@@ -1,58 +1,88 @@
 From: gerg@uclinux.org (Greg Ungerer)
-Date: Mon, 12 Dec 2016 15:48:17 +1000
-Subject: [PATCH 4/4] ARM: versatile: support configuring versatile machine
- for no-MMU
+Date: Mon, 12 Dec 2016 15:50:51 +1000
+Subject: [PATCHv2 4/4] ARM: versatile: support configuring versatile machine
+ for, no-MMU
 In-Reply-To: <20161209202901.GQ14217@n2100.armlinux.org.uk>
 References: <1481093992-30520-1-git-send-email-gerg@uclinux.org>
  <1481093992-30520-2-git-send-email-gerg@uclinux.org>
  <CACRpkdZywn46QbnvKcN-jkt43Vf+GBSNQkLgnnNg-DC-8aSO5w@mail.gmail.com>
  <58481DD1.6090606@arm.com> <20161209202901.GQ14217@n2100.armlinux.org.uk>
-Message-ID: <48483769-1fef-86a6-feff-d98981cfb330@uclinux.org>
+Message-ID: <f2cffcd3-992e-812a-7163-4efd9a308bb6@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/16 06:29, Russell King - ARM Linux wrote:
-> On Wed, Dec 07, 2016 at 02:33:53PM +0000, Vladimir Murzin wrote:
->> Hi Linus,
->>
->> On 07/12/16 14:11, Linus Walleij wrote:
->>> Another target I had in mind was the Integrator which
->>> incidentally supports a bunch of the old noMMU core
->>> tiles where we can swap in an ARM946, which I guess
->>> could work with this?
->>
->> Do you mind trying my "Allow NOMMU for MULTIPLATFORM" series [1]? Greg just
->> reported it did a trick for Versatile, there is a good chance it would work
->> for Integrator too ;)
-> 
-> My views on gluing multiplatform and nommu together have already been
-> stated several times, and remain unchanged.
-> 
-> Greg's patch looks almost sane, but what I'd like to see is instead of
-> directly doing this:
-> 
->  config ARCH_VERSATILE
->         bool "ARM Ltd. Versatile family"
-> -       depends on ARCH_MULTI_V5
-> +       depends on ARCH_MULTI_V5 || ARM_SINGLE_ARMV5
-> 
-> we could do:
-> 
->  config ARCH_VERSATILE
->         bool "ARM Ltd. Versatile family" if ARCH_MULTI_V5
-> -       depends on ARCH_MULTI_V5
-> +       depends on ARCH_MULTI_V5 || ARM_SINGLE_ARMV5
-> 	default y if ARM_SINGLE_ARCH_VERSATILE
-> 
-> adding the versatile entry in the upper level choice (where it always used
-> to be) but with "ARM_SINGLE_ARCH_VERSATILE" instead.
-> 
-> This would have the effect of allowing the multiplatform-converted stuff
-> to start being used on nommu (again) but without running into the problems
-> I've highlighted.
+Allow the arm versatile machine to be configured for no-MMU operation.
 
-Thanks for the feedback Russell. Let me re-spin this patch with
-this in mind.
+Older kernels had the ability to build the versatile machine with the MMU
+disabled (!CONFIG_MMU). Recent changes to convert the versatile machine
+to device tree lost this ability. (Although older kernels could be built
+they did not run due to a bug in the IO_ADDRESS() mapping on this machine).
 
-Regards
-Greg
+The motivation for this is that the versatile machine is well supported
+in qemu. And this provides an excellent platform for development and
+testing no-MMU support on ARM in general.
+
+This patch adds a versatile platform selection in the upper level arm
+system type menu - where it appeared in older kernel versions - when
+configuring for the no-MMU case. There is no visible change to the way
+versatile is selected for the MMU enabled case.
+
+Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+---
+ arch/arm/Kconfig                | 11 +++++++++++
+ arch/arm/Kconfig.debug          |  3 ++-
+ arch/arm/mach-versatile/Kconfig |  5 +++--
+ 3 files changed, 16 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index b5d529f..8960e7a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -353,6 +353,17 @@ config ARM_SINGLE_ARMV7M
+ 	select SPARSE_IRQ
+ 	select USE_OF
+ 
++config ARM_SINGLE_ARCH_VERSATILE
++	bool "ARM Ltd. Versatile family"
++	depends on !MMU
++	select AUTO_ZRELADDR
++	select CLKSRC_OF
++	select COMMON_CLK
++	select GENERIC_CLOCKEVENTS
++	select GPIOLIB
++	select SPARSE_IRQ
++	select USE_OF
++
+ config ARCH_GEMINI
+ 	bool "Cortina Systems Gemini"
+ 	select CLKSRC_MMIO
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index d83f7c3..3f393e4 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1712,7 +1712,8 @@ config DEBUG_UNCOMPRESS
+ config UNCOMPRESS_INCLUDE
+ 	string
+ 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
+-					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M
++					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M || \
++					ARM_SINGLE_ARCH_VERSATILE
+ 	default "mach/uncompress.h"
+ 
+ config EARLY_PRINTK
+diff --git a/arch/arm/mach-versatile/Kconfig b/arch/arm/mach-versatile/Kconfig
+index c257d40..c03a8c8 100644
+--- a/arch/arm/mach-versatile/Kconfig
++++ b/arch/arm/mach-versatile/Kconfig
+@@ -1,6 +1,7 @@
+ config ARCH_VERSATILE
+-	bool "ARM Ltd. Versatile family"
+-	depends on ARCH_MULTI_V5
++	bool "ARM Ltd. Versatile family" if ARCH_MULTI_V5
++	depends on ARCH_MULTI_V5 || ARM_SINGLE_ARCH_VERSATILE
++	default y if ARM_SINGLE_ARCH_VERSATILE
+ 	select ARM_AMBA
+ 	select ARM_TIMER_SP804
+ 	select ARM_VIC
+-- 
+1.9.1
