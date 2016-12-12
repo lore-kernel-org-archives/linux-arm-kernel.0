@@ -1,103 +1,38 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 12 Dec 2016 14:05:41 +0100
-Subject: [PATCH v6 4/5] ARM: dts: da850-lcdk: add the vga-bridge node
+Date: Mon, 12 Dec 2016 14:05:42 +0100
+Subject: [PATCH v6 5/5] ARM: dts: da850: specify the maximum pixel clock rate
+ for tilcdc
 In-Reply-To: <1481547942-24775-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1481547942-24775-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1481547942-24775-5-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1481547942-24775-6-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the vga-bridge node to the board DT together with corresponding
-ports and vga connector. This allows to retrieve the edid info from
-the display automatically.
+At maximum CPU frequency of 300 MHz the maximum pixel clock frequency
+is 37.5 MHz[1]. We must filter out any mode for which the calculated
+pixel clock rate would exceed this value.
+
+Specify the max-pixelclock property for the display node for
+da850-lcdk.
+
+[1] http://processors.wiki.ti.com/index.php/OMAP-L1x/C674x/AM1x_LCD_Controller_(LCDC)_Throughput_and_Optimization_Techniques
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- arch/arm/boot/dts/da850-lcdk.dts | 67 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 67 insertions(+)
+ arch/arm/boot/dts/da850.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index afcb482..e003111 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -51,6 +51,51 @@
- 			system-clock-frequency = <24576000>;
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 3f51e59..ba5bf80 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -452,6 +452,7 @@
+ 			compatible = "ti,da850-tilcdc";
+ 			reg = <0x213000 0x1000>;
+ 			interrupts = <52>;
++			max-pixelclock = <37500>;
+ 			status = "disabled";
  		};
  	};
-+
-+	vga-bridge {
-+		compatible = "ti,ths8135";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0>;
-+
-+				vga_bridge_in: endpoint {
-+					reg = <0>;
-+					remote-endpoint = <&lcdc_out_vga>;
-+				};
-+			};
-+
-+			port at 1 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <1>;
-+
-+				vga_bridge_out: endpoint {
-+					reg = <0>;
-+					remote-endpoint = <&vga_con_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	vga {
-+		compatible = "vga-connector";
-+
-+		ddc-i2c-bus = <&i2c0>;
-+
-+		port {
-+			vga_con_in: endpoint {
-+				remote-endpoint = <&vga_bridge_out>;
-+			};
-+		};
-+	};
- };
- 
- &pmx_core {
-@@ -236,3 +281,25 @@
- &memctrl {
- 	status = "okay";
- };
-+
-+&lcdc {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd_pins>;
-+
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		lcdc_out: port at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+
-+			lcdc_out_vga: endpoint {
-+				reg = <0>;
-+				remote-endpoint = <&vga_bridge_in>;
-+			};
-+		};
-+	};
-+};
 -- 
 2.9.3
