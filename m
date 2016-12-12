@@ -1,31 +1,31 @@
 From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Mon, 12 Dec 2016 17:15:41 +0100
-Subject: [PATCH v6 4/5] ARM: dts: stm32: Add I2C1 support for STM32429 eval
- board
+Date: Mon, 12 Dec 2016 17:15:42 +0100
+Subject: [PATCH v6 5/5] ARM: configs: stm32: Add I2C support for STM32
+ defconfig
 In-Reply-To: <1481559342-6106-1-git-send-email-cedric.madianga@gmail.com>
 References: <1481559342-6106-1-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <1481559342-6106-5-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <1481559342-6106-6-git-send-email-cedric.madianga@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
 ---
- arch/arm/boot/dts/stm32429i-eval.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/configs/stm32_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
-index afb90bc..74e0045 100644
---- a/arch/arm/boot/dts/stm32429i-eval.dts
-+++ b/arch/arm/boot/dts/stm32429i-eval.dts
-@@ -141,3 +141,9 @@
- 	pinctrl-names = "default";
- 	status = "okay";
- };
-+
-+&i2c1 {
-+	pinctrl-0 = <&i2c1_pins_b>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+};
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index e7b56d4..9494eaf 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -52,6 +52,9 @@ CONFIG_SERIAL_NONSTANDARD=y
+ CONFIG_SERIAL_STM32=y
+ CONFIG_SERIAL_STM32_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
++CONFIG_I2C=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_STM32F4=y
+ # CONFIG_HWMON is not set
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_NEW_LEDS=y
 -- 
 1.9.1
