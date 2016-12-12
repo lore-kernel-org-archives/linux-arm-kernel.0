@@ -1,210 +1,122 @@
-From: harinikatakamlinux@gmail.com (Harini Katakam)
-Date: Mon, 12 Dec 2016 16:04:12 +0530
-Subject: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in Cadence GEM.
-In-Reply-To: <07C910AB6AC6C345A093D5A08F5AF568CB74D84D@CHN-SV-EXMX03.mchp-main.com>
-References: <1481134912-2243-1-git-send-email-andrei.pistirica@microchip.com>
- <20161207193908.GA13062@netboy> <20161207210416.GA27622@netboy>
- <07C910AB6AC6C345A093D5A08F5AF568CB74AF28@CHN-SV-EXMX03.mchp-main.com>
- <BN3PR07MB2516992DEE883FAD6DC3ED08C9870@BN3PR07MB2516.namprd07.prod.outlook.com>
- <07C910AB6AC6C345A093D5A08F5AF568CB74D84D@CHN-SV-EXMX03.mchp-main.com>
-Message-ID: <CAFcVEC+voKmftUcEg_qM7aZyR_TiyPfAsW3VrcDMysVBGZdf1g@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 12 Dec 2016 10:35:14 +0000
+Subject: [PATCH v4] arm64: fpsimd: improve stacking logic in
+ non-interruptible context
+In-Reply-To: <CAKv+Gu_VPA81H2-Kr_dyUWMmgqc_DevBYwr4adh+L2nBBqY5yA@mail.gmail.com>
+References: <1481301992-2344-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20161209182155.GB21051@e104818-lin.cambridge.arm.com>
+ <20161209192932.GD1574@e103592.cambridge.arm.com>
+ <CAKv+Gu_VPA81H2-Kr_dyUWMmgqc_DevBYwr4adh+L2nBBqY5yA@mail.gmail.com>
+Message-ID: <20161212103512.GE1574@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrei,
+On Fri, Dec 09, 2016 at 08:57:20PM +0000, Ard Biesheuvel wrote:
+> On 9 December 2016 at 19:29, Dave Martin <Dave.Martin@arm.com> wrote:
+> > On Fri, Dec 09, 2016 at 06:21:55PM +0000, Catalin Marinas wrote:
+> >> On Fri, Dec 09, 2016 at 04:46:32PM +0000, Ard Biesheuvel wrote:
+> >> >  void kernel_neon_begin_partial(u32 num_regs)
+> >> >  {
+> >> > -   if (in_interrupt()) {
+> >> > -           struct fpsimd_partial_state *s = this_cpu_ptr(
+> >> > -                   in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+> >> > +   struct fpsimd_partial_state *s;
+> >> > +   int level;
+> >> > +
+> >> > +   preempt_disable();
+> >> > +
+> >> > +   level = this_cpu_inc_return(kernel_neon_nesting_level);
+> >> > +   BUG_ON(level > 3);
+> >> > +
+> >> > +   if (level > 1) {
+> >> > +           s = this_cpu_ptr(nested_fpsimdstate);
+> >> >
+> >> > -           BUG_ON(num_regs > 32);
+> >> > -           fpsimd_save_partial_state(s, roundup(num_regs, 2));
+> >> > +           WARN_ON_ONCE(num_regs > 32);
+> >> > +           num_regs = min(roundup(num_regs, 2), 32U);
+> >> > +
+> >> > +           fpsimd_save_partial_state(&s[level - 2], num_regs);
+> >> >     } else {
+> >> >             /*
+> >> >              * Save the userland FPSIMD state if we have one and if we
+> >> > @@ -241,7 +256,6 @@ void kernel_neon_begin_partial(u32 num_regs)
+> >> >              * that there is no longer userland FPSIMD state in the
+> >> >              * registers.
+> >> >              */
+> >> > -           preempt_disable();
+> >> >             if (current->mm &&
+> >> >                 !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+> >> >                     fpsimd_save_state(&current->thread.fpsimd_state);
+> >>
+> >> I wonder whether we could actually do this saving and flag/level setting
+> >> in reverse to simplify the races. Something like your previous patch but
+> >> only set TIF_FOREIGN_FPSTATE after saving:
+> >>
+> >>       level = this_cpu_read(kernel_neon_nesting_level);
+> >>       if (level > 0) {
+> >>               ...
+> >>               fpsimd_save_partial_state();
+> >>       } else {
+> >>               if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
+> >>                       fpsimd_save_state();
+> >>               set_thread_flag(TIF_FOREIGN_FPSTATE);
+> >>       }
+> >>       this_cpu_inc(kernel_neon_nesting_level);
+> >>
+> >> There is a risk of extra saving if we get an interrupt after
+> >> test_thread_flag() and before set_thread_flag() but I don't think this
+> >> would corrupt any state, just writing things twice.
+> >
+> > I would worry that we can save two states over the same buffer and then
+> > restore an uninitialised buffer in this case unless we are careful.
+> > Because the level-dependent code is now misbracketed by the inc/dec,
+> > a preempting call races with the outer call and use the same value.
+> >
+> > I guess we could do
+> >
+> > if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
+> >         fpsimd_save_state();
+> > clear_thread_flag(TIF_FOREIGN_FPSTATE);
+> >
+> > at the start unconditionally, before the _inc_return().
+> >
+> > The task state may then get saved in the middle of being saved, but
+> > as you say it shouldn't have changed in the meantime.
+> 
+> It /will/ have changed in the meantime: when the interrupted context
+> is resumed, it will happily proceed with saving the state where it
+> left off, but now the register file contains whatever was left after
+> the interrupt handler is done with the NEON.
 
-On Mon, Dec 12, 2016 at 3:52 PM,  <Andrei.Pistirica@microchip.com> wrote:
->
->
->> -----Original Message-----
->> From: Rafal Ozieblo [mailto:rafalo at cadence.com]
->> Sent: Friday, December 09, 2016 11:20 AM
->> To: Andrei Pistirica - M16132; richardcochran at gmail.com
->> Cc: netdev at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; davem at davemloft.net;
->> nicolas.ferre at atmel.com; harinikatakamlinux at gmail.com;
->> harini.katakam at xilinx.com; punnaia at xilinx.com; michals at xilinx.com;
->> anirudh at xilinx.com; boris.brezillon at free-electrons.com;
->> alexandre.belloni at free-electrons.com; tbultel at pixelsurmer.com
->> Subject: RE: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in Cadence
->> GEM.
->>
->> -----Original Message-----
->> > From: Andrei.Pistirica at microchip.com
->> > [mailto:Andrei.Pistirica at microchip.com]
->> > Sent: 8 grudnia 2016 15:42
->> > To: richardcochran at gmail.com
->> > Cc: netdev at vger.kernel.org; linux-kernel at vger.kernel.org;
->> > linux-arm-kernel at lists.infradead.org; davem at davemloft.net;
->> > nicolas.ferre at atmel.com; harinikatakamlinux at gmail.com;
->> > harini.katakam at xilinx.com; punnaia at xilinx.com; michals at xilinx.com;
->> > anirudh at xilinx.com; boris.brezillon at free-electrons.com;
->> > alexandre.belloni at free-electrons.com; tbultel at pixelsurmer.com; Rafal
->> > Ozieblo
->> > Subject: RE: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in
->> Cadence GEM.
->> >
->> >
->> >
->> > > -----Original Message-----
->> > > From: Richard Cochran [mailto:richardcochran at gmail.com]
->> > > Sent: Wednesday, December 07, 2016 11:04 PM
->> > > To: Andrei Pistirica - M16132
->> > > Cc: netdev at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
->> > > kernel at lists.infradead.org; davem at davemloft.net;
->> > > nicolas.ferre at atmel.com; harinikatakamlinux at gmail.com;
->> > > harini.katakam at xilinx.com; punnaia at xilinx.com; michals at xilinx.com;
->> > > anirudh at xilinx.com; boris.brezillon at free-electrons.com;
->> > > alexandre.belloni at free-electrons.com; tbultel at pixelsurmer.com;
->> > > rafalo at cadence.com
->> > > Subject: Re: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in
->> > > Cadence GEM.
->> > >
->> > > On Wed, Dec 07, 2016 at 08:39:09PM +0100, Richard Cochran wrote:
->> > > > > +static s32 gem_ptp_max_adj(unsigned int f_nom) {
->> > > > > +       u64 adj;
->> > > > > +
->> > > > > +       /* The 48 bits of seconds for the GEM overflows every:
->> > > > > +        * 2^48/(365.25 * 24 * 60 *60) =~ 8 925 512 years (~= 9 mil years),
->> > > > > +        * thus the maximum adjust frequency must not overflow
->> > > > > + CNS
->> > > register:
->> > > > > +        *
->> > > > > +        * addend  = 10^9/nominal_freq
->> > > > > +        * adj_max = +/- addend*ppb_max/10^9
->> > > > > +        * max_ppb = (2^8-1)*nominal_freq-10^9
->> > > > > +        */
->> > > > > +       adj = f_nom;
->> > > > > +       adj *= 0xffff;
->> > > > > +       adj -= 1000000000ULL;
->> > > >
->> > > > What is this computation, and how does it relate to the comment?
->> >
->> > I considered the following simple equation: increment value at nominal
->> frequency (which is 10^9/nominal frequency nsecs) + the maximum drift
->> value (nsecs) <= maximum increment value@nominal frequency (which is
->> 8bit:0xffff).
->> > If maximum drift is written as function of nominal frequency and
->> maximum ppb, then the equation above yields that the maximum ppb is:
->> (2^8 - 1) *nominal_frequency - 10^9. The equation is also simplified by the
->> fact that the drift is written as ppm + 16bit_fractions and the increment
->> value is written as nsec + 16bit_fractions.
->> >
->> > Rafal said that this value is hardcoded: 0x64E6, while Harini said:
->> 250000000.
->>
->> To clarify a little bit. In my reference code this value (0x64E6) was taken
->> from our legacy code. It was used for testing only. I know it should be
->> change to something more accurate. This is the reason why I asked how did
->> you count it (250000000). According to our calculations this value depends
->> on actual set period (incr_ns and incr_sub_ns) and min and max value we
->> can set. The calculation were a little bit intricate, so we decided to leave it
->> as it was.
->>
->> >
->> > I need to dig into this...
->> >
->> > >
->> > > I am not sure what you meant, but it sounds like you are on the wrong
->> track.
->> > > Let me explain...
->> >
->> > Thanks.
->> >
->> > >
->> > > The max_adj has nothing at all to do with the width of the time register.
->> > > Rather, it should reflect the maximum possible change in the tuning
->> word.
->> > >
->> > > For example, with a nominal 8 ns period, the tuning word is 0x80000.
->> > > Looking at running the clock more slowly, the slowest possible word
->> > > is 0x00001, meaning a difference of 0x7FFFF.  This implies an
->> > > adjustment of
->> > > 0x7FFFF/0x80000 or 999998092 ppb.  Running more quickly, we can
->> > > already have 0x100000, twice as fast, or just under 2 billion ppb.
->> > >
->> > > You should consider the extreme cases to determine the most limited
->> > > (smallest) max_adj value:
->> > >
->> > > Case 1 - high frequency
->> > > ~~~~~~~~~~~~~~~~~~~~~~~
->> > >
->> > > With a nominal 1 ns period, we have the nominal tuning word 0x10000.
->> > > The smallest is 0x1 for a difference of 0xFFFF.  This corresponds to
->> > > an adjustment of 0xFFFF/0x10000 = .9999847412109375 or 999984741 ppb.
->> > >
->> > > Case 2 - low frequency
->> > > ~~~~~~~~~~~~~~~~~~~~~~
->> > >
->> > > With a nominal 255 ns period, the nominal word is 0xFF0000, the
->> > > largest 0xFFFFFF, and the difference is 0xFFFF.  This corresponds to
->> > > and adjustment of 0xFFFF/0xFF0000 = .0039215087890625 or 3921508 ppb.
->> > >
->> > > Since 3921508 ppb is a huge adjustment, you can simply use that as a
->> > > safe maximum, ignoring the actual input clock.
->> > >
->> > > Thanks,
->> > > Richard
->> > >
->> > >
->> >
->> > Regards,
->> > Andrei
->> >
->>
->> Best regards,
->> Rafal Ozieblo   |   Firmware System Engineer,
->> phone nbr.: +48 32 5085469
->> www.cadence.com
->
-> Hi Guys,
->
-> Based on Richard's input, this is what I want to do for our platforms:
->
-> struct macb_ptp_info {
->         void (*ptp_init)(struct net_device *ndev);
->         void (*ptp_remove)(struct net_device *ndev);
-> +       s32 (*get_ptp_max_adj)(void);
->         unsigned int (*get_tsu_rate)(struct macb *bp);
->         int (*get_ts_info)(struct net_device *dev,
->                            struct ethtool_ts_info *info);
->        int (*get_hwtst)(struct net_device *netdev,
->                          struct ifreq *ifr);
->        int (*set_hwtst)(struct net_device *netdev,
->                          struct ifreq *ifr, int cmd);
-> };
->
-> +static s32 gem_get_ptp_max_adj(void)
-> +{
-> +       return 3921508;
-> +}
->
->  static struct macb_ptp_info gem_ptp_info = {
->        .ptp_init        = gem_ptp_init,
->        .ptp_remove      = gem_ptp_remove,
-> +       .get_ptp_max_adj = gem_get_ptp_max_adj,
->        .get_tsu_rate    = gem_get_tsu_rate,
->        .get_ts_info     = gem_get_ts_info,
->        .get_hwtst       = gem_get_hwtst,
->        .set_hwtst       = gem_set_hwtst,
->  };
->
-> [...]
-> void gem_ptp_init(struct net_device *ndev)
->  {
-> [...]
->         /* nominal frequency and maximum adjustment in ppb */
->         bp->tsu_rate = bp->ptp_info->get_tsu_rate(bp);
-> +       bp->ptp_caps.max_adj = bp->ptp_info->get_ptp_max_adj();
-> [...]
-> }
->
-> Richard, are you agree with this?
->
-> Harini, you can fill the callback with the value for your platform. Tell me if you are ok with function's signature.
->
+Hmmm, true.  The NEON regs will have been restored by kernel_neon_end()
+in the inner context, but the extra SVE bits won't have been.
 
-Thanks, this works for me.
+> 
+> > The nested
+> > save code may then do a partial save of the same state on top of that
+> > which could get restored at the inner kernel_neon_end() call.
+> >
+> 
+> I'm afraid the only way to deal with this correctly is to treat the
+> whole sequence as a critical section, which means execute it with
+> interrupts disabled.
 
-Regards,
-Harini
+Or we make the KERNEL_MODE_NEON code SVE-aware, which is where I started
+off.  In that case, we do SVE (partial) save/restore whenever
+kernel_mode_neon() is called with live SVE state.  The change here is
+that would we consider that there is always live SVE state until the
+fpsimd_save_state() actually finishes at the outer level.  We may want
+to delay setting of TIF_FOREIGN_FPSTATE for that purpose.
+
+This means you do take an additional latency hit if you want to use NEON
+in an interrupting context and there happens to be live SVE state.  It's
+a consequence of the architecture though -- I don't think there's any
+way to get around it.  We can still scale the cost by implementing
+sve_save_partial_state() or something equivalent.
+
+You original inc()+save() ... restore()+dec() seems sound enough if
+viewed this way.  Unless I'm missing something?
+
+Cheers
+---Dave
