@@ -1,26 +1,24 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 12 Dec 2016 09:24:36 -0800
-Subject: [PATCH] clk: bcm: Fix 'maybe-uninitialized' warning in
- bcm2835_clock_choose_div_and_prate()
-In-Reply-To: <1481529653-28133-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1481529653-28133-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <87twa93vsb.fsf@eliezer.anholt.net>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 12 Dec 2016 11:25:11 -0600
+Subject: [PATCH 2/4] dt-bindings: mfd: Remove TPS65217 interrupts
+In-Reply-To: <20161209062833.5768-3-woogyom.kim@gmail.com>
+References: <20161209062833.5768-1-woogyom.kim@gmail.com>
+ <20161209062833.5768-3-woogyom.kim@gmail.com>
+Message-ID: <20161212172511.5nj7whzytpkmrk7z@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris Brezillon <boris.brezillon@free-electrons.com> writes:
+On Fri, Dec 09, 2016 at 03:28:31PM +0900, Milo Kim wrote:
+> Interrupt numbers are from the datasheet, so no need to keep them in
+> the ABI. Use the number in the DT file.
 
-> best_rate is reported as potentially uninitialized by gcc.
->
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Fixes: 155e8b3b0ee3 ("clk: bcm: Support rate change propagation on bcm2835 clocks")
-> Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+I don't see the purpose of ripping this out. The headers have always 
+been for convienence, not whether the values come from the datasheet or 
+not.
 
-Reviewed-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161212/65cadde3/attachment.sig>
+> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+> ---
+>  arch/arm/boot/dts/am335x-bone-common.dtsi |  8 +++-----
+>  include/dt-bindings/mfd/tps65217.h        | 26 --------------------------
+>  2 files changed, 3 insertions(+), 31 deletions(-)
+>  delete mode 100644 include/dt-bindings/mfd/tps65217.h
