@@ -1,41 +1,123 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 12 Dec 2016 10:03:21 +0100
-Subject: [PATCH] clk: bcm: Fix 'maybe-uninitialized' warning in
- bcm2835_clock_choose_div_and_prate()
-In-Reply-To: <2237053.NkkLiYIyzc@wuerfel>
-References: <1481529653-28133-1-git-send-email-boris.brezillon@free-electrons.com>
- <3107859.uaKLk6DMRd@wuerfel> <20161212093130.6e348a61@bbrezillon>
- <2237053.NkkLiYIyzc@wuerfel>
-Message-ID: <20161212100321.0b0e7172@bbrezillon>
+From: rick.chang@mediatek.com (Rick Chang)
+Date: Mon, 12 Dec 2016 17:07:01 +0800
+Subject: [PATCH v8 2/4] vcodec: mediatek: Add Mediatek JPEG Decoder Driver
+In-Reply-To: <CAAJzSMfNyMiia==mXKo6aBw1VxMBxGE20LB870Zm1u9mCoioyQ@mail.gmail.com>
+References: <1480475340-21893-1-git-send-email-rick.chang@mediatek.com>
+ <1480475340-21893-3-git-send-email-rick.chang@mediatek.com>
+ <CAAJzSMfNyMiia==mXKo6aBw1VxMBxGE20LB870Zm1u9mCoioyQ@mail.gmail.com>
+Message-ID: <1481533621.13825.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Dec 2016 09:34:28 +0100
-Arnd Bergmann <arnd@arndb.de> wrote:
+Hi Ricky,
 
-> On Monday, December 12, 2016 9:31:30 AM CET Boris Brezillon wrote:
-> > On Mon, 12 Dec 2016 09:12:36 +0100
-> > Arnd Bergmann <arnd@arndb.de> wrote:
-> >   
-> > > On Monday, December 12, 2016 9:00:53 AM CET Boris Brezillon wrote:  
-> > > > best_rate is reported as potentially uninitialized by gcc.
-> > > > 
-> > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > > Fixes: 155e8b3b0ee3 ("clk: bcm: Support rate change propagation on bcm2835 clocks")
-> > > > Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>    
-> > > 
-> > > I wonder why I didn't get that. Which compiler version did you use?
-> > >   
-> > 
-> > In case you're interested, my gcc [1] failed to detect it as well, and
-> > this is not the first time it happens :-/.
-> > 
-> > [1]gcc (Ubuntu 5.4.0-6ubuntu1~16.04.4) 5.4.0 20160609  
-> 
-> No, I see it now with gcc-7, it only just turned up in linux-next.
-> 
-> I ran into it right away with an allmodconfig build. You were
-> probably testing based on an earlier v4.9-rc release that had
-> the warning globally disabled.
+Thanks for your feedback. We will fix the problem in another patch.
 
-Indeed, I was testing on a 4.9-rc.
+On Mon, 2016-12-12 at 12:34 +0800, Ricky Liang wrote:
+> Hi Rick,
+> 
+> On Wed, Nov 30, 2016 at 11:08 AM, Rick Chang <rick.chang@mediatek.com> wrote:
+> > Add v4l2 driver for Mediatek JPEG Decoder
+> >
+> > Signed-off-by: Rick Chang <rick.chang@mediatek.com>
+> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+> 
+> <snip...>
+> 
+> > +static bool mtk_jpeg_check_resolution_change(struct mtk_jpeg_ctx *ctx,
+> > +                                            struct mtk_jpeg_dec_param *param)
+> > +{
+> > +       struct mtk_jpeg_dev *jpeg = ctx->jpeg;
+> > +       struct mtk_jpeg_q_data *q_data;
+> > +
+> > +       q_data = &ctx->out_q;
+> > +       if (q_data->w != param->pic_w || q_data->h != param->pic_h) {
+> > +               v4l2_dbg(1, debug, &jpeg->v4l2_dev, "Picture size change\n");
+> > +               return true;
+> > +       }
+> > +
+> > +       q_data = &ctx->cap_q;
+> > +       if (q_data->fmt != mtk_jpeg_find_format(ctx, param->dst_fourcc,
+> > +                                               MTK_JPEG_FMT_TYPE_CAPTURE)) {
+> > +               v4l2_dbg(1, debug, &jpeg->v4l2_dev, "format change\n");
+> > +               return true;
+> > +       }
+> > +       return false;
+> 
+> <snip...>
+> 
+> > +static void mtk_jpeg_device_run(void *priv)
+> > +{
+> > +       struct mtk_jpeg_ctx *ctx = priv;
+> > +       struct mtk_jpeg_dev *jpeg = ctx->jpeg;
+> > +       struct vb2_buffer *src_buf, *dst_buf;
+> > +       enum vb2_buffer_state buf_state = VB2_BUF_STATE_ERROR;
+> > +       unsigned long flags;
+> > +       struct mtk_jpeg_src_buf *jpeg_src_buf;
+> > +       struct mtk_jpeg_bs bs;
+> > +       struct mtk_jpeg_fb fb;
+> > +       int i;
+> > +
+> > +       src_buf = v4l2_m2m_next_src_buf(ctx->fh.m2m_ctx);
+> > +       dst_buf = v4l2_m2m_next_dst_buf(ctx->fh.m2m_ctx);
+> > +       jpeg_src_buf = mtk_jpeg_vb2_to_srcbuf(src_buf);
+> > +
+> > +       if (jpeg_src_buf->flags & MTK_JPEG_BUF_FLAGS_LAST_FRAME) {
+> > +               for (i = 0; i < dst_buf->num_planes; i++)
+> > +                       vb2_set_plane_payload(dst_buf, i, 0);
+> > +               buf_state = VB2_BUF_STATE_DONE;
+> > +               goto dec_end;
+> > +       }
+> > +
+> > +       if (mtk_jpeg_check_resolution_change(ctx, &jpeg_src_buf->dec_param)) {
+> > +               mtk_jpeg_queue_src_chg_event(ctx);
+> > +               ctx->state = MTK_JPEG_SOURCE_CHANGE;
+> > +               v4l2_m2m_job_finish(jpeg->m2m_dev, ctx->fh.m2m_ctx);
+> > +               return;
+> > +       }
+> 
+> This only detects source change if multiple OUPUT buffers are queued.
+> It does not catch the source change in the following scenario:
+> 
+> - OUPUT buffers for jpeg1 enqueued
+> - OUTPUT queue STREAMON
+> - userspace creates CAPTURE buffers
+> - CAPTURE buffers enqueued
+> - CAPTURE queue STREAMON
+> - decode
+> - OUTPUT queue STREAMOFF
+> - userspace recreates OUTPUT buffers for jpeg2
+> - OUTPUT buffers for jpeg2 enqueued
+> - OUTPUT queue STREAMON
+> 
+> In the above sequence if jpeg2's decoded size is larger than jpeg1 the
+> function fails to detect that the existing CAPTURE buffers are not big
+> enough to hold the decoded data.
+> 
+> A possible fix is to pass *dst_buf to
+> mtk_jpeg_check_resolution_change(), and check in the function that all
+> the dst_buf planes are large enough to hold the decoded data.
+> 
+> > +
+> > +       mtk_jpeg_set_dec_src(ctx, src_buf, &bs);
+> > +       if (mtk_jpeg_set_dec_dst(ctx, &jpeg_src_buf->dec_param, dst_buf, &fb))
+> > +               goto dec_end;
+> > +
+> > +       spin_lock_irqsave(&jpeg->hw_lock, flags);
+> > +       mtk_jpeg_dec_reset(jpeg->dec_reg_base);
+> > +       mtk_jpeg_dec_set_config(jpeg->dec_reg_base,
+> > +                               &jpeg_src_buf->dec_param, &bs, &fb);
+> > +
+> > +       mtk_jpeg_dec_start(jpeg->dec_reg_base);
+> > +       spin_unlock_irqrestore(&jpeg->hw_lock, flags);
+> > +       return;
+> > +
+> > +dec_end:
+> > +       v4l2_m2m_src_buf_remove(ctx->fh.m2m_ctx);
+> > +       v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
+> > +       v4l2_m2m_buf_done(to_vb2_v4l2_buffer(src_buf), buf_state);
+> > +       v4l2_m2m_buf_done(to_vb2_v4l2_buffer(dst_buf), buf_state);
+> > +       v4l2_m2m_job_finish(jpeg->m2m_dev, ctx->fh.m2m_ctx);
+> > +}
+> 
+> <snip...>
