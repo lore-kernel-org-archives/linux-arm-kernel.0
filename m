@@ -1,36 +1,91 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Tue, 13 Dec 2016 00:14:29 +0530
-Subject: [PATCH 0/2] ARM: v7-A !MMU fixes for fun (&fame)
-In-Reply-To: <20161211131028.3019-1-afzal.mohd.ma@gmail.com>
-References: <20161211131028.3019-1-afzal.mohd.ma@gmail.com>
-Message-ID: <20161212184429.GA5219@afzalpc>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 12 Dec 2016 12:51:49 -0600
+Subject: [PATCH v6 1/8] MFD: add bindings for STM32 Timers driver
+In-Reply-To: <1481292919-26587-2-git-send-email-benjamin.gaignard@st.com>
+References: <1481292919-26587-1-git-send-email-benjamin.gaignard@st.com>
+ <1481292919-26587-2-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <20161212185149.rt3xqpn3mbaavb4l@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Dec 11, 2016 at 06:40:28PM +0530, Afzal Mohammed wrote:
-
-> Kernel reached the stage of invoking user space init & panicked, though
-> it could not reach till prompt for want of user space executables
+On Fri, Dec 09, 2016 at 03:15:12PM +0100, Benjamin Gaignard wrote:
+> Add bindings information for STM32 Timers
 > 
-> So far i have not come across a toolchain (or a way to create toolchain)
-> to create !MMU user space executables for Cortex-A.
+> version 6:
+> - rename stm32-gtimer to stm32-timers
+> - change compatible
+> - add description about the IPs
+> 
+> version 2:
+> - rename stm32-mfd-timer to stm32-gptimer
+> - only keep one compatible string
+> 
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> ---
+>  .../devicetree/bindings/mfd/stm32-timers.txt       | 46 ++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-timers.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/stm32-timers.txt b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+> new file mode 100644
+> index 0000000..b30868e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+> @@ -0,0 +1,46 @@
+> +STM32 Timers driver bindings
+> +
+> +This IP provides 3 types of timer along with PWM functionality:
+> +- advanced-control timers consist of a 16-bit auto-reload counter driven by a programmable
+> +  prescaler, break input feature, PWM outputs and complementary PWM ouputs channels.
+> +- general-purpose timers consist of a 16-bit or 32-bit auto-reload counter driven by a
+> +  programmable prescaler and PWM outputs.
+> +- basic timers consist of a 16-bit auto-reload counter driven by a programmable prescaler.
+> +
+> +Required parameters:
+> +- compatible: must be "st,stm32-timers"
+> +
+> +- reg:			Physical base address and length of the controller's
+> +			registers.
+> +- clock-names: 		Set to "clk_int".
 
-Now able to reach prompt using buildroot initramfs, Thanks to
-Peter Korsgaard for suggesting the way to create user space executables
-for !MMU Cortex-A.
+'clk' is redundant. Also, you don't really need -names when there is 
+only one of them.
 
-> multi_v7_defconfig was used & all platforms except TI OMAP/AM/DM/DRA &
-> Freescale i.MX family was deselected. ARM_MPU option was disabled as
-> Vladimir had given an early warning. DRAM_BASE was set to 0x80000000.
-> During the course of bringup, futex was causing issues, hence FUTEX was
-> removed. L1 & L2 caches were disabled in config. High vectors were
-> disabled & vectors were made to remap to base of RAM. An additional OMAP
-> specific change to avoid one ioremap was also required.
+> +- clocks: 		Phandle to the clock used by the timer module.
+> +			For Clk properties, please refer to ../clock/clock-bindings.txt
+> +
+> +Optional parameters:
+> +- resets:		Phandle to the parent reset controller.
+> +			See ../reset/st,stm32-rcc.txt
+> +
+> +Optional subnodes:
+> +- pwm:			See ../pwm/pwm-stm32.txt
+> +- timer:		See ../iio/timer/stm32-timer-trigger.txt
+> +
+> +Example:
+> +	timers at 40010000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "st,stm32-timers";
+> +		reg = <0x40010000 0x400>;
+> +		clocks = <&rcc 0 160>;
+> +		clock-names = "clk_int";
+> +
+> +		pwm {
+> +			compatible = "st,stm32-pwm";
+> +			pinctrl-0	= <&pwm1_pins>;
+> +			pinctrl-names	= "default";
+> +		};
+> +
+> +		timer {
+> +			compatible = "st,stm32-timer-trigger";
+> +			reg = <0>;
 
-For the sake of completeness,
-SMP was disabled & flat binary support enabled in Kernel.
+You don't need reg here as there is only one. In turn, you don't need 
+#address-cells or #size-cells.
 
-Regards
-afzal
+> +		};
+> +	};
+> -- 
+> 1.9.1
+> 
