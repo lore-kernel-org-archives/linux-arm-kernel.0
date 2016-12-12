@@ -1,58 +1,54 @@
-From: mickael.guene@st.com (mickael guene)
-Date: Mon, 12 Dec 2016 08:07:16 +0100
-Subject: [RFC v3 PATCH 00/25] Allow NOMMU for MULTIPLATFORM
-In-Reply-To: <87fulus094.fsf@dell.be.48ers.dk>
-References: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
- <20161210181639.GA5660@afzalpc> <878trntrig.fsf@dell.be.48ers.dk>
- <20161211070104.GB3035@afzalpc> <87fulus094.fsf@dell.be.48ers.dk>
-Message-ID: <238a0185-db3a-fa43-cd7d-91baebdb82d4@st.com>
+From: xuejiancheng@hisilicon.com (Jiancheng Xue)
+Date: Mon, 12 Dec 2016 15:11:44 +0800
+Subject: [PATCH 1/3] arm: hisi: add ARCH_MULTI_V5 support
+In-Reply-To: <fb89c03e-ea67-d339-b222-6f0e08988563@gmail.com>
+References: <20161017120705.3726-1-wenpan@hisilicon.com>
+ <20161017120705.3726-2-wenpan@hisilicon.com> <5893354.6MrIxqzRoI@wuerfel>
+ <2fcf5a5f-8935-c4f0-a034-c8a72dc2be0f@hisilicon.com>
+ <fb89c03e-ea67-d339-b222-6f0e08988563@gmail.com>
+Message-ID: <cfecdd06-90c4-6e9c-30cb-59b1ee70e8a5@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
 
-  You can find an R toolchain here:
-https://github.com/mickael-guene/fdpic_manifest/releases/download/v7-r-1.0.1/toolset-v7-r-1.0.1-0-gbdcc6a7c-armv7-r.tgz
 
-  It's an fdpic toolset for cortex-r cpu class. gcc version is
-quite old (4.7).
+On 2016/12/9 23:07, Marty Plummer wrote:
+> On 12/04/2016 08:03 PM, Jiancheng Xue wrote:
+>> Hi Arnd,
+>>
+>> On 2016/10/17 21:48, Arnd Bergmann wrote:
+>>> On Monday, October 17, 2016 8:07:03 PM CEST Pan Wen wrote:
+>>>> Add support for some HiSilicon SoCs which depend on ARCH_MULTI_V5.
+>>>>
+>>>> Signed-off-by: Pan Wen <wenpan@hisilicon.com>
+>>>>
+>>>
+>>> Looks ok. I've added Marty Plummer to Cc, he was recently proposing
+>>> patches for Hi3520, which I think is closely related to this one.
+>>> Please try to work together so the patches don't conflict. It should
+>>> be fairly straightforward since you are basically doing the same
+>>> change here.
+>>>
+>> Marty hasn't give any replies about this thread until now. I reviewed
+>> the patch for Hi3520. And I think this patch won't conflict with Hi3520.
+>> Could you help us to ack this patch?
+>>
+>> Thanks,
+>> Jiancheng
+>>
+>>
+> Hello all
+> 
+> Sorry for my lack of activity, I've just been very busy lately with real
+> world considerations (well, real world but related to this; I have
+> another board based on hi3521a I've been tinkering with, trying to get
+> the manuf. to release gpl source via the sfconfservancy). I've not given
+> up on the project, however, since devices like this really need updates
+> in light of the recent botnets targeting devices of this sort as
+> manpower.
 
-  Note also that generated code may crash on class A cpu due to
-generation of udiv/sdiv which is optional for class A.
-(cortex a15 is ok but not a9).
+Do you have any objections to this patch?  If not, I hope this patch can
+be merged in 4.10.  Thank you.
 
-Hope it helps
-
-Regards
-Mickael
-
-On 12/11/2016 09:01 PM, Peter Korsgaard wrote:
->>>>>> "Afzal" == Afzal Mohammed <afzal.mohd.ma@gmail.com> writes:
->
-> Hi,
->
->  >> You can build a toolchain and initramfs with Buildroot. Have a look at
->  >> the stm32f429 nommu config:
->  >>
->  >> https://git.buildroot.net/buildroot/tree/configs/stm32f429_disco_defconfig
->
->  > iiuc, it builds one for Cortex-M. i already had a file system w/
->  > busybox compiled using a Cortex-M toolchain (stolen from
->  > Pengutronix's OSELAS.Toolchain), which works on Cortex M4 (Vybrid
->  > VF610 M4 core). But it does not work here, i.e. on Cortex A, seems the
->  > above mentioned also would have the same effect.
->
-> Hmm, I'm not sure why a cortex-M toolchain wouldn't work on cortex-A, I
-> thought the 'M' instruction set was a pure subset of the 'A'.
->
->  > And in buildroot, couldn't see Cortex R option in menuconfig, and
->  > selecting Cortex-A's excludes flat binary target & presents only with
->  > ELF.
->
-> We indeed don't have cortex-R support. I'm not aware of any cortex-R
-> Linux support.
->
-> When you select a cortex-A variant, then we enable MMU support by
-> default, but you can disable it under toolchain options (Enable MMU) and
-> then the flat binary option is available.
->
+Regards,
+Jiancheng
