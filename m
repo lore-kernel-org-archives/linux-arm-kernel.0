@@ -1,181 +1,115 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 12 Dec 2016 11:30:20 -0700
-Subject: [PATCH] PCI: mvebu: Handle changes to the bridge windows while enabled
-Message-ID: <20161212183020.GA30274@obsidianresearch.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue, 13 Dec 2016 00:08:39 +0530
+Subject: [PATCH V7 0/8] Add support for privileged mappings
+Message-ID: <1481567927-14791-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI core will write to the bridge window config multiple times
-while they are enabled. This can lead to mbus failures like:
+This series is a resend of the V5 that Mitch sent sometime back [2]
+All the patches are the same and i have just rebased. Redid patch [3],
+as it does not apply in this code base. Added a couple of more patches
+[4], [5] from Robin for adding the privileged attributes to armv7s format
+and arm-smmuv3 revert.
 
- mvebu_mbus: cannot add window '4:e8', conflicts with another window
- mvebu-pcie mbus:pex at e0000000: Could not create MBus window at [mem 0xe0000000-0xe00fffff]: -22
+The following patch to the ARM SMMU driver:
 
-For me this is happening during a hotplug cycle. The PCI core is
-not changing the values, just writing them twice while active.
+    commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
+    Author: Robin Murphy <robin.murphy@arm.com>
+    Date:   Tue Jan 26 18:06:34 2016 +0000
+    
+        iommu/arm-smmu: Treat all device transactions as unprivileged
 
-The patch addresses the general case of any change to an active window,
-but not atomically. The code is slightly refactored so io and mem
-can share more of the window logic.
+started forcing all SMMU transactions to come through as "unprivileged".
+The rationale given was that:
 
-Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
----
- drivers/pci/host/pci-mvebu.c | 101 +++++++++++++++++++++++++------------------
- 1 file changed, 60 insertions(+), 41 deletions(-)
+  (1) There is no way in the IOMMU API to even request privileged
+      mappings.
 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 307f81d6b479af..af724731b22f53 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -133,6 +133,12 @@ struct mvebu_pcie {
- 	int nports;
- };
- 
-+struct mvebu_pcie_window {
-+	phys_addr_t base;
-+	phys_addr_t remap;
-+	size_t size;
-+};
-+
- /* Structure representing one PCIe interface */
- struct mvebu_pcie_port {
- 	char *name;
-@@ -150,10 +156,8 @@ struct mvebu_pcie_port {
- 	struct mvebu_sw_pci_bridge bridge;
- 	struct device_node *dn;
- 	struct mvebu_pcie *pcie;
--	phys_addr_t memwin_base;
--	size_t memwin_size;
--	phys_addr_t iowin_base;
--	size_t iowin_size;
-+	struct mvebu_pcie_window memwin;
-+	struct mvebu_pcie_window iowin;
- 	u32 saved_pcie_stat;
- };
- 
-@@ -379,23 +383,45 @@ static void mvebu_pcie_add_windows(struct mvebu_pcie_port *port,
- 	}
- }
- 
-+static void mvebu_pcie_set_window(struct mvebu_pcie_port *port,
-+				  unsigned int target, unsigned int attribute,
-+				  const struct mvebu_pcie_window *desired,
-+				  struct mvebu_pcie_window *cur)
-+{
-+	if (desired->base == cur->base && desired->remap == cur->remap &&
-+	    desired->size == cur->size)
-+		return;
-+
-+	if (cur->size != 0) {
-+		mvebu_pcie_del_windows(port, cur->base, cur->size);
-+		cur->size = 0;
-+		cur->base = 0;
-+
-+		/*
-+		 * If something tries to change the window while it is enabled
-+		 * the change will not be done atomically. That would be
-+		 * difficult to do in the general case.
-+		 */
-+	}
-+
-+	if (desired->size == 0)
-+		return;
-+
-+	mvebu_pcie_add_windows(port, target, attribute, desired->base,
-+			       desired->size, desired->remap);
-+	*cur = *desired;
-+}
-+
- static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
- {
--	phys_addr_t iobase;
-+	struct mvebu_pcie_window desired = {};
- 
- 	/* Are the new iobase/iolimit values invalid? */
- 	if (port->bridge.iolimit < port->bridge.iobase ||
- 	    port->bridge.iolimitupper < port->bridge.iobaseupper ||
- 	    !(port->bridge.command & PCI_COMMAND_IO)) {
--
--		/* If a window was configured, remove it */
--		if (port->iowin_base) {
--			mvebu_pcie_del_windows(port, port->iowin_base,
--					       port->iowin_size);
--			port->iowin_base = 0;
--			port->iowin_size = 0;
--		}
--
-+		mvebu_pcie_set_window(port, port->io_target, port->io_attr,
-+				      &desired, &port->iowin);
- 		return;
- 	}
- 
-@@ -412,32 +438,27 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
- 	 * specifications. iobase is the bus address, port->iowin_base
- 	 * is the CPU address.
- 	 */
--	iobase = ((port->bridge.iobase & 0xF0) << 8) |
--		(port->bridge.iobaseupper << 16);
--	port->iowin_base = port->pcie->io.start + iobase;
--	port->iowin_size = ((0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
--			    (port->bridge.iolimitupper << 16)) -
--			    iobase) + 1;
--
--	mvebu_pcie_add_windows(port, port->io_target, port->io_attr,
--			       port->iowin_base, port->iowin_size,
--			       iobase);
-+	desired.remap = ((port->bridge.iobase & 0xF0) << 8) |
-+			(port->bridge.iobaseupper << 16);
-+	desired.base = port->pcie->io.start + desired.remap;
-+	desired.size = ((0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
-+			 (port->bridge.iolimitupper << 16)) -
-+			desired.remap) +
-+		       1;
-+
-+	mvebu_pcie_set_window(port, port->io_target, port->io_attr, &desired,
-+			      &port->iowin);
- }
- 
- static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
- {
-+	struct mvebu_pcie_window desired = {.remap = MVEBU_MBUS_NO_REMAP};
-+
- 	/* Are the new membase/memlimit values invalid? */
- 	if (port->bridge.memlimit < port->bridge.membase ||
- 	    !(port->bridge.command & PCI_COMMAND_MEMORY)) {
--
--		/* If a window was configured, remove it */
--		if (port->memwin_base) {
--			mvebu_pcie_del_windows(port, port->memwin_base,
--					       port->memwin_size);
--			port->memwin_base = 0;
--			port->memwin_size = 0;
--		}
--
-+		mvebu_pcie_set_window(port, port->mem_target, port->mem_attr,
-+				      &desired, &port->memwin);
- 		return;
- 	}
- 
-@@ -447,14 +468,12 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
- 	 * window to setup, according to the PCI-to-PCI bridge
- 	 * specifications.
- 	 */
--	port->memwin_base  = ((port->bridge.membase & 0xFFF0) << 16);
--	port->memwin_size  =
--		(((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
--		port->memwin_base + 1;
--
--	mvebu_pcie_add_windows(port, port->mem_target, port->mem_attr,
--			       port->memwin_base, port->memwin_size,
--			       MVEBU_MBUS_NO_REMAP);
-+	desired.base = ((port->bridge.membase & 0xFFF0) << 16);
-+	desired.size = (((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
-+		       desired.base + 1;
-+
-+	mvebu_pcie_set_window(port, port->mem_target, port->mem_attr, &desired,
-+			      &port->memwin);
- }
- 
- /*
+  (2) It's difficult to implement a DMA mapper that correctly models the
+      ARM VMSAv8 behavior of unprivileged-writeable =>
+      privileged-execute-never.
+
+This series rectifies (1) by introducing an IOMMU API for privileged
+mappings and implements it in io-pgtable-arm.
+
+This series rectifies (2) by introducing a new dma attribute
+(DMA_ATTR_PRIVILEGED) for users of the DMA API that need privileged
+mappings which are inaccessible to lesser-privileged execution levels, and
+implements it in the arm64 IOMMU DMA mapper.  The one known user (pl330.c)
+is converted over to the new attribute.
+
+Jordan and Jeremy can provide more info on the use case if needed, but the
+high level is that it's a security feature to prevent attacks such as [1].
+
+Note that, i tested this on arm64 with arm-smmuv2, short descriptor changes,
+and do not have an platform to test this with arm-smmuv3.
+
+[1] https://github.com/robclark/kilroy
+[2] https://lkml.org/lkml/2016/7/27/590
+[3] https://patchwork.kernel.org/patch/9250493/
+[4] http://www.linux-arm.org/git?p=linux-rm.git;a=commit;h=1291bd74f05d31da1dab3df02987cba5bd25849b
+[5] http://www.linux-arm.org/git?p=linux-rm.git;a=commit;h=a79c1c6333f26849dba418cd92de26b60f5954f3
+
+Changelog:
+ v6..v7
+    - Added couple of more patches, picked up acks, updated commit log
+
+ v5..v6
+    - Rebased all the patches and redid 6/6 as it does not apply in
+      this code base. 
+
+ v4..v5
+
+    - Simplified patch 4/6 (suggested by Robin Murphy).
+
+  v3..v4
+
+    - Rebased and reworked on linux next due to the dma attrs rework going
+      on over there.  Patches changed: 3/6, 4/6, and 5/6.
+
+  v2..v3
+
+    - Incorporated feedback from Robin:
+      * Various comments and re-wordings.
+      * Use existing bit definitions for IOMMU_PRIV implementation
+        in io-pgtable-arm.
+      * Renamed and redocumented dma_direction_to_prot.
+      * Don't worry about executability in new DMA attr.
+
+  v1..v2
+
+    - Added a new DMA attribute to make executable privileged mappings
+      work, and use that in the pl330 driver (suggested by Will).
+
+Jeremy Gebben (1):
+  iommu/io-pgtable-arm: add support for the IOMMU_PRIV flag
+
+Mitchel Humpherys (4):
+  iommu: add IOMMU_PRIV attribute
+  common: DMA-mapping: add DMA_ATTR_PRIVILEGED attribute
+  arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED
+  dmaengine: pl330: Make sure microcode is privileged
+
+Robin Murphy (2):
+  iommu/io-pgtable-arm-v7s: Add support for the IOMMU_PRIV flag
+  iommu/arm-smmu: Revert "iommu/arm-smmu: Set PRIVCFG in stage 1 STEs"
+
+Sricharan R (1):
+  iommu/arm-smmu: Set privileged attribute to 'default' instead of
+    'unprivileged'
+
+ Documentation/DMA-attributes.txt   | 10 ++++++++++
+ arch/arm64/mm/dma-mapping.c        |  6 +++---
+ drivers/dma/pl330.c                |  5 +++--
+ drivers/iommu/arm-smmu-v3.c        |  7 +------
+ drivers/iommu/arm-smmu.c           |  2 +-
+ drivers/iommu/dma-iommu.c          | 10 ++++++++--
+ drivers/iommu/io-pgtable-arm-v7s.c |  6 +++++-
+ drivers/iommu/io-pgtable-arm.c     |  5 ++++-
+ include/linux/dma-iommu.h          |  3 ++-
+ include/linux/dma-mapping.h        |  7 +++++++
+ include/linux/iommu.h              |  1 +
+ 11 files changed, 45 insertions(+), 17 deletions(-)
+
 -- 
-2.7.4
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
