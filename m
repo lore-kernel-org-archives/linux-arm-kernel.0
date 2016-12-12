@@ -1,115 +1,46 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 12 Dec 2016 18:49:22 +0200
-Subject: [PATCH v5 2/4] drm: bridge: add support for TI ths8135
-In-Reply-To: <20161212164547.jw5ejbums6nwwtw2@rob-hp-laptop>
-References: <1481107365-24839-1-git-send-email-bgolaszewski@baylibre.com>
- <1481107365-24839-3-git-send-email-bgolaszewski@baylibre.com>
- <20161212164547.jw5ejbums6nwwtw2@rob-hp-laptop>
-Message-ID: <11861401.mfQG629sXd@avalon>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 12 Dec 2016 16:57:44 +0000
+Subject: [PATCH 1/1] arm/module: maximum utilization of module area.
+In-Reply-To: <alpine.LFD.2.20.1612121026250.1657@knanqh.ubzr>
+References: <1481012975-44478-1-git-send-email-maninder1.s@samsung.com>
+ <CGME20161212102403epcas4p2e039072e2acdc3d20c1b8ac86e823375@epcas4p2.samsung.com>
+ <20161212112230epcms5p6af05aef34f72eab15061a166d18cff00@epcms5p6>
+ <alpine.LFD.2.20.1612121026250.1657@knanqh.ubzr>
+Message-ID: <CAKv+Gu9kboYtEwZygYz8PnwQsLuRgibFfyJNcsE6tjG+xvDkeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 12 December 2016 at 15:28, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Mon, 12 Dec 2016, Vaneet Narang wrote:
+>
+>> Hi,
+>>
+>> >A PC24 relocation has a range of +/-32MB.  This means that where-ever
+>> >the module is placed, it must be capable of reaching any function
+>> >within the kernel text, which may itself be quite large (eg, 8MB, or
+>> >possibly larger).  The module area exists to allow modules to be
+>> >located in an area where PC24 relocations are able to reach all of the
+>> >kernel text on sensibly configured kernels, thereby allowing for
+>> >optimal performance.
+>> >
+>> >If you wish to load large modules, then enable ARM_MODULE_PLTS, which
+>> >will use the less efficient PLT method (which is basically an indirect
+>> >function call) for relocations that PC24 can't handle, and will allow
+>> >the module to be loaded into the vmalloc area.
+>> >
+>> >Growing the module area so that smaller modules also get penalised by
+>> >the PLT indirection is not sane.
+>>
+>> This is exactly what i am saying. These changes are useful to accomdate
+>> 22MB modules without enabling ARM_MODULE_PLTS.
+>
+> I think you need to figure out why you need such a huge module in the
+> first place.  That is very uncommon indeed.
+>
 
-On Monday 12 Dec 2016 10:45:47 Rob Herring wrote:
-> On Wed, Dec 07, 2016 at 11:42:43AM +0100, Bartosz Golaszewski wrote:
-> > THS8135 is a configurable video DAC. Add DT bindings for this chip and
-> > use the dumb-vga-dac driver for now as no configuration is required to
-> > make it work.
-> > 
-> > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> > ---
-> > 
-> >  .../bindings/display/bridge/ti,ths8135.txt         | 52 +++++++++++++++++
-> >  drivers/gpu/drm/bridge/dumb-vga-dac.c              |  1 +
-> >  2 files changed, 53 insertions(+)
-> >  create mode 100644
-> >  Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
-> Acked-by: Rob Herring <robh@kernel.org>
-> 
-> But one nit below:
-> > diff --git
-> > a/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
-> > b/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt new
-> > file mode 100644
-> > index 0000000..23cd8ee
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
-> > @@ -0,0 +1,52 @@
-> > +THS8135 Video DAC
-> > +-----------------
-> > +
-> > +This is the binding for Texas Instruments THS8135 Video DAC bridge.
-> > +
-> > +Required properties:
-> > +
-> > +- compatible: Must be "ti,ths8135"
-> > +
-> > +Required nodes:
-> > +
-> > +This device has two video ports. Their connections are modelled using the
-> > OF +graph bindings specified in
-> > Documentation/devicetree/bindings/graph.txt. +
-> > +- Video port 0 for RGB input
-> > +- Video port 1 for VGA output
-> > +
-> > +Example
-> > +-------
-> > +
-> > +vga-bridge {
-> > +	compatible = "ti,ths8135";
-> > +	#address-cells = <1>;
-> > +	#size-cells = <0>;
-> > +
-> > +	ports {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		port at 0 {
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			reg = <0>;
-> > +
-> > +			vga_bridge_in: endpoint at 0 {
-> > +				reg = <0>;
-> 
-> You don't need reg here.
+Also, note that the module PLT code was recently optimized, to remove
+some pathological behavior which severely affected load times of large
+modules.
 
-In which case the endpoint node should be named endpoint, not endpoint at 0. You 
-could then also remove the #address-cells and #size-cells properties from the 
-port at 0 node. Same for port at 1 below.
-
-> > +				remote-endpoint = <&lcdc_out_vga>;
-> > +			};
-> > +		};
-> > +
-> > +		port at 1 {
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			reg = <1>;
-> > +
-> > +			vga_bridge_out: endpoint at 0 {
-> > +				reg = <0>;
-> > +				remote-endpoint = <&vga_con_in>;
-> > +			};
-> > +		};
-> > +	};
-> > +};
-> > diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> > b/drivers/gpu/drm/bridge/dumb-vga-dac.c index afec232..498fa75 100644
-> > --- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> > +++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> > @@ -204,6 +204,7 @@ static int dumb_vga_remove(struct platform_device
-> > *pdev)
-> >  
-> >  static const struct of_device_id dumb_vga_match[] = {
-> >  	{ .compatible = "dumb-vga-dac" },
-> > +	{ .compatible = "ti,ths8135" },
-> >  	{},
-> >  };
-> >  MODULE_DEVICE_TABLE(of, dumb_vga_match);
-
--- 
-Regards,
-
-Laurent Pinchart
+Can you quantify the performance hit you are taking when using module
+PLTs? And the actual increase in memory footprint?
