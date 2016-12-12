@@ -1,75 +1,48 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Dec 2016 13:02:05 -0600
-Subject: [PATCH v6 3/8] PWM: add pwm-stm32 DT bindings
-In-Reply-To: <1481292919-26587-4-git-send-email-benjamin.gaignard@st.com>
-References: <1481292919-26587-1-git-send-email-benjamin.gaignard@st.com>
- <1481292919-26587-4-git-send-email-benjamin.gaignard@st.com>
-Message-ID: <20161212190205.b5t3x6i2o7igldlo@rob-hp-laptop>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Dec 2016 19:16:51 +0000
+Subject: [PATCH v3 11/12] arm64: dts: marvell: add sdhci support for
+ Armada 7K/8K
+In-Reply-To: <87bmwhdrx7.fsf@free-electrons.com>
+References: <cover.e0137cef24a16a2c7d795548de554993595d4a98.1481279228.git-series.gregory.clement@free-electrons.com>
+ <923c97f32a828b579756bf86946689ed54a0a174.1481279228.git-series.gregory.clement@free-electrons.com>
+ <20161209200729.GO14217@n2100.armlinux.org.uk>
+ <87bmwhdrx7.fsf@free-electrons.com>
+Message-ID: <20161212191651.GV14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2016 at 03:15:14PM +0100, Benjamin Gaignard wrote:
-> Define bindings for pwm-stm32
+On Mon, Dec 12, 2016 at 05:37:56PM +0100, Gregory CLEMENT wrote:
+> Hi Russell King,
+>  
+>  On ven., d?c. 09 2016, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 > 
-> version 6:
-> - change st,breakinput parameter format to make it usuable on stm32f7 too.
+> > On Fri, Dec 09, 2016 at 11:30:07AM +0100, Gregory CLEMENT wrote:
+> >> Also enable it on the Armada 7040 DB board
+> >> 
+> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> >
+> > Hi,
+> >
+> > Can this also be added to the cp110 on the 7k/8k SoCs as well, or does
+> > it rely on other unmerged support?
 > 
-> version 2:
-> - use parameters instead of compatible of handle the hardware configuration
+> I did not add this one because until now I had not the hardware setup
+> available to test it.
 > 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> ---
->  .../devicetree/bindings/pwm/pwm-stm32.txt          | 33 ++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> new file mode 100644
-> index 0000000..866f222
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> @@ -0,0 +1,33 @@
-> +STMicroelectronics STM32 Timers PWM bindings
-> +
-> +Must be a sub-node of an STM32 Timers device tree node.
-> +See ../mfd/stm32-timers.txt for details about the parent node.
-> +
-> +Required parameters:
-> +- compatible:		Must be "st,stm32-pwm".
-> +- pinctrl-names: 	Set to "default".
-> +- pinctrl-0: 		List of phandles pointing to pin configuration nodes for PWM module.
-> +			For Pinctrl properties see ../pinctrl/pinctrl-bindings.txt
-> +
-> +Optional parameters:
-> +- st,breakinput:	Arrays of three u32 <index level filter> to describe break input configurations.
-> +			"index" indicates on which break input the configuration should be applied.
-> +			"level" gives the active level (0=low or 1=high) for this configuration.
-> +			"filter" gives the filtering value to be applied.
-> +
-> +Example:
-> +	timers at 40010000 {
+> But at least I can add the ressources in the device tree and now I can
+> test it partially.
 
-timer at ...
+There's another option: add the DT resources in a separate patch, send
+it out for someone else to test.  When it comes back with a tested-by,
+then it can be included along with the rest of the patch set.
 
-With that,
+I'd send something, but I don't know what the GIC interrupt number
+would be without using the CP110's ICU (which isn't supported in
+mainline yet.)  I've already tested your previous patch set (along with
+ICU support + needed DT bits) on the SR Macchiatobin board... it seems
+to work fine.
 
-Acked-by: Rob Herring <robh@kernel.org>
-
-
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "st,stm32-timers";
-> +		reg = <0x40010000 0x400>;
-> +		clocks = <&rcc 0 160>;
-> +		clock-names = "clk_int";
-> +
-> +		pwm {
-> +			compatible = "st,stm32-pwm";
-> +			pinctrl-0	= <&pwm1_pins>;
-> +			pinctrl-names	= "default";
-> +			st,breakinput = <0 1 5>;
-> +		};
-> +	};
-> -- 
-> 1.9.1
-> 
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
