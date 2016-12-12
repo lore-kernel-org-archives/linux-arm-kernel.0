@@ -1,85 +1,86 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 12 Dec 2016 11:38:02 -0800
-Subject: [PATCH 3/3] clk: keystone: Add sci-clk driver support
-In-Reply-To: <22dacb0c-a3bc-50ce-e4b9-f74a0c706f20@ti.com>
-References: <1477053961-27128-1-git-send-email-t-kristo@ti.com>
- <1477053961-27128-4-git-send-email-t-kristo@ti.com>
- <20161208001348.GC5423@codeaurora.org>
- <cb608729-b617-0eab-5ddf-d78ff47b237e@ti.com>
- <20161208211044.GI5423@codeaurora.org>
- <22dacb0c-a3bc-50ce-e4b9-f74a0c706f20@ti.com>
-Message-ID: <20161212193800.GL5423@codeaurora.org>
+From: christopher.lee.bostic@gmail.com (Christopher Bostic)
+Date: Mon, 12 Dec 2016 13:49:41 -0600
+Subject: [PATCH 16/16] drivers/fsi: Add GPIO based FSI master
+In-Reply-To: <6a39f4d9-0f20-a146-3122-86d3f75c58fa@ozlabs.org>
+References: <1481069677-53660-1-git-send-email-christopher.lee.bostic@gmail.com>
+ <1481069677-53660-17-git-send-email-christopher.lee.bostic@gmail.com>
+ <6a39f4d9-0f20-a146-3122-86d3f75c58fa@ozlabs.org>
+Message-ID: <CAA0LjjV98roN5MEyfkRFf8m61C_nHi6Wxq_2wHB=c6YQ35_wUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09, Tero Kristo wrote:
-> On 08/12/16 23:10, Stephen Boyd wrote:
-> >On 12/08, Tero Kristo wrote:
-> >>On 08/12/16 02:13, Stephen Boyd wrote:
-> >>>On 10/21, Tero Kristo wrote:
-> >>>>diff --git a/drivers/clk/keystone/sci-clk.c b/drivers/clk/keystone/sci-clk.c
-> >>>>new file mode 100644
-> >>>>index 0000000..f6af5bd
-> >>>>--- /dev/null
-> >>>>+++ b/drivers/clk/keystone/sci-clk.c
-> >>
-> >>>
-> >>>>+
-> >>>>+	handle = devm_ti_sci_get_handle(dev);
-> >>>>+	if (IS_ERR(handle))
-> >>>>+		return PTR_ERR(handle);
-> >>>>+
-> >>>>+	provider = devm_kzalloc(dev, sizeof(*provider), GFP_KERNEL);
-> >>>>+	if (!provider)
-> >>>>+		return -ENOMEM;
-> >>>>+
-> >>>>+	provider->clocks = data;
-> >>>>+
-> >>>>+	provider->sci = handle;
-> >>>>+	provider->ops = &handle->ops.clk_ops;
-> >>>>+	provider->dev = dev;
-> >>>>+
-> >>>>+	ti_sci_init_clocks(provider);
-> >>>
-> >>>And if this fails?
-> >>
-> >>Yea this is kind of controversial. ti_sci_init_clocks() can fail if
-> >>any of the clocks registered will fail. I decided to have it this
-> >>way so that at least some clocks might work in failure cause, and
-> >>you might have a booting device instead of total lock-up.
-> >>
-> >>Obviously it could be done so that if any clock fails, we would
-> >>de-register all clocks at that point, but personally I think this is
-> >>a worse option.
-> >>
-> >>ti_sci_init_clocks could probably be modified to continue
-> >>registering clocks when a single clock fails though. Currently it
-> >>aborts at first failure.
-> >>
-> >
-> >That sounds like a better approach if we don't care about
-> >failures to register a clock. Returning a value from a function
-> >and not using it isn't really a great design.
-> >
-> >I worry that if we start returning errors from clk_hw_register()
-> >that something will go wrong though, so really I don't know why
-> >we want to ignore errors at all. Just for debugging a boot hang?
-> >Can't we use early console to at least see that this driver is
-> >failing to probe and debug that way?
-> 
-> Early console can be used to debug that, but it is kind of annoying
-> to recompile most of the kernel when you suddenly need to use it.
+On Thu, Dec 8, 2016 at 10:12 PM, Jeremy Kerr <jk@ozlabs.org> wrote:
+> Hi Chris,
+>
+>> +static ssize_t store_scan(struct device *dev,
+>> +                             struct device_attribute *attr,
+>> +                             const char *buf,
+>> +                             size_t count)
+>> +{
+>> +     struct fsi_master_gpio *master = dev_get_drvdata(dev);
+>> +
+>> +     fsi_master_gpio_init(master);
+>> +
+>> +     /* clear out any old scan data if present */
+>> +     fsi_master_unregister(&master->master);
+>> +     fsi_master_register(&master->master);
+>> +
+>> +     return count;
+>> +}
+>> +
+>> +static DEVICE_ATTR(scan, 0200, NULL, store_scan);
+>
+> I think it would make more sense to have the scan attribute populated by
+> the fsi core; we want this on all masters, not just GPIO.
+>
 
-I thought SERIAL_EARLYCON was selected by drivers that support
-it? So there shouldn't be any rebuilding required.
+Hi Jeremy,
 
-> 
-> How about modifying the ti_sci_init_clocks func to print an error
-> for each failed clock?
+Sure, will move that to the core.
 
-Ok that's fine too. I'd prefer the function had a return type of
-void if we're not planning on using the return value, that's all.
+> Currently, the only GPIO-master-specific functionality here is the
+> fsi_master_gpio_init() - but isn't this something that we can do at
+> probe time instead?
+>
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Yes that can be done at probe time.  Will change.
+
+>> +static int fsi_master_gpio_probe(struct platform_device *pdev)
+>> +{
+>> +     struct fsi_master_gpio *master;
+>> +     struct gpio_desc *gpio;
+>> +
+>> +     master = devm_kzalloc(&pdev->dev, sizeof(*master), GFP_KERNEL);
+>> +     if (!master)
+>> +             return -ENOMEM;
+>
+> We should be populating master->dev.parent, see
+>
+>   https://github.com/jk-ozlabs/linux/commit/5225d6c47
+>
+>
+
+Will make the change.
+
+>> +     /* Optional pins */
+>> +
+>> +     gpio = devm_gpiod_get(&pdev->dev, "trans", 0);
+>> +     if (IS_ERR(gpio))
+>> +             dev_dbg(&pdev->dev, "probe: failed to get trans pin\n");
+>> +     else
+>> +             master->gpio_trans = gpio;
+>
+> I found devm_gpiod_get_optional(), which might make this a little
+> neater.
+
+Will make this change.
+
+
+Thanks,
+Chris
+
+>
+> Cheers,
+>
+>
+> Jeremy
