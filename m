@@ -1,31 +1,188 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Mon, 12 Dec 2016 10:59:51 +0100
-Subject: [PATCH 3/8] rtc: add STM32 RTC driver
-In-Reply-To: <20161207183709.tbkapu34ljlg4skp@piout.net>
-References: <1480687801-19525-2-git-send-email-amelie.delaunay@st.com>
- <1480687801-19525-5-git-send-email-amelie.delaunay@st.com>
- <20161202175646.GA3284@linaro.org>
- <15bea9e9-adcc-edb0-1bd1-33d395c72eec@st.com>
- <20161207183709.tbkapu34ljlg4skp@piout.net>
-Message-ID: <a2d3ddc0-c8f6-0f42-ad33-a92e0ac6aee4@st.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 12 Dec 2016 11:18:01 +0100
+Subject: [RFT PATCH] ARM64: dts: meson-gxbb: Add reserved memory zone and
+ usable memory range
+Message-ID: <20161212101801.28491-1-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+The Amlogic Meson GXBB secure monitor uses part of the memory space, this
+patch adds these reserved zones and redefines the usable memory range for
+each boards.
 
-On 12/07/2016 07:37 PM, Alexandre Belloni wrote:
-> On 05/12/2016 at 10:43:14 +0100, Amelie DELAUNAY wrote :
->>>> +
->>>> +    device_init_wakeup(&pdev->dev, true);
->>>
->>> What happens if device_init_wakeup() returns an error?
->> It means that RTC won't be able to wake up the board with RTC alarm. I can
->> add a warning for the user in this case ?
->>>
->
-> There is exactly one driver ever checking the return value of
-> device_init_wakeup(). It basically always succeeds.
->
->
-OK so, is it OK for everyone that I bet on the fact that it will always 
-succeed?
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi |  2 +-
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi           | 21 +++++++++++++++++++++
+ .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts     |  2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts |  2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi    |  2 +-
+ .../boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts   |  2 +-
+ .../boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts    |  2 +-
+ .../boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts  |  2 +-
+ .../boot/dts/amlogic/meson-gxl-nexbox-a95x.dts      |  2 +-
+ .../arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts |  2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts |  2 +-
+ 11 files changed, 31 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
+index 7a078be..ac40b2d 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
+@@ -56,7 +56,7 @@
+ 
+ 	memory at 0 {
+ 		device_type = "memory";
+-		reg = <0x0 0x0 0x0 0x80000000>;
++		reg = <0x0 0x1000000 0x0 0x7f000000>;
+ 	};
+ 
+ 	vddio_boot: regulator-vddio_boot {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+index fc033c0..e085588 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+@@ -55,6 +55,27 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+ 
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		secos: secos {
++			reg = <0x0 0x05300000 0x0 0x2000000>;
++			no-map;
++		};
++
++		pstore: pstore {
++			reg = <0x0 0x07300000 0x0 0x100000>;
++			no-map;
++		};
++
++		secmon: secmon {
++			reg = <0x0 0x10000000 0x0 0x200000>;
++			no-map;
++		};
++	};
++
+ 	cpus {
+ 		#address-cells = <0x2>;
+ 		#size-cells = <0x0>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+index 9696820..25b8832 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+@@ -62,7 +62,7 @@
+ 
+ 	memory at 0 {
+ 		device_type = "memory";
+-		reg = <0x0 0x0 0x0 0x40000000>;
++		reg = <0x0 0x1000000 0x0 0x3f000000>;
+ 	};
+ 
+ 	leds {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+index 238fbea..839c66a 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+@@ -61,7 +61,7 @@
+ 
+ 	memory at 0 {
+ 		device_type = "memory";
+-		reg = <0x0 0x0 0x0 0x80000000>;
++		reg = <0x0 0x1000000 0x0 0x7f000000>;
+ 	};
+ 
+ 	usb_otg_pwr: regulator-usb-pwrs {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+index 203be28..9a39518 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+@@ -55,7 +55,7 @@
+ 
+ 	memory at 0 {
+ 		device_type = "memory";
+-		reg = <0x0 0x0 0x0 0x40000000>;
++		reg = <0x0 0x1000000 0x0 0x3f000000>;
+ 	};
+ 
+ 	usb_pwr: regulator-usb-pwrs {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
+index 62fb496..287a4c7 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
+@@ -50,6 +50,6 @@
+ 
+ 	memory at 0 {
+ 		device_type = "memory";
+-		reg = <0x0 0x0 0x0 0x80000000>;
++		reg = <0x0 0x1000000 0x0 0x7f000000>;
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
+index 9a9663a..8bdbbe2 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
+@@ -50,6 +50,6 @@
+ 
+ 	memory at 0 {
+ 		device_type = "memory";
+-		reg = <0x0 0x0 0x0 0x40000000>;
++		reg = <0x0 0x1000000 0x0 0x3f000000>;
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
+index 2fe167b..2d85295 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
+@@ -50,6 +50,6 @@
+ 
+ 	memory at 0 {
+ 		device_type = "memory";
+-		reg = <0x0 0x0 0x0 0x80000000>;
++		reg = <0x0 0x1000000 0x0 0x7f000000>;
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts
+index e99101a..4ec2bbb 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts
+@@ -60,7 +60,7 @@
+ 
+ 	memory at 0 {
+ 		device_type = "memory";
+-		reg = <0x0 0x0 0x0 0x80000000>;
++		reg = <0x0 0x1000000 0x0 0x7f000000>;
+ 	};
+ 
+ 	vddio_card: gpio-regulator {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+index 9639f01..b8b5b74 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+@@ -59,7 +59,7 @@
+ 
+ 	memory at 0 {
+ 		device_type = "memory";
+-		reg = <0x0 0x0 0x0 0x80000000>;
++		reg = <0x0 0x1000000 0x0 0x7f000000>;
+ 	};
+ };
+ 
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
+index f859d75..1544747 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
+@@ -62,7 +62,7 @@
+ 
+ 	memory at 0 {
+ 		device_type = "memory";
+-		reg = <0x0 0x0 0x0 0x80000000>;
++		reg = <0x0 0x1000000 0x0 0x7f000000>;
+ 	};
+ 
+ 	vddio_boot: regulator-vddio-boot {
+-- 
+2.7.0
