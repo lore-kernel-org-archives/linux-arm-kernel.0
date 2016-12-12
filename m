@@ -1,52 +1,63 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 12 Dec 2016 15:39:44 +0100
-Subject: [PATCH renesas/devel 10/13] ARM: dts: r8a7790: Use R-Car Gen 2
- fallback binding for i2c nodes
-In-Reply-To: <CAMuHMdX3QR00t-QwCv+AFqMmWvFZ-wuvVAa5S2p0Cnu3mWB9CQ@mail.gmail.com>
- <0db5b88e-41fb-03db-fa61-48e754356901@cogentembedded.com>
-Message-ID: <20161212143942.GA31172@verge.net.au>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 12 Dec 2016 06:44:51 -0800
+Subject: [PATCH] watchdog: bcm2835_wdt: set WDOG_HW_RUNNING bit when
+ appropriate
+In-Reply-To: <1481536123-9279-1-git-send-email-rasmus.villemoes@prevas.dk>
+References: <1481536123-9279-1-git-send-email-rasmus.villemoes@prevas.dk>
+Message-ID: <6b56aefc-d19e-7854-d7ad-35b321176735@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2016 at 01:28:30PM +0300, Sergei Shtylyov wrote:
-> Hello!
-> 
-> On 12/12/2016 12:11 PM, Simon Horman wrote:
-> 
-> >Use recently added R-Car Gen 2 fallback binding for iii nodes in
-> 
->    s/iii/iic/?
+On 12/12/2016 01:48 AM, Rasmus Villemoes wrote:
+> A bootloader may start the watchdog device before handing control to
+> the kernel - in that case, we should tell the kernel about it so the
+> watchdog framework can keep it alive until userspace opens
+> /dev/watchdog0.
+>
+> Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
 
-Yes, thanks for noticing that.
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-> >DT for r8a7790 SoC.
-> >
-> >This has no run-time effect for the current driver as the initialisation
-> >sequence is the same for the SoC-specific binding for r8a7790 and the
-> >fallback binding for R-Car Gen 2.
-> >
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> [...]
-> 
-> MBR, Sergei
-> 
-
-On Mon, Dec 12, 2016 at 02:42:29PM +0100, Geert Uytterhoeven wrote:
-> Hi SImon,
-> 
-> On Mon, Dec 12, 2016 at 10:11 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Use recently added R-Car Gen 2 fallback binding for iii nodes in
-> 
-> As Sergei already pointed out: s/iii/iic/.
-> 
-> You may also want to s/i2c/iic/ in the one-line summary, to avoid having
-> multiple different patches with the same one-line summary (initially I was a
-> bit confused by this, as Gmail grouped them together).
-
-Yes, I meant to differentiate the subjects as you suggest.
-I'll fix things up.
-
-> These two comments apply to all iic DT patches in this series.
-
-Got it.
+> ---
+>  drivers/watchdog/bcm2835_wdt.c | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>
+> diff --git a/drivers/watchdog/bcm2835_wdt.c b/drivers/watchdog/bcm2835_wdt.c
+> index 4dddd82..c32c45b 100644
+> --- a/drivers/watchdog/bcm2835_wdt.c
+> +++ b/drivers/watchdog/bcm2835_wdt.c
+> @@ -55,6 +55,15 @@ struct bcm2835_wdt {
+>  static unsigned int heartbeat;
+>  static bool nowayout = WATCHDOG_NOWAYOUT;
+>
+> +static bool bcm2835_wdt_is_running(struct bcm2835_wdt *wdt)
+> +{
+> +	uint32_t cur;
+> +
+> +	cur = readl(wdt->base + PM_RSTC);
+> +
+> +	return !!(cur & PM_RSTC_WRCFG_FULL_RESET);
+> +}
+> +
+>  static int bcm2835_wdt_start(struct watchdog_device *wdog)
+>  {
+>  	struct bcm2835_wdt *wdt = watchdog_get_drvdata(wdog);
+> @@ -181,6 +190,17 @@ static int bcm2835_wdt_probe(struct platform_device *pdev)
+>  	watchdog_init_timeout(&bcm2835_wdt_wdd, heartbeat, dev);
+>  	watchdog_set_nowayout(&bcm2835_wdt_wdd, nowayout);
+>  	bcm2835_wdt_wdd.parent = &pdev->dev;
+> +	if (bcm2835_wdt_is_running(wdt)) {
+> +		/*
+> +		 * The currently active timeout value (set by the
+> +		 * bootloader) may be different from the module
+> +		 * heartbeat parameter or the value in device
+> +		 * tree. But we just need to set WDOG_HW_RUNNING,
+> +		 * because then the framework will "immediately" ping
+> +		 * the device, updating the timeout.
+> +		 */
+> +		set_bit(WDOG_HW_RUNNING, &bcm2835_wdt_wdd.status);
+> +	}
+>  	err = watchdog_register_device(&bcm2835_wdt_wdd);
+>  	if (err) {
+>  		dev_err(dev, "Failed to register watchdog device");
+>
