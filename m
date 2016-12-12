@@ -1,28 +1,55 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 12 Dec 2016 09:31:30 +0100
-Subject: [PATCH] clk: bcm: Fix 'maybe-uninitialized' warning in
- bcm2835_clock_choose_div_and_prate()
-In-Reply-To: <3107859.uaKLk6DMRd@wuerfel>
-References: <1481529653-28133-1-git-send-email-boris.brezillon@free-electrons.com>
- <3107859.uaKLk6DMRd@wuerfel>
-Message-ID: <20161212093130.6e348a61@bbrezillon>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Mon, 12 Dec 2016 09:34:29 +0100
+Subject: [PATCH v5 2/5] i2c: Add STM32F4 I2C driver
+In-Reply-To: <20161211214232.GA2552@katana>
+References: <1481185563-8735-1-git-send-email-cedric.madianga@gmail.com>
+ <1481185563-8735-3-git-send-email-cedric.madianga@gmail.com>
+ <20161211214232.GA2552@katana>
+Message-ID: <CAOAejn0gH3t8NGLUELfB3nv-UM=Gtr04JtLqrm=SiYfPVbYv-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Dec 2016 09:12:36 +0100
-Arnd Bergmann <arnd@arndb.de> wrote:
+Hi Wolfram,
 
-> On Monday, December 12, 2016 9:00:53 AM CET Boris Brezillon wrote:
-> > best_rate is reported as potentially uninitialized by gcc.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Fixes: 155e8b3b0ee3 ("clk: bcm: Support rate change propagation on bcm2835 clocks")
-> > Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>  
-> 
-> I wonder why I didn't get that. Which compiler version did you use?
-> 
+Thanks for your comments.
+I will fix all of them + build errors reported by build-bot in the V6.
 
-In case you're interested, my gcc [1] failed to detect it as well, and
-this is not the first time it happens :-/.
+Best regards,
 
-[1]gcc (Ubuntu 5.4.0-6ubuntu1~16.04.4) 5.4.0 20160609
+Cedric Madianga
+
+2016-12-11 22:42 GMT+01:00 Wolfram Sang <wsa@the-dreams.de>:
+> Hi,
+>
+>> +config I2C_STM32F4
+>> +     tristate "STMicroelectronics STM32F4 I2C support"
+>> +     depends on ARCH_STM32  || COMPILE_TEST
+>
+> Double space.
+>
+>> +#define STM32F4_I2C_MIN_FREQ         2
+>> +#define STM32F4_I2C_MAX_FREQ         42
+>
+> Those two must be unsigned to fix the build error (e.g. 2U) reported by
+> build-bot.
+>
+> Also, I get the following build warnings:
+>
+>   CC      drivers/i2c/busses/i2c-stm32f4.o
+> drivers/i2c/busses/i2c-stm32f4.c: In function ?stm32f4_i2c_handle_rx_addr?:
+> drivers/i2c/busses/i2c-stm32f4.c:445:6: warning: variable ?sr2? set but not used [-Wunused-but-set-variable]
+>   u32 sr2;
+>       ^~~
+> drivers/i2c/busses/i2c-stm32f4.c: In function ?stm32f4_i2c_isr_event?:
+> drivers/i2c/busses/i2c-stm32f4.c:496:41: warning: variable ?sr2? set but not used [-Wunused-but-set-variable]
+>   u32 real_status, possible_status, ien, sr2;
+>
+> I assume those are reads to clear the register, so we really don't need
+> to save the value in a variable.
+>
+> Rest is looking good.
+>
+> Thanks,
+>
+>    Wolfram
+>
