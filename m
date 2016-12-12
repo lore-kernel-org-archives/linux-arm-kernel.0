@@ -1,60 +1,84 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Tue, 13 Dec 2016 01:04:46 +0530
-Subject: [RESEND PATCH V6 0/6] Add support for privileged mappings
-References: <1480690509-13490-1-git-send-email-sricharan@codeaurora.org>
- <e7e05493-e216-d744-b828-351d2c70150d@arm.com>
- <000d01d24e02$e3023700$a906a500$@codeaurora.org>
- <ad7a90ce-c1cd-856e-8573-394c05fda6e4@arm.com>
-Message-ID: <000c01d254ae$d0236930$706a3b90$@codeaurora.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 12 Dec 2016 13:37:52 -0600
+Subject: [PATCH v2] usb: dwc3: omap: fix race of pm runtime with irq handler
+ in probe
+Message-ID: <20161212193752.32029-1-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Now races can happen between interrupt handler execution and PM runtime in
+error handling code path in probe and in dwc3_omap_remove() which will lead
+to system crash:
 
+in probe:
+...
+ err1:
+	pm_runtime_put_sync(dev);
+^^ PM runtime can race with IRQ handler when deferred probing happening
+   due to extcon
+	pm_runtime_disable(dev);
 
->Hi Robin,
->
->>>> Hi Sricharan,
->>>>
->>>> On 02/12/16 14:55, Sricharan R wrote:
->>>>> This series is a resend of the V5 that Mitch sent sometime back [2]
->>>>> All the patches are the same and i have just rebased. Not sure why this
->>>>> finally did not make it last time. The last patch in the previous
->>>>> series does not apply now [3], so just redid that. Also Copied the tags
->>>>> that he had from last time as well.
->>>>
->>>> Heh, I was assuming this would be down to me to pick up. Vinod did have
->>>> some complaints last time about the commit message on the PL330 patch -
->>>> I did get as far as rewriting that and reworking onto my SMMU
->>>> changes[1], I just hadn't got round to sending it, so it fell onto the
->>>> "after the next merge window" pile.
->>>>
->>>> I'd give some review comments, but they'd essentially be a diff against
->>>> that branch :)
->>>>
->>>
->>> Sure, i did not knew that you were on this already. I can repost with the diff
->>> from your branch taken in or wait for you as well. I am fine with either ways
->>> that you suggest.
->>>
->>> I checked the patches against your branch, i see that the changes are,
->>>
->>> 1) one patch for implementing it for armv7s descriptor
->>> 2) Changes on pl330 patch commit logs and
->>> 3) One patch for doing the revert on arm-smmuv3 as well.
->>
->>If you want to pick up my short-descriptor and SMMUv3 patches and run
->>with them you're more than welcome - the rest is just cosmetic stuff
->>which doesn't really matter, especially as it's picking up acks as-is.
->>
->
->Sure, i will repost with additional stuff picked up from your branch and
->the acks as well.
+	return ret;
 
-Posted V7 [1], while i tested the additional short descriptor changes,
-but was not able to get hold of board with arm-smmuv3 in it.
+in dwc3_omap_remove:
+...
+	dwc3_omap_disable_irqs(omap);
+^^ IRQs are disabled in HW, but handler may still run
+	of_platform_depopulate(omap->dev);
+	pm_runtime_put_sync(&pdev->dev);
+^^ PM runtime can race with IRQ handler
+	pm_runtime_disable(&pdev->dev);
 
-[1] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1291140.html
+	return 0;
 
-Regards,
- Sricharan
+So, OMAP DWC3 IRQ need to be disabled before calling
+pm_runtime_put() in probe and in dwc3_omap_remove().
+
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+Link on v1:
+ http://www.spinics.net/lists/linux-omap/msg133846.html 
+
+ drivers/usb/dwc3/dwc3-omap.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/usb/dwc3/dwc3-omap.c b/drivers/usb/dwc3/dwc3-omap.c
+index 29e80cc..eb1b9cb 100644
+--- a/drivers/usb/dwc3/dwc3-omap.c
++++ b/drivers/usb/dwc3/dwc3-omap.c
+@@ -19,6 +19,7 @@
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/slab.h>
++#include <linux/irq.h>
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+ #include <linux/platform_data/dwc3-omap.h>
+@@ -510,7 +511,7 @@ static int dwc3_omap_probe(struct platform_device *pdev)
+ 
+ 	/* check the DMA Status */
+ 	reg = dwc3_omap_readl(omap->base, USBOTGSS_SYSCONFIG);
+-
++	irq_set_status_flags(omap->irq, IRQ_NOAUTOEN);
+ 	ret = devm_request_threaded_irq(dev, omap->irq, dwc3_omap_interrupt,
+ 					dwc3_omap_interrupt_thread, IRQF_SHARED,
+ 					"dwc3-omap", omap);
+@@ -531,7 +532,7 @@ static int dwc3_omap_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	dwc3_omap_enable_irqs(omap);
+-
++	enable_irq(omap->irq);
+ 	return 0;
+ 
+ err2:
+@@ -552,6 +553,7 @@ static int dwc3_omap_remove(struct platform_device *pdev)
+ 	extcon_unregister_notifier(omap->edev, EXTCON_USB, &omap->vbus_nb);
+ 	extcon_unregister_notifier(omap->edev, EXTCON_USB_HOST, &omap->id_nb);
+ 	dwc3_omap_disable_irqs(omap);
++	disable_irq(omap->irq);
+ 	of_platform_depopulate(omap->dev);
+ 	pm_runtime_put_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+-- 
+2.10.1
