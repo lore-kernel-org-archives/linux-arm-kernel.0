@@ -1,60 +1,34 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 12 Dec 2016 13:06:51 +0000
-Subject: [PATCH 4/4] ARM: versatile: support configuring versatile machine
- for no-MMU
-In-Reply-To: <20161209202901.GQ14217@n2100.armlinux.org.uk>
-References: <1481093992-30520-1-git-send-email-gerg@uclinux.org>
- <1481093992-30520-2-git-send-email-gerg@uclinux.org>
- <CACRpkdZywn46QbnvKcN-jkt43Vf+GBSNQkLgnnNg-DC-8aSO5w@mail.gmail.com>
- <58481DD1.6090606@arm.com> <20161209202901.GQ14217@n2100.armlinux.org.uk>
-Message-ID: <584EA0EB.7040100@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 12 Dec 2016 14:32:37 +0100
+Subject: [PATCH renesas/devel 01/13] ARM: dts: r8a7779: Use R-Car Gen 1
+ fallback binding for i2c nodes
+In-Reply-To: <1481533902-14789-2-git-send-email-horms+renesas@verge.net.au>
+References: <1481533902-14789-1-git-send-email-horms+renesas@verge.net.au>
+ <1481533902-14789-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVjNQ_ioz=nYQJodB2r78K56MWpbphu=yqBwQL58-d0RA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/16 20:29, Russell King - ARM Linux wrote:
-> On Wed, Dec 07, 2016 at 02:33:53PM +0000, Vladimir Murzin wrote:
->> Hi Linus,
->>
->> On 07/12/16 14:11, Linus Walleij wrote:
->>> Another target I had in mind was the Integrator which
->>> incidentally supports a bunch of the old noMMU core
->>> tiles where we can swap in an ARM946, which I guess
->>> could work with this?
->>
->> Do you mind trying my "Allow NOMMU for MULTIPLATFORM" series [1]? Greg just
->> reported it did a trick for Versatile, there is a good chance it would work
->> for Integrator too ;)
-> 
-> My views on gluing multiplatform and nommu together have already been
-> stated several times, and remain unchanged.
-> 
+On Mon, Dec 12, 2016 at 10:11 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Use recently added R-Car Gen 1 fallback binding for i2c nodes in
+> DT for r8a7779 SoC.
+>
+> This has no run-time effect for the current driver as the initialisation
+> sequence is the same for the SoC-specific binding for r8a7779 and the
+> fallback binding for R-Car Gen 1.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Should I treat this as the whole series is discarded or there is something you
-can pick up?
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Cheers
-Vladimir
+Gr{oetje,eeting}s,
 
-> Greg's patch looks almost sane, but what I'd like to see is instead of
-> directly doing this:
-> 
->  config ARCH_VERSATILE
->         bool "ARM Ltd. Versatile family"
-> -       depends on ARCH_MULTI_V5
-> +       depends on ARCH_MULTI_V5 || ARM_SINGLE_ARMV5
-> 
-> we could do:
-> 
->  config ARCH_VERSATILE
->         bool "ARM Ltd. Versatile family" if ARCH_MULTI_V5
-> -       depends on ARCH_MULTI_V5
-> +       depends on ARCH_MULTI_V5 || ARM_SINGLE_ARMV5
-> 	default y if ARM_SINGLE_ARCH_VERSATILE
-> 
-> adding the versatile entry in the upper level choice (where it always used
-> to be) but with "ARM_SINGLE_ARCH_VERSATILE" instead.
-> 
-> This would have the effect of allowing the multiplatform-converted stuff
-> to start being used on nommu (again) but without running into the problems
-> I've highlighted.
-> 
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
