@@ -1,34 +1,28 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 12 Dec 2016 09:30:13 +0100
-Subject: [PATCH] arm64: dts: h3ulcb: Provide sd0_uhs node
-In-Reply-To: <cover.1481530910.git.horms+renesas@verge.net.au>
-References: <cover.1481530910.git.horms+renesas@verge.net.au>
-Message-ID: <8ebcb400af619ee0ddeb39c06fc35511b20cc697.1481530910.git.horms+renesas@verge.net.au>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 12 Dec 2016 09:31:30 +0100
+Subject: [PATCH] clk: bcm: Fix 'maybe-uninitialized' warning in
+ bcm2835_clock_choose_div_and_prate()
+In-Reply-To: <3107859.uaKLk6DMRd@wuerfel>
+References: <1481529653-28133-1-git-send-email-boris.brezillon@free-electrons.com>
+ <3107859.uaKLk6DMRd@wuerfel>
+Message-ID: <20161212093130.6e348a61@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide separaate sd0 and sd0_uhs nodes rather than duplicate sd0 nodes.
+On Mon, 12 Dec 2016 09:12:36 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-Cc: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Fixes: 93373c309a70 ("arm64: dts: h3ulcb: rename SDHI0 pins")
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> On Monday, December 12, 2016 9:00:53 AM CET Boris Brezillon wrote:
+> > best_rate is reported as potentially uninitialized by gcc.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > Fixes: 155e8b3b0ee3 ("clk: bcm: Support rate change propagation on bcm2835 clocks")
+> > Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>  
+> 
+> I wonder why I didn't get that. Which compiler version did you use?
+> 
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-index 6ffb0517421a..dbea2c3d8f0c 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-@@ -169,7 +169,7 @@
- 		power-source = <3300>;
- 	};
- 
--	sdhi0_pins_uhs: sd0 {
-+	sdhi0_pins_uhs: sd0_uhs {
- 		groups = "sdhi0_data4", "sdhi0_ctrl";
- 		function = "sdhi0";
- 		power-source = <1800>;
--- 
-2.7.0.rc3.207.g0ac5344
+In case you're interested, my gcc [1] failed to detect it as well, and
+this is not the first time it happens :-/.
+
+[1]gcc (Ubuntu 5.4.0-6ubuntu1~16.04.4) 5.4.0 20160609
