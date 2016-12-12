@@ -1,63 +1,197 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 12 Dec 2016 06:44:51 -0800
-Subject: [PATCH] watchdog: bcm2835_wdt: set WDOG_HW_RUNNING bit when
- appropriate
-In-Reply-To: <1481536123-9279-1-git-send-email-rasmus.villemoes@prevas.dk>
-References: <1481536123-9279-1-git-send-email-rasmus.villemoes@prevas.dk>
-Message-ID: <6b56aefc-d19e-7854-d7ad-35b321176735@roeck-us.net>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Mon, 12 Dec 2016 09:46:25 -0500
+Subject: [Xen-devel] [PATCH v2 1/4] Support for building in a Xen binary
+In-Reply-To: <20161122150917.16524-2-andre.przywara@arm.com>
+References: <20161122150917.16524-1-andre.przywara@arm.com>
+ <20161122150917.16524-2-andre.przywara@arm.com>
+Message-ID: <20161212144625.GA1686@char.us.oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2016 01:48 AM, Rasmus Villemoes wrote:
-> A bootloader may start the watchdog device before handing control to
-> the kernel - in that case, we should tell the kernel about it so the
-> watchdog framework can keep it alive until userspace opens
-> /dev/watchdog0.
->
-> Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
+On Tue, Nov 22, 2016 at 03:09:14PM +0000, Andre Przywara wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> Add support for building a Xen binary which includes a Dom0 image and
+> the Dom0 command-line.
+> 
+> If the user specifies --with-xen=<Xen>, where Xen is an appropriate
+> AArch64 Xen binary, the build system will generate a xen-system.axf
+> instead of a linux-system.axf.
+> 
+> Original patch from Ian Campbell, but I modified most of it so all bugs
+> are probably mine.
+> [Andre: adapt to newest boot-wrapper branch, increase load address,
+> 	fixup Xen image file test]
+> 
+> Cc: Ian Campbell <ijc@hellion.org.uk>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Tested-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 
+And also
+Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 > ---
->  drivers/watchdog/bcm2835_wdt.c | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->
-> diff --git a/drivers/watchdog/bcm2835_wdt.c b/drivers/watchdog/bcm2835_wdt.c
-> index 4dddd82..c32c45b 100644
-> --- a/drivers/watchdog/bcm2835_wdt.c
-> +++ b/drivers/watchdog/bcm2835_wdt.c
-> @@ -55,6 +55,15 @@ struct bcm2835_wdt {
->  static unsigned int heartbeat;
->  static bool nowayout = WATCHDOG_NOWAYOUT;
->
-> +static bool bcm2835_wdt_is_running(struct bcm2835_wdt *wdt)
-> +{
-> +	uint32_t cur;
+>  .gitignore    |  1 +
+>  Makefile.am   | 10 +++++++---
+>  boot_common.c |  4 ++--
+>  configure.ac  | 17 +++++++++++++++++
+>  model.lds.S   | 14 ++++++++++++++
+>  5 files changed, 41 insertions(+), 5 deletions(-)
+> 
+> diff --git a/.gitignore b/.gitignore
+> index 8653852..80770c0 100644
+> --- a/.gitignore
+> +++ b/.gitignore
+> @@ -14,6 +14,7 @@ configure
+>  dtc
+>  fdt.dtb
+>  Image
+> +Xen
+>  install-sh
+>  Makefile
+>  Makefile.in
+> diff --git a/Makefile.am b/Makefile.am
+> index 692d2cc..f8b9ec9 100644
+> --- a/Makefile.am
+> +++ b/Makefile.am
+> @@ -85,7 +85,6 @@ TEXT_LIMIT	:= 0x80080000
+>  endif
+>  
+>  LD_SCRIPT	:= model.lds.S
+> -IMAGE		:= linux-system.axf
+>  
+>  FS_OFFSET	:= 0x10000000
+>  FILESYSTEM_START:= $(shell echo $$(($(PHYS_OFFSET) + $(FS_OFFSET))))
+> @@ -94,6 +93,11 @@ FILESYSTEM_END	:= $(shell echo $$(($(FILESYSTEM_START) + $(FILESYSTEM_SIZE))))
+>  
+>  FDT_OFFSET	:= 0x08000000
+>  
+> +if XEN
+> +XEN		:= -DXEN=$(XEN_IMAGE)
+> +XEN_OFFSET	:= 0x08200000
+> +endif
 > +
-> +	cur = readl(wdt->base + PM_RSTC);
+>  if INITRD
+>  INITRD_FLAGS	:= -DUSE_INITRD
+>  CHOSEN_NODE	:= chosen {						\
+> @@ -121,7 +125,7 @@ all: $(IMAGE)
+>  
+>  CLEANFILES = $(IMAGE) $(OFILES) model.lds fdt.dtb
+>  
+> -$(IMAGE): $(OFILES) model.lds fdt.dtb $(KERNEL_IMAGE) $(FILESYSTEM)
+> +$(IMAGE): $(OFILES) model.lds fdt.dtb $(KERNEL_IMAGE) $(FILESYSTEM) $(XEN_IMAGE)
+>  	$(LD) $(LDFLAGS) $(OFILES) -o $@ --script=model.lds
+>  
+>  %.o: %.S Makefile
+> @@ -131,7 +135,7 @@ $(IMAGE): $(OFILES) model.lds fdt.dtb $(KERNEL_IMAGE) $(FILESYSTEM)
+>  	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEFINES) -c -o $@ $<
+>  
+>  model.lds: $(LD_SCRIPT) Makefile
+> -	$(CPP) $(CPPFLAGS) -ansi -DPHYS_OFFSET=$(PHYS_OFFSET) -DMBOX_OFFSET=$(MBOX_OFFSET) -DKERNEL_OFFSET=$(KERNEL_OFFSET) -DFDT_OFFSET=$(FDT_OFFSET) -DFS_OFFSET=$(FS_OFFSET) -DKERNEL=$(KERNEL_IMAGE) -DFILESYSTEM=$(FILESYSTEM) -DTEXT_LIMIT=$(TEXT_LIMIT) -P -C -o $@ $<
+> +	$(CPP) $(CPPFLAGS) -ansi -DPHYS_OFFSET=$(PHYS_OFFSET) -DMBOX_OFFSET=$(MBOX_OFFSET) -DKERNEL_OFFSET=$(KERNEL_OFFSET) -DFDT_OFFSET=$(FDT_OFFSET) -DFS_OFFSET=$(FS_OFFSET) $(XEN) -DXEN_OFFSET=$(XEN_OFFSET) -DKERNEL=$(KERNEL_IMAGE) -DFILESYSTEM=$(FILESYSTEM) -DTEXT_LIMIT=$(TEXT_LIMIT) -P -C -o $@ $<
+>  
+>  fdt.dtb: $(KERNEL_DTB) Makefile gen-cpu-nodes.sh
+>  	( $(DTC) -O dts -I dtb $(KERNEL_DTB) ; echo "/ { $(CHOSEN_NODE) $(PSCI_NODE) $(CPUS_NODE) };" ) | $(DTC) -O dtb -o $@ -
+> diff --git a/boot_common.c b/boot_common.c
+> index 4947fe3..e7b8e1d 100644
+> --- a/boot_common.c
+> +++ b/boot_common.c
+> @@ -9,7 +9,7 @@
+>  #include <cpu.h>
+>  #include <spin.h>
+>  
+> -extern unsigned long kernel;
+> +extern unsigned long entrypoint;
+>  extern unsigned long dtb;
+>  
+>  void init_platform(void);
+> @@ -67,7 +67,7 @@ void __noreturn first_spin(unsigned int cpu, unsigned long *mbox,
+>  	if (cpu == 0) {
+>  		init_platform();
+>  
+> -		*mbox = (unsigned long)&kernel;
+> +		*mbox = (unsigned long)&entrypoint;
+>  		sevl();
+>  		spin(mbox, invalid, 1);
+>  	} else {
+> diff --git a/configure.ac b/configure.ac
+> index ab8f5b3..f7e24c7 100644
+> --- a/configure.ac
+> +++ b/configure.ac
+> @@ -40,6 +40,18 @@ AC_ARG_WITH([dtb],
+>  	AS_HELP_STRING([--with-dtb], [Specify a particular DTB to use]),
+>  	[KERN_DTB="$withval"])
+>  
+> +AC_ARG_WITH([xen],
+> +	AS_HELP_STRING([--with-xen], [Compile for Xen, and Specify a particular Xen to use]),
+> +	X_IMAGE=$withval)
 > +
-> +	return !!(cur & PM_RSTC_WRCFG_FULL_RESET);
-> +}
+> +AS_IF([test "x$X_IMAGE" == "x"], [],
+> +      [AS_IF([test ! -f "$X_IMAGE"],
+> +	     [AC_MSG_ERROR([Could not find Xen hypervisor binary: $X_IMAGE])]
+> +      )]
+> +)
+> +AC_SUBST([XEN_IMAGE], [$X_IMAGE])
+> +AM_CONDITIONAL([XEN], [test "x$X_IMAGE" != "x"])
 > +
->  static int bcm2835_wdt_start(struct watchdog_device *wdog)
->  {
->  	struct bcm2835_wdt *wdt = watchdog_get_drvdata(wdog);
-> @@ -181,6 +190,17 @@ static int bcm2835_wdt_probe(struct platform_device *pdev)
->  	watchdog_init_timeout(&bcm2835_wdt_wdd, heartbeat, dev);
->  	watchdog_set_nowayout(&bcm2835_wdt_wdd, nowayout);
->  	bcm2835_wdt_wdd.parent = &pdev->dev;
-> +	if (bcm2835_wdt_is_running(wdt)) {
-> +		/*
-> +		 * The currently active timeout value (set by the
-> +		 * bootloader) may be different from the module
-> +		 * heartbeat parameter or the value in device
-> +		 * tree. But we just need to set WDOG_HW_RUNNING,
-> +		 * because then the framework will "immediately" ping
-> +		 * the device, updating the timeout.
-> +		 */
-> +		set_bit(WDOG_HW_RUNNING, &bcm2835_wdt_wdd.status);
+>  # Ensure that the user has provided us with a sane kernel dir.
+>  m4_define([CHECKFILES], [KERN_DIR,
+>  	KERN_DTB,
+> @@ -50,6 +62,10 @@ m4_foreach([checkfile], [CHECKFILES],
+>  
+>  AC_SUBST([KERNEL_IMAGE], [$KERN_IMAGE])
+>  AC_SUBST([KERNEL_DTB], [$KERN_DTB])
+> +AS_IF([test "x$X_IMAGE" != "x"],
+> +      [AC_SUBST([IMAGE], ["xen-system.axf"])],
+> +      [AC_SUBST([IMAGE], ["linux-system.axf"])]
+> +)
+>  
+>  # Allow a user to pass --enable-psci
+>  AC_ARG_ENABLE([psci],
+> @@ -119,4 +135,5 @@ echo "  CPU IDs:                           ${CPU_IDS}"
+>  echo "  Use GICv3?                         ${USE_GICV3}"
+>  echo "  Boot-wrapper execution state:      AArch${BOOTWRAPPER_ES}"
+>  echo "  Kernel execution state:            AArch${KERNEL_ES}"
+> +echo "  Xen image                          ${XEN_IMAGE:-NONE}"
+>  echo ""
+> diff --git a/model.lds.S b/model.lds.S
+> index 51c5684..511f552 100644
+> --- a/model.lds.S
+> +++ b/model.lds.S
+> @@ -16,6 +16,9 @@ OUTPUT_ARCH(aarch64)
+>  #endif
+>  TARGET(binary)
+>  
+> +#ifdef XEN
+> +INPUT(XEN)
+> +#endif
+>  INPUT(KERNEL)
+>  INPUT(./fdt.dtb)
+>  
+> @@ -36,6 +39,17 @@ SECTIONS
+>  		KERNEL
+>  	}
+>  
+> +#ifdef XEN
+> +	.xen (PHYS_OFFSET + XEN_OFFSET): {
+> +		xen = .;
+> +		XEN
 > +	}
->  	err = watchdog_register_device(&bcm2835_wdt_wdd);
->  	if (err) {
->  		dev_err(dev, "Failed to register watchdog device");
->
+> +
+> +	entrypoint = xen;
+> +#else
+> +	entrypoint = kernel;
+> +#endif
+> +
+>  	.dtb (PHYS_OFFSET + FDT_OFFSET): {
+>  		dtb = .;
+>  		./fdt.dtb
+> -- 
+> 2.9.0
+> 
+> 
+> _______________________________________________
+> Xen-devel mailing list
+> Xen-devel at lists.xen.org
+> https://lists.xen.org/xen-devel
