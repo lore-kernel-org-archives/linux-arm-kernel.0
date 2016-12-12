@@ -1,84 +1,52 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 12 Dec 2016 19:24:47 +0530
-Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
-In-Reply-To: <5370936.ZbqF1HU8Jz@amdc3058>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
- <m27fcn3pb1.fsf@baylibre.com> <578CEB74.2080002@ti.com>
- <5370936.ZbqF1HU8Jz@amdc3058>
-Message-ID: <8ea5971a-338d-e8b9-6be8-8fe2658fc04d@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 12 Dec 2016 15:39:44 +0100
+Subject: [PATCH renesas/devel 10/13] ARM: dts: r8a7790: Use R-Car Gen 2
+ fallback binding for i2c nodes
+In-Reply-To: <CAMuHMdX3QR00t-QwCv+AFqMmWvFZ-wuvVAa5S2p0Cnu3mWB9CQ@mail.gmail.com>
+ <0db5b88e-41fb-03db-fa61-48e754356901@cogentembedded.com>
+Message-ID: <20161212143942.GA31172@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomiej,
+On Mon, Dec 12, 2016 at 01:28:30PM +0300, Sergei Shtylyov wrote:
+> Hello!
+> 
+> On 12/12/2016 12:11 PM, Simon Horman wrote:
+> 
+> >Use recently added R-Car Gen 2 fallback binding for iii nodes in
+> 
+>    s/iii/iic/?
 
-On Monday 12 December 2016 06:15 PM, Bartlomiej Zolnierkiewicz wrote:
-> 
-> Hi,
-> 
-> On Monday, July 18, 2016 08:15:08 PM Sekhar Nori wrote:
->> On Friday 15 July 2016 08:45 PM, Kevin Hilman wrote:
->>> Arnd Bergmann <arnd@arndb.de> writes:
->>>
->>>> On Wednesday, July 13, 2016 12:59:23 PM CEST Bartlomiej Zolnierkiewicz wrote:
->>>>>
->>>>> On Friday, July 08, 2016 10:23:48 PM Arnd Bergmann wrote:
->>>>>> On Friday, July 8, 2016 5:24:41 PM CEST Bartlomiej Zolnierkiewicz wrote:
->>>>>>> This patch disables deprecated IDE subsystem in assabet_defconfig
->>>>>>> (no IDE host drivers are selected in this config so there is no
->>>>>>> valid reason to enable IDE subsystem itself).
->>>>>>>
->>>>>>> Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->>>>>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->>>>>>
->>>>>> I think the series makes a lot of sense. I have checked your assertions
->>>>>> in the changelogs and found no flaws in your logic, so I think we should
->>>>>> take them all through arm-soc unless there are other concerns.
->>>>>
->>>>> Thank you.
->>>>>
->>>>> Should I resend everything or just patches that were not reposted yet
->>>>> (the ones that were marked as RFT initially and got no feedback)?
->>>>
->>>> I'd be fine with just getting a pull request with all the patches that
->>>> had no negative feedback and that were not already applied (if any).
->>>>
->>>>>> Do you have a list of ARM defconfigs that keep using CONFIG_IDE and
->>>>>> how you determined that they need it?
->>>>>
->>>>> The only such defconfig is davinci_all_defconfig which uses
->>>>> palm_bk3710 host driver (CONFIG_BLK_DEV_PALMCHIP_BK3710).
->>>>>
->>>>>> I know that ARCH_RPC/ARCH_ACORN has a couple of special drivers that
->>>>>> have no libata replacement, are there any others like that, or are
->>>>>> they all platforms that should in theory work with libata but need
->>>>>> testing?
->>>>>
->>>>> All platforms except ARCH_ACORN, ARCH_DAVINCI & ARCH_RPC should work
->>>>> with libata.
->>>>
->>>> Adding Sekhar and Kevin for DaVinci: At first sight, palm_bk3710 looks
->>>> fairly straightforward (meaning someone has to do a few day's work)
->>>> to convert into a libata driver.
->>>>
->>>> As this is on on-chip controller that is part of a dm644x and dm646x,
->>>> it should also not be hard to test (as long as someone can find
->>>> a hard drive to plug in).
->>>
->>> I have a hard drive, but don't have any dm64xx hardware anymore to test
->>> this.  My last working dm644x board died last year.
->>
->> I have a working DM6446 EVM. I was able to connect a hard drive to it
->> and do some basic tests with v4.6 kernel.
->>
->> I will look into converting the driver to libata. Might take some time
->> because this is unfamiliar territory for me.
-> 
-> Do you need some help with it?
-> 
-> I can provide you with draft driver patch if you want.
+Yes, thanks for noticing that.
 
-A draft driver patch will really help. I can test/debug. Otherwise, not
-sure when I will really be able to get to this.
+> >DT for r8a7790 SoC.
+> >
+> >This has no run-time effect for the current driver as the initialisation
+> >sequence is the same for the SoC-specific binding for r8a7790 and the
+> >fallback binding for R-Car Gen 2.
+> >
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> [...]
+> 
+> MBR, Sergei
+> 
 
-Regards,
-Sekhar
+On Mon, Dec 12, 2016 at 02:42:29PM +0100, Geert Uytterhoeven wrote:
+> Hi SImon,
+> 
+> On Mon, Dec 12, 2016 at 10:11 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Use recently added R-Car Gen 2 fallback binding for iii nodes in
+> 
+> As Sergei already pointed out: s/iii/iic/.
+> 
+> You may also want to s/i2c/iic/ in the one-line summary, to avoid having
+> multiple different patches with the same one-line summary (initially I was a
+> bit confused by this, as Gmail grouped them together).
+
+Yes, I meant to differentiate the subjects as you suggest.
+I'll fix things up.
+
+> These two comments apply to all iic DT patches in this series.
+
+Got it.
