@@ -1,34 +1,103 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 12 Dec 2016 14:05:40 +0100
-Subject: [PATCH v6 3/5] drm: bridge: add support for TI ths8135
+Date: Mon, 12 Dec 2016 14:05:41 +0100
+Subject: [PATCH v6 4/5] ARM: dts: da850-lcdk: add the vga-bridge node
 In-Reply-To: <1481547942-24775-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1481547942-24775-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1481547942-24775-4-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1481547942-24775-5-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-THS8135 is a configurable video DAC, but no configuration is actually
-necessary to make it work.
-
-For now use the dumb-vga-dac driver to support it.
+Add the vga-bridge node to the board DT together with corresponding
+ports and vga connector. This allows to retrieve the edid info from
+the display automatically.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- drivers/gpu/drm/bridge/dumb-vga-dac.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/da850-lcdk.dts | 67 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 67 insertions(+)
 
-diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-index afec232..498fa75 100644
---- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
-+++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-@@ -204,6 +204,7 @@ static int dumb_vga_remove(struct platform_device *pdev)
- 
- static const struct of_device_id dumb_vga_match[] = {
- 	{ .compatible = "dumb-vga-dac" },
-+	{ .compatible = "ti,ths8135" },
- 	{},
+diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+index afcb482..e003111 100644
+--- a/arch/arm/boot/dts/da850-lcdk.dts
++++ b/arch/arm/boot/dts/da850-lcdk.dts
+@@ -51,6 +51,51 @@
+ 			system-clock-frequency = <24576000>;
+ 		};
+ 	};
++
++	vga-bridge {
++		compatible = "ti,ths8135";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0>;
++
++				vga_bridge_in: endpoint {
++					reg = <0>;
++					remote-endpoint = <&lcdc_out_vga>;
++				};
++			};
++
++			port at 1 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <1>;
++
++				vga_bridge_out: endpoint {
++					reg = <0>;
++					remote-endpoint = <&vga_con_in>;
++				};
++			};
++		};
++	};
++
++	vga {
++		compatible = "vga-connector";
++
++		ddc-i2c-bus = <&i2c0>;
++
++		port {
++			vga_con_in: endpoint {
++				remote-endpoint = <&vga_bridge_out>;
++			};
++		};
++	};
  };
- MODULE_DEVICE_TABLE(of, dumb_vga_match);
+ 
+ &pmx_core {
+@@ -236,3 +281,25 @@
+ &memctrl {
+ 	status = "okay";
+ };
++
++&lcdc {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&lcd_pins>;
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		lcdc_out: port at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++
++			lcdc_out_vga: endpoint {
++				reg = <0>;
++				remote-endpoint = <&vga_bridge_in>;
++			};
++		};
++	};
++};
 -- 
 2.9.3
