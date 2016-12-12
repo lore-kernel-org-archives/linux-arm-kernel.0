@@ -1,68 +1,144 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 12 Dec 2016 13:11:20 +0100
-Subject: [RFC PATCH 15/23] arm: use kconfig fragments for ARCH_PXA
- defconfigs (part 1)
-In-Reply-To: <87a8c415hs.fsf@belgarion.home>
-References: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20161210094643epcas1p2375b6359995384ff76edbec0e23e0ab1@epcas1p2.samsung.com>
- <87a8c415hs.fsf@belgarion.home>
-Message-ID: <2063576.NTX1QzvF1P@amdc3058>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 12 Dec 2016 12:16:07 +0000
+Subject: [linux-sunxi] sunxi-ng clocks: leaving certain clocks alone?
+In-Reply-To: <CAGb2v67kCAr6Ty5=Gg8vOGNC6xhuRM66Wa=H+C3AD=_d_H+N8w@mail.gmail.com>
+References: <d70f2809-102c-a3de-c77c-43af27bbcbbc@arm.com>
+ <CAGb2v67kCAr6Ty5=Gg8vOGNC6xhuRM66Wa=H+C3AD=_d_H+N8w@mail.gmail.com>
+Message-ID: <4e6ddb18-0686-1639-544c-c02371331d3c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Chen-Yu,
 
-Hi,
+thanks for the answer!
 
-On Saturday, December 10, 2016 10:46:23 AM Robert Jarzmik wrote:
-> Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> writes:
+On 12/12/16 04:41, Chen-Yu Tsai wrote:
+> On Mon, Dec 12, 2016 at 7:54 AM, Andr? Przywara <andre.przywara@arm.com> wrote:
+>> Hi,
+>>
+>> I was observing that the new sunxi-ng clock code apparently explicitly
+>> turns off _all_ clocks that are not used or needed. I find this rather
+>> unfortunate, as I wanted to use the THS temperature sensor from ARM
+>> Trusted Firmware to implement emergency shutdown or DVFS throttling.
+>> That works until the clock framework finds the clock (as enumerated in
+>> ccu-sun50i-a64.c) and obviously explicitly clears bit 31 in the THS mod
+>> clock register and bit 8 in the respective clock gate register.
+>> Turning them manually back on via /dev/mem or removing the THS clock
+>> from the sunxi-ng driver fixes this for me.
+>>
+>> This was not happening with the old Allwinner clocks, since the kernel
+>> wouldn't even know about it if there was no driver and the clock wasn't
+>> mentioned in the DT.
+>>
+>> Now with sunxi-ng even though the THS clock is not actually referenced
+>> or used in the DT, the kernel turns it off. I would expect that upon
+>> entering the kernel all unneeded clocks are turned off anyway, so there
+>> is no need to mess with clocks that have no user, but are enumerated in
+>> the ccu driver.
 > 
-> > Replace [lpd270,lubbock,mainstone,pxa255-idp]_defconfig-s with
-> > a Makefile target using merge_config.
-> >
-> > The patch was verified with doing:
-> >
-> >     $ make [lpd270,...]_defconfig
-> >     $ make savedefconfig
-> >
-> > and comparing resulting defconfig files (before/after the patch).
-> >
-> > Cc: Daniel Mack <daniel@zonque.org>
-> > Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> > Cc: Robert Jarzmik <robert.jarzmik@free.fr>
-> > Cc: Cyril Bur <cyrilbur@gmail.com>
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> I can't say that's absolutely true (wink).
 > 
-> Hi Bartolomiej,
+>>
+>> I wonder if this kills simplefb as well, for instance, since I believe
+>> that U-Boot needs to turn on certain clocks and relies on them staying up.
 > 
-> It's a bit hard to judge without any context for me, especially I'm receiving
-> patches 11 to 21 but not the others. I suppose the advantage of defconfig
+> The simplefb bindings takes clocks and regulators expressly for the
+> purpose of keeping them enabled.
 
-Sorry about that.
+Right, I should have checked this before ...
 
-> fragments was already discussed somewhere, could you point me to that please ?
-
-http://marc.info/?l=linux-kernel&m=148102838302106&w=2
-
-I've put the patches on hold for now after the feedback from Olof & Arnd.
-
-> One small thing that could be improved is the "pxa_basic*" names.
+>>
+>> So my questions:
+>> 1) Is this expected behaviour?
 > 
-> I think pxa_basic1 is "pxa_refboards" or something like that, as these are the
-> initial reference designs as far as I know from Intel and validation vehicles
-> rather that form factors.
+> Yes.
 > 
-> In the same way, pxa_basic2 is rather "pxa_sharpsl" as these are sharp designs.
+>> 2) If yes, should it really be?
+>> 3) If yes, shouldn't there be way to explicitly tell Linux to leave that
+>> clock alone, preferably via DT? Although the sunxi-ng clocks take
+>> control over the whole CCU unit, I wonder if it should really mess with
+>> clocks there are not referenced in the DT.
 > 
-> And pxa_basic3 looks like Motorola platforms, so "pxa_motorola" perhaps ?
-> 
-> I noticed imote2.config ended up based on pxa_basic3, while I would have
-> expected it to be based on pxa_basic1 as it looks like a reference board to me
-> ...
+> As it owns the whole CCU unit, why not? And how would it know if some
+> clock is referenced or not, unless going through the whole device tree?
 
-Thank you for your comments.
+I was hoping that it just provides clocks to any users (drivers) and
+wouldn't bother with tinkering with every clock unless explicitly being
+asked for (by a driver being pointed to a specific clock through DT).
+So it would need to iterate through anything - neither the whole DT nor
+it's own list of clocks.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+> Furthermore, nothing prevents another device driver from referencing
+> said clock and turning it off when it's not in use. Think THS driver
+> with runtime PM.
+
+I am totally OK with that: Any potential Linux THS driver can take over,
+if the DT references this device and the clock.
+My point is that atm there is no such driver and so the clocks framework
+shouldn't turn that clock off.
+
+> Are you also mapping the THS to secure only? Otherwise nothing would
+> prevent Linux from also claiming it.
+
+Unfortunately the THS is always unsecure. And even if it could be
+switched, after a recent IRC discussion I came to believe that those
+secure peripherals features only works when the secure boot feature is
+used, which requires to blow an efuse and thus is not easily doable on
+most boards and also irreversible.
+Also I am not sure whether this security feature actually extends to the
+mod clocks and the bus reset and clock gates bits.
+
+But I was relying on that Linux doesn't touch hardware that's not
+referenced in the DT, so if firmware uses the THS, any Linux THS node
+would need to go - or the other way around: if there is a Linux THS
+node, firmware backs off.
+
+>> Maybe there is some way to reference those clocks via some dummy driver
+>> or DT node to avoid this behaviour? Is there any prior art in this respect?
+> 
+> If you want a clock to not be disabled by anyone, adding CLK_IS_CRITICAL
+> to its flags is the proper option. This is done in the clk driver though.
+
+Yes, I was thinking about that, but it indeed sounds like a hack to
+follow this.
+
+> If you just don't want the clk subsystem to disable unused clks at boot
+> time, you can add "clk_ignore_unused" to the kernel boot parameters.
+> I think this is more of a hack and debugging tool though.
+
+Good point, but indeed looks like a debug feature.
+
+> About dummy drivers, simplefb comes to mind again. But simplefb disables
+> them when it gets kicked out by the drm driver.
+
+Which I am fine with. If people are desperate about a THS driver, this
+could take over, although I would expect a firmware driving the THS
+would discourage this - for instance by removing a THS node.
+
+> Maybe there are other examples.
+
+OK, thanks for the pointer, I will look into this direction.
+
+Cheers,
+Andre.
+
+>> I think this issue will affect more future users (thinking of EFI RTC,
+>> EFI graphics, etc.), so I wanted to start a discussion on this.
+>>
+>> Any input welcome.
+>>
+>> Cheers,
+>> Andre.
+>>
+>> P.S. For reference my use case: ARM Trusted Firmware (ATF) enables the
+>> temperature sensor (THS) and programs a shutdown value. It programs the
+>> respective interrupt as secure and registers an IRQ handler in ATF to
+>> shutdown the system or take other appropriate matters to avoid
+>> overheating. Additionally the sensor is exported via the generic SCPI
+>> interface, so the existing scpi-hwmon driver picks it up and reports it
+>> to whoever is interested in Linux land via the normal interfaces.
+>>
+>> --
+>> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+>> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+>> For more options, visit https://groups.google.com/d/optout.
