@@ -1,52 +1,82 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 12 Dec 2016 12:40:05 +0000
-Subject: [PATCH v7 1/8] Documentation: arm: define DT cpu
- capacity-dmips-mhz bindings
-In-Reply-To: <1473085372-2840-2-git-send-email-juri.lelli@arm.com>
-References: <1473085372-2840-1-git-send-email-juri.lelli@arm.com>
- <1473085372-2840-2-git-send-email-juri.lelli@arm.com>
-Message-ID: <20161212124005.GA19177@red-moon>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 12 Dec 2016 13:45:03 +0100
+Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
+In-Reply-To: <578CEB74.2080002@ti.com>
+References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
+ <m27fcn3pb1.fsf@baylibre.com> <578CEB74.2080002@ti.com>
+Message-ID: <5370936.ZbqF1HU8Jz@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 05, 2016 at 03:22:45PM +0100, Juri Lelli wrote:
 
-[...]
+Hi,
 
-> +===========================================
-> +5 - References
-> +===========================================
-> +
-> +[1] ARM Linux Kernel documentation - CPUs bindings
-> +    Documentation/devicetree/bindings/arm/cpus.txt
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index e6782d50cbcd..c1dcf4cade2e 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -241,6 +241,14 @@ nodes to be present and contain the properties described below.
->  			# List of phandles to idle state nodes supported
->  			  by this cpu [3].
->  
-> +	- capacity-dmips-mhz
-> +		Usage: Optional
-> +		Value type: <u32>
-> +		Definition:
-> +			# u32 value representing CPU capacity [3] in
-> +			  DMIPS/MHz, relative to highest capacity-dmips-mhz
-> +			  in the system.
-> +
->  	- rockchip,pmu
->  		Usage: optional for systems that have an "enable-method"
->  		       property value of "rockchip,rk3066-smp"
-> @@ -464,3 +472,5 @@ cpus {
->  [2] arm/msm/qcom,kpss-acc.txt
->  [3] ARM Linux kernel documentation - idle states bindings
->      Documentation/devicetree/bindings/arm/idle-states.txt
-> +[3] ARM Linux kernel documentation - cpu capacity bindings
-> +    Documentation/devicetree/bindings/arm/cpu-capacity.txt
+On Monday, July 18, 2016 08:15:08 PM Sekhar Nori wrote:
+> On Friday 15 July 2016 08:45 PM, Kevin Hilman wrote:
+> > Arnd Bergmann <arnd@arndb.de> writes:
+> > 
+> >> On Wednesday, July 13, 2016 12:59:23 PM CEST Bartlomiej Zolnierkiewicz wrote:
+> >>>
+> >>> On Friday, July 08, 2016 10:23:48 PM Arnd Bergmann wrote:
+> >>>> On Friday, July 8, 2016 5:24:41 PM CEST Bartlomiej Zolnierkiewicz wrote:
+> >>>>> This patch disables deprecated IDE subsystem in assabet_defconfig
+> >>>>> (no IDE host drivers are selected in this config so there is no
+> >>>>> valid reason to enable IDE subsystem itself).
+> >>>>>
+> >>>>> Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> >>>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> >>>>
+> >>>> I think the series makes a lot of sense. I have checked your assertions
+> >>>> in the changelogs and found no flaws in your logic, so I think we should
+> >>>> take them all through arm-soc unless there are other concerns.
+> >>>
+> >>> Thank you.
+> >>>
+> >>> Should I resend everything or just patches that were not reposted yet
+> >>> (the ones that were marked as RFT initially and got no feedback)?
+> >>
+> >> I'd be fine with just getting a pull request with all the patches that
+> >> had no negative feedback and that were not already applied (if any).
+> >>
+> >>>> Do you have a list of ARM defconfigs that keep using CONFIG_IDE and
+> >>>> how you determined that they need it?
+> >>>
+> >>> The only such defconfig is davinci_all_defconfig which uses
+> >>> palm_bk3710 host driver (CONFIG_BLK_DEV_PALMCHIP_BK3710).
+> >>>
+> >>>> I know that ARCH_RPC/ARCH_ACORN has a couple of special drivers that
+> >>>> have no libata replacement, are there any others like that, or are
+> >>>> they all platforms that should in theory work with libata but need
+> >>>> testing?
+> >>>
+> >>> All platforms except ARCH_ACORN, ARCH_DAVINCI & ARCH_RPC should work
+> >>> with libata.
+> >>
+> >> Adding Sekhar and Kevin for DaVinci: At first sight, palm_bk3710 looks
+> >> fairly straightforward (meaning someone has to do a few day's work)
+> >> to convert into a libata driver.
+> >>
+> >> As this is on on-chip controller that is part of a dm644x and dm646x,
+> >> it should also not be hard to test (as long as someone can find
+> >> a hard drive to plug in).
+> > 
+> > I have a hard drive, but don't have any dm64xx hardware anymore to test
+> > this.  My last working dm644x board died last year.
+> 
+> I have a working DM6446 EVM. I was able to connect a hard drive to it
+> and do some basic tests with v4.6 kernel.
+> 
+> I will look into converting the driver to libata. Might take some time
+> because this is unfamiliar territory for me.
 
-Trivia: bumped into this while reviewing something else, too many
-threes, you will have to fix the added reference up.
+Do you need some help with it?
 
-Thanks,
-Lorenzo
+I can provide you with draft driver patch if you want.
+
+I'm also on #kernel IRC channel in case you have some questions..
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
