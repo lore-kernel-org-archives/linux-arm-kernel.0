@@ -1,46 +1,58 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Mon, 12 Dec 2016 07:58:03 +0100
-Subject: [PATCH 2/2] kcov: make kcov work properly with KASLR enabled
-In-Reply-To: <f3f9c3a3-349d-65ff-6c84-51878cfd8072@linux.com>
-References: <1481417456-28826-1-git-send-email-alex.popov@linux.com>
- <1481417456-28826-3-git-send-email-alex.popov@linux.com>
- <CACT4Y+bOd-Lzs45jyEr73GkRc7zZDxL8Z3fSc+TeZVRNVC6M-A@mail.gmail.com>
- <f3f9c3a3-349d-65ff-6c84-51878cfd8072@linux.com>
-Message-ID: <CACT4Y+agNw4FY5N+B0QwSR63uGCUG1msEZKeYu_NywwV3Hek4w@mail.gmail.com>
+From: mickael.guene@st.com (mickael guene)
+Date: Mon, 12 Dec 2016 08:07:16 +0100
+Subject: [RFC v3 PATCH 00/25] Allow NOMMU for MULTIPLATFORM
+In-Reply-To: <87fulus094.fsf@dell.be.48ers.dk>
+References: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
+ <20161210181639.GA5660@afzalpc> <878trntrig.fsf@dell.be.48ers.dk>
+ <20161211070104.GB3035@afzalpc> <87fulus094.fsf@dell.be.48ers.dk>
+Message-ID: <238a0185-db3a-fa43-cd7d-91baebdb82d4@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 11, 2016 at 10:37 PM, Alexander Popov <alex.popov@linux.com> wrote:
-> On 11.12.2016 12:32, Dmitry Vyukov wrote:
->> On Sun, Dec 11, 2016 at 1:50 AM, Alexander Popov <alex.popov@linux.com> wrote:
->>> Subtract KASLR offset from the kernel addresses reported by kcov.
->>> Tested on x86_64 and AArch64 (Hikey LeMaker).
->>>
->>> Signed-off-by: Alexander Popov <alex.popov@linux.com>
->>> ---
->>>  kernel/kcov.c | 8 +++++++-
->>>  1 file changed, 7 insertions(+), 1 deletion(-)
->>
->> I think generally this is the right thing to do.
->>
->>  There are 2 pending patches for kcov by +Quentin (hopefully in mm):
->> "kcov: add AFL-style tracing"
->> "kcov: size of arena is now given in bytes"
->> https://groups.google.com/forum/#!topic/syzkaller/gcqbIhKjGcY
->> https://groups.google.com/d/msg/syzkaller/gcqbIhKjGcY/KQFryjBKCAAJ
->>
->> Your patch probably conflicts with them.
->> Should you base them on top of these patches, so that Andrew can merge
->> it without conflicts?
->
-> Excuse me, I can't find these patches in:
-> git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
-> git://git.kernel.org/pub/scm/linux/kernel/git/mhocko/mm.git
-> git://git.cmpxchg.org/linux-mmots.git
->
-> Could you point at the tree which I can rebase onto?
-> Should I cherry-pick Quentin's patches manually?
+Hi all,
 
+  You can find an R toolchain here:
+https://github.com/mickael-guene/fdpic_manifest/releases/download/v7-r-1.0.1/toolset-v7-r-1.0.1-0-gbdcc6a7c-armv7-r.tgz
 
-Quentin, do you know destiny of your patches? They does not seem to be
-in mm tree.
+  It's an fdpic toolset for cortex-r cpu class. gcc version is
+quite old (4.7).
+
+  Note also that generated code may crash on class A cpu due to
+generation of udiv/sdiv which is optional for class A.
+(cortex a15 is ok but not a9).
+
+Hope it helps
+
+Regards
+Mickael
+
+On 12/11/2016 09:01 PM, Peter Korsgaard wrote:
+>>>>>> "Afzal" == Afzal Mohammed <afzal.mohd.ma@gmail.com> writes:
+>
+> Hi,
+>
+>  >> You can build a toolchain and initramfs with Buildroot. Have a look at
+>  >> the stm32f429 nommu config:
+>  >>
+>  >> https://git.buildroot.net/buildroot/tree/configs/stm32f429_disco_defconfig
+>
+>  > iiuc, it builds one for Cortex-M. i already had a file system w/
+>  > busybox compiled using a Cortex-M toolchain (stolen from
+>  > Pengutronix's OSELAS.Toolchain), which works on Cortex M4 (Vybrid
+>  > VF610 M4 core). But it does not work here, i.e. on Cortex A, seems the
+>  > above mentioned also would have the same effect.
+>
+> Hmm, I'm not sure why a cortex-M toolchain wouldn't work on cortex-A, I
+> thought the 'M' instruction set was a pure subset of the 'A'.
+>
+>  > And in buildroot, couldn't see Cortex R option in menuconfig, and
+>  > selecting Cortex-A's excludes flat binary target & presents only with
+>  > ELF.
+>
+> We indeed don't have cortex-R support. I'm not aware of any cortex-R
+> Linux support.
+>
+> When you select a cortex-A variant, then we enable MMU support by
+> default, but you can disable it under toolchain options (Enable MMU) and
+> then the flat binary option is available.
+>
