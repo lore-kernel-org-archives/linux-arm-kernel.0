@@ -1,35 +1,30 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 12 Dec 2016 21:18:46 +0100
-Subject: [PATCH v3 11/12] arm64: dts: marvell: add sdhci support for
- Armada 7K/8K
-In-Reply-To: <20161212191651.GV14217@n2100.armlinux.org.uk>
-References: <cover.e0137cef24a16a2c7d795548de554993595d4a98.1481279228.git-series.gregory.clement@free-electrons.com>
- <923c97f32a828b579756bf86946689ed54a0a174.1481279228.git-series.gregory.clement@free-electrons.com>
- <20161209200729.GO14217@n2100.armlinux.org.uk>
- <87bmwhdrx7.fsf@free-electrons.com>
- <20161212191651.GV14217@n2100.armlinux.org.uk>
-Message-ID: <20161212211846.12db0b3c@free-electrons.com>
+From: peter@korsgaard.com (Peter Korsgaard)
+Date: Mon, 12 Dec 2016 21:42:01 +0100
+Subject: [PATCH 0/2] ARM: v7-A !MMU fixes for fun (&fame)
+In-Reply-To: <20161212184429.GA5219@afzalpc> (Afzal Mohammed's message of
+ "Tue, 13 Dec 2016 00:14:29 +0530")
+References: <20161211131028.3019-1-afzal.mohd.ma@gmail.com>
+ <20161212184429.GA5219@afzalpc>
+Message-ID: <87fuls517q.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+>>>>> "Afzal" == Afzal Mohammed <afzal.mohd.ma@gmail.com> writes:
 
-On Mon, 12 Dec 2016 19:16:51 +0000, Russell King - ARM Linux wrote:
+ > Hi,
+ > On Sun, Dec 11, 2016 at 06:40:28PM +0530, Afzal Mohammed wrote:
 
-> I'd send something, but I don't know what the GIC interrupt number
-> would be without using the CP110's ICU (which isn't supported in
-> mainline yet.)
+ >> Kernel reached the stage of invoking user space init & panicked, though
+ >> it could not reach till prompt for want of user space executables
+ >> 
+ >> So far i have not come across a toolchain (or a way to create toolchain)
+ >> to create !MMU user space executables for Cortex-A.
 
-For now, mainline relies on a static mapping of CP interrupts to GIC
-interrupts, via an ICU configuration done in ATF. It's pretty
-straightforward to figure out the CP interrupts to GIC interrupt
-mapping if you have access to the ATF source code. If you don't, I can
-provide the necessary details.
+ > Now able to reach prompt using buildroot initramfs, Thanks to
+ > Peter Korsgaard for suggesting the way to create user space executables
+ > for !MMU Cortex-A.
 
-Best regards,
+Great, thats nice to hear!
 
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Bye, Peter Korsgaard
