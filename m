@@ -1,32 +1,88 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 12 Dec 2016 09:00:53 +0100
-Subject: [PATCH] clk: bcm: Fix 'maybe-uninitialized' warning in
- bcm2835_clock_choose_div_and_prate()
-Message-ID: <1481529653-28133-1-git-send-email-boris.brezillon@free-electrons.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Mon, 12 Dec 2016 09:07:45 +0100
+Subject: [PATCH v2 00/11] add support for VBUS max current and min voltage
+ limits AXP20X and AXP22X PMICs
+In-Reply-To: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
+References: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
+Message-ID: <2189bf2a-b577-85d6-c54a-0440aed05411@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-best_rate is reported as potentially uninitialized by gcc.
+Hi all,
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Fixes: 155e8b3b0ee3 ("clk: bcm: Support rate change propagation on bcm2835 clocks")
-Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
----
- drivers/clk/bcm/clk-bcm2835.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I forgot to add a question to my cover letter so here it is:
 
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index eaf82f49dede..0d14409097e7 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -1029,7 +1029,7 @@ static unsigned long bcm2835_clock_choose_div_and_prate(struct clk_hw *hw,
- 	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
- 	struct bcm2835_cprman *cprman = clock->cprman;
- 	const struct bcm2835_clock_data *data = clock->data;
--	unsigned long best_rate;
-+	unsigned long best_rate = 0;
- 	u32 curdiv, mindiv, maxdiv;
- 	struct clk_hw *parent;
- 
+The X-Powers AXP209 and AXP223 PMICs allow to not limit the maximal
+current for the VBUS power supply.[1]
+(If a Chinese-speaking person could check it's the same for the AXP221
+that would be great also[2]).
+
+In the get_property (axp20x_usb_power_get_property) of the power supply
+driver, I see that we use -1 as value for "no limit". Should we use the
+same (-1) value for the set_property (axp20x_usb_power_set_property) to
+disable max current limit?
+
+[1] http://dl.linux-sunxi.org/AXP/AXP209_Datasheet_v1.0en.pdf page 33,
+REG 30H, BITS 0 & 1
+[2]
+http://dl.linux-sunxi.org/AXP/AXP221%20Datasheet%20V1.2%2020130326%20.pdf
+page 33, REG 30H, BITS 0 & 1 => ??? is written for when the BIT(1) is
+set.
+
+Thanks,
+Quentin
+
+On 09/12/2016 12:04, Quentin Schulz wrote:
+> The X-Powers AXP209 and AXP20X PMICs are able to set a limit for the
+> VBUS power supply for both max current and min voltage supplied. This
+> series of patch adds the possibility to set these limits from sysfs.
+> 
+> Also, the AXP223 PMIC shares most of its behaviour with the AXP221 but
+> the former can set the VBUS power supply max current to 100mA, unlike
+> the latter. The AXP223 VBUS power supply driver used to probe on the
+> AXP221 compatible. This series of patch introduces a new compatible for
+> the AXP223 to be able to set the current max limit to 100mA.
+> 
+> With that new compatible, boards having the AXP223 see their DT updated
+> to use the VBUS power supply driver with the correct compatible.
+> 
+> This series of patch also migrates from of_device_is_compatible function
+> to the data field of of_device_id to identify the compatible used to
+> probe. This improves the code readability.
+> 
+> Mostly cosmetic changes in v2 and adding volatile and writeable regs to
+> AXP20X and AXP22X MFD cells for the VBUS power supply driver.
+> 
+> Quentin Schulz (11):
+>   power: supply: axp20x_usb_power: use of_device_id data field instead
+>     of device_is_compatible
+>   mfd: axp20x: add volatile and writeable reg ranges for VBUS power
+>     supply driver
+>   power: supply: axp20x_usb_power: set min voltage and max current from
+>     sysfs
+>   Documentation: DT: binding: axp20x_usb_power: add axp223 compatible
+>   power: supply: axp20x_usb_power: add 100mA max current limit for
+>     AXP223
+>   mfd: axp20x: add separate MFD cell for AXP223
+>   ARM: dtsi: add DTSI for AXP223
+>   ARM: dts: sun8i-a33-olinuxino: use AXP223 DTSI
+>   ARM: dts: sun8i-a33-sinlinx-sina33: use AXP223 DTSI
+>   ARM: dts: sun8i-r16-parrot: use AXP223 DTSI
+>   ARM: dtsi: sun8i-reference-design-tablet: use AXP223 DTSI
+> 
+>  .../bindings/power/supply/axp20x_usb_power.txt     |   5 +
+>  arch/arm/boot/dts/axp223.dtsi                      |  58 +++++++++++
+>  arch/arm/boot/dts/sun8i-a33-olinuxino.dts          |   2 +-
+>  arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     |   2 +-
+>  arch/arm/boot/dts/sun8i-r16-parrot.dts             |   2 +-
+>  .../boot/dts/sun8i-reference-design-tablet.dtsi    |   2 +-
+>  drivers/mfd/axp20x.c                               |  32 +++++-
+>  drivers/power/supply/axp20x_usb_power.c            | 116 ++++++++++++++++++---
+>  8 files changed, 197 insertions(+), 22 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/axp223.dtsi
+> 
+
 -- 
-2.7.4
+Quentin Schulz, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
