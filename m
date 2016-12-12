@@ -1,37 +1,100 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Dec 2016 09:34:28 +0100
-Subject: [PATCH] clk: bcm: Fix 'maybe-uninitialized' warning in
- bcm2835_clock_choose_div_and_prate()
-In-Reply-To: <20161212093130.6e348a61@bbrezillon>
-References: <1481529653-28133-1-git-send-email-boris.brezillon@free-electrons.com>
- <3107859.uaKLk6DMRd@wuerfel> <20161212093130.6e348a61@bbrezillon>
-Message-ID: <2237053.NkkLiYIyzc@wuerfel>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 12 Dec 2016 10:50:49 +0200
+Subject: [PATCH] media: platform: xilinx: xilinx-tpg: constify
+ v4l2_subdev_* structures
+In-Reply-To: <1481449952-26119-1-git-send-email-bhumirks@gmail.com>
+References: <1481449952-26119-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <2425766.trygpAiYzB@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 12, 2016 9:31:30 AM CET Boris Brezillon wrote:
-> On Mon, 12 Dec 2016 09:12:36 +0100
-> Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > On Monday, December 12, 2016 9:00:53 AM CET Boris Brezillon wrote:
-> > > best_rate is reported as potentially uninitialized by gcc.
-> > > 
-> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > Fixes: 155e8b3b0ee3 ("clk: bcm: Support rate change propagation on bcm2835 clocks")
-> > > Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>  
-> > 
-> > I wonder why I didn't get that. Which compiler version did you use?
-> > 
-> 
-> In case you're interested, my gcc [1] failed to detect it as well, and
-> this is not the first time it happens :-/.
-> 
-> [1]gcc (Ubuntu 5.4.0-6ubuntu1~16.04.4) 5.4.0 20160609
+Hi Bhumika,
 
-No, I see it now with gcc-7, it only just turned up in linux-next.
+Thank you for the patch.
 
-I ran into it right away with an allmodconfig build. You were
-probably testing based on an earlier v4.9-rc release that had
-the warning globally disabled.
+On Sunday 11 Dec 2016 15:22:32 Bhumika Goyal wrote:
+> v4l2_subdev_{core/pad/video}_ops structures are stored in the
+> fields of the v4l2_subdev_ops structure which are of type const.
+> Also, v4l2_subdev_ops structure is passed to a function
+> having its argument of type const. As these structures are never
+> modified, so declare them as const.
+> Done using Coccinelle: (One of the scripts used)
+> 
+> @r1 disable optional_qualifier @
+> identifier i;
+> position p;
+> @@
+> static struct v4l2_subdev_video_ops i at p = {...};
+> 
+> @ok1@
+> identifier r1.i;
+> position p;
+> struct v4l2_subdev_ops obj;
+> @@
+> obj.video=&i at p;
+> 
+> @bad@
+> position p!={r1.p,ok1.p};
+> identifier r1.i;
+> @@
+> i at p
+> 
+> @depends on !bad disable optional_qualifier@
+> identifier r1.i;
+> @@
+> +const
+> struct v4l2_subdev_video_ops i;
+> 
+> File size before:
+>    text	   data	    bss	    dec	    hex	filename
+>    6170	   2752	    144	   9066	   236a media/platform/xilinx/xilinx-
+tpg.o
+> 
+> File size after:
+>    text	   data	    bss	    dec	    hex	filename
+>    6666	   2384	      8	   9058	   2362 media/platform/xilinx/xilinx-
+tpg.o
+> 
+> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 
-	Arnd
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+>  drivers/media/platform/xilinx/xilinx-tpg.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/media/platform/xilinx/xilinx-tpg.c
+> b/drivers/media/platform/xilinx/xilinx-tpg.c index 2ec1f6c..9c49d1d 100644
+> --- a/drivers/media/platform/xilinx/xilinx-tpg.c
+> +++ b/drivers/media/platform/xilinx/xilinx-tpg.c
+> @@ -460,21 +460,21 @@ static int xtpg_s_ctrl(struct v4l2_ctrl *ctrl)
+>  	.s_ctrl	= xtpg_s_ctrl,
+>  };
+> 
+> -static struct v4l2_subdev_core_ops xtpg_core_ops = {
+> +static const struct v4l2_subdev_core_ops xtpg_core_ops = {
+>  };
+> 
+> -static struct v4l2_subdev_video_ops xtpg_video_ops = {
+> +static const struct v4l2_subdev_video_ops xtpg_video_ops = {
+>  	.s_stream = xtpg_s_stream,
+>  };
+> 
+> -static struct v4l2_subdev_pad_ops xtpg_pad_ops = {
+> +static const struct v4l2_subdev_pad_ops xtpg_pad_ops = {
+>  	.enum_mbus_code		= xvip_enum_mbus_code,
+>  	.enum_frame_size	= xtpg_enum_frame_size,
+>  	.get_fmt		= xtpg_get_format,
+>  	.set_fmt		= xtpg_set_format,
+>  };
+> 
+> -static struct v4l2_subdev_ops xtpg_ops = {
+> +static const struct v4l2_subdev_ops xtpg_ops = {
+>  	.core   = &xtpg_core_ops,
+>  	.video  = &xtpg_video_ops,
+>  	.pad    = &xtpg_pad_ops,
+
+-- 
+Regards,
+
+Laurent Pinchart
