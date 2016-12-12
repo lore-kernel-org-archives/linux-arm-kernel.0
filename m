@@ -1,57 +1,34 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Mon, 12 Dec 2016 13:33:53 +0000
-Subject: [PATCH v7 1/8] Documentation: arm: define DT cpu
- capacity-dmips-mhz bindings
-In-Reply-To: <20161212124005.GA19177@red-moon>
-References: <1473085372-2840-1-git-send-email-juri.lelli@arm.com>
- <1473085372-2840-2-git-send-email-juri.lelli@arm.com>
- <20161212124005.GA19177@red-moon>
-Message-ID: <20161212133353.GB27472@e106622-lin>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 12 Dec 2016 14:33:44 +0100
+Subject: [PATCH renesas/devel 03/13] ARM: dts: r8a7790: Use R-Car Gen 2
+ fallback binding for i2c nodes
+In-Reply-To: <1481533902-14789-4-git-send-email-horms+renesas@verge.net.au>
+References: <1481533902-14789-1-git-send-email-horms+renesas@verge.net.au>
+ <1481533902-14789-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVgeaXBkXrXS9OR70jsPoL50Zbpm63oH58ntSTygVUT2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/16 12:40, Lorenzo Pieralisi wrote:
-> On Mon, Sep 05, 2016 at 03:22:45PM +0100, Juri Lelli wrote:
-> 
-> [...]
-> 
-> > +===========================================
-> > +5 - References
-> > +===========================================
-> > +
-> > +[1] ARM Linux Kernel documentation - CPUs bindings
-> > +    Documentation/devicetree/bindings/arm/cpus.txt
-> > diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> > index e6782d50cbcd..c1dcf4cade2e 100644
-> > --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> > +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> > @@ -241,6 +241,14 @@ nodes to be present and contain the properties described below.
-> >  			# List of phandles to idle state nodes supported
-> >  			  by this cpu [3].
-> >  
-> > +	- capacity-dmips-mhz
-> > +		Usage: Optional
-> > +		Value type: <u32>
-> > +		Definition:
-> > +			# u32 value representing CPU capacity [3] in
-> > +			  DMIPS/MHz, relative to highest capacity-dmips-mhz
-> > +			  in the system.
-> > +
-> >  	- rockchip,pmu
-> >  		Usage: optional for systems that have an "enable-method"
-> >  		       property value of "rockchip,rk3066-smp"
-> > @@ -464,3 +472,5 @@ cpus {
-> >  [2] arm/msm/qcom,kpss-acc.txt
-> >  [3] ARM Linux kernel documentation - idle states bindings
-> >      Documentation/devicetree/bindings/arm/idle-states.txt
-> > +[3] ARM Linux kernel documentation - cpu capacity bindings
-> > +    Documentation/devicetree/bindings/arm/cpu-capacity.txt
-> 
-> Trivia: bumped into this while reviewing something else, too many
-> threes, you will have to fix the added reference up.
+On Mon, Dec 12, 2016 at 10:11 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Use recently added R-Car Gen 2 fallback binding for i2c nodes in
+> DT for r8a7790 SoC.
+>
+> This has no run-time effect for the current driver as the initialisation
+> sequence is the same for the SoC-specific binding for r8a7790 and the
+> fallback binding for R-Car Gen 2.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Argh! Fixed locally, thanks for catching it.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Best,
+Gr{oetje,eeting}s,
 
-- Juri
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
