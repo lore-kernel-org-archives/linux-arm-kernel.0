@@ -1,46 +1,41 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 12 Dec 2016 14:32:11 +0530
-Subject: [PATCH v7 1/2] provide lock-less versions of clk_{enable|disable}
-In-Reply-To: <20161209185421.fybpk4bdq6b7yglf@pengutronix.de>
-References: <1481302773-14181-1-git-send-email-abailon@baylibre.com>
- <20161209185421.fybpk4bdq6b7yglf@pengutronix.de>
-Message-ID: <e548f7cf-a1d5-0bc2-1095-db8464a1bcc4@ti.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 12 Dec 2016 10:03:21 +0100
+Subject: [PATCH] clk: bcm: Fix 'maybe-uninitialized' warning in
+ bcm2835_clock_choose_div_and_prate()
+In-Reply-To: <2237053.NkkLiYIyzc@wuerfel>
+References: <1481529653-28133-1-git-send-email-boris.brezillon@free-electrons.com>
+ <3107859.uaKLk6DMRd@wuerfel> <20161212093130.6e348a61@bbrezillon>
+ <2237053.NkkLiYIyzc@wuerfel>
+Message-ID: <20161212100321.0b0e7172@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Mon, 12 Dec 2016 09:34:28 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-On Saturday 10 December 2016 12:24 AM, Uwe Kleine-K?nig wrote:
-> Hello,
+> On Monday, December 12, 2016 9:31:30 AM CET Boris Brezillon wrote:
+> > On Mon, 12 Dec 2016 09:12:36 +0100
+> > Arnd Bergmann <arnd@arndb.de> wrote:
+> >   
+> > > On Monday, December 12, 2016 9:00:53 AM CET Boris Brezillon wrote:  
+> > > > best_rate is reported as potentially uninitialized by gcc.
+> > > > 
+> > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > > Fixes: 155e8b3b0ee3 ("clk: bcm: Support rate change propagation on bcm2835 clocks")
+> > > > Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>    
+> > > 
+> > > I wonder why I didn't get that. Which compiler version did you use?
+> > >   
+> > 
+> > In case you're interested, my gcc [1] failed to detect it as well, and
+> > this is not the first time it happens :-/.
+> > 
+> > [1]gcc (Ubuntu 5.4.0-6ubuntu1~16.04.4) 5.4.0 20160609  
 > 
-> On Fri, Dec 09, 2016 at 05:59:32PM +0100, Alexandre Bailon wrote:
->> Rename __clk_{enable|disble} in davinci_clk_{enable|disable}.
->> davinci_clk_{enable|disable} is a lock-less version of
->> clk_{enable|disable}.
->> This is useful to recursively enable clock without doing recursive call
->> to clk_enable(), which would cause a recursive locking issue.
->> The lock-less version could be used by example by the usb20 phy clock,
->> that need to enable the usb20 clock before to start.
+> No, I see it now with gcc-7, it only just turned up in linux-next.
 > 
-> I wouldn't call that lock-less. The difference is that the newly exposed
-> funcion requires the caller to already hold the lock. So maybe a better
+> I ran into it right away with an allmodconfig build. You were
+> probably testing based on an earlier v4.9-rc release that had
+> the warning globally disabled.
 
-Right.
-
-> name would be clk_enable_locked.
-
-I am not sure the new name you propose is much clearer. Unless I am
-missing an obvious naming pattern in kernel. Besides, I want to have the
-"davinci_" prefix for consistency with how other mach-davinci internal
-functions are named. FWIW, the equivalent function in common-clk is
-called clk_core_enable().
-
-> 
-> Would it be more sensible to convert davinci to common-clk?
-
-Yes, but there is no work going on on that and AFAIK, know one is
-planning on working on it too. These patches are needed anyway since we
-need to fix the existing issue on v4.10
-
-Thanks,
-Sekhar
+Indeed, I was testing on a 4.9-rc.
