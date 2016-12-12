@@ -1,72 +1,107 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 Dec 2016 11:29:14 +0000
-Subject: [PATCH 1/2] arm64: setup: introduce kaslr_offset()
-In-Reply-To: <1481417456-28826-2-git-send-email-alex.popov@linux.com>
-References: <1481417456-28826-1-git-send-email-alex.popov@linux.com>
- <1481417456-28826-2-git-send-email-alex.popov@linux.com>
-Message-ID: <20161212112914.GC21248@arm.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Mon, 12 Dec 2016 13:30:54 +0200
+Subject: [PATCH 1/1] arm: mm: Fix comments in sg_sync functions
+In-Reply-To: <560A6C80.1050808@arm.com>
+References: <1443471655-28302-1-git-send-email-sakari.ailus@linux.intel.com>
+ <560A6C80.1050808@arm.com>
+Message-ID: <20161212113053.GR16630@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 11, 2016 at 03:50:55AM +0300, Alexander Popov wrote:
-> Introduce kaslr_offset() similarly to x86_64 for fixing kcov.
+Hi Robin and others,
+
+On Tue, Sep 29, 2015 at 11:48:32AM +0100, Robin Murphy wrote:
+> Hi Sakari,
 > 
-> Signed-off-by: Alexander Popov <alex.popov@linux.com>
-> ---
->  arch/arm64/include/asm/setup.h      | 19 +++++++++++++++++++
->  arch/arm64/include/uapi/asm/setup.h |  4 ++--
->  arch/arm64/kernel/setup.c           |  8 ++++----
->  3 files changed, 25 insertions(+), 6 deletions(-)
->  create mode 100644 arch/arm64/include/asm/setup.h
+> On 28/09/15 21:20, Sakari Ailus wrote:
+> >The comment on the usage of arm_dma_sync_sg_for_cpu(),
+> >arm_dma_sync_sg_for_device(), arm_iommu_sync_sg_for_cpu() and
+> >arm_iommu_sync_sg_for_device() functions wrongly noted that the "nelems"
+> >parameter is the number of sglist entries returned by dma_map_sg(), while
+> >this must be the number of entiries passed to dma_map_sg() instead.
 > 
-> diff --git a/arch/arm64/include/asm/setup.h b/arch/arm64/include/asm/setup.h
-> new file mode 100644
-> index 0000000..e7b59b9
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/setup.h
-> @@ -0,0 +1,19 @@
-> +/*
-> + * arch/arm64/include/asm/setup.h
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __ASM_SETUP_H
-> +#define __ASM_SETUP_H
-> +
-> +#include <uapi/asm/setup.h>
-> +
-> +static inline unsigned long kaslr_offset(void)
-> +{
-> +	return kimage_vaddr - KIMAGE_VADDR;
-> +}
-> +
-> +#endif
+> Oops, I somehow missed you off cc when I posted [0] last week, apologies. I
+> was planning to stick that in Russell's patch system today, but since you've
+> done a slightly more thorough job with s/map/sync/ than I managed, I'm happy
+> for this version to take precedence over mine:
+> 
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-You could probably just stick this in asm/memory.h, since that's where
-kimage_vaddr is declared and it would save adding a new header file.
+I was cleaning up my old branches and noticed this patch isn't merged yet.
+It still applies cleanly though. How shall we proceed, should I send a pull
+request?
 
-> diff --git a/arch/arm64/include/uapi/asm/setup.h b/arch/arm64/include/uapi/asm/setup.h
-> index 9cf2e46..26631c8 100644
-> --- a/arch/arm64/include/uapi/asm/setup.h
-> +++ b/arch/arm64/include/uapi/asm/setup.h
-> @@ -16,8 +16,8 @@
->   * You should have received a copy of the GNU General Public License
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
-> -#ifndef __ASM_SETUP_H
-> -#define __ASM_SETUP_H
-> +#ifndef _UAPI__ASM_SETUP_H
-> +#define _UAPI__ASM_SETUP_H
->  
->  #include <linux/types.h>
+> 
+> I'd hope that the lack of objections to my patch so far (and Dan's approval)
+> also apply transitively to this one  ;)
+> 
+> Robin.
+> 
+> [0]:http://thread.gmane.org/gmane.linux.ports.arm.kernel/441862
+> 
+> >Suggested-by: Daniel Kurtz <djkurtz@chromium.org>
+> >Signed-off-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+> >---
+> >Hi folks,
+> >
+> >This related patch was applied to Jonathan Corbet's tree:
+> >
+> ><URL:http://www.spinics.net/lists/linux-doc/msg31801.html>
+> >
+> >The comments were indeed wrong. This may have contributed to a related
+> >videobuf2 bug:
+> >
+> ><URL:http://www.spinics.net/lists/linux-media/msg93765.html>
+> >
+> >  arch/arm/mm/dma-mapping.c | 8 ++++----
+> >  1 file changed, 4 insertions(+), 4 deletions(-)
+> >
+> >diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> >index e626043..1c0154a 100644
+> >--- a/arch/arm/mm/dma-mapping.c
+> >+++ b/arch/arm/mm/dma-mapping.c
+> >@@ -958,7 +958,7 @@ void arm_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+> >   * arm_dma_sync_sg_for_cpu
+> >   * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+> >   * @sg: list of buffers
+> >- * @nents: number of buffers to map (returned from dma_map_sg)
+> >+ * @nents: number of buffers to sync (same as was passed to dma_map_sg)
+> >   * @dir: DMA transfer direction (same as was passed to dma_map_sg)
+> >   */
+> >  void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+> >@@ -977,7 +977,7 @@ void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+> >   * arm_dma_sync_sg_for_device
+> >   * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+> >   * @sg: list of buffers
+> >- * @nents: number of buffers to map (returned from dma_map_sg)
+> >+ * @nents: number of buffers to sync (same as was passed to dma_map_sg)
+> >   * @dir: DMA transfer direction (same as was passed to dma_map_sg)
+> >   */
+> >  void arm_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
+> >@@ -1672,7 +1672,7 @@ void arm_iommu_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+> >   * arm_iommu_sync_sg_for_cpu
+> >   * @dev: valid struct device pointer
+> >   * @sg: list of buffers
+> >- * @nents: number of buffers to map (returned from dma_map_sg)
+> >+ * @nents: number of buffers to sync (same as was passed to dma_map_sg)
+> >   * @dir: DMA transfer direction (same as was passed to dma_map_sg)
+> >   */
+> >  void arm_iommu_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+> >@@ -1690,7 +1690,7 @@ void arm_iommu_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+> >   * arm_iommu_sync_sg_for_device
+> >   * @dev: valid struct device pointer
+> >   * @sg: list of buffers
+> >- * @nents: number of buffers to map (returned from dma_map_sg)
+> >+ * @nents: number of buffers to sync (same as was passed to dma_map_sg)
+> >   * @dir: DMA transfer direction (same as was passed to dma_map_sg)
+> >   */
+> >  void arm_iommu_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
+> >
+> 
+> 
 
-You can drop this hunk.
+-- 
+Kind regards,
 
-With those changes:
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
