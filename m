@@ -1,58 +1,68 @@
-From: rasmus.villemoes@prevas.dk (Rasmus Villemoes)
-Date: Mon, 12 Dec 2016 10:48:43 +0100
-Subject: [PATCH] watchdog: bcm2835_wdt: set WDOG_HW_RUNNING bit when
- appropriate
-Message-ID: <1481536123-9279-1-git-send-email-rasmus.villemoes@prevas.dk>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 12 Dec 2016 09:37:58 +0000
+Subject: Tegra baseline test results for v4.9-rc7
+Message-ID: <2bfa1561-9257-3b32-8020-b8ec038df8f3@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A bootloader may start the watchdog device before handing control to
-the kernel - in that case, we should tell the kernel about it so the
-watchdog framework can keep it alive until userspace opens
-/dev/watchdog0.
+Here are some basic Tegra test results for Linux v4.9-rc7.
+Logs and other details at:
 
-Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
----
- drivers/watchdog/bcm2835_wdt.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+    https://nvtb.github.io//linux/test_v4.9-rc7/20161127133104/
 
-diff --git a/drivers/watchdog/bcm2835_wdt.c b/drivers/watchdog/bcm2835_wdt.c
-index 4dddd82..c32c45b 100644
---- a/drivers/watchdog/bcm2835_wdt.c
-+++ b/drivers/watchdog/bcm2835_wdt.c
-@@ -55,6 +55,15 @@ struct bcm2835_wdt {
- static unsigned int heartbeat;
- static bool nowayout = WATCHDOG_NOWAYOUT;
- 
-+static bool bcm2835_wdt_is_running(struct bcm2835_wdt *wdt)
-+{
-+	uint32_t cur;
-+
-+	cur = readl(wdt->base + PM_RSTC);
-+
-+	return !!(cur & PM_RSTC_WRCFG_FULL_RESET);
-+}
-+
- static int bcm2835_wdt_start(struct watchdog_device *wdog)
- {
- 	struct bcm2835_wdt *wdt = watchdog_get_drvdata(wdog);
-@@ -181,6 +190,17 @@ static int bcm2835_wdt_probe(struct platform_device *pdev)
- 	watchdog_init_timeout(&bcm2835_wdt_wdd, heartbeat, dev);
- 	watchdog_set_nowayout(&bcm2835_wdt_wdd, nowayout);
- 	bcm2835_wdt_wdd.parent = &pdev->dev;
-+	if (bcm2835_wdt_is_running(wdt)) {
-+		/*
-+		 * The currently active timeout value (set by the
-+		 * bootloader) may be different from the module
-+		 * heartbeat parameter or the value in device
-+		 * tree. But we just need to set WDOG_HW_RUNNING,
-+		 * because then the framework will "immediately" ping
-+		 * the device, updating the timeout.
-+		 */
-+		set_bit(WDOG_HW_RUNNING, &bcm2835_wdt_wdd.status);
-+	}
- 	err = watchdog_register_device(&bcm2835_wdt_wdd);
- 	if (err) {
- 		dev_err(dev, "Failed to register watchdog device");
--- 
-2.7.4
+
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.9-rc6 (9c763584b7c8911106bb77af7e648bef09af9d80)):
+   text     data      bss    total  kernel
+    -88      +88        0        0  defconfig
+  +1312        0        0    +1312  multi_v7_defconfig
+   +928        0        0     +928  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.9-rc6 (9c763584b7c8911106bb77af7e648bef09af9d80))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
