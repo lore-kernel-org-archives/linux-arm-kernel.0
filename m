@@ -1,132 +1,111 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 12 Dec 2016 17:56:27 +0000
-Subject: [PATCH v5] arm64: fpsimd: improve stacking logic in non-interruptible
- context
-Message-ID: <1481565387-8039-1-git-send-email-ard.biesheuvel@linaro.org>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Mon, 12 Dec 2016 23:33:57 +0530
+Subject: [PATCH] media: platform: exynos4-is: constify v4l2_subdev_* structures
+Message-ID: <1481565837-20467-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we allow kernel mode NEON in softirq or hardirq context by
-stacking and unstacking a slice of the NEON register file for each call
-to kernel_neon_begin() and kernel_neon_end(), respectively.
+v4l2_subdev_{core/pad/video}_ops structures are stored in the
+fields of the v4l2_subdev_ops structure which are of type const.
+Also, v4l2_subdev_ops structure is passed to a function
+having its argument of type const. As these structures are never
+modified, so declare them as const.
+Done using Coccinelle:(one of the scripts used)
 
-Given that
-a) a CPU typically spends most of its time in userland, during which time
-   no kernel mode NEON in process context is in progress,
-b) a CPU spends most of its time in the kernel doing other things than
-   kernel mode NEON when it gets interrupted to perform kernel mode NEON
-   in softirq context
+@r1 disable optional_qualifier @
+identifier i;
+position p;
+@@
+static struct v4l2_subdev_ops i at p = {...};
 
-the stacking and subsequent unstacking is only necessary if we are
-interrupting a thread while it is performing kernel mode NEON in process
-context, which means that in all other cases, we can simply preserve the
-userland FPSIMD state once, and only restore it upon return to userland,
-even if we are being invoked from softirq or hardirq context.
+@ok1@
+identifier r1.i;
+position p;
+expression e1;
+@@
+v4l2_subdev_init(e1,&i at p)
 
-So instead of checking whether we are running in interrupt context, keep
-track of the level of nested kernel mode NEON calls in progress, and only
-perform the eager stack/unstack if the level exceeds 1.
+@bad@
+position p!={r1.p,ok1.p};
+identifier r1.i;
+@@
+i at p
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+@depends on !bad disable optional_qualifier@
+identifier r1.i;
+@@
++const
+struct v4l2_subdev_ops i;
+
+File size before:
+   text	   data	    bss	    dec	    hex	filename
+  16830	   1064	      0	  17894	   45e6 platform/exynos4-is/fimc-capture.o
+   7787	    704	     20	   8511	   213f platform/exynos4-is/mipi-csis.o
+
+File size after:
+   text	   data	    bss	    dec	    hex	filename
+  17022	    880	      0	  17902	   45ee platform/exynos4-is/fimc-capture.o
+   8299	    192	     20	   8511	   213f platform/exynos4-is/mipi-csis.o
+
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 ---
- arch/arm64/kernel/fpsimd.c | 64 +++++++++++++++++++++++++++++++++-------------
- 1 file changed, 46 insertions(+), 18 deletions(-)
+ drivers/media/platform/exynos4-is/fimc-capture.c | 4 ++--
+ drivers/media/platform/exynos4-is/mipi-csis.c    | 8 ++++----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 394c61db5566..c19363775436 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -220,45 +220,73 @@ void fpsimd_flush_task_state(struct task_struct *t)
- 
- #ifdef CONFIG_KERNEL_MODE_NEON
- 
--static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
--static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
-+/*
-+ * Although unlikely, it is possible for three kernel mode NEON contexts to
-+ * be live at the same time: process context, softirq context and hardirq
-+ * context. So while the userland context is stashed in the thread's fpsimd
-+ * state structure, we need two additional levels of storage.
-+ */
-+static DEFINE_PER_CPU(struct fpsimd_partial_state, nested_fpsimdstate[2]);
-+static DEFINE_PER_CPU(int, kernel_neon_nesting_level);
- 
- /*
-  * Kernel-side NEON support functions
-  */
- void kernel_neon_begin_partial(u32 num_regs)
- {
--	if (in_interrupt()) {
--		struct fpsimd_partial_state *s = this_cpu_ptr(
--			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-+	struct fpsimd_partial_state *s;
-+	int level;
- 
--		BUG_ON(num_regs > 32);
--		fpsimd_save_partial_state(s, roundup(num_regs, 2));
--	} else {
-+	preempt_disable();
-+
-+	if (!test_thread_flag(TIF_FOREIGN_FPSTATE)) {
- 		/*
- 		 * Save the userland FPSIMD state if we have one and if we
- 		 * haven't done so already. Clear fpsimd_last_state to indicate
- 		 * that there is no longer userland FPSIMD state in the
- 		 * registers.
- 		 */
--		preempt_disable();
--		if (current->mm &&
--		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
--			fpsimd_save_state(&current->thread.fpsimd_state);
-+		if (current->mm) {
-+			unsigned long flags;
-+
-+			local_irq_save(flags);
-+			if (!test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
-+				fpsimd_save_state(&current->thread.fpsimd_state);
-+			local_irq_restore(flags);
-+		} else {
-+			set_thread_flag(TIF_FOREIGN_FPSTATE);
-+		}
- 		this_cpu_write(fpsimd_last_state, NULL);
- 	}
-+
-+	level = this_cpu_inc_return(kernel_neon_nesting_level);
-+	BUG_ON(level > 3);
-+
-+	if (level > 1) {
-+		s = this_cpu_ptr(nested_fpsimdstate);
-+
-+		WARN_ON_ONCE(num_regs > 32);
-+		num_regs = min(roundup(num_regs, 2), 32U);
-+
-+		fpsimd_save_partial_state(&s[level - 2], num_regs);
-+	}
+diff --git a/drivers/media/platform/exynos4-is/fimc-capture.c b/drivers/media/platform/exynos4-is/fimc-capture.c
+index 964f4a6..a5e729c 100644
+--- a/drivers/media/platform/exynos4-is/fimc-capture.c
++++ b/drivers/media/platform/exynos4-is/fimc-capture.c
+@@ -1695,7 +1695,7 @@ static int fimc_subdev_set_selection(struct v4l2_subdev *sd,
+ 	return 0;
  }
- EXPORT_SYMBOL(kernel_neon_begin_partial);
  
- void kernel_neon_end(void)
- {
--	if (in_interrupt()) {
--		struct fpsimd_partial_state *s = this_cpu_ptr(
--			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
--		fpsimd_load_partial_state(s);
--	} else {
--		preempt_enable();
-+	struct fpsimd_partial_state *s;
-+	int level;
-+
-+	level = this_cpu_read(kernel_neon_nesting_level);
-+	BUG_ON(level < 1);
-+
-+	if (level > 1) {
-+		s = this_cpu_ptr(nested_fpsimdstate);
-+		fpsimd_load_partial_state(&s[level - 2]);
- 	}
-+	this_cpu_dec(kernel_neon_nesting_level);
-+	preempt_enable();
+-static struct v4l2_subdev_pad_ops fimc_subdev_pad_ops = {
++static const struct v4l2_subdev_pad_ops fimc_subdev_pad_ops = {
+ 	.enum_mbus_code = fimc_subdev_enum_mbus_code,
+ 	.get_selection = fimc_subdev_get_selection,
+ 	.set_selection = fimc_subdev_set_selection,
+@@ -1703,7 +1703,7 @@ static int fimc_subdev_set_selection(struct v4l2_subdev *sd,
+ 	.set_fmt = fimc_subdev_set_fmt,
+ };
+ 
+-static struct v4l2_subdev_ops fimc_subdev_ops = {
++static const struct v4l2_subdev_ops fimc_subdev_ops = {
+ 	.pad = &fimc_subdev_pad_ops,
+ };
+ 
+diff --git a/drivers/media/platform/exynos4-is/mipi-csis.c b/drivers/media/platform/exynos4-is/mipi-csis.c
+index befd9fc..f819b29 100644
+--- a/drivers/media/platform/exynos4-is/mipi-csis.c
++++ b/drivers/media/platform/exynos4-is/mipi-csis.c
+@@ -649,23 +649,23 @@ static int s5pcsis_log_status(struct v4l2_subdev *sd)
+ 	return 0;
  }
- EXPORT_SYMBOL(kernel_neon_end);
  
+-static struct v4l2_subdev_core_ops s5pcsis_core_ops = {
++static const struct v4l2_subdev_core_ops s5pcsis_core_ops = {
+ 	.s_power = s5pcsis_s_power,
+ 	.log_status = s5pcsis_log_status,
+ };
+ 
+-static struct v4l2_subdev_pad_ops s5pcsis_pad_ops = {
++static const struct v4l2_subdev_pad_ops s5pcsis_pad_ops = {
+ 	.enum_mbus_code = s5pcsis_enum_mbus_code,
+ 	.get_fmt = s5pcsis_get_fmt,
+ 	.set_fmt = s5pcsis_set_fmt,
+ };
+ 
+-static struct v4l2_subdev_video_ops s5pcsis_video_ops = {
++static const struct v4l2_subdev_video_ops s5pcsis_video_ops = {
+ 	.s_rx_buffer = s5pcsis_s_rx_buffer,
+ 	.s_stream = s5pcsis_s_stream,
+ };
+ 
+-static struct v4l2_subdev_ops s5pcsis_subdev_ops = {
++static const struct v4l2_subdev_ops s5pcsis_subdev_ops = {
+ 	.core = &s5pcsis_core_ops,
+ 	.pad = &s5pcsis_pad_ops,
+ 	.video = &s5pcsis_video_ops,
 -- 
-2.7.4
+1.9.1
