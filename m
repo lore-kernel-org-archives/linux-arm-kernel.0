@@ -1,74 +1,68 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 12 Dec 2016 09:28:03 +0000
-Subject: [RFC v3 PATCH 00/25] Allow NOMMU for MULTIPLATFORM
-In-Reply-To: <238a0185-db3a-fa43-cd7d-91baebdb82d4@st.com>
-References: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
- <20161210181639.GA5660@afzalpc> <878trntrig.fsf@dell.be.48ers.dk>
- <20161211070104.GB3035@afzalpc> <87fulus094.fsf@dell.be.48ers.dk>
- <238a0185-db3a-fa43-cd7d-91baebdb82d4@st.com>
-Message-ID: <584E6DA3.5070009@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 12 Dec 2016 09:30:38 +0000
+Subject: Tegra baseline test results for v4.9-rc6
+Message-ID: <327c4929-c942-f73e-a680-553deb3b099b@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Here are some basic Tegra test results for Linux v4.9-rc6.
+Logs and other details at:
 
-On 12/12/16 07:07, mickael guene wrote:
-> Hi all,
-> 
->  You can find an R toolchain here:
-> https://github.com/mickael-guene/fdpic_manifest/releases/download/v7-r-1.0.1/toolset-v7-r-1.0.1-0-gbdcc6a7c-armv7-r.tgz
-> 
->  It's an fdpic toolset for cortex-r cpu class. gcc version is
-> quite old (4.7).
-> 
->  Note also that generated code may crash on class A cpu due to
-> generation of udiv/sdiv which is optional for class A.
-> (cortex a15 is ok but not a9).
-> 
-> Hope it helps
+    https://nvtb.github.io//linux/test_v4.9-rc6/20161121033104/
 
-Unfortunately, it doesn't help because it depends on FDPIC Linux patches
-which are out of tree and no link has been given.
 
-M-class toolchain should just work with A-class; you don't even need to
-disable MMU to try it out after d782e42 ("ARM: 8594/1: enable binfmt_flat on
-systems with an MMU").
+Test summary
+------------
 
-Cheers
-Vladimir
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-> 
-> Regards
-> Mickael
-> 
-> On 12/11/2016 09:01 PM, Peter Korsgaard wrote:
->>>>>>> "Afzal" == Afzal Mohammed <afzal.mohd.ma@gmail.com> writes:
->>
->> Hi,
->>
->>  >> You can build a toolchain and initramfs with Buildroot. Have a look at
->>  >> the stm32f429 nommu config:
->>  >>
->>  >> https://git.buildroot.net/buildroot/tree/configs/stm32f429_disco_defconfig
->>
->>  > iiuc, it builds one for Cortex-M. i already had a file system w/
->>  > busybox compiled using a Cortex-M toolchain (stolen from
->>  > Pengutronix's OSELAS.Toolchain), which works on Cortex M4 (Vybrid
->>  > VF610 M4 core). But it does not work here, i.e. on Cortex A, seems the
->>  > above mentioned also would have the same effect.
->>
->> Hmm, I'm not sure why a cortex-M toolchain wouldn't work on cortex-A, I
->> thought the 'M' instruction set was a pure subset of the 'A'.
->>
->>  > And in buildroot, couldn't see Cortex R option in menuconfig, and
->>  > selecting Cortex-A's excludes flat binary target & presents only with
->>  > ELF.
->>
->> We indeed don't have cortex-R support. I'm not aware of any cortex-R
->> Linux support.
->>
->> When you select a cortex-A variant, then we enable MMU support by
->> default, but you can disable it under toolchain options (Enable MMU) and
->> then the flat binary option is available.
->>
-> 
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.9-rc5 (a25f0944ba9b1d8a6813fd6f1a86f1bd59ac25a6)):
+   text     data      bss    total  kernel
+   -329     +592        0     +263  defconfig
+  +1307      +64        0    +1371  multi_v7_defconfig
+  +1143        0        0    +1143  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.9-rc5 (a25f0944ba9b1d8a6813fd6f1a86f1bd59ac25a6))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
