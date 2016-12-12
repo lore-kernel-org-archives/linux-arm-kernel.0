@@ -1,50 +1,203 @@
-From: v.narang@samsung.com (=?UTF-8?B?VmFuZWV0IE5hcmFuZw==?=)
-Date: Mon, 12 Dec 2016 10:08:36 +0000
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzFdIGFybS9tb2R1bGU6IG1heGltdW0g?=
- =?UTF-8?B?dXRpbGl6YXRpb24gb2YgbW9kdWxlIGFyZWEu?=
-References: <1481012975-44478-1-git-send-email-maninder1.s@samsung.com>
- <CGME20161206091317epcas3p3702de092ecce4ac079b27180dd48c744@epcas3p3.samsung.com>
-Message-ID: <20161212100836epcms5p2679e36dab1af137e07ecb33970362463@epcms5p2>
+From: Andrei.Pistirica@microchip.com (Andrei.Pistirica at microchip.com)
+Date: Mon, 12 Dec 2016 10:22:43 +0000
+Subject: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <BN3PR07MB2516992DEE883FAD6DC3ED08C9870@BN3PR07MB2516.namprd07.prod.outlook.com>
+References: <1481134912-2243-1-git-send-email-andrei.pistirica@microchip.com>
+ <20161207193908.GA13062@netboy> <20161207210416.GA27622@netboy>
+ <07C910AB6AC6C345A093D5A08F5AF568CB74AF28@CHN-SV-EXMX03.mchp-main.com>
+ <BN3PR07MB2516992DEE883FAD6DC3ED08C9870@BN3PR07MB2516.namprd07.prod.outlook.com>
+Message-ID: <07C910AB6AC6C345A093D5A08F5AF568CB74D84D@CHN-SV-EXMX03.mchp-main.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
-
->> +#ifndef CONFIG_THUMB2_KERNEL
->> +#define MODULES_START  ALIGN((unsigned long)_etext - SZ_32M, PAGE_SIZE)
->
->On a multi_v7_defconfig kernel, the text size is >8 MB, which means
->you are only adding ~7 MB to the module area, while consuming 16 MB of
->additional address space.
-
-I am not sure if 16MB virtual address space will make any difference on embedded 
-systems where physical memory is already less than virtual address space.
-if required address space wastage can be reduced by keeping TASK_SIZE as 
-PAGE_OFFSET - 24MB like below
-
-#define MODULES_VADDR          (PAGE_OFFSET - SZ_24M)
-#define TASK_SIZE              (UL(CONFIG_PAGE_OFFSET) - UL(SZ_24M))
 
 
-> Given that 20 MB modules are very uncommon,
+> -----Original Message-----
+> From: Rafal Ozieblo [mailto:rafalo at cadence.com]
+> Sent: Friday, December 09, 2016 11:20 AM
+> To: Andrei Pistirica - M16132; richardcochran at gmail.com
+> Cc: netdev at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; davem at davemloft.net;
+> nicolas.ferre at atmel.com; harinikatakamlinux at gmail.com;
+> harini.katakam at xilinx.com; punnaia at xilinx.com; michals at xilinx.com;
+> anirudh at xilinx.com; boris.brezillon at free-electrons.com;
+> alexandre.belloni at free-electrons.com; tbultel at pixelsurmer.com
+> Subject: RE: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in Cadence
+> GEM.
+> 
+> -----Original Message-----
+> > From: Andrei.Pistirica at microchip.com
+> > [mailto:Andrei.Pistirica at microchip.com]
+> > Sent: 8 grudnia 2016 15:42
+> > To: richardcochran at gmail.com
+> > Cc: netdev at vger.kernel.org; linux-kernel at vger.kernel.org;
+> > linux-arm-kernel at lists.infradead.org; davem at davemloft.net;
+> > nicolas.ferre at atmel.com; harinikatakamlinux at gmail.com;
+> > harini.katakam at xilinx.com; punnaia at xilinx.com; michals at xilinx.com;
+> > anirudh at xilinx.com; boris.brezillon at free-electrons.com;
+> > alexandre.belloni at free-electrons.com; tbultel at pixelsurmer.com; Rafal
+> > Ozieblo
+> > Subject: RE: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in
+> Cadence GEM.
+> >
+> >
+> >
+> > > -----Original Message-----
+> > > From: Richard Cochran [mailto:richardcochran at gmail.com]
+> > > Sent: Wednesday, December 07, 2016 11:04 PM
+> > > To: Andrei Pistirica - M16132
+> > > Cc: netdev at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> > > kernel at lists.infradead.org; davem at davemloft.net;
+> > > nicolas.ferre at atmel.com; harinikatakamlinux at gmail.com;
+> > > harini.katakam at xilinx.com; punnaia at xilinx.com; michals at xilinx.com;
+> > > anirudh at xilinx.com; boris.brezillon at free-electrons.com;
+> > > alexandre.belloni at free-electrons.com; tbultel at pixelsurmer.com;
+> > > rafalo at cadence.com
+> > > Subject: Re: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in
+> > > Cadence GEM.
+> > >
+> > > On Wed, Dec 07, 2016 at 08:39:09PM +0100, Richard Cochran wrote:
+> > > > > +static s32 gem_ptp_max_adj(unsigned int f_nom) {
+> > > > > +       u64 adj;
+> > > > > +
+> > > > > +       /* The 48 bits of seconds for the GEM overflows every:
+> > > > > +        * 2^48/(365.25 * 24 * 60 *60) =~ 8 925 512 years (~= 9 mil years),
+> > > > > +        * thus the maximum adjust frequency must not overflow
+> > > > > + CNS
+> > > register:
+> > > > > +        *
+> > > > > +        * addend  = 10^9/nominal_freq
+> > > > > +        * adj_max = +/- addend*ppb_max/10^9
+> > > > > +        * max_ppb = (2^8-1)*nominal_freq-10^9
+> > > > > +        */
+> > > > > +       adj = f_nom;
+> > > > > +       adj *= 0xffff;
+> > > > > +       adj -= 1000000000ULL;
+> > > >
+> > > > What is this computation, and how does it relate to the comment?
+> >
+> > I considered the following simple equation: increment value at nominal
+> frequency (which is 10^9/nominal frequency nsecs) + the maximum drift
+> value (nsecs) <= maximum increment value@nominal frequency (which is
+> 8bit:0xffff).
+> > If maximum drift is written as function of nominal frequency and
+> maximum ppb, then the equation above yields that the maximum ppb is:
+> (2^8 - 1) *nominal_frequency - 10^9. The equation is also simplified by the
+> fact that the drift is written as ppm + 16bit_fractions and the increment
+> value is written as nsec + 16bit_fractions.
+> >
+> > Rafal said that this value is hardcoded: 0x64E6, while Harini said:
+> 250000000.
+> 
+> To clarify a little bit. In my reference code this value (0x64E6) was taken
+> from our legacy code. It was used for testing only. I know it should be
+> change to something more accurate. This is the reason why I asked how did
+> you count it (250000000). According to our calculations this value depends
+> on actual set period (incr_ns and incr_sub_ns) and min and max value we
+> can set. The calculation were a little bit intricate, so we decided to leave it
+> as it was.
+> 
+> >
+> > I need to dig into this...
+> >
+> > >
+> > > I am not sure what you meant, but it sounds like you are on the wrong
+> track.
+> > > Let me explain...
+> >
+> > Thanks.
+> >
+> > >
+> > > The max_adj has nothing at all to do with the width of the time register.
+> > > Rather, it should reflect the maximum possible change in the tuning
+> word.
+> > >
+> > > For example, with a nominal 8 ns period, the tuning word is 0x80000.
+> > > Looking at running the clock more slowly, the slowest possible word
+> > > is 0x00001, meaning a difference of 0x7FFFF.  This implies an
+> > > adjustment of
+> > > 0x7FFFF/0x80000 or 999998092 ppb.  Running more quickly, we can
+> > > already have 0x100000, twice as fast, or just under 2 billion ppb.
+> > >
+> > > You should consider the extreme cases to determine the most limited
+> > > (smallest) max_adj value:
+> > >
+> > > Case 1 - high frequency
+> > > ~~~~~~~~~~~~~~~~~~~~~~~
+> > >
+> > > With a nominal 1 ns period, we have the nominal tuning word 0x10000.
+> > > The smallest is 0x1 for a difference of 0xFFFF.  This corresponds to
+> > > an adjustment of 0xFFFF/0x10000 = .9999847412109375 or 999984741 ppb.
+> > >
+> > > Case 2 - low frequency
+> > > ~~~~~~~~~~~~~~~~~~~~~~
+> > >
+> > > With a nominal 255 ns period, the nominal word is 0xFF0000, the
+> > > largest 0xFFFFFF, and the difference is 0xFFFF.  This corresponds to
+> > > and adjustment of 0xFFFF/0xFF0000 = .0039215087890625 or 3921508 ppb.
+> > >
+> > > Since 3921508 ppb is a huge adjustment, you can simply use that as a
+> > > safe maximum, ignoring the actual input clock.
+> > >
+> > > Thanks,
+> > > Richard
+> > >
+> > >
+> >
+> > Regards,
+> > Andrei
+> >
+> 
+> Best regards,
+> Rafal Ozieblo   |   Firmware System Engineer,
+> phone nbr.: +48 32 5085469
+> www.cadence.com
 
-Size of all modules can be 20MB, this seems to be normal scenario.
+Hi Guys,
 
->I think it is better to enable CONFIG_ARM_MODULE_PLTS instead. That
+Based on Richard's input, this is what I want to do for our platforms:
 
-CONFIG_ARM_MODULE_PLTS has function call overhead as it refers PLT table
-while calling kernel functions. Also size of modules will also gets increased a bit.
-So using short calls from modules to kernel will be faster. 
-These changes trying to utilize best available space for kernel modules for
-making short calls. 
-So CONFIG_ARM_MODULE_PLTS is not required when modules
-can be accomdated within 20MB.
+struct macb_ptp_info {
+        void (*ptp_init)(struct net_device *ndev);
+        void (*ptp_remove)(struct net_device *ndev);
++       s32 (*get_ptp_max_adj)(void);
+        unsigned int (*get_tsu_rate)(struct macb *bp);
+        int (*get_ts_info)(struct net_device *dev,
+                           struct ethtool_ts_info *info);
+       int (*get_hwtst)(struct net_device *netdev,
+                         struct ifreq *ifr);
+       int (*set_hwtst)(struct net_device *netdev,
+                         struct ifreq *ifr, int cmd); 
+};
 
->way, there is no need to update these defaults for everyone.
->
++static s32 gem_get_ptp_max_adj(void)
++{
++       return 3921508;
++}
 
->> +#else
->> +#define MODULES_START MODULES_VADDR
+ static struct macb_ptp_info gem_ptp_info = {
+       .ptp_init        = gem_ptp_init,
+       .ptp_remove      = gem_ptp_remove,
++       .get_ptp_max_adj = gem_get_ptp_max_adj,
+       .get_tsu_rate    = gem_get_tsu_rate,
+       .get_ts_info     = gem_get_ts_info,
+       .get_hwtst       = gem_get_hwtst,
+       .set_hwtst       = gem_set_hwtst,
+ };
 
-Thanks & Regards,
-Vaneet Narang
+[...]
+void gem_ptp_init(struct net_device *ndev)
+ {
+[...]
+        /* nominal frequency and maximum adjustment in ppb */
+        bp->tsu_rate = bp->ptp_info->get_tsu_rate(bp);
++       bp->ptp_caps.max_adj = bp->ptp_info->get_ptp_max_adj();
+[...]
+}
+
+Richard, are you agree with this?
+
+Harini, you can fill the callback with the value for your platform. Tell me if you are ok with function's signature.
+
+Regards,
+Andrei
