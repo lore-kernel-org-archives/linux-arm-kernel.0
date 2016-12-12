@@ -1,114 +1,52 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 12 Dec 2016 12:22:42 +0000
-Subject: [PATCH 1/1] arm: mm: Fix comments in sg_sync functions
-In-Reply-To: <20161212113053.GR16630@valkosipuli.retiisi.org.uk>
-References: <1443471655-28302-1-git-send-email-sakari.ailus@linux.intel.com>
- <560A6C80.1050808@arm.com>
- <20161212113053.GR16630@valkosipuli.retiisi.org.uk>
-Message-ID: <7205a598-aa85-89d0-7cff-80ac117ee85b@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 12 Dec 2016 12:40:05 +0000
+Subject: [PATCH v7 1/8] Documentation: arm: define DT cpu
+ capacity-dmips-mhz bindings
+In-Reply-To: <1473085372-2840-2-git-send-email-juri.lelli@arm.com>
+References: <1473085372-2840-1-git-send-email-juri.lelli@arm.com>
+ <1473085372-2840-2-git-send-email-juri.lelli@arm.com>
+Message-ID: <20161212124005.GA19177@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sakari,
+On Mon, Sep 05, 2016 at 03:22:45PM +0100, Juri Lelli wrote:
 
-On 12/12/16 11:30, Sakari Ailus wrote:
-> Hi Robin and others,
-> 
-> On Tue, Sep 29, 2015 at 11:48:32AM +0100, Robin Murphy wrote:
->> Hi Sakari,
->>
->> On 28/09/15 21:20, Sakari Ailus wrote:
->>> The comment on the usage of arm_dma_sync_sg_for_cpu(),
->>> arm_dma_sync_sg_for_device(), arm_iommu_sync_sg_for_cpu() and
->>> arm_iommu_sync_sg_for_device() functions wrongly noted that the "nelems"
->>> parameter is the number of sglist entries returned by dma_map_sg(), while
->>> this must be the number of entiries passed to dma_map_sg() instead.
->>
->> Oops, I somehow missed you off cc when I posted [0] last week, apologies. I
->> was planning to stick that in Russell's patch system today, but since you've
->> done a slightly more thorough job with s/map/sync/ than I managed, I'm happy
->> for this version to take precedence over mine:
->>
->> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> 
-> I was cleaning up my old branches and noticed this patch isn't merged yet.
-> It still applies cleanly though. How shall we proceed, should I send a pull
-> request?
+[...]
 
-I guess it should probably go through the ARM tree, so the best course
-of action would be to submit it to Russell's patch system[1] for him to
-pick up.
+> +===========================================
+> +5 - References
+> +===========================================
+> +
+> +[1] ARM Linux Kernel documentation - CPUs bindings
+> +    Documentation/devicetree/bindings/arm/cpus.txt
+> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> index e6782d50cbcd..c1dcf4cade2e 100644
+> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> @@ -241,6 +241,14 @@ nodes to be present and contain the properties described below.
+>  			# List of phandles to idle state nodes supported
+>  			  by this cpu [3].
+>  
+> +	- capacity-dmips-mhz
+> +		Usage: Optional
+> +		Value type: <u32>
+> +		Definition:
+> +			# u32 value representing CPU capacity [3] in
+> +			  DMIPS/MHz, relative to highest capacity-dmips-mhz
+> +			  in the system.
+> +
+>  	- rockchip,pmu
+>  		Usage: optional for systems that have an "enable-method"
+>  		       property value of "rockchip,rk3066-smp"
+> @@ -464,3 +472,5 @@ cpus {
+>  [2] arm/msm/qcom,kpss-acc.txt
+>  [3] ARM Linux kernel documentation - idle states bindings
+>      Documentation/devicetree/bindings/arm/idle-states.txt
+> +[3] ARM Linux kernel documentation - cpu capacity bindings
+> +    Documentation/devicetree/bindings/arm/cpu-capacity.txt
 
-Robin.
+Trivia: bumped into this while reviewing something else, too many
+threes, you will have to fix the added reference up.
 
-[1]:http://www.armlinux.org.uk/developer/patches/
-
->>
->> I'd hope that the lack of objections to my patch so far (and Dan's approval)
->> also apply transitively to this one  ;)
->>
->> Robin.
->>
->> [0]:http://thread.gmane.org/gmane.linux.ports.arm.kernel/441862
->>
->>> Suggested-by: Daniel Kurtz <djkurtz@chromium.org>
->>> Signed-off-by: Sakari Ailus <sakari.ailus@linux.intel.com>
->>> ---
->>> Hi folks,
->>>
->>> This related patch was applied to Jonathan Corbet's tree:
->>>
->>> <URL:http://www.spinics.net/lists/linux-doc/msg31801.html>
->>>
->>> The comments were indeed wrong. This may have contributed to a related
->>> videobuf2 bug:
->>>
->>> <URL:http://www.spinics.net/lists/linux-media/msg93765.html>
->>>
->>>  arch/arm/mm/dma-mapping.c | 8 ++++----
->>>  1 file changed, 4 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->>> index e626043..1c0154a 100644
->>> --- a/arch/arm/mm/dma-mapping.c
->>> +++ b/arch/arm/mm/dma-mapping.c
->>> @@ -958,7 +958,7 @@ void arm_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
->>>   * arm_dma_sync_sg_for_cpu
->>>   * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
->>>   * @sg: list of buffers
->>> - * @nents: number of buffers to map (returned from dma_map_sg)
->>> + * @nents: number of buffers to sync (same as was passed to dma_map_sg)
->>>   * @dir: DMA transfer direction (same as was passed to dma_map_sg)
->>>   */
->>>  void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
->>> @@ -977,7 +977,7 @@ void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
->>>   * arm_dma_sync_sg_for_device
->>>   * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
->>>   * @sg: list of buffers
->>> - * @nents: number of buffers to map (returned from dma_map_sg)
->>> + * @nents: number of buffers to sync (same as was passed to dma_map_sg)
->>>   * @dir: DMA transfer direction (same as was passed to dma_map_sg)
->>>   */
->>>  void arm_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
->>> @@ -1672,7 +1672,7 @@ void arm_iommu_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
->>>   * arm_iommu_sync_sg_for_cpu
->>>   * @dev: valid struct device pointer
->>>   * @sg: list of buffers
->>> - * @nents: number of buffers to map (returned from dma_map_sg)
->>> + * @nents: number of buffers to sync (same as was passed to dma_map_sg)
->>>   * @dir: DMA transfer direction (same as was passed to dma_map_sg)
->>>   */
->>>  void arm_iommu_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
->>> @@ -1690,7 +1690,7 @@ void arm_iommu_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
->>>   * arm_iommu_sync_sg_for_device
->>>   * @dev: valid struct device pointer
->>>   * @sg: list of buffers
->>> - * @nents: number of buffers to map (returned from dma_map_sg)
->>> + * @nents: number of buffers to sync (same as was passed to dma_map_sg)
->>>   * @dir: DMA transfer direction (same as was passed to dma_map_sg)
->>>   */
->>>  void arm_iommu_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
->>>
->>
->>
-> 
+Thanks,
+Lorenzo
