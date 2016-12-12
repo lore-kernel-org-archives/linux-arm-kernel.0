@@ -1,46 +1,52 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Dec 2016 12:56:48 +0000
-Subject: [PATCH 1/1] arm/module: maximum utilization of module area.
-In-Reply-To: <20161212112230epcms5p6af05aef34f72eab15061a166d18cff00@epcms5p6>
-References: <1481012975-44478-1-git-send-email-maninder1.s@samsung.com>
- <CGME20161212102403epcas4p2e039072e2acdc3d20c1b8ac86e823375@epcas4p2.samsung.com>
- <20161212112230epcms5p6af05aef34f72eab15061a166d18cff00@epcms5p6>
-Message-ID: <20161212125648.GU14217@n2100.armlinux.org.uk>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 12 Dec 2016 14:05:37 +0100
+Subject: [PATCH v6 0/5] ARM: dts: da850: tilcdc related DT changes
+Message-ID: <1481547942-24775-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2016 at 11:22:30AM +0000, Vaneet Narang wrote:
-> Hi,
-> 
-> >A PC24 relocation has a range of +/-32MB.  This means that where-ever
-> >the module is placed, it must be capable of reaching any function
-> >within the kernel text, which may itself be quite large (eg, 8MB, or
-> >possibly larger).  The module area exists to allow modules to be
-> >located in an area where PC24 relocations are able to reach all of the
-> >kernel text on sensibly configured kernels, thereby allowing for
-> >optimal performance.
-> >
-> >If you wish to load large modules, then enable ARM_MODULE_PLTS, which
-> >will use the less efficient PLT method (which is basically an indirect
-> >function call) for relocations that PC24 can't handle, and will allow
-> >the module to be loaded into the vmalloc area.
-> >
-> >Growing the module area so that smaller modules also get penalised by
-> >the PLT indirection is not sane.
-> 
-> This is exactly what i am saying. These changes are useful to accomdate
-> 22MB modules without enabling ARM_MODULE_PLTS. 
+This series contains the last DT changes required for LCDC support
+on da850-lcdk. The first one adds the dumb-vga-dac nodes, the second
+limits the maximum pixel clock rate.
 
-Obviously I wasn't clear enough.
+v1 -> v2:
+- drop patch 3/3 (already merged)
+- use max-pixelclock instead of max-bandwidth for display mode limiting
 
-No, I do not like your change for the reasons given above.  I'm not going
-to accept it.
+v2 -> v3:
+- make the commit message in patch [2/2] more detailed
+- move the max-pixelclock property to da850.dtsi as the limit
+  affects all da850-based boards
 
-If you want to use 22MB modules, enable ARM_MODULE_PLTS.
+v3 -> v4:
+- remove the input port from the display node
+- move the display ports node to da850-lcdk.dts
+- rename the vga_bridge node to vga-bridge
+- move the LCDC pins to the LCDC node (from the vga bridge node)
 
-Thank you.
+v4 -> v5:
+- rename the display label to lcdc
+- instead of using the 'dumb-vga-dac' compatible, add bindings for
+  ti,ths8135 and use it as the vga-bridge node compatible
+
+v5 -> v6:
+- drop the endpoint numbers for nodes with single endpoints
+- split patch 2/4 from v5 into two separate patches: one adding DT
+  bindings and one adding actual support for ths8135
+
+Bartosz Golaszewski (5):
+  ARM: dts: da850: rename the display node label
+  drm: bridge: add DT bindings for TI ths8135
+  drm: bridge: add support for TI ths8135
+  ARM: dts: da850-lcdk: add the vga-bridge node
+  ARM: dts: da850: specify the maximum pixel clock rate for tilcdc
+
+ .../bindings/display/bridge/ti,ths8135.txt         | 52 +++++++++++++++++
+ arch/arm/boot/dts/da850-lcdk.dts                   | 67 ++++++++++++++++++++++
+ arch/arm/boot/dts/da850.dtsi                       |  3 +-
+ drivers/gpu/drm/bridge/dumb-vga-dac.c              |  1 +
+ 4 files changed, 122 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.9.3
