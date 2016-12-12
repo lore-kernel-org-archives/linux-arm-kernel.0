@@ -1,132 +1,132 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 12 Dec 2016 17:55:31 +0000
-Subject: [PATCH v4] arm64: fpsimd: improve stacking logic in
- non-interruptible context
-In-Reply-To: <20161212103512.GE1574@e103592.cambridge.arm.com>
-References: <1481301992-2344-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161209182155.GB21051@e104818-lin.cambridge.arm.com>
- <20161209192932.GD1574@e103592.cambridge.arm.com>
- <CAKv+Gu_VPA81H2-Kr_dyUWMmgqc_DevBYwr4adh+L2nBBqY5yA@mail.gmail.com>
- <20161212103512.GE1574@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu-1TWhWddzx8vgZ35+4CoZGZvnnH9Nu0qY8Tb4QeEo6qA@mail.gmail.com>
+Date: Mon, 12 Dec 2016 17:56:27 +0000
+Subject: [PATCH v5] arm64: fpsimd: improve stacking logic in non-interruptible
+ context
+Message-ID: <1481565387-8039-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 December 2016 at 10:35, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Fri, Dec 09, 2016 at 08:57:20PM +0000, Ard Biesheuvel wrote:
->> On 9 December 2016 at 19:29, Dave Martin <Dave.Martin@arm.com> wrote:
->> > On Fri, Dec 09, 2016 at 06:21:55PM +0000, Catalin Marinas wrote:
->> >> On Fri, Dec 09, 2016 at 04:46:32PM +0000, Ard Biesheuvel wrote:
->> >> >  void kernel_neon_begin_partial(u32 num_regs)
->> >> >  {
->> >> > -   if (in_interrupt()) {
->> >> > -           struct fpsimd_partial_state *s = this_cpu_ptr(
->> >> > -                   in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
->> >> > +   struct fpsimd_partial_state *s;
->> >> > +   int level;
->> >> > +
->> >> > +   preempt_disable();
->> >> > +
->> >> > +   level = this_cpu_inc_return(kernel_neon_nesting_level);
->> >> > +   BUG_ON(level > 3);
->> >> > +
->> >> > +   if (level > 1) {
->> >> > +           s = this_cpu_ptr(nested_fpsimdstate);
->> >> >
->> >> > -           BUG_ON(num_regs > 32);
->> >> > -           fpsimd_save_partial_state(s, roundup(num_regs, 2));
->> >> > +           WARN_ON_ONCE(num_regs > 32);
->> >> > +           num_regs = min(roundup(num_regs, 2), 32U);
->> >> > +
->> >> > +           fpsimd_save_partial_state(&s[level - 2], num_regs);
->> >> >     } else {
->> >> >             /*
->> >> >              * Save the userland FPSIMD state if we have one and if we
->> >> > @@ -241,7 +256,6 @@ void kernel_neon_begin_partial(u32 num_regs)
->> >> >              * that there is no longer userland FPSIMD state in the
->> >> >              * registers.
->> >> >              */
->> >> > -           preempt_disable();
->> >> >             if (current->mm &&
->> >> >                 !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
->> >> >                     fpsimd_save_state(&current->thread.fpsimd_state);
->> >>
->> >> I wonder whether we could actually do this saving and flag/level setting
->> >> in reverse to simplify the races. Something like your previous patch but
->> >> only set TIF_FOREIGN_FPSTATE after saving:
->> >>
->> >>       level = this_cpu_read(kernel_neon_nesting_level);
->> >>       if (level > 0) {
->> >>               ...
->> >>               fpsimd_save_partial_state();
->> >>       } else {
->> >>               if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
->> >>                       fpsimd_save_state();
->> >>               set_thread_flag(TIF_FOREIGN_FPSTATE);
->> >>       }
->> >>       this_cpu_inc(kernel_neon_nesting_level);
->> >>
->> >> There is a risk of extra saving if we get an interrupt after
->> >> test_thread_flag() and before set_thread_flag() but I don't think this
->> >> would corrupt any state, just writing things twice.
->> >
->> > I would worry that we can save two states over the same buffer and then
->> > restore an uninitialised buffer in this case unless we are careful.
->> > Because the level-dependent code is now misbracketed by the inc/dec,
->> > a preempting call races with the outer call and use the same value.
->> >
->> > I guess we could do
->> >
->> > if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
->> >         fpsimd_save_state();
->> > clear_thread_flag(TIF_FOREIGN_FPSTATE);
->> >
->> > at the start unconditionally, before the _inc_return().
->> >
->> > The task state may then get saved in the middle of being saved, but
->> > as you say it shouldn't have changed in the meantime.
->>
->> It /will/ have changed in the meantime: when the interrupted context
->> is resumed, it will happily proceed with saving the state where it
->> left off, but now the register file contains whatever was left after
->> the interrupt handler is done with the NEON.
->
-> Hmmm, true.  The NEON regs will have been restored by kernel_neon_end()
-> in the inner context, but the extra SVE bits won't have been.
->
+Currently, we allow kernel mode NEON in softirq or hardirq context by
+stacking and unstacking a slice of the NEON register file for each call
+to kernel_neon_begin() and kernel_neon_end(), respectively.
 
-Even worse: both the interrupter and the interruptee think they are
-preserving the userland context, so once the interrupter is done, it
-will not restore the context as it found it. The interruptee will then
-proceed and write whatever is left in those registers into the saved
-state.
+Given that
+a) a CPU typically spends most of its time in userland, during which time
+   no kernel mode NEON in process context is in progress,
+b) a CPU spends most of its time in the kernel doing other things than
+   kernel mode NEON when it gets interrupted to perform kernel mode NEON
+   in softirq context
 
->>
->> > The nested
->> > save code may then do a partial save of the same state on top of that
->> > which could get restored at the inner kernel_neon_end() call.
->> >
->>
->> I'm afraid the only way to deal with this correctly is to treat the
->> whole sequence as a critical section, which means execute it with
->> interrupts disabled.
->
-> Or we make the KERNEL_MODE_NEON code SVE-aware, which is where I started
-> off.  In that case, we do SVE (partial) save/restore whenever
-> kernel_mode_neon() is called with live SVE state.  The change here is
-> that would we consider that there is always live SVE state until the
-> fpsimd_save_state() actually finishes at the outer level.  We may want
-> to delay setting of TIF_FOREIGN_FPSTATE for that purpose.
->
-> This means you do take an additional latency hit if you want to use NEON
-> in an interrupting context and there happens to be live SVE state.  It's
-> a consequence of the architecture though -- I don't think there's any
-> way to get around it.  We can still scale the cost by implementing
-> sve_save_partial_state() or something equivalent.
->
-> You original inc()+save() ... restore()+dec() seems sound enough if
-> viewed this way.  Unless I'm missing something?
->
+the stacking and subsequent unstacking is only necessary if we are
+interrupting a thread while it is performing kernel mode NEON in process
+context, which means that in all other cases, we can simply preserve the
+userland FPSIMD state once, and only restore it upon return to userland,
+even if we are being invoked from softirq or hardirq context.
 
-I think having a small critical section is not so bad. Let me send out
-a v5 so we can discuss ...
+So instead of checking whether we are running in interrupt context, keep
+track of the level of nested kernel mode NEON calls in progress, and only
+perform the eager stack/unstack if the level exceeds 1.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/fpsimd.c | 64 +++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 46 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 394c61db5566..c19363775436 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -220,45 +220,73 @@ void fpsimd_flush_task_state(struct task_struct *t)
+ 
+ #ifdef CONFIG_KERNEL_MODE_NEON
+ 
+-static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
+-static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
++/*
++ * Although unlikely, it is possible for three kernel mode NEON contexts to
++ * be live at the same time: process context, softirq context and hardirq
++ * context. So while the userland context is stashed in the thread's fpsimd
++ * state structure, we need two additional levels of storage.
++ */
++static DEFINE_PER_CPU(struct fpsimd_partial_state, nested_fpsimdstate[2]);
++static DEFINE_PER_CPU(int, kernel_neon_nesting_level);
+ 
+ /*
+  * Kernel-side NEON support functions
+  */
+ void kernel_neon_begin_partial(u32 num_regs)
+ {
+-	if (in_interrupt()) {
+-		struct fpsimd_partial_state *s = this_cpu_ptr(
+-			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
++	struct fpsimd_partial_state *s;
++	int level;
+ 
+-		BUG_ON(num_regs > 32);
+-		fpsimd_save_partial_state(s, roundup(num_regs, 2));
+-	} else {
++	preempt_disable();
++
++	if (!test_thread_flag(TIF_FOREIGN_FPSTATE)) {
+ 		/*
+ 		 * Save the userland FPSIMD state if we have one and if we
+ 		 * haven't done so already. Clear fpsimd_last_state to indicate
+ 		 * that there is no longer userland FPSIMD state in the
+ 		 * registers.
+ 		 */
+-		preempt_disable();
+-		if (current->mm &&
+-		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+-			fpsimd_save_state(&current->thread.fpsimd_state);
++		if (current->mm) {
++			unsigned long flags;
++
++			local_irq_save(flags);
++			if (!test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
++				fpsimd_save_state(&current->thread.fpsimd_state);
++			local_irq_restore(flags);
++		} else {
++			set_thread_flag(TIF_FOREIGN_FPSTATE);
++		}
+ 		this_cpu_write(fpsimd_last_state, NULL);
+ 	}
++
++	level = this_cpu_inc_return(kernel_neon_nesting_level);
++	BUG_ON(level > 3);
++
++	if (level > 1) {
++		s = this_cpu_ptr(nested_fpsimdstate);
++
++		WARN_ON_ONCE(num_regs > 32);
++		num_regs = min(roundup(num_regs, 2), 32U);
++
++		fpsimd_save_partial_state(&s[level - 2], num_regs);
++	}
+ }
+ EXPORT_SYMBOL(kernel_neon_begin_partial);
+ 
+ void kernel_neon_end(void)
+ {
+-	if (in_interrupt()) {
+-		struct fpsimd_partial_state *s = this_cpu_ptr(
+-			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+-		fpsimd_load_partial_state(s);
+-	} else {
+-		preempt_enable();
++	struct fpsimd_partial_state *s;
++	int level;
++
++	level = this_cpu_read(kernel_neon_nesting_level);
++	BUG_ON(level < 1);
++
++	if (level > 1) {
++		s = this_cpu_ptr(nested_fpsimdstate);
++		fpsimd_load_partial_state(&s[level - 2]);
+ 	}
++	this_cpu_dec(kernel_neon_nesting_level);
++	preempt_enable();
+ }
+ EXPORT_SYMBOL(kernel_neon_end);
+ 
+-- 
+2.7.4
