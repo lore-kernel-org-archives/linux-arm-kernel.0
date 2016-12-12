@@ -1,58 +1,64 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Sun, 11 Dec 2016 23:54:06 +0000
-Subject: sunxi-ng clocks: leaving certain clocks alone?
-Message-ID: <d70f2809-102c-a3de-c77c-43af27bbcbbc@arm.com>
+From: ping.bai@nxp.com (Jacky Bai)
+Date: Mon, 12 Dec 2016 02:32:15 +0000
+Subject: [PATCH 10/11] Document: dt: binding: imx: update doc for imx6sll
+In-Reply-To: <20161208225424.GQ5423@codeaurora.org>
+References: <1480660774-25055-1-git-send-email-ping.bai@nxp.com>
+ <1480660774-25055-11-git-send-email-ping.bai@nxp.com>
+ <20161208225424.GQ5423@codeaurora.org>
+Message-ID: <AM3PR04MB53013A2B683F78B91B59BF287980@AM3PR04MB530.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+> Subject: Re: [PATCH 10/11] Document: dt: binding: imx: update doc for imx6sll
+> 
+> On 12/02, Bai Ping wrote:
+> > Add necessary document update for i.MX6SLL support.
+> >
+> > Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> > ---
+> >  .../devicetree/bindings/clock/imx6sll-clock.txt    | 13 ++++++++
+> >  .../bindings/pinctrl/fsl,imx6sll-pinctrl.txt       | 37 ++++++++++++++++++++++
+> 
+> Please split the bindings into different patches and put them closer to the
+> drivers that use them in the series.
 
-I was observing that the new sunxi-ng clock code apparently explicitly
-turns off _all_ clocks that are not used or needed. I find this rather
-unfortunate, as I wanted to use the THS temperature sensor from ARM
-Trusted Firmware to implement emergency shutdown or DVFS throttling.
-That works until the clock framework finds the clock (as enumerated in
-ccu-sun50i-a64.c) and obviously explicitly clears bit 31 in the THS mod
-clock register and bit 8 in the respective clock gate register.
-Turning them manually back on via /dev/mem or removing the THS clock
-from the sunxi-ng driver fixes this for me.
+Ok, I will fix it in V2.
 
-This was not happening with the old Allwinner clocks, since the kernel
-wouldn't even know about it if there was no driver and the clock wasn't
-mentioned in the DT.
+> 
+> >  2 files changed, 50 insertions(+)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/clock/imx6sll-clock.txt
+> >  create mode 100644
+> > Documentation/devicetree/bindings/pinctrl/fsl,imx6sll-pinctrl.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/clock/imx6sll-clock.txt
+> > b/Documentation/devicetree/bindings/clock/imx6sll-clock.txt
+> > new file mode 100644
+> > index 0000000..4f52efa
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/clock/imx6sll-clock.txt
+> > @@ -0,0 +1,13 @@
+> > +* Clock bindings for Freescale i.MX6 UltraLite
+> > +
+> > +Required properties:
+> > +- compatible: Should be "fsl,imx6sll-ccm"
+> > +- reg: Address and length of the register set
+> > +- #clock-cells: Should be <1>
+> > +- clocks: list of clock specifiers, must contain an entry for each
+> > +required
+> > +  entry in clock-names
+> > +- clock-names: should include entries "ckil", "osc", "ipp_di0" and "ipp_di1"
+> > +
+> > +The clock consumer should specify the desired clock by having the
+> > +clock ID in its "clocks" phandle cell.  See
+> > +include/dt-bindings/clock/imx6sll-clock.h
+> > +for the full list of i.MX6 SLL clock IDs.
+> 
+> Can you add an example node here?
+> 
 
-Now with sunxi-ng even though the THS clock is not actually referenced
-or used in the DT, the kernel turns it off. I would expect that upon
-entering the kernel all unneeded clocks are turned off anyway, so there
-is no need to mess with clocks that have no user, but are enumerated in
-the ccu driver.
+Thanks for review, I will add it in V2. 
 
-I wonder if this kills simplefb as well, for instance, since I believe
-that U-Boot needs to turn on certain clocks and relies on them staying up.
-
-So my questions:
-1) Is this expected behaviour?
-2) If yes, should it really be?
-3) If yes, shouldn't there be way to explicitly tell Linux to leave that
-clock alone, preferably via DT? Although the sunxi-ng clocks take
-control over the whole CCU unit, I wonder if it should really mess with
-clocks there are not referenced in the DT.
-
-Maybe there is some way to reference those clocks via some dummy driver
-or DT node to avoid this behaviour? Is there any prior art in this respect?
-
-I think this issue will affect more future users (thinking of EFI RTC,
-EFI graphics, etc.), so I wanted to start a discussion on this.
-
-Any input welcome.
-
-Cheers,
-Andre.
-
-P.S. For reference my use case: ARM Trusted Firmware (ATF) enables the
-temperature sensor (THS) and programs a shutdown value. It programs the
-respective interrupt as secure and registers an IRQ handler in ATF to
-shutdown the system or take other appropriate matters to avoid
-overheating. Additionally the sensor is exported via the generic SCPI
-interface, so the existing scpi-hwmon driver picks it up and reports it
-to whoever is interested in Linux land via the normal interfaces.
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux
+> Foundation Collaborative Project
