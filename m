@@ -1,21 +1,21 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 12 Dec 2016 14:37:15 +0100
-Subject: [PATCH renesas/devel 08/13] arm64: dts: r8a7795: Use R-Car Gen 3
+Date: Mon, 12 Dec 2016 14:37:48 +0100
+Subject: [PATCH renesas/devel 09/13] arm64: dts: r8a7796: Use R-Car Gen 3
  fallback binding for i2c nodes
-In-Reply-To: <1481533902-14789-9-git-send-email-horms+renesas@verge.net.au>
+In-Reply-To: <1481533902-14789-10-git-send-email-horms+renesas@verge.net.au>
 References: <1481533902-14789-1-git-send-email-horms+renesas@verge.net.au>
- <1481533902-14789-9-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdU-Z_Bn46BQ1Qv+tHyzqMEFj87GvRWmpk-c5Non6L7A2w@mail.gmail.com>
+ <1481533902-14789-10-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWzfwb_ww_t3iv1DOT4GLOdZdo2CevtiYzwvoKJQoiPGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Dec 12, 2016 at 10:11 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
 > Use recently added R-Car Gen 3 fallback binding for i2c nodes in
-> DT for r8a7795 SoC.
+> DT for r8a7796 SoC.
 >
 > This has no run-time effect for the current driver as the initialisation
-> sequence is the same for the SoC-specific binding for r8a7795 and the
+> sequence is the same for the SoC-specific binding for r8a7796 and the
 > fallback binding for R-Car Gen 3.
 >
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
