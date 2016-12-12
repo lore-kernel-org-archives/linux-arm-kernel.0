@@ -1,64 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 12 Dec 2016 10:11:31 +0100
-Subject: [PATCH renesas/devel 02/13] ARM: dts: r8a7778: Use R-Car Gen 1
- fallback binding for i2c nodes
-In-Reply-To: <1481533902-14789-1-git-send-email-horms+renesas@verge.net.au>
-References: <1481533902-14789-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1481533902-14789-3-git-send-email-horms+renesas@verge.net.au>
+Date: Mon, 12 Dec 2016 10:11:29 +0100
+Subject: [PATCH renesas/devel 00/13] ARM,
+ arm64: dts: Use R-Car fallback bindings for i2c/iic nodes
+Message-ID: <1481533902-14789-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added R-Car Gen 1 fallback binding for i2c nodes in
-DT for r8a7778 SoC.
+Hi,
 
-This has no run-time effect for the current driver as the initialisation
-sequence is the same for the SoC-specific binding for r8a7778 and the
-fallback binding for R-Car Gen 1.
+this short series makes use of newly added R-Car fallback bindings in
+i2c and iic nodes of the DTs for SoCs where the drivers in question are
+already used.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7778.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+This should have no run-time effect at this time as the current
+driver implementations use the same initialisation squeuences for
+SoC-specific and R-Car fallback bindings for all the cases covered by
+this patch-set.
 
-diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
-index b0c9674fad17..1e93c94a9eac 100644
---- a/arch/arm/boot/dts/r8a7778.dtsi
-+++ b/arch/arm/boot/dts/r8a7778.dtsi
-@@ -150,7 +150,7 @@
- 	i2c0: i2c at ffc70000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7778";
-+		compatible = "renesas,i2c-r8a7778", "renesas,rcar-gen1-i2c";
- 		reg = <0xffc70000 0x1000>;
- 		interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_I2C0>;
-@@ -161,7 +161,7 @@
- 	i2c1: i2c at ffc71000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7778";
-+		compatible = "renesas,i2c-r8a7778", "renesas,rcar-gen1-i2c";
- 		reg = <0xffc71000 0x1000>;
- 		interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_I2C1>;
-@@ -172,7 +172,7 @@
- 	i2c2: i2c at ffc72000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7778";
-+		compatible = "renesas,i2c-r8a7778", "renesas,rcar-gen1-i2c";
- 		reg = <0xffc72000 0x1000>;
- 		interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_I2C2>;
-@@ -183,7 +183,7 @@
- 	i2c3: i2c at ffc73000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7778";
-+		compatible = "renesas,i2c-r8a7778", "renesas,rcar-gen1-i2c";
- 		reg = <0xffc73000 0x1000>;
- 		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_I2C3>;
+Based on renesas-devel-20161212-v4.9
+
+Simon Horman (13):
+  ARM: dts: r8a7779: Use R-Car Gen 1 fallback binding for i2c nodes
+  ARM: dts: r8a7778: Use R-Car Gen 1 fallback binding for i2c nodes
+  ARM: dts: r8a7790: Use R-Car Gen 2 fallback binding for i2c nodes
+  ARM: dts: r8a7791: Use R-Car Gen 2 fallback binding for i2c nodes
+  ARM: dts: r8a7792: Use R-Car Gen 2 fallback binding for i2c nodes
+  ARM: dts: r8a7793: Use R-Car Gen 2 fallback binding for i2c nodes
+  ARM: dts: r8a7794: Use R-Car Gen 2 fallback binding for i2c nodes
+  arm64: dts: r8a7795: Use R-Car Gen 3 fallback binding for i2c nodes
+  arm64: dts: r8a7796: Use R-Car Gen 3 fallback binding for i2c nodes
+  ARM: dts: r8a7790: Use R-Car Gen 2 fallback binding for i2c nodes
+  ARM: dts: r8a7791: Use R-Car Gen 2 fallback binding for i2c nodes
+  ARM: dts: r8a7793: Use R-Car Gen 2 fallback binding for i2c nodes
+  ARM: dts: r8a7794: Use R-Car Gen 2 fallback binding for i2c nodes
+
+ arch/arm/boot/dts/r8a7778.dtsi           |  8 ++++----
+ arch/arm/boot/dts/r8a7779.dtsi           |  8 ++++----
+ arch/arm/boot/dts/r8a7790.dtsi           | 20 ++++++++++++--------
+ arch/arm/boot/dts/r8a7791.dtsi           | 21 ++++++++++++---------
+ arch/arm/boot/dts/r8a7792.dtsi           | 18 ++++++++++++------
+ arch/arm/boot/dts/r8a7793.dtsi           | 21 ++++++++++++---------
+ arch/arm/boot/dts/r8a7794.dtsi           | 18 ++++++++++--------
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 21 ++++++++++++++-------
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 21 ++++++++++++++-------
+ 9 files changed, 94 insertions(+), 62 deletions(-)
+
 -- 
 2.7.0.rc3.207.g0ac5344
