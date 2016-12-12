@@ -1,20 +1,138 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Dec 2016 09:12:36 +0100
-Subject: [PATCH] clk: bcm: Fix 'maybe-uninitialized' warning in
- bcm2835_clock_choose_div_and_prate()
-In-Reply-To: <1481529653-28133-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1481529653-28133-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <3107859.uaKLk6DMRd@wuerfel>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 12 Dec 2016 09:12:56 +0100
+Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
+ reserved regions
+In-Reply-To: <584CB481.3040902@redhat.com>
+References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
+ <c5d4efa7-699d-4aa3-44cc-4ce03d0ce185@redhat.com>
+ <584CB481.3040902@redhat.com>
+Message-ID: <ca2a723f-6880-b3af-eef6-5482272a98fb@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 12, 2016 9:00:53 AM CET Boris Brezillon wrote:
-> best_rate is reported as potentially uninitialized by gcc.
+Hi Don,
+
+On 11/12/2016 03:05, Don Dutile wrote:
+> On 12/08/2016 04:36 AM, Auger Eric wrote:
+>> Hi,
+>>
+>> On 15/11/2016 14:09, Eric Auger wrote:
+>>> Following LPC discussions, we now report reserved regions through
+>>> iommu-group sysfs reserved_regions attribute file.
+>>
+>>
+>> While I am respinning this series into v4, here is a tentative summary
+>> of technical topics for which no consensus was reached at this point.
+>>
+>> 1) Shall we report the usable IOVA range instead of reserved IOVA
+>>     ranges. Not discussed at/after LPC.
+>>     x I currently report reserved regions. Alex expressed the need to
+>>       report the full usable IOVA range instead (x86 min-max range
+>>       minus MSI APIC window). I think this is meaningful for ARM
+>>       too where arm-smmu might not support the full 64b range.
+>>     x Any objection we report the usable IOVA regions instead?
+>>
+>> 2) Shall the kernel check collision with MSI window* when userspace
+>>     calls VFIO_IOMMU_MAP_DMA?
+>>     Joerg/Will No; Alex yes
+>>     *for IOVA regions consumed downstream to the IOMMU: everyone says NO
+>>
+>> 3) RMRR reporting in the iommu group sysfs? Joerg: yes; Don: no
+> Um, I'm missing context, but the only thing I recall saying no to wrt RMRR
+> is that _any_ device that has an RMRR cannot be assigned to a guest.
+Yes that was my understanding
+> Or, are you saying, RMRR's should be exposed in the guest os?  if so, then
+> you have my 'no' there.
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Fixes: 155e8b3b0ee3 ("clk: bcm: Support rate change propagation on bcm2835 clocks")
-> Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+>>     My current series does not expose them in iommu group sysfs.
+>>     I understand we can expose the RMRR regions in the iomm group sysfs
+>>     without necessarily supporting RMRR requiring device assignment.
+> This sentence doesn't make sense to me.
+> Can you try re-wording it?
+> I can't tell what RMRR has to do w/device assignment, other than what I
+> said above.
+> Exposing RMRR's in sysfs is not an issue in general.
+Sorry for the confusion. I Meant we can expose RMRR regions as part of
+the reserved regions through the iommu group sysfs API without
+supporting device assignment of devices that has RMRR.
 
-I wonder why I didn't get that. Which compiler version did you use?
+Hope it clarifies
 
-	Arnd
+Eric
+> 
+>>     We can also add this support later.
+>>
+>> Thanks
+>>
+>> Eric
+>>
+>>
+>>>
+>>> Reserved regions are populated through the IOMMU get_resv_region
+>>> callback
+>>> (former get_dm_regions), now implemented by amd-iommu, intel-iommu and
+>>> arm-smmu.
+>>>
+>>> The intel-iommu reports the [FEE0_0000h - FEF0_000h] MSI window as an
+>>> IOMMU_RESV_NOMAP reserved region.
+>>>
+>>> arm-smmu reports the MSI window (arbitrarily located at 0x8000000 and
+>>> 1MB large) and the PCI host bridge windows.
+>>>
+>>> The series integrates a not officially posted patch from Robin:
+>>> "iommu/dma: Allow MSI-only cookies".
+>>>
+>>> This series currently does not address IRQ safety assessment.
+>>>
+>>> Best Regards
+>>>
+>>> Eric
+>>>
+>>> Git: complete series available at
+>>> https://github.com/eauger/linux/tree/v4.9-rc5-reserved-rfc-v3
+>>>
+>>> History:
+>>> RFC v2 -> v3:
+>>> - switch to an iommu-group sysfs API
+>>> - use new dummy allocator provided by Robin
+>>> - dummy allocator initialized by vfio-iommu-type1 after enumerating
+>>>    the reserved regions
+>>> - at the moment ARM MSI base address/size is left unchanged compared
+>>>    to v2
+>>> - we currently report reserved regions and not usable IOVA regions as
+>>>    requested by Alex
+>>>
+>>> RFC v1 -> v2:
+>>> - fix intel_add_reserved_regions
+>>> - add mutex lock/unlock in vfio_iommu_type1
+>>>
+>>>
+>>> Eric Auger (10):
+>>>    iommu/dma: Allow MSI-only cookies
+>>>    iommu: Rename iommu_dm_regions into iommu_resv_regions
+>>>    iommu: Add new reserved IOMMU attributes
+>>>    iommu: iommu_alloc_resv_region
+>>>    iommu: Do not map reserved regions
+>>>    iommu: iommu_get_group_resv_regions
+>>>    iommu: Implement reserved_regions iommu-group sysfs file
+>>>    iommu/vt-d: Implement reserved region get/put callbacks
+>>>    iommu/arm-smmu: Implement reserved region get/put callbacks
+>>>    vfio/type1: Get MSI cookie
+>>>
+>>>   drivers/iommu/amd_iommu.c       |  20 +++---
+>>>   drivers/iommu/arm-smmu.c        |  52 +++++++++++++++
+>>>   drivers/iommu/dma-iommu.c       | 116
+>>> ++++++++++++++++++++++++++-------
+>>>   drivers/iommu/intel-iommu.c     |  50 ++++++++++----
+>>>   drivers/iommu/iommu.c           | 141
+>>> ++++++++++++++++++++++++++++++++++++----
+>>>   drivers/vfio/vfio_iommu_type1.c |  26 ++++++++
+>>>   include/linux/dma-iommu.h       |   7 ++
+>>>   include/linux/iommu.h           |  49 ++++++++++----
+>>>   8 files changed, 391 insertions(+), 70 deletions(-)
+>>>
+> 
+> -- 
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
