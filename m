@@ -1,210 +1,136 @@
 From: jon.mason@broadcom.com (Jon Mason)
-Date: Tue, 13 Dec 2016 13:13:51 -0500
-Subject: [PATCH 7/7] ARM: dts: NSP: Add SD/MMC support
+Date: Tue, 13 Dec 2016 13:13:49 -0500
+Subject: [PATCH 5/7] ARM: dts: NSP: Add and enable amac2
 In-Reply-To: <1481652831-2744-1-git-send-email-jon.mason@broadcom.com>
 References: <1481652831-2744-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1481652831-2744-8-git-send-email-jon.mason@broadcom.com>
+Message-ID: <1481652831-2744-6-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SD/MMC support to the Broadcom NSP SVK and XMC.
+Add and enable the third AMAC ethernet interface in the device trees for
+the platforms where it is present.  Also, enable amac1 on some of the
+platforms where that was missing.
 
 Signed-off-by: Jon Mason <jon.mason@broadcom.com>
 ---
- arch/arm/boot/dts/bcm-nsp.dtsi     |   9 +++
- arch/arm/boot/dts/bcm958525xmc.dts |   6 +-
- arch/arm/boot/dts/bcm958625k.dts   | 118 ++++++++++++++++++++++++-------------
- 3 files changed, 90 insertions(+), 43 deletions(-)
+ arch/arm/boot/dts/bcm-nsp.dtsi    | 9 +++++++++
+ arch/arm/boot/dts/bcm958622hr.dts | 8 ++++++++
+ arch/arm/boot/dts/bcm958623hr.dts | 8 ++++++++
+ arch/arm/boot/dts/bcm958625hr.dts | 8 ++++++++
+ arch/arm/boot/dts/bcm958625k.dts  | 4 ++++
+ arch/arm/boot/dts/bcm988312hr.dts | 8 ++++++++
+ 6 files changed, 45 insertions(+)
 
 diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index ecffc16..6c58c78 100644
+index 9cd77ab..ecffc16 100644
 --- a/arch/arm/boot/dts/bcm-nsp.dtsi
 +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -209,6 +209,15 @@
- 			#dma-cells = <1>;
+@@ -227,6 +227,15 @@
+ 			status = "disabled";
  		};
  
-+		sdio: sdhci at 21000 {
-+			compatible = "brcm,sdhci-iproc-cygnus";
-+			reg = <0x21000 0x100>;
-+			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
-+			sdhci,auto-cmd12;
-+			clocks = <&lcpll0 BCM_NSP_LCPLL0_SDIO_CLK>;
++		amac2: ethernet at 24000 {
++			compatible = "brcm,nsp-amac";
++			reg = <0x024000 0x1000>,
++			      <0x112000 0x1000>;
++			reg-names = "amac_base", "idm_base";
++			interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
 +			status = "disabled";
 +		};
 +
- 		amac0: ethernet at 22000 {
- 			compatible = "brcm,nsp-amac";
- 			reg = <0x022000 0x1000>,
-diff --git a/arch/arm/boot/dts/bcm958525xmc.dts b/arch/arm/boot/dts/bcm958525xmc.dts
-index 3912269..41e7fd3 100644
---- a/arch/arm/boot/dts/bcm958525xmc.dts
-+++ b/arch/arm/boot/dts/bcm958525xmc.dts
-@@ -59,7 +59,7 @@
- 	};
- };
- 
--/* XHCI and SD/MMC support needed to be complete */
-+/* XHCI support needed to be complete */
- 
- &amac0 {
- 	status = "okay";
-@@ -184,6 +184,10 @@
+ 		nand: nand at 26000 {
+ 			compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
+ 			reg = <0x026000 0x600>,
+diff --git a/arch/arm/boot/dts/bcm958622hr.dts b/arch/arm/boot/dts/bcm958622hr.dts
+index 18b8ffb..477c486 100644
+--- a/arch/arm/boot/dts/bcm958622hr.dts
++++ b/arch/arm/boot/dts/bcm958622hr.dts
+@@ -65,6 +65,14 @@
  	status = "okay";
  };
  
-+&sdio {
-+	status = "ok";
++&amac1 {
++	status = "okay";
 +};
 +
- &uart0 {
++&amac2 {
++	status = "okay";
++};
++
+ &nand {
+ 	nandcs at 0 {
+ 		compatible = "brcm,nandcs";
+diff --git a/arch/arm/boot/dts/bcm958623hr.dts b/arch/arm/boot/dts/bcm958623hr.dts
+index 61499ae..c0a499d 100644
+--- a/arch/arm/boot/dts/bcm958623hr.dts
++++ b/arch/arm/boot/dts/bcm958623hr.dts
+@@ -65,6 +65,14 @@
  	status = "okay";
  };
+ 
++&amac1 {
++	status = "okay";
++};
++
++&amac2 {
++	status = "okay";
++};
++
+ &nand {
+ 	nandcs at 0 {
+ 		compatible = "brcm,nandcs";
+diff --git a/arch/arm/boot/dts/bcm958625hr.dts b/arch/arm/boot/dts/bcm958625hr.dts
+index 94cce23..f7eb585 100644
+--- a/arch/arm/boot/dts/bcm958625hr.dts
++++ b/arch/arm/boot/dts/bcm958625hr.dts
+@@ -63,6 +63,14 @@
+ 	status = "okay";
+ };
+ 
++&amac1 {
++	status = "okay";
++};
++
++&amac2 {
++	status = "okay";
++};
++
+ &nand {
+ 	nandcs at 0 {
+ 		compatible = "brcm,nandcs";
 diff --git a/arch/arm/boot/dts/bcm958625k.dts b/arch/arm/boot/dts/bcm958625k.dts
-index 6e994f2..f8d47e5 100644
+index 7aa86c7..6e994f2 100644
 --- a/arch/arm/boot/dts/bcm958625k.dts
 +++ b/arch/arm/boot/dts/bcm958625k.dts
-@@ -117,58 +117,34 @@
- 
- &pinctrl {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&nand_sel>;
-+	pinctrl-0 = <&nand_sel>, <&gpiobs>, <&pwmc>;
-+
- 	nand_sel: nand_sel {
- 		function = "nand";
- 		groups = "nand_grp";
- 	};
--};
--
--&srab {
--	compatible = "brcm,bcm58625-srab", "brcm,nsp-srab";
--	status = "okay";
--
--	ports {
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		port at 0 {
--			label = "port0";
--			reg = <0>;
--		};
--
--		port at 1 {
--			label = "port1";
--			reg = <1>;
--		};
--
--		port at 2 {
--			label = "port2";
--			reg = <2>;
--		};
- 
--		port at 3 {
--			label = "port3";
--			reg = <3>;
--		};
-+	gpiobs: gpiobs {
-+		function = "gpio_b";
-+		groups = "gpio_b_0_grp", "gpio_b_1_grp", "gpio_b_2_grp",
-+			 "gpio_b_3_grp";
-+	};
- 
--		port at 4 {
--			label = "port4";
--			reg = <4>;
--		};
-+	pwmc: pwmc {
-+		function = "pwm";
-+		groups = "pwm0_grp", "pwm1_grp", "pwm2_grp", "pwm3_grp";
-+	};
- 
--		port at 5 {
--			ethernet = <&amac0>;
--			label = "cpu";
--			reg = <5>;
--			fixed-link {
--				speed = <1000>;
--				full-duplex;
--			};
--		};
-+	emmc_sel: emmc_sel {
-+		function = "emmc";
-+		groups = "emmc_grp";
- 	};
- };
- 
-+&pwm {
-+	status = "okay";
-+};
-+
- &qspi {
- 	bspi-sel = <0>;
- 	flash: m25p80 at 0 {
-@@ -215,6 +191,64 @@
+@@ -61,6 +61,10 @@
  	status = "okay";
  };
  
-+/*
-+ * By default the sd slot is functional. For emmc to work add "<&emmc_sel>"
-+ * and delete "<&nand_sel>" in "pinctrl-0" property of pinctrl node. Remove the
-+ * bus-width property here and disable the nand node with status = "disabled";.
-+ *
-+ * Ex: pinctrl-0 = <&emmc_sel>, <&gpiobs>, <&pwmc>;
-+ */
-+&sdio {
-+	bus-width = <4>;
-+	no-1-8-v;
-+	status = "ok";
-+};
-+
-+&srab {
-+	compatible = "brcm,bcm58625-srab", "brcm,nsp-srab";
++&amac2 {
 +	status = "okay";
-+
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		port at 0 {
-+			label = "port0";
-+			reg = <0>;
-+		};
-+
-+		port at 1 {
-+			label = "port1";
-+			reg = <1>;
-+		};
-+
-+		port at 2 {
-+			label = "port2";
-+			reg = <2>;
-+		};
-+
-+		port at 3 {
-+			label = "port3";
-+			reg = <3>;
-+		};
-+
-+		port at 4 {
-+			label = "port4";
-+			reg = <4>;
-+		};
-+
-+		port at 5 {
-+			ethernet = <&amac0>;
-+			label = "cpu";
-+			reg = <5>;
-+			fixed-link {
-+				speed = <1000>;
-+				full-duplex;
-+			};
-+		};
-+	};
 +};
 +
- &uart0 {
+ &nand {
+ 	nandcs at 0 {
+ 		compatible = "brcm,nandcs";
+diff --git a/arch/arm/boot/dts/bcm988312hr.dts b/arch/arm/boot/dts/bcm988312hr.dts
+index c324c9f..16666324 100644
+--- a/arch/arm/boot/dts/bcm988312hr.dts
++++ b/arch/arm/boot/dts/bcm988312hr.dts
+@@ -65,6 +65,14 @@
  	status = "okay";
  };
+ 
++&amac1 {
++	status = "okay";
++};
++
++&amac2 {
++	status = "okay";
++};
++
+ &nand {
+ 	nandcs at 0 {
+ 		compatible = "brcm,nandcs";
 -- 
 2.7.4
