@@ -1,38 +1,113 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Wed, 14 Dec 2016 04:54:14 +0800
-Subject: [PATCH 2/6] clk: sunxi-ng: set the parent rate when adjustin CPUX
- clock on A33
-In-Reply-To: <20161213154451.y4wcrqhtcc5sqli7@lukather>
-References: <20161213152252.53749-1-icenowy@aosc.xyz>
- <20161213152252.53749-3-icenowy@aosc.xyz>
- <20161213154451.y4wcrqhtcc5sqli7@lukather>
-Message-ID: <306991481662454@web33j.yandex.ru>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 13 Dec 2016 15:07:14 -0600
+Subject: [PATCH v6 1/8] MFD: add bindings for STM32 Timers driver
+In-Reply-To: <CA+M3ks4ukP14YE5-6+gAzJBjEmjEyGyVbsVGOm8ehVm0EfzO-w@mail.gmail.com>
+References: <1481292919-26587-1-git-send-email-benjamin.gaignard@st.com>
+ <1481292919-26587-2-git-send-email-benjamin.gaignard@st.com>
+ <20161212185149.rt3xqpn3mbaavb4l@rob-hp-laptop>
+ <CA+M3ks4ukP14YE5-6+gAzJBjEmjEyGyVbsVGOm8ehVm0EfzO-w@mail.gmail.com>
+Message-ID: <CAL_Jsq+qzhUAMG_jL6CSHz+kHu6M6N8Nko4KfRQRgRgtk-KTKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-13.12.2016, 23:44, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> On Tue, Dec 13, 2016 at 11:22:48PM +0800, Icenowy Zheng wrote:
->> ?The CPUX clock on A33, which is for the Cortex-A7 cores, is designed to
->> ?be changeable by changing the rate of PLL_CPUX.
+On Tue, Dec 13, 2016 at 3:29 AM, Benjamin Gaignard
+<benjamin.gaignard@linaro.org> wrote:
+> 2016-12-12 19:51 GMT+01:00 Rob Herring <robh@kernel.org>:
+>> On Fri, Dec 09, 2016 at 03:15:12PM +0100, Benjamin Gaignard wrote:
+>>> Add bindings information for STM32 Timers
+>>>
+>>> version 6:
+>>> - rename stm32-gtimer to stm32-timers
+>>> - change compatible
+>>> - add description about the IPs
+>>>
+>>> version 2:
+>>> - rename stm32-mfd-timer to stm32-gptimer
+>>> - only keep one compatible string
+>>>
+>>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>>> ---
+>>>  .../devicetree/bindings/mfd/stm32-timers.txt       | 46 ++++++++++++++++++++++
+>>>  1 file changed, 46 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-timers.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/mfd/stm32-timers.txt b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+>>> new file mode 100644
+>>> index 0000000..b30868e
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+>>> @@ -0,0 +1,46 @@
+>>> +STM32 Timers driver bindings
+>>> +
+>>> +This IP provides 3 types of timer along with PWM functionality:
+>>> +- advanced-control timers consist of a 16-bit auto-reload counter driven by a programmable
+>>> +  prescaler, break input feature, PWM outputs and complementary PWM ouputs channels.
+>>> +- general-purpose timers consist of a 16-bit or 32-bit auto-reload counter driven by a
+>>> +  programmable prescaler and PWM outputs.
+>>> +- basic timers consist of a 16-bit auto-reload counter driven by a programmable prescaler.
+>>> +
+>>> +Required parameters:
+>>> +- compatible: must be "st,stm32-timers"
+>>> +
+>>> +- reg:                       Physical base address and length of the controller's
+>>> +                     registers.
+>>> +- clock-names:               Set to "clk_int".
 >>
->> ?Add CLK_SET_RATE_PARENT flag to this clock.
+>> 'clk' is redundant. Also, you don't really need -names when there is
+>> only one of them.
+>
+> I use devm_regmap_init_mmio_clk() which get the clock by it name so
+> I have to define it in DT.
+
+Are you sure NULL is not allowed? I don't know, but at least clk_get()
+allows NULL.
+
+It's fine to keep, just drop the "clk_" part.
+
+>
+>>> +- clocks:            Phandle to the clock used by the timer module.
+>>> +                     For Clk properties, please refer to ../clock/clock-bindings.txt
+>>> +
+>>> +Optional parameters:
+>>> +- resets:            Phandle to the parent reset controller.
+>>> +                     See ../reset/st,stm32-rcc.txt
+>>> +
+>>> +Optional subnodes:
+>>> +- pwm:                       See ../pwm/pwm-stm32.txt
+>>> +- timer:             See ../iio/timer/stm32-timer-trigger.txt
+>>> +
+>>> +Example:
+>>> +     timers at 40010000 {
+>>> +             #address-cells = <1>;
+>>> +             #size-cells = <0>;
+>>> +             compatible = "st,stm32-timers";
+>>> +             reg = <0x40010000 0x400>;
+>>> +             clocks = <&rcc 0 160>;
+>>> +             clock-names = "clk_int";
+>>> +
+>>> +             pwm {
+>>> +                     compatible = "st,stm32-pwm";
+>>> +                     pinctrl-0       = <&pwm1_pins>;
+>>> +                     pinctrl-names   = "default";
+>>> +             };
+>>> +
+>>> +             timer {
+>>> +                     compatible = "st,stm32-timer-trigger";
+>>> +                     reg = <0>;
 >>
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> You don't need reg here as there is only one. In turn, you don't need
+>> #address-cells or #size-cells.
 >
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> I use "reg" to set each timer configuration.
+> From hardware point of view they are all the same except for which hardware
+> signals they could consume and/or send.
 
-Excuse me, have you merged this patch?
+This sounds okay, but...
 
-If merged, I won't contain it in my PATCH v2, thus the PATCH v2 will contain
-only an updated OPP patch.
+> "reg" is used as index of the two tables in driver code.
 
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+this statement doesn't really sound like valid use of reg.
+
+If you keep reg, then the node needs a unit address (timer at 0).
+
+Rob
