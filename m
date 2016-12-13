@@ -1,65 +1,435 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue, 13 Dec 2016 23:09:05 +1030
-Subject: [PATCH v3 6/6] mfd: dt: Move syscon bindings to syscon
- subdirectory
-In-Reply-To: <5094120.Y7DXfRGTEm@wuerfel>
-References: <20161206025321.1792-1-andrew@aj.id.au>
- <20161213110710.GV3625@dell.home> <1481630734.3112.40.camel@aj.id.au>
- <5094120.Y7DXfRGTEm@wuerfel>
-Message-ID: <1481632745.3112.42.camel@aj.id.au>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 13 Dec 2016 14:40:36 +0200
+Subject: [PATCH v2 3/9] ARM: dts: dra72: Add separate dtsi for tps65917
+In-Reply-To: <20161021103841.8044-4-lokeshvutla@ti.com>
+References: <20161021103841.8044-1-lokeshvutla@ti.com>
+ <20161021103841.8044-4-lokeshvutla@ti.com>
+Message-ID: <045e8200-69bd-8590-1da4-96235444db4c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-12-13 at 13:17 +0100, Arnd Bergmann wrote:
-> On Tuesday, December 13, 2016 10:35:34 PM CET Andrew Jeffery wrote:
-> > On Tue, 2016-12-13 at 11:07 +0000, Lee Jones wrote:
-> > > On Tue, 13 Dec 2016, Andrew Jeffery wrote:
-> > > > On Mon, 2016-12-12 at 09:39 -0600, Rob Herring wrote:
-> > > > > On Tue, Dec 06, 2016 at 01:53:21PM +1100, Andrew Jeffery wrote:
-> > > > 
-> > > > Lee's next email in the chain poked Arnd for an opinion, but Arnd
-> > > > didn't reply.
-> > > > 
-> > > > I don't mind. I moved these bindings separately so we could just drop
-> > > > the patch if there was push-back. If we drop the whole idea I'll need
-> > > > to apply a small fix to patch 5/6 to avoid creating the syscon
-> > > > subdirectory.
-> > > 
-> > > The sub-directory is a good idea for drivers who are *solely* syscon
-> > > based.
-> > > 
-> > 
-> > Yes, I wasn't saying otherwise, just commenting on my motivation and
-> > approach.
-> > 
-> > As far as I can tell all of the bindings I move here describe solely
-> > syscon-based devices.
-> > 
++Tomi, Kishon, Carlos
+ 
+Hi,
+
+On 21/10/16 13:38, Lokesh Vutla wrote:
+> dra72-evm-common.dtsi consolidates dra72-evm.dts and dra72-evm-revc.dts
+> which also include tps65917 pmic support as both the evms uses the same
+> pmic. But, dra71-evm has mostly similar features with a different pmic.
+> In order to exploit dra72-evm-common.dtsi, creating a separate dtsi
+> for tps65915 support and including it in respective board files.
 > 
-> But do we know which ones they are?
-> 
-> In principle, any syscon device node can have a specialized driver
-> exporting an interface, the bindings always allow it to be done
-> one way or the other, and we may change the driver or run a different
-> OS that has decided differently.
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+>  arch/arm/boot/dts/dra72-evm-common.dtsi   | 128 ----------------------------
+>  arch/arm/boot/dts/dra72-evm-revc.dts      |  21 +++--
+>  arch/arm/boot/dts/dra72-evm-tps65917.dtsi | 134 ++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/dra72-evm.dts           |  14 ++--
+>  4 files changed, 154 insertions(+), 143 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/dra72-evm-tps65917.dtsi
 > 
 
-Right; for the Linux case there are currently no driver implementations
-that match on the compatible strings in the documents I moved (save for
-qcom,tcsr, except that it's the qcom,gsbi compatible driver parsing a
-phandle to the qcom,tcsr syscon node).
+This patch breaks USB XHCI and boot on dra72-evm (both revC and non revC)
 
-However, I can't guarantee the solely-syscon property for other
-operating systems. Given that, it now looks to me like we shouldn't
-have such a directory at all.
+I'll explain why below.
 
-Cheers,
+[   13.625167] Unhandled fault: imprecise external abort (0x1406) at 0x00000000
+[   13.632557] pgd = ede10000
+[   13.635390] [00000000] *pgd=00000000
+[   13.639145] Internal error: : 1406 [#1] SMP ARM
+[   13.643893] Modules linked in: xhci_plat_hcd(+) xhci_hcd usbcore omapfb dwc3 cfbfillrect snd_soc_davinci_mcasp cfbimgblt cfbcopyarea udc_core connector_hdmi encoder_tpd12s015 snd_soc_edma m25p80 snd_soc_simpe
+[   13.695557] CPU: 0 PID: 440 Comm: modprobe Not tainted 4.9.0-rc1 #1050
+[   13.702399] Hardware name: Generic DRA72X (Flattened Device Tree)
+[   13.708786] task: edb5c040 task.stack: edd10000
+[   13.713540] PC is at _raw_spin_unlock_irqrestore+0x0/0x44
+[   13.719219] LR is at xhci_hub_control+0xc2c/0x15e0 [xhci_hcd]
+[   13.725242] pc : [<c07df718>]    lr : [<bf486300>]    psr: a0000093
+[   13.725242] sp : edd118c0  ip : c0e306b4  fp : 00000000
+[   13.737278] r10: 00000000  r9 : 60000013  r8 : edf28218
+[   13.742753] r7 : edf28000  r6 : 00000000  r5 : 00000000  r4 : edf2a000
+[   13.749593] r3 : 00000000  r2 : 00000000  r1 : 60000013  r0 : edf28218
 
-Andrew
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161213/b1925e8e/attachment.sig>
+
+> diff --git a/arch/arm/boot/dts/dra72-evm-common.dtsi b/arch/arm/boot/dts/dra72-evm-common.dtsi
+> index 8537b6a..9903ac7 100644
+> --- a/arch/arm/boot/dts/dra72-evm-common.dtsi
+> +++ b/arch/arm/boot/dts/dra72-evm-common.dtsi
+> @@ -214,123 +214,6 @@
+>  	status = "okay";
+>  	clock-frequency = <400000>;
+>  
+> -	tps65917: tps65917 at 58 {
+> -		compatible = "ti,tps65917";
+> -		reg = <0x58>;
+> -
+> -		interrupts = <GIC_SPI 2 IRQ_TYPE_NONE>;  /* IRQ_SYS_1N */
+> -		interrupt-controller;
+> -		#interrupt-cells = <2>;
+> -
+> -		ti,system-power-controller;
+> -
+> -		tps65917_pmic {
+> -			compatible = "ti,tps65917-pmic";
+> -
+> -			smps1-in-supply = <&vsys_3v3>;
+> -			smps2-in-supply = <&vsys_3v3>;
+> -			smps3-in-supply = <&vsys_3v3>;
+> -			smps4-in-supply = <&vsys_3v3>;
+> -			smps5-in-supply = <&vsys_3v3>;
+> -			ldo1-in-supply = <&vsys_3v3>;
+> -			ldo2-in-supply = <&vsys_3v3>;
+> -			ldo3-in-supply = <&vsys_3v3>;
+> -			ldo4-in-supply = <&evm_5v0>;
+> -			ldo5-in-supply = <&vsys_3v3>;
+> -
+> -			tps65917_regulators: regulators {
+> -				smps1_reg: smps1 {
+> -					/* VDD_MPU */
+> -					regulator-name = "smps1";
+> -					regulator-min-microvolt = <850000>;
+> -					regulator-max-microvolt = <1250000>;
+> -					regulator-always-on;
+> -					regulator-boot-on;
+> -				};
+> -
+> -				smps2_reg: smps2 {
+> -					/* VDD_CORE */
+> -					regulator-name = "smps2";
+> -					regulator-min-microvolt = <850000>;
+> -					regulator-max-microvolt = <1150000>;
+> -					regulator-boot-on;
+> -					regulator-always-on;
+> -				};
+> -
+> -				smps3_reg: smps3 {
+> -					/* VDD_GPU IVA DSPEVE */
+> -					regulator-name = "smps3";
+> -					regulator-min-microvolt = <850000>;
+> -					regulator-max-microvolt = <1250000>;
+> -					regulator-boot-on;
+> -					regulator-always-on;
+> -				};
+> -
+> -				smps4_reg: smps4 {
+> -					/* VDDS1V8 */
+> -					regulator-name = "smps4";
+> -					regulator-min-microvolt = <1800000>;
+> -					regulator-max-microvolt = <1800000>;
+> -					regulator-always-on;
+> -					regulator-boot-on;
+> -				};
+> -
+> -				smps5_reg: smps5 {
+> -					/* VDD_DDR */
+> -					regulator-name = "smps5";
+> -					regulator-min-microvolt = <1350000>;
+> -					regulator-max-microvolt = <1350000>;
+> -					regulator-boot-on;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo1_reg: ldo1 {
+> -					/* LDO1_OUT --> SDIO  */
+> -					regulator-name = "ldo1";
+> -					regulator-min-microvolt = <1800000>;
+> -					regulator-max-microvolt = <3300000>;
+> -					regulator-always-on;
+> -					regulator-boot-on;
+> -					regulator-allow-bypass;
+> -				};
+> -
+> -				ldo3_reg: ldo3 {
+> -					/* VDDA_1V8_PHY */
+> -					regulator-name = "ldo3";
+> -					regulator-min-microvolt = <1800000>;
+> -					regulator-max-microvolt = <1800000>;
+> -					regulator-boot-on;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo5_reg: ldo5 {
+> -					/* VDDA_1V8_PLL */
+> -					regulator-name = "ldo5";
+> -					regulator-min-microvolt = <1800000>;
+> -					regulator-max-microvolt = <1800000>;
+> -					regulator-always-on;
+> -					regulator-boot-on;
+> -				};
+> -
+> -				ldo4_reg: ldo4 {
+> -					/* VDDA_3V_USB: VDDA_USBHS33 */
+> -					regulator-name = "ldo4";
+> -					regulator-min-microvolt = <3300000>;
+> -					regulator-max-microvolt = <3300000>;
+> -					regulator-boot-on;
+> -				};
+> -			};
+> -		};
+> -
+> -		tps65917_power_button {
+> -			compatible = "ti,palmas-pwrbutton";
+> -			interrupt-parent = <&tps65917>;
+> -			interrupts = <1 IRQ_TYPE_NONE>;
+> -			wakeup-source;
+> -			ti,palmas-long-press-seconds = <6>;
+> -		};
+> -	};
+> -
+>  	pcf_gpio_21: gpio at 21 {
+>  		compatible = "ti,pcf8575", "nxp,pcf8575";
+>  		reg = <0x21>;
+> @@ -480,14 +363,6 @@
+>  	};
+>  };
+>  
+> -&usb2_phy1 {
+> -	phy-supply = <&ldo4_reg>;
+> -};
+> -
+> -&usb2_phy2 {
+> -	phy-supply = <&ldo4_reg>;
+> -};
+> -
+
+You remove this here but don't add them in the board dts files.
+
+>  &omap_dwc3_1 {
+>  	extcon = <&extcon_usb1>;
+>  };
+> @@ -509,7 +384,6 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&mmc1_pins_default>;
+>  	vmmc-supply = <&evm_3v3_sd>;
+> -	vmmc_aux-supply = <&ldo1_reg>;
+
+What about this?
+
+>  	bus-width = <4>;
+>  	/*
+>  	 * SDCD signal is not being used here - using the fact that GPIO mode
+> @@ -606,8 +480,6 @@
+>  
+>  &dss {
+>  	status = "ok";
+> -
+> -	vdda_video-supply = <&ldo5_reg>;
+
+and this?
+
+>  };
+>  
+>  &hdmi {
+> diff --git a/arch/arm/boot/dts/dra72-evm-revc.dts b/arch/arm/boot/dts/dra72-evm-revc.dts
+> index 064b322..4ea2a0c 100644
+> --- a/arch/arm/boot/dts/dra72-evm-revc.dts
+> +++ b/arch/arm/boot/dts/dra72-evm-revc.dts
+> @@ -17,17 +17,22 @@
+>  	};
+>  };
+>  
+> -&tps65917_regulators {
+> -	ldo2_reg: ldo2 {
+> -		/* LDO2_OUT --> VDDA_1V8_PHY2 */
+> -		regulator-name = "ldo2";
+> -		regulator-min-microvolt = <1800000>;
+> -		regulator-max-microvolt = <1800000>;
+> -		regulator-always-on;
+> -		regulator-boot-on;
+> +&i2c1 {
+> +	tps65917: tps65917 at 58 {
+> +		reg = <0x58>;
+> +
+> +		interrupts = <GIC_SPI 2 IRQ_TYPE_NONE>;  /* IRQ_SYS_1N */
+>  	};
+>  };
+>  
+> +#include "dra72-evm-tps65917.dtsi"
+> +
+> +&ldo2_reg {
+> +	/* LDO2_OUT --> VDDA_1V8_PHY2 */
+> +	regulator-always-on;
+> +	regulator-boot-on;
+> +};
+> +
+
+Here you need to add the usb2_phy1 & 2 supplies.
+
+>  &hdmi {
+>  	vdda-supply = <&ldo2_reg>;
+>  };
+> diff --git a/arch/arm/boot/dts/dra72-evm-tps65917.dtsi b/arch/arm/boot/dts/dra72-evm-tps65917.dtsi
+> new file mode 100644
+> index 0000000..ee6dac4
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/dra72-evm-tps65917.dtsi
+> @@ -0,0 +1,134 @@
+> +/*
+> + * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/*
+> + * Integrated Power Management Chip
+> + * http://www.ti.com/lit/ds/symlink/tps65917-q1.pdf
+> + */
+> +
+> +&tps65917 {
+> +	compatible = "ti,tps65917";
+> +
+> +	interrupt-controller;
+> +	#interrupt-cells = <2>;
+> +
+> +	ti,system-power-controller;
+> +
+> +	tps65917_pmic {
+> +		compatible = "ti,tps65917-pmic";
+> +
+> +		smps1-in-supply = <&vsys_3v3>;
+> +		smps2-in-supply = <&vsys_3v3>;
+> +		smps3-in-supply = <&vsys_3v3>;
+> +		smps4-in-supply = <&vsys_3v3>;
+> +		smps5-in-supply = <&vsys_3v3>;
+> +		ldo1-in-supply = <&vsys_3v3>;
+> +		ldo2-in-supply = <&vsys_3v3>;
+> +		ldo3-in-supply = <&vsys_3v3>;
+> +		ldo4-in-supply = <&evm_5v0>;
+> +		ldo5-in-supply = <&vsys_3v3>;
+> +
+> +		tps65917_regulators: regulators {
+> +			smps1_reg: smps1 {
+> +				/* VDD_MPU */
+> +				regulator-name = "smps1";
+> +				regulator-min-microvolt = <850000>;
+> +				regulator-max-microvolt = <1250000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			smps2_reg: smps2 {
+> +				/* VDD_CORE */
+> +				regulator-name = "smps2";
+> +				regulator-min-microvolt = <850000>;
+> +				regulator-max-microvolt = <1150000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			smps3_reg: smps3 {
+> +				/* VDD_GPU IVA DSPEVE */
+> +				regulator-name = "smps3";
+> +				regulator-min-microvolt = <850000>;
+> +				regulator-max-microvolt = <1250000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			smps4_reg: smps4 {
+> +				/* VDDS1V8 */
+> +				regulator-name = "smps4";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			smps5_reg: smps5 {
+> +				/* VDD_DDR */
+> +				regulator-name = "smps5";
+> +				regulator-min-microvolt = <1350000>;
+> +				regulator-max-microvolt = <1350000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo1_reg: ldo1 {
+> +				/* LDO1_OUT --> SDIO  */
+> +				regulator-name = "ldo1";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-allow-bypass;
+> +			};
+> +
+> +			ldo2_reg: ldo2 {
+> +				regulator-name = "ldo2";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-allow-bypass;
+> +			};
+> +
+> +			ldo3_reg: ldo3 {
+> +				/* VDDA_1V8_PHY */
+> +				regulator-name = "ldo3";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo5_reg: ldo5 {
+> +				/* VDDA_1V8_PLL */
+> +				regulator-name = "ldo5";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			ldo4_reg: ldo4 {
+> +				/* VDDA_3V_USB: VDDA_USBHS33 */
+> +				regulator-name = "ldo4";
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-boot-on;
+> +			};
+> +		};
+> +	};
+> +
+> +	tps65917_power_button {
+> +		compatible = "ti,palmas-pwrbutton";
+> +		interrupt-parent = <&tps65917>;
+> +		interrupts = <1 IRQ_TYPE_NONE>;
+> +		wakeup-source;
+> +		ti,palmas-long-press-seconds = <6>;
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
+> index e3a9b69..cd9c4ff 100644
+> --- a/arch/arm/boot/dts/dra72-evm.dts
+> +++ b/arch/arm/boot/dts/dra72-evm.dts
+> @@ -15,16 +15,16 @@
+>  	};
+>  };
+>  
+> -&tps65917_regulators {
+> -	ldo2_reg: ldo2 {
+> -		/* LDO2_OUT --> TP1017 (UNUSED)  */
+> -		regulator-name = "ldo2";
+> -		regulator-min-microvolt = <1800000>;
+> -		regulator-max-microvolt = <3300000>;
+> -		regulator-allow-bypass;
+> +&i2c1 {
+> +	tps65917: tps65917 at 58 {
+> +		reg = <0x58>;
+> +
+> +		interrupts = <GIC_SPI 2 IRQ_TYPE_NONE>;  /* IRQ_SYS_1N */
+>  	};
+>  };
+>  
+> +#include "dra72-evm-tps65917.dtsi"
+> +
+>  &hdmi {
+>  	vdda-supply = <&ldo3_reg>;
+>  };
+> 
+
+Here as well you need to add the usb2_phy1 & 2 supplies.
+
+We probably need to add dss and mmc supplies as well to both the board dts files?
+
+cheers,
+-roger
