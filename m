@@ -1,43 +1,56 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 13 Dec 2016 13:41:17 +0100
-Subject: [PATCH 0/3] arm64/clk: update Marvell Armada CP110 system controller
- driver
-Message-ID: <1481632880-9198-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 13 Dec 2016 13:41:19 +0100
+Subject: [PATCH 2/3] clk: mvebu: adjust clock handling for the CP110 system
+ controller
+In-Reply-To: <1481632880-9198-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1481632880-9198-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1481632880-9198-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This commit adds support for the GOP_DP gatable clock found in the
+CP110 system controller. This clock is controlled by bit 9, and has
+clock 18 as its parent. Therefore, clock 18 is in fact not only
+controlling SD/MMC, but also GOP, but it is renamed as SD_MMC_GOP
+accordingly.
 
-This small set of commits updates the Marvell Armada CP110 system
-controller driver, its Device Tree binding, and Device Tree
-representation, to take into account two new things:
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/clk/mvebu/cp110-system-controller.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
- - The clock driver now handles clock n?9 (GOP) as a child of clock
-   n?18 (controls SD/MMC and GOP)
-
- - The DT representation is adjusted to name clock n?18 "sd-mmc-gop"
-   instead of just "sd-mmc".
-
-This set of commits is some preparation work to add networking support
-for Marvell Armada 7K/8K.
-
-I would expect patches 1 and 2 to be taken by the clock maintainers,
-and patch 3 be taken by the Marvell EBU maintainers.
-
-Thanks,
-
-Thomas
-
-Thomas Petazzoni (3):
-  dt-bindings: arm: update Armada CP110 system controller binding
-  clk: mvebu: adjust clock handling for the CP110 system controller
-  arm64: dts: marvell: adjust name of sd-mmc-gop clock in syscon
-
- .../devicetree/bindings/arm/marvell/cp110-system-controller0.txt    | 6 +++---
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi                | 2 +-
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi                 | 2 +-
- drivers/clk/mvebu/cp110-system-controller.c                         | 6 ++++--
- 4 files changed, 9 insertions(+), 7 deletions(-)
-
+diff --git a/drivers/clk/mvebu/cp110-system-controller.c b/drivers/clk/mvebu/cp110-system-controller.c
+index f2303da..3c91cab 100644
+--- a/drivers/clk/mvebu/cp110-system-controller.c
++++ b/drivers/clk/mvebu/cp110-system-controller.c
+@@ -66,6 +66,7 @@ enum {
+ #define CP110_GATE_SDIO			4
+ #define CP110_GATE_XOR1			7
+ #define CP110_GATE_XOR0			8
++#define CP110_GATE_GOP_DP		9
+ #define CP110_GATE_PCIE_X1_0		11
+ #define CP110_GATE_PCIE_X1_1		12
+ #define CP110_GATE_PCIE_X4		13
+@@ -73,7 +74,7 @@ enum {
+ #define CP110_GATE_SATA			15
+ #define CP110_GATE_SATA_USB		16
+ #define CP110_GATE_MAIN			17
+-#define CP110_GATE_SDMMC		18
++#define CP110_GATE_SDMMC_GOP		18
+ #define CP110_GATE_SLOW_IO		21
+ #define CP110_GATE_USB3H0		22
+ #define CP110_GATE_USB3H1		23
+@@ -309,9 +310,10 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
+ 			parent = ppv2_name;
+ 			break;
+ 		case CP110_GATE_SDIO:
++		case CP110_GATE_GOP_DP:
+ 			of_property_read_string_index(np,
+ 						      "gate-clock-output-names",
+-						      CP110_GATE_SDMMC, &parent);
++						      CP110_GATE_SDMMC_GOP, &parent);
+ 			break;
+ 		case CP110_GATE_XOR1:
+ 		case CP110_GATE_XOR0:
 -- 
 2.7.4
