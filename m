@@ -1,76 +1,83 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 13 Dec 2016 16:55:42 +0200
-Subject: [PATCH v2 3/9] ARM: dts: dra72: Add separate dtsi for tps65917
-In-Reply-To: <91b4075f-2dfb-0d17-592d-f99b91ace590@ti.com>
-References: <20161021103841.8044-1-lokeshvutla@ti.com>
- <20161021103841.8044-4-lokeshvutla@ti.com>
- <045e8200-69bd-8590-1da4-96235444db4c@ti.com>
- <91b4075f-2dfb-0d17-592d-f99b91ace590@ti.com>
-Message-ID: <ec0a127f-c6e1-cb9c-b369-deece94cb858@ti.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 13 Dec 2016 15:02:30 +0000
+Subject: [RFC v2 PATCH 0/3] Fix dma_alloc_coherent() and friends for NOMMU
+In-Reply-To: <ed07f3ca-8ce7-fb1b-2292-238ecf6460da@arm.com>
+References: <1481636704-18948-1-git-send-email-vladimir.murzin@arm.com>
+ <20161213140711.GY14217@n2100.armlinux.org.uk> <58500243.8070107@arm.com>
+ <ed07f3ca-8ce7-fb1b-2292-238ecf6460da@arm.com>
+Message-ID: <58500D86.4070600@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lokesh,
-
-On 13/12/16 15:08, Lokesh Vutla wrote:
-> 
-> 
-> On Tuesday 13 December 2016 06:10 PM, Roger Quadros wrote:
->> +Tomi, Kishon, Carlos
->>  
->> Hi,
->>
->> On 21/10/16 13:38, Lokesh Vutla wrote:
->>> dra72-evm-common.dtsi consolidates dra72-evm.dts and dra72-evm-revc.dts
->>> which also include tps65917 pmic support as both the evms uses the same
->>> pmic. But, dra71-evm has mostly similar features with a different pmic.
->>> In order to exploit dra72-evm-common.dtsi, creating a separate dtsi
->>> for tps65915 support and including it in respective board files.
+On 13/12/16 14:25, Robin Murphy wrote:
+> On 13/12/16 14:14, Vladimir Murzin wrote:
+>> On 13/12/16 14:07, Russell King - ARM Linux wrote:
+>>> On Tue, Dec 13, 2016 at 01:45:01PM +0000, Vladimir Murzin wrote:
+>>>> This patch set is trying to address the issue by providing region of
+>>>> memory suitable for consistent DMA operations. It is supposed that such
+>>>> region is marked by MPU as non-cacheable. Since we have MPU support in
+>>>> Linux for R-class only and M-class setting MPU in bootloader, proposed
+>>>> interface to advertise such memory is via "memdma=size at start" command
+>>>> line option, to avoid clashing with normal memory (which usually comes
+>>>> from dts) it'd be safer to use it together with "mem=" command line
+>>>> option. Meanwhile, I'm open to suggestions for the better way telling
+>>>> Linux of such memory.
 >>>
->>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->>> ---
->>>  arch/arm/boot/dts/dra72-evm-common.dtsi   | 128 ----------------------------
->>>  arch/arm/boot/dts/dra72-evm-revc.dts      |  21 +++--
->>>  arch/arm/boot/dts/dra72-evm-tps65917.dtsi | 134 ++++++++++++++++++++++++++++++
->>>  arch/arm/boot/dts/dra72-evm.dts           |  14 ++--
->>>  4 files changed, 154 insertions(+), 143 deletions(-)
->>>  create mode 100644 arch/arm/boot/dts/dra72-evm-tps65917.dtsi
+>>> For those nommu systems where the MPU is not used, how do they allocate
+>>> DMA memory without setting aside a chunk of memory?
+>>>
+>>> >From what I understand of the current nommu code, it would just use
+>>> the normal page allocator for DMA memory allocation, so now requiring
+>>> everything to fit the "nommu has mpu" case seems like it's going to
+>>> break older nommu.
 >>>
 >>
->> This patch breaks USB XHCI and boot on dra72-evm (both revC and non revC)
->>
->> I'll explain why below.
->>
->> [   13.625167] Unhandled fault: imprecise external abort (0x1406) at 0x00000000
->> [   13.632557] pgd = ede10000
->> [   13.635390] [00000000] *pgd=00000000
->> [   13.639145] Internal error: : 1406 [#1] SMP ARM
->> [   13.643893] Modules linked in: xhci_plat_hcd(+) xhci_hcd usbcore omapfb dwc3 cfbfillrect snd_soc_davinci_mcasp cfbimgblt cfbcopyarea udc_core connector_hdmi encoder_tpd12s015 snd_soc_edma m25p80 snd_soc_simpe
->> [   13.695557] CPU: 0 PID: 440 Comm: modprobe Not tainted 4.9.0-rc1 #1050
->> [   13.702399] Hardware name: Generic DRA72X (Flattened Device Tree)
->> [   13.708786] task: edb5c040 task.stack: edd10000
->> [   13.713540] PC is at _raw_spin_unlock_irqrestore+0x0/0x44
->> [   13.719219] LR is at xhci_hub_control+0xc2c/0x15e0 [xhci_hcd]
->> [   13.725242] pc : [<c07df718>]    lr : [<bf486300>]    psr: a0000093
->> [   13.725242] sp : edd118c0  ip : c0e306b4  fp : 00000000
->> [   13.737278] r10: 00000000  r9 : 60000013  r8 : edf28218
->> [   13.742753] r7 : edf28000  r6 : 00000000  r5 : 00000000  r4 : edf2a000
->> [   13.749593] r3 : 00000000  r2 : 00000000  r1 : 60000013  r0 : edf28218
+>> Probably, it'd be better if we just fallback to dma-noop operations if there
+>> is no dma region, i.e. assume that platform is coherent. We still need a way
+>> to tell user that absence of such region can be reason of broken DMA.
 > 
-> Hmm.. Thanks for catching it. I remember it was booting when I tested,
-> not sure how I missed this :(. usb2_phy1 & 2, mmc and dss supplies needs
-> to be added in dra72-evm-tps65917.dtsi file.
+> As I mentioned internally, I think it would be worth trying to use CMA
+> for this, because dma_map_ops are already wired to try that first, and
+> from what I can see it seems already set up to do precisely this via a
+> "shared-dma-pool" reserved memory region (see rmem_cma_setup() in
+> drivers/base/dma-contiguous.c) - mandating that for cached v7-M systems
+> whilst letting cache-less/non-MPU systems automatically fall back to the
+> normal page allocator in its absence would seem to solve all 3 cases.
 
-OK.
+Unfortunately,
+
+config DMA_CMA
+        bool "DMA Contiguous Memory Allocator"
+        depends on HAVE_DMA_CONTIGUOUS && CMA
+        help
+...
+config CMA
+        bool "Contiguous Memory Allocator"
+        depends on HAVE_MEMBLOCK && MMU
+	select MIGRATION
+
+and it blows up if I remove dependecy on MMU :(
+
+Another option would be drivers/base/dma-coherent.c, but, IIUC, in this case
+memory is reserved per device exclusively, so I'm in doubt if tiny M-class can
+afford that...
+
+
 > 
-> Tony,
-> 	Do you want me to resend this patch or fixup patch on top of this?
+> Other than the allocator issue, though, the rest of the refactoring does
+> look nice.
 
-In case you send a new patch. please add
+Thanks for going through it!
 
-Reported-by: Carlos Hernandez <ceh@ti.com>
+Cheers
+Vladimir
 
-Thanks.
-
-cheers,
--roger
+> 
+> Robin.
+> 
+>>
+>> Cheers
+>> Vladimir
+>>
+> 
+> 
