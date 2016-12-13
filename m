@@ -1,45 +1,368 @@
-From: jcm@jonmasters.org (Jon Masters)
-Date: Tue, 13 Dec 2016 04:09:39 -0500
-Subject: [PATCH v2] PCI: Add information about describing PCI in ACPI
-In-Reply-To: <20161129213955.15663.21173.stgit@bhelgaas-glaptop.roam.corp.google.com>
-References: <20161129212816.15663.28100.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20161129213955.15663.21173.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <d7e1adbe-91a2-1a76-93b3-c880f9635e5e@jonmasters.org>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue, 13 Dec 2016 10:15:21 +0100
+Subject: [PATCH v6 7/8] ARM: dts: stm32: add Timers driver for stm32f429
+ MCU
+In-Reply-To: <20161212185943.ph7njaqb2lxtgdn4@rob-hp-laptop>
+References: <1481292919-26587-1-git-send-email-benjamin.gaignard@st.com>
+ <1481292919-26587-8-git-send-email-benjamin.gaignard@st.com>
+ <20161212185943.ph7njaqb2lxtgdn4@rob-hp-laptop>
+Message-ID: <CA+M3ks6hMDVqDkjn_vcu-d2YkJkiAmCS44Nc7rtfgAkD09LNFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2016 04:39 PM, Bjorn Helgaas wrote:
+2016-12-12 19:59 GMT+01:00 Rob Herring <robh@kernel.org>:
+> On Fri, Dec 09, 2016 at 03:15:18PM +0100, Benjamin Gaignard wrote:
+>> Add Timers and it sub-nodes into DT for stm32f429 family.
+>>
+>> version 6:
+>> - split patch in two: one for SoC family and one for stm32f469
+>>   discovery board.
+>>
+>> version 5:
+>> - rename gptimer node to timers
+>> - re-order timers node par addresses
+>>
+>> version 4:
+>> - remove unwanted indexing in pwm@ and timer@ node name
+>> - use "reg" instead of additional parameters to set timer
+>>   configuration
+>>
+>> version 3:
+>> - use "st,stm32-timer-trigger" in DT
+>>
+>> version 2:
+>> - use parameters to describe hardware capabilities
+>> - do not use references for pwm and iio timer subnodes
+>>
+>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>> ---
+>>  arch/arm/boot/dts/stm32f429.dtsi | 275 +++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 275 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+>> index bca491d..d0fb9cc 100644
+>> --- a/arch/arm/boot/dts/stm32f429.dtsi
+>> +++ b/arch/arm/boot/dts/stm32f429.dtsi
+>> @@ -355,6 +355,21 @@
+>>                                       slew-rate = <2>;
+>>                               };
+>>                       };
+>> +
+>> +                     pwm1_pins: pwm at 1 {
+>
+> No reg prop, so should not have a unit-address. Given the names in the
+> define below, seems like "timer1" would be appropriate.
+>
+>> +                             pins {
+>> +                                     pinmux = <STM32F429_PA8_FUNC_TIM1_CH1>,
+>> +                                              <STM32F429_PB13_FUNC_TIM1_CH1N>,
+>> +                                              <STM32F429_PB12_FUNC_TIM1_BKIN>;
+>> +                             };
+>> +                     };
+>> +
+>> +                     pwm3_pins: pwm at 3 {
+>> +                             pins {
+>> +                                     pinmux = <STM32F429_PB4_FUNC_TIM3_CH1>,
+>> +                                              <STM32F429_PB5_FUNC_TIM3_CH2>;
+>> +                             };
+>> +                     };
+>>               };
+>>
+>>               rcc: rcc at 40023810 {
+>> @@ -426,6 +441,266 @@
+>>                       interrupts = <80>;
+>>                       clocks = <&rcc 0 38>;
+>>               };
+>> +
+>> +             timers2: timers at 40000000 {
+>
+> timer at ...
+>
+> It may be more than just a timer, there's not a better generic name.
+>
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>> +                     compatible = "st,stm32-timers";
+>> +                     reg = <0x40000000 0x400>;
+>> +                     clocks = <&rcc 0 128>;
+>> +                     clock-names = "clk_int";
+>> +                     status = "disabled";
+>> +
+>> +                     pwm {
+>> +                             compatible = "st,stm32-pwm";
+>> +                             status = "disabled";
+>> +                     };
+>> +
+>> +                     timer {
+>> +                             compatible = "st,stm32-timer-trigger";
+>> +                             reg = <1>;
+>> +                             status = "disabled";
+>> +                     };
+>> +             };
+>> +
+>> +             timers3: timers at 40000400 {
+>
+> ditto
+>
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>> +                     compatible = "st,stm32-timers";
+>> +                     reg = <0x40000400 0x400>;
+>> +                     clocks = <&rcc 0 129>;
+>> +                     clock-names = "clk_int";
+>> +                     status = "disabled";
+>> +
+>> +                     pwm {
+>> +                             compatible = "st,stm32-pwm";
+>> +                             status = "disabled";
+>> +                     };
+>> +
+>> +                     timer {
+>> +                             compatible = "st,stm32-timer-trigger";
+>> +                             reg = <2>;
+>> +                             status = "disabled";
+>> +                     };
+>> +             };
+>> +
+>> +             timers4: timers at 40000800 {
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>> +                     compatible = "st,stm32-timers";
+>> +                     reg = <0x40000800 0x400>;
+>> +                     clocks = <&rcc 0 130>;
+>> +                     clock-names = "clk_int";
+>> +                     status = "disabled";
+>> +
+>> +                     pwm {
+>> +                             compatible = "st,stm32-pwm";
+>> +                             status = "disabled";
+>> +                     };
+>> +
+>> +                     timer {
+>> +                             compatible = "st,stm32-timer-trigger";
+>> +                             reg = <3>;
+>> +                             status = "disabled";
+>> +                     };
+>> +             };
+>> +
+>> +             timers5: timers at 40000C00 {
+>
+> timer at ...
+>
+> And use lowercase hex.
+>
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>> +                     compatible = "st,stm32-timers";
+>> +                     reg = <0x40000C00 0x400>;
+>
+> ditto
+>
+>> +                     clocks = <&rcc 0 131>;
+>> +                     clock-names = "clk_int";
+>> +                     status = "disabled";
+>> +
+>> +                     pwm {
+>> +                             compatible = "st,stm32-pwm";
+>> +                             status = "disabled";
+>> +                     };
+>> +
+>> +                     timer {
+>> +                             compatible = "st,stm32-timer-trigger";
+>> +                             reg = <4>;
+>> +                             status = "disabled";
+>> +                     };
+>> +             };
+>> +
+>> +             timers6: timers at 40001000 {
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>> +                     compatible = "st,stm32-timers";
+>> +                     reg = <0x40001000 0x400>;
+>> +                     clocks = <&rcc 0 132>;
+>> +                     clock-names = "clk_int";
+>> +                     status = "disabled";
+>> +
+>> +                     timer {
+>> +                             compatible = "st,stm32-timer-trigger";
+>> +                             reg = <5>;
+>> +                             status = "disabled";
+>> +                     };
+>> +             };
+>> +
+>> +             timers7: timers at 40001400 {
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>> +                     compatible = "st,stm32-timers";
+>> +                     reg = <0x40001400 0x400>;
+>> +                     clocks = <&rcc 0 133>;
+>> +                     clock-names = "clk_int";
+>> +                     status = "disabled";
+>> +
+>> +                     timer {
+>> +                             compatible = "st,stm32-timer-trigger";
+>> +                             reg = <6>;
+>> +                             status = "disabled";
+>> +                     };
+>> +             };
+>> +
+>> +             timers12: timers at 40001800 {
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>> +                     compatible = "st,stm32-timers";
+>> +                     reg = <0x40001800 0x400>;
+>> +                     clocks = <&rcc 0 134>;
+>> +                     clock-names = "clk_int";
+>> +                     status = "disabled";
+>> +
+>> +                     pwm {
+>> +                             compatible = "st,stm32-pwm";
+>> +                             status = "disabled";
+>> +                     };
+>> +
+>> +                     timer {
+>> +                             compatible = "st,stm32-timer-trigger";
+>> +                             reg = <9>;
+>> +                             status = "disabled";
+>> +                     };
+>> +             };
+>> +
+>> +             timers13: timers at 40001C00 {
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>> +                     compatible = "st,stm32-timers";
+>> +                     reg = <0x40001C00 0x400>;
+>> +                     clocks = <&rcc 0 135>;
+>> +                     clock-names = "clk_int";
+>> +                     status = "disabled";
+>> +
+>> +                     pwm {
+>> +                             compatible = "st,stm32-pwm";
+>> +                             status = "disabled";
+>> +                     };
+>> +             };
+>> +
+>> +             timers14: timers at 40002000 {
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>> +                     compatible = "st,stm32-timers";
+>> +                     reg = <0x40002000 0x400>;
+>> +                     clocks = <&rcc 0 136>;
+>> +                     clock-names = "clk_int";
+>> +                     status = "disabled";
+>> +
+>> +                     pwm {
+>> +                             compatible = "st,stm32-pwm";
+>> +                             status = "disabled";
+>> +                     };
+>> +             };
+>> +
+>> +             timers1: timers at 40010000 {
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>> +                     compatible = "st,stm32-timers";
+>> +                     reg = <0x40010000 0x400>;
+>> +                     clocks = <&rcc 0 160>;
+>> +                     clock-names = "clk_int";
+>> +                     status = "disabled";
+>> +
+>> +                     pwm {
+>> +                             compatible = "st,stm32-pwm";
+>> +                             status = "disabled";
+>> +                     };
+>> +
+>> +                     timer {
+>> +                             compatible = "st,stm32-timer-trigger";
+>> +                             reg = <0>;
+>> +                             status = "disabled";
+>> +                     };
+>> +             };
+>> +
+>> +             timers8: timers at 40010400 {
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>> +                     compatible = "st,stm32-timers";
+>> +                     reg = <0x40010400 0x400>;
+>> +                     clocks = <&rcc 0 161>;
+>> +                     clock-names = "clk_int";
+>> +                     status = "disabled";
+>> +
+>> +                     pwm {
+>> +                             compatible = "st,stm32-pwm";
+>> +                             status = "disabled";
+>> +                     };
+>> +
+>> +                     timer {
+>> +                             compatible = "st,stm32-timer-trigger";
+>> +                             reg = <7>;
+>> +                             status = "disabled";
+>> +                     };
+>> +             };
+>> +
+>> +             timers9: timers at 40014000 {
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>> +                     compatible = "st,stm32-timers";
+>> +                     reg = <0x40014000 0x400>;
+>> +                     clocks = <&rcc 0 176>;
+>> +                     clock-names = "clk_int";
+>> +                     status = "disabled";
+>> +
+>> +                     pwm {
+>> +                             compatible = "st,stm32-pwm";
+>> +                             status = "disabled";
+>> +                     };
+>> +
+>> +                     timer {
+>> +                             compatible = "st,stm32-timer-trigger";
+>> +                             reg = <8>;
+>> +                             status = "disabled";
+>> +                     };
+>> +             };
+>> +
+>> +             timers10: timers at 40014400 {
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>> +                     compatible = "st,stm32-timers";
+>> +                     reg = <0x40014400 0x400>;
+>> +                     clocks = <&rcc 0 177>;
+>> +                     clock-names = "clk_int";
+>> +                     status = "disabled";
+>> +
+>> +                     pwm {
+>> +                             compatible = "st,stm32-pwm";
+>> +                             status = "disabled";
+>> +                     };
+>> +             };
+>> +
+>> +             timers11: timers at 40014800 {
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>> +                     compatible = "st,stm32-timers";
+>> +                     reg = <0x40014800 0x400>;
+>> +                     clocks = <&rcc 0 178>;
+>> +                     clock-names = "clk_int";
+>> +                     status = "disabled";
+>> +
+>> +                     pwm {
+>> +                             compatible = "st,stm32-pwm";
+>> +                             status = "disabled";
+>> +                     };
+>> +             };
+>>       };
+>>  };
+>>
+>> --
+>> 1.9.1
+>>
 
-> +New architectures should be able to use "Consumer" Extended Address Space
-> +descriptors in the PNP0A03 device for bridge registers, including ECAM,
-> +although a strict interpretation of [6] might prohibit this.  Old x86 and
-> +ia64 kernels assume all address space descriptors, including "Consumer"
-> +Extended Address Space ones, are windows, so it would not be safe to
-> +describe bridge registers this way on those architectures.
 
-<snip>
 
-> +[6] PCI Firmware 3.0, sec 4.1.2:
+-- 
+Benjamin Gaignard
 
-<snip>
+Graphic Study Group
 
-Thanks for the revised writeup, Bjorn. It's great. I'm trying to get the
-above clarified explicitly in terms of the spec, and in terms of what
-other Operating Systems would like to see as general preference.
+Linaro.org ? Open source software for ARM SoCs
 
-To your point about second generation ARM (server) systems: we're actually
-on generation 3+ now and finally getting to the point where people are
-listening. A great many times over the past few years, people have had
-to be sat on until they did what was needed. Fortunately, we are going
-to finally have upstream kernels (and distros based upon them) that
-boot out of the box on compliant hardware and will be able to point
-people at the usual "upstream first" messaging we've been pushing.
-
-I had originally fallen for the SoC koolaid that PCIe was not essential,
-and was convinced fairly early that this was nonsense. But it has taken
-a few years for everyone else to get onto that bandwagon. First you give
-them exactly what they know and love (a 1-2 socket Xeon class machine
-with lots of PCIe lanes), then you go and fix the design to give them
-what they actually need (which logically enumerates as PCIe but isn't) ;)
-
-Jon.
+Follow Linaro: Facebook | Twitter | Blog
