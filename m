@@ -1,129 +1,65 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 13 Dec 2016 11:43:06 +0000
-Subject: [PATCH v5] arm64: fpsimd: improve stacking logic in
- non-interruptible context
-In-Reply-To: <20161213111120.GF1574@e103592.cambridge.arm.com>
-References: <1481565387-8039-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161213111120.GF1574@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu8HRLhzMaYTrL9YP4_AfuAkMTAnirWqUk6OpZ2EyzVGSg@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 13 Dec 2016 12:45:49 +0100
+Subject: [PATCH v2 renesas/devel 03/13] ARM: dts: r8a7790: Use R-Car Gen 2
+ fallback binding for i2c nodes
+In-Reply-To: <1481629559-14187-1-git-send-email-horms+renesas@verge.net.au>
+References: <1481629559-14187-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1481629559-14187-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 December 2016 at 11:11, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Mon, Dec 12, 2016 at 05:56:27PM +0000, Ard Biesheuvel wrote:
->> Currently, we allow kernel mode NEON in softirq or hardirq context by
->> stacking and unstacking a slice of the NEON register file for each call
->> to kernel_neon_begin() and kernel_neon_end(), respectively.
->>
->> Given that
->> a) a CPU typically spends most of its time in userland, during which time
->>    no kernel mode NEON in process context is in progress,
->> b) a CPU spends most of its time in the kernel doing other things than
->>    kernel mode NEON when it gets interrupted to perform kernel mode NEON
->>    in softirq context
->>
->> the stacking and subsequent unstacking is only necessary if we are
->> interrupting a thread while it is performing kernel mode NEON in process
->> context, which means that in all other cases, we can simply preserve the
->> userland FPSIMD state once, and only restore it upon return to userland,
->> even if we are being invoked from softirq or hardirq context.
->>
->> So instead of checking whether we are running in interrupt context, keep
->> track of the level of nested kernel mode NEON calls in progress, and only
->> perform the eager stack/unstack if the level exceeds 1.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/kernel/fpsimd.c | 64 +++++++++++++++++++++++++++++++++-------------
->>  1 file changed, 46 insertions(+), 18 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
->> index 394c61db5566..c19363775436 100644
->> --- a/arch/arm64/kernel/fpsimd.c
->> +++ b/arch/arm64/kernel/fpsimd.c
->> @@ -220,45 +220,73 @@ void fpsimd_flush_task_state(struct task_struct *t)
->>
->>  #ifdef CONFIG_KERNEL_MODE_NEON
->>
->> -static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
->> -static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
->> +/*
->> + * Although unlikely, it is possible for three kernel mode NEON contexts to
->> + * be live at the same time: process context, softirq context and hardirq
->> + * context. So while the userland context is stashed in the thread's fpsimd
->> + * state structure, we need two additional levels of storage.
->> + */
->> +static DEFINE_PER_CPU(struct fpsimd_partial_state, nested_fpsimdstate[2]);
->> +static DEFINE_PER_CPU(int, kernel_neon_nesting_level);
->>
->>  /*
->>   * Kernel-side NEON support functions
->>   */
->>  void kernel_neon_begin_partial(u32 num_regs)
->>  {
->> -     if (in_interrupt()) {
->> -             struct fpsimd_partial_state *s = this_cpu_ptr(
->> -                     in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
->> +     struct fpsimd_partial_state *s;
->> +     int level;
->>
->> -             BUG_ON(num_regs > 32);
->> -             fpsimd_save_partial_state(s, roundup(num_regs, 2));
->> -     } else {
->> +     preempt_disable();
->> +
->> +     if (!test_thread_flag(TIF_FOREIGN_FPSTATE)) {
->>               /*
->>                * Save the userland FPSIMD state if we have one and if we
->>                * haven't done so already. Clear fpsimd_last_state to indicate
->>                * that there is no longer userland FPSIMD state in the
->>                * registers.
->>                */
->> -             preempt_disable();
->> -             if (current->mm &&
->> -                 !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
->> -                     fpsimd_save_state(&current->thread.fpsimd_state);
->> +             if (current->mm) {
->> +                     unsigned long flags;
->> +
->> +                     local_irq_save(flags);
->
-> For non-SVE hardware (i.e., all hardware for now), this raises mean IRQ
-> latency if KERNEL_MODE_NEON is used, to fix a bug that doesn't exist.
->
-> For SVE hardware, we would be disabling interrupts around typically a
-> few KB of stores.  I don't know what the actual hardware numbers would
-> look like, but this feels like a disproportionate cost to the problem
-> being solved...
->
+Use recently added R-Car Gen 2 fallback binding for i2c nodes in
+DT for r8a7790 SoC.
 
-That is a fair point. We'd be better off doing a spin_trylock)_, and
-whoever gets the lock first can perform the fpsimd_save_state() until
-completion.
+This has no run-time effect for the current driver as the initialisation
+sequence is the same for the SoC-specific binding for r8a7790 and the
+fallback binding for R-Car Gen 2.
 
-> After all, why do this here...
->
->> +                     if (!test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
->> +                             fpsimd_save_state(&current->thread.fpsimd_state);
->> +                     local_irq_restore(flags);
->> +             } else {
->> +                     set_thread_flag(TIF_FOREIGN_FPSTATE);
->> +             }
->>               this_cpu_write(fpsimd_last_state, NULL);
->>       }
->> +
->> +     level = this_cpu_inc_return(kernel_neon_nesting_level);
->
-> ...and yet go to all this trouble to avoid disabling IRQs for a _nested_
-> kernel_neon_begin()?
->
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/boot/dts/r8a7790.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-I am not sure I follow here: do you mean the this_cpu_inc_return would
-be simpler if we would en-/disable interrupts?
-
-> Did I miss something, or does increasing the count around the outermost
-> case too without IRQ disabling not work, in the non-SVE case?
->
-
-I think it does work for the non-SVE case, since it will restore the
-FP/SIMD state after returning.
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index b7ed7466308b..823ab536175d 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -480,7 +480,7 @@
+ 	i2c0: i2c at e6508000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,i2c-r8a7790";
++		compatible = "renesas,i2c-r8a7790", "renesas,rcar-gen2-i2c";
+ 		reg = <0 0xe6508000 0 0x40>;
+ 		interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7790_CLK_I2C0>;
+@@ -492,7 +492,7 @@
+ 	i2c1: i2c at e6518000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,i2c-r8a7790";
++		compatible = "renesas,i2c-r8a7790", "renesas,rcar-gen2-i2c";
+ 		reg = <0 0xe6518000 0 0x40>;
+ 		interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7790_CLK_I2C1>;
+@@ -504,7 +504,7 @@
+ 	i2c2: i2c at e6530000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,i2c-r8a7790";
++		compatible = "renesas,i2c-r8a7790", "renesas,rcar-gen2-i2c";
+ 		reg = <0 0xe6530000 0 0x40>;
+ 		interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7790_CLK_I2C2>;
+@@ -516,7 +516,7 @@
+ 	i2c3: i2c at e6540000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,i2c-r8a7790";
++		compatible = "renesas,i2c-r8a7790", "renesas,rcar-gen2-i2c";
+ 		reg = <0 0xe6540000 0 0x40>;
+ 		interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7790_CLK_I2C3>;
+-- 
+2.7.0.rc3.207.g0ac5344
