@@ -1,44 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Dec 2016 13:17:16 +0100
-Subject: [PATCH v3 6/6] mfd: dt: Move syscon bindings to syscon
- subdirectory
-In-Reply-To: <1481630734.3112.40.camel@aj.id.au>
-References: <20161206025321.1792-1-andrew@aj.id.au>
- <20161213110710.GV3625@dell.home> <1481630734.3112.40.camel@aj.id.au>
-Message-ID: <5094120.Y7DXfRGTEm@wuerfel>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 13 Dec 2016 12:20:24 +0000
+Subject: [PATCH V7 7/8] iommu/arm-smmu: Set privileged attribute to
+ 'default' instead of 'unprivileged'
+In-Reply-To: <1481567927-14791-8-git-send-email-sricharan@codeaurora.org>
+References: <1481567927-14791-1-git-send-email-sricharan@codeaurora.org>
+ <1481567927-14791-8-git-send-email-sricharan@codeaurora.org>
+Message-ID: <03731ccb-dad0-6e0b-577b-4cd8e47717c0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, December 13, 2016 10:35:34 PM CET Andrew Jeffery wrote:
-> On Tue, 2016-12-13 at 11:07 +0000, Lee Jones wrote:
-> > On Tue, 13 Dec 2016, Andrew Jeffery wrote:
-> > > On Mon, 2016-12-12 at 09:39 -0600, Rob Herring wrote:
-> > > > On Tue, Dec 06, 2016 at 01:53:21PM +1100, Andrew Jeffery wrote:
-> > > 
-> > > Lee's next email in the chain poked Arnd for an opinion, but Arnd
-> > > didn't reply.
-> > > 
-> > > I don't mind. I moved these bindings separately so we could just drop
-> > > the patch if there was push-back. If we drop the whole idea I'll need
-> > > to apply a small fix to patch 5/6 to avoid creating the syscon
-> > > subdirectory.
-> > 
-> > The sub-directory is a good idea for drivers who are *solely* syscon
-> > based.
-> > 
+On 12/12/16 18:38, Sricharan R wrote:
+> Currently the driver sets all the device transactions privileges
+> to UNPRIVILEGED, but there are cases where the iommu masters wants
+> to isolate privileged supervisor and unprivileged user.
+> So don't override the privileged setting to unprivileged, instead
+> set it to default as incoming and let it be controlled by the pagetable
+> settings.
 > 
-> Yes, I wasn't saying otherwise, just commenting on my motivation and
-> approach.
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+
+Since everything else has already got my tags on it:
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+I'd say the whole series looks good to go now, thanks for picking it up.
+
+Robin.
+
+> ---
+>  drivers/iommu/arm-smmu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> As far as I can tell all of the bindings I move here describe solely
-> syscon-based devices.
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index eaa8f44..8bb0eea 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1213,7 +1213,7 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
+>  			continue;
+>  
+>  		s2cr[idx].type = type;
+> -		s2cr[idx].privcfg = S2CR_PRIVCFG_UNPRIV;
+> +		s2cr[idx].privcfg = S2CR_PRIVCFG_DEFAULT;
+>  		s2cr[idx].cbndx = cbndx;
+>  		arm_smmu_write_s2cr(smmu, idx);
+>  	}
 > 
-
-But do we know which ones they are?
-
-In principle, any syscon device node can have a specialized driver
-exporting an interface, the bindings always allow it to be done
-one way or the other, and we may change the driver or run a different
-OS that has decided differently.
-
-	Arnd
