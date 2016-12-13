@@ -1,369 +1,86 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 13 Dec 2016 10:29:51 +0100
-Subject: [PATCH v6 7/8] ARM: dts: stm32: add Timers driver for stm32f429
- MCU
-In-Reply-To: <20161212185943.ph7njaqb2lxtgdn4@rob-hp-laptop>
-References: <1481292919-26587-1-git-send-email-benjamin.gaignard@st.com>
- <1481292919-26587-8-git-send-email-benjamin.gaignard@st.com>
- <20161212185943.ph7njaqb2lxtgdn4@rob-hp-laptop>
-Message-ID: <CA+M3ks4EX2ONTraPC26MJFqsu9Kp7b1x5WOySpnfOH_xGLbTWw@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 13 Dec 2016 09:38:21 +0000
+Subject: [PATCH RFC 2/2] ARM: nommu: remap exception base address to RAM
+In-Reply-To: <20161211131255.3221-1-afzal.mohd.ma@gmail.com>
+References: <20161211131028.3019-1-afzal.mohd.ma@gmail.com>
+ <20161211131255.3221-1-afzal.mohd.ma@gmail.com>
+Message-ID: <584FC18D.2050908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-12-12 19:59 GMT+01:00 Rob Herring <robh@kernel.org>:
-> On Fri, Dec 09, 2016 at 03:15:18PM +0100, Benjamin Gaignard wrote:
->> Add Timers and it sub-nodes into DT for stm32f429 family.
->>
->> version 6:
->> - split patch in two: one for SoC family and one for stm32f469
->>   discovery board.
->>
->> version 5:
->> - rename gptimer node to timers
->> - re-order timers node par addresses
->>
->> version 4:
->> - remove unwanted indexing in pwm@ and timer@ node name
->> - use "reg" instead of additional parameters to set timer
->>   configuration
->>
->> version 3:
->> - use "st,stm32-timer-trigger" in DT
->>
->> version 2:
->> - use parameters to describe hardware capabilities
->> - do not use references for pwm and iio timer subnodes
->>
->> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
->> ---
->>  arch/arm/boot/dts/stm32f429.dtsi | 275 +++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 275 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
->> index bca491d..d0fb9cc 100644
->> --- a/arch/arm/boot/dts/stm32f429.dtsi
->> +++ b/arch/arm/boot/dts/stm32f429.dtsi
->> @@ -355,6 +355,21 @@
->>                                       slew-rate = <2>;
->>                               };
->>                       };
->> +
->> +                     pwm1_pins: pwm at 1 {
->
-> No reg prop, so should not have a unit-address. Given the names in the
-> define below, seems like "timer1" would be appropriate.
->
+On 11/12/16 13:12, Afzal Mohammed wrote:
+> Remap exception base address to start of RAM in Kernel in !MMU mode.
+> 
+> Based on existing Kconfig help, Kernel was expecting it to be
+> configured by external support. Also earlier it was not possible to
+> copy the exception table to start of RAM due to Kconfig dependency,
+> which has been fixed by a change prior to this.
+> 
+> Kernel text start at an offset of at least 32K to account for page
+> tables in MMU case. On a !MMU build too this space is kept aside, and
+> since 2 pages (8K) is the maximum for exception plus stubs, it can be
+> placed at the start of RAM.
+> 
+> Signed-off-by: Afzal Mohammed <afzal.mohd.ma@gmail.com>
+> ---
+> 
+> i am a bit shaky about this change, though it works here on Cortex-A9,
+> this probably would have to be made robust so as to not cause issue on
+> other v7-A's upon trying to do !MMU (this won't affect normal MMU boot),
+> or specifically where security extensions are not enabled. Also effect
+> of hypervisor extension also need to be considered. Please let know if
+> any better ways to handle this.
 
-Here pins muxing is only targeting PWM part of the the MFD , that why I have
-labeled it with "pwm".
+You might need to check ID_PFR1 for that.
 
->> +                             pins {
->> +                                     pinmux = <STM32F429_PA8_FUNC_TIM1_CH1>,
->> +                                              <STM32F429_PB13_FUNC_TIM1_CH1N>,
->> +                                              <STM32F429_PB12_FUNC_TIM1_BKIN>;
->> +                             };
->> +                     };
->> +
->> +                     pwm3_pins: pwm at 3 {
->> +                             pins {
->> +                                     pinmux = <STM32F429_PB4_FUNC_TIM3_CH1>,
->> +                                              <STM32F429_PB5_FUNC_TIM3_CH2>;
->> +                             };
->> +                     };
->>               };
->>
->>               rcc: rcc at 40023810 {
->> @@ -426,6 +441,266 @@
->>                       interrupts = <80>;
->>                       clocks = <&rcc 0 38>;
->>               };
->> +
->> +             timers2: timers at 40000000 {
->
-> timer at ...
->
-> It may be more than just a timer, there's not a better generic name.
+> 
+> 
+>  arch/arm/Kconfig-nommu       | 6 +++---
+>  arch/arm/kernel/head-nommu.S | 6 ++++++
+>  2 files changed, 9 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig-nommu b/arch/arm/Kconfig-nommu
+> index b7576349528c..f57fbe3d5eb0 100644
+> --- a/arch/arm/Kconfig-nommu
+> +++ b/arch/arm/Kconfig-nommu
+> @@ -46,9 +46,9 @@ config REMAP_VECTORS_TO_RAM
+>  	  If your CPU provides a remap facility which allows the exception
+>  	  vectors to be mapped to writable memory, say 'n' here.
+>  
+> -	  Otherwise, say 'y' here.  In this case, the kernel will require
+> -	  external support to redirect the hardware exception vectors to
+> -	  the writable versions located at DRAM_BASE.
+> +	  Otherwise, say 'y' here.  In this case, the kernel will
+> +	  redirect the hardware exception vectors to the writable
+> +	  versions located at DRAM_BASE.
+>  
+>  config ARM_MPU
+>         bool 'Use the ARM v7 PMSA Compliant MPU'
+> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+> index 6b4eb27b8758..ac31c9647830 100644
+> --- a/arch/arm/kernel/head-nommu.S
+> +++ b/arch/arm/kernel/head-nommu.S
+> @@ -158,6 +158,12 @@ __after_proc_init:
+>  	bic	r0, r0, #CR_V
+>  #endif
+>  	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
+> +
+> +#ifdef CONFIG_REMAP_VECTORS_TO_RAM
+> +	mov	r3, #CONFIG_VECTORS_BASE	@ read VECTORS_BASE
 
-"timer" is already used in DT for clocksource driver.
-"timers" cover "advanced-control", "generic" and "basic" hardware timers IPs,
-which share the same registers mapping (only the level of feature are different)
+ldr r3,=CONFIG_VECTORS_BASE
 
->
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +                     compatible = "st,stm32-timers";
->> +                     reg = <0x40000000 0x400>;
->> +                     clocks = <&rcc 0 128>;
->> +                     clock-names = "clk_int";
->> +                     status = "disabled";
->> +
->> +                     pwm {
->> +                             compatible = "st,stm32-pwm";
->> +                             status = "disabled";
->> +                     };
->> +
->> +                     timer {
->> +                             compatible = "st,stm32-timer-trigger";
->> +                             reg = <1>;
->> +                             status = "disabled";
->> +                     };
->> +             };
->> +
->> +             timers3: timers at 40000400 {
->
-> ditto
->
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +                     compatible = "st,stm32-timers";
->> +                     reg = <0x40000400 0x400>;
->> +                     clocks = <&rcc 0 129>;
->> +                     clock-names = "clk_int";
->> +                     status = "disabled";
->> +
->> +                     pwm {
->> +                             compatible = "st,stm32-pwm";
->> +                             status = "disabled";
->> +                     };
->> +
->> +                     timer {
->> +                             compatible = "st,stm32-timer-trigger";
->> +                             reg = <2>;
->> +                             status = "disabled";
->> +                     };
->> +             };
->> +
->> +             timers4: timers at 40000800 {
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +                     compatible = "st,stm32-timers";
->> +                     reg = <0x40000800 0x400>;
->> +                     clocks = <&rcc 0 130>;
->> +                     clock-names = "clk_int";
->> +                     status = "disabled";
->> +
->> +                     pwm {
->> +                             compatible = "st,stm32-pwm";
->> +                             status = "disabled";
->> +                     };
->> +
->> +                     timer {
->> +                             compatible = "st,stm32-timer-trigger";
->> +                             reg = <3>;
->> +                             status = "disabled";
->> +                     };
->> +             };
->> +
->> +             timers5: timers at 40000C00 {
->
-> timer at ...
->
-> And use lowercase hex.
+would be more robust. I hit this in [1]
 
-ok
+[1] https://www.spinics.net/lists/arm-kernel/msg546825.html
 
->
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +                     compatible = "st,stm32-timers";
->> +                     reg = <0x40000C00 0x400>;
->
-> ditto
->
->> +                     clocks = <&rcc 0 131>;
->> +                     clock-names = "clk_int";
->> +                     status = "disabled";
->> +
->> +                     pwm {
->> +                             compatible = "st,stm32-pwm";
->> +                             status = "disabled";
->> +                     };
->> +
->> +                     timer {
->> +                             compatible = "st,stm32-timer-trigger";
->> +                             reg = <4>;
->> +                             status = "disabled";
->> +                     };
->> +             };
->> +
->> +             timers6: timers at 40001000 {
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +                     compatible = "st,stm32-timers";
->> +                     reg = <0x40001000 0x400>;
->> +                     clocks = <&rcc 0 132>;
->> +                     clock-names = "clk_int";
->> +                     status = "disabled";
->> +
->> +                     timer {
->> +                             compatible = "st,stm32-timer-trigger";
->> +                             reg = <5>;
->> +                             status = "disabled";
->> +                     };
->> +             };
->> +
->> +             timers7: timers at 40001400 {
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +                     compatible = "st,stm32-timers";
->> +                     reg = <0x40001400 0x400>;
->> +                     clocks = <&rcc 0 133>;
->> +                     clock-names = "clk_int";
->> +                     status = "disabled";
->> +
->> +                     timer {
->> +                             compatible = "st,stm32-timer-trigger";
->> +                             reg = <6>;
->> +                             status = "disabled";
->> +                     };
->> +             };
->> +
->> +             timers12: timers at 40001800 {
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +                     compatible = "st,stm32-timers";
->> +                     reg = <0x40001800 0x400>;
->> +                     clocks = <&rcc 0 134>;
->> +                     clock-names = "clk_int";
->> +                     status = "disabled";
->> +
->> +                     pwm {
->> +                             compatible = "st,stm32-pwm";
->> +                             status = "disabled";
->> +                     };
->> +
->> +                     timer {
->> +                             compatible = "st,stm32-timer-trigger";
->> +                             reg = <9>;
->> +                             status = "disabled";
->> +                     };
->> +             };
->> +
->> +             timers13: timers at 40001C00 {
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +                     compatible = "st,stm32-timers";
->> +                     reg = <0x40001C00 0x400>;
->> +                     clocks = <&rcc 0 135>;
->> +                     clock-names = "clk_int";
->> +                     status = "disabled";
->> +
->> +                     pwm {
->> +                             compatible = "st,stm32-pwm";
->> +                             status = "disabled";
->> +                     };
->> +             };
->> +
->> +             timers14: timers at 40002000 {
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +                     compatible = "st,stm32-timers";
->> +                     reg = <0x40002000 0x400>;
->> +                     clocks = <&rcc 0 136>;
->> +                     clock-names = "clk_int";
->> +                     status = "disabled";
->> +
->> +                     pwm {
->> +                             compatible = "st,stm32-pwm";
->> +                             status = "disabled";
->> +                     };
->> +             };
->> +
->> +             timers1: timers at 40010000 {
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +                     compatible = "st,stm32-timers";
->> +                     reg = <0x40010000 0x400>;
->> +                     clocks = <&rcc 0 160>;
->> +                     clock-names = "clk_int";
->> +                     status = "disabled";
->> +
->> +                     pwm {
->> +                             compatible = "st,stm32-pwm";
->> +                             status = "disabled";
->> +                     };
->> +
->> +                     timer {
->> +                             compatible = "st,stm32-timer-trigger";
->> +                             reg = <0>;
->> +                             status = "disabled";
->> +                     };
->> +             };
->> +
->> +             timers8: timers at 40010400 {
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +                     compatible = "st,stm32-timers";
->> +                     reg = <0x40010400 0x400>;
->> +                     clocks = <&rcc 0 161>;
->> +                     clock-names = "clk_int";
->> +                     status = "disabled";
->> +
->> +                     pwm {
->> +                             compatible = "st,stm32-pwm";
->> +                             status = "disabled";
->> +                     };
->> +
->> +                     timer {
->> +                             compatible = "st,stm32-timer-trigger";
->> +                             reg = <7>;
->> +                             status = "disabled";
->> +                     };
->> +             };
->> +
->> +             timers9: timers at 40014000 {
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +                     compatible = "st,stm32-timers";
->> +                     reg = <0x40014000 0x400>;
->> +                     clocks = <&rcc 0 176>;
->> +                     clock-names = "clk_int";
->> +                     status = "disabled";
->> +
->> +                     pwm {
->> +                             compatible = "st,stm32-pwm";
->> +                             status = "disabled";
->> +                     };
->> +
->> +                     timer {
->> +                             compatible = "st,stm32-timer-trigger";
->> +                             reg = <8>;
->> +                             status = "disabled";
->> +                     };
->> +             };
->> +
->> +             timers10: timers at 40014400 {
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +                     compatible = "st,stm32-timers";
->> +                     reg = <0x40014400 0x400>;
->> +                     clocks = <&rcc 0 177>;
->> +                     clock-names = "clk_int";
->> +                     status = "disabled";
->> +
->> +                     pwm {
->> +                             compatible = "st,stm32-pwm";
->> +                             status = "disabled";
->> +                     };
->> +             };
->> +
->> +             timers11: timers at 40014800 {
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +                     compatible = "st,stm32-timers";
->> +                     reg = <0x40014800 0x400>;
->> +                     clocks = <&rcc 0 178>;
->> +                     clock-names = "clk_int";
->> +                     status = "disabled";
->> +
->> +                     pwm {
->> +                             compatible = "st,stm32-pwm";
->> +                             status = "disabled";
->> +                     };
->> +             };
->>       };
->>  };
->>
->> --
->> 1.9.1
->>
+Cheers
+Vladimir
+
+> +	mcr	p15, 0, r3, c12, c0, 0		@ write to VBAR
+> +#endif
+> +
+>  #elif defined (CONFIG_CPU_V7M)
+>  	/* For V7M systems we want to modify the CCR similarly to the SCTLR */
+>  #ifdef CONFIG_CPU_DCACHE_DISABLE
+> 
