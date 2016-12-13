@@ -1,42 +1,43 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 13 Dec 2016 12:31:44 +0000
-Subject: [PATCHv5 09/11] mm/kasan: Switch to using __pa_symbol and lm_alias
-In-Reply-To: <1481068257-6367-10-git-send-email-labbott@redhat.com>
-References: <1481068257-6367-1-git-send-email-labbott@redhat.com>
- <1481068257-6367-10-git-send-email-labbott@redhat.com>
-Message-ID: <20161213123144.GB24607@leverpostej>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Tue, 13 Dec 2016 13:34:02 +0100
+Subject: [RFC v2 00/13] usb/mmc/power: Fix USB/LAN when TFTP booting
+In-Reply-To: <c956e27e-7e01-2a2f-0e35-796c4a6556ae@xs4all.nl>
+References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
+ <c956e27e-7e01-2a2f-0e35-796c4a6556ae@xs4all.nl>
+Message-ID: <b34f49c8-6b37-cabf-2a0f-c8d465c53159@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2016 at 03:50:55PM -0800, Laura Abbott wrote:
-> 
-> __pa_symbol is the correct API to find the physical address of symbols.
-> Switch to it to allow for debugging APIs to work correctly. Other
-> functions such as p*d_populate may call __pa internally. Ensure that the
-> address passed is in the linear region by calling lm_alias.
-> 
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> Tested-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> v5: Add missing lm_alias call
-> ---
->  mm/kasan/kasan_init.c | 15 ++++++++-------
->  1 file changed, 8 insertions(+), 7 deletions(-)
-> 
-> diff --git a/mm/kasan/kasan_init.c b/mm/kasan/kasan_init.c
-> index 3f9a41c..922f459 100644
-> --- a/mm/kasan/kasan_init.c
-> +++ b/mm/kasan/kasan_init.c
-> @@ -16,6 +16,7 @@
->  #include <linux/kernel.h>
->  #include <linux/memblock.h>
->  #include <linux/pfn.h>
-> +#include <linux/mm.h>
+Try again, this time with Krzysztof's new email address...
 
-Nit: include ordering.
-
-Regardless, my tags above still stand!
-
-Thanks,
-Mark.
+On 13/12/16 13:20, Hans Verkuil wrote:
+> Hi Krzysztof,
+>
+> This still seems to be broken with the latest 4.9 kernel, right?
+>
+> Has there been any progress on this? Do you have an updated patch series
+> for me to use?
+>
+> Regards,
+>
+>     Hans
+>
+> On 05/05/16 14:34, Krzysztof Kozlowski wrote:
+>> Hi,
+>>
+>> This is a different, second try to fix usb3503+lan on Odroid U3 board
+>> if it was initialized by bootloader (e.g. for TFTP boot).
+>>
+>> First version:
+>> http://www.spinics.net/lists/linux-usb/msg140042.html
+>>
+>>
+>> Problem
+>> =======
+>> When Odroid U3 (usb3503 + smsc95xx + max77686) boots from network (TFTP),
+>> the usb3503 and LAN smsc95xx do not show up in "lsusb". Hard-reset
+>> is required, e.g. by suspend to RAM. The actual TFTP boot does
+>> not have to happen. Just "usb start" from U-Boot is sufficient.
+>>
+>
+>
