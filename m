@@ -1,28 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Dec 2016 17:37:48 -0800
-Subject: [PATCHv4 00/15] clk: ti: add support for hwmod clocks
-In-Reply-To: <20161213013133.GR4920@atomide.com>
-References: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
- <20161028005341.GR26139@codeaurora.org>
- <2cfa10a9-9ea0-23e4-30de-9aece13e47e3@ti.com>
- <20161028233750.GQ16026@codeaurora.org>
- <7371ef35-5d95-bf78-4c97-c61091a1fa4b@ti.com>
- <148156710975.37646.2957511113527634913@resonance>
- <20161213004914.GM5423@codeaurora.org>
- <20161213013133.GR4920@atomide.com>
-Message-ID: <20161213013748.GS4920@atomide.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Tue, 13 Dec 2016 09:53:57 +0800
+Subject: [PATCH] dt-bindings: Document the hi3660 reset bindings
+In-Reply-To: <20161212172041.7v2s573tt6qbzlfz@rob-hp-laptop>
+References: <1480989092-31847-2-git-send-email-zhangfei.gao@linaro.org>
+ <1481249504-7942-1-git-send-email-zhangfei.gao@linaro.org>
+ <20161212172041.7v2s573tt6qbzlfz@rob-hp-laptop>
+Message-ID: <0158e878-fb10-f351-f9f0-fe9d1f1be821@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [161212 17:33]:
-> 
-> So we just need the clockdomain clock nodes, then each clock output is
-> just offset from that clockdomain. And we can have readable defines
-> for the offsets. That's all there should be to it.
 
-And we actually have already have the clock-output-names property so
-no need to define anything for the clockdomain clock outputs I guess.
-
-Regards,
-
-Tony
+On 2016?12?13? 01:20, Rob Herring wrote:
+> On Fri, Dec 09, 2016 at 10:11:44AM +0800, Zhangfei Gao wrote:
+>> Add DT bindings documentation for hi3660 SoC reset controller.
+>>
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>> ---
+>>   .../bindings/reset/hisilicon,hi3660-reset.txt      | 43 ++++++++++++++++++++++
+>>   1 file changed, 43 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+> Acked-by: Rob Herring <robh@kernel.org>
+Thanks Rob.
