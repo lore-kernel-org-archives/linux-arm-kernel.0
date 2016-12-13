@@ -1,42 +1,142 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 13 Dec 2016 16:47:42 +0000
-Subject: [PATCH v2 2/2] mfd: axp20x: Fix AXP806 access errors on cold boot
-In-Reply-To: <20161209112018.GL3625@dell.home>
-References: <20161123031616.10114-1-wens@csie.org>
- <20161123031616.10114-3-wens@csie.org>
- <20161209112018.GL3625@dell.home>
-Message-ID: <20161213164742.4ztisstxifatlm5a@sirena.org.uk>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 13 Dec 2016 17:52:29 +0100
+Subject: [PATCH] ARM: dts: Add missing CPU frequencies for Exynos5422/5800
+Message-ID: <5220084.l31t5oJbsy@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2016 at 11:20:18AM +0000, Lee Jones wrote:
+Add missing 2000MHz & 1900MHz OPPs (for A15 cores) and 1400MHz OPP
+(for A7 cores).  Also update common Odroid-XU3 Lite/XU3/XU4 thermal
+cooling maps to account for new OPPs.
 
-> Is the following valid/necessary?
+Since new OPPs are not available on all Exynos5422/5800 boards modify
+dts files for Odroid-XU3 Lite (limited to 1.8 GHz / 1.3 GHz) & Peach
+Pi (limited to 2.0 GHz / 1.3 GHz) accordingly.
 
-> On Wed, 23 Nov 2016, Chen-Yu Tsai wrote:
-> > The AXP806 supports either master/standalone or slave mode.
-> > Slave mode allows sharing the serial bus, even with multiple
-> > AXP806 which all have the same hardware address.
+Tested on Odroid-XU3 and XU3 Lite.
 
-> > This is done with extra "serial interface address extension",
-> > or AXP806_BUS_ADDR_EXT, and "register address extension", or
-> > AXP806_REG_ADDR_EXT, registers. The former is read-only, with
-> > 1 bit customizable at the factory, and 1 bit depending on the
+Cc: Doug Anderson <dianders@chromium.org>
+Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+Cc: Andreas Faerber <afaerber@suse.de>
+Cc: Thomas Abraham <thomas.ab@samsung.com>
+Cc: Ben Gamari <ben@smart-cactus.org>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |   14 +++++++-------
+ arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts    |   17 +++++++++++++++++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts          |    4 ++++
+ arch/arm/boot/dts/exynos5800.dtsi                  |   15 +++++++++++++++
+ 4 files changed, 43 insertions(+), 7 deletions(-)
 
-I don't really know anything about the details of this chip, sorry.
-
-> > This patch sets AXP806_REG_ADDR_EXT to 0x10, which is what we
-> > know to be the proper value for a standard AXP806 in slave mode.
-> > Afterwards it will reinitialize the regmap cache, to purge any
-> > invalid stale values.
-
-If the chip has been reset then you'd want to reset the cache too.  I've
-no idea if that's needed here or not though, it depends what happens to
-the global state of the chip when this reconfiguration happens.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 484 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161213/18150a5a/attachment.sig>
+Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+===================================================================
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2016-12-13 15:59:33.779763261 +0100
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2016-12-13 15:59:33.775763261 +0100
+@@ -118,7 +118,7 @@
+ 				/*
+ 				 * When reaching cpu_alert3, reduce CPU
+ 				 * by 2 steps. On Exynos5422/5800 that would
+-				 * be: 1600 MHz and 1100 MHz.
++				 * (usually) be: 1800 MHz and 1200 MHz.
+ 				 */
+ 				map3 {
+ 					trip = <&cpu_alert3>;
+@@ -131,16 +131,16 @@
+ 
+ 				/*
+ 				 * When reaching cpu_alert4, reduce CPU
+-				 * further, down to 600 MHz (11 steps for big,
+-				 * 7 steps for LITTLE).
++				 * further, down to 600 MHz (13 steps for big,
++				 * 8 steps for LITTLE).
+ 				 */
+-				map5 {
++				cooling_map5: map5 {
+ 					trip = <&cpu_alert4>;
+-					cooling-device = <&cpu0 3 7>;
++					cooling-device = <&cpu0 3 8>;
+ 				};
+-				map6 {
++				cooling_map6: map6 {
+ 					trip = <&cpu_alert4>;
+-					cooling-device = <&cpu4 3 11>;
++					cooling-device = <&cpu4 3 13>;
+ 				};
+ 			};
+ 		};
+Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
+===================================================================
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts	2016-12-13 15:59:33.779763261 +0100
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts	2016-12-13 15:59:33.775763261 +0100
+@@ -21,6 +21,23 @@
+ 	compatible = "hardkernel,odroid-xu3-lite", "samsung,exynos5800", "samsung,exynos5";
+ };
+ 
++&cluster_a15_opp_table {
++	/delete-node/opp at 2000000000;
++	/delete-node/opp at 1900000000;
++};
++
++&cluster_a7_opp_table {
++	/delete-node/opp at 1400000000;
++};
++
++&cooling_map5 {
++	cooling-device = <&cpu0 3 7>;
++};
++
++&cooling_map6 {
++	cooling-device = <&cpu4 3 11>;
++};
++
+ &pwm {
+ 	/*
+ 	 * PWM 0 -- fan
+Index: b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+===================================================================
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts	2016-12-13 15:59:33.779763261 +0100
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts	2016-12-13 15:59:33.779763261 +0100
+@@ -146,6 +146,10 @@
+ 	vdd-supply = <&ldo9_reg>;
+ };
+ 
++&cluster_a7_opp_table {
++	/delete-property/opp at 1400000000;
++};
++
+ &cpu0 {
+ 	cpu-supply = <&buck2_reg>;
+ };
+Index: b/arch/arm/boot/dts/exynos5800.dtsi
+===================================================================
+--- a/arch/arm/boot/dts/exynos5800.dtsi	2016-12-13 15:59:33.779763261 +0100
++++ b/arch/arm/boot/dts/exynos5800.dtsi	2016-12-13 15:59:33.779763261 +0100
+@@ -24,6 +24,16 @@
+ };
+ 
+ &cluster_a15_opp_table {
++	opp at 2000000000 {
++		opp-hz = /bits/ 64 <2000000000>;
++		opp-microvolt = <1250000>;
++		clock-latency-ns = <140000>;
++	};
++	opp at 1900000000 {
++		opp-hz = /bits/ 64 <1900000000>;
++		opp-microvolt = <1250000>;
++		clock-latency-ns = <140000>;
++	};
+ 	opp at 1700000000 {
+ 		opp-microvolt = <1250000>;
+ 	};
+@@ -85,6 +95,11 @@
+ };
+ 
+ &cluster_a7_opp_table {
++	opp_a7_14: opp at 1400000000 {
++		opp-hz = /bits/ 64 <1400000000>;
++		opp-microvolt = <1250000>;
++		clock-latency-ns = <140000>;
++	};
+ 	opp at 1300000000 {
+ 		opp-microvolt = <1250000>;
+ 	};
