@@ -1,28 +1,57 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 13 Dec 2016 18:36:48 +0100
-Subject: [PATCH 9/9] arm64: dts: rockchip: add regulator info for Kevin
- digitizer
-In-Reply-To: <1480645653-36943-10-git-send-email-briannorris@chromium.org>
-References: <1480645653-36943-1-git-send-email-briannorris@chromium.org>
- <1480645653-36943-10-git-send-email-briannorris@chromium.org>
-Message-ID: <2884868.1AkzspAEPR@phil>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 13 Dec 2016 18:48:33 +0100
+Subject: [PATCH v4 04/12] mmc: sdhci: Export sdhci_enable_sdio_irq() from
+ sdhci.c
+In-Reply-To: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
+References: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
+Message-ID: <04201111658cabdce1aa10767fa408da36636d64.1481651244.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 1. Dezember 2016, 18:27:33 CET schrieb Brian Norris:
-> We need to enable this regulator before the digitizer can be used. Wacom
-> recommended waiting for 100 ms before talking to the HID.
-> 
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
-> ---
-> Uses WIP bindings:
-> 
-> [PATCH v3 1/2] devicetree: i2c-hid: Add regulator support
-> https://patchwork.kernel.org/patch/9457493/
+From: Hu Ziji <huziji@marvell.com>
 
-if you notice the bindings being accepted before me, could you notify here 
-please?
+Export sdhci_enable_sdio_irq() from sdhci.c. Thus vendor SDHC
+driver can implement its specific SDIO irq contorl.
 
+Signed-off-by: Hu Ziji <huziji@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/mmc/host/sdhci.c | 3 ++-
+ drivers/mmc/host/sdhci.h | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-Thanks
-Heiko
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index e971abb1368f..e174379ee019 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1817,7 +1817,7 @@ static void sdhci_enable_sdio_irq_nolock(struct sdhci_host *host, int enable)
+ 	}
+ }
+ 
+-static void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
++void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
+ {
+ 	struct sdhci_host *host = mmc_priv(mmc);
+ 	unsigned long flags;
+@@ -1831,6 +1831,7 @@ static void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
+ 	sdhci_enable_sdio_irq_nolock(host, enable);
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ }
++EXPORT_SYMBOL_GPL(sdhci_enable_sdio_irq);
+ 
+ int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+ 				      struct mmc_ios *ios)
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index 95beadc66849..a3e8913452fc 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -692,6 +692,7 @@ void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
+ int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+ 				      struct mmc_ios *ios);
+ int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode);
++void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable);
+ 
+ #ifdef CONFIG_PM
+ extern int sdhci_suspend_host(struct sdhci_host *host);
+-- 
+git-series 0.9.1
