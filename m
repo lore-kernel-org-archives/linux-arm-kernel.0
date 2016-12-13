@@ -1,68 +1,64 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 13 Dec 2016 15:04:31 +0000
-Subject: [RFC v2 PATCH 0/3] Fix dma_alloc_coherent() and friends for NOMMU
-In-Reply-To: <1BE9400D-BACB-4C07-B6F0-1963D90A7029@esh.hu>
-References: <1481636704-18948-1-git-send-email-vladimir.murzin@arm.com>
- <1BE9400D-BACB-4C07-B6F0-1963D90A7029@esh.hu>
-Message-ID: <58500DFF.6010801@arm.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Tue, 13 Dec 2016 16:07:36 +0100
+Subject: [PATCH] drm: tilcdc: simplify the recovery from sync lost error on
+ rev1
+Message-ID: <1481641656-25227-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Revision 2 of LCDC suffers from an issue where a SYNC_LOST error
+caused by limited memory bandwidth may leave the picture shifted a
+couple pixels to the right.
 
-On 13/12/16 14:33, Szemz? Andr?s wrote:
-> Hi,
-> 
->> On 2016. Dec 13., at 14:45, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
->>
->> Hi,
->>
->> It seem that addition of cache support for M-class cpus uncovered
->> latent bug in DMA usage. NOMMU memory model has been treated as being
->> always consistent; however, for R/M classes of cpu memory can be
->> covered by MPU which in turn might configure RAM as Normal
->> i.e. bufferable and cacheable. It breaks dma_alloc_coherent() and
->> friends, since data can stuck in caches now or be buffered.
->>
->> This patch set is trying to address the issue by providing region of
->> memory suitable for consistent DMA operations. It is supposed that such
->> region is marked by MPU as non-cacheable. Since we have MPU support in
->> Linux for R-class only and M-class setting MPU in bootloader, proposed
->> interface to advertise such memory is via "memdma=size at start" command
->> line option, to avoid clashing with normal memory (which usually comes
->> from dts) it'd be safer to use it together with "mem=" command line
->> option. Meanwhile, I'm open to suggestions for the better way telling
->> Linux of such memory.
->>
-> 
-> I have tested these patches on my ATMEL SAME70 armv7m board.
-> 
-> After setting the memory regions and attributes in the bootloader and providing the required 
-> command line parameters, the DMA issues fixed.
-> 
-> I have tested an usart, sdcard, and ethernet driver with DMA enabled.
-> 
-> Booting Linux on physical CPU 0x0
-> Linux version 4.9.0 (root at debian) (gcc version 4.8.3 20140320 (prerelease) (Sourcery CodeBench Lite 2014.05-29) ) #4 Mon Dec 12 20:27:21 CET 201
-> 6
-> CPU: ARMv7-M [410fc271] revision 1 (ARMv7M), cr=00000000
-> CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
-> OF: fdt:Machine model: SAME70-sampione board
-> Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 15748
-> Kernel command line: console=ttyS1,115200 root=/dev/mmcblk0p2 rw init=/linuxrc rootwait mem=62M memdma=2M at 0x73e00000
-> 
-> So you can add my Tested-by.
-> 
-> Thanks for the patches!
+This issue has not been observed on revision 1, while the recovery
+mechanism introduces a different issue, where the END_OF_FRAME
+interrupt doesn't fire while drm is waiting for vblanks.
 
-Glad to hear it works for you! Thanks for reporting and testing!
+On rev1: recover from sync lost errors by simply clearing the
+RASTER_ENABLE bit in the RASTER_CTRL register and re-enabling it
+again as is suggested by the datasheet.
 
-Cheers
-Vladimir
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ drivers/gpu/drm/tilcdc/tilcdc_crtc.c | 24 +++++++++++++++---------
+ 1 file changed, 15 insertions(+), 9 deletions(-)
 
-> 
-> Regards,
-> Andras
-> 
-> 
-> 
+diff --git a/drivers/gpu/drm/tilcdc/tilcdc_crtc.c b/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
+index 9942b05..70e57a7 100644
+--- a/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
++++ b/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
+@@ -921,17 +921,23 @@ irqreturn_t tilcdc_crtc_irq(struct drm_crtc *crtc)
+ 		dev_err_ratelimited(dev->dev, "%s(0x%08x): Sync lost",
+ 				    __func__, stat);
+ 		tilcdc_crtc->frame_intact = false;
+-		if (tilcdc_crtc->sync_lost_count++ >
+-		    SYNC_LOST_COUNT_LIMIT) {
+-			dev_err(dev->dev, "%s(0x%08x): Sync lost flood detected, recovering", __func__, stat);
+-			queue_work(system_wq, &tilcdc_crtc->recover_work);
+-			if (priv->rev == 1)
+-				tilcdc_clear(dev, LCDC_RASTER_CTRL_REG,
+-					     LCDC_V1_SYNC_LOST_INT_ENA);
+-			else
++		if (priv->rev == 1) {
++			tilcdc_clear(dev,
++				     LCDC_RASTER_CTRL_REG, LCDC_RASTER_ENABLE);
++			tilcdc_set(dev,
++				   LCDC_RASTER_CTRL_REG, LCDC_RASTER_ENABLE);
++		} else {
++			if (tilcdc_crtc->sync_lost_count++ >
++			    SYNC_LOST_COUNT_LIMIT) {
++				dev_err(dev->dev,
++					"%s(0x%08x): Sync lost flood detected, recovering",
++					__func__, stat);
++				queue_work(system_wq,
++					   &tilcdc_crtc->recover_work);
+ 				tilcdc_write(dev, LCDC_INT_ENABLE_CLR_REG,
+ 					     LCDC_SYNC_LOST);
+-			tilcdc_crtc->sync_lost_count = 0;
++				tilcdc_crtc->sync_lost_count = 0;
++			}
+ 		}
+ 	}
+ 
+-- 
+2.9.3
