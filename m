@@ -1,38 +1,62 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 13 Dec 2016 11:09:19 +0100
-Subject: [PATCH v7 5/5] ARM: dts: da850: specify the maximum pixel clock rate
- for tilcdc
-In-Reply-To: <1481623759-12786-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1481623759-12786-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1481623759-12786-6-git-send-email-bgolaszewski@baylibre.com>
+Date: Tue, 13 Dec 2016 11:18:45 +0100
+Subject: [PATCH v6 4/5] ARM: dts: da850-lcdk: add the vga-bridge node
+In-Reply-To: <9d5fa409-bb4f-f62b-2548-0a3b82228e08@ti.com>
+References: <1481547942-24775-1-git-send-email-bgolaszewski@baylibre.com>
+ <1481547942-24775-5-git-send-email-bgolaszewski@baylibre.com>
+ <9d5fa409-bb4f-f62b-2548-0a3b82228e08@ti.com>
+Message-ID: <CAMpxmJU2Xn8NZnx7S6Eo0Syh-KVKWVNsJ1zATkwYciXPdDfdTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At maximum CPU frequency of 300 MHz the maximum pixel clock frequency
-is 37.5 MHz[1]. We must filter out any mode for which the calculated
-pixel clock rate would exceed this value.
+2016-12-13 9:46 GMT+01:00 Tomi Valkeinen <tomi.valkeinen@ti.com>:
+> Hi,
+>
+> On 12/12/16 15:05, Bartosz Golaszewski wrote:
+>
+>> +&lcdc {
+>> +     status = "okay";
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&lcd_pins>;
+>> +
+>> +     ports {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +
+>> +             lcdc_out: port at 1 {
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>> +                     reg = <1>;
+>> +
+>> +                     lcdc_out_vga: endpoint {
+>> +                             reg = <0>;
+>> +                             remote-endpoint = <&vga_bridge_in>;
+>> +                     };
+>> +             };
+>> +     };
+>> +};
+>>
+>
+> This is not correct. LCDC has just one output, so port at 1 doesn't make
+> sense. It's port at 0. But with just one port, you can leave "ports" away.
+> And you don't need the port's label for anything, if I'm not mistaken. So:
+>
+> &lcdc {
+>         status = "okay";
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&lcd_pins>;
+>
+>         port {
+>                 lcdc_out_vga: endpoint {
+>                         remote-endpoint = <&vga_bridge_in>;
+>                 };
+>         };
+> };
+>
+>  Tomi
+>
 
-Specify the max-pixelclock property for the display node for
-da850-lcdk.
+Right, fixed in v7.
 
-[1] http://processors.wiki.ti.com/index.php/OMAP-L1x/C674x/AM1x_LCD_Controller_(LCDC)_Throughput_and_Optimization_Techniques
-
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/boot/dts/da850.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 6b0ef3d..58b1566 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -462,6 +462,7 @@
- 			compatible = "ti,da850-tilcdc";
- 			reg = <0x213000 0x1000>;
- 			interrupts = <52>;
-+			max-pixelclock = <37500>;
- 			status = "disabled";
- 		};
- 	};
--- 
-2.9.3
+Thanks,
+Bartosz
