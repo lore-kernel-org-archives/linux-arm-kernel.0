@@ -1,124 +1,74 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue, 13 Dec 2016 18:03:33 +0100
-Subject: [PATCH] net: mvpp2: fix dma unmapping of TX buffers for fragments
-In-Reply-To: <1481647995-7213-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1481647995-7213-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CAPv3WKfAwe+yonZuZptaRjnJy9dMRUdXvnAJdRpvvvHqNBznLA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 13 Dec 2016 11:11:04 -0600
+Subject: [PATCH v6 3/8] PWM: add pwm-stm32 DT bindings
+In-Reply-To: <CA+M3ks6CQsOA0w82yiTaCw04e7gRwNx1mfeHanE3MDjkuX-gjg@mail.gmail.com>
+References: <1481292919-26587-1-git-send-email-benjamin.gaignard@st.com>
+ <1481292919-26587-4-git-send-email-benjamin.gaignard@st.com>
+ <20161212190205.b5t3x6i2o7igldlo@rob-hp-laptop>
+ <20161213111137.GW3625@dell.home>
+ <CAL_JsqL8pJSFb8LbABAYJOQ0URaMpyupbFryk_mS2ToN1kStdA@mail.gmail.com>
+ <CA+M3ks6CQsOA0w82yiTaCw04e7gRwNx1mfeHanE3MDjkuX-gjg@mail.gmail.com>
+Message-ID: <CAL_Jsq+y175h8HE3c+r7ArGVqpHe5hKyrjY_Ay-w0oEcLMy6TA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Tue, Dec 13, 2016 at 10:28 AM, Benjamin Gaignard
+<benjamin.gaignard@linaro.org> wrote:
+> 2016-12-13 16:57 GMT+01:00 Rob Herring <robh@kernel.org>:
+>> On Tue, Dec 13, 2016 at 5:11 AM, Lee Jones <lee.jones@linaro.org> wrote:
+>>> On Mon, 12 Dec 2016, Rob Herring wrote:
+>>>
+>>>> On Fri, Dec 09, 2016 at 03:15:14PM +0100, Benjamin Gaignard wrote:
+>>>> > Define bindings for pwm-stm32
+>>>> >
+>>>> > version 6:
+>>>> > - change st,breakinput parameter format to make it usuable on stm32f7 too.
+>>>> >
+>>>> > version 2:
+>>>> > - use parameters instead of compatible of handle the hardware configuration
+>>>> >
+>>>> > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>>>> > ---
+>>>> >  .../devicetree/bindings/pwm/pwm-stm32.txt          | 33 ++++++++++++++++++++++
+>>>> >  1 file changed, 33 insertions(+)
+>>>> >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+>>>> >
+>>>> > diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+>>>> > new file mode 100644
+>>>> > index 0000000..866f222
+>>>> > --- /dev/null
+>>>> > +++ b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+>>>> > @@ -0,0 +1,33 @@
+>>>> > +STMicroelectronics STM32 Timers PWM bindings
+>>>> > +
+>>>> > +Must be a sub-node of an STM32 Timers device tree node.
+>>>> > +See ../mfd/stm32-timers.txt for details about the parent node.
+>>>> > +
+>>>> > +Required parameters:
+>>>> > +- compatible:              Must be "st,stm32-pwm".
+>>>> > +- pinctrl-names:   Set to "default".
+>>>> > +- pinctrl-0:               List of phandles pointing to pin configuration nodes for PWM module.
+>>>> > +                   For Pinctrl properties see ../pinctrl/pinctrl-bindings.txt
+>>>> > +
+>>>> > +Optional parameters:
+>>>> > +- st,breakinput:   Arrays of three u32 <index level filter> to describe break input configurations.
+>>>> > +                   "index" indicates on which break input the configuration should be applied.
+>>>> > +                   "level" gives the active level (0=low or 1=high) for this configuration.
+>>>> > +                   "filter" gives the filtering value to be applied.
+>>>> > +
+>>>> > +Example:
+>>>> > +   timers at 40010000 {
+>>>>
+>>>> timer at ...
+>>>
+>>> No, it should be timers.
+>>
+>> Read the spec. "timer" is a generic node name. "timers" is not. How
+>> many is not relevant.
+>
+> "timer" is already used in stm32 DT for clocksource node... It is also why
+> I use "timers" for this.
 
-Reviewed-by: Marcin Wojtas <mw@semihalf.com>
+That doesn't matter. They are at different levels in the hierarchy.
 
-Best regards,
-Marcin
-
-2016-12-13 17:53 GMT+01:00 Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com>:
-> Since commit 71ce391dfb784 ("net: mvpp2: enable proper per-CPU TX
-> buffers unmapping"), we are not correctly DMA unmapping TX buffers for
-> fragments.
->
-> Indeed, the mvpp2_txq_inc_put() function only stores in the
-> txq_cpu->tx_buffs[] array the physical address of the buffer to be
-> DMA-unmapped when skb != NULL. In addition, when DMA-unmapping, we use
-> skb_headlen(skb) to get the size to be unmapped. Both of this works fine
-> for TX descriptors that are associated directly to a SKB, but not the
-> ones that are used for fragments, with a NULL pointer as skb:
->
->  - We have a NULL physical address when calling DMA unmap
->  - skb_headlen(skb) crashes because skb is NULL
->
-> This causes random crashes when fragments are used.
->
-> To solve this problem, this commit:
->
->  - Stores the physical address of the buffer to be unmapped
->    unconditionally, regardless of whether it is tied to a SKB or not.
->
->  - Adds a txq_cpu->tx_data_size[] array to store the size of the DMA
->    buffer to be unmapped upon TX completion.
->
-> Fixes: 71ce391dfb784 ("net: mvpp2: enable proper per-CPU TX buffers unmapping")
-> Reported-by: Raphael G <raphael.glon@corp.ovh.com>
-> Cc: Raphael G <raphael.glon@corp.ovh.com>
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/net/ethernet/marvell/mvpp2.c | 20 ++++++++++++++++----
->  1 file changed, 16 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-> index 1026c45..d168b13 100644
-> --- a/drivers/net/ethernet/marvell/mvpp2.c
-> +++ b/drivers/net/ethernet/marvell/mvpp2.c
-> @@ -791,6 +791,8 @@ struct mvpp2_txq_pcpu {
->         /* Array of transmitted buffers' physical addresses */
->         dma_addr_t *tx_buffs;
->
-> +       size_t *tx_data_size;
-> +
->         /* Index of last TX DMA descriptor that was inserted */
->         int txq_put_index;
->
-> @@ -980,9 +982,10 @@ static void mvpp2_txq_inc_put(struct mvpp2_txq_pcpu *txq_pcpu,
->                               struct mvpp2_tx_desc *tx_desc)
->  {
->         txq_pcpu->tx_skb[txq_pcpu->txq_put_index] = skb;
-> -       if (skb)
-> -               txq_pcpu->tx_buffs[txq_pcpu->txq_put_index] =
-> -                                                        tx_desc->buf_phys_addr;
-> +       txq_pcpu->tx_data_size[txq_pcpu->txq_put_index] =
-> +               tx_desc->data_size;
-> +       txq_pcpu->tx_buffs[txq_pcpu->txq_put_index] =
-> +               tx_desc->buf_phys_addr;
->         txq_pcpu->txq_put_index++;
->         if (txq_pcpu->txq_put_index == txq_pcpu->size)
->                 txq_pcpu->txq_put_index = 0;
-> @@ -4404,11 +4407,13 @@ static void mvpp2_txq_bufs_free(struct mvpp2_port *port,
->                 dma_addr_t buf_phys_addr =
->                                     txq_pcpu->tx_buffs[txq_pcpu->txq_get_index];
->                 struct sk_buff *skb = txq_pcpu->tx_skb[txq_pcpu->txq_get_index];
-> +               size_t data_size =
-> +                       txq_pcpu->tx_data_size[txq_pcpu->txq_get_index];
->
->                 mvpp2_txq_inc_get(txq_pcpu);
->
->                 dma_unmap_single(port->dev->dev.parent, buf_phys_addr,
-> -                                skb_headlen(skb), DMA_TO_DEVICE);
-> +                                data_size, DMA_TO_DEVICE);
->                 if (!skb)
->                         continue;
->                 dev_kfree_skb_any(skb);
-> @@ -4662,6 +4667,11 @@ static int mvpp2_txq_init(struct mvpp2_port *port,
->                 if (!txq_pcpu->tx_buffs)
->                         goto error;
->
-> +               txq_pcpu->tx_data_size = kmalloc(txq_pcpu->size *
-> +                                                sizeof(size_t), GFP_KERNEL);
-> +               if (!txq_pcpu->tx_data_size)
-> +                       goto error;
-> +
->                 txq_pcpu->count = 0;
->                 txq_pcpu->reserved_num = 0;
->                 txq_pcpu->txq_put_index = 0;
-> @@ -4675,6 +4685,7 @@ static int mvpp2_txq_init(struct mvpp2_port *port,
->                 txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
->                 kfree(txq_pcpu->tx_skb);
->                 kfree(txq_pcpu->tx_buffs);
-> +               kfree(txq_pcpu->tx_data_size);
->         }
->
->         dma_free_coherent(port->dev->dev.parent,
-> @@ -4695,6 +4706,7 @@ static void mvpp2_txq_deinit(struct mvpp2_port *port,
->                 txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
->                 kfree(txq_pcpu->tx_skb);
->                 kfree(txq_pcpu->tx_buffs);
-> +               kfree(txq_pcpu->tx_data_size);
->         }
->
->         if (txq->descs)
-> --
-> 2.7.4
->
+Rob
