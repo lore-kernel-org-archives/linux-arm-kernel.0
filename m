@@ -1,37 +1,77 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 13 Dec 2016 15:53:50 +0200
-Subject: [RFC v2 00/13] usb/mmc/power: Fix USB/LAN when TFTP booting
-In-Reply-To: <b34f49c8-6b37-cabf-2a0f-c8d465c53159@xs4all.nl>
-References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
- <c956e27e-7e01-2a2f-0e35-796c4a6556ae@xs4all.nl>
- <b34f49c8-6b37-cabf-2a0f-c8d465c53159@xs4all.nl>
-Message-ID: <CAJKOXPdEy5N3qR3YGWJi41wD3uRDONmd16gC5LuayZ4_krT6YA@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 13 Dec 2016 13:55:46 +0000
+Subject: [PATCH V7 4/8] common: DMA-mapping: add DMA_ATTR_PRIVILEGED
+ attribute
+In-Reply-To: <1481567927-14791-5-git-send-email-sricharan@codeaurora.org>
+References: <1481567927-14791-1-git-send-email-sricharan@codeaurora.org>
+ <1481567927-14791-5-git-send-email-sricharan@codeaurora.org>
+Message-ID: <941457b5-9bfc-8df5-6f70-5f92e950cd89@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2016 at 2:34 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
-> Try again, this time with Krzysztof's new email address...
->
->
-> On 13/12/16 13:20, Hans Verkuil wrote:
->>
->> Hi Krzysztof,
->>
->> This still seems to be broken with the latest 4.9 kernel, right?
->>
->> Has there been any progress on this? Do you have an updated patch series
->> for me to use?
+On 12/12/16 18:38, Sricharan R wrote:
+> From: Mitchel Humpherys <mitchelh@codeaurora.org>
+> 
+> This patch adds the DMA_ATTR_PRIVILEGED attribute to the DMA-mapping
+> subsystem.
+> 
+> Some advanced peripherals such as remote processors and GPUs perform
+> accesses to DMA buffers in both privileged "supervisor" and unprivileged
+> "user" modes.  This attribute is used to indicate to the DMA-mapping
+> subsystem that the buffer is fully accessible at the elevated privilege
+> level (and ideally inaccessible or at least read-only at the
+> lesser-privileged levels).
+> 
+> Cc: linux-doc at vger.kernel.org
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+> Tested-by: Robin Murphy <robin.murphy@arm.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+> ---
+>  Documentation/DMA-attributes.txt | 10 ++++++++++
+>  include/linux/dma-mapping.h      |  7 +++++++
+>  2 files changed, 17 insertions(+)
+> 
+> diff --git a/Documentation/DMA-attributes.txt b/Documentation/DMA-attributes.txt
+> index 98bf7ac..44c6bc4 100644
+> --- a/Documentation/DMA-attributes.txt
+> +++ b/Documentation/DMA-attributes.txt
+> @@ -143,3 +143,13 @@ So, this provides a way for drivers to avoid those error messages on calls
+>  where allocation failures are not a problem, and shouldn't bother the logs.
+>  
+>  NOTE: At the moment DMA_ATTR_NO_WARN is only implemented on PowerPC.
+> +
+> +DMA_ATTR_PRIVILEGED
+> +------------------------------
+> +
+> +Some advanced peripherals such as remote processors and GPUs perform
+> +accesses to DMA buffers in both privileged "supervisor" and unprivileged
+> +"user" modes.  This attribute is used to indicate to the DMA-mapping
+> +subsystem that the buffer is fully accessible at the elevated privilege
+> +level (and ideally inaccessible or at least read-only at the
+> +lesser-privileged levels).
+> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> index 6f3e6ca..ee31ea1 100644
+> --- a/include/linux/dma-mapping.h
+> +++ b/include/linux/dma-mapping.h
+> @@ -63,6 +63,13 @@
+>  #define DMA_ATTR_NO_WARN	(1UL << 8)
+>  
+>  /*
+> + * DMA_ATTR_PRIVILEGED: used to indicate that the buffer is fully
+> + * accessible at an elevated privilege level (and ideally inaccessible or
+> + * at least read-only at lesser-privileged levels).
+> + */
+> +#define DMA_ATTR_PRIVILEGED		(1UL << 8)
 
-Hi,
+Oops, I spoke slightly too soon - there's a value conflict here which
+has been missed in the rebase.
 
-I think it is not fixed. Still. I left this work to others. AFAIK,
-Peter Chen is working on a new generic approach:
-https://lwn.net/Articles/703556/
-On top of his patchset, Odroid would need some DTS code as well (and
-maybe something in usb3503). However I do not plan to work on this
-anymore as I do not have Odroid U3 anymore. Marek and Bartlomiej from
-Samsung Poland are in CC-list so maybe they would like to continue the
-work?
+Robin
 
-Best regards,
-Krzysztof
+> +
+> +/*
+>   * A dma_addr_t can hold any valid DMA or bus address for the platform.
+>   * It can be given to a device to use as a DMA source or target.  A CPU cannot
+>   * reference a dma_addr_t directly because there may be translation between
+> 
