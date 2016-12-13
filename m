@@ -1,190 +1,65 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 13 Dec 2016 12:35:29 +0000
-Subject: [PATCH v6] arm64: fpsimd: improve stacking logic in non-interruptible
- context
-Message-ID: <1481632529-24218-1-git-send-email-ard.biesheuvel@linaro.org>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Tue, 13 Dec 2016 23:09:05 +1030
+Subject: [PATCH v3 6/6] mfd: dt: Move syscon bindings to syscon
+ subdirectory
+In-Reply-To: <5094120.Y7DXfRGTEm@wuerfel>
+References: <20161206025321.1792-1-andrew@aj.id.au>
+ <20161213110710.GV3625@dell.home> <1481630734.3112.40.camel@aj.id.au>
+ <5094120.Y7DXfRGTEm@wuerfel>
+Message-ID: <1481632745.3112.42.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we allow kernel mode NEON in softirq or hardirq context by
-stacking and unstacking a slice of the NEON register file for each call
-to kernel_neon_begin() and kernel_neon_end(), respectively.
+On Tue, 2016-12-13 at 13:17 +0100, Arnd Bergmann wrote:
+> On Tuesday, December 13, 2016 10:35:34 PM CET Andrew Jeffery wrote:
+> > On Tue, 2016-12-13 at 11:07 +0000, Lee Jones wrote:
+> > > On Tue, 13 Dec 2016, Andrew Jeffery wrote:
+> > > > On Mon, 2016-12-12 at 09:39 -0600, Rob Herring wrote:
+> > > > > On Tue, Dec 06, 2016 at 01:53:21PM +1100, Andrew Jeffery wrote:
+> > > > 
+> > > > Lee's next email in the chain poked Arnd for an opinion, but Arnd
+> > > > didn't reply.
+> > > > 
+> > > > I don't mind. I moved these bindings separately so we could just drop
+> > > > the patch if there was push-back. If we drop the whole idea I'll need
+> > > > to apply a small fix to patch 5/6 to avoid creating the syscon
+> > > > subdirectory.
+> > > 
+> > > The sub-directory is a good idea for drivers who are *solely* syscon
+> > > based.
+> > > 
+> > 
+> > Yes, I wasn't saying otherwise, just commenting on my motivation and
+> > approach.
+> > 
+> > As far as I can tell all of the bindings I move here describe solely
+> > syscon-based devices.
+> > 
+> 
+> But do we know which ones they are?
+> 
+> In principle, any syscon device node can have a specialized driver
+> exporting an interface, the bindings always allow it to be done
+> one way or the other, and we may change the driver or run a different
+> OS that has decided differently.
+> 
 
-Given that
-a) a CPU typically spends most of its time in userland, during which time
-   no kernel mode NEON in process context is in progress,
-b) a CPU spends most of its time in the kernel doing other things than
-   kernel mode NEON when it gets interrupted to perform kernel mode NEON
-   in softirq context
+Right; for the Linux case there are currently no driver implementations
+that match on the compatible strings in the documents I moved (save for
+qcom,tcsr, except that it's the qcom,gsbi compatible driver parsing a
+phandle to the qcom,tcsr syscon node).
 
-the stacking and subsequent unstacking is only necessary if we are
-interrupting a thread while it is performing kernel mode NEON in process
-context, which means that in all other cases, we can simply preserve the
-userland FPSIMD state once, and only restore it upon return to userland,
-even if we are being invoked from softirq or hardirq context.
+However, I can't guarantee the solely-syscon property for other
+operating systems. Given that, it now looks to me like we shouldn't
+have such a directory at all.
 
-So instead of checking whether we are running in interrupt context, keep
-track of the level of nested kernel mode NEON calls in progress, and only
-perform the eager stack/unstack if the level exceeds 1.
+Cheers,
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v6:
-- use a spinlock instead of disabling interrupts
-
-v5:
-- perform the test-and-set and the fpsimd_save_state with interrupts disabled,
-  to prevent nested kernel_neon_begin()/_end() pairs to clobber the state
-  while it is being preserved
-
-v4:
-- use this_cpu_inc/dec, which give sufficient guarantees regarding
-  concurrency, but do not imply SMP barriers, which are not needed here
-
-v3:
-- avoid corruption by concurrent invocations of kernel_neon_begin()/_end()
-
-v2:
-- BUG() on unexpected values of the nesting level
-- relax the BUG() on num_regs>32 to a WARN, given that nothing actually
-  breaks in that case
-
- arch/arm64/include/asm/fpsimd.h |  3 +
- arch/arm64/kernel/fpsimd.c      | 77 ++++++++++++++------
- 2 files changed, 58 insertions(+), 22 deletions(-)
-
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 50f559f574fe..ee09fe1c37b6 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -17,6 +17,7 @@
- #define __ASM_FP_H
- 
- #include <asm/ptrace.h>
-+#include <linux/spinlock.h>
- 
- #ifndef __ASSEMBLY__
- 
-@@ -37,6 +38,8 @@ struct fpsimd_state {
- 			u32 fpcr;
- 		};
- 	};
-+	/* lock protecting the preserved state while it is being saved */
-+	spinlock_t lock;
- 	/* the id of the last cpu to have restored this state */
- 	unsigned int cpu;
- };
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 394c61db5566..886eea2d4084 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -160,6 +160,7 @@ void fpsimd_flush_thread(void)
- 	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
- 	fpsimd_flush_task_state(current);
- 	set_thread_flag(TIF_FOREIGN_FPSTATE);
-+	spin_lock_init(&current->thread.fpsimd_state.lock);
- }
- 
- /*
-@@ -220,45 +221,77 @@ void fpsimd_flush_task_state(struct task_struct *t)
- 
- #ifdef CONFIG_KERNEL_MODE_NEON
- 
--static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
--static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
-+/*
-+ * Although unlikely, it is possible for three kernel mode NEON contexts to
-+ * be live at the same time: process context, softirq context and hardirq
-+ * context. So while the userland context is stashed in the thread's fpsimd
-+ * state structure, we need two additional levels of storage.
-+ */
-+static DEFINE_PER_CPU(struct fpsimd_partial_state, nested_fpsimdstate[2]);
-+static DEFINE_PER_CPU(int, kernel_neon_nesting_level);
- 
- /*
-  * Kernel-side NEON support functions
-  */
- void kernel_neon_begin_partial(u32 num_regs)
- {
--	if (in_interrupt()) {
--		struct fpsimd_partial_state *s = this_cpu_ptr(
--			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-+	struct fpsimd_partial_state *s;
-+	int level;
- 
--		BUG_ON(num_regs > 32);
--		fpsimd_save_partial_state(s, roundup(num_regs, 2));
--	} else {
-+	preempt_disable();
-+
-+	/*
-+	 * Save the userland FPSIMD state if we have one and if we
-+	 * haven't done so already. Clear fpsimd_last_state to indicate
-+	 * that there is no longer userland FPSIMD state in the
-+	 * registers.
-+	 */
-+	if (current->mm && !test_thread_flag(TIF_FOREIGN_FPSTATE)) {
- 		/*
--		 * Save the userland FPSIMD state if we have one and if we
--		 * haven't done so already. Clear fpsimd_last_state to indicate
--		 * that there is no longer userland FPSIMD state in the
-+		 * Whoever test-and-sets the TIF_FOREIGN_FPSTATE flag should
-+		 * preserve the userland FP/SIMD state without interruption by
-+		 * nested kernel_neon_begin()/_end() calls.
-+		 * The reason is that the FP/SIMD register file is shared with
-+		 * SVE on hardware that supports it, and nested kernel mode NEON
-+		 * calls do not restore the upper part of the shared SVE/SIMD
- 		 * registers.
- 		 */
--		preempt_disable();
--		if (current->mm &&
--		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
--			fpsimd_save_state(&current->thread.fpsimd_state);
--		this_cpu_write(fpsimd_last_state, NULL);
-+		if (spin_trylock(&current->thread.fpsimd_state.lock)) {
-+			if (!test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
-+				fpsimd_save_state(&current->thread.fpsimd_state);
-+			spin_unlock(&current->thread.fpsimd_state.lock);
-+		}
-+	}
-+	this_cpu_write(fpsimd_last_state, NULL);
-+
-+	level = this_cpu_inc_return(kernel_neon_nesting_level);
-+	BUG_ON(level > 3);
-+
-+	if (level > 1) {
-+		s = this_cpu_ptr(nested_fpsimdstate);
-+
-+		WARN_ON_ONCE(num_regs > 32);
-+		num_regs = min(roundup(num_regs, 2), 32U);
-+
-+		fpsimd_save_partial_state(&s[level - 2], num_regs);
- 	}
- }
- EXPORT_SYMBOL(kernel_neon_begin_partial);
- 
- void kernel_neon_end(void)
- {
--	if (in_interrupt()) {
--		struct fpsimd_partial_state *s = this_cpu_ptr(
--			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
--		fpsimd_load_partial_state(s);
--	} else {
--		preempt_enable();
-+	struct fpsimd_partial_state *s;
-+	int level;
-+
-+	level = this_cpu_read(kernel_neon_nesting_level);
-+	BUG_ON(level < 1);
-+
-+	if (level > 1) {
-+		s = this_cpu_ptr(nested_fpsimdstate);
-+		fpsimd_load_partial_state(&s[level - 2]);
- 	}
-+	this_cpu_dec(kernel_neon_nesting_level);
-+	preempt_enable();
- }
- EXPORT_SYMBOL(kernel_neon_end);
- 
--- 
-2.7.4
+Andrew
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161213/b1925e8e/attachment.sig>
