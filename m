@@ -1,33 +1,27 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 13 Dec 2016 15:26:55 +0530
-Subject: [PATCH 1/2] ARM: dts: dra7-evm: Remove pinmux configurations for
- erratum i869
-In-Reply-To: <b80e3cbc8a377abdb40ab11de78ce0b3fb67596f.1480411308.git.nsekhar@ti.com>
-References: <cover.1480411308.git.nsekhar@ti.com>
- <b80e3cbc8a377abdb40ab11de78ce0b3fb67596f.1480411308.git.nsekhar@ti.com>
-Message-ID: <13b4ce8b-4a3c-d066-e897-28eb4d511d76@ti.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Tue, 13 Dec 2016 13:01:03 +0300
+Subject: =?UTF-8?B?UmU6IEVYVDogaW14LXNkbWEgVUFSVCBzZXJpZXMgZmFpbGVkIGZvciBpLk1Y?=
+ =?UTF-8?B?NTE=?=
+In-Reply-To: <4f8cf2ee-3cd6-31ce-dc12-8a763f19f8e5@ge.com>
+References: <1481538186.727700380@f399.i.mail.ru>
+ <4f8cf2ee-3cd6-31ce-dc12-8a763f19f8e5@ge.com>
+Message-ID: <1481623263.657365881@f431.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 November 2016 02:54 PM, Sekhar Nori wrote:
+>???????????, 12 ??????? 2016, 16:48 +03:00 ?? "Han, Nandor (GE Healthcare)" <nandor.han@ge.com>:
+>
+>Hi Alexander,
+>????Thanks for info. I have already posted a patch that probably will 
+>fix this issue.
+>
+>https://lkml.org/lkml/2016/10/11/319
+>
+>It was already tested on imx6 and imx53. Let me know how it works.
+>
+>Reference:
+>http://lists-archives.com/linux-kernel/28679793-ext-pre-4-9-rc-dma-regression-imx6-sound-etc.html
 
-> A side-effect of this patch is that NAND support is removed. NAND
-> pins clash with VOUT3 on DRA7-EVM. U-Boot selects VOUT3 over NAND
-> as per TI EVM application needs.
+Yes, it helps me, thanks!
 
-I claimed this ..
-
->  &gpmc {
->  	status = "okay";
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&nand_flash_x16>;
->  	ranges = <0 0 0x08000000 0x01000000>;	/* minimum GPMC partition = 16MB */
->  	nand at 0,0 {
->  		compatible = "ti,omap2-nand";
-
-.. but forgot to keep the gpmc node disabled. I will fix this and send a
-v2. dra72-evm-common.dtsi needs a similar patch. Will include that in v2
-as well.
-
-Thanks,
-Sekhar
+---
