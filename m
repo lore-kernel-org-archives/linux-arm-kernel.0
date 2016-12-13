@@ -1,109 +1,67 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Tue, 13 Dec 2016 15:20:14 +0100
-Subject: [PATCH v4 3/9] clk: stm32f4: Add post divisor for I2S & SAI PLLs
+Date: Tue, 13 Dec 2016 15:20:16 +0100
+Subject: [PATCH v4 5/9] clk: stm32f4: Add I2S clock
 In-Reply-To: <1481638820-29324-1-git-send-email-gabriel.fernandez@st.com>
 References: <1481638820-29324-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1481638820-29324-4-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1481638820-29324-6-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-This patch adds post dividers of I2S & SAI PLLs.
-These dividers are managed by a dedicated register (RCC_DCKCFGR).
-The PLL should be off before a set rate.
+This patch introduces I2S clock for stm32f4 soc.
+The I2S clock could be derived from an external clock or from pll-i2s
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- drivers/clk/clk-stm32f4.c | 55 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+ drivers/clk/clk-stm32f4.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-index cab2014..70ca93c 100644
+index 076a063..a7a6a16 100644
 --- a/drivers/clk/clk-stm32f4.c
 +++ b/drivers/clk/clk-stm32f4.c
-@@ -47,6 +47,10 @@
- #define STM32F4_RCC_CSR			0x74
- #define STM32F4_RCC_PLLI2SCFGR		0x84
- #define STM32F4_RCC_PLLSAICFGR		0x88
-+#define STM32F4_RCC_DCKCFGR		0x8c
+@@ -946,6 +946,8 @@ static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
+ 
+ static const char *lcd_parent[1] = { "pllsai-r-div" };
+ 
++static const char *i2s_parents[2] = { "plli2s-r", NULL };
 +
-+#define NONE -1
-+#define NO_IDX  NONE
- 
- struct stm32f4_gate_data {
- 	u8	offset;
-@@ -357,6 +361,19 @@ struct stm32f4_pll {
- 
- #define to_stm32f4_pll(_gate) container_of(_gate, struct stm32f4_pll, gate)
- 
-+struct stm32f4_pll_post_div_data {
-+	int idx;
-+	u8 pll_num;
-+	const char *name;
-+	const char *parent;
-+	u8 flag;
-+	u8 offset;
-+	u8 shift;
-+	u8 width;
-+	u8 flag_div;
-+	const struct clk_div_table *div_table;
-+};
-+
- struct stm32f4_vco_data {
- 	const char *vco_name;
- 	u8 offset;
-@@ -370,6 +387,23 @@ struct stm32f4_vco_data {
- 	{ "vco-sai", STM32F4_RCC_PLLSAICFGR, 28, 29 },
+ struct stm32_aux_clk {
+ 	int idx;
+ 	const char *name;
+@@ -975,6 +977,12 @@ struct stm32f4_clk_data {
+ 		STM32F4_RCC_APB2ENR, 26,
+ 		CLK_SET_RATE_PARENT
+ 	},
++	{
++		CLK_I2S, "i2s", i2s_parents, ARRAY_SIZE(i2s_parents),
++		STM32F4_RCC_CFGR, 23, 1,
++		NO_GATE, 0,
++		CLK_SET_RATE_PARENT
++	},
  };
  
-+
-+static const struct clk_div_table post_divr_table[] = {
-+	{ 0, 2 }, { 1, 4 }, { 2, 8 }, { 3, 16 }, { 0 }
-+};
-+
-+#define MAX_POST_DIV 3
-+static const struct stm32f4_pll_post_div_data  post_div_data[MAX_POST_DIV] = {
-+	{ CLK_I2SQ_PDIV, PLL_I2S, "plli2s-q-div", "plli2s-q",
-+		CLK_SET_RATE_PARENT, STM32F4_RCC_DCKCFGR, 0, 5, 0, NULL},
-+
-+	{ CLK_SAIQ_PDIV, PLL_SAI, "pllsai-q-div", "pllsai-q",
-+		CLK_SET_RATE_PARENT, STM32F4_RCC_DCKCFGR, 8, 5, 0, NULL },
-+
-+	{ NO_IDX, PLL_SAI, "pllsai-r-div", "pllsai-r", CLK_SET_RATE_PARENT,
-+		STM32F4_RCC_DCKCFGR, 16, 2, 0, post_divr_table },
-+};
-+
- struct stm32f4_div_data {
- 	u8 shift;
- 	u8 width;
-@@ -996,6 +1030,27 @@ static void __init stm32f4_rcc_init(struct device_node *np)
- 	clks[PLL_VCO_SAI] = stm32f4_rcc_register_pll("vco_in",
- 			&data->pll_data[2], &stm32f4_clk_lock);
+ static const struct stm32f4_clk_data stm32f429_clk_data = {
+@@ -1069,7 +1077,7 @@ static struct clk_hw *stm32_register_aux_clk(const char *name,
  
-+	for (n = 0; n < MAX_POST_DIV; n++) {
-+		const struct stm32f4_pll_post_div_data *post_div;
-+		struct clk_hw *hw;
+ static void __init stm32f4_rcc_init(struct device_node *np)
+ {
+-	const char *hse_clk;
++	const char *hse_clk, *i2s_in_clk;
+ 	int n;
+ 	const struct of_device_id *match;
+ 	const struct stm32f4_clk_data *data;
+@@ -1104,6 +1112,10 @@ static void __init stm32f4_rcc_init(struct device_node *np)
+ 
+ 	hse_clk = of_clk_get_parent_name(np, 0);
+ 
++	i2s_in_clk = of_clk_get_parent_name(np, 1);
 +
-+		post_div = &post_div_data[n];
++	i2s_parents[1] = i2s_in_clk;
 +
-+		hw = clk_register_pll_div(post_div->name,
-+				post_div->parent,
-+				post_div->flag,
-+				base + post_div->offset,
-+				post_div->shift,
-+				post_div->width,
-+				post_div->flag_div,
-+				post_div->div_table,
-+				clks[post_div->pll_num],
-+				&stm32f4_clk_lock);
-+
-+		if (post_div->idx != NO_IDX)
-+			clks[post_div->idx] = hw;
-+	}
-+
- 	sys_parents[1] = hse_clk;
- 	clk_register_mux_table(
- 	    NULL, "sys", sys_parents, ARRAY_SIZE(sys_parents), 0,
+ 	clk_register_fixed_rate_with_accuracy(NULL, "hsi", NULL, 0,
+ 			16000000, 160000);
+ 	pllcfgr = readl(base + STM32F4_RCC_PLLCFGR);
 -- 
 1.9.1
