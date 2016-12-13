@@ -1,70 +1,74 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 13 Dec 2016 18:48:39 +0100
-Subject: [PATCH v4 10/12] arm64: dts: marvell: add eMMC support for Armada 37xx
-In-Reply-To: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
-References: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
-Message-ID: <d873110717f2d986efd490b29295c7f8c916edc2.1481651244.git-series.gregory.clement@free-electrons.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 13 Dec 2016 18:48:50 +0100
+Subject: [PATCH 8/9] arm64: dts: rockchip: partially describe PWM
+ regulators for Gru
+In-Reply-To: <20161207170916.GA84287@google.com>
+References: <1480645653-36943-1-git-send-email-briannorris@chromium.org>
+ <2418784.7dMdkAyuIx@phil> <20161207170916.GA84287@google.com>
+Message-ID: <13721273.q1HcHZAhdQ@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the eMMC support for Armada 37xx SoC and enable it in the Armada 3720
-DB board.
+Am Mittwoch, 7. Dezember 2016, 09:09:17 CET schrieb Brian Norris:
+> Hi Heiko,
+> 
+> On Wed, Dec 07, 2016 at 05:48:24PM +0100, Heiko Stuebner wrote:
+> > Am Donnerstag, 1. Dezember 2016, 18:27:32 CET schrieb Brian Norris:
+> > > We need to add regulators to the CPU nodes, so cpufreq doesn't think it
+> > > can crank up the clock speed without changing the voltage. However, we
+> > > don't yet have the DT bindings to fully describe the Over Voltage
+> > > Protection (OVP) circuits on these boards. Without that description, we
+> > > might end up changing the voltage too much, too fast.
+> > > 
+> > > Add the pwm-regulator descriptions and associate the CPU OPPs, but leave
+> > > them disabled.
+> > > 
+> > > Signed-off-by: Brian Norris <briannorris@chromium.org>
+> > 
+> > is there a specific reason for keeping this change separate?
+> 
+> Maybe not a great one. I figured they were somewhat controversial, so I
+> at least wanted to split the "cpufreq patches" (i.e., this and the
+> previous) from the main DTS(I) additions. I also figured we typically
+> like to keep the base SoC changes separate from the board DTS(I)
+> changes.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-3720-db.dts | 17 +++++++++++++++++
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 11 +++++++++++
- 2 files changed, 28 insertions(+)
+I was scratching my head for a bit where this was affecting the evb, until I 
+found the include at the end of patch5 :-) .
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-index 1372e9a6aaa4..707625031e29 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-@@ -72,6 +72,23 @@
- 	status = "okay";
- };
- 
-+&sdhci0 {
-+	non-removable;
-+	bus-width = <8>;
-+	mmc-ddr-1_8v;
-+	mmc-hs400-1_8v;
-+	marvell,xenon-emmc;
-+	marvell,pad-type = "fixed-1-8v";
-+	status = "okay";
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	mmccard: mmccard at 0 {
-+		compatible = "mmc-card";
-+		reg = <0>;
-+	};
-+};
-+
- /* CON31 */
- &usb3 {
- 	status = "okay";
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index c4762538ec01..0c4cafe92e66 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -161,6 +161,17 @@
- 				};
- 			};
- 
-+			sdhci0: sdhci at d8000 {
-+				compatible = "marvell,armada-3700-sdhci",
-+				"marvell,sdhci-xenon";
-+				reg = <0xd8000 0x300
-+				       0x17808 0x4>;
-+				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&nb_perih_clk 0>;
-+				clock-names = "core";
-+				status = "disabled";
-+			};
-+
- 			sata: sata at e0000 {
- 				compatible = "marvell,armada-3700-ahci";
- 				reg = <0xe0000 0x2000>;
--- 
-git-series 0.9.1
+> > While it is nice for documentation reasons, as it stands now the previous
+> > patch introduces a regression (cpufreq trying to scale without regulators)
+> > and immediately fixes it here.
+> 
+> Right. Additionally, as noted on the previous patch, we might do the
+> same with EVB. But I don't know what the regulators are like for EVB.
+> This is probably a bigger deal, since EVB has been working (allegedly)
+> upstream for a while now.
+
+Yep, it was at least booting :-) . I guess I should wire it up again. My shiny 
+new Gru somehow did take up its space recently.
+
+> There's no way to split these up without either breaking compilation or
+> breaking bisectability. For Kevin/Gru, they don't function at all before
+> this series, so I figured some "settle" time wasn't a huge deal.
+> 
+> > So if you're ok with it, I'd like to merge this one back into the previous
+> > patch when applying.
+> 
+> That'd be OK with me, as long as we're also confident about EVB.
+
+That somehow sounds unrelated, as this patch only touches gru stuff anyway. So 
+if the evb breaks, it would do so after patch5 already.
+
+
+> Maybe at a minimum, I should just patch in some empty regulator nodes,
+> so cpufreq doesn't think there's no need to handle voltage.
+
+So I guess going forward we could do, describe the evb pwm regulators (in 
+disabled state), add general OPPs, add gru with pwm regulators?
+
+I'll try to hook up my evb and check on the pwm-regulators in the schematics 
+this week.
+
+
+Heiko
