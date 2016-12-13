@@ -1,37 +1,49 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 13 Dec 2016 11:14:49 -0800
-Subject: [PATCH] Input: imx6ul_tsc - generalize the averaging property
-In-Reply-To: <20161213191050.3yrmxaubpgjh65bz@rob-hp-laptop>
-References: <1481440003-27168-1-git-send-email-guy.shapiro@mobi-wize.com>
- <20161213191050.3yrmxaubpgjh65bz@rob-hp-laptop>
-Message-ID: <1CDAF0C6-25E1-4CE9-8F98-F07333827B98@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 13 Dec 2016 20:14:59 +0100
+Subject: [PATCH 6/6] ARM: dts: sun8i: raise the max voltage of DCDC2 in
+ sun8i reference tablets
+In-Reply-To: <20161213152252.53749-7-icenowy@aosc.xyz>
+References: <20161213152252.53749-1-icenowy@aosc.xyz>
+ <20161213152252.53749-7-icenowy@aosc.xyz>
+Message-ID: <20161213191459.mmoejcmf26qqtyze@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On December 13, 2016 11:10:50 AM PST, Rob Herring <robh@kernel.org> wrote:
->On Sun, Dec 11, 2016 at 09:06:43AM +0200, Guy Shapiro wrote:
->> Make the avarage-samples property a general touchscreen property
->> rather than imx6ul device specific.
->> 
->> Signed-off-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
->> ---
->>  .../bindings/input/touchscreen/imx6ul_tsc.txt      | 11 ++----
->>  .../bindings/input/touchscreen/touchscreen.txt     |  3 ++
->>  drivers/input/touchscreen/imx6ul_tsc.c             | 46
->++++++++++++++++------
->>  3 files changed, 41 insertions(+), 19 deletions(-)
->
->You can't just switch existing bindings as that breaks compatibility 
->with old dtbs. The kernel driver would need to support both. Just 
->introduce the new common property and use it for your device.
->
+On Tue, Dec 13, 2016 at 11:22:52PM +0800, Icenowy Zheng wrote:
+> The "extremity_freq" frequency described in the original FEX files uses
+> a voltage of 1.46v, which is beyond the current maximum voltage value of
+> DCDC2 (Cortex-A7 supply) in the sun8i reference tablet DTSI file.
+> 
+> Raise the maximum value to 1.46v.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+>  arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
+> index 7ac8bb4bc95a..325ca5bd67a5 100644
+> --- a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
+> @@ -180,7 +180,7 @@
+>  &reg_dcdc2 {
+>  	regulator-always-on;
+>  	regulator-min-microvolt = <900000>;
+> -	regulator-max-microvolt = <1400000>;
+> +	regulator-max-microvolt = <1460000>;
 
-The old binding is only in my tree at the moment, so I do not think there is compatibility concerns.
+This is outside of the voltage range tolerated by the CPU. NAK.
 
-Are you OK with the new binding itself?
-
-
-Thanks.
+Maxime
 
 -- 
-Dmitry
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161213/b9ea0961/attachment.sig>
