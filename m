@@ -1,53 +1,55 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 13 Dec 2016 14:25:35 +0000
+From: sza@esh.hu (=?utf-8?B?U3plbXrFkSBBbmRyw6Fz?=)
+Date: Tue, 13 Dec 2016 15:33:24 +0100
 Subject: [RFC v2 PATCH 0/3] Fix dma_alloc_coherent() and friends for NOMMU
-In-Reply-To: <58500243.8070107@arm.com>
+In-Reply-To: <1481636704-18948-1-git-send-email-vladimir.murzin@arm.com>
 References: <1481636704-18948-1-git-send-email-vladimir.murzin@arm.com>
- <20161213140711.GY14217@n2100.armlinux.org.uk> <58500243.8070107@arm.com>
-Message-ID: <ed07f3ca-8ce7-fb1b-2292-238ecf6460da@arm.com>
+Message-ID: <1BE9400D-BACB-4C07-B6F0-1963D90A7029@esh.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/12/16 14:14, Vladimir Murzin wrote:
-> On 13/12/16 14:07, Russell King - ARM Linux wrote:
->> On Tue, Dec 13, 2016 at 01:45:01PM +0000, Vladimir Murzin wrote:
->>> This patch set is trying to address the issue by providing region of
->>> memory suitable for consistent DMA operations. It is supposed that such
->>> region is marked by MPU as non-cacheable. Since we have MPU support in
->>> Linux for R-class only and M-class setting MPU in bootloader, proposed
->>> interface to advertise such memory is via "memdma=size at start" command
->>> line option, to avoid clashing with normal memory (which usually comes
->>> from dts) it'd be safer to use it together with "mem=" command line
->>> option. Meanwhile, I'm open to suggestions for the better way telling
->>> Linux of such memory.
->>
->> For those nommu systems where the MPU is not used, how do they allocate
->> DMA memory without setting aside a chunk of memory?
->>
->> >From what I understand of the current nommu code, it would just use
->> the normal page allocator for DMA memory allocation, so now requiring
->> everything to fit the "nommu has mpu" case seems like it's going to
->> break older nommu.
->>
+Hi,
+
+> On 2016. Dec 13., at 14:45, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
 > 
-> Probably, it'd be better if we just fallback to dma-noop operations if there
-> is no dma region, i.e. assume that platform is coherent. We still need a way
-> to tell user that absence of such region can be reason of broken DMA.
-
-As I mentioned internally, I think it would be worth trying to use CMA
-for this, because dma_map_ops are already wired to try that first, and
-from what I can see it seems already set up to do precisely this via a
-"shared-dma-pool" reserved memory region (see rmem_cma_setup() in
-drivers/base/dma-contiguous.c) - mandating that for cached v7-M systems
-whilst letting cache-less/non-MPU systems automatically fall back to the
-normal page allocator in its absence would seem to solve all 3 cases.
-
-Other than the allocator issue, though, the rest of the refactoring does
-look nice.
-
-Robin.
-
+> Hi,
 > 
-> Cheers
-> Vladimir
+> It seem that addition of cache support for M-class cpus uncovered
+> latent bug in DMA usage. NOMMU memory model has been treated as being
+> always consistent; however, for R/M classes of cpu memory can be
+> covered by MPU which in turn might configure RAM as Normal
+> i.e. bufferable and cacheable. It breaks dma_alloc_coherent() and
+> friends, since data can stuck in caches now or be buffered.
 > 
+> This patch set is trying to address the issue by providing region of
+> memory suitable for consistent DMA operations. It is supposed that such
+> region is marked by MPU as non-cacheable. Since we have MPU support in
+> Linux for R-class only and M-class setting MPU in bootloader, proposed
+> interface to advertise such memory is via "memdma=size at start" command
+> line option, to avoid clashing with normal memory (which usually comes
+> from dts) it'd be safer to use it together with "mem=" command line
+> option. Meanwhile, I'm open to suggestions for the better way telling
+> Linux of such memory.
+> 
+
+I have tested these patches on my ATMEL SAME70 armv7m board.
+
+After setting the memory regions and attributes in the bootloader and providing the required 
+command line parameters, the DMA issues fixed.
+
+I have tested an usart, sdcard, and ethernet driver with DMA enabled.
+
+Booting Linux on physical CPU 0x0
+Linux version 4.9.0 (root at debian) (gcc version 4.8.3 20140320 (prerelease) (Sourcery CodeBench Lite 2014.05-29) ) #4 Mon Dec 12 20:27:21 CET 201
+6
+CPU: ARMv7-M [410fc271] revision 1 (ARMv7M), cr=00000000
+CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+OF: fdt:Machine model: SAME70-sampione board
+Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 15748
+Kernel command line: console=ttyS1,115200 root=/dev/mmcblk0p2 rw init=/linuxrc rootwait mem=62M memdma=2M at 0x73e00000
+
+So you can add my Tested-by.
+
+Thanks for the patches!
+
+Regards,
+Andras
