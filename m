@@ -1,59 +1,76 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 13 Dec 2016 12:45:58 +0100
-Subject: [PATCH v2 renesas/devel 12/13] ARM: dts: r8a7793: Use R-Car Gen 2
- fallback binding for iic nodes
-In-Reply-To: <1481629559-14187-1-git-send-email-horms+renesas@verge.net.au>
-References: <1481629559-14187-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1481629559-14187-13-git-send-email-horms+renesas@verge.net.au>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Tue, 13 Dec 2016 22:35:34 +1030
+Subject: [PATCH v3 6/6] mfd: dt: Move syscon bindings to syscon
+ subdirectory
+In-Reply-To: <20161213110710.GV3625@dell.home>
+References: <20161206025321.1792-1-andrew@aj.id.au>
+ <20161206025321.1792-7-andrew@aj.id.au>
+ <20161212153911.drhczoagyyhu7jm4@rob-hp-laptop>
+ <1481604793.3112.32.camel@aj.id.au> <20161213110710.GV3625@dell.home>
+Message-ID: <1481630734.3112.40.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added R-Car Gen 2 fallback binding for iic nodes in
-DT for r8a7793 SoC.
+On Tue, 2016-12-13 at 11:07 +0000, Lee Jones wrote:
+> On Tue, 13 Dec 2016, Andrew Jeffery wrote:
+> 
+> > On Mon, 2016-12-12 at 09:39 -0600, Rob Herring wrote:
+> > > On Tue, Dec 06, 2016 at 01:53:21PM +1100, Andrew Jeffery wrote:
+> > > > The use of syscons is growing, lets collate them in their own part of
+> > > > the bindings tree.
+> > > > 
+> > > > > > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> > > > 
+> > > > ---
+> > > > ?Documentation/devicetree/bindings/mfd/{ => syscon}/aspeed-scu.txt?????????| 0
+> > > > ?Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-gpbr.txt?????????| 0
+> > > > ?Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-matrix.txt???????| 0
+> > > > ?Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-smc.txt??????????| 0
+> > > > ?Documentation/devicetree/bindings/mfd/{ => syscon}/qcom,tcsr.txt??????????| 0
+> > > > ?Documentation/devicetree/bindings/mfd/{ => syscon}/syscon.txt?????????????| 0
+> > > > ?.../devicetree/bindings/mfd/{ => syscon}/ti-keystone-devctrl.txt??????????| 0
+> > > > ?7 files changed, 0 insertions(+), 0 deletions(-)
+> > > > ?rename Documentation/devicetree/bindings/mfd/{ => syscon}/aspeed-scu.txt (100%)
+> > > > ?rename Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-gpbr.txt (100%)
+> > > > ?rename Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-matrix.txt (100%)
+> > > > ?rename Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-smc.txt (100%)
+> > > > ?rename Documentation/devicetree/bindings/mfd/{ => syscon}/qcom,tcsr.txt (100%)
+> > > > ?rename Documentation/devicetree/bindings/mfd/{ => syscon}/syscon.txt (100%)
+> > > > ?rename Documentation/devicetree/bindings/mfd/{ => syscon}/ti-keystone-devctrl.txt (100%)
+> > > 
+> > > I'm not so sure this is the right direction. syscon usage is pretty much?
+> > > spread throughout the tree.
+> > 
+> > This patch was created based on my interpretation of Lee's feedback
+> > here:
+> > 
+> > https://lkml.org/lkml/2016/11/18/650
+> > 
+> > Lee's next email in the chain poked Arnd for an opinion, but Arnd
+> > didn't reply.
+> > 
+> > I don't mind. I moved these bindings separately so we could just drop
+> > the patch if there was push-back. If we drop the whole idea I'll need
+> > to apply a small fix to patch 5/6 to avoid creating the syscon
+> > subdirectory.
+> 
+> The sub-directory is a good idea for drivers who are *solely* syscon
+> based.
+> 
 
-This has no run-time effect for the current driver as the initialisation
-sequence is the same for the SoC-specific binding for r8a7793 and the
-fallback binding for R-Car Gen 2.
+Yes, I wasn't saying otherwise, just commenting on my motivation and
+approach.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r8a7793.dtsi | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+As far as I can tell all of the bindings I move here describe solely
+syscon-based devices.
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index cbe9ac629693..d5114cac656d 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -485,7 +485,8 @@
- 		/* doesn't need pinmux */
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,iic-r8a7793", "renesas,rmobile-iic";
-+		compatible = "renesas,iic-r8a7793", "renesas,rcar-gen2-iic",
-+			     "renesas,rmobile-iic";
- 		reg = <0 0xe60b0000 0 0x425>;
- 		interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7793_CLK_IICDVFS>;
-@@ -499,7 +500,8 @@
- 	i2c7: i2c at e6500000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,iic-r8a7793", "renesas,rmobile-iic";
-+		compatible = "renesas,iic-r8a7793", "renesas,rcar-gen2-iic",
-+			     "renesas,rmobile-iic";
- 		reg = <0 0xe6500000 0 0x425>;
- 		interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7793_CLK_IIC0>;
-@@ -513,7 +515,8 @@
- 	i2c8: i2c at e6510000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,iic-r8a7793", "renesas,rmobile-iic";
-+		compatible = "renesas,iic-r8a7793", "renesas,rcar-gen2-iic",
-+			     "renesas,rmobile-iic";
- 		reg = <0 0xe6510000 0 0x425>;
- 		interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7793_CLK_IIC1>;
--- 
-2.7.0.rc3.207.g0ac5344
+Cheers,
+
+Andrew
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161213/d37749c2/attachment.sig>
