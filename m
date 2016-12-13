@@ -1,34 +1,37 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 13 Dec 2016 20:13:50 +0100
-Subject: [PATCH 5/6] ARM: dts: sun8i: set cpu-supply in reference tablet
- DTSI
-In-Reply-To: <20161213152252.53749-6-icenowy@aosc.xyz>
-References: <20161213152252.53749-1-icenowy@aosc.xyz>
- <20161213152252.53749-6-icenowy@aosc.xyz>
-Message-ID: <20161213191350.dsybyjfuocrvx4zj@lukather>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 13 Dec 2016 11:14:49 -0800
+Subject: [PATCH] Input: imx6ul_tsc - generalize the averaging property
+In-Reply-To: <20161213191050.3yrmxaubpgjh65bz@rob-hp-laptop>
+References: <1481440003-27168-1-git-send-email-guy.shapiro@mobi-wize.com>
+ <20161213191050.3yrmxaubpgjh65bz@rob-hp-laptop>
+Message-ID: <1CDAF0C6-25E1-4CE9-8F98-F07333827B98@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2016 at 11:22:51PM +0800, Icenowy Zheng wrote:
-> All reference design A33 tablets uses DCDC2 of AXP223 as the power
-> supply of the Cortex-A7 cores.
-> 
-> Set the cpu-supply in the DTSI of sun8i reference tablets.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+On December 13, 2016 11:10:50 AM PST, Rob Herring <robh@kernel.org> wrote:
+>On Sun, Dec 11, 2016 at 09:06:43AM +0200, Guy Shapiro wrote:
+>> Make the avarage-samples property a general touchscreen property
+>> rather than imx6ul device specific.
+>> 
+>> Signed-off-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
+>> ---
+>>  .../bindings/input/touchscreen/imx6ul_tsc.txt      | 11 ++----
+>>  .../bindings/input/touchscreen/touchscreen.txt     |  3 ++
+>>  drivers/input/touchscreen/imx6ul_tsc.c             | 46
+>++++++++++++++++------
+>>  3 files changed, 41 insertions(+), 19 deletions(-)
+>
+>You can't just switch existing bindings as that breaks compatibility 
+>with old dtbs. The kernel driver would need to support both. Just 
+>introduce the new common property and use it for your device.
+>
 
-Applied, thanks
+The old binding is only in my tree at the moment, so I do not think there is compatibility concerns.
 
-Maxime
+Are you OK with the new binding itself?
+
+
+Thanks.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161213/7c630f82/attachment.sig>
+Dmitry
