@@ -1,69 +1,64 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Dec 2016 13:00:36 +0000
-Subject: [PATCH] ARM: dts: vexpress: Support GICC_DIR operations
-In-Reply-To: <903fb243-7ab1-211f-e29f-27ab00a4aa01@arm.com>
-References: <20161210201351.25894-1-christoffer.dall@linaro.org>
- <9d9198a1-ba56-46e5-6226-89eb3825aac3@arm.com>
- <903fb243-7ab1-211f-e29f-27ab00a4aa01@arm.com>
-Message-ID: <dda80db0-b683-d0a6-f4ab-9dd23fd6903a@arm.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 13 Dec 2016 18:38:51 +0530
+Subject: [PATCH v2 3/9] ARM: dts: dra72: Add separate dtsi for tps65917
+In-Reply-To: <045e8200-69bd-8590-1da4-96235444db4c@ti.com>
+References: <20161021103841.8044-1-lokeshvutla@ti.com>
+ <20161021103841.8044-4-lokeshvutla@ti.com>
+ <045e8200-69bd-8590-1da4-96235444db4c@ti.com>
+Message-ID: <91b4075f-2dfb-0d17-592d-f99b91ace590@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/12/16 12:16, Sudeep Holla wrote:
+
+
+On Tuesday 13 December 2016 06:10 PM, Roger Quadros wrote:
+> +Tomi, Kishon, Carlos
+>  
+> Hi,
 > 
-> 
-> On 12/12/16 17:35, Marc Zyngier wrote:
->> [+Sudeep]
+> On 21/10/16 13:38, Lokesh Vutla wrote:
+>> dra72-evm-common.dtsi consolidates dra72-evm.dts and dra72-evm-revc.dts
+>> which also include tps65917 pmic support as both the evms uses the same
+>> pmic. But, dra71-evm has mostly similar features with a different pmic.
+>> In order to exploit dra72-evm-common.dtsi, creating a separate dtsi
+>> for tps65915 support and including it in respective board files.
 >>
->> On 10/12/16 20:13, Christoffer Dall wrote:
->>> The GICv2 CPU interface registers span across 8K, not 4K as indicated in
->>> the DT.  Only the GICC_DIR register is located after the initial 4K
->>> boundary, leaving a functional system but without support for separately
->>> EOI'ing and deactivating interrupts.
->>>
->>> After this change the system support split priority drop and interrupt
->>> deactivation.
->>>
->>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>> ---
->>>  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
->>> index 0205c97..2e0cf39 100644
->>> --- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
->>> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
->>> @@ -126,7 +126,7 @@
->>>  		#address-cells = <0>;
->>>  		interrupt-controller;
->>>  		reg = <0 0x2c001000 0 0x1000>,
->>> -		      <0 0x2c002000 0 0x1000>,
->>> +		      <0 0x2c002000 0 0x2000>,
->>>  		      <0 0x2c004000 0 0x2000>,
->>>  		      <0 0x2c006000 0 0x2000>;
->>>  		interrupts = <1 9 0xf04>;
->>>
->>
->> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>> ---
+>>  arch/arm/boot/dts/dra72-evm-common.dtsi   | 128 ----------------------------
+>>  arch/arm/boot/dts/dra72-evm-revc.dts      |  21 +++--
+>>  arch/arm/boot/dts/dra72-evm-tps65917.dtsi | 134 ++++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/dra72-evm.dts           |  14 ++--
+>>  4 files changed, 154 insertions(+), 143 deletions(-)
+>>  create mode 100644 arch/arm/boot/dts/dra72-evm-tps65917.dtsi
 >>
 > 
-> Thanks Marc, I see couple of other instances of this like tc2 and rtsm
-> model on arm64. Do they need to be fixed too ? I guess so. If so I will
-> fixup this to patch add tc1. And add another one for rtsm.
+> This patch breaks USB XHCI and boot on dra72-evm (both revC and non revC)
+> 
+> I'll explain why below.
+> 
+> [   13.625167] Unhandled fault: imprecise external abort (0x1406) at 0x00000000
+> [   13.632557] pgd = ede10000
+> [   13.635390] [00000000] *pgd=00000000
+> [   13.639145] Internal error: : 1406 [#1] SMP ARM
+> [   13.643893] Modules linked in: xhci_plat_hcd(+) xhci_hcd usbcore omapfb dwc3 cfbfillrect snd_soc_davinci_mcasp cfbimgblt cfbcopyarea udc_core connector_hdmi encoder_tpd12s015 snd_soc_edma m25p80 snd_soc_simpe
+> [   13.695557] CPU: 0 PID: 440 Comm: modprobe Not tainted 4.9.0-rc1 #1050
+> [   13.702399] Hardware name: Generic DRA72X (Flattened Device Tree)
+> [   13.708786] task: edb5c040 task.stack: edd10000
+> [   13.713540] PC is at _raw_spin_unlock_irqrestore+0x0/0x44
+> [   13.719219] LR is at xhci_hub_control+0xc2c/0x15e0 [xhci_hcd]
+> [   13.725242] pc : [<c07df718>]    lr : [<bf486300>]    psr: a0000093
+> [   13.725242] sp : edd118c0  ip : c0e306b4  fp : 00000000
+> [   13.737278] r10: 00000000  r9 : 60000013  r8 : edf28218
+> [   13.742753] r7 : edf28000  r6 : 00000000  r5 : 00000000  r4 : edf2a000
+> [   13.749593] r3 : 00000000  r2 : 00000000  r1 : 60000013  r0 : edf28218
 
-Yes, that'd be good.
+Hmm.. Thanks for catching it. I remember it was booting when I tested,
+not sure how I missed this :(. usb2_phy1 & 2, mmc and dss supplies needs
+to be added in dra72-evm-tps65917.dtsi file.
 
-> Also I see loads of gic-400 compatible dts(mainly rockchip and renasas)
-> having just 4k. Are they left like this intentionally ? I remember you
-> fixing most of the DTS when you found this issue initially.
+Tony,
+	Do you want me to resend this patch or fixup patch on top of this?
 
-I still have these patches stashed somewhere (I remember sunxi being one
-of the offender as well). I also need to come up with a software
-workaround enabling the 8kB region with the old DT (because it is likely
-that KVM will stop working on them if we merge Christoffer's timer patches).
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks and regards,
+Lokesh
