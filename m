@@ -1,24 +1,33 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Tue, 13 Dec 2016 08:24:47 +0900
-Subject: [PATCH 2/4] dt-bindings: mfd: Remove TPS65217 interrupts
-In-Reply-To: <20161212172511.5nj7whzytpkmrk7z@rob-hp-laptop>
-References: <20161209062833.5768-1-woogyom.kim@gmail.com>
- <20161209062833.5768-3-woogyom.kim@gmail.com>
- <20161212172511.5nj7whzytpkmrk7z@rob-hp-laptop>
-Message-ID: <fe4985c0-d60a-2562-12a7-064404efd64c@gmail.com>
+From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
+Date: Tue, 13 Dec 2016 01:12:38 +0100 (CET)
+Subject: [PATCH net-next 18/27] net/skbuff: add macros for VLAN_PRESENT bit
+In-Reply-To: <cover.1481586602.git.mirq-linux@rere.qmqm.pl>
+References: <cover.1481586602.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <3cad1213a287755f5b6d698b45d839ca76d6d841.1481586602.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13/2016 02:25 AM, Rob Herring wrote:
-> On Fri, Dec 09, 2016 at 03:28:31PM +0900, Milo Kim wrote:
->> Interrupt numbers are from the datasheet, so no need to keep them in
->> the ABI. Use the number in the DT file.
-> I don't see the purpose of ripping this out. The headers have always
-> been for convienence, not whether the values come from the datasheet or
-> not.
+Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+---
+ include/linux/skbuff.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-My understanding is it's a same rule as other interrupt controllers.
-I'd like to have Arnd's opinion for this.
-
-Best regards,
-Milo
+diff --git a/include/linux/skbuff.h b/include/linux/skbuff.h
+index 332e767..4a85a1f 100644
+--- a/include/linux/skbuff.h
++++ b/include/linux/skbuff.h
+@@ -768,6 +768,12 @@ struct sk_buff {
+ 	__u32			priority;
+ 	int			skb_iif;
+ 	__u32			hash;
++#define PKT_VLAN_PRESENT_BIT	4	// CFI (12-th bit) in TCI
++#ifdef __BIG_ENDIAN
++#define PKT_VLAN_PRESENT_OFFSET()	offsetof(struct sk_buff, vlan_tci)
++#else
++#define PKT_VLAN_PRESENT_OFFSET()	(offsetof(struct sk_buff, vlan_tci) + 1)
++#endif
+ 	__be16			vlan_proto;
+ 	__u16			vlan_tci;
+ #if defined(CONFIG_NET_RX_BUSY_POLL) || defined(CONFIG_XPS)
+-- 
+2.10.2
