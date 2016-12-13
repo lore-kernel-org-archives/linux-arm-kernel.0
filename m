@@ -1,135 +1,76 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Tue, 13 Dec 2016 20:24:17 +0530
-Subject: [PATCH V7 5/8] arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED
-In-Reply-To: <4e6ebf88-0138-afce-d752-56b66d69772f@arm.com>
-References: <1481567927-14791-1-git-send-email-sricharan@codeaurora.org>
- <1481567927-14791-6-git-send-email-sricharan@codeaurora.org>
- <7d09fc5a-9425-c171-e469-2759534de2dc@arm.com>
- <002301d2554e$89112d20$9b338760$@codeaurora.org>
- <4e6ebf88-0138-afce-d752-56b66d69772f@arm.com>
-Message-ID: <002501d25550$ccf29400$66d7bc00$@codeaurora.org>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 13 Dec 2016 16:55:42 +0200
+Subject: [PATCH v2 3/9] ARM: dts: dra72: Add separate dtsi for tps65917
+In-Reply-To: <91b4075f-2dfb-0d17-592d-f99b91ace590@ti.com>
+References: <20161021103841.8044-1-lokeshvutla@ti.com>
+ <20161021103841.8044-4-lokeshvutla@ti.com>
+ <045e8200-69bd-8590-1da4-96235444db4c@ti.com>
+ <91b4075f-2dfb-0d17-592d-f99b91ace590@ti.com>
+Message-ID: <ec0a127f-c6e1-cb9c-b369-deece94cb858@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Lokesh,
 
->
->On 13/12/16 14:38, Sricharan wrote:
->> Hi Robin,
+On 13/12/16 15:08, Lokesh Vutla wrote:
+> 
+> 
+> On Tuesday 13 December 2016 06:10 PM, Roger Quadros wrote:
+>> +Tomi, Kishon, Carlos
+>>  
+>> Hi,
 >>
->>> -----Original Message-----
->>> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Robin Murphy
->>> Sent: Tuesday, December 13, 2016 7:33 PM
->>> To: Sricharan R <sricharan@codeaurora.org>; jcrouse at codeaurora.org; pdaly at codeaurora.org; jgebben at codeaurora.org;
->>> joro at 8bytes.org; linux-kernel at vger.kernel.org; pratikp at codeaurora.org; iommu at lists.linux-foundation.org;
->tzeng at codeaurora.org;
->>> linux-arm-kernel at lists.infradead.org; will.deacon at arm.com; mitchelh at codeaurora.org; vinod.koul at intel.com
->>> Cc: dan.j.williams at intel.com
->>> Subject: Re: [PATCH V7 5/8] arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED
+>> On 21/10/16 13:38, Lokesh Vutla wrote:
+>>> dra72-evm-common.dtsi consolidates dra72-evm.dts and dra72-evm-revc.dts
+>>> which also include tps65917 pmic support as both the evms uses the same
+>>> pmic. But, dra71-evm has mostly similar features with a different pmic.
+>>> In order to exploit dra72-evm-common.dtsi, creating a separate dtsi
+>>> for tps65915 support and including it in respective board files.
 >>>
->>> On 12/12/16 18:38, Sricharan R wrote:
->>>> From: Mitchel Humpherys <mitchelh@codeaurora.org>
->>>>
->>>> The newly added DMA_ATTR_PRIVILEGED is useful for creating mappings that
->>>> are only accessible to privileged DMA engines.  Implement it in
->>>> dma-iommu.c so that the ARM64 DMA IOMMU mapper can make use of it.
->>>>
->>>> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
->>>> Tested-by: Robin Murphy <robin.murphy@arm.com>
->>>> Acked-by: Will Deacon <will.deacon@arm.com>
->>>> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
->>>> ---
->>>>  arch/arm64/mm/dma-mapping.c |  6 +++---
->>>>  drivers/iommu/dma-iommu.c   | 10 ++++++++--
->>>>  include/linux/dma-iommu.h   |  3 ++-
->>>>  3 files changed, 13 insertions(+), 6 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->>>> index 401f79a..ae76ead 100644
->>>> --- a/arch/arm64/mm/dma-mapping.c
->>>> +++ b/arch/arm64/mm/dma-mapping.c
->>>> @@ -557,7 +557,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
->>>>  				 unsigned long attrs)
->>>>  {
->>>>  	bool coherent = is_device_dma_coherent(dev);
->>>> -	int ioprot = dma_direction_to_prot(DMA_BIDIRECTIONAL, coherent);
->>>> +	int ioprot = dma_info_to_prot(DMA_BIDIRECTIONAL, coherent, attrs);
->>>>  	size_t iosize = size;
->>>>  	void *addr;
->>>>
->>>> @@ -711,7 +711,7 @@ static dma_addr_t __iommu_map_page(struct device *dev, struct page *page,
->>>>  				   unsigned long attrs)
->>>>  {
->>>>  	bool coherent = is_device_dma_coherent(dev);
->>>> -	int prot = dma_direction_to_prot(dir, coherent);
->>>> +	int prot = dma_info_to_prot(dir, coherent, attrs);
->>>>  	dma_addr_t dev_addr = iommu_dma_map_page(dev, page, offset, size, prot);
->>>>
->>>>  	if (!iommu_dma_mapping_error(dev, dev_addr) &&
->>>> @@ -769,7 +769,7 @@ static int __iommu_map_sg_attrs(struct device *dev, struct scatterlist *sgl,
->>>>  		__iommu_sync_sg_for_device(dev, sgl, nelems, dir);
->>>>
->>>>  	return iommu_dma_map_sg(dev, sgl, nelems,
->>>> -			dma_direction_to_prot(dir, coherent));
->>>> +				dma_info_to_prot(dir, coherent, attrs));
->>>>  }
->>>>
->>>>  static void __iommu_unmap_sg_attrs(struct device *dev,
->>>> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
->>>> index d2a7a46..756d5e0 100644
->>>> --- a/drivers/iommu/dma-iommu.c
->>>> +++ b/drivers/iommu/dma-iommu.c
->>>> @@ -182,16 +182,22 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
->>>>  EXPORT_SYMBOL(iommu_dma_init_domain);
->>>>
->>>>  /**
->>>> - * dma_direction_to_prot - Translate DMA API directions to IOMMU API page flags
->>>> + * dma_info_to_prot - Translate DMA API directions and attributes to IOMMU API
->>>> + *                    page flags.
->>>>   * @dir: Direction of DMA transfer
->>>>   * @coherent: Is the DMA master cache-coherent?
->>>> + * @attrs: DMA attributes for the mapping
->>>>   *
->>>>   * Return: corresponding IOMMU API page protection flags
->>>>   */
->>>> -int dma_direction_to_prot(enum dma_data_direction dir, bool coherent)
->>>> +int dma_info_to_prot(enum dma_data_direction dir, bool coherent,
->>>> +		     unsigned long attrs)
->>>>  {
->>>>  	int prot = coherent ? IOMMU_CACHE : 0;
->>>>
->>>> +	if (attrs & DMA_ATTR_PRIVILEGED)
->>>> +		prot |= IOMMU_PRIV;
->>>> +
->>>>  	switch (dir) {
->>>>  	case DMA_BIDIRECTIONAL:
->>>>  		return prot | IOMMU_READ | IOMMU_WRITE;
->>>
->>> ...and applying against -next now also needs this hunk:
->>>
->>> @@ -639,7 +639,7 @@ dma_addr_t iommu_dma_map_resource(struct device
->>> *dev, phys_addr_t phys,
->>> 		size_t size, enum dma_data_direction dir, unsigned long attrs)
->>> {
->>> 	return __iommu_dma_map(dev, phys, size,
->>> -			dma_direction_to_prot(dir, false) | IOMMU_MMIO);
->>> +			dma_info_to_prot(dir, false, attrs) | IOMMU_MMIO);
->>> }
->>>
->>> void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
->>>
->>> With those two issues fixed up, I've given the series (applied to
->>> next-20161213) a spin on a SMMUv3/PL330 fast model and it still checks out.
+>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>>> ---
+>>>  arch/arm/boot/dts/dra72-evm-common.dtsi   | 128 ----------------------------
+>>>  arch/arm/boot/dts/dra72-evm-revc.dts      |  21 +++--
+>>>  arch/arm/boot/dts/dra72-evm-tps65917.dtsi | 134 ++++++++++++++++++++++++++++++
+>>>  arch/arm/boot/dts/dra72-evm.dts           |  14 ++--
+>>>  4 files changed, 154 insertions(+), 143 deletions(-)
+>>>  create mode 100644 arch/arm/boot/dts/dra72-evm-tps65917.dtsi
 >>>
 >>
->> oops, sorry that i missed this in rebase. I can repost now with this fixed,
->> 'checks out' you mean something is not working correct ?
->
->No, I mean it _is_ still correct - I guess that's more of an idiom than
->I thought :)
->
+>> This patch breaks USB XHCI and boot on dra72-evm (both revC and non revC)
+>>
+>> I'll explain why below.
+>>
+>> [   13.625167] Unhandled fault: imprecise external abort (0x1406) at 0x00000000
+>> [   13.632557] pgd = ede10000
+>> [   13.635390] [00000000] *pgd=00000000
+>> [   13.639145] Internal error: : 1406 [#1] SMP ARM
+>> [   13.643893] Modules linked in: xhci_plat_hcd(+) xhci_hcd usbcore omapfb dwc3 cfbfillrect snd_soc_davinci_mcasp cfbimgblt cfbcopyarea udc_core connector_hdmi encoder_tpd12s015 snd_soc_edma m25p80 snd_soc_simpe
+>> [   13.695557] CPU: 0 PID: 440 Comm: modprobe Not tainted 4.9.0-rc1 #1050
+>> [   13.702399] Hardware name: Generic DRA72X (Flattened Device Tree)
+>> [   13.708786] task: edb5c040 task.stack: edd10000
+>> [   13.713540] PC is at _raw_spin_unlock_irqrestore+0x0/0x44
+>> [   13.719219] LR is at xhci_hub_control+0xc2c/0x15e0 [xhci_hcd]
+>> [   13.725242] pc : [<c07df718>]    lr : [<bf486300>]    psr: a0000093
+>> [   13.725242] sp : edd118c0  ip : c0e306b4  fp : 00000000
+>> [   13.737278] r10: 00000000  r9 : 60000013  r8 : edf28218
+>> [   13.742753] r7 : edf28000  r6 : 00000000  r5 : 00000000  r4 : edf2a000
+>> [   13.749593] r3 : 00000000  r2 : 00000000  r1 : 60000013  r0 : edf28218
+> 
+> Hmm.. Thanks for catching it. I remember it was booting when I tested,
+> not sure how I missed this :(. usb2_phy1 & 2, mmc and dss supplies needs
+> to be added in dra72-evm-tps65917.dtsi file.
 
-ha ok, thanks for the testing as well. I will just send a v8 with those two fixed now.
+OK.
+> 
+> Tony,
+> 	Do you want me to resend this patch or fixup patch on top of this?
 
-Regards,
- Sricharan
+In case you send a new patch. please add
+
+Reported-by: Carlos Hernandez <ceh@ti.com>
+
+Thanks.
+
+cheers,
+-roger
