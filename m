@@ -1,55 +1,55 @@
-From: sza@esh.hu (=?utf-8?B?U3plbXrFkSBBbmRyw6Fz?=)
-Date: Tue, 13 Dec 2016 15:33:24 +0100
-Subject: [RFC v2 PATCH 0/3] Fix dma_alloc_coherent() and friends for NOMMU
-In-Reply-To: <1481636704-18948-1-git-send-email-vladimir.murzin@arm.com>
-References: <1481636704-18948-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1BE9400D-BACB-4C07-B6F0-1963D90A7029@esh.hu>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue, 13 Dec 2016 15:33:30 +0100
+Subject: [PATCH v9 1/3] ARM: sunxi_defconfig: Add CONFIG_THERMAL_OF
+In-Reply-To: <20161213143332.24988-1-quentin.schulz@free-electrons.com>
+References: <20161213143332.24988-1-quentin.schulz@free-electrons.com>
+Message-ID: <20161213143332.24988-2-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This enables CONFIG_THERMAL_OF by default for sunxi_defconfig. It is
+required to get Allwinner SoCs' temperature from the GPADC driver.
 
-> On 2016. Dec 13., at 14:45, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
-> 
-> Hi,
-> 
-> It seem that addition of cache support for M-class cpus uncovered
-> latent bug in DMA usage. NOMMU memory model has been treated as being
-> always consistent; however, for R/M classes of cpu memory can be
-> covered by MPU which in turn might configure RAM as Normal
-> i.e. bufferable and cacheable. It breaks dma_alloc_coherent() and
-> friends, since data can stuck in caches now or be buffered.
-> 
-> This patch set is trying to address the issue by providing region of
-> memory suitable for consistent DMA operations. It is supposed that such
-> region is marked by MPU as non-cacheable. Since we have MPU support in
-> Linux for R-class only and M-class setting MPU in bootloader, proposed
-> interface to advertise such memory is via "memdma=size at start" command
-> line option, to avoid clashing with normal memory (which usually comes
-> from dts) it'd be safer to use it together with "mem=" command line
-> option. Meanwhile, I'm open to suggestions for the better way telling
-> Linux of such memory.
-> 
+The Allwinner SoCs all have an ADC that can also act as a touchscreen
+controller and a thermal sensor. The first four channels can be used
+either for the ADC or the touchscreen and the fifth channel is used for
+the thermal sensor.
 
-I have tested these patches on my ATMEL SAME70 armv7m board.
+The thermal sensor requires the IP to be in touchscreen mode to return
+correct values. Therefore, if the user is continuously reading the ADC
+channel(s), the thermal framework in which the thermal sensor is
+registered will switch the IP in touchscreen mode to get a temperature
+value and requires a delay of 100ms (because of the mode switching),
+then the ADC will switch back to ADC mode and requires also a delay of
+100ms. If the ADC readings are critical to user and the SoC temperature
+is not, the GPADC driver is capable of not registering the thermal
+sensor in the thermal framework and thus, "quicken" the ADC readings. In
+most use cases, the SoC temperature is more critical (for cpu throttling
+for example or activating cooling devices) than ADC readings, thus it is
+now enabled by default.
 
-After setting the memory regions and attributes in the bootloader and providing the required 
-command line parameters, the DMA issues fixed.
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+---
 
-I have tested an usart, sdcard, and ethernet driver with DMA enabled.
+v8:
+ - more explanatory commit log,
 
-Booting Linux on physical CPU 0x0
-Linux version 4.9.0 (root at debian) (gcc version 4.8.3 20140320 (prerelease) (Sourcery CodeBench Lite 2014.05-29) ) #4 Mon Dec 12 20:27:21 CET 201
-6
-CPU: ARMv7-M [410fc271] revision 1 (ARMv7M), cr=00000000
-CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
-OF: fdt:Machine model: SAME70-sampione board
-Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 15748
-Kernel command line: console=ttyS1,115200 root=/dev/mmcblk0p2 rw init=/linuxrc rootwait mem=62M memdma=2M at 0x73e00000
+added in v7
 
-So you can add my Tested-by.
+ arch/arm/configs/sunxi_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks for the patches!
-
-Regards,
-Andras
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index 714da33..8aaeae3 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -83,6 +83,7 @@ CONFIG_GPIO_SYSFS=y
+ CONFIG_POWER_SUPPLY=y
+ CONFIG_AXP20X_POWER=y
+ CONFIG_THERMAL=y
++CONFIG_THERMAL_OF=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_SUNXI_WATCHDOG=y
+-- 
+2.9.3
