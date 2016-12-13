@@ -1,105 +1,55 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Tue, 13 Dec 2016 15:20:18 +0100
-Subject: [PATCH v4 7/9] clk: stm32f4: SDIO & 48Mhz clock management for
- STM32F469 board
-In-Reply-To: <1481638820-29324-1-git-send-email-gabriel.fernandez@st.com>
-References: <1481638820-29324-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1481638820-29324-8-git-send-email-gabriel.fernandez@st.com>
+Date: Tue, 13 Dec 2016 15:20:11 +0100
+Subject: [PATCH v4 0/9]  STM32F4 missing clocks
+Message-ID: <1481638820-29324-1-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-In the stm32f469 soc, the 48Mhz clock could be derived from pll-q or
-from pll-sai-p.
+v4:
+ - Fix post divider for lcd (replace CLK_DIVIDER_POWER_OF_TWO flage by a divider table)
+ - Allow posibility to change parent of SAI clocks.
+ - Use common definition file for STM32Fx clocks.
 
-The SDIO clock could be also derived from 48Mhz or from sys clock.
+v3:
+ - restructure the patch series to have only one patch for all bindings changes.
+   (clk: stm32f4: Update DT bindings documentation)
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
----
- drivers/clk/clk-stm32f4.c | 49 ++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 46 insertions(+), 3 deletions(-)
+v2:
+ - Put post divider in config structure
+ - Rework patch-set
+    - add update dt binding documentation
+    - add clock definition file
+ - Use composite for pll vco clocks
+ - For auxiliary clock, allow the possiblity to enable peripheral
+   clocks at same time (sugested by radek)
+ - Add vco_in clock (entry frequency for all pll) to simplify the code and clarify clock tree
+ - Fix missing end of divider tables
 
-diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-index 2bff436..11174a5 100644
---- a/drivers/clk/clk-stm32f4.c
-+++ b/drivers/clk/clk-stm32f4.c
-@@ -211,7 +211,7 @@ struct stm32f4_gate_data {
- 	{ STM32F4_RCC_APB2ENR,  8,	"adc1",		"apb2_div" },
- 	{ STM32F4_RCC_APB2ENR,  9,	"adc2",		"apb2_div" },
- 	{ STM32F4_RCC_APB2ENR, 10,	"adc3",		"apb2_div" },
--	{ STM32F4_RCC_APB2ENR, 11,	"sdio",		"pll48" },
-+	{ STM32F4_RCC_APB2ENR, 11,	"sdio",		"sdmux" },
- 	{ STM32F4_RCC_APB2ENR, 12,	"spi1",		"apb2_div" },
- 	{ STM32F4_RCC_APB2ENR, 13,	"spi4",		"apb2_div" },
- 	{ STM32F4_RCC_APB2ENR, 14,	"syscfg",	"apb2_div" },
-@@ -951,6 +951,10 @@ static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
- static const char *sai_parents[4] = { "pllsai-q-div", "plli2s-q-div", NULL,
- 	"no-clock" };
- 
-+static const char *pll48_parents[2] = { "pll-q", "pllsai-p" };
-+
-+static const char *sdmux_parents[2] = { "pll48", "sys" };
-+
- struct stm32_aux_clk {
- 	int idx;
- 	const char *name;
-@@ -1000,6 +1004,45 @@ struct stm32f4_clk_data {
- 	},
- };
- 
-+static const struct stm32_aux_clk stm32f469_aux_clk[] = {
-+	{
-+		CLK_LCD, "lcd-tft", lcd_parent, ARRAY_SIZE(lcd_parent),
-+		NO_MUX, 0, 0,
-+		STM32F4_RCC_APB2ENR, 26,
-+		CLK_SET_RATE_PARENT
-+	},
-+	{
-+		CLK_I2S, "i2s", i2s_parents, ARRAY_SIZE(i2s_parents),
-+		STM32F4_RCC_CFGR, 23, 1,
-+		NO_GATE, 0,
-+		CLK_SET_RATE_PARENT
-+	},
-+	{
-+		CLK_SAI1, "sai1-a", sai_parents, ARRAY_SIZE(sai_parents),
-+		STM32F4_RCC_DCKCFGR, 20, 3,
-+		STM32F4_RCC_APB2ENR, 22,
-+		CLK_SET_RATE_PARENT
-+	},
-+	{
-+		CLK_SAI2, "sai1-b", sai_parents, ARRAY_SIZE(sai_parents),
-+		STM32F4_RCC_DCKCFGR, 22, 3,
-+		STM32F4_RCC_APB2ENR, 22,
-+		CLK_SET_RATE_PARENT
-+	},
-+	{
-+		NO_IDX, "pll48", pll48_parents, ARRAY_SIZE(pll48_parents),
-+		STM32F4_RCC_DCKCFGR, 27, 1,
-+		NO_GATE, 0,
-+		0
-+	},
-+	{
-+		NO_IDX, "sdmux", sdmux_parents, ARRAY_SIZE(sdmux_parents),
-+		STM32F4_RCC_DCKCFGR, 28, 1,
-+		NO_GATE, 0,
-+		0
-+	},
-+};
-+
- static const struct stm32f4_clk_data stm32f429_clk_data = {
- 	.gates_data	= stm32f429_gates,
- 	.gates_map	= stm32f42xx_gate_map,
-@@ -1014,8 +1057,8 @@ struct stm32f4_clk_data {
- 	.gates_map	= stm32f46xx_gate_map,
- 	.gates_num	= ARRAY_SIZE(stm32f469_gates),
- 	.pll_data	= stm32f469_pll,
--	.aux_clk	= stm32f429_aux_clk,
--	.aux_clk_num	= ARRAY_SIZE(stm32f429_aux_clk),
-+	.aux_clk	= stm32f469_aux_clk,
-+	.aux_clk_num	= ARRAY_SIZE(stm32f469_aux_clk),
- };
- 
- static const struct of_device_id stm32f4_of_match[] = {
+This patch-set adds:
+ - I2S & SAI PLLs
+ - SDIO & 48 Mhz clocks
+ - LCD-TFT clock
+ - I2S & SAI clocks
+
+Gabriel Fernandez (9):
+  clk: stm32f4: Update DT bindings documentation
+  clk: stm32f4: Add PLL_I2S & PLL_SAI for STM32F429/469 boards
+  clk: stm32f4: Add post divisor for I2S & SAI PLLs
+  clk: stm32f4: Add lcd-tft clock
+  clk: stm32f4: Add I2S clock
+  clk: stm32f4: Add SAI clocks
+  clk: stm32f4: SDIO & 48Mhz clock management for STM32F469 board
+  ARM: dts: stm32f4: Add external I2S clock
+  ARM: dts: stm32f4: Include auxiliary stm32fx clock definition
+
+ .../devicetree/bindings/clock/st,stm32-rcc.txt     |  17 +
+ arch/arm/boot/dts/stm32f429.dtsi                   |   9 +-
+ drivers/clk/clk-stm32f4.c                          | 595 ++++++++++++++++++++-
+ include/dt-bindings/clock/stm32fx-clock.h          |  39 ++
+ 4 files changed, 640 insertions(+), 20 deletions(-)
+ create mode 100644 include/dt-bindings/clock/stm32fx-clock.h
+
 -- 
 1.9.1
