@@ -1,61 +1,83 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 13 Dec 2016 11:07:10 +0000
-Subject: [PATCH v3 6/6] mfd: dt: Move syscon bindings to syscon
- subdirectory
-In-Reply-To: <1481604793.3112.32.camel@aj.id.au>
-References: <20161206025321.1792-1-andrew@aj.id.au>
- <20161206025321.1792-7-andrew@aj.id.au>
- <20161212153911.drhczoagyyhu7jm4@rob-hp-laptop>
- <1481604793.3112.32.camel@aj.id.au>
-Message-ID: <20161213110710.GV3625@dell.home>
+Date: Tue, 13 Dec 2016 11:11:37 +0000
+Subject: [PATCH v6 3/8] PWM: add pwm-stm32 DT bindings
+In-Reply-To: <20161212190205.b5t3x6i2o7igldlo@rob-hp-laptop>
+References: <1481292919-26587-1-git-send-email-benjamin.gaignard@st.com>
+ <1481292919-26587-4-git-send-email-benjamin.gaignard@st.com>
+ <20161212190205.b5t3x6i2o7igldlo@rob-hp-laptop>
+Message-ID: <20161213111137.GW3625@dell.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Dec 2016, Andrew Jeffery wrote:
+On Mon, 12 Dec 2016, Rob Herring wrote:
 
-> On Mon, 2016-12-12 at 09:39 -0600, Rob Herring wrote:
-> > On Tue, Dec 06, 2016 at 01:53:21PM +1100, Andrew Jeffery wrote:
-> > > The use of syscons is growing, lets collate them in their own part of
-> > > the bindings tree.
-> > > 
-> > > > > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-> > > ---
-> > > ?Documentation/devicetree/bindings/mfd/{ => syscon}/aspeed-scu.txt?????????| 0
-> > > ?Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-gpbr.txt?????????| 0
-> > > ?Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-matrix.txt???????| 0
-> > > ?Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-smc.txt??????????| 0
-> > > ?Documentation/devicetree/bindings/mfd/{ => syscon}/qcom,tcsr.txt??????????| 0
-> > > ?Documentation/devicetree/bindings/mfd/{ => syscon}/syscon.txt?????????????| 0
-> > > ?.../devicetree/bindings/mfd/{ => syscon}/ti-keystone-devctrl.txt??????????| 0
-> > > ?7 files changed, 0 insertions(+), 0 deletions(-)
-> > > ?rename Documentation/devicetree/bindings/mfd/{ => syscon}/aspeed-scu.txt (100%)
-> > > ?rename Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-gpbr.txt (100%)
-> > > ?rename Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-matrix.txt (100%)
-> > > ?rename Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-smc.txt (100%)
-> > > ?rename Documentation/devicetree/bindings/mfd/{ => syscon}/qcom,tcsr.txt (100%)
-> > > ?rename Documentation/devicetree/bindings/mfd/{ => syscon}/syscon.txt (100%)
-> > > ?rename Documentation/devicetree/bindings/mfd/{ => syscon}/ti-keystone-devctrl.txt (100%)
+> On Fri, Dec 09, 2016 at 03:15:14PM +0100, Benjamin Gaignard wrote:
+> > Define bindings for pwm-stm32
 > > 
-> > I'm not so sure this is the right direction. syscon usage is pretty much?
-> > spread throughout the tree.
+> > version 6:
+> > - change st,breakinput parameter format to make it usuable on stm32f7 too.
+> > 
+> > version 2:
+> > - use parameters instead of compatible of handle the hardware configuration
+> > 
+> > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> > ---
+> >  .../devicetree/bindings/pwm/pwm-stm32.txt          | 33 ++++++++++++++++++++++
+> >  1 file changed, 33 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+> > new file mode 100644
+> > index 0000000..866f222
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+> > @@ -0,0 +1,33 @@
+> > +STMicroelectronics STM32 Timers PWM bindings
+> > +
+> > +Must be a sub-node of an STM32 Timers device tree node.
+> > +See ../mfd/stm32-timers.txt for details about the parent node.
+> > +
+> > +Required parameters:
+> > +- compatible:		Must be "st,stm32-pwm".
+> > +- pinctrl-names: 	Set to "default".
+> > +- pinctrl-0: 		List of phandles pointing to pin configuration nodes for PWM module.
+> > +			For Pinctrl properties see ../pinctrl/pinctrl-bindings.txt
+> > +
+> > +Optional parameters:
+> > +- st,breakinput:	Arrays of three u32 <index level filter> to describe break input configurations.
+> > +			"index" indicates on which break input the configuration should be applied.
+> > +			"level" gives the active level (0=low or 1=high) for this configuration.
+> > +			"filter" gives the filtering value to be applied.
+> > +
+> > +Example:
+> > +	timers at 40010000 {
 > 
-> This patch was created based on my interpretation of Lee's feedback
-> here:
-> 
-> https://lkml.org/lkml/2016/11/18/650
-> 
-> Lee's next email in the chain poked Arnd for an opinion, but Arnd
-> didn't reply.
-> 
-> I don't mind. I moved these bindings separately so we could just drop
-> the patch if there was push-back. If we drop the whole idea I'll need
-> to apply a small fix to patch 5/6 to avoid creating the syscon
-> subdirectory.
+> timer at ...
 
-The sub-directory is a good idea for drivers who are *solely* syscon
-based.
+No, it should be timers.
 
+The 's' is intentional, since this parent (MFD) device houses 3
+different types of timers.  The "timer" node is a child of this one.
 
+> With that,
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+> 
+> 
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		compatible = "st,stm32-timers";
+> > +		reg = <0x40010000 0x400>;
+> > +		clocks = <&rcc 0 160>;
+> > +		clock-names = "clk_int";
+> > +
+> > +		pwm {
+> > +			compatible = "st,stm32-pwm";
+> > +			pinctrl-0	= <&pwm1_pins>;
+> > +			pinctrl-names	= "default";
+> > +			st,breakinput = <0 1 5>;
+> > +		};
+> > +	};
 
 -- 
 Lee Jones
