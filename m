@@ -1,86 +1,33 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue, 13 Dec 2016 17:38:44 +0800
-Subject: [PATCH v1 2/3] clk: rockchip: add clock controller for rk3328
-In-Reply-To: <1481618869-1239-3-git-send-email-zhangqing@rock-chips.com>
-References: <1481618869-1239-1-git-send-email-zhangqing@rock-chips.com>
- <1481618869-1239-3-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <acc7fa12-07ee-eab0-c8e8-b8bba00d9b00@rock-chips.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 13 Dec 2016 15:26:55 +0530
+Subject: [PATCH 1/2] ARM: dts: dra7-evm: Remove pinmux configurations for
+ erratum i869
+In-Reply-To: <b80e3cbc8a377abdb40ab11de78ce0b3fb67596f.1480411308.git.nsekhar@ti.com>
+References: <cover.1480411308.git.nsekhar@ti.com>
+ <b80e3cbc8a377abdb40ab11de78ce0b3fb67596f.1480411308.git.nsekhar@ti.com>
+Message-ID: <13b4ce8b-4a3c-d066-e897-28eb4d511d76@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Elaine,
+On Tuesday 29 November 2016 02:54 PM, Sekhar Nori wrote:
 
-I always only keep an eye for mmc stuff here. :)
+> A side-effect of this patch is that NAND support is removed. NAND
+> pins clash with VOUT3 on DRA7-EVM. U-Boot selects VOUT3 over NAND
+> as per TI EVM application needs.
 
-On 2016/12/13 16:47, Elaine Zhang wrote:
-> Add the clock tree definition for the new rk3328 SoC.
->
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> ---
+I claimed this ..
 
-----8<--------------
+>  &gpmc {
+>  	status = "okay";
+> -	pinctrl-names = "default";
+> -	pinctrl-0 = <&nand_flash_x16>;
+>  	ranges = <0 0 0x08000000 0x01000000>;	/* minimum GPMC partition = 16MB */
+>  	nand at 0,0 {
+>  		compatible = "ti,omap2-nand";
 
-> +
-> +	/* PD_MMC */
-> +	MMC(SCLK_SDMMC_DRV, "sdmmc_drv", "sclk_sdmmc",
-> +	    RK3328_SDMMC_CON0, 1),
-> +	MMC(SCLK_SDMMC_SAMPLE, "sdmmc_sample", "sclk_sdmmc",
-> +	    RK3328_SDMMC_CON1, 0),
-> +
+.. but forgot to keep the gpmc node disabled. I will fix this and send a
+v2. dra72-evm-common.dtsi needs a similar patch. Will include that in v2
+as well.
 
-All of offset for these *_sample are wrong, and they should be 1
-, the same as *_drv. You could refer to P565 of TRM instead the
-section of CRU for these details.
-
-> +	MMC(SCLK_SDIO_DRV, "sdio_drv", "sclk_sdio",
-> +	    RK3328_SDIO_CON0, 1),
-> +	MMC(SCLK_SDIO_SAMPLE, "sdio_sample", "sclk_sdio",
-> +	    RK3328_SDIO_CON1, 0),
-> +
-> +	MMC(SCLK_EMMC_DRV, "emmc_drv", "sclk_emmc",
-> +	    RK3328_EMMC_CON0, 1),
-> +	MMC(SCLK_EMMC_SAMPLE, "emmc_sample", "sclk_emmc",
-> +	    RK3328_EMMC_CON1, 0),
-> +
-> +	MMC(SCLK_SDMMC_EXT_DRV, "sdmmc_ext_drv", "sclk_sdmmc_ext",
-> +	    RK3328_SDMMC_EXT_CON0, 1),
-> +	MMC(SCLK_SDMMC_EXT_SAMPLE, "sdmmc_ext_sample", "sclk_sdmmc_ext",
-> +	    RK3328_SDMMC_EXT_CON1, 0),
-> +};
-> +
-
-----8<--------
-
-
-> +#define RK3328_SDMMC_CON0		0x380
-> +#define RK3328_SDMMC_CON1		0x384
-> +#define RK3328_SDIO_CON0		0x388
-> +#define RK3328_SDIO_CON1		0x38c
-> +#define RK3328_EMMC_CON0		0x390
-> +#define RK3328_EMMC_CON1		0x394
-> +#define RK3328_SDMMC_EXT_CON0		0x398
-> +#define RK3328_SDMMC_EXT_CON1		0x39C
-
-
-Just wondering is it worth, but this uppercase 'C' isn't
-consistent with the former lowercase
-
-
-> +
->  #define RK3368_PLL_CON(x)		RK2928_PLL_CON(x)
->  #define RK3368_CLKSEL_CON(x)		((x) * 0x4 + 0x100)
->  #define RK3368_CLKGATE_CON(x)		((x) * 0x4 + 0x200)
-> @@ -130,6 +152,7 @@
->  enum rockchip_pll_type {
->  	pll_rk3036,
->  	pll_rk3066,
-> +	pll_rk3328,
->  	pll_rk3399,
->  };
->
->
-
-
--- 
-Best Regards
-Shawn Lin
+Thanks,
+Sekhar
