@@ -1,33 +1,73 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 13 Dec 2016 11:09:15 +0100
-Subject: [PATCH v7 1/5] ARM: dts: da850: rename the display node label
+Date: Tue, 13 Dec 2016 11:09:16 +0100
+Subject: [PATCH v7 2/5] drm: bridge: add DT bindings for TI ths8135
 In-Reply-To: <1481623759-12786-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1481623759-12786-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1481623759-12786-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1481623759-12786-3-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tilcdc node name is 'display' as per the ePAPR 1.1 recommendation.
-The label is also 'display', but change it to 'lcdc' to make it clear
-what the underlying hardware is.
+THS8135 is a configurable video DAC. Add DT bindings for this chip.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/da850.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ .../bindings/display/bridge/ti,ths8135.txt         | 46 ++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 104155d..6b0ef3d 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -458,7 +458,7 @@
- 			dma-names = "tx", "rx";
- 		};
- 
--		display: display at 213000 {
-+		lcdc: display at 213000 {
- 			compatible = "ti,da850-tilcdc";
- 			reg = <0x213000 0x1000>;
- 			interrupts = <52>;
+diff --git a/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt b/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
+new file mode 100644
+index 0000000..6ec1a88
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
+@@ -0,0 +1,46 @@
++THS8135 Video DAC
++-----------------
++
++This is the binding for Texas Instruments THS8135 Video DAC bridge.
++
++Required properties:
++
++- compatible: Must be "ti,ths8135"
++
++Required nodes:
++
++This device has two video ports. Their connections are modelled using the OF
++graph bindings specified in Documentation/devicetree/bindings/graph.txt.
++
++- Video port 0 for RGB input
++- Video port 1 for VGA output
++
++Example
++-------
++
++vga-bridge {
++	compatible = "ti,ths8135";
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			reg = <0>;
++
++			vga_bridge_in: endpoint {
++				remote-endpoint = <&lcdc_out_vga>;
++			};
++		};
++
++		port at 1 {
++			reg = <1>;
++
++			vga_bridge_out: endpoint {
++				remote-endpoint = <&vga_con_in>;
++			};
++		};
++	};
++};
 -- 
 2.9.3
