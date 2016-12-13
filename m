@@ -1,97 +1,38 @@
 From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Tue, 13 Dec 2016 14:40:48 +0100
-Subject: [PATCH 6/9] dmaengine: stm32-dma: Fix residue computation issue in
- cyclic mode
+Date: Tue, 13 Dec 2016 14:40:51 +0100
+Subject: [PATCH 9/9] dmaengine: stm32-dma: Add max_burst support
 In-Reply-To: <1481636451-27863-1-git-send-email-cedric.madianga@gmail.com>
 References: <1481636451-27863-1-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <1481636451-27863-7-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <1481636451-27863-10-git-send-email-cedric.madianga@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch resolves the residue computation issue detected in cyclic mode.
-Now, in cyclic mode, we increment next_sg variable as soon as a period is
-transferred instead of after pushing a new sg request.
-Then, we take into account that after transferring a complete buffer,
-the next_sg variable is equal to 0.
+This patch sets the max_burst value supported by the STM32 DMA
 
 Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-Reviewed-by: Ludovic BARRE <ludovic.barre@st.com>
 ---
- drivers/dma/stm32-dma.c | 39 ++++++++++++++++++++++++++-------------
- 1 file changed, 26 insertions(+), 13 deletions(-)
+ drivers/dma/stm32-dma.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
-index adb846c..ba929a9 100644
+index b7be43a..49f86ca 100644
 --- a/drivers/dma/stm32-dma.c
 +++ b/drivers/dma/stm32-dma.c
-@@ -500,8 +500,6 @@ static void stm32_dma_configure_next_sg(struct stm32_dma_chan *chan)
- 			dev_dbg(chan2dev(chan), "CT=0 <=> SM1AR: 0x%08x\n",
- 				stm32_dma_read(dmadev, STM32_DMA_SM1AR(id)));
- 		}
--
--		chan->next_sg++;
- 	}
- }
+@@ -114,6 +114,7 @@
+ #define STM32_DMA_MAX_CHANNELS		0x08
+ #define STM32_DMA_MAX_REQUEST_ID	0x08
+ #define STM32_DMA_MAX_DATA_PARAM	0x03
++#define STM32_DMA_MAX_BURST		16
  
-@@ -510,6 +508,7 @@ static void stm32_dma_handle_chan_done(struct stm32_dma_chan *chan)
- 	if (chan->desc) {
- 		if (chan->desc->cyclic) {
- 			vchan_cyclic_callback(&chan->desc->vdesc);
-+			chan->next_sg++;
- 			stm32_dma_configure_next_sg(chan);
- 		} else {
- 			chan->busy = false;
-@@ -846,26 +845,40 @@ static struct dma_async_tx_descriptor *stm32_dma_prep_dma_memcpy(
- 	return vchan_tx_prep(&chan->vchan, &desc->vdesc, flags);
- }
+ enum stm32_dma_width {
+ 	STM32_DMA_BYTE,
+@@ -1084,6 +1085,7 @@ static int stm32_dma_probe(struct platform_device *pdev)
+ 		BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
+ 	dd->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ 	dd->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
++	dd->max_burst = STM32_DMA_MAX_BURST;
+ 	dd->dev = &pdev->dev;
+ 	INIT_LIST_HEAD(&dd->channels);
  
-+static u32 stm32_dma_get_remaining_bytes(struct stm32_dma_chan *chan)
-+{
-+	u32 dma_scr, width, ndtr;
-+	struct stm32_dma_device *dmadev = stm32_dma_get_dev(chan);
-+
-+	dma_scr = stm32_dma_read(dmadev, STM32_DMA_SCR(chan->id));
-+	width = STM32_DMA_SCR_PSIZE_GET(dma_scr);
-+	ndtr = stm32_dma_read(dmadev, STM32_DMA_SNDTR(chan->id));
-+
-+	return ndtr << width;
-+}
-+
- static size_t stm32_dma_desc_residue(struct stm32_dma_chan *chan,
- 				     struct stm32_dma_desc *desc,
- 				     u32 next_sg)
- {
--	struct stm32_dma_device *dmadev = stm32_dma_get_dev(chan);
--	u32 dma_scr, width, residue, count;
-+	u32 residue = 0;
- 	int i;
- 
--	residue = 0;
-+	/*
-+	 * In cyclic mode, for the last period, residue = remaining bytes from
-+	 * NDTR
-+	 */
-+	if (chan->desc->cyclic && next_sg == 0)
-+		return stm32_dma_get_remaining_bytes(chan);
- 
-+	/*
-+	 * For all other periods in cyclic mode, and in sg mode,
-+	 * residue = remaining bytes from NDTR + remaining periods/sg to be
-+	 * transferred
-+	 */
- 	for (i = next_sg; i < desc->num_sgs; i++)
- 		residue += desc->sg_req[i].len;
--
--	if (next_sg != 0) {
--		dma_scr = stm32_dma_read(dmadev, STM32_DMA_SCR(chan->id));
--		width = STM32_DMA_SCR_PSIZE_GET(dma_scr);
--		count = stm32_dma_read(dmadev, STM32_DMA_SNDTR(chan->id));
--
--		residue += count << width;
--	}
-+	residue += stm32_dma_get_remaining_bytes(chan);
- 
- 	return residue;
- }
 -- 
 1.9.1
