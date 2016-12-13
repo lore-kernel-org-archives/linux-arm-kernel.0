@@ -1,49 +1,101 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 13 Dec 2016 20:14:59 +0100
-Subject: [PATCH 6/6] ARM: dts: sun8i: raise the max voltage of DCDC2 in
- sun8i reference tablets
-In-Reply-To: <20161213152252.53749-7-icenowy@aosc.xyz>
-References: <20161213152252.53749-1-icenowy@aosc.xyz>
- <20161213152252.53749-7-icenowy@aosc.xyz>
-Message-ID: <20161213191459.mmoejcmf26qqtyze@lukather>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 13 Dec 2016 19:17:51 +0000
+Subject: [PATCH v6] arm64: fpsimd: improve stacking logic in
+ non-interruptible context
+In-Reply-To: <20161213173457.GF23377@e104818-lin.cambridge.arm.com>
+References: <1481632529-24218-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20161213173457.GF23377@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu9+Rcuc3Ubbom_NrYW5sR5B9teSfhM1+zi2JKhj4GUXWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2016 at 11:22:52PM +0800, Icenowy Zheng wrote:
-> The "extremity_freq" frequency described in the original FEX files uses
-> a voltage of 1.46v, which is beyond the current maximum voltage value of
-> DCDC2 (Cortex-A7 supply) in the sun8i reference tablet DTSI file.
-> 
-> Raise the maximum value to 1.46v.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
->  arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-> index 7ac8bb4bc95a..325ca5bd67a5 100644
-> --- a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-> @@ -180,7 +180,7 @@
->  &reg_dcdc2 {
->  	regulator-always-on;
->  	regulator-min-microvolt = <900000>;
-> -	regulator-max-microvolt = <1400000>;
-> +	regulator-max-microvolt = <1460000>;
+On 13 December 2016 at 17:34, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Dec 13, 2016 at 12:35:29PM +0000, Ard Biesheuvel wrote:
+>> Currently, we allow kernel mode NEON in softirq or hardirq context by
+>> stacking and unstacking a slice of the NEON register file for each call
+>> to kernel_neon_begin() and kernel_neon_end(), respectively.
+>>
+>> Given that
+>> a) a CPU typically spends most of its time in userland, during which time
+>>    no kernel mode NEON in process context is in progress,
+>> b) a CPU spends most of its time in the kernel doing other things than
+>>    kernel mode NEON when it gets interrupted to perform kernel mode NEON
+>>    in softirq context
+>>
+>> the stacking and subsequent unstacking is only necessary if we are
+>> interrupting a thread while it is performing kernel mode NEON in process
+>> context, which means that in all other cases, we can simply preserve the
+>> userland FPSIMD state once, and only restore it upon return to userland,
+>> even if we are being invoked from softirq or hardirq context.
+>>
+>> So instead of checking whether we are running in interrupt context, keep
+>> track of the level of nested kernel mode NEON calls in progress, and only
+>> perform the eager stack/unstack if the level exceeds 1.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>> v6:
+>> - use a spinlock instead of disabling interrupts
+>
+> My concern with the spinlock or disabling interrupts is the latency if
+> we ever get some insanely long SVE vectors.
+>
 
-This is outside of the voltage range tolerated by the CPU. NAK.
+Thinking about this a bit more, and trying a couple of things in code,
+I think this looks like it could be a nasty problem.
 
-Maxime
+The primary issue is that *any* code that handles the FP/SIMD state,
+i.e., preserve it, restore it, etc, could be interrupted, and if
+kernel_neon_begin()/_end() was used during that time, the top SVE end
+of the registers is just blown away if we don't make the nested
+save/restore SVE aware.
+
+For instance, looking at
+
+void fpsimd_restore_current_state(void)
+{
+  preempt_disable();
+  if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+    struct fpsimd_state *st = &current->thread.fpsimd_state;
+
+    fpsimd_load_state(st);
+    this_cpu_write(fpsimd_last_state, st);
+    st->cpu = smp_processor_id();
+  }
+  preempt_enable();
+}
+
+if fpsimd_load_state() is interrupted and the NEON is used, the
+registers that were restored before the interruption will have
+incorrect values if SVE is being used by userland.
+
+On the preserve side, we can deal with this by preserving into a temp
+buffer, and only store the value that was recorded when the flag was
+set, i.e.,
+
+static void safe_preserve_fpsimd_state(void)
+{
+  union __fpsimd_percpu_state *s = this_cpu_ptr(nested_fpsimdstate);
+
+  if (in_irq()) {
+  /* No interruptions possible, so just proceed */
+    if (!test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+      fpsimd_save_state(&current->thread.fpsimd_state);
+    } else {
+      struct fpsimd_state *fp;
+
+      fp = in_interrupt() ? &s[0].full : &s[1].full;
+
+      fpsimd_save_state(fp);
+      if (!test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+        current->thread.fpsimd_state = *fp;
+  }
+}
+
+which is already cumbersome if the full FP/SIMD state grows to 64 KB
+
+However, on the restore side, I fail to see how we can tolerate
+interruptions in a similar way.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161213/b9ea0961/attachment.sig>
+Ard.
