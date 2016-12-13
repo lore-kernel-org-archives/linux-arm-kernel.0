@@ -1,36 +1,36 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 13 Dec 2016 23:22:51 +0800
-Subject: [PATCH 5/6] ARM: dts: sun8i: set cpu-supply in reference tablet DTSI
+Date: Tue, 13 Dec 2016 23:22:52 +0800
+Subject: [PATCH 6/6] ARM: dts: sun8i: raise the max voltage of DCDC2 in sun8i
+ reference tablets
 In-Reply-To: <20161213152252.53749-1-icenowy@aosc.xyz>
 References: <20161213152252.53749-1-icenowy@aosc.xyz>
-Message-ID: <20161213152252.53749-6-icenowy@aosc.xyz>
+Message-ID: <20161213152252.53749-7-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All reference design A33 tablets uses DCDC2 of AXP223 as the power
-supply of the Cortex-A7 cores.
+The "extremity_freq" frequency described in the original FEX files uses
+a voltage of 1.46v, which is beyond the current maximum voltage value of
+DCDC2 (Cortex-A7 supply) in the sun8i reference tablet DTSI file.
 
-Set the cpu-supply in the DTSI of sun8i reference tablets.
+Raise the maximum value to 1.46v.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
- arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-index 08cd00143635..7ac8bb4bc95a 100644
+index 7ac8bb4bc95a..325ca5bd67a5 100644
 --- a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
 +++ b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-@@ -213,6 +213,10 @@
- 	regulator-name = "vcc-rtc";
+@@ -180,7 +180,7 @@
+ &reg_dcdc2 {
+ 	regulator-always-on;
+ 	regulator-min-microvolt = <900000>;
+-	regulator-max-microvolt = <1400000>;
++	regulator-max-microvolt = <1460000>;
+ 	regulator-name = "vdd-sys";
  };
  
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
-+};
-+
- &r_uart {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&r_uart_pins_a>;
 -- 
 2.11.0
