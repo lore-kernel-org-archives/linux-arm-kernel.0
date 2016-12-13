@@ -1,92 +1,84 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Mon, 12 Dec 2016 23:18:29 -0500
-Subject: [PATCH v2] ACPI/NUMA: Do not map pxm to node when NUMA is turned off
-Message-ID: <1481602709-18260-1-git-send-email-boris.ostrovsky@oracle.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Tue, 13 Dec 2016 15:10:00 +1030
+Subject: [PATCH v3 4/6] mfd: dt: Add bindings for the Aspeed LPC Host
+ Controller (LHC)
+In-Reply-To: <20161212153018.lfkicwknikfbzdlf@rob-hp-laptop>
+References: <20161206025321.1792-1-andrew@aj.id.au>
+ <20161206025321.1792-5-andrew@aj.id.au>
+ <20161212153018.lfkicwknikfbzdlf@rob-hp-laptop>
+Message-ID: <1481604000.3112.30.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise we may unexpectedly reference a non-zero node via, for example,
-acpi_get_node() while other parts of the kernel assume that only node 0
-(which is what NUMA_NO_NODE is supposed to be converted to) is
-available.
+On Mon, 2016-12-12 at 09:30 -0600, Rob Herring wrote:
+> On Tue, Dec 06, 2016 at 01:53:19PM +1100, Andrew Jeffery wrote:
+> > The LPC bus pinmux configuration on fifth generation Aspeed SoCs depends
+> > on bits in both the System Control Unit and the LPC Host Controller.
+> > 
+> > The Aspeed LPC Host Controller is described as a child node of the
+> > LPC host-range syscon device for arbitration of access by the host
+> > controller and pinmux drivers.
+> > 
+> > > > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> > ---
+> > ?.../devicetree/bindings/mfd/aspeed-lpc.txt?????????| 22 ++++++++++++++++++++++
+> > ?1 file changed, 22 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt b/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
+> > index a97131aba446..9de318ef72da 100644
+> > --- a/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
+> > +++ b/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
+> > > > @@ -109,3 +109,25 @@ lpc: lpc at 1e789000 {
+> > > > ?	};
+> > ?};
+> > ?
+> > +Host Node Children
+> > +==================
+> > +
+> > +LPC Host Controller
+> > +-------------------
+> > +
+> > +The Aspeed LPC Host Controller configures the Low Pin Count (LPC) bus behaviour
+> > +between the host and the baseboard management controller. The registers exist
+> > +in the "host" portion of the Aspeed LPC controller, which must be the parent of
+> > +the LPC host controller node.
+> > +
+> > +Required properties:
+> > > > +- compatible:		"aspeed,ast2500-lhc";
+> > > > +- reg:			contains offset/length value of the LHC memory
+> > +			region.
+> 
+> How many regions? Looks like 2.
 
-Signed-off-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
----
-V2:
-* Drop __initdata from x86's numa_off 
-* Make numa_off available to drivers/acpi/numa.c for arm64 and IA64 
+Yes, two. The first region is registers configuring various LPC host
+controller properties. The second region is for configuring the LPC
+serial IRQ trigger modes.
 
- arch/arm64/include/asm/numa.h | 2 ++
- arch/arm64/mm/numa.c          | 2 +-
- arch/ia64/include/asm/numa.h  | 2 ++
- arch/x86/mm/numa.c            | 2 +-
- drivers/acpi/numa.c           | 2 +-
- 5 files changed, 7 insertions(+), 3 deletions(-)
+Would you like me to say as much in the patch? It's not a completely
+clear split of functionality as other serial IRQ properties are also
+described in the first region. Maybe describing the datasheet's
+register names for the regions (LHCR[0-8] for the first, LHCR[A-B] for
+the second) would help?
 
-diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
-index 600887e..bf466d1 100644
---- a/arch/arm64/include/asm/numa.h
-+++ b/arch/arm64/include/asm/numa.h
-@@ -15,6 +15,8 @@
- 
- extern nodemask_t numa_nodes_parsed __initdata;
- 
-+extern bool numa_off;
-+
- /* Mappings between node number and cpus on that node. */
- extern cpumask_var_t node_to_cpumask_map[MAX_NUMNODES];
- void numa_clear_node(unsigned int cpu);
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index 4b32168..b388a99 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -35,7 +35,7 @@
- 
- static int numa_distance_cnt;
- static u8 *numa_distance;
--static bool numa_off;
-+bool numa_off;
- 
- static __init int numa_parse_early_param(char *opt)
- {
-diff --git a/arch/ia64/include/asm/numa.h b/arch/ia64/include/asm/numa.h
-index 2db0a6c..ebef7f4 100644
---- a/arch/ia64/include/asm/numa.h
-+++ b/arch/ia64/include/asm/numa.h
-@@ -65,6 +65,8 @@ struct node_cpuid_s {
- 
- #define local_nodeid (cpu_to_node_map[smp_processor_id()])
- 
-+#define numa_off     0
-+
- extern void map_cpu_to_node(int cpu, int nid);
- extern void unmap_cpu_from_node(int cpu, int nid);
- extern void numa_clear_node(int cpu);
-diff --git a/arch/x86/mm/numa.c b/arch/x86/mm/numa.c
-index 3f35b48..12dcad7 100644
---- a/arch/x86/mm/numa.c
-+++ b/arch/x86/mm/numa.c
-@@ -19,7 +19,7 @@
- 
- #include "numa_internal.h"
- 
--int __initdata numa_off;
-+int numa_off;
- nodemask_t numa_nodes_parsed __initdata;
- 
- struct pglist_data *node_data[MAX_NUMNODES] __read_mostly;
-diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
-index ce3a7a1..edb0c79 100644
---- a/drivers/acpi/numa.c
-+++ b/drivers/acpi/numa.c
-@@ -70,7 +70,7 @@ int acpi_map_pxm_to_node(int pxm)
- {
- 	int node;
- 
--	if (pxm < 0 || pxm >= MAX_PXM_DOMAINS)
-+	if (pxm < 0 || pxm >= MAX_PXM_DOMAINS || numa_off)
- 		return NUMA_NO_NODE;
- 
- 	node = pxm_to_node_map[pxm];
--- 
-1.8.3.1
+Cheers,
+
+Andrew
+
+> 
+> > +
+> > +Example:
+> > +
+> > > > +lhc: lhc at 20 {
+> > > > +	compatible = "aspeed,ast2500-lhc";
+> > > > +	reg = <0x20 0x24 0x48 0x8>;
+> > +};
+> > --?
+> > 2.9.3
+> > 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161213/a48a14e0/attachment.sig>
