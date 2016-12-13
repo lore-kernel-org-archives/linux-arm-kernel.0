@@ -1,83 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 13 Dec 2016 12:45:50 +0100
-Subject: [PATCH v2 renesas/devel 04/13] ARM: dts: r8a7791: Use R-Car Gen 2
- fallback binding for i2c nodes
-In-Reply-To: <1481629559-14187-1-git-send-email-horms+renesas@verge.net.au>
-References: <1481629559-14187-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1481629559-14187-5-git-send-email-horms+renesas@verge.net.au>
+Date: Tue, 13 Dec 2016 12:45:46 +0100
+Subject: [PATCH v2 renesas/devel 00/13] ARM,
+ arm64: dts: Use R-Car fallback bindings for i2c/iic nodes
+Message-ID: <1481629559-14187-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added R-Car Gen 2 fallback binding for i2c nodes in
-DT for r8a7791 SoC.
+Hi,
 
-This has no run-time effect for the current driver as the initialisation
-sequence is the same for the SoC-specific binding for r8a7791 and the
-fallback binding for R-Car Gen 2.
+this short series makes use of newly added R-Car fallback bindings in i2c
+and iic nodes of the DTs for SoCs where the drivers in question are already
+used.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r8a7791.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+This should have no run-time effect at this time as the current driver
+implementations use the same initialisation squeuences for SoC-specific and
+R-Car fallback bindings for all the cases covered by this patch-set.
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 93f446db6a21..48662c13f79a 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -444,7 +444,7 @@
- 	i2c0: i2c at e6508000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7791";
-+		compatible = "renesas,i2c-r8a7791", "renesas,rcar-gen2-i2c";
- 		reg = <0 0xe6508000 0 0x40>;
- 		interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7791_CLK_I2C0>;
-@@ -456,7 +456,7 @@
- 	i2c1: i2c at e6518000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7791";
-+		compatible = "renesas,i2c-r8a7791", "renesas,rcar-gen2-i2c";
- 		reg = <0 0xe6518000 0 0x40>;
- 		interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7791_CLK_I2C1>;
-@@ -468,7 +468,7 @@
- 	i2c2: i2c at e6530000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7791";
-+		compatible = "renesas,i2c-r8a7791", "renesas,rcar-gen2-i2c";
- 		reg = <0 0xe6530000 0 0x40>;
- 		interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7791_CLK_I2C2>;
-@@ -480,7 +480,7 @@
- 	i2c3: i2c at e6540000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7791";
-+		compatible = "renesas,i2c-r8a7791", "renesas,rcar-gen2-i2c";
- 		reg = <0 0xe6540000 0 0x40>;
- 		interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7791_CLK_I2C3>;
-@@ -492,7 +492,7 @@
- 	i2c4: i2c at e6520000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7791";
-+		compatible = "renesas,i2c-r8a7791", "renesas,rcar-gen2-i2c";
- 		reg = <0 0xe6520000 0 0x40>;
- 		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7791_CLK_I2C4>;
-@@ -505,7 +505,7 @@
- 		/* doesn't need pinmux */
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7791";
-+		compatible = "renesas,i2c-r8a7791", "renesas,rcar-gen2-i2c";
- 		reg = <0 0xe6528000 0 0x40>;
- 		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7791_CLK_I2C5>;
+Based on renesas-devel-20161212-v4.9
+
+Changes since v1:
+* s/iii/iic/
+* Differentiate subject lines for i2c and iic patches
+* Reviewed-by tags from Geert
+
+Simon Horman (13):
+  ARM: dts: r8a7779: Use R-Car Gen 1 fallback binding for i2c nodes
+  ARM: dts: r8a7778: Use R-Car Gen 1 fallback binding for i2c nodes
+  ARM: dts: r8a7790: Use R-Car Gen 2 fallback binding for i2c nodes
+  ARM: dts: r8a7791: Use R-Car Gen 2 fallback binding for i2c nodes
+  ARM: dts: r8a7792: Use R-Car Gen 2 fallback binding for i2c nodes
+  ARM: dts: r8a7793: Use R-Car Gen 2 fallback binding for i2c nodes
+  ARM: dts: r8a7794: Use R-Car Gen 2 fallback binding for i2c nodes
+  arm64: dts: r8a7795: Use R-Car Gen 3 fallback binding for i2c nodes
+  arm64: dts: r8a7796: Use R-Car Gen 3 fallback binding for i2c nodes
+  ARM: dts: r8a7790: Use R-Car Gen 2 fallback binding for iic nodes
+  ARM: dts: r8a7791: Use R-Car Gen 2 fallback binding for iic nodes
+  ARM: dts: r8a7793: Use R-Car Gen 2 fallback binding for iic nodes
+  ARM: dts: r8a7794: Use R-Car Gen 2 fallback binding for iic nodes
+
+ arch/arm/boot/dts/r8a7778.dtsi           |  8 ++++----
+ arch/arm/boot/dts/r8a7779.dtsi           |  8 ++++----
+ arch/arm/boot/dts/r8a7790.dtsi           | 20 ++++++++++++--------
+ arch/arm/boot/dts/r8a7791.dtsi           | 21 ++++++++++++---------
+ arch/arm/boot/dts/r8a7792.dtsi           | 18 ++++++++++++------
+ arch/arm/boot/dts/r8a7793.dtsi           | 21 ++++++++++++---------
+ arch/arm/boot/dts/r8a7794.dtsi           | 18 ++++++++++--------
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 21 ++++++++++++++-------
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 21 ++++++++++++++-------
+ 9 files changed, 94 insertions(+), 62 deletions(-)
+
 -- 
 2.7.0.rc3.207.g0ac5344
