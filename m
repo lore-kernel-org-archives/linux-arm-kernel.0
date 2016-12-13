@@ -1,163 +1,206 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 13 Dec 2016 11:11:20 +0000
-Subject: [PATCH v5] arm64: fpsimd: improve stacking logic in
- non-interruptible context
-In-Reply-To: <1481565387-8039-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1481565387-8039-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20161213111120.GF1574@e103592.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 13 Dec 2016 11:11:15 +0000
+Subject: [PATCH] ARM: soft-reboot into same mode that we entered the kernel
+In-Reply-To: <20161213105410.GB19985@leverpostej>
+References: <E1cFRAn-0003ob-HH@rmk-PC.armlinux.org.uk>
+ <20161213105410.GB19985@leverpostej>
+Message-ID: <20161213111115.GX14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2016 at 05:56:27PM +0000, Ard Biesheuvel wrote:
-> Currently, we allow kernel mode NEON in softirq or hardirq context by
-> stacking and unstacking a slice of the NEON register file for each call
-> to kernel_neon_begin() and kernel_neon_end(), respectively.
+On Tue, Dec 13, 2016 at 10:54:11AM +0000, Mark Rutland wrote:
+> Hi,
 > 
-> Given that
-> a) a CPU typically spends most of its time in userland, during which time
->    no kernel mode NEON in process context is in progress,
-> b) a CPU spends most of its time in the kernel doing other things than
->    kernel mode NEON when it gets interrupted to perform kernel mode NEON
->    in softirq context
+> On Fri, Dec 09, 2016 at 07:49:37PM +0000, Russell King wrote:
+> > When we soft-reboot (eg, kexec) from one kernel into the next, we need
+> > to ensure that we enter the new kernel in the same processor mode as
+> > when we were entered, so that (eg) the new kernel can install its own
+> > hypervisor - the old kernel's hypervisor will have been overwritten.
+> > 
+> > In order to do this, we need to pass a flag to cpu_reset() so it knows
+> > what to do, and we need to modify the kernel's own hypervisor stub to
+> > allow it to handle a soft-reboot.
+> > 
+> > As we are always guaranteed to install our own hypervisor if we're
+> > entered in HYP32 mode, and KVM will have moved itself out of the way
+> > on kexec/normal reboot, we can assume that our hypervisor is in place
+> > when we want to kexec, so changing our hypervisor API should not be a
+> > problem.
+> > 
+> > Tested-by: Keerthy <j-keerthy@ti.com>
+> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > ---
+> > Mark,
+> > 
+> > Any opinions on this?
+> > 
+> > Thanks.
 > 
-> the stacking and subsequent unstacking is only necessary if we are
-> interrupting a thread while it is performing kernel mode NEON in process
-> context, which means that in all other cases, we can simply preserve the
-> userland FPSIMD state once, and only restore it upon return to userland,
-> even if we are being invoked from softirq or hardirq context.
+> The above sounds like the right thing to do, but I'm not familiar enough
+> with the 32-bit hyp + kvm code to say much about the implementation.
 > 
-> So instead of checking whether we are running in interrupt context, keep
-> track of the level of nested kernel mode NEON calls in progress, and only
-> perform the eager stack/unstack if the level exceeds 1.
+> Hopefully Dave, Marc, or Christoffer have thoughts.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/fpsimd.c | 64 +++++++++++++++++++++++++++++++++-------------
->  1 file changed, 46 insertions(+), 18 deletions(-)
+> Otherwise, I only have a couple of minor comments below.
 > 
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 394c61db5566..c19363775436 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -220,45 +220,73 @@ void fpsimd_flush_task_state(struct task_struct *t)
->  
->  #ifdef CONFIG_KERNEL_MODE_NEON
->  
-> -static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
-> -static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
-> +/*
-> + * Although unlikely, it is possible for three kernel mode NEON contexts to
-> + * be live at the same time: process context, softirq context and hardirq
-> + * context. So while the userland context is stashed in the thread's fpsimd
-> + * state structure, we need two additional levels of storage.
-> + */
-> +static DEFINE_PER_CPU(struct fpsimd_partial_state, nested_fpsimdstate[2]);
-> +static DEFINE_PER_CPU(int, kernel_neon_nesting_level);
->  
->  /*
->   * Kernel-side NEON support functions
->   */
->  void kernel_neon_begin_partial(u32 num_regs)
->  {
-> -	if (in_interrupt()) {
-> -		struct fpsimd_partial_state *s = this_cpu_ptr(
-> -			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-> +	struct fpsimd_partial_state *s;
-> +	int level;
->  
-> -		BUG_ON(num_regs > 32);
-> -		fpsimd_save_partial_state(s, roundup(num_regs, 2));
-> -	} else {
-> +	preempt_disable();
-> +
-> +	if (!test_thread_flag(TIF_FOREIGN_FPSTATE)) {
->  		/*
->  		 * Save the userland FPSIMD state if we have one and if we
->  		 * haven't done so already. Clear fpsimd_last_state to indicate
->  		 * that there is no longer userland FPSIMD state in the
->  		 * registers.
->  		 */
-> -		preempt_disable();
-> -		if (current->mm &&
-> -		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
-> -			fpsimd_save_state(&current->thread.fpsimd_state);
-> +		if (current->mm) {
-> +			unsigned long flags;
-> +
-> +			local_irq_save(flags);
-
-For non-SVE hardware (i.e., all hardware for now), this raises mean IRQ
-latency if KERNEL_MODE_NEON is used, to fix a bug that doesn't exist.
-
-For SVE hardware, we would be disabling interrupts around typically a
-few KB of stores.  I don't know what the actual hardware numbers would
-look like, but this feels like a disproportionate cost to the problem
-being solved...
-
-After all, why do this here...
-
-> +			if (!test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
-> +				fpsimd_save_state(&current->thread.fpsimd_state);
-> +			local_irq_restore(flags);
-> +		} else {
-> +			set_thread_flag(TIF_FOREIGN_FPSTATE);
-> +		}
->  		this_cpu_write(fpsimd_last_state, NULL);
->  	}
-> +
-> +	level = this_cpu_inc_return(kernel_neon_nesting_level);
-
-...and yet go to all this trouble to avoid disabling IRQs for a _nested_
-kernel_neon_begin()?
-
-
-Did I miss something, or does increasing the count around the outermost
-case too without IRQ disabling not work, in the non-SVE case?
-
-Cheers
----Dave
-
-> +	BUG_ON(level > 3);
-> +
-> +	if (level > 1) {
-> +		s = this_cpu_ptr(nested_fpsimdstate);
-> +
-> +		WARN_ON_ONCE(num_regs > 32);
-> +		num_regs = min(roundup(num_regs, 2), 32U);
-> +
-> +		fpsimd_save_partial_state(&s[level - 2], num_regs);
-> +	}
->  }
->  EXPORT_SYMBOL(kernel_neon_begin_partial);
->  
->  void kernel_neon_end(void)
->  {
-> -	if (in_interrupt()) {
-> -		struct fpsimd_partial_state *s = this_cpu_ptr(
-> -			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-> -		fpsimd_load_partial_state(s);
-> -	} else {
-> -		preempt_enable();
-> +	struct fpsimd_partial_state *s;
-> +	int level;
-> +
-> +	level = this_cpu_read(kernel_neon_nesting_level);
-> +	BUG_ON(level < 1);
-> +
-> +	if (level > 1) {
-> +		s = this_cpu_ptr(nested_fpsimdstate);
-> +		fpsimd_load_partial_state(&s[level - 2]);
->  	}
-> +	this_cpu_dec(kernel_neon_nesting_level);
-> +	preempt_enable();
->  }
->  EXPORT_SYMBOL(kernel_neon_end);
->  
-> -- 
-> 2.7.4
+> > 
+> >  arch/arm/include/asm/proc-fns.h |  4 ++--
+> >  arch/arm/kernel/hyp-stub.S      | 36 ++++++++++++++++++++++++++++++------
+> >  arch/arm/kernel/reboot.c        | 12 ++++++++++--
+> >  arch/arm/mm/proc-v7.S           | 12 ++++++++----
+> >  4 files changed, 50 insertions(+), 14 deletions(-)
+> > 
+> > diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
+> > index 8877ad5ffe10..f2e1af45bd6f 100644
+> > --- a/arch/arm/include/asm/proc-fns.h
+> > +++ b/arch/arm/include/asm/proc-fns.h
+> > @@ -43,7 +43,7 @@ extern struct processor {
+> >  	/*
+> >  	 * Special stuff for a reset
+> >  	 */
+> > -	void (*reset)(unsigned long addr) __attribute__((noreturn));
+> > +	void (*reset)(unsigned long addr, bool hvc) __attribute__((noreturn));
+> >  	/*
+> >  	 * Idle the processor
+> >  	 */
+> > @@ -88,7 +88,7 @@ extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte);
+> >  #else
+> >  extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte, unsigned int ext);
+> >  #endif
+> > -extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
+> > +extern void cpu_reset(unsigned long addr, bool hvc) __attribute__((noreturn));
+> >  
+> >  /* These three are private to arch/arm/kernel/suspend.c */
+> >  extern void cpu_do_suspend(void *);
+> > diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+> > index 15d073ae5da2..cab1ac36939d 100644
+> > --- a/arch/arm/kernel/hyp-stub.S
+> > +++ b/arch/arm/kernel/hyp-stub.S
+> > @@ -22,6 +22,9 @@
+> >  #include <asm/assembler.h>
+> >  #include <asm/virt.h>
+> >  
+> > +#define HVC_GET_VECTORS -1
+> > +#define HVC_SOFT_RESTART 1
+> > +
+> >  #ifndef ZIMAGE
+> >  /*
+> >   * For the kernel proper, we need to find out the CPU boot mode long after
+> > @@ -202,9 +205,18 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
+> >  ENDPROC(__hyp_stub_install_secondary)
+> >  
+> >  __hyp_stub_do_trap:
+> > -	cmp	r0, #-1
+> > -	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
+> > -	mcrne	p15, 4, r0, c12, c0, 0	@ set HVBAR
+> > +	cmp	r0, #HVC_GET_VECTORS
+> > +	bne	1f
+> > +	mrc	p15, 4, r0, c12, c0, 0	@ get HVBAR
+> > +	b	__hyp_stub_exit
+> > +
+> > +1:	teq	r0, #HVC_SOFT_RESTART
+> > +	bne	1f
+> > +	mov	r0, r3
+> > +	bx	r0
+> > +
+> > +1:	mcrne	p15, 4, r0, c12, c0, 0	@ set HVBAR
+> > +__hyp_stub_exit:
+> >  	__ERET
+> >  ENDPROC(__hyp_stub_do_trap)
+> >  
+> > @@ -231,14 +243,26 @@ ENDPROC(__hyp_stub_do_trap)
+> >   * initialisation entry point.
+> >   */
+> >  ENTRY(__hyp_get_vectors)
+> > -	mov	r0, #-1
+> > +	mov	r0, #HVC_GET_VECTORS
+> > +	__HVC(0)
+> > +	ret	lr
+> >  ENDPROC(__hyp_get_vectors)
+> > -	@ fall through
+> > +
+> >  ENTRY(__hyp_set_vectors)
+> > +	tst	r0, #31
+> > +	bne	1f
+> >  	__HVC(0)
+> > -	ret	lr
+> > +1:	ret	lr
+> >  ENDPROC(__hyp_set_vectors)
 > 
+> Why the new check? This looks unrelated to the rest of the patch.
+
+It's not unrelated.  The ARM32 hyp-stub has a total crap ABI:
+
+- r0 = -1 => read VBAR
+- r0 != -1 => write r0 to VBAR
+
+So, this check is there to ensure that you can't do something stupid
+like:
+	__hyp_set_vectors(1)
+
+and inadvertently end up invoking the restart method - the check is
+there to "make room" for the new hyp call in the ABI.
+
+It hasn't been clear what the scope of the API, or the stub ABI actually
+is - nothing about that is really documented, so I didn't want to
+radically redesign the stub ABI to be more sensible and risk breakage
+elsewhere - especially as I'm reliant on others to test this.  (All my
+32-bit platforms enter the kernel in SVC mode from the boot loader, even
+those which are virtualisation-capable.)
+
+> > +ENTRY(__hyp_soft_restart)
+> > +	mov	r3, r0
+> > +	mov	r0, #HVC_SOFT_RESTART
+> > +	__HVC(0)
+> > +	mov	r0, r3
+> > +	ret	lr
+> > +ENDPROC(__hyp_soft_restart)
+> > +
+> >  #ifndef ZIMAGE
+> >  .align 2
+> >  .L__boot_cpu_mode_offset:
+> > diff --git a/arch/arm/kernel/reboot.c b/arch/arm/kernel/reboot.c
+> > index 3fa867a2aae6..f0e3c7f1ea21 100644
+> > --- a/arch/arm/kernel/reboot.c
+> > +++ b/arch/arm/kernel/reboot.c
+> > @@ -12,10 +12,11 @@
+> >  
+> >  #include <asm/cacheflush.h>
+> >  #include <asm/idmap.h>
+> > +#include <asm/virt.h>
+> >  
+> >  #include "reboot.h"
+> >  
+> > -typedef void (*phys_reset_t)(unsigned long);
+> > +typedef void (*phys_reset_t)(unsigned long, bool);
+> >  
+> >  /*
+> >   * Function pointers to optional machine specific functions
+> > @@ -36,6 +37,7 @@ static u64 soft_restart_stack[16];
+> >  static void __soft_restart(void *addr)
+> >  {
+> >  	phys_reset_t phys_reset;
+> > +	bool hvc = false;
+> >  
+> >  	/* Take out a flat memory mapping. */
+> >  	setup_mm_for_reboot();
+> > @@ -51,7 +53,13 @@ static void __soft_restart(void *addr)
+> >  
+> >  	/* Switch to the identity mapping. */
+> >  	phys_reset = (phys_reset_t)virt_to_idmap(cpu_reset);
+> > -	phys_reset((unsigned long)addr);
+> > +
+> > +#ifdef CONFIG_ARM_VIRT_EXT
+> > +	/* original stub should be restored by kvm */
+> > +	hvc = is_hyp_mode_available();
+> > +#endif
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> When !CONFIG_ARM_VIRT_EXT, is_hyp_mode_available() is defined so as to
+> always be false, so we can drop the ifdef here.
+
+Ok.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
