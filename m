@@ -1,51 +1,46 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 13 Dec 2016 13:54:54 -0600
-Subject: [PATCH] Input: imx6ul_tsc - generalize the averaging property
-In-Reply-To: <1481440003-27168-1-git-send-email-guy.shapiro@mobi-wize.com>
-References: <1481440003-27168-1-git-send-email-guy.shapiro@mobi-wize.com>
-Message-ID: <CAL_JsqJAdxrUGL5pjTPDkrXTsKJU-vL1Y4TpqhP79bESs9vR-g@mail.gmail.com>
+Date: Tue, 13 Dec 2016 14:06:20 -0600
+Subject: [PATCH v2 2/2] crypto: mediatek - add DT bindings documentation
+In-Reply-To: <1481592676-2248-3-git-send-email-ryder.lee@mediatek.com>
+References: <1481592676-2248-1-git-send-email-ryder.lee@mediatek.com>
+ <1481592676-2248-3-git-send-email-ryder.lee@mediatek.com>
+Message-ID: <20161213200620.kh34dptxpdcbhkhl@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 11, 2016 at 1:06 AM, Guy Shapiro <guy.shapiro@mobi-wize.com> wrote:
-> Make the avarage-samples property a general touchscreen property
-> rather than imx6ul device specific.
->
-> Signed-off-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
+On Tue, Dec 13, 2016 at 09:31:16AM +0800, Ryder Lee wrote:
+> Add DT bindings documentation for the crypto driver
+> 
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 > ---
->  .../bindings/input/touchscreen/imx6ul_tsc.txt      | 11 ++----
->  .../bindings/input/touchscreen/touchscreen.txt     |  3 ++
->  drivers/input/touchscreen/imx6ul_tsc.c             | 46 ++++++++++++++++------
->  3 files changed, 41 insertions(+), 19 deletions(-)
+>  .../devicetree/bindings/crypto/mediatek-crypto.txt | 32 ++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/crypto/mediatek-crypto.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/crypto/mediatek-crypto.txt b/Documentation/devicetree/bindings/crypto/mediatek-crypto.txt
+> new file mode 100644
+> index 0000000..47a786e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/crypto/mediatek-crypto.txt
+> @@ -0,0 +1,32 @@
+> +MediaTek cryptographic accelerators
+> +
+> +Required properties:
+> +- compatible: Should be "mediatek,eip97-crypto"
+> +- reg: Address and length of the register set for the device
+> +- interrupts: Should contain the five crypto engines interrupts in numeric
+> +	order. These are global system and four descriptor rings.
+> +- clocks: the clock used by the core
+> +- clock-names: the names of the clock listed in the clocks property. These are
+> +	"ethif", "cryp"
+> +- power-domains: Must contain a reference to the PM domain.
+> +
+> +
+> +Optional properties:
+> +- interrupt-parent: Should be the phandle for the interrupt controller
+> +  that services interrupts for this device
 
-[...]
-
-> +       switch (average_samples) {
-> +       case 1:
-> +               tsc->average_enable = false;
-> +               tsc->average_select = 0; /* value unused; initialize anyway */
-> +               break;
-> +       case 4:
-> +               tsc->average_enable = true;
-> +               tsc->average_select = 0;
-> +               break;
-> +       case 8:
-> +               tsc->average_enable = true;
-> +               tsc->average_select = 1;
-> +               break;
-> +       case 16:
-> +               tsc->average_enable = true;
-> +               tsc->average_select = 2;
-> +               break;
-> +       case 32:
-> +               tsc->average_enable = true;
-> +               tsc->average_select = 3;
-> +               break;
-
-This could be more efficiently written as
-
-tsc->average_select = log2(average_samples) - 2;
-
-Then enable if >=0.
+This is not optional. It's perhaps inherited from the parent. You can 
+drop it as it's implied by interrupts property.
 
 Rob
