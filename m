@@ -1,96 +1,70 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 13 Dec 2016 18:48:29 +0100
-Subject: [PATCH v4 00/12] mmc: Add support to Marvell Xenon SD Host Controller
-Message-ID: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
+Date: Tue, 13 Dec 2016 18:48:39 +0100
+Subject: [PATCH v4 10/12] arm64: dts: marvell: add eMMC support for Armada 37xx
+In-Reply-To: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
+References: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
+Message-ID: <d873110717f2d986efd490b29295c7f8c916edc2.1481651244.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add the eMMC support for Armada 37xx SoC and enable it in the Armada 3720
+DB board.
 
-This the forth version of the series adding support for the SDHCI
-Xenon controller. It can be currently found on the Armada 37xx and the
-Armada 7K/8K but will be also used in more Marvell SoC (and not only
-the mvebu ones actually).
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts | 17 +++++++++++++++++
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 11 +++++++++++
+ 2 files changed, 28 insertions(+)
 
-v3 -> v4:
-For this version a few change have been done:
-- fixes 2 bug  reported by kbuild-bot
-  - remove extra of_node_put()
-  - convert 0 in false for function returning boolean
-
-- add a device tree node for the sdhci controller present on the CP
-  master for A7K/A8K. It also led to rename the sdhci0 node on AP to
-  ap_sdhci0 to make a distinction with the one present on CP master.
-
-v2 -> v3
-I think that now most (if not all) the remarks had been taking into
-account since the second version. According to Ziji Hu, here are the
-following changes:
-" Changes in V3:
-  Adjust and improve Xenon DT bindings. Move some caps setting from driver into
-  DT. Use mmc-card sub-node to represent eMMC type.
-  Remove PHY Sampling Fixed Delay Line scan in lower speed mode.
-  Improve Xenon probe and ->init_card() functions.
-  Export sdhci_enable_sdio_irq() and implement own SDIO IRQ control.
-  Split PHY patch into two smaller patches.
-  Temporarily remove AXI clock before its implementation is improved."
-
-Besides this changes I also
-- Removed the sdhci-xenon-phy.h and moved its content in the
-shc-xenon-phy.c file.
-- Fixed the tuning-count usage
-- Managed the error case for clk_prepare_enable
-
-For the record the change from v1 was:
-" Changes in V2:
-  rebase on v4.9-rc2.
-  Re-write Xenon bindings. Ajust Xenon DT property naming.
-  Add a new DT property to indicate eMMC card type, instead of using
-  variable card_candidate.
-  Clear quirks SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12 in Xenon platform data
-  Add support to HS400 retuning."
-
-Thanks,
-
-Gregory
-
-Gregory CLEMENT (3):
-  arm64: dts: marvell: add eMMC support for Armada 37xx
-  arm64: dts: marvell: add sdhci support for Armada 7K/8K
-  arm64: configs: enable SDHCI driver for Xenon
-
-Hu Ziji (9):
-  mmc: sdhci: Export sdhci_set_ios() from sdhci.c
-  mmc: sdhci: Export sdhci_start_signal_voltage_switch() in sdhci.c
-  mmc: sdhci: Export sdhci_execute_tuning() in sdhci.c
-  mmc: sdhci: Export sdhci_enable_sdio_irq() from sdhci.c
-  MAINTAINERS: add entry for Marvell Xenon MMC Host Controller drivers
-  dt: bindings: Add bindings for Marvell Xenon SD Host Controller
-  mmc: sdhci-xenon: Add Marvell Xenon SDHC core functionality
-  mmc: sdhci-xenon: Add support to PHYs of Marvell Xenon SDHC.
-  mmc: sdhci-xenon: Add SOC PHY PAD voltage control
-
- Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt | 197 ++-
- MAINTAINERS                                                   |   7 +-
- arch/arm64/boot/dts/marvell/armada-3720-db.dts                |  17 +-
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi                  |  11 +-
- arch/arm64/boot/dts/marvell/armada-7040-db.dts                |  14 +-
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi                 |   9 +-
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi          |  10 +-
- arch/arm64/configs/defconfig                                  |   1 +-
- drivers/mmc/host/Kconfig                                      |   9 +-
- drivers/mmc/host/Makefile                                     |   3 +-
- drivers/mmc/host/sdhci-xenon-phy.c                            | 908 +++++++-
- drivers/mmc/host/sdhci-xenon.c                                | 615 +++++-
- drivers/mmc/host/sdhci-xenon.h                                | 111 +-
- drivers/mmc/host/sdhci.c                                      |  14 +-
- drivers/mmc/host/sdhci.h                                      |   5 +-
- 15 files changed, 1926 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
- create mode 100644 drivers/mmc/host/sdhci-xenon-phy.c
- create mode 100644 drivers/mmc/host/sdhci-xenon.c
- create mode 100644 drivers/mmc/host/sdhci-xenon.h
-
-base-commit: 9fe68cad6e74967b88d0c6aeca7d9cd6b6e91942
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+index 1372e9a6aaa4..707625031e29 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+@@ -72,6 +72,23 @@
+ 	status = "okay";
+ };
+ 
++&sdhci0 {
++	non-removable;
++	bus-width = <8>;
++	mmc-ddr-1_8v;
++	mmc-hs400-1_8v;
++	marvell,xenon-emmc;
++	marvell,pad-type = "fixed-1-8v";
++	status = "okay";
++
++	#address-cells = <1>;
++	#size-cells = <0>;
++	mmccard: mmccard at 0 {
++		compatible = "mmc-card";
++		reg = <0>;
++	};
++};
++
+ /* CON31 */
+ &usb3 {
+ 	status = "okay";
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index c4762538ec01..0c4cafe92e66 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -161,6 +161,17 @@
+ 				};
+ 			};
+ 
++			sdhci0: sdhci at d8000 {
++				compatible = "marvell,armada-3700-sdhci",
++				"marvell,sdhci-xenon";
++				reg = <0xd8000 0x300
++				       0x17808 0x4>;
++				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&nb_perih_clk 0>;
++				clock-names = "core";
++				status = "disabled";
++			};
++
+ 			sata: sata at e0000 {
+ 				compatible = "marvell,armada-3700-ahci";
+ 				reg = <0xe0000 0x2000>;
 -- 
 git-series 0.9.1
