@@ -1,27 +1,74 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 13 Dec 2016 13:01:03 +0300
-Subject: =?UTF-8?B?UmU6IEVYVDogaW14LXNkbWEgVUFSVCBzZXJpZXMgZmFpbGVkIGZvciBpLk1Y?=
- =?UTF-8?B?NTE=?=
-In-Reply-To: <4f8cf2ee-3cd6-31ce-dc12-8a763f19f8e5@ge.com>
-References: <1481538186.727700380@f399.i.mail.ru>
- <4f8cf2ee-3cd6-31ce-dc12-8a763f19f8e5@ge.com>
-Message-ID: <1481623263.657365881@f431.i.mail.ru>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 13 Dec 2016 11:01:48 +0100
+Subject: [PATCH v6 3/5] ARM: dts: stm32: Add I2C1 support for STM32F429 SoC
+In-Reply-To: <1481559342-6106-4-git-send-email-cedric.madianga@gmail.com>
+References: <1481559342-6106-1-git-send-email-cedric.madianga@gmail.com>
+ <1481559342-6106-4-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <da86d0db-9fe2-8d0b-6e22-61a9eea92cc5@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->???????????, 12 ??????? 2016, 16:48 +03:00 ?? "Han, Nandor (GE Healthcare)" <nandor.han@ge.com>:
->
->Hi Alexander,
->????Thanks for info. I have already posted a patch that probably will 
->fix this issue.
->
->https://lkml.org/lkml/2016/10/11/319
->
->It was already tested on imx6 and imx53. Let me know how it works.
->
->Reference:
->http://lists-archives.com/linux-kernel/28679793-ext-pre-4-9-rc-dma-regression-imx6-sound-etc.html
+Hi Cedric,
 
-Yes, it helps me, thanks!
+On 12/12/2016 05:15 PM, M'boumba Cedric Madianga wrote:
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
 
----
+Please Add a commit message.
+
+> ---
+>  arch/arm/boot/dts/stm32f429.dtsi | 23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+> index 7de52ee..cbdece7 100644
+> --- a/arch/arm/boot/dts/stm32f429.dtsi
+> +++ b/arch/arm/boot/dts/stm32f429.dtsi
+> @@ -48,6 +48,7 @@
+>  #include "skeleton.dtsi"
+>  #include "armv7-m.dtsi"
+>  #include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
+> +#include <dt-bindings/mfd/stm32f4-rcc.h>
+>
+>  / {
+>  	clocks {
+> @@ -337,6 +338,16 @@
+>  					slew-rate = <2>;
+>  				};
+>  			};
+> +
+> +			i2c1_pins_b: i2c1 at 0 {
+> +				pins1 {
+> +					pinmux = <STM32F429_PB9_FUNC_I2C1_SDA>;
+> +					drive-open-drain;
+> +				};
+> +				pins2 {
+> +					pinmux = <STM32F429_PB6_FUNC_I2C1_SCL>;
+> +				};
+> +			};
+>  		};
+>
+>  		rcc: rcc at 40023810 {
+> @@ -409,6 +420,18 @@
+>  			interrupts = <80>;
+>  			clocks = <&rcc 0 38>;
+>  		};
+> +
+> +		i2c1: i2c at 40005400 {
+
+Can you check the order on device node please ? (should follow base@)
+
+> +			compatible = "st,stm32f4-i2c";
+> +			reg = <0x40005400 0x400>;
+> +			interrupts = <31>,
+> +				     <32>;
+> +			resets = <&rcc STM32F4_APB1_RESET(I2C1)>;
+> +			clocks = <&rcc 0 STM32F4_APB1_CLOCK(I2C1)>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +		};
+>  	};
+>  };
+>
+>
