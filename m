@@ -1,48 +1,37 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 13 Dec 2016 12:20:24 +0000
-Subject: [PATCH V7 7/8] iommu/arm-smmu: Set privileged attribute to
- 'default' instead of 'unprivileged'
-In-Reply-To: <1481567927-14791-8-git-send-email-sricharan@codeaurora.org>
-References: <1481567927-14791-1-git-send-email-sricharan@codeaurora.org>
- <1481567927-14791-8-git-send-email-sricharan@codeaurora.org>
-Message-ID: <03731ccb-dad0-6e0b-577b-4cd8e47717c0@arm.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Tue, 13 Dec 2016 13:20:19 +0100
+Subject: [RFC v2 00/13] usb/mmc/power: Fix USB/LAN when TFTP booting
+In-Reply-To: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
+References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <c956e27e-7e01-2a2f-0e35-796c4a6556ae@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/16 18:38, Sricharan R wrote:
-> Currently the driver sets all the device transactions privileges
-> to UNPRIVILEGED, but there are cases where the iommu masters wants
-> to isolate privileged supervisor and unprivileged user.
-> So don't override the privileged setting to unprivileged, instead
-> set it to default as incoming and let it be controlled by the pagetable
-> settings.
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+Hi Krzysztof,
 
-Since everything else has already got my tags on it:
+This still seems to be broken with the latest 4.9 kernel, right?
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Has there been any progress on this? Do you have an updated patch series
+for me to use?
 
-I'd say the whole series looks good to go now, thanks for picking it up.
+Regards,
 
-Robin.
+	Hans
 
-> ---
->  drivers/iommu/arm-smmu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index eaa8f44..8bb0eea 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1213,7 +1213,7 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
->  			continue;
->  
->  		s2cr[idx].type = type;
-> -		s2cr[idx].privcfg = S2CR_PRIVCFG_UNPRIV;
-> +		s2cr[idx].privcfg = S2CR_PRIVCFG_DEFAULT;
->  		s2cr[idx].cbndx = cbndx;
->  		arm_smmu_write_s2cr(smmu, idx);
->  	}
-> 
+On 05/05/16 14:34, Krzysztof Kozlowski wrote:
+> Hi,
+>
+> This is a different, second try to fix usb3503+lan on Odroid U3 board
+> if it was initialized by bootloader (e.g. for TFTP boot).
+>
+> First version:
+> http://www.spinics.net/lists/linux-usb/msg140042.html
+>
+>
+> Problem
+> =======
+> When Odroid U3 (usb3503 + smsc95xx + max77686) boots from network (TFTP),
+> the usb3503 and LAN smsc95xx do not show up in "lsusb". Hard-reset
+> is required, e.g. by suspend to RAM. The actual TFTP boot does
+> not have to happen. Just "usb start" from U-Boot is sufficient.
+>
