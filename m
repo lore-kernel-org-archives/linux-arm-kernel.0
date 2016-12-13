@@ -1,89 +1,92 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue, 13 Dec 2016 09:12:40 +0530
-Subject: [PATCH v2 2/2] dt-bindings: Add DT bindings info for FlexRM ring
- manager
-In-Reply-To: <20161209180132.lnpvwybnij5uykuq@rob-hp-laptop>
-References: <1480653536-5551-1-git-send-email-anup.patel@broadcom.com>
- <1480653536-5551-3-git-send-email-anup.patel@broadcom.com>
- <20161209180132.lnpvwybnij5uykuq@rob-hp-laptop>
-Message-ID: <CAALAos-B0a3VhiuNWyWVeuitmUZh=2Y=ubFNe+_5eo29sBw6Sg@mail.gmail.com>
+From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
+Date: Mon, 12 Dec 2016 23:18:29 -0500
+Subject: [PATCH v2] ACPI/NUMA: Do not map pxm to node when NUMA is turned off
+Message-ID: <1481602709-18260-1-git-send-email-boris.ostrovsky@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 9, 2016 at 11:31 PM, Rob Herring <robh@kernel.org> wrote:
-> On Fri, Dec 02, 2016 at 10:08:56AM +0530, Anup Patel wrote:
->> This patch adds device tree bindings document for the FlexRM
->> ring manager found on Broadcom iProc SoCs.
->>
->> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
->> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
->> ---
->>  .../bindings/mailbox/brcm,iproc-flexrm-mbox.txt    | 60 ++++++++++++++++++++++
->>  1 file changed, 60 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
->> new file mode 100644
->> index 0000000..e81f116
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
->> @@ -0,0 +1,60 @@
->
-> [...]
->
->> +Example:
->> +--------
->> +crypto_mbox: mbox at 67000000 {
->> +     compatible = "brcm,flexrm-mbox";
->> +     reg = <0x67000000 0x200000>;
->> +     msi-parent = <&gic_its 0x7f00>;
->> +     #mbox-cells = <3>;
->> +};
->> +
->> +crypto_client {
->> +     ...
->> +     mboxes = <&crypto_mbox 0 0x1 0xffff>,
->> +              <&crypto_mbox 1 0x1 0xffff>,
->> +              <&crypto_mbox 16 0x1 0xffff>,
->> +              <&crypto_mbox 17 0x1 0xffff>,
->> +              <&crypto_mbox 30 0x1 0xffff>,
->> +              <&crypto_mbox 31 0x1 0xffff>;
->
-> The FlexRM part looks fine. I still don't understand what this node is.
-> Is this a h/w block or just a list of mailboxes? What determines the
-> mailbox channel numbers here? I need to see what the complete node looks
-> like.
+Otherwise we may unexpectedly reference a non-zero node via, for example,
+acpi_get_node() while other parts of the kernel assume that only node 0
+(which is what NUMA_NO_NODE is supposed to be converted to) is
+available.
 
-The crypto_client is an example mailbox client for FlexRM mailbox.
+Signed-off-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+---
+V2:
+* Drop __initdata from x86's numa_off 
+* Make numa_off available to drivers/acpi/numa.c for arm64 and IA64 
 
-The example shows that we have FlexRM ring manager providing
-ring based programming interface to Crypto offload engine. The
-Crypto offload engine driver is a mailbox client driver.
+ arch/arm64/include/asm/numa.h | 2 ++
+ arch/arm64/mm/numa.c          | 2 +-
+ arch/ia64/include/asm/numa.h  | 2 ++
+ arch/x86/mm/numa.c            | 2 +-
+ drivers/acpi/numa.c           | 2 +-
+ 5 files changed, 7 insertions(+), 3 deletions(-)
 
-FlexRM mailbox requires 3 cells to specify each mailbox channel in
-"mboxes" attribute of mailbox client DT node. The 1st cell is
-mailbox channel number (or FlexRM ring number). Rest of the
-cells are explained in bindings document.
-
-Complete node would look something like below:
-
-crypto_client {
-     compatible = "brcm,iproc-spu2";
-     mboxes = <&crypto_mbox 0 0x1 0xffff>,
-                     <&crypto_mbox 1 0x1 0xffff>,
-                     <&crypto_mbox 16 0x1 0xffff>,
-                     <&crypto_mbox 17 0x1 0xffff>,
-                     <&crypto_mbox 30 0x1 0xffff>,
-                     <&crypto_mbox 31 0x1 0xffff>;
-};
-
-The Crypto driver was recently submitted by Rob Rice.
-Refer https://www.spinics.net/lists/kernel/msg2395306.html
-
-Similar to Crypto offload engine, we also have RAID offload
-engine. The RAID offload engine driver is also implemented
-as mailbox client driver.
-
-Regards,
-Anup
+diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
+index 600887e..bf466d1 100644
+--- a/arch/arm64/include/asm/numa.h
++++ b/arch/arm64/include/asm/numa.h
+@@ -15,6 +15,8 @@
+ 
+ extern nodemask_t numa_nodes_parsed __initdata;
+ 
++extern bool numa_off;
++
+ /* Mappings between node number and cpus on that node. */
+ extern cpumask_var_t node_to_cpumask_map[MAX_NUMNODES];
+ void numa_clear_node(unsigned int cpu);
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index 4b32168..b388a99 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -35,7 +35,7 @@
+ 
+ static int numa_distance_cnt;
+ static u8 *numa_distance;
+-static bool numa_off;
++bool numa_off;
+ 
+ static __init int numa_parse_early_param(char *opt)
+ {
+diff --git a/arch/ia64/include/asm/numa.h b/arch/ia64/include/asm/numa.h
+index 2db0a6c..ebef7f4 100644
+--- a/arch/ia64/include/asm/numa.h
++++ b/arch/ia64/include/asm/numa.h
+@@ -65,6 +65,8 @@ struct node_cpuid_s {
+ 
+ #define local_nodeid (cpu_to_node_map[smp_processor_id()])
+ 
++#define numa_off     0
++
+ extern void map_cpu_to_node(int cpu, int nid);
+ extern void unmap_cpu_from_node(int cpu, int nid);
+ extern void numa_clear_node(int cpu);
+diff --git a/arch/x86/mm/numa.c b/arch/x86/mm/numa.c
+index 3f35b48..12dcad7 100644
+--- a/arch/x86/mm/numa.c
++++ b/arch/x86/mm/numa.c
+@@ -19,7 +19,7 @@
+ 
+ #include "numa_internal.h"
+ 
+-int __initdata numa_off;
++int numa_off;
+ nodemask_t numa_nodes_parsed __initdata;
+ 
+ struct pglist_data *node_data[MAX_NUMNODES] __read_mostly;
+diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
+index ce3a7a1..edb0c79 100644
+--- a/drivers/acpi/numa.c
++++ b/drivers/acpi/numa.c
+@@ -70,7 +70,7 @@ int acpi_map_pxm_to_node(int pxm)
+ {
+ 	int node;
+ 
+-	if (pxm < 0 || pxm >= MAX_PXM_DOMAINS)
++	if (pxm < 0 || pxm >= MAX_PXM_DOMAINS || numa_off)
+ 		return NUMA_NO_NODE;
+ 
+ 	node = pxm_to_node_map[pxm];
+-- 
+1.8.3.1
