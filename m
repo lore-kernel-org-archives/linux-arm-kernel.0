@@ -1,113 +1,105 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Tue, 13 Dec 2016 15:20:12 +0100
-Subject: [PATCH v4 1/9] clk: stm32f4: Update DT bindings documentation
+Date: Tue, 13 Dec 2016 15:20:18 +0100
+Subject: [PATCH v4 7/9] clk: stm32f4: SDIO & 48Mhz clock management for
+ STM32F469 board
 In-Reply-To: <1481638820-29324-1-git-send-email-gabriel.fernandez@st.com>
 References: <1481638820-29324-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1481638820-29324-2-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1481638820-29324-8-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-Creation of dt include file for specific stm32f4 clocks.
-These specific clocks are not derived from system clock (SYSCLOCK)
-We should use index 1 to use these clocks in DT.
-e.g. <&rcc 1 CLK_LSI>
+In the stm32f469 soc, the 48Mhz clock could be derived from pll-q or
+from pll-sai-p.
+
+The SDIO clock could be also derived from 48Mhz or from sys clock.
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/clock/st,stm32-rcc.txt     | 17 ++++++++++
- include/dt-bindings/clock/stm32fx-clock.h          | 39 ++++++++++++++++++++++
- 2 files changed, 56 insertions(+)
- create mode 100644 include/dt-bindings/clock/stm32fx-clock.h
+ drivers/clk/clk-stm32f4.c | 49 ++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 46 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt b/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
-index 0532d81..8f19d87 100644
---- a/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
-+++ b/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
-@@ -17,6 +17,9 @@ Required properties:
-   property, containing a phandle to the clock device node, an index selecting
-   between gated clocks and other clocks and an index specifying the clock to
-   use.
-+- clocks: External oscillator clock phandle
-+  - high speed external clock signal (HSE)
-+  - external I2S clock (I2S_CKIN)
+diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
+index 2bff436..11174a5 100644
+--- a/drivers/clk/clk-stm32f4.c
++++ b/drivers/clk/clk-stm32f4.c
+@@ -211,7 +211,7 @@ struct stm32f4_gate_data {
+ 	{ STM32F4_RCC_APB2ENR,  8,	"adc1",		"apb2_div" },
+ 	{ STM32F4_RCC_APB2ENR,  9,	"adc2",		"apb2_div" },
+ 	{ STM32F4_RCC_APB2ENR, 10,	"adc3",		"apb2_div" },
+-	{ STM32F4_RCC_APB2ENR, 11,	"sdio",		"pll48" },
++	{ STM32F4_RCC_APB2ENR, 11,	"sdio",		"sdmux" },
+ 	{ STM32F4_RCC_APB2ENR, 12,	"spi1",		"apb2_div" },
+ 	{ STM32F4_RCC_APB2ENR, 13,	"spi4",		"apb2_div" },
+ 	{ STM32F4_RCC_APB2ENR, 14,	"syscfg",	"apb2_div" },
+@@ -951,6 +951,10 @@ static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
+ static const char *sai_parents[4] = { "pllsai-q-div", "plli2s-q-div", NULL,
+ 	"no-clock" };
  
- Example:
- 
-@@ -25,6 +28,7 @@ Example:
- 		#clock-cells = <2>
- 		compatible = "st,stm32f42xx-rcc", "st,stm32-rcc";
- 		reg = <0x40023800 0x400>;
-+		clocks = <&clk_hse>, <&clk_i2s_ckin>;
- 	};
- 
- Specifying gated clocks
-@@ -66,6 +70,19 @@ The secondary index is bound with the following magic numbers:
- 
- 	0	SYSTICK
- 	1	FCLK
-+	2	CLK_LSI		(low-power clock source)
-+	3	CLK_LSE		(generated from a 32.768 kHz low-speed external
-+				 crystal or ceramic resonator)
-+	4	CLK_HSE_RTC	(HSE division factor for RTC clock)
-+	5	CLK_RTC		(real-time clock)
-+	6	PLL_VCO_I2S	(vco frequency of I2S pll)
-+	7	PLL_VCO_SAI	(vco frequency of SAI pll)
-+	8	CLK_LCD		(LCD-TFT)
-+	9	CLK_I2S		(I2S clocks)
-+	10	CLK_SAI1	(audio clocks)
-+	11	CLK_SAI2
-+	12	CLK_I2SQ_PDIV	(post divisor of pll i2s q divisor)
-+	13	CLK_SAIQ_PDIV	(post divisor of pll sai q divisor)
- 
- Example:
- 
-diff --git a/include/dt-bindings/clock/stm32fx-clock.h b/include/dt-bindings/clock/stm32fx-clock.h
-new file mode 100644
-index 0000000..08bcab6
---- /dev/null
-+++ b/include/dt-bindings/clock/stm32fx-clock.h
-@@ -0,0 +1,39 @@
-+/*
-+ * stm32fx-clock.h
-+ *
-+ * Copyright (C) 2016 STMicroelectronics
-+ * Author: Gabriel Fernandez for STMicroelectronics.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
++static const char *pll48_parents[2] = { "pll-q", "pllsai-p" };
 +
-+/*
-+ * List of clocks wich are not derived from system clock (SYSCLOCK)
-+ *
-+ * The index of these clocks is the secondary index of DT bindings
-+ * (see Documentatoin/devicetree/bindings/clock/st,stm32-rcc.txt)
-+ *
-+ * e.g:
-+	<assigned-clocks = <&rcc 1 CLK_LSE>;
-+*/
++static const char *sdmux_parents[2] = { "pll48", "sys" };
 +
-+#ifndef _DT_BINDINGS_CLK_STMFX_H
-+#define _DT_BINDINGS_CLK_STMFX_H
+ struct stm32_aux_clk {
+ 	int idx;
+ 	const char *name;
+@@ -1000,6 +1004,45 @@ struct stm32f4_clk_data {
+ 	},
+ };
+ 
++static const struct stm32_aux_clk stm32f469_aux_clk[] = {
++	{
++		CLK_LCD, "lcd-tft", lcd_parent, ARRAY_SIZE(lcd_parent),
++		NO_MUX, 0, 0,
++		STM32F4_RCC_APB2ENR, 26,
++		CLK_SET_RATE_PARENT
++	},
++	{
++		CLK_I2S, "i2s", i2s_parents, ARRAY_SIZE(i2s_parents),
++		STM32F4_RCC_CFGR, 23, 1,
++		NO_GATE, 0,
++		CLK_SET_RATE_PARENT
++	},
++	{
++		CLK_SAI1, "sai1-a", sai_parents, ARRAY_SIZE(sai_parents),
++		STM32F4_RCC_DCKCFGR, 20, 3,
++		STM32F4_RCC_APB2ENR, 22,
++		CLK_SET_RATE_PARENT
++	},
++	{
++		CLK_SAI2, "sai1-b", sai_parents, ARRAY_SIZE(sai_parents),
++		STM32F4_RCC_DCKCFGR, 22, 3,
++		STM32F4_RCC_APB2ENR, 22,
++		CLK_SET_RATE_PARENT
++	},
++	{
++		NO_IDX, "pll48", pll48_parents, ARRAY_SIZE(pll48_parents),
++		STM32F4_RCC_DCKCFGR, 27, 1,
++		NO_GATE, 0,
++		0
++	},
++	{
++		NO_IDX, "sdmux", sdmux_parents, ARRAY_SIZE(sdmux_parents),
++		STM32F4_RCC_DCKCFGR, 28, 1,
++		NO_GATE, 0,
++		0
++	},
++};
 +
-+#define SYSTICK			0
-+#define FCLK			1
-+#define CLK_LSI			2
-+#define CLK_LSE			3
-+#define CLK_HSE_RTC		4
-+#define CLK_RTC			5
-+#define PLL_VCO_I2S		6
-+#define PLL_VCO_SAI		7
-+#define CLK_LCD			8
-+#define CLK_I2S			9
-+#define CLK_SAI1		10
-+#define CLK_SAI2		11
-+#define CLK_I2SQ_PDIV		12
-+#define CLK_SAIQ_PDIV		13
-+
-+#define END_PRIMARY_CLK		14
-+
-+#endif
+ static const struct stm32f4_clk_data stm32f429_clk_data = {
+ 	.gates_data	= stm32f429_gates,
+ 	.gates_map	= stm32f42xx_gate_map,
+@@ -1014,8 +1057,8 @@ struct stm32f4_clk_data {
+ 	.gates_map	= stm32f46xx_gate_map,
+ 	.gates_num	= ARRAY_SIZE(stm32f469_gates),
+ 	.pll_data	= stm32f469_pll,
+-	.aux_clk	= stm32f429_aux_clk,
+-	.aux_clk_num	= ARRAY_SIZE(stm32f429_aux_clk),
++	.aux_clk	= stm32f469_aux_clk,
++	.aux_clk_num	= ARRAY_SIZE(stm32f469_aux_clk),
+ };
+ 
+ static const struct of_device_id stm32f4_of_match[] = {
 -- 
 1.9.1
