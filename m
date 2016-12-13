@@ -1,316 +1,308 @@
 From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Tue, 13 Dec 2016 16:08:10 +0100
-Subject: [PATCH 1/4] video: add HDMI state notifier support
+Date: Tue, 13 Dec 2016 16:08:13 +0100
+Subject: [PATCH 4/4] s5p-cec: add hdmi-notifier support, move out of staging
 In-Reply-To: <20161213150813.37966-1-hverkuil@xs4all.nl>
 References: <20161213150813.37966-1-hverkuil@xs4all.nl>
-Message-ID: <20161213150813.37966-2-hverkuil@xs4all.nl>
+Message-ID: <20161213150813.37966-5-hverkuil@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hans Verkuil <hans.verkuil@cisco.com>
 
-Add support for HDMI hotplug and EDID notifiers, which is used to convey
-information from HDMI drivers to their CEC and audio counterparts.
+By using the HDMI notifier framework there is no longer any reason
+to manually set the physical address. This was the one blocking
+issue that prevented this driver from going out of staging, so do
+this move as well.
 
-Based on an earlier version from Russell King:
+Update the bindings documenting the new hdmi phandle and
+update exynos4.dtsi accordingly.
 
-https://patchwork.kernel.org/patch/9277043/
-
-The hdmi_notifier is a reference counted object containing the HDMI state
-of an HDMI device.
-
-When a new notifier is registered the current state will be reported to
-that notifier at registration time.
+Tested with my Odroid U3.
 
 Signed-off-by: Hans Verkuil <hans.verkuil@cisco.com>
 ---
- drivers/video/Kconfig         |   3 +
- drivers/video/Makefile        |   1 +
- drivers/video/hdmi-notifier.c | 134 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/hdmi-notifier.h | 109 ++++++++++++++++++++++++++++++++++
- 4 files changed, 247 insertions(+)
- create mode 100644 drivers/video/hdmi-notifier.c
- create mode 100644 include/linux/hdmi-notifier.h
+ .../devicetree/bindings/media/s5p-cec.txt          |  2 ++
+ arch/arm/boot/dts/exynos4.dtsi                     |  1 +
+ drivers/media/platform/Kconfig                     | 18 +++++++++++
+ drivers/media/platform/Makefile                    |  1 +
+ .../media => media/platform}/s5p-cec/Makefile      |  0
+ .../platform}/s5p-cec/exynos_hdmi_cec.h            |  0
+ .../platform}/s5p-cec/exynos_hdmi_cecctrl.c        |  0
+ .../media => media/platform}/s5p-cec/regs-cec.h    |  0
+ .../media => media/platform}/s5p-cec/s5p_cec.c     | 35 ++++++++++++++++++----
+ .../media => media/platform}/s5p-cec/s5p_cec.h     |  3 ++
+ drivers/staging/media/Kconfig                      |  2 --
+ drivers/staging/media/Makefile                     |  1 -
+ drivers/staging/media/s5p-cec/Kconfig              |  9 ------
+ drivers/staging/media/s5p-cec/TODO                 |  7 -----
+ 14 files changed, 55 insertions(+), 24 deletions(-)
+ rename drivers/{staging/media => media/platform}/s5p-cec/Makefile (100%)
+ rename drivers/{staging/media => media/platform}/s5p-cec/exynos_hdmi_cec.h (100%)
+ rename drivers/{staging/media => media/platform}/s5p-cec/exynos_hdmi_cecctrl.c (100%)
+ rename drivers/{staging/media => media/platform}/s5p-cec/regs-cec.h (100%)
+ rename drivers/{staging/media => media/platform}/s5p-cec/s5p_cec.c (89%)
+ rename drivers/{staging/media => media/platform}/s5p-cec/s5p_cec.h (97%)
+ delete mode 100644 drivers/staging/media/s5p-cec/Kconfig
+ delete mode 100644 drivers/staging/media/s5p-cec/TODO
 
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index 3c20af9..1ee7b9f 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -36,6 +36,9 @@ config VIDEOMODE_HELPERS
- config HDMI
- 	bool
+diff --git a/Documentation/devicetree/bindings/media/s5p-cec.txt b/Documentation/devicetree/bindings/media/s5p-cec.txt
+index 925ab4d..710fc00 100644
+--- a/Documentation/devicetree/bindings/media/s5p-cec.txt
++++ b/Documentation/devicetree/bindings/media/s5p-cec.txt
+@@ -15,6 +15,7 @@ Required properties:
+   - clock-names : from common clock binding: must contain "hdmicec",
+ 		  corresponding to entry in the clocks property.
+   - samsung,syscon-phandle - phandle to the PMU system controller
++  - samsung,hdmi-phandle - phandle to the HDMI controller
  
-+config HDMI_NOTIFIERS
-+	bool
+ Example:
+ 
+@@ -25,6 +26,7 @@ hdmicec: cec at 100B0000 {
+ 	clocks = <&clock CLK_HDMI_CEC>;
+ 	clock-names = "hdmicec";
+ 	samsung,syscon-phandle = <&pmu_system_controller>;
++	samsung,hdmi-phandle = <&hdmi>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&hdmi_cec>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 5f034eb..48ab7fc 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -750,6 +750,7 @@
+ 		clocks = <&clock CLK_HDMI_CEC>;
+ 		clock-names = "hdmicec";
+ 		samsung,syscon-phandle = <&pmu_system_controller>;
++		samsung,hdmi-phandle = <&hdmi>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&hdmi_cec>;
+ 		status = "disabled";
+diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+index d944421..42f747a 100644
+--- a/drivers/media/platform/Kconfig
++++ b/drivers/media/platform/Kconfig
+@@ -392,6 +392,24 @@ config VIDEO_TI_SC
+ config VIDEO_TI_CSC
+ 	tristate
+ 
++menuconfig V4L_CEC_DRIVERS
++	bool "Platform HDMI CEC drivers"
++	depends on MEDIA_CEC_SUPPORT
 +
- if VT
- 	source "drivers/video/console/Kconfig"
- endif
-diff --git a/drivers/video/Makefile b/drivers/video/Makefile
-index 9ad3c17..65f5649 100644
---- a/drivers/video/Makefile
-+++ b/drivers/video/Makefile
-@@ -1,5 +1,6 @@
- obj-$(CONFIG_VGASTATE)            += vgastate.o
- obj-$(CONFIG_HDMI)                += hdmi.o
-+obj-$(CONFIG_HDMI_NOTIFIERS)      += hdmi-notifier.o
++if V4L_CEC_DRIVERS
++
++config VIDEO_SAMSUNG_S5P_CEC
++       tristate "Samsung S5P CEC driver"
++       depends on VIDEO_DEV && MEDIA_CEC_SUPPORT && (PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST)
++       select HDMI_NOTIFIERS
++       ---help---
++         This is a driver for Samsung S5P HDMI CEC interface. It uses the
++         generic CEC framework interface.
++         CEC bus is present in the HDMI connector and enables communication
++         between compatible devices.
++
++endif #V4L_CEC_DRIVERS
++
+ menuconfig V4L_TEST_DRIVERS
+ 	bool "Media test drivers"
+ 	depends on MEDIA_CAMERA_SUPPORT
+diff --git a/drivers/media/platform/Makefile b/drivers/media/platform/Makefile
+index 5b3cb27..ad3bf22 100644
+--- a/drivers/media/platform/Makefile
++++ b/drivers/media/platform/Makefile
+@@ -33,6 +33,7 @@ obj-$(CONFIG_VIDEO_SAMSUNG_S5P_JPEG)	+= s5p-jpeg/
+ obj-$(CONFIG_VIDEO_SAMSUNG_S5P_MFC)	+= s5p-mfc/
  
- obj-$(CONFIG_VT)		  += console/
- obj-$(CONFIG_LOGO)		  += logo/
-diff --git a/drivers/video/hdmi-notifier.c b/drivers/video/hdmi-notifier.c
-new file mode 100644
-index 0000000..29e4225
---- /dev/null
-+++ b/drivers/video/hdmi-notifier.c
-@@ -0,0 +1,134 @@
-+#include <linux/export.h>
+ obj-$(CONFIG_VIDEO_SAMSUNG_S5P_G2D)	+= s5p-g2d/
++obj-$(CONFIG_VIDEO_SAMSUNG_S5P_CEC)	+= s5p-cec/
+ obj-$(CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC)	+= exynos-gsc/
+ 
+ obj-$(CONFIG_VIDEO_STI_BDISP)		+= sti/bdisp/
+diff --git a/drivers/staging/media/s5p-cec/Makefile b/drivers/media/platform/s5p-cec/Makefile
+similarity index 100%
+rename from drivers/staging/media/s5p-cec/Makefile
+rename to drivers/media/platform/s5p-cec/Makefile
+diff --git a/drivers/staging/media/s5p-cec/exynos_hdmi_cec.h b/drivers/media/platform/s5p-cec/exynos_hdmi_cec.h
+similarity index 100%
+rename from drivers/staging/media/s5p-cec/exynos_hdmi_cec.h
+rename to drivers/media/platform/s5p-cec/exynos_hdmi_cec.h
+diff --git a/drivers/staging/media/s5p-cec/exynos_hdmi_cecctrl.c b/drivers/media/platform/s5p-cec/exynos_hdmi_cecctrl.c
+similarity index 100%
+rename from drivers/staging/media/s5p-cec/exynos_hdmi_cecctrl.c
+rename to drivers/media/platform/s5p-cec/exynos_hdmi_cecctrl.c
+diff --git a/drivers/staging/media/s5p-cec/regs-cec.h b/drivers/media/platform/s5p-cec/regs-cec.h
+similarity index 100%
+rename from drivers/staging/media/s5p-cec/regs-cec.h
+rename to drivers/media/platform/s5p-cec/regs-cec.h
+diff --git a/drivers/staging/media/s5p-cec/s5p_cec.c b/drivers/media/platform/s5p-cec/s5p_cec.c
+similarity index 89%
+rename from drivers/staging/media/s5p-cec/s5p_cec.c
+rename to drivers/media/platform/s5p-cec/s5p_cec.c
+index 2a07968..565ee92 100644
+--- a/drivers/staging/media/s5p-cec/s5p_cec.c
++++ b/drivers/media/platform/s5p-cec/s5p_cec.c
+@@ -14,15 +14,18 @@
+  */
+ 
+ #include <linux/clk.h>
 +#include <linux/hdmi-notifier.h>
-+#include <linux/string.h>
-+#include <linux/slab.h>
-+#include <linux/list.h>
+ #include <linux/interrupt.h>
+ #include <linux/kernel.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/timer.h>
+ #include <linux/workqueue.h>
++#include <media/cec-edid.h>
+ #include <media/cec.h>
+ 
+ #include "exynos_hdmi_cec.h"
+@@ -167,10 +170,22 @@ static const struct cec_adap_ops s5p_cec_adap_ops = {
+ static int s5p_cec_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
++	struct device_node *np;
++	struct platform_device *hdmi_dev;
+ 	struct resource *res;
+ 	struct s5p_cec_dev *cec;
+ 	int ret;
+ 
++	np = of_parse_phandle(pdev->dev.of_node, "samsung,hdmi-phandle", 0);
 +
-+static LIST_HEAD(hdmi_notifiers);
-+static DEFINE_MUTEX(hdmi_notifiers_lock);
-+
-+struct hdmi_notifier *hdmi_notifier_get(struct device *dev)
-+{
-+	struct hdmi_notifier *n;
-+
-+	mutex_lock(&hdmi_notifiers_lock);
-+	list_for_each_entry(n, &hdmi_notifiers, head) {
-+		if (n->dev == dev) {
-+			mutex_unlock(&hdmi_notifiers_lock);
-+			kref_get(&n->kref);
-+			return n;
-+		}
++	if (!np) {
++		dev_err(&pdev->dev, "Failed to find hdmi node in device tree\n");
++		return -ENODEV;
 +	}
-+	n = kzalloc(sizeof(*n), GFP_KERNEL);
-+	if (!n)
-+		goto unlock;
-+	n->dev = dev;
-+	mutex_init(&n->lock);
-+	BLOCKING_INIT_NOTIFIER_HEAD(&n->notifiers);
-+	kref_init(&n->kref);
-+	list_add_tail(&n->head, &hdmi_notifiers);
-+unlock:
-+	mutex_unlock(&hdmi_notifiers_lock);
-+	return n;
-+}
-+EXPORT_SYMBOL_GPL(hdmi_notifier_get);
++	hdmi_dev = of_find_device_by_node(np);
++	if (hdmi_dev == NULL)
++		return -EPROBE_DEFER;
 +
-+static void hdmi_notifier_release(struct kref *kref)
-+{
-+	struct hdmi_notifier *n =
-+		container_of(kref, struct hdmi_notifier, kref);
+ 	cec = devm_kzalloc(&pdev->dev, sizeof(*cec), GFP_KERNEL);
+ 	if (!cec)
+ 		return -ENOMEM;
+@@ -200,24 +215,33 @@ static int s5p_cec_probe(struct platform_device *pdev)
+ 	if (IS_ERR(cec->reg))
+ 		return PTR_ERR(cec->reg);
+ 
++	cec->notifier = hdmi_notifier_get(&hdmi_dev->dev);
++	if (cec->notifier == NULL)
++		return -ENOMEM;
 +
-+	mutex_lock(&hdmi_notifiers_lock);
-+	list_del(&n->head);
-+	mutex_unlock(&hdmi_notifiers_lock);
-+	kfree(n->edid);
-+	kfree(n);
-+}
+ 	cec->adap = cec_allocate_adapter(&s5p_cec_adap_ops, cec,
+ 		CEC_NAME,
+-		CEC_CAP_PHYS_ADDR | CEC_CAP_LOG_ADDRS | CEC_CAP_TRANSMIT |
++		CEC_CAP_LOG_ADDRS | CEC_CAP_TRANSMIT |
+ 		CEC_CAP_PASSTHROUGH | CEC_CAP_RC, 1);
+ 	ret = PTR_ERR_OR_ZERO(cec->adap);
+ 	if (ret)
+ 		return ret;
 +
-+void hdmi_notifier_put(struct hdmi_notifier *n)
-+{
-+	kref_put(&n->kref, hdmi_notifier_release);
-+}
-+EXPORT_SYMBOL_GPL(hdmi_notifier_put);
-+
-+int hdmi_notifier_register(struct hdmi_notifier *n, struct notifier_block *nb)
-+{
-+	int ret = blocking_notifier_chain_register(&n->notifiers, nb);
-+
+ 	ret = cec_register_adapter(cec->adap, &pdev->dev);
+-	if (ret) {
+-		cec_delete_adapter(cec->adap);
+-		return ret;
+-	}
 +	if (ret)
-+		return ret;
-+	kref_get(&n->kref);
-+	mutex_lock(&n->lock);
-+	if (n->connected) {
-+		blocking_notifier_call_chain(&n->notifiers, HDMI_CONNECTED, n);
-+		if (n->edid_size)
-+			blocking_notifier_call_chain(&n->notifiers, HDMI_NEW_EDID, n);
-+		if (n->has_eld)
-+			blocking_notifier_call_chain(&n->notifiers, HDMI_NEW_ELD, n);
-+	}
-+	mutex_unlock(&n->lock);
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(hdmi_notifier_register);
++		goto err_delete_adapter;
 +
-+int hdmi_notifier_unregister(struct hdmi_notifier *n, struct notifier_block *nb)
-+{
-+	int ret = blocking_notifier_chain_unregister(&n->notifiers, nb);
++	cec_register_hdmi_notifier(cec->adap, cec->notifier);
+ 
+ 	platform_set_drvdata(pdev, cec);
+ 	pm_runtime_enable(dev);
+ 
+ 	dev_dbg(dev, "successfuly probed\n");
+ 	return 0;
 +
-+	if (ret == 0)
-+		hdmi_notifier_put(n);
++err_delete_adapter:
++	cec_delete_adapter(cec->adap);
 +	return ret;
-+}
-+EXPORT_SYMBOL_GPL(hdmi_notifier_unregister);
+ }
+ 
+ static int s5p_cec_remove(struct platform_device *pdev)
+@@ -225,6 +249,7 @@ static int s5p_cec_remove(struct platform_device *pdev)
+ 	struct s5p_cec_dev *cec = platform_get_drvdata(pdev);
+ 
+ 	cec_unregister_adapter(cec->adap);
++	hdmi_notifier_put(cec->notifier);
+ 	pm_runtime_disable(&pdev->dev);
+ 	return 0;
+ }
+diff --git a/drivers/staging/media/s5p-cec/s5p_cec.h b/drivers/media/platform/s5p-cec/s5p_cec.h
+similarity index 97%
+rename from drivers/staging/media/s5p-cec/s5p_cec.h
+rename to drivers/media/platform/s5p-cec/s5p_cec.h
+index 03732c1..69856b1 100644
+--- a/drivers/staging/media/s5p-cec/s5p_cec.h
++++ b/drivers/media/platform/s5p-cec/s5p_cec.h
+@@ -59,12 +59,15 @@ enum cec_state {
+ 	STATE_ERROR
+ };
+ 
++struct hdmi_notifier;
 +
-+void hdmi_event_connect(struct hdmi_notifier *n)
-+{
-+	mutex_lock(&n->lock);
-+	n->connected = true;
-+	blocking_notifier_call_chain(&n->notifiers, HDMI_CONNECTED, n);
-+	mutex_unlock(&n->lock);
-+}
-+EXPORT_SYMBOL_GPL(hdmi_event_connect);
-+
-+void hdmi_event_disconnect(struct hdmi_notifier *n)
-+{
-+	mutex_lock(&n->lock);
-+	n->connected = false;
-+	n->has_eld = false;
-+	n->edid_size = 0;
-+	blocking_notifier_call_chain(&n->notifiers, HDMI_DISCONNECTED, n);
-+	mutex_unlock(&n->lock);
-+}
-+EXPORT_SYMBOL_GPL(hdmi_event_disconnect);
-+
-+int hdmi_event_new_edid(struct hdmi_notifier *n, const void *edid, size_t size)
-+{
-+	mutex_lock(&n->lock);
-+	if (n->edid_allocated_size < size) {
-+		void *p = kmalloc(size, GFP_KERNEL);
-+
-+		if (p == NULL) {
-+			mutex_unlock(&n->lock);
-+			return -ENOMEM;
-+		}
-+		kfree(n->edid);
-+		n->edid = p;
-+		n->edid_allocated_size = size;
-+	}
-+	memcpy(n->edid, edid, size);
-+	n->edid_size = size;
-+	blocking_notifier_call_chain(&n->notifiers, HDMI_NEW_EDID, n);
-+	mutex_unlock(&n->lock);
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(hdmi_event_new_edid);
-+
-+void hdmi_event_new_eld(struct hdmi_notifier *n, const u8 eld[128])
-+{
-+	mutex_lock(&n->lock);
-+	memcpy(n->eld, eld, sizeof(n->eld));
-+	n->has_eld = true;
-+	blocking_notifier_call_chain(&n->notifiers, HDMI_NEW_ELD, n);
-+	mutex_unlock(&n->lock);
-+}
-+EXPORT_SYMBOL_GPL(hdmi_event_new_eld);
-diff --git a/include/linux/hdmi-notifier.h b/include/linux/hdmi-notifier.h
-new file mode 100644
-index 0000000..1d88db0
---- /dev/null
-+++ b/include/linux/hdmi-notifier.h
-@@ -0,0 +1,109 @@
-+/*
-+ * hdmi-notifier.h - notify interested parties of (dis)connect and EDID
-+ * events
-+ *
-+ * Copyright 2016 Russell King <rmk+kernel@arm.linux.org.uk>
-+ * Copyright 2016 Cisco Systems, Inc. and/or its affiliates. All rights reserved.
-+ */
-+
-+#ifndef LINUX_HDMI_NOTIFIER_H
-+#define LINUX_HDMI_NOTIFIER_H
-+
-+#include <linux/types.h>
-+#include <linux/notifier.h>
-+#include <linux/kref.h>
-+
-+enum {
-+	HDMI_CONNECTED,
-+	HDMI_DISCONNECTED,
-+	HDMI_NEW_EDID,
-+	HDMI_NEW_ELD,
-+};
-+
-+struct device;
-+
-+struct hdmi_notifier {
-+	struct mutex lock;
-+	struct list_head head;
-+	struct kref kref;
-+	struct blocking_notifier_head notifiers;
-+	struct device *dev;
-+
-+	/* Current state */
-+	bool connected;
-+	bool has_eld;
-+	unsigned char eld[128];
-+	void *edid;
-+	size_t edid_size;
-+	size_t edid_allocated_size;
-+};
-+
-+/**
-+ * hdmi_notifier_get - find or create a new hdmi_notifier for the given device.
-+ * @dev: device that sends the events.
-+ *
-+ * If a notifier for device @dev already exists, then increase the refcount
-+ * and return that notifier.
-+ *
-+ * If it doesn't exist, then allocate a new notifier struct and return a
-+ * pointer to that new struct.
-+ *
-+ * Return NULL if the memory could not be allocated.
-+ */
-+struct hdmi_notifier *hdmi_notifier_get(struct device *dev);
-+
-+/**
-+ * hdmi_notifier_put - decrease refcount and delete when the refcount reaches 0.
-+ * @n: notifier
-+ */
-+void hdmi_notifier_put(struct hdmi_notifier *n);
-+
-+/**
-+ * hdmi_notifier_register - register the notifier with the notifier_block.
-+ * @n: the HDMI notifier
-+ * @nb: the notifier_block
-+ */
-+int hdmi_notifier_register(struct hdmi_notifier *n, struct notifier_block *nb);
-+
-+/**
-+ * hdmi_notifier_unregister - unregister the notifier with the notifier_block.
-+ * @n: the HDMI notifier
-+ * @nb: the notifier_block
-+ */
-+int hdmi_notifier_unregister(struct hdmi_notifier *n, struct notifier_block *nb);
-+
-+/**
-+ * hdmi_event_connect - send a connect event.
-+ * @n: the HDMI notifier
-+ *
-+ * Send an HDMI_CONNECTED event to any registered parties.
-+ */
-+void hdmi_event_connect(struct hdmi_notifier *n);
-+
-+/**
-+ * hdmi_event_disconnect - send a disconnect event.
-+ * @n: the HDMI notifier
-+ *
-+ * Send an HDMI_DISCONNECTED event to any registered parties.
-+ */
-+void hdmi_event_disconnect(struct hdmi_notifier *n);
-+
-+/**
-+ * hdmi_event_new_edid - send a new EDID event.
-+ * @n: the HDMI notifier
-+ *
-+ * Send an HDMI_NEW_EDID event to any registered parties.
-+ * This function will make a copy the EDID so it can return -ENOMEM if
-+ * no memory could be allocated.
-+ */
-+int hdmi_event_new_edid(struct hdmi_notifier *n, const void *edid, size_t size);
-+
-+/**
-+ * hdmi_event_new_eld - send a new ELD event.
-+ * @n: the HDMI notifier
-+ *
-+ * Send an HDMI_NEW_ELD event to any registered parties.
-+ */
-+void hdmi_event_new_eld(struct hdmi_notifier *n, const u8 eld[128]);
-+
-+#endif
+ struct s5p_cec_dev {
+ 	struct cec_adapter	*adap;
+ 	struct clk		*clk;
+ 	struct device		*dev;
+ 	struct mutex		lock;
+ 	struct regmap           *pmu;
++	struct hdmi_notifier	*notifier;
+ 	int			irq;
+ 	void __iomem		*reg;
+ 
+diff --git a/drivers/staging/media/Kconfig b/drivers/staging/media/Kconfig
+index ffb8fa7..1b7804c 100644
+--- a/drivers/staging/media/Kconfig
++++ b/drivers/staging/media/Kconfig
+@@ -27,8 +27,6 @@ source "drivers/staging/media/davinci_vpfe/Kconfig"
+ 
+ source "drivers/staging/media/omap4iss/Kconfig"
+ 
+-source "drivers/staging/media/s5p-cec/Kconfig"
+-
+ # Keep LIRC at the end, as it has sub-menus
+ source "drivers/staging/media/lirc/Kconfig"
+ 
+diff --git a/drivers/staging/media/Makefile b/drivers/staging/media/Makefile
+index a28e82c..e11afbf 100644
+--- a/drivers/staging/media/Makefile
++++ b/drivers/staging/media/Makefile
+@@ -1,5 +1,4 @@
+ obj-$(CONFIG_I2C_BCM2048)	+= bcm2048/
+-obj-$(CONFIG_VIDEO_SAMSUNG_S5P_CEC) += s5p-cec/
+ obj-$(CONFIG_DVB_CXD2099)	+= cxd2099/
+ obj-$(CONFIG_LIRC_STAGING)	+= lirc/
+ obj-$(CONFIG_VIDEO_DM365_VPFE)	+= davinci_vpfe/
+diff --git a/drivers/staging/media/s5p-cec/Kconfig b/drivers/staging/media/s5p-cec/Kconfig
+deleted file mode 100644
+index ddfd955..0000000
+--- a/drivers/staging/media/s5p-cec/Kconfig
++++ /dev/null
+@@ -1,9 +0,0 @@
+-config VIDEO_SAMSUNG_S5P_CEC
+-       tristate "Samsung S5P CEC driver"
+-       depends on VIDEO_DEV && MEDIA_CEC_SUPPORT && (PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST)
+-       ---help---
+-         This is a driver for Samsung S5P HDMI CEC interface. It uses the
+-         generic CEC framework interface.
+-         CEC bus is present in the HDMI connector and enables communication
+-         between compatible devices.
+-
+diff --git a/drivers/staging/media/s5p-cec/TODO b/drivers/staging/media/s5p-cec/TODO
+deleted file mode 100644
+index 64f21ba..0000000
+--- a/drivers/staging/media/s5p-cec/TODO
++++ /dev/null
+@@ -1,7 +0,0 @@
+-This driver requires that userspace sets the physical address.
+-However, this should be passed on from the corresponding
+-Samsung HDMI driver.
+-
+-We have to wait until the HDMI notifier framework has been merged
+-in order to handle this gracefully, until that time this driver
+-has to remain in staging.
 -- 
 2.10.2
