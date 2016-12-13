@@ -1,45 +1,44 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 13 Dec 2016 17:55:18 +0100
-Subject: double free issue, mvpp2 driver, armada375 modules
-In-Reply-To: <57272206.6070703@corp.ovh.com>
-References: <57272206.6070703@corp.ovh.com>
-Message-ID: <20161213175518.3b3b1ff8@free-electrons.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 13 Dec 2016 16:58:12 +0000
+Subject: [PATCH] ARM: add cmpxchg64 helper for ARMv7-M
+In-Reply-To: <20161210123234.GA5468@salvia>
+References: <20161210103646.1407256-1-arnd@arndb.de>
+ <20161210123234.GA5468@salvia>
+Message-ID: <20161213165811.GZ14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Mon, 2 May 2016 11:46:46 +0200, Raphael G wrote:
-
-> enclosed the kernel panic we obtain after boot with a slightly patched 
-> upstream kernel (4.5.2).
+On Sat, Dec 10, 2016 at 01:32:34PM +0100, Pablo Neira Ayuso wrote:
+> Hi Arnd,
 > 
-> (as well as the patchset applied to the upstream kernel, so that you can 
-> know which code we are talking about. Too bad we cannot use the upstream 
-> kernel but we had no choice about this + we're no experts so we rely on 
-> provided patches, adapted to our bootloader and hardware for this)
+> On Sat, Dec 10, 2016 at 11:36:34AM +0100, Arnd Bergmann wrote:
+> > A change to the netfilter code in net-next introduced the first caller of
+> > cmpxchg64 that can get built on ARMv7-M, leading to an error from the
+> > assembler that points out the lack of 64-bit atomics on this architecture:
+> > 
+> > /tmp/ccMe7djj.s: Assembler messages:
+> > /tmp/ccMe7djj.s:367: Error: selected processor does not support `ldrexd r0,r1,[lr]' in Thumb mode
+> > /tmp/ccMe7djj.s:371: Error: selected processor does not support `strexd ip,r2,r3,[lr]' in Thumb mode
+> > /tmp/ccMe7djj.s:389: Error: selected processor does not support `ldrexd r8,r9,[r7]' in Thumb mode
+> > /tmp/ccMe7djj.s:393: Error: selected processor does not support `strexd lr,r0,r1,[r7]' in Thumb mode
+> > scripts/Makefile.build:299: recipe for target 'net/netfilter/nft_counter.o' failed
+> > 
+> > This makes ARMv7-M use the same emulation from asm-generic/cmpxchg-local.h
+> > that we use on architectures earlier than ARMv6K, to fix the build. The
+> > 32-bit atomics are available on ARMv7-M and we keep using them there.
+> > This ARM specific change is probably something we should do regardless
+> > of the netfilter code.
+> > 
+> > However, looking at the new nft_counter_reset() function in nft_counter.c,
+> > this looks incorrect to me not just on ARMv7-M but also on other
+> > architectures, with at least the following possible race:
 > 
-> Reproduce:
-> boot on kernel on an armada375 module, connect to it, launch a top in 
-> commandline
-> 
-> As seen with Marcin Wojtas, reverting commit 
-> e864b4c7b184bde36fa6a02bb3190983d2f796f9 fixes this issue.
-> 
-> Reporting upstream so that you can decide what should be done next
+> Right, Eric Dumazet already spotted this problem. I'm preparing a
+> patch that doesn't require cmpxchg64(). Will keep you on Cc. Thanks.
 
-Thanks for your report. I have finally submitted a fix for this issue.
-You can find it at:
+Please keep me on the Cc as well so I know what's happening, thanks.
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/473989.html
-
-If you have the time to test it and report back, it would be very
-useful.
-
-Thanks a lot!
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
