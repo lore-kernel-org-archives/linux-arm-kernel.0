@@ -1,60 +1,57 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 14 Dec 2016 10:21:09 +1100
-Subject: [GIT PULL] arm64 updates for 4.10
-In-Reply-To: <20161213192156.GA12471@e104818-lin.cambridge.arm.com>
-References: <20161213192156.GA12471@e104818-lin.cambridge.arm.com>
-Message-ID: <20161214102109.41c522f1@canb.auug.org.au>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 13 Dec 2016 15:28:35 -0800
+Subject: [PATCH 03/11] driver: clk: imx: Add clock driver for imx6sll
+In-Reply-To: <AM3PR04MB5302BE33BE1F2C9913FF61587980@AM3PR04MB530.eurprd04.prod.outlook.com>
+References: <1480660774-25055-1-git-send-email-ping.bai@nxp.com>
+ <1480660774-25055-4-git-send-email-ping.bai@nxp.com>
+ <20161208225257.GP5423@codeaurora.org>
+ <AM3PR04MB5302BE33BE1F2C9913FF61587980@AM3PR04MB530.eurprd04.prod.outlook.com>
+Message-ID: <20161213232835.GR5423@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On Tue, 13 Dec 2016 19:21:59 +0000 Catalin Marinas <catalin.marinas@arm.com> wrote:
->
-> Please pull the arm64 updates for 4.10 below.
+On 12/12, Jacky Bai wrote:
+> > On 12/02, Bai Ping wrote:
+> > > diff --git a/drivers/clk/imx/clk-imx6sll.c
+> > > b/drivers/clk/imx/clk-imx6sll.c new file mode 100644 index
+> > > 0000000..c5219e1
+> > > --- /dev/null
+> > > +++ b/drivers/clk/imx/clk-imx6sll.c
+> > > +0x20, 16, 1, pll7_bypass_sels, ARRAY_SIZE(pll7_bypass_sels),
+> > > +CLK_SET_RATE_PARENT);
+> > > +
+> > > +	/* Do not bypass PLLs initially */
+> > > +	clk_set_parent(clks[IMX6SLL_PLL1_BYPASS], clks[IMX6SLL_CLK_PLL1]);
+> > > +	clk_set_parent(clks[IMX6SLL_PLL2_BYPASS], clks[IMX6SLL_CLK_PLL2]);
+> > > +	clk_set_parent(clks[IMX6SLL_PLL3_BYPASS], clks[IMX6SLL_CLK_PLL3]);
+> > > +	clk_set_parent(clks[IMX6SLL_PLL4_BYPASS], clks[IMX6SLL_CLK_PLL4]);
+> > > +	clk_set_parent(clks[IMX6SLL_PLL5_BYPASS], clks[IMX6SLL_CLK_PLL5]);
+> > > +	clk_set_parent(clks[IMX6SLL_PLL6_BYPASS], clks[IMX6SLL_CLK_PLL6]);
+> > > +	clk_set_parent(clks[IMX6SLL_PLL7_BYPASS], clks[IMX6SLL_CLK_PLL7]);
+> > 
+> > Can we just put raw register writes here instead? I'd prefer we didn't use clk
+> > consumer APIs to do things to the clk tree from the providers. The problem
+> > there being that:
+> > 
+> >  1) We're trying to move away from using consumer APIs in  provider drivers.
+> > It's ok if they're used during probe, but  inside clk_ops is not preferred.
+> > 
+> >  2) Even if you have a clk pointer, it may be "orphaned" at the  time of
+> > registration and so calling the APIs here works now but  eventually we may
+> > want to return an EPROBE_DEFER error in that  case and this may block that
+> > effort.
+> > 
+> > I suppose if this is the only clk driver on this machine then this last point isn't a
+> > concern and things are probably ok here.
+> > 
 > 
-> The patches touch the generic include/linux/thread_info.h to factor out
-> struct restart_block into a separate include/linux/restart_block.h file
-> (needed for arm64 moving thread_info off stack; acked by Andy
-> Lutomirski).
-> 
-> There is also a small refactoring touching drivers/irqchip/irq-gic-v3.c
-> and additional watchpoint lengths added to
-> include/uapi/linux/hw_breakpoint.h.
+> Using raw register writing has an issue.  The register is modified, but it seems the clock 'parent-child' relationship can 
+> not match the register setting. The register setting is not bypass the pll, but in debug 'clk_summary', the
+> pll is bypassed.  
 
-I have also been carrying a merge fix up patch due to a conflict in the
-merge of the arm64 tree with commit
-
-  272d01bd790f ("arm64: Fix circular include of asm/lse.h through linux/jump_label.h")
-
-from v4.9-rc5:
-
-From: Stephen Rothwell <sfr@canb.auug.org.au>
-Date: Tue, 22 Nov 2016 10:30:40 +1100
-Subject: [PATCH] arm64: merge fix for code movement to cpucaps.h
-
-Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
----
- arch/arm64/include/asm/cpucaps.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index 87b446535185..4174f09678c4 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -34,7 +34,8 @@
- #define ARM64_HAS_32BIT_EL0			13
- #define ARM64_HYP_OFFSET_LOW			14
- #define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
-+#define ARM64_HAS_NO_FPSIMD			16
- 
--#define ARM64_NCAPS				16
-+#define ARM64_NCAPS				17
- 
- #endif /* __ASM_CPUCAPS_H */
--- 
-2.10.2
+So program the register settings before registering the clocks
+with the framework?
 
 -- 
-Cheers,
-Stephen Rothwell
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
