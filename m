@@ -1,32 +1,39 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 13 Dec 2016 15:09:23 -0600
-Subject: [PATCH 2/4] dt-bindings: mfd: Remove TPS65217 interrupts
-In-Reply-To: <fe4985c0-d60a-2562-12a7-064404efd64c@gmail.com>
-References: <20161209062833.5768-1-woogyom.kim@gmail.com>
- <20161209062833.5768-3-woogyom.kim@gmail.com>
- <20161212172511.5nj7whzytpkmrk7z@rob-hp-laptop>
- <fe4985c0-d60a-2562-12a7-064404efd64c@gmail.com>
-Message-ID: <CAL_JsqJL-oh9FwXSH=R2Vr1J2TDD1LqHfFY2es88rsq4Jz7DjQ@mail.gmail.com>
+Date: Tue, 13 Dec 2016 15:14:03 -0600
+Subject: [PATCH 5/5] Documentation: fsl-quadspi: Add fsl, ls1012a-qspi
+ compatible string
+In-Reply-To: <DB6PR0402MB2902DADEB4E6D06418AD311F899B0@DB6PR0402MB2902.eurprd04.prod.outlook.com>
+References: <1481188984-43683-1-git-send-email-yao.yuan@freescale.com>
+ <1481188984-43683-6-git-send-email-yao.yuan@freescale.com>
+ <20161212170948.fq7v5lva4kgt6hly@rob-hp-laptop>
+ <DB6PR0402MB2902DADEB4E6D06418AD311F899B0@DB6PR0402MB2902.eurprd04.prod.outlook.com>
+Message-ID: <CAL_Jsq+jp_2m7D=Hv6TRa+1nQZhPis-0MPK5kOAWge_7RvN4Qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2016 at 5:24 PM, Milo Kim <woogyom.kim@gmail.com> wrote:
-> On 12/13/2016 02:25 AM, Rob Herring wrote:
+On Mon, Dec 12, 2016 at 8:47 PM, Yao Yuan <yao.yuan@nxp.com> wrote:
+> On Thu, Dec 13, 2016 at 05:23:02PM +0800, Rob Herring wrote:
+>> On Thu, Dec 08, 2016 at 05:23:04PM +0800, Yuan Yao wrote:
+>> > From: Yuan Yao <yao.yuan@nxp.com>
 >>
->> On Fri, Dec 09, 2016 at 03:28:31PM +0900, Milo Kim wrote:
->>>
->>> Interrupt numbers are from the datasheet, so no need to keep them in
->>> the ABI. Use the number in the DT file.
+>> Same problem in this subject too.
 >>
->> I don't see the purpose of ripping this out. The headers have always
->> been for convienence, not whether the values come from the datasheet or
->> not.
+>> >
+>> > new compatible string: "fsl,ls1012a-qspi".
+>> >
+>> > Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
+>> > ---
+>> >  Documentation/devicetree/bindings/mtd/fsl-quadspi.txt | 1 +
+>> >  1 file changed, 1 insertion(+)
+>>
+>> Acked-by: Rob Herring <robh@kernel.org>
 >
->
-> My understanding is it's a same rule as other interrupt controllers.
+> Thanks for your review.
+> And do you have any suggestion for this subject?
 
-Oh yes, that's true. We never use defines for interrupts. In that case:
+The problem is you have a space in the compatible string: "fsl,
+ls1012a-qspi" rather than "fsl,ls1012a-qspi"
 
-Acked-by: Rob Herring <robh@kernel.org>
+Also, I prefer "dt/bindings: " as the beginning of binding patch subjects.
 
 Rob
