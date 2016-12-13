@@ -1,66 +1,38 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 13 Dec 2016 21:34:57 +0100
-Subject: [PATCH] i2c: designware: add reset interface
-In-Reply-To: <1479789700-19532-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1479789700-19532-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <20161213203457.GB2889@katana>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Wed, 14 Dec 2016 04:54:14 +0800
+Subject: [PATCH 2/6] clk: sunxi-ng: set the parent rate when adjustin CPUX
+ clock on A33
+In-Reply-To: <20161213154451.y4wcrqhtcc5sqli7@lukather>
+References: <20161213152252.53749-1-icenowy@aosc.xyz>
+ <20161213152252.53749-3-icenowy@aosc.xyz>
+ <20161213154451.y4wcrqhtcc5sqli7@lukather>
+Message-ID: <306991481662454@web33j.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2016 at 12:41:40PM +0800, Zhangfei Gao wrote:
-> Some platforms like hi3660 need do reset first to allow accessing registers
-> 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 
-Adding designware maintainers to CC...
 
-> ---
->  drivers/i2c/busses/i2c-designware-core.h    | 1 +
->  drivers/i2c/busses/i2c-designware-platdrv.c | 5 +++++
->  2 files changed, 6 insertions(+)
-> 
-> diff --git a/drivers/i2c/busses/i2c-designware-core.h b/drivers/i2c/busses/i2c-designware-core.h
-> index 0d44d2a..94b14fa 100644
-> --- a/drivers/i2c/busses/i2c-designware-core.h
-> +++ b/drivers/i2c/busses/i2c-designware-core.h
-> @@ -80,6 +80,7 @@ struct dw_i2c_dev {
->  	void __iomem		*base;
->  	struct completion	cmd_complete;
->  	struct clk		*clk;
-> +	struct reset_control	*rst;
->  	u32			(*get_clk_rate_khz) (struct dw_i2c_dev *dev);
->  	struct dw_pci_controller *controller;
->  	int			cmd_err;
-> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-> index 0b42a12..fd80e58 100644
-> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
-> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-> @@ -38,6 +38,7 @@
->  #include <linux/pm_runtime.h>
->  #include <linux/property.h>
->  #include <linux/io.h>
-> +#include <linux/reset.h>
->  #include <linux/slab.h>
->  #include <linux/acpi.h>
->  #include <linux/platform_data/i2c-designware.h>
-> @@ -176,6 +177,10 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
->  	dev->irq = irq;
->  	platform_set_drvdata(pdev, dev);
->  
-> +	dev->rst = devm_reset_control_get(&pdev->dev, NULL);
-> +	if (!IS_ERR(dev->rst))
-> +		reset_control_reset(dev->rst);
-> +
->  	/* fast mode by default because of legacy reasons */
->  	dev->clk_freq = 400000;
->  
-> -- 
-> 2.7.4
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161213/c10a0a77/attachment.sig>
+13.12.2016, 23:44, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> On Tue, Dec 13, 2016 at 11:22:48PM +0800, Icenowy Zheng wrote:
+>> ?The CPUX clock on A33, which is for the Cortex-A7 cores, is designed to
+>> ?be changeable by changing the rate of PLL_CPUX.
+>>
+>> ?Add CLK_SET_RATE_PARENT flag to this clock.
+>>
+>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Excuse me, have you merged this patch?
+
+If merged, I won't contain it in my PATCH v2, thus the PATCH v2 will contain
+only an updated OPP patch.
+
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
