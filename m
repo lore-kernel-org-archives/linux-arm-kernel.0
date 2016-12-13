@@ -1,232 +1,61 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Tue, 13 Dec 2016 11:38:36 -0700
-Subject: [PATCH V6 00/10] Add UEFI 2.6 and ACPI 6.1 updates for RAS on
- ARM64
-In-Reply-To: <86258A5CC0A3704780874CF6004BA8A62DC9A081@lhreml502-mbs>
-References: <1481147303-7979-1-git-send-email-tbaicar@codeaurora.org>
- <86258A5CC0A3704780874CF6004BA8A62DC9A081@lhreml502-mbs>
-Message-ID: <5a93f8e8-3cef-3d92-f937-bb790c94e25f@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 13 Dec 2016 18:43:33 +0000
+Subject: [PATCH V8 3/3] irqchip: qcom: Add IRQ combiner driver
+In-Reply-To: <1481653317.29291.19.camel@perches.com>
+References: <1480460259-8585-1-git-send-email-agustinv@codeaurora.org>
+ <1480460259-8585-4-git-send-email-agustinv@codeaurora.org>
+ <b009635d-8a10-5e22-4438-0019d79d01d3@arm.com>
+ <78bfd90d47200347628f7dd98451122f@codeaurora.org>
+ <1481653317.29291.19.camel@perches.com>
+Message-ID: <413b214c-146e-a1ca-7e84-6fc96959d7c7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shiju,
+On 13/12/16 18:21, Joe Perches wrote:
+> On Tue, 2016-12-13 at 10:23 -0500, Agustin Vega-Frias wrote:
+>> On 2016-12-07 13:16, Marc Zyngier wrote:
+>>>> +	}
+>>>> +
+>>>> +	combiner->domain = irq_domain_create_linear(
+>>>> +		pdev->dev.fwnode, combiner->nirqs, &domain_ops, combiner);
+>>>
+>>> On a single line, please. Do no listen to the checkpatch police that
+>>> will tell you otherwise. It really hurt my eyes to see this opening
+>>> bracket and *nothing* after that.
+>>
+>> Will do.
+> 
+> It seems generally preferred to have at least one argument on the
+> same line as the function being called.
+> 
+> So, here are some options:
+> 
+> Maximally fill the lines to 80 columns with the value being set
+> and function call while aligning to open parenthesis
+> 
+> 	combiner->domain = irq_domain_create_linear(pdev->dev.fwnode,
+> 						    combiner->nirqs,
+> 						    &domain_ops, combiner);
 
-Great! Thank you for testing! :)
+I can live with something like this.
 
-Tyler
+> Use a separate line for the function call:
+> 
+> 	combiner->domain =
+> 		irq_domain_create_linear(pdev->dev.fwnode, combiner->nirqs,
+> 					 &domain_ops, combiner);
 
-On 12/13/2016 4:10 AM, Shiju Jose wrote:
-> Hi Tyler,
->
-> We have tested V6 patch set on our platform. It worked fine.
->
-> Thanks,
-> Shiju
->
->> -----Original Message-----
->> From: Tyler Baicar [mailto:tbaicar at codeaurora.org]
->> Sent: 07 December 2016 21:48
->> To: christoffer.dall at linaro.org; marc.zyngier at arm.com;
->> pbonzini at redhat.com; rkrcmar at redhat.com; linux at armlinux.org.uk;
->> catalin.marinas at arm.com; will.deacon at arm.com; rjw at rjwysocki.net;
->> lenb at kernel.org; matt at codeblueprint.co.uk; robert.moore at intel.com;
->> lv.zheng at intel.com; nkaje at codeaurora.org; zjzhang at codeaurora.org;
->> mark.rutland at arm.com; james.morse at arm.com; akpm at linux-foundation.org;
->> eun.taik.lee at samsung.com; sandeepa.s.prabhu at gmail.com;
->> labbott at redhat.com; shijie.huang at arm.com; rruigrok at codeaurora.org;
->> paul.gortmaker at windriver.com; tn at semihalf.com; fu.wei at linaro.org;
->> rostedt at goodmis.org; bristot at redhat.com; linux-arm-
->> kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
->> kvm at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
->> acpi at vger.kernel.org; linux-efi at vger.kernel.org; devel at acpica.org;
->> Suzuki.Poulose at arm.com; punit.agrawal at arm.com; astone at redhat.com;
->> harba at codeaurora.org; hanjun.guo at linaro.org; John Garry; Shiju Jose
->> Cc: Tyler Baicar
->> Subject: [PATCH V6 00/10] Add UEFI 2.6 and ACPI 6.1 updates for RAS on
->> ARM64
->>
->> When a memory error, CPU error, PCIe error, or other type of hardware
->> error that's covered by RAS occurs, firmware should populate the shared
->> GHES memory location with the proper GHES structures to notify the OS
->> of the error.
->> For example, platforms that implement firmware first handling may
->> implement separate GHES sources for corrected errors and uncorrected
->> errors. If the error is an uncorrectable error, then the firmware will
->> notify the OS immediately since the error needs to be handled ASAP. The
->> OS will then be able to take the appropriate action needed such as
->> offlining a page. If the error is a corrected error, then the firmware
->> will not interrupt the OS immediately.
->> Instead, the OS will see and report the error the next time it's GHES
->> timer expires. The kernel will first parse the GHES structures and
->> report the errors through the kernel logs and then notify the user
->> space through RAS trace events. This allows user space applications
->> such as RAS Daemon to see the errors and report them however the user
->> desires. This patchset extends the kernel functionality for RAS errors
->> based on updates in the UEFI 2.6 and ACPI 6.1 specifications.
->>
->> An example flow from firmware to user space could be:
->>
->>                   +---------------+
->>         +-------->|               |
->>         |         |  GHES polling |--+
->> +-------------+  |    source     |  |   +---------------+   +----------
->> --+
->> |             |  +---------------+  |   |  Kernel GHES  |   |
->> |
->> |  Firmware   |                     +-->|  CPER AER and |-->|  RAS
->> trace |
->> |             |  +---------------+  |   |  EDAC drivers |   |   event
->> |
->> +-------------+  |               |  |   +---------------+   +----------
->> --+
->>         |         |  GHES sci     |--+
->>         +-------->|   source      |
->>                   +---------------+
->>
->> Add support for Generic Hardware Error Source (GHES) v2, which
->> introduces the capability for the OS to acknowledge the consumption of
->> the error record generated by the Reliability, Availability and
->> Serviceability (RAS) controller.
->> This eliminates potential race conditions between the OS and the RAS
->> controller.
->>
->> Add support for the timestamp field added to the Generic Error Data
->> Entry v3, allowing the OS to log the time that the error is generated
->> by the firmware, rather than the time the error is consumed. This
->> improves the correctness of event sequences when analyzing error logs.
->> The timestamp is added in ACPI 6.1, reference Table 18-343 Generic
->> Error Data Entry.
->>
->> Add support for ARMv8 Common Platform Error Record (CPER) per UEFI 2.6
->> specification. ARMv8 specific processor error information is reported
->> as part of the CPER records.  This provides more detail on for
->> processor error logs. This can help describe ARMv8 cache, tlb, and bus
->> errors.
->>
->> Synchronous External Abort (SEA) represents a specific processor error
->> condition in ARM systems. A handler is added to recognize SEA errors,
->> and a notifier is added to parse and report the errors before the
->> process is killed. Refer to section N.2.1.1 in the Common Platform
->> Error Record appendix of the UEFI 2.6 specification.
->>
->> Currently the kernel ignores CPER records that are unrecognized.
->> On the other hand, UEFI spec allows for non-standard (eg. vendor
->> proprietary) error section type in CPER (Common Platform Error Record),
->> as defined in section N2.3 of UEFI version 2.5. Therefore, user is not
->> able to see hardware error data of non-standard section.
->>
->> If section Type field of Generic Error Data Entry is unrecognized,
->> prints out the raw data in dmesg buffer, and also adds a tracepoint for
->> reporting such hardware errors.
->>
->> Currently even if an error status block's severity is fatal, the kernel
->> does not honor the severity level and panic. With the firmware first
->> model, the platform could inform the OS about a fatal hardware error
->> through the non-NMI GHES notification type. The OS should panic when a
->> hardware error record is received with this severity.
->>
->> Add support to handle SEAs that occur while a KVM guest kernel is
->> running. Currently these are unsupported by the guest abort handling.
->>
->> Depends on: [PATCH v15] acpi, apei, arm64: APEI initial support for
->> aarch64.
->>              https://lkml.org/lkml/2016/12/1/312
->>
->> V6: Change HEST_TYPE_GENERIC_V2 to IS_HEST_TYPE_GENERIC_V2 for
->> readability
->>      Move APEI helper defines from cper.h to ghes.h
->>      Add data_len decrement back into print loop
->>      Change references to ARMv8 to just ARM
->>      Rewrite ARM processor context info parsing
->>      Check valid bit of ARM error info field before printing it
->>      Add include of linux/uuid.h in ghes.c
->>
->> V5: Fix GHES goto logic for error conditions
->>      Change ghes_do_read_ack to ghes_ack_error
->>      Make sure data version check is >= 3
->>      Use CPER helper functions in print functions
->>      Make handle_guest_sea() dummy function static for arm
->>      Add arm to subject line for KVM patch
->>
->> V4: Add bit offset left shift to read_ack_write value
->>      Make HEST generic and generic_v2 structures a union in the ghes
->> structure
->>      Move gdata v3 helper functions into ghes.h to avoid duplication
->>      Reorder the timestamp print and avoid memcpy
->>      Add helper functions for gdata size checking
->>      Rename the SEA functions
->>      Add helper function for GHES panics
->>      Set fru_id to NULL UUID at variable declaration
->>      Limit ARM trace event parameters to the needed structures
->>      Reorder the ARM trace event variables to save space
->>      Add comment for why we don't pass SEAs to the guest when it aborts
->>      Move ARM trace event call into GHES driver instead of CPER
->>
->> V3: Fix unmapped address to the read_ack_register in ghes.c
->>      Add helper function to get the proper payload based on generic data
->> entry
->>       version
->>      Move timestamp print to avoid changing function calls in cper.c
->>      Remove patch "arm64: exception: handle instruction abort at current
->> EL"
->>       since the el1_ia handler is already added in 4.8
->>      Add EFI and ARM64 dependencies for HAVE_ACPI_APEI_SEA
->>      Add a new trace event for ARM type errors
->>      Add support to handle KVM guest SEAs
->>
->> V2: Add PSCI state print for the ARMv8 error type.
->>      Separate timestamp year into year and century using BCD format.
->>      Rebase on top of ACPICA 20160318 release and remove header file
->> changes
->>       in include/acpi/actbl1.h.
->>      Add panic OS with fatal error status block patch.
->>      Add processing of unrecognized CPER error section patches with
->> updates
->>       from previous comments. Original patches:
->> https://lkml.org/lkml/2015/9/8/646
->>
->> V1: https://lkml.org/lkml/2016/2/5/544
->>
->> Jonathan (Zhixiong) Zhang (1):
->>    acpi: apei: panic OS with fatal error status block
->>
->> Tyler Baicar (9):
->>    acpi: apei: read ack upon ghes record consumption
->>    ras: acpi/apei: cper: generic error data entry v3 per ACPI 6.1
->>    efi: parse ARM processor error
->>    arm64: exception: handle Synchronous External Abort
->>    acpi: apei: handle SEA notification type for ARMv8
->>    efi: print unrecognized CPER section
->>    ras: acpi / apei: generate trace event for unrecognized CPER section
->>    trace, ras: add ARM processor error trace event
->>    arm/arm64: KVM: add guest SEA support
->>
->>   arch/arm/include/asm/kvm_arm.h       |   1 +
->>   arch/arm/include/asm/system_misc.h   |   5 +
->>   arch/arm/kvm/mmu.c                   |  18 +++-
->>   arch/arm64/Kconfig                   |   1 +
->>   arch/arm64/include/asm/kvm_arm.h     |   1 +
->>   arch/arm64/include/asm/system_misc.h |  15 +++
->>   arch/arm64/mm/fault.c                |  71 ++++++++++--
->>   drivers/acpi/apei/Kconfig            |  14 +++
->>   drivers/acpi/apei/ghes.c             | 189
->> +++++++++++++++++++++++++++++---
->>   drivers/acpi/apei/hest.c             |   7 +-
->>   drivers/firmware/efi/cper.c          | 204
->> ++++++++++++++++++++++++++++++++---
->>   drivers/ras/ras.c                    |   2 +
->>   include/acpi/ghes.h                  |  27 ++++-
->>   include/linux/cper.h                 |  53 +++++++++
->>   include/ras/ras_event.h              | 100 +++++++++++++++++
->>   15 files changed, 664 insertions(+), 44 deletions(-)
->>
->> --
->> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
->> Technologies, Inc.
->> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a
->> Linux Foundation Collaborative Project.
+But I find this one pretty horrid.
 
+> Or just ignore the 80 column limit wherever you deem appropriate.
+
+Which is my usual advise. I consider the 80 column rule a good way of
+limiting the complexity of code (if the nesting pushes you too far on
+the right of the screen, you're doing something wrong), but not for
+simple statements such as this one.
+
+Thanks,
+
+	M.
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Jazz is not dead. It just smells funny...
