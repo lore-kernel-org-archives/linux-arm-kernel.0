@@ -1,30 +1,56 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 13 Dec 2016 16:09:59 +0000
-Subject: [PATCH 3/6] ARM: dts: sun8i: add a cpu0 label to cpu@0 node on
- A23/33
-In-Reply-To: <20161213152252.53749-4-icenowy@aosc.xyz>
-References: <20161213152252.53749-1-icenowy@aosc.xyz>
- <20161213152252.53749-4-icenowy@aosc.xyz>
-Message-ID: <139af71f-390a-4023-8f82-71dd80212518@arm.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 13 Dec 2016 17:27:56 +0100
+Subject: [PATCH] tty/serial: atmel_serial: BUG: stop DMA from transmitting in
+ stop_tx
+Message-ID: <20161213162756.16139-1-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+If we don't disable the transmitter in atmel_stop_tx, the DMA buffer
+continues to send data until it is emptied.
+This cause problems with the flow control (CTS is asserted and data are
+still sent).
 
+So, disabling the transmitter in atmel_stop_tx is a sane thing to do.
 
-On 13/12/16 15:22, Icenowy Zheng wrote:
-> A "cpu0" label is needed on cpu at 0 for cpufreq-dt to work.
-> 
+Tested on at91sam9g35-cm(DMA)
+Tested for regressions on sama5d2-xplained(Fifo) and at91sam9g20ek(PDC)
 
-IIUC any label should be fine and I don't see anything in the driver
-looking for such label name. All I see is it looks for cpu0 regulator
-for *legacy* DTs
+Cc: <stable@vger.kernel.org> (beware, this won't apply before 4.3)
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+---
+ drivers/tty/serial/atmel_serial.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-> Add such a label, in order to prepare for cpufreq support of A23/33.
-> 
+NB: this is not for the 4.10 merge window, I'm just sending it now to
+have some comments if someone is againts it.
 
-You need this as you add the same label in the following patches. The
-commit message sounds like cpufreq-dt search for that label by name.
-
--- 
-Regards,
-Sudeep
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 168b10cad47b..f9d42de5ab2d 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -481,6 +481,14 @@ static void atmel_stop_tx(struct uart_port *port)
+ 		/* disable PDC transmit */
+ 		atmel_uart_writel(port, ATMEL_PDC_PTCR, ATMEL_PDC_TXTDIS);
+ 	}
++
++	/*
++	 * Disable the transmitter.
++	 * This is mandatory when DMA is used, otherwise the DMA buffer
++	 * is fully transmitted.
++	 */
++	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXDIS);
++
+ 	/* Disable interrupts */
+ 	atmel_uart_writel(port, ATMEL_US_IDR, atmel_port->tx_done_mask);
+ 
+@@ -513,6 +521,9 @@ static void atmel_start_tx(struct uart_port *port)
+ 
+ 	/* Enable interrupts */
+ 	atmel_uart_writel(port, ATMEL_US_IER, atmel_port->tx_done_mask);
++
++	/* re-enable the transmitter */
++	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
+ }
+ 
+ /*
