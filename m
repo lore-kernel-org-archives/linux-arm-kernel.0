@@ -1,34 +1,33 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 12 Dec 2016 18:20:13 -0800
-Subject: [PATCH 0/6] USB support for Broadcom NSP SoC
-In-Reply-To: <1478683994-12008-1-git-send-email-yendapally.reddy@broadcom.com>
-References: <1478683994-12008-1-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <79483fc3-5e91-a1f0-1dbf-1987682373e6@gmail.com>
+From: yao.yuan@nxp.com (Yao Yuan)
+Date: Tue, 13 Dec 2016 02:46:10 +0000
+Subject: [PATCH 3/5] Documentation: dt: mtd: add chip support for "jedec,
+ spi-nor"
+In-Reply-To: <20161212170903.ixr6iu4c5txzreub@rob-hp-laptop>
+References: <1481188984-43683-1-git-send-email-yao.yuan@freescale.com>
+ <1481188984-43683-4-git-send-email-yao.yuan@freescale.com>
+ <20161212170903.ixr6iu4c5txzreub@rob-hp-laptop>
+Message-ID: <DB6PR0402MB2902124A1862A91F4FA18643899B0@DB6PR0402MB2902.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/2016 01:33 AM, Yendapally Reddy Dhananjaya Reddy wrote:
-> This patch set contains the usb support for Broadcom NSP SoC.
-> The usb phy is connected through mdio interface. The mdio interface
-> can be used to access either internal phys or external phys using a
-> multiplexer.
+On Thu, Dec 13, 2016 at 05:23:02PM +0800, Rob Herring wrote:
+> On Thu, Dec 08, 2016 at 05:23:02PM +0800, Yuan Yao wrote:
+> > From: Yuan Yao <yao.yuan@nxp.com>
 > 
-> The first patch provides the documentation details for mdio-mux and
-> second patch provides the documentation details for usb3 phy. The third
-> patch contains the mdio-mux support and fourth patch contains the
-> changes to the mdio bus driver.
+> The compatible string is wrong in the subject.
 > 
-> The fifth patch provides the phy driver and sixth patch provides the
-> enable method for usb.
+> >
+> > "sst25wf040b" and "en25s64" are also chip compatible with SPI NOR flash.
+> >
+> > Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
+> > ---
+> >  Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt | 2 ++
+> >  1 file changed, 2 insertions(+)
 > 
-> This patch series has been tested on NSP bcm958625HR board.
-> This patch series is based on v4.9.0-rc1 and is available from github-
-> repo: https://github.com/Broadcom/cygnus-linux.git
-> branch:nsp-usb-v1
+> Otherwise,
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Can you resubmit this patch series with the feedback from Andrew, Rob
-and Scott addressed?
-
-Thanks!
--- 
-Florian
+Thanks for your review.
+I will update the subject and send v2 soon.
+ 
