@@ -1,86 +1,163 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 13 Dec 2016 11:11:37 +0000
-Subject: [PATCH v6 3/8] PWM: add pwm-stm32 DT bindings
-In-Reply-To: <20161212190205.b5t3x6i2o7igldlo@rob-hp-laptop>
-References: <1481292919-26587-1-git-send-email-benjamin.gaignard@st.com>
- <1481292919-26587-4-git-send-email-benjamin.gaignard@st.com>
- <20161212190205.b5t3x6i2o7igldlo@rob-hp-laptop>
-Message-ID: <20161213111137.GW3625@dell.home>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 13 Dec 2016 11:11:20 +0000
+Subject: [PATCH v5] arm64: fpsimd: improve stacking logic in
+ non-interruptible context
+In-Reply-To: <1481565387-8039-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1481565387-8039-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20161213111120.GF1574@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Dec 2016, Rob Herring wrote:
-
-> On Fri, Dec 09, 2016 at 03:15:14PM +0100, Benjamin Gaignard wrote:
-> > Define bindings for pwm-stm32
-> > 
-> > version 6:
-> > - change st,breakinput parameter format to make it usuable on stm32f7 too.
-> > 
-> > version 2:
-> > - use parameters instead of compatible of handle the hardware configuration
-> > 
-> > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> > ---
-> >  .../devicetree/bindings/pwm/pwm-stm32.txt          | 33 ++++++++++++++++++++++
-> >  1 file changed, 33 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> > new file mode 100644
-> > index 0000000..866f222
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> > @@ -0,0 +1,33 @@
-> > +STMicroelectronics STM32 Timers PWM bindings
-> > +
-> > +Must be a sub-node of an STM32 Timers device tree node.
-> > +See ../mfd/stm32-timers.txt for details about the parent node.
-> > +
-> > +Required parameters:
-> > +- compatible:		Must be "st,stm32-pwm".
-> > +- pinctrl-names: 	Set to "default".
-> > +- pinctrl-0: 		List of phandles pointing to pin configuration nodes for PWM module.
-> > +			For Pinctrl properties see ../pinctrl/pinctrl-bindings.txt
-> > +
-> > +Optional parameters:
-> > +- st,breakinput:	Arrays of three u32 <index level filter> to describe break input configurations.
-> > +			"index" indicates on which break input the configuration should be applied.
-> > +			"level" gives the active level (0=low or 1=high) for this configuration.
-> > +			"filter" gives the filtering value to be applied.
-> > +
-> > +Example:
-> > +	timers at 40010000 {
+On Mon, Dec 12, 2016 at 05:56:27PM +0000, Ard Biesheuvel wrote:
+> Currently, we allow kernel mode NEON in softirq or hardirq context by
+> stacking and unstacking a slice of the NEON register file for each call
+> to kernel_neon_begin() and kernel_neon_end(), respectively.
 > 
-> timer at ...
-
-No, it should be timers.
-
-The 's' is intentional, since this parent (MFD) device houses 3
-different types of timers.  The "timer" node is a child of this one.
-
-> With that,
+> Given that
+> a) a CPU typically spends most of its time in userland, during which time
+>    no kernel mode NEON in process context is in progress,
+> b) a CPU spends most of its time in the kernel doing other things than
+>    kernel mode NEON when it gets interrupted to perform kernel mode NEON
+>    in softirq context
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
+> the stacking and subsequent unstacking is only necessary if we are
+> interrupting a thread while it is performing kernel mode NEON in process
+> context, which means that in all other cases, we can simply preserve the
+> userland FPSIMD state once, and only restore it upon return to userland,
+> even if we are being invoked from softirq or hardirq context.
 > 
+> So instead of checking whether we are running in interrupt context, keep
+> track of the level of nested kernel mode NEON calls in progress, and only
+> perform the eager stack/unstack if the level exceeds 1.
 > 
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		compatible = "st,stm32-timers";
-> > +		reg = <0x40010000 0x400>;
-> > +		clocks = <&rcc 0 160>;
-> > +		clock-names = "clk_int";
-> > +
-> > +		pwm {
-> > +			compatible = "st,stm32-pwm";
-> > +			pinctrl-0	= <&pwm1_pins>;
-> > +			pinctrl-names	= "default";
-> > +			st,breakinput = <0 1 5>;
-> > +		};
-> > +	};
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/fpsimd.c | 64 +++++++++++++++++++++++++++++++++-------------
+>  1 file changed, 46 insertions(+), 18 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 394c61db5566..c19363775436 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -220,45 +220,73 @@ void fpsimd_flush_task_state(struct task_struct *t)
+>  
+>  #ifdef CONFIG_KERNEL_MODE_NEON
+>  
+> -static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
+> -static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
+> +/*
+> + * Although unlikely, it is possible for three kernel mode NEON contexts to
+> + * be live at the same time: process context, softirq context and hardirq
+> + * context. So while the userland context is stashed in the thread's fpsimd
+> + * state structure, we need two additional levels of storage.
+> + */
+> +static DEFINE_PER_CPU(struct fpsimd_partial_state, nested_fpsimdstate[2]);
+> +static DEFINE_PER_CPU(int, kernel_neon_nesting_level);
+>  
+>  /*
+>   * Kernel-side NEON support functions
+>   */
+>  void kernel_neon_begin_partial(u32 num_regs)
+>  {
+> -	if (in_interrupt()) {
+> -		struct fpsimd_partial_state *s = this_cpu_ptr(
+> -			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+> +	struct fpsimd_partial_state *s;
+> +	int level;
+>  
+> -		BUG_ON(num_regs > 32);
+> -		fpsimd_save_partial_state(s, roundup(num_regs, 2));
+> -	} else {
+> +	preempt_disable();
+> +
+> +	if (!test_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>  		/*
+>  		 * Save the userland FPSIMD state if we have one and if we
+>  		 * haven't done so already. Clear fpsimd_last_state to indicate
+>  		 * that there is no longer userland FPSIMD state in the
+>  		 * registers.
+>  		 */
+> -		preempt_disable();
+> -		if (current->mm &&
+> -		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+> -			fpsimd_save_state(&current->thread.fpsimd_state);
+> +		if (current->mm) {
+> +			unsigned long flags;
+> +
+> +			local_irq_save(flags);
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+For non-SVE hardware (i.e., all hardware for now), this raises mean IRQ
+latency if KERNEL_MODE_NEON is used, to fix a bug that doesn't exist.
+
+For SVE hardware, we would be disabling interrupts around typically a
+few KB of stores.  I don't know what the actual hardware numbers would
+look like, but this feels like a disproportionate cost to the problem
+being solved...
+
+After all, why do this here...
+
+> +			if (!test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+> +				fpsimd_save_state(&current->thread.fpsimd_state);
+> +			local_irq_restore(flags);
+> +		} else {
+> +			set_thread_flag(TIF_FOREIGN_FPSTATE);
+> +		}
+>  		this_cpu_write(fpsimd_last_state, NULL);
+>  	}
+> +
+> +	level = this_cpu_inc_return(kernel_neon_nesting_level);
+
+...and yet go to all this trouble to avoid disabling IRQs for a _nested_
+kernel_neon_begin()?
+
+
+Did I miss something, or does increasing the count around the outermost
+case too without IRQ disabling not work, in the non-SVE case?
+
+Cheers
+---Dave
+
+> +	BUG_ON(level > 3);
+> +
+> +	if (level > 1) {
+> +		s = this_cpu_ptr(nested_fpsimdstate);
+> +
+> +		WARN_ON_ONCE(num_regs > 32);
+> +		num_regs = min(roundup(num_regs, 2), 32U);
+> +
+> +		fpsimd_save_partial_state(&s[level - 2], num_regs);
+> +	}
+>  }
+>  EXPORT_SYMBOL(kernel_neon_begin_partial);
+>  
+>  void kernel_neon_end(void)
+>  {
+> -	if (in_interrupt()) {
+> -		struct fpsimd_partial_state *s = this_cpu_ptr(
+> -			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+> -		fpsimd_load_partial_state(s);
+> -	} else {
+> -		preempt_enable();
+> +	struct fpsimd_partial_state *s;
+> +	int level;
+> +
+> +	level = this_cpu_read(kernel_neon_nesting_level);
+> +	BUG_ON(level < 1);
+> +
+> +	if (level > 1) {
+> +		s = this_cpu_ptr(nested_fpsimdstate);
+> +		fpsimd_load_partial_state(&s[level - 2]);
+>  	}
+> +	this_cpu_dec(kernel_neon_nesting_level);
+> +	preempt_enable();
+>  }
+>  EXPORT_SYMBOL(kernel_neon_end);
+>  
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
