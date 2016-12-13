@@ -1,117 +1,107 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 13 Dec 2016 12:29:00 -0800
-Subject: [PATCH v3 0/4] ARM: Add support for CONFIG_DEBUG_VIRTUAL
-In-Reply-To: <20161209233628.6642-1-f.fainelli@gmail.com>
-References: <20161208185933.13749-1-f.fainelli@gmail.com>
- <20161209233628.6642-1-f.fainelli@gmail.com>
-Message-ID: <9364069a-834d-383f-c98f-b9d020fe2d0b@gmail.com>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Tue, 13 Dec 2016 20:30:18 +0000
+Subject: [RFC v4 00/16] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
+ reserved regions
+Message-ID: <1481661034-3088-1-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/2016 03:36 PM, Florian Fainelli wrote:
-> This patch series builds on top of Laura's [PATCHv5 00/10] CONFIG_DEBUG_VIRTUAL
-> for arm64 to add support for CONFIG_DEBUG_VIRTUAL for ARM.
-> 
-> This was tested on a Brahma B15 platform (ARMv7 + HIGHMEM + LPAE).
-> 
-> Note that the treewide changes would involve a huge CC list, which
-> is why it has been purposely trimmed to just focusing on the DEBUG_VIRTUAL
-> aspect.
+Following LPC discussions, we now report reserved regions through
+iommu-group sysfs reserved_regions attribute file.
 
-Any comments on this? How would you approach merging these patches?
-Thank you!
+Reserved regions are populated through the IOMMU get_resv_region
+callback (former get_dm_regions), now implemented by amd-iommu,
+intel-iommu and arm-smmu:
+- the amd-iommu reports device direct mapped regions.
+- the intel-iommu reports the [0xfee00000 - 0xfeefffff] MSI window
+  as an IOMMU_RESV_NOMAP reserved region.
+- the arm-smmu reports the MSI window (arbitrarily located at
+  0x8000000 and 1MB large).
 
-> 
-> Changes in v3:
-> 
-> - fix build failures reported by Kbuild test robot
-> 
-> Changes in v2:
-> 
-> - Modified MTD LART driver not to create symbol conflicts with
->   KERNEL_START
-> - Fixed patch that defines and uses KERNEL_START/END
-> - Fixed __pa_symbol()'s definition
-> - Inline __pa_symbol() check wihtin the VIRTUAL_BUG_ON statement
-> - Simplified check for virtual addresses
-> - Added a tree-wide patch changing SMP/PM implementations to use
->   __pa_symbol(), build tested against multi_v{5,7}_defconfig
-> 
-> Thanks!
-> 
-> Florian Fainelli (4):
->   mtd: lart: Rename partition defines to be prefixed with PART_
->   ARM: Define KERNEL_START and KERNEL_END
->   ARM: Add support for CONFIG_DEBUG_VIRTUAL
->   ARM: treewide: Replace uses of virt_to_phys with __pa_symbol
-> 
->  arch/arm/Kconfig                          |   1 +
->  arch/arm/boot/compressed/piggy.xzkern     | Bin 0 -> 2998584 bytes
->  arch/arm/common/mcpm_entry.c              |  12 +++----
->  arch/arm/include/asm/memory.h             |  23 ++++++++++++--
->  arch/arm/mach-alpine/platsmp.c            |   2 +-
->  arch/arm/mach-axxia/platsmp.c             |   2 +-
->  arch/arm/mach-bcm/bcm63xx_smp.c           |   2 +-
->  arch/arm/mach-bcm/platsmp-brcmstb.c       |   2 +-
->  arch/arm/mach-bcm/platsmp.c               |   4 +--
->  arch/arm/mach-berlin/platsmp.c            |   2 +-
->  arch/arm/mach-exynos/firmware.c           |   4 +--
->  arch/arm/mach-exynos/mcpm-exynos.c        |   2 +-
->  arch/arm/mach-exynos/platsmp.c            |   4 +--
->  arch/arm/mach-exynos/pm.c                 |   6 ++--
->  arch/arm/mach-exynos/suspend.c            |   6 ++--
->  arch/arm/mach-hisi/platmcpm.c             |   2 +-
->  arch/arm/mach-hisi/platsmp.c              |   6 ++--
->  arch/arm/mach-imx/platsmp.c               |   2 +-
->  arch/arm/mach-imx/pm-imx6.c               |   2 +-
->  arch/arm/mach-imx/src.c                   |   2 +-
->  arch/arm/mach-mediatek/platsmp.c          |   2 +-
->  arch/arm/mach-mvebu/pm.c                  |   2 +-
->  arch/arm/mach-mvebu/pmsu.c                |   2 +-
->  arch/arm/mach-mvebu/system-controller.c   |   2 +-
->  arch/arm/mach-omap2/control.c             |   8 ++---
->  arch/arm/mach-omap2/omap-mpuss-lowpower.c |   8 ++---
->  arch/arm/mach-omap2/omap-smp.c            |   4 +--
->  arch/arm/mach-prima2/platsmp.c            |   2 +-
->  arch/arm/mach-prima2/pm.c                 |   2 +-
->  arch/arm/mach-pxa/palmz72.c               |   2 +-
->  arch/arm/mach-pxa/pxa25x.c                |   2 +-
->  arch/arm/mach-pxa/pxa27x.c                |   2 +-
->  arch/arm/mach-pxa/pxa3xx.c                |   2 +-
->  arch/arm/mach-realview/platsmp-dt.c       |   2 +-
->  arch/arm/mach-rockchip/platsmp.c          |   4 +--
->  arch/arm/mach-rockchip/pm.c               |   2 +-
->  arch/arm/mach-s3c24xx/mach-jive.c         |   2 +-
->  arch/arm/mach-s3c24xx/pm-s3c2410.c        |   2 +-
->  arch/arm/mach-s3c24xx/pm-s3c2416.c        |   2 +-
->  arch/arm/mach-s3c64xx/pm.c                |   2 +-
->  arch/arm/mach-s5pv210/pm.c                |   2 +-
->  arch/arm/mach-sa1100/pm.c                 |   2 +-
->  arch/arm/mach-shmobile/platsmp-apmu.c     |   6 ++--
->  arch/arm/mach-shmobile/platsmp-scu.c      |   4 +--
->  arch/arm/mach-socfpga/platsmp.c           |   4 +--
->  arch/arm/mach-spear/platsmp.c             |   2 +-
->  arch/arm/mach-sti/platsmp.c               |   2 +-
->  arch/arm/mach-sunxi/platsmp.c             |   4 +--
->  arch/arm/mach-tango/platsmp.c             |   2 +-
->  arch/arm/mach-tango/pm.c                  |   2 +-
->  arch/arm/mach-tegra/reset.c               |   4 +--
->  arch/arm/mach-ux500/platsmp.c             |   2 +-
->  arch/arm/mach-vexpress/dcscb.c            |   2 +-
->  arch/arm/mach-vexpress/platsmp.c          |   2 +-
->  arch/arm/mach-vexpress/tc2_pm.c           |   4 +--
->  arch/arm/mach-zx/platsmp.c                |   4 +--
->  arch/arm/mach-zynq/platsmp.c              |   2 +-
->  arch/arm/mm/Makefile                      |   1 +
->  arch/arm/mm/init.c                        |   7 ++--
->  arch/arm/mm/mmu.c                         |   6 +---
->  arch/arm/mm/physaddr.c                    |  51 ++++++++++++++++++++++++++++++
->  drivers/mtd/devices/lart.c                |  24 +++++++-------
->  62 files changed, 173 insertions(+), 108 deletions(-)
->  create mode 100644 arch/arm/boot/compressed/piggy.xzkern
->  create mode 100644 arch/arm/mm/physaddr.c
-> 
+Unsafe interrupt assignment is tested by enumerating all MSI irq
+domains and checking they support MSI remapping. This check is done
+in case we detect the iommu translates MSI (an IOMMU_RESV_MSI
+window exists). Otherwise the IRQ remapping capability is checked
+at IOMMU level. Obviously this is a defensive IRQ safety assessment.
+Assuming there are several MSI controllers in the system and at
+least one does not implement IRQ remapping, the assignment will be
+considered as unsafe (even if this controller is not acessible from
+the assigned devices).
 
+The series integrates a not officially posted patch from Robin:
+"iommu/dma: Allow MSI-only cookies".
+
+Best Regards
+
+Eric
+
+Git: complete series available at
+https://github.com/eauger/linux/tree/v4.9-reserved-v4
+
+History:
+
+RFCv3 -> RFCv4:
+- arm-smmu driver does not register PCI host bridge windows as
+  reserved regions anymore
+- Implement reserved region get/put callbacks also in arm-smmuv3
+- take the iommu_group lock on iommu_get_group_resv_regions
+- add a type field in iommu_resv_region instead of using prot
+- init the region list_head in iommu_alloc_resv_region, also
+  add type parameter
+- iommu_insert_resv_region manage overlaps and sort reserved
+  windows
+- address IRQ safety assessment by enumerating all the MSI irq
+  domains and checking the MSI_REMAP flag
+- update Documentation/ABI/testing/sysfs-kernel-iommu_groups
+- Did not add T-b since the code has significantly changed
+
+RFCv2 -> RFCv3:
+- switch to an iommu-group sysfs API
+- use new dummy allocator provided by Robin
+- dummy allocator initialized by vfio-iommu-type1 after enumerating
+  the reserved regions
+- at the moment ARM MSI base address/size is left unchanged compared
+  to v2
+- we currently report reserved regions and not usable IOVA regions as
+  requested by Alex
+
+RFC v1 -> v2:
+- fix intel_add_reserved_regions
+- add mutex lock/unlock in vfio_iommu_type1
+
+
+Eric Auger (16):
+  iommu/dma: Allow MSI-only cookies
+  iommu: Rename iommu_dm_regions into iommu_resv_regions
+  iommu: Add a new type field in iommu_resv_region
+  iommu: iommu_alloc_resv_region
+  iommu: Only map direct mapped regions
+  iommu: iommu_get_group_resv_regions
+  iommu: Implement reserved_regions iommu-group sysfs file
+  iommu/vt-d: Implement reserved region get/put callbacks
+  iommu/arm-smmu: Implement reserved region get/put callbacks
+  iommu/arm-smmu-v3: Implement reserved region get/put callbacks
+  irqdomain: Add IRQ_DOMAIN_FLAG_MSI_REMAP value
+  irqdomain: irq_domain_check_msi_remap
+  irqchip/gicv3-its: Sets IRQ_DOMAIN_FLAG_MSI_REMAP
+  vfio/type1: Allow transparent MSI IOVA allocation
+  vfio/type1: Check MSI remapping at irq domain level
+  iommu/arm-smmu: Do not advertise IOMMU_CAP_INTR_REMAP anymore
+
+ .../ABI/testing/sysfs-kernel-iommu_groups          |   9 ++
+ drivers/iommu/amd_iommu.c                          |  21 +--
+ drivers/iommu/arm-smmu-v3.c                        |  30 +++-
+ drivers/iommu/arm-smmu.c                           |  30 +++-
+ drivers/iommu/dma-iommu.c                          | 116 +++++++++++++---
+ drivers/iommu/intel-iommu.c                        |  50 +++++--
+ drivers/iommu/iommu.c                              | 152 +++++++++++++++++++--
+ drivers/irqchip/irq-gic-v3-its.c                   |   1 +
+ drivers/vfio/vfio_iommu_type1.c                    |  37 ++++-
+ include/linux/dma-iommu.h                          |   7 +
+ include/linux/iommu.h                              |  46 +++++--
+ include/linux/irqdomain.h                          |   8 ++
+ kernel/irq/irqdomain.c                             |  24 ++++
+ 13 files changed, 455 insertions(+), 76 deletions(-)
 
 -- 
-Florian
+1.9.1
