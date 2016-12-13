@@ -1,130 +1,124 @@
 From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Tue, 13 Dec 2016 16:08:12 +0100
-Subject: [PATCH 3/4] cec: integrate HDMI notifier support
+Date: Tue, 13 Dec 2016 16:08:11 +0100
+Subject: [PATCH 2/4] exynos_hdmi: add HDMI notifier support
 In-Reply-To: <20161213150813.37966-1-hverkuil@xs4all.nl>
 References: <20161213150813.37966-1-hverkuil@xs4all.nl>
-Message-ID: <20161213150813.37966-4-hverkuil@xs4all.nl>
+Message-ID: <20161213150813.37966-3-hverkuil@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hans Verkuil <hans.verkuil@cisco.com>
 
-Support the HDMI notifier framework, simplifying drivers that
-depend on this.
+Implement the HDMI notifier support to allow CEC drivers to
+be informed when there is a new EDID and when a connect or
+disconnect happens.
 
 Signed-off-by: Hans Verkuil <hans.verkuil@cisco.com>
 ---
- drivers/media/cec/cec-core.c | 50 ++++++++++++++++++++++++++++++++++++++++++++
- include/media/cec.h          | 15 +++++++++++++
- 2 files changed, 65 insertions(+)
+ drivers/gpu/drm/exynos/Kconfig       |  1 +
+ drivers/gpu/drm/exynos/exynos_hdmi.c | 24 +++++++++++++++++++++---
+ 2 files changed, 22 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/media/cec/cec-core.c b/drivers/media/cec/cec-core.c
-index aca3ab8..c620a4c 100644
---- a/drivers/media/cec/cec-core.c
-+++ b/drivers/media/cec/cec-core.c
-@@ -195,6 +195,52 @@ static void cec_devnode_unregister(struct cec_devnode *devnode)
- 	put_device(&devnode->dev);
+diff --git a/drivers/gpu/drm/exynos/Kconfig b/drivers/gpu/drm/exynos/Kconfig
+index 465d344f..34f3b6f 100644
+--- a/drivers/gpu/drm/exynos/Kconfig
++++ b/drivers/gpu/drm/exynos/Kconfig
+@@ -77,6 +77,7 @@ config DRM_EXYNOS_DP
+ config DRM_EXYNOS_HDMI
+ 	bool "HDMI"
+ 	depends on DRM_EXYNOS_MIXER || DRM_EXYNOS5433_DECON
++	select HDMI_NOTIFIERS
+ 	help
+ 	  Choose this option if you want to use Exynos HDMI for DRM.
+ 
+diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
+index e8fb6ef..2bfc411 100644
+--- a/drivers/gpu/drm/exynos/exynos_hdmi.c
++++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
+@@ -31,6 +31,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/clk.h>
+ #include <linux/gpio/consumer.h>
++#include <linux/hdmi-notifier.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/io.h>
+ #include <linux/of_address.h>
+@@ -132,6 +133,7 @@ struct hdmi_context {
+ 	struct delayed_work		hotplug_work;
+ 	struct drm_display_mode		current_mode;
+ 	u8				cea_video_id;
++	struct hdmi_notifier		*notifier;
+ 	const struct hdmi_driver_data	*drv_data;
+ 
+ 	void __iomem			*regs;
+@@ -857,9 +859,12 @@ static enum drm_connector_status hdmi_detect(struct drm_connector *connector,
+ {
+ 	struct hdmi_context *hdata = connector_to_hdmi(connector);
+ 
+-	if (gpiod_get_value(hdata->hpd_gpio))
++	if (gpiod_get_value(hdata->hpd_gpio)) {
++		hdmi_event_connect(hdata->notifier);
+ 		return connector_status_connected;
++	}
+ 
++	hdmi_event_disconnect(hdata->notifier);
+ 	return connector_status_disconnected;
  }
  
-+#ifdef CONFIG_HDMI_NOTIFIERS
-+static u16 parse_hdmi_addr(const struct edid *edid)
-+{
-+	if (!edid || edid->extensions == 0)
-+		return CEC_PHYS_ADDR_INVALID;
-+
-+	return cec_get_edid_phys_addr((u8 *)edid,
-+				EDID_LENGTH * (edid->extensions + 1), NULL);
-+}
-+
-+static int cec_hdmi_notify(struct notifier_block *nb, unsigned long event,
-+			   void *data)
-+{
-+	struct cec_adapter *adap = container_of(nb, struct cec_adapter, nb);
-+	struct hdmi_notifier *n = data;
-+	unsigned int phys;
-+
-+	dprintk(1, "event %lu\n", event);
-+
-+	switch (event) {
-+	case HDMI_DISCONNECTED:
-+		cec_s_phys_addr(adap, CEC_PHYS_ADDR_INVALID, false);
-+		break;
-+
-+	case HDMI_NEW_EDID:
-+		phys = parse_hdmi_addr(n->edid);
-+		cec_s_phys_addr(adap, phys, false);
-+		break;
+@@ -898,6 +903,9 @@ static int hdmi_get_modes(struct drm_connector *connector)
+ 		edid->width_cm, edid->height_cm);
+ 
+ 	drm_mode_connector_update_edid_property(connector, edid);
++	hdmi_event_connect(hdata->notifier);
++	hdmi_event_new_edid(hdata->notifier, edid,
++			    EDID_LENGTH * (1 + edid->extensions));
+ 
+ 	ret = drm_add_edid_modes(connector, edid);
+ 
+@@ -1544,6 +1552,7 @@ static void hdmi_disable(struct drm_encoder *encoder)
+ 	if (funcs && funcs->disable)
+ 		(*funcs->disable)(crtc);
+ 
++	hdmi_event_disconnect(hdata->notifier);
+ 	cancel_delayed_work(&hdata->hotplug_work);
+ 
+ 	hdmiphy_disable(hdata);
+@@ -1893,15 +1902,22 @@ static int hdmi_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	hdata->notifier = hdmi_notifier_get(&pdev->dev);
++	if (hdata->notifier == NULL) {
++		ret = -ENOMEM;
++		goto err_hdmiphy;
 +	}
 +
-+	return NOTIFY_OK;
-+}
-+
-+void cec_register_hdmi_notifier(struct cec_adapter *adap,
-+				struct hdmi_notifier *notifier)
-+{
-+	if (WARN_ON(!adap->devnode.registered))
-+		return;
-+
-+	adap->nb.notifier_call = cec_hdmi_notify;
-+	adap->notifier = notifier;
-+	hdmi_notifier_register(adap->notifier, &adap->nb);
-+}
-+EXPORT_SYMBOL_GPL(cec_register_hdmi_notifier);
-+#endif
-+
- struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
- 					 void *priv, const char *name, u32 caps,
- 					 u8 available_las)
-@@ -344,6 +390,10 @@ void cec_unregister_adapter(struct cec_adapter *adap)
- 	adap->rc = NULL;
- #endif
- 	debugfs_remove_recursive(adap->cec_dir);
-+#ifdef CONFIG_HDMI_NOTIFIERS
-+	if (adap->notifier)
-+		hdmi_notifier_unregister(adap->notifier, &adap->nb);
-+#endif
- 	cec_devnode_unregister(&adap->devnode);
- }
- EXPORT_SYMBOL_GPL(cec_unregister_adapter);
-diff --git a/include/media/cec.h b/include/media/cec.h
-index 96a0aa7..3b4860d 100644
---- a/include/media/cec.h
-+++ b/include/media/cec.h
-@@ -28,6 +28,11 @@
- #include <linux/kthread.h>
- #include <linux/timer.h>
- #include <linux/cec-funcs.h>
-+#ifdef CONFIG_HDMI_NOTIFIERS
-+#include <linux/notifier.h>
-+#include <linux/hdmi-notifier.h>
-+#include <drm/drm_edid.h>
-+#endif
- #include <media/rc-core.h>
- #include <media/cec-edid.h>
+ 	pm_runtime_enable(dev);
  
-@@ -173,6 +178,11 @@ struct cec_adapter {
- 	bool passthrough;
- 	struct cec_log_addrs log_addrs;
+ 	ret = component_add(&pdev->dev, &hdmi_component_ops);
+ 	if (ret)
+-		goto err_disable_pm_runtime;
++		goto err_notifier_put;
  
-+#ifdef CONFIG_HDMI_NOTIFIERS
-+	struct hdmi_notifier	*notifier;
-+	struct notifier_block	nb;
-+#endif
-+
- 	struct dentry *cec_dir;
- 	struct dentry *status_file;
+ 	return ret;
  
-@@ -213,6 +223,11 @@ void cec_transmit_done(struct cec_adapter *adap, u8 status, u8 arb_lost_cnt,
- 		       u8 nack_cnt, u8 low_drive_cnt, u8 error_cnt);
- void cec_received_msg(struct cec_adapter *adap, struct cec_msg *msg);
+-err_disable_pm_runtime:
++err_notifier_put:
++	hdmi_notifier_put(hdata->notifier);
+ 	pm_runtime_disable(dev);
  
-+#ifdef CONFIG_HDMI_NOTIFIERS
-+void cec_register_hdmi_notifier(struct cec_adapter *adap,
-+				struct hdmi_notifier *notifier);
-+#endif
-+
- #else
+ err_hdmiphy:
+@@ -1918,9 +1934,11 @@ static int hdmi_remove(struct platform_device *pdev)
+ 	struct hdmi_context *hdata = platform_get_drvdata(pdev);
  
- static inline int cec_register_adapter(struct cec_adapter *adap,
+ 	cancel_delayed_work_sync(&hdata->hotplug_work);
++	hdmi_event_disconnect(hdata->notifier);
+ 
+ 	component_del(&pdev->dev, &hdmi_component_ops);
+ 
++	hdmi_notifier_put(hdata->notifier);
+ 	pm_runtime_disable(&pdev->dev);
+ 
+ 	if (!IS_ERR(hdata->reg_hdmi_en))
 -- 
 2.10.2
