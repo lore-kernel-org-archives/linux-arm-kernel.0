@@ -1,121 +1,32 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 13 Dec 2016 14:02:33 +0000
-Subject: [PATCH V7 5/8] arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED
-In-Reply-To: <1481567927-14791-6-git-send-email-sricharan@codeaurora.org>
-References: <1481567927-14791-1-git-send-email-sricharan@codeaurora.org>
- <1481567927-14791-6-git-send-email-sricharan@codeaurora.org>
-Message-ID: <7d09fc5a-9425-c171-e469-2759534de2dc@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 13 Dec 2016 14:07:11 +0000
+Subject: [RFC v2 PATCH 0/3] Fix dma_alloc_coherent() and friends for NOMMU
+In-Reply-To: <1481636704-18948-1-git-send-email-vladimir.murzin@arm.com>
+References: <1481636704-18948-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20161213140711.GY14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/16 18:38, Sricharan R wrote:
-> From: Mitchel Humpherys <mitchelh@codeaurora.org>
-> 
-> The newly added DMA_ATTR_PRIVILEGED is useful for creating mappings that
-> are only accessible to privileged DMA engines.  Implement it in
-> dma-iommu.c so that the ARM64 DMA IOMMU mapper can make use of it.
-> 
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> Tested-by: Robin Murphy <robin.murphy@arm.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
-> ---
->  arch/arm64/mm/dma-mapping.c |  6 +++---
->  drivers/iommu/dma-iommu.c   | 10 ++++++++--
->  include/linux/dma-iommu.h   |  3 ++-
->  3 files changed, 13 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index 401f79a..ae76ead 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -557,7 +557,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
->  				 unsigned long attrs)
->  {
->  	bool coherent = is_device_dma_coherent(dev);
-> -	int ioprot = dma_direction_to_prot(DMA_BIDIRECTIONAL, coherent);
-> +	int ioprot = dma_info_to_prot(DMA_BIDIRECTIONAL, coherent, attrs);
->  	size_t iosize = size;
->  	void *addr;
->  
-> @@ -711,7 +711,7 @@ static dma_addr_t __iommu_map_page(struct device *dev, struct page *page,
->  				   unsigned long attrs)
->  {
->  	bool coherent = is_device_dma_coherent(dev);
-> -	int prot = dma_direction_to_prot(dir, coherent);
-> +	int prot = dma_info_to_prot(dir, coherent, attrs);
->  	dma_addr_t dev_addr = iommu_dma_map_page(dev, page, offset, size, prot);
->  
->  	if (!iommu_dma_mapping_error(dev, dev_addr) &&
-> @@ -769,7 +769,7 @@ static int __iommu_map_sg_attrs(struct device *dev, struct scatterlist *sgl,
->  		__iommu_sync_sg_for_device(dev, sgl, nelems, dir);
->  
->  	return iommu_dma_map_sg(dev, sgl, nelems,
-> -			dma_direction_to_prot(dir, coherent));
-> +				dma_info_to_prot(dir, coherent, attrs));
->  }
->  
->  static void __iommu_unmap_sg_attrs(struct device *dev,
-> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-> index d2a7a46..756d5e0 100644
-> --- a/drivers/iommu/dma-iommu.c
-> +++ b/drivers/iommu/dma-iommu.c
-> @@ -182,16 +182,22 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
->  EXPORT_SYMBOL(iommu_dma_init_domain);
->  
->  /**
-> - * dma_direction_to_prot - Translate DMA API directions to IOMMU API page flags
-> + * dma_info_to_prot - Translate DMA API directions and attributes to IOMMU API
-> + *                    page flags.
->   * @dir: Direction of DMA transfer
->   * @coherent: Is the DMA master cache-coherent?
-> + * @attrs: DMA attributes for the mapping
->   *
->   * Return: corresponding IOMMU API page protection flags
->   */
-> -int dma_direction_to_prot(enum dma_data_direction dir, bool coherent)
-> +int dma_info_to_prot(enum dma_data_direction dir, bool coherent,
-> +		     unsigned long attrs)
->  {
->  	int prot = coherent ? IOMMU_CACHE : 0;
->  
-> +	if (attrs & DMA_ATTR_PRIVILEGED)
-> +		prot |= IOMMU_PRIV;
-> +
->  	switch (dir) {
->  	case DMA_BIDIRECTIONAL:
->  		return prot | IOMMU_READ | IOMMU_WRITE;
+On Tue, Dec 13, 2016 at 01:45:01PM +0000, Vladimir Murzin wrote:
+> This patch set is trying to address the issue by providing region of
+> memory suitable for consistent DMA operations. It is supposed that such
+> region is marked by MPU as non-cacheable. Since we have MPU support in
+> Linux for R-class only and M-class setting MPU in bootloader, proposed
+> interface to advertise such memory is via "memdma=size at start" command
+> line option, to avoid clashing with normal memory (which usually comes
+> from dts) it'd be safer to use it together with "mem=" command line
+> option. Meanwhile, I'm open to suggestions for the better way telling
+> Linux of such memory.
 
-...and applying against -next now also needs this hunk:
+For those nommu systems where the MPU is not used, how do they allocate
+DMA memory without setting aside a chunk of memory?
 
-@@ -639,7 +639,7 @@ dma_addr_t iommu_dma_map_resource(struct device
-*dev, phys_addr_t phys,
- 		size_t size, enum dma_data_direction dir, unsigned long attrs)
- {
- 	return __iommu_dma_map(dev, phys, size,
--			dma_direction_to_prot(dir, false) | IOMMU_MMIO);
-+			dma_info_to_prot(dir, false, attrs) | IOMMU_MMIO);
- }
+>From what I understand of the current nommu code, it would just use
+the normal page allocator for DMA memory allocation, so now requiring
+everything to fit the "nommu has mpu" case seems like it's going to
+break older nommu.
 
- void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
-
-With those two issues fixed up, I've given the series (applied to
-next-20161213) a spin on a SMMUv3/PL330 fast model and it still checks out.
-
-Robin.
-
-> diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
-> index 32c5890..a203181 100644
-> --- a/include/linux/dma-iommu.h
-> +++ b/include/linux/dma-iommu.h
-> @@ -34,7 +34,8 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
->  		u64 size, struct device *dev);
->  
->  /* General helpers for DMA-API <-> IOMMU-API interaction */
-> -int dma_direction_to_prot(enum dma_data_direction dir, bool coherent);
-> +int dma_info_to_prot(enum dma_data_direction dir, bool coherent,
-> +		     unsigned long attrs);
->  
->  /*
->   * These implement the bulk of the relevant DMA mapping callbacks, but require
-> 
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
