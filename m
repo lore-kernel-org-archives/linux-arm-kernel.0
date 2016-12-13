@@ -1,84 +1,39 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 13 Dec 2016 18:48:40 +0100
-Subject: [PATCH v4 11/12] arm64: dts: marvell: add sdhci support for Armada
- 7K/8K
+Date: Tue, 13 Dec 2016 18:48:34 +0100
+Subject: [PATCH v4 05/12] MAINTAINERS: add entry for Marvell Xenon MMC Host
+ Controller drivers
 In-Reply-To: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
 References: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
-Message-ID: <2564fe18eb9cc8a0a1a3311cdf7e7141f35211bd.1481651244.git-series.gregory.clement@free-electrons.com>
+Message-ID: <84c0e00dadec80ee5ab47e7472f4b88aba9ed6ef.1481651244.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also enable it on the Armada 7040 DB board
+From: Hu Ziji <huziji@marvell.com>
 
+Add maintainer entry for Marvell Xenon eMMC/SD/SDIO Host
+Controller drivers.
+
+Signed-off-by: Hu Ziji <huziji@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-7040-db.dts       | 14 +++++++++++++-
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi        |  9 ++++++++-
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 10 +++++++++-
- 3 files changed, 33 insertions(+)
+ MAINTAINERS | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-index 070b589680c5..6adbfcd26369 100644
---- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-@@ -146,3 +146,17 @@
- &cpm_usb3_1 {
- 	status = "okay";
- };
-+
-+&ap_sdhci0 {
-+	status = "okay";
-+	bus-width = <4>;
-+	no-1-8-v;
-+	non-removable;
-+};
-+
-+&cpm_sdhci0 {
-+	status = "okay";
-+	bus-width = <4>;
-+	no-1-8-v;
-+	non-removable;
-+};
-diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index 7b6136182ad0..181e8c5de3bf 100644
---- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -229,6 +229,15 @@
+diff --git a/MAINTAINERS b/MAINTAINERS
+index c44795306342..1a5c4c30ea24 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7604,6 +7604,11 @@ M:	Nicolas Pitre <nico@fluxnic.net>
+ S:	Odd Fixes
+ F:	drivers/mmc/host/mvsdio.*
  
- 			};
- 
-+			ap_sdhci0: sdhci at 6e0000 {
-+				compatible = "marvell,armada-7000-sdhci";
-+				reg = <0x6e0000 0x300>;
-+				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-+				clock-names = "core";
-+				clocks = <&cpm_syscon0 1 4>;
-+				status = "disabled";
-+			};
++MARVELL XENON MMC/SD/SDIO HOST CONTROLLER DRIVER
++M:	Ziji Hu <huziji@marvell.com>
++L:	linux-mmc at vger.kernel.org
++S:	Supported
 +
- 			ap_syscon: system-controller at 6f4000 {
- 				compatible = "marvell,ap806-system-controller",
- 					     "syscon";
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index e5e3ed678b6f..035b2b2fc9ca 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -164,6 +164,16 @@
- 				clocks = <&cpm_syscon0 1 21>;
- 				status = "disabled";
- 			};
-+
-+			cpm_sdhci0: sdhci at 780000 {
-+				compatible = "marvell,armada-7000-sdhci";
-+				reg = <0x780000 0x300>;
-+				interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
-+				clock-names = "core";
-+				clocks = <&cpm_syscon0 1 4>;
-+				status = "disabled";
-+			};
-+
- 		};
- 
- 		cpm_pcie0: pcie at f2600000 {
+ MATROX FRAMEBUFFER DRIVER
+ L:	linux-fbdev at vger.kernel.org
+ S:	Orphan
 -- 
 git-series 0.9.1
