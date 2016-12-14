@@ -1,46 +1,27 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Wed, 14 Dec 2016 10:35:06 +0530
-Subject: [PATCH v7 3/5] drm: bridge: add support for TI ths8135
-In-Reply-To: <1481623759-12786-4-git-send-email-bgolaszewski@baylibre.com>
-References: <1481623759-12786-1-git-send-email-bgolaszewski@baylibre.com>
- <1481623759-12786-4-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <dbb47a8f-07be-19d6-e77b-f5c06fd39c61@codeaurora.org>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 14 Dec 2016 13:05:51 +0800
+Subject: [PATCH v2] crypto: sun4i-ss: support the Security System PRNG
+In-Reply-To: <20161213141059.GB10647@Red>
+References: <1480934922-20732-1-git-send-email-clabbe.montjoie@gmail.com>
+ <20161205123705.GA10732@gondor.apana.org.au>
+ <20161205125738.GA13525@Red>
+ <20161207120900.GC20680@gondor.apana.org.au>
+ <20161207125127.GB28218@Red>
+ <20161208090618.GB22932@gondor.apana.org.au>
+ <20161213141059.GB10647@Red>
+Message-ID: <20161214050551.GD9592@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 12/13/2016 03:39 PM, Bartosz Golaszewski wrote:
-> THS8135 is a configurable video DAC, but no configuration is actually
-> necessary to make it work.
+On Tue, Dec 13, 2016 at 03:10:59PM +0100, Corentin Labbe wrote:
 >
-> For now use the dumb-vga-dac driver to support it.
+> I have found two solutions:
 
-Queued to drm-misc-next
+No we already have algif_rng so let's not confuse things even
+further by making hwrng take PRNGs.
 
-Archit
-
->
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> ---
->  drivers/gpu/drm/bridge/dumb-vga-dac.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> index e570698..86e9f9c 100644
-> --- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> +++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> @@ -237,6 +237,7 @@ static int dumb_vga_remove(struct platform_device *pdev)
->
->  static const struct of_device_id dumb_vga_match[] = {
->  	{ .compatible = "dumb-vga-dac" },
-> +	{ .compatible = "ti,ths8135" },
->  	{},
->  };
->  MODULE_DEVICE_TABLE(of, dumb_vga_match);
->
-
+Cheers,
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
