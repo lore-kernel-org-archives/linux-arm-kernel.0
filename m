@@ -1,77 +1,43 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Wed, 14 Dec 2016 21:00:50 +0200
-Subject: [PATCH] i2c: designware: add reset interface
-In-Reply-To: <20161213203457.GB2889@katana>
-References: <1479789700-19532-1-git-send-email-zhangfei.gao@linaro.org>
- <20161213203457.GB2889@katana>
-Message-ID: <1481742050.9552.5.camel@linux.intel.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 14 Dec 2016 11:08:03 -0800
+Subject: [PATCH v3 2/2] FPGA: Add TS-7300 FPGA manager
+In-Reply-To: <SN1PR0101MB1565A30EFE8AFEB319B84124D09A0@SN1PR0101MB1565.prod.exchangelabs.com>
+References: <20161214023553.9377-1-f.fainelli@gmail.com>
+ <20161214023553.9377-3-f.fainelli@gmail.com>
+ <CAAtXAHe6q2jRWXt+KUWCFnP5j21E3x=P+4wjZTOaSSB_pX71Eg@mail.gmail.com>
+ <cf772070-73d9-fa07-b2b9-e0038832b7be@gmail.com>
+ <SN1PR0101MB1565A30EFE8AFEB319B84124D09A0@SN1PR0101MB1565.prod.exchangelabs.com>
+Message-ID: <a8973dbf-0053-f44d-05f2-b787317db765@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-12-13 at 21:34 +0100, Wolfram Sang wrote:
-> On Tue, Nov 22, 2016 at 12:41:40PM +0800, Zhangfei Gao wrote:
-> > Some platforms like hi3660 need do reset first to allow accessing
-> > registers
-> > 
-> > Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+On 12/14/2016 10:58 AM, Hartley Sweeten wrote:
+> On Wednesday, December 14, 2016 11:55 AM, Florian Fainelli wrote:
+>> My understanding is that, yes, this triggers the final write. You are
+>> right that ts73xx_fpga_write() can be called multiple times. It sounds
+>> like what my write_complete function does right now is just return that
+>> we successfully completed the bistream write, but this snippet that you
+>> are quoting should actually be moved into write_complete.
 > 
-> Adding designware maintainers to CC...
+> Florian,
 > 
-> > ---
-> > ?drivers/i2c/busses/i2c-designware-core.h????| 1 +
-> > ?drivers/i2c/busses/i2c-designware-platdrv.c | 5 +++++
-> > ?2 files changed, 6 insertions(+)
-> > 
-> > diff --git a/drivers/i2c/busses/i2c-designware-core.h
-> > b/drivers/i2c/busses/i2c-designware-core.h
-> > index 0d44d2a..94b14fa 100644
-> > --- a/drivers/i2c/busses/i2c-designware-core.h
-> > +++ b/drivers/i2c/busses/i2c-designware-core.h
-> > @@ -80,6 +80,7 @@ struct dw_i2c_dev {
-> > ?	void __iomem		*base;
-> > ?	struct completion	cmd_complete;
-> > ?	struct clk		*clk;
-> > +	struct reset_control	*rst;
-> > ?	u32			(*get_clk_rate_khz) (struct
-> > dw_i2c_dev *dev);
-> > ?	struct dw_pci_controller *controller;
-> > ?	int			cmd_err;
-> > diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c
-> > b/drivers/i2c/busses/i2c-designware-platdrv.c
-> > index 0b42a12..fd80e58 100644
-> > --- a/drivers/i2c/busses/i2c-designware-platdrv.c
-> > +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-> > @@ -38,6 +38,7 @@
-> > ?#include <linux/pm_runtime.h>
-> > ?#include <linux/property.h>
-> > ?#include <linux/io.h>
-> > +#include <linux/reset.h>
-> > ?#include <linux/slab.h>
-> > ?#include <linux/acpi.h>
-> > ?#include <linux/platform_data/i2c-designware.h>
-> > @@ -176,6 +177,10 @@ static int dw_i2c_plat_probe(struct
-> > platform_device *pdev)
-> > ?	dev->irq = irq;
-> > ?	platform_set_drvdata(pdev, dev);
-> > ?
-> > +	dev->rst = devm_reset_control_get(&pdev->dev, NULL);
-> > +	if (!IS_ERR(dev->rst))
-> > +		reset_control_reset(dev->rst);
+> I'm in the process of getting a TS-7300 board so I can help test this. Hopefully
+> I will have it by next week.
 
-Do we care about EPROBE_DEFER?
+Great! I got a few things on my list that have not been submitted yet:
 
-Perhaps on error path we need to assert it.
+- tmp124 support through drivers/hwmon/lm70.c
+- specific memcpy_{from,to}io accessors for ethoc from the FPGA
+- serial port support for the UARTs from the FPGA
 
-And I guess it should be devm_reset_control_get_optional().
+And some other things that are giving me issues at the moment, like
+SPI_3WIRE support for spi-ep93xx so I can configure the tmp124 to send
+alarms/have temperature thresholds.
 
-> > +
-> > ?	/* fast mode by default because of legacy reasons */
-> > ?	dev->clk_freq = 400000;
-> > ?
-> > --?
-> > 2.7.4
-> > 
+My branch is here:
 
+https://github.com/ffainelli/linux/tree/ts72xx
+
+Cheers
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Florian
