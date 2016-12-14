@@ -1,178 +1,352 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 14 Dec 2016 11:46:11 -0800
-Subject: [PATCH 01/11] clk: bcm2835: Don't rate change PLLs on behalf of DSI
- PLL dividers.
+Date: Wed, 14 Dec 2016 11:46:13 -0800
+Subject: [PATCH 03/11] clk: bcm2835: Add leaf clock measurement support,
+ disabled by default
 In-Reply-To: <20161214194621.16499-1-eric@anholt.net>
 References: <20161214194621.16499-1-eric@anholt.net>
-Message-ID: <20161214194621.16499-2-eric@anholt.net>
+Message-ID: <20161214194621.16499-4-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our core PLLs are intended to be configured once and left alone.  With
-the SET_RATE_PARENT, asking to set the PLLD_DSI1 clock rate would
-change PLLD just to get closer to the requested DSI clock, thus
-changing PLLD_PER, the UART and ethernet PHY clock rates downstream of
-it, and breaking ethernet.
-
-We *do* want PLLH to change so that PLLH_AUX can be exactly the value
-we want, though.  Thus, we need to have a per-divider policy of
-whether to pass rate changes up.
+This proved incredibly useful during debugging of the DSI driver, to
+see if our clocks were running at rate we requested.  Let's leave it
+here for the next person interacting with clocks on the platform (and
+so that hopefully we can just hook it up to debugfs some day).
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- drivers/clk/bcm/clk-bcm2835.c | 42 ++++++++++++++++++++++++++++--------------
- 1 file changed, 28 insertions(+), 14 deletions(-)
+ drivers/clk/bcm/clk-bcm2835.c | 144 ++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 119 insertions(+), 25 deletions(-)
 
 diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index b68bf573dcfb..6641030e8eae 100644
+index b0a8cd19a30c..77fd9f5f056f 100644
 --- a/drivers/clk/bcm/clk-bcm2835.c
 +++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -428,6 +428,7 @@ struct bcm2835_pll_divider_data {
- 	u32 load_mask;
- 	u32 hold_mask;
- 	u32 fixed_divider;
-+	u32 flags;
+@@ -39,6 +39,7 @@
+ #include <linux/clk.h>
+ #include <linux/clk/bcm2835.h>
+ #include <linux/debugfs.h>
++#include <linux/delay.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
+@@ -98,7 +99,8 @@
+ #define CM_SMIDIV		0x0b4
+ /* no definition for 0x0b8  and 0x0bc */
+ #define CM_TCNTCTL		0x0c0
+-#define CM_TCNTDIV		0x0c4
++# define CM_TCNT_SRC1_SHIFT		12
++#define CM_TCNTCNT		0x0c4
+ #define CM_TECCTL		0x0c8
+ #define CM_TECDIV		0x0cc
+ #define CM_TD0CTL		0x0d0
+@@ -338,6 +340,61 @@ static inline u32 cprman_read(struct bcm2835_cprman *cprman, u32 reg)
+ 	return readl(cprman->regs + reg);
+ }
+ 
++/* Does a cycle of measuring a clock through the TCNT clock, which may
++ * source from many other clocks in the system.
++ */
++static unsigned long bcm2835_measure_tcnt_mux(struct bcm2835_cprman *cprman,
++					      u32 tcnt_mux)
++{
++	u32 osccount = 19200; /* 1ms */
++	u32 count;
++	ktime_t timeout;
++
++	spin_lock(&cprman->regs_lock);
++
++	cprman_write(cprman, CM_TCNTCTL, CM_KILL);
++
++	cprman_write(cprman, CM_TCNTCTL,
++		     (tcnt_mux & CM_SRC_MASK) |
++		     (tcnt_mux >> CM_SRC_BITS) << CM_TCNT_SRC1_SHIFT);
++
++	cprman_write(cprman, CM_OSCCOUNT, osccount);
++
++	/* do a kind delay@the start */
++	mdelay(1);
++
++	/* Finish off whatever is left of OSCCOUNT */
++	timeout = ktime_add_ns(ktime_get(), LOCK_TIMEOUT_NS);
++	while (cprman_read(cprman, CM_OSCCOUNT)) {
++		if (ktime_after(ktime_get(), timeout)) {
++			dev_err(cprman->dev, "timeout waiting for OSCCOUNT\n");
++			count = 0;
++			goto out;
++		}
++		cpu_relax();
++	}
++
++	/* Wait for BUSY to clear. */
++	timeout = ktime_add_ns(ktime_get(), LOCK_TIMEOUT_NS);
++	while (cprman_read(cprman, CM_TCNTCTL) & CM_BUSY) {
++		if (ktime_after(ktime_get(), timeout)) {
++			dev_err(cprman->dev, "timeout waiting for !BUSY\n");
++			count = 0;
++			goto out;
++		}
++		cpu_relax();
++	}
++
++	count = cprman_read(cprman, CM_TCNTCNT);
++
++	cprman_write(cprman, CM_TCNTCTL, 0);
++
++out:
++	spin_unlock(&cprman->regs_lock);
++
++	return count * 1000;
++}
++
+ static int bcm2835_debugfs_regset(struct bcm2835_cprman *cprman, u32 base,
+ 				  struct debugfs_reg32 *regs, size_t nregs,
+ 				  struct dentry *dentry)
+@@ -470,6 +527,8 @@ struct bcm2835_clock_data {
+ 
+ 	bool is_vpu_clock;
+ 	bool is_mash_clock;
++
++	u32 tcnt_mux;
  };
  
- struct bcm2835_clock_data {
-@@ -1201,7 +1202,7 @@ bcm2835_register_pll_divider(struct bcm2835_cprman *cprman,
- 	init.num_parents = 1;
- 	init.name = divider_name;
- 	init.ops = &bcm2835_pll_divider_clk_ops;
--	init.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED;
-+	init.flags = data->flags | CLK_IGNORE_UNUSED;
+ struct bcm2835_gate_data {
+@@ -1006,6 +1065,17 @@ static int bcm2835_clock_on(struct clk_hw *hw)
+ 		     CM_GATE);
+ 	spin_unlock(&cprman->regs_lock);
  
- 	divider = devm_kzalloc(cprman->dev, sizeof(*divider), GFP_KERNEL);
- 	if (!divider)
-@@ -1408,7 +1409,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.a2w_reg = A2W_PLLA_CORE,
- 		.load_mask = CM_PLLA_LOADCORE,
- 		.hold_mask = CM_PLLA_HOLDCORE,
--		.fixed_divider = 1),
-+		.fixed_divider = 1,
-+		.flags = CLK_SET_RATE_PARENT),
- 	[BCM2835_PLLA_PER]	= REGISTER_PLL_DIV(
- 		.name = "plla_per",
- 		.source_pll = "plla",
-@@ -1416,7 +1418,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.a2w_reg = A2W_PLLA_PER,
- 		.load_mask = CM_PLLA_LOADPER,
- 		.hold_mask = CM_PLLA_HOLDPER,
--		.fixed_divider = 1),
-+		.fixed_divider = 1,
-+		.flags = CLK_SET_RATE_PARENT),
- 	[BCM2835_PLLA_DSI0]	= REGISTER_PLL_DIV(
- 		.name = "plla_dsi0",
- 		.source_pll = "plla",
-@@ -1432,7 +1435,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.a2w_reg = A2W_PLLA_CCP2,
- 		.load_mask = CM_PLLA_LOADCCP2,
- 		.hold_mask = CM_PLLA_HOLDCCP2,
--		.fixed_divider = 1),
-+		.fixed_divider = 1,
-+		.flags = CLK_SET_RATE_PARENT),
++	/* Debug code to measure the clock once it's turned on to see
++	 * if it's ticking at the rate we expect.
++	 */
++	if (data->tcnt_mux && false) {
++		dev_info(cprman->dev,
++			 "clk %s: rate %ld, measure %ld\n",
++			 data->name,
++			 clk_hw_get_rate(hw),
++			 bcm2835_measure_tcnt_mux(cprman, data->tcnt_mux));
++	}
++
+ 	return 0;
+ }
  
- 	/* PLLB is used for the ARM's clock. */
- 	[BCM2835_PLLB]		= REGISTER_PLL(
-@@ -1456,7 +1460,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.a2w_reg = A2W_PLLB_ARM,
- 		.load_mask = CM_PLLB_LOADARM,
- 		.hold_mask = CM_PLLB_HOLDARM,
--		.fixed_divider = 1),
-+		.fixed_divider = 1,
-+		.flags = CLK_SET_RATE_PARENT),
+@@ -1707,7 +1777,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.ctl_reg = CM_OTPCTL,
+ 		.div_reg = CM_OTPDIV,
+ 		.int_bits = 4,
+-		.frac_bits = 0),
++		.frac_bits = 0,
++		.tcnt_mux = 6),
+ 	/*
+ 	 * Used for a 1Mhz clock for the system clocksource, and also used
+ 	 * bythe watchdog timer and the camera pulse generator.
+@@ -1741,13 +1812,15 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.ctl_reg = CM_H264CTL,
+ 		.div_reg = CM_H264DIV,
+ 		.int_bits = 4,
+-		.frac_bits = 8),
++		.frac_bits = 8,
++		.tcnt_mux = 1),
+ 	[BCM2835_CLOCK_ISP]	= REGISTER_VPU_CLK(
+ 		.name = "isp",
+ 		.ctl_reg = CM_ISPCTL,
+ 		.div_reg = CM_ISPDIV,
+ 		.int_bits = 4,
+-		.frac_bits = 8),
++		.frac_bits = 8,
++		.tcnt_mux = 2),
  
  	/*
- 	 * PLLC is the core PLL, used to drive the core VPU clock.
-@@ -1485,7 +1490,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.a2w_reg = A2W_PLLC_CORE0,
- 		.load_mask = CM_PLLC_LOADCORE0,
- 		.hold_mask = CM_PLLC_HOLDCORE0,
--		.fixed_divider = 1),
-+		.fixed_divider = 1,
-+		.flags = CLK_SET_RATE_PARENT),
- 	[BCM2835_PLLC_CORE1]	= REGISTER_PLL_DIV(
- 		.name = "pllc_core1",
- 		.source_pll = "pllc",
-@@ -1493,7 +1499,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.a2w_reg = A2W_PLLC_CORE1,
- 		.load_mask = CM_PLLC_LOADCORE1,
- 		.hold_mask = CM_PLLC_HOLDCORE1,
--		.fixed_divider = 1),
-+		.fixed_divider = 1,
-+		.flags = CLK_SET_RATE_PARENT),
- 	[BCM2835_PLLC_CORE2]	= REGISTER_PLL_DIV(
- 		.name = "pllc_core2",
- 		.source_pll = "pllc",
-@@ -1501,7 +1508,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.a2w_reg = A2W_PLLC_CORE2,
- 		.load_mask = CM_PLLC_LOADCORE2,
- 		.hold_mask = CM_PLLC_HOLDCORE2,
--		.fixed_divider = 1),
-+		.fixed_divider = 1,
-+		.flags = CLK_SET_RATE_PARENT),
- 	[BCM2835_PLLC_PER]	= REGISTER_PLL_DIV(
- 		.name = "pllc_per",
- 		.source_pll = "pllc",
-@@ -1509,7 +1517,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.a2w_reg = A2W_PLLC_PER,
- 		.load_mask = CM_PLLC_LOADPER,
- 		.hold_mask = CM_PLLC_HOLDPER,
--		.fixed_divider = 1),
-+		.fixed_divider = 1,
-+		.flags = CLK_SET_RATE_PARENT),
- 
+ 	 * Secondary SDRAM clock.  Used for low-voltage modes when the PLL
+@@ -1758,13 +1831,15 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.ctl_reg = CM_SDCCTL,
+ 		.div_reg = CM_SDCDIV,
+ 		.int_bits = 6,
+-		.frac_bits = 0),
++		.frac_bits = 0,
++		.tcnt_mux = 3),
+ 	[BCM2835_CLOCK_V3D]	= REGISTER_VPU_CLK(
+ 		.name = "v3d",
+ 		.ctl_reg = CM_V3DCTL,
+ 		.div_reg = CM_V3DDIV,
+ 		.int_bits = 4,
+-		.frac_bits = 8),
++		.frac_bits = 8,
++		.tcnt_mux = 4),
  	/*
- 	 * PLLD is the display PLL, used to drive DSI display panels.
-@@ -1538,7 +1547,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.a2w_reg = A2W_PLLD_CORE,
- 		.load_mask = CM_PLLD_LOADCORE,
- 		.hold_mask = CM_PLLD_HOLDCORE,
--		.fixed_divider = 1),
-+		.fixed_divider = 1,
-+		.flags = CLK_SET_RATE_PARENT),
- 	[BCM2835_PLLD_PER]	= REGISTER_PLL_DIV(
- 		.name = "plld_per",
- 		.source_pll = "plld",
-@@ -1546,7 +1556,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.a2w_reg = A2W_PLLD_PER,
- 		.load_mask = CM_PLLD_LOADPER,
- 		.hold_mask = CM_PLLD_HOLDPER,
--		.fixed_divider = 1),
-+		.fixed_divider = 1,
-+		.flags = CLK_SET_RATE_PARENT),
- 	[BCM2835_PLLD_DSI0]	= REGISTER_PLL_DIV(
- 		.name = "plld_dsi0",
- 		.source_pll = "plld",
-@@ -1591,7 +1602,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.a2w_reg = A2W_PLLH_RCAL,
- 		.load_mask = CM_PLLH_LOADRCAL,
- 		.hold_mask = 0,
--		.fixed_divider = 10),
-+		.fixed_divider = 10,
-+		.flags = CLK_SET_RATE_PARENT),
- 	[BCM2835_PLLH_AUX]	= REGISTER_PLL_DIV(
- 		.name = "pllh_aux",
- 		.source_pll = "pllh",
-@@ -1599,7 +1611,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.a2w_reg = A2W_PLLH_AUX,
- 		.load_mask = CM_PLLH_LOADAUX,
- 		.hold_mask = 0,
--		.fixed_divider = 10),
-+		.fixed_divider = 10,
-+		.flags = CLK_SET_RATE_PARENT),
- 	[BCM2835_PLLH_PIX]	= REGISTER_PLL_DIV(
- 		.name = "pllh_pix",
- 		.source_pll = "pllh",
-@@ -1607,7 +1620,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.a2w_reg = A2W_PLLH_PIX,
- 		.load_mask = CM_PLLH_LOADPIX,
- 		.hold_mask = 0,
--		.fixed_divider = 10),
-+		.fixed_divider = 10,
-+		.flags = CLK_SET_RATE_PARENT),
+ 	 * VPU clock.  This doesn't have an enable bit, since it drives
+ 	 * the bus for everything else, and is special so it doesn't need
+@@ -1778,7 +1853,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.int_bits = 12,
+ 		.frac_bits = 8,
+ 		.flags = CLK_IS_CRITICAL,
+-		.is_vpu_clock = true),
++		.is_vpu_clock = true,
++		.tcnt_mux = 5),
  
- 	/* the clocks */
+ 	/* clocks with per parent mux */
+ 	[BCM2835_CLOCK_AVEO]	= REGISTER_PER_CLK(
+@@ -1786,19 +1862,22 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.ctl_reg = CM_AVEOCTL,
+ 		.div_reg = CM_AVEODIV,
+ 		.int_bits = 4,
+-		.frac_bits = 0),
++		.frac_bits = 0,
++		.tcnt_mux = 38),
+ 	[BCM2835_CLOCK_CAM0]	= REGISTER_PER_CLK(
+ 		.name = "cam0",
+ 		.ctl_reg = CM_CAM0CTL,
+ 		.div_reg = CM_CAM0DIV,
+ 		.int_bits = 4,
+-		.frac_bits = 8),
++		.frac_bits = 8,
++		.tcnt_mux = 14),
+ 	[BCM2835_CLOCK_CAM1]	= REGISTER_PER_CLK(
+ 		.name = "cam1",
+ 		.ctl_reg = CM_CAM1CTL,
+ 		.div_reg = CM_CAM1DIV,
+ 		.int_bits = 4,
+-		.frac_bits = 8),
++		.frac_bits = 8,
++		.tcnt_mux = 15),
+ 	[BCM2835_CLOCK_DFT]	= REGISTER_PER_CLK(
+ 		.name = "dft",
+ 		.ctl_reg = CM_DFTCTL,
+@@ -1810,7 +1889,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.ctl_reg = CM_DPICTL,
+ 		.div_reg = CM_DPIDIV,
+ 		.int_bits = 4,
+-		.frac_bits = 8),
++		.frac_bits = 8,
++		.tcnt_mux = 17),
+ 
+ 	/* Arasan EMMC clock */
+ 	[BCM2835_CLOCK_EMMC]	= REGISTER_PER_CLK(
+@@ -1818,7 +1898,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.ctl_reg = CM_EMMCCTL,
+ 		.div_reg = CM_EMMCDIV,
+ 		.int_bits = 4,
+-		.frac_bits = 8),
++		.frac_bits = 8,
++		.tcnt_mux = 39),
+ 
+ 	/* General purpose (GPIO) clocks */
+ 	[BCM2835_CLOCK_GP0]	= REGISTER_PER_CLK(
+@@ -1827,7 +1908,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.div_reg = CM_GP0DIV,
+ 		.int_bits = 12,
+ 		.frac_bits = 12,
+-		.is_mash_clock = true),
++		.is_mash_clock = true,
++		.tcnt_mux = 20),
+ 	[BCM2835_CLOCK_GP1]	= REGISTER_PER_CLK(
+ 		.name = "gp1",
+ 		.ctl_reg = CM_GP1CTL,
+@@ -1835,7 +1917,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.int_bits = 12,
+ 		.frac_bits = 12,
+ 		.flags = CLK_IS_CRITICAL,
+-		.is_mash_clock = true),
++		.is_mash_clock = true,
++		.tcnt_mux = 21),
+ 	[BCM2835_CLOCK_GP2]	= REGISTER_PER_CLK(
+ 		.name = "gp2",
+ 		.ctl_reg = CM_GP2CTL,
+@@ -1850,40 +1933,46 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.ctl_reg = CM_HSMCTL,
+ 		.div_reg = CM_HSMDIV,
+ 		.int_bits = 4,
+-		.frac_bits = 8),
++		.frac_bits = 8,
++		.tcnt_mux = 22),
+ 	[BCM2835_CLOCK_PCM]	= REGISTER_PER_CLK(
+ 		.name = "pcm",
+ 		.ctl_reg = CM_PCMCTL,
+ 		.div_reg = CM_PCMDIV,
+ 		.int_bits = 12,
+ 		.frac_bits = 12,
+-		.is_mash_clock = true),
++		.is_mash_clock = true,
++		.tcnt_mux = 23),
+ 	[BCM2835_CLOCK_PWM]	= REGISTER_PER_CLK(
+ 		.name = "pwm",
+ 		.ctl_reg = CM_PWMCTL,
+ 		.div_reg = CM_PWMDIV,
+ 		.int_bits = 12,
+ 		.frac_bits = 12,
+-		.is_mash_clock = true),
++		.is_mash_clock = true,
++		.tcnt_mux = 24),
+ 	[BCM2835_CLOCK_SLIM]	= REGISTER_PER_CLK(
+ 		.name = "slim",
+ 		.ctl_reg = CM_SLIMCTL,
+ 		.div_reg = CM_SLIMDIV,
+ 		.int_bits = 12,
+ 		.frac_bits = 12,
+-		.is_mash_clock = true),
++		.is_mash_clock = true,
++		.tcnt_mux = 25),
+ 	[BCM2835_CLOCK_SMI]	= REGISTER_PER_CLK(
+ 		.name = "smi",
+ 		.ctl_reg = CM_SMICTL,
+ 		.div_reg = CM_SMIDIV,
+ 		.int_bits = 4,
+-		.frac_bits = 8),
++		.frac_bits = 8,
++		.tcnt_mux = 27),
+ 	[BCM2835_CLOCK_UART]	= REGISTER_PER_CLK(
+ 		.name = "uart",
+ 		.ctl_reg = CM_UARTCTL,
+ 		.div_reg = CM_UARTDIV,
+ 		.int_bits = 10,
+-		.frac_bits = 12),
++		.frac_bits = 12,
++		.tcnt_mux = 28),
+ 
+ 	/* TV encoder clock.  Only operating frequency is 108Mhz.  */
+ 	[BCM2835_CLOCK_VEC]	= REGISTER_PER_CLK(
+@@ -1891,7 +1980,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.ctl_reg = CM_VECCTL,
+ 		.div_reg = CM_VECDIV,
+ 		.int_bits = 4,
+-		.frac_bits = 0),
++		.frac_bits = 0,
++		.tcnt_mux = 29),
+ 
+ 	/* dsi clocks */
+ 	[BCM2835_CLOCK_DSI0E]	= REGISTER_PER_CLK(
+@@ -1899,25 +1989,29 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.ctl_reg = CM_DSI0ECTL,
+ 		.div_reg = CM_DSI0EDIV,
+ 		.int_bits = 4,
+-		.frac_bits = 8),
++		.frac_bits = 8,
++		.tcnt_mux = 18),
+ 	[BCM2835_CLOCK_DSI1E]	= REGISTER_PER_CLK(
+ 		.name = "dsi1e",
+ 		.ctl_reg = CM_DSI1ECTL,
+ 		.div_reg = CM_DSI1EDIV,
+ 		.int_bits = 4,
+-		.frac_bits = 8),
++		.frac_bits = 8,
++		.tcnt_mux = 19),
+ 	[BCM2835_CLOCK_DSI0P]	= REGISTER_DSI0_CLK(
+ 		.name = "dsi0p",
+ 		.ctl_reg = CM_DSI0PCTL,
+ 		.div_reg = CM_DSI0PDIV,
+ 		.int_bits = 0,
+-		.frac_bits = 0),
++		.frac_bits = 0,
++		.tcnt_mux = 12),
+ 	[BCM2835_CLOCK_DSI1P]	= REGISTER_DSI1_CLK(
+ 		.name = "dsi1p",
+ 		.ctl_reg = CM_DSI1PCTL,
+ 		.div_reg = CM_DSI1PDIV,
+ 		.int_bits = 0,
+-		.frac_bits = 0),
++		.frac_bits = 0,
++		.tcnt_mux = 13),
+ 
+ 	/* the gates */
  
 -- 
 2.11.0
