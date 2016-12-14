@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Dec 2016 23:37:45 +0100
-Subject: [PATCH 38/39] ARM: dts: orion5x-kuroboxpro: Correct license text
+Date: Wed, 14 Dec 2016 23:37:46 +0100
+Subject: [PATCH 39/39] ARM: dts: orion5x-lswsgl: Correct license text
 In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
 References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214223746.23066-39-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214223746.23066-40-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,17 +11,17 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
-Cc: Roger Shimizu <rogershimizu@gmail.com>
+Cc: Benjamin Cama <benoar@dolka.fr>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/orion5x-kuroboxpro.dts | 10 +++++-----
+ arch/arm/boot/dts/orion5x-lswsgl.dts | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/orion5x-kuroboxpro.dts b/arch/arm/boot/dts/orion5x-kuroboxpro.dts
-index 1a672b098d0b..e28b568e741a 100644
---- a/arch/arm/boot/dts/orion5x-kuroboxpro.dts
-+++ b/arch/arm/boot/dts/orion5x-kuroboxpro.dts
-@@ -17,17 +17,17 @@
+diff --git a/arch/arm/boot/dts/orion5x-lswsgl.dts b/arch/arm/boot/dts/orion5x-lswsgl.dts
+index 6b47a52ceb9c..ea966ec03dd0 100644
+--- a/arch/arm/boot/dts/orion5x-lswsgl.dts
++++ b/arch/arm/boot/dts/orion5x-lswsgl.dts
+@@ -14,17 +14,17 @@
   *     published by the Free Software Foundation; either version 2 of the
   *     License, or (at your option) any later version.
   *
@@ -42,7 +42,7 @@ index 1a672b098d0b..e28b568e741a 100644
   *     copy, modify, merge, publish, distribute, sublicense, and/or
   *     sell copies of the Software, and to permit persons to whom the
   *     Software is furnished to do so, subject to the following
-@@ -36,11 +36,11 @@
+@@ -33,11 +33,11 @@
   *     The above copyright notice and this permission notice shall be
   *     included in all copies or substantial portions of the Software.
   *
