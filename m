@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Dec 2016 00:57:38 +0100
-Subject: [PATCH 29/37] ARM: dts: imx6ul-pico-hobbit: Correct license text
+Date: Thu, 15 Dec 2016 00:57:43 +0100
+Subject: [PATCH 34/37] ARM: dts: vf610m4: Correct license text
 In-Reply-To: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
 References: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214235746.7108-30-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214235746.7108-35-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,21 +11,21 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
-Cc: Diego Dorta <diego.dorta@nxp.com>
-Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: Vanessa Maegima <vanessa.maegima@nxp.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Joachim Eastwood <manabian@gmail.com>
+Cc: Stefan Agner <stefan@agner.ch>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/imx6ul-pico-hobbit.dts | 10 +++++-----
+ arch/arm/boot/dts/vf610m4.dtsi | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6ul-pico-hobbit.dts b/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
-index 827d9e8fc74e..7d7254b12a75 100644
---- a/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
-+++ b/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
-@@ -14,17 +14,17 @@
-  *     modify it under the terms of the GNU General Public License
-  *     version 2 as published by the Free Software Foundation.
+diff --git a/arch/arm/boot/dts/vf610m4.dtsi b/arch/arm/boot/dts/vf610m4.dtsi
+index 9f2c731839f2..1474bd34d0f1 100644
+--- a/arch/arm/boot/dts/vf610m4.dtsi
++++ b/arch/arm/boot/dts/vf610m4.dtsi
+@@ -13,17 +13,17 @@
+  *     published by the Free Software Foundation; either version 2 of the
+  *     License, or (at your option) any later version.
   *
 - *     This file is distributed in the hope that it will be useful
 + *     This file is distributed in the hope that it will be useful,
@@ -44,7 +44,7 @@ index 827d9e8fc74e..7d7254b12a75 100644
   *     copy, modify, merge, publish, distribute, sublicense, and/or
   *     sell copies of the Software, and to permit persons to whom the
   *     Software is furnished to do so, subject to the following
-@@ -33,11 +33,11 @@
+@@ -32,11 +32,11 @@
   *     The above copyright notice and this permission notice shall be
   *     included in all copies or substantial portions of the Software.
   *
