@@ -1,81 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Dec 2016 12:17:47 +0000
-Subject: [PATCH 2/2] ARM: soft-reboot into same mode that we entered the
- kernel
-In-Reply-To: <20161214120541.GD14217@n2100.armlinux.org.uk>
-References: <20161213113044.GC19985@leverpostej>
- <E1cH751-0003kk-Ts@rmk-PC.armlinux.org.uk>
- <20161214115648.GG17982@leverpostej>
- <20161214120541.GD14217@n2100.armlinux.org.uk>
-Message-ID: <20161214121747.GH17982@leverpostej>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 14 Dec 2016 17:51:05 +0530
+Subject: [PATCH 1/2] arm64: Add enable/disable d-cache support for
+ purgatory
+In-Reply-To: <20161214113701.GE17982@leverpostej>
+References: <cover.1479788404.git.panand@redhat.com>
+ <7a4866b928c0905ec1074dce1bfc7984c968a58a.1479788404.git.panand@redhat.com>
+ <5838834D.90205@arm.com> <d8f354da-1e61-feaf-f76a-18e90361e98b@redhat.com>
+ <9a79b666-7990-2a23-2d74-52b3317ce272@redhat.com> <58512A01.70101@arm.com>
+ <20161214113701.GE17982@leverpostej>
+Message-ID: <3a6ac655-bfa6-0d90-6351-731ce36e99eb@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2016 at 12:05:41PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Dec 14, 2016 at 11:56:49AM +0000, Mark Rutland wrote:
-> > On Wed, Dec 14, 2016 at 10:46:35AM +0000, Russell King wrote:
-> > > When we soft-reboot (eg, kexec) from one kernel into the next, we need
-> > > to ensure that we enter the new kernel in the same processor mode as
-> > > when we were entered, so that (eg) the new kernel can install its own
-> > > hypervisor - the old kernel's hypervisor will have been overwritten.
-> > > 
-> > > In order to do this, we need to pass a flag to cpu_reset() so it knows
-> > > what to do, and we need to modify the kernel's own hypervisor stub to
-> > > allow it to handle a soft-reboot.
-> > > 
-> > > As we are always guaranteed to install our own hypervisor if we're
-> > > entered in HYP32 mode, and KVM will have moved itself out of the way
-> > > on kexec/normal reboot, we can assume that our hypervisor is in place
-> > > when we want to kexec, so changing our hypervisor API should not be a
-> > > problem.
-> > 
-> > Just to check, does that also hold true for kdump?
-> > 
-> > I haven't gone digging yet, but it looks like KVM might still be
-> > installed, rather than the hyp stub, and we might need some logic to
-> > ensure that it's torn down...
-> 
-> The same problem will be true of ARM64 - I don't see any solution to
-> that in the present state.
 
-Sure. We don't have kdump suppoort yet, and I intend for that to be
-addressed before kdump support is merged.
 
-> > > @@ -51,7 +52,9 @@ static void __soft_restart(void *addr)
-> > >  
-> > >  	/* Switch to the identity mapping. */
-> > >  	phys_reset = (phys_reset_t)virt_to_idmap(cpu_reset);
-> > > -	phys_reset((unsigned long)addr);
-> > > +
-> > > +	/* original stub should be restored by kvm */
-> > > +	phys_reset((unsigned long)addr, is_hyp_mode_available());
-> > 
-> > ... otherwise here we'd call into the KVM hyp code in a potentially
-> > confusing manner.
-> > 
-> > Otherwise, this looks fine to me.
-> 
-> The only thing that I can think which would resolve that would be to
-> lay down a standard API for the hyp code, so things like reboot into
-> hyp mode can work irrespective of the hyp stub in place.
+On Wednesday 14 December 2016 05:07 PM, Mark Rutland wrote:
+> On Wed, Dec 14, 2016 at 11:16:17AM +0000, James Morse wrote:
+>> Hi Pratyush,
+>>
+>> On 14/12/16 10:12, Pratyush Anand wrote:
+>>> On Wednesday 14 December 2016 03:08 PM, Pratyush Anand wrote:
+>>>>> I would go as far as to generate the page tables at 'kexec -l' time,
+>>>>> and only if
+>>>>
+>>>> Ok..So you mean that I create a new section which will have page table
+>>>> entries mapping physicalmemory represented by remaining section, and
+>>>> then purgatory can just enable mmu with page table from that section,
+>>>> right? Seems doable. can do that.
+>>>
+>>> I see a problem here. If we create  page table as a new segment then, how can we
+>>> verify in purgatory that sha for page table is correct? We need page table
+>>> before sha verification start,and we can not rely the page table created by
+>>> first kernel until it's sha is verified. So a chicken-egg problem.
+>>
+>> There is more than one of those! What happens if your sha256 calculation code is
+>> corrupted? You have to run it before you know. The same goes for all the
+>> purgatory code.
+>>
+>> This is why I think its better to do this in the kernel before we exit to
+>> purgatory, but obviously that doesn't work for kdump.
+>
+> I see in an earlier message that the need for sha256 was being discussed
+> in another thread. Do either of you happen to have a pointer to that.
+>
 
-Sure; having the KVM hyp code also implement HVC_SOFT_RESTART seems
-sensible. This would also work for arm64.
+patch 0/2 of this series.
 
-> The issue here is that a panic can happen at any time from any context
-> with any hyp stub in place, so there _needs_ to be a uniform way to do
-> this.  It's very bad that we've got this far without this point having
-> been considered - all we can do right now is to try and fix the issues
-> as they come up.
-> 
-> Right now, let's fix this so we get some kind of improvement, and later
-> try to sort out some kind of uniform interface for this task.
+> To me, it seems like it doesn't come with much benefit for the kdump
+> case given that's best-effort anyway, and as above the verification code
+> could have been be corrupted. In the non-kdump case it's not strictly
+> necessary and seems like a debugging aid rather than a necessary piece
+> of functionality -- if that's the case, a 20 second delay isn't the end
+> of the world...
 
-Sure, that's a bigger task, and this is definitely a step in the right
-direction.
 
-We need to avoid the kdump regression somehow though; can we somehow
-detect if KVM is active and avoid issuing the HVC_SOFT_RESTART?
+Even for the non-kdump ie `kexec -l` case we do not have a functionality 
+to bypass sha verification in kexec-tools. --lite option with the 
+kexec-tools was discouraged and not accepted. So,it is 20s for both 
+`kexec -l` and `kexec -p`.
+Also other arch like x86_64 takes negligible time in sha verification.
 
-Thanks,
-Mark.
+~Pratyush
