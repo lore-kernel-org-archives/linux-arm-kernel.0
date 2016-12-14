@@ -1,104 +1,43 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 14 Dec 2016 22:16:07 +0200
-Subject: [PATCH 2/2] xilinx_dma: Add reset support
-In-Reply-To: <4220c66c29d83bec1ded798ee383b5460c162cfc.1481735244.git.roliveir@synopsys.com>
-References: <cover.1481735244.git.roliveir@synopsys.com>
- <4220c66c29d83bec1ded798ee383b5460c162cfc.1481735244.git.roliveir@synopsys.com>
-Message-ID: <5658430.jXmKZEXWrS@avalon>
+From: pali.rohar@gmail.com (=?UTF-8?q?Pali=20Roh=C3=A1r?=)
+Date: Wed, 14 Dec 2016 22:12:43 +0100
+Subject: [PATCH] arm: dt: Initialize boot_command_line from CONFIG_CMDLINE in
+ case DT does not provide /chosen/bootargs
+Message-ID: <1481749963-8664-1-git-send-email-pali.rohar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ramiro,
+Commit 008a2ebcd677 ("ARM: dts: omap3: Remove skeleton.dtsi usage") broke
+support for setting cmdline on Nokia N900 via CONFIG_CMDLINE.
 
-Thank you for the patch.
+It is because arm code booted in DT mode parse cmdline only via function
+early_init_dt_scan_chosen() and that function does not fill variable
+boot_command_line when DTB does not contain /chosen entry. It is called
+from function early_init_dt_scan_nodes() in setup_machine_fdt().
 
-On Wednesday 14 Dec 2016 17:18:24 Ramiro Oliveira wrote:
-> Add a DT property to control an optional external reset line
-> 
-> Signed-off-by: Ramiro Oliveira <roliveir@synopsys.com>
-> ---
->  drivers/dma/xilinx/xilinx_dma.c | 23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
-> 
-> diff --git a/drivers/dma/xilinx/xilinx_dma.c
-> b/drivers/dma/xilinx/xilinx_dma.c index 5c9f11b..b845224 100644
-> --- a/drivers/dma/xilinx/xilinx_dma.c
-> +++ b/drivers/dma/xilinx/xilinx_dma.c
-> @@ -46,6 +46,7 @@
->  #include <linux/slab.h>
->  #include <linux/clk.h>
->  #include <linux/io-64-nonatomic-lo-hi.h>
-> +#include <linux/reset.h>
+This patch fixes it by explicitly filling boot_command_line in function
+setup_machine_fdt() after calling early_init_dt_scan_nodes() in case
+boot_command_line still remains empty.
 
-I had neatly sorted the header alphabetically until someone added clk.h and 
-io-64-nonatomic-lo-hi.h :-( Could you please move reset.h just before slab.h ?
+Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+---
+ arch/arm/kernel/devtree.c |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-> 
->  #include "../dmaengine.h"
-> 
-> @@ -409,6 +410,7 @@ struct xilinx_dma_device {
->  	struct clk *rxs_clk;
->  	u32 nr_channels;
->  	u32 chan_id;
-> +	struct reset_control *rst;
->  };
-> 
->  /* Macros */
-> @@ -2543,6 +2545,27 @@ static int xilinx_dma_probe(struct platform_device
-> *pdev) if (IS_ERR(xdev->regs))
->  		return PTR_ERR(xdev->regs);
-> 
-> +	xdev->rst = devm_reset_control_get_optional(&pdev->dev, "reset");
-
-devm_reset_control_get_optional() is deprecated as explained in linux/reset.h, 
-you should use devm_reset_control_get_optional_exclusive() or 
-devm_reset_control_get_optional_shared() instead, as applicable.
-
-This being said, I'm wondering why the optional versions of those functions 
-exist, as they do exactly the same as the non-optional versions. The API feels 
-wrong, it should have been modelled like the GPIO API. Feel free to fix it if 
-you want :-) But that's out of scope for this patch.
-
-> +	if (IS_ERR(xdev->rst)) {
-> +		err = PTR_ERR(xdev->rst);
-> +		switch (err) {
-> +		case -ENOENT:
-
-If you drop the name as proposed in the review of patch 1/2 you don't have to 
-check for -ENOENT.
-
-> +		case -ENOTSUPP:
-> +			xdev->rst = NULL;
-> +		break;
-
-Wrong indentation.
-
-You need to handle -EPROBE_DEFER and defer probing of the xilinx_dma device.
-
-> +		default:
-> +			dev_err(xdev->dev, "error getting reset %d\n", err);
-> +		return err;
-
-Wrong indentation.
-
-> +		}
-> +	} else {
-> +		err = reset_control_deassert(xdev->rst);
-> +		if (err) {
-> +			dev_err(xdev->dev, "failed to deassert reset: %d\n",
-> +					err);
-
-Wrong indentation.
-
-> +			return err;
-> +		}
-> +	}
-> +
->  	/* Retrieve the DMA engine properties from the device tree */
->  	xdev->has_sg = of_property_read_bool(node, "xlnx,include-sg");
->  	if (xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA)
-
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index f676feb..dbe25b1 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -260,6 +260,11 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+ 
+ 	early_init_dt_scan_nodes();
+ 
++#ifdef CONFIG_CMDLINE
++	if (!boot_command_line[0])
++		strlcpy(boot_command_line, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
++#endif
++
+ 	/* Change machine number to match the mdesc we're using */
+ 	__machine_arch_type = mdesc->nr;
+ 
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.9.5
