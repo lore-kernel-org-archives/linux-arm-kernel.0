@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Dec 2016 23:46:19 +0100
-Subject: [PATCH 3/4] ARM64: dts: marvell/armada-372x: Correct license text
+Date: Wed, 14 Dec 2016 23:46:18 +0100
+Subject: [PATCH 2/4] ARM64: dts: marvell/armada-3720-db: Correct license text
 In-Reply-To: <20161214224620.23830-1-alexandre.belloni@free-electrons.com>
 References: <20161214224620.23830-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214224620.23830-4-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214224620.23830-3-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,16 +12,18 @@ multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
 Cc: Andreas F?rber <afaerber@suse.de>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-372x.dtsi | 10 +++++-----
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-372x.dtsi b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
-index 5120296596c2..59d7557d3b1b 100644
---- a/arch/arm64/boot/dts/marvell/armada-372x.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
-@@ -16,17 +16,17 @@
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+index 1372e9a6aaa4..2e707875039a 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+@@ -15,17 +15,17 @@
   *     published by the Free Software Foundation; either version 2 of the
   *     License, or (at your option) any later version.
   *
@@ -42,7 +44,7 @@ index 5120296596c2..59d7557d3b1b 100644
   *     copy, modify, merge, publish, distribute, sublicense, and/or
   *     sell copies of the Software, and to permit persons to whom the
   *     Software is furnished to do so, subject to the following
-@@ -35,11 +35,11 @@
+@@ -34,11 +34,11 @@
   *     The above copyright notice and this permission notice shall be
   *     included in all copies or substantial portions of the Software.
   *
