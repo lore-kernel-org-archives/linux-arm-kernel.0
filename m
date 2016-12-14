@@ -1,123 +1,72 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 14 Dec 2016 11:46:15 -0800
-Subject: [PATCH 05/11] drm/vc4: Add support for feeding DSI encoders from the
- pixel valve.
+Date: Wed, 14 Dec 2016 11:46:18 -0800
+Subject: [PATCH 08/11] dt-bindings: Document the Raspberry Pi Touchscreen
+ nodes.
 In-Reply-To: <20161214194621.16499-1-eric@anholt.net>
 References: <20161214194621.16499-1-eric@anholt.net>
-Message-ID: <20161214194621.16499-6-eric@anholt.net>
+Message-ID: <20161214194621.16499-9-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have to set a different pixel format, which tells the hardware to
-use the pix_width field that's fed in sideband from the DSI encoder to
-divide the "pixel" clock.
+This doesn't yet cover input, but the driver does get the display
+working when the firmware is disabled from talking to our I2C lines.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- drivers/gpu/drm/vc4/vc4_crtc.c | 33 +++++++++++++++++++--------------
- drivers/gpu/drm/vc4/vc4_regs.h |  2 ++
- 2 files changed, 21 insertions(+), 14 deletions(-)
+ .../display/panel/raspberrypi,touchscreen.txt      | 45 ++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/raspberrypi,touchscreen.txt
 
-diff --git a/drivers/gpu/drm/vc4/vc4_crtc.c b/drivers/gpu/drm/vc4/vc4_crtc.c
-index a0fd3e66bc4b..cd070e0c79a6 100644
---- a/drivers/gpu/drm/vc4/vc4_crtc.c
-+++ b/drivers/gpu/drm/vc4/vc4_crtc.c
-@@ -349,38 +349,40 @@ static u32 vc4_get_fifo_full_level(u32 format)
- }
- 
- /*
-- * Returns the clock select bit for the connector attached to the
-- * CRTC.
-+ * Returns the encoder attached to the CRTC.
-+ *
-+ * VC4 can only scan out to one encoder at a time, while the DRM core
-+ * allows drivers to push pixels to more than one encoder from the
-+ * same CRTC.
-  */
--static int vc4_get_clock_select(struct drm_crtc *crtc)
-+static struct drm_encoder *vc4_get_crtc_encoder(struct drm_crtc *crtc)
- {
- 	struct drm_connector *connector;
- 
- 	drm_for_each_connector(connector, crtc->dev) {
- 		if (connector->state->crtc == crtc) {
--			struct drm_encoder *encoder = connector->encoder;
--			struct vc4_encoder *vc4_encoder =
--				to_vc4_encoder(encoder);
--
--			return vc4_encoder->clock_select;
-+			return connector->encoder;
- 		}
- 	}
- 
--	return -1;
-+	return NULL;
- }
- 
- static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
- {
- 	struct drm_device *dev = crtc->dev;
- 	struct vc4_dev *vc4 = to_vc4_dev(dev);
-+	struct drm_encoder *encoder = vc4_get_crtc_encoder(crtc);
-+	struct vc4_encoder *vc4_encoder = to_vc4_encoder(encoder);
- 	struct vc4_crtc *vc4_crtc = to_vc4_crtc(crtc);
- 	struct drm_crtc_state *state = crtc->state;
- 	struct drm_display_mode *mode = &state->adjusted_mode;
- 	bool interlace = mode->flags & DRM_MODE_FLAG_INTERLACE;
- 	u32 pixel_rep = (mode->flags & DRM_MODE_FLAG_DBLCLK) ? 2 : 1;
--	u32 format = PV_CONTROL_FORMAT_24;
-+	bool is_dsi = (vc4_encoder->type == VC4_ENCODER_TYPE_DSI0 ||
-+		       vc4_encoder->type == VC4_ENCODER_TYPE_DSI1);
-+	u32 format = is_dsi ? PV_CONTROL_FORMAT_DSIV_24 : PV_CONTROL_FORMAT_24;
- 	bool debug_dump_regs = false;
--	int clock_select = vc4_get_clock_select(crtc);
- 
- 	if (debug_dump_regs) {
- 		DRM_INFO("CRTC %d regs before:\n", drm_crtc_index(crtc));
-@@ -436,17 +438,19 @@ static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
- 		 */
- 		CRTC_WRITE(PV_V_CONTROL,
- 			   PV_VCONTROL_CONTINUOUS |
-+			   (is_dsi ? PV_VCONTROL_DSI : 0) |
- 			   PV_VCONTROL_INTERLACE |
- 			   VC4_SET_FIELD(mode->htotal * pixel_rep / 2,
- 					 PV_VCONTROL_ODD_DELAY));
- 		CRTC_WRITE(PV_VSYNCD_EVEN, 0);
- 	} else {
--		CRTC_WRITE(PV_V_CONTROL, PV_VCONTROL_CONTINUOUS);
-+		CRTC_WRITE(PV_V_CONTROL,
-+			   PV_VCONTROL_CONTINUOUS |
-+			   (is_dsi ? PV_VCONTROL_DSI : 0));
- 	}
- 
- 	CRTC_WRITE(PV_HACT_ACT, mode->hdisplay * pixel_rep);
- 
--
- 	CRTC_WRITE(PV_CONTROL,
- 		   VC4_SET_FIELD(format, PV_CONTROL_FORMAT) |
- 		   VC4_SET_FIELD(vc4_get_fifo_full_level(format),
-@@ -455,7 +459,8 @@ static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
- 		   PV_CONTROL_CLR_AT_START |
- 		   PV_CONTROL_TRIGGER_UNDERFLOW |
- 		   PV_CONTROL_WAIT_HSTART |
--		   VC4_SET_FIELD(clock_select, PV_CONTROL_CLK_SELECT) |
-+		   VC4_SET_FIELD(vc4_encoder->clock_select,
-+				 PV_CONTROL_CLK_SELECT) |
- 		   PV_CONTROL_FIFO_CLR |
- 		   PV_CONTROL_EN);
- 
-diff --git a/drivers/gpu/drm/vc4/vc4_regs.h b/drivers/gpu/drm/vc4/vc4_regs.h
-index b3b297fba709..385405a2df05 100644
---- a/drivers/gpu/drm/vc4/vc4_regs.h
-+++ b/drivers/gpu/drm/vc4/vc4_regs.h
-@@ -190,6 +190,8 @@
- # define PV_VCONTROL_ODD_DELAY_SHIFT		6
- # define PV_VCONTROL_ODD_FIRST			BIT(5)
- # define PV_VCONTROL_INTERLACE			BIT(4)
-+# define PV_VCONTROL_DSI			BIT(3)
-+# define PV_VCONTROL_COMMAND			BIT(2)
- # define PV_VCONTROL_CONTINUOUS			BIT(1)
- # define PV_VCONTROL_VIDEN			BIT(0)
- 
+diff --git a/Documentation/devicetree/bindings/display/panel/raspberrypi,touchscreen.txt b/Documentation/devicetree/bindings/display/panel/raspberrypi,touchscreen.txt
+new file mode 100644
+index 000000000000..fd328c52706b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/raspberrypi,touchscreen.txt
+@@ -0,0 +1,45 @@
++This binding covers the official 7" (800x480) Raspberry Pi touchscreen
++panel.
++
++This DSI panel contains:
++
++- TC358762 DSI->DPI bridge
++- Atmel microcontroller on I2C for power sequencing the DSI bridge and
++  controlling backlight
++- Touchscreen controller on I2C for touch input
++
++and the binding currently covers the DSI display parts but not its
++touch input.
++
++Required properties:
++- compatible:	Must be "raspberrypi,touchscreen"
++- raspberrypi,touchscreen-bridge:
++		Handle to the I2C device for Atmel microcontroller
++
++Example:
++
++dsi1: dsi at 7e700000 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	<...>
++
++	pitouchscreen: panel at 0 {
++		compatible = "raspberrypi,touchscreen";
++		reg = <0>;
++
++		raspberrypi,touchscreen-bridge = <&pitouchscreen_bridge>;
++	};
++};
++
++i2c_dsi: i2c {
++	compatible = "i2c-gpio";
++	#address-cells = <1>;
++	#size-cells = <0>;
++	gpios = <&gpio 28 0
++		 &gpio 29 0>;
++
++	pitouchscreen_bridge: bridge at 45 {
++		compatible = "raspberrypi,touchscreen-bridge-i2c";
++		reg = <0x45>;
++	};
++};
 -- 
 2.11.0
