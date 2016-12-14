@@ -1,45 +1,58 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 14 Dec 2016 13:53:23 +0100
-Subject: partial bluetooth success on n900 [was Re: bluetooth/uart
- timeout handling]
-In-Reply-To: <201612141321.30181@pali>
-References: <20161016002454.ul5rdqwubvkct4pf@earth>
- <20161018224259.jrwbaal27irzjqyo@earth> <20161019092506.GA1461@amd>
- <201612141321.30181@pali>
-Message-ID: <20161214125323.GA4951@amd>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 14 Dec 2016 04:56:41 -0800
+Subject: [PATCH linux v1 0/4] Seven segment display support
+In-Reply-To: <20161214134530.2bd54a4e@free-electrons.com>
+References: <1481702104-8617-1-git-send-email-jaghu@google.com>
+ <20161214134530.2bd54a4e@free-electrons.com>
+Message-ID: <20161214125641.GA5379@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > [  220.248596] tty ttyO1: Radio packet sent
-> > [  220.249328] Bluetooth: hci0: Frame reassembly failed (-84)
-> > [  220.272949] tty ttyO1: wakeup received: 1 -> 0
-> > [  221.283477] tty ttyO1: radio packet timeout!
-> > [  221.283630] enqueue: hu c304cc80 skb cd4a9b40
-> > [  223.363372] Bluetooth: hci0 command 0xfc18 tx timeout
-> > pavel at n900:~$
+On Wed, Dec 14, 2016 at 01:45:30PM +0100, Thomas Petazzoni wrote:
+> Hello,
 > 
-> In log are still some failures, but ... is bluetooth working now?
-
-It is... for Sebastian. I'm playing with camera now.
-
-> I see that you applied this patch: 
-> https://git.kernel.org/cgit/linux/kernel/git/pavel/linux-n900.git/commit/?id=051aa3fbf03ac770d8344690f5a936a7f04c6884
+> On Tue, 13 Dec 2016 23:55:00 -0800, Jaghathiswari Rankappagounder
+> Natarajan wrote:
 > 
-> Looks like that pinmux is in DTS file incorrect. Can somebody verify it? 
-> Maybe Tony?
+> > Documentation for the binding which provides an interface for adding clock,
+> > data and clear signal GPIO lines to control seven segment display.
+> > 
+> > The platform device driver provides an API for displaying on two 7-segment
+> > displays, and implements the required bit-banging. The hardware assumed is
+> > 74HC164 wired to two 7-segment displays.
+> > 
+> > The character device driver implements the user-space API for letting a user
+> > write to two 7-segment displays including any conversion methods necessary
+> > to map the user input to two 7-segment displays.
+> > 
+> > Adding clock, data and clear signal GPIO lines in the devicetree to control
+> > seven segment display on zaius platform.
+> > 
+> > The platform driver matches on the device tree node; the platform driver also
+> > initializes the character device.
+> > 
+> > Tested that the seven segment display works properly by writing to the
+> > character device file on a EVB AST2500 board which also has 74HC164 wired
+> > to two 7-segment displays.
+> 
+> FWIW, I proposed a driver for seven segment displays back in 2013:
+> 
+>    http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/139986.html
+> 
+> And the feedback from Greg KH was: we don't need a driver for that, do
+> it from userspace. See:
+> 
+>    http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/139992.html
+> 
+> So: good luck :-)
 
-Yes, it is. Sebastian was pretty certain about that.
+Did anyone ever write a library for this type of thing?
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161214/615b77da/attachment-0001.sig>
+Again, I don't want to see one-off drivers for random devices like this
+that should be able to all be controlled from userspace in a common
+manner.  Much like we did for fingerprint readers a long long time
+ago...
+
+thanks,
+
+greg k-h
