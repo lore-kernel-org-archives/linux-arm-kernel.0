@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Dec 2016 00:57:41 +0100
-Subject: [PATCH 32/37] ARM: dts: vf610: Correct license text
+Date: Thu, 15 Dec 2016 00:57:33 +0100
+Subject: [PATCH 24/37] ARM: dts: imx6q-marsboard: Correct license text
 In-Reply-To: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
 References: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214235746.7108-33-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214235746.7108-25-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,29 +11,17 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
-Cc: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
-Cc: Chao Fu <b44548@freescale.com>
-Cc: Chircu Bogdan <Bogdan.Chircu@freescale.com>
-Cc: Cosmin Stoica <cosminstefan.stoica@freescale.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Eddy Petrisor <eddy.petrisor@freescale.com>
-Cc: Fugang Duan <B38611@freescale.com>
-Cc: Huang Shijie <b32955@freescale.com>
-Cc: Jingchang Lu <b35083@freescale.com>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Stefan Agner <stefan@agner.ch>
-Cc: Stephen Warren <swarren@nvidia.com>
-Cc: Xiubo Li <Li.Xiubo@freescale.com>
-Cc: Yuan Yao <yao.yuan@freescale.com>
+Cc: Sergio Prado <sergio.prado@e-labworks.com>
+Cc: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/vf610.dtsi | 10 +++++-----
+ arch/arm/boot/dts/imx6q-marsboard.dts | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index 0cfc060f94d7..80fef182c672 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
+diff --git a/arch/arm/boot/dts/imx6q-marsboard.dts b/arch/arm/boot/dts/imx6q-marsboard.dts
+index f7995c513b67..6ebf69d0f56e 100644
+--- a/arch/arm/boot/dts/imx6q-marsboard.dts
++++ b/arch/arm/boot/dts/imx6q-marsboard.dts
 @@ -10,17 +10,17 @@
   *     modify it under the terms of the GNU General Public License
   *     version 2 as published by the Free Software Foundation.
