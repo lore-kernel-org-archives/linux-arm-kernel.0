@@ -1,38 +1,61 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Dec 2016 23:58:27 +0000
-Subject: [PATCH] arm: Adjust memory boundaries after reservations
-In-Reply-To: <1481681501-13788-1-git-send-email-labbott@redhat.com>
-References: <1481681501-13788-1-git-send-email-labbott@redhat.com>
-Message-ID: <20161214235827.GI14217@n2100.armlinux.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 15 Dec 2016 00:57:25 +0100
+Subject: [PATCH 16/37] ARM: dts: imx6qdl-icore-rqs: Correct license text
+In-Reply-To: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
+References: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214235746.7108-17-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2016 at 06:11:41PM -0800, Laura Abbott wrote:
-> The poorly named sanity_check_meminfo is responsible for setting up the
-> boundary for lowmem/highmem. This needs to be set up before memblock
-> reservations can occur. At the time memblock reservations can occur,
-> memory can also be removed from the system. This can throw off the
-> calculation of the lowmem/highmem boundary. On some systems this may be
-> harmless, on others this may result in incorrect ranges being passed to
-> the main memory allocator. Correct this by recalcuating the
-> lowmem/highmem boundary after all reservations have been made.
-> As part of this, rename sanity_check_meminfo to actually refect what the
-> function is doing.
+The license test has been mangled at some point then copy pasted across
+multiple files. Restore it to what it should be.
+Note that this is not intended as a license change.
 
-I think this needs more explanation - after reading that, I'm left
-wondering wtf is going on...
+Cc: Michael Trimarchi <michael@amarulasolutions.com>
+Cc: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-Let's say that the memory boundary was at 0x30000000.  Memory from
-0x2f000000 to 0x30000000 is stolen, which reserves it and removes
-it from the available memory.
-
-Since the memory is no longer available, why would the stolen range
-end up being passed to the main memory allocator?
-
-How is this any different from the boot loader omitting the memory
-range in the first place?
-
+diff --git a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+index d5c3aa88adbe..ed60d72b06b9 100644
+--- a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+@@ -10,17 +10,17 @@
+  *     modify it under the terms of the GNU General Public License
+  *     version 2 as published by the Free Software Foundation.
+  *
+- *     This file is distributed in the hope that it will be useful
++ *     This file is distributed in the hope that it will be useful,
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+  *
+- * Or, alternatively
++ * Or, alternatively,
+  *
+  *  b) Permission is hereby granted, free of charge, to any person
+  *     obtaining a copy of this software and associated documentation
+  *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use
++ *     restriction, including without limitation the rights to use,
+  *     copy, modify, merge, publish, distribute, sublicense, and/or
+  *     sell copies of the Software, and to permit persons to whom the
+  *     Software is furnished to do so, subject to the following
+@@ -29,11 +29,11 @@
+  *     The above copyright notice and this permission notice shall be
+  *     included in all copies or substantial portions of the Software.
+  *
+- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.10.2
