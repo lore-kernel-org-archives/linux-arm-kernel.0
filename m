@@ -1,29 +1,78 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 14 Dec 2016 19:43:50 +0530
-Subject: [PATCH 1/2] arm64: Add enable/disable d-cache support for
- purgatory
-In-Reply-To: <20161214134457.GJ17982@leverpostej>
-References: <cover.1479788404.git.panand@redhat.com>
- <7a4866b928c0905ec1074dce1bfc7984c968a58a.1479788404.git.panand@redhat.com>
- <5838834D.90205@arm.com> <d8f354da-1e61-feaf-f76a-18e90361e98b@redhat.com>
- <9a79b666-7990-2a23-2d74-52b3317ce272@redhat.com> <58512A01.70101@arm.com>
- <20161214113701.GE17982@leverpostej>
- <3a6ac655-bfa6-0d90-6351-731ce36e99eb@redhat.com>
- <20161214134457.GJ17982@leverpostej>
-Message-ID: <8a22f7bb-d0c4-8bda-4c2a-7a5c0b441a9b@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Dec 2016 15:15:53 +0100
+Subject: [PATCH linux v1 0/4] Seven segment display support
+In-Reply-To: <ac324946-41da-c090-a0ca-78155611bb7e@baylibre.com>
+References: <1481702104-8617-1-git-send-email-jaghu@google.com>
+ <20161214125641.GA5379@kroah.com>
+ <ac324946-41da-c090-a0ca-78155611bb7e@baylibre.com>
+Message-ID: <2512681.Wh85HyB8FH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wednesday, December 14, 2016 2:12:41 PM CET Neil Armstrong wrote:
+> On 12/14/2016 01:56 PM, Greg KH wrote:
+> > On Wed, Dec 14, 2016 at 01:45:30PM +0100, Thomas Petazzoni wrote:
+> >> Hello,
+> >>
+> >> On Tue, 13 Dec 2016 23:55:00 -0800, Jaghathiswari Rankappagounder
+> >> Natarajan wrote:
+> >>
+> >>> Documentation for the binding which provides an interface for adding clock,
+> >>> data and clear signal GPIO lines to control seven segment display.
+> >>>
+> >>> The platform device driver provides an API for displaying on two 7-segment
+> >>> displays, and implements the required bit-banging. The hardware assumed is
+> >>> 74HC164 wired to two 7-segment displays.
+> >>>
+> >>> The character device driver implements the user-space API for letting a user
+> >>> write to two 7-segment displays including any conversion methods necessary
+> >>> to map the user input to two 7-segment displays.
+> >>>
+> >>> Adding clock, data and clear signal GPIO lines in the devicetree to control
+> >>> seven segment display on zaius platform.
+> >>>
+> >>> The platform driver matches on the device tree node; the platform driver also
+> >>> initializes the character device.
+> >>>
+> >>> Tested that the seven segment display works properly by writing to the
+> >>> character device file on a EVB AST2500 board which also has 74HC164 wired
+> >>> to two 7-segment displays.
+> >>
+> >> FWIW, I proposed a driver for seven segment displays back in 2013:
+> >>
+> >>    http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/139986.html
+> >>
+> >> And the feedback from Greg KH was: we don't need a driver for that, do
+> >> it from userspace. See:
+> >>
+> >>    http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/139992.html
+> >>
+> >> So: good luck 
+> > 
+> > Did anyone ever write a library for this type of thing?
+> > 
+> > Again, I don't want to see one-off drivers for random devices like this
+> > that should be able to all be controlled from userspace in a common
+> > manner.  Much like we did for fingerprint readers a long long time
+> > ago...
+> > 
 
+> Actually, it's more than a random interface, a lot of SoCs and boards actually have such displays
+> and it's a pity to use UIO, sysfs gpio bitbanging and all sort of ugly stuff to only print a few
+> characters a simple and clean driver could achieve.
+> Some very well known SoCs even have integrated registers to lower the BOM and bypass the need for
+> a 74HC164 like component and avoid gpio bit banging.
+> 
+> My personal concern is that you could also need to drive more segments, thus 7-segments
+> is too restrictive.
+> 
+> But this driver is well structured, the gpio-bitbanging sub-driver is welcome.
 
-On Wednesday 14 December 2016 07:14 PM, Mark Rutland wrote:
->> Even for the non-kdump ie `kexec -l` case we do not have a
->> > functionality to bypass sha verification in kexec-tools. --lite
->> > option with the kexec-tools was discouraged and not accepted.
-> Ok. Do you have a pointer to the thread regarding that, for context?
->
+Maybe we can find a way to fit this into the existing drivers/leds/ subsystem?
 
-https://lists.ozlabs.org/pipermail/petitboot/2015-October/000141.html
-https://lists.ozlabs.org/pipermail/petitboot/2015-October/000136.html
+That already supports blinking, brightness and colour attributes of LEDs,
+so could this be extended to support (one of) digit, number, character
+or string with a common sysfs attribute and a way to hook up a led driver
+to that?
 
-~Pratyush
+	Arnd
