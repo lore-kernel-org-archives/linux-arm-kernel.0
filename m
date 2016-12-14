@@ -1,189 +1,59 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 14 Dec 2016 14:28:06 +0100
-Subject: [PATCH] ARM: dts: Add missing CPU frequencies for Exynos5422/5800
-In-Reply-To: <26ffeee4-ff43-b3d3-3267-5fcbc50e2974@osg.samsung.com>
-References: <5220084.l31t5oJbsy@amdc3058>
- <CGME20161213191823epcas5p346582b73ad9b401d9e773a1b076f1f61@epcas5p3.samsung.com>
- <26ffeee4-ff43-b3d3-3267-5fcbc50e2974@osg.samsung.com>
-Message-ID: <2340115.HEG9AYUCMD@amdc3058>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 14 Dec 2016 14:31:58 +0100
+Subject: partial bluetooth success on n900 [was Re: bluetooth/uart
+ timeout handling]
+In-Reply-To: <20161214125323.GA4951@amd>
+References: <20161016002454.ul5rdqwubvkct4pf@earth>
+ <20161018224259.jrwbaal27irzjqyo@earth> <20161019092506.GA1461@amd>
+ <201612141321.30181@pali> <20161214125323.GA4951@amd>
+Message-ID: <20161214133158.mwvs574l4otbc7hf@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Pali & Pavel,
 
-On Tuesday, December 13, 2016 04:18:05 PM Javier Martinez Canillas wrote:
-> Hello Bartlomiej,
-
-Hi,
-
-> On 12/13/2016 01:52 PM, Bartlomiej Zolnierkiewicz wrote:
-> > Add missing 2000MHz & 1900MHz OPPs (for A15 cores) and 1400MHz OPP
-> > (for A7 cores).  Also update common Odroid-XU3 Lite/XU3/XU4 thermal
-> > cooling maps to account for new OPPs.
+On Wed, Dec 14, 2016 at 01:53:23PM +0100, Pavel Machek wrote:
+> > > [  220.248596] tty ttyO1: Radio packet sent
+> > > [  220.249328] Bluetooth: hci0: Frame reassembly failed (-84)
+> > > [  220.272949] tty ttyO1: wakeup received: 1 -> 0
+> > > [  221.283477] tty ttyO1: radio packet timeout!
+> > > [  221.283630] enqueue: hu c304cc80 skb cd4a9b40
+> > > [  223.363372] Bluetooth: hci0 command 0xfc18 tx timeout
+> > > pavel at n900:~$
 > > 
-> > Since new OPPs are not available on all Exynos5422/5800 boards modify
-> > dts files for Odroid-XU3 Lite (limited to 1.8 GHz / 1.3 GHz) & Peach
-> > Pi (limited to 2.0 GHz / 1.3 GHz) accordingly.
+> > In log are still some failures, but ... is bluetooth working now?
+
+I could scan for devices. The code is still racy, though. It's
+most likely related to the newly introduced idle code. (Without
+sending the BT module to correctly idle the bcm2048 does not
+work correctly at all)
+
+I was quite busy the last few weeks and did not manage to find
+much time for kernel work. Now I will first have to catch up
+with my power-supply tree.
+
+> It is... for Sebastian. I'm playing with camera now.
+> 
+> > I see that you applied this patch: 
+> > https://git.kernel.org/cgit/linux/kernel/git/pavel/linux-n900.git/commit/?id=051aa3fbf03ac770d8344690f5a936a7f04c6884
 > > 
-> > Tested on Odroid-XU3 and XU3 Lite.
-> > 
-> > Cc: Doug Anderson <dianders@chromium.org>
-> > Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> > Cc: Andreas Faerber <afaerber@suse.de>
-> > Cc: Thomas Abraham <thomas.ab@samsung.com>
-> > Cc: Ben Gamari <ben@smart-cactus.org>
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > ---
-> >  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |   14 +++++++-------
-> >  arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts    |   17 +++++++++++++++++
-> >  arch/arm/boot/dts/exynos5800-peach-pi.dts          |    4 ++++
-> >  arch/arm/boot/dts/exynos5800.dtsi                  |   15 +++++++++++++++
-> >  4 files changed, 43 insertions(+), 7 deletions(-)
-> > 
-> > Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> > ===================================================================
-> > --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2016-12-13 15:59:33.779763261 +0100
-> > +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2016-12-13 15:59:33.775763261 +0100
-> > @@ -118,7 +118,7 @@
-> >  				/*
-> >  				 * When reaching cpu_alert3, reduce CPU
-> >  				 * by 2 steps. On Exynos5422/5800 that would
-> > -				 * be: 1600 MHz and 1100 MHz.
-> > +				 * (usually) be: 1800 MHz and 1200 MHz.
-> >  				 */
-> >  				map3 {
-> >  					trip = <&cpu_alert3>;
-> > @@ -131,16 +131,16 @@
-> >  
-> >  				/*
-> >  				 * When reaching cpu_alert4, reduce CPU
-> > -				 * further, down to 600 MHz (11 steps for big,
-> > -				 * 7 steps for LITTLE).
-> > +				 * further, down to 600 MHz (13 steps for big,
-> > +				 * 8 steps for LITTLE).
-> >  				 */
-> > -				map5 {
-> > +				cooling_map5: map5 {
-> >  					trip = <&cpu_alert4>;
-> > -					cooling-device = <&cpu0 3 7>;
-> > +					cooling-device = <&cpu0 3 8>;
-> >  				};
-> > -				map6 {
-> > +				cooling_map6: map6 {
-> >  					trip = <&cpu_alert4>;
-> > -					cooling-device = <&cpu4 3 11>;
-> > +					cooling-device = <&cpu4 3 13>;
-> >  				};
-> >  			};
-> >  		};
-> > Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-> > ===================================================================
-> > --- a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts	2016-12-13 15:59:33.779763261 +0100
-> > +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts	2016-12-13 15:59:33.775763261 +0100
-> > @@ -21,6 +21,23 @@
-> >  	compatible = "hardkernel,odroid-xu3-lite", "samsung,exynos5800", "samsung,exynos5";
-> >  };
-> >  
-> > +&cluster_a15_opp_table {
-> > +	/delete-node/opp at 2000000000;
-> > +	/delete-node/opp at 1900000000;
-> > +};
-> > +
-> > +&cluster_a7_opp_table {
-> > +	/delete-node/opp at 1400000000;
-> > +};
-> > +
+> > Looks like that pinmux is in DTS file incorrect. Can somebody verify it? 
+> > Maybe Tony?
 > 
-> I think that a comment in the DTS why these operating points aren't available
-> in this board will make more clear why the nodes are being deleted.
+> Yes, it is. Sebastian was pretty certain about that.
 
-Ok, I will add these comments in the next patch revision.
+Yes, I'm certain. The bootloader enables the pullup resistors.
+Note, that the wrong DTS entry is not in mainline. My bluetooth
+branch has a fixed DTS patch instead of a fixup patch on top of
+the broken one:
 
-> > +&cooling_map5 {
-> > +	cooling-device = <&cpu0 3 7>;
-> > +};
-> > +
-> > +&cooling_map6 {
-> > +	cooling-device = <&cpu4 3 11>;
-> > +};
-> > +
-> >  &pwm {
-> >  	/*
-> >  	 * PWM 0 -- fan
-> > Index: b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> > ===================================================================
-> > --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts	2016-12-13 15:59:33.779763261 +0100
-> > +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts	2016-12-13 15:59:33.779763261 +0100
-> > @@ -146,6 +146,10 @@
-> >  	vdd-supply = <&ldo9_reg>;
-> >  };
-> >  
-> > +&cluster_a7_opp_table {
-> > +	/delete-property/opp at 1400000000;
-> > +};
-> > +
-> >  &cpu0 {
-> >  	cpu-supply = <&buck2_reg>;
-> >  };
-> > Index: b/arch/arm/boot/dts/exynos5800.dtsi
-> > ===================================================================
-> > --- a/arch/arm/boot/dts/exynos5800.dtsi	2016-12-13 15:59:33.779763261 +0100
-> > +++ b/arch/arm/boot/dts/exynos5800.dtsi	2016-12-13 15:59:33.779763261 +0100
-> > @@ -24,6 +24,16 @@
-> >  };
-> >  
-> >  &cluster_a15_opp_table {
-> > +	opp at 2000000000 {
-> > +		opp-hz = /bits/ 64 <2000000000>;
-> > +		opp-microvolt = <1250000>;
-> > +		clock-latency-ns = <140000>;
-> > +	};
-> > +	opp at 1900000000 {
-> > +		opp-hz = /bits/ 64 <1900000000>;
-> > +		opp-microvolt = <1250000>;
-> > +		clock-latency-ns = <140000>;
-> > +	};
-> >  	opp at 1700000000 {
-> >  		opp-microvolt = <1250000>;
-> >  	};
-> > @@ -85,6 +95,11 @@
-> >  };
-> >
-> 
-> AFAIK Thomas restricted the maximum OPP, because for A15 freqs > 1.8GHz the
-> INT rail would need to be scaled up as well since there's a maximum voltage
-> difference between the ARM and INT rails before the system becomes unstable:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/276766.html
-> https://lkml.org/lkml/2014/5/2/419
-> 
-> The ChromiumOS vendor tree uses a virtual regulator driver that makes sure
-> the maximum voltage skew is between a limit. But that never made to mainline:
-> 
-> https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/arch/arm/boot/dts/exynos5420-peach-pit.dtsi#90
-> https://lkml.org/lkml/2014/4/29/28
-> 
-> Did that change and there's infrastructure in mainline now to cope with that?
-> If that's the case, I think it would be good to mention in the commit message.
+https://git.kernel.org/cgit/linux/kernel/git/sre/linux-n900.git/commit/?h=nokia-bluetooth-dev&id=6b63c111a979d100cfbdd76cb4a6bbadace35216
 
-I was not aware of this limitation and AFAIK mainline has currently
-no code to handle it.  I also cannot find any code to handle this in
-Hardkernel's vendor kernel for Odroid-XU3 board.
-
-Do you know whether this problem exists also on Exynos5422/5800
-SoCs or only on Exynos5420 one?  I see that ChromiumOS uses virtual
-regulator code also on Exynos5800 SoC based Peach Pi board but was
-the problem actually present on this board?
-
-[ I added Arjun to Cc:, maybe he can help in explaining this issue
-  (unfortunately Inderpal's email is no longer working). ]
-
-Please also note that on Exynos5422/5800 SoCs the same ARM rail
-voltage is used for 1.9 GHz & 2.0 GHz OPPs as for the 1.8 GHz one.
-IOW if the problem exists it is already present in the mainline
-kernel.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161214/28d87fe2/attachment.sig>
