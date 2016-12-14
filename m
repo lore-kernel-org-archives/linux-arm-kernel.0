@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Dec 2016 23:37:25 +0100
-Subject: [PATCH 18/39] ARM: dts: armada-390: Correct license text
+Date: Wed, 14 Dec 2016 23:37:27 +0100
+Subject: [PATCH 20/39] ARM: dts: armada-398-db: Correct license text
 In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
 References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214223746.23066-19-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214223746.23066-21-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,16 +12,18 @@ multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
 Cc: Grzegorz Jaszczyk <jaz@semihalf.com>
+Cc: Rafa? Mi?ecki <zajec5@gmail.com>
+Cc: Stefan Roese <sr@denx.de>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-390.dtsi | 10 +++++-----
+ arch/arm/boot/dts/armada-398-db.dts | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-390.dtsi b/arch/arm/boot/dts/armada-390.dtsi
-index 6cd18d8aaac7..0d8a54ad007c 100644
---- a/arch/arm/boot/dts/armada-390.dtsi
-+++ b/arch/arm/boot/dts/armada-390.dtsi
+diff --git a/arch/arm/boot/dts/armada-398-db.dts b/arch/arm/boot/dts/armada-398-db.dts
+index 268c8349c884..e8604281c3c9 100644
+--- a/arch/arm/boot/dts/armada-398-db.dts
++++ b/arch/arm/boot/dts/armada-398-db.dts
 @@ -15,17 +15,17 @@
   *     published by the Free Software Foundation; either version 2 of the
   *     License, or (at your option) any later version.
