@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Dec 2016 00:57:16 +0100
-Subject: [PATCH 07/37] ARM: dts: imx6dl-ts4900: Correct license text
+Date: Thu, 15 Dec 2016 00:57:17 +0100
+Subject: [PATCH 08/37] ARM: dts: imx6q-apalis-ixora: Correct license text
 In-Reply-To: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
 References: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214235746.7108-8-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214235746.7108-9-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,17 +11,21 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
-Cc: Lucile Quirion <lucile.quirion@savoirfairelinux.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Juergen Borleis <jbe@pengutronix.de>
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+Cc: Petr ?tetiar <ynezz@true.cz>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/imx6dl-ts4900.dts | 10 +++++-----
+ arch/arm/boot/dts/imx6q-apalis-ixora.dts | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl-ts4900.dts b/arch/arm/boot/dts/imx6dl-ts4900.dts
-index 85eddeb30e21..6ea0b780677d 100644
---- a/arch/arm/boot/dts/imx6dl-ts4900.dts
-+++ b/arch/arm/boot/dts/imx6dl-ts4900.dts
-@@ -10,17 +10,17 @@
+diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora.dts b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+index 207b85b91ada..97b9b53a5086 100644
+--- a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
++++ b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+@@ -12,17 +12,17 @@
   *     modify it under the terms of the GNU General Public License
   *     version 2 as published by the Free Software Foundation.
   *
@@ -42,7 +46,7 @@ index 85eddeb30e21..6ea0b780677d 100644
   *     copy, modify, merge, publish, distribute, sublicense, and/or
   *     sell copies of the Software, and to permit persons to whom the
   *     Software is furnished to do so, subject to the following
-@@ -29,11 +29,11 @@
+@@ -31,11 +31,11 @@
   *     The above copyright notice and this permission notice shall be
   *     included in all copies or substantial portions of the Software.
   *
