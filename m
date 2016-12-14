@@ -1,165 +1,81 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 14 Dec 2016 20:20:40 +0200
-Subject: [PATCH] ARM: dts: Add missing CPU frequencies for Exynos5422/5800
-In-Reply-To: <26ffeee4-ff43-b3d3-3267-5fcbc50e2974@osg.samsung.com>
-References: <5220084.l31t5oJbsy@amdc3058>
- <26ffeee4-ff43-b3d3-3267-5fcbc50e2974@osg.samsung.com>
-Message-ID: <20161214182040.GA5292@kozik-lap>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 14 Dec 2016 10:47:07 -0800
+Subject: [PATCH v3 1/2] ARM: ep93xx: Register ts73xx-fpga manager driver
+ for TS-7300
+In-Reply-To: <CAAtXAHcO4bN2YmrEabiivnBJLXdU56j4rv4A12FL_XKuwc5Dxw@mail.gmail.com>
+References: <20161214023553.9377-1-f.fainelli@gmail.com>
+ <20161214023553.9377-2-f.fainelli@gmail.com>
+ <CAAtXAHcO4bN2YmrEabiivnBJLXdU56j4rv4A12FL_XKuwc5Dxw@mail.gmail.com>
+Message-ID: <322992d6-a6f9-3893-7edc-52e4b7649b3e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2016 at 04:18:05PM -0300, Javier Martinez Canillas wrote:
-> Hello Bartlomiej,
+On 12/13/2016 10:14 PM, Moritz Fischer wrote:
+> Hi Florian,
 > 
-> On 12/13/2016 01:52 PM, Bartlomiej Zolnierkiewicz wrote:
-> > Add missing 2000MHz & 1900MHz OPPs (for A15 cores) and 1400MHz OPP
-> > (for A7 cores).  Also update common Odroid-XU3 Lite/XU3/XU4 thermal
-> > cooling maps to account for new OPPs.
-> > 
-> > Since new OPPs are not available on all Exynos5422/5800 boards modify
-> > dts files for Odroid-XU3 Lite (limited to 1.8 GHz / 1.3 GHz) & Peach
-> > Pi (limited to 2.0 GHz / 1.3 GHz) accordingly.
-> > 
-> > Tested on Odroid-XU3 and XU3 Lite.
-> > 
-> > Cc: Doug Anderson <dianders@chromium.org>
-> > Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> > Cc: Andreas Faerber <afaerber@suse.de>
-> > Cc: Thomas Abraham <thomas.ab@samsung.com>
-> > Cc: Ben Gamari <ben@smart-cactus.org>
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > ---
-> >  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |   14 +++++++-------
-> >  arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts    |   17 +++++++++++++++++
-> >  arch/arm/boot/dts/exynos5800-peach-pi.dts          |    4 ++++
-> >  arch/arm/boot/dts/exynos5800.dtsi                  |   15 +++++++++++++++
-> >  4 files changed, 43 insertions(+), 7 deletions(-)
-> > 
-> > Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> > ===================================================================
-> > --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2016-12-13 15:59:33.779763261 +0100
-> > +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2016-12-13 15:59:33.775763261 +0100
-> > @@ -118,7 +118,7 @@
-> >  				/*
-> >  				 * When reaching cpu_alert3, reduce CPU
-> >  				 * by 2 steps. On Exynos5422/5800 that would
-> > -				 * be: 1600 MHz and 1100 MHz.
-> > +				 * (usually) be: 1800 MHz and 1200 MHz.
-> >  				 */
-> >  				map3 {
-> >  					trip = <&cpu_alert3>;
-> > @@ -131,16 +131,16 @@
-> >  
-> >  				/*
-> >  				 * When reaching cpu_alert4, reduce CPU
-> > -				 * further, down to 600 MHz (11 steps for big,
-> > -				 * 7 steps for LITTLE).
-> > +				 * further, down to 600 MHz (13 steps for big,
-> > +				 * 8 steps for LITTLE).
-> >  				 */
-> > -				map5 {
-> > +				cooling_map5: map5 {
-> >  					trip = <&cpu_alert4>;
-> > -					cooling-device = <&cpu0 3 7>;
-> > +					cooling-device = <&cpu0 3 8>;
-> >  				};
-> > -				map6 {
-> > +				cooling_map6: map6 {
-> >  					trip = <&cpu_alert4>;
-> > -					cooling-device = <&cpu4 3 11>;
-> > +					cooling-device = <&cpu4 3 13>;
-> >  				};
-> >  			};
-> >  		};
-> > Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-> > ===================================================================
-> > --- a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts	2016-12-13 15:59:33.779763261 +0100
-> > +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts	2016-12-13 15:59:33.775763261 +0100
-> > @@ -21,6 +21,23 @@
-> >  	compatible = "hardkernel,odroid-xu3-lite", "samsung,exynos5800", "samsung,exynos5";
-> >  };
-> >  
-> > +&cluster_a15_opp_table {
-> > +	/delete-node/opp at 2000000000;
-> > +	/delete-node/opp at 1900000000;
-> > +};
-> > +
-> > +&cluster_a7_opp_table {
-> > +	/delete-node/opp at 1400000000;
-> > +};
-> > +
+> On Tue, Dec 13, 2016 at 6:35 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> Register the TS-7300 FPGA manager device drivers which allows us to load
+>> bitstreams into the on-board Altera Cyclone II FPGA.
+>>
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>> ---
+>>  arch/arm/mach-ep93xx/ts72xx.c | 26 ++++++++++++++++++++++++++
+>>  1 file changed, 26 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
+>> index 3b39ea353d30..acf72ea670ef 100644
+>> --- a/arch/arm/mach-ep93xx/ts72xx.c
+>> +++ b/arch/arm/mach-ep93xx/ts72xx.c
+>> @@ -230,6 +230,28 @@ static struct ep93xx_eth_data __initdata ts72xx_eth_data = {
+>>         .phy_id         = 1,
+>>  };
+>>
+>> +#if IS_ENABLED(CONFIG_FPGA_MGR_TS73XX)
+>> +
+>> +/* Relative to EP93XX_CS1_PHYS_BASE */
+>> +#define TS73XX_FPGA_LOADER_BASE                0x03c00000
+>> +
+>> +static struct resource ts73xx_fpga_resources[] = {
+>> +       {
+>> +               .start  = EP93XX_CS1_PHYS_BASE + TS73XX_FPGA_LOADER_BASE,
+>> +               .end    = EP93XX_CS1_PHYS_BASE + TS73XX_FPGA_LOADER_BASE + 1,
+>> +               .flags  = IORESOURCE_MEM,
+>> +       },
+>> +};
+>> +
+>> +static struct platform_device ts73xx_fpga_device = {
+>> +       .name   = "ts73xx-fpga-mgr",
+>> +       .id     = -1,
+>> +       .resource = ts73xx_fpga_resources,
+>> +       .num_resources = ARRAY_SIZE(ts73xx_fpga_resources),
+>> +};
+>> +
+>> +#endif
+>> +
+>>  static void __init ts72xx_init_machine(void)
+>>  {
+>>         ep93xx_init_devices();
+>> @@ -238,6 +260,10 @@ static void __init ts72xx_init_machine(void)
+>>         platform_device_register(&ts72xx_wdt_device);
+>>
+>>         ep93xx_register_eth(&ts72xx_eth_data, 1);
+>> +#if IS_ENABLED(CONFIG_FPGA_MGR_TS73XX)
+>> +       if (board_is_ts7300())
+>> +               platform_device_register(&ts73xx_fpga_device);
+>> +#endif
+>>  }
+>>
+>>  MACHINE_START(TS72XX, "Technologic Systems TS-72xx SBC")
+>> --
+>> 2.9.3
+>>
 > 
-> I think that a comment in the DTS why these operating points aren't available
-> in this board will make more clear why the nodes are being deleted.
-> 
-> > +&cooling_map5 {
-> > +	cooling-device = <&cpu0 3 7>;
-> > +};
-> > +
-> > +&cooling_map6 {
-> > +	cooling-device = <&cpu4 3 11>;
-> > +};
-> > +
-> >  &pwm {
-> >  	/*
-> >  	 * PWM 0 -- fan
-> > Index: b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> > ===================================================================
-> > --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts	2016-12-13 15:59:33.779763261 +0100
-> > +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts	2016-12-13 15:59:33.779763261 +0100
-> > @@ -146,6 +146,10 @@
-> >  	vdd-supply = <&ldo9_reg>;
-> >  };
-> >  
-> > +&cluster_a7_opp_table {
-> > +	/delete-property/opp at 1400000000;
-> > +};
-> > +
-> >  &cpu0 {
-> >  	cpu-supply = <&buck2_reg>;
-> >  };
-> > Index: b/arch/arm/boot/dts/exynos5800.dtsi
-> > ===================================================================
-> > --- a/arch/arm/boot/dts/exynos5800.dtsi	2016-12-13 15:59:33.779763261 +0100
-> > +++ b/arch/arm/boot/dts/exynos5800.dtsi	2016-12-13 15:59:33.779763261 +0100
-> > @@ -24,6 +24,16 @@
-> >  };
-> >  
-> >  &cluster_a15_opp_table {
-> > +	opp at 2000000000 {
-> > +		opp-hz = /bits/ 64 <2000000000>;
-> > +		opp-microvolt = <1250000>;
-> > +		clock-latency-ns = <140000>;
-> > +	};
-> > +	opp at 1900000000 {
-> > +		opp-hz = /bits/ 64 <1900000000>;
-> > +		opp-microvolt = <1250000>;
-> > +		clock-latency-ns = <140000>;
-> > +	};
-> >  	opp at 1700000000 {
-> >  		opp-microvolt = <1250000>;
-> >  	};
-> > @@ -85,6 +95,11 @@
-> >  };
-> >
-> 
-> AFAIK Thomas restricted the maximum OPP, because for A15 freqs > 1.8GHz the
-> INT rail would need to be scaled up as well since there's a maximum voltage
-> difference between the ARM and INT rails before the system becomes unstable:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/276766.html
-> https://lkml.org/lkml/2014/5/2/419
+> I think this is backwards, shouldn't this be your [PATCH 2/2]?
+> Otherwise you're using
+> the driver before you added it.
 
-The choice of skipping > 1.8 GHz could be also made because of missing
-ASV which is important to detect the BIN2 of Exynos5422. The BIN2 is
-capped to 1.8/1.3.
-
-Anyway this shouldn't be limiting us now because we have all data
-statically coded in DTS - in mainline boards, only Odroid XU3-lite
-uses BIN2.
-
-Beside comments from Javier, I would be happy to see high frequencies
-Tested-by on Peach Pi/Pit. AFAIR, we did not have these in SRPOL. :)
-
-Best regards,
-Krzysztof
+I can definitively re-order the patches, although I don't think this
+really makes a difference, a driver without device does nothing, and
+vice versa.
+-- 
+Florian
