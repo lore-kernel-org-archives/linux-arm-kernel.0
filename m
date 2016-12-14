@@ -1,71 +1,123 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 14 Dec 2016 11:46:16 -0800
-Subject: [PATCH 06/11] dt-bindings: Document the VC4 DSI module nodes.
+Date: Wed, 14 Dec 2016 11:46:15 -0800
+Subject: [PATCH 05/11] drm/vc4: Add support for feeding DSI encoders from the
+ pixel valve.
 In-Reply-To: <20161214194621.16499-1-eric@anholt.net>
 References: <20161214194621.16499-1-eric@anholt.net>
-Message-ID: <20161214194621.16499-7-eric@anholt.net>
+Message-ID: <20161214194621.16499-6-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are part of the vc4 display pipeline.
+We have to set a different pixel format, which tells the hardware to
+use the pix_width field that's fed in sideband from the DSI encoder to
+divide the "pixel" clock.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- .../devicetree/bindings/display/brcm,bcm-vc4.txt   | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+ drivers/gpu/drm/vc4/vc4_crtc.c | 33 +++++++++++++++++++--------------
+ drivers/gpu/drm/vc4/vc4_regs.h |  2 ++
+ 2 files changed, 21 insertions(+), 14 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-index e2768703ac2b..34c7fddcea39 100644
---- a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-+++ b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-@@ -56,6 +56,18 @@ Required properties for V3D:
- - interrupts:	The interrupt number
- 		  See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
+diff --git a/drivers/gpu/drm/vc4/vc4_crtc.c b/drivers/gpu/drm/vc4/vc4_crtc.c
+index a0fd3e66bc4b..cd070e0c79a6 100644
+--- a/drivers/gpu/drm/vc4/vc4_crtc.c
++++ b/drivers/gpu/drm/vc4/vc4_crtc.c
+@@ -349,38 +349,40 @@ static u32 vc4_get_fifo_full_level(u32 format)
+ }
  
-+Required properties for DSI:
-+- compatible:	Should be "brcm,bcm2835-dsi0" or "brcm,bcm2835-dsi1"
-+- reg:		Physical base address and length of the DSI block's registers
-+- interrupts:	The interrupt number
-+		  See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-+- clocks:	a) phy: The DSI PLL clock feeding the DSI analog PHY
-+		b) escape: The DSI ESC clock from CPRMAN
-+		c) pixel: The DSI pixel clock from CPRMAN
-+- clock-output-names:
-+		The 3 clocks output from the DSI analog PHY: dsi[01]_byte,
-+		dsi[01]_ddr2, and dsi[01]_ddr
-+
- [1] Documentation/devicetree/bindings/media/video-interfaces.txt
+ /*
+- * Returns the clock select bit for the connector attached to the
+- * CRTC.
++ * Returns the encoder attached to the CRTC.
++ *
++ * VC4 can only scan out to one encoder at a time, while the DRM core
++ * allows drivers to push pixels to more than one encoder from the
++ * same CRTC.
+  */
+-static int vc4_get_clock_select(struct drm_crtc *crtc)
++static struct drm_encoder *vc4_get_crtc_encoder(struct drm_crtc *crtc)
+ {
+ 	struct drm_connector *connector;
  
- Example:
-@@ -99,6 +111,29 @@ dpi: dpi at 7e208000 {
- 	};
- };
+ 	drm_for_each_connector(connector, crtc->dev) {
+ 		if (connector->state->crtc == crtc) {
+-			struct drm_encoder *encoder = connector->encoder;
+-			struct vc4_encoder *vc4_encoder =
+-				to_vc4_encoder(encoder);
+-
+-			return vc4_encoder->clock_select;
++			return connector->encoder;
+ 		}
+ 	}
  
-+dsi1: dsi at 7e700000 {
-+	compatible = "brcm,bcm2835-dsi1";
-+	reg = <0x7e700000 0x8c>;
-+	interrupts = <2 12>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	#clock-cells = <1>;
-+
-+	clocks = <&clocks BCM2835_PLLD_DSI1>,
-+		 <&clocks BCM2835_CLOCK_DSI1E>,
-+		 <&clocks BCM2835_CLOCK_DSI1P>;
-+	clock-names = "phy", "escape", "pixel";
-+
-+	clock-output-names = "dsi1_byte", "dsi1_ddr2", "dsi1_ddr";
-+
-+	pitouchscreen: panel at 0 {
-+		compatible = "raspberrypi,touchscreen";
-+		reg = <0>;
-+
-+		<...>
-+	};
-+};
-+
- vec: vec at 7e806000 {
- 	compatible = "brcm,bcm2835-vec";
- 	reg = <0x7e806000 0x1000>;
+-	return -1;
++	return NULL;
+ }
+ 
+ static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
+ {
+ 	struct drm_device *dev = crtc->dev;
+ 	struct vc4_dev *vc4 = to_vc4_dev(dev);
++	struct drm_encoder *encoder = vc4_get_crtc_encoder(crtc);
++	struct vc4_encoder *vc4_encoder = to_vc4_encoder(encoder);
+ 	struct vc4_crtc *vc4_crtc = to_vc4_crtc(crtc);
+ 	struct drm_crtc_state *state = crtc->state;
+ 	struct drm_display_mode *mode = &state->adjusted_mode;
+ 	bool interlace = mode->flags & DRM_MODE_FLAG_INTERLACE;
+ 	u32 pixel_rep = (mode->flags & DRM_MODE_FLAG_DBLCLK) ? 2 : 1;
+-	u32 format = PV_CONTROL_FORMAT_24;
++	bool is_dsi = (vc4_encoder->type == VC4_ENCODER_TYPE_DSI0 ||
++		       vc4_encoder->type == VC4_ENCODER_TYPE_DSI1);
++	u32 format = is_dsi ? PV_CONTROL_FORMAT_DSIV_24 : PV_CONTROL_FORMAT_24;
+ 	bool debug_dump_regs = false;
+-	int clock_select = vc4_get_clock_select(crtc);
+ 
+ 	if (debug_dump_regs) {
+ 		DRM_INFO("CRTC %d regs before:\n", drm_crtc_index(crtc));
+@@ -436,17 +438,19 @@ static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
+ 		 */
+ 		CRTC_WRITE(PV_V_CONTROL,
+ 			   PV_VCONTROL_CONTINUOUS |
++			   (is_dsi ? PV_VCONTROL_DSI : 0) |
+ 			   PV_VCONTROL_INTERLACE |
+ 			   VC4_SET_FIELD(mode->htotal * pixel_rep / 2,
+ 					 PV_VCONTROL_ODD_DELAY));
+ 		CRTC_WRITE(PV_VSYNCD_EVEN, 0);
+ 	} else {
+-		CRTC_WRITE(PV_V_CONTROL, PV_VCONTROL_CONTINUOUS);
++		CRTC_WRITE(PV_V_CONTROL,
++			   PV_VCONTROL_CONTINUOUS |
++			   (is_dsi ? PV_VCONTROL_DSI : 0));
+ 	}
+ 
+ 	CRTC_WRITE(PV_HACT_ACT, mode->hdisplay * pixel_rep);
+ 
+-
+ 	CRTC_WRITE(PV_CONTROL,
+ 		   VC4_SET_FIELD(format, PV_CONTROL_FORMAT) |
+ 		   VC4_SET_FIELD(vc4_get_fifo_full_level(format),
+@@ -455,7 +459,8 @@ static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
+ 		   PV_CONTROL_CLR_AT_START |
+ 		   PV_CONTROL_TRIGGER_UNDERFLOW |
+ 		   PV_CONTROL_WAIT_HSTART |
+-		   VC4_SET_FIELD(clock_select, PV_CONTROL_CLK_SELECT) |
++		   VC4_SET_FIELD(vc4_encoder->clock_select,
++				 PV_CONTROL_CLK_SELECT) |
+ 		   PV_CONTROL_FIFO_CLR |
+ 		   PV_CONTROL_EN);
+ 
+diff --git a/drivers/gpu/drm/vc4/vc4_regs.h b/drivers/gpu/drm/vc4/vc4_regs.h
+index b3b297fba709..385405a2df05 100644
+--- a/drivers/gpu/drm/vc4/vc4_regs.h
++++ b/drivers/gpu/drm/vc4/vc4_regs.h
+@@ -190,6 +190,8 @@
+ # define PV_VCONTROL_ODD_DELAY_SHIFT		6
+ # define PV_VCONTROL_ODD_FIRST			BIT(5)
+ # define PV_VCONTROL_INTERLACE			BIT(4)
++# define PV_VCONTROL_DSI			BIT(3)
++# define PV_VCONTROL_COMMAND			BIT(2)
+ # define PV_VCONTROL_CONTINUOUS			BIT(1)
+ # define PV_VCONTROL_VIDEN			BIT(0)
+ 
 -- 
 2.11.0
