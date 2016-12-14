@@ -1,69 +1,46 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Wed, 14 Dec 2016 13:28:27 +0100
-Subject: [PATCH] n900 device tree: cleanup
-In-Reply-To: <20161207031048.pi7j4dms5uuco3yf@earth>
-References: <20161011075416.GA22453@amd> <20161011081243.GA24580@amd>
- <20161207031048.pi7j4dms5uuco3yf@earth>
-Message-ID: <201612141328.27244@pali>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Dec 2016 12:29:45 +0000
+Subject: [PATCH 2/2] ARM: soft-reboot into same mode that we entered the
+ kernel
+In-Reply-To: <20161214121747.GH17982@leverpostej>
+References: <20161213113044.GC19985@leverpostej>
+ <E1cH751-0003kk-Ts@rmk-PC.armlinux.org.uk>
+ <20161214115648.GG17982@leverpostej>
+ <20161214120541.GD14217@n2100.armlinux.org.uk>
+ <20161214121747.GH17982@leverpostej>
+Message-ID: <20161214122945.GE14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 December 2016 04:10:48 Sebastian Reichel wrote:
-> Hi Tony,
+On Wed, Dec 14, 2016 at 12:17:47PM +0000, Mark Rutland wrote:
+> On Wed, Dec 14, 2016 at 12:05:41PM +0000, Russell King - ARM Linux wrote:
+> > The issue here is that a panic can happen at any time from any context
+> > with any hyp stub in place, so there _needs_ to be a uniform way to do
+> > this.  It's very bad that we've got this far without this point having
+> > been considered - all we can do right now is to try and fix the issues
+> > as they come up.
+> > 
+> > Right now, let's fix this so we get some kind of improvement, and later
+> > try to sort out some kind of uniform interface for this task.
 > 
-> It looks like this fell through the cracks. Apart from inconsistent
-> patch subject:
+> Sure, that's a bigger task, and this is definitely a step in the right
+> direction.
 > 
-> Reviewed-By: Sebastian Reichel <sre@kernel.org>
+> We need to avoid the kdump regression somehow though; can we somehow
+> detect if KVM is active and avoid issuing the HVC_SOFT_RESTART?
 
-Fine for me too. Reviewed-By: Pali Roh?r <pali.rohar@gmail.com>
+That's a question for KVM people.
 
-> -- Sebastian
-> 
-> On Tue, Oct 11, 2016 at 10:12:43AM +0200, Pavel Machek wrote:
-> > Fix GPIO comment to be consistent with rest of file and add comment
-> > what tpa6130 is.
-> > 
-> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > 
-> > diff --git a/arch/arm/boot/dts/omap3-n900.dts
-> > b/arch/arm/boot/dts/omap3-n900.dts index bfffd6c..ca9fe8c 100644
-> > --- a/arch/arm/boot/dts/omap3-n900.dts
-> > +++ b/arch/arm/boot/dts/omap3-n900.dts
-> > @@ -47,7 +47,7 @@
-> > 
-> >  		compatible = "gpio-leds";
-> >  		heartbeat {
-> >  		
-> >  			label = "debug::sleep";
-> > 
-> > -			gpios = <&gpio6 2 GPIO_ACTIVE_HIGH>;  /* gpio162 */
-> > +			gpios = <&gpio6 2 GPIO_ACTIVE_HIGH>;  /* 162 */
-> > 
-> >  			linux,default-trigger = "default-on";
-> >  			pinctrl-names = "default";
-> >  			pinctrl-0 = <&debug_leds>;
-> > 
-> > @@ -637,6 +637,7 @@
-> > 
-> >  		reg = <0x55>;
-> >  	
-> >  	};
-> > 
-> > +	/* Stereo headphone amplifier */
-> > 
-> >  	tpa6130a2: tpa6130a2 at 60 {
-> >  	
-> >  		compatible = "ti,tpa6130a2";
-> >  		reg = <0x60>;
+However, there's a bigger question, which is: what do we want to happen
+in the case of kdump - do we want to be entering the kdump kernel in
+HYP or SVC mode?  As the kdump kernel exists to be able to save the
+state of a crashing system, the kdump kernel should do that and then
+restart the system in a clean way (iow, not via yet another kexec.)
+
+So maybe the right answer is that kdump should always invoke the kernel
+in SVC mode.
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161214/38ca0953/attachment.sig>
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
