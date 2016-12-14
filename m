@@ -1,77 +1,83 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Tue, 13 Dec 2016 22:14:58 -0800
-Subject: [PATCH v3 1/2] ARM: ep93xx: Register ts73xx-fpga manager driver
- for TS-7300
-In-Reply-To: <20161214023553.9377-2-f.fainelli@gmail.com>
-References: <20161214023553.9377-1-f.fainelli@gmail.com>
- <20161214023553.9377-2-f.fainelli@gmail.com>
-Message-ID: <CAAtXAHcO4bN2YmrEabiivnBJLXdU56j4rv4A12FL_XKuwc5Dxw@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 14 Dec 2016 08:08:36 +0100
+Subject: [PATCH v3 1/4] mtd: lart: Rename partition defines to be
+ prefixed with PART_
+In-Reply-To: <20161209233628.6642-2-f.fainelli@gmail.com>
+References: <20161208185933.13749-1-f.fainelli@gmail.com>
+ <20161209233628.6642-1-f.fainelli@gmail.com>
+ <20161209233628.6642-2-f.fainelli@gmail.com>
+Message-ID: <20161214080836.6149dc42@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+On Fri,  9 Dec 2016 15:36:25 -0800
+Florian Fainelli <f.fainelli@gmail.com> wrote:
 
-On Tue, Dec 13, 2016 at 6:35 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> Register the TS-7300 FPGA manager device drivers which allows us to load
-> bitstreams into the on-board Altera Cyclone II FPGA.
->
+> In preparation for defining KERNEL_START on ARM, rename KERNEL_START to
+> PART_KERNEL_START, and to be consistent, do this for all
+> partition-related constants.
+> 
 > Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
 > ---
->  arch/arm/mach-ep93xx/ts72xx.c | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->
-> diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
-> index 3b39ea353d30..acf72ea670ef 100644
-> --- a/arch/arm/mach-ep93xx/ts72xx.c
-> +++ b/arch/arm/mach-ep93xx/ts72xx.c
-> @@ -230,6 +230,28 @@ static struct ep93xx_eth_data __initdata ts72xx_eth_data = {
->         .phy_id         = 1,
+>  drivers/mtd/devices/lart.c | 24 ++++++++++++------------
+>  1 file changed, 12 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/mtd/devices/lart.c b/drivers/mtd/devices/lart.c
+> index 82bd00af5cc3..268aae45b514 100644
+> --- a/drivers/mtd/devices/lart.c
+> +++ b/drivers/mtd/devices/lart.c
+> @@ -75,18 +75,18 @@ static char module_name[] = "lart";
+>  
+>  /* blob */
+>  #define NUM_BLOB_BLOCKS		FLASH_NUMBLOCKS_16m_PARAM
+> -#define BLOB_START			0x00000000
+> -#define BLOB_LEN			(NUM_BLOB_BLOCKS * FLASH_BLOCKSIZE_PARAM)
+> +#define PART_BLOB_START		0x00000000
+> +#define PART_BLOB_LEN		(NUM_BLOB_BLOCKS * FLASH_BLOCKSIZE_PARAM)
+>  
+>  /* kernel */
+>  #define NUM_KERNEL_BLOCKS	7
+> -#define KERNEL_START		(BLOB_START + BLOB_LEN)
+> -#define KERNEL_LEN			(NUM_KERNEL_BLOCKS * FLASH_BLOCKSIZE_MAIN)
+> +#define PART_KERNEL_START	(PART_BLOB_START + PART_BLOB_LEN)
+> +#define PART_KERNEL_LEN		(NUM_KERNEL_BLOCKS * FLASH_BLOCKSIZE_MAIN)
+>  
+>  /* initial ramdisk */
+>  #define NUM_INITRD_BLOCKS	24
+> -#define INITRD_START		(KERNEL_START + KERNEL_LEN)
+> -#define INITRD_LEN			(NUM_INITRD_BLOCKS * FLASH_BLOCKSIZE_MAIN)
+> +#define PART_INITRD_START	(PART_KERNEL_START + PART_KERNEL_LEN)
+> +#define PART_INITRD_LEN		(NUM_INITRD_BLOCKS * FLASH_BLOCKSIZE_MAIN)
+>  
+>  /*
+>   * See section 4.0 in "3 Volt Fast Boot Block Flash Memory" Intel Datasheet
+> @@ -587,20 +587,20 @@ static struct mtd_partition lart_partitions[] = {
+>  	/* blob */
+>  	{
+>  		.name	= "blob",
+> -		.offset	= BLOB_START,
+> -		.size	= BLOB_LEN,
+> +		.offset	= PART_BLOB_START,
+> +		.size	= PART_BLOB_LEN,
+>  	},
+>  	/* kernel */
+>  	{
+>  		.name	= "kernel",
+> -		.offset	= KERNEL_START,		/* MTDPART_OFS_APPEND */
+> -		.size	= KERNEL_LEN,
+> +		.offset	= PART_KERNEL_START,	/* MTDPART_OFS_APPEND */
+> +		.size	= PART_KERNEL_LEN,
+>  	},
+>  	/* initial ramdisk / file system */
+>  	{
+>  		.name	= "file system",
+> -		.offset	= INITRD_START,		/* MTDPART_OFS_APPEND */
+> -		.size	= INITRD_LEN,		/* MTDPART_SIZ_FULL */
+> +		.offset	= PART_INITRD_START,	/* MTDPART_OFS_APPEND */
+> +		.size	= PART_INITRD_LEN,	/* MTDPART_SIZ_FULL */
+>  	}
 >  };
->
-> +#if IS_ENABLED(CONFIG_FPGA_MGR_TS73XX)
-> +
-> +/* Relative to EP93XX_CS1_PHYS_BASE */
-> +#define TS73XX_FPGA_LOADER_BASE                0x03c00000
-> +
-> +static struct resource ts73xx_fpga_resources[] = {
-> +       {
-> +               .start  = EP93XX_CS1_PHYS_BASE + TS73XX_FPGA_LOADER_BASE,
-> +               .end    = EP93XX_CS1_PHYS_BASE + TS73XX_FPGA_LOADER_BASE + 1,
-> +               .flags  = IORESOURCE_MEM,
-> +       },
-> +};
-> +
-> +static struct platform_device ts73xx_fpga_device = {
-> +       .name   = "ts73xx-fpga-mgr",
-> +       .id     = -1,
-> +       .resource = ts73xx_fpga_resources,
-> +       .num_resources = ARRAY_SIZE(ts73xx_fpga_resources),
-> +};
-> +
-> +#endif
-> +
->  static void __init ts72xx_init_machine(void)
->  {
->         ep93xx_init_devices();
-> @@ -238,6 +260,10 @@ static void __init ts72xx_init_machine(void)
->         platform_device_register(&ts72xx_wdt_device);
->
->         ep93xx_register_eth(&ts72xx_eth_data, 1);
-> +#if IS_ENABLED(CONFIG_FPGA_MGR_TS73XX)
-> +       if (board_is_ts7300())
-> +               platform_device_register(&ts73xx_fpga_device);
-> +#endif
->  }
->
->  MACHINE_START(TS72XX, "Technologic Systems TS-72xx SBC")
-> --
-> 2.9.3
->
-
-I think this is backwards, shouldn't this be your [PATCH 2/2]?
-Otherwise you're using
-the driver before you added it.
-
-Thanks,
-
-Moritz
+>  #define NUM_PARTITIONS ARRAY_SIZE(lart_partitions)
