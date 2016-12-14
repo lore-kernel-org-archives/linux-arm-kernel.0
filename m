@@ -1,43 +1,31 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 14 Dec 2016 11:08:03 -0800
-Subject: [PATCH v3 2/2] FPGA: Add TS-7300 FPGA manager
-In-Reply-To: <SN1PR0101MB1565A30EFE8AFEB319B84124D09A0@SN1PR0101MB1565.prod.exchangelabs.com>
-References: <20161214023553.9377-1-f.fainelli@gmail.com>
- <20161214023553.9377-3-f.fainelli@gmail.com>
- <CAAtXAHe6q2jRWXt+KUWCFnP5j21E3x=P+4wjZTOaSSB_pX71Eg@mail.gmail.com>
- <cf772070-73d9-fa07-b2b9-e0038832b7be@gmail.com>
- <SN1PR0101MB1565A30EFE8AFEB319B84124D09A0@SN1PR0101MB1565.prod.exchangelabs.com>
-Message-ID: <a8973dbf-0053-f44d-05f2-b787317db765@gmail.com>
+From: prasannatsmkumar@gmail.com (PrasannaKumar Muralidharan)
+Date: Thu, 15 Dec 2016 00:47:16 +0530
+Subject: [PATCH v2] crypto: sun4i-ss: support the Security System PRNG
+In-Reply-To: <20161214050551.GD9592@gondor.apana.org.au>
+References: <1480934922-20732-1-git-send-email-clabbe.montjoie@gmail.com>
+ <20161205123705.GA10732@gondor.apana.org.au> <20161205125738.GA13525@Red>
+ <20161207120900.GC20680@gondor.apana.org.au> <20161207125127.GB28218@Red>
+ <20161208090618.GB22932@gondor.apana.org.au> <20161213141059.GB10647@Red>
+ <20161214050551.GD9592@gondor.apana.org.au>
+Message-ID: <CANc+2y7C-=S_5MZuqP0Q+y2FwHqS2_p9-iYuAu1A1tXqzxp_oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2016 10:58 AM, Hartley Sweeten wrote:
-> On Wednesday, December 14, 2016 11:55 AM, Florian Fainelli wrote:
->> My understanding is that, yes, this triggers the final write. You are
->> right that ts73xx_fpga_write() can be called multiple times. It sounds
->> like what my write_complete function does right now is just return that
->> we successfully completed the bistream write, but this snippet that you
->> are quoting should actually be moved into write_complete.
-> 
-> Florian,
-> 
-> I'm in the process of getting a TS-7300 board so I can help test this. Hopefully
-> I will have it by next week.
+>> I have found two solutions:
+>
+> No we already have algif_rng so let's not confuse things even
+> further by making hwrng take PRNGs.
 
-Great! I got a few things on my list that have not been submitted yet:
+Even if both the solutions could not be adopted I think there must be
+a way for applications to use similar API to get true rng or prng.
+Given the case that no user complained about prng data when using
+/dev/hwrng is it safe to assume that the random data generated is
+acceptable for users? If so, the drivers can be left without any
+modification.
 
-- tmp124 support through drivers/hwmon/lm70.c
-- specific memcpy_{from,to}io accessors for ethoc from the FPGA
-- serial port support for the UARTs from the FPGA
+Should there be a mandate that driver will be accepted only when it
+passes 'rngtest'. This will make sure that prng drivers won't get
+added in future.
 
-And some other things that are giving me issues at the moment, like
-SPI_3WIRE support for spi-ep93xx so I can configure the tmp124 to send
-alarms/have temperature thresholds.
-
-My branch is here:
-
-https://github.com/ffainelli/linux/tree/ts72xx
-
-Cheers
--- 
-Florian
+Regards,
+PrasannaKumar
