@@ -1,44 +1,65 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Wed, 14 Dec 2016 14:38:16 +0100
-Subject: [PATCHv6] support for AD5820 camera auto-focus coil
-In-Reply-To: <20160808214132.GB2946@xo-6d-61-c0.localdomain>
-References: <20160521054336.GA27123@amd>
- <20160808080955.GA3182@valkosipuli.retiisi.org.uk>
- <20160808214132.GB2946@xo-6d-61-c0.localdomain>
-Message-ID: <201612141438.16603@pali>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 14 Dec 2016 13:42:45 +0000
+Subject: [PATCH 2/2] ARM: soft-reboot into same mode that we entered the
+ kernel
+In-Reply-To: <20161214120541.GD14217@n2100.armlinux.org.uk>
+References: <20161213113044.GC19985@leverpostej>
+ <E1cH751-0003kk-Ts@rmk-PC.armlinux.org.uk>
+ <20161214115648.GG17982@leverpostej>
+ <20161214120541.GD14217@n2100.armlinux.org.uk>
+Message-ID: <2c6fd1cb-dd14-56f7-60c5-5030e0b02e1d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 August 2016 23:41:32 Pavel Machek wrote:
-> On Mon 2016-08-08 11:09:56, Sakari Ailus wrote:
-> > On Fri, Aug 05, 2016 at 12:26:11PM +0200, Pavel Machek wrote:
-> > > This adds support for AD5820 autofocus coil, found for example in
-> > > Nokia N900 smartphone.
-> > 
-> > Thanks, Pavel!
-> > 
-> > Let's use V4L2_CID_FOCUS_ABSOLUTE, as is in the patch. If we get
-> > something better in the future, we'll switch to that then.
-> > 
-> > I've applied this to ad5820 branch in my tree.
+On 14/12/16 12:05, Russell King - ARM Linux wrote:
+> On Wed, Dec 14, 2016 at 11:56:49AM +0000, Mark Rutland wrote:
+>> On Wed, Dec 14, 2016 at 10:46:35AM +0000, Russell King wrote:
+>>> When we soft-reboot (eg, kexec) from one kernel into the next, we need
+>>> to ensure that we enter the new kernel in the same processor mode as
+>>> when we were entered, so that (eg) the new kernel can install its own
+>>> hypervisor - the old kernel's hypervisor will have been overwritten.
+>>>
+>>> In order to do this, we need to pass a flag to cpu_reset() so it knows
+>>> what to do, and we need to modify the kernel's own hypervisor stub to
+>>> allow it to handle a soft-reboot.
+>>>
+>>> As we are always guaranteed to install our own hypervisor if we're
+>>> entered in HYP32 mode, and KVM will have moved itself out of the way
+>>> on kexec/normal reboot, we can assume that our hypervisor is in place
+>>> when we want to kexec, so changing our hypervisor API should not be a
+>>> problem.
+>>
+>> Just to check, does that also hold true for kdump?
+>>
+>> I haven't gone digging yet, but it looks like KVM might still be
+>> installed, rather than the hyp stub, and we might need some logic to
+>> ensure that it's torn down...
 > 
-> Thanks. If I understands things correctly, both DTS patch and this
-> patch are waiting in your tree, so we should be good to go for 4.9
-> (unless some unexpected problems surface)?
+> The same problem will be true of ARM64 - I don't see any solution to
+> that in the present state.
 > 
-> Best regards,
-> 									Pavel
+>>> @@ -51,7 +52,9 @@ static void __soft_restart(void *addr)
+>>>  
+>>>  	/* Switch to the identity mapping. */
+>>>  	phys_reset = (phys_reset_t)virt_to_idmap(cpu_reset);
+>>> -	phys_reset((unsigned long)addr);
+>>> +
+>>> +	/* original stub should be restored by kvm */
+>>> +	phys_reset((unsigned long)addr, is_hyp_mode_available());
+>>
+>> ... otherwise here we'd call into the KVM hyp code in a potentially
+>> confusing manner.
+>>
+>> Otherwise, this looks fine to me.
+> 
+> The only thing that I can think which would resolve that would be to
+> lay down a standard API for the hyp code, so things like reboot into
+> hyp mode can work irrespective of the hyp stub in place.
 
-Was DTS patch merged into 4.9? At least I do not see updated that dts 
-file omap3-n900.dts in linus tree...
+That looks like a sensible thing to do. I'll look into it.
 
+Thanks,
+
+	M.
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161214/d8addaf7/attachment-0001.sig>
+Jazz is not dead. It just smells funny...
