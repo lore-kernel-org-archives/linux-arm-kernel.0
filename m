@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Dec 2016 23:37:14 +0100
-Subject: [PATCH 07/39] ARM: dts: armada-370-rd: Correct license text
+Date: Wed, 14 Dec 2016 23:37:37 +0100
+Subject: [PATCH 30/39] ARM: dts: armada-xp-mv78260: Correct license text
 In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
 References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214223746.23066-8-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214223746.23066-31-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,21 +12,21 @@ multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
 Cc: Arnaud Ebalard <arno@natisbad.org>
-Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
 Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: Florian Fainelli <florian@openwrt.org>
-Cc: Simon Baatz <gmbnomis@gmail.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Simon Guinot <simon.guinot@sequanux.org>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Willy Tarreau <w@1wt.eu>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-rd.dts | 10 +++++-----
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
-index fbef730e8d37..e920f7166d4a 100644
---- a/arch/arm/boot/dts/armada-370-rd.dts
-+++ b/arch/arm/boot/dts/armada-370-rd.dts
-@@ -16,17 +16,17 @@
+diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+index c5fdc99f0dbe..40d606d34b3a 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+@@ -15,17 +15,17 @@
   *     published by the Free Software Foundation; either version 2 of the
   *     License, or (at your option) any later version.
   *
@@ -47,7 +47,7 @@ index fbef730e8d37..e920f7166d4a 100644
   *     copy, modify, merge, publish, distribute, sublicense, and/or
   *     sell copies of the Software, and to permit persons to whom the
   *     Software is furnished to do so, subject to the following
-@@ -35,11 +35,11 @@
+@@ -34,11 +34,11 @@
   *     The above copyright notice and this permission notice shall be
   *     included in all copies or substantial portions of the Software.
   *
