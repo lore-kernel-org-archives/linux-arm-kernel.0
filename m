@@ -1,60 +1,178 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 14 Dec 2016 11:46:10 -0800
-Subject: [PATCH 00/11] drm/vc4: DSI panel support + Raspberry Pi touchscreen
-Message-ID: <20161214194621.16499-1-eric@anholt.net>
+Date: Wed, 14 Dec 2016 11:46:11 -0800
+Subject: [PATCH 01/11] clk: bcm2835: Don't rate change PLLs on behalf of DSI
+ PLL dividers.
+In-Reply-To: <20161214194621.16499-1-eric@anholt.net>
+References: <20161214194621.16499-1-eric@anholt.net>
+Message-ID: <20161214194621.16499-2-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After 9 months of development, I finally got the DSI panel to light up
-from poweron, and this is the series for enabling it.  I've included
-the whole thing Cced to all the subsystems, as there are some
-interesting choices we have to make (how the analog PHY clocks are
-represented in common clocks? and how the touchscreen panel is
-represented in DT).
+Our core PLLs are intended to be configured once and left alone.  With
+the SET_RATE_PARENT, asking to set the PLLD_DSI1 clock rate would
+change PLLD just to get closer to the requested DSI clock, thus
+changing PLLD_PER, the UART and ethernet PHY clock rates downstream of
+it, and breaking ethernet.
 
-There's one commit left out of the series, which is the fix to allow
-bcm2835_dma.c's poll-for-completion from IRQ handlers for the DSI1
-register write workaround.  However, with the panel's DSI transaction
-workaround, we're not triggering our IRQ handler anyway.
+We *do* want PLLH to change so that PLLH_AUX can be exactly the value
+we want, though.  Thus, we need to have a per-divider policy of
+whether to pass rate changes up.
 
-Note that patch #11 is not intended to be pushed, it's just a demo.
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ drivers/clk/bcm/clk-bcm2835.c | 42 ++++++++++++++++++++++++++++--------------
+ 1 file changed, 28 insertions(+), 14 deletions(-)
 
-Eric Anholt (11):
-  clk: bcm2835: Don't rate change PLLs on behalf of DSI PLL dividers.
-  clk: bcm2835: Register the DSI0/DSI1 pixel clocks.
-  clk: bcm2835: Add leaf clock measurement support, disabled by default
-  drm/vc4: Set up SCALER_DISPCTRL at boot.
-  drm/vc4: Add support for feeding DSI encoders from the pixel valve.
-  dt-bindings: Document the VC4 DSI module nodes.
-  drm/vc4: Add DSI driver
-  dt-bindings: Document the Raspberry Pi Touchscreen nodes.
-  drm/panel: Add support for the Raspberry Pi 7" Touchscreen.
-  ARM: bcm2835: dt: Add the DSI module nodes and clocks.
-  ARM: bcm2835: Enable the Raspberry Pi touchscreen panel.
-
- .../bindings/clock/brcm,bcm2835-cprman.txt         |   15 +-
- .../devicetree/bindings/display/brcm,bcm-vc4.txt   |   35 +
- .../display/panel/raspberrypi,touchscreen.txt      |   45 +
- arch/arm/boot/dts/bcm2835-rpi.dtsi                 |    8 +
- arch/arm/boot/dts/bcm283x.dtsi                     |   77 +-
- drivers/clk/bcm/clk-bcm2835.c                      |  302 +++-
- drivers/gpu/drm/panel/Kconfig                      |    8 +
- drivers/gpu/drm/panel/Makefile                     |    1 +
- .../gpu/drm/panel/panel-raspberrypi-touchscreen.c  |  509 ++++++
- drivers/gpu/drm/vc4/Kconfig                        |    2 +
- drivers/gpu/drm/vc4/Makefile                       |    1 +
- drivers/gpu/drm/vc4/vc4_crtc.c                     |   33 +-
- drivers/gpu/drm/vc4/vc4_debugfs.c                  |    1 +
- drivers/gpu/drm/vc4/vc4_drv.c                      |    1 +
- drivers/gpu/drm/vc4/vc4_drv.h                      |    5 +
- drivers/gpu/drm/vc4/vc4_dsi.c                      | 1725 ++++++++++++++++++++
- drivers/gpu/drm/vc4/vc4_hvs.c                      |   14 +
- drivers/gpu/drm/vc4/vc4_regs.h                     |    5 +
- include/dt-bindings/clock/bcm2835.h                |    2 +
- 19 files changed, 2722 insertions(+), 67 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/display/panel/raspberrypi,touchscreen.txt
- create mode 100644 drivers/gpu/drm/panel/panel-raspberrypi-touchscreen.c
- create mode 100644 drivers/gpu/drm/vc4/vc4_dsi.c
-
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index b68bf573dcfb..6641030e8eae 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -428,6 +428,7 @@ struct bcm2835_pll_divider_data {
+ 	u32 load_mask;
+ 	u32 hold_mask;
+ 	u32 fixed_divider;
++	u32 flags;
+ };
+ 
+ struct bcm2835_clock_data {
+@@ -1201,7 +1202,7 @@ bcm2835_register_pll_divider(struct bcm2835_cprman *cprman,
+ 	init.num_parents = 1;
+ 	init.name = divider_name;
+ 	init.ops = &bcm2835_pll_divider_clk_ops;
+-	init.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED;
++	init.flags = data->flags | CLK_IGNORE_UNUSED;
+ 
+ 	divider = devm_kzalloc(cprman->dev, sizeof(*divider), GFP_KERNEL);
+ 	if (!divider)
+@@ -1408,7 +1409,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.a2w_reg = A2W_PLLA_CORE,
+ 		.load_mask = CM_PLLA_LOADCORE,
+ 		.hold_mask = CM_PLLA_HOLDCORE,
+-		.fixed_divider = 1),
++		.fixed_divider = 1,
++		.flags = CLK_SET_RATE_PARENT),
+ 	[BCM2835_PLLA_PER]	= REGISTER_PLL_DIV(
+ 		.name = "plla_per",
+ 		.source_pll = "plla",
+@@ -1416,7 +1418,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.a2w_reg = A2W_PLLA_PER,
+ 		.load_mask = CM_PLLA_LOADPER,
+ 		.hold_mask = CM_PLLA_HOLDPER,
+-		.fixed_divider = 1),
++		.fixed_divider = 1,
++		.flags = CLK_SET_RATE_PARENT),
+ 	[BCM2835_PLLA_DSI0]	= REGISTER_PLL_DIV(
+ 		.name = "plla_dsi0",
+ 		.source_pll = "plla",
+@@ -1432,7 +1435,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.a2w_reg = A2W_PLLA_CCP2,
+ 		.load_mask = CM_PLLA_LOADCCP2,
+ 		.hold_mask = CM_PLLA_HOLDCCP2,
+-		.fixed_divider = 1),
++		.fixed_divider = 1,
++		.flags = CLK_SET_RATE_PARENT),
+ 
+ 	/* PLLB is used for the ARM's clock. */
+ 	[BCM2835_PLLB]		= REGISTER_PLL(
+@@ -1456,7 +1460,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.a2w_reg = A2W_PLLB_ARM,
+ 		.load_mask = CM_PLLB_LOADARM,
+ 		.hold_mask = CM_PLLB_HOLDARM,
+-		.fixed_divider = 1),
++		.fixed_divider = 1,
++		.flags = CLK_SET_RATE_PARENT),
+ 
+ 	/*
+ 	 * PLLC is the core PLL, used to drive the core VPU clock.
+@@ -1485,7 +1490,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.a2w_reg = A2W_PLLC_CORE0,
+ 		.load_mask = CM_PLLC_LOADCORE0,
+ 		.hold_mask = CM_PLLC_HOLDCORE0,
+-		.fixed_divider = 1),
++		.fixed_divider = 1,
++		.flags = CLK_SET_RATE_PARENT),
+ 	[BCM2835_PLLC_CORE1]	= REGISTER_PLL_DIV(
+ 		.name = "pllc_core1",
+ 		.source_pll = "pllc",
+@@ -1493,7 +1499,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.a2w_reg = A2W_PLLC_CORE1,
+ 		.load_mask = CM_PLLC_LOADCORE1,
+ 		.hold_mask = CM_PLLC_HOLDCORE1,
+-		.fixed_divider = 1),
++		.fixed_divider = 1,
++		.flags = CLK_SET_RATE_PARENT),
+ 	[BCM2835_PLLC_CORE2]	= REGISTER_PLL_DIV(
+ 		.name = "pllc_core2",
+ 		.source_pll = "pllc",
+@@ -1501,7 +1508,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.a2w_reg = A2W_PLLC_CORE2,
+ 		.load_mask = CM_PLLC_LOADCORE2,
+ 		.hold_mask = CM_PLLC_HOLDCORE2,
+-		.fixed_divider = 1),
++		.fixed_divider = 1,
++		.flags = CLK_SET_RATE_PARENT),
+ 	[BCM2835_PLLC_PER]	= REGISTER_PLL_DIV(
+ 		.name = "pllc_per",
+ 		.source_pll = "pllc",
+@@ -1509,7 +1517,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.a2w_reg = A2W_PLLC_PER,
+ 		.load_mask = CM_PLLC_LOADPER,
+ 		.hold_mask = CM_PLLC_HOLDPER,
+-		.fixed_divider = 1),
++		.fixed_divider = 1,
++		.flags = CLK_SET_RATE_PARENT),
+ 
+ 	/*
+ 	 * PLLD is the display PLL, used to drive DSI display panels.
+@@ -1538,7 +1547,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.a2w_reg = A2W_PLLD_CORE,
+ 		.load_mask = CM_PLLD_LOADCORE,
+ 		.hold_mask = CM_PLLD_HOLDCORE,
+-		.fixed_divider = 1),
++		.fixed_divider = 1,
++		.flags = CLK_SET_RATE_PARENT),
+ 	[BCM2835_PLLD_PER]	= REGISTER_PLL_DIV(
+ 		.name = "plld_per",
+ 		.source_pll = "plld",
+@@ -1546,7 +1556,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.a2w_reg = A2W_PLLD_PER,
+ 		.load_mask = CM_PLLD_LOADPER,
+ 		.hold_mask = CM_PLLD_HOLDPER,
+-		.fixed_divider = 1),
++		.fixed_divider = 1,
++		.flags = CLK_SET_RATE_PARENT),
+ 	[BCM2835_PLLD_DSI0]	= REGISTER_PLL_DIV(
+ 		.name = "plld_dsi0",
+ 		.source_pll = "plld",
+@@ -1591,7 +1602,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.a2w_reg = A2W_PLLH_RCAL,
+ 		.load_mask = CM_PLLH_LOADRCAL,
+ 		.hold_mask = 0,
+-		.fixed_divider = 10),
++		.fixed_divider = 10,
++		.flags = CLK_SET_RATE_PARENT),
+ 	[BCM2835_PLLH_AUX]	= REGISTER_PLL_DIV(
+ 		.name = "pllh_aux",
+ 		.source_pll = "pllh",
+@@ -1599,7 +1611,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.a2w_reg = A2W_PLLH_AUX,
+ 		.load_mask = CM_PLLH_LOADAUX,
+ 		.hold_mask = 0,
+-		.fixed_divider = 10),
++		.fixed_divider = 10,
++		.flags = CLK_SET_RATE_PARENT),
+ 	[BCM2835_PLLH_PIX]	= REGISTER_PLL_DIV(
+ 		.name = "pllh_pix",
+ 		.source_pll = "pllh",
+@@ -1607,7 +1620,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.a2w_reg = A2W_PLLH_PIX,
+ 		.load_mask = CM_PLLH_LOADPIX,
+ 		.hold_mask = 0,
+-		.fixed_divider = 10),
++		.fixed_divider = 10,
++		.flags = CLK_SET_RATE_PARENT),
+ 
+ 	/* the clocks */
+ 
 -- 
 2.11.0
