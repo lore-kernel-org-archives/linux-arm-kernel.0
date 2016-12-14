@@ -1,141 +1,75 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 14 Dec 2016 14:07:22 +0100
-Subject: [PATCH v6 1/8] MFD: add bindings for STM32 Timers driver
-In-Reply-To: <CAL_Jsq+qzhUAMG_jL6CSHz+kHu6M6N8Nko4KfRQRgRgtk-KTKg@mail.gmail.com>
-References: <1481292919-26587-1-git-send-email-benjamin.gaignard@st.com>
- <1481292919-26587-2-git-send-email-benjamin.gaignard@st.com>
- <20161212185149.rt3xqpn3mbaavb4l@rob-hp-laptop>
- <CA+M3ks4ukP14YE5-6+gAzJBjEmjEyGyVbsVGOm8ehVm0EfzO-w@mail.gmail.com>
- <CAL_Jsq+qzhUAMG_jL6CSHz+kHu6M6N8Nko4KfRQRgRgtk-KTKg@mail.gmail.com>
-Message-ID: <CA+M3ks62h6Qnqjp9kaz=mbCHwOf2jmy7TGQQvED2LLH2NP0cGA@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 14 Dec 2016 14:12:41 +0100
+Subject: [PATCH linux v1 0/4] Seven segment display support
+In-Reply-To: <20161214125641.GA5379@kroah.com>
+References: <1481702104-8617-1-git-send-email-jaghu@google.com>
+ <20161214134530.2bd54a4e@free-electrons.com>
+ <20161214125641.GA5379@kroah.com>
+Message-ID: <ac324946-41da-c090-a0ca-78155611bb7e@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-12-13 22:07 GMT+01:00 Rob Herring <robh@kernel.org>:
-> On Tue, Dec 13, 2016 at 3:29 AM, Benjamin Gaignard
-> <benjamin.gaignard@linaro.org> wrote:
->> 2016-12-12 19:51 GMT+01:00 Rob Herring <robh@kernel.org>:
->>> On Fri, Dec 09, 2016 at 03:15:12PM +0100, Benjamin Gaignard wrote:
->>>> Add bindings information for STM32 Timers
->>>>
->>>> version 6:
->>>> - rename stm32-gtimer to stm32-timers
->>>> - change compatible
->>>> - add description about the IPs
->>>>
->>>> version 2:
->>>> - rename stm32-mfd-timer to stm32-gptimer
->>>> - only keep one compatible string
->>>>
->>>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
->>>> ---
->>>>  .../devicetree/bindings/mfd/stm32-timers.txt       | 46 ++++++++++++++++++++++
->>>>  1 file changed, 46 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-timers.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/mfd/stm32-timers.txt b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
->>>> new file mode 100644
->>>> index 0000000..b30868e
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
->>>> @@ -0,0 +1,46 @@
->>>> +STM32 Timers driver bindings
->>>> +
->>>> +This IP provides 3 types of timer along with PWM functionality:
->>>> +- advanced-control timers consist of a 16-bit auto-reload counter driven by a programmable
->>>> +  prescaler, break input feature, PWM outputs and complementary PWM ouputs channels.
->>>> +- general-purpose timers consist of a 16-bit or 32-bit auto-reload counter driven by a
->>>> +  programmable prescaler and PWM outputs.
->>>> +- basic timers consist of a 16-bit auto-reload counter driven by a programmable prescaler.
->>>> +
->>>> +Required parameters:
->>>> +- compatible: must be "st,stm32-timers"
->>>> +
->>>> +- reg:                       Physical base address and length of the controller's
->>>> +                     registers.
->>>> +- clock-names:               Set to "clk_int".
+On 12/14/2016 01:56 PM, Greg KH wrote:
+> On Wed, Dec 14, 2016 at 01:45:30PM +0100, Thomas Petazzoni wrote:
+>> Hello,
+>>
+>> On Tue, 13 Dec 2016 23:55:00 -0800, Jaghathiswari Rankappagounder
+>> Natarajan wrote:
+>>
+>>> Documentation for the binding which provides an interface for adding clock,
+>>> data and clear signal GPIO lines to control seven segment display.
 >>>
->>> 'clk' is redundant. Also, you don't really need -names when there is
->>> only one of them.
->>
->> I use devm_regmap_init_mmio_clk() which get the clock by it name so
->> I have to define it in DT.
->
-> Are you sure NULL is not allowed? I don't know, but at least clk_get()
-> allows NULL.
-
-regmap_mmio_gen_context() doesn't call clk_get() if the clock name isn't set:
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/base/regmap/regmap-mmio.c?id=refs/tags/v4.9#n308
-
-so clock-names field is really needed.
-
-> It's fine to keep, just drop the "clk_" part.
-
-ok
-
->
->>
->>>> +- clocks:            Phandle to the clock used by the timer module.
->>>> +                     For Clk properties, please refer to ../clock/clock-bindings.txt
->>>> +
->>>> +Optional parameters:
->>>> +- resets:            Phandle to the parent reset controller.
->>>> +                     See ../reset/st,stm32-rcc.txt
->>>> +
->>>> +Optional subnodes:
->>>> +- pwm:                       See ../pwm/pwm-stm32.txt
->>>> +- timer:             See ../iio/timer/stm32-timer-trigger.txt
->>>> +
->>>> +Example:
->>>> +     timers at 40010000 {
->>>> +             #address-cells = <1>;
->>>> +             #size-cells = <0>;
->>>> +             compatible = "st,stm32-timers";
->>>> +             reg = <0x40010000 0x400>;
->>>> +             clocks = <&rcc 0 160>;
->>>> +             clock-names = "clk_int";
->>>> +
->>>> +             pwm {
->>>> +                     compatible = "st,stm32-pwm";
->>>> +                     pinctrl-0       = <&pwm1_pins>;
->>>> +                     pinctrl-names   = "default";
->>>> +             };
->>>> +
->>>> +             timer {
->>>> +                     compatible = "st,stm32-timer-trigger";
->>>> +                     reg = <0>;
+>>> The platform device driver provides an API for displaying on two 7-segment
+>>> displays, and implements the required bit-banging. The hardware assumed is
+>>> 74HC164 wired to two 7-segment displays.
 >>>
->>> You don't need reg here as there is only one. In turn, you don't need
->>> #address-cells or #size-cells.
+>>> The character device driver implements the user-space API for letting a user
+>>> write to two 7-segment displays including any conversion methods necessary
+>>> to map the user input to two 7-segment displays.
+>>>
+>>> Adding clock, data and clear signal GPIO lines in the devicetree to control
+>>> seven segment display on zaius platform.
+>>>
+>>> The platform driver matches on the device tree node; the platform driver also
+>>> initializes the character device.
+>>>
+>>> Tested that the seven segment display works properly by writing to the
+>>> character device file on a EVB AST2500 board which also has 74HC164 wired
+>>> to two 7-segment displays.
 >>
->> I use "reg" to set each timer configuration.
->> From hardware point of view they are all the same except for which hardware
->> signals they could consume and/or send.
->
-> This sounds okay, but...
->
->> "reg" is used as index of the two tables in driver code.
->
-> this statement doesn't really sound like valid use of reg.
->
-> If you keep reg, then the node needs a unit address (timer at 0).
+>> FWIW, I proposed a driver for seven segment displays back in 2013:
+>>
+>>    http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/139986.html
+>>
+>> And the feedback from Greg KH was: we don't need a driver for that, do
+>> it from userspace. See:
+>>
+>>    http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/139992.html
+>>
+>> So: good luck :-)
+> 
+> Did anyone ever write a library for this type of thing?
+> 
+> Again, I don't want to see one-off drivers for random devices like this
+> that should be able to all be controlled from userspace in a common
+> manner.  Much like we did for fingerprint readers a long long time
+> ago...
+> 
+> thanks,
+> 
+> greg k-h
 
-I will do that in next version but I will wait for other maintainers (PWM/IIO)
-remarks before send it
+Hi Greg,
 
-Thanks
+Actually, it's more than a random interface, a lot of SoCs and boards actually have such displays
+and it's a pity to use UIO, sysfs gpio bitbanging and all sort of ugly stuff to only print a few
+characters a simple and clean driver could achieve.
+Some very well known SoCs even have integrated registers to lower the BOM and bypass the need for
+a 74HC164 like component and avoid gpio bit banging.
 
-Benjamin
->
-> Rob
+My personal concern is that you could also need to drive more segments, thus 7-segments
+is too restrictive.
 
+But this driver is well structured, the gpio-bitbanging sub-driver is welcome.
 
-
--- 
-Benjamin Gaignard
-
-Graphic Study Group
-
-Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro: Facebook | Twitter | Blog
+Neil
