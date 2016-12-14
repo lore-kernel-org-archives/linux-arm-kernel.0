@@ -1,37 +1,61 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 14 Dec 2016 19:22:46 -0300
-Subject: [PATCH] arm: dt: Initialize boot_command_line from CONFIG_CMDLINE
- in case DT does not provide /chosen/bootargs
-In-Reply-To: <1481749963-8664-1-git-send-email-pali.rohar@gmail.com>
-References: <1481749963-8664-1-git-send-email-pali.rohar@gmail.com>
-Message-ID: <CABxcv=n=FOFedS9vF9qf68PAWy3YQoAMHJcgiG9TiaLrDOZXDw@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 14 Dec 2016 23:37:09 +0100
+Subject: [PATCH 02/39] ARM: dts: armada-370-dlink-dns327l: Correct license text
+In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
+References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214223746.23066-3-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Pali,
+The license test has been mangled at some point then copy pasted across
+multiple files. Restore it to what it should be.
+Note that this is not intended as a license change.
 
-On Wed, Dec 14, 2016 at 6:12 PM, Pali Roh?r <pali.rohar@gmail.com> wrote:
-> Commit 008a2ebcd677 ("ARM: dts: omap3: Remove skeleton.dtsi usage") broke
-> support for setting cmdline on Nokia N900 via CONFIG_CMDLINE.
->
+Cc: Andrew Andrianov <andrew@ncrmnt.org>
+Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-370-dlink-dns327l.dts | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-This commit really exposed the issue rather than causing it. But since
-it was working before due including skeleton.dtsi which defines an
-empty chosen node, I think that you should add a:
-
-Fixes: 008a2ebcd677 ("ARM: dts: omap3: Remove skeleton.dtsi usage")
-
-> It is because arm code booted in DT mode parse cmdline only via function
-> early_init_dt_scan_chosen() and that function does not fill variable
-> boot_command_line when DTB does not contain /chosen entry. It is called
-> from function early_init_dt_scan_nodes() in setup_machine_fdt().
->
-> This patch fixes it by explicitly filling boot_command_line in function
-> setup_machine_fdt() after calling early_init_dt_scan_nodes() in case
-> boot_command_line still remains empty.
->
-> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> ---
-
-Best regards,
-Javier
+diff --git a/arch/arm/boot/dts/armada-370-dlink-dns327l.dts b/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
+index e2a363b1dd8a..60821b77297d 100644
+--- a/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
++++ b/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
+@@ -13,17 +13,17 @@
+  *     published by the Free Software Foundation; either version 2 of the
+  *     License, or (at your option) any later version.
+  *
+- *     This file is distributed in the hope that it will be useful
++ *     This file is distributed in the hope that it will be useful,
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+  *
+- * Or, alternatively
++ * Or, alternatively,
+  *
+  *  b) Permission is hereby granted, free of charge, to any person
+  *     obtaining a copy of this software and associated documentation
+  *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use
++ *     restriction, including without limitation the rights to use,
+  *     copy, modify, merge, publish, distribute, sublicense, and/or
+  *     sell copies of the Software, and to permit persons to whom the
+  *     Software is furnished to do so, subject to the following
+@@ -32,11 +32,11 @@
+  *     The above copyright notice and this permission notice shall be
+  *     included in all copies or substantial portions of the Software.
+  *
+- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
+-- 
+2.10.2
