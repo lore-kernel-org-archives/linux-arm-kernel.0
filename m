@@ -1,35 +1,19 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 14 Dec 2016 16:30:13 +0100
-Subject: [PATCH v2] ARM: dts: sunxi: Change node name for pwrseq pin on
- Olinuxino-lime2-emmc
-In-Reply-To: <20161214145724.42745-1-manu@bidouilliste.com>
-References: <20161214145724.42745-1-manu@bidouilliste.com>
-Message-ID: <20161214153013.bkdm3pu3osepfnn2@lukather>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 14 Dec 2016 23:38:06 +0800
+Subject: [PATCH v2 01/11] power: supply: axp20x_usb_power: use
+ of_device_id data field instead of device_is_compatible
+In-Reply-To: <20161209110419.28981-2-quentin.schulz@free-electrons.com>
+References: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
+ <20161209110419.28981-2-quentin.schulz@free-electrons.com>
+Message-ID: <CAGb2v67GHZ6fq6PoSJt3O3170ej1Gjkc5PGgCRptSQjcOi=zXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2016 at 03:57:24PM +0100, Emmanuel Vadot wrote:
-> The node name for the power seq pin is mmc2 at 0 like the mmc2_pins_a one.
-> This makes the original node (mmc2_pins_a) scrapped out of the dtb and
-> result in a unusable eMMC if U-Boot didn't configured the pins to the
-> correct functions.
-> 
-> Changes since v1:
->  * Rename the node mmc2-rst-pin
+On Fri, Dec 9, 2016 at 7:04 PM, Quentin Schulz
+<quentin.schulz@free-electrons.com> wrote:
+> This replaces calls to of_device_is_compatible to check data field of
+> of_device_id matched when probing the driver.
+>
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-That changelog should be after the ---. Removed it and applied.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161214/2918b004/attachment.sig>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
