@@ -1,59 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Dec 2016 07:10:56 -0800
-Subject: partial bluetooth success on n900 [was Re: bluetooth/uart
- timeout handling]
-In-Reply-To: <20161214133158.mwvs574l4otbc7hf@earth>
-References: <20161016002454.ul5rdqwubvkct4pf@earth>
- <20161018224259.jrwbaal27irzjqyo@earth> <20161019092506.GA1461@amd>
- <201612141321.30181@pali> <20161214125323.GA4951@amd>
- <20161214133158.mwvs574l4otbc7hf@earth>
-Message-ID: <20161214151056.GX4920@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 14 Dec 2016 16:30:13 +0100
+Subject: [PATCH v2] ARM: dts: sunxi: Change node name for pwrseq pin on
+ Olinuxino-lime2-emmc
+In-Reply-To: <20161214145724.42745-1-manu@bidouilliste.com>
+References: <20161214145724.42745-1-manu@bidouilliste.com>
+Message-ID: <20161214153013.bkdm3pu3osepfnn2@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@kernel.org> [161214 05:32]:
-> Hi Pali & Pavel,
+On Wed, Dec 14, 2016 at 03:57:24PM +0100, Emmanuel Vadot wrote:
+> The node name for the power seq pin is mmc2 at 0 like the mmc2_pins_a one.
+> This makes the original node (mmc2_pins_a) scrapped out of the dtb and
+> result in a unusable eMMC if U-Boot didn't configured the pins to the
+> correct functions.
 > 
-> On Wed, Dec 14, 2016 at 01:53:23PM +0100, Pavel Machek wrote:
-> > > > [  220.248596] tty ttyO1: Radio packet sent
-> > > > [  220.249328] Bluetooth: hci0: Frame reassembly failed (-84)
-> > > > [  220.272949] tty ttyO1: wakeup received: 1 -> 0
-> > > > [  221.283477] tty ttyO1: radio packet timeout!
-> > > > [  221.283630] enqueue: hu c304cc80 skb cd4a9b40
-> > > > [  223.363372] Bluetooth: hci0 command 0xfc18 tx timeout
-> > > > pavel at n900:~$
-> > > 
-> > > In log are still some failures, but ... is bluetooth working now?
-> 
-> I could scan for devices. The code is still racy, though. It's
-> most likely related to the newly introduced idle code. (Without
-> sending the BT module to correctly idle the bcm2048 does not
-> work correctly at all)
-> 
-> I was quite busy the last few weeks and did not manage to find
-> much time for kernel work. Now I will first have to catch up
-> with my power-supply tree.
-> 
-> > It is... for Sebastian. I'm playing with camera now.
-> > 
-> > > I see that you applied this patch: 
-> > > https://git.kernel.org/cgit/linux/kernel/git/pavel/linux-n900.git/commit/?id=051aa3fbf03ac770d8344690f5a936a7f04c6884
-> > > 
-> > > Looks like that pinmux is in DTS file incorrect. Can somebody verify it? 
-> > > Maybe Tony?
-> > 
-> > Yes, it is. Sebastian was pretty certain about that.
-> 
-> Yes, I'm certain. The bootloader enables the pullup resistors.
-> Note, that the wrong DTS entry is not in mainline. My bluetooth
-> branch has a fixed DTS patch instead of a fixup patch on top of
-> the broken one:
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/sre/linux-n900.git/commit/?h=nokia-bluetooth-dev&id=6b63c111a979d100cfbdd76cb4a6bbadace35216
+> Changes since v1:
+>  * Rename the node mmc2-rst-pin
 
-Maybe send it so we can merge it as a fix during the early -rc
-cycle?
+That changelog should be after the ---. Removed it and applied.
 
-Regards,
+Thanks!
+Maxime
 
-Tony
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161214/2918b004/attachment.sig>
