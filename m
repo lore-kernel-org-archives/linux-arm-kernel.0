@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Dec 2016 23:37:09 +0100
-Subject: [PATCH 02/39] ARM: dts: armada-370-dlink-dns327l: Correct license text
+Date: Wed, 14 Dec 2016 23:37:10 +0100
+Subject: [PATCH 03/39] ARM: dts: armada-370: Correct license text
 In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
 References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214223746.23066-3-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214223746.23066-4-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,18 +11,27 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
-Cc: Andrew Andrianov <andrew@ncrmnt.org>
+Cc: Arnaud Ebalard <arno@natisbad.org>
+Cc: Ben Dooks <ben.dooks@codethink.co.uk>
 Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Cc: Lior Amsalem <alior@marvell.com>
+Cc: Ryan Press <ryan@presslab.us>
+Cc: Simon Guinot <simon.guinot@sequanux.org>
+Cc: Stefan Roese <sr@denx.de>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Yehuda Yitschak <yehuday@marvell.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-dlink-dns327l.dts | 10 +++++-----
+ arch/arm/boot/dts/armada-370.dtsi | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-dlink-dns327l.dts b/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
-index e2a363b1dd8a..60821b77297d 100644
---- a/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
-+++ b/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
-@@ -13,17 +13,17 @@
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index b4258105e91f..c057c54f6b36 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -17,17 +17,17 @@
   *     published by the Free Software Foundation; either version 2 of the
   *     License, or (at your option) any later version.
   *
@@ -43,7 +52,7 @@ index e2a363b1dd8a..60821b77297d 100644
   *     copy, modify, merge, publish, distribute, sublicense, and/or
   *     sell copies of the Software, and to permit persons to whom the
   *     Software is furnished to do so, subject to the following
-@@ -32,11 +32,11 @@
+@@ -36,11 +36,11 @@
   *     The above copyright notice and this permission notice shall be
   *     included in all copies or substantial portions of the Software.
   *
