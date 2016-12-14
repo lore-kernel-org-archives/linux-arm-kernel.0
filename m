@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Dec 2016 23:37:30 +0100
-Subject: [PATCH 23/39] ARM: dts: armada-xp-axpwifiap: Correct license text
+Date: Wed, 14 Dec 2016 23:37:17 +0100
+Subject: [PATCH 10/39] ARM: dts: armada-375-db: Correct license text
 In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
 References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214223746.23066-24-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214223746.23066-11-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,24 +11,20 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
-Cc: Arnaud Ebalard <arno@natisbad.org>
 Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
 Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: Paul Bolle <pebolle@tiscali.nl>
 Cc: Rafa? Mi?ecki <zajec5@gmail.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Stefan Roese <sr@denx.de>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-axpwifiap.dts | 10 +++++-----
+ arch/arm/boot/dts/armada-375-db.dts | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-index ce152719bc28..6a25eb427822 100644
---- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-+++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-@@ -20,17 +20,17 @@
+diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
+index cded5f0a262d..6bbe3a35810d 100644
+--- a/arch/arm/boot/dts/armada-375-db.dts
++++ b/arch/arm/boot/dts/armada-375-db.dts
+@@ -17,17 +17,17 @@
   *     published by the Free Software Foundation; either version 2 of the
   *     License, or (at your option) any later version.
   *
@@ -49,7 +45,7 @@ index ce152719bc28..6a25eb427822 100644
   *     copy, modify, merge, publish, distribute, sublicense, and/or
   *     sell copies of the Software, and to permit persons to whom the
   *     Software is furnished to do so, subject to the following
-@@ -39,11 +39,11 @@
+@@ -36,11 +36,11 @@
   *     The above copyright notice and this permission notice shall be
   *     included in all copies or substantial portions of the Software.
   *
