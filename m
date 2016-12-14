@@ -1,247 +1,581 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 14 Dec 2016 11:46:12 -0800
-Subject: [PATCH 02/11] clk: bcm2835: Register the DSI0/DSI1 pixel clocks.
+Date: Wed, 14 Dec 2016 11:46:19 -0800
+Subject: [PATCH 09/11] drm/panel: Add support for the Raspberry Pi 7"
+ Touchscreen.
 In-Reply-To: <20161214194621.16499-1-eric@anholt.net>
 References: <20161214194621.16499-1-eric@anholt.net>
-Message-ID: <20161214194621.16499-3-eric@anholt.net>
+Message-ID: <20161214194621.16499-10-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DSI pixel clocks are muxed from clocks generated in the analog phy
-by the DSI driver.  In order to set them as parents, we need to do the
-same name lookup dance on them as we do for our root oscillator.
+This driver communicates with the Atmel microcontroller for sequencing
+the poweron of the TC358762 DSI-DPI bridge and controlling the
+backlight PWM.
+
+The following lines are required in config.txt, to keep the firmware
+from trying to bash our I2C lines and steal the DSI interrupts:
+
+    disable_touchscreen=1
+    ignore_lcd=2
+    mask_gpu_interrupt1=0x1000
+
+This means that the firmware won't power on the panel at boot time (no
+rainbow) and the touchscreen input won't work.  The native input
+driver for the touchscreen still needs to be written.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- .../bindings/clock/brcm,bcm2835-cprman.txt         |  15 ++-
- drivers/clk/bcm/clk-bcm2835.c                      | 120 ++++++++++++++++++---
- include/dt-bindings/clock/bcm2835.h                |   2 +
- 3 files changed, 124 insertions(+), 13 deletions(-)
+ drivers/gpu/drm/panel/Kconfig                      |   8 +
+ drivers/gpu/drm/panel/Makefile                     |   1 +
+ .../gpu/drm/panel/panel-raspberrypi-touchscreen.c  | 509 +++++++++++++++++++++
+ 3 files changed, 518 insertions(+)
+ create mode 100644 drivers/gpu/drm/panel/panel-raspberrypi-touchscreen.c
 
-diff --git a/Documentation/devicetree/bindings/clock/brcm,bcm2835-cprman.txt b/Documentation/devicetree/bindings/clock/brcm,bcm2835-cprman.txt
-index e56a1df3a9d3..dd906db34b32 100644
---- a/Documentation/devicetree/bindings/clock/brcm,bcm2835-cprman.txt
-+++ b/Documentation/devicetree/bindings/clock/brcm,bcm2835-cprman.txt
-@@ -16,7 +16,20 @@ Required properties:
- - #clock-cells:	Should be <1>. The permitted clock-specifier values can be
- 		  found in include/dt-bindings/clock/bcm2835.h
- - reg:		Specifies base physical address and size of the registers
--- clocks:	The external oscillator clock phandle
-+- clocks:	phandles to the parent clocks used as input to the module, in
-+		  the following order:
+diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
+index 62aba976e744..de7a56ab758b 100644
+--- a/drivers/gpu/drm/panel/Kconfig
++++ b/drivers/gpu/drm/panel/Kconfig
+@@ -52,6 +52,14 @@ config DRM_PANEL_PANASONIC_VVX10F034N00
+ 	  WUXGA (1920x1200) Novatek NT1397-based DSI panel as found in some
+ 	  Xperia Z2 tablets
+ 
++config DRM_PANEL_RASPBERRYPI_TOUCHSCREEN
++	tristate "Raspberry Pi 7-inch touchscreen panel"
++	depends on DRM_MIPI_DSI
++	help
++	  Say Y here if you want to enable support for the Raspberry
++	  Pi 7" Touchscreen.  To compile this driver as a module,
++	  choose M here.
 +
-+		  - External oscillator
-+		  - DSI0 byte clock
-+		  - DSI0 DDR2 clock
-+		  - DSI0 DDR clock
-+		  - DSI1 byte clock
-+		  - DSI1 DDR2 clock
-+		  - DSI1 DDR clock
-+
-+		  Only external oscillator is required.  The DSI clocks may
-+		  not be present, in which case their children will be
-+		  unusable.
- 
- Example:
- 
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 6641030e8eae..b0a8cd19a30c 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -297,11 +297,32 @@
- #define LOCK_TIMEOUT_NS		100000000
- #define BCM2835_MAX_FB_RATE	1750000000u
- 
+ config DRM_PANEL_SAMSUNG_S6E8AA0
+ 	tristate "Samsung S6E8AA0 DSI video mode panel"
+ 	depends on OF
+diff --git a/drivers/gpu/drm/panel/Makefile b/drivers/gpu/drm/panel/Makefile
+index a5c7ec0236e0..e8a7ed280fff 100644
+--- a/drivers/gpu/drm/panel/Makefile
++++ b/drivers/gpu/drm/panel/Makefile
+@@ -2,6 +2,7 @@ obj-$(CONFIG_DRM_PANEL_SIMPLE) += panel-simple.o
+ obj-$(CONFIG_DRM_PANEL_JDI_LT070ME05000) += panel-jdi-lt070me05000.o
+ obj-$(CONFIG_DRM_PANEL_LG_LG4573) += panel-lg-lg4573.o
+ obj-$(CONFIG_DRM_PANEL_PANASONIC_VVX10F034N00) += panel-panasonic-vvx10f034n00.o
++obj-$(CONFIG_DRM_PANEL_RASPBERRYPI_TOUCHSCREEN) += panel-raspberrypi-touchscreen.o
+ obj-$(CONFIG_DRM_PANEL_SAMSUNG_LD9040) += panel-samsung-ld9040.o
+ obj-$(CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0) += panel-samsung-s6e8aa0.o
+ obj-$(CONFIG_DRM_PANEL_SHARP_LQ101R1SX01) += panel-sharp-lq101r1sx01.o
+diff --git a/drivers/gpu/drm/panel/panel-raspberrypi-touchscreen.c b/drivers/gpu/drm/panel/panel-raspberrypi-touchscreen.c
+new file mode 100644
+index 000000000000..d2cbf9e0a067
+--- /dev/null
++++ b/drivers/gpu/drm/panel/panel-raspberrypi-touchscreen.c
+@@ -0,0 +1,509 @@
 +/*
-+ * Names of clocks used within the driver that need to be replaced
-+ * with an external parent's name.  This array is in the order that
-+ * the clocks node in the DT references external clocks.
++ * Copyright ? 2016 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Portions of this file (derived from panel-simple.c) are:
++ *
++ * Copyright (C) 2013, NVIDIA Corporation.  All rights reserved.
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sub license,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the
++ * next paragraph) shall be included in all copies or substantial portions
++ * of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL
++ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
++ * DEALINGS IN THE SOFTWARE.
 + */
-+static const char *const cprman_parent_names[] = {
-+	"xosc",
-+	"dsi0_byte",
-+	"dsi0_ddr2",
-+	"dsi0_ddr",
-+	"dsi1_byte",
-+	"dsi1_ddr2",
-+	"dsi1_ddr",
++
++/**
++ * DOC: Raspberry Pi 7" touchscreen panel driver.
++ *
++ * The 7" touchscreen consists of a DPI LCD panel, a Toshiba
++ * TC358762XBG DSI-DPI bridge, and an I2C-connected Atmel ATTINY88-MUR
++ * controlling power management, the LCD PWM, and the touchscreen.
++ *
++ * This driver presents this device as a MIPI DSI panel to the DRM
++ * driver, and should expose the touchscreen as a HID device.
++ */
++
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/fb.h>
++#include <linux/gpio.h>
++#include <linux/gpio/consumer.h>
++#include <linux/i2c.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_graph.h>
++#include <linux/pm.h>
++
++#include <drm/drm_panel.h>
++#include <drm/drmP.h>
++#include <drm/drm_crtc.h>
++#include <drm/drm_mipi_dsi.h>
++#include <drm/drm_panel.h>
++
++/* I2C registers of the Atmel microcontroller. */
++enum REG_ADDR {
++	REG_ID = 0x80,
++	REG_PORTA, // BIT(2) for horizontal flip, BIT(3) for vertical flip
++	REG_PORTB,
++	REG_PORTC,
++	REG_PORTD,
++	REG_POWERON,
++	REG_PWM,
++	REG_DDRA,
++	REG_DDRB,
++	REG_DDRC,
++	REG_DDRD,
++	REG_TEST,
++	REG_WR_ADDRL,
++	REG_WR_ADDRH,
++	REG_READH,
++	REG_READL,
++	REG_WRITEH,
++	REG_WRITEL,
++	REG_ID2,
 +};
 +
- struct bcm2835_cprman {
- 	struct device *dev;
- 	void __iomem *regs;
- 	spinlock_t regs_lock; /* spinlock for all clocks */
--	const char *osc_name;
++/* We only turn the PWM on or off, without varying values. */
++#define RPI_TOUCHSCREEN_MAX_BRIGHTNESS 1
 +
-+	/*
-+	 * Real names of cprman clock parents looked up through
-+	 * of_clk_get_parent_name(), which will be used in the
-+	 * parent_names[] arrays for clock registration.
++/* DSI D-PHY Layer Registers */
++#define D0W_DPHYCONTTX		0x0004
++#define CLW_DPHYCONTRX		0x0020
++#define D0W_DPHYCONTRX		0x0024
++#define D1W_DPHYCONTRX		0x0028
++#define COM_DPHYCONTRX		0x0038
++#define CLW_CNTRL		0x0040
++#define D0W_CNTRL		0x0044
++#define D1W_CNTRL		0x0048
++#define DFTMODE_CNTRL		0x0054
++
++/* DSI PPI Layer Registers */
++#define PPI_STARTPPI		0x0104
++#define PPI_BUSYPPI		0x0108
++#define PPI_LINEINITCNT		0x0110
++#define PPI_LPTXTIMECNT		0x0114
++//#define PPI_LANEENABLE		0x0134
++//#define PPI_TX_RX_TA		0x013C
++#define PPI_CLS_ATMR		0x0140
++#define PPI_D0S_ATMR		0x0144
++#define PPI_D1S_ATMR		0x0148
++#define PPI_D0S_CLRSIPOCOUNT	0x0164
++#define PPI_D1S_CLRSIPOCOUNT	0x0168
++#define CLS_PRE			0x0180
++#define D0S_PRE			0x0184
++#define D1S_PRE			0x0188
++#define CLS_PREP		0x01A0
++#define D0S_PREP		0x01A4
++#define D1S_PREP		0x01A8
++#define CLS_ZERO		0x01C0
++#define D0S_ZERO		0x01C4
++#define D1S_ZERO		0x01C8
++#define PPI_CLRFLG		0x01E0
++#define PPI_CLRSIPO		0x01E4
++#define HSTIMEOUT		0x01F0
++#define HSTIMEOUTENABLE		0x01F4
++
++/* DSI Protocol Layer Registers */
++#define DSI_STARTDSI		0x0204
++#define DSI_BUSYDSI		0x0208
++#define DSI_LANEENABLE		0x0210
++# define DSI_LANEENABLE_CLOCK		BIT(0)
++# define DSI_LANEENABLE_D0		BIT(1)
++# define DSI_LANEENABLE_D1		BIT(2)
++
++#define DSI_LANESTATUS0		0x0214
++#define DSI_LANESTATUS1		0x0218
++#define DSI_INTSTATUS		0x0220
++#define DSI_INTMASK		0x0224
++#define DSI_INTCLR		0x0228
++#define DSI_LPTXTO		0x0230
++#define DSI_MODE		0x0260
++#define DSI_PAYLOAD0		0x0268
++#define DSI_PAYLOAD1		0x026C
++#define DSI_SHORTPKTDAT		0x0270
++#define DSI_SHORTPKTREQ		0x0274
++#define DSI_BTASTA		0x0278
++#define DSI_BTACLR		0x027C
++
++/* DSI General Registers */
++#define DSIERRCNT		0x0300
++#define DSISIGMOD		0x0304
++
++/* DSI Application Layer Registers */
++#define APLCTRL			0x0400
++#define APLSTAT			0x0404
++#define APLERR			0x0408
++#define PWRMOD			0x040C
++#define RDPKTLN			0x0410
++#define PXLFMT			0x0414
++#define MEMWRCMD		0x0418
++
++/* LCDC/DPI Host Registers */
++#define LCDCTRL			0x0420
++#define HSR			0x0424
++#define HDISPR			0x0428
++#define VSR			0x042C
++#define VDISPR			0x0430
++#define VFUEN			0x0434
++
++/* DBI-B Host Registers */
++#define DBIBCTRL		0x0440
++
++/* SPI Master Registers */
++#define SPICMR			0x0450
++#define SPITCR			0x0454
++
++/* System Controller Registers */
++#define SYSSTAT			0x0460
++#define SYSCTRL			0x0464
++#define SYSPLL1			0x0468
++#define SYSPLL2			0x046C
++#define SYSPLL3			0x0470
++#define SYSPMCTRL		0x047C
++
++/* GPIO Registers */
++#define GPIOC			0x0480
++#define GPIOO			0x0484
++#define GPIOI			0x0488
++
++/* I2C Registers */
++#define I2CCLKCTRL		0x0490
++
++/* Chip/Rev Registers */
++#define IDREG			0x04A0
++
++/* Debug Registers */
++#define WCMDQUEUE		0x0500
++#define RCMDQUEUE		0x0504
++
++struct rpi_touchscreen {
++	struct drm_panel base;
++	struct mipi_dsi_device *dsi;
++	struct i2c_client *bridge_i2c;
++
++	/* Version of the firmware on the bridge chip */
++	int atmel_ver;
++};
++
++static const struct drm_display_mode rpi_touchscreen_modes[] = {
++	{
++		/* The DSI PLL can only integer divide from the 2Ghz
++		 * PLLD, giving us few choices.  We pick a divide by 3
++		 * as our DSI HS clock, giving us a pixel clock of
++		 * that divided by 24 bits.  Pad out HFP to get our
++		 * panel to refresh at 60Hz, even if that doesn't
++		 * match the datasheet.
++		 */
++#define PIXEL_CLOCK ((2000000000 / 3) / 24)
++#define VREFRESH    60
++#define VTOTAL      (480 + 7 + 2 + 21)
++#define HACT        800
++#define HSW         2
++#define HBP         46
++#define HFP         ((PIXEL_CLOCK / (VTOTAL * VREFRESH)) - (HACT + HSW + HBP))
++
++		.clock = PIXEL_CLOCK / 1000,
++		.hdisplay = HACT,
++		.hsync_start = HACT + HFP,
++		.hsync_end = HACT + HFP + HSW,
++		.htotal = HACT + HFP + HSW + HBP,
++		.vdisplay = 480,
++		.vsync_start = 480 + 7,
++		.vsync_end = 480 + 7 + 2,
++		.vtotal = VTOTAL,
++		.vrefresh = 60,
++	},
++};
++
++static struct rpi_touchscreen *panel_to_ts(struct drm_panel *panel)
++{
++	return container_of(panel, struct rpi_touchscreen, base);
++}
++
++static u8 rpi_touchscreen_i2c_read(struct rpi_touchscreen *ts, u8 reg)
++{
++	return i2c_smbus_read_byte_data(ts->bridge_i2c, reg);
++}
++
++static void rpi_touchscreen_i2c_write(struct rpi_touchscreen *ts,
++				      u8 reg, u8 val)
++{
++	int ret;
++
++	ret = i2c_smbus_write_byte_data(ts->bridge_i2c, reg, val);
++	if (ret)
++		dev_err(&ts->dsi->dev, "I2C write failed: %d\n", ret);
++}
++
++static int rpi_touchscreen_write(struct rpi_touchscreen *ts, u16 reg, u32 val)
++{
++#if 0
++	/* The firmware uses LP DSI transactions like this to bring up
++	 * the hardware, which should be faster than using I2C to then
++	 * pass to the Toshiba.  However, I was unable to get it to
++	 * work.
 +	 */
-+	const char *real_parent_names[ARRAY_SIZE(cprman_parent_names)];
- 
- 	/* Must be last */
- 	struct clk_hw_onecell_data onecell;
-@@ -905,6 +926,9 @@ static long bcm2835_clock_rate_from_divisor(struct bcm2835_clock *clock,
- 	const struct bcm2835_clock_data *data = clock->data;
- 	u64 temp;
- 
-+	if (data->int_bits == 0 && data->frac_bits == 0)
-+		return parent_rate;
++	u8 msg[] = {
++		reg,
++		reg >> 8,
++		val,
++		val >> 8,
++		val >> 16,
++		val >> 24,
++	};
 +
- 	/*
- 	 * The divisor is a 12.12 fixed point field, but only some of
- 	 * the bits are populated in any given clock.
-@@ -928,7 +952,12 @@ static unsigned long bcm2835_clock_get_rate(struct clk_hw *hw,
- 	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
- 	struct bcm2835_cprman *cprman = clock->cprman;
- 	const struct bcm2835_clock_data *data = clock->data;
--	u32 div = cprman_read(cprman, data->div_reg);
-+	u32 div;
++	mipi_dsi_dcs_write_buffer(ts->dsi, msg, sizeof(msg));
++#else
++	rpi_touchscreen_i2c_write(ts, REG_WR_ADDRH, reg >> 8);
++	rpi_touchscreen_i2c_write(ts, REG_WR_ADDRL, reg);
++	rpi_touchscreen_i2c_write(ts, REG_WRITEH, val >> 8);
++	rpi_touchscreen_i2c_write(ts, REG_WRITEL, val);
++#endif
 +
-+	if (data->int_bits == 0 && data->frac_bits == 0)
-+		return parent_rate;
++	return 0;
++}
 +
-+	div = cprman_read(cprman, data->div_reg);
- 
- 	return bcm2835_clock_rate_from_divisor(clock, parent_rate, div);
- }
-@@ -1158,7 +1187,7 @@ static struct clk_hw *bcm2835_register_pll(struct bcm2835_cprman *cprman,
- 	memset(&init, 0, sizeof(init));
- 
- 	/* All of the PLLs derive from the external oscillator. */
--	init.parent_names = &cprman->osc_name;
-+	init.parent_names = &cprman->real_parent_names[0];
- 	init.num_parents = 1;
- 	init.name = data->name;
- 	init.ops = &bcm2835_pll_clk_ops;
-@@ -1244,18 +1273,22 @@ static struct clk_hw *bcm2835_register_clock(struct bcm2835_cprman *cprman,
- 	struct bcm2835_clock *clock;
- 	struct clk_init_data init;
- 	const char *parents[1 << CM_SRC_BITS];
--	size_t i;
-+	size_t i, j;
- 	int ret;
- 
- 	/*
--	 * Replace our "xosc" references with the oscillator's
--	 * actual name.
-+	 * Replace our strings referencing parent clocks with the
-+	 * actual clock-output-name of the parent.
- 	 */
- 	for (i = 0; i < data->num_mux_parents; i++) {
--		if (strcmp(data->parents[i], "xosc") == 0)
--			parents[i] = cprman->osc_name;
--		else
--			parents[i] = data->parents[i];
-+		parents[i] = data->parents[i];
++static int rpi_touchscreen_disable(struct drm_panel *panel)
++{
++	struct rpi_touchscreen *ts = panel_to_ts(panel);
 +
-+		for (j = 0; j < ARRAY_SIZE(cprman_parent_names); j++) {
-+			if (strcmp(parents[i], cprman_parent_names[j]) == 0) {
-+				parents[i] = cprman->real_parent_names[j];
-+				break;
-+			}
-+		}
- 	}
- 
- 	memset(&init, 0, sizeof(init));
-@@ -1375,6 +1408,47 @@ static const char *const bcm2835_clock_vpu_parents[] = {
- 	__VA_ARGS__)
- 
- /*
-+ * DSI parent clocks.  The DSI byte/DDR/DDR2 clocks come from the DSI
-+ * analog PHY.  The _inv variants are generated internally to cprman,
-+ * but we don't use them so they aren't hooked up.
-+ */
-+static const char *const bcm2835_clock_dsi0_parents[] = {
-+	"gnd",
-+	"xosc",
-+	"testdebug0",
-+	"testdebug1",
-+	"dsi0_ddr",
-+	"dsi0_ddr_inv",
-+	"dsi0_ddr2",
-+	"dsi0_ddr2_inv",
-+	"dsi0_byte",
-+	"dsi0_byte_inv",
-+};
++	rpi_touchscreen_i2c_write(ts, REG_PWM, 0);
 +
-+static const char *const bcm2835_clock_dsi1_parents[] = {
-+	"gnd",
-+	"xosc",
-+	"testdebug0",
-+	"testdebug1",
-+	"dsi1_ddr",
-+	"dsi1_ddr_inv",
-+	"dsi1_ddr2",
-+	"dsi1_ddr2_inv",
-+	"dsi1_byte",
-+	"dsi1_byte_inv",
-+};
++	rpi_touchscreen_i2c_write(ts, REG_POWERON, 0);
++	udelay(1);
 +
-+#define REGISTER_DSI0_CLK(...)	REGISTER_CLK(				\
-+	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_dsi0_parents),	\
-+	.parents = bcm2835_clock_dsi0_parents,				\
-+	__VA_ARGS__)
++	return 0;
++}
 +
-+#define REGISTER_DSI1_CLK(...)	REGISTER_CLK(				\
-+	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_dsi1_parents),	\
-+	.parents = bcm2835_clock_dsi1_parents,				\
-+	__VA_ARGS__)
++static int rpi_touchscreen_noop(struct drm_panel *panel)
++{
++	return 0;
++}
 +
-+/*
-  * the real definition of all the pll, pll_dividers and clocks
-  * these make use of the above REGISTER_* macros
-  */
-@@ -1832,6 +1906,18 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.div_reg = CM_DSI1EDIV,
- 		.int_bits = 4,
- 		.frac_bits = 8),
-+	[BCM2835_CLOCK_DSI0P]	= REGISTER_DSI0_CLK(
-+		.name = "dsi0p",
-+		.ctl_reg = CM_DSI0PCTL,
-+		.div_reg = CM_DSI0PDIV,
-+		.int_bits = 0,
-+		.frac_bits = 0),
-+	[BCM2835_CLOCK_DSI1P]	= REGISTER_DSI1_CLK(
-+		.name = "dsi1p",
-+		.ctl_reg = CM_DSI1PCTL,
-+		.div_reg = CM_DSI1PDIV,
-+		.int_bits = 0,
-+		.frac_bits = 0),
- 
- 	/* the gates */
- 
-@@ -1890,8 +1976,18 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
- 	if (IS_ERR(cprman->regs))
- 		return PTR_ERR(cprman->regs);
- 
--	cprman->osc_name = of_clk_get_parent_name(dev->of_node, 0);
--	if (!cprman->osc_name)
-+	for (i = 0; i < ARRAY_SIZE(cprman_parent_names); i++) {
-+		cprman->real_parent_names[i] =
-+			of_clk_get_parent_name(dev->of_node, i);
++static int rpi_touchscreen_enable(struct drm_panel *panel)
++{
++	struct rpi_touchscreen *ts = panel_to_ts(panel);
++	int i;
++
++	rpi_touchscreen_i2c_write(ts, REG_POWERON, 1);
++	/* Wait for nPWRDWN to go low to indicate poweron is done. */
++	for (i = 0; i < 100; i++) {
++		if (rpi_touchscreen_i2c_read(ts, REG_PORTB) & 1)
++			break;
 +	}
-+	/*
-+	 * Make sure the external oscillator has been registered.
-+	 *
-+	 * The other (DSI) clocks are not present on older device
-+	 * trees, which we still need to support for backwards
-+	 * compatibility.
-+	 */
-+	if (!cprman->real_parent_names[0])
- 		return -ENODEV;
- 
- 	platform_set_drvdata(pdev, cprman);
-diff --git a/include/dt-bindings/clock/bcm2835.h b/include/dt-bindings/clock/bcm2835.h
-index 360e00cefd35..a0c812b0fa39 100644
---- a/include/dt-bindings/clock/bcm2835.h
-+++ b/include/dt-bindings/clock/bcm2835.h
-@@ -64,3 +64,5 @@
- #define BCM2835_CLOCK_CAM1		46
- #define BCM2835_CLOCK_DSI0E		47
- #define BCM2835_CLOCK_DSI1E		48
-+#define BCM2835_CLOCK_DSI0P		49
-+#define BCM2835_CLOCK_DSI1P		50
++
++	rpi_touchscreen_write(ts, DSI_LANEENABLE,
++			      DSI_LANEENABLE_CLOCK |
++			      DSI_LANEENABLE_D0 |
++			      (ts->dsi->lanes > 1 ? DSI_LANEENABLE_D1 : 0));
++	rpi_touchscreen_write(ts, PPI_D0S_CLRSIPOCOUNT, 0x05);
++	rpi_touchscreen_write(ts, PPI_D1S_CLRSIPOCOUNT, 0x05);
++	rpi_touchscreen_write(ts, PPI_D0S_ATMR, 0x00);
++	rpi_touchscreen_write(ts, PPI_D1S_ATMR, 0x00);
++	rpi_touchscreen_write(ts, PPI_LPTXTIMECNT, 0x03);
++
++	rpi_touchscreen_write(ts, SPICMR, 0x00);
++	rpi_touchscreen_write(ts, LCDCTRL, 0x00100150);
++	rpi_touchscreen_write(ts, SYSCTRL, 0x040f);
++	msleep(100);
++
++	rpi_touchscreen_write(ts, PPI_STARTPPI, 0x01);
++	rpi_touchscreen_write(ts, DSI_STARTDSI, 0x01);
++	msleep(100);
++
++	/* Turn on the backklight. */
++	rpi_touchscreen_i2c_write(ts, REG_PWM, 255);
++
++	rpi_touchscreen_i2c_write(ts, REG_PORTA, BIT(3));
++
++	return 0;
++}
++
++static int rpi_touchscreen_get_modes(struct drm_panel *panel)
++{
++	struct drm_connector *connector = panel->connector;
++	struct drm_device *drm = panel->drm;
++	unsigned int i, num = 0;
++
++	for (i = 0; i < ARRAY_SIZE(rpi_touchscreen_modes); i++) {
++		const struct drm_display_mode *m = &rpi_touchscreen_modes[i];
++		struct drm_display_mode *mode;
++
++		mode = drm_mode_duplicate(drm, m);
++		if (!mode) {
++			dev_err(drm->dev, "failed to add mode %ux%u@%u\n",
++				m->hdisplay, m->vdisplay, m->vrefresh);
++			continue;
++		}
++
++		mode->type |= DRM_MODE_TYPE_DRIVER;
++
++		if (i == 0)
++			mode->type |= DRM_MODE_TYPE_PREFERRED;
++
++		drm_mode_set_name(mode);
++
++		drm_mode_probed_add(connector, mode);
++		num++;
++	}
++
++	connector->display_info.bpc = 8;
++	connector->display_info.width_mm = 154;
++	connector->display_info.height_mm = 86;
++
++	return num;
++}
++
++static const struct drm_panel_funcs rpi_touchscreen_funcs = {
++	.disable = rpi_touchscreen_disable,
++	.unprepare = rpi_touchscreen_noop,
++	.prepare = rpi_touchscreen_noop,
++	.enable = rpi_touchscreen_enable,
++	.get_modes = rpi_touchscreen_get_modes,
++};
++
++static struct i2c_client *rpi_touchscreen_get_i2c(struct device *dev,
++						  const char *name)
++{
++	struct device_node *node;
++	struct i2c_client *client;
++
++	node = of_parse_phandle(dev->of_node, name, 0);
++	if (!node)
++		return ERR_PTR(-ENODEV);
++
++	client = of_find_i2c_device_by_node(node);
++
++	of_node_put(node);
++
++	return client;
++}
++
++static int rpi_touchscreen_dsi_probe(struct mipi_dsi_device *dsi)
++{
++	struct device *dev = &dsi->dev;
++	struct rpi_touchscreen *ts;
++	int ret, ver;
++
++	ts = devm_kzalloc(dev, sizeof(*ts), GFP_KERNEL);
++	if (!ts)
++		return -ENOMEM;
++
++	dev_set_drvdata(dev, ts);
++
++	ts->dsi = dsi;
++	dsi->mode_flags = (MIPI_DSI_MODE_VIDEO |
++			   MIPI_DSI_MODE_VIDEO_SYNC_PULSE |
++			   MIPI_DSI_MODE_LPM);
++	dsi->format = MIPI_DSI_FMT_RGB888;
++	dsi->lanes = 1;
++
++	ts->bridge_i2c =
++		rpi_touchscreen_get_i2c(dev, "raspberrypi,touchscreen-bridge");
++	if (!ts->bridge_i2c) {
++		ret = -EPROBE_DEFER;
++		return ret;
++	}
++
++	ver = rpi_touchscreen_i2c_read(ts, REG_ID);
++	if (ver < 0) {
++		dev_err(dev, "Atmel I2C read failed: %d\n", ver);
++		return -ENODEV;
++	}
++
++	switch (ver) {
++	case 0xde:
++		ts->atmel_ver = 1;
++		break;
++	case 0xc3:
++		ts->atmel_ver = 2;
++		break;
++	default:
++		dev_err(dev, "Unknown Atmel firmware revision: 0x%02x\n", ver);
++		return -ENODEV;
++	}
++
++	/* Turn off at boot, so we can cleanly sequence powering on. */
++	rpi_touchscreen_i2c_write(ts, REG_POWERON, 0);
++
++	drm_panel_init(&ts->base);
++	ts->base.dev = dev;
++	ts->base.funcs = &rpi_touchscreen_funcs;
++
++	ret = drm_panel_add(&ts->base);
++	if (ret < 0)
++		goto err_release_bridge;
++
++	return mipi_dsi_attach(dsi);
++
++err_release_bridge:
++	put_device(&ts->bridge_i2c->dev);
++	return ret;
++}
++
++static int rpi_touchscreen_dsi_remove(struct mipi_dsi_device *dsi)
++{
++	struct device *dev = &dsi->dev;
++	struct rpi_touchscreen *ts = dev_get_drvdata(dev);
++	int ret;
++
++	ret = mipi_dsi_detach(dsi);
++	if (ret < 0) {
++		dev_err(&dsi->dev, "failed to detach from DSI host: %d\n", ret);
++		return ret;
++	}
++
++	drm_panel_detach(&ts->base);
++	drm_panel_remove(&ts->base);
++
++	put_device(&ts->bridge_i2c->dev);
++
++	return 0;
++}
++
++static void rpi_touchscreen_dsi_shutdown(struct mipi_dsi_device *dsi)
++{
++	struct device *dev = &dsi->dev;
++	struct rpi_touchscreen *ts = dev_get_drvdata(dev);
++
++	rpi_touchscreen_i2c_write(ts, REG_POWERON, 0);
++}
++
++static const struct of_device_id rpi_touchscreen_of_match[] = {
++	{ .compatible = "raspberrypi,touchscreen" },
++	{ } /* sentinel */
++};
++MODULE_DEVICE_TABLE(of, rpi_touchscreen_of_match);
++
++static struct mipi_dsi_driver rpi_touchscreen_driver = {
++	.driver = {
++		.name = "raspberrypi-touchscreen",
++		.of_match_table = rpi_touchscreen_of_match,
++	},
++	.probe = rpi_touchscreen_dsi_probe,
++	.remove = rpi_touchscreen_dsi_remove,
++	.shutdown = rpi_touchscreen_dsi_shutdown,
++};
++module_mipi_dsi_driver(rpi_touchscreen_driver);
++
++MODULE_AUTHOR("Eric Anholt <eric@anholt.net>");
++MODULE_DESCRIPTION("Raspberry Pi 7-inch touchscreen driver");
++MODULE_LICENSE("GPL v2");
 -- 
 2.11.0
