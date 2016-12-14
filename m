@@ -1,9 +1,10 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Dec 2016 23:37:12 +0100
-Subject: [PATCH 05/39] ARM: dts: armada-370-netgear-rn102: Correct license text
+Date: Wed, 14 Dec 2016 23:37:15 +0100
+Subject: [PATCH 08/39] ARM: dts: armada-370-synology-ds213j: Correct license
+ text
 In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
 References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214223746.23066-6-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214223746.23066-9-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,21 +13,19 @@ multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
 Cc: Arnaud Ebalard <arno@natisbad.org>
-Cc: Ben Peddell <klightspeed@killerwolves.net>
+Cc: Rafa? Mi?ecki <zajec5@gmail.com>
 Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Stefan Roese <sr@denx.de>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-netgear-rn102.dts | 10 +++++-----
+ arch/arm/boot/dts/armada-370-synology-ds213j.dts | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-index 39181b3fa90d..c4cbb81b43e8 100644
---- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-+++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+diff --git a/arch/arm/boot/dts/armada-370-synology-ds213j.dts b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
+index a9cc42776874..384d50a382ef 100644
+--- a/arch/arm/boot/dts/armada-370-synology-ds213j.dts
++++ b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
 @@ -13,17 +13,17 @@
   *     published by the Free Software Foundation; either version 2 of the
   *     License, or (at your option) any later version.
