@@ -1,63 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Dec 2016 12:40:56 +0000
-Subject: [PATCH 2/2] ARM: soft-reboot into same mode that we entered the
- kernel
-In-Reply-To: <20161214122945.GE14217@n2100.armlinux.org.uk>
-References: <20161213113044.GC19985@leverpostej>
- <E1cH751-0003kk-Ts@rmk-PC.armlinux.org.uk>
- <20161214115648.GG17982@leverpostej>
- <20161214120541.GD14217@n2100.armlinux.org.uk>
- <20161214121747.GH17982@leverpostej>
- <20161214122945.GE14217@n2100.armlinux.org.uk>
-Message-ID: <20161214124056.GI17982@leverpostej>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 14 Dec 2016 13:45:30 +0100
+Subject: [PATCH linux v1 0/4] Seven segment display support
+In-Reply-To: <1481702104-8617-1-git-send-email-jaghu@google.com>
+References: <1481702104-8617-1-git-send-email-jaghu@google.com>
+Message-ID: <20161214134530.2bd54a4e@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2016 at 12:29:45PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Dec 14, 2016 at 12:17:47PM +0000, Mark Rutland wrote:
-> > On Wed, Dec 14, 2016 at 12:05:41PM +0000, Russell King - ARM Linux wrote:
-> > > The issue here is that a panic can happen at any time from any context
-> > > with any hyp stub in place, so there _needs_ to be a uniform way to do
-> > > this.  It's very bad that we've got this far without this point having
-> > > been considered - all we can do right now is to try and fix the issues
-> > > as they come up.
-> > > 
-> > > Right now, let's fix this so we get some kind of improvement, and later
-> > > try to sort out some kind of uniform interface for this task.
-> > 
-> > Sure, that's a bigger task, and this is definitely a step in the right
-> > direction.
-> > 
-> > We need to avoid the kdump regression somehow though; can we somehow
-> > detect if KVM is active and avoid issuing the HVC_SOFT_RESTART?
+Hello,
+
+On Tue, 13 Dec 2016 23:55:00 -0800, Jaghathiswari Rankappagounder
+Natarajan wrote:
+
+> Documentation for the binding which provides an interface for adding clock,
+> data and clear signal GPIO lines to control seven segment display.
 > 
-> That's a question for KVM people.
+> The platform device driver provides an API for displaying on two 7-segment
+> displays, and implements the required bit-banging. The hardware assumed is
+> 74HC164 wired to two 7-segment displays.
 > 
-> However, there's a bigger question, which is: what do we want to happen
-> in the case of kdump - do we want to be entering the kdump kernel in
-> HYP or SVC mode?  As the kdump kernel exists to be able to save the
-> state of a crashing system, the kdump kernel should do that and then
-> restart the system in a clean way (iow, not via yet another kexec.)
+> The character device driver implements the user-space API for letting a user
+> write to two 7-segment displays including any conversion methods necessary
+> to map the user input to two 7-segment displays.
 > 
-> So maybe the right answer is that kdump should always invoke the kernel
-> in SVC mode.
+> Adding clock, data and clear signal GPIO lines in the devicetree to control
+> seven segment display on zaius platform.
+> 
+> The platform driver matches on the device tree node; the platform driver also
+> initializes the character device.
+> 
+> Tested that the seven segment display works properly by writing to the
+> character device file on a EVB AST2500 board which also has 74HC164 wired
+> to two 7-segment displays.
 
-Personally, my view is the opposite -- we should always exit the way we
-came, and kdump can go from there. Otherwise we're leaving context
-active in hyp mode that might hinder kdump (or would otherwise be useful
-for kdump to be able to access).
+FWIW, I proposed a driver for seven segment displays back in 2013:
 
-For example, we might want to do something like kernel guard, where even
-the host kernel would have a stage-2 translation active in hyp that we'd
-need to tear down. That, or the hyp page table might have been
-corrupted, and tearing down ASAP might save us from asynchrnous issues
-from page table walks. It's all a trade-off, either way -- the hyp code
-could also be corrupt.
+   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/139986.html
 
-Certainly I would expect that once kdump's logged what it can, it should
-trigger a real reboot.
+And the feedback from Greg KH was: we don't need a driver for that, do
+it from userspace. See:
 
-Thanks,
-Mark.
+   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/139992.html
 
-[1] https://01.org/intel-kgt
+So: good luck :-)
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
