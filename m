@@ -1,78 +1,44 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 14 Dec 2016 08:50:19 -0800
-Subject: [PATCH linux v1 0/4] Seven segment display support
-In-Reply-To: <ac324946-41da-c090-a0ca-78155611bb7e@baylibre.com>
-References: <1481702104-8617-1-git-send-email-jaghu@google.com>
- <20161214134530.2bd54a4e@free-electrons.com>
- <20161214125641.GA5379@kroah.com>
- <ac324946-41da-c090-a0ca-78155611bb7e@baylibre.com>
-Message-ID: <20161214165019.GC14275@kroah.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 14 Dec 2016 18:08:14 +0100 (CET)
+Subject: Linux crashes when trying to online secondary core
+In-Reply-To: <ef972981-3fb6-74a4-cd83-a6629d2dab2a@free.fr>
+References: <ef972981-3fb6-74a4-cd83-a6629d2dab2a@free.fr>
+Message-ID: <alpine.DEB.2.20.1612141807410.3556@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2016 at 02:12:41PM +0100, Neil Armstrong wrote:
-> On 12/14/2016 01:56 PM, Greg KH wrote:
-> > On Wed, Dec 14, 2016 at 01:45:30PM +0100, Thomas Petazzoni wrote:
-> >> Hello,
-> >>
-> >> On Tue, 13 Dec 2016 23:55:00 -0800, Jaghathiswari Rankappagounder
-> >> Natarajan wrote:
-> >>
-> >>> Documentation for the binding which provides an interface for adding clock,
-> >>> data and clear signal GPIO lines to control seven segment display.
-> >>>
-> >>> The platform device driver provides an API for displaying on two 7-segment
-> >>> displays, and implements the required bit-banging. The hardware assumed is
-> >>> 74HC164 wired to two 7-segment displays.
-> >>>
-> >>> The character device driver implements the user-space API for letting a user
-> >>> write to two 7-segment displays including any conversion methods necessary
-> >>> to map the user input to two 7-segment displays.
-> >>>
-> >>> Adding clock, data and clear signal GPIO lines in the devicetree to control
-> >>> seven segment display on zaius platform.
-> >>>
-> >>> The platform driver matches on the device tree node; the platform driver also
-> >>> initializes the character device.
-> >>>
-> >>> Tested that the seven segment display works properly by writing to the
-> >>> character device file on a EVB AST2500 board which also has 74HC164 wired
-> >>> to two 7-segment displays.
-> >>
-> >> FWIW, I proposed a driver for seven segment displays back in 2013:
-> >>
-> >>    http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/139986.html
-> >>
-> >> And the feedback from Greg KH was: we don't need a driver for that, do
-> >> it from userspace. See:
-> >>
-> >>    http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/139992.html
-> >>
-> >> So: good luck :-)
-> > 
-> > Did anyone ever write a library for this type of thing?
-> > 
-> > Again, I don't want to see one-off drivers for random devices like this
-> > that should be able to all be controlled from userspace in a common
-> > manner.  Much like we did for fingerprint readers a long long time
-> > ago...
-> > 
-> > thanks,
-> > 
-> > greg k-h
+On Wed, 14 Dec 2016, Mason wrote:
+
+> Hello,
 > 
-> Hi Greg,
-> 
-> Actually, it's more than a random interface, a lot of SoCs and boards actually have such displays
-> and it's a pity to use UIO, sysfs gpio bitbanging and all sort of ugly stuff to only print a few
-> characters a simple and clean driver could achieve.
+> I'm seeing Linux v4.9 crash (dereferencing NULL) when I try to online
+> the secondary core, after putting it offline.
 
-Great, then let's make an API that all devices of this type could use,
-and not just take individual drivers that all have a custom char or
-sysfs interface which requires custom userspace code to be able to drive
-all of the different devices in a common way (i.e. a library would have
-to be written anyways...)
+Does the patch below fix the issue?
 
-thanks,
+Thanks,
 
-greg k-h
+	tglx
+	
+8<---------------
+
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index 22acee76cf4c..2594c287b078 100644
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -101,7 +101,6 @@ enum cpuhp_state {
+ 	CPUHP_AP_ARM_L2X0_STARTING,
+ 	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
+ 	CPUHP_AP_ARM_GLOBAL_TIMER_STARTING,
+-	CPUHP_AP_DUMMY_TIMER_STARTING,
+ 	CPUHP_AP_JCORE_TIMER_STARTING,
+ 	CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
+ 	CPUHP_AP_ARM_TWD_STARTING,
+@@ -111,6 +110,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_MARCO_TIMER_STARTING,
+ 	CPUHP_AP_MIPS_GIC_TIMER_STARTING,
+ 	CPUHP_AP_ARC_TIMER_STARTING,
++	CPUHP_AP_DUMMY_TIMER_STARTING,
+ 	CPUHP_AP_KVM_STARTING,
+ 	CPUHP_AP_KVM_ARM_VGIC_INIT_STARTING,
+ 	CPUHP_AP_KVM_ARM_VGIC_STARTING,
