@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Dec 2016 23:37:11 +0100
-Subject: [PATCH 04/39] ARM: dts: armada-370-mirabox: Correct license text
+Date: Wed, 14 Dec 2016 23:37:08 +0100
+Subject: [PATCH 01/39] ARM: dts: armada-370-db: Correct license text
 In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
 References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214223746.23066-5-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214223746.23066-2-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,21 +12,24 @@ multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
 Cc: Arnaud Ebalard <arno@natisbad.org>
+Cc: Ben Dooks <ben.dooks@codethink.co.uk>
 Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
 Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: Ryan Press <ryan@presslab.us>
+Cc: Lior Amsalem <alior@marvell.com>
+Cc: Rafa? Mi?ecki <zajec5@gmail.com>
 Cc: Simon Baatz <gmbnomis@gmail.com>
+Cc: Stefan Roese <sr@denx.de>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-mirabox.dts | 10 +++++-----
+ arch/arm/boot/dts/armada-370-db.dts | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-index d5e19cd4d256..209a4a15e91f 100644
---- a/arch/arm/boot/dts/armada-370-mirabox.dts
-+++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-@@ -13,17 +13,17 @@
+diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+index 033fa63544f7..1dc63e7eaece 100644
+--- a/arch/arm/boot/dts/armada-370-db.dts
++++ b/arch/arm/boot/dts/armada-370-db.dts
+@@ -18,17 +18,17 @@
   *     published by the Free Software Foundation; either version 2 of the
   *     License, or (at your option) any later version.
   *
@@ -47,7 +50,7 @@ index d5e19cd4d256..209a4a15e91f 100644
   *     copy, modify, merge, publish, distribute, sublicense, and/or
   *     sell copies of the Software, and to permit persons to whom the
   *     Software is furnished to do so, subject to the following
-@@ -32,11 +32,11 @@
+@@ -37,11 +37,11 @@
   *     The above copyright notice and this permission notice shall be
   *     included in all copies or substantial portions of the Software.
   *
