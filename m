@@ -1,581 +1,1836 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 14 Dec 2016 11:46:19 -0800
-Subject: [PATCH 09/11] drm/panel: Add support for the Raspberry Pi 7"
- Touchscreen.
+Date: Wed, 14 Dec 2016 11:46:17 -0800
+Subject: [PATCH 07/11] drm/vc4: Add DSI driver
 In-Reply-To: <20161214194621.16499-1-eric@anholt.net>
 References: <20161214194621.16499-1-eric@anholt.net>
-Message-ID: <20161214194621.16499-10-eric@anholt.net>
+Message-ID: <20161214194621.16499-8-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver communicates with the Atmel microcontroller for sequencing
-the poweron of the TC358762 DSI-DPI bridge and controlling the
-backlight PWM.
-
-The following lines are required in config.txt, to keep the firmware
-from trying to bash our I2C lines and steal the DSI interrupts:
-
-    disable_touchscreen=1
-    ignore_lcd=2
-    mask_gpu_interrupt1=0x1000
-
-This means that the firmware won't power on the panel at boot time (no
-rainbow) and the touchscreen input won't work.  The native input
-driver for the touchscreen still needs to be written.
+The DSI0 and DSI1 blocks on the 2835 are related hardware blocks.
+Some registers move around, and the featureset is slightly different,
+as DSI1 (the 4-lane DSI) is a later version of the hardware block.
+This driver doesn't yet enable DSI0, since we don't have any hardware
+to test against, but it does put a lot of the register definitions and
+code in place.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- drivers/gpu/drm/panel/Kconfig                      |   8 +
- drivers/gpu/drm/panel/Makefile                     |   1 +
- .../gpu/drm/panel/panel-raspberrypi-touchscreen.c  | 509 +++++++++++++++++++++
- 3 files changed, 518 insertions(+)
- create mode 100644 drivers/gpu/drm/panel/panel-raspberrypi-touchscreen.c
+ drivers/gpu/drm/vc4/Kconfig       |    2 +
+ drivers/gpu/drm/vc4/Makefile      |    1 +
+ drivers/gpu/drm/vc4/vc4_debugfs.c |    1 +
+ drivers/gpu/drm/vc4/vc4_drv.c     |    1 +
+ drivers/gpu/drm/vc4/vc4_drv.h     |    5 +
+ drivers/gpu/drm/vc4/vc4_dsi.c     | 1725 +++++++++++++++++++++++++++++++++++++
+ 6 files changed, 1735 insertions(+)
+ create mode 100644 drivers/gpu/drm/vc4/vc4_dsi.c
 
-diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
-index 62aba976e744..de7a56ab758b 100644
---- a/drivers/gpu/drm/panel/Kconfig
-+++ b/drivers/gpu/drm/panel/Kconfig
-@@ -52,6 +52,14 @@ config DRM_PANEL_PANASONIC_VVX10F034N00
- 	  WUXGA (1920x1200) Novatek NT1397-based DSI panel as found in some
- 	  Xperia Z2 tablets
+diff --git a/drivers/gpu/drm/vc4/Kconfig b/drivers/gpu/drm/vc4/Kconfig
+index e53df59cb139..e1517d07cb7d 100644
+--- a/drivers/gpu/drm/vc4/Kconfig
++++ b/drivers/gpu/drm/vc4/Kconfig
+@@ -2,10 +2,12 @@ config DRM_VC4
+ 	tristate "Broadcom VC4 Graphics"
+ 	depends on ARCH_BCM2835 || COMPILE_TEST
+ 	depends on DRM
++	depends on COMMON_CLK
+ 	select DRM_KMS_HELPER
+ 	select DRM_KMS_CMA_HELPER
+ 	select DRM_GEM_CMA_HELPER
+ 	select DRM_PANEL
++	select DRM_MIPI_DSI
+ 	help
+ 	  Choose this option if you have a system that has a Broadcom
+ 	  VC4 GPU, such as the Raspberry Pi or other BCM2708/BCM2835.
+diff --git a/drivers/gpu/drm/vc4/Makefile b/drivers/gpu/drm/vc4/Makefile
+index 7757f69a8a77..61f45d122bd0 100644
+--- a/drivers/gpu/drm/vc4/Makefile
++++ b/drivers/gpu/drm/vc4/Makefile
+@@ -8,6 +8,7 @@ vc4-y := \
+ 	vc4_crtc.o \
+ 	vc4_drv.o \
+ 	vc4_dpi.o \
++	vc4_dsi.o \
+ 	vc4_kms.o \
+ 	vc4_gem.o \
+ 	vc4_hdmi.o \
+diff --git a/drivers/gpu/drm/vc4/vc4_debugfs.c b/drivers/gpu/drm/vc4/vc4_debugfs.c
+index caf817bac885..3ca476c6e057 100644
+--- a/drivers/gpu/drm/vc4/vc4_debugfs.c
++++ b/drivers/gpu/drm/vc4/vc4_debugfs.c
+@@ -18,6 +18,7 @@
+ static const struct drm_info_list vc4_debugfs_list[] = {
+ 	{"bo_stats", vc4_bo_stats_debugfs, 0},
+ 	{"dpi_regs", vc4_dpi_debugfs_regs, 0},
++	{"dsi1_regs", vc4_dsi_debugfs_regs, 0, (void *)(uintptr_t)1},
+ 	{"hdmi_regs", vc4_hdmi_debugfs_regs, 0},
+ 	{"vec_regs", vc4_vec_debugfs_regs, 0},
+ 	{"hvs_regs", vc4_hvs_debugfs_regs, 0},
+diff --git a/drivers/gpu/drm/vc4/vc4_drv.c b/drivers/gpu/drm/vc4/vc4_drv.c
+index bdab333979dc..2d2edc7dcf4a 100644
+--- a/drivers/gpu/drm/vc4/vc4_drv.c
++++ b/drivers/gpu/drm/vc4/vc4_drv.c
+@@ -298,6 +298,7 @@ static struct platform_driver *const component_drivers[] = {
+ 	&vc4_hdmi_driver,
+ 	&vc4_vec_driver,
+ 	&vc4_dpi_driver,
++	&vc4_dsi_driver,
+ 	&vc4_hvs_driver,
+ 	&vc4_crtc_driver,
+ 	&vc4_v3d_driver,
+diff --git a/drivers/gpu/drm/vc4/vc4_drv.h b/drivers/gpu/drm/vc4/vc4_drv.h
+index b5c4bb14d0d1..723f0ec940ac 100644
+--- a/drivers/gpu/drm/vc4/vc4_drv.h
++++ b/drivers/gpu/drm/vc4/vc4_drv.h
+@@ -17,6 +17,7 @@ struct vc4_dev {
+ 	struct vc4_crtc *crtc[3];
+ 	struct vc4_v3d *v3d;
+ 	struct vc4_dpi *dpi;
++	struct vc4_dsi *dsi1;
+ 	struct vc4_vec *vec;
  
-+config DRM_PANEL_RASPBERRYPI_TOUCHSCREEN
-+	tristate "Raspberry Pi 7-inch touchscreen panel"
-+	depends on DRM_MIPI_DSI
-+	help
-+	  Say Y here if you want to enable support for the Raspberry
-+	  Pi 7" Touchscreen.  To compile this driver as a module,
-+	  choose M here.
+ 	struct drm_fbdev_cma *fbdev;
+@@ -465,6 +466,10 @@ void __iomem *vc4_ioremap_regs(struct platform_device *dev, int index);
+ extern struct platform_driver vc4_dpi_driver;
+ int vc4_dpi_debugfs_regs(struct seq_file *m, void *unused);
+ 
++/* vc4_dsi.c */
++extern struct platform_driver vc4_dsi_driver;
++int vc4_dsi_debugfs_regs(struct seq_file *m, void *unused);
 +
- config DRM_PANEL_SAMSUNG_S6E8AA0
- 	tristate "Samsung S6E8AA0 DSI video mode panel"
- 	depends on OF
-diff --git a/drivers/gpu/drm/panel/Makefile b/drivers/gpu/drm/panel/Makefile
-index a5c7ec0236e0..e8a7ed280fff 100644
---- a/drivers/gpu/drm/panel/Makefile
-+++ b/drivers/gpu/drm/panel/Makefile
-@@ -2,6 +2,7 @@ obj-$(CONFIG_DRM_PANEL_SIMPLE) += panel-simple.o
- obj-$(CONFIG_DRM_PANEL_JDI_LT070ME05000) += panel-jdi-lt070me05000.o
- obj-$(CONFIG_DRM_PANEL_LG_LG4573) += panel-lg-lg4573.o
- obj-$(CONFIG_DRM_PANEL_PANASONIC_VVX10F034N00) += panel-panasonic-vvx10f034n00.o
-+obj-$(CONFIG_DRM_PANEL_RASPBERRYPI_TOUCHSCREEN) += panel-raspberrypi-touchscreen.o
- obj-$(CONFIG_DRM_PANEL_SAMSUNG_LD9040) += panel-samsung-ld9040.o
- obj-$(CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0) += panel-samsung-s6e8aa0.o
- obj-$(CONFIG_DRM_PANEL_SHARP_LQ101R1SX01) += panel-sharp-lq101r1sx01.o
-diff --git a/drivers/gpu/drm/panel/panel-raspberrypi-touchscreen.c b/drivers/gpu/drm/panel/panel-raspberrypi-touchscreen.c
+ /* vc4_gem.c */
+ void vc4_gem_init(struct drm_device *dev);
+ void vc4_gem_destroy(struct drm_device *dev);
+diff --git a/drivers/gpu/drm/vc4/vc4_dsi.c b/drivers/gpu/drm/vc4/vc4_dsi.c
 new file mode 100644
-index 000000000000..d2cbf9e0a067
+index 000000000000..17fcac381dbb
 --- /dev/null
-+++ b/drivers/gpu/drm/panel/panel-raspberrypi-touchscreen.c
-@@ -0,0 +1,509 @@
++++ b/drivers/gpu/drm/vc4/vc4_dsi.c
+@@ -0,0 +1,1725 @@
 +/*
-+ * Copyright ? 2016 Broadcom
++ * Copyright (C) 2016 Broadcom
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
 + *
-+ * Portions of this file (derived from panel-simple.c) are:
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
 + *
-+ * Copyright (C) 2013, NVIDIA Corporation.  All rights reserved.
-+ *
-+ * Permission is hereby granted, free of charge, to any person obtaining a
-+ * copy of this software and associated documentation files (the "Software"),
-+ * to deal in the Software without restriction, including without limitation
-+ * the rights to use, copy, modify, merge, publish, distribute, sub license,
-+ * and/or sell copies of the Software, and to permit persons to whom the
-+ * Software is furnished to do so, subject to the following conditions:
-+ *
-+ * The above copyright notice and this permission notice (including the
-+ * next paragraph) shall be included in all copies or substantial portions
-+ * of the Software.
-+ *
-+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-+ * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL
-+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-+ * DEALINGS IN THE SOFTWARE.
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
 +/**
-+ * DOC: Raspberry Pi 7" touchscreen panel driver.
++ * DOC: VC4 DSI0/DSI1 module
 + *
-+ * The 7" touchscreen consists of a DPI LCD panel, a Toshiba
-+ * TC358762XBG DSI-DPI bridge, and an I2C-connected Atmel ATTINY88-MUR
-+ * controlling power management, the LCD PWM, and the touchscreen.
++ * BCM2835 contains two DSI modules, DSI0 and DSI1.  DSI0 is a
++ * single-lane DSI controller, while DSI1 is a more modern 4-lane DSI
++ * controller.
 + *
-+ * This driver presents this device as a MIPI DSI panel to the DRM
-+ * driver, and should expose the touchscreen as a HID device.
++ * Most Raspberry Pi boards expose DSI1 as their "DISPLAY" connector,
++ * while the compute module brings both DSI0 and DSI1 out.
++ *
++ * This driver has been tested for DSI1 video-mode display only
++ * currently, with most of the information necessary for DSI0
++ * hopefully present.
 + */
 +
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/fb.h>
-+#include <linux/gpio.h>
-+#include <linux/gpio/consumer.h>
-+#include <linux/i2c.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_graph.h>
-+#include <linux/pm.h>
++#include "drm_atomic_helper.h"
++#include "drm_crtc_helper.h"
++#include "drm_edid.h"
++#include "drm_mipi_dsi.h"
++#include "drm_panel.h"
++#include "linux/clk.h"
++#include "linux/clk-provider.h"
++#include "linux/completion.h"
++#include "linux/component.h"
++#include "linux/dmaengine.h"
++#include "linux/i2c.h"
++#include "linux/of_address.h"
++#include "linux/of_platform.h"
++#include "linux/pm_runtime.h"
++#include "vc4_drv.h"
++#include "vc4_regs.h"
 +
-+#include <drm/drm_panel.h>
-+#include <drm/drmP.h>
-+#include <drm/drm_crtc.h>
-+#include <drm/drm_mipi_dsi.h>
-+#include <drm/drm_panel.h>
++#define DSI_CMD_FIFO_DEPTH  16
++#define DSI_PIX_FIFO_DEPTH 256
++#define DSI_PIX_FIFO_WIDTH   4
 +
-+/* I2C registers of the Atmel microcontroller. */
-+enum REG_ADDR {
-+	REG_ID = 0x80,
-+	REG_PORTA, // BIT(2) for horizontal flip, BIT(3) for vertical flip
-+	REG_PORTB,
-+	REG_PORTC,
-+	REG_PORTD,
-+	REG_POWERON,
-+	REG_PWM,
-+	REG_DDRA,
-+	REG_DDRB,
-+	REG_DDRC,
-+	REG_DDRD,
-+	REG_TEST,
-+	REG_WR_ADDRL,
-+	REG_WR_ADDRH,
-+	REG_READH,
-+	REG_READL,
-+	REG_WRITEH,
-+	REG_WRITEL,
-+	REG_ID2,
++#define DSI0_CTRL		0x00
++
++/* Command packet control. */
++#define DSI0_TXPKT1C		0x04 /* AKA PKTC */
++#define DSI1_TXPKT1C		0x04
++# define DSI_TXPKT1C_TRIG_CMD_MASK	VC4_MASK(31, 24)
++# define DSI_TXPKT1C_TRIG_CMD_SHIFT	24
++# define DSI_TXPKT1C_CMD_REPEAT_MASK	VC4_MASK(23, 10)
++# define DSI_TXPKT1C_CMD_REPEAT_SHIFT	10
++
++# define DSI_TXPKT1C_DISPLAY_NO_MASK	VC4_MASK(9, 8)
++# define DSI_TXPKT1C_DISPLAY_NO_SHIFT	8
++/* Short, trigger, BTA, or a long packet that fits all in CMDFIFO. */
++# define DSI_TXPKT1C_DISPLAY_NO_SHORT		0
++/* Primary display where cmdfifo provides part of the payload and
++ * pixelvalve the rest.
++ */
++# define DSI_TXPKT1C_DISPLAY_NO_PRIMARY		1
++/* Secondary display where cmdfifo provides part of the payload and
++ * pixfifo the rest.
++ */
++# define DSI_TXPKT1C_DISPLAY_NO_SECONDARY	2
++
++# define DSI_TXPKT1C_CMD_TX_TIME_MASK	VC4_MASK(7, 6)
++# define DSI_TXPKT1C_CMD_TX_TIME_SHIFT	6
++
++# define DSI_TXPKT1C_CMD_CTRL_MASK	VC4_MASK(5, 4)
++# define DSI_TXPKT1C_CMD_CTRL_SHIFT	4
++/* Command only.  Uses TXPKT1H and DISPLAY_NO */
++# define DSI_TXPKT1C_CMD_CTRL_TX	0
++/* Command with BTA for either ack or read data. */
++# define DSI_TXPKT1C_CMD_CTRL_RX	1
++/* Trigger according to TRIG_CMD */
++# define DSI_TXPKT1C_CMD_CTRL_TRIG	2
++/* BTA alone for getting error status after a command, or a TE trigger
++ * without a previous command.
++ */
++# define DSI_TXPKT1C_CMD_CTRL_BTA	3
++
++# define DSI_TXPKT1C_CMD_MODE_LP	BIT(3)
++# define DSI_TXPKT1C_CMD_TYPE_LONG	BIT(2)
++# define DSI_TXPKT1C_CMD_TE_EN		BIT(1)
++# define DSI_TXPKT1C_CMD_EN		BIT(0)
++
++/* Command packet header. */
++#define DSI0_TXPKT1H		0x08 /* AKA PKTH */
++#define DSI1_TXPKT1H		0x08
++# define DSI_TXPKT1H_BC_CMDFIFO_MASK	VC4_MASK(31, 24)
++# define DSI_TXPKT1H_BC_CMDFIFO_SHIFT	24
++# define DSI_TXPKT1H_BC_PARAM_MASK	VC4_MASK(23, 8)
++# define DSI_TXPKT1H_BC_PARAM_SHIFT	8
++# define DSI_TXPKT1H_BC_DT_MASK		VC4_MASK(7, 0)
++# define DSI_TXPKT1H_BC_DT_SHIFT	0
++
++#define DSI0_RXPKT1H		0x0c /* AKA RX1_PKTH */
++#define DSI1_RXPKT1H		0x14
++# define DSI_RXPKT1H_CRC_ERR		BIT(31)
++# define DSI_RXPKT1H_DET_ERR		BIT(30)
++# define DSI_RXPKT1H_ECC_ERR		BIT(29)
++# define DSI_RXPKT1H_COR_ERR		BIT(28)
++# define DSI_RXPKT1H_INCOMP_PKT		BIT(25)
++# define DSI_RXPKT1H_PKT_TYPE_LONG	BIT(24)
++/* Byte count if DSI_RXPKT1H_PKT_TYPE_LONG */
++# define DSI_RXPKT1H_BC_PARAM_MASK	VC4_MASK(23, 8)
++# define DSI_RXPKT1H_BC_PARAM_SHIFT	8
++/* Short return bytes if !DSI_RXPKT1H_PKT_TYPE_LONG */
++# define DSI_RXPKT1H_SHORT_1_MASK	VC4_MASK(23, 16)
++# define DSI_RXPKT1H_SHORT_1_SHIFT	16
++# define DSI_RXPKT1H_SHORT_0_MASK	VC4_MASK(15, 8)
++# define DSI_RXPKT1H_SHORT_0_SHIFT	8
++# define DSI_RXPKT1H_DT_LP_CMD_MASK	VC4_MASK(7, 0)
++# define DSI_RXPKT1H_DT_LP_CMD_SHIFT	0
++
++#define DSI0_RXPKT2H		0x10 /* AKA RX2_PKTH */
++#define DSI1_RXPKT2H		0x18
++# define DSI_RXPKT1H_DET_ERR		BIT(30)
++# define DSI_RXPKT1H_ECC_ERR		BIT(29)
++# define DSI_RXPKT1H_COR_ERR		BIT(28)
++# define DSI_RXPKT1H_INCOMP_PKT		BIT(25)
++# define DSI_RXPKT1H_BC_PARAM_MASK	VC4_MASK(23, 8)
++# define DSI_RXPKT1H_BC_PARAM_SHIFT	8
++# define DSI_RXPKT1H_DT_MASK		VC4_MASK(7, 0)
++# define DSI_RXPKT1H_DT_SHIFT		0
++
++#define DSI0_TXPKT_CMD_FIFO	0x14 /* AKA CMD_DATAF */
++#define DSI1_TXPKT_CMD_FIFO	0x1c
++
++#define DSI0_DISP0_CTRL		0x18
++# define DSI_DISP0_PIX_CLK_DIV_MASK	VC4_MASK(21, 13)
++# define DSI_DISP0_PIX_CLK_DIV_SHIFT	13
++# define DSI_DISP0_LP_STOP_CTRL_MASK	VC4_MASK(12, 11)
++# define DSI_DISP0_LP_STOP_CTRL_SHIFT	11
++# define DSI_DISP0_LP_STOP_DISABLE	0
++# define DSI_DISP0_LP_STOP_PERLINE	1
++# define DSI_DISP0_LP_STOP_PERFRAME	2
++
++/* Transmit RGB pixels and null packets only during HACTIVE, instead
++ * of going to LP-STOP.
++ */
++# define DSI_DISP_HACTIVE_NULL		BIT(10)
++/* Transmit blanking packet only during vblank, instead of allowing LP-STOP. */
++# define DSI_DISP_VBLP_CTRL		BIT(9)
++/* Transmit blanking packet only during HFP, instead of allowing LP-STOP. */
++# define DSI_DISP_HFP_CTRL		BIT(8)
++/* Transmit blanking packet only during HBP, instead of allowing LP-STOP. */
++# define DSI_DISP_HBP_CTRL		BIT(7)
++# define DSI_DISP0_CHANNEL_MASK		VC4_MASK(6, 5)
++# define DSI_DISP0_CHANNEL_SHIFT	5
++/* Enables end events for HSYNC/VSYNC, not just start events. */
++# define DSI_DISP0_ST_END		BIT(4)
++# define DSI_DISP0_PFORMAT_MASK		VC4_MASK(3, 2)
++# define DSI_DISP0_PFORMAT_SHIFT	2
++# define DSI_PFORMAT_RGB565		0
++# define DSI_PFORMAT_RGB666_PACKED	1
++# define DSI_PFORMAT_RGB666		2
++# define DSI_PFORMAT_RGB888		3
++/* Default is VIDEO mode. */
++# define DSI_DISP0_COMMAND_MODE		BIT(1)
++# define DSI_DISP0_ENABLE		BIT(0)
++
++#define DSI0_DISP1_CTRL		0x1c
++#define DSI1_DISP1_CTRL		0x2c
++/* Format of the data written to TXPKT_PIX_FIFO. */
++# define DSI_DISP1_PFORMAT_MASK		VC4_MASK(2, 1)
++# define DSI_DISP1_PFORMAT_SHIFT	1
++# define DSI_DISP1_PFORMAT_16BIT	0
++# define DSI_DISP1_PFORMAT_24BIT	1
++# define DSI_DISP1_PFORMAT_32BIT_LE	2
++# define DSI_DISP1_PFORMAT_32BIT_BE	3
++
++/* DISP1 is always command mode. */
++# define DSI_DISP1_ENABLE		BIT(0)
++
++#define DSI0_TXPKT_PIX_FIFO		0x20 /* AKA PIX_FIFO */
++
++#define DSI0_INT_STAT		0x24
++#define DSI0_INT_EN		0x28
++# define DSI1_INT_PHY_D3_ULPS		BIT(30)
++# define DSI1_INT_PHY_D3_STOP		BIT(29)
++# define DSI1_INT_PHY_D2_ULPS		BIT(28)
++# define DSI1_INT_PHY_D2_STOP		BIT(27)
++# define DSI1_INT_PHY_D1_ULPS		BIT(26)
++# define DSI1_INT_PHY_D1_STOP		BIT(25)
++# define DSI1_INT_PHY_D0_ULPS		BIT(24)
++# define DSI1_INT_PHY_D0_STOP		BIT(23)
++# define DSI1_INT_FIFO_ERR		BIT(22)
++# define DSI1_INT_PHY_DIR_RTF		BIT(21)
++# define DSI1_INT_PHY_RXLPDT		BIT(20)
++# define DSI1_INT_PHY_RXTRIG		BIT(19)
++# define DSI1_INT_PHY_D0_LPDT		BIT(18)
++# define DSI1_INT_PHY_DIR_FTR		BIT(17)
++
++/* Signaled when the clock lane enters the given state. */
++# define DSI1_INT_PHY_CLOCK_ULPS	BIT(16)
++# define DSI1_INT_PHY_CLOCK_HS		BIT(15)
++# define DSI1_INT_PHY_CLOCK_STOP	BIT(14)
++
++/* Signaled on timeouts */
++# define DSI1_INT_PR_TO			BIT(13)
++# define DSI1_INT_TA_TO			BIT(12)
++# define DSI1_INT_LPRX_TO		BIT(11)
++# define DSI1_INT_HSTX_TO		BIT(10)
++
++/* Contention on a line when trying to drive the line low */
++# define DSI1_INT_ERR_CONT_LP1		BIT(9)
++# define DSI1_INT_ERR_CONT_LP0		BIT(8)
++
++/* Control error: incorrect line state sequence on data lane 0. */
++# define DSI1_INT_ERR_CONTROL		BIT(7)
++/* LPDT synchronization error (bits received not a multiple of 8. */
++
++# define DSI1_INT_ERR_SYNC_ESC		BIT(6)
++/* Signaled after receiving an error packet from the display in
++ * response to a read.
++ */
++# define DSI1_INT_RXPKT2		BIT(5)
++/* Signaled after receiving a packet.  The header and optional short
++ * response will be in RXPKT1H, and a long response will be in the
++ * RXPKT_FIFO.
++ */
++# define DSI1_INT_RXPKT1		BIT(4)
++# define DSI1_INT_TXPKT2_DONE		BIT(3)
++# define DSI1_INT_TXPKT2_END		BIT(2)
++/* Signaled after all repeats of TXPKT1 are transferred. */
++# define DSI1_INT_TXPKT1_DONE		BIT(1)
++/* Signaled after each TXPKT1 repeat is scheduled. */
++# define DSI1_INT_TXPKT1_END		BIT(0)
++
++#define DSI1_INTERRUPTS_ALWAYS_ENABLED	(DSI1_INT_ERR_SYNC_ESC | \
++					 DSI1_INT_ERR_CONTROL |	 \
++					 DSI1_INT_ERR_CONT_LP0 | \
++					 DSI1_INT_ERR_CONT_LP1 | \
++					 DSI1_INT_HSTX_TO |	 \
++					 DSI1_INT_LPRX_TO |	 \
++					 DSI1_INT_TA_TO |	 \
++					 DSI1_INT_PR_TO)
++
++#define DSI0_STAT		0x2c
++#define DSI0_HSTX_TO_CNT	0x30
++#define DSI0_LPRX_TO_CNT	0x34
++#define DSI0_TA_TO_CNT		0x38
++#define DSI0_PR_TO_CNT		0x3c
++#define DSI0_PHYC		0x40
++# define DSI1_PHYC_ESC_CLK_LPDT_MASK	VC4_MASK(25, 20)
++# define DSI1_PHYC_ESC_CLK_LPDT_SHIFT	20
++# define DSI1_PHYC_HS_CLK_CONTINUOUS	BIT(18)
++# define DSI0_PHYC_ESC_CLK_LPDT_MASK	VC4_MASK(17, 12)
++# define DSI0_PHYC_ESC_CLK_LPDT_SHIFT	12
++# define DSI1_PHYC_CLANE_ULPS		BIT(17)
++# define DSI1_PHYC_CLANE_ENABLE		BIT(16)
++# define DSI_PHYC_DLANE3_ULPS		BIT(13)
++# define DSI_PHYC_DLANE3_ENABLE		BIT(12)
++# define DSI0_PHYC_HS_CLK_CONTINUOUS	BIT(10)
++# define DSI0_PHYC_CLANE_ULPS		BIT(9)
++# define DSI_PHYC_DLANE2_ULPS		BIT(9)
++# define DSI0_PHYC_CLANE_ENABLE		BIT(8)
++# define DSI_PHYC_DLANE2_ENABLE		BIT(8)
++# define DSI_PHYC_DLANE1_ULPS		BIT(5)
++# define DSI_PHYC_DLANE1_ENABLE		BIT(4)
++# define DSI_PHYC_DLANE0_FORCE_STOP	BIT(2)
++# define DSI_PHYC_DLANE0_ULPS		BIT(1)
++# define DSI_PHYC_DLANE0_ENABLE		BIT(0)
++
++#define DSI0_HS_CLT0		0x44
++#define DSI0_HS_CLT1		0x48
++#define DSI0_HS_CLT2		0x4c
++#define DSI0_HS_DLT3		0x50
++#define DSI0_HS_DLT4		0x54
++#define DSI0_HS_DLT5		0x58
++#define DSI0_HS_DLT6		0x5c
++#define DSI0_HS_DLT7		0x60
++
++#define DSI0_PHY_AFEC0		0x64
++# define DSI0_PHY_AFEC0_DDR2CLK_EN		BIT(26)
++# define DSI0_PHY_AFEC0_DDRCLK_EN		BIT(25)
++# define DSI0_PHY_AFEC0_LATCH_ULPS		BIT(24)
++# define DSI1_PHY_AFEC0_IDR_DLANE3_MASK		VC4_MASK(31, 29)
++# define DSI1_PHY_AFEC0_IDR_DLANE3_SHIFT	29
++# define DSI1_PHY_AFEC0_IDR_DLANE2_MASK		VC4_MASK(28, 26)
++# define DSI1_PHY_AFEC0_IDR_DLANE2_SHIFT	26
++# define DSI1_PHY_AFEC0_IDR_DLANE1_MASK		VC4_MASK(27, 23)
++# define DSI1_PHY_AFEC0_IDR_DLANE1_SHIFT	23
++# define DSI1_PHY_AFEC0_IDR_DLANE0_MASK		VC4_MASK(22, 20)
++# define DSI1_PHY_AFEC0_IDR_DLANE0_SHIFT	20
++# define DSI1_PHY_AFEC0_IDR_CLANE_MASK		VC4_MASK(19, 17)
++# define DSI1_PHY_AFEC0_IDR_CLANE_SHIFT		17
++# define DSI0_PHY_AFEC0_ACTRL_DLANE1_MASK	VC4_MASK(23, 20)
++# define DSI0_PHY_AFEC0_ACTRL_DLANE1_SHIFT	20
++# define DSI0_PHY_AFEC0_ACTRL_DLANE0_MASK	VC4_MASK(19, 16)
++# define DSI0_PHY_AFEC0_ACTRL_DLANE0_SHIFT	16
++# define DSI0_PHY_AFEC0_ACTRL_CLANE_MASK	VC4_MASK(15, 12)
++# define DSI0_PHY_AFEC0_ACTRL_CLANE_SHIFT	12
++# define DSI1_PHY_AFEC0_DDR2CLK_EN		BIT(16)
++# define DSI1_PHY_AFEC0_DDRCLK_EN		BIT(15)
++# define DSI1_PHY_AFEC0_LATCH_ULPS		BIT(14)
++# define DSI1_PHY_AFEC0_RESET			BIT(13)
++# define DSI1_PHY_AFEC0_PD			BIT(12)
++# define DSI0_PHY_AFEC0_RESET			BIT(11)
++# define DSI1_PHY_AFEC0_PD_BG			BIT(11)
++# define DSI0_PHY_AFEC0_PD			BIT(10)
++# define DSI1_PHY_AFEC0_PD_DLANE3		BIT(10)
++# define DSI0_PHY_AFEC0_PD_BG			BIT(9)
++# define DSI1_PHY_AFEC0_PD_DLANE2		BIT(9)
++# define DSI0_PHY_AFEC0_PD_DLANE1		BIT(8)
++# define DSI1_PHY_AFEC0_PD_DLANE1		BIT(8)
++# define DSI_PHY_AFEC0_PTATADJ_MASK		VC4_MASK(7, 4)
++# define DSI_PHY_AFEC0_PTATADJ_SHIFT		4
++# define DSI_PHY_AFEC0_CTATADJ_MASK		VC4_MASK(3, 0)
++# define DSI_PHY_AFEC0_CTATADJ_SHIFT		0
++
++#define DSI0_PHY_AFEC1		0x68
++# define DSI0_PHY_AFEC1_IDR_DLANE1_MASK		VC4_MASK(10, 8)
++# define DSI0_PHY_AFEC1_IDR_DLANE1_SHIFT	8
++# define DSI0_PHY_AFEC1_IDR_DLANE0_MASK		VC4_MASK(6, 4)
++# define DSI0_PHY_AFEC1_IDR_DLANE0_SHIFT	4
++# define DSI0_PHY_AFEC1_IDR_CLANE_MASK		VC4_MASK(2, 0)
++# define DSI0_PHY_AFEC1_IDR_CLANE_SHIFT		0
++
++#define DSI0_TST_SEL		0x6c
++#define DSI0_TST_MON		0x70
++#define DSI0_ID			0x74
++# define DSI_ID_VALUE		0x00647369
++
++#define DSI1_CTRL		0x00
++# define DSI_CTRL_HS_CLKC_MASK		VC4_MASK(15, 14)
++# define DSI_CTRL_HS_CLKC_SHIFT		14
++# define DSI_CTRL_HS_CLKC_BYTE		0
++# define DSI_CTRL_HS_CLKC_DDR2		1
++# define DSI_CTRL_HS_CLKC_DDR		2
++
++# define DSI_CTRL_RX_LPDT_EOT_DISABLE	BIT(13)
++# define DSI_CTRL_LPDT_EOT_DISABLE	BIT(12)
++# define DSI_CTRL_HSDT_EOT_DISABLE	BIT(11)
++# define DSI_CTRL_SOFT_RESET_CFG	BIT(10)
++# define DSI_CTRL_CAL_BYTE		BIT(9)
++# define DSI_CTRL_INV_BYTE		BIT(8)
++# define DSI_CTRL_CLR_LDF		BIT(7)
++# define DSI0_CTRL_CLR_PBCF		BIT(6)
++# define DSI1_CTRL_CLR_RXF		BIT(6)
++# define DSI0_CTRL_CLR_CPBCF		BIT(5)
++# define DSI1_CTRL_CLR_PDF		BIT(5)
++# define DSI0_CTRL_CLR_PDF		BIT(4)
++# define DSI1_CTRL_CLR_CDF		BIT(4)
++# define DSI0_CTRL_CLR_CDF		BIT(3)
++# define DSI0_CTRL_CTRL2		BIT(2)
++# define DSI1_CTRL_DISABLE_DISP_CRCC	BIT(2)
++# define DSI0_CTRL_CTRL1		BIT(1)
++# define DSI1_CTRL_DISABLE_DISP_ECCC	BIT(1)
++# define DSI0_CTRL_CTRL0		BIT(0)
++# define DSI1_CTRL_EN			BIT(0)
++# define DSI0_CTRL_RESET_FIFOS		(DSI_CTRL_CLR_LDF | \
++					 DSI0_CTRL_CLR_PBCF | \
++					 DSI0_CTRL_CLR_CPBCF |	\
++					 DSI0_CTRL_CLR_PDF | \
++					 DSI0_CTRL_CLR_CDF)
++# define DSI1_CTRL_RESET_FIFOS		(DSI_CTRL_CLR_LDF | \
++					 DSI1_CTRL_CLR_RXF | \
++					 DSI1_CTRL_CLR_PDF | \
++					 DSI1_CTRL_CLR_CDF)
++
++#define DSI1_TXPKT2C		0x0c
++#define DSI1_TXPKT2H		0x10
++#define DSI1_TXPKT_PIX_FIFO	0x20
++#define DSI1_RXPKT_FIFO		0x24
++#define DSI1_DISP0_CTRL		0x28
++#define DSI1_INT_STAT		0x30
++#define DSI1_INT_EN		0x34
++/* State reporting bits.  These mostly behave like INT_STAT, where
++ * writing a 1 clears the bit.
++ */
++#define DSI1_STAT		0x38
++# define DSI1_STAT_PHY_D3_ULPS		BIT(31)
++# define DSI1_STAT_PHY_D3_STOP		BIT(30)
++# define DSI1_STAT_PHY_D2_ULPS		BIT(29)
++# define DSI1_STAT_PHY_D2_STOP		BIT(28)
++# define DSI1_STAT_PHY_D1_ULPS		BIT(27)
++# define DSI1_STAT_PHY_D1_STOP		BIT(26)
++# define DSI1_STAT_PHY_D0_ULPS		BIT(25)
++# define DSI1_STAT_PHY_D0_STOP		BIT(24)
++# define DSI1_STAT_FIFO_ERR		BIT(23)
++# define DSI1_STAT_PHY_RXLPDT		BIT(22)
++# define DSI1_STAT_PHY_RXTRIG		BIT(21)
++# define DSI1_STAT_PHY_D0_LPDT		BIT(20)
++/* Set when in forward direction */
++# define DSI1_STAT_PHY_DIR		BIT(19)
++# define DSI1_STAT_PHY_CLOCK_ULPS	BIT(18)
++# define DSI1_STAT_PHY_CLOCK_HS		BIT(17)
++# define DSI1_STAT_PHY_CLOCK_STOP	BIT(16)
++# define DSI1_STAT_PR_TO		BIT(15)
++# define DSI1_STAT_TA_TO		BIT(14)
++# define DSI1_STAT_LPRX_TO		BIT(13)
++# define DSI1_STAT_HSTX_TO		BIT(12)
++# define DSI1_STAT_ERR_CONT_LP1		BIT(11)
++# define DSI1_STAT_ERR_CONT_LP0		BIT(10)
++# define DSI1_STAT_ERR_CONTROL		BIT(9)
++# define DSI1_STAT_ERR_SYNC_ESC		BIT(8)
++# define DSI1_STAT_RXPKT2		BIT(7)
++# define DSI1_STAT_RXPKT1		BIT(6)
++# define DSI1_STAT_TXPKT2_BUSY		BIT(5)
++# define DSI1_STAT_TXPKT2_DONE		BIT(4)
++# define DSI1_STAT_TXPKT2_END		BIT(3)
++# define DSI1_STAT_TXPKT1_BUSY		BIT(2)
++# define DSI1_STAT_TXPKT1_DONE		BIT(1)
++# define DSI1_STAT_TXPKT1_END		BIT(0)
++
++#define DSI1_HSTX_TO_CNT	0x3c
++#define DSI1_LPRX_TO_CNT	0x40
++#define DSI1_TA_TO_CNT		0x44
++#define DSI1_PR_TO_CNT		0x48
++#define DSI1_PHYC		0x4c
++
++#define DSI1_HS_CLT0		0x50
++# define DSI_HS_CLT0_CZERO_MASK		VC4_MASK(26, 18)
++# define DSI_HS_CLT0_CZERO_SHIFT	18
++# define DSI_HS_CLT0_CPRE_MASK		VC4_MASK(17, 9)
++# define DSI_HS_CLT0_CPRE_SHIFT		9
++# define DSI_HS_CLT0_CPREP_MASK		VC4_MASK(8, 0)
++# define DSI_HS_CLT0_CPREP_SHIFT	0
++
++#define DSI1_HS_CLT1		0x54
++# define DSI_HS_CLT1_CTRAIL_MASK	VC4_MASK(17, 9)
++# define DSI_HS_CLT1_CTRAIL_SHIFT	9
++# define DSI_HS_CLT1_CPOST_MASK		VC4_MASK(8, 0)
++# define DSI_HS_CLT1_CPOST_SHIFT	0
++
++#define DSI1_HS_CLT2		0x58
++# define DSI_HS_CLT2_WUP_MASK		VC4_MASK(23, 0)
++# define DSI_HS_CLT2_WUP_SHIFT		0
++
++#define DSI1_HS_DLT3		0x5c
++# define DSI_HS_DLT3_EXIT_MASK		VC4_MASK(26, 18)
++# define DSI_HS_DLT3_EXIT_SHIFT		18
++# define DSI_HS_DLT3_ZERO_MASK		VC4_MASK(17, 9)
++# define DSI_HS_DLT3_ZERO_SHIFT		9
++# define DSI_HS_DLT3_PRE_MASK		VC4_MASK(8, 0)
++# define DSI_HS_DLT3_PRE_SHIFT		0
++
++#define DSI1_HS_DLT4		0x60
++# define DSI_HS_DLT4_ANLAT_MASK		VC4_MASK(22, 18)
++# define DSI_HS_DLT4_ANLAT_SHIFT	18
++# define DSI_HS_DLT4_TRAIL_MASK		VC4_MASK(17, 9)
++# define DSI_HS_DLT4_TRAIL_SHIFT	9
++# define DSI_HS_DLT4_LPX_MASK		VC4_MASK(8, 0)
++# define DSI_HS_DLT4_LPX_SHIFT		0
++
++#define DSI1_HS_DLT5		0x64
++# define DSI_HS_DLT5_INIT_MASK		VC4_MASK(23, 0)
++# define DSI_HS_DLT5_INIT_SHIFT		0
++
++#define DSI1_HS_DLT6		0x68
++# define DSI_HS_DLT6_TA_GET_MASK	VC4_MASK(31, 24)
++# define DSI_HS_DLT6_TA_GET_SHIFT	24
++# define DSI_HS_DLT6_TA_SURE_MASK	VC4_MASK(23, 16)
++# define DSI_HS_DLT6_TA_SURE_SHIFT	16
++# define DSI_HS_DLT6_TA_GO_MASK		VC4_MASK(15, 8)
++# define DSI_HS_DLT6_TA_GO_SHIFT	8
++# define DSI_HS_DLT6_LP_LPX_MASK	VC4_MASK(7, 0)
++# define DSI_HS_DLT6_LP_LPX_SHIFT	0
++
++#define DSI1_HS_DLT7		0x6c
++# define DSI_HS_DLT7_LP_WUP_MASK	VC4_MASK(23, 0)
++# define DSI_HS_DLT7_LP_WUP_SHIFT	0
++
++#define DSI1_PHY_AFEC0		0x70
++
++#define DSI1_PHY_AFEC1		0x74
++# define DSI1_PHY_AFEC1_ACTRL_DLANE3_MASK	VC4_MASK(19, 16)
++# define DSI1_PHY_AFEC1_ACTRL_DLANE3_SHIFT	16
++# define DSI1_PHY_AFEC1_ACTRL_DLANE2_MASK	VC4_MASK(15, 12)
++# define DSI1_PHY_AFEC1_ACTRL_DLANE2_SHIFT	12
++# define DSI1_PHY_AFEC1_ACTRL_DLANE1_MASK	VC4_MASK(11, 8)
++# define DSI1_PHY_AFEC1_ACTRL_DLANE1_SHIFT	8
++# define DSI1_PHY_AFEC1_ACTRL_DLANE0_MASK	VC4_MASK(7, 4)
++# define DSI1_PHY_AFEC1_ACTRL_DLANE0_SHIFT	4
++# define DSI1_PHY_AFEC1_ACTRL_CLANE_MASK	VC4_MASK(3, 0)
++# define DSI1_PHY_AFEC1_ACTRL_CLANE_SHIFT	0
++
++#define DSI1_TST_SEL		0x78
++#define DSI1_TST_MON		0x7c
++#define DSI1_PHY_TST1		0x80
++#define DSI1_PHY_TST2		0x84
++#define DSI1_PHY_FIFO_STAT	0x88
++/* Actually, all registers in the range that aren't otherwise claimed
++ * will return the ID.
++ */
++#define DSI1_ID			0x8c
++
++/* General DSI hardware state. */
++struct vc4_dsi {
++	struct platform_device *pdev;
++
++	struct mipi_dsi_host dsi_host;
++	struct drm_encoder *encoder;
++	struct drm_connector *connector;
++	struct drm_panel *panel;
++
++	void __iomem *regs;
++
++	struct dma_chan *reg_dma_chan;
++	dma_addr_t reg_dma_paddr;
++	u32 *reg_dma_mem;
++	dma_addr_t reg_paddr;
++
++	/* Whether we're on bcm2835's DSI0 or DSI1. */
++	int port;
++
++	/* DSI channel for the panel we're connected to. */
++	u32 channel;
++	u32 lanes;
++	enum mipi_dsi_pixel_format format;
++	u32 mode_flags;
++
++	/* Input clock from CPRMAN to the digital PHY, for the DSI
++	 * escape clock.
++	 */
++	struct clk *escape_clock;
++
++	/* Input clock to the analog PHY, used to generate the DSI bit
++	 * clock.
++	 */
++	struct clk *pll_phy_clock;
++
++	/* HS Clocks generated within the DSI analog PHY. */
++	struct clk_fixed_factor phy_clocks[3];
++
++	struct clk_onecell_data clk_onecell;
++
++	/* Pixel clock output to the pixelvalve, generated from the HS
++	 * clock.
++	 */
++	struct clk *pixel_clock;
++
++	struct completion xfer_completion;
++	int xfer_result;
 +};
 +
-+/* We only turn the PWM on or off, without varying values. */
-+#define RPI_TOUCHSCREEN_MAX_BRIGHTNESS 1
++#define host_to_dsi(host) container_of(host, struct vc4_dsi, dsi_host)
 +
-+/* DSI D-PHY Layer Registers */
-+#define D0W_DPHYCONTTX		0x0004
-+#define CLW_DPHYCONTRX		0x0020
-+#define D0W_DPHYCONTRX		0x0024
-+#define D1W_DPHYCONTRX		0x0028
-+#define COM_DPHYCONTRX		0x0038
-+#define CLW_CNTRL		0x0040
-+#define D0W_CNTRL		0x0044
-+#define D1W_CNTRL		0x0048
-+#define DFTMODE_CNTRL		0x0054
-+
-+/* DSI PPI Layer Registers */
-+#define PPI_STARTPPI		0x0104
-+#define PPI_BUSYPPI		0x0108
-+#define PPI_LINEINITCNT		0x0110
-+#define PPI_LPTXTIMECNT		0x0114
-+//#define PPI_LANEENABLE		0x0134
-+//#define PPI_TX_RX_TA		0x013C
-+#define PPI_CLS_ATMR		0x0140
-+#define PPI_D0S_ATMR		0x0144
-+#define PPI_D1S_ATMR		0x0148
-+#define PPI_D0S_CLRSIPOCOUNT	0x0164
-+#define PPI_D1S_CLRSIPOCOUNT	0x0168
-+#define CLS_PRE			0x0180
-+#define D0S_PRE			0x0184
-+#define D1S_PRE			0x0188
-+#define CLS_PREP		0x01A0
-+#define D0S_PREP		0x01A4
-+#define D1S_PREP		0x01A8
-+#define CLS_ZERO		0x01C0
-+#define D0S_ZERO		0x01C4
-+#define D1S_ZERO		0x01C8
-+#define PPI_CLRFLG		0x01E0
-+#define PPI_CLRSIPO		0x01E4
-+#define HSTIMEOUT		0x01F0
-+#define HSTIMEOUTENABLE		0x01F4
-+
-+/* DSI Protocol Layer Registers */
-+#define DSI_STARTDSI		0x0204
-+#define DSI_BUSYDSI		0x0208
-+#define DSI_LANEENABLE		0x0210
-+# define DSI_LANEENABLE_CLOCK		BIT(0)
-+# define DSI_LANEENABLE_D0		BIT(1)
-+# define DSI_LANEENABLE_D1		BIT(2)
-+
-+#define DSI_LANESTATUS0		0x0214
-+#define DSI_LANESTATUS1		0x0218
-+#define DSI_INTSTATUS		0x0220
-+#define DSI_INTMASK		0x0224
-+#define DSI_INTCLR		0x0228
-+#define DSI_LPTXTO		0x0230
-+#define DSI_MODE		0x0260
-+#define DSI_PAYLOAD0		0x0268
-+#define DSI_PAYLOAD1		0x026C
-+#define DSI_SHORTPKTDAT		0x0270
-+#define DSI_SHORTPKTREQ		0x0274
-+#define DSI_BTASTA		0x0278
-+#define DSI_BTACLR		0x027C
-+
-+/* DSI General Registers */
-+#define DSIERRCNT		0x0300
-+#define DSISIGMOD		0x0304
-+
-+/* DSI Application Layer Registers */
-+#define APLCTRL			0x0400
-+#define APLSTAT			0x0404
-+#define APLERR			0x0408
-+#define PWRMOD			0x040C
-+#define RDPKTLN			0x0410
-+#define PXLFMT			0x0414
-+#define MEMWRCMD		0x0418
-+
-+/* LCDC/DPI Host Registers */
-+#define LCDCTRL			0x0420
-+#define HSR			0x0424
-+#define HDISPR			0x0428
-+#define VSR			0x042C
-+#define VDISPR			0x0430
-+#define VFUEN			0x0434
-+
-+/* DBI-B Host Registers */
-+#define DBIBCTRL		0x0440
-+
-+/* SPI Master Registers */
-+#define SPICMR			0x0450
-+#define SPITCR			0x0454
-+
-+/* System Controller Registers */
-+#define SYSSTAT			0x0460
-+#define SYSCTRL			0x0464
-+#define SYSPLL1			0x0468
-+#define SYSPLL2			0x046C
-+#define SYSPLL3			0x0470
-+#define SYSPMCTRL		0x047C
-+
-+/* GPIO Registers */
-+#define GPIOC			0x0480
-+#define GPIOO			0x0484
-+#define GPIOI			0x0488
-+
-+/* I2C Registers */
-+#define I2CCLKCTRL		0x0490
-+
-+/* Chip/Rev Registers */
-+#define IDREG			0x04A0
-+
-+/* Debug Registers */
-+#define WCMDQUEUE		0x0500
-+#define RCMDQUEUE		0x0504
-+
-+struct rpi_touchscreen {
-+	struct drm_panel base;
-+	struct mipi_dsi_device *dsi;
-+	struct i2c_client *bridge_i2c;
-+
-+	/* Version of the firmware on the bridge chip */
-+	int atmel_ver;
-+};
-+
-+static const struct drm_display_mode rpi_touchscreen_modes[] = {
-+	{
-+		/* The DSI PLL can only integer divide from the 2Ghz
-+		 * PLLD, giving us few choices.  We pick a divide by 3
-+		 * as our DSI HS clock, giving us a pixel clock of
-+		 * that divided by 24 bits.  Pad out HFP to get our
-+		 * panel to refresh at 60Hz, even if that doesn't
-+		 * match the datasheet.
-+		 */
-+#define PIXEL_CLOCK ((2000000000 / 3) / 24)
-+#define VREFRESH    60
-+#define VTOTAL      (480 + 7 + 2 + 21)
-+#define HACT        800
-+#define HSW         2
-+#define HBP         46
-+#define HFP         ((PIXEL_CLOCK / (VTOTAL * VREFRESH)) - (HACT + HSW + HBP))
-+
-+		.clock = PIXEL_CLOCK / 1000,
-+		.hdisplay = HACT,
-+		.hsync_start = HACT + HFP,
-+		.hsync_end = HACT + HFP + HSW,
-+		.htotal = HACT + HFP + HSW + HBP,
-+		.vdisplay = 480,
-+		.vsync_start = 480 + 7,
-+		.vsync_end = 480 + 7 + 2,
-+		.vtotal = VTOTAL,
-+		.vrefresh = 60,
-+	},
-+};
-+
-+static struct rpi_touchscreen *panel_to_ts(struct drm_panel *panel)
++static inline void
++dsi_dma_workaround_write(struct vc4_dsi *dsi, u32 offset, u32 val)
 +{
-+	return container_of(panel, struct rpi_touchscreen, base);
-+}
-+
-+static u8 rpi_touchscreen_i2c_read(struct rpi_touchscreen *ts, u8 reg)
-+{
-+	return i2c_smbus_read_byte_data(ts->bridge_i2c, reg);
-+}
-+
-+static void rpi_touchscreen_i2c_write(struct rpi_touchscreen *ts,
-+				      u8 reg, u8 val)
-+{
++	struct dma_chan *chan = dsi->reg_dma_chan;
++	struct dma_async_tx_descriptor *tx;
++	dma_cookie_t cookie;
 +	int ret;
 +
-+	ret = i2c_smbus_write_byte_data(ts->bridge_i2c, reg, val);
++	/* DSI0 should be able to write normally. */
++	if (!chan) {
++		writel(val, dsi->regs + offset);
++		return;
++	}
++
++	*dsi->reg_dma_mem = val;
++
++	tx = chan->device->device_prep_dma_memcpy(chan,
++						  dsi->reg_paddr + offset,
++						  dsi->reg_dma_paddr,
++						  4, 0);
++	if (!tx) {
++		DRM_ERROR("Failed to set up DMA register write\n");
++		return;
++	}
++
++	cookie = tx->tx_submit(tx);
++	ret = dma_submit_error(cookie);
++	if (ret) {
++		DRM_ERROR("Failed to submit DMA: %d\n", ret);
++		return;
++	}
++	ret = dma_sync_wait(chan, cookie);
 +	if (ret)
-+		dev_err(&ts->dsi->dev, "I2C write failed: %d\n", ret);
++		DRM_ERROR("Failed to wait for DMA: %d\n", ret);
 +}
 +
-+static int rpi_touchscreen_write(struct rpi_touchscreen *ts, u16 reg, u32 val)
-+{
-+#if 0
-+	/* The firmware uses LP DSI transactions like this to bring up
-+	 * the hardware, which should be faster than using I2C to then
-+	 * pass to the Toshiba.  However, I was unable to get it to
-+	 * work.
-+	 */
-+	u8 msg[] = {
-+		reg,
-+		reg >> 8,
-+		val,
-+		val >> 8,
-+		val >> 16,
-+		val >> 24,
-+	};
++#define DSI_READ(offset) readl(dsi->regs + (offset))
++#define DSI_WRITE(offset, val) dsi_dma_workaround_write(dsi, offset, val)
++#define DSI_PORT_READ(offset) \
++	DSI_READ(dsi->port ? DSI1_##offset : DSI0_##offset)
++#define DSI_PORT_WRITE(offset, val) \
++	DSI_WRITE(dsi->port ? DSI1_##offset : DSI0_##offset, val)
++#define DSI_PORT_BIT(bit) (dsi->port ? DSI1_##bit : DSI0_##bit)
 +
-+	mipi_dsi_dcs_write_buffer(ts->dsi, msg, sizeof(msg));
-+#else
-+	rpi_touchscreen_i2c_write(ts, REG_WR_ADDRH, reg >> 8);
-+	rpi_touchscreen_i2c_write(ts, REG_WR_ADDRL, reg);
-+	rpi_touchscreen_i2c_write(ts, REG_WRITEH, val >> 8);
-+	rpi_touchscreen_i2c_write(ts, REG_WRITEL, val);
-+#endif
-+
-+	return 0;
-+}
-+
-+static int rpi_touchscreen_disable(struct drm_panel *panel)
-+{
-+	struct rpi_touchscreen *ts = panel_to_ts(panel);
-+
-+	rpi_touchscreen_i2c_write(ts, REG_PWM, 0);
-+
-+	rpi_touchscreen_i2c_write(ts, REG_POWERON, 0);
-+	udelay(1);
-+
-+	return 0;
-+}
-+
-+static int rpi_touchscreen_noop(struct drm_panel *panel)
-+{
-+	return 0;
-+}
-+
-+static int rpi_touchscreen_enable(struct drm_panel *panel)
-+{
-+	struct rpi_touchscreen *ts = panel_to_ts(panel);
-+	int i;
-+
-+	rpi_touchscreen_i2c_write(ts, REG_POWERON, 1);
-+	/* Wait for nPWRDWN to go low to indicate poweron is done. */
-+	for (i = 0; i < 100; i++) {
-+		if (rpi_touchscreen_i2c_read(ts, REG_PORTB) & 1)
-+			break;
-+	}
-+
-+	rpi_touchscreen_write(ts, DSI_LANEENABLE,
-+			      DSI_LANEENABLE_CLOCK |
-+			      DSI_LANEENABLE_D0 |
-+			      (ts->dsi->lanes > 1 ? DSI_LANEENABLE_D1 : 0));
-+	rpi_touchscreen_write(ts, PPI_D0S_CLRSIPOCOUNT, 0x05);
-+	rpi_touchscreen_write(ts, PPI_D1S_CLRSIPOCOUNT, 0x05);
-+	rpi_touchscreen_write(ts, PPI_D0S_ATMR, 0x00);
-+	rpi_touchscreen_write(ts, PPI_D1S_ATMR, 0x00);
-+	rpi_touchscreen_write(ts, PPI_LPTXTIMECNT, 0x03);
-+
-+	rpi_touchscreen_write(ts, SPICMR, 0x00);
-+	rpi_touchscreen_write(ts, LCDCTRL, 0x00100150);
-+	rpi_touchscreen_write(ts, SYSCTRL, 0x040f);
-+	msleep(100);
-+
-+	rpi_touchscreen_write(ts, PPI_STARTPPI, 0x01);
-+	rpi_touchscreen_write(ts, DSI_STARTDSI, 0x01);
-+	msleep(100);
-+
-+	/* Turn on the backklight. */
-+	rpi_touchscreen_i2c_write(ts, REG_PWM, 255);
-+
-+	rpi_touchscreen_i2c_write(ts, REG_PORTA, BIT(3));
-+
-+	return 0;
-+}
-+
-+static int rpi_touchscreen_get_modes(struct drm_panel *panel)
-+{
-+	struct drm_connector *connector = panel->connector;
-+	struct drm_device *drm = panel->drm;
-+	unsigned int i, num = 0;
-+
-+	for (i = 0; i < ARRAY_SIZE(rpi_touchscreen_modes); i++) {
-+		const struct drm_display_mode *m = &rpi_touchscreen_modes[i];
-+		struct drm_display_mode *mode;
-+
-+		mode = drm_mode_duplicate(drm, m);
-+		if (!mode) {
-+			dev_err(drm->dev, "failed to add mode %ux%u@%u\n",
-+				m->hdisplay, m->vdisplay, m->vrefresh);
-+			continue;
-+		}
-+
-+		mode->type |= DRM_MODE_TYPE_DRIVER;
-+
-+		if (i == 0)
-+			mode->type |= DRM_MODE_TYPE_PREFERRED;
-+
-+		drm_mode_set_name(mode);
-+
-+		drm_mode_probed_add(connector, mode);
-+		num++;
-+	}
-+
-+	connector->display_info.bpc = 8;
-+	connector->display_info.width_mm = 154;
-+	connector->display_info.height_mm = 86;
-+
-+	return num;
-+}
-+
-+static const struct drm_panel_funcs rpi_touchscreen_funcs = {
-+	.disable = rpi_touchscreen_disable,
-+	.unprepare = rpi_touchscreen_noop,
-+	.prepare = rpi_touchscreen_noop,
-+	.enable = rpi_touchscreen_enable,
-+	.get_modes = rpi_touchscreen_get_modes,
++/* VC4 DSI encoder KMS struct */
++struct vc4_dsi_encoder {
++	struct vc4_encoder base;
++	struct vc4_dsi *dsi;
 +};
 +
-+static struct i2c_client *rpi_touchscreen_get_i2c(struct device *dev,
-+						  const char *name)
++static inline struct vc4_dsi_encoder *
++to_vc4_dsi_encoder(struct drm_encoder *encoder)
 +{
-+	struct device_node *node;
-+	struct i2c_client *client;
-+
-+	node = of_parse_phandle(dev->of_node, name, 0);
-+	if (!node)
-+		return ERR_PTR(-ENODEV);
-+
-+	client = of_find_i2c_device_by_node(node);
-+
-+	of_node_put(node);
-+
-+	return client;
++	return container_of(encoder, struct vc4_dsi_encoder, base.base);
 +}
 +
-+static int rpi_touchscreen_dsi_probe(struct mipi_dsi_device *dsi)
++/* VC4 DSI connector KMS struct */
++struct vc4_dsi_connector {
++	struct drm_connector base;
++	struct vc4_dsi *dsi;
++};
++
++static inline struct vc4_dsi_connector *
++to_vc4_dsi_connector(struct drm_connector *connector)
 +{
-+	struct device *dev = &dsi->dev;
-+	struct rpi_touchscreen *ts;
-+	int ret, ver;
++	return container_of(connector, struct vc4_dsi_connector, base);
++}
 +
-+	ts = devm_kzalloc(dev, sizeof(*ts), GFP_KERNEL);
-+	if (!ts)
-+		return -ENOMEM;
++#define DSI_REG(reg) { reg, #reg }
++static const struct {
++	u32 reg;
++	const char *name;
++} dsi0_regs[] = {
++	DSI_REG(DSI0_CTRL),
++	DSI_REG(DSI0_STAT),
++	DSI_REG(DSI0_HSTX_TO_CNT),
++	DSI_REG(DSI0_LPRX_TO_CNT),
++	DSI_REG(DSI0_TA_TO_CNT),
++	DSI_REG(DSI0_PR_TO_CNT),
++	DSI_REG(DSI0_DISP0_CTRL),
++	DSI_REG(DSI0_DISP1_CTRL),
++	DSI_REG(DSI0_INT_STAT),
++	DSI_REG(DSI0_INT_EN),
++	DSI_REG(DSI0_PHYC),
++	DSI_REG(DSI0_HS_CLT0),
++	DSI_REG(DSI0_HS_CLT1),
++	DSI_REG(DSI0_HS_CLT2),
++	DSI_REG(DSI0_HS_DLT3),
++	DSI_REG(DSI0_HS_DLT4),
++	DSI_REG(DSI0_HS_DLT5),
++	DSI_REG(DSI0_HS_DLT6),
++	DSI_REG(DSI0_HS_DLT7),
++	DSI_REG(DSI0_PHY_AFEC0),
++	DSI_REG(DSI0_PHY_AFEC1),
++	DSI_REG(DSI0_ID),
++};
 +
-+	dev_set_drvdata(dev, ts);
++static const struct {
++	u32 reg;
++	const char *name;
++} dsi1_regs[] = {
++	DSI_REG(DSI1_CTRL),
++	DSI_REG(DSI1_STAT),
++	DSI_REG(DSI1_HSTX_TO_CNT),
++	DSI_REG(DSI1_LPRX_TO_CNT),
++	DSI_REG(DSI1_TA_TO_CNT),
++	DSI_REG(DSI1_PR_TO_CNT),
++	DSI_REG(DSI1_DISP0_CTRL),
++	DSI_REG(DSI1_DISP1_CTRL),
++	DSI_REG(DSI1_INT_STAT),
++	DSI_REG(DSI1_INT_EN),
++	DSI_REG(DSI1_PHYC),
++	DSI_REG(DSI1_HS_CLT0),
++	DSI_REG(DSI1_HS_CLT1),
++	DSI_REG(DSI1_HS_CLT2),
++	DSI_REG(DSI1_HS_DLT3),
++	DSI_REG(DSI1_HS_DLT4),
++	DSI_REG(DSI1_HS_DLT5),
++	DSI_REG(DSI1_HS_DLT6),
++	DSI_REG(DSI1_HS_DLT7),
++	DSI_REG(DSI1_PHY_AFEC0),
++	DSI_REG(DSI1_PHY_AFEC1),
++	DSI_REG(DSI1_ID),
++};
 +
-+	ts->dsi = dsi;
-+	dsi->mode_flags = (MIPI_DSI_MODE_VIDEO |
-+			   MIPI_DSI_MODE_VIDEO_SYNC_PULSE |
-+			   MIPI_DSI_MODE_LPM);
-+	dsi->format = MIPI_DSI_FMT_RGB888;
-+	dsi->lanes = 1;
++static void vc4_dsi_dump_regs(struct vc4_dsi *dsi)
++{
++	int i;
 +
-+	ts->bridge_i2c =
-+		rpi_touchscreen_get_i2c(dev, "raspberrypi,touchscreen-bridge");
-+	if (!ts->bridge_i2c) {
-+		ret = -EPROBE_DEFER;
-+		return ret;
++	if (dsi->port == 0) {
++		for (i = 0; i < ARRAY_SIZE(dsi0_regs); i++) {
++			DRM_INFO("0x%04x (%s): 0x%08x\n",
++				 dsi0_regs[i].reg, dsi0_regs[i].name,
++				 DSI_READ(dsi0_regs[i].reg));
++		}
++	} else {
++		for (i = 0; i < ARRAY_SIZE(dsi1_regs); i++) {
++			DRM_INFO("0x%04x (%s): 0x%08x\n",
++				 dsi1_regs[i].reg, dsi1_regs[i].name,
++				 DSI_READ(dsi1_regs[i].reg));
++		}
++	}
++}
++
++#ifdef CONFIG_DEBUG_FS
++int vc4_dsi_debugfs_regs(struct seq_file *m, void *unused)
++{
++	struct drm_info_node *node = (struct drm_info_node *)m->private;
++	struct drm_device *drm = node->minor->dev;
++	struct vc4_dev *vc4 = to_vc4_dev(drm);
++	int dsi_index = (uintptr_t)node->info_ent->data;
++	struct vc4_dsi *dsi = (dsi_index == 1 ? vc4->dsi1 : NULL);
++	int i;
++
++	if (!dsi)
++		return 0;
++
++	if (dsi->port == 0) {
++		for (i = 0; i < ARRAY_SIZE(dsi0_regs); i++) {
++			seq_printf(m, "0x%04x (%s): 0x%08x\n",
++				   dsi0_regs[i].reg, dsi0_regs[i].name,
++				   DSI_READ(dsi0_regs[i].reg));
++		}
++	} else {
++		for (i = 0; i < ARRAY_SIZE(dsi1_regs); i++) {
++			seq_printf(m, "0x%04x (%s): 0x%08x\n",
++				   dsi1_regs[i].reg, dsi1_regs[i].name,
++				   DSI_READ(dsi1_regs[i].reg));
++		}
 +	}
 +
-+	ver = rpi_touchscreen_i2c_read(ts, REG_ID);
-+	if (ver < 0) {
-+		dev_err(dev, "Atmel I2C read failed: %d\n", ver);
-+		return -ENODEV;
++	return 0;
++}
++#endif
++
++static enum drm_connector_status
++vc4_dsi_connector_detect(struct drm_connector *connector, bool force)
++{
++	struct vc4_dsi_connector *vc4_connector =
++		to_vc4_dsi_connector(connector);
++	struct vc4_dsi *dsi = vc4_connector->dsi;
++
++	if (dsi->panel)
++		return connector_status_connected;
++	else
++		return connector_status_disconnected;
++}
++
++static void vc4_dsi_connector_destroy(struct drm_connector *connector)
++{
++	drm_connector_unregister(connector);
++	drm_connector_cleanup(connector);
++}
++
++static int vc4_dsi_connector_get_modes(struct drm_connector *connector)
++{
++	struct vc4_dsi_connector *vc4_connector =
++		to_vc4_dsi_connector(connector);
++	struct vc4_dsi *dsi = vc4_connector->dsi;
++
++	if (dsi->panel)
++		return drm_panel_get_modes(dsi->panel);
++
++	return 0;
++}
++
++static const struct drm_connector_funcs vc4_dsi_connector_funcs = {
++	.dpms = drm_atomic_helper_connector_dpms,
++	.detect = vc4_dsi_connector_detect,
++	.fill_modes = drm_helper_probe_single_connector_modes,
++	.destroy = vc4_dsi_connector_destroy,
++	.reset = drm_atomic_helper_connector_reset,
++	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
++	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
++};
++
++static const struct drm_connector_helper_funcs vc4_dsi_connector_helper_funcs = {
++	.get_modes = vc4_dsi_connector_get_modes,
++};
++
++static struct drm_connector *vc4_dsi_connector_init(struct drm_device *dev,
++						    struct vc4_dsi *dsi)
++{
++	struct drm_connector *connector = NULL;
++	struct vc4_dsi_connector *dsi_connector;
++	int ret = 0;
++
++	dsi_connector = devm_kzalloc(dev->dev, sizeof(*dsi_connector),
++				     GFP_KERNEL);
++	if (!dsi_connector) {
++		ret = -ENOMEM;
++		goto fail;
++	}
++	connector = &dsi_connector->base;
++
++	dsi_connector->dsi = dsi;
++
++	drm_connector_init(dev, connector, &vc4_dsi_connector_funcs,
++			   DRM_MODE_CONNECTOR_DSI);
++	drm_connector_helper_add(connector, &vc4_dsi_connector_helper_funcs);
++
++	connector->polled = 0;
++	connector->interlace_allowed = 0;
++	connector->doublescan_allowed = 0;
++
++	drm_mode_connector_attach_encoder(connector, dsi->encoder);
++
++	return connector;
++
++fail:
++	if (connector)
++		vc4_dsi_connector_destroy(connector);
++
++	return ERR_PTR(ret);
++}
++
++static void vc4_dsi_encoder_destroy(struct drm_encoder *encoder)
++{
++	drm_encoder_cleanup(encoder);
++}
++
++static const struct drm_encoder_funcs vc4_dsi_encoder_funcs = {
++	.destroy = vc4_dsi_encoder_destroy,
++};
++
++static void vc4_dsi_latch_ulps(struct vc4_dsi *dsi, bool latch)
++{
++	u32 afec0 = DSI_PORT_READ(PHY_AFEC0);
++
++	if (latch)
++		afec0 |= DSI_PORT_BIT(PHY_AFEC0_LATCH_ULPS);
++	else
++		afec0 &= ~DSI_PORT_BIT(PHY_AFEC0_LATCH_ULPS);
++
++	DSI_PORT_WRITE(PHY_AFEC0, afec0);
++}
++
++/* Enters or exits Ultra Low Power State. */
++static void vc4_dsi_ulps(struct vc4_dsi *dsi, bool ulps)
++{
++	bool continuous = dsi->mode_flags & MIPI_DSI_CLOCK_NON_CONTINUOUS;
++	u32 phyc_ulps = ((continuous ? DSI_PORT_BIT(PHYC_CLANE_ULPS) : 0) |
++			 DSI_PHYC_DLANE0_ULPS |
++			 (dsi->lanes > 1 ? DSI_PHYC_DLANE1_ULPS : 0) |
++			 (dsi->lanes > 2 ? DSI_PHYC_DLANE2_ULPS : 0) |
++			 (dsi->lanes > 3 ? DSI_PHYC_DLANE3_ULPS : 0));
++	u32 stat_ulps = ((continuous ? DSI1_STAT_PHY_CLOCK_ULPS : 0) |
++			 DSI1_STAT_PHY_D0_ULPS |
++			 (dsi->lanes > 1 ? DSI1_STAT_PHY_D1_ULPS : 0) |
++			 (dsi->lanes > 2 ? DSI1_STAT_PHY_D2_ULPS : 0) |
++			 (dsi->lanes > 3 ? DSI1_STAT_PHY_D3_ULPS : 0));
++	u32 stat_stop = ((continuous ? DSI1_STAT_PHY_CLOCK_STOP : 0) |
++			 DSI1_STAT_PHY_D0_STOP |
++			 (dsi->lanes > 1 ? DSI1_STAT_PHY_D1_STOP : 0) |
++			 (dsi->lanes > 2 ? DSI1_STAT_PHY_D2_STOP : 0) |
++			 (dsi->lanes > 3 ? DSI1_STAT_PHY_D3_STOP : 0));
++	int ret;
++
++	DSI_PORT_WRITE(STAT, stat_ulps);
++	DSI_PORT_WRITE(PHYC, DSI_PORT_READ(PHYC) | phyc_ulps);
++	ret = wait_for((DSI_PORT_READ(STAT) & stat_ulps) == stat_ulps, 200);
++	if (ret) {
++		dev_warn(&dsi->pdev->dev,
++			 "Timeout waiting for DSI ULPS entry: STAT 0x%08x",
++			 DSI_PORT_READ(STAT));
++		DSI_PORT_WRITE(PHYC, DSI_PORT_READ(PHYC) & ~phyc_ulps);
++		vc4_dsi_latch_ulps(dsi, false);
++		return;
 +	}
 +
-+	switch (ver) {
-+	case 0xde:
-+		ts->atmel_ver = 1;
++	/* The DSI module can't be disabled while the module is
++	 * generating ULPS state.  So, to be able to disable the
++	 * module, we have the AFE latch the ULPS state and continue
++	 * on to having the module enter STOP.
++	 */
++	vc4_dsi_latch_ulps(dsi, ulps);
++
++	DSI_PORT_WRITE(STAT, stat_stop);
++	DSI_PORT_WRITE(PHYC, DSI_PORT_READ(PHYC) & ~phyc_ulps);
++	ret = wait_for((DSI_PORT_READ(STAT) & stat_stop) == stat_stop, 200);
++	if (ret) {
++		dev_warn(&dsi->pdev->dev,
++			 "Timeout waiting for DSI STOP entry: STAT 0x%08x",
++			 DSI_PORT_READ(STAT));
++		DSI_PORT_WRITE(PHYC, DSI_PORT_READ(PHYC) & ~phyc_ulps);
++		return;
++	}
++}
++
++static u32
++dsi_hs_timing(u32 ui_ns, u32 ns, u32 ui)
++{
++	/* The HS timings have to be rounded up to a multiple of 8
++	 * because we're using the byte clock.
++	 */
++	return roundup(ui + DIV_ROUND_UP(ns, ui_ns), 8);
++}
++
++/* ESC always runs at 100Mhz. */
++#define ESC_TIME_NS 10
++
++static u32
++dsi_esc_timing(u32 ns)
++{
++	return DIV_ROUND_UP(ns, ESC_TIME_NS);
++}
++
++static void vc4_dsi_encoder_disable(struct drm_encoder *encoder)
++{
++	struct vc4_dsi_encoder *vc4_encoder = to_vc4_dsi_encoder(encoder);
++	struct vc4_dsi *dsi = vc4_encoder->dsi;
++	struct device *dev = &dsi->pdev->dev;
++
++	drm_panel_disable(dsi->panel);
++
++	vc4_dsi_ulps(dsi, true);
++
++	drm_panel_unprepare(dsi->panel);
++
++	clk_disable_unprepare(dsi->pll_phy_clock);
++	clk_disable_unprepare(dsi->escape_clock);
++	clk_disable_unprepare(dsi->pixel_clock);
++
++	pm_runtime_put(dev);
++}
++
++static void vc4_dsi_encoder_enable(struct drm_encoder *encoder)
++{
++	struct drm_display_mode *mode = &encoder->crtc->mode;
++	struct vc4_dsi_encoder *vc4_encoder = to_vc4_dsi_encoder(encoder);
++	struct vc4_dsi *dsi = vc4_encoder->dsi;
++	struct device *dev = &dsi->pdev->dev;
++	u32 format = 0, divider = 0;
++	bool debug_dump_regs = false;
++	unsigned long hs_clock;
++	u32 ui_ns;
++	/* Minimum LP state duration in escape clock cycles. */
++	u32 lpx = dsi_esc_timing(60);
++	unsigned long pixel_clock_hz = mode->clock * 1000;
++	unsigned long dsip_clock;
++	unsigned long phy_clock;
++	int ret;
++
++	ret = pm_runtime_get_sync(dev);
++	if (ret) {
++		DRM_ERROR("Failed to runtime PM enable on DSI%d\n", dsi->port);
++		return;
++	}
++
++	ret = drm_panel_prepare(dsi->panel);
++	if (ret) {
++		DRM_ERROR("Panel failed to prepare\n");
++		return;
++	}
++
++	if (debug_dump_regs) {
++		DRM_INFO("DSI regs before:\n");
++		vc4_dsi_dump_regs(dsi);
++	}
++
++	switch (dsi->format) {
++	case MIPI_DSI_FMT_RGB888:
++		format = DSI_PFORMAT_RGB888;
++		divider = 24 / dsi->lanes;
 +		break;
-+	case 0xc3:
-+		ts->atmel_ver = 2;
++	case MIPI_DSI_FMT_RGB666:
++		format = DSI_PFORMAT_RGB666;
++		divider = 24 / dsi->lanes;
 +		break;
-+	default:
-+		dev_err(dev, "Unknown Atmel firmware revision: 0x%02x\n", ver);
-+		return -ENODEV;
++	case MIPI_DSI_FMT_RGB666_PACKED:
++		format = DSI_PFORMAT_RGB666_PACKED;
++		divider = 18 / dsi->lanes;
++		break;
++	case MIPI_DSI_FMT_RGB565:
++		format = DSI_PFORMAT_RGB565;
++		divider = 16 / dsi->lanes;
++		break;
 +	}
 +
-+	/* Turn off at boot, so we can cleanly sequence powering on. */
-+	rpi_touchscreen_i2c_write(ts, REG_POWERON, 0);
++	phy_clock = pixel_clock_hz * divider;
++	ret = clk_set_rate(dsi->pll_phy_clock, phy_clock);
++	if (ret) {
++		dev_err(&dsi->pdev->dev,
++			"Failed to set phy clock to %ld: %d\n", phy_clock, ret);
++	}
 +
-+	drm_panel_init(&ts->base);
-+	ts->base.dev = dev;
-+	ts->base.funcs = &rpi_touchscreen_funcs;
++	/* Reset the DSI and all its fifos. */
++	DSI_PORT_WRITE(CTRL,
++		       DSI_CTRL_SOFT_RESET_CFG |
++		       DSI_PORT_BIT(CTRL_RESET_FIFOS));
 +
-+	ret = drm_panel_add(&ts->base);
-+	if (ret < 0)
-+		goto err_release_bridge;
++	DSI_PORT_WRITE(CTRL,
++		       DSI_CTRL_HSDT_EOT_DISABLE |
++		       DSI_CTRL_RX_LPDT_EOT_DISABLE);
 +
-+	return mipi_dsi_attach(dsi);
++	/* Clear all stat bits so we see what has happened during enable. */
++	DSI_PORT_WRITE(STAT, DSI_PORT_READ(STAT));
 +
-+err_release_bridge:
-+	put_device(&ts->bridge_i2c->dev);
++	/* Set AFE CTR00/CTR1 to release powerdown of analog. */
++	if (dsi->port == 0) {
++		u32 afec0 = (VC4_SET_FIELD(7, DSI_PHY_AFEC0_PTATADJ) |
++			     VC4_SET_FIELD(7, DSI_PHY_AFEC0_CTATADJ));
++
++		if (dsi->lanes < 2)
++			afec0 |= DSI0_PHY_AFEC0_PD_DLANE1;
++
++		if (!(dsi->mode_flags & MIPI_DSI_MODE_VIDEO))
++			afec0 |= DSI0_PHY_AFEC0_RESET;
++
++		DSI_PORT_WRITE(PHY_AFEC0, afec0);
++
++		DSI_PORT_WRITE(PHY_AFEC1,
++			       VC4_SET_FIELD(6,  DSI0_PHY_AFEC1_IDR_DLANE1) |
++			       VC4_SET_FIELD(6,  DSI0_PHY_AFEC1_IDR_DLANE0) |
++			       VC4_SET_FIELD(6,  DSI0_PHY_AFEC1_IDR_CLANE));
++	} else {
++		u32 afec0 = (VC4_SET_FIELD(7, DSI_PHY_AFEC0_PTATADJ) |
++			     VC4_SET_FIELD(7, DSI_PHY_AFEC0_CTATADJ) |
++			     VC4_SET_FIELD(6, DSI1_PHY_AFEC0_IDR_CLANE) |
++			     VC4_SET_FIELD(6, DSI1_PHY_AFEC0_IDR_DLANE0) |
++			     VC4_SET_FIELD(6, DSI1_PHY_AFEC0_IDR_DLANE1) |
++			     VC4_SET_FIELD(6, DSI1_PHY_AFEC0_IDR_DLANE2) |
++			     VC4_SET_FIELD(6, DSI1_PHY_AFEC0_IDR_DLANE3));
++
++		if (dsi->lanes < 4)
++			afec0 |= DSI1_PHY_AFEC0_PD_DLANE3;
++		if (dsi->lanes < 3)
++			afec0 |= DSI1_PHY_AFEC0_PD_DLANE2;
++		if (dsi->lanes < 2)
++			afec0 |= DSI1_PHY_AFEC0_PD_DLANE1;
++
++		afec0 |= DSI1_PHY_AFEC0_RESET;
++
++		DSI_PORT_WRITE(PHY_AFEC0, afec0);
++
++		DSI_PORT_WRITE(PHY_AFEC1, 0);
++
++		/* AFEC reset hold time */
++		mdelay(1);
++	}
++
++	ret = clk_prepare_enable(dsi->escape_clock);
++	if (ret) {
++		DRM_ERROR("Failed to turn on DSI escape clock: %d\n", ret);
++		return;
++	}
++
++	ret = clk_prepare_enable(dsi->pll_phy_clock);
++	if (ret) {
++		DRM_ERROR("Failed to turn on DSI PLL: %d\n", ret);
++		return;
++	}
++
++	hs_clock = clk_get_rate(dsi->pll_phy_clock);
++
++	/* Yes, we set the DSI0P/DSI1P pixel clock to the byte rate,
++	 * not the pixel clock rate.  DSIxP take from the APHY's byte,
++	 * DDR2, or DDR4 clock (we use byte) and feed into the PV at
++	 * that rate.  Separately, a value derived from PIX_CLK_DIV
++	 * and HS_CLKC is fed into the PV to divide down to the actual
++	 * pixel clock for pushing pixels into DSI.
++	 */
++	dsip_clock = phy_clock / 8;
++	ret = clk_set_rate(dsi->pixel_clock, dsip_clock);
++	if (ret) {
++		dev_err(dev, "Failed to set pixel clock to %ldHz: %d\n",
++			dsip_clock, ret);
++	}
++
++	ret = clk_prepare_enable(dsi->pixel_clock);
++	if (ret) {
++		DRM_ERROR("Failed to turn on DSI pixel clock: %d\n", ret);
++		return;
++	}
++
++	/* How many ns one DSI unit interval is.  Note that the clock
++	 * is DDR, so there's an extra divide by 2.
++	 */
++	ui_ns = DIV_ROUND_UP(500000000, hs_clock);
++
++	DSI_PORT_WRITE(HS_CLT0,
++		       VC4_SET_FIELD(dsi_hs_timing(ui_ns, 262, 0),
++				     DSI_HS_CLT0_CZERO) |
++		       VC4_SET_FIELD(dsi_hs_timing(ui_ns, 0, 8),
++				     DSI_HS_CLT0_CPRE) |
++		       VC4_SET_FIELD(dsi_hs_timing(ui_ns, 38, 0),
++				     DSI_HS_CLT0_CPREP));
++
++	DSI_PORT_WRITE(HS_CLT1,
++		       VC4_SET_FIELD(dsi_hs_timing(ui_ns, 60, 0),
++				     DSI_HS_CLT1_CTRAIL) |
++		       VC4_SET_FIELD(dsi_hs_timing(ui_ns, 60, 52),
++				     DSI_HS_CLT1_CPOST));
++
++	DSI_PORT_WRITE(HS_CLT2,
++		       VC4_SET_FIELD(dsi_hs_timing(ui_ns, 1000000, 0),
++				     DSI_HS_CLT2_WUP));
++
++	DSI_PORT_WRITE(HS_DLT3,
++		       VC4_SET_FIELD(dsi_hs_timing(ui_ns, 100, 0),
++				     DSI_HS_DLT3_EXIT) |
++		       VC4_SET_FIELD(dsi_hs_timing(ui_ns, 105, 6),
++				     DSI_HS_DLT3_ZERO) |
++		       VC4_SET_FIELD(dsi_hs_timing(ui_ns, 40, 4),
++				     DSI_HS_DLT3_PRE));
++
++	DSI_PORT_WRITE(HS_DLT4,
++		       VC4_SET_FIELD(dsi_hs_timing(ui_ns, lpx * ESC_TIME_NS, 0),
++				     DSI_HS_DLT4_LPX) |
++		       VC4_SET_FIELD(max(dsi_hs_timing(ui_ns, 0, 8),
++					 dsi_hs_timing(ui_ns, 60, 4)),
++				     DSI_HS_DLT4_TRAIL) |
++		       VC4_SET_FIELD(0, DSI_HS_DLT4_ANLAT));
++
++	DSI_PORT_WRITE(HS_DLT5, VC4_SET_FIELD(dsi_hs_timing(ui_ns, 1000, 5000),
++					      DSI_HS_DLT5_INIT));
++
++	DSI_PORT_WRITE(HS_DLT6,
++		       VC4_SET_FIELD(lpx * 5, DSI_HS_DLT6_TA_GET) |
++		       VC4_SET_FIELD(lpx, DSI_HS_DLT6_TA_SURE) |
++		       VC4_SET_FIELD(lpx * 4, DSI_HS_DLT6_TA_GO) |
++		       VC4_SET_FIELD(lpx, DSI_HS_DLT6_LP_LPX));
++
++	DSI_PORT_WRITE(HS_DLT7,
++		       VC4_SET_FIELD(dsi_esc_timing(1000000),
++				     DSI_HS_DLT7_LP_WUP));
++
++	DSI_PORT_WRITE(PHYC,
++		       DSI_PHYC_DLANE0_ENABLE |
++		       (dsi->lanes >= 2 ? DSI_PHYC_DLANE1_ENABLE : 0) |
++		       (dsi->lanes >= 3 ? DSI_PHYC_DLANE2_ENABLE : 0) |
++		       (dsi->lanes >= 4 ? DSI_PHYC_DLANE3_ENABLE : 0) |
++		       DSI_PORT_BIT(PHYC_CLANE_ENABLE) |
++		       ((dsi->mode_flags & MIPI_DSI_CLOCK_NON_CONTINUOUS) ?
++			0 : DSI_PORT_BIT(PHYC_HS_CLK_CONTINUOUS)) |
++		       (dsi->port == 0 ?
++			VC4_SET_FIELD(lpx - 1, DSI0_PHYC_ESC_CLK_LPDT) :
++			VC4_SET_FIELD(lpx - 1, DSI1_PHYC_ESC_CLK_LPDT)));
++
++	DSI_PORT_WRITE(CTRL,
++		       DSI_PORT_READ(CTRL) |
++		       DSI_CTRL_CAL_BYTE);
++
++	/* HS timeout in HS clock cycles: disabled. */
++	DSI_PORT_WRITE(HSTX_TO_CNT, 0);
++	/* LP receive timeout in HS clocks. */
++	DSI_PORT_WRITE(LPRX_TO_CNT, 0xffffff);
++	/* Bus turnaround timeout */
++	DSI_PORT_WRITE(TA_TO_CNT, 100000);
++	/* Display reset sequence timeout */
++	DSI_PORT_WRITE(PR_TO_CNT, 100000);
++
++	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO) {
++		DSI_PORT_WRITE(DISP0_CTRL,
++			       VC4_SET_FIELD(divider, DSI_DISP0_PIX_CLK_DIV) |
++			       VC4_SET_FIELD(format, DSI_DISP0_PFORMAT) |
++			       VC4_SET_FIELD(DSI_DISP0_LP_STOP_PERFRAME,
++					     DSI_DISP0_LP_STOP_CTRL) |
++			       DSI_DISP0_ST_END |
++			       DSI_DISP0_ENABLE);
++	} else {
++		DSI_PORT_WRITE(DISP0_CTRL,
++			       DSI_DISP0_COMMAND_MODE |
++			       DSI_DISP0_ENABLE);
++	}
++
++	/* Set up DISP1 for transferring long command payloads through
++	 * the pixfifo.
++	 */
++	DSI_PORT_WRITE(DISP1_CTRL,
++		       VC4_SET_FIELD(DSI_DISP1_PFORMAT_32BIT_LE,
++				     DSI_DISP1_PFORMAT) |
++		       DSI_DISP1_ENABLE);
++
++	/* Ungate the block. */
++	if (dsi->port == 0)
++		DSI_PORT_WRITE(CTRL, DSI_PORT_READ(CTRL) | DSI0_CTRL_CTRL0);
++	else
++		DSI_PORT_WRITE(CTRL, DSI_PORT_READ(CTRL) | DSI1_CTRL_EN);
++
++	/* Bring AFE out of reset. */
++	if (dsi->port == 0) {
++	} else {
++		DSI_PORT_WRITE(PHY_AFEC0,
++			       DSI_PORT_READ(PHY_AFEC0) &
++			       ~DSI1_PHY_AFEC0_RESET);
++	}
++
++	vc4_dsi_ulps(dsi, false);
++
++	if (debug_dump_regs) {
++		DRM_INFO("DSI regs after:\n");
++		vc4_dsi_dump_regs(dsi);
++	}
++
++	ret = drm_panel_enable(dsi->panel);
++	if (ret) {
++		DRM_ERROR("Panel failed to enable\n");
++		drm_panel_unprepare(dsi->panel);
++		return;
++	}
++}
++
++static ssize_t vc4_dsi_host_transfer(struct mipi_dsi_host *host,
++				     const struct mipi_dsi_msg *msg)
++{
++	struct vc4_dsi *dsi = host_to_dsi(host);
++	struct mipi_dsi_packet packet;
++	u32 pkth = 0, pktc = 0;
++	int i, ret;
++	bool is_long = mipi_dsi_packet_format_is_long(msg->type);
++	u32 cmd_fifo_len = 0, pix_fifo_len = 0;
++
++	mipi_dsi_create_packet(&packet, msg);
++
++	pkth |= VC4_SET_FIELD(packet.header[0], DSI_TXPKT1H_BC_DT);
++	pkth |= VC4_SET_FIELD(packet.header[1] |
++			      (packet.header[2] << 8),
++			      DSI_TXPKT1H_BC_PARAM);
++	if (is_long) {
++		/* Divide data across the various FIFOs we have available.
++		 * The command FIFO takes byte-oriented data, but is of
++		 * limited size. The pixel FIFO (never actually used for
++		 * pixel data in reality) is word oriented, and substantially
++		 * larger. So, we use the pixel FIFO for most of the data,
++		 * sending the residual bytes in the command FIFO@the start.
++		 *
++		 * With this arrangement, the command FIFO will never get full.
++		 */
++		if (packet.payload_length <= 16) {
++			cmd_fifo_len = packet.payload_length;
++			pix_fifo_len = 0;
++		} else {
++			cmd_fifo_len = (packet.payload_length %
++					DSI_PIX_FIFO_WIDTH);
++			pix_fifo_len = ((packet.payload_length - cmd_fifo_len) /
++					DSI_PIX_FIFO_WIDTH);
++		}
++
++		WARN_ON_ONCE(pix_fifo_len >= DSI_PIX_FIFO_DEPTH);
++
++		pkth |= VC4_SET_FIELD(cmd_fifo_len, DSI_TXPKT1H_BC_CMDFIFO);
++	}
++
++	if (msg->rx_len) {
++		pktc |= VC4_SET_FIELD(DSI_TXPKT1C_CMD_CTRL_RX,
++				      DSI_TXPKT1C_CMD_CTRL);
++	} else {
++		pktc |= VC4_SET_FIELD(DSI_TXPKT1C_CMD_CTRL_TX,
++				      DSI_TXPKT1C_CMD_CTRL);
++	}
++
++	for (i = 0; i < cmd_fifo_len; i++)
++		DSI_PORT_WRITE(TXPKT_CMD_FIFO, packet.payload[i]);
++	for (i = 0; i < pix_fifo_len; i++) {
++		const u8 *pix = packet.payload + cmd_fifo_len + i * 4;
++
++		DSI_PORT_WRITE(TXPKT_PIX_FIFO,
++			       pix[0] |
++			       pix[1] << 8 |
++			       pix[2] << 16 |
++			       pix[3] << 24);
++	}
++
++	if (msg->flags & MIPI_DSI_MSG_USE_LPM)
++		pktc |= DSI_TXPKT1C_CMD_MODE_LP;
++	if (is_long)
++		pktc |= DSI_TXPKT1C_CMD_TYPE_LONG;
++
++	/* Send one copy of the packet.  Larger repeats are used for pixel
++	 * data in command mode.
++	 */
++	pktc |= VC4_SET_FIELD(1, DSI_TXPKT1C_CMD_REPEAT);
++
++	pktc |= DSI_TXPKT1C_CMD_EN;
++	if (pix_fifo_len) {
++		pktc |= VC4_SET_FIELD(DSI_TXPKT1C_DISPLAY_NO_SECONDARY,
++				      DSI_TXPKT1C_DISPLAY_NO);
++	} else {
++		pktc |= VC4_SET_FIELD(DSI_TXPKT1C_DISPLAY_NO_SHORT,
++				      DSI_TXPKT1C_DISPLAY_NO);
++	}
++
++	/* Enable the appropriate interrupt for the transfer completion. */
++	dsi->xfer_result = 0;
++	reinit_completion(&dsi->xfer_completion);
++	DSI_PORT_WRITE(INT_STAT, DSI1_INT_TXPKT1_DONE | DSI1_INT_PHY_DIR_RTF);
++	if (msg->rx_len) {
++		DSI_PORT_WRITE(INT_EN, (DSI1_INTERRUPTS_ALWAYS_ENABLED |
++					DSI1_INT_PHY_DIR_RTF));
++	} else {
++		DSI_PORT_WRITE(INT_EN, (DSI1_INTERRUPTS_ALWAYS_ENABLED |
++					DSI1_INT_TXPKT1_DONE));
++	}
++
++	/* Send the packet. */
++	DSI_PORT_WRITE(TXPKT1H, pkth);
++	DSI_PORT_WRITE(TXPKT1C, pktc);
++
++	if (!wait_for_completion_timeout(&dsi->xfer_completion,
++					 msecs_to_jiffies(1000))) {
++		dev_err(&dsi->pdev->dev, "transfer interrupt wait timeout");
++		dev_err(&dsi->pdev->dev, "instat: 0x%08x\n",
++			DSI_PORT_READ(INT_STAT));
++		ret = -ETIMEDOUT;
++	} else {
++		ret = dsi->xfer_result;
++	}
++
++	DSI_PORT_WRITE(INT_EN, DSI1_INTERRUPTS_ALWAYS_ENABLED);
++
++	if (ret)
++		goto reset_fifo_and_return;
++
++	if (ret == 0 && msg->rx_len) {
++		u32 rxpkt1h = DSI_PORT_READ(RXPKT1H);
++		u8 *msg_rx = msg->rx_buf;
++
++		if (rxpkt1h & DSI_RXPKT1H_PKT_TYPE_LONG) {
++			u32 rxlen = VC4_GET_FIELD(rxpkt1h,
++						  DSI_RXPKT1H_BC_PARAM);
++
++			if (rxlen != msg->rx_len) {
++				DRM_ERROR("DSI returned %db, expecting %db\n",
++					  rxlen, (int)msg->rx_len);
++				ret = -ENXIO;
++				goto reset_fifo_and_return;
++			}
++
++			for (i = 0; i < msg->rx_len; i++)
++				msg_rx[i] = DSI_READ(DSI1_RXPKT_FIFO);
++		} else {
++			/* FINISHME: Handle AWER */
++
++			msg_rx[0] = VC4_GET_FIELD(rxpkt1h,
++						  DSI_RXPKT1H_SHORT_0);
++			if (msg->rx_len > 1) {
++				msg_rx[1] = VC4_GET_FIELD(rxpkt1h,
++							  DSI_RXPKT1H_SHORT_1);
++			}
++		}
++	}
++
++	return ret;
++
++reset_fifo_and_return:
++	DRM_ERROR("DSI transfer failed, resetting: %d\n", ret);
++
++	DSI_PORT_WRITE(TXPKT1C, DSI_PORT_READ(TXPKT1C) & ~DSI_TXPKT1C_CMD_EN);
++	udelay(1);
++	DSI_PORT_WRITE(CTRL,
++		       DSI_PORT_READ(CTRL) |
++		       DSI_PORT_BIT(CTRL_RESET_FIFOS));
++
++	DSI_PORT_WRITE(TXPKT1C, 0);
++	DSI_PORT_WRITE(INT_EN, DSI1_INTERRUPTS_ALWAYS_ENABLED);
 +	return ret;
 +}
 +
-+static int rpi_touchscreen_dsi_remove(struct mipi_dsi_device *dsi)
++static int vc4_dsi_host_attach(struct mipi_dsi_host *host,
++			       struct mipi_dsi_device *device)
 +{
-+	struct device *dev = &dsi->dev;
-+	struct rpi_touchscreen *ts = dev_get_drvdata(dev);
-+	int ret;
++	struct vc4_dsi *dsi = host_to_dsi(host);
++	int ret = 0;
 +
-+	ret = mipi_dsi_detach(dsi);
-+	if (ret < 0) {
-+		dev_err(&dsi->dev, "failed to detach from DSI host: %d\n", ret);
-+		return ret;
++	dsi->lanes = device->lanes;
++	dsi->channel = device->channel;
++	dsi->format = device->format;
++	dsi->mode_flags = device->mode_flags;
++
++	if (!(dsi->mode_flags & MIPI_DSI_MODE_VIDEO)) {
++		dev_err(&dsi->pdev->dev,
++			"Only VIDEO mode panels supported currently.\n");
++		return 0;
 +	}
 +
-+	drm_panel_detach(&ts->base);
-+	drm_panel_remove(&ts->base);
++	dsi->panel = of_drm_find_panel(device->dev.of_node);
++	if (!dsi->panel)
++		return 0;
 +
-+	put_device(&ts->bridge_i2c->dev);
++	ret = drm_panel_attach(dsi->panel, dsi->connector);
++	if (ret != 0)
++		return ret;
++
++	drm_helper_hpd_irq_event(dsi->connector->dev);
 +
 +	return 0;
 +}
 +
-+static void rpi_touchscreen_dsi_shutdown(struct mipi_dsi_device *dsi)
++static int vc4_dsi_host_detach(struct mipi_dsi_host *host,
++			       struct mipi_dsi_device *device)
 +{
-+	struct device *dev = &dsi->dev;
-+	struct rpi_touchscreen *ts = dev_get_drvdata(dev);
++	struct vc4_dsi *dsi = host_to_dsi(host);
 +
-+	rpi_touchscreen_i2c_write(ts, REG_POWERON, 0);
++	if (dsi->panel) {
++		int ret = drm_panel_detach(dsi->panel);
++
++		if (ret)
++			return ret;
++
++		dsi->panel = NULL;
++
++		drm_helper_hpd_irq_event(dsi->connector->dev);
++	}
++
++	return 0;
 +}
 +
-+static const struct of_device_id rpi_touchscreen_of_match[] = {
-+	{ .compatible = "raspberrypi,touchscreen" },
-+	{ } /* sentinel */
++static const struct mipi_dsi_host_ops vc4_dsi_host_ops = {
++	.attach = vc4_dsi_host_attach,
++	.detach = vc4_dsi_host_detach,
++	.transfer = vc4_dsi_host_transfer,
 +};
-+MODULE_DEVICE_TABLE(of, rpi_touchscreen_of_match);
 +
-+static struct mipi_dsi_driver rpi_touchscreen_driver = {
++static const struct drm_encoder_helper_funcs vc4_dsi_encoder_helper_funcs = {
++	.disable = vc4_dsi_encoder_disable,
++	.enable = vc4_dsi_encoder_enable,
++};
++
++static const struct of_device_id vc4_dsi_dt_match[] = {
++	{ .compatible = "brcm,bcm2835-dsi1", (void *)(uintptr_t)1 },
++	{}
++};
++
++static void dsi_handle_error(struct vc4_dsi *dsi,
++			     irqreturn_t *ret, u32 stat, u32 bit,
++			     const char *type)
++{
++	if (!(stat & bit))
++		return;
++
++	DRM_ERROR("DSI%d: %s error\n", dsi->port, type);
++	*ret = IRQ_HANDLED;
++}
++
++static irqreturn_t vc4_dsi_irq_handler(int irq, void *data)
++{
++	struct vc4_dsi *dsi = data;
++	u32 stat = DSI_PORT_READ(INT_STAT);
++	irqreturn_t ret = IRQ_NONE;
++
++	DSI_PORT_WRITE(INT_STAT, stat);
++
++	dsi_handle_error(dsi, &ret, stat,
++			 DSI1_INT_ERR_SYNC_ESC, "LPDT sync");
++	dsi_handle_error(dsi, &ret, stat,
++			 DSI1_INT_ERR_CONTROL, "data lane 0 sequence");
++	dsi_handle_error(dsi, &ret, stat,
++			 DSI1_INT_ERR_CONT_LP0, "LP0 contention");
++	dsi_handle_error(dsi, &ret, stat,
++			 DSI1_INT_ERR_CONT_LP1, "LP1 contention");
++	dsi_handle_error(dsi, &ret, stat,
++			 DSI1_INT_HSTX_TO, "HSTX timeout");
++	dsi_handle_error(dsi, &ret, stat,
++			 DSI1_INT_LPRX_TO, "LPRX timeout");
++	dsi_handle_error(dsi, &ret, stat,
++			 DSI1_INT_TA_TO, "turnaround timeout");
++	dsi_handle_error(dsi, &ret, stat,
++			 DSI1_INT_PR_TO, "peripheral reset timeout");
++
++	if (stat & (DSI1_INT_TXPKT1_DONE | DSI1_INT_PHY_DIR_RTF)) {
++		complete(&dsi->xfer_completion);
++		ret = IRQ_HANDLED;
++	} else if (stat & DSI1_INT_HSTX_TO) {
++		complete(&dsi->xfer_completion);
++		dsi->xfer_result = -ETIMEDOUT;
++		ret = IRQ_HANDLED;
++	}
++
++	return ret;
++}
++
++/**
++ * Exposes clocks generated by the analog PHY that are consumed by
++ * CPRMAN (clk-bcm2835.c).
++ */
++static int
++vc4_dsi_init_phy_clocks(struct vc4_dsi *dsi)
++{
++	struct device *dev = &dsi->pdev->dev;
++	const char *parent_name = __clk_get_name(dsi->pll_phy_clock);
++	static const struct {
++		const char *dsi0_name, *dsi1_name;
++		int div;
++	} phy_clocks[] = {
++		{ "dsi0_byte", "dsi1_byte", 8 },
++		{ "dsi0_ddr2", "dsi1_ddr2", 4 },
++		{ "dsi0_ddr", "dsi1_ddr", 2 },
++	};
++	int i;
++
++	dsi->clk_onecell.clk_num = ARRAY_SIZE(phy_clocks);
++	dsi->clk_onecell.clks = devm_kcalloc(dev,
++					     dsi->clk_onecell.clk_num,
++					     sizeof(*dsi->clk_onecell.clks),
++					     GFP_KERNEL);
++	if (!dsi->clk_onecell.clks)
++		return -ENOMEM;
++
++	for (i = 0; i < ARRAY_SIZE(phy_clocks); i++) {
++		struct clk_fixed_factor *fix = &dsi->phy_clocks[i];
++		struct clk_init_data init;
++		struct clk *clk;
++
++		/* We just use core fixed factor clock ops for the PHY
++		 * clocks.  The clocks are actually gated by the
++		 * PHY_AFEC0_DDRCLK_EN bits, which we should be
++		 * setting if we use the DDR/DDR2 clocks.  However,
++		 * vc4_dsi_encoder_enable() is setting up both AFEC0,
++		 * setting both our parent DSI PLL's rate and this
++		 * clock's rate, so it knows if DDR/DDR2 are going to
++		 * be used and could enable the gates itself.
++		 */
++		fix->mult = 1;
++		fix->div = phy_clocks[i].div;
++		fix->hw.init = &init;
++
++		memset(&init, 0, sizeof(init));
++		init.parent_names = &parent_name;
++		init.num_parents = 1;
++		if (dsi->port == 1)
++			init.name = phy_clocks[i].dsi1_name;
++		else
++			init.name = phy_clocks[i].dsi0_name;
++		init.ops = &clk_fixed_factor_ops;
++		init.flags = CLK_IS_BASIC;
++
++		clk = devm_clk_register(dev, &fix->hw);
++		if (IS_ERR(clk))
++			return PTR_ERR(clk);
++
++		dsi->clk_onecell.clks[i] = clk;
++	}
++
++	return of_clk_add_provider(dev->of_node,
++				   of_clk_src_onecell_get,
++				   &dsi->clk_onecell);
++}
++
++static int vc4_dsi_bind(struct device *dev, struct device *master, void *data)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct drm_device *drm = dev_get_drvdata(master);
++	struct vc4_dev *vc4 = to_vc4_dev(drm);
++	struct vc4_dsi *dsi;
++	struct vc4_dsi_encoder *vc4_dsi_encoder;
++	const struct of_device_id *match;
++	dma_cap_mask_t dma_mask;
++	int ret;
++
++	dsi = devm_kzalloc(dev, sizeof(*dsi), GFP_KERNEL);
++	if (!dsi)
++		return -ENOMEM;
++
++	match = of_match_device(vc4_dsi_dt_match, dev);
++	if (!match)
++		return -ENODEV;
++
++	dsi->port = (uintptr_t)match->data;
++
++	vc4_dsi_encoder = devm_kzalloc(dev, sizeof(*vc4_dsi_encoder),
++				       GFP_KERNEL);
++	if (!vc4_dsi_encoder)
++		return -ENOMEM;
++	vc4_dsi_encoder->base.type = VC4_ENCODER_TYPE_DSI1;
++	vc4_dsi_encoder->dsi = dsi;
++	dsi->encoder = &vc4_dsi_encoder->base.base;
++
++	dsi->pdev = pdev;
++	dsi->regs = vc4_ioremap_regs(pdev, 0);
++	if (IS_ERR(dsi->regs))
++		return PTR_ERR(dsi->regs);
++
++	if (DSI_PORT_READ(ID) != DSI_ID_VALUE) {
++		dev_err(dev, "Port returned 0x%08x for ID instead of 0x%08x\n",
++			DSI_PORT_READ(ID), DSI_ID_VALUE);
++		return -ENODEV;
++	}
++
++	/* DSI1 has a broken AXI slave that doesn't respond to writes
++	 * from the ARM.  It does handle writes from the DMA engine,
++	 * so set up a channel for talking to it.
++	 */
++	if (dsi->port == 1) {
++		dsi->reg_dma_mem = dma_alloc_coherent(dev, 4,
++						      &dsi->reg_dma_paddr,
++						      GFP_KERNEL);
++		if (!dsi->reg_dma_mem) {
++			DRM_ERROR("Failed to get DMA memory\n");
++			return -ENOMEM;
++		}
++
++		dma_cap_zero(dma_mask);
++		dma_cap_set(DMA_MEMCPY, dma_mask);
++		dsi->reg_dma_chan = dma_request_chan_by_mask(&dma_mask);
++		if (IS_ERR(dsi->reg_dma_chan)) {
++			ret = PTR_ERR(dsi->reg_dma_chan);
++			if (ret != -EPROBE_DEFER)
++				DRM_ERROR("Failed to get DMA channel: %d\n",
++					  ret);
++			return ret;
++		}
++
++		/* Get the physical address of the device's registers.  The
++		 * struct resource for the regs gives us the bus address
++		 * instead.
++		 */
++		dsi->reg_paddr = be32_to_cpup(of_get_address(dev->of_node,
++							     0, NULL, NULL));
++	}
++
++	init_completion(&dsi->xfer_completion);
++	/* At startup enable error-reporting interrupts and nothing else. */
++	DSI_PORT_WRITE(INT_EN, DSI1_INTERRUPTS_ALWAYS_ENABLED);
++	/* Clear any existing interrupt state. */
++	DSI_PORT_WRITE(INT_STAT, DSI_PORT_READ(INT_STAT));
++
++	ret = devm_request_irq(dev, platform_get_irq(pdev, 0),
++			       vc4_dsi_irq_handler, 0, "vc4 dsi", dsi);
++	if (ret) {
++		if (ret != -EPROBE_DEFER)
++			dev_err(dev, "Failed to get interrupt: %d\n", ret);
++		return ret;
++	}
++
++	dsi->escape_clock = devm_clk_get(dev, "escape");
++	if (IS_ERR(dsi->escape_clock)) {
++		ret = PTR_ERR(dsi->escape_clock);
++		if (ret != -EPROBE_DEFER)
++			dev_err(dev, "Failed to get escape clock: %d\n", ret);
++		return ret;
++	}
++
++	dsi->pll_phy_clock = devm_clk_get(dev, "phy");
++	if (IS_ERR(dsi->pll_phy_clock)) {
++		ret = PTR_ERR(dsi->pll_phy_clock);
++		if (ret != -EPROBE_DEFER)
++			dev_err(dev, "Failed to get phy clock: %d\n", ret);
++		return ret;
++	}
++
++	dsi->pixel_clock = devm_clk_get(dev, "pixel");
++	if (IS_ERR(dsi->pixel_clock)) {
++		ret = PTR_ERR(dsi->pixel_clock);
++		if (ret != -EPROBE_DEFER)
++			dev_err(dev, "Failed to get pixel clock: %d\n", ret);
++		return ret;
++	}
++
++	/* The esc clock rate is supposed to always be 100Mhz. */
++	ret = clk_set_rate(dsi->escape_clock, 100 * 1000000);
++	if (ret) {
++		dev_err(dev, "Failed to set esc clock: %d\n", ret);
++		return ret;
++	}
++
++	ret = vc4_dsi_init_phy_clocks(dsi);
++	if (ret)
++		return ret;
++
++	if (dsi->port == 1)
++		vc4->dsi1 = dsi;
++
++	drm_encoder_init(drm, dsi->encoder, &vc4_dsi_encoder_funcs,
++			 DRM_MODE_ENCODER_DSI, NULL);
++	drm_encoder_helper_add(dsi->encoder, &vc4_dsi_encoder_helper_funcs);
++
++	dsi->connector = vc4_dsi_connector_init(drm, dsi);
++	if (IS_ERR(dsi->connector)) {
++		ret = PTR_ERR(dsi->connector);
++		goto err_destroy_encoder;
++	}
++
++	dsi->dsi_host.ops = &vc4_dsi_host_ops;
++	dsi->dsi_host.dev = dev;
++
++	mipi_dsi_host_register(&dsi->dsi_host);
++
++	dev_set_drvdata(dev, dsi);
++
++	pm_runtime_enable(dev);
++
++	return 0;
++
++err_destroy_encoder:
++	vc4_dsi_encoder_destroy(dsi->encoder);
++
++	return ret;
++}
++
++static void vc4_dsi_unbind(struct device *dev, struct device *master,
++			   void *data)
++{
++	struct drm_device *drm = dev_get_drvdata(master);
++	struct vc4_dev *vc4 = to_vc4_dev(drm);
++	struct vc4_dsi *dsi = dev_get_drvdata(dev);
++
++	pm_runtime_disable(dev);
++
++	vc4_dsi_connector_destroy(dsi->connector);
++	vc4_dsi_encoder_destroy(dsi->encoder);
++
++	mipi_dsi_host_unregister(&dsi->dsi_host);
++
++	clk_disable_unprepare(dsi->pll_phy_clock);
++	clk_disable_unprepare(dsi->escape_clock);
++
++	if (dsi->port == 1)
++		vc4->dsi1 = NULL;
++}
++
++static const struct component_ops vc4_dsi_ops = {
++	.bind   = vc4_dsi_bind,
++	.unbind = vc4_dsi_unbind,
++};
++
++static int vc4_dsi_dev_probe(struct platform_device *pdev)
++{
++	return component_add(&pdev->dev, &vc4_dsi_ops);
++}
++
++static int vc4_dsi_dev_remove(struct platform_device *pdev)
++{
++	component_del(&pdev->dev, &vc4_dsi_ops);
++	return 0;
++}
++
++struct platform_driver vc4_dsi_driver = {
++	.probe = vc4_dsi_dev_probe,
++	.remove = vc4_dsi_dev_remove,
 +	.driver = {
-+		.name = "raspberrypi-touchscreen",
-+		.of_match_table = rpi_touchscreen_of_match,
++		.name = "vc4_dsi",
++		.of_match_table = vc4_dsi_dt_match,
 +	},
-+	.probe = rpi_touchscreen_dsi_probe,
-+	.remove = rpi_touchscreen_dsi_remove,
-+	.shutdown = rpi_touchscreen_dsi_shutdown,
 +};
-+module_mipi_dsi_driver(rpi_touchscreen_driver);
-+
-+MODULE_AUTHOR("Eric Anholt <eric@anholt.net>");
-+MODULE_DESCRIPTION("Raspberry Pi 7-inch touchscreen driver");
-+MODULE_LICENSE("GPL v2");
 -- 
 2.11.0
