@@ -1,39 +1,40 @@
-From: rob.rice@broadcom.com (Rob (William) Rice)
-Date: Wed, 14 Dec 2016 10:00:22 -0500
-Subject: [PATCH 3/3] crypto: brcm: Add Broadcom SPU driver DT entry.
-In-Reply-To: <201612110810.BEVbRp0B%fengguang.wu@intel.com>
-References: <201612110810.BEVbRp0B%fengguang.wu@intel.com>
-Message-ID: <52897a59-f8e6-8df6-348d-c208f1b65575@broadcom.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Dec 2016 07:08:19 -0800
+Subject: [PATCHv6] support for AD5820 camera auto-focus coil
+In-Reply-To: <201612141438.16603@pali>
+References: <20160521054336.GA27123@amd>
+ <20160808080955.GA3182@valkosipuli.retiisi.org.uk>
+ <20160808214132.GB2946@xo-6d-61-c0.localdomain>
+ <201612141438.16603@pali>
+Message-ID: <20161214150819.GW4920@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I will rebase to Herbert's latest when I submit v3 to address Mark 
-Rutland's DT comments (and any others that come in).
+* Pali Roh?r <pali.rohar@gmail.com> [161214 05:38]:
+> On Monday 08 August 2016 23:41:32 Pavel Machek wrote:
+> > On Mon 2016-08-08 11:09:56, Sakari Ailus wrote:
+> > > On Fri, Aug 05, 2016 at 12:26:11PM +0200, Pavel Machek wrote:
+> > > > This adds support for AD5820 autofocus coil, found for example in
+> > > > Nokia N900 smartphone.
+> > > 
+> > > Thanks, Pavel!
+> > > 
+> > > Let's use V4L2_CID_FOCUS_ABSOLUTE, as is in the patch. If we get
+> > > something better in the future, we'll switch to that then.
+> > > 
+> > > I've applied this to ad5820 branch in my tree.
+> > 
+> > Thanks. If I understands things correctly, both DTS patch and this
+> > patch are waiting in your tree, so we should be good to go for 4.9
+> > (unless some unexpected problems surface)?
+> > 
+> > Best regards,
+> > 									Pavel
+> 
+> Was DTS patch merged into 4.9? At least I do not see updated that dts 
+> file omap3-n900.dts in linus tree...
 
-Rob
+If it's not in current mainline or next, it's off my radar so sounds
+like I've somehow missed it and needs resending..
 
-
-On 12/10/2016 7:14 PM, kbuild test robot wrote:
-> Hi Rob,
->
-> [auto build test ERROR on cryptodev/master]
-> [also build test ERROR on v4.9-rc8]
-> [cannot apply to next-20161209]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->
-> url:    https://github.com/0day-ci/linux/commits/Rob-Rice/crypto-brcm-DT-documentation-for-Broadcom-SPU-driver/20161202-010038
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/herbert/cryptodev-2.6.git master
-> config: arm64-defconfig (attached as .config)
-> compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->          wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->          chmod +x ~/bin/make.cross
->          # save the attached .config to linux build tree
->          make.cross ARCH=arm64
->
-> All errors (new ones prefixed by >>):
->
->>> ERROR: Input tree has errors, aborting (use -f to force output)
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Tony
