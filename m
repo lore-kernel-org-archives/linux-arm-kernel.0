@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Dec 2016 23:37:22 +0100
-Subject: [PATCH 15/39] ARM: dts: armada-388-rd: Correct license text
+Date: Wed, 14 Dec 2016 23:37:13 +0100
+Subject: [PATCH 06/39] ARM: dts: armada-370-netgear-rn104: Correct license text
 In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
 References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214223746.23066-16-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214223746.23066-7-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,20 +11,22 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
+Cc: Arnaud Ebalard <arno@natisbad.org>
 Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-Cc: Rafa? Mi?ecki <zajec5@gmail.com>
-Cc: Stefan Roese <sr@denx.de>
+Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-388-rd.dts | 10 +++++-----
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-388-rd.dts b/arch/arm/boot/dts/armada-388-rd.dts
-index dd3462ddb6b9..af82f275eac2 100644
---- a/arch/arm/boot/dts/armada-388-rd.dts
-+++ b/arch/arm/boot/dts/armada-388-rd.dts
-@@ -17,17 +17,17 @@
+diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+index 11565752b9f6..742129d53343 100644
+--- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
++++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+@@ -13,17 +13,17 @@
   *     published by the Free Software Foundation; either version 2 of the
   *     License, or (at your option) any later version.
   *
@@ -45,7 +47,7 @@ index dd3462ddb6b9..af82f275eac2 100644
   *     copy, modify, merge, publish, distribute, sublicense, and/or
   *     sell copies of the Software, and to permit persons to whom the
   *     Software is furnished to do so, subject to the following
-@@ -36,11 +36,11 @@
+@@ -32,11 +32,11 @@
   *     The above copyright notice and this permission notice shall be
   *     included in all copies or substantial portions of the Software.
   *
