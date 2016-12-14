@@ -1,52 +1,56 @@
 From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
-Date: Wed, 14 Dec 2016 18:12:33 -0500
-Subject: [PATCH 3/6] dt-bindings: bus: Add documentation for the Technologic
- Systems NBUS
+Date: Wed, 14 Dec 2016 18:12:35 -0500
+Subject: [PATCH 5/6] ARM: dts: TS-4600: add NBUS support
 In-Reply-To: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
 References: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
-Message-ID: <20161214231237.17496-4-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20161214231237.17496-6-sebastien.bourdelin@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for the Technologic Systems NBUS that is used
-to interface with peripherals in the FPGA of the TS-4600 SoM.
+This commit enables the NBUS on the TS-4600, using the ts-nbus driver.
 
 Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
 ---
- Documentation/devicetree/bindings/bus/ts-nbus.txt | 50 +++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/bus/ts-nbus.txt
+ arch/arm/boot/dts/imx28-ts4600-common.dtsi | 43 ++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/bus/ts-nbus.txt b/Documentation/devicetree/bindings/bus/ts-nbus.txt
-new file mode 100644
-index 0000000..2f777ee
---- /dev/null
-+++ b/Documentation/devicetree/bindings/bus/ts-nbus.txt
-@@ -0,0 +1,50 @@
-+Technologic Systems NBUS
+diff --git a/arch/arm/boot/dts/imx28-ts4600-common.dtsi b/arch/arm/boot/dts/imx28-ts4600-common.dtsi
+index 04bd5a5..b668933 100644
+--- a/arch/arm/boot/dts/imx28-ts4600-common.dtsi
++++ b/arch/arm/boot/dts/imx28-ts4600-common.dtsi
+@@ -44,6 +44,28 @@
+ 					fsl,pull-up = <MXS_PULL_DISABLE>;
+ 				};
+ 
++				nbus_pins: nbus_pins {
++					fsl,pinmux-ids = <
++						MX28_PAD_GPMI_D00__GPIO_0_0
++						MX28_PAD_GPMI_D01__GPIO_0_1
++						MX28_PAD_GPMI_D02__GPIO_0_2
++						MX28_PAD_GPMI_D03__GPIO_0_3
++						MX28_PAD_GPMI_D04__GPIO_0_4
++						MX28_PAD_GPMI_D05__GPIO_0_5
++						MX28_PAD_GPMI_D06__GPIO_0_6
++						MX28_PAD_GPMI_D07__GPIO_0_7
++						MX28_PAD_GPMI_CE0N__GPIO_0_16
++						MX28_PAD_GPMI_RDY1__GPIO_0_21
++						MX28_PAD_GPMI_RDN__GPIO_0_24
++						MX28_PAD_GPMI_WRN__GPIO_0_25
++						MX28_PAD_GPMI_ALE__GPIO_0_26
++					>;
++					fsl,drive-strength = <MXS_DRIVE_4mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_DISABLE>;
 +
-+The NBUS is a bus used to interface with peripherals in the Technologic
-+Systems FPGA on the TS-4600 SoM.
++				};
 +
-+Required properties :
-+ - compatible     : "technologic,ts-nbus", "simple-bus"
-+ - #address-cells : must be 1
-+ - #size-cells    : must be 0
-+ - pws            : The PWM pin connected to the clock line on the FPGA
-+ - data-gpios	  : The GPIO pin connected to the data line on the FPGA
-+ - csn-gpios	  : The GPIO pin connected to the csn line on the FPGA
-+ - txrx-gpios	  : The GPIO pin connected to the txrx line on the FPGA
-+ - strobe-gpios	  : The GPIO pin connected to the stobe line on the FPGA
-+ - ale-gpios	  : The GPIO pin connected to the ale line on the FPGA
-+ - rdy-gpios	  : The GPIO pin connected to the rdy line on the FPGA
-+
-+Child nodes:
-+
-+The NBUS node can contain zero or more child nodes representing peripherals
-+on the bus.
-+
-+Example:
-+
+ 			};
+ 		};
+ 
+@@ -75,4 +97,25 @@
+ 		};
+ 	};
+ 
 +	nbus {
 +		compatible = "technologic,ts-nbus", "simple-bus";
 +		pinctrl-0 = <&nbus_pins>;
@@ -66,12 +70,8 @@ index 0000000..2f777ee
 +		strobe-gpios = <&gpio0 25 GPIO_ACTIVE_HIGH>;
 +		ale-gpios    = <&gpio0 26 GPIO_ACTIVE_HIGH>;
 +		rdy-gpios    = <&gpio0 21 GPIO_ACTIVE_HIGH>;
-+
-+		wdt at 2a {
-+			compatible = "...";
-+
-+			/* ... */
-+		};
 +	};
++
+ };
 -- 
 2.10.2
