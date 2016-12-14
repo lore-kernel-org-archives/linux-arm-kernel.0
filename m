@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Dec 2016 00:57:31 +0100
-Subject: [PATCH 22/37] ARM: dts: imx6q-h100: Correct license text
+Date: Thu, 15 Dec 2016 00:57:34 +0100
+Subject: [PATCH 25/37] ARM: dts: imx6q-ts4900: Correct license text
 In-Reply-To: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
 References: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214235746.7108-23-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214235746.7108-26-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,16 +11,16 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
-Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Lucile Quirion <lucile.quirion@savoirfairelinux.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/imx6q-h100.dts | 10 +++++-----
+ arch/arm/boot/dts/imx6q-ts4900.dts | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-h100.dts b/arch/arm/boot/dts/imx6q-h100.dts
-index 65e66f994f88..8f9252889971 100644
---- a/arch/arm/boot/dts/imx6q-h100.dts
-+++ b/arch/arm/boot/dts/imx6q-h100.dts
+diff --git a/arch/arm/boot/dts/imx6q-ts4900.dts b/arch/arm/boot/dts/imx6q-ts4900.dts
+index 9b81ebc8b0d4..fab76f8cd076 100644
+--- a/arch/arm/boot/dts/imx6q-ts4900.dts
++++ b/arch/arm/boot/dts/imx6q-ts4900.dts
 @@ -10,17 +10,17 @@
   *     modify it under the terms of the GNU General Public License
   *     version 2 as published by the Free Software Foundation.
