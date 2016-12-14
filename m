@@ -1,34 +1,77 @@
 From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
-Date: Wed, 14 Dec 2016 18:12:31 -0500
-Subject: [PATCH 1/6] of: documentation: add bindings documentation for TS-4600
+Date: Wed, 14 Dec 2016 18:12:33 -0500
+Subject: [PATCH 3/6] dt-bindings: bus: Add documentation for the Technologic
+ Systems NBUS
 In-Reply-To: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
 References: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
-Message-ID: <20161214231237.17496-2-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20161214231237.17496-4-sebastien.bourdelin@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the documentation for the TS-4600 by Technologic Systems.
+Add binding documentation for the Technologic Systems NBUS that is used
+to interface with peripherals in the FPGA of the TS-4600 SoM.
 
 Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
 ---
- Documentation/devicetree/bindings/arm/technologic.txt | 5 +++++
- 1 file changed, 5 insertions(+)
+ Documentation/devicetree/bindings/bus/ts-nbus.txt | 50 +++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/bus/ts-nbus.txt
 
-diff --git a/Documentation/devicetree/bindings/arm/technologic.txt b/Documentation/devicetree/bindings/arm/technologic.txt
-index 33797ac..e9d6d65 100644
---- a/Documentation/devicetree/bindings/arm/technologic.txt
-+++ b/Documentation/devicetree/bindings/arm/technologic.txt
-@@ -1,6 +1,11 @@
- Technologic Systems Platforms Device Tree Bindings
- --------------------------------------------------
- 
-+TS-4600 is a System-on-Module based on the Freescale i.MX28 System-on-Chip.
-+It can be mounted on a carrier board providing additional peripheral connectors.
-+Required root node properties:
-+	- compatible = "technologic,imx28-ts4600", "fsl,imx28"
+diff --git a/Documentation/devicetree/bindings/bus/ts-nbus.txt b/Documentation/devicetree/bindings/bus/ts-nbus.txt
+new file mode 100644
+index 0000000..2f777ee
+--- /dev/null
++++ b/Documentation/devicetree/bindings/bus/ts-nbus.txt
+@@ -0,0 +1,50 @@
++Technologic Systems NBUS
 +
- TS-4800 board
- Required root node properties:
- 	- compatible = "technologic,imx51-ts4800", "fsl,imx51";
++The NBUS is a bus used to interface with peripherals in the Technologic
++Systems FPGA on the TS-4600 SoM.
++
++Required properties :
++ - compatible     : "technologic,ts-nbus", "simple-bus"
++ - #address-cells : must be 1
++ - #size-cells    : must be 0
++ - pws            : The PWM pin connected to the clock line on the FPGA
++ - data-gpios	  : The GPIO pin connected to the data line on the FPGA
++ - csn-gpios	  : The GPIO pin connected to the csn line on the FPGA
++ - txrx-gpios	  : The GPIO pin connected to the txrx line on the FPGA
++ - strobe-gpios	  : The GPIO pin connected to the stobe line on the FPGA
++ - ale-gpios	  : The GPIO pin connected to the ale line on the FPGA
++ - rdy-gpios	  : The GPIO pin connected to the rdy line on the FPGA
++
++Child nodes:
++
++The NBUS node can contain zero or more child nodes representing peripherals
++on the bus.
++
++Example:
++
++	nbus {
++		compatible = "technologic,ts-nbus", "simple-bus";
++		pinctrl-0 = <&nbus_pins>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pwms = <&pwm 2 83>;
++		data-gpios   = <&gpio0 0 GPIO_ACTIVE_HIGH
++				&gpio0 1 GPIO_ACTIVE_HIGH
++				&gpio0 2 GPIO_ACTIVE_HIGH
++				&gpio0 3 GPIO_ACTIVE_HIGH
++				&gpio0 4 GPIO_ACTIVE_HIGH
++				&gpio0 5 GPIO_ACTIVE_HIGH
++				&gpio0 6 GPIO_ACTIVE_HIGH
++				&gpio0 7 GPIO_ACTIVE_HIGH>;
++		csn-gpios    = <&gpio0 16 GPIO_ACTIVE_HIGH>;
++		txrx-gpios   = <&gpio0 24 GPIO_ACTIVE_HIGH>;
++		strobe-gpios = <&gpio0 25 GPIO_ACTIVE_HIGH>;
++		ale-gpios    = <&gpio0 26 GPIO_ACTIVE_HIGH>;
++		rdy-gpios    = <&gpio0 21 GPIO_ACTIVE_HIGH>;
++
++		wdt at 2a {
++			compatible = "...";
++
++			/* ... */
++		};
++	};
 -- 
 2.10.2
