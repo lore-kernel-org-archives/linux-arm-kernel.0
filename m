@@ -1,122 +1,77 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Wed, 14 Dec 2016 20:02:57 +0100
-Subject: [PATCH v4 00/12] mmc: Add support to Marvell Xenon SD Host
- Controller
-In-Reply-To: <CAPv3WKeE_2gMn12MXraoUmDEJhi307mGuc4BgDYpethKNsMqRQ@mail.gmail.com>
-References: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
- <CAPv3WKeE_2gMn12MXraoUmDEJhi307mGuc4BgDYpethKNsMqRQ@mail.gmail.com>
-Message-ID: <CAPv3WKe9OZv_q-vJovcArFV+OdjV9PavS2cUmhikY-L++e3okA@mail.gmail.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Wed, 14 Dec 2016 21:00:50 +0200
+Subject: [PATCH] i2c: designware: add reset interface
+In-Reply-To: <20161213203457.GB2889@katana>
+References: <1479789700-19532-1-git-send-email-zhangfei.gao@linaro.org>
+ <20161213203457.GB2889@katana>
+Message-ID: <1481742050.9552.5.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resend in plain text, sorry for noise.
+On Tue, 2016-12-13 at 21:34 +0100, Wolfram Sang wrote:
+> On Tue, Nov 22, 2016 at 12:41:40PM +0800, Zhangfei Gao wrote:
+> > Some platforms like hi3660 need do reset first to allow accessing
+> > registers
+> > 
+> > Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> 
+> Adding designware maintainers to CC...
+> 
+> > ---
+> > ?drivers/i2c/busses/i2c-designware-core.h????| 1 +
+> > ?drivers/i2c/busses/i2c-designware-platdrv.c | 5 +++++
+> > ?2 files changed, 6 insertions(+)
+> > 
+> > diff --git a/drivers/i2c/busses/i2c-designware-core.h
+> > b/drivers/i2c/busses/i2c-designware-core.h
+> > index 0d44d2a..94b14fa 100644
+> > --- a/drivers/i2c/busses/i2c-designware-core.h
+> > +++ b/drivers/i2c/busses/i2c-designware-core.h
+> > @@ -80,6 +80,7 @@ struct dw_i2c_dev {
+> > ?	void __iomem		*base;
+> > ?	struct completion	cmd_complete;
+> > ?	struct clk		*clk;
+> > +	struct reset_control	*rst;
+> > ?	u32			(*get_clk_rate_khz) (struct
+> > dw_i2c_dev *dev);
+> > ?	struct dw_pci_controller *controller;
+> > ?	int			cmd_err;
+> > diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c
+> > b/drivers/i2c/busses/i2c-designware-platdrv.c
+> > index 0b42a12..fd80e58 100644
+> > --- a/drivers/i2c/busses/i2c-designware-platdrv.c
+> > +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+> > @@ -38,6 +38,7 @@
+> > ?#include <linux/pm_runtime.h>
+> > ?#include <linux/property.h>
+> > ?#include <linux/io.h>
+> > +#include <linux/reset.h>
+> > ?#include <linux/slab.h>
+> > ?#include <linux/acpi.h>
+> > ?#include <linux/platform_data/i2c-designware.h>
+> > @@ -176,6 +177,10 @@ static int dw_i2c_plat_probe(struct
+> > platform_device *pdev)
+> > ?	dev->irq = irq;
+> > ?	platform_set_drvdata(pdev, dev);
+> > ?
+> > +	dev->rst = devm_reset_control_get(&pdev->dev, NULL);
+> > +	if (!IS_ERR(dev->rst))
+> > +		reset_control_reset(dev->rst);
 
-2016-12-14 20:02 GMT+01:00 Marcin Wojtas <mw@semihalf.com>:
-> Hi Gregory,
->
-> Checked a3700 and a7k (both interfaces, CP - one after changing to use eMMC
-> variant in DT). Everything works fine. You can add:
->
-> Tested-by: Marcin Wojtas <mw@semihalf.com>
->
-> Best regards,
-> Marcin
->
-> 2016-12-13 18:48 GMT+01:00 Gregory CLEMENT
-> <gregory.clement@free-electrons.com>:
->>
->> Hello,
->>
->> This the forth version of the series adding support for the SDHCI
->> Xenon controller. It can be currently found on the Armada 37xx and the
->> Armada 7K/8K but will be also used in more Marvell SoC (and not only
->> the mvebu ones actually).
->>
->> v3 -> v4:
->> For this version a few change have been done:
->> - fixes 2 bug  reported by kbuild-bot
->>   - remove extra of_node_put()
->>   - convert 0 in false for function returning boolean
->>
->> - add a device tree node for the sdhci controller present on the CP
->>   master for A7K/A8K. It also led to rename the sdhci0 node on AP to
->>   ap_sdhci0 to make a distinction with the one present on CP master.
->>
->> v2 -> v3
->> I think that now most (if not all) the remarks had been taking into
->> account since the second version. According to Ziji Hu, here are the
->> following changes:
->> " Changes in V3:
->>   Adjust and improve Xenon DT bindings. Move some caps setting from driver
->> into
->>   DT. Use mmc-card sub-node to represent eMMC type.
->>   Remove PHY Sampling Fixed Delay Line scan in lower speed mode.
->>   Improve Xenon probe and ->init_card() functions.
->>   Export sdhci_enable_sdio_irq() and implement own SDIO IRQ control.
->>   Split PHY patch into two smaller patches.
->>   Temporarily remove AXI clock before its implementation is improved."
->>
->> Besides this changes I also
->> - Removed the sdhci-xenon-phy.h and moved its content in the
->> shc-xenon-phy.c file.
->> - Fixed the tuning-count usage
->> - Managed the error case for clk_prepare_enable
->>
->> For the record the change from v1 was:
->> " Changes in V2:
->>   rebase on v4.9-rc2.
->>   Re-write Xenon bindings. Ajust Xenon DT property naming.
->>   Add a new DT property to indicate eMMC card type, instead of using
->>   variable card_candidate.
->>   Clear quirks SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12 in Xenon platform data
->>   Add support to HS400 retuning."
->>
->> Thanks,
->>
->> Gregory
->>
->> Gregory CLEMENT (3):
->>   arm64: dts: marvell: add eMMC support for Armada 37xx
->>   arm64: dts: marvell: add sdhci support for Armada 7K/8K
->>   arm64: configs: enable SDHCI driver for Xenon
->>
->> Hu Ziji (9):
->>   mmc: sdhci: Export sdhci_set_ios() from sdhci.c
->>   mmc: sdhci: Export sdhci_start_signal_voltage_switch() in sdhci.c
->>   mmc: sdhci: Export sdhci_execute_tuning() in sdhci.c
->>   mmc: sdhci: Export sdhci_enable_sdio_irq() from sdhci.c
->>   MAINTAINERS: add entry for Marvell Xenon MMC Host Controller drivers
->>   dt: bindings: Add bindings for Marvell Xenon SD Host Controller
->>   mmc: sdhci-xenon: Add Marvell Xenon SDHC core functionality
->>   mmc: sdhci-xenon: Add support to PHYs of Marvell Xenon SDHC.
->>   mmc: sdhci-xenon: Add SOC PHY PAD voltage control
->>
->>  Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt | 197 ++-
->>  MAINTAINERS                                                   |   7 +-
->>  arch/arm64/boot/dts/marvell/armada-3720-db.dts                |  17 +-
->>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi                  |  11 +-
->>  arch/arm64/boot/dts/marvell/armada-7040-db.dts                |  14 +-
->>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi                 |   9 +-
->>  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi          |  10 +-
->>  arch/arm64/configs/defconfig                                  |   1 +-
->>  drivers/mmc/host/Kconfig                                      |   9 +-
->>  drivers/mmc/host/Makefile                                     |   3 +-
->>  drivers/mmc/host/sdhci-xenon-phy.c                            | 908
->> +++++++-
->>  drivers/mmc/host/sdhci-xenon.c                                | 615
->> +++++-
->>  drivers/mmc/host/sdhci-xenon.h                                | 111 +-
->>  drivers/mmc/host/sdhci.c                                      |  14 +-
->>  drivers/mmc/host/sdhci.h                                      |   5 +-
->>  15 files changed, 1926 insertions(+), 5 deletions(-)
->>  create mode 100644
->> Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
->>  create mode 100644 drivers/mmc/host/sdhci-xenon-phy.c
->>  create mode 100644 drivers/mmc/host/sdhci-xenon.c
->>  create mode 100644 drivers/mmc/host/sdhci-xenon.h
->>
->> base-commit: 9fe68cad6e74967b88d0c6aeca7d9cd6b6e91942
->> --
->> git-series 0.9.1
->
->
+Do we care about EPROBE_DEFER?
+
+Perhaps on error path we need to assert it.
+
+And I guess it should be devm_reset_control_get_optional().
+
+> > +
+> > ?	/* fast mode by default because of legacy reasons */
+> > ?	dev->clk_freq = 400000;
+> > ?
+> > --?
+> > 2.7.4
+> > 
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
