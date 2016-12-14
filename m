@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Dec 2016 23:46:17 +0100
-Subject: [PATCH 1/4] ARM64: dts: marvell/armada-371x: Correct license text
+Date: Wed, 14 Dec 2016 23:46:19 +0100
+Subject: [PATCH 3/4] ARM64: dts: marvell/armada-372x: Correct license text
 In-Reply-To: <20161214224620.23830-1-alexandre.belloni@free-electrons.com>
 References: <20161214224620.23830-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214224620.23830-2-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214224620.23830-4-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,15 +11,16 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
+Cc: Andreas F?rber <afaerber@suse.de>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-371x.dtsi | 10 +++++-----
+ arch/arm64/boot/dts/marvell/armada-372x.dtsi | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-371x.dtsi b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
-index c9e5325b8ac3..11226f7b9ed9 100644
---- a/arch/arm64/boot/dts/marvell/armada-371x.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
+diff --git a/arch/arm64/boot/dts/marvell/armada-372x.dtsi b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
+index 5120296596c2..59d7557d3b1b 100644
+--- a/arch/arm64/boot/dts/marvell/armada-372x.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
 @@ -16,17 +16,17 @@
   *     published by the Free Software Foundation; either version 2 of the
   *     License, or (at your option) any later version.
