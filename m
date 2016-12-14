@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Dec 2016 23:37:17 +0100
-Subject: [PATCH 10/39] ARM: dts: armada-375-db: Correct license text
+Date: Wed, 14 Dec 2016 23:37:21 +0100
+Subject: [PATCH 14/39] ARM: dts: armada-388-db: Correct license text
 In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
 References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214223746.23066-11-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214223746.23066-15-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,19 +12,20 @@ multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
 Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Cc: Marcin Wojtas <mw@semihalf.com>
 Cc: Rafa? Mi?ecki <zajec5@gmail.com>
+Cc: Stefan Roese <sr@denx.de>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-375-db.dts | 10 +++++-----
+ arch/arm/boot/dts/armada-388-db.dts | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
-index cded5f0a262d..6bbe3a35810d 100644
---- a/arch/arm/boot/dts/armada-375-db.dts
-+++ b/arch/arm/boot/dts/armada-375-db.dts
-@@ -17,17 +17,17 @@
+diff --git a/arch/arm/boot/dts/armada-388-db.dts b/arch/arm/boot/dts/armada-388-db.dts
+index de26c762239c..1ac923826445 100644
+--- a/arch/arm/boot/dts/armada-388-db.dts
++++ b/arch/arm/boot/dts/armada-388-db.dts
+@@ -16,17 +16,17 @@
   *     published by the Free Software Foundation; either version 2 of the
   *     License, or (at your option) any later version.
   *
@@ -45,7 +46,7 @@ index cded5f0a262d..6bbe3a35810d 100644
   *     copy, modify, merge, publish, distribute, sublicense, and/or
   *     sell copies of the Software, and to permit persons to whom the
   *     Software is furnished to do so, subject to the following
-@@ -36,11 +36,11 @@
+@@ -35,11 +35,11 @@
   *     The above copyright notice and this permission notice shall be
   *     included in all copies or substantial portions of the Software.
   *
