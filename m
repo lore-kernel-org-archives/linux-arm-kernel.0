@@ -1,53 +1,144 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Dec 2016 23:52:24 +0000
-Subject: [PATCH] arm: dt: Initialize boot_command_line from
- CONFIG_CMDLINE in case DT does not provide /chosen/bootargs
-In-Reply-To: <1481749963-8664-1-git-send-email-pali.rohar@gmail.com>
-References: <1481749963-8664-1-git-send-email-pali.rohar@gmail.com>
-Message-ID: <20161214235224.GH14217@n2100.armlinux.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 15 Dec 2016 00:57:10 +0100
+Subject: [PATCH 01/37] ARM: dts: imx6dl-aristainetos2: Correct license text
+In-Reply-To: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
+References: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214235746.7108-2-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2016 at 10:12:43PM +0100, Pali Roh?r wrote:
-> Commit 008a2ebcd677 ("ARM: dts: omap3: Remove skeleton.dtsi usage") broke
-> support for setting cmdline on Nokia N900 via CONFIG_CMDLINE.
-> 
-> It is because arm code booted in DT mode parse cmdline only via function
-> early_init_dt_scan_chosen() and that function does not fill variable
-> boot_command_line when DTB does not contain /chosen entry. It is called
-> from function early_init_dt_scan_nodes() in setup_machine_fdt().
-> 
-> This patch fixes it by explicitly filling boot_command_line in function
-> setup_machine_fdt() after calling early_init_dt_scan_nodes() in case
-> boot_command_line still remains empty.
+The license test has been mangled at some point then copy pasted across
+multiple files. Restore it to what it should be.
+Note that this is not intended as a license change.
 
-This looks like a hack.
+Cc: Dong Aisheng <aisheng.dong@freescale.com>
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Heiko Schocher <hs@denx.de>
+Cc: Rafa? Mi?ecki <zajec5@gmail.com>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/imx6dl-aristainetos2_4.dts | 10 +++++-----
+ arch/arm/boot/dts/imx6dl-aristainetos2_7.dts | 10 +++++-----
+ arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi | 10 +++++-----
+ 3 files changed, 15 insertions(+), 15 deletions(-)
 
-First, the matter of the ATAGs compatibility.  The decompressor relies on
-there being a pre-existing /chosen node to insert the command line and
-other parameters into.  If we've dropped it (by dropping skeleton.dtsi)
-then we've just regressed more than just N900 - the decompressor won't
-be able to merge the ATAGs into the concatenated FDT.
-
-Second, CONFIG_CMDLINE has never been in place on DT systems - it's
-something atags_parse.c has been dealing with which isn't involved on
-DT.  For DT, we expect the command line to be passed in.
-
-Now, given that, I find your commit message rather fishy.  You seem to
-be claiming that CONFIG_CMDLINE used to work, but the fact is, we've
-never had it working on device tree systems.
-
-Instead, what I think was going on is that the bug you're seeing is
-that the removal of skeleton.dtsi results in the /chosen node being
-absent, which in turn prevents the decompressor picking the various
-parameters out of the ATAGs and dropping them into the DT blob.
-
-That, to me, sounds like a regression, and the fix is not to hack
-support for an unrelated feature, but to fix the original problem -
-and I think in this case, it's reasonable to ask for the offending
-commit to be reverted.
-
+diff --git a/arch/arm/boot/dts/imx6dl-aristainetos2_4.dts b/arch/arm/boot/dts/imx6dl-aristainetos2_4.dts
+index bb92f309c191..0677625463d6 100644
+--- a/arch/arm/boot/dts/imx6dl-aristainetos2_4.dts
++++ b/arch/arm/boot/dts/imx6dl-aristainetos2_4.dts
+@@ -12,17 +12,17 @@
+  *     modify it under the terms of the GNU General Public License
+  *     version 2 as published by the Free Software Foundation.
+  *
+- *     This file is distributed in the hope that it will be useful
++ *     This file is distributed in the hope that it will be useful,
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+  *
+- * Or, alternatively
++ * Or, alternatively,
+  *
+  *  b) Permission is hereby granted, free of charge, to any person
+  *     obtaining a copy of this software and associated documentation
+  *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use
++ *     restriction, including without limitation the rights to use,
+  *     copy, modify, merge, publish, distribute, sublicense, and/or
+  *     sell copies of the Software, and to permit persons to whom the
+  *     Software is furnished to do so, subject to the following
+@@ -31,11 +31,11 @@
+  *     The above copyright notice and this permission notice shall be
+  *     included in all copies or substantial portions of the Software.
+  *
+- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
+diff --git a/arch/arm/boot/dts/imx6dl-aristainetos2_7.dts b/arch/arm/boot/dts/imx6dl-aristainetos2_7.dts
+index 3d5ad2cc7e22..805b1318b7f7 100644
+--- a/arch/arm/boot/dts/imx6dl-aristainetos2_7.dts
++++ b/arch/arm/boot/dts/imx6dl-aristainetos2_7.dts
+@@ -12,17 +12,17 @@
+  *     modify it under the terms of the GNU General Public License
+  *     version 2 as published by the Free Software Foundation.
+  *
+- *     This file is distributed in the hope that it will be useful
++ *     This file is distributed in the hope that it will be useful,
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+  *
+- * Or, alternatively
++ * Or, alternatively,
+  *
+  *  b) Permission is hereby granted, free of charge, to any person
+  *     obtaining a copy of this software and associated documentation
+  *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use
++ *     restriction, including without limitation the rights to use,
+  *     copy, modify, merge, publish, distribute, sublicense, and/or
+  *     sell copies of the Software, and to permit persons to whom the
+  *     Software is furnished to do so, subject to the following
+@@ -31,11 +31,11 @@
+  *     The above copyright notice and this permission notice shall be
+  *     included in all copies or substantial portions of the Software.
+  *
+- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
+diff --git a/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi b/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
+index 7fff02c406f2..6450699859ce 100644
+--- a/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
+@@ -12,17 +12,17 @@
+  *     modify it under the terms of the GNU General Public License
+  *     version 2 as published by the Free Software Foundation.
+  *
+- *     This file is distributed in the hope that it will be useful
++ *     This file is distributed in the hope that it will be useful,
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+  *
+- * Or, alternatively
++ * Or, alternatively,
+  *
+  *  b) Permission is hereby granted, free of charge, to any person
+  *     obtaining a copy of this software and associated documentation
+  *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use
++ *     restriction, including without limitation the rights to use,
+  *     copy, modify, merge, publish, distribute, sublicense, and/or
+  *     sell copies of the Software, and to permit persons to whom the
+  *     Software is furnished to do so, subject to the following
+@@ -31,11 +31,11 @@
+  *     The above copyright notice and this permission notice shall be
+  *     included in all copies or substantial portions of the Software.
+  *
+- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.10.2
