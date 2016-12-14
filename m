@@ -1,53 +1,74 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 14 Dec 2016 13:45:30 +0100
-Subject: [PATCH linux v1 0/4] Seven segment display support
-In-Reply-To: <1481702104-8617-1-git-send-email-jaghu@google.com>
-References: <1481702104-8617-1-git-send-email-jaghu@google.com>
-Message-ID: <20161214134530.2bd54a4e@free-electrons.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 14 Dec 2016 14:46:04 +0200
+Subject: [PATCH] ARM: dts: dra72-evm-tps65917: Add voltage supplies to
+ usb_phy, mmc, dss
+In-Reply-To: <972859e0-30ff-8170-d5d3-af9b8591276b@ti.com>
+References: <20161214085703.506-1-lokeshvutla@ti.com>
+ <2bb73170-dbb5-01a3-5b3a-4d5d9414e3a9@ti.com>
+ <972859e0-30ff-8170-d5d3-af9b8591276b@ti.com>
+Message-ID: <0ebffa34-c095-46f7-431e-a8886b33a468@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, 13 Dec 2016 23:55:00 -0800, Jaghathiswari Rankappagounder
-Natarajan wrote:
-
-> Documentation for the binding which provides an interface for adding clock,
-> data and clear signal GPIO lines to control seven segment display.
+On 14/12/16 14:35, Lokesh Vutla wrote:
 > 
-> The platform device driver provides an API for displaying on two 7-segment
-> displays, and implements the required bit-banging. The hardware assumed is
-> 74HC164 wired to two 7-segment displays.
 > 
-> The character device driver implements the user-space API for letting a user
-> write to two 7-segment displays including any conversion methods necessary
-> to map the user input to two 7-segment displays.
+> On Wednesday 14 December 2016 04:30 PM, Roger Quadros wrote:
+>> Lokesh,
+>>
+>> On 14/12/16 10:57, Lokesh Vutla wrote:
+>>> Commit 5d080aa30681 ("ARM: dts: dra72: Add separate dtsi for tps65917")
+>>> added a separate dtsi for dra72-evm-tps65917 moving all the voltage supplies
+>>> to this file. But it missed adding voltage supplies to usb_phy, mmc,
+>>> dss and deleted from dra72-evm-common.dtsi. Adding the voltage supply
+>>> phandles to these nodes in dra72-evm-tps65917.dtsi
+>>>
+>>> Fixes: 5d080aa30681 ("ARM: dts: dra72: Add separate dtsi for tps65917")
+>>> Reported-by: Carlos Hernandez <ceh@ti.com>
+>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>>> ---
+>>> Logs:
+>>> - DRA72-evm revC: http://pastebin.ubuntu.com/23627665/ 
+>>> - DRA72-evm revB: http://pastebin.ubuntu.com/23627658/
+>>>  arch/arm/boot/dts/dra72-evm-tps65917.dtsi | 16 ++++++++++++++++
+>>>  1 file changed, 16 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/dra72-evm-tps65917.dtsi b/arch/arm/boot/dts/dra72-evm-tps65917.dtsi
+>>> index ee6dac44edf1..e6df676886c0 100644
+>>> --- a/arch/arm/boot/dts/dra72-evm-tps65917.dtsi
+>>> +++ b/arch/arm/boot/dts/dra72-evm-tps65917.dtsi
+>>> @@ -132,3 +132,19 @@
+>>>  		ti,palmas-long-press-seconds = <6>;
+>>>  	};
+>>>  };
+>>> +
+>>> +&usb2_phy1 {
+>>> +	phy-supply = <&ldo4_reg>;
+>>> +};
+>>> +
+>>> +&usb2_phy2 {
+>>> +	phy-supply = <&ldo4_reg>;
+>>> +};
+>>> +
+>>> +&dss {
+>>> +	vdda_video-supply = <&ldo5_reg>;
+>>> +};
+>>> +
+>>> +&mmc1 {
+>>> +	vmmc_aux-supply = <&ldo1_reg>;
+>>> +};
+>>>
+>>
+>> Are you sure that all future users of dra72-evm-tps65917.dtsi will use this same configuration?
+>> If not I'd rather put this in the board dts files.
 > 
-> Adding clock, data and clear signal GPIO lines in the devicetree to control
-> seven segment display on zaius platform.
-> 
-> The platform driver matches on the device tree node; the platform driver also
-> initializes the character device.
-> 
-> Tested that the seven segment display works properly by writing to the
-> character device file on a EVB AST2500 board which also has 74HC164 wired
-> to two 7-segment displays.
+> hmm..This debate already happened when creating dra72-evm-tps65917 file
+> and concluded that all the common regulator stuff on dra72 evm revA,B,C
+> should go in this file. Any new board which is not similar to dra72-evm
+> will not be using this file.
 
-FWIW, I proposed a driver for seven segment displays back in 2013:
+OK, then it is fine. Thanks for clarifying.
 
-   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/139986.html
-
-And the feedback from Greg KH was: we don't need a driver for that, do
-it from userspace. See:
-
-   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/139992.html
-
-So: good luck :-)
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+cheers,
+-roger
