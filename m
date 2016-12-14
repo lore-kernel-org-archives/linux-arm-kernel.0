@@ -1,35 +1,39 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Wed, 14 Dec 2016 15:22:28 +0100
-Subject: [PATCH] clk: stm32f4: Use CLK_OF_DECLARE_DRIVER initialization method
-Message-ID: <1481725348-860-1-git-send-email-gabriel.fernandez@st.com>
+Date: Wed, 14 Dec 2016 15:23:17 +0100
+Subject: [PATCH] dt-bindings: mfd: stm32f429: Add QSPI & DSI constants into DT
+ include file
+Message-ID: <1481725397-941-1-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-Clock and reset controller use same compatible strings (same IP).
-
-Since commit 989eafd0b609 ("clk: core: Avoid double initialization of
-clocks") the OF core flags clock controllers registered with the
-CLK_OF_DECLARE() macro as OF_POPULATED, so platform devices with the same
-compatible string will not be registered.
+It will be used by clock and reset drivers, and DT bindings.
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- drivers/clk/clk-stm32f4.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ include/dt-bindings/mfd/stm32f4-rcc.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-index 11174a5..0f5ab9b 100644
---- a/drivers/clk/clk-stm32f4.c
-+++ b/drivers/clk/clk-stm32f4.c
-@@ -1325,5 +1325,5 @@ static void __init stm32f4_rcc_init(struct device_node *np)
- 	kfree(clks);
- 	iounmap(base);
- }
--CLK_OF_DECLARE(stm32f42xx_rcc, "st,stm32f42xx-rcc", stm32f4_rcc_init);
--CLK_OF_DECLARE(stm32f46xx_rcc, "st,stm32f469-rcc", stm32f4_rcc_init);
-+CLK_OF_DECLARE_DRIVER(stm32f42xx_rcc, "st,stm32f42xx-rcc", stm32f4_rcc_init);
-+CLK_OF_DECLARE_DRIVER(stm32f46xx_rcc, "st,stm32f469-rcc", stm32f4_rcc_init);
+diff --git a/include/dt-bindings/mfd/stm32f4-rcc.h b/include/dt-bindings/mfd/stm32f4-rcc.h
+index e98942d..315f6c3 100644
+--- a/include/dt-bindings/mfd/stm32f4-rcc.h
++++ b/include/dt-bindings/mfd/stm32f4-rcc.h
+@@ -40,6 +40,7 @@
+ 
+ /* AHB3 */
+ #define STM32F4_RCC_AHB3_FMC	0
++#define STM32F4_RCC_AHB3_QSPI	1
+ 
+ #define STM32F4_AHB3_RESET(bit)	(STM32F4_RCC_AHB3_##bit + (0x18 * 8))
+ #define STM32F4_AHB3_CLOCK(bit)	(STM32F4_RCC_AHB3_##bit + (0x38 * 8))
+@@ -91,6 +92,7 @@
+ #define STM32F4_RCC_APB2_SPI6	21
+ #define STM32F4_RCC_APB2_SAI1	22
+ #define STM32F4_RCC_APB2_LTDC	26
++#define STM32F4_RCC_APB2_DSI	27
+ 
+ #define STM32F4_APB2_RESET(bit)	(STM32F4_RCC_APB2_##bit + (0x24 * 8))
+ #define STM32F4_APB2_CLOCK(bit)	(STM32F4_RCC_APB2_##bit + (0x44 * 8))
 -- 
 1.9.1
