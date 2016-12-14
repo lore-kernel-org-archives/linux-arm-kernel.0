@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Dec 2016 00:57:29 +0100
-Subject: [PATCH 20/37] ARM: dts: imx6*-sabrelite: Correct license text
+Date: Thu, 15 Dec 2016 00:57:22 +0100
+Subject: [PATCH 13/37] ARM: dts: imx6q-bx50v3: Correct license text
 In-Reply-To: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
 References: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214235746.7108-21-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214235746.7108-14-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,73 +11,18 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
-Cc: Dong Aisheng <aisheng.dong@freescale.com>
-Cc: Eric Nelson <eric.nelson@boundarydevices.com>
-Cc: Gary Bisson <gary.bisson@boundarydevices.com>
-Cc: Hui Wang <jason77.wang@gmail.com>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Marek Vasut <marex@denx.de>
-Cc: Markus Pargmann <mpa@pengutronix.de>
-Cc: Nicolin Chen <b42378@freescale.com>
-Cc: Peter Seiderer <ps.report@gmx.net>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Rafa? Mi?ecki <zajec5@gmail.com>
-Cc: Richard Zhao <richard.zhao@freescale.com>
-Cc: Richard Zhu <r65037@freescale.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Troy Kisky <troy.kisky@boundarydevices.com>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+Cc: Akshay Bhat <akshay.bhat@timesys.com>
+Cc: Justin Waters <justin.waters@timesys.com>
+Cc: Ken Lin <ken.lin@advantech.com.tw>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/imx6q-sabrelite.dts    | 10 +++++-----
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 10 +++++-----
- 2 files changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/imx6q-bx50v3.dtsi | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index 66d10d8d534c..02a7cdfd57c9 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -11,17 +11,17 @@
-  *     modify it under the terms of the GNU General Public License
-  *     version 2 as published by the Free Software Foundation.
-  *
-- *     This file is distributed in the hope that it will be useful
-+ *     This file is distributed in the hope that it will be useful,
-  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  *     GNU General Public License for more details.
-  *
-- * Or, alternatively
-+ * Or, alternatively,
-  *
-  *  b) Permission is hereby granted, free of charge, to any person
-  *     obtaining a copy of this software and associated documentation
-  *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use
-+ *     restriction, including without limitation the rights to use,
-  *     copy, modify, merge, publish, distribute, sublicense, and/or
-  *     sell copies of the Software, and to permit persons to whom the
-  *     Software is furnished to do so, subject to the following
-@@ -30,11 +30,11 @@
-  *     The above copyright notice and this permission notice shall be
-  *     included in all copies or substantial portions of the Software.
-  *
-- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
-diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-index 81dd6cd1937d..f016fad68d0a 100644
---- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+diff --git a/arch/arm/boot/dts/imx6q-bx50v3.dtsi b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
+index e4a415fd899b..88cbad098e2b 100644
+--- a/arch/arm/boot/dts/imx6q-bx50v3.dtsi
++++ b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
 @@ -11,17 +11,17 @@
   *     modify it under the terms of the GNU General Public License
   *     version 2 as published by the Free Software Foundation.
