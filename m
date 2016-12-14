@@ -1,161 +1,25 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 14 Dec 2016 19:57:11 +0100 (CET)
-Subject: mmc: core: complete/wait_for_completion performance
-In-Reply-To: <1481706204.3994.4.camel@embedded.rocks>
-References: <1479644869.2653.3.camel@embedded.rocks>
- <585759233.283839.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
- <1479652929.2841.1.camel@embedded.rocks>
- <187975187.249177.bccdc17e-e9c6-48c2-aeaf-3b81f1b61ec7.open-xchange@email.1und1.de>
- <1479669034.1975.1.camel@embedded.rocks>
- <1198138554.59982.63209ba1-8fb4-4a13-9ee0-f746a192f4c7.open-xchange@email.1und1.de>
- <1481095953.17027.0.camel@embedded.rocks>
- <123257138.400786.e58aee3b-9fc2-4b39-a030-c2409c5b92fc.open-xchange@email.1und1.de>
- <1481706204.3994.4.camel@embedded.rocks>
-Message-ID: <962480933.163666.1481741832090@email.1und1.de>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Wed, 14 Dec 2016 18:58:05 +0000
+Subject: [PATCH v3 2/2] FPGA: Add TS-7300 FPGA manager
+In-Reply-To: <cf772070-73d9-fa07-b2b9-e0038832b7be@gmail.com>
+References: <20161214023553.9377-1-f.fainelli@gmail.com>
+ <20161214023553.9377-3-f.fainelli@gmail.com>
+ <CAAtXAHe6q2jRWXt+KUWCFnP5j21E3x=P+4wjZTOaSSB_pX71Eg@mail.gmail.com>
+ <cf772070-73d9-fa07-b2b9-e0038832b7be@gmail.com>
+Message-ID: <SN1PR0101MB1565A30EFE8AFEB319B84124D09A0@SN1PR0101MB1565.prod.exchangelabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi J?rg,
+On Wednesday, December 14, 2016 11:55 AM, Florian Fainelli wrote:
+> My understanding is that, yes, this triggers the final write. You are
+> right that ts73xx_fpga_write() can be called multiple times. It sounds
+> like what my write_complete function does right now is just return that
+> we successfully completed the bistream write, but this snippet that you
+> are quoting should actually be moved into write_complete.
 
-> J?rg Krause <joerg.krause@embedded.rocks> hat am 14. Dezember 2016 um 10:03 geschrieben:
-> 
-> 
-> Hi Stefan,
-> 
-> On Wed, 2016-12-07 at 20:23 +0100, Stefan Wahren wrote:
-> > Hi J?rg,
-> > 
-> > > J?rg Krause <joerg.krause@embedded.rocks> hat am 7. Dezember 2016
-> > > um 08:32
-> > > geschrieben:
-> > > 
-> > > 
-> > > Hit Stefan,
-> > > 
-> > > On Sat, 2016-11-26 at 20:10 +0100, Stefan Wahren wrote:
-> > > > Hi J?rg,
-> > > > 
-> > > > > J?rg Krause <joerg.krause@embedded.rocks> hat am 20. November
-> > > > > 2016
-> > > > > um 20:10
-> > > > > geschrieben:
-> > > > > 
-> > > > > 
-> > > > > On Sun, 2016-11-20 at 16:44 +0100, Stefan Wahren wrote:
-> > > > > > > J?rg Krause <joerg.krause@embedded.rocks> hat am 20.
-> > > > > > > November
-> > > > > > > 2016
-> > > > > > > um 15:42
-> > > > > > > geschrieben:
-> > > > > > > 
-> > > > > > > 
-> > > > > > > Hi Stefan,
-> > > > > > > 
-> > > > > > > On Sun, 2016-11-20 at 14:28 +0100, Stefan Wahren wrote:
-> > > > > > > > Hi J?rg,
-> > > > > > > > 
-> > > > > > > > > J?rg Krause <joerg.krause@embedded.rocks> hat am 20.
-> > > > > > > > > November
-> > > > > > > > > 2016
-> > > > > > > > > um 13:27
-> > > > > > > > > geschrieben:
-> > > > > > > > > 
-> > > > > > > > > 
-> > > > > > > > > Hi,
-> > > > > > > > > 
-> > > > > > > > > I started the discussion on this mailing list in
-> > > > > > > > > another
-> > > > > > > > > thread
-> > > > > > > > > [1],
-> > > > > > > > > but I'd like to move it to a new thread, because it
-> > > > > > > > > might
-> > > > > > > > > be
-> > > > > > > > > mmc
-> > > > > > > > > specific.
-> > > > > > > > > 
-> > > > > > > > > The issue is that I am noticed low wifi network
-> > > > > > > > > throughput
-> > > > > > > > > on
-> > > > > > > > > an
-> > > > > > > > > i.MX28
-> > > > > > > > > board with the mainline kernel (v4.7.10, about 6 Mbps)
-> > > > > > > > > compared
-> > > > > > > > > to
-> > > > > > > > > the
-> > > > > > > > > vendor kernel (Freescale v2.6.35.3, about 20 Mbps). The
-> > > > > > > > > wifi
-> > > > > > > > > chip
-> > > > > > > > > is
-> > > > > > > > > attached using the SDIO interface.
-> > > > > > > > > 
-> > > > > > > > > I started investigation where the bottleneck in the
-> > > > > > > > > mainline
-> > > > > > > > > kernel might come from. Therefore I checked that the
-> > > > > > > > > configs
-> > > > > > > > > and
-> > > > > > > > > settings for the interfaces and drivers are the same.
-> > > > > > > > > They
-> > > > > > > > > are.
-> > > > > > > > 
-> > > > > > > > so you're not using the mxs_defconfig settings anymore?
-> > > > > > > 
-> > > > > > > No, I changed the settings.
-> > > > > > > 
-> > > > > > 
-> > > > > > What happens to performance to if you change the following
-> > > > > > settings
-> > > > > > to the same
-> > > > > > like in mxs_defconfig?
-> > > > > > 
-> > > > > > CONFIG_PREEMPT_VOLUNTARY=y
-> > > > > > CONFIG_DEFAULT_IOSCHED="noop"
-> > > > > 
-> > > > > No much change at all. The time difference between complete()
-> > > > > and
-> > > > > wait_for_complete() decreases in best case to 110 us, but also
-> > > > > varies
-> > > > > to above 130 us.
-> > > > 
-> > > > just a weird idea. Did you tried to add MMC_CAP_CMD23 into the
-> > > > caps
-> > > > [1]?
-> > > > 
-> > > > [1] - http://lxr.free-electrons.com/source/drivers/mmc/host/mxs-m
-> > > > mc.c
-> > > > ?v=4.8#L642
-> > > 
-> > > I tried, but it did not improved the timing or throughput. However,
-> > > many thanks for the input.
-> > > 
-> > > J?rg
-> > 
-> > did you try cyclictest [1]?
-> 
-> Not yet. Not sure what to measure and which values to compare here.
+Florian,
 
-i tought you have the vendor kernel and the mainline kernel available for your platform.
+I'm in the process of getting a TS-7300 board so I can help test this. Hopefully
+I will have it by next week.
 
-So you could compare the both kernels.
-
-> 
-> > 
-> > Beside the time for a request the amount of requests for the complete
-> > iperf test
-> > would we interesting. Maybe there are retries.
-> > 
-> > I'm still interested in your PIO mode patches for mxs-mmc even
-> > without clean up.
-> 
-> Actually, the patch does not implement a PIO mode, but drops DMA and
-> uses polling instead. I've attached the patch.
-
-Thanks. I applied it, but unfortunately this breaks SD card support for my Duckbill and the kernel isn't able to mount the rootfs:
-
-[    2.267073] mxs-mmc 80010000.ssp: initialized
-[    2.272624] mxs-mmc 80010000.ssp: AC command error 0xffffff92
-
-> 
-> > [1] - https://git.kernel.org/cgit/utils/rt-tests/rt-tests.git/
-> 
-> Best regards
-> J?rg
+Hartley
