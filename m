@@ -1,35 +1,95 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 14 Dec 2016 15:42:22 +0530
-Subject: [PATCH 1/2] arm64: Add enable/disable d-cache support for
- purgatory
-In-Reply-To: <d8f354da-1e61-feaf-f76a-18e90361e98b@redhat.com>
-References: <cover.1479788404.git.panand@redhat.com>
- <7a4866b928c0905ec1074dce1bfc7984c968a58a.1479788404.git.panand@redhat.com>
- <5838834D.90205@arm.com> <d8f354da-1e61-feaf-f76a-18e90361e98b@redhat.com>
-Message-ID: <9a79b666-7990-2a23-2d74-52b3317ce272@redhat.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 14 Dec 2016 10:15:33 +0000
+Subject: [RFC v2 PATCH 0/3] Fix dma_alloc_coherent() and friends for NOMMU
+In-Reply-To: <552e7994-31ee-9ec8-4acd-8f37d1a157a4@arm.com>
+References: <1481636704-18948-1-git-send-email-vladimir.murzin@arm.com>
+ <20161213140711.GY14217@n2100.armlinux.org.uk> <58500243.8070107@arm.com>
+ <ed07f3ca-8ce7-fb1b-2292-238ecf6460da@arm.com> <58500D86.4070600@arm.com>
+ <552e7994-31ee-9ec8-4acd-8f37d1a157a4@arm.com>
+Message-ID: <58511BC5.9060904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Wednesday 14 December 2016 03:08 PM, Pratyush Anand wrote:
->
+On 13/12/16 18:32, Robin Murphy wrote:
+> On 13/12/16 15:02, Vladimir Murzin wrote:
+>> On 13/12/16 14:25, Robin Murphy wrote:
+>>> On 13/12/16 14:14, Vladimir Murzin wrote:
+>>>> On 13/12/16 14:07, Russell King - ARM Linux wrote:
+>>>>> On Tue, Dec 13, 2016 at 01:45:01PM +0000, Vladimir Murzin wrote:
+>>>>>> This patch set is trying to address the issue by providing region of
+>>>>>> memory suitable for consistent DMA operations. It is supposed that such
+>>>>>> region is marked by MPU as non-cacheable. Since we have MPU support in
+>>>>>> Linux for R-class only and M-class setting MPU in bootloader, proposed
+>>>>>> interface to advertise such memory is via "memdma=size at start" command
+>>>>>> line option, to avoid clashing with normal memory (which usually comes
+>>>>>> from dts) it'd be safer to use it together with "mem=" command line
+>>>>>> option. Meanwhile, I'm open to suggestions for the better way telling
+>>>>>> Linux of such memory.
+>>>>>
+>>>>> For those nommu systems where the MPU is not used, how do they allocate
+>>>>> DMA memory without setting aside a chunk of memory?
+>>>>>
+>>>>> >From what I understand of the current nommu code, it would just use
+>>>>> the normal page allocator for DMA memory allocation, so now requiring
+>>>>> everything to fit the "nommu has mpu" case seems like it's going to
+>>>>> break older nommu.
+>>>>>
+>>>>
+>>>> Probably, it'd be better if we just fallback to dma-noop operations if there
+>>>> is no dma region, i.e. assume that platform is coherent. We still need a way
+>>>> to tell user that absence of such region can be reason of broken DMA.
+>>>
+>>> As I mentioned internally, I think it would be worth trying to use CMA
+>>> for this, because dma_map_ops are already wired to try that first, and
+>>> from what I can see it seems already set up to do precisely this via a
+>>> "shared-dma-pool" reserved memory region (see rmem_cma_setup() in
+>>> drivers/base/dma-contiguous.c) - mandating that for cached v7-M systems
+>>> whilst letting cache-less/non-MPU systems automatically fall back to the
+>>> normal page allocator in its absence would seem to solve all 3 cases.
 >>
->> I would go as far as to generate the page tables at 'kexec -l' time,
->> and only if
->
-> Ok..So you mean that I create a new section which will have page table
-> entries mapping physicalmemory represented by remaining section, and
-> then purgatory can just enable mmu with page table from that section,
-> right? Seems doable. can do that.
+>> Unfortunately,
+>>
+>> config DMA_CMA
+>>         bool "DMA Contiguous Memory Allocator"
+>>         depends on HAVE_DMA_CONTIGUOUS && CMA
+>>         help
+>> ...
+>> config CMA
+>>         bool "Contiguous Memory Allocator"
+>>         depends on HAVE_MEMBLOCK && MMU
+>> 	select MIGRATION
+>>
+>> and it blows up if I remove dependecy on MMU :(
+> 
+> Ah yes, fair enough.
+> 
+>> Another option would be drivers/base/dma-coherent.c, but, IIUC, in this case
+>> memory is reserved per device exclusively, so I'm in doubt if tiny M-class can
+>> afford that...
+> 
+> I think as usual I managed to conflate the two - it was actually
+> dma_alloc_from_coherent() I had in mind when I mentioned dma_map_ops. It
+> does seem from 7bfa5ab6fa1b that dma-coherent *can* handle multiple
+> devices per region, so it wouldn't appear to be too hard to implement a
+> default coherent region (possibly specific to ARM_MPU) for all devices
+> in a similar manner to the default contiguous region. Either way I do
+> still think a reserved memory region in the DT is nicer and probably
+> more robust than the command line parameter.
 
-I see a problem here. If we create  page table as a new segment then, 
-how can we verify in purgatory that sha for page table is correct? We 
-need page table before sha verification start,and we can not rely the 
-page table created by first kernel until it's sha is verified. So a 
-chicken-egg problem.
+Ok, I'll look at this option in detail.
 
-I think, creating page table will just take fraction of second and 
-should be good even in purgatory, What do you say?
+Thanks
+Vladimir
 
-~Pratyush
+> 
+> Robin.
+> 
+>>> Other than the allocator issue, though, the rest of the refactoring does
+>>> look nice.
+>>
+>> Thanks for going through it!
+>>
+>> Cheers
+>> Vladimir
+> 
+> 
