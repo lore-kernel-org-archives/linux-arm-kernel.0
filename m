@@ -1,39 +1,32 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Wed, 14 Dec 2016 15:23:17 +0100
-Subject: [PATCH] dt-bindings: mfd: stm32f429: Add QSPI & DSI constants into DT
- include file
-Message-ID: <1481725397-941-1-git-send-email-gabriel.fernandez@st.com>
+Date: Wed, 14 Dec 2016 15:24:16 +0100
+Subject: [PATCH] pinctrl: stm32: activate strict mux mode
+Message-ID: <1481725456-1030-1-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-It will be used by clock and reset drivers, and DT bindings.
+This activates strict mode muxing for the STM32 pin controllers,
+as these do not allow GPIO and functions to use the same pin
+simultaneously.
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- include/dt-bindings/mfd/stm32f4-rcc.h | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/pinctrl/stm32/pinctrl-stm32.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/dt-bindings/mfd/stm32f4-rcc.h b/include/dt-bindings/mfd/stm32f4-rcc.h
-index e98942d..315f6c3 100644
---- a/include/dt-bindings/mfd/stm32f4-rcc.h
-+++ b/include/dt-bindings/mfd/stm32f4-rcc.h
-@@ -40,6 +40,7 @@
+diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
+index efc4371..c983a1e 100644
+--- a/drivers/pinctrl/stm32/pinctrl-stm32.c
++++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
+@@ -631,6 +631,7 @@ static int stm32_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
+ 	.get_function_groups	= stm32_pmx_get_func_groups,
+ 	.set_mux		= stm32_pmx_set_mux,
+ 	.gpio_set_direction	= stm32_pmx_gpio_set_direction,
++	.strict			= true,
+ };
  
- /* AHB3 */
- #define STM32F4_RCC_AHB3_FMC	0
-+#define STM32F4_RCC_AHB3_QSPI	1
- 
- #define STM32F4_AHB3_RESET(bit)	(STM32F4_RCC_AHB3_##bit + (0x18 * 8))
- #define STM32F4_AHB3_CLOCK(bit)	(STM32F4_RCC_AHB3_##bit + (0x38 * 8))
-@@ -91,6 +92,7 @@
- #define STM32F4_RCC_APB2_SPI6	21
- #define STM32F4_RCC_APB2_SAI1	22
- #define STM32F4_RCC_APB2_LTDC	26
-+#define STM32F4_RCC_APB2_DSI	27
- 
- #define STM32F4_APB2_RESET(bit)	(STM32F4_RCC_APB2_##bit + (0x24 * 8))
- #define STM32F4_APB2_CLOCK(bit)	(STM32F4_RCC_APB2_##bit + (0x44 * 8))
+ /* Pinconf functions */
 -- 
 1.9.1
