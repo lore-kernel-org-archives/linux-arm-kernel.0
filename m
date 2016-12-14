@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Dec 2016 00:57:15 +0100
-Subject: [PATCH 06/37] ARM: dts: imx6dl-sabrelite: Correct license text
+Date: Thu, 15 Dec 2016 00:57:19 +0100
+Subject: [PATCH 10/37] ARM: dts: imx6q-b650v3: Correct license text
 In-Reply-To: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
 References: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214235746.7108-7-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214235746.7108-11-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,17 +11,17 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
-Cc: Gary Bisson <gary.bisson@boundarydevices.com>
-Cc: Troy Kisky <troy.kisky@boundarydevices.com>
+Cc: Akshay Bhat <akshay.bhat@timesys.com>
+Cc: Ken Lin <ken.lin@advantech.com.tw>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/imx6dl-sabrelite.dts | 10 +++++-----
+ arch/arm/boot/dts/imx6q-b650v3.dts | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl-sabrelite.dts b/arch/arm/boot/dts/imx6dl-sabrelite.dts
-index 0f06ca5c9146..2f904527a097 100644
---- a/arch/arm/boot/dts/imx6dl-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6dl-sabrelite.dts
+diff --git a/arch/arm/boot/dts/imx6q-b650v3.dts b/arch/arm/boot/dts/imx6q-b650v3.dts
+index d85388725426..8814ae9b7de4 100644
+--- a/arch/arm/boot/dts/imx6q-b650v3.dts
++++ b/arch/arm/boot/dts/imx6q-b650v3.dts
 @@ -11,17 +11,17 @@
   *     modify it under the terms of the GNU General Public License
   *     version 2 as published by the Free Software Foundation.
