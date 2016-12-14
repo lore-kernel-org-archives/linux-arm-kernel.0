@@ -1,9 +1,10 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Dec 2016 23:37:46 +0100
-Subject: [PATCH 39/39] ARM: dts: orion5x-lswsgl: Correct license text
+Date: Wed, 14 Dec 2016 23:37:23 +0100
+Subject: [PATCH 16/39] ARM: dts: armada-38x-solidrun-microsom: Correct license
+ text
 In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
 References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214223746.23066-40-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214223746.23066-17-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,19 +12,20 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
-Cc: Benjamin Cama <benoar@dolka.fr>
+Cc: Marcin Wojtas <mw@semihalf.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/orion5x-lswsgl.dts | 10 +++++-----
+ arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/orion5x-lswsgl.dts b/arch/arm/boot/dts/orion5x-lswsgl.dts
-index 6b47a52ceb9c..ea966ec03dd0 100644
---- a/arch/arm/boot/dts/orion5x-lswsgl.dts
-+++ b/arch/arm/boot/dts/orion5x-lswsgl.dts
-@@ -14,17 +14,17 @@
-  *     published by the Free Software Foundation; either version 2 of the
-  *     License, or (at your option) any later version.
+diff --git a/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi b/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
+index 8c9842237b60..02f18ab5b69c 100644
+--- a/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
++++ b/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
+@@ -17,17 +17,17 @@
+  *     modify it under the terms of the GNU General Public License
+  *     version 2 as published by the Free Software Foundation.
   *
 - *     This file is distributed in the hope that it will be useful
 + *     This file is distributed in the hope that it will be useful,
@@ -42,7 +44,7 @@ index 6b47a52ceb9c..ea966ec03dd0 100644
   *     copy, modify, merge, publish, distribute, sublicense, and/or
   *     sell copies of the Software, and to permit persons to whom the
   *     Software is furnished to do so, subject to the following
-@@ -33,11 +33,11 @@
+@@ -36,11 +36,11 @@
   *     The above copyright notice and this permission notice shall be
   *     included in all copies or substantial portions of the Software.
   *
