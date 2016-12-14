@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Dec 2016 23:37:18 +0100
-Subject: [PATCH 11/39] ARM: dts: armada-375: Correct license text
+Date: Wed, 14 Dec 2016 23:37:12 +0100
+Subject: [PATCH 05/39] ARM: dts: armada-370-netgear-rn102: Correct license text
 In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
 References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214223746.23066-12-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214223746.23066-6-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,22 +11,23 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
+Cc: Arnaud Ebalard <arno@natisbad.org>
+Cc: Ben Peddell <klightspeed@killerwolves.net>
 Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
 Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: Lior Amsalem <alior@marvell.com>
-Cc: Marcin Wojtas <mw@semihalf.com>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-375.dtsi | 10 +++++-----
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index cc952cf8ec30..23548223797a 100644
---- a/arch/arm/boot/dts/armada-375.dtsi
-+++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -16,17 +16,17 @@
+diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+index 39181b3fa90d..c4cbb81b43e8 100644
+--- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
++++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+@@ -13,17 +13,17 @@
   *     published by the Free Software Foundation; either version 2 of the
   *     License, or (at your option) any later version.
   *
@@ -47,7 +48,7 @@ index cc952cf8ec30..23548223797a 100644
   *     copy, modify, merge, publish, distribute, sublicense, and/or
   *     sell copies of the Software, and to permit persons to whom the
   *     Software is furnished to do so, subject to the following
-@@ -35,11 +35,11 @@
+@@ -32,11 +32,11 @@
   *     The above copyright notice and this permission notice shall be
   *     included in all copies or substantial portions of the Software.
   *
