@@ -1,352 +1,71 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 14 Dec 2016 11:46:13 -0800
-Subject: [PATCH 03/11] clk: bcm2835: Add leaf clock measurement support,
- disabled by default
+Date: Wed, 14 Dec 2016 11:46:16 -0800
+Subject: [PATCH 06/11] dt-bindings: Document the VC4 DSI module nodes.
 In-Reply-To: <20161214194621.16499-1-eric@anholt.net>
 References: <20161214194621.16499-1-eric@anholt.net>
-Message-ID: <20161214194621.16499-4-eric@anholt.net>
+Message-ID: <20161214194621.16499-7-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This proved incredibly useful during debugging of the DSI driver, to
-see if our clocks were running at rate we requested.  Let's leave it
-here for the next person interacting with clocks on the platform (and
-so that hopefully we can just hook it up to debugfs some day).
+These are part of the vc4 display pipeline.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- drivers/clk/bcm/clk-bcm2835.c | 144 ++++++++++++++++++++++++++++++++++--------
- 1 file changed, 119 insertions(+), 25 deletions(-)
+ .../devicetree/bindings/display/brcm,bcm-vc4.txt   | 35 ++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index b0a8cd19a30c..77fd9f5f056f 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -39,6 +39,7 @@
- #include <linux/clk.h>
- #include <linux/clk/bcm2835.h>
- #include <linux/debugfs.h>
-+#include <linux/delay.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
-@@ -98,7 +99,8 @@
- #define CM_SMIDIV		0x0b4
- /* no definition for 0x0b8  and 0x0bc */
- #define CM_TCNTCTL		0x0c0
--#define CM_TCNTDIV		0x0c4
-+# define CM_TCNT_SRC1_SHIFT		12
-+#define CM_TCNTCNT		0x0c4
- #define CM_TECCTL		0x0c8
- #define CM_TECDIV		0x0cc
- #define CM_TD0CTL		0x0d0
-@@ -338,6 +340,61 @@ static inline u32 cprman_read(struct bcm2835_cprman *cprman, u32 reg)
- 	return readl(cprman->regs + reg);
- }
+diff --git a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
+index e2768703ac2b..34c7fddcea39 100644
+--- a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
++++ b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
+@@ -56,6 +56,18 @@ Required properties for V3D:
+ - interrupts:	The interrupt number
+ 		  See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
  
-+/* Does a cycle of measuring a clock through the TCNT clock, which may
-+ * source from many other clocks in the system.
-+ */
-+static unsigned long bcm2835_measure_tcnt_mux(struct bcm2835_cprman *cprman,
-+					      u32 tcnt_mux)
-+{
-+	u32 osccount = 19200; /* 1ms */
-+	u32 count;
-+	ktime_t timeout;
++Required properties for DSI:
++- compatible:	Should be "brcm,bcm2835-dsi0" or "brcm,bcm2835-dsi1"
++- reg:		Physical base address and length of the DSI block's registers
++- interrupts:	The interrupt number
++		  See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
++- clocks:	a) phy: The DSI PLL clock feeding the DSI analog PHY
++		b) escape: The DSI ESC clock from CPRMAN
++		c) pixel: The DSI pixel clock from CPRMAN
++- clock-output-names:
++		The 3 clocks output from the DSI analog PHY: dsi[01]_byte,
++		dsi[01]_ddr2, and dsi[01]_ddr
 +
-+	spin_lock(&cprman->regs_lock);
-+
-+	cprman_write(cprman, CM_TCNTCTL, CM_KILL);
-+
-+	cprman_write(cprman, CM_TCNTCTL,
-+		     (tcnt_mux & CM_SRC_MASK) |
-+		     (tcnt_mux >> CM_SRC_BITS) << CM_TCNT_SRC1_SHIFT);
-+
-+	cprman_write(cprman, CM_OSCCOUNT, osccount);
-+
-+	/* do a kind delay@the start */
-+	mdelay(1);
-+
-+	/* Finish off whatever is left of OSCCOUNT */
-+	timeout = ktime_add_ns(ktime_get(), LOCK_TIMEOUT_NS);
-+	while (cprman_read(cprman, CM_OSCCOUNT)) {
-+		if (ktime_after(ktime_get(), timeout)) {
-+			dev_err(cprman->dev, "timeout waiting for OSCCOUNT\n");
-+			count = 0;
-+			goto out;
-+		}
-+		cpu_relax();
-+	}
-+
-+	/* Wait for BUSY to clear. */
-+	timeout = ktime_add_ns(ktime_get(), LOCK_TIMEOUT_NS);
-+	while (cprman_read(cprman, CM_TCNTCTL) & CM_BUSY) {
-+		if (ktime_after(ktime_get(), timeout)) {
-+			dev_err(cprman->dev, "timeout waiting for !BUSY\n");
-+			count = 0;
-+			goto out;
-+		}
-+		cpu_relax();
-+	}
-+
-+	count = cprman_read(cprman, CM_TCNTCNT);
-+
-+	cprman_write(cprman, CM_TCNTCTL, 0);
-+
-+out:
-+	spin_unlock(&cprman->regs_lock);
-+
-+	return count * 1000;
-+}
-+
- static int bcm2835_debugfs_regset(struct bcm2835_cprman *cprman, u32 base,
- 				  struct debugfs_reg32 *regs, size_t nregs,
- 				  struct dentry *dentry)
-@@ -470,6 +527,8 @@ struct bcm2835_clock_data {
+ [1] Documentation/devicetree/bindings/media/video-interfaces.txt
  
- 	bool is_vpu_clock;
- 	bool is_mash_clock;
-+
-+	u32 tcnt_mux;
+ Example:
+@@ -99,6 +111,29 @@ dpi: dpi at 7e208000 {
+ 	};
  };
  
- struct bcm2835_gate_data {
-@@ -1006,6 +1065,17 @@ static int bcm2835_clock_on(struct clk_hw *hw)
- 		     CM_GATE);
- 	spin_unlock(&cprman->regs_lock);
- 
-+	/* Debug code to measure the clock once it's turned on to see
-+	 * if it's ticking at the rate we expect.
-+	 */
-+	if (data->tcnt_mux && false) {
-+		dev_info(cprman->dev,
-+			 "clk %s: rate %ld, measure %ld\n",
-+			 data->name,
-+			 clk_hw_get_rate(hw),
-+			 bcm2835_measure_tcnt_mux(cprman, data->tcnt_mux));
-+	}
++dsi1: dsi at 7e700000 {
++	compatible = "brcm,bcm2835-dsi1";
++	reg = <0x7e700000 0x8c>;
++	interrupts = <2 12>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++	#clock-cells = <1>;
 +
- 	return 0;
- }
- 
-@@ -1707,7 +1777,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.ctl_reg = CM_OTPCTL,
- 		.div_reg = CM_OTPDIV,
- 		.int_bits = 4,
--		.frac_bits = 0),
-+		.frac_bits = 0,
-+		.tcnt_mux = 6),
- 	/*
- 	 * Used for a 1Mhz clock for the system clocksource, and also used
- 	 * bythe watchdog timer and the camera pulse generator.
-@@ -1741,13 +1812,15 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.ctl_reg = CM_H264CTL,
- 		.div_reg = CM_H264DIV,
- 		.int_bits = 4,
--		.frac_bits = 8),
-+		.frac_bits = 8,
-+		.tcnt_mux = 1),
- 	[BCM2835_CLOCK_ISP]	= REGISTER_VPU_CLK(
- 		.name = "isp",
- 		.ctl_reg = CM_ISPCTL,
- 		.div_reg = CM_ISPDIV,
- 		.int_bits = 4,
--		.frac_bits = 8),
-+		.frac_bits = 8,
-+		.tcnt_mux = 2),
- 
- 	/*
- 	 * Secondary SDRAM clock.  Used for low-voltage modes when the PLL
-@@ -1758,13 +1831,15 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.ctl_reg = CM_SDCCTL,
- 		.div_reg = CM_SDCDIV,
- 		.int_bits = 6,
--		.frac_bits = 0),
-+		.frac_bits = 0,
-+		.tcnt_mux = 3),
- 	[BCM2835_CLOCK_V3D]	= REGISTER_VPU_CLK(
- 		.name = "v3d",
- 		.ctl_reg = CM_V3DCTL,
- 		.div_reg = CM_V3DDIV,
- 		.int_bits = 4,
--		.frac_bits = 8),
-+		.frac_bits = 8,
-+		.tcnt_mux = 4),
- 	/*
- 	 * VPU clock.  This doesn't have an enable bit, since it drives
- 	 * the bus for everything else, and is special so it doesn't need
-@@ -1778,7 +1853,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.int_bits = 12,
- 		.frac_bits = 8,
- 		.flags = CLK_IS_CRITICAL,
--		.is_vpu_clock = true),
-+		.is_vpu_clock = true,
-+		.tcnt_mux = 5),
- 
- 	/* clocks with per parent mux */
- 	[BCM2835_CLOCK_AVEO]	= REGISTER_PER_CLK(
-@@ -1786,19 +1862,22 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.ctl_reg = CM_AVEOCTL,
- 		.div_reg = CM_AVEODIV,
- 		.int_bits = 4,
--		.frac_bits = 0),
-+		.frac_bits = 0,
-+		.tcnt_mux = 38),
- 	[BCM2835_CLOCK_CAM0]	= REGISTER_PER_CLK(
- 		.name = "cam0",
- 		.ctl_reg = CM_CAM0CTL,
- 		.div_reg = CM_CAM0DIV,
- 		.int_bits = 4,
--		.frac_bits = 8),
-+		.frac_bits = 8,
-+		.tcnt_mux = 14),
- 	[BCM2835_CLOCK_CAM1]	= REGISTER_PER_CLK(
- 		.name = "cam1",
- 		.ctl_reg = CM_CAM1CTL,
- 		.div_reg = CM_CAM1DIV,
- 		.int_bits = 4,
--		.frac_bits = 8),
-+		.frac_bits = 8,
-+		.tcnt_mux = 15),
- 	[BCM2835_CLOCK_DFT]	= REGISTER_PER_CLK(
- 		.name = "dft",
- 		.ctl_reg = CM_DFTCTL,
-@@ -1810,7 +1889,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.ctl_reg = CM_DPICTL,
- 		.div_reg = CM_DPIDIV,
- 		.int_bits = 4,
--		.frac_bits = 8),
-+		.frac_bits = 8,
-+		.tcnt_mux = 17),
- 
- 	/* Arasan EMMC clock */
- 	[BCM2835_CLOCK_EMMC]	= REGISTER_PER_CLK(
-@@ -1818,7 +1898,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.ctl_reg = CM_EMMCCTL,
- 		.div_reg = CM_EMMCDIV,
- 		.int_bits = 4,
--		.frac_bits = 8),
-+		.frac_bits = 8,
-+		.tcnt_mux = 39),
- 
- 	/* General purpose (GPIO) clocks */
- 	[BCM2835_CLOCK_GP0]	= REGISTER_PER_CLK(
-@@ -1827,7 +1908,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.div_reg = CM_GP0DIV,
- 		.int_bits = 12,
- 		.frac_bits = 12,
--		.is_mash_clock = true),
-+		.is_mash_clock = true,
-+		.tcnt_mux = 20),
- 	[BCM2835_CLOCK_GP1]	= REGISTER_PER_CLK(
- 		.name = "gp1",
- 		.ctl_reg = CM_GP1CTL,
-@@ -1835,7 +1917,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.int_bits = 12,
- 		.frac_bits = 12,
- 		.flags = CLK_IS_CRITICAL,
--		.is_mash_clock = true),
-+		.is_mash_clock = true,
-+		.tcnt_mux = 21),
- 	[BCM2835_CLOCK_GP2]	= REGISTER_PER_CLK(
- 		.name = "gp2",
- 		.ctl_reg = CM_GP2CTL,
-@@ -1850,40 +1933,46 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.ctl_reg = CM_HSMCTL,
- 		.div_reg = CM_HSMDIV,
- 		.int_bits = 4,
--		.frac_bits = 8),
-+		.frac_bits = 8,
-+		.tcnt_mux = 22),
- 	[BCM2835_CLOCK_PCM]	= REGISTER_PER_CLK(
- 		.name = "pcm",
- 		.ctl_reg = CM_PCMCTL,
- 		.div_reg = CM_PCMDIV,
- 		.int_bits = 12,
- 		.frac_bits = 12,
--		.is_mash_clock = true),
-+		.is_mash_clock = true,
-+		.tcnt_mux = 23),
- 	[BCM2835_CLOCK_PWM]	= REGISTER_PER_CLK(
- 		.name = "pwm",
- 		.ctl_reg = CM_PWMCTL,
- 		.div_reg = CM_PWMDIV,
- 		.int_bits = 12,
- 		.frac_bits = 12,
--		.is_mash_clock = true),
-+		.is_mash_clock = true,
-+		.tcnt_mux = 24),
- 	[BCM2835_CLOCK_SLIM]	= REGISTER_PER_CLK(
- 		.name = "slim",
- 		.ctl_reg = CM_SLIMCTL,
- 		.div_reg = CM_SLIMDIV,
- 		.int_bits = 12,
- 		.frac_bits = 12,
--		.is_mash_clock = true),
-+		.is_mash_clock = true,
-+		.tcnt_mux = 25),
- 	[BCM2835_CLOCK_SMI]	= REGISTER_PER_CLK(
- 		.name = "smi",
- 		.ctl_reg = CM_SMICTL,
- 		.div_reg = CM_SMIDIV,
- 		.int_bits = 4,
--		.frac_bits = 8),
-+		.frac_bits = 8,
-+		.tcnt_mux = 27),
- 	[BCM2835_CLOCK_UART]	= REGISTER_PER_CLK(
- 		.name = "uart",
- 		.ctl_reg = CM_UARTCTL,
- 		.div_reg = CM_UARTDIV,
- 		.int_bits = 10,
--		.frac_bits = 12),
-+		.frac_bits = 12,
-+		.tcnt_mux = 28),
- 
- 	/* TV encoder clock.  Only operating frequency is 108Mhz.  */
- 	[BCM2835_CLOCK_VEC]	= REGISTER_PER_CLK(
-@@ -1891,7 +1980,8 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.ctl_reg = CM_VECCTL,
- 		.div_reg = CM_VECDIV,
- 		.int_bits = 4,
--		.frac_bits = 0),
-+		.frac_bits = 0,
-+		.tcnt_mux = 29),
- 
- 	/* dsi clocks */
- 	[BCM2835_CLOCK_DSI0E]	= REGISTER_PER_CLK(
-@@ -1899,25 +1989,29 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.ctl_reg = CM_DSI0ECTL,
- 		.div_reg = CM_DSI0EDIV,
- 		.int_bits = 4,
--		.frac_bits = 8),
-+		.frac_bits = 8,
-+		.tcnt_mux = 18),
- 	[BCM2835_CLOCK_DSI1E]	= REGISTER_PER_CLK(
- 		.name = "dsi1e",
- 		.ctl_reg = CM_DSI1ECTL,
- 		.div_reg = CM_DSI1EDIV,
- 		.int_bits = 4,
--		.frac_bits = 8),
-+		.frac_bits = 8,
-+		.tcnt_mux = 19),
- 	[BCM2835_CLOCK_DSI0P]	= REGISTER_DSI0_CLK(
- 		.name = "dsi0p",
- 		.ctl_reg = CM_DSI0PCTL,
- 		.div_reg = CM_DSI0PDIV,
- 		.int_bits = 0,
--		.frac_bits = 0),
-+		.frac_bits = 0,
-+		.tcnt_mux = 12),
- 	[BCM2835_CLOCK_DSI1P]	= REGISTER_DSI1_CLK(
- 		.name = "dsi1p",
- 		.ctl_reg = CM_DSI1PCTL,
- 		.div_reg = CM_DSI1PDIV,
- 		.int_bits = 0,
--		.frac_bits = 0),
-+		.frac_bits = 0,
-+		.tcnt_mux = 13),
- 
- 	/* the gates */
- 
++	clocks = <&clocks BCM2835_PLLD_DSI1>,
++		 <&clocks BCM2835_CLOCK_DSI1E>,
++		 <&clocks BCM2835_CLOCK_DSI1P>;
++	clock-names = "phy", "escape", "pixel";
++
++	clock-output-names = "dsi1_byte", "dsi1_ddr2", "dsi1_ddr";
++
++	pitouchscreen: panel at 0 {
++		compatible = "raspberrypi,touchscreen";
++		reg = <0>;
++
++		<...>
++	};
++};
++
+ vec: vec at 7e806000 {
+ 	compatible = "brcm,bcm2835-vec";
+ 	reg = <0x7e806000 0x1000>;
 -- 
 2.11.0
