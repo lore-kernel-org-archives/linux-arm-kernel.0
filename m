@@ -1,34 +1,55 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Wed, 14 Dec 2016 20:54:10 +0100
-Subject: [PATCH] arm: Adjust memory boundaries after reservations
-In-Reply-To: <1481681501-13788-1-git-send-email-labbott@redhat.com>
-References: <1481681501-13788-1-git-send-email-labbott@redhat.com>
-Message-ID: <CAM=E1R4j_5T--iZJ16dgGtKbx2HA4hjjnTkM7pBrZYU8OcAJnw@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 14 Dec 2016 21:56:10 +0200
+Subject: [PATCH 1/2] xilinx_dma: Edit device tree bindings documentation
+In-Reply-To: <78b8d3b8540a2310818cf0c5b05adbc29e067981.1481735244.git.roliveir@synopsys.com>
+References: <cover.1481735244.git.roliveir@synopsys.com>
+ <78b8d3b8540a2310818cf0c5b05adbc29e067981.1481735244.git.roliveir@synopsys.com>
+Message-ID: <12776575.5mdqB62qf1@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+Hi Ramiro,
 
+Thank you for the patch.
 
-On 14 December 2016 at 03:11, Laura Abbott <labbott@redhat.com> wrote:
-> The poorly named sanity_check_meminfo is responsible for setting up the
-> boundary for lowmem/highmem. This needs to be set up before memblock
-> reservations can occur. At the time memblock reservations can occur,
-> memory can also be removed from the system. This can throw off the
-> calculation of the lowmem/highmem boundary. On some systems this may be
-> harmless, on others this may result in incorrect ranges being passed to
-> the main memory allocator. Correct this by recalcuating the
-> lowmem/highmem boundary after all reservations have been made.
-> As part of this, rename sanity_check_meminfo to actually refect what the
-> function is doing.
->
-> Reported-by: Magnus Lilja <lilja.magnus@gmail.com>
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
+On Wednesday 14 Dec 2016 17:18:23 Ramiro Oliveira wrote:
+> Add reset property documentation for Xilinx DMA
+> 
+> Signed-off-by: Ramiro Oliveira <roliveir@synopsys.com>
 > ---
+>  Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt index
+> a2b8bfa..7ebce72 100644
+> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> @@ -40,6 +40,10 @@ Required properties for VDMA:
+>  Optional properties:
+>  - xlnx,include-sg: Tells configured for Scatter-mode in
+>  	the hardware.
+> +- resets : Must contain an entry for each entry in reset-names.
+> +  See ../reset/reset.txt for details.
+> +- reset-names : Must include the following entries:
+> +  - reset
 
-Thanks! I've applied the patch on a v4.9 kernel tree and tried it on
-the i.MX31 board and the patch resolves the issue.
+If the IP core has a single reset, can't we omit the name ?
 
-Tested-by: Magnus Lilja <lilja.magnus@gmail.com>
+>  Optional properties for AXI DMA:
+>  - xlnx,mcdma: Tells whether configured for multi-channel mode in the
+> hardware. Optional properties for VDMA:
+> @@ -83,6 +87,8 @@ axi_vdma_0: axivdma at 40030000 {
+>  	clocks = <&clk 0>, <&clk 1>, <&clk 2>, <&clk 3>, <&clk 4>;
+>  	clock-names = "s_axi_lite_aclk", "m_axi_mm2s_aclk", "m_axi_s2mm_aclk",
+>  		      "m_axis_mm2s_aclk", "s_axis_s2mm_aclk";
+> +	resets = <&rst 2>;
+> +	reset-names = "reset";
+>  	dma-channel at 40030000 {
+>  		compatible = "xlnx,axi-vdma-mm2s-channel";
+>  		interrupts = < 0 54 4 >;
 
-Regards, Magnus
+-- 
+Regards,
+
+Laurent Pinchart
