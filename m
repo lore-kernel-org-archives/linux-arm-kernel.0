@@ -1,109 +1,65 @@
 From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
-Date: Wed, 14 Dec 2016 18:12:36 -0500
-Subject: [PATCH 6/6] watchdog: ts4600: add driver for TS-4600 watchdog
+Date: Wed, 14 Dec 2016 18:12:34 -0500
+Subject: [PATCH 4/6] bus: add driver for the Technologic Systems NBUS
 In-Reply-To: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
 References: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
-Message-ID: <20161214231237.17496-7-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20161214231237.17496-5-sebastien.bourdelin@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This watchdog is instantiated in a FPGA and can only be access using a
-GPIOs bit-banged bus, called the NBUS by Technologic Systems.
-The watchdog is made of only one register, called the feed register.
-Writing to this register will re-arm the watchdog for a given time (and
-enable it if it was disable). It can be disabled by writing a special
-value into it.
+This driver implements a GPIOs bit-banged bus, called the NBUS by
+Technologic Systems. It is used to communicate with the peripherals in
+the FPGA on the TS-4600 SoM.
 
 Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
 ---
- .../devicetree/bindings/watchdog/ts4600-wdt.txt    |  16 ++
- arch/arm/boot/dts/imx28-ts4600-common.dtsi         |   5 +
- drivers/watchdog/Kconfig                           |  10 +
- drivers/watchdog/Makefile                          |   1 +
- drivers/watchdog/ts4600_wdt.c                      | 213 +++++++++++++++++++++
- 5 files changed, 245 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt
- create mode 100644 drivers/watchdog/ts4600_wdt.c
+ drivers/bus/Kconfig     |   9 +
+ drivers/bus/Makefile    |   1 +
+ drivers/bus/ts-nbus.c   | 451 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/ts-nbus.h |  17 ++
+ 4 files changed, 478 insertions(+)
+ create mode 100644 drivers/bus/ts-nbus.c
+ create mode 100644 include/linux/ts-nbus.h
 
-diff --git a/Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt b/Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt
-new file mode 100644
-index 0000000..61d620e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt
-@@ -0,0 +1,16 @@
-+TS-4600 Technologic Systems Watchdog
-+
-+Required properties:
-+- compatible: must be "technologic,ts4600-wdt"
-+- reg: offset to the FPGA's watchdog register
-+
-+Optional property:
-+- timeout-sec: contains the watchdog timeout in seconds.
-+
-+Example:
-+
-+wdt {
-+	compatible = "technologic,ts4600-wdt";
-+	reg = <0x2a>;
-+	timeout-sec = <10>;
-+};
-diff --git a/arch/arm/boot/dts/imx28-ts4600-common.dtsi b/arch/arm/boot/dts/imx28-ts4600-common.dtsi
-index b668933..dd7318c 100644
---- a/arch/arm/boot/dts/imx28-ts4600-common.dtsi
-+++ b/arch/arm/boot/dts/imx28-ts4600-common.dtsi
-@@ -116,6 +116,11 @@
- 		strobe-gpios = <&gpio0 25 GPIO_ACTIVE_HIGH>;
- 		ale-gpios    = <&gpio0 26 GPIO_ACTIVE_HIGH>;
- 		rdy-gpios    = <&gpio0 21 GPIO_ACTIVE_HIGH>;
-+
-+		wdt at 2a {
-+			compatible = "technologic,ts4600-wdt";
-+			reg = <0x2a>;
-+		};
- 	};
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index 7875105..74e72b3 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -150,6 +150,15 @@ config TEGRA_ACONNECT
+ 	  Driver for the Tegra ACONNECT bus which is used to interface with
+ 	  the devices inside the Audio Processing Engine (APE) for Tegra210.
  
- };
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 3eb58cb..7a8e176 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -500,6 +500,16 @@ config NUC900_WATCHDOG
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called nuc900_wdt.
- 
-+config TS4600_WATCHDOG
-+	tristate "TS-4600 Watchdog"
-+	depends on HAS_IOMEM && OF
-+	depends on SOC_IMX28 || COMPILE_TEST
-+	select WATCHDOG_CORE
++config TS_NBUS
++	tristate "Technologic Systems NBUS Driver"
++	default y
++	depends on SOC_IMX28
++	depends on OF_GPIO && PWM
 +	help
-+	  Technologic Systems TS-4600 has watchdog timer implemented in
-+	  an external FPGA. Say Y here if you want to support for the
-+	  watchdog timer on TS-4600 board.
++	  Driver for the Technologic Systems NBUS which is used to interface
++	  with the peripherals in the FPGA of the TS-4600 SoM.
 +
- config TS4800_WATCHDOG
- 	tristate "TS-4800 Watchdog"
- 	depends on HAS_IOMEM && OF
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index caa9f4a..d4b4bd2 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -61,6 +61,7 @@ obj-$(CONFIG_RN5T618_WATCHDOG) += rn5t618_wdt.o
- obj-$(CONFIG_COH901327_WATCHDOG) += coh901327_wdt.o
- obj-$(CONFIG_STMP3XXX_RTC_WATCHDOG) += stmp3xxx_rtc_wdt.o
- obj-$(CONFIG_NUC900_WATCHDOG) += nuc900_wdt.o
-+obj-$(CONFIG_TS4600_WATCHDOG) += ts4600_wdt.o
- obj-$(CONFIG_TS4800_WATCHDOG) += ts4800_wdt.o
- obj-$(CONFIG_TS72XX_WATCHDOG) += ts72xx_wdt.o
- obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
-diff --git a/drivers/watchdog/ts4600_wdt.c b/drivers/watchdog/ts4600_wdt.c
+ config UNIPHIER_SYSTEM_BUS
+ 	tristate "UniPhier System Bus driver"
+ 	depends on ARCH_UNIPHIER && OF
+diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+index c6cfa6b..83f874a 100644
+--- a/drivers/bus/Makefile
++++ b/drivers/bus/Makefile
+@@ -19,5 +19,6 @@ obj-$(CONFIG_QCOM_EBI2)		+= qcom-ebi2.o
+ obj-$(CONFIG_SUNXI_RSB)		+= sunxi-rsb.o
+ obj-$(CONFIG_SIMPLE_PM_BUS)	+= simple-pm-bus.o
+ obj-$(CONFIG_TEGRA_ACONNECT)	+= tegra-aconnect.o
++obj-$(CONFIG_TS_NBUS)		+= ts-nbus.o
+ obj-$(CONFIG_UNIPHIER_SYSTEM_BUS)	+= uniphier-system-bus.o
+ obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o
+diff --git a/drivers/bus/ts-nbus.c b/drivers/bus/ts-nbus.c
 new file mode 100644
-index 0000000..db91b40
+index 0000000..44fc89d
 --- /dev/null
-+++ b/drivers/watchdog/ts4600_wdt.c
-@@ -0,0 +1,213 @@
++++ b/drivers/bus/ts-nbus.c
+@@ -0,0 +1,451 @@
 +/*
-+ * Watchdog driver for TS-4600 based boards
++ * NBUS driver for TS-4600 based boards
 + *
 + * Copyright (c) 2016 - Savoir-faire Linux
 + * Author: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
@@ -112,208 +68,469 @@ index 0000000..db91b40
 + * License version 2. This program is licensed "as is" without any
 + * warranty of any kind, whether express or implied.
 + *
-+ * The watchdog on the TS-4600 based boards is in an FPGA and can only be
-+ * accessed using a GPIO bit-banged bus called the NBUS by Technologic Systems.
-+ * The logic for the watchdog is the same then for the TS-4800 SoM, only the way
-+ * to access it change, therefore this driver is heavely based on the ts4800_wdt
-+ * driver from Damien Riegel <damien.riegel@savoirfairelinux.com>.
++ * This driver implements a GPIOs bit-banged bus, called the NBUS by Technologic
++ * Systems. It is used to communicate with the peripherals in the FPGA on the
++ * TS-4600 SoM.
 + */
 +
++#include <linux/gpio.h>
 +#include <linux/kernel.h>
 +#include <linux/module.h>
++#include <linux/mutex.h>
 +#include <linux/of.h>
++#include <linux/of_gpio.h>
 +#include <linux/platform_device.h>
-+#include <linux/ts-nbus.h>
-+#include <linux/watchdog.h>
++#include <linux/pwm.h>
 +
-+static bool nowayout = WATCHDOG_NOWAYOUT;
-+module_param(nowayout, bool, 0);
-+MODULE_PARM_DESC(nowayout,
-+	"Watchdog cannot be stopped once started (default="
-+	__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
++static DEFINE_MUTEX(ts_nbus_lock);
++static bool ts_nbus_ready;
 +
-+/* possible feed values */
-+#define TS4600_WDT_FEED_2S       0x1
-+#define TS4600_WDT_FEED_10S      0x2
-+#define TS4600_WDT_DISABLE       0x3
++#define TS_NBUS_READ_MODE  0
++#define TS_NBUS_WRITE_MODE 1
++#define TS_NBUS_DIRECTION_IN  0
++#define TS_NBUS_DIRECTION_OUT 1
++#define TS_NBUS_WRITE_ADR 0
++#define TS_NBUS_WRITE_VAL 1
 +
-+struct ts4600_wdt {
-+	struct watchdog_device  wdd;
-+	u32                     feed_offset;
-+	u32                     feed_val;
++struct ts_nbus {
++	struct pwm_device *pwm;
++	int num_data;
++	int *data;
++	int csn;
++	int txrx;
++	int strobe;
++	int ale;
++	int rdy;
 +};
++
++static struct ts_nbus *ts_nbus;
 +
 +/*
-+ * TS-4600 supports the following timeout values:
-+ *
-+ *   value desc
-+ *   ---------------------
-+ *     0    feed for 338ms
-+ *     1    feed for 2.706s
-+ *     2    feed for 10.824s
-+ *     3    disable watchdog
-+ *
-+ * Keep the regmap/timeout map ordered by timeout
++ * request all gpios required by the bus.
 + */
-+static const struct {
-+	const int timeout;
-+	const int regval;
-+} ts4600_wdt_map[] = {
-+	{ 2,  TS4600_WDT_FEED_2S },
-+	{ 10, TS4600_WDT_FEED_10S },
-+};
-+
-+#define MAX_TIMEOUT_INDEX       (ARRAY_SIZE(ts4600_wdt_map) - 1)
-+
-+static void ts4600_write_feed(struct ts4600_wdt *wdt, u32 val)
++static int ts_nbus_init(struct platform_device *pdev)
 +{
-+	ts_nbus_write(wdt->feed_offset, val);
-+}
-+
-+static int ts4600_wdt_start(struct watchdog_device *wdd)
-+{
-+	struct ts4600_wdt *wdt = watchdog_get_drvdata(wdd);
-+
-+	ts4600_write_feed(wdt, wdt->feed_val);
-+
-+	return 0;
-+}
-+
-+static int ts4600_wdt_stop(struct watchdog_device *wdd)
-+{
-+	struct ts4600_wdt *wdt = watchdog_get_drvdata(wdd);
-+
-+	ts4600_write_feed(wdt, TS4600_WDT_DISABLE);
-+	return 0;
-+}
-+
-+static int ts4600_wdt_set_timeout(struct watchdog_device *wdd,
-+				  unsigned int timeout)
-+{
-+	struct ts4600_wdt *wdt = watchdog_get_drvdata(wdd);
++	int err;
 +	int i;
 +
-+	for (i = 0; i < MAX_TIMEOUT_INDEX; i++) {
-+		if (ts4600_wdt_map[i].timeout >= timeout)
-+			break;
++	for (i = 0; i < ts_nbus->num_data; i++) {
++		err = devm_gpio_request_one(&pdev->dev, ts_nbus->data[i],
++					    GPIOF_OUT_INIT_HIGH,
++					    "TS NBUS data");
++		if (err)
++			return err;
 +	}
 +
-+	wdd->timeout = ts4600_wdt_map[i].timeout;
-+	wdt->feed_val = ts4600_wdt_map[i].regval;
++	err = devm_gpio_request_one(&pdev->dev, ts_nbus->csn,
++				    GPIOF_OUT_INIT_HIGH,
++				    "TS NBUS csn");
++	if (err)
++		return err;
++
++	err = devm_gpio_request_one(&pdev->dev, ts_nbus->txrx,
++				    GPIOF_OUT_INIT_HIGH,
++				    "TS NBUS txrx");
++	if (err)
++		return err;
++
++	err = devm_gpio_request_one(&pdev->dev, ts_nbus->strobe,
++				    GPIOF_OUT_INIT_HIGH,
++				    "TS NBUS strobe");
++	if (err)
++		return err;
++
++	err = devm_gpio_request_one(&pdev->dev, ts_nbus->ale,
++				    GPIOF_OUT_INIT_HIGH,
++				    "TS NBUS ale");
++	if (err)
++		return err;
++
++	err = devm_gpio_request_one(&pdev->dev, ts_nbus->rdy,
++				    GPIOF_IN,
++				    "TS NBUS rdy");
++	if (err)
++		return err;
 +
 +	return 0;
 +}
 +
-+static const struct watchdog_ops ts4600_wdt_ops = {
-+	.owner = THIS_MODULE,
-+	.start = ts4600_wdt_start,
-+	.stop = ts4600_wdt_stop,
-+	.set_timeout = ts4600_wdt_set_timeout,
-+};
-+
-+static const struct watchdog_info ts4600_wdt_info = {
-+	.options = WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE | WDIOF_KEEPALIVEPING,
-+	.identity = "TS-4600 Watchdog",
-+};
-+
-+static int ts4600_wdt_probe(struct platform_device *pdev)
++/*
++ * retrieve all gpios used by the bus from the device tree.
++ */
++static int ts_nbus_get_of_pdata(struct device *dev, struct device_node *np)
 +{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct watchdog_device *wdd;
-+	struct ts4600_wdt *wdt;
-+	u32 reg;
++	int num_data;
++	int *data;
 +	int ret;
++	int i;
 +
-+	ret = of_property_read_u32(np, "reg", &reg);
++	ret = of_gpio_named_count(np, "data-gpios");
 +	if (ret < 0) {
-+		dev_err(&pdev->dev, "missing reg property\n");
++		dev_err(dev,
++			"failed to count GPIOs in DT property data-gpios\n");
 +		return ret;
 +	}
-+
-+	/* check for the NBUS state and defer the probing if it is not ready */
-+	if (!ts_nbus_is_ready())
-+		return -EPROBE_DEFER;
-+
-+	/* allocate memory for watchdog struct */
-+	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
-+	if (!wdt)
++	num_data = ret;
++	data = devm_kzalloc(dev, num_data * sizeof(*data), GFP_KERNEL);
++	if (!data)
 +		return -ENOMEM;
 +
-+	/* set offset to know where to write */
-+	wdt->feed_offset = reg;
++	for (i = 0; i < num_data; i++) {
++		ret = of_get_named_gpio(np, "data-gpios", i);
++		if (ret < 0) {
++			dev_err(dev, "failed to retrieve data-gpio from dts\n");
++			return ret;
++		}
++		data[i] = ret;
++	}
++	ts_nbus->num_data = num_data;
++	ts_nbus->data = data;
 +
-+	/* Initialize struct watchdog_device */
-+	wdd = &wdt->wdd;
-+	wdd->parent = &pdev->dev;
-+	wdd->info = &ts4600_wdt_info;
-+	wdd->ops = &ts4600_wdt_ops;
-+	wdd->min_timeout = ts4600_wdt_map[0].timeout;
-+	wdd->max_timeout = ts4600_wdt_map[MAX_TIMEOUT_INDEX].timeout;
++	ret = of_get_named_gpio(np, "csn-gpios", 0);
++	if (ret < 0) {
++		dev_err(dev, "failed to retrieve csn-gpio from dts\n");
++		return ret;
++	}
++	ts_nbus->csn = ret;
 +
-+	watchdog_set_drvdata(wdd, wdt);
-+	watchdog_set_nowayout(wdd, nowayout);
-+	watchdog_init_timeout(wdd, 0, &pdev->dev);
++	ret = of_get_named_gpio(np, "txrx-gpios", 0);
++	if (ret < 0) {
++		dev_err(dev, "failed to retrieve txrx-gpio from dts\n");
++		return ret;
++	}
++	ts_nbus->txrx = ret;
 +
-+	/*
-+	 * As this watchdog supports only a few values, ts4600_wdt_set_timeout
-+	 * must be called to initialize timeout and feed_val with valid values.
-+	 * Default to maximum timeout if none, or an invalid one, is provided in
-+	 * device tree.
-+	 */
-+	if (!wdd->timeout)
-+		wdd->timeout = wdd->max_timeout;
-+	ts4600_wdt_set_timeout(wdd, wdd->timeout);
++	ret = of_get_named_gpio(np, "strobe-gpios", 0);
++	if (ret < 0) {
++		dev_err(dev, "failed to retrieve strobe-gpio from dts\n");
++		return ret;
++	}
++	ts_nbus->strobe = ret;
 +
-+	/*
-+	 * The feed register is write-only, so it is not possible to determine
-+	 * watchdog's state. Disable it to be in a known state.
-+	 */
-+	ts4600_wdt_stop(wdd);
++	ret = of_get_named_gpio(np, "ale-gpios", 0);
++	if (ret < 0) {
++		dev_err(dev, "failed to retrieve ale-gpio from dts\n");
++		return ret;
++	}
++	ts_nbus->ale = ret;
 +
-+	ret = watchdog_register_device(wdd);
-+	if (ret) {
-+		dev_err(&pdev->dev,
-+			"failed to register watchdog device\n");
++	ret = of_get_named_gpio(np, "rdy-gpios", 0);
++	if (ret < 0) {
++		dev_err(dev, "failed to retrieve rdy-gpio from dts\n");
++		return ret;
++	}
++	ts_nbus->rdy = ret;
++
++	return 0;
++}
++
++/*
++ * the txrx gpio is used by the FPGA to know if the following transactions
++ * should be handled to read or write a value.
++ */
++static inline void ts_nbus_set_mode(int mode)
++{
++	if (mode == TS_NBUS_READ_MODE)
++		gpio_set_value(ts_nbus->txrx, 0);
++	else
++		gpio_set_value(ts_nbus->txrx, 1);
++}
++
++/*
++ * the data gpios are used for reading and writing values, their directions
++ * should be adjusted accordingly.
++ */
++static inline void ts_nbus_set_direction(int direction)
++{
++	int i;
++
++	for (i = 0; i < ts_nbus->num_data; i++) {
++		if (direction == TS_NBUS_DIRECTION_IN)
++			gpio_direction_input(ts_nbus->data[i]);
++		else
++			gpio_direction_output(ts_nbus->data[i], 1);
++	}
++}
++
++/*
++ * reset the bus in its initial state.
++ */
++static inline void ts_nbus_reset_bus(void)
++{
++	int i;
++
++	for (i = 0; i < ts_nbus->num_data; i++)
++		gpio_set_value(ts_nbus->data[i], 0);
++
++	gpio_set_value(ts_nbus->csn, 0);
++	gpio_set_value(ts_nbus->strobe, 0);
++	gpio_set_value(ts_nbus->ale, 0);
++}
++
++/*
++ * let the FPGA knows it can process.
++ */
++static inline void ts_nbus_start_transaction(void)
++{
++	gpio_set_value(ts_nbus->strobe, 1);
++}
++
++/*
++ * return the byte value read from the data gpios.
++ */
++static inline u8 ts_nbus_read_byte(void)
++{
++	int i;
++	u8 value = 0;
++
++	for (i = 0; i < ts_nbus->num_data; i++)
++		if (ts_nbus->data[i])
++			value |= 1 << i;
++
++	return value;
++}
++
++/*
++ * set the data gpios accordingly to the byte value.
++ */
++static inline void ts_nbus_write_byte(u8 byte)
++{
++	int i;
++
++	for (i = 0; i < ts_nbus->num_data; i++)
++		if (byte & (1 << i))
++			gpio_set_value(ts_nbus->data[i], 1);
++}
++
++/*
++ * reading the bus consists of resetting the bus, then notifying the FPGA to
++ * send the data in the data gpios and return the read value.
++ */
++static inline u8 ts_nbus_read_bus(void)
++{
++	ts_nbus_reset_bus();
++	ts_nbus_start_transaction();
++
++	return ts_nbus_read_byte();
++}
++
++/*
++ * writing to the bus consists of resetting the bus, then define the type of
++ * command (address/value), write the data and notify the FPGA to retrieve the
++ * value in the data gpios.
++ */
++static inline void ts_nbus_write_bus(int cmd, u8 value)
++{
++	ts_nbus_reset_bus();
++
++	if (cmd == TS_NBUS_WRITE_ADR)
++		gpio_set_value(ts_nbus->ale, 1);
++
++	ts_nbus_write_byte(value);
++	ts_nbus_start_transaction();
++}
++
++/*
++ * read the value in the FPGA register at the given address.
++ */
++u16 ts_nbus_read(u8 adr)
++{
++	int i;
++	u16 val;
++
++	/* bus access must be atomic */
++	mutex_lock(&ts_nbus_lock);
++
++	/* set the bus in read mode */
++	ts_nbus_set_mode(TS_NBUS_READ_MODE);
++
++	/* write address */
++	ts_nbus_write_bus(TS_NBUS_WRITE_ADR, adr);
++
++	/* set the data gpios direction as input before reading */
++	ts_nbus_set_direction(TS_NBUS_DIRECTION_IN);
++
++	/* reading value MSB first */
++	do {
++		val = 0;
++		for (i = 1; i >= 0; i--)
++			val |= (ts_nbus_read_bus() << (i * 8));
++		gpio_set_value(ts_nbus->csn, 1);
++	} while (gpio_get_value(ts_nbus->rdy));
++
++	/* restore the data gpios direction as output after reading */
++	ts_nbus_set_direction(TS_NBUS_DIRECTION_OUT);
++
++	mutex_unlock(&ts_nbus_lock);
++
++	return val;
++}
++EXPORT_SYMBOL_GPL(ts_nbus_read);
++
++/*
++ * write the desired value in the FPGA register at the given address.
++ */
++int ts_nbus_write(u8 adr, u16 value)
++{
++	int i;
++
++	/* bus access must be atomic */
++	mutex_lock(&ts_nbus_lock);
++
++	/* set the bus in write mode */
++	ts_nbus_set_mode(TS_NBUS_WRITE_MODE);
++
++	/* write address */
++	ts_nbus_write_bus(TS_NBUS_WRITE_ADR, adr);
++
++	/* writing value MSB first */
++	for (i = 1; i >= 0; i--)
++		ts_nbus_write_bus(TS_NBUS_WRITE_VAL, (u8)(value >> (i * 8)));
++
++	/* wait for completion */
++	gpio_set_value(ts_nbus->csn, 1);
++	while (gpio_get_value(ts_nbus->rdy) != 0) {
++		gpio_set_value(ts_nbus->csn, 0);
++		gpio_set_value(ts_nbus->csn, 1);
++	}
++
++	mutex_unlock(&ts_nbus_lock);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(ts_nbus_write);
++
++/*
++ * helper function to know the state of the bus.
++ * this function is useful to let peripherals defer their probing while the bus
++ * is not ready.
++ */
++bool ts_nbus_is_ready(void)
++{
++	bool nbus_state;
++
++	mutex_lock(&ts_nbus_lock);
++	nbus_state = ts_nbus_ready;
++	mutex_unlock(&ts_nbus_lock);
++
++	return nbus_state;
++}
++EXPORT_SYMBOL_GPL(ts_nbus_is_ready);
++
++static int ts_nbus_probe(struct platform_device *pdev)
++{
++	struct pwm_device *pwm;
++	struct pwm_args pargs;
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	int ret;
++
++	ts_nbus = devm_kzalloc(dev, sizeof(*ts_nbus), GFP_KERNEL);
++	if (!ts_nbus)
++		return -ENOMEM;
++
++	ret = ts_nbus_get_of_pdata(dev, np);
++	if (ret)
++		return ret;
++	ret = ts_nbus_init(pdev);
++	if (ret < 0)
++		return ret;
++
++	pwm = devm_pwm_get(dev, NULL);
++	if (IS_ERR(pwm)) {
++		ret = PTR_ERR(pwm);
++		if (ret != -EPROBE_DEFER)
++			dev_err(dev, "unable to request PWM\n");
 +		return ret;
 +	}
 +
-+	platform_set_drvdata(pdev, wdt);
++	pwm_get_args(pwm, &pargs);
++	if (!pargs.period) {
++		dev_err(&pdev->dev, "invalid PWM period\n");
++		return -EINVAL;
++	}
 +
-+	dev_info(&pdev->dev,
-+		 "initialized (timeout = %d sec, nowayout = %d)\n",
-+		 wdd->timeout, nowayout);
++	/*
++	 * FIXME: pwm_apply_args() should be removed when switching to
++	 * the atomic PWM API.
++	 */
++	pwm_apply_args(pwm);
++	ret = pwm_config(pwm, pargs.period, pargs.period);
++	if (ret < 0)
++		return ret;
++
++	/*
++	 * we can now start the FPGA and let the peripherals knows the bus is
++	 * ready.
++	 */
++	pwm_enable(pwm);
++	ts_nbus->pwm = pwm;
++
++	mutex_lock(&ts_nbus_lock);
++	ts_nbus_ready = true;
++	mutex_unlock(&ts_nbus_lock);
++
++	dev_info(dev, "initialized\n");
 +
 +	return 0;
 +}
 +
-+static int ts4600_wdt_remove(struct platform_device *pdev)
++static int ts_nbus_remove(struct platform_device *pdev)
 +{
-+	struct ts4600_wdt *wdt = platform_get_drvdata(pdev);
++	/* disable bus access */
++	mutex_lock(&ts_nbus_lock);
++	ts_nbus_ready = false;
++	mutex_unlock(&ts_nbus_lock);
 +
-+	watchdog_unregister_device(&wdt->wdd);
++	/* shutdown the FPGA */
++	pwm_disable(ts_nbus->pwm);
 +
 +	return 0;
 +}
 +
-+static const struct of_device_id ts4600_wdt_of_match[] = {
-+	{ .compatible = "technologic,ts4600-wdt", },
++static const struct of_device_id ts_nbus_of_match[] = {
++	{ .compatible = "technologic,ts-nbus", },
 +	{ },
 +};
-+MODULE_DEVICE_TABLE(of, ts4600_wdt_of_match);
++MODULE_DEVICE_TABLE(of, ts_nbus_of_match);
 +
-+static struct platform_driver ts4600_wdt_driver = {
-+	.probe		= ts4600_wdt_probe,
-+	.remove		= ts4600_wdt_remove,
++static struct platform_driver ts_nbus_driver = {
++	.probe		= ts_nbus_probe,
++	.remove		= ts_nbus_remove,
 +	.driver		= {
-+		.name	= "ts4600_wdt",
-+		.of_match_table = ts4600_wdt_of_match,
++		.name	= "ts_nbus",
++		.of_match_table = ts_nbus_of_match,
 +	},
 +};
 +
-+module_platform_driver(ts4600_wdt_driver);
++module_platform_driver(ts_nbus_driver);
 +
++MODULE_ALIAS("platform:ts_nbus");
 +MODULE_AUTHOR("Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>");
++MODULE_DESCRIPTION("Technologic Systems NBUS");
 +MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:ts4600_wdt");
+diff --git a/include/linux/ts-nbus.h b/include/linux/ts-nbus.h
+new file mode 100644
+index 0000000..5fcdb96
+--- /dev/null
++++ b/include/linux/ts-nbus.h
+@@ -0,0 +1,17 @@
++/*
++ * Copyright (c) 2016 - Savoir-faire Linux
++ * Author: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef _TS_NBUS_H
++#define _TS_NBUS_H
++
++extern u16 ts_nbus_read(u8 adr);
++extern int ts_nbus_write(u8 adr, u16 value);
++extern bool ts_nbus_is_ready(void);
++
++#endif /* _TS_NBUS_H */
 -- 
 2.10.2
