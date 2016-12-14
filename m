@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Dec 2016 23:46:18 +0100
-Subject: [PATCH 2/4] ARM64: dts: marvell/armada-3720-db: Correct license text
-In-Reply-To: <20161214224620.23830-1-alexandre.belloni@free-electrons.com>
-References: <20161214224620.23830-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214224620.23830-3-alexandre.belloni@free-electrons.com>
+Date: Wed, 14 Dec 2016 23:37:38 +0100
+Subject: [PATCH 31/39] ARM: dts: armada-xp-mv78460: Correct license text
+In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
+References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214223746.23066-32-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,18 +11,20 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
-Cc: Andreas F?rber <afaerber@suse.de>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Simon Guinot <simon.guinot@sequanux.org>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Willy Tarreau <w@1wt.eu>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-3720-db.dts | 10 +++++-----
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-index 1372e9a6aaa4..2e707875039a 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+index 0e24f1a38540..d75a0a8ab8b4 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
 @@ -15,17 +15,17 @@
   *     published by the Free Software Foundation; either version 2 of the
   *     License, or (at your option) any later version.
