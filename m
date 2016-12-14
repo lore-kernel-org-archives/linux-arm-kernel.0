@@ -1,57 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 Dec 2016 16:43:34 -0800
-Subject: [PATCHv4 00/15] clk: ti: add support for hwmod clocks
-In-Reply-To: <148166654419.37646.7680435609801736363@resonance>
-References: <2cfa10a9-9ea0-23e4-30de-9aece13e47e3@ti.com>
- <20161028233750.GQ16026@codeaurora.org>
- <7371ef35-5d95-bf78-4c97-c61091a1fa4b@ti.com>
- <148156710975.37646.2957511113527634913@resonance>
- <20161213004914.GM5423@codeaurora.org>
- <20161213013133.GR4920@atomide.com>
- <148160402543.37646.6019420188689675769@resonance>
- <4b016883-e7c9-94d8-d964-3c8dfee6ee13@ti.com>
- <20161213153724.GT4920@atomide.com>
- <148166654419.37646.7680435609801736363@resonance>
-Message-ID: <20161214004334.GU4920@atomide.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 13 Dec 2016 19:56:14 -0500 (EST)
+Subject: [PATCH 2/2] kbuild: make modversion for exported asm symbols
+ more convivial
+In-Reply-To: <9b2f99ca-0ac6-12b0-e753-5ce6feec96e8@suse.com>
+References: <1481171047-333-1-git-send-email-nicolas.pitre@linaro.org>
+ <1481171047-333-3-git-send-email-nicolas.pitre@linaro.org>
+ <9b2f99ca-0ac6-12b0-e753-5ce6feec96e8@suse.com>
+Message-ID: <alpine.LFD.2.20.1612131935110.1657@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Michael Turquette <mturquette@baylibre.com> [161213 14:02]:
-> Quoting Tony Lindgren (2016-12-13 07:37:24)
-> > For the clkctrl clocks, here's what I'd like to see. The driver should be
-> > just a regular device driver along the lines we did with the ADPLL as in
-> > Documentation/devicetree/bindings/clock/ti/adpll.txt.
+On Wed, 14 Dec 2016, Michal Marek wrote:
+
+> Dne 8.12.2016 v 05:24 Nicolas Pitre napsal(a):
+> > Rather than having an asm-prototypes.h file where C prototypes for exported
+> > asm symbols are centralized, let's have some macros that can be used
+> > directly in the code where those symbols are exported for genksyms
+> > consumption.  Either the prototype is provided directly if no include
+> > files has it, or the include file containing it is specified.
 > > 
-> > For the binding, something like the following should work as a minimal
-> > example, this follows what we have in the hardware:
+> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > ---
+> >  include/asm-generic/export.h | 15 +++++++++++++++
+> >  scripts/Makefile.build       | 22 +++++++++++++++-------
+> >  2 files changed, 30 insertions(+), 7 deletions(-)
 > > 
-> > &prm {
-> >         ...
-> > 
-> >         /* See "CD_WKUP Clock Domain" in 4430 TRM page 393 */
-> >         wkup_cm: clock at 1800 {
-> >                 compatible = "ti,clkctrl";
-> >                 reg = <0x1800 0x100>;
-> >                 #clock-cells = <1>;
-> >                 clocks = <&wkup_l4_iclk2 &wkup_32k_fclk
-> >                           &32k_fclk &gp1_fclk>;
-> >                 clock-output-names =
-> >                         "sysctrl_padconf_wkup",
-> >                         "badgap",
-> >                         "sysctrl_general_wkup",
-> >                         "gpio1",
-> >                         "keyboard",
-> >                         "sar_ram",
-> >                         "32ktimer",
-> >                         "gptimer1";
+> > diff --git a/include/asm-generic/export.h b/include/asm-generic/export.h
+> > index 39a19dc366..83dda5f840 100644
+> > --- a/include/asm-generic/export.h
+> > +++ b/include/asm-generic/export.h
+> > @@ -84,11 +84,26 @@ KSYM(__kcrctab_\name):
+> >  #define __EXPORT_SYMBOL(sym, val, sec) ___EXPORT_SYMBOL sym, val, sec
+> >  #endif
+> >  
+> > +/* in the non genksyms case those are no-ops */
+> > +#define SYMBOL_CPROTO(expr)
+> > +#define SYMBOL_CPROTO_INCLUDE(file)
 > 
-> Is there a technical reason to use clock-output-names? If you share a
-> header between the clock provider driver and DT with the phandle offsets
-> then we should be able to avoid this property altogether. Stephen and I
-> are trying to phase this one out as much as possible.
+> Do we really _need_ the SYMBOL_CPROTO macro? The exported functions are
+> called from C files presumably, so there ought to be headers with the
+> declarations. If these headers can't be included easily, we should fix
+> them, but having copies of the declarations in the asm files is no big
+> improvement over the asm-prototypes.h approach, IMO.
 
-Oh OK no reason for names, defines for the offsets will work just fine.
+On ARM there are a few symbols that are part of the gcc support library 
+such as division routines and so on.  Those are never called directly 
+from C code. It is the compiler that implicitly creates references to 
+them.  However, in order to be able to export those symbols, dummy C 
+prototypes were used before it was possible to export symbols from asm 
+code but those prototypes make no sense otherwise.  So the SYMBOL_CPROTO 
+macro is there mainly to maintain backward compatibility with the 
+traditional symbol version signature for those symbols.
 
-Regards,
+The SYMBOL_CPROTO macro, being close to the actual code, could mark the 
+intended definition for symbols in assembly code and allow for a tool to 
+ensure there is no mismatch with the actual declaration located 
+elsewhere. That could be useful for all global symbols, not just 
+exported ones.  But that's not the primary reason why I created it.
 
-Tony
+
+Nicolas
