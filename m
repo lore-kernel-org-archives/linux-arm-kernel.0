@@ -1,52 +1,56 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 15 Dec 2016 01:07:52 +0300
-Subject: [PATCH] ARM: dts: r8a7791: link DU to VSPDs
-In-Reply-To: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
-References: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
-Message-ID: <1922293.x1RvWWSErN@wasted.cogentembedded.com>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Wed, 14 Dec 2016 17:10:35 -0500
+Subject: [PATCH V9 0/3] irqchip: qcom: Add IRQ combiner driver
+Message-ID: <1481753438-3905-1-git-send-email-agustinv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the "vsps" property to the DU device node in order to link this node to
-the VSPD nodes.
+Add support for IRQ combiners in the Top-level Control and Status
+Registers (TCSR) hardware block in Qualcomm Technologies chips.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+The first patch prevents the ACPI core from attempting to map IRQ resources
+with a valid ResourceSource as GSIs.
 
----
-This patch is against the 'renesas-devel-20161212-v4.9' of Simon Horman's
-'renesas.git' repo.  It's  only meaningful if the DU driver patch I've just
-posted is applied.
+The first patch adds support for ResourceSource/IRQ domain mapping and
+fixes IRQ probe deferral by allowing platform_device IRQ resources to be
+re-initialized from the corresponding ACPI IRQ resource.
 
- arch/arm/boot/dts/r8a7791.dtsi |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Both changes described above are conditional on the ACPI_GENERIC_GSI config.
 
-Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7791.dtsi
-@@ -989,7 +989,7 @@
- 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
- 	};
- 
--	vsp1 at fe930000 {
-+	vspd0: vsp1 at fe930000 {
- 		compatible = "renesas,vsp1";
- 		reg = <0 0xfe930000 0 0x8000>;
- 		interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
-@@ -997,7 +997,7 @@
- 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
- 	};
- 
--	vsp1 at fe938000 {
-+	vspd1: vsp1 at fe938000 {
- 		compatible = "renesas,vsp1";
- 		reg = <0 0xfe938000 0 0x8000>;
- 		interrupts = <GIC_SPI 247 IRQ_TYPE_LEVEL_HIGH>;
-@@ -1016,6 +1016,7 @@
- 			 <&mstp7_clks R8A7791_CLK_DU1>,
- 			 <&mstp7_clks R8A7791_CLK_LVDS0>;
- 		clock-names = "du.0", "du.1", "lvds.0";
-+		vsps = <&vspd0 &vspd1>;
- 		status = "disabled";
- 
- 		ports {
+The third patch takes advantage of the new capabilities to implement
+the driver for the IRQ combiners.
+
+Tested on top of v4.9.
+
+Changes V8 -> V9:
+* Do not attempt the mapping for non-GSI IRQs during bus scan.
+* Make some public APIs private to drivers/acpi/irq.c since they are no
+  longer used on other modules.
+
+Changes V7 -> V8:
+* Reorder patches to allow all new code to be under drivers/acpi/irq.c.
+* Change acpi_irq_get implementation to be more similar to of_irq_get
+  to improve maintainability.
+
+Agustin Vega-Frias (3):
+  ACPI: Generic GSI: Do not attempt to map non-GSI IRQs during bus scan
+  ACPI: Add support for ResourceSource/IRQ domain mapping
+  irqchip: qcom: Add IRQ combiner driver
+
+ drivers/acpi/Makefile               |   2 +-
+ drivers/acpi/gsi.c                  |  98 -----------
+ drivers/acpi/irq.c                  | 280 +++++++++++++++++++++++++++++++
+ drivers/acpi/resource.c             |  17 +-
+ drivers/base/platform.c             |   9 +-
+ drivers/irqchip/Kconfig             |   9 +
+ drivers/irqchip/Makefile            |   1 +
+ drivers/irqchip/qcom-irq-combiner.c | 322 ++++++++++++++++++++++++++++++++++++
+ include/linux/acpi.h                |  10 ++
+ 9 files changed, 647 insertions(+), 101 deletions(-)
+ delete mode 100644 drivers/acpi/gsi.c
+ create mode 100644 drivers/acpi/irq.c
+ create mode 100644 drivers/irqchip/qcom-irq-combiner.c
+
+--
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
