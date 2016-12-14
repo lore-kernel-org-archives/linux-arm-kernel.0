@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Dec 2016 00:57:35 +0100
-Subject: [PATCH 26/37] ARM: dts: imx6sx-nitrogen6sx: Correct license text
+Date: Thu, 15 Dec 2016 00:57:36 +0100
+Subject: [PATCH 27/37] ARM: dts: imx6sx-sdb-sai: Correct license text
 In-Reply-To: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
 References: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214235746.7108-27-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214235746.7108-28-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,17 +11,15 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
-Cc: Gary Bisson <gary.bisson@boundarydevices.com>
-Cc: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/imx6sx-nitrogen6sx.dts | 10 +++++-----
+ arch/arm/boot/dts/imx6sx-sdb-sai.dts | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6sx-nitrogen6sx.dts b/arch/arm/boot/dts/imx6sx-nitrogen6sx.dts
-index 9b817f3501a6..b9de06da576a 100644
---- a/arch/arm/boot/dts/imx6sx-nitrogen6sx.dts
-+++ b/arch/arm/boot/dts/imx6sx-nitrogen6sx.dts
+diff --git a/arch/arm/boot/dts/imx6sx-sdb-sai.dts b/arch/arm/boot/dts/imx6sx-sdb-sai.dts
+index 0155450d680e..2ac865b7c364 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb-sai.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb-sai.dts
 @@ -10,17 +10,17 @@
   *     modify it under the terms of the GNU General Public License
   *     version 2 as published by the Free Software Foundation.
