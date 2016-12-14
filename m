@@ -1,95 +1,74 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 14 Dec 2016 10:15:33 +0000
-Subject: [RFC v2 PATCH 0/3] Fix dma_alloc_coherent() and friends for NOMMU
-In-Reply-To: <552e7994-31ee-9ec8-4acd-8f37d1a157a4@arm.com>
-References: <1481636704-18948-1-git-send-email-vladimir.murzin@arm.com>
- <20161213140711.GY14217@n2100.armlinux.org.uk> <58500243.8070107@arm.com>
- <ed07f3ca-8ce7-fb1b-2292-238ecf6460da@arm.com> <58500D86.4070600@arm.com>
- <552e7994-31ee-9ec8-4acd-8f37d1a157a4@arm.com>
-Message-ID: <58511BC5.9060904@arm.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Wed, 14 Dec 2016 10:46:30 +0000
+Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
+In-Reply-To: <20161213113044.GC19985@leverpostej>
+References: <20161213113044.GC19985@leverpostej>
+Message-ID: <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/12/16 18:32, Robin Murphy wrote:
-> On 13/12/16 15:02, Vladimir Murzin wrote:
->> On 13/12/16 14:25, Robin Murphy wrote:
->>> On 13/12/16 14:14, Vladimir Murzin wrote:
->>>> On 13/12/16 14:07, Russell King - ARM Linux wrote:
->>>>> On Tue, Dec 13, 2016 at 01:45:01PM +0000, Vladimir Murzin wrote:
->>>>>> This patch set is trying to address the issue by providing region of
->>>>>> memory suitable for consistent DMA operations. It is supposed that such
->>>>>> region is marked by MPU as non-cacheable. Since we have MPU support in
->>>>>> Linux for R-class only and M-class setting MPU in bootloader, proposed
->>>>>> interface to advertise such memory is via "memdma=size at start" command
->>>>>> line option, to avoid clashing with normal memory (which usually comes
->>>>>> from dts) it'd be safer to use it together with "mem=" command line
->>>>>> option. Meanwhile, I'm open to suggestions for the better way telling
->>>>>> Linux of such memory.
->>>>>
->>>>> For those nommu systems where the MPU is not used, how do they allocate
->>>>> DMA memory without setting aside a chunk of memory?
->>>>>
->>>>> >From what I understand of the current nommu code, it would just use
->>>>> the normal page allocator for DMA memory allocation, so now requiring
->>>>> everything to fit the "nommu has mpu" case seems like it's going to
->>>>> break older nommu.
->>>>>
->>>>
->>>> Probably, it'd be better if we just fallback to dma-noop operations if there
->>>> is no dma region, i.e. assume that platform is coherent. We still need a way
->>>> to tell user that absence of such region can be reason of broken DMA.
->>>
->>> As I mentioned internally, I think it would be worth trying to use CMA
->>> for this, because dma_map_ops are already wired to try that first, and
->>> from what I can see it seems already set up to do precisely this via a
->>> "shared-dma-pool" reserved memory region (see rmem_cma_setup() in
->>> drivers/base/dma-contiguous.c) - mandating that for cached v7-M systems
->>> whilst letting cache-less/non-MPU systems automatically fall back to the
->>> normal page allocator in its absence would seem to solve all 3 cases.
->>
->> Unfortunately,
->>
->> config DMA_CMA
->>         bool "DMA Contiguous Memory Allocator"
->>         depends on HAVE_DMA_CONTIGUOUS && CMA
->>         help
->> ...
->> config CMA
->>         bool "Contiguous Memory Allocator"
->>         depends on HAVE_MEMBLOCK && MMU
->> 	select MIGRATION
->>
->> and it blows up if I remove dependecy on MMU :(
-> 
-> Ah yes, fair enough.
-> 
->> Another option would be drivers/base/dma-coherent.c, but, IIUC, in this case
->> memory is reserved per device exclusively, so I'm in doubt if tiny M-class can
->> afford that...
-> 
-> I think as usual I managed to conflate the two - it was actually
-> dma_alloc_from_coherent() I had in mind when I mentioned dma_map_ops. It
-> does seem from 7bfa5ab6fa1b that dma-coherent *can* handle multiple
-> devices per region, so it wouldn't appear to be too hard to implement a
-> default coherent region (possibly specific to ARM_MPU) for all devices
-> in a similar manner to the default contiguous region. Either way I do
-> still think a reserved memory region in the DT is nicer and probably
-> more robust than the command line parameter.
+Improve the hyp-stub ABI to allow it to do more than just get/set the
+vectors.  We follow the example in ARM64, where r0 is used as an opcode
+with the other registers as an argument.
 
-Ok, I'll look at this option in detail.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/kernel/hyp-stub.S | 27 ++++++++++++++++++++++-----
+ 1 file changed, 22 insertions(+), 5 deletions(-)
 
-Thanks
-Vladimir
-
-> 
-> Robin.
-> 
->>> Other than the allocator issue, though, the rest of the refactoring does
->>> look nice.
->>
->> Thanks for going through it!
->>
->> Cheers
->> Vladimir
-> 
-> 
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index 15d073ae5da2..f3e9ba5fb642 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -22,6 +22,9 @@
+ #include <asm/assembler.h>
+ #include <asm/virt.h>
+ 
++#define HVC_GET_VECTORS 0
++#define HVC_SET_VECTORS 1
++
+ #ifndef ZIMAGE
+ /*
+  * For the kernel proper, we need to find out the CPU boot mode long after
+@@ -202,9 +205,19 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
+ ENDPROC(__hyp_stub_install_secondary)
+ 
+ __hyp_stub_do_trap:
+-	cmp	r0, #-1
+-	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
+-	mcrne	p15, 4, r0, c12, c0, 0	@ set HVBAR
++	teq	r0, #HVC_GET_VECTORS
++	bne	1f
++	mrc	p15, 4, r0, c12, c0, 0	@ get HVBAR
++	b	__hyp_stub_exit
++
++1:	teq	r0, #HVC_SET_VECTORS
++	bne	1f
++	mcr	p15, 4, r1, c12, c0, 0	@ set HVBAR
++	b	__hyp_stub_exit
++
++1:	mov	r0, #-1
++
++__hyp_stub_exit:
+ 	__ERET
+ ENDPROC(__hyp_stub_do_trap)
+ 
+@@ -231,10 +244,14 @@ ENDPROC(__hyp_stub_do_trap)
+  * initialisation entry point.
+  */
+ ENTRY(__hyp_get_vectors)
+-	mov	r0, #-1
++	mov	r0, #HVC_GET_VECTORS
++	__HVC(0)
++	ret	lr
+ ENDPROC(__hyp_get_vectors)
+-	@ fall through
++
+ ENTRY(__hyp_set_vectors)
++	mov	r1, r0
++	mov	r0, #HVC_SET_VECTORS
+ 	__HVC(0)
+ 	ret	lr
+ ENDPROC(__hyp_set_vectors)
+-- 
+2.7.4
