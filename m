@@ -1,52 +1,29 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 14 Dec 2016 15:09:34 +0100
-Subject: [PATCH] ARM: dts: sunxi: Change node name for pwrseq pin on
- Olinuxino-lime2-emmc
-In-Reply-To: <20161214100856.23735-1-manu@bidouilliste.com>
-References: <20161214100856.23735-1-manu@bidouilliste.com>
-Message-ID: <20161214140934.zdztogdjjis23raw@lukather>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 14 Dec 2016 19:43:50 +0530
+Subject: [PATCH 1/2] arm64: Add enable/disable d-cache support for
+ purgatory
+In-Reply-To: <20161214134457.GJ17982@leverpostej>
+References: <cover.1479788404.git.panand@redhat.com>
+ <7a4866b928c0905ec1074dce1bfc7984c968a58a.1479788404.git.panand@redhat.com>
+ <5838834D.90205@arm.com> <d8f354da-1e61-feaf-f76a-18e90361e98b@redhat.com>
+ <9a79b666-7990-2a23-2d74-52b3317ce272@redhat.com> <58512A01.70101@arm.com>
+ <20161214113701.GE17982@leverpostej>
+ <3a6ac655-bfa6-0d90-6351-731ce36e99eb@redhat.com>
+ <20161214134457.GJ17982@leverpostej>
+Message-ID: <8a22f7bb-d0c4-8bda-4c2a-7a5c0b441a9b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emmanuel,
 
-On Wed, Dec 14, 2016 at 11:08:56AM +0100, Emmanuel Vadot wrote:
-> The node name for the power seq pin is mmc2 at 0 like the mmc2_pins_a one.
-> This makes the original node (mmc2_pins_a) scrapped out of the dtb and
-> result in a unusable eMMC if U-Boot didn't configured the pins to the
-> correct functions.
-> 
-> Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
-> ---
->  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
-> index 5ea4915..68cb1b5 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
-> @@ -56,7 +56,7 @@
->  };
->  
->  &pio {
-> -	mmc2_pins_nrst: mmc2 at 0 {
-> +	mmc2_pins_nrst: mmc2 at 1 {
 
-That would be even better if you renamed it to something like
-mmc2-rst-pin to avoid all future conflicts (for example if we ever add
-a second mmc pins groups.
+On Wednesday 14 December 2016 07:14 PM, Mark Rutland wrote:
+>> Even for the non-kdump ie `kexec -l` case we do not have a
+>> > functionality to bypass sha verification in kexec-tools. --lite
+>> > option with the kexec-tools was discouraged and not accepted.
+> Ok. Do you have a pointer to the thread regarding that, for context?
+>
 
-Thanks!
-Maxime
+https://lists.ozlabs.org/pipermail/petitboot/2015-October/000141.html
+https://lists.ozlabs.org/pipermail/petitboot/2015-October/000136.html
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161214/a7d1b197/attachment-0001.sig>
+~Pratyush
