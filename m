@@ -1,9 +1,9 @@
 From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
-Date: Wed, 14 Dec 2016 18:12:32 -0500
+Date: Wed, 14 Dec 2016 18:12:37 -0500
 Subject: [PATCH 2/6] ARM: dts: TS-4600: add basic device tree
 In-Reply-To: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
 References: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
-Message-ID: <20161214231237.17496-3-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20161214231237.17496-8-sebastien.bourdelin@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
