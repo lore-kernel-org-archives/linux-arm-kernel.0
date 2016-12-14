@@ -1,39 +1,44 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 14 Dec 2016 09:11:47 +0000
-Subject: [PATCH 2/2] arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA
-In-Reply-To: <1481706707-6211-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1481706707-6211-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1481706707-6211-3-git-send-email-ard.biesheuvel@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 14 Dec 2016 10:21:03 +0100
+Subject: [PATCH 2/6] clk: sunxi-ng: set the parent rate when adjustin
+ CPUX clock on A33
+In-Reply-To: <306991481662454@web33j.yandex.ru>
+References: <20161213152252.53749-1-icenowy@aosc.xyz>
+ <20161213152252.53749-3-icenowy@aosc.xyz>
+ <20161213154451.y4wcrqhtcc5sqli7@lukather>
+ <306991481662454@web33j.yandex.ru>
+Message-ID: <20161214092103.xgs62aqkjgsseuqe@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NUMA code may get confused by the presence of NOMAP regions within
-zones, resulting in spurious BUG() checks where the node id deviates
-from the containing zone's node id.
+On Wed, Dec 14, 2016 at 04:54:14AM +0800, Icenowy Zheng wrote:
+> 
+> 
+> 13.12.2016, 23:44, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > On Tue, Dec 13, 2016 at 11:22:48PM +0800, Icenowy Zheng wrote:
+> >> ?The CPUX clock on A33, which is for the Cortex-A7 cores, is designed to
+> >> ?be changeable by changing the rate of PLL_CPUX.
+> >>
+> >> ?Add CLK_SET_RATE_PARENT flag to this clock.
+> >>
+> >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> >
+> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> Excuse me, have you merged this patch?
 
-Since the kernel has no business reasoning about node ids of pages it
-does not own in the first place, enable CONFIG_HOLES_IN_ZONE to ensure
-that such pages are disregarded.
+Yes, sorry, that's what I meant :)
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/Kconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+Maxime
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 111742126897..0472afe64d55 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -614,6 +614,10 @@ config NEED_PER_CPU_EMBED_FIRST_CHUNK
- 	def_bool y
- 	depends on NUMA
- 
-+config HOLES_IN_ZONE
-+	def_bool y
-+	depends on NUMA
-+
- source kernel/Kconfig.preempt
- source kernel/Kconfig.hz
- 
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161214/f4ba7e80/attachment.sig>
