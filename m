@@ -1,25 +1,122 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Wed, 14 Dec 2016 18:58:05 +0000
-Subject: [PATCH v3 2/2] FPGA: Add TS-7300 FPGA manager
-In-Reply-To: <cf772070-73d9-fa07-b2b9-e0038832b7be@gmail.com>
-References: <20161214023553.9377-1-f.fainelli@gmail.com>
- <20161214023553.9377-3-f.fainelli@gmail.com>
- <CAAtXAHe6q2jRWXt+KUWCFnP5j21E3x=P+4wjZTOaSSB_pX71Eg@mail.gmail.com>
- <cf772070-73d9-fa07-b2b9-e0038832b7be@gmail.com>
-Message-ID: <SN1PR0101MB1565A30EFE8AFEB319B84124D09A0@SN1PR0101MB1565.prod.exchangelabs.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Wed, 14 Dec 2016 20:02:57 +0100
+Subject: [PATCH v4 00/12] mmc: Add support to Marvell Xenon SD Host
+ Controller
+In-Reply-To: <CAPv3WKeE_2gMn12MXraoUmDEJhi307mGuc4BgDYpethKNsMqRQ@mail.gmail.com>
+References: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
+ <CAPv3WKeE_2gMn12MXraoUmDEJhi307mGuc4BgDYpethKNsMqRQ@mail.gmail.com>
+Message-ID: <CAPv3WKe9OZv_q-vJovcArFV+OdjV9PavS2cUmhikY-L++e3okA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 14, 2016 11:55 AM, Florian Fainelli wrote:
-> My understanding is that, yes, this triggers the final write. You are
-> right that ts73xx_fpga_write() can be called multiple times. It sounds
-> like what my write_complete function does right now is just return that
-> we successfully completed the bistream write, but this snippet that you
-> are quoting should actually be moved into write_complete.
+Resend in plain text, sorry for noise.
 
-Florian,
-
-I'm in the process of getting a TS-7300 board so I can help test this. Hopefully
-I will have it by next week.
-
-Hartley
+2016-12-14 20:02 GMT+01:00 Marcin Wojtas <mw@semihalf.com>:
+> Hi Gregory,
+>
+> Checked a3700 and a7k (both interfaces, CP - one after changing to use eMMC
+> variant in DT). Everything works fine. You can add:
+>
+> Tested-by: Marcin Wojtas <mw@semihalf.com>
+>
+> Best regards,
+> Marcin
+>
+> 2016-12-13 18:48 GMT+01:00 Gregory CLEMENT
+> <gregory.clement@free-electrons.com>:
+>>
+>> Hello,
+>>
+>> This the forth version of the series adding support for the SDHCI
+>> Xenon controller. It can be currently found on the Armada 37xx and the
+>> Armada 7K/8K but will be also used in more Marvell SoC (and not only
+>> the mvebu ones actually).
+>>
+>> v3 -> v4:
+>> For this version a few change have been done:
+>> - fixes 2 bug  reported by kbuild-bot
+>>   - remove extra of_node_put()
+>>   - convert 0 in false for function returning boolean
+>>
+>> - add a device tree node for the sdhci controller present on the CP
+>>   master for A7K/A8K. It also led to rename the sdhci0 node on AP to
+>>   ap_sdhci0 to make a distinction with the one present on CP master.
+>>
+>> v2 -> v3
+>> I think that now most (if not all) the remarks had been taking into
+>> account since the second version. According to Ziji Hu, here are the
+>> following changes:
+>> " Changes in V3:
+>>   Adjust and improve Xenon DT bindings. Move some caps setting from driver
+>> into
+>>   DT. Use mmc-card sub-node to represent eMMC type.
+>>   Remove PHY Sampling Fixed Delay Line scan in lower speed mode.
+>>   Improve Xenon probe and ->init_card() functions.
+>>   Export sdhci_enable_sdio_irq() and implement own SDIO IRQ control.
+>>   Split PHY patch into two smaller patches.
+>>   Temporarily remove AXI clock before its implementation is improved."
+>>
+>> Besides this changes I also
+>> - Removed the sdhci-xenon-phy.h and moved its content in the
+>> shc-xenon-phy.c file.
+>> - Fixed the tuning-count usage
+>> - Managed the error case for clk_prepare_enable
+>>
+>> For the record the change from v1 was:
+>> " Changes in V2:
+>>   rebase on v4.9-rc2.
+>>   Re-write Xenon bindings. Ajust Xenon DT property naming.
+>>   Add a new DT property to indicate eMMC card type, instead of using
+>>   variable card_candidate.
+>>   Clear quirks SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12 in Xenon platform data
+>>   Add support to HS400 retuning."
+>>
+>> Thanks,
+>>
+>> Gregory
+>>
+>> Gregory CLEMENT (3):
+>>   arm64: dts: marvell: add eMMC support for Armada 37xx
+>>   arm64: dts: marvell: add sdhci support for Armada 7K/8K
+>>   arm64: configs: enable SDHCI driver for Xenon
+>>
+>> Hu Ziji (9):
+>>   mmc: sdhci: Export sdhci_set_ios() from sdhci.c
+>>   mmc: sdhci: Export sdhci_start_signal_voltage_switch() in sdhci.c
+>>   mmc: sdhci: Export sdhci_execute_tuning() in sdhci.c
+>>   mmc: sdhci: Export sdhci_enable_sdio_irq() from sdhci.c
+>>   MAINTAINERS: add entry for Marvell Xenon MMC Host Controller drivers
+>>   dt: bindings: Add bindings for Marvell Xenon SD Host Controller
+>>   mmc: sdhci-xenon: Add Marvell Xenon SDHC core functionality
+>>   mmc: sdhci-xenon: Add support to PHYs of Marvell Xenon SDHC.
+>>   mmc: sdhci-xenon: Add SOC PHY PAD voltage control
+>>
+>>  Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt | 197 ++-
+>>  MAINTAINERS                                                   |   7 +-
+>>  arch/arm64/boot/dts/marvell/armada-3720-db.dts                |  17 +-
+>>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi                  |  11 +-
+>>  arch/arm64/boot/dts/marvell/armada-7040-db.dts                |  14 +-
+>>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi                 |   9 +-
+>>  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi          |  10 +-
+>>  arch/arm64/configs/defconfig                                  |   1 +-
+>>  drivers/mmc/host/Kconfig                                      |   9 +-
+>>  drivers/mmc/host/Makefile                                     |   3 +-
+>>  drivers/mmc/host/sdhci-xenon-phy.c                            | 908
+>> +++++++-
+>>  drivers/mmc/host/sdhci-xenon.c                                | 615
+>> +++++-
+>>  drivers/mmc/host/sdhci-xenon.h                                | 111 +-
+>>  drivers/mmc/host/sdhci.c                                      |  14 +-
+>>  drivers/mmc/host/sdhci.h                                      |   5 +-
+>>  15 files changed, 1926 insertions(+), 5 deletions(-)
+>>  create mode 100644
+>> Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
+>>  create mode 100644 drivers/mmc/host/sdhci-xenon-phy.c
+>>  create mode 100644 drivers/mmc/host/sdhci-xenon.c
+>>  create mode 100644 drivers/mmc/host/sdhci-xenon.h
+>>
+>> base-commit: 9fe68cad6e74967b88d0c6aeca7d9cd6b6e91942
+>> --
+>> git-series 0.9.1
+>
+>
