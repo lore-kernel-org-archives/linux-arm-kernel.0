@@ -1,45 +1,52 @@
-From: yao.yuan@nxp.com (Yao Yuan)
-Date: Wed, 14 Dec 2016 07:52:07 +0000
-Subject: [PATCH 5/5] Documentation: fsl-quadspi: Add fsl, ls1012a-qspi
- compatible string
-In-Reply-To: <CAL_Jsq+jp_2m7D=Hv6TRa+1nQZhPis-0MPK5kOAWge_7RvN4Qg@mail.gmail.com>
-References: <1481188984-43683-1-git-send-email-yao.yuan@freescale.com>
- <1481188984-43683-6-git-send-email-yao.yuan@freescale.com>
- <20161212170948.fq7v5lva4kgt6hly@rob-hp-laptop>
- <DB6PR0402MB2902DADEB4E6D06418AD311F899B0@DB6PR0402MB2902.eurprd04.prod.outlook.com>
- <CAL_Jsq+jp_2m7D=Hv6TRa+1nQZhPis-0MPK5kOAWge_7RvN4Qg@mail.gmail.com>
-Message-ID: <AM5PR0402MB2900DCF4C944648A9E50535C899A0@AM5PR0402MB2900.eurprd04.prod.outlook.com>
+From: jaghu@google.com (Jaghathiswari Rankappagounder Natarajan)
+Date: Tue, 13 Dec 2016 23:55:00 -0800
+Subject: [PATCH linux v1 0/4] Seven segment display support
+Message-ID: <1481702104-8617-1-git-send-email-jaghu@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 14, 2016 at 05:23:02PM +0800, Rob Herring wrote:
-> On Mon, Dec 12, 2016 at 8:47 PM, Yao Yuan <yao.yuan@nxp.com> wrote:
-> > On Thu, Dec 13, 2016 at 05:23:02PM +0800, Rob Herring wrote:
-> >> On Thu, Dec 08, 2016 at 05:23:04PM +0800, Yuan Yao wrote:
-> >> > From: Yuan Yao <yao.yuan@nxp.com>
-> >>
-> >> Same problem in this subject too.
-> >>
-> >> >
-> >> > new compatible string: "fsl,ls1012a-qspi".
-> >> >
-> >> > Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
-> >> > ---
-> >> >  Documentation/devicetree/bindings/mtd/fsl-quadspi.txt | 1 +
-> >> >  1 file changed, 1 insertion(+)
-> >>
-> >> Acked-by: Rob Herring <robh@kernel.org>
-> >
-> > Thanks for your review.
-> > And do you have any suggestion for this subject?
-> 
-> The problem is you have a space in the compatible string: "fsl, ls1012a-qspi"
-> rather than "fsl,ls1012a-qspi"
-> 
-> Also, I prefer "dt/bindings: " as the beginning of binding patch subjects.
-> 
+This patchset includes:
 
-Ok, Get it.
+Documentation for the binding which provides an interface for adding clock,
+data and clear signal GPIO lines to control seven segment display.
 
-Thanks for your comments.
-I will send v2 soon.
+The platform device driver provides an API for displaying on two 7-segment
+displays, and implements the required bit-banging. The hardware assumed is
+74HC164 wired to two 7-segment displays.
+
+The character device driver implements the user-space API for letting a user
+write to two 7-segment displays including any conversion methods necessary
+to map the user input to two 7-segment displays.
+
+Adding clock, data and clear signal GPIO lines in the devicetree to control
+seven segment display on zaius platform.
+
+The platform driver matches on the device tree node; the platform driver also
+initializes the character device.
+
+Tested that the seven segment display works properly by writing to the
+character device file on a EVB AST2500 board which also has 74HC164 wired
+to two 7-segment displays.
+
+Jaghathiswari Rankappagounder Natarajan (4):
+  Documentation: dt-bindings: Document bindings for seven segment
+    display support
+  drivers: misc: Character device driver for seven segment display
+  drivers: misc: Platform driver for seven segment display support
+  arm: dts: Add dt-binding to support seven segment display on zaius
+
+ .../devicetree/bindings/misc/seven-seg-gpio.txt    |  27 +++
+ arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts         |   8 +
+ drivers/misc/Kconfig                               |  16 ++
+ drivers/misc/Makefile                              |   2 +
+ drivers/misc/seven_seg_disp.c                      | 197 ++++++++++++++++++++
+ drivers/misc/seven_seg_disp.h                      |  34 ++++
+ drivers/misc/seven_seg_gpio.c                      | 206 +++++++++++++++++++++
+ 7 files changed, 490 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/misc/seven-seg-gpio.txt
+ create mode 100644 drivers/misc/seven_seg_disp.c
+ create mode 100644 drivers/misc/seven_seg_disp.h
+ create mode 100644 drivers/misc/seven_seg_gpio.c
+
+--
+2.8.0.rc3.226.g39d4020
