@@ -1,41 +1,74 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 14 Dec 2016 17:40:53 +0000
-Subject: [PATCH v2 2/2] mfd: axp20x: Fix AXP806 access errors on cold boot
-In-Reply-To: <CAGb2v66vggNNfFrAiNKKGXY0ayiG1qh5tcRok2NLTRkVHWKFeg@mail.gmail.com>
-References: <20161123031616.10114-1-wens@csie.org>
- <20161123031616.10114-3-wens@csie.org>
- <20161209112018.GL3625@dell.home>
- <20161213164742.4ztisstxifatlm5a@sirena.org.uk>
- <CAGb2v66vggNNfFrAiNKKGXY0ayiG1qh5tcRok2NLTRkVHWKFeg@mail.gmail.com>
-Message-ID: <20161214174053.qsm6umlgtdivevwt@sirena.org.uk>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 14 Dec 2016 18:47:43 +0100
+Subject: Linux crashes when trying to online secondary core
+In-Reply-To: <alpine.DEB.2.20.1612141807410.3556@nanos>
+References: <ef972981-3fb6-74a4-cd83-a6629d2dab2a@free.fr>
+ <alpine.DEB.2.20.1612141807410.3556@nanos>
+Message-ID: <8a021a90-e69e-f38b-c8df-ea8963f3973f@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2016 at 09:52:31PM +0800, Chen-Yu Tsai wrote:
+On 14/12/2016 18:08, Thomas Gleixner wrote:
 
-> What this patch does is make sure the registers match, to guarantee
-> access, and then reinitialize the regmap cache to get rid of any
-> stale data.
+> On Wed, 14 Dec 2016, Mason wrote:
+> 
+>> I'm seeing Linux v4.9 crash (dereferencing NULL) when I try to online
+>> the secondary core, after putting it offline.
+> 
+> Does the patch below fix the issue?
+> 
+> Thanks,
+> 
+> 	tglx
+> 	
+> 8<---------------
+> 
+> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+> index 22acee76cf4c..2594c287b078 100644
+> --- a/include/linux/cpuhotplug.h
+> +++ b/include/linux/cpuhotplug.h
+> @@ -101,7 +101,6 @@ enum cpuhp_state {
+>  	CPUHP_AP_ARM_L2X0_STARTING,
+>  	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
+>  	CPUHP_AP_ARM_GLOBAL_TIMER_STARTING,
+> -	CPUHP_AP_DUMMY_TIMER_STARTING,
+>  	CPUHP_AP_JCORE_TIMER_STARTING,
+>  	CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
+>  	CPUHP_AP_ARM_TWD_STARTING,
+> @@ -111,6 +110,7 @@ enum cpuhp_state {
+>  	CPUHP_AP_MARCO_TIMER_STARTING,
+>  	CPUHP_AP_MIPS_GIC_TIMER_STARTING,
+>  	CPUHP_AP_ARC_TIMER_STARTING,
+> +	CPUHP_AP_DUMMY_TIMER_STARTING,
+>  	CPUHP_AP_KVM_STARTING,
+>  	CPUHP_AP_KVM_ARM_VGIC_INIT_STARTING,
+>  	CPUHP_AP_KVM_ARM_VGIC_STARTING,
 
-So what you're saying is that previous writes may have been ignored?
+$ patch -p1 < tglx.patch 
+patching file include/linux/cpuhotplug.h
+Hunk #1 succeeded at 80 (offset -21 lines).
+Hunk #2 succeeded@89 (offset -21 lines).
 
-> > If the chip has been reset then you'd want to reset the cache too.  I've
-> > no idea if that's needed here or not though, it depends what happens to
-> > the global state of the chip when this reconfiguration happens.
+It does seem to fix the problem:
 
-> It is not a reset in the general sense. I suppose a better way would
-> be to do an explicit write to the register first, then initialize
-> the regmap. I'd have to export the write function from the RSB bus
-> driver first though.
+# echo 0 > /sys/devices/system/cpu/cpu1/online
+SMC called with a0=0x00[000001 a1=0x00000121 a2=0x00000005  a3 =0xc01189b4  0x00000121
+[1][flow/suspend3.c:39] CPU 1 die: jumping6 to. post-boot WFE
+402826] CPU1: shutdown
+SMC called with a0=0x00000001 a1=0x00000122 a2=0x00000000 a3=0x00000000 0x00000122
+[0][flow/suspend.c:82] Killing core1
+armor+++ armor: core 1 booted, entering wfe...
+# echo 1 > /sys/devices/system/cpu/cpu1/online
+[  215.692700] tango_boot_secondary from __cpu_up
+SMC called with a0=0x80101500 a1=0x00000105 a2=0x00000000 a3=0x00000000 0x00000105
+[  215.704494] tango_set_aux_boot_addr=0
+SMC called with a0=0x00000001 a1=0x00000104 a2=0x00000000 a3=0x00000000 0x00000104
+[0][flow/smc_handler.c:127] waking up CPU1
+[  215.719308] tango_start_aux_core=0
 
-Surely just doing a write immediately after initializing the regmap
-would have the same effect?  That'd ensure that the hardware has the
-desired value before there are any other writes.  But I might be missing
-something here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161214/082576db/attachment.sig>
+
+I reverted your patch, and the kernel blows up again.
+
+So what's the problem, and how does your patch solve it?
+
+Regards.
