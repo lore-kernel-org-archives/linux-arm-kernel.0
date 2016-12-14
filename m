@@ -1,77 +1,52 @@
 From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
-Date: Wed, 14 Dec 2016 18:12:35 -0500
-Subject: [PATCH 5/6] ARM: dts: TS-4600: add NBUS support
-In-Reply-To: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
-References: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
-Message-ID: <20161214231237.17496-6-sebastien.bourdelin@savoirfairelinux.com>
+Date: Wed, 14 Dec 2016 18:12:30 -0500
+Subject: [PATCH 0/6] Add board support for TS-4600
+Message-ID: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit enables the NBUS on the TS-4600, using the ts-nbus driver.
+This patch serie adds support for the TS-4600 boards rev A and B. These
+boards, manufactured by Technologic Systems, are based on an i.MX28.
 
-Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
----
- arch/arm/boot/dts/imx28-ts4600-common.dtsi | 43 ++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+This serie include the support for the watchdog which could be enable
+at Linux boot time depending on the bootloader.
 
-diff --git a/arch/arm/boot/dts/imx28-ts4600-common.dtsi b/arch/arm/boot/dts/imx28-ts4600-common.dtsi
-index 04bd5a5..b668933 100644
---- a/arch/arm/boot/dts/imx28-ts4600-common.dtsi
-+++ b/arch/arm/boot/dts/imx28-ts4600-common.dtsi
-@@ -44,6 +44,28 @@
- 					fsl,pull-up = <MXS_PULL_DISABLE>;
- 				};
- 
-+				nbus_pins: nbus_pins {
-+					fsl,pinmux-ids = <
-+						MX28_PAD_GPMI_D00__GPIO_0_0
-+						MX28_PAD_GPMI_D01__GPIO_0_1
-+						MX28_PAD_GPMI_D02__GPIO_0_2
-+						MX28_PAD_GPMI_D03__GPIO_0_3
-+						MX28_PAD_GPMI_D04__GPIO_0_4
-+						MX28_PAD_GPMI_D05__GPIO_0_5
-+						MX28_PAD_GPMI_D06__GPIO_0_6
-+						MX28_PAD_GPMI_D07__GPIO_0_7
-+						MX28_PAD_GPMI_CE0N__GPIO_0_16
-+						MX28_PAD_GPMI_RDY1__GPIO_0_21
-+						MX28_PAD_GPMI_RDN__GPIO_0_24
-+						MX28_PAD_GPMI_WRN__GPIO_0_25
-+						MX28_PAD_GPMI_ALE__GPIO_0_26
-+					>;
-+					fsl,drive-strength = <MXS_DRIVE_4mA>;
-+					fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+					fsl,pull-up = <MXS_PULL_DISABLE>;
-+
-+				};
-+
- 			};
- 		};
- 
-@@ -75,4 +97,25 @@
- 		};
- 	};
- 
-+	nbus {
-+		compatible = "technologic,ts-nbus", "simple-bus";
-+		pinctrl-0 = <&nbus_pins>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pwms = <&pwm 2 83>;
-+		data-gpios   = <&gpio0 0 GPIO_ACTIVE_HIGH
-+				&gpio0 1 GPIO_ACTIVE_HIGH
-+				&gpio0 2 GPIO_ACTIVE_HIGH
-+				&gpio0 3 GPIO_ACTIVE_HIGH
-+				&gpio0 4 GPIO_ACTIVE_HIGH
-+				&gpio0 5 GPIO_ACTIVE_HIGH
-+				&gpio0 6 GPIO_ACTIVE_HIGH
-+				&gpio0 7 GPIO_ACTIVE_HIGH>;
-+		csn-gpios    = <&gpio0 16 GPIO_ACTIVE_HIGH>;
-+		txrx-gpios   = <&gpio0 24 GPIO_ACTIVE_HIGH>;
-+		strobe-gpios = <&gpio0 25 GPIO_ACTIVE_HIGH>;
-+		ale-gpios    = <&gpio0 26 GPIO_ACTIVE_HIGH>;
-+		rdy-gpios    = <&gpio0 21 GPIO_ACTIVE_HIGH>;
-+	};
-+
- };
+The watchdog and few peripherals are implemented in a FPGA, and can
+only be access using a custom GPIOs bit-banged bus which is called the
+NBUS by Technologic Systems.
+A driver for this bus is also included and used by the watchdog.
+
+Sebastien Bourdelin (6):
+  of: documentation: add bindings documentation for TS-4600
+  ARM: dts: TS-4600: add basic device tree
+  dt-bindings: bus: Add documentation for the Technologic Systems NBUS
+  bus: add driver for the Technologic Systems NBUS
+  ARM: dts: TS-4600: add NBUS support
+  watchdog: ts4600: add driver for TS-4600 watchdog
+
+ .../devicetree/bindings/arm/technologic.txt        |   5 +
+ Documentation/devicetree/bindings/bus/ts-nbus.txt  |  50 +++
+ .../devicetree/bindings/watchdog/ts4600-wdt.txt    |  16 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/imx28-ts4600-common.dtsi         | 126 ++++++
+ arch/arm/boot/dts/imx28-ts4600-rev-a.dts           |  22 +
+ arch/arm/boot/dts/imx28-ts4600-rev-b.dts           |  22 +
+ drivers/bus/Kconfig                                |   9 +
+ drivers/bus/Makefile                               |   1 +
+ drivers/bus/ts-nbus.c                              | 451 +++++++++++++++++++++
+ drivers/watchdog/Kconfig                           |  10 +
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/ts4600_wdt.c                      | 213 ++++++++++
+ include/linux/ts-nbus.h                            |  17 +
+ 14 files changed, 945 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/bus/ts-nbus.txt
+ create mode 100644 Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt
+ create mode 100644 arch/arm/boot/dts/imx28-ts4600-common.dtsi
+ create mode 100644 arch/arm/boot/dts/imx28-ts4600-rev-a.dts
+ create mode 100644 arch/arm/boot/dts/imx28-ts4600-rev-b.dts
+ create mode 100644 drivers/bus/ts-nbus.c
+ create mode 100644 drivers/watchdog/ts4600_wdt.c
+ create mode 100644 include/linux/ts-nbus.h
+
 -- 
 2.10.2
