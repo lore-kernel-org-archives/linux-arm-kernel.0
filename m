@@ -1,28 +1,39 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Wed, 14 Dec 2016 17:35:53 +0100
-Subject: [PATCH 1/1] arm64: Correcting format specifier for printing 64
- bit addresses
-In-Reply-To: <20161206161116.GD4816@cbox>
-References: <1480925393-8386-1-git-send-email-maninder1.s@samsung.com>
- <20161206161116.GD4816@cbox>
-Message-ID: <65935935-bdd9-c6a6-1a33-2bbaf6ffbbc5@redhat.com>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Wed, 14 Dec 2016 16:36:30 +0000
+Subject: [PATCH 2/2] FPGA: Add TS-7300 FPGA manager
+In-Reply-To: <alpine.DEB.2.10.1612120951520.3310@atull-730U3E-740U3E>
+References: <20161211221750.27743-1-f.fainelli@gmail.com>
+ <20161211221750.27743-3-f.fainelli@gmail.com>
+ <alpine.DEB.2.10.1612120951520.3310@atull-730U3E-740U3E>
+Message-ID: <SN1PR0101MB15658783ED2430979BC4978CD09A0@SN1PR0101MB1565.prod.exchangelabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday, December 12, 2016 9:02 AM, Alan Tull wrote:
+> On Sun, 11 Dec 2016, Florian Fainelli wrote:
+>> Add support for loading bitstreams on the Altera Cyclone II FPGA
+>> populated on the TS-7300 board. This is done through the configuration
+>> and data registers offered through a memory interface between the EP93xx
+>> SoC and the FPGA.
+>> 
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>
+> Hi Florain,
+>
+> Thanks for submitting!
+>
+> How specific is this to the tx7300 board?
+>
+> I'm unclear about the programming method here.  Are these registers
+> exposed by the EP93xx?  Is it possible that another cpu could access
+> these two registers to configure the cyclone ii?  Is this passive
+> serial?
 
+Alan,
 
-On 06/12/2016 17:11, Christoffer Dall wrote:
-> +		kvm_err("Unsupported guest CP%d access at: %08lx\n",
-> +			cp, *vcpu_pc(vcpu));
-> +	else
-> +		kvm_err("Unsupported guest CP%d access at: %016lx\n",
-> +			cp, *vcpu_pc(vcpu));
-> 
-> It feels a bit much to me to have an if-statement to differentiate the
-> number of leading zeros, so if it's important to always have fixed
-> widths then I would just use %016lx in both cases.
+>From the schematic, it appears that the Cyclone II FPGA is configured for
+Fast AS programming. The glue chip (MAXII CLPD) on the board appears to
+implement some kind of state machine to handle the FPGA programming
+using two registers in the glue chip.
 
-Really, this is just a debugging message.  Just use "0x%lx" and let's
-stop bikeshedding. :)
-
-Paolo
+Hartley
