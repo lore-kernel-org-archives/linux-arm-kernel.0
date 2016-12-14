@@ -1,24 +1,78 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Wed, 14 Dec 2016 16:39:51 +0000
-Subject: [PATCH v3 1/2] ARM: ep93xx: Register ts73xx-fpga manager driver
- for TS-7300
-In-Reply-To: <20161214023553.9377-2-f.fainelli@gmail.com>
-References: <20161214023553.9377-1-f.fainelli@gmail.com>
- <20161214023553.9377-2-f.fainelli@gmail.com>
-Message-ID: <SN1PR0101MB15653914100FD7D819A071F4D09A0@SN1PR0101MB1565.prod.exchangelabs.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 14 Dec 2016 08:50:19 -0800
+Subject: [PATCH linux v1 0/4] Seven segment display support
+In-Reply-To: <ac324946-41da-c090-a0ca-78155611bb7e@baylibre.com>
+References: <1481702104-8617-1-git-send-email-jaghu@google.com>
+ <20161214134530.2bd54a4e@free-electrons.com>
+ <20161214125641.GA5379@kroah.com>
+ <ac324946-41da-c090-a0ca-78155611bb7e@baylibre.com>
+Message-ID: <20161214165019.GC14275@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, December 13, 2016 7:36 PM, Florian Fainelli wrote:
->
-> Register the TS-7300 FPGA manager device drivers which allows us to load
-> bitstreams into the on-board Altera Cyclone II FPGA.
->
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  arch/arm/mach-ep93xx/ts72xx.c | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
+On Wed, Dec 14, 2016 at 02:12:41PM +0100, Neil Armstrong wrote:
+> On 12/14/2016 01:56 PM, Greg KH wrote:
+> > On Wed, Dec 14, 2016 at 01:45:30PM +0100, Thomas Petazzoni wrote:
+> >> Hello,
+> >>
+> >> On Tue, 13 Dec 2016 23:55:00 -0800, Jaghathiswari Rankappagounder
+> >> Natarajan wrote:
+> >>
+> >>> Documentation for the binding which provides an interface for adding clock,
+> >>> data and clear signal GPIO lines to control seven segment display.
+> >>>
+> >>> The platform device driver provides an API for displaying on two 7-segment
+> >>> displays, and implements the required bit-banging. The hardware assumed is
+> >>> 74HC164 wired to two 7-segment displays.
+> >>>
+> >>> The character device driver implements the user-space API for letting a user
+> >>> write to two 7-segment displays including any conversion methods necessary
+> >>> to map the user input to two 7-segment displays.
+> >>>
+> >>> Adding clock, data and clear signal GPIO lines in the devicetree to control
+> >>> seven segment display on zaius platform.
+> >>>
+> >>> The platform driver matches on the device tree node; the platform driver also
+> >>> initializes the character device.
+> >>>
+> >>> Tested that the seven segment display works properly by writing to the
+> >>> character device file on a EVB AST2500 board which also has 74HC164 wired
+> >>> to two 7-segment displays.
+> >>
+> >> FWIW, I proposed a driver for seven segment displays back in 2013:
+> >>
+> >>    http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/139986.html
+> >>
+> >> And the feedback from Greg KH was: we don't need a driver for that, do
+> >> it from userspace. See:
+> >>
+> >>    http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/139992.html
+> >>
+> >> So: good luck :-)
+> > 
+> > Did anyone ever write a library for this type of thing?
+> > 
+> > Again, I don't want to see one-off drivers for random devices like this
+> > that should be able to all be controlled from userspace in a common
+> > manner.  Much like we did for fingerprint readers a long long time
+> > ago...
+> > 
+> > thanks,
+> > 
+> > greg k-h
+> 
+> Hi Greg,
+> 
+> Actually, it's more than a random interface, a lot of SoCs and boards actually have such displays
+> and it's a pity to use UIO, sysfs gpio bitbanging and all sort of ugly stuff to only print a few
+> characters a simple and clean driver could achieve.
 
-For the ep93xx core change:
+Great, then let's make an API that all devices of this type could use,
+and not just take individual drivers that all have a custom char or
+sysfs interface which requires custom userspace code to be able to drive
+all of the different devices in a common way (i.e. a library would have
+to be written anyways...)
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+thanks,
+
+greg k-h
