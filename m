@@ -1,20 +1,42 @@
 From: Ramiro.Oliveira@synopsys.com (Ramiro Oliveira)
-Date: Wed, 14 Dec 2016 17:18:22 +0000
-Subject: [PATCH 0/2] xilinx_dma: Add external reset control
-Message-ID: <cover.1481735244.git.roliveir@synopsys.com>
+Date: Wed, 14 Dec 2016 17:18:23 +0000
+Subject: [PATCH 1/2] xilinx_dma: Edit device tree bindings documentation
+In-Reply-To: <cover.1481735244.git.roliveir@synopsys.com>
+References: <cover.1481735244.git.roliveir@synopsys.com>
+Message-ID: <78b8d3b8540a2310818cf0c5b05adbc29e067981.1481735244.git.roliveir@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for controlling an external reset line. Since
-this reset line is optional it won't break compatibility.
+Add reset property documentation for Xilinx DMA
 
-Ramiro Oliveira (2):
-  xilinx_dma: Edit device tree bindings documentation
-  xilinx_dma: Add reset support
+Signed-off-by: Ramiro Oliveira <roliveir@synopsys.com>
+---
+ Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
- .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |  6 ++++++
- drivers/dma/xilinx/xilinx_dma.c                    | 23 ++++++++++++++++++++++
- 2 files changed, 29 insertions(+)
-
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+index a2b8bfa..7ebce72 100644
+--- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
++++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+@@ -40,6 +40,10 @@ Required properties for VDMA:
+ Optional properties:
+ - xlnx,include-sg: Tells configured for Scatter-mode in
+ 	the hardware.
++- resets : Must contain an entry for each entry in reset-names.
++  See ../reset/reset.txt for details.
++- reset-names : Must include the following entries:
++  - reset
+ Optional properties for AXI DMA:
+ - xlnx,mcdma: Tells whether configured for multi-channel mode in the hardware.
+ Optional properties for VDMA:
+@@ -83,6 +87,8 @@ axi_vdma_0: axivdma at 40030000 {
+ 	clocks = <&clk 0>, <&clk 1>, <&clk 2>, <&clk 3>, <&clk 4>;
+ 	clock-names = "s_axi_lite_aclk", "m_axi_mm2s_aclk", "m_axi_s2mm_aclk",
+ 		      "m_axis_mm2s_aclk", "s_axis_s2mm_aclk";
++	resets = <&rst 2>;
++	reset-names = "reset";
+ 	dma-channel at 40030000 {
+ 		compatible = "xlnx,axi-vdma-mm2s-channel";
+ 		interrupts = < 0 54 4 >;
 -- 
 2.10.2
