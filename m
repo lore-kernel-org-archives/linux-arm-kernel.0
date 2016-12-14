@@ -1,75 +1,131 @@
-From: guy.shapiro@mobi-wize.com (Guy Shapiro)
-Date: Wed, 14 Dec 2016 09:09:36 +0200
-Subject: [PATCH] Input: imx6ul_tsc - generalize the averaging property
-In-Reply-To: <CAL_JsqJAdxrUGL5pjTPDkrXTsKJU-vL1Y4TpqhP79bESs9vR-g@mail.gmail.com>
-References: <1481440003-27168-1-git-send-email-guy.shapiro@mobi-wize.com>
- <CAL_JsqJAdxrUGL5pjTPDkrXTsKJU-vL1Y4TpqhP79bESs9vR-g@mail.gmail.com>
-Message-ID: <6760ad61-b596-b80d-4100-09f926abab05@mobi-wize.com>
+From: jcliang@chromium.org (Ricky Liang)
+Date: Wed, 14 Dec 2016 15:29:00 +0800
+Subject: [PATCH v8 2/4] vcodec: mediatek: Add Mediatek JPEG Decoder Driver
+In-Reply-To: <1481533621.13825.2.camel@mtksdaap41>
+References: <1480475340-21893-1-git-send-email-rick.chang@mediatek.com>
+ <1480475340-21893-3-git-send-email-rick.chang@mediatek.com>
+ <CAAJzSMfNyMiia==mXKo6aBw1VxMBxGE20LB870Zm1u9mCoioyQ@mail.gmail.com>
+ <1481533621.13825.2.camel@mtksdaap41>
+Message-ID: <CAAJzSMca41ExE+k924D6M-1=t8v+aduTC2FwfqdpF4R32kBuGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/12/2016 21:54, Rob Herring wrote:
+Hi Rick,
 
-> On Sun, Dec 11, 2016 at 1:06 AM, Guy Shapiro <guy.shapiro@mobi-wize.com> wrote:
->> Make the avarage-samples property a general touchscreen property
->> rather than imx6ul device specific.
+Can you upload patchset v9 to address the issue? Thanks!
+
+On Mon, Dec 12, 2016 at 5:07 PM, Rick Chang <rick.chang@mediatek.com> wrote:
+> Hi Ricky,
+>
+> Thanks for your feedback. We will fix the problem in another patch.
+>
+> On Mon, 2016-12-12 at 12:34 +0800, Ricky Liang wrote:
+>> Hi Rick,
 >>
->> Signed-off-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
->> ---
->>   .../bindings/input/touchscreen/imx6ul_tsc.txt      | 11 ++----
->>   .../bindings/input/touchscreen/touchscreen.txt     |  3 ++
->>   drivers/input/touchscreen/imx6ul_tsc.c             | 46 ++++++++++++++++------
->>   3 files changed, 41 insertions(+), 19 deletions(-)
-> [...]
+>> On Wed, Nov 30, 2016 at 11:08 AM, Rick Chang <rick.chang@mediatek.com> wrote:
+>> > Add v4l2 driver for Mediatek JPEG Decoder
+>> >
+>> > Signed-off-by: Rick Chang <rick.chang@mediatek.com>
+>> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+>>
+>> <snip...>
+>>
+>> > +static bool mtk_jpeg_check_resolution_change(struct mtk_jpeg_ctx *ctx,
+>> > +                                            struct mtk_jpeg_dec_param *param)
+>> > +{
+>> > +       struct mtk_jpeg_dev *jpeg = ctx->jpeg;
+>> > +       struct mtk_jpeg_q_data *q_data;
+>> > +
+>> > +       q_data = &ctx->out_q;
+>> > +       if (q_data->w != param->pic_w || q_data->h != param->pic_h) {
+>> > +               v4l2_dbg(1, debug, &jpeg->v4l2_dev, "Picture size change\n");
+>> > +               return true;
+>> > +       }
+>> > +
+>> > +       q_data = &ctx->cap_q;
+>> > +       if (q_data->fmt != mtk_jpeg_find_format(ctx, param->dst_fourcc,
+>> > +                                               MTK_JPEG_FMT_TYPE_CAPTURE)) {
+>> > +               v4l2_dbg(1, debug, &jpeg->v4l2_dev, "format change\n");
+>> > +               return true;
+>> > +       }
+>> > +       return false;
+>>
+>> <snip...>
+>>
+>> > +static void mtk_jpeg_device_run(void *priv)
+>> > +{
+>> > +       struct mtk_jpeg_ctx *ctx = priv;
+>> > +       struct mtk_jpeg_dev *jpeg = ctx->jpeg;
+>> > +       struct vb2_buffer *src_buf, *dst_buf;
+>> > +       enum vb2_buffer_state buf_state = VB2_BUF_STATE_ERROR;
+>> > +       unsigned long flags;
+>> > +       struct mtk_jpeg_src_buf *jpeg_src_buf;
+>> > +       struct mtk_jpeg_bs bs;
+>> > +       struct mtk_jpeg_fb fb;
+>> > +       int i;
+>> > +
+>> > +       src_buf = v4l2_m2m_next_src_buf(ctx->fh.m2m_ctx);
+>> > +       dst_buf = v4l2_m2m_next_dst_buf(ctx->fh.m2m_ctx);
+>> > +       jpeg_src_buf = mtk_jpeg_vb2_to_srcbuf(src_buf);
+>> > +
+>> > +       if (jpeg_src_buf->flags & MTK_JPEG_BUF_FLAGS_LAST_FRAME) {
+>> > +               for (i = 0; i < dst_buf->num_planes; i++)
+>> > +                       vb2_set_plane_payload(dst_buf, i, 0);
+>> > +               buf_state = VB2_BUF_STATE_DONE;
+>> > +               goto dec_end;
+>> > +       }
+>> > +
+>> > +       if (mtk_jpeg_check_resolution_change(ctx, &jpeg_src_buf->dec_param)) {
+>> > +               mtk_jpeg_queue_src_chg_event(ctx);
+>> > +               ctx->state = MTK_JPEG_SOURCE_CHANGE;
+>> > +               v4l2_m2m_job_finish(jpeg->m2m_dev, ctx->fh.m2m_ctx);
+>> > +               return;
+>> > +       }
+>>
+>> This only detects source change if multiple OUPUT buffers are queued.
+>> It does not catch the source change in the following scenario:
+>>
+>> - OUPUT buffers for jpeg1 enqueued
+>> - OUTPUT queue STREAMON
+>> - userspace creates CAPTURE buffers
+>> - CAPTURE buffers enqueued
+>> - CAPTURE queue STREAMON
+>> - decode
+>> - OUTPUT queue STREAMOFF
+>> - userspace recreates OUTPUT buffers for jpeg2
+>> - OUTPUT buffers for jpeg2 enqueued
+>> - OUTPUT queue STREAMON
+>>
+>> In the above sequence if jpeg2's decoded size is larger than jpeg1 the
+>> function fails to detect that the existing CAPTURE buffers are not big
+>> enough to hold the decoded data.
+>>
+>> A possible fix is to pass *dst_buf to
+>> mtk_jpeg_check_resolution_change(), and check in the function that all
+>> the dst_buf planes are large enough to hold the decoded data.
+>>
+>> > +
+>> > +       mtk_jpeg_set_dec_src(ctx, src_buf, &bs);
+>> > +       if (mtk_jpeg_set_dec_dst(ctx, &jpeg_src_buf->dec_param, dst_buf, &fb))
+>> > +               goto dec_end;
+>> > +
+>> > +       spin_lock_irqsave(&jpeg->hw_lock, flags);
+>> > +       mtk_jpeg_dec_reset(jpeg->dec_reg_base);
+>> > +       mtk_jpeg_dec_set_config(jpeg->dec_reg_base,
+>> > +                               &jpeg_src_buf->dec_param, &bs, &fb);
+>> > +
+>> > +       mtk_jpeg_dec_start(jpeg->dec_reg_base);
+>> > +       spin_unlock_irqrestore(&jpeg->hw_lock, flags);
+>> > +       return;
+>> > +
+>> > +dec_end:
+>> > +       v4l2_m2m_src_buf_remove(ctx->fh.m2m_ctx);
+>> > +       v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
+>> > +       v4l2_m2m_buf_done(to_vb2_v4l2_buffer(src_buf), buf_state);
+>> > +       v4l2_m2m_buf_done(to_vb2_v4l2_buffer(dst_buf), buf_state);
+>> > +       v4l2_m2m_job_finish(jpeg->m2m_dev, ctx->fh.m2m_ctx);
+>> > +}
+>>
+>> <snip...>
 >
->> +       switch (average_samples) {
->> +       case 1:
->> +               tsc->average_enable = false;
->> +               tsc->average_select = 0; /* value unused; initialize anyway */
->> +               break;
->> +       case 4:
->> +               tsc->average_enable = true;
->> +               tsc->average_select = 0;
->> +               break;
->> +       case 8:
->> +               tsc->average_enable = true;
->> +               tsc->average_select = 1;
->> +               break;
->> +       case 16:
->> +               tsc->average_enable = true;
->> +               tsc->average_select = 2;
->> +               break;
->> +       case 32:
->> +               tsc->average_enable = true;
->> +               tsc->average_select = 3;
->> +               break;
-> This could be more efficiently written as
 >
-> tsc->average_select = log2(average_samples) - 2;
->
-> Then enable if >=0.
-
-Using '1' to indicate no averaging is more consistent then using '0'.
-I think it is better to validate the values rather then round them.
-
-What do you think about:
-+       switch (average_samples) {
-+       case 1:
-+               tsc->average_enable = false;
-+               tsc->average_select = 0; /* value unused; initialize 
-anyway */
-+               break;
-+       case 4:
-+       case 8:
-+       case 16:
-+       case 32:
-+               tsc->average_enable = true;
-+               tsc->average_select = ilog2(average_samples) - 2;
-+               break;
-+       default:
-+               dev_err(&pdev->dev,
-+                       "touchscreen-average-samples (%u) must be 1, 4, 
-8, 16 or 32\n",
-+                       average_samples);
-
-Guy.
