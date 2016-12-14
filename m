@@ -1,52 +1,54 @@
 From: jaghu@google.com (Jaghathiswari Rankappagounder Natarajan)
-Date: Tue, 13 Dec 2016 23:55:00 -0800
-Subject: [PATCH linux v1 0/4] Seven segment display support
-Message-ID: <1481702104-8617-1-git-send-email-jaghu@google.com>
+Date: Tue, 13 Dec 2016 23:55:01 -0800
+Subject: [PATCH linux v1 1/4] Documentation: dt-bindings: Document bindings
+ for seven segment display support
+In-Reply-To: <1481702104-8617-1-git-send-email-jaghu@google.com>
+References: <1481702104-8617-1-git-send-email-jaghu@google.com>
+Message-ID: <1481702104-8617-2-git-send-email-jaghu@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset includes:
+This binding provides interface for adding clock, data and clear signal GPIO
+lines to control seven segment display.
 
-Documentation for the binding which provides an interface for adding clock,
-data and clear signal GPIO lines to control seven segment display.
-
-The platform device driver provides an API for displaying on two 7-segment
-displays, and implements the required bit-banging. The hardware assumed is
-74HC164 wired to two 7-segment displays.
-
-The character device driver implements the user-space API for letting a user
-write to two 7-segment displays including any conversion methods necessary
-to map the user input to two 7-segment displays.
-
-Adding clock, data and clear signal GPIO lines in the devicetree to control
-seven segment display on zaius platform.
-
-The platform driver matches on the device tree node; the platform driver also
-initializes the character device.
-
-Tested that the seven segment display works properly by writing to the
-character device file on a EVB AST2500 board which also has 74HC164 wired
-to two 7-segment displays.
-
-Jaghathiswari Rankappagounder Natarajan (4):
-  Documentation: dt-bindings: Document bindings for seven segment
-    display support
-  drivers: misc: Character device driver for seven segment display
-  drivers: misc: Platform driver for seven segment display support
-  arm: dts: Add dt-binding to support seven segment display on zaius
-
- .../devicetree/bindings/misc/seven-seg-gpio.txt    |  27 +++
- arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts         |   8 +
- drivers/misc/Kconfig                               |  16 ++
- drivers/misc/Makefile                              |   2 +
- drivers/misc/seven_seg_disp.c                      | 197 ++++++++++++++++++++
- drivers/misc/seven_seg_disp.h                      |  34 ++++
- drivers/misc/seven_seg_gpio.c                      | 206 +++++++++++++++++++++
- 7 files changed, 490 insertions(+)
+Signed-off-by: Jaghathiswari Rankappagounder Natarajan <jaghu@google.com>
+---
+ .../devicetree/bindings/misc/seven-seg-gpio.txt    | 27 ++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/misc/seven-seg-gpio.txt
- create mode 100644 drivers/misc/seven_seg_disp.c
- create mode 100644 drivers/misc/seven_seg_disp.h
- create mode 100644 drivers/misc/seven_seg_gpio.c
 
+diff --git a/Documentation/devicetree/bindings/misc/seven-seg-gpio.txt b/Documentation/devicetree/bindings/misc/seven-seg-gpio.txt
+new file mode 100644
+index 0000000..9a4e255
+--- /dev/null
++++ b/Documentation/devicetree/bindings/misc/seven-seg-gpio.txt
+@@ -0,0 +1,27 @@
++This binding defines interface to add clock, data and clear GPIO lines required
++for seven segment display support.
++
++Required properties:
++- compatible : should be "seven-seg-gpio-dev".
++- clock-gpios :  Should specify the GPIO pin connected to the Clock line on the
++  hardware.
++- data-gpios : Should specify the GPIO pin connected to Data line on the
++  hardware.
++- clear-gpios : Should specify the GPIO pin connected to Clear line on the
++  hardware.
++
++Optional properties:
++- refresh-interval-ms : The interval at which to refresh the display.
++  If this property is not present, the default value is 1000.
++
++Examples:
++
++#include <dt-bindings/gpio/gpio.h>
++
++seven-seg-disp {
++	compatible = "seven-seg-gpio-dev";
++	refresh-interval-ms = "1000";
++	clock-gpios = <&gpio 0 GPIO_ACTIVE_LOW>;
++	data-gpios = <&gpio 1 GPIO_ACTIVE_HIGH>;
++	clear-gpios = <&gpio 2 GPIO_ACTIVE_HIGH>;
++};
 --
 2.8.0.rc3.226.g39d4020
