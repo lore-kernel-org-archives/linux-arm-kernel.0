@@ -1,65 +1,34 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Dec 2016 23:37:39 +0100
-Subject: [PATCH 32/39] ARM: dts: armada-xp-netgear-rn2120: Correct license text
-In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214223746.23066-33-alexandre.belloni@free-electrons.com>
+From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
+Date: Wed, 14 Dec 2016 18:12:31 -0500
+Subject: [PATCH 1/6] of: documentation: add bindings documentation for TS-4600
+In-Reply-To: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
+References: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20161214231237.17496-2-sebastien.bourdelin@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The license test has been mangled at some point then copy pasted across
-multiple files. Restore it to what it should be.
-Note that this is not intended as a license change.
+This adds the documentation for the TS-4600 by Technologic Systems.
 
-Cc: Arnaud Ebalard <arno@natisbad.org>
-Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
 ---
- arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ Documentation/devicetree/bindings/arm/technologic.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-index d19f44c70925..3937a481b0ac 100644
---- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-+++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-@@ -13,17 +13,17 @@
-  *     published by the Free Software Foundation; either version 2 of the
-  *     License, or (at your option) any later version.
-  *
-- *     This file is distributed in the hope that it will be useful
-+ *     This file is distributed in the hope that it will be useful,
-  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  *     GNU General Public License for more details.
-  *
-- * Or, alternatively
-+ * Or, alternatively,
-  *
-  *  b) Permission is hereby granted, free of charge, to any person
-  *     obtaining a copy of this software and associated documentation
-  *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use
-+ *     restriction, including without limitation the rights to use,
-  *     copy, modify, merge, publish, distribute, sublicense, and/or
-  *     sell copies of the Software, and to permit persons to whom the
-  *     Software is furnished to do so, subject to the following
-@@ -32,11 +32,11 @@
-  *     The above copyright notice and this permission notice shall be
-  *     included in all copies or substantial portions of the Software.
-  *
-- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
+diff --git a/Documentation/devicetree/bindings/arm/technologic.txt b/Documentation/devicetree/bindings/arm/technologic.txt
+index 33797ac..e9d6d65 100644
+--- a/Documentation/devicetree/bindings/arm/technologic.txt
++++ b/Documentation/devicetree/bindings/arm/technologic.txt
+@@ -1,6 +1,11 @@
+ Technologic Systems Platforms Device Tree Bindings
+ --------------------------------------------------
+ 
++TS-4600 is a System-on-Module based on the Freescale i.MX28 System-on-Chip.
++It can be mounted on a carrier board providing additional peripheral connectors.
++Required root node properties:
++	- compatible = "technologic,imx28-ts4600", "fsl,imx28"
++
+ TS-4800 board
+ Required root node properties:
+ 	- compatible = "technologic,imx51-ts4800", "fsl,imx51";
 -- 
 2.10.2
