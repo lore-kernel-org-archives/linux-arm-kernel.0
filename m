@@ -1,61 +1,151 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 14 Dec 2016 19:32:15 +1030
-Subject: [PATCH linux v1 4/4] arm: dts: Add dt-binding to support seven
- segment display on zaius
-In-Reply-To: <1481702104-8617-5-git-send-email-jaghu@google.com>
-References: <1481702104-8617-1-git-send-email-jaghu@google.com>
- <1481702104-8617-5-git-send-email-jaghu@google.com>
-Message-ID: <CACPK8Xd0znB0C+P8mstjjSgJWN2T_a0h2jJYG77gVbiZghtCyA@mail.gmail.com>
+From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
+Date: Wed, 14 Dec 2016 10:03:24 +0100
+Subject: mmc: core: complete/wait_for_completion performance
+In-Reply-To: <123257138.400786.e58aee3b-9fc2-4b39-a030-c2409c5b92fc.open-xchange@email.1und1.de>
+References: <1479644869.2653.3.camel@embedded.rocks>
+ <585759233.283839.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
+ <1479652929.2841.1.camel@embedded.rocks>
+ <187975187.249177.bccdc17e-e9c6-48c2-aeaf-3b81f1b61ec7.open-xchange@email.1und1.de>
+ <1479669034.1975.1.camel@embedded.rocks>
+ <1198138554.59982.63209ba1-8fb4-4a13-9ee0-f746a192f4c7.open-xchange@email.1und1.de>
+ <1481095953.17027.0.camel@embedded.rocks>
+ <123257138.400786.e58aee3b-9fc2-4b39-a030-c2409c5b92fc.open-xchange@email.1und1.de>
+Message-ID: <1481706204.3994.4.camel@embedded.rocks>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jagha,
+Hi Stefan,
 
-On Wed, Dec 14, 2016 at 6:25 PM, Jaghathiswari Rankappagounder
-Natarajan <jaghu@google.com> wrote:
-> Add clock, data and clear signal GPIO lines to control seven segment display on
-> zaius platform.
->
-> Signed-off-by: Jaghathiswari Rankappagounder Natarajan <jaghu@google.com>
+On Wed, 2016-12-07 at 20:23 +0100, Stefan Wahren wrote:
+> Hi J?rg,
+> 
+> > J?rg Krause <joerg.krause@embedded.rocks> hat am 7. Dezember 2016
+> > um 08:32
+> > geschrieben:
+> > 
+> > 
+> > Hit Stefan,
+> > 
+> > On Sat, 2016-11-26 at 20:10 +0100, Stefan Wahren wrote:
+> > > Hi J?rg,
+> > > 
+> > > > J?rg Krause <joerg.krause@embedded.rocks> hat am 20. November
+> > > > 2016
+> > > > um 20:10
+> > > > geschrieben:
+> > > > 
+> > > > 
+> > > > On Sun, 2016-11-20 at 16:44 +0100, Stefan Wahren wrote:
+> > > > > > J?rg Krause <joerg.krause@embedded.rocks> hat am 20.
+> > > > > > November
+> > > > > > 2016
+> > > > > > um 15:42
+> > > > > > geschrieben:
+> > > > > > 
+> > > > > > 
+> > > > > > Hi Stefan,
+> > > > > > 
+> > > > > > On Sun, 2016-11-20 at 14:28 +0100, Stefan Wahren wrote:
+> > > > > > > Hi J?rg,
+> > > > > > > 
+> > > > > > > > J?rg Krause <joerg.krause@embedded.rocks> hat am 20.
+> > > > > > > > November
+> > > > > > > > 2016
+> > > > > > > > um 13:27
+> > > > > > > > geschrieben:
+> > > > > > > > 
+> > > > > > > > 
+> > > > > > > > Hi,
+> > > > > > > > 
+> > > > > > > > I started the discussion on this mailing list in
+> > > > > > > > another
+> > > > > > > > thread
+> > > > > > > > [1],
+> > > > > > > > but I'd like to move it to a new thread, because it
+> > > > > > > > might
+> > > > > > > > be
+> > > > > > > > mmc
+> > > > > > > > specific.
+> > > > > > > > 
+> > > > > > > > The issue is that I am noticed low wifi network
+> > > > > > > > throughput
+> > > > > > > > on
+> > > > > > > > an
+> > > > > > > > i.MX28
+> > > > > > > > board with the mainline kernel (v4.7.10, about 6 Mbps)
+> > > > > > > > compared
+> > > > > > > > to
+> > > > > > > > the
+> > > > > > > > vendor kernel (Freescale v2.6.35.3, about 20 Mbps). The
+> > > > > > > > wifi
+> > > > > > > > chip
+> > > > > > > > is
+> > > > > > > > attached using the SDIO interface.
+> > > > > > > > 
+> > > > > > > > I started investigation where the bottleneck in the
+> > > > > > > > mainline
+> > > > > > > > kernel?might come from. Therefore I checked that the
+> > > > > > > > configs
+> > > > > > > > and
+> > > > > > > > settings for the interfaces and drivers are the same.
+> > > > > > > > They
+> > > > > > > > are.
+> > > > > > > 
+> > > > > > > so you're not using the mxs_defconfig settings anymore?
+> > > > > > 
+> > > > > > No, I changed the settings.
+> > > > > > 
+> > > > > 
+> > > > > What happens to performance to if you change the following
+> > > > > settings
+> > > > > to the same
+> > > > > like in mxs_defconfig?
+> > > > > 
+> > > > > CONFIG_PREEMPT_VOLUNTARY=y
+> > > > > CONFIG_DEFAULT_IOSCHED="noop"
+> > > > 
+> > > > No much change at all. The time difference between complete()
+> > > > and
+> > > > wait_for_complete() decreases in best case to 110 us, but also
+> > > > varies
+> > > > to above 130 us.
+> > > 
+> > > just a weird idea. Did you tried to add MMC_CAP_CMD23 into the
+> > > caps
+> > > [1]?
+> > > 
+> > > [1] - http://lxr.free-electrons.com/source/drivers/mmc/host/mxs-m
+> > > mc.c
+> > > ?v=4.8#L642
+> > 
+> > I tried, but it did not improved the timing or throughput. However,
+> > many thanks for the input.
+> > 
+> > J?rg
+> 
+> did you try cyclictest [1]?
 
-The Zaius device tree is not upstream. I suggest you submit it through
-the Aspeed maintainer's tree (me!) for inclusion in the next merge
-window.
+Not yet. Not sure what to measure and which values to compare here.
 
-For the time being, drop this patch from your series as it will not
-apply to the upstream kernel.
+> 
+> Beside the time for a request the amount of requests for the complete
+> iperf test
+> would we interesting. Maybe there are retries.
+> 
+> I'm still interested in your PIO mode patches for mxs-mmc even
+> without clean up.
 
-As a general rule make sure you're basing the patches you send
-upstream on a tag from an upstream tree. Linus' v4.9 tag would be the
-best one at this point in time.
+Actually, the patch does not implement a PIO mode, but drops DMA and
+uses polling instead. I've attached the patch.
 
-Cheers,
+> [1] - https://git.kernel.org/cgit/utils/rt-tests/rt-tests.git/
 
-Joel
-
-> ---
->  arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts | 8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts b/arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts
-> index 8ef4ece..ccb8147 100644
-> --- a/arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts
-> +++ b/arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts
-> @@ -43,6 +43,14 @@
->                         gpios = <&gpio ASPEED_GPIO(H, 7) GPIO_ACTIVE_LOW>;
->                 };
->         };
-> +
-> +       seven-seg-disp {
-> +               compatible = "seven-seg-gpio-dev";
-> +               refresh-interval-ms = "1000";
-> +               clock-gpios = <&gpio ASPEED_GPIO(J, 0) GPIO_ACTIVE_HIGH>;
-> +               data-gpios = <&gpio ASPEED_GPIO(J, 2) GPIO_ACTIVE_HIGH>;
-> +               clear-gpios = <&gpio ASPEED_GPIO(J, 1) GPIO_ACTIVE_HIGH>;
-> +       };
->  };
->
->  &fmc {
-> --
-> 2.8.0.rc3.226.g39d4020
->
+Best regards
+J?rg
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-mmc-mxs-mmc-drop-DMA-and-use-polling-mode.patch
+Type: text/x-patch
+Size: 7570 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161214/c2c74830/attachment-0001.bin>
