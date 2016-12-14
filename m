@@ -1,79 +1,45 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Dec 2016 12:46:40 +0000
-Subject: [PATCH 2/2] ARM: soft-reboot into same mode that we entered the
- kernel
-In-Reply-To: <20161214124056.GI17982@leverpostej>
-References: <20161213113044.GC19985@leverpostej>
- <E1cH751-0003kk-Ts@rmk-PC.armlinux.org.uk>
- <20161214115648.GG17982@leverpostej>
- <20161214120541.GD14217@n2100.armlinux.org.uk>
- <20161214121747.GH17982@leverpostej>
- <20161214122945.GE14217@n2100.armlinux.org.uk>
- <20161214124056.GI17982@leverpostej>
-Message-ID: <20161214124640.GG14217@n2100.armlinux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 14 Dec 2016 13:53:23 +0100
+Subject: partial bluetooth success on n900 [was Re: bluetooth/uart
+ timeout handling]
+In-Reply-To: <201612141321.30181@pali>
+References: <20161016002454.ul5rdqwubvkct4pf@earth>
+ <20161018224259.jrwbaal27irzjqyo@earth> <20161019092506.GA1461@amd>
+ <201612141321.30181@pali>
+Message-ID: <20161214125323.GA4951@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2016 at 12:40:56PM +0000, Mark Rutland wrote:
-> On Wed, Dec 14, 2016 at 12:29:45PM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Dec 14, 2016 at 12:17:47PM +0000, Mark Rutland wrote:
-> > > On Wed, Dec 14, 2016 at 12:05:41PM +0000, Russell King - ARM Linux wrote:
-> > > > The issue here is that a panic can happen at any time from any context
-> > > > with any hyp stub in place, so there _needs_ to be a uniform way to do
-> > > > this.  It's very bad that we've got this far without this point having
-> > > > been considered - all we can do right now is to try and fix the issues
-> > > > as they come up.
-> > > > 
-> > > > Right now, let's fix this so we get some kind of improvement, and later
-> > > > try to sort out some kind of uniform interface for this task.
-> > > 
-> > > Sure, that's a bigger task, and this is definitely a step in the right
-> > > direction.
-> > > 
-> > > We need to avoid the kdump regression somehow though; can we somehow
-> > > detect if KVM is active and avoid issuing the HVC_SOFT_RESTART?
-> > 
-> > That's a question for KVM people.
-> > 
-> > However, there's a bigger question, which is: what do we want to happen
-> > in the case of kdump - do we want to be entering the kdump kernel in
-> > HYP or SVC mode?  As the kdump kernel exists to be able to save the
-> > state of a crashing system, the kdump kernel should do that and then
-> > restart the system in a clean way (iow, not via yet another kexec.)
-> > 
-> > So maybe the right answer is that kdump should always invoke the kernel
-> > in SVC mode.
+Hi!
+
+> > [  220.248596] tty ttyO1: Radio packet sent
+> > [  220.249328] Bluetooth: hci0: Frame reassembly failed (-84)
+> > [  220.272949] tty ttyO1: wakeup received: 1 -> 0
+> > [  221.283477] tty ttyO1: radio packet timeout!
+> > [  221.283630] enqueue: hu c304cc80 skb cd4a9b40
+> > [  223.363372] Bluetooth: hci0 command 0xfc18 tx timeout
+> > pavel at n900:~$
 > 
-> Personally, my view is the opposite -- we should always exit the way we
-> came, and kdump can go from there. Otherwise we're leaving context
-> active in hyp mode that might hinder kdump (or would otherwise be useful
-> for kdump to be able to access).
+> In log are still some failures, but ... is bluetooth working now?
+
+It is... for Sebastian. I'm playing with camera now.
+
+> I see that you applied this patch: 
+> https://git.kernel.org/cgit/linux/kernel/git/pavel/linux-n900.git/commit/?id=051aa3fbf03ac770d8344690f5a936a7f04c6884
 > 
-> For example, we might want to do something like kernel guard, where even
-> the host kernel would have a stage-2 translation active in hyp that we'd
-> need to tear down. That, or the hyp page table might have been
-> corrupted, and tearing down ASAP might save us from asynchrnous issues
-> from page table walks. It's all a trade-off, either way -- the hyp code
-> could also be corrupt.
+> Looks like that pinmux is in DTS file incorrect. Can somebody verify it? 
+> Maybe Tony?
 
-However, the issue there is that if there is a hyp page table present,
-it means that we're no longer saving out a true image of the running
-system - the core dump expects to be an image as seen from previously
-running kernel, which would be in SVC mode.
+Yes, it is. Sebastian was pretty certain about that.
 
-If we save out the view of memory from HYP mode, we're no longer saving
-out the same thing - and the physical addresses which are stored within
-kdump for things like the CPU states (which are physical addresses as
-seen in SVC mode) are no longer valid.
-
-So, to make kdump work in this situation probably needs a significant
-rework of kdump's idea of what a physical address is.
-
-In the mean time, I think the approach I've put forward is the only
-sensible one until we can be sure that a HYP mode core-dump really does
-make sense.
-
+									Pavel
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161214/615b77da/attachment-0001.sig>
