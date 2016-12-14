@@ -1,40 +1,116 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 14 Dec 2016 13:57:07 +0100
-Subject: [PATCH 0/2] video/sti/cec: add HDMI notifier support
-Message-ID: <1481720229-7587-1-git-send-email-benjamin.gaignard@linaro.org>
+Date: Wed, 14 Dec 2016 13:57:08 +0100
+Subject: [PATCH 1/2] sti: hdmi: add HDMI notifier support
+In-Reply-To: <1481720229-7587-1-git-send-email-benjamin.gaignard@linaro.org>
+References: <1481720229-7587-1-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <1481720229-7587-2-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following (copying !) what Hans have done in this serie of patches
-http://www.spinics.net/lists/linux-media/msg109141.html
-I have implemented hdmi notifier in hdmi controled and stih-cec drivers.
+Implement the HDMI notifier support to allow CEC drivers to
+be informed when there is a new EDID and when a connect or
+disconnect happens.
 
-Those patches should be applied on top of Hans patches for exynos.
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+---
+ drivers/gpu/drm/sti/Kconfig    |  1 +
+ drivers/gpu/drm/sti/sti_hdmi.c | 15 +++++++++++++++
+ drivers/gpu/drm/sti/sti_hdmi.h |  2 ++
+ 3 files changed, 18 insertions(+)
 
-I have tested hdmi notifier by pluging/unpluging HDMI cable and check
-the value of the physical address with "cec-ctl --tuner".
-"cec-compliance -A" is also functional.
-
-Hans, I haven't move stih-cec out of staging because I don't have the
-exact branch to test it, can you do the move for stih-cec after applying
-those patches ?
-
-Regards,
-Benjamin
-
-Benjamin Gaignard (2):
-  sti: hdmi: add HDMI notifier support
-  stih-cec: add hdmi-notifier support
-
- .../devicetree/bindings/media/stih-cec.txt         |  2 ++
- arch/arm/boot/dts/stih407-family.dtsi              | 12 ---------
- arch/arm/boot/dts/stih410.dtsi                     | 15 ++++++++++-
- drivers/gpu/drm/sti/Kconfig                        |  1 +
- drivers/gpu/drm/sti/sti_hdmi.c                     | 15 +++++++++++
- drivers/gpu/drm/sti/sti_hdmi.h                     |  2 ++
- drivers/staging/media/st-cec/Kconfig               |  1 +
- drivers/staging/media/st-cec/stih-cec.c            | 29 +++++++++++++++++++++-
- 8 files changed, 63 insertions(+), 14 deletions(-)
-
+diff --git a/drivers/gpu/drm/sti/Kconfig b/drivers/gpu/drm/sti/Kconfig
+index acd7286..59ceffc 100644
+--- a/drivers/gpu/drm/sti/Kconfig
++++ b/drivers/gpu/drm/sti/Kconfig
+@@ -8,5 +8,6 @@ config DRM_STI
+ 	select DRM_PANEL
+ 	select FW_LOADER
+ 	select SND_SOC_HDMI_CODEC if SND_SOC
++	select HDMI_NOTIFIERS
+ 	help
+ 	  Choose this option to enable DRM on STM stiH4xx chipset
+diff --git a/drivers/gpu/drm/sti/sti_hdmi.c b/drivers/gpu/drm/sti/sti_hdmi.c
+index 376b076..6667371 100644
+--- a/drivers/gpu/drm/sti/sti_hdmi.c
++++ b/drivers/gpu/drm/sti/sti_hdmi.c
+@@ -786,6 +786,8 @@ static void sti_hdmi_disable(struct drm_bridge *bridge)
+ 	clk_disable_unprepare(hdmi->clk_pix);
+ 
+ 	hdmi->enabled = false;
++
++	hdmi_event_disconnect(hdmi->notifier);
+ }
+ 
+ static void sti_hdmi_pre_enable(struct drm_bridge *bridge)
+@@ -892,6 +894,10 @@ static int sti_hdmi_connector_get_modes(struct drm_connector *connector)
+ 	if (!edid)
+ 		goto fail;
+ 
++	hdmi_event_connect(hdmi->notifier);
++	hdmi_event_new_edid(hdmi->notifier, edid,
++			    EDID_LENGTH * (edid->extensions + 1));
++
+ 	count = drm_add_edid_modes(connector, edid);
+ 	drm_mode_connector_update_edid_property(connector, edid);
+ 	drm_edid_to_eld(connector, edid);
+@@ -949,10 +955,12 @@ struct drm_connector_helper_funcs sti_hdmi_connector_helper_funcs = {
+ 
+ 	if (hdmi->hpd) {
+ 		DRM_DEBUG_DRIVER("hdmi cable connected\n");
++		hdmi_event_connect(hdmi->notifier);
+ 		return connector_status_connected;
+ 	}
+ 
+ 	DRM_DEBUG_DRIVER("hdmi cable disconnected\n");
++	hdmi_event_disconnect(hdmi->notifier);
+ 	return connector_status_disconnected;
+ }
+ 
+@@ -1464,6 +1472,10 @@ static int sti_hdmi_probe(struct platform_device *pdev)
+ 		goto release_adapter;
+ 	}
+ 
++	hdmi->notifier = hdmi_notifier_get(&pdev->dev);
++	if (!hdmi->notifier)
++		goto release_adapter;
++
+ 	hdmi->reset = devm_reset_control_get(dev, "hdmi");
+ 	/* Take hdmi out of reset */
+ 	if (!IS_ERR(hdmi->reset))
+@@ -1483,11 +1495,14 @@ static int sti_hdmi_remove(struct platform_device *pdev)
+ {
+ 	struct sti_hdmi *hdmi = dev_get_drvdata(&pdev->dev);
+ 
++	hdmi_event_disconnect(hdmi->notifier);
++
+ 	i2c_put_adapter(hdmi->ddc_adapt);
+ 	if (hdmi->audio_pdev)
+ 		platform_device_unregister(hdmi->audio_pdev);
+ 	component_del(&pdev->dev, &sti_hdmi_ops);
+ 
++	hdmi_notifier_put(hdmi->notifier);
+ 	return 0;
+ }
+ 
+diff --git a/drivers/gpu/drm/sti/sti_hdmi.h b/drivers/gpu/drm/sti/sti_hdmi.h
+index 119bc35..70aac98 100644
+--- a/drivers/gpu/drm/sti/sti_hdmi.h
++++ b/drivers/gpu/drm/sti/sti_hdmi.h
+@@ -8,6 +8,7 @@
+ #define _STI_HDMI_H_
+ 
+ #include <linux/hdmi.h>
++#include <linux/hdmi-notifier.h>
+ #include <linux/platform_device.h>
+ 
+ #include <drm/drmP.h>
+@@ -102,6 +103,7 @@ struct sti_hdmi {
+ 	struct platform_device *audio_pdev;
+ 	struct hdmi_audio_params audio;
+ 	struct drm_connector *drm_connector;
++	struct hdmi_notifier *notifier;
+ };
+ 
+ u32 hdmi_read(struct sti_hdmi *hdmi, int offset);
 -- 
 1.9.1
