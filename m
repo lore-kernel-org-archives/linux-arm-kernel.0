@@ -1,151 +1,40 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
-Date: Wed, 14 Dec 2016 10:03:24 +0100
-Subject: mmc: core: complete/wait_for_completion performance
-In-Reply-To: <123257138.400786.e58aee3b-9fc2-4b39-a030-c2409c5b92fc.open-xchange@email.1und1.de>
-References: <1479644869.2653.3.camel@embedded.rocks>
- <585759233.283839.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
- <1479652929.2841.1.camel@embedded.rocks>
- <187975187.249177.bccdc17e-e9c6-48c2-aeaf-3b81f1b61ec7.open-xchange@email.1und1.de>
- <1479669034.1975.1.camel@embedded.rocks>
- <1198138554.59982.63209ba1-8fb4-4a13-9ee0-f746a192f4c7.open-xchange@email.1und1.de>
- <1481095953.17027.0.camel@embedded.rocks>
- <123257138.400786.e58aee3b-9fc2-4b39-a030-c2409c5b92fc.open-xchange@email.1und1.de>
-Message-ID: <1481706204.3994.4.camel@embedded.rocks>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 14 Dec 2016 09:11:45 +0000
+Subject: [PATCH 0/2] arm64: numa: fix spurious BUG() on NOMAP regions
+Message-ID: <1481706707-6211-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+This fixes the issue reported by Robert Richter where the fact that
+the node id of struct pages covered by NOMAP regions is not initialized,
+triggering a VM_BUG_ON() in the mm code.
 
-On Wed, 2016-12-07 at 20:23 +0100, Stefan Wahren wrote:
-> Hi J?rg,
-> 
-> > J?rg Krause <joerg.krause@embedded.rocks> hat am 7. Dezember 2016
-> > um 08:32
-> > geschrieben:
-> > 
-> > 
-> > Hit Stefan,
-> > 
-> > On Sat, 2016-11-26 at 20:10 +0100, Stefan Wahren wrote:
-> > > Hi J?rg,
-> > > 
-> > > > J?rg Krause <joerg.krause@embedded.rocks> hat am 20. November
-> > > > 2016
-> > > > um 20:10
-> > > > geschrieben:
-> > > > 
-> > > > 
-> > > > On Sun, 2016-11-20 at 16:44 +0100, Stefan Wahren wrote:
-> > > > > > J?rg Krause <joerg.krause@embedded.rocks> hat am 20.
-> > > > > > November
-> > > > > > 2016
-> > > > > > um 15:42
-> > > > > > geschrieben:
-> > > > > > 
-> > > > > > 
-> > > > > > Hi Stefan,
-> > > > > > 
-> > > > > > On Sun, 2016-11-20 at 14:28 +0100, Stefan Wahren wrote:
-> > > > > > > Hi J?rg,
-> > > > > > > 
-> > > > > > > > J?rg Krause <joerg.krause@embedded.rocks> hat am 20.
-> > > > > > > > November
-> > > > > > > > 2016
-> > > > > > > > um 13:27
-> > > > > > > > geschrieben:
-> > > > > > > > 
-> > > > > > > > 
-> > > > > > > > Hi,
-> > > > > > > > 
-> > > > > > > > I started the discussion on this mailing list in
-> > > > > > > > another
-> > > > > > > > thread
-> > > > > > > > [1],
-> > > > > > > > but I'd like to move it to a new thread, because it
-> > > > > > > > might
-> > > > > > > > be
-> > > > > > > > mmc
-> > > > > > > > specific.
-> > > > > > > > 
-> > > > > > > > The issue is that I am noticed low wifi network
-> > > > > > > > throughput
-> > > > > > > > on
-> > > > > > > > an
-> > > > > > > > i.MX28
-> > > > > > > > board with the mainline kernel (v4.7.10, about 6 Mbps)
-> > > > > > > > compared
-> > > > > > > > to
-> > > > > > > > the
-> > > > > > > > vendor kernel (Freescale v2.6.35.3, about 20 Mbps). The
-> > > > > > > > wifi
-> > > > > > > > chip
-> > > > > > > > is
-> > > > > > > > attached using the SDIO interface.
-> > > > > > > > 
-> > > > > > > > I started investigation where the bottleneck in the
-> > > > > > > > mainline
-> > > > > > > > kernel?might come from. Therefore I checked that the
-> > > > > > > > configs
-> > > > > > > > and
-> > > > > > > > settings for the interfaces and drivers are the same.
-> > > > > > > > They
-> > > > > > > > are.
-> > > > > > > 
-> > > > > > > so you're not using the mxs_defconfig settings anymore?
-> > > > > > 
-> > > > > > No, I changed the settings.
-> > > > > > 
-> > > > > 
-> > > > > What happens to performance to if you change the following
-> > > > > settings
-> > > > > to the same
-> > > > > like in mxs_defconfig?
-> > > > > 
-> > > > > CONFIG_PREEMPT_VOLUNTARY=y
-> > > > > CONFIG_DEFAULT_IOSCHED="noop"
-> > > > 
-> > > > No much change at all. The time difference between complete()
-> > > > and
-> > > > wait_for_complete() decreases in best case to 110 us, but also
-> > > > varies
-> > > > to above 130 us.
-> > > 
-> > > just a weird idea. Did you tried to add MMC_CAP_CMD23 into the
-> > > caps
-> > > [1]?
-> > > 
-> > > [1] - http://lxr.free-electrons.com/source/drivers/mmc/host/mxs-m
-> > > mc.c
-> > > ?v=4.8#L642
-> > 
-> > I tried, but it did not improved the timing or throughput. However,
-> > many thanks for the input.
-> > 
-> > J?rg
-> 
-> did you try cyclictest [1]?
+I know that this approach is the least preferred option by Robert, but it
+has been used successfully in the downstream Linaro Enterprise kernel,
+running on HiSilicon D05, which suffered from the same issue as Cavium
+ThunderX where it was originally reported.
 
-Not yet. Not sure what to measure and which values to compare here.
+Given that the other proposed solutions either fail to solve the issue
+completely, or cause regressions in other code (hibernate), I think this
+issue is appropriate for merging now, and backported to -stable. If there
+are performance concerns, we can try to improve on this solution, which
+could include reverting patch #2 altogether, for all I care.
 
-> 
-> Beside the time for a request the amount of requests for the complete
-> iperf test
-> would we interesting. Maybe there are retries.
-> 
-> I'm still interested in your PIO mode patches for mxs-mmc even
-> without clean up.
+Patch #1 fixes a bug in the generic mm code where a struct page is
+dereferenced before pfn_valid() is called. This should probably go to
+stable regardless of where the arm64 discussion goes.
 
-Actually, the patch does not implement a PIO mode, but drops DMA and
-uses polling instead. I've attached the patch.
+Patch #2 enables CONFIG_HOLES_IN_ZONE for arm64 numa, causing the kernel
+to no longer assume that all pages in a zone have valid struct pages
+associated with them.
 
-> [1] - https://git.kernel.org/cgit/utils/rt-tests/rt-tests.git/
+Ard Biesheuvel (2):
+  mm: don't dereference struct page fields of invalid pages
+  arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA
 
-Best regards
-J?rg
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-mmc-mxs-mmc-drop-DMA-and-use-polling-mode.patch
-Type: text/x-patch
-Size: 7570 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161214/c2c74830/attachment-0001.bin>
+ arch/arm64/Kconfig | 4 ++++
+ mm/page_alloc.c    | 6 +++---
+ 2 files changed, 7 insertions(+), 3 deletions(-)
+
+-- 
+2.7.4
