@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Dec 2016 00:57:23 +0100
-Subject: [PATCH 14/37] ARM: dts: imx6q-cm-fx6: Correct license text
+Date: Thu, 15 Dec 2016 00:57:24 +0100
+Subject: [PATCH 15/37] ARM: dts: imx6qdl-apalis: Correct license text
 In-Reply-To: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
 References: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214235746.7108-15-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214235746.7108-16-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,19 +11,19 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
-Cc: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
-Cc: Igor Grinberg <grinberg@compulab.co.il>
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+Cc: Petr ?tetiar <ynezz@true.cz>
 Cc: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
-Cc: Valentin Raevsky <valentin@compulab.co.il>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/imx6q-cm-fx6.dts | 10 +++++-----
+ arch/arm/boot/dts/imx6qdl-apalis.dtsi | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-index 59bc5a4dce17..4fb478d2801e 100644
---- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
-+++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+index 99e323b57261..261ad3010ba8 100644
+--- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
 @@ -12,17 +12,17 @@
   *     modify it under the terms of the GNU General Public License
   *     version 2 as published by the Free Software Foundation.
