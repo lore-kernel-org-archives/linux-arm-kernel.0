@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Dec 2016 00:57:46 +0100
-Subject: [PATCH 37/37] ARM: dts: vfxxx: Correct license text
+Date: Thu, 15 Dec 2016 00:57:42 +0100
+Subject: [PATCH 33/37] ARM: dts: vf610m4-cosmic: Correct license text
 In-Reply-To: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
 References: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214235746.7108-38-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214235746.7108-34-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,25 +11,19 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
-Cc: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
-Cc: Bill Pringlemeir <bpringlemeir@nbsps.com>
-Cc: Cory Tusar <cory.tusar@pid1solutions.com>
-Cc: Frank Li <Frank.Li@freescale.com>
-Cc: Guenter Roeck <linux@roeck-us.net>
-Cc: Sanchayan Maity <maitysanchayan@gmail.com>
-Cc: Stefan Agner <stefan@agner.ch>
+Cc: Afzal Mohammed <afzal.mohd.ma@gmail.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/vfxxx.dtsi | 10 +++++-----
+ arch/arm/boot/dts/vf610m4-cosmic.dts | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-index 2c13ec696ac5..d7d77779bb3a 100644
---- a/arch/arm/boot/dts/vfxxx.dtsi
-+++ b/arch/arm/boot/dts/vfxxx.dtsi
-@@ -10,17 +10,17 @@
-  *     modify it under the terms of the GNU General Public License
-  *     version 2 as published by the Free Software Foundation.
+diff --git a/arch/arm/boot/dts/vf610m4-cosmic.dts b/arch/arm/boot/dts/vf610m4-cosmic.dts
+index 8944a2d2054c..f7474c11aabd 100644
+--- a/arch/arm/boot/dts/vf610m4-cosmic.dts
++++ b/arch/arm/boot/dts/vf610m4-cosmic.dts
+@@ -15,17 +15,17 @@
+  *     published by the Free Software Foundation; either version 2 of the
+  *     License, or (at your option) any later version.
   *
 - *     This file is distributed in the hope that it will be useful
 + *     This file is distributed in the hope that it will be useful,
@@ -48,7 +42,7 @@ index 2c13ec696ac5..d7d77779bb3a 100644
   *     copy, modify, merge, publish, distribute, sublicense, and/or
   *     sell copies of the Software, and to permit persons to whom the
   *     Software is furnished to do so, subject to the following
-@@ -29,11 +29,11 @@
+@@ -34,11 +34,11 @@
   *     The above copyright notice and this permission notice shall be
   *     included in all copies or substantial portions of the Software.
   *
