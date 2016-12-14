@@ -1,75 +1,63 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 14 Dec 2016 18:05:09 +0530
-Subject: [PATCH] ARM: dts: dra72-evm-tps65917: Add voltage supplies to
- usb_phy, mmc, dss
-In-Reply-To: <2bb73170-dbb5-01a3-5b3a-4d5d9414e3a9@ti.com>
-References: <20161214085703.506-1-lokeshvutla@ti.com>
- <2bb73170-dbb5-01a3-5b3a-4d5d9414e3a9@ti.com>
-Message-ID: <972859e0-30ff-8170-d5d3-af9b8591276b@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 14 Dec 2016 12:40:56 +0000
+Subject: [PATCH 2/2] ARM: soft-reboot into same mode that we entered the
+ kernel
+In-Reply-To: <20161214122945.GE14217@n2100.armlinux.org.uk>
+References: <20161213113044.GC19985@leverpostej>
+ <E1cH751-0003kk-Ts@rmk-PC.armlinux.org.uk>
+ <20161214115648.GG17982@leverpostej>
+ <20161214120541.GD14217@n2100.armlinux.org.uk>
+ <20161214121747.GH17982@leverpostej>
+ <20161214122945.GE14217@n2100.armlinux.org.uk>
+Message-ID: <20161214124056.GI17982@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Wednesday 14 December 2016 04:30 PM, Roger Quadros wrote:
-> Lokesh,
+On Wed, Dec 14, 2016 at 12:29:45PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Dec 14, 2016 at 12:17:47PM +0000, Mark Rutland wrote:
+> > On Wed, Dec 14, 2016 at 12:05:41PM +0000, Russell King - ARM Linux wrote:
+> > > The issue here is that a panic can happen at any time from any context
+> > > with any hyp stub in place, so there _needs_ to be a uniform way to do
+> > > this.  It's very bad that we've got this far without this point having
+> > > been considered - all we can do right now is to try and fix the issues
+> > > as they come up.
+> > > 
+> > > Right now, let's fix this so we get some kind of improvement, and later
+> > > try to sort out some kind of uniform interface for this task.
+> > 
+> > Sure, that's a bigger task, and this is definitely a step in the right
+> > direction.
+> > 
+> > We need to avoid the kdump regression somehow though; can we somehow
+> > detect if KVM is active and avoid issuing the HVC_SOFT_RESTART?
 > 
-> On 14/12/16 10:57, Lokesh Vutla wrote:
->> Commit 5d080aa30681 ("ARM: dts: dra72: Add separate dtsi for tps65917")
->> added a separate dtsi for dra72-evm-tps65917 moving all the voltage supplies
->> to this file. But it missed adding voltage supplies to usb_phy, mmc,
->> dss and deleted from dra72-evm-common.dtsi. Adding the voltage supply
->> phandles to these nodes in dra72-evm-tps65917.dtsi
->>
->> Fixes: 5d080aa30681 ("ARM: dts: dra72: Add separate dtsi for tps65917")
->> Reported-by: Carlos Hernandez <ceh@ti.com>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
->> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->> ---
->> Logs:
->> - DRA72-evm revC: http://pastebin.ubuntu.com/23627665/ 
->> - DRA72-evm revB: http://pastebin.ubuntu.com/23627658/
->>  arch/arm/boot/dts/dra72-evm-tps65917.dtsi | 16 ++++++++++++++++
->>  1 file changed, 16 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/dra72-evm-tps65917.dtsi b/arch/arm/boot/dts/dra72-evm-tps65917.dtsi
->> index ee6dac44edf1..e6df676886c0 100644
->> --- a/arch/arm/boot/dts/dra72-evm-tps65917.dtsi
->> +++ b/arch/arm/boot/dts/dra72-evm-tps65917.dtsi
->> @@ -132,3 +132,19 @@
->>  		ti,palmas-long-press-seconds = <6>;
->>  	};
->>  };
->> +
->> +&usb2_phy1 {
->> +	phy-supply = <&ldo4_reg>;
->> +};
->> +
->> +&usb2_phy2 {
->> +	phy-supply = <&ldo4_reg>;
->> +};
->> +
->> +&dss {
->> +	vdda_video-supply = <&ldo5_reg>;
->> +};
->> +
->> +&mmc1 {
->> +	vmmc_aux-supply = <&ldo1_reg>;
->> +};
->>
+> That's a question for KVM people.
 > 
-> Are you sure that all future users of dra72-evm-tps65917.dtsi will use this same configuration?
-> If not I'd rather put this in the board dts files.
-
-hmm..This debate already happened when creating dra72-evm-tps65917 file
-and concluded that all the common regulator stuff on dra72 evm revA,B,C
-should go in this file. Any new board which is not similar to dra72-evm
-will not be using this file.
-
-Thanks and regards,
-Lokesh
-
+> However, there's a bigger question, which is: what do we want to happen
+> in the case of kdump - do we want to be entering the kdump kernel in
+> HYP or SVC mode?  As the kdump kernel exists to be able to save the
+> state of a crashing system, the kdump kernel should do that and then
+> restart the system in a clean way (iow, not via yet another kexec.)
 > 
-> cheers,
-> -roger
-> 
+> So maybe the right answer is that kdump should always invoke the kernel
+> in SVC mode.
+
+Personally, my view is the opposite -- we should always exit the way we
+came, and kdump can go from there. Otherwise we're leaving context
+active in hyp mode that might hinder kdump (or would otherwise be useful
+for kdump to be able to access).
+
+For example, we might want to do something like kernel guard, where even
+the host kernel would have a stage-2 translation active in hyp that we'd
+need to tear down. That, or the hyp page table might have been
+corrupted, and tearing down ASAP might save us from asynchrnous issues
+from page table walks. It's all a trade-off, either way -- the hyp code
+could also be corrupt.
+
+Certainly I would expect that once kdump's logged what it can, it should
+trigger a real reboot.
+
+Thanks,
+Mark.
+
+[1] https://01.org/intel-kgt
