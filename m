@@ -1,61 +1,31 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 14 Dec 2016 13:00:50 +0200
-Subject: [PATCH] ARM: dts: dra72-evm-tps65917: Add voltage supplies to
- usb_phy, mmc, dss
-In-Reply-To: <20161214085703.506-1-lokeshvutla@ti.com>
-References: <20161214085703.506-1-lokeshvutla@ti.com>
-Message-ID: <2bb73170-dbb5-01a3-5b3a-4d5d9414e3a9@ti.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Dec 2016 11:06:35 +0000
+Subject: [PATCH linux v1 4/4] arm: dts: Add dt-binding to support seven
+ segment display on zaius
+In-Reply-To: <10697525.O7CkPN6Gfl@wuerfel>
+References: <1481702104-8617-1-git-send-email-jaghu@google.com>
+ <1481702104-8617-5-git-send-email-jaghu@google.com>
+ <3917905.e4iOqADnVQ@wuerfel> <10697525.O7CkPN6Gfl@wuerfel>
+Message-ID: <20161214110635.GB14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lokesh,
-
-On 14/12/16 10:57, Lokesh Vutla wrote:
-> Commit 5d080aa30681 ("ARM: dts: dra72: Add separate dtsi for tps65917")
-> added a separate dtsi for dra72-evm-tps65917 moving all the voltage supplies
-> to this file. But it missed adding voltage supplies to usb_phy, mmc,
-> dss and deleted from dra72-evm-common.dtsi. Adding the voltage supply
-> phandles to these nodes in dra72-evm-tps65917.dtsi
+On Wed, Dec 14, 2016 at 10:00:46AM +0100, Arnd Bergmann wrote:
+> On Wednesday, December 14, 2016 9:55:47 AM CET Arnd Bergmann wrote:
+> > According to your introductory mail, the interface is assumed to be
+> > a 74HC164. Should we use that ID in the compatible string?
+> > 
+> > We can always add other strings later if we want to support multiple
+> > wire formats.
 > 
-> Fixes: 5d080aa30681 ("ARM: dts: dra72: Add separate dtsi for tps65917")
-> Reported-by: Carlos Hernandez <ceh@ti.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
-> Logs:
-> - DRA72-evm revC: http://pastebin.ubuntu.com/23627665/ 
-> - DRA72-evm revB: http://pastebin.ubuntu.com/23627658/
->  arch/arm/boot/dts/dra72-evm-tps65917.dtsi | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/dra72-evm-tps65917.dtsi b/arch/arm/boot/dts/dra72-evm-tps65917.dtsi
-> index ee6dac44edf1..e6df676886c0 100644
-> --- a/arch/arm/boot/dts/dra72-evm-tps65917.dtsi
-> +++ b/arch/arm/boot/dts/dra72-evm-tps65917.dtsi
-> @@ -132,3 +132,19 @@
->  		ti,palmas-long-press-seconds = <6>;
->  	};
->  };
-> +
-> +&usb2_phy1 {
-> +	phy-supply = <&ldo4_reg>;
-> +};
-> +
-> +&usb2_phy2 {
-> +	phy-supply = <&ldo4_reg>;
-> +};
-> +
-> +&dss {
-> +	vdda_video-supply = <&ldo5_reg>;
-> +};
-> +
-> +&mmc1 {
-> +	vmmc_aux-supply = <&ldo1_reg>;
-> +};
-> 
+> Actually, looking up 74hc164, that seems to be a gpio expander,
+> so maybe a more flexible way to do the same is to put a driver
+> for the expander into drivers/gpio/ and have the main driver
+> access the outputs of that using the gpiolib interface.
 
-Are you sure that all future users of dra72-evm-tps65917.dtsi will use this same configuration?
-If not I'd rather put this in the board dts files.
+There already is - drivers/gpio/gpio-74x164.c
 
-cheers,
--roger
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
