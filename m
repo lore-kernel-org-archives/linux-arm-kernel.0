@@ -1,111 +1,68 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 14 Dec 2016 11:46:20 -0800
-Subject: [PATCH 10/11] ARM: bcm2835: dt: Add the DSI module nodes and clocks.
+Date: Wed, 14 Dec 2016 11:46:14 -0800
+Subject: [PATCH 04/11] drm/vc4: Set up SCALER_DISPCTRL at boot.
 In-Reply-To: <20161214194621.16499-1-eric@anholt.net>
 References: <20161214194621.16499-1-eric@anholt.net>
-Message-ID: <20161214194621.16499-11-eric@anholt.net>
+Message-ID: <20161214194621.16499-5-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The modules stay disabled by default, and if you want to enable DSI
-you'll need an overlay that connects a panel to it.
+We want the HVS on, obviously, and we also want DSP3 (PV1's source) to
+be muxed from HVS channel 2 like we expect in vc4_crtc.c.  The
+firmware wasn't setting the DSP3 mux up when both the LCD and HDMI
+were disabled.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- arch/arm/boot/dts/bcm2835-rpi.dtsi |  8 +++++++
- arch/arm/boot/dts/bcm283x.dtsi     | 49 +++++++++++++++++++++++++++++++++++---
- 2 files changed, 54 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/vc4/vc4_hvs.c  | 14 ++++++++++++++
+ drivers/gpu/drm/vc4/vc4_regs.h |  3 +++
+ 2 files changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index e9b47b2bbc33..365648898f3a 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -84,3 +84,11 @@
- 	power-domains = <&power RPI_POWER_DOMAIN_HDMI>;
- 	status = "okay";
- };
-+
-+&dsi0 {
-+	power-domains = <&power RPI_POWER_DOMAIN_DSI0>;
-+};
-+
-+&dsi1 {
-+	power-domains = <&power RPI_POWER_DOMAIN_DSI1>;
-+};
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 46d46d894a44..82a4eccfb3d8 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -93,10 +93,13 @@
- 			#clock-cells = <1>;
- 			reg = <0x7e101000 0x2000>;
+diff --git a/drivers/gpu/drm/vc4/vc4_hvs.c b/drivers/gpu/drm/vc4/vc4_hvs.c
+index 6fbab1c82cb1..fc68b1b4da52 100644
+--- a/drivers/gpu/drm/vc4/vc4_hvs.c
++++ b/drivers/gpu/drm/vc4/vc4_hvs.c
+@@ -170,6 +170,7 @@ static int vc4_hvs_bind(struct device *dev, struct device *master, void *data)
+ 	struct vc4_dev *vc4 = drm->dev_private;
+ 	struct vc4_hvs *hvs = NULL;
+ 	int ret;
++	u32 dispctrl;
  
--			/* CPRMAN derives everything from the platform's
--			 * oscillator.
-+			/* CPRMAN derives almost everything from the
-+			 * platform's oscillator.  However, the DSI
-+			 * pixel clocks come from the DSI analog PHY.
- 			 */
--			clocks = <&clk_osc>;
-+			clocks = <&clk_osc>,
-+				<&dsi0 0>, <&dsi0 1>, <&dsi0 2>,
-+				<&dsi1 0>, <&dsi1 1>, <&dsi1 2>;
- 		};
+ 	hvs = devm_kzalloc(&pdev->dev, sizeof(*hvs), GFP_KERNEL);
+ 	if (!hvs)
+@@ -211,6 +212,19 @@ static int vc4_hvs_bind(struct device *dev, struct device *master, void *data)
+ 		return ret;
  
- 		rng at 7e104000 {
-@@ -187,6 +190,26 @@
- 			interrupts = <2 14>; /* pwa1 */
- 		};
+ 	vc4->hvs = hvs;
++
++	dispctrl = HVS_READ(SCALER_DISPCTRL);
++
++	dispctrl |= SCALER_DISPCTRL_ENABLE;
++
++	/* Set DSP3 (PV1) to use HVS channel 2, which would otherwise
++	 * be unused.
++	 */
++	dispctrl &= ~SCALER_DISPCTRL_DSP3_MUX_MASK;
++	dispctrl |= VC4_SET_FIELD(2, SCALER_DISPCTRL_DSP3_MUX);
++
++	HVS_WRITE(SCALER_DISPCTRL, dispctrl);
++
+ 	return 0;
+ }
  
-+		dsi0: dsi at 7e209000 {
-+			compatible = "brcm,bcm2835-dsi0";
-+			reg = <0x7e209000 0x78>;
-+			interrupts = <2 4>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			#clock-cells = <1>;
+diff --git a/drivers/gpu/drm/vc4/vc4_regs.h b/drivers/gpu/drm/vc4/vc4_regs.h
+index 39f6886b2410..b3b297fba709 100644
+--- a/drivers/gpu/drm/vc4/vc4_regs.h
++++ b/drivers/gpu/drm/vc4/vc4_regs.h
+@@ -244,6 +244,9 @@
+ # define SCALER_DISPCTRL_ENABLE			BIT(31)
+ # define SCALER_DISPCTRL_DSP2EISLUR		BIT(15)
+ # define SCALER_DISPCTRL_DSP1EISLUR		BIT(14)
++# define SCALER_DISPCTRL_DSP3_MUX_MASK		VC4_MASK(19, 18)
++# define SCALER_DISPCTRL_DSP3_MUX_SHIFT		18
 +
-+			clocks = <&clocks BCM2835_PLLA_DSI0>,
-+				 <&clocks BCM2835_CLOCK_DSI0E>,
-+				 <&clocks BCM2835_CLOCK_DSI0P>;
-+			clock-names = "phy", "escape", "pixel";
-+
-+			clock-output-names = "dsi0_byte",
-+					     "dsi0_ddr2",
-+					     "dsi0_ddr";
-+
-+			status = "disabled";
-+		};
-+
- 		aux: aux at 0x7e215000 {
- 			compatible = "brcm,bcm2835-aux";
- 			#clock-cells = <1>;
-@@ -246,6 +269,26 @@
- 			interrupts = <2 1>;
- 		};
- 
-+		dsi1: dsi at 7e700000 {
-+			compatible = "brcm,bcm2835-dsi1";
-+			reg = <0x7e700000 0x8c>;
-+			interrupts = <2 12>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			#clock-cells = <1>;
-+
-+			clocks = <&clocks BCM2835_PLLD_DSI1>,
-+				 <&clocks BCM2835_CLOCK_DSI1E>,
-+				 <&clocks BCM2835_CLOCK_DSI1P>;
-+			clock-names = "phy", "escape", "pixel";
-+
-+			clock-output-names = "dsi1_byte",
-+					     "dsi1_ddr2",
-+					     "dsi1_ddr";
-+
-+			status = "disabled";
-+		};
-+
- 		i2c1: i2c at 7e804000 {
- 			compatible = "brcm,bcm2835-i2c";
- 			reg = <0x7e804000 0x1000>;
+ /* Enables Display 0 short line and underrun contribution to
+  * SCALER_DISPSTAT_IRQDISP0.  Note that short frame contributions are
+  * always enabled.
 -- 
 2.11.0
