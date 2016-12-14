@@ -1,10 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Dec 2016 23:37:34 +0100
-Subject: [PATCH 27/39] ARM: dts: armada-xp-lenovo-ix4-300d: Correct license
- text
+Date: Wed, 14 Dec 2016 23:37:43 +0100
+Subject: [PATCH 36/39] ARM: dts: dove-sbc-a510: Correct license text
 In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
 References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214223746.23066-28-alexandre.belloni@free-electrons.com>
+Message-ID: <20161214223746.23066-37-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,24 +11,19 @@ The license test has been mangled at some point then copy pasted across
 multiple files. Restore it to what it should be.
 Note that this is not intended as a license change.
 
-Cc: Arnaud Ebalard <arno@natisbad.org>
-Cc: Benoit Masson <yahoo@perenite.com>
-Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-Cc: Geert Uytterhoeven <geert+renesas@glider.be>
 Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 10 +++++-----
+ arch/arm/boot/dts/dove-sbc-a510.dts | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-index 8af463f26ea1..6462fe11e3c0 100644
---- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-+++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+diff --git a/arch/arm/boot/dts/dove-sbc-a510.dts b/arch/arm/boot/dts/dove-sbc-a510.dts
+index 288e707dea99..2bb85a9b7614 100644
+--- a/arch/arm/boot/dts/dove-sbc-a510.dts
++++ b/arch/arm/boot/dts/dove-sbc-a510.dts
 @@ -13,17 +13,17 @@
-  *     published by the Free Software Foundation; either version 2 of the
-  *     License, or (at your option) any later version.
+  *     published by the Free Software Foundation; version 2 of the
+  *     License.
   *
 - *     This file is distributed in the hope that it will be useful
 + *     This file is distributed in the hope that it will be useful,
