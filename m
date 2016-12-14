@@ -1,83 +1,75 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 14 Dec 2016 08:08:36 +0100
-Subject: [PATCH v3 1/4] mtd: lart: Rename partition defines to be
- prefixed with PART_
-In-Reply-To: <20161209233628.6642-2-f.fainelli@gmail.com>
-References: <20161208185933.13749-1-f.fainelli@gmail.com>
- <20161209233628.6642-1-f.fainelli@gmail.com>
- <20161209233628.6642-2-f.fainelli@gmail.com>
-Message-ID: <20161214080836.6149dc42@bbrezillon>
+From: guy.shapiro@mobi-wize.com (Guy Shapiro)
+Date: Wed, 14 Dec 2016 09:09:36 +0200
+Subject: [PATCH] Input: imx6ul_tsc - generalize the averaging property
+In-Reply-To: <CAL_JsqJAdxrUGL5pjTPDkrXTsKJU-vL1Y4TpqhP79bESs9vR-g@mail.gmail.com>
+References: <1481440003-27168-1-git-send-email-guy.shapiro@mobi-wize.com>
+ <CAL_JsqJAdxrUGL5pjTPDkrXTsKJU-vL1Y4TpqhP79bESs9vR-g@mail.gmail.com>
+Message-ID: <6760ad61-b596-b80d-4100-09f926abab05@mobi-wize.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  9 Dec 2016 15:36:25 -0800
-Florian Fainelli <f.fainelli@gmail.com> wrote:
+On 13/12/2016 21:54, Rob Herring wrote:
 
-> In preparation for defining KERNEL_START on ARM, rename KERNEL_START to
-> PART_KERNEL_START, and to be consistent, do this for all
-> partition-related constants.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> On Sun, Dec 11, 2016 at 1:06 AM, Guy Shapiro <guy.shapiro@mobi-wize.com> wrote:
+>> Make the avarage-samples property a general touchscreen property
+>> rather than imx6ul device specific.
+>>
+>> Signed-off-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
+>> ---
+>>   .../bindings/input/touchscreen/imx6ul_tsc.txt      | 11 ++----
+>>   .../bindings/input/touchscreen/touchscreen.txt     |  3 ++
+>>   drivers/input/touchscreen/imx6ul_tsc.c             | 46 ++++++++++++++++------
+>>   3 files changed, 41 insertions(+), 19 deletions(-)
+> [...]
+>
+>> +       switch (average_samples) {
+>> +       case 1:
+>> +               tsc->average_enable = false;
+>> +               tsc->average_select = 0; /* value unused; initialize anyway */
+>> +               break;
+>> +       case 4:
+>> +               tsc->average_enable = true;
+>> +               tsc->average_select = 0;
+>> +               break;
+>> +       case 8:
+>> +               tsc->average_enable = true;
+>> +               tsc->average_select = 1;
+>> +               break;
+>> +       case 16:
+>> +               tsc->average_enable = true;
+>> +               tsc->average_select = 2;
+>> +               break;
+>> +       case 32:
+>> +               tsc->average_enable = true;
+>> +               tsc->average_select = 3;
+>> +               break;
+> This could be more efficiently written as
+>
+> tsc->average_select = log2(average_samples) - 2;
+>
+> Then enable if >=0.
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Using '1' to indicate no averaging is more consistent then using '0'.
+I think it is better to validate the values rather then round them.
 
-> ---
->  drivers/mtd/devices/lart.c | 24 ++++++++++++------------
->  1 file changed, 12 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/mtd/devices/lart.c b/drivers/mtd/devices/lart.c
-> index 82bd00af5cc3..268aae45b514 100644
-> --- a/drivers/mtd/devices/lart.c
-> +++ b/drivers/mtd/devices/lart.c
-> @@ -75,18 +75,18 @@ static char module_name[] = "lart";
->  
->  /* blob */
->  #define NUM_BLOB_BLOCKS		FLASH_NUMBLOCKS_16m_PARAM
-> -#define BLOB_START			0x00000000
-> -#define BLOB_LEN			(NUM_BLOB_BLOCKS * FLASH_BLOCKSIZE_PARAM)
-> +#define PART_BLOB_START		0x00000000
-> +#define PART_BLOB_LEN		(NUM_BLOB_BLOCKS * FLASH_BLOCKSIZE_PARAM)
->  
->  /* kernel */
->  #define NUM_KERNEL_BLOCKS	7
-> -#define KERNEL_START		(BLOB_START + BLOB_LEN)
-> -#define KERNEL_LEN			(NUM_KERNEL_BLOCKS * FLASH_BLOCKSIZE_MAIN)
-> +#define PART_KERNEL_START	(PART_BLOB_START + PART_BLOB_LEN)
-> +#define PART_KERNEL_LEN		(NUM_KERNEL_BLOCKS * FLASH_BLOCKSIZE_MAIN)
->  
->  /* initial ramdisk */
->  #define NUM_INITRD_BLOCKS	24
-> -#define INITRD_START		(KERNEL_START + KERNEL_LEN)
-> -#define INITRD_LEN			(NUM_INITRD_BLOCKS * FLASH_BLOCKSIZE_MAIN)
-> +#define PART_INITRD_START	(PART_KERNEL_START + PART_KERNEL_LEN)
-> +#define PART_INITRD_LEN		(NUM_INITRD_BLOCKS * FLASH_BLOCKSIZE_MAIN)
->  
->  /*
->   * See section 4.0 in "3 Volt Fast Boot Block Flash Memory" Intel Datasheet
-> @@ -587,20 +587,20 @@ static struct mtd_partition lart_partitions[] = {
->  	/* blob */
->  	{
->  		.name	= "blob",
-> -		.offset	= BLOB_START,
-> -		.size	= BLOB_LEN,
-> +		.offset	= PART_BLOB_START,
-> +		.size	= PART_BLOB_LEN,
->  	},
->  	/* kernel */
->  	{
->  		.name	= "kernel",
-> -		.offset	= KERNEL_START,		/* MTDPART_OFS_APPEND */
-> -		.size	= KERNEL_LEN,
-> +		.offset	= PART_KERNEL_START,	/* MTDPART_OFS_APPEND */
-> +		.size	= PART_KERNEL_LEN,
->  	},
->  	/* initial ramdisk / file system */
->  	{
->  		.name	= "file system",
-> -		.offset	= INITRD_START,		/* MTDPART_OFS_APPEND */
-> -		.size	= INITRD_LEN,		/* MTDPART_SIZ_FULL */
-> +		.offset	= PART_INITRD_START,	/* MTDPART_OFS_APPEND */
-> +		.size	= PART_INITRD_LEN,	/* MTDPART_SIZ_FULL */
->  	}
->  };
->  #define NUM_PARTITIONS ARRAY_SIZE(lart_partitions)
+What do you think about:
++       switch (average_samples) {
++       case 1:
++               tsc->average_enable = false;
++               tsc->average_select = 0; /* value unused; initialize 
+anyway */
++               break;
++       case 4:
++       case 8:
++       case 16:
++       case 32:
++               tsc->average_enable = true;
++               tsc->average_select = ilog2(average_samples) - 2;
++               break;
++       default:
++               dev_err(&pdev->dev,
++                       "touchscreen-average-samples (%u) must be 1, 4, 
+8, 16 or 32\n",
++                       average_samples);
+
+Guy.
