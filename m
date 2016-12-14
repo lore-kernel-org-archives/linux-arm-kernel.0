@@ -1,75 +1,189 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 14 Dec 2016 14:12:41 +0100
-Subject: [PATCH linux v1 0/4] Seven segment display support
-In-Reply-To: <20161214125641.GA5379@kroah.com>
-References: <1481702104-8617-1-git-send-email-jaghu@google.com>
- <20161214134530.2bd54a4e@free-electrons.com>
- <20161214125641.GA5379@kroah.com>
-Message-ID: <ac324946-41da-c090-a0ca-78155611bb7e@baylibre.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 14 Dec 2016 14:28:06 +0100
+Subject: [PATCH] ARM: dts: Add missing CPU frequencies for Exynos5422/5800
+In-Reply-To: <26ffeee4-ff43-b3d3-3267-5fcbc50e2974@osg.samsung.com>
+References: <5220084.l31t5oJbsy@amdc3058>
+ <CGME20161213191823epcas5p346582b73ad9b401d9e773a1b076f1f61@epcas5p3.samsung.com>
+ <26ffeee4-ff43-b3d3-3267-5fcbc50e2974@osg.samsung.com>
+Message-ID: <2340115.HEG9AYUCMD@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2016 01:56 PM, Greg KH wrote:
-> On Wed, Dec 14, 2016 at 01:45:30PM +0100, Thomas Petazzoni wrote:
->> Hello,
->>
->> On Tue, 13 Dec 2016 23:55:00 -0800, Jaghathiswari Rankappagounder
->> Natarajan wrote:
->>
->>> Documentation for the binding which provides an interface for adding clock,
->>> data and clear signal GPIO lines to control seven segment display.
->>>
->>> The platform device driver provides an API for displaying on two 7-segment
->>> displays, and implements the required bit-banging. The hardware assumed is
->>> 74HC164 wired to two 7-segment displays.
->>>
->>> The character device driver implements the user-space API for letting a user
->>> write to two 7-segment displays including any conversion methods necessary
->>> to map the user input to two 7-segment displays.
->>>
->>> Adding clock, data and clear signal GPIO lines in the devicetree to control
->>> seven segment display on zaius platform.
->>>
->>> The platform driver matches on the device tree node; the platform driver also
->>> initializes the character device.
->>>
->>> Tested that the seven segment display works properly by writing to the
->>> character device file on a EVB AST2500 board which also has 74HC164 wired
->>> to two 7-segment displays.
->>
->> FWIW, I proposed a driver for seven segment displays back in 2013:
->>
->>    http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/139986.html
->>
->> And the feedback from Greg KH was: we don't need a driver for that, do
->> it from userspace. See:
->>
->>    http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/139992.html
->>
->> So: good luck :-)
+
+On Tuesday, December 13, 2016 04:18:05 PM Javier Martinez Canillas wrote:
+> Hello Bartlomiej,
+
+Hi,
+
+> On 12/13/2016 01:52 PM, Bartlomiej Zolnierkiewicz wrote:
+> > Add missing 2000MHz & 1900MHz OPPs (for A15 cores) and 1400MHz OPP
+> > (for A7 cores).  Also update common Odroid-XU3 Lite/XU3/XU4 thermal
+> > cooling maps to account for new OPPs.
+> > 
+> > Since new OPPs are not available on all Exynos5422/5800 boards modify
+> > dts files for Odroid-XU3 Lite (limited to 1.8 GHz / 1.3 GHz) & Peach
+> > Pi (limited to 2.0 GHz / 1.3 GHz) accordingly.
+> > 
+> > Tested on Odroid-XU3 and XU3 Lite.
+> > 
+> > Cc: Doug Anderson <dianders@chromium.org>
+> > Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> > Cc: Andreas Faerber <afaerber@suse.de>
+> > Cc: Thomas Abraham <thomas.ab@samsung.com>
+> > Cc: Ben Gamari <ben@smart-cactus.org>
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > ---
+> >  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |   14 +++++++-------
+> >  arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts    |   17 +++++++++++++++++
+> >  arch/arm/boot/dts/exynos5800-peach-pi.dts          |    4 ++++
+> >  arch/arm/boot/dts/exynos5800.dtsi                  |   15 +++++++++++++++
+> >  4 files changed, 43 insertions(+), 7 deletions(-)
+> > 
+> > Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> > ===================================================================
+> > --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2016-12-13 15:59:33.779763261 +0100
+> > +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2016-12-13 15:59:33.775763261 +0100
+> > @@ -118,7 +118,7 @@
+> >  				/*
+> >  				 * When reaching cpu_alert3, reduce CPU
+> >  				 * by 2 steps. On Exynos5422/5800 that would
+> > -				 * be: 1600 MHz and 1100 MHz.
+> > +				 * (usually) be: 1800 MHz and 1200 MHz.
+> >  				 */
+> >  				map3 {
+> >  					trip = <&cpu_alert3>;
+> > @@ -131,16 +131,16 @@
+> >  
+> >  				/*
+> >  				 * When reaching cpu_alert4, reduce CPU
+> > -				 * further, down to 600 MHz (11 steps for big,
+> > -				 * 7 steps for LITTLE).
+> > +				 * further, down to 600 MHz (13 steps for big,
+> > +				 * 8 steps for LITTLE).
+> >  				 */
+> > -				map5 {
+> > +				cooling_map5: map5 {
+> >  					trip = <&cpu_alert4>;
+> > -					cooling-device = <&cpu0 3 7>;
+> > +					cooling-device = <&cpu0 3 8>;
+> >  				};
+> > -				map6 {
+> > +				cooling_map6: map6 {
+> >  					trip = <&cpu_alert4>;
+> > -					cooling-device = <&cpu4 3 11>;
+> > +					cooling-device = <&cpu4 3 13>;
+> >  				};
+> >  			};
+> >  		};
+> > Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
+> > ===================================================================
+> > --- a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts	2016-12-13 15:59:33.779763261 +0100
+> > +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts	2016-12-13 15:59:33.775763261 +0100
+> > @@ -21,6 +21,23 @@
+> >  	compatible = "hardkernel,odroid-xu3-lite", "samsung,exynos5800", "samsung,exynos5";
+> >  };
+> >  
+> > +&cluster_a15_opp_table {
+> > +	/delete-node/opp at 2000000000;
+> > +	/delete-node/opp at 1900000000;
+> > +};
+> > +
+> > +&cluster_a7_opp_table {
+> > +	/delete-node/opp at 1400000000;
+> > +};
+> > +
 > 
-> Did anyone ever write a library for this type of thing?
+> I think that a comment in the DTS why these operating points aren't available
+> in this board will make more clear why the nodes are being deleted.
+
+Ok, I will add these comments in the next patch revision.
+
+> > +&cooling_map5 {
+> > +	cooling-device = <&cpu0 3 7>;
+> > +};
+> > +
+> > +&cooling_map6 {
+> > +	cooling-device = <&cpu4 3 11>;
+> > +};
+> > +
+> >  &pwm {
+> >  	/*
+> >  	 * PWM 0 -- fan
+> > Index: b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> > ===================================================================
+> > --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts	2016-12-13 15:59:33.779763261 +0100
+> > +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts	2016-12-13 15:59:33.779763261 +0100
+> > @@ -146,6 +146,10 @@
+> >  	vdd-supply = <&ldo9_reg>;
+> >  };
+> >  
+> > +&cluster_a7_opp_table {
+> > +	/delete-property/opp at 1400000000;
+> > +};
+> > +
+> >  &cpu0 {
+> >  	cpu-supply = <&buck2_reg>;
+> >  };
+> > Index: b/arch/arm/boot/dts/exynos5800.dtsi
+> > ===================================================================
+> > --- a/arch/arm/boot/dts/exynos5800.dtsi	2016-12-13 15:59:33.779763261 +0100
+> > +++ b/arch/arm/boot/dts/exynos5800.dtsi	2016-12-13 15:59:33.779763261 +0100
+> > @@ -24,6 +24,16 @@
+> >  };
+> >  
+> >  &cluster_a15_opp_table {
+> > +	opp at 2000000000 {
+> > +		opp-hz = /bits/ 64 <2000000000>;
+> > +		opp-microvolt = <1250000>;
+> > +		clock-latency-ns = <140000>;
+> > +	};
+> > +	opp at 1900000000 {
+> > +		opp-hz = /bits/ 64 <1900000000>;
+> > +		opp-microvolt = <1250000>;
+> > +		clock-latency-ns = <140000>;
+> > +	};
+> >  	opp at 1700000000 {
+> >  		opp-microvolt = <1250000>;
+> >  	};
+> > @@ -85,6 +95,11 @@
+> >  };
+> >
 > 
-> Again, I don't want to see one-off drivers for random devices like this
-> that should be able to all be controlled from userspace in a common
-> manner.  Much like we did for fingerprint readers a long long time
-> ago...
+> AFAIK Thomas restricted the maximum OPP, because for A15 freqs > 1.8GHz the
+> INT rail would need to be scaled up as well since there's a maximum voltage
+> difference between the ARM and INT rails before the system becomes unstable:
 > 
-> thanks,
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/276766.html
+> https://lkml.org/lkml/2014/5/2/419
 > 
-> greg k-h
+> The ChromiumOS vendor tree uses a virtual regulator driver that makes sure
+> the maximum voltage skew is between a limit. But that never made to mainline:
+> 
+> https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/arch/arm/boot/dts/exynos5420-peach-pit.dtsi#90
+> https://lkml.org/lkml/2014/4/29/28
+> 
+> Did that change and there's infrastructure in mainline now to cope with that?
+> If that's the case, I think it would be good to mention in the commit message.
 
-Hi Greg,
+I was not aware of this limitation and AFAIK mainline has currently
+no code to handle it.  I also cannot find any code to handle this in
+Hardkernel's vendor kernel for Odroid-XU3 board.
 
-Actually, it's more than a random interface, a lot of SoCs and boards actually have such displays
-and it's a pity to use UIO, sysfs gpio bitbanging and all sort of ugly stuff to only print a few
-characters a simple and clean driver could achieve.
-Some very well known SoCs even have integrated registers to lower the BOM and bypass the need for
-a 74HC164 like component and avoid gpio bit banging.
+Do you know whether this problem exists also on Exynos5422/5800
+SoCs or only on Exynos5420 one?  I see that ChromiumOS uses virtual
+regulator code also on Exynos5800 SoC based Peach Pi board but was
+the problem actually present on this board?
 
-My personal concern is that you could also need to drive more segments, thus 7-segments
-is too restrictive.
+[ I added Arjun to Cc:, maybe he can help in explaining this issue
+  (unfortunately Inderpal's email is no longer working). ]
 
-But this driver is well structured, the gpio-bitbanging sub-driver is welcome.
+Please also note that on Exynos5422/5800 SoCs the same ARM rail
+voltage is used for 1.9 GHz & 2.0 GHz OPPs as for the 1.8 GHz one.
+IOW if the problem exists it is already present in the mainline
+kernel.
 
-Neil
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
