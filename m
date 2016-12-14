@@ -1,36 +1,35 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Wed, 14 Dec 2016 18:11:40 +0800
-Subject: [PATCH 2/3] clk: rockchip: rk3399: export 480M_SRC clocks id for
- usbphy0/usbphy1
-In-Reply-To: <1481710301-1454-1-git-send-email-zhengxing@rock-chips.com>
-References: <1481710301-1454-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1481710301-1454-3-git-send-email-zhengxing@rock-chips.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 14 Dec 2016 15:42:22 +0530
+Subject: [PATCH 1/2] arm64: Add enable/disable d-cache support for
+ purgatory
+In-Reply-To: <d8f354da-1e61-feaf-f76a-18e90361e98b@redhat.com>
+References: <cover.1479788404.git.panand@redhat.com>
+ <7a4866b928c0905ec1074dce1bfc7984c968a58a.1479788404.git.panand@redhat.com>
+ <5838834D.90205@arm.com> <d8f354da-1e61-feaf-f76a-18e90361e98b@redhat.com>
+Message-ID: <9a79b666-7990-2a23-2d74-52b3317ce272@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch exports USBPHYx_480M_SRC clocks for usbphy.
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
----
 
- drivers/clk/rockchip/clk-rk3399.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On Wednesday 14 December 2016 03:08 PM, Pratyush Anand wrote:
+>
+>>
+>> I would go as far as to generate the page tables at 'kexec -l' time,
+>> and only if
+>
+> Ok..So you mean that I create a new section which will have page table
+> entries mapping physicalmemory represented by remaining section, and
+> then purgatory can just enable mmu with page table from that section,
+> right? Seems doable. can do that.
 
-diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index 3490887..cf2af4c 100644
---- a/drivers/clk/rockchip/clk-rk3399.c
-+++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -411,9 +411,9 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 	GATE(SCLK_USB2PHY1_REF, "clk_usb2phy1_ref", "xin24m", CLK_IGNORE_UNUSED,
- 			RK3399_CLKGATE_CON(6), 6, GFLAGS),
- 
--	GATE(0, "clk_usbphy0_480m_src", "clk_usbphy0_480m", 0,
-+	GATE(SCLK_USBPHY0_480M_SRC, "clk_usbphy0_480m_src", "clk_usbphy0_480m", 0,
- 			RK3399_CLKGATE_CON(13), 12, GFLAGS),
--	GATE(0, "clk_usbphy1_480m_src", "clk_usbphy1_480m", 0,
-+	GATE(SCLK_USBPHY1_480M_SRC, "clk_usbphy1_480m_src", "clk_usbphy1_480m", 0,
- 			RK3399_CLKGATE_CON(13), 12, GFLAGS),
- 	MUX(0, "clk_usbphy_480m", mux_usbphy_480m_p, 0,
- 			RK3399_CLKSEL_CON(14), 6, 1, MFLAGS),
--- 
-2.7.4
+I see a problem here. If we create  page table as a new segment then, 
+how can we verify in purgatory that sha for page table is correct? We 
+need page table before sha verification start,and we can not rely the 
+page table created by first kernel until it's sha is verified. So a 
+chicken-egg problem.
+
+I think, creating page table will just take fraction of second and 
+should be good even in purgatory, What do you say?
+
+~Pratyush
