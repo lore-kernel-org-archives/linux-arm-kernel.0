@@ -1,77 +1,53 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Thu, 15 Dec 2016 08:50:31 +0900
-Subject: jemalloc testsuite stalls in memset
-In-Reply-To: <mvmmvfy37g1.fsf@hawking.suse.de>
-References: <mvmmvfy37g1.fsf@hawking.suse.de>
-Message-ID: <20161214235031.GA2912@bbox>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Dec 2016 23:52:24 +0000
+Subject: [PATCH] arm: dt: Initialize boot_command_line from
+ CONFIG_CMDLINE in case DT does not provide /chosen/bootargs
+In-Reply-To: <1481749963-8664-1-git-send-email-pali.rohar@gmail.com>
+References: <1481749963-8664-1-git-send-email-pali.rohar@gmail.com>
+Message-ID: <20161214235224.GH14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-First of all, thanks for the report and sorry I have no time now so maybe
-I should investigate the problem next week.
-
-On Wed, Dec 14, 2016 at 03:34:54PM +0100, Andreas Schwab wrote:
-> When running the jemalloc-4.4.0 testsuite on aarch64 with glibc 2.24 the
-> test/unit/junk test hangs in memset:
+On Wed, Dec 14, 2016 at 10:12:43PM +0100, Pali Roh?r wrote:
+> Commit 008a2ebcd677 ("ARM: dts: omap3: Remove skeleton.dtsi usage") broke
+> support for setting cmdline on Nokia N900 via CONFIG_CMDLINE.
 > 
-> (gdb) r
-> Starting program: /tmp/jemalloc/jemalloc-4.4.0/test/unit/junk
-> [Thread debugging using libthread_db enabled]
-> Using host libthread_db library "/lib64/libthread_db.so.1".
-> test_junk_small: pass
-> test_junk_large: pass
-> ^C
-> Program received signal SIGINT, Interrupt.
-> memset () at ../sysdeps/aarch64/memset.S:91
-> 91              str     q0, [dstin]
-> (gdb) x/i $pc
-> => 0xffffb7ddf54c <memset+140>: str     q0, [x0]
+> It is because arm code booted in DT mode parse cmdline only via function
+> early_init_dt_scan_chosen() and that function does not fill variable
+> boot_command_line when DTB does not contain /chosen entry. It is called
+> from function early_init_dt_scan_nodes() in setup_machine_fdt().
 > 
-> x0 is pointing to the start of this mmap'd block:
-> 
->       0xffffb7400000     0xffffb7600000   0x200000        0x0
-> 
-> Any attempt to contine execution or step over the insn still causes the
-> process to hang here.  Only after accessing the memory through the
-> debugger the test successfully continues to completion.
+> This patch fixes it by explicitly filling boot_command_line in function
+> setup_machine_fdt() after calling early_init_dt_scan_nodes() in case
+> boot_command_line still remains empty.
 
-You mean program itself access the address(ie, 0xffffb7400000) is hang
-while access the address from the debugger is OK?
+This looks like a hack.
 
-Scratch head. :/
+First, the matter of the ATAGs compatibility.  The decompressor relies on
+there being a pre-existing /chosen node to insert the command line and
+other parameters into.  If we've dropped it (by dropping skeleton.dtsi)
+then we've just regressed more than just N900 - the decompressor won't
+be able to merge the ATAGs into the concatenated FDT.
 
-Can you reproduce it easily?
-Did you test it in real machine or qemu on x86?
-Could you show me how I can reproduce it?
-I want to test it in x86 machine, first of all.
-Unfortunately, I don't have any aarch64 platform now so maybe I have to
-run it on qemu on x86 until I can set up aarch64 platform if it is reproducible
-on real machine only.
+Second, CONFIG_CMDLINE has never been in place on DT systems - it's
+something atags_parse.c has been dealing with which isn't involved on
+DT.  For DT, we expect the command line to be passed in.
 
-> 
-> The kernel has been configured with transparent hugepages.
-> 
-> CONFIG_TRANSPARENT_HUGEPAGE=y
-> CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS=y
-> # CONFIG_TRANSPARENT_HUGEPAGE_MADVISE is not set
-> CONFIG_TRANSPARENT_HUGE_PAGECACHE=y
+Now, given that, I find your commit message rather fishy.  You seem to
+be claiming that CONFIG_CMDLINE used to work, but the fact is, we've
+never had it working on device tree systems.
 
-What's the exact kernel version?
-I don't think it's HUGE_PAGECACHE problem but to narrow down the scope,
-could you test it without CONFIG_TRANSPARENT_HUGE_PAGECACHE?
+Instead, what I think was going on is that the bug you're seeing is
+that the removal of skeleton.dtsi results in the /chosen node being
+absent, which in turn prevents the decompressor picking the various
+parameters out of the ATAGs and dropping them into the DT blob.
 
-Thanks.
+That, to me, sounds like a regression, and the fix is not to hack
+support for an unrelated feature, but to fix the original problem -
+and I think in this case, it's reasonable to ask for the offending
+commit to be reverted.
 
-> 
-> This issue has been bisected to commit
-> b8d3c4c3009d42869dc03a1da0efc2aa687d0ab4 ("mm/huge_memory.c: don't split
-> THP page when MADV_FREE syscall is called").
-> 
-> Andreas.
-> 
-> -- 
-> Andreas Schwab, SUSE Labs, schwab at suse.de
-> GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-> "And now for something completely different."
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
