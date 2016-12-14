@@ -1,81 +1,82 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Wed, 14 Dec 2016 09:25:47 +0530
-Subject: [PATCH] media: platform: exynos4-is: constify v4l2_subdev_ops
- strcutures
-Message-ID: <1481687747-28785-1-git-send-email-bhumirks@gmail.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Wed, 14 Dec 2016 10:34:46 +0530
+Subject: [PATCH v7 2/5] drm: bridge: add DT bindings for TI ths8135
+In-Reply-To: <1481623759-12786-3-git-send-email-bgolaszewski@baylibre.com>
+References: <1481623759-12786-1-git-send-email-bgolaszewski@baylibre.com>
+ <1481623759-12786-3-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <7ed24ce8-2498-b97b-05e7-7bc9ae372167@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check for v4l2_subdev_ops structures that are only passed as an
-argument to the function v4l2_subdev_init. This argument is of type
-const, so v4l2_subdev_ops structures having this property can also  be
-declared const.
-Done using Coccinelle:
+Hi,
 
-@r1 disable optional_qualifier @
-identifier i;
-position p;
-@@
-static struct v4l2_subdev_ops i at p = {...};
+On 12/13/2016 03:39 PM, Bartosz Golaszewski wrote:
+> THS8135 is a configurable video DAC. Add DT bindings for this chip.
 
-@ok1@
-identifier r1.i;
-position p;
-@@
-v4l2_subdev_init(...,&i at p)
+Queued to drm-misc-next
+>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+>  .../bindings/display/bridge/ti,ths8135.txt         | 46 ++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
+>
+> diff --git a/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt b/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
+> new file mode 100644
+> index 0000000..6ec1a88
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
+> @@ -0,0 +1,46 @@
+> +THS8135 Video DAC
+> +-----------------
+> +
+> +This is the binding for Texas Instruments THS8135 Video DAC bridge.
+> +
+> +Required properties:
+> +
+> +- compatible: Must be "ti,ths8135"
+> +
+> +Required nodes:
+> +
+> +This device has two video ports. Their connections are modelled using the OF
+> +graph bindings specified in Documentation/devicetree/bindings/graph.txt.
+> +
+> +- Video port 0 for RGB input
+> +- Video port 1 for VGA output
+> +
+> +Example
+> +-------
+> +
+> +vga-bridge {
+> +	compatible = "ti,ths8135";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	ports {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		port at 0 {
+> +			reg = <0>;
+> +
+> +			vga_bridge_in: endpoint {
+> +				remote-endpoint = <&lcdc_out_vga>;
+> +			};
+> +		};
+> +
+> +		port at 1 {
+> +			reg = <1>;
+> +
+> +			vga_bridge_out: endpoint {
+> +				remote-endpoint = <&vga_con_in>;
+> +			};
+> +		};
+> +	};
+> +};
+>
 
-@bad@
-position p!={r1.p,ok1.p};
-identifier r1.i;
-@@
-i at p
-
-@depends on !bad disable optional_qualifier@
-identifier r1.i;
-@@
-+const
-struct v4l2_subdev_ops i;
-
-Before and after size details:
-
-   text	   data	    bss	    dec	    hex	filename
-   6743	    152	     20	   6915	   1b03	platform/exynos4-is/fimc-isp.o
-   6807	     88	     20	   6915	   1b03	platform/exynos4-is/fimc-isp.o
-
-  15653	    392	     36	  16081	   3ed1	platform/exynos4-is/fimc-lite.o
-  15717	    308	     36	  16061	   3ebd	platform/exynos4-is/fimc-lite.o
-
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
----
- drivers/media/platform/exynos4-is/fimc-isp.c  | 2 +-
- drivers/media/platform/exynos4-is/fimc-lite.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/media/platform/exynos4-is/fimc-isp.c b/drivers/media/platform/exynos4-is/fimc-isp.c
-index 8efe916..fd793d3 100644
---- a/drivers/media/platform/exynos4-is/fimc-isp.c
-+++ b/drivers/media/platform/exynos4-is/fimc-isp.c
-@@ -433,7 +433,7 @@ static void fimc_isp_subdev_unregistered(struct v4l2_subdev *sd)
- 	.s_power = fimc_isp_subdev_s_power,
- };
- 
--static struct v4l2_subdev_ops fimc_is_subdev_ops = {
-+static const struct v4l2_subdev_ops fimc_is_subdev_ops = {
- 	.core = &fimc_is_core_ops,
- 	.video = &fimc_is_subdev_video_ops,
- 	.pad = &fimc_is_subdev_pad_ops,
-diff --git a/drivers/media/platform/exynos4-is/fimc-lite.c b/drivers/media/platform/exynos4-is/fimc-lite.c
-index b91abf1..18b6aaa 100644
---- a/drivers/media/platform/exynos4-is/fimc-lite.c
-+++ b/drivers/media/platform/exynos4-is/fimc-lite.c
-@@ -1361,7 +1361,7 @@ static void fimc_lite_subdev_unregistered(struct v4l2_subdev *sd)
- 	.log_status = fimc_lite_log_status,
- };
- 
--static struct v4l2_subdev_ops fimc_lite_subdev_ops = {
-+static const struct v4l2_subdev_ops fimc_lite_subdev_ops = {
- 	.core = &fimc_lite_core_ops,
- 	.video = &fimc_lite_subdev_video_ops,
- 	.pad = &fimc_lite_subdev_pad_ops,
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
