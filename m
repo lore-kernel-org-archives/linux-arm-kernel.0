@@ -1,176 +1,35 @@
-From: m.reichl@fivetechno.de (Markus Reichl)
-Date: Thu, 15 Dec 2016 14:55:43 +0100
-Subject: [PATCH v2] ARM: dts: Add missing CPU frequencies for
- Exynos5422/5800
-In-Reply-To: <10512254.nyUcL0zgTP@amdc3058>
-References: <10512254.nyUcL0zgTP@amdc3058>
-Message-ID: <0a0c9237-3e67-bf84-8f32-ef3a49827d0b@fivetechno.de>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 15 Dec 2016 22:03:36 +0800
+Subject: [PATCH 2/3] dma: zx: set DMA_CYCLIC cap_mask bit
+In-Reply-To: <1481810617-7650-1-git-send-email-shawnguo@kernel.org>
+References: <1481810617-7650-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <1481810617-7650-2-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomiej,
+From: Shawn Guo <shawn.guo@linaro.org>
 
-Am 15.12.2016 um 12:55 schrieb Bartlomiej Zolnierkiewicz:
-> Add missing 2000MHz & 1900MHz OPPs (for A15 cores) and 1400MHz OPP
-> (for A7 cores).  Also update common Odroid-XU3 Lite/XU3/XU4 thermal
-> cooling maps to account for new OPPs.
-> 
-> Since new OPPs are not available on all Exynos5422/5800 boards modify
-> dts files for Odroid-XU3 Lite (limited to 1.8 GHz / 1.3 GHz) & Peach
-> Pi (limited to 2.0 GHz / 1.3 GHz) accordingly.
-> 
-> Tested on Odroid-XU3 and XU3 Lite.
-> 
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Cc: Andreas Faerber <afaerber@suse.de>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Cc: Ben Gamari <ben@smart-cactus.org>
-> Cc: Arjun K V <arjun.kv@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
-> v2:
-> - added comments about limitations of SoC revisions used by Odroid-XU3 Lite and
->   Peach Pi boards (suggested by Javier)
-> - removed redundant opp_a7_14 label
-> - added Arjun to Cc:
-> 
-> Javier, could you test it on Peach Pi board?
-> 
->  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |   14 ++++++-------
->  arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts    |   22 +++++++++++++++++++++
->  arch/arm/boot/dts/exynos5800-peach-pi.dts          |    9 ++++++++
->  arch/arm/boot/dts/exynos5800.dtsi                  |   15 ++++++++++++++
->  4 files changed, 53 insertions(+), 7 deletions(-)
-> 
-> Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> ===================================================================
-> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2016-12-15 12:43:54.365955950 +0100
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2016-12-15 12:43:54.361955949 +0100
-> @@ -118,7 +118,7 @@
->  				/*
->  				 * When reaching cpu_alert3, reduce CPU
->  				 * by 2 steps. On Exynos5422/5800 that would
-> -				 * be: 1600 MHz and 1100 MHz.
-> +				 * (usually) be: 1800 MHz and 1200 MHz.
->  				 */
->  				map3 {
->  					trip = <&cpu_alert3>;
-> @@ -131,16 +131,16 @@
->  
->  				/*
->  				 * When reaching cpu_alert4, reduce CPU
-> -				 * further, down to 600 MHz (11 steps for big,
-> -				 * 7 steps for LITTLE).
-> +				 * further, down to 600 MHz (13 steps for big,
-> +				 * 8 steps for LITTLE).
->  				 */
-> -				map5 {
-> +				cooling_map5: map5 {
->  					trip = <&cpu_alert4>;
-> -					cooling-device = <&cpu0 3 7>;
-> +					cooling-device = <&cpu0 3 8>;
->  				};
-> -				map6 {
-> +				cooling_map6: map6 {
->  					trip = <&cpu_alert4>;
-> -					cooling-device = <&cpu4 3 11>;
-> +					cooling-device = <&cpu4 3 13>;
->  				};
->  			};
->  		};
-> Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-> ===================================================================
-> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts	2016-12-15 12:43:54.365955950 +0100
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts	2016-12-15 12:43:54.361955949 +0100
-> @@ -21,6 +21,28 @@
->  	compatible = "hardkernel,odroid-xu3-lite", "samsung,exynos5800", "samsung,exynos5";
->  };
->  
-> +/*
-> + * Odroid XU3-Lite board uses SoC revision with lower maximum frequencies
-> + * than Odroid XU3/XU4 boards: 1.8 GHz for A15 cores & 1.3 GHz for A7 cores.
-> + * Therefore we need to update OPPs tables and thermal maps accordingly.
-> + */
-> +&cluster_a15_opp_table {
-> +	/delete-node/opp at 2000000000;
-> +	/delete-node/opp at 1900000000;
-> +};
-> +
-> +&cluster_a7_opp_table {
-> +	/delete-node/opp at 1400000000;
-> +};
-> +
-> +&cooling_map5 {
-> +	cooling-device = <&cpu0 3 7>;
-> +};
-> +
-> +&cooling_map6 {
-> +	cooling-device = <&cpu4 3 11>;
-> +};
-> +
->  &pwm {
->  	/*
->  	 * PWM 0 -- fan
-> Index: b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> ===================================================================
-> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts	2016-12-15 12:43:54.365955950 +0100
-> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts	2016-12-15 12:43:54.361955949 +0100
-> @@ -146,6 +146,15 @@
->  	vdd-supply = <&ldo9_reg>;
->  };
->  
-> +/*
-> + * Peach Pi board uses SoC revision with lower maximum frequency for A7 cores
-> + * (1.3 GHz instead of 1.4 GHz) than Odroid XU3/XU4 boards.  Thus we need to
-> + * update A7 OPPs table accordingly.
-> + */
-> +&cluster_a7_opp_table {
-> +	/delete-property/opp at 1400000000;
-> +};
-> +
->  &cpu0 {
->  	cpu-supply = <&buck2_reg>;
->  };
-> Index: b/arch/arm/boot/dts/exynos5800.dtsi
-> ===================================================================
-> --- a/arch/arm/boot/dts/exynos5800.dtsi	2016-12-15 12:43:54.365955950 +0100
-> +++ b/arch/arm/boot/dts/exynos5800.dtsi	2016-12-15 12:43:54.361955949 +0100
-> @@ -24,6 +24,16 @@
->  };
->  
->  &cluster_a15_opp_table {
-> +	opp at 2000000000 {
-> +		opp-hz = /bits/ 64 <2000000000>;
-> +		opp-microvolt = <1250000>;
-> +		clock-latency-ns = <140000>;
-> +	};
-> +	opp at 1900000000 {
-> +		opp-hz = /bits/ 64 <1900000000>;
-> +		opp-microvolt = <1250000>;
-> +		clock-latency-ns = <140000>;
-> +	};
->  	opp at 1700000000 {
->  		opp-microvolt = <1250000>;
->  	};
-> @@ -85,6 +95,11 @@
->  };
->  
->  &cluster_a7_opp_table {
-> +	opp at 1400000000 {
-> +		opp-hz = /bits/ 64 <1400000000>;
-> +		opp-microvolt = <1250000>;
-> +		clock-latency-ns = <140000>;
-> +	};
->  	opp at 1300000000 {
->  		opp-microvolt = <1250000>;
->  	};
-> 
+The zx_dma driver supports cyclic transfer mode.  Let's set DMA_CYCLIC
+cap_mask bit to make that clear, and avoid unnecessary failure when
+clients request channel via dma_request_chan_by_mask() with DMA_CYCLIC
+bit set in mask.
 
-On Odroid XU4, XU3 and XU3-lite:
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/dma/zx_dma.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Tested-by: Markus Reichl <m.reichl@fivetechno.de>
-
-Thanks,
---
-Markus Reichl
+diff --git a/drivers/dma/zx_dma.c b/drivers/dma/zx_dma.c
+index 380276d078b2..33155c6816cc 100644
+--- a/drivers/dma/zx_dma.c
++++ b/drivers/dma/zx_dma.c
+@@ -812,6 +812,7 @@ static int zx_dma_probe(struct platform_device *op)
+ 	INIT_LIST_HEAD(&d->slave.channels);
+ 	dma_cap_set(DMA_SLAVE, d->slave.cap_mask);
+ 	dma_cap_set(DMA_MEMCPY, d->slave.cap_mask);
++	dma_cap_set(DMA_CYCLIC, d->slave.cap_mask);
+ 	dma_cap_set(DMA_PRIVATE, d->slave.cap_mask);
+ 	d->slave.dev = &op->dev;
+ 	d->slave.device_free_chan_resources = zx_dma_free_chan_resources;
+-- 
+1.9.1
