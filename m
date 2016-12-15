@@ -1,104 +1,92 @@
-From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
-Date: Thu, 15 Dec 2016 17:40:33 +0200
-Subject: [PATCH v2] i2c: designware: add reset interface
-In-Reply-To: <66e86b18-c6d5-4290-5e93-dcae50596da6@electromag.com.au>
-References: <1479789700-19532-1-git-send-email-zhangfei.gao@linaro.org>
- <1481792388-13781-1-git-send-email-zhangfei.gao@linaro.org>
- <1481805227.9552.15.camel@linux.intel.com>
- <66e86b18-c6d5-4290-5e93-dcae50596da6@electromag.com.au>
-Message-ID: <9521a8fa-6a99-8cb7-9425-62509e7793a9@linux.intel.com>
+From: Jose.Abreu@synopsys.com (Jose Abreu)
+Date: Thu, 15 Dec 2016 15:45:49 +0000
+Subject: [PATCH 1/3] dmaengine: xilinx_dma: Check for channel idle state
+ before submitting dma descriptor
+In-Reply-To: <1481814682-31780-2-git-send-email-appanad@xilinx.com>
+References: <1481814682-31780-1-git-send-email-appanad@xilinx.com>
+ <1481814682-31780-2-git-send-email-appanad@xilinx.com>
+Message-ID: <5f667b4f-b1f3-df34-ec0d-b62061328642@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2016 04:11 PM, Phil Reid wrote:
-> On 15/12/2016 20:33, Andy Shevchenko wrote:
->> On Thu, 2016-12-15 at 16:59 +0800, Zhangfei Gao wrote:
->>> Some platforms like hi3660 need do reset first to allow accessing
->>> registers
->>
->> Patch itself looks good, but would be nice to have it tested.
->>
->> Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
->>
->>>
->>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->>> ---
->>>  drivers/i2c/busses/i2c-designware-core.h    |  1 +
->>>  drivers/i2c/busses/i2c-designware-platdrv.c | 28
->>> ++++++++++++++++++++++++----
->>>  2 files changed, 25 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/drivers/i2c/busses/i2c-designware-core.h
->>> b/drivers/i2c/busses/i2c-designware-core.h
->>> index 0d44d2a..94b14fa 100644
->>> --- a/drivers/i2c/busses/i2c-designware-core.h
->>> +++ b/drivers/i2c/busses/i2c-designware-core.h
->>> @@ -80,6 +80,7 @@ struct dw_i2c_dev {
->>>      void __iomem        *base;
->>>      struct completion    cmd_complete;
->>>      struct clk        *clk;
->>> +    struct reset_control    *rst;
->>>      u32            (*get_clk_rate_khz) (struct
->>> dw_i2c_dev *dev);
->>>      struct dw_pci_controller *controller;
->>>      int            cmd_err;
->>> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c
->>> b/drivers/i2c/busses/i2c-designware-platdrv.c
->>> index 0b42a12..e9016ae 100644
->>> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
->>> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
->>> @@ -38,6 +38,7 @@
->>>  #include <linux/pm_runtime.h>
->>>  #include <linux/property.h>
->>>  #include <linux/io.h>
->>> +#include <linux/reset.h>
->>>  #include <linux/slab.h>
->>>  #include <linux/acpi.h>
->>>  #include <linux/platform_data/i2c-designware.h>
->>> @@ -176,6 +177,14 @@ static int dw_i2c_plat_probe(struct
->>> platform_device *pdev)
->>>      dev->irq = irq;
->>>      platform_set_drvdata(pdev, dev);
->>>
->>> +    dev->rst = devm_reset_control_get_optional(&pdev->dev, NULL);
->>> +    if (IS_ERR(dev->rst)) {
->>> +        if (PTR_ERR(dev->rst) == -EPROBE_DEFER)
->>> +            return -EPROBE_DEFER;
->>> +    } else {
->>> +        reset_control_deassert(dev->rst);
->>> +    }
->>> +
-> More for my education. But some drivers seem to handle the error codes a
-> little more explicitly.
-> Whats the best approach?
+Hi Kedar,
+
+
+On 15-12-2016 15:11, Kedareswara rao Appana wrote:
+> Add channel idle state to ensure that dma descriptor is not
+> submitted when VDMA engine is in progress.
 >
-> eg: From usb/dwc2 driver it continues only if ENOENT / ENOTSUPP errors
-> are return
-> and ENOMEM / EINVAL etc is a fatal error.
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+>  drivers/dma/xilinx/xilinx_dma.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 >
-> hsotg->reset = devm_reset_control_get_optional(hsotg->dev, "dwc2");
-> if (IS_ERR(hsotg->reset)) {
->         ret = PTR_ERR(hsotg->reset);
->         switch (ret) {
->         case -ENOENT:
->         case -ENOTSUPP:
->                 hsotg->reset = NULL;
->                 break;
->         default:
->                 dev_err(hsotg->dev, "error getting reset control %d\n",
->                         ret);
->                 return ret;
->         }
+> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+> index 8288fe4..736c2a3 100644
+> --- a/drivers/dma/xilinx/xilinx_dma.c
+> +++ b/drivers/dma/xilinx/xilinx_dma.c
+> @@ -321,6 +321,7 @@ struct xilinx_dma_tx_descriptor {
+>   * @cyclic: Check for cyclic transfers.
+>   * @genlock: Support genlock mode
+>   * @err: Channel has errors
+> + * @idle: Check for channel idle
+>   * @tasklet: Cleanup work after irq
+>   * @config: Device configuration info
+>   * @flush_on_fsync: Flush on Frame sync
+> @@ -351,6 +352,7 @@ struct xilinx_dma_chan {
+>  	bool cyclic;
+>  	bool genlock;
+>  	bool err;
+> +	bool idle;
+>  	struct tasklet_struct tasklet;
+>  	struct xilinx_vdma_config config;
+>  	bool flush_on_fsync;
+> @@ -966,6 +968,7 @@ static void xilinx_dma_halt(struct xilinx_dma_chan *chan)
+>  			chan, dma_ctrl_read(chan, XILINX_DMA_REG_DMASR));
+>  		chan->err = true;
+>  	}
+> +	chan->idle = true;
+>  }
+>  
+>  /**
+> @@ -1007,6 +1010,9 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
+>  	if (chan->err)
+>  		return;
+>  
+> +	if (!chan->idle)
+> +		return;
+> +
+>  	if (list_empty(&chan->pending_list))
+>  		return;
+>  
+> @@ -1110,6 +1116,7 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
+>  		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last->hw.vsize);
+>  	}
+>  
+> +	chan->idle = false;
+>  	if (!chan->has_sg) {
+>  		list_del(&desc->node);
+>  		list_add_tail(&desc->node, &chan->active_list);
+> @@ -1447,6 +1454,7 @@ static irqreturn_t xilinx_dma_irq_handler(int irq, void *data)
+>  	if (status & XILINX_DMA_DMASR_FRM_CNT_IRQ) {
+>  		spin_lock(&chan->lock);
+>  		xilinx_dma_complete_descriptor(chan);
+> +		chan->idle = true;
+>  		chan->start_transfer(chan);
+>  		spin_unlock(&chan->lock);
+>  	}
+> @@ -2327,6 +2335,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
+>  	chan->has_sg = xdev->has_sg;
+>  	chan->desc_pendingcount = 0x0;
+>  	chan->ext_addr = xdev->ext_addr;
+> +	chan->idle = true;
+>  
+>  	spin_lock_init(&chan->lock);
+>  	INIT_LIST_HEAD(&chan->pending_list);
 
-This looks a bit extreme. At least we shouldn't spam log on machines 
-that don't need reset control. I kind of think it's good enough to do 
-like the patch does. I.e. handle only EPROBE_DEFER and let all other 
-errors fall through and keep the controller in reset and let the 
-dev->rst carry an error code.
+I think there is missing a set to true in idle when a channel
+reset is performed.
+Otherwise: Reviewed-by: Jose Abreu <joabreu@synopsys.com>
 
-I guess EINVAL is likely seen by developer only. ENOMEM is so fatal that 
-things are already falling apart somewhere else too and I don't think it 
-needs special handling here.
-
--- 
-Jarkko
+Best regards,
+Jose Miguel Abreu
