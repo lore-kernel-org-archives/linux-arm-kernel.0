@@ -1,63 +1,80 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Thu, 15 Dec 2016 08:00:09 +0100
-Subject: [PATCH 8/8] Makefile: drop -D__CHECK_ENDIAN__ from cflags
-In-Reply-To: <1481778865-27667-9-git-send-email-mst@redhat.com>
-References: <1481778865-27667-1-git-send-email-mst@redhat.com>
- <1481778865-27667-9-git-send-email-mst@redhat.com>
-Message-ID: <DF6B4348-C994-47D1-89C9-1BE16062C2B3@holtmann.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 15 Dec 2016 08:33:25 +0100
+Subject: [PATCH 03/39] ARM: dts: armada-370: Correct license text
+In-Reply-To: <20161214223746.23066-4-alexandre.belloni@free-electrons.com>
+References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
+ <20161214223746.23066-4-alexandre.belloni@free-electrons.com>
+Message-ID: <20161215073325.lkjjgbz7kdxgmtnr@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
-
-> That's the default now, no need for makefiles to set it.
+On Wed, Dec 14, 2016 at 11:37:10PM +0100, Alexandre Belloni wrote:
+> The license test has been mangled at some point then copy pasted across
+> multiple files. Restore it to what it should be.
+> Note that this is not intended as a license change.
 > 
-> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> Cc: Arnaud Ebalard <arno@natisbad.org>
+> Cc: Ben Dooks <ben.dooks@codethink.co.uk>
+> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Cc: Lior Amsalem <alior@marvell.com>
+> Cc: Ryan Press <ryan@presslab.us>
+> Cc: Simon Guinot <simon.guinot@sequanux.org>
+> Cc: Stefan Roese <sr@denx.de>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+> Cc: Yehuda Yitschak <yehuday@marvell.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > ---
-> drivers/bluetooth/Makefile                                | 2 --
-> drivers/net/can/Makefile                                  | 1 -
-> drivers/net/ethernet/altera/Makefile                      | 1 -
-> drivers/net/ethernet/atheros/alx/Makefile                 | 1 -
-> drivers/net/ethernet/freescale/Makefile                   | 2 --
-> drivers/net/wireless/ath/Makefile                         | 2 --
-> drivers/net/wireless/ath/wil6210/Makefile                 | 2 --
-> drivers/net/wireless/broadcom/brcm80211/brcmfmac/Makefile | 2 --
-> drivers/net/wireless/broadcom/brcm80211/brcmsmac/Makefile | 1 -
-> drivers/net/wireless/intel/iwlegacy/Makefile              | 2 --
-> drivers/net/wireless/intel/iwlwifi/Makefile               | 2 +-
-> drivers/net/wireless/intel/iwlwifi/dvm/Makefile           | 2 +-
-> drivers/net/wireless/intel/iwlwifi/mvm/Makefile           | 2 +-
-> drivers/net/wireless/intersil/orinoco/Makefile            | 3 ---
-> drivers/net/wireless/mediatek/mt7601u/Makefile            | 2 --
-> drivers/net/wireless/realtek/rtlwifi/Makefile             | 2 --
-> drivers/net/wireless/realtek/rtlwifi/btcoexist/Makefile   | 2 --
-> drivers/net/wireless/realtek/rtlwifi/rtl8188ee/Makefile   | 2 --
-> drivers/net/wireless/realtek/rtlwifi/rtl8192c/Makefile    | 2 --
-> drivers/net/wireless/realtek/rtlwifi/rtl8192ce/Makefile   | 2 --
-> drivers/net/wireless/realtek/rtlwifi/rtl8192cu/Makefile   | 2 --
-> drivers/net/wireless/realtek/rtlwifi/rtl8192de/Makefile   | 2 --
-> drivers/net/wireless/realtek/rtlwifi/rtl8192ee/Makefile   | 2 --
-> drivers/net/wireless/realtek/rtlwifi/rtl8192se/Makefile   | 2 --
-> drivers/net/wireless/realtek/rtlwifi/rtl8723ae/Makefile   | 2 --
-> drivers/net/wireless/realtek/rtlwifi/rtl8723be/Makefile   | 2 --
-> drivers/net/wireless/realtek/rtlwifi/rtl8723com/Makefile  | 2 --
-> drivers/net/wireless/realtek/rtlwifi/rtl8821ae/Makefile   | 2 --
-> drivers/net/wireless/ti/wl1251/Makefile                   | 2 --
-> drivers/net/wireless/ti/wlcore/Makefile                   | 2 --
-> drivers/staging/rtl8188eu/Makefile                        | 2 +-
-> drivers/staging/rtl8192e/Makefile                         | 2 --
-> drivers/staging/rtl8192e/rtl8192e/Makefile                | 2 --
-> net/bluetooth/Makefile                                    | 2 --
-> net/ieee802154/Makefile                                   | 2 --
-> net/mac80211/Makefile                                     | 2 +-
-> net/mac802154/Makefile                                    | 2 --
-> net/wireless/Makefile                                     | 2 --
-> 38 files changed, 5 insertions(+), 68 deletions(-)
+>  arch/arm/boot/dts/armada-370.dtsi | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+> index b4258105e91f..c057c54f6b36 100644
+> --- a/arch/arm/boot/dts/armada-370.dtsi
+> +++ b/arch/arm/boot/dts/armada-370.dtsi
+> @@ -17,17 +17,17 @@
+>   *     published by the Free Software Foundation; either version 2 of the
+>   *     License, or (at your option) any later version.
+>   *
+> - *     This file is distributed in the hope that it will be useful
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+> - * Or, alternatively
+> + * Or, alternatively,
+>   *
+>   *  b) Permission is hereby granted, free of charge, to any person
+>   *     obtaining a copy of this software and associated documentation
+>   *     files (the "Software"), to deal in the Software without
+> - *     restriction, including without limitation the rights to use
+> + *     restriction, including without limitation the rights to use,
+>   *     copy, modify, merge, publish, distribute, sublicense, and/or
+>   *     sell copies of the Software, and to permit persons to whom the
+>   *     Software is furnished to do so, subject to the following
+> @@ -36,11 +36,11 @@
+>   *     The above copyright notice and this permission notice shall be
+>   *     included in all copies or substantial portions of the Software.
+>   *
+> - *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>   *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>   *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>   *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> - *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>   *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>   *     OTHER DEALINGS IN THE SOFTWARE.
+> -- 
+> 2.10.2
+> 
+> 
 
-for drivers/bluetooth, net/bluetooth, net/ieee802154 and net/mac802154
-
-Acked-by: Marcel Holtmann <marcel@holtmann.org>
-
-Regards
-
-Marcel
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
