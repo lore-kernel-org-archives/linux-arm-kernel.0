@@ -1,78 +1,120 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 15 Dec 2016 11:38:28 +0100
-Subject: [PATCH 23/39] ARM: dts: armada-xp-axpwifiap: Correct license text
-In-Reply-To: <20161214223746.23066-24-alexandre.belloni@free-electrons.com>
-References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
- <20161214223746.23066-24-alexandre.belloni@free-electrons.com>
-Message-ID: <37a43cbd-cc36-d3b7-af0b-2a5c1f7d1a08@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Dec 2016 11:18:48 +0000
+Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
+In-Reply-To: <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
+References: <20161213113044.GC19985@leverpostej>
+ <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
+Message-ID: <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.12.2016 23:37, Alexandre Belloni wrote:
-> The license test has been mangled at some point then copy pasted across
-> multiple files. Restore it to what it should be.
-> Note that this is not intended as a license change.
->
-> Cc: Arnaud Ebalard <arno@natisbad.org>
-> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Paul Bolle <pebolle@tiscali.nl>
-> Cc: Rafa? Mi?ecki <zajec5@gmail.com>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-
-Feel free to add my
-
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-
-for Patches 23, 25, 27, 29, 30, 31, 32, 33, 35, 36, i.e. all I
-have been in Cc.
-
-Sebastian
-
-> Cc: Stefan Roese <sr@denx.de>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On 14/12/16 10:46, Russell King wrote:
+> Improve the hyp-stub ABI to allow it to do more than just get/set the
+> vectors.  We follow the example in ARM64, where r0 is used as an opcode
+> with the other registers as an argument.
+> 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 > ---
->  arch/arm/boot/dts/armada-xp-axpwifiap.dts | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> index ce152719bc28..6a25eb427822 100644
-> --- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> +++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> @@ -20,17 +20,17 @@
->   *     published by the Free Software Foundation; either version 2 of the
->   *     License, or (at your option) any later version.
->   *
-> - *     This file is distributed in the hope that it will be useful
-> + *     This file is distributed in the hope that it will be useful,
->   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->   *     GNU General Public License for more details.
->   *
-> - * Or, alternatively
-> + * Or, alternatively,
->   *
->   *  b) Permission is hereby granted, free of charge, to any person
->   *     obtaining a copy of this software and associated documentation
->   *     files (the "Software"), to deal in the Software without
-> - *     restriction, including without limitation the rights to use
-> + *     restriction, including without limitation the rights to use,
->   *     copy, modify, merge, publish, distribute, sublicense, and/or
->   *     sell copies of the Software, and to permit persons to whom the
->   *     Software is furnished to do so, subject to the following
-> @@ -39,11 +39,11 @@
->   *     The above copyright notice and this permission notice shall be
->   *     included in all copies or substantial portions of the Software.
->   *
-> - *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->   *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->   *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->   *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> - *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->   *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->   *     OTHER DEALINGS IN THE SOFTWARE.
->
+>  arch/arm/kernel/hyp-stub.S | 27 ++++++++++++++++++++++-----
+>  1 file changed, 22 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+> index 15d073ae5da2..f3e9ba5fb642 100644
+> --- a/arch/arm/kernel/hyp-stub.S
+> +++ b/arch/arm/kernel/hyp-stub.S
+> @@ -22,6 +22,9 @@
+>  #include <asm/assembler.h>
+>  #include <asm/virt.h>
+>  
+> +#define HVC_GET_VECTORS 0
+> +#define HVC_SET_VECTORS 1
+> +
+>  #ifndef ZIMAGE
+>  /*
+>   * For the kernel proper, we need to find out the CPU boot mode long after
+> @@ -202,9 +205,19 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
+>  ENDPROC(__hyp_stub_install_secondary)
+>  
+>  __hyp_stub_do_trap:
+> -	cmp	r0, #-1
+> -	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
+> -	mcrne	p15, 4, r0, c12, c0, 0	@ set HVBAR
+> +	teq	r0, #HVC_GET_VECTORS
+> +	bne	1f
+> +	mrc	p15, 4, r0, c12, c0, 0	@ get HVBAR
+> +	b	__hyp_stub_exit
+> +
+> +1:	teq	r0, #HVC_SET_VECTORS
+> +	bne	1f
+> +	mcr	p15, 4, r1, c12, c0, 0	@ set HVBAR
+> +	b	__hyp_stub_exit
+> +
+> +1:	mov	r0, #-1
+> +
+> +__hyp_stub_exit:
+>  	__ERET
+>  ENDPROC(__hyp_stub_do_trap)
+>  
+> @@ -231,10 +244,14 @@ ENDPROC(__hyp_stub_do_trap)
+>   * initialisation entry point.
+>   */
+>  ENTRY(__hyp_get_vectors)
+> -	mov	r0, #-1
+> +	mov	r0, #HVC_GET_VECTORS
+
+This breaks the KVM implementation of __hyp_get_vectors, easily fixed
+with the following patchlet:
+
+diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
+index a2e75b8..0fe637e 100644
+--- a/arch/arm/include/asm/virt.h
++++ b/arch/arm/include/asm/virt.h
+@@ -89,6 +89,14 @@ extern char __hyp_text_start[];
+ extern char __hyp_text_end[];
+ #endif
+ 
++#else
++
++/* Only assembly code should need those */
++
++#define HVC_GET_VECTORS 0
++#define HVC_SET_VECTORS 1
++#define HVC_SOFT_RESTART 2
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif /* ! VIRT_H */
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index ebc26f8..1c6888f 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -22,10 +22,6 @@
+ #include <asm/assembler.h>
+ #include <asm/virt.h>
+ 
+-#define HVC_GET_VECTORS 0
+-#define HVC_SET_VECTORS 1
+-#define HVC_SOFT_RESTART 2
+-
+ #ifndef ZIMAGE
+ /*
+  * For the kernel proper, we need to find out the CPU boot mode long after
+diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+index 96beb53..1f8db7d 100644
+--- a/arch/arm/kvm/hyp/hyp-entry.S
++++ b/arch/arm/kvm/hyp/hyp-entry.S
+@@ -127,7 +127,7 @@ hyp_hvc:
+ 	pop	{r0, r1, r2}
+ 
+ 	/* Check for __hyp_get_vectors */
+-	cmp	r0, #-1
++	cmp	r0, #HVC_GET_VECTORS
+ 	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
+ 	beq	1f
+ 
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
