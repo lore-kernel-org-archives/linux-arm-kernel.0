@@ -1,33 +1,55 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Wed, 14 Dec 2016 19:20:53 -0800
-Subject: [PATCH 3/3] arm64: dts: rockchip: add clk-480m for ehci and ohci
- of rk3399
-In-Reply-To: <5ce521da-119a-2de8-026c-5992fedfef43@rock-chips.com>
-References: <1481710301-1454-1-git-send-email-zhengxing@rock-chips.com>
- <1481710301-1454-4-git-send-email-zhengxing@rock-chips.com>
- <CAD=FV=UU4JdRjRgEvc_wxprvi6bo46+jd=x2m2QzOe4uJmuRPA@mail.gmail.com>
- <5ce521da-119a-2de8-026c-5992fedfef43@rock-chips.com>
-Message-ID: <20161215032052.GA116728@google.com>
+From: victor.chong@linaro.org (Victor Chong)
+Date: Thu, 15 Dec 2016 12:55:26 +0900
+Subject: [PATCH] builddeb: Use aarch64 instead of arm64 for UTS_MACHINE
+In-Reply-To: <1481280644-15614-1-git-send-email-will.deacon@arm.com>
+References: <1481280644-15614-1-git-send-email-will.deacon@arm.com>
+Message-ID: <CAHqM-QiF3i7a42M9fXq4myRCXSu3yrSgY6fmpCu0KZdedSJ6-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2016 at 10:41:04AM +0800, Xing Zheng wrote:
-> // Frank
-> 
-> Hi Doug,  Brain,
->     Thanks for the reply.
->     Sorry I forgot these patches have been sent earlier, and Frank
-> have some explained and discussed with Heiko.
-> Please see https://patchwork.kernel.org/patch/9255245/
->     Perhaps we can move to that patch tree to continue the discussion.
-> 
->     I think Frank and William will help us to continue checking these.
+Hi Will,
 
-I only briefly read that discussion, but AFAICT it doesn't actually
-address all the comments/quetions we had here. For instance, the
-power_off() vs. delayed-work race in your USB2 PHY driver (is that
-intentional?). Also, the question of why PHY (auto?)suspend is relevant.
+Just found out that a similar patch was submitted earlier back in Nov.
 
-I'll check again tomorrow.
+https://patchwork.kernel.org/patch/9444665/
 
-Brian
+Thanks!
+
+On Fri, Dec 9, 2016 at 7:50 PM, Will Deacon <will.deacon@arm.com> wrote:
+> From: Michal Marek <mmarek@suse.com>
+>
+> On arm64-based systems, uname -m reports "aarch64", so this is what
+> we should be using for UTS_MACHINE and matching that in the builddeb
+> script instead of "arm64".
+>
+> There was a patch fixing this:
+>
+>   https://patchwork.kernel.org/patch/9305483/
+>
+> but I accidentally merged v1 of the patch, which omitted the update to
+> builddeb. This patch follows up with that missing hunk.
+>
+> Reported-by: Victor Chong <victor.chong@linaro.org>
+> Signed-off-by: Michal Marek <mmarek@suse.com>
+> [will: salvaged missing hunk from original patch]
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  scripts/package/builddeb | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/scripts/package/builddeb b/scripts/package/builddeb
+> index 8ea9fd2b6573..9530b1634a02 100755
+> --- a/scripts/package/builddeb
+> +++ b/scripts/package/builddeb
+> @@ -51,7 +51,7 @@ set_debarch() {
+>                 debarch=hppa ;;
+>         mips*)
+>                 debarch=mips$(grep -q CPU_LITTLE_ENDIAN=y $KCONFIG_CONFIG && echo el || true) ;;
+> -       arm64)
+> +       aarch64*)
+>                 debarch=arm64 ;;
+>         arm*)
+>                 if grep -q CONFIG_AEABI=y $KCONFIG_CONFIG; then
+> --
+> 2.1.4
+>
