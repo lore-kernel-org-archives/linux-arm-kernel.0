@@ -1,73 +1,98 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Dec 2016 15:37:15 +0000
-Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
-In-Reply-To: <20161215151548.GL14217@n2100.armlinux.org.uk>
-References: <20161213113044.GC19985@leverpostej>
- <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
- <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
- <20161215113539.GK14217@n2100.armlinux.org.uk>
- <06fca797-da5d-f7f2-eecb-9b1b33b7e83f@arm.com>
- <20161215151548.GL14217@n2100.armlinux.org.uk>
-Message-ID: <c21d6514-44a2-ba88-0fe5-d14d5897cc48@arm.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Thu, 15 Dec 2016 16:39:30 +0100
+Subject: [PATCH 2/2] arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA
+In-Reply-To: <1481706707-6211-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1481706707-6211-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1481706707-6211-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20161215153930.GA8111@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/16 15:15, Russell King - ARM Linux wrote:
-> On Thu, Dec 15, 2016 at 11:46:41AM +0000, Marc Zyngier wrote:
->> On 15/12/16 11:35, Russell King - ARM Linux wrote:
->>> On Thu, Dec 15, 2016 at 11:18:48AM +0000, Marc Zyngier wrote:
->>>> On 14/12/16 10:46, Russell King wrote:
->>>>> @@ -231,10 +244,14 @@ ENDPROC(__hyp_stub_do_trap)
->>>>>   * initialisation entry point.
->>>>>   */
->>>>>  ENTRY(__hyp_get_vectors)
->>>>> -	mov	r0, #-1
->>>>> +	mov	r0, #HVC_GET_VECTORS
->>>>
->>>> This breaks the KVM implementation of __hyp_get_vectors, easily fixed
->>>> with the following patchlet:
->>>
->>> Right, so what Mark said is wrong:
->>>
->>> "The hyp-stub is part of the kernel image, and the API is private to
->>>  that particular image, so we can change things -- there's no ABI to
->>>  worry about."
->>
->> I think Mark is right. The API *is* private to the kernel, and KVM being
->> the only in-kernel hypervisor on ARM, this is not an ABI.
-> 
-> Again, that's wrong.
-> 
-> We have two hypervisors in the kernel.  One is KVM, the other is the
-> stub.  Sure, the stub isn't a full implementation of a hypervisor, but
-> it is nevertheless, for the purposes of _this_ discussion, a hypervisor
-> of sorts.
-> 
-> The reason that both are included is because they both appear to share
-> a common interface (although that's totally not documented anywhere.)
+I was going to do some measurements but my kernel crashes now with a
+page fault in efi_rtc_probe():
 
-And this interface exists for the sole purpose of enabling KVM. Call it
-a hypervisor if you wish, but its usefulness is doubtful on its own.
+[   21.663393] Unable to handle kernel paging request at virtual address 20251000
+[   21.663396] pgd = ffff000009090000
+[   21.663401] [20251000] *pgd=0000010ffff90003
+[   21.663402] , *pud=0000010ffff90003
+[   21.663404] , *pmd=0000000fdc030003
+[   21.663405] , *pte=00e8832000250707
 
->>> So no, I'm going with my original patch (which TI has tested) which is
->>> the minimal change, and if we _then_ want to rework the HYP mode
->>> interfaces, that's the time to do the other changes when more people
->>> (such as KVM folk) are paying attention and we can come to a cross-
->>> hypervisor agreement on what the interface should be.
->>
->> Given that there is a single in-kernel hypervisor, I can't really see
->> who we're going to agree anything with...
-> 
-> As far as I can see, the hyp-stub falls under ARM arch maintanence.
-> KVM falls under KVM people.  Two different groups, we need agreement
-> between them what a sane API for both "hypervisors" should be.
+The sparsemem config requires the whole section to be initialized.
+Your patches do not address this.
 
-Well, I though we had the right level of discussion by reviewing your
-patches and coming up with improvements. If you're after something else,
-please let me know.
+On 14.12.16 09:11:47, Ard Biesheuvel wrote:
+> +config HOLES_IN_ZONE
+> +	def_bool y
+> +	depends on NUMA
 
-Thanks,
+This enables pfn_valid_within() for arm64 and causes the check for
+each page of a section. The arm64 implementation of pfn_valid() is
+already expensive (traversing memblock areas). Now, this is increased
+by a factor of 2^18 for 4k page size (16384 for 64k). We need to
+initialize the whole section to avoid that.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+-Robert
+
+
+
+
+
+
+[   21.663393] Unable to handle kernel paging request at virtual address 20251000
+[   21.663396] pgd = ffff000009090000
+[   21.663401] [20251000] *pgd=0000010ffff90003
+[   21.663402] , *pud=0000010ffff90003
+[   21.663404] , *pmd=0000000fdc030003
+[   21.663405] , *pte=00e8832000250707
+[   21.663405] 
+[   21.663411] Internal error: Oops: 96000047 [#1] SMP
+[   21.663416] Modules linked in:
+[   21.663425] CPU: 49 PID: 1 Comm: swapper/0 Tainted: G        W       4.9.0.0.vanilla10-00002-g429605e9ab0a #1
+[   21.663426] Hardware name: www.cavium.com ThunderX CRB-2S/ThunderX CRB-2S, BIOS 0.3 Sep 13 2016
+[   21.663429] task: ffff800feee6bc00 task.stack: ffff800fec050000
+[   21.663433] PC is at 0x201ff820
+[   21.663434] LR is at 0x201fdfc0
+[   21.663435] pc : [<00000000201ff820>] lr : [<00000000201fdfc0>] pstate: 20000045
+[   21.663437] sp : ffff800fec053b70
+[   21.663440] x29: ffff800fec053bc0 x28: 0000000000000000 
+[   21.663443] x27: ffff000008ce3e08 x26: ffff000008c52568 
+[   21.663445] x25: ffff000008bf045c x24: ffff000008bdb828 
+[   21.663448] x23: 0000000000000000 x22: 0000000000000040 
+[   21.663451] x21: ffff800fec053bb8 x20: 0000000020251000 
+[   21.663453] x19: ffff800fec053c20 x18: 0000000000000000 
+[   21.663456] x17: 0000000000000000 x16: 00000000bbb67a65 
+[   21.663459] x15: ffffffffffffffff x14: ffff810016ea291c 
+[   21.663461] x13: ffff810016ea2181 x12: 0000000000000030 
+[   21.663464] x11: 0101010101010101 x10: 7f7f7f7f7f7f7f7f 
+[   21.663467] x9 : feff716475687163 x8 : ffffffffffffffff 
+[   21.663469] x7 : 83f0680000000000 x6 : 0000000000000000 
+[   21.663472] x5 : ffff800fc187aab9 x4 : 0002000000000000 
+[   21.663474] x3 : ffff800fec053bb8 x2 : 0000000000000000 
+[   21.663477] x1 : 83f0680000000000 x0 : 0000000020251000 
+[   21.663478] 
+[   21.663479] Process swapper/0 (pid: 1, stack limit = 0xffff800fec050020)
+...
+[   21.663605] [<00000000201ff820>] 0x201ff820
+[   21.663617] [<ffff000008c3eef4>] efi_rtc_probe+0x24/0x78
+[   21.663625] [<ffff000008586c88>] platform_drv_probe+0x60/0xc8
+[   21.663636] [<ffff0000085845d4>] driver_probe_device+0x26c/0x420
+[   21.663639] [<ffff0000085848ac>] __driver_attach+0x124/0x128
+[   21.663642] [<ffff000008581e08>] bus_for_each_dev+0x70/0xb0
+[   21.663644] [<ffff000008583c30>] driver_attach+0x30/0x40
+[   21.663647] [<ffff000008583668>] bus_add_driver+0x200/0x2b8
+[   21.663650] [<ffff000008585430>] driver_register+0x68/0x100
+[   21.663652] [<ffff000008586e3c>] __platform_driver_probe+0x84/0x128
+[   21.663654] [<ffff000008c3eec8>] efi_rtc_driver_init+0x20/0x28
+[   21.663658] [<ffff000008082d94>] do_one_initcall+0x44/0x138
+[   21.663665] [<ffff000008bf0d0c>] kernel_init_freeable+0x1ac/0x24c
+[   21.663673] [<ffff00000885e7a0>] kernel_init+0x18/0x110
+[   21.663675] [<ffff000008082b30>] ret_from_fork+0x10/0x20
+[   21.663679] Code: f9400000 d5033d9f d65f03c0 d5033e9f (f9000001) 
+[   21.663688] ---[ end trace e420ef9636e3c9b2 ]---
+[   21.663711] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+[   21.663711] 
+[   21.663713] SMP: stopping secondary CPUs
+[   21.670234] Kernel Offset: disabled
+[   21.670235] Memory Limit: none
+[   22.681333] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
