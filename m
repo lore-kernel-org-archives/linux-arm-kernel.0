@@ -1,10 +1,10 @@
 From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Thu, 15 Dec 2016 07:49:29 +0000
-Subject: [PATCH 08/37] ARM: dts: imx6q-apalis-ixora: Correct license text
-In-Reply-To: <20161214235746.7108-9-alexandre.belloni@free-electrons.com>
+Date: Thu, 15 Dec 2016 07:49:58 +0000
+Subject: [PATCH 15/37] ARM: dts: imx6qdl-apalis: Correct license text
+In-Reply-To: <20161214235746.7108-16-alexandre.belloni@free-electrons.com>
 References: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
- <20161214235746.7108-9-alexandre.belloni@free-electrons.com>
-Message-ID: <1481788168.2845.1.camel@toradex.com>
+ <20161214235746.7108-16-alexandre.belloni@free-electrons.com>
+Message-ID: <1481788197.2845.2.camel@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,25 +14,24 @@ On Thu, 2016-12-15 at 00:57 +0100, Alexandre Belloni wrote:
 > multiple files. Restore it to what it should be.
 > Note that this is not intended as a license change.
 > 
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Juergen Borleis <jbe@pengutronix.de>
-> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
 > Cc: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 > Cc: Petr ?tetiar <ynezz@true.cz>
+> Cc: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
 > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-
 > electrons.com>
 
-Acked-by:?Marcel Ziswiler <marcel.ziswiler@toradex.com>
+Acked-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 
 > ---
-> ?arch/arm/boot/dts/imx6q-apalis-ixora.dts | 10 +++++-----
+> ?arch/arm/boot/dts/imx6qdl-apalis.dtsi | 10 +++++-----
 > ?1 file changed, 5 insertions(+), 5 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-> b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-> index 207b85b91ada..97b9b53a5086 100644
-> --- a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-> +++ b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+> diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+> b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+> index 99e323b57261..261ad3010ba8 100644
+> --- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
 > @@ -12,17 +12,17 @@
 > ? *?????modify it under the terms of the GNU General Public License
 > ? *?????version 2 as published by the Free Software Foundation.
