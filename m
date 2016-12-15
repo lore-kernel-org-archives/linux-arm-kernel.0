@@ -1,41 +1,26 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 15 Dec 2016 14:59:06 +0000
-Subject: Need some information about IOMMU support for ARM64 in 4.6
-In-Reply-To: <E6F4274F7BEC774AAA4E7A98618BCFAE132076@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <E6F4274F7BEC774AAA4E7A98618BCFAE132076@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <a02aee03-00ff-4855-73fe-a5ac809c461c@arm.com>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Thu, 15 Dec 2016 20:41:19 +0530
+Subject: [PATCH 0/3] dmaengine: xilinx_dma: Bug fixes
+Message-ID: <1481814682-31780-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Barghav,
+This patch series fixes below bugs in DMA and VDMA IP's
+---> Do not start VDMA until frame buffer is processed by the h/w
+---> Fix bug in Multi frame sotres handling in VDMA
+---> Fix issues w.r.to multi frame descriptors submit with AXI DMA S2MM(recv) Side.
 
-I assume you're talking about the ARM SMMU(v2)?
 
-On 15/12/16 06:50, Bhargav Shah wrote:
-> Hi,
-> I am using kernel version 4.6.
-> of_iommu_configure() gets IOMMU ops from of_iommu_list and call arch_setup_dma_ops.
-> Presently, __iommu_setup_dma_ops() it expects iommu ops to be present. 
-> Here, of_iommu_configure() get NULL iommu ops and it calls arch_setup_dma_ops with it.
-> 
-> So, in my current flow iommu ops is not getting set for device.
+Kedareswara rao Appana (3):
+  dmaengine: xilinx_dma: Check for channel idle state before submitting
+    dma descriptor
+  dmaeninge: xilinx_dma: Fix bug in multiple frame stores scenario in
+    vdma
+  dmaengine: xilinx_dma: Fix race condition in the driver for multiple
+    descriptor scenario
 
-Yes. The SMMUv2 driver in 4.6 does not call of_iommu_set_ops(). That's
-because it doesn't support of_xlate() either, so in general can't be
-used for DMA ops. The default domain support which went into 4.6 was
-just some early groundwork which, in hindsight, caused more problems
-than it solved at that time.
+ drivers/dma/xilinx/xilinx_dma.c | 185 +++++++++++++++++++++++++---------------
+ 1 file changed, 118 insertions(+), 67 deletions(-)
 
-> Am I missing something  which is causing this ?
-> What is proper way to set iommu ops to device ? 
-
-The proper way would be to update to 4.9, where full generic
-configuration and DMA ops support finally landed ;)
-
-Robin.
-
-> 
-> Thanks
-> Bhargav 
-> 
-> 
+-- 
+2.1.2
