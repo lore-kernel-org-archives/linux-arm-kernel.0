@@ -1,52 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Dec 2016 11:46:41 +0000
-Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
-In-Reply-To: <20161215113539.GK14217@n2100.armlinux.org.uk>
-References: <20161213113044.GC19985@leverpostej>
- <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
- <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
- <20161215113539.GK14217@n2100.armlinux.org.uk>
-Message-ID: <06fca797-da5d-f7f2-eecb-9b1b33b7e83f@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Dec 2016 11:50:01 +0000
+Subject: [Xen-devel] [PATCH v2 4/4] Explicitly clean linux-system.axf and
+ xen-system.axf
+In-Reply-To: <cb5e65ca-65a2-6e0c-47f5-1773d6173739@arm.com>
+References: <20161122150917.16524-1-andre.przywara@arm.com>
+ <20161122150917.16524-5-andre.przywara@arm.com>
+ <20161212144729.GD1686@char.us.oracle.com>
+ <cb5e65ca-65a2-6e0c-47f5-1773d6173739@arm.com>
+Message-ID: <20161215115000.GB21758@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/16 11:35, Russell King - ARM Linux wrote:
-> On Thu, Dec 15, 2016 at 11:18:48AM +0000, Marc Zyngier wrote:
->> On 14/12/16 10:46, Russell King wrote:
->>> @@ -231,10 +244,14 @@ ENDPROC(__hyp_stub_do_trap)
->>>   * initialisation entry point.
->>>   */
->>>  ENTRY(__hyp_get_vectors)
->>> -	mov	r0, #-1
->>> +	mov	r0, #HVC_GET_VECTORS
->>
->> This breaks the KVM implementation of __hyp_get_vectors, easily fixed
->> with the following patchlet:
+On Mon, Dec 12, 2016 at 02:50:20PM +0000, Andre Przywara wrote:
+> Hi Konrad,
 > 
-> Right, so what Mark said is wrong:
+> On 12/12/16 14:47, Konrad Rzeszutek Wilk wrote:
+> > On Tue, Nov 22, 2016 at 03:09:17PM +0000, Andre Przywara wrote:
+> >> From: Christoffer Dall <christoffer.dall@linaro.org>
+> >>
+> >> When doing a make clean, only the output image currently configured to
+> >> build is being removed.  However, one would expect all build artifacts
+> >> to be removed when doing a 'make clean' and when switching between Xen
+> >> and Linux builds, it is easy to accidentally run an older build than
+> >> intended.  Simply hardcode the axf image file names.
+> >>
+> >> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >> Reviewed-by: Julien Grall <julien.grall@arm.com>
+> > 
+> > Tested-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> > Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 > 
-> "The hyp-stub is part of the kernel image, and the API is private to
->  that particular image, so we can change things -- there's no ABI to
->  worry about."
+> Thanks a lot!
+> 
+> I will try to poke Mark to see if we can get this merged eventually.
 
-I think Mark is right. The API *is* private to the kernel, and KVM being
-the only in-kernel hypervisor on ARM, this is not an ABI.
+I'm happy to take these so long as this doesn't adversely affect non-Xen
+usage. I assume they don't. :)
 
-It is an unfortunate bug that no symbolic constant was used to highlight
-the two implementations of the same functionality, but I don't think
-that makes anything wrong in what Mark said here.
-
-> So no, I'm going with my original patch (which TI has tested) which is
-> the minimal change, and if we _then_ want to rework the HYP mode
-> interfaces, that's the time to do the other changes when more people
-> (such as KVM folk) are paying attention and we can come to a cross-
-> hypervisor agreement on what the interface should be.
-
-Given that there is a single in-kernel hypervisor, I can't really see
-who we're going to agree anything with...
+Could you fix this up as per Julien's comments, and fold in the tags?
+I'm happy to take that from a v3 or a git repo.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Mark.
