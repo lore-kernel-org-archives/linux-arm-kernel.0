@@ -1,120 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Dec 2016 11:18:48 +0000
-Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
-In-Reply-To: <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
-References: <20161213113044.GC19985@leverpostej>
- <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
-Message-ID: <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 15 Dec 2016 11:17:27 +0000
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <7900ae24-6803-a271-944c-8830f718fef0@free.fr>
+References: <20161208103921.GC6408@localhost>
+ <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
+ <20161208163755.GH6408@localhost>
+ <yw1xy3zqxt7x.fsf@unicorn.mansr.com>
+ <20161209065955.GJ6408@localhost>
+ <6ce1ea97-1d68-2203-c7b4-73315e801655@laposte.net>
+ <20161209171727.GK6408@localhost>
+ <ec33d3f0-6474-2b13-8a26-077ce3785d31@free.fr>
+ <20161209175606.GM6408@localhost>
+ <7900ae24-6803-a271-944c-8830f718fef0@free.fr>
+Message-ID: <20161215111727.35csnouwegedcmuu@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/12/16 10:46, Russell King wrote:
-> Improve the hyp-stub ABI to allow it to do more than just get/set the
-> vectors.  We follow the example in ARM64, where r0 is used as an opcode
-> with the other registers as an argument.
-> 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  arch/arm/kernel/hyp-stub.S | 27 ++++++++++++++++++++++-----
->  1 file changed, 22 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-> index 15d073ae5da2..f3e9ba5fb642 100644
-> --- a/arch/arm/kernel/hyp-stub.S
-> +++ b/arch/arm/kernel/hyp-stub.S
-> @@ -22,6 +22,9 @@
->  #include <asm/assembler.h>
->  #include <asm/virt.h>
->  
-> +#define HVC_GET_VECTORS 0
-> +#define HVC_SET_VECTORS 1
-> +
->  #ifndef ZIMAGE
->  /*
->   * For the kernel proper, we need to find out the CPU boot mode long after
-> @@ -202,9 +205,19 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
->  ENDPROC(__hyp_stub_install_secondary)
->  
->  __hyp_stub_do_trap:
-> -	cmp	r0, #-1
-> -	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
-> -	mcrne	p15, 4, r0, c12, c0, 0	@ set HVBAR
-> +	teq	r0, #HVC_GET_VECTORS
-> +	bne	1f
-> +	mrc	p15, 4, r0, c12, c0, 0	@ get HVBAR
-> +	b	__hyp_stub_exit
-> +
-> +1:	teq	r0, #HVC_SET_VECTORS
-> +	bne	1f
-> +	mcr	p15, 4, r1, c12, c0, 0	@ set HVBAR
-> +	b	__hyp_stub_exit
-> +
-> +1:	mov	r0, #-1
-> +
-> +__hyp_stub_exit:
->  	__ERET
->  ENDPROC(__hyp_stub_do_trap)
->  
-> @@ -231,10 +244,14 @@ ENDPROC(__hyp_stub_do_trap)
->   * initialisation entry point.
->   */
->  ENTRY(__hyp_get_vectors)
-> -	mov	r0, #-1
-> +	mov	r0, #HVC_GET_VECTORS
+On Fri, Dec 09, 2016 at 07:23:17PM +0100, Mason wrote:
+> On 09/12/2016 18:56, Vinod Koul wrote:
 
-This breaks the KVM implementation of __hyp_get_vectors, easily fixed
-with the following patchlet:
+> > Right, but in that case the fallback would be PIO mode, and if that is
+> > not availble (IIRC some f your devices don't) then reject the usage with
+> > EAGAIN.
 
-diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-index a2e75b8..0fe637e 100644
---- a/arch/arm/include/asm/virt.h
-+++ b/arch/arm/include/asm/virt.h
-@@ -89,6 +89,14 @@ extern char __hyp_text_start[];
- extern char __hyp_text_end[];
- #endif
- 
-+#else
-+
-+/* Only assembly code should need those */
-+
-+#define HVC_GET_VECTORS 0
-+#define HVC_SET_VECTORS 1
-+#define HVC_SOFT_RESTART 2
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif /* ! VIRT_H */
-diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index ebc26f8..1c6888f 100644
---- a/arch/arm/kernel/hyp-stub.S
-+++ b/arch/arm/kernel/hyp-stub.S
-@@ -22,10 +22,6 @@
- #include <asm/assembler.h>
- #include <asm/virt.h>
- 
--#define HVC_GET_VECTORS 0
--#define HVC_SET_VECTORS 1
--#define HVC_SOFT_RESTART 2
--
- #ifndef ZIMAGE
- /*
-  * For the kernel proper, we need to find out the CPU boot mode long after
-diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-index 96beb53..1f8db7d 100644
---- a/arch/arm/kvm/hyp/hyp-entry.S
-+++ b/arch/arm/kvm/hyp/hyp-entry.S
-@@ -127,7 +127,7 @@ hyp_hvc:
- 	pop	{r0, r1, r2}
- 
- 	/* Check for __hyp_get_vectors */
--	cmp	r0, #-1
-+	cmp	r0, #HVC_GET_VECTORS
- 	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
- 	beq	1f
- 
+> Maybe I'm missing something, but I don't see how that would help.
+> Take the NAND Flash controller driver, for instance. PIO is not
+> an option, because the ECC engine is tied to DMA.
 
-Thanks,
+> And failing with -EAGAIN doesn't help the busy looping situation.
+> The caller should be put on some kind of queue to wait for a
+> "channel ready" event.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Even without the tie into ECC being an issue it seems like falling back
+to PIO could produce poor results at the system level - it's likely that
+the PIO would be very expensive and take longer than waiting would've
+done, increasing the burden on the CPU and slowing things down overall
+for userspace.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 484 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161215/e41e6df1/attachment.sig>
