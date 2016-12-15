@@ -1,45 +1,76 @@
-From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Thu, 15 Dec 2016 19:20:11 +0300
-Subject: arm64: mm: bug around swiotlb_dma_ops
-Message-ID: <8862fe21-0a82-a09a-c1cb-aa79d46179ec@cogentembedded.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu, 15 Dec 2016 17:24:03 +0100
+Subject: [PATCH v2 1/2] arm64: dts: r8a7796: Add EthernetAVB instance
+In-Reply-To: <1481819044-19605-1-git-send-email-geert+renesas@glider.be>
+References: <1481819044-19605-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1481819044-19605-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Per Documentation/DMA-API-HOWTO.txt, driver of device capable of 64-bit
-DMA addressing, should call dma_set_mask_and_coherent(dev,
-DMA_BIT_MASK(64)) and if that succeeds, assume that 64-bit DMA
-addressing is available.
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v2:
+  - Rebased.
+---
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 43 ++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-This behaves incorrectly on arm64 system (Renesas r8a7795-h3ulcb) here.
-
-- Device (NVME SSD) has it's dev->archdata.dma_ops set to swiotlb_dma_ops.
-
-- swiotlb_dma_ops.dma_supported is set to swiotlb_dma_supported():
-
-int swiotlb_dma_supported(struct device *hwdev, u64 mask)
-{
-        return phys_to_dma(hwdev, io_tlb_end - 1) <= mask;
-}
-
-this definitely returns true for mask=DMA_BIT_MASK(64) since that is
-maximum possible 64-bit value.
-
-- Thus device dma_mask is unconditionally updated, and
-dma_set_mask_and_coherent() succeeds.
-
-- Later, __swiotlb_map_page() / __swiotlb_map_sg_attr() will consult
-this updated mask, and return high addresses as valid DMA addresses.
-
-
-Thus recommended dma_set_mask_and_coherent() call, instead of checking
-if platform supports 64-bit DMA addressing, unconditionally enables
-64-bit DMA addressing. In case of device actually can't do DMA to 64-bit
-addresses (e.g. because of limitations in PCIe controller), this breaks
-things. This is exactly what happens here.
-
-
-Not sure what is proper fix for this though.
-
-Nikita
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 7bf0f2f6c2243cfc..d9d8dc53b408c36e 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -421,6 +421,49 @@
+ 			};
+ 		};
+ 
++		avb: ethernet at e6800000 {
++			compatible = "renesas,etheravb-r8a7796",
++				     "renesas,etheravb-rcar-gen3";
++			reg = <0 0xe6800000 0 0x800>, <0 0xe6a00000 0 0x10000>;
++			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "ch0", "ch1", "ch2", "ch3",
++					  "ch4", "ch5", "ch6", "ch7",
++					  "ch8", "ch9", "ch10", "ch11",
++					  "ch12", "ch13", "ch14", "ch15",
++					  "ch16", "ch17", "ch18", "ch19",
++					  "ch20", "ch21", "ch22", "ch23",
++					  "ch24";
++			clocks = <&cpg CPG_MOD 812>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			phy-mode = "rgmii-id";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
+ 		scif2: serial at e6e88000 {
+ 			compatible = "renesas,scif-r8a7796",
+ 				     "renesas,rcar-gen3-scif", "renesas,scif";
+-- 
+1.9.1
