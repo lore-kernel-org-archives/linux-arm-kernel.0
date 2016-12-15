@@ -1,58 +1,30 @@
-From: sr@denx.de (Stefan Roese)
-Date: Thu, 15 Dec 2016 07:01:11 +0100
-Subject: [PATCH 00/39] ARM: dts: mvebu: Fix license text
-In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-Message-ID: <f45b66fa-9a86-8d58-6df0-2bfba6855e55@denx.de>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 15 Dec 2016 14:09:04 +0800
+Subject: [PATCH v2] crypto: sun4i-ss: support the Security System PRNG
+In-Reply-To: <CANc+2y7C-=S_5MZuqP0Q+y2FwHqS2_p9-iYuAu1A1tXqzxp_oA@mail.gmail.com>
+References: <1480934922-20732-1-git-send-email-clabbe.montjoie@gmail.com>
+ <20161205123705.GA10732@gondor.apana.org.au>
+ <20161205125738.GA13525@Red>
+ <20161207120900.GC20680@gondor.apana.org.au>
+ <20161207125127.GB28218@Red>
+ <20161208090618.GB22932@gondor.apana.org.au>
+ <20161213141059.GB10647@Red>
+ <20161214050551.GD9592@gondor.apana.org.au>
+ <CANc+2y7C-=S_5MZuqP0Q+y2FwHqS2_p9-iYuAu1A1tXqzxp_oA@mail.gmail.com>
+Message-ID: <20161215060904.GB13152@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.12.2016 23:37, Alexandre Belloni wrote:
-> When the license was switched to dual GPLv2/X11, the text that was used
-> was missing a few characters. Fix that now.
->
-> I'll let the maintainers decide whether this change requires an ack of
-> every contributors. It has been separated with that in mind if
-> necessary.
->
-> Cc: Andrew Andrianov <andrew@ncrmnt.org>
-> Cc: Arnaud Ebalard <arno@natisbad.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Ben Dooks <ben.dooks@codethink.co.uk>
-> Cc: Benjamin Cama <benoar@dolka.fr>
-> Cc: Benoit Masson <yahoo@perenite.com>
-> Cc: Ben Peddell <klightspeed@killerwolves.net>
-> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Cc: Chris Packham <chris.packham@alliedtelesis.co.nz>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Florian Fainelli <florian@openwrt.org>
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Greg Ungerer <gerg@uclinux.org>
-> Cc: Grzegorz Jaszczyk <jaz@semihalf.com>
-> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
-> Cc: Imre Kaloz <kaloz@openwrt.org>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Lior Amsalem <alior@marvell.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Marcin Wojtas <mw@semihalf.com>
-> Cc: Mario Lange <mario_lange@gmx.net>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Nadav Haklai <nadavh@marvell.com>
-> Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> Cc: Paul Bolle <pebolle@tiscali.nl>
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Rafa? Mi?ecki <zajec5@gmail.com>
-> Cc: Roger Shimizu <rogershimizu@gmail.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Ryan Press <ryan@presslab.us>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Simon Baatz <gmbnomis@gmail.com>
-> Cc: Simon Guinot <simon.guinot@sequanux.org>
-> Cc: Stefan Roese <sr@denx.de>
+On Thu, Dec 15, 2016 at 12:47:16AM +0530, PrasannaKumar Muralidharan wrote:
+> Should there be a mandate that driver will be accepted only when it
+> passes 'rngtest'. This will make sure that prng drivers won't get
+> added in future.
 
-For the complete patch series:
+You cannot use software to distinguish between a PRNG and an HRNG.
+We can only rely on the veracity of the documentation.
 
-Acked-by: Stefan Roese <sr@denx.de>
-
-Thanks,
-Stefan
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
