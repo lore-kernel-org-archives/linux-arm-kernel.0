@@ -1,20 +1,63 @@
-From: bhargav.shah@xilinx.com (Bhargav Shah)
-Date: Thu, 15 Dec 2016 06:50:58 +0000
-Subject: Need some information about IOMMU support for ARM64 in 4.6
-Message-ID: <E6F4274F7BEC774AAA4E7A98618BCFAE132076@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: marcel@holtmann.org (Marcel Holtmann)
+Date: Thu, 15 Dec 2016 08:00:09 +0100
+Subject: [PATCH 8/8] Makefile: drop -D__CHECK_ENDIAN__ from cflags
+In-Reply-To: <1481778865-27667-9-git-send-email-mst@redhat.com>
+References: <1481778865-27667-1-git-send-email-mst@redhat.com>
+ <1481778865-27667-9-git-send-email-mst@redhat.com>
+Message-ID: <DF6B4348-C994-47D1-89C9-1BE16062C2B3@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-I am using kernel version 4.6.
-of_iommu_configure() gets IOMMU ops from of_iommu_list and call arch_setup_dma_ops.
-Presently, __iommu_setup_dma_ops() it expects iommu ops to be present. 
-Here, of_iommu_configure() get NULL iommu ops and it calls arch_setup_dma_ops with it.
+Hi Michael,
 
-So, in my current flow iommu ops is not getting set for device.
+> That's the default now, no need for makefiles to set it.
+> 
+> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> ---
+> drivers/bluetooth/Makefile                                | 2 --
+> drivers/net/can/Makefile                                  | 1 -
+> drivers/net/ethernet/altera/Makefile                      | 1 -
+> drivers/net/ethernet/atheros/alx/Makefile                 | 1 -
+> drivers/net/ethernet/freescale/Makefile                   | 2 --
+> drivers/net/wireless/ath/Makefile                         | 2 --
+> drivers/net/wireless/ath/wil6210/Makefile                 | 2 --
+> drivers/net/wireless/broadcom/brcm80211/brcmfmac/Makefile | 2 --
+> drivers/net/wireless/broadcom/brcm80211/brcmsmac/Makefile | 1 -
+> drivers/net/wireless/intel/iwlegacy/Makefile              | 2 --
+> drivers/net/wireless/intel/iwlwifi/Makefile               | 2 +-
+> drivers/net/wireless/intel/iwlwifi/dvm/Makefile           | 2 +-
+> drivers/net/wireless/intel/iwlwifi/mvm/Makefile           | 2 +-
+> drivers/net/wireless/intersil/orinoco/Makefile            | 3 ---
+> drivers/net/wireless/mediatek/mt7601u/Makefile            | 2 --
+> drivers/net/wireless/realtek/rtlwifi/Makefile             | 2 --
+> drivers/net/wireless/realtek/rtlwifi/btcoexist/Makefile   | 2 --
+> drivers/net/wireless/realtek/rtlwifi/rtl8188ee/Makefile   | 2 --
+> drivers/net/wireless/realtek/rtlwifi/rtl8192c/Makefile    | 2 --
+> drivers/net/wireless/realtek/rtlwifi/rtl8192ce/Makefile   | 2 --
+> drivers/net/wireless/realtek/rtlwifi/rtl8192cu/Makefile   | 2 --
+> drivers/net/wireless/realtek/rtlwifi/rtl8192de/Makefile   | 2 --
+> drivers/net/wireless/realtek/rtlwifi/rtl8192ee/Makefile   | 2 --
+> drivers/net/wireless/realtek/rtlwifi/rtl8192se/Makefile   | 2 --
+> drivers/net/wireless/realtek/rtlwifi/rtl8723ae/Makefile   | 2 --
+> drivers/net/wireless/realtek/rtlwifi/rtl8723be/Makefile   | 2 --
+> drivers/net/wireless/realtek/rtlwifi/rtl8723com/Makefile  | 2 --
+> drivers/net/wireless/realtek/rtlwifi/rtl8821ae/Makefile   | 2 --
+> drivers/net/wireless/ti/wl1251/Makefile                   | 2 --
+> drivers/net/wireless/ti/wlcore/Makefile                   | 2 --
+> drivers/staging/rtl8188eu/Makefile                        | 2 +-
+> drivers/staging/rtl8192e/Makefile                         | 2 --
+> drivers/staging/rtl8192e/rtl8192e/Makefile                | 2 --
+> net/bluetooth/Makefile                                    | 2 --
+> net/ieee802154/Makefile                                   | 2 --
+> net/mac80211/Makefile                                     | 2 +-
+> net/mac802154/Makefile                                    | 2 --
+> net/wireless/Makefile                                     | 2 --
+> 38 files changed, 5 insertions(+), 68 deletions(-)
 
-Am I missing something  which is causing this ?
-What is proper way to set iommu ops to device ? 
+for drivers/bluetooth, net/bluetooth, net/ieee802154 and net/mac802154
 
-Thanks
-Bhargav 
+Acked-by: Marcel Holtmann <marcel@holtmann.org>
+
+Regards
+
+Marcel
