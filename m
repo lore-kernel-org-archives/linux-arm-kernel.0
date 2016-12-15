@@ -1,89 +1,69 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri, 16 Dec 2016 02:27:54 +0800
-Subject: [PATCH v2] ARM: dts: sun8i: add opp-v2 table for A33
-Message-ID: <20161215182754.33921-1-icenowy@aosc.xyz>
+From: ar@linux.vnet.ibm.com (Andrea Reale)
+Date: Thu, 15 Dec 2016 18:31:55 +0000
+Subject: [RFC PATCH] Memory hotplug support for arm64 platform
+In-Reply-To: <58523AC5.10800@huawei.com>
+References: <1481717765-31186-1-git-send-email-m.bielski@virtualopensystems.com>
+ <58523598.3080902@huawei.com> <58523AC5.10800@huawei.com>
+Message-ID: <20161215183154.GC4806@samekh>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An operating point table is needed for the cpu frequency adjusting to
-work.
+Hi Xishi Qiu,
 
-The operating point table is converted from the common value in
-extracted script.fex from many A33 board/tablets.
+thanks for your comments. 
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-Changes since v1:
-- Fix format problem (blank lines).
-- Removed the 1.344GHz operating point, as it's overvoltage and overclocked.
+The short anwser to your question is the following.  As you hinted,
+it is related to the way pfn_valid() is implemented in arm64 when
+CONFIG_HAVE_ARCH_PFN_VALID is true (default), i.e., just a check for
+the NOMAP flags on the corresponding memblocks.
 
-This patch depends on the following patchset:
+Since arch_add_memory->__add_pages() expects pfn_valid() to return false
+when it is first called, we mark corresponding memory blocks with NOMAP;
+however, arch_add_memory->__add_pages()->__add_section()->__add_zone()
+expects pfn_valid() to return true when, at the end of its body,
+it cycles through pages to call SetPageReserved(). Since blocks are
+marked with NOMAP, pages will not be reserved there, henceforth we
+need to reserve them after we clear the NOMAP flag inside the body of
+arch_add_memory. Having pages reserved at the end of arch_add_memory
+is a preconditions for the upcoming onlining of memory blocks (see
+memory_block_change_state()).
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/473962.html
+> It's because that in memmap_init_zone() -> early_pfn_valid(), the new page is still
+> invalid, so we need to init it after memblock_clear_nomap()
+> 
+> So why not use __init_single_page() and set_pageblock_migratetype()?
 
-It's the v2 of the [PATCH 4/6] in this patchset.
+About your comment on memmap_init_zone()->early_pfn_valid(), I think
+that that particular check is never executed in the context of memory
+hotplug; in fact, just before the call to early_pfn_valid(), the code
+will jump to the `not_early` label, because the context == MEMMAP_HOPTLUG.
 
-I think this operating point table may also apply to A23, as there's no
-difference except the points over 1.2GHz between A23 and A33's stock dvfs table.
+Now, the question would be: why there's no need for this hack in
+implementation for memory hotplug for other architectures (e.g.,
+x86)? The answer we have found lies in the following: as said above,
+when CONFIG_HAVE_ARCH_PFN_VALID is true (default), the implementation
+of pfn_valid for arm64 just checks the NOMAP flag on the memmblocks,
+and returns true if corresponding memblock_add_node() has succeeded (it
+seems it does not consider the sparse memory model structures created
+by arm64_memory_present() and sparse_init()).
 
-But as A23 CCU may not have the necessary fixes, I won't add the table to A23
-now.
+On the contrary, the implementation of pfn_valid() for other
+architectures is defined in include/linux/mmzone.h. This
+implemenation, among other things, checks for the
+SECTION_HAS_MEM_MAP flag on section->section_mem_map. Now,
+when we go to memory hotplug, this flag is actually set inside
+__add_section()->sparse_add_one_section()->sparse_init_one_section(). This
+happens before the call to __add_zone(), so that, when it is eventually
+invoked, pfn_valid() would return true and pages would be correctly
+reserved.  On the contrary, on arm64, it will keep returning false
+because of the different implementation of pfn_valid().
 
-Chen-Yu, could you test the CCU fixes I described in the patchset above on A23,
-then test this operating points table?
+Given the above, we believed it was cleaner to go for this little and
+well-confined hack rather then possibly changing the logic of pfn_valid.
 
-If it's necessary, you can send out the CCU fixes and add one more patch that
-moves this opp-v2 table to sun8i-a23-a33.dtsi .
+However, we are very open for discussion and suggestions for improvement.
+In particular, any advices on how to effectively modify pfn_valid()
+without breaking existing functionalities are very welcome.
 
- arch/arm/boot/dts/sun8i-a33.dtsi | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index 504996cbee29..0f5b2af72981 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -46,7 +46,42 @@
- #include <dt-bindings/dma/sun4i-a10.h>
- 
- / {
-+	cpu0_opp_table: opp_table0 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 648000000 {
-+			opp-hz = /bits/ 64 <648000000>;
-+			opp-microvolt = <1040000>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
-+		};
-+
-+		opp at 816000000 {
-+			opp-hz = /bits/ 64 <816000000>;
-+			opp-microvolt = <1100000>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
-+		};
-+
-+		opp at 1008000000 {
-+			opp-hz = /bits/ 64 <1008000000>;
-+			opp-microvolt = <1200000>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
-+		};
-+
-+		opp at 1200000000 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			opp-microvolt = <1320000>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
-+		};
-+	};
-+
- 	cpus {
-+		cpu0: cpu at 0 {
-+			clocks = <&ccu CLK_CPUX>;
-+			clock-names = "cpu";
-+			operating-points-v2 = <&cpu0_opp_table>;
-+		};
-+
- 		cpu at 2 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
--- 
-2.11.0
+Thanks,
+Andrea
