@@ -1,78 +1,82 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 15 Dec 2016 13:33:19 +0900
-Subject: [PATCH v2 1/5] clk: samsung: exynos5433: Set NoC (Network On Chip)
- clocks as critical
-In-Reply-To: <1481173091-9728-2-git-send-email-cw00.choi@samsung.com>
-References: <1481173091-9728-1-git-send-email-cw00.choi@samsung.com>
- <CGME20161208050020epcas2p444709cd01b75a3e49ca60ae41338e017@epcas2p4.samsung.com>
- <1481173091-9728-2-git-send-email-cw00.choi@samsung.com>
-Message-ID: <58521D0F.5040704@samsung.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Thu, 15 Dec 2016 07:15:06 +0200
+Subject: [PATCH 0/8] enable endian checks for all sparse builds
+Message-ID: <1481778865-27667-1-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sylwester,
+This is just a reposting of the patch that enables endian checks, with addition
+of trivial patches that drop __bitwise__ and __CHECK_ENDIAN__ everywhere.
 
-Could you please review this patch?
+I plan to include this in my pull request unless I hear otherwise.
+
+Michael S. Tsirkin (8):
+  linux/types.h: enable endian checks for all sparse builds
+  tools: enable endian checks for all sparse builds
+  Documentation/sparse: drop __bitwise__
+  checkpatch: replace __bitwise__ with __bitwise
+  linux: drop __bitwise__ everywhere
+  Documentation/sparse: drop __CHECK_ENDIAN__
+  fs/logfs: drop __CHECK_ENDIAN__
+  Makefile: drop -D__CHECK_ENDIAN__ from cflags
+
+ Documentation/translations/zh_CN/sparse.txt               |  7 +------
+ arch/arm/plat-samsung/include/plat/gpio-cfg.h             |  2 +-
+ drivers/md/dm-cache-block-types.h                         |  6 +++---
+ drivers/net/ethernet/sun/sunhme.h                         |  2 +-
+ drivers/net/wireless/intel/iwlwifi/iwl-fw-file.h          |  4 ++--
+ fs/logfs/logfs.h                                          |  4 +---
+ include/linux/mmzone.h                                    |  2 +-
+ include/linux/serial_core.h                               |  4 ++--
+ include/linux/types.h                                     |  4 ++--
+ include/scsi/iscsi_proto.h                                |  2 +-
+ include/target/target_core_base.h                         |  2 +-
+ include/uapi/linux/types.h                                |  4 ----
+ include/uapi/linux/virtio_types.h                         |  6 +++---
+ net/ieee802154/6lowpan/6lowpan_i.h                        |  2 +-
+ net/mac80211/ieee80211_i.h                                |  4 ++--
+ tools/include/linux/types.h                               |  4 ----
+ Documentation/dev-tools/sparse.rst                        | 14 +-------------
+ drivers/bluetooth/Makefile                                |  2 --
+ drivers/net/can/Makefile                                  |  1 -
+ drivers/net/ethernet/altera/Makefile                      |  1 -
+ drivers/net/ethernet/atheros/alx/Makefile                 |  1 -
+ drivers/net/ethernet/freescale/Makefile                   |  2 --
+ drivers/net/wireless/ath/Makefile                         |  2 --
+ drivers/net/wireless/ath/wil6210/Makefile                 |  2 --
+ drivers/net/wireless/broadcom/brcm80211/brcmfmac/Makefile |  2 --
+ drivers/net/wireless/broadcom/brcm80211/brcmsmac/Makefile |  1 -
+ drivers/net/wireless/intel/iwlegacy/Makefile              |  2 --
+ drivers/net/wireless/intel/iwlwifi/Makefile               |  2 +-
+ drivers/net/wireless/intel/iwlwifi/dvm/Makefile           |  2 +-
+ drivers/net/wireless/intel/iwlwifi/mvm/Makefile           |  2 +-
+ drivers/net/wireless/intersil/orinoco/Makefile            |  3 ---
+ drivers/net/wireless/mediatek/mt7601u/Makefile            |  2 --
+ drivers/net/wireless/realtek/rtlwifi/Makefile             |  2 --
+ drivers/net/wireless/realtek/rtlwifi/btcoexist/Makefile   |  2 --
+ drivers/net/wireless/realtek/rtlwifi/rtl8188ee/Makefile   |  2 --
+ drivers/net/wireless/realtek/rtlwifi/rtl8192c/Makefile    |  2 --
+ drivers/net/wireless/realtek/rtlwifi/rtl8192ce/Makefile   |  2 --
+ drivers/net/wireless/realtek/rtlwifi/rtl8192cu/Makefile   |  2 --
+ drivers/net/wireless/realtek/rtlwifi/rtl8192de/Makefile   |  2 --
+ drivers/net/wireless/realtek/rtlwifi/rtl8192ee/Makefile   |  2 --
+ drivers/net/wireless/realtek/rtlwifi/rtl8192se/Makefile   |  2 --
+ drivers/net/wireless/realtek/rtlwifi/rtl8723ae/Makefile   |  2 --
+ drivers/net/wireless/realtek/rtlwifi/rtl8723be/Makefile   |  2 --
+ drivers/net/wireless/realtek/rtlwifi/rtl8723com/Makefile  |  2 --
+ drivers/net/wireless/realtek/rtlwifi/rtl8821ae/Makefile   |  2 --
+ drivers/net/wireless/ti/wl1251/Makefile                   |  2 --
+ drivers/net/wireless/ti/wlcore/Makefile                   |  2 --
+ drivers/staging/rtl8188eu/Makefile                        |  2 +-
+ drivers/staging/rtl8192e/Makefile                         |  2 --
+ drivers/staging/rtl8192e/rtl8192e/Makefile                |  2 --
+ net/bluetooth/Makefile                                    |  2 --
+ net/ieee802154/Makefile                                   |  2 --
+ net/mac80211/Makefile                                     |  2 +-
+ net/mac802154/Makefile                                    |  2 --
+ net/wireless/Makefile                                     |  2 --
+ scripts/checkpatch.pl                                     |  4 ++--
+ 56 files changed, 30 insertions(+), 120 deletions(-)
 
 -- 
-Regards,
-Chanwoo Choi
-
-On 2016? 12? 08? 13:58, Chanwoo Choi wrote:
-> The ACLK_BUS0/1/2 are used for NoC (Network on Chip). If NoC's clocks are
-> disabled, the system halt happen. Following clock must be always enabled.
-> - CLK_ACLK_BUS0_400 : NoC's bus clock for PERIC/PERIS/FSYS/MSCL
-> - CLK_ACLK_BUS1_400 : NoC's bus clock for MFC/HEVC/G3D
-> - CLK_ACLK_BUS2_400 : NoC's bus clock for GSCL/DISP/G2D/CAM0/CAM1/ISP
-> 
-> Also, this patch adds the CLK_SET_RATE_PARENT flag to the CLK_SCLK_JPEG_MSCL
-> because this clock should be used for bus frequency scaling. This clock need to
-> be changed on the fly with CLK_SET_RATE_PARENT flag.
-> 
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Chanwoo Choi <cw00.choi@samsung.com>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc:linux-clk at vger.kernel.org
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos5433.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
-> index f096bd7df40c..0db5204c307c 100644
-> --- a/drivers/clk/samsung/clk-exynos5433.c
-> +++ b/drivers/clk/samsung/clk-exynos5433.c
-> @@ -549,10 +549,10 @@
->  			29, CLK_IGNORE_UNUSED, 0),
->  	GATE(CLK_ACLK_BUS0_400, "aclk_bus0_400", "div_aclk_bus0_400",
->  			ENABLE_ACLK_TOP, 26,
-> -			CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
-> +			CLK_IS_CRITICAL | CLK_SET_RATE_PARENT, 0),
->  	GATE(CLK_ACLK_BUS1_400, "aclk_bus1_400", "div_aclk_bus1_400",
->  			ENABLE_ACLK_TOP, 25,
-> -			CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
-> +			CLK_IS_CRITICAL | CLK_SET_RATE_PARENT, 0),
->  	GATE(CLK_ACLK_IMEM_200, "aclk_imem_200", "div_aclk_imem_266",
->  			ENABLE_ACLK_TOP, 24,
->  			CLK_IS_CRITICAL | CLK_SET_RATE_PARENT, 0),
-> @@ -616,7 +616,7 @@
->  
->  	/* ENABLE_SCLK_TOP_MSCL */
->  	GATE(CLK_SCLK_JPEG_MSCL, "sclk_jpeg_mscl", "div_sclk_jpeg",
-> -			ENABLE_SCLK_TOP_MSCL, 0, 0, 0),
-> +			ENABLE_SCLK_TOP_MSCL, 0, CLK_SET_RATE_PARENT, 0),
->  
->  	/* ENABLE_SCLK_TOP_CAM1 */
->  	GATE(CLK_SCLK_ISP_SENSOR2, "sclk_isp_sensor2", "div_sclk_isp_sensor2_b",
-> @@ -1382,7 +1382,7 @@ static void __init exynos5433_cmu_cpif_init(struct device_node *np)
->  	/* ENABLE_ACLK_MIF3 */
->  	GATE(CLK_ACLK_BUS2_400, "aclk_bus2_400", "div_aclk_bus2_400",
->  			ENABLE_ACLK_MIF3, 4,
-> -			CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
-> +			CLK_IS_CRITICAL | CLK_SET_RATE_PARENT, 0),
->  	GATE(CLK_ACLK_DISP_333, "aclk_disp_333", "div_aclk_disp_333",
->  			ENABLE_ACLK_MIF3, 1,
->  			CLK_IS_CRITICAL | CLK_SET_RATE_PARENT, 0),
-> 
+MST
