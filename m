@@ -1,38 +1,43 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 15 Dec 2016 08:57:57 +0100
-Subject: [PATCH 8/8] Makefile: drop -D__CHECK_ENDIAN__ from cflags
-In-Reply-To: <1481778865-27667-9-git-send-email-mst@redhat.com>
-References: <1481778865-27667-1-git-send-email-mst@redhat.com>
- <1481778865-27667-9-git-send-email-mst@redhat.com>
-Message-ID: <4b0172bd-2779-35b2-96af-407087db844e@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 15 Dec 2016 09:01:43 +0100
+Subject: [PATCH 20/37] ARM: dts: imx6*-sabrelite: Correct license text
+In-Reply-To: <20161214235746.7108-21-alexandre.belloni@free-electrons.com>
+References: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
+ <20161214235746.7108-21-alexandre.belloni@free-electrons.com>
+Message-ID: <20161215080143.et2e74aobtobf4bf@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2016 06:15 AM, Michael S. Tsirkin wrote:
-> That's the default now, no need for makefiles to set it.
+On Thu, Dec 15, 2016 at 12:57:29AM +0100, Alexandre Belloni wrote:
+> The license test has been mangled at some point then copy pasted across
+> multiple files. Restore it to what it should be.
+> Note that this is not intended as a license change.
 > 
-> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-> ---
-[...]
->  drivers/net/can/Makefile                                  | 1 -
+> Cc: Dong Aisheng <aisheng.dong@freescale.com>
+> Cc: Eric Nelson <eric.nelson@boundarydevices.com>
+> Cc: Gary Bisson <gary.bisson@boundarydevices.com>
+> Cc: Hui Wang <jason77.wang@gmail.com>
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Marek Vasut <marex@denx.de>
+> Cc: Markus Pargmann <mpa@pengutronix.de>
+> Cc: Nicolin Chen <b42378@freescale.com>
+> Cc: Peter Seiderer <ps.report@gmx.net>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Rafa? Mi?ecki <zajec5@gmail.com>
+> Cc: Richard Zhao <richard.zhao@freescale.com>
+> Cc: Richard Zhu <r65037@freescale.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Troy Kisky <troy.kisky@boundarydevices.com>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-For drivers/net/can/Makefile:
+for the patches I was Cc:d, i.e. 5, 12, 14, 15, 16, 18, 19, 20 and 24.
 
-Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
-
-regards,
-Marc
+Best regards
+Uwe
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161215/0b31e486/attachment.sig>
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
