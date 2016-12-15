@@ -1,97 +1,137 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Dec 2016 18:57:18 +0000
-Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
-In-Reply-To: <c21d6514-44a2-ba88-0fe5-d14d5897cc48@arm.com>
-References: <20161213113044.GC19985@leverpostej>
- <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
- <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
- <20161215113539.GK14217@n2100.armlinux.org.uk>
- <06fca797-da5d-f7f2-eecb-9b1b33b7e83f@arm.com>
- <20161215151548.GL14217@n2100.armlinux.org.uk>
- <c21d6514-44a2-ba88-0fe5-d14d5897cc48@arm.com>
-Message-ID: <20161215185717.GM14217@n2100.armlinux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Dec 2016 20:07:06 +0100
+Subject: arm64: mm: bug around swiotlb_dma_ops
+In-Reply-To: <8862fe21-0a82-a09a-c1cb-aa79d46179ec@cogentembedded.com>
+References: <8862fe21-0a82-a09a-c1cb-aa79d46179ec@cogentembedded.com>
+Message-ID: <2687486.uRNLKRAd5t@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2016 at 03:37:15PM +0000, Marc Zyngier wrote:
-> On 15/12/16 15:15, Russell King - ARM Linux wrote:
-> > On Thu, Dec 15, 2016 at 11:46:41AM +0000, Marc Zyngier wrote:
-> >> On 15/12/16 11:35, Russell King - ARM Linux wrote:
-> >>> On Thu, Dec 15, 2016 at 11:18:48AM +0000, Marc Zyngier wrote:
-> >>>> On 14/12/16 10:46, Russell King wrote:
-> >>>>> @@ -231,10 +244,14 @@ ENDPROC(__hyp_stub_do_trap)
-> >>>>>   * initialisation entry point.
-> >>>>>   */
-> >>>>>  ENTRY(__hyp_get_vectors)
-> >>>>> -	mov	r0, #-1
-> >>>>> +	mov	r0, #HVC_GET_VECTORS
-> >>>>
-> >>>> This breaks the KVM implementation of __hyp_get_vectors, easily fixed
-> >>>> with the following patchlet:
-> >>>
-> >>> Right, so what Mark said is wrong:
-> >>>
-> >>> "The hyp-stub is part of the kernel image, and the API is private to
-> >>>  that particular image, so we can change things -- there's no ABI to
-> >>>  worry about."
-> >>
-> >> I think Mark is right. The API *is* private to the kernel, and KVM being
-> >> the only in-kernel hypervisor on ARM, this is not an ABI.
-> > 
-> > Again, that's wrong.
-> > 
-> > We have two hypervisors in the kernel.  One is KVM, the other is the
-> > stub.  Sure, the stub isn't a full implementation of a hypervisor, but
-> > it is nevertheless, for the purposes of _this_ discussion, a hypervisor
-> > of sorts.
-> > 
-> > The reason that both are included is because they both appear to share
-> > a common interface (although that's totally not documented anywhere.)
+On Thursday, December 15, 2016 7:20:11 PM CET Nikita Yushchenko wrote:
+> Hi.
 > 
-> And this interface exists for the sole purpose of enabling KVM. Call it
-> a hypervisor if you wish, but its usefulness is doubtful on its own.
+> Per Documentation/DMA-API-HOWTO.txt, driver of device capable of 64-bit
+> DMA addressing, should call dma_set_mask_and_coherent(dev,
+> DMA_BIT_MASK(64)) and if that succeeds, assume that 64-bit DMA
+> addressing is available.
 > 
-> >>> So no, I'm going with my original patch (which TI has tested) which is
-> >>> the minimal change, and if we _then_ want to rework the HYP mode
-> >>> interfaces, that's the time to do the other changes when more people
-> >>> (such as KVM folk) are paying attention and we can come to a cross-
-> >>> hypervisor agreement on what the interface should be.
-> >>
-> >> Given that there is a single in-kernel hypervisor, I can't really see
-> >> who we're going to agree anything with...
-> > 
-> > As far as I can see, the hyp-stub falls under ARM arch maintanence.
-> > KVM falls under KVM people.  Two different groups, we need agreement
-> > between them what a sane API for both "hypervisors" should be.
+> This behaves incorrectly on arm64 system (Renesas r8a7795-h3ulcb) here.
 > 
-> Well, I though we had the right level of discussion by reviewing your
-> patches and coming up with improvements. If you're after something else,
-> please let me know.
+> - Device (NVME SSD) has it's dev->archdata.dma_ops set to swiotlb_dma_ops.
+> 
+> - swiotlb_dma_ops.dma_supported is set to swiotlb_dma_supported():
+> 
+> int swiotlb_dma_supported(struct device *hwdev, u64 mask)
+> {
+>         return phys_to_dma(hwdev, io_tlb_end - 1) <= mask;
+> }
+> 
+> this definitely returns true for mask=DMA_BIT_MASK(64) since that is
+> maximum possible 64-bit value.
+> 
+> - Thus device dma_mask is unconditionally updated, and
+> dma_set_mask_and_coherent() succeeds.
+> 
+> - Later, __swiotlb_map_page() / __swiotlb_map_sg_attr() will consult
+> this updated mask, and return high addresses as valid DMA addresses.
+> 
+> 
+> Thus recommended dma_set_mask_and_coherent() call, instead of checking
+> if platform supports 64-bit DMA addressing, unconditionally enables
+> 64-bit DMA addressing. In case of device actually can't do DMA to 64-bit
+> addresses (e.g. because of limitations in PCIe controller), this breaks
+> things. This is exactly what happens here.
+> 
+> 
+> Not sure what is proper fix for this though.
 
-What I'm after is a meaningful discussion between ARM arch maintainers
-and KVM maintainers - so far all I see are people on the ARM side of
-things.
+I had prototyped something for this a long time ago. It's probably
+wrong or incomplete, but maybe it helps you get closer to a solution.
 
-I've also yet to have any response on some of the KVM questions I raised
-earlier in this thread - again, silence from KVM people.
+	Arnd
 
-What's also coming clear is that there's very few people who understand
-all the interactions here, and the whole thing seems to be an undocumented
-mess.  Something needs to change there - people need to stop shovelling
-half baked crap into the kernel.  KVM have the privilege of being able to
-push ARM stuff directly, I now see that was a very big mistake.
+commit 76c3f31874b0791b4be72cdd64791a64495c3a4a
+Author: Arnd Bergmann <arnd@arndb.de>
+Date:   Tue Nov 17 14:06:55 2015 +0100
 
-So, I want KVM further changes to come through my tree once this merge
-window is over - and I want to see some documentation about how things
-hang together, because hardly anyone understands it right now, and that's
-_really_ bad.
+    [EXPERIMENTAL] ARM64: check implement dma_set_mask
+    
+    Needs work for coherent mask
+    
+    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Let's start with some documentation on the KVM hypervisor interfaces on
-32-bit ARM.  Documentation/virtual/kvm/hypercalls.txt already contains
-some for x86, s390 and PPC, so that would be a good place to document
-the ARM side.  Arguably, that should have already been done.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
+index 243ef256b8c9..a57e7bb10e71 100644
+--- a/arch/arm64/include/asm/device.h
++++ b/arch/arm64/include/asm/device.h
+@@ -22,6 +22,7 @@ struct dev_archdata {
+ 	void *iommu;			/* private IOMMU data */
+ #endif
+ 	bool dma_coherent;
++	u64 parent_dma_mask;
+ };
+ 
+ struct pdev_archdata {
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 290a84f3351f..aa65875c611b 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -352,6 +352,31 @@ static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
+ 	return 1;
+ }
+ 
++static int __swiotlb_set_dma_mask(struct device *dev, u64 mask)
++{
++	/* device is not DMA capable */
++	if (!dev->dma_mask)
++		return -EIO;
++
++	/* mask is below swiotlb bounce buffer, so fail */
++	if (!swiotlb_dma_supported(dev, mask))
++		return -EIO;
++
++	/*
++	 * because of the swiotlb, we can return success for
++	 * larger masks, but need to ensure that bounce buffers
++	 * are used above parent_dma_mask, so set that as
++	 * the effective mask.
++	 */
++	if (mask > dev->archdata.parent_dma_mask)
++		mask = dev->archdata.parent_dma_mask;
++
++
++	*dev->dma_mask = mask;
++
++	return 0;
++}
++
+ static struct dma_map_ops swiotlb_dma_ops = {
+ 	.alloc = __dma_alloc,
+ 	.free = __dma_free,
+@@ -367,6 +392,7 @@ static struct dma_map_ops swiotlb_dma_ops = {
+ 	.sync_sg_for_device = __swiotlb_sync_sg_for_device,
+ 	.dma_supported = __swiotlb_dma_supported,
+ 	.mapping_error = swiotlb_dma_mapping_error,
++	.set_dma_mask = __swiotlb_set_dma_mask,
+ };
+ 
+ static int __init atomic_pool_init(void)
+@@ -957,6 +983,18 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 	if (!dev->archdata.dma_ops)
+ 		dev->archdata.dma_ops = &swiotlb_dma_ops;
+ 
++	/*
++	 * we don't yet support buses that have a non-zero mapping.
++	 *  Let's hope we won't need it
++	 */
++	WARN_ON(dma_base != 0);
++
++	/*
++	 * Whatever the parent bus can set. A device must not set
++	 * a DMA mask larger than this.
++	 */
++	dev->archdata.parent_dma_mask = size;
++
+ 	dev->archdata.dma_coherent = coherent;
+ 	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
+ }
