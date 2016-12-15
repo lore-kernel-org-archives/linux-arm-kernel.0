@@ -1,86 +1,59 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 16 Dec 2016 00:31:11 +0800
-Subject: [stericsson:ab8500-gpadc 1/1] drivers/hwmon/ab8500.c:20:43: fatal
- error: linux/mfd/abx500/ab8500-gpadc.h: No such file or directory
-Message-ID: <201612160008.sRNBj2aE%fengguang.wu@intel.com>
+From: dianders@google.com (Doug Anderson)
+Date: Thu, 15 Dec 2016 08:34:09 -0800
+Subject: [PATCH 3/3] arm64: dts: rockchip: add clk-480m for ehci and ohci
+ of rk3399
+In-Reply-To: <991221a4-3962-1bcb-7863-72f5553eba40@rock-chips.com>
+References: <1481710301-1454-1-git-send-email-zhengxing@rock-chips.com>
+ <1481710301-1454-4-git-send-email-zhengxing@rock-chips.com>
+ <CAD=FV=UU4JdRjRgEvc_wxprvi6bo46+jd=x2m2QzOe4uJmuRPA@mail.gmail.com>
+ <5ce521da-119a-2de8-026c-5992fedfef43@rock-chips.com>
+ <991221a4-3962-1bcb-7863-72f5553eba40@rock-chips.com>
+Message-ID: <CAD=FV=XKQaqRS4jUM7NpN2KEV8USj_cVWbh7q4274n3jBtwORg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git ab8500-gpadc
-head:   4e7f2be1ec1f1ebfd4912f7f4575e0bfb233e784
-commit: 4e7f2be1ec1f1ebfd4912f7f4575e0bfb233e784 [1/1] AB8500 GPADC IIO
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 4e7f2be1ec1f1ebfd4912f7f4575e0bfb233e784
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Hi,
 
-All errors (new ones prefixed by >>):
+On Wed, Dec 14, 2016 at 10:41 PM, Frank Wang <frank.wang@rock-chips.com> wrote:
+> Hi Brain, Doug and Heiko,
+>
+> I would like to summarize why this story was constructed.
+>
+> The ehci/ohci-platform suspend process are blocked due to UTMI clock which
+> directly output from usb-phy has been disabled, and why the UTMI clock was
+> disabled?
+>
+> UTMI clock and 480m clock all output from the same internal PLL of usb-phy,
+> and there is only one bit can use to control this PLL on or off, which we
+> named "otg_commononn"(GRF, offset 0x0e450/0x0e460 bit4 ) in RK3399 TRM.
+>
+> When system boot up, ehci/ohci-platform probe function invoke
+> phy_power_on(), further invoke rockchip_usb2phy_power_on() to enable 480m
+> clock, actually, it sets the otg_commononn bit on, and then usb-phy will go
+> to (auto)suspend if there is no devices plug-in after 1 minute, the
+> rockchip_usb2phy_power_off() will be invoked and the 480m clock may be
+> disabled in the (auto)suspend process. As a result, the otg_commononn bit
+> may be turned off, and all output clock of usb-phy will be disabled.
+> However, ehci/ohci-platform PM suspend operation (read/write controller
+> register) are based on the UTMI clock.
+>
+> So we introduced "clk_usbphy0_480m_src"/"clk_usbphy1_480m_src" as one input
+> clock for ehci/ohci-platform, in this way, the otg_commononn bit is not
+> turned off until ehci/ohci-platform go to PM suspend.
 
->> drivers/hwmon/ab8500.c:20:43: fatal error: linux/mfd/abx500/ab8500-gpadc.h: No such file or directory
-    #include <linux/mfd/abx500/ab8500-gpadc.h>
-                                              ^
-   compilation terminated.
---
->> drivers/power/supply/ab8500_charger.c:32:43: fatal error: linux/mfd/abx500/ab8500-gpadc.h: No such file or directory
-    #include <linux/mfd/abx500/ab8500-gpadc.h>
-                                              ^
-   compilation terminated.
---
->> drivers/power/supply/ab8500_fg.c:35:43: fatal error: linux/mfd/abx500/ab8500-gpadc.h: No such file or directory
-    #include <linux/mfd/abx500/ab8500-gpadc.h>
-                                              ^
-   compilation terminated.
---
->> drivers/power/supply/ab8500_btemp.c:29:43: fatal error: linux/mfd/abx500/ab8500-gpadc.h: No such file or directory
-    #include <linux/mfd/abx500/ab8500-gpadc.h>
-                                              ^
-   compilation terminated.
+I still need to digest all of the things that were added to this
+thread overnight, but nothing I've seen so far indicates that you need
+the post-gated clock.  AKA I still think you need to redo your patch
+to replace:
 
-vim +20 drivers/hwmon/ab8500.c
+              clocks = <&cru HCLK_HOST0>, <&cru HCLK_HOST0_ARB>,
+                       <&cru SCLK_USBPHY0_480M_SRC>;
 
-0bbb06ed Hongbo Zhang  2013-04-03   4   *         Hongbo Zhang <hongbo.zhang@linaro.org>
-0bbb06ed Hongbo Zhang  2013-04-03   5   * License Terms: GNU General Public License v2
-0bbb06ed Hongbo Zhang  2013-04-03   6   *
-0bbb06ed Hongbo Zhang  2013-04-03   7   * When the AB8500 thermal warning temperature is reached (threshold cannot
-0bbb06ed Hongbo Zhang  2013-04-03   8   * be changed by SW), an interrupt is set, and if no further action is taken
-3afb57fa Guenter Roeck 2014-09-29   9   * within a certain time frame, kernel_power_off will be called.
-0bbb06ed Hongbo Zhang  2013-04-03  10   *
-0bbb06ed Hongbo Zhang  2013-04-03  11   * When AB8500 thermal shutdown temperature is reached a hardware shutdown of
-0bbb06ed Hongbo Zhang  2013-04-03  12   * the AB8500 will occur.
-0bbb06ed Hongbo Zhang  2013-04-03  13   */
-0bbb06ed Hongbo Zhang  2013-04-03  14  
-0bbb06ed Hongbo Zhang  2013-04-03  15  #include <linux/err.h>
-0bbb06ed Hongbo Zhang  2013-04-03  16  #include <linux/hwmon.h>
-0bbb06ed Hongbo Zhang  2013-04-03  17  #include <linux/hwmon-sysfs.h>
-0bbb06ed Hongbo Zhang  2013-04-03  18  #include <linux/mfd/abx500.h>
-0bbb06ed Hongbo Zhang  2013-04-03  19  #include <linux/mfd/abx500/ab8500-bm.h>
-0bbb06ed Hongbo Zhang  2013-04-03 @20  #include <linux/mfd/abx500/ab8500-gpadc.h>
-0bbb06ed Hongbo Zhang  2013-04-03  21  #include <linux/module.h>
-0bbb06ed Hongbo Zhang  2013-04-03  22  #include <linux/platform_device.h>
-0bbb06ed Hongbo Zhang  2013-04-03  23  #include <linux/power/ab8500.h>
-3afb57fa Guenter Roeck 2014-09-29  24  #include <linux/reboot.h>
-0bbb06ed Hongbo Zhang  2013-04-03  25  #include <linux/slab.h>
-0bbb06ed Hongbo Zhang  2013-04-03  26  #include <linux/sysfs.h>
-0bbb06ed Hongbo Zhang  2013-04-03  27  #include "abx500.h"
-0bbb06ed Hongbo Zhang  2013-04-03  28  
+with:
 
-:::::: The code at line 20 was first introduced by commit
-:::::: 0bbb06ed564d211d10eae12bdb423fce6178468f hwmon: Add ST-Ericsson ABX500 hwmon driver
+              clocks = <&cru HCLK_HOST0>, <&cru HCLK_HOST0_ARB>,
+                        <&u2phy0>;
 
-:::::: TO: Hongbo Zhang <hongbo.zhang@linaro.org>
-:::::: CC: Anton Vorontsov <anton@enomsg.org>
+Can you please comment on that?
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 60059 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161216/315ba469/attachment-0001.gz>
+-Doug
