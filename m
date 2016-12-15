@@ -1,28 +1,45 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Thu, 15 Dec 2016 16:48:45 +0100
-Subject: [PATCH] arm64: mm: Fix NOMAP page initialization
-In-Reply-To: <4bc9df75-1b67-2428-184e-ce52b5f95528@huawei.com>
-References: <1481307042-29773-1-git-send-email-rrichter@cavium.com>
- <83d6e6d0-cfb3-ec8b-241b-ec6a50dc2aa9@huawei.com>
- <9168b603-04aa-4302-3197-00f17fb336bd@huawei.com>
- <20161214094542.GE5588@rric.localdomain>
- <4bc9df75-1b67-2428-184e-ce52b5f95528@huawei.com>
-Message-ID: <20161215154845.GB8111@rric.localdomain>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 15 Dec 2016 16:07:26 +0000
+Subject: [PATCH 2/2] arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA
+In-Reply-To: <20161215153930.GA8111@rric.localdomain>
+References: <1481706707-6211-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1481706707-6211-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20161215153930.GA8111@rric.localdomain>
+Message-ID: <CAKv+Gu8K+mokbjzM8EpTJoCp3XAKK1_Doq1Zx=A2CCWTT6FbYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.12.16 11:01:04, Yisheng Xie wrote:
-> > I sent a V2 patch that uses pfn_present(). This only initilizes
-> > sections with memory.
-> hmm? maybe I do not quite catch what your mean, but I do not think
-> pfn_present is right for this case.
-> 
-> IMO, The valid_section() means the section with mem_map, not section with memory.
+On 15 December 2016 at 15:39, Robert Richter <robert.richter@cavium.com> wrote:
+> I was going to do some measurements but my kernel crashes now with a
+> page fault in efi_rtc_probe():
+>
+> [   21.663393] Unable to handle kernel paging request at virtual address 20251000
+> [   21.663396] pgd = ffff000009090000
+> [   21.663401] [20251000] *pgd=0000010ffff90003
+> [   21.663402] , *pud=0000010ffff90003
+> [   21.663404] , *pmd=0000000fdc030003
+> [   21.663405] , *pte=00e8832000250707
+>
+> The sparsemem config requires the whole section to be initialized.
+> Your patches do not address this.
+>
 
-Right, the section may be uninitialized with the present flag only.
-valid_section() is better, this is also the pfn_valid() default
-implementation.
+96000047 is a third level translation fault, and the PTE address has
+RES0 bits set. I don't see how this is related to sparsemem, could you
+explain?
 
-Will rework. Thanks.
+> On 14.12.16 09:11:47, Ard Biesheuvel wrote:
+>> +config HOLES_IN_ZONE
+>> +     def_bool y
+>> +     depends on NUMA
+>
+> This enables pfn_valid_within() for arm64 and causes the check for
+> each page of a section. The arm64 implementation of pfn_valid() is
+> already expensive (traversing memblock areas). Now, this is increased
+> by a factor of 2^18 for 4k page size (16384 for 64k). We need to
+> initialize the whole section to avoid that.
+>
 
--Robert
+I know that. But if you want something for -stable, we should have
+something that is correct first, and only then care about the
+performance hit (if there is one)
