@@ -1,45 +1,118 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 15 Dec 2016 11:17:27 +0000
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <7900ae24-6803-a271-944c-8830f718fef0@free.fr>
-References: <20161208103921.GC6408@localhost>
- <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
- <20161208163755.GH6408@localhost>
- <yw1xy3zqxt7x.fsf@unicorn.mansr.com>
- <20161209065955.GJ6408@localhost>
- <6ce1ea97-1d68-2203-c7b4-73315e801655@laposte.net>
- <20161209171727.GK6408@localhost>
- <ec33d3f0-6474-2b13-8a26-077ce3785d31@free.fr>
- <20161209175606.GM6408@localhost>
- <7900ae24-6803-a271-944c-8830f718fef0@free.fr>
-Message-ID: <20161215111727.35csnouwegedcmuu@sirena.org.uk>
+From: Ramiro.Oliveira@synopsys.com (Ramiro Oliveira)
+Date: Thu, 15 Dec 2016 11:26:54 +0000
+Subject: [PATCH 2/2] xilinx_dma: Add reset support
+In-Reply-To: <5658430.jXmKZEXWrS@avalon>
+References: <cover.1481735244.git.roliveir@synopsys.com>
+ <4220c66c29d83bec1ded798ee383b5460c162cfc.1481735244.git.roliveir@synopsys.com>
+ <5658430.jXmKZEXWrS@avalon>
+Message-ID: <380d1b11-814d-0164-3d49-e976f2deb3f9@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2016 at 07:23:17PM +0100, Mason wrote:
-> On 09/12/2016 18:56, Vinod Koul wrote:
+Hi Laurent,
 
-> > Right, but in that case the fallback would be PIO mode, and if that is
-> > not availble (IIRC some f your devices don't) then reject the usage with
-> > EAGAIN.
+Thank you for your feedback.
 
-> Maybe I'm missing something, but I don't see how that would help.
-> Take the NAND Flash controller driver, for instance. PIO is not
-> an option, because the ECC engine is tied to DMA.
+On 12/14/2016 8:16 PM, Laurent Pinchart wrote:
+> Hi Ramiro,
+> 
+> Thank you for the patch.
+> 
+> On Wednesday 14 Dec 2016 17:18:24 Ramiro Oliveira wrote:
+>> Add a DT property to control an optional external reset line
+>>
+>> Signed-off-by: Ramiro Oliveira <roliveir@synopsys.com>
+>> ---
+>>  drivers/dma/xilinx/xilinx_dma.c | 23 +++++++++++++++++++++++
+>>  1 file changed, 23 insertions(+)
+>>
+>> diff --git a/drivers/dma/xilinx/xilinx_dma.c
+>> b/drivers/dma/xilinx/xilinx_dma.c index 5c9f11b..b845224 100644
+>> --- a/drivers/dma/xilinx/xilinx_dma.c
+>> +++ b/drivers/dma/xilinx/xilinx_dma.c
+>> @@ -46,6 +46,7 @@
+>>  #include <linux/slab.h>
+>>  #include <linux/clk.h>
+>>  #include <linux/io-64-nonatomic-lo-hi.h>
+>> +#include <linux/reset.h>
+> 
+> I had neatly sorted the header alphabetically until someone added clk.h and 
+> io-64-nonatomic-lo-hi.h :-( Could you please move reset.h just before slab.h ?
+> 
 
-> And failing with -EAGAIN doesn't help the busy looping situation.
-> The caller should be put on some kind of queue to wait for a
-> "channel ready" event.
+Sure. Actually I was tempted to reorder it, but I decided not to do it. I'll do
+it now
 
-Even without the tie into ECC being an issue it seems like falling back
-to PIO could produce poor results at the system level - it's likely that
-the PIO would be very expensive and take longer than waiting would've
-done, increasing the burden on the CPU and slowing things down overall
-for userspace.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 484 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161215/e41e6df1/attachment.sig>
+>>
+>>  #include "../dmaengine.h"
+>>
+>> @@ -409,6 +410,7 @@ struct xilinx_dma_device {
+>>  	struct clk *rxs_clk;
+>>  	u32 nr_channels;
+>>  	u32 chan_id;
+>> +	struct reset_control *rst;
+>>  };
+>>
+>>  /* Macros */
+>> @@ -2543,6 +2545,27 @@ static int xilinx_dma_probe(struct platform_device
+>> *pdev) if (IS_ERR(xdev->regs))
+>>  		return PTR_ERR(xdev->regs);
+>>
+>> +	xdev->rst = devm_reset_control_get_optional(&pdev->dev, "reset");
+> 
+> devm_reset_control_get_optional() is deprecated as explained in linux/reset.h, 
+> you should use devm_reset_control_get_optional_exclusive() or 
+> devm_reset_control_get_optional_shared() instead, as applicable.
+> 
+> This being said, I'm wondering why the optional versions of those functions 
+> exist, as they do exactly the same as the non-optional versions. The API feels 
+> wrong, it should have been modelled like the GPIO API. Feel free to fix it if 
+> you want :-) But that's out of scope for this patch.
+> 
+
+I missed the comment stating that devm_reset_control_get_optional() was deprecated.
+
+I could fix it. Your sugestion is modelling these functions like the GPIO API?
+
+>> +	if (IS_ERR(xdev->rst)) {
+>> +		err = PTR_ERR(xdev->rst);
+>> +		switch (err) {
+>> +		case -ENOENT:
+> 
+> If you drop the name as proposed in the review of patch 1/2 you don't have to 
+> check for -ENOENT.
+> 
+
+I'll do that.
+
+>> +		case -ENOTSUPP:
+>> +			xdev->rst = NULL;
+>> +		break;
+> 
+> Wrong indentation.
+> 
+> You need to handle -EPROBE_DEFER and defer probing of the xilinx_dma device.
+> 
+>> +		default:
+>> +			dev_err(xdev->dev, "error getting reset %d\n", err);
+>> +		return err;
+> 
+> Wrong indentation.
+> 
+>> +		}
+>> +	} else {
+>> +		err = reset_control_deassert(xdev->rst);
+>> +		if (err) {
+>> +			dev_err(xdev->dev, "failed to deassert reset: %d\n",
+>> +					err);
+> 
+> Wrong indentation.
+> 
+>> +			return err;
+>> +		}
+>> +	}
+>> +
+>>  	/* Retrieve the DMA engine properties from the device tree */
+>>  	xdev->has_sg = of_property_read_bool(node, "xlnx,include-sg");
+>>  	if (xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA)
+> 
