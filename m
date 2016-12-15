@@ -1,32 +1,40 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Thu, 15 Dec 2016 11:34:05 +0000
-Subject: [PATCH v2 1/4] Support for building in a Xen binary
-In-Reply-To: <20161122150917.16524-2-andre.przywara@arm.com>
-References: <20161122150917.16524-1-andre.przywara@arm.com>
- <20161122150917.16524-2-andre.przywara@arm.com>
-Message-ID: <4df45802-b8f2-b566-9106-22b31b7898eb@arm.com>
+From: manu@bidouilliste.com (Emmanuel Vadot)
+Date: Thu, 15 Dec 2016 12:35:33 +0100
+Subject: [PATCH v2] ARM: dts: sunxi: Change node name for pwrseq pin on
+ Olinuxino-lime2-emmc
+In-Reply-To: <20161214153013.bkdm3pu3osepfnn2@lukather>
+References: <20161214145724.42745-1-manu@bidouilliste.com>
+ <20161214153013.bkdm3pu3osepfnn2@lukather>
+Message-ID: <20161215123533.f7e2373d2a9eb113ee7b0600@bidouilliste.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
 
-On 22/11/16 15:09, Andre Przywara wrote:
-> diff --git a/configure.ac b/configure.ac
-> index ab8f5b3..f7e24c7 100644
-> --- a/configure.ac
-> +++ b/configure.ac
-> @@ -40,6 +40,18 @@ AC_ARG_WITH([dtb],
->  	AS_HELP_STRING([--with-dtb], [Specify a particular DTB to use]),
->  	[KERN_DTB="$withval"])
->
-> +AC_ARG_WITH([xen],
-> +	AS_HELP_STRING([--with-xen], [Compile for Xen, and Specify a particular Xen to use]),
+ Hi Maxime,
 
-NIT: s/Specify/specify/
+On Wed, 14 Dec 2016 16:30:13 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-Reviewed-by: Julien Grall <julien.grall@arm.com>
+> On Wed, Dec 14, 2016 at 03:57:24PM +0100, Emmanuel Vadot wrote:
+> > The node name for the power seq pin is mmc2 at 0 like the mmc2_pins_a one.
+> > This makes the original node (mmc2_pins_a) scrapped out of the dtb and
+> > result in a unusable eMMC if U-Boot didn't configured the pins to the
+> > correct functions.
+> > 
+> > Changes since v1:
+> >  * Rename the node mmc2-rst-pin
+> 
+> That changelog should be after the ---. Removed it and applied.
+> 
+> Thanks!
+> Maxime
 
-Cheers,
+ Sorry, still kinda new at doing patches for Linux, will be more
+carefull next time.
+ Quick question, when you say applied, applied where exactly ? I had a
+quick look at your branches on git.kernel.org didn't find anything.
+
+ Thanks.
 
 -- 
-Julien Grall
+Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
