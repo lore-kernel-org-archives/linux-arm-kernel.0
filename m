@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 15 Dec 2016 12:21:02 +0000
-Subject: Applied "ASoC: samsung: Remove tests of member address" to the asoc
- tree
-In-Reply-To: <1481363471-21364-1-git-send-email-krzk@kernel.org>
-Message-ID: <E1cHV1y-0000f2-8r@debutante>
+Date: Thu, 15 Dec 2016 12:20:53 +0000
+Subject: Applied "ASoC: atmel: tse850: rely on the ssc to register as a cpu
+ dai by itself" to the asoc tree
+In-Reply-To: <1481052157-23400-3-git-send-email-peda@axentia.se>
+Message-ID: <E1cHV1p-0000av-9J@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: samsung: Remove tests of member address
+   ASoC: atmel: tse850: rely on the ssc to register as a cpu dai by itself
 
 has been applied to the asoc tree at
 
@@ -34,97 +34,139 @@ to this mail.
 Thanks,
 Mark
 
->From 409c69be433b819c924a8d1c457a835bc6d51700 Mon Sep 17 00:00:00 2001
-From: Krzysztof Kozlowski <krzk@kernel.org>
-Date: Sat, 10 Dec 2016 11:51:11 +0200
-Subject: [PATCH] ASoC: samsung: Remove tests of member address
+>From ca8c7f233fa2c40e2a23f982dc33d947f28ad207 Mon Sep 17 00:00:00 2001
+From: Peter Rosin <peda@axentia.se>
+Date: Tue, 6 Dec 2016 20:22:37 +0100
+Subject: [PATCH] ASoC: atmel: tse850: rely on the ssc to register as a cpu dai
+ by itself
 
-The driver was checking for non-NULL address of struct's members:
- - s3c_audio_pdata->type (union),
- - s3c_audio_pdata->type.i2s (embedded struct).
+This breaks devicetree compatibility, but in this case that is ok. All
+affected units are either on my desk, or running an even older version
+of the driver that is not compatible with the upstreamed version anyway
+(and when these other units are eventually updated, they will get a
+fresh dtb as well, so that is not a significant problem either).
 
-This is pointless as these will be always non-NULL.  The 's3c_audio_pdata'
-is always initialized in static memory so it will be zeroed.
-Additionally the 'type' member was an union with only one member.
+All of that is of course assuming that noone else has managed to build
+something that can use this driver, but that seems extremely improbable.
 
-It is safe to reorganize the structures to get rid of useless union and
-checks for addresses to fix the coccinelle warning:
-	>> sound/soc/samsung/i2s.c:1270:2-4: ERROR: test of a variable/field address
-
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Signed-off-by: Peter Rosin <peda@axentia.se>
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- arch/arm/mach-s3c64xx/dev-audio.c      |  4 +---
- include/linux/platform_data/asoc-s3c.h |  6 ++----
- sound/soc/samsung/i2s.c                | 10 ++--------
- 3 files changed, 5 insertions(+), 15 deletions(-)
+ .../bindings/sound/axentia,tse850-pcm5142.txt      | 11 ++++++++---
+ sound/soc/atmel/tse850-pcm5142.c                   | 23 +++-------------------
+ 2 files changed, 11 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/dev-audio.c b/arch/arm/mach-s3c64xx/dev-audio.c
-index b57783371d52..247dcc0b691e 100644
---- a/arch/arm/mach-s3c64xx/dev-audio.c
-+++ b/arch/arm/mach-s3c64xx/dev-audio.c
-@@ -106,9 +106,7 @@ static struct s3c_audio_pdata i2sv4_pdata = {
- 	.dma_playback = DMACH_HSI_I2SV40_TX,
- 	.dma_capture = DMACH_HSI_I2SV40_RX,
- 	.type = {
--		.i2s = {
--			.quirks = QUIRK_PRI_6CHAN,
--		},
-+		.quirks = QUIRK_PRI_6CHAN,
- 	},
- };
+diff --git a/Documentation/devicetree/bindings/sound/axentia,tse850-pcm5142.txt b/Documentation/devicetree/bindings/sound/axentia,tse850-pcm5142.txt
+index 5b9b38f578bb..fdb25b492514 100644
+--- a/Documentation/devicetree/bindings/sound/axentia,tse850-pcm5142.txt
++++ b/Documentation/devicetree/bindings/sound/axentia,tse850-pcm5142.txt
+@@ -2,8 +2,7 @@ Devicetree bindings for the Axentia TSE-850 audio complex
  
-diff --git a/include/linux/platform_data/asoc-s3c.h b/include/linux/platform_data/asoc-s3c.h
-index 15bf56ee8af7..90641a5daaf0 100644
---- a/include/linux/platform_data/asoc-s3c.h
-+++ b/include/linux/platform_data/asoc-s3c.h
-@@ -18,7 +18,7 @@
+ Required properties:
+   - compatible: "axentia,tse850-pcm5142"
+-  - axentia,ssc-controller: The phandle of the atmel SSC controller used as
+-    cpu dai.
++  - axentia,cpu-dai: The phandle of the cpu dai.
+   - axentia,audio-codec: The phandle of the PCM5142 codec.
+   - axentia,add-gpios: gpio specifier that controls the mixer.
+   - axentia,loop1-gpios: gpio specifier that controls loop relays on channel 1.
+@@ -43,6 +42,12 @@ the PCM5142 codec.
  
- extern void s3c64xx_ac97_setup_gpio(int);
+ Example:
  
--struct samsung_i2s {
-+struct samsung_i2s_type {
- /* If the Primary DAI has 5.1 Channels */
- #define QUIRK_PRI_6CHAN		(1 << 0)
- /* If the I2S block has a Stereo Overlay Channel */
-@@ -47,7 +47,5 @@ struct s3c_audio_pdata {
- 	void *dma_capture;
- 	void *dma_play_sec;
- 	void *dma_capture_mic;
--	union {
--		struct samsung_i2s i2s;
--	} type;
-+	struct samsung_i2s_type type;
- };
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index e00974bc5616..d55326289a4a 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -1218,7 +1218,6 @@ static int samsung_i2s_probe(struct platform_device *pdev)
- {
- 	struct i2s_dai *pri_dai, *sec_dai = NULL;
- 	struct s3c_audio_pdata *i2s_pdata = pdev->dev.platform_data;
--	struct samsung_i2s *i2s_cfg = NULL;
- 	struct resource *res;
- 	u32 regs_base, quirks = 0, idma_addr = 0;
- 	struct device_node *np = pdev->dev.of_node;
-@@ -1267,13 +1266,8 @@ static int samsung_i2s_probe(struct platform_device *pdev)
- 		pri_dai->dma_capture.filter_data = i2s_pdata->dma_capture;
- 		pri_dai->filter = i2s_pdata->dma_filter;
++	&ssc0 {
++		#sound-dai-cells = <0>;
++
++		status = "okay";
++	};
++
+ 	&i2c {
+ 		codec: pcm5142 at 4c {
+ 			compatible = "ti,pcm5142";
+@@ -77,7 +82,7 @@ Example:
+ 	sound {
+ 		compatible = "axentia,tse850-pcm5142";
  
--		if (&i2s_pdata->type)
--			i2s_cfg = &i2s_pdata->type.i2s;
+-		axentia,ssc-controller = <&ssc0>;
++		axentia,cpu-dai = <&ssc0>;
+ 		axentia,audio-codec = <&codec>;
+ 
+ 		axentia,add-gpios = <&pioA 8 GPIO_ACTIVE_LOW>;
+diff --git a/sound/soc/atmel/tse850-pcm5142.c b/sound/soc/atmel/tse850-pcm5142.c
+index ac6a814c8ecf..a72c7d642026 100644
+--- a/sound/soc/atmel/tse850-pcm5142.c
++++ b/sound/soc/atmel/tse850-pcm5142.c
+@@ -51,11 +51,7 @@
+ #include <sound/soc.h>
+ #include <sound/pcm_params.h>
+ 
+-#include "atmel_ssc_dai.h"
 -
--		if (i2s_cfg) {
--			quirks = i2s_cfg->quirks;
--			idma_addr = i2s_cfg->idma_addr;
--		}
-+		quirks = i2s_pdata->type.quirks;
-+		idma_addr = i2s_pdata->type.idma_addr;
- 	} else {
- 		quirks = i2s_dai_data->quirks;
- 		if (of_property_read_u32(np, "samsung,idma-addr",
+ struct tse850_priv {
+-	int ssc_id;
+-
+ 	struct gpio_desc *add;
+ 	struct gpio_desc *loop1;
+ 	struct gpio_desc *loop2;
+@@ -329,23 +325,20 @@ static int tse850_dt_init(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct device_node *codec_np, *cpu_np;
+-	struct snd_soc_card *card = &tse850_card;
+ 	struct snd_soc_dai_link *dailink = &tse850_dailink;
+-	struct tse850_priv *tse850 = snd_soc_card_get_drvdata(card);
+ 
+ 	if (!np) {
+ 		dev_err(&pdev->dev, "only device tree supported\n");
+ 		return -EINVAL;
+ 	}
+ 
+-	cpu_np = of_parse_phandle(np, "axentia,ssc-controller", 0);
++	cpu_np = of_parse_phandle(np, "axentia,cpu-dai", 0);
+ 	if (!cpu_np) {
+-		dev_err(&pdev->dev, "failed to get dai and pcm info\n");
++		dev_err(&pdev->dev, "failed to get cpu dai\n");
+ 		return -EINVAL;
+ 	}
+ 	dailink->cpu_of_node = cpu_np;
+ 	dailink->platform_of_node = cpu_np;
+-	tse850->ssc_id = of_alias_get_id(cpu_np, "ssc");
+ 	of_node_put(cpu_np);
+ 
+ 	codec_np = of_parse_phandle(np, "axentia,audio-codec", 0);
+@@ -415,23 +408,14 @@ static int tse850_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	ret = atmel_ssc_set_audio(tse850->ssc_id);
+-	if (ret != 0) {
+-		dev_err(dev,
+-			"failed to set SSC %d for audio\n", tse850->ssc_id);
+-		goto err_disable_ana;
+-	}
+-
+ 	ret = snd_soc_register_card(card);
+ 	if (ret) {
+ 		dev_err(dev, "snd_soc_register_card failed\n");
+-		goto err_put_audio;
++		goto err_disable_ana;
+ 	}
+ 
+ 	return 0;
+ 
+-err_put_audio:
+-	atmel_ssc_put_audio(tse850->ssc_id);
+ err_disable_ana:
+ 	regulator_disable(tse850->ana);
+ 	return ret;
+@@ -443,7 +427,6 @@ static int tse850_remove(struct platform_device *pdev)
+ 	struct tse850_priv *tse850 = snd_soc_card_get_drvdata(card);
+ 
+ 	snd_soc_unregister_card(card);
+-	atmel_ssc_put_audio(tse850->ssc_id);
+ 	regulator_disable(tse850->ana);
+ 
+ 	return 0;
 -- 
 2.11.0
