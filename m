@@ -1,118 +1,45 @@
-From: Jose.Abreu@synopsys.com (Jose Abreu)
-Date: Thu, 15 Dec 2016 16:10:20 +0000
-Subject: [PATCH 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
- stores scenario in vdma
-In-Reply-To: <1481814682-31780-3-git-send-email-appanad@xilinx.com>
-References: <1481814682-31780-1-git-send-email-appanad@xilinx.com>
- <1481814682-31780-3-git-send-email-appanad@xilinx.com>
-Message-ID: <9d92984b-e04a-cd29-e933-d8ea4d610c94@synopsys.com>
+From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
+Date: Thu, 15 Dec 2016 19:20:11 +0300
+Subject: arm64: mm: bug around swiotlb_dma_ops
+Message-ID: <8862fe21-0a82-a09a-c1cb-aa79d46179ec@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kedar,
+Hi.
+
+Per Documentation/DMA-API-HOWTO.txt, driver of device capable of 64-bit
+DMA addressing, should call dma_set_mask_and_coherent(dev,
+DMA_BIT_MASK(64)) and if that succeeds, assume that 64-bit DMA
+addressing is available.
+
+This behaves incorrectly on arm64 system (Renesas r8a7795-h3ulcb) here.
+
+- Device (NVME SSD) has it's dev->archdata.dma_ops set to swiotlb_dma_ops.
+
+- swiotlb_dma_ops.dma_supported is set to swiotlb_dma_supported():
+
+int swiotlb_dma_supported(struct device *hwdev, u64 mask)
+{
+        return phys_to_dma(hwdev, io_tlb_end - 1) <= mask;
+}
+
+this definitely returns true for mask=DMA_BIT_MASK(64) since that is
+maximum possible 64-bit value.
+
+- Thus device dma_mask is unconditionally updated, and
+dma_set_mask_and_coherent() succeeds.
+
+- Later, __swiotlb_map_page() / __swiotlb_map_sg_attr() will consult
+this updated mask, and return high addresses as valid DMA addresses.
 
 
-On 15-12-2016 15:11, Kedareswara rao Appana wrote:
-> When VDMA is configured for more than one frame in the h/w
-> for example h/w is configured for n number of frames and user
-> Submits n number of frames and triggered the DMA using issue_pending API.
-> In the current driver flow we are submitting one frame at a time
-> but we should submit all the n number of frames at one time as the h/w
-> Is configured for n number of frames.
->
-> This patch fixes this issue.
->
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> ---
->  drivers/dma/xilinx/xilinx_dma.c | 43 +++++++++++++++++++++++++----------------
->  1 file changed, 26 insertions(+), 17 deletions(-)
->
-> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-> index 736c2a3..4f3fa94 100644
-> --- a/drivers/dma/xilinx/xilinx_dma.c
-> +++ b/drivers/dma/xilinx/xilinx_dma.c
-> @@ -1087,23 +1087,33 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
->  				tail_segment->phys);
->  	} else {
->  		struct xilinx_vdma_tx_segment *segment, *last = NULL;
-> -		int i = 0;
-> +		int i = 0, j = 0;
->  
->  		if (chan->desc_submitcount < chan->num_frms)
->  			i = chan->desc_submitcount;
->  
-> -		list_for_each_entry(segment, &desc->segments, node) {
-> -			if (chan->ext_addr)
-> -				vdma_desc_write_64(chan,
-> -					XILINX_VDMA_REG_START_ADDRESS_64(i++),
-> -					segment->hw.buf_addr,
-> -					segment->hw.buf_addr_msb);
-> -			else
-> -				vdma_desc_write(chan,
-> -					XILINX_VDMA_REG_START_ADDRESS(i++),
-> -					segment->hw.buf_addr);
-> -
-> -			last = segment;
-> +		for (j = 0; j < chan->num_frms; ) {
-> +			list_for_each_entry(segment, &desc->segments, node) {
-> +				if (chan->ext_addr)
-> +					vdma_desc_write_64(chan,
-> +					  XILINX_VDMA_REG_START_ADDRESS_64(i++),
-> +					  segment->hw.buf_addr,
-> +					  segment->hw.buf_addr_msb);
-> +				else
-> +					vdma_desc_write(chan,
-> +					    XILINX_VDMA_REG_START_ADDRESS(i++),
-> +					    segment->hw.buf_addr);
-> +
-> +				last = segment;
+Thus recommended dma_set_mask_and_coherent() call, instead of checking
+if platform supports 64-bit DMA addressing, unconditionally enables
+64-bit DMA addressing. In case of device actually can't do DMA to 64-bit
+addresses (e.g. because of limitations in PCIe controller), this breaks
+things. This is exactly what happens here.
 
-Hmm, is it possible to submit more than one segment? If so, then
-i and j will get out of sync.
 
-> +			}
-> +			list_del(&desc->node);
-> +			list_add_tail(&desc->node, &chan->active_list);
-> +			j++;
+Not sure what is proper fix for this though.
 
-But if i is non zero and pending_list has more than num_frms then
-i will not wrap-around as it should and will write to invalid
-framebuffer location, right?
-
-> +			if (list_empty(&chan->pending_list))
-> +				break;
-> +			desc = list_first_entry(&chan->pending_list,
-> +						struct xilinx_dma_tx_descriptor,
-> +						node);
->  		}
->  
->  		if (!last)
-> @@ -1114,14 +1124,13 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
->  		vdma_desc_write(chan, XILINX_DMA_REG_FRMDLY_STRIDE,
->  				last->hw.stride);
->  		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last->hw.vsize);
-
-Maybe a check that all framebuffers contain valid addresses
-should be done before programming vsize so that VDMA does not try
-to write to invalid addresses.
-
-> +
-> +		chan->desc_submitcount += j;
-> +		chan->desc_pendingcount -= j;
->  	}
->  
->  	chan->idle = false;
->  	if (!chan->has_sg) {
-> -		list_del(&desc->node);
-> -		list_add_tail(&desc->node, &chan->active_list);
-> -		chan->desc_submitcount++;
-> -		chan->desc_pendingcount--;
->  		if (chan->desc_submitcount == chan->num_frms)
->  			chan->desc_submitcount = 0;
-
-"desc_submitcount >= chan->num_frms would be safer here.
-
->  	} else {
-
-Best regards,
-Jose Miguel Abreu
+Nikita
