@@ -1,79 +1,161 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Dec 2016 11:55:09 +0000
-Subject: [PATCH] boot-wrapper: configure: fix file detection when
- cross-compiling
-In-Reply-To: <20161122151501.16643-1-andre.przywara@arm.com>
-References: <20161122151501.16643-1-andre.przywara@arm.com>
-Message-ID: <20161215115509.GC21758@leverpostej>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 15 Dec 2016 12:55:59 +0100
+Subject: [PATCH v2] ARM: dts: Add missing CPU frequencies for Exynos5422/5800
+Message-ID: <10512254.nyUcL0zgTP@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2016 at 03:15:01PM +0000, Andre Przywara wrote:
-> The autotools documentation states that CHECKFILES cannot be used when
-> cross-compiling[1], because it's meant to check files in the target
-> system, not on the build host. When just giving --host on the configure
-> command line, the script detects cross compilation rather late; and as the
-> file test just happens to execute earlier, this works anyway.
-> However if one gives both --host and --build, cross compilation is
-> detected very early and ./configure complains:
-> 
-> checking for /src/linux-arm64... configure: error: cannot check for file existence when cross compiling
-> 
-> So replace the checkfile macro usage with a simple "test -f" call (which
-> is the recommended way of checking for files on the build host) and output
-> proper error messages.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> 
-> [1] https://www.gnu.org/software/autoconf/manual/autoconf.html#Files
+Add missing 2000MHz & 1900MHz OPPs (for A15 cores) and 1400MHz OPP
+(for A7 cores).  Also update common Odroid-XU3 Lite/XU3/XU4 thermal
+cooling maps to account for new OPPs.
 
-This looks fine to me. Does this conflict with the Xen patches at all?
+Since new OPPs are not available on all Exynos5422/5800 boards modify
+dts files for Odroid-XU3 Lite (limited to 1.8 GHz / 1.3 GHz) & Peach
+Pi (limited to 2.0 GHz / 1.3 GHz) accordingly.
 
-To make it easier to pick these all up, could you please fold this into
-the Xen series as a preparatory patch?
+Tested on Odroid-XU3 and XU3 Lite.
 
-Thanks,
-Mark.
+Cc: Doug Anderson <dianders@chromium.org>
+Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+Cc: Andreas Faerber <afaerber@suse.de>
+Cc: Thomas Abraham <thomas.ab@samsung.com>
+Cc: Ben Gamari <ben@smart-cactus.org>
+Cc: Arjun K V <arjun.kv@samsung.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+v2:
+- added comments about limitations of SoC revisions used by Odroid-XU3 Lite and
+  Peach Pi boards (suggested by Javier)
+- removed redundant opp_a7_14 label
+- added Arjun to Cc:
 
-> ---
->  configure.ac | 23 ++++++++++++++++++-----
->  1 file changed, 18 insertions(+), 5 deletions(-)
-> 
-> diff --git a/configure.ac b/configure.ac
-> index ab8f5b3..e0daec4 100644
-> --- a/configure.ac
-> +++ b/configure.ac
-> @@ -41,12 +41,25 @@ AC_ARG_WITH([dtb],
->  	[KERN_DTB="$withval"])
->  
->  # Ensure that the user has provided us with a sane kernel dir.
-> -m4_define([CHECKFILES], [KERN_DIR,
-> -	KERN_DTB,
-> -	KERN_IMAGE])
-> +if ! test -d $KERN_DIR; then
-> +	AC_MSG_ERROR([Could not find Linux kernel dir $KERN_DIR.])
-> +fi
-> +
-> +AC_MSG_CHECKING([whether DTB file exists])
-> +if ! test -f $KERN_DTB; then
-> +	AC_MSG_RESULT([no])
-> +	AC_MSG_ERROR([You need to specify a valid DTB file, could not find: $KERN_DTB])
-> +else
-> +	AC_MSG_RESULT([yes])
-> +fi
->  
-> -m4_foreach([checkfile], [CHECKFILES],
-> -	[AC_CHECK_FILE([$checkfile], [], AC_MSG_ERROR([No such file or directory: $checkfile]))])
-> +AC_MSG_CHECKING([whether kernel image exists])
-> +if ! test -f $KERN_IMAGE; then
-> +	AC_MSG_RESULT([no])
-> +	AC_MSG_ERROR([You need to compile a kernel first, could not find: $KERN_IMAGE])
-> +else
-> +	AC_MSG_RESULT([yes])
-> +fi
->  
->  AC_SUBST([KERNEL_IMAGE], [$KERN_IMAGE])
->  AC_SUBST([KERNEL_DTB], [$KERN_DTB])
-> -- 
-> 2.9.0
-> 
+Javier, could you test it on Peach Pi board?
+
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |   14 ++++++-------
+ arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts    |   22 +++++++++++++++++++++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts          |    9 ++++++++
+ arch/arm/boot/dts/exynos5800.dtsi                  |   15 ++++++++++++++
+ 4 files changed, 53 insertions(+), 7 deletions(-)
+
+Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+===================================================================
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2016-12-15 12:43:54.365955950 +0100
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2016-12-15 12:43:54.361955949 +0100
+@@ -118,7 +118,7 @@
+ 				/*
+ 				 * When reaching cpu_alert3, reduce CPU
+ 				 * by 2 steps. On Exynos5422/5800 that would
+-				 * be: 1600 MHz and 1100 MHz.
++				 * (usually) be: 1800 MHz and 1200 MHz.
+ 				 */
+ 				map3 {
+ 					trip = <&cpu_alert3>;
+@@ -131,16 +131,16 @@
+ 
+ 				/*
+ 				 * When reaching cpu_alert4, reduce CPU
+-				 * further, down to 600 MHz (11 steps for big,
+-				 * 7 steps for LITTLE).
++				 * further, down to 600 MHz (13 steps for big,
++				 * 8 steps for LITTLE).
+ 				 */
+-				map5 {
++				cooling_map5: map5 {
+ 					trip = <&cpu_alert4>;
+-					cooling-device = <&cpu0 3 7>;
++					cooling-device = <&cpu0 3 8>;
+ 				};
+-				map6 {
++				cooling_map6: map6 {
+ 					trip = <&cpu_alert4>;
+-					cooling-device = <&cpu4 3 11>;
++					cooling-device = <&cpu4 3 13>;
+ 				};
+ 			};
+ 		};
+Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
+===================================================================
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts	2016-12-15 12:43:54.365955950 +0100
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts	2016-12-15 12:43:54.361955949 +0100
+@@ -21,6 +21,28 @@
+ 	compatible = "hardkernel,odroid-xu3-lite", "samsung,exynos5800", "samsung,exynos5";
+ };
+ 
++/*
++ * Odroid XU3-Lite board uses SoC revision with lower maximum frequencies
++ * than Odroid XU3/XU4 boards: 1.8 GHz for A15 cores & 1.3 GHz for A7 cores.
++ * Therefore we need to update OPPs tables and thermal maps accordingly.
++ */
++&cluster_a15_opp_table {
++	/delete-node/opp at 2000000000;
++	/delete-node/opp at 1900000000;
++};
++
++&cluster_a7_opp_table {
++	/delete-node/opp at 1400000000;
++};
++
++&cooling_map5 {
++	cooling-device = <&cpu0 3 7>;
++};
++
++&cooling_map6 {
++	cooling-device = <&cpu4 3 11>;
++};
++
+ &pwm {
+ 	/*
+ 	 * PWM 0 -- fan
+Index: b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+===================================================================
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts	2016-12-15 12:43:54.365955950 +0100
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts	2016-12-15 12:43:54.361955949 +0100
+@@ -146,6 +146,15 @@
+ 	vdd-supply = <&ldo9_reg>;
+ };
+ 
++/*
++ * Peach Pi board uses SoC revision with lower maximum frequency for A7 cores
++ * (1.3 GHz instead of 1.4 GHz) than Odroid XU3/XU4 boards.  Thus we need to
++ * update A7 OPPs table accordingly.
++ */
++&cluster_a7_opp_table {
++	/delete-property/opp at 1400000000;
++};
++
+ &cpu0 {
+ 	cpu-supply = <&buck2_reg>;
+ };
+Index: b/arch/arm/boot/dts/exynos5800.dtsi
+===================================================================
+--- a/arch/arm/boot/dts/exynos5800.dtsi	2016-12-15 12:43:54.365955950 +0100
++++ b/arch/arm/boot/dts/exynos5800.dtsi	2016-12-15 12:43:54.361955949 +0100
+@@ -24,6 +24,16 @@
+ };
+ 
+ &cluster_a15_opp_table {
++	opp at 2000000000 {
++		opp-hz = /bits/ 64 <2000000000>;
++		opp-microvolt = <1250000>;
++		clock-latency-ns = <140000>;
++	};
++	opp at 1900000000 {
++		opp-hz = /bits/ 64 <1900000000>;
++		opp-microvolt = <1250000>;
++		clock-latency-ns = <140000>;
++	};
+ 	opp at 1700000000 {
+ 		opp-microvolt = <1250000>;
+ 	};
+@@ -85,6 +95,11 @@
+ };
+ 
+ &cluster_a7_opp_table {
++	opp at 1400000000 {
++		opp-hz = /bits/ 64 <1400000000>;
++		opp-microvolt = <1250000>;
++		clock-latency-ns = <140000>;
++	};
+ 	opp at 1300000000 {
+ 		opp-microvolt = <1250000>;
+ 	};
