@@ -1,142 +1,57 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Thu, 15 Dec 2016 10:41:04 +0800
-Subject: [PATCH 3/3] arm64: dts: rockchip: add clk-480m for ehci and ohci
- of rk3399
-In-Reply-To: <CAD=FV=UU4JdRjRgEvc_wxprvi6bo46+jd=x2m2QzOe4uJmuRPA@mail.gmail.com>
-References: <1481710301-1454-1-git-send-email-zhengxing@rock-chips.com>
- <1481710301-1454-4-git-send-email-zhengxing@rock-chips.com>
- <CAD=FV=UU4JdRjRgEvc_wxprvi6bo46+jd=x2m2QzOe4uJmuRPA@mail.gmail.com>
-Message-ID: <5ce521da-119a-2de8-026c-5992fedfef43@rock-chips.com>
+From: zhongjiang@huawei.com (zhong jiang)
+Date: Thu, 15 Dec 2016 10:59:39 +0800
+Subject: [RESEND PATCH 1/2] arm64: change from CONT_PMD_SHIFT to
+ CONT_PTE_SHIFT
+In-Reply-To: <CAKv+Gu8Qh8N+fagYqtO_04fZ=Wxg5S-=4bmPD0bxQrSyb+NZvw@mail.gmail.com>
+References: <1481725151-20549-1-git-send-email-zhongjiang@huawei.com>
+ <1481725151-20549-2-git-send-email-zhongjiang@huawei.com>
+ <CAKv+Gu8Qh8N+fagYqtO_04fZ=Wxg5S-=4bmPD0bxQrSyb+NZvw@mail.gmail.com>
+Message-ID: <5852071B.60202@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-// Frank
-
-Hi Doug,  Brain,
-     Thanks for the reply.
-     Sorry I forgot these patches have been sent earlier, and Frank have 
-some explained and discussed with Heiko.
-Please see https://patchwork.kernel.org/patch/9255245/
-     Perhaps we can move to that patch tree to continue the discussion.
-
-     I think Frank and William will help us to continue checking these.
-
-Thanks
-
-? 2016?12?15? 08:10, Doug Anderson ??:
-> Hi,
->
-> On Wed, Dec 14, 2016 at 2:11 AM, Xing Zheng <zhengxing@rock-chips.com> wrote:
->> From: William wu <wulf@rock-chips.com>
+On 2016/12/14 22:45, Ard Biesheuvel wrote:
+> On 14 December 2016 at 14:19, zhongjiang <zhongjiang@huawei.com> wrote:
+>> From: zhong jiang <zhongjiang@huawei.com>
 >>
->> We found that the suspend process was blocked when it run into
->> ehci/ohci module due to clk-480m of usb2-phy was disabled.
+>> I think that CONT_PTE_SHIFT is more reasonable even if they are some
+>> value. and the patch is not any functional change.
 >>
->> The root cause is that usb2-phy suspended earlier than ehci/ohci
->> (usb2-phy will be auto suspended if no devices plug-in).
-> This is really weird, but I can confirm it is true on my system too
-> (kernel-4.4 based).  At least I see:
->
-> [  208.012065] calling  usb1+ @ 4984, parent: fe380000.usb, cb: usb_dev_suspend
-> [  208.569112] calling  ff770000.syscon:usb2-phy at e450+ @ 4983, parent:
-> ff770000.syscon, cb: platform_pm_suspend
-> [  208.569113] call ff770000.syscon:usb2-phy at e450+ returned 0 after 0 usecs
-> [  208.569439] calling  fe380000.usb+ @ 4983, parent: platform, cb:
-> platform_pm_suspend
-> [  208.569444] call fe380000.usb+ returned 0 after 4 usecs
->
->
-> In general I thought that suspend order was supposed to be related to
-> probe order.  So if your probe order is A, B, C then your suspend
-> order would be C, B, A.  ...and we know for sure that the USB PHY
-> needs to probe _before_ the main USB controller.  If it didn't then
-> you'd get an EPROBE_DEFER in the USB controller, right?  So that means
-> that the USB controller should be suspending before its PHY.
->
-> Any chance this is somehow related to async probe?  I'm not a huge
-> expert on async probe but I guess I could imagine things getting
-> confused if you had a sequence like this:
->
-> 1. Start USB probe (async)
-> 2. Start PHY probe
-> 3. Finish PHY probe
-> 4. In USB probe, ask for PHY--no problems since PHY probe finished
-> 5. Finish USB probe
->
-> The probe order would be USB before PHY even though the USB probe
-> _depended_ on the PHY probe being finished...  :-/  Anyway, probably
-> I'm just misunderstanding something and someone can tell me how dumb I
-> am...
->
-> I also notice that the ehci_platform_power_off() function we're
-> actually making PHY commands right before the same commands that turn
-> off our clocks.  Presumably those commands aren't really so good to do
-> if the PHY has already been suspended?
->
-> Actually, does the PHY suspend from platform_pm_suspend() actually
-> even do anything?  It doesn't look like it.  It looks as if all the
-> PHY cares about is init/exit and on/off...  ...and it looks as if the
-> PHY should be turned off by the EHCI controller at about the same time
-> it turns off its clocks...
->
-> I haven't fully dug, but is there any chance that things are getting
-> confused between the OTG PHY and the Host PHY?  Maybe when we turn off
-> the OTG PHY it turns off something that the host PHY needs?
->
->
->> and the
->> clk-480m provided by it was disabled if no module used. However,
->> some suspend process related ehci/ohci are base on this clock,
->> so we should refer it into ehci/ohci driver to prevent this case.
-> Though I don't actually have details about the internals of the chip,
-> it does seem highly likely that the USB block actually uses this clock
-> for some things, so it doesn't seem insane (to me) to have the USB
-> controller request that the clock be on.  So, in general, I don't have
-> lots of objections to including the USB PHY Clock here.
->
-> ...but I think you have the wrong clock (please correct me if I'm
-> wrong).  I think you really wanted your input clock to be
-> "clk_usbphy0_480m", not "clk_usbphy0_480m_src".  Specifically I
-> believe there is a gate between the clock outputted by the PHY and the
-> USB Controller itself.  I'm guessing that the gate is only there
-> between the PHY and the "clk_usbphy_480m" MUX.
->
-> As evidence, I have a totally functioning system right now where
-> "clk_usbphy0_480m_src" is currently gated.
->
-> That means really you should be changing your clocks to this (untested):
->
->                 clocks = <&cru HCLK_HOST0>, <&cru HCLK_HOST0_ARB>,
->                          <&u2phy0>;
->
-> ...and then you could drop the other two patches in this series.
->
-> ===
->
-> OK, I actually briefly tested my proposed change and it at least seems
-> to build and boot OK.  You'd have to test it to make sure it makes
-> your tests pass...
->
-> ===
->
-> So I guess to summarize all the above:
->
-> * It seems to me like there's some deeper root cause and your patch
-> will at most put a band-aid on it.  Seems like digging out the root
-> cause is a good idea.
->
-> * Though I don't believe it solves the root problem, the idea of the
-> USB Controller holding onto the PHY clock doesn't seem wrong.
->
-> * You're holding onto the wrong clock in your patch--you want the one
-> before the gate (I think).
->
->
-> -Doug
->
->
->
+> This may be the case for 64k pages, but not for 16k pages, and I
+> actually think add_default_hugepagesz() could be made unconditional,
+> given that both 64k on 4k kernels and 2 MB on 16k kernels are useful
+> hugepage sizes that are not otherwise available by default.
+ I agree that we can make add_default_hugepagesz() to be unconditional.
+ but I do not know the history why it did so at that time. The patch
+ just is based on the current kernel.
 
+ by the way, please review the second patch if you have time. Any comment
+ will be welcomed.
 
--- 
-- Xing Zheng
+ Thanks
+ zhongjiang
+>> Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+>> ---
+>>  arch/arm64/mm/hugetlbpage.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+>> index 2e49bd2..0a4c97b 100644
+>> --- a/arch/arm64/mm/hugetlbpage.c
+>> +++ b/arch/arm64/mm/hugetlbpage.c
+>> @@ -323,7 +323,7 @@ static __init int setup_hugepagesz(char *opt)
+>>  static __init int add_default_hugepagesz(void)
+>>  {
+>>         if (size_to_hstate(CONT_PTES * PAGE_SIZE) == NULL)
+>> -               hugetlb_add_hstate(CONT_PMD_SHIFT);
+>> +               hugetlb_add_hstate(CONT_PTE_SHIFT);
+>>         return 0;
+>>  }
+>>  arch_initcall(add_default_hugepagesz);
+>> --
+>> 1.8.3.1
+>>
+> .
+>
