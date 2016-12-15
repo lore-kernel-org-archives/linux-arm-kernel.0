@@ -1,69 +1,90 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Dec 2016 00:57:44 +0100
-Subject: [PATCH 35/37] ARM: dts: vf610-twr: Correct license text
-In-Reply-To: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
-References: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161214235746.7108-36-alexandre.belloni@free-electrons.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 14 Dec 2016 16:07:39 -0800
+Subject: [RFC PATCH 0/4] Ion caching (yet again) proof of concept
+Message-ID: <1481760463-3515-1-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The license test has been mangled at some point then copy pasted across
-multiple files. Restore it to what it should be.
-Note that this is not intended as a license change.
 
-Cc: Bill Pringlemeir <bpringlemeir@nbsps.com>
-Cc: Chao Fu <b44548@freescale.com>
-Cc: Chircu Bogdan <Bogdan.Chircu@freescale.com>
-Cc: Cory Tusar <cory.tusar@pid1solutions.com>
-Cc: Cosmin Stoica <cosminstefan.stoica@freescale.com>
-Cc: Eddy Petrisor <eddy.petrisor@freescale.com>
-Cc: Fugang Duan <B38611@freescale.com>
-Cc: Jingchang Lu <b35083@freescale.com>
-Cc: Stefan Agner <stefan@agner.ch>
-Cc: Xiubo Li <Li.Xiubo@freescale.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/vf610-twr.dts | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Hi,
 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index cdc100732514..53e3b8b250c6 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -10,17 +10,17 @@
-  *     modify it under the terms of the GNU General Public License
-  *     version 2 as published by the Free Software Foundation.
-  *
-- *     This file is distributed in the hope that it will be useful
-+ *     This file is distributed in the hope that it will be useful,
-  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  *     GNU General Public License for more details.
-  *
-- * Or, alternatively
-+ * Or, alternatively,
-  *
-  *  b) Permission is hereby granted, free of charge, to any person
-  *     obtaining a copy of this software and associated documentation
-  *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use
-+ *     restriction, including without limitation the rights to use,
-  *     copy, modify, merge, publish, distribute, sublicense, and/or
-  *     sell copies of the Software, and to permit persons to whom the
-  *     Software is furnished to do so, subject to the following
-@@ -29,11 +29,11 @@
-  *     The above copyright notice and this permission notice shall be
-  *     included in all copies or substantial portions of the Software.
-  *
-- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
+I've been (once again) looking at alternate caching models for Ion. Part of
+this work is also to make Ion fit better in to the dma_buf model.
+
+Ion is a bit unusual for dma_buf. Most drivers that support dma_buf have two
+parts: exporting buffers that a driver allocates and importing buffers
+allocated elsewhere for use by the driver. Ion is basically designed to export
+only and not import buffers from other drivers (the need for import is also
+on my TODO list) Even more unusual, there is no actual 'driver' to map into.
+Ion currently does nothing except pass back the same sg_table each time without
+calling dma_map.
+
+The description of the .map_dma_buf function in dma_buf_ops
+
+ * @map_dma_buf: returns list of scatter pages allocated, increases usecount
+ *               of the buffer. Requires atleast one attach to be called
+ *               before. Returned sg list should already be mapped into
+ *               _device_ address space. This call may sleep. May also return
+ *               -EINTR. Should return -EINVAL if attach hasn't been called yet.
+
+
+So Ion is definitely not doing this correctly. This ties back into correcting
+the caching model. If we call dma_map_sg/dma_unmap_sg with begin_cpu_access,
+this should be enough to allow the caches to always be properly synchronized
+and means we can drop the various dma_sync calls floating around. This is going
+to violate one of the big fat comments in ion_buffer_create
+
+        /*
+         * this will set up dma addresses for the sglist -- it is not
+         * technically correct as per the dma api -- a specific
+         * device isn't really taking ownership here.  However, in practice on
+         * our systems the only dma_address space is physical addresses.
+         * Additionally, we can't afford the overhead of invalidating every
+         * allocation via dma_map_sg. The implicit contract here is that
+         * memory coming from the heaps is ready for dma, ie if it has a
+         * cached mapping that mapping has been invalidated
+         */
+        for_each_sg(buffer->sg_table->sgl, sg, buffer->sg_table->nents, i) {
+                sg_dma_address(sg) = sg_phys(sg);
+                sg_dma_len(sg) = sg->length;
+        }
+
+
+The overhead of invalidating is a valid concern. I'm hoping that the
+architecture has either evolved such that this won't be a problem or we can
+figure out some clever use of DMA_ATTR_SKIP_CPU_SYNC.
+
+As part of this, I'm considering dropping the fault synchronization. If we have
+explicit use begin_cpu_access and use of the dma_buf sync ioctls, I don't think
+it should be necessary.
+
+I have a 'pre-RFC' tree at https://pagure.io/kernel-ion/branch/ion_cache_proof_dec14
+Yes, the patches are not bisectable and there is more to be done. These have
+been compile tested only and haven't been hooked up to anything to actually run
+(another actually big TODO). I'm mostly looking for feedback if this looks like
+the right direction and if there are going to be major problems with this
+approach. I don't actually anticipate this getting merged into
+drivers/staging/android/ion but this is the easiest way to continue discussion.
+
+Thanks,
+Laura
+
+Laura Abbott (4):
+  staging: android: ion: Some cleanup
+  staging: android: ion: Duplicate sg_table
+  staging: android: ion: Remove page faulting support
+  staging: android: ion: Call dma_map_sg for syncing and mapping
+
+ drivers/staging/android/ion/ion-ioctl.c         |   6 -
+ drivers/staging/android/ion/ion.c               | 251 ++++++++----------------
+ drivers/staging/android/ion/ion.h               |   5 +-
+ drivers/staging/android/ion/ion_carveout_heap.c |  16 +-
+ drivers/staging/android/ion/ion_chunk_heap.c    |  15 +-
+ drivers/staging/android/ion/ion_cma_heap.c      |   5 +-
+ drivers/staging/android/ion/ion_page_pool.c     |   3 -
+ drivers/staging/android/ion/ion_priv.h          |   4 +-
+ drivers/staging/android/ion/ion_system_heap.c   |  14 +-
+ 9 files changed, 90 insertions(+), 229 deletions(-)
+
 -- 
-2.10.2
+2.7.4
