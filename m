@@ -1,87 +1,78 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 15 Dec 2016 11:35:12 +0100
-Subject: Linux crashes when trying to online secondary core
-In-Reply-To: <8a021a90-e69e-f38b-c8df-ea8963f3973f@free.fr>
-References: <ef972981-3fb6-74a4-cd83-a6629d2dab2a@free.fr>
- <alpine.DEB.2.20.1612141807410.3556@nanos>
- <8a021a90-e69e-f38b-c8df-ea8963f3973f@free.fr>
-Message-ID: <1147ef90-7877-e4d2-bb2b-5c4fa8d3144b@free.fr>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 15 Dec 2016 11:38:28 +0100
+Subject: [PATCH 23/39] ARM: dts: armada-xp-axpwifiap: Correct license text
+In-Reply-To: <20161214223746.23066-24-alexandre.belloni@free-electrons.com>
+References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
+ <20161214223746.23066-24-alexandre.belloni@free-electrons.com>
+Message-ID: <37a43cbd-cc36-d3b7-af0b-2a5c1f7d1a08@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/12/2016 18:47, Mason wrote:
+On 14.12.2016 23:37, Alexandre Belloni wrote:
+> The license test has been mangled at some point then copy pasted across
+> multiple files. Restore it to what it should be.
+> Note that this is not intended as a license change.
+>
+> Cc: Arnaud Ebalard <arno@natisbad.org>
+> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Cc: Paul Bolle <pebolle@tiscali.nl>
+> Cc: Rafa? Mi?ecki <zajec5@gmail.com>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-> On 14/12/2016 18:08, Thomas Gleixner wrote:
-> 
->> On Wed, 14 Dec 2016, Mason wrote:
->>
->>> I'm seeing Linux v4.9 crash (dereferencing NULL) when I try to online
->>> the secondary core, after putting it offline.
->>
->> Does the patch below fix the issue?
->>
->> Thanks,
->>
->> 	tglx
->> 	
->> 8<---------------
->>
->> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
->> index 22acee76cf4c..2594c287b078 100644
->> --- a/include/linux/cpuhotplug.h
->> +++ b/include/linux/cpuhotplug.h
->> @@ -101,7 +101,6 @@ enum cpuhp_state {
->>  	CPUHP_AP_ARM_L2X0_STARTING,
->>  	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
->>  	CPUHP_AP_ARM_GLOBAL_TIMER_STARTING,
->> -	CPUHP_AP_DUMMY_TIMER_STARTING,
->>  	CPUHP_AP_JCORE_TIMER_STARTING,
->>  	CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
->>  	CPUHP_AP_ARM_TWD_STARTING,
->> @@ -111,6 +110,7 @@ enum cpuhp_state {
->>  	CPUHP_AP_MARCO_TIMER_STARTING,
->>  	CPUHP_AP_MIPS_GIC_TIMER_STARTING,
->>  	CPUHP_AP_ARC_TIMER_STARTING,
->> +	CPUHP_AP_DUMMY_TIMER_STARTING,
->>  	CPUHP_AP_KVM_STARTING,
->>  	CPUHP_AP_KVM_ARM_VGIC_INIT_STARTING,
->>  	CPUHP_AP_KVM_ARM_VGIC_STARTING,
-> 
-> $ patch -p1 < tglx.patch 
-> patching file include/linux/cpuhotplug.h
-> Hunk #1 succeeded at 80 (offset -21 lines).
-> Hunk #2 succeeded at 89 (offset -21 lines).
-> 
-> It does seem to fix the problem:
-> 
-> # echo 0 > /sys/devices/system/cpu/cpu1/online
-> SMC called with a0=0x00[000001 a1=0x00000121 a2=0x00000005  a3 =0xc01189b4  0x00000121
-> [1][flow/suspend3.c:39] CPU 1 die: jumping6 to. post-boot WFE
-> 402826] CPU1: shutdown
-> SMC called with a0=0x00000001 a1=0x00000122 a2=0x00000000 a3=0x00000000 0x00000122
-> [0][flow/suspend.c:82] Killing core1
-> armor+++ armor: core 1 booted, entering wfe...
-> # echo 1 > /sys/devices/system/cpu/cpu1/online
-> [  215.692700] tango_boot_secondary from __cpu_up
-> SMC called with a0=0x80101500 a1=0x00000105 a2=0x00000000 a3=0x00000000 0x00000105
-> [  215.704494] tango_set_aux_boot_addr=0
-> SMC called with a0=0x00000001 a1=0x00000104 a2=0x00000000 a3=0x00000000 0x00000104
-> [0][flow/smc_handler.c:127] waking up CPU1
-> [  215.719308] tango_start_aux_core=0
-> 
-> 
-> I reverted your patch, and the kernel blows up again.
-> 
-> So what's the problem, and how does your patch solve it?
+Feel free to add my
 
-Link to the original report:
-https://marc.info/?l=linux-arm-kernel&m=148173152524746&w=2
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-Forgot to CC Robin Murphy, who had provided valuable input
-in similar circumstances a few months back.
+for Patches 23, 25, 27, 29, 30, 31, 32, 33, 35, 36, i.e. all I
+have been in Cc.
 
-Also add LKML, since this doesn't appear to be ARM-specific.
+Sebastian
 
-Do I need to specify which device tree I was using?
-
-Regards.
+> Cc: Stefan Roese <sr@denx.de>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-xp-axpwifiap.dts | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> index ce152719bc28..6a25eb427822 100644
+> --- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> +++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> @@ -20,17 +20,17 @@
+>   *     published by the Free Software Foundation; either version 2 of the
+>   *     License, or (at your option) any later version.
+>   *
+> - *     This file is distributed in the hope that it will be useful
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+> - * Or, alternatively
+> + * Or, alternatively,
+>   *
+>   *  b) Permission is hereby granted, free of charge, to any person
+>   *     obtaining a copy of this software and associated documentation
+>   *     files (the "Software"), to deal in the Software without
+> - *     restriction, including without limitation the rights to use
+> + *     restriction, including without limitation the rights to use,
+>   *     copy, modify, merge, publish, distribute, sublicense, and/or
+>   *     sell copies of the Software, and to permit persons to whom the
+>   *     Software is furnished to do so, subject to the following
+> @@ -39,11 +39,11 @@
+>   *     The above copyright notice and this permission notice shall be
+>   *     included in all copies or substantial portions of the Software.
+>   *
+> - *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>   *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>   *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>   *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> - *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>   *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>   *     OTHER DEALINGS IN THE SOFTWARE.
+>
