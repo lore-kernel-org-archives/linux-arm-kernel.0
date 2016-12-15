@@ -1,251 +1,136 @@
-From: Jose.Abreu@synopsys.com (Jose Abreu)
-Date: Thu, 15 Dec 2016 15:31:07 +0000
-Subject: [PATCH] dmaengine: xilinx_dma: Add support for multiple buffers
-In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A65C899@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <40ba7c24927eeffdcc66425f8ca1203589276c08.1481812291.git.joabreu@synopsys.com>
- <C246CAC1457055469EF09E3A7AC4E11A4A65C899@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <72be3955-1ec8-05f4-c8ee-ac29da69904d@synopsys.com>
+From: Ramiro.Oliveira@synopsys.com (Ramiro Oliveira)
+Date: Thu, 15 Dec 2016 15:30:32 +0000
+Subject: [PATCH v2] i2c: designware: add reset interface
+In-Reply-To: <1481805227.9552.15.camel@linux.intel.com>
+References: <1479789700-19532-1-git-send-email-zhangfei.gao@linaro.org>
+ <1481792388-13781-1-git-send-email-zhangfei.gao@linaro.org>
+ <1481805227.9552.15.camel@linux.intel.com>
+Message-ID: <fda7e3ef-5bc1-9837-b421-4293baa3de34@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kedar,
+Hi Andy and Zhangfei
 
+On 12/15/2016 12:33 PM, Andy Shevchenko wrote:
+> On Thu, 2016-12-15 at 16:59 +0800, Zhangfei Gao wrote:
+>> Some platforms like hi3660 need do reset first to allow accessing
+>> registers
+> 
+> Patch itself looks good, but would be nice to have it tested.
+> 
+> Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> 
 
-On 15-12-2016 15:19, Appana Durga Kedareswara Rao wrote:
-> Hi Jose Abreu,
->
-> 	Thanks for the patch...
->
->> Xilinx VDMA supports multiple framebuffers. This patch adds correct handling for
->> the scenario where multiple framebuffers are available in the HW and parking
->> mode is not set.
+I tested the patch and it's working for the ARC architecture.
+
 >>
->> We corrected these situations:
->> 	1) Do not start VDMA until all the framebuffers
->> 	have been programmed with a valid address.
->> 	2) Restart variables when VDMA halts/resets.
->> 	3) Halt channel when all the framebuffers have
->> 	finished and there is not anymore segments
->> 	pending.
->> 	4) Do not try to overlap framebuffers until they
->> 	are completed.
->>
->> All these situations, without this patch, can lead to data corruption and even
->> system memory corruption. If, for example, user has a VDMA with 3
->> framebuffers, with direction DMA_DEV_TO_MEM and user only submits one
->> segment, VDMA will write first to the segment the user submitted BUT if the
->> user doesn't submit another segment in a timelly manner then VDMA will write
->> to position 0 of system mem in the following VSYNC.
-> 	I have posted different patch series for fixing these issues just now...
-> Please take a look into it...
->
-> Regards,
-> Kedar.
-
-Thanks, I will review them.
-
-Best regards,
-Jose Miguel Abreu
-
->
->> Signed-off-by: Jose Abreu <joabreu@synopsys.com>
->> Cc: Carlos Palminha <palminha@synopsys.com>
->> Cc: Vinod Koul <vinod.koul@intel.com>
->> Cc: Dan Williams <dan.j.williams@intel.com>
->> Cc: Kedareswara rao Appana <appana.durga.rao@xilinx.com>
->> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->> Cc: dmaengine at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 >> ---
->>  drivers/dma/xilinx/xilinx_dma.c | 80 ++++++++++++++++++++++++++++++++++-
->> ------
->>  1 file changed, 68 insertions(+), 12 deletions(-)
+>>  drivers/i2c/busses/i2c-designware-core.h    |  1 +
+>>  drivers/i2c/busses/i2c-designware-platdrv.c | 28
+>> ++++++++++++++++++++++++----
+>>  2 files changed, 25 insertions(+), 4 deletions(-)
 >>
->> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
->> index 8288fe4..30eec5a 100644
->> --- a/drivers/dma/xilinx/xilinx_dma.c
->> +++ b/drivers/dma/xilinx/xilinx_dma.c
->> @@ -351,10 +351,12 @@ struct xilinx_dma_chan {
->>  	bool cyclic;
->>  	bool genlock;
->>  	bool err;
->> +	bool running;
->>  	struct tasklet_struct tasklet;
->>  	struct xilinx_vdma_config config;
->>  	bool flush_on_fsync;
->>  	u32 desc_pendingcount;
->> +	u32 seg_pendingcount;
->>  	bool ext_addr;
->>  	u32 desc_submitcount;
->>  	u32 residue;
->> @@ -946,6 +948,17 @@ static bool xilinx_dma_is_idle(struct xilinx_dma_chan
->> *chan)  }
->>
->>  /**
->> + * xilinx_vdma_is_multi_buffer - Check if VDMA has multiple
->> +framebuffers
->> + * @chan: Driver specific DMA channel
->> + *
->> + * Return: '1' if is multi buffer, '0' if not.
->> + */
->> +static bool xilinx_vdma_is_multi_buffer(struct xilinx_dma_chan *chan) {
->> +	return chan->num_frms > 1;
->> +}
->> +
->> +/**
->>   * xilinx_dma_halt - Halt DMA channel
->>   * @chan: Driver specific DMA channel
->>   */
->> @@ -966,6 +979,10 @@ static void xilinx_dma_halt(struct xilinx_dma_chan
->> *chan)
->>  			chan, dma_ctrl_read(chan,
->> XILINX_DMA_REG_DMASR));
->>  		chan->err = true;
->>  	}
->> +
->> +	chan->seg_pendingcount = 0;
->> +	chan->desc_submitcount = 0;
->> +	chan->running = false;
->>  }
->>
->>  /**
->> @@ -1002,14 +1019,35 @@ static void xilinx_vdma_start_transfer(struct
->> xilinx_dma_chan *chan)
->>  	struct xilinx_dma_tx_descriptor *desc, *tail_desc;
->>  	u32 reg;
->>  	struct xilinx_vdma_tx_segment *tail_segment;
->> +	bool mbf = xilinx_vdma_is_multi_buffer(chan) && !config->park;
->>
->>  	/* This function was invoked with lock held */
->>  	if (chan->err)
->>  		return;
->>
->> -	if (list_empty(&chan->pending_list))
->> +	/*
->> +	 * Can't continue if we have already consumed all the available
->> +	 * framebuffers and they are not done yet.
->> +	 */
->> +	if (mbf && (chan->seg_pendingcount >= chan->num_frms))
->>  		return;
->>
->> +	if (list_empty(&chan->pending_list)) {
->> +		/*
->> +		 * Can't keep running if there are no pending segments. Halt
->> +		 * the channel as security measure. Notice that this will not
->> +		 * corrupt current transactions because this function is
->> +		 * called after the pendingcount is decreased and after the
->> +		 * current transaction has finished.
->> +		 */
->> +		if (mbf && chan->running && !chan->seg_pendingcount) {
->> +			dev_dbg(chan->dev, "pending list empty: halting\n");
->> +			xilinx_dma_halt(chan);
->> +		}
->> +
->> +		return;
+>> diff --git a/drivers/i2c/busses/i2c-designware-core.h
+>> b/drivers/i2c/busses/i2c-designware-core.h
+>> index 0d44d2a..94b14fa 100644
+>> --- a/drivers/i2c/busses/i2c-designware-core.h
+>> +++ b/drivers/i2c/busses/i2c-designware-core.h
+>> @@ -80,6 +80,7 @@ struct dw_i2c_dev {
+>>  	void __iomem		*base;
+>>  	struct completion	cmd_complete;
+>>  	struct clk		*clk;
+>> +	struct reset_control	*rst;
+>>  	u32			(*get_clk_rate_khz) (struct
+>> dw_i2c_dev *dev);
+>>  	struct dw_pci_controller *controller;
+>>  	int			cmd_err;
+>> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c
+>> b/drivers/i2c/busses/i2c-designware-platdrv.c
+>> index 0b42a12..e9016ae 100644
+>> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
+>> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+>> @@ -38,6 +38,7 @@
+>>  #include <linux/pm_runtime.h>
+>>  #include <linux/property.h>
+>>  #include <linux/io.h>
+>> +#include <linux/reset.h>
+>>  #include <linux/slab.h>
+>>  #include <linux/acpi.h>
+>>  #include <linux/platform_data/i2c-designware.h>
+>> @@ -176,6 +177,14 @@ static int dw_i2c_plat_probe(struct
+>> platform_device *pdev)
+>>  	dev->irq = irq;
+>>  	platform_set_drvdata(pdev, dev);
+>>  
+>> +	dev->rst = devm_reset_control_get_optional(&pdev->dev, NULL);
+
+devm_reset_control_get_optional() is deprecated as explained in linux/reset.h,
+you should use devm_reset_control_get_optional_exclusive() or
+devm_reset_control_get_optional_shared() instead, as applicable.
+
+I submitted a similar patch earlier today and I made the same mistake.
+
+>> +	if (IS_ERR(dev->rst)) {
+>> +		if (PTR_ERR(dev->rst) == -EPROBE_DEFER)
+>> +			return -EPROBE_DEFER;
+>> +	} else {
+>> +		reset_control_deassert(dev->rst);
 >> +	}
 >> +
->>  	desc = list_first_entry(&chan->pending_list,
->>  				struct xilinx_dma_tx_descriptor, node);
->>  	tail_desc = list_last_entry(&chan->pending_list,
->> @@ -1079,6 +1117,8 @@ static void xilinx_vdma_start_transfer(struct
->> xilinx_dma_chan *chan)
->>  	if (chan->has_sg) {
->>  		dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
->>  				tail_segment->phys);
->> +		list_splice_tail_init(&chan->pending_list, &chan->active_list);
->> +		chan->desc_pendingcount = 0;
->>  	} else {
->>  		struct xilinx_vdma_tx_segment *segment, *last = NULL;
->>  		int i = 0;
->> @@ -1097,29 +1137,34 @@ static void xilinx_vdma_start_transfer(struct
->> xilinx_dma_chan *chan)
->>
->> 	XILINX_VDMA_REG_START_ADDRESS(i++),
->>  					segment->hw.buf_addr);
->>
->> +			chan->seg_pendingcount++;
->>  			last = segment;
->>  		}
->>
->>  		if (!last)
->>  			return;
->>
->> -		/* HW expects these parameters to be same for one
->> transaction */
->> -		vdma_desc_write(chan, XILINX_DMA_REG_HSIZE, last-
->>> hw.hsize);
->> -		vdma_desc_write(chan, XILINX_DMA_REG_FRMDLY_STRIDE,
->> -				last->hw.stride);
->> -		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last-
->>> hw.vsize);
->> -	}
->> -
->> -	if (!chan->has_sg) {
->>  		list_del(&desc->node);
->>  		list_add_tail(&desc->node, &chan->active_list);
->>  		chan->desc_submitcount++;
->>  		chan->desc_pendingcount--;
->>  		if (chan->desc_submitcount == chan->num_frms)
->>  			chan->desc_submitcount = 0;
->> -	} else {
->> -		list_splice_tail_init(&chan->pending_list, &chan->active_list);
->> -		chan->desc_pendingcount = 0;
->> +
->> +		/*
->> +		 * Can't start until all the framebuffers have been programmed
->> +		 * or else corruption can occur.
->> +		 */
->> +		if (mbf && !chan->running &&
->> +		   (chan->seg_pendingcount < chan->num_frms))
->> +			return;
->> +
->> +		/* HW expects these parameters to be same for one
->> transaction */
->> +		vdma_desc_write(chan, XILINX_DMA_REG_HSIZE, last-
->>> hw.hsize);
->> +		vdma_desc_write(chan, XILINX_DMA_REG_FRMDLY_STRIDE,
->> +				last->hw.stride);
->> +		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last-
->>> hw.vsize);
->> +		chan->running = true;
->>  	}
->>  }
->>
->> @@ -1327,12 +1372,20 @@ static void xilinx_dma_issue_pending(struct
->> dma_chan *dchan)  static void xilinx_dma_complete_descriptor(struct
->> xilinx_dma_chan *chan)  {
->>  	struct xilinx_dma_tx_descriptor *desc, *next;
->> +	struct xilinx_vdma_tx_segment *segment;
->>
->>  	/* This function was invoked with lock held */
->>  	if (list_empty(&chan->active_list))
->>  		return;
->>
->>  	list_for_each_entry_safe(desc, next, &chan->active_list, node) {
->> +		if (chan->xdev->dma_config->dmatype == XDMA_TYPE_VDMA)
+>>  	/* fast mode by default because of legacy reasons */
+>>  	dev->clk_freq = 400000;
+>>  
+>> @@ -207,12 +216,13 @@ static int dw_i2c_plat_probe(struct
+>> platform_device *pdev)
+>>  	    && dev->clk_freq != 1000000 && dev->clk_freq != 3400000)
 >> {
->> +			list_for_each_entry(segment, &desc->segments, node)
->> {
->> +				if (chan->seg_pendingcount > 0)
->> +					chan->seg_pendingcount--;
->> +			}
->> +		}
->> +
->>  		list_del(&desc->node);
->>  		if (!desc->cyclic)
->>  			dma_cookie_complete(&desc->async_tx);
->> @@ -1366,6 +1419,9 @@ static int xilinx_dma_reset(struct xilinx_dma_chan
->> *chan)
+>>  		dev_err(&pdev->dev,
+>>  			"Only 100kHz, 400kHz, 1MHz and 3.4MHz
+>> supported");
+>> -		return -EINVAL;
+>> +		r = -EINVAL;
+>> +		goto exit_reset;
 >>  	}
->>
->>  	chan->err = false;
->> +	chan->seg_pendingcount = 0;
->> +	chan->desc_submitcount = 0;
->> +	chan->running = false;
->>
->>  	return err;
+>>  
+>>  	r = i2c_dw_eval_lock_support(dev);
+>>  	if (r)
+>> -		return r;
+>> +		goto exit_reset;
+>>  
+>>  	dev->functionality =
+>>  		I2C_FUNC_I2C |
+>> @@ -270,10 +280,18 @@ static int dw_i2c_plat_probe(struct
+>> platform_device *pdev)
+>>  	}
+>>  
+>>  	r = i2c_dw_probe(dev);
+>> -	if (r && !dev->pm_runtime_disabled)
+>> -		pm_runtime_disable(&pdev->dev);
+>> +	if (r)
+>> +		goto exit_probe;
+>>  
+>>  	return r;
+>> +
+>> +exit_probe:
+>> +	if (!dev->pm_runtime_disabled)
+>> +		pm_runtime_disable(&pdev->dev);
+>> +exit_reset:
+>> +	if (!IS_ERR_OR_NULL(dev->rst))
+>> +		reset_control_assert(dev->rst);
+>> +	return r;
 >>  }
->> --
->> 1.9.1
->>
+>>  
+>>  static int dw_i2c_plat_remove(struct platform_device *pdev)
+>> @@ -290,6 +308,8 @@ static int dw_i2c_plat_remove(struct
+>> platform_device *pdev)
+>>  	pm_runtime_put_sync(&pdev->dev);
+>>  	if (!dev->pm_runtime_disabled)
+>>  		pm_runtime_disable(&pdev->dev);
+>> +	if (!IS_ERR_OR_NULL(dev->rst))
+>> +		reset_control_assert(dev->rst);
+>>  
+>>  	return 0;
+>>  }
+> 
+Tested-by: Ramiro Oliveira <ramiro.oliveira@synopsys.com>
