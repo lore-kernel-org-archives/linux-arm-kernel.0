@@ -1,90 +1,124 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Wed, 14 Dec 2016 16:07:39 -0800
-Subject: [RFC PATCH 0/4] Ion caching (yet again) proof of concept
-Message-ID: <1481760463-3515-1-git-send-email-labbott@redhat.com>
+Date: Wed, 14 Dec 2016 16:07:43 -0800
+Subject: [RFC PATCH 4/4] staging: android: ion: Call dma_map_sg for syncing
+ and mapping
+In-Reply-To: <1481760463-3515-1-git-send-email-labbott@redhat.com>
+References: <1481760463-3515-1-git-send-email-labbott@redhat.com>
+Message-ID: <1481760463-3515-5-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi,
+Technically, calling dma_buf_map_attachment should return a buffer
+properly dma_mapped. Add calls to dma_map_sg to begin_cpu_access to
+ensure this happens. As a side effect, this lets Ion buffers take
+advantage of the dma_buf sync ioctls.
 
-I've been (once again) looking at alternate caching models for Ion. Part of
-this work is also to make Ion fit better in to the dma_buf model.
+Not-signed-off-by: Laura Abbott <labbott@redhat.com>
+---
+ drivers/staging/android/ion/ion.c | 61 ++++++++++++++++++++++++++++++---------
+ 1 file changed, 47 insertions(+), 14 deletions(-)
 
-Ion is a bit unusual for dma_buf. Most drivers that support dma_buf have two
-parts: exporting buffers that a driver allocates and importing buffers
-allocated elsewhere for use by the driver. Ion is basically designed to export
-only and not import buffers from other drivers (the need for import is also
-on my TODO list) Even more unusual, there is no actual 'driver' to map into.
-Ion currently does nothing except pass back the same sg_table each time without
-calling dma_map.
-
-The description of the .map_dma_buf function in dma_buf_ops
-
- * @map_dma_buf: returns list of scatter pages allocated, increases usecount
- *               of the buffer. Requires atleast one attach to be called
- *               before. Returned sg list should already be mapped into
- *               _device_ address space. This call may sleep. May also return
- *               -EINTR. Should return -EINVAL if attach hasn't been called yet.
-
-
-So Ion is definitely not doing this correctly. This ties back into correcting
-the caching model. If we call dma_map_sg/dma_unmap_sg with begin_cpu_access,
-this should be enough to allow the caches to always be properly synchronized
-and means we can drop the various dma_sync calls floating around. This is going
-to violate one of the big fat comments in ion_buffer_create
-
-        /*
-         * this will set up dma addresses for the sglist -- it is not
-         * technically correct as per the dma api -- a specific
-         * device isn't really taking ownership here.  However, in practice on
-         * our systems the only dma_address space is physical addresses.
-         * Additionally, we can't afford the overhead of invalidating every
-         * allocation via dma_map_sg. The implicit contract here is that
-         * memory coming from the heaps is ready for dma, ie if it has a
-         * cached mapping that mapping has been invalidated
-         */
-        for_each_sg(buffer->sg_table->sgl, sg, buffer->sg_table->nents, i) {
-                sg_dma_address(sg) = sg_phys(sg);
-                sg_dma_len(sg) = sg->length;
-        }
-
-
-The overhead of invalidating is a valid concern. I'm hoping that the
-architecture has either evolved such that this won't be a problem or we can
-figure out some clever use of DMA_ATTR_SKIP_CPU_SYNC.
-
-As part of this, I'm considering dropping the fault synchronization. If we have
-explicit use begin_cpu_access and use of the dma_buf sync ioctls, I don't think
-it should be necessary.
-
-I have a 'pre-RFC' tree at https://pagure.io/kernel-ion/branch/ion_cache_proof_dec14
-Yes, the patches are not bisectable and there is more to be done. These have
-been compile tested only and haven't been hooked up to anything to actually run
-(another actually big TODO). I'm mostly looking for feedback if this looks like
-the right direction and if there are going to be major problems with this
-approach. I don't actually anticipate this getting merged into
-drivers/staging/android/ion but this is the easiest way to continue discussion.
-
-Thanks,
-Laura
-
-Laura Abbott (4):
-  staging: android: ion: Some cleanup
-  staging: android: ion: Duplicate sg_table
-  staging: android: ion: Remove page faulting support
-  staging: android: ion: Call dma_map_sg for syncing and mapping
-
- drivers/staging/android/ion/ion-ioctl.c         |   6 -
- drivers/staging/android/ion/ion.c               | 251 ++++++++----------------
- drivers/staging/android/ion/ion.h               |   5 +-
- drivers/staging/android/ion/ion_carveout_heap.c |  16 +-
- drivers/staging/android/ion/ion_chunk_heap.c    |  15 +-
- drivers/staging/android/ion/ion_cma_heap.c      |   5 +-
- drivers/staging/android/ion/ion_page_pool.c     |   3 -
- drivers/staging/android/ion/ion_priv.h          |   4 +-
- drivers/staging/android/ion/ion_system_heap.c   |  14 +-
- 9 files changed, 90 insertions(+), 229 deletions(-)
-
+diff --git a/drivers/staging/android/ion/ion.c b/drivers/staging/android/ion/ion.c
+index 86dba07..5177d79 100644
+--- a/drivers/staging/android/ion/ion.c
++++ b/drivers/staging/android/ion/ion.c
+@@ -776,6 +776,11 @@ static struct sg_table *dup_sg_table(struct sg_table *table)
+ 	return new_table;
+ }
+ 
++static void free_duped_table(struct sg_table *table)
++{
++	sg_free_table(table);
++	kfree(table);
++}
+ 
+ static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
+ 					enum dma_data_direction direction)
+@@ -784,15 +789,29 @@ static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
+ 	struct ion_buffer *buffer = dmabuf->priv;
+ 	struct sg_table *table;
+ 
+-	return dup_sg_table(buffer->sg_table);
++	/*
++	 * TODO: Need to sync wrt CPU or device completely owning?
++	 */
++
++	table = dup_sg_table(buffer->sg_table);
++
++	if (!dma_map_sg(attachment->dev, table->sgl, table->nents,
++			direction)){
++		ret = -ENOMEM;
++		goto err;
++	}
++
++err:
++	free_duped_table(table);
++	return ERR_PTR(ret);
+ }
+ 
+ static void ion_unmap_dma_buf(struct dma_buf_attachment *attachment,
+ 			      struct sg_table *table,
+ 			      enum dma_data_direction direction)
+ {
+-	sg_free_table(table);
+-	kfree(table);
++	dma_unmap_sg(attachment->dev, table->sgl, table->nents, direction);
++	free_duped_table(table);
+ }
+ 
+ struct ion_vma_list {
+@@ -889,16 +908,24 @@ static int ion_dma_buf_begin_cpu_access(struct dma_buf *dmabuf,
+ 	struct ion_buffer *buffer = dmabuf->priv;
+ 	void *vaddr;
+ 
+-	if (!buffer->heap->ops->map_kernel) {
+-		pr_err("%s: map kernel is not implemented by this heap.\n",
+-		       __func__);
+-		return -ENODEV;
++	/*
++	 * TODO: Move this elsewhere because we don't always need a vaddr
++	 */
++	if (buffer->heap->ops->map_kernel) {
++		mutex_lock(&buffer->lock);
++		vaddr = ion_buffer_kmap_get(buffer);
++		mutex_unlock(&buffer->lock);
+ 	}
+ 
+-	mutex_lock(&buffer->lock);
+-	vaddr = ion_buffer_kmap_get(buffer);
+-	mutex_unlock(&buffer->lock);
+-	return PTR_ERR_OR_ZERO(vaddr);
++	/*
++	 * Close enough right now? Flag to skip sync?
++	 */
++	if (!dma_map_sg(buffer->dev->dev.this_device, buffer->sg_table->sgl,
++			buffer->sg_table->nents,
++                        DMA_BIDIRECTIONAL))
++		return -ENOMEM;
++
++	return 0;
+ }
+ 
+ static int ion_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
+@@ -906,9 +933,15 @@ static int ion_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
+ {
+ 	struct ion_buffer *buffer = dmabuf->priv;
+ 
+-	mutex_lock(&buffer->lock);
+-	ion_buffer_kmap_put(buffer);
+-	mutex_unlock(&buffer->lock);
++	if (buffer->heap->ops->map_kernel) {
++		mutex_lock(&buffer->lock);
++		ion_buffer_kmap_put(buffer);
++		mutex_unlock(&buffer->lock);
++	}
++
++	dma_unmap_sg(buffer->dev->dev.this_device, buffer->sg_table->sgl,
++			buffer->sg_table->nents,
++			DMA_BIDIRECTIONAL);
+ 
+ 	return 0;
+ }
 -- 
 2.7.4
