@@ -1,57 +1,30 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Thu, 15 Dec 2016 10:24:47 +0100
-Subject: jemalloc testsuite stalls in memset
-In-Reply-To: <20161214235031.GA2912@bbox> (Minchan Kim's message of "Thu, 15
- Dec 2016 08:50:31 +0900")
-References: <mvmmvfy37g1.fsf@hawking.suse.de> <20161214235031.GA2912@bbox>
-Message-ID: <mvm4m2535pc.fsf@hawking.suse.de>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 15 Dec 2016 18:59:28 +0900
+Subject: [PATCH] ARM: dts: r8a7791: link DU to VSPDs
+In-Reply-To: <1922293.x1RvWWSErN@wasted.cogentembedded.com>
+References: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
+ <1922293.x1RvWWSErN@wasted.cogentembedded.com>
+Message-ID: <CANqRtoRg6RxnqQAmuqFw1sjC6+zUUKR+6cBt9tkCOnR-d06OhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Dez 15 2016, Minchan Kim <minchan@kernel.org> wrote:
+Hi Sergei,
 
-> You mean program itself access the address(ie, 0xffffb7400000) is hang
-> while access the address from the debugger is OK?
-
-Yes.
-
-> Can you reproduce it easily?
-
-100%
-
-> Did you test it in real machine or qemu on x86?
-
-Both real and kvm.
-
-> Could you show me how I can reproduce it?
-
-Just run make check.
-
-> I want to test it in x86 machine, first of all.
-> Unfortunately, I don't have any aarch64 platform now so maybe I have to
-> run it on qemu on x86 until I can set up aarch64 platform if it is reproducible
-> on real machine only.
+On Thu, Dec 15, 2016 at 7:07 AM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Add the "vsps" property to the DU device node in order to link this node to
+> the VSPD nodes.
 >
->> 
->> The kernel has been configured with transparent hugepages.
->> 
->> CONFIG_TRANSPARENT_HUGEPAGE=y
->> CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS=y
->> # CONFIG_TRANSPARENT_HUGEPAGE_MADVISE is not set
->> CONFIG_TRANSPARENT_HUGE_PAGECACHE=y
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 >
-> What's the exact kernel version?
+> ---
+> This patch is against the 'renesas-devel-20161212-v4.9' of Simon Horman's
+> 'renesas.git' repo.  It's  only meaningful if the DU driver patch I've just
+> posted is applied.
 
-Anything >= your commit.
+Next time, please consider pointing out the exact name of the patch
+you are referring to.
 
-> I don't think it's HUGE_PAGECACHE problem but to narrow down the scope,
-> could you test it without CONFIG_TRANSPARENT_HUGE_PAGECACHE?
+Thanks,
 
-That cannot be deselected.
-
-Andreas.
-
--- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
+/ magnus
