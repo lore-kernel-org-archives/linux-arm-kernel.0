@@ -1,45 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Dec 2016 11:50:01 +0000
-Subject: [Xen-devel] [PATCH v2 4/4] Explicitly clean linux-system.axf and
- xen-system.axf
-In-Reply-To: <cb5e65ca-65a2-6e0c-47f5-1773d6173739@arm.com>
-References: <20161122150917.16524-1-andre.przywara@arm.com>
- <20161122150917.16524-5-andre.przywara@arm.com>
- <20161212144729.GD1686@char.us.oracle.com>
- <cb5e65ca-65a2-6e0c-47f5-1773d6173739@arm.com>
-Message-ID: <20161215115000.GB21758@leverpostej>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 15 Dec 2016 03:50:59 -0800
+Subject: [PATCH 8/8] Makefile: drop -D__CHECK_ENDIAN__ from cflags
+In-Reply-To: <1481778865-27667-9-git-send-email-mst@redhat.com>
+References: <1481778865-27667-1-git-send-email-mst@redhat.com>
+ <1481778865-27667-9-git-send-email-mst@redhat.com>
+Message-ID: <20161215115059.GA22750@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2016 at 02:50:20PM +0000, Andre Przywara wrote:
-> Hi Konrad,
+On Thu, Dec 15, 2016 at 07:15:30AM +0200, Michael S. Tsirkin wrote:
+> That's the default now, no need for makefiles to set it.
 > 
-> On 12/12/16 14:47, Konrad Rzeszutek Wilk wrote:
-> > On Tue, Nov 22, 2016 at 03:09:17PM +0000, Andre Przywara wrote:
-> >> From: Christoffer Dall <christoffer.dall@linaro.org>
-> >>
-> >> When doing a make clean, only the output image currently configured to
-> >> build is being removed.  However, one would expect all build artifacts
-> >> to be removed when doing a 'make clean' and when switching between Xen
-> >> and Linux builds, it is easy to accidentally run an older build than
-> >> intended.  Simply hardcode the axf image file names.
-> >>
-> >> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >> Reviewed-by: Julien Grall <julien.grall@arm.com>
-> > 
-> > Tested-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> > Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> 
-> Thanks a lot!
-> 
-> I will try to poke Mark to see if we can get this merged eventually.
+> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> ---
+>  drivers/bluetooth/Makefile                                | 2 --
+>  drivers/net/can/Makefile                                  | 1 -
+>  drivers/net/ethernet/altera/Makefile                      | 1 -
+>  drivers/net/ethernet/atheros/alx/Makefile                 | 1 -
+>  drivers/net/ethernet/freescale/Makefile                   | 2 --
+>  drivers/net/wireless/ath/Makefile                         | 2 --
+>  drivers/net/wireless/ath/wil6210/Makefile                 | 2 --
+>  drivers/net/wireless/broadcom/brcm80211/brcmfmac/Makefile | 2 --
+>  drivers/net/wireless/broadcom/brcm80211/brcmsmac/Makefile | 1 -
+>  drivers/net/wireless/intel/iwlegacy/Makefile              | 2 --
+>  drivers/net/wireless/intel/iwlwifi/Makefile               | 2 +-
+>  drivers/net/wireless/intel/iwlwifi/dvm/Makefile           | 2 +-
+>  drivers/net/wireless/intel/iwlwifi/mvm/Makefile           | 2 +-
+>  drivers/net/wireless/intersil/orinoco/Makefile            | 3 ---
+>  drivers/net/wireless/mediatek/mt7601u/Makefile            | 2 --
+>  drivers/net/wireless/realtek/rtlwifi/Makefile             | 2 --
+>  drivers/net/wireless/realtek/rtlwifi/btcoexist/Makefile   | 2 --
+>  drivers/net/wireless/realtek/rtlwifi/rtl8188ee/Makefile   | 2 --
+>  drivers/net/wireless/realtek/rtlwifi/rtl8192c/Makefile    | 2 --
+>  drivers/net/wireless/realtek/rtlwifi/rtl8192ce/Makefile   | 2 --
+>  drivers/net/wireless/realtek/rtlwifi/rtl8192cu/Makefile   | 2 --
+>  drivers/net/wireless/realtek/rtlwifi/rtl8192de/Makefile   | 2 --
+>  drivers/net/wireless/realtek/rtlwifi/rtl8192ee/Makefile   | 2 --
+>  drivers/net/wireless/realtek/rtlwifi/rtl8192se/Makefile   | 2 --
+>  drivers/net/wireless/realtek/rtlwifi/rtl8723ae/Makefile   | 2 --
+>  drivers/net/wireless/realtek/rtlwifi/rtl8723be/Makefile   | 2 --
+>  drivers/net/wireless/realtek/rtlwifi/rtl8723com/Makefile  | 2 --
+>  drivers/net/wireless/realtek/rtlwifi/rtl8821ae/Makefile   | 2 --
+>  drivers/net/wireless/ti/wl1251/Makefile                   | 2 --
+>  drivers/net/wireless/ti/wlcore/Makefile                   | 2 --
+>  drivers/staging/rtl8188eu/Makefile                        | 2 +-
+>  drivers/staging/rtl8192e/Makefile                         | 2 --
+>  drivers/staging/rtl8192e/rtl8192e/Makefile                | 2 --
+>  net/bluetooth/Makefile                                    | 2 --
+>  net/ieee802154/Makefile                                   | 2 --
+>  net/mac80211/Makefile                                     | 2 +-
+>  net/mac802154/Makefile                                    | 2 --
+>  net/wireless/Makefile                                     | 2 --
+>  38 files changed, 5 insertions(+), 68 deletions(-)
 
-I'm happy to take these so long as this doesn't adversely affect non-Xen
-usage. I assume they don't. :)
+For drivers/staging:
 
-Could you fix this up as per Julien's comments, and fold in the tags?
-I'm happy to take that from a v3 or a git repo.
-
-Thanks,
-Mark.
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
