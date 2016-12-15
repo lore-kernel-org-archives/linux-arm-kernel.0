@@ -1,42 +1,87 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 15 Dec 2016 18:28:58 +0800
-Subject: [PATCH 6/6] watchdog: ts4600: add driver for TS-4600 watchdog
-In-Reply-To: <20161214231237.17496-7-sebastien.bourdelin@savoirfairelinux.com>
-Message-ID: <201612151847.aVsOJIuu%fengguang.wu@intel.com>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 15 Dec 2016 11:35:12 +0100
+Subject: Linux crashes when trying to online secondary core
+In-Reply-To: <8a021a90-e69e-f38b-c8df-ea8963f3973f@free.fr>
+References: <ef972981-3fb6-74a4-cd83-a6629d2dab2a@free.fr>
+ <alpine.DEB.2.20.1612141807410.3556@nanos>
+ <8a021a90-e69e-f38b-c8df-ea8963f3973f@free.fr>
+Message-ID: <1147ef90-7877-e4d2-bb2b-5c4fa8d3144b@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastien,
+On 14/12/2016 18:47, Mason wrote:
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.9]
-[cannot apply to next-20161215]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> On 14/12/2016 18:08, Thomas Gleixner wrote:
+> 
+>> On Wed, 14 Dec 2016, Mason wrote:
+>>
+>>> I'm seeing Linux v4.9 crash (dereferencing NULL) when I try to online
+>>> the secondary core, after putting it offline.
+>>
+>> Does the patch below fix the issue?
+>>
+>> Thanks,
+>>
+>> 	tglx
+>> 	
+>> 8<---------------
+>>
+>> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+>> index 22acee76cf4c..2594c287b078 100644
+>> --- a/include/linux/cpuhotplug.h
+>> +++ b/include/linux/cpuhotplug.h
+>> @@ -101,7 +101,6 @@ enum cpuhp_state {
+>>  	CPUHP_AP_ARM_L2X0_STARTING,
+>>  	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
+>>  	CPUHP_AP_ARM_GLOBAL_TIMER_STARTING,
+>> -	CPUHP_AP_DUMMY_TIMER_STARTING,
+>>  	CPUHP_AP_JCORE_TIMER_STARTING,
+>>  	CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
+>>  	CPUHP_AP_ARM_TWD_STARTING,
+>> @@ -111,6 +110,7 @@ enum cpuhp_state {
+>>  	CPUHP_AP_MARCO_TIMER_STARTING,
+>>  	CPUHP_AP_MIPS_GIC_TIMER_STARTING,
+>>  	CPUHP_AP_ARC_TIMER_STARTING,
+>> +	CPUHP_AP_DUMMY_TIMER_STARTING,
+>>  	CPUHP_AP_KVM_STARTING,
+>>  	CPUHP_AP_KVM_ARM_VGIC_INIT_STARTING,
+>>  	CPUHP_AP_KVM_ARM_VGIC_STARTING,
+> 
+> $ patch -p1 < tglx.patch 
+> patching file include/linux/cpuhotplug.h
+> Hunk #1 succeeded at 80 (offset -21 lines).
+> Hunk #2 succeeded at 89 (offset -21 lines).
+> 
+> It does seem to fix the problem:
+> 
+> # echo 0 > /sys/devices/system/cpu/cpu1/online
+> SMC called with a0=0x00[000001 a1=0x00000121 a2=0x00000005  a3 =0xc01189b4  0x00000121
+> [1][flow/suspend3.c:39] CPU 1 die: jumping6 to. post-boot WFE
+> 402826] CPU1: shutdown
+> SMC called with a0=0x00000001 a1=0x00000122 a2=0x00000000 a3=0x00000000 0x00000122
+> [0][flow/suspend.c:82] Killing core1
+> armor+++ armor: core 1 booted, entering wfe...
+> # echo 1 > /sys/devices/system/cpu/cpu1/online
+> [  215.692700] tango_boot_secondary from __cpu_up
+> SMC called with a0=0x80101500 a1=0x00000105 a2=0x00000000 a3=0x00000000 0x00000105
+> [  215.704494] tango_set_aux_boot_addr=0
+> SMC called with a0=0x00000001 a1=0x00000104 a2=0x00000000 a3=0x00000000 0x00000104
+> [0][flow/smc_handler.c:127] waking up CPU1
+> [  215.719308] tango_start_aux_core=0
+> 
+> 
+> I reverted your patch, and the kernel blows up again.
+> 
+> So what's the problem, and how does your patch solve it?
 
-url:    https://github.com/0day-ci/linux/commits/Sebastien-Bourdelin/of-documentation-add-bindings-documentation-for-TS-4600/20161215-072238
-config: i386-allyesconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+Link to the original report:
+https://marc.info/?l=linux-arm-kernel&m=148173152524746&w=2
 
-All errors (new ones prefixed by >>):
+Forgot to CC Robin Murphy, who had provided valuable input
+in similar circumstances a few months back.
 
-   drivers/built-in.o: In function `ts4600_wdt_start':
->> ts4600_wdt.c:(.text+0x2333d64): undefined reference to `ts_nbus_write'
-   drivers/built-in.o: In function `ts4600_wdt_stop':
-   ts4600_wdt.c:(.text+0x2333d85): undefined reference to `ts_nbus_write'
-   drivers/built-in.o: In function `ts4600_wdt_probe':
-   ts4600_wdt.c:(.text+0x2333e66): undefined reference to `ts_nbus_write'
->> ts4600_wdt.c:(.text+0x2333ee9): undefined reference to `ts_nbus_is_ready'
+Also add LKML, since this doesn't appear to be ARM-specific.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 57052 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161215/7129c152/attachment-0001.gz>
+Do I need to specify which device tree I was using?
+
+Regards.
