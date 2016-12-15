@@ -1,107 +1,176 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 15 Dec 2016 15:56:34 +0200
-Subject: [PATCH 2/2] xilinx_dma: Add reset support
-In-Reply-To: <380d1b11-814d-0164-3d49-e976f2deb3f9@synopsys.com>
-References: <cover.1481735244.git.roliveir@synopsys.com>
- <5658430.jXmKZEXWrS@avalon>
- <380d1b11-814d-0164-3d49-e976f2deb3f9@synopsys.com>
-Message-ID: <4539024.0pO4eXcfb0@avalon>
+From: m.reichl@fivetechno.de (Markus Reichl)
+Date: Thu, 15 Dec 2016 14:55:43 +0100
+Subject: [PATCH v2] ARM: dts: Add missing CPU frequencies for
+ Exynos5422/5800
+In-Reply-To: <10512254.nyUcL0zgTP@amdc3058>
+References: <10512254.nyUcL0zgTP@amdc3058>
+Message-ID: <0a0c9237-3e67-bf84-8f32-ef3a49827d0b@fivetechno.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ramiro,
+Hi Bartlomiej,
 
-(CC'ing Philipp Zabel)
-
-On Thursday 15 Dec 2016 11:26:54 Ramiro Oliveira wrote:
-> On 12/14/2016 8:16 PM, Laurent Pinchart wrote:
-> > Hi Ramiro,
-> > 
-> > Thank you for the patch.
-> > 
-> > On Wednesday 14 Dec 2016 17:18:24 Ramiro Oliveira wrote:
-> >> Add a DT property to control an optional external reset line
-> >> 
-> >> Signed-off-by: Ramiro Oliveira <roliveir@synopsys.com>
-> >> ---
-> >> 
-> >>  drivers/dma/xilinx/xilinx_dma.c | 23 +++++++++++++++++++++++
-> >>  1 file changed, 23 insertions(+)
-> >> 
-> >> diff --git a/drivers/dma/xilinx/xilinx_dma.c
-> >> b/drivers/dma/xilinx/xilinx_dma.c index 5c9f11b..b845224 100644
-> >> --- a/drivers/dma/xilinx/xilinx_dma.c
-> >> +++ b/drivers/dma/xilinx/xilinx_dma.c
-> >> @@ -46,6 +46,7 @@
-> >>  #include <linux/slab.h>
-> >>  #include <linux/clk.h>
-> >>  #include <linux/io-64-nonatomic-lo-hi.h>
-> >> +#include <linux/reset.h>
-> > 
-> > I had neatly sorted the header alphabetically until someone added clk.h
-> > and io-64-nonatomic-lo-hi.h :-( Could you please move reset.h just before
-> > slab.h ?
->
-> Sure. Actually I was tempted to reorder it, but I decided not to do it. I'll
-> do it now
-
-Yeah, I'll sleep better tonight :-D
-
-> >>  #include "../dmaengine.h"
-> >> 
-> >> @@ -409,6 +410,7 @@ struct xilinx_dma_device {
-> >>  	struct clk *rxs_clk;
-> >>  	u32 nr_channels;
-> >>  	u32 chan_id;
-> >> +	struct reset_control *rst;
-> >>  };
-> >>  
-> >>  /* Macros */
-> >> @@ -2543,6 +2545,27 @@ static int xilinx_dma_probe(struct platform_device
-> >> *pdev) if (IS_ERR(xdev->regs))
-> >>  		return PTR_ERR(xdev->regs);
-> >> 
-> >> +	xdev->rst = devm_reset_control_get_optional(&pdev->dev, "reset");
-> > 
-> > devm_reset_control_get_optional() is deprecated as explained in
-> > linux/reset.h, you should use devm_reset_control_get_optional_exclusive()
-> > or devm_reset_control_get_optional_shared() instead, as applicable.
-> > 
-> > This being said, I'm wondering why the optional versions of those
-> > functions exist, as they do exactly the same as the non-optional versions.
-> > The API feels wrong, it should have been modelled like the GPIO API. Feel
-> > free to fix it if you want :-) But that's out of scope for this patch.
+Am 15.12.2016 um 12:55 schrieb Bartlomiej Zolnierkiewicz:
+> Add missing 2000MHz & 1900MHz OPPs (for A15 cores) and 1400MHz OPP
+> (for A7 cores).  Also update common Odroid-XU3 Lite/XU3/XU4 thermal
+> cooling maps to account for new OPPs.
 > 
-> I missed the comment stating that devm_reset_control_get_optional() was
-> deprecated.
+> Since new OPPs are not available on all Exynos5422/5800 boards modify
+> dts files for Odroid-XU3 Lite (limited to 1.8 GHz / 1.3 GHz) & Peach
+> Pi (limited to 2.0 GHz / 1.3 GHz) accordingly.
 > 
-> I could fix it. Your sugestion is modelling these functions like the GPIO
-> API?
+> Tested on Odroid-XU3 and XU3 Lite.
+> 
+> Cc: Doug Anderson <dianders@chromium.org>
+> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> Cc: Andreas Faerber <afaerber@suse.de>
+> Cc: Thomas Abraham <thomas.ab@samsung.com>
+> Cc: Ben Gamari <ben@smart-cactus.org>
+> Cc: Arjun K V <arjun.kv@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+> v2:
+> - added comments about limitations of SoC revisions used by Odroid-XU3 Lite and
+>   Peach Pi boards (suggested by Javier)
+> - removed redundant opp_a7_14 label
+> - added Arjun to Cc:
+> 
+> Javier, could you test it on Peach Pi board?
+> 
+>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |   14 ++++++-------
+>  arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts    |   22 +++++++++++++++++++++
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts          |    9 ++++++++
+>  arch/arm/boot/dts/exynos5800.dtsi                  |   15 ++++++++++++++
+>  4 files changed, 53 insertions(+), 7 deletions(-)
+> 
+> Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> ===================================================================
+> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2016-12-15 12:43:54.365955950 +0100
+> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2016-12-15 12:43:54.361955949 +0100
+> @@ -118,7 +118,7 @@
+>  				/*
+>  				 * When reaching cpu_alert3, reduce CPU
+>  				 * by 2 steps. On Exynos5422/5800 that would
+> -				 * be: 1600 MHz and 1100 MHz.
+> +				 * (usually) be: 1800 MHz and 1200 MHz.
+>  				 */
+>  				map3 {
+>  					trip = <&cpu_alert3>;
+> @@ -131,16 +131,16 @@
+>  
+>  				/*
+>  				 * When reaching cpu_alert4, reduce CPU
+> -				 * further, down to 600 MHz (11 steps for big,
+> -				 * 7 steps for LITTLE).
+> +				 * further, down to 600 MHz (13 steps for big,
+> +				 * 8 steps for LITTLE).
+>  				 */
+> -				map5 {
+> +				cooling_map5: map5 {
+>  					trip = <&cpu_alert4>;
+> -					cooling-device = <&cpu0 3 7>;
+> +					cooling-device = <&cpu0 3 8>;
+>  				};
+> -				map6 {
+> +				cooling_map6: map6 {
+>  					trip = <&cpu_alert4>;
+> -					cooling-device = <&cpu4 3 11>;
+> +					cooling-device = <&cpu4 3 13>;
+>  				};
+>  			};
+>  		};
+> Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
+> ===================================================================
+> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts	2016-12-15 12:43:54.365955950 +0100
+> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts	2016-12-15 12:43:54.361955949 +0100
+> @@ -21,6 +21,28 @@
+>  	compatible = "hardkernel,odroid-xu3-lite", "samsung,exynos5800", "samsung,exynos5";
+>  };
+>  
+> +/*
+> + * Odroid XU3-Lite board uses SoC revision with lower maximum frequencies
+> + * than Odroid XU3/XU4 boards: 1.8 GHz for A15 cores & 1.3 GHz for A7 cores.
+> + * Therefore we need to update OPPs tables and thermal maps accordingly.
+> + */
+> +&cluster_a15_opp_table {
+> +	/delete-node/opp at 2000000000;
+> +	/delete-node/opp at 1900000000;
+> +};
+> +
+> +&cluster_a7_opp_table {
+> +	/delete-node/opp at 1400000000;
+> +};
+> +
+> +&cooling_map5 {
+> +	cooling-device = <&cpu0 3 7>;
+> +};
+> +
+> +&cooling_map6 {
+> +	cooling-device = <&cpu4 3 11>;
+> +};
+> +
+>  &pwm {
+>  	/*
+>  	 * PWM 0 -- fan
+> Index: b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> ===================================================================
+> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts	2016-12-15 12:43:54.365955950 +0100
+> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts	2016-12-15 12:43:54.361955949 +0100
+> @@ -146,6 +146,15 @@
+>  	vdd-supply = <&ldo9_reg>;
+>  };
+>  
+> +/*
+> + * Peach Pi board uses SoC revision with lower maximum frequency for A7 cores
+> + * (1.3 GHz instead of 1.4 GHz) than Odroid XU3/XU4 boards.  Thus we need to
+> + * update A7 OPPs table accordingly.
+> + */
+> +&cluster_a7_opp_table {
+> +	/delete-property/opp at 1400000000;
+> +};
+> +
+>  &cpu0 {
+>  	cpu-supply = <&buck2_reg>;
+>  };
+> Index: b/arch/arm/boot/dts/exynos5800.dtsi
+> ===================================================================
+> --- a/arch/arm/boot/dts/exynos5800.dtsi	2016-12-15 12:43:54.365955950 +0100
+> +++ b/arch/arm/boot/dts/exynos5800.dtsi	2016-12-15 12:43:54.361955949 +0100
+> @@ -24,6 +24,16 @@
+>  };
+>  
+>  &cluster_a15_opp_table {
+> +	opp at 2000000000 {
+> +		opp-hz = /bits/ 64 <2000000000>;
+> +		opp-microvolt = <1250000>;
+> +		clock-latency-ns = <140000>;
+> +	};
+> +	opp at 1900000000 {
+> +		opp-hz = /bits/ 64 <1900000000>;
+> +		opp-microvolt = <1250000>;
+> +		clock-latency-ns = <140000>;
+> +	};
+>  	opp at 1700000000 {
+>  		opp-microvolt = <1250000>;
+>  	};
+> @@ -85,6 +95,11 @@
+>  };
+>  
+>  &cluster_a7_opp_table {
+> +	opp at 1400000000 {
+> +		opp-hz = /bits/ 64 <1400000000>;
+> +		opp-microvolt = <1250000>;
+> +		clock-latency-ns = <140000>;
+> +	};
+>  	opp at 1300000000 {
+>  		opp-microvolt = <1250000>;
+>  	};
+> 
 
-I think it would be better for driver if the _get_optional functions would 
-return an ERR_PTR() for errors and NULL when reset control is not available, 
-and then have the rest of the reset controller API accept NULL as a no-op. 
-Your implementation would then be
+On Odroid XU4, XU3 and XU3-lite:
 
-	xdev->rst = devm_reset_control_get_optional_exclusive(&pdev->dev,
-							      "reset");
-	if (IS_ERR(xdev->rst)) {
-		err = PTR_ERR(xdev->rst);
-		if (err != -EPROBE_DEFER)
-			dev_err(xdev->dev, "error getting reset %d\n", err);
-		return err;
-	}
+Tested-by: Markus Reichl <m.reichl@fivetechno.de>
 
-	err = reset_control_deassert(xdev->rst);
-	if (err) {
-		dev_err(xdev->dev, "failed to deassert reset: %d\n", err);
-		return err;
-	}
-
-That requires modifying the reset controller API, so it's a bit out-of-scope, 
-but if you could give it a go, it would be great.
-
--- 
-Regards,
-
-Laurent Pinchart
+Thanks,
+--
+Markus Reichl
