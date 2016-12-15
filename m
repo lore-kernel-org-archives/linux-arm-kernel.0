@@ -1,74 +1,57 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Thu, 15 Dec 2016 17:08:19 +0800
-Subject: [PATCH] drm/mediatek: Support UYVY and YUYV format for overlay
-In-Reply-To: <1481692473-18755-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1481692473-18755-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <CAGS+omCYjJxkfAjPHHL_rsKoOH-2-stcqx12CVTfFz=Ei60Jmg@mail.gmail.com>
+From: schwab@suse.de (Andreas Schwab)
+Date: Thu, 15 Dec 2016 10:24:47 +0100
+Subject: jemalloc testsuite stalls in memset
+In-Reply-To: <20161214235031.GA2912@bbox> (Minchan Kim's message of "Thu, 15
+ Dec 2016 08:50:31 +0900")
+References: <mvmmvfy37g1.fsf@hawking.suse.de> <20161214235031.GA2912@bbox>
+Message-ID: <mvm4m2535pc.fsf@hawking.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bibby,
+On Dez 15 2016, Minchan Kim <minchan@kernel.org> wrote:
 
-On Wed, Dec 14, 2016 at 1:14 PM, Bibby Hsieh <bibby.hsieh@mediatek.com> wrote:
->
-> MT8173 overlay can support UYVY and YUYV format,
-> we add the format in DRM driver.
->
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_disp_ovl.c  | 6 ++++++
->  drivers/gpu/drm/mediatek/mtk_drm_plane.c | 2 ++
->  2 files changed, 8 insertions(+)
->
-> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> index 019b7ca..0a340f3 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> @@ -44,6 +44,8 @@
->  #define OVL_CON_CLRFMT_RGB888  (1 << 12)
->  #define OVL_CON_CLRFMT_RGBA8888        (2 << 12)
->  #define OVL_CON_CLRFMT_ARGB8888        (3 << 12)
-> +#define OVL_CON_CLRFMT_UYVY    (4 << 12)
-> +#define OVL_CON_CLRFMT_YUYV    (5 << 12)
->  #define        OVL_CON_AEN             BIT(8)
->  #define        OVL_CON_ALPHA           0xff
->
-> @@ -161,6 +163,10 @@ static unsigned int ovl_fmt_convert(unsigned int fmt)
->         case DRM_FORMAT_XBGR8888:
->         case DRM_FORMAT_ABGR8888:
->                 return OVL_CON_CLRFMT_RGBA8888 | OVL_CON_BYTE_SWAP;
-> +       case DRM_FORMAT_YUYV:
-> +               return OVL_CON_CLRFMT_YUYV;
-> +       case DRM_FORMAT_UYVY:
-> +               return OVL_CON_CLRFMT_UYVY;
+> You mean program itself access the address(ie, 0xffffb7400000) is hang
+> while access the address from the debugger is OK?
 
-nit: probably better to alphabetize these (UYVY before YUVU).
+Yes.
 
->         }
->  }
+> Can you reproduce it easily?
+
+100%
+
+> Did you test it in real machine or qemu on x86?
+
+Both real and kvm.
+
+> Could you show me how I can reproduce it?
+
+Just run make check.
+
+> I want to test it in x86 machine, first of all.
+> Unfortunately, I don't have any aarch64 platform now so maybe I have to
+> run it on qemu on x86 until I can set up aarch64 platform if it is reproducible
+> on real machine only.
 >
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-> index c461a23..b94c6ee 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-> @@ -28,6 +28,8 @@
->         DRM_FORMAT_XRGB8888,
->         DRM_FORMAT_ARGB8888,
->         DRM_FORMAT_RGB565,
-> +       DRM_FORMAT_YUYV,
-> +       DRM_FORMAT_UYVY,
-
-
-nit: probably better to alphabetize these.
-
-Other than that,
-
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-
+>> 
+>> The kernel has been configured with transparent hugepages.
+>> 
+>> CONFIG_TRANSPARENT_HUGEPAGE=y
+>> CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS=y
+>> # CONFIG_TRANSPARENT_HUGEPAGE_MADVISE is not set
+>> CONFIG_TRANSPARENT_HUGE_PAGECACHE=y
 >
->  };
->
->  static void mtk_plane_reset(struct drm_plane *plane)
-> --
-> 1.9.1
->
+> What's the exact kernel version?
+
+Anything >= your commit.
+
+> I don't think it's HUGE_PAGECACHE problem but to narrow down the scope,
+> could you test it without CONFIG_TRANSPARENT_HUGE_PAGECACHE?
+
+That cannot be deselected.
+
+Andreas.
+
+-- 
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
