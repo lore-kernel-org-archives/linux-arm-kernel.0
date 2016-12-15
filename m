@@ -1,113 +1,36 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Thu, 15 Dec 2016 19:09:39 +0000
-Subject: [PATCH 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
- stores scenario in vdma
-In-Reply-To: <9d92984b-e04a-cd29-e933-d8ea4d610c94@synopsys.com>
-References: <1481814682-31780-1-git-send-email-appanad@xilinx.com>
- <1481814682-31780-3-git-send-email-appanad@xilinx.com>
- <9d92984b-e04a-cd29-e933-d8ea4d610c94@synopsys.com>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A65C9D3@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 15 Dec 2016 20:33:07 +0100
+Subject: [PATCH v6 2/5] i2c: Add STM32F4 I2C driver
+In-Reply-To: <CAOAejn0Ej90amOZUC2wGNBsTAZVmcqEaViV1-TeoaspiADBkkg@mail.gmail.com>
+References: <1481559342-6106-1-git-send-email-cedric.madianga@gmail.com>
+ <1481559342-6106-3-git-send-email-cedric.madianga@gmail.com>
+ <20161213092031.d2ax2pnpzzicriel@pengutronix.de>
+ <CAOAejn0Ej90amOZUC2wGNBsTAZVmcqEaViV1-TeoaspiADBkkg@mail.gmail.com>
+Message-ID: <20161215193307.436sggu4zy4zezoe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jose Miguel Abreu,
+Hello Cedric,
 
-	Thanks for the review....
-
-> > -			last = segment;
-> > +		for (j = 0; j < chan->num_frms; ) {
-> > +			list_for_each_entry(segment, &desc->segments, node)
-> {
-> > +				if (chan->ext_addr)
-> > +					vdma_desc_write_64(chan,
-> > +
-> XILINX_VDMA_REG_START_ADDRESS_64(i++),
-> > +					  segment->hw.buf_addr,
-> > +					  segment->hw.buf_addr_msb);
-> > +				else
-> > +					vdma_desc_write(chan,
-> > +
-> XILINX_VDMA_REG_START_ADDRESS(i++),
-> > +					    segment->hw.buf_addr);
-> > +
-> > +				last = segment;
-> 
-> Hmm, is it possible to submit more than one segment? If so, then i and j will get
-> out of sync.
-
-If h/w is configured for more than 1 frame buffer and user submits more than one frame buffer
-We can submit more than one frame/ segment to hw right??
-
-> 
-> > +			}
-> > +			list_del(&desc->node);
-> > +			list_add_tail(&desc->node, &chan->active_list);
-> > +			j++;
-> 
-> But if i is non zero and pending_list has more than num_frms then i will not
-> wrap-around as it should and will write to invalid framebuffer location, right?
-
-Yep will fix in v2...
-		
-	If (if (list_empty(&chan->pending_list)) || (i == chan->num_frms)
-		break;
-
-Above condition is sufficient right???
-
-> 
-> > +			if (list_empty(&chan->pending_list))
-> > +				break;
-> > +			desc = list_first_entry(&chan->pending_list,
-> > +						struct
-> xilinx_dma_tx_descriptor,
-> > +						node);
-> >  		}
+On Thu, Dec 15, 2016 at 04:26:25PM +0100, M'boumba Cedric Madianga wrote:
+> >> +static struct platform_driver stm32f4_i2c_driver = {
+> >> +     .driver = {
+> >> +             .name = "stm32f4-i2c",
+> >> +             .of_match_table = stm32f4_i2c_match,
 > >
-> >  		if (!last)
-> > @@ -1114,14 +1124,13 @@ static void xilinx_vdma_start_transfer(struct
-> xilinx_dma_chan *chan)
-> >  		vdma_desc_write(chan, XILINX_DMA_REG_FRMDLY_STRIDE,
-> >  				last->hw.stride);
-> >  		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last-
-> >hw.vsize);
-> 
-> Maybe a check that all framebuffers contain valid addresses should be done
-> before programming vsize so that VDMA does not try to write to invalid
-> addresses.
+> > Is this needed?
+> Without of_match_table, I could not match an I2C device instance from
+> DT with this driver.
+> So maybe, there is a misunderstanding.
+> Could you please clarify your question ?
 
-Do we really need to check for valid address??? 
-I didn't get you what to do you mean by invalid address could you please explain???
-In the driver we are reading form the pending_list which will be updated by pep_interleaved_dma 
-Call so we are under assumption that user sends the proper address right???
+I thought (but I could be wrong) that if the driver is called
+"stm32f4-i2c", it is used to match "st,stm32f4-i2c" even without
+.of_match_table. If this doesn't work, please disregard my question.
 
-> 
-> > +
-> > +		chan->desc_submitcount += j;
-> > +		chan->desc_pendingcount -= j;
-> >  	}
-> >
-> >  	chan->idle = false;
-> >  	if (!chan->has_sg) {
-> > -		list_del(&desc->node);
-> > -		list_add_tail(&desc->node, &chan->active_list);
-> > -		chan->desc_submitcount++;
-> > -		chan->desc_pendingcount--;
-> >  		if (chan->desc_submitcount == chan->num_frms)
-> >  			chan->desc_submitcount = 0;
-> 
-> "desc_submitcount >= chan->num_frms would be safer here.
+Best regards
+Uwe
 
-Sure will fix in v2...
-
-Regards,
-Kedar.
-
-> 
-> >  	} else {
-> 
-> Best regards,
-> Jose Miguel Abreu
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in the body
-> of a message to majordomo at vger.kernel.org More majordomo info at
-> http://vger.kernel.org/majordomo-info.html
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
