@@ -1,76 +1,70 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 15 Dec 2016 17:24:03 +0100
-Subject: [PATCH v2 1/2] arm64: dts: r8a7796: Add EthernetAVB instance
-In-Reply-To: <1481819044-19605-1-git-send-email-geert+renesas@glider.be>
-References: <1481819044-19605-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1481819044-19605-2-git-send-email-geert+renesas@glider.be>
+Date: Thu, 15 Dec 2016 17:24:02 +0100
+Subject: [PATCH v2 0/2] arm64: dts: r8a7796: salvator-x: Enable EthernetAVB
+Message-ID: <1481819044-19605-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+	Hi Simon, Magnus,
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v2:
-  - Rebased.
----
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 43 ++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+This patch series enables networking on r8a7796/salvator-x.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 7bf0f2f6c2243cfc..d9d8dc53b408c36e 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -421,6 +421,49 @@
- 			};
- 		};
- 
-+		avb: ethernet at e6800000 {
-+			compatible = "renesas,etheravb-r8a7796",
-+				     "renesas,etheravb-rcar-gen3";
-+			reg = <0 0xe6800000 0 0x800>, <0 0xe6a00000 0 0x10000>;
-+			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "ch0", "ch1", "ch2", "ch3",
-+					  "ch4", "ch5", "ch6", "ch7",
-+					  "ch8", "ch9", "ch10", "ch11",
-+					  "ch12", "ch13", "ch14", "ch15",
-+					  "ch16", "ch17", "ch18", "ch19",
-+					  "ch20", "ch21", "ch22", "ch23",
-+					  "ch24";
-+			clocks = <&cpg CPG_MOD 812>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			phy-mode = "rgmii-id";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
- 		scif2: serial at e6e88000 {
- 			compatible = "renesas,scif-r8a7796",
- 				     "renesas,rcar-gen3-scif", "renesas,scif";
+Network performance is currently limited to 100 Mbps by the ravb driver.
+Performance figures with nuttcp are ca. 94 Mbps for both receive and
+transmit, at 12% vs. 4% CPU load. For receive, this is comparable to
+sh_eth on Koelsch; for transmit, it's ca. 20% faster.
+
+With "ravb: Support 1Gbps on R-Car H3 ES1.1+ and R-Car M3-W" applied,
+network throughput is higher, but has a high variance:
+  - receive: 245-426 Mbps, at 100% CPU load (ksoftirqd + nuttcp),
+  - transmit: 426 Mbps, at 95% CPU load (nuttcp).
+When limiting memory to 1 GiB, and thus avoiding swiotlb bounce buffers,
+network throughput increases (CPU load is similar though) to 546 resp.
+625 Mbps.
+The 50% performance penalty of swiotlb is expected to be mitigated when
+IOMMU support will become available.
+
+Note that at high receive speeds, the driver sometimes prints:
+
+    ravb e6800000.ethernet eth0: Receive Descriptor Empty
+
+This may even cause nuttcp to fail with:
+
+    nuttcp-t: v6.1.2: Error: server not ACKing data
+
+NFS root survives fine, though.
+I'm wondering if this is also seen on the R-Car Gen2 boards where
+EthernetAVB is available?
+
+Changes compared to v1, as sent by Laurent before:
+  - Add pinctrl. Drive strength is not yet included, like on current
+    r8a7795/salvator-x.
+
+This series is based on renesas-devel-20161212-v4.9. To actually work,
+you need to merge my sh-pfc-for-v4.10 branch, which is upstream and will
+be in v4.10-rc1. As this is a pure runtime dependency, and does not
+imply a regression, this series can be applied now.
+
+Thanks for applying!
+
+Laurent Pinchart (2):
+  arm64: dts: renesas: r8a7796: Add EthernetAVB instance
+  arm64: dts: r8a7796: salvator-x: Enable EthernetAVB
+
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 32 ++++++++++++++++
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 43 ++++++++++++++++++++++
+ 2 files changed, 75 insertions(+)
+
 -- 
 1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
