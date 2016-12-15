@@ -1,168 +1,38 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Thu, 15 Dec 2016 07:50:34 +0000
-Subject: [PATCH] ARM: dts: tegra124-apalis: Correct license text
-In-Reply-To: <20161215000451.8394-1-alexandre.belloni@free-electrons.com>
-References: <20161215000451.8394-1-alexandre.belloni@free-electrons.com>
-Message-ID: <1481788233.2845.3.camel@toradex.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 15 Dec 2016 08:57:57 +0100
+Subject: [PATCH 8/8] Makefile: drop -D__CHECK_ENDIAN__ from cflags
+In-Reply-To: <1481778865-27667-9-git-send-email-mst@redhat.com>
+References: <1481778865-27667-1-git-send-email-mst@redhat.com>
+ <1481778865-27667-9-git-send-email-mst@redhat.com>
+Message-ID: <4b0172bd-2779-35b2-96af-407087db844e@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-12-15 at 01:04 +0100, Alexandre Belloni wrote:
-> The license test has been mangled at some point then copy pasted
-> across
-> multiple files. Restore it to what it should be.
-> Note that this is not intended as a license change.
+On 12/15/2016 06:15 AM, Michael S. Tsirkin wrote:
+> That's the default now, no need for makefiles to set it.
 > 
-> Cc: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-
-> electrons.com>
-
-Acked-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-
+> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
 > ---
-> ?arch/arm/boot/dts/tegra124-apalis-emc.dtsi | 10 +++++-----
-> ?arch/arm/boot/dts/tegra124-apalis-eval.dts | 10 +++++-----
-> ?arch/arm/boot/dts/tegra124-apalis.dtsi?????| 10 +++++-----
-> ?3 files changed, 15 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/tegra124-apalis-emc.dtsi
-> b/arch/arm/boot/dts/tegra124-apalis-emc.dtsi
-> index ca2c3a557895..0e3013ff6c63 100644
-> --- a/arch/arm/boot/dts/tegra124-apalis-emc.dtsi
-> +++ b/arch/arm/boot/dts/tegra124-apalis-emc.dtsi
-> @@ -10,17 +10,17 @@
-> ? *?????modify it under the terms of the GNU General Public License
-> ? *?????version 2 as published by the Free Software Foundation.
-> ? *
-> - *?????This file is distributed in the hope that it will be useful
-> + *?????This file is distributed in the hope that it will be useful,
-> ? *?????but WITHOUT ANY WARRANTY; without even the implied warranty
-> of
-> ? *?????MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.??See the
-> ? *?????GNU General Public License for more details.
-> ? *
-> - * Or, alternatively
-> + * Or, alternatively,
-> ? *
-> ? *??b) Permission is hereby granted, free of charge, to any person
-> ? *?????obtaining a copy of this software and associated
-> documentation
-> ? *?????files (the "Software"), to deal in the Software without
-> - *?????restriction, including without limitation the rights to use
-> + *?????restriction, including without limitation the rights to use,
-> ? *?????copy, modify, merge, publish, distribute, sublicense, and/or
-> ? *?????sell copies of the Software, and to permit persons to whom
-> the
-> ? *?????Software is furnished to do so, subject to the following
-> @@ -29,11 +29,11 @@
-> ? *?????The above copyright notice and this permission notice shall
-> be
-> ? *?????included in all copies or substantial portions of the
-> Software.
-> ? *
-> - *?????THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *?????THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
-> KIND,
-> ? *?????EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-> WARRANTIES
-> ? *?????OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> ? *?????NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> - *?????HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *?????HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> ? *?????WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> ? *?????FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> ? *?????OTHER DEALINGS IN THE SOFTWARE.
-> diff --git a/arch/arm/boot/dts/tegra124-apalis-eval.dts
-> b/arch/arm/boot/dts/tegra124-apalis-eval.dts
-> index 653044a44f0d..dec449f7b574 100644
-> --- a/arch/arm/boot/dts/tegra124-apalis-eval.dts
-> +++ b/arch/arm/boot/dts/tegra124-apalis-eval.dts
-> @@ -10,17 +10,17 @@
-> ? *?????modify it under the terms of the GNU General Public License
-> ? *?????version 2 as published by the Free Software Foundation.
-> ? *
-> - *?????This file is distributed in the hope that it will be useful
-> + *?????This file is distributed in the hope that it will be useful,
-> ? *?????but WITHOUT ANY WARRANTY; without even the implied warranty
-> of
-> ? *?????MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.??See the
-> ? *?????GNU General Public License for more details.
-> ? *
-> - * Or, alternatively
-> + * Or, alternatively,
-> ? *
-> ? *??b) Permission is hereby granted, free of charge, to any person
-> ? *?????obtaining a copy of this software and associated
-> documentation
-> ? *?????files (the "Software"), to deal in the Software without
-> - *?????restriction, including without limitation the rights to use
-> + *?????restriction, including without limitation the rights to use,
-> ? *?????copy, modify, merge, publish, distribute, sublicense, and/or
-> ? *?????sell copies of the Software, and to permit persons to whom
-> the
-> ? *?????Software is furnished to do so, subject to the following
-> @@ -29,11 +29,11 @@
-> ? *?????The above copyright notice and this permission notice shall
-> be
-> ? *?????included in all copies or substantial portions of the
-> Software.
-> ? *
-> - *?????THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *?????THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
-> KIND,
-> ? *?????EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-> WARRANTIES
-> ? *?????OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> ? *?????NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> - *?????HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *?????HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> ? *?????WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> ? *?????FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> ? *?????OTHER DEALINGS IN THE SOFTWARE.
-> diff --git a/arch/arm/boot/dts/tegra124-apalis.dtsi
-> b/arch/arm/boot/dts/tegra124-apalis.dtsi
-> index e7a73db17613..fa96556f5a45 100644
-> --- a/arch/arm/boot/dts/tegra124-apalis.dtsi
-> +++ b/arch/arm/boot/dts/tegra124-apalis.dtsi
-> @@ -10,17 +10,17 @@
-> ? *?????modify it under the terms of the GNU General Public License
-> ? *?????version 2 as published by the Free Software Foundation.
-> ? *
-> - *?????This file is distributed in the hope that it will be useful
-> + *?????This file is distributed in the hope that it will be useful,
-> ? *?????but WITHOUT ANY WARRANTY; without even the implied warranty
-> of
-> ? *?????MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.??See the
-> ? *?????GNU General Public License for more details.
-> ? *
-> - * Or, alternatively
-> + * Or, alternatively,
-> ? *
-> ? *??b) Permission is hereby granted, free of charge, to any person
-> ? *?????obtaining a copy of this software and associated
-> documentation
-> ? *?????files (the "Software"), to deal in the Software without
-> - *?????restriction, including without limitation the rights to use
-> + *?????restriction, including without limitation the rights to use,
-> ? *?????copy, modify, merge, publish, distribute, sublicense, and/or
-> ? *?????sell copies of the Software, and to permit persons to whom
-> the
-> ? *?????Software is furnished to do so, subject to the following
-> @@ -29,11 +29,11 @@
-> ? *?????The above copyright notice and this permission notice shall
-> be
-> ? *?????included in all copies or substantial portions of the
-> Software.
-> ? *
-> - *?????THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *?????THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
-> KIND,
-> ? *?????EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-> WARRANTIES
-> ? *?????OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> ? *?????NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> - *?????HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *?????HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> ? *?????WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> ? *?????FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> ? *?????OTHER DEALINGS IN THE SOFTWARE.
+[...]
+>  drivers/net/can/Makefile                                  | 1 -
+
+For drivers/net/can/Makefile:
+
+Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
+
+regards,
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161215/0b31e486/attachment.sig>
