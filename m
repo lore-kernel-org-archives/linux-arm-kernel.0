@@ -1,161 +1,68 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 15 Dec 2016 12:55:59 +0100
-Subject: [PATCH v2] ARM: dts: Add missing CPU frequencies for Exynos5422/5800
-Message-ID: <10512254.nyUcL0zgTP@amdc3058>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Dec 2016 12:00:45 +0000
+Subject: Linux crashes when trying to online secondary core
+In-Reply-To: <1147ef90-7877-e4d2-bb2b-5c4fa8d3144b@free.fr>
+References: <ef972981-3fb6-74a4-cd83-a6629d2dab2a@free.fr>
+ <alpine.DEB.2.20.1612141807410.3556@nanos>
+ <8a021a90-e69e-f38b-c8df-ea8963f3973f@free.fr>
+ <1147ef90-7877-e4d2-bb2b-5c4fa8d3144b@free.fr>
+Message-ID: <20161215120045.GD21758@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing 2000MHz & 1900MHz OPPs (for A15 cores) and 1400MHz OPP
-(for A7 cores).  Also update common Odroid-XU3 Lite/XU3/XU4 thermal
-cooling maps to account for new OPPs.
+On Thu, Dec 15, 2016 at 11:35:12AM +0100, Mason wrote:
+> On 14/12/2016 18:47, Mason wrote:
+> > On 14/12/2016 18:08, Thomas Gleixner wrote:
+> >> Does the patch below fix the issue?
 
-Since new OPPs are not available on all Exynos5422/5800 boards modify
-dts files for Odroid-XU3 Lite (limited to 1.8 GHz / 1.3 GHz) & Peach
-Pi (limited to 2.0 GHz / 1.3 GHz) accordingly.
+> >> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+> >> index 22acee76cf4c..2594c287b078 100644
+> >> --- a/include/linux/cpuhotplug.h
+> >> +++ b/include/linux/cpuhotplug.h
+> >> @@ -101,7 +101,6 @@ enum cpuhp_state {
+> >>  	CPUHP_AP_ARM_L2X0_STARTING,
+> >>  	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
+> >>  	CPUHP_AP_ARM_GLOBAL_TIMER_STARTING,
+> >> -	CPUHP_AP_DUMMY_TIMER_STARTING,
+> >>  	CPUHP_AP_JCORE_TIMER_STARTING,
+> >>  	CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
+> >>  	CPUHP_AP_ARM_TWD_STARTING,
+> >> @@ -111,6 +110,7 @@ enum cpuhp_state {
+> >>  	CPUHP_AP_MARCO_TIMER_STARTING,
+> >>  	CPUHP_AP_MIPS_GIC_TIMER_STARTING,
+> >>  	CPUHP_AP_ARC_TIMER_STARTING,
+> >> +	CPUHP_AP_DUMMY_TIMER_STARTING,
+> >>  	CPUHP_AP_KVM_STARTING,
+> >>  	CPUHP_AP_KVM_ARM_VGIC_INIT_STARTING,
+> >>  	CPUHP_AP_KVM_ARM_VGIC_STARTING,
 
-Tested on Odroid-XU3 and XU3 Lite.
+> > It does seem to fix the problem:
 
-Cc: Doug Anderson <dianders@chromium.org>
-Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-Cc: Andreas Faerber <afaerber@suse.de>
-Cc: Thomas Abraham <thomas.ab@samsung.com>
-Cc: Ben Gamari <ben@smart-cactus.org>
-Cc: Arjun K V <arjun.kv@samsung.com>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
-v2:
-- added comments about limitations of SoC revisions used by Odroid-XU3 Lite and
-  Peach Pi boards (suggested by Javier)
-- removed redundant opp_a7_14 label
-- added Arjun to Cc:
+> > I reverted your patch, and the kernel blows up again.
+> > 
+> > So what's the problem, and how does your patch solve it?
+> 
+> Link to the original report:
+> https://marc.info/?l=linux-arm-kernel&m=148173152524746&w=2
+> 
+> Forgot to CC Robin Murphy, who had provided valuable input
+> in similar circumstances a few months back.
+> 
+> Also add LKML, since this doesn't appear to be ARM-specific.
+> 
+> Do I need to specify which device tree I was using?
 
-Javier, could you test it on Peach Pi board?
+This is already fixed in the linux-tip tree, with commit messages
+describing the fix.
 
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |   14 ++++++-------
- arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts    |   22 +++++++++++++++++++++
- arch/arm/boot/dts/exynos5800-peach-pi.dts          |    9 ++++++++
- arch/arm/boot/dts/exynos5800.dtsi                  |   15 ++++++++++++++
- 4 files changed, 53 insertions(+), 7 deletions(-)
+It's specific to a few clocksources, due to their hotplug callbacks
+occuring later than the dummy timer. That triggers the bug fixed in:
 
-Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-===================================================================
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2016-12-15 12:43:54.365955950 +0100
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2016-12-15 12:43:54.361955949 +0100
-@@ -118,7 +118,7 @@
- 				/*
- 				 * When reaching cpu_alert3, reduce CPU
- 				 * by 2 steps. On Exynos5422/5800 that would
--				 * be: 1600 MHz and 1100 MHz.
-+				 * (usually) be: 1800 MHz and 1200 MHz.
- 				 */
- 				map3 {
- 					trip = <&cpu_alert3>;
-@@ -131,16 +131,16 @@
- 
- 				/*
- 				 * When reaching cpu_alert4, reduce CPU
--				 * further, down to 600 MHz (11 steps for big,
--				 * 7 steps for LITTLE).
-+				 * further, down to 600 MHz (13 steps for big,
-+				 * 8 steps for LITTLE).
- 				 */
--				map5 {
-+				cooling_map5: map5 {
- 					trip = <&cpu_alert4>;
--					cooling-device = <&cpu0 3 7>;
-+					cooling-device = <&cpu0 3 8>;
- 				};
--				map6 {
-+				cooling_map6: map6 {
- 					trip = <&cpu_alert4>;
--					cooling-device = <&cpu4 3 11>;
-+					cooling-device = <&cpu4 3 13>;
- 				};
- 			};
- 		};
-Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-===================================================================
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts	2016-12-15 12:43:54.365955950 +0100
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts	2016-12-15 12:43:54.361955949 +0100
-@@ -21,6 +21,28 @@
- 	compatible = "hardkernel,odroid-xu3-lite", "samsung,exynos5800", "samsung,exynos5";
- };
- 
-+/*
-+ * Odroid XU3-Lite board uses SoC revision with lower maximum frequencies
-+ * than Odroid XU3/XU4 boards: 1.8 GHz for A15 cores & 1.3 GHz for A7 cores.
-+ * Therefore we need to update OPPs tables and thermal maps accordingly.
-+ */
-+&cluster_a15_opp_table {
-+	/delete-node/opp at 2000000000;
-+	/delete-node/opp at 1900000000;
-+};
-+
-+&cluster_a7_opp_table {
-+	/delete-node/opp at 1400000000;
-+};
-+
-+&cooling_map5 {
-+	cooling-device = <&cpu0 3 7>;
-+};
-+
-+&cooling_map6 {
-+	cooling-device = <&cpu4 3 11>;
-+};
-+
- &pwm {
- 	/*
- 	 * PWM 0 -- fan
-Index: b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-===================================================================
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts	2016-12-15 12:43:54.365955950 +0100
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts	2016-12-15 12:43:54.361955949 +0100
-@@ -146,6 +146,15 @@
- 	vdd-supply = <&ldo9_reg>;
- };
- 
-+/*
-+ * Peach Pi board uses SoC revision with lower maximum frequency for A7 cores
-+ * (1.3 GHz instead of 1.4 GHz) than Odroid XU3/XU4 boards.  Thus we need to
-+ * update A7 OPPs table accordingly.
-+ */
-+&cluster_a7_opp_table {
-+	/delete-property/opp at 1400000000;
-+};
-+
- &cpu0 {
- 	cpu-supply = <&buck2_reg>;
- };
-Index: b/arch/arm/boot/dts/exynos5800.dtsi
-===================================================================
---- a/arch/arm/boot/dts/exynos5800.dtsi	2016-12-15 12:43:54.365955950 +0100
-+++ b/arch/arm/boot/dts/exynos5800.dtsi	2016-12-15 12:43:54.361955949 +0100
-@@ -24,6 +24,16 @@
- };
- 
- &cluster_a15_opp_table {
-+	opp at 2000000000 {
-+		opp-hz = /bits/ 64 <2000000000>;
-+		opp-microvolt = <1250000>;
-+		clock-latency-ns = <140000>;
-+	};
-+	opp at 1900000000 {
-+		opp-hz = /bits/ 64 <1900000000>;
-+		opp-microvolt = <1250000>;
-+		clock-latency-ns = <140000>;
-+	};
- 	opp at 1700000000 {
- 		opp-microvolt = <1250000>;
- 	};
-@@ -85,6 +95,11 @@
- };
- 
- &cluster_a7_opp_table {
-+	opp at 1400000000 {
-+		opp-hz = /bits/ 64 <1400000000>;
-+		opp-microvolt = <1250000>;
-+		clock-latency-ns = <140000>;
-+	};
- 	opp at 1300000000 {
- 		opp-microvolt = <1250000>;
- 	};
+https://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?h=timers/urgent&id=c1a9eeb938b5433947e5ea22f89baff3182e7075
+
+The relevant timers were fixed in:
+
+https://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?h=smp/urgent&id=9bf11ecce5a2758e5a097c2f3a13d08552d0d6f9
+
+Thanks,
+Mark.
