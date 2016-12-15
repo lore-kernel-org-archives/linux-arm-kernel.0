@@ -1,40 +1,39 @@
-From: manu@bidouilliste.com (Emmanuel Vadot)
-Date: Thu, 15 Dec 2016 12:35:33 +0100
-Subject: [PATCH v2] ARM: dts: sunxi: Change node name for pwrseq pin on
- Olinuxino-lime2-emmc
-In-Reply-To: <20161214153013.bkdm3pu3osepfnn2@lukather>
-References: <20161214145724.42745-1-manu@bidouilliste.com>
- <20161214153013.bkdm3pu3osepfnn2@lukather>
-Message-ID: <20161215123533.f7e2373d2a9eb113ee7b0600@bidouilliste.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Dec 2016 11:35:39 +0000
+Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
+In-Reply-To: <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
+References: <20161213113044.GC19985@leverpostej>
+ <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
+ <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
+Message-ID: <20161215113539.GK14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
- Hi Maxime,
-
-On Wed, 14 Dec 2016 16:30:13 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-
-> On Wed, Dec 14, 2016 at 03:57:24PM +0100, Emmanuel Vadot wrote:
-> > The node name for the power seq pin is mmc2 at 0 like the mmc2_pins_a one.
-> > This makes the original node (mmc2_pins_a) scrapped out of the dtb and
-> > result in a unusable eMMC if U-Boot didn't configured the pins to the
-> > correct functions.
-> > 
-> > Changes since v1:
-> >  * Rename the node mmc2-rst-pin
+On Thu, Dec 15, 2016 at 11:18:48AM +0000, Marc Zyngier wrote:
+> On 14/12/16 10:46, Russell King wrote:
+> > @@ -231,10 +244,14 @@ ENDPROC(__hyp_stub_do_trap)
+> >   * initialisation entry point.
+> >   */
+> >  ENTRY(__hyp_get_vectors)
+> > -	mov	r0, #-1
+> > +	mov	r0, #HVC_GET_VECTORS
 > 
-> That changelog should be after the ---. Removed it and applied.
-> 
-> Thanks!
-> Maxime
+> This breaks the KVM implementation of __hyp_get_vectors, easily fixed
+> with the following patchlet:
 
- Sorry, still kinda new at doing patches for Linux, will be more
-carefull next time.
- Quick question, when you say applied, applied where exactly ? I had a
-quick look at your branches on git.kernel.org didn't find anything.
+Right, so what Mark said is wrong:
 
- Thanks.
+"The hyp-stub is part of the kernel image, and the API is private to
+ that particular image, so we can change things -- there's no ABI to
+ worry about."
+
+So no, I'm going with my original patch (which TI has tested) which is
+the minimal change, and if we _then_ want to rework the HYP mode
+interfaces, that's the time to do the other changes when more people
+(such as KVM folk) are paying attention and we can come to a cross-
+hypervisor agreement on what the interface should be.
 
 -- 
-Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
