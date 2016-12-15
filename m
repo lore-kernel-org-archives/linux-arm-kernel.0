@@ -1,136 +1,73 @@
-From: Ramiro.Oliveira@synopsys.com (Ramiro Oliveira)
-Date: Thu, 15 Dec 2016 15:30:32 +0000
-Subject: [PATCH v2] i2c: designware: add reset interface
-In-Reply-To: <1481805227.9552.15.camel@linux.intel.com>
-References: <1479789700-19532-1-git-send-email-zhangfei.gao@linaro.org>
- <1481792388-13781-1-git-send-email-zhangfei.gao@linaro.org>
- <1481805227.9552.15.camel@linux.intel.com>
-Message-ID: <fda7e3ef-5bc1-9837-b421-4293baa3de34@synopsys.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Dec 2016 15:37:15 +0000
+Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
+In-Reply-To: <20161215151548.GL14217@n2100.armlinux.org.uk>
+References: <20161213113044.GC19985@leverpostej>
+ <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
+ <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
+ <20161215113539.GK14217@n2100.armlinux.org.uk>
+ <06fca797-da5d-f7f2-eecb-9b1b33b7e83f@arm.com>
+ <20161215151548.GL14217@n2100.armlinux.org.uk>
+Message-ID: <c21d6514-44a2-ba88-0fe5-d14d5897cc48@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy and Zhangfei
-
-On 12/15/2016 12:33 PM, Andy Shevchenko wrote:
-> On Thu, 2016-12-15 at 16:59 +0800, Zhangfei Gao wrote:
->> Some platforms like hi3660 need do reset first to allow accessing
->> registers
-> 
-> Patch itself looks good, but would be nice to have it tested.
-> 
-> Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> 
-
-I tested the patch and it's working for the ARC architecture.
-
+On 15/12/16 15:15, Russell King - ARM Linux wrote:
+> On Thu, Dec 15, 2016 at 11:46:41AM +0000, Marc Zyngier wrote:
+>> On 15/12/16 11:35, Russell King - ARM Linux wrote:
+>>> On Thu, Dec 15, 2016 at 11:18:48AM +0000, Marc Zyngier wrote:
+>>>> On 14/12/16 10:46, Russell King wrote:
+>>>>> @@ -231,10 +244,14 @@ ENDPROC(__hyp_stub_do_trap)
+>>>>>   * initialisation entry point.
+>>>>>   */
+>>>>>  ENTRY(__hyp_get_vectors)
+>>>>> -	mov	r0, #-1
+>>>>> +	mov	r0, #HVC_GET_VECTORS
+>>>>
+>>>> This breaks the KVM implementation of __hyp_get_vectors, easily fixed
+>>>> with the following patchlet:
+>>>
+>>> Right, so what Mark said is wrong:
+>>>
+>>> "The hyp-stub is part of the kernel image, and the API is private to
+>>>  that particular image, so we can change things -- there's no ABI to
+>>>  worry about."
 >>
->> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->> ---
->>  drivers/i2c/busses/i2c-designware-core.h    |  1 +
->>  drivers/i2c/busses/i2c-designware-platdrv.c | 28
->> ++++++++++++++++++++++++----
->>  2 files changed, 25 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-designware-core.h
->> b/drivers/i2c/busses/i2c-designware-core.h
->> index 0d44d2a..94b14fa 100644
->> --- a/drivers/i2c/busses/i2c-designware-core.h
->> +++ b/drivers/i2c/busses/i2c-designware-core.h
->> @@ -80,6 +80,7 @@ struct dw_i2c_dev {
->>  	void __iomem		*base;
->>  	struct completion	cmd_complete;
->>  	struct clk		*clk;
->> +	struct reset_control	*rst;
->>  	u32			(*get_clk_rate_khz) (struct
->> dw_i2c_dev *dev);
->>  	struct dw_pci_controller *controller;
->>  	int			cmd_err;
->> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c
->> b/drivers/i2c/busses/i2c-designware-platdrv.c
->> index 0b42a12..e9016ae 100644
->> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
->> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
->> @@ -38,6 +38,7 @@
->>  #include <linux/pm_runtime.h>
->>  #include <linux/property.h>
->>  #include <linux/io.h>
->> +#include <linux/reset.h>
->>  #include <linux/slab.h>
->>  #include <linux/acpi.h>
->>  #include <linux/platform_data/i2c-designware.h>
->> @@ -176,6 +177,14 @@ static int dw_i2c_plat_probe(struct
->> platform_device *pdev)
->>  	dev->irq = irq;
->>  	platform_set_drvdata(pdev, dev);
->>  
->> +	dev->rst = devm_reset_control_get_optional(&pdev->dev, NULL);
-
-devm_reset_control_get_optional() is deprecated as explained in linux/reset.h,
-you should use devm_reset_control_get_optional_exclusive() or
-devm_reset_control_get_optional_shared() instead, as applicable.
-
-I submitted a similar patch earlier today and I made the same mistake.
-
->> +	if (IS_ERR(dev->rst)) {
->> +		if (PTR_ERR(dev->rst) == -EPROBE_DEFER)
->> +			return -EPROBE_DEFER;
->> +	} else {
->> +		reset_control_deassert(dev->rst);
->> +	}
->> +
->>  	/* fast mode by default because of legacy reasons */
->>  	dev->clk_freq = 400000;
->>  
->> @@ -207,12 +216,13 @@ static int dw_i2c_plat_probe(struct
->> platform_device *pdev)
->>  	    && dev->clk_freq != 1000000 && dev->clk_freq != 3400000)
->> {
->>  		dev_err(&pdev->dev,
->>  			"Only 100kHz, 400kHz, 1MHz and 3.4MHz
->> supported");
->> -		return -EINVAL;
->> +		r = -EINVAL;
->> +		goto exit_reset;
->>  	}
->>  
->>  	r = i2c_dw_eval_lock_support(dev);
->>  	if (r)
->> -		return r;
->> +		goto exit_reset;
->>  
->>  	dev->functionality =
->>  		I2C_FUNC_I2C |
->> @@ -270,10 +280,18 @@ static int dw_i2c_plat_probe(struct
->> platform_device *pdev)
->>  	}
->>  
->>  	r = i2c_dw_probe(dev);
->> -	if (r && !dev->pm_runtime_disabled)
->> -		pm_runtime_disable(&pdev->dev);
->> +	if (r)
->> +		goto exit_probe;
->>  
->>  	return r;
->> +
->> +exit_probe:
->> +	if (!dev->pm_runtime_disabled)
->> +		pm_runtime_disable(&pdev->dev);
->> +exit_reset:
->> +	if (!IS_ERR_OR_NULL(dev->rst))
->> +		reset_control_assert(dev->rst);
->> +	return r;
->>  }
->>  
->>  static int dw_i2c_plat_remove(struct platform_device *pdev)
->> @@ -290,6 +308,8 @@ static int dw_i2c_plat_remove(struct
->> platform_device *pdev)
->>  	pm_runtime_put_sync(&pdev->dev);
->>  	if (!dev->pm_runtime_disabled)
->>  		pm_runtime_disable(&pdev->dev);
->> +	if (!IS_ERR_OR_NULL(dev->rst))
->> +		reset_control_assert(dev->rst);
->>  
->>  	return 0;
->>  }
+>> I think Mark is right. The API *is* private to the kernel, and KVM being
+>> the only in-kernel hypervisor on ARM, this is not an ABI.
 > 
-Tested-by: Ramiro Oliveira <ramiro.oliveira@synopsys.com>
+> Again, that's wrong.
+> 
+> We have two hypervisors in the kernel.  One is KVM, the other is the
+> stub.  Sure, the stub isn't a full implementation of a hypervisor, but
+> it is nevertheless, for the purposes of _this_ discussion, a hypervisor
+> of sorts.
+> 
+> The reason that both are included is because they both appear to share
+> a common interface (although that's totally not documented anywhere.)
+
+And this interface exists for the sole purpose of enabling KVM. Call it
+a hypervisor if you wish, but its usefulness is doubtful on its own.
+
+>>> So no, I'm going with my original patch (which TI has tested) which is
+>>> the minimal change, and if we _then_ want to rework the HYP mode
+>>> interfaces, that's the time to do the other changes when more people
+>>> (such as KVM folk) are paying attention and we can come to a cross-
+>>> hypervisor agreement on what the interface should be.
+>>
+>> Given that there is a single in-kernel hypervisor, I can't really see
+>> who we're going to agree anything with...
+> 
+> As far as I can see, the hyp-stub falls under ARM arch maintanence.
+> KVM falls under KVM people.  Two different groups, we need agreement
+> between them what a sane API for both "hypervisors" should be.
+
+Well, I though we had the right level of discussion by reviewing your
+patches and coming up with improvements. If you're after something else,
+please let me know.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
