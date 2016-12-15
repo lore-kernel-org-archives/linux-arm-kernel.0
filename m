@@ -1,50 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Dec 2016 17:08:11 +0000
-Subject: [PATCH v11 7/7] arm: pmu: Add PMU definitions for cores not
- initially online
-In-Reply-To: <457894f4-67f8-9d32-ee8b-5a34e9a21488@arm.com>
-References: <1480704961-6910-1-git-send-email-jeremy.linton@arm.com>
- <1480704961-6910-8-git-send-email-jeremy.linton@arm.com>
- <20161206152118.GK2498@arm.com>
- <457894f4-67f8-9d32-ee8b-5a34e9a21488@arm.com>
-Message-ID: <20161215170810.GJ10481@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 15 Dec 2016 19:28:39 +0200
+Subject: [PATCH 5/8] linux: drop __bitwise__ everywhere
+In-Reply-To: <1481778865-27667-6-git-send-email-mst@redhat.com>
+References: <1481778865-27667-1-git-send-email-mst@redhat.com>
+ <1481778865-27667-6-git-send-email-mst@redhat.com>
+Message-ID: <20161215172839.GA6520@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2016 at 11:56:56AM -0600, Jeremy Linton wrote:
-> Hi,
+On Thu, Dec 15, 2016 at 07:15:20AM +0200, Michael S. Tsirkin wrote:
+> __bitwise__ used to mean "yes, please enable sparse checks
+> unconditionally", but now that we dropped __CHECK_ENDIAN__
+> __bitwise is exactly the same.
+> There aren't many users, replace it by __bitwise everywhere.
 > 
-> On 12/06/2016 09:21 AM, Will Deacon wrote:
-> >On Fri, Dec 02, 2016 at 12:56:01PM -0600, Jeremy Linton wrote:
-> >>ACPI CPUs aren't associated with a PMU until they have been put
-> >>online. This means that we potentially have to update a PMU
-> >>definition the first time a CPU is hot added to the machine.
-> >>
-> >>Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> >>---
-> >> drivers/perf/arm_pmu.c       | 38 ++++++++++++++++++++++++++++++++++++--
-> >> include/linux/perf/arm_pmu.h |  4 ++++
-> >> 2 files changed, 40 insertions(+), 2 deletions(-)
-> >>
-> >>diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> >>index fa40294..4abb2fe 100644
-> >>--- a/drivers/perf/arm_pmu.c
-> >>+++ b/drivers/perf/arm_pmu.c
-> >>@@ -711,6 +711,30 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
-> >> 	return 0;
-> >> }
-> >>
-> >>+static DEFINE_SPINLOCK(arm_pmu_resource_lock);
-> >
-> >Why do you need this spinlock? The hotplug notifiers are serialised afaik,
-> >and you don't take it anywhere else.
+> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> ---
+>  arch/arm/plat-samsung/include/plat/gpio-cfg.h    | 2 +-
+>  drivers/md/dm-cache-block-types.h                | 6 +++---
+>  drivers/net/ethernet/sun/sunhme.h                | 2 +-
+>  drivers/net/wireless/intel/iwlwifi/iwl-fw-file.h | 4 ++--
+>  include/linux/mmzone.h                           | 2 +-
+>  include/linux/serial_core.h                      | 4 ++--
+>  include/linux/types.h                            | 4 ++--
+>  include/scsi/iscsi_proto.h                       | 2 +-
+>  include/target/target_core_base.h                | 2 +-
+>  include/uapi/linux/virtio_types.h                | 6 +++---
+>  net/ieee802154/6lowpan/6lowpan_i.h               | 2 +-
+>  net/mac80211/ieee80211_i.h                       | 4 ++--
+>  12 files changed, 20 insertions(+), 20 deletions(-)
 > 
-> Well, I assumed they were serialized, but then I went looking for a
-> guarantee and couldn't find one specific to the notifiers, even though the
-> previous lock was removed. 
+> diff --git a/arch/arm/plat-samsung/include/plat/gpio-cfg.h b/arch/arm/plat-samsung/include/plat/gpio-cfg.h
+> index 21391fa..e55d1f5 100644
+> --- a/arch/arm/plat-samsung/include/plat/gpio-cfg.h
+> +++ b/arch/arm/plat-samsung/include/plat/gpio-cfg.h
+> @@ -26,7 +26,7 @@
+>  
+>  #include <linux/types.h>
+>  
+> -typedef unsigned int __bitwise__ samsung_gpio_pull_t;
+> +typedef unsigned int __bitwise samsung_gpio_pull_t;
+>  
+>  /* forward declaration if gpio-core.h hasn't been included */
+>  struct samsung_gpio_chip;
 
-They should be serialised either by virtue of them all running off the back
-of a single CPU (because the hotplug thread hasn't yet been created), or
-by the st->done completion for the hotplug work threads.
+For plat-samsung:
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Will
+Best regards,
+Krzysztof
