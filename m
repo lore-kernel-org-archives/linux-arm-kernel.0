@@ -1,118 +1,32 @@
-From: Ramiro.Oliveira@synopsys.com (Ramiro Oliveira)
-Date: Thu, 15 Dec 2016 11:26:54 +0000
-Subject: [PATCH 2/2] xilinx_dma: Add reset support
-In-Reply-To: <5658430.jXmKZEXWrS@avalon>
-References: <cover.1481735244.git.roliveir@synopsys.com>
- <4220c66c29d83bec1ded798ee383b5460c162cfc.1481735244.git.roliveir@synopsys.com>
- <5658430.jXmKZEXWrS@avalon>
-Message-ID: <380d1b11-814d-0164-3d49-e976f2deb3f9@synopsys.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Thu, 15 Dec 2016 11:34:05 +0000
+Subject: [PATCH v2 1/4] Support for building in a Xen binary
+In-Reply-To: <20161122150917.16524-2-andre.przywara@arm.com>
+References: <20161122150917.16524-1-andre.przywara@arm.com>
+ <20161122150917.16524-2-andre.przywara@arm.com>
+Message-ID: <4df45802-b8f2-b566-9106-22b31b7898eb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Hi Andre,
 
-Thank you for your feedback.
+On 22/11/16 15:09, Andre Przywara wrote:
+> diff --git a/configure.ac b/configure.ac
+> index ab8f5b3..f7e24c7 100644
+> --- a/configure.ac
+> +++ b/configure.ac
+> @@ -40,6 +40,18 @@ AC_ARG_WITH([dtb],
+>  	AS_HELP_STRING([--with-dtb], [Specify a particular DTB to use]),
+>  	[KERN_DTB="$withval"])
+>
+> +AC_ARG_WITH([xen],
+> +	AS_HELP_STRING([--with-xen], [Compile for Xen, and Specify a particular Xen to use]),
 
-On 12/14/2016 8:16 PM, Laurent Pinchart wrote:
-> Hi Ramiro,
-> 
-> Thank you for the patch.
-> 
-> On Wednesday 14 Dec 2016 17:18:24 Ramiro Oliveira wrote:
->> Add a DT property to control an optional external reset line
->>
->> Signed-off-by: Ramiro Oliveira <roliveir@synopsys.com>
->> ---
->>  drivers/dma/xilinx/xilinx_dma.c | 23 +++++++++++++++++++++++
->>  1 file changed, 23 insertions(+)
->>
->> diff --git a/drivers/dma/xilinx/xilinx_dma.c
->> b/drivers/dma/xilinx/xilinx_dma.c index 5c9f11b..b845224 100644
->> --- a/drivers/dma/xilinx/xilinx_dma.c
->> +++ b/drivers/dma/xilinx/xilinx_dma.c
->> @@ -46,6 +46,7 @@
->>  #include <linux/slab.h>
->>  #include <linux/clk.h>
->>  #include <linux/io-64-nonatomic-lo-hi.h>
->> +#include <linux/reset.h>
-> 
-> I had neatly sorted the header alphabetically until someone added clk.h and 
-> io-64-nonatomic-lo-hi.h :-( Could you please move reset.h just before slab.h ?
-> 
+NIT: s/Specify/specify/
 
-Sure. Actually I was tempted to reorder it, but I decided not to do it. I'll do
-it now
+Reviewed-by: Julien Grall <julien.grall@arm.com>
 
->>
->>  #include "../dmaengine.h"
->>
->> @@ -409,6 +410,7 @@ struct xilinx_dma_device {
->>  	struct clk *rxs_clk;
->>  	u32 nr_channels;
->>  	u32 chan_id;
->> +	struct reset_control *rst;
->>  };
->>
->>  /* Macros */
->> @@ -2543,6 +2545,27 @@ static int xilinx_dma_probe(struct platform_device
->> *pdev) if (IS_ERR(xdev->regs))
->>  		return PTR_ERR(xdev->regs);
->>
->> +	xdev->rst = devm_reset_control_get_optional(&pdev->dev, "reset");
-> 
-> devm_reset_control_get_optional() is deprecated as explained in linux/reset.h, 
-> you should use devm_reset_control_get_optional_exclusive() or 
-> devm_reset_control_get_optional_shared() instead, as applicable.
-> 
-> This being said, I'm wondering why the optional versions of those functions 
-> exist, as they do exactly the same as the non-optional versions. The API feels 
-> wrong, it should have been modelled like the GPIO API. Feel free to fix it if 
-> you want :-) But that's out of scope for this patch.
-> 
+Cheers,
 
-I missed the comment stating that devm_reset_control_get_optional() was deprecated.
-
-I could fix it. Your sugestion is modelling these functions like the GPIO API?
-
->> +	if (IS_ERR(xdev->rst)) {
->> +		err = PTR_ERR(xdev->rst);
->> +		switch (err) {
->> +		case -ENOENT:
-> 
-> If you drop the name as proposed in the review of patch 1/2 you don't have to 
-> check for -ENOENT.
-> 
-
-I'll do that.
-
->> +		case -ENOTSUPP:
->> +			xdev->rst = NULL;
->> +		break;
-> 
-> Wrong indentation.
-> 
-> You need to handle -EPROBE_DEFER and defer probing of the xilinx_dma device.
-> 
->> +		default:
->> +			dev_err(xdev->dev, "error getting reset %d\n", err);
->> +		return err;
-> 
-> Wrong indentation.
-> 
->> +		}
->> +	} else {
->> +		err = reset_control_deassert(xdev->rst);
->> +		if (err) {
->> +			dev_err(xdev->dev, "failed to deassert reset: %d\n",
->> +					err);
-> 
-> Wrong indentation.
-> 
->> +			return err;
->> +		}
->> +	}
->> +
->>  	/* Retrieve the DMA engine properties from the device tree */
->>  	xdev->has_sg = of_property_read_bool(node, "xlnx,include-sg");
->>  	if (xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA)
-> 
+-- 
+Julien Grall
