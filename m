@@ -1,39 +1,32 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Dec 2016 11:35:39 +0000
-Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
-In-Reply-To: <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
-References: <20161213113044.GC19985@leverpostej>
- <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
- <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
-Message-ID: <20161215113539.GK14217@n2100.armlinux.org.uk>
+From: julien.grall@arm.com (Julien Grall)
+Date: Thu, 15 Dec 2016 11:41:12 +0000
+Subject: [PATCH v2 2/4] Xen: Support adding DT nodes
+In-Reply-To: <20161122150917.16524-3-andre.przywara@arm.com>
+References: <20161122150917.16524-1-andre.przywara@arm.com>
+ <20161122150917.16524-3-andre.przywara@arm.com>
+Message-ID: <a83a030f-e643-4f92-19af-06fce19ebb9d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2016 at 11:18:48AM +0000, Marc Zyngier wrote:
-> On 14/12/16 10:46, Russell King wrote:
-> > @@ -231,10 +244,14 @@ ENDPROC(__hyp_stub_do_trap)
-> >   * initialisation entry point.
-> >   */
-> >  ENTRY(__hyp_get_vectors)
-> > -	mov	r0, #-1
-> > +	mov	r0, #HVC_GET_VECTORS
-> 
-> This breaks the KVM implementation of __hyp_get_vectors, easily fixed
-> with the following patchlet:
+Hi Andre,
 
-Right, so what Mark said is wrong:
+On 22/11/16 15:09, Andre Przywara wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
+>
+> Support adding xen,xen-bootargs node via --with-xen-bootargs to the
 
-"The hyp-stub is part of the kernel image, and the API is private to
- that particular image, so we can change things -- there's no ABI to
- worry about."
+Based the code, the configure option is --with-xen-cmdline.
 
-So no, I'm going with my original patch (which TI has tested) which is
-the minimal change, and if we _then_ want to rework the HYP mode
-interfaces, that's the time to do the other changes when more people
-(such as KVM folk) are paying attention and we can come to a cross-
-hypervisor agreement on what the interface should be.
+> configure script and automatically add the Dom0 node to the DT as well.
+>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+
+With the above request:
+
+Reviewed-by: Julien Grall <julien.grall@arm.com>
+
+Regards,
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Julien Grall
