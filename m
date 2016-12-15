@@ -1,111 +1,97 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 15 Dec 2016 19:51:40 +0100 (CET)
-Subject: mmc: core: complete/wait_for_completion performance
-In-Reply-To: <1481809814.29241.2.camel@embedded.rocks>
-References: <1479644869.2653.3.camel@embedded.rocks>
- <585759233.283839.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
- <1479652929.2841.1.camel@embedded.rocks>
- <187975187.249177.bccdc17e-e9c6-48c2-aeaf-3b81f1b61ec7.open-xchange@email.1und1.de>
- <1479669034.1975.1.camel@embedded.rocks>
- <1198138554.59982.63209ba1-8fb4-4a13-9ee0-f746a192f4c7.open-xchange@email.1und1.de>
- <1481095953.17027.0.camel@embedded.rocks>
- <123257138.400786.e58aee3b-9fc2-4b39-a030-c2409c5b92fc.open-xchange@email.1und1.de>
- <1481706204.3994.4.camel@embedded.rocks>
- <962480933.163666.1481741832090@email.1und1.de>
- <1481809814.29241.2.camel@embedded.rocks>
-Message-ID: <875319194.240552.1481827900469@email.1und1.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Dec 2016 18:57:18 +0000
+Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
+In-Reply-To: <c21d6514-44a2-ba88-0fe5-d14d5897cc48@arm.com>
+References: <20161213113044.GC19985@leverpostej>
+ <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
+ <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
+ <20161215113539.GK14217@n2100.armlinux.org.uk>
+ <06fca797-da5d-f7f2-eecb-9b1b33b7e83f@arm.com>
+ <20161215151548.GL14217@n2100.armlinux.org.uk>
+ <c21d6514-44a2-ba88-0fe5-d14d5897cc48@arm.com>
+Message-ID: <20161215185717.GM14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi J?rg,
-
-> J?rg Krause <joerg.krause@embedded.rocks> hat am 15. Dezember 2016 um 14:50 geschrieben:
-> 
-> 
-> Hi Stefan,
-> 
-> On Wed, 2016-12-14 at 19:57 +0100, Stefan Wahren wrote:
-> > Hi J?rg,
+On Thu, Dec 15, 2016 at 03:37:15PM +0000, Marc Zyngier wrote:
+> On 15/12/16 15:15, Russell King - ARM Linux wrote:
+> > On Thu, Dec 15, 2016 at 11:46:41AM +0000, Marc Zyngier wrote:
+> >> On 15/12/16 11:35, Russell King - ARM Linux wrote:
+> >>> On Thu, Dec 15, 2016 at 11:18:48AM +0000, Marc Zyngier wrote:
+> >>>> On 14/12/16 10:46, Russell King wrote:
+> >>>>> @@ -231,10 +244,14 @@ ENDPROC(__hyp_stub_do_trap)
+> >>>>>   * initialisation entry point.
+> >>>>>   */
+> >>>>>  ENTRY(__hyp_get_vectors)
+> >>>>> -	mov	r0, #-1
+> >>>>> +	mov	r0, #HVC_GET_VECTORS
+> >>>>
+> >>>> This breaks the KVM implementation of __hyp_get_vectors, easily fixed
+> >>>> with the following patchlet:
+> >>>
+> >>> Right, so what Mark said is wrong:
+> >>>
+> >>> "The hyp-stub is part of the kernel image, and the API is private to
+> >>>  that particular image, so we can change things -- there's no ABI to
+> >>>  worry about."
+> >>
+> >> I think Mark is right. The API *is* private to the kernel, and KVM being
+> >> the only in-kernel hypervisor on ARM, this is not an ABI.
 > > 
-> 
-> [snip]
-> 
-> > > > 
-> > > > did you try cyclictest [1]?
-> > > 
-> > > Not yet. Not sure what to measure and which values to compare here.
+> > Again, that's wrong.
 > > 
-> > i tought you have the vendor kernel and the mainline kernel available
-> > for your platform.
+> > We have two hypervisors in the kernel.  One is KVM, the other is the
+> > stub.  Sure, the stub isn't a full implementation of a hypervisor, but
+> > it is nevertheless, for the purposes of _this_ discussion, a hypervisor
+> > of sorts.
 > > 
-> > So you could compare the both kernels.
+> > The reason that both are included is because they both appear to share
+> > a common interface (although that's totally not documented anywhere.)
 > 
-> Yes, that's right. I will have a look at this tool.
+> And this interface exists for the sole purpose of enabling KVM. Call it
+> a hypervisor if you wish, but its usefulness is doubtful on its own.
 > 
-> > > 
-> > > > 
-> > > > Beside the time for a request the amount of requests for the
-> > > > complete
-> > > > iperf test
-> > > > would we interesting. Maybe there are retries.
-> > > > 
-> > > > I'm still interested in your PIO mode patches for mxs-mmc even
-> > > > without clean up.
-> > > 
-> > > Actually, the patch does not implement a PIO mode, but drops DMA
-> > > and
-> > > uses polling instead. I've attached the patch.
+> >>> So no, I'm going with my original patch (which TI has tested) which is
+> >>> the minimal change, and if we _then_ want to rework the HYP mode
+> >>> interfaces, that's the time to do the other changes when more people
+> >>> (such as KVM folk) are paying attention and we can come to a cross-
+> >>> hypervisor agreement on what the interface should be.
+> >>
+> >> Given that there is a single in-kernel hypervisor, I can't really see
+> >> who we're going to agree anything with...
 > > 
-> > Thanks. I applied it, but unfortunately this breaks SD card support
-> > for my Duckbill and the kernel isn't able to mount the rootfs:
-> > 
-> > [    2.267073] mxs-mmc 80010000.ssp: initialized
-> > [    2.272624] mxs-mmc 80010000.ssp: AC command error 0xffffff92
+> > As far as I can see, the hyp-stub falls under ARM arch maintanence.
+> > KVM falls under KVM people.  Two different groups, we need agreement
+> > between them what a sane API for both "hypervisors" should be.
 > 
-> Sorry, I messed up the branches. I attached the correct patch which is
-> working for me on Linux v4.9.
+> Well, I though we had the right level of discussion by reviewing your
+> patches and coming up with improvements. If you're after something else,
+> please let me know.
 
-i tested the second version but there isn't any performance gain with the patch.
+What I'm after is a meaningful discussion between ARM arch maintainers
+and KVM maintainers - so far all I see are people on the ARM side of
+things.
 
-Duckbill with class 10 SD card
-Linux 4.8 without patch
+I've also yet to have any response on some of the KVM questions I raised
+earlier in this thread - again, silence from KVM people.
 
-dd if=/dev/zero of=test bs=1k count=10000
-10000+0 records in
-10000+0 records out
-10240000 bytes (10 MB) copied, 2.68934 s, 3.8 MB/s
+What's also coming clear is that there's very few people who understand
+all the interactions here, and the whole thing seems to be an undocumented
+mess.  Something needs to change there - people need to stop shovelling
+half baked crap into the kernel.  KVM have the privilege of being able to
+push ARM stuff directly, I now see that was a very big mistake.
 
-dd if=/dev/zero of=test bs=8k count=10000
-10000+0 records in
-10000+0 records out
-81920000 bytes (82 MB) copied, 8.24305 s, 9.9 MB/s
+So, I want KVM further changes to come through my tree once this merge
+window is over - and I want to see some documentation about how things
+hang together, because hardly anyone understands it right now, and that's
+_really_ bad.
 
+Let's start with some documentation on the KVM hypervisor interfaces on
+32-bit ARM.  Documentation/virtual/kvm/hypercalls.txt already contains
+some for x86, s390 and PPC, so that would be a good place to document
+the ARM side.  Arguably, that should have already been done.
 
-Duckbill with class 10 SD card
-Linux 4.8 with patch
-
-dd if=/dev/zero of=test bs=1k count=10000
-10000+0 records in
-10000+0 records out
-10240000 bytes (10 MB) copied, 3.41193 s, 3.0 MB/s
-
-dd if=/dev/zero of=test bs=8k count=10000
-10000+0 records in
-10000+0 records out
-81920000 bytes (82 MB) copied, 14.4564 s, 5.7 MB/s
-
-Additionally i get these warning during boot:
-
-[    2.278445] mxs-mmc 80010000.ssp: initialized
-[    2.283996] mxs-mmc 80010000.ssp: AC command error -110
-[    2.305158] mxs-mmc 80010000.ssp: AC command error -110
-[    2.322975] mxs-mmc 80010000.ssp: AC command error -110
-[    2.338660] mxs-mmc 80010000.ssp: AC command error -110
-[    2.344289] mxs-mmc 80010000.ssp: AC command error -110
-[    2.365653] mxs-mmc 80010000.ssp: AC command error -110
-
-Regards
-Stefan
-
-> 
-> J?rg
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
