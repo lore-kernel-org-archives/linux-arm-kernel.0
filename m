@@ -1,307 +1,195 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Dec 2016 00:10:13 +0100
-Subject: [GIT PULL 7/7] ARM: SoC driver updates for v4.10
+Date: Fri, 16 Dec 2016 00:03:13 +0100
+Subject: [GIT PULL 3/7] ARM: SoC defconfig updates for v4.10
 In-Reply-To: <2664636.Hf0nvRznEK@wuerfel>
 References: <2664636.Hf0nvRznEK@wuerfel>
-Message-ID: <3484127.qQQDAIArAO@wuerfel>
+Message-ID: <3605479.MNqTqkDJEG@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit da65a1589dacc7ec44ea0557a14d70a39d991f32:
+The following changes since commit 07d9a380680d1c0eb51ef87ff2eab5c994949e69:
 
-  base: soc: Provide a dummy implementation of soc_device_match() (2016-11-10 10:10:37 +0100)
+  Linux 4.9-rc2 (2016-10-23 17:10:14 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-drivers
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-defconfig
 
-for you to fetch changes up to 2ada9593224ccc0f6a9368778dc55a59b92aff10:
+for you to fetch changes up to 9f793ef32fc6bf8ae8ca49e3adcdca7143553b58:
 
-  Merge tag 'qcom-drivers-for-4.10-2' of git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux into next/drivers (2016-11-30 22:49:14 +0100)
-
-----------------------------------------------------------------
-ARM: SoC driver updates for v4.10
-
-Driver updates for ARM SoCs, including a couple of newly added drivers:
-
-- A new driver for the power management controller on TI Keystone
-- Support for the prerelease "SCPI" firmware protocol that ended up
-  being shipped by Amlogic in their GXBB SoC.
-- A soc_device can now be matched using a glob from inside the
-  kernel, when another driver wants to know the specific chip
-  it is running on and cannot find out from DT, firmware or hardware.
-- Renesas SoCs now support identification through the soc_device
-  interface, both in user space and kernel.
-- Renesas r8a7743 and r8a7745 gain support for their system controller
-- A new checking module for the ARM "PSCI" (not to be confused
-  with "SCPI" mentioned above) firmware interface.
-- A new driver for the Tegra GMI memory interface
-- Support for the Tegra firmware interfaces with their
-  power management controllers
-
-As usual, the updates for the reset controller framework are merged
-here, as they tend to touch multiple SoCs as well, including a new
-driver for the Oxford (now Broadcom) OX820 chip and the Tegra
-bpmp interface.
-
-The existing drivers for Atmel, Qualcomm, NVIDIA, TI Davinci, and
-Rockchips SoCs see some further updates.
-
-Conflicts:
-- ARCH_RENESAS now selects SOC_BUS, but no longer needs GPIOLIB
-- drivers/soc/renesas/Makefile: multiple files got added, keep
-  all in logical sorting
+  Merge tag 'davinci-for-v4.10/defconfig-4' of git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci into next/defconfig (2016-12-07 12:35:06 -0800)
 
 ----------------------------------------------------------------
-Alexandre Belloni (4):
-      Documentation: dt: atmel-at91: Document secumod bindings
-      ARM: at91: add secumod register definitions
-      misc: sram: document new compatible
-      misc: sram: add Atmel securam support
+ARM: SoC defconfig updates for v4.10
 
-Andy Gross (1):
-      Merge tag 'qcom-drivers-for-4.10' into drivers-for-4.10-2
+Defconfig additions, removals, etc. Most of these are small changes adding
+the options for newly upstreamed drivers, or drivers needed for new board
+support.
 
-Arnd Bergmann (8):
-      Merge tag 'davinci-for-v4.10/drivers-2' of git://git.kernel.org/.../nsekhar/linux-davinci into next/drivers
-      misc: sram: remove useless #ifdef
-      Merge tag 'renesas-r8a7745-sysc-for-v4.10' of git://git.kernel.org/.../horms/renesas into next/drivers
-      Merge tag 'soc-device-match-tag1' of git://git.kernel.org/.../geert/renesas-drivers into next/drivers
-      Merge tag 'renesas-soc-match-for-v4.10' of git://git.kernel.org/.../horms/renesas into next/drivers
-      Merge tag 'scpi-updates-4.10' of git://git.kernel.org/.../sudeep.holla/linux into next/drivers
-      Merge branch 'for-4.10-ti-sci-base' of https://github.com/t-kristo/linux-pm into next/drivers
-      Merge tag 'qcom-drivers-for-4.10-2' of git://git.kernel.org/.../agross/linux into next/drivers
+Bartlomiej Zolnierkiewicz has done a series of patches reducing the use
+of CONFIG_IDE from 19 to 3 in favor of CONFIG_ATA.
 
-Bartosz Golaszewski (4):
-      memory: davinci: add support for da8xx DDR2/mDDR controller
-      bus: davinci: add support for da8xx bus master priority control
-      bus: da8xx-mstpri: drop the call to of_flat_dt_get_machine_name()
-      memory: da8xx-ddrctl: drop the call to of_flat_dt_get_machine_name()
+Overall more patches than usual, but nothing big.
 
-Bjorn Andersson (1):
-      soc: qcom: wcnss_ctrl: Stub wcnss_ctrl API
+----------------------------------------------------------------
+Adam Ford (1):
+      ARM: omap2plus_defconfig: Enable TOUCHSCREEN_TSC2004
 
-Caesar Wang (1):
-      soc: rockchip: power-domain: avoid infinite loop
+Alan Tull (1):
+      ARM: socfpga: updates for socfpga_defconfig
 
-Dan Carpenter (1):
-      mailbox: tegra-hsp: Use after free in tegra_hsp_remove_doorbells()
+Alexandre Bailon (1):
+      ARM: davinci_all_defconfig: Enable da8xx usb otg
 
-Douglas Anderson (1):
-      soc: rockchip: power-domain: Don't (incorrectly) set rk3399 up/down counts
+Alexandre TORGUE (1):
+      ARM: configs: Add new config fragment to change RAM start point
 
-Geert Uytterhoeven (2):
-      ARM: shmobile: Document DT bindings for Product Register
-      soc: renesas: Identify SoC and register with the SoC bus
+Arnd Bergmann (4):
+      Merge branch 'v4.9-rc2-arm-configs-pata' of https://github.com/bzolnier/linux into next/defconfig
+      Merge tag 'davinci-for-v4.10/defconfig-3' of git://git.kernel.org/.../nsekhar/linux-davinci into next/defconfig
+      Merge tag 'arm-soc/for-4.10/defconfig' of http://github.com/Broadcom/stblinux into next/defconfig
+      Merge tag 'sti-defconfig-for-4.10-round3' of git://git.kernel.org/.../pchotard/sti into next/defconfig
 
-Heiko Stuebner (1):
-      soc: rockchip: power-domain: use pm_genpd_remove in error cleanup
+Axel Haslam (1):
+      ARM: davinci_all_defconfig: Enable OHCI as module
 
-James Liao (1):
-      soc: mediatek: Refine scpsys to support multiple platform
+Bartlomiej Zolnierkiewicz (16):
+      arm: assabet_defconfig: disable IDE subsystem
+      arm: badge4_defconfig: disable IDE subsystem
+      arm: cerfcube_defconfig: disable IDE subsystem
+      arm: lart_defconfig: disable IDE subsystem
+      arm: mainstone_defconfig: disable IDE subsystem
+      arm: shannon_defconfig: disable IDE subsystem
+      arm: collie_defconfig: convert to use libata PATA drivers
+      arm: omap1_defconfig: convert to use libata PATA drivers
+      arm: am200epdkit_defconfig: convert to use libata PATA drivers
+      arm: corgi_defconfig: convert to use libata PATA drivers
+      arm: h3600_defconfig: convert to use libata PATA drivers
+      arm: ixp4xx_defconfig: convert to use libata PATA drivers
+      arm: jornada720_defconfig: convert to use libata PATA drivers
+      arm: netwinder_defconfig: convert to use libata PATA drivers
+      arm: s3c2410_defconfig: convert to use libata PATA drivers
+      arm: spitz_defconfig: convert to use libata PATA drivers
 
-Jon Hunter (4):
-      soc/tegra: pmc: Guard against uninitialised PMC clock
-      soc/tegra: pmc: Simplify IO rail bit handling
-      soc/tegra: pmc: Check return code for pm_genpd_init()
-      soc/tegra: pmc: Remove genpd when adding provider fails
+Bartosz Golaszewski (2):
+      ARM: davinci_all_defconfig: enable LCDC DRM driver
+      ARM: davinci_all_defconfig: enable the mstpri and ddrctl drivers
 
-Joseph Lo (3):
-      soc/tegra: Add Tegra186 support
-      dt-bindings: mailbox: Add Tegra HSP binding
-      dt-bindings: firmware: Add bindings for Tegra BPMP
+David Lechner (3):
+      ARM: davinci_all_defconfig: enable gpio poweroff driver
+      ARM: davinci_all_defconfig: build MMC into kernel
+      ARM: davinci_all_defconfig: enable LED default-on trigger
 
-Kevin Brodsky (1):
-      drivers: psci: PSCI checker module
+Dinh Nguyen (2):
+      ARM: socfpga_defconfig: Enable HIGHMEM
+      ARM: socfpga_defconfig: enable FS configs to support Angstrom filesystem
 
-Laxman Dewangan (3):
-      soc/tegra: pmc: Use BIT macro for register field definition
-      soc/tegra: pmc: Correct type of variable for tegra_pmc_readl()
-      soc/tegra: pmc: Add I/O pad voltage support
+Florian Fainelli (2):
+      ARM: multi_v7_defconfig: Enable BCM47xx/BCM5301x drivers
+      Merge tag 'bcm2835-defconfig-next-2016-11-18' into defconfig/next
 
-Martin Blumenstingl (1):
-      reset: allow using reset_control_reset with shared reset
+Javier Martinez Canillas (2):
+      ARM: exynos_defconfig: Enable exynos-gsc driver as module
+      ARM: multi_v7_defconfig: Enable exynos-gsc driver as module
 
-Michael Scott (1):
-      MAINTAINERS: add drivers/pinctrl/qcom to ARM/QUALCOMM SUPPORT
+Linus Walleij (3):
+      ARM: defconfig: update U8500 defconfig
+      ARM: defconfig: turn on the DT cpufreq for Integrator
+      ARM: defconfig: drop GPIO_SYSFS on multiplatforms
 
-Mirza Krak (2):
-      dt/bindings: Add bindings for Tegra GMI controller
-      bus: Add support for Tegra Generic Memory Interface
+Lokesh Vutla (2):
+      ARM: omap2plus_defconfig: Enable REGULATOR_GPIO
+      ARM: omap2plus_defconfig: Enable LP873X support
 
-Neil Armstrong (7):
-      reset: oxnas: Add OX820 support
-      dt-bindings: reset: oxnas: Add include file with reset indexes
-      dt-bindings: reset: oxnas: Update for OX820
-      firmware: arm_scpi: increase MAX_DVFS_OPPS to 16 entries
-      firmware: arm_scpi: add alternative legacy structures, functions and macros
-      firmware: arm_scpi: allow firmware with get_capabilities not implemented
-      Documentation: bindings: Add support for Amlogic GXBB SCPI protocol
+Marcel Ziswiler (1):
+      ARM: tegra: Enable SGTL5000 audio
 
-Nishanth Menon (5):
-      Documentation: Add support for TI System Control Interface (TI-SCI) protocol
-      firmware: Add basic support for TI System Control Interface (TI-SCI) protocol
-      firmware: ti_sci: Add support for Device control
-      firmware: ti_sci: Add support for Clock control
-      firmware: ti_sci: Add support for reboot core service
+Marek Vasut (2):
+      ARM: imx_v6_v7_defconfig: Increase CMA size
+      ARM: imx_v6_v7_defconfig: Select the es8328 codec driver
+
+Martin Sperl (1):
+      ARM: bcm2835: add thermal driver to default config
+
+Maxime Coquelin (1):
+      ARM: config: Enable GPIO Key driver in stm32_defconfig
+
+Maxime Ripard (2):
+      ARM: sunxi: Enable VGA bridge
+      ARM: multi_v7: enable VGA bridge
+
+Neil Armstrong (1):
+      ARM: qcom_defconfig: Fix MDM9515 LCC and GCC config
+
+Niklas S?derlund (1):
+      ARM: shmobile: defconfig: Enable CONFIG_CGROUPS
 
 Olof Johansson (12):
-      Merge tag 'renesas-drivers-for-v4.10' of git://git.kernel.org/.../horms/renesas into next/drivers
-      Merge tag 'v4.10-rockchip-drivers1' of git://git.kernel.org/.../mmind/linux-rockchip into next/drivers
-      Merge tag 'qcom-drivers-for-4.10' of git://git.kernel.org/.../agross/linux into next/drivers
-      Merge tag 'davinci-for-v4.10/drivers' of git://git.kernel.org/.../nsekhar/linux-davinci into next/drivers
-      Merge tag 'v4.9-next-soc' of https://github.com/mbgg/linux-mediatek into next/drivers
-      Merge tag 'at91-ab-4.10-drivers' of git://git.kernel.org/.../abelloni/linux into next/drivers
-      Merge tag 'reset-for-4.10' of git://git.pengutronix.de/git/pza/linux into next/drivers
-      Merge tag 'tegra-for-4.10-mailbox' of git://git.kernel.org/.../tegra/linux into next/drivers
-      Merge tag 'tegra-for-4.10-firmware' of git://git.kernel.org/.../tegra/linux into next/drivers
-      Merge tag 'tegra-for-4.10-reset' of git://git.kernel.org/.../tegra/linux into next/drivers
-      Merge tag 'tegra-for-4.10-bus' of git://git.kernel.org/.../tegra/linux into next/drivers
-      Merge tag 'tegra-for-4.10-soc' of git://git.kernel.org/.../tegra/linux into next/drivers
+      Merge tag 'sti-defconfig-for-4.10' of git://git.kernel.org/.../pchotard/sti into next/defconfig
+      Merge tag 'renesas-defconfig-for-v4.10' of git://git.kernel.org/.../horms/renesas into next/defconfig
+      Merge tag 'davinci-for-v4.10/defconfig' of git://git.kernel.org/.../nsekhar/linux-davinci into next/defconfig
+      Merge tag 'samsung-defconfig-4.10' of git://git.kernel.org/.../krzk/linux into next/defconfig
+      Merge branch 'sti-defconfig-for-4.10-round2' of git://git.kernel.org/.../pchotard/sti into next/defconfig
+      Merge tag 'socfpga_defconfig_updates_for_v4.10' of git://git.kernel.org/.../dinguyen/linux into next/defconfig
+      Merge tag 'qcom-defconfig-for-4.10' of git://git.kernel.org/.../agross/linux into next/defconfig
+      Merge tag 'imx-defconfig-4.10' of git://git.kernel.org/.../shawnguo/linux into next/defconfig
+      Merge tag 'sunxi-defconfig-for-4.10' of https://git.kernel.org/.../mripard/linux into next/defconfig
+      Merge tag 'omap-for-v4.10/defconfig-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/defconfig
+      Merge tag 'tegra-for-4.10-arm-defconfig' of git://git.kernel.org/.../tegra/linux into next/defconfig
+      Merge tag 'davinci-for-v4.10/defconfig-4' of git://git.kernel.org/.../nsekhar/linux-davinci into next/defconfig
 
-Paul Gortmaker (5):
-      reset: berlin: make it explicitly non-modular
-      reset: socfpga: make it explicitly non-modular
-      reset: sunxi: make it explicitly non-modular
-      reset: zynq: make it explicitly non-modular
-      reset: lpc18xx: make it explicitly non-modular
+Patrice Chotard (2):
+      ARM: multi_v7_defconfig: Remove ST_THERMAL_SYSCFG Kconfig symbol
+      ARM: multi_v7_defconfig: enable STMicroelectronics HVA driver
 
 Peter Griffin (2):
-      reset: sti: Remove STiH415/6 reset support
-      reset: sti: softreset: Remove obsolete platforms from dt binding doc.
+      ARM: multi_v7_defconfig: Remove miphy365 phy Kconfig symbol.
+      ARM: multi_v7_defconfig: Remove stih41x phy Kconfig symbol.
 
-Sergei Shtylyov (4):
-      ARM: shmobile: r8a7743: add power domain index macros
-      soc: renesas: rcar-sysc: add R8A7743 support
-      ARM: shmobile: r8a7745: add power domain index macros
-      soc: renesas: rcar-sysc: add R8A7745 support
+Sekhar Nori (1):
+      ARM: davinci_all_defconfig: add missing options for systemd
 
-Shunli Wang (1):
-      soc: mediatek: Add MT2701 scpsys driver
+Steffen Trumtrar (1):
+      ARM: socfpga: defconfig: enable qspi
 
-Srinivas Kandagatla (1):
-      pinctrl: pm8994: add pad voltage regulator defines
+Thierry Reding (2):
+      ARM: tegra: Update default configuration for v4.9-rc1
+      ARM: tegra: Enable GMI driver in default configuration
 
-Stephen Warren (2):
-      dt-bindings: Add power domains to Tegra BPMP firmware
-      dt-bindings: firmware: Allow child nodes inside the Tegra BPMP
+Tony Lindgren (1):
+      ARM: omap2plus_defconfig: Run make savedefconfig to save some space
 
-Sudeep Holla (4):
-      firmware: arm_scpi: add command indirection to support legacy commands
-      Documentation: bindings: decouple juno specific details from generic binding
-      Documentation: bindings: add compatible specific to pre v1.0 SCPI protocols
-      firmware: arm_scpi: add support for pre-v1.0 SCPI compatible
-
-Thierry Reding (11):
-      soc/tegra: pmc: Use consistent ordering of bit definitions
-      soc/tegra: pmc: Clean-up I/O rail error messages
-      soc/tegra: pmc: Use consistent naming for PM domains
-      Merge branch 'for-4.10/soc' into for-4.10/mailbox
-      mailbox: Add Tegra HSP driver
-      Merge branch 'for-4.10/mailbox' into for-4.10/firmware
-      firmware: tegra: Add IVC library
-      firmware: tegra: Add BPMP support
-      Merge branch 'for-4.10/firmware' into for-4.10/reset
-      reset: Add Tegra BPMP reset driver
-      drivers: psci: Allow PSCI node to be disabled
-
-Tomeu Vizoso (1):
-      soc: rockchip: power-domain: Handle errors from of_genpd_add_provider_onecell
-
-Wei Yongjun (3):
-      memory: atmel-ebi: fix return value check in at91_ebi_dev_disable()
-      memory: atmel-sdramc: use builtin_platform_driver to simplify the code
-      firmware: qcom: scm: Use devm_reset_controller_register()
-
-spjoshi at codeaurora.org (3):
-      dt-bindings: firmware: scm: Add MSM8996 DT bindings
-      firmware: qcom: scm: Remove core, iface and bus clocks dependency
-      firmware: qcom: scm: Return PTR_ERR when devm_clk_get fails
-
- .../devicetree/bindings/arm/amlogic,scpi.txt       |   20 +
- Documentation/devicetree/bindings/arm/arm,scpi.txt |   25 +-
- .../devicetree/bindings/arm/atmel-at91.txt         |   16 +
- .../devicetree/bindings/arm/juno,scpi.txt          |   26 +
- .../devicetree/bindings/arm/keystone/ti,sci.txt    |   81 +
- Documentation/devicetree/bindings/arm/shmobile.txt |   18 +
- .../devicetree/bindings/bus/nvidia,tegra20-gmi.txt |  132 ++
- .../devicetree/bindings/bus/ti,da850-mstpri.txt    |   20 +
- .../bindings/firmware/nvidia,tegra186-bpmp.txt     |  108 ++
- .../devicetree/bindings/firmware/qcom,scm.txt      |    2 +
- .../bindings/mailbox/nvidia,tegra186-hsp.txt       |   52 +
- .../memory-controllers/ti-da8xx-ddrctl.txt         |   20 +
- .../bindings/power/renesas,rcar-sysc.txt           |    8 +-
- .../devicetree/bindings/reset/oxnas,reset.txt      |   44 +-
- Documentation/devicetree/bindings/sram/sram.txt    |    2 +-
- MAINTAINERS                                        |   11 +
- arch/arm/mach-shmobile/Kconfig                     |    1 +
- arch/arm/mach-sti/Kconfig                          |    2 -
- arch/arm64/Kconfig.platforms                       |    1 +
- drivers/bus/Kconfig                                |   16 +
- drivers/bus/Makefile                               |    3 +
- drivers/bus/da8xx-mstpri.c                         |  267 +++
- drivers/bus/tegra-gmi.c                            |  284 +++
- drivers/firmware/Kconfig                           |   27 +
- drivers/firmware/Makefile                          |    3 +
- drivers/firmware/arm_scpi.c                        |  276 ++-
- drivers/firmware/psci.c                            |    2 +-
- drivers/firmware/psci_checker.c                    |  490 +++++
- drivers/firmware/qcom_scm.c                        |   53 +-
- drivers/firmware/tegra/Kconfig                     |   25 +
- drivers/firmware/tegra/Makefile                    |    2 +
- drivers/firmware/tegra/bpmp.c                      |  868 +++++++++
- drivers/firmware/tegra/ivc.c                       |  695 +++++++
- drivers/firmware/ti_sci.c                          | 1991 ++++++++++++++++++++
- drivers/firmware/ti_sci.h                          |  492 +++++
- drivers/mailbox/Kconfig                            |    9 +
- drivers/mailbox/Makefile                           |    2 +
- drivers/mailbox/tegra-hsp.c                        |  479 +++++
- drivers/memory/Kconfig                             |    8 +
- drivers/memory/Makefile                            |    1 +
- drivers/memory/atmel-ebi.c                         |    2 +-
- drivers/memory/atmel-sdramc.c                      |    6 +-
- drivers/memory/da8xx-ddrctl.c                      |  173 ++
- drivers/misc/sram.c                                |   42 +-
- drivers/reset/Kconfig                              |    1 +
- drivers/reset/Makefile                             |    1 +
- drivers/reset/core.c                               |   43 +-
- drivers/reset/reset-berlin.c                       |   12 +-
- drivers/reset/reset-lpc18xx.c                      |   32 +-
- drivers/reset/reset-oxnas.c                        |    1 +
- drivers/reset/reset-socfpga.c                      |   10 +-
- drivers/reset/reset-sunxi.c                        |    9 +-
- drivers/reset/reset-zynq.c                         |   10 +-
- drivers/reset/sti/Kconfig                          |    8 -
- drivers/reset/sti/Makefile                         |    2 -
- drivers/reset/sti/reset-stih415.c                  |  112 --
- drivers/reset/sti/reset-stih416.c                  |  143 --
- drivers/reset/tegra/Kconfig                        |    2 +
- drivers/reset/tegra/Makefile                       |    1 +
- drivers/reset/tegra/reset-bpmp.c                   |   71 +
- drivers/soc/mediatek/Kconfig                       |    2 +-
- drivers/soc/mediatek/mtk-scpsys.c                  |  465 +++--
- drivers/soc/renesas/Makefile                       |    4 +
- drivers/soc/renesas/r8a7743-sysc.c                 |   32 +
- drivers/soc/renesas/r8a7745-sysc.c                 |   32 +
- drivers/soc/renesas/rcar-sysc.c                    |    6 +
- drivers/soc/renesas/rcar-sysc.h                    |    2 +
- drivers/soc/renesas/renesas-soc.c                  |  257 +++
- drivers/soc/rockchip/pm_domains.c                  |   81 +-
- drivers/soc/tegra/Kconfig                          |   14 +
- drivers/soc/tegra/pmc.c                            |  398 +++-
- include/dt-bindings/clock/tegra186-clock.h         |  940 +++++++++
- include/dt-bindings/mailbox/tegra186-hsp.h         |   24 +
- include/dt-bindings/pinctrl/qcom,pmic-gpio.h       |    4 +
- include/dt-bindings/pinctrl/qcom,pmic-mpp.h        |    6 +
- include/dt-bindings/power/tegra186-powergate.h     |   39 +
- include/dt-bindings/reset/oxsemi,ox810se.h         |   53 +
- include/dt-bindings/reset/oxsemi,ox820.h           |   53 +
- include/dt-bindings/reset/tegra186-reset.h         |  217 +++
- include/linux/soc/qcom/wcnss_ctrl.h                |   13 +
- include/linux/soc/ti/ti_sci_protocol.h             |  249 +++
- include/soc/at91/atmel-secumod.h                   |   19 +
- include/soc/tegra/bpmp-abi.h                       | 1601 ++++++++++++++++
- include/soc/tegra/bpmp.h                           |  141 ++
- include/soc/tegra/ivc.h                            |  109 ++
- include/soc/tegra/pmc.h                            |  126 +-
- 86 files changed, 11428 insertions(+), 722 deletions(-)
+ arch/arm/configs/am200epdkit_defconfig  |  5 +++--
+ arch/arm/configs/assabet_defconfig      |  1 -
+ arch/arm/configs/badge4_defconfig       |  2 --
+ arch/arm/configs/bcm2835_defconfig      |  2 ++
+ arch/arm/configs/cerfcube_defconfig     |  1 -
+ arch/arm/configs/collie_defconfig       |  5 +++--
+ arch/arm/configs/corgi_defconfig        |  7 +++----
+ arch/arm/configs/davinci_all_defconfig  | 20 ++++++++++++++++----
+ arch/arm/configs/dram_0xc0000000.config |  1 +
+ arch/arm/configs/exynos_defconfig       |  1 +
+ arch/arm/configs/h3600_defconfig        |  5 +++--
+ arch/arm/configs/imx_v6_v7_defconfig    |  2 ++
+ arch/arm/configs/integrator_defconfig   |  1 +
+ arch/arm/configs/ixp4xx_defconfig       |  9 +++++----
+ arch/arm/configs/jornada720_defconfig   |  5 +++--
+ arch/arm/configs/lart_defconfig         |  2 --
+ arch/arm/configs/mainstone_defconfig    |  1 -
+ arch/arm/configs/multi_v5_defconfig     |  1 -
+ arch/arm/configs/multi_v7_defconfig     | 20 ++++++++++++++++----
+ arch/arm/configs/netwinder_defconfig    |  7 ++++---
+ arch/arm/configs/omap1_defconfig        |  4 ++--
+ arch/arm/configs/omap2plus_defconfig    | 12 ++++++------
+ arch/arm/configs/qcom_defconfig         |  4 ++--
+ arch/arm/configs/s3c2410_defconfig      | 10 +++-------
+ arch/arm/configs/shannon_defconfig      |  1 -
+ arch/arm/configs/shmobile_defconfig     |  1 +
+ arch/arm/configs/socfpga_defconfig      | 15 +++++++++++++++
+ arch/arm/configs/spitz_defconfig        |  8 +++-----
+ arch/arm/configs/stm32_defconfig        |  3 +--
+ arch/arm/configs/sunxi_defconfig        |  1 +
+ arch/arm/configs/tegra_defconfig        | 27 +++++++++++++--------------
+ arch/arm/configs/u8500_defconfig        |  7 +++----
+ 32 files changed, 113 insertions(+), 78 deletions(-)
+ create mode 100644 arch/arm/configs/dram_0xc0000000.config
