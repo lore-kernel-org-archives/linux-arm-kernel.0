@@ -1,39 +1,77 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Fri, 16 Dec 2016 18:14:06 +0100
-Subject: [PATCH 2/2] arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA
-In-Reply-To: <125f3064-bbec-d923-ad9f-b2d152ee2c2d@linaro.org>
-References: <1481706707-6211-1-git-send-email-ard.biesheuvel@linaro.org>
- <1481706707-6211-3-git-send-email-ard.biesheuvel@linaro.org>
- <20161215153930.GA8111@rric.localdomain>
- <125f3064-bbec-d923-ad9f-b2d152ee2c2d@linaro.org>
-Message-ID: <20161216171406.GE4930@rric.localdomain>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 16 Dec 2016 17:20:22 +0000
+Subject: [PATCH] ARM: disallow ARM_THUMB for ARMv4 builds
+In-Reply-To: <20161216091457.2452987-1-arnd@arndb.de>
+References: <20161216091457.2452987-1-arnd@arndb.de>
+Message-ID: <CAKv+Gu93Gtkh7spA-HUHNKSmDjhK_nuwR9KaDu8=S2GDyhUJCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.12.16 09:57:20, Hanjun Guo wrote:
-> Hi Robert,
-> 
-> On 2016/12/15 23:39, Robert Richter wrote:
-> >I was going to do some measurements but my kernel crashes now with a
-> >page fault in efi_rtc_probe():
-> >
-> >[   21.663393] Unable to handle kernel paging request at virtual address 20251000
-> >[   21.663396] pgd = ffff000009090000
-> >[   21.663401] [20251000] *pgd=0000010ffff90003
-> >[   21.663402] , *pud=0000010ffff90003
-> >[   21.663404] , *pmd=0000000fdc030003
-> >[   21.663405] , *pte=00e8832000250707
-> >
-> >The sparsemem config requires the whole section to be initialized.
-> >Your patches do not address this.
-> 
-> This patch set is running properly on D05, both the boot and
-> LTP MM stress test are ok, seems it's a different configuration
-> of memory mappings in firmware, just a stupid question, which
-> part is related to this problem, is it only the Reserved memory?
+On 16 December 2016 at 09:14, Arnd Bergmann <arnd@arndb.de> wrote:
+> With old compilers (gcc-4.3 and earlier), we run into a build error
+> when CONFIG_ARM_THUMB is enabled in kernels that have both ARMv4 and
+> ARMv4T/ARMv5 CPU support:
+>
+> arch/arm/kernel/entry-armv.S: Assembler messages:
+> arch/arm/kernel/entry-armv.S:938: Error: selected processor does not support `bx lr' in ARM mode
+> arch/arm/kernel/entry-armv.S:961: Error: selected processor does not support `bx lr' in ARM mode
+> arch/arm/kernel/entry-armv.S:1004: Error: selected processor does not support `bx lr' in ARM mode
+>
+> The problem evidently is that 'bx' cannot work on the old CPUs, but
+> the new ones have to use it whenever returning to THUMB user space.
+>
 
-The problem are efi reserved regions that are no longer reserved but
-marked as nomap pages. Those are excluded from page initialization
-causing parts of a memory section not being initialized.
+Can't we use the old
 
--Robert
+tst lr, #1
+moveq pc, lr
+bx lr
+
+trick? (where bx lr needs to be emitted as a plain opcode to hide it
+from the assembler)
+
+> This was discussed a while ago without a conclusion about what
+> the proper patch should be to solve it, and came again up now when I
+> experimented with old toolchain versions.
+>
+> This sidesteps the problem by declaring that we do not support
+> the configuration and instead have to disable CONFIG_ARM_THUMB
+> and not use THUMB user space with a kernel that supports the
+> FA526 CPU, which is the only one that is allowed in a multiplatform
+> configuration together with ARMv4T/ARMv5 anyway. This is not
+> a regression because the configuration never worked anyway.
+> The only platform affected by this is moxart, as no other ARMv4
+> platforms are part of ARCH_MULTIPLATFORM.
+>
+> Cc: Jonas Jensen <jonas.jensen@gmail.com>
+> Link: http://lkml.iu.edu/hypermail/linux/kernel/1404.1/00908.html
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/mm/Kconfig | 6 +-----
+>  1 file changed, 1 insertion(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index 5d4920c069f2..f7b7aa37964f 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -655,11 +655,7 @@ config ARCH_DMA_ADDR_T_64BIT
+>
+>  config ARM_THUMB
+>         bool "Support Thumb user binaries" if !CPU_THUMBONLY
+> -       depends on CPU_ARM720T || CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || \
+> -               CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || \
+> -               CPU_ARM1020 || CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || \
+> -               CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_V6 || CPU_V6K || \
+> -               CPU_V7 || CPU_FEROCEON || CPU_V7M
+> +       depends on !(CPU_32v3 || CPU_32v4)
+>         default y
+>         help
+>           Say Y if you want to include kernel support for running user space
+> --
+> 2.9.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
