@@ -1,58 +1,66 @@
-From: yu.chen.surf@gmail.com (Yu Chen)
-Date: Fri, 16 Dec 2016 13:14:06 +0800
-Subject: Linux fails to start secondary cores when system resumes from
- Suspend-to-RAM
-In-Reply-To: <d4db03ce-80fc-2968-c5c2-84f79272ce8d@free.fr>
-References: <d4db03ce-80fc-2968-c5c2-84f79272ce8d@free.fr>
-Message-ID: <CADjb_WQ8ZTtcXYQ_3iobLCW7+rnG8FqyFQ1E47AZVGxP0JyB0w@mail.gmail.com>
+From: minchan@kernel.org (Minchan Kim)
+Date: Fri, 16 Dec 2016 15:39:40 +0900
+Subject: jemalloc testsuite stalls in memset
+In-Reply-To: <mvm4m2535pc.fsf@hawking.suse.de>
+References: <mvmmvfy37g1.fsf@hawking.suse.de> <20161214235031.GA2912@bbox>
+ <mvm4m2535pc.fsf@hawking.suse.de>
+Message-ID: <20161216063940.GA1334@bbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2016 at 11:18 PM, Mason <slash.tmp@free.fr> wrote:
-> Hello,
->
-> I'm playing with suspend-to-RAM on the tango platform:
->
->   http://lxr.free-electrons.com/source/arch/arm/mach-tango/platsmp.c
->
-> When the system is suspended, the CPU is completely powered down
-> (receives no power whatsoever). When the system receives a wake-up
-> event, the CPU is powered up, and starts up exactly the same way
-> as for a cold boot (I think).
->
-> However, while Linux successfully starts the secondary cores when
-> the system first boots, it fails when the system resumes from "S3".
->
-> I added printascii() calls inside secondary_start_kernel() and I can
-> see that the following instruction are "properly" run:
->
->         cpu_switch_mm(mm->pgd, mm);
->         local_flush_bp_all();
->         enter_lazy_tlb(mm, current);
->
-> but it seems local_flush_tlb_all(); never returns... :-(
->
->   http://lxr.free-electrons.com/source/arch/arm/include/asm/tlbflush.h#L332
->
->
-> Looking more closely at that function, it seems to be failing in:
->
->         tlb_op(TLB_V7_UIS_FULL, "c8, c7, 0", zero);
->
-> (meaning: I get a log before, but not after)
->
-> On my system, tlb_op(TLB_V7_UIS_FULL, "c8, c7, 0", zero);
-> resolves to:
->
-> c010ce18:       e3170602        tst     r7, #2097152    ; 0x200000
-> c010ce1c:       1e086f17        mcrne   15, 0, r6, cr8, cr7, {0}
->
-> What could be happening?
-> Can a core "hang" on this instruction?
-> Can a core "crash" on this instruction (meaning, an exception
-> is raised, and the core loops inside the exception code without
-> Linux noticing... that seems unlikely)
->
-> I'm stumped. Could someone throw me a clue?
-try online/offline the nonboot CPUs via
-/sys/devices/system/cpu/cpuX/online
+Hello,
+
+On Thu, Dec 15, 2016 at 10:24:47AM +0100, Andreas Schwab wrote:
+> On Dez 15 2016, Minchan Kim <minchan@kernel.org> wrote:
+> 
+> > You mean program itself access the address(ie, 0xffffb7400000) is hang
+> > while access the address from the debugger is OK?
+> 
+> Yes.
+> 
+> > Can you reproduce it easily?
+> 
+> 100%
+> 
+> > Did you test it in real machine or qemu on x86?
+> 
+> Both real and kvm.
+> 
+> > Could you show me how I can reproduce it?
+> 
+> Just run make check.
+> 
+> > I want to test it in x86 machine, first of all.
+> > Unfortunately, I don't have any aarch64 platform now so maybe I have to
+> > run it on qemu on x86 until I can set up aarch64 platform if it is reproducible
+> > on real machine only.
+> >
+> >> 
+> >> The kernel has been configured with transparent hugepages.
+> >> 
+> >> CONFIG_TRANSPARENT_HUGEPAGE=y
+> >> CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS=y
+> >> # CONFIG_TRANSPARENT_HUGEPAGE_MADVISE is not set
+> >> CONFIG_TRANSPARENT_HUGE_PAGECACHE=y
+> >
+> > What's the exact kernel version?
+> 
+> Anything >= your commit.
+
+Thanks for the info. I cannot setup testing enviroment but when I read code,
+it seems we need pmd_wrprotect for non-hardware dirty architecture.
+
+Below helps?
+
+diff --git a/mm/huge_memory.c b/mm/huge_memory.c
+index e10a4fe..dc37c9a 100644
+--- a/mm/huge_memory.c
++++ b/mm/huge_memory.c
+@@ -1611,6 +1611,7 @@ int madvise_free_huge_pmd(struct mmu_gather *tlb, struct vm_area_struct *vma,
+ 			tlb->fullmm);
+ 		orig_pmd = pmd_mkold(orig_pmd);
+ 		orig_pmd = pmd_mkclean(orig_pmd);
++		orig_pmd = pmd_wrprotect(orig_pmd);
+ 
+ 		set_pmd_at(mm, addr, pmd, orig_pmd);
+ 		tlb_remove_pmd_tlb_entry(tlb, pmd, addr);
