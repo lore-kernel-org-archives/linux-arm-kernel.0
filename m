@@ -1,94 +1,58 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Fri, 16 Dec 2016 11:01:29 +0800
-Subject: [PATCH v2] i2c: designware: add reset interface
-In-Reply-To: <fd0afd5f-6ee4-a06f-2d03-444f71662c1b@linaro.org>
-References: <1479789700-19532-1-git-send-email-zhangfei.gao@linaro.org>
- <1481792388-13781-1-git-send-email-zhangfei.gao@linaro.org>
- <1481805227.9552.15.camel@linux.intel.com>
- <fda7e3ef-5bc1-9837-b421-4293baa3de34@synopsys.com>
- <fd0afd5f-6ee4-a06f-2d03-444f71662c1b@linaro.org>
-Message-ID: <49a5d8a4-864e-e80e-eee0-57c876d25aaf@linaro.org>
+From: yu.chen.surf@gmail.com (Yu Chen)
+Date: Fri, 16 Dec 2016 13:14:06 +0800
+Subject: Linux fails to start secondary cores when system resumes from
+ Suspend-to-RAM
+In-Reply-To: <d4db03ce-80fc-2968-c5c2-84f79272ce8d@free.fr>
+References: <d4db03ce-80fc-2968-c5c2-84f79272ce8d@free.fr>
+Message-ID: <CADjb_WQ8ZTtcXYQ_3iobLCW7+rnG8FqyFQ1E47AZVGxP0JyB0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Philipp
-
-
-On 2016?12?16? 10:45, zhangfei wrote:
+On Thu, Dec 15, 2016 at 11:18 PM, Mason <slash.tmp@free.fr> wrote:
+> Hello,
+>
+> I'm playing with suspend-to-RAM on the tango platform:
+>
+>   http://lxr.free-electrons.com/source/arch/arm/mach-tango/platsmp.c
+>
+> When the system is suspended, the CPU is completely powered down
+> (receives no power whatsoever). When the system receives a wake-up
+> event, the CPU is powered up, and starts up exactly the same way
+> as for a cold boot (I think).
+>
+> However, while Linux successfully starts the secondary cores when
+> the system first boots, it fails when the system resumes from "S3".
+>
+> I added printascii() calls inside secondary_start_kernel() and I can
+> see that the following instruction are "properly" run:
+>
+>         cpu_switch_mm(mm->pgd, mm);
+>         local_flush_bp_all();
+>         enter_lazy_tlb(mm, current);
+>
+> but it seems local_flush_tlb_all(); never returns... :-(
+>
+>   http://lxr.free-electrons.com/source/arch/arm/include/asm/tlbflush.h#L332
 >
 >
-> On 2016?12?15? 23:30, Ramiro Oliveira wrote:
->> Hi Andy and Zhangfei
->>
->> On 12/15/2016 12:33 PM, Andy Shevchenko wrote:
->>> On Thu, 2016-12-15 at 16:59 +0800, Zhangfei Gao wrote:
->>>> Some platforms like hi3660 need do reset first to allow accessing
->>>> registers
->>> Patch itself looks good, but would be nice to have it tested.
->>>
->>> Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
->>>
->> I tested the patch and it's working for the ARC architecture.
->>
->>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->>>> ---
->>>>   drivers/i2c/busses/i2c-designware-core.h    |  1 +
->>>>   drivers/i2c/busses/i2c-designware-platdrv.c | 28
->>>> ++++++++++++++++++++++++----
->>>>   2 files changed, 25 insertions(+), 4 deletions(-)
->>>>
->>>> diff --git a/drivers/i2c/busses/i2c-designware-core.h
->>>> b/drivers/i2c/busses/i2c-designware-core.h
->>>> index 0d44d2a..94b14fa 100644
->>>> --- a/drivers/i2c/busses/i2c-designware-core.h
->>>> +++ b/drivers/i2c/busses/i2c-designware-core.h
->>>> @@ -80,6 +80,7 @@ struct dw_i2c_dev {
->>>>       void __iomem        *base;
->>>>       struct completion    cmd_complete;
->>>>       struct clk        *clk;
->>>> +    struct reset_control    *rst;
->>>>       u32            (*get_clk_rate_khz) (struct
->>>> dw_i2c_dev *dev);
->>>>       struct dw_pci_controller *controller;
->>>>       int            cmd_err;
->>>> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c
->>>> b/drivers/i2c/busses/i2c-designware-platdrv.c
->>>> index 0b42a12..e9016ae 100644
->>>> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
->>>> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
->>>> @@ -38,6 +38,7 @@
->>>>   #include <linux/pm_runtime.h>
->>>>   #include <linux/property.h>
->>>>   #include <linux/io.h>
->>>> +#include <linux/reset.h>
->>>>   #include <linux/slab.h>
->>>>   #include <linux/acpi.h>
->>>>   #include <linux/platform_data/i2c-designware.h>
->>>> @@ -176,6 +177,14 @@ static int dw_i2c_plat_probe(struct
->>>> platform_device *pdev)
->>>>       dev->irq = irq;
->>>>       platform_set_drvdata(pdev, dev);
->>>>   +    dev->rst = devm_reset_control_get_optional(&pdev->dev, NULL);
->> devm_reset_control_get_optional() is deprecated as explained in 
->> linux/reset.h,
->> you should use devm_reset_control_get_optional_exclusive() or
->> devm_reset_control_get_optional_shared() instead, as applicable.
->>
->> I submitted a similar patch earlier today and I made the same mistake.
+> Looking more closely at that function, it seems to be failing in:
 >
-> Thanks Ramiro for the info
-> Will use devm_reset_control_get_optional_exclusive instead.
-> But should the interface be as simple as possible?
+>         tlb_op(TLB_V7_UIS_FULL, "c8, c7, 0", zero);
 >
-> Thanks
-Sorry, a bit confused.
-Is that mean we should not use devm_reset_control_get_optional()
-While driver should decide whether use 
-devm_reset_control_get_optional_exclusive() or
-devm_reset_control_get_optional_shared()
-What if different platform has different requirement?
-
-Looks the difference between _exclusive and _shared is refcount,
-How about handle this inside, and not decided by interface?
-
-Thanks
+> (meaning: I get a log before, but not after)
+>
+> On my system, tlb_op(TLB_V7_UIS_FULL, "c8, c7, 0", zero);
+> resolves to:
+>
+> c010ce18:       e3170602        tst     r7, #2097152    ; 0x200000
+> c010ce1c:       1e086f17        mcrne   15, 0, r6, cr8, cr7, {0}
+>
+> What could be happening?
+> Can a core "hang" on this instruction?
+> Can a core "crash" on this instruction (meaning, an exception
+> is raised, and the core loops inside the exception code without
+> Linux noticing... that seems unlikely)
+>
+> I'm stumped. Could someone throw me a clue?
+try online/offline the nonboot CPUs via
+/sys/devices/system/cpu/cpuX/online
