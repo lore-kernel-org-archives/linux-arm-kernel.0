@@ -1,63 +1,108 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 16 Dec 2016 09:37:20 +0200
-Subject: [PATCH] ARM: dts: Add missing CPU frequencies for Exynos5422/5800
-In-Reply-To: <CAD=FV=W6R8cNuR+gTnNRF6d-TNgzUeYTwuCp27efoMsd0YOH3g@mail.gmail.com>
-References: <5220084.l31t5oJbsy@amdc3058>
- <CGME20161213191823epcas5p346582b73ad9b401d9e773a1b076f1f61@epcas5p3.samsung.com>
- <26ffeee4-ff43-b3d3-3267-5fcbc50e2974@osg.samsung.com>
- <2340115.HEG9AYUCMD@amdc3058>
- <CAD=FV=W6R8cNuR+gTnNRF6d-TNgzUeYTwuCp27efoMsd0YOH3g@mail.gmail.com>
-Message-ID: <20161216073720.GA3489@kozik-lap>
+From: loic.pallardy@st.com (loic pallardy)
+Date: Fri, 16 Dec 2016 09:26:52 +0100
+Subject: [PATCH 2/2] remoteproc: Remove firmware_loading_complete
+In-Reply-To: <1481846632-4778-2-git-send-email-spjoshi@codeaurora.org>
+References: <1481846632-4778-1-git-send-email-spjoshi@codeaurora.org>
+ <1481846632-4778-2-git-send-email-spjoshi@codeaurora.org>
+Message-ID: <948b5b23-9440-00ef-7cf9-eca62ea93165@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2016 at 04:52:58PM -0800, Doug Anderson wrote:
-> > [ I added Arjun to Cc:, maybe he can help in explaining this issue
-> >   (unfortunately Inderpal's email is no longer working). ]
-> >
-> > Please also note that on Exynos5422/5800 SoCs the same ARM rail
-> > voltage is used for 1.9 GHz & 2.0 GHz OPPs as for the 1.8 GHz one.
-> > IOW if the problem exists it is already present in the mainline
-> > kernel.
-> 
-> Interesting.  In the ChromeOS tree I see significantly higher voltages
-> needed...  Note that one might naively look at
-> <https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/drivers/cpufreq/exynos5420-cpufreq.c#178>.
-> 
-> 1362500, /* L0  2100 */
-> 1312500, /* L1  2000 */
-> 
-> ..but, amazingly enough those voltages aren't used at all.  Surprise!
-> 
-> I believe that the above numbers are actually not used and the ASV
-> numbers are used instead.  See
-> <https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/arch/arm/mach-exynos/include/mach/asv-exynos542x.h#452>
-> 
-> { 2100000,
-> 1350000, 1350000, 1350000, 1350000, 1350000,
-> 1337500, 1325000, 1312500, 1300000, 1287500,
-> 1275000, 1262500, 1250000, 1237500 },
-> 
-> I believe that interpretation there is: some bins of the CPU can run
-> at 2.1 GHz just fine at 1.25 V but others need up to 1.35V.
 
-That is definitely the case. One could just look at vendors ASV table
-(for 1.9 GHz):
-{ 1900000, 1300000, 1287500, 1262500, 1237500, 1225000, 1212500,
-                    1200000, 1187500, 1175000, 1162500, 1150000,
-		             1137500, 1125000, 1112500, 1112500},
 
-The theoretical difference is up to 1.875V! From my experiments I saw
-BIN1 chips which should be the same... but some working on 1.2V, some on
-1.225V (@1.9 GHz). I didn't see any requiring higher voltages but that
-does not mean that there aren't such...
+On 12/16/2016 01:03 AM, Sarangdhar Joshi wrote:
+> rproc_del() waits on firmware_loading_complete in order to
+> make sure rproc_add() completed successfully before calling
+> rproc_shutdown().  However since rproc_add() will always be
+> called before rproc_del(), we do not need to wait on
+> firmware_loading_complete. Drop this completion variable
+> altogether.
+>
+Hi,
 
-> ...so if you're running at 2.1 GHz at 1.25V then perhaps you're just
-> running on a CPU from a nice bin?
+firmware_loading_complete is used to synchronize all operations on rproc 
+with parallel work launched by request_firmware_nowait.
+rproc_add could be done and firmware loading still pending. In that case 
+rproc_del mustn't be called before end of the procedure.
 
-Would be nice to see a dump of PKG_ID and AUX_INFO chipid registers
-along with name of tested board. Because the "Tested on XU3" is not
-sufficient.
+If you decide to remove this synchronization you need either to modify 
+rproc boot sequence or to replace it by something else.
 
-Best regards,
-Krzysztof
+Regards,
+Loic
+
+> Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
+> ---
+>
+> Sending this patch again since I had missed usage of
+> firmware_loading_complete in drivers/soc/ti/wkup_m3_ipc.c
+>
+>  drivers/remoteproc/remoteproc_core.c | 12 +-----------
+>  include/linux/remoteproc.h           |  2 --
+>  2 files changed, 1 insertion(+), 13 deletions(-)
+>
+> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+> index 953ee29..862fa4e 100644
+> --- a/drivers/remoteproc/remoteproc_core.c
+> +++ b/drivers/remoteproc/remoteproc_core.c
+> @@ -975,17 +975,12 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
+>  		rproc_boot(rproc);
+>
+>  	release_firmware(fw);
+> -	/* allow rproc_del() contexts, if any, to proceed */
+> -	complete_all(&rproc->firmware_loading_complete);
+>  }
+>
+>  static int rproc_add_virtio_devices(struct rproc *rproc)
+>  {
+>  	int ret;
+>
+> -	/* rproc_del() calls must wait until async loader completes */
+> -	init_completion(&rproc->firmware_loading_complete);
+> -
+>  	/*
+>  	 * We must retrieve early virtio configuration info from
+>  	 * the firmware (e.g. whether to register a virtio device,
+> @@ -997,10 +992,8 @@ static int rproc_add_virtio_devices(struct rproc *rproc)
+>  	ret = request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG,
+>  				      rproc->firmware, &rproc->dev, GFP_KERNEL,
+>  				      rproc, rproc_fw_config_virtio);
+> -	if (ret < 0) {
+> +	if (ret < 0)
+>  		dev_err(&rproc->dev, "request_firmware_nowait err: %d\n", ret);
+> -		complete_all(&rproc->firmware_loading_complete);
+> -	}
+>
+>  	return ret;
+>  }
+> @@ -1483,9 +1476,6 @@ int rproc_del(struct rproc *rproc)
+>  	if (!rproc)
+>  		return -EINVAL;
+>
+> -	/* if rproc is just being registered, wait */
+> -	wait_for_completion(&rproc->firmware_loading_complete);
+> -
+>  	/* if rproc is marked always-on, rproc_add() booted it */
+>  	/* TODO: make sure this works with rproc->power > 1 */
+>  	if (rproc->auto_boot)
+> diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
+> index e2f3a32..19d84a0 100644
+> --- a/include/linux/remoteproc.h
+> +++ b/include/linux/remoteproc.h
+> @@ -397,7 +397,6 @@ enum rproc_crash_type {
+>   * @num_traces: number of trace buffers
+>   * @carveouts: list of physically contiguous memory allocations
+>   * @mappings: list of iommu mappings we initiated, needed on shutdown
+> - * @firmware_loading_complete: marks e/o asynchronous firmware loading
+>   * @bootaddr: address of first instruction to boot rproc with (optional)
+>   * @rvdevs: list of remote virtio devices
+>   * @subdevs: list of subdevices, to following the running state
+> @@ -428,7 +427,6 @@ struct rproc {
+>  	int num_traces;
+>  	struct list_head carveouts;
+>  	struct list_head mappings;
+> -	struct completion firmware_loading_complete;
+>  	u32 bootaddr;
+>  	struct list_head rvdevs;
+>  	struct list_head subdevs;
+>
