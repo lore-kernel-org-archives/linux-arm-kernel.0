@@ -1,42 +1,58 @@
-From: zhongjiang@huawei.com (zhong jiang)
-Date: Fri, 16 Dec 2016 17:10:05 +0800
-Subject: [RESEND PATCH 2/2] arm64: make WANT_HUGE_PMD_SHARE depends on
- HUGETLB_PAGE
-In-Reply-To: <1481725151-20549-3-git-send-email-zhongjiang@huawei.com>
-References: <1481725151-20549-1-git-send-email-zhongjiang@huawei.com>
- <1481725151-20549-3-git-send-email-zhongjiang@huawei.com>
-Message-ID: <5853AF6D.20305@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Dec 2016 10:14:39 +0100
+Subject: [PATCH] ARM: disallow ARM_THUMB for ARMv4 builds
+Message-ID: <20161216091457.2452987-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/12/14 22:19, zhongjiang wrote:
-> From: zhong jiang <zhongjiang@huawei.com>
->
-> when HUGETLB_PAGE is disable, WANT_HUGE_PMD_SHARE contains the
-> fuctions should not be use. therefore, we add the dependency.
->
-> Signed-off-by: zhong jiang <zhongjiang@huawei.com>
-> ---
->  arch/arm64/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 969ef88..694ca73 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -640,6 +640,7 @@ config SYS_SUPPORTS_HUGETLBFS
->  
->  config ARCH_WANT_HUGE_PMD_SHARE
->  	def_bool y if ARM64_4K_PAGES || (ARM64_16K_PAGES && !ARM64_VA_BITS_36)
-> +	depends on HUGETLB_PAGE
->  
->  config ARCH_HAS_CACHE_LINE_SIZE
->  	def_bool y
-Hi,
-      I still think it is a issue. Perhaps above changelog is unclear.  Further explain is as follows.
- when hugetlb_pages is disable and arch_want_huge_pmd_share is enable,   we maybe call
- huge_pmd_sahre in hugetlbpage.c, but the function actually is not definition as it is not
- exported.  is it right ??
+With old compilers (gcc-4.3 and earlier), we run into a build error
+when CONFIG_ARM_THUMB is enabled in kernels that have both ARMv4 and
+ARMv4T/ARMv5 CPU support:
 
-Thanks
-zhongjiang
+arch/arm/kernel/entry-armv.S: Assembler messages:
+arch/arm/kernel/entry-armv.S:938: Error: selected processor does not support `bx lr' in ARM mode
+arch/arm/kernel/entry-armv.S:961: Error: selected processor does not support `bx lr' in ARM mode
+arch/arm/kernel/entry-armv.S:1004: Error: selected processor does not support `bx lr' in ARM mode
+
+The problem evidently is that 'bx' cannot work on the old CPUs, but
+the new ones have to use it whenever returning to THUMB user space.
+
+This was discussed a while ago without a conclusion about what
+the proper patch should be to solve it, and came again up now when I
+experimented with old toolchain versions.
+
+This sidesteps the problem by declaring that we do not support
+the configuration and instead have to disable CONFIG_ARM_THUMB
+and not use THUMB user space with a kernel that supports the
+FA526 CPU, which is the only one that is allowed in a multiplatform
+configuration together with ARMv4T/ARMv5 anyway. This is not
+a regression because the configuration never worked anyway.
+The only platform affected by this is moxart, as no other ARMv4
+platforms are part of ARCH_MULTIPLATFORM.
+
+Cc: Jonas Jensen <jonas.jensen@gmail.com>
+Link: http://lkml.iu.edu/hypermail/linux/kernel/1404.1/00908.html
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mm/Kconfig | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
+
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 5d4920c069f2..f7b7aa37964f 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -655,11 +655,7 @@ config ARCH_DMA_ADDR_T_64BIT
+ 
+ config ARM_THUMB
+ 	bool "Support Thumb user binaries" if !CPU_THUMBONLY
+-	depends on CPU_ARM720T || CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || \
+-		CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || \
+-		CPU_ARM1020 || CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || \
+-		CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_V6 || CPU_V6K || \
+-		CPU_V7 || CPU_FEROCEON || CPU_V7M
++	depends on !(CPU_32v3 || CPU_32v4)
+ 	default y
+ 	help
+ 	  Say Y if you want to include kernel support for running user space
+-- 
+2.9.0
