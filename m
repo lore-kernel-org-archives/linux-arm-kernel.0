@@ -1,54 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 16 Dec 2016 12:35:12 +0000
-Subject: [RESEND PATCH 2/2] arm64: make WANT_HUGE_PMD_SHARE depends on
- HUGETLB_PAGE
-In-Reply-To: <5853AF6D.20305@huawei.com>
-References: <1481725151-20549-1-git-send-email-zhongjiang@huawei.com>
- <1481725151-20549-3-git-send-email-zhongjiang@huawei.com>
- <5853AF6D.20305@huawei.com>
-Message-ID: <20161216123512.GF13191@arm.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Fri, 16 Dec 2016 13:37:56 +0100
+Subject: [PATCH] pinctrl: stm32: activate strict mux mode
+In-Reply-To: <1481725456-1030-1-git-send-email-gabriel.fernandez@st.com>
+References: <1481725456-1030-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <42c18683-6d2e-b717-2863-7f6c405cfa83@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 16, 2016 at 05:10:05PM +0800, zhong jiang wrote:
-> On 2016/12/14 22:19, zhongjiang wrote:
-> > From: zhong jiang <zhongjiang@huawei.com>
-> >
-> > when HUGETLB_PAGE is disable, WANT_HUGE_PMD_SHARE contains the
-> > fuctions should not be use. therefore, we add the dependency.
-> >
-> > Signed-off-by: zhong jiang <zhongjiang@huawei.com>
-> > ---
-> >  arch/arm64/Kconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > index 969ef88..694ca73 100644
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -640,6 +640,7 @@ config SYS_SUPPORTS_HUGETLBFS
-> >  
-> >  config ARCH_WANT_HUGE_PMD_SHARE
-> >  	def_bool y if ARM64_4K_PAGES || (ARM64_16K_PAGES && !ARM64_VA_BITS_36)
-> > +	depends on HUGETLB_PAGE
-> >  
-> >  config ARCH_HAS_CACHE_LINE_SIZE
-> >  	def_bool y
-> Hi,
->       I still think it is a issue. Perhaps above changelog is unclear.  Further explain is as follows.
->  when hugetlb_pages is disable and arch_want_huge_pmd_share is enable,   we maybe call
->  huge_pmd_sahre in hugetlbpage.c, but the function actually is not definition as it is not
->  exported.  is it right ??
 
-The only users of ARCH_WANT_HUGE_PMD_SHARE on arm64 are:
 
-arch/arm64/mm/hugetlbpage.c:            if (IS_ENABLED(CONFIG_ARCH_WANT_HUGE_PMD_SHARE) &&
-mm/hugetlb.c:#ifdef CONFIG_ARCH_WANT_HUGE_PMD_SHARE
-mm/hugetlb.c:#else /* !CONFIG_ARCH_WANT_HUGE_PMD_SHARE */
-mm/hugetlb.c:#endif /* CONFIG_ARCH_WANT_HUGE_PMD_SHARE */
+On 12/14/2016 03:24 PM, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+> 
+> This activates strict mode muxing for the STM32 pin controllers,
+> as these do not allow GPIO and functions to use the same pin
+> simultaneously.
+> 
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> ---
+>  drivers/pinctrl/stm32/pinctrl-stm32.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
+> index efc4371..c983a1e 100644
+> --- a/drivers/pinctrl/stm32/pinctrl-stm32.c
+> +++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
+> @@ -631,6 +631,7 @@ static int stm32_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
+>  	.get_function_groups	= stm32_pmx_get_func_groups,
+>  	.set_mux		= stm32_pmx_set_mux,
+>  	.gpio_set_direction	= stm32_pmx_gpio_set_direction,
+> +	.strict			= true,
+>  };
+>  
+>  /* Pinconf functions */
+> 
 
-and neither of those files are compiled if !HUGETLB_PAGE.
+Hi Gaby
 
-Are you actually seeing a problem here?
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
 
-Will
+regards
