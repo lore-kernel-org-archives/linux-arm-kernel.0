@@ -1,36 +1,63 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Fri, 16 Dec 2016 15:16:20 +0100
-Subject: jemalloc testsuite stalls in memset
-In-Reply-To: <20161216063940.GA1334@bbox> (Minchan Kim's message of "Fri, 16
- Dec 2016 15:39:40 +0900")
-References: <mvmmvfy37g1.fsf@hawking.suse.de> <20161214235031.GA2912@bbox>
- <mvm4m2535pc.fsf@hawking.suse.de> <20161216063940.GA1334@bbox>
-Message-ID: <87d1gshscr.fsf@suse.de>
+From: zhongjiang@huawei.com (zhong jiang)
+Date: Fri, 16 Dec 2016 22:08:53 +0800
+Subject: [RESEND PATCH 2/2] arm64: make WANT_HUGE_PMD_SHARE depends on
+ HUGETLB_PAGE
+In-Reply-To: <20161216123512.GF13191@arm.com>
+References: <1481725151-20549-1-git-send-email-zhongjiang@huawei.com>
+ <1481725151-20549-3-git-send-email-zhongjiang@huawei.com>
+ <5853AF6D.20305@huawei.com> <20161216123512.GF13191@arm.com>
+Message-ID: <5853F575.1080109@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Dez 16 2016, Minchan Kim <minchan@kernel.org> wrote:
-
-> Below helps?
+On 2016/12/16 20:35, Will Deacon wrote:
+> On Fri, Dec 16, 2016 at 05:10:05PM +0800, zhong jiang wrote:
+>> On 2016/12/14 22:19, zhongjiang wrote:
+>>> From: zhong jiang <zhongjiang@huawei.com>
+>>>
+>>> when HUGETLB_PAGE is disable, WANT_HUGE_PMD_SHARE contains the
+>>> fuctions should not be use. therefore, we add the dependency.
+>>>
+>>> Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+>>> ---
+>>>  arch/arm64/Kconfig | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>> index 969ef88..694ca73 100644
+>>> --- a/arch/arm64/Kconfig
+>>> +++ b/arch/arm64/Kconfig
+>>> @@ -640,6 +640,7 @@ config SYS_SUPPORTS_HUGETLBFS
+>>>  
+>>>  config ARCH_WANT_HUGE_PMD_SHARE
+>>>  	def_bool y if ARM64_4K_PAGES || (ARM64_16K_PAGES && !ARM64_VA_BITS_36)
+>>> +	depends on HUGETLB_PAGE
+>>>  
+>>>  config ARCH_HAS_CACHE_LINE_SIZE
+>>>  	def_bool y
+>> Hi,
+>>       I still think it is a issue. Perhaps above changelog is unclear.  Further explain is as follows.
+>>  when hugetlb_pages is disable and arch_want_huge_pmd_share is enable,   we maybe call
+>>  huge_pmd_sahre in hugetlbpage.c, but the function actually is not definition as it is not
+>>  exported.  is it right ??
+> The only users of ARCH_WANT_HUGE_PMD_SHARE on arm64 are:
 >
-> diff --git a/mm/huge_memory.c b/mm/huge_memory.c
-> index e10a4fe..dc37c9a 100644
-> --- a/mm/huge_memory.c
-> +++ b/mm/huge_memory.c
-> @@ -1611,6 +1611,7 @@ int madvise_free_huge_pmd(struct mmu_gather *tlb, struct vm_area_struct *vma,
->  			tlb->fullmm);
->  		orig_pmd = pmd_mkold(orig_pmd);
->  		orig_pmd = pmd_mkclean(orig_pmd);
-> +		orig_pmd = pmd_wrprotect(orig_pmd);
->  
->  		set_pmd_at(mm, addr, pmd, orig_pmd);
->  		tlb_remove_pmd_tlb_entry(tlb, pmd, addr);
+> arch/arm64/mm/hugetlbpage.c:            if (IS_ENABLED(CONFIG_ARCH_WANT_HUGE_PMD_SHARE) &&
+> mm/hugetlb.c:#ifdef CONFIG_ARCH_WANT_HUGE_PMD_SHARE
+> mm/hugetlb.c:#else /* !CONFIG_ARCH_WANT_HUGE_PMD_SHARE */
+> mm/hugetlb.c:#endif /* CONFIG_ARCH_WANT_HUGE_PMD_SHARE */
+>
+> and neither of those files are compiled if !HUGETLB_PAGE.
+>
+> Are you actually seeing a problem here?
+>
+> Will
+>
+> .
+>
+  I got it.  Please forget the  stupid patch and my stupid comments.
+ 
+ but the first patch look reasonable.  Is it accepted  ?
 
-Thanks, this fixes the issue (tested with 4.9).
-
-Andreas.
-
--- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
+ Thanks
+ zhongjiang
