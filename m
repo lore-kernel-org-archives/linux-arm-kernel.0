@@ -1,82 +1,36 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 16 Dec 2016 08:25:23 +0100
-Subject: Linux fails to start secondary cores when system resumes from
- Suspend-to-RAM
-In-Reply-To: <CADjb_WQ8ZTtcXYQ_3iobLCW7+rnG8FqyFQ1E47AZVGxP0JyB0w@mail.gmail.com>
-References: <d4db03ce-80fc-2968-c5c2-84f79272ce8d@free.fr>
- <CADjb_WQ8ZTtcXYQ_3iobLCW7+rnG8FqyFQ1E47AZVGxP0JyB0w@mail.gmail.com>
-Message-ID: <8c3c6592-1e9a-10d3-2a89-c22a2a23cf4b@free.fr>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 16 Dec 2016 15:26:44 +0800
+Subject: [PATCH v2 0/3] Add audio clocks support for ZTE ZX296718
+Message-ID: <1481873207-22929-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/12/2016 06:14, Yu Chen wrote:
+From: Shawn Guo <shawn.guo@linaro.org>
 
-> On Thu, Dec 15, 2016 at 11:18 PM, Mason wrote:
->
->> I'm playing with suspend-to-RAM on the tango platform:
->>
->>   http://lxr.free-electrons.com/source/arch/arm/mach-tango/platsmp.c
->>
->> When the system is suspended, the CPU is completely powered down
->> (receives no power whatsoever). When the system receives a wake-up
->> event, the CPU is powered up, and starts up exactly the same way
->> as for a cold boot (I think).
->>
->> However, while Linux successfully starts the secondary cores when
->> the system first boots, it fails when the system resumes from "S3".
->>
->> I added printascii() calls inside secondary_start_kernel() and I can
->> see that the following instruction are "properly" run:
->>
->>         cpu_switch_mm(mm->pgd, mm);
->>         local_flush_bp_all();
->>         enter_lazy_tlb(mm, current);
->>
->> but it seems local_flush_tlb_all(); never returns... :-(
->>
->>   http://lxr.free-electrons.com/source/arch/arm/include/asm/tlbflush.h#L332
->>
->>
->> Looking more closely at that function, it seems to be failing in:
->>
->>         tlb_op(TLB_V7_UIS_FULL, "c8, c7, 0", zero);
->>
->> (meaning: I get a log before, but not after)
->>
->> On my system, tlb_op(TLB_V7_UIS_FULL, "c8, c7, 0", zero);
->> resolves to:
->>
->> c010ce18:       e3170602        tst     r7, #2097152    ; 0x200000
->> c010ce1c:       1e086f17        mcrne   15, 0, r6, cr8, cr7, {0}
->>
->> What could be happening?
->> Can a core "hang" on this instruction?
->> Can a core "crash" on this instruction (meaning, an exception
->> is raised, and the core loops inside the exception code without
->> Linux noticing... that seems unlikely)
->>
->> I'm stumped. Could someone throw me a clue?
->
-> try online/offline the nonboot CPUs via
-> /sys/devices/system/cpu/cpuX/online
+It adds missing audio related clocks for ZTE SoC ZX296718.  With these
+clocks added, we can get HDMI audio work through SPDIF interface.
 
-offline + online secondary core works.
+Changes for v2:
+ - Add a patch to clean up existing driver code.
+ - Clean up unused divider configuration lookup table.
+ - Use uintptr_t instead of u64 to cast 'reg_base' for summation.
+ - Instead of panic, give an error message and return error code when
+   of_clk_add_hw_provider() call fails.
+ - Drop unnecessary ulong type cast.
+ - Use pr_debug instead of pr_info to avoid noisy messages
 
-Note: all cores are in the same power domain, so even if all
-secondary cores are offline, the CPU block remains powered up
-(secondary cores are just held in reset, or spinning in WFI,
-depending on the firmware version).
+Jun Nie (1):
+  clk: zte: add audio clocks for zx296718
 
-When the system is suspended, the CPU block (as well as 99%
-of the system) is powered down. Thus, upon resume, all cores
-will run the boot sequence (again).
+Shawn Guo (2):
+  clk: zx296718: do not panic on failure
+  dt-bindings: zx296718-clk: add compatible for audio clock controller
 
-I'm guessing that something goes wrong during this second
-boot sequence. Could there be a race condition between the
-primary core and one of the secondary cores?
+ .../devicetree/bindings/clock/zx296718-clk.txt     |   3 +
+ drivers/clk/zte/clk-zx296718.c                     | 154 +++++++++++++++++++--
+ drivers/clk/zte/clk.c                              | 127 +++++++++++++++++
+ drivers/clk/zte/clk.h                              |  21 +++
+ 4 files changed, 296 insertions(+), 9 deletions(-)
 
-What is different in the Linux boot sequence between cold
-boot and resume? I'm thinking that the state stored in RAM
-is in fact incompatible with what Linux expects when it resumes...
-
-Regards.
+-- 
+1.9.1
