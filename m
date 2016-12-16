@@ -1,108 +1,112 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 16 Dec 2016 16:33:58 +0100
-Subject: [RFC v2 PATCH 0/3] Fix dma_alloc_coherent() and friends for NOMMU
-In-Reply-To: <58540199.6000002@arm.com>
-References: <1481636704-18948-1-git-send-email-vladimir.murzin@arm.com>
- <82f0d72e-7029-ad88-3e44-ab48784297fa@st.com> <58540199.6000002@arm.com>
-Message-ID: <29733f5a-d833-e8f2-b0cd-3734ea68996a@st.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 16 Dec 2016 17:35:57 +0200
+Subject: [PATCH 1/3] dmaengine: xilinx_dma: Check for channel idle state
+ before submitting dma descriptor
+In-Reply-To: <1481814682-31780-2-git-send-email-appanad@xilinx.com>
+References: <1481814682-31780-1-git-send-email-appanad@xilinx.com>
+ <1481814682-31780-2-git-send-email-appanad@xilinx.com>
+Message-ID: <5248247.n0rV8xBPrZ@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Kedareswara,
 
-On 12/16/2016 04:00 PM, Vladimir Murzin wrote:
-> Hi Alexandre,
->
-> On 16/12/16 14:57, Alexandre Torgue wrote:
->> Hi Vladimir,
->>
->> On 12/13/2016 02:45 PM, Vladimir Murzin wrote:
->>> Hi,
->>>
->>> It seem that addition of cache support for M-class cpus uncovered
->>> latent bug in DMA usage. NOMMU memory model has been treated as being
->>> always consistent; however, for R/M classes of cpu memory can be
->>> covered by MPU which in turn might configure RAM as Normal
->>> i.e. bufferable and cacheable. It breaks dma_alloc_coherent() and
->>> friends, since data can stuck in caches now or be buffered.
->>>
->>> This patch set is trying to address the issue by providing region of
->>> memory suitable for consistent DMA operations. It is supposed that such
->>> region is marked by MPU as non-cacheable. Since we have MPU support in
->>> Linux for R-class only and M-class setting MPU in bootloader, proposed
->>> interface to advertise such memory is via "memdma=size at start" command
->>> line option, to avoid clashing with normal memory (which usually comes
->>> from dts) it'd be safer to use it together with "mem=" command line
->>> option. Meanwhile, I'm open to suggestions for the better way telling
->>> Linux of such memory.
->>>
->>> For configuration without cache support (like Cortex-M3/M4) dma
->>> operations are forced to be coherent and wired with dma-noop. Such
->>> decision is made based on cacheid global variable. In case cpu
->>> supports caches and no coherent memory region is given - dma is
->>> disallowed. Probably, some other important checks are missing, so I'll
->>> all my ears :)
->>>
->>> To make life easier NOMMU dma operations are kept in separate
->>> compilation unit.
->>>
->>> Thanks!
->>>
->>> Changelog:
->>>
->>>     RFC v1 -> RFC v2
->>>            - s/dmac_unmap_area/dmac_map_area in __dma_page_cpu_to_dev()
->>>        - removed unrelated changes in nommu.c
->>>
->>> Vladimir Murzin (3):
->>>   ARM: NOMMU: introduce dma operations for noMMU
->>>   ARM: NOMMU: set ARM_DMA_MEM_BUFFERABLE for M-class cpus
->>>   ARM: dma-mapping: remove traces of NOMMU code
->>>
->>>  arch/arm/include/asm/dma-mapping.h |    3 +-
->>>  arch/arm/mm/Kconfig                |    2 +-
->>>  arch/arm/mm/Makefile               |    5 +-
->>>  arch/arm/mm/dma-mapping-nommu.c    |  262 ++++++++++++++++++++++++++++++++++++
->>>  arch/arm/mm/dma-mapping.c          |   26 +---
->>>  arch/arm/mm/mm.h                   |    3 +
->>>  arch/arm/mm/nommu.c                |    6 +
->>>  7 files changed, 278 insertions(+), 29 deletions(-)
->>>  create mode 100644 arch/arm/mm/dma-mapping-nommu.c
->>>
->>
->> First, thanks for this series.
->>
->> I tested it on stm32f746 platform. Main issues related to cache and DMA are fixed but I still have an issue using dma_zalloc_alloc API. Allocated memory is not set to zero.
->> Can you have a look on it please?
->
-> Thanks for testing! I think following diff should fix dma_zalloc_alloc():
+Thank you for the patch.
 
-Yes. With the patch below, it works fine.
+On Thursday 15 Dec 2016 20:41:20 Kedareswara rao Appana wrote:
+> Add channel idle state to ensure that dma descriptor is not
+> submitted when VDMA engine is in progress.
+>
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+>  drivers/dma/xilinx/xilinx_dma.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/drivers/dma/xilinx/xilinx_dma.c
+> b/drivers/dma/xilinx/xilinx_dma.c index 8288fe4..736c2a3 100644
+> --- a/drivers/dma/xilinx/xilinx_dma.c
+> +++ b/drivers/dma/xilinx/xilinx_dma.c
+> @@ -321,6 +321,7 @@ struct xilinx_dma_tx_descriptor {
+>   * @cyclic: Check for cyclic transfers.
+>   * @genlock: Support genlock mode
+>   * @err: Channel has errors
+> + * @idle: Check for channel idle
+>   * @tasklet: Cleanup work after irq
+>   * @config: Device configuration info
+>   * @flush_on_fsync: Flush on Frame sync
+> @@ -351,6 +352,7 @@ struct xilinx_dma_chan {
+>  	bool cyclic;
+>  	bool genlock;
+>  	bool err;
+> +	bool idle;
+>  	struct tasklet_struct tasklet;
+>  	struct xilinx_vdma_config config;
+>  	bool flush_on_fsync;
+> @@ -966,6 +968,7 @@ static void xilinx_dma_halt(struct xilinx_dma_chan
+> *chan) chan, dma_ctrl_read(chan, XILINX_DMA_REG_DMASR));
+>  		chan->err = true;
+>  	}
+> +	chan->idle = true;
+>  }
+> 
+>  /**
+> @@ -1007,6 +1010,9 @@ static void xilinx_vdma_start_transfer(struct
+> xilinx_dma_chan *chan)
+> 	if (chan->err)
+>  		return;
+> 
+> +	if (!chan->idle)
+> +		return;
 
-Thanks
-Alex
+Don't you need to perform the same check for the DMA and CDMA channels ? If 
+so, shouldn't this be moved to common code ?
 
->
-> diff --git a/arch/arm/mm/dma-mapping-nommu.c b/arch/arm/mm/dma-mapping-nommu.c
-> index f92d98a..1f97bb8 100644
-> --- a/arch/arm/mm/dma-mapping-nommu.c
-> +++ b/arch/arm/mm/dma-mapping-nommu.c
-> @@ -38,6 +38,7 @@ static void *arm_nommu_dma_alloc(struct device *dev, size_t size,
->
->         ptr = (void *)gen_pool_alloc(dma_pool, size);
->         if (ptr) {
-> +               memset(ptr, 0, size);
->                 *dma_handle = __pa(ptr);
->                 dmac_flush_range(ptr, ptr + size);
->                 outer_flush_range(__pa(ptr), __pa(ptr) + size);
->
->
-> Cheers
-> Vladimir
->
->>
->> Thanks
->> Alex
->>
->>
->
+There's another problem (not strictly introduced by this patch) I wanted to 
+mention. The append_desc_queue() function, called from your tx_submit handler, 
+appends descriptors to the pending_list. The DMA engine API states that a 
+transfer submitted by tx_submit will not be executed until .issue_pending() is 
+called. However, if a transfer is in progress at tx_submit time, I believe 
+that the IRQ handler, at transfer completion, will start the next transfer 
+from the pending_list even if .issue_pending() hasn't been called for it.
+
+>  	if (list_empty(&chan->pending_list))
+>  		return;
+
+Now that you catch busy channels with a software flag, do you still need the 
+xilinx_dma_is_running() and xilinx_dma_is_idle() checks ? Three different 
+checks for the same or very similar conditions are confusing, if you really 
+need them you should document clearly how they differ.
+
+> @@ -1110,6 +1116,7 @@ static void xilinx_vdma_start_transfer(struct
+> xilinx_dma_chan *chan) vdma_desc_write(chan, XILINX_DMA_REG_VSIZE,
+> last->hw.vsize);
+>  	}
+> 
+> +	chan->idle = false;
+
+(and this too)
+
+>  	if (!chan->has_sg) {
+>  		list_del(&desc->node);
+>  		list_add_tail(&desc->node, &chan->active_list);
+> @@ -1447,6 +1454,7 @@ static irqreturn_t xilinx_dma_irq_handler(int irq,
+> void *data) if (status & XILINX_DMA_DMASR_FRM_CNT_IRQ) {
+>  		spin_lock(&chan->lock);
+>  		xilinx_dma_complete_descriptor(chan);
+> +		chan->idle = true;
+>  		chan->start_transfer(chan);
+>  		spin_unlock(&chan->lock);
+>  	}
+> @@ -2327,6 +2335,7 @@ static int xilinx_dma_chan_probe(struct
+> xilinx_dma_device *xdev, chan->has_sg = xdev->has_sg;
+>  	chan->desc_pendingcount = 0x0;
+>  	chan->ext_addr = xdev->ext_addr;
+> +	chan->idle = true;
+> 
+>  	spin_lock_init(&chan->lock);
+>  	INIT_LIST_HEAD(&chan->pending_list);
+
+-- 
+Regards,
+
+Laurent Pinchart
