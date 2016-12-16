@@ -1,87 +1,82 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 16 Dec 2016 14:40:41 +0800
-Subject: [PATCH 2/2] clk: zte: add audio clocks for zx296718
-In-Reply-To: <20161208210453.GH5423@codeaurora.org>
-References: <1481189157-8995-1-git-send-email-shawnguo@kernel.org>
- <1481189157-8995-2-git-send-email-shawnguo@kernel.org>
- <20161208210453.GH5423@codeaurora.org>
-Message-ID: <20161216064039.GB8787@dragon>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 16 Dec 2016 08:25:23 +0100
+Subject: Linux fails to start secondary cores when system resumes from
+ Suspend-to-RAM
+In-Reply-To: <CADjb_WQ8ZTtcXYQ_3iobLCW7+rnG8FqyFQ1E47AZVGxP0JyB0w@mail.gmail.com>
+References: <d4db03ce-80fc-2968-c5c2-84f79272ce8d@free.fr>
+ <CADjb_WQ8ZTtcXYQ_3iobLCW7+rnG8FqyFQ1E47AZVGxP0JyB0w@mail.gmail.com>
+Message-ID: <8c3c6592-1e9a-10d3-2a89-c22a2a23cf4b@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2016 at 01:04:53PM -0800, Stephen Boyd wrote:
-> > +	if (of_clk_add_hw_provider(np, of_clk_hw_onecell_get, &audio_hw_onecell_data))
-> > +		panic("could not register clk provider\n");
-> 
-> Why don't we return error? We returned errors before if we
-> couldn't map the ioregion.
+On 16/12/2016 06:14, Yu Chen wrote:
 
-Yes.  Rather than panic, we should check return and give an error
-message in case of failure.
+> On Thu, Dec 15, 2016 at 11:18 PM, Mason wrote:
+>
+>> I'm playing with suspend-to-RAM on the tango platform:
+>>
+>>   http://lxr.free-electrons.com/source/arch/arm/mach-tango/platsmp.c
+>>
+>> When the system is suspended, the CPU is completely powered down
+>> (receives no power whatsoever). When the system receives a wake-up
+>> event, the CPU is powered up, and starts up exactly the same way
+>> as for a cold boot (I think).
+>>
+>> However, while Linux successfully starts the secondary cores when
+>> the system first boots, it fails when the system resumes from "S3".
+>>
+>> I added printascii() calls inside secondary_start_kernel() and I can
+>> see that the following instruction are "properly" run:
+>>
+>>         cpu_switch_mm(mm->pgd, mm);
+>>         local_flush_bp_all();
+>>         enter_lazy_tlb(mm, current);
+>>
+>> but it seems local_flush_tlb_all(); never returns... :-(
+>>
+>>   http://lxr.free-electrons.com/source/arch/arm/include/asm/tlbflush.h#L332
+>>
+>>
+>> Looking more closely at that function, it seems to be failing in:
+>>
+>>         tlb_op(TLB_V7_UIS_FULL, "c8, c7, 0", zero);
+>>
+>> (meaning: I get a log before, but not after)
+>>
+>> On my system, tlb_op(TLB_V7_UIS_FULL, "c8, c7, 0", zero);
+>> resolves to:
+>>
+>> c010ce18:       e3170602        tst     r7, #2097152    ; 0x200000
+>> c010ce1c:       1e086f17        mcrne   15, 0, r6, cr8, cr7, {0}
+>>
+>> What could be happening?
+>> Can a core "hang" on this instruction?
+>> Can a core "crash" on this instruction (meaning, an exception
+>> is raised, and the core loops inside the exception code without
+>> Linux noticing... that seems unlikely)
+>>
+>> I'm stumped. Could someone throw me a clue?
+>
+> try online/offline the nonboot CPUs via
+> /sys/devices/system/cpu/cpuX/online
 
-> 
-> > +	pr_info("audio-clk init over, nr:%d\n", AUDIO_NR_CLKS);
-> 
-> debug noise?
+offline + online secondary core works.
 
-Agreed.  I will just clean it up.
+Note: all cores are in the same power domain, so even if all
+secondary cores are offline, the CPU block remains powered up
+(secondary cores are just held in reset, or spinning in WFI,
+depending on the firmware version).
 
-<snip>
+When the system is suspended, the CPU block (as well as 99%
+of the system) is powered down. Thus, upon resume, all cores
+will run the boot sequence (again).
 
-> > +static unsigned long audio_calc_rate(struct clk_zx_audio_divider *audio_div,
-> > +				     u32 reg_frac, u32 reg_int,
-> > +				     unsigned long parent_rate)
-> > +{
-> > +	unsigned long rate, m, n;
-> > +
-> > +	if (audio_div->table) {
-> > +		const struct zx_clk_audio_div_table *divt = audio_div->table;
-> > +
-> > +		for (; divt->rate; divt++) {
-> > +			if ((divt->int_reg == reg_int) && (divt->frac_reg == reg_frac))
-> 
-> Please remove extra parenthesis here.
+I'm guessing that something goes wrong during this second
+boot sequence. Could there be a race condition between the
+primary core and one of the secondary cores?
 
-The whole hunk of the code will be dropped, since the divider lookup
-table is not actually used.
+What is different in the Linux boot sequence between cold
+boot and resume? I'm thinking that the state stored in RAM
+is in fact incompatible with what Linux expects when it resumes...
 
-> 
-> > +				return divt->rate;
-> > +		}
-> > +	}
-> > +	if (audio_div->table)
-> > +		pr_warn("cannot found the config(int_reg:0x%x, frac_reg:0x%x) in table, we will caculate it\n",
-> > +			reg_int, reg_frac);
-
-<snip>
-
-> > +	div_table->rate = (ulong)(parent_rate * n) / ((ulong)reg_int * n + m);
-> 
-> Please don't use ulong, use unsigned long. Also consider using
-> local variables so the line isn't overly long.
-
-It seems to me that none of the type casts is really necessary.  So I
-will just drop them.
-
-> 
-> > +	div_table->int_reg = reg_int;
-> > +	div_table->frac_reg = reg_frac;
-> > +}
-> [...]
-> > +
-> > +static int zx_audio_div_set_rate(struct clk_hw *hw, unsigned long rate,
-> > +				    unsigned long parent_rate)
-> > +{
-> > +	struct clk_zx_audio_divider *zx_audio_div = to_clk_zx_audio_div(hw);
-> > +	struct zx_clk_audio_div_table divt;
-> > +	unsigned int val;
-> > +
-> > +	audio_calc_reg(zx_audio_div, &divt, rate, parent_rate);
-> > +	if (divt.rate != rate)
-> > +		pr_info("the real rate is:%ld", divt.rate);
-> 
-> Debug noise?
-
-I will change it to pr_debug.
-
-Shawn
+Regards.
