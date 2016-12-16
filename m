@@ -1,262 +1,69 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 16 Dec 2016 13:07:21 +0100
-Subject: [PATCH v10 7/8] arm/arm64: vgic: Implement
- KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
-In-Reply-To: <1480576187-5012-8-git-send-email-vijay.kilari@gmail.com>
-References: <1480576187-5012-1-git-send-email-vijay.kilari@gmail.com>
- <1480576187-5012-8-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <4272e489-7aa4-b77d-ec09-22b58af78336@redhat.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 16 Dec 2016 09:13:34 -0300
+Subject: [PATCH] arm: dt: Initialize boot_command_line from CONFIG_CMDLINE
+ in case DT does not provide /chosen/bootargs
+In-Reply-To: <201612161246.12155@pali>
+References: <1481749963-8664-1-git-send-email-pali.rohar@gmail.com>
+ <20161214235224.GH14217@n2100.armlinux.org.uk> <201612150109.20868@pali>
+ <201612161246.12155@pali>
+Message-ID: <029ec718-89c0-b08e-de7e-279946c1a9bd@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vijaya,
+Hello Pali,
 
-On 01/12/2016 08:09, vijay.kilari at gmail.com wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+On 12/16/2016 08:46 AM, Pali Roh?r wrote:
+> On Thursday 15 December 2016 01:09:20 Pali Roh?r wrote:
+>> On Thursday 15 December 2016 00:52:24 Russell King - ARM Linux wrote:
+>>> On Wed, Dec 14, 2016 at 10:12:43PM +0100, Pali Roh?r wrote:
+>>>> Commit 008a2ebcd677 ("ARM: dts: omap3: Remove skeleton.dtsi
+>>>> usage") broke support for setting cmdline on Nokia N900 via
+>>>> CONFIG_CMDLINE.
+>>>>
+>>>> It is because arm code booted in DT mode parse cmdline only via
+>>>> function early_init_dt_scan_chosen() and that function does not
+>>>> fill variable boot_command_line when DTB does not contain /chosen
+>>>> entry. It is called from function early_init_dt_scan_nodes() in
+>>>> setup_machine_fdt().
+>>>>
+>>>> This patch fixes it by explicitly filling boot_command_line in
+>>>> function setup_machine_fdt() after calling
+>>>> early_init_dt_scan_nodes() in case boot_command_line still
+>>>> remains empty.
+>>>
+>>> This looks like a hack.
+>>>
+>>> First, the matter of the ATAGs compatibility.  The decompressor
+>>> relies on there being a pre-existing /chosen node to insert the
+>>> command line and other parameters into.  If we've dropped it (by
+>>> dropping skeleton.dtsi) then we've just regressed more than just
+>>> N900 - the decompressor won't be able to merge the ATAGs into the
+>>> concatenated FDT.
+>>
+>> Hm... I did not think about it. But right this can be broken too...
 > 
-> Userspace requires to store and restore of line_level for
-> level triggered interrupts using ioctl KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO.
+> Tony, Javier: are you aware of above ??? problem?
 > 
-> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> ---
->  arch/arm/include/uapi/asm/kvm.h     |  7 ++++++
->  arch/arm64/include/uapi/asm/kvm.h   |  6 +++++
->  virt/kvm/arm/vgic/vgic-kvm-device.c | 45 +++++++++++++++++++++++++++++++++++-
->  virt/kvm/arm/vgic/vgic-mmio-v3.c    | 11 +++++++++
->  virt/kvm/arm/vgic/vgic-mmio.c       | 46 +++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic-mmio.h       |  5 ++++
->  virt/kvm/arm/vgic/vgic.h            |  2 ++
->  7 files changed, 121 insertions(+), 1 deletion(-)
+> It looks like commit 008a2ebcd677 ("ARM: dts: omap3: Remove 
+> skeleton.dtsi usage") should be really reverted.
 > 
-> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> index 98658d9d..f347779 100644
-> --- a/arch/arm/include/uapi/asm/kvm.h
-> +++ b/arch/arm/include/uapi/asm/kvm.h
-> @@ -191,6 +191,13 @@ struct kvm_arch_memory_slot {
->  #define KVM_DEV_ARM_VGIC_GRP_CTRL       4
->  #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
->  #define KVM_DEV_ARM_VGIC_CPU_SYSREGS    6
-> +#define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO 7
-> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
-> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
-> +			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
-> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK	0x3ff
-> +#define VGIC_LEVEL_INFO_LINE_LEVEL	0
-> +
->  #define   KVM_DEV_ARM_VGIC_CTRL_INIT    0
->  
->  /* KVM_IRQ_LINE irq field index values */
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 91c7137..4100f8c 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -211,6 +211,12 @@ struct kvm_arch_memory_slot {
->  #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
->  #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
->  #define KVM_DEV_ARM_VGIC_CPU_SYSREGS    6
-> +#define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO 7
-> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
-> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
-> +			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
-> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK	0x3ff
-> +#define VGIC_LEVEL_INFO_LINE_LEVEL	0
->  
->  #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
->  
-> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> index b6266fe..d5f7197 100644
-> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> @@ -510,6 +510,21 @@ static int vgic_v3_attr_regs_access(struct kvm_device *dev,
->  						  regid, reg);
->  		break;
->  	}
-> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-> +		unsigned int info, intid;
-> +
-> +		info = (attr->attr & KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK) >>
-> +			KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT;
-> +		if (info == VGIC_LEVEL_INFO_LINE_LEVEL) {
-> +			intid = attr->attr &
-> +				KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK;
-> +			ret = vgic_v3_line_level_info_uaccess(vcpu, is_write,
-> +							      intid, reg);
-> +		} else {
-> +			ret = -EINVAL;
-> +		}
-> +		break;
-> +	}
->  	default:
->  		ret = -EINVAL;
->  		break;
-> @@ -552,6 +567,17 @@ static int vgic_v3_set_attr(struct kvm_device *dev,
->  
->  		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
->  	}
-> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-> +		u64 reg;
-> +		u32 tmp32;
-> +
-> +		if (get_user(tmp32, uaddr))
-> +			return -EFAULT;
-> +
-> +		reg = tmp32;
-> +		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
-> +	}
->  	}
->  	return -ENXIO;
->  }
-> @@ -587,8 +613,18 @@ static int vgic_v3_get_attr(struct kvm_device *dev,
->  			return ret;
->  		return put_user(reg, uaddr);
->  	}
-> -	}
-> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-> +		u64 reg;
-> +		u32 tmp32;
->  
-> +		ret = vgic_v3_attr_regs_access(dev, attr, &reg, false);
-> +		if (ret)
-> +			return ret;
-> +		tmp32 = reg;
-> +		return put_user(tmp32, uaddr);
-> +	}
-> +	}
->  	return -ENXIO;
->  }
->  
-> @@ -609,6 +645,13 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
->  		return vgic_v3_has_attr_regs(dev, attr);
->  	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
->  		return 0;
-> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-> +		if (((attr->attr & KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK) >>
-> +		      KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT) ==
-> +		      VGIC_LEVEL_INFO_LINE_LEVEL)
-> +			return 0;
-> +		break;
-> +	}
->  	case KVM_DEV_ARM_VGIC_GRP_CTRL:
->  		switch (attr->attr) {
->  		case KVM_DEV_ARM_VGIC_CTRL_INIT:
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index 51439c9..9491d72 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -809,3 +809,14 @@ int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
->  		return vgic_uaccess(vcpu, &rd_dev, is_write,
->  				    offset, val);
->  }
-> +
-> +int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-> +				    u32 intid, u64 *val)
-> +{
-I don't see anyone checking vINTID is multiple of 32 as emphasized in
-Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-> +	if (is_write)
-> +		vgic_write_irq_line_level_info(vcpu, intid, *val);
-> +	else
-> +		*val = vgic_read_irq_line_level_info(vcpu, intid);
-> +
-> +	return 0;
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> index f81e0e5..28fef92b 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> @@ -371,6 +371,52 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
->  	}
->  }
->  
-> +u64 vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid)
-> +{
-> +	int i;
-> +	u64 val = 0;
-> +
-> +	for (i = 0; i < 32; i++) {
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +
-> +		if (irq->line_level)
-> +			val |= (1U << i);
-what about SGIs and higher ID than the number of interrupts supported.
-Spec says RAZ/WI.
-> +
-> +		vgic_put_irq(vcpu->kvm, irq);
-> +	}
-> +
-> +	return val;
-> +}
-> +
-> +void vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
-> +				    const u64 val)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < 32; i++) {
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +
-same as above.
-> +		spin_lock(&irq->irq_lock);
-> +		if (val & (1U << i)) {
-> +			if (irq->config == VGIC_CONFIG_LEVEL) {
-> +				irq->line_level = true;
-> +				irq->pending = true;
-> +				vgic_queue_irq_unlock(vcpu->kvm, irq);
-> +			} else {
-> +				spin_unlock(&irq->irq_lock);
-> +			}
-> +		} else {
-> +			if (irq->config == VGIC_CONFIG_EDGE ||
-can't we just ignore VGIC_CONFIG_EDGE case for which line_level is not
-modeled?
-> +			    (irq->config == VGIC_CONFIG_LEVEL &&
-> +			    !irq->soft_pending))
-> +				irq->line_level = false;
-To me the line level does not depend on the soft_pending bit. The
-pending state depends on both.
 
-Thanks
+I don't think reverting the mentioned commit is the correct fix for your
+problem. We are trying to get rid of skeleton.dtsi for many reasons, see
+commit commit ("3ebee5a2e141 arm64: dts: kill skeleton.dtsi").
 
-Eric
-> +			spin_unlock(&irq->irq_lock);
-> +		}
-> +
-> +		vgic_put_irq(vcpu->kvm, irq);
-> +	}
-> +}
-> +
->  static int match_region(const void *key, const void *elt)
->  {
->  	const unsigned int offset = (unsigned long)key;
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-> index 1cc7faf..b9423b4 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.h
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
-> @@ -181,6 +181,11 @@ int vgic_validate_mmio_region_addr(struct kvm_device *dev,
->  				   const struct vgic_register_region *regions,
->  				   int nr_regions, gpa_t addr);
->  
-> +u64 vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid);
-> +
-> +void vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
-> +				    const u64 val);
-> +
->  unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
->  
->  unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev);
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index eac272c..60d4350 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -144,6 +144,8 @@ int vgic_v3_cpu_sysregs_uaccess(struct kvm_vcpu *vcpu, bool is_write,
->  			 u64 id, u64 *val);
->  int vgic_v3_has_cpu_sysregs_attr(struct kvm_vcpu *vcpu, bool is_write, u64 id,
->  				u64 *reg);
-> +int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-> +				    u32 intid, u64 *val);
->  int kvm_register_vgic_device(unsigned long type);
->  void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
->  void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-> 
+Also, the chosen node is mentioned to be optional in the ePAPR document
+and u-boot creates a chosen node if isn't found [0] so this issue is only
+present in boards that don't use u-boot like the N900/N950/N9 phones.
+
+So if NOLO doesn't do the same than u-boot and the kernel expects a chosen
+node, I suggest to add an empty chosen node in the omap3-n900.dts and
+omap3-n950-n9.dtsi device tree source files.
+
+[0]: http://git.denx.de/?p=u-boot.git;a=blob;f=common/fdt_support.c;h=c9f7019e38e8de1469f506cdd57353fd27d8e134;hb=HEAD#l226
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
