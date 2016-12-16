@@ -1,56 +1,115 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Dec 2016 16:27:22 +0000
-Subject: [PATCH] arm: dt: Initialize boot_command_line from
- CONFIG_CMDLINE in case DT does not provide /chosen/bootargs
-In-Reply-To: <201612161713.46770@pali>
-References: <1481749963-8664-1-git-send-email-pali.rohar@gmail.com>
- <1b779429-8ce4-a49b-38e4-573b28a7c05f@osg.samsung.com>
- <20161216154029.GF4920@atomide.com> <201612161713.46770@pali>
-Message-ID: <20161216162722.GN14217@n2100.armlinux.org.uk>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Fri, 16 Dec 2016 11:30:41 -0500
+Subject: [PATCH V9 1/3] ACPI: Generic GSI: Do not attempt to map non-GSI
+ IRQs during bus scan
+In-Reply-To: <20161216162439.GA24673@red-moon>
+References: <1481753438-3905-1-git-send-email-agustinv@codeaurora.org>
+ <1481753438-3905-2-git-send-email-agustinv@codeaurora.org>
+ <20161216162439.GA24673@red-moon>
+Message-ID: <b63b1d787c91024d1e49a4fd430ed29d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 16, 2016 at 05:13:46PM +0100, Pali Roh?r wrote:
-> On Friday 16 December 2016 16:40:30 Tony Lindgren wrote:
-> > * Javier Martinez Canillas <javier@osg.samsung.com> [161216 04:54]:
-> > > On 12/16/2016 09:48 AM, Pali Roh?r wrote:
-> > > >>> saying that it cause problems which need to be properly fixed.
-> > > >>> And if fixing them is harder and will take more time, then
-> > > >>> correct option is to revert 008a2ebcd677 due to breaking
-> > > >>> support for more devices.
-> > > >> 
-> > > >> If you think that others boards may have the same issue, then
-> > > >> you could add an empty chosen node to omap3.dtsi. As I said I
-> > > >> think that in practice this will only be needed for the
-> > > >> machines using NOLO but you are right that in theory you could
-> > > >> boot them using other bootloaders and having an empty node
-> > > >> doesn't cause any harm anyway.
-> > > > 
-> > > > Should not be it part of any arm board? IIRC ATAG support is (or
-> > > > was) not omap3 specified.
-> > > 
-> > > Yes, but you were talking about commit 008a2ebcd677 which only
-> > > removed skeleton.dtsi usage for OMAP3 boards. The same can be done
-> > > for other SoCs in its top level dtsi for the SoC family of course.
-> > 
-> > Yeah probaby best to add the empty chosen node to the ones that had
-> > skeleton.dtsi removed.
+Hi Lorenzo,
+
+On 2016-12-16 11:24, Lorenzo Pieralisi wrote:
+> On Wed, Dec 14, 2016 at 05:10:36PM -0500, Agustin Vega-Frias wrote:
+>> ACPI extended IRQ resources may contain a Resource Source field to 
+>> specify
+>> an alternate interrupt controller, attempting to map them as GSIs is
+>> incorrect, so just disable the platform resource.
+>> 
+>> Since this field is currently ignored, we make this change conditional
+>> on CONFIG_ACPI_GENERIC_GSI to keep the current behavior on x86 
+>> platforms,
+>> in case some existing ACPI tables are using this incorrectly.
+>> 
+>> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
+>> ---
+>>  drivers/acpi/resource.c | 17 ++++++++++++++++-
+>>  1 file changed, 16 insertions(+), 1 deletion(-)
+>> 
+>> diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
+>> index 56241eb..76ca4e9 100644
+>> --- a/drivers/acpi/resource.c
+>> +++ b/drivers/acpi/resource.c
+>> @@ -43,6 +43,18 @@ static inline bool 
+>> acpi_iospace_resource_valid(struct resource *res)
+>>  acpi_iospace_resource_valid(struct resource *res) { return true; }
+>>  #endif
+>> 
+>> +#ifdef CONFIG_ACPI_GENERIC_GSI
+>> +static inline bool is_gsi(struct acpi_resource_extended_irq *ext_irq)
+>> +{
+>> +	return ext_irq->resource_source.string_length == 0;
+>> +}
+>> +#else
+>> +static inline bool is_gsi(struct acpi_resource_extended_irq *ext_irq)
+>> +{
+>> +	return true;
+>> +}
+>> +#endif
 > 
-> Ok. But still I think that it should be added globally to all arm board 
-> which can be booted by ATAG bootloader.
-
-+1
-
-> > And I think the code should print a warning if no chosen node is
-> > found?
+> Well, patch is simple there is not much to say other that on the
+> firmware side I honestly do not see many options, either we remove the
+> ifdeffery above and make the check unconditional (ie we do check on
+> x86/ia64 too instead of always returning true) and see if things hold 
+> up
+> on x86 (at least we try) or we will never know and will never be able 
+> to
+> use this on x86 if there will ever be need.
 > 
-> Which code? Decompressor? Yes, it should but I do not know if at that 
-> time is (serial) console usable...
+> It would be certainly weird to find out that a descriptor has a
+> resource_source pointer put there by mistake (because that's what we 
+> are
+> talking about, things work on x86/ia64 by ignoring the resource_source
+> pointer so any string there is just an unfortunate mistake AFAICS).
+> 
+> I am quite tempted to remove the ifdef and make the is_gsi() check 
+> effective on
+> x86/ia64 too.
 
-It isn't in multiplatform situations.  Best if the kernel prints it,
-because then it can be logged.
+I wouldn't be opposed to that. I added the #ifdef out of abundance of 
+caution,
+but if the x86 folks agree and we can get sufficient testing to ensure 
+this
+doesn't break anything I'd like to remove it too.
+
+Thanks,
+Agustin
+
+> 
+> Lorenzo
+> 
+>> +
+>>  static bool acpi_dev_resource_len_valid(u64 start, u64 end, u64 len, 
+>> bool io)
+>>  {
+>>  	u64 reslen = end - start + 1;
+>> @@ -470,9 +482,12 @@ bool acpi_dev_resource_interrupt(struct 
+>> acpi_resource *ares, int index,
+>>  			acpi_dev_irqresource_disabled(res, 0);
+>>  			return false;
+>>  		}
+>> -		acpi_dev_get_irqresource(res, ext_irq->interrupts[index],
+>> +		if (is_gsi(ext_irq))
+>> +			acpi_dev_get_irqresource(res, ext_irq->interrupts[index],
+>>  					 ext_irq->triggering, ext_irq->polarity,
+>>  					 ext_irq->sharable, false);
+>> +		else
+>> +			acpi_dev_irqresource_disabled(res, 0);
+>>  		break;
+>>  	default:
+>>  		res->flags = 0;
+>> --
+>> Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
+>> Technologies, Inc.
+>> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+>> Linux Foundation Collaborative Project.
+>> 
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux Foundation Collaborative Project.
