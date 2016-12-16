@@ -1,67 +1,52 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 16 Dec 2016 13:19:29 +0000
-Subject: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
-Message-ID: <ad6b6a4937b1fe183e6d48ccbaf4cb46db92fed4.1481893907.git.robin.murphy@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 16 Dec 2016 15:14:36 +0100
+Subject: [PATCH] Documentation: dt: Explicitly mark Samsung Exynos SoC bindings
+ as unstable
+Message-ID: <1481897676-13578-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current SMR masking support using a 2-cell iommu-specifier is
-primarily intended to handle individual masters with large and/or
-complex Stream ID assignments; it quickly gets a bit clunky in other SMR
-use-cases where we just want to consistently mask out the same part of
-every Stream ID (e.g. for MMU-500 configurations where the appended TBU
-number gets in the way unnecessarily). Let's add a new property to allow
-a single global mask value to better fit the latter situation.
+Samsung Exynos SoCs and boards related bindings evolved since the initial
+introduction, but initially the bindings were minimal and a bit incomplete
+(they never described all the hardware modules available in the SoCs).
+Since then some significant (not fully compatible) changes have been
+already committed a few times (like gpio replaced by pinctrl, display ddc,
+mfc reserved memory, some core clocks added to various hardware modules,
+added more required nodes).
 
-CC: Stuart Yoder <stuart.yoder@nxp.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+On the other side there are no boards which have device tree embedded in
+the bootloader. Device tree blob is always compiled from the kernel tree
+and updated together with the kernel image.
+
+Thus to avoid further adding a bunch of workarounds for old/missing
+bindings and allow to make cleanup of the existing code and device tree
+files, lets mark Samsung Exynos SoC platform bindings as unstable. This
+means that bindings can may change at any time and users should use the
+dtb file compiled from the same kernel source tree as the kernel image.
+
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
+ Documentation/devicetree/bindings/arm/samsung/exynos.txt | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos.txt
 
-Compile-tested only...
-
- Documentation/devicetree/bindings/iommu/arm,smmu.txt | 8 ++++++++
- drivers/iommu/arm-smmu.c                             | 4 +++-
- 2 files changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-index e862d1485205..98f5cbe5fdb4 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -60,6 +60,14 @@ conditions.
-                   aliases of secure registers have to be used during
-                   SMMU configuration.
- 
-+- stream-match-mask : Specifies a fixed SMR mask value to combine with
-+                  the Stream ID value from every iommu-specifier. This
-+                  may be used instead of an "#iommu-cells" value of 2
-+                  when there is no need for per-master SMR masks, but
-+                  it is still desired to mask some portion of every
-+                  Stream ID (e.g. for certain MMU-500 configurations
-+                  given globally unique external IDs).
+diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos.txt b/Documentation/devicetree/bindings/arm/samsung/exynos.txt
+new file mode 100644
+index 000000000000..0c606f4c6e85
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/samsung/exynos.txt
+@@ -0,0 +1,12 @@
++Samsung Exynos SoC Family Device Tree Bindings
++---------------------------------------------------------------
 +
- ** Deprecated properties:
- 
- - mmu-masters (deprecated in favour of the generic "iommus" binding) :
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 8f7281444551..f1abcb7dde36 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1534,13 +1534,15 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
- 
- static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
- {
--	u32 fwid = 0;
-+	u32 mask, fwid = 0;
- 
- 	if (args->args_count > 0)
- 		fwid |= (u16)args->args[0];
- 
- 	if (args->args_count > 1)
- 		fwid |= (u16)args->args[1] << SMR_MASK_SHIFT;
-+	else if (!of_property_read_u32(args->np, "stream-match-mask", &mask))
-+		fwid |= (u16)mask << SMR_MASK_SHIFT;
- 
- 	return iommu_fwspec_add_ids(dev, &fwid, 1);
- }
++Work in progress statement:
++
++Device tree files and bindings applying to Samsung Exynos SoCs and boards are
++considered "unstable". Any Samsung Exynos device tree binding may change at any
++time. Be sure to use a device tree binary and a kernel image generated from the
++same source tree.
++
++Please refer to Documentation/devicetree/bindings/ABI.txt for a definition of a
++stable binding/ABI.
 -- 
-2.10.2.dirty
+1.9.1
