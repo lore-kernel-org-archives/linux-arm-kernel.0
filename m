@@ -1,20 +1,18 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 16 Dec 2016 17:18:34 +0530
-Subject: [PATCH 1/2] media: s5p-mfc: convert drivers to use the new vb2_queue
- dev field
+Date: Fri, 16 Dec 2016 17:18:35 +0530
+Subject: [PATCH 2/2] media: s5p-mfc: fix MMAP of mfc buffer during reqbufs
 In-Reply-To: <1481888915-19624-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1481888915-19624-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1481888915-19624-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1481888915-19624-3-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Smitha T Murthy <smitha.t@samsung.com>
 
-commit 2548fee63d9e ("[media] media/platform: convert drivers to use the new
-vb2_queue dev field") has missed to set dev pointer of vb2_queue which will be
-used in reqbufs of mfc driver. Without this change following error is observed:
-
----------------------------------------------------------------
+It has been observed on ARM64 based Exynos SoC, if IOMMU is not enabled
+and we try to use reserved memory for MFC, reqbufs fails with below
+mentioned error
+---------------------------------------------------------------------------
 V4L2 Codec decoding example application
 Kamil Debski <k.debski@samsung.com>
 Copyright 2012 Samsung Electronics Co., Ltd.
@@ -34,34 +32,99 @@ size=4194304 (requested=4194304)
 [App] Out buf phy : 0x00000000, virt : 0xffffffff
 Output Length is = 0x300000
 Error (mfc.c:mfc_dec_setup_output:145): Failed to MMAP MFC OUTPUT buffer
--------------------------------------------------------
+-------------------------------------------------------------------------
+This is because the device requesting for memory is mfc0.left not the parent mfc0.
+Hence setting of alloc_devs need to be done only if IOMMU is enabled
+and in that case both the left and right device is treated as mfc0 only.
 
 Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
 [pankaj.dubey: debugging issue and formatting commit message]
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
- drivers/media/platform/s5p-mfc/s5p_mfc.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 17 ++++++++++-------
+ drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 18 +++++++++++-------
+ 2 files changed, 21 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index 0a5b8f5..6ea8246 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -838,6 +838,7 @@ static int s5p_mfc_open(struct file *file)
- 	q->type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
- 	q->drv_priv = &ctx->fh;
- 	q->lock = &dev->mfc_mutex;
-+	q->dev = &dev->plat_dev->dev;
- 	if (vdev == dev->vfd_dec) {
- 		q->io_modes = VB2_MMAP;
- 		q->ops = get_dec_queue_ops();
-@@ -861,6 +862,7 @@ static int s5p_mfc_open(struct file *file)
- 	q->io_modes = VB2_MMAP;
- 	q->drv_priv = &ctx->fh;
- 	q->lock = &dev->mfc_mutex;
-+	q->dev = &dev->plat_dev->dev;
- 	if (vdev == dev->vfd_dec) {
- 		q->io_modes = VB2_MMAP;
- 		q->ops = get_dec_queue_ops();
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+index 52081dd..9cfca5d 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+@@ -30,6 +30,7 @@
+ #include "s5p_mfc_intr.h"
+ #include "s5p_mfc_opr.h"
+ #include "s5p_mfc_pm.h"
++#include "s5p_mfc_iommu.h"
+ 
+ static struct s5p_mfc_fmt formats[] = {
+ 	{
+@@ -930,16 +931,18 @@ static int s5p_mfc_queue_setup(struct vb2_queue *vq,
+ 	    vq->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+ 		psize[0] = ctx->luma_size;
+ 		psize[1] = ctx->chroma_size;
+-
+-		if (IS_MFCV6_PLUS(dev))
+-			alloc_devs[0] = ctx->dev->mem_dev_l;
+-		else
+-			alloc_devs[0] = ctx->dev->mem_dev_r;
+-		alloc_devs[1] = ctx->dev->mem_dev_l;
++		if (exynos_is_iommu_available(&dev->plat_dev->dev)) {
++			if (IS_MFCV6_PLUS(dev))
++				alloc_devs[0] = ctx->dev->mem_dev_l;
++			else
++				alloc_devs[0] = ctx->dev->mem_dev_r;
++			alloc_devs[1] = ctx->dev->mem_dev_l;
++		}
+ 	} else if (vq->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE &&
+ 		   ctx->state == MFCINST_INIT) {
+ 		psize[0] = ctx->dec_src_buf_size;
+-		alloc_devs[0] = ctx->dev->mem_dev_l;
++		if (exynos_is_iommu_available(&dev->plat_dev->dev))
++			alloc_devs[0] = ctx->dev->mem_dev_l;
+ 	} else {
+ 		mfc_err("This video node is dedicated to decoding. Decoding not initialized\n");
+ 		return -EINVAL;
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+index fcc2e05..eb8f06d 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+@@ -30,6 +30,7 @@
+ #include "s5p_mfc_enc.h"
+ #include "s5p_mfc_intr.h"
+ #include "s5p_mfc_opr.h"
++#include "s5p_mfc_iommu.h"
+ 
+ #define DEF_SRC_FMT_ENC	V4L2_PIX_FMT_NV12M
+ #define DEF_DST_FMT_ENC	V4L2_PIX_FMT_H264
+@@ -1832,7 +1833,8 @@ static int s5p_mfc_queue_setup(struct vb2_queue *vq,
+ 		if (*buf_count > MFC_MAX_BUFFERS)
+ 			*buf_count = MFC_MAX_BUFFERS;
+ 		psize[0] = ctx->enc_dst_buf_size;
+-		alloc_devs[0] = ctx->dev->mem_dev_l;
++		if (exynos_is_iommu_available(&dev->plat_dev->dev))
++			alloc_devs[0] = ctx->dev->mem_dev_l;
+ 	} else if (vq->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
+ 		if (ctx->src_fmt)
+ 			*plane_count = ctx->src_fmt->num_planes;
+@@ -1847,12 +1849,14 @@ static int s5p_mfc_queue_setup(struct vb2_queue *vq,
+ 		psize[0] = ctx->luma_size;
+ 		psize[1] = ctx->chroma_size;
+ 
+-		if (IS_MFCV6_PLUS(dev)) {
+-			alloc_devs[0] = ctx->dev->mem_dev_l;
+-			alloc_devs[1] = ctx->dev->mem_dev_l;
+-		} else {
+-			alloc_devs[0] = ctx->dev->mem_dev_r;
+-			alloc_devs[1] = ctx->dev->mem_dev_r;
++		if (exynos_is_iommu_available(&dev->plat_dev->dev)) {
++			if (IS_MFCV6_PLUS(dev)) {
++				alloc_devs[0] = ctx->dev->mem_dev_l;
++				alloc_devs[1] = ctx->dev->mem_dev_l;
++			} else {
++				alloc_devs[0] = ctx->dev->mem_dev_r;
++				alloc_devs[1] = ctx->dev->mem_dev_r;
++			}
+ 		}
+ 	} else {
+ 		mfc_err("invalid queue type: %d\n", vq->type);
 -- 
 2.7.4
