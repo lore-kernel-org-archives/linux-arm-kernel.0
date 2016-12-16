@@ -1,16 +1,18 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 16 Dec 2016 11:18:12 -0300
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 16 Dec 2016 15:27:13 +0100
 Subject: [PATCH] Documentation: dt: Explicitly mark Samsung Exynos SoC
  bindings as unstable
 In-Reply-To: <1481897676-13578-1-git-send-email-m.szyprowski@samsung.com>
-References: <1481897676-13578-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <136c527a-a491-8a45-9ae9-3a2adfc59ab4@osg.samsung.com>
+References: <CGME20161216141453epcas1p28d5ebc9d62f5a704bb9bc64ca68abcdf@epcas1p2.samsung.com>
+ <1481897676-13578-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <2984700.McujOSQ7LH@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marek,
 
-On 12/16/2016 11:14 AM, Marek Szyprowski wrote:
+Hi,
+
+On Friday, December 16, 2016 03:14:36 PM Marek Szyprowski wrote:
 > Samsung Exynos SoCs and boards related bindings evolved since the initial
 > introduction, but initially the bindings were minimal and a bit incomplete
 > (they never described all the hardware modules available in the SoCs).
@@ -30,12 +32,37 @@ On 12/16/2016 11:14 AM, Marek Szyprowski wrote:
 > dtb file compiled from the same kernel source tree as the kernel image.
 > 
 > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
+This change is long overdue..
+
+Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+
 > ---
+>  Documentation/devicetree/bindings/arm/samsung/exynos.txt | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos.txt b/Documentation/devicetree/bindings/arm/samsung/exynos.txt
+> new file mode 100644
+> index 000000000000..0c606f4c6e85
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos.txt
+> @@ -0,0 +1,12 @@
+> +Samsung Exynos SoC Family Device Tree Bindings
+> +---------------------------------------------------------------
+> +
+> +Work in progress statement:
+> +
+> +Device tree files and bindings applying to Samsung Exynos SoCs and boards are
+> +considered "unstable". Any Samsung Exynos device tree binding may change at any
+> +time. Be sure to use a device tree binary and a kernel image generated from the
+> +same source tree.
+> +
+> +Please refer to Documentation/devicetree/bindings/ABI.txt for a definition of a
+> +stable binding/ABI.
 
-I completely agree with you on this.
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
