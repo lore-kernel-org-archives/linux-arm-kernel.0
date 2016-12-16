@@ -1,64 +1,39 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 16 Dec 2016 11:28:39 -0800
-Subject: [PATCH 2/2] remoteproc: Remove firmware_loading_complete
-In-Reply-To: <948b5b23-9440-00ef-7cf9-eca62ea93165@st.com>
-References: <1481846632-4778-1-git-send-email-spjoshi@codeaurora.org>
- <1481846632-4778-2-git-send-email-spjoshi@codeaurora.org>
- <948b5b23-9440-00ef-7cf9-eca62ea93165@st.com>
-Message-ID: <20161216192839.GT3439@tuxbot>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Fri, 16 Dec 2016 20:06:11 +0000
+Subject: [PATCH] i2c: mux: pca954x: fix i2c mux selection caching
+Message-ID: <E1cHylf-00071o-KZ@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 16 Dec 00:26 PST 2016, loic pallardy wrote:
+smbus functions return -ve on error, 0 on success.  However,
+__i2c_transfer() have a different return signature - -ve on error, or
+number of buffers transferred (which may be zero or greater.)
 
-> 
-> 
-> On 12/16/2016 01:03 AM, Sarangdhar Joshi wrote:
-> >rproc_del() waits on firmware_loading_complete in order to
-> >make sure rproc_add() completed successfully before calling
-> >rproc_shutdown().  However since rproc_add() will always be
-> >called before rproc_del(), we do not need to wait on
-> >firmware_loading_complete. Drop this completion variable
-> >altogether.
-> >
-> Hi,
-> 
-> firmware_loading_complete is used to synchronize all operations on rproc
-> with parallel work launched by request_firmware_nowait.
+The upshot of this is that the sense of the test is reversed when using
+the mux on a bus supporting the master_xfer method: we cache the value
+and never retry if we fail to transfer any buffers, but if we succeed,
+we clear the cached value.
 
-We had a deadlock scenario in this code, where a call to rproc_boot()
-would grab the rproc mutex and the request_firmware_nowait() callback
-would wait on this lock before it would signal the completion that the
-rproc_boot() was waiting for.
+Fix this.
 
-As the request_firmware_nowait() doesn't do anything other than handle
-auto_boot and signal the completion - and there is an internal sleep
-mechanism for handling concurrent request_firmware calls - I posted a
-patch and dropped the rproc_boot() wait thing.
+Fixes: 463e8f845cbf ("i2c: mux: pca954x: retry updating the mux selection on failure")
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ drivers/i2c/muxes/i2c-mux-pca954x.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> rproc_add could be done and firmware loading still pending. In that case
-> rproc_del mustn't be called before end of the procedure.
-
-You're right.
-
-We might have an outstanding request_firmware_nowait() when we hit
-rproc_del() and we might free the underlaying rproc context.
-
-Holding a reference over the request_firmware_nowait() would solve this,
-but would cause issues if we get a rproc_add() from the same driver
-(e.g. after module unload/load) before the firmware timer has fired -
-and released the resources.
-
-This issue could be remedied by moving the rproc_delete_debug_dir() to
-rproc_del() and aim for not having any objects exposed outside the
-remoteproc core once rproc_del() returns.
-
-> 
-> If you decide to remove this synchronization you need either to modify rproc
-> boot sequence or to replace it by something else.
-> 
-
-I agree.
-
-Regards,
-Bjorn
+diff --git a/drivers/i2c/muxes/i2c-mux-pca954x.c b/drivers/i2c/muxes/i2c-mux-pca954x.c
+index 8bc3d36d2837..b6d62ecbd5b6 100644
+--- a/drivers/i2c/muxes/i2c-mux-pca954x.c
++++ b/drivers/i2c/muxes/i2c-mux-pca954x.c
+@@ -179,7 +179,7 @@ static int pca954x_select_chan(struct i2c_mux_core *muxc, u32 chan)
+ 	/* Only select the channel if its different from the last channel */
+ 	if (data->last_chan != regval) {
+ 		ret = pca954x_reg_write(muxc->parent, client, regval);
+-		data->last_chan = ret ? 0 : regval;
++		data->last_chan = ret >= 0 ? regval : 0;
+ 	}
+ 
+ 	return ret;
+-- 
+2.7.4
