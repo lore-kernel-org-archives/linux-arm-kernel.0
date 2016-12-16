@@ -1,39 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 11 Dec 2016 15:59:01 +0100
-Subject: [PATCH 3/3] mm: make pagoff_t type 64-bit
-In-Reply-To: <1481461003-14361-4-git-send-email-ynorov@caviumnetworks.com>
-References: <1481461003-14361-1-git-send-email-ynorov@caviumnetworks.com>
- <1481461003-14361-4-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <2636242.RWRJivuddj@wuerfel>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Fri, 16 Dec 2016 00:02:45 +0000
+Subject: [PATCH 0/3] clkdev: add devm_get_clk_from_child()
+In-Reply-To: <20161215122115.zpxawc2xdc45rczf@sirena.org.uk>
+References: <874m2jvtmw.wl%kuninori.morimoto.gx@renesas.com>
+ <20161208220824.GM5423@codeaurora.org>
+ <8737hyymo9.wl%kuninori.morimoto.gx@renesas.com>
+ <20161215122115.zpxawc2xdc45rczf@sirena.org.uk>
+Message-ID: <87d1gsu4hm.wl-kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, December 11, 2016 6:26:42 PM CET Yury Norov wrote:
-> Also fix related interfaces
+
+Hi Mark
+
+> > Mark, I think I should re-post 2nd patch (3rd will be dropped) after
+> > merge window ? There will be no branch dependency
 > 
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> ---
->  fs/btrfs/extent_io.c       | 2 +-
->  fs/ext2/dir.c              | 4 ++--
->  include/linux/mm.h         | 9 +++++----
->  include/linux/radix-tree.h | 8 ++++----
->  include/linux/types.h      | 2 +-
->  lib/radix-tree.c           | 8 ++++----
->  mm/debug.c                 | 2 +-
->  mm/internal.h              | 2 +-
->  mm/memory.c                | 4 ++--
->  mm/mmap.c                  | 7 ++++---
->  mm/readahead.c             | 4 ++--
->  mm/util.c                  | 3 ++-
->  12 files changed, 29 insertions(+), 26 deletions(-)
-> 
+> Should be fine without but obviously if it looks like it's gone AWOL
+> then reposting would be good.
 
-Thanks Yury for the demonstration. I think this would put the nail
-in the coffin of the idea of mmap64 even for Pavel, who didn't
-seem convinced already.
-
-Changing all those interfaces and structure, struct page in particular,
-is clearly too costly for any advantage we might have otherwise
-gained.
-
-	Arnd
+OK, Thanks !
