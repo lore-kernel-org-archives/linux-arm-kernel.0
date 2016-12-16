@@ -1,91 +1,137 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 16 Dec 2016 13:47:48 +0100
-Subject: [PATCH] ARM: dts: sun8i-q8-common: enable bluetooth on SDIO Wi-Fi
-In-Reply-To: <20161213233658.atGuNCNY@smtp1h.mail.yandex.net>
-References: <20161213233658.atGuNCNY@smtp1h.mail.yandex.net>
-Message-ID: <20161216124748.rkvnnlo4x5onzpvk@lukather>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Fri, 16 Dec 2016 13:48:35 +0100
+Subject: [PATCH] arm: dt: Initialize boot_command_line from CONFIG_CMDLINE
+ in case DT does not provide /chosen/bootargs
+In-Reply-To: <5c56e769-76be-295e-b655-8431dde35370@osg.samsung.com>
+References: <1481749963-8664-1-git-send-email-pali.rohar@gmail.com>
+ <201612161332.36406@pali>
+ <5c56e769-76be-295e-b655-8431dde35370@osg.samsung.com>
+Message-ID: <201612161348.35917@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2016 at 07:49:00PM +0800, Icenowy Zheng wrote:
+On Friday 16 December 2016 13:38:34 Javier Martinez Canillas wrote:
+> Hello Pali,
 > 
-> 2016?12?9? ??4:07? Maxime Ripard <maxime.ripard@free-electrons.com>???
-> >
-> > On Tue, Dec 06, 2016 at 04:08:38PM +0800, Icenowy Zheng wrote: 
-> > > Some SDIO Wi-Fi chips (such as RTL8703AS) have a UART bluetooth, which 
-> > > has a dedicated enable pin (PL8 in the reference design). 
-> > > 
-> > > Enable the pin in the same way as the WLAN enable pins. 
-> > > 
-> > > Tested on an A33 Q8 tablet with RTL8703AS. 
-> > > 
-> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz> 
-> > > --- 
-> > > 
-> > > This patch should be coupled with the uart1 node patch I send before: 
-> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/471997.html 
-> > > 
-> > > For RTL8703AS, the rtl8723bs bluetooth code is used, which can be retrieve from: 
-> > > https://github.com/lwfinger/rtl8723bs_bt 
-> > > 
-> > >? arch/arm/boot/dts/sun8i-q8-common.dtsi | 2 +- 
-> > >? 1 file changed, 1 insertion(+), 1 deletion(-) 
-> > > 
-> > > diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi 
-> > > index c676940..4aeb5bb 100644 
-> > > --- a/arch/arm/boot/dts/sun8i-q8-common.dtsi 
-> > > +++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi 
-> > > @@ -88,7 +88,7 @@ 
-> > >? 
-> > >? &r_pio { 
-> > >? wifi_pwrseq_pin_q8: wifi_pwrseq_pin at 0 { 
-> > > - pins = "PL6", "PL7", "PL11"; 
-> > > + pins = "PL6", "PL7", "PL8", "PL11"; 
-> > >? function = "gpio_in"; 
-> > >? bias-pull-up; 
-> > >? }; 
-> >
-> > There's several things wrong here. The first one is that you rely 
-> > solely on the pinctrl state to maintain a reset line. This is very 
-> > fragile (especially since the GPIO pinctrl state are likely to go away 
-> > at some point), but it also means that if your driver wants to recover 
-> > from that situation at some point, it won't work. 
-> >
-> > The other one is that the bluetooth and wifi chips are two devices in 
-> > linux, and you assign that pin to the wrong device (wifi). 
-> >
-> > rfkill-gpio is made just for that, so please use it. 
+> On 12/16/2016 09:32 AM, Pali Roh?r wrote:
+> > Hi!
+> > 
+> > On Friday 16 December 2016 13:13:34 Javier Martinez Canillas wrote:
+> >> Hello Pali,
+> >> 
+> >> On 12/16/2016 08:46 AM, Pali Roh?r wrote:
+> >>> On Thursday 15 December 2016 01:09:20 Pali Roh?r wrote:
+> >>>> On Thursday 15 December 2016 00:52:24 Russell King - ARM Linux
+> >>>> 
+> >>>> wrote:
+> >>>>> On Wed, Dec 14, 2016 at 10:12:43PM +0100, Pali Roh?r wrote:
+> >>>>>> Commit 008a2ebcd677 ("ARM: dts: omap3: Remove skeleton.dtsi
+> >>>>>> usage") broke support for setting cmdline on Nokia N900 via
+> >>>>>> CONFIG_CMDLINE.
+> >>>>>> 
+> >>>>>> It is because arm code booted in DT mode parse cmdline only
+> >>>>>> via function early_init_dt_scan_chosen() and that function
+> >>>>>> does not fill variable boot_command_line when DTB does not
+> >>>>>> contain /chosen entry. It is called from function
+> >>>>>> early_init_dt_scan_nodes() in setup_machine_fdt().
+> >>>>>> 
+> >>>>>> This patch fixes it by explicitly filling boot_command_line in
+> >>>>>> function setup_machine_fdt() after calling
+> >>>>>> early_init_dt_scan_nodes() in case boot_command_line still
+> >>>>>> remains empty.
+> >>>>> 
+> >>>>> This looks like a hack.
+> >>>>> 
+> >>>>> First, the matter of the ATAGs compatibility.  The decompressor
+> >>>>> relies on there being a pre-existing /chosen node to insert the
+> >>>>> command line and other parameters into.  If we've dropped it
+> >>>>> (by dropping skeleton.dtsi) then we've just regressed more
+> >>>>> than just N900 - the decompressor won't be able to merge the
+> >>>>> ATAGs into the concatenated FDT.
+> >>>> 
+> >>>> Hm... I did not think about it. But right this can be broken
+> >>>> too...
+> >>> 
+> >>> Tony, Javier: are you aware of above ??? problem?
+> >>> 
+> >>> It looks like commit 008a2ebcd677 ("ARM: dts: omap3: Remove
+> >>> skeleton.dtsi usage") should be really reverted.
+> >> 
+> >> I don't think reverting the mentioned commit is the correct fix
+> >> for your problem. We are trying to get rid of skeleton.dtsi for
+> >> many reasons, see commit commit ("3ebee5a2e141 arm64: dts: kill
+> >> skeleton.dtsi").
+> > 
+> > $ git show 3ebee5a2e141
+> > 
+> > * The default empty /chosen and /aliases are somewhat useless...
+> > 
+> > That is not truth, they are not useless as Russell King wrote --
+> > removing them break ATAG support.
+> > 
+> > (But that commit is for arm64 which probably is not using ATAGs...
+> > But I do not know. At least it is not truth for 32bit arm.)
+> > 
+> >> Also, the chosen node is mentioned to be optional in the ePAPR
+> >> document and u-boot creates a chosen node if isn't found [0] so
+> >> this issue is only present in boards that don't use u-boot like
+> >> the N900/N950/N9 phones.
+> > 
+> > Linux arm decompressor does not propagate ATAGs when /chosen is
+> > missing. Sorry, but if for Linux /chosen is required (and without
+> > it is broken!) then some ePARP document does not apply there.
+> > Either Linux code needs to be fixed (so /chosen will be really
+> > only optional) or /chosen stay in Linux required. There is no
+> > other option.
+> > 
+> > And I hope that U-boot is not the only one bootloader which Linux
+> > kernel supports. I thought that I can use *any* bootloader to boot
+> > Linux kernel not just U-Boot which is doing some magic...
+> > 
+> > With this step you are basically going to break booting Linux
+> > kernel with all others bootloaders... And personally I really
+> > dislike this idea.
+> > 
+> >> So if NOLO doesn't do the same than u-boot and the kernel expects
+> >> a chosen node, I suggest to add an empty chosen node in the
+> >> omap3-n900.dts and omap3-n950-n9.dtsi device tree source files.
+> > 
+> > That would fix a problem for N900, N950 and N9. But not for all
+> > other ARM devices which bootloader pass some ATAGs.
+> > 
+> > IIRC rule of kernel is not to break compatibility and that commit
+> > 008a2ebcd677 really did it.
+> > 
+> > Note: I'm not saying if 008a2ebcd677 is good or bad. I'm just
+> > saying that it cause problems which need to be properly fixed. And
+> > if fixing them is harder and will take more time, then correct
+> > option is to revert 008a2ebcd677 due to breaking support for more
+> > devices.
 > 
-> The GPIO is not for the radio, but for the full Bluetooth part.
+> If you think that others boards may have the same issue, then you
+> could add an empty chosen node to omap3.dtsi. As I said I think that
+> in practice this will only be needed for the machines using NOLO but
+> you are right that in theory you could boot them using other
+> bootloaders and having an empty node doesn't cause any harm anyway.
 
-I know.
+Should not be it part of any arm board? IIRC ATAG support is (or was) 
+not omap3 specified.
 
-> If it's set to 0, then the bluetooth part will reset, and the
-> hciattach will fail.
-
-Both rfkill-gpio and rfkill-regulator will shutdown when called
-(either by poking the reset pin or shutting down the regulator), so
-that definitely seems like an expected behavior to put the device in
-reset.
-
-> The BSP uses this as a rfkill, and the result is that the bluetooth
-> on/off switch do not work properly.
-
-Then rfkill needs fixing, but working around it by hoping that the
-core will probe an entirely different device, and enforcing a default
-that the rest of the kernel might or might not change is both fragile
-and wrong.
-
-Maxime
+> >> [0]:
+> >> http://git.denx.de/?p=u-boot.git;a=blob;f=common/fdt_support.c;h=c
+> >> 9f 7019e38e8de1469f506cdd57353fd27d8e134;hb=HEAD#l226
+> >> 
+> >> Best regards,
+> 
+> Best regards,
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Pali Roh?r
+pali.rohar at gmail.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161216/7af246ff/attachment.sig>
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161216/debc8ab2/attachment.sig>
