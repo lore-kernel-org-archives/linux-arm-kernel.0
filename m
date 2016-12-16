@@ -1,36 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Dec 2016 10:08:55 +0100
-Subject: [PATCH] omap2: mark omap_init_rng as __init
-Message-ID: <20161216090906.2313595-1-arnd@arndb.de>
+From: zhongjiang@huawei.com (zhong jiang)
+Date: Fri, 16 Dec 2016 17:10:05 +0800
+Subject: [RESEND PATCH 2/2] arm64: make WANT_HUGE_PMD_SHARE depends on
+ HUGETLB_PAGE
+In-Reply-To: <1481725151-20549-3-git-send-email-zhongjiang@huawei.com>
+References: <1481725151-20549-1-git-send-email-zhongjiang@huawei.com>
+ <1481725151-20549-3-git-send-email-zhongjiang@huawei.com>
+Message-ID: <5853AF6D.20305@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I found this section mismatch when building with an older
-compiler release:
+On 2016/12/14 22:19, zhongjiang wrote:
+> From: zhong jiang <zhongjiang@huawei.com>
+>
+> when HUGETLB_PAGE is disable, WANT_HUGE_PMD_SHARE contains the
+> fuctions should not be use. therefore, we add the dependency.
+>
+> Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+> ---
+>  arch/arm64/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 969ef88..694ca73 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -640,6 +640,7 @@ config SYS_SUPPORTS_HUGETLBFS
+>  
+>  config ARCH_WANT_HUGE_PMD_SHARE
+>  	def_bool y if ARM64_4K_PAGES || (ARM64_16K_PAGES && !ARM64_VA_BITS_36)
+> +	depends on HUGETLB_PAGE
+>  
+>  config ARCH_HAS_CACHE_LINE_SIZE
+>  	def_bool y
+Hi,
+      I still think it is a issue. Perhaps above changelog is unclear.  Further explain is as follows.
+ when hugetlb_pages is disable and arch_want_huge_pmd_share is enable,   we maybe call
+ huge_pmd_sahre in hugetlbpage.c, but the function actually is not definition as it is not
+ exported.  is it right ??
 
-WARNING: vmlinux.o(.text+0x3051c): Section mismatch in reference from the function omap_init_rng() to the function .init.text:omap_device_build()
-
-Obviously this one function should be __init as well. Normally
-we don't get a warning as the function gets inlined into its
-caller.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-omap2/devices.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 3fdb94599184..473951203104 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -121,7 +121,7 @@ static inline void omap_init_mcspi(void) {}
-  *
-  * Bind the RNG hwmod to the RNG omap_device.  No return value.
-  */
--static void omap_init_rng(void)
-+static void __init omap_init_rng(void)
- {
- 	struct omap_hwmod *oh;
- 	struct platform_device *pdev;
--- 
-2.9.0
+Thanks
+zhongjiang
