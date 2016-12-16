@@ -1,68 +1,132 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 16 Dec 2016 10:28:48 +0100
-Subject: [PATCH] ARM: imx: remove unused device definitions
-In-Reply-To: <3673316.UJiiIZbYgE@wuerfel>
-References: <20161216090533.2195228-1-arnd@arndb.de>
- <7e077d23-eec1-6a6a-9318-84a5543d684d@pengutronix.de>
- <3673316.UJiiIZbYgE@wuerfel>
-Message-ID: <ae8b13db-1150-0ef5-b97d-12ab54dbf151@pengutronix.de>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 16 Dec 2016 10:44:20 +0100
+Subject: [PATCH v6 1/5] [media] davinci: VPIF: fix module loading, init
+ errors
+In-Reply-To: <20161207183025.20684-2-khilman@baylibre.com>
+References: <20161207183025.20684-1-khilman@baylibre.com>
+ <20161207183025.20684-2-khilman@baylibre.com>
+Message-ID: <19dc6321-1433-e089-f753-e5f736e26073@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/16/2016 10:23 AM, Arnd Bergmann wrote:
-> On Friday, December 16, 2016 10:10:49 AM CET Marc Kleine-Budde wrote:
->> On 12/16/2016 10:05 AM, Arnd Bergmann wrote:
->>> I stumbled over these during build testing, they are evidently
->>> not referenced anywhere any more.
->>>
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>> ---
->>>  arch/arm/mach-imx/devices/platform-flexcan.c         |  9 ---------
->>>  arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c | 10 ----------
->>>  2 files changed, 19 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-imx/devices/platform-flexcan.c b/arch/arm/mach-imx/devices/platform-flexcan.c
->>> index 55d61eaf63c6..8a1a2fc4ce10 100644
->>> --- a/arch/arm/mach-imx/devices/platform-flexcan.c
->>> +++ b/arch/arm/mach-imx/devices/platform-flexcan.c
->>> @@ -19,15 +19,6 @@
->>>  #define imx_flexcan_data_entry(soc, _id, _hwid, _size)			\
->>>  	[_id] = imx_flexcan_data_entry_single(soc, _id, _hwid, _size)
->>>  
->>> -#ifdef CONFIG_SOC_IMX25
->>> -const struct imx_flexcan_data imx25_flexcan_data[] __initconst = {
->>> -#define imx25_flexcan_data_entry(_id, _hwid)				\
->>> -	imx_flexcan_data_entry(MX25, _id, _hwid, SZ_16K)
->>> -	imx25_flexcan_data_entry(0, 1),
->>> -	imx25_flexcan_data_entry(1, 2),
->>> -};
->>> -#endif /* ifdef CONFIG_SOC_IMX25 */
->>> -
->>>  #ifdef CONFIG_SOC_IMX35
->>>  const struct imx_flexcan_data imx35_flexcan_data[] __initconst = {
->>>  #define imx35_flexcan_data_entry(_id, _hwid)				\
->>
->> What about the imx35 variant?
->>
-> 
-> It's used from here:
-> 
-> arch/arm/mach-imx/mach-pcm043.c:        imx35_add_flexcan1();
+On 07/12/16 19:30, Kevin Hilman wrote:
+> Fix problems with automatic module loading by adding MODULE_ALIAS.  Also
+> fix various load-time errors cause by incorrect or not present
+> platform_data.
+>
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> ---
+>  drivers/media/platform/davinci/vpif.c         |  5 ++++-
+>  drivers/media/platform/davinci/vpif_capture.c | 15 ++++++++++++++-
+>  drivers/media/platform/davinci/vpif_display.c |  6 ++++++
+>  3 files changed, 24 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/media/platform/davinci/vpif.c b/drivers/media/platform/davinci/vpif.c
+> index 0380cf2e5775..f50148dcba64 100644
+> --- a/drivers/media/platform/davinci/vpif.c
+> +++ b/drivers/media/platform/davinci/vpif.c
+> @@ -32,6 +32,9 @@
+>  MODULE_DESCRIPTION("TI DaVinci Video Port Interface driver");
+>  MODULE_LICENSE("GPL");
+>
+> +#define VPIF_DRIVER_NAME	"vpif"
+> +MODULE_ALIAS("platform:" VPIF_DRIVER_NAME);
+> +
+>  #define VPIF_CH0_MAX_MODES	22
+>  #define VPIF_CH1_MAX_MODES	2
+>  #define VPIF_CH2_MAX_MODES	15
+> @@ -466,7 +469,7 @@ static const struct dev_pm_ops vpif_pm = {
+>
+>  static struct platform_driver vpif_driver = {
+>  	.driver = {
+> -		.name	= "vpif",
+> +		.name	= VPIF_DRIVER_NAME,
+>  		.pm	= vpif_pm_ops,
+>  	},
+>  	.remove = vpif_remove,
+> diff --git a/drivers/media/platform/davinci/vpif_capture.c b/drivers/media/platform/davinci/vpif_capture.c
+> index 5104cc0ee40e..20c4344ed118 100644
+> --- a/drivers/media/platform/davinci/vpif_capture.c
+> +++ b/drivers/media/platform/davinci/vpif_capture.c
+> @@ -45,6 +45,7 @@ module_param(debug, int, 0644);
+>  MODULE_PARM_DESC(debug, "Debug level 0-1");
+>
+>  #define VPIF_DRIVER_NAME	"vpif_capture"
+> +MODULE_ALIAS("platform:" VPIF_DRIVER_NAME);
+>
+>  /* global variables */
+>  static struct vpif_device vpif_obj = { {NULL} };
+> @@ -647,6 +648,10 @@ static int vpif_input_to_subdev(
+>
+>  	vpif_dbg(2, debug, "vpif_input_to_subdev\n");
+>
+> +	if (!chan_cfg)
+> +		return -1;
+> +	if (input_index >= chan_cfg->input_count)
+> +		return -1;
+>  	subdev_name = chan_cfg->inputs[input_index].subdev_name;
+>  	if (subdev_name == NULL)
+>  		return -1;
+> @@ -654,7 +659,7 @@ static int vpif_input_to_subdev(
+>  	/* loop through the sub device list to get the sub device info */
+>  	for (i = 0; i < vpif_cfg->subdev_count; i++) {
+>  		subdev_info = &vpif_cfg->subdev_info[i];
+> -		if (!strcmp(subdev_info->name, subdev_name))
+> +		if (subdev_info && !strcmp(subdev_info->name, subdev_name))
 
-Yes, you're right. Sorry, I searched before my 2nd tee.
+Why this change? subdev_info can never be NULL.
 
-Marc
+Regards,
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+	Hans
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161216/35018b9c/attachment.sig>
+>  			return i;
+>  	}
+>  	return -1;
+> @@ -685,6 +690,9 @@ static int vpif_set_input(
+>  	if (sd_index >= 0) {
+>  		sd = vpif_obj.sd[sd_index];
+>  		subdev_info = &vpif_cfg->subdev_info[sd_index];
+> +	} else {
+> +		/* no subdevice, no input to setup */
+> +		return 0;
+>  	}
+>
+>  	/* first setup input path from sub device to vpif */
+> @@ -1435,6 +1443,11 @@ static __init int vpif_probe(struct platform_device *pdev)
+>  	int res_idx = 0;
+>  	int i, err;
+>
+> +	if (!pdev->dev.platform_data) {
+> +		dev_warn(&pdev->dev, "Missing platform data.  Giving up.\n");
+> +		return -EINVAL;
+> +	}
+> +
+>  	vpif_dev = &pdev->dev;
+>
+>  	err = initialize_vpif();
+> diff --git a/drivers/media/platform/davinci/vpif_display.c b/drivers/media/platform/davinci/vpif_display.c
+> index 75b27233ec2f..7f632b757d32 100644
+> --- a/drivers/media/platform/davinci/vpif_display.c
+> +++ b/drivers/media/platform/davinci/vpif_display.c
+> @@ -42,6 +42,7 @@ module_param(debug, int, 0644);
+>  MODULE_PARM_DESC(debug, "Debug level 0-1");
+>
+>  #define VPIF_DRIVER_NAME	"vpif_display"
+> +MODULE_ALIAS("platform:" VPIF_DRIVER_NAME);
+>
+>  /* Is set to 1 in case of SDTV formats, 2 in case of HDTV formats. */
+>  static int ycmux_mode;
+> @@ -1249,6 +1250,11 @@ static __init int vpif_probe(struct platform_device *pdev)
+>  	int res_idx = 0;
+>  	int i, err;
+>
+> +	if (!pdev->dev.platform_data) {
+> +		dev_warn(&pdev->dev, "Missing platform data.  Giving up.\n");
+> +		return -EINVAL;
+> +	}
+> +
+>  	vpif_dev = &pdev->dev;
+>  	err = initialize_vpif();
+>
+>
