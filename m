@@ -1,33 +1,36 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Fri, 16 Dec 2016 09:50:50 +0100
-Subject: [PATCHv2 1/8] ARM: dts: stm32: set HSE_RTC clock frequency to 1 MHz
- on stm32f429
+Date: Fri, 16 Dec 2016 09:50:54 +0100
+Subject: [PATCHv2 5/8] ARM: dts: stm32: enable RTC on stm32f429-disco
 In-Reply-To: <1481878257-29163-1-git-send-email-amelie.delaunay@st.com>
 References: <1481878257-29163-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1481878257-29163-2-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1481878257-29163-6-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set HSE_RTC clock frequency to 1 MHz, as the clock supplied to
-the RTC must be 1 MHz.
+This patch enables RTC on stm32f429-disco with LSI as clock source because
+X2 crystal for LSE is not fitted by default.
 
 Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
- arch/arm/boot/dts/stm32f429.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/stm32f429-disco.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index b077f99..d195ccf 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -371,6 +371,8 @@
- 			reg = <0x40023800 0x400>;
- 			clocks = <&clk_hse>, <&clk_i2s_ckin>;
- 			st,syscfg = <&pwrcfg>;
-+			assigned-clocks = <&rcc 1 CLK_HSE_RTC>;
-+			assigned-clock-rates = <1000000>;
- 		};
+diff --git a/arch/arm/boot/dts/stm32f429-disco.dts b/arch/arm/boot/dts/stm32f429-disco.dts
+index b6e63d8..49eddf6 100644
+--- a/arch/arm/boot/dts/stm32f429-disco.dts
++++ b/arch/arm/boot/dts/stm32f429-disco.dts
+@@ -94,6 +94,12 @@
+ 	clock-frequency = <8000000>;
+ };
  
- 		dma1: dma-controller at 40026000 {
++&rtc {
++	assigned-clocks = <&rcc 1 CLK_RTC>;
++	assigned-clock-parents = <&rcc 1 CLK_LSI>;
++	status = "okay";
++};
++
+ &usart1 {
+ 	pinctrl-0 = <&usart1_pins_a>;
+ 	pinctrl-names = "default";
 -- 
 1.9.1
