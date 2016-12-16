@@ -1,52 +1,27 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Fri, 16 Dec 2016 22:20:35 +0100
-Subject: [PATCH] i2c: mux: pca954x: fix i2c mux selection caching
-In-Reply-To: <E1cHylf-00071o-KZ@rmk-PC.armlinux.org.uk>
-References: <E1cHylf-00071o-KZ@rmk-PC.armlinux.org.uk>
-Message-ID: <251c31e3-141c-8884-d56a-fa539714d1ff@axentia.se>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Dec 2016 22:51:08 +0100
+Subject: [PATCH] ARM: disallow ARM_THUMB for ARMv4 builds
+In-Reply-To: <CAKv+Gu93Gtkh7spA-HUHNKSmDjhK_nuwR9KaDu8=S2GDyhUJCA@mail.gmail.com>
+References: <20161216091457.2452987-1-arnd@arndb.de>
+ <CAKv+Gu93Gtkh7spA-HUHNKSmDjhK_nuwR9KaDu8=S2GDyhUJCA@mail.gmail.com>
+Message-ID: <4112999.Nl7pxYH1YF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-12-16 21:06, Russell King wrote:
-> smbus functions return -ve on error, 0 on success.  However,
-> __i2c_transfer() have a different return signature - -ve on error, or
-> number of buffers transferred (which may be zero or greater.)
+On Friday, December 16, 2016 5:20:22 PM CET Ard Biesheuvel wrote:
 > 
-> The upshot of this is that the sense of the test is reversed when using
-> the mux on a bus supporting the master_xfer method: we cache the value
-> and never retry if we fail to transfer any buffers, but if we succeed,
-> we clear the cached value.
-
-Ouch! Thanks for catching this.
-
-> Fix this.
-
-But lets fix the corner case of __i2c_transfer returning 0 instead of
-the expected 1 as well (not sure if that's even possible, but lets close
-the possibility just in case), so I'd prefer if you could fix
-pca954x_reg_write() to return 0 iff __i2c_transfer(...) returns 1
-instead, and -EREMOTEIO on other non-negative return values. Thanks!
-
-Cheers,
-peda
-
-> Fixes: 463e8f845cbf ("i2c: mux: pca954x: retry updating the mux selection on failure")
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  drivers/i2c/muxes/i2c-mux-pca954x.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Can't we use the old
 > 
-> diff --git a/drivers/i2c/muxes/i2c-mux-pca954x.c b/drivers/i2c/muxes/i2c-mux-pca954x.c
-> index 8bc3d36d2837..b6d62ecbd5b6 100644
-> --- a/drivers/i2c/muxes/i2c-mux-pca954x.c
-> +++ b/drivers/i2c/muxes/i2c-mux-pca954x.c
-> @@ -179,7 +179,7 @@ static int pca954x_select_chan(struct i2c_mux_core *muxc, u32 chan)
->  	/* Only select the channel if its different from the last channel */
->  	if (data->last_chan != regval) {
->  		ret = pca954x_reg_write(muxc->parent, client, regval);
-> -		data->last_chan = ret ? 0 : regval;
-> +		data->last_chan = ret >= 0 ? regval : 0;
->  	}
->  
->  	return ret;
+> tst lr, #1
+> moveq pc, lr
+> bx lr
 > 
+> trick? (where bx lr needs to be emitted as a plain opcode to hide it
+> from the assembler)
+> 
+
+Yes, that should work around the specific problem in theory, but back
+when Jonas tried it, it still didn't work. There may also be other
+problems in that configuration.
+
+	Arnd
