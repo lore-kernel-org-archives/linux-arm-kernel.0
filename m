@@ -1,55 +1,58 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Fri, 16 Dec 2016 12:46:12 +0100
-Subject: [PATCH] arm: dt: Initialize boot_command_line from CONFIG_CMDLINE
- in case DT does not provide /chosen/bootargs
-In-Reply-To: <201612150109.20868@pali>
-References: <1481749963-8664-1-git-send-email-pali.rohar@gmail.com>
- <20161214235224.GH14217@n2100.armlinux.org.uk> <201612150109.20868@pali>
-Message-ID: <201612161246.12155@pali>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 16 Dec 2016 11:54:13 +0000
+Subject: [PATCH 3/4] iommu/arm-smmu: Disable stalling faults for all
+ endpoints
+In-Reply-To: <CAF6AEGujUb37qagBZK1T13eAh=50zy0z5HpFF9FsuvkZZ7c5qw@mail.gmail.com>
+References: <1471525542-14969-1-git-send-email-will.deacon@arm.com>
+ <1471525542-14969-4-git-send-email-will.deacon@arm.com>
+ <CAF6AEGujUb37qagBZK1T13eAh=50zy0z5HpFF9FsuvkZZ7c5qw@mail.gmail.com>
+Message-ID: <20161216115413.GE13191@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 December 2016 01:09:20 Pali Roh?r wrote:
-> On Thursday 15 December 2016 00:52:24 Russell King - ARM Linux wrote:
-> > On Wed, Dec 14, 2016 at 10:12:43PM +0100, Pali Roh?r wrote:
-> > > Commit 008a2ebcd677 ("ARM: dts: omap3: Remove skeleton.dtsi
-> > > usage") broke support for setting cmdline on Nokia N900 via
-> > > CONFIG_CMDLINE.
-> > > 
-> > > It is because arm code booted in DT mode parse cmdline only via
-> > > function early_init_dt_scan_chosen() and that function does not
-> > > fill variable boot_command_line when DTB does not contain /chosen
-> > > entry. It is called from function early_init_dt_scan_nodes() in
-> > > setup_machine_fdt().
-> > > 
-> > > This patch fixes it by explicitly filling boot_command_line in
-> > > function setup_machine_fdt() after calling
-> > > early_init_dt_scan_nodes() in case boot_command_line still
-> > > remains empty.
-> > 
-> > This looks like a hack.
-> > 
-> > First, the matter of the ATAGs compatibility.  The decompressor
-> > relies on there being a pre-existing /chosen node to insert the
-> > command line and other parameters into.  If we've dropped it (by
-> > dropping skeleton.dtsi) then we've just regressed more than just
-> > N900 - the decompressor won't be able to merge the ATAGs into the
-> > concatenated FDT.
+Hi Rob,
+
+On Tue, Dec 06, 2016 at 06:30:21PM -0500, Rob Clark wrote:
+> On Thu, Aug 18, 2016 at 9:05 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > Enabling stalling faults can result in hardware deadlock on poorly
+> > designed systems, particularly those with a PCI root complex upstream of
+> > the SMMU.
+> >
+> > Although it's not really Linux's job to save hardware integrators from
+> > their own misfortune, it *is* our job to stop userspace (e.g. VFIO
+> > clients) from hosing the system for everybody else, even if they might
+> > already be required to have elevated privileges.
+> >
+> > Given that the fault handling code currently executes entirely in IRQ
+> > context, there is nothing that can sensibly be done to recover from
+> > things like page faults anyway, so let's rip this code out for now and
+> > avoid the potential for deadlock.
 > 
-> Hm... I did not think about it. But right this can be broken too...
+> so, I'd like to re-introduce this feature, I *guess* as some sort of
+> opt-in quirk (ie. disabled by default unless something in DT tells you
+> otherwise??  But I'm open to suggestions.  I'm not entirely sure what
+> hw was having problems due to this feature.)
+> 
+> On newer snapdragon devices we are using arm-smmu for the GPU, and
+> halting the GPU so the driver's fault handler can dump some GPU state
+> on faults is enormously helpful for debugging and tracking down where
+> in the gpu cmdstream the fault was triggered.  In addition, we will
+> eventually want the ability to update pagetables from fault handler
+> and resuming the faulting transition.
 
-Tony, Javier: are you aware of above ??? problem?
+I'm not against reintroducing this, but it would certainly need to be
+opt-in, as you suggest. If we want to try to use stall faults to enable
+demand paging for DMA, then that means running core mm code to resolve
+the fault and we can't do that in irq context. Consequently, we have to
+hand this off to a thread, which means the hardware must allow the SS
+bit to remain set without immediately reasserting the interrupt line.
+Furthermore, we can't handle multiple faults on a context-bank, so we'd
+need to restrict ourselves to one device (i.e. faulting stream) per
+domain (CB).
 
-It looks like commit 008a2ebcd677 ("ARM: dts: omap3: Remove 
-skeleton.dtsi usage") should be really reverted.
+I think that means we want both specific compatible strings to identify
+the SS bit behaviour, but also a way to opt-in for the stall model as a
+separate property to indicate that the SoC integration can support this
+without e.g. deadlocking.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161216/cf408722/attachment.sig>
+Will
