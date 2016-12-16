@@ -1,77 +1,98 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 16 Dec 2016 17:20:22 +0000
-Subject: [PATCH] ARM: disallow ARM_THUMB for ARMv4 builds
-In-Reply-To: <20161216091457.2452987-1-arnd@arndb.de>
-References: <20161216091457.2452987-1-arnd@arndb.de>
-Message-ID: <CAKv+Gu93Gtkh7spA-HUHNKSmDjhK_nuwR9KaDu8=S2GDyhUJCA@mail.gmail.com>
+From: dianders@google.com (Doug Anderson)
+Date: Fri, 16 Dec 2016 09:28:21 -0800
+Subject: [PATCH 3/3] arm64: dts: rockchip: add clk-480m for ehci and ohci
+ of rk3399
+In-Reply-To: <5853903D.8030605@rock-chips.com>
+References: <1481710301-1454-1-git-send-email-zhengxing@rock-chips.com>
+ <991221a4-3962-1bcb-7863-72f5553eba40@rock-chips.com>
+ <CAD=FV=XKQaqRS4jUM7NpN2KEV8USj_cVWbh7q4274n3jBtwORg@mail.gmail.com>
+ <2526685.VC5cUs58On@phil> <5853903D.8030605@rock-chips.com>
+Message-ID: <CAD=FV=W1BW6FSZ6MSxR6RhvtZyGsdQbz9vU_QshaQ5A65ENMCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 December 2016 at 09:14, Arnd Bergmann <arnd@arndb.de> wrote:
-> With old compilers (gcc-4.3 and earlier), we run into a build error
-> when CONFIG_ARM_THUMB is enabled in kernels that have both ARMv4 and
-> ARMv4T/ARMv5 CPU support:
->
-> arch/arm/kernel/entry-armv.S: Assembler messages:
-> arch/arm/kernel/entry-armv.S:938: Error: selected processor does not support `bx lr' in ARM mode
-> arch/arm/kernel/entry-armv.S:961: Error: selected processor does not support `bx lr' in ARM mode
-> arch/arm/kernel/entry-armv.S:1004: Error: selected processor does not support `bx lr' in ARM mode
->
-> The problem evidently is that 'bx' cannot work on the old CPUs, but
-> the new ones have to use it whenever returning to THUMB user space.
->
+Hi,
 
-Can't we use the old
+On Thu, Dec 15, 2016 at 10:57 PM, Xing Zheng <zhengxing@rock-chips.com> wrote:
+> Hi Heiko, Doug,
+>
+> On 2016?12?16? 02:18, Heiko Stuebner wrote:
+>
+> Am Donnerstag, 15. Dezember 2016, 08:34:09 CET schrieb Doug Anderson:
+>
+>
+> I still need to digest all of the things that were added to this
+> thread overnight, but nothing I've seen so far indicates that you need
+> the post-gated clock.  AKA I still think you need to redo your patch
+> to replace:
+>
+>               clocks = <&cru HCLK_HOST0>, <&cru HCLK_HOST0_ARB>,
+>                        <&cru SCLK_USBPHY0_480M_SRC>;
+>
+> with:
+>
+>               clocks = <&cru HCLK_HOST0>, <&cru HCLK_HOST0_ARB>,
+>                         <&u2phy0>;
+>
+> Can you please comment on that?
+>
+> Also, with the change, the ehci will keep the clock (and thus the phy)
+> always
+> on. Does the phy-autosuspend even save anything now?
+>
+> In any case, could we make the clock-names entry sound nicer than
+> usbphy0_480m
+> please? bindings/usb/atmel-usb.txt calls its UTMI clock simply "usb_clk",
+> but
+> something like "utmi" should also work.
+> While at it you could also fix up the other clock names to something like
+> "host" and "arbiter" or so?.
+>
+>
+> Heiko
+>
+>
+> The usbphy related clock tress like this:
+>
+>
+> Actually, at drivers/phy/phy-rockchip-inno-usb2.c, we can only
+> enable/disable the master gate via GRF is PHY_PLL, not UTMI_CLK.
+>
+> And the naming style of the "hclk_host0" keep the name "hclk_host0" on the
+> clcok tree diagram:
+>
+>
+> Therefore, could we rename the clock name like this:
+> ----
+> for usb_host0_ehci and usb_host0_ohci:
+>         clocks = <&cru HCLK_HOST0>, <&cru HCLK_HOST0_ARB>,
+>              <&cru SCLK_U2PHY0>;
+>         clock-names = "hclk_host0", "hclk_host0_arb",
+>                   "sclk_u2phy0";
+>
+> for usb_host1_ehci and usb_host1_ohci:
+>         clocks = <&cru HCLK_HOST1>, <&cru HCLK_HOST1_ARB>,
+>              <&cru SCLK_U2PHY1>;
+>         clock-names = "hclk_host1", "hclk_host1_arb",
+>                   "sclk_u2phy1";
+> ----
+>
+> BTW, the "arb" is an abbreviation for arbiter.
 
-tst lr, #1
-moveq pc, lr
-bx lr
+You don't specify what this new "SCLK_U2PHY0" ID is, so it's a little
+hard for me to know what you're intending.
 
-trick? (where bx lr needs to be emitted as a plain opcode to hide it
-from the assembler)
+...however, I still don't see any reason why you can't just use the
+solution I proposed.  Specifying the clock as "<&u2phy0>" is the
+correct thing to do.  The input clock to the EHCI driver is exactly
+the clock provided by the USB PHY with no gate in between (just as I
+said).  There is no reason to somehow buffer it by the cru.  The cru
+doesn't see this clock and has no reason to be involved.
 
-> This was discussed a while ago without a conclusion about what
-> the proper patch should be to solve it, and came again up now when I
-> experimented with old toolchain versions.
->
-> This sidesteps the problem by declaring that we do not support
-> the configuration and instead have to disable CONFIG_ARM_THUMB
-> and not use THUMB user space with a kernel that supports the
-> FA526 CPU, which is the only one that is allowed in a multiplatform
-> configuration together with ARMv4T/ARMv5 anyway. This is not
-> a regression because the configuration never worked anyway.
-> The only platform affected by this is moxart, as no other ARMv4
-> platforms are part of ARCH_MULTIPLATFORM.
->
-> Cc: Jonas Jensen <jonas.jensen@gmail.com>
-> Link: http://lkml.iu.edu/hypermail/linux/kernel/1404.1/00908.html
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mm/Kconfig | 6 +-----
->  1 file changed, 1 insertion(+), 5 deletions(-)
->
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 5d4920c069f2..f7b7aa37964f 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -655,11 +655,7 @@ config ARCH_DMA_ADDR_T_64BIT
->
->  config ARM_THUMB
->         bool "Support Thumb user binaries" if !CPU_THUMBONLY
-> -       depends on CPU_ARM720T || CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || \
-> -               CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || \
-> -               CPU_ARM1020 || CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || \
-> -               CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_V6 || CPU_V6K || \
-> -               CPU_V7 || CPU_FEROCEON || CPU_V7M
-> +       depends on !(CPU_32v3 || CPU_32v4)
->         default y
->         help
->           Say Y if you want to include kernel support for running user space
-> --
-> 2.9.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+> Thanks.
+
+Note that there were many other comments on this thread besides mine.
+Are you planning to address any of them?
+
+-Doug
