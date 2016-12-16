@@ -1,63 +1,41 @@
-From: zhongjiang@huawei.com (zhong jiang)
-Date: Fri, 16 Dec 2016 22:08:53 +0800
-Subject: [RESEND PATCH 2/2] arm64: make WANT_HUGE_PMD_SHARE depends on
- HUGETLB_PAGE
-In-Reply-To: <20161216123512.GF13191@arm.com>
-References: <1481725151-20549-1-git-send-email-zhongjiang@huawei.com>
- <1481725151-20549-3-git-send-email-zhongjiang@huawei.com>
- <5853AF6D.20305@huawei.com> <20161216123512.GF13191@arm.com>
-Message-ID: <5853F575.1080109@huawei.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 16 Dec 2016 11:18:12 -0300
+Subject: [PATCH] Documentation: dt: Explicitly mark Samsung Exynos SoC
+ bindings as unstable
+In-Reply-To: <1481897676-13578-1-git-send-email-m.szyprowski@samsung.com>
+References: <1481897676-13578-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <136c527a-a491-8a45-9ae9-3a2adfc59ab4@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/12/16 20:35, Will Deacon wrote:
-> On Fri, Dec 16, 2016 at 05:10:05PM +0800, zhong jiang wrote:
->> On 2016/12/14 22:19, zhongjiang wrote:
->>> From: zhong jiang <zhongjiang@huawei.com>
->>>
->>> when HUGETLB_PAGE is disable, WANT_HUGE_PMD_SHARE contains the
->>> fuctions should not be use. therefore, we add the dependency.
->>>
->>> Signed-off-by: zhong jiang <zhongjiang@huawei.com>
->>> ---
->>>  arch/arm64/Kconfig | 1 +
->>>  1 file changed, 1 insertion(+)
->>>
->>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>> index 969ef88..694ca73 100644
->>> --- a/arch/arm64/Kconfig
->>> +++ b/arch/arm64/Kconfig
->>> @@ -640,6 +640,7 @@ config SYS_SUPPORTS_HUGETLBFS
->>>  
->>>  config ARCH_WANT_HUGE_PMD_SHARE
->>>  	def_bool y if ARM64_4K_PAGES || (ARM64_16K_PAGES && !ARM64_VA_BITS_36)
->>> +	depends on HUGETLB_PAGE
->>>  
->>>  config ARCH_HAS_CACHE_LINE_SIZE
->>>  	def_bool y
->> Hi,
->>       I still think it is a issue. Perhaps above changelog is unclear.  Further explain is as follows.
->>  when hugetlb_pages is disable and arch_want_huge_pmd_share is enable,   we maybe call
->>  huge_pmd_sahre in hugetlbpage.c, but the function actually is not definition as it is not
->>  exported.  is it right ??
-> The only users of ARCH_WANT_HUGE_PMD_SHARE on arm64 are:
->
-> arch/arm64/mm/hugetlbpage.c:            if (IS_ENABLED(CONFIG_ARCH_WANT_HUGE_PMD_SHARE) &&
-> mm/hugetlb.c:#ifdef CONFIG_ARCH_WANT_HUGE_PMD_SHARE
-> mm/hugetlb.c:#else /* !CONFIG_ARCH_WANT_HUGE_PMD_SHARE */
-> mm/hugetlb.c:#endif /* CONFIG_ARCH_WANT_HUGE_PMD_SHARE */
->
-> and neither of those files are compiled if !HUGETLB_PAGE.
->
-> Are you actually seeing a problem here?
->
-> Will
->
-> .
->
-  I got it.  Please forget the  stupid patch and my stupid comments.
- 
- but the first patch look reasonable.  Is it accepted  ?
+Hello Marek,
 
- Thanks
- zhongjiang
+On 12/16/2016 11:14 AM, Marek Szyprowski wrote:
+> Samsung Exynos SoCs and boards related bindings evolved since the initial
+> introduction, but initially the bindings were minimal and a bit incomplete
+> (they never described all the hardware modules available in the SoCs).
+> Since then some significant (not fully compatible) changes have been
+> already committed a few times (like gpio replaced by pinctrl, display ddc,
+> mfc reserved memory, some core clocks added to various hardware modules,
+> added more required nodes).
+> 
+> On the other side there are no boards which have device tree embedded in
+> the bootloader. Device tree blob is always compiled from the kernel tree
+> and updated together with the kernel image.
+> 
+> Thus to avoid further adding a bunch of workarounds for old/missing
+> bindings and allow to make cleanup of the existing code and device tree
+> files, lets mark Samsung Exynos SoC platform bindings as unstable. This
+> means that bindings can may change at any time and users should use the
+> dtb file compiled from the same kernel source tree as the kernel image.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+
+I completely agree with you on this.
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
