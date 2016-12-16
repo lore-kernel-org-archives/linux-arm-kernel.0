@@ -1,52 +1,36 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 16 Dec 2016 15:14:36 +0100
-Subject: [PATCH] Documentation: dt: Explicitly mark Samsung Exynos SoC bindings
- as unstable
-Message-ID: <1481897676-13578-1-git-send-email-m.szyprowski@samsung.com>
+From: schwab@suse.de (Andreas Schwab)
+Date: Fri, 16 Dec 2016 15:16:20 +0100
+Subject: jemalloc testsuite stalls in memset
+In-Reply-To: <20161216063940.GA1334@bbox> (Minchan Kim's message of "Fri, 16
+ Dec 2016 15:39:40 +0900")
+References: <mvmmvfy37g1.fsf@hawking.suse.de> <20161214235031.GA2912@bbox>
+ <mvm4m2535pc.fsf@hawking.suse.de> <20161216063940.GA1334@bbox>
+Message-ID: <87d1gshscr.fsf@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Samsung Exynos SoCs and boards related bindings evolved since the initial
-introduction, but initially the bindings were minimal and a bit incomplete
-(they never described all the hardware modules available in the SoCs).
-Since then some significant (not fully compatible) changes have been
-already committed a few times (like gpio replaced by pinctrl, display ddc,
-mfc reserved memory, some core clocks added to various hardware modules,
-added more required nodes).
+On Dez 16 2016, Minchan Kim <minchan@kernel.org> wrote:
 
-On the other side there are no boards which have device tree embedded in
-the bootloader. Device tree blob is always compiled from the kernel tree
-and updated together with the kernel image.
+> Below helps?
+>
+> diff --git a/mm/huge_memory.c b/mm/huge_memory.c
+> index e10a4fe..dc37c9a 100644
+> --- a/mm/huge_memory.c
+> +++ b/mm/huge_memory.c
+> @@ -1611,6 +1611,7 @@ int madvise_free_huge_pmd(struct mmu_gather *tlb, struct vm_area_struct *vma,
+>  			tlb->fullmm);
+>  		orig_pmd = pmd_mkold(orig_pmd);
+>  		orig_pmd = pmd_mkclean(orig_pmd);
+> +		orig_pmd = pmd_wrprotect(orig_pmd);
+>  
+>  		set_pmd_at(mm, addr, pmd, orig_pmd);
+>  		tlb_remove_pmd_tlb_entry(tlb, pmd, addr);
 
-Thus to avoid further adding a bunch of workarounds for old/missing
-bindings and allow to make cleanup of the existing code and device tree
-files, lets mark Samsung Exynos SoC platform bindings as unstable. This
-means that bindings can may change at any time and users should use the
-dtb file compiled from the same kernel source tree as the kernel image.
+Thanks, this fixes the issue (tested with 4.9).
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- Documentation/devicetree/bindings/arm/samsung/exynos.txt | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos.txt
+Andreas.
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos.txt b/Documentation/devicetree/bindings/arm/samsung/exynos.txt
-new file mode 100644
-index 000000000000..0c606f4c6e85
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/samsung/exynos.txt
-@@ -0,0 +1,12 @@
-+Samsung Exynos SoC Family Device Tree Bindings
-+---------------------------------------------------------------
-+
-+Work in progress statement:
-+
-+Device tree files and bindings applying to Samsung Exynos SoCs and boards are
-+considered "unstable". Any Samsung Exynos device tree binding may change at any
-+time. Be sure to use a device tree binary and a kernel image generated from the
-+same source tree.
-+
-+Please refer to Documentation/devicetree/bindings/ABI.txt for a definition of a
-+stable binding/ABI.
 -- 
-1.9.1
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
