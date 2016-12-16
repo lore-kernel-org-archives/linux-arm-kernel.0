@@ -1,66 +1,87 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Fri, 16 Dec 2016 15:39:40 +0900
-Subject: jemalloc testsuite stalls in memset
-In-Reply-To: <mvm4m2535pc.fsf@hawking.suse.de>
-References: <mvmmvfy37g1.fsf@hawking.suse.de> <20161214235031.GA2912@bbox>
- <mvm4m2535pc.fsf@hawking.suse.de>
-Message-ID: <20161216063940.GA1334@bbox>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 16 Dec 2016 14:40:41 +0800
+Subject: [PATCH 2/2] clk: zte: add audio clocks for zx296718
+In-Reply-To: <20161208210453.GH5423@codeaurora.org>
+References: <1481189157-8995-1-git-send-email-shawnguo@kernel.org>
+ <1481189157-8995-2-git-send-email-shawnguo@kernel.org>
+ <20161208210453.GH5423@codeaurora.org>
+Message-ID: <20161216064039.GB8787@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Dec 08, 2016 at 01:04:53PM -0800, Stephen Boyd wrote:
+> > +	if (of_clk_add_hw_provider(np, of_clk_hw_onecell_get, &audio_hw_onecell_data))
+> > +		panic("could not register clk provider\n");
+> 
+> Why don't we return error? We returned errors before if we
+> couldn't map the ioregion.
 
-On Thu, Dec 15, 2016 at 10:24:47AM +0100, Andreas Schwab wrote:
-> On Dez 15 2016, Minchan Kim <minchan@kernel.org> wrote:
-> 
-> > You mean program itself access the address(ie, 0xffffb7400000) is hang
-> > while access the address from the debugger is OK?
-> 
-> Yes.
-> 
-> > Can you reproduce it easily?
-> 
-> 100%
-> 
-> > Did you test it in real machine or qemu on x86?
-> 
-> Both real and kvm.
-> 
-> > Could you show me how I can reproduce it?
-> 
-> Just run make check.
-> 
-> > I want to test it in x86 machine, first of all.
-> > Unfortunately, I don't have any aarch64 platform now so maybe I have to
-> > run it on qemu on x86 until I can set up aarch64 platform if it is reproducible
-> > on real machine only.
-> >
-> >> 
-> >> The kernel has been configured with transparent hugepages.
-> >> 
-> >> CONFIG_TRANSPARENT_HUGEPAGE=y
-> >> CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS=y
-> >> # CONFIG_TRANSPARENT_HUGEPAGE_MADVISE is not set
-> >> CONFIG_TRANSPARENT_HUGE_PAGECACHE=y
-> >
-> > What's the exact kernel version?
-> 
-> Anything >= your commit.
+Yes.  Rather than panic, we should check return and give an error
+message in case of failure.
 
-Thanks for the info. I cannot setup testing enviroment but when I read code,
-it seems we need pmd_wrprotect for non-hardware dirty architecture.
+> 
+> > +	pr_info("audio-clk init over, nr:%d\n", AUDIO_NR_CLKS);
+> 
+> debug noise?
 
-Below helps?
+Agreed.  I will just clean it up.
 
-diff --git a/mm/huge_memory.c b/mm/huge_memory.c
-index e10a4fe..dc37c9a 100644
---- a/mm/huge_memory.c
-+++ b/mm/huge_memory.c
-@@ -1611,6 +1611,7 @@ int madvise_free_huge_pmd(struct mmu_gather *tlb, struct vm_area_struct *vma,
- 			tlb->fullmm);
- 		orig_pmd = pmd_mkold(orig_pmd);
- 		orig_pmd = pmd_mkclean(orig_pmd);
-+		orig_pmd = pmd_wrprotect(orig_pmd);
- 
- 		set_pmd_at(mm, addr, pmd, orig_pmd);
- 		tlb_remove_pmd_tlb_entry(tlb, pmd, addr);
+<snip>
+
+> > +static unsigned long audio_calc_rate(struct clk_zx_audio_divider *audio_div,
+> > +				     u32 reg_frac, u32 reg_int,
+> > +				     unsigned long parent_rate)
+> > +{
+> > +	unsigned long rate, m, n;
+> > +
+> > +	if (audio_div->table) {
+> > +		const struct zx_clk_audio_div_table *divt = audio_div->table;
+> > +
+> > +		for (; divt->rate; divt++) {
+> > +			if ((divt->int_reg == reg_int) && (divt->frac_reg == reg_frac))
+> 
+> Please remove extra parenthesis here.
+
+The whole hunk of the code will be dropped, since the divider lookup
+table is not actually used.
+
+> 
+> > +				return divt->rate;
+> > +		}
+> > +	}
+> > +	if (audio_div->table)
+> > +		pr_warn("cannot found the config(int_reg:0x%x, frac_reg:0x%x) in table, we will caculate it\n",
+> > +			reg_int, reg_frac);
+
+<snip>
+
+> > +	div_table->rate = (ulong)(parent_rate * n) / ((ulong)reg_int * n + m);
+> 
+> Please don't use ulong, use unsigned long. Also consider using
+> local variables so the line isn't overly long.
+
+It seems to me that none of the type casts is really necessary.  So I
+will just drop them.
+
+> 
+> > +	div_table->int_reg = reg_int;
+> > +	div_table->frac_reg = reg_frac;
+> > +}
+> [...]
+> > +
+> > +static int zx_audio_div_set_rate(struct clk_hw *hw, unsigned long rate,
+> > +				    unsigned long parent_rate)
+> > +{
+> > +	struct clk_zx_audio_divider *zx_audio_div = to_clk_zx_audio_div(hw);
+> > +	struct zx_clk_audio_div_table divt;
+> > +	unsigned int val;
+> > +
+> > +	audio_calc_reg(zx_audio_div, &divt, rate, parent_rate);
+> > +	if (divt.rate != rate)
+> > +		pr_info("the real rate is:%ld", divt.rate);
+> 
+> Debug noise?
+
+I will change it to pr_debug.
+
+Shawn
