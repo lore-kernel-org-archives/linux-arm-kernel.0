@@ -1,119 +1,54 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Fri, 16 Dec 2016 13:32:36 +0100
-Subject: [PATCH] arm: dt: Initialize boot_command_line from CONFIG_CMDLINE
- in case DT does not provide /chosen/bootargs
-In-Reply-To: <029ec718-89c0-b08e-de7e-279946c1a9bd@osg.samsung.com>
-References: <1481749963-8664-1-git-send-email-pali.rohar@gmail.com>
- <201612161246.12155@pali>
- <029ec718-89c0-b08e-de7e-279946c1a9bd@osg.samsung.com>
-Message-ID: <201612161332.36406@pali>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 16 Dec 2016 12:35:12 +0000
+Subject: [RESEND PATCH 2/2] arm64: make WANT_HUGE_PMD_SHARE depends on
+ HUGETLB_PAGE
+In-Reply-To: <5853AF6D.20305@huawei.com>
+References: <1481725151-20549-1-git-send-email-zhongjiang@huawei.com>
+ <1481725151-20549-3-git-send-email-zhongjiang@huawei.com>
+ <5853AF6D.20305@huawei.com>
+Message-ID: <20161216123512.GF13191@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Fri, Dec 16, 2016 at 05:10:05PM +0800, zhong jiang wrote:
+> On 2016/12/14 22:19, zhongjiang wrote:
+> > From: zhong jiang <zhongjiang@huawei.com>
+> >
+> > when HUGETLB_PAGE is disable, WANT_HUGE_PMD_SHARE contains the
+> > fuctions should not be use. therefore, we add the dependency.
+> >
+> > Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+> > ---
+> >  arch/arm64/Kconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index 969ef88..694ca73 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -640,6 +640,7 @@ config SYS_SUPPORTS_HUGETLBFS
+> >  
+> >  config ARCH_WANT_HUGE_PMD_SHARE
+> >  	def_bool y if ARM64_4K_PAGES || (ARM64_16K_PAGES && !ARM64_VA_BITS_36)
+> > +	depends on HUGETLB_PAGE
+> >  
+> >  config ARCH_HAS_CACHE_LINE_SIZE
+> >  	def_bool y
+> Hi,
+>       I still think it is a issue. Perhaps above changelog is unclear.  Further explain is as follows.
+>  when hugetlb_pages is disable and arch_want_huge_pmd_share is enable,   we maybe call
+>  huge_pmd_sahre in hugetlbpage.c, but the function actually is not definition as it is not
+>  exported.  is it right ??
 
-On Friday 16 December 2016 13:13:34 Javier Martinez Canillas wrote:
-> Hello Pali,
-> 
-> On 12/16/2016 08:46 AM, Pali Roh?r wrote:
-> > On Thursday 15 December 2016 01:09:20 Pali Roh?r wrote:
-> >> On Thursday 15 December 2016 00:52:24 Russell King - ARM Linux
-> >> wrote:
-> >>> On Wed, Dec 14, 2016 at 10:12:43PM +0100, Pali Roh?r wrote:
-> >>>> Commit 008a2ebcd677 ("ARM: dts: omap3: Remove skeleton.dtsi
-> >>>> usage") broke support for setting cmdline on Nokia N900 via
-> >>>> CONFIG_CMDLINE.
-> >>>> 
-> >>>> It is because arm code booted in DT mode parse cmdline only via
-> >>>> function early_init_dt_scan_chosen() and that function does not
-> >>>> fill variable boot_command_line when DTB does not contain
-> >>>> /chosen entry. It is called from function
-> >>>> early_init_dt_scan_nodes() in setup_machine_fdt().
-> >>>> 
-> >>>> This patch fixes it by explicitly filling boot_command_line in
-> >>>> function setup_machine_fdt() after calling
-> >>>> early_init_dt_scan_nodes() in case boot_command_line still
-> >>>> remains empty.
-> >>> 
-> >>> This looks like a hack.
-> >>> 
-> >>> First, the matter of the ATAGs compatibility.  The decompressor
-> >>> relies on there being a pre-existing /chosen node to insert the
-> >>> command line and other parameters into.  If we've dropped it (by
-> >>> dropping skeleton.dtsi) then we've just regressed more than just
-> >>> N900 - the decompressor won't be able to merge the ATAGs into the
-> >>> concatenated FDT.
-> >> 
-> >> Hm... I did not think about it. But right this can be broken
-> >> too...
-> > 
-> > Tony, Javier: are you aware of above ??? problem?
-> > 
-> > It looks like commit 008a2ebcd677 ("ARM: dts: omap3: Remove
-> > skeleton.dtsi usage") should be really reverted.
-> 
-> I don't think reverting the mentioned commit is the correct fix for
-> your problem. We are trying to get rid of skeleton.dtsi for many
-> reasons, see commit commit ("3ebee5a2e141 arm64: dts: kill
-> skeleton.dtsi").
+The only users of ARCH_WANT_HUGE_PMD_SHARE on arm64 are:
 
-$ git show 3ebee5a2e141
+arch/arm64/mm/hugetlbpage.c:            if (IS_ENABLED(CONFIG_ARCH_WANT_HUGE_PMD_SHARE) &&
+mm/hugetlb.c:#ifdef CONFIG_ARCH_WANT_HUGE_PMD_SHARE
+mm/hugetlb.c:#else /* !CONFIG_ARCH_WANT_HUGE_PMD_SHARE */
+mm/hugetlb.c:#endif /* CONFIG_ARCH_WANT_HUGE_PMD_SHARE */
 
-* The default empty /chosen and /aliases are somewhat useless...
+and neither of those files are compiled if !HUGETLB_PAGE.
 
-That is not truth, they are not useless as Russell King wrote -- 
-removing them break ATAG support.
+Are you actually seeing a problem here?
 
-(But that commit is for arm64 which probably is not using ATAGs... But I 
-do not know. At least it is not truth for 32bit arm.)
-
-> Also, the chosen node is mentioned to be optional in the ePAPR
-> document and u-boot creates a chosen node if isn't found [0] so this
-> issue is only present in boards that don't use u-boot like the
-> N900/N950/N9 phones.
-
-Linux arm decompressor does not propagate ATAGs when /chosen is missing. 
-Sorry, but if for Linux /chosen is required (and without it is broken!) 
-then some ePARP document does not apply there. Either Linux code needs 
-to be fixed (so /chosen will be really only optional) or /chosen stay in 
-Linux required. There is no other option.
-
-And I hope that U-boot is not the only one bootloader which Linux kernel 
-supports. I thought that I can use *any* bootloader to boot Linux kernel 
-not just U-Boot which is doing some magic...
-
-With this step you are basically going to break booting Linux kernel 
-with all others bootloaders... And personally I really dislike this 
-idea.
-
-> So if NOLO doesn't do the same than u-boot and the kernel expects a
-> chosen node, I suggest to add an empty chosen node in the
-> omap3-n900.dts and omap3-n950-n9.dtsi device tree source files.
-
-That would fix a problem for N900, N950 and N9. But not for all other 
-ARM devices which bootloader pass some ATAGs.
-
-IIRC rule of kernel is not to break compatibility and that commit 
-008a2ebcd677 really did it.
-
-Note: I'm not saying if 008a2ebcd677 is good or bad. I'm just saying 
-that it cause problems which need to be properly fixed. And if fixing 
-them is harder and will take more time, then correct option is to revert 
-008a2ebcd677 due to breaking support for more devices.
-
-> [0]:
-> http://git.denx.de/?p=u-boot.git;a=blob;f=common/fdt_support.c;h=c9f
-> 7019e38e8de1469f506cdd57353fd27d8e134;hb=HEAD#l226
-> 
-> Best regards,
-
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161216/e81662a3/attachment-0001.sig>
+Will
