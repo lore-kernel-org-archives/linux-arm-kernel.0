@@ -1,54 +1,34 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 16 Dec 2016 09:39:36 +0800
-Subject: [RFC v3 PATCH 20/25] ARM: i.MX: remove map_io callback
-In-Reply-To: <1480691143-19845-21-git-send-email-vladimir.murzin@arm.com>
-References: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
- <1480691143-19845-21-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20161216013934.GA8787@dragon>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 16 Dec 2016 09:57:20 +0800
+Subject: [PATCH 2/2] arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA
+In-Reply-To: <20161215153930.GA8111@rric.localdomain>
+References: <1481706707-6211-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1481706707-6211-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20161215153930.GA8111@rric.localdomain>
+Message-ID: <125f3064-bbec-d923-ad9f-b2d152ee2c2d@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 03:05:38PM +0000, Vladimir Murzin wrote:
-> There is no need to define map_io only for debug_ll_io_init() since it
-> is already called in devicemaps_init() if map_io is NULL.
-> 
-> Apart from that, for NOMMU build debug_ll_io_init() is a nop which
-> leads to following error:
-> 
-> CC      arch/arm/mach-imx/mach-imx1.o
-> arch/arm/mach-imx/mach-imx1.c:40:13: error: 'debug_ll_io_init' undeclared here (not in a function)
->   .map_io  = debug_ll_io_init,
->              ^
-> make[1]: *** [arch/arm/mach-imx/mach-imx1.o] Error 1
-> 
-> Cc: Alexander Shiyan <shc_work@mail.ru>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Hi Robert,
 
-It looks like a cleanup which can be applied separately.
+On 2016/12/15 23:39, Robert Richter wrote:
+> I was going to do some measurements but my kernel crashes now with a
+> page fault in efi_rtc_probe():
+>
+> [   21.663393] Unable to handle kernel paging request at virtual address 20251000
+> [   21.663396] pgd = ffff000009090000
+> [   21.663401] [20251000] *pgd=0000010ffff90003
+> [   21.663402] , *pud=0000010ffff90003
+> [   21.663404] , *pmd=0000000fdc030003
+> [   21.663405] , *pte=00e8832000250707
+>
+> The sparsemem config requires the whole section to be initialized.
+> Your patches do not address this.
 
-Applied, thanks.
+This patch set is running properly on D05, both the boot and
+LTP MM stress test are ok, seems it's a different configuration
+of memory mappings in firmware, just a stupid question, which
+part is related to this problem, is it only the Reserved memory?
 
-Shawn
-
-> ---
->  arch/arm/mach-imx/mach-imx1.c |    1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/mach-imx1.c b/arch/arm/mach-imx/mach-imx1.c
-> index de5ab8d..3a8406e 100644
-> --- a/arch/arm/mach-imx/mach-imx1.c
-> +++ b/arch/arm/mach-imx/mach-imx1.c
-> @@ -37,7 +37,6 @@ static void __init imx1_init_irq(void)
->  };
->  
->  DT_MACHINE_START(IMX1_DT, "Freescale i.MX1 (Device Tree Support)")
-> -	.map_io		= debug_ll_io_init,
->  	.init_early	= imx1_init_early,
->  	.init_irq	= imx1_init_irq,
->  	.dt_compat	= imx1_dt_board_compat,
-> -- 
-> 1.7.9.5
-> 
+Thanks
+Hanjun
