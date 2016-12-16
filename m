@@ -1,113 +1,107 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Dec 2016 12:14:45 +0100
-Subject: [RFC] minimum gcc version for kernel: raise to gcc-4.3 or 4.6?
-In-Reply-To: <20161216105634.235457-1-arnd@arndb.de>
-References: <20161216105634.235457-1-arnd@arndb.de>
-Message-ID: <3302470.IDcDrWa0u6@wuerfel>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Fri, 16 Dec 2016 12:42:34 +0100
+Subject: [PATCH] arm: dt: Initialize boot_command_line from CONFIG_CMDLINE
+ in case DT does not provide /chosen/bootargs
+In-Reply-To: <20161215100931.GJ14217@n2100.armlinux.org.uk>
+References: <1481749963-8664-1-git-send-email-pali.rohar@gmail.com>
+ <201612150109.20868@pali> <20161215100931.GJ14217@n2100.armlinux.org.uk>
+Message-ID: <201612161242.34764@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Fixed linux-arm-kernel mailing list address, sorry for the duplicate,
- I'm not reposting all the ugly patches though, unless someone really
- wants them, https://lkml.org/lkml/2016/12/16/174 has a copy]
+On Thursday 15 December 2016 11:09:32 Russell King - ARM Linux wrote:
+> On Thu, Dec 15, 2016 at 01:09:20AM +0100, Pali Roh?r wrote:
+> > If cmdline is not in DT, but /chosen exists, then function
+> > early_init_dt_scan_chosen() use cmdline from CONFIG_CMDLINE.
+> 
+> Ah, yes.  Looks to me then as if the bug exists there, and not in
+> arch code then.  early_init_dt_scan_chosen() completely ignores the
+> CMDLINE options if the chosen node is not found.
 
-On Friday, December 16, 2016 11:56:21 AM CET Arnd Bergmann wrote:
-> I had some fun doing build testing with older gcc versions, building
-> every release from 4.0 through 7.0 and running that on my randconfig
-> setup to see what comes out.
+Yes... but question is: shoud function named early_init_dt_scan_chosen() 
+use CONFIG_CMDLINE if there is DT entry? From name dt_scan_chosen I 
+would expect that it scan /chosen and set some fields from /chosen...
+
+At least name of that function is confusing.
+
+> > What is reason that CONFIG_CMDLINE is not supported for DT?
 > 
-> First of all, gcc-4.9 and higher is basically warning-free everywhere,
-> although gcc-7 introduces some interesting new warnings (I have started
-> doing patches for those as well). gcc-4.8 is probably good, too, and
-> gcc-4.6 and 4.7 at least don't produce build failures in general, though
-> the level of false-positive warnings increases (we could decide to turn
-> those off for older compilers for build test purposes).
+> Sorry, that's my mistake - as you've pointed out above, it is
+> supported but via generic code.  I was only looking at arch code
+> when I made the statement.
 > 
-> In gcc-4.5 and below, dead code elimination is not as good as later,
-> causing a couple of link errors, and some of them have no good workaround
-> (see patch 1). It would be nice to declare that version too old, but
-> several older distros that are still in wide use ship with compilers
-> earlier than 4.6:
+> This patch (untested) should solve it:
 > 
->  RHEL6:		gcc-4.4
->  Debian 6:	gcc-4.4
->  Ubuntu 10.04:	gcc-4.4
->  SLES11:	gcc-4.3
+>  drivers/of/fdt.c | 40 ++++++++++++++++++++--------------------
+>  1 file changed, 20 insertions(+), 20 deletions(-)
 > 
-> With gcc-4.3, we need a couple of workaround patches beyond the problem
-> mentioned above, more configuration options are unavailable and we get
-> a significant number of false-positive warnings, but it's not much worse
-> than gcc-4.5 otherwise.
+> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> index c89d5d231a0e..fb89157332c6 100644
+> --- a/drivers/of/fdt.c
+> +++ b/drivers/of/fdt.c
+> @@ -1073,26 +1073,6 @@ int __init early_init_dt_scan_chosen(unsigned
+> long node, const char *uname, if (p != NULL && l > 0)
+>  		strlcpy(data, p, min((int)l, COMMAND_LINE_SIZE));
 > 
-> These are the options I had to disable to get gcc-4.3 randconfig builds
-> working:
+> -	/*
+> -	 * CONFIG_CMDLINE is meant to be a default in case nothing else
+> -	 * managed to set the command line, unless CONFIG_CMDLINE_FORCE
+> -	 * is set in which case we override whatever was found earlier.
+> -	 */
+> -#ifdef CONFIG_CMDLINE
+> -#if defined(CONFIG_CMDLINE_EXTEND)
+> -	strlcat(data, " ", COMMAND_LINE_SIZE);
+> -	strlcat(data, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
+> -#elif defined(CONFIG_CMDLINE_FORCE)
+> -	strlcpy(data, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
+> -#else
+> -	/* No arguments from boot loader, use kernel's  cmdl*/
+> -	if (!((char *)data)[0])
+> -		strlcpy(data, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
+> -#endif
+> -#endif /* CONFIG_CMDLINE */
+> -
+> -	pr_debug("Command line is: %s\n", (char*)data);
+> -
+>  	/* break now */
+>  	return 1;
+>  }
+> @@ -1205,6 +1185,26 @@ void __init early_init_dt_scan_nodes(void)
+>  	/* Retrieve various information from the /chosen node */
+>  	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
 > 
->  CONFIG_HAVE_GCC_PLUGINS
->  CONFIG_CC_STACKPROTECTOR_STRONG
->  CONFIG_ARM_SINGLE_ARMV7M
->  CONFIG_THUMB2_KERNEL
->  CONFIG_KERNEL_MODE_NEON
->  CONFIG_VDSO
->  CONFIG_FUNCTION_TRACER (with CONFIG_FRAME_POINTER=n)
-> 
-> I have not checked in detail which version is required for
-> each of the above.
-> 
-> Specifically on ARM, going further makes things rather useless especially
-> for build testing: with gcc-4.2, we lose support for ARMv7, EABI, and
-> effectively ARMv6 (as it relies on EABI for building reliably). Also,
-> the number of false-positive build warnings is so high that it is useless
-> for finding actual bugs from the warnings.
-> 
-> See the replies to this mail for 13 patches I needed to work around
-> issues for each of the releases before 4.6. I have also submitted
-> some separate patches for issues that I considered actual bugs
-> uncovered by the older compilers and that should be applied regardless.
-> 
-> The original gcc-4.3 release was in early 2008. If we decide to still
-> support that, we probably want the first 10 quirks in this series,
-> while gcc-4.6 (released in 2011) requires none of them.
-> 
-> 	Arnd
-> 
-> Arnd Bergmann (13):
->   [HACK] gcc-4.5: avoid  link errors for unused function pointers
->   KVM: arm: fix gcc-4.5 build
->   ARM: div64: fix building with gcc-4.5 and lower
->   vfio-pci: use 32-bit comparisons for register address for gcc-4.5
->   clk: pxa: fix gcc-4.4 build
->   ARM: atomic: fix gcc-4.4 build
->   watchdog: kempld: fix gcc-4.3 build
->   arm/arm64: xen: avoid gcc-4.4 warning
->   ARM: mark cmpxchg and xchg __always_inline for gcc-4.3
->   asm-generic: mark cmpxchg as __always_inline for gcc-4.3
->   fs: fix unsigned enum warning with gcc-4.2
->   KVM: arm: avoid binary number literals for gcc-4.2
->   ARM: avoid 'Q' asm constraint for gcc-4.1 and earlier
-> 
->  arch/arm/include/asm/atomic.h        | 10 ++++++++--
->  arch/arm/include/asm/cmpxchg.h       | 12 ++++++------
->  arch/arm/include/asm/div64.h         | 17 +++--------------
->  arch/arm/include/asm/io.h            |  8 ++++++++
->  arch/arm/include/asm/kvm_mmu.h       |  2 +-
->  arch/arm/include/asm/percpu.h        |  5 ++++-
->  arch/arm/mach-imx/pm-imx5.c          | 20 ++++++++++++++++----
->  arch/arm/mach-sa1100/pm.c            |  2 ++
->  arch/arm/plat-samsung/pm.c           |  4 ++++
->  drivers/clk/pxa/clk-pxa.c            |  3 +--
->  drivers/dma/ti-dma-crossbar.c        |  4 ++++
->  drivers/firmware/psci_checker.c      |  3 +++
->  drivers/iio/adc/exynos_adc.c         |  3 +++
->  drivers/net/ethernet/via/via-rhine.c |  6 ++++++
->  drivers/vfio/pci/vfio_pci_rdwr.c     |  5 ++++-
->  drivers/watchdog/kempld_wdt.c        |  9 ++++++++-
->  include/asm-generic/cmpxchg-local.h  |  7 ++++---
->  include/linux/fs.h                   |  2 +-
->  include/xen/arm/page.h               |  1 +
->  virt/kvm/arm/vgic/vgic-its.c         |  4 ++--
->  virt/kvm/arm/vgic/vgic-mmio-v3.c     |  8 ++++----
->  virt/kvm/arm/vgic/vgic-mmio.c        | 16 ++++++++--------
->  virt/kvm/arm/vgic/vgic-mmio.h        | 12 ++++++------
->  23 files changed, 107 insertions(+), 56 deletions(-)
-> 
-> 
+> +	/*
+> +	 * CONFIG_CMDLINE is meant to be a default in case nothing else
+> +	 * managed to set the command line, unless CONFIG_CMDLINE_FORCE
+> +	 * is set in which case we override whatever was found earlier.
+> +	 */
+> +#ifdef CONFIG_CMDLINE
+> +#if defined(CONFIG_CMDLINE_EXTEND)
+> +	strlcat(boot_command_line, " ", COMMAND_LINE_SIZE);
+> +	strlcat(boot_command_line, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
+> +#elif defined(CONFIG_CMDLINE_FORCE)
+> +	strlcpy(boot_command_line, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
+> +#else
+> +	/* No arguments from boot loader, use kernel's cmdline */
+> +	if (!boot_command_line[0])
+> +		strlcpy(boot_command_line, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
+> +#endif
+> +#endif /* CONFIG_CMDLINE */
+> +
+> +	pr_debug("Command line is: %s\n", boot_command_line);
+> +
+>  	/* Initialize {size,address}-cells info */
+>  	of_scan_flat_dt(early_init_dt_scan_root, NULL);
+
+Patch is working fine and fixes my problem. You can add my Tested-by.
+
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161216/bfd7ea52/attachment.sig>
