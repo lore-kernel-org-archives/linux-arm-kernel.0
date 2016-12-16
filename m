@@ -1,137 +1,85 @@
-From: Jose.Abreu@synopsys.com (Jose Abreu)
-Date: Fri, 16 Dec 2016 10:11:30 +0000
-Subject: [PATCH 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
- stores scenario in vdma
-In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A65C9D3@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1481814682-31780-1-git-send-email-appanad@xilinx.com>
- <1481814682-31780-3-git-send-email-appanad@xilinx.com>
- <9d92984b-e04a-cd29-e933-d8ea4d610c94@synopsys.com>
- <C246CAC1457055469EF09E3A7AC4E11A4A65C9D3@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <689b1077-6ee3-60d0-1fdf-0a125003a479@synopsys.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 16 Dec 2016 11:39:11 +0100
+Subject: [PATCH] dmaengine: pl330: Fix runtime PM support for terminated
+ transfers
+Message-ID: <1481884751-21411-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kedar,
+PL330 DMA engine driver is leaking a runtime reference after any terminated
+DMA transactions. This patch fixes this issue by tracking runtime PM state
+of the device and making additional call to pm_runtime_put() in terminate_all
+callback if needed.
 
+Fixes: ae43b3289186 ("ARM: 8202/1: dmaengine: pl330: Add runtime Power Management support v12")
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ drivers/dma/pl330.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-On 15-12-2016 19:09, Appana Durga Kedareswara Rao wrote:
-> Hi Jose Miguel Abreu,
->
-> 	Thanks for the review....
->
->>> -			last = segment;
->>> +		for (j = 0; j < chan->num_frms; ) {
->>> +			list_for_each_entry(segment, &desc->segments, node)
->> {
->>> +				if (chan->ext_addr)
->>> +					vdma_desc_write_64(chan,
->>> +
->> XILINX_VDMA_REG_START_ADDRESS_64(i++),
->>> +					  segment->hw.buf_addr,
->>> +					  segment->hw.buf_addr_msb);
->>> +				else
->>> +					vdma_desc_write(chan,
->>> +
->> XILINX_VDMA_REG_START_ADDRESS(i++),
->>> +					    segment->hw.buf_addr);
->>> +
->>> +				last = segment;
->> Hmm, is it possible to submit more than one segment? If so, then i and j will get
->> out of sync.
-> If h/w is configured for more than 1 frame buffer and user submits more than one frame buffer
-> We can submit more than one frame/ segment to hw right??
-
-I'm not sure. When I used VDMA driver I always submitted only one
-segment and multiple descriptors. But the problem is, for example:
-
-If you have:
-descriptor1 (2 segments)
-descriptor2 (2 segments)
-
-And you have 3 frame buffers in the HW.
-
-Then:
-1st frame buffer will have: descriptor1 -> segment1
-2nd frame buffer will have: descriptor1 -> segment2
-3rd frame buffer will have: descriptor2 -> segment1
-but, 4th frame buffer will have: descriptor2 -> segment2 <----
-INVALID because there is only 3 frame buffers
-
-So, maybe a check inside the loop "list_for_each_entry(segment,
-&desc->segments, node)" could be a nice to have.
-
->
->>> +			}
->>> +			list_del(&desc->node);
->>> +			list_add_tail(&desc->node, &chan->active_list);
->>> +			j++;
->> But if i is non zero and pending_list has more than num_frms then i will not
->> wrap-around as it should and will write to invalid framebuffer location, right?
-> Yep will fix in v2...
-> 		
-> 	If (if (list_empty(&chan->pending_list)) || (i == chan->num_frms)
-> 		break;
->
-> Above condition is sufficient right???
-
-Looks ok.
-
->
->>> +			if (list_empty(&chan->pending_list))
->>> +				break;
->>> +			desc = list_first_entry(&chan->pending_list,
->>> +						struct
->> xilinx_dma_tx_descriptor,
->>> +						node);
->>>  		}
->>>
->>>  		if (!last)
->>> @@ -1114,14 +1124,13 @@ static void xilinx_vdma_start_transfer(struct
->> xilinx_dma_chan *chan)
->>>  		vdma_desc_write(chan, XILINX_DMA_REG_FRMDLY_STRIDE,
->>>  				last->hw.stride);
->>>  		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last-
->>> hw.vsize);
->> Maybe a check that all framebuffers contain valid addresses should be done
->> before programming vsize so that VDMA does not try to write to invalid
->> addresses.
-> Do we really need to check for valid address??? 
-> I didn't get you what to do you mean by invalid address could you please explain???
-> In the driver we are reading form the pending_list which will be updated by pep_interleaved_dma 
-> Call so we are under assumption that user sends the proper address right???
-
-What I mean by valid address is to check that i variable has
-already been incremented by num_frms at least once since a VDMA
-reset. This way you know that you have programmed all the
-addresses of the frame buffers with an address and they are non-zero.
-
-Best regards,
-Jose Miguel Abreu
-
->
->>> +
->>> +		chan->desc_submitcount += j;
->>> +		chan->desc_pendingcount -= j;
->>>  	}
->>>
->>>  	chan->idle = false;
->>>  	if (!chan->has_sg) {
->>> -		list_del(&desc->node);
->>> -		list_add_tail(&desc->node, &chan->active_list);
->>> -		chan->desc_submitcount++;
->>> -		chan->desc_pendingcount--;
->>>  		if (chan->desc_submitcount == chan->num_frms)
->>>  			chan->desc_submitcount = 0;
->> "desc_submitcount >= chan->num_frms would be safer here.
-> Sure will fix in v2...
->
-> Regards,
-> Kedar.
->
->>>  	} else {
->> Best regards,
->> Jose Miguel Abreu
->> --
->> To unsubscribe from this list: send the line "unsubscribe dmaengine" in the body
->> of a message to majordomo at vger.kernel.org More majordomo info at
->> http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 030fe05ed43b..9f3dbc8c63d2 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -448,6 +448,9 @@ struct dma_pl330_chan {
+ 
+ 	/* for cyclic capability */
+ 	bool cyclic;
++
++	/* for runtime pm tracking */
++	bool active;
+ };
+ 
+ struct pl330_dmac {
+@@ -2031,6 +2034,7 @@ static void pl330_tasklet(unsigned long data)
+ 		_stop(pch->thread);
+ 		spin_unlock(&pch->thread->dmac->lock);
+ 		power_down = true;
++		pch->active = false;
+ 	} else {
+ 		/* Make sure the PL330 Channel thread is active */
+ 		spin_lock(&pch->thread->dmac->lock);
+@@ -2050,6 +2054,7 @@ static void pl330_tasklet(unsigned long data)
+ 			desc->status = PREP;
+ 			list_move_tail(&desc->node, &pch->work_list);
+ 			if (power_down) {
++				pch->active = true;
+ 				spin_lock(&pch->thread->dmac->lock);
+ 				_start(pch->thread);
+ 				spin_unlock(&pch->thread->dmac->lock);
+@@ -2164,6 +2169,7 @@ static int pl330_terminate_all(struct dma_chan *chan)
+ 	unsigned long flags;
+ 	struct pl330_dmac *pl330 = pch->dmac;
+ 	LIST_HEAD(list);
++	bool power_down = false;
+ 
+ 	pm_runtime_get_sync(pl330->ddma.dev);
+ 	spin_lock_irqsave(&pch->lock, flags);
+@@ -2174,6 +2180,8 @@ static int pl330_terminate_all(struct dma_chan *chan)
+ 	pch->thread->req[0].desc = NULL;
+ 	pch->thread->req[1].desc = NULL;
+ 	pch->thread->req_running = -1;
++	power_down = pch->active;
++	pch->active = false;
+ 
+ 	/* Mark all desc done */
+ 	list_for_each_entry(desc, &pch->submitted_list, node) {
+@@ -2191,6 +2199,8 @@ static int pl330_terminate_all(struct dma_chan *chan)
+ 	list_splice_tail_init(&pch->completed_list, &pl330->desc_pool);
+ 	spin_unlock_irqrestore(&pch->lock, flags);
+ 	pm_runtime_mark_last_busy(pl330->ddma.dev);
++	if (power_down)
++		pm_runtime_put_autosuspend(pl330->ddma.dev);
+ 	pm_runtime_put_autosuspend(pl330->ddma.dev);
+ 
+ 	return 0;
+@@ -2350,6 +2360,7 @@ static void pl330_issue_pending(struct dma_chan *chan)
+ 		 * updated on work_list emptiness status.
+ 		 */
+ 		WARN_ON(list_empty(&pch->submitted_list));
++		pch->active = true;
+ 		pm_runtime_get_sync(pch->dmac->ddma.dev);
+ 	}
+ 	list_splice_tail_init(&pch->submitted_list, &pch->work_list);
+-- 
+1.9.1
