@@ -1,47 +1,52 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 16 Dec 2016 14:41:48 -0600
-Subject: [PATCH v7 1/2] provide lock-less versions of clk_{enable|disable}
-In-Reply-To: <35adff3d-c6a6-7b65-fb61-6da447dd6c3f@baylibre.com>
-References: <1481302773-14181-1-git-send-email-abailon@baylibre.com>
- <20161209185421.fybpk4bdq6b7yglf@pengutronix.de>
- <e548f7cf-a1d5-0bc2-1095-db8464a1bcc4@ti.com>
- <35adff3d-c6a6-7b65-fb61-6da447dd6c3f@baylibre.com>
-Message-ID: <e004a3f8-2dde-b21c-b09e-da5a65d768f6@lechnology.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri, 16 Dec 2016 22:20:35 +0100
+Subject: [PATCH] i2c: mux: pca954x: fix i2c mux selection caching
+In-Reply-To: <E1cHylf-00071o-KZ@rmk-PC.armlinux.org.uk>
+References: <E1cHylf-00071o-KZ@rmk-PC.armlinux.org.uk>
+Message-ID: <251c31e3-141c-8884-d56a-fa539714d1ff@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2016 04:27 AM, Alexandre Bailon wrote:
-> On 12/12/2016 10:02 AM, Sekhar Nori wrote:
->> Hi Uwe,
->>
->> On Saturday 10 December 2016 12:24 AM, Uwe Kleine-K?nig wrote:
->>> Hello,
->>>
->>> On Fri, Dec 09, 2016 at 05:59:32PM +0100, Alexandre Bailon wrote:
->>>> Rename __clk_{enable|disble} in davinci_clk_{enable|disable}.
->>>> davinci_clk_{enable|disable} is a lock-less version of
->>>> clk_{enable|disable}.
->>>> This is useful to recursively enable clock without doing recursive call
->>>> to clk_enable(), which would cause a recursive locking issue.
->>>> The lock-less version could be used by example by the usb20 phy clock,
->>>> that need to enable the usb20 clock before to start.
->>>
->>> I wouldn't call that lock-less. The difference is that the newly exposed
->>> funcion requires the caller to already hold the lock. So maybe a better
->>
->> Right.
-> Is it enough to update the commit message or should I also update the
-> patch title?
-> If so, could you suggest one because I don't know how to describe it
-> shortly.
+On 2016-12-16 21:06, Russell King wrote:
+> smbus functions return -ve on error, 0 on success.  However,
+> __i2c_transfer() have a different return signature - -ve on error, or
+> number of buffers transferred (which may be zero or greater.)
+> 
+> The upshot of this is that the sense of the test is reversed when using
+> the mux on a bus supporting the master_xfer method: we cache the value
+> and never retry if we fail to transfer any buffers, but if we succeed,
+> we clear the cached value.
 
-How about... "ARM: davinci: Make __clk_{enable,disable} functions public"
+Ouch! Thanks for catching this.
 
+> Fix this.
 
+But lets fix the corner case of __i2c_transfer returning 0 instead of
+the expected 1 as well (not sure if that's even possible, but lets close
+the possibility just in case), so I'd prefer if you could fix
+pca954x_reg_write() to return 0 iff __i2c_transfer(...) returns 1
+instead, and -EREMOTEIO on other non-negative return values. Thanks!
 
+Cheers,
+peda
 
-
->
-> Thanks,
-> Alexandre
->
+> Fixes: 463e8f845cbf ("i2c: mux: pca954x: retry updating the mux selection on failure")
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  drivers/i2c/muxes/i2c-mux-pca954x.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/i2c/muxes/i2c-mux-pca954x.c b/drivers/i2c/muxes/i2c-mux-pca954x.c
+> index 8bc3d36d2837..b6d62ecbd5b6 100644
+> --- a/drivers/i2c/muxes/i2c-mux-pca954x.c
+> +++ b/drivers/i2c/muxes/i2c-mux-pca954x.c
+> @@ -179,7 +179,7 @@ static int pca954x_select_chan(struct i2c_mux_core *muxc, u32 chan)
+>  	/* Only select the channel if its different from the last channel */
+>  	if (data->last_chan != regval) {
+>  		ret = pca954x_reg_write(muxc->parent, client, regval);
+> -		data->last_chan = ret ? 0 : regval;
+> +		data->last_chan = ret >= 0 ? regval : 0;
+>  	}
+>  
+>  	return ret;
+> 
