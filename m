@@ -1,85 +1,71 @@
 From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Fri, 16 Dec 2016 15:17:49 -0800
-Subject: [PATCH v6 0/5] Altera Cyclone Passive Serial SPI FPGA Manager
-Message-ID: <cover.1481918884.git.stillcompiling@gmail.com>
+Date: Fri, 16 Dec 2016 15:17:50 -0800
+Subject: [PATCH v6 1/5] lib: add bitrev8x4()
+In-Reply-To: <cover.1481918884.git.stillcompiling@gmail.com>
+References: <cover.1481918884.git.stillcompiling@gmail.com>
+Message-ID: <3d70fb271f0d2ab2bfbbc60281913bdb3c5f0fb7.1481918884.git.stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds an FPGA manager for Altera cyclone FPGAs
-that can program them using an spi port and a couple of gpios, using
-Alteras passive serial protocol.
+Add a function to reverse bytes within a 32 bit word.
+Operate on a u32 rather than individual bytes.
+ARCH specific versions require substantially fewer instructions than
+working a byte at a time.
 
-Need ACKs from ARCH maintainers for ARCH specific implementations of
-__arch_bitrev8x4(), and I've added more ARCHes, so will need more ACKS, 
-but the generic code will work without that patch, so if there is a holdup
-the rest of the series can go in without patch 2
+Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+---
+ include/linux/bitrev.h | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-Changes from v5:
-- Rebased on next-20161214xi
-- Corrected for FPGA Mgr API change in  write_init() and write_complete()
-- Better describe the device cyclone-ps-spi runs on in the file header.
-- Split the bitrev8x4 patch into generic and arch specific patches...
-- Added AARCH64 and MIPS implementations of bitrev8x4()... they all have to 
-  have an implementation for it to compile cleanly across platforms
-- Added the changes to imx6q-evi.dts to the patch set.
-
-Changes from v4:
-- Added the needed return statement to __arch_bitrev8x4()
-- Added Rob Herrings ACK for and fix a typo in the commit log of patch 2
-
-Changes from v3:
-- Fixed up the state() function to return the state of the status pin
-  reqested by Alan Tull
-- Switched the pin to ACTIVE_LOW and coresponding logic level, and updated
-  the corresponding documentation. Thanks Rob Herring for pointing out my
-  mistake.
-- Per Rob Herring, switched from "gpio" to "gpios" in dts
-
-Changes from v2:
-- Merged patch 3 and 4 as suggested in review by Moritz Fischer
-- Changed FPGA_MIN_DELAY from 250 to 50 ms is the time advertized by
-  Altera. This now works, as we don't assume it is done
-
-Changes from v1:
-- Changed the name from cyclone-spi-fpga-mgr to cyclone-ps-spi-fpga-mgr
-  This name change was requested by Alan Tull, to be specific about which
-  programming method is being employed on the fpga.
-- Changed the name of the reset-gpio to config-gpio to closer match the
-  way the pins are described in the Altera manual
-- Moved MODULE_LICENCE, _AUTHOR, and _DESCRIPTION to the bottom
-
-- Added a bitrev8x4() function to the bitrev headers and implemented ARM
- const, runtime, and ARM specific faster versions (This may end up
- needing to be a standalone patch)
-
-- Moved the bitswapping into cyclonespi_write(), as requested.
-  This falls short of my desired generic lsb first spi support, but is a step
-  in that direction.
-
-- Fixed whitespace problems introduced during refactoring
-
-- Replaced magic number for initial delay with a descriptive macro
-- Poll the fpga to see when it is ready rather than a fixed 1 ms sleep
-
-Joshua Clayton (5):
-  lib: add bitrev8x4()
-  lib: implement __arch_bitrev8x4()
-  doc: dt: add cyclone-ps-spi binding document
-  fpga manager: Add cyclone-ps-spi driver for Altera FPGAs
-  ARM: dts: imx6q-evi: support cyclone-ps-spi
-
- .../bindings/fpga/cyclone-ps-spi-fpga-mgr.txt      |  25 +++
- arch/arm/boot/dts/imx6q-evi.dts                    |  16 ++
- arch/arm/include/asm/bitrev.h                      |   6 +
- arch/arm64/include/asm/bitrev.h                    |   6 +
- arch/mips/include/asm/bitrev.h                     |   6 +
- drivers/fpga/Kconfig                               |   7 +
- drivers/fpga/Makefile                              |   1 +
- drivers/fpga/cyclone-ps-spi.c                      | 186 +++++++++++++++++++++
- include/linux/bitrev.h                             |  26 +++
- 9 files changed, 279 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fpga/cyclone-ps-spi-fpga-mgr.txt
- create mode 100644 drivers/fpga/cyclone-ps-spi.c
-
+diff --git a/include/linux/bitrev.h b/include/linux/bitrev.h
+index fb790b8..868dcb6 100644
+--- a/include/linux/bitrev.h
++++ b/include/linux/bitrev.h
+@@ -27,6 +27,14 @@ static inline u32 __bitrev32(u32 x)
+ 	return (__bitrev16(x & 0xffff) << 16) | __bitrev16(x >> 16);
+ }
+ 
++static inline u32 __bitrev8x4(u32 x)
++{
++	return(__bitrev8(x & 0xff) |
++	       (__bitrev8((x >> 8)  & 0xff) << 8) |
++	       (__bitrev8((x >> 16)  & 0xff) << 16) |
++	       (__bitrev8((x >> 24)  & 0xff) << 24));
++}
++
+ #endif /* CONFIG_HAVE_ARCH_BITREVERSE */
+ 
+ #define __constant_bitrev32(x)	\
+@@ -50,6 +58,15 @@ static inline u32 __bitrev32(u32 x)
+ 	__x;								\
+ })
+ 
++#define __constant_bitrev8x4(x) \
++({			\
++	u32 __x = x;	\
++	__x = ((__x & (u32)0xF0F0F0F0UL) >> 4) | ((__x & (u32)0x0F0F0F0FUL) << 4);	\
++	__x = ((__x & (u32)0xCCCCCCCCUL) >> 2) | ((__x & (u32)0x33333333UL) << 2);	\
++	__x = ((__x & (u32)0xAAAAAAAAUL) >> 1) | ((__x & (u32)0x55555555UL) << 1);	\
++	__x;								\
++})
++
+ #define __constant_bitrev8(x)	\
+ ({					\
+ 	u8 __x = x;			\
+@@ -75,6 +92,14 @@ static inline u32 __bitrev32(u32 x)
+ 	__bitrev16(__x);				\
+  })
+ 
++#define bitrev8x4(x) \
++({			\
++	u32 __x = x;	\
++	__builtin_constant_p(__x) ?	\
++	__constant_bitrev8x4(__x) :			\
++	__bitrev8x4(__x);				\
++})
++
+ #define bitrev8(x) \
+ ({			\
+ 	u8 __x = x;	\
 -- 
 2.9.3
