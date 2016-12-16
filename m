@@ -1,53 +1,82 @@
 From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Fri, 16 Dec 2016 15:17:54 -0800
-Subject: [PATCH v6 5/5] ARM: dts: imx6q-evi: support cyclone-ps-spi
+Date: Fri, 16 Dec 2016 15:17:51 -0800
+Subject: [PATCH v6 2/5] lib: implement __arch_bitrev8x4()
 In-Reply-To: <cover.1481918884.git.stillcompiling@gmail.com>
 References: <cover.1481918884.git.stillcompiling@gmail.com>
-Message-ID: <26327c58cbf5acd8078c50e87d23293c80ee89a2.1481918884.git.stillcompiling@gmail.com>
+Message-ID: <6c1c052d3c1d0c02a791aaaf8e114360ab1cb4e7.1481918884.git.stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Altera cyclone V FPGA connected to an spi port
-to the evi devicetree file
+Implement faster bitrev8x4() for arm, arm64 and mips, all the platforms
+with CONFIG_HAVE_ARCH_BITREVERSE.
+ARM platforms just need a byteswap added to the existing __arch_bitrev32()
+Amusingly, the mips implementation is exactly the opposite, requiring
+removal of the byteswap from its __arch_bitrev32()
 
 Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
 ---
- arch/arm/boot/dts/imx6q-evi.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/include/asm/bitrev.h   | 6 ++++++
+ arch/arm64/include/asm/bitrev.h | 6 ++++++
+ arch/mips/include/asm/bitrev.h  | 6 ++++++
+ include/linux/bitrev.h          | 1 +
+ 4 files changed, 19 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
-index 7c7c1a8..ec4d365 100644
---- a/arch/arm/boot/dts/imx6q-evi.dts
-+++ b/arch/arm/boot/dts/imx6q-evi.dts
-@@ -95,6 +95,15 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_ecspi1 &pinctrl_ecspi1cs>;
- 	status = "okay";
-+
-+	fpga_spi: cyclonespi at 0 {
-+		compatible = "altr,cyclone-ps-spi-fpga-mgr";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+		pinctrl-0 = <&pinctrl_fpgaspi>;
-+		config-gpios = <&gpio4 9 GPIO_ACTIVE_LOW>;
-+		status-gpios = <&gpio4 11 GPIO_ACTIVE_LOW>;
-+	};
- };
+diff --git a/arch/arm/include/asm/bitrev.h b/arch/arm/include/asm/bitrev.h
+index ec291c3..9482f78 100644
+--- a/arch/arm/include/asm/bitrev.h
++++ b/arch/arm/include/asm/bitrev.h
+@@ -17,4 +17,10 @@ static __always_inline __attribute_const__ u8 __arch_bitrev8(u8 x)
+ 	return __arch_bitrev32((u32)x) >> 24;
+ }
  
- &ecspi3 {
-@@ -322,6 +331,13 @@
- 		>;
- 	};
- 
-+	pinctrl_fpgaspi: fpgaspigrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_ROW1__GPIO4_IO09 0x1b0b0
-+			MX6QDL_PAD_KEY_ROW2__GPIO4_IO11 0x1b0b0
-+		>;
-+	};
++static __always_inline __attribute_const__ u32 __arch_bitrev8x4(u32 x)
++{
++	__asm__ ("rbit %0, %1; rev %0, %0" : "=r" (x) : "r" (x));
++	return x;
++}
 +
- 	pinctrl_gpminand: gpminandgrp {
- 		fsl,pins = <
- 			MX6QDL_PAD_NANDF_CLE__NAND_CLE 0xb0b1
+ #endif
+diff --git a/arch/arm64/include/asm/bitrev.h b/arch/arm64/include/asm/bitrev.h
+index a5a0c36..1801078 100644
+--- a/arch/arm64/include/asm/bitrev.h
++++ b/arch/arm64/include/asm/bitrev.h
+@@ -16,4 +16,10 @@ static __always_inline __attribute_const__ u8 __arch_bitrev8(u8 x)
+ 	return __arch_bitrev32((u32)x) >> 24;
+ }
+ 
++static __always_inline __attribute_const__ u32 __arch_bitrev8x4(u32 x)
++{
++	__asm__ ("rbit %0, %1; rev %0, %0" : "=r" (x) : "r" (x));
++	return x;
++}
++
+ #endif
+diff --git a/arch/mips/include/asm/bitrev.h b/arch/mips/include/asm/bitrev.h
+index bc739a4..9ac6439 100644
+--- a/arch/mips/include/asm/bitrev.h
++++ b/arch/mips/include/asm/bitrev.h
+@@ -27,4 +27,10 @@ static __always_inline __attribute_const__ u8 __arch_bitrev8(u8 x)
+ 	return ret;
+ }
+ 
++static __always_inline __attribute_const__ u32 __arch_bitrev8x4(u32 x)
++{
++	u32 ret;
++	asm("bitswap    %0, %1" : "=r"(ret) : "r"(x));
++	return ret;
++}
+ #endif /* __MIPS_ASM_BITREV_H__ */
+diff --git a/include/linux/bitrev.h b/include/linux/bitrev.h
+index 868dcb6..b1cfa1a 100644
+--- a/include/linux/bitrev.h
++++ b/include/linux/bitrev.h
+@@ -9,6 +9,7 @@
+ #define __bitrev32 __arch_bitrev32
+ #define __bitrev16 __arch_bitrev16
+ #define __bitrev8 __arch_bitrev8
++#define __bitrev8x4 __arch_bitrev8x4
+ 
+ #else
+ extern u8 const byte_rev_table[256];
 -- 
 2.9.3
