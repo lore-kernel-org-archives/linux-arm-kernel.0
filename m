@@ -1,115 +1,27 @@
-From: agustinv@codeaurora.org (Agustin Vega-Frias)
-Date: Fri, 16 Dec 2016 11:30:41 -0500
-Subject: [PATCH V9 1/3] ACPI: Generic GSI: Do not attempt to map non-GSI
- IRQs during bus scan
-In-Reply-To: <20161216162439.GA24673@red-moon>
-References: <1481753438-3905-1-git-send-email-agustinv@codeaurora.org>
- <1481753438-3905-2-git-send-email-agustinv@codeaurora.org>
- <20161216162439.GA24673@red-moon>
-Message-ID: <b63b1d787c91024d1e49a4fd430ed29d@codeaurora.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 16 Dec 2016 18:54:09 +0200
+Subject: [PATCH] cpufreq: s3c64xx: remove incorrect __init annotation
+In-Reply-To: <20161216090625.2235668-1-arnd@arndb.de>
+References: <20161216090625.2235668-1-arnd@arndb.de>
+Message-ID: <20161216165409.GA3610@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-
-On 2016-12-16 11:24, Lorenzo Pieralisi wrote:
-> On Wed, Dec 14, 2016 at 05:10:36PM -0500, Agustin Vega-Frias wrote:
->> ACPI extended IRQ resources may contain a Resource Source field to 
->> specify
->> an alternate interrupt controller, attempting to map them as GSIs is
->> incorrect, so just disable the platform resource.
->> 
->> Since this field is currently ignored, we make this change conditional
->> on CONFIG_ACPI_GENERIC_GSI to keep the current behavior on x86 
->> platforms,
->> in case some existing ACPI tables are using this incorrectly.
->> 
->> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
->> ---
->>  drivers/acpi/resource.c | 17 ++++++++++++++++-
->>  1 file changed, 16 insertions(+), 1 deletion(-)
->> 
->> diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
->> index 56241eb..76ca4e9 100644
->> --- a/drivers/acpi/resource.c
->> +++ b/drivers/acpi/resource.c
->> @@ -43,6 +43,18 @@ static inline bool 
->> acpi_iospace_resource_valid(struct resource *res)
->>  acpi_iospace_resource_valid(struct resource *res) { return true; }
->>  #endif
->> 
->> +#ifdef CONFIG_ACPI_GENERIC_GSI
->> +static inline bool is_gsi(struct acpi_resource_extended_irq *ext_irq)
->> +{
->> +	return ext_irq->resource_source.string_length == 0;
->> +}
->> +#else
->> +static inline bool is_gsi(struct acpi_resource_extended_irq *ext_irq)
->> +{
->> +	return true;
->> +}
->> +#endif
+On Fri, Dec 16, 2016 at 10:06:15AM +0100, Arnd Bergmann wrote:
+> s3c64xx_cpufreq_config_regulator is incorrectly annotated
+> as __init, since the caller is also not init:
 > 
-> Well, patch is simple there is not much to say other that on the
-> firmware side I honestly do not see many options, either we remove the
-> ifdeffery above and make the check unconditional (ie we do check on
-> x86/ia64 too instead of always returning true) and see if things hold 
-> up
-> on x86 (at least we try) or we will never know and will never be able 
-> to
-> use this on x86 if there will ever be need.
+> WARNING: vmlinux.o(.text+0x92fe1c): Section mismatch in reference from the function s3c64xx_cpufreq_driver_init() to the function .init.text:s3c64xx_cpufreq_config_regulator()
 > 
-> It would be certainly weird to find out that a descriptor has a
-> resource_source pointer put there by mistake (because that's what we 
-> are
-> talking about, things work on x86/ia64 by ignoring the resource_source
-> pointer so any string there is just an unfortunate mistake AFAICS).
+> With modern gcc versions, the function gets inline, so we don't
+> see the warning, this only happens with gcc-4.6 and older.
 > 
-> I am quite tempted to remove the ifdef and make the is_gsi() check 
-> effective on
-> x86/ia64 too.
-
-I wouldn't be opposed to that. I added the #ifdef out of abundance of 
-caution,
-but if the x86 folks agree and we can get sufficient testing to ensure 
-this
-doesn't break anything I'd like to remove it too.
-
-Thanks,
-Agustin
-
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/cpufreq/s3c64xx-cpufreq.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Lorenzo
-> 
->> +
->>  static bool acpi_dev_resource_len_valid(u64 start, u64 end, u64 len, 
->> bool io)
->>  {
->>  	u64 reslen = end - start + 1;
->> @@ -470,9 +482,12 @@ bool acpi_dev_resource_interrupt(struct 
->> acpi_resource *ares, int index,
->>  			acpi_dev_irqresource_disabled(res, 0);
->>  			return false;
->>  		}
->> -		acpi_dev_get_irqresource(res, ext_irq->interrupts[index],
->> +		if (is_gsi(ext_irq))
->> +			acpi_dev_get_irqresource(res, ext_irq->interrupts[index],
->>  					 ext_irq->triggering, ext_irq->polarity,
->>  					 ext_irq->sharable, false);
->> +		else
->> +			acpi_dev_irqresource_disabled(res, 0);
->>  		break;
->>  	default:
->>  		res->flags = 0;
->> --
->> Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
->> Technologies, Inc.
->> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
->> Linux Foundation Collaborative Project.
->> 
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
-Linux Foundation Collaborative Project.
+Best regards,
+Krzysztof
