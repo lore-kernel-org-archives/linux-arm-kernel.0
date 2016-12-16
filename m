@@ -1,51 +1,91 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 16 Dec 2016 12:44:18 +0000
-Subject: [PATCH v10 7/8] arm/arm64: vgic: Implement
- KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
-In-Reply-To: <4272e489-7aa4-b77d-ec09-22b58af78336@redhat.com>
-References: <1480576187-5012-1-git-send-email-vijay.kilari@gmail.com>
- <1480576187-5012-8-git-send-email-vijay.kilari@gmail.com>
- <4272e489-7aa4-b77d-ec09-22b58af78336@redhat.com>
-Message-ID: <CAFEAcA-Ev4_949mRvagAa0wtMnUZBuQmMssWsMs3JPTBw_FviQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 16 Dec 2016 13:47:48 +0100
+Subject: [PATCH] ARM: dts: sun8i-q8-common: enable bluetooth on SDIO Wi-Fi
+In-Reply-To: <20161213233658.atGuNCNY@smtp1h.mail.yandex.net>
+References: <20161213233658.atGuNCNY@smtp1h.mail.yandex.net>
+Message-ID: <20161216124748.rkvnnlo4x5onzpvk@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 December 2016 at 12:07, Auger Eric <eric.auger@redhat.com> wrote:
-> Hi Vijaya,
->
-> On 01/12/2016 08:09, vijay.kilari at gmail.com wrote:
->> +void vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
->> +                                 const u64 val)
->> +{
->> +     int i;
->> +
->> +     for (i = 0; i < 32; i++) {
->> +             struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->> +
-> same as above.
->> +             spin_lock(&irq->irq_lock);
->> +             if (val & (1U << i)) {
->> +                     if (irq->config == VGIC_CONFIG_LEVEL) {
->> +                             irq->line_level = true;
->> +                             irq->pending = true;
->> +                             vgic_queue_irq_unlock(vcpu->kvm, irq);
->> +                     } else {
->> +                             spin_unlock(&irq->irq_lock);
->> +                     }
->> +             } else {
->> +                     if (irq->config == VGIC_CONFIG_EDGE ||
-> can't we just ignore VGIC_CONFIG_EDGE case for which line_level is not
-> modeled?
->> +                         (irq->config == VGIC_CONFIG_LEVEL &&
->> +                         !irq->soft_pending))
->> +                             irq->line_level = false;
-> To me the line level does not depend on the soft_pending bit. The
-> pending state depends on both.
+On Fri, Dec 09, 2016 at 07:49:00PM +0800, Icenowy Zheng wrote:
+> 
+> 2016?12?9? ??4:07? Maxime Ripard <maxime.ripard@free-electrons.com>???
+> >
+> > On Tue, Dec 06, 2016 at 04:08:38PM +0800, Icenowy Zheng wrote: 
+> > > Some SDIO Wi-Fi chips (such as RTL8703AS) have a UART bluetooth, which 
+> > > has a dedicated enable pin (PL8 in the reference design). 
+> > > 
+> > > Enable the pin in the same way as the WLAN enable pins. 
+> > > 
+> > > Tested on an A33 Q8 tablet with RTL8703AS. 
+> > > 
+> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz> 
+> > > --- 
+> > > 
+> > > This patch should be coupled with the uart1 node patch I send before: 
+> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/471997.html 
+> > > 
+> > > For RTL8703AS, the rtl8723bs bluetooth code is used, which can be retrieve from: 
+> > > https://github.com/lwfinger/rtl8723bs_bt 
+> > > 
+> > >? arch/arm/boot/dts/sun8i-q8-common.dtsi | 2 +- 
+> > >? 1 file changed, 1 insertion(+), 1 deletion(-) 
+> > > 
+> > > diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi 
+> > > index c676940..4aeb5bb 100644 
+> > > --- a/arch/arm/boot/dts/sun8i-q8-common.dtsi 
+> > > +++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi 
+> > > @@ -88,7 +88,7 @@ 
+> > >? 
+> > >? &r_pio { 
+> > >? wifi_pwrseq_pin_q8: wifi_pwrseq_pin at 0 { 
+> > > - pins = "PL6", "PL7", "PL11"; 
+> > > + pins = "PL6", "PL7", "PL8", "PL11"; 
+> > >? function = "gpio_in"; 
+> > >? bias-pull-up; 
+> > >? }; 
+> >
+> > There's several things wrong here. The first one is that you rely 
+> > solely on the pinctrl state to maintain a reset line. This is very 
+> > fragile (especially since the GPIO pinctrl state are likely to go away 
+> > at some point), but it also means that if your driver wants to recover 
+> > from that situation at some point, it won't work. 
+> >
+> > The other one is that the bluetooth and wifi chips are two devices in 
+> > linux, and you assign that pin to the wrong device (wifi). 
+> >
+> > rfkill-gpio is made just for that, so please use it. 
+> 
+> The GPIO is not for the radio, but for the full Bluetooth part.
 
-Without having looked at the details, it seems surprising to
-me that the implementation of "set line level to X" is not
-"set irq->line_level to X; figure out consequences and update
-other state as necessary"...
+I know.
 
-thanks
--- PMM
+> If it's set to 0, then the bluetooth part will reset, and the
+> hciattach will fail.
+
+Both rfkill-gpio and rfkill-regulator will shutdown when called
+(either by poking the reset pin or shutting down the regulator), so
+that definitely seems like an expected behavior to put the device in
+reset.
+
+> The BSP uses this as a rfkill, and the result is that the bluetooth
+> on/off switch do not work properly.
+
+Then rfkill needs fixing, but working around it by hoping that the
+core will probe an entirely different device, and enforcing a default
+that the rest of the kernel might or might not change is both fragile
+and wrong.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161216/7af246ff/attachment.sig>
