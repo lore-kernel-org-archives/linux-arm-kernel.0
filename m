@@ -1,41 +1,92 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 17 Dec 2016 21:36:55 +0100
-Subject: [PATCH 0/5] meson-gx: reset RGMII PHYs and configure TX delay
-In-Reply-To: <20161202234739.22929-1-martin.blumenstingl@googlemail.com>
-References: <20161202234739.22929-1-martin.blumenstingl@googlemail.com>
-Message-ID: <CAFBinCDpBew7wreNPn6=J3jKsw_Ok=Ed9_+Gxsefb661RvUdrA@mail.gmail.com>
+From: nipun.gupta@nxp.com (Nipun Gupta)
+Date: Sat, 17 Dec 2016 21:06:40 +0000
+Subject: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
+In-Reply-To: <ad6b6a4937b1fe183e6d48ccbaf4cb46db92fed4.1481893907.git.robin.murphy@arm.com>
+References: <ad6b6a4937b1fe183e6d48ccbaf4cb46db92fed4.1481893907.git.robin.murphy@arm.com>
+Message-ID: <DB6PR0402MB2694957C2D7C648CC342627FE69F0@DB6PR0402MB2694.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-
-On Sat, Dec 3, 2016 at 12:47 AM, Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
-> This partially fixes the 1000Mbit/s ethernet TX throughput issues (on
-> networks which are not affected by the EEE problem, as reported here:
-> [1]).
-> The actual problem for the TX throughput issues was that the TX delay
-> was applied twice:
-> - once "accidentally" by the PHY (this was fixed with [2])
-> - once by the MAC because there was a hardcoded TX delay (of 2ns),
->   this will be configurable with the changes from [0]
->
-> These are the dts changes which belong to my other series (in v2
-> these patches were part of the other series, upon request of the
-> net maintainers I have split the .dts changes into their own series so
-> we are able to take both through different trees):
-> "[PATCH net-next v3 0/2] stmmac: dwmac-meson8b: configurable
-> RGMII TX delay": [0].
-> Thus this series depends on the ACK for the binding changes in the
-> other series!
->
-> I based these changes on my other series "[PATCH v2 0/2] GXL and GXM
-> SCPI improvements": [3]
-the DT binding changes for the meson8b-dwmac driver were ACK'ed by Rob
-Herring, so you can proceed with this series once you applied the SCPI
-patches.
 
 
-Thank you!
-Regards,
-Martin
+> -----Original Message-----
+> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+> bounces at lists.linux-foundation.org] On Behalf Of Robin Murphy
+> Sent: Friday, December 16, 2016 18:49
+> To: iommu at lists.linux-foundation.org; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Cc: mark.rutland at arm.com; will.deacon at arm.com; Stuart Yoder
+> <stuart.yoder@nxp.com>
+> Subject: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
+> 
+> The current SMR masking support using a 2-cell iommu-specifier is
+> primarily intended to handle individual masters with large and/or
+> complex Stream ID assignments; it quickly gets a bit clunky in other SMR
+> use-cases where we just want to consistently mask out the same part of
+> every Stream ID (e.g. for MMU-500 configurations where the appended TBU
+> number gets in the way unnecessarily). Let's add a new property to allow
+> a single global mask value to better fit the latter situation.
+> 
+> CC: Stuart Yoder <stuart.yoder@nxp.com>
+
+Tested-by: Nipun Gupta <nipun.gupta@nxp.com>
+
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+> 
+> Compile-tested only...
+> 
+>  Documentation/devicetree/bindings/iommu/arm,smmu.txt | 8 ++++++++
+>  drivers/iommu/arm-smmu.c                             | 4 +++-
+>  2 files changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> index e862d1485205..98f5cbe5fdb4 100644
+> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> @@ -60,6 +60,14 @@ conditions.
+>                    aliases of secure registers have to be used during
+>                    SMMU configuration.
+> 
+> +- stream-match-mask : Specifies a fixed SMR mask value to combine with
+> +                  the Stream ID value from every iommu-specifier. This
+> +                  may be used instead of an "#iommu-cells" value of 2
+> +                  when there is no need for per-master SMR masks, but
+> +                  it is still desired to mask some portion of every
+> +                  Stream ID (e.g. for certain MMU-500 configurations
+> +                  given globally unique external IDs).
+> +
+>  ** Deprecated properties:
+> 
+>  - mmu-masters (deprecated in favour of the generic "iommus" binding) :
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 8f7281444551..f1abcb7dde36 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1534,13 +1534,15 @@ static int arm_smmu_domain_set_attr(struct
+> iommu_domain *domain,
+> 
+>  static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+>  {
+> -	u32 fwid = 0;
+> +	u32 mask, fwid = 0;
+> 
+>  	if (args->args_count > 0)
+>  		fwid |= (u16)args->args[0];
+> 
+>  	if (args->args_count > 1)
+>  		fwid |= (u16)args->args[1] << SMR_MASK_SHIFT;
+> +	else if (!of_property_read_u32(args->np, "stream-match-mask",
+> &mask))
+> +		fwid |= (u16)mask << SMR_MASK_SHIFT;
+> 
+>  	return iommu_fwspec_add_ids(dev, &fwid, 1);
+>  }
+> --
+> 2.10.2.dirty
+> 
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
