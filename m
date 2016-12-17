@@ -1,102 +1,112 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Sat, 17 Dec 2016 13:01:41 +0530
-Subject: [PATCH] ARM: dts: Add missing CPU frequencies for Exynos5422/5800
-In-Reply-To: <1b6e8d3a-ec7a-db5d-dd0e-ef9d1480f80a@fivetechno.de>
-References: <5220084.l31t5oJbsy@amdc3058>
- <CGME20161213191823epcas5p346582b73ad9b401d9e773a1b076f1f61@epcas5p3.samsung.com>
- <26ffeee4-ff43-b3d3-3267-5fcbc50e2974@osg.samsung.com>
- <2340115.HEG9AYUCMD@amdc3058>
- <CAD=FV=W6R8cNuR+gTnNRF6d-TNgzUeYTwuCp27efoMsd0YOH3g@mail.gmail.com>
- <20161216073720.GA3489@kozik-lap>
- <1b6e8d3a-ec7a-db5d-dd0e-ef9d1480f80a@fivetechno.de>
-Message-ID: <CANAwSgTbhYPBdiiO0qcHDN2eVJS+NLJXKK1eqRF50mzVi-Tycg@mail.gmail.com>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Sat, 17 Dec 2016 16:59:36 +0530
+Subject: [PATCH] drivers: remoteproc: constify rproc_ops structures
+Message-ID: <1481974176-19912-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
+Declare rproc_ops structures as const as they are only passed as an
+argument to the function rproc_alloc. This argument is of type const, so
+rproc_ops structures having this property can be declared const too.
+Done using Coccinelle:
 
-On 16 December 2016 at 14:38, Markus Reichl <m.reichl@fivetechno.de> wrote:
-> Am 16.12.2016 um 08:37 schrieb Krzysztof Kozlowski:
->> On Thu, Dec 15, 2016 at 04:52:58PM -0800, Doug Anderson wrote:
->>>> [ I added Arjun to Cc:, maybe he can help in explaining this issue
->>>>   (unfortunately Inderpal's email is no longer working). ]
->>>>
->>>> Please also note that on Exynos5422/5800 SoCs the same ARM rail
->>>> voltage is used for 1.9 GHz & 2.0 GHz OPPs as for the 1.8 GHz one.
->>>> IOW if the problem exists it is already present in the mainline
->>>> kernel.
->>>
->>> Interesting.  In the ChromeOS tree I see significantly higher voltages
->>> needed...  Note that one might naively look at
->>> <https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/drivers/cpufreq/exynos5420-cpufreq.c#178>.
->>>
->>> 1362500, /* L0  2100 */
->>> 1312500, /* L1  2000 */
->>>
->>> ..but, amazingly enough those voltages aren't used at all.  Surprise!
->>>
->>> I believe that the above numbers are actually not used and the ASV
->>> numbers are used instead.  See
->>> <https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/arch/arm/mach-exynos/include/mach/asv-exynos542x.h#452>
->>>
->>> { 2100000,
->>> 1350000, 1350000, 1350000, 1350000, 1350000,
->>> 1337500, 1325000, 1312500, 1300000, 1287500,
->>> 1275000, 1262500, 1250000, 1237500 },
->>>
->>> I believe that interpretation there is: some bins of the CPU can run
->>> at 2.1 GHz just fine at 1.25 V but others need up to 1.35V.
->>
->> That is definitely the case. One could just look at vendors ASV table
->> (for 1.9 GHz):
->> { 1900000, 1300000, 1287500, 1262500, 1237500, 1225000, 1212500,
->>                     1200000, 1187500, 1175000, 1162500, 1150000,
->>                            1137500, 1125000, 1112500, 1112500},
->>
->> The theoretical difference is up to 1.875V! From my experiments I saw
->> BIN1 chips which should be the same... but some working on 1.2V, some on
->> 1.225V (@1.9 GHz). I didn't see any requiring higher voltages but that
->> does not mean that there aren't such...
->>
->>> ...so if you're running at 2.1 GHz at 1.25V then perhaps you're just
->>> running on a CPU from a nice bin?
->
-> I've been running the proposed frequency/voltage combinations without any
-> stability problems on my XU4, XU3 and even XU3-lite ( I did not delete the
-> nodes on XU3-lite dts) with make -j8 kernel and ssvb-cpuburn.
-> The chips are poorly cooled, especially the XU4 and quickly step down.
+@r1 disable optional_qualifier @
+identifier i;
+position p;
+@@
+static struct rproc_ops i at p = {...};
 
-[snip]
+@ok1@
+identifier r1.i;
+position p;
+@@
+rproc_alloc(...,&i at p,...)
 
-As per my knowlegde Odroid XU3/4 can throttle at much high temperature.
+@bad@
+position p!={r1.p,ok1.p};
+identifier r1.i;
+@@
+i at p
 
-https://github.com/hardkernel/linux/blob/odroidxu3-3.10.y/drivers/thermal/exynos_thermal.c#L1629
+@depends on !bad disable optional_qualifier@
+identifier r1.i;
+@@
++const
+struct rproc_ops i;
 
-The device tree binding for thermal-zone is kept bit low alert
-temperature values
-in-order to avoid reaches critical temperature and board shutdown
-when compiling the source code. We need t fix this thermal-zone
+File sizes before:
+   text	   data	    bss	    dec	    hex	filename
+   1258	    416	      0	   1674	    68a remoteproc/omap_remoteproc.o
+   2402	    240	      0	   2642	    a52 remoteproc/st_remoteproc.o
+   2064	    272	      0	   2336	    920 remoteproc/st_slim_rproc.o
+   2160	    240	      0	   2400	    960 remoteproc/wkup_m3_rproc.o
 
-Their could be some race in thermal or the step wise governor for
-exynos is not working correctly.
+File sizes after:
+   text	   data	    bss	    dec	    hex	filename
+   1297	    368	      0	   1665	    681 remoteproc/omap_remoteproc.o
+   2434	    192	      0	   2626	    a42 remoteproc/st_remoteproc.o
+   2112	    240	      0	   2352	    930 remoteproc/st_slim_rproc.o
+   2200	    192	      0	   2392	    958 remoteproc/wkup_m3_rproc.o
 
-Better option is to print the cpufreq for cpu0 and cpu4 and respective temp
-and plot a graph along timeline. It will give us clear idea on how much
-time is spend on high frequency on stress testing.
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+---
+ drivers/remoteproc/omap_remoteproc.c | 2 +-
+ drivers/remoteproc/st_remoteproc.c   | 2 +-
+ drivers/remoteproc/st_slim_rproc.c   | 2 +-
+ drivers/remoteproc/wkup_m3_rproc.c   | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-#!/bin/bash
-t=0
-while true :
-do
- a=`cat /sys/devices/virtual/thermal/thermal_zone0/temp`
- b=`cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq`
- c=`cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq`
- d=`cat /sys/devices/system/cpu/cpu4/cpufreq/scaling_cur_freq`
- e=`cat /sys/devices/system/cpu/cpu4/cpufreq/cpuinfo_cur_freq`
- (( t += 5 ))
- echo $t,$a,$b,$d,$e
- sleep 1
-done
-
-Best Regards
--Anand Moon
+diff --git a/drivers/remoteproc/omap_remoteproc.c b/drivers/remoteproc/omap_remoteproc.c
+index fa63bf2..a96ce90 100644
+--- a/drivers/remoteproc/omap_remoteproc.c
++++ b/drivers/remoteproc/omap_remoteproc.c
+@@ -177,7 +177,7 @@ static int omap_rproc_stop(struct rproc *rproc)
+ 	return 0;
+ }
+ 
+-static struct rproc_ops omap_rproc_ops = {
++static const struct rproc_ops omap_rproc_ops = {
+ 	.start		= omap_rproc_start,
+ 	.stop		= omap_rproc_stop,
+ 	.kick		= omap_rproc_kick,
+diff --git a/drivers/remoteproc/st_remoteproc.c b/drivers/remoteproc/st_remoteproc.c
+index da4e152..f21787b 100644
+--- a/drivers/remoteproc/st_remoteproc.c
++++ b/drivers/remoteproc/st_remoteproc.c
+@@ -107,7 +107,7 @@ static int st_rproc_stop(struct rproc *rproc)
+ 	return sw_err ?: pwr_err;
+ }
+ 
+-static struct rproc_ops st_rproc_ops = {
++static const struct rproc_ops st_rproc_ops = {
+ 	.start		= st_rproc_start,
+ 	.stop		= st_rproc_stop,
+ };
+diff --git a/drivers/remoteproc/st_slim_rproc.c b/drivers/remoteproc/st_slim_rproc.c
+index 507716c..6cfd862 100644
+--- a/drivers/remoteproc/st_slim_rproc.c
++++ b/drivers/remoteproc/st_slim_rproc.c
+@@ -200,7 +200,7 @@ static void *slim_rproc_da_to_va(struct rproc *rproc, u64 da, int len)
+ 	return va;
+ }
+ 
+-static struct rproc_ops slim_rproc_ops = {
++static const struct rproc_ops slim_rproc_ops = {
+ 	.start		= slim_rproc_start,
+ 	.stop		= slim_rproc_stop,
+ 	.da_to_va       = slim_rproc_da_to_va,
+diff --git a/drivers/remoteproc/wkup_m3_rproc.c b/drivers/remoteproc/wkup_m3_rproc.c
+index 18175d0..1ada0e5 100644
+--- a/drivers/remoteproc/wkup_m3_rproc.c
++++ b/drivers/remoteproc/wkup_m3_rproc.c
+@@ -111,7 +111,7 @@ static void *wkup_m3_rproc_da_to_va(struct rproc *rproc, u64 da, int len)
+ 	return va;
+ }
+ 
+-static struct rproc_ops wkup_m3_rproc_ops = {
++static const struct rproc_ops wkup_m3_rproc_ops = {
+ 	.start		= wkup_m3_rproc_start,
+ 	.stop		= wkup_m3_rproc_stop,
+ 	.da_to_va	= wkup_m3_rproc_da_to_va,
+-- 
+1.9.1
