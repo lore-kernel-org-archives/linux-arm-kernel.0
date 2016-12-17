@@ -1,39 +1,63 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 16 Dec 2016 16:49:01 -0800
-Subject: [PATCH v6 0/5] davinci: VPIF: add DT support
-In-Reply-To: <d4b0501a-f83a-c8b1-e460-1ba50f68cca7@xs4all.nl> (Hans Verkuil's
- message of "Fri, 16 Dec 2016 10:47:09 +0100")
-References: <20161207183025.20684-1-khilman@baylibre.com>
- <d4b0501a-f83a-c8b1-e460-1ba50f68cca7@xs4all.nl>
-Message-ID: <m2k2aze5xe.fsf@baylibre.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 16 Dec 2016 17:00:31 -0800
+Subject: [PATCH] mtk-vcodec: use designated initializers
+Message-ID: <20161217010031.GA140323@beast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hans Verkuil <hverkuil@xs4all.nl> writes:
+Prepare to mark sensitive kernel structures for randomization by making
+sure they're using designated initializers. These were identified during
+allyesconfig builds of x86, arm, and arm64, with most initializer fixes
+extracted from grsecurity.
 
-> On 07/12/16 19:30, Kevin Hilman wrote:
->> Prepare the groundwork for adding DT support for davinci VPIF drivers.
->> This series does some fixups/cleanups and then adds the DT binding and
->> DT compatible string matching for DT probing.
->>
->> The controversial part from previous versions around async subdev
->> parsing, and specifically hard-coding the input/output routing of
->> subdevs, has been left out of this series.  That part can be done as a
->> follow-on step after agreement has been reached on the path forward.
->> With this version, platforms can still use the VPIF capture/display
->> drivers, but must provide platform_data for the subdevs and subdev
->> routing.
->>
->> Tested video capture to memory on da850-lcdk board using composite
->> input.
->
-> Other than the comment for the first patch this series looks good.
->
-> So once that's addressed I'll queue it up for 4.11.
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c | 8 ++++----
+ drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c  | 8 ++++----
+ 2 files changed, 8 insertions(+), 8 deletions(-)
 
-I've fixed that issue, and sent an update for just that patch in reply
-to the original.
+diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
+index b76c80bdf30b..4eb3be37ba14 100644
+--- a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
++++ b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
+@@ -665,10 +665,10 @@ static int h264_enc_deinit(unsigned long handle)
+ }
+ 
+ static const struct venc_common_if venc_h264_if = {
+-	h264_enc_init,
+-	h264_enc_encode,
+-	h264_enc_set_param,
+-	h264_enc_deinit,
++	.init = h264_enc_init,
++	.encode = h264_enc_encode,
++	.set_param = h264_enc_set_param,
++	.deinit = h264_enc_deinit,
+ };
+ 
+ const struct venc_common_if *get_h264_enc_comm_if(void);
+diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
+index 544f57186243..a6fa145f2c54 100644
+--- a/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
++++ b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
+@@ -470,10 +470,10 @@ static int vp8_enc_deinit(unsigned long handle)
+ }
+ 
+ static const struct venc_common_if venc_vp8_if = {
+-	vp8_enc_init,
+-	vp8_enc_encode,
+-	vp8_enc_set_param,
+-	vp8_enc_deinit,
++	.init = vp8_enc_init,
++	.encode = vp8_enc_encode,
++	.set_param = vp8_enc_set_param,
++	.deinit = vp8_enc_deinit,
+ };
+ 
+ const struct venc_common_if *get_vp8_enc_comm_if(void);
+-- 
+2.7.4
 
-Thanks for the review,
 
-Kevin
+-- 
+Kees Cook
+Nexus Security
