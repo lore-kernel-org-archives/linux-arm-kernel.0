@@ -1,232 +1,109 @@
-From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
-Date: Sat, 17 Dec 2016 19:19:01 +0100
-Subject: [PATCH v1 & v6 1/2] PM/devfreq: add suspend frequency support
-In-Reply-To: <CAGTfZH0HDuexEHR5aqBxWifFKL1fBT1K80XGFX27YqHtDf_7hw@mail.gmail.com>
-References: <CGME20161124061416epcms1p44a0152bca14312f1229cab835ea0297f@epcms1p4>
- <20161124061416epcms1p44a0152bca14312f1229cab835ea0297f@epcms1p4>
- <58368C91.8030502@rock-chips.com> <5836927B.9010205@samsung.com>
- <5836980F.6050006@rock-chips.com> <5836A1E0.1070707@samsung.com>
- <5836A622.20007@rock-chips.com> <5836B2C2.6090308@samsung.com>
- <5836B8D1.9050707@samsung.com>
- <CAGTfZH34MvFGGuPgt=qUM6FMmi+Z80akY5ZH1k6gXdzg19fh9Q@mail.gmail.com>
- <5855560E.4050609@math.uni-bielefeld.de>
- <CAGTfZH0HDuexEHR5aqBxWifFKL1fBT1K80XGFX27YqHtDf_7hw@mail.gmail.com>
-Message-ID: <58558195.20907@math.uni-bielefeld.de>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sat, 17 Dec 2016 19:21:17 +0100
+Subject: [PATCH net-next v4 0/2] stmmac: dwmac-meson8b: configurable RGMII TX
+ delay
+In-Reply-To: <20161202233238.17561-1-martin.blumenstingl@googlemail.com>
+References: <20161202233238.17561-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20161217182119.4037-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Chanwoo,
+Currently the dwmac-meson8b stmmac glue driver uses a hardcoded 1/4
+cycle (= 2ns) TX clock delay. This seems to work fine for many boards
+(for example Odroid-C2 or Amlogic's reference boards) but there are
+some others where TX traffic is simply broken.
+There are probably multiple reasons why it's working on some boards
+while it's broken on others:
+- some of Amlogic's reference boards are using a Micrel PHY
+- hardware circuit design
+- maybe more...
 
+iperf3 results on my Mecool BB2 board (Meson GXM, RTL8211F PHY) with
+TX clock delay disabled on the MAC (as it's enabled in the PHY driver).
+TX throughput was virtually zero before:
+$ iperf3 -c 192.168.1.100 -R
+Connecting to host 192.168.1.100, port 5201
+Reverse mode, remote host 192.168.1.100 is sending
+[  4] local 192.168.1.206 port 52828 connected to 192.168.1.100 port 5201
+[ ID] Interval           Transfer     Bandwidth
+[  4]   0.00-1.00   sec   108 MBytes   901 Mbits/sec
+[  4]   1.00-2.00   sec  94.2 MBytes   791 Mbits/sec
+[  4]   2.00-3.00   sec  96.5 MBytes   810 Mbits/sec
+[  4]   3.00-4.00   sec  96.2 MBytes   808 Mbits/sec
+[  4]   4.00-5.00   sec  96.6 MBytes   810 Mbits/sec
+[  4]   5.00-6.00   sec  96.5 MBytes   810 Mbits/sec
+[  4]   6.00-7.00   sec  96.6 MBytes   810 Mbits/sec
+[  4]   7.00-8.00   sec  96.5 MBytes   809 Mbits/sec
+[  4]   8.00-9.00   sec   105 MBytes   884 Mbits/sec
+[  4]   9.00-10.00  sec   111 MBytes   934 Mbits/sec
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Retr
+[  4]   0.00-10.00  sec  1000 MBytes   839 Mbits/sec    0             sender
+[  4]   0.00-10.00  sec   998 MBytes   837 Mbits/sec                  receiver
 
-Chanwoo Choi wrote:
-> 2016-12-18 0:13 GMT+09:00 Tobias Jakobi <tjakobi@math.uni-bielefeld.de>:
->> Hey guys,
->>
->> Chanwoo Choi wrote:
->>> Hi Lin,
->>>
->>> 2016-11-24 18:54 GMT+09:00 Chanwoo Choi <cw00.choi@samsung.com>:
->>>> Hi Lin,
->>>>
->>>> On 2016? 11? 24? 18:28, Chanwoo Choi wrote:
->>>>> Hi Lin,
->>>>>
->>>>> On 2016? 11? 24? 17:34, hl wrote:
->>>>>> Hi Chanwoo Choi,
->>>>>>
->>>>>>
->>>>>> On 2016?11?24? 16:16, Chanwoo Choi wrote:
->>>>>>> Hi Lin,
->>>>>>>
->>>>>>> On 2016? 11? 24? 16:34, hl wrote:
->>>>>>>> Hi Chanwoo Choi,
->>>>>>>>
->>>>>>>>      I think the dev_pm_opp_get_suspend_opp() have implement most of
->>>>>>>> the funtion, all we need is just define the node in dts, like following:
->>>>>>>>
->>>>>>>> &dmc_opp_table {
->>>>>>>>      opp06 {
->>>>>>>>          opp-suspend;
->>>>>>>>      };
->>>>>>>> };
->>>>>>> Two approaches use the 'opp-suspend' property.
->>>>>>>
->>>>>>> I think that the method to support suspend-opp have to
->>>>>>> guarantee following conditions:
->>>>>>> - Support the all of devfreq's governors.
->>>>>>     As MyungJoo Ham suggestion, i will set the suspend frequency in devfreq_suspend_device(),
->>>>>> which will ingore governor.
->>>>>
->>>>> Other approach already support the all of governors.
->>>>> Before calling the mail, I discussed with Myungjoo Ham.
->>>>> Myungjoo prefer to use the devfreq_suspend/devfreq_resume().
->>>>
->>>> It is not correct expression. We need to wait the reply from Myungjoo
->>>> to clarify this.
->>>>
->>>>>
->>>>> To Myungjoo,
->>>>> Please add your opinion how to support the suspend frequency.
->>>>
->>>>>
->>>>>>> - Devfreq framework have the responsibility to change the
->>>>>>>    frequency/voltage for suspend-opp. If we uses the
->>>>>>>    new devfreq_suspend(), each devfreq device don't care
->>>>>>>    how to support the suspend-opp. Just the developer of each
->>>>>>>    devfreq device need to add 'opp-suspend' propet to OPP entry in DT file.
->>>>>> Why should support change the voltage in devfreq framework, i think it shuold be handle in
->>>>>> specific driver, i think the devfreq only handle it can get the right frequency, then pass it to
->>>>>
->>>>> No, the frequency should be handled by governor or framework.
->>>>> The each devfreq device has no any responsibility of next frequency/voltage.
->>>>> The governor and core of devfreq can decide the next frequency/voltage.
->>>>> You can refer to the cpufreq subsystem.
->>>>>
->>>>>> specific driver, i think the voltage should handle in the devfreq->profile->target();
->>>>>
->>>>> The call of devfreq->profile->target() have to be handled by devfreq framework.
->>>>> If user want to set the suspend frequency, user can add the 'suspend-opp' property.
->>>>> It think this way is easy.
->>>>>
->>>>> But,
->>>>> If the each devfreq device want to decide the next frequency/voltage only for
->>>>> suspend state. We can check the cpufreq subsystem.
->>>>>
->>>>> If specific devfreq device want to handle the suspend frequency,
->>>>> each devfreq will add the own suspend/resume functions as following:
->>>>>
->>>>>       struct devfreq_dev_profile {
->>>>>               int (*suspend)(struct devfreq *dev);    // new function pointer
->>>>>               int (*resume)(struct devfreq *dev);     // new function pointer
->>>>>       } a_profile;
->>>>>
->>>>>       a_profile = devfreq_generic_suspend;
->>>>>
->>>>>       The devfreq framework will provide the devfreq_generic_suspend() funticon.
->>>>>               int devfreq_generic_suspend(struce devfreq *dev) {
->>>>>                       ...
->>>>>                       devfreq->profile->target(..., devfreq->suspend_freq);
->>>>>                       ...
->>>>>               }
->>>>>
->>>>>       or
->>>>>
->>>>>       a_profile = a_devfreq_suspend; // specific function of each devfreq device
->>>>>
->>>>>       The devfreq_suspend() will call 'devfreq->profile->suspend()' function
->>>>>       instead of devfreq->profile->target();
->>>>>
->>>>>       The devfreq call the 'devfreq->profile->suspend()'
->>>>>       to support the suspend frequency.
->>>>>
->>>>> Regards,
->>>>> Chanwoo Choi
->>>>
->>>> The key difference between two approaches:
->>>>
->>>> Your approach:
->>>> - The each developer should add the 'opp-suspend' property to the dts file.
->>>> - The each devfreq should call the devfreq_suspend_device()
->>>>   to support the suspend frequency.
->>>>
->>>>   If each devfreq doesn't call the devfreq_suspend_device(), devfreq framework
->>>>   can support the suspend frequency.
->>>>
->>>> Other approach:
->>>> - The each developer only should add the 'opp-suspend' property to the dts file
->>>>   without the additional behavior.
->>>>
->>>> In the cpufreq subsystem,
->>>> When support the suspend frequency of cpufreq, we just add 'opp-suspend' property
->>>> without the additional behavior.
->>>
->>> I'm missing the use-case when using the devfreq_suspend_device()
->>> before entering the suspend mode. We should consider the case when
->>> devfreq device
->>> calls the devfreq_suspend_device() directly. Because devfreq_suspend_device()
->>> is exported function, each devfreq device call this function on the fly
->>> without entering the suspend mode.
->>>
->>> I correct my opinion. Your approach is necessary. I'm sorry to confuse you.
->>> So, I make the following patch. This patch set the suspend frequency
->>> in devfreq_suspend_device() after stoping the governor.
->>> It consider the all governors of devfreq.
->>>
->>> What do you think?
->>> If you are ok, I'll send this patch with your author.
->> The problem I see here is that we need to keep track of the suspended
->> state when suspending the (entire) devfreq subsystem. When doing that,
->> we don't know if any device driver has previously called
->> devfreq_suspend_device() and might end up calling it twice.
->>
->> Same thing on devfreq subsystem resume.
->>
->> I've prepared a new RFC of my series (going to send it shortly), but I'm
->> not so happy with the current design. I think it would be much cleaner
->> to keep some suspend_refcount in struct devfreq so that I can call
->> devfreq_suspend_device() multiple times, while keeping a sane internal
->> state.
-> 
-> I agree the devfreq need  reference count for devfreq_suspend/resume_device.
-> This patch focus on when changing the suspend frequency.
-> 
->>
->> Something like devfreq_device_runtime_{put,get}() perhaps?
-> 
-> Why do devfreq need new additional functions?
-> I think the devfreq_suspend/resume_device are enough.
-Just thinking out loud here. I would prefer a naming that implies that
-some refcounting is going on. When I see a pair of function with
-put/get, then I usually know what is going on.
+iperf Done.
+$ iperf3 -c 192.168.1.100
+Connecting to host 192.168.1.100, port 5201
+[  4] local 192.168.1.206 port 52832 connected to 192.168.1.100 port 5201
+[ ID] Interval           Transfer     Bandwidth       Retr  Cwnd
+[  4]   0.00-1.01   sec  99.5 MBytes   829 Mbits/sec  117    139 KBytes
+[  4]   1.01-2.00   sec   105 MBytes   884 Mbits/sec  129   70.7 KBytes
+[  4]   2.00-3.01   sec   107 MBytes   889 Mbits/sec  106    187 KBytes
+[  4]   3.01-4.01   sec   105 MBytes   878 Mbits/sec   92    143 KBytes
+[  4]   4.01-5.00   sec   105 MBytes   882 Mbits/sec  140    129 KBytes
+[  4]   5.00-6.01   sec   106 MBytes   883 Mbits/sec  115    195 KBytes
+[  4]   6.01-7.00   sec   102 MBytes   863 Mbits/sec  133   70.7 KBytes
+[  4]   7.00-8.01   sec   106 MBytes   884 Mbits/sec  143   97.6 KBytes
+[  4]   8.01-9.01   sec   104 MBytes   875 Mbits/sec  124    107 KBytes
+[  4]   9.01-10.01  sec   105 MBytes   876 Mbits/sec   90    139 KBytes
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Retr
+[  4]   0.00-10.01  sec  1.02 GBytes   874 Mbits/sec  1189             sender
+[  4]   0.00-10.01  sec  1.02 GBytes   873 Mbits/sec                  receiver
 
-Here I would have to look at the actual implementation to realize, at
-the moment, that I have to be careful calling these functions twice.
+iperf Done.
 
--Tobias
+I get similar TX throughput on my Meson GXBB "MXQ Pro+" board when I
+disable the PHY's TX-delay and configure a 4ms TX-delay on the MAC.
+So changes to at least the RTL8211F PHY driver are needed to get it
+working properly in all situations.
 
+Changes since v3:
+- rebased to apply against current net-next branch (fixes a conflict
+  with d2ed0a7755fe14c7 "net: ethernet: stmmac: fix of-node and
+  fixed-link-phydev leaks")
+- 
 
-> 
-> Thanks,
-> Chanwoo Choi
-> 
->>
->> - Tobias
->>
->>
->>
->>>
->>>  int devfreq_suspend_device(struct devfreq *devfreq)
->>>  {
->>> +      int ret = 0;
->>> +
->>>         if (!devfreq)
->>>         return -EINVAL;
->>>
->>>         if (!devfreq->governor)
->>>              return 0;
->>>
->>> -      return devfreq->governor->event_handler(devfreq,
->>> +     ret = devfreq->governor->event_handler(devfreq,
->>>                     DEVFREQ_GOV_SUSPEND, NULL);
->>> +      if (ret < 0) {
->>> +           dev_err(devfreq->dev.parent, "failed to suspend governor\n");
->>> +           return ret;
->>> +      }
->>> +
->>> +      if (devfreq->suspend_freq) {
->>> +           ret = devfreq->profile->target(devfreq->dev.parent,
->>> +                                      &devfreq->suspend_freq, 0);
->>> +           if (ret < 0) {
->>> +                  dev_err(devfreq->dev.parent,
->>> +                             "failed to set suspend-freq\n");
->>> +                  return ret;
->>> +           }
->>> +           dev_dbg(devfreq->dev.parent, "Setting suspend-freq: %lu\n",
->>> +                          devfreq->suspend_freq);
->>> +      }
->>> +
->>> +      return 0;
->>>  }
->>>  EXPORT_SYMBOL(devfreq_suspend_device);
->>>
->>
+Changes since v2:
+- moved all .dts patches (3-7) to a separate series
+- removed the default 2ns TX delay when phy-mode RGMII is specified
+- (rebased against current net-next)
+
+Changes since v1:
+- renamed the devicetree property "amlogic,tx-delay" to
+  "amlogic,tx-delay-ns", which makes the .dts easier to read as we can
+  simply specify human-readable values instead of having "preprocessor
+  defines and calculation in human brain". Thanks to Andrew Lunn for
+  the suggestion!
+- improved documentation to indicate when the MAC TX-delay should be
+  configured and how to use the PHY's TX-delay
+- changed the default TX-delay in the dwmac-meson8b driver from 2ns
+  to 0ms when any of the rgmii-*id modes are used (the 2ns default
+  value still applies for phy-mode "rgmii")
+- added patches to properly reset the PHY on Meson GXBB devices and to
+  use a similar configuration than the one we use on Meson GXL devices
+  (by passing a phy-handle to stmmac and defining the PHY in the mdio0
+  bus - patch 3-6)
+- add the "amlogic,tx-delay-ns" property to all boards which are using
+  the RGMII PHY (patch 7)
+
+Martin Blumenstingl (2):
+  net: dt-bindings: add RGMII TX delay configuration to meson8b-dwmac
+  net: stmmac: dwmac-meson8b: make the RGMII TX delay configurable
+
+ .../devicetree/bindings/net/meson-dwmac.txt         | 14 ++++++++++++++
+ drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c | 21 +++++++++++++++------
+ 2 files changed, 29 insertions(+), 6 deletions(-)
+
+-- 
+2.11.0
