@@ -1,92 +1,78 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 17 Dec 2016 19:21:19 +0100
-Subject: [PATCH net-next v4 2/2] net: stmmac: dwmac-meson8b: make the RGMII TX
- delay configurable
-In-Reply-To: <20161217182119.4037-1-martin.blumenstingl@googlemail.com>
-References: <20161202233238.17561-1-martin.blumenstingl@googlemail.com>
- <20161217182119.4037-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20161217182119.4037-3-martin.blumenstingl@googlemail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sat, 17 Dec 2016 20:48:06 +0200
+Subject: [PATCH v8 6/8] ARM: EXYNOS: remove secondary startup
+ initialization from smp_prepare_cpus
+In-Reply-To: <1481375323-29724-7-git-send-email-pankaj.dubey@samsung.com>
+References: <1481375323-29724-1-git-send-email-pankaj.dubey@samsung.com>
+ <1481375323-29724-7-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <20161217184806.GB30265@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prior to this patch we were using a hardcoded RGMII TX clock delay of
-2ns (= 1/4 cycle of the 125MHz RGMII TX clock). This value works for
-many boards, but unfortunately not for all (due to the way the actual
-circuit is designed, sometimes because the TX delay is enabled in the
-PHY, etc.). Making the TX delay on the MAC side configurable allows us
-to support all possible hardware combinations.
+On Sat, Dec 10, 2016 at 06:38:41PM +0530, Pankaj Dubey wrote:
+> We are taking care of setting secondary cpu boot address in
+> exynos_boot_secondary just before sending ipi to secondary CPUs,
+> so we can safely remove this setting from smp_prepare_cpus.
 
-This allows fixing a compatibility issue on some boards, where the
-RTL8211F PHY is configured to generate the TX delay. We can now turn
-off the TX delay in the MAC, because otherwise we would be applying the
-delay twice (which results in non-working TX traffic).
+Indeed setting boot address is doubled. However between them, the power
+is turned on and Exynos3250 is being restarted.
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Tested-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c | 21 +++++++++++++++------
- 1 file changed, 15 insertions(+), 6 deletions(-)
+It would be nice to test it on Exynos3250 (Artik5 or Gear2?) and some of
+Exynos4 family. Beside that looks good to me, I just want to see some
+tested-by.
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
-index ffaed1f35efe..db970cd6600f 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
-@@ -35,10 +35,6 @@
- 
- #define PRG_ETH0_TXDLY_SHIFT		5
- #define PRG_ETH0_TXDLY_MASK		GENMASK(6, 5)
--#define PRG_ETH0_TXDLY_OFF		(0x0 << PRG_ETH0_TXDLY_SHIFT)
--#define PRG_ETH0_TXDLY_QUARTER		(0x1 << PRG_ETH0_TXDLY_SHIFT)
--#define PRG_ETH0_TXDLY_HALF		(0x2 << PRG_ETH0_TXDLY_SHIFT)
--#define PRG_ETH0_TXDLY_THREE_QUARTERS	(0x3 << PRG_ETH0_TXDLY_SHIFT)
- 
- /* divider for the result of m250_sel */
- #define PRG_ETH0_CLK_M250_DIV_SHIFT	7
-@@ -69,6 +65,8 @@ struct meson8b_dwmac {
- 
- 	struct clk_divider	m25_div;
- 	struct clk		*m25_div_clk;
-+
-+	u32			tx_delay_ns;
- };
- 
- static void meson8b_dwmac_mask_bits(struct meson8b_dwmac *dwmac, u32 reg,
-@@ -179,6 +177,7 @@ static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
- {
- 	int ret;
- 	unsigned long clk_rate;
-+	u8 tx_dly_val;
- 
- 	switch (dwmac->phy_mode) {
- 	case PHY_INTERFACE_MODE_RGMII:
-@@ -196,9 +195,13 @@ static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
- 		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
- 					PRG_ETH0_INVERTED_RMII_CLK, 0);
- 
--		/* TX clock delay - all known boards use a 1/4 cycle delay */
-+		/* TX clock delay in ns = "8ns / 4 * tx_dly_val" (where
-+		 * 8ns are exactly one cycle of the 125MHz RGMII TX clock):
-+		 * 0ns = 0x0, 2ns = 0x1, 4ns = 0x2, 6ns = 0x3
-+		 */
-+		tx_dly_val = dwmac->tx_delay_ns >> 1;
- 		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0, PRG_ETH0_TXDLY_MASK,
--					PRG_ETH0_TXDLY_QUARTER);
-+					tx_dly_val << PRG_ETH0_TXDLY_SHIFT);
- 		break;
- 
- 	case PHY_INTERFACE_MODE_RMII:
-@@ -282,6 +285,12 @@ static int meson8b_dwmac_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "missing phy-mode property\n");
- 		ret = -EINVAL;
- 		goto err_remove_config_dt;
-+	} else if (dwmac->phy_mode != PHY_INTERFACE_MODE_RMII) {
-+		/* ignore errors as this is an optional property - by default
-+		 * we assume a TX delay of 0ns.
-+		 */
-+		of_property_read_u32(pdev->dev.of_node, "amlogic,tx-delay-ns",
-+				     &dwmac->tx_delay_ns);
- 	}
- 
- 	ret = meson8b_init_clk(dwmac);
--- 
-2.11.0
+Best regards,
+Krzysztof
+
+> 
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/platsmp.c | 25 -------------------------
+>  1 file changed, 25 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+> index 43eec10..4de254e 100644
+> --- a/arch/arm/mach-exynos/platsmp.c
+> +++ b/arch/arm/mach-exynos/platsmp.c
+> @@ -403,8 +403,6 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  
+>  static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+>  {
+> -	int i;
+> -
+>  	exynos_sysram_init();
+>  
+>  	exynos_set_delayed_reset_assertion(true);
+> @@ -414,29 +412,6 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+>  		if (exynos_scu_enable())
+>  			return;
+>  	}
+> -	/*
+> -	 * Write the address of secondary startup into the
+> -	 * system-wide flags register. The boot monitor waits
+> -	 * until it receives a soft interrupt, and then the
+> -	 * secondary CPU branches to this address.
+> -	 *
+> -	 * Try using firmware operation first and fall back to
+> -	 * boot register if it fails.
+> -	 */
+> -	for (i = 1; i < max_cpus; ++i) {
+> -		unsigned long boot_addr;
+> -		u32 mpidr;
+> -		u32 core_id;
+> -		int ret;
+> -
+> -		mpidr = cpu_logical_map(i);
+> -		core_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> -		boot_addr = virt_to_phys(exynos4_secondary_startup);
+> -
+> -		ret = exynos_set_boot_addr(core_id, boot_addr);
+> -		if (ret)
+> -			break;
+> -	}
+>  }
+>  
+>  #ifdef CONFIG_HOTPLUG_CPU
+> -- 
+> 2.7.4
+> 
