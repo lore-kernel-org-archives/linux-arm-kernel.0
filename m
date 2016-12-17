@@ -1,112 +1,70 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Sat, 17 Dec 2016 16:59:36 +0530
-Subject: [PATCH] drivers: remoteproc: constify rproc_ops structures
-Message-ID: <1481974176-19912-1-git-send-email-bhumirks@gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sat, 17 Dec 2016 14:03:43 +0200
+Subject: [PATCH v8 1/8] soc: samsung: add exynos chipid driver support
+In-Reply-To: <CAGcde9FBGcNpYbei0PsyHjt3_HVmm=x8oYkS-F7t0Rca6fpDAQ@mail.gmail.com>
+References: <1481375323-29724-1-git-send-email-pankaj.dubey@samsung.com>
+ <1481375323-29724-2-git-send-email-pankaj.dubey@samsung.com>
+ <20161216173703.GA3746@kozik-lap>
+ <CAGcde9FBGcNpYbei0PsyHjt3_HVmm=x8oYkS-F7t0Rca6fpDAQ@mail.gmail.com>
+Message-ID: <20161217120343.GA16051@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare rproc_ops structures as const as they are only passed as an
-argument to the function rproc_alloc. This argument is of type const, so
-rproc_ops structures having this property can be declared const too.
-Done using Coccinelle:
+On Sat, Dec 17, 2016 at 09:36:59AM +0530, Pankaj Dubey wrote:
+> Hi Krzysztof,
+> 
+> On 16 December 2016 at 23:07, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > On Sat, Dec 10, 2016 at 06:38:36PM +0530, Pankaj Dubey wrote:
+> >> Exynos SoCs have Chipid, for identification of product IDs and SoC revisions.
+> >> This patch intends to provide initialization code for all these functionalities,
+> >> at the same time it provides some sysfs entries for accessing these information
+> >> to user-space.
+> >>
+> >> This driver uses existing binding for exynos-chipid.
+> >>
+> >> CC: Grant Likely <grant.likely@linaro.org>
+> >> CC: Rob Herring <robh+dt@kernel.org>
+> >> CC: Linus Walleij <linus.walleij@linaro.org>
+> >> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> >> [m.szyprowski: for suggestion and code snippet of product_id_to_soc_id]
+> >> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >> ---
+> >>  drivers/soc/samsung/Kconfig         |   5 ++
+> >>  drivers/soc/samsung/Makefile        |   1 +
+> >>  drivers/soc/samsung/exynos-chipid.c | 116 ++++++++++++++++++++++++++++++++++++
+> >>  3 files changed, 122 insertions(+)
+> >>  create mode 100644 drivers/soc/samsung/exynos-chipid.c
+> >>
+> >> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
+> >> index 2455339..f9ab858 100644
+> >> --- a/drivers/soc/samsung/Kconfig
+> >> +++ b/drivers/soc/samsung/Kconfig
+> >> @@ -14,4 +14,9 @@ config EXYNOS_PM_DOMAINS
+> >>       bool "Exynos PM domains" if COMPILE_TEST
+> >>       depends on PM_GENERIC_DOMAINS || COMPILE_TEST
+> >>
+> >> +config EXYNOS_CHIPID
+> >> +     bool "Exynos Chipid controller driver" if COMPILE_TEST
+> >> +     depends on (ARM && ARCH_EXYNOS) || ((ARM || ARM64) && COMPILE_TEST)
+> >
+> > 1. Why this can be compile tested only on ARM architectures?
+> 
+> Well I just used dependency same as EXYNOS_PMU, but I can see it will
+> be enabled for compile test on ARM64 isn't it?
 
-@r1 disable optional_qualifier @
-identifier i;
-position p;
-@@
-static struct rproc_ops i at p = {...};
+I don't remember the PMU case... maybe it used clocks or something. Here
+there are no arch-specific build dependencies.
 
-@ok1@
-identifier r1.i;
-position p;
-@@
-rproc_alloc(...,&i at p,...)
+> 
+> > 2. Don't you need also SOC_BUS?
+> 
+> CHIPID needs SoC_BUS and for the same reason it is selecting SOC_BUS
+> in the next line.
+> If we mark it as a dependency (under depends on), even then we need to
+> select this either
+> under same EXYNOS_CHIPID config or ARCH_EXYNOS config.
 
-@bad@
-position p!={r1.p,ok1.p};
-identifier r1.i;
-@@
-i at p
+Ah, I missed that line... Argh, sorry for noise.
 
-@depends on !bad disable optional_qualifier@
-identifier r1.i;
-@@
-+const
-struct rproc_ops i;
-
-File sizes before:
-   text	   data	    bss	    dec	    hex	filename
-   1258	    416	      0	   1674	    68a remoteproc/omap_remoteproc.o
-   2402	    240	      0	   2642	    a52 remoteproc/st_remoteproc.o
-   2064	    272	      0	   2336	    920 remoteproc/st_slim_rproc.o
-   2160	    240	      0	   2400	    960 remoteproc/wkup_m3_rproc.o
-
-File sizes after:
-   text	   data	    bss	    dec	    hex	filename
-   1297	    368	      0	   1665	    681 remoteproc/omap_remoteproc.o
-   2434	    192	      0	   2626	    a42 remoteproc/st_remoteproc.o
-   2112	    240	      0	   2352	    930 remoteproc/st_slim_rproc.o
-   2200	    192	      0	   2392	    958 remoteproc/wkup_m3_rproc.o
-
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
----
- drivers/remoteproc/omap_remoteproc.c | 2 +-
- drivers/remoteproc/st_remoteproc.c   | 2 +-
- drivers/remoteproc/st_slim_rproc.c   | 2 +-
- drivers/remoteproc/wkup_m3_rproc.c   | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/remoteproc/omap_remoteproc.c b/drivers/remoteproc/omap_remoteproc.c
-index fa63bf2..a96ce90 100644
---- a/drivers/remoteproc/omap_remoteproc.c
-+++ b/drivers/remoteproc/omap_remoteproc.c
-@@ -177,7 +177,7 @@ static int omap_rproc_stop(struct rproc *rproc)
- 	return 0;
- }
- 
--static struct rproc_ops omap_rproc_ops = {
-+static const struct rproc_ops omap_rproc_ops = {
- 	.start		= omap_rproc_start,
- 	.stop		= omap_rproc_stop,
- 	.kick		= omap_rproc_kick,
-diff --git a/drivers/remoteproc/st_remoteproc.c b/drivers/remoteproc/st_remoteproc.c
-index da4e152..f21787b 100644
---- a/drivers/remoteproc/st_remoteproc.c
-+++ b/drivers/remoteproc/st_remoteproc.c
-@@ -107,7 +107,7 @@ static int st_rproc_stop(struct rproc *rproc)
- 	return sw_err ?: pwr_err;
- }
- 
--static struct rproc_ops st_rproc_ops = {
-+static const struct rproc_ops st_rproc_ops = {
- 	.start		= st_rproc_start,
- 	.stop		= st_rproc_stop,
- };
-diff --git a/drivers/remoteproc/st_slim_rproc.c b/drivers/remoteproc/st_slim_rproc.c
-index 507716c..6cfd862 100644
---- a/drivers/remoteproc/st_slim_rproc.c
-+++ b/drivers/remoteproc/st_slim_rproc.c
-@@ -200,7 +200,7 @@ static void *slim_rproc_da_to_va(struct rproc *rproc, u64 da, int len)
- 	return va;
- }
- 
--static struct rproc_ops slim_rproc_ops = {
-+static const struct rproc_ops slim_rproc_ops = {
- 	.start		= slim_rproc_start,
- 	.stop		= slim_rproc_stop,
- 	.da_to_va       = slim_rproc_da_to_va,
-diff --git a/drivers/remoteproc/wkup_m3_rproc.c b/drivers/remoteproc/wkup_m3_rproc.c
-index 18175d0..1ada0e5 100644
---- a/drivers/remoteproc/wkup_m3_rproc.c
-+++ b/drivers/remoteproc/wkup_m3_rproc.c
-@@ -111,7 +111,7 @@ static void *wkup_m3_rproc_da_to_va(struct rproc *rproc, u64 da, int len)
- 	return va;
- }
- 
--static struct rproc_ops wkup_m3_rproc_ops = {
-+static const struct rproc_ops wkup_m3_rproc_ops = {
- 	.start		= wkup_m3_rproc_start,
- 	.stop		= wkup_m3_rproc_stop,
- 	.da_to_va	= wkup_m3_rproc_da_to_va,
--- 
-1.9.1
+Best regards,
+Krzysztof
