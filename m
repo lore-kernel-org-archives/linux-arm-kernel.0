@@ -1,70 +1,110 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 17 Dec 2016 14:03:43 +0200
-Subject: [PATCH v8 1/8] soc: samsung: add exynos chipid driver support
-In-Reply-To: <CAGcde9FBGcNpYbei0PsyHjt3_HVmm=x8oYkS-F7t0Rca6fpDAQ@mail.gmail.com>
-References: <1481375323-29724-1-git-send-email-pankaj.dubey@samsung.com>
- <1481375323-29724-2-git-send-email-pankaj.dubey@samsung.com>
- <20161216173703.GA3746@kozik-lap>
- <CAGcde9FBGcNpYbei0PsyHjt3_HVmm=x8oYkS-F7t0Rca6fpDAQ@mail.gmail.com>
-Message-ID: <20161217120343.GA16051@kozik-lap>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 17 Dec 2016 12:07:11 +0000
+Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
+In-Reply-To: <20161215185717.GM14217@n2100.armlinux.org.uk>
+References: <20161213113044.GC19985@leverpostej>
+ <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
+ <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
+ <20161215113539.GK14217@n2100.armlinux.org.uk>
+ <06fca797-da5d-f7f2-eecb-9b1b33b7e83f@arm.com>
+ <20161215151548.GL14217@n2100.armlinux.org.uk>
+ <c21d6514-44a2-ba88-0fe5-d14d5897cc48@arm.com>
+ <20161215185717.GM14217@n2100.armlinux.org.uk>
+Message-ID: <20161217120707.GA72718@MBP.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 17, 2016 at 09:36:59AM +0530, Pankaj Dubey wrote:
-> Hi Krzysztof,
-> 
-> On 16 December 2016 at 23:07, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> > On Sat, Dec 10, 2016 at 06:38:36PM +0530, Pankaj Dubey wrote:
-> >> Exynos SoCs have Chipid, for identification of product IDs and SoC revisions.
-> >> This patch intends to provide initialization code for all these functionalities,
-> >> at the same time it provides some sysfs entries for accessing these information
-> >> to user-space.
-> >>
-> >> This driver uses existing binding for exynos-chipid.
-> >>
-> >> CC: Grant Likely <grant.likely@linaro.org>
-> >> CC: Rob Herring <robh+dt@kernel.org>
-> >> CC: Linus Walleij <linus.walleij@linaro.org>
-> >> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> >> [m.szyprowski: for suggestion and code snippet of product_id_to_soc_id]
-> >> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> >> ---
-> >>  drivers/soc/samsung/Kconfig         |   5 ++
-> >>  drivers/soc/samsung/Makefile        |   1 +
-> >>  drivers/soc/samsung/exynos-chipid.c | 116 ++++++++++++++++++++++++++++++++++++
-> >>  3 files changed, 122 insertions(+)
-> >>  create mode 100644 drivers/soc/samsung/exynos-chipid.c
-> >>
-> >> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
-> >> index 2455339..f9ab858 100644
-> >> --- a/drivers/soc/samsung/Kconfig
-> >> +++ b/drivers/soc/samsung/Kconfig
-> >> @@ -14,4 +14,9 @@ config EXYNOS_PM_DOMAINS
-> >>       bool "Exynos PM domains" if COMPILE_TEST
-> >>       depends on PM_GENERIC_DOMAINS || COMPILE_TEST
-> >>
-> >> +config EXYNOS_CHIPID
-> >> +     bool "Exynos Chipid controller driver" if COMPILE_TEST
-> >> +     depends on (ARM && ARCH_EXYNOS) || ((ARM || ARM64) && COMPILE_TEST)
-> >
-> > 1. Why this can be compile tested only on ARM architectures?
-> 
-> Well I just used dependency same as EXYNOS_PMU, but I can see it will
-> be enabled for compile test on ARM64 isn't it?
+Hi Russell,
 
-I don't remember the PMU case... maybe it used clocks or something. Here
-there are no arch-specific build dependencies.
+Just a quick reply expressing my opinion on the ABI and KVM maintenance
+topics. Sorry I won't be able to follow up until the new year as I go on
+holiday soon.
 
+On Thu, Dec 15, 2016 at 06:57:18PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Dec 15, 2016 at 03:37:15PM +0000, Marc Zyngier wrote:
+> > On 15/12/16 15:15, Russell King - ARM Linux wrote:
+> > > On Thu, Dec 15, 2016 at 11:46:41AM +0000, Marc Zyngier wrote:
+> > >> On 15/12/16 11:35, Russell King - ARM Linux wrote:
+> > >>> On Thu, Dec 15, 2016 at 11:18:48AM +0000, Marc Zyngier wrote:
+> > >>>> On 14/12/16 10:46, Russell King wrote:
+> > >>>>> @@ -231,10 +244,14 @@ ENDPROC(__hyp_stub_do_trap)
+> > >>>>>   * initialisation entry point.
+> > >>>>>   */
+> > >>>>>  ENTRY(__hyp_get_vectors)
+> > >>>>> -	mov	r0, #-1
+> > >>>>> +	mov	r0, #HVC_GET_VECTORS
+> > >>>>
+> > >>>> This breaks the KVM implementation of __hyp_get_vectors, easily fixed
+> > >>>> with the following patchlet:
+> > >>>
+> > >>> Right, so what Mark said is wrong:
+> > >>>
+> > >>> "The hyp-stub is part of the kernel image, and the API is private to
+> > >>>  that particular image, so we can change things -- there's no ABI to
+> > >>>  worry about."
+> > >>
+> > >> I think Mark is right. The API *is* private to the kernel, and KVM being
+> > >> the only in-kernel hypervisor on ARM, this is not an ABI.
+> > > 
+> > > Again, that's wrong.
+> > > 
+> > > We have two hypervisors in the kernel.  One is KVM, the other is the
+> > > stub.  Sure, the stub isn't a full implementation of a hypervisor, but
+> > > it is nevertheless, for the purposes of _this_ discussion, a hypervisor
+> > > of sorts.
+> > > 
+> > > The reason that both are included is because they both appear to share
+> > > a common interface (although that's totally not documented anywhere.)
+> > 
+> > And this interface exists for the sole purpose of enabling KVM. Call it
+> > a hypervisor if you wish, but its usefulness is doubtful on its own.
+
+IMO, the interface between EL1 and EL2 _is_ ABI. However, it should not
+be confused with a *stable* ABI like the one we expose to user. Since
+all users of the EL2 ABI live inside the kernel (either on the EL1 or
+EL2 side), we are free to change it as long as everything is updated
+simultaneously. I don't see this any different from other in-kernel ABI
+like that exposed to loadable modules (for the latter, we have the
+advantage of a partly self-documenting ABI as part of the C language).
+
+I would welcome some documentation for the EL2 ABI as well, especially
+since head.S and the KVM counterpart is maintained by different people.
+
+> What's also coming clear is that there's very few people who understand
+> all the interactions here, and the whole thing seems to be an undocumented
+> mess.  Something needs to change there - people need to stop shovelling
+> half baked crap into the kernel.  KVM have the privilege of being able to
+> push ARM stuff directly, I now see that was a very big mistake.
 > 
-> > 2. Don't you need also SOC_BUS?
-> 
-> CHIPID needs SoC_BUS and for the same reason it is selecting SOC_BUS
-> in the next line.
-> If we mark it as a dependency (under depends on), even then we need to
-> select this either
-> under same EXYNOS_CHIPID config or ARCH_EXYNOS config.
+> So, I want KVM further changes to come through my tree once this merge
+> window is over -
 
-Ah, I missed that line... Argh, sorry for noise.
+I'm afraid I strongly disagree. There are a few reasons neither you nor
+me gatekeep the KVM port: (a) the ARM KVM maintainers know a lot more
+about KVM than either of us, (b) the KVM code under arch/arm is reused
+by arm64 and (c) you or I would certainly become a bottleneck. There is
+a lot more to KVM support on ARM than the hyp stub and realistically you
+won't have the time to review all the stuff that comes your way.
 
-Best regards,
-Krzysztof
+Just because there is an interface between two or more pieces of code,
+it is not a strong enough argument for them to have the same gatekeeper
+(I wouldn't say maintainer since IMO this implies a lot more). That
+said, you can always advise other maintainers on how to do things right,
+ask for proper documentation (as you did), review how things are defined
+and implemented, especially when they touch code _you_ maintain.
+
+> Let's start with some documentation on the KVM hypervisor interfaces on
+> 32-bit ARM.  Documentation/virtual/kvm/hypercalls.txt already contains
+> some for x86, s390 and PPC, so that would be a good place to document
+> the ARM side.  Arguably, that should have already been done.
+
+I'm all for documenting the interface.
+
+(even though Will and I co-maintain arch/arm64, I deliberately kept his
+name out of the above as I haven't had the chance to ask for his
+opinion on this matter, which may as well differ)
+
+I have to go and pack now. Merry Christmas!
+
+-- 
+Catalin
