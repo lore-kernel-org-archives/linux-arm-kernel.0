@@ -1,110 +1,183 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 17 Dec 2016 12:07:11 +0000
-Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
-In-Reply-To: <20161215185717.GM14217@n2100.armlinux.org.uk>
-References: <20161213113044.GC19985@leverpostej>
- <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
- <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
- <20161215113539.GK14217@n2100.armlinux.org.uk>
- <06fca797-da5d-f7f2-eecb-9b1b33b7e83f@arm.com>
- <20161215151548.GL14217@n2100.armlinux.org.uk>
- <c21d6514-44a2-ba88-0fe5-d14d5897cc48@arm.com>
- <20161215185717.GM14217@n2100.armlinux.org.uk>
-Message-ID: <20161217120707.GA72718@MBP.local>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Sat, 17 Dec 2016 23:50:03 +0900
+Subject: [PATCH v1 & v6 1/2] PM/devfreq: add suspend frequency support
+In-Reply-To: <5836B8D1.9050707@samsung.com>
+References: <CGME20161124061416epcms1p44a0152bca14312f1229cab835ea0297f@epcms1p4>
+ <20161124061416epcms1p44a0152bca14312f1229cab835ea0297f@epcms1p4>
+ <58368C91.8030502@rock-chips.com> <5836927B.9010205@samsung.com>
+ <5836980F.6050006@rock-chips.com> <5836A1E0.1070707@samsung.com>
+ <5836A622.20007@rock-chips.com> <5836B2C2.6090308@samsung.com>
+ <5836B8D1.9050707@samsung.com>
+Message-ID: <CAGTfZH34MvFGGuPgt=qUM6FMmi+Z80akY5ZH1k6gXdzg19fh9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Lin,
 
-Just a quick reply expressing my opinion on the ABI and KVM maintenance
-topics. Sorry I won't be able to follow up until the new year as I go on
-holiday soon.
+2016-11-24 18:54 GMT+09:00 Chanwoo Choi <cw00.choi@samsung.com>:
+> Hi Lin,
+>
+> On 2016? 11? 24? 18:28, Chanwoo Choi wrote:
+>> Hi Lin,
+>>
+>> On 2016? 11? 24? 17:34, hl wrote:
+>>> Hi Chanwoo Choi,
+>>>
+>>>
+>>> On 2016?11?24? 16:16, Chanwoo Choi wrote:
+>>>> Hi Lin,
+>>>>
+>>>> On 2016? 11? 24? 16:34, hl wrote:
+>>>>> Hi Chanwoo Choi,
+>>>>>
+>>>>>      I think the dev_pm_opp_get_suspend_opp() have implement most of
+>>>>> the funtion, all we need is just define the node in dts, like following:
+>>>>>
+>>>>> &dmc_opp_table {
+>>>>>      opp06 {
+>>>>>          opp-suspend;
+>>>>>      };
+>>>>> };
+>>>> Two approaches use the 'opp-suspend' property.
+>>>>
+>>>> I think that the method to support suspend-opp have to
+>>>> guarantee following conditions:
+>>>> - Support the all of devfreq's governors.
+>>>     As MyungJoo Ham suggestion, i will set the suspend frequency in devfreq_suspend_device(),
+>>> which will ingore governor.
+>>
+>> Other approach already support the all of governors.
+>> Before calling the mail, I discussed with Myungjoo Ham.
+>> Myungjoo prefer to use the devfreq_suspend/devfreq_resume().
+>
+> It is not correct expression. We need to wait the reply from Myungjoo
+> to clarify this.
+>
+>>
+>> To Myungjoo,
+>> Please add your opinion how to support the suspend frequency.
+>
+>>
+>>>> - Devfreq framework have the responsibility to change the
+>>>>    frequency/voltage for suspend-opp. If we uses the
+>>>>    new devfreq_suspend(), each devfreq device don't care
+>>>>    how to support the suspend-opp. Just the developer of each
+>>>>    devfreq device need to add 'opp-suspend' propet to OPP entry in DT file.
+>>> Why should support change the voltage in devfreq framework, i think it shuold be handle in
+>>> specific driver, i think the devfreq only handle it can get the right frequency, then pass it to
+>>
+>> No, the frequency should be handled by governor or framework.
+>> The each devfreq device has no any responsibility of next frequency/voltage.
+>> The governor and core of devfreq can decide the next frequency/voltage.
+>> You can refer to the cpufreq subsystem.
+>>
+>>> specific driver, i think the voltage should handle in the devfreq->profile->target();
+>>
+>> The call of devfreq->profile->target() have to be handled by devfreq framework.
+>> If user want to set the suspend frequency, user can add the 'suspend-opp' property.
+>> It think this way is easy.
+>>
+>> But,
+>> If the each devfreq device want to decide the next frequency/voltage only for
+>> suspend state. We can check the cpufreq subsystem.
+>>
+>> If specific devfreq device want to handle the suspend frequency,
+>> each devfreq will add the own suspend/resume functions as following:
+>>
+>>       struct devfreq_dev_profile {
+>>               int (*suspend)(struct devfreq *dev);    // new function pointer
+>>               int (*resume)(struct devfreq *dev);     // new function pointer
+>>       } a_profile;
+>>
+>>       a_profile = devfreq_generic_suspend;
+>>
+>>       The devfreq framework will provide the devfreq_generic_suspend() funticon.
+>>               int devfreq_generic_suspend(struce devfreq *dev) {
+>>                       ...
+>>                       devfreq->profile->target(..., devfreq->suspend_freq);
+>>                       ...
+>>               }
+>>
+>>       or
+>>
+>>       a_profile = a_devfreq_suspend; // specific function of each devfreq device
+>>
+>>       The devfreq_suspend() will call 'devfreq->profile->suspend()' function
+>>       instead of devfreq->profile->target();
+>>
+>>       The devfreq call the 'devfreq->profile->suspend()'
+>>       to support the suspend frequency.
+>>
+>> Regards,
+>> Chanwoo Choi
+>
+> The key difference between two approaches:
+>
+> Your approach:
+> - The each developer should add the 'opp-suspend' property to the dts file.
+> - The each devfreq should call the devfreq_suspend_device()
+>   to support the suspend frequency.
+>
+>   If each devfreq doesn't call the devfreq_suspend_device(), devfreq framework
+>   can support the suspend frequency.
+>
+> Other approach:
+> - The each developer only should add the 'opp-suspend' property to the dts file
+>   without the additional behavior.
+>
+> In the cpufreq subsystem,
+> When support the suspend frequency of cpufreq, we just add 'opp-suspend' property
+> without the additional behavior.
 
-On Thu, Dec 15, 2016 at 06:57:18PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Dec 15, 2016 at 03:37:15PM +0000, Marc Zyngier wrote:
-> > On 15/12/16 15:15, Russell King - ARM Linux wrote:
-> > > On Thu, Dec 15, 2016 at 11:46:41AM +0000, Marc Zyngier wrote:
-> > >> On 15/12/16 11:35, Russell King - ARM Linux wrote:
-> > >>> On Thu, Dec 15, 2016 at 11:18:48AM +0000, Marc Zyngier wrote:
-> > >>>> On 14/12/16 10:46, Russell King wrote:
-> > >>>>> @@ -231,10 +244,14 @@ ENDPROC(__hyp_stub_do_trap)
-> > >>>>>   * initialisation entry point.
-> > >>>>>   */
-> > >>>>>  ENTRY(__hyp_get_vectors)
-> > >>>>> -	mov	r0, #-1
-> > >>>>> +	mov	r0, #HVC_GET_VECTORS
-> > >>>>
-> > >>>> This breaks the KVM implementation of __hyp_get_vectors, easily fixed
-> > >>>> with the following patchlet:
-> > >>>
-> > >>> Right, so what Mark said is wrong:
-> > >>>
-> > >>> "The hyp-stub is part of the kernel image, and the API is private to
-> > >>>  that particular image, so we can change things -- there's no ABI to
-> > >>>  worry about."
-> > >>
-> > >> I think Mark is right. The API *is* private to the kernel, and KVM being
-> > >> the only in-kernel hypervisor on ARM, this is not an ABI.
-> > > 
-> > > Again, that's wrong.
-> > > 
-> > > We have two hypervisors in the kernel.  One is KVM, the other is the
-> > > stub.  Sure, the stub isn't a full implementation of a hypervisor, but
-> > > it is nevertheless, for the purposes of _this_ discussion, a hypervisor
-> > > of sorts.
-> > > 
-> > > The reason that both are included is because they both appear to share
-> > > a common interface (although that's totally not documented anywhere.)
-> > 
-> > And this interface exists for the sole purpose of enabling KVM. Call it
-> > a hypervisor if you wish, but its usefulness is doubtful on its own.
+I'm missing the use-case when using the devfreq_suspend_device()
+before entering the suspend mode. We should consider the case when
+devfreq device
+calls the devfreq_suspend_device() directly. Because devfreq_suspend_device()
+is exported function, each devfreq device call this function on the fly
+without entering the suspend mode.
 
-IMO, the interface between EL1 and EL2 _is_ ABI. However, it should not
-be confused with a *stable* ABI like the one we expose to user. Since
-all users of the EL2 ABI live inside the kernel (either on the EL1 or
-EL2 side), we are free to change it as long as everything is updated
-simultaneously. I don't see this any different from other in-kernel ABI
-like that exposed to loadable modules (for the latter, we have the
-advantage of a partly self-documenting ABI as part of the C language).
+I correct my opinion. Your approach is necessary. I'm sorry to confuse you.
+So, I make the following patch. This patch set the suspend frequency
+in devfreq_suspend_device() after stoping the governor.
+It consider the all governors of devfreq.
 
-I would welcome some documentation for the EL2 ABI as well, especially
-since head.S and the KVM counterpart is maintained by different people.
+What do you think?
+If you are ok, I'll send this patch with your author.
 
-> What's also coming clear is that there's very few people who understand
-> all the interactions here, and the whole thing seems to be an undocumented
-> mess.  Something needs to change there - people need to stop shovelling
-> half baked crap into the kernel.  KVM have the privilege of being able to
-> push ARM stuff directly, I now see that was a very big mistake.
-> 
-> So, I want KVM further changes to come through my tree once this merge
-> window is over -
+ int devfreq_suspend_device(struct devfreq *devfreq)
+ {
++      int ret = 0;
++
+        if (!devfreq)
+        return -EINVAL;
 
-I'm afraid I strongly disagree. There are a few reasons neither you nor
-me gatekeep the KVM port: (a) the ARM KVM maintainers know a lot more
-about KVM than either of us, (b) the KVM code under arch/arm is reused
-by arm64 and (c) you or I would certainly become a bottleneck. There is
-a lot more to KVM support on ARM than the hyp stub and realistically you
-won't have the time to review all the stuff that comes your way.
+        if (!devfreq->governor)
+             return 0;
 
-Just because there is an interface between two or more pieces of code,
-it is not a strong enough argument for them to have the same gatekeeper
-(I wouldn't say maintainer since IMO this implies a lot more). That
-said, you can always advise other maintainers on how to do things right,
-ask for proper documentation (as you did), review how things are defined
-and implemented, especially when they touch code _you_ maintain.
-
-> Let's start with some documentation on the KVM hypervisor interfaces on
-> 32-bit ARM.  Documentation/virtual/kvm/hypercalls.txt already contains
-> some for x86, s390 and PPC, so that would be a good place to document
-> the ARM side.  Arguably, that should have already been done.
-
-I'm all for documenting the interface.
-
-(even though Will and I co-maintain arch/arm64, I deliberately kept his
-name out of the above as I haven't had the chance to ask for his
-opinion on this matter, which may as well differ)
-
-I have to go and pack now. Merry Christmas!
+-      return devfreq->governor->event_handler(devfreq,
++     ret = devfreq->governor->event_handler(devfreq,
+                    DEVFREQ_GOV_SUSPEND, NULL);
++      if (ret < 0) {
++           dev_err(devfreq->dev.parent, "failed to suspend governor\n");
++           return ret;
++      }
++
++      if (devfreq->suspend_freq) {
++           ret = devfreq->profile->target(devfreq->dev.parent,
++                                      &devfreq->suspend_freq, 0);
++           if (ret < 0) {
++                  dev_err(devfreq->dev.parent,
++                             "failed to set suspend-freq\n");
++                  return ret;
++           }
++           dev_dbg(devfreq->dev.parent, "Setting suspend-freq: %lu\n",
++                          devfreq->suspend_freq);
++      }
++
++      return 0;
+ }
+ EXPORT_SYMBOL(devfreq_suspend_device);
 
 -- 
-Catalin
+Best Regards,
+Chanwoo Choi
