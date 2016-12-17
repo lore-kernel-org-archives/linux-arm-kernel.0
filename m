@@ -1,34 +1,41 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 17 Dec 2016 21:37:46 +0200
-Subject: [PATCH] Documentation: dt: Explicitly mark Samsung Exynos SoC
- bindings as unstable
-In-Reply-To: <1481897676-13578-1-git-send-email-m.szyprowski@samsung.com>
-References: <1481897676-13578-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20161217193746.GA8980@kozik-lap>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sat, 17 Dec 2016 21:36:55 +0100
+Subject: [PATCH 0/5] meson-gx: reset RGMII PHYs and configure TX delay
+In-Reply-To: <20161202234739.22929-1-martin.blumenstingl@googlemail.com>
+References: <20161202234739.22929-1-martin.blumenstingl@googlemail.com>
+Message-ID: <CAFBinCDpBew7wreNPn6=J3jKsw_Ok=Ed9_+Gxsefb661RvUdrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 16, 2016 at 03:14:36PM +0100, Marek Szyprowski wrote:
-> Samsung Exynos SoCs and boards related bindings evolved since the initial
-> introduction, but initially the bindings were minimal and a bit incomplete
-> (they never described all the hardware modules available in the SoCs).
-> Since then some significant (not fully compatible) changes have been
-> already committed a few times (like gpio replaced by pinctrl, display ddc,
-> mfc reserved memory, some core clocks added to various hardware modules,
-> added more required nodes).
-> 
-> On the other side there are no boards which have device tree embedded in
-> the bootloader. Device tree blob is always compiled from the kernel tree
-> and updated together with the kernel image.
-> 
-> Thus to avoid further adding a bunch of workarounds for old/missing
-> bindings and allow to make cleanup of the existing code and device tree
-> files, lets mark Samsung Exynos SoC platform bindings as unstable. This
-> means that bindings can may change at any time and users should use the
-> dtb file compiled from the same kernel source tree as the kernel image.
+Hi Kevin,
 
-I agree but please re-send it after merge window. This is not the best
-time to start discussions about it.
+On Sat, Dec 3, 2016 at 12:47 AM, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> This partially fixes the 1000Mbit/s ethernet TX throughput issues (on
+> networks which are not affected by the EEE problem, as reported here:
+> [1]).
+> The actual problem for the TX throughput issues was that the TX delay
+> was applied twice:
+> - once "accidentally" by the PHY (this was fixed with [2])
+> - once by the MAC because there was a hardcoded TX delay (of 2ns),
+>   this will be configurable with the changes from [0]
+>
+> These are the dts changes which belong to my other series (in v2
+> these patches were part of the other series, upon request of the
+> net maintainers I have split the .dts changes into their own series so
+> we are able to take both through different trees):
+> "[PATCH net-next v3 0/2] stmmac: dwmac-meson8b: configurable
+> RGMII TX delay": [0].
+> Thus this series depends on the ACK for the binding changes in the
+> other series!
+>
+> I based these changes on my other series "[PATCH v2 0/2] GXL and GXM
+> SCPI improvements": [3]
+the DT binding changes for the meson8b-dwmac driver were ACK'ed by Rob
+Herring, so you can proceed with this series once you applied the SCPI
+patches.
 
-Best regards,
-Krzysztof
+
+Thank you!
+Regards,
+Martin
