@@ -1,77 +1,78 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 17 Dec 2016 02:20:22 +0100
-Subject: [PATCH 3/3] arm64: dts: rockchip: add clk-480m for ehci and ohci
- of rk3399
-In-Reply-To: <5853903D.8030605@rock-chips.com>
-References: <1481710301-1454-1-git-send-email-zhengxing@rock-chips.com>
- <2526685.VC5cUs58On@phil> <5853903D.8030605@rock-chips.com>
-Message-ID: <9948170.UXsXzrYPRK@phil>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 16 Dec 2016 17:46:26 -0800
+Subject: [PATCHv4 00/15] clk: ti: add support for hwmod clocks
+In-Reply-To: <4b016883-e7c9-94d8-d964-3c8dfee6ee13@ti.com>
+References: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
+ <20161028005341.GR26139@codeaurora.org>
+ <2cfa10a9-9ea0-23e4-30de-9aece13e47e3@ti.com>
+ <20161028233750.GQ16026@codeaurora.org>
+ <7371ef35-5d95-bf78-4c97-c61091a1fa4b@ti.com>
+ <148156710975.37646.2957511113527634913@resonance>
+ <20161213004914.GM5423@codeaurora.org>
+ <20161213013133.GR4920@atomide.com>
+ <148160402543.37646.6019420188689675769@resonance>
+ <4b016883-e7c9-94d8-d964-3c8dfee6ee13@ti.com>
+Message-ID: <20161217014626.GX5423@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 16. Dezember 2016, 14:57:01 CET schrieb Xing Zheng:
-> Hi Heiko, Doug,
+On 12/13, Tero Kristo wrote:
+> On 13/12/16 06:40, Michael Turquette wrote:
+> >>>On 12/12, Michael Turquette wrote:
+> >
+> >Is the goal to describe this hardware topology in DT? Is that right
+> >thing to do? I think it's cool to have this modeled *somehow* in Linux,
+> >but I'm not sure DT is the right place to model the interconnect and
+> >every device hanging off of it.
+> >
+> >I don't want to put words in Stephen's mouth, but I think the issue over
+> >whether clockdomains are CCF clock providers or some genpd thing is
+> >probably less important to him than the fact that the DT bindings are
+> >super detailed to inner workings of the SoC.
 > 
-> On 2016?12?16? 02:18, Heiko Stuebner wrote:
-> > Am Donnerstag, 15. Dezember 2016, 08:34:09 CET schrieb Doug Anderson:
-> >> I still need to digest all of the things that were added to this
-> >> thread overnight, but nothing I've seen so far indicates that you need
-> >> the post-gated clock.  AKA I still think you need to redo your patch
-> >> 
-> >> to replace:
-> >>                clocks = <&cru HCLK_HOST0>, <&cru HCLK_HOST0_ARB>,
-> >>                
-> >>                         <&cru SCLK_USBPHY0_480M_SRC>;
-> >> 
-> >> with:
-> >>                clocks = <&cru HCLK_HOST0>, <&cru HCLK_HOST0_ARB>,
-> >>                
-> >>                          <&u2phy0>;
-> >> 
-> >> Can you please comment on that?
-> > 
-> > Also, with the change, the ehci will keep the clock (and thus the phy)
-> > always on. Does the phy-autosuspend even save anything now?
-> > 
-> > In any case, could we make the clock-names entry sound nicer than
-> > usbphy0_480m please? bindings/usb/atmel-usb.txt calls its UTMI clock
-> > simply "usb_clk", but something like "utmi" should also work.
-> > While at it you could also fix up the other clock names to something like
-> > "host" and "arbiter" or so?.
-> > 
-> > 
-> > Heiko
+> Ok, so your preference would be to reduce the data under DT, and the
+> ideal approach would be a single prcm node. I think we still need to
+> keep the prm / cm1 / cm2 as separate nodes, as they are pretty
+> individual from hardware point of view, provide quite different
+> features, and they reside in some cases in quite different address
+> spaces also. Anyway, here's what I gather we should probably have in
+> DT:
 > 
-> The usbphy related clock tress like this:
+> - reset provider
+>   * example: resets = <&prm OMAP4_IVA2_RESET>;
+>   * only from 'prm' node
 > 
+> - genpd provider (for the hwmods, clockdomains, powerdomains,
+> voltage domains)
+>   * examples: power-domains = <&cm2 OMAP4_DSS_CORE_MOD>;
+> 		power-domains = <&cm2 OMAP4_DSS_CLKDM>;
+> 		power-domains = <&prm OMAP4_DSS_PWRDM>;
+> 		power-domains = <&prm OMAP4_CORE_VOLTDM>;
+>   * from all 'prm', 'cm1' and 'cm2' nodes, though 'prm' would be the
+> only one providing _CLKDM, _PWRDM, _VOLTDM genpds.
 > 
-> Actually, at drivers/phy/phy-rockchip-inno-usb2.c, we can only
-> enable/disable the master gate via GRF is PHY_PLL, not UTMI_CLK.
+> - clock provider (for anything that requires clocks)
+>   * example: clocks = <&cm1 OMAP4_DPLL_MPU_CK>;
+>   * from all 'prm', 'cm1' and 'cm2' nodes
 > 
-> And the naming style of the "hclk_host0" keep the name "hclk_host0" on
-> the clcok tree diagram:
+> This would eventually cause an ABI breakage for the clock handles,
+> if we transfer the existing clocks to this format, and remove the
+> existing clock handles from DT. Otherwise, I think we could just
+> transition the existing hwmod data to this new format only, and add
+> the clockdomain / powerdomain / voltagedomain support a bit later.
 > 
-> 
-> Therefore, could we rename the clock name like this:
-> ----
-> for usb_host0_ehci and usb_host0_ohci:
->          clocks = <&cru HCLK_HOST0>, <&cru HCLK_HOST0_ARB>,
->               <&cru SCLK_U2PHY0>;
->          clock-names = "hclk_host0", "hclk_host0_arb",
->                    "sclk_u2phy0";
-> 
-> for usb_host1_ehci and usb_host1_ohci:
->          clocks = <&cru HCLK_HOST1>, <&cru HCLK_HOST1_ARB>,
->               <&cru SCLK_U2PHY1>;
->          clock-names = "hclk_host1", "hclk_host1_arb",
->                    "sclk_u2phy1";
-> ----
-> 
-> BTW, the "arb" is an abbreviation for arbiter.
 
-clock-naming wise, the clock names in devicetree bindings should always 
-describe the clock in the context of the peripheral, not the hosts clock-tree.
+This sounds about right. Is the ABI break because we get rid of
+clock nodes and just have a few big nodes? I thought we had
+already broken DT ABI here but if we didn't then that isn't
+great. Perhaps to make things keep working we can detect the old
+style one node per clock design and register a bunch of providers
+individually from the single driver probe? It would have to match
+up the registers with a clk_hw pointer somewhere, but it should
+be possible. Alternatively, we keep both designs around for some
+time and have different compatibles and different driver entry
+points.
 
-So if the clock supplies the "arbiter" part, the clock-name should be called 
-"arbiter". Same for "utmi" and the host clock that could be named "usbhost" or 
-just "host" in the clock-names property.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
