@@ -1,52 +1,63 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 18 Dec 2016 11:57:00 +0000
-Subject: [PATCH] ARM: disallow ARM_THUMB for ARMv4 builds
-In-Reply-To: <4112999.Nl7pxYH1YF@wuerfel>
-References: <20161216091457.2452987-1-arnd@arndb.de>
- <CAKv+Gu93Gtkh7spA-HUHNKSmDjhK_nuwR9KaDu8=S2GDyhUJCA@mail.gmail.com>
- <4112999.Nl7pxYH1YF@wuerfel>
-Message-ID: <CAKv+Gu_1zbAB45SQ=702_v3H=RetLFsgknmp52iTSV9M4GSqHg@mail.gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sun, 18 Dec 2016 14:37:46 +0100
+Subject: [PATCH net-next v3 0/4] Fix OdroidC2 Gigabit Tx link issue
+In-Reply-To: <162595c2-d403-0070-3399-de03c1653065@gmail.com>
+References: <1480326409-25419-1-git-send-email-jbrunet@baylibre.com>
+ <20161129.193853.827524417068912706.davem@davemloft.net>
+ <e14a3b0c-dc34-be14-48b3-518a0ad0c080@gmail.com>
+ <20161129.201331.2207317476589573523.davem@davemloft.net>
+ <162595c2-d403-0070-3399-de03c1653065@gmail.com>
+Message-ID: <CAFBinCBxM2Kt1Q2Fo8wBx-Oxc8nRAuhPyt06mvXc4c8pUxt_4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 December 2016 at 21:51, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday, December 16, 2016 5:20:22 PM CET Ard Biesheuvel wrote:
+Hi Florian, Hi Jerome,
+
+On Wed, Nov 30, 2016 at 2:15 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 11/29/2016 05:13 PM, David Miller wrote:
+>> From: Florian Fainelli <f.fainelli@gmail.com>
+>> Date: Tue, 29 Nov 2016 16:43:20 -0800
 >>
->> Can't we use the old
+>>> On 11/29/2016 04:38 PM, David Miller wrote:
+>>>> From: Jerome Brunet <jbrunet@baylibre.com>
+>>>> Date: Mon, 28 Nov 2016 10:46:45 +0100
+>>>>
+>>>>> This patchset fixes an issue with the OdroidC2 board (DWMAC + RTL8211F).
+>>>>> The platform seems to enter LPI on the Rx path too often while performing
+>>>>> relatively high TX transfer. This eventually break the link (both Tx and
+>>>>> Rx), and require to bring the interface down and up again to get the Rx
+>>>>> path working again.
+>>>>>
+>>>>> The root cause of this issue is not fully understood yet but disabling EEE
+>>>>> advertisement on the PHY prevent this feature to be negotiated.
+>>>>> With this change, the link is stable and reliable, with the expected
+>>>>> throughput performance.
+>>>>>
+>>>>> The patchset adds options in the generic phy driver to disable EEE
+>>>>> advertisement, through device tree. The way it is done is very similar
+>>>>> to the handling of the max-speed property.
+>>>>
+>>>> Patches 1-3 applied to net-next, thanks.
+>>>
+>>> Meh, there was a v4 submitted shortly after, and I objected to the whole
+>>> idea of using that kind of Device Tree properties to disable EEE, we can
+>>> send reverts though..
 >>
->> tst lr, #1
->> moveq pc, lr
->> bx lr
->>
->> trick? (where bx lr needs to be emitted as a plain opcode to hide it
->> from the assembler)
->>
+>> Sorry, I lost this in all the discussion, I can revert.
 >
-> Yes, that should work around the specific problem in theory, but back
-> when Jonas tried it, it still didn't work. There may also be other
-> problems in that configuration.
+> Yeah, I can understand why, these freaking PHYs tend to generate a lot
+> of noise and discussion...
 >
+>>
+>> Just send me a revert of the entire merge commit
+>> a152c91889556df17ca6d8ea134fb2cb4ac9f893 with a short
+>> description of why and I'll apply it.
+>
+> OK, I will talk with Jerome first to make sure that we are in agreement
+> with the solution to deploy to fix the OdroidC2 problem first.
+simply because I'm curious: what was the outcome of your discussion?
+can we stay with the current solution or are any changes required?
 
-This should do the trick as well, I think:
 
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 9f157e7c51e7..3bfb32010234 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -835,7 +835,12 @@ ENDPROC(__switch_to)
-
-        .macro  usr_ret, reg
- #ifdef CONFIG_ARM_THUMB
-+#ifdef CONFIG_CPU_32v4
-+       str     \reg, [sp, #-4]!
-+       ldr     pc, [sp], #4
-+#else
-        bx      \reg
-+#endif
- #else
-        ret     \reg
- #endif
-
-with the added benefit that we don't clobber the N and Z flags. Of
-course, this will result in all CPUs using a non-optimal sequence if
-support for v4 is compiled in.
+Regards,
+Martin
