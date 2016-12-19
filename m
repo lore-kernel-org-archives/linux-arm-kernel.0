@@ -1,32 +1,34 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 19 Dec 2016 20:03:56 +0200
-Subject: [PATCH v8 1/8] soc: samsung: add exynos chipid driver support
-In-Reply-To: <9b64f5c0-e289-9091-c784-ae4bfad3caf5@samsung.com>
-References: <1481375323-29724-1-git-send-email-pankaj.dubey@samsung.com>
- <1481375323-29724-2-git-send-email-pankaj.dubey@samsung.com>
- <CGME20161219120000epcas1p1904dfec707de0ce20341279f354d74dc@epcas1p1.samsung.com>
- <ceba534d-108d-9ac4-d29c-c2a55af49849@fivetechno.de>
- <9b64f5c0-e289-9091-c784-ae4bfad3caf5@samsung.com>
-Message-ID: <CAJKOXPciOBSWFxcB-sYAXwFdyXqKzs=5duZBPjsL2gtt1Xz-cw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 19 Dec 2016 19:41:30 +0100
+Subject: [PATCH] ARM: dts: imx: Pass an empty 'chosen' node
+In-Reply-To: <1482161298-32624-1-git-send-email-fabio.estevam@nxp.com>
+References: <1482161298-32624-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <20161219184130.o2dpr7lie256hq76@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2016 at 3:29 PM, pankaj.dubey <pankaj.dubey@samsung.com> wrote:
->
-> Hi Markus,
->
-> On Monday 19 December 2016 05:29 PM, Markus Reichl wrote:
-> > Hi Pankaj,
-> >
-> > tested your patches 1/8 and 2/8 + Javiers diff for verbose output:
-> > https://www.spinics.net/lists/linux-samsung-soc/msg56576.html
-> >
-> > on Odroid U3:
-> > [    0.080178] Exynos: CPU[UNKNOWN] CPU_REV[0x20] PKG_ID[0x602d058] AUX_INFO[0x0]
-> > on Odroid X:
-> > [    0.080169] Exynos: CPU[UNKNOWN] CPU_REV[0x11] PKG_ID[0x1b0f6008] AUX_INFO[0x0]
+Hello,
 
-Hmm.... this needs fixes.
+On Mon, Dec 19, 2016 at 01:28:18PM -0200, Fabio Estevam wrote:
+> Commit 7f107887d199 ("ARM: dts: imx: Remove skeleton.dtsi") causes boot
+> issues when the bootloader does not create a 'chosen' node if such node
+> is not present in the dtb.
+> 
+> The reason for the boot failure is well explained by Javier Martinez
+> Canillas: "the decompressor relies on a pre-existing chosen node to be
+> available to insert the command line and merge other ATAGS info."
+> 
+> , so pass an empty 'chosen' node to fix the boot problem.
+> 
+> This issue has been seen in the kernelci reports with Barebox as
+> bootloader.
 
-Best regards,
-Krzysztof
+wouldn't it be better to fix the decompressor code to eventually create
+the /chosen node when it doesn't exist?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
