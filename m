@@ -1,47 +1,101 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 19 Dec 2016 16:16:47 +0100
-Subject: [PATCH net-next v4 2/4] dt-bindings: net: add EEE capability
- constants
-In-Reply-To: <20161205143942.f3w6nmp3jvmrk5es@rob-hp-laptop>
-References: <1480348229-25672-1-git-send-email-jbrunet@baylibre.com>
- <1480348229-25672-3-git-send-email-jbrunet@baylibre.com>
- <20161205143942.f3w6nmp3jvmrk5es@rob-hp-laptop>
-Message-ID: <1482160607.5163.16.camel@baylibre.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Mon, 19 Dec 2016 23:22:12 +0800
+Subject: Problems to Allwinner H3's eFUSE/SID
+Message-ID: <136061482160932@web34j.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi everyone,
 
-First, Thx for this information and sorry for this late reply
-As you may have seen yourself, there was little bit of confusion while
-discussing this patch series.
+Today, I and KotCzarny on IRC of linux-sunxi found a problem in the SID
+controller of H3 (incl. H2+).
 
-The point is the v3 was applied before your reply (patches 2 and 3 not
-combined unfortunately).
-Because of this confusion, the series needed a few fixes witch removes
-the previously added bindings [0].
-This time, I made sure to modify (remove) the bindings along with the
-documentation.
+See https://irclog.whitequark.org/linux-sunxi/2016-12-19 .
 
-[0]:?http://lkml.kernel.org/r/1482159938-13239-1-git-send-email-jbrunet
-@baylibre.com
+Two read method of the H3 eFUSE is used in the BSP: by register accessing, or
+directly access 0x01c14200.
 
-Cheers
-Jerome
+>From http://linux-sunxi.org/SID_Register_Guide we can see a difference between
+the H3 SIDs read out by sunxi-fel and the H3 SIDs read out by devmem2 (in
+legacy kernel).
 
-On Mon, 2016-12-05 at 08:39 -0600, Rob Herring wrote:
-> On Mon, Nov 28, 2016 at 04:50:26PM +0100, Jerome Brunet wrote:
-> > 
-> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> > Tested-by: Yegor Yefremov <yegorslists@googlemail.com>
-> > Tested-by: Andreas F?rber <afaerber@suse.de>
-> > Tested-by: Neil Armstrong <narmstrong@baylibre.com>
-> > ---
-> > ?include/dt-bindings/net/mdio.h | 19 +++++++++++++++++++
-> > ?1 file changed, 19 insertions(+)
-> > ?create mode 100644 include/dt-bindings/net/mdio.h
-> 
-> Seems changes are wanted on this, but patches 2 and 3 should be?
-> combined. The header is part of the binding doc.
-> 
-> Rob
+According to the source of H2+ BSP[1], H2+ and H3 can be differed by the last
+byte of the first word of SID. (0x42 and 0x83 is H2+, 0x00 and 0x81 is H3,
+0x58 is H3D (currently not known SoC) )
+
+However, all the SIDs retrieved by `sunxi-fel sid`, both H2+ and H3, start
+with 0x02004620, which do not match this rule.
+
+The readout by devmem2 is satisfying this rule: their first word is
+0x02c00081, matches H3.
+
+Then I found the SID-reading code from BSP U-Boot[2], which is based on
+register operations. With this kind of code (I wrote one prototype in
+userspace with /dev/mem), I got "02c00081 74004620 50358720 3c27048e" on
+my Orange Pi One. ("02004620 74358720 5027048e 3c0000c3" with sunxi-fel sid)
+And, after accessing to the SID by registers, the value of *0x01c14200 become
+also "02c00081".
+
+With direct access to 0x01c14200 after boot with mainline kernel, I got also
+"02004620".
+
+Then I altered the program to do the register operations with sunxi-fel, the
+result is also "02c00081", and changed `sunxi-fel sid` result to "02c00081".
+
+Summary:
+
++-----------------------------------------------+----------------+
+| Read situation                                | The first word |
++-----------------------------------------------+----------------+
+| Direct read by sunxi-fel                      | 02004620       |
+| Direct read in mainline /dev/mem              | 02004620       |
+| Direct read in legacy /dev/mem                | 02c00081       |
+| Register access in FEL                        | 02c00081       |
+| Register access in mainline                   | 02c00081       |
+| Direct read after register access in FEL      | 02c00081       |
+| Direct read after register access in mainline | 02c00081       |
++-----------------------------------------------+----------------+
+
+According to some facts:
+- The register based access to SID is weird: it needs ~5 register
+  operations per word of SID.
+- Reading via register access will change the value when reading by accessing
+  0x01c14200.
+- In the u-boot code[2] there's some functions which read out the SID by
+  registers and then abandoned the value.
+- This mismatch do not exist on A64.
+
+I think that: Allwinner designed a "cache" to the SID to make the simplify the
+code to read it, and it automatically loaded the cache when booting; however,
+when doing first cache on H3, some byte shifts occured, and the value become
+wrong. A manual read on H3 can make the cache right again. This is a silicon
+bug, and fixed in A64.
+
+This raises a problem: currently many systems has used the misread SID value to
+generated lots of MAC addresses, and workaround this SID bug will change them.
+
+However, if this bug is not workarounded, the sun8i-ths driver won't work well
+(as some calibartion value lies in eFUSE). I think some early user of this
+driver has already experienced bad readout value.
+(The calibration value differs on my opi1 and KotCzarny's opipc)
+
+And many wrong SID values have been generated by `sunxi-fel sid`. (Although I
+think sunxi-fel must have the workaround)
+
+Note: in this email, "SID" and "eFUSE" both indicate the controller on H3/A64
+at 0x01c14000, which is a OTP memory implemented by eFUSE technique.
+
+Furthermore, A83T may also have this problem, testers are welcome!
+
+[1] http://filez.zoobab.com/allwinner/h2/201609022/lichee/linux-3.4/arch/arm/mach-sunxi/sun8i.c
+[2] http://filez.zoobab.com/allwinner/h2/201609022/lichee/brandy/u-boot-2011.09/arch/arm/cpu/armv7/sun8iw7/efuse.c
+
+Experiments:
+- https://gist.github.com/Icenowy/2f4859ab1bc05814522fc7445179a8c9
+  A SID readout shell script via FEL with register access.
+- https://31.135.195.151:20281/d/efuse/
+  A SID readout program via /dev/mem with register access by KotCzarny.
+  (with statically compiled binary)
+
+Regards,
+Icenowy
