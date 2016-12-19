@@ -1,42 +1,32 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 19 Dec 2016 09:47:37 -0800
-Subject: [PATCH] clocksource: arm_arch_timer: print timer value at init time
-Message-ID: <1482169657-15773-1-git-send-email-olof@lixom.net>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 19 Dec 2016 20:03:56 +0200
+Subject: [PATCH v8 1/8] soc: samsung: add exynos chipid driver support
+In-Reply-To: <9b64f5c0-e289-9091-c784-ae4bfad3caf5@samsung.com>
+References: <1481375323-29724-1-git-send-email-pankaj.dubey@samsung.com>
+ <1481375323-29724-2-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20161219120000epcas1p1904dfec707de0ce20341279f354d74dc@epcas1p1.samsung.com>
+ <ceba534d-108d-9ac4-d29c-c2a55af49849@fivetechno.de>
+ <9b64f5c0-e289-9091-c784-ae4bfad3caf5@samsung.com>
+Message-ID: <CAJKOXPciOBSWFxcB-sYAXwFdyXqKzs=5duZBPjsL2gtt1Xz-cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is useful to get an indication of how much time we spent in firmware.
+On Mon, Dec 19, 2016 at 3:29 PM, pankaj.dubey <pankaj.dubey@samsung.com> wrote:
+>
+> Hi Markus,
+>
+> On Monday 19 December 2016 05:29 PM, Markus Reichl wrote:
+> > Hi Pankaj,
+> >
+> > tested your patches 1/8 and 2/8 + Javiers diff for verbose output:
+> > https://www.spinics.net/lists/linux-samsung-soc/msg56576.html
+> >
+> > on Odroid U3:
+> > [    0.080178] Exynos: CPU[UNKNOWN] CPU_REV[0x20] PKG_ID[0x602d058] AUX_INFO[0x0]
+> > on Odroid X:
+> > [    0.080169] Exynos: CPU[UNKNOWN] CPU_REV[0x11] PKG_ID[0x1b0f6008] AUX_INFO[0x0]
 
-It's not guaranteed that the timer started at 0 on reset, so it's just
-an approximation, and might very well be invalid on some systems. But
-it's still a useful metric to have access to.
+Hmm.... this needs fixes.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- drivers/clocksource/arm_arch_timer.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 02fef68..c26078b 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -521,6 +521,8 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
- 
- static void arch_timer_banner(unsigned type)
- {
-+	unsigned long cnt = arch_timer_read_counter();
-+
- 	pr_info("Architected %s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
- 		     type & ARCH_CP15_TIMER ? "cp15" : "",
- 		     type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  " and " : "",
-@@ -534,6 +536,8 @@ static void arch_timer_banner(unsigned type)
- 		     type & ARCH_MEM_TIMER ?
- 			arch_timer_mem_use_virtual ? "virt" : "phys" :
- 			"");
-+	pr_info("Initial timer value: 0x%lx: %ld.%02lds\n",
-+		cnt, cnt/arch_timer_rate, (cnt/(arch_timer_rate/100)) % 100);
- }
- 
- u32 arch_timer_get_rate(void)
--- 
-2.8.0.rc3.29.gb552ff8
+Best regards,
+Krzysztof
