@@ -1,71 +1,96 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 19 Dec 2016 15:19:20 +0100
-Subject: [PATCH] drm: tilcdc: simplify the recovery from sync lost error
- on rev1
-In-Reply-To: <590211f1-8e31-cecc-8dd2-f7e2976b81d1@ti.com>
-References: <1481641656-25227-1-git-send-email-bgolaszewski@baylibre.com>
- <590211f1-8e31-cecc-8dd2-f7e2976b81d1@ti.com>
-Message-ID: <CAMpxmJVHXoP0BokfbPwQmC=eBaNfS5yfG77EB_MnScmSbUVAdA@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 19 Dec 2016 22:24:44 +0800
+Subject: [PATCH] ARM: dts: sun8i-q8-common: enable bluetooth on SDIO Wi-Fi
+In-Reply-To: <11985541482156512@web2g.yandex.ru>
+References: <20161213233658.atGuNCNY@smtp1h.mail.yandex.net>
+ <20161216124748.rkvnnlo4x5onzpvk@lukather> <4720181481899200@web7g.yandex.ru>
+ <20161219100952.bspym36nsehda3za@lukather> <11985541482156512@web2g.yandex.ru>
+Message-ID: <CAGb2v67wU+Hw-6oa9FxzB33sZY8Up-59HZ_mneFBdcRhXbU1pA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-12-19 14:09 GMT+01:00 Jyri Sarha <jsarha@ti.com>:
-> One comment bellow.
+On Mon, Dec 19, 2016 at 10:08 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
 >
-> On 12/13/16 17:07, Bartosz Golaszewski wrote:
->> Revision 2 of LCDC suffers from an issue where a SYNC_LOST error
->> caused by limited memory bandwidth may leave the picture shifted a
->> couple pixels to the right.
+>
+> 19.12.2016, 18:09, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>> On Fri, Dec 16, 2016 at 10:40:00PM +0800, Icenowy Zheng wrote:
+>>>  >>  > >  &r_pio {
+>>>  >>  > >  wifi_pwrseq_pin_q8: wifi_pwrseq_pin at 0 {
+>>>  >>  > > - pins = "PL6", "PL7", "PL11";
+>>>  >>  > > + pins = "PL6", "PL7", "PL8", "PL11";
+>>>  >>  > >  function = "gpio_in";
+>>>  >>  > >  bias-pull-up;
+>>>  >>  > >  };
+>>>  >>  >
+>>>  >>  > There's several things wrong here. The first one is that you rely
+>>>  >>  > solely on the pinctrl state to maintain a reset line. This is very
+>>>  >>  > fragile (especially since the GPIO pinctrl state are likely to go away
+>>>  >>  > at some point), but it also means that if your driver wants to recover
+>>>  >>  > from that situation at some point, it won't work.
+>>>  >>  >
+>>>  >>  > The other one is that the bluetooth and wifi chips are two devices in
+>>>  >>  > linux, and you assign that pin to the wrong device (wifi).
+>>>  >>  >
+>>>  >>  > rfkill-gpio is made just for that, so please use it.
+>>>  >>
+>>>  >>  The GPIO is not for the radio, but for the full Bluetooth part.
+>>>  >
+>>>  > I know.
+>>>  >
+>>>  >>  If it's set to 0, then the bluetooth part will reset, and the
+>>>  >>  hciattach will fail.
+>>>  >
+>>>  > Both rfkill-gpio and rfkill-regulator will shutdown when called
+>>>  > (either by poking the reset pin or shutting down the regulator), so
+>>>  > that definitely seems like an expected behavior to put the device in
+>>>  > reset.
+>>>  >
+>>>  >>  The BSP uses this as a rfkill, and the result is that the bluetooth
+>>>  >>  on/off switch do not work properly.
+>>>  >
+>>>  > Then rfkill needs fixing, but working around it by hoping that the
+>>>  > core will probe an entirely different device, and enforcing a default
+>>>  > that the rest of the kernel might or might not change is both fragile
+>>>  > and wrong.
+>>>
+>>>  I think a rfkill-gpio here works just like the BSP rfkill...
+>>>
+>>>  The real problem is that the Realtek UART bluetooth driver is a userspace
+>>>  program (a modified hciattach), which is not capable of the GPIO reset...
 >>
->> This issue has not been observed on revision 1, while the recovery
->> mechanism introduces a different issue, where the END_OF_FRAME
->> interrupt doesn't fire while drm is waiting for vblanks.
+>> Can't you run rfkill before attaching? What is the problem exactly?
+>> It's not in reset for long enough?
 >>
->> On rev1: recover from sync lost errors by simply clearing the
->> RASTER_ENABLE bit in the RASTER_CTRL register and re-enabling it
->> again as is suggested by the datasheet.
->>
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
->>  drivers/gpu/drm/tilcdc/tilcdc_crtc.c | 24 +++++++++++++++---------
->>  1 file changed, 15 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/tilcdc/tilcdc_crtc.c b/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
->> index 9942b05..70e57a7 100644
->> --- a/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
->> +++ b/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
->> @@ -921,17 +921,23 @@ irqreturn_t tilcdc_crtc_irq(struct drm_crtc *crtc)
->>               dev_err_ratelimited(dev->dev, "%s(0x%08x): Sync lost",
->>                                   __func__, stat);
->>               tilcdc_crtc->frame_intact = false;
->> -             if (tilcdc_crtc->sync_lost_count++ >
->> -                 SYNC_LOST_COUNT_LIMIT) {
->> -                     dev_err(dev->dev, "%s(0x%08x): Sync lost flood detected, recovering", __func__, stat);
->> -                     queue_work(system_wq, &tilcdc_crtc->recover_work);
->> -                     if (priv->rev == 1)
->> -                             tilcdc_clear(dev, LCDC_RASTER_CTRL_REG,
->> -                                          LCDC_V1_SYNC_LOST_INT_ENA);
->> -                     else
->> +             if (priv->rev == 1) {
+>> This seems more and more like an issue in the BT stack you're
+>> using. We might consider workarounds in the kernel, but they have to
+>> be correct.
 >
-> I would add here:
-> +               if ((tilcdc_read(dev, LCDC_RASTER_CTRL_REG) &
-> +                               LCDC_RASTER_ENABLE)) {
+> One more rfkill interface will be generated for hci0 after hciattach, which can
+> be safely toggled block and unblock.
 >
->> +                     tilcdc_clear(dev,
->> +                                  LCDC_RASTER_CTRL_REG, LCDC_RASTER_ENABLE);
->> +                     tilcdc_set(dev,
->> +                                LCDC_RASTER_CTRL_REG, LCDC_RASTER_ENABLE);
-> +               }
+> However, if the GPIO is toggled down, the hciattach program will die.
 >
-> Just in case the interrupt is for some reason handled right after the
-> crtc is disabled.
->
-> With this addition I could send a pull request for this fix still today,
-> if you agree with the change.
+> The bluetooth stack I used is fd.o's BlueZ.
 
-I'm not sure this can really happen, but it won't hurt either, so I'll
-send a v2.
+I think the bigger issue is that the tty/serial subsystem does not have
+power sequencing support. Here we're trying to use rfkill to do that,
+but that doesn't seem to be what it was intended for. It might work with
+standalone USB bluetooth controllers that don't need any special setup,
+since the device will just appear and get registered. But it might not
+work so well with UART based adapters that need userspace fiddling with
+firmware and hciattach.
 
-Thanks,
-Bartosz
+And like Icenowy mentioned, the bluetooth stack registers another rfkill
+control, which presumable just blocks transmissions.
+
+Regards
+ChenYu
+
+>
+>>
+>> Maxime
+>>
+>> --
+>> Maxime Ripard, Free Electrons
+>> Embedded Linux and Kernel engineering
+>> http://free-electrons.com
