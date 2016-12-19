@@ -1,140 +1,60 @@
-From: m.reichl@fivetechno.de (Markus Reichl)
-Date: Mon, 19 Dec 2016 10:14:04 +0100
-Subject: [PATCH] ARM: dts: Add missing CPU frequencies for Exynos5422/5800
-In-Reply-To: <f4f0dd96-abf1-d1ba-86a6-99f216b5175b@osg.samsung.com>
-References: <5220084.l31t5oJbsy@amdc3058>
- <CGME20161213191823epcas5p346582b73ad9b401d9e773a1b076f1f61@epcas5p3.samsung.com>
- <26ffeee4-ff43-b3d3-3267-5fcbc50e2974@osg.samsung.com>
- <2340115.HEG9AYUCMD@amdc3058>
- <CAD=FV=W6R8cNuR+gTnNRF6d-TNgzUeYTwuCp27efoMsd0YOH3g@mail.gmail.com>
- <20161216073720.GA3489@kozik-lap>
- <1b6e8d3a-ec7a-db5d-dd0e-ef9d1480f80a@fivetechno.de>
- <f4f0dd96-abf1-d1ba-86a6-99f216b5175b@osg.samsung.com>
-Message-ID: <027dfa2d-487a-e360-6e4a-4fc44f6622fa@fivetechno.de>
+From: jerry.huang@nxp.com (Changming Huang)
+Date: Mon, 19 Dec 2016 17:25:52 +0800
+Subject: [PATCH v3 1/3] USB3/DWC3: Add definition for global soc bus
+ configuration register
+Message-ID: <1482139554-13618-1-git-send-email-jerry.huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+Add the macro definition for global soc bus configuration register 0/1
 
-Am 16.12.2016 um 17:22 schrieb Javier Martinez Canillas:
-> Hello Markus,
-> 
-> On 12/16/2016 06:08 AM, Markus Reichl wrote:
->> Am 16.12.2016 um 08:37 schrieb Krzysztof Kozlowski:
->>> On Thu, Dec 15, 2016 at 04:52:58PM -0800, Doug Anderson wrote:
->>>>> [ I added Arjun to Cc:, maybe he can help in explaining this issue
->>>>>   (unfortunately Inderpal's email is no longer working). ]
->>>>>
->>>>> Please also note that on Exynos5422/5800 SoCs the same ARM rail
->>>>> voltage is used for 1.9 GHz & 2.0 GHz OPPs as for the 1.8 GHz one.
->>>>> IOW if the problem exists it is already present in the mainline
->>>>> kernel.
->>>>
->>>> Interesting.  In the ChromeOS tree I see significantly higher voltages
->>>> needed...  Note that one might naively look at
->>>> <https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/drivers/cpufreq/exynos5420-cpufreq.c#178>.
->>>>
->>>> 1362500, /* L0  2100 */
->>>> 1312500, /* L1  2000 */
->>>>
->>>> ..but, amazingly enough those voltages aren't used at all.  Surprise!
->>>>
->>>> I believe that the above numbers are actually not used and the ASV
->>>> numbers are used instead.  See
->>>> <https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/arch/arm/mach-exynos/include/mach/asv-exynos542x.h#452>
->>>>
->>>> { 2100000,
->>>> 1350000, 1350000, 1350000, 1350000, 1350000,
->>>> 1337500, 1325000, 1312500, 1300000, 1287500,
->>>> 1275000, 1262500, 1250000, 1237500 },
->>>>
->>>> I believe that interpretation there is: some bins of the CPU can run
->>>> at 2.1 GHz just fine at 1.25 V but others need up to 1.35V.
->>>
->>> That is definitely the case. One could just look at vendors ASV table
->>> (for 1.9 GHz):
->>> { 1900000, 1300000, 1287500, 1262500, 1237500, 1225000, 1212500,
->>>                     1200000, 1187500, 1175000, 1162500, 1150000,
->>> 		             1137500, 1125000, 1112500, 1112500},
->>>
->>> The theoretical difference is up to 1.875V! From my experiments I saw
->>> BIN1 chips which should be the same... but some working on 1.2V, some on
->>> 1.225V (@1.9 GHz). I didn't see any requiring higher voltages but that
->>> does not mean that there aren't such...
->>>
->>>> ...so if you're running at 2.1 GHz at 1.25V then perhaps you're just
->>>> running on a CPU from a nice bin?
->>
->> I've been running the proposed frequency/voltage combinations without any
->> stability problems on my XU4, XU3 and even XU3-lite ( I did not delete the
->> nodes on XU3-lite dts) with make -j8 kernel and ssvb-cpuburn.
->> The chips are poorly cooled, especially the XU4 and quickly step down.
->>
->>>
->>> Would be nice to see a dump of PKG_ID and AUX_INFO chipid registers
->>> along with name of tested board. Because the "Tested on XU3" is not
->>> sufficient.
->>
->> If you point me to how to read these values out, I will publish them.
->>
-> 
-> You can use the exynos-chipid driver posted by Pankaj. Apply patches 1 and
-> 2 from this series (http://www.spinics.net/lists/arm-kernel/msg548384.html)
-> and then this diff to get the values of the registers that Krzysztof asked:
-> 
-Thanks for the code.
+Signed-off-by: Changming Huang <jerry.huang@nxp.com>
+---
+Changes in v3:
+  - no change
+Changes in v2:
+  - split the patch
+  - add more macro definition for soc bus configuration register
 
-XU4:	 [    0.080039] Exynos: CPU[EXYNOS5800] CPU_REV[0x1] PKG_ID[0x1c04832a] AUX_INFO[0x43] 
-XU3:	 [    0.080034] Exynos: CPU[EXYNOS5800] CPU_REV[0x1] PKG_ID[0x1604832a] AUX_INFO[0x43] 
-XU3-lite:[    0.080033] Exynos: CPU[EXYNOS5800] CPU_REV[0x1] PKG_ID[0x5a12832a] AUX_INFO[0x13000054] 
+ drivers/usb/dwc3/core.h |   26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-Servus,
---
-Markus Reichl
-
-> diff --git a/drivers/soc/samsung/exynos-chipid.c b/drivers/soc/samsung/exynos-chipid.c
-> index cf0128b18ee2..49fa76ec6d49 100644
-> --- a/drivers/soc/samsung/exynos-chipid.c
-> +++ b/drivers/soc/samsung/exynos-chipid.c
-> @@ -22,6 +22,9 @@
->  #define EXYNOS_MAINREV_MASK	(0xF << 0)
->  #define EXYNOS_REV_MASK		(EXYNOS_SUBREV_MASK | EXYNOS_MAINREV_MASK)
->  
-> +#define EXYNOS_PKG_ID		0x04
-> +#define EXYNOS_AUX_INFO		0x1C
-> +
->  static const struct exynos_soc_id {
->  	const char *name;
->  	unsigned int id;
-> @@ -71,6 +74,8 @@ int __init exynos_chipid_early_init(void)
->  	const struct of_device_id *match;
->  	u32 product_id;
->  	u32 revision;
-> +	u32 pkg_id;
-> +	u32 aux_info;
->  
->  	np = of_find_matching_node_and_match(NULL,
->  			of_exynos_chipid_ids, &match);
-> @@ -84,6 +89,8 @@ int __init exynos_chipid_early_init(void)
->  
->  	product_id  = readl_relaxed(exynos_chipid_base);
->  	revision = product_id & EXYNOS_REV_MASK;
-> +	pkg_id = readl_relaxed(exynos_chipid_base + EXYNOS_PKG_ID);
-> +	aux_info = readl_relaxed(exynos_chipid_base + EXYNOS_AUX_INFO);
->  	iounmap(exynos_chipid_base);
->  
->  	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-> @@ -100,8 +107,8 @@ int __init exynos_chipid_early_init(void)
->  	soc_dev_attr->soc_id = product_id_to_soc_id(product_id);
->  
->  
-> -	pr_info("Exynos: CPU[%s] CPU_REV[0x%x] Detected\n",
-> -			product_id_to_soc_id(product_id), revision);
-> +	pr_info("Exynos: CPU[%s] CPU_REV[0x%x] PKG_ID[0x%x] AUX_INFO[0x%x] \n",
-> +		product_id_to_soc_id(product_id), revision, pkg_id, aux_info);
->  
->  	soc_dev = soc_device_register(soc_dev_attr);
->  	if (IS_ERR(soc_dev)) {
-> 
-> Best regards,
-> 
+diff --git a/drivers/usb/dwc3/core.h b/drivers/usb/dwc3/core.h
+index de5a857..065aa6f 100644
+--- a/drivers/usb/dwc3/core.h
++++ b/drivers/usb/dwc3/core.h
+@@ -161,6 +161,32 @@
+ 
+ /* Bit fields */
+ 
++/* Global SoC Bus Configuration Register 0 */
++#define AXI3_CACHE_TYPE_AW		0x8 /* write allocate */
++#define AXI3_CACHE_TYPE_AR		0x4 /* read allocate */
++#define AXI3_CACHE_TYPE_SNP		0x2 /* cacheable */
++#define AXI3_CACHE_TYPE_BUF		0x1 /* bufferable */
++#define DWC3_GSBUSCFG0_DATARD_SHIFT	28
++#define DWC3_GSBUSCFG0_DESCRD_SHIFT	24
++#define DWC3_GSBUSCFG0_DATAWR_SHIFT	20
++#define DWC3_GSBUSCFG0_DESCWR_SHIFT	16
++#define DWC3_GSBUSCFG0_SNP_MASK		0xffff0000
++#define DWC3_GSBUSCFG0_DATABIGEND	(1 << 11)
++#define DWC3_GSBUSCFG0_DESCBIGEND	(1 << 10)
++#define DWC3_GSBUSCFG0_INCR256BRSTENA	(1 << 7) /* INCR256 burst */
++#define DWC3_GSBUSCFG0_INCR128BRSTENA	(1 << 6) /* INCR128 burst */
++#define DWC3_GSBUSCFG0_INCR64BRSTENA	(1 << 5) /* INCR64 burst */
++#define DWC3_GSBUSCFG0_INCR32BRSTENA	(1 << 4) /* INCR32 burst */
++#define DWC3_GSBUSCFG0_INCR16BRSTENA	(1 << 3) /* INCR16 burst */
++#define DWC3_GSBUSCFG0_INCR8BRSTENA	(1 << 2) /* INCR8 burst */
++#define DWC3_GSBUSCFG0_INCR4BRSTENA	(1 << 1) /* INCR4 burst */
++#define DWC3_GSBUSCFG0_INCRBRSTENA	(1 << 0) /* undefined length enable */
++#define DWC3_GSBUSCFG0_INCRBRST_MASK	0xff
++
++/* Global SoC Bus Configuration Register 1 */
++#define DWC3_GSBUSCFG1_1KPAGEENA	(1 << 12) /* 1K page boundary enable */
++#define DWC3_GSBUSCFG1_PTRANSLIMIT_MASK	0xf00
++
+ /* Global Debug Queue/FIFO Space Available Register */
+ #define DWC3_GDBGFIFOSPACE_NUM(n)	((n) & 0x1f)
+ #define DWC3_GDBGFIFOSPACE_TYPE(n)	(((n) << 5) & 0x1e0)
+-- 
+1.7.9.5
