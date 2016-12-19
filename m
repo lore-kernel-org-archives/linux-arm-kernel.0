@@ -1,90 +1,43 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 19 Dec 2016 08:22:07 +0200
-Subject: [PATCHv4 00/15] clk: ti: add support for hwmod clocks
-In-Reply-To: <20161217014626.GX5423@codeaurora.org>
-References: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
- <20161028005341.GR26139@codeaurora.org>
- <2cfa10a9-9ea0-23e4-30de-9aece13e47e3@ti.com>
- <20161028233750.GQ16026@codeaurora.org>
- <7371ef35-5d95-bf78-4c97-c61091a1fa4b@ti.com>
- <148156710975.37646.2957511113527634913@resonance>
- <20161213004914.GM5423@codeaurora.org> <20161213013133.GR4920@atomide.com>
- <148160402543.37646.6019420188689675769@resonance>
- <4b016883-e7c9-94d8-d964-3c8dfee6ee13@ti.com>
- <20161217014626.GX5423@codeaurora.org>
-Message-ID: <88baee5e-48c3-f0d3-de5e-8e578fab0aa4@ti.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Mon, 19 Dec 2016 12:43:45 +0530
+Subject: [PATCH V2 0/2] kexec-tools: arm64: Enable D-cache in purgatory
+Message-ID: <cover.1482129830.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/12/16 03:46, Stephen Boyd wrote:
-> On 12/13, Tero Kristo wrote:
->> On 13/12/16 06:40, Michael Turquette wrote:
->>>>> On 12/12, Michael Turquette wrote:
->>>
->>> Is the goal to describe this hardware topology in DT? Is that right
->>> thing to do? I think it's cool to have this modeled *somehow* in Linux,
->>> but I'm not sure DT is the right place to model the interconnect and
->>> every device hanging off of it.
->>>
->>> I don't want to put words in Stephen's mouth, but I think the issue over
->>> whether clockdomains are CCF clock providers or some genpd thing is
->>> probably less important to him than the fact that the DT bindings are
->>> super detailed to inner workings of the SoC.
->>
->> Ok, so your preference would be to reduce the data under DT, and the
->> ideal approach would be a single prcm node. I think we still need to
->> keep the prm / cm1 / cm2 as separate nodes, as they are pretty
->> individual from hardware point of view, provide quite different
->> features, and they reside in some cases in quite different address
->> spaces also. Anyway, here's what I gather we should probably have in
->> DT:
->>
->> - reset provider
->>   * example: resets = <&prm OMAP4_IVA2_RESET>;
->>   * only from 'prm' node
->>
->> - genpd provider (for the hwmods, clockdomains, powerdomains,
->> voltage domains)
->>   * examples: power-domains = <&cm2 OMAP4_DSS_CORE_MOD>;
->> 		power-domains = <&cm2 OMAP4_DSS_CLKDM>;
->> 		power-domains = <&prm OMAP4_DSS_PWRDM>;
->> 		power-domains = <&prm OMAP4_CORE_VOLTDM>;
->>   * from all 'prm', 'cm1' and 'cm2' nodes, though 'prm' would be the
->> only one providing _CLKDM, _PWRDM, _VOLTDM genpds.
->>
->> - clock provider (for anything that requires clocks)
->>   * example: clocks = <&cm1 OMAP4_DPLL_MPU_CK>;
->>   * from all 'prm', 'cm1' and 'cm2' nodes
->>
->> This would eventually cause an ABI breakage for the clock handles,
->> if we transfer the existing clocks to this format, and remove the
->> existing clock handles from DT. Otherwise, I think we could just
->> transition the existing hwmod data to this new format only, and add
->> the clockdomain / powerdomain / voltagedomain support a bit later.
->>
->
-> This sounds about right. Is the ABI break because we get rid of
-> clock nodes and just have a few big nodes?
+It takes more that 2 minutes to verify SHA in purgatory when vmlinuz image
+is around 13MB and initramfs is around 30MB. It takes more than 20 second
+even when we have -O2 optimization enabled. However, if dcache is enabled
+during purgatory execution then, it takes just a second in SHA
+verification.
 
-In the above plan, the ABI breakage is because we get rid of the 
-existing clock nodes and replace everything with a single (or few) clock 
-provider nodes.
+Therefore, these patches adds support for dcache enabling facility during
+purgatory execution.
 
-> I thought we had
-> already broken DT ABI here but if we didn't then that isn't
-> great. Perhaps to make things keep working we can detect the old
-> style one node per clock design and register a bunch of providers
-> individually from the single driver probe?  It would have to match
-> up the registers with a clk_hw pointer somewhere, but it should
-> be possible. Alternatively, we keep both designs around for some
-> time and have different compatibles and different driver entry
-> points.
+Although I have simplified the logic a bit now, however I understand that
+there are reservations for introducing this complexity for gaining few
+seconding of execution time during kexec or crash reboot.  But, I believe
+if d-cache enabling code is stable enough then there should not be any
+hindrances to accept it. So, please give it a try with your platform and
+let me know if you see any issue or it does not work. I am still open to
+improve it further if needed.
 
-Keeping both around for a while should be okay, the design for this 
-series was done with that in mind. I didn't address the scrapping of old 
-clock data yet though, but that would be a step taken in the future.
+Changes since V1:
+	- Moved page table creation logic from purgatory to kexec code.
+	- Only 4K page table is supported, with 48 bit VA and 2M block size
+	- if platform supports a 4K page size, then D-cache is always
+	  enabled now.
+ 
+Pratyush Anand (2):
+  kexec: arm64: create identity page table to be used in purgatory
+  arm64: enable d-cache support during purgatory sha verification
 
-First thing to do here would be to implement the hwmod genpds, rest can 
-follow later, but we need an agreement if this is the way we want to go.
+ kexec/arch/arm64/kexec-arm64.c         | 152 ++++++++++++++++++
+ purgatory/arch/arm64/Makefile          |   1 +
+ purgatory/arch/arm64/cache.S           | 281 +++++++++++++++++++++++++++++++++
+ purgatory/arch/arm64/purgatory-arm64.c |   5 +
+ 4 files changed, 439 insertions(+)
+ create mode 100644 purgatory/arch/arm64/cache.S
 
--Tero
+-- 
+2.7.4
