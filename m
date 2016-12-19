@@ -1,52 +1,58 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 19 Dec 2016 10:20:45 +0800
-Subject: [PATCH v3 2/2] crypto: mediatek - add DT bindings documentation
-In-Reply-To: <1482114045-18716-1-git-send-email-ryder.lee@mediatek.com>
-References: <1482114045-18716-1-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <1482114045-18716-3-git-send-email-ryder.lee@mediatek.com>
+Date: Mon, 19 Dec 2016 10:20:43 +0800
+Subject: [PATCH v3 0/2] Add MediaTek crypto accelerator driver
+Message-ID: <1482114045-18716-1-git-send-email-ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings documentation for the crypto driver
+Hello,
 
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
----
- .../devicetree/bindings/crypto/mediatek-crypto.txt | 27 ++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+This adds support for the MediaTek hardware accelerator on
+some SoCs.
+
+This driver currently implement: 
+- SHA1 and SHA2 family(HMAC) hash algorithms.
+- AES block cipher in CBC/ECB mode with 128/196/256 bits keys.
+
+Chances since v3:
+-remove unused structure member
+-drop interrupt-parent from DT bindings documentation
+
+Changes since v2:
+- use byteorder conversion macros and type identifiers for descriptors
+- revise register definition macros to make it more clear
+- revise DT compatiable string
+
+Changes since v1:
+- remove EXPORT_SYMBOL
+- remove unused PRNG setting
+- sort headers in alphabetical order
+- add a definition for IRQ unmber
+- replace ambiguous definition
+- add more annotation and function comment
+- add COMPILE_TEST in Kconfig
+
+Ryder Lee (2):
+  Add crypto driver support for some MediaTek chips
+  crypto: mediatek - add DT bindings documentation
+
+ .../devicetree/bindings/crypto/mediatek-crypto.txt |   27 +
+ drivers/crypto/Kconfig                             |   17 +
+ drivers/crypto/Makefile                            |    1 +
+ drivers/crypto/mediatek/Makefile                   |    2 +
+ drivers/crypto/mediatek/mtk-aes.c                  |  765 +++++++++++
+ drivers/crypto/mediatek/mtk-platform.c             |  604 ++++++++
+ drivers/crypto/mediatek/mtk-platform.h             |  238 ++++
+ drivers/crypto/mediatek/mtk-regs.h                 |  194 +++
+ drivers/crypto/mediatek/mtk-sha.c                  | 1437 ++++++++++++++++++++
+ 9 files changed, 3285 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/crypto/mediatek-crypto.txt
+ create mode 100644 drivers/crypto/mediatek/Makefile
+ create mode 100644 drivers/crypto/mediatek/mtk-aes.c
+ create mode 100644 drivers/crypto/mediatek/mtk-platform.c
+ create mode 100644 drivers/crypto/mediatek/mtk-platform.h
+ create mode 100644 drivers/crypto/mediatek/mtk-regs.h
+ create mode 100644 drivers/crypto/mediatek/mtk-sha.c
 
-diff --git a/Documentation/devicetree/bindings/crypto/mediatek-crypto.txt b/Documentation/devicetree/bindings/crypto/mediatek-crypto.txt
-new file mode 100644
-index 0000000..c204725
---- /dev/null
-+++ b/Documentation/devicetree/bindings/crypto/mediatek-crypto.txt
-@@ -0,0 +1,27 @@
-+MediaTek cryptographic accelerators
-+
-+Required properties:
-+- compatible: Should be "mediatek,eip97-crypto"
-+- reg: Address and length of the register set for the device
-+- interrupts: Should contain the five crypto engines interrupts in numeric
-+	order. These are global system and four descriptor rings.
-+- clocks: the clock used by the core
-+- clock-names: the names of the clock listed in the clocks property. These are
-+	"ethif", "cryp"
-+- power-domains: Must contain a reference to the PM domain.
-+
-+
-+Example:
-+	crypto: crypto at 1b240000 {
-+		compatible = "mediatek,eip97-crypto";
-+		reg = <0 0x1b240000 0 0x20000>;
-+		interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 83 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 84 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 97 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
-+			 <&ethsys CLK_ETHSYS_CRYPTO>;
-+		clock-names = "ethif","cryp";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
-+	};
 -- 
 1.9.1
