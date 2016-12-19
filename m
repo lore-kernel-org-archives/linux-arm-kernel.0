@@ -1,225 +1,24 @@
-From: muvarov@gmail.com (Maxim Uvarov)
-Date: Mon, 19 Dec 2016 10:21:40 +0300
+From: panand@redhat.com (Pratyush Anand)
+Date: Mon, 19 Dec 2016 12:53:17 +0530
 Subject: [PATCH V2 1/2] kexec: arm64: create identity page table to be
  used in purgatory
-In-Reply-To: <ea98a0045c8d466456f53150f341546810dd47e1.1482129830.git.panand@redhat.com>
+In-Reply-To: <CAJGZr0Jg2ptdWGTDczOjdzDx6EkM5mOxWwKckWAZXvA9fzMpUg@mail.gmail.com>
 References: <cover.1482129830.git.panand@redhat.com>
  <ea98a0045c8d466456f53150f341546810dd47e1.1482129830.git.panand@redhat.com>
-Message-ID: <CAJGZr0Jg2ptdWGTDczOjdzDx6EkM5mOxWwKckWAZXvA9fzMpUg@mail.gmail.com>
+ <CAJGZr0Jg2ptdWGTDczOjdzDx6EkM5mOxWwKckWAZXvA9fzMpUg@mail.gmail.com>
+Message-ID: <c6efdafb-0521-6b9c-4f81-4f455d56be79@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-12-19 10:13 GMT+03:00 Pratyush Anand <panand@redhat.com>:
-> Purgatory sha verification is very slow when D-cache is not enabled there.
-> We need to enable MMU as well to enable D-Cache.Therefore,we need to an
-> identity mapped page table in purgatory.
->
-> Since debugging is very difficult in purgatory therefore we prefer to do as
-> much work as possible in kexec.
->
-> This patch prepares page table for purgatory in advance. We support only 4K
-> page table,because it will be available on most of the platform. This page
-> table is passed to the purgatory as a new segment.
->
-> VA bit is fixed as 48, page table level is 3 where 3rd level page table
-> contains 2M block entries.
->
-> Signed-off-by: Pratyush Anand <panand@redhat.com>
-> ---
->  kexec/arch/arm64/kexec-arm64.c | 152 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 152 insertions(+)
->
-> diff --git a/kexec/arch/arm64/kexec-arm64.c b/kexec/arch/arm64/kexec-arm64.c
-> index 04fd3968bb52..c2c8ff1b6940 100644
-> --- a/kexec/arch/arm64/kexec-arm64.c
-> +++ b/kexec/arch/arm64/kexec-arm64.c
-> @@ -24,6 +24,45 @@
->  #include "kexec-syscall.h"
->  #include "arch/options.h"
->
-> +/*
-> + * kexec creates identity page table to be used in purgatory so that
-> + * dcache verification becomes faster.
-> + *
-> + * These are the definitions to be used by page table creation routine.
-> + *
-> + * Only 4K page table, 3 level, 2M block mapping, 48bit VA is supported
-> + */
-> +#define PGDIR_SHIFT            39
-> +#define PUD_SHIFT              30
-> +#define PMD_SHIFT              21
-> +#define PTRS_PER_PGD           0x1FF
-> +#define PTRS_PER_PUD           0x1FF
-> +#define PTRS_PER_PMD           0x1FF
-> +#define PMD_TYPE_TABLE         (3UL << 0)
-> +#define PMD_TYPE_SECT          (1UL << 0)
-> +#define PMD_SECT_AF            (1UL << 10)
-> +#define PMD_ATTRINDX(t)                ((unsigned long)(t) << 2)
-> +#define MT_NORMAL              4
-> +#define PMD_FLAGS_NORMAL       (PMD_TYPE_SECT | PMD_SECT_AF)
-> +#define MMU_FLAGS_NORMAL       (PMD_ATTRINDX(MT_NORMAL) | PMD_FLAGS_NORMAL)
-> +#define SECTION_SIZE           (2 * 1024 * 1024)
-> +#define PAGE_SIZE              (4 * 1024)
-> +/* Since we are using 3 level of page tables, therefore minimum number of
-> + * table will be 3. Most likely we will never need more than 3. Each entry
-> + * in level 3 page table can map 2MB memory area. Thus a level 3 page table
-> + * indexed by bit 29:21 can map a total of 1G memory area. Therefore, if
-> + * any segment crosses 1G boundary, then we will need one more level 3
-> + * table. Similarly, level 2 page table indexed by bit 38:30 can map a
-> + * total of 512G memory area. If segment addresses are more than 512G apart
-> + * then we will need two more table for each such block. We do not expect
-> + * any memory segment to cross 512G boundary, however if we will ever wish
-> + * to support uart debugging in purgatory then that might cross the
-> + * boundary and therefore additional 2 more table space. Thus we will need
-> + * maximum of 6 table space.
-> + */
-> +#define MAX_PGTBLE_SZ  (6 * 4096)
-> +static int next_tbl_cnt = 1;
-> +
->  /* Global varables the core kexec routines expect. */
->
->  unsigned char reuse_initrd;
-> @@ -316,6 +355,117 @@ unsigned long arm64_locate_kernel_segment(struct kexec_info *info)
->         return hole;
->  }
->
-> +static unsigned long *create_table_entry(unsigned long *pgtbl_buf,
-> +               unsigned long pgtbl_mem, unsigned long *tbl,
-> +               unsigned long virt, int shift,
-> +               unsigned long ptrs)
-> +{
-> +       unsigned long index, desc, offset;
-> +
-> +       index = (virt >> shift) & ptrs;
-> +       /* check if we have allocated a table already for this index */
-> +       if (tbl[index]) {
-> +               /*
-> +                * table index will have entry as per purgatory page table
-> +                * memory. Find out corresponding buffer address of table.
-> +                */
-> +               desc = tbl[index] & ~3UL;
-> +               offset = desc - pgtbl_mem;
-> +               return &pgtbl_buf[offset >> 3];
-> +       }
-> +
-> +       /*
-> +        * Always write page table content as per page table memory allocated
-> +        * for purgaory area, but return corresponding buffer area alloced
-> +        * in kexec
-> +        */
-> +       if (next_tbl_cnt > 5)
-> +               die("%s: No more memory for page table\n", __func__);
-> +
-> +       tbl[index] = (pgtbl_mem + PAGE_SIZE * next_tbl_cnt) | PMD_TYPE_TABLE;
-> +
-> +       return &pgtbl_buf[(next_tbl_cnt++ * PAGE_SIZE) >> 3];
-> +}
-> +
-> +static void craete_block_entry(unsigned long *tbl, unsigned long flags,
-
-typo in name
-
-> +               unsigned long phys, unsigned long virt)
-> +{
-> +       unsigned long index;
-> +       unsigned long desc;
-> +
-> +       index = (virt >> PMD_SHIFT) & PTRS_PER_PMD;
-> +       desc = (phys >> PMD_SHIFT) << PMD_SHIFT;
-> +       desc |= flags;
-> +       tbl[index] = desc;
-> +}
-> +
-> +static void create_identity_entry(unsigned long *pgtbl_buf,
-> +               unsigned long pgtbl_mem, unsigned long virt,
-> +               unsigned long flags)
-> +{
-> +       unsigned long *tbl = pgtbl_buf;
-> +
-> +       tbl = create_table_entry(pgtbl_buf, pgtbl_mem, tbl, virt,
-> +                       PGDIR_SHIFT, PTRS_PER_PGD);
-> +       tbl = create_table_entry(pgtbl_buf, pgtbl_mem, tbl, virt,
-> +                       PUD_SHIFT, PTRS_PER_PUD);
-> +       craete_block_entry(tbl, flags, virt, virt);
-> +}
-> +
-> +/**
-> + * arm64_create_pgtbl_segment - Create page table segments to be used by
-> + * purgatory. Page table will have entries to access memory area of all
-> + * those segments which becomes part of sha verification in purgatory.
-> + * Additionaly, we also create page table for purgatory segment as well.
-> + */
-> +
-> +static int arm64_create_pgtbl_segment(struct kexec_info *info,
-> +               unsigned long hole_min, unsigned long hole_max)
-> +{
-> +       unsigned long *pgtbl_buf;
-> +       int i;
-> +       unsigned long mstart, mend, pgtbl_mem;
-> +       unsigned long purgatory_base, purgatory_len;
-> +
-> +       pgtbl_buf = xmalloc(MAX_PGTBLE_SZ);
-> +       memset(pgtbl_buf, 0, MAX_PGTBLE_SZ);
-> +       pgtbl_mem = add_buffer_phys_virt(info, pgtbl_buf, MAX_PGTBLE_SZ,
-> +                       MAX_PGTBLE_SZ, PAGE_SIZE, hole_min, hole_max, 1, 0);
-> +       for (i = 0; i < info->nr_segments; i++) {
-> +               if (info->segment[i].mem == (void *)info->rhdr.rel_addr) {
-> +                       purgatory_base = (unsigned long)info->segment[i].mem;
-> +                       purgatory_len = info->segment[i].memsz;
-> +               }
-> +               mstart = (unsigned long)info->segment[i].mem;
-> +               mend = mstart + info->segment[i].memsz;
-> +               mstart &= ~(SECTION_SIZE - 1);
-> +               while (mstart < mend) {
-> +                       create_identity_entry(pgtbl_buf, pgtbl_mem,
-> +                                       mstart, MMU_FLAGS_NORMAL);
-> +                       mstart += SECTION_SIZE;
-> +               }
-> +       }
-> +
-> +       /* we will need pgtble_base in purgatory for enabling d-cache */
-> +       elf_rel_set_symbol(&info->rhdr, "pgtble_base", &pgtbl_mem,
-> +               sizeof(pgtbl_mem));
-> +       /*
-> +        * We need to disable d-cache before we exit from purgatory.
-> +        * Since, only dcache flush by VAs is recomeneded, therefore we
-> +        * will also need memory location of all those area which will be
-> +        * accessed in purgatory with enabled d-cache. sha256_regions
-> +        * already have start and length for all the segments except
-> +        * purgatory. Therefore, we will need to pass start and length of
-> +        * purgatory additionaly.
-> +        */
-> +       elf_rel_set_symbol(&info->rhdr, "purgatory_base", &purgatory_base,
-> +               sizeof(purgatory_base));
-> +       elf_rel_set_symbol(&info->rhdr, "purgatory_len", &purgatory_len,
-> +               sizeof(purgatory_len));
-> +
-> +       return 0;
-> +}
-> +
->  /**
->   * arm64_load_other_segments - Prepare the dtb, initrd and purgatory segments.
->   */
-> @@ -423,6 +573,8 @@ int arm64_load_other_segments(struct kexec_info *info,
->         elf_rel_set_symbol(&info->rhdr, "arm64_dtb_addr", &dtb_base,
->                 sizeof(dtb_base));
->
-> +       arm64_create_pgtbl_segment(info, hole_min, hole_max);
-> +
->         return 0;
->  }
->
-> --
-> 2.7.4
->
->
-> _______________________________________________
-> kexec mailing list
-> kexec at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/kexec
 
 
+On Monday 19 December 2016 12:51 PM, Maxim Uvarov wrote:
+>> +
+>> > +static void craete_block_entry(unsigned long *tbl, unsigned long flags,
+> typo in name
+>
 
--- 
-Best regards,
-Maxim Uvarov
+Thanks.
+Will fix.
+
+~Pratyush
