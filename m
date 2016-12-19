@@ -1,96 +1,207 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 19 Dec 2016 22:24:44 +0800
-Subject: [PATCH] ARM: dts: sun8i-q8-common: enable bluetooth on SDIO Wi-Fi
-In-Reply-To: <11985541482156512@web2g.yandex.ru>
-References: <20161213233658.atGuNCNY@smtp1h.mail.yandex.net>
- <20161216124748.rkvnnlo4x5onzpvk@lukather> <4720181481899200@web7g.yandex.ru>
- <20161219100952.bspym36nsehda3za@lukather> <11985541482156512@web2g.yandex.ru>
-Message-ID: <CAGb2v67wU+Hw-6oa9FxzB33sZY8Up-59HZ_mneFBdcRhXbU1pA@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 19 Dec 2016 14:24:19 +0000
+Subject: [PATCH v2] efi/libstub: arm*: Pass latest memory map to the kernel
+Message-ID: <20161219142419.16780-1-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2016 at 10:08 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
->
->
-> 19.12.2016, 18:09, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
->> On Fri, Dec 16, 2016 at 10:40:00PM +0800, Icenowy Zheng wrote:
->>>  >>  > >  &r_pio {
->>>  >>  > >  wifi_pwrseq_pin_q8: wifi_pwrseq_pin at 0 {
->>>  >>  > > - pins = "PL6", "PL7", "PL11";
->>>  >>  > > + pins = "PL6", "PL7", "PL8", "PL11";
->>>  >>  > >  function = "gpio_in";
->>>  >>  > >  bias-pull-up;
->>>  >>  > >  };
->>>  >>  >
->>>  >>  > There's several things wrong here. The first one is that you rely
->>>  >>  > solely on the pinctrl state to maintain a reset line. This is very
->>>  >>  > fragile (especially since the GPIO pinctrl state are likely to go away
->>>  >>  > at some point), but it also means that if your driver wants to recover
->>>  >>  > from that situation at some point, it won't work.
->>>  >>  >
->>>  >>  > The other one is that the bluetooth and wifi chips are two devices in
->>>  >>  > linux, and you assign that pin to the wrong device (wifi).
->>>  >>  >
->>>  >>  > rfkill-gpio is made just for that, so please use it.
->>>  >>
->>>  >>  The GPIO is not for the radio, but for the full Bluetooth part.
->>>  >
->>>  > I know.
->>>  >
->>>  >>  If it's set to 0, then the bluetooth part will reset, and the
->>>  >>  hciattach will fail.
->>>  >
->>>  > Both rfkill-gpio and rfkill-regulator will shutdown when called
->>>  > (either by poking the reset pin or shutting down the regulator), so
->>>  > that definitely seems like an expected behavior to put the device in
->>>  > reset.
->>>  >
->>>  >>  The BSP uses this as a rfkill, and the result is that the bluetooth
->>>  >>  on/off switch do not work properly.
->>>  >
->>>  > Then rfkill needs fixing, but working around it by hoping that the
->>>  > core will probe an entirely different device, and enforcing a default
->>>  > that the rest of the kernel might or might not change is both fragile
->>>  > and wrong.
->>>
->>>  I think a rfkill-gpio here works just like the BSP rfkill...
->>>
->>>  The real problem is that the Realtek UART bluetooth driver is a userspace
->>>  program (a modified hciattach), which is not capable of the GPIO reset...
->>
->> Can't you run rfkill before attaching? What is the problem exactly?
->> It's not in reset for long enough?
->>
->> This seems more and more like an issue in the BT stack you're
->> using. We might consider workarounds in the kernel, but they have to
->> be correct.
->
-> One more rfkill interface will be generated for hci0 after hciattach, which can
-> be safely toggled block and unblock.
->
-> However, if the GPIO is toggled down, the hciattach program will die.
->
-> The bluetooth stack I used is fd.o's BlueZ.
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-I think the bigger issue is that the tty/serial subsystem does not have
-power sequencing support. Here we're trying to use rfkill to do that,
-but that doesn't seem to be what it was intended for. It might work with
-standalone USB bluetooth controllers that don't need any special setup,
-since the device will just appear and get registered. But it might not
-work so well with UART based adapters that need userspace fiddling with
-firmware and hciattach.
+As reported by James, the current libstub code involving the annotated
+memory map only works somewhat correctly by accident, due to the fact
+that a pool allocation happens to be reused immediately, retaining its
+former contents.
 
-And like Icenowy mentioned, the bluetooth stack registers another rfkill
-control, which presumable just blocks transmissions.
+Instead of juggling memory maps, which makes the code more complex than
+it needs to be, simply put a placholder value into the FDT, and only
+write the actual value after ExitBootServices() has been called.
 
-Regards
-ChenYu
+Reported-by: James Morse <james.morse@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+[Update mmap-size too, remove updated_fdt()s unused params and header entry]
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+Hi Ard,
 
->
->>
->> Maxime
->>
->> --
->> Maxime Ripard, Free Electrons
->> Embedded Linux and Kernel engineering
->> http://free-electrons.com
+This is a v2 of your patch that updates the mmap-size too. This solves the
+truncated memmap problem I saw with v1 on Seattle.
+
+The original patch was CC-stable, so I think this should also have:
+Cc: <stable@vger.kernel.org>
+Fixes: ed9cc156c42f ("efi/libstub: Use efi_exit_boot_services() in FDT")
+
+
+Thanks,
+
+James
+
+ drivers/firmware/efi/libstub/efistub.h |  8 ----
+ drivers/firmware/efi/libstub/fdt.c     | 75 +++++++++++++++++++++-------------
+ 2 files changed, 47 insertions(+), 36 deletions(-)
+
+diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
+index ee49cd23ee63..fac67992bede 100644
+--- a/drivers/firmware/efi/libstub/efistub.h
++++ b/drivers/firmware/efi/libstub/efistub.h
+@@ -30,14 +30,6 @@ efi_status_t efi_file_close(void *handle);
+ 
+ unsigned long get_dram_base(efi_system_table_t *sys_table_arg);
+ 
+-efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+-			unsigned long orig_fdt_size,
+-			void *fdt, int new_fdt_size, char *cmdline_ptr,
+-			u64 initrd_addr, u64 initrd_size,
+-			efi_memory_desc_t *memory_map,
+-			unsigned long map_size, unsigned long desc_size,
+-			u32 desc_ver);
+-
+ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 					    void *handle,
+ 					    unsigned long *new_fdt_addr,
+diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+index a6a93116a8f0..6d33d709f6b3 100644
+--- a/drivers/firmware/efi/libstub/fdt.c
++++ b/drivers/firmware/efi/libstub/fdt.c
+@@ -16,13 +16,11 @@
+ 
+ #include "efistub.h"
+ 
+-efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+-			unsigned long orig_fdt_size,
+-			void *fdt, int new_fdt_size, char *cmdline_ptr,
+-			u64 initrd_addr, u64 initrd_size,
+-			efi_memory_desc_t *memory_map,
+-			unsigned long map_size, unsigned long desc_size,
+-			u32 desc_ver)
++static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
++			       unsigned long orig_fdt_size,
++			       void *fdt, int new_fdt_size, char *cmdline_ptr,
++			       u64 initrd_addr, u64 initrd_size,
++			       unsigned long desc_size, u32 desc_ver)
+ {
+ 	int node, num_rsv;
+ 	int status;
+@@ -101,13 +99,13 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+ 	if (status)
+ 		goto fdt_set_fail;
+ 
+-	fdt_val64 = cpu_to_fdt64((u64)(unsigned long)memory_map);
++	fdt_val64 = U64_MAX; /* placeholder */
+ 	status = fdt_setprop(fdt, node, "linux,uefi-mmap-start",
+ 			     &fdt_val64,  sizeof(fdt_val64));
+ 	if (status)
+ 		goto fdt_set_fail;
+ 
+-	fdt_val32 = cpu_to_fdt32(map_size);
++	fdt_val32 = U32_MAX; /* placeholder */
+ 	status = fdt_setprop(fdt, node, "linux,uefi-mmap-size",
+ 			     &fdt_val32,  sizeof(fdt_val32));
+ 	if (status)
+@@ -148,6 +146,32 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+ 	return EFI_LOAD_ERROR;
+ }
+ 
++static efi_status_t update_fdt_memmap(void *fdt, u64 memmap, u32 map_size)
++{
++	int node = fdt_path_offset(fdt, "/chosen");
++	efi_status_t status;
++
++	if (node < 0)
++		return EFI_LOAD_ERROR;
++
++	memmap = cpu_to_fdt64(memmap);
++	status = fdt_setprop_inplace(fdt, node, "linux,uefi-mmap-start",
++				     &memmap, sizeof(memmap));
++
++	if (status)
++		return EFI_LOAD_ERROR;
++
++	map_size = cpu_to_fdt32(map_size);
++	status = fdt_setprop_inplace(fdt, node, "linux,uefi-mmap-size",
++				     &map_size, sizeof(map_size));
++
++	if (status)
++		return EFI_LOAD_ERROR;
++
++
++	return EFI_SUCCESS;
++}
++
+ #ifndef EFI_FDT_ALIGN
+ #define EFI_FDT_ALIGN EFI_PAGE_SIZE
+ #endif
+@@ -243,20 +267,11 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 			goto fail;
+ 		}
+ 
+-		/*
+-		 * Now that we have done our final memory allocation (and free)
+-		 * we can get the memory map key  needed for
+-		 * exit_boot_services().
+-		 */
+-		status = efi_get_memory_map(sys_table, &map);
+-		if (status != EFI_SUCCESS)
+-			goto fail_free_new_fdt;
+-
+ 		status = update_fdt(sys_table,
+ 				    (void *)fdt_addr, fdt_size,
+ 				    (void *)*new_fdt_addr, new_fdt_size,
+ 				    cmdline_ptr, initrd_addr, initrd_size,
+-				    memory_map, map_size, desc_size, desc_ver);
++				    desc_size, desc_ver);
+ 
+ 		/* Succeeding the first time is the expected case. */
+ 		if (status == EFI_SUCCESS)
+@@ -266,20 +281,16 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 			/*
+ 			 * We need to allocate more space for the new
+ 			 * device tree, so free existing buffer that is
+-			 * too small.  Also free memory map, as we will need
+-			 * to get new one that reflects the free/alloc we do
+-			 * on the device tree buffer.
++			 * too small.
+ 			 */
+ 			efi_free(sys_table, new_fdt_size, *new_fdt_addr);
+-			sys_table->boottime->free_pool(memory_map);
+ 			new_fdt_size += EFI_PAGE_SIZE;
+ 		} else {
+ 			pr_efi_err(sys_table, "Unable to construct new device tree.\n");
+-			goto fail_free_mmap;
++			goto fail_free_new_fdt;
+ 		}
+ 	}
+ 
+-	sys_table->boottime->free_pool(memory_map);
+ 	priv.runtime_map = runtime_map;
+ 	priv.runtime_entry_count = &runtime_entry_count;
+ 	status = efi_exit_boot_services(sys_table, handle, &map, &priv,
+@@ -288,6 +299,17 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 	if (status == EFI_SUCCESS) {
+ 		efi_set_virtual_address_map_t *svam;
+ 
++		status = update_fdt_memmap((void *)*new_fdt_addr,
++					   (u64)memory_map, (u32)map_size);
++		if (status != EFI_SUCCESS) {
++			/*
++			 * The kernel won't get far without the memory map, but
++			 * may still be able to print something meaningful so
++			 * return success here.
++			 */
++			return EFI_SUCCESS;
++		}
++
+ 		/* Install the new virtual address map */
+ 		svam = sys_table->runtime->set_virtual_address_map;
+ 		status = svam(runtime_entry_count * desc_size, desc_size,
+@@ -319,9 +341,6 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 
+ 	pr_efi_err(sys_table, "Exit boot services failed.\n");
+ 
+-fail_free_mmap:
+-	sys_table->boottime->free_pool(memory_map);
+-
+ fail_free_new_fdt:
+ 	efi_free(sys_table, new_fdt_size, *new_fdt_addr);
+ 
+-- 
+2.10.1
