@@ -1,40 +1,71 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon, 19 Dec 2016 15:18:03 +0100
-Subject: [PATCH v2] ARM: dts: sun8i: add opp-v2 table for A33
-In-Reply-To: <11975791482156406@web2g.yandex.ru>
-References: <20161215182754.33921-1-icenowy@aosc.xyz>
- <20161219084652.kiqdkiewu5tujlyd@lukather>
- <CAGb2v65YWntCrFHtSbxhtTWkt+UwkW3xoY-ae26MpH+-ULLXSQ@mail.gmail.com>
- <11975791482156406@web2g.yandex.ru>
-Message-ID: <8af4327f-b779-9d97-347f-bfe4b8303a60@free-electrons.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 19 Dec 2016 15:19:20 +0100
+Subject: [PATCH] drm: tilcdc: simplify the recovery from sync lost error
+ on rev1
+In-Reply-To: <590211f1-8e31-cecc-8dd2-f7e2976b81d1@ti.com>
+References: <1481641656-25227-1-git-send-email-bgolaszewski@baylibre.com>
+ <590211f1-8e31-cecc-8dd2-f7e2976b81d1@ti.com>
+Message-ID: <CAMpxmJVHXoP0BokfbPwQmC=eBaNfS5yfG77EB_MnScmSbUVAdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2016-12-19 14:09 GMT+01:00 Jyri Sarha <jsarha@ti.com>:
+> One comment bellow.
+>
+> On 12/13/16 17:07, Bartosz Golaszewski wrote:
+>> Revision 2 of LCDC suffers from an issue where a SYNC_LOST error
+>> caused by limited memory bandwidth may leave the picture shifted a
+>> couple pixels to the right.
+>>
+>> This issue has not been observed on revision 1, while the recovery
+>> mechanism introduces a different issue, where the END_OF_FRAME
+>> interrupt doesn't fire while drm is waiting for vblanks.
+>>
+>> On rev1: recover from sync lost errors by simply clearing the
+>> RASTER_ENABLE bit in the RASTER_CTRL register and re-enabling it
+>> again as is suggested by the datasheet.
+>>
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> ---
+>>  drivers/gpu/drm/tilcdc/tilcdc_crtc.c | 24 +++++++++++++++---------
+>>  1 file changed, 15 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/tilcdc/tilcdc_crtc.c b/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
+>> index 9942b05..70e57a7 100644
+>> --- a/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
+>> +++ b/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
+>> @@ -921,17 +921,23 @@ irqreturn_t tilcdc_crtc_irq(struct drm_crtc *crtc)
+>>               dev_err_ratelimited(dev->dev, "%s(0x%08x): Sync lost",
+>>                                   __func__, stat);
+>>               tilcdc_crtc->frame_intact = false;
+>> -             if (tilcdc_crtc->sync_lost_count++ >
+>> -                 SYNC_LOST_COUNT_LIMIT) {
+>> -                     dev_err(dev->dev, "%s(0x%08x): Sync lost flood detected, recovering", __func__, stat);
+>> -                     queue_work(system_wq, &tilcdc_crtc->recover_work);
+>> -                     if (priv->rev == 1)
+>> -                             tilcdc_clear(dev, LCDC_RASTER_CTRL_REG,
+>> -                                          LCDC_V1_SYNC_LOST_INT_ENA);
+>> -                     else
+>> +             if (priv->rev == 1) {
+>
+> I would add here:
+> +               if ((tilcdc_read(dev, LCDC_RASTER_CTRL_REG) &
+> +                               LCDC_RASTER_ENABLE)) {
+>
+>> +                     tilcdc_clear(dev,
+>> +                                  LCDC_RASTER_CTRL_REG, LCDC_RASTER_ENABLE);
+>> +                     tilcdc_set(dev,
+>> +                                LCDC_RASTER_CTRL_REG, LCDC_RASTER_ENABLE);
+> +               }
+>
+> Just in case the interrupt is for some reason handled right after the
+> crtc is disabled.
+>
+> With this addition I could send a pull request for this fix still today,
+> if you agree with the change.
 
-On 19/12/2016 15:06, Icenowy Zheng wrote:
-> 
-> After proper testing of A23 ccu, the operating points can also apply to A23.
-> (According to A23 devices' fex)
-> 
+I'm not sure this can really happen, but it won't hurt either, so I'll
+send a v2.
 
-I disagree. I've looked into using the same operating points for A23 and
-A33 for CPUfreq and I came to the conclusion that not all A23-based
-boards share the same operating points. You can find the fex files for
-the different boards here:
-https://github.com/linux-sunxi/sunxi-boards/tree/master/sys_config/a23
-
-After gathering all supported frequencies/voltages for each A23-based
-boards, I found that only the following frequencies and voltages are
-supported by all A23-based boards:
-
- - 1008 MHz, 1220 mV
- - 816 MHz, 1120 mV
- - 600 MHz, 1040 mV
-
-Quentin
-
--- 
-Quentin Schulz, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks,
+Bartosz
