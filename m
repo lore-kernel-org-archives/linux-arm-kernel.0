@@ -1,104 +1,56 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon, 19 Dec 2016 15:30:10 +0100
-Subject: [PATCH v2] ARM: dts: sun8i: add opp-v2 table for A33
-In-Reply-To: <11975791482156406@web2g.yandex.ru>
-References: <20161215182754.33921-1-icenowy@aosc.xyz>
- <20161219084652.kiqdkiewu5tujlyd@lukather>
- <CAGb2v65YWntCrFHtSbxhtTWkt+UwkW3xoY-ae26MpH+-ULLXSQ@mail.gmail.com>
- <11975791482156406@web2g.yandex.ru>
-Message-ID: <e8cbfe0c-7cd8-80a9-fece-92e1a67d2423@free-electrons.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Mon, 19 Dec 2016 15:30:12 +0100
+Subject: [PATCH v1] mtd: nand: tango: Update DT binding description
+Message-ID: <ba47f2f1-bcdc-91e8-ed79-153931ccdad8@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/12/2016 15:06, Icenowy Zheng wrote:
-> 
-> 
-> 19.12.2016, 16:54, "Chen-Yu Tsai" <wens@csie.org>:
->> On Mon, Dec 19, 2016 at 4:46 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->>>  On Fri, Dec 16, 2016 at 02:27:54AM +0800, Icenowy Zheng wrote:
->>>>  An operating point table is needed for the cpu frequency adjusting to
->>>>  work.
->>>>
->>>>  The operating point table is converted from the common value in
->>>>  extracted script.fex from many A33 board/tablets.
->>>>
->>>>  Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->>>>  ---
->>>>  Changes since v1:
->>>>  - Fix format problem (blank lines).
->>>>  - Removed the 1.344GHz operating point, as it's overvoltage and overclocked.
->>>>
->>>>  This patch depends on the following patchset:
->>>>
->>>>  http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/473962.html
->>>>
->>>>  It's the v2 of the [PATCH 4/6] in this patchset.
->>>>
->>>>  I think this operating point table may also apply to A23, as there's no
->>>>  difference except the points over 1.2GHz between A23 and A33's stock dvfs table.
->>>>
->>>>  But as A23 CCU may not have the necessary fixes, I won't add the table to A23
->>>>  now.
->>>>
->>>>  Chen-Yu, could you test the CCU fixes I described in the patchset above on A23,
->>>>  then test this operating points table?
->>>>
->>>>  If it's necessary, you can send out the CCU fixes and add one more patch that
->>>>  moves this opp-v2 table to sun8i-a23-a33.dtsi .
->>>>
->>>>   arch/arm/boot/dts/sun8i-a33.dtsi | 35 +++++++++++++++++++++++++++++++++++
->>>>   1 file changed, 35 insertions(+)
->>>>
->>>>  diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
->>>>  index 504996cbee29..0f5b2af72981 100644
->>>>  --- a/arch/arm/boot/dts/sun8i-a33.dtsi
->>>>  +++ b/arch/arm/boot/dts/sun8i-a33.dtsi
->>>>  @@ -46,7 +46,42 @@
->>>>   #include <dt-bindings/dma/sun4i-a10.h>
->>>>
->>>>   / {
->>>>  + cpu0_opp_table: opp_table0 {
->>>>  + compatible = "operating-points-v2";
->>>>  + opp-shared;
->>>>  +
->>>>  + opp at 648000000 {
->>>>  + opp-hz = /bits/ 64 <648000000>;
->>>>  + opp-microvolt = <1040000>;
->>>>  + clock-latency-ns = <244144>; /* 8 32k periods */
->>>>  + };
->>>>  +
->>>>  + opp at 816000000 {
->>>>  + opp-hz = /bits/ 64 <816000000>;
->>>>  + opp-microvolt = <1100000>;
->>>>  + clock-latency-ns = <244144>; /* 8 32k periods */
->>>>  + };
->>>>  +
->>>>  + opp at 1008000000 {
->>>>  + opp-hz = /bits/ 64 <1008000000>;
->>>>  + opp-microvolt = <1200000>;
->>>>  + clock-latency-ns = <244144>; /* 8 32k periods */
->>>>  + };
->>>>  +
->>>>  + opp at 1200000000 {
->>>>  + opp-hz = /bits/ 64 <1200000000>;
->>>>  + opp-microvolt = <1320000>;
->>>>  + clock-latency-ns = <244144>; /* 8 32k periods */
->>>>  + };
->>>>  + };
->>>>  +
+Visually separate register ranges (address/size pairs) in reg prop.
+Change DMA channel name, for consistency with other drivers.
 
-Also, there are a lot more operating points for the A33, see:
-https://github.com/QSchulz/linux/blob/v4.9-rc4_adc_a31_v7/cpufreq_a33/arch/arm/boot/dts/sun8i-a33.dtsi#L323-L340
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+ Documentation/devicetree/bindings/mtd/tango-nand.txt | 6 +++---
+ drivers/mtd/nand/tango_nand.c                        | 2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-They are present in the Allwinner Linux source code and in the fex of
-all A33-based boards.
-
-Is there a reason for not adding all opp?
-
-Quentin
-
+diff --git a/Documentation/devicetree/bindings/mtd/tango-nand.txt b/Documentation/devicetree/bindings/mtd/tango-nand.txt
+index ad5a02f2ac8c..cd1bf2ac9055 100644
+--- a/Documentation/devicetree/bindings/mtd/tango-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/tango-nand.txt
+@@ -5,7 +5,7 @@ Required properties:
+ - compatible: "sigma,smp8758-nand"
+ - reg: address/size of nfc_reg, nfc_mem, and pbus_reg
+ - dmas: reference to the DMA channel used by the controller
+-- dma-names: "nfc_sbox"
++- dma-names: "rxtx"
+ - clocks: reference to the system clock
+ - #address-cells: <1>
+ - #size-cells: <0>
+@@ -17,9 +17,9 @@ Example:
+ 
+ 	nandc: nand-controller at 2c000 {
+ 		compatible = "sigma,smp8758-nand";
+-		reg = <0x2c000 0x30 0x2d000 0x800 0x20000 0x1000>;
++		reg = <0x2c000 0x30>, <0x2d000 0x800>, <0x20000 0x1000>;
+ 		dmas = <&dma0 3>;
+-		dma-names = "nfc_sbox";
++		dma-names = "rxtx";
+ 		clocks = <&clkgen SYS_CLK>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+diff --git a/drivers/mtd/nand/tango_nand.c b/drivers/mtd/nand/tango_nand.c
+index cc23db64f0ca..51dc88d6b8da 100644
+--- a/drivers/mtd/nand/tango_nand.c
++++ b/drivers/mtd/nand/tango_nand.c
+@@ -629,7 +629,7 @@ static int tango_nand_probe(struct platform_device *pdev)
+ 	if (IS_ERR(clk))
+ 		return PTR_ERR(clk);
+ 
+-	nfc->chan = dma_request_chan(&pdev->dev, "nfc_sbox");
++	nfc->chan = dma_request_chan(&pdev->dev, "rxtx");
+ 	if (IS_ERR(nfc->chan))
+ 		return PTR_ERR(nfc->chan);
+ 
 -- 
-Quentin Schulz, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.10.0
