@@ -1,31 +1,61 @@
-From: sr@denx.de (Stefan Roese)
-Date: Mon, 19 Dec 2016 07:15:15 +0100
-Subject: [PATCH] mtd: nand: fsmc: remove stale non-DT probe path
-In-Reply-To: <1482060895-26838-1-git-send-email-linus.walleij@linaro.org>
-References: <1482060895-26838-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <417a2f4f-7ef0-72c9-fa9c-223b40c0bda3@denx.de>
+From: christophe.jaillet@wanadoo.fr (Marion & Christophe JAILLET)
+Date: Mon, 19 Dec 2016 07:19:43 +0100
+Subject: [RFC] Question about freeing of resource in 'atlas7_pinmux_probe()',
+ in file 'drivers/pinctrl/sirf/pinctrl-atlas7.c'
+Message-ID: <612eedc5-0f28-7a38-abad-4b9573208875@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.12.2016 12:34, Linus Walleij wrote:
-> The FSMC driver has an execution path and a header file in
-> <linux/mtd/fsmc.h> that serves to support passing in platform
-> data through board files, albeit no upstream users of this
-> mechanism exist.
->
-> The header file also contains function headers for functions that
-> do not exist in the kernel.
->
-> Delete this and move the platform data struct, parsing and
-> handling into the driver, assume we are using OF and make the
-> driver depend on OF, remove the ifdefs making that optional.
->
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: Stefan Roese <sr@denx.de>
-> Cc: Vipin Kumar <vipin.kumar@st.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Hi,
 
-Reviewed-by: Stefan Roese <sr@denx.de>
+while playing with coccinelle, a missing 'of_node_put()' triggered in 
+'atlas7_pinmux_probe()', in file 'drivers/pinctrl/sirf/pinctrl-atlas7.c'.
 
-Thanks,
-Stefan
+     /* The sd3 and sd9 shared all pins, and the function select by
+      * SYS2PCI_SDIO9SEL register
+      */
+     sys2pci_np = of_find_node_by_name(NULL, "sys2pci");
+     if (!sys2pci_np)
+         return -EINVAL;
+     ret = of_address_to_resource(sys2pci_np, 0, &res);
+     if (ret) <-------------    missing of_node_put(sys2pci_np);
+         return ret;
+     pmx->sys2pci_base = devm_ioremap_resource(&pdev->dev, &res);
+     if (IS_ERR(pmx->sys2pci_base)) {
+         of_node_put(sys2pci_np); <-------------    added by commit 
+151b8c5ba1eb
+         return -ENOMEM;
+     }
+
+Looking@the history of this file, I found a recent commit that added 
+another missing of_node_put (see above).
+
+
+Adding missing 'of_node_put()' in error handling paths is fine, but in 
+this particular case, I was wondering if one was not also missing in the 
+normal path?
+
+
+In such a case, I would revert 151b8c5ba1eb and propose something like:
+     /* The sd3 and sd9 shared all pins, and the function select by
+      * SYS2PCI_SDIO9SEL register
+      */
+     sys2pci_np = of_find_node_by_name(NULL, "sys2pci");
+     if (!sys2pci_np)
+         return -EINVAL;
+     ret = of_address_to_resource(sys2pci_np, 0, &res);
+     if (ret) {
+         of_node_put(sys2pci_np);
+         return ret;
+     }
+     of_node_put(sys2pci_np);
+
+     pmx->sys2pci_base = devm_ioremap_resource(&pdev->dev, &res);
+     if (IS_ERR(pmx->sys2pci_base))
+         return -ENOMEM;
+
+Thanks for your comment,
+
+best regards,
+
+CJ
