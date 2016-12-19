@@ -1,37 +1,37 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Mon, 19 Dec 2016 16:03:15 +0100
-Subject: [PATCH 4/4] arm64: dts: marvell: Add ethernet switch definition
- for the EXPRESSObin
-In-Reply-To: <20161219155819.4cdf0f40@free-electrons.com>
-References: <20161219141610.30934-1-romain.perier@free-electrons.com>
- <20161219141610.30934-5-romain.perier@free-electrons.com>
- <20161219155819.4cdf0f40@free-electrons.com>
-Message-ID: <8f8426ec-65fb-49ae-4238-74012010f1b5@free-electrons.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 19 Dec 2016 16:05:35 +0100
+Subject: [PATCH net 0/3] Fix integration of eee-broken-modes
+Message-ID: <1482159938-13239-1-git-send-email-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The purpose of this series is to fix the integration of the ethernet phy
+property "eee-broken-modes" [0]
 
-Le 19/12/2016 ? 15:58, Thomas Petazzoni a ?crit :
-> Hello,
->
-> On Mon, 19 Dec 2016 15:16:09 +0100, Romain Perier wrote:
->> This defines and enables the Marvell ethernet switch MVE886341 on the
->> Marvell EXPRESSObin board.
->>
->> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
->
-> I didn't want to make this (silly) comment but since you got another
-> comment that will let you send a new iteration, here is my silly
-> comment: the name of the board is EspressoBin, not ExpressoBin.
->
-> Thanks!
->
-> Thomas
->
+The v3 of this series has been merged, missing a fix (error reported by
+kbuild robot) available in the v4 [1]
 
-Ack for the two feedback (I don't know why I have replaced "es" by "ex" 
-:/, anyway...)
+More importantly, Florian opposed adding a DT property mapping a device
+register this directly [2]. The concern was that the property could be
+abused to implement platform configuration policy. After discussing it,
+I think we agreed that such information about the HW (defect) should appear
+in the platform DT. However, the preferred way is to add a boolean property
+for each EEE broken mode.
 
-Thanks,
-Romain
+[0]: http://lkml.kernel.org/r/1480326409-25419-1-git-send-email-jbrunet at baylibre.com
+[1]: http://lkml.kernel.org/r/1480348229-25672-1-git-send-email-jbrunet at baylibre.com
+[2]: http://lkml.kernel.org/r/e14a3b0c-dc34-be14-48b3-518a0ad0c080 at gmail.com
+
+Jerome Brunet (3):
+  net: phy: fix sign type error in genphy_config_eee_advert
+  net: phy: use boolean dt properties for eee broken modes
+  dt: bindings: net: use boolean dt properties for eee broken modes
+
+ Documentation/devicetree/bindings/net/phy.txt | 10 ++++++++--
+ drivers/net/phy/phy_device.c                  | 22 +++++++++++++++++-----
+ include/dt-bindings/net/mdio.h                | 19 -------------------
+ 3 files changed, 25 insertions(+), 26 deletions(-)
+ delete mode 100644 include/dt-bindings/net/mdio.h
+
+-- 
+2.7.4
