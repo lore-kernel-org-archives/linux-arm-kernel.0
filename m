@@ -1,65 +1,25 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 19 Dec 2016 23:23:51 +0100
-Subject: [PATCHv6] support for AD5820 camera auto-focus coil
-In-Reply-To: <20161215065022.GC16630@valkosipuli.retiisi.org.uk>
-References: <20160521054336.GA27123@amd>
- <20160808080955.GA3182@valkosipuli.retiisi.org.uk>
- <20160808214132.GB2946@xo-6d-61-c0.localdomain>
- <201612141438.16603@pali> <20161214150819.GW4920@atomide.com>
- <20161215065022.GC16630@valkosipuli.retiisi.org.uk>
-Message-ID: <20161219201015.GB4974@amd>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 19 Dec 2016 14:33:51 -0800
+Subject: [PATCH] staging: vc04_services: Fix bracing on single statement
+ blocks
+In-Reply-To: <20161218054822.GA16024@mainline.lan>
+References: <20161218054822.GA16024@mainline.lan>
+Message-ID: <87tw9zim5s.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Aaron Moore <aaron@atamisk.net> writes:
 
-> Hi Pali and Tony,
-> On Wed, Dec 14, 2016 at 07:08:19AM -0800, Tony Lindgren wrote:
-> > * Pali Roh?r <pali.rohar@gmail.com> [161214 05:38]:
-> > > On Monday 08 August 2016 23:41:32 Pavel Machek wrote:
-> > > > On Mon 2016-08-08 11:09:56, Sakari Ailus wrote:
-> > > > > On Fri, Aug 05, 2016 at 12:26:11PM +0200, Pavel Machek wrote:
-> > > > > > This adds support for AD5820 autofocus coil, found for example in
-> > > > > > Nokia N900 smartphone.
-> > > > > 
-> > > > > Thanks, Pavel!
-> > > > > 
-> > > > > Let's use V4L2_CID_FOCUS_ABSOLUTE, as is in the patch. If we get
-> > > > > something better in the future, we'll switch to that then.
-> > > > > 
-> > > > > I've applied this to ad5820 branch in my tree.
-> > > > 
-> > > > Thanks. If I understands things correctly, both DTS patch and this
-> > > > patch are waiting in your tree, so we should be good to go for 4.9
-> > > > (unless some unexpected problems surface)?
-> > > > 
-> > > > Best regards,
-> > > > 									Pavel
-> > > 
-> > > Was DTS patch merged into 4.9? At least I do not see updated that dts 
-> > > file omap3-n900.dts in linus tree...
-> > 
-> > If it's not in current mainline or next, it's off my radar so sounds
-> > like I've somehow missed it and needs resending..
-> 
-> Where's this patch? I remember seeing the driver patch and the DT
-> documentation but no actual DT source patch for the N900.
+> Fix coding style issue caught by checkpatch.pl relating to braces on
+> single statement blocks. This issue was corrected in 3 locations.
+>
+> Signed-off-by: Aaron Moore <aaron@atamisk.net>
 
-The patch was not yet submitted. Autofocus coil is not too useful
-withou camera support, and we don't yet have support for v4l subdevs
-for omap3. I have it in the camera tree, but there are still pieces to
-be done before this is useful.
-
-Best regards,
-									Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Reviewed-by: Eric Anholt <eric@anholt.net>
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161219/39969b35/attachment.sig>
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161219/f7d2dc40/attachment.sig>
