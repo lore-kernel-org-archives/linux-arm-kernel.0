@@ -1,54 +1,36 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 19 Dec 2016 16:27:28 -0500
-Subject: [PATCH 2/3] arm64: Work around Falkor erratum 1003
-In-Reply-To: <20161208103115.GF33075@MBP.local>
-References: <20161207200028.4420-1-cov@codeaurora.org>
- <20161207200028.4420-2-cov@codeaurora.org> <20161208103115.GF33075@MBP.local>
-Message-ID: <495f2ae6-156d-4b69-1fcb-d9052898b185@codeaurora.org>
+From: lilja.magnus@gmail.com (Magnus Lilja)
+Date: Mon, 19 Dec 2016 22:28:53 +0100
+Subject: [PATCH 1/2] i.MX31: ipu: Make sure the interrupt routine checks all
+ interrupts.
+In-Reply-To: <1482182934-18559-1-git-send-email-lilja.magnus@gmail.com>
+References: <1482182934-18559-1-git-send-email-lilja.magnus@gmail.com>
+Message-ID: <1482182934-18559-2-git-send-email-lilja.magnus@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+Commit 3d8cc00073d6750ffe883685e49b2e4a0f596370 consolidated the two
+interrupts routines into one, but the remaining interrupt routine only
+checks the status of the error interrupts, not the normal interrupts.
 
-On 12/08/2016 05:31 AM, Catalin Marinas wrote:
-> On Wed, Dec 07, 2016 at 03:00:26PM -0500, Christopher Covington wrote:
->> From: Shanker Donthineni <shankerd@codeaurora.org>
->>
->> On the Qualcomm Datacenter Technologies Falkor v1 CPU, memory accesses may
->> allocate TLB entries using an incorrect ASID when TTBRx_EL1 is being
->> updated. Changing the TTBRx_EL1[ASID] and TTBRx_EL1[BADDR] fields
->> separately using a reserved ASID will ensure that there are no TLB entries
->> with incorrect ASID after changing the the ASID.
->>
->> Pseudo code:
->>   write TTBRx_EL1[ASID] to a reserved value
->>   ISB
->>   write TTBRx_EL1[BADDR] to a desired value
->>   ISB
->>   write TTBRx_EL1[ASID] to a desired value
->>   ISB
-> 
-> While the new ASID probably won't have incorrect TLB entries, the
-> reserved ASID will have random entries from all over the place. That's
-> because in step 1 you change the ASID to the reserved one while leaving
-> the old BADDR in place. There is a brief time before changing the ASID
-> when speculative page table walks will populate the TLB with entries
-> tagged with the reserved ASID. Such entries are never removed during TLB
-> shoot-down for the real ASID, so, depending on how this CPU implements
-> the walk cache, you could end up with intermediate level entries still
-> active and pointing to freed/reused pages. It will eventually hit an
-> entry that looks global with weird consequences.
-> 
-> We've been bitten by this in the past on arm32: 52af9c6cd863 ("ARM:
-> 6943/1: mm: use TTBR1 instead of reserved context ID").
+This patch fixes that problem (tested on i.MX31 PDK board).
 
-Thanks for bringing this up, but I'm told the scenario you describe won't
-happen on the Falkor 1.0 CPU.
+Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
+---
+ drivers/dma/ipu/ipu_irq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Cov
-
+diff --git a/drivers/dma/ipu/ipu_irq.c b/drivers/dma/ipu/ipu_irq.c
+index dd184b5..2846278 100644
+--- a/drivers/dma/ipu/ipu_irq.c
++++ b/drivers/dma/ipu/ipu_irq.c
+@@ -272,7 +272,7 @@ static void ipu_irq_handler(struct irq_desc *desc)
+ 	u32 status;
+ 	int i, line;
+ 
+-	for (i = IPU_IRQ_NR_FN_BANKS; i < IPU_IRQ_NR_BANKS; i++) {
++	for (i = 0; i < IPU_IRQ_NR_BANKS; i++) {
+ 		struct ipu_irq_bank *bank = irq_bank + i;
+ 
+ 		raw_spin_lock(&bank_lock);
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
-Aurora Forum, a Linux Foundation Collaborative Project.
+2.7.4
