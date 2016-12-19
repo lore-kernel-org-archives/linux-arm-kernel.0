@@ -1,20 +1,99 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 19 Dec 2016 16:05:07 -0600
-Subject: [PATCH 1/6] of: documentation: add bindings documentation for
- TS-4600
-In-Reply-To: <20161214231237.17496-2-sebastien.bourdelin@savoirfairelinux.com>
+Date: Mon, 19 Dec 2016 16:12:47 -0600
+Subject: [PATCH 3/6] dt-bindings: bus: Add documentation for the
+ Technologic Systems NBUS
+In-Reply-To: <20161214231237.17496-4-sebastien.bourdelin@savoirfairelinux.com>
 References: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
- <20161214231237.17496-2-sebastien.bourdelin@savoirfairelinux.com>
-Message-ID: <20161219220507.qwmqy3at532ykyng@rob-hp-laptop>
+ <20161214231237.17496-4-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20161219221247.cgcvssqo23qyslyj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2016 at 06:12:31PM -0500, Sebastien Bourdelin wrote:
-> This adds the documentation for the TS-4600 by Technologic Systems.
+On Wed, Dec 14, 2016 at 06:12:33PM -0500, Sebastien Bourdelin wrote:
+> Add binding documentation for the Technologic Systems NBUS that is used
+> to interface with peripherals in the FPGA of the TS-4600 SoM.
 > 
 > Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
 > ---
->  Documentation/devicetree/bindings/arm/technologic.txt | 5 +++++
->  1 file changed, 5 insertions(+)
+>  Documentation/devicetree/bindings/bus/ts-nbus.txt | 50 +++++++++++++++++++++++
+>  1 file changed, 50 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/bus/ts-nbus.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/bus/ts-nbus.txt b/Documentation/devicetree/bindings/bus/ts-nbus.txt
+> new file mode 100644
+> index 0000000..2f777ee
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/bus/ts-nbus.txt
+> @@ -0,0 +1,50 @@
+> +Technologic Systems NBUS
+> +
+> +The NBUS is a bus used to interface with peripherals in the Technologic
+> +Systems FPGA on the TS-4600 SoM.
+> +
+> +Required properties :
+> + - compatible     : "technologic,ts-nbus", "simple-bus"
+> + - #address-cells : must be 1
+> + - #size-cells    : must be 0
+> + - pws            : The PWM pin connected to the clock line on the FPGA
 
-Acked-by: Rob Herring <robh@kernel.org>
+Using PWM binding?
+
+> + - data-gpios	  : The GPIO pin connected to the data line on the FPGA
+> + - csn-gpios	  : The GPIO pin connected to the csn line on the FPGA
+> + - txrx-gpios	  : The GPIO pin connected to the txrx line on the FPGA
+> + - strobe-gpios	  : The GPIO pin connected to the stobe line on the FPGA
+> + - ale-gpios	  : The GPIO pin connected to the ale line on the FPGA
+> + - rdy-gpios	  : The GPIO pin connected to the rdy line on the FPGA
+
+These all need vendor prefix.
+
+This is not any sort of standard bus?
+
+> +
+> +Child nodes:
+> +
+> +The NBUS node can contain zero or more child nodes representing peripherals
+> +on the bus.
+> +
+> +Example:
+> +
+> +	nbus {
+> +		compatible = "technologic,ts-nbus", "simple-bus";
+
+I don't think simple-bus is really valid here. Don't you need the nbus 
+driver before the devices are usable?
+
+> +		pinctrl-0 = <&nbus_pins>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pwms = <&pwm 2 83>;
+> +		data-gpios   = <&gpio0 0 GPIO_ACTIVE_HIGH
+> +				&gpio0 1 GPIO_ACTIVE_HIGH
+> +				&gpio0 2 GPIO_ACTIVE_HIGH
+> +				&gpio0 3 GPIO_ACTIVE_HIGH
+> +				&gpio0 4 GPIO_ACTIVE_HIGH
+> +				&gpio0 5 GPIO_ACTIVE_HIGH
+> +				&gpio0 6 GPIO_ACTIVE_HIGH
+> +				&gpio0 7 GPIO_ACTIVE_HIGH>;
+> +		csn-gpios    = <&gpio0 16 GPIO_ACTIVE_HIGH>;
+> +		txrx-gpios   = <&gpio0 24 GPIO_ACTIVE_HIGH>;
+> +		strobe-gpios = <&gpio0 25 GPIO_ACTIVE_HIGH>;
+> +		ale-gpios    = <&gpio0 26 GPIO_ACTIVE_HIGH>;
+> +		rdy-gpios    = <&gpio0 21 GPIO_ACTIVE_HIGH>;
+> +
+> +		wdt at 2a {
+
+watchdog at ...
+
+> +			compatible = "...";
+> +
+> +			/* ... */
+> +		};
+> +	};
+> -- 
+> 2.10.2
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
