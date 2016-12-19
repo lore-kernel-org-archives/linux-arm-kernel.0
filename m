@@ -1,10 +1,10 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 19 Dec 2016 16:05:38 +0100
-Subject: [PATCH net 3/3] dt: bindings: net: use boolean dt properties for eee
- broken modes
+Date: Mon, 19 Dec 2016 16:05:37 +0100
+Subject: [PATCH net 2/3] net: phy: use boolean dt properties for eee broken
+ modes
 In-Reply-To: <1482159938-13239-1-git-send-email-jbrunet@baylibre.com>
 References: <1482159938-13239-1-git-send-email-jbrunet@baylibre.com>
-Message-ID: <1482159938-13239-4-git-send-email-jbrunet@baylibre.com>
+Message-ID: <1482159938-13239-3-git-send-email-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,56 +22,44 @@ over one bit field value mapping the register (too) directly.
 Cc: Florian Fainelli <f.fainelli@gmail.com>
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- Documentation/devicetree/bindings/net/phy.txt | 10 ++++++++--
- include/dt-bindings/net/mdio.h                | 19 -------------------
- 2 files changed, 8 insertions(+), 21 deletions(-)
- delete mode 100644 include/dt-bindings/net/mdio.h
+ drivers/net/phy/phy_device.c | 18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/phy.txt b/Documentation/devicetree/bindings/net/phy.txt
-index 54749b60a466..ff1bc4b1bb3b 100644
---- a/Documentation/devicetree/bindings/net/phy.txt
-+++ b/Documentation/devicetree/bindings/net/phy.txt
-@@ -38,8 +38,14 @@ Optional Properties:
- - enet-phy-lane-swap: If set, indicates the PHY will swap the TX/RX lanes to
-   compensate for the board being designed with the lanes swapped.
+diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
+index ee5ebadb1463..92b08383cafa 100644
+--- a/drivers/net/phy/phy_device.c
++++ b/drivers/net/phy/phy_device.c
+@@ -1665,7 +1665,7 @@ static void of_set_phy_supported(struct phy_device *phydev)
+ static void of_set_phy_eee_broken(struct phy_device *phydev)
+ {
+ 	struct device_node *node = phydev->mdio.dev.of_node;
+-	u32 broken;
++	u32 broken = 0;
  
--- eee-broken-modes: Bits to clear in the MDIO_AN_EEE_ADV register to
--  disable EEE broken modes.
-+- eee-broken-100tx:
-+- eee-broken-1000t:
-+- eee-broken-10gt:
-+- eee-broken-1000kx:
-+- eee-broken-10gkx4:
-+- eee-broken-10gkr:
-+  Mark the corresponding energy efficient ethernet mode as broken and
-+  request the ethernet to stop advertising it.
+ 	if (!IS_ENABLED(CONFIG_OF_MDIO))
+ 		return;
+@@ -1673,8 +1673,20 @@ static void of_set_phy_eee_broken(struct phy_device *phydev)
+ 	if (!node)
+ 		return;
  
- Example:
+-	if (!of_property_read_u32(node, "eee-broken-modes", &broken))
+-		phydev->eee_broken_modes = broken;
++	if (of_property_read_bool(node, "eee-broken-100tx"))
++		broken |= MDIO_EEE_100TX;
++	if (of_property_read_bool(node, "eee-broken-1000t"))
++		broken |= MDIO_EEE_1000T;
++	if (of_property_read_bool(node, "eee-broken-10gt"))
++		broken |= MDIO_EEE_10GT;
++	if (of_property_read_bool(node, "eee-broken-1000kx"))
++		broken |= MDIO_EEE_1000KX;
++	if (of_property_read_bool(node, "eee-broken-10gkx4"))
++		broken |= MDIO_EEE_10GKX4;
++	if (of_property_read_bool(node, "eee-broken-10gkr"))
++		broken |= MDIO_EEE_10GKR;
++
++	phydev->eee_broken_modes = broken;
+ }
  
-diff --git a/include/dt-bindings/net/mdio.h b/include/dt-bindings/net/mdio.h
-deleted file mode 100644
-index 99c6d903d439..000000000000
---- a/include/dt-bindings/net/mdio.h
-+++ /dev/null
-@@ -1,19 +0,0 @@
--/*
-- * This header provides generic constants for ethernet MDIO bindings
-- */
--
--#ifndef _DT_BINDINGS_NET_MDIO_H
--#define _DT_BINDINGS_NET_MDIO_H
--
--/*
-- * EEE capability Advertisement
-- */
--
--#define MDIO_EEE_100TX		0x0002	/* 100TX EEE cap */
--#define MDIO_EEE_1000T		0x0004	/* 1000T EEE cap */
--#define MDIO_EEE_10GT		0x0008	/* 10GT EEE cap */
--#define MDIO_EEE_1000KX		0x0010	/* 1000KX EEE cap */
--#define MDIO_EEE_10GKX4		0x0020	/* 10G KX4 EEE cap */
--#define MDIO_EEE_10GKR		0x0040	/* 10G KR EEE cap */
--
--#endif
+ /**
 -- 
 2.7.4
