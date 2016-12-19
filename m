@@ -1,37 +1,26 @@
 From: romain.perier@free-electrons.com (Romain Perier)
-Date: Mon, 19 Dec 2016 15:16:06 +0100
-Subject: [PATCH 1/4] net: dsa: mv88e6xxx: Allow mv88e6xxx_smi_init() to be
- used at address 0x1
-In-Reply-To: <20161219141610.30934-1-romain.perier@free-electrons.com>
-References: <20161219141610.30934-1-romain.perier@free-electrons.com>
-Message-ID: <20161219141610.30934-2-romain.perier@free-electrons.com>
+Date: Mon, 19 Dec 2016 15:16:05 +0100
+Subject: [PATCH 0/4] Add support for the ethernet switch on the EXPRESSObin
+Message-ID: <20161219141610.30934-1-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the function mv88e6xxx_smi_init() returns -EINVAL if the bit
-zero of sw_addr is 0x1. However, on some platforms, ethernet switches
-are configured in Multi chip addressing mode and available at MDIO
-address 0x1.
+This set of patches adds support for the Marvell ethernet switch 88E6341.
+It also add the devicetree definition of thid switch to the DT board.
 
-Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
----
- drivers/net/dsa/mv88e6xxx/chip.c | 4 ----
- 1 file changed, 4 deletions(-)
+Romain Perier (4):
+  net: dsa: mv88e6xxx: Allow mv88e6xxx_smi_init() to be used at address
+    0x1
+  net: dsa: mv88e6xxx: Don't forbid MDIO I/Os for PHY addr >=
+    num_of_ports
+  net: dsa: mv88e6xxx: Add support for ethernet switch 88E6341/88E6141
+  arm64: dts: marvell: Add ethernet switch definition for the
+    EXPRESSObin
 
-diff --git a/drivers/net/dsa/mv88e6xxx/chip.c b/drivers/net/dsa/mv88e6xxx/chip.c
-index f7222dc..b5f0e1e 100644
---- a/drivers/net/dsa/mv88e6xxx/chip.c
-+++ b/drivers/net/dsa/mv88e6xxx/chip.c
-@@ -4240,10 +4240,6 @@ static void mv88e6xxx_phy_destroy(struct mv88e6xxx_chip *chip)
- static int mv88e6xxx_smi_init(struct mv88e6xxx_chip *chip,
- 			      struct mii_bus *bus, int sw_addr)
- {
--	/* ADDR[0] pin is unavailable externally and considered zero */
--	if (sw_addr & 0x1)
--		return -EINVAL;
--
- 	if (sw_addr == 0)
- 		chip->smi_ops = &mv88e6xxx_smi_single_chip_ops;
- 	else if (mv88e6xxx_has(chip, MV88E6XXX_FLAGS_MULTI_CHIP))
+ .../boot/dts/marvell/armada-3720-espressobin.dts   | 67 ++++++++++++++++++++++
+ drivers/net/dsa/mv88e6xxx/chip.c                   | 24 ++++----
+ drivers/net/dsa/mv88e6xxx/mv88e6xxx.h              |  4 +-
+ 3 files changed, 84 insertions(+), 11 deletions(-)
+
 -- 
 2.9.3
