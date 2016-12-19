@@ -1,56 +1,30 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Mon, 19 Dec 2016 15:30:12 +0100
-Subject: [PATCH v1] mtd: nand: tango: Update DT binding description
-Message-ID: <ba47f2f1-bcdc-91e8-ed79-153931ccdad8@sigmadesigns.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 19 Dec 2016 15:38:48 +0100
+Subject: [PATCH 1/4] net: dsa: mv88e6xxx: Allow mv88e6xxx_smi_init() to
+ be used at address 0x1
+In-Reply-To: <20161219141610.30934-2-romain.perier@free-electrons.com>
+References: <20161219141610.30934-1-romain.perier@free-electrons.com>
+ <20161219141610.30934-2-romain.perier@free-electrons.com>
+Message-ID: <20161219143848.GA10048@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Visually separate register ranges (address/size pairs) in reg prop.
-Change DMA channel name, for consistency with other drivers.
+On Mon, Dec 19, 2016 at 03:16:06PM +0100, Romain Perier wrote:
+> Currently, the function mv88e6xxx_smi_init() returns -EINVAL if the bit
+> zero of sw_addr is 0x1. However, on some platforms, ethernet switches
+> are configured in Multi chip addressing mode and available at MDIO
+> address 0x1.
 
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
----
- Documentation/devicetree/bindings/mtd/tango-nand.txt | 6 +++---
- drivers/mtd/nand/tango_nand.c                        | 2 +-
- 2 files changed, 4 insertions(+), 4 deletions(-)
+Hi Romain
 
-diff --git a/Documentation/devicetree/bindings/mtd/tango-nand.txt b/Documentation/devicetree/bindings/mtd/tango-nand.txt
-index ad5a02f2ac8c..cd1bf2ac9055 100644
---- a/Documentation/devicetree/bindings/mtd/tango-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/tango-nand.txt
-@@ -5,7 +5,7 @@ Required properties:
- - compatible: "sigma,smp8758-nand"
- - reg: address/size of nfc_reg, nfc_mem, and pbus_reg
- - dmas: reference to the DMA channel used by the controller
--- dma-names: "nfc_sbox"
-+- dma-names: "rxtx"
- - clocks: reference to the system clock
- - #address-cells: <1>
- - #size-cells: <0>
-@@ -17,9 +17,9 @@ Example:
- 
- 	nandc: nand-controller at 2c000 {
- 		compatible = "sigma,smp8758-nand";
--		reg = <0x2c000 0x30 0x2d000 0x800 0x20000 0x1000>;
-+		reg = <0x2c000 0x30>, <0x2d000 0x800>, <0x20000 0x1000>;
- 		dmas = <&dma0 3>;
--		dma-names = "nfc_sbox";
-+		dma-names = "rxtx";
- 		clocks = <&clkgen SYS_CLK>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/drivers/mtd/nand/tango_nand.c b/drivers/mtd/nand/tango_nand.c
-index cc23db64f0ca..51dc88d6b8da 100644
---- a/drivers/mtd/nand/tango_nand.c
-+++ b/drivers/mtd/nand/tango_nand.c
-@@ -629,7 +629,7 @@ static int tango_nand_probe(struct platform_device *pdev)
- 	if (IS_ERR(clk))
- 		return PTR_ERR(clk);
- 
--	nfc->chan = dma_request_chan(&pdev->dev, "nfc_sbox");
-+	nfc->chan = dma_request_chan(&pdev->dev, "rxtx");
- 	if (IS_ERR(nfc->chan))
- 		return PTR_ERR(nfc->chan);
- 
--- 
-2.10.0
+What branch is this against? net-next?
+
+Please see:
+
+https://www.spinics.net/lists/netdev/msg409156.html
+
+It would be nicer to use Volodymyr, since it has been reviewed. 
+
+Volodymyr, what happened to your version 2? Did David accept it?
+
+	   Andrew
