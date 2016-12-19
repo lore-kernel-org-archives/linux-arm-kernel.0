@@ -1,163 +1,66 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 19 Dec 2016 21:15:04 +0200
-Subject: [PATCH v10 0/8] power: add power sequence library
-In-Reply-To: <1479087359-7547-1-git-send-email-peter.chen@nxp.com>
-References: <1479087359-7547-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <20161219191504.GA18988@kozik-lap>
+From: nwatters@codeaurora.org (Nate Watterson)
+Date: Mon, 19 Dec 2016 15:26:40 -0500
+Subject: [PATCH] iommu/arm-smmu-v3: avoid over allocating for l2 stream tables
+Message-ID: <1482179200-4264-1-git-send-email-nwatters@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 14, 2016 at 09:35:51AM +0800, Peter Chen wrote:
-> Hi all,
-> 
-> This is a follow-up for my last power sequence framework patch set [1].
-> According to Rob Herring and Ulf Hansson's comments[2]. The kinds of
-> power sequence instances will be added at postcore_initcall, the match
-> criteria is compatible string first, if the compatible string is not
-> matched between dts and library, it will try to use generic power sequence.
-> 	 
-> The host driver just needs to call of_pwrseq_on/of_pwrseq_off
-> if only one power sequence instance is needed, for more power sequences
-> are used, using of_pwrseq_on_list/of_pwrseq_off_list instead (eg, USB hub driver).
-> 
-> In future, if there are special power sequence requirements, the special
-> power sequence library can be created.
-> 
-> This patch set is tested on i.mx6 sabresx evk using a dts change, I use
-> two hot-plug devices to simulate this use case, the related binding
-> change is updated at patch [1/6], The udoo board changes were tested
-> using my last power sequence patch set.[3]
-> 
-> Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
-> need to power on itself before it can be found by ULPI bus.
-> 
-> [1] http://www.spinics.net/lists/linux-usb/msg142755.html
-> [2] http://www.spinics.net/lists/linux-usb/msg143106.html
-> [3] http://www.spinics.net/lists/linux-usb/msg142815.html
-> 
-> Changes for v10:
-> - Improve the kernel-doc for power sequence core, including exported APIs and
->   main structure. [Patch 2/8]
-> - Change Kconfig, and let the user choose power sequence. [Patch 2/8]
-> - Delete EXPORT_SYMBOL and change related APIs as local, these APIs do not
->   be intended to export currently. [Patch 2/8]
-> - Selete POWER_SEQUENCE at USB core's Kconfig. [Patch 4/8]
+Currently, all l2 stream tables are being allocated with space for
+(1<<split) stes without regard to the number of sid bits the smmu
+physically supports. To avoid allocating memory for inaccessible
+stes, this patch limits the span of an l2 table to be no larger
+than the sid size of the smmu to which it belongs.
 
-Hi Peter,
+Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
+---
+ drivers/iommu/arm-smmu-v3.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-It is great that you continued the work on this.
-
-I saw (in some previous mails) your repo mentioned:
-https://git.kernel.org/cgit/linux/kernel/git/peter.chen/usb.git/
-Does it contain the recent version of this patchset?
-
-I want to build on top of it fixes for usb3503 on Odroid U3 board.
-
-Best regards,
-Krzysztof
-
-> 
-> Changes for v9:
-> - Add Vaibhav Hiremath's reviewed-by [Patch 4/8]
-> - Rebase to v4.9-rc1
-> 
-> Changes for v8:
-> - Allocate one extra pwrseq instance if pwrseq_get has succeed, it can avoid
->   preallocate instances problem which the number of instance is decided at
->   compile time, thanks for Heiko Stuebner's suggestion [Patch 2/8]
-> - Delete pwrseq_compatible_sample.c which is the demo purpose to show compatible
->   match method. [Patch 2/8]
-> - Add Maciej S. Szmigiero's tested-by. [Patch 7/8]
-> 
-> Changes for v7:
-> - Create kinds of power sequence instance at postcore_initcall, and match
->   the instance with node using compatible string, the beneit of this is
->   the host driver doesn't need to consider which pwrseq instance needs
->   to be used, and pwrseq core will match it, however, it eats some memories
->   if less power sequence instances are used. [Patch 2/8]
-> - Add pwrseq_compatible_sample.c to test match pwrseq using device_id. [Patch 2/8]
-> - Fix the comments Vaibhav Hiremath adds for error path for clock and do not
->   use device_node for parameters at pwrseq_on. [Patch 2/8]
-> - Simplify the caller to use power sequence, follows Alan's commnets [Patch 4/8]
-> - Tested three pwrseq instances together using both specific compatible string and
->   generic libraries.
-> 
-> Changes for v6:
-> - Add Matthias Kaehlcke's Reviewed-by and Tested-by. (patch [2/6])
-> - Change chipidea core of_node assignment for coming user. (patch [5/6])
-> - Applies Joshua Clayton's three dts changes for two boards,
->   the USB device's reg has only #address-cells, but without #size-cells.
-> 
-> Changes for v5:
-> - Delete pwrseq_register/pwrseq_unregister, which is useless currently
-> - Fix the linker error when the pwrseq user is compiled as module
-> 
-> Changes for v4:
-> - Create the patch on next-20160722 
-> - Fix the of_node is not NULL after chipidea driver is unbinded [Patch 5/6]
-> - Using more friendly wait method for reset gpio [Patch 2/6]
-> - Support multiple input clocks [Patch 2/6]
-> - Add Rob Herring's ack for DT changes
-> - Add Joshua Clayton's Tested-by
-> 
-> Changes for v3:
-> - Delete "power-sequence" property at binding-doc, and change related code
->   at both library and user code.
-> - Change binding-doc example node name with Rob's comments
-> - of_get_named_gpio_flags only gets the gpio, but without setting gpio flags,
->   add additional code request gpio with proper gpio flags
-> - Add Philipp Zabel's Ack and MAINTAINER's entry
-> 
-> Changes for v2:
-> - Delete "pwrseq" prefix and clock-names for properties at dt binding
-> - Should use structure not but its pointer for kzalloc
-> - Since chipidea core has no of_node, let core's of_node equals glue
->   layer's at core's probe
-> 
-> Joshua Clayton (2):
->   ARM: dts: imx6qdl: Enable usb node children with <reg>
->   ARM: dts: imx6q-evi: Fix onboard hub reset line
-> 
-> Peter Chen (6):
->   binding-doc: power: pwrseq-generic: add binding doc for generic power
->     sequence library
->   power: add power sequence library
->   binding-doc: usb: usb-device: add optional properties for power
->     sequence
->   usb: core: add power sequence handling for USB devices
->   usb: chipidea: let chipidea core device of_node equal's glue layer
->     device of_node
->   ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
-> 
->  .../bindings/power/pwrseq/pwrseq-generic.txt       |  48 +++++
->  .../devicetree/bindings/usb/usb-device.txt         |  10 +-
->  MAINTAINERS                                        |   9 +
->  arch/arm/boot/dts/imx6q-evi.dts                    |  25 +--
->  arch/arm/boot/dts/imx6qdl-udoo.dtsi                |  26 ++-
->  arch/arm/boot/dts/imx6qdl.dtsi                     |   6 +
->  drivers/power/Kconfig                              |   1 +
->  drivers/power/Makefile                             |   1 +
->  drivers/power/pwrseq/Kconfig                       |  21 ++
->  drivers/power/pwrseq/Makefile                      |   2 +
->  drivers/power/pwrseq/core.c                        | 237 +++++++++++++++++++++
->  drivers/power/pwrseq/pwrseq_generic.c              | 183 ++++++++++++++++
->  drivers/usb/Kconfig                                |   1 +
->  drivers/usb/chipidea/core.c                        |  27 ++-
->  drivers/usb/core/hub.c                             |  41 +++-
->  drivers/usb/core/hub.h                             |   1 +
->  include/linux/power/pwrseq.h                       |  60 ++++++
->  17 files changed, 658 insertions(+), 41 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
->  create mode 100644 drivers/power/pwrseq/Kconfig
->  create mode 100644 drivers/power/pwrseq/Makefile
->  create mode 100644 drivers/power/pwrseq/core.c
->  create mode 100644 drivers/power/pwrseq/pwrseq_generic.c
->  create mode 100644 include/linux/power/pwrseq.h
-> 
-> -- 
-> 2.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 4d6ec44..5dca671 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1129,6 +1129,7 @@ static void arm_smmu_init_bypass_stes(u64 *strtab, unsigned int nent)
+ 
+ static int arm_smmu_init_l2_strtab(struct arm_smmu_device *smmu, u32 sid)
+ {
++	u8 span;
+ 	size_t size;
+ 	void *strtab;
+ 	struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
+@@ -1137,10 +1138,11 @@ static int arm_smmu_init_l2_strtab(struct arm_smmu_device *smmu, u32 sid)
+ 	if (desc->l2ptr)
+ 		return 0;
+ 
+-	size = 1 << (STRTAB_SPLIT + ilog2(STRTAB_STE_DWORDS) + 3);
++	span = (smmu->sid_bits < STRTAB_SPLIT) ? smmu->sid_bits : STRTAB_SPLIT;
++	size = 1 << (span + ilog2(STRTAB_STE_DWORDS) + 3);
+ 	strtab = &cfg->strtab[(sid >> STRTAB_SPLIT) * STRTAB_L1_DESC_DWORDS];
+ 
+-	desc->span = STRTAB_SPLIT + 1;
++	desc->span = span + 1;
+ 	desc->l2ptr = dmam_alloc_coherent(smmu->dev, size, &desc->l2ptr_dma,
+ 					  GFP_KERNEL | __GFP_ZERO);
+ 	if (!desc->l2ptr) {
+@@ -1150,7 +1152,7 @@ static int arm_smmu_init_l2_strtab(struct arm_smmu_device *smmu, u32 sid)
+ 		return -ENOMEM;
+ 	}
+ 
+-	arm_smmu_init_bypass_stes(desc->l2ptr, 1 << STRTAB_SPLIT);
++	arm_smmu_init_bypass_stes(desc->l2ptr, 1 << span);
+ 	arm_smmu_write_strtab_l1_desc(strtab, desc);
+ 	return 0;
+ }
+@@ -2001,6 +2003,8 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
+ 		dev_warn(smmu->dev,
+ 			 "2-level strtab only covers %u/%u bits of SID\n",
+ 			 size, smmu->sid_bits);
++	else if (smmu->sid_bits < size)
++		size = smmu->sid_bits;
+ 
+ 	l1size = cfg->num_l1_ents * (STRTAB_L1_DESC_DWORDS << 3);
+ 	strtab = dmam_alloc_coherent(smmu->dev, l1size, &cfg->strtab_dma,
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux
+Foundation Collaborative Project.
