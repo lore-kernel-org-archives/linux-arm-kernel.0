@@ -1,123 +1,456 @@
-From: jerry.huang@nxp.com (Changming Huang)
-Date: Mon, 19 Dec 2016 17:25:54 +0800
-Subject: [PATCH v3 3/3] USB3/DWC3: Enable undefined length INCR burst type
-In-Reply-To: <1482139554-13618-1-git-send-email-jerry.huang@nxp.com>
-References: <1482139554-13618-1-git-send-email-jerry.huang@nxp.com>
-Message-ID: <1482139554-13618-3-git-send-email-jerry.huang@nxp.com>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Mon, 19 Dec 2016 15:17:37 +0530
+Subject: [PATCH v10 6/8] arm/arm64: vgic: Implement VGICv3 CPU interface
+ access
+In-Reply-To: <af6f17a5-f20a-91f7-c280-1669e9b805a4@redhat.com>
+References: <1480576187-5012-1-git-send-email-vijay.kilari@gmail.com>
+ <1480576187-5012-7-git-send-email-vijay.kilari@gmail.com>
+ <af6f17a5-f20a-91f7-c280-1669e9b805a4@redhat.com>
+Message-ID: <CALicx6spkmp4ipvCA_TUfzaJ0K38tpWHsV9CGU4MEQzTwa00sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the undefined length INCR burst type and set INCRx.
-Different platform may has the different burst size type.
-In order to get best performance, we need to tune the burst size to
-one special value, instead of the default value.
+On Fri, Dec 16, 2016 at 5:55 PM, Auger Eric <eric.auger@redhat.com> wrote:
+> Hi Vijaya,
+>
+> On 01/12/2016 08:09, vijay.kilari at gmail.com wrote:
+>> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>>
+>> VGICv3 CPU interface registers are accessed using
+>> KVM_DEV_ARM_VGIC_CPU_SYSREGS ioctl. These registers are accessed
+>> as 64-bit. The cpu MPIDR value is passed along with register id.
+>> is used to identify the cpu for registers access.
+> s/is/It is
+>>
+>> The VM that supports SEIs expect it on destination machine to handle
+>> guest aborts and hence checked for ICC_CTLR_EL1.SEIS compatibility.
+>> Similarly, VM that supports Affinity Level 3 that is required for AArch64
+>> mode, is required to be supported on destination machine. Hence checked
+>> for ICC_CTLR_EL1.A3V compatibility.
+> We make sure ICC_CTLR_EL1 SEIS and A3V are compatible on source and target?
+>>
+>> The arch/arm64/kvm/vgic-sys-reg-v3.c handles read and write of VGIC
+>> CPU registers for AArch64.
+>>
+>> For AArch32 mode, arch/arm/kvm/vgic-v3-coproc.c file is created but
+>> APIs are not implemented.
+>>
+>> Updated arch/arm/include/uapi/asm/kvm.h with new definitions
+>> required to compile for AArch32.
+>>
+>> The version of VGIC v3 specification is define here
+> s/define/defined
+>> Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+>>
+>> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+>> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>> ---
+>> --- /dev/null
+>> +++ b/arch/arm64/kvm/vgic-sys-reg-v3.c
+>> @@ -0,0 +1,338 @@
+>> +/*
+>> + * VGIC system registers handling functions for AArch64 mode
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/irqchip/arm-gic-v3.h>
+>> +#include <linux/kvm.h>
+>> +#include <linux/kvm_host.h>
+>> +#include <asm/kvm_emulate.h>
+>> +#include "vgic.h"
+>> +#include "sys_regs.h"
+>> +
+>> +static bool access_gic_ctlr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>> +                         const struct sys_reg_desc *r)
+>> +{
+>> +     u32 host_pri_bits, host_id_bits, host_seis, host_a3v, seis, a3v;
+>> +     struct vgic_cpu *vgic_v3_cpu = &vcpu->arch.vgic_cpu;
+>> +     struct vgic_vmcr vmcr;
+>> +     u64 val;
+>> +
+>> +     vgic_get_vmcr(vcpu, &vmcr);
+>> +     if (p->is_write) {
+>> +             val = p->regval;
+>> +
+>> +             /*
+>> +              * Disallow restoring VM state if not supported by this
+>> +              * hardware.
+>> +              */
+>> +             host_pri_bits = ((val & ICC_CTLR_EL1_PRI_BITS_MASK) >>
+>> +                              ICC_CTLR_EL1_PRI_BITS_SHIFT) + 1;
+> I am confused by the "host" terminology. Those are the "source" values
+> we want to restore and we compare with the destination current value, right?
 
-Signed-off-by: Changming Huang <jerry.huang@nxp.com>
-Signed-off-by: Rajesh Bhagat <rajesh.bhagat@nxp.com>
----
-Changes in v3:
-  - add new property for INCR burst in usb node to reset GSBUSCFG0.
-Changes in v2:
-  - split patch
-  - create one new function to handle soc bus configuration register.
+yes
 
- drivers/usb/dwc3/core.c |   51 +++++++++++++++++++++++++++++++++++++++++++++++
- drivers/usb/dwc3/core.h |    7 +++++++
- 2 files changed, 58 insertions(+)
+>> +             if (host_pri_bits > vgic_v3_cpu->num_pri_bits)
+>> +                     return false;
+> I am lost. Who did set num_pri_bits and num_id_bits we compare with?
 
-diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-index 369bab1..404d7e9 100644
---- a/drivers/usb/dwc3/core.c
-+++ b/drivers/usb/dwc3/core.c
-@@ -650,6 +650,55 @@ static void dwc3_core_setup_global_control(struct dwc3 *dwc)
- 	dwc3_writel(dwc->regs, DWC3_GCTL, reg);
- }
- 
-+/* set global soc bus configuration registers */
-+static void dwc3_set_soc_bus_cfg(struct dwc3 *dwc)
-+{
-+	struct device *dev = dwc->dev;
-+	u32 cfg;
-+	int ret;
-+
-+	cfg = dwc3_readl(dwc->regs, DWC3_GSBUSCFG0);
-+
-+	/* Get INCR burst type, if return !NULL, not to change this type */
-+	ret = device_property_read_u32_array(dev,
-+			"snps,incr-burst-type-adjustment",
-+			dwc->incr_burst_type, 2);
-+	if (!ret) {
-+		/* Enable Undefined Length INCR Burst and Enable INCRx Burst */
-+		cfg &= ~DWC3_GSBUSCFG0_INCRBRST_MASK;
-+		if (*dwc->incr_burst_type)
-+			cfg |= DWC3_GSBUSCFG0_INCRBRSTENA;
-+		switch (*(dwc->incr_burst_type + 1)) {
-+		case 256:
-+			cfg |= DWC3_GSBUSCFG0_INCR256BRSTENA;
-+			break;
-+		case 128:
-+			cfg |= DWC3_GSBUSCFG0_INCR128BRSTENA;
-+			break;
-+		case 64:
-+			cfg |= DWC3_GSBUSCFG0_INCR64BRSTENA;
-+			break;
-+		case 32:
-+			cfg |= DWC3_GSBUSCFG0_INCR32BRSTENA;
-+			break;
-+		case 16:
-+			cfg |= DWC3_GSBUSCFG0_INCR16BRSTENA;
-+			break;
-+		case 8:
-+			cfg |= DWC3_GSBUSCFG0_INCR8BRSTENA;
-+			break;
-+		case 4:
-+			cfg |= DWC3_GSBUSCFG0_INCR4BRSTENA;
-+			break;
-+		default:
-+			dev_err(dev, "Invalid property\n");
-+			break;
-+		}
-+	}
-+
-+	dwc3_writel(dwc->regs, DWC3_GSBUSCFG0, cfg);
-+}
-+
- /**
-  * dwc3_core_init - Low-level initialization of DWC3 Core
-  * @dwc: Pointer to our controller context structure
-@@ -698,6 +747,8 @@ static int dwc3_core_init(struct dwc3 *dwc)
- 	/* Adjust Frame Length */
- 	dwc3_frame_length_adjustment(dwc);
- 
-+	dwc3_set_soc_bus_cfg(dwc);
-+
- 	usb_phy_set_suspend(dwc->usb2_phy, 0);
- 	usb_phy_set_suspend(dwc->usb3_phy, 0);
- 	ret = phy_power_on(dwc->usb2_generic_phy);
-diff --git a/drivers/usb/dwc3/core.h b/drivers/usb/dwc3/core.h
-index 065aa6f..cfe389b 100644
---- a/drivers/usb/dwc3/core.h
-+++ b/drivers/usb/dwc3/core.h
-@@ -805,6 +805,7 @@ struct dwc3_scratchpad_array {
-  * @regs: base address for our registers
-  * @regs_size: address space size
-  * @fladj: frame length adjustment
-+ * @incr_burst_type: INCR burst type adjustment
-  * @irq_gadget: peripheral controller's IRQ number
-  * @nr_scratch: number of scratch buffers
-  * @u1u2: only used on revisions <1.83a for workaround
-@@ -928,6 +929,12 @@ struct dwc3 {
- 	enum usb_phy_interface	hsphy_mode;
- 
- 	u32			fladj;
-+	/*
-+	 * For INCR burst type.
-+	 * First field: for undefined length INCR burst type enable.
-+	 * Second field: for INCRx burst type enable
-+	 */
-+	u32			incr_burst_type[2];
- 	u32			irq_gadget;
- 	u32			nr_scratch;
- 	u32			u1u2;
--- 
-1.7.9.5
+In vgic_v3_enable()  these values are computed
+
+> Seis and a3v I get this is computed on probe
+>> +
+>> +             vgic_v3_cpu->num_pri_bits = host_pri_bits;
+>> +
+>> +             host_id_bits = (val & ICC_CTLR_EL1_ID_BITS_MASK) >>
+>> +                             ICC_CTLR_EL1_ID_BITS_SHIFT;
+>> +             if (host_id_bits > vgic_v3_cpu->num_id_bits)
+>> +                     return false;
+>> +
+>> +             vgic_v3_cpu->num_id_bits = host_id_bits;
+>> +
+>> +             host_seis = ((kvm_vgic_global_state.ich_vtr_el2 &
+>> +                          ICH_VTR_SEIS_MASK) >> ICH_VTR_SEIS_SHIFT);
+>> +             seis = (val & ICC_CTLR_EL1_SEIS_MASK) >>
+>> +                     ICC_CTLR_EL1_SEIS_SHIFT;
+>> +             if (host_seis != seis)
+>> +                     return false;
+>> +
+>> +             host_a3v = ((kvm_vgic_global_state.ich_vtr_el2 &
+>> +                         ICH_VTR_A3V_MASK) >> ICH_VTR_A3V_SHIFT);
+>> +             a3v = (val & ICC_CTLR_EL1_A3V_MASK) >> ICC_CTLR_EL1_A3V_SHIFT;
+>> +             if (host_a3v != a3v)
+>> +                     return false;
+>> +
+>> +             vmcr.ctlr = val & ICC_CTLR_EL1_CBPR_MASK;
+>> +             vmcr.ctlr |= val & ICC_CTLR_EL1_EOImode_MASK;
+> nit: I still don't get why the vmcr has CPBR and EOImode set with the
+> ICC_CTLR_EL1 layout and then this gets transformed in the proper vmcr
+> format by vgic_set_vmcr. This is confusing to me and would at least
+> deserve a comment attached to struct vgic_vmcr definition.
+
+I will add a comment
+>
+> Why don't we set the vmcr.ctlr directly in its ICH_VMCR format? In
+> set/get_vmcr all the other struct vgic_vmcr fields are handled in
+> ICH_VMCR native layout except the ctrl field.
+
+None of the fields of struct vgic_vmcr are in ICH_VMCR native layout.
+Except ctlr all the other fields are registers having single field value.
+Ex: pmr, bpr0 etc.,
+
+>
+>> +             vgic_set_vmcr(vcpu, &vmcr);
+>> +     } else {
+>> +             val = 0;
+>> +             val |= (vgic_v3_cpu->num_pri_bits - 1) <<
+>> +                     ICC_CTLR_EL1_PRI_BITS_SHIFT;
+>> +             val |= vgic_v3_cpu->num_id_bits << ICC_CTLR_EL1_ID_BITS_SHIFT;
+>> +             val |= ((kvm_vgic_global_state.ich_vtr_el2 &
+>> +                     ICH_VTR_SEIS_MASK) >> ICH_VTR_SEIS_SHIFT) <<
+>> +                     ICC_CTLR_EL1_SEIS_SHIFT;
+>> +             val |= ((kvm_vgic_global_state.ich_vtr_el2 &
+>> +                     ICH_VTR_A3V_MASK) >> ICH_VTR_A3V_SHIFT) <<
+>> +                     ICC_CTLR_EL1_A3V_SHIFT;
+>> +             val |= vmcr.ctlr & ICC_CTLR_EL1_CBPR_MASK;
+>> +             val |= vmcr.ctlr & ICC_CTLR_EL1_EOImode_MASK;
+>> +
+>> +             p->regval = val;
+>> +     }
+>> +
+>> +     return true;
+>> +}
+>> +
+>> +static bool access_gic_pmr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>> +                        const struct sys_reg_desc *r)
+>> +{
+>> +     struct vgic_vmcr vmcr;
+>> +
+>> +     vgic_get_vmcr(vcpu, &vmcr);
+>> +     if (p->is_write) {
+>> +             vmcr.pmr = (p->regval & ICC_PMR_EL1_MASK) >> ICC_PMR_EL1_SHIFT;
+>> +             vgic_set_vmcr(vcpu, &vmcr);
+>> +     } else {
+>> +             p->regval = (vmcr.pmr << ICC_PMR_EL1_SHIFT) & ICC_PMR_EL1_MASK;
+>> +     }
+>> +
+>> +     return true;
+>> +}
+>> +
+>> +static bool access_gic_bpr0(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>> +                         const struct sys_reg_desc *r)
+>> +{
+>> +     struct vgic_vmcr vmcr;
+>> +
+>> +     vgic_get_vmcr(vcpu, &vmcr);
+>> +     if (p->is_write) {
+>> +             vmcr.bpr = (p->regval & ICC_BPR0_EL1_MASK) >>
+>> +                         ICC_BPR0_EL1_SHIFT;
+>> +             vgic_set_vmcr(vcpu, &vmcr);
+>> +     } else {
+>> +             p->regval = (vmcr.bpr << ICC_BPR0_EL1_SHIFT) &
+>> +                          ICC_BPR0_EL1_MASK;
+>> +     }
+>> +
+>> +     return true;
+>> +}
+>> +
+>> +static bool access_gic_bpr1(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>> +                         const struct sys_reg_desc *r)
+>> +{
+>> +     struct vgic_vmcr vmcr;
+>> +
+>> +     if (!p->is_write)
+>> +             p->regval = 0;
+>> +
+>> +     vgic_get_vmcr(vcpu, &vmcr);
+>> +     if (!((vmcr.ctlr & ICH_VMCR_CBPR_MASK) >> ICH_VMCR_CBPR_SHIFT)) {
+>> +             if (p->is_write) {
+>> +                     vmcr.abpr = (p->regval & ICC_BPR1_EL1_MASK) >>
+>> +                                  ICC_BPR1_EL1_SHIFT;
+>> +                     vgic_set_vmcr(vcpu, &vmcr);
+>> +             } else {
+>> +                     p->regval = (vmcr.abpr << ICC_BPR1_EL1_SHIFT) &
+>> +                                  ICC_BPR1_EL1_MASK;
+>> +             }
+>> +     } else {
+>> +             if (!p->is_write)
+>> +                     p->regval = min((vmcr.bpr + 1), 7U);
+>> +     }
+>> +
+>> +     return true;
+>> +}
+>> +
+>> +static bool access_gic_grpen0(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>> +                           const struct sys_reg_desc *r)
+>> +{
+>> +     struct vgic_vmcr vmcr;
+>> +
+>> +     vgic_get_vmcr(vcpu, &vmcr);
+>> +     if (p->is_write) {
+>> +             vmcr.grpen0 = (p->regval & ICC_IGRPEN0_EL1_MASK) >>
+>> +                            ICC_IGRPEN0_EL1_SHIFT;
+>> +             vgic_set_vmcr(vcpu, &vmcr);
+>> +     } else {
+>> +             p->regval = (vmcr.grpen0 << ICC_IGRPEN0_EL1_SHIFT) &
+>> +                          ICC_IGRPEN0_EL1_MASK;
+>> +     }
+>> +
+>> +     return true;
+>> +}
+>> +
+>> +static bool access_gic_grpen1(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>> +                           const struct sys_reg_desc *r)
+>> +{
+>> +     struct vgic_vmcr vmcr;
+>> +
+>> +     vgic_get_vmcr(vcpu, &vmcr);
+>> +     if (p->is_write) {
+>> +             vmcr.grpen1 = (p->regval & ICC_IGRPEN1_EL1_MASK) >>
+>> +                            ICC_IGRPEN1_EL1_SHIFT;
+>> +             vgic_set_vmcr(vcpu, &vmcr);
+>> +     } else {
+>> +             p->regval = (vmcr.grpen1 << ICC_IGRPEN1_EL1_SHIFT) &
+>> +                          ICC_IGRPEN1_EL1_MASK;
+>> +     }
+>> +
+>> +     return true;
+>> +}
+>> +
+>> +static void vgic_v3_access_apr_reg(struct kvm_vcpu *vcpu,
+>> +                                struct sys_reg_params *p, u8 apr, u8 idx)
+>> +{
+>> +     struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
+>> +     uint32_t *ap_reg;
+>> +
+>> +     if (apr)
+>> +             ap_reg = &vgicv3->vgic_ap1r[idx];
+>> +     else
+>> +             ap_reg = &vgicv3->vgic_ap0r[idx];
+>> +
+>> +     if (p->is_write)
+>> +             *ap_reg = p->regval;
+>> +     else
+>> +             p->regval = *ap_reg;
+>> +}
+>> +
+>> +static bool access_gic_aprn(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>> +                         const struct sys_reg_desc *r, u8 apr)
+>> +{
+>> +     struct vgic_cpu *vgic_v3_cpu = &vcpu->arch.vgic_cpu;
+>> +     u8 idx = r->Op2 & 3;
+>> +
+>> +     /*
+>> +      * num_pri_bits are initialized with HW supported values.
+>> +      * We can rely safely on num_pri_bits even if VM has not
+>> +      * restored ICC_CTLR_EL1 before restoring APnR registers.
+>> +      */
+>> +     switch (vgic_v3_cpu->num_pri_bits) {
+>> +     case 7:
+>> +             vgic_v3_access_apr_reg(vcpu, p, apr, idx);
+>> +             break;
+>> +     case 6:
+>> +             if (idx > 1)
+>> +                     goto err;
+>> +             vgic_v3_access_apr_reg(vcpu, p, apr, idx);
+>> +             break;
+>> +     default:
+>> +             if (idx > 0)
+>> +                     goto err;
+>> +             vgic_v3_access_apr_reg(vcpu, p, apr, idx);
+>> +     }
+>> +
+>> +     return true;
+>> +err:
+>> +     if (!p->is_write)
+>> +             p->regval = 0;
+>> +
+>> +     return false;
+>> +}
+>> +
+>> +static bool access_gic_ap0r(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>> +                         const struct sys_reg_desc *r)
+>> +
+>> +{
+>> +     return access_gic_aprn(vcpu, p, r, 0);
+>> +}
+>> +
+>> +static bool access_gic_ap1r(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>> +                         const struct sys_reg_desc *r)
+>> +{
+>> +     return access_gic_aprn(vcpu, p, r, 1);
+>> +}
+>> +
+>> +static bool access_gic_sre(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>> +                        const struct sys_reg_desc *r)
+>> +{
+>> +     struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
+>> +
+>> +     /* Validate SRE bit */
+>> +     if (p->is_write) {
+>> +             if (!(p->regval & ICC_SRE_EL1_SRE))
+>> +                     return false;
+>> +     } else {
+>> +             p->regval = vgicv3->vgic_sre;
+>> +     }
+>> +
+>> +     return true;
+>> +}
+>> +static const struct sys_reg_desc gic_v3_icc_reg_descs[] = {
+>> +     /* ICC_PMR_EL1 */
+>> +     { Op0(3), Op1(0), CRn(4), CRm(6), Op2(0), access_gic_pmr },
+>> +     /* ICC_BPR0_EL1 */
+>> +     { Op0(3), Op1(0), CRn(12), CRm(8), Op2(3), access_gic_bpr0 },
+>> +     /* ICC_AP0R0_EL1 */
+>> +     { Op0(3), Op1(0), CRn(12), CRm(8), Op2(4), access_gic_ap0r },
+>> +     /* ICC_AP0R1_EL1 */
+>> +     { Op0(3), Op1(0), CRn(12), CRm(8), Op2(5), access_gic_ap0r },
+>> +     /* ICC_AP0R2_EL1 */
+>> +     { Op0(3), Op1(0), CRn(12), CRm(8), Op2(6), access_gic_ap0r },
+>> +     /* ICC_AP0R3_EL1 */
+>> +     { Op0(3), Op1(0), CRn(12), CRm(8), Op2(7), access_gic_ap0r },
+>> +     /* ICC_AP1R0_EL1 */
+>> +     { Op0(3), Op1(0), CRn(12), CRm(9), Op2(0), access_gic_ap1r },
+>> +     /* ICC_AP1R1_EL1 */
+>> +     { Op0(3), Op1(0), CRn(12), CRm(9), Op2(1), access_gic_ap1r },
+>> +     /* ICC_AP1R2_EL1 */
+>> +     { Op0(3), Op1(0), CRn(12), CRm(9), Op2(2), access_gic_ap1r },
+>> +     /* ICC_AP1R3_EL1 */
+>> +     { Op0(3), Op1(0), CRn(12), CRm(9), Op2(3), access_gic_ap1r },
+>> +     /* ICC_BPR1_EL1 */
+>> +     { Op0(3), Op1(0), CRn(12), CRm(12), Op2(3), access_gic_bpr1 },
+>> +     /* ICC_CTLR_EL1 */
+>> +     { Op0(3), Op1(0), CRn(12), CRm(12), Op2(4), access_gic_ctlr },
+>> +     /* ICC_SRE_EL1 */
+>> +     { Op0(3), Op1(0), CRn(12), CRm(12), Op2(5), access_gic_sre },
+>> +     /* ICC_IGRPEN0_EL1 */
+>> +     { Op0(3), Op1(0), CRn(12), CRm(12), Op2(6), access_gic_grpen0 },
+>> +     /* ICC_GRPEN1_EL1 */
+>> +     { Op0(3), Op1(0), CRn(12), CRm(12), Op2(7), access_gic_grpen1 },
+>> +};
+>> +
+>> +int vgic_v3_has_cpu_sysregs_attr(struct kvm_vcpu *vcpu, bool is_write, u64 id,
+>> +                             u64 *reg)
+>> +{
+>> +     struct sys_reg_params params;
+>> +     u64 sysreg = (id & KVM_DEV_ARM_VGIC_SYSREG_MASK) | KVM_REG_SIZE_U64;
+> At the beginning I asked myself why we did not OR with KVM_REG_ARM64 as
+> stated in include/uapi/linux/kvm.h but then looking at
+> index_to_params() implementation it looks it is not used.
+>> +
+>> +     params.regval = *reg;
+>> +     params.is_write = is_write;
+>> +     params.is_aarch32 = false;
+>> +     params.is_32bit = false;
+>> +
+>> +     if (find_reg_by_id(sysreg, &params, gic_v3_icc_reg_descs,
+>> +                           ARRAY_SIZE(gic_v3_icc_reg_descs)))
+>> +             return 0;
+>> +
+>> +     return -ENXIO;
+>> +}
+>> +
+>> +int vgic_v3_cpu_sysregs_uaccess(struct kvm_vcpu *vcpu, bool is_write, u64 id,
+>> +                             u64 *reg)
+>> +{
+>> +     struct sys_reg_params params;
+>> +     const struct sys_reg_desc *r;
+>> +     u64 sysreg = (id & KVM_DEV_ARM_VGIC_SYSREG_MASK) | KVM_REG_SIZE_U64;
+>> +
+>> +     if (is_write)
+>> +             params.regval = *reg;
+>> +     params.is_write = is_write;
+>> +     params.is_aarch32 = false;
+>> +     params.is_32bit = false;
+>> +
+>> +     r = find_reg_by_id(sysreg, &params, gic_v3_icc_reg_descs,
+>> +                        ARRAY_SIZE(gic_v3_icc_reg_descs));
+>> +     if (!r)
+>> +             return -ENXIO;
+>> +
+>> +     if (!r->access(vcpu, &params, r))
+>> +             return -EINVAL;
+>> +
+>> +     if (!is_write)
+>> +             *reg = params.regval;
+>> +
+>> +     return 0;
+>> +}
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index 002f092..730a18a 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -71,6 +71,9 @@ struct vgic_global {
+>>
+>>       /* GIC system register CPU interface */
+>>       struct static_key_false gicv3_cpuif;
+>> +
+>> +     /* Cache ICH_VTR_EL2 reg value */
+> nit: comment does not bring much value I think
+>> +     u32                     ich_vtr_el2;
+>>  };
+>>
+>>  extern struct vgic_global kvm_vgic_global_state;
+>> @@ -269,6 +272,12 @@ struct vgic_cpu {
+>>       u64 pendbaser;
+>>
+>>       bool lpis_enabled;
+>> +
+>> +     /* Cache guest priority bits */
+>> +     u32 num_pri_bits;
+>> +
+>> +     /* Cache guest interrupt ID bits */
+>> +     u32 num_id_bits;
+>>  };
+>>
+>>  extern struct static_key_false vgic_v2_cpuif_trap;
+>> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+>> index bc7de95..b6266fe 100644
+>> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
+>> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+>> @@ -16,6 +16,7 @@
+>>  #include <linux/kvm_host.h>
+>>  #include <kvm/arm_vgic.h>
+>>  #include <linux/uaccess.h>
+>> +#include <asm/kvm_emulate.h>
+> not needed I think
+OK.
