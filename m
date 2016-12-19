@@ -1,39 +1,77 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 19 Dec 2016 16:05:36 +0100
-Subject: [PATCH net 1/3] net: phy: fix sign type error in
- genphy_config_eee_advert
+Date: Mon, 19 Dec 2016 16:05:38 +0100
+Subject: [PATCH net 3/3] dt: bindings: net: use boolean dt properties for eee
+ broken modes
 In-Reply-To: <1482159938-13239-1-git-send-email-jbrunet@baylibre.com>
 References: <1482159938-13239-1-git-send-email-jbrunet@baylibre.com>
-Message-ID: <1482159938-13239-2-git-send-email-jbrunet@baylibre.com>
+Message-ID: <1482159938-13239-4-git-send-email-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In genphy_config_eee_advert, the return value of phy_read_mmd_indirect is
-checked to know if the register could be accessed but the result is
-assigned to a 'u32'.
-Changing to 'int' to correctly get errors from phy_read_mmd_indirect.
+The patches regarding eee-broken-modes was merged before all people
+involved could find an agreement on the best way to move forward.
 
-Fixes: d853d145ea3e ("net: phy: add an option to disable EEE advertisement")
-Reported-by: Julia Lawall <julia.lawall@lip6.fr>
+While we agreed on having a DT property to mark particular modes as broken,
+the value used for eee-broken-modes mapped the phy register in very direct
+way. Because of this, the concern is that it could be used to implement
+configuration policies instead of describing a broken HW.
+
+In the end, having a boolean property for each mode seems to be preferred
+over one bit field value mapping the register (too) directly.
+
+Cc: Florian Fainelli <f.fainelli@gmail.com>
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- drivers/net/phy/phy_device.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/net/phy.txt | 10 ++++++++--
+ include/dt-bindings/net/mdio.h                | 19 -------------------
+ 2 files changed, 8 insertions(+), 21 deletions(-)
+ delete mode 100644 include/dt-bindings/net/mdio.h
 
-diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
-index 9c06f8028f0c..ee5ebadb1463 100644
---- a/drivers/net/phy/phy_device.c
-+++ b/drivers/net/phy/phy_device.c
-@@ -1187,8 +1187,8 @@ static int genphy_config_advert(struct phy_device *phydev)
-  */
- static int genphy_config_eee_advert(struct phy_device *phydev)
- {
--	u32 broken = phydev->eee_broken_modes;
--	u32 old_adv, adv;
-+	int broken = phydev->eee_broken_modes;
-+	int old_adv, adv;
+diff --git a/Documentation/devicetree/bindings/net/phy.txt b/Documentation/devicetree/bindings/net/phy.txt
+index 54749b60a466..ff1bc4b1bb3b 100644
+--- a/Documentation/devicetree/bindings/net/phy.txt
++++ b/Documentation/devicetree/bindings/net/phy.txt
+@@ -38,8 +38,14 @@ Optional Properties:
+ - enet-phy-lane-swap: If set, indicates the PHY will swap the TX/RX lanes to
+   compensate for the board being designed with the lanes swapped.
  
- 	/* Nothing to disable */
- 	if (!broken)
+-- eee-broken-modes: Bits to clear in the MDIO_AN_EEE_ADV register to
+-  disable EEE broken modes.
++- eee-broken-100tx:
++- eee-broken-1000t:
++- eee-broken-10gt:
++- eee-broken-1000kx:
++- eee-broken-10gkx4:
++- eee-broken-10gkr:
++  Mark the corresponding energy efficient ethernet mode as broken and
++  request the ethernet to stop advertising it.
+ 
+ Example:
+ 
+diff --git a/include/dt-bindings/net/mdio.h b/include/dt-bindings/net/mdio.h
+deleted file mode 100644
+index 99c6d903d439..000000000000
+--- a/include/dt-bindings/net/mdio.h
++++ /dev/null
+@@ -1,19 +0,0 @@
+-/*
+- * This header provides generic constants for ethernet MDIO bindings
+- */
+-
+-#ifndef _DT_BINDINGS_NET_MDIO_H
+-#define _DT_BINDINGS_NET_MDIO_H
+-
+-/*
+- * EEE capability Advertisement
+- */
+-
+-#define MDIO_EEE_100TX		0x0002	/* 100TX EEE cap */
+-#define MDIO_EEE_1000T		0x0004	/* 1000T EEE cap */
+-#define MDIO_EEE_10GT		0x0008	/* 10GT EEE cap */
+-#define MDIO_EEE_1000KX		0x0010	/* 1000KX EEE cap */
+-#define MDIO_EEE_10GKX4		0x0020	/* 10G KX4 EEE cap */
+-#define MDIO_EEE_10GKR		0x0040	/* 10G KR EEE cap */
+-
+-#endif
 -- 
 2.7.4
