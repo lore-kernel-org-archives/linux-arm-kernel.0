@@ -1,97 +1,81 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 19 Dec 2016 12:55:52 +0000
-Subject: [PATCH v6 3/8] PWM: add pwm-stm32 DT bindings
-In-Reply-To: <CAL_JsqL8pJSFb8LbABAYJOQ0URaMpyupbFryk_mS2ToN1kStdA@mail.gmail.com>
-References: <1481292919-26587-1-git-send-email-benjamin.gaignard@st.com>
- <1481292919-26587-4-git-send-email-benjamin.gaignard@st.com>
- <20161212190205.b5t3x6i2o7igldlo@rob-hp-laptop>
- <20161213111137.GW3625@dell.home>
- <CAL_JsqL8pJSFb8LbABAYJOQ0URaMpyupbFryk_mS2ToN1kStdA@mail.gmail.com>
-Message-ID: <20161219125552.GD23486@dell>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Mon, 19 Dec 2016 15:09:12 +0200
+Subject: [PATCH] drm: tilcdc: simplify the recovery from sync lost error
+ on rev1
+In-Reply-To: <1481641656-25227-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1481641656-25227-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <590211f1-8e31-cecc-8dd2-f7e2976b81d1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Dec 2016, Rob Herring wrote:
-> On Tue, Dec 13, 2016 at 5:11 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Mon, 12 Dec 2016, Rob Herring wrote:
-> >
-> >> On Fri, Dec 09, 2016 at 03:15:14PM +0100, Benjamin Gaignard wrote:
-> >> > Define bindings for pwm-stm32
-> >> >
-> >> > version 6:
-> >> > - change st,breakinput parameter format to make it usuable on stm32f7 too.
-> >> >
-> >> > version 2:
-> >> > - use parameters instead of compatible of handle the hardware configuration
-> >> >
-> >> > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> >> > ---
-> >> >  .../devicetree/bindings/pwm/pwm-stm32.txt          | 33 ++++++++++++++++++++++
-> >> >  1 file changed, 33 insertions(+)
-> >> >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> >> >
-> >> > diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> >> > new file mode 100644
-> >> > index 0000000..866f222
-> >> > --- /dev/null
-> >> > +++ b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> >> > @@ -0,0 +1,33 @@
-> >> > +STMicroelectronics STM32 Timers PWM bindings
-> >> > +
-> >> > +Must be a sub-node of an STM32 Timers device tree node.
-> >> > +See ../mfd/stm32-timers.txt for details about the parent node.
-> >> > +
-> >> > +Required parameters:
-> >> > +- compatible:              Must be "st,stm32-pwm".
-> >> > +- pinctrl-names:   Set to "default".
-> >> > +- pinctrl-0:               List of phandles pointing to pin configuration nodes for PWM module.
-> >> > +                   For Pinctrl properties see ../pinctrl/pinctrl-bindings.txt
-> >> > +
-> >> > +Optional parameters:
-> >> > +- st,breakinput:   Arrays of three u32 <index level filter> to describe break input configurations.
-> >> > +                   "index" indicates on which break input the configuration should be applied.
-> >> > +                   "level" gives the active level (0=low or 1=high) for this configuration.
-> >> > +                   "filter" gives the filtering value to be applied.
-> >> > +
-> >> > +Example:
-> >> > +   timers at 40010000 {
-> >>
-> >> timer at ...
-> >
-> > No, it should be timers.
+One comment bellow.
+
+On 12/13/16 17:07, Bartosz Golaszewski wrote:
+> Revision 2 of LCDC suffers from an issue where a SYNC_LOST error
+> caused by limited memory bandwidth may leave the picture shifted a
+> couple pixels to the right.
 > 
-> Read the spec. "timer" is a generic node name. "timers" is not. How
-> many is not relevant.
+> This issue has not been observed on revision 1, while the recovery
+> mechanism introduces a different issue, where the END_OF_FRAME
+> interrupt doesn't fire while drm is waiting for vblanks.
+> 
+> On rev1: recover from sync lost errors by simply clearing the
+> RASTER_ENABLE bit in the RASTER_CTRL register and re-enabling it
+> again as is suggested by the datasheet.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  drivers/gpu/drm/tilcdc/tilcdc_crtc.c | 24 +++++++++++++++---------
+>  1 file changed, 15 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/tilcdc/tilcdc_crtc.c b/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
+> index 9942b05..70e57a7 100644
+> --- a/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
+> +++ b/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
+> @@ -921,17 +921,23 @@ irqreturn_t tilcdc_crtc_irq(struct drm_crtc *crtc)
+>  		dev_err_ratelimited(dev->dev, "%s(0x%08x): Sync lost",
+>  				    __func__, stat);
+>  		tilcdc_crtc->frame_intact = false;
+> -		if (tilcdc_crtc->sync_lost_count++ >
+> -		    SYNC_LOST_COUNT_LIMIT) {
+> -			dev_err(dev->dev, "%s(0x%08x): Sync lost flood detected, recovering", __func__, stat);
+> -			queue_work(system_wq, &tilcdc_crtc->recover_work);
+> -			if (priv->rev == 1)
+> -				tilcdc_clear(dev, LCDC_RASTER_CTRL_REG,
+> -					     LCDC_V1_SYNC_LOST_INT_ENA);
+> -			else
+> +		if (priv->rev == 1) {
 
-It's not the amount of timers that there are, it's the different types
-of timers which this one IP contains.
+I would add here:
++		if ((tilcdc_read(dev, LCDC_RASTER_CTRL_REG) &
++				LCDC_RASTER_ENABLE)) {
 
-In MFD we usually list the part number or IP name, however in this
-case its difficult because the same IP doesn't have a specific name
-listed, and provides; advanced, general purpose and basic timers, as
-well as PWM functionality.
+> +			tilcdc_clear(dev,
+> +				     LCDC_RASTER_CTRL_REG, LCDC_RASTER_ENABLE);
+> +			tilcdc_set(dev,
+> +				   LCDC_RASTER_CTRL_REG, LCDC_RASTER_ENABLE);
++		}
 
-This IP is not a timer (although one of its children is one).  It's
-the parent device of many different types of timer.
+Just in case the interrupt is for some reason handled right after the
+crtc is disabled.
 
-timer {
-      timer {
-      };
+With this addition I could send a pull request for this fix still today,
+if you agree with the change.
 
-      pwm {
-      };
-};
-
-... looks weird.
-
-"timer" is not right for the parent IP.  Happy for you to provide an
-alternative to "timers" though?
-
-> > The 's' is intentional, since this parent (MFD) device houses 3
-> > different types of timers.  The "timer" node is a child of this one.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> +		} else {
+> +			if (tilcdc_crtc->sync_lost_count++ >
+> +			    SYNC_LOST_COUNT_LIMIT) {
+> +				dev_err(dev->dev,
+> +					"%s(0x%08x): Sync lost flood detected, recovering",
+> +					__func__, stat);
+> +				queue_work(system_wq,
+> +					   &tilcdc_crtc->recover_work);
+>  				tilcdc_write(dev, LCDC_INT_ENABLE_CLR_REG,
+>  					     LCDC_SYNC_LOST);
+> -			tilcdc_crtc->sync_lost_count = 0;
+> +				tilcdc_crtc->sync_lost_count = 0;
+> +			}
+>  		}
+>  	}
+>  
+> 
