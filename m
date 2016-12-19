@@ -1,162 +1,81 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 19 Dec 2016 17:27:42 +0100
-Subject: Problems to Allwinner H3's eFUSE/SID
-In-Reply-To: <13032681482164747@web30h.yandex.ru>
-References: <136061482160932@web34j.yandex.ru>
- <a2e87cff-d92c-37e3-e380-48ce1710ec08@redhat.com>
- <8758581482163602@web22j.yandex.ru>
- <12fa0112-b0e2-21e0-f369-7372944153d5@redhat.com>
- <13032681482164747@web30h.yandex.ru>
-Message-ID: <710ccad2-5c8a-b485-047b-ac925a930630@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 19 Dec 2016 10:31:26 -0600
+Subject: [PATCH v2 02/10] dt-bindings: hisi: Add Hisilicon HiP05/06/07
+ Djtag dts bindings
+In-Reply-To: <1481129719-159487-1-git-send-email-anurup.m@huawei.com>
+References: <1481129719-159487-1-git-send-email-anurup.m@huawei.com>
+Message-ID: <20161219163126.w6ibkd6ayvblkwqt@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Dec 07, 2016 at 11:55:19AM -0500, Anurup M wrote:
+> From: Tan Xiaojun <tanxiaojun@huawei.com>
+> 
+> Add Hisilicon HiP05/06/07 Djtag dts bindings for CPU and IO Die
+> 
+> Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
+> Signed-off-by: Anurup M <anurup.m@huawei.com>
+> ---
+>  .../devicetree/bindings/arm/hisilicon/djtag.txt    | 41 ++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt b/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
+> new file mode 100644
+> index 0000000..733498e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
+> @@ -0,0 +1,41 @@
+> +The Hisilicon Djtag is an independent component which connects with some other
+> +components in the SoC by Debug Bus. The djtag is available in CPU and IO dies
+> +in the chip. The djtag controls access to connecting modules of CPU and IO
+> +dies.
+> +The various connecting components in CPU die (like L3 cache, L3 cache PMU etc.)
+> +are accessed by djtag during real time debugging. In IO die there are connecting
+> +components like RSA. These components appear as devices atatched to djtag bus.
+> +
+> +Hisilicon HiP05/06 djtag for CPU and HiP05 IO die
+> +Required properties:
+> +  - compatible : "hisilicon,hisi-djtag-v1"
 
-On 19-12-16 17:25, Icenowy Zheng wrote:
->
->
-> 20.12.2016, 00:17, "Hans de Goede" <hdegoede@redhat.com>:
->> Hi,
->>
->> On 19-12-16 17:06, Icenowy Zheng wrote:
->>>  19.12.2016, 23:30, "Hans de Goede" <hdegoede@redhat.com>:
->>>>  Hi,
->>>>
->>>>  On 19-12-16 16:22, Icenowy Zheng wrote:
->>>>>   Hi everyone,
->>>>>
->>>>>   Today, I and KotCzarny on IRC of linux-sunxi found a problem in the SID
->>>>>   controller of H3 (incl. H2+).
->>>>>
->>>>>   See https://irclog.whitequark.org/linux-sunxi/2016-12-19 .
->>>>>
->>>>>   Two read method of the H3 eFUSE is used in the BSP: by register accessing, or
->>>>>   directly access 0x01c14200.
->>>>>
->>>>>   From http://linux-sunxi.org/SID_Register_Guide we can see a difference between
->>>>>   the H3 SIDs read out by sunxi-fel and the H3 SIDs read out by devmem2 (in
->>>>>   legacy kernel).
->>>>>
->>>>>   According to the source of H2+ BSP[1], H2+ and H3 can be differed by the last
->>>>>   byte of the first word of SID. (0x42 and 0x83 is H2+, 0x00 and 0x81 is H3,
->>>>>   0x58 is H3D (currently not known SoC) )
->>>>>
->>>>>   However, all the SIDs retrieved by `sunxi-fel sid`, both H2+ and H3, start
->>>>>   with 0x02004620, which do not match this rule.
->>>>>
->>>>>   The readout by devmem2 is satisfying this rule: their first word is
->>>>>   0x02c00081, matches H3.
->>>>>
->>>>>   Then I found the SID-reading code from BSP U-Boot[2], which is based on
->>>>>   register operations. With this kind of code (I wrote one prototype in
->>>>>   userspace with /dev/mem), I got "02c00081 74004620 50358720 3c27048e" on
->>>>>   my Orange Pi One. ("02004620 74358720 5027048e 3c0000c3" with sunxi-fel sid)
->>>>>   And, after accessing to the SID by registers, the value of *0x01c14200 become
->>>>>   also "02c00081".
->>>>>
->>>>>   With direct access to 0x01c14200 after boot with mainline kernel, I got also
->>>>>   "02004620".
->>>>>
->>>>>   Then I altered the program to do the register operations with sunxi-fel, the
->>>>>   result is also "02c00081", and changed `sunxi-fel sid` result to "02c00081".
->>>>>
->>>>>   Summary:
->>>>>
->>>>>   +-----------------------------------------------+----------------+
->>>>>   | Read situation | The first word |
->>>>>   +-----------------------------------------------+----------------+
->>>>>   | Direct read by sunxi-fel | 02004620 |
->>>>>   | Direct read in mainline /dev/mem | 02004620 |
->>>>>   | Direct read in legacy /dev/mem | 02c00081 |
->>>>>   | Register access in FEL | 02c00081 |
->>>>>   | Register access in mainline | 02c00081 |
->>>>>   | Direct read after register access in FEL | 02c00081 |
->>>>>   | Direct read after register access in mainline | 02c00081 |
->>>>>   +-----------------------------------------------+----------------+
->>>>>
->>>>>   According to some facts:
->>>>>   - The register based access to SID is weird: it needs ~5 register
->>>>>     operations per word of SID.
->>>>>   - Reading via register access will change the value when reading by accessing
->>>>>     0x01c14200.
->>>>>   - In the u-boot code[2] there's some functions which read out the SID by
->>>>>     registers and then abandoned the value.
->>>>>   - This mismatch do not exist on A64.
->>>>>
->>>>>   I think that: Allwinner designed a "cache" to the SID to make the simplify the
->>>>>   code to read it, and it automatically loaded the cache when booting; however,
->>>>>   when doing first cache on H3, some byte shifts occured, and the value become
->>>>>   wrong. A manual read on H3 can make the cache right again. This is a silicon
->>>>>   bug, and fixed in A64.
->>>>>
->>>>>   This raises a problem: currently many systems has used the misread SID value to
->>>>>   generated lots of MAC addresses, and workaround this SID bug will change them.
->>>>>
->>>>>   However, if this bug is not workarounded, the sun8i-ths driver won't work well
->>>>>   (as some calibartion value lies in eFUSE). I think some early user of this
->>>>>   driver has already experienced bad readout value.
->>>>>   (The calibration value differs on my opi1 and KotCzarny's opipc)
->>>>>
->>>>>   And many wrong SID values have been generated by `sunxi-fel sid`. (Although I
->>>>>   think sunxi-fel must have the workaround)
->>>>>
->>>>>   Note: in this email, "SID" and "eFUSE" both indicate the controller on H3/A64
->>>>>   at 0x01c14000, which is a OTP memory implemented by eFUSE technique.
->>>>>
->>>>>   Furthermore, A83T may also have this problem, testers are welcome!
->>>>>
->>>>>   [1] http://filez.zoobab.com/allwinner/h2/201609022/lichee/linux-3.4/arch/arm/mach-sunxi/sun8i.c
->>>>>   [2] http://filez.zoobab.com/allwinner/h2/201609022/lichee/brandy/u-boot-2011.09/arch/arm/cpu/armv7/sun8iw7/efuse.c
->>>>>
->>>>>   Experiments:
->>>>>   - https://gist.github.com/Icenowy/2f4859ab1bc05814522fc7445179a8c9
->>>>>     A SID readout shell script via FEL with register access.
->>>>>   - https://31.135.195.151:20281/d/efuse/
->>>>>     A SID readout program via /dev/mem with register access by KotCzarny.
->>>>>     (with statically compiled binary)
->>>>
->>>>  Good detective work!
->>>>
->>>>  I believe this would best be fixed by making u-boot use the register access
->>>>  method to get the SID on affected chips, and make sure u-boot reads the
->>>>  SID at-least once.
->>>
->>>  Yes.
->>>
->>>  However, what I considered is that fixing this bug will change H3 devices'
->>>  MAC addresses, as they are derived from SID.
->>
->> I know, but I think we will just need to accept this onetime change
->> of the fixed MAC addresses to fix this bug. I don't think this is
->> a big problem since the driver for the H3 ethernet has not been
->> merged into the mainline kernel yet.
->>
->>>  Maybe we should add #ifdef's to MAC generation code after this fix.
->>
->> I would rather not see #ifdefs for this, see above, but that is no
->> longer my call, see below.
->>
->>>  (This is why I will create this discussion)
->>>
->>>  P.S. Are you still the maintainer of sunxi boards support of u-boot? The
->>>  MAINTAINER file in board/sunxi indicates this.
->>
->> No I'm no longer the maintainer, I'm still the MAINTAINER file because
->> I have a lot of boards and as such I'm still the point of contact for
->> those boards (if there are any board specific issues / questions), but
->> as indicated in the main MAINTAINERS file Jagan Teki <jagan@openedev.com>
->> is the maintainer now.
->
-> But the current status of the file will indicates you are the maintainer of boards
-> support of sunxi.
+These need SoC specific compatible strings. They probably should 
+also include cpu or io in the compatible string. I would expect there 
+are things like events, triggers, or component connections for debug 
+that are SoC specifc.
 
-No it indicates that I'm the maintainer for the defconfig files for a whole list
-of boards, nothing more and nothing less.
+> +  - reg : Register address and size
+> +  - scl-id : The Super Cluster ID for CPU or IO die
+> +
+> +Hisilicon HiP06 djtag for IO die and HiP07 djtag for CPU and IO die
+> +Required properties:
+> +  - compatible : "hisilicon,hisi-djtag-v2"
 
-If you think it needs to be clarified, feel free to submit a patch to make this
-more clear.
+Same here.
 
-Regards,
-
-Hans
+> +  - reg : Register address and size
+> +  - scl-id : The Super Cluster ID for CPU or IO die
+> +
+> +Example 1: Djtag for CPU die
+> +
+> +	/* for Hisilicon HiP05 djtag for CPU Die */
+> +	djtag0: djtag at 80010000 {
+> +		compatible = "hisilicon,hisi-djtag-v1";
+> +		reg = <0x0 0x80010000 0x0 0x10000>;
+> +		scl-id = <0x02>;
+> +
+> +		/* All connecting components will appear as child nodes */
+> +	};
+> +
+> +Example 2: Djtag for IO die
+> +
+> +	/* for Hisilicon HiP05 djtag for IO Die */
+> +	djtag1: djtag at d0000000 {
+> +		compatible = "hisilicon,hisi-djtag-v1";
+> +		reg = <0x0 0xd0000000 0x0 0x10000>;
+> +		scl-id = <0x01>;
+> +
+> +		/* All connecting components will appear as child nodes */
+> +	};
+> -- 
+> 2.1.4
+> 
