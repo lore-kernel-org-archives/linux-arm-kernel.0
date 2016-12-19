@@ -1,49 +1,40 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 19 Dec 2016 11:44:32 -0300
-Subject: [PATCH 0/9] ARM: omap: Add empty chosen node in SoCs top level DTSI
-Message-ID: <1482158681-4530-1-git-send-email-javier@osg.samsung.com>
+Date: Mon, 19 Dec 2016 11:44:33 -0300
+Subject: [PATCH 1/9] ARM: dts: omap2: Add an empty chosen node to top level
+ DTSI
+In-Reply-To: <1482158681-4530-1-git-send-email-javier@osg.samsung.com>
+References: <1482158681-4530-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1482158681-4530-2-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony,
+Commit d1f3156fc8c7 ("ARM: dts: omap2: Remove skeleton.dtsi usage")
+removed the skeleton.dtsi usage since we want to get rid of it.
 
-As discussed in [0], there's a regression when booting a kernel with a DTB
-that doesn't have a pre-existing chosen node. This is usually not an issue
-for most boards since u-boot creates an empty chosen node if isn't present
-in the DTB.
+But this can cause issues when booting a kernel with a boot-loader
+that doesn't create a chosen node if this isn't present in the DTB
+since the decompressor relies on a pre-existing chosen node to be
+available to insert the command line and merge other ATAGS info.
 
-But it can be an issue for others bootloaders as Pali pointed out with the
-N9/900/950 phones and the Nokia Loader (NoLo).
+Fixes: d1f3156fc8c7 ("ARM: dts: omap2: Remove skeleton.dtsi usage")
+Reported-by: Pali Rohar <pali.rohar@gmail.com>
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
-This patch series add chosen nodes in the top level DTSI for all OMAP SoCs.
+ arch/arm/boot/dts/omap2.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-[0]: http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1294379.html
-
-Best regards,
-Javier
-
-
-Javier Martinez Canillas (9):
-  ARM: dts: omap2: Add an empty chosen node to top level DTSI
-  ARM: dts: omap3: Add an empty chosen node to top level DTSI
-  ARM: dts: omap4: Add an empty chosen node to top level DTSI
-  ARM: dts: omap5: Add an empty chosen node to top level DTSI
-  ARM: dts: am33xx: Add an empty chosen node to top level DTSI
-  ARM: dts: am4372: Add an empty chosen node to top level DTSI
-  ARM: dts: dm814x: Add an empty chosen node to top level DTSI
-  ARM: dts: dm816x: Add an empty chosen node to top level DTSI
-  ARM: dts: dra7: Add an empty chosen node to top level DTSI
-
- arch/arm/boot/dts/am33xx.dtsi | 1 +
- arch/arm/boot/dts/am4372.dtsi | 1 +
- arch/arm/boot/dts/dm814x.dtsi | 1 +
- arch/arm/boot/dts/dm816x.dtsi | 1 +
- arch/arm/boot/dts/dra7.dtsi   | 1 +
- arch/arm/boot/dts/omap2.dtsi  | 1 +
- arch/arm/boot/dts/omap3.dtsi  | 1 +
- arch/arm/boot/dts/omap4.dtsi  | 1 +
- arch/arm/boot/dts/omap5.dtsi  | 1 +
- 9 files changed, 9 insertions(+)
-
+diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
+index 4f793a025a72..f1d6de8b3c19 100644
+--- a/arch/arm/boot/dts/omap2.dtsi
++++ b/arch/arm/boot/dts/omap2.dtsi
+@@ -17,6 +17,7 @@
+ 	interrupt-parent = <&intc>;
+ 	#address-cells = <1>;
+ 	#size-cells = <1>;
++	chosen { };
+ 
+ 	aliases {
+ 		serial0 = &uart1;
 -- 
 2.7.4
