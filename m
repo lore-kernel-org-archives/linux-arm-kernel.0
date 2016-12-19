@@ -1,72 +1,97 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon, 19 Dec 2016 13:28:11 +0100
-Subject: [PATCH v2 02/11] mfd: axp20x: add volatile and writeable reg
- ranges for VBUS power supply driver
-In-Reply-To: <CAGb2v66jDsU2rt4d-0ydWR926y-hHTfOBJQmyYVdKd7rcm1WWQ@mail.gmail.com>
-References: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
- <20161209110419.28981-3-quentin.schulz@free-electrons.com>
- <CAGb2v66jDsU2rt4d-0ydWR926y-hHTfOBJQmyYVdKd7rcm1WWQ@mail.gmail.com>
-Message-ID: <98fa2460-b7fe-3a0b-5b93-7a2e4e6e83ce@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 19 Dec 2016 12:55:52 +0000
+Subject: [PATCH v6 3/8] PWM: add pwm-stm32 DT bindings
+In-Reply-To: <CAL_JsqL8pJSFb8LbABAYJOQ0URaMpyupbFryk_mS2ToN1kStdA@mail.gmail.com>
+References: <1481292919-26587-1-git-send-email-benjamin.gaignard@st.com>
+ <1481292919-26587-4-git-send-email-benjamin.gaignard@st.com>
+ <20161212190205.b5t3x6i2o7igldlo@rob-hp-laptop>
+ <20161213111137.GW3625@dell.home>
+ <CAL_JsqL8pJSFb8LbABAYJOQ0URaMpyupbFryk_mS2ToN1kStdA@mail.gmail.com>
+Message-ID: <20161219125552.GD23486@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
-
-On 14/12/2016 16:43, Chen-Yu Tsai wrote:
-> On Fri, Dec 9, 2016 at 7:04 PM, Quentin Schulz
-> <quentin.schulz@free-electrons.com> wrote:
->> The X-Powers AXP20X and AXP22X PMICs allow to choose the maximum voltage
->> and minimum current delivered by the VBUS power supply.
->>
->> This adds the register used by the VBUS power supply driver to the range
->> of volatile and writeable regs ranges.
->>
->> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->> ---
->>
->> added in v2
->>
->>  drivers/mfd/axp20x.c | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
->> index ba130be..6ee2cc6 100644
->> --- a/drivers/mfd/axp20x.c
->> +++ b/drivers/mfd/axp20x.c
->> @@ -65,12 +65,14 @@ static const struct regmap_access_table axp152_volatile_table = {
->>
->>  static const struct regmap_range axp20x_writeable_ranges[] = {
->>         regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
->> +       regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
+On Tue, 13 Dec 2016, Rob Herring wrote:
+> On Tue, Dec 13, 2016 at 5:11 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Mon, 12 Dec 2016, Rob Herring wrote:
+> >
+> >> On Fri, Dec 09, 2016 at 03:15:14PM +0100, Benjamin Gaignard wrote:
+> >> > Define bindings for pwm-stm32
+> >> >
+> >> > version 6:
+> >> > - change st,breakinput parameter format to make it usuable on stm32f7 too.
+> >> >
+> >> > version 2:
+> >> > - use parameters instead of compatible of handle the hardware configuration
+> >> >
+> >> > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> >> > ---
+> >> >  .../devicetree/bindings/pwm/pwm-stm32.txt          | 33 ++++++++++++++++++++++
+> >> >  1 file changed, 33 insertions(+)
+> >> >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+> >> >
+> >> > diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+> >> > new file mode 100644
+> >> > index 0000000..866f222
+> >> > --- /dev/null
+> >> > +++ b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+> >> > @@ -0,0 +1,33 @@
+> >> > +STMicroelectronics STM32 Timers PWM bindings
+> >> > +
+> >> > +Must be a sub-node of an STM32 Timers device tree node.
+> >> > +See ../mfd/stm32-timers.txt for details about the parent node.
+> >> > +
+> >> > +Required parameters:
+> >> > +- compatible:              Must be "st,stm32-pwm".
+> >> > +- pinctrl-names:   Set to "default".
+> >> > +- pinctrl-0:               List of phandles pointing to pin configuration nodes for PWM module.
+> >> > +                   For Pinctrl properties see ../pinctrl/pinctrl-bindings.txt
+> >> > +
+> >> > +Optional parameters:
+> >> > +- st,breakinput:   Arrays of three u32 <index level filter> to describe break input configurations.
+> >> > +                   "index" indicates on which break input the configuration should be applied.
+> >> > +                   "level" gives the active level (0=low or 1=high) for this configuration.
+> >> > +                   "filter" gives the filtering value to be applied.
+> >> > +
+> >> > +Example:
+> >> > +   timers at 40010000 {
+> >>
+> >> timer at ...
+> >
+> > No, it should be timers.
 > 
-> This is already covered by the previous entry.
-> 
->>         regmap_reg_range(AXP20X_DCDC_MODE, AXP20X_FG_RES),
->>         regmap_reg_range(AXP20X_RDC_H, AXP20X_OCV(AXP20X_OCV_MAX)),
->>  };
->>
->>  static const struct regmap_range axp20x_volatile_ranges[] = {
->>         regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_USB_OTG_STATUS),
->> +       regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
-> 
-> And I'm not sure why you specify it as volatile? The PMIC doesn't change any
-> of the bits in this register on its own.
-> 
+> Read the spec. "timer" is a generic node name. "timers" is not. How
+> many is not relevant.
 
-I got things mixed up between the work on the battery driver I'll soon
-send (which actually needs updated reg ranges) and this VBUS driver.
-Sorry for that.
+It's not the amount of timers that there are, it's the different types
+of timers which this one IP contains.
 
-> Same for the AXP22x bits. So basically I think you don't need this patch.
-> 
+In MFD we usually list the part number or IP name, however in this
+case its difficult because the same IP doesn't have a specific name
+listed, and provides; advanced, general purpose and basic timers, as
+well as PWM functionality.
 
-Indeed. Should I send a v3 to remove this patch or is it fine for you to
-ignore this one?
+This IP is not a timer (although one of its children is one).  It's
+the parent device of many different types of timer.
 
-Thanks!
-Quentin
+timer {
+      timer {
+      };
+
+      pwm {
+      };
+};
+
+... looks weird.
+
+"timer" is not right for the parent IP.  Happy for you to provide an
+alternative to "timers" though?
+
+> > The 's' is intentional, since this parent (MFD) device houses 3
+> > different types of timers.  The "timer" node is a child of this one.
 
 -- 
-Quentin Schulz, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
