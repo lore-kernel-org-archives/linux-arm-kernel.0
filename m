@@ -1,65 +1,31 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 19 Dec 2016 16:05:37 +0100
-Subject: [PATCH net 2/3] net: phy: use boolean dt properties for eee broken
- modes
-In-Reply-To: <1482159938-13239-1-git-send-email-jbrunet@baylibre.com>
-References: <1482159938-13239-1-git-send-email-jbrunet@baylibre.com>
-Message-ID: <1482159938-13239-3-git-send-email-jbrunet@baylibre.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 19 Dec 2016 16:07:59 +0100
+Subject: [PATCH 1/4] net: dsa: mv88e6xxx: Allow mv88e6xxx_smi_init() to
+ be used at address 0x1
+In-Reply-To: <CABHmqqDqhJa6N=Ayu-GFNyp4g90dXzTje6o8qfCEP2DacCFWdQ@mail.gmail.com>
+References: <20161219141610.30934-1-romain.perier@free-electrons.com>
+ <20161219141610.30934-2-romain.perier@free-electrons.com>
+ <20161219143848.GA10048@lunn.ch>
+ <292d4f15-c58b-3565-26ec-98a025b6adb3@free-electrons.com>
+ <20161219150008.GE10048@lunn.ch>
+ <CABHmqqDqhJa6N=Ayu-GFNyp4g90dXzTje6o8qfCEP2DacCFWdQ@mail.gmail.com>
+Message-ID: <20161219150759.GG10048@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patches regarding eee-broken-modes was merged before all people
-involved could find an agreement on the best way to move forward.
+On Mon, Dec 19, 2016 at 04:04:32PM +0100, Volodymyr Bendiuga wrote:
+> Hi Andrew,
+> 
+> No, it did not get accepted. Or at least I did not see
+> David accepting it. Let me know if I should resubmit it.
 
-While we agreed on having a DT property to mark particular modes as broken,
-the value used for eee-broken-modes mapped the phy register in very direct
-way. Because of this, the concern is that it could be used to implement
-configuration policies instead of describing a broken HW.
+Hi Volodymyr
 
-In the end, having a boolean property for each mode seems to be preferred
-over one bit field value mapping the register (too) directly.
+Please do resend it. Probably netdev will reopen sometime after the
+25th.
 
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- drivers/net/phy/phy_device.c | 18 +++++++++++++++---
- 1 file changed, 15 insertions(+), 3 deletions(-)
+Don't forget to include the reviewed-by i gave.
 
-diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
-index ee5ebadb1463..92b08383cafa 100644
---- a/drivers/net/phy/phy_device.c
-+++ b/drivers/net/phy/phy_device.c
-@@ -1665,7 +1665,7 @@ static void of_set_phy_supported(struct phy_device *phydev)
- static void of_set_phy_eee_broken(struct phy_device *phydev)
- {
- 	struct device_node *node = phydev->mdio.dev.of_node;
--	u32 broken;
-+	u32 broken = 0;
- 
- 	if (!IS_ENABLED(CONFIG_OF_MDIO))
- 		return;
-@@ -1673,8 +1673,20 @@ static void of_set_phy_eee_broken(struct phy_device *phydev)
- 	if (!node)
- 		return;
- 
--	if (!of_property_read_u32(node, "eee-broken-modes", &broken))
--		phydev->eee_broken_modes = broken;
-+	if (of_property_read_bool(node, "eee-broken-100tx"))
-+		broken |= MDIO_EEE_100TX;
-+	if (of_property_read_bool(node, "eee-broken-1000t"))
-+		broken |= MDIO_EEE_1000T;
-+	if (of_property_read_bool(node, "eee-broken-10gt"))
-+		broken |= MDIO_EEE_10GT;
-+	if (of_property_read_bool(node, "eee-broken-1000kx"))
-+		broken |= MDIO_EEE_1000KX;
-+	if (of_property_read_bool(node, "eee-broken-10gkx4"))
-+		broken |= MDIO_EEE_10GKX4;
-+	if (of_property_read_bool(node, "eee-broken-10gkr"))
-+		broken |= MDIO_EEE_10GKR;
-+
-+	phydev->eee_broken_modes = broken;
- }
- 
- /**
--- 
-2.7.4
+Thanks
+
+	Andrew
