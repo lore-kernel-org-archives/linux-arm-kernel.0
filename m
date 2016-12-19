@@ -1,79 +1,40 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Mon, 19 Dec 2016 15:16:08 +0100
-Subject: [PATCH 3/4] net: dsa: mv88e6xxx: Add support for ethernet switch
- 88E6341/88E6141
-In-Reply-To: <20161219141610.30934-1-romain.perier@free-electrons.com>
-References: <20161219141610.30934-1-romain.perier@free-electrons.com>
-Message-ID: <20161219141610.30934-4-romain.perier@free-electrons.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Mon, 19 Dec 2016 15:18:03 +0100
+Subject: [PATCH v2] ARM: dts: sun8i: add opp-v2 table for A33
+In-Reply-To: <11975791482156406@web2g.yandex.ru>
+References: <20161215182754.33921-1-icenowy@aosc.xyz>
+ <20161219084652.kiqdkiewu5tujlyd@lukather>
+ <CAGb2v65YWntCrFHtSbxhtTWkt+UwkW3xoY-ae26MpH+-ULLXSQ@mail.gmail.com>
+ <11975791482156406@web2g.yandex.ru>
+Message-ID: <8af4327f-b779-9d97-347f-bfe4b8303a60@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell 88E6341 device is single-chip, 6-port ethernet switch with
-four integrated 10/100/1000Mbps ethernet transceivers and one high speed
-SerDes interfaces. It is compatible with switches of family 88E6352.
+Hi,
 
-This commit adds basic support for this switch by describing its
-capabilities to the driver.
+On 19/12/2016 15:06, Icenowy Zheng wrote:
+> 
+> After proper testing of A23 ccu, the operating points can also apply to A23.
+> (According to A23 devices' fex)
+> 
 
-Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
----
- drivers/net/dsa/mv88e6xxx/chip.c      | 14 ++++++++++++++
- drivers/net/dsa/mv88e6xxx/mv88e6xxx.h |  4 +++-
- 2 files changed, 17 insertions(+), 1 deletion(-)
+I disagree. I've looked into using the same operating points for A23 and
+A33 for CPUfreq and I came to the conclusion that not all A23-based
+boards share the same operating points. You can find the fex files for
+the different boards here:
+https://github.com/linux-sunxi/sunxi-boards/tree/master/sys_config/a23
 
-diff --git a/drivers/net/dsa/mv88e6xxx/chip.c b/drivers/net/dsa/mv88e6xxx/chip.c
-index 76d944e..72ba24b 100644
---- a/drivers/net/dsa/mv88e6xxx/chip.c
-+++ b/drivers/net/dsa/mv88e6xxx/chip.c
-@@ -4086,6 +4086,20 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
- 		.ops = &mv88e6321_ops,
- 	},
- 
-+	[MV88E6341] = {
-+		.prod_num = PORT_SWITCH_ID_PROD_NUM_6341,
-+		.family = MV88E6XXX_FAMILY_6352,
-+		.name = "Marvell 88E6341",
-+		.num_databases = 4096,
-+		.num_ports = 6,
-+		.port_base_addr = 0x10,
-+		.global1_addr = 0x1b,
-+		.age_time_coeff = 15000,
-+		.tag_protocol = DSA_TAG_PROTO_EDSA,
-+		.flags = MV88E6XXX_FLAGS_FAMILY_6352,
-+		.ops = &mv88e6352_ops,
-+	},
-+
- 	[MV88E6350] = {
- 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6350,
- 		.family = MV88E6XXX_FAMILY_6351,
-diff --git a/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h b/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h
-index af54bae..176d6c4 100644
---- a/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h
-+++ b/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h
-@@ -86,6 +86,7 @@
- #define PORT_SWITCH_ID_PROD_NUM_6097	0x099
- #define PORT_SWITCH_ID_PROD_NUM_6131	0x106
- #define PORT_SWITCH_ID_PROD_NUM_6320	0x115
-+#define PORT_SWITCH_ID_PROD_NUM_6341	0x340
- #define PORT_SWITCH_ID_PROD_NUM_6123	0x121
- #define PORT_SWITCH_ID_PROD_NUM_6161	0x161
- #define PORT_SWITCH_ID_PROD_NUM_6165	0x165
-@@ -432,6 +433,7 @@ enum mv88e6xxx_model {
- 	MV88E6290,
- 	MV88E6320,
- 	MV88E6321,
-+	MV88E6341,
- 	MV88E6350,
- 	MV88E6351,
- 	MV88E6352,
-@@ -448,7 +450,7 @@ enum mv88e6xxx_family {
- 	MV88E6XXX_FAMILY_6185,	/* 6108 6121 6122 6131 6152 6155 6182 6185 */
- 	MV88E6XXX_FAMILY_6320,	/* 6320 6321 */
- 	MV88E6XXX_FAMILY_6351,	/* 6171 6175 6350 6351 */
--	MV88E6XXX_FAMILY_6352,	/* 6172 6176 6240 6352 */
-+	MV88E6XXX_FAMILY_6352,	/* 6172 6176 6240 6341 6352 */
- 	MV88E6XXX_FAMILY_6390,  /* 6190 6190X 6191 6290 6390 6390X */
- };
- 
+After gathering all supported frequencies/voltages for each A23-based
+boards, I found that only the following frequencies and voltages are
+supported by all A23-based boards:
+
+ - 1008 MHz, 1220 mV
+ - 816 MHz, 1120 mV
+ - 600 MHz, 1040 mV
+
+Quentin
+
 -- 
-2.9.3
+Quentin Schulz, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
