@@ -1,56 +1,27 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 19 Dec 2016 15:52:27 +0100
-Subject: [PATCH 3/4] net: dsa: mv88e6xxx: Add support for ethernet switch
- 88E6341/88E6141
-In-Reply-To: <20161219141610.30934-4-romain.perier@free-electrons.com>
+Date: Mon, 19 Dec 2016 15:56:06 +0100
+Subject: [PATCH 2/4] net: dsa: mv88e6xxx: Don't forbid MDIO I/Os for PHY
+ addr >= num_of_ports
+In-Reply-To: <20161219141610.30934-3-romain.perier@free-electrons.com>
 References: <20161219141610.30934-1-romain.perier@free-electrons.com>
- <20161219141610.30934-4-romain.perier@free-electrons.com>
-Message-ID: <20161219145227.GC10048@lunn.ch>
+ <20161219141610.30934-3-romain.perier@free-electrons.com>
+Message-ID: <20161219145606.GD10048@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain
+On Mon, Dec 19, 2016 at 03:16:07PM +0100, Romain Perier wrote:
+> Some Marvell ethernet switches have internal ethernet transceivers with
+> hardcoded phy addresses. These addresses can be grearer than the number
+> of ports or its value might be different than the associated port number.
+> This is for example the case for MV88E6341 that has 6 ports and internal
+> Port 1 to Port4 PHYs mapped at SMI addresses from 0x11 to 0x14.
+> 
+> This commits fixes the issue by removing the condition in MDIO callbacks.
+> 
+> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
 
-> diff --git a/drivers/net/dsa/mv88e6xxx/chip.c b/drivers/net/dsa/mv88e6xxx/chip.c
-> index 76d944e..72ba24b 100644
-> --- a/drivers/net/dsa/mv88e6xxx/chip.c
-> +++ b/drivers/net/dsa/mv88e6xxx/chip.c
-> @@ -4086,6 +4086,20 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
->  		.ops = &mv88e6321_ops,
->  	},
->  
-> +	[MV88E6341] = {
-> +		.prod_num = PORT_SWITCH_ID_PROD_NUM_6341,
-> +		.family = MV88E6XXX_FAMILY_6352,
-> +		.name = "Marvell 88E6341",
-> +		.num_databases = 4096,
-> +		.num_ports = 6,
-> +		.port_base_addr = 0x10,
-> +		.global1_addr = 0x1b,
-> +		.age_time_coeff = 15000,
-> +		.tag_protocol = DSA_TAG_PROTO_EDSA,
-> +		.flags = MV88E6XXX_FLAGS_FAMILY_6352,
-> +		.ops = &mv88e6352_ops,
+So it is not quite compatible with the 6352. Thanks Marvell :-(
 
-Even if it i 100% compatible with the 6532, you should still add an
-ops structure for it. All chips have their own, even when the are
-exactly the same as other in the family.
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-> --- a/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h
-> +++ b/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h
-> @@ -86,6 +86,7 @@
->  #define PORT_SWITCH_ID_PROD_NUM_6097	0x099
->  #define PORT_SWITCH_ID_PROD_NUM_6131	0x106
->  #define PORT_SWITCH_ID_PROD_NUM_6320	0x115
-> +#define PORT_SWITCH_ID_PROD_NUM_6341	0x340
->  #define PORT_SWITCH_ID_PROD_NUM_6123	0x121
->  #define PORT_SWITCH_ID_PROD_NUM_6161	0x161
-
-Ah, err..
-
-These should be in numerical order of the macro.
-PORT_SWITCH_ID_PROD_NUM_6320 is however in the wrong place.  Please
-put the 6341 after the 6321.
-
-Thanks
-	Andrew
+    Andrew
