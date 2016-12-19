@@ -1,76 +1,65 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 19 Dec 2016 16:15:08 -0600
-Subject: [PATCH 1/2] dt-bindings: Document the hi3660 clock bindings
-In-Reply-To: <1481781493-6188-2-git-send-email-zhangfei.gao@linaro.org>
-References: <1481781493-6188-1-git-send-email-zhangfei.gao@linaro.org>
- <1481781493-6188-2-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <20161219221508.jxgmv36hib3ekanf@rob-hp-laptop>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 19 Dec 2016 23:23:51 +0100
+Subject: [PATCHv6] support for AD5820 camera auto-focus coil
+In-Reply-To: <20161215065022.GC16630@valkosipuli.retiisi.org.uk>
+References: <20160521054336.GA27123@amd>
+ <20160808080955.GA3182@valkosipuli.retiisi.org.uk>
+ <20160808214132.GB2946@xo-6d-61-c0.localdomain>
+ <201612141438.16603@pali> <20161214150819.GW4920@atomide.com>
+ <20161215065022.GC16630@valkosipuli.retiisi.org.uk>
+Message-ID: <20161219201015.GB4974@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2016 at 01:58:12PM +0800, Zhangfei Gao wrote:
-> Add DT bindings documentation for hi3660 SoC clock.
+Hi!
+
+> Hi Pali and Tony,
+> On Wed, Dec 14, 2016 at 07:08:19AM -0800, Tony Lindgren wrote:
+> > * Pali Roh?r <pali.rohar@gmail.com> [161214 05:38]:
+> > > On Monday 08 August 2016 23:41:32 Pavel Machek wrote:
+> > > > On Mon 2016-08-08 11:09:56, Sakari Ailus wrote:
+> > > > > On Fri, Aug 05, 2016 at 12:26:11PM +0200, Pavel Machek wrote:
+> > > > > > This adds support for AD5820 autofocus coil, found for example in
+> > > > > > Nokia N900 smartphone.
+> > > > > 
+> > > > > Thanks, Pavel!
+> > > > > 
+> > > > > Let's use V4L2_CID_FOCUS_ABSOLUTE, as is in the patch. If we get
+> > > > > something better in the future, we'll switch to that then.
+> > > > > 
+> > > > > I've applied this to ad5820 branch in my tree.
+> > > > 
+> > > > Thanks. If I understands things correctly, both DTS patch and this
+> > > > patch are waiting in your tree, so we should be good to go for 4.9
+> > > > (unless some unexpected problems surface)?
+> > > > 
+> > > > Best regards,
+> > > > 									Pavel
+> > > 
+> > > Was DTS patch merged into 4.9? At least I do not see updated that dts 
+> > > file omap3-n900.dts in linus tree...
+> > 
+> > If it's not in current mainline or next, it's off my radar so sounds
+> > like I've somehow missed it and needs resending..
 > 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> ---
->  .../devicetree/bindings/clock/hi3660-clock.txt     | 42 ++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/hi3660-clock.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/hi3660-clock.txt b/Documentation/devicetree/bindings/clock/hi3660-clock.txt
-> new file mode 100644
-> index 0000000..7296fd7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/hi3660-clock.txt
-> @@ -0,0 +1,42 @@
-> +* Hisilicon Hi3660 Clock Controller
-> +
-> +The Hi3660 clock controller generates and supplies clock to various
-> +controllers within the Hi3660 SoC.
-> +
-> +Required Properties:
-> +
-> +- compatible: the compatible should be one of the following strings to
-> +	indicate the clock controller functionality.
-> +
-> +	- "hisilicon,hi3660-crgctrl"
-> +	- "hisilicon,hi3660-pctrl"
-> +	- "hisilicon,hi3660-pmuctrl"
-> +	- "hisilicon,hi3660-sctrl"
-> +	- "hisilicon,hi3660-iomcu"
-> +
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +
-> +- #clock-cells: should be 1.
-> +
-> +Each clock is assigned an identifier and client nodes use this identifier
-> +to specify the clock which they consume.
-> +
-> +All these identifier could be found in <dt-bindings/clock/hi3660-clock.h>.
-> +
-> +Examples:
-> +	crg_ctrl: crg_ctrl at fff35000 {
+> Where's this patch? I remember seeing the driver patch and the DT
+> documentation but no actual DT source patch for the N900.
 
-clock-controller at ...
+The patch was not yet submitted. Autofocus coil is not too useful
+withou camera support, and we don't yet have support for v4l subdevs
+for omap3. I have it in the camera tree, but there are still pieces to
+be done before this is useful.
 
-> +		compatible = "hisilicon,hi3660-crgctrl", "syscon";
-> +		reg = <0x0 0xfff35000 0x0 0x1000>;
-> +		#clock-cells = <1>;
-> +	};
-> +
-> +	uart0: uart at fdf02000 {
+Best regards,
+									Pavel
 
-serial at ...
-
-> +		compatible = "arm,pl011", "arm,primecell";
-> +		reg = <0x0 0xfdf02000 0x0 0x1000>;
-> +		interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&crg_ctrl HI3660_CLK_MUX_UART0>,
-> +			 <&crg_ctrl HI3660_PCLK>;
-> +		clock-names = "uartclk", "apb_pclk";
-> +		status = "disabled";
-> +	};
-> -- 
-> 2.7.4
-> 
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161219/39969b35/attachment.sig>
