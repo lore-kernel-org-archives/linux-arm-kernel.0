@@ -1,52 +1,29 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 19 Dec 2016 10:53:54 +0100
-Subject: [PATCH] ARM: dts: da850-lcdk: add gpio-keys
-Message-ID: <1482141234-11546-1-git-send-email-bgolaszewski@baylibre.com>
+Date: Mon, 19 Dec 2016 10:58:11 +0100
+Subject: [PATCH] bus: da850-mstpri: fix my e-mail address
+Message-ID: <1482141491-26924-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a gpio-keys node for two user buttons present on the board.
+I noticed my e-mail address is wrong in this one. This patch fixes it.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/boot/dts/da850-lcdk.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ drivers/bus/da8xx-mstpri.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index 397c77a..628f4de 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -6,6 +6,7 @@
- /dts-v1/;
- #include "da850.dtsi"
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
- 
- / {
- 	model = "DA850/AM1808/OMAP-L138 LCDK";
-@@ -90,6 +91,23 @@
- 			};
- 		};
- 	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		autorepeat;
-+
-+		user1 {
-+			label = "GPIO Key USER1";
-+			linux,code = <BTN_0>;
-+			gpios = <&gpio 36 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		user2 {
-+			label = "GPIO Key USER2";
-+			linux,code = <BTN_1>;
-+			gpios = <&gpio 37 GPIO_ACTIVE_LOW>;
-+		};
-+	};
- };
- 
- &pmx_core {
+diff --git a/drivers/bus/da8xx-mstpri.c b/drivers/bus/da8xx-mstpri.c
+index 063397f..9af9bcc 100644
+--- a/drivers/bus/da8xx-mstpri.c
++++ b/drivers/bus/da8xx-mstpri.c
+@@ -4,7 +4,7 @@
+  * Copyright (C) 2016 BayLibre SAS
+  *
+  * Author:
+- *   Bartosz Golaszewski <bgolaszewski@baylibre.com.com>
++ *   Bartosz Golaszewski <bgolaszewski@baylibre.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
 -- 
 2.9.3
