@@ -1,37 +1,65 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 19 Dec 2016 12:33:44 -0300
-Subject: [PATCH] ARM: dts: imx: Pass an empty 'chosen' node
-In-Reply-To: <1482161298-32624-1-git-send-email-fabio.estevam@nxp.com>
-References: <1482161298-32624-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <ea4488a7-2c19-b92d-3c9f-f9260b7fdfbf@osg.samsung.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Mon, 19 Dec 2016 15:39:43 +0000
+Subject: [PATCH 1/3] dmaengine: xilinx_dma: Check for channel idle state
+ before submitting dma descriptor
+In-Reply-To: <5248247.n0rV8xBPrZ@avalon>
+References: <1481814682-31780-1-git-send-email-appanad@xilinx.com>
+ <1481814682-31780-2-git-send-email-appanad@xilinx.com>
+ <5248247.n0rV8xBPrZ@avalon>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A65D58E@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Fabio,
+Hi Laurent Pinchart,
 
-On 12/19/2016 12:28 PM, Fabio Estevam wrote:
-> Commit 7f107887d199 ("ARM: dts: imx: Remove skeleton.dtsi") causes boot
-> issues when the bootloader does not create a 'chosen' node if such node
-> is not present in the dtb.
-> 
-> The reason for the boot failure is well explained by Javier Martinez
-> Canillas: "the decompressor relies on a pre-existing chosen node to be
-> available to insert the command line and merge other ATAGS info."
-> 
-> , so pass an empty 'chosen' node to fix the boot problem.
-> 
-> This issue has been seen in the kernelci reports with Barebox as
-> bootloader.
-> 
-> Fixes: 7f107887d199 ("ARM: dts: imx: Remove skeleton.dtsi")
-> Reported-by: kernelci.org bot <bot@kernelci.org>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
+	Thanks for the review...
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> >
+> > +	if (!chan->idle)
+> > +		return;
+> 
+> Don't you need to perform the same check for the DMA and CDMA channels ? If
+> so, shouldn't this be moved to common code ?
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Will fix it in v2...
+
+> 
+> There's another problem (not strictly introduced by this patch) I wanted to
+> mention. The append_desc_queue() function, called from your tx_submit
+> handler, appends descriptors to the pending_list. The DMA engine API states
+> that a transfer submitted by tx_submit will not be executed until .issue_pending()
+> is called. However, if a transfer is in progress at tx_submit time, I believe that
+> the IRQ handler, at transfer completion, will start the next transfer from the
+> pending_list even if .issue_pending() hasn't been called for it.
+> 
+> >  	if (list_empty(&chan->pending_list))
+> >  		return;
+
+
+If user submits more than h/w limit then that case only driver will process
+The descriptors from the pending_list for other cases the pending_list will be 
+Empty so driver just returns from there.
+
+> 
+> Now that you catch busy channels with a software flag, do you still need the
+> xilinx_dma_is_running() and xilinx_dma_is_idle() checks ? Three different checks
+> for the same or very similar conditions are confusing, if you really need them
+> you should document clearly how they differ.
+
+Will remove the xilinx_dma_is_running and xilinx_dmais_idle() checks and will use
+Chan->idle check across all the IP's. Will fix it v2...
+
+> 
+> > @@ -1110,6 +1116,7 @@ static void xilinx_vdma_start_transfer(struct
+> > xilinx_dma_chan *chan) vdma_desc_write(chan, XILINX_DMA_REG_VSIZE,
+> > last->hw.vsize);
+> >  	}
+> >
+> > +	chan->idle = false;
+> 
+> (and this too)
+
+Will fix in v2...
+
+Regards,
+Kedar.
