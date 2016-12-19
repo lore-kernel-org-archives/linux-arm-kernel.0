@@ -1,43 +1,65 @@
 From: romain.perier@free-electrons.com (Romain Perier)
-Date: Mon, 19 Dec 2016 15:56:34 +0100
-Subject: [PATCH 1/4] net: dsa: mv88e6xxx: Allow mv88e6xxx_smi_init() to be
- used at address 0x1
-In-Reply-To: <20161219143848.GA10048@lunn.ch>
+Date: Mon, 19 Dec 2016 15:58:17 +0100
+Subject: [PATCH 3/4] net: dsa: mv88e6xxx: Add support for ethernet switch
+ 88E6341/88E6141
+In-Reply-To: <20161219145227.GC10048@lunn.ch>
 References: <20161219141610.30934-1-romain.perier@free-electrons.com>
- <20161219141610.30934-2-romain.perier@free-electrons.com>
- <20161219143848.GA10048@lunn.ch>
-Message-ID: <292d4f15-c58b-3565-26ec-98a025b6adb3@free-electrons.com>
+ <20161219141610.30934-4-romain.perier@free-electrons.com>
+ <20161219145227.GC10048@lunn.ch>
+Message-ID: <bc0af369-28a9-af38-723b-d4b182bb153e@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Andrew,
 
-Le 19/12/2016 ? 15:38, Andrew Lunn a ?crit :
-> On Mon, Dec 19, 2016 at 03:16:06PM +0100, Romain Perier wrote:
->> Currently, the function mv88e6xxx_smi_init() returns -EINVAL if the bit
->> zero of sw_addr is 0x1. However, on some platforms, ethernet switches
->> are configured in Multi chip addressing mode and available at MDIO
->> address 0x1.
->
+Le 19/12/2016 ? 15:52, Andrew Lunn a ?crit :
 > Hi Romain
 >
-> What branch is this against? net-next?
+>> diff --git a/drivers/net/dsa/mv88e6xxx/chip.c b/drivers/net/dsa/mv88e6xxx/chip.c
+>> index 76d944e..72ba24b 100644
+>> --- a/drivers/net/dsa/mv88e6xxx/chip.c
+>> +++ b/drivers/net/dsa/mv88e6xxx/chip.c
+>> @@ -4086,6 +4086,20 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
+>>  		.ops = &mv88e6321_ops,
+>>  	},
+>>
+>> +	[MV88E6341] = {
+>> +		.prod_num = PORT_SWITCH_ID_PROD_NUM_6341,
+>> +		.family = MV88E6XXX_FAMILY_6352,
+>> +		.name = "Marvell 88E6341",
+>> +		.num_databases = 4096,
+>> +		.num_ports = 6,
+>> +		.port_base_addr = 0x10,
+>> +		.global1_addr = 0x1b,
+>> +		.age_time_coeff = 15000,
+>> +		.tag_protocol = DSA_TAG_PROTO_EDSA,
+>> +		.flags = MV88E6XXX_FLAGS_FAMILY_6352,
+>> +		.ops = &mv88e6352_ops,
+>
+> Even if it i 100% compatible with the 6532, you should still add an
+> ops structure for it. All chips have their own, even when the are
+> exactly the same as other in the family.
 
-Until last friday it was based onto next-20161216, I rebased onto the 
-torvalds's tree this morning (so ~4.10-pre-rc1).
+Ack, I will fix this.
 
 >
-> Please see:
+>> --- a/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h
+>> +++ b/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h
+>> @@ -86,6 +86,7 @@
+>>  #define PORT_SWITCH_ID_PROD_NUM_6097	0x099
+>>  #define PORT_SWITCH_ID_PROD_NUM_6131	0x106
+>>  #define PORT_SWITCH_ID_PROD_NUM_6320	0x115
+>> +#define PORT_SWITCH_ID_PROD_NUM_6341	0x340
+>>  #define PORT_SWITCH_ID_PROD_NUM_6123	0x121
+>>  #define PORT_SWITCH_ID_PROD_NUM_6161	0x161
 >
-> https://www.spinics.net/lists/netdev/msg409156.html
-
-Oh, it's already fixed, good. I did not see this patch :)
-
+> Ah, err..
 >
-> It would be nicer to use Volodymyr, since it has been reviewed.
+> These should be in numerical order of the macro.
+> PORT_SWITCH_ID_PROD_NUM_6320 is however in the wrong place.  Please
+> put the 6341 after the 6321.
 
-
-As the fix is already there, I will use it, sure.
+good catch, ok.
 
 Thanks,
 Romain
