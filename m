@@ -1,23 +1,48 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Tue, 20 Dec 2016 10:43:39 +0100
-Subject: [PATCH v8 01/16] FDT: introduce global phandle allocation
-In-Reply-To: <80430161-b363-4740-0eef-8cb73bc2ecbd@arm.com>
-References: <20161104173203.21168-1-andre.przywara@arm.com>
- <20161104173203.21168-2-andre.przywara@arm.com>
- <be44a9ad-f820-9a62-9a5d-682867674e91@arm.com>
- <80430161-b363-4740-0eef-8cb73bc2ecbd@arm.com>
-Message-ID: <20161220094339.6yg624kev2wqxidt@kamzik.brq.redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Dec 2016 09:53:41 +0000
+Subject: [PATCH] iommu/arm-smmu-v3: prevent corruption of ste stage-1
+ context ptr
+In-Reply-To: <1482179918-4457-1-git-send-email-nwatters@codeaurora.org>
+References: <1482179918-4457-1-git-send-email-nwatters@codeaurora.org>
+Message-ID: <20161220095340.GB10132@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2016 at 06:43:29PM +0000, Andre Przywara wrote:
-> Well, yes. The problem is that AFAIK you cannot initialize an array
-> easily with all the values getting set to something other than zero.
+Hi Nate,
 
-u32 phandles[PHANDLES_MAX] = { [0 ... PHANDLES_MAX-1] = FDT_INVALID_PHANDLE };
+Thanks for the patch.
 
-(Unrelated, but could you please add format.subjectprefix = PATCH kvmtool
- to your git config. I just suggested via a kvmtool README patch...)
+On Mon, Dec 19, 2016 at 03:38:38PM -0500, Nate Watterson wrote:
+> To ensure that the stage-1 context ptr for an ste points to the
+> intended context descriptor, this patch adds code to clear away
+> the stale context ptr value prior to or'ing in the new one.
+> 
+> Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 4d6ec44..093f9f1 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -1080,6 +1080,8 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+>  		if (smmu->features & ARM_SMMU_FEAT_STALLS)
+>  			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
+>  
+> +		val &= ~(STRTAB_STE_0_S1CTXPTR_MASK <<
+> +			 STRTAB_STE_0_S1CTXPTR_SHIFT);
+>  		val |= (ste->s1_cfg->cdptr_dma & STRTAB_STE_0_S1CTXPTR_MASK
+>  		        << STRTAB_STE_0_S1CTXPTR_SHIFT) |
+>  			STRTAB_STE_0_CFG_S1_TRANS;
 
-Thanks,
-drew
+Good catch. We only clear the Config field at present, although I think
+it would be better if we just did val = 0 instead of clearing the Config
+field, and then just recreate all of the S1-related fields (ctxptr, fmt,
+cdmax) if we're installing a stage-1 STE. The other STE fields aren't
+treated as read-modify-write, so it's more consistent not to treat the
+initial dword specially other than for determining ste_live.
+
+What do you think?
+
+Will
