@@ -1,47 +1,57 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue, 20 Dec 2016 17:45:35 +1030
-Subject: [PATCH v4 5/5] mfd: dt: Add bindings for the Aspeed SoC Display
- Controller (GFX)
-In-Reply-To: <20161220071535.27542-1-andrew@aj.id.au>
-References: <20161220071535.27542-1-andrew@aj.id.au>
-Message-ID: <20161220071535.27542-6-andrew@aj.id.au>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Tue, 20 Dec 2016 13:57:58 +0530
+Subject: [PATCH -next] phy: rockchip-typec: fix non static symbol warnings
+In-Reply-To: <1474470325-32139-1-git-send-email-weiyj.lk@gmail.com>
+References: <1474470325-32139-1-git-send-email-weiyj.lk@gmail.com>
+Message-ID: <CAFp+6iF6BmieCDUvxhJ+-s0RNfKfzi1yi8YHnNB1jUEUNFGO4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Aspeed SoC Display Controller is presented as a syscon device to
-arbitrate access by display and pinmux drivers. Video pinmux
-configuration on fifth generation SoCs depends on bits in both the
-System Control Unit and the Display Controller.
+On Wed, Sep 21, 2016 at 8:35 PM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
+> From: Wei Yongjun <weiyongjun1@huawei.com>
+>
+> Fixes the following sparse warnings:
+>
+> drivers/phy/phy-rockchip-typec.c:295:16: warning:
+>  symbol 'usb3_pll_cfg' was not declared. Should it be static?
+> drivers/phy/phy-rockchip-typec.c:312:16: warning:
+>  symbol 'dp_pll_cfg' was not declared. Should it be static?
+>
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> ---
+>  drivers/phy/phy-rockchip-typec.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/phy/phy-rockchip-typec.c b/drivers/phy/phy-rockchip-typec.c
+> index 7cfb0f8..555604c 100644
+> --- a/drivers/phy/phy-rockchip-typec.c
+> +++ b/drivers/phy/phy-rockchip-typec.c
+> @@ -292,7 +292,7 @@ struct phy_reg {
+>         u32 addr;
+>  };
+>
+> -struct phy_reg usb3_pll_cfg[] = {
+> +static struct phy_reg usb3_pll_cfg[] = {
 
-Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/mfd/aspeed-gfx.txt | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-gfx.txt
+const as well ?
 
-diff --git a/Documentation/devicetree/bindings/mfd/aspeed-gfx.txt b/Documentation/devicetree/bindings/mfd/aspeed-gfx.txt
-new file mode 100644
-index 000000000000..aea5370efd97
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/aspeed-gfx.txt
-@@ -0,0 +1,17 @@
-+* Device tree bindings for Aspeed SoC Display Controller (GFX)
-+
-+The Aspeed SoC Display Controller primarily does as its name suggests, but also
-+participates in pinmux requests on the g5 SoCs. It is therefore considered a
-+syscon device.
-+
-+Required properties:
-+- compatible:		"aspeed,ast2500-gfx", "syscon"
-+- reg:			contains offset/length value of the GFX memory
-+			region.
-+
-+Example:
-+
-+gfx: display at 1e6e6000 {
-+	compatible = "aspeed,ast2500-gfx", "syscon";
-+	reg = <0x1e6e6000 0x1000>;
-+};
+>         { 0xf0,         CMN_PLL0_VCOCAL_INIT },
+>         { 0x18,         CMN_PLL0_VCOCAL_ITER },
+>         { 0xd0,         CMN_PLL0_INTDIV },
+> @@ -309,7 +309,7 @@ struct phy_reg usb3_pll_cfg[] = {
+>         { 0x8,          CMN_DIAG_PLL0_LF_PROG },
+>  };
+>
+> -struct phy_reg dp_pll_cfg[] = {
+> +static struct phy_reg dp_pll_cfg[] = {
+
+const ?
+[..]
+
+
+Thanks
+Vivek
+
 -- 
-2.9.3
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
