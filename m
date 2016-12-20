@@ -1,26 +1,30 @@
 From: david@lechnology.com (David Lechner)
-Date: Tue, 20 Dec 2016 14:23:01 -0600
-Subject: [PATCH 0/3] TI DA8xx/OMAPL13x/AM17xx/AM18xx UART
-Message-ID: <1482265384-715-1-git-send-email-david@lechnology.com>
+Date: Tue, 20 Dec 2016 14:23:02 -0600
+Subject: [PATCH 1/3] doc: DT: Add ti,da830-uart to serial/8250 bindings
+In-Reply-To: <1482265384-715-1-git-send-email-david@lechnology.com>
+References: <1482265384-715-1-git-send-email-david@lechnology.com>
+Message-ID: <1482265384-715-2-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds a new UART port type for TI DA8xx/OMAPL13x/AM17xx/AM18xx UART.
-This SoCs have a non-standard register for UART power management that needs
-special handling in the UART driver.
+This adds the ti,da830-uart compatible string to serial 8250 UART bindings.
 
-David Lechner (3):
-  doc: DT: Add ti,da830-uart to serial/8250 bindings
-  serial: 8250: Add new port type for TI DA8xx/OMAPL13x/AM17xx/AM18xx
-  ARM: da850: Add ti,da830-uart compatible for serial ports
+Signed-off-by: David Lechner <david@lechnology.com>
+---
+ Documentation/devicetree/bindings/serial/8250.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
- Documentation/devicetree/bindings/serial/8250.txt |  1 +
- arch/arm/boot/dts/da850.dtsi                      |  9 ++++++---
- drivers/tty/serial/8250/8250_of.c                 |  1 +
- drivers/tty/serial/8250/8250_port.c               | 22 ++++++++++++++++++++++
- include/uapi/linux/serial_core.h                  |  3 ++-
- include/uapi/linux/serial_reg.h                   |  8 ++++++++
- 6 files changed, 40 insertions(+), 4 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/serial/8250.txt b/Documentation/devicetree/bindings/serial/8250.txt
+index f86bb06..10276a4 100644
+--- a/Documentation/devicetree/bindings/serial/8250.txt
++++ b/Documentation/devicetree/bindings/serial/8250.txt
+@@ -19,6 +19,7 @@ Required properties:
+ 	- "altr,16550-FIFO128"
+ 	- "fsl,16550-FIFO64"
+ 	- "fsl,ns16550"
++	- "ti,da830-uart"
+ 	- "serial" if the port type is unknown.
+ - reg : offset and length of the register set for the device.
+ - interrupts : should contain uart interrupt.
 -- 
 2.7.4
