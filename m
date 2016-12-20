@@ -1,83 +1,42 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 19 Dec 2016 18:23:36 -0600
-Subject: [PATCH] tty: hvc_dcc: Add basic early_con support
-Message-ID: <20161220002336.28733-1-nm@ti.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 19 Dec 2016 20:13:36 -0800
+Subject: [PATCH v4 0/2] FPGA: TS-7300 FPGA manager
+In-Reply-To: <20161218202158.10582-1-f.fainelli@gmail.com>
+References: <20161218202158.10582-1-f.fainelli@gmail.com>
+Message-ID: <c964999f-0988-dc41-5e5e-c0ff9c2455b1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some cases, earlycon can help catch errors with kernel boot prior to
-standard console is available.
+On 12/18/2016 12:21 PM, Florian Fainelli wrote:
+> Hi all,
+> 
+> This patch series adds support for loading bitstreams into the Altera Cyclone II
+> connected to an EP9302 on a TS-7300 board.
+> 
+> Changes in v4:
+> 
+> - fixed ops->write not to do the final configuration release
+> - reordered patches
+> 
+> Changes in v3:
+> 
+> - fix write_init and write_complete signatures
+> 
+> Changes in v2:
+> 
+> - rebased against fpga/for-next
+> - added defines for configuration bits and delays
+> - added error mesage if ioremap() fails
+> - detailed how the configuration through CPLD is done
 
-Example bootargs: console=hvc0 earlycon=hvcdcc
+Alan, Moritz, thanks for providing Acked-by, I was under the impression
+these patches would be taken by you through the FPGA tree, since Hartley
+acked the EP93xx part and since that was the tree used as a baseline.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-Based on: v4.9 tag
-Also applies on: next-20161219
-Tested on Simulation environment (which did not have serial console option)
+Let me know how you want to proceed, since EP93xx is not as active as
+other ARM SoCs, there may not be a specific tree where to stage these
+patches (unless you take them).
 
- drivers/tty/hvc/hvc_dcc.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
-
-diff --git a/drivers/tty/hvc/hvc_dcc.c b/drivers/tty/hvc/hvc_dcc.c
-index 82f240fb98f0..1ec06e550656 100644
---- a/drivers/tty/hvc/hvc_dcc.c
-+++ b/drivers/tty/hvc/hvc_dcc.c
-@@ -10,7 +10,9 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <linux/console.h>
- #include <linux/init.h>
-+#include <linux/serial_core.h>
- 
- #include <asm/dcc.h>
- #include <asm/processor.h>
-@@ -94,3 +96,45 @@ static int __init hvc_dcc_init(void)
- 	return PTR_ERR_OR_ZERO(p);
- }
- device_initcall(hvc_dcc_init);
-+
-+static int hvc_dcc_earlyputc(int c)
-+{
-+	unsigned long count = 0xFFFFFFFF;
-+	static bool dead_dcc_earlycon;
-+
-+	if (dead_dcc_earlycon)
-+		return -EBUSY;
-+
-+	while (count--) {
-+		if (!(__dcc_getstatus() & DCC_STATUS_TX))
-+			break;
-+	}
-+	if (!count) {
-+		dead_dcc_earlycon = true;
-+		return -EBUSY;
-+	}
-+	__dcc_putchar(c);
-+	return 0;
-+}
-+
-+static void hvc_dcc_earlywrite(struct console *con, const char *s,
-+			       unsigned int n)
-+{
-+	int r;
-+
-+	while (n--) {
-+		r = hvc_dcc_earlyputc(*s);
-+		if (r)
-+			break;
-+		s++;
-+	}
-+}
-+
-+static int
-+__init early_hvc_dcc_setup(struct earlycon_device *device, const char *opt)
-+{
-+	device->con->write = hvc_dcc_earlywrite;
-+	return 0;
-+}
-+
-+EARLYCON_DECLARE(hvcdcc, early_hvc_dcc_setup);
+Thanks!
 -- 
-2.11.0.65.geff96d7
+Florian
