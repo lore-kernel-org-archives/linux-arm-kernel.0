@@ -1,24 +1,29 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 20 Dec 2016 16:37:00 +0100
-Subject: [PATCH v2 2/3] net: dsa: mv88e6xxx: Add support for ethernet
- switch 88E6341/88E6141
-In-Reply-To: <20161220085138.3998-3-romain.perier@free-electrons.com>
+Date: Tue, 20 Dec 2016 16:42:34 +0100
+Subject: [PATCH v2 3/3] arm64: dts: marvell: Add ethernet switch
+ definition for the ESPRESSObin
+In-Reply-To: <20161220085138.3998-4-romain.perier@free-electrons.com>
 References: <20161220085138.3998-1-romain.perier@free-electrons.com>
- <20161220085138.3998-3-romain.perier@free-electrons.com>
-Message-ID: <20161220153700.GB30952@lunn.ch>
+ <20161220085138.3998-4-romain.perier@free-electrons.com>
+Message-ID: <20161220154234.GC30952@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2016 at 09:51:37AM +0100, Romain Perier wrote:
-> The Marvell 88E6341 device is single-chip, 6-port ethernet switch with
-> four integrated 10/100/1000Mbps ethernet transceivers and one high speed
-> SerDes interfaces. It is compatible with switches of family 88E6352.
-> 
-> This commit adds basic support for this switch by describing its
-> capabilities to the driver.
-> 
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+> +&mdio {
+> +	switch0: switch0 at 0 {
+> +		compatible = "marvell,mv88e6085";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		reg = <1>;
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Ah, sorry, missed this last time. reg = <1>, that means switch0 at 1.
+That is a general rule for all device tree bindings.
 
-    Andrew
+> +		mdio {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <1>;
+
+what is this reg value for?
+
+     Andrew
