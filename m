@@ -1,68 +1,45 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 20 Dec 2016 09:52:38 -0800
-Subject: [PATCH v3] arm64: SMMU-v2: Workaround for Cavium ThunderX erratum
- 28168
-In-Reply-To: <20161220115630.GD10132@arm.com>
-References: <1482231993-27571-1-git-send-email-gakula@caviumnetworks.com>
- <bd950765-8c1f-14d5-2be8-efa76f2d6b6b@arm.com>
- <20161220115630.GD10132@arm.com>
-Message-ID: <d8aed795-f4ce-609e-ccd2-0daf628b0376@caviumnetworks.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 20 Dec 2016 09:55:38 -0800
+Subject: [PATCH] i2c: uniphier[-f]: fix bool logic calculation
+In-Reply-To: <CAK7LNATrR9dSuuUZR98f=uOZqSGqUBnUNZmrUqUZgubHHE+X4A@mail.gmail.com>
+References: <1476851911-21729-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAK7LNATrR9dSuuUZR98f=uOZqSGqUBnUNZmrUqUZgubHHE+X4A@mail.gmail.com>
+Message-ID: <1482256538.1984.23.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/2016 03:56 AM, Will Deacon wrote:
-> On Tue, Dec 20, 2016 at 11:52:58AM +0000, Marc Zyngier wrote:
->> On 20/12/16 11:06, Geetha sowjanya wrote:
->>> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
->>> +#ifdef CONFIG_CAVIUM_ERRATUM_28168
->>> +/*
->>> + * Cavium ThunderX erratum 28168
->>> + *
->>> + * Due to erratum #28168 PCI-inbound MSI-X store to the interrupt
->>> + * controller are delivered to the interrupt controller before older
->>> + * PCI-inbound memory stores are committed. Doing a sync on SMMU
->>> + * will make sure all prior data transfers are completed before
->>> + * invoking ISR.
->>> + *
->>> + */
->>> +void dev_smmu_tlb_sync(struct device *dev)
->>> +{
->>> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
->>> +	struct arm_smmu_device *smmu = fwspec_smmu(fwspec);
->>> +
->>> +	if (smmu)
->>> +		__arm_smmu_tlb_sync(smmu);
->>> +}
->>> +#endif
->>
->> I'll let Robin and Will comment on this, but it strikes be as rather odd
->> that nothing will happen if the SMMU is in bypass or simply compiled
->> out. So this workaround is at best incomplete.
->
-> Agreed. Unless the SMMU is the cause of the issue, relying on it to
-> implement the workaround is fragile and unnecessarily introduces a linkage
-> between SMMU driver internals and the interrupt handling code.
+On Wed, 2016-12-21 at 01:20 +0900, Masahiro Yamada wrote:
+> Hi.
+> 
+> I have not got any comment, but does this seem
+> a right thing to do?
+
+> This code is working, but it should not depend on how "bool" is
+> typedef'ed, or the bit position of I2C_M_RD.
+
+<shrug>
+
+I think bool can be guaranteed to be _Bool.
+
+So a change not necessary as the original code
+has a c90 guarantee of the same result.
+
+6.3.1.2 Boolean type
+1
+When any scalar value is converted to _Bool, the result is 0 if the value compares equal
+to 0; otherwise, the result is 1.
 
 
-The SMMU is not the cause of the problem, it is the solution, and as 
-such is required.
-
-Perhaps we should have a Kconfig "select" for the SMMU driver if 
-CAVIUM_ERRATUM_28168 is selected.
-
-
->
-> Not a fan.
-
-In general, I don't think anybody is a big fan of errata and their 
-workarounds.
-
-
->
-> Will
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> 2016-10-19 13:38 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+[]
+> > diff --git a/drivers/i2c/busses/i2c-uniphier-f.c b/drivers/i2c/busses/i2c-uniphier-f.c
+[]
+> > @@ -309,7 +309,7 @@ static int uniphier_fi2c_master_xfer_one(struct i2c_adapter *adap,
+> >                                          struct i2c_msg *msg, bool stop)
+> >  {
+> >         struct uniphier_fi2c_priv *priv = i2c_get_adapdata(adap);
+> > -       bool is_read = msg->flags & I2C_M_RD;
+> > +       bool is_read = !!(msg->flags & I2C_M_RD);
+> >         unsigned long time_left;
+> > 
+> >         dev_dbg(&adap->dev, "%s: addr=0x%02x, len=%d, stop=%d\n",
