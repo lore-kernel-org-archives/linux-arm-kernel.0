@@ -1,40 +1,40 @@
 From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
-Date: Tue, 20 Dec 2016 06:40:43 +0100
-Subject: [PATCH 1/2] pinctrl: sirf: atlas7: Add missing 'of_node_put()'
-Message-ID: <20161220054043.25417-1-christophe.jaillet@wanadoo.fr>
+Date: Tue, 20 Dec 2016 06:41:22 +0100
+Subject: [PATCH 2/2] pinctrl: sirf: atlas7: Improve code layout
+Message-ID: <20161220054122.25508-1-christophe.jaillet@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reference to 'sys2pci_np' should be dropped in all cases here, not only in
-error handling path.
+Add some tab in order to improve indentation.
 
 Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
 ---
- drivers/pinctrl/sirf/pinctrl-atlas7.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/pinctrl/sirf/pinctrl-atlas7.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/pinctrl/sirf/pinctrl-atlas7.c b/drivers/pinctrl/sirf/pinctrl-atlas7.c
-index 7f3041697813..f714f67c4b64 100644
+index f714f67c4b64..76df538fa814 100644
 --- a/drivers/pinctrl/sirf/pinctrl-atlas7.c
 +++ b/drivers/pinctrl/sirf/pinctrl-atlas7.c
-@@ -5420,14 +5420,15 @@ static int atlas7_pinmux_probe(struct platform_device *pdev)
- 	sys2pci_np = of_find_node_by_name(NULL, "sys2pci");
- 	if (!sys2pci_np)
- 		return -EINVAL;
-+
- 	ret = of_address_to_resource(sys2pci_np, 0, &res);
-+	of_node_put(sys2pci_np);
- 	if (ret)
- 		return ret;
-+
- 	pmx->sys2pci_base = devm_ioremap_resource(&pdev->dev, &res);
--	if (IS_ERR(pmx->sys2pci_base)) {
--		of_node_put(sys2pci_np);
-+	if (IS_ERR(pmx->sys2pci_base))
- 		return -ENOMEM;
--	}
- 
- 	pmx->dev = &pdev->dev;
+@@ -5444,7 +5444,7 @@ static int atlas7_pinmux_probe(struct platform_device *pdev)
+ 		pmx->regs[idx] = of_iomap(np, idx);
+ 		if (!pmx->regs[idx]) {
+ 			dev_err(&pdev->dev,
+-			"can't map ioc bank#%d registers\n", idx);
++				"can't map ioc bank#%d registers\n", idx);
+ 			ret = -ENOMEM;
+ 			goto unmap_io;
+ 		}
+@@ -6057,8 +6057,8 @@ static int atlas7_gpio_probe(struct platform_device *pdev)
+ 	ret = gpiochip_add_data(chip, a7gc);
+ 	if (ret) {
+ 		dev_err(&pdev->dev,
+-		"%s: error in probe function with status %d\n",
+-		np->name, ret);
++			"%s: error in probe function with status %d\n",
++			np->name, ret);
+ 		goto failed;
+ 	}
  
 -- 
 2.9.3
