@@ -1,75 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 20 Dec 2016 16:17:53 +0000
-Subject: [PATCH 3/4] iommu/arm-smmu: Disable stalling faults for all
- endpoints
-In-Reply-To: <000c01d259d6$cc750460$655f0d20$@codeaurora.org>
-References: <1471525542-14969-1-git-send-email-will.deacon@arm.com>
- <1471525542-14969-4-git-send-email-will.deacon@arm.com>
- <CAF6AEGujUb37qagBZK1T13eAh=50zy0z5HpFF9FsuvkZZ7c5qw@mail.gmail.com>
- <20161216115413.GE13191@arm.com>
- <000c01d259d6$cc750460$655f0d20$@codeaurora.org>
-Message-ID: <20161220161752.GJ10132@arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 21 Dec 2016 01:20:28 +0900
+Subject: [PATCH] i2c: uniphier[-f]: fix bool logic calculation
+In-Reply-To: <1476851911-21729-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1476851911-21729-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNATrR9dSuuUZR98f=uOZqSGqUBnUNZmrUqUZgubHHE+X4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2016 at 02:33:36PM +0530, Sricharan wrote:
-> >On Tue, Dec 06, 2016 at 06:30:21PM -0500, Rob Clark wrote:
-> >> On Thu, Aug 18, 2016 at 9:05 AM, Will Deacon <will.deacon@arm.com> wrote:
-> >> > Enabling stalling faults can result in hardware deadlock on poorly
-> >> > designed systems, particularly those with a PCI root complex upstream of
-> >> > the SMMU.
-> >> >
-> >> > Although it's not really Linux's job to save hardware integrators from
-> >> > their own misfortune, it *is* our job to stop userspace (e.g. VFIO
-> >> > clients) from hosing the system for everybody else, even if they might
-> >> > already be required to have elevated privileges.
-> >> >
-> >> > Given that the fault handling code currently executes entirely in IRQ
-> >> > context, there is nothing that can sensibly be done to recover from
-> >> > things like page faults anyway, so let's rip this code out for now and
-> >> > avoid the potential for deadlock.
-> >>
-> >> so, I'd like to re-introduce this feature, I *guess* as some sort of
-> >> opt-in quirk (ie. disabled by default unless something in DT tells you
-> >> otherwise??  But I'm open to suggestions.  I'm not entirely sure what
-> >> hw was having problems due to this feature.)
-> >>
-> >> On newer snapdragon devices we are using arm-smmu for the GPU, and
-> >> halting the GPU so the driver's fault handler can dump some GPU state
-> >> on faults is enormously helpful for debugging and tracking down where
-> >> in the gpu cmdstream the fault was triggered.  In addition, we will
-> >> eventually want the ability to update pagetables from fault handler
-> >> and resuming the faulting transition.
-> >
-> >I'm not against reintroducing this, but it would certainly need to be
-> >opt-in, as you suggest. If we want to try to use stall faults to enable
-> >demand paging for DMA, then that means running core mm code to resolve
-> >the fault and we can't do that in irq context. Consequently, we have to
-> >hand this off to a thread, which means the hardware must allow the SS
-> >bit to remain set without immediately reasserting the interrupt line.
-> >Furthermore, we can't handle multiple faults on a context-bank, so we'd
-> >need to restrict ourselves to one device (i.e. faulting stream) per
-> >domain (CB).
-> >
-> >I think that means we want both specific compatible strings to identify
-> >the SS bit behaviour, but also a way to opt-in for the stall model as a
-> >separate property to indicate that the SoC integration can support this
-> >without e.g. deadlocking.
-> >
-> 
-> To understand the reason on the need for the quirk based on SS bit behavior,
-> if the platform supports stall model and enabled, then SS bit should be implemented
-> and remain set until the RESUME register is written back, means same behavior
-> always ?
+Hi.
 
-The behaviour of the SS bit is IMPLEMENTATION DEFINED per the architecture,
-so we need to know which way the given implementation chose to go. If we
-want to support paging, then we absolutely need a way to return from the
-interrupt handler without having handled the stall (i.e. without having
-written to the RESUME register). That means that we mustn't take the same
-interrupt immediately, otherwise we'll end up getting stuck in an infinite
-fault. One hacky option would be to mask the interrupt at the GIC, but
-that adds an additional requirement of one interrupt per context bank,
-which isn't typically implemented in my experience.
+I have not got any comment, but does this seem
+a right thing to do?
 
-Will
+2016-10-19 13:38 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> This code is working, but it should not depend on how "bool" is
+> typedef'ed, or the bit position of I2C_M_RD.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+>
+>  drivers/i2c/busses/i2c-uniphier-f.c | 2 +-
+>  drivers/i2c/busses/i2c-uniphier.c   | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-uniphier-f.c b/drivers/i2c/busses/i2c-uniphier-f.c
+> index db9105e..b54448e 100644
+> --- a/drivers/i2c/busses/i2c-uniphier-f.c
+> +++ b/drivers/i2c/busses/i2c-uniphier-f.c
+> @@ -309,7 +309,7 @@ static int uniphier_fi2c_master_xfer_one(struct i2c_adapter *adap,
+>                                          struct i2c_msg *msg, bool stop)
+>  {
+>         struct uniphier_fi2c_priv *priv = i2c_get_adapdata(adap);
+> -       bool is_read = msg->flags & I2C_M_RD;
+> +       bool is_read = !!(msg->flags & I2C_M_RD);
+>         unsigned long time_left;
+>
+>         dev_dbg(&adap->dev, "%s: addr=0x%02x, len=%d, stop=%d\n",
+> diff --git a/drivers/i2c/busses/i2c-uniphier.c b/drivers/i2c/busses/i2c-uniphier.c
+> index 56e92af..cc80bb2 100644
+> --- a/drivers/i2c/busses/i2c-uniphier.c
+> +++ b/drivers/i2c/busses/i2c-uniphier.c
+> @@ -177,7 +177,7 @@ static int uniphier_i2c_stop(struct i2c_adapter *adap)
+>  static int uniphier_i2c_master_xfer_one(struct i2c_adapter *adap,
+>                                         struct i2c_msg *msg, bool stop)
+>  {
+> -       bool is_read = msg->flags & I2C_M_RD;
+> +       bool is_read = !!(msg->flags & I2C_M_RD);
+>         bool recovery = false;
+>         int ret;
+>
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
