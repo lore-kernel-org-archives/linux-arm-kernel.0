@@ -1,10 +1,10 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 20 Dec 2016 11:27:03 +0100
-Subject: [PATCH 1/7] Documentation: DT: bindings: iio: adc: add documentation
- for Allwinner SoCs' GPADC driver
+Date: Tue, 20 Dec 2016 11:27:04 +0100
+Subject: [PATCH 2/7] Documentation: DT: bindings: mfd: add documentation for
+ Allwinner SoCs' GPADC MFD driver
 In-Reply-To: <20161220102709.9504-1-quentin.schulz@free-electrons.com>
 References: <20161220102709.9504-1-quentin.schulz@free-electrons.com>
-Message-ID: <20161220102709.9504-2-quentin.schulz@free-electrons.com>
+Message-ID: <20161220102709.9504-3-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,21 +15,28 @@ the touchscreen and the fifth channel is used for the thermal sensor.
 If there is not a touchscreen controller, the one and only channel is
 used for the thermal sensor.
 
-This patch adds the documentation for the driver of the Allwinner SoCs'
-GPADC.
+The Allwinner SoCs already have an existing DT binding for the
+touchscreen controller and thermal sensor for the sun4i-ts input driver
+which does let the user use the ADC. To keep backward compatibility,
+this MFD driver re-uses the same bindings as the sun4i-ts input driver
+and will probe the required drivers to make the ADC and thermal sensor
+work.
+
+This patch adds the binding documentation for the MFD driver of the
+Allwinner SoCs' GPADC.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
- .../bindings/iio/adc/sun4i-gpadc-iio.txt           | 57 ++++++++++++++++++++++
- 1 file changed, 57 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/sun4i-gpadc-iio.txt
+ .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 47 ++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/sun4i-gpadc-iio.txt b/Documentation/devicetree/bindings/iio/adc/sun4i-gpadc-iio.txt
+diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
 new file mode 100644
-index 0000000..aab768d
+index 0000000..bc4b4f6
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/iio/adc/sun4i-gpadc-iio.txt
-@@ -0,0 +1,57 @@
++++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+@@ -0,0 +1,47 @@
 +Allwinner SoCs' GPADC Device Tree bindings
 +------------------------------------------
 +
@@ -45,24 +52,19 @@ index 0000000..aab768d
 +input/touchscreen/sun4i-ts.c which is absolutely incompatible with this driver.
 +
 +The Allwinner A10, A13 and A31 SoCs already have a DT binding for the
-+aforementioned input driver, thus an MFD driver matches the existing DT binding
-+(mfd/sun4i-gpadc.c) and replaces the input driver. No DT binding is required for
-+these SoCs' ADC, everything is handled by the MFD which is matching the existing
-+DT binding for input/touchscreen/sun4i-ts.c.
-+
-+The Allwinner A33 GPADC only have a thermal sensor and have a proper DT binding
-+for this driver unlike the previously mentioned SoCs.
++aforementioned input driver, thus this MFD driver matches the existing DT
++binding (mfd/sun4i-gpadc.c).
++To keep DT binding compatibility, the MFD replaces the sun4i-ts input driver and
++probes required drivers (IIO GPADC driver (iio/adc/sun4i-gpadc-iio.c),
++iio-hwmon and soon the touchscreen driver) without the need for a DT binding for
++each driver.
 +
 +Required properties:
-+ - compatible: "allwinner,sun8i-a33-gpadc-iio"
-+
-+Optional properties:
-+(for use with thermal framework for CPU thermal throttling for example, and/or
-+ IIO consumers)
-+ - #thermal-sensor-cells = <0>; (see
-+Documentation/devicetree/bindings/thermal/thermal.txt)
-+ - #io-channel-cells = <0>; (see
-+Documentation/devicetree/bindings/iio/iio-bindings.txt)
++ - compatible: one of:
++	- "allwinner,sun4i-a10-ts",
++	- "allwinner,sun5i-a13-ts",
++	- "allwinner,sun6i-a31-ts"
++ - #thermal-sensor-cells = <0>;
 +
 +Example:
 +
@@ -76,16 +78,11 @@ index 0000000..aab768d
 +soc at 01c00000 {
 +	[...]
 +	rtp: rtp at 01c25000 {
-+		compatible = "allwinner,sun8i-a33-gpadc-iio";
++		compatible = "allwinner,sun6i-a31-ts";
 +		reg = <0x01c25000 0x100>;
++		interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
 +		#thermal-sensor-cells = <0>;
-+		#io-channel-cells = <0>;
 +	};
-+}
-+
-+iio_hwmon {
-+	compatible = "iio-hwmon";
-+	io-channels = <&rtp>;
 +};
 -- 
 2.9.3
