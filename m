@@ -1,45 +1,30 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 20 Dec 2016 09:55:38 -0800
-Subject: [PATCH] i2c: uniphier[-f]: fix bool logic calculation
-In-Reply-To: <CAK7LNATrR9dSuuUZR98f=uOZqSGqUBnUNZmrUqUZgubHHE+X4A@mail.gmail.com>
-References: <1476851911-21729-1-git-send-email-yamada.masahiro@socionext.com>
- <CAK7LNATrR9dSuuUZR98f=uOZqSGqUBnUNZmrUqUZgubHHE+X4A@mail.gmail.com>
-Message-ID: <1482256538.1984.23.camel@perches.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 20 Dec 2016 13:51:20 -0500 (EST)
+Subject: [PATCH net 0/3] Fix integration of eee-broken-modes
+In-Reply-To: <1482159938-13239-1-git-send-email-jbrunet@baylibre.com>
+References: <1482159938-13239-1-git-send-email-jbrunet@baylibre.com>
+Message-ID: <20161220.135120.552249230607699619.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-12-21 at 01:20 +0900, Masahiro Yamada wrote:
-> Hi.
+From: Jerome Brunet <jbrunet@baylibre.com>
+Date: Mon, 19 Dec 2016 16:05:35 +0100
+
+> The purpose of this series is to fix the integration of the ethernet phy
+> property "eee-broken-modes" [0]
 > 
-> I have not got any comment, but does this seem
-> a right thing to do?
+> The v3 of this series has been merged, missing a fix (error reported by
+> kbuild robot) available in the v4 [1]
+> 
+> More importantly, Florian opposed adding a DT property mapping a device
+> register this directly [2]. The concern was that the property could be
+> abused to implement platform configuration policy. After discussing it,
+> I think we agreed that such information about the HW (defect) should appear
+> in the platform DT. However, the preferred way is to add a boolean property
+> for each EEE broken mode.
+> 
+> [0]: http://lkml.kernel.org/r/1480326409-25419-1-git-send-email-jbrunet at baylibre.com
+> [1]: http://lkml.kernel.org/r/1480348229-25672-1-git-send-email-jbrunet at baylibre.com
+> [2]: http://lkml.kernel.org/r/e14a3b0c-dc34-be14-48b3-518a0ad0c080 at gmail.com
 
-> This code is working, but it should not depend on how "bool" is
-> typedef'ed, or the bit position of I2C_M_RD.
-
-<shrug>
-
-I think bool can be guaranteed to be _Bool.
-
-So a change not necessary as the original code
-has a c90 guarantee of the same result.
-
-6.3.1.2 Boolean type
-1
-When any scalar value is converted to _Bool, the result is 0 if the value compares equal
-to 0; otherwise, the result is 1.
-
-
-> 2016-10-19 13:38 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-[]
-> > diff --git a/drivers/i2c/busses/i2c-uniphier-f.c b/drivers/i2c/busses/i2c-uniphier-f.c
-[]
-> > @@ -309,7 +309,7 @@ static int uniphier_fi2c_master_xfer_one(struct i2c_adapter *adap,
-> >                                          struct i2c_msg *msg, bool stop)
-> >  {
-> >         struct uniphier_fi2c_priv *priv = i2c_get_adapdata(adap);
-> > -       bool is_read = msg->flags & I2C_M_RD;
-> > +       bool is_read = !!(msg->flags & I2C_M_RD);
-> >         unsigned long time_left;
-> > 
-> >         dev_dbg(&adap->dev, "%s: addr=0x%02x, len=%d, stop=%d\n",
+Series applied, thank you.
