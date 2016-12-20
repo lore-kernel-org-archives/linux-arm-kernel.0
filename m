@@ -1,46 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 20 Dec 2016 11:56:31 +0000
-Subject: [PATCH v3] arm64: SMMU-v2: Workaround for Cavium ThunderX
- erratum 28168
-In-Reply-To: <bd950765-8c1f-14d5-2be8-efa76f2d6b6b@arm.com>
-References: <1482231993-27571-1-git-send-email-gakula@caviumnetworks.com>
- <bd950765-8c1f-14d5-2be8-efa76f2d6b6b@arm.com>
-Message-ID: <20161220115630.GD10132@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 20 Dec 2016 12:58:08 +0100
+Subject: [PATCH 0/2] s5p-mfc fix for using reserved memory
+In-Reply-To: <1481888915-19624-1-git-send-email-pankaj.dubey@samsung.com>
+References: <CGME20161216115004epcas1p276eddca803dcafe3470e223386b86da0@epcas1p2.samsung.com>
+ <1481888915-19624-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <ea03c72a-a0f4-46e6-bd29-474549a0f145@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2016 at 11:52:58AM +0000, Marc Zyngier wrote:
-> On 20/12/16 11:06, Geetha sowjanya wrote:
-> > From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
-> > +#ifdef CONFIG_CAVIUM_ERRATUM_28168
-> > +/*
-> > + * Cavium ThunderX erratum 28168
-> > + *
-> > + * Due to erratum #28168 PCI-inbound MSI-X store to the interrupt
-> > + * controller are delivered to the interrupt controller before older
-> > + * PCI-inbound memory stores are committed. Doing a sync on SMMU
-> > + * will make sure all prior data transfers are completed before
-> > + * invoking ISR.
-> > + *
-> > + */
-> > +void dev_smmu_tlb_sync(struct device *dev)
-> > +{
-> > +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-> > +	struct arm_smmu_device *smmu = fwspec_smmu(fwspec);
-> > +
-> > +	if (smmu)
-> > +		__arm_smmu_tlb_sync(smmu);
-> > +}
-> > +#endif
-> 
-> I'll let Robin and Will comment on this, but it strikes be as rather odd
-> that nothing will happen if the SMMU is in bypass or simply compiled
-> out. So this workaround is at best incomplete.
+Hi Pankaj
 
-Agreed. Unless the SMMU is the cause of the issue, relying on it to
-implement the workaround is fragile and unnecessarily introduces a linkage
-between SMMU driver internals and the interrupt handling code.
 
-Not a fan.
+On 2016-12-16 12:48, Pankaj Dubey wrote:
+> It has been observed on ARM64 based Exynos SoC, if IOMMU is not enabled
+> and we try to use reserved memory for MFC, reqbufs fails with below
+> mentioned error
+> ---------------------------------------------------------------------------
+> V4L2 Codec decoding example application
+> Kamil Debski <k.debski@samsung.com>
+> Copyright 2012 Samsung Electronics Co., Ltd.
+>
+> Opening MFC.
+> (mfc.c:mfc_open:58): MFC Info (/dev/video0): driver="s5p-mfc" \
+> bus_info="platform:12c30000.mfc0" card="s5p-mfc-dec" fd=0x4[
+> 42.339165] Remapping memory failed, error: -6
+>
+> MFC Open Success.
+> (main.c:main:711): Successfully opened all necessary files and devices
+> (mfc.c:mfc_dec_setup_output:103): Setup MFC decoding OUTPUT buffer \
+> size=4194304 (requested=4194304)
+> (mfc.c:mfc_dec_setup_output:120): Number of MFC OUTPUT buffers is 2 \
+> (requested 2)
+>
+> [App] Out buf phy : 0x00000000, virt : 0xffffffff
+> Output Length is = 0x300000
+> Error (mfc.c:mfc_dec_setup_output:145): Failed to MMAP MFC OUTPUT buffer
+> -------------------------------------------------------------------------
+> This is because the device requesting for memory is mfc0.left not the parent mfc0.
+> Hence setting of alloc_devs need to be done only if IOMMU is enabled
+> and in that case both the left and right device is treated as mfc0 only.
+> Also we need to populate vb2_queue's dev pointer with mfc dev pointer.
 
-Will
+I also got this issue but Your solution is imho not the proper approach.
+Too much hacking in the driver, while the issue is in the core. ARM64 
+requires
+to call arch_setup_dma_ops() for each device that will be used for 
+dma-mapping.
+So the issue is in drivers/of/of_reserved_mem.c - in
+of_reserved_mem_device_init_by_idx() function, which should ensure that
+arch_setup_dma_ops() is called also for the virtual devices for reserved 
+memory.
+
+s5p-mfc driver however still requires some patching for 
+dma-mapping/iommu glue
+used on ARM64 architecture.
+
+> Smitha T Murthy (2):
+>    media: s5p-mfc: convert drivers to use the new vb2_queue dev field
+>    media: s5p-mfc: fix MMAP of mfc buffer during reqbufs
+>
+>   drivers/media/platform/s5p-mfc/s5p_mfc.c     |  2 ++
+>   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 17 ++++++++++-------
+>   drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 18 +++++++++++-------
+>   3 files changed, 23 insertions(+), 14 deletions(-)
+>
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
