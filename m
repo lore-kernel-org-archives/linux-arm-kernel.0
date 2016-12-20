@@ -1,41 +1,46 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue, 20 Dec 2016 17:45:30 +1030
-Subject: [PATCH v4 0/5] mfd: dt: Add bindings for the Aspeed MFDs
-Message-ID: <20161220071535.27542-1-andrew@aj.id.au>
+Date: Tue, 20 Dec 2016 17:45:32 +1030
+Subject: [PATCH v4 2/5] mfd: dt: ranges,
+ #address-cells and #size-cells as optional properties
+In-Reply-To: <20161220071535.27542-1-andrew@aj.id.au>
+References: <20161220071535.27542-1-andrew@aj.id.au>
+Message-ID: <20161220071535.27542-3-andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Whilst describing a device and not a bus, simple-mfd is modelled on
+simple-bus where child nodes are iterated and registered as platform
+devices. Some complex devices, e.g. the Aspeed LPC controller, can
+benefit from address space mapping such that child nodes can use the
+regs property to describe their resource offsets within the
+multi-function device.
 
-Here's v4 of the Aspeed LPC MFD devicetree bindings series. v3 can be found at:
+Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/mfd/mfd.txt | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-  https://lkml.org/lkml/2016/12/5/835
-
-Changes since v3:
-
-* Based on Arnd's argument[1], drop the addition of the mfd/syscon bindings
-  directory as well as the the last patch in v3, which moved a number of
-  existing bindings. Eventually the Aspeed display controller will have a
-  device-specific driver so it doesn't belong there either.
-
-* Add a compatible string for the AST2400 in the LPC Host Controller bindings
-  as requested by Joel and slightly tweak the reg description for Rob.
-
-[1] https://lkml.org/lkml/2016/12/13/202
-
-Andrew Jeffery (5):
-  mfd: dt: Fix "indicates" typo in mfd bindings document
-  mfd: dt: ranges, #address-cells and #size-cells as optional properties
-  mfd: dt: Add Aspeed Low Pin Count Controller bindings
-  mfd: dt: Add bindings for the Aspeed LPC Host Controller (LHC)
-  mfd: dt: Add bindings for the Aspeed SoC Display Controller (GFX)
-
- .../devicetree/bindings/mfd/aspeed-gfx.txt         |  17 +++
- .../devicetree/bindings/mfd/aspeed-lpc.txt         | 137 +++++++++++++++++++++
- Documentation/devicetree/bindings/mfd/mfd.txt      |  12 +-
- 3 files changed, 165 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-gfx.txt
- create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
-
+diff --git a/Documentation/devicetree/bindings/mfd/mfd.txt b/Documentation/devicetree/bindings/mfd/mfd.txt
+index f1fceeda12f1..bcb6abb9d413 100644
+--- a/Documentation/devicetree/bindings/mfd/mfd.txt
++++ b/Documentation/devicetree/bindings/mfd/mfd.txt
+@@ -25,6 +25,16 @@ Optional properties:
+   be used. In the latter case the child devices will be determined by the
+   operating system.
+ 
++- ranges: Describes the address mapping relationship to the parent. Should set
++  the child's base address to 0, the physical address within parent's address
++  space, and the length of the address map.
++
++- #address-cells: Specifies the number of cells used to represent physical base
++  addresses. Must be present if ranges is used.
++
++- #size-cells: Specifies the number of cells used to represent the size of an
++  address. Must be present if ranges is used.
++
+ Example:
+ 
+ foo at 1000 {
 -- 
 2.9.3
