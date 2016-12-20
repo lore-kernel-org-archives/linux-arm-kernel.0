@@ -1,31 +1,75 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 20 Dec 2016 17:17:14 +0100
-Subject: [PATCH v2 3/3] arm64: dts: marvell: Add ethernet switch
- definition for the ESPRESSObin
-In-Reply-To: <c27998fd-3807-5c99-382b-b8d0d0f06526@free-electrons.com>
-References: <20161220085138.3998-1-romain.perier@free-electrons.com>
- <20161220085138.3998-4-romain.perier@free-electrons.com>
- <20161220154234.GC30952@lunn.ch>
- <c27998fd-3807-5c99-382b-b8d0d0f06526@free-electrons.com>
-Message-ID: <20161220161714.GD30952@lunn.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Dec 2016 16:17:53 +0000
+Subject: [PATCH 3/4] iommu/arm-smmu: Disable stalling faults for all
+ endpoints
+In-Reply-To: <000c01d259d6$cc750460$655f0d20$@codeaurora.org>
+References: <1471525542-14969-1-git-send-email-will.deacon@arm.com>
+ <1471525542-14969-4-git-send-email-will.deacon@arm.com>
+ <CAF6AEGujUb37qagBZK1T13eAh=50zy0z5HpFF9FsuvkZZ7c5qw@mail.gmail.com>
+ <20161216115413.GE13191@arm.com>
+ <000c01d259d6$cc750460$655f0d20$@codeaurora.org>
+Message-ID: <20161220161752.GJ10132@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>+		mdio {
-> >>+			#address-cells = <1>;
-> >>+			#size-cells = <0>;
-> >>+			reg = <1>;
+On Mon, Dec 19, 2016 at 02:33:36PM +0530, Sricharan wrote:
+> >On Tue, Dec 06, 2016 at 06:30:21PM -0500, Rob Clark wrote:
+> >> On Thu, Aug 18, 2016 at 9:05 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >> > Enabling stalling faults can result in hardware deadlock on poorly
+> >> > designed systems, particularly those with a PCI root complex upstream of
+> >> > the SMMU.
+> >> >
+> >> > Although it's not really Linux's job to save hardware integrators from
+> >> > their own misfortune, it *is* our job to stop userspace (e.g. VFIO
+> >> > clients) from hosing the system for everybody else, even if they might
+> >> > already be required to have elevated privileges.
+> >> >
+> >> > Given that the fault handling code currently executes entirely in IRQ
+> >> > context, there is nothing that can sensibly be done to recover from
+> >> > things like page faults anyway, so let's rip this code out for now and
+> >> > avoid the potential for deadlock.
+> >>
+> >> so, I'd like to re-introduce this feature, I *guess* as some sort of
+> >> opt-in quirk (ie. disabled by default unless something in DT tells you
+> >> otherwise??  But I'm open to suggestions.  I'm not entirely sure what
+> >> hw was having problems due to this feature.)
+> >>
+> >> On newer snapdragon devices we are using arm-smmu for the GPU, and
+> >> halting the GPU so the driver's fault handler can dump some GPU state
+> >> on faults is enormously helpful for debugging and tracking down where
+> >> in the gpu cmdstream the fault was triggered.  In addition, we will
+> >> eventually want the ability to update pagetables from fault handler
+> >> and resuming the faulting transition.
 > >
-> >what is this reg value for?
+> >I'm not against reintroducing this, but it would certainly need to be
+> >opt-in, as you suggest. If we want to try to use stall faults to enable
+> >demand paging for DMA, then that means running core mm code to resolve
+> >the fault and we can't do that in irq context. Consequently, we have to
+> >hand this off to a thread, which means the hardware must allow the SS
+> >bit to remain set without immediately reasserting the interrupt line.
+> >Furthermore, we can't handle multiple faults on a context-bank, so we'd
+> >need to restrict ourselves to one device (i.e. faulting stream) per
+> >domain (CB).
 > >
-> >     Andrew
+> >I think that means we want both specific compatible strings to identify
+> >the SS bit behaviour, but also a way to opt-in for the stall model as a
+> >separate property to indicate that the SoC integration can support this
+> >without e.g. deadlocking.
 > >
 > 
-> It was required to avoid a warning thrown by the mdio subsystem
+> To understand the reason on the need for the quirk based on SS bit behavior,
+> if the platform supports stall model and enabled, then SS bit should be implemented
+> and remain set until the RESUME register is written back, means same behavior
+> always ?
 
-Do you remember what the warning was?
+The behaviour of the SS bit is IMPLEMENTATION DEFINED per the architecture,
+so we need to know which way the given implementation chose to go. If we
+want to support paging, then we absolutely need a way to return from the
+interrupt handler without having handled the stall (i.e. without having
+written to the RESUME register). That means that we mustn't take the same
+interrupt immediately, otherwise we'll end up getting stuck in an infinite
+fault. One hacky option would be to mask the interrupt at the GIC, but
+that adds an additional requirement of one interrupt per context bank,
+which isn't typically implemented in my experience.
 
-This seems odd to me. I don't see why a reg is needed here.
-
-Thanks
-	Andrew
+Will
