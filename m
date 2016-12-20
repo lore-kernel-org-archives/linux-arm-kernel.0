@@ -1,17 +1,15 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 20 Dec 2016 15:25:54 +0100
-Subject: [PATCH 1/7] Documentation: DT: bindings: iio: adc: add
- documentation for Allwinner SoCs' GPADC driver
-In-Reply-To: <20161220102709.9504-2-quentin.schulz@free-electrons.com>
+Date: Tue, 20 Dec 2016 15:26:50 +0100
+Subject: [PATCH 2/7] Documentation: DT: bindings: mfd: add documentation
+ for Allwinner SoCs' GPADC MFD driver
+In-Reply-To: <20161220102709.9504-3-quentin.schulz@free-electrons.com>
 References: <20161220102709.9504-1-quentin.schulz@free-electrons.com>
- <20161220102709.9504-2-quentin.schulz@free-electrons.com>
-Message-ID: <20161220142554.rcocnculfehiwhpn@lukather>
+ <20161220102709.9504-3-quentin.schulz@free-electrons.com>
+Message-ID: <20161220142650.voojrp3vpoa7vzjn@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Dec 20, 2016 at 11:27:03AM +0100, Quentin Schulz wrote:
+On Tue, Dec 20, 2016 at 11:27:04AM +0100, Quentin Schulz wrote:
 > The Allwinner SoCs all have an ADC that can also act as a thermal sensor
 > and sometimes as a touchscreen controller. If there is a touchscreen
 > controller, the first four channels can be used either for the ADC or
@@ -19,21 +17,28 @@ On Tue, Dec 20, 2016 at 11:27:03AM +0100, Quentin Schulz wrote:
 > If there is not a touchscreen controller, the one and only channel is
 > used for the thermal sensor.
 > 
-> This patch adds the documentation for the driver of the Allwinner SoCs'
-> GPADC.
+> The Allwinner SoCs already have an existing DT binding for the
+> touchscreen controller and thermal sensor for the sun4i-ts input driver
+> which does let the user use the ADC. To keep backward compatibility,
+> this MFD driver re-uses the same bindings as the sun4i-ts input driver
+> and will probe the required drivers to make the ADC and thermal sensor
+> work.
+> 
+> This patch adds the binding documentation for the MFD driver of the
+> Allwinner SoCs' GPADC.
 > 
 > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 > ---
->  .../bindings/iio/adc/sun4i-gpadc-iio.txt           | 57 ++++++++++++++++++++++
->  1 file changed, 57 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/sun4i-gpadc-iio.txt
+>  .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 47 ++++++++++++++++++++++
+>  1 file changed, 47 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/sun4i-gpadc-iio.txt b/Documentation/devicetree/bindings/iio/adc/sun4i-gpadc-iio.txt
+> diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
 > new file mode 100644
-> index 0000000..aab768d
+> index 0000000..bc4b4f6
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/adc/sun4i-gpadc-iio.txt
-> @@ -0,0 +1,57 @@
+> +++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> @@ -0,0 +1,47 @@
 > +Allwinner SoCs' GPADC Device Tree bindings
 > +------------------------------------------
 > +
@@ -49,40 +54,23 @@ On Tue, Dec 20, 2016 at 11:27:03AM +0100, Quentin Schulz wrote:
 > +input/touchscreen/sun4i-ts.c which is absolutely incompatible with this driver.
 > +
 > +The Allwinner A10, A13 and A31 SoCs already have a DT binding for the
-> +aforementioned input driver, thus an MFD driver matches the existing DT binding
-> +(mfd/sun4i-gpadc.c) and replaces the input driver. No DT binding is required for
-> +these SoCs' ADC, everything is handled by the MFD which is matching the existing
-> +DT binding for input/touchscreen/sun4i-ts.c.
+> +aforementioned input driver, thus this MFD driver matches the existing DT
+> +binding (mfd/sun4i-gpadc.c).
+> +To keep DT binding compatibility, the MFD replaces the sun4i-ts input driver and
+> +probes required drivers (IIO GPADC driver (iio/adc/sun4i-gpadc-iio.c),
+> +iio-hwmon and soon the touchscreen driver) without the need for a DT binding for
+> +each driver.
 > +
-> +The Allwinner A33 GPADC only have a thermal sensor and have a proper DT binding
-> +for this driver unlike the previously mentioned SoCs.
-
-The DT bindings should be agnostic from the OS. You can remove all
-mention of the implementations details in Linux.
-
-(and you should wrap at 72 characters).
-
-But we already have a binding document for that controller, so you
-shouldn't create a new one, reuse the old one that is already there.
-
 > +Required properties:
-> + - compatible: "allwinner,sun8i-a33-gpadc-iio"
+> + - compatible: one of:
+> +	- "allwinner,sun4i-a10-ts",
+> +	- "allwinner,sun5i-a13-ts",
+> +	- "allwinner,sun6i-a31-ts"
+> + - #thermal-sensor-cells = <0>;
 
-IIO is an implementation detail. The IP is called GPADC.
-You're also missing reg.
+Same thing here, we already have such a document, please amend it if
+needed.
 
-> +
-> +Optional properties:
-> +(for use with thermal framework for CPU thermal throttling for example, and/or
-> + IIO consumers)
-> + - #thermal-sensor-cells = <0>; (see
-> +Documentation/devicetree/bindings/thermal/thermal.txt)
-> + - #io-channel-cells = <0>; (see
-> +Documentation/devicetree/bindings/iio/iio-bindings.txt)
-
-I wouldn't list that as optional.
-
-Thanks,
 Maxime
 
 -- 
@@ -95,4 +83,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161220/34694221/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161220/e00bb9e3/attachment.sig>
