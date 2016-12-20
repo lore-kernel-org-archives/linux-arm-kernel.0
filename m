@@ -1,29 +1,44 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 21 Dec 2016 01:04:52 +0900
-Subject: [PATCH 1/2] arm64: defconfig: enable CONFIG_MTD_BLOCK
-Message-ID: <1482249893-14988-1-git-send-email-yamada.masahiro@socionext.com>
+From: romain.perier@free-electrons.com (Romain Perier)
+Date: Tue, 20 Dec 2016 17:09:38 +0100
+Subject: [PATCH v2 3/3] arm64: dts: marvell: Add ethernet switch
+ definition for the ESPRESSObin
+In-Reply-To: <20161220154234.GC30952@lunn.ch>
+References: <20161220085138.3998-1-romain.perier@free-electrons.com>
+ <20161220085138.3998-4-romain.perier@free-electrons.com>
+ <20161220154234.GC30952@lunn.ch>
+Message-ID: <c27998fd-3807-5c99-382b-b8d0d0f06526@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the block layer support for MTD devices.
+Hi,
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Le 20/12/2016 ? 16:42, Andrew Lunn a ?crit :
+>> +&mdio {
+>> +	switch0: switch0 at 0 {
+>> +		compatible = "marvell,mv88e6085";
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		reg = <1>;
+>
+> Ah, sorry, missed this last time. reg = <1>, that means switch0 at 1.
+> That is a general rule for all device tree bindings.
 
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 869dded..32d73ab 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -143,6 +143,7 @@ CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_DMA_CMA=y
- CONFIG_MTD=y
-+CONFIG_MTD_BLOCK=y
- CONFIG_MTD_M25P80=y
- CONFIG_MTD_SPI_NOR=y
- CONFIG_BLK_DEV_LOOP=y
--- 
-2.7.4
+Ahhh, I did not pay attention either :/
+I will fix this.
+
+
+>
+>> +		mdio {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			reg = <1>;
+>
+> what is this reg value for?
+>
+>      Andrew
+>
+
+It was required to avoid a warning thrown by the mdio subsystem
+
+Romain
