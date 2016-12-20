@@ -1,347 +1,66 @@
-From: rafalo@cadence.com (Rafal Ozieblo)
-Date: Tue, 20 Dec 2016 16:38:45 +0000
-Subject: [RFC PATCH net-next v4 2/2] macb: Enable 1588 support in SAMA5Dx
- platforms.
-In-Reply-To: <1481720175-12703-2-git-send-email-andrei.pistirica@microchip.com>
-References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
- <1481720175-12703-2-git-send-email-andrei.pistirica@microchip.com>
-Message-ID: <BN3PR07MB2516E276164A4C2B5F92DDFDC9900@BN3PR07MB2516.namprd07.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 20 Dec 2016 16:50:22 +0000
+Subject: [RFC PATCH] vring: Force use of DMA API for ARM-based systems
+In-Reply-To: <1482246864-16399-1-git-send-email-will.deacon@arm.com>
+References: <1482246864-16399-1-git-send-email-will.deacon@arm.com>
+Message-ID: <ed400fb2-6f92-a343-8b7b-0cb4254802c3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrei Pistirica [mailto:andrei.pistirica at microchip.com] 
-Sent: 14 grudnia 2016 13:56
-
-> This patch does the following:                                                                                     
-> - Enable HW time stamp for the following platforms: SAMA5D2, SAMA5D3 and                                           
->   SAMA5D4.                                                                                                         
-> - HW time stamp capabilities are advertised via ethtool and macb ioctl is                                          
->   updated accordingly.                                                                                             
-> - HW time stamp on the PTP Ethernet packets are received using the                                                 
->   SO_TIMESTAMPING API. Where timers are obtained from the PTP event/peer                                           
->   registers.                                                                                                       
->                                                                                                                    
-> Note: Patch on net-next, on December 7th.                                                                          
->                                                                                                                    
-> Signed-off-by: Andrei Pistirica <andrei.pistirica@microchip.com>                                                   
-> ---                                                                                                                
-> Patch history:                                                                                                     
->                                                                                                                    
-> Version 1:                                                                                                         
-> Integration with SAMA5D2 only. This feature wasn't tested on any other platform that might use cadence/gem.        
->                                                                                                                    
-> Patch is not completely ported to the very latest version of net-next, and it will be after review.                
->                                                                                                                    
-> Version 2 modifications:                                                                                           
-> - add PTP caps for SAMA5D2/3/4 platforms                                                                           
-> - and cosmetic changes                                                                                             
->                                                                                                                    
-> Version 3 modifications:                                                                                           
-> - add support for sama5D2/3/4 platforms using GEM-PTP interface.                                                   
->                                                                                                                    
-> Version 4 modifications:                                                                                           
-> - time stamp only PTP_V2 events                                                                                    
-> - maximum adjustment value is set based on Richard's input                                                         
->                                                                                                                    
-> Note: Patch on net-next, on December 14th.                                                                         
->                                                                                                                    
->  drivers/net/ethernet/cadence/macb.c | 168 ++++++++++++++++++++++++++++++++++--                                    
->  1 file changed, 163 insertions(+), 5 deletions(-)                                                                 
->                                                                                                                    
-> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c                             
-> index 538544a..8d5c976 100644                                                                                      
-> --- a/drivers/net/ethernet/cadence/macb.c                                                                          
-> +++ b/drivers/net/ethernet/cadence/macb.c                                                                          
-> @@ -714,6 +714,8 @@ static void macb_tx_interrupt(struct macb_queue *queue)                                        
->                                                                                                                    
->                       /* First, update TX stats if needed */                                                       
->                       if (skb) {                                                                                   
-> +                             gem_ptp_do_txstamp(bp, skb);                                                         
-> +                                                                                          
-I think, you can not do it in that way. 
-It will hold two locks. If you enable appropriate option in kernel (as far as I 
-remember CONFIG_DEBUG_SPINLOCK) you will get a warning here.
-
-Please look at following call-stack:
-
-1. macb_interrupt()   // spin_lock(&bp->lock) is taken
-2. macb_tx_interrupt()
-3. macb_handle_txtstamp()
-4. skb_tstamp_tx()
-5. __skb_tstamp_tx()
-6. skb_may_tx_timestamp()
-7. read_lock_bh() // second lock is taken
-
-I know that those are different locks and different types. But this could lead 
-to deadlocks. This is the reason of warning I could see.
-And this is the reason why I get timestamp in interrupt routine but pass it to 
-skb outside interrupt (using circular buffer).
-
-Please, refer to this:
-https://lkml.org/lkml/2016/11/18/168
-
-1. macb_tx_interrupt()
-2. macb_tx_timestamp_add() and schedule_work(&queue->tx_timestamp_task)
-
-Then, outside interrupt (without holding a lock) :
-1. macb_tx_timestamp_flush()
-2. macb_tstamp_tx()
-3. skb_tstamp_tx()
-
->                               netdev_vdbg(bp->dev, "skb %u (data %p) TX complete\n",                               
->                                           macb_tx_ring_wrap(bp, tail),                                             
->                                           skb->data);                                                              
-> @@ -878,6 +880,8 @@ static int gem_rx(struct macb *bp, int budget)                                                 
->                   GEM_BFEXT(RX_CSUM, ctrl) & GEM_RX_CSUM_CHECKED_MASK)                                             
->                       skb->ip_summed = CHECKSUM_UNNECESSARY;                                                       
->                                                                                                                    
-> +             gem_ptp_do_rxstamp(bp, skb);                                                                         
-> +                                                                                                                  
->               bp->stats.rx_packets++;                                                                              
->               bp->stats.rx_bytes += skb->len;                                                                      
->                                                                                                                    
-> @@ -2080,6 +2084,9 @@ static int macb_open(struct net_device *dev)                                                 
->                                                                                                                    
->       netif_tx_start_all_queues(dev);                                                                              
->                                                                                                                    
-> +     if (bp->ptp_info)                                                                                            
-> +             bp->ptp_info->ptp_init(dev);                                                                         
-> +                                                                                                                  
->       return 0;                                                                                                    
->  }                                                                                                                 
->                                                                                                                    
-> @@ -2101,6 +2108,9 @@ static int macb_close(struct net_device *dev)                                                
->                                                                                                                    
->       macb_free_consistent(bp);                                                                                    
->                                                                                                                    
-> +     if (bp->ptp_info)                                                                                            
-> +             bp->ptp_info->ptp_remove(dev);                                                                       
-> +                                                                                                                  
->       return 0;                                                                                                    
->  }                                                                                                                 
->                                                                                                                    
-> @@ -2374,6 +2384,133 @@ static int macb_set_ringparam(struct net_device *netdev,                                   
->       return 0;                                                                                                    
->  }                                                                                                                 
->                                                                                                                    
-> +#ifdef CONFIG_MACB_USE_HWSTAMP                                                                                    
-> +static unsigned int gem_get_tsu_rate(struct macb *bp) {                                                           
-> +     /* Note: TSU rate is hardwired to PCLK. */                                                                   
-> +     return clk_get_rate(bp->pclk);                                                                               
-> +}     
-Not exactly. There could be separate TSU clock. 
-In my solution I check tsu_clk in DT before I decide to take pclk.
-But it could be change in macb_ptp_info.
-
-> +                                                                                                                  
-> +static s32 gem_get_ptp_max_adj(void)                                                                              
-> +{                                                                                                                 
-> +     return 3921508;                                                                                              
-> +}                                                                                                                 
-> +                                                                                                                  
-> +static int gem_get_ts_info(struct net_device *dev,                                                                
-> +                        struct ethtool_ts_info *info)                                                             
-> +{                                                                                                                 
-> +     struct macb *bp = netdev_priv(dev);                                                                          
-> +                                                                                                                  
-> +     ethtool_op_get_ts_info(dev, info);                                                                           
-> +     info->so_timestamping =                                                                                      
-> +             SOF_TIMESTAMPING_TX_SOFTWARE |                                                                       
-> +             SOF_TIMESTAMPING_RX_SOFTWARE |                                                                       
-> +             SOF_TIMESTAMPING_SOFTWARE |                                                                          
-> +             SOF_TIMESTAMPING_TX_HARDWARE |                                                                       
-> +             SOF_TIMESTAMPING_RX_HARDWARE |                                                                       
-> +             SOF_TIMESTAMPING_RAW_HARDWARE;                                                                       
-> +     info->phc_index = -1;                                                                                        
-> +                                                                                                                  
-> +     if (bp->ptp_clock)                                                                                           
-> +             info->phc_index = ptp_clock_index(bp->ptp_clock);                                                    
-> +                                                                                                                  
-> +     return 0;                                                                                                    
-> +}                                                                                                                 
-> +                                                                                                                  
-> +static int gem_set_hwtst(struct net_device *netdev,                                                               
-> +                      struct ifreq *ifr, int cmd)                                                                 
-> +{                                                                                                                 
-> +     struct hwtstamp_config config;                                                                               
-> +     struct macb *priv = netdev_priv(netdev);                                                                     
-> +     u32 regval;                                                                                                  
-> +                                                                                                                  
-> +     netdev_vdbg(netdev, "macb_hwtstamp_ioctl\n");                                                                
-> +                                                                                                                  
-> +     if (copy_from_user(&config, ifr->ifr_data, sizeof(config)))                                                  
-> +             return -EFAULT;                                                                                      
-> +                                                                                                                  
-> +     /* reserved for future extensions */                                                                         
-> +     if (config.flags)                                                                                            
-> +             return -EINVAL;                                                                                      
-> +                                                                                                                  
-> +     switch (config.tx_type) {                                                                                    
-> +     case HWTSTAMP_TX_OFF:                                                                                        
-> +             priv->hwts_tx_en = false;                                                                            
-> +             break;                                                                                               
-> +     case HWTSTAMP_TX_ON:                                                                                         
-> +             priv->hwts_tx_en = true;                                                                             
-> +             break;                                                                                               
-> +     default:                                                                                                     
-> +             return -ERANGE;                                                                                      
-> +     }                                                                                                            
-> +                                                                                                                  
-> +     switch (config.rx_filter) {                                                                                  
-> +     case HWTSTAMP_FILTER_NONE:                                                                                   
-> +             if (priv->hwts_rx_en)                                                                                
-> +                     priv->hwts_rx_en = false;                                                                    
-> +             break;                                                                                               
-> +     case HWTSTAMP_FILTER_PTP_V2_L4_EVENT:                                                                        
-> +     case HWTSTAMP_FILTER_PTP_V2_L2_EVENT:                                                                        
-> +     case HWTSTAMP_FILTER_PTP_V2_L2_SYNC:                                                                         
-> +     case HWTSTAMP_FILTER_PTP_V2_L4_SYNC:                                                                         
-> +     case HWTSTAMP_FILTER_PTP_V2_L2_DELAY_REQ:                                                                    
-> +     case HWTSTAMP_FILTER_PTP_V2_L4_DELAY_REQ:                                                                    
-> +     case HWTSTAMP_FILTER_PTP_V2_EVENT:                                                                           
-> +     case HWTSTAMP_FILTER_PTP_V2_SYNC:                                                                            
-> +     case HWTSTAMP_FILTER_PTP_V2_DELAY_REQ:                                                                       
-> +             config.rx_filter = HWTSTAMP_FILTER_PTP_V2_EVENT;                                                     
-> +             regval = macb_readl(priv, NCR);                                                                      
-> +             macb_writel(priv, NCR, (regval | MACB_BIT(SRTSM)));                                                  
-> +                                                                                                                  
-> +             if (!priv->hwts_rx_en)                                                                               
-> +                     priv->hwts_rx_en = true;                                                                     
-> +             break;                                                                                               
-> +     default:                                                                                                     
-> +             config.rx_filter = HWTSTAMP_FILTER_NONE;                                                             
-> +             return -ERANGE;                                                                                      
-> +     }                                                                                                            
-> +                                                                                                                  
-> +     return copy_to_user(ifr->ifr_data, &config, sizeof(config)) ?                                                
-> +             -EFAULT : 0;                                                                                         
-> +}                                                                                                                 
-> +                                                                                                                  
-> +static int gem_get_hwtst(struct net_device *netdev,                                                               
-> +                      struct ifreq *ifr)                                                                          
-> +{                                                                                                                 
-> +     struct hwtstamp_config config;                                                                               
-> +     struct macb *priv = netdev_priv(netdev);                                                                     
-> +                                                                                                                  
-> +     config.flags = 0;                                                                                            
-> +     config.tx_type = priv->hwts_tx_en ? HWTSTAMP_TX_ON : HWTSTAMP_TX_OFF;                                        
-> +     config.rx_filter = (priv->hwts_rx_en ?                                                                       
-> +                         HWTSTAMP_FILTER_ALL : HWTSTAMP_FILTER_NONE);                                             
-> +                                                                                                                  
-> +     return copy_to_user(ifr->ifr_data, &config, sizeof(config)) ?                                                
-> +             -EFAULT : 0;                                                                                         
-> +}                                                                                                                 
-> +                                                                                                                  
-> +static struct macb_ptp_info gem_ptp_info = {                                                                      
-> +     .ptp_init        = gem_ptp_init,                                                                             
-> +     .ptp_remove      = gem_ptp_remove,                                                                           
-> +     .get_ptp_max_adj = gem_get_ptp_max_adj,                                                                      
-> +     .get_tsu_rate    = gem_get_tsu_rate,                                                                         
-> +     .get_ts_info     = gem_get_ts_info,                                                                          
-> +     .get_hwtst       = gem_get_hwtst,                                                                            
-> +     .set_hwtst       = gem_set_hwtst,                                                                            
-> +};                                                                                                                
-> +#endif                                                                                                            
-> +                                                                                                                  
-> +static int macb_get_ts_info(struct net_device *netdev,                                                            
-> +                         struct ethtool_ts_info *info)                                                            
-> +{                                                                                                                 
-> +     struct macb *bp = netdev_priv(netdev);                                                                       
-> +                                                                                                                  
-> +     if (bp->ptp_info)                                                                                            
-> +             return bp->ptp_info->get_ts_info(netdev, info);                                                      
-> +                                                                                                                  
-> +     return ethtool_op_get_ts_info(netdev, info); }                                                               
-> +                                                                                                                  
->  static const struct ethtool_ops macb_ethtool_ops = {                                                              
->       .get_regs_len           = macb_get_regs_len,                                                                 
->       .get_regs               = macb_get_regs,                                                                     
-> @@ -2391,7 +2528,7 @@ static const struct ethtool_ops gem_ethtool_ops = {                                          
->       .get_regs_len           = macb_get_regs_len,                                                                 
->       .get_regs               = macb_get_regs,                                                                     
->       .get_link               = ethtool_op_get_link,                                                               
-> -     .get_ts_info            = ethtool_op_get_ts_info,                                                            
-> +     .get_ts_info            = macb_get_ts_info,                                                                  
->       .get_ethtool_stats      = gem_get_ethtool_stats,                                                             
->       .get_strings            = gem_get_ethtool_strings,                                                           
->       .get_sset_count         = gem_get_sset_count,                                                                
-> @@ -2404,6 +2541,7 @@ static const struct ethtool_ops gem_ethtool_ops = {  static int macb_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)  {                                                                                  
->       struct phy_device *phydev = dev->phydev;                                                                     
-> +     struct macb *bp = netdev_priv(dev);                                                                          
->                                                                                                                    
->       if (!netif_running(dev))                                                                                     
->               return -EINVAL;                                                                                      
-> @@ -2411,7 +2549,20 @@ static int macb_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)                    
->       if (!phydev)                                                                                                 
->               return -ENODEV;
->
-> -     return phy_mii_ioctl(phydev, rq, cmd);
-> +     switch (cmd) {
-> +     case SIOCSHWTSTAMP:
-> +             if (bp->ptp_info)
-> +                     return bp->ptp_info->set_hwtst(dev, rq, cmd);
+On 20/12/16 15:14, Will Deacon wrote:
+> Booting Linux on an ARM fastmodel containing an SMMU emulation results
+> in an unexpected I/O page fault from the legacy virtio-blk PCI device:
+> 
+> [    1.211721] arm-smmu-v3 2b400000.smmu: event 0x10 received:
+> [    1.211800] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
+> [    1.211880] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
+> [    1.211959] arm-smmu-v3 2b400000.smmu:	0x00000008fa081002
+> [    1.212075] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
+> [    1.212155] arm-smmu-v3 2b400000.smmu: event 0x10 received:
+> [    1.212234] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
+> [    1.212314] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
+> [    1.212394] arm-smmu-v3 2b400000.smmu:	0x00000008fa081000
+> [    1.212471] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
+> 
+> <system hangs failing to read partition table>
+> 
+> This is because the virtio-blk is behind an SMMU, so we have consequently
+> swizzled its DMA ops and configured the SMMU to translate accesses. This
+> then requires the vring code to use the DMA API to establish translations,
+> otherwise all transactions will result in fatal faults and termination.
+> 
+> Given that ARM-based systems only see an SMMU if one is really present
+> (the topology is all described by firmware tables such as device-tree or
+> IORT), then we can safely use the DMA API for all virtio devices.
+> 
+> Cc: Andy Lutomirski <luto@kernel.org>
+> Cc: Michael S. Tsirkin <mst@redhat.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/virtio/virtio_ring.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/virtio/virtio_ring.c b/drivers/virtio/virtio_ring.c
+> index ed9c9eeedfe5..06b91e29d1b7 100644
+> --- a/drivers/virtio/virtio_ring.c
+> +++ b/drivers/virtio/virtio_ring.c
+> @@ -159,6 +159,10 @@ static bool vring_use_dma_api(struct virtio_device *vdev)
+>  	if (xen_domain())
+>  		return true;
+>  
+> +	/* On ARM-based machines, the DMA ops will do the right thing */
+> +	if (IS_ENABLED(CONFIG_ARM) || IS_ENABLED(CONFIG_ARM64))
+> +		return true;
 > +
-> +             return -EOPNOTSUPP;
-> +     case SIOCGHWTSTAMP:
-> +             if (bp->ptp_info)
-> +                     return bp->ptp_info->get_hwtst(dev, rq);
-> +
-> +             return -EOPNOTSUPP;
-> +     default:
-> +             return phy_mii_ioctl(phydev, rq, cmd);
-> +     }
+>  	return false;
 >  }
->
->  static int macb_set_features(struct net_device *netdev, @@ -2485,6 +2636,12 @@ static void macb_configure_caps(struct macb *bp,
->               dcfg = gem_readl(bp, DCFG2);
->               if ((dcfg & (GEM_BIT(RX_PKT_BUFF) | GEM_BIT(TX_PKT_BUFF))) == 0)
->                       bp->caps |= MACB_CAPS_FIFO_MODE;
-> +
-> +             /* iff HWSTAMP is configure and gem has the capability */ #ifdef
-> +CONFIG_MACB_USE_HWSTAMP
-> +             if (gem_has_ptp(bp))
-> +                     bp->ptp_info = &gem_ptp_info;
-> +#endif
->       }
->
->       dev_dbg(&bp->pdev->dev, "Cadence caps 0x%08x\n", bp->caps); @@ -3041,7 +3198,7 @@ static const struct macb_config pc302gem_config = {  };
->
->  static const struct macb_config sama5d2_config = {
-> -     .caps = MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII,
-> +     .caps = MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII | MACB_CAPS_GEM_HAS_PTP,
-There are many IP cores with many configuration. If it is possible, capabilities should be read from IP directly.
-And it is possible in that case:
-Design Configuration Register 5 (0x290)
-bit 8: tsu
-There is now PTP hardware support without that bit.
+>  
+> 
 
->       .dma_burst_length = 16,
->       .clk_init = macb_clk_init,
->       .init = macb_init,
-> @@ -3049,14 +3206,15 @@ static const struct macb_config sama5d2_config = {
->
->  static const struct macb_config sama5d3_config = {
->       .caps = MACB_CAPS_SG_DISABLED | MACB_CAPS_GIGABIT_MODE_AVAILABLE
-> -           | MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII,
-> +           | MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII
-> +           | MACB_CAPS_GEM_HAS_PTP,
->       .dma_burst_length = 16,
->       .clk_init = macb_clk_init,
->       .init = macb_init,
->  };
->
->  static const struct macb_config sama5d4_config = {
-> -     .caps = MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII,
-> +     .caps = MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII | MACB_CAPS_GEM_HAS_PTP,
->       .dma_burst_length = 4,
->       .clk_init = macb_clk_init,
->       .init = macb_init,
-> --
-> 2.7.4
+This patch makes my model usable again, so FWIW:
 
-In macb_start_xmit() there is also invoked skb_tx_timestamp() for software timestamping.
-I think, it should be disabled if you do hardware timestamping.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Best regards, 
-Rafal Ozieblo   |   Firmware System Engineer, 
-www.cadence.com
+	M.
+-- 
+Jazz is not dead. It just smells funny...
