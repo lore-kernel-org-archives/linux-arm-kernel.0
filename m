@@ -1,58 +1,82 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 20 Dec 2016 19:44:48 +0530
-Subject: [GIT PULL] Mailbox changes for v4.10
-Message-ID: <CABb+yY34U2Otupw5SUJLYccTTF5iNA=Lgy3DxYxHW3D6fVkG-Q@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 20 Dec 2016 15:16:13 +0100
+Subject: [linux-sunxi][PATCH] ARM: dts: sun4i: A1000: add axp209
+ regulator nodes
+In-Reply-To: <20161220102242.2423-1-codekipper@gmail.com>
+References: <20161220102242.2423-1-codekipper@gmail.com>
+Message-ID: <20161220141613.czhs54laqpovidej@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, Dec 20, 2016 at 11:22:42AM +0100, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+> 
+> This patch adds the regulator nodes for the axp209 by including
+> the axp209 dtsi.
+> 
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun4i-a10-a1000.dts | 34 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+> index 68c6bdb2cf7c..e7394d701856 100644
+> --- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
+> +++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+> @@ -196,6 +196,40 @@
+>  	};
+>  };
+>  
+> +#include "axp209.dtsi"
+> +
+> +&reg_dcdc2 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1000000>;
+> +	regulator-max-microvolt = <1400000>;
+> +	regulator-name = "vdd-cpu";
+> +};
+> +
+> +&reg_dcdc3 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1000000>;
+> +	regulator-max-microvolt = <1250000>;
+> +	regulator-name = "vdd-int-dll";
+> +};
+> +
+> +&reg_ldo1 {
+> +	regulator-name = "vdd-rtc";
+> +};
+> +
+> +&reg_ldo2 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <3000000>;
+> +	regulator-max-microvolt = <3000000>;
+> +	regulator-name = "avcc";
+> +};
+> +
+> +&reg_ldo3 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <2800000>;
+> +	regulator-max-microvolt = <2800000>;
+> +	regulator-name = "vcc-wifi";
 
-The following changes since commit 16ae16c6e5616c084168740990fc508bda6655d4:
+If this is used only for the wifi, there's no point in keeping it
+enabled.
 
-  Merge tag 'mmc-v4.9-rc5' of
-git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc (2016-11-24
-10:51:18 -0800)
+Also, taking the chance to enable cpufreq by setting the cpu-suplly
+property would be a good idea.
 
-are available in the git repository at:
+Thanks!
+Maxime
 
-  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
-mailbox-for-next
-
-for you to fetch changes up to db4d22c07e3e652eeec82abcc1399e6305edd838:
-
-  mailbox: mailbox-test: allow reserved areas in SRAM (2016-12-19
-20:10:23 +0530)
-
-----------------------------------------------------------------
-- New features (poll and SRAM usage) added to the mailbox-test driver
-- Major update of Broadcom's PDC controller driver
-- Minor fix for auto-loading test and STI driver modules
-
-----------------------------------------------------------------
-Javier Martinez Canillas (2):
-      mailbox: mailbox-test: Fix module autoload
-      mailbox: sti: Fix module autoload for OF registration
-
-Rob Rice (9):
-      mailbox: bcm-pdc: Use octal permissions rather than symbolic
-      mailbox: bcm-pdc: Convert from interrupts to poll for tx done
-      mailbox: bcm-pdc: streamline rx code
-      mailbox: bcm-pdc: Try to improve branch prediction
-      mailbox: bcm-pdc: Convert from threaded IRQ to tasklet
-      mailbox: bcm-pdc: Don't use iowrite32 to write DMA descriptors
-      mailbox: bcm-pdc: Performance improvements
-      mailbox: bcm-pdc: Simplify interrupt handler logic
-      mailbox: bcm-pdc: Remove unnecessary void* casts
-
-Steve Lin (2):
-      mailbox: bcm-pdc: Changes so mbox client can be removed / re-inserted
-      mailbox: bcm-pdc: PDC driver leaves debugfs files after removal
-
-Sudeep Holla (2):
-      mailbox: mailbox-test: add support for fasync/poll
-      mailbox: mailbox-test: allow reserved areas in SRAM
-
- drivers/mailbox/bcm-pdc-mailbox.c | 548 ++++++++++++++++++++++----------------
- drivers/mailbox/mailbox-sti.c     |   1 +
- drivers/mailbox/mailbox-test.c    |  92 ++++++-
- 3 files changed, 407 insertions(+), 234 deletions(-)
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161220/6f56d8f4/attachment-0001.sig>
