@@ -1,114 +1,156 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 20 Dec 2016 14:23:03 -0600
-Subject: [PATCH 2/3] serial: 8250: Add new port type for TI
- DA8xx/OMAPL13x/AM17xx/AM18xx
-In-Reply-To: <1482265384-715-1-git-send-email-david@lechnology.com>
-References: <1482265384-715-1-git-send-email-david@lechnology.com>
-Message-ID: <1482265384-715-3-git-send-email-david@lechnology.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 20 Dec 2016 21:44:51 +0100
+Subject: [PATCH v6 4/5] fpga manager: Add cyclone-ps-spi driver for
+ Altera FPGAs
+In-Reply-To: <ba899a9f-3a31-85c5-9da4-dd64a2661e60@gmail.com>
+References: <cover.1481918884.git.stillcompiling@gmail.com>
+ <abaad69b5dd15c086826cc9b6e2d52aefb04f9ef.1481918884.git.stillcompiling@gmail.com>
+ <20161219072326.fael3uughtghexl4@pengutronix.de>
+ <ba899a9f-3a31-85c5-9da4-dd64a2661e60@gmail.com>
+Message-ID: <20161220204451.knlh4zqz53gx4neq@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a new UART port type for TI DA8xx/OMAPL13x/AM17xx/AM18xx. These
-SoCs have standard 8250 registers plus some extra non-standard registers.
+Hello Joshua,
 
-The UART will not function unless the non-standard Power and Emulation
-Management Register (PWREMU_MGMT) is configured correctly. This is
-currently handled in arch/arm/mach-davinci/serial.c for non-device-tree
-boards. Making this part of the UART driver will allow UART to work on
-device-tree boards as well and the mach code can eventually be removed.
+On Tue, Dec 20, 2016 at 11:47:37AM -0800, Joshua Clayton wrote:
+> >> + *  Copyright (c) 2017 United Western Technologies, Corporation
+> > In which timezone it's already 2017? s/  / /
+> >
+> LOL. It will be 2017 long before 4.11 was my thinking.
+> I guess I've never spent much time on time stamp etiquette for copyright.
+> It said "2015" in v5, despite still being revised.
 
-Signed-off-by: David Lechner <david@lechnology.com>
----
- drivers/tty/serial/8250/8250_of.c   |  1 +
- drivers/tty/serial/8250/8250_port.c | 22 ++++++++++++++++++++++
- include/uapi/linux/serial_core.h    |  3 ++-
- include/uapi/linux/serial_reg.h     |  8 ++++++++
- 4 files changed, 33 insertions(+), 1 deletion(-)
+Well, you have to put the date when you worked on the driver.
 
-diff --git a/drivers/tty/serial/8250/8250_of.c b/drivers/tty/serial/8250/8250_of.c
-index d25ab1c..5281252 100644
---- a/drivers/tty/serial/8250/8250_of.c
-+++ b/drivers/tty/serial/8250/8250_of.c
-@@ -332,6 +332,7 @@ static const struct of_device_id of_platform_serial_table[] = {
- 		.data = (void *)PORT_ALTR_16550_F128, },
- 	{ .compatible = "mrvl,mmp-uart",
- 		.data = (void *)PORT_XSCALE, },
-+	{ .compatible = "ti,da830-uart", .data = (void *)PORT_DA830, },
- 	{ /* end of list */ },
- };
- MODULE_DEVICE_TABLE(of, of_platform_serial_table);
-diff --git a/drivers/tty/serial/8250/8250_port.c b/drivers/tty/serial/8250/8250_port.c
-index fe4399b..ea854054 100644
---- a/drivers/tty/serial/8250/8250_port.c
-+++ b/drivers/tty/serial/8250/8250_port.c
-@@ -273,6 +273,15 @@ static const struct serial8250_config uart_config[] = {
- 		.rxtrig_bytes	= {1, 4, 8, 14},
- 		.flags		= UART_CAP_FIFO,
- 	},
-+	[PORT_DA830] = {
-+		.name		= "TI DA8xx/OMAPL13x/AM17xx/AM18xx",
-+		.fifo_size	= 16,
-+		.tx_loadsz	= 16,
-+		.fcr		= UART_FCR_DMA_SELECT | UART_FCR_ENABLE_FIFO |
-+				  UART_FCR_R_TRIG_10,
-+		.rxtrig_bytes	= {1, 4, 8, 14},
-+		.flags		= UART_CAP_FIFO | UART_CAP_AFE,
-+	},
- };
+> >> + *
+> >> + *  Joshua Clayton <stillcompiling@gmail.com>
+> >> + *
+> >> + * Manage Altera FPGA firmware that is loaded over spi using the passive
+> >> + * serial configuration method.
+> >> + * Firmware must be in binary "rbf" format.
+> >> + * Works on Cyclone V. Should work on cyclone series.
+> >> + * May work on other Altera FPGAs.
+> > I can test this later on an Arria 10. I'm not sure what the connection
+> > between "Cyclone" and "Arria" is, but the protocol looks similar.
+> My guess was it would be.
+> Would be wonderful to have someone to test.
+
+I didn't come around yet.
+
+> >> + *
+> >> + */
+> >> +
+> >> +#include <linux/bitrev.h>
+> >> +#include <linux/delay.h>
+> >> +#include <linux/fpga/fpga-mgr.h>
+> >> +#include <linux/gpio/consumer.h>
+> >> +#include <linux/module.h>
+> >> +#include <linux/of_gpio.h>
+> >> +#include <linux/spi/spi.h>
+> >> +#include <linux/sizes.h>
+> >> +
+> >> +#define FPGA_RESET_TIME		50   /* time in usecs to trigger FPGA config */
+> >> +#define FPGA_MIN_DELAY		50   /* min usecs to wait for config status */
+> >> +#define FPGA_MAX_DELAY		1000 /* max usecs to wait for config status */
+> >> +
+> >> +struct cyclonespi_conf {
+> >> +	struct gpio_desc *config;
+> >> +	struct gpio_desc *status;
+> >> +	struct spi_device *spi;
+> >> +};
+> >> +
+> >> +static const struct of_device_id of_ef_match[] = {
+> >> +	{ .compatible = "altr,cyclone-ps-spi-fpga-mgr", },
+> >> +	{}
+> >> +};
+> >> +MODULE_DEVICE_TABLE(of, of_ef_match);
+> > barebox already has such a driver, the binding is available at
+> >
+> > 	https://git.pengutronix.de/cgit/barebox/tree/Documentation/devicetree/bindings/firmware/altr,passive-serial.txt
+> >
+> > (This isn't completely accurate because nstat is optional in the driver.)
+> Interesting.
+> The binding looks ... like we should synchronize those bindings.
+
+ack.
+
+> >> +	gpiod_set_value(conf->config, 1);
+> >> +	usleep_range(FPGA_RESET_TIME, FPGA_RESET_TIME + 20);
+> >> +	if (!gpiod_get_value(conf->status)) {
+> >> +		dev_err(&mgr->dev, "Status pin should be low.\n");
+> > You write this when get_value returns 0. There is something fishy.
+> I'll take a look. These gpios are "active low", so a logical 1 is a
+> physical low, IIRC. Maybe I should change the wording:
+> Something like dev_err(&mgr->dev, "Status pin should be in reset.\n");
+
+maybe "inactive"? Then then you should better use nconfig as dts name
+(as done in the barebox binding) and put the active low information into
+the flag.
+
+> >> +		return -EIO;
+> >> +	}
+> >> +
+> >> +	gpiod_set_value(conf->config, 0);
+> >> +	for (i = 0; i < (FPGA_MAX_DELAY / FPGA_MIN_DELAY); i++) {
+> >> +		usleep_range(FPGA_MIN_DELAY, FPGA_MIN_DELAY + 20);
+> >> +		if (!gpiod_get_value(conf->status))
+> >> +			return 0;
+> >> +	}
+> >> +
+> >> +	dev_err(&mgr->dev, "Status pin not ready.\n");
+> >> +	return -EIO;
+> > For Arria 10 the documentation has:
+> >
+> > 	To ensure a successful configuration, send the entire
+> > 	configuration data to the device. CONF_DONE is released high
+> > 	when the device receives all the configuration data
+> > 	successfully. After CONF_DONE goes high, send two additional
+> > 	falling edges on DCLK to begin initialization and enter user
+> > 	mode.
+> >
+> > ISTR this is necessary for Arria V, too.
+> DCLK is the spi clock, yes?
+> Would sending an extra byte after CONF_DONE is released suffice?
+
+The barebox driver sends two bytes.
+
+> >> +}
+> >> +
+> >> +static int cyclonespi_write(struct fpga_manager *mgr, const char *buf,
+> >> +			    size_t count)
+> >> +{
+> >> +	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
+> >> +	const char *fw_data = buf;
+> >> +	const char *fw_data_end = fw_data + count;
+> >> +
+> >> +	while (fw_data < fw_data_end) {
+> >> +		int ret;
+> >> +		size_t stride = min(fw_data_end - fw_data, SZ_4K);
+> >> +
+> >> +		rev_buf((void *)fw_data, stride);
+> > This isn't necessary if the spi controller supports SPI_LSB_FIRST. At
+> > least the mvebu spi core can do this for you. (The driver doesn't
+> > support it yet, though.)
+> This is true, but many of them do not.
+
+And I think it's hard to detect if the adapter driver supports this or
+simply ignores it.
  
- /* Uart divisor latch read */
-@@ -2118,6 +2127,19 @@ int serial8250_do_startup(struct uart_port *port)
- 		serial_port_out(port, UART_LCR, 0);
- 	}
- 
-+	if (port->type == PORT_DA830) {
-+		/* Reset the port */
-+		serial_port_out(port, UART_IER, 0);
-+		serial_port_out(port, UART_DA830_PWREMU_MGMT, 0);
-+		mdelay(10);
-+
-+		/* Enable Tx, Rx and free run mode */
-+		serial_port_out(port, UART_DA830_PWREMU_MGMT,
-+				UART_DA830_PWREMU_MGMT_UTRST |
-+				UART_DA830_PWREMU_MGMT_URRST |
-+				UART_DA830_PWREMU_MGMT_FREE);
-+	}
-+
- #ifdef CONFIG_SERIAL_8250_RSA
- 	/*
- 	 * If this is an RSA port, see if we can kick it up to the
-diff --git a/include/uapi/linux/serial_core.h b/include/uapi/linux/serial_core.h
-index 99dbed8..a126d05 100644
---- a/include/uapi/linux/serial_core.h
-+++ b/include/uapi/linux/serial_core.h
-@@ -56,7 +56,8 @@
- #define PORT_ALTR_16550_F128 28 /* Altera 16550 UART with 128 FIFOs */
- #define PORT_RT2880	29	/* Ralink RT2880 internal UART */
- #define PORT_16550A_FSL64 30	/* Freescale 16550 UART with 64 FIFOs */
--#define PORT_MAX_8250	30	/* max port ID */
-+#define PORT_DA830	31	/* TI DA8xx/OMAP13x/AM17xx/AM18xx */
-+#define PORT_MAX_8250	31	/* max port ID */
- 
- /*
-  * ARM specific type numbers.  These are not currently guaranteed
-diff --git a/include/uapi/linux/serial_reg.h b/include/uapi/linux/serial_reg.h
-index b4c0484..0e72eeb 100644
---- a/include/uapi/linux/serial_reg.h
-+++ b/include/uapi/linux/serial_reg.h
-@@ -327,6 +327,14 @@
- #define SERIAL_RSA_BAUD_BASE (921600)
- #define SERIAL_RSA_BAUD_BASE_LO (SERIAL_RSA_BAUD_BASE / 8)
- 
-+/* Extra registers for TI DA8xx/OMAP13x/AM17xx/AM18xx */
-+#define UART_DA830_PWREMU_MGMT	12
-+
-+/* PWREMU_MGMT register bits */
-+#define UART_DA830_PWREMU_MGMT_FREE	(1 << 0)  /* Free-running mode */
-+#define UART_DA830_PWREMU_MGMT_URRST	(1 << 13) /* Receiver reset/enable */
-+#define UART_DA830_PWREMU_MGMT_UTRST	(1 << 14) /* Transmitter reset/enable */
-+
- /*
-  * Extra serial register definitions for the internal UARTs
-  * in TI OMAP processors.
+> Moritz Fischer had  proposal to add things like this with a flag.
+> It could then be part of the library, rather than part of the driver
+> 
+> Speaking of which,
+> I made an unsuccessful attempt to hack generic lsb first SPI
+> with an extra bounce buffer.
+> Sending was fine, but I ran into trouble with LSB first rx
+> (I think) because of dma.
+
+Link?
+
+Best regards
+Uwe
+
 -- 
-2.7.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
