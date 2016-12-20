@@ -1,71 +1,52 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 20 Dec 2016 12:58:08 +0100
-Subject: [PATCH 0/2] s5p-mfc fix for using reserved memory
-In-Reply-To: <1481888915-19624-1-git-send-email-pankaj.dubey@samsung.com>
-References: <CGME20161216115004epcas1p276eddca803dcafe3470e223386b86da0@epcas1p2.samsung.com>
- <1481888915-19624-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <ea03c72a-a0f4-46e6-bd29-474549a0f145@samsung.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 20 Dec 2016 20:04:52 +0800
+Subject: [PATCH] drm: zte: add overlay plane support
+In-Reply-To: <20161208155755.GY31595@intel.com>
+References: <1481166761-5100-1-git-send-email-shawnguo@kernel.org>
+ <20161208155755.GY31595@intel.com>
+Message-ID: <20161220120451.GC8787@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj
+Hi Ville,
 
+On Thu, Dec 08, 2016 at 05:57:55PM +0200, Ville Syrj?l? wrote:
+> On Thu, Dec 08, 2016 at 11:12:41AM +0800, Shawn Guo wrote:
+> <snip>
+> > +static void zx_vl_plane_atomic_update(struct drm_plane *plane,
+> > +				      struct drm_plane_state *old_state)
+> > +{
+> > +	struct zx_plane *zplane = to_zx_plane(plane);
+> > +	struct drm_framebuffer *fb = plane->state->fb;
+> > +	struct drm_gem_cma_object *cma_obj;
+> > +	void __iomem *layer = zplane->layer;
+> > +	void __iomem *hbsc = zplane->hbsc;
+> > +	void __iomem *paddr_reg;
+> > +	dma_addr_t paddr;
+> > +	u32 src_x, src_y, src_w, src_h;
+> > +	u32 dst_x, dst_y, dst_w, dst_h;
+> > +	uint32_t format;
+> > +	u32 fmt;
+> > +	int num_planes;
+> > +	int i;
+> > +
+> > +	if (!fb)
+> > +		return;
+> > +
+> > +	format = fb->pixel_format;
+> > +
+> > +	src_x = plane->state->src_x >> 16;
+> > +	src_y = plane->state->src_y >> 16;
+> > +	src_w = plane->state->src_w >> 16;
+> > +	src_h = plane->state->src_h >> 16;
+> > +
+> > +	dst_x = plane->state->crtc_x;
+> > +	dst_y = plane->state->crtc_y;
+> > +	dst_w = plane->state->crtc_w;
+> > +	dst_h = plane->state->crtc_h;
+> 
+> This shouls use the clipped coordiantes.
 
-On 2016-12-16 12:48, Pankaj Dubey wrote:
-> It has been observed on ARM64 based Exynos SoC, if IOMMU is not enabled
-> and we try to use reserved memory for MFC, reqbufs fails with below
-> mentioned error
-> ---------------------------------------------------------------------------
-> V4L2 Codec decoding example application
-> Kamil Debski <k.debski@samsung.com>
-> Copyright 2012 Samsung Electronics Co., Ltd.
->
-> Opening MFC.
-> (mfc.c:mfc_open:58): MFC Info (/dev/video0): driver="s5p-mfc" \
-> bus_info="platform:12c30000.mfc0" card="s5p-mfc-dec" fd=0x4[
-> 42.339165] Remapping memory failed, error: -6
->
-> MFC Open Success.
-> (main.c:main:711): Successfully opened all necessary files and devices
-> (mfc.c:mfc_dec_setup_output:103): Setup MFC decoding OUTPUT buffer \
-> size=4194304 (requested=4194304)
-> (mfc.c:mfc_dec_setup_output:120): Number of MFC OUTPUT buffers is 2 \
-> (requested 2)
->
-> [App] Out buf phy : 0x00000000, virt : 0xffffffff
-> Output Length is = 0x300000
-> Error (mfc.c:mfc_dec_setup_output:145): Failed to MMAP MFC OUTPUT buffer
-> -------------------------------------------------------------------------
-> This is because the device requesting for memory is mfc0.left not the parent mfc0.
-> Hence setting of alloc_devs need to be done only if IOMMU is enabled
-> and in that case both the left and right device is treated as mfc0 only.
-> Also we need to populate vb2_queue's dev pointer with mfc dev pointer.
+Thanks for spotting this.  I will fix it in v2.
 
-I also got this issue but Your solution is imho not the proper approach.
-Too much hacking in the driver, while the issue is in the core. ARM64 
-requires
-to call arch_setup_dma_ops() for each device that will be used for 
-dma-mapping.
-So the issue is in drivers/of/of_reserved_mem.c - in
-of_reserved_mem_device_init_by_idx() function, which should ensure that
-arch_setup_dma_ops() is called also for the virtual devices for reserved 
-memory.
-
-s5p-mfc driver however still requires some patching for 
-dma-mapping/iommu glue
-used on ARM64 architecture.
-
-> Smitha T Murthy (2):
->    media: s5p-mfc: convert drivers to use the new vb2_queue dev field
->    media: s5p-mfc: fix MMAP of mfc buffer during reqbufs
->
->   drivers/media/platform/s5p-mfc/s5p_mfc.c     |  2 ++
->   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 17 ++++++++++-------
->   drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 18 +++++++++++-------
->   3 files changed, 23 insertions(+), 14 deletions(-)
->
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Shawn
