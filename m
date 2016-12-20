@@ -1,58 +1,26 @@
 From: david@lechnology.com (David Lechner)
-Date: Tue, 20 Dec 2016 14:23:04 -0600
-Subject: [PATCH 3/3] ARM: da850: Add ti, da830-uart compatible for serial ports
-In-Reply-To: <1482265384-715-1-git-send-email-david@lechnology.com>
-References: <1482265384-715-1-git-send-email-david@lechnology.com>
-Message-ID: <1482265384-715-4-git-send-email-david@lechnology.com>
+Date: Tue, 20 Dec 2016 14:23:01 -0600
+Subject: [PATCH 0/3] TI DA8xx/OMAPL13x/AM17xx/AM18xx UART
+Message-ID: <1482265384-715-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TI DA8xx/OMAPL13x/AM17xx/AM18xx SoCs have extra UART registers beyond
-the standard 8250 registers, so we need a new compatible string to
-indicate this. Also, at least one of these registers uses the full 32
-bits, so we need to specify reg-io-width in addition to reg-shift.
+This series adds a new UART port type for TI DA8xx/OMAPL13x/AM17xx/AM18xx UART.
+This SoCs have a non-standard register for UART power management that needs
+special handling in the UART driver.
 
-"ns16550a" is left in the compatible specification since it does work
-as long as the bootloader configures the SoC UART power management
-registers.
+David Lechner (3):
+  doc: DT: Add ti,da830-uart to serial/8250 bindings
+  serial: 8250: Add new port type for TI DA8xx/OMAPL13x/AM17xx/AM18xx
+  ARM: da850: Add ti,da830-uart compatible for serial ports
 
-Signed-off-by: David Lechner <david@lechnology.com>
----
- arch/arm/boot/dts/da850.dtsi | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/serial/8250.txt |  1 +
+ arch/arm/boot/dts/da850.dtsi                      |  9 ++++++---
+ drivers/tty/serial/8250/8250_of.c                 |  1 +
+ drivers/tty/serial/8250/8250_port.c               | 22 ++++++++++++++++++++++
+ include/uapi/linux/serial_core.h                  |  3 ++-
+ include/uapi/linux/serial_reg.h                   |  8 ++++++++
+ 6 files changed, 40 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 104155d..f6cd212 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -266,22 +266,25 @@
- 			interrupt-names = "edm3_tcerrint";
- 		};
- 		serial0: serial at 42000 {
--			compatible = "ns16550a";
-+			compatible = "ti,da830-uart", "ns16550a";
- 			reg = <0x42000 0x100>;
-+			reg-io-width = <4>;
- 			reg-shift = <2>;
- 			interrupts = <25>;
- 			status = "disabled";
- 		};
- 		serial1: serial at 10c000 {
--			compatible = "ns16550a";
-+			compatible = "ti,da830-uart", "ns16550a";
- 			reg = <0x10c000 0x100>;
-+			reg-io-width = <4>;
- 			reg-shift = <2>;
- 			interrupts = <53>;
- 			status = "disabled";
- 		};
- 		serial2: serial at 10d000 {
--			compatible = "ns16550a";
-+			compatible = "ti,da830-uart", "ns16550a";
- 			reg = <0x10d000 0x100>;
-+			reg-io-width = <4>;
- 			reg-shift = <2>;
- 			interrupts = <61>;
- 			status = "disabled";
 -- 
 2.7.4
