@@ -1,29 +1,33 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 20 Dec 2016 12:03:48 +0100
-Subject: [PATCH renesas/devel 0/4] ARM, arm64: dts: Use R-Car fallback
- bindings for msiof nodes
-In-Reply-To: <1482229959-25584-1-git-send-email-horms+renesas@verge.net.au>
+Date: Tue, 20 Dec 2016 12:04:15 +0100
+Subject: [PATCH renesas/devel 1/4] arm64: dts: r8a7796: Use R-Car Gen 3
+ fallback binding for msiof nodes
+In-Reply-To: <CAMuHMdV50sQtV_Rk5Kw=dyJ=rzX3_Fq=WThjhaFU+GPbzXNhbg@mail.gmail.com>
 References: <1482229959-25584-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20161220110348.GL19532@verge.net.au>
+ <1482229959-25584-2-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdXpN9x5YH0tiSRxme0yySS1NpaF41_DaePzuWd+3QD=AQ@mail.gmail.com>
+ <CAMuHMdV50sQtV_Rk5Kw=dyJ=rzX3_Fq=WThjhaFU+GPbzXNhbg@mail.gmail.com>
+Message-ID: <20161220110415.GM19532@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2016 at 11:32:35AM +0100, Simon Horman wrote:
-> Hi,
+On Tue, Dec 20, 2016 at 11:44:14AM +0100, Geert Uytterhoeven wrote:
+> On Tue, Dec 20, 2016 at 11:42 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+> > On Tue, Dec 20, 2016 at 11:32 AM, Simon Horman
+> > <horms+renesas@verge.net.au> wrote:
+> >> Use recently added R-Car Gen 3 fallback binding for msiof nodes in
+> >> DT for r8a7796 SoC.
+> >>
+> >> This has no run-time effect for the current driver as the initialisation
+> >> sequence is the same for the SoC-specific binding for r8a7796 and the
+> >> fallback binding for R-Car Gen 3.
+> >>
+> >> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >
+> > Reviewed-by: Geert Uytterhoeven <geert@linux-m68k.org>
 > 
-> this short series makes use of newly added R-Car fallback bindings in msiof
-> nodes of the DTs for SoCs where the drivers in question are already used.
-> 
-> This should have no run-time effect at this time as the current driver
-> implementations use the same initialisation sequences for SoC-specific and
-> R-Car fallback bindings for all the cases covered by this patch-set.
-> 
-> Based on renesas-devel-20161212-v4.9
-> 
-> Simon Horman (4):
->   arm64: dts: r8a7796: Use R-Car Gen 3 fallback binding for msiof nodes
->   ARM: dts: r8a7791: Use R-Car Gen 2 fallback binding for msiof nodes
->   ARM: dts: r8a7792: Use R-Car Gen 2 fallback binding for msiof nodes
->   ARM: dts: r8a7790: Use R-Car Gen 2 fallback binding for msiof nodes
+> and
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-I have queued these up with Geert's Acks.
+I have taken the liberty of only adding your second tag.
