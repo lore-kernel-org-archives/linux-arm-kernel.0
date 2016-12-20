@@ -1,32 +1,23 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Tue, 20 Dec 2016 09:53:29 +0100
-Subject: [PATCH v2 0/3] Add support for the ethernet switch on the
- ESPRESSObin
-In-Reply-To: <20161220085138.3998-1-romain.perier@free-electrons.com>
-References: <20161220085138.3998-1-romain.perier@free-electrons.com>
-Message-ID: <1fa806aa-1c8f-64c5-8b86-13dc4fd2d1ee@free-electrons.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Tue, 20 Dec 2016 10:43:39 +0100
+Subject: [PATCH v8 01/16] FDT: introduce global phandle allocation
+In-Reply-To: <80430161-b363-4740-0eef-8cb73bc2ecbd@arm.com>
+References: <20161104173203.21168-1-andre.przywara@arm.com>
+ <20161104173203.21168-2-andre.przywara@arm.com>
+ <be44a9ad-f820-9a62-9a5d-682867674e91@arm.com>
+ <80430161-b363-4740-0eef-8cb73bc2ecbd@arm.com>
+Message-ID: <20161220094339.6yg624kev2wqxidt@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Dec 19, 2016 at 06:43:29PM +0000, Andre Przywara wrote:
+> Well, yes. The problem is that AFAIK you cannot initialize an array
+> easily with all the values getting set to something other than zero.
 
-Le 20/12/2016 ? 09:51, Romain Perier a ?crit :
-> This set of patches adds support for the Marvell ethernet switch 88E6341.
-> It also add the devicetree definition of this switch to the DT board.
->
-> Romain Perier (3):
->   net: dsa: mv88e6xxx: Don't forbid MDIO I/Os for PHY addr >=
->     num_of_ports
->   net: dsa: mv88e6xxx: Add support for ethernet switch 88E6341/88E6141
->   arm64: dts: marvell: Add ethernet switch definition for the
->     ESPRESSObin
->
->  .../boot/dts/marvell/armada-3720-espressobin.dts   | 67 ++++++++++++++++++++++
->  drivers/net/dsa/mv88e6xxx/chip.c                   | 48 ++++++++++++++--
->  drivers/net/dsa/mv88e6xxx/mv88e6xxx.h              |  4 +-
->  3 files changed, 112 insertions(+), 7 deletions(-)
->
+u32 phandles[PHANDLES_MAX] = { [0 ... PHANDLES_MAX-1] = FDT_INVALID_PHANDLE };
 
-Oh and I rebased the whole series onto net-next.
+(Unrelated, but could you please add format.subjectprefix = PATCH kvmtool
+ to your git config. I just suggested via a kvmtool README patch...)
 
-Romain
+Thanks,
+drew
