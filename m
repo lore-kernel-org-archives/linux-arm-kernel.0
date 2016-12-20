@@ -1,120 +1,32 @@
 From: romain.perier@free-electrons.com (Romain Perier)
-Date: Tue, 20 Dec 2016 09:51:37 +0100
-Subject: [PATCH v2 2/3] net: dsa: mv88e6xxx: Add support for ethernet switch
- 88E6341/88E6141
+Date: Tue, 20 Dec 2016 09:53:29 +0100
+Subject: [PATCH v2 0/3] Add support for the ethernet switch on the
+ ESPRESSObin
 In-Reply-To: <20161220085138.3998-1-romain.perier@free-electrons.com>
 References: <20161220085138.3998-1-romain.perier@free-electrons.com>
-Message-ID: <20161220085138.3998-3-romain.perier@free-electrons.com>
+Message-ID: <1fa806aa-1c8f-64c5-8b86-13dc4fd2d1ee@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell 88E6341 device is single-chip, 6-port ethernet switch with
-four integrated 10/100/1000Mbps ethernet transceivers and one high speed
-SerDes interfaces. It is compatible with switches of family 88E6352.
+Hi,
 
-This commit adds basic support for this switch by describing its
-capabilities to the driver.
+Le 20/12/2016 ? 09:51, Romain Perier a ?crit :
+> This set of patches adds support for the Marvell ethernet switch 88E6341.
+> It also add the devicetree definition of this switch to the DT board.
+>
+> Romain Perier (3):
+>   net: dsa: mv88e6xxx: Don't forbid MDIO I/Os for PHY addr >=
+>     num_of_ports
+>   net: dsa: mv88e6xxx: Add support for ethernet switch 88E6341/88E6141
+>   arm64: dts: marvell: Add ethernet switch definition for the
+>     ESPRESSObin
+>
+>  .../boot/dts/marvell/armada-3720-espressobin.dts   | 67 ++++++++++++++++++++++
+>  drivers/net/dsa/mv88e6xxx/chip.c                   | 48 ++++++++++++++--
+>  drivers/net/dsa/mv88e6xxx/mv88e6xxx.h              |  4 +-
+>  3 files changed, 112 insertions(+), 7 deletions(-)
+>
 
-Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
----
+Oh and I rebased the whole series onto net-next.
 
- Changes in v2:
-  - Add a dedicated data structure for the operations of the 88E6341
-  - Re-ordered PORT_SWITCH_ID_PROD_NUM_6341 in alphabetic order with other
-    macros
-
- drivers/net/dsa/mv88e6xxx/chip.c      | 42 +++++++++++++++++++++++++++++++++++
- drivers/net/dsa/mv88e6xxx/mv88e6xxx.h |  4 +++-
- 2 files changed, 45 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/net/dsa/mv88e6xxx/chip.c b/drivers/net/dsa/mv88e6xxx/chip.c
-index 76d944e..5e97dc4 100644
---- a/drivers/net/dsa/mv88e6xxx/chip.c
-+++ b/drivers/net/dsa/mv88e6xxx/chip.c
-@@ -3625,6 +3625,34 @@ static const struct mv88e6xxx_ops mv88e6321_ops = {
- 	.reset = mv88e6352_g1_reset,
- };
- 
-+static const struct mv88e6xxx_ops mv88e6341_ops = {
-+	/* MV88E6XXX_FAMILY_6352 */
-+	.get_eeprom = mv88e6xxx_g2_get_eeprom16,
-+	.set_eeprom = mv88e6xxx_g2_set_eeprom16,
-+	.set_switch_mac = mv88e6xxx_g2_set_switch_mac,
-+	.phy_read = mv88e6xxx_g2_smi_phy_read,
-+	.phy_write = mv88e6xxx_g2_smi_phy_write,
-+	.port_set_link = mv88e6xxx_port_set_link,
-+	.port_set_duplex = mv88e6xxx_port_set_duplex,
-+	.port_set_rgmii_delay = mv88e6352_port_set_rgmii_delay,
-+	.port_set_speed = mv88e6352_port_set_speed,
-+	.port_tag_remap = mv88e6095_port_tag_remap,
-+	.port_set_frame_mode = mv88e6351_port_set_frame_mode,
-+	.port_set_egress_unknowns = mv88e6351_port_set_egress_unknowns,
-+	.port_set_ether_type = mv88e6351_port_set_ether_type,
-+	.port_jumbo_config = mv88e6165_port_jumbo_config,
-+	.port_egress_rate_limiting = mv88e6097_port_egress_rate_limiting,
-+	.port_pause_config = mv88e6097_port_pause_config,
-+	.stats_snapshot = mv88e6320_g1_stats_snapshot,
-+	.stats_get_sset_count = mv88e6095_stats_get_sset_count,
-+	.stats_get_strings = mv88e6095_stats_get_strings,
-+	.stats_get_stats = mv88e6095_stats_get_stats,
-+	.g1_set_cpu_port = mv88e6095_g1_set_cpu_port,
-+	.g1_set_egress_port = mv88e6095_g1_set_egress_port,
-+	.mgmt_rsvd2cpu = mv88e6095_g2_mgmt_rsvd2cpu,
-+	.reset = mv88e6352_g1_reset,
-+};
-+
- static const struct mv88e6xxx_ops mv88e6350_ops = {
- 	/* MV88E6XXX_FAMILY_6351 */
- 	.set_switch_mac = mv88e6xxx_g2_set_switch_mac,
-@@ -4086,6 +4114,20 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
- 		.ops = &mv88e6321_ops,
- 	},
- 
-+	[MV88E6341] = {
-+		.prod_num = PORT_SWITCH_ID_PROD_NUM_6341,
-+		.family = MV88E6XXX_FAMILY_6352,
-+		.name = "Marvell 88E6341",
-+		.num_databases = 4096,
-+		.num_ports = 6,
-+		.port_base_addr = 0x10,
-+		.global1_addr = 0x1b,
-+		.age_time_coeff = 15000,
-+		.tag_protocol = DSA_TAG_PROTO_EDSA,
-+		.flags = MV88E6XXX_FLAGS_FAMILY_6352,
-+		.ops = &mv88e6341_ops,
-+	},
-+
- 	[MV88E6350] = {
- 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6350,
- 		.family = MV88E6XXX_FAMILY_6351,
-diff --git a/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h b/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h
-index af54bae..cb55fdb 100644
---- a/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h
-+++ b/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h
-@@ -100,6 +100,7 @@
- #define PORT_SWITCH_ID_PROD_NUM_6240	0x240
- #define PORT_SWITCH_ID_PROD_NUM_6290	0x290
- #define PORT_SWITCH_ID_PROD_NUM_6321	0x310
-+#define PORT_SWITCH_ID_PROD_NUM_6341	0x340
- #define PORT_SWITCH_ID_PROD_NUM_6352	0x352
- #define PORT_SWITCH_ID_PROD_NUM_6350	0x371
- #define PORT_SWITCH_ID_PROD_NUM_6351	0x375
-@@ -432,6 +433,7 @@ enum mv88e6xxx_model {
- 	MV88E6290,
- 	MV88E6320,
- 	MV88E6321,
-+	MV88E6341,
- 	MV88E6350,
- 	MV88E6351,
- 	MV88E6352,
-@@ -448,7 +450,7 @@ enum mv88e6xxx_family {
- 	MV88E6XXX_FAMILY_6185,	/* 6108 6121 6122 6131 6152 6155 6182 6185 */
- 	MV88E6XXX_FAMILY_6320,	/* 6320 6321 */
- 	MV88E6XXX_FAMILY_6351,	/* 6171 6175 6350 6351 */
--	MV88E6XXX_FAMILY_6352,	/* 6172 6176 6240 6352 */
-+	MV88E6XXX_FAMILY_6352,	/* 6172 6176 6240 6341 6352 */
- 	MV88E6XXX_FAMILY_6390,  /* 6190 6190X 6191 6290 6390 6390X */
- };
- 
--- 
-2.9.3
+Romain
