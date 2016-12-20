@@ -1,85 +1,102 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 20 Dec 2016 12:12:29 +0000
-Subject: [PATCH] crypto: testmgr: Use linear alias for test input
-In-Reply-To: <1482190646-7720-1-git-send-email-labbott@redhat.com>
-References: <1482190646-7720-1-git-send-email-labbott@redhat.com>
-Message-ID: <CAKv+Gu-1fXgNfuBByNWsDuT-Ft3gThHy3AYo2DF4rvKwrPtP4Q@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 20 Dec 2016 14:50:11 +0100
+Subject: [PATCH] ARM: dts: sun8i-q8-common: enable bluetooth on SDIO Wi-Fi
+In-Reply-To: <CAGb2v67wU+Hw-6oa9FxzB33sZY8Up-59HZ_mneFBdcRhXbU1pA@mail.gmail.com>
+References: <20161213233658.atGuNCNY@smtp1h.mail.yandex.net>
+ <20161216124748.rkvnnlo4x5onzpvk@lukather>
+ <4720181481899200@web7g.yandex.ru>
+ <20161219100952.bspym36nsehda3za@lukather>
+ <11985541482156512@web2g.yandex.ru>
+ <CAGb2v67wU+Hw-6oa9FxzB33sZY8Up-59HZ_mneFBdcRhXbU1pA@mail.gmail.com>
+Message-ID: <20161220135011.2rk7v6tjujhivcy6@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 December 2016 at 23:37, Laura Abbott <labbott@redhat.com> wrote:
-> Christopher Covington reported a crash on aarch64 on recent Fedora
-> kernels:
->
-> kernel BUG at ./include/linux/scatterlist.h:140!
-> Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-> Modules linked in:
-> CPU: 2 PID: 752 Comm: cryptomgr_test Not tainted 4.9.0-11815-ge93b1cc #162
-> Hardware name: linux,dummy-virt (DT)
-> task: ffff80007c650080 task.stack: ffff800008910000
-> PC is at sg_init_one+0xa0/0xb8
-> LR is at sg_init_one+0x24/0xb8
-> ...
-> [<ffff000008398db8>] sg_init_one+0xa0/0xb8
-> [<ffff000008350a44>] test_acomp+0x10c/0x438
-> [<ffff000008350e20>] alg_test_comp+0xb0/0x118
-> [<ffff00000834f28c>] alg_test+0x17c/0x2f0
-> [<ffff00000834c6a4>] cryptomgr_test+0x44/0x50
-> [<ffff0000080dac70>] kthread+0xf8/0x128
-> [<ffff000008082ec0>] ret_from_fork+0x10/0x50
->
-> The test vectors used for input are part of the kernel image. These
-> inputs are passed as a buffer to sg_init_one which eventually blows up
-> with BUG_ON(!virt_addr_valid(buf)). On arm64, virt_addr_valid returns
-> false for the kernel image since virt_to_page will not return the
-> correct page. The kernel image is also aliased to the linear map so get
-> the linear alias and pass that to the scatterlist instead.
->
-> Reported-by: Christopher Covington <cov@codeaurora.org>
-> Fixes: d7db7a882deb ("crypto: acomp - update testmgr with support for acomp")
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> x86 supports virt_addr_valid working on kernel image addresses but arm64 is
-> more strict. This is the direction things have been moving with my
-> CONFIG_DEBUG_VIRTUAL series for arm64 which is tightening the definition of
-> __pa/__pa_symbol.
+On Mon, Dec 19, 2016 at 10:24:44PM +0800, Chen-Yu Tsai wrote:
+> On Mon, Dec 19, 2016 at 10:08 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+> >
+> >
+> > 19.12.2016, 18:09, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> >> On Fri, Dec 16, 2016 at 10:40:00PM +0800, Icenowy Zheng wrote:
+> >>>  >>  > >  &r_pio {
+> >>>  >>  > >  wifi_pwrseq_pin_q8: wifi_pwrseq_pin at 0 {
+> >>>  >>  > > - pins = "PL6", "PL7", "PL11";
+> >>>  >>  > > + pins = "PL6", "PL7", "PL8", "PL11";
+> >>>  >>  > >  function = "gpio_in";
+> >>>  >>  > >  bias-pull-up;
+> >>>  >>  > >  };
+> >>>  >>  >
+> >>>  >>  > There's several things wrong here. The first one is that you rely
+> >>>  >>  > solely on the pinctrl state to maintain a reset line. This is very
+> >>>  >>  > fragile (especially since the GPIO pinctrl state are likely to go away
+> >>>  >>  > at some point), but it also means that if your driver wants to recover
+> >>>  >>  > from that situation at some point, it won't work.
+> >>>  >>  >
+> >>>  >>  > The other one is that the bluetooth and wifi chips are two devices in
+> >>>  >>  > linux, and you assign that pin to the wrong device (wifi).
+> >>>  >>  >
+> >>>  >>  > rfkill-gpio is made just for that, so please use it.
+> >>>  >>
+> >>>  >>  The GPIO is not for the radio, but for the full Bluetooth part.
+> >>>  >
+> >>>  > I know.
+> >>>  >
+> >>>  >>  If it's set to 0, then the bluetooth part will reset, and the
+> >>>  >>  hciattach will fail.
+> >>>  >
+> >>>  > Both rfkill-gpio and rfkill-regulator will shutdown when called
+> >>>  > (either by poking the reset pin or shutting down the regulator), so
+> >>>  > that definitely seems like an expected behavior to put the device in
+> >>>  > reset.
+> >>>  >
+> >>>  >>  The BSP uses this as a rfkill, and the result is that the bluetooth
+> >>>  >>  on/off switch do not work properly.
+> >>>  >
+> >>>  > Then rfkill needs fixing, but working around it by hoping that the
+> >>>  > core will probe an entirely different device, and enforcing a default
+> >>>  > that the rest of the kernel might or might not change is both fragile
+> >>>  > and wrong.
+> >>>
+> >>>  I think a rfkill-gpio here works just like the BSP rfkill...
+> >>>
+> >>>  The real problem is that the Realtek UART bluetooth driver is a userspace
+> >>>  program (a modified hciattach), which is not capable of the GPIO reset...
+> >>
+> >> Can't you run rfkill before attaching? What is the problem exactly?
+> >> It's not in reset for long enough?
+> >>
+> >> This seems more and more like an issue in the BT stack you're
+> >> using. We might consider workarounds in the kernel, but they have to
+> >> be correct.
+> >
+> > One more rfkill interface will be generated for hci0 after hciattach, which can
+> > be safely toggled block and unblock.
+> >
+> > However, if the GPIO is toggled down, the hciattach program will die.
+> >
+> > The bluetooth stack I used is fd.o's BlueZ.
+> 
+> I think the bigger issue is that the tty/serial subsystem does not have
+> power sequencing support. Here we're trying to use rfkill to do that,
+> but that doesn't seem to be what it was intended for. It might work with
+> standalone USB bluetooth controllers that don't need any special setup,
+> since the device will just appear and get registered. But it might not
+> work so well with UART based adapters that need userspace fiddling with
+> firmware and hciattach.
 
-A helper function would be nice, so that we can call
-sg_init_table/sg_set_page directly, and avoid the redundant
-virt_to_phys(__va()) translation (and add a comment *why* we should
-not use sg_init_one() with the address of a kernel symbol).
+Then you can also have a look at the generic power sequence patches
+that are floating around.
 
-But I will leave it up to Herbert to decide whether he prefers that or not.
+Maxime
 
-In any case,
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-> ---
->  crypto/testmgr.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/crypto/testmgr.c b/crypto/testmgr.c
-> index f616ad7..f5bac10 100644
-> --- a/crypto/testmgr.c
-> +++ b/crypto/testmgr.c
-> @@ -1464,7 +1464,7 @@ static int test_acomp(struct crypto_acomp *tfm, struct comp_testvec *ctemplate,
->
->                 memset(output, 0, dlen);
->                 init_completion(&result.completion);
-> -               sg_init_one(&src, ctemplate[i].input, ilen);
-> +               sg_init_one(&src, __va(__pa_symbol(ctemplate[i].input)), ilen);
->                 sg_init_one(&dst, output, dlen);
->
->                 req = acomp_request_alloc(tfm);
-> @@ -1513,7 +1513,7 @@ static int test_acomp(struct crypto_acomp *tfm, struct comp_testvec *ctemplate,
->
->                 memset(output, 0, dlen);
->                 init_completion(&result.completion);
-> -               sg_init_one(&src, dtemplate[i].input, ilen);
-> +               sg_init_one(&src, __va(__pa_symbol(dtemplate[i].input)), ilen);
->                 sg_init_one(&dst, output, dlen);
->
->                 req = acomp_request_alloc(tfm);
-> --
-> 2.7.4
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161220/4ffe5077/attachment.sig>
