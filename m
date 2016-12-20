@@ -1,94 +1,181 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 20 Dec 2016 22:33:28 +0000
-Subject: [PATCH v2] efi/libstub: arm*: Pass latest memory map to the kernel
-In-Reply-To: <CAKv+Gu8_8+GdaV86_ctf=PzKxPvT3tbUOcuz5OkyBya5OC+ekw@mail.gmail.com>
-References: <20161219142419.16780-1-james.morse@arm.com>
- <20161219213859.GA2225@codeblueprint.co.uk>
- <CAKv+Gu8_8+GdaV86_ctf=PzKxPvT3tbUOcuz5OkyBya5OC+ekw@mail.gmail.com>
-Message-ID: <CAKv+Gu9OM5e+vxPiYB=i5uvthMDg3OkKfiZPaNJz2og0JWGOLQ@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 20 Dec 2016 23:40:32 +0100
+Subject: [PATCH v2] ARM64: dts: marvell: Correct license text
+Message-ID: <20161220224032.6866-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 December 2016 at 22:32, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 19 December 2016 at 21:38, Matt Fleming <matt@codeblueprint.co.uk> wrote:
->> On Mon, 19 Dec, at 02:24:19PM, James Morse wrote:
->>> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>
->>> As reported by James, the current libstub code involving the annotated
->>> memory map only works somewhat correctly by accident, due to the fact
->>> that a pool allocation happens to be reused immediately, retaining its
->>> former contents.
->>>
->>> Instead of juggling memory maps, which makes the code more complex than
->>> it needs to be, simply put a placholder value into the FDT, and only
->>> write the actual value after ExitBootServices() has been called.
->>>
->>> Reported-by: James Morse <james.morse@arm.com>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> [Update mmap-size too, remove updated_fdt()s unused params and header entry]
->>> Signed-off-by: James Morse <james.morse@arm.com>
->>> ---
->>> Hi Ard,
->>>
->>> This is a v2 of your patch that updates the mmap-size too. This solves the
->>> truncated memmap problem I saw with v1 on Seattle.
->>>
->>> The original patch was CC-stable, so I think this should also have:
->>> Cc: <stable@vger.kernel.org>
->>> Fixes: ed9cc156c42f ("efi/libstub: Use efi_exit_boot_services() in FDT")
->>>
->>>
->>> Thanks,
->>>
->>> James
->>>
->>>  drivers/firmware/efi/libstub/efistub.h |  8 ----
->>>  drivers/firmware/efi/libstub/fdt.c     | 75 +++++++++++++++++++++-------------
->>>  2 files changed, 47 insertions(+), 36 deletions(-)
->>
->> Thanks James. I've queued this one up in the 'urgent' queue and tagged
->> it for stable. I'll send it to tip before the end of the week.
->
-> Could we fold the hunk below, please?
->
-> diff --git a/drivers/firmware/efi/libstub/fdt.c
-> b/drivers/firmware/efi/libstub/fdt.c
-> index 9b11b0559a23..90ab96845937 100644
-> --- a/drivers/firmware/efi/libstub/fdt.c
-> +++ b/drivers/firmware/efi/libstub/fdt.c
-> @@ -149,26 +149,25 @@ static efi_status_t
-> update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
->  static efi_status_t update_fdt_memmap(void *fdt, u64 memmap, u32 map_size)
->  {
->         int node = fdt_path_offset(fdt, "/chosen");
-> -       efi_status_t status;
-> +       int err;
->
->         if (node < 0)
->                 return EFI_LOAD_ERROR;
->
->         memmap = cpu_to_fdt64(memmap);
-> -       status = fdt_setprop_inplace(fdt, node, "linux,uefi-mmap-start",
-> -                                    &memmap, sizeof(memmap));
-> +       err = fdt_setprop_inplace(fdt, node, "linux,uefi-mmap-start",
-> +                                 &memmap, sizeof(memmap));
->
->         if (status)
->                 return EFI_LOAD_ERROR;
->
->         map_size = cpu_to_fdt32(map_size);
-> -       status = fdt_setprop_inplace(fdt, node, "linux,uefi-mmap-size",
-> -                                    &map_size, sizeof(map_size));
-> +       err = fdt_setprop_inplace(fdt, node, "linux,uefi-mmap-size",
-> +                                 &map_size, sizeof(map_size));
->
->         if (status)
->                 return EFI_LOAD_ERROR;
->
-> -
->         return EFI_SUCCESS;
->  }
->
-> My mistake, and harmless in practice, but sloppy nonetheless
+The license text has been mangled at some point then copy pasted across
+multiple files. Restore it to what it should be.
+Note that this is not intended as a license change.
 
-... but with the 'if (status)' replaced as well, of course (2x)
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+Changes in v2:
+ - squashed all the patches
+ - fix commit message
+
+ arch/arm64/boot/dts/marvell/armada-371x.dtsi   | 10 +++++-----
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts | 10 +++++-----
+ arch/arm64/boot/dts/marvell/armada-372x.dtsi   | 10 +++++-----
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 10 +++++-----
+ 4 files changed, 20 insertions(+), 20 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/marvell/armada-371x.dtsi b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
+index c9e5325b8ac3..11226f7b9ed9 100644
+--- a/arch/arm64/boot/dts/marvell/armada-371x.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
+@@ -16,17 +16,17 @@
+  *     published by the Free Software Foundation; either version 2 of the
+  *     License, or (at your option) any later version.
+  *
+- *     This file is distributed in the hope that it will be useful
++ *     This file is distributed in the hope that it will be useful,
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+  *
+- * Or, alternatively
++ * Or, alternatively,
+  *
+  *  b) Permission is hereby granted, free of charge, to any person
+  *     obtaining a copy of this software and associated documentation
+  *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use
++ *     restriction, including without limitation the rights to use,
+  *     copy, modify, merge, publish, distribute, sublicense, and/or
+  *     sell copies of the Software, and to permit persons to whom the
+  *     Software is furnished to do so, subject to the following
+@@ -35,11 +35,11 @@
+  *     The above copyright notice and this permission notice shall be
+  *     included in all copies or substantial portions of the Software.
+  *
+- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+index 1372e9a6aaa4..2e707875039a 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+@@ -15,17 +15,17 @@
+  *     published by the Free Software Foundation; either version 2 of the
+  *     License, or (at your option) any later version.
+  *
+- *     This file is distributed in the hope that it will be useful
++ *     This file is distributed in the hope that it will be useful,
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+  *
+- * Or, alternatively
++ * Or, alternatively,
+  *
+  *  b) Permission is hereby granted, free of charge, to any person
+  *     obtaining a copy of this software and associated documentation
+  *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use
++ *     restriction, including without limitation the rights to use,
+  *     copy, modify, merge, publish, distribute, sublicense, and/or
+  *     sell copies of the Software, and to permit persons to whom the
+  *     Software is furnished to do so, subject to the following
+@@ -34,11 +34,11 @@
+  *     The above copyright notice and this permission notice shall be
+  *     included in all copies or substantial portions of the Software.
+  *
+- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
+diff --git a/arch/arm64/boot/dts/marvell/armada-372x.dtsi b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
+index 5120296596c2..59d7557d3b1b 100644
+--- a/arch/arm64/boot/dts/marvell/armada-372x.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
+@@ -16,17 +16,17 @@
+  *     published by the Free Software Foundation; either version 2 of the
+  *     License, or (at your option) any later version.
+  *
+- *     This file is distributed in the hope that it will be useful
++ *     This file is distributed in the hope that it will be useful,
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+  *
+- * Or, alternatively
++ * Or, alternatively,
+  *
+  *  b) Permission is hereby granted, free of charge, to any person
+  *     obtaining a copy of this software and associated documentation
+  *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use
++ *     restriction, including without limitation the rights to use,
+  *     copy, modify, merge, publish, distribute, sublicense, and/or
+  *     sell copies of the Software, and to permit persons to whom the
+  *     Software is furnished to do so, subject to the following
+@@ -35,11 +35,11 @@
+  *     The above copyright notice and this permission notice shall be
+  *     included in all copies or substantial portions of the Software.
+  *
+- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index e9bd58793464..3c6f5d9d15c4 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -15,17 +15,17 @@
+  *     published by the Free Software Foundation; either version 2 of the
+  *     License, or (at your option) any later version.
+  *
+- *     This file is distributed in the hope that it will be useful
++ *     This file is distributed in the hope that it will be useful,
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+  *
+- * Or, alternatively
++ * Or, alternatively,
+  *
+  *  b) Permission is hereby granted, free of charge, to any person
+  *     obtaining a copy of this software and associated documentation
+  *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use
++ *     restriction, including without limitation the rights to use,
+  *     copy, modify, merge, publish, distribute, sublicense, and/or
+  *     sell copies of the Software, and to permit persons to whom the
+  *     Software is furnished to do so, subject to the following
+@@ -34,11 +34,11 @@
+  *     The above copyright notice and this permission notice shall be
+  *     included in all copies or substantial portions of the Software.
+  *
+- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
+-- 
+2.11.0
