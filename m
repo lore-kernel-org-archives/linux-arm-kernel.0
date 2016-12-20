@@ -1,70 +1,83 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 19 Dec 2016 15:37:26 -0800
-Subject: [PATCH] crypto: testmgr: Use linear alias for test input
-Message-ID: <1482190646-7720-1-git-send-email-labbott@redhat.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 19 Dec 2016 18:23:36 -0600
+Subject: [PATCH] tty: hvc_dcc: Add basic early_con support
+Message-ID: <20161220002336.28733-1-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christopher Covington reported a crash on aarch64 on recent Fedora
-kernels:
+In some cases, earlycon can help catch errors with kernel boot prior to
+standard console is available.
 
-kernel BUG at ./include/linux/scatterlist.h:140!
-Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 2 PID: 752 Comm: cryptomgr_test Not tainted 4.9.0-11815-ge93b1cc #162
-Hardware name: linux,dummy-virt (DT)
-task: ffff80007c650080 task.stack: ffff800008910000
-PC is at sg_init_one+0xa0/0xb8
-LR is at sg_init_one+0x24/0xb8
-...
-[<ffff000008398db8>] sg_init_one+0xa0/0xb8
-[<ffff000008350a44>] test_acomp+0x10c/0x438
-[<ffff000008350e20>] alg_test_comp+0xb0/0x118
-[<ffff00000834f28c>] alg_test+0x17c/0x2f0
-[<ffff00000834c6a4>] cryptomgr_test+0x44/0x50
-[<ffff0000080dac70>] kthread+0xf8/0x128
-[<ffff000008082ec0>] ret_from_fork+0x10/0x50
+Example bootargs: console=hvc0 earlycon=hvcdcc
 
-The test vectors used for input are part of the kernel image. These
-inputs are passed as a buffer to sg_init_one which eventually blows up
-with BUG_ON(!virt_addr_valid(buf)). On arm64, virt_addr_valid returns
-false for the kernel image since virt_to_page will not return the
-correct page. The kernel image is also aliased to the linear map so get
-the linear alias and pass that to the scatterlist instead.
-
-Reported-by: Christopher Covington <cov@codeaurora.org>
-Fixes: d7db7a882deb ("crypto: acomp - update testmgr with support for acomp")
-Signed-off-by: Laura Abbott <labbott@redhat.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
-x86 supports virt_addr_valid working on kernel image addresses but arm64 is
-more strict. This is the direction things have been moving with my
-CONFIG_DEBUG_VIRTUAL series for arm64 which is tightening the definition of
-__pa/__pa_symbol.
----
- crypto/testmgr.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Based on: v4.9 tag
+Also applies on: next-20161219
+Tested on Simulation environment (which did not have serial console option)
 
-diff --git a/crypto/testmgr.c b/crypto/testmgr.c
-index f616ad7..f5bac10 100644
---- a/crypto/testmgr.c
-+++ b/crypto/testmgr.c
-@@ -1464,7 +1464,7 @@ static int test_acomp(struct crypto_acomp *tfm, struct comp_testvec *ctemplate,
+ drivers/tty/hvc/hvc_dcc.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+
+diff --git a/drivers/tty/hvc/hvc_dcc.c b/drivers/tty/hvc/hvc_dcc.c
+index 82f240fb98f0..1ec06e550656 100644
+--- a/drivers/tty/hvc/hvc_dcc.c
++++ b/drivers/tty/hvc/hvc_dcc.c
+@@ -10,7 +10,9 @@
+  * GNU General Public License for more details.
+  */
  
- 		memset(output, 0, dlen);
- 		init_completion(&result.completion);
--		sg_init_one(&src, ctemplate[i].input, ilen);
-+		sg_init_one(&src, __va(__pa_symbol(ctemplate[i].input)), ilen);
- 		sg_init_one(&dst, output, dlen);
++#include <linux/console.h>
+ #include <linux/init.h>
++#include <linux/serial_core.h>
  
- 		req = acomp_request_alloc(tfm);
-@@ -1513,7 +1513,7 @@ static int test_acomp(struct crypto_acomp *tfm, struct comp_testvec *ctemplate,
- 
- 		memset(output, 0, dlen);
- 		init_completion(&result.completion);
--		sg_init_one(&src, dtemplate[i].input, ilen);
-+		sg_init_one(&src, __va(__pa_symbol(dtemplate[i].input)), ilen);
- 		sg_init_one(&dst, output, dlen);
- 
- 		req = acomp_request_alloc(tfm);
+ #include <asm/dcc.h>
+ #include <asm/processor.h>
+@@ -94,3 +96,45 @@ static int __init hvc_dcc_init(void)
+ 	return PTR_ERR_OR_ZERO(p);
+ }
+ device_initcall(hvc_dcc_init);
++
++static int hvc_dcc_earlyputc(int c)
++{
++	unsigned long count = 0xFFFFFFFF;
++	static bool dead_dcc_earlycon;
++
++	if (dead_dcc_earlycon)
++		return -EBUSY;
++
++	while (count--) {
++		if (!(__dcc_getstatus() & DCC_STATUS_TX))
++			break;
++	}
++	if (!count) {
++		dead_dcc_earlycon = true;
++		return -EBUSY;
++	}
++	__dcc_putchar(c);
++	return 0;
++}
++
++static void hvc_dcc_earlywrite(struct console *con, const char *s,
++			       unsigned int n)
++{
++	int r;
++
++	while (n--) {
++		r = hvc_dcc_earlyputc(*s);
++		if (r)
++			break;
++		s++;
++	}
++}
++
++static int
++__init early_hvc_dcc_setup(struct earlycon_device *device, const char *opt)
++{
++	device->con->write = hvc_dcc_earlywrite;
++	return 0;
++}
++
++EARLYCON_DECLARE(hvcdcc, early_hvc_dcc_setup);
 -- 
-2.7.4
+2.11.0.65.geff96d7
