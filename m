@@ -1,33 +1,30 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 20 Dec 2016 13:58:26 +0800
-Subject: [PATCH] ARM: dts: sun8i: add a delay after reset xr819 on Orange Pi
- Zero
-Message-ID: <20161220055826.30725-1-icenowy@aosc.xyz>
+From: meng.yi@nxp.com (Meng Yi)
+Date: Tue, 20 Dec 2016 14:03:07 +0800
+Subject: [PATCH] arm64/dts/ls2080a-rdb: remove disable status of pca9547
+Message-ID: <1482213787-27814-1-git-send-email-meng.yi@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-XR819 seems to need a delay after its reset line to be deasserted,
-otherwise it may not respond MMC commands correctly, and fail to
-initialize.
+pca9547 won't probed since its status property is disabled.
+while there are devices connected to it, we need remove status
+property to let ds3232 and adt7461 probed correctly.
 
-Add a 200ms delay in the mmc-pwrseq.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Signed-off-by: Meng Yi <meng.yi@nxp.com>
 ---
- arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-index d18807f73060..b7ca916d871d 100644
---- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-+++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-@@ -92,6 +92,7 @@
- 	wifi_pwrseq: wifi_pwrseq {
- 		compatible = "mmc-pwrseq-simple";
- 		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>;
-+		post-power-on-delay-ms = <200>;
- 	};
- };
- 
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
+index 265e0a8..2ff46ca 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
+@@ -102,7 +102,6 @@
+ 		reg = <0x75>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		status = "disabled";
+ 		i2c at 1 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
 -- 
-2.11.0
+2.1.0.27.g96db324
