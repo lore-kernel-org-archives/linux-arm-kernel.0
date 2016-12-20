@@ -1,67 +1,31 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Tue, 20 Dec 2016 14:59:17 +0800
-Subject: [PATCH] drm/mediatek: Support UYVY and YUYV format for overlay
-In-Reply-To: <1481692473-18755-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1481692473-18755-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1482217157.18168.10.camel@mtksdaap41>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Tue, 20 Dec 2016 17:45:31 +1030
+Subject: [PATCH v4 1/5] mfd: dt: Fix "indicates" typo in mfd bindings document
+In-Reply-To: <20161220071535.27542-1-andrew@aj.id.au>
+References: <20161220071535.27542-1-andrew@aj.id.au>
+Message-ID: <20161220071535.27542-2-andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bibby,
+Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/mfd/mfd.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-On Wed, 2016-12-14 at 13:14 +0800, Bibby Hsieh wrote:
-> MT8173 overlay can support UYVY and YUYV format,
-> we add the format in DRM driver.
-> 
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_disp_ovl.c  | 6 ++++++
->  drivers/gpu/drm/mediatek/mtk_drm_plane.c | 2 ++
->  2 files changed, 8 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> index 019b7ca..0a340f3 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> @@ -44,6 +44,8 @@
->  #define OVL_CON_CLRFMT_RGB888	(1 << 12)
->  #define OVL_CON_CLRFMT_RGBA8888	(2 << 12)
->  #define OVL_CON_CLRFMT_ARGB8888	(3 << 12)
-> +#define OVL_CON_CLRFMT_UYVY	(4 << 12)
-> +#define OVL_CON_CLRFMT_YUYV	(5 << 12)
->  #define	OVL_CON_AEN		BIT(8)
->  #define	OVL_CON_ALPHA		0xff
->  
-> @@ -161,6 +163,10 @@ static unsigned int ovl_fmt_convert(unsigned int fmt)
->  	case DRM_FORMAT_XBGR8888:
->  	case DRM_FORMAT_ABGR8888:
->  		return OVL_CON_CLRFMT_RGBA8888 | OVL_CON_BYTE_SWAP;
-> +	case DRM_FORMAT_YUYV:
-> +		return OVL_CON_CLRFMT_YUYV;
-> +	case DRM_FORMAT_UYVY:
-> +		return OVL_CON_CLRFMT_UYVY;
->  	}
->  }
-Your patch looks good, but I am not sure about some details.
-AFAIK, there is a color matrix here to describe how to transform from
-BT.601 / BT.709 / other color space to RGB color space.  You can use the
-default value if you don't care how colors are represented.  Or you can
-specify the matrix in this patch.
-
-Regards,
-yt.shen
-
->  
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-> index c461a23..b94c6ee 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-> @@ -28,6 +28,8 @@
->  	DRM_FORMAT_XRGB8888,
->  	DRM_FORMAT_ARGB8888,
->  	DRM_FORMAT_RGB565,
-> +	DRM_FORMAT_YUYV,
-> +	DRM_FORMAT_UYVY,
->  };
->  
->  static void mtk_plane_reset(struct drm_plane *plane)
+diff --git a/Documentation/devicetree/bindings/mfd/mfd.txt b/Documentation/devicetree/bindings/mfd/mfd.txt
+index af9d6931a1a2..f1fceeda12f1 100644
+--- a/Documentation/devicetree/bindings/mfd/mfd.txt
++++ b/Documentation/devicetree/bindings/mfd/mfd.txt
+@@ -19,7 +19,7 @@ Optional properties:
+ 
+ - compatible : "simple-mfd" - this signifies that the operating system should
+   consider all subnodes of the MFD device as separate devices akin to how
+-  "simple-bus" inidicates when to see subnodes as children for a simple
++  "simple-bus" indicates when to see subnodes as children for a simple
+   memory-mapped bus. For more complex devices, when the nexus driver has to
+   probe registers to figure out what child devices exist etc, this should not
+   be used. In the latter case the child devices will be determined by the
+-- 
+2.9.3
