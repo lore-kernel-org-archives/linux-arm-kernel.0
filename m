@@ -1,42 +1,61 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 20 Dec 2016 08:20:33 +0300
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAyLzJdIG1mZDogbWMxM3h4eDogUGFzcyB0aGUgSVJRRl9U?=
- =?UTF-8?B?UklHR0VSX0hJR0ggZmxhZy4=?=
-In-Reply-To: <1482182934-18559-3-git-send-email-lilja.magnus@gmail.com>
-References: <1482182934-18559-1-git-send-email-lilja.magnus@gmail.com>
- <1482182934-18559-3-git-send-email-lilja.magnus@gmail.com>
-Message-ID: <1482211233.10253607@f408.i.mail.ru>
+From: atull@kernel.org (Alan Tull)
+Date: Mon, 19 Dec 2016 23:25:58 -0600 (CST)
+Subject: [PATCH v4 0/2] FPGA: TS-7300 FPGA manager
+In-Reply-To: <c964999f-0988-dc41-5e5e-c0ff9c2455b1@gmail.com>
+References: <20161218202158.10582-1-f.fainelli@gmail.com>
+ <c964999f-0988-dc41-5e5e-c0ff9c2455b1@gmail.com>
+Message-ID: <alpine.DEB.2.10.1612192315470.2521@atull-730U3E-740U3E>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->???????, 20 ??????? 2016, 0:28 +03:00 ?? Magnus Lilja <lilja.magnus@gmail.com>:
->
->All supported mc13xxx devices have active high interrupt outputs. Make sure
->to configure the interrupt as active high by passing the IRQF_TRIGGER_HIGH
->flag. This is required at least on the i.MX31 PDK board.
->
->Signed-off-by: Magnus Lilja < lilja.magnus@gmail.com >
->---
->
->?drivers/mfd/mc13xxx-core.c | 2 +-
->?1 file changed, 1 insertion(+), 1 deletion(-)
->
->diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
->index d7f54e4..4cbe6b7 100644
->--- a/drivers/mfd/mc13xxx-core.c
->+++ b/drivers/mfd/mc13xxx-core.c
->@@ -440,7 +440,7 @@ int mc13xxx_common_init(struct device *dev)
->?mc13xxx->irq_chip.irqs = mc13xxx->irqs;
->?mc13xxx->irq_chip.num_irqs = ARRAY_SIZE(mc13xxx->irqs);
->?
->-ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq, IRQF_ONESHOT,
->+ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq, IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
->?  0, &mc13xxx->irq_chip, &mc13xxx->irq_data);
->?if (ret)
->?return ret;
+On Mon, 19 Dec 2016, Florian Fainelli wrote:
 
-IRQ line can be passed through inverter to IC.
-On my opinion the best way to handle all possible situations is parse
-devicetree IRQ flags and pass to the driver.
+> On 12/18/2016 12:21 PM, Florian Fainelli wrote:
+> > Hi all,
+> > 
+> > This patch series adds support for loading bitstreams into the Altera Cyclone II
+> > connected to an EP9302 on a TS-7300 board.
+> > 
+> > Changes in v4:
+> > 
+> > - fixed ops->write not to do the final configuration release
+> > - reordered patches
+> > 
+> > Changes in v3:
+> > 
+> > - fix write_init and write_complete signatures
+> > 
+> > Changes in v2:
+> > 
+> > - rebased against fpga/for-next
+> > - added defines for configuration bits and delays
+> > - added error mesage if ioremap() fails
+> > - detailed how the configuration through CPLD is done
+> 
+> Alan, Moritz, thanks for providing Acked-by, I was under the impression
+> these patches would be taken by you through the FPGA tree,
 
----
+Hi Florain,
+
+That's right, I'll handle it.  The FPGA tree goes in through Greg.
+We're in the merge window where stuff Greg already has is going to
+Linus so it's too late to get this into 4.10.  I'll be doing a pull
+after that.
+
+Alan
+
+> since Hartley
+> acked the EP93xx part and since that was the tree used as a baseline.
+> 
+> Let me know how you want to proceed, since EP93xx is not as active as
+> other ARM SoCs, there may not be a specific tree where to stage these
+> patches (unless you take them).
+> 
+> Thanks!
+> -- 
+> Florian
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fpga" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
