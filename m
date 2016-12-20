@@ -1,30 +1,36 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Tue, 20 Dec 2016 11:40:35 +0100
-Subject: [linux-sunxi][PATCH 0/3] Enable SPDIF on the Mele I7
-Message-ID: <20161220104038.22532-1-codekipper@gmail.com>
+Date: Tue, 20 Dec 2016 11:40:36 +0100
+Subject: [linux-sunxi][PATCH 1/3] ARM: dts: sun6i: Add SPDIF TX pin to the A31
+In-Reply-To: <20161220104038.22532-1-codekipper@gmail.com>
+References: <20161220104038.22532-1-codekipper@gmail.com>
+Message-ID: <20161220104038.22532-2-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-Hi All,
-here is the patch set required to enable SPDIF on the Mele I7 which is
-a A31 based TV-box. To get this working a fix has to be applied to the
-clock driver and this will be pushed seperately.
+Add the SPDIF TX pin to the A31 dtsi.
 
-For now the dtsi changes can be applied and when the clk change is
-merged then we can finialise this push by applying the I7 patch.
-BR,
-CK
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+---
+ arch/arm/boot/dts/sun6i-a31.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Marcus Cooper (3):
-  ARM: dts: sun6i: Add SPDIF TX pin to the A31
-  ARM: dts: sun6i: Add the SPDIF block to the A31
-  ARM: dts: sun6i: Add SPDIF to the Mele I7
-
- arch/arm/boot/dts/sun6i-a31-i7.dts | 24 ++++++++++++++++++++++++
- arch/arm/boot/dts/sun6i-a31.dtsi   | 19 +++++++++++++++++++
- 2 files changed, 43 insertions(+)
-
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 20a0331ddfb5..7370ba6c9993 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -586,6 +586,11 @@
+ 				bias-pull-up;
+ 			};
+ 
++			spdif_pins_a: spdif at 0 {
++				pins = "PH28";
++				function = "spdif";
++			};
++
+ 			uart0_pins_a: uart0 at 0 {
+ 				pins = "PH20", "PH21";
+ 				function = "uart0";
 -- 
 2.11.0
