@@ -1,181 +1,40 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 20 Dec 2016 23:40:32 +0100
-Subject: [PATCH v2] ARM64: dts: marvell: Correct license text
-Message-ID: <20161220224032.6866-1-alexandre.belloni@free-electrons.com>
+From: code@mmayer.net (Markus Mayer)
+Date: Tue, 20 Dec 2016 14:55:28 -0800
+Subject: [PATCH v4 0/2] cpufreq: brcmstb-cpufreq: CPUfreq driver for older
+ Broadcom STB SoCs
+Message-ID: <20161220225530.96699-1-code@mmayer.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The license text has been mangled at some point then copy pasted across
-multiple files. Restore it to what it should be.
-Note that this is not intended as a license change.
+From: Markus Mayer <mmayer@broadcom.com>
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
-Changes in v2:
- - squashed all the patches
- - fix commit message
+This CPUfreq driver provides basic frequency scaling for older Broadcom
+STB SoCs that do not use AVS firmware with DVFS support. There is no
+support for voltage scaling.
 
- arch/arm64/boot/dts/marvell/armada-371x.dtsi   | 10 +++++-----
- arch/arm64/boot/dts/marvell/armada-3720-db.dts | 10 +++++-----
- arch/arm64/boot/dts/marvell/armada-372x.dtsi   | 10 +++++-----
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 10 +++++-----
- 4 files changed, 20 insertions(+), 20 deletions(-)
+v3 of this patch can be found here: https://lkml.org/lkml/2016/11/22/747
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-371x.dtsi b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
-index c9e5325b8ac3..11226f7b9ed9 100644
---- a/arch/arm64/boot/dts/marvell/armada-371x.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
-@@ -16,17 +16,17 @@
-  *     published by the Free Software Foundation; either version 2 of the
-  *     License, or (at your option) any later version.
-  *
-- *     This file is distributed in the hope that it will be useful
-+ *     This file is distributed in the hope that it will be useful,
-  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  *     GNU General Public License for more details.
-  *
-- * Or, alternatively
-+ * Or, alternatively,
-  *
-  *  b) Permission is hereby granted, free of charge, to any person
-  *     obtaining a copy of this software and associated documentation
-  *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use
-+ *     restriction, including without limitation the rights to use,
-  *     copy, modify, merge, publish, distribute, sublicense, and/or
-  *     sell copies of the Software, and to permit persons to whom the
-  *     Software is furnished to do so, subject to the following
-@@ -35,11 +35,11 @@
-  *     The above copyright notice and this permission notice shall be
-  *     included in all copies or substantial portions of the Software.
-  *
-- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-index 1372e9a6aaa4..2e707875039a 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-@@ -15,17 +15,17 @@
-  *     published by the Free Software Foundation; either version 2 of the
-  *     License, or (at your option) any later version.
-  *
-- *     This file is distributed in the hope that it will be useful
-+ *     This file is distributed in the hope that it will be useful,
-  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  *     GNU General Public License for more details.
-  *
-- * Or, alternatively
-+ * Or, alternatively,
-  *
-  *  b) Permission is hereby granted, free of charge, to any person
-  *     obtaining a copy of this software and associated documentation
-  *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use
-+ *     restriction, including without limitation the rights to use,
-  *     copy, modify, merge, publish, distribute, sublicense, and/or
-  *     sell copies of the Software, and to permit persons to whom the
-  *     Software is furnished to do so, subject to the following
-@@ -34,11 +34,11 @@
-  *     The above copyright notice and this permission notice shall be
-  *     included in all copies or substantial portions of the Software.
-  *
-- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
-diff --git a/arch/arm64/boot/dts/marvell/armada-372x.dtsi b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
-index 5120296596c2..59d7557d3b1b 100644
---- a/arch/arm64/boot/dts/marvell/armada-372x.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
-@@ -16,17 +16,17 @@
-  *     published by the Free Software Foundation; either version 2 of the
-  *     License, or (at your option) any later version.
-  *
-- *     This file is distributed in the hope that it will be useful
-+ *     This file is distributed in the hope that it will be useful,
-  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  *     GNU General Public License for more details.
-  *
-- * Or, alternatively
-+ * Or, alternatively,
-  *
-  *  b) Permission is hereby granted, free of charge, to any person
-  *     obtaining a copy of this software and associated documentation
-  *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use
-+ *     restriction, including without limitation the rights to use,
-  *     copy, modify, merge, publish, distribute, sublicense, and/or
-  *     sell copies of the Software, and to permit persons to whom the
-  *     Software is furnished to do so, subject to the following
-@@ -35,11 +35,11 @@
-  *     The above copyright notice and this permission notice shall be
-  *     included in all copies or substantial portions of the Software.
-  *
-- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index e9bd58793464..3c6f5d9d15c4 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -15,17 +15,17 @@
-  *     published by the Free Software Foundation; either version 2 of the
-  *     License, or (at your option) any later version.
-  *
-- *     This file is distributed in the hope that it will be useful
-+ *     This file is distributed in the hope that it will be useful,
-  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  *     GNU General Public License for more details.
-  *
-- * Or, alternatively
-+ * Or, alternatively,
-  *
-  *  b) Permission is hereby granted, free of charge, to any person
-  *     obtaining a copy of this software and associated documentation
-  *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use
-+ *     restriction, including without limitation the rights to use,
-  *     copy, modify, merge, publish, distribute, sublicense, and/or
-  *     sell copies of the Software, and to permit persons to whom the
-  *     Software is furnished to do so, subject to the following
-@@ -34,11 +34,11 @@
-  *     The above copyright notice and this permission notice shall be
-  *     included in all copies or substantial portions of the Software.
-  *
-- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
+Changes since v3:
+  - added binding document
+  - got rid of calls to __clk_lookup(), using devm_clk_get() instead
+  - re-worked clock lookup code a bit, along with switching to devm_clk_get()
+  - get_frequencies() became a void function, removing the need for some
+    error checking
+  - fixed CONFIG_ARM_BRCM_AVS_CPUFREQ typo
+  - fixed MODULE_DEVICE_TABLE declaration
+
+Markus Mayer (2):
+  dt-bindings: brcm: clocks: add binding for brcmstb-cpu-clk-div
+  cpufreq: brcmstb-cpufreq: CPUfreq driver for older Broadcom STB SoCs
+
+ .../bindings/clock/brcm,brcmstb-cpu-clk-div.txt    |  83 +++++
+ MAINTAINERS                                        |   1 +
+ drivers/cpufreq/Kconfig.arm                        |  12 +
+ drivers/cpufreq/Makefile                           |   1 +
+ drivers/cpufreq/brcmstb-cpufreq.c                  | 377 +++++++++++++++++++++
+ 5 files changed, 474 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/brcm,brcmstb-cpu-clk-div.txt
+ create mode 100644 drivers/cpufreq/brcmstb-cpufreq.c
+
 -- 
-2.11.0
+2.7.4
