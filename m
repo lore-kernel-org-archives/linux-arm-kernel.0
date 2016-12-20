@@ -1,62 +1,34 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Tue, 20 Dec 2016 11:40:38 +0100
-Subject: [linux-sunxi][PATCH 3/3] ARM: dts: sun6i: Add SPDIF to the Mele I7
-In-Reply-To: <20161220104038.22532-1-codekipper@gmail.com>
-References: <20161220104038.22532-1-codekipper@gmail.com>
-Message-ID: <20161220104038.22532-4-codekipper@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 20 Dec 2016 11:42:29 +0100
+Subject: [PATCH renesas/devel 1/4] arm64: dts: r8a7796: Use R-Car Gen 3
+ fallback binding for msiof nodes
+In-Reply-To: <1482229959-25584-2-git-send-email-horms+renesas@verge.net.au>
+References: <1482229959-25584-1-git-send-email-horms+renesas@verge.net.au>
+ <1482229959-25584-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXpN9x5YH0tiSRxme0yySS1NpaF41_DaePzuWd+3QD=AQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+On Tue, Dec 20, 2016 at 11:32 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Use recently added R-Car Gen 3 fallback binding for msiof nodes in
+> DT for r8a7796 SoC.
+>
+> This has no run-time effect for the current driver as the initialisation
+> sequence is the same for the SoC-specific binding for r8a7796 and the
+> fallback binding for R-Car Gen 3.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Enable the S/PDIF transmitter that is present on the Mele I7.
+Reviewed-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
----
- arch/arm/boot/dts/sun6i-a31-i7.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+Gr{oetje,eeting}s,
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-i7.dts b/arch/arm/boot/dts/sun6i-a31-i7.dts
-index a2193309a199..2bc57d2dcd80 100644
---- a/arch/arm/boot/dts/sun6i-a31-i7.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-i7.dts
-@@ -69,6 +69,23 @@
- 			gpios = <&pio 7 13 GPIO_ACTIVE_HIGH>;
- 		};
- 	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "On-board SPDIF";
-+		simple-audio-card,cpu {
-+			sound-dai = <&spdif>;
-+		};
-+
-+		simple-audio-card,codec {
-+			sound-dai = <&spdif_out>;
-+		};
-+	};
-+
-+	spdif_out: spdif-out {
-+		#sound-dai-cells = <0>;
-+		compatible = "linux,spdif-dit";
-+	};
- };
- 
- &codec {
-@@ -138,6 +155,13 @@
- 	status = "okay";
- };
- 
-+&spdif {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spdif_pins_a>;
-+	spdif-out = "okay";
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
--- 
-2.11.0
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
