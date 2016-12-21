@@ -1,65 +1,43 @@
 From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Wed, 21 Dec 2016 11:19:34 +0100
-Subject: [PATCH 2/3] drivers/perf: arm_pmu: add arm_pmu_device_remove
+Date: Wed, 21 Dec 2016 11:19:35 +0100
+Subject: [PATCH 3/3] arm: perf: Add platform driver removal function
 In-Reply-To: <20161221101935.17178-1-alexander.stein@systec-electronic.com>
 References: <20161221101935.17178-1-alexander.stein@systec-electronic.com>
-Message-ID: <20161221101935.17178-3-alexander.stein@systec-electronic.com>
+Message-ID: <20161221101935.17178-4-alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ARM PMU removal function. This will be required by perf event drivers
-when option DEBUG_TEST_DRIVER_REMOVE is enabled.
+Despite the driver cannot be built as a module using the option
+DEBUG_TEST_DRIVER_REMOVE requires the drivers to actually remove the
+device.
 
 Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
 ---
- drivers/perf/arm_pmu.c       | 14 ++++++++++++++
- include/linux/perf/arm_pmu.h |  2 ++
- 2 files changed, 16 insertions(+)
+ arch/arm/kernel/perf_event_v7.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index a9bbdbf..b7ddc4c 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -1022,6 +1022,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 	armpmu_init(pmu);
- 
- 	pmu->plat_device = pdev;
-+	platform_set_drvdata(pdev, pmu);
- 
- 	if (node && (of_id = of_match_node(of_table, pdev->dev.of_node))) {
- 		init_fn = of_id->data;
-@@ -1073,6 +1074,19 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 	return ret;
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index b942349..3ad02a2 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -2026,12 +2026,18 @@ static int armv7_pmu_device_probe(struct platform_device *pdev)
+ 				    armv7_pmu_probe_table);
  }
  
-+int arm_pmu_device_remove(struct platform_device *pdev)
++static int armv7_pmu_device_remove(struct platform_device *pdev)
 +{
-+	struct arm_pmu *pmu = platform_get_drvdata(pdev);
-+
-+	__oprofile_cpu_pmu = NULL;
-+
-+	perf_pmu_unregister(&pmu->pmu);
-+
-+	cpu_pmu_destroy(pmu);
-+
-+	return 0;
++	return arm_pmu_device_remove(pdev);
 +}
 +
- static int arm_pmu_hp_init(void)
- {
- 	int ret;
-diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index 8462da2..8106f27 100644
---- a/include/linux/perf/arm_pmu.h
-+++ b/include/linux/perf/arm_pmu.h
-@@ -159,6 +159,8 @@ struct pmu_probe_info {
- int arm_pmu_device_probe(struct platform_device *pdev,
- 			 const struct of_device_id *of_table,
- 			 const struct pmu_probe_info *probe_table);
-+int arm_pmu_device_remove(struct platform_device *pdev);
-+
+ static struct platform_driver armv7_pmu_driver = {
+ 	.driver		= {
+ 		.name	= "armv7-pmu",
+ 		.of_match_table = armv7_pmu_of_device_ids,
+ 	},
+ 	.probe		= armv7_pmu_device_probe,
++	.remove		= armv7_pmu_device_remove,
+ };
  
- #define ARMV8_PMU_PDEV_NAME "armv8-pmu"
- 
+ static int __init register_armv7_pmu_driver(void)
 -- 
 2.10.2
