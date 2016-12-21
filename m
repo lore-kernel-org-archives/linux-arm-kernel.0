@@ -1,41 +1,98 @@
-From: uwe@kleine-koenig.org (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 21 Dec 2016 17:50:13 +0100
-Subject: [PATCH] ARM: dts: turris-omnia: add support for ethernet switch
-In-Reply-To: <20161221151814.GJ30952@lunn.ch>
-References: <20161221102047.28036-1-uwe@kleine-koenig.org>
- <20161221151814.GJ30952@lunn.ch>
-Message-ID: <20161221165012.cyvotxbjtqqkna33@perseus.defre.kleine-koenig.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 21 Dec 2016 16:54:22 +0000
+Subject: How to remove warn msg "cache: parent cpui should not be
+ sleeping" i=1, 2, 3...
+In-Reply-To: <20161221193703.6eac880c@xhacker>
+References: <20161221193703.6eac880c@xhacker>
+Message-ID: <a793d088-2faf-3ea8-41b6-f0b614a71e19@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andrew,
 
-On Wed, Dec 21, 2016 at 04:18:14PM +0100, Andrew Lunn wrote:
-> On Wed, Dec 21, 2016 at 11:20:47AM +0100, Uwe Kleine-K?nig wrote:
-> > when the MAC is operated in rgmii mode and the switch in rgmii-id
-> > communication between them works fine. The other way round it doesn't work.
-> > The fixed-link nodes in the cpu port description is necessary to let the
-> > mv88e6xxx driver use the phy-mode description. Is this a bug?
+
+On 21/12/16 11:37, Jisheng Zhang wrote:
+> Hi all,
 > 
-> It is somewhat deliberate. Normally, there is no phy at all for a cpu
-> port or a dsa port. If there is no phy, it makes no sense to set the
-> phy-mode. With fixed-link, there is a phy connected to the MAC, in
-> terms of how the network stack sees the devices. It is a somewhat
-> special phy, in fact its bandwidth is fixed, but it does support
-> phy-handle, and a few other phy properties and callbacks.
+> I'm not sure this is a bug, when wake up from s2ram, I could get something
+> like:
+> 
+> [  313.271464] Enabling non-boot CPUs ...
+> [  313.271551] CPU1: Booted secondary processor
+> [  313.271556] Detected VIPT I-cache on CPU1
+> [  313.301378]  cache: parent cpu1 should not be sleeping
+> [  313.301504] CPU1 is up
+> [  313.301582] CPU2: Booted secondary processor
+> [  313.301585] Detected VIPT I-cache on CPU2
+> [  313.331485]  cache: parent cpu2 should not be sleeping
+> [  313.331605] CPU2 is up
+> [  313.331683] CPU3: Booted secondary processor
+> [  313.331686] Detected VIPT I-cache on CPU3
+> [  313.361599]  cache: parent cpu3 should not be sleeping
+> [  313.361719] CPU3 is up
+> 
+> This is because we call cpu_device_create() when secondary cpu is brought
+> online, the cpu_cache device's parent device: cpu device isn't already
+> resumed, all device resume will resume after secondary cores are brought
+> up.
+> 
+> What's the elegant solution to remove this warning msg?
+> 
 
-Here the switch is the phy, and in this case it is necessary to
-correctly configure it's physical properties. fixed-link is conceptual
-wrong here because (IIUC) this is for MACs only. So (maybe also for DSA
-v3 or a general phy cleanup) a standard binding to specify this which
-doesn't formalise the switch (or general: phy) as MAC.
+It is not a serious warning as you can see a comment in the code:
+"/*
+ * This is a fib.  But we'll allow new children to be added below
+ * a resumed device, even if the device hasn't been completed yet.
+ */"
 
-Best regards
-Uwe
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161221/2dc91dc6/attachment.sig>
+But if we think it needs to be removed, I have something like below in
+my mind. I am not sure if this is hacky or not(completely untested, not
+even compiled).
+
+Regards,
+Sudeep
+
+-->8
+
+diff --git i/drivers/base/cpu.c w/drivers/base/cpu.c
+index 4c28e1a09786..2a5c04377adf 100644
+--- i/drivers/base/cpu.c
++++ w/drivers/base/cpu.c
+@@ -344,6 +344,14 @@ static int cpu_uevent(struct device *dev, struct
+kobj_uevent_env *env)
+ }
+ #endif
+
++static int cpu_dev_pm_unset_is_prepared(unsigned int cpu)
++{
++       struct device *cpu_dev = get_cpu_device(cpu);
++
++       if(cpu_dev)
++               cpu_dev->power.is_prepared = false;
++       return 0;
++}
+ /*
+  * register_cpu - Setup a sysfs device for a CPU.
+  * @cpu - cpu->hotpluggable field set to 1 will generate a control file in
+@@ -377,7 +385,9 @@ int register_cpu(struct cpu *cpu, int num)
+        per_cpu(cpu_sys_devices, num) = &cpu->dev;
+        register_cpu_under_node(num, cpu_to_node(num));
+
+-       return 0;
++       return cpuhp_setup_state_nocalls(CPUHP_CPUDEV_PM_PREPARE,
++                                "base/cpu/dev_pm:prepare",
++                                cpu_dev_pm_unset_is_prepared, NULL);
+ }
+
+ struct device *get_cpu_device(unsigned cpu)
+diff --git i/include/linux/cpuhotplug.h w/include/linux/cpuhotplug.h
+index 2ab7bf53d529..5bfe3c1aa148 100644
+--- i/include/linux/cpuhotplug.h
++++ w/include/linux/cpuhotplug.h
+@@ -51,6 +51,7 @@ enum cpuhp_state {
+        CPUHP_SLAB_PREPARE,
+        CPUHP_MD_RAID5_PREPARE,
+        CPUHP_RCUTREE_PREP,
++       CPUHP_CPUDEV_PM_PREPARE,
+        CPUHP_CPUIDLE_COUPLED_PREPARE,
+        CPUHP_POWERPC_PMAC_PREPARE,
+        CPUHP_POWERPC_MMU_CTX_PREPARE,
