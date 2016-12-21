@@ -1,47 +1,69 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 21 Dec 2016 10:02:54 +0100
-Subject: [PATCH v2] rtc: armada38x: Followed the new recommendation for
- errata implementation
-In-Reply-To: <20161221004308.terkq5u5pb2hbcbw@piout.net> (Alexandre Belloni's
- message of "Wed, 21 Dec 2016 01:43:08 +0100")
-References: <20161213112510.25692-1-gregory.clement@free-electrons.com>
- <20161221004308.terkq5u5pb2hbcbw@piout.net>
-Message-ID: <87tw9xiri9.fsf@free-electrons.com>
+Date: Wed, 21 Dec 2016 10:06:47 +0100
+Subject: [PATCH v3 net-next 1/3] net: dsa: mv88e6xxx: Don't forbid MDIO
+ I/Os for PHY addr >= num_of_ports
+In-Reply-To: <20161221090045.474-2-romain.perier@free-electrons.com> (Romain
+ Perier's message of "Wed, 21 Dec 2016 10:00:43 +0100")
+References: <20161221090045.474-1-romain.perier@free-electrons.com>
+ <20161221090045.474-2-romain.perier@free-electrons.com>
+Message-ID: <87poklirbs.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
- 
- On mer., d?c. 21 2016, Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+Hi Romain,
 
 
-I agree with all your remark expect one, see below:
-[...]
->>  	rtc_update_irq(rtc->rtc_dev, 1, event);
->>  
->>  	return IRQ_HANDLED;
->> @@ -221,6 +282,11 @@ static __init int armada38x_rtc_probe(struct platform_device *pdev)
->>  	if (!rtc)
->>  		return -ENOMEM;
->>  
->> +	rtc->val_to_freq = devm_kcalloc(&pdev->dev, SAMPLE_NR,
->> +				sizeof(struct value_to_freq), GFP_KERNEL);
->> +	if (!rtc->val_to_freq)
->> +		return -ENOMEM;
->> +
+it seems there is a remaining typo :)
+
+ On mer., d?c. 21 2016, Romain Perier <romain.perier@free-electrons.com> wrote:
+
+> Some Marvell ethernet switches have internal ethernet transceivers with
+> hardcoded phy addresses. These addresses can be grearer than the number
+                                                  greater
+> of ports or its value might be different than the associated port number.
+> This is for example the case for MV88E6341 that has 6 ports and internal
+> Port 1 to Port4 PHYs mapped at SMI addresses from 0x11 to 0x14.
 >
-> The whole struct armada38x_rtc is already allocated just before. Maybe
-> you can put the whole array inside the structure instead of doing a new
-> allocation.
-
-Actually it was done on purpose. Indeed the same RTC IP is used in the
-Armada 3700 (a patch is coming soon), and for this IP this issue was
-fixed and we do not need to store 100 read. That's why I want to
-allocate the array only if needed.
-
-Thanks,
-
-Gregory
+> This commits fixes the issue by removing the condition in MDIO callbacks.
+>
+> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>
+> Changes in v2:
+>  - Added tag "Reviewed-by" by Andrew
+>  - Fixed typo in the commit log
+>
+>  drivers/net/dsa/mv88e6xxx/chip.c | 6 ------
+>  1 file changed, 6 deletions(-)
+>
+> diff --git a/drivers/net/dsa/mv88e6xxx/chip.c b/drivers/net/dsa/mv88e6xxx/chip.c
+> index b5f0e1e..76d944e 100644
+> --- a/drivers/net/dsa/mv88e6xxx/chip.c
+> +++ b/drivers/net/dsa/mv88e6xxx/chip.c
+> @@ -2881,9 +2881,6 @@ static int mv88e6xxx_mdio_read(struct mii_bus *bus, int phy, int reg)
+>  	u16 val;
+>  	int err;
+>  
+> -	if (phy >= mv88e6xxx_num_ports(chip))
+> -		return 0xffff;
+> -
+>  	mutex_lock(&chip->reg_lock);
+>  	err = mv88e6xxx_phy_read(chip, phy, reg, &val);
+>  	mutex_unlock(&chip->reg_lock);
+> @@ -2896,9 +2893,6 @@ static int mv88e6xxx_mdio_write(struct mii_bus *bus, int phy, int reg, u16 val)
+>  	struct mv88e6xxx_chip *chip = bus->priv;
+>  	int err;
+>  
+> -	if (phy >= mv88e6xxx_num_ports(chip))
+> -		return 0xffff;
+> -
+>  	mutex_lock(&chip->reg_lock);
+>  	err = mv88e6xxx_phy_write(chip, phy, reg, val);
+>  	mutex_unlock(&chip->reg_lock);
+> -- 
+> 2.9.3
+>
 
 -- 
 Gregory Clement, Free Electrons
