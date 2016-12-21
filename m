@@ -1,98 +1,54 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 21 Dec 2016 16:54:22 +0000
-Subject: How to remove warn msg "cache: parent cpui should not be
- sleeping" i=1, 2, 3...
-In-Reply-To: <20161221193703.6eac880c@xhacker>
-References: <20161221193703.6eac880c@xhacker>
-Message-ID: <a793d088-2faf-3ea8-41b6-f0b614a71e19@arm.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 21 Dec 2016 16:55:56 +0800
+Subject: [PATCH] crypto: testmgr: Use linear alias for test input
+In-Reply-To: <1482190646-7720-1-git-send-email-labbott@redhat.com>
+References: <1482190646-7720-1-git-send-email-labbott@redhat.com>
+Message-ID: <20161221085556.GC29501@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 21/12/16 11:37, Jisheng Zhang wrote:
-> Hi all,
+On Mon, Dec 19, 2016 at 03:37:26PM -0800, Laura Abbott wrote:
+> Christopher Covington reported a crash on aarch64 on recent Fedora
+> kernels:
 > 
-> I'm not sure this is a bug, when wake up from s2ram, I could get something
-> like:
+> kernel BUG at ./include/linux/scatterlist.h:140!
+> Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+> Modules linked in:
+> CPU: 2 PID: 752 Comm: cryptomgr_test Not tainted 4.9.0-11815-ge93b1cc #162
+> Hardware name: linux,dummy-virt (DT)
+> task: ffff80007c650080 task.stack: ffff800008910000
+> PC is at sg_init_one+0xa0/0xb8
+> LR is at sg_init_one+0x24/0xb8
+> ...
+> [<ffff000008398db8>] sg_init_one+0xa0/0xb8
+> [<ffff000008350a44>] test_acomp+0x10c/0x438
+> [<ffff000008350e20>] alg_test_comp+0xb0/0x118
+> [<ffff00000834f28c>] alg_test+0x17c/0x2f0
+> [<ffff00000834c6a4>] cryptomgr_test+0x44/0x50
+> [<ffff0000080dac70>] kthread+0xf8/0x128
+> [<ffff000008082ec0>] ret_from_fork+0x10/0x50
 > 
-> [  313.271464] Enabling non-boot CPUs ...
-> [  313.271551] CPU1: Booted secondary processor
-> [  313.271556] Detected VIPT I-cache on CPU1
-> [  313.301378]  cache: parent cpu1 should not be sleeping
-> [  313.301504] CPU1 is up
-> [  313.301582] CPU2: Booted secondary processor
-> [  313.301585] Detected VIPT I-cache on CPU2
-> [  313.331485]  cache: parent cpu2 should not be sleeping
-> [  313.331605] CPU2 is up
-> [  313.331683] CPU3: Booted secondary processor
-> [  313.331686] Detected VIPT I-cache on CPU3
-> [  313.361599]  cache: parent cpu3 should not be sleeping
-> [  313.361719] CPU3 is up
+> The test vectors used for input are part of the kernel image. These
+> inputs are passed as a buffer to sg_init_one which eventually blows up
+> with BUG_ON(!virt_addr_valid(buf)). On arm64, virt_addr_valid returns
+> false for the kernel image since virt_to_page will not return the
+> correct page. The kernel image is also aliased to the linear map so get
+> the linear alias and pass that to the scatterlist instead.
 > 
-> This is because we call cpu_device_create() when secondary cpu is brought
-> online, the cpu_cache device's parent device: cpu device isn't already
-> resumed, all device resume will resume after secondary cores are brought
-> up.
-> 
-> What's the elegant solution to remove this warning msg?
-> 
+> Reported-by: Christopher Covington <cov@codeaurora.org>
+> Fixes: d7db7a882deb ("crypto: acomp - update testmgr with support for acomp")
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> x86 supports virt_addr_valid working on kernel image addresses but arm64 is
+> more strict. This is the direction things have been moving with my
+> CONFIG_DEBUG_VIRTUAL series for arm64 which is tightening the definition of
+> __pa/__pa_symbol.
 
-It is not a serious warning as you can see a comment in the code:
-"/*
- * This is a fib.  But we'll allow new children to be added below
- * a resumed device, even if the device hasn't been completed yet.
- */"
+Please fix this by copying the templates to kmalloced memory like
+the other test_* functions.
 
-But if we think it needs to be removed, I have something like below in
-my mind. I am not sure if this is hacky or not(completely untested, not
-even compiled).
-
-Regards,
-Sudeep
-
--->8
-
-diff --git i/drivers/base/cpu.c w/drivers/base/cpu.c
-index 4c28e1a09786..2a5c04377adf 100644
---- i/drivers/base/cpu.c
-+++ w/drivers/base/cpu.c
-@@ -344,6 +344,14 @@ static int cpu_uevent(struct device *dev, struct
-kobj_uevent_env *env)
- }
- #endif
-
-+static int cpu_dev_pm_unset_is_prepared(unsigned int cpu)
-+{
-+       struct device *cpu_dev = get_cpu_device(cpu);
-+
-+       if(cpu_dev)
-+               cpu_dev->power.is_prepared = false;
-+       return 0;
-+}
- /*
-  * register_cpu - Setup a sysfs device for a CPU.
-  * @cpu - cpu->hotpluggable field set to 1 will generate a control file in
-@@ -377,7 +385,9 @@ int register_cpu(struct cpu *cpu, int num)
-        per_cpu(cpu_sys_devices, num) = &cpu->dev;
-        register_cpu_under_node(num, cpu_to_node(num));
-
--       return 0;
-+       return cpuhp_setup_state_nocalls(CPUHP_CPUDEV_PM_PREPARE,
-+                                "base/cpu/dev_pm:prepare",
-+                                cpu_dev_pm_unset_is_prepared, NULL);
- }
-
- struct device *get_cpu_device(unsigned cpu)
-diff --git i/include/linux/cpuhotplug.h w/include/linux/cpuhotplug.h
-index 2ab7bf53d529..5bfe3c1aa148 100644
---- i/include/linux/cpuhotplug.h
-+++ w/include/linux/cpuhotplug.h
-@@ -51,6 +51,7 @@ enum cpuhp_state {
-        CPUHP_SLAB_PREPARE,
-        CPUHP_MD_RAID5_PREPARE,
-        CPUHP_RCUTREE_PREP,
-+       CPUHP_CPUDEV_PM_PREPARE,
-        CPUHP_CPUIDLE_COUPLED_PREPARE,
-        CPUHP_POWERPC_PMAC_PREPARE,
-        CPUHP_POWERPC_MMU_CTX_PREPARE,
+Thanks,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
