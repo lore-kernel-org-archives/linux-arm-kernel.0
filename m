@@ -1,51 +1,45 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 21 Dec 2016 14:04:56 -0800
-Subject: [PATCH] arm64: dts: msm8996: Add required memory carveouts
-In-Reply-To: <1482357822-20823-1-git-send-email-andy.gross@linaro.org>
-References: <1482357822-20823-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <99427fc2-7d6f-af5f-6284-6ccb8f84d3f3@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 21 Dec 2016 23:33:22 +0100
+Subject: Mainline Patch Enable Can support in sunxi-a20.dtsi
+In-Reply-To: <1737278812.179886.1482137303825@email.1und1.de>
+References: <1737278812.179886.1482137303825@email.1und1.de>
+Message-ID: <20161221223322.phsfhki7alqrkoyb@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/21/2016 02:03 PM, Andy Gross wrote:
-> From: Stephen Boyd <sboyd@codeaurora.org>
->
-> This patch adds required memory carveouts so that the kernel does not
-> access memory that is in use or has been reserved for use by other remote
-> processors.
+Hi Christian,
 
-Thanks,
+On Mon, Dec 19, 2016 at 09:48:23AM +0100, Christian Waldeck wrote:
+> <!DOCTYPE html>
+> <html><head>
+>     <meta charset="UTF-8">
+> </head><body><p>Hello Maxime and Chen-Yu, <br></p><p><br></p><p>I`am currently working with an A20 Board from In-Circuit. <br></p><p>It took us quite some time to fetch all information about enabling the can pins on tha device. <br></p><p>Now we have working solution. <br></p><p><br></p><p>Attached to this email is a patch file which enables can-bus at the sunxi-A20.dtsi file<br></p><p>and the corresponding sun7i-a20-icnova-swac.dts BSP description. <br></p><p><br></p><p>Hopefully you can integrate this piece of configuration<br></p><p>to save time for other users, that are trying to work with the can-bus fram A20 SoC. <br></p><p><br></p><p class="io-ox-signature">Best regards, <br> <br>Christian Waldeck<br> <br>Green Digit GmbH<br>Zeppelinstr. 5<br>82205 Gilching<br><br>fon: +49 (0) 8105 39989-78<br>fax: +49 (0) 8105 39989-77<br><br>http://www.greendigit.de<br><br>Amtsgericht M&#252;nchen, HRB 180693<br>Gesch&#228;ftsf&#252;hrer: Volker Werbus</p></body></html>
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Thanks a lot for your patch.
 
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> ---
->  arch/arm64/boot/dts/qcom/msm8996.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> index cde4114..25e11dc 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> @@ -64,6 +64,16 @@
->  			reg = <0x0 0x86000000 0x0 0x200000>;
->  			no-map;
->  		};
-> +
-> +		memory at 85800000 {
-> +			reg = <0x0 0x85800000 0x0 0x800000>;
-> +			no-map;
-> +		};
-> +
-> +		memory at 86200000 {
-> +			reg = <0x0 0x86200000 0x0 0x2600000>;
-> +			no-map;
-> +		};
->  	};
->  
->  	cpus {
+However, it has a number of things that prevent it from being applied as is.
 
+The two majors flaws are that you sent it in HTML format, which
+prevents it from being applied. Your patch also lacks a Signed-off-by
+tag, which is used to know that you have the legal right to submit the
+patch.
+
+You can have more documentation on how to send your first patch here
+https://kernelnewbies.org/FirstKernelPatch#head-dc6a8aa0be0d0e8ed9dc03726d0b5a1fb0f65e1f
+
+and in Documentation/SubmittingPatches in the kernel source code.
+
+Thanks!
+Maxime
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161221/b203bf31/attachment.sig>
