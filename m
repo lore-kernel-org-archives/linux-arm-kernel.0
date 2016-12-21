@@ -1,53 +1,36 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 21 Dec 2016 12:31:34 +0100
-Subject: [PATCH] ARM64: dts: meson-gxbb-odroidc2: fix GbE tx link breakage
-Message-ID: <1482319894-656-1-git-send-email-jbrunet@baylibre.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 21 Dec 2016 19:37:03 +0800
+Subject: How to remove warn msg "cache: parent cpui should not be sleeping"
+ i=1, 2, 3...
+Message-ID: <20161221193703.6eac880c@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OdroidC2 GbE link breaks under heavy tx transfer. This happens even if the
-MAC does not enable Energy Efficient Ethernet (No Low Power state Idle on
-the Tx path). The problem seems to come from the phy Rx path, entering the
-LPI state.
+Hi all,
 
-Disabling EEE advertisement on the phy prevent this feature to be
-negociated with the link partner and solve the issue.
+I'm not sure this is a bug, when wake up from s2ram, I could get something
+like:
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
+[  313.271464] Enabling non-boot CPUs ...
+[  313.271551] CPU1: Booted secondary processor
+[  313.271556] Detected VIPT I-cache on CPU1
+[  313.301378]  cache: parent cpu1 should not be sleeping
+[  313.301504] CPU1 is up
+[  313.301582] CPU2: Booted secondary processor
+[  313.301585] Detected VIPT I-cache on CPU2
+[  313.331485]  cache: parent cpu2 should not be sleeping
+[  313.331605] CPU2 is up
+[  313.331683] CPU3: Booted secondary processor
+[  313.331686] Detected VIPT I-cache on CPU3
+[  313.361599]  cache: parent cpu3 should not be sleeping
+[  313.361719] CPU3 is up
 
-This patch is based on Linus recent master branch [0]
-This patch depends on the series [1] which has been merged in this branch.
+This is because we call cpu_device_create() when secondary cpu is brought
+online, the cpu_cache device's parent device: cpu device isn't already
+resumed, all device resume will resume after secondary cores are brought
+up.
 
-0: ba6d973f78eb ("Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net")
-1: http://lkml.kernel.org/r/1480326409-25419-1-git-send-email-jbrunet at baylibre.com
-   Fix integration of eee-broken-modes
-   
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+What's the elegant solution to remove this warning msg?
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-index 238fbeacd330..d8933e9e9a5a 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-@@ -147,6 +147,18 @@
- 	status = "okay";
- 	pinctrl-0 = <&eth_rgmii_pins>;
- 	pinctrl-names = "default";
-+	phy-handle = <&eth_phy0>;
-+
-+	mdio {
-+		compatible = "snps,dwmac-mdio";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		eth_phy0: ethernet-phy at 0 {
-+			reg = <0>;
-+			eee-broken-1000t;
-+		};
-+	};
- };
- 
- &ir {
--- 
-2.7.4
+Thanks in advance,
+Jisheng
