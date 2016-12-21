@@ -1,8 +1,10 @@
 From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Wed, 21 Dec 2016 18:29:42 +0800
-Subject: [PATCH v2] arm64: dts: rockchip: add u2phy clock for ehci and ohci of
- rk3399
-Message-ID: <1482316182-2305-1-git-send-email-zhengxing@rock-chips.com>
+Date: Wed, 21 Dec 2016 18:41:05 +0800
+Subject: [RESEND PATCH v2] arm64: dts: rockchip: add u2phy clock for ehci and
+ ohci of rk3399
+In-Reply-To: <1482316182-2305-1-git-send-email-zhengxing@rock-chips.com>
+References: <1482316182-2305-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1482316865-2769-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,12 +20,7 @@ some suspend process related ehci/ohci are base on this clock,
 so we should refer it into ehci/ohci driver to prevent this case.
 
 The u2phy clock flow like this:
----
-
-Changes in v2:
-- update the commit message
-- remove patches whic add and export the USBPHYx_480M_SRC clock IDs
-
+===
       u2phy ________________
            |                |    |-----> UTMI_CLK ---------> | EHCI |
 OSC_24M ---|---> PHY_PLL----|----|
@@ -31,11 +28,16 @@ OSC_24M ---|---> PHY_PLL----|----|
                     |
                     |
                    GRF
----
+===
 
 Signed-off-by: William wu <wulf@rock-chips.com>
 Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 ---
+
+Changes in v2:
+- update the commit message
+- remove patches whic add and export the USBPHYx_480M_SRC clock IDs
+
  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 28 ++++++++++++++++++++--------
  1 file changed, 20 insertions(+), 8 deletions(-)
 
