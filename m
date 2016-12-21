@@ -1,51 +1,30 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 21 Dec 2016 12:16:14 +0100
-Subject: [PATCH net-next 07/27] net: mvpp2: simplify mvpp2_bm_bufs_add()
+Date: Wed, 21 Dec 2016 12:16:16 +0100
+Subject: [PATCH net-next 09/27] net: mvpp2: fix indentation of
+ MVPP2_EXT_GLOBAL_CTRL_DEFAULT
 In-Reply-To: <1482318994-23488-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1482318994-23488-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482318994-23488-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482318994-23488-10-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvpp2_bm_bufs_add() currently creates a fake cookie by calling
-mvpp2_bm_cookie_pool_set(), just to be able to call
-mvpp2_pool_refill(). But all what mvpp2_pool_refill() does is extract
-the pool ID from the cookie, and call mvpp2_bm_pool_put() with this ID.
-
-Instead of doing this convoluted thing, just call mvpp2_bm_pool_put()
-directly, since we have the BM pool ID.
-
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 868ef4c..98edcb6 100644
+index e11eb6f..6ec1135 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -3626,7 +3626,6 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
- {
- 	struct sk_buff *skb;
- 	int i, buf_size, total_size;
--	u32 bm;
- 	dma_addr_t phys_addr;
+@@ -254,7 +254,7 @@
+ #define MVPP2_PHY_AN_CFG0_REG			0x34
+ #define     MVPP2_PHY_AN_STOP_SMI0_MASK		BIT(7)
+ #define MVPP2_MNG_EXTENDED_GLOBAL_CTRL_REG	0x305c
+-#define MVPP2_EXT_GLOBAL_CTRL_DEFAULT		0x27
++#define     MVPP2_EXT_GLOBAL_CTRL_DEFAULT	0x27
  
- 	buf_size = MVPP2_RX_BUF_SIZE(bm_pool->pkt_size);
-@@ -3640,13 +3639,12 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
- 		return 0;
- 	}
- 
--	bm = mvpp2_bm_cookie_pool_set(0, bm_pool->id);
- 	for (i = 0; i < buf_num; i++) {
- 		skb = mvpp2_skb_alloc(port, bm_pool, &phys_addr, GFP_KERNEL);
- 		if (!skb)
- 			break;
- 
--		mvpp2_pool_refill(port, bm, (u32)phys_addr, (u32)skb);
-+		mvpp2_bm_pool_put(port, bm_pool->id, (u32)phys_addr, (u32)skb);
- 	}
- 
- 	/* Update BM driver with number of buffers added to pool */
+ /* Per-port registers */
+ #define MVPP2_GMAC_CTRL_0_REG			0x0
 -- 
 2.7.4
