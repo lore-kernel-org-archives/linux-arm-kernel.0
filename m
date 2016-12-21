@@ -1,74 +1,37 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Wed, 21 Dec 2016 05:30:21 +0200
-Subject: [PATCH 1/3] dt: pwm: lpc32xx: add description of clocks and
- #pwm-cells properties
-In-Reply-To: <015305d5-c22f-52da-9605-f2c19e3108b1@mleia.com>
-References: <20161205014237.1689-1-vz@mleia.com>
- <20161205014237.1689-2-vz@mleia.com>
- <20161209214137.2hdugl5rmnwjrus4@rob-hp-laptop>
- <015305d5-c22f-52da-9605-f2c19e3108b1@mleia.com>
-Message-ID: <5a865e27-e673-2f45-6c71-ca1e7d92a346@mleia.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 20 Dec 2016 21:36:29 -0600
+Subject: [PATCH] Documentation: dt: Explicitly mark Samsung Exynos SoC
+ bindings as unstable
+In-Reply-To: <1481897676-13578-1-git-send-email-m.szyprowski@samsung.com>
+References: <1481897676-13578-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20161221033629.xny3xnwhvkgcdlv7@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2016 01:51 AM, Vladimir Zapolskiy wrote:
-> Hi Rob,
+On Fri, Dec 16, 2016 at 03:14:36PM +0100, Marek Szyprowski wrote:
+> Samsung Exynos SoCs and boards related bindings evolved since the initial
+> introduction, but initially the bindings were minimal and a bit incomplete
+> (they never described all the hardware modules available in the SoCs).
+> Since then some significant (not fully compatible) changes have been
+> already committed a few times (like gpio replaced by pinctrl, display ddc,
+> mfc reserved memory, some core clocks added to various hardware modules,
+> added more required nodes).
 > 
-> On 12/09/2016 11:41 PM, Rob Herring wrote:
->> On Mon, Dec 05, 2016 at 03:42:37AM +0200, Vladimir Zapolskiy wrote:
->>> NXP LPC32xx SoCs have two simple independent PWM controllers with a single
->>> output each, in this case there is no need to specify PWM channel argument
->>> on client side, one cell for setting PWM output frequency is sufficient.
->>>
->>> Another added to the description property 'clocks' has a standard meaning
->>> of a controller supply clock, in the LPC32xx User's Manual the clock is
->>> denoted as PWM1_CLK or PWM2_CLK clock.
->>>
->>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
->>> ---
->>>  Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt | 7 +++++++
->>>  1 file changed, 7 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
->>> index 74b5bc5..523d796 100644
->>> --- a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
->>> +++ b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
->>> @@ -3,15 +3,22 @@ LPC32XX PWM controller
->>>  Required properties:
->>>  - compatible: should be "nxp,lpc3220-pwm"
->>>  - reg: physical base address and length of the controller's registers
->>> +- clocks: clock phandle and clock specifier pair
->>> +- #pwm-cells: should be 1, the cell is used to specify the period in
->>> +  nanoseconds.
->>
->> This use of the cell is a bit odd as the period is s/w config and this 
->> would typically be a channel selection or such.
+> On the other side there are no boards which have device tree embedded in
+> the bootloader. Device tree blob is always compiled from the kernel tree
+> and updated together with the kernel image.
 > 
-> this is a classic PWM channel configuration property for PWM consumers
-> described in DT, for instance PWM frequency for display panel backlight
-> on boot.
-> 
-> I think >90% of PWM controllers with device tree bindings have this
-> argument in #pwm-cells, from bindings/pwm/pwm.txt :
-> 
->     pwm-specifier typically encodes the chip-relative PWM number and
->     the PWM period in nanoseconds.
-> 
-> You also may skim through phandle arguments of 'pwms' property,
-> commonly the second argument is the requested frequency.
-> 
-> In this particular case I just drop PWM channel number, because
-> the LPC32xx PWM controller has a single output channel.
-> 
->> What if I want user specified/changed periods?
->>
-> 
-> The preset period still can be changed over sysfs in runtime.
+> Thus to avoid further adding a bunch of workarounds for old/missing
+> bindings and allow to make cleanup of the existing code and device tree
+> files, lets mark Samsung Exynos SoC platform bindings as unstable. This
+> means that bindings can may change at any time and users should use the
+> dtb file compiled from the same kernel source tree as the kernel image.
 
-Rob, have I managed to answer your questions?
+I'd like this to be more explicit about which bindings in particular are 
+not considered stable (or which ones are). "exynos" covers lots of 
+things.
 
-If you accept my clarification, could you please ack the change?
+I'll still complain if commit messages don't say explicitly that the 
+commit breaks compatibility and why that is okay.
 
---
-With best wishes,
-Vladimir
+Rob
