@@ -1,60 +1,59 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 22 Dec 2016 02:26:03 +0800
-Subject: [arm-platforms:kvm-arm64/gicv4-wip 17/39]
- drivers/irqchip/irq-gic-v3-its.c:698:24: error: 'id' undeclared
-Message-ID: <201612220258.0UxMBzO5%fengguang.wu@intel.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 21 Dec 2016 19:32:06 +0100 (CET)
+Subject: ARM: imx: mmdc: Fix completely broken cpu hotplug code
+In-Reply-To: <alpine.DEB.2.20.1612211917490.3424@nanos>
+References: <alpine.DEB.2.20.1612211917490.3424@nanos>
+Message-ID: <alpine.DEB.2.20.1612211928430.3424@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv4-wip
-head:   1bca4673c546185e9812e8479900eca8a3ca9c33
-commit: 1136731f544e664ab2990fe615c049ead0479b6d [17/39] irqchip/gic-v3-its: Generalize LPI configuration
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 1136731f544e664ab2990fe615c049ead0479b6d
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+On Wed, 21 Dec 2016, Thomas Gleixner wrote:
+> The cpu hotplug support of this perf driver is broken in several ways:
+> 
+> 1) It adds a instance before setting up the state.
+> 
+> 2) The state for the instance is different from the state of the
+>    callback. It's just a randomly chosen state.
+> 
+> 3) The instance registration is not error checked so nobody noticed that
+>    the call can never succeed.
+> 
+> 4) The state for the multi install callbacks is chosen randomly and
+>    overwrites existing state. This is now prevented by the core code so the
+>    call is guaranteed to fail.
+> 
+> 5) The error exit path in the init function leaves the instance registered
+>    and then frees the memory which contains the enqueued hlist node.
+> 
+> 6) The remove function is removing the state and not the instance.
+> 
+> Fix it by:
+> 
+> - Setting up the state before adding instances. Use a dynamically allocated
+>   state for it.
+> 
+> - Install instances after the state has been set up
+> 
+> - Remove the instance in the error path before freeing memory
+> 
+> - Remove instance not the state in the driver remove callback
+> 
+> While at is use raw_cpu_processor_id(), because cpu_processor_id() cannot
+> be used in preemptible context, and set the driver data after successful
+> registration of the pmu.
+> 
+> Fixes: e76bdfd7403a ("ARM: imx: Added perf functionality to mmdc driver")
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Zhengyu Shen <zhengyu.shen@nxp.com>
+> Cc: Frank Li <frank.li@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
 
-Note: the arm-platforms/kvm-arm64/gicv4-wip HEAD 1bca4673c546185e9812e8479900eca8a3ca9c33 builds fine.
-      It only hurts bisectibility.
+Shawn,
 
-All errors (new ones prefixed by >>):
+as I have the final hotplug notifier removal pending here, which will break
+also the compilation of this driver, I would prefer to merge that through
+my tree before the removal patches to avoid build breakage.
 
-   drivers/irqchip/irq-gic-v3-its.c: In function 'lpi_update_config':
->> drivers/irqchip/irq-gic-v3-its.c:698:24: error: 'id' undeclared (first use in this function)
-     its_send_inv(its_dev, id);
-                           ^~
-   drivers/irqchip/irq-gic-v3-its.c:698:24: note: each undeclared identifier is reported only once for each function it appears in
+Thanks,
 
-vim +/id +698 drivers/irqchip/irq-gic-v3-its.c
-
-c48ed51c Marc Zyngier 2014-11-24  692  	 * Humpf...
-c48ed51c Marc Zyngier 2014-11-24  693  	 */
-c48ed51c Marc Zyngier 2014-11-24  694  	if (gic_rdists->flags & RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING)
-c48ed51c Marc Zyngier 2014-11-24  695  		__flush_dcache_area(cfg, sizeof(*cfg));
-c48ed51c Marc Zyngier 2014-11-24  696  	else
-c48ed51c Marc Zyngier 2014-11-24  697  		dsb(ishst);
-c48ed51c Marc Zyngier 2014-11-24 @698  	its_send_inv(its_dev, id);
-c48ed51c Marc Zyngier 2014-11-24  699  }
-c48ed51c Marc Zyngier 2014-11-24  700  
-c48ed51c Marc Zyngier 2014-11-24  701  static void its_mask_irq(struct irq_data *d)
-
-:::::: The code at line 698 was first introduced by commit
-:::::: c48ed51c0d101ec4351530bdd6e1a01808f0a441 irqchip: GICv3: ITS: irqchip implementation
-
-:::::: TO: Marc Zyngier <marc.zyngier@arm.com>
-:::::: CC: Jason Cooper <jason@lakedaemon.net>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 31902 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161222/15f88814/attachment-0001.gz>
+	tglx
