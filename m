@@ -1,79 +1,32 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Wed, 21 Dec 2016 20:41:03 +0100
-Subject: [PATCH 2/2] mfd: mc13xxx: Pass the IRQF_TRIGGER_HIGH flag.
-In-Reply-To: <1482300049.831956101@f373.i.mail.ru>
-References: <1482182934-18559-1-git-send-email-lilja.magnus@gmail.com>
- <1482211233.10253607@f408.i.mail.ru>
- <CAM=E1R5=k5NXurdV=6TzE9bPH5M3zyFpUjuJpGd9ECKrdjaj7w@mail.gmail.com>
- <1482300049.831956101@f373.i.mail.ru>
-Message-ID: <CAM=E1R7mBa7PSyshR+VwbeCqqDytkTknNksWQmf3Yk2r0_nHZw@mail.gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 21 Dec 2016 03:49:35 -0800
+Subject: [PATCH 1/5] ARM: dts: qcom: apq8064: Add missing scm clock
+Message-ID: <20161221114939.19973-1-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+As per the device tree binding the apq8064 scm node requires the core
+clock to be specified, so add this.
 
-On 21 December 2016 at 07:00, Alexander Shiyan <shc_work@mail.ru> wrote:
->>???????, 20 ??????? 2016, 22:35 +03:00 ?? Magnus Lilja <lilja.magnus@gmail.com>:
->>
->>On 20 December 2016 at 06:20, Alexander Shiyan < shc_work@mail.ru > wrote:
->>>>???????, 20 ??????? 2016, 0:28 +03:00 ?? Magnus Lilja < lilja.magnus@gmail.com >:
->>>>
->>>>All supported mc13xxx devices have active high interrupt outputs. Make sure
->>>>to configure the interrupt as active high by passing the IRQF_TRIGGER_HIGH
->>>>flag. This is required at least on the i.MX31 PDK board.
->>>>
->>>>Signed-off-by: Magnus Lilja <  lilja.magnus@gmail.com >
->>>>---
->>>>
->>>> drivers/mfd/mc13xxx-core.c | 2 +-
->>>> 1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>>diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
->>>>index d7f54e4..4cbe6b7 100644
->>>>--- a/drivers/mfd/mc13xxx-core.c
->>>>+++ b/drivers/mfd/mc13xxx-core.c
->>>>@@ -440,7 +440,7 @@ int mc13xxx_common_init(struct device *dev)
->>>> mc13xxx->irq_chip.irqs = mc13xxx->irqs;
->>>> mc13xxx->irq_chip.num_irqs = ARRAY_SIZE(mc13xxx->irqs);
->>>>
->>>>-ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq, IRQF_ONESHOT,
->>>>+ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq, IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
->>>>   0, &mc13xxx->irq_chip, &mc13xxx->irq_data);
->>>> if (ret)
->>>> return ret;
->>>
->>> IRQ line can be passed through inverter to IC.
->>> On my opinion the best way to handle all possible situations is parse
->>> devicetree IRQ flags and pass to the driver.
->>
->>My guess is that most boards follow the evaluation boards/kits and
->>don't have an inverter so I think the default should be TRIG_HIGH
->>since that will make most boards work automatically. But I can have a
->>look at making it configurable (with and without the use of device
->>tree), but for the device tree stuff I would need pointers to similar
->>code since my experience with that is none.
->>Any pointers to similar code?
->
-> Hello.
->
-> Perhaps I'm wrong and the desired active level has setup at the IRQ code level.
+Cc: John Stultz <john.stultz@linaro.org>
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+ arch/arm/boot/dts/qcom-apq8064.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Don't think I understand what you mean here.
-
-> Otherwise, I think you need to use something like the following:
->
-> unsigned flags = irqd_get_trigger_type(irq_get_irq_data(irq));
-> flags = (flags == IRQ_TYPE_NONE) ? IRQF_TRIGGER_HIGH : flags;
-> ret = regmap_add_irq_chip(..., IRQF_ONESHOT | flags, ...);
-
-That would work but I don't know how one would set the trigger type in
-case of not using device trees. But that would only be a problem if a
-board really has an inverter on the IRQ line so that can be solved
-later, and might be not necessary to solve if mx31 boards are
-converted to device tree usage.
-
-I guess that get trigger_type can be set via the device tree magic
-when using device trees.
-
-
-Regards, Magnus
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index 268bd470c865..78bf155a52f3 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -303,6 +303,9 @@
+ 	firmware {
+ 		scm {
+ 			compatible = "qcom,scm-apq8064";
++
++			clocks = <&gcc CE3_CORE_CLK>;
++			clock-names = "core";
+ 		};
+ 	};
+ 
+-- 
+2.11.0
