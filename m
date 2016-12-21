@@ -1,154 +1,215 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 21 Dec 2016 12:16:32 +0100
-Subject: [PATCH net-next 25/27] net: mvpp2: adapt rxq distribution to PPv2.2
+Date: Wed, 21 Dec 2016 12:16:23 +0100
+Subject: [PATCH net-next 16/27] net: mvpp2: introduce PPv2.2 HW descriptors
+ and adapt accessors
 In-Reply-To: <1482318994-23488-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1482318994-23488-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482318994-23488-26-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482318994-23488-17-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In PPv2.1, we have a maximum of 8 RXQs per port, with a default of 4
-RXQs per port, and we were assigning RXQs 0->3 to the first port, 4->7
-to the second port, 8->11 to the third port, etc.
-
-In PPv2.2, we have a maximum of 32 RXQs per port, and we must allocate
-RXQs from the range of 32 RXQs available for each port. So port 0 must
-use RXQs in the range 0->31, port 1 in the range 32->63, etc.
-
-This commit adapts the mvpp2 to this difference between PPv2.1 and
-PPv2.2:
-
- - The constant definition MVPP2_MAX_RXQ is replaced by a new field
-   'max_port_rxqs' in 'struct mvpp2', which stores the maximum number of
-   RXQs per port. This field is initialized during ->probe() depending
-   on the IP version.
-
- - MVPP2_RXQ_TOTAL_NUM is removed, and instead we calculate the total
-   number of RXQs by multiplying the number of ports by the maximum of
-   RXQs per port. This was anyway used in only one place.
-
- - In mvpp2_port_probe(), the calculation of port->first_rxq is adjusted
-   to cope with the different allocation strategy between PPv2.1 and
-   PPv2.2. Due to this change, the 'next_first_rxq' argument of this
-   function is no longer needed and is removed.
+This commit adds the definition of the PPv2.2 HW descriptors, adjusts
+the mvpp2_tx_desc and mvpp2_rx_desc structures accordingly, and adapts
+the accessors to work on both PPv2.1 and PPv2.2.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 35 +++++++++++++++++++----------------
- 1 file changed, 19 insertions(+), 16 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 109 +++++++++++++++++++++++++++++++----
+ 1 file changed, 98 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index d061a1a..c389590 100644
+index 1086b36..41d7bed 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -399,15 +399,9 @@
- /* Maximum number of TXQs used by single port */
- #define MVPP2_MAX_TXQ			8
- 
--/* Maximum number of RXQs used by single port */
--#define MVPP2_MAX_RXQ			8
--
- /* Dfault number of RXQs in use */
- #define MVPP2_DEFAULT_RXQ		4
- 
--/* Total number of RXQs available to all ports */
--#define MVPP2_RXQ_TOTAL_NUM		(MVPP2_MAX_PORTS * MVPP2_MAX_RXQ)
--
- /* Max number of Rx descriptors */
- #define MVPP2_MAX_RXD			128
- 
-@@ -728,6 +722,9 @@ struct mvpp2 {
- 
- 	/* HW IP Version */
- 	enum { MVPP21, MVPP22 } ip_version;
-+
-+	/* Maximum number of RXQs per port */
-+	unsigned int max_port_rxqs;
+@@ -773,18 +773,42 @@ struct mvpp21_rx_desc {
+ 	u32 reserved8;
  };
  
- struct mvpp2_pcpu_stats {
-@@ -6355,7 +6352,8 @@ static int mvpp2_port_init(struct mvpp2_port *port)
- 	struct mvpp2_txq_pcpu *txq_pcpu;
- 	int queue, cpu, err;
++/* HW TX descriptor for PPv2.2 */
++struct mvpp22_tx_desc {
++	u32 command;
++	u8  packet_offset;
++	u8  phys_txq;
++	u16 data_size;
++	u64 reserved1;
++	u64 buf_phys_addr_ptp;
++	u64 buf_cookie_misc;
++};
++
++/* HW RX descriptor for PPv2.2 */
++struct mvpp22_rx_desc {
++	u32 status;
++	u16 reserved1;
++	u16 data_size;
++	u32 reserved2;
++	u32 reserved3;
++	u64 buf_phys_addr_key_hash;
++	u64 buf_cookie_misc;
++};
++
+ /* Opaque type used by the driver to manipulate the HW TX and RX
+  * descriptors
+  */
+ struct mvpp2_tx_desc {
+ 	union {
+ 		struct mvpp21_tx_desc pp21;
++		struct mvpp22_tx_desc pp22;
+ 	};
+ };
  
--	if (port->first_rxq + rxq_number > MVPP2_RXQ_TOTAL_NUM)
-+	if (port->first_rxq + rxq_number >
-+	    MVPP2_MAX_PORTS * priv->max_port_rxqs)
- 		return -EINVAL;
+ struct mvpp2_rx_desc {
+ 	union {
+ 		struct mvpp21_rx_desc pp21;
++		struct mvpp22_rx_desc pp22;
+ 	};
+ };
  
- 	/* Disable port */
-@@ -6474,8 +6472,7 @@ static int mvpp2_port_init(struct mvpp2_port *port)
- /* Ports initialization */
- static int mvpp2_port_probe(struct platform_device *pdev,
- 			    struct device_node *port_node,
--			    struct mvpp2 *priv,
--			    int *next_first_rxq)
-+			    struct mvpp2 *priv)
+@@ -991,72 +1015,135 @@ static u32 mvpp2_read(struct mvpp2 *priv, u32 offset)
+ static dma_addr_t mvpp2_txdesc_phys_addr_get(struct mvpp2_port *port,
+ 					     struct mvpp2_tx_desc *tx_desc)
  {
- 	struct device_node *phy_node;
- 	struct mvpp2_port *port;
-@@ -6533,7 +6530,11 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 
- 	port->priv = priv;
- 	port->id = id;
--	port->first_rxq = *next_first_rxq;
-+	if (priv->ip_version == MVPP21)
-+		port->first_rxq = port->id * rxq_number;
+-	return tx_desc->pp21.buf_phys_addr;
++	if (port->priv->ip_version == MVPP21)
++		return tx_desc->pp21.buf_phys_addr;
 +	else
-+		port->first_rxq = port->id * priv->max_port_rxqs;
++		return tx_desc->pp22.buf_phys_addr_ptp & DMA_BIT_MASK(40);
+ }
+ 
+ static void mvpp2_txdesc_phys_addr_set(struct mvpp2_port *port,
+ 				       struct mvpp2_tx_desc *tx_desc,
+ 				       dma_addr_t phys_addr)
+ {
+-	tx_desc->pp21.buf_phys_addr = phys_addr;
++	if (port->priv->ip_version == MVPP21) {
++		tx_desc->pp21.buf_phys_addr = phys_addr;
++	} else {
++		u64 val = (u64)phys_addr;
 +
- 	port->phy_node = phy_node;
- 	port->phy_interface = phy_mode;
++		tx_desc->pp22.buf_phys_addr_ptp &= ~DMA_BIT_MASK(40);
++		tx_desc->pp22.buf_phys_addr_ptp |= val;
++	}
+ }
  
-@@ -6625,8 +6626,6 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 	}
- 	netdev_info(dev, "Using %s mac address %pM\n", mac_from, dev->dev_addr);
- 
--	/* Increment the first Rx queue number to be used by the next port */
--	*next_first_rxq += rxq_number;
- 	priv->port_list[id] = port;
- 	return 0;
- 
-@@ -6772,7 +6771,7 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
- 	u32 val;
- 
- 	/* Checks for hardware constraints */
--	if (rxq_number % 4 || (rxq_number > MVPP2_MAX_RXQ) ||
-+	if (rxq_number % 4 || (rxq_number > priv->max_port_rxqs) ||
- 	    (txq_number > MVPP2_MAX_TXQ)) {
- 		dev_err(&pdev->dev, "invalid queue size parameter\n");
- 		return -EINVAL;
-@@ -6861,7 +6860,7 @@ static int mvpp2_probe(struct platform_device *pdev)
- 	struct device_node *port_node;
- 	struct mvpp2 *priv;
- 	struct resource *res;
--	int port_count, first_rxq, cpu;
-+	int port_count, cpu;
- 	int err;
- 
- 	priv = devm_kzalloc(&pdev->dev, sizeof(struct mvpp2), GFP_KERNEL);
-@@ -6896,6 +6895,11 @@ static int mvpp2_probe(struct platform_device *pdev)
- 		priv->cpu_base[cpu] = priv->base + cpu * addr_space_sz;
- 	}
- 
-+	if (priv->ip_version == MVPP21)
-+		priv->max_port_rxqs = 8;
+ static size_t mvpp2_txdesc_size_get(struct mvpp2_port *port,
+ 				    struct mvpp2_tx_desc *tx_desc)
+ {
+-	return tx_desc->pp21.data_size;
++	if (port->priv->ip_version == MVPP21)
++		return tx_desc->pp21.data_size;
 +	else
-+		priv->max_port_rxqs = 32;
-+
- 	priv->pp_clk = devm_clk_get(&pdev->dev, "pp_clk");
- 	if (IS_ERR(priv->pp_clk))
- 		return PTR_ERR(priv->pp_clk);
-@@ -6938,9 +6942,8 @@ static int mvpp2_probe(struct platform_device *pdev)
- 	}
++		return tx_desc->pp22.data_size;
+ }
  
- 	/* Initialize ports */
--	first_rxq = 0;
- 	for_each_available_child_of_node(dn, port_node) {
--		err = mvpp2_port_probe(pdev, port_node, priv, &first_rxq);
-+		err = mvpp2_port_probe(pdev, port_node, priv);
- 		if (err < 0)
- 			goto err_gop_clk;
- 	}
+ static void mvpp2_txdesc_size_set(struct mvpp2_port *port,
+ 				  struct mvpp2_tx_desc *tx_desc,
+ 				  size_t size)
+ {
+-	tx_desc->pp21.data_size = size;
++	if (port->priv->ip_version == MVPP21)
++		tx_desc->pp21.data_size = size;
++	else
++		tx_desc->pp22.data_size = size;
+ }
+ 
+ static void mvpp2_txdesc_txq_set(struct mvpp2_port *port,
+ 				 struct mvpp2_tx_desc *tx_desc,
+ 				 unsigned int txq)
+ {
+-	tx_desc->pp21.phys_txq = txq;
++	if (port->priv->ip_version == MVPP21)
++		tx_desc->pp21.phys_txq = txq;
++	else
++		tx_desc->pp22.phys_txq = txq;
+ }
+ 
+ static void mvpp2_txdesc_cmd_set(struct mvpp2_port *port,
+ 				 struct mvpp2_tx_desc *tx_desc,
+ 				 unsigned int command)
+ {
+-	tx_desc->pp21.command = command;
++	if (port->priv->ip_version == MVPP21)
++		tx_desc->pp21.command = command;
++	else
++		tx_desc->pp22.command = command;
+ }
+ 
+ static void mvpp2_txdesc_offset_set(struct mvpp2_port *port,
+ 				    struct mvpp2_tx_desc *tx_desc,
+ 				    unsigned int offset)
+ {
+-	tx_desc->pp21.packet_offset = offset;
++	if (port->priv->ip_version == MVPP21)
++		tx_desc->pp21.packet_offset = offset;
++	else
++		tx_desc->pp22.packet_offset = offset;
+ }
+ 
+ static dma_addr_t mvpp2_rxdesc_phys_addr_get(struct mvpp2_port *port,
+ 					     struct mvpp2_rx_desc *rx_desc)
+ {
+-	return rx_desc->pp21.buf_phys_addr;
++	if (port->priv->ip_version == MVPP21)
++		return rx_desc->pp21.buf_phys_addr;
++	else
++		return rx_desc->pp22.buf_phys_addr_key_hash & DMA_BIT_MASK(40);
+ }
+ 
+ static unsigned long mvpp2_rxdesc_virt_addr_get(struct mvpp2_port *port,
+ 						struct mvpp2_rx_desc *rx_desc)
+ {
+-	return rx_desc->pp21.buf_cookie;
++	/* PPv2.1 can only be used on 32 bits architectures, and there
++	 * are 32 bits in buf_cookie which are enough to store the
++	 * full virtual address, so things are easy.
++	 */
++	if (port->priv->ip_version == MVPP21) {
++		return rx_desc->pp21.buf_cookie;
++	} else {
++		/* On PPv2.2, the situation is more complicated,
++		 * because there is only 40 bits to store the virtual
++		 * address, which is not sufficient. So on 64 bits
++		 * systems, we use phys_to_virt() to get the virtual
++		 * address from the physical address, which is fine
++		 * because the kernel linear mapping includes the
++		 * entire 40 bits physical address space. On 32 bits
++		 * systems however, we can't use phys_to_virt(), but
++		 * since virtual addresses are 32 bits only, there is
++		 * enough space in the RX descriptor for the full
++		 * virtual address.
++		 */
++#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
++		dma_addr_t dma_addr =
++			rx_desc->pp22.buf_phys_addr_key_hash & DMA_BIT_MASK(40);
++		phys_addr_t phys_addr =
++			dma_to_phys(port->dev->dev.parent, dma_addr);
++
++		return (unsigned long)phys_to_virt(phys_addr);
++#else
++		return rx_desc->pp22.buf_cookie_misc & DMA_BIT_MASK(40);
++#endif
++	}
+ }
+ 
+ static size_t mvpp2_rxdesc_size_get(struct mvpp2_port *port,
+ 				    struct mvpp2_rx_desc *rx_desc)
+ {
+-	return rx_desc->pp21.data_size;
++	if (port->priv->ip_version == MVPP21)
++		return rx_desc->pp21.data_size;
++	else
++		return rx_desc->pp22.data_size;
+ }
+ 
+ static u32 mvpp2_rxdesc_status_get(struct mvpp2_port *port,
+ 				   struct mvpp2_rx_desc *rx_desc)
+ {
+-	return rx_desc->pp21.status;
++	if (port->priv->ip_version == MVPP21)
++		return rx_desc->pp21.status;
++	else
++		return rx_desc->pp22.status;
+ }
+ 
+ static void mvpp2_txq_inc_get(struct mvpp2_txq_pcpu *txq_pcpu)
 -- 
 2.7.4
