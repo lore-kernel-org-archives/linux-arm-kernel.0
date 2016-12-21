@@ -1,37 +1,50 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 20 Dec 2016 21:36:29 -0600
-Subject: [PATCH] Documentation: dt: Explicitly mark Samsung Exynos SoC
- bindings as unstable
-In-Reply-To: <1481897676-13578-1-git-send-email-m.szyprowski@samsung.com>
-References: <1481897676-13578-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20161221033629.xny3xnwhvkgcdlv7@rob-hp-laptop>
+From: nwatters@codeaurora.org (Nate Watterson)
+Date: Tue, 20 Dec 2016 23:11:48 -0500
+Subject: [PATCH] iommu/arm-smmu-v3: Clear prior settings when updating STEs
+In-Reply-To: <20161220095340.GB10132@arm.com>
+References: <20161220095340.GB10132@arm.com>
+Message-ID: <1482293508-21621-1-git-send-email-nwatters@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 16, 2016 at 03:14:36PM +0100, Marek Szyprowski wrote:
-> Samsung Exynos SoCs and boards related bindings evolved since the initial
-> introduction, but initially the bindings were minimal and a bit incomplete
-> (they never described all the hardware modules available in the SoCs).
-> Since then some significant (not fully compatible) changes have been
-> already committed a few times (like gpio replaced by pinctrl, display ddc,
-> mfc reserved memory, some core clocks added to various hardware modules,
-> added more required nodes).
-> 
-> On the other side there are no boards which have device tree embedded in
-> the bootloader. Device tree blob is always compiled from the kernel tree
-> and updated together with the kernel image.
-> 
-> Thus to avoid further adding a bunch of workarounds for old/missing
-> bindings and allow to make cleanup of the existing code and device tree
-> files, lets mark Samsung Exynos SoC platform bindings as unstable. This
-> means that bindings can may change at any time and users should use the
-> dtb file compiled from the same kernel source tree as the kernel image.
+To prevent corruption of the stage-1 context pointer field when
+updating STEs, rebuild the entire containing dword instead of
+clearing individual fields.
 
-I'd like this to be more explicit about which bindings in particular are 
-not considered stable (or which ones are). "exynos" covers lots of 
-things.
+Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
+---
+ drivers/iommu/arm-smmu-v3.c | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-I'll still complain if commit messages don't say explicitly that the 
-commit breaks compatibility and why that is okay.
-
-Rob
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 4d6ec44..94f305d 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1042,13 +1042,8 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+ 		}
+ 	}
+ 
+-	/* Nuke the existing Config, as we're going to rewrite it */
+-	val &= ~(STRTAB_STE_0_CFG_MASK << STRTAB_STE_0_CFG_SHIFT);
+-
+-	if (ste->valid)
+-		val |= STRTAB_STE_0_V;
+-	else
+-		val &= ~STRTAB_STE_0_V;
++	/* Nuke the existing STE_0 value, as we're going to rewrite it */
++	val = ste->valid ? STRTAB_STE_0_V : 0;
+ 
+ 	if (ste->bypass) {
+ 		val |= disable_bypass ? STRTAB_STE_0_CFG_ABORT
+@@ -1083,7 +1078,6 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+ 		val |= (ste->s1_cfg->cdptr_dma & STRTAB_STE_0_S1CTXPTR_MASK
+ 		        << STRTAB_STE_0_S1CTXPTR_SHIFT) |
+ 			STRTAB_STE_0_CFG_S1_TRANS;
+-
+ 	}
+ 
+ 	if (ste->s2_cfg) {
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux
+Foundation Collaborative Project.
