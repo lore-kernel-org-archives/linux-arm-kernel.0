@@ -1,20 +1,79 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Tue, 20 Dec 2016 17:01:14 -0800
-Subject: [PATCH 1/2] soc: ti: knav_dma: fix typos in trace message
-In-Reply-To: <1482272663-29829-1-git-send-email-m-karicheri2@ti.com>
-References: <1482272663-29829-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <06b11675-e66f-2a0f-134a-29ab789f7d99@oracle.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Wed, 21 Dec 2016 05:27:16 +0200
+Subject: [PATCH 3/4] video: ARM CLCD: use panel device node for getting
+ backlight and mode
+In-Reply-To: <20161221032717.13154-1-vz@mleia.com>
+References: <20161221032717.13154-1-vz@mleia.com>
+Message-ID: <20161221032717.13154-4-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/2016 2:24 PM, Murali Karicheri wrote:
-> This patch fixes some typos in the trace message
->
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
-Patch 1 and 2 looks fine. Will pick them for next
-merge window. Thanks !!
+Having obtained panel device node in clcdfb_of_init_display() it allows to
+generalize and simplify two more helper functions clcdfb_of_get_backlight()
+and clcdfb_of_get_mode().
 
-Regards,
-Santosh
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+---
+ drivers/video/fbdev/amba-clcd.c | 20 +++++---------------
+ 1 file changed, 5 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
+index f25b5fc..0fab92c 100644
+--- a/drivers/video/fbdev/amba-clcd.c
++++ b/drivers/video/fbdev/amba-clcd.c
+@@ -624,16 +624,11 @@ static int clcdfb_snprintf_mode(char *buf, int size, struct fb_videomode *mode)
+ 			mode->refresh);
+ }
+ 
+-static int clcdfb_of_get_backlight(struct device_node *endpoint,
++static int clcdfb_of_get_backlight(struct device_node *panel,
+ 				   struct clcd_panel *clcd_panel)
+ {
+-	struct device_node *panel;
+ 	struct device_node *backlight;
+ 
+-	panel = of_graph_get_remote_port_parent(endpoint);
+-	if (!panel)
+-		return -ENODEV;
+-
+ 	/* Look up the optional backlight phandle */
+ 	backlight = of_parse_phandle(panel, "backlight", 0);
+ 	if (backlight) {
+@@ -646,19 +641,14 @@ static int clcdfb_of_get_backlight(struct device_node *endpoint,
+ 	return 0;
+ }
+ 
+-static int clcdfb_of_get_mode(struct device *dev, struct device_node *endpoint,
+-		struct clcd_panel *clcd_panel)
++static int clcdfb_of_get_mode(struct device *dev, struct device_node *panel,
++			      struct clcd_panel *clcd_panel)
+ {
+ 	int err;
+-	struct device_node *panel;
+ 	struct fb_videomode *mode;
+ 	char *name;
+ 	int len;
+ 
+-	panel = of_graph_get_remote_port_parent(endpoint);
+-	if (!panel)
+-		return -ENODEV;
+-
+ 	/* Only directly connected DPI panels supported for now */
+ 	if (of_device_is_compatible(panel, "panel-dpi"))
+ 		err = clcdfb_of_get_dpi_panel_mode(panel, clcd_panel);
+@@ -791,11 +781,11 @@ static int clcdfb_of_init_display(struct clcd_fb *fb)
+ 			return err;
+ 	}
+ 
+-	err = clcdfb_of_get_backlight(endpoint, fb->panel);
++	err = clcdfb_of_get_backlight(panel, fb->panel);
+ 	if (err)
+ 		return err;
+ 
+-	err = clcdfb_of_get_mode(&fb->dev->dev, endpoint, fb->panel);
++	err = clcdfb_of_get_mode(&fb->dev->dev, panel, fb->panel);
+ 	if (err)
+ 		return err;
+ 
+-- 
+2.10.2
