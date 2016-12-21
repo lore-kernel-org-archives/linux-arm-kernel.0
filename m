@@ -1,12 +1,12 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 21 Dec 2016 16:29:37 +0900
-Subject: [PATCH 3/3] phy: rockchip-inno-usb2: Set EXTCON_USB when
- EXTCON_CHG_USB_SDP was set
-In-Reply-To: <767c3dfccde4807e3645951d4aeebca0ab5cc5e4.1482300213.git.baolin.wang@linaro.org>
+Date: Wed, 21 Dec 2016 16:22:35 +0900
+Subject: [PATCH 2/3] extcon: axp288: Set EXTCON_USB when EXTCON_CHG_USB_SDP
+ was set
+In-Reply-To: <11fb7adc2982a9134faee9abb1de4dcfb253f2d2.1482300213.git.baolin.wang@linaro.org>
 References: <7b9836ce2ca34118a2acd1ea113605a5f13b4439.1482300213.git.baolin.wang@linaro.org>
- <CGME20161221061515epcas3p457a1cc4c0961f75d82118e7327af21f6@epcas3p4.samsung.com>
- <767c3dfccde4807e3645951d4aeebca0ab5cc5e4.1482300213.git.baolin.wang@linaro.org>
-Message-ID: <585A2F61.20403@samsung.com>
+ <CGME20161221061312epcas5p182c45848e940dc20134ac55091dd8341@epcas5p1.samsung.com>
+ <11fb7adc2982a9134faee9abb1de4dcfb253f2d2.1482300213.git.baolin.wang@linaro.org>
+Message-ID: <585A2DBB.8070504@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,40 +18,88 @@ On 2016? 12? 21? 15:10, Baolin Wang wrote:
 > 
 > Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
 > ---
->  drivers/phy/phy-rockchip-inno-usb2.c |    7 ++++++-
+>  drivers/extcon/extcon-axp288.c |    7 ++++++-
 >  1 file changed, 6 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
-> index 2f99ec9..71fbe0f 100644
-> --- a/drivers/phy/phy-rockchip-inno-usb2.c
-> +++ b/drivers/phy/phy-rockchip-inno-usb2.c
-> @@ -595,9 +595,14 @@ static void rockchip_usb2phy_otg_sm_work(struct work_struct *work)
->  		if (rport->vbus_attached != vbus_attach) {
->  			rport->vbus_attached = vbus_attach;
+> diff --git a/drivers/extcon/extcon-axp288.c b/drivers/extcon/extcon-axp288.c
+> index 42f41e8..4490726 100644
+> --- a/drivers/extcon/extcon-axp288.c
+> +++ b/drivers/extcon/extcon-axp288.c
+> @@ -102,6 +102,7 @@ enum axp288_extcon_irq {
+>  };
 >  
-> -			if (notify_charger && rphy->edev)
-> +			if (notify_charger && rphy->edev) {
->  				extcon_set_cable_state_(rphy->edev,
->  							cable, vbus_attach);
-> +				if (cable == EXTCON_CHG_USB_SDP)
-> +					extcon_set_cable_state_(rphy->edev,
-> +								EXTCON_USB,
-> +								vbus_attach);
-> +			}
->  		}
->  		break;
->  	case OTG_STATE_B_PERIPHERAL:
+>  static const unsigned int axp288_extcon_cables[] = {
+> +	EXTCON_USB,
+>  	EXTCON_CHG_USB_SDP,
+>  	EXTCON_CHG_USB_CDP,
+>  	EXTCON_CHG_USB_DCP,
+> @@ -225,8 +226,12 @@ static int axp288_handle_chrg_det_event(struct axp288_extcon_info *info)
+>  			vbus_attach ? USB_EVENT_VBUS : USB_EVENT_NONE, NULL);
+>  	}
+>  
+> -	if (notify_charger)
+> +	if (notify_charger) {
+>  		extcon_set_state_sync(info->edev, cable, vbus_attach);
+> +		if (cable == EXTCON_CHG_USB_SDP)
+> +			extcon_set_state_sync(info->edev, EXTCON_USB,
+> +					      vbus_attach);
+> +	}
+>  
+>  	/* Clear the flags on disconnect event */
+>  	if (!vbus_attach)
 > 
 
-Looks good to me. But I prefer to use the 'extcon_set_state_sync' intead of extcon_set_cable_state_().
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+The extcon-axp288.c driver has some patches on extcon-next[1] branch.
+[1] https://git.kernel.org/cgit/linux/kernel/git/chanwoo/extcon.git/log/?h=extcon-next
 
-I sent the patches[1] for extcon API to alter the deprecated API.
-If you possible, I'd like you to alter the extcon API instead of deprecated API.
-[1] https://patchwork.kernel.org/patch/9453645/
-- extcon_set_cable_state_() -> extcon_set_state_sync()
-- extcon_get_cable_state_() -> extcon_get_state()
-- Use devm_extcon_register_notifier() instead of extcon_register_notifier().
+I rework your patch on extcon-next branch as following:
+If you ok, I'll merge it for v4.11.
+
+commit 1a96f92bdfab86d0b634e56092f543cad348fd0b
+Refs: extcon-next, extcon-next-for-4.10-15-g1a96f92bdfab
+Author:     Baolin Wang <baolin.wang@linaro.org>
+AuthorDate: Wed Dec 21 15:51:26 2016 +0900
+Commit:     Chanwoo Choi <cw00.choi@samsung.com>
+CommitDate: Wed Dec 21 15:52:00 2016 +0900
+
+    extcon: axp288: Set EXTCON_USB when EXTCON_CHG_USB_SDP was set
+
+    According to the documentation, we should set the EXTCON_USB when
+    one SDP charger connector was reported.
+
+    Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+    Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+ drivers/extcon/extcon-axp288.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/extcon/extcon-axp288.c b/drivers/extcon/extcon-axp288.c
+index 3e145e2a4860..f4fd03e58e37 100644
+--- a/drivers/extcon/extcon-axp288.c
++++ b/drivers/extcon/extcon-axp288.c
+@@ -96,6 +96,7 @@ enum axp288_extcon_irq {
+        EXTCON_CHG_USB_SDP,
+        EXTCON_CHG_USB_CDP,
+        EXTCON_CHG_USB_DCP,
++       EXTCON_USB,
+        EXTCON_NONE,
+ };
+
+@@ -206,8 +207,15 @@ static int axp288_handle_chrg_det_event(struct axp288_extcon_info *info)
+                                        : EXTCON_GPIO_MUX_SEL_PMIC);
+
+        extcon_set_state_sync(info->edev, info->previous_cable, false);
++       if (info->previous_cable == EXTCON_CHG_USB_SDP)
++               extcon_set_state_sync(info->edev, EXTCON_USB, false);
++
+        if (vbus_attach) {
+                extcon_set_state_sync(info->edev, cable, vbus_attach);
++               if (cable == EXTCON_CHG_USB_SDP)
++                       extcon_set_state_sync(info->edev, EXTCON_USB,
++                                               vbus_attach);
++
+                info->previous_cable = cable;
+        }
 
 -- 
 Regards,
