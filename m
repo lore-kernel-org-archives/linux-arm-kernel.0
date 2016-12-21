@@ -1,157 +1,60 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Wed, 21 Dec 2016 14:46:03 +0800
-Subject: [PATCH v19 15/15] acpi/arm64: Add SBSA Generic Watchdog support in
- GTDT driver
-In-Reply-To: <20161221064603.11830-1-fu.wei@linaro.org>
-References: <20161221064603.11830-1-fu.wei@linaro.org>
-Message-ID: <20161221064603.11830-16-fu.wei@linaro.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 21 Dec 2016 16:20:32 +0900
+Subject: [PATCH 1/3] extcon: Add documentation for EXTCON_CHG_USB_* and
+ EXTCON_USB_*
+In-Reply-To: <7b9836ce2ca34118a2acd1ea113605a5f13b4439.1482300213.git.baolin.wang@linaro.org>
+References: <CGME20161221061321epcas2p196fd90254d59164e1195840bdd546fa7@epcas2p1.samsung.com>
+ <7b9836ce2ca34118a2acd1ea113605a5f13b4439.1482300213.git.baolin.wang@linaro.org>
+Message-ID: <585A2D40.9000606@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+Hi,
 
-This driver adds support for parsing SBSA Generic Watchdog timer
-in GTDT, parse all info in SBSA Generic Watchdog Structure in GTDT,
-and creating a platform device with that information.
+On 2016? 12? 21? 15:10, Baolin Wang wrote:
+> Current there is both "EXTCON_USB" and "EXTCON_CHG_USB_SDP" which
+> both seem to suggest a standard downstream port. But there is no
+> documentation describing how these relate.
+> 
+> Thus add documentation to describe EXTCON_CHG_USB_SDP should always
+> appear together with EXTCON_USB, and EXTCON_CHG_USB_ACA would normally
+> appear with EXTCON_USB_HOST.
+> 
+> Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+> ---
+>  include/linux/extcon.h |    9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/include/linux/extcon.h b/include/linux/extcon.h
+> index b871c0c..6498b05 100644
+> --- a/include/linux/extcon.h
+> +++ b/include/linux/extcon.h
+> @@ -46,7 +46,14 @@
+>  #define EXTCON_USB		1
+>  #define EXTCON_USB_HOST		2
+>  
+> -/* Charging external connector */
+> +/*
+> + * Charging external connector
+> + *
+> + * When one SDP charger connector was reported, we should also report
+> + * the USB connector, which means EXTCON_CHG_USB_SDP should always
+> + * appear together with EXTCON_USB. The same as ACA charger connector,
+> + * EXTCON_CHG_USB_ACA should always appear with EXTCON_USB_HOST.
+> + */
 
-This allows the operating system to obtain device data from the
-resource of platform device. The platform device named "sbsa-gwdt"
-can be used by the ARM SBSA Generic Watchdog driver.
+Looks good to me.
+But, you use the different word for ACA as following:
+I think that 'would normally' is proper in descritpion.
 
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
----
- drivers/acpi/arm64/gtdt.c | 93 +++++++++++++++++++++++++++++++++++++++++++++++
- drivers/watchdog/Kconfig  |  1 +
- 2 files changed, 94 insertions(+)
+- commit msg : EXTCON_CHG_USB_ACA would normally appear with EXTCON_USB_HOST.
+- description: EXTCON_CHG_USB_ACA should always appear with EXTCON_USB_HOST.
 
-diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
-index 91ea6cb..22d3659 100644
---- a/drivers/acpi/arm64/gtdt.c
-+++ b/drivers/acpi/arm64/gtdt.c
-@@ -14,6 +14,7 @@
- #include <linux/acpi.h>
- #include <linux/init.h>
- #include <linux/kernel.h>
-+#include <linux/platform_device.h>
- 
- #include <clocksource/arm_arch_timer.h>
- 
-@@ -59,6 +60,13 @@ static inline bool is_timer_block(void *platform_timer)
- 	return gh->type == ACPI_GTDT_TYPE_TIMER_BLOCK;
- }
- 
-+static inline bool is_watchdog(void *platform_timer)
-+{
-+	struct acpi_gtdt_header *gh = platform_timer;
-+
-+	return gh->type == ACPI_GTDT_TYPE_WATCHDOG;
-+}
-+
- static int __init map_gt_gsi(u32 interrupt, u32 flags)
- {
- 	int trigger, polarity;
-@@ -279,3 +287,88 @@ int __init acpi_arch_timer_mem_init(struct arch_timer_mem *data,
- 
- 	return 0;
- }
-+
-+/*
-+ * Initialize a SBSA generic Watchdog platform device info from GTDT
-+ */
-+static int __init gtdt_import_sbsa_gwdt(struct acpi_gtdt_watchdog *wd,
-+					int index)
-+{
-+	struct platform_device *pdev;
-+	int irq = map_gt_gsi(wd->timer_interrupt, wd->timer_flags);
-+	int no_irq = 1;
-+
-+	/*
-+	 * According to SBSA specification the size of refresh and control
-+	 * frames of SBSA Generic Watchdog is SZ_4K(Offset 0x000 ? 0xFFF).
-+	 */
-+	struct resource res[] = {
-+		DEFINE_RES_MEM(wd->control_frame_address, SZ_4K),
-+		DEFINE_RES_MEM(wd->refresh_frame_address, SZ_4K),
-+		DEFINE_RES_IRQ(irq),
-+	};
-+
-+	pr_debug("found a Watchdog (0x%llx/0x%llx gsi:%u flags:0x%x).\n",
-+		 wd->refresh_frame_address, wd->control_frame_address,
-+		 wd->timer_interrupt, wd->timer_flags);
-+
-+	if (!(wd->refresh_frame_address && wd->control_frame_address)) {
-+		pr_err(FW_BUG "failed to get the Watchdog base address.\n");
-+		return -EINVAL;
-+	}
-+
-+	if (!wd->timer_interrupt)
-+		pr_warn(FW_BUG "failed to get the Watchdog interrupt.\n");
-+	else if (irq <= 0)
-+		pr_warn("failed to map the Watchdog interrupt.\n");
-+	else
-+		no_irq = 0;
-+
-+	/*
-+	 * Add a platform device named "sbsa-gwdt" to match the platform driver.
-+	 * "sbsa-gwdt": SBSA(Server Base System Architecture) Generic Watchdog
-+	 * The platform driver (like drivers/watchdog/sbsa_gwdt.c)can get device
-+	 * info below by matching this name.
-+	 */
-+	pdev = platform_device_register_simple("sbsa-gwdt", index, res,
-+					       ARRAY_SIZE(res) - no_irq);
-+	if (IS_ERR(pdev)) {
-+		acpi_unregister_gsi(wd->timer_interrupt);
-+		return PTR_ERR(pdev);
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init gtdt_sbsa_gwdt_init(void)
-+{
-+	int ret, i = 0;
-+	void *platform_timer;
-+	struct acpi_table_header *table;
-+
-+	if (acpi_disabled)
-+		return 0;
-+
-+	if (ACPI_FAILURE(acpi_get_table(ACPI_SIG_GTDT, 0, &table)))
-+		return -EINVAL;
-+
-+	ret = acpi_gtdt_init(table, NULL);
-+	if (ret)
-+		return ret;
-+
-+	for_each_platform_timer(platform_timer) {
-+		if (is_watchdog(platform_timer)) {
-+			ret = gtdt_import_sbsa_gwdt(platform_timer, i);
-+			if (ret)
-+				break;
-+			i++;
-+		}
-+	}
-+
-+	if (i)
-+		pr_info("found %d SBSA generic Watchdog(s).\n", i);
-+
-+	return ret;
-+}
-+
-+device_initcall(gtdt_sbsa_gwdt_init);
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 3eb58cb..a95c62d 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -219,6 +219,7 @@ config ARM_SBSA_WATCHDOG
- 	tristate "ARM SBSA Generic Watchdog"
- 	depends on ARM64
- 	depends on ARM_ARCH_TIMER
-+	depends on ACPI_GTDT || !ACPI
- 	select WATCHDOG_CORE
- 	help
- 	  ARM SBSA Generic Watchdog has two stage timeouts:
+>  #define EXTCON_CHG_USB_SDP	5	/* Standard Downstream Port */
+>  #define EXTCON_CHG_USB_DCP	6	/* Dedicated Charging Port */
+>  #define EXTCON_CHG_USB_CDP	7	/* Charging Downstream Port */
+> 
+
 -- 
-2.9.3
+Regards,
+Chanwoo Choi
