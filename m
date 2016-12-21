@@ -1,37 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 21 Dec 2016 23:41:59 +0100
-Subject: [PATCH 3/3] ARM: dts: sun5i: add support for Lichee Pi One board
-In-Reply-To: <20161221200235.11617-3-icenowy@aosc.xyz>
-References: <20161221200235.11617-1-icenowy@aosc.xyz>
- <20161221200235.11617-3-icenowy@aosc.xyz>
-Message-ID: <20161221224159.wnziqeanjkp63y4o@lukather>
+From: joelaf@google.com (Joel Fernandes)
+Date: Wed, 21 Dec 2016 14:44:46 -0800
+Subject: [PATCH] arm64: Don't trace __switch_to if function graph tracer is
+ enabled
+Message-ID: <1482360288-124624-1-git-send-email-joelaf@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2016 at 04:02:35AM +0800, Icenowy Zheng wrote:
-> Lichee Pi One is a low-cost Allwinner A13-based development board, with
-> an AXP209 PMU, a USB2.0 OTG port, a USB2.0 host port (or an onboard
-> RTL8723BU Wi-Fi card), optional headers for LCD and CSI, two GPIO
-> headers and two MicroSD card slots (connected to mmc0 and mmc2, both
-> bootable).
-> 
-> Add support for it.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Function graph tracer shows negative time (wrap around) when tracing
+__switch_to if the nosleep-time trace option is enabled.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Time compensation for nosleep-time is done by an ftrace probe on
+sched_switch. This doesn't work well for the following events (with
+letters representing timestamps):
+A - sched switch probe called for task T switch out
+B - __switch_to calltime is recorded
+C - sched_switch probe called for task T switch in
+D - __switch_to rettime is recorded
 
-Thanks!
-Maxime
+If C - A > D - B, then we end up over compensating for the time spent in
+__switch_to giving rise to negative times in the trace output.
 
+On x86, __switch_to is not traced if function graph tracer is enabled.
+Do the same for arm64 as well.
+
+Cc: Todd Kjos <tkjos@google.com>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Joel Fernandes <joelaf@google.com>
+---
+ arch/arm64/kernel/process.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 01753cd..e84ee27 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -324,7 +324,7 @@ void uao_thread_switch(struct task_struct *next)
+ /*
+  * Thread switching.
+  */
+-struct task_struct *__switch_to(struct task_struct *prev,
++__notrace_funcgraph struct task_struct *__switch_to(struct task_struct *prev,
+ 				struct task_struct *next)
+ {
+ 	struct task_struct *last;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161221/1e2e9f64/attachment.sig>
+2.8.0.rc3.226.g39d4020
