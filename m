@@ -1,79 +1,65 @@
 From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Wed, 21 Dec 2016 11:19:33 +0100
-Subject: [PATCH 1/3] drivers/perf: arm_pmu: Use devm_ allocators
+Date: Wed, 21 Dec 2016 11:19:34 +0100
+Subject: [PATCH 2/3] drivers/perf: arm_pmu: add arm_pmu_device_remove
 In-Reply-To: <20161221101935.17178-1-alexander.stein@systec-electronic.com>
 References: <20161221101935.17178-1-alexander.stein@systec-electronic.com>
-Message-ID: <20161221101935.17178-2-alexander.stein@systec-electronic.com>
+Message-ID: <20161221101935.17178-3-alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This eliminates several calls to kfree.
+Add ARM PMU removal function. This will be required by perf event drivers
+when option DEBUG_TEST_DRIVER_REMOVE is enabled.
 
 Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
 ---
- drivers/perf/arm_pmu.c | 14 ++++----------
- 1 file changed, 4 insertions(+), 10 deletions(-)
+ drivers/perf/arm_pmu.c       | 14 ++++++++++++++
+ include/linux/perf/arm_pmu.h |  2 ++
+ 2 files changed, 16 insertions(+)
 
 diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index b37b572..a9bbdbf 100644
+index a9bbdbf..b7ddc4c 100644
 --- a/drivers/perf/arm_pmu.c
 +++ b/drivers/perf/arm_pmu.c
-@@ -917,7 +917,8 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
- 	bool using_spi = false;
- 	struct platform_device *pdev = pmu->plat_device;
+@@ -1022,6 +1022,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 	armpmu_init(pmu);
  
--	irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
-+	irqs = devm_kcalloc(&pdev->dev, pdev->num_resources, sizeof(*irqs),
-+			    GFP_KERNEL);
- 	if (!irqs)
- 		return -ENOMEM;
+ 	pmu->plat_device = pdev;
++	platform_set_drvdata(pdev, pmu);
  
-@@ -939,7 +940,6 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
- 				pr_err("PPI/SPI IRQ type mismatch for %s!\n",
- 					dn->name);
- 				of_node_put(dn);
--				kfree(irqs);
- 				return -EINVAL;
- 			}
- 
-@@ -988,10 +988,8 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
- 			int ret;
- 
- 			ret = irq_get_percpu_devid_partition(irq, &pmu->supported_cpus);
--			if (ret) {
--				kfree(irqs);
-+			if (ret)
- 				return ret;
--			}
- 		} else {
- 			/* Otherwise default to all CPUs */
- 			cpumask_setall(&pmu->supported_cpus);
-@@ -1001,8 +999,6 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
- 	/* If we matched up the IRQ affinities, use them to route the SPIs */
- 	if (using_spi && i == pdev->num_resources)
- 		pmu->irq_affinity = irqs;
--	else
--		kfree(irqs);
- 
- 	return 0;
- }
-@@ -1017,7 +1013,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 	struct arm_pmu *pmu;
- 	int ret = -ENODEV;
- 
--	pmu = kzalloc(sizeof(struct arm_pmu), GFP_KERNEL);
-+	pmu = devm_kzalloc(&pdev->dev, sizeof(struct arm_pmu), GFP_KERNEL);
- 	if (!pmu) {
- 		pr_info("failed to allocate PMU device!\n");
- 		return -ENOMEM;
-@@ -1074,8 +1070,6 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- out_free:
- 	pr_info("%s: failed to register PMU devices!\n",
- 		of_node_full_name(node));
--	kfree(pmu->irq_affinity);
--	kfree(pmu);
+ 	if (node && (of_id = of_match_node(of_table, pdev->dev.of_node))) {
+ 		init_fn = of_id->data;
+@@ -1073,6 +1074,19 @@ int arm_pmu_device_probe(struct platform_device *pdev,
  	return ret;
  }
+ 
++int arm_pmu_device_remove(struct platform_device *pdev)
++{
++	struct arm_pmu *pmu = platform_get_drvdata(pdev);
++
++	__oprofile_cpu_pmu = NULL;
++
++	perf_pmu_unregister(&pmu->pmu);
++
++	cpu_pmu_destroy(pmu);
++
++	return 0;
++}
++
+ static int arm_pmu_hp_init(void)
+ {
+ 	int ret;
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index 8462da2..8106f27 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -159,6 +159,8 @@ struct pmu_probe_info {
+ int arm_pmu_device_probe(struct platform_device *pdev,
+ 			 const struct of_device_id *of_table,
+ 			 const struct pmu_probe_info *probe_table);
++int arm_pmu_device_remove(struct platform_device *pdev);
++
+ 
+ #define ARMV8_PMU_PDEV_NAME "armv8-pmu"
  
 -- 
 2.10.2
