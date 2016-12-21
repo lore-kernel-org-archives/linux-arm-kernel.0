@@ -1,38 +1,41 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Wed, 21 Dec 2016 22:13:58 +0100
-Subject: [PATCH] dmaengine: ipu: Make sure the interrupt routine checks all
- interrupts.
-Message-ID: <1482354838-22615-1-git-send-email-lilja.magnus@gmail.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Wed, 21 Dec 2016 16:03:42 -0600
+Subject: [PATCH] arm64: dts: msm8996: Add required memory carveouts
+Message-ID: <1482357822-20823-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 3d8cc00073d6 ("dmaengine: ipu: Consolidate duplicated irq handlers")
-consolidated the two interrupts routines into one, but the remaining
-interrupt routine only checks the status of the error interrupts, not the
-normal interrupts.
+From: Stephen Boyd <sboyd@codeaurora.org>
 
-This patch fixes that problem (tested on i.MX31 PDK board).
+This patch adds required memory carveouts so that the kernel does not
+access memory that is in use or has been reserved for use by other remote
+processors.
 
-Fixes: 3d8cc00073d6 ("dmaengine: ipu: Consolidate duplicated irq handlers")
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: <stable@vger.kernel.org> # 4.1.x
-Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
+Signed-off-by: Andy Gross <andy.gross@linaro.org>
 ---
- drivers/dma/ipu/ipu_irq.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/qcom/msm8996.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/dma/ipu/ipu_irq.c b/drivers/dma/ipu/ipu_irq.c
-index dd184b5..2846278 100644
---- a/drivers/dma/ipu/ipu_irq.c
-+++ b/drivers/dma/ipu/ipu_irq.c
-@@ -272,7 +272,7 @@ static void ipu_irq_handler(struct irq_desc *desc)
- 	u32 status;
- 	int i, line;
+diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+index cde4114..25e11dc 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+@@ -64,6 +64,16 @@
+ 			reg = <0x0 0x86000000 0x0 0x200000>;
+ 			no-map;
+ 		};
++
++		memory at 85800000 {
++			reg = <0x0 0x85800000 0x0 0x800000>;
++			no-map;
++		};
++
++		memory at 86200000 {
++			reg = <0x0 0x86200000 0x0 0x2600000>;
++			no-map;
++		};
+ 	};
  
--	for (i = IPU_IRQ_NR_FN_BANKS; i < IPU_IRQ_NR_BANKS; i++) {
-+	for (i = 0; i < IPU_IRQ_NR_BANKS; i++) {
- 		struct ipu_irq_bank *bank = irq_bank + i;
- 
- 		raw_spin_lock(&bank_lock);
+ 	cpus {
 -- 
-2.7.4
+1.9.1
