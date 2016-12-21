@@ -1,45 +1,59 @@
-From: bernhard.nortmann@web.de (Bernhard Nortmann)
-Date: Wed, 21 Dec 2016 16:11:11 +0100
-Subject: [linux-sunxi] Problems to Allwinner H3's eFUSE/SID
-In-Reply-To: <136061482160932@web34j.yandex.ru>
-References: <136061482160932@web34j.yandex.ru>
-Message-ID: <da626646-3fdf-30e1-48d3-54f225a37d20@web.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 21 Dec 2016 16:18:14 +0100
+Subject: [PATCH] ARM: dts: turris-omnia: add support for ethernet switch
+In-Reply-To: <20161221102047.28036-1-uwe@kleine-koenig.org>
+References: <20161221102047.28036-1-uwe@kleine-koenig.org>
+Message-ID: <20161221151814.GJ30952@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Side note:
+On Wed, Dec 21, 2016 at 11:20:47AM +0100, Uwe Kleine-K?nig wrote:
+> The Turris Omnia features a Marvell MV88E7176 ethernet switch. Add it to
+> the dts.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> ---
+> Hello,
+> 
+> when the MAC is operated in rgmii mode and the switch in rgmii-id
+> communication between them works fine. The other way round it doesn't work.
+> The fixed-link nodes in the cpu port description is necessary to let the
+> mv88e6xxx driver use the phy-mode description. Is this a bug?
 
-Am 19.12.2016 um 16:22 schrieb Icenowy Zheng:
-> [...]
->
-> According to some facts:
-> - The register based access to SID is weird: it needs ~5 register
->    operations per word of SID.
-> [...]
->
+It is somewhat deliberate. Normally, there is no phy at all for a cpu
+port or a dsa port. If there is no phy, it makes no sense to set the
+phy-mode. With fixed-link, there is a phy connected to the MAC, in
+terms of how the network stack sees the devices. It is a somewhat
+special phy, in fact its bandwidth is fixed, but it does support
+phy-handle, and a few other phy properties and callbacks.
 
-My experiments seem to indicate that Allwinner's implementation might be
-overly complicated. I have used an alternative approach and did not notice
-any issues so far.
+> Regarding the binding, I think the label in the port nodes is strange.
+> 
+> 	label = "lan2"
+> 
+> for an external port is fine. But
+> 
+> 	label = "cpu"
+> 
+> for a port facing a CPU MAC looks wrong, still more as the Turris Omnia has
+> two ports connected to the SoC and so there are two ports with the same
+> label.
 
-They start by reading SID_PRCTL and use bit mask operations to get in the
-key index value (PG_INDEX), then use a second write to set OP_LOCK and
-READ_START. As far as I can tell, it's sufficient to construct (and write)
-a single value from these three components. Allwinner finally clears out
-the used bits by another mask operation, simply writing zero seems to get
-that job done equally well.
+This is somewhat historical. When DSA was designed, only one CPU port
+was expected. There are in fact quite a few devices with two CPU
+ports. I have some old proof of concept patches to support this, with
+some basic load balancing. In the last few weeks, John Crispin has
+been working on them, and has duel CPU ports working for the qca8k.
+So i expect early next year we can make the Marvell chips support dual
+CPU ports as well.
 
-My implementation can be seen in
-https://github.com/n1tehawk/sunxi-tools/blob/20161220_sid-fix/uart0-helloworld-sdboot.c#L242-L256
-or as assembler code in
-https://github.com/n1tehawk/sunxi-tools/blob/20161220_sid-fix/sid_read_root.S#L43-L65
+> I would suggest to use a separate property for that, e.g.
+> 
+> 	cpu-port;
+> 
+> and no label.
 
-A corresponding PR is at 
-https://github.com/linux-sunxi/sunxi-tools/pull/91 ,
-or you may clone my branch directly
-("git clone https://github.com/n1tehawk/sunxi-tools.git -b 
-20161220_sid-fix").
+I would suggest keeping this idea for DSA v3, otherwise we end up with
+messy code for little gain.
 
-Testers would be very welcome.
-
-Regards, B. Nortmann
+      Andrew
