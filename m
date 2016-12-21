@@ -1,130 +1,79 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 22 Dec 2016 00:26:40 +0530
-Subject: [PATCH 10/18] arm64: ilp32: introduce binfmt_ilp32.c
-In-Reply-To: <20161205153801.GE14429@e104818-lin.cambridge.arm.com>
-References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
- <1477081997-4770-11-git-send-email-ynorov@caviumnetworks.com>
- <20161205153801.GE14429@e104818-lin.cambridge.arm.com>
-Message-ID: <20161221185640.GA16562@yury-N73SV>
+From: lilja.magnus@gmail.com (Magnus Lilja)
+Date: Wed, 21 Dec 2016 20:41:03 +0100
+Subject: [PATCH 2/2] mfd: mc13xxx: Pass the IRQF_TRIGGER_HIGH flag.
+In-Reply-To: <1482300049.831956101@f373.i.mail.ru>
+References: <1482182934-18559-1-git-send-email-lilja.magnus@gmail.com>
+ <1482211233.10253607@f408.i.mail.ru>
+ <CAM=E1R5=k5NXurdV=6TzE9bPH5M3zyFpUjuJpGd9ECKrdjaj7w@mail.gmail.com>
+ <1482300049.831956101@f373.i.mail.ru>
+Message-ID: <CAM=E1R7mBa7PSyshR+VwbeCqqDytkTknNksWQmf3Yk2r0_nHZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2016 at 03:38:01PM +0000, Catalin Marinas wrote:
-> On Fri, Oct 21, 2016 at 11:33:09PM +0300, Yury Norov wrote:
-> > binfmt_ilp32.c is needed to handle ILP32 binaries
-> > 
-> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> > Signed-off-by: Bamvor Zhang Jian <bamvor.zhangjian@linaro.org>
-> > ---
-> >  arch/arm64/include/asm/elf.h     |  6 +++
-> >  arch/arm64/kernel/Makefile       |  1 +
-> >  arch/arm64/kernel/binfmt_ilp32.c | 97 ++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 104 insertions(+)
-> >  create mode 100644 arch/arm64/kernel/binfmt_ilp32.c
-> > 
-> > diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> > index f259fe8..be29dde 100644
-> > --- a/arch/arm64/include/asm/elf.h
-> > +++ b/arch/arm64/include/asm/elf.h
-> > @@ -175,10 +175,16 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
-> >  
-> >  #define COMPAT_ELF_ET_DYN_BASE		(2 * TASK_SIZE_32 / 3)
-> >  
-> > +#ifndef USE_AARCH64_GREG
-> >  /* AArch32 registers. */
-> >  #define COMPAT_ELF_NGREG		18
-> >  typedef unsigned int			compat_elf_greg_t;
-> >  typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
-> > +#else /* AArch64 registers for AARCH64/ILP32 */
-> > +#define COMPAT_ELF_NGREG	ELF_NGREG
-> > +#define compat_elf_greg_t	elf_greg_t
-> > +#define compat_elf_gregset_t	elf_gregset_t
-> > +#endif
-> 
-> I think you only need compat_elf_gregset_t definition here and leave the
-> other two undefined.
+Hi,
 
-I checked everything here again, and found that almost all compat defines
-may be moved to corresponding binfmt files. If everything is OK, I'll
-incorporate next patch to the series
+On 21 December 2016 at 07:00, Alexander Shiyan <shc_work@mail.ru> wrote:
+>>???????, 20 ??????? 2016, 22:35 +03:00 ?? Magnus Lilja <lilja.magnus@gmail.com>:
+>>
+>>On 20 December 2016 at 06:20, Alexander Shiyan < shc_work@mail.ru > wrote:
+>>>>???????, 20 ??????? 2016, 0:28 +03:00 ?? Magnus Lilja < lilja.magnus@gmail.com >:
+>>>>
+>>>>All supported mc13xxx devices have active high interrupt outputs. Make sure
+>>>>to configure the interrupt as active high by passing the IRQF_TRIGGER_HIGH
+>>>>flag. This is required at least on the i.MX31 PDK board.
+>>>>
+>>>>Signed-off-by: Magnus Lilja <  lilja.magnus@gmail.com >
+>>>>---
+>>>>
+>>>> drivers/mfd/mc13xxx-core.c | 2 +-
+>>>> 1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>
+>>>>diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
+>>>>index d7f54e4..4cbe6b7 100644
+>>>>--- a/drivers/mfd/mc13xxx-core.c
+>>>>+++ b/drivers/mfd/mc13xxx-core.c
+>>>>@@ -440,7 +440,7 @@ int mc13xxx_common_init(struct device *dev)
+>>>> mc13xxx->irq_chip.irqs = mc13xxx->irqs;
+>>>> mc13xxx->irq_chip.num_irqs = ARRAY_SIZE(mc13xxx->irqs);
+>>>>
+>>>>-ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq, IRQF_ONESHOT,
+>>>>+ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq, IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
+>>>>   0, &mc13xxx->irq_chip, &mc13xxx->irq_data);
+>>>> if (ret)
+>>>> return ret;
+>>>
+>>> IRQ line can be passed through inverter to IC.
+>>> On my opinion the best way to handle all possible situations is parse
+>>> devicetree IRQ flags and pass to the driver.
+>>
+>>My guess is that most boards follow the evaluation boards/kits and
+>>don't have an inverter so I think the default should be TRIG_HIGH
+>>since that will make most boards work automatically. But I can have a
+>>look at making it configurable (with and without the use of device
+>>tree), but for the device tree stuff I would need pointers to similar
+>>code since my experience with that is none.
+>>Any pointers to similar code?
+>
+> Hello.
+>
+> Perhaps I'm wrong and the desired active level has setup at the IRQ code level.
 
-Yury
+Don't think I understand what you mean here.
 
---
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index abb75f5..76f0a5c 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -176,30 +176,10 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
- 
- #define COMPAT_ELF_ET_DYN_BASE		(2 * TASK_SIZE_32 / 3)
- 
--#ifndef USE_AARCH64_GREG
- /* AArch32 registers. */
- #define COMPAT_ELF_NGREG		18
- typedef unsigned int			compat_elf_greg_t;
- typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
--#else /* AArch64 registers for AARCH64/ILP32 */
--#define COMPAT_ELF_NGREG	ELF_NGREG
--#define compat_elf_greg_t	elf_greg_t
--#define compat_elf_gregset_t	elf_gregset_t
--#endif
--
--/* AArch32 EABI. */
--#define EF_ARM_EABI_MASK		0xff000000
--#define compat_elf_check_arch(x)	(system_supports_32bit_el0() && \
--					 ((x)->e_machine == EM_ARM) && \
--					 ((x)->e_flags & EF_ARM_EABI_MASK))
--
--#define compat_start_thread		compat_start_thread
--#define COMPAT_ARCH_DLINFO
--extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
--				      int uses_interp);
--#define compat_arch_setup_additional_pages \
--					aarch32_setup_vectors_page
--
- #endif /* CONFIG_COMPAT */
- 
- #endif /* !__ASSEMBLY__ */
-diff --git a/arch/arm64/kernel/binfmt_elf32.c b/arch/arm64/kernel/binfmt_elf32.c
-index 99a4cf2..7c38a22 100644
---- a/arch/arm64/kernel/binfmt_elf32.c
-+++ b/arch/arm64/kernel/binfmt_elf32.c
-@@ -17,16 +17,16 @@
- #define COMPAT_ELF_HWCAP		(compat_elf_hwcap)
- #define COMPAT_ELF_HWCAP2		(compat_elf_hwcap2)
- 
--#ifdef __AARCH64EB__
--#define COMPAT_ELF_PLATFORM		("v8b")
--#else
--#define COMPAT_ELF_PLATFORM		("v8l")
--#endif
--
- #define compat_arch_setup_additional_pages \
- 					aarch32_setup_vectors_page
- struct linux_binprm;
- extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
- 				      int uses_interp);
- 
-+/* AArch32 EABI. */
-+#define compat_elf_check_arch(x)	(system_supports_32bit_el0() && \
-+					 ((x)->e_machine == EM_ARM) && \
-+					 ((x)->e_flags & EF_ARM_EABI_MASK))
-+
-+
- #include "../../../fs/compat_binfmt_elf.c"
-diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
-index dd62467..ec4a412 100644
---- a/arch/arm64/kernel/binfmt_ilp32.c
-+++ b/arch/arm64/kernel/binfmt_ilp32.c
-@@ -1,7 +1,9 @@
- /*
-  * Support for ILP32 Linux/aarch64 ELF binaries.
-  */
--#define USE_AARCH64_GREG
-+
-+#undef compat_elf_gregset_t
-+#define compat_elf_gregset_t	elf_gregset_t
- 
- #include <linux/elfcore-compat.h>
- #include <linux/time.h>
+> Otherwise, I think you need to use something like the following:
+>
+> unsigned flags = irqd_get_trigger_type(irq_get_irq_data(irq));
+> flags = (flags == IRQ_TYPE_NONE) ? IRQF_TRIGGER_HIGH : flags;
+> ret = regmap_add_irq_chip(..., IRQF_ONESHOT | flags, ...);
+
+That would work but I don't know how one would set the trigger type in
+case of not using device trees. But that would only be a problem if a
+board really has an inverter on the IRQ line so that can be solved
+later, and might be not necessary to solve if mx31 boards are
+converted to device tree usage.
+
+I guess that get trigger_type can be set via the device tree magic
+when using device trees.
+
+
+Regards, Magnus
