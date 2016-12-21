@@ -1,84 +1,51 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 21 Dec 2016 12:16:07 +0100
-Subject: [PATCH net-next 00/27] net: mvpp2: add basic support for PPv2.2
-Message-ID: <1482318994-23488-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 21 Dec 2016 12:16:14 +0100
+Subject: [PATCH net-next 07/27] net: mvpp2: simplify mvpp2_bm_bufs_add()
+In-Reply-To: <1482318994-23488-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1482318994-23488-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482318994-23488-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The mvpp2_bm_bufs_add() currently creates a fake cookie by calling
+mvpp2_bm_cookie_pool_set(), just to be able to call
+mvpp2_pool_refill(). But all what mvpp2_pool_refill() does is extract
+the pool ID from the cookie, and call mvpp2_bm_pool_put() with this ID.
 
-The goal of this patch series is to add basic support for PPv2.2 in
-the existing mvpp2 driver. mvpp2 currently supported the PPv2.1
-version of the IP, used in the 32 bits Marvell Armada 375 SoC. PPv2.2
-is an evolution of this IP block, used in the 64 bits Marvell Armada
-7K/8K SoCs.
+Instead of doing this convoluted thing, just call mvpp2_bm_pool_put()
+directly, since we have the BM pool ID.
 
-In order to ease the review, the introduction of PPv2.2 support has
-been made into multiple small commits, with the final commit adding
-the compatible string that makes the PPv2.2 support actually
-usable. The series remain fully bisectable.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/mvpp2.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Here is a quick overview of the series:
-
- - Patch 1 updates the Device Tree binding documentation.
-
- - Patch 2 to 10 make improvements to the mvpp2 not directly related
-   to the PPv2.2 support, but useful to have as they cleanup some dead
-   code, fix a few issues, etc.
-
- - Patch 11 switches the driver to build_skb(), which is needed to
-   support PPv2.2 (details in the commit log itself)
-
- - Patch 12 makes the driver build on 64 bits platform.
-
- - Patches 13 to 26 add the PPv2.2 support step by step.
-
- - Patch 27 finally adds the compatible string, which makes the PPv2.2
-   support usable.
-
-I'd like to thank Stefan Chulski and Marcin Wojtas, who helped me a
-lot in the development of this patch series, by reviewing the patches,
-and giving lots of useful hints to debug the driver on PPv2.2. Thanks!
-
-Best regards,
-
-Thomas
-
-
-Thomas Petazzoni (27):
-  dt-bindings: net: update Marvell PPv2 binding for PPv2.2 support
-  net: mvpp2: handle too large value handling in
-    mvpp2_rx_pkts_coal_set()
-  net: mvpp2: handle too large value in mvpp2_rx_time_coal_set()
-  net: mvpp2: release reference to txq_cpu[] entry after unmapping
-  net: mvpp2: remove unused 'tx_skb' field of 'struct mvpp2_tx_queue'
-  net: mvpp2: drop useless fields in mvpp2_bm_pool and related code
-  net: mvpp2: simplify mvpp2_bm_bufs_add()
-  net: mvpp2: remove unused register definitions
-  net: mvpp2: fix indentation of MVPP2_EXT_GLOBAL_CTRL_DEFAULT
-  net: mvpp2: simplify MVPP2_PRS_RI_* definitions
-  net: mvpp2: switch to build_skb() in the RX path
-  net: mvpp2: enable building on 64-bit platforms
-  net: mvpp2: add and use accessors for TX/RX descriptors
-  net: mvpp2: add ip_version field in "struct mvpp2"
-  net: mvpp2: introduce an intermediate union for the TX/RX descriptors
-  net: mvpp2: introduce PPv2.2 HW descriptors and adapt accessors
-  net: mvpp2: adjust the allocation/free of BM pools for PPv2.2
-  net: mvpp2: adapt the mvpp2_rxq_*_pool_set functions to PPv2.2
-  net: mvpp2: adapt mvpp2_defaults_set() to PPv2.2
-  net: mvpp2: adjust mvpp2_{rxq,txq}_init for PPv2.2
-  net: mvpp2: handle register mapping and access for PPv2.2
-  net: mvpp2: handle misc PPv2.1/PPv2.2 differences
-  net: mvpp2: add AXI bridge initialization for PPv2.2
-  net: mvpp2: rework RXQ interrupt group initialization for PPv2.2
-  net: mvpp2: adapt rxq distribution to PPv2.2
-  net: mvpp2: add support for an additional clock needed for PPv2.2
-  net: mvpp2: finally add the PPv2.2 compatible string
-
- .../devicetree/bindings/net/marvell-pp2.txt        |  66 +-
- drivers/net/ethernet/marvell/Kconfig               |   2 +-
- drivers/net/ethernet/marvell/mvpp2.c               | 940 ++++++++++++++++-----
- 3 files changed, 789 insertions(+), 219 deletions(-)
-
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index 868ef4c..98edcb6 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -3626,7 +3626,6 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
+ {
+ 	struct sk_buff *skb;
+ 	int i, buf_size, total_size;
+-	u32 bm;
+ 	dma_addr_t phys_addr;
+ 
+ 	buf_size = MVPP2_RX_BUF_SIZE(bm_pool->pkt_size);
+@@ -3640,13 +3639,12 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
+ 		return 0;
+ 	}
+ 
+-	bm = mvpp2_bm_cookie_pool_set(0, bm_pool->id);
+ 	for (i = 0; i < buf_num; i++) {
+ 		skb = mvpp2_skb_alloc(port, bm_pool, &phys_addr, GFP_KERNEL);
+ 		if (!skb)
+ 			break;
+ 
+-		mvpp2_pool_refill(port, bm, (u32)phys_addr, (u32)skb);
++		mvpp2_bm_pool_put(port, bm_pool->id, (u32)phys_addr, (u32)skb);
+ 	}
+ 
+ 	/* Update BM driver with number of buffers added to pool */
 -- 
 2.7.4
