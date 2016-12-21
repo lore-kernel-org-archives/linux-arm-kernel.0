@@ -1,45 +1,41 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 21 Dec 2016 17:49:07 +0100
+From: uwe@kleine-koenig.org (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 21 Dec 2016 17:50:13 +0100
 Subject: [PATCH] ARM: dts: turris-omnia: add support for ethernet switch
-In-Reply-To: <20161221102047.28036-1-uwe@kleine-koenig.org>
+In-Reply-To: <20161221151814.GJ30952@lunn.ch>
 References: <20161221102047.28036-1-uwe@kleine-koenig.org>
-Message-ID: <20161221164907.GN30952@lunn.ch>
+ <20161221151814.GJ30952@lunn.ch>
+Message-ID: <20161221165012.cyvotxbjtqqkna33@perseus.defre.kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->  	/* Switch MV88E7176 at address 0x10 */
-> +	switch at 10 {
-> +		compatible = "marvell,mv88e6085";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		dsa,member = <0 0>;
-> +
-> +		reg = <0x10>;
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			ports at 0 {
-> +				reg = <0>;
-> +				label = "lan0";
-> +				phy-handle = <&lan0phy>;
+Hello Andrew,
 
-snip
+On Wed, Dec 21, 2016 at 04:18:14PM +0100, Andrew Lunn wrote:
+> On Wed, Dec 21, 2016 at 11:20:47AM +0100, Uwe Kleine-K?nig wrote:
+> > when the MAC is operated in rgmii mode and the switch in rgmii-id
+> > communication between them works fine. The other way round it doesn't work.
+> > The fixed-link nodes in the cpu port description is necessary to let the
+> > mv88e6xxx driver use the phy-mode description. Is this a bug?
+> 
+> It is somewhat deliberate. Normally, there is no phy at all for a cpu
+> port or a dsa port. If there is no phy, it makes no sense to set the
+> phy-mode. With fixed-link, there is a phy connected to the MAC, in
+> terms of how the network stack sees the devices. It is a somewhat
+> special phy, in fact its bandwidth is fixed, but it does support
+> phy-handle, and a few other phy properties and callbacks.
 
-> +		mdio {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			lan0phy: ethernet-phy at 0 {
-> +				compatible = "ethernet-phy-ieee802.3-c22";
-> +				reg = <0>;
-> +			};
+Here the switch is the phy, and in this case it is necessary to
+correctly configure it's physical properties. fixed-link is conceptual
+wrong here because (IIUC) this is for MACs only. So (maybe also for DSA
+v3 or a general phy cleanup) a standard binding to specify this which
+doesn't formalise the switch (or general: phy) as MAC.
 
-You probably don't need the phy-handle's and the whole mdio node. So
-long as there is a simple mapping, port 0 uses the phy at address 0,
-it should just work. You only need the mdio node when you want to
-support PHY interrupts, or there is an odd mapping between port and
-PHY, like the new switch chip added recently.
-
-   Andrew
+Best regards
+Uwe
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161221/2dc91dc6/attachment.sig>
