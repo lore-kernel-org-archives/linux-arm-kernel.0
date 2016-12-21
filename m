@@ -1,30 +1,159 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 21 Dec 2016 18:28:30 -0200
-Subject: [PATCH 2/2] mfd: mc13xxx: Pass the IRQF_TRIGGER_HIGH flag.
-In-Reply-To: <1bec9023-1869-2847-bea6-adebc5af0093@mleia.com>
-References: <1482182934-18559-1-git-send-email-lilja.magnus@gmail.com>
- <1482211233.10253607@f408.i.mail.ru>
- <CAM=E1R5=k5NXurdV=6TzE9bPH5M3zyFpUjuJpGd9ECKrdjaj7w@mail.gmail.com>
- <1482300049.831956101@f373.i.mail.ru>
- <CAM=E1R7mBa7PSyshR+VwbeCqqDytkTknNksWQmf3Yk2r0_nHZw@mail.gmail.com>
- <1bec9023-1869-2847-bea6-adebc5af0093@mleia.com>
-Message-ID: <CAOMZO5CifMQGu2dFAm4a5BTUrqdJS77k-n3daBR6qCqtdX_W-Q@mail.gmail.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 21 Dec 2016 12:32:54 -0800
+Subject: [PATCHv2] crypto: testmgr: Use heap buffer for acomp test input
+Message-ID: <1482352374-22750-1-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2016 at 6:24 PM, Vladimir Zapolskiy <vz@mleia.com> wrote:
 
-> Correct, I would recommend to postpone adding any extensions to the driver
-> platform data, which by the way is found in include/linux/mfd/mc13xxx.h
->
-> The extension can be added only when it becomes needed.
+Christopher Covington reported a crash on aarch64 on recent Fedora
+kernels:
 
-Yes, I agree.
+kernel BUG at ./include/linux/scatterlist.h:140!
+Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+Modules linked in:
+CPU: 2 PID: 752 Comm: cryptomgr_test Not tainted 4.9.0-11815-ge93b1cc #162
+Hardware name: linux,dummy-virt (DT)
+task: ffff80007c650080 task.stack: ffff800008910000
+PC is at sg_init_one+0xa0/0xb8
+LR is at sg_init_one+0x24/0xb8
+...
+[<ffff000008398db8>] sg_init_one+0xa0/0xb8
+[<ffff000008350a44>] test_acomp+0x10c/0x438
+[<ffff000008350e20>] alg_test_comp+0xb0/0x118
+[<ffff00000834f28c>] alg_test+0x17c/0x2f0
+[<ffff00000834c6a4>] cryptomgr_test+0x44/0x50
+[<ffff0000080dac70>] kthread+0xf8/0x128
+[<ffff000008082ec0>] ret_from_fork+0x10/0x50
 
-> FWIW I ran the v4.9-rc kernel with device trees on i.MX31 Lite board
-> with MC13783, and what I can confirm is that in my case the proposed
-> change is not needed at all. Thus I'm going to verify shortly that
-> the commit does not break the currently correct runtime behaviour on
-> my board.
+The test vectors used for input are part of the kernel image. These
+inputs are passed as a buffer to sg_init_one which eventually blows up
+with BUG_ON(!virt_addr_valid(buf)). On arm64, virt_addr_valid returns
+false for the kernel image since virt_to_page will not return the
+correct page. Fix this by copying the input vectors to heap buffer
+before setting up the scatterlist.
 
-Nice to see imx31 with dt support :-)
+Reported-by: Christopher Covington <cov@codeaurora.org>
+Fixes: d7db7a882deb ("crypto: acomp - update testmgr with support for acomp")
+Signed-off-by: Laura Abbott <labbott@redhat.com>
+---
+ crypto/testmgr.c | 30 ++++++++++++++++++++++++++++--
+ 1 file changed, 28 insertions(+), 2 deletions(-)
+
+diff --git a/crypto/testmgr.c b/crypto/testmgr.c
+index f616ad7..44e888b 100644
+--- a/crypto/testmgr.c
++++ b/crypto/testmgr.c
+@@ -1461,16 +1461,25 @@ static int test_acomp(struct crypto_acomp *tfm, struct comp_testvec *ctemplate,
+ 	for (i = 0; i < ctcount; i++) {
+ 		unsigned int dlen = COMP_BUF_SIZE;
+ 		int ilen = ctemplate[i].inlen;
++		void *input_vec;
+ 
++		input_vec = kmalloc(ilen, GFP_KERNEL);
++		if (!input_vec) {
++			ret = -ENOMEM;
++			goto out;
++		}
++
++		memcpy(input_vec, ctemplate[i].input, ilen);
+ 		memset(output, 0, dlen);
+ 		init_completion(&result.completion);
+-		sg_init_one(&src, ctemplate[i].input, ilen);
++		sg_init_one(&src, input_vec, ilen);
+ 		sg_init_one(&dst, output, dlen);
+ 
+ 		req = acomp_request_alloc(tfm);
+ 		if (!req) {
+ 			pr_err("alg: acomp: request alloc failed for %s\n",
+ 			       algo);
++			kfree(input_vec);
+ 			ret = -ENOMEM;
+ 			goto out;
+ 		}
+@@ -1483,6 +1492,7 @@ static int test_acomp(struct crypto_acomp *tfm, struct comp_testvec *ctemplate,
+ 		if (ret) {
+ 			pr_err("alg: acomp: compression failed on test %d for %s: ret=%d\n",
+ 			       i + 1, algo, -ret);
++			kfree(input_vec);
+ 			acomp_request_free(req);
+ 			goto out;
+ 		}
+@@ -1491,6 +1501,7 @@ static int test_acomp(struct crypto_acomp *tfm, struct comp_testvec *ctemplate,
+ 			pr_err("alg: acomp: Compression test %d failed for %s: output len = %d\n",
+ 			       i + 1, algo, req->dlen);
+ 			ret = -EINVAL;
++			kfree(input_vec);
+ 			acomp_request_free(req);
+ 			goto out;
+ 		}
+@@ -1500,26 +1511,37 @@ static int test_acomp(struct crypto_acomp *tfm, struct comp_testvec *ctemplate,
+ 			       i + 1, algo);
+ 			hexdump(output, req->dlen);
+ 			ret = -EINVAL;
++			kfree(input_vec);
+ 			acomp_request_free(req);
+ 			goto out;
+ 		}
+ 
++		kfree(input_vec);
+ 		acomp_request_free(req);
+ 	}
+ 
+ 	for (i = 0; i < dtcount; i++) {
+ 		unsigned int dlen = COMP_BUF_SIZE;
+ 		int ilen = dtemplate[i].inlen;
++		void *input_vec;
++
++		input_vec = kmalloc(ilen, GFP_KERNEL);
++		if (!input_vec) {
++			ret = -ENOMEM;
++			goto out;
++		}
+ 
++		memcpy(input_vec, dtemplate[i].input, ilen);
+ 		memset(output, 0, dlen);
+ 		init_completion(&result.completion);
+-		sg_init_one(&src, dtemplate[i].input, ilen);
++		sg_init_one(&src, input_vec, ilen);
+ 		sg_init_one(&dst, output, dlen);
+ 
+ 		req = acomp_request_alloc(tfm);
+ 		if (!req) {
+ 			pr_err("alg: acomp: request alloc failed for %s\n",
+ 			       algo);
++			kfree(input_vec);
+ 			ret = -ENOMEM;
+ 			goto out;
+ 		}
+@@ -1532,6 +1554,7 @@ static int test_acomp(struct crypto_acomp *tfm, struct comp_testvec *ctemplate,
+ 		if (ret) {
+ 			pr_err("alg: acomp: decompression failed on test %d for %s: ret=%d\n",
+ 			       i + 1, algo, -ret);
++			kfree(input_vec);
+ 			acomp_request_free(req);
+ 			goto out;
+ 		}
+@@ -1540,6 +1563,7 @@ static int test_acomp(struct crypto_acomp *tfm, struct comp_testvec *ctemplate,
+ 			pr_err("alg: acomp: Decompression test %d failed for %s: output len = %d\n",
+ 			       i + 1, algo, req->dlen);
+ 			ret = -EINVAL;
++			kfree(input_vec);
+ 			acomp_request_free(req);
+ 			goto out;
+ 		}
+@@ -1549,10 +1573,12 @@ static int test_acomp(struct crypto_acomp *tfm, struct comp_testvec *ctemplate,
+ 			       i + 1, algo);
+ 			hexdump(output, req->dlen);
+ 			ret = -EINVAL;
++			kfree(input_vec);
+ 			acomp_request_free(req);
+ 			goto out;
+ 		}
+ 
++		kfree(input_vec);
+ 		acomp_request_free(req);
+ 	}
+ 
+-- 
+2.7.4
