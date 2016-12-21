@@ -1,105 +1,79 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Wed, 21 Dec 2016 17:21:05 +0300
-Subject: [PATCH v4 0/9] Implement clocksource for rockchip SoC using
- rockchip timer
-In-Reply-To: <1480436092-10728-1-git-send-email-al.kochet@gmail.com>
-References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
- <1480436092-10728-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <E6DD9335-0D2D-47CB-8098-5F96C2E08139@gmail.com>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Wed, 21 Dec 2016 15:45:48 +0100
+Subject: [PATCH 2/3] drivers/perf: arm_pmu: add arm_pmu_device_remove
+In-Reply-To: <20161221133854.GU3124@twins.programming.kicks-ass.net>
+References: <20161221101935.17178-1-alexander.stein@systec-electronic.com>
+ <20161221101935.17178-3-alexander.stein@systec-electronic.com>
+ <20161221133854.GU3124@twins.programming.kicks-ass.net>
+Message-ID: <1724522.5tsCXqVGvj@ws-stein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Heiko, Daniel!
+On Wednesday 21 December 2016 14:38:54, Peter Zijlstra wrote:
+> On Wed, Dec 21, 2016 at 11:19:34AM +0100, Alexander Stein wrote:
+> > Add ARM PMU removal function. This will be required by perf event drivers
+> > when option DEBUG_TEST_DRIVER_REMOVE is enabled.
+> > 
+> > Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+> > ---
+> > 
+> >  drivers/perf/arm_pmu.c       | 14 ++++++++++++++
+> >  include/linux/perf/arm_pmu.h |  2 ++
+> >  2 files changed, 16 insertions(+)
+> > 
+> > diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> > index a9bbdbf..b7ddc4c 100644
+> > --- a/drivers/perf/arm_pmu.c
+> > +++ b/drivers/perf/arm_pmu.c
+> > @@ -1022,6 +1022,7 @@ int arm_pmu_device_probe(struct platform_device
+> > *pdev,> 
+> >  	armpmu_init(pmu);
+> >  	
+> >  	pmu->plat_device = pdev;
+> > 
+> > +	platform_set_drvdata(pdev, pmu);
+> > 
+> >  	if (node && (of_id = of_match_node(of_table, pdev->dev.of_node))) {
+> >  	
+> >  		init_fn = of_id->data;
+> > 
+> > @@ -1073,6 +1074,19 @@ int arm_pmu_device_probe(struct platform_device
+> > *pdev,> 
+> >  	return ret;
+> >  
+> >  }
+> > 
+> > +int arm_pmu_device_remove(struct platform_device *pdev)
+> > +{
+> > +	struct arm_pmu *pmu = platform_get_drvdata(pdev);
+> > +
+> > +	__oprofile_cpu_pmu = NULL;
+> > +
+> > +	perf_pmu_unregister(&pmu->pmu);
+> > +
+> > +	cpu_pmu_destroy(pmu);
+> > +
+> > +	return 0;
+> > +}
+> 
+> So normally, if there are events that use this pmu, we hold a reference
+> on its module, which avoids removal from happening.
+> 
+> How is that guarantee made by DEBUG_TEST_DRIVER_REMOVE ? Or will it
+> simply kill everything even though there's active events for the PMU?
 
-Are there any reasons why the patches [1][2] are not applied yet into kernel?
-How can I help in applying patches?
+AFAICS you won't be able to hold any reference until this test remove is done. 
+This feature is implemented in really_probe(). If the driver is successfully 
+probed it will be removed and probed again.
+But reading that part of the code I stumbled over suppress_bind_attrs which 
+would prevent this procedure. After some grepping I found commit 80c6397c3 
+("clk: oxnas: make it explicitly non-modular").
+Essentially setting
+> .suppress_bind_attrs = true
+in the platform_driver.
+IMHO this seems far better than to add some remove functions only for testing 
+a non-removable driver. I'll come up with a 2nd series, patch 1/3 is still 
+valid.
 
-Regards,
-Alexander.
-
-[1] http://lists.infradead.org/pipermail/linux-rockchip/2016-November/thread.html#13236
-     [PATCH v4 0/9] Implement clocksource for rockchip SoC using rockchip timer 
-[2] http://lists.infradead.org/pipermail/linux-rockchip/2016-December/013308.html 
-
-
-> 29 ????. 2016 ?., ? 19:14, Alexander Kochetkov <al.kochet@gmail.com> ???????(?):
-> 
-> Hello,
-> 
-> This patch series contain:
-> - devicetree bindings clarification for rockchip timers
-> - dts files fixes for rk3228-evb, rk3229-evb and rk3188
-> - implementation of clocksource and sched clock for rockchip SoC
-> 
-> The clock supplying the arm-global-timer on the rk3188 is coming from the
-> the cpu clock itself and thus changes its rate everytime cpufreq adjusts
-> the cpu frequency making this timer unsuitable as a stable clocksource.
-> 
-> The rk3188, rk3288 and following socs share a separate timer block already
-> handled by the rockchip-timer driver. Therefore adapt this driver to also
-> be able to act as clocksource on rk3188.
-> 
-> In order to test clocksource you can run following commands and check
-> how much time it take in real. On rk3188 it take about ~45 seconds.
-> 
->        cpufreq-set -f 1.6GHZ
->        date; sleep 60; date
-> 
-> rk3288 (and probably anything newer) is irrelevant to this patch,
-> as it has the arch timer interface. This patch may be usefull
-> for Cortex-A9/A5 based parts.
-> 
-> Regards,
-> Alexander.
-> 
-> This is try 4. Please discard all v1, v2, v3 patches.
-> 
-> Changes in v4:
-> merged 7 and 8 from series 3
-> merged 10, 11, 12, 13 from series 3
-> fixed commit message
-> 
-> Changes in v3:
-> added patches:
-> ARM: dts: rockchip: disable arm-global-timer for rk3188
-> clocksource/drivers/rockchip_timer: Prevent ftrace recursion
-> 
-> devicetree v1 patches:
-> https://patchwork.ozlabs.org/patch/699019/
-> https://patchwork.ozlabs.org/patch/699020/
-> 
-> kernel v1 patches:
-> https://patchwork.kernel.org/patch/9443975/
-> https://patchwork.kernel.org/patch/9443971/
-> https://patchwork.kernel.org/patch/9443959/
-> https://patchwork.kernel.org/patch/9443963/
-> https://patchwork.kernel.org/patch/9443979/
-> https://patchwork.kernel.org/patch/9443989/
-> https://patchwork.kernel.org/patch/9443987/
-> https://patchwork.kernel.org/patch/9443977/
-> https://patchwork.kernel.org/patch/9443991/
-> 
-> Alexander Kochetkov (9):
->  dt-bindings: clarify compatible property for rockchip timers
->  ARM: dts: rockchip: update compatible property for rk3228 timer
->  ARM: dts: rockchip: update compatible property for rk3229 timer
->  ARM: dts: rockchip: add timer entries to rk3188 SoC
->  ARM: dts: rockchip: disable arm-global-timer for rk3188
->  clocksource/drivers/rockchip_timer: split bc_timer into rk_timer and
->    rk_clock_event_device
->  clocksource/drivers/rockchip_timer: low level routines take rk_timer
->    as parameter
->  clocksource/drivers/rockchip_timer: move TIMER_INT_UNMASK out of
->    rk_timer_enable()
->  clocksource/drivers/rockchip_timer: implement clocksource timer
-> 
-> .../bindings/timer/rockchip,rk-timer.txt           |   12 +-
-> arch/arm/boot/dts/rk3188.dtsi                      |   17 ++
-> arch/arm/boot/dts/rk3228-evb.dts                   |    4 +
-> arch/arm/boot/dts/rk3229-evb.dts                   |    4 +
-> drivers/clocksource/rockchip_timer.c               |  207 +++++++++++++++-----
-> 5 files changed, 190 insertions(+), 54 deletions(-)
-> 
-> -- 
-> 1.7.9.5
-> 
+Best regards,
+Alexander
