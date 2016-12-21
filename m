@@ -1,50 +1,73 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Wed, 21 Dec 2016 13:22:15 +0530
-Subject: [PATCH v8 1/8] soc: samsung: add exynos chipid driver support
-In-Reply-To: <CAJKOXPciOBSWFxcB-sYAXwFdyXqKzs=5duZBPjsL2gtt1Xz-cw@mail.gmail.com>
-References: <1481375323-29724-1-git-send-email-pankaj.dubey@samsung.com>
- <1481375323-29724-2-git-send-email-pankaj.dubey@samsung.com>
- <CGME20161219120000epcas1p1904dfec707de0ce20341279f354d74dc@epcas1p1.samsung.com>
- <ceba534d-108d-9ac4-d29c-c2a55af49849@fivetechno.de>
- <9b64f5c0-e289-9091-c784-ae4bfad3caf5@samsung.com>
- <CAJKOXPciOBSWFxcB-sYAXwFdyXqKzs=5duZBPjsL2gtt1Xz-cw@mail.gmail.com>
-Message-ID: <fe649525-72de-327b-e11c-72aaa1afc810@samsung.com>
+From: baolin.wang@linaro.org (Baolin Wang)
+Date: Wed, 21 Dec 2016 15:53:44 +0800
+Subject: [PATCH 1/3] extcon: Add documentation for EXTCON_CHG_USB_* and
+ EXTCON_USB_*
+In-Reply-To: <585A2D40.9000606@samsung.com>
+References: <CGME20161221061321epcas2p196fd90254d59164e1195840bdd546fa7@epcas2p1.samsung.com>
+ <7b9836ce2ca34118a2acd1ea113605a5f13b4439.1482300213.git.baolin.wang@linaro.org>
+ <585A2D40.9000606@samsung.com>
+Message-ID: <CAMz4kuKfRKd-0YXekfATT3e_anKewJ5qOHsVbi4hJV10d6Eq0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus, Krzysztof,
+Hi,
 
-On Monday 19 December 2016 11:33 PM, Krzysztof Kozlowski wrote:
-> On Mon, Dec 19, 2016 at 3:29 PM, pankaj.dubey <pankaj.dubey@samsung.com> wrote:
+On 21 December 2016 at 15:20, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> Hi,
+>
+> On 2016? 12? 21? 15:10, Baolin Wang wrote:
+>> Current there is both "EXTCON_USB" and "EXTCON_CHG_USB_SDP" which
+>> both seem to suggest a standard downstream port. But there is no
+>> documentation describing how these relate.
 >>
->> Hi Markus,
+>> Thus add documentation to describe EXTCON_CHG_USB_SDP should always
+>> appear together with EXTCON_USB, and EXTCON_CHG_USB_ACA would normally
+>> appear with EXTCON_USB_HOST.
 >>
->> On Monday 19 December 2016 05:29 PM, Markus Reichl wrote:
->>> Hi Pankaj,
->>>
->>> tested your patches 1/8 and 2/8 + Javiers diff for verbose output:
->>> https://www.spinics.net/lists/linux-samsung-soc/msg56576.html
->>>
->>> on Odroid U3:
->>> [    0.080178] Exynos: CPU[UNKNOWN] CPU_REV[0x20] PKG_ID[0x602d058] AUX_INFO[0x0]
->>> on Odroid X:
->>> [    0.080169] Exynos: CPU[UNKNOWN] CPU_REV[0x11] PKG_ID[0x1b0f6008] AUX_INFO[0x0]
-> 
-> Hmm.... this needs fixes.
-> 
+>> Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+>> ---
+>>  include/linux/extcon.h |    9 ++++++++-
+>>  1 file changed, 8 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/include/linux/extcon.h b/include/linux/extcon.h
+>> index b871c0c..6498b05 100644
+>> --- a/include/linux/extcon.h
+>> +++ b/include/linux/extcon.h
+>> @@ -46,7 +46,14 @@
+>>  #define EXTCON_USB           1
+>>  #define EXTCON_USB_HOST              2
+>>
+>> -/* Charging external connector */
+>> +/*
+>> + * Charging external connector
+>> + *
+>> + * When one SDP charger connector was reported, we should also report
+>> + * the USB connector, which means EXTCON_CHG_USB_SDP should always
+>> + * appear together with EXTCON_USB. The same as ACA charger connector,
+>> + * EXTCON_CHG_USB_ACA should always appear with EXTCON_USB_HOST.
+>> + */
+>
+> Looks good to me.
+> But, you use the different word for ACA as following:
+> I think that 'would normally' is proper in descritpion.
 
-Ah.. I missed to notice this.
+Okay, I will change to 'would normally' in next version patch. Thanks.
 
-I found issue as:  in case of Exynos4412 CPU_ID is mentioned wrong as
-(0xE4412000) in the driver code which caused this issue. Correct value
-of CPU_ID is 0xE4412200. I will fix this in next version. Once again
-thanks for testing and letting me know about this issue.
+>
+> - commit msg : EXTCON_CHG_USB_ACA would normally appear with EXTCON_USB_HOST.
+> - description: EXTCON_CHG_USB_ACA should always appear with EXTCON_USB_HOST.
+>
+>>  #define EXTCON_CHG_USB_SDP   5       /* Standard Downstream Port */
+>>  #define EXTCON_CHG_USB_DCP   6       /* Dedicated Charging Port */
+>>  #define EXTCON_CHG_USB_CDP   7       /* Charging Downstream Port */
+>>
+>
+> --
+> Regards,
+> Chanwoo Choi
 
-Thanks,
-Pankaj Dubey
 
-> Best regards,
-> Krzysztof
-> 
-> 
-> 
+
+-- 
+Baolin.wang
+Best Regards
