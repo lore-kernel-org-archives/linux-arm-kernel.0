@@ -1,31 +1,63 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 21 Dec 2016 18:04:00 +0100
-Subject: [PATCH net-next 14/27] net: mvpp2: add ip_version field in
- "struct mvpp2"
-In-Reply-To: <20161221170252.GO30952@lunn.ch>
-References: <1482318994-23488-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482318994-23488-15-git-send-email-thomas.petazzoni@free-electrons.com>
- <20161221170252.GO30952@lunn.ch>
-Message-ID: <20161221180400.27aca37c@free-electrons.com>
+From: jtoppins@redhat.com (Jonathan Toppins)
+Date: Wed, 21 Dec 2016 12:54:05 -0500
+Subject: [RFC] arm64/acpi: make ACPI boot preference configurable
+Message-ID: <7eba0601099f75f19021c4259eca75ada06f4511.1482341997.git.jtoppins@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch allows a user to configure ACPI to be preferred over
+device-tree.
 
-On Wed, 21 Dec 2016 18:02:52 +0100, Andrew Lunn wrote:
+Currently for ACPI to be used a user either has to set acpi=on on the
+kernel command line or make sure any device tree passed to the kernel
+is empty. If the dtb passed to the kernel is non-empty then device-tree
+will be chosen as the boot method of choice even if it is not correct.
+To prevent this situation where a system is only intended to be booted
+via ACPI a user can set this kernel configuration so it ignores
+device-tree settings unless ACPI table checks fail.
 
-> On Wed, Dec 21, 2016 at 12:16:21PM +0100, Thomas Petazzoni wrote:
-> > In preparation to the introduction for the support of PPv2.2 in the
-> > mvpp2 driver, this commit adds an ip_version field to the struct
-> > mvpp2  
-> 
-> When i read this, i was thinking IPv4 vs IPv6. It is a network driver after all.
-> Could you maybe call this hw_version?
+Signed-off-by: Jonathan Toppins <jtoppins@redhat.com>
+---
+ arch/arm64/Kconfig       | 13 +++++++++++++
+ arch/arm64/kernel/acpi.c |  2 +-
+ 2 files changed, 14 insertions(+), 1 deletion(-)
 
-Sure, will do. Thanks for the feedback!
-
-Thomas
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 111742126897..e432e84245b9 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -954,6 +954,19 @@ config ARM64_ACPI_PARKING_PROTOCOL
+ 	  protocol even if the corresponding data is present in the ACPI
+ 	  MADT table.
+ 
++config ARM64_PREFER_ACPI
++	bool "Prefer usage of ACPI boot tables over device-tree"
++	depends on ACPI
++	help
++	  Normally device-tree is preferred over ACPI on arm64 unless
++	  explicitly preferred via kernel command line, something like: acpi=on
++	  This configuration changes this default behaviour by pretending
++	  the user set acpi=on on the command line. This configuration still
++	  allows the user to turn acpi table parsing off via acpi=off. If
++	  for some reason the table checks fail the system will still fall
++	  back to using device-tree unless the user explicitly sets acpi=force
++	  on the command line.
++
+ config CMDLINE
+ 	string "Default kernel command string"
+ 	default ""
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index 252a6d9c1da5..b5dfa5752ff7 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -43,7 +43,7 @@ int acpi_pci_disabled = 1;	/* skip ACPI PCI scan and IRQ initialization */
+ EXPORT_SYMBOL(acpi_pci_disabled);
+ 
+ static bool param_acpi_off __initdata;
+-static bool param_acpi_on __initdata;
++static bool param_acpi_on __initdata = IS_ENABLED(CONFIG_ARM64_PREFER_ACPI);
+ static bool param_acpi_force __initdata;
+ 
+ static int __init parse_acpi(char *arg)
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.10.2
