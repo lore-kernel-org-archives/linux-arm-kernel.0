@@ -1,10 +1,10 @@
 From: baolin.wang@linaro.org (Baolin Wang)
-Date: Wed, 21 Dec 2016 14:10:48 +0800
-Subject: [PATCH 2/3] extcon: axp288: Set EXTCON_USB when EXTCON_CHG_USB_SDP
- was set
+Date: Wed, 21 Dec 2016 14:10:49 +0800
+Subject: [PATCH 3/3] phy: rockchip-inno-usb2: Set EXTCON_USB when
+ EXTCON_CHG_USB_SDP was set
 In-Reply-To: <7b9836ce2ca34118a2acd1ea113605a5f13b4439.1482300213.git.baolin.wang@linaro.org>
 References: <7b9836ce2ca34118a2acd1ea113605a5f13b4439.1482300213.git.baolin.wang@linaro.org>
-Message-ID: <11fb7adc2982a9134faee9abb1de4dcfb253f2d2.1482300213.git.baolin.wang@linaro.org>
+Message-ID: <767c3dfccde4807e3645951d4aeebca0ab5cc5e4.1482300213.git.baolin.wang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,34 +13,28 @@ one SDP charger connector was reported.
 
 Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
 ---
- drivers/extcon/extcon-axp288.c |    7 ++++++-
+ drivers/phy/phy-rockchip-inno-usb2.c |    7 ++++++-
  1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/extcon/extcon-axp288.c b/drivers/extcon/extcon-axp288.c
-index 42f41e8..4490726 100644
---- a/drivers/extcon/extcon-axp288.c
-+++ b/drivers/extcon/extcon-axp288.c
-@@ -102,6 +102,7 @@ enum axp288_extcon_irq {
- };
+diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
+index 2f99ec9..71fbe0f 100644
+--- a/drivers/phy/phy-rockchip-inno-usb2.c
++++ b/drivers/phy/phy-rockchip-inno-usb2.c
+@@ -595,9 +595,14 @@ static void rockchip_usb2phy_otg_sm_work(struct work_struct *work)
+ 		if (rport->vbus_attached != vbus_attach) {
+ 			rport->vbus_attached = vbus_attach;
  
- static const unsigned int axp288_extcon_cables[] = {
-+	EXTCON_USB,
- 	EXTCON_CHG_USB_SDP,
- 	EXTCON_CHG_USB_CDP,
- 	EXTCON_CHG_USB_DCP,
-@@ -225,8 +226,12 @@ static int axp288_handle_chrg_det_event(struct axp288_extcon_info *info)
- 			vbus_attach ? USB_EVENT_VBUS : USB_EVENT_NONE, NULL);
- 	}
- 
--	if (notify_charger)
-+	if (notify_charger) {
- 		extcon_set_state_sync(info->edev, cable, vbus_attach);
-+		if (cable == EXTCON_CHG_USB_SDP)
-+			extcon_set_state_sync(info->edev, EXTCON_USB,
-+					      vbus_attach);
-+	}
- 
- 	/* Clear the flags on disconnect event */
- 	if (!vbus_attach)
+-			if (notify_charger && rphy->edev)
++			if (notify_charger && rphy->edev) {
+ 				extcon_set_cable_state_(rphy->edev,
+ 							cable, vbus_attach);
++				if (cable == EXTCON_CHG_USB_SDP)
++					extcon_set_cable_state_(rphy->edev,
++								EXTCON_USB,
++								vbus_attach);
++			}
+ 		}
+ 		break;
+ 	case OTG_STATE_B_PERIPHERAL:
 -- 
 1.7.9.5
