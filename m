@@ -1,276 +1,103 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 21 Dec 2016 11:28:16 +0100
-Subject: [PATCH v3] rtc: armada38x: Follow the new recommendation for errata
- implementation
-Message-ID: <20161221102816.6939-1-gregory.clement@free-electrons.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Wed, 21 Dec 2016 18:29:42 +0800
+Subject: [PATCH v2] arm64: dts: rockchip: add u2phy clock for ehci and ohci of
+ rk3399
+Message-ID: <1482316182-2305-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to RES-3124064:
+From: William wu <wulf@rock-chips.com>
 
-The device supports CPU write and read access to the RTC time register.
-However, due to this restriction, read and write from/to internal RTC
-register may fail.
+We found that the suspend process was blocked when it run into
+ehci/ohci module due to clk-480m of usb2-phy was disabled.
 
-Workaround:
-General setup:
-1. Configure the RTC Mbus Bridge Timing Control register (offset 0x184A0)
-   to value 0xFD4D4FFF
-   Write RTC WRCLK Period to its maximum value (0x3FF)
-   Write RTC WRCLK setup to 0x29
-   Write RTC WRCLK High Time to 0x53 (default value)
-   Write RTC Read Output Delay to its maximum value (0x1F)
-   Mbus - Read All Byte Enable to 0x1 (default value)
-2. Configure the RTC Test Configuration Register (offset 0xA381C) bit3
-   to '1' (Reserved, Marvell internal)
+The root cause is that usb2-phy suspended earlier than ehci/ohci
+(usb2-phy will be auto suspended if no devices plug-in). and the
+clk-480m provided by it was disabled if no module used. However,
+some suspend process related ehci/ohci are base on this clock,
+so we should refer it into ehci/ohci driver to prevent this case.
 
-For any RTC register read operation:
-1. Read the requested register 100 times.
-2. Find the result that appears most frequently and use this result
-   as the correct value.
-
-For any RTC register write operation:
-1. Issue two dummy writes of 0x0 to the RTC Status register (offset
-   0xA3800).
-2. Write the time to the RTC Time register (offset 0xA380C).
-
-This patch is based on the work of Shaker Daibes
-
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+The u2phy clock flow like this:
 ---
-Hi,
 
-this patch followed the patch series sent here:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/473232.html
+Changes in v2:
+- update the commit message
+- remove patches whic add and export the USBPHYx_480M_SRC clock IDs
 
-For now I kept the patch 2 converting to time64_t apart after Russell
-King feedback.
+      u2phy ________________
+           |                |    |-----> UTMI_CLK ---------> | EHCI |
+OSC_24M ---|---> PHY_PLL----|----|
+           |________^_______|    |-----> 480M_CLK ---|G|---> | USBPHY_480M_SRC| ----> USBPHY_480M for SoC
+                    |
+                    |
+                   GRF
+---
 
-Changelog:
+Signed-off-by: William wu <wulf@rock-chips.com>
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+---
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 28 ++++++++++++++++++++--------
+ 1 file changed, 20 insertions(+), 8 deletions(-)
 
-v2 -> v3:
-- Removed unrelated change
-- Remove Unnecessary blank line
-- Used u32 instead of uint32_t
-- use the new errata name: RES-3124064 instead of FE-3124064
-
-v1 -> v2:
-- merged the patch 1 and 3
-- substantially modified the 1st patch with I think a better
-implementation:
-  - First I do not put anymore more a big array onto the stack as
-    suggested by Andrew Lunn.
-  - Then I optimize the way to find the correct value.
-
-Gregory
-
- drivers/rtc/rtc-armada38x.c | 118 +++++++++++++++++++++++++++++++++++---------
- 1 file changed, 95 insertions(+), 23 deletions(-)
-
-diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
-index 9a3f2a6f512e..6c9a2cbdc1a9 100644
---- a/drivers/rtc/rtc-armada38x.c
-+++ b/drivers/rtc/rtc-armada38x.c
-@@ -29,50 +29,118 @@
- #define RTC_TIME	    0xC
- #define RTC_ALARM1	    0x10
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index b65c193..2ad9255 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -315,8 +315,10 @@
+ 		compatible = "generic-ehci";
+ 		reg = <0x0 0xfe380000 0x0 0x20000>;
+ 		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH 0>;
+-		clocks = <&cru HCLK_HOST0>, <&cru HCLK_HOST0_ARB>;
+-		clock-names = "hclk_host0", "hclk_host0_arb";
++		clocks = <&cru HCLK_HOST0>, <&cru HCLK_HOST0_ARB>,
++			 <&u2phy0>;
++		clock-names = "usbhost", "arbiter",
++			      "utmi";
+ 		phys = <&u2phy0_host>;
+ 		phy-names = "usb";
+ 		status = "disabled";
+@@ -326,8 +328,12 @@
+ 		compatible = "generic-ohci";
+ 		reg = <0x0 0xfe3a0000 0x0 0x20000>;
+ 		interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH 0>;
+-		clocks = <&cru HCLK_HOST0>, <&cru HCLK_HOST0_ARB>;
+-		clock-names = "hclk_host0", "hclk_host0_arb";
++		clocks = <&cru HCLK_HOST0>, <&cru HCLK_HOST0_ARB>,
++			 <&u2phy0>;
++		clock-names = "usbhost", "arbiter",
++			      "utmi";
++		phys = <&u2phy0_host>;
++		phy-names = "usb";
+ 		status = "disabled";
+ 	};
  
-+#define SOC_RTC_BRIDGE_TIMING_CTL   0x0
-+#define SOC_RTC_PERIOD_OFFS		0
-+#define SOC_RTC_PERIOD_MASK		(0x3FF << SOC_RTC_PERIOD_OFFS)
-+#define SOC_RTC_READ_DELAY_OFFS		26
-+#define SOC_RTC_READ_DELAY_MASK		(0x1F << SOC_RTC_READ_DELAY_OFFS)
-+
- #define SOC_RTC_INTERRUPT   0x8
- #define SOC_RTC_ALARM1		BIT(0)
- #define SOC_RTC_ALARM2		BIT(1)
- #define SOC_RTC_ALARM1_MASK	BIT(2)
- #define SOC_RTC_ALARM2_MASK	BIT(3)
- 
-+#define SAMPLE_NR 100
-+
-+struct value_to_freq {
-+	u32 value;
-+	u8 freq;
-+};
-+
- struct armada38x_rtc {
- 	struct rtc_device   *rtc_dev;
- 	void __iomem	    *regs;
- 	void __iomem	    *regs_soc;
- 	spinlock_t	    lock;
- 	int		    irq;
-+	struct value_to_freq *val_to_freq;
- };
- 
- /*
-  * According to the datasheet, the OS should wait 5us after every
-  * register write to the RTC hard macro so that the required update
-  * can occur without holding off the system bus
-+ * According to errata RES-3124064, Write to any RTC register
-+ * may fail. As a workaround, before writing to RTC
-+ * register, issue a dummy write of 0x0 twice to RTC Status
-+ * register.
-  */
-+
- static void rtc_delayed_write(u32 val, struct armada38x_rtc *rtc, int offset)
- {
-+	writel(0, rtc->regs + RTC_STATUS);
-+	writel(0, rtc->regs + RTC_STATUS);
- 	writel(val, rtc->regs + offset);
- 	udelay(5);
- }
- 
-+/* Update RTC-MBUS bridge timing parameters */
-+static void rtc_update_mbus_timing_params(struct armada38x_rtc *rtc)
-+{
-+	u32 reg;
-+
-+	reg = readl(rtc->regs_soc + SOC_RTC_BRIDGE_TIMING_CTL);
-+	reg &= ~SOC_RTC_PERIOD_MASK;
-+	reg |= 0x3FF << SOC_RTC_PERIOD_OFFS; /* Maximum value */
-+	reg &= ~SOC_RTC_READ_DELAY_MASK;
-+	reg |= 0x1F << SOC_RTC_READ_DELAY_OFFS; /* Maximum value */
-+	writel(reg, rtc->regs_soc + SOC_RTC_BRIDGE_TIMING_CTL);
-+}
-+
-+static u32 read_rtc_register_wa(struct armada38x_rtc *rtc, u8 rtc_reg)
-+{
-+	int i, index_max, max = 0;
-+
-+	for (i = 0; i < SAMPLE_NR; i++) {
-+		rtc->val_to_freq[i].value = readl(rtc->regs + rtc_reg);
-+		rtc->val_to_freq[i].freq = 0;
-+	}
-+
-+	for (i = 0; i < SAMPLE_NR; i++) {
-+		int j = 0;
-+		u32 value = rtc->val_to_freq[i].value;
-+
-+		while (rtc->val_to_freq[j].freq) {
-+			if (rtc->val_to_freq[j].value == value) {
-+				rtc->val_to_freq[j].freq++;
-+				break;
-+			}
-+			j++;
-+		}
-+
-+		if (!rtc->val_to_freq[j].freq) {
-+			rtc->val_to_freq[j].value = value;
-+			rtc->val_to_freq[j].freq = 1;
-+		}
-+
-+		if (rtc->val_to_freq[j].freq > max) {
-+			index_max = j;
-+			max = rtc->val_to_freq[j].freq;
-+		}
-+
-+		/*
-+		 * If a value have already half of the sample this is
-+		 * the most frequent one and we can stop the research
-+		 * right now
-+		 */
-+		if (max > SAMPLE_NR / 2)
-+			break;
-+	}
-+
-+	return rtc->val_to_freq[index_max].value;
-+}
-+
- static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
- {
- 	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
--	unsigned long time, time_check, flags;
-+	unsigned long time, flags;
- 
- 	spin_lock_irqsave(&rtc->lock, flags);
--	time = readl(rtc->regs + RTC_TIME);
--	/*
--	 * WA for failing time set attempts. As stated in HW ERRATA if
--	 * more than one second between two time reads is detected
--	 * then read once again.
--	 */
--	time_check = readl(rtc->regs + RTC_TIME);
--	if ((time_check - time) > 1)
--		time_check = readl(rtc->regs + RTC_TIME);
--
-+	time = read_rtc_register_wa(rtc, RTC_TIME);
- 	spin_unlock_irqrestore(&rtc->lock, flags);
- 
--	rtc_time_to_tm(time_check, tm);
-+	rtc_time_to_tm(time, tm);
- 
- 	return 0;
- }
-@@ -87,16 +155,9 @@ static int armada38x_rtc_set_time(struct device *dev, struct rtc_time *tm)
- 
- 	if (ret)
- 		goto out;
--	/*
--	 * According to errata FE-3124064, Write to RTC TIME register
--	 * may fail. As a workaround, after writing to RTC TIME
--	 * register, issue a dummy write of 0x0 twice to RTC Status
--	 * register.
--	 */
-+
- 	spin_lock_irqsave(&rtc->lock, flags);
- 	rtc_delayed_write(time, rtc, RTC_TIME);
--	rtc_delayed_write(0, rtc, RTC_STATUS);
--	rtc_delayed_write(0, rtc, RTC_STATUS);
- 	spin_unlock_irqrestore(&rtc->lock, flags);
- 
- out:
-@@ -111,8 +172,8 @@ static int armada38x_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
- 
- 	spin_lock_irqsave(&rtc->lock, flags);
- 
--	time = readl(rtc->regs + RTC_ALARM1);
--	val = readl(rtc->regs + RTC_IRQ1_CONF) & RTC_IRQ1_AL_EN;
-+	time = read_rtc_register_wa(rtc, RTC_ALARM1);
-+	val = read_rtc_register_wa(rtc, RTC_IRQ1_CONF) & RTC_IRQ1_AL_EN;
- 
- 	spin_unlock_irqrestore(&rtc->lock, flags);
- 
-@@ -182,7 +243,7 @@ static irqreturn_t armada38x_rtc_alarm_irq(int irq, void *data)
- 	val = readl(rtc->regs_soc + SOC_RTC_INTERRUPT);
- 
- 	writel(val & ~SOC_RTC_ALARM1, rtc->regs_soc + SOC_RTC_INTERRUPT);
--	val = readl(rtc->regs + RTC_IRQ1_CONF);
-+	val = read_rtc_register_wa(rtc, RTC_IRQ1_CONF);
- 	/* disable all the interrupts for alarm 1 */
- 	rtc_delayed_write(0, rtc, RTC_IRQ1_CONF);
- 	/* Ack the event */
-@@ -221,6 +282,11 @@ static __init int armada38x_rtc_probe(struct platform_device *pdev)
- 	if (!rtc)
- 		return -ENOMEM;
- 
-+	rtc->val_to_freq = devm_kcalloc(&pdev->dev, SAMPLE_NR,
-+				sizeof(struct value_to_freq), GFP_KERNEL);
-+	if (!rtc->val_to_freq)
-+		return -ENOMEM;
-+
- 	spin_lock_init(&rtc->lock);
- 
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rtc");
-@@ -253,6 +319,9 @@ static __init int armada38x_rtc_probe(struct platform_device *pdev)
- 	if (rtc->irq != -1)
- 		device_init_wakeup(&pdev->dev, 1);
- 
-+	/* Update RTC-MBUS bridge timing parameters */
-+	rtc_update_mbus_timing_params(rtc);
-+
- 	rtc->rtc_dev = devm_rtc_device_register(&pdev->dev, pdev->name,
- 					&armada38x_rtc_ops, THIS_MODULE);
- 	if (IS_ERR(rtc->rtc_dev)) {
-@@ -280,6 +349,9 @@ static int armada38x_rtc_resume(struct device *dev)
- 	if (device_may_wakeup(dev)) {
- 		struct armada38x_rtc *rtc = dev_get_drvdata(dev);
- 
-+		/* Update RTC-MBUS bridge timing parameters */
-+		rtc_update_mbus_timing_params(rtc);
-+
- 		return disable_irq_wake(rtc->irq);
- 	}
+@@ -335,8 +341,10 @@
+ 		compatible = "generic-ehci";
+ 		reg = <0x0 0xfe3c0000 0x0 0x20000>;
+ 		interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH 0>;
+-		clocks = <&cru HCLK_HOST1>, <&cru HCLK_HOST1_ARB>;
+-		clock-names = "hclk_host1", "hclk_host1_arb";
++		clocks = <&cru HCLK_HOST1>, <&cru HCLK_HOST1_ARB>,
++			 <&u2phy1>;
++		clock-names = "usbhost", "arbiter",
++			      "utmi";
+ 		phys = <&u2phy1_host>;
+ 		phy-names = "usb";
+ 		status = "disabled";
+@@ -346,8 +354,12 @@
+ 		compatible = "generic-ohci";
+ 		reg = <0x0 0xfe3e0000 0x0 0x20000>;
+ 		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH 0>;
+-		clocks = <&cru HCLK_HOST1>, <&cru HCLK_HOST1_ARB>;
+-		clock-names = "hclk_host1", "hclk_host1_arb";
++		clocks = <&cru HCLK_HOST1>, <&cru HCLK_HOST1_ARB>,
++			 <&u2phy1>;
++		clock-names = "usbhost", "arbiter",
++			      "utmi";
++		phys = <&u2phy1_host>;
++		phy-names = "usb";
+ 		status = "disabled";
+ 	};
  
 -- 
-2.11.0
+2.7.4
