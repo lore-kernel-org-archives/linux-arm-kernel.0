@@ -1,88 +1,66 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Wed, 21 Dec 2016 11:14:39 +0530
-Subject: [PATCH 0/2] s5p-mfc fix for using reserved memory
-In-Reply-To: <ea03c72a-a0f4-46e6-bd29-474549a0f145@samsung.com>
-References: <CGME20161216115004epcas1p276eddca803dcafe3470e223386b86da0@epcas1p2.samsung.com>
- <1481888915-19624-1-git-send-email-pankaj.dubey@samsung.com>
- <ea03c72a-a0f4-46e6-bd29-474549a0f145@samsung.com>
-Message-ID: <57a75b39-95bf-16f2-54fb-7c7e032a2eb7@samsung.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 21 Dec 2016 09:00:49 +0300
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAyLzJdIG1mZDogbWMxM3h4eDogUGFzcyB0aGUgSVJRRl9U?=
+ =?UTF-8?B?UklHR0VSX0hJR0ggZmxhZy4=?=
+In-Reply-To: <CAM=E1R5=k5NXurdV=6TzE9bPH5M3zyFpUjuJpGd9ECKrdjaj7w@mail.gmail.com>
+References: <1482182934-18559-1-git-send-email-lilja.magnus@gmail.com>
+ <1482211233.10253607@f408.i.mail.ru>
+ <CAM=E1R5=k5NXurdV=6TzE9bPH5M3zyFpUjuJpGd9ECKrdjaj7w@mail.gmail.com>
+Message-ID: <1482300049.831956101@f373.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+>???????, 20 ??????? 2016, 22:35 +03:00 ?? Magnus Lilja <lilja.magnus@gmail.com>:
+>
+>On 20 December 2016 at 06:20, Alexander Shiyan < shc_work@mail.ru > wrote:
+>>>???????, 20 ??????? 2016, 0:28 +03:00 ?? Magnus Lilja < lilja.magnus@gmail.com >:
+>>>
+>>>All supported mc13xxx devices have active high interrupt outputs. Make sure
+>>>to configure the interrupt as active high by passing the IRQF_TRIGGER_HIGH
+>>>flag. This is required at least on the i.MX31 PDK board.
+>>>
+>>>Signed-off-by: Magnus Lilja <  lilja.magnus@gmail.com >
+>>>---
+>>>
+>>> drivers/mfd/mc13xxx-core.c | 2 +-
+>>> 1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>>diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
+>>>index d7f54e4..4cbe6b7 100644
+>>>--- a/drivers/mfd/mc13xxx-core.c
+>>>+++ b/drivers/mfd/mc13xxx-core.c
+>>>@@ -440,7 +440,7 @@ int mc13xxx_common_init(struct device *dev)
+>>> mc13xxx->irq_chip.irqs = mc13xxx->irqs;
+>>> mc13xxx->irq_chip.num_irqs = ARRAY_SIZE(mc13xxx->irqs);
+>>>
+>>>-ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq, IRQF_ONESHOT,
+>>>+ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq, IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
+>>>   0, &mc13xxx->irq_chip, &mc13xxx->irq_data);
+>>> if (ret)
+>>> return ret;
+>>
+>> IRQ line can be passed through inverter to IC.
+>> On my opinion the best way to handle all possible situations is parse
+>> devicetree IRQ flags and pass to the driver.
+>
+>My guess is that most boards follow the evaluation boards/kits and
+>don't have an inverter so I think the default should be TRIG_HIGH
+>since that will make most boards work automatically. But I can have a
+>look at making it configurable (with and without the use of device
+>tree), but for the device tree stuff I would need pointers to similar
+>code since my experience with that is none.
+>Any pointers to similar code?
 
-On Tuesday 20 December 2016 05:28 PM, Marek Szyprowski wrote:
-> Hi Pankaj
-> 
-> 
-> On 2016-12-16 12:48, Pankaj Dubey wrote:
->> It has been observed on ARM64 based Exynos SoC, if IOMMU is not enabled
->> and we try to use reserved memory for MFC, reqbufs fails with below
->> mentioned error
->> ---------------------------------------------------------------------------
->>
->> V4L2 Codec decoding example application
->> Kamil Debski <k.debski@samsung.com>
->> Copyright 2012 Samsung Electronics Co., Ltd.
->>
->> Opening MFC.
->> (mfc.c:mfc_open:58): MFC Info (/dev/video0): driver="s5p-mfc" \
->> bus_info="platform:12c30000.mfc0" card="s5p-mfc-dec" fd=0x4[
->> 42.339165] Remapping memory failed, error: -6
->>
->> MFC Open Success.
->> (main.c:main:711): Successfully opened all necessary files and devices
->> (mfc.c:mfc_dec_setup_output:103): Setup MFC decoding OUTPUT buffer \
->> size=4194304 (requested=4194304)
->> (mfc.c:mfc_dec_setup_output:120): Number of MFC OUTPUT buffers is 2 \
->> (requested 2)
->>
->> [App] Out buf phy : 0x00000000, virt : 0xffffffff
->> Output Length is = 0x300000
->> Error (mfc.c:mfc_dec_setup_output:145): Failed to MMAP MFC OUTPUT buffer
->> -------------------------------------------------------------------------
->> This is because the device requesting for memory is mfc0.left not the
->> parent mfc0.
->> Hence setting of alloc_devs need to be done only if IOMMU is enabled
->> and in that case both the left and right device is treated as mfc0 only.
->> Also we need to populate vb2_queue's dev pointer with mfc dev pointer.
-> 
-> I also got this issue but Your solution is imho not the proper approach.
-> Too much hacking in the driver, while the issue is in the core. ARM64
-> requires
-> to call arch_setup_dma_ops() for each device that will be used for
-> dma-mapping.
-> So the issue is in drivers/of/of_reserved_mem.c - in
-> of_reserved_mem_device_init_by_idx() function, which should ensure that
-> arch_setup_dma_ops() is called also for the virtual devices for reserved
-> memory.
-> 
-> s5p-mfc driver however still requires some patching for
-> dma-mapping/iommu glue
-> used on ARM64 architecture.
-> 
+Hello.
 
-Thanks for review and suggestion.
-Our initial investigation pointed out issue due to change in vb2_queue
-dev field by commit 2548fee63d9e ("[media] media/platform: convert
-drivers to use the new vb2_queue dev field"), where only for mfc q->dev
-pointer was not set.
+Perhaps I'm wrong and the desired active level has setup at the IRQ code level.
+Otherwise, I think you need to use something like the following:
 
-But I think you are right, and of_reserved_mem_device_init_by_idx should
-take care of setting dma_ops for devices which calls this function. So I
-will be submitting new change soon to fix this issue after testing it.
+unsigned flags = irqd_get_trigger_type(irq_get_irq_data(irq));
+flags = (flags == IRQ_TYPE_NONE) ? IRQF_TRIGGER_HIGH : flags;
+ret = regmap_add_irq_chip(..., IRQF_ONESHOT | flags, ...);
 
-Thanks,
-Pankaj Dubey
+Please fix me.
+Thanks.
 
->> Smitha T Murthy (2):
->>    media: s5p-mfc: convert drivers to use the new vb2_queue dev field
->>    media: s5p-mfc: fix MMAP of mfc buffer during reqbufs
->>
->>   drivers/media/platform/s5p-mfc/s5p_mfc.c     |  2 ++
->>   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 17 ++++++++++-------
->>   drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 18 +++++++++++-------
->>   3 files changed, 23 insertions(+), 14 deletions(-)
->>
-> 
-> Best regards
+---
