@@ -1,143 +1,92 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 21 Dec 2016 15:47:12 -0800
-Subject: [PATCH v4 1/2] dt-bindings: brcm: clocks: add binding for
- brcmstb-cpu-clk-div
-In-Reply-To: <20161220225530.96699-2-code@mmayer.net>
-References: <20161220225530.96699-1-code@mmayer.net>
- <20161220225530.96699-2-code@mmayer.net>
-Message-ID: <20161221234712.GH8288@codeaurora.org>
+From: minchan@kernel.org (Minchan Kim)
+Date: Thu, 22 Dec 2016 08:48:21 +0900
+Subject: [PATCH] mm: pmd dirty emulation in page fault handler
+Message-ID: <1482364101-16204-1-git-send-email-minchan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20, Markus Mayer wrote:
-> From: Markus Mayer <mmayer@broadcom.com>
-> 
-> Add binding document for brcm,brcmstb-cpu-clk-div.
-> 
-> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
-> ---
->  .../bindings/clock/brcm,brcmstb-cpu-clk-div.txt    | 83 ++++++++++++++++++++++
->  MAINTAINERS                                        |  1 +
->  2 files changed, 84 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/brcm,brcmstb-cpu-clk-div.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/brcm,brcmstb-cpu-clk-div.txt b/Documentation/devicetree/bindings/clock/brcm,brcmstb-cpu-clk-div.txt
-> new file mode 100644
-> index 0000000..3bc99c5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/brcm,brcmstb-cpu-clk-div.txt
-> @@ -0,0 +1,83 @@
-> +The CPU divider node serves as the sole clock for the CPU complex. It supports
-> +power-of-2 clock division, with a divider of "1" as the default highest-speed
-> +setting.
-> +
-> +Required properties:
-> +- compatible: shall be "brcm,brcmstb-cpu-clk-div"
-> +- reg: address and width of the divider configuration register
-> +- #clock-cells: shall be set to 0
-> +- clocks: phandle of clock provider which provides the source clock
-> +          (this would typically be a "fixed-clock" type PLL)
-> +- div-table: list of (raw_value,divider) ordered pairs that correspond to the
-> +             allowed clock divider settings
-> +- div-shift-width: least-significant bit position and width of divider value
-> +
-> +Optional properties:
-> +- clocks: additional clocks can be specified if needed
-> +- clock-names: clocks can be named, so they can be looked up
-> +
-> +Example:
-> +	sw_scb: sw_scb {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <432000000>;
-> +	};
-> +
+Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
+http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
 
-Is this a PLL?
+The problem is page fault handler supports only accessed flag emulation
+for THP page of SW-dirty/accessed architecture.
 
-> +	fixed0: fixed0 {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <54000000>;
-> +	};
+This patch enables dirty-bit emulation for those architectures.
+Without it, MADV_FREE makes application hang by repeated fault forever.
 
-And perhaps some sort of oscillator?
+[1] mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called
 
-> +
-> +	cpu_pdiv: cpu_pdiv at f04e0008 {
-> +		compatible = "divider-clock";
-> +		#clock-cells = <0>;
-> +		reg = <0xf04e0008 0x4>;
-> +		bit-shift = <10>;
-> +		bit-mask = <0xf>;
-> +		index-starts-at-one;
-> +		clocks = <&fixed0>;
-> +		clock-names = "fixed0";
-> +	};
-> +
-> +	cpu_ndiv_int: cpu_ndiv_int {
-> +		compatible = "fixed-factor-clock";
+Cc: Jason Evans <je@fb.com>
+Cc: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: linux-arch at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: <stable@vger.kernel.org> [4.5+]
+Fixes: b8d3c4c3009d ("mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called")
+Reported-by: Andreas Schwab <schwab@suse.de>
+Signed-off-by: Minchan Kim <minchan@kernel.org>
+---
+ mm/huge_memory.c |  6 ++++--
+ mm/memory.c      | 18 ++++++++++--------
+ 2 files changed, 14 insertions(+), 10 deletions(-)
 
-Ok..
-
-> +		#clock-cells = <0>;
-> +		clock-div = <1>;
-> +		clock-mult = <167>;
-> +		clocks = <&cpu_pdiv>;
-> +		clock-names = "cpu_pdiv";
-> +	};
-> +
-> +	cpu_mdiv_ch0: cpu_mdiv_ch0 at f04e0000 {
-> +		compatible = "divider-clock";
-
-Is there a binding for this?
-
-> +		#clock-cells = <0>;
-> +		reg = <0xf04e0000 0x4>;
-> +		bit-shift = <1>;
-> +		bit-mask = <0xff>;
-> +		index-starts-at-one;
-> +		clocks = <&cpu_ndiv_int>;
-> +		clock-names = "cpu_ndiv_int";
-> +	};
-> +
-> +	cpupll: cpupll at 0 {
-> +		#clock-cells = <0>;
-> +		clock-frequency = <1503000000>;
-> +		compatible = "fixed-clock";
-> +	};
-> +
-> +	cpuclkdiv: cpu-clk-div at 0 {
-
-Wrong unit address. Should be f03e257c?
-
-> +		#clock-cells = <0>;
-> +		clock-names = "cpupll",
-> +			"cpu_mdiv_ch0",
-> +			"cpu_ndiv_int",
-> +			"sw_scb";
-> +		clocks = <&cpupll,
-> +			&cpu_mdiv_ch0,
-> +			&cpu_ndiv_int,
-> +			&sw_scb>;
-> +		compatible = "brcm,brcmstb-cpu-clk-div";
-> +		reg = <0xf03e257c 0x4>;
-> +		div-table = <0x00 1>;
-> +		div-shift-width = <0 5>;
-
-This entire DT design seems wrong. We don't put these sorts of
-register level details into DT. There should be a driver that
-knows the type of device that is present and how to drive that
-hardware.
-
->From what I can tell there's something like a mux controller at
-0xf04e0000 and then there's some sort of divider controller at
-0xf03e0000. Perhaps those are two different devices that need
-independent drivers? My wild guess is the PLL control is in those
-register regions too, but we're not exposing control of them.
-That's ok, but don't put the PLL into the DT as a fixed clock.
-Just register it from the driver.
-
+diff --git a/mm/huge_memory.c b/mm/huge_memory.c
+index 10eedbf..29ec8a4 100644
+--- a/mm/huge_memory.c
++++ b/mm/huge_memory.c
+@@ -883,15 +883,17 @@ void huge_pmd_set_accessed(struct vm_fault *vmf, pmd_t orig_pmd)
+ {
+ 	pmd_t entry;
+ 	unsigned long haddr;
++	bool write = vmf->flags & FAULT_FLAG_WRITE;
+ 
+ 	vmf->ptl = pmd_lock(vmf->vma->vm_mm, vmf->pmd);
+ 	if (unlikely(!pmd_same(*vmf->pmd, orig_pmd)))
+ 		goto unlock;
+ 
+ 	entry = pmd_mkyoung(orig_pmd);
++	if (write)
++		entry = pmd_mkdirty(entry);
+ 	haddr = vmf->address & HPAGE_PMD_MASK;
+-	if (pmdp_set_access_flags(vmf->vma, haddr, vmf->pmd, entry,
+-				vmf->flags & FAULT_FLAG_WRITE))
++	if (pmdp_set_access_flags(vmf->vma, haddr, vmf->pmd, entry, write))
+ 		update_mmu_cache_pmd(vmf->vma, vmf->address, vmf->pmd);
+ 
+ unlock:
+diff --git a/mm/memory.c b/mm/memory.c
+index 36c774f..7408ddc 100644
+--- a/mm/memory.c
++++ b/mm/memory.c
+@@ -3637,18 +3637,20 @@ static int __handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
+ 			if (pmd_protnone(orig_pmd) && vma_is_accessible(vma))
+ 				return do_huge_pmd_numa_page(&vmf, orig_pmd);
+ 
+-			if ((vmf.flags & FAULT_FLAG_WRITE) &&
+-					!pmd_write(orig_pmd)) {
+-				ret = wp_huge_pmd(&vmf, orig_pmd);
+-				if (!(ret & VM_FAULT_FALLBACK))
++			if (vmf.flags & FAULT_FLAG_WRITE) {
++				if (!pmd_write(orig_pmd)) {
++					ret = wp_huge_pmd(&vmf, orig_pmd);
++					if (ret == VM_FAULT_FALLBACK)
++						goto pte_fault;
+ 					return ret;
+-			} else {
+-				huge_pmd_set_accessed(&vmf, orig_pmd);
+-				return 0;
++				}
+ 			}
++
++			huge_pmd_set_accessed(&vmf, orig_pmd);
++			return 0;
+ 		}
+ 	}
+-
++pte_fault:
+ 	return handle_pte_fault(&vmf);
+ }
+ 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.7.4
