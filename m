@@ -1,169 +1,52 @@
-From: uwe@kleine-koenig.org (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 21 Dec 2016 11:20:47 +0100
-Subject: [PATCH] ARM: dts: turris-omnia: add support for ethernet switch
-Message-ID: <20161221102047.28036-1-uwe@kleine-koenig.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 21 Dec 2016 11:26:54 +0100
+Subject: [PATCHv2 0/3] arm64/clk: update Marvell Armada CP110 system
+ controller driver
+Message-ID: <1482316017-22154-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Turris Omnia features a Marvell MV88E7176 ethernet switch. Add it to
-the dts.
-
-Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
----
 Hello,
 
-when the MAC is operated in rgmii mode and the switch in rgmii-id
-communication between them works fine. The other way round it doesn't work.
-The fixed-link nodes in the cpu port description is necessary to let the
-mv88e6xxx driver use the phy-mode description. Is this a bug?
+This small set of commits updates the Marvell Armada CP110 system
+controller driver, its Device Tree binding, and Device Tree
+representation, to take into account three new things:
 
-Regarding the binding, I think the label in the port nodes is strange.
+ - The clock driver now handles clock n?9 (GOP) as a child of clock
+   n?18 (controls SD/MMC and GOP)
 
-	label = "lan2"
+ - The DT representation is adjusted to name clock n?18 "sd-mmc-gop"
+   instead of just "sd-mmc".
 
-for an external port is fine. But
+ - The clock driver now handles clock n?5 (MG) as a child of clock n?6
+   (MG_CORE).
 
-	label = "cpu"
+This set of commits is some preparation work to add networking support
+for Marvell Armada 7K/8K.
 
-for a port facing a CPU MAC looks wrong, still more as the Turris Omnia has
-two ports connected to the SoC and so there are two ports with the same
-label. I would suggest to use a separate property for that, e.g.
+I would expect patches 1 and 2 to be taken by the clock maintainers,
+and patch 3 be taken by the Marvell EBU maintainers.
 
-	cpu-port;
+Changes since v1:
 
-and no label.
+ - Addition of the handling of the MG and MG_CORE clocks (n?5 and
+   n?6), also needed for the networking support on Marvell Aramda
+   7K/8K.
 
-Best regards
-Uwe
+Thanks,
 
- arch/arm/boot/dts/armada-385-turris-omnia.dts | 101 +++++++++++++++++++++++++-
- 1 file changed, 99 insertions(+), 2 deletions(-)
+Thomas
 
-diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-index ab49acb2d452..6722d3243f9b 100644
---- a/arch/arm/boot/dts/armada-385-turris-omnia.dts
-+++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-@@ -122,7 +122,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&ge0_rgmii_pins>;
- 	status = "okay";
--	phy-mode = "rgmii-id";
-+	phy-mode = "rgmii";
- 
- 	fixed-link {
- 		speed = <1000>;
-@@ -135,7 +135,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&ge1_rgmii_pins>;
- 	status = "okay";
--	phy-mode = "rgmii-id";
-+	phy-mode = "rgmii";
- 
- 	fixed-link {
- 		speed = <1000>;
-@@ -274,6 +274,103 @@
- 	};
- 
- 	/* Switch MV88E7176 at address 0x10 */
-+	switch at 10 {
-+		compatible = "marvell,mv88e6085";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		dsa,member = <0 0>;
-+
-+		reg = <0x10>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			ports at 0 {
-+				reg = <0>;
-+				label = "lan0";
-+				phy-handle = <&lan0phy>;
-+			};
-+
-+			ports at 1 {
-+				reg = <1>;
-+				label = "lan1";
-+				phy-handle = <&lan1phy>;
-+			};
-+
-+			ports at 2 {
-+				reg = <2>;
-+				label = "lan2";
-+				phy-handle = <&lan2phy>;
-+			};
-+
-+			ports at 3 {
-+				reg = <3>;
-+				label = "lan3";
-+				phy-handle = <&lan3phy>;
-+			};
-+
-+			ports at 4 {
-+				reg = <4>;
-+				label = "lan4";
-+				phy-handle = <&lan4phy>;
-+			};
-+
-+			ports at 5 {
-+				reg = <5>;
-+				label = "cpu";
-+				ethernet = <&eth1>;
-+				phy-mode = "rgmii-id";
-+
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+
-+			ports at 6 {
-+				reg = <6>;
-+				label = "cpu";
-+				ethernet = <&eth0>;
-+				phy-mode = "rgmii-id";
-+
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+		};
-+
-+		mdio {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			lan0phy: ethernet-phy at 0 {
-+				compatible = "ethernet-phy-ieee802.3-c22";
-+				reg = <0>;
-+			};
-+
-+			lan1phy: ethernet-phy at 1 {
-+				compatible = "ethernet-phy-ieee802.3-c22";
-+				reg = <1>;
-+			};
-+
-+			lan2phy: ethernet-phy at 2 {
-+				compatible = "ethernet-phy-ieee802.3-c22";
-+				reg = <2>;
-+			};
-+
-+			lan3phy: ethernet-phy at 3 {
-+				compatible = "ethernet-phy-ieee802.3-c22";
-+				reg = <3>;
-+			};
-+
-+			lan4phy: ethernet-phy at 4 {
-+				compatible = "ethernet-phy-ieee802.3-c22";
-+				reg = <4>;
-+			};
-+		};
-+	};
- };
- 
- &pinctrl {
+Thomas Petazzoni (3):
+  dt-bindings: arm: update Armada CP110 system controller binding
+  clk: mvebu: adjust clock handling for the CP110 system controller
+  arm64: dts: marvell: adjust name of sd-mmc-gop clock in syscon
+
+ .../bindings/arm/marvell/cp110-system-controller0.txt       |  6 +++---
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi        |  2 +-
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi         |  2 +-
+ drivers/clk/mvebu/cp110-system-controller.c                 | 13 +++++++++++--
+ 4 files changed, 16 insertions(+), 7 deletions(-)
+
 -- 
-2.11.0
+2.7.4
