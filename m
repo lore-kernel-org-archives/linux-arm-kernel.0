@@ -1,49 +1,79 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Wed, 21 Dec 2016 11:10:29 +0100
-Subject: [PATCH 1/2] spi: armada-3700: Coding style fixes
-In-Reply-To: <20161221101030.10925-1-romain.perier@free-electrons.com>
-References: <20161221101030.10925-1-romain.perier@free-electrons.com>
-Message-ID: <20161221101030.10925-2-romain.perier@free-electrons.com>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Wed, 21 Dec 2016 11:19:33 +0100
+Subject: [PATCH 1/3] drivers/perf: arm_pmu: Use devm_ allocators
+In-Reply-To: <20161221101935.17178-1-alexander.stein@systec-electronic.com>
+References: <20161221101935.17178-1-alexander.stein@systec-electronic.com>
+Message-ID: <20161221101935.17178-2-alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following warning are reported by checkpatch.pl:
+This eliminates several calls to kfree.
 
-CHECK: Alignment should match open parenthesis
-+static void a3700_spi_transfer_setup(struct spi_device *spi,
-+                                   struct spi_transfer *xfer)
-
-WARNING: Missing a blank line after declarations
-+                       u32 data = le32_to_cpu(val);
-+                       memcpy(a3700_spi->rx_buf, &data, 4);
-
-total: 0 errors, 1 warnings, 1 checks, 923 lines checked
-
-Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
 ---
- drivers/spi/spi-armada-3700.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/perf/arm_pmu.c | 14 ++++----------
+ 1 file changed, 4 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/spi/spi-armada-3700.c b/drivers/spi/spi-armada-3700.c
-index ec5fb01..0bfe5ff 100644
---- a/drivers/spi/spi-armada-3700.c
-+++ b/drivers/spi/spi-armada-3700.c
-@@ -420,7 +420,7 @@ static void a3700_spi_fifo_thres_set(struct a3700_spi *a3700_spi,
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index b37b572..a9bbdbf 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -917,7 +917,8 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
+ 	bool using_spi = false;
+ 	struct platform_device *pdev = pmu->plat_device;
+ 
+-	irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
++	irqs = devm_kcalloc(&pdev->dev, pdev->num_resources, sizeof(*irqs),
++			    GFP_KERNEL);
+ 	if (!irqs)
+ 		return -ENOMEM;
+ 
+@@ -939,7 +940,6 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
+ 				pr_err("PPI/SPI IRQ type mismatch for %s!\n",
+ 					dn->name);
+ 				of_node_put(dn);
+-				kfree(irqs);
+ 				return -EINVAL;
+ 			}
+ 
+@@ -988,10 +988,8 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
+ 			int ret;
+ 
+ 			ret = irq_get_percpu_devid_partition(irq, &pmu->supported_cpus);
+-			if (ret) {
+-				kfree(irqs);
++			if (ret)
+ 				return ret;
+-			}
+ 		} else {
+ 			/* Otherwise default to all CPUs */
+ 			cpumask_setall(&pmu->supported_cpus);
+@@ -1001,8 +999,6 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
+ 	/* If we matched up the IRQ affinities, use them to route the SPIs */
+ 	if (using_spi && i == pdev->num_resources)
+ 		pmu->irq_affinity = irqs;
+-	else
+-		kfree(irqs);
+ 
+ 	return 0;
+ }
+@@ -1017,7 +1013,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 	struct arm_pmu *pmu;
+ 	int ret = -ENODEV;
+ 
+-	pmu = kzalloc(sizeof(struct arm_pmu), GFP_KERNEL);
++	pmu = devm_kzalloc(&pdev->dev, sizeof(struct arm_pmu), GFP_KERNEL);
+ 	if (!pmu) {
+ 		pr_info("failed to allocate PMU device!\n");
+ 		return -ENOMEM;
+@@ -1074,8 +1070,6 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ out_free:
+ 	pr_info("%s: failed to register PMU devices!\n",
+ 		of_node_full_name(node));
+-	kfree(pmu->irq_affinity);
+-	kfree(pmu);
+ 	return ret;
  }
  
- static void a3700_spi_transfer_setup(struct spi_device *spi,
--				    struct spi_transfer *xfer)
-+				     struct spi_transfer *xfer)
- {
- 	struct a3700_spi *a3700_spi;
- 	unsigned int byte_len;
-@@ -561,6 +561,7 @@ static int a3700_spi_fifo_read(struct a3700_spi *a3700_spi)
- 		val = spireg_read(a3700_spi, A3700_SPI_DATA_IN_REG);
- 		if (a3700_spi->buf_len >= 4) {
- 			u32 data = le32_to_cpu(val);
-+
- 			memcpy(a3700_spi->rx_buf, &data, 4);
- 
- 			a3700_spi->buf_len -= 4;
 -- 
-2.9.3
+2.10.2
