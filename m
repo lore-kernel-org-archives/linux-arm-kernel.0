@@ -1,49 +1,32 @@
-From: joelaf@google.com (Joel Fernandes)
-Date: Wed, 21 Dec 2016 14:44:46 -0800
-Subject: [PATCH] arm64: Don't trace __switch_to if function graph tracer is
- enabled
-Message-ID: <1482360288-124624-1-git-send-email-joelaf@google.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 21 Dec 2016 15:14:46 -0800
+Subject: [PATCH 02/11] clk: bcm2835: Register the DSI0/DSI1 pixel clocks.
+In-Reply-To: <20161214194621.16499-3-eric@anholt.net>
+References: <20161214194621.16499-1-eric@anholt.net>
+ <20161214194621.16499-3-eric@anholt.net>
+Message-ID: <20161221231446.GA8288@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function graph tracer shows negative time (wrap around) when tracing
-__switch_to if the nosleep-time trace option is enabled.
+On 12/14, Eric Anholt wrote:
+>  
+>  	/* the gates */
+>  
+> @@ -1890,8 +1976,18 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
+>  	if (IS_ERR(cprman->regs))
+>  		return PTR_ERR(cprman->regs);
+>  
+> -	cprman->osc_name = of_clk_get_parent_name(dev->of_node, 0);
+> -	if (!cprman->osc_name)
+> +	for (i = 0; i < ARRAY_SIZE(cprman_parent_names); i++) {
+> +		cprman->real_parent_names[i] =
+> +			of_clk_get_parent_name(dev->of_node, i);
+> +	}
 
-Time compensation for nosleep-time is done by an ftrace probe on
-sched_switch. This doesn't work well for the following events (with
-letters representing timestamps):
-A - sched switch probe called for task T switch out
-B - __switch_to calltime is recorded
-C - sched_switch probe called for task T switch in
-D - __switch_to rettime is recorded
+Can we use of_clk_parent_fill() here? Or do we need to support
+holes in the parent array? If it's the latter please add a
+comment so we don't mistakenly change this later.
 
-If C - A > D - B, then we end up over compensating for the time spent in
-__switch_to giving rise to negative times in the trace output.
-
-On x86, __switch_to is not traced if function graph tracer is enabled.
-Do the same for arm64 as well.
-
-Cc: Todd Kjos <tkjos@google.com>
-Cc: Steven Rostedt <rostedt@goodmis.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Joel Fernandes <joelaf@google.com>
----
- arch/arm64/kernel/process.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 01753cd..e84ee27 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -324,7 +324,7 @@ void uao_thread_switch(struct task_struct *next)
- /*
-  * Thread switching.
-  */
--struct task_struct *__switch_to(struct task_struct *prev,
-+__notrace_funcgraph struct task_struct *__switch_to(struct task_struct *prev,
- 				struct task_struct *next)
- {
- 	struct task_struct *last;
 -- 
-2.8.0.rc3.226.g39d4020
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
