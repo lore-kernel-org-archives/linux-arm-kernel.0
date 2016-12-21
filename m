@@ -1,76 +1,52 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 21 Dec 2016 11:26:56 +0100
-Subject: [PATCHv2 2/3] clk: mvebu: adjust clock handling for the CP110 system
- controller
+Date: Wed, 21 Dec 2016 11:26:55 +0100
+Subject: [PATCHv2 1/3] dt-bindings: arm: update Armada CP110 system controller
+ binding
 In-Reply-To: <1482316017-22154-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1482316017-22154-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482316017-22154-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482316017-22154-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit:
-
- - makes the GOP_DP (bit 9) gatable clock a child clock of the
-   SD_MMC_GOP (bit 18) clock, as it should have been. The clock for bit
-   18 was just named SD_MMC, but since it also covers the GOP block, it
-   is renamed SD_MMC_GOP.
-
- - makes the MG (bit 5) gatable clock a child clock of the MG_CORE
-   clock (bit 6)
+It turns out that in the CP110 HW block present in Marvell Armada
+7K/8K SoCs, gatable clock n?18 not only controls SD/MMC, but also the
+GOP block. This commit updates the Device Tree binding for this piece
+of hardware accordingly.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/clk/mvebu/cp110-system-controller.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/arm/marvell/cp110-system-controller0.txt    | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/mvebu/cp110-system-controller.c b/drivers/clk/mvebu/cp110-system-controller.c
-index f2303da..8038b93 100644
---- a/drivers/clk/mvebu/cp110-system-controller.c
-+++ b/drivers/clk/mvebu/cp110-system-controller.c
-@@ -64,8 +64,11 @@ enum {
- #define CP110_GATE_NAND			2
- #define CP110_GATE_PPV2			3
- #define CP110_GATE_SDIO			4
-+#define CP110_GATE_MG			5
-+#define CP110_GATE_MG_CORE		6
- #define CP110_GATE_XOR1			7
- #define CP110_GATE_XOR0			8
-+#define CP110_GATE_GOP_DP		9
- #define CP110_GATE_PCIE_X1_0		11
- #define CP110_GATE_PCIE_X1_1		12
- #define CP110_GATE_PCIE_X4		13
-@@ -73,7 +76,7 @@ enum {
- #define CP110_GATE_SATA			15
- #define CP110_GATE_SATA_USB		16
- #define CP110_GATE_MAIN			17
--#define CP110_GATE_SDMMC		18
-+#define CP110_GATE_SDMMC_GOP		18
- #define CP110_GATE_SLOW_IO		21
- #define CP110_GATE_USB3H0		22
- #define CP110_GATE_USB3H1		23
-@@ -302,6 +305,11 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
- 						      "gate-clock-output-names",
- 						      CP110_GATE_MAIN, &parent);
- 			break;
-+		case CP110_GATE_MG:
-+			of_property_read_string_index(np,
-+						      "gate-clock-output-names",
-+						      CP110_GATE_MG_CORE, &parent);
-+			break;
- 		case CP110_GATE_NAND:
- 			parent = nand_name;
- 			break;
-@@ -309,9 +317,10 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
- 			parent = ppv2_name;
- 			break;
- 		case CP110_GATE_SDIO:
-+		case CP110_GATE_GOP_DP:
- 			of_property_read_string_index(np,
- 						      "gate-clock-output-names",
--						      CP110_GATE_SDMMC, &parent);
-+						      CP110_GATE_SDMMC_GOP, &parent);
- 			break;
- 		case CP110_GATE_XOR1:
- 		case CP110_GATE_XOR0:
+diff --git a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
+index 30c5469..07dbb35 100644
+--- a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
++++ b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
+@@ -45,7 +45,7 @@ The following clocks are available:
+    - 1 15	SATA
+    - 1 16	SATA USB
+    - 1 17	Main
+-   - 1 18	SD/MMC
++   - 1 18	SD/MMC/GOP
+    - 1 21	Slow IO (SPI, NOR, BootROM, I2C, UART)
+    - 1 22	USB3H0
+    - 1 23	USB3H1
+@@ -65,7 +65,7 @@ Required properties:
+ 	"cpm-audio", "cpm-communit", "cpm-nand", "cpm-ppv2", "cpm-sdio",
+ 	"cpm-mg-domain", "cpm-mg-core", "cpm-xor1", "cpm-xor0", "cpm-gop-dp", "none",
+ 	"cpm-pcie_x10", "cpm-pcie_x11", "cpm-pcie_x4", "cpm-pcie-xor", "cpm-sata",
+-	"cpm-sata-usb", "cpm-main", "cpm-sd-mmc", "none", "none", "cpm-slow-io",
++	"cpm-sata-usb", "cpm-main", "cpm-sd-mmc-gop", "none", "none", "cpm-slow-io",
+ 	"cpm-usb3h0", "cpm-usb3h1", "cpm-usb3dev", "cpm-eip150", "cpm-eip197";
+ 
+ Example:
+@@ -78,6 +78,6 @@ Example:
+ 		gate-clock-output-names = "cpm-audio", "cpm-communit", "cpm-nand", "cpm-ppv2", "cpm-sdio",
+ 			"cpm-mg-domain", "cpm-mg-core", "cpm-xor1", "cpm-xor0", "cpm-gop-dp", "none",
+ 			"cpm-pcie_x10", "cpm-pcie_x11", "cpm-pcie_x4", "cpm-pcie-xor", "cpm-sata",
+-			"cpm-sata-usb", "cpm-main", "cpm-sd-mmc", "none", "none", "cpm-slow-io",
++			"cpm-sata-usb", "cpm-main", "cpm-sd-mmc-gop", "none", "none", "cpm-slow-io",
+ 			"cpm-usb3h0", "cpm-usb3h1", "cpm-usb3dev", "cpm-eip150", "cpm-eip197";
+ 	};
 -- 
 2.7.4
