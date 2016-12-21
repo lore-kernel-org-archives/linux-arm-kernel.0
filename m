@@ -1,52 +1,76 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 21 Dec 2016 11:26:54 +0100
-Subject: [PATCHv2 0/3] arm64/clk: update Marvell Armada CP110 system
- controller driver
-Message-ID: <1482316017-22154-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 21 Dec 2016 11:26:56 +0100
+Subject: [PATCHv2 2/3] clk: mvebu: adjust clock handling for the CP110 system
+ controller
+In-Reply-To: <1482316017-22154-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1482316017-22154-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482316017-22154-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This commit:
 
-This small set of commits updates the Marvell Armada CP110 system
-controller driver, its Device Tree binding, and Device Tree
-representation, to take into account three new things:
+ - makes the GOP_DP (bit 9) gatable clock a child clock of the
+   SD_MMC_GOP (bit 18) clock, as it should have been. The clock for bit
+   18 was just named SD_MMC, but since it also covers the GOP block, it
+   is renamed SD_MMC_GOP.
 
- - The clock driver now handles clock n?9 (GOP) as a child of clock
-   n?18 (controls SD/MMC and GOP)
+ - makes the MG (bit 5) gatable clock a child clock of the MG_CORE
+   clock (bit 6)
 
- - The DT representation is adjusted to name clock n?18 "sd-mmc-gop"
-   instead of just "sd-mmc".
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/clk/mvebu/cp110-system-controller.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
- - The clock driver now handles clock n?5 (MG) as a child of clock n?6
-   (MG_CORE).
-
-This set of commits is some preparation work to add networking support
-for Marvell Armada 7K/8K.
-
-I would expect patches 1 and 2 to be taken by the clock maintainers,
-and patch 3 be taken by the Marvell EBU maintainers.
-
-Changes since v1:
-
- - Addition of the handling of the MG and MG_CORE clocks (n?5 and
-   n?6), also needed for the networking support on Marvell Aramda
-   7K/8K.
-
-Thanks,
-
-Thomas
-
-Thomas Petazzoni (3):
-  dt-bindings: arm: update Armada CP110 system controller binding
-  clk: mvebu: adjust clock handling for the CP110 system controller
-  arm64: dts: marvell: adjust name of sd-mmc-gop clock in syscon
-
- .../bindings/arm/marvell/cp110-system-controller0.txt       |  6 +++---
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi        |  2 +-
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi         |  2 +-
- drivers/clk/mvebu/cp110-system-controller.c                 | 13 +++++++++++--
- 4 files changed, 16 insertions(+), 7 deletions(-)
-
+diff --git a/drivers/clk/mvebu/cp110-system-controller.c b/drivers/clk/mvebu/cp110-system-controller.c
+index f2303da..8038b93 100644
+--- a/drivers/clk/mvebu/cp110-system-controller.c
++++ b/drivers/clk/mvebu/cp110-system-controller.c
+@@ -64,8 +64,11 @@ enum {
+ #define CP110_GATE_NAND			2
+ #define CP110_GATE_PPV2			3
+ #define CP110_GATE_SDIO			4
++#define CP110_GATE_MG			5
++#define CP110_GATE_MG_CORE		6
+ #define CP110_GATE_XOR1			7
+ #define CP110_GATE_XOR0			8
++#define CP110_GATE_GOP_DP		9
+ #define CP110_GATE_PCIE_X1_0		11
+ #define CP110_GATE_PCIE_X1_1		12
+ #define CP110_GATE_PCIE_X4		13
+@@ -73,7 +76,7 @@ enum {
+ #define CP110_GATE_SATA			15
+ #define CP110_GATE_SATA_USB		16
+ #define CP110_GATE_MAIN			17
+-#define CP110_GATE_SDMMC		18
++#define CP110_GATE_SDMMC_GOP		18
+ #define CP110_GATE_SLOW_IO		21
+ #define CP110_GATE_USB3H0		22
+ #define CP110_GATE_USB3H1		23
+@@ -302,6 +305,11 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
+ 						      "gate-clock-output-names",
+ 						      CP110_GATE_MAIN, &parent);
+ 			break;
++		case CP110_GATE_MG:
++			of_property_read_string_index(np,
++						      "gate-clock-output-names",
++						      CP110_GATE_MG_CORE, &parent);
++			break;
+ 		case CP110_GATE_NAND:
+ 			parent = nand_name;
+ 			break;
+@@ -309,9 +317,10 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
+ 			parent = ppv2_name;
+ 			break;
+ 		case CP110_GATE_SDIO:
++		case CP110_GATE_GOP_DP:
+ 			of_property_read_string_index(np,
+ 						      "gate-clock-output-names",
+-						      CP110_GATE_SDMMC, &parent);
++						      CP110_GATE_SDMMC_GOP, &parent);
+ 			break;
+ 		case CP110_GATE_XOR1:
+ 		case CP110_GATE_XOR0:
 -- 
 2.7.4
