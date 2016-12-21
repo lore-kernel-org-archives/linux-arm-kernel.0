@@ -1,54 +1,25 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 21 Dec 2016 16:55:56 +0800
-Subject: [PATCH] crypto: testmgr: Use linear alias for test input
-In-Reply-To: <1482190646-7720-1-git-send-email-labbott@redhat.com>
-References: <1482190646-7720-1-git-send-email-labbott@redhat.com>
-Message-ID: <20161221085556.GC29501@gondor.apana.org.au>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 21 Dec 2016 18:02:52 +0100
+Subject: [PATCH net-next 14/27] net: mvpp2: add ip_version field in
+ "struct mvpp2"
+In-Reply-To: <1482318994-23488-15-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1482318994-23488-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1482318994-23488-15-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20161221170252.GO30952@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 19, 2016 at 03:37:26PM -0800, Laura Abbott wrote:
-> Christopher Covington reported a crash on aarch64 on recent Fedora
-> kernels:
-> 
-> kernel BUG at ./include/linux/scatterlist.h:140!
-> Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-> Modules linked in:
-> CPU: 2 PID: 752 Comm: cryptomgr_test Not tainted 4.9.0-11815-ge93b1cc #162
-> Hardware name: linux,dummy-virt (DT)
-> task: ffff80007c650080 task.stack: ffff800008910000
-> PC is at sg_init_one+0xa0/0xb8
-> LR is at sg_init_one+0x24/0xb8
-> ...
-> [<ffff000008398db8>] sg_init_one+0xa0/0xb8
-> [<ffff000008350a44>] test_acomp+0x10c/0x438
-> [<ffff000008350e20>] alg_test_comp+0xb0/0x118
-> [<ffff00000834f28c>] alg_test+0x17c/0x2f0
-> [<ffff00000834c6a4>] cryptomgr_test+0x44/0x50
-> [<ffff0000080dac70>] kthread+0xf8/0x128
-> [<ffff000008082ec0>] ret_from_fork+0x10/0x50
-> 
-> The test vectors used for input are part of the kernel image. These
-> inputs are passed as a buffer to sg_init_one which eventually blows up
-> with BUG_ON(!virt_addr_valid(buf)). On arm64, virt_addr_valid returns
-> false for the kernel image since virt_to_page will not return the
-> correct page. The kernel image is also aliased to the linear map so get
-> the linear alias and pass that to the scatterlist instead.
-> 
-> Reported-by: Christopher Covington <cov@codeaurora.org>
-> Fixes: d7db7a882deb ("crypto: acomp - update testmgr with support for acomp")
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> x86 supports virt_addr_valid working on kernel image addresses but arm64 is
-> more strict. This is the direction things have been moving with my
-> CONFIG_DEBUG_VIRTUAL series for arm64 which is tightening the definition of
-> __pa/__pa_symbol.
+Hi Thomas
 
-Please fix this by copying the templates to kmalloced memory like
-the other test_* functions.
+Minor nit pick.
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+On Wed, Dec 21, 2016 at 12:16:21PM +0100, Thomas Petazzoni wrote:
+> In preparation to the introduction for the support of PPv2.2 in the
+> mvpp2 driver, this commit adds an ip_version field to the struct
+> mvpp2
+
+When i read this, i was thinking IPv4 vs IPv6. It is a network driver after all.
+Could you maybe call this hw_version?
+
+Thanks
+	Andrew
