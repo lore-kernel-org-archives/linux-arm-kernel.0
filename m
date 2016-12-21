@@ -1,106 +1,31 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 21 Dec 2016 12:16:29 +0100
-Subject: [PATCH net-next 22/27] net: mvpp2: handle misc PPv2.1/PPv2.2
- differences
+Date: Wed, 21 Dec 2016 12:16:15 +0100
+Subject: [PATCH net-next 08/27] net: mvpp2: remove unused register definitions
 In-Reply-To: <1482318994-23488-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1482318994-23488-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482318994-23488-23-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482318994-23488-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit handles a few miscellaneous differences between PPv2.1 and
-PPv2.2 in different areas, where code done for PPv2.1 doesn't apply for
-PPv2.2 or needs to be adjusted (getting the MAC address, disabling PHY
-polling, etc.).
-
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 31 ++++++++++++++++++++++---------
- 1 file changed, 22 insertions(+), 9 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 4163b0e..9b5a7c2 100644
+index 98edcb6..e11eb6f 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -304,6 +304,9 @@
- #define      MVPP2_GMAC_TX_FIFO_MIN_TH_MASK(v)	(((v) << 6) & \
- 					MVPP2_GMAC_TX_FIFO_MIN_TH_ALL_MASK)
+@@ -253,10 +253,6 @@
+ #define MVPP2_SRC_ADDR_HIGH			0x28
+ #define MVPP2_PHY_AN_CFG0_REG			0x34
+ #define     MVPP2_PHY_AN_STOP_SMI0_MASK		BIT(7)
+-#define MVPP2_MIB_COUNTERS_BASE(port)		(0x1000 + ((port) >> 1) * \
+-						0x400 + (port) * 0x400)
+-#define     MVPP2_MIB_LATE_COLLISION		0x7c
+-#define MVPP2_ISR_SUM_MASK_REG			0x220c
+ #define MVPP2_MNG_EXTENDED_GLOBAL_CTRL_REG	0x305c
+ #define MVPP2_EXT_GLOBAL_CTRL_DEFAULT		0x27
  
-+#define MVPP22_SMI_MISC_CFG_REG			0x2a204
-+#define      MVPP22_SMI_POLLING_EN		BIT(10)
-+
- #define MVPP22_PORT_BASE			0x30e00
- #define MVPP22_PORT_OFFSET			0x1000
- 
-@@ -5846,7 +5849,7 @@ static int mvpp2_check_ringparam_valid(struct net_device *dev,
- 	return 0;
- }
- 
--static void mvpp2_get_mac_address(struct mvpp2_port *port, unsigned char *addr)
-+static void mvpp21_get_mac_address(struct mvpp2_port *port, unsigned char *addr)
- {
- 	u32 mac_addr_l, mac_addr_m, mac_addr_h;
- 
-@@ -6294,7 +6297,7 @@ static const struct ethtool_ops mvpp2_eth_tool_ops = {
- 
- /* Driver initialization */
- 
--static void mvpp2_port_power_up(struct mvpp2_port *port)
-+static void mvpp21_port_power_up(struct mvpp2_port *port)
- {
- 	mvpp2_port_mii_set(port);
- 	mvpp2_port_periodic_xon_disable(port);
-@@ -6513,7 +6516,8 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 		mac_from = "device tree";
- 		ether_addr_copy(dev->dev_addr, dt_mac_addr);
- 	} else {
--		mvpp2_get_mac_address(port, hw_mac_addr);
-+		if (priv->ip_version == MVPP21)
-+			mvpp21_get_mac_address(port, hw_mac_addr);
- 		if (is_valid_ether_addr(hw_mac_addr)) {
- 			mac_from = "hardware";
- 			ether_addr_copy(dev->dev_addr, hw_mac_addr);
-@@ -6533,7 +6537,9 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 		dev_err(&pdev->dev, "failed to init port %d\n", id);
- 		goto err_free_stats;
- 	}
--	mvpp2_port_power_up(port);
-+
-+	if (priv->ip_version == MVPP21)
-+		mvpp21_port_power_up(port);
- 
- 	port->pcpu = alloc_percpu(struct mvpp2_port_pcpu);
- 	if (!port->pcpu) {
-@@ -6671,9 +6677,15 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
- 		mvpp2_conf_mbus_windows(dram_target_info, priv);
- 
- 	/* Disable HW PHY polling */
--	val = readl(priv->lms_base + MVPP2_PHY_AN_CFG0_REG);
--	val |= MVPP2_PHY_AN_STOP_SMI0_MASK;
--	writel(val, priv->lms_base + MVPP2_PHY_AN_CFG0_REG);
-+	if (priv->ip_version == MVPP21) {
-+		val = readl(priv->lms_base + MVPP2_PHY_AN_CFG0_REG);
-+		val |= MVPP2_PHY_AN_STOP_SMI0_MASK;
-+		writel(val, priv->lms_base + MVPP2_PHY_AN_CFG0_REG);
-+	} else {
-+		val = readl(priv->iface_base + MVPP22_SMI_MISC_CFG_REG);
-+		val &= ~MVPP22_SMI_POLLING_EN;
-+		writel(val, priv->iface_base + MVPP22_SMI_MISC_CFG_REG);
-+	}
- 
- 	/* Allocate and initialize aggregated TXQs */
- 	priv->aggr_txqs = devm_kcalloc(&pdev->dev, num_present_cpus(),
-@@ -6698,8 +6710,9 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
- 	for (i = 0; i < MVPP2_MAX_PORTS; i++)
- 		mvpp2_write(priv, MVPP2_ISR_RXQ_GROUP_REG(i), rxq_number);
- 
--	writel(MVPP2_EXT_GLOBAL_CTRL_DEFAULT,
--	       priv->lms_base + MVPP2_MNG_EXTENDED_GLOBAL_CTRL_REG);
-+	if (priv->ip_version == MVPP21)
-+		writel(MVPP2_EXT_GLOBAL_CTRL_DEFAULT,
-+		       priv->lms_base + MVPP2_MNG_EXTENDED_GLOBAL_CTRL_REG);
- 
- 	/* Allow cache snoop when transmiting packets */
- 	mvpp2_write(priv, MVPP2_TX_SNOOP_REG, 0x1);
 -- 
 2.7.4
