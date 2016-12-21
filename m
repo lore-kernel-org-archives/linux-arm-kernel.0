@@ -1,178 +1,103 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 21 Dec 2016 12:16:28 +0100
-Subject: [PATCH net-next 21/27] net: mvpp2: handle register mapping and access
- for PPv2.2
+Date: Wed, 21 Dec 2016 12:16:33 +0100
+Subject: [PATCH net-next 26/27] net: mvpp2: add support for an additional
+ clock needed for PPv2.2
 In-Reply-To: <1482318994-23488-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1482318994-23488-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482318994-23488-22-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482318994-23488-27-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adjusts the mvpp2 driver register mapping and access logic
-to support PPv2.2, to handle a number of differences.
-
-Due to how the registers are laid out in memory, the Device Tree binding
-for the "reg" property is different:
-
- - On PPv2.1, we had a first area for the common registers, and then one
-   area per port.
-
- - On PPv2.2, we have a first area for the common registers, and a
-   second area for all the per-ports registers.
-
-In addition, on PPv2.2, the area for the common registers is split into
-so-called "address spaces" of 64 KB each. They allow to access the same
-registers, but from different CPUs. Hence the introduction of cpu_base[]
-in 'struct mvpp2', and the modification of the mvpp2_write() and
-mvpp2_read() register accessors. For PPv2.1, the compatibility is
-preserved by using an "address space" size of 0.
+The PPv2.2 variant of the network controller needs an additional
+clock, the "MG clock" in order for the IP block to operate
+properly. This commit adds support for this additional clock to the
+driver, reworking as needed the error handling path.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 78 +++++++++++++++++++++++++++++-------
- 1 file changed, 64 insertions(+), 14 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 25 +++++++++++++++++++++----
+ 1 file changed, 21 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index eb9fe86..4163b0e 100644
+index c389590..d9368d6 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -304,6 +304,9 @@
- #define      MVPP2_GMAC_TX_FIFO_MIN_TH_MASK(v)	(((v) << 6) & \
- 					MVPP2_GMAC_TX_FIFO_MIN_TH_ALL_MASK)
- 
-+#define MVPP22_PORT_BASE			0x30e00
-+#define MVPP22_PORT_OFFSET			0x1000
-+
- #define MVPP2_CAUSE_TXQ_SENT_DESC_ALL_MASK	0xff
- 
- /* Descriptor ring Macros */
-@@ -631,6 +634,11 @@ enum mvpp2_prs_l3_cast {
-  */
- #define MVPP2_BM_SHORT_PKT_SIZE		MVPP2_RX_MAX_PKT_SIZE(512)
- 
-+#define MVPP21_ADDR_SPACE_SZ		0
-+#define MVPP22_ADDR_SPACE_SZ		SZ_64K
-+
-+#define MVPP2_MAX_CPUS			4
-+
- enum mvpp2_bm_type {
- 	MVPP2_BM_FREE,
- 	MVPP2_BM_SWF_LONG,
-@@ -644,6 +652,13 @@ struct mvpp2 {
- 	/* Shared registers' base addresses */
- 	void __iomem *base;
- 	void __iomem *lms_base;
-+	void __iomem *iface_base;
-+
-+	/* On PPv2.2, each CPU can access the base register through a
-+	 * separate address space, each 64 KB apart from each
-+	 * other.
-+	 */
-+	void __iomem *cpu_base[MVPP2_MAX_CPUS];
- 
+@@ -702,6 +702,7 @@ struct mvpp2 {
  	/* Common clocks */
  	struct clk *pp_clk;
-@@ -1021,12 +1036,21 @@ static int txq_number = MVPP2_MAX_TXQ;
+ 	struct clk *gop_clk;
++	struct clk *mg_clk;
  
- static void mvpp2_write(struct mvpp2 *priv, u32 offset, u32 data)
- {
--	writel(data, priv->base + offset);
-+	int cpu = get_cpu();
-+
-+	writel(data, priv->cpu_base[cpu] + offset);
-+	put_cpu();
- }
+ 	/* List of pointers to port structures */
+ 	struct mvpp2_port **port_list;
+@@ -6916,6 +6917,18 @@ static int mvpp2_probe(struct platform_device *pdev)
+ 	if (err < 0)
+ 		goto err_pp_clk;
  
- static u32 mvpp2_read(struct mvpp2 *priv, u32 offset)
- {
--	return readl(priv->base + offset);
-+	int cpu = get_cpu();
-+	u32 val;
-+
-+	val = readl(priv->cpu_base[cpu] + offset);
-+	put_cpu();
-+
-+	return val;
- }
- 
- static dma_addr_t mvpp2_txdesc_phys_addr_get(struct mvpp2_port *port,
-@@ -6408,7 +6432,6 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 	u32 id;
- 	int features;
- 	int phy_mode;
--	int priv_common_regs_num = 2;
- 	int err, i, cpu;
- 
- 	dev = alloc_etherdev_mqs(sizeof(struct mvpp2_port), txq_number,
-@@ -6458,12 +6481,24 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 	port->phy_node = phy_node;
- 	port->phy_interface = phy_mode;
- 
--	res = platform_get_resource(pdev, IORESOURCE_MEM,
--				    priv_common_regs_num + id);
--	port->base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(port->base)) {
--		err = PTR_ERR(port->base);
--		goto err_free_irq;
-+	if (priv->ip_version == MVPP21) {
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, 2 + id);
-+		port->base = devm_ioremap_resource(&pdev->dev, res);
-+		if (IS_ERR(port->base)) {
-+			err = PTR_ERR(port->base);
-+			goto err_free_irq;
-+		}
-+	} else {
-+		u32 gop_id;
-+
-+		if (of_property_read_u32(port_node, "gop-port-id", &gop_id)) {
-+			err = -EINVAL;
-+			dev_err(&pdev->dev, "missing gop-port-id value\n");
-+			goto err_free_irq;
++	if (priv->ip_version == MVPP22) {
++		priv->mg_clk = devm_clk_get(&pdev->dev, "mg_clk");
++		if (IS_ERR(priv->mg_clk)) {
++			err = PTR_ERR(priv->mg_clk);
++			goto err_gop_clk;
 +		}
 +
-+		port->base = priv->iface_base + MVPP22_PORT_BASE +
-+			gop_id * MVPP22_PORT_OFFSET;
++		err = clk_prepare_enable(priv->mg_clk);
++		if (err < 0)
++			goto err_gop_clk;
++	}
++
+ 	/* Get system's tclk rate */
+ 	priv->tclk = clk_get_rate(priv->pp_clk);
+ 
+@@ -6923,14 +6936,14 @@ static int mvpp2_probe(struct platform_device *pdev)
+ 	err = mvpp2_init(pdev, priv);
+ 	if (err < 0) {
+ 		dev_err(&pdev->dev, "failed to initialize controller\n");
+-		goto err_gop_clk;
++		goto err_mg_clk;
  	}
  
- 	/* Alloc per-cpu stats */
-@@ -6691,7 +6726,7 @@ static int mvpp2_probe(struct platform_device *pdev)
- 	struct device_node *port_node;
- 	struct mvpp2 *priv;
- 	struct resource *res;
--	int port_count, first_rxq;
-+	int port_count, first_rxq, cpu;
- 	int err;
+ 	port_count = of_get_available_child_count(dn);
+ 	if (port_count == 0) {
+ 		dev_err(&pdev->dev, "no ports enabled\n");
+ 		err = -ENODEV;
+-		goto err_gop_clk;
++		goto err_mg_clk;
+ 	}
  
- 	priv = devm_kzalloc(&pdev->dev, sizeof(struct mvpp2), GFP_KERNEL);
-@@ -6706,10 +6741,25 @@ static int mvpp2_probe(struct platform_device *pdev)
- 	if (IS_ERR(priv->base))
- 		return PTR_ERR(priv->base);
+ 	priv->port_list = devm_kcalloc(&pdev->dev, port_count,
+@@ -6938,19 +6951,22 @@ static int mvpp2_probe(struct platform_device *pdev)
+ 				      GFP_KERNEL);
+ 	if (!priv->port_list) {
+ 		err = -ENOMEM;
+-		goto err_gop_clk;
++		goto err_mg_clk;
+ 	}
  
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
--	priv->lms_base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(priv->lms_base))
--		return PTR_ERR(priv->lms_base);
-+	if (priv->ip_version == MVPP21) {
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+		priv->lms_base = devm_ioremap_resource(&pdev->dev, res);
-+		if (IS_ERR(priv->lms_base))
-+			return PTR_ERR(priv->lms_base);
-+	} else {
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+		priv->iface_base = devm_ioremap_resource(&pdev->dev, res);
-+		if (IS_ERR(priv->iface_base))
-+			return PTR_ERR(priv->iface_base);
-+	}
-+
-+	for_each_present_cpu(cpu) {
-+		u32 addr_space_sz;
-+
-+		addr_space_sz = (priv->ip_version == MVPP21 ?
-+				 MVPP21_ADDR_SPACE_SZ : MVPP22_ADDR_SPACE_SZ);
-+		priv->cpu_base[cpu] = priv->base + cpu * addr_space_sz;
-+	}
+ 	/* Initialize ports */
+ 	for_each_available_child_of_node(dn, port_node) {
+ 		err = mvpp2_port_probe(pdev, port_node, priv);
+ 		if (err < 0)
+-			goto err_gop_clk;
++			goto err_mg_clk;
+ 	}
  
- 	priv->pp_clk = devm_clk_get(&pdev->dev, "pp_clk");
- 	if (IS_ERR(priv->pp_clk))
+ 	platform_set_drvdata(pdev, priv);
+ 	return 0;
+ 
++err_mg_clk:
++	if (priv->ip_version == MVPP22)
++		clk_disable_unprepare(priv->mg_clk);
+ err_gop_clk:
+ 	clk_disable_unprepare(priv->gop_clk);
+ err_pp_clk:
+@@ -6986,6 +7002,7 @@ static int mvpp2_remove(struct platform_device *pdev)
+ 				  aggr_txq->descs_phys);
+ 	}
+ 
++	clk_disable_unprepare(priv->mg_clk);
+ 	clk_disable_unprepare(priv->pp_clk);
+ 	clk_disable_unprepare(priv->gop_clk);
+ 
 -- 
 2.7.4
