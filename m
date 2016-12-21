@@ -1,30 +1,21 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 21 Dec 2016 14:25:19 +0100
-Subject: [v4, 3/3] ARM: dts: vf610-zii-dev-rev-b: Remove 'fixed-link'
- from DSA ports
-In-Reply-To: <1482325125-15725-1-git-send-email-nikita.yoush@cogentembedded.com>
-References: <1482131877-6097-3-git-send-email-andrew.smirnov@gmail.com>
- <1482325125-15725-1-git-send-email-nikita.yoush@cogentembedded.com>
-Message-ID: <20161221132519.bkkqyfk3beow7nc5@pengutronix.de>
+From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
+Date: Wed, 21 Dec 2016 16:30:11 +0300
+Subject: [v4,
+ 1/3] ARM: dts: vf610-zii-dev-rev-b: Remove leftover PWM pingroup
+In-Reply-To: <1482131877-6097-1-git-send-email-andrew.smirnov@gmail.com>
+References: <1482131877-6097-1-git-send-email-andrew.smirnov@gmail.com>
+Message-ID: <1482327011-19979-1-git-send-email-nikita.yoush@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2016 at 03:58:45PM +0300, Nikita Yushchenko wrote:
-> > Remove 'fixed-link' nodes from DSA ports since they are not needed (they
-> > are not limiting link's speed and the ports will be configured to their
-> > maximux speed as a default)
-> >
-> > Suggested-by: Andrew Lunn <andrew@lunn.ch>
-> > Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> 
-> With this patch, ports connected to revB's second switch stop working.
+> Remove pwm0grp since it is:
+>
+>	a) Not referenced anywhere in the DTS file (unlike Tower board it
+>	is based on, this board does not use/expose FTM0)
+>
+>	b) Configures PTB2 and PTB3 in a way that contradicts
+>	pinctrl-mdio-mux
+>
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-This is probably because without a fixed-link node the phy-mode setting
-isn't applied by the driver.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Tested-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
