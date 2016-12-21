@@ -1,268 +1,40 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu, 22 Dec 2016 04:02:35 +0800
-Subject: [PATCH 3/3] ARM: dts: sun5i: add support for Lichee Pi One board
-In-Reply-To: <20161221200235.11617-1-icenowy@aosc.xyz>
-References: <20161221200235.11617-1-icenowy@aosc.xyz>
-Message-ID: <20161221200235.11617-3-icenowy@aosc.xyz>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 21 Dec 2016 18:08:24 -0200
+Subject: [PATCH 1/2] i.MX31: ipu: Make sure the interrupt routine checks
+ all interrupts.
+In-Reply-To: <1482182934-18559-2-git-send-email-lilja.magnus@gmail.com>
+References: <1482182934-18559-1-git-send-email-lilja.magnus@gmail.com>
+ <1482182934-18559-2-git-send-email-lilja.magnus@gmail.com>
+Message-ID: <CAOMZO5C61gfL95sW=r5RLxFaDSeb34FuFSx8Pj=J2-WqYD1qaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lichee Pi One is a low-cost Allwinner A13-based development board, with
-an AXP209 PMU, a USB2.0 OTG port, a USB2.0 host port (or an onboard
-RTL8723BU Wi-Fi card), optional headers for LCD and CSI, two GPIO
-headers and two MicroSD card slots (connected to mmc0 and mmc2, both
-bootable).
+Hi Magnus,
 
-Add support for it.
+On Mon, Dec 19, 2016 at 7:28 PM, Magnus Lilja <lilja.magnus@gmail.com> wrote:
+> Commit 3d8cc00073d6750ffe883685e49b2e4a0f596370 consolidated the two
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- arch/arm/boot/dts/Makefile                   |   1 +
- arch/arm/boot/dts/sun5i-a13-licheepi-one.dts | 224 +++++++++++++++++++++++++++
- 2 files changed, 225 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun5i-a13-licheepi-one.dts
+The standard form to specify a commit is 3d8cc00073d6 ("dmaengine:
+ipu: Consolidate duplicated irq handlers")
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index cccdbcb557b6..5902d4ca7138 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -781,6 +781,7 @@ dtb-$(CONFIG_MACH_SUN5I) += \
- 	sun5i-a13-empire-electronix-m712.dtb \
- 	sun5i-a13-hsg-h702.dtb \
- 	sun5i-a13-inet-98v-rev2.dtb \
-+	sun5i-a13-licheepi-one.dtb \
- 	sun5i-a13-olinuxino.dtb \
- 	sun5i-a13-olinuxino-micro.dtb \
- 	sun5i-a13-q8-tablet.dtb \
-diff --git a/arch/arm/boot/dts/sun5i-a13-licheepi-one.dts b/arch/arm/boot/dts/sun5i-a13-licheepi-one.dts
-new file mode 100644
-index 000000000000..566cda91a66b
---- /dev/null
-+++ b/arch/arm/boot/dts/sun5i-a13-licheepi-one.dts
-@@ -0,0 +1,224 @@
-+/*
-+ * Copyright 2016 Icenowy Zheng <icenowy@aosc.xyz>
-+ *
-+ * Based on sun5i-a13-olinuxino.dts, which is
-+ *   Copyright 2012 Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *   Copyright 2013 Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun5i-a13.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Lichee Pi One";
-+	compatible = "licheepi,licheepi-one", "allwinner,sun5i-a13";
-+
-+	aliases {
-+		serial0 = &uart1;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		red {
-+			label ="licheepi:red:usr";
-+			gpios = <&pio 2 5 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		green {
-+			label ="licheepi:green:usr";
-+			gpios = <&pio 2 19 GPIO_ACTIVE_LOW>;
-+			default-state = "on";
-+		};
-+
-+		blue {
-+			label ="licheepi:blue:usr";
-+			gpios = <&pio 2 4 GPIO_ACTIVE_LOW>;
-+		};
-+
-+	};
-+};
-+
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		compatible = "x-powers,axp209";
-+		reg = <0x34>;
-+		interrupts = <0>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+	};
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "disabled";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "disabled";
-+};
-+
-+&lradc {
-+	vref-supply = <&reg_ldo2>;
-+	status = "okay";
-+
-+	button at 984 {
-+		label = "Home";
-+		linux,code = <KEY_HOMEPAGE>;
-+		channel = <0>;
-+		voltage = <984126>;
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	broken-cd;
-+	status = "okay";
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_4bit_pins_a>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	broken-cd;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&otg_sram {
-+	status = "okay";
-+};
-+
-+#include "axp209.dtsi"
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-int-dll";
-+};
-+
-+&reg_ldo1 {
-+	regulator-name = "vdd-rtc";
-+};
-+
-+&reg_ldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
-+};
-+
-+&reg_ldo3 {
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <1800000>;
-+	regulator-name = "csi-1.8v";
-+};
-+
-+&reg_ldo4 {
-+	regulator-min-microvolt = <2800000>;
-+	regulator-max-microvolt = <2800000>;
-+	regulator-name = "csi-2.8v";
-+};
-+
-+&reg_usb0_vbus {
-+	gpio = <&pio 2 12 GPIO_ACTIVE_HIGH>; /* PC12 */
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins_b>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	pinctrl-names = "default";
-+	usb0_id_det-gpio = <&pio 6 2 GPIO_ACTIVE_HIGH>; /* PG2 */
-+	usb0_vbus_det-gpio = <&pio 6 1 GPIO_ACTIVE_HIGH>; /* PG1 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
-+	usb1_vbus-supply = <&reg_vcc5v0>;
-+	status = "okay";
-+};
--- 
-2.11.0
+> interrupts routines into one, but the remaining interrupt routine only
+> checks the status of the error interrupts, not the normal interrupts.
+>
+> This patch fixes that problem (tested on i.MX31 PDK board).
+>
+> Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
+
+Patch looks good, but I have some suggestions:
+
+- Subject should start with dmaengine, so something like:
+Subject: dmaengine: ipu: Make sure the ....
+
+- You sent these two patches on a series, but as they touch different
+subsystems they could be sent separately, each one to the proper
+maintainer. For dmaengine the maintainer is Vinod. Hint: you can run
+./scripts/get_maintainer.pl on your patch and it will list the
+maintainer and lists the patches should be sent to.
+
+You should also add a Fixes tag above your Signed-off-by like this:
+Fixes: 3d8cc00073d6 ("dmaengine: ipu: Consolidate duplicated irq handlers")
+Cc: <stable@vger.kernel.org> # 4.3.x
