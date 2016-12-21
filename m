@@ -1,51 +1,49 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 21 Dec 2016 12:16:11 +0100
-Subject: [PATCH net-next 04/27] net: mvpp2: release reference to txq_cpu[]
- entry after unmapping
+Date: Wed, 21 Dec 2016 12:16:10 +0100
+Subject: [PATCH net-next 03/27] net: mvpp2: handle too large value in
+ mvpp2_rx_time_coal_set()
 In-Reply-To: <1482318994-23488-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1482318994-23488-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482318994-23488-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482318994-23488-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvpp2_txq_bufs_free() function is called upon TX completion to DMA
-unmap TX buffers, and free the corresponding SKBs. It gets the
-references to the SKB to free and the DMA buffer to unmap from a per-CPU
-txq_pcpu data structure.
-
-However, the code currently increments the pointer to the next entry
-before doing the DMA unmap and freeing the SKB. It does not cause any
-visible problem because for a given SKB the TX completion is guaranteed
-to take place on the CPU where the TX was started. However, it is much
-more logical to increment the pointer to the next entry once the current
-entry has been completely unmapped/released.
+When configuring the MVPP2_ISR_RX_THRESHOLD_REG with the RX coalescing
+time threshold, we do not check for the maximum allowed value supported
+by the driver, which means we might overflow and use a bogus value. This
+commit adds a check for this situation, and if a value higher than what
+is supported by the hardware is provided, then we use the maximum value
+supported by the hardware.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 12edefe..84eb5fb 100644
+index 4c9e3ea..12edefe 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -4420,13 +4420,12 @@ static void mvpp2_txq_bufs_free(struct mvpp2_port *port,
- 		struct mvpp2_txq_pcpu_buf *tx_buf =
- 			txq_pcpu->buffs + txq_pcpu->txq_get_index;
+@@ -154,6 +154,7 @@
  
--		mvpp2_txq_inc_get(txq_pcpu);
--
- 		dma_unmap_single(port->dev->dev.parent, tx_buf->phys,
- 				 tx_buf->size, DMA_TO_DEVICE);
--		if (!tx_buf->skb)
--			continue;
--		dev_kfree_skb_any(tx_buf->skb);
-+		if (tx_buf->skb)
-+			dev_kfree_skb_any(tx_buf->skb);
+ /* Interrupt Cause and Mask registers */
+ #define MVPP2_ISR_RX_THRESHOLD_REG(rxq)		(0x5200 + 4 * (rxq))
++#define     MVPP2_MAX_ISR_RX_THRESHOLD		0xfffff0
+ #define MVPP2_ISR_RXQ_GROUP_REG(rxq)		(0x5400 + 4 * (rxq))
+ #define MVPP2_ISR_ENABLE_REG(port)		(0x5420 + 4 * (port))
+ #define     MVPP2_ISR_ENABLE_INTERRUPT(mask)	((mask) & 0xffff)
+@@ -4397,6 +4398,12 @@ static void mvpp2_rx_time_coal_set(struct mvpp2_port *port,
+ 	u32 val;
+ 
+ 	val = (port->priv->tclk / USEC_PER_SEC) * usec;
 +
-+		mvpp2_txq_inc_get(txq_pcpu);
- 	}
- }
++	if (val > MVPP2_MAX_ISR_RX_THRESHOLD) {
++		val = MVPP2_MAX_ISR_RX_THRESHOLD;
++		usec = (val * USEC_PER_SEC) / port->priv->tclk;
++	}
++
+ 	mvpp2_write(port->priv, MVPP2_ISR_RX_THRESHOLD_REG(rxq->id), val);
  
+ 	rxq->time_coal = usec;
 -- 
 2.7.4
