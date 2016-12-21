@@ -1,87 +1,34 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 21 Dec 2016 12:16:17 +0100
-Subject: [PATCH net-next 10/27] net: mvpp2: simplify MVPP2_PRS_RI_* definitions
+Date: Wed, 21 Dec 2016 12:16:12 +0100
+Subject: [PATCH net-next 05/27] net: mvpp2: remove unused 'tx_skb' field of
+ 'struct mvpp2_tx_queue'
 In-Reply-To: <1482318994-23488-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1482318994-23488-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482318994-23488-11-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482318994-23488-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the MVPP2_PRS_RI_* definitions use the ~(value) syntax, which
-doesn't compile nicely on 64-bit. Moreover, those definitions are in
-fact unneeded, since they are always used in combination with a bit
-mask that ensures only the appropriate bits are modified.
-
-Therefore, such definitions should just be set to 0x0. For example:
-
- #define MVPP2_PRS_RI_L2_CAST_MASK              0x600
- #define MVPP2_PRS_RI_L2_UCAST                  ~(BIT(9) | BIT(10))
- #define MVPP2_PRS_RI_L2_MCAST                  BIT(9)
- #define MVPP2_PRS_RI_L2_BCAST                  BIT(10)
-
-becomes
-
- #define MVPP2_PRS_RI_L2_CAST_MASK              0x600
- #define MVPP2_PRS_RI_L2_UCAST                  0x0
- #define MVPP2_PRS_RI_L2_MCAST                  BIT(9)
- #define MVPP2_PRS_RI_L2_BCAST                  BIT(10)
-
-Because the values (MVPP2_PRS_RI_L2_UCAST, MVPP2_PRS_RI_L2_MCAST and
-MVPP2_PRS_RI_L2_BCAST) are always applied with
-MVPP2_PRS_RI_L2_CAST_MASK, and therefore there is no need for
-MVPP2_PRS_RI_L2_UCAST to be defined as ~(BIT(9) | BIT(10)).
-
-It fixes the following warnings when building the driver on a 64-bit
-platform (which is not possible as of this commit, but will be enabled
-in a follow-up commit):
-
-drivers/net/ethernet/marvell/mvpp2.c: In function ?mvpp2_prs_mac_promisc_set?:
-drivers/net/ethernet/marvell/mvpp2.c:524:33: warning: large integer implicitly truncated to unsigned type [-Woverflow]
- #define MVPP2_PRS_RI_L2_UCAST   ~(BIT(9) | BIT(10))
-                                 ^
-drivers/net/ethernet/marvell/mvpp2.c:1459:33: note: in expansion of macro ?MVPP2_PRS_RI_L2_UCAST?
-   mvpp2_prs_sram_ri_update(&pe, MVPP2_PRS_RI_L2_UCAST,
+This commit remove a field of 'struct mvpp2_tx_queue' that is not used
+anywhere.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 6ec1135..a713e7d 100644
+index 84eb5fb..fe854b3 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -511,19 +511,19 @@ enum mvpp2_tag_type {
- #define MVPP2_PRS_RI_MAC_ME_MASK		0x1
- #define MVPP2_PRS_RI_DSA_MASK			0x2
- #define MVPP2_PRS_RI_VLAN_MASK			0xc
--#define MVPP2_PRS_RI_VLAN_NONE			~(BIT(2) | BIT(3))
-+#define MVPP2_PRS_RI_VLAN_NONE			0x0
- #define MVPP2_PRS_RI_VLAN_SINGLE		BIT(2)
- #define MVPP2_PRS_RI_VLAN_DOUBLE		BIT(3)
- #define MVPP2_PRS_RI_VLAN_TRIPLE		(BIT(2) | BIT(3))
- #define MVPP2_PRS_RI_CPU_CODE_MASK		0x70
- #define MVPP2_PRS_RI_CPU_CODE_RX_SPEC		BIT(4)
- #define MVPP2_PRS_RI_L2_CAST_MASK		0x600
--#define MVPP2_PRS_RI_L2_UCAST			~(BIT(9) | BIT(10))
-+#define MVPP2_PRS_RI_L2_UCAST			0x0
- #define MVPP2_PRS_RI_L2_MCAST			BIT(9)
- #define MVPP2_PRS_RI_L2_BCAST			BIT(10)
- #define MVPP2_PRS_RI_PPPOE_MASK			0x800
- #define MVPP2_PRS_RI_L3_PROTO_MASK		0x7000
--#define MVPP2_PRS_RI_L3_UN			~(BIT(12) | BIT(13) | BIT(14))
-+#define MVPP2_PRS_RI_L3_UN			0x0
- #define MVPP2_PRS_RI_L3_IP4			BIT(12)
- #define MVPP2_PRS_RI_L3_IP4_OPT			BIT(13)
- #define MVPP2_PRS_RI_L3_IP4_OTHER		(BIT(12) | BIT(13))
-@@ -531,7 +531,7 @@ enum mvpp2_tag_type {
- #define MVPP2_PRS_RI_L3_IP6_EXT			(BIT(12) | BIT(14))
- #define MVPP2_PRS_RI_L3_ARP			(BIT(13) | BIT(14))
- #define MVPP2_PRS_RI_L3_ADDR_MASK		0x18000
--#define MVPP2_PRS_RI_L3_UCAST			~(BIT(15) | BIT(16))
-+#define MVPP2_PRS_RI_L3_UCAST			0x0
- #define MVPP2_PRS_RI_L3_MCAST			BIT(15)
- #define MVPP2_PRS_RI_L3_BCAST			(BIT(15) | BIT(16))
- #define MVPP2_PRS_RI_IP_FRAG_MASK		0x20000
+@@ -823,9 +823,6 @@ struct mvpp2_tx_queue {
+ 	/* Per-CPU control of physical Tx queues */
+ 	struct mvpp2_txq_pcpu __percpu *pcpu;
+ 
+-	/* Array of transmitted skb */
+-	struct sk_buff **tx_skb;
+-
+ 	u32 done_pkts_coal;
+ 
+ 	/* Virtual address of thex Tx DMA descriptors array */
 -- 
 2.7.4
