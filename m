@@ -1,57 +1,106 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 22 Dec 2016 08:35:19 +0100
-Subject: [PATCH] ARM64: zynqmp: Fix i2c node's compatible string
-In-Reply-To: <1482385788-7187-1-git-send-email-moritz.fischer@ettus.com>
-References: <1482385788-7187-1-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <d1e69302-8367-7c57-ecd7-f72861c3a49e@xilinx.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 22 Dec 2016 15:48:44 +0800
+Subject: How to remove warn msg "cache: parent cpui should not be
+ sleeping" i=1, 2, 3...
+In-Reply-To: <a793d088-2faf-3ea8-41b6-f0b614a71e19@arm.com>
+References: <20161221193703.6eac880c@xhacker>
+ <a793d088-2faf-3ea8-41b6-f0b614a71e19@arm.com>
+Message-ID: <20161222154844.36448939@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.12.2016 06:49, Moritz Fischer wrote:
-> From: Moritz Fischer <mdf@kernel.org>
-> 
-> The Zynq Ultrascale MP uses version 1.4 of the Cadence IP core
-> which fixes some silicon bugs that needed software workarounds
-> in Version 1.0 that was used on Zynq systems.
-> 
-> Signed-off-by: Moritz Fischer <mdf@kernel.org>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> Cc: U-Boot List <u-boot@lists.denx.de>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> ---
-> 
-> Hi Michal,
-> 
-> I think this is a slip up and should be r1p14 for
-> Ultrascale ZynqMP. drivers/i2c/i2c-cadence.c already uses this.
-> I Cc'd the u-boot list, because the same change would be required there.
-> 
-> Cheers,
-> 
-> Moritz
-> 
-> ---
->  arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> index 68a90833..a5a5f91 100644
-> --- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> +++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> @@ -175,7 +175,7 @@
->  		};
->  
->  		i2c0: i2c at ff020000 {
-> -			compatible = "cdns,i2c-r1p10";
-> +			compatible = "cdns,i2c-r1p14";
+On Wed, 21 Dec 2016 16:54:22 +0000 Sudeep Holla wrote:
 
-I was checking this internally and p10 is doing something what p14
-doesn't need to do. That's why this should be
+> On 21/12/16 11:37, Jisheng Zhang wrote:
+> > Hi all,
+> > 
+> > I'm not sure this is a bug, when wake up from s2ram, I could get something
+> > like:
+> > 
+> > [  313.271464] Enabling non-boot CPUs ...
+> > [  313.271551] CPU1: Booted secondary processor
+> > [  313.271556] Detected VIPT I-cache on CPU1
+> > [  313.301378]  cache: parent cpu1 should not be sleeping
+> > [  313.301504] CPU1 is up
+> > [  313.301582] CPU2: Booted secondary processor
+> > [  313.301585] Detected VIPT I-cache on CPU2
+> > [  313.331485]  cache: parent cpu2 should not be sleeping
+> > [  313.331605] CPU2 is up
+> > [  313.331683] CPU3: Booted secondary processor
+> > [  313.331686] Detected VIPT I-cache on CPU3
+> > [  313.361599]  cache: parent cpu3 should not be sleeping
+> > [  313.361719] CPU3 is up
+> > 
+> > This is because we call cpu_device_create() when secondary cpu is brought
+> > online, the cpu_cache device's parent device: cpu device isn't already
+> > resumed, all device resume will resume after secondary cores are brought
+> > up.
+> > 
+> > What's the elegant solution to remove this warning msg?
+> >   
+> 
+> It is not a serious warning as you can see a comment in the code:
+> "/*
+>  * This is a fib.  But we'll allow new children to be added below
+>  * a resumed device, even if the device hasn't been completed yet.
+>  */"
+> 
 
-compatible = "cdns,i2c-r1p14", "cdns,i2c-r1p10";
+Great, make sense, I agree with "this is not a serious warn msg".
 
-The same of course for u-boot where also p14 should be added to the driver.
+Thanks for the help,
+Jisheng
 
-Thanks,
-Michal
+
+> But if we think it needs to be removed, I have something like below in
+> my mind. I am not sure if this is hacky or not(completely untested, not
+> even compiled).
+> 
+> Regards,
+> Sudeep
+> 
+> -->8  
+> 
+> diff --git i/drivers/base/cpu.c w/drivers/base/cpu.c
+> index 4c28e1a09786..2a5c04377adf 100644
+> --- i/drivers/base/cpu.c
+> +++ w/drivers/base/cpu.c
+> @@ -344,6 +344,14 @@ static int cpu_uevent(struct device *dev, struct
+> kobj_uevent_env *env)
+>  }
+>  #endif
+> 
+> +static int cpu_dev_pm_unset_is_prepared(unsigned int cpu)
+> +{
+> +       struct device *cpu_dev = get_cpu_device(cpu);
+> +
+> +       if(cpu_dev)
+> +               cpu_dev->power.is_prepared = false;
+> +       return 0;
+> +}
+>  /*
+>   * register_cpu - Setup a sysfs device for a CPU.
+>   * @cpu - cpu->hotpluggable field set to 1 will generate a control file in
+> @@ -377,7 +385,9 @@ int register_cpu(struct cpu *cpu, int num)
+>         per_cpu(cpu_sys_devices, num) = &cpu->dev;
+>         register_cpu_under_node(num, cpu_to_node(num));
+> 
+> -       return 0;
+> +       return cpuhp_setup_state_nocalls(CPUHP_CPUDEV_PM_PREPARE,
+> +                                "base/cpu/dev_pm:prepare",
+> +                                cpu_dev_pm_unset_is_prepared, NULL);
+>  }
+> 
+>  struct device *get_cpu_device(unsigned cpu)
+> diff --git i/include/linux/cpuhotplug.h w/include/linux/cpuhotplug.h
+> index 2ab7bf53d529..5bfe3c1aa148 100644
+> --- i/include/linux/cpuhotplug.h
+> +++ w/include/linux/cpuhotplug.h
+> @@ -51,6 +51,7 @@ enum cpuhp_state {
+>         CPUHP_SLAB_PREPARE,
+>         CPUHP_MD_RAID5_PREPARE,
+>         CPUHP_RCUTREE_PREP,
+> +       CPUHP_CPUDEV_PM_PREPARE,
+>         CPUHP_CPUIDLE_COUPLED_PREPARE,
+>         CPUHP_POWERPC_PMAC_PREPARE,
+>         CPUHP_POWERPC_MMU_CTX_PREPARE,
