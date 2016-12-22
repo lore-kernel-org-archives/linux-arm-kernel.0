@@ -1,21 +1,17 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 21 Dec 2016 16:11:20 -0800
-Subject: [PATCH v4 7/9] clk: stm32f4: SDIO & 48Mhz clock management for
- STM32F469 board
-In-Reply-To: <1481638820-29324-8-git-send-email-gabriel.fernandez@st.com>
+Date: Wed, 21 Dec 2016 16:11:15 -0800
+Subject: [PATCH v4 6/9] clk: stm32f4: Add SAI clocks
+In-Reply-To: <1481638820-29324-7-git-send-email-gabriel.fernandez@st.com>
 References: <1481638820-29324-1-git-send-email-gabriel.fernandez@st.com>
- <1481638820-29324-8-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20161222001120.GV8288@codeaurora.org>
+ <1481638820-29324-7-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20161222001115.GU8288@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/13, gabriel.fernandez at st.com wrote:
 > From: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> In the stm32f469 soc, the 48Mhz clock could be derived from pll-q or
-> from pll-sai-p.
-> 
-> The SDIO clock could be also derived from 48Mhz or from sys clock.
+> This patch introduces SAI clocks for stm32f4 socs.
 > 
 > Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 > ---
