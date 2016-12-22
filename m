@@ -1,37 +1,69 @@
-From: bamvor.zhangjian@huawei.com (bamvor.zhangjian at huawei.com)
-Date: Thu, 22 Dec 2016 19:35:01 +0800
-Subject: [PATCH] arm64: print bad_frame in handle_signal
-Message-ID: <20161222113501.17167-1-bamvor.zhangjian@huawei.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 22 Dec 2016 13:08:14 +0100
+Subject: [PATCH] clk: mvebu: adjust AP806 CPU clock frequencies to production
+ chip
+Message-ID: <1482408494-7429-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
+This commit adjusts the list of possible "Sample At Reset" values that
+define the CPU clock frequency of the AP806 (part of Marvell Armada
+7K/8K) to the values that have been validated with the production
+chip. Earlier values were preliminary.
 
-Sometims handle_signal will fail due to the bad frame and send to
-segfault to process consequently. But there is no information in system
-log which lead to hard to debug the root issue.
-
-This patch add as same bad frame print as sys_rt_sigreturn.
-
-Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm64/kernel/signal.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/clk/mvebu/ap806-system-controller.c | 28 +++++++++++++++++++++++-----
+ 1 file changed, 23 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index c7b6de6..cd6b81b 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -316,6 +316,10 @@ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
- 	if (!ret)
- 		user_fastforward_single_step(tsk);
+diff --git a/drivers/clk/mvebu/ap806-system-controller.c b/drivers/clk/mvebu/ap806-system-controller.c
+index 02023ba..962e0c5 100644
+--- a/drivers/clk/mvebu/ap806-system-controller.c
++++ b/drivers/clk/mvebu/ap806-system-controller.c
+@@ -55,21 +55,39 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
  
-+	if (show_unhandled_signals)
-+		pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
-+				    current->comm, task_pid_nr(current),
-+				    __func__, regs->pc, regs->sp);
- 	signal_setup_done(ret, ksig, 0);
- }
- 
+ 	freq_mode = reg & AP806_SAR_CLKFREQ_MODE_MASK;
+ 	switch (freq_mode) {
+-	case 0x0 ... 0x5:
++	case 0x0:
++	case 0x1:
+ 		cpuclk_freq = 2000;
+ 		break;
+-	case 0x6 ... 0xB:
++	case 0x6:
++	case 0x7:
+ 		cpuclk_freq = 1800;
+ 		break;
+-	case 0xC ... 0x11:
++	case 0x4:
++	case 0xB:
++	case 0xD:
+ 		cpuclk_freq = 1600;
+ 		break;
+-	case 0x12 ... 0x16:
++	case 0x1a:
+ 		cpuclk_freq = 1400;
+ 		break;
+-	case 0x17 ... 0x19:
++	case 0x14:
++	case 0x17:
+ 		cpuclk_freq = 1300;
+ 		break;
++	case 0x19:
++		cpuclk_freq = 1200;
++		break;
++	case 0x13:
++	case 0x1d:
++		cpuclk_freq = 1000;
++		break;
++	case 0x1c:
++		cpuclk_freq = 800;
++		break;
++	case 0x1b:
++		cpuclk_freq = 600;
++		break;
+ 	default:
+ 		dev_err(&pdev->dev, "invalid SAR value\n");
+ 		return -EINVAL;
 -- 
-2.10.2
+2.7.4
