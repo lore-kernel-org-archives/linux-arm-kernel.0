@@ -1,42 +1,47 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 22 Dec 2016 13:35:16 +0800
-Subject: [PATCH v5 08/14] ACPI: ARM64: IORT: rework iort_node_get_id()
+Date: Thu, 22 Dec 2016 13:35:19 +0800
+Subject: [PATCH v5 11/14] msi: platform: make
+ platform_msi_create_device_domain() ACPI aware
 In-Reply-To: <1482384922-21507-1-git-send-email-guohanjun@huawei.com>
 References: <1482384922-21507-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1482384922-21507-9-git-send-email-guohanjun@huawei.com>
+Message-ID: <1482384922-21507-12-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-iort_node_get_id() has two output, one is the mapped ids,
-the other is the referenced parent node which is returned
-from the function.
+With the platform msi domain created for ITS, irqchip such as
+mbi-gen connecting ITS, which needs ctreate its own irqdomain.
 
-For now we need a API just return its parent node for
-single mapping, so just update this function slightly then
-reuse it later.
+Fortunately with the platform msi support upstreamed by Marc,
+we just need to add minor code to make it run properly.
+
+platform_msi_create_device_domain() is almost ready for ACPI use
+except of_node_to_fwnode() is for dt only, make it ACPI aware then
+things will work in both DTS and ACPI.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Greg KH <gregkh@linuxfoundation.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Greg KH <gregkh@linuxfoundation.org>
 ---
- drivers/acpi/arm64/iort.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/base/platform-msi.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index ab7bae7..bc68d93 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -347,7 +347,8 @@ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
- 	if (map[index].flags & ACPI_IORT_ID_SINGLE_MAPPING) {
- 		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
- 		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
--			*id_out = map[index].output_base;
-+			if (id_out)
-+				*id_out = map[index].output_base;
- 			return parent;
- 		}
- 	}
+diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
+index be6a599..035ca3b 100644
+--- a/drivers/base/platform-msi.c
++++ b/drivers/base/platform-msi.c
+@@ -345,8 +345,7 @@ struct irq_domain *
+ 
+ 	data->host_data = host_data;
+ 	domain = irq_domain_create_hierarchy(dev->msi_domain, 0, nvec,
+-					     of_node_to_fwnode(dev->of_node),
+-					     ops, data);
++					     dev->fwnode, ops, data);
+ 	if (!domain)
+ 		goto free_priv;
+ 
 -- 
 1.7.12.4
