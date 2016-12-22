@@ -1,41 +1,29 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 22 Dec 2016 11:47:47 +0100
-Subject: [PATCH v4 11/12] arm64: dts: marvell: add sdhci support for
- Armada 7K/8K
-In-Reply-To: <20161222104502.GV14217@n2100.armlinux.org.uk>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Dec 2016 11:18:02 +0000
+Subject: [PATCH v4 06/12] dt: bindings: Add bindings for Marvell Xenon SD
+ Host Controller
+In-Reply-To: <b8acb86f1e7977648977ed5c6b4eb86323e4b777.1481651244.git-series.gregory.clement@free-electrons.com>
 References: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
- <2564fe18eb9cc8a0a1a3311cdf7e7141f35211bd.1481651244.git-series.gregory.clement@free-electrons.com>
- <20161222104502.GV14217@n2100.armlinux.org.uk>
-Message-ID: <20161222114747.734faa50@free-electrons.com>
+ <b8acb86f1e7977648977ed5c6b4eb86323e4b777.1481651244.git-series.gregory.clement@free-electrons.com>
+Message-ID: <20161222111802.GX14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Dec 13, 2016 at 06:48:35PM +0100, Gregory CLEMENT wrote:
+> +Optional Properties:
+> +- mmc-card:
+> +  mmc-card child node must be provided when current SDHC is for eMMC.
+> +  Xenon SDHC often can support both SD and eMMC. This child node indicates that
+> +  current SDHC is for eMMC card. Thus Xenon eMMC specific configuration and
+> +  operations can be enabled prior to eMMC init sequence.
+> +  Please refer to Documentation/devicetree/bindings/mmc/mmc-card.txt.
+> +  This child node should not be set if current Xenon SDHC is for SD/SDIO.
 
-On Thu, 22 Dec 2016 10:45:02 +0000, Russell King - ARM Linux wrote:
-> On Tue, Dec 13, 2016 at 06:48:40PM +0100, Gregory CLEMENT wrote:
-> > diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> > index 7b6136182ad0..181e8c5de3bf 100644
-> > --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> > +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> > @@ -229,6 +229,15 @@
-> >  
-> >  			};
-> >  
-> > +			ap_sdhci0: sdhci at 6e0000 {
-> > +				compatible = "marvell,armada-7000-sdhci";
-> > +				reg = <0x6e0000 0x300>;
-> > +				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-> > +				clock-names = "core";
-> > +				clocks = <&cpm_syscon0 1 4>;  
-> 
-> This seems to be the wrong clock - how can the AP SDHCI core be connected
-> to the CPM syscon (which is on a different die.)
+This looks like a typo - shouldn't it be "mmccard" and not "mmc-card"?
+Your examples below use "mmccard" as does the documentation you point
+towards.
 
-Agreed. This cannot be the right clock.
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
