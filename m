@@ -1,54 +1,36 @@
 From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 22 Dec 2016 17:13:27 +1300
-Subject: [PATCH 4/5] arm: mvebu: Add device tree for 98DX3236 SoCs
+Date: Thu, 22 Dec 2016 17:13:28 +1300
+Subject: [PATCH 5/5] arm: mvebu: Add device tree for db-dxbc2 and
+ db-xc3-24g4xg boards
 In-Reply-To: <20161222041328.3303-1-chris.packham@alliedtelesis.co.nz>
 References: <20161222041328.3303-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20161222041328.3303-5-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20161222041328.3303-6-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell 98DX3236, 98DX3336, 98DX4521 and variants are switch ASICs
-with integrated CPUs. They are similar to the Armada XP SoCs but have
-different I/O interfaces.
+These boards are Marvell's evaluation boards for the 98DX4251 and
+98DX3336 SoCs.
 
 Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 ---
- .../devicetree/bindings/arm/marvell/98dx3236.txt   |  10 +
- arch/arm/boot/dts/armada-xp-98dx3236.dtsi          | 231 +++++++++++++++++++++
- arch/arm/boot/dts/armada-xp-98dx3336.dtsi          |  78 +++++++
- arch/arm/boot/dts/armada-xp-98dx4251.dtsi          |  78 +++++++
- 4 files changed, 397 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/marvell/98dx3236.txt
- create mode 100644 arch/arm/boot/dts/armada-xp-98dx3236.dtsi
- create mode 100644 arch/arm/boot/dts/armada-xp-98dx3336.dtsi
- create mode 100644 arch/arm/boot/dts/armada-xp-98dx4251.dtsi
+ arch/arm/boot/dts/db-dxbc2.dts      | 159 ++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/db-xc3-24g4xg.dts | 155 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 314 insertions(+)
+ create mode 100644 arch/arm/boot/dts/db-dxbc2.dts
+ create mode 100644 arch/arm/boot/dts/db-xc3-24g4xg.dts
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell/98dx3236.txt b/Documentation/devicetree/bindings/arm/marvell/98dx3236.txt
+diff --git a/arch/arm/boot/dts/db-dxbc2.dts b/arch/arm/boot/dts/db-dxbc2.dts
 new file mode 100644
-index 000000000000..e7dc9b2dd90b
+index 000000000000..f56786cea5f8
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/marvell/98dx3236.txt
-@@ -0,0 +1,10 @@
-+Marvell 98DX3236, 98DX3336 and 98DX4251 Platforms Device Tree Bindings
-+----------------------------------------------------------------------
-+
-+Boards with a SoC of the Marvell 98DX3236, 98DX3336 and 98DX4251 families
-+shall have the following property:
-+
-+Required root node property:
-+
-+compatible: one of "marvell,armadaxp-98dx3236", "marvell,armadaxp-98dx3336"
-+            or "marvell,armadaxp-98dx4251"
-diff --git a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-new file mode 100644
-index 000000000000..bac53f8b44af
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-@@ -0,0 +1,231 @@
++++ b/arch/arm/boot/dts/db-dxbc2.dts
+@@ -0,0 +1,159 @@
 +/*
-+ * Device Tree Include file for Marvell 98dx3236 family SoC
++ * Device Tree file for DB-DXBC2 board
 + *
 + * Copyright (C) 2016 Allied Telesis Labs
++ *
++ * Based on armada-xp-db.dts
 + *
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
@@ -88,34 +70,30 @@ index 000000000000..bac53f8b44af
 + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + *
-+ * Contains definitions specific to the 98dx3236 SoC that are not
-+ * common to all Armada XP SoCs.
++ * Note: this Device Tree assumes that the bootloader has remapped the
++ * internal registers to 0xf1000000 (instead of the default
++ * 0xd0000000). The 0xf1000000 is the default used by the recent,
++ * DT-capable, U-Boot bootloaders provided by Marvell. Some earlier
++ * boards were delivered with an older version of the bootloader that
++ * left internal registers mapped at 0xd0000000. If you are in this
++ * situation, you should either update your bootloader (preferred
++ * solution) or the below Device Tree should be adjusted.
 + */
 +
-+#include "armada-xp.dtsi"
++/dts-v1/;
++#include "armada-xp-98dx4251.dtsi"
 +
 +/ {
-+	model = "Marvell 98DX3236 SoC";
-+	compatible = "marvell,armadaxp-98dx3236", "marvell,armadaxp", "marvell,armada-370-xp";
++	model = "Marvell Bobcat2 Evaluation Board";
++	compatible = "marvell,db-dxbc2", "marvell,armadaxp-98dx4251", "marvell,armadaxp", "marvell,armada-370-xp";
 +
-+	aliases {
-+		gpio0 = &gpio0;
-+		gpio1 = &gpio1;
-+		gpio2 = &gpio2;
++	chosen {
++		bootargs = "console=ttyS0,115200 earlyprintk";
 +	};
 +
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "marvell,98dx3236-smp";
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "marvell,sheeva-v7";
-+			reg = <0>;
-+			clocks = <&cpuclk 0>;
-+			clock-latency = <1000000>;
-+		};
++	memory {
++		device_type = "memory";
++		reg = <0 0x00000000 0 0x20000000>; /* 512 MB */
 +	};
 +
 +	soc {
@@ -125,323 +103,246 @@ index 000000000000..bac53f8b44af
 +			  MBUS_ID(0x03, 0x00) 0 0 0xa8000000 0x4000000
 +			  MBUS_ID(0x08, 0x00) 0 0 0xac000000 0x100000>;
 +
-+		/*
-+		 * 98DX3236 has 1 x1 PCIe unit Gen2.0: One unit can be
-+		 */
-+		pcie-controller {
-+			compatible = "marvell,armada-xp-pcie";
-+			status = "disabled";
-+			device_type = "pci";
++		devbus-bootcs {
++			status = "okay";
 +
-+			#address-cells = <3>;
-+			#size-cells = <2>;
++			/* Device Bus parameters are required */
 +
-+			msi-parent = <&mpic>;
-+			bus-range = <0x00 0xff>;
++			/* Read parameters */
++			devbus,bus-width    = <16>;
++			devbus,turn-off-ps  = <60000>;
++			devbus,badr-skew-ps = <0>;
++			devbus,acc-first-ps = <124000>;
++			devbus,acc-next-ps  = <248000>;
++			devbus,rd-setup-ps  = <0>;
++			devbus,rd-hold-ps   = <0>;
 +
-+			ranges =
-+			       <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000   /* Port 0.0 registers */
-+				0x82000000 0x1 0       MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0.0 MEM */
-+				0x81000000 0x1 0       MBUS_ID(0x04, 0xe0) 0 1 0 /* Port 0.0 IO  */
-+				0x82000000 0x2 0       MBUS_ID(0x04, 0xd8) 0 1 0 /* Port 0.1 MEM */>;
-+
-+			pcie at 1,0 {
-+				device_type = "pci";
-+				assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
-+				reg = <0x0800 0 0 0 0>;
-+				#address-cells = <3>;
-+				#size-cells = <2>;
-+				#interrupt-cells = <1>;
-+				ranges = <0x82000000 0 0 0x82000000 0x1 0 1 0
-+					  0x81000000 0 0 0x81000000 0x1 0 1 0>;
-+				interrupt-map-mask = <0 0 0 0>;
-+				interrupt-map = <0 0 0 0 &mpic 58>;
-+				marvell,pcie-port = <0>;
-+				marvell,pcie-lane = <0>;
-+				clocks = <&gateclk 5>;
-+				status = "disabled";
-+			};
++			/* Write parameters */
++			devbus,sync-enable = <0>;
++			devbus,wr-high-ps  = <60000>;
++			devbus,wr-low-ps   = <60000>;
++			devbus,ale-wr-ps   = <60000>;
 +		};
 +
 +		internal-regs {
-+			coreclk: mvebu-sar at 18230 {
-+				compatible = "marvell,mv98dx3236-core-clock";
-+			};
-+
-+			cpuclk: clock-complex at 18700 {
-+				compatible = "marvell,mv98dx3236-cpu-clock";
-+			};
-+
-+			corediv-clock at 18740 {
-+				compatible = "marvell,mv98dx3236-corediv-clock";
-+				reg = <0xf8268 0xc>;
-+				base = <&dfx>;
-+				#clock-cells = <1>;
-+				clocks = <&mainpll>;
-+				clock-output-names = "nand";
-+			};
-+
-+			xor at 60900 {
-+				status = "disabled";
-+			};
-+
-+			xor at f0900 {
-+				status = "disabled";
-+			};
-+
-+			xor at f0800 {
-+				compatible = "marvell,orion-xor";
-+				reg = <0xf0800 0x100
-+				       0xf0a00 0x100>;
-+				clocks = <&gateclk 22>;
++			serial at 12000 {
 +				status = "okay";
-+
-+				xor10 {
-+					interrupts = <51>;
-+					dmacap,memcpy;
-+					dmacap,xor;
-+				};
-+				xor11 {
-+					interrupts = <52>;
-+					dmacap,memcpy;
-+					dmacap,xor;
-+					dmacap,memset;
-+				};
++			};
++			serial at 12100 {
++				status = "okay";
 +			};
 +
-+			gpio0: gpio at 18100 {
-+				compatible = "marvell,orion-gpio";
-+				reg = <0x18100 0x40>;
-+				ngpios = <32>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <82>, <83>, <84>, <85>;
++			i2c at 11000 {
++				clock-frequency = <100000>;
++				status = "okay";
 +			};
 +
-+			/* does not exist */
-+			gpio1: gpio at 18140 {
-+				compatible = "marvell,orion-gpio";
-+				reg = <0x18140 0x40>;
++			mvsdio at d4000 {
++				pinctrl-0 = <&sdio_pins>;
++				pinctrl-names = "default";
++				status = "okay";
++				/* No CD or WP GPIOs */
++				broken-cd;
++			};
++
++			nand at d0000 {
++				status = "okay";
++				num-cs = <1>;
++				marvell,nand-keep-config;
++				marvell,nand-enable-arbiter;
++				nand-on-flash-bbt;
++				nand-ecc-strength = <4>;
++				nand-ecc-step-size = <512>;
++			};
++		};
++	};
++};
++
++&spi0 {
++	status = "okay";
++
++	spi-flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "m25p64";
++		reg = <0>; /* Chip select 0 */
++		spi-max-frequency = <20000000>;
++		m25p,fast-read;
++
++		partition at u-boot {
++			reg = <0x00000000 0x00100000>;
++			label = "u-boot";
++		};
++		partition at u-boot-env {
++			reg = <0x00100000 0x00040000>;
++			label = "u-boot-env";
++		};
++		partition at unused {
++			reg = <0x00140000 0x00ec0000>;
++			label = "unused";
++		};
++
++	};
++};
+diff --git a/arch/arm/boot/dts/db-xc3-24g4xg.dts b/arch/arm/boot/dts/db-xc3-24g4xg.dts
+new file mode 100644
+index 000000000000..5eb89ffb9a7d
+--- /dev/null
++++ b/arch/arm/boot/dts/db-xc3-24g4xg.dts
+@@ -0,0 +1,155 @@
++/*
++ * Device Tree file for DB-XC3-24G4XG board
++ *
++ * Copyright (C) 2016 Allied Telesis Labs
++ *
++ * Based on armada-xp-db.dts
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ *
++ * Note: this Device Tree assumes that the bootloader has remapped the
++ * internal registers to 0xf1000000 (instead of the default
++ * 0xd0000000). The 0xf1000000 is the default used by the recent,
++ * DT-capable, U-Boot bootloaders provided by Marvell. Some earlier
++ * boards were delivered with an older version of the bootloader that
++ * left internal registers mapped at 0xd0000000. If you are in this
++ * situation, you should either update your bootloader (preferred
++ * solution) or the below Device Tree should be adjusted.
++ */
++
++/dts-v1/;
++#include "armada-xp-98dx3336.dtsi"
++
++/ {
++	model = "DB-XC3-24G4XG";
++	compatible = "marvell,db-xc3-24g4xg", "marvell,armadaxp-98dx3336", "marvell,armadaxp", "marvell,armada-370-xp";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlyprintk";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0 0x00000000 0 0x40000000>; /* 1 GB */
++	};
++
++	soc {
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
++			  MBUS_ID(0x03, 0x00) 0 0 0xa8000000 0x4000000
++			  MBUS_ID(0x08, 0x00) 0 0 0xac000000 0x100000>;
++
++		devbus-bootcs {
++			status = "okay";
++
++			/* Device Bus parameters are required */
++
++			/* Read parameters */
++			devbus,bus-width    = <16>;
++			devbus,turn-off-ps  = <60000>;
++			devbus,badr-skew-ps = <0>;
++			devbus,acc-first-ps = <124000>;
++			devbus,acc-next-ps  = <248000>;
++			devbus,rd-setup-ps  = <0>;
++			devbus,rd-hold-ps   = <0>;
++
++			/* Write parameters */
++			devbus,sync-enable = <0>;
++			devbus,wr-high-ps  = <60000>;
++			devbus,wr-low-ps   = <60000>;
++			devbus,ale-wr-ps   = <60000>;
++		};
++
++		internal-regs {
++			serial at 12000 {
++				status = "okay";
++			};
++			serial at 12100 {
++				status = "okay";
++			};
++
++			i2c at 11000 {
++				clock-frequency = <100000>;
++				status = "okay";
++			};
++
++			mvsdio at d4000 {
 +				status = "disabled";
 +			};
 +
-+			gpio2: gpio at 18180 { /* rework some properties */
-+				compatible = "marvell,orion-gpio";
-+				reg = <0x18180 0x40>;
-+				ngpios = <1>; /* only gpio #32 */
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <87>;
-+			};
-+		};
-+
-+		dfx-registers {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 MBUS_ID(0x08, 0x00) 0 0x100000>;
-+
-+			dfx: dfx at 0 {
-+				compatible = "simple-bus";
-+				reg = <0 0x100000>;
-+			};
-+		};
-+
-+		switch {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 MBUS_ID(0x03, 0x00) 0 0x100000>;
-+
-+			packet-processor at 0 {
-+				compatible = "marvell,prestera-98dx3236";
-+				reg = <0 0x4000000>;
-+				interrupts = <33>, <34>, <35>;
-+				dfx = <&dfx>;
++			nand at d0000 {
++				status = "okay";
++				num-cs = <1>;
++				marvell,nand-keep-config;
++				marvell,nand-enable-arbiter;
++				nand-on-flash-bbt;
++				nand-ecc-strength = <4>;
++				nand-ecc-step-size = <512>;
 +			};
 +		};
 +	};
 +};
 +
-+&pinctrl {
-+	compatible = "marvell,98dx3236-pinctrl";
++&spi0 {
++	status = "okay";
 +
-+	spi0_pins: spi0-pins {
-+		marvell,pins = "mpp0", "mpp1",
-+			       "mpp2", "mpp3";
-+		marvell,function = "spi0";
-+	};
-+};
-diff --git a/arch/arm/boot/dts/armada-xp-98dx3336.dtsi b/arch/arm/boot/dts/armada-xp-98dx3336.dtsi
-new file mode 100644
-index 000000000000..9c9aa565fd82
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-xp-98dx3336.dtsi
-@@ -0,0 +1,78 @@
-+/*
-+ * Device Tree Include file for Marvell 98dx3336 family SoC
-+ *
-+ * Copyright (C) 2016 Allied Telesis Labs
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ *
-+ * Contains definitions specific to the 98dx3336 SoC that are not
-+ * common to all Armada XP SoCs.
-+ */
++	spi-flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "m25p64";
++		reg = <0>; /* Chip select 0 */
++		spi-max-frequency = <20000000>;
++		m25p,fast-read;
 +
-+#include "armada-xp-98dx3236.dtsi"
-+
-+/ {
-+	model = "Marvell 98DX3336 SoC";
-+	compatible = "marvell,armadaxp-98dx3336", "marvell,armadaxp-98dx3236", "marvell,armadaxp", "marvell,armada-370-xp";
-+
-+	cpus {
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "marvell,sheeva-v7";
-+			reg = <1>;
-+			clocks = <&cpuclk 1>;
-+			clock-latency = <1000000>;
++		partition at u-boot {
++			reg = <0x00000000 0x00100000>;
++			label = "u-boot";
 +		};
-+	};
-+
-+	soc {
-+		internal-regs {
-+			resume at 20980 {
-+				compatible = "marvell,98dx3336-resume-ctrl";
-+				reg = <0x20980 0x10>;
-+			};
++		partition at u-boot-env {
++			reg = <0x00100000 0x00040000>;
++			label = "u-boot-env";
++		};
++		partition at unused {
++			reg = <0x00140000 0x00ec0000>;
++			label = "unused";
 +		};
 +
-+		switch {
-+			packet-processor at 0 {
-+				compatible = "marvell,prestera-98dx3336";
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/armada-xp-98dx4251.dtsi b/arch/arm/boot/dts/armada-xp-98dx4251.dtsi
-new file mode 100644
-index 000000000000..5d1da8513fae
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-xp-98dx4251.dtsi
-@@ -0,0 +1,78 @@
-+/*
-+ * Device Tree Include file for Marvell 98dx4521 family SoC
-+ *
-+ * Copyright (C) 2016 Allied Telesis Labs
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ *
-+ * Contains definitions specific to the 98dx4521 SoC that are not
-+ * common to all Armada XP SoCs.
-+ */
-+
-+#include "armada-xp-98dx3236.dtsi"
-+
-+/ {
-+	model = "Marvell 98DX4251 SoC";
-+	compatible = "marvell,armadaxp-98dx4521", "marvell,armadaxp-98dx3236", "marvell,armadaxp", "marvell,armada-370-xp";
-+
-+	cpus {
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "marvell,sheeva-v7";
-+			reg = <1>;
-+			clocks = <&cpuclk 1>;
-+			clock-latency = <1000000>;
-+		};
-+	};
-+
-+	soc {
-+		internal-regs {
-+			resume at 20980 {
-+				compatible = "marvell,98dx3336-resume-ctrl";
-+				reg = <0x20980 0x10>;
-+			};
-+		};
-+
-+		switch {
-+			packet-processor at 0 {
-+				compatible = "marvell,prestera-98dx4521";
-+			};
-+		};
 +	};
 +};
 -- 
