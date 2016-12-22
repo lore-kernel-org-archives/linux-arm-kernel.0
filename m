@@ -1,43 +1,31 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Thu, 22 Dec 2016 22:58:43 +0200
-Subject: [BISECTED] v4.9: OMAP MMC regression
-In-Reply-To: <20161217220120.xgyzq2hwxn3lsmm2@raspberrypi-2.musicnaut.iki.fi>
-References: <20161217220120.xgyzq2hwxn3lsmm2@raspberrypi-2.musicnaut.iki.fi>
-Message-ID: <20161222205843.md4uggwyegcfuk3j@raspberrypi-2.musicnaut.iki.fi>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 22 Dec 2016 15:00:44 -0600
+Subject: [PATCH v4 4/5] mfd: dt: Add bindings for the Aspeed LPC Host
+ Controller (LHC)
+In-Reply-To: <20161220071535.27542-5-andrew@aj.id.au>
+References: <20161220071535.27542-1-andrew@aj.id.au>
+ <20161220071535.27542-5-andrew@aj.id.au>
+Message-ID: <20161222210044.iwrackjlmroi6tl7@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Dec 18, 2016 at 12:01:21AM +0200, Aaro Koskinen wrote:
-> OMAP MMC is silently missing when booting v4.9 on Nokia 770 (OMAP1).
+On Tue, Dec 20, 2016 at 05:45:34PM +1030, Andrew Jeffery wrote:
+> The LPC bus pinmux configuration on fifth generation Aspeed SoCs depends
+> on bits in both the System Control Unit and the LPC Host Controller.
 > 
-> Bisected to:
+> The Aspeed LPC Host Controller is described as a child node of the
+> LPC host-range syscon device for arbitration of access by the host
+> controller and pinmux drivers.
 > 
-> commit 2d1a9a946faebfedd660a1f1c2b90984fff41f91
-> Author: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Date:   Wed Jul 20 11:50:29 2016 +0300
+> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
 > 
->     dmaengine: omap-dma: Dynamically allocate memory for lch_map
+> Linus: I've retained your r-b tag I don't think the addition of the ast2400
+> compatible string will fuss you. Please let me know if you feel this is
+> inappropriate.
 > 
-> Reveting the commit makes MMC to appear and work again...
+>  .../devicetree/bindings/mfd/aspeed-lpc.txt         | 26 ++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
 
-This commit basically reduces dma_requests count to 17 (from 127)
-on OMAP1.
-
-This cannot be correct, since OMAP1 MMC is using requests (from
-omap1_init_mmc):
-
-                        rx_req = 22;
-                        tx_req = 21;
-[...]
-                        rx_req = 55;
-                        tx_req = 54;
-
-MMC probe will fail because omap_dma_filter_fn() will fail during
-dma_request_chan().
-
-I think 2d1a9a946faebfedd660a1f1c2b90984fff41f91 should be reverted.
-I cannot anymore boot my 770 with >= 4.9 kernel.
-
-A.
+Acked-by: Rob Herring <robh@kernel.org>
