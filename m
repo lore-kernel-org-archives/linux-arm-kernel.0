@@ -1,48 +1,81 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 22 Dec 2016 16:53:08 -0600
-Subject: [PATCH 4/5] arm: mvebu: Add device tree for 98DX3236 SoCs
-In-Reply-To: <20161222041328.3303-5-chris.packham@alliedtelesis.co.nz>
-References: <20161222041328.3303-1-chris.packham@alliedtelesis.co.nz>
- <20161222041328.3303-5-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20161222225308.4npzerakj2axmbuw@rob-hp-laptop>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 22 Dec 2016 23:06:51 +0000
+Subject: [RFC] arm64/acpi: make ACPI boot preference configurable
+In-Reply-To: <7eba0601099f75f19021c4259eca75ada06f4511.1482341997.git.jtoppins@redhat.com>
+References: <7eba0601099f75f19021c4259eca75ada06f4511.1482341997.git.jtoppins@redhat.com>
+Message-ID: <20161222230650.GB30170@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2016 at 05:13:27PM +1300, Chris Packham wrote:
-> The Marvell 98DX3236, 98DX3336, 98DX4521 and variants are switch ASICs
-> with integrated CPUs. They are similar to the Armada XP SoCs but have
-> different I/O interfaces.
+Hi,
+
+On Wed, Dec 21, 2016 at 12:54:05PM -0500, Jonathan Toppins wrote:
+> This patch allows a user to configure ACPI to be preferred over
+> device-tree.
 > 
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> Currently for ACPI to be used a user either has to set acpi=on on the
+> kernel command line or make sure any device tree passed to the kernel
+> is empty. If the dtb passed to the kernel is non-empty then device-tree
+> will be chosen as the boot method of choice even if it is not correct.
+> To prevent this situation where a system is only intended to be booted
+> via ACPI a user can set this kernel configuration so it ignores
+> device-tree settings unless ACPI table checks fail.
+
+I'm a little confused here. Judging by the comment inside acpi_boot_table_init,
+and the code immediately below it, in the absence of a "real" DTB, ACPI will be
+used.
+
+Could you elaborate on the situation where "a system is only intended to be
+booted via ACPI"? e.g. whose preference or requirement is this? The HW vendor,
+distro, or user? Why/when would the current behaviour not be correct?
+
+Thanks,
+Mark.
+
+> 
+> Signed-off-by: Jonathan Toppins <jtoppins@redhat.com>
 > ---
->  .../devicetree/bindings/arm/marvell/98dx3236.txt   |  10 +
->  arch/arm/boot/dts/armada-xp-98dx3236.dtsi          | 231 +++++++++++++++++++++
->  arch/arm/boot/dts/armada-xp-98dx3336.dtsi          |  78 +++++++
->  arch/arm/boot/dts/armada-xp-98dx4251.dtsi          |  78 +++++++
->  4 files changed, 397 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/marvell/98dx3236.txt
->  create mode 100644 arch/arm/boot/dts/armada-xp-98dx3236.dtsi
->  create mode 100644 arch/arm/boot/dts/armada-xp-98dx3336.dtsi
->  create mode 100644 arch/arm/boot/dts/armada-xp-98dx4251.dtsi
+>  arch/arm64/Kconfig       | 13 +++++++++++++
+>  arch/arm64/kernel/acpi.c |  2 +-
+>  2 files changed, 14 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/marvell/98dx3236.txt b/Documentation/devicetree/bindings/arm/marvell/98dx3236.txt
-> new file mode 100644
-> index 000000000000..e7dc9b2dd90b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/marvell/98dx3236.txt
-> @@ -0,0 +1,10 @@
-> +Marvell 98DX3236, 98DX3336 and 98DX4251 Platforms Device Tree Bindings
-> +----------------------------------------------------------------------
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 111742126897..e432e84245b9 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -954,6 +954,19 @@ config ARM64_ACPI_PARKING_PROTOCOL
+>  	  protocol even if the corresponding data is present in the ACPI
+>  	  MADT table.
+>  
+> +config ARM64_PREFER_ACPI
+> +	bool "Prefer usage of ACPI boot tables over device-tree"
+> +	depends on ACPI
+> +	help
+> +	  Normally device-tree is preferred over ACPI on arm64 unless
+> +	  explicitly preferred via kernel command line, something like: acpi=on
+> +	  This configuration changes this default behaviour by pretending
+> +	  the user set acpi=on on the command line. This configuration still
+> +	  allows the user to turn acpi table parsing off via acpi=off. If
+> +	  for some reason the table checks fail the system will still fall
+> +	  back to using device-tree unless the user explicitly sets acpi=force
+> +	  on the command line.
 > +
-> +Boards with a SoC of the Marvell 98DX3236, 98DX3336 and 98DX4251 families
-> +shall have the following property:
-> +
-> +Required root node property:
-> +
-> +compatible: one of "marvell,armadaxp-98dx3236", "marvell,armadaxp-98dx3336"
-> +            or "marvell,armadaxp-98dx4251"
-
-The 3336 and 4251 are compatible with 3236 according to the dts files. 
-That needs to be expressed here.
-
-Rob
+>  config CMDLINE
+>  	string "Default kernel command string"
+>  	default ""
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index 252a6d9c1da5..b5dfa5752ff7 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -43,7 +43,7 @@ int acpi_pci_disabled = 1;	/* skip ACPI PCI scan and IRQ initialization */
+>  EXPORT_SYMBOL(acpi_pci_disabled);
+>  
+>  static bool param_acpi_off __initdata;
+> -static bool param_acpi_on __initdata;
+> +static bool param_acpi_on __initdata = IS_ENABLED(CONFIG_ARM64_PREFER_ACPI);
+>  static bool param_acpi_force __initdata;
+>  
+>  static int __init parse_acpi(char *arg)
+> -- 
+> 2.10.2
+> 
