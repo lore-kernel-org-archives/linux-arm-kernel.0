@@ -1,39 +1,37 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Dec 2016 11:25:28 +0000
-Subject: [PATCH v4 00/12] mmc: Add support to Marvell Xenon SD Host
- Controller
-In-Reply-To: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
-References: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20161222112528.GZ14217@n2100.armlinux.org.uk>
+From: bamvor.zhangjian@huawei.com (bamvor.zhangjian at huawei.com)
+Date: Thu, 22 Dec 2016 19:35:01 +0800
+Subject: [PATCH] arm64: print bad_frame in handle_signal
+Message-ID: <20161222113501.17167-1-bamvor.zhangjian@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2016 at 06:48:29PM +0100, Gregory CLEMENT wrote:
-> This the forth version of the series adding support for the SDHCI
-> Xenon controller. It can be currently found on the Armada 37xx and the
-> Armada 7K/8K but will be also used in more Marvell SoC (and not only
-> the mvebu ones actually).
+From: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
 
-With the problems and niggles fixed, it seems to work here on my 8040
-board (along with dma-coherent):
+Sometims handle_signal will fail due to the bad frame and send to
+segfault to process consequently. But there is no information in system
+log which lead to hard to debug the root issue.
 
-sdhci: Secure Digital Host Controller Interface driver
-sdhci: Copyright(c) Pierre Ossman
-sdhci-pltfm: SDHCI platform and OF driver helper
-mmc0: SDHCI controller on f06e0000.sdhci [f06e0000.sdhci] using ADMA 64-bit
-mmc0: new high speed MMC card at address 0001
-mmcblk0: mmc0:0001 8GND3R 7.28 GiB
-mmc1: SDHCI controller on f2780000.sdhci [f2780000.sdhci] using ADMA 64-bit
-mmcblk0boot0: mmc0:0001 8GND3R partition 1 4.00 MiB
-mmcblk0boot1: mmc0:0001 8GND3R partition 2 4.00 MiB
-mmcblk0rpmb: mmc0:0001 8GND3R partition 3 512 KiB
-mmc1: new high speed SDHC card at address 0001
-mmcblk1: mmc1:0001 00000 14.6 GiB
- mmcblk1: p1 p2 p3
+This patch add as same bad frame print as sys_rt_sigreturn.
 
-Thanks.
+Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
+---
+ arch/arm64/kernel/signal.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index c7b6de6..cd6b81b 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -316,6 +316,10 @@ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
+ 	if (!ret)
+ 		user_fastforward_single_step(tsk);
+ 
++	if (show_unhandled_signals)
++		pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
++				    current->comm, task_pid_nr(current),
++				    __func__, regs->pc, regs->sp);
+ 	signal_setup_done(ret, ksig, 0);
+ }
+ 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.10.2
