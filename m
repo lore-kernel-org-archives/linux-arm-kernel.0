@@ -1,59 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 22 Dec 2016 12:51:12 -0800
-Subject: [PATCH 2/2] clk: hi3660: Clock driver support for Hisilicon
- hi3660 SoC
-In-Reply-To: <fc7bebd2-ad03-6479-d6e7-42f5d724216c@linaro.org>
-References: <1481781493-6188-1-git-send-email-zhangfei.gao@linaro.org>
- <1481781493-6188-3-git-send-email-zhangfei.gao@linaro.org>
- <20161221232551.GB8288@codeaurora.org>
- <fc7bebd2-ad03-6479-d6e7-42f5d724216c@linaro.org>
-Message-ID: <20161222205112.GD8288@codeaurora.org>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Thu, 22 Dec 2016 22:58:43 +0200
+Subject: [BISECTED] v4.9: OMAP MMC regression
+In-Reply-To: <20161217220120.xgyzq2hwxn3lsmm2@raspberrypi-2.musicnaut.iki.fi>
+References: <20161217220120.xgyzq2hwxn3lsmm2@raspberrypi-2.musicnaut.iki.fi>
+Message-ID: <20161222205843.md4uggwyegcfuk3j@raspberrypi-2.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22, zhangfei wrote:
-> On 2016?12?22? 07:25, Stephen Boyd wrote:
-> >On 12/15, Zhangfei Gao wrote:
-> >>Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> >
-> >>+
-> >>+	switch (type) {
-> >>+	case HI3660_CRGCTRL:
-> >>+		hi3660_clk_crgctrl_init(np);
-> >>+		break;
-> >>+	case HI3660_PCTRL:
-> >>+		hi3660_clk_pctrl_init(np);
-> >>+		break;
-> >>+	case HI3660_PMUCTRL:
-> >>+		hi3660_clk_pmuctrl_init(np);
-> >>+		break;
-> >>+	case HI3660_SCTRL:
-> >>+		hi3660_clk_sctrl_init(np);
-> >>+		break;
-> >>+	case HI3660_IOMCU:
-> >>+		hi3660_clk_iomcu_init(np);
-> >>+		break;
-> >This "multi-device" driver design is sort of odd. Why not have
-> >different files and struct drivers for the different devices in
-> >the system that are clock controllers? I don't really understand
-> >why we're controlling the devices with one struct driver
-> >instance. Is something shared between the devices?
-> Do you mean put in different .c / drivers?
+Hi,
 
-Yes.
+On Sun, Dec 18, 2016 at 12:01:21AM +0200, Aaro Koskinen wrote:
+> OMAP MMC is silently missing when booting v4.9 on Nokia 770 (OMAP1).
+> 
+> Bisected to:
+> 
+> commit 2d1a9a946faebfedd660a1f1c2b90984fff41f91
+> Author: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Date:   Wed Jul 20 11:50:29 2016 +0300
+> 
+>     dmaengine: omap-dma: Dynamically allocate memory for lch_map
+> 
+> Reveting the commit makes MMC to appear and work again...
 
-> They have to be put in the same file, since the parent / child
-> relate to each other.
+This commit basically reduces dma_requests count to 17 (from 127)
+on OMAP1.
 
-We handle clk parent/child relationships through strings. So why
-does that mean we need to put these in the same file with the
-same struct driver?
+This cannot be correct, since OMAP1 MMC is using requests (from
+omap1_init_mmc):
 
-> They are for the same chip, but some put in different region for
-> privilege control.
+                        rx_req = 22;
+                        tx_req = 21;
+[...]
+                        rx_req = 55;
+                        tx_req = 54;
 
-Ok.
+MMC probe will fail because omap_dma_filter_fn() will fail during
+dma_request_chan().
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I think 2d1a9a946faebfedd660a1f1c2b90984fff41f91 should be reverted.
+I cannot anymore boot my 770 with >= 4.9 kernel.
+
+A.
