@@ -1,54 +1,45 @@
-From: mdf@kernel.org (mdf at kernel.org)
-Date: Thu, 22 Dec 2016 09:19:25 -0800
-Subject: [PATCH v2] ARM64: zynqmp: Fix i2c node's compatible string
-Message-ID: <1482427165-8951-1-git-send-email-mdf@kernel.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 22 Dec 2016 18:24:55 +0100
+Subject: [PATCH 0/6] Add support for pinctrl/gpio on Armada 37xx
+Message-ID: <20161222172501.16121-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Moritz Fischer <mdf@kernel.org>
+Hi,
 
-The Zynq Ultrascale MP uses version 1.4 of the Cadence IP core
-which fixes some silicon bugs that needed software workarounds
-in Version 1.0 that was used on Zynq systems.
+this series add support for the pin and gpio controllers present on
+the Armada 37xx SoCs.
 
-Signed-off-by: Moritz Fischer <mdf@kernel.org>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-Cc: Rob Herring <robh+dt@kernel.org>
----
-Changes from v1:
+Each Armada 37xx SoC comes with 2 pin controllers: one on the south
+bridge (managing 28 pins) and one on the north bridge (managing 36 pins).
 
-- Added fall through case to cdns,i2c-r1p10
+At the hardware level the controller configure the pins by group and not
+pin by pin.
 
-Cheers,
+The gpio controller is also capable to handle interrupt from gpio.
 
-Moritz
+Gregory
 
----
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Gregory CLEMENT (6):
+  pinctrl: dt-bindings: Add documentation for Armada 37xx pin
+    controllers
+  pinctrl: armada-37xx: Add pin controller support for Armada 37xx
+  pinctrl: armada-37xx: Add gpio support
+  pinctrl: aramda-37xx: Add irqchip support
+  ARM64: dts: marvell: Add pinctrl nodes for Armada 3700
+  ARM64: dts: marvell: armada37xx: add pinctrl definition
 
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-index 68a90833..ee86d02 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-@@ -175,7 +175,7 @@
- 		};
- 
- 		i2c0: i2c at ff020000 {
--			compatible = "cdns,i2c-r1p10";
-+			compatible = "cdns,i2c-r1p14", "cdns,i2c-r1p10";
- 			status = "disabled";
- 			interrupt-parent = <&gic>;
- 			interrupts = <0 17 4>;
-@@ -185,7 +185,7 @@
- 		};
- 
- 		i2c1: i2c at ff030000 {
--			compatible = "cdns,i2c-r1p10";
-+			compatible = "cdns,i2c-r1p14", "cdns,i2c-r1p10";
- 			status = "disabled";
- 			interrupt-parent = <&gic>;
- 			interrupts = <0 18 4>;
+ .../pinctrl/marvell,armada-37xx-pinctrl.txt        | 127 +++
+ arch/arm64/Kconfig.platforms                       |   2 +
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts     |   8 +
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  60 +-
+ drivers/pinctrl/Makefile                           |   2 +-
+ drivers/pinctrl/mvebu/Kconfig                      |   7 +
+ drivers/pinctrl/mvebu/Makefile                     |   3 +-
+ drivers/pinctrl/mvebu/pinctrl-armada-37xx.c        | 848 +++++++++++++++++++++
+ 8 files changed, 1052 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
+ create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+
 -- 
-2.7.4
+2.11.0
