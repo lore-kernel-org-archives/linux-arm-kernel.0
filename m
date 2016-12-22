@@ -1,58 +1,168 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Wed, 21 Dec 2016 21:49:48 -0800
-Subject: [PATCH] ARM64: zynqmp: Fix i2c node's compatible string
-Message-ID: <1482385788-7187-1-git-send-email-moritz.fischer@ettus.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 22 Dec 2016 13:35:22 +0800
+Subject: [PATCH v5 14/14] irqchip: mbigen: Add ACPI support
+In-Reply-To: <1482384922-21507-1-git-send-email-guohanjun@huawei.com>
+References: <1482384922-21507-1-git-send-email-guohanjun@huawei.com>
+Message-ID: <1482384922-21507-15-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Moritz Fischer <mdf@kernel.org>
+From: Hanjun Guo <hanjun.guo@linaro.org>
 
-The Zynq Ultrascale MP uses version 1.4 of the Cadence IP core
-which fixes some silicon bugs that needed software workarounds
-in Version 1.0 that was used on Zynq systems.
+With the preparation of platform msi support and interrupt producer
+in DSDT, we can add mbigen ACPI support now.
 
-Signed-off-by: Moritz Fischer <mdf@kernel.org>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-Cc: U-Boot List <u-boot@lists.denx.de>
-Cc: Rob Herring <robh+dt@kernel.org>
+We are using _PRS methd to indicate number of irq pins instead
+of num_pins in DT to avoid _DSD usage in this case.
+
+For mbi-gen,
+    Device(MBI0) {
+          Name(_HID, "HISI0152")
+          Name(_UID, Zero)
+          Name(_CRS, ResourceTemplate() {
+                  Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
+          })
+
+          Name (_PRS, ResourceTemplate() {
+		  Interrupt(ResourceProducer,...) {12,14,....}
+          })
+    }
+
+For devices,
+
+   Device(COM0) {
+          Name(_HID, "ACPIIDxx")
+          Name(_UID, Zero)
+          Name(_CRS, ResourceTemplate() {
+                 Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
+		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12}
+          })
+    }
+
+With the helpe of platform msi and interrupt producer, then devices
+will get the virq from mbi-gen's irqdomain.
+
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ma Jun <majun258@huawei.com>
 ---
+ drivers/irqchip/irq-mbigen.c | 70 ++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 67 insertions(+), 3 deletions(-)
 
-Hi Michal,
-
-I think this is a slip up and should be r1p14 for
-Ultrascale ZynqMP. drivers/i2c/i2c-cadence.c already uses this.
-I Cc'd the u-boot list, because the same change would be required there.
-
-Cheers,
-
-Moritz
-
----
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-index 68a90833..a5a5f91 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-@@ -175,7 +175,7 @@
- 		};
+diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+index 4e11da5..17d35fa 100644
+--- a/drivers/irqchip/irq-mbigen.c
++++ b/drivers/irqchip/irq-mbigen.c
+@@ -16,6 +16,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
- 		i2c0: i2c at ff020000 {
--			compatible = "cdns,i2c-r1p10";
-+			compatible = "cdns,i2c-r1p14";
- 			status = "disabled";
- 			interrupt-parent = <&gic>;
- 			interrupts = <0 17 4>;
-@@ -185,7 +185,7 @@
- 		};
++#include <linux/acpi.h>
+ #include <linux/interrupt.h>
+ #include <linux/irqchip.h>
+ #include <linux/module.h>
+@@ -180,7 +181,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
+ 				    unsigned long *hwirq,
+ 				    unsigned int *type)
+ {
+-	if (is_of_node(fwspec->fwnode)) {
++	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
+ 		if (fwspec->param_count != 2)
+ 			return -EINVAL;
  
- 		i2c1: i2c at ff030000 {
--			compatible = "cdns,i2c-r1p10";
-+			compatible = "cdns,i2c-r1p14";
- 			status = "disabled";
- 			interrupt-parent = <&gic>;
- 			interrupts = <0 18 4>;
+@@ -271,6 +272,54 @@ static int mbigen_of_create_domain(struct platform_device *pdev,
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_ACPI
++static acpi_status mbigen_acpi_process_resource(struct acpi_resource *ares,
++					     void *context)
++{
++	struct acpi_resource_extended_irq *ext_irq;
++	u32 *num_irqs = context;
++
++	switch (ares->type) {
++	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
++		ext_irq = &ares->data.extended_irq;
++		*num_irqs += ext_irq->interrupt_count;
++		break;
++	default:
++		break;
++	}
++
++	return AE_OK;
++}
++
++static int mbigen_acpi_create_domain(struct platform_device *pdev,
++				     struct mbigen_device *mgn_chip)
++{
++	struct irq_domain *domain;
++	u32 num_msis = 0;
++	acpi_status status;
++
++	status = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), METHOD_NAME__PRS,
++				     mbigen_acpi_process_resource, &num_msis);
++        if (ACPI_FAILURE(status) || num_msis == 0)
++		return -EINVAL;
++
++	domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
++						   mbigen_write_msg,
++						   &mbigen_domain_ops,
++						   mgn_chip);
++	if (!domain)
++		return -ENOMEM;
++
++	return 0;
++}
++#else
++static int mbigen_acpi_create_domain(struct platform_device *pdev,
++				     struct mbigen_device *mgn_chip)
++{
++	return -ENODEV;
++}
++#endif
++
+ static int mbigen_device_probe(struct platform_device *pdev)
+ {
+ 	struct mbigen_device *mgn_chip;
+@@ -288,9 +337,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
+ 	if (IS_ERR(mgn_chip->base))
+ 		return PTR_ERR(mgn_chip->base);
+ 
+-	err = mbigen_of_create_domain(pdev, mgn_chip);
+-	if (err)
++	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
++		err = mbigen_of_create_domain(pdev, mgn_chip);
++	else if (ACPI_COMPANION(&pdev->dev))
++		err = mbigen_acpi_create_domain(pdev, mgn_chip);
++	else
++		err = -EINVAL;
++
++	if (err) {
++		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain", mgn_chip->base);
+ 		return err;
++	}
+ 
+ 	platform_set_drvdata(pdev, mgn_chip);
+ 	return 0;
+@@ -302,10 +359,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
+ };
+ MODULE_DEVICE_TABLE(of, mbigen_of_match);
+ 
++static const struct acpi_device_id mbigen_acpi_match[] = {
++        { "HISI0152", 0 },
++	{}
++};
++MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
++
+ static struct platform_driver mbigen_platform_driver = {
+ 	.driver = {
+ 		.name		= "Hisilicon MBIGEN-V2",
+ 		.of_match_table	= mbigen_of_match,
++		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
+ 	},
+ 	.probe			= mbigen_device_probe,
+ };
 -- 
-2.4.11
+1.7.12.4
