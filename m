@@ -1,189 +1,147 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Wed, 21 Dec 2016 18:40:05 -0800
-Subject: [PATCH v3 3/4] ARM: Add support for CONFIG_DEBUG_VIRTUAL
-In-Reply-To: <20161209233628.6642-4-f.fainelli@gmail.com>
-References: <20161208185933.13749-1-f.fainelli@gmail.com>
- <20161209233628.6642-1-f.fainelli@gmail.com>
- <20161209233628.6642-4-f.fainelli@gmail.com>
-Message-ID: <7721bed8-4b08-f5ce-056e-45f02a431e76@redhat.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 21 Dec 2016 21:16:13 -0600
+Subject: [PATCH 1/2] soc: ti: Use remoteproc auto_boot feature
+In-Reply-To: <1481846632-4778-1-git-send-email-spjoshi@codeaurora.org>
+References: <1481846632-4778-1-git-send-email-spjoshi@codeaurora.org>
+Message-ID: <1f5b2631-f744-a5c1-55c1-82eb27d5cbd7@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/2016 03:36 PM, Florian Fainelli wrote:
-> x86 has an option: CONFIG_DEBUG_VIRTUAL to do additional checks on
-> virt_to_phys calls. The goal is to catch users who are calling
-> virt_to_phys on non-linear addresses immediately. This includes caller
-> using __virt_to_phys() on image addresses instead of __pa_symbol(). This
-> is a generally useful debug feature to spot bad code (particulary in
-> drivers).
+Hi Sarang,
+
+On 12/15/2016 06:03 PM, Sarangdhar Joshi wrote:
+> The function wkup_m3_rproc_boot_thread waits for asynchronous
+> firmware loading to complete successfully before calling
+> rproc_boot(). The same can be achieved by just setting
+> rproc->auto_boot flag. Change this. As a result this change
+> removes wkup_m3_rproc_boot_thread and moves m3_ipc->sync_complete
+> initialization to the wkup_m3_ipc_probe().
 > 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> Other than the current usage, the firmware_loading_complete is
+> only used in rproc_del() where it's no longer needed.  This
+> change is in preparation for removing firmware_loading_complete
+> completely.
+
+Based on the comments so far, I am assuming that you are dropping this
+series.
+
+In any case, this series did break our PM stack. We definitely don't
+want to auto-boot the wkup_m3_rproc device, that responsibility will
+need to stay with the wkup_m3_ipc driver.
+
+regards
+Suman
+
+> 
+> CC: Dave Gerlach <d-gerlach@ti.com>
+> CC: Suman Anna <s-anna@ti.com>
+> CC: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
 > ---
->  arch/arm/Kconfig              |  1 +
->  arch/arm/include/asm/memory.h | 16 ++++++++++++--
->  arch/arm/mm/Makefile          |  1 +
->  arch/arm/mm/physaddr.c        | 51 +++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 67 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm/mm/physaddr.c
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index b5d529fdffab..5e66173c5787 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -2,6 +2,7 @@ config ARM
->  	bool
->  	default y
->  	select ARCH_CLOCKSOURCE_DATA
-> +	select ARCH_HAS_DEBUG_VIRTUAL
->  	select ARCH_HAS_DEVMEM_IS_ALLOWED
->  	select ARCH_HAS_ELF_RANDOMIZE
->  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index bee7511c5098..d90300193adf 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -213,7 +213,7 @@ extern const void *__pv_table_begin, *__pv_table_end;
->  	: "r" (x), "I" (__PV_BITS_31_24)		\
->  	: "cc")
+> Hi Suman,
+> 
+> Unfortunately, I don't have a TI device and couldn't test this
+> change. Is it possible for you to test this change on TI device?
+> 
+> Thanks in advance.
+> 
+> Regards,
+> Sarang
+> 
+>  drivers/remoteproc/wkup_m3_rproc.c |  2 +-
+>  drivers/soc/ti/wkup_m3_ipc.c       | 35 ++---------------------------------
+>  2 files changed, 3 insertions(+), 34 deletions(-)
+> 
+> diff --git a/drivers/remoteproc/wkup_m3_rproc.c b/drivers/remoteproc/wkup_m3_rproc.c
+> index 18175d0..79ea022 100644
+> --- a/drivers/remoteproc/wkup_m3_rproc.c
+> +++ b/drivers/remoteproc/wkup_m3_rproc.c
+> @@ -167,7 +167,7 @@ static int wkup_m3_rproc_probe(struct platform_device *pdev)
+>  		goto err;
+>  	}
 >  
-> -static inline phys_addr_t __virt_to_phys(unsigned long x)
-> +static inline phys_addr_t __virt_to_phys_nodebug(unsigned long x)
->  {
->  	phys_addr_t t;
+> -	rproc->auto_boot = false;
+> +	rproc->auto_boot = true;
 >  
-> @@ -245,7 +245,7 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
->  #define PHYS_OFFSET	PLAT_PHYS_OFFSET
->  #define PHYS_PFN_OFFSET	((unsigned long)(PHYS_OFFSET >> PAGE_SHIFT))
+>  	wkupm3 = rproc->priv;
+>  	wkupm3->rproc = rproc;
+> diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
+> index 8823cc8..31090d70 100644
+> --- a/drivers/soc/ti/wkup_m3_ipc.c
+> +++ b/drivers/soc/ti/wkup_m3_ipc.c
+> @@ -17,7 +17,6 @@
 >  
-> -static inline phys_addr_t __virt_to_phys(unsigned long x)
-> +static inline phys_addr_t __virt_to_phys_nodebug(unsigned long x)
->  {
->  	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
+>  #include <linux/err.h>
+>  #include <linux/kernel.h>
+> -#include <linux/kthread.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/irq.h>
+>  #include <linux/module.h>
+> @@ -365,22 +364,6 @@ void wkup_m3_ipc_put(struct wkup_m3_ipc *m3_ipc)
 >  }
-> @@ -261,6 +261,16 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
->  	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
->  	 PHYS_PFN_OFFSET)
+>  EXPORT_SYMBOL_GPL(wkup_m3_ipc_put);
 >  
-> +#define __pa_symbol_nodebug(x)	__virt_to_phys_nodebug((x))
-> +
-> +#ifdef CONFIG_DEBUG_VIRTUAL
-> +extern phys_addr_t __virt_to_phys(unsigned long x);
-> +extern phys_addr_t __phys_addr_symbol(unsigned long x);
-> +#else
-> +#define __virt_to_phys(x)	__virt_to_phys_nodebug(x)
-> +#define __phys_addr_symbol(x)	__pa_symbol_nodebug(x)
-> +#endif
-> +
->  /*
->   * These are *only* valid on the kernel direct mapped RAM memory.
->   * Note: Drivers should NOT use these.  They are the wrong
-> @@ -283,9 +293,11 @@ static inline void *phys_to_virt(phys_addr_t x)
->   * Drivers should NOT use these either.
->   */
->  #define __pa(x)			__virt_to_phys((unsigned long)(x))
-> +#define __pa_symbol(x)		__phys_addr_symbol(RELOC_HIDE((unsigned long)(x), 0))
->  #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
->  #define pfn_to_kaddr(pfn)	__va((phys_addr_t)(pfn) << PAGE_SHIFT)
+> -static void wkup_m3_rproc_boot_thread(struct wkup_m3_ipc *m3_ipc)
+> -{
+> -	struct device *dev = m3_ipc->dev;
+> -	int ret;
+> -
+> -	wait_for_completion(&m3_ipc->rproc->firmware_loading_complete);
+> -
+> -	init_completion(&m3_ipc->sync_complete);
+> -
+> -	ret = rproc_boot(m3_ipc->rproc);
+> -	if (ret)
+> -		dev_err(dev, "rproc_boot failed\n");
+> -
+> -	do_exit(0);
+> -}
+> -
+>  static int wkup_m3_ipc_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> @@ -388,7 +371,6 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
+>  	phandle rproc_phandle;
+>  	struct rproc *m3_rproc;
+>  	struct resource *res;
+> -	struct task_struct *task;
+>  	struct wkup_m3_ipc *m3_ipc;
 >  
-> +
->  extern long long arch_phys_to_idmap_offset;
+>  	m3_ipc = devm_kzalloc(dev, sizeof(*m3_ipc), GFP_KERNEL);
+> @@ -402,6 +384,8 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
+>  		return PTR_ERR(m3_ipc->ipc_mem_base);
+>  	}
 >  
->  /*
-> diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-> index e8698241ece9..b3dea80715b4 100644
-> --- a/arch/arm/mm/Makefile
-> +++ b/arch/arm/mm/Makefile
-> @@ -14,6 +14,7 @@ endif
+> +	init_completion(&m3_ipc->sync_complete);
+> +
+>  	irq = platform_get_irq(pdev, 0);
+>  	if (!irq) {
+>  		dev_err(&pdev->dev, "no irq resource\n");
+> @@ -449,25 +433,10 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
 >  
->  obj-$(CONFIG_ARM_PTDUMP)	+= dump.o
->  obj-$(CONFIG_MODULES)		+= proc-syms.o
-> +obj-$(CONFIG_DEBUG_VIRTUAL)	+= physaddr.o
+>  	m3_ipc->ops = &ipc_ops;
 >  
->  obj-$(CONFIG_ALIGNMENT_TRAP)	+= alignment.o
->  obj-$(CONFIG_HIGHMEM)		+= highmem.o
-> diff --git a/arch/arm/mm/physaddr.c b/arch/arm/mm/physaddr.c
-> new file mode 100644
-> index 000000000000..0288760306ce
-> --- /dev/null
-> +++ b/arch/arm/mm/physaddr.c
-> @@ -0,0 +1,51 @@
-> +#include <linux/bug.h>
-> +#include <linux/export.h>
-> +#include <linux/types.h>
-> +#include <linux/mmdebug.h>
-> +#include <linux/mm.h>
-> +
-> +#include <asm/sections.h>
-> +#include <asm/memory.h>
-> +#include <asm/fixmap.h>
-> +#include <asm/dma.h>
-> +
-> +#include "mm.h"
-> +
-> +static inline bool __virt_addr_valid(unsigned long x)
-> +{
-> +	/* high_memory does not get immediately defined, and there
-> +	 * are early callers of __pa() against PAGE_OFFSET, just catch
-> +	 * these here, then do normal checks, with the exception of
-> +	 * MAX_DMA_ADDRESS.
-> +	 */
-> +	if ((x >= PAGE_OFFSET && !high_memory) ||
-> +	   (x >= PAGE_OFFSET &&
-> +	    high_memory && x < (unsigned long)high_memory) ||
-> +	    x == MAX_DMA_ADDRESS)
-> +		return true;
-
-This is difficult to read, it's easier to read if it's split out:
-
-if (!high_memory && x >= PAGE_OFFSET)
-	return true;
-
-if (high_memory && x >= PAGE_OFFSET && x < (unsigned long) high_memory)
-	return true;
-
-if (x == MAX_DMA_ADDRESS)
-	return true;
-
-I'm really not a fan of the check for MAX_DMA_ADDRESS. arm64 gets away
-with this because it uses the asm-generic version of dma.h which sets
-MAX_DMA_ADDRESS to PAGE_OFFSET. __pa(MAX_DMA_ADDRESS) is used a
-bunch of places in the kernel as a lower limit for memblock
-allocation. The implication seems to be that MAX_DMA_ADDRESS
-corresponds to something that corresponds to a real physical address.
-The existing code happens to work because it will simply retry the
-allocation if without the lower bound.
-
-I don't see a good way to fix this though. It doesn't look like
-MAX_DMA_ADDRESS can be changed if it's actually going to be used
-for DMA and there isn't a unified way to just get a physical address.
-
-Thanks,
-Laura
-
-> +
-> +	return false;
-> +}
-> +
-> +phys_addr_t __virt_to_phys(unsigned long x)
-> +{
-> +	WARN(!__virt_addr_valid(x),
-> +	     "virt_to_phys used for non-linear address: %pK (%pS)\n",
-> +	     (void *)x,
-> +	     (void *)x);
-> +
-> +	return __virt_to_phys_nodebug(x);
-> +}
-> +EXPORT_SYMBOL(__virt_to_phys);
-> +
-> +phys_addr_t __phys_addr_symbol(unsigned long x)
-> +{
-> +	/* This is bounds checking against the kernel image only.
-> +	 * __pa_symbol should only be used on kernel symbol addresses.
-> +	 */
-> +	VIRTUAL_BUG_ON(x < (unsigned long)KERNEL_START ||
-> +		       x > (unsigned long)KERNEL_END);
-> +
-> +	return __pa_symbol_nodebug(x);
-> +}
-> +EXPORT_SYMBOL(__phys_addr_symbol);
+> -	/*
+> -	 * Wait for firmware loading completion in a thread so we
+> -	 * can boot the wkup_m3 as soon as it's ready without holding
+> -	 * up kernel boot
+> -	 */
+> -	task = kthread_run((void *)wkup_m3_rproc_boot_thread, m3_ipc,
+> -			   "wkup_m3_rproc_loader");
+> -
+> -	if (IS_ERR(task)) {
+> -		dev_err(dev, "can't create rproc_boot thread\n");
+> -		goto err_put_rproc;
+> -	}
+> -
+>  	m3_ipc_state = m3_ipc;
+>  
+>  	return 0;
+>  
+> -err_put_rproc:
+> -	rproc_put(m3_rproc);
+>  err_free_mbox:
+>  	mbox_free_channel(m3_ipc->mbox);
+>  	return ret;
 > 
