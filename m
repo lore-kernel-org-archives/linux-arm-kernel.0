@@ -1,22 +1,24 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 21 Dec 2016 16:11:15 -0800
-Subject: [PATCH v4 6/9] clk: stm32f4: Add SAI clocks
-In-Reply-To: <1481638820-29324-7-git-send-email-gabriel.fernandez@st.com>
-References: <1481638820-29324-1-git-send-email-gabriel.fernandez@st.com>
- <1481638820-29324-7-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20161222001115.GU8288@codeaurora.org>
+Date: Wed, 21 Dec 2016 16:14:53 -0800
+Subject: [PATCHv2 1/3] dt-bindings: arm: update Armada CP110 system
+ controller binding
+In-Reply-To: <1482316017-22154-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1482316017-22154-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1482316017-22154-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20161222001453.GW8288@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+On 12/21, Thomas Petazzoni wrote:
+> It turns out that in the CP110 HW block present in Marvell Armada
+> 7K/8K SoCs, gatable clock n?18 not only controls SD/MMC, but also the
+> GOP block. This commit updates the Device Tree binding for this piece
+> of hardware accordingly.
 > 
-> This patch introduces SAI clocks for stm32f4 socs.
-> 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
 
-Applied to clk-stm32f4 and merged into clk-next
+Applied to clk-next
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
