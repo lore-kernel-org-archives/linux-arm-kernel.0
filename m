@@ -1,65 +1,46 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Fri, 23 Dec 2016 16:53:07 +0900
-Subject: [PATCH v3] mm: pmd dirty emulation in page fault handler
-Message-ID: <1482479587-4823-1-git-send-email-minchan@kernel.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 22 Dec 2016 16:10:25 +0100
+Subject: [PATCH 3/3] ARM: dts: sun5i: add support for Lichee Pi One board
+In-Reply-To: <718681482365231@web25g.yandex.ru>
+References: <20161221200235.11617-1-icenowy@aosc.xyz>
+ <20161221200235.11617-3-icenowy@aosc.xyz>
+ <20161221224159.wnziqeanjkp63y4o@lukather>
+ <718681482365231@web25g.yandex.ru>
+Message-ID: <20161222151025.kz5cpjeivxiqyemw@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
-http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
+On Thu, Dec 22, 2016 at 08:07:11AM +0800, Icenowy Zheng wrote:
+> 
+> 
+> 22.12.2016, 06:42, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > On Thu, Dec 22, 2016 at 04:02:35AM +0800, Icenowy Zheng wrote:
+> >> ?Lichee Pi One is a low-cost Allwinner A13-based development board, with
+> >> ?an AXP209 PMU, a USB2.0 OTG port, a USB2.0 host port (or an onboard
+> >> ?RTL8723BU Wi-Fi card), optional headers for LCD and CSI, two GPIO
+> >> ?headers and two MicroSD card slots (connected to mmc0 and mmc2, both
+> >> ?bootable).
+> >>
+> >> ?Add support for it.
+> >>
+> >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> >
+> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> Excuse me. Who should apply it?
 
-The problem is page fault handler supports only accessed flag emulation
-for THP page of SW-dirty/accessed architecture.
+Gaaah, sorry, I meant I applied it...
 
-This patch enables dirty-bit emulation for those architectures.
-Without it, MADV_FREE makes application hang by repeated fault forever.
+Maxime
 
-[1] b8d3c4c3009d, mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called
-
-Cc: Jason Evans <je@fb.com>
-Cc: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: linux-arch at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: <stable@vger.kernel.org> [4.5+]
-Fixes: b8d3c4c3009d ("mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called")
-Reported-and-Tested-by: Andreas Schwab <schwab@suse.de>
-Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-Signed-off-by: Minchan Kim <minchan@kernel.org>
----
-* from v2
-  * Add acked-by/tested-by
-
-* from v1
-  * Remove __handle_mm_fault part - Kirill
-
- mm/huge_memory.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/mm/huge_memory.c b/mm/huge_memory.c
-index 10eedbf..29ec8a4 100644
---- a/mm/huge_memory.c
-+++ b/mm/huge_memory.c
-@@ -883,15 +883,17 @@ void huge_pmd_set_accessed(struct vm_fault *vmf, pmd_t orig_pmd)
- {
- 	pmd_t entry;
- 	unsigned long haddr;
-+	bool write = vmf->flags & FAULT_FLAG_WRITE;
- 
- 	vmf->ptl = pmd_lock(vmf->vma->vm_mm, vmf->pmd);
- 	if (unlikely(!pmd_same(*vmf->pmd, orig_pmd)))
- 		goto unlock;
- 
- 	entry = pmd_mkyoung(orig_pmd);
-+	if (write)
-+		entry = pmd_mkdirty(entry);
- 	haddr = vmf->address & HPAGE_PMD_MASK;
--	if (pmdp_set_access_flags(vmf->vma, haddr, vmf->pmd, entry,
--				vmf->flags & FAULT_FLAG_WRITE))
-+	if (pmdp_set_access_flags(vmf->vma, haddr, vmf->pmd, entry, write))
- 		update_mmu_cache_pmd(vmf->vma, vmf->address, vmf->pmd);
- 
- unlock:
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161222/0d1bdac9/attachment.sig>
