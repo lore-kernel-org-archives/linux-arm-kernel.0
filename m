@@ -1,115 +1,118 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Thu, 22 Dec 2016 11:17:13 +0300
-Subject: [PATCH] mm: pmd dirty emulation in page fault handler
-In-Reply-To: <1482364101-16204-1-git-send-email-minchan@kernel.org>
-References: <1482364101-16204-1-git-send-email-minchan@kernel.org>
-Message-ID: <20161222081713.GA32480@node.shutemov.name>
+From: uwe@kleine-koenig.org (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 22 Dec 2016 10:43:27 +0100
+Subject: [PATCH v2] ARM: dts: turris-omnia: add support for ethernet switch
+Message-ID: <20161222094327.24051-1-uwe@kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2016 at 08:48:21AM +0900, Minchan Kim wrote:
-> Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
+The Turris Omnia features a Marvell MV88E7176 ethernet switch. Add it to
+the dts.
 
-I guess you wanted put b8d3c4c3009d before [1], right?
+Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+---
+Changes since (implicit) v1:
+ - drop mdio bus and per port phy-handle as they match the default
+   setup.
 
-> http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
-> 
-> The problem is page fault handler supports only accessed flag emulation
-> for THP page of SW-dirty/accessed architecture.
-> 
-> This patch enables dirty-bit emulation for those architectures.
-> Without it, MADV_FREE makes application hang by repeated fault forever.
-> 
-> [1] mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called
-> 
-> Cc: Jason Evans <je@fb.com>
-> Cc: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: linux-arch at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: <stable@vger.kernel.org> [4.5+]
-> Fixes: b8d3c4c3009d ("mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called")
-> Reported-by: Andreas Schwab <schwab@suse.de>
-> Signed-off-by: Minchan Kim <minchan@kernel.org>
-> ---
->  mm/huge_memory.c |  6 ++++--
->  mm/memory.c      | 18 ++++++++++--------
->  2 files changed, 14 insertions(+), 10 deletions(-)
-> 
-> diff --git a/mm/huge_memory.c b/mm/huge_memory.c
-> index 10eedbf..29ec8a4 100644
-> --- a/mm/huge_memory.c
-> +++ b/mm/huge_memory.c
-> @@ -883,15 +883,17 @@ void huge_pmd_set_accessed(struct vm_fault *vmf, pmd_t orig_pmd)
->  {
->  	pmd_t entry;
->  	unsigned long haddr;
-> +	bool write = vmf->flags & FAULT_FLAG_WRITE;
->  
->  	vmf->ptl = pmd_lock(vmf->vma->vm_mm, vmf->pmd);
->  	if (unlikely(!pmd_same(*vmf->pmd, orig_pmd)))
->  		goto unlock;
->  
->  	entry = pmd_mkyoung(orig_pmd);
-> +	if (write)
-> +		entry = pmd_mkdirty(entry);
->  	haddr = vmf->address & HPAGE_PMD_MASK;
-> -	if (pmdp_set_access_flags(vmf->vma, haddr, vmf->pmd, entry,
-> -				vmf->flags & FAULT_FLAG_WRITE))
-> +	if (pmdp_set_access_flags(vmf->vma, haddr, vmf->pmd, entry, write))
->  		update_mmu_cache_pmd(vmf->vma, vmf->address, vmf->pmd);
->  
->  unlock:
-> diff --git a/mm/memory.c b/mm/memory.c
-> index 36c774f..7408ddc 100644
-> --- a/mm/memory.c
-> +++ b/mm/memory.c
-> @@ -3637,18 +3637,20 @@ static int __handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
->  			if (pmd_protnone(orig_pmd) && vma_is_accessible(vma))
->  				return do_huge_pmd_numa_page(&vmf, orig_pmd);
->  
-> -			if ((vmf.flags & FAULT_FLAG_WRITE) &&
-> -					!pmd_write(orig_pmd)) {
-> -				ret = wp_huge_pmd(&vmf, orig_pmd);
-> -				if (!(ret & VM_FAULT_FALLBACK))
-> +			if (vmf.flags & FAULT_FLAG_WRITE) {
-> +				if (!pmd_write(orig_pmd)) {
-> +					ret = wp_huge_pmd(&vmf, orig_pmd);
-> +					if (ret == VM_FAULT_FALLBACK)
+One thing I was surprised is that the mv88e6xxx module isn't autoloaded
+by udev. Is this expected?
 
-In theory, more than one flag can be set and it would lead to
-false-negative. Bit check was the right thing.
+Best regards
+Uwe
 
-And I don't understand why do you need to change code in
-__handle_mm_fault() at all.
->From what I see change to huge_pmd_set_accessed() should be enough.
+ arch/arm/boot/dts/armada-385-turris-omnia.dts | 66 ++++++++++++++++++++++++++-
+ 1 file changed, 64 insertions(+), 2 deletions(-)
 
-> +						goto pte_fault;
->  					return ret;
-> -			} else {
-> -				huge_pmd_set_accessed(&vmf, orig_pmd);
-> -				return 0;
-> +				}
->  			}
-> +
-> +			huge_pmd_set_accessed(&vmf, orig_pmd);
-> +			return 0;
->  		}
->  	}
-> -
-> +pte_fault:
->  	return handle_pte_fault(&vmf);
->  }
->  
-> -- 
-> 2.7.4
-> 
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
-
+diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
+index ab49acb2d452..f8e55fa7f0fa 100644
+--- a/arch/arm/boot/dts/armada-385-turris-omnia.dts
++++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
+@@ -122,7 +122,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&ge0_rgmii_pins>;
+ 	status = "okay";
+-	phy-mode = "rgmii-id";
++	phy-mode = "rgmii";
+ 
+ 	fixed-link {
+ 		speed = <1000>;
+@@ -135,7 +135,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&ge1_rgmii_pins>;
+ 	status = "okay";
+-	phy-mode = "rgmii-id";
++	phy-mode = "rgmii";
+ 
+ 	fixed-link {
+ 		speed = <1000>;
+@@ -274,6 +274,68 @@
+ 	};
+ 
+ 	/* Switch MV88E7176 at address 0x10 */
++	switch at 10 {
++		compatible = "marvell,mv88e6085";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		dsa,member = <0 0>;
++
++		reg = <0x10>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			ports at 0 {
++				reg = <0>;
++				label = "lan0";
++			};
++
++			ports at 1 {
++				reg = <1>;
++				label = "lan1";
++			};
++
++			ports at 2 {
++				reg = <2>;
++				label = "lan2";
++			};
++
++			ports at 3 {
++				reg = <3>;
++				label = "lan3";
++			};
++
++			ports at 4 {
++				reg = <4>;
++				label = "lan4";
++			};
++
++			ports at 5 {
++				reg = <5>;
++				label = "cpu";
++				ethernet = <&eth1>;
++				phy-mode = "rgmii-id";
++
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++				};
++			};
++
++			ports at 6 {
++				reg = <6>;
++				label = "cpu";
++				ethernet = <&eth0>;
++				phy-mode = "rgmii-id";
++
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++				};
++			};
++		};
++	};
+ };
+ 
+ &pinctrl {
 -- 
- Kirill A. Shutemov
+2.11.0
