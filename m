@@ -1,19 +1,24 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 21 Dec 2016 16:14:53 -0800
-Subject: [PATCHv2 1/3] dt-bindings: arm: update Armada CP110 system
- controller binding
-In-Reply-To: <1482316017-22154-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 21 Dec 2016 16:14:56 -0800
+Subject: [PATCHv2 2/3] clk: mvebu: adjust clock handling for the CP110
+ system controller
+In-Reply-To: <1482316017-22154-3-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1482316017-22154-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482316017-22154-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20161222001453.GW8288@codeaurora.org>
+ <1482316017-22154-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20161222001456.GX8288@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/21, Thomas Petazzoni wrote:
-> It turns out that in the CP110 HW block present in Marvell Armada
-> 7K/8K SoCs, gatable clock n?18 not only controls SD/MMC, but also the
-> GOP block. This commit updates the Device Tree binding for this piece
-> of hardware accordingly.
+> This commit:
+> 
+>  - makes the GOP_DP (bit 9) gatable clock a child clock of the
+>    SD_MMC_GOP (bit 18) clock, as it should have been. The clock for bit
+>    18 was just named SD_MMC, but since it also covers the GOP block, it
+>    is renamed SD_MMC_GOP.
+> 
+>  - makes the MG (bit 5) gatable clock a child clock of the MG_CORE
+>    clock (bit 6)
 > 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
