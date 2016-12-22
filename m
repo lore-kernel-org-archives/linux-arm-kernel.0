@@ -1,74 +1,92 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Thu, 22 Dec 2016 21:35:33 +0300
-Subject: [PATCH] mm: pmd dirty emulation in page fault handler
-In-Reply-To: <20161222145203.GA18970@bbox>
-References: <1482364101-16204-1-git-send-email-minchan@kernel.org>
- <20161222081713.GA32480@node.shutemov.name>
- <20161222145203.GA18970@bbox>
-Message-ID: <20161222183533.GA29876@node.shutemov.name>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 22 Dec 2016 12:39:08 -0600
+Subject: [PATCH v2 2/4] dt-bindings: add bindings for rk3328 clock
+ controller
+In-Reply-To: <1482112573-11613-3-git-send-email-zhangqing@rock-chips.com>
+References: <1482112573-11613-1-git-send-email-zhangqing@rock-chips.com>
+ <1482112573-11613-3-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <20161222183908.gjrajbfxgrwwb4vn@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2016 at 11:52:03PM +0900, Minchan Kim wrote:
-> Hello,
+On Mon, Dec 19, 2016 at 09:56:11AM +0800, Elaine Zhang wrote:
+> Add devicetree bindings for Rockchip cru which found on
+> Rockchip SoCs.
 > 
-> On Thu, Dec 22, 2016 at 11:17:13AM +0300, Kirill A. Shutemov wrote:
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> ---
+>  .../bindings/clock/rockchip,rk3328-cru.txt         | 57 ++++++++++++++++++++++
+>  1 file changed, 57 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3328-cru.txt
 > 
-> < snip >
-> > > diff --git a/mm/memory.c b/mm/memory.c
-> > > index 36c774f..7408ddc 100644
-> > > --- a/mm/memory.c
-> > > +++ b/mm/memory.c
-> > > @@ -3637,18 +3637,20 @@ static int __handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
-> > >  			if (pmd_protnone(orig_pmd) && vma_is_accessible(vma))
-> > >  				return do_huge_pmd_numa_page(&vmf, orig_pmd);
-> > >  
-> > > -			if ((vmf.flags & FAULT_FLAG_WRITE) &&
-> > > -					!pmd_write(orig_pmd)) {
-> > > -				ret = wp_huge_pmd(&vmf, orig_pmd);
-> > > -				if (!(ret & VM_FAULT_FALLBACK))
-> > > +			if (vmf.flags & FAULT_FLAG_WRITE) {
-> > > +				if (!pmd_write(orig_pmd)) {
-> > > +					ret = wp_huge_pmd(&vmf, orig_pmd);
-> > > +					if (ret == VM_FAULT_FALLBACK)
-> > 
-> > In theory, more than one flag can be set and it would lead to
-> > false-negative. Bit check was the right thing.
-> > 
-> > And I don't understand why do you need to change code in
-> > __handle_mm_fault() at all.
-> > From what I see change to huge_pmd_set_accessed() should be enough.
-> 
-> Yeb. Thanks for the review. Here v2 goes.
-> 
-> From b3ec95c0df91ad113525968a4a6b53030fd0b48d Mon Sep 17 00:00:00 2001
-> From: Minchan Kim <minchan@kernel.org>
-> Date: Thu, 22 Dec 2016 23:43:49 +0900
-> Subject: [PATCH v2] mm: pmd dirty emulation in page fault handler
-> 
-> Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
-> http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
-> 
-> The problem is page fault handler supports only accessed flag emulation
-> for THP page of SW-dirty/accessed architecture.
-> 
-> This patch enables dirty-bit emulation for those architectures.
-> Without it, MADV_FREE makes application hang by repeated fault forever.
-> 
-> [1] b8d3c4c3009d, mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called
-> 
-> Cc: Jason Evans <je@fb.com>
-> Cc: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: linux-arch at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: <stable@vger.kernel.org> [4.5+]
-> Fixes: b8d3c4c3009d ("mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called")
-> Reported-by: Andreas Schwab <schwab@suse.de>
-> Signed-off-by: Minchan Kim <minchan@kernel.org>
+> diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3328-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3328-cru.txt
+> new file mode 100644
+> index 000000000000..20053494d49f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/rockchip,rk3328-cru.txt
+> @@ -0,0 +1,57 @@
+> +* Rockchip RK3328 Clock and Reset Unit
+> +
+> +The RK3328 clock controller generates and supplies clock to various
+> +controllers within the SoC and also implements a reset controller for SoC
+> +peripherals.
+> +
+> +Required Properties:
+> +
+> +- compatible: should be "rockchip,rk3328-cru"
 
-Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+The example shows other compatibles. IMO, I would drop them rather than 
+add them here.
 
--- 
- Kirill A. Shutemov
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- #clock-cells: should be 1.
+> +- #reset-cells: should be 1.
+> +
+> +Optional Properties:
+> +
+> +- rockchip,grf: phandle to the syscon managing the "general register files"
+> +  If missing pll rates are not changeable, due to the missing pll lock status.
+> +
+> +Each clock is assigned an identifier and client nodes can use this identifier
+> +to specify the clock which they consume. All available clocks are defined as
+> +preprocessor macros in the dt-bindings/clock/rk3328-cru.h headers and can be
+> +used in device tree sources. Similar macros exist for the reset sources in
+> +these files.
+> +
+> +External clocks:
+> +
+> +There are several clocks that are generated outside the SoC. It is expected
+> +that they are defined using standard clock bindings with following
+> +clock-output-names:
+> + - "xin24m" - crystal input - required,
+> + - "clkin_i2s" - external I2S clock - optional,
+> + - "gmac_clkin" - external GMAC clock - optional
+> + - "phy_50m_out" - output clock of the pll in the mac phy
+> +
+> +Example: Clock controller node:
+> +
+> +	cru: clock-controller at ff440000 {
+> +		compatible = "rockchip,rk3328-cru", "rockchip,cru", "syscon";
+> +		reg = <0x0 0xff440000 0x0 0x1000>;
+> +		rockchip,grf = <&grf>;
+> +
+> +		#clock-cells = <1>;
+> +		#reset-cells = <1>;
+> +	};
+> +
+> +Example: UART controller node that consumes the clock generated by the clock
+> +  controller:
+> +
+> +	uart0: serial at ff120000 {
+> +		compatible = "snps,dw-apb-uart";
+> +		reg = <0xff120000 0x100>;
+> +		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+> +		reg-shift = <2>;
+> +		reg-io-width = <4>;
+> +		clocks = <&cru SCLK_UART0>;
+> +	};
+> -- 
+> 1.9.1
+> 
+> 
