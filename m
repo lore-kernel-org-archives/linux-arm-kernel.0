@@ -1,19 +1,39 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 22 Dec 2016 15:18:52 -0600
-Subject: [PATCH 1/3] doc: DT: Add ti,da830-uart to serial/8250 bindings
-In-Reply-To: <1482265384-715-2-git-send-email-david@lechnology.com>
-References: <1482265384-715-1-git-send-email-david@lechnology.com>
- <1482265384-715-2-git-send-email-david@lechnology.com>
-Message-ID: <20161222211852.4r6cpi5tzoc2qbyt@rob-hp-laptop>
+Date: Thu, 22 Dec 2016 15:20:19 -0600
+Subject: [PATCH] devicetree: bindings: clk: mvebu: fix description for
+ sata1 on Armada XP
+In-Reply-To: <20161220212005.26139-1-uwe@kleine-koenig.org>
+References: <20161220212005.26139-1-uwe@kleine-koenig.org>
+Message-ID: <20161222212019.t52jy4h5cczsah7z@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2016 at 02:23:02PM -0600, David Lechner wrote:
-> This adds the ti,da830-uart compatible string to serial 8250 UART bindings.
+On Tue, Dec 20, 2016 at 10:20:05PM +0100, Uwe Kleine-K?nig wrote:
+> SATA Host 0 clock is (as correctly documented) id 15/sata0.
 > 
-> Signed-off-by: David Lechner <david@lechnology.com>
+> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
 > ---
->  Documentation/devicetree/bindings/serial/8250.txt | 1 +
->  1 file changed, 1 insertion(+)
+>  Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Acked-by: Rob Herring <robh@kernel.org>
+Applied, thanks.
+
+Rob
+
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+> index cb8542d910b3..5142efc8099d 100644
+> --- a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+> @@ -117,7 +117,7 @@ ID	Clock	Peripheral
+>  25	tdm	Time Division Mplx
+>  28	xor1	XOR DMA 1
+>  29	sata1lnk
+> -30	sata1	SATA Host 0
+> +30	sata1	SATA Host 1
+>  
+>  The following is a list of provided IDs for Dove:
+>  ID	Clock	Peripheral
+> -- 
+> 2.10.2
+> 
