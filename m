@@ -1,387 +1,202 @@
 From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 22 Dec 2016 17:13:24 +1300
-Subject: [PATCH 1/5] clk: mvebu: support for 98DX3236 SoC
+Date: Thu, 22 Dec 2016 17:13:25 +1300
+Subject: [PATCH 2/5] arm: mvebu: support for SMP on 98DX3336 SoC
 In-Reply-To: <20161222041328.3303-1-chris.packham@alliedtelesis.co.nz>
 References: <20161222041328.3303-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20161222041328.3303-2-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20161222041328.3303-3-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 98DX3236, 98DX3336, 98DX4521 and variants have a different TCLK from
-the Armada XP (200MHz vs 250MHz). The CPU core clock is fixed at 800MHz.
-
-The clock gating options are a subset of those on the Armada XP.
-
-The core clock divider is different to the Armada XP also.
+Compared to the armada-xp the 98DX3336 uses different registers to set
+the boot address for the secondary CPU so a new enable-method is needed.
+This will only work if the machine definition doesn't define an overall
+smp_ops because there is not currently a way of overriding this from the
+device tree if it is set in the machine definition.
 
 Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 ---
- drivers/clk/mvebu/Makefile             |   2 +-
- drivers/clk/mvebu/armada-xp.c          |  42 +++++++
- drivers/clk/mvebu/clk-cpu.c            |  33 +++++-
- drivers/clk/mvebu/mv98dx3236-corediv.c | 207 +++++++++++++++++++++++++++++++++
- 4 files changed, 280 insertions(+), 4 deletions(-)
- create mode 100644 drivers/clk/mvebu/mv98dx3236-corediv.c
+ .../bindings/arm/marvell/98dx3236-resume-ctrl.txt  | 18 ++++++
+ arch/arm/mach-mvebu/Makefile                       |  1 +
+ arch/arm/mach-mvebu/common.h                       |  1 +
+ arch/arm/mach-mvebu/platsmp.c                      | 43 ++++++++++++++
+ arch/arm/mach-mvebu/pmsu-98dx3236.c                | 69 ++++++++++++++++++++++
+ 5 files changed, 132 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell/98dx3236-resume-ctrl.txt
+ create mode 100644 arch/arm/mach-mvebu/pmsu-98dx3236.c
 
-diff --git a/drivers/clk/mvebu/Makefile b/drivers/clk/mvebu/Makefile
-index d9ae97fb43c4..6a3681e3d6db 100644
---- a/drivers/clk/mvebu/Makefile
-+++ b/drivers/clk/mvebu/Makefile
-@@ -9,7 +9,7 @@ obj-$(CONFIG_ARMADA_39X_CLK)	+= armada-39x.o
- obj-$(CONFIG_ARMADA_37XX_CLK)	+= armada-37xx-xtal.o
- obj-$(CONFIG_ARMADA_37XX_CLK)	+= armada-37xx-tbg.o
- obj-$(CONFIG_ARMADA_37XX_CLK)	+= armada-37xx-periph.o
--obj-$(CONFIG_ARMADA_XP_CLK)	+= armada-xp.o
-+obj-$(CONFIG_ARMADA_XP_CLK)	+= armada-xp.o mv98dx3236-corediv.o
- obj-$(CONFIG_ARMADA_AP806_SYSCON) += ap806-system-controller.o
- obj-$(CONFIG_ARMADA_CP110_SYSCON) += cp110-system-controller.o
- obj-$(CONFIG_DOVE_CLK)		+= dove.o dove-divider.o
-diff --git a/drivers/clk/mvebu/armada-xp.c b/drivers/clk/mvebu/armada-xp.c
-index b3094315a3c0..0413bf8284e0 100644
---- a/drivers/clk/mvebu/armada-xp.c
-+++ b/drivers/clk/mvebu/armada-xp.c
-@@ -52,6 +52,12 @@ static u32 __init axp_get_tclk_freq(void __iomem *sar)
- 	return 250000000;
- }
- 
-+/* MV98DX3236 TCLK frequency is fixed to 200MHz */
-+static u32 __init mv98dx3236_get_tclk_freq(void __iomem *sar)
-+{
-+	return 200000000;
-+}
-+
- static const u32 axp_cpu_freqs[] __initconst = {
- 	1000000000,
- 	1066000000,
-@@ -89,6 +95,12 @@ static u32 __init axp_get_cpu_freq(void __iomem *sar)
- 	return cpu_freq;
- }
- 
-+/* MV98DX3236 CLK frequency is fixed to 800MHz */
-+static u32 __init mv98dx3236_get_cpu_freq(void __iomem *sar)
-+{
-+	return 800000000;
-+}
-+
- static const int axp_nbclk_ratios[32][2] __initconst = {
- 	{0, 1}, {1, 2}, {2, 2}, {2, 2},
- 	{1, 2}, {1, 2}, {1, 1}, {2, 3},
-@@ -158,6 +170,14 @@ static const struct coreclk_soc_desc axp_coreclks = {
- 	.num_ratios = ARRAY_SIZE(axp_coreclk_ratios),
- };
- 
-+static const struct coreclk_soc_desc mv98dx3236_coreclks = {
-+	.get_tclk_freq = mv98dx3236_get_tclk_freq,
-+	.get_cpu_freq = mv98dx3236_get_cpu_freq,
-+	.get_clk_ratio = NULL,
-+	.ratios = NULL,
-+	.num_ratios = 0,
-+};
-+
- /*
-  * Clock Gating Control
-  */
-@@ -195,6 +215,15 @@ static const struct clk_gating_soc_desc axp_gating_desc[] __initconst = {
- 	{ }
- };
- 
-+static const struct clk_gating_soc_desc mv98dx3236_gating_desc[] __initconst = {
-+	{ "ge1", NULL, 3, 0 },
-+	{ "ge0", NULL, 4, 0 },
-+	{ "pex00", NULL, 5, 0 },
-+	{ "sdio", NULL, 17, 0 },
-+	{ "xor0", NULL, 22, 0 },
-+	{ }
-+};
-+
- static void __init axp_clk_init(struct device_node *np)
- {
- 	struct device_node *cgnp =
-@@ -206,3 +235,16 @@ static void __init axp_clk_init(struct device_node *np)
- 		mvebu_clk_gating_setup(cgnp, axp_gating_desc);
- }
- CLK_OF_DECLARE(axp_clk, "marvell,armada-xp-core-clock", axp_clk_init);
-+
-+static void __init mv98dx3236_clk_init(struct device_node *np)
-+{
-+	struct device_node *cgnp =
-+		of_find_compatible_node(NULL, NULL, "marvell,armada-xp-gating-clock");
-+
-+	mvebu_coreclk_setup(np, &mv98dx3236_coreclks);
-+
-+	if (cgnp)
-+		mvebu_clk_gating_setup(cgnp, mv98dx3236_gating_desc);
-+}
-+CLK_OF_DECLARE(mv98dx3236_clk, "marvell,mv98dx3236-core-clock",
-+	       mv98dx3236_clk_init);
-diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
-index 5837eb8a212f..29f295e7a36b 100644
---- a/drivers/clk/mvebu/clk-cpu.c
-+++ b/drivers/clk/mvebu/clk-cpu.c
-@@ -165,7 +165,9 @@ static const struct clk_ops cpu_ops = {
- 	.set_rate = clk_cpu_set_rate,
- };
- 
--static void __init of_cpu_clk_setup(struct device_node *node)
-+/* Add parameter to allow this to support different clock operations. */
-+static void __init _of_cpu_clk_setup(struct device_node *node,
-+			const struct clk_ops *cpu_clk_ops)
- {
- 	struct cpu_clk *cpuclk;
- 	void __iomem *clock_complex_base = of_iomap(node, 0);
-@@ -218,7 +220,7 @@ static void __init of_cpu_clk_setup(struct device_node *node)
- 		cpuclk[cpu].hw.init = &init;
- 
- 		init.name = cpuclk[cpu].clk_name;
--		init.ops = &cpu_ops;
-+		init.ops = cpu_clk_ops;
- 		init.flags = 0;
- 		init.parent_names = &cpuclk[cpu].parent_name;
- 		init.num_parents = 1;
-@@ -243,5 +245,30 @@ static void __init of_cpu_clk_setup(struct device_node *node)
- 	iounmap(clock_complex_base);
- }
- 
-+/* Use this function to call the generic setup with the correct
-+ * clock operation
-+ */
-+static void __init of_cpu_clk_setup(struct device_node *node)
-+{
-+	_of_cpu_clk_setup(node, &cpu_ops);
-+}
-+
- CLK_OF_DECLARE(armada_xp_cpu_clock, "marvell,armada-xp-cpu-clock",
--					 of_cpu_clk_setup);
-+					of_cpu_clk_setup);
-+
-+/* Define the clock and operations for the mv98dx3236 - it cannot perform
-+ * any operations.
-+ */
-+static const struct clk_ops mv98dx3236_cpu_ops = {
-+	.recalc_rate = NULL,
-+	.round_rate = NULL,
-+	.set_rate = NULL,
-+};
-+
-+static void __init of_mv98dx3236_cpu_clk_setup(struct device_node *node)
-+{
-+	_of_cpu_clk_setup(node, &mv98dx3236_cpu_ops);
-+}
-+
-+CLK_OF_DECLARE(mv98dx3236_cpu_clock, "marvell,mv98dx3236-cpu-clock",
-+					 of_mv98dx3236_cpu_clk_setup);
-diff --git a/drivers/clk/mvebu/mv98dx3236-corediv.c b/drivers/clk/mvebu/mv98dx3236-corediv.c
+diff --git a/Documentation/devicetree/bindings/arm/marvell/98dx3236-resume-ctrl.txt b/Documentation/devicetree/bindings/arm/marvell/98dx3236-resume-ctrl.txt
 new file mode 100644
-index 000000000000..3060764a8e5d
+index 000000000000..8082ba872edd
 --- /dev/null
-+++ b/drivers/clk/mvebu/mv98dx3236-corediv.c
-@@ -0,0 +1,207 @@
-+/*
-+ * MV98DX3236 Core divider clock
-+ *
-+ * Copyright (C) 2015 Allied Telesis Labs
-+ *
-+ * Based on armada-xp-corediv.c
-+ * Copyright (C) 2015 Marvell
-+ *
-+ * John Thompson <john.thompson@alliedtelesis.co.nz>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/clk-provider.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+#include <linux/delay.h>
-+#include "common.h"
++++ b/Documentation/devicetree/bindings/arm/marvell/98dx3236-resume-ctrl.txt
+@@ -0,0 +1,18 @@
++Resume Control
++--------------
++Available on Marvell SOCs: 98DX3336 and 98DX4251
 +
-+#define CORE_CLK_DIV_RATIO_MASK		0xff
++Required properties:
 +
-+#define CLK_DIV_RATIO_NAND_MASK 0x0f
-+#define CLK_DIV_RATIO_NAND_OFFSET 6
-+#define CLK_DIV_RATIO_NAND_FORCE_RELOAD_BIT 26
++- compatible: must be "marvell,98dx3336-resume-ctrl"
 +
-+#define RATIO_RELOAD_BIT BIT(10)
-+#define RATIO_REG_OFFSET 0x08
++- reg: Should contain resume control registers location and length
 +
-+/*
-+ * This structure represents one core divider clock for the clock
-+ * framework, and is dynamically allocated for each core divider clock
-+ * existing in the current SoC.
-+ */
-+struct clk_corediv {
-+	struct clk_hw hw;
-+	void __iomem *reg;
-+	spinlock_t lock;
++Example:
++
++resume at 20980 {
++	compatible = "marvell,98dx3336-resume-ctrl";
++	reg = <0x20980 0x10>;
 +};
 +
-+static struct clk_onecell_data clk_data;
 +
-+
-+#define to_corediv_clk(p) container_of(p, struct clk_corediv, hw)
-+
-+static int mv98dx3236_corediv_is_enabled(struct clk_hw *hwclk)
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index 6c6497e80a7b..2a2dd8324fb8 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -7,6 +7,7 @@ obj-$(CONFIG_MACH_MVEBU_ANY)	 += system-controller.o mvebu-soc-id.o
+ 
+ ifeq ($(CONFIG_MACH_MVEBU_V7),y)
+ obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o pmsu_ll.o
++obj-y				 += pmsu-98dx3236.o
+ 
+ obj-$(CONFIG_PM)		 += pm.o pm-board.o
+ obj-$(CONFIG_SMP)		 += platsmp.o headsmp.o platsmp-a9.o headsmp-a9.o
+diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+index 6b775492cfad..099dabf23461 100644
+--- a/arch/arm/mach-mvebu/common.h
++++ b/arch/arm/mach-mvebu/common.h
+@@ -27,4 +27,5 @@ void __iomem *mvebu_get_scu_base(void);
+ 
+ int mvebu_pm_suspend_init(void (*board_pm_enter)(void __iomem *sdram_reg,
+ 							u32 srcmd));
++void mv98dx3236_resume_set_cpu_boot_addr(int hw_cpu, void *boot_addr);
+ #endif
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index 46c742d3bd41..3c9ab9a008ad 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -182,5 +182,48 @@ const struct smp_operations armada_xp_smp_ops __initconst = {
+ #endif
+ };
+ 
++static int mv98dx3236_boot_secondary(unsigned int cpu, struct task_struct *idle)
 +{
-+	/* Core divider is always active */
-+	return 1;
-+}
++	int ret, hw_cpu;
 +
-+static int mv98dx3236_corediv_enable(struct clk_hw *hwclk)
-+{
-+	/* always succeeds */
-+	return 0;
-+}
++	pr_info("Booting CPU %d\n", cpu);
 +
-+static void mv98dx3236_corediv_disable(struct clk_hw *hwclk)
-+{
-+	/* can't be disabled so is left alone */
-+}
-+
-+static unsigned long mv98dx3236_corediv_recalc_rate(struct clk_hw *hwclk,
-+					 unsigned long parent_rate)
-+{
-+	struct clk_corediv *corediv = to_corediv_clk(hwclk);
-+	u32 reg, div;
-+
-+	reg = readl(corediv->reg + RATIO_REG_OFFSET);
-+	div = (reg >> CLK_DIV_RATIO_NAND_OFFSET) & CLK_DIV_RATIO_NAND_MASK;
-+	return parent_rate / div;
-+}
-+
-+static long mv98dx3236_corediv_round_rate(struct clk_hw *hwclk,
-+			       unsigned long rate, unsigned long *parent_rate)
-+{
-+	/* Valid ratio are 1:4, 1:5, 1:6 and 1:8 */
-+	u32 div;
-+
-+	div = *parent_rate / rate;
-+	if (div < 4)
-+		div = 4;
-+	else if (div > 6)
-+		div = 8;
-+
-+	return *parent_rate / div;
-+}
-+
-+static int mv98dx3236_corediv_set_rate(struct clk_hw *hwclk, unsigned long rate,
-+			    unsigned long parent_rate)
-+{
-+	struct clk_corediv *corediv = to_corediv_clk(hwclk);
-+	unsigned long flags = 0;
-+	u32 reg, div;
-+
-+	div = parent_rate / rate;
-+
-+	spin_lock_irqsave(&corediv->lock, flags);
-+
-+	/* Write new divider to the divider ratio register */
-+	reg = readl(corediv->reg + RATIO_REG_OFFSET);
-+	reg &= ~(CLK_DIV_RATIO_NAND_MASK << CLK_DIV_RATIO_NAND_OFFSET);
-+	reg |= (div & CLK_DIV_RATIO_NAND_MASK) << CLK_DIV_RATIO_NAND_OFFSET;
-+	writel(reg, corediv->reg + RATIO_REG_OFFSET);
-+
-+	/* Set reload-force for this clock */
-+	reg = readl(corediv->reg) | BIT(CLK_DIV_RATIO_NAND_FORCE_RELOAD_BIT);
-+	writel(reg, corediv->reg);
-+
-+	/* Now trigger the clock update */
-+	reg = readl(corediv->reg + RATIO_REG_OFFSET) | RATIO_RELOAD_BIT;
-+	writel(reg, corediv->reg + RATIO_REG_OFFSET);
++	hw_cpu = cpu_logical_map(cpu);
++	set_secondary_cpu_clock(hw_cpu);
++	mv98dx3236_resume_set_cpu_boot_addr(hw_cpu,
++					    armada_xp_secondary_startup);
 +
 +	/*
-+	 * Wait for clocks to settle down, and then clear all the
-+	 * ratios request and the reload request.
++	 * This is needed to wake up CPUs in the offline state after
++	 * using CPU hotplug.
 +	 */
-+	udelay(1000);
-+	reg &= ~(CORE_CLK_DIV_RATIO_MASK | RATIO_RELOAD_BIT);
-+	writel(reg, corediv->reg + RATIO_REG_OFFSET);
-+	udelay(1000);
++	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
 +
-+	spin_unlock_irqrestore(&corediv->lock, flags);
++	/*
++	 * This is needed to take secondary CPUs out of reset on the
++	 * initial boot.
++	 */
++	ret = mvebu_cpu_reset_deassert(hw_cpu);
++	if (ret) {
++		pr_warn("unable to boot CPU: %d\n", ret);
++		return ret;
++	}
 +
 +	return 0;
 +}
 +
-+static const struct clk_ops ops = {
-+	.enable = mv98dx3236_corediv_enable,
-+	.disable = mv98dx3236_corediv_disable,
-+	.is_enabled = mv98dx3236_corediv_is_enabled,
-+	.recalc_rate = mv98dx3236_corediv_recalc_rate,
-+	.round_rate = mv98dx3236_corediv_round_rate,
-+	.set_rate = mv98dx3236_corediv_set_rate,
++struct smp_operations mv98dx3236_smp_ops __initdata = {
++	.smp_init_cpus		= armada_xp_smp_init_cpus,
++	.smp_prepare_cpus	= armada_xp_smp_prepare_cpus,
++	.smp_boot_secondary	= mv98dx3236_boot_secondary,
++	.smp_secondary_init     = armada_xp_secondary_init,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_die		= armada_xp_cpu_die,
++	.cpu_kill               = armada_xp_cpu_kill,
++#endif
 +};
 +
-+static void __init mv98dx3236_corediv_clk_init(struct device_node *node)
+ CPU_METHOD_OF_DECLARE(armada_xp_smp, "marvell,armada-xp-smp",
+ 		      &armada_xp_smp_ops);
++CPU_METHOD_OF_DECLARE(mv98dx3236_smp, "marvell,98dx3236-smp",
++		      &mv98dx3236_smp_ops);
+diff --git a/arch/arm/mach-mvebu/pmsu-98dx3236.c b/arch/arm/mach-mvebu/pmsu-98dx3236.c
+new file mode 100644
+index 000000000000..fadc81d0c051
+--- /dev/null
++++ b/arch/arm/mach-mvebu/pmsu-98dx3236.c
+@@ -0,0 +1,69 @@
++/**
++ * CPU resume support for 98DX4521 internal CPU (a.k.a. MSYS).
++ */
++
++#define pr_fmt(fmt) "mv98dx3236-resume: " fmt
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/of_address.h>
++#include <linux/io.h>
++#include "common.h"
++
++static void __iomem *mv98dx3236_resume_base;
++#define MV98DX3236_CPU_RESUME_CTRL_OFFSET	0x08
++#define MV98DX3236_CPU_RESUME_ADDR_OFFSET	0x04
++
++static const struct of_device_id of_mv98dx3236_resume_table[] = {
++	{.compatible = "marvell,98dx3336-resume-ctrl",},
++	{ /* end of list */ },
++};
++
++void mv98dx3236_resume_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
 +{
-+	struct clk_init_data init;
-+	struct clk_corediv *corediv;
-+	struct clk **clks;
-+	void __iomem *base;
-+	const __be32 *off;
-+	const char *parent_name;
-+	const char *clk_name;
-+	int len;
-+	struct device_node *dfx_node;
++	WARN_ON(hw_cpu != 1);
 +
-+	dfx_node = of_parse_phandle(node, "base", 0);
-+	if (WARN_ON(!dfx_node))
-+		return;
-+
-+	off = of_get_property(node, "reg", &len);
-+	if (WARN_ON(!off))
-+		return;
-+
-+	base = of_iomap(dfx_node, 0);
-+	if (WARN_ON(!base))
-+		return;
-+
-+	of_node_put(dfx_node);
-+
-+	parent_name = of_clk_get_parent_name(node, 0);
-+
-+	clk_data.clk_num = 1;
-+
-+	/* clks holds the clock array */
-+	clks = kcalloc(clk_data.clk_num, sizeof(struct clk *),
-+				GFP_KERNEL);
-+	if (WARN_ON(!clks))
-+		goto err_unmap;
-+	/* corediv holds the clock specific array */
-+	corediv = kcalloc(clk_data.clk_num, sizeof(struct clk_corediv),
-+				GFP_KERNEL);
-+	if (WARN_ON(!corediv))
-+		goto err_free_clks;
-+
-+	spin_lock_init(&corediv->lock);
-+
-+	of_property_read_string_index(node, "clock-output-names",
-+					  0, &clk_name);
-+
-+	init.num_parents = 1;
-+	init.parent_names = &parent_name;
-+	init.name = clk_name;
-+	init.ops = &ops;
-+	init.flags = 0;
-+
-+	corediv[0].reg = (void *)((int)base + be32_to_cpu(*off));
-+	corediv[0].hw.init = &init;
-+
-+	clks[0] = clk_register(NULL, &corediv[0].hw);
-+	WARN_ON(IS_ERR(clks[0]));
-+
-+	clk_data.clks = clks;
-+	of_clk_add_provider(node, of_clk_src_onecell_get, &clk_data);
-+	return;
-+
-+err_free_clks:
-+	kfree(clks);
-+err_unmap:
-+	iounmap(base);
++	writel(0, mv98dx3236_resume_base + MV98DX3236_CPU_RESUME_CTRL_OFFSET);
++	writel(virt_to_phys(boot_addr), mv98dx3236_resume_base +
++	       MV98DX3236_CPU_RESUME_ADDR_OFFSET);
 +}
 +
-+CLK_OF_DECLARE(mv98dx3236_corediv_clk, "marvell,mv98dx3236-corediv-clock",
-+	       mv98dx3236_corediv_clk_init);
++static int __init mv98dx3236_resume_init(void)
++{
++	struct device_node *np;
++	struct resource res;
++	int ret = 0;
++
++	np = of_find_matching_node(NULL, of_mv98dx3236_resume_table);
++	if (!np)
++		return 0;
++
++	pr_info("Initializing 98DX4521 Resume\n");
++
++	if (of_address_to_resource(np, 0, &res)) {
++		pr_err("unable to get resource\n");
++		ret = -ENOENT;
++		goto out;
++	}
++
++	if (!request_mem_region(res.start, resource_size(&res),
++				np->full_name)) {
++		pr_err("unable to request region\n");
++		ret = -EBUSY;
++		goto out;
++	}
++
++	mv98dx3236_resume_base = ioremap(res.start, resource_size(&res));
++	if (!mv98dx3236_resume_base) {
++		pr_err("unable to map registers\n");
++		release_mem_region(res.start, resource_size(&res));
++		ret = -ENOMEM;
++		goto out;
++	}
++
++out:
++	of_node_put(np);
++	return ret;
++}
++
++early_initcall(mv98dx3236_resume_init);
 -- 
 2.11.0.24.ge6920cf
