@@ -1,78 +1,74 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 22 Dec 2016 12:16:46 -0600
-Subject: [2/3] serial: 8250: Add new port type for TI
- DA8xx/OMAPL13x/AM17xx/AM18xx
-In-Reply-To: <306c9ce3-4003-84b9-fd0f-34232399f1aa@ti.com>
-References: <1482265384-715-3-git-send-email-david@lechnology.com>
- <306c9ce3-4003-84b9-fd0f-34232399f1aa@ti.com>
-Message-ID: <97641ab2-ba78-7186-db62-57b3bd76243f@lechnology.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Thu, 22 Dec 2016 21:35:33 +0300
+Subject: [PATCH] mm: pmd dirty emulation in page fault handler
+In-Reply-To: <20161222145203.GA18970@bbox>
+References: <1482364101-16204-1-git-send-email-minchan@kernel.org>
+ <20161222081713.GA32480@node.shutemov.name>
+ <20161222145203.GA18970@bbox>
+Message-ID: <20161222183533.GA29876@node.shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2016 09:21 AM, Franklin S Cooper Jr wrote:
->
->
-> On 12/20/2016 02:23 PM, David Lechner wrote:
->> This adds a new UART port type for TI DA8xx/OMAPL13x/AM17xx/AM18xx. These
->> SoCs have standard 8250 registers plus some extra non-standard registers.
->>
->> The UART will not function unless the non-standard Power and Emulation
->> Management Register (PWREMU_MGMT) is configured correctly. This is
->> currently handled in arch/arm/mach-davinci/serial.c for non-device-tree
->> boards. Making this part of the UART driver will allow UART to work on
->> device-tree boards as well and the mach code can eventually be removed.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> ---
->>  drivers/tty/serial/8250/8250_of.c   |  1 +
->>  drivers/tty/serial/8250/8250_port.c | 22 ++++++++++++++++++++++
->>  include/uapi/linux/serial_core.h    |  3 ++-
->>  include/uapi/linux/serial_reg.h     |  8 ++++++++
->>  4 files changed, 33 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/tty/serial/8250/8250_of.c b/drivers/tty/serial/8250/8250_of.c
->> index d25ab1c..5281252 100644
->> --- a/drivers/tty/serial/8250/8250_of.c
->> +++ b/drivers/tty/serial/8250/8250_of.c
->> @@ -332,6 +332,7 @@ static const struct of_device_id of_platform_serial_table[] = {
->>  		.data = (void *)PORT_ALTR_16550_F128, },
->>  	{ .compatible = "mrvl,mmp-uart",
->>  		.data = (void *)PORT_XSCALE, },
->> +	{ .compatible = "ti,da830-uart", .data = (void *)PORT_DA830, },
->>  	{ /* end of list */ },
->>  };
->>  MODULE_DEVICE_TABLE(of, of_platform_serial_table);
->> diff --git a/drivers/tty/serial/8250/8250_port.c b/drivers/tty/serial/8250/8250_port.c
->> index fe4399b..ea854054 100644
->> --- a/drivers/tty/serial/8250/8250_port.c
->> +++ b/drivers/tty/serial/8250/8250_port.c
->> @@ -273,6 +273,15 @@ static const struct serial8250_config uart_config[] = {
->>  		.rxtrig_bytes	= {1, 4, 8, 14},
->>  		.flags		= UART_CAP_FIFO,
->>  	},
->> +	[PORT_DA830] = {
->> +		.name		= "TI DA8xx/OMAPL13x/AM17xx/AM18xx",
->> +		.fifo_size	= 16,
->> +		.tx_loadsz	= 16,
->> +		.fcr		= UART_FCR_DMA_SELECT | UART_FCR_ENABLE_FIFO |
->> +				  UART_FCR_R_TRIG_10,
->> +		.rxtrig_bytes	= {1, 4, 8, 14},
->> +		.flags		= UART_CAP_FIFO | UART_CAP_AFE,
->> +	},
->>  };
->
->
-> Any reason why the fcr and flags fields are changed when compared
-> against PORT_16550A?
+On Thu, Dec 22, 2016 at 11:52:03PM +0900, Minchan Kim wrote:
+> Hello,
+> 
+> On Thu, Dec 22, 2016 at 11:17:13AM +0300, Kirill A. Shutemov wrote:
+> 
+> < snip >
+> > > diff --git a/mm/memory.c b/mm/memory.c
+> > > index 36c774f..7408ddc 100644
+> > > --- a/mm/memory.c
+> > > +++ b/mm/memory.c
+> > > @@ -3637,18 +3637,20 @@ static int __handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
+> > >  			if (pmd_protnone(orig_pmd) && vma_is_accessible(vma))
+> > >  				return do_huge_pmd_numa_page(&vmf, orig_pmd);
+> > >  
+> > > -			if ((vmf.flags & FAULT_FLAG_WRITE) &&
+> > > -					!pmd_write(orig_pmd)) {
+> > > -				ret = wp_huge_pmd(&vmf, orig_pmd);
+> > > -				if (!(ret & VM_FAULT_FALLBACK))
+> > > +			if (vmf.flags & FAULT_FLAG_WRITE) {
+> > > +				if (!pmd_write(orig_pmd)) {
+> > > +					ret = wp_huge_pmd(&vmf, orig_pmd);
+> > > +					if (ret == VM_FAULT_FALLBACK)
+> > 
+> > In theory, more than one flag can be set and it would lead to
+> > false-negative. Bit check was the right thing.
+> > 
+> > And I don't understand why do you need to change code in
+> > __handle_mm_fault() at all.
+> > From what I see change to huge_pmd_set_accessed() should be enough.
+> 
+> Yeb. Thanks for the review. Here v2 goes.
+> 
+> From b3ec95c0df91ad113525968a4a6b53030fd0b48d Mon Sep 17 00:00:00 2001
+> From: Minchan Kim <minchan@kernel.org>
+> Date: Thu, 22 Dec 2016 23:43:49 +0900
+> Subject: [PATCH v2] mm: pmd dirty emulation in page fault handler
+> 
+> Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
+> http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
+> 
+> The problem is page fault handler supports only accessed flag emulation
+> for THP page of SW-dirty/accessed architecture.
+> 
+> This patch enables dirty-bit emulation for those architectures.
+> Without it, MADV_FREE makes application hang by repeated fault forever.
+> 
+> [1] b8d3c4c3009d, mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called
+> 
+> Cc: Jason Evans <je@fb.com>
+> Cc: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: linux-arch at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: <stable@vger.kernel.org> [4.5+]
+> Fixes: b8d3c4c3009d ("mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called")
+> Reported-by: Andreas Schwab <schwab@suse.de>
+> Signed-off-by: Minchan Kim <minchan@kernel.org>
 
-The AM1808 TRM says to "always enable" the DMA bit. I figured setting it 
-now could save someone trouble later if they wanted to add DMA support. 
-It does not matter if it is set even if you are not using DMA.
+Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
 
-Since we are using the special reset register that resets the state 
-machine, setting UART_FCR_CLEAR_RCVR and UART_FCR_CLEAR_XMIT seems 
-redundant.
-
-And in my testing with an AM1808, UART_CAP_AFE is not automatically 
-detected even though the chip has this capability, so it needs to be 
-manually specified.
+-- 
+ Kirill A. Shutemov
