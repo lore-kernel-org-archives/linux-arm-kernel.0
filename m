@@ -1,108 +1,189 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Thu, 22 Dec 2016 10:01:05 +0800
-Subject: [PATCH 2/2] clk: hi3660: Clock driver support for Hisilicon
- hi3660 SoC
-In-Reply-To: <20161221232551.GB8288@codeaurora.org>
-References: <1481781493-6188-1-git-send-email-zhangfei.gao@linaro.org>
- <1481781493-6188-3-git-send-email-zhangfei.gao@linaro.org>
- <20161221232551.GB8288@codeaurora.org>
-Message-ID: <fc7bebd2-ad03-6479-d6e7-42f5d724216c@linaro.org>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 21 Dec 2016 18:40:05 -0800
+Subject: [PATCH v3 3/4] ARM: Add support for CONFIG_DEBUG_VIRTUAL
+In-Reply-To: <20161209233628.6642-4-f.fainelli@gmail.com>
+References: <20161208185933.13749-1-f.fainelli@gmail.com>
+ <20161209233628.6642-1-f.fainelli@gmail.com>
+ <20161209233628.6642-4-f.fainelli@gmail.com>
+Message-ID: <7721bed8-4b08-f5ce-056e-45f02a431e76@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stephen
+On 12/09/2016 03:36 PM, Florian Fainelli wrote:
+> x86 has an option: CONFIG_DEBUG_VIRTUAL to do additional checks on
+> virt_to_phys calls. The goal is to catch users who are calling
+> virt_to_phys on non-linear addresses immediately. This includes caller
+> using __virt_to_phys() on image addresses instead of __pa_symbol(). This
+> is a generally useful debug feature to spot bad code (particulary in
+> drivers).
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  arch/arm/Kconfig              |  1 +
+>  arch/arm/include/asm/memory.h | 16 ++++++++++++--
+>  arch/arm/mm/Makefile          |  1 +
+>  arch/arm/mm/physaddr.c        | 51 +++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 67 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/mm/physaddr.c
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index b5d529fdffab..5e66173c5787 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -2,6 +2,7 @@ config ARM
+>  	bool
+>  	default y
+>  	select ARCH_CLOCKSOURCE_DATA
+> +	select ARCH_HAS_DEBUG_VIRTUAL
+>  	select ARCH_HAS_DEVMEM_IS_ALLOWED
+>  	select ARCH_HAS_ELF_RANDOMIZE
+>  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index bee7511c5098..d90300193adf 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -213,7 +213,7 @@ extern const void *__pv_table_begin, *__pv_table_end;
+>  	: "r" (x), "I" (__PV_BITS_31_24)		\
+>  	: "cc")
+>  
+> -static inline phys_addr_t __virt_to_phys(unsigned long x)
+> +static inline phys_addr_t __virt_to_phys_nodebug(unsigned long x)
+>  {
+>  	phys_addr_t t;
+>  
+> @@ -245,7 +245,7 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+>  #define PHYS_OFFSET	PLAT_PHYS_OFFSET
+>  #define PHYS_PFN_OFFSET	((unsigned long)(PHYS_OFFSET >> PAGE_SHIFT))
+>  
+> -static inline phys_addr_t __virt_to_phys(unsigned long x)
+> +static inline phys_addr_t __virt_to_phys_nodebug(unsigned long x)
+>  {
+>  	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
+>  }
+> @@ -261,6 +261,16 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+>  	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
+>  	 PHYS_PFN_OFFSET)
+>  
+> +#define __pa_symbol_nodebug(x)	__virt_to_phys_nodebug((x))
+> +
+> +#ifdef CONFIG_DEBUG_VIRTUAL
+> +extern phys_addr_t __virt_to_phys(unsigned long x);
+> +extern phys_addr_t __phys_addr_symbol(unsigned long x);
+> +#else
+> +#define __virt_to_phys(x)	__virt_to_phys_nodebug(x)
+> +#define __phys_addr_symbol(x)	__pa_symbol_nodebug(x)
+> +#endif
+> +
+>  /*
+>   * These are *only* valid on the kernel direct mapped RAM memory.
+>   * Note: Drivers should NOT use these.  They are the wrong
+> @@ -283,9 +293,11 @@ static inline void *phys_to_virt(phys_addr_t x)
+>   * Drivers should NOT use these either.
+>   */
+>  #define __pa(x)			__virt_to_phys((unsigned long)(x))
+> +#define __pa_symbol(x)		__phys_addr_symbol(RELOC_HIDE((unsigned long)(x), 0))
+>  #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
+>  #define pfn_to_kaddr(pfn)	__va((phys_addr_t)(pfn) << PAGE_SHIFT)
+>  
+> +
+>  extern long long arch_phys_to_idmap_offset;
+>  
+>  /*
+> diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+> index e8698241ece9..b3dea80715b4 100644
+> --- a/arch/arm/mm/Makefile
+> +++ b/arch/arm/mm/Makefile
+> @@ -14,6 +14,7 @@ endif
+>  
+>  obj-$(CONFIG_ARM_PTDUMP)	+= dump.o
+>  obj-$(CONFIG_MODULES)		+= proc-syms.o
+> +obj-$(CONFIG_DEBUG_VIRTUAL)	+= physaddr.o
+>  
+>  obj-$(CONFIG_ALIGNMENT_TRAP)	+= alignment.o
+>  obj-$(CONFIG_HIGHMEM)		+= highmem.o
+> diff --git a/arch/arm/mm/physaddr.c b/arch/arm/mm/physaddr.c
+> new file mode 100644
+> index 000000000000..0288760306ce
+> --- /dev/null
+> +++ b/arch/arm/mm/physaddr.c
+> @@ -0,0 +1,51 @@
+> +#include <linux/bug.h>
+> +#include <linux/export.h>
+> +#include <linux/types.h>
+> +#include <linux/mmdebug.h>
+> +#include <linux/mm.h>
+> +
+> +#include <asm/sections.h>
+> +#include <asm/memory.h>
+> +#include <asm/fixmap.h>
+> +#include <asm/dma.h>
+> +
+> +#include "mm.h"
+> +
+> +static inline bool __virt_addr_valid(unsigned long x)
+> +{
+> +	/* high_memory does not get immediately defined, and there
+> +	 * are early callers of __pa() against PAGE_OFFSET, just catch
+> +	 * these here, then do normal checks, with the exception of
+> +	 * MAX_DMA_ADDRESS.
+> +	 */
+> +	if ((x >= PAGE_OFFSET && !high_memory) ||
+> +	   (x >= PAGE_OFFSET &&
+> +	    high_memory && x < (unsigned long)high_memory) ||
+> +	    x == MAX_DMA_ADDRESS)
+> +		return true;
 
-Thanks for the suggestion.
+This is difficult to read, it's easier to read if it's split out:
 
-On 2016?12?22? 07:25, Stephen Boyd wrote:
-> On 12/15, Zhangfei Gao wrote:
->> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> Add some commit text here?
-OK
->
->> diff --git a/drivers/clk/hisilicon/clk-hi3660.c b/drivers/clk/hisilicon/clk-hi3660.c
->> new file mode 100644
->> index 0000000..42ca47d
->> --- /dev/null
->> +++ b/drivers/clk/hisilicon/clk-hi3660.c
->> @@ -0,0 +1,601 @@
->> +/*
->> + * Copyright (c) 2016-2017 Linaro Ltd.
->> + * Copyright (c) 2016-2017 HiSilicon Technologies Co., Ltd.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + */
->> +
->> +#include <dt-bindings/clock/hi3660-clock.h>
->> +#include <linux/clk-provider.h>
->> +#include <linux/module.h>
-> This isn't needed.
->
->> +#include <linux/of_device.h>
->> +#include <linux/platform_device.h>
->> +#include "clk.h"
->> +
-> [...]
->> +
->> +static int hi3660_clk_probe(struct platform_device *pdev)
->> +{
->> +	struct device *dev = &pdev->dev;
->> +	struct device_node *np = pdev->dev.of_node;
->> +	const struct of_device_id *of_id;
->> +	enum hi3660_clk_type type;
->> +
->> +	of_id = of_match_device(hi3660_clk_match_table, dev);
->> +	if (!of_id)
->> +		return -EINVAL;
->> +
->> +	type = (enum hi3660_clk_type)of_id->data;
-> Use of_device_get_match_data() instead please.
-Yes, this is simpler.
->
->> +
->> +	switch (type) {
->> +	case HI3660_CRGCTRL:
->> +		hi3660_clk_crgctrl_init(np);
->> +		break;
->> +	case HI3660_PCTRL:
->> +		hi3660_clk_pctrl_init(np);
->> +		break;
->> +	case HI3660_PMUCTRL:
->> +		hi3660_clk_pmuctrl_init(np);
->> +		break;
->> +	case HI3660_SCTRL:
->> +		hi3660_clk_sctrl_init(np);
->> +		break;
->> +	case HI3660_IOMCU:
->> +		hi3660_clk_iomcu_init(np);
->> +		break;
-> This "multi-device" driver design is sort of odd. Why not have
-> different files and struct drivers for the different devices in
-> the system that are clock controllers? I don't really understand
-> why we're controlling the devices with one struct driver
-> instance. Is something shared between the devices?
-Do you mean put in different .c / drivers?
-They have to be put in the same file, since the parent / child relate to 
-each other.
-They are for the same chip, but some put in different region for 
-privilege control.
->
->> +	default:
->> +		break;
->> +	}
->> +	return 0;
->> +}
-> [...]
->> +
->> +MODULE_LICENSE("GPL");
->> +MODULE_ALIAS("platform:hi3660-clk");
->> +MODULE_DESCRIPTION("HiSilicon Hi3660 Clock Driver");
->
-> You can drop these MODULE_* things as they're not going to be
-> used in builtin only code.
-ok, got it.
+if (!high_memory && x >= PAGE_OFFSET)
+	return true;
 
-Thanks
+if (high_memory && x >= PAGE_OFFSET && x < (unsigned long) high_memory)
+	return true;
+
+if (x == MAX_DMA_ADDRESS)
+	return true;
+
+I'm really not a fan of the check for MAX_DMA_ADDRESS. arm64 gets away
+with this because it uses the asm-generic version of dma.h which sets
+MAX_DMA_ADDRESS to PAGE_OFFSET. __pa(MAX_DMA_ADDRESS) is used a
+bunch of places in the kernel as a lower limit for memblock
+allocation. The implication seems to be that MAX_DMA_ADDRESS
+corresponds to something that corresponds to a real physical address.
+The existing code happens to work because it will simply retry the
+allocation if without the lower bound.
+
+I don't see a good way to fix this though. It doesn't look like
+MAX_DMA_ADDRESS can be changed if it's actually going to be used
+for DMA and there isn't a unified way to just get a physical address.
+
+Thanks,
+Laura
+
+> +
+> +	return false;
+> +}
+> +
+> +phys_addr_t __virt_to_phys(unsigned long x)
+> +{
+> +	WARN(!__virt_addr_valid(x),
+> +	     "virt_to_phys used for non-linear address: %pK (%pS)\n",
+> +	     (void *)x,
+> +	     (void *)x);
+> +
+> +	return __virt_to_phys_nodebug(x);
+> +}
+> +EXPORT_SYMBOL(__virt_to_phys);
+> +
+> +phys_addr_t __phys_addr_symbol(unsigned long x)
+> +{
+> +	/* This is bounds checking against the kernel image only.
+> +	 * __pa_symbol should only be used on kernel symbol addresses.
+> +	 */
+> +	VIRTUAL_BUG_ON(x < (unsigned long)KERNEL_START ||
+> +		       x > (unsigned long)KERNEL_END);
+> +
+> +	return __pa_symbol_nodebug(x);
+> +}
+> +EXPORT_SYMBOL(__phys_addr_symbol);
+> 
