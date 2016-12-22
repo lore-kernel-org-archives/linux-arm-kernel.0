@@ -1,81 +1,199 @@
-From: xypron.glpk@gmx.de (Heinrich Schuchardt)
-Date: Thu, 22 Dec 2016 11:02:10 +0100
-Subject: [RFT PATCH] ARM64: dts: meson-gxbb: Add reserved memory zone and
- usable memory range
-In-Reply-To: <56869b90-6bee-f6ae-a7b1-884b4c0d72c0@baylibre.com>
-References: <20161212101801.28491-1-narmstrong@baylibre.com>
- <09bb78ed-c8ec-d21f-d464-16e55c481d4e@gmx.de>
- <56869b90-6bee-f6ae-a7b1-884b4c0d72c0@baylibre.com>
-Message-ID: <2ac01237-a7f8-5b3b-0f97-dd49ce6623fb@gmx.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 22 Dec 2016 18:31:20 +0800
+Subject: [linux-sunxi] Re: Problems to Allwinner H3's eFUSE/SID
+In-Reply-To: <12fa0112-b0e2-21e0-f369-7372944153d5@redhat.com>
+References: <136061482160932@web34j.yandex.ru>
+ <a2e87cff-d92c-37e3-e380-48ce1710ec08@redhat.com>
+ <8758581482163602@web22j.yandex.ru>
+ <12fa0112-b0e2-21e0-f369-7372944153d5@redhat.com>
+Message-ID: <CAGb2v64s08tey0ZevivFpxBk-dRjrApiyyh3mwYyVARHQV=Www@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2016 10:52 AM, Neil Armstrong wrote:
+On Tue, Dec 20, 2016 at 12:17 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+>
+> On 19-12-16 17:06, Icenowy Zheng wrote:
+>>
+>>
+>>
+>> 19.12.2016, 23:30, "Hans de Goede" <hdegoede@redhat.com>:
+>>>
+>>> Hi,
+>>>
+>>> On 19-12-16 16:22, Icenowy Zheng wrote:
+>>>>
+>>>>  Hi everyone,
+>>>>
+>>>>  Today, I and KotCzarny on IRC of linux-sunxi found a problem in the SID
+>>>>  controller of H3 (incl. H2+).
+>>>>
+>>>>  See https://irclog.whitequark.org/linux-sunxi/2016-12-19 .
+>>>>
+>>>>  Two read method of the H3 eFUSE is used in the BSP: by register
+>>>> accessing, or
+>>>>  directly access 0x01c14200.
+>>>>
+>>>>  From http://linux-sunxi.org/SID_Register_Guide we can see a difference
+>>>> between
+>>>>  the H3 SIDs read out by sunxi-fel and the H3 SIDs read out by devmem2
+>>>> (in
+>>>>  legacy kernel).
+>>>>
+>>>>  According to the source of H2+ BSP[1], H2+ and H3 can be differed by
+>>>> the last
+>>>>  byte of the first word of SID. (0x42 and 0x83 is H2+, 0x00 and 0x81 is
+>>>> H3,
+>>>>  0x58 is H3D (currently not known SoC) )
+>>>>
+>>>>  However, all the SIDs retrieved by `sunxi-fel sid`, both H2+ and H3,
+>>>> start
+>>>>  with 0x02004620, which do not match this rule.
+>>>>
+>>>>  The readout by devmem2 is satisfying this rule: their first word is
+>>>>  0x02c00081, matches H3.
+>>>>
+>>>>  Then I found the SID-reading code from BSP U-Boot[2], which is based on
+>>>>  register operations. With this kind of code (I wrote one prototype in
+>>>>  userspace with /dev/mem), I got "02c00081 74004620 50358720 3c27048e"
+>>>> on
+>>>>  my Orange Pi One. ("02004620 74358720 5027048e 3c0000c3" with sunxi-fel
+>>>> sid)
+>>>>  And, after accessing to the SID by registers, the value of *0x01c14200
+>>>> become
+>>>>  also "02c00081".
+>>>>
+>>>>  With direct access to 0x01c14200 after boot with mainline kernel, I got
+>>>> also
+>>>>  "02004620".
+>>>>
+>>>>  Then I altered the program to do the register operations with
+>>>> sunxi-fel, the
+>>>>  result is also "02c00081", and changed `sunxi-fel sid` result to
+>>>> "02c00081".
+>>>>
+>>>>  Summary:
+>>>>
+>>>>  +-----------------------------------------------+----------------+
+>>>>  | Read situation | The first word |
+>>>>  +-----------------------------------------------+----------------+
+>>>>  | Direct read by sunxi-fel | 02004620 |
+>>>>  | Direct read in mainline /dev/mem | 02004620 |
+>>>>  | Direct read in legacy /dev/mem | 02c00081 |
+>>>>  | Register access in FEL | 02c00081 |
+>>>>  | Register access in mainline | 02c00081 |
+>>>>  | Direct read after register access in FEL | 02c00081 |
+>>>>  | Direct read after register access in mainline | 02c00081 |
+>>>>  +-----------------------------------------------+----------------+
+>>>>
+>>>>  According to some facts:
+>>>>  - The register based access to SID is weird: it needs ~5 register
+>>>>    operations per word of SID.
+>>>>  - Reading via register access will change the value when reading by
+>>>> accessing
+>>>>    0x01c14200.
+>>>>  - In the u-boot code[2] there's some functions which read out the SID
+>>>> by
+>>>>    registers and then abandoned the value.
+>>>>  - This mismatch do not exist on A64.
+>>>>
+>>>>  I think that: Allwinner designed a "cache" to the SID to make the
+>>>> simplify the
+>>>>  code to read it, and it automatically loaded the cache when booting;
+>>>> however,
+>>>>  when doing first cache on H3, some byte shifts occured, and the value
+>>>> become
+>>>>  wrong. A manual read on H3 can make the cache right again. This is a
+>>>> silicon
+>>>>  bug, and fixed in A64.
+>>>>
+>>>>  This raises a problem: currently many systems has used the misread SID
+>>>> value to
+>>>>  generated lots of MAC addresses, and workaround this SID bug will
+>>>> change them.
+>>>>
+>>>>  However, if this bug is not workarounded, the sun8i-ths driver won't
+>>>> work well
+>>>>  (as some calibartion value lies in eFUSE). I think some early user of
+>>>> this
+>>>>  driver has already experienced bad readout value.
+>>>>  (The calibration value differs on my opi1 and KotCzarny's opipc)
+>>>>
+>>>>  And many wrong SID values have been generated by `sunxi-fel sid`.
+>>>> (Although I
+>>>>  think sunxi-fel must have the workaround)
+>>>>
+>>>>  Note: in this email, "SID" and "eFUSE" both indicate the controller on
+>>>> H3/A64
+>>>>  at 0x01c14000, which is a OTP memory implemented by eFUSE technique.
+>>>>
+>>>>  Furthermore, A83T may also have this problem, testers are welcome!
+>>>>
+>>>>  [1]
+>>>> http://filez.zoobab.com/allwinner/h2/201609022/lichee/linux-3.4/arch/arm/mach-sunxi/sun8i.c
+>>>>  [2]
+>>>> http://filez.zoobab.com/allwinner/h2/201609022/lichee/brandy/u-boot-2011.09/arch/arm/cpu/armv7/sun8iw7/efuse.c
+>>>>
+>>>>  Experiments:
+>>>>  - https://gist.github.com/Icenowy/2f4859ab1bc05814522fc7445179a8c9
+>>>>    A SID readout shell script via FEL with register access.
+>>>>  - https://31.135.195.151:20281/d/efuse/
+>>>>    A SID readout program via /dev/mem with register access by KotCzarny.
+>>>>    (with statically compiled binary)
+>>>
+>>>
+>>> Good detective work!
+>>>
+>>> I believe this would best be fixed by making u-boot use the register
+>>> access
+>>> method to get the SID on affected chips, and make sure u-boot reads the
+>>> SID at-least once.
+>>
+>>
+>> Yes.
+>>
+>> However, what I considered is that fixing this bug will change H3 devices'
+>> MAC addresses, as they are derived from SID.
+>
+>
+> I know, but I think we will just need to accept this onetime change
+> of the fixed MAC addresses to fix this bug. I don't think this is
+> a big problem since the driver for the H3 ethernet has not been
+> merged into the mainline kernel yet.
 
-> Hi Heinrich,
-> 
-> Thanks for testing and for the report,
-> we are still struggling into finding what are these zones and how to label them correctly.
-> 
-> We need to identify the zones on all boards, the patch I provided works on a non-odroid-c2 and gxm and gxl boards.
-> 
-> Neil
-> 
-Hello Neil,
+Do we still need to do the CRC32 across the SID values to generate
+the MAC addresses?
 
-the configuration below works for me on the Hardkernel Odroid C2.
+ChenYu
 
-ramoops is needed for CONFIG_PSTORE_RAM.
-Debian Stretch has CONFIG_PSTORE_RAM=m. Same is true for Fedora.
-I have chosen the address arbitrarily. To accommodate 512 MB boards we
-would have to put it below 0x20000000.
-The size parameters are the same as in hisilicon/hi6220-hikey.dts and
-qcom-apq8064-asus-nexus7-flo.dts.
-
-linux,cma is used for contiguous memory assignment. I have taken the
-align parameter from arm-src-kernel-2016-08-18-26e194264c.tar.gz
-provided by Amlogic at
-http://openlinux.amlogic.com:8000/download/ARM/kernel/ .
-See Documentation/DMA-API.txt for the usage of align.
-They use the same value 0x400000 for all GXBB boards.
-So we want to put this zone into meson-gxbb.dtsi.
-
-secmon is used by drivers/firmware/meson/meson_sm.c.
-Amlogic uses the same address range for all 64bit boards.
-
-	memory at 0 {
-		device_type = "memory";
-		linux,usable-memory = <0x0 0x1000000 0x0 0x7f000000>;
-	};
-
-	reserved-memory {
-		#address-cells = <0x2>;
-		#size-cells = <0x2>;
-		ranges;
-
-		ramoops at 0x23f00000 {
-			compatible = "ramoops";
-			reg = <0x0 0x23f00000 0x0 0x100000>;
-			record-size = <0x20000>;
-			console-size = <0x20000>;
-			ftrace-size = <0x20000>;
-		};
-
-		secmon: secmon {
-			compatible = "amlogic, aml_secmon_memory";
-			reg = <0x0 0x10000000 0x0 0x200000>;
-			no-map;
-		};
-
-		linux,cma {
-			compatible = "shared-dma-pool";
-			reusable;
-			size = <0x0 0xbc00000>;
-			alignment = <0x0 0x400000>;
-			linux,cma-default;
-		};
-	};
-
-Best regards
-
-Heinrich Schuchardt
+>> Maybe we should add #ifdef's to MAC generation code after this fix.
+>
+>
+> I would rather not see #ifdefs for this, see above, but that is no
+> longer my call, see below.
+>
+>>
+>> (This is why I will create this discussion)
+>>
+>> P.S. Are you still the maintainer of sunxi boards support of u-boot? The
+>> MAINTAINER file in board/sunxi indicates this.
+>
+>
+> No I'm no longer the maintainer, I'm still the MAINTAINER file because
+> I have a lot of boards and as such I'm still the point of contact for
+> those boards (if there are any board specific issues / questions), but
+> as indicated in the main MAINTAINERS file Jagan Teki <jagan@openedev.com>
+> is the maintainer now.
+>
+>
+> Regards,
+>
+> Hans
+>
+> --
+> You received this message because you are subscribed to the Google Groups
+> "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an
+> email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
