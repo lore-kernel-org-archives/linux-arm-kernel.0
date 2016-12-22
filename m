@@ -1,47 +1,38 @@
-From: minyard@acm.org (Corey Minyard)
-Date: Thu, 22 Dec 2016 15:47:15 -0600
-Subject: [PATCH v4 0/5] mfd: dt: Add bindings for the Aspeed MFDs
-In-Reply-To: <20161220071535.27542-1-andrew@aj.id.au>
-References: <20161220071535.27542-1-andrew@aj.id.au>
-Message-ID: <4e69b379-299f-ebf3-3a61-9ac1bcaba7b3@acm.org>
+From: schwab@suse.de (Andreas Schwab)
+Date: Thu, 22 Dec 2016 23:12:32 +0100
+Subject: [PATCH] mm: pmd dirty emulation in page fault handler
+In-Reply-To: <20161222145203.GA18970@bbox> (Minchan Kim's message of "Thu, 22
+ Dec 2016 23:52:03 +0900")
+References: <1482364101-16204-1-git-send-email-minchan@kernel.org>
+ <20161222081713.GA32480@node.shutemov.name>
+ <20161222145203.GA18970@bbox>
+Message-ID: <8737hftxyn.fsf@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It looks like this is ready.  Should I take this in the IPMI tree, or is 
-there a better tree for it?
+On Dez 22 2016, Minchan Kim <minchan@kernel.org> wrote:
 
--corey
+> From b3ec95c0df91ad113525968a4a6b53030fd0b48d Mon Sep 17 00:00:00 2001
+> From: Minchan Kim <minchan@kernel.org>
+> Date: Thu, 22 Dec 2016 23:43:49 +0900
+> Subject: [PATCH v2] mm: pmd dirty emulation in page fault handler
+>
+> Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
+> http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
+>
+> The problem is page fault handler supports only accessed flag emulation
+> for THP page of SW-dirty/accessed architecture.
+>
+> This patch enables dirty-bit emulation for those architectures.
+> Without it, MADV_FREE makes application hang by repeated fault forever.
+>
+> [1] b8d3c4c3009d, mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called
 
-On 12/20/2016 01:15 AM, Andrew Jeffery wrote:
-> Hi Lee,
->
-> Here's v4 of the Aspeed LPC MFD devicetree bindings series. v3 can be found at:
->
->    https://lkml.org/lkml/2016/12/5/835
->
-> Changes since v3:
->
-> * Based on Arnd's argument[1], drop the addition of the mfd/syscon bindings
->    directory as well as the the last patch in v3, which moved a number of
->    existing bindings. Eventually the Aspeed display controller will have a
->    device-specific driver so it doesn't belong there either.
->
-> * Add a compatible string for the AST2400 in the LPC Host Controller bindings
->    as requested by Joel and slightly tweak the reg description for Rob.
->
-> [1] https://lkml.org/lkml/2016/12/13/202
->
-> Andrew Jeffery (5):
->    mfd: dt: Fix "indicates" typo in mfd bindings document
->    mfd: dt: ranges, #address-cells and #size-cells as optional properties
->    mfd: dt: Add Aspeed Low Pin Count Controller bindings
->    mfd: dt: Add bindings for the Aspeed LPC Host Controller (LHC)
->    mfd: dt: Add bindings for the Aspeed SoC Display Controller (GFX)
->
->   .../devicetree/bindings/mfd/aspeed-gfx.txt         |  17 +++
->   .../devicetree/bindings/mfd/aspeed-lpc.txt         | 137 +++++++++++++++++++++
->   Documentation/devicetree/bindings/mfd/mfd.txt      |  12 +-
->   3 files changed, 165 insertions(+), 1 deletion(-)
->   create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-gfx.txt
->   create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
->
+Successfully tested a backport to 4.9.
+
+Andreas.
+
+-- 
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
