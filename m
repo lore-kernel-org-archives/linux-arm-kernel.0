@@ -1,71 +1,39 @@
-From: diana.craciun@nxp.com (Diana Madalina Craciun)
-Date: Thu, 22 Dec 2016 12:41:53 +0000
-Subject: [RFC v4 15/16] vfio/type1: Check MSI remapping at irq domain level
-References: <1481661034-3088-1-git-send-email-eric.auger@redhat.com>
- <1481661034-3088-16-git-send-email-eric.auger@redhat.com>
-Message-ID: <HE1PR04MB13219CC90CE2BBE62356D94CFF920@HE1PR04MB1321.eurprd04.prod.outlook.com>
+From: huziji@marvell.com (Ziji Hu)
+Date: Thu, 22 Dec 2016 20:47:07 +0800
+Subject: [PATCH v4 06/12] dt: bindings: Add bindings for Marvell Xenon SD
+ Host Controller
+In-Reply-To: <20161222111802.GX14217@n2100.armlinux.org.uk>
+References: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
+ <b8acb86f1e7977648977ed5c6b4eb86323e4b777.1481651244.git-series.gregory.clement@free-electrons.com>
+ <20161222111802.GX14217@n2100.armlinux.org.uk>
+Message-ID: <c7755b17-d1a8-b1eb-4750-9b57c35768f1@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi Russell,
 
-On 12/13/2016 10:32 PM, Eric Auger wrote:
-> In case the IOMMU does not bypass MSI transactions (typical
-> case on ARM), we check all MSI controllers are IRQ remapping
-> capable. If not the IRQ assignment may be unsafe.
+On 2016/12/22 19:18, Russell King - ARM Linux wrote:
+> On Tue, Dec 13, 2016 at 06:48:35PM +0100, Gregory CLEMENT wrote:
+>> +Optional Properties:
+>> +- mmc-card:
+>> +  mmc-card child node must be provided when current SDHC is for eMMC.
+>> +  Xenon SDHC often can support both SD and eMMC. This child node indicates that
+>> +  current SDHC is for eMMC card. Thus Xenon eMMC specific configuration and
+>> +  operations can be enabled prior to eMMC init sequence.
+>> +  Please refer to Documentation/devicetree/bindings/mmc/mmc-card.txt.
+>> +  This child node should not be set if current Xenon SDHC is for SD/SDIO.
+> 
+> This looks like a typo - shouldn't it be "mmccard" and not "mmc-card"?
+> Your examples below use "mmccard" as does the documentation you point
+> towards.
 >
-> At this stage the arm-smmu-(v3) still advertise the
-> IOMMU_CAP_INTR_REMAP capability at IOMMU level. This will be
-> removed in subsequent patches.
->
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> ---
->  drivers/vfio/vfio_iommu_type1.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-> index d07fe73..a05648b 100644
-> --- a/drivers/vfio/vfio_iommu_type1.c
-> +++ b/drivers/vfio/vfio_iommu_type1.c
-> @@ -37,6 +37,7 @@
->  #include <linux/vfio.h>
->  #include <linux/workqueue.h>
->  #include <linux/dma-iommu.h>
-> +#include <linux/irqdomain.h>
->  
->  #define DRIVER_VERSION  "0.2"
->  #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
-> @@ -765,7 +766,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
->  	struct vfio_domain *domain, *d;
->  	struct bus_type *bus = NULL;
->  	int ret;
-> -	bool resv_msi;
-> +	bool resv_msi, msi_remap;
->  	phys_addr_t resv_msi_base;
->  
->  	mutex_lock(&iommu->lock);
-> @@ -818,8 +819,10 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
->  	INIT_LIST_HEAD(&domain->group_list);
->  	list_add(&group->next, &domain->group_list);
->  
-> -	if (!allow_unsafe_interrupts &&
-> -	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
-> +	msi_remap = resv_msi ? irq_domain_check_msi_remap() :
-> +			       iommu_capable(bus, IOMMU_CAP_INTR_REMAP);
-> +
-> +	if (!allow_unsafe_interrupts && !msi_remap) {
->  		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
->  		       __func__);
->  		ret = -EPERM;
 
-I tested your v4.9-reserved-v4 branch on a ITS capable hardware (NXP
-LS2080), so I did not set allow_unsafe_interrupts. It fails here
-complaining that the there is no interrupt remapping support. The
-irq_domain_check_msi_remap function returns false as none of the checked
-domains has the IRQ_DOMAIN_FLAG_MSI_REMAP flag set. I think the reason
-is that the flags are not propagated through the domain hierarchy when
-the domain is created.
+    Thanks a lot for the review.
 
-Thanks,
+    I might mix up it with compatible "mmc-card".
+    I will change it to sub-node name in next version soon.
 
-Diana
+    Thank you.
+
+Best regards,
+Hu Ziji
