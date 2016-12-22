@@ -1,39 +1,38 @@
-From: huziji@marvell.com (Ziji Hu)
-Date: Thu, 22 Dec 2016 20:47:07 +0800
-Subject: [PATCH v4 06/12] dt: bindings: Add bindings for Marvell Xenon SD
- Host Controller
-In-Reply-To: <20161222111802.GX14217@n2100.armlinux.org.uk>
-References: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
- <b8acb86f1e7977648977ed5c6b4eb86323e4b777.1481651244.git-series.gregory.clement@free-electrons.com>
- <20161222111802.GX14217@n2100.armlinux.org.uk>
-Message-ID: <c7755b17-d1a8-b1eb-4750-9b57c35768f1@marvell.com>
+From: alex.popov@linux.com (Alexander Popov)
+Date: Thu, 22 Dec 2016 15:51:27 +0300
+Subject: [PATCH 1/2] arm64: setup: introduce kaslr_offset()
+In-Reply-To: <20161222061857.GA26502@yury-N73SV>
+References: <1481417456-28826-1-git-send-email-alex.popov@linux.com>
+ <1481417456-28826-2-git-send-email-alex.popov@linux.com>
+ <20161222061857.GA26502@yury-N73SV>
+Message-ID: <4094c1ef-0a75-7076-58e0-52ece326188b@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On 22.12.2016 09:18, Yury Norov wrote:
+> On Sun, Dec 11, 2016 at 03:50:55AM +0300, Alexander Popov wrote:
+>> Introduce kaslr_offset() similarly to x86_64 for fixing kcov.
 
-On 2016/12/22 19:18, Russell King - ARM Linux wrote:
-> On Tue, Dec 13, 2016 at 06:48:35PM +0100, Gregory CLEMENT wrote:
->> +Optional Properties:
->> +- mmc-card:
->> +  mmc-card child node must be provided when current SDHC is for eMMC.
->> +  Xenon SDHC often can support both SD and eMMC. This child node indicates that
->> +  current SDHC is for eMMC card. Thus Xenon eMMC specific configuration and
->> +  operations can be enabled prior to eMMC init sequence.
->> +  Please refer to Documentation/devicetree/bindings/mmc/mmc-card.txt.
->> +  This child node should not be set if current Xenon SDHC is for SD/SDIO.
+[...]
+
+> Hi Alexander,
 > 
-> This looks like a typo - shouldn't it be "mmccard" and not "mmc-card"?
-> Your examples below use "mmccard" as does the documentation you point
-> towards.
->
+> I found today's linux-next master broken:
 
-    Thanks a lot for the review.
+[...]
 
-    I might mix up it with compatible "mmc-card".
-    I will change it to sub-node name in next version soon.
+> It looks like you declare kaslr_offset() twice - in this patch, and in 7ede8665f
+> (arm64: setup: introduce kaslr_offset()). 
 
-    Thank you.
+Hello Yury,
+
+There was a race during applying this patch. So currently linux-next has 2 versions of it.
+
+The first one is 1a339a14b1f2c7a0dfdd6db79eee1e55d3cec357, which is original.
+The second one is 7ede8665f27cde7da69e8b2fbeaa1ed0664879c5, updated by Will Deacon and
+applied to the mainline.
+
+I'm sorry for that. The first one should be definitely dropped.
 
 Best regards,
-Hu Ziji
+Alexander
