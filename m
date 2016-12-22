@@ -1,60 +1,54 @@
 From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Thu, 22 Dec 2016 14:35:00 +0100
-Subject: [PATCH v7 1/5] dt-bindings: Document the STM32 I2C bindings
-In-Reply-To: <1482413704-17531-1-git-send-email-cedric.madianga@gmail.com>
-References: <1482413704-17531-1-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <1482413704-17531-2-git-send-email-cedric.madianga@gmail.com>
+Date: Thu, 22 Dec 2016 14:34:59 +0100
+Subject: [PATCH v7 0/5] Add support for the STM32F4 I2C
+Message-ID: <1482413704-17531-1-git-send-email-cedric.madianga@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation of device tree bindings for the STM32 I2C
-controller.
+This patchset adds support for the I2C controller embedded in STM32F4xx SoC.
+It enables I2C transfer in interrupt mode with Standard-mode and Fast-mode bus
+speed.
 
-Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/i2c/i2c-stm32.txt          | 33 ++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+Changes since v6:
+- Add commit message for the patches in defconfig, .dtsi and .dts files (Alex)
+- Order I2C instance base address in .dtsi file (Alex)
+- Add commit message for the patch in stm32429i-eval.dts  (Alex)
+- Add link to the STM32F4 Soc ref manual where I2C device is described (Uwe)
+- Use more usal way to define constants with several lines (Uwe)
+- Remove rate variable from stm32f4_i2c_timings as it is not used (Uwe)
+- Remove irq variable from stm32f4_i2c_dev struct are they are only needed
+  during probe (Uwe)
+- Add comment from datasheet to explain stm32f4_i2c_timings values (Uwe)
+- Rework i2c soft_reset implementation (Uwe)
+- Replace "it" by "irq" as it is a more usual abbreviation for interrupt (Uwe)
+- Add comment from datasheet to explain periph clk freq calculation (Uwe)
+- Use DIV_ROUND_UP instead of plain division when required (Uwe)
+- Add comment from datasheet to explain timing rise calculation (Uwe)
+- Rework timing rise calculation by using shorter computation (Uwe)
+- Remove (u8) cast when reading I2C data register (Uwe)
+- Rework isr_event routine to handle several events during one call of the
+  routine (Uwe)
+- Precise which type of irq is failed when a irq request error occurs (Uwe)
+- Use devm_request_irq() instead of devm_request_threaded_irq() to avoid
+  spurious evt irq when clearing status registers in threaded context
+
+M'boumba Cedric Madianga (5):
+  dt-bindings: Document the STM32 I2C bindings
+  i2c: Add STM32F4 I2C driver
+  ARM: dts: stm32: Add I2C1 support for STM32F429 SoC
+  ARM: dts: stm32: Add I2C1 support for STM32429 eval board
+  ARM: configs: stm32: Add I2C support for STM32 defconfig
+
+ .../devicetree/bindings/i2c/i2c-stm32.txt          |  33 +
+ arch/arm/boot/dts/stm32429i-eval.dts               |   6 +
+ arch/arm/boot/dts/stm32f429.dtsi                   |  23 +
+ arch/arm/configs/stm32_defconfig                   |   3 +
+ drivers/i2c/busses/Kconfig                         |  10 +
+ drivers/i2c/busses/Makefile                        |   1 +
+ drivers/i2c/busses/i2c-stm32f4.c                   | 896 +++++++++++++++++++++
+ 7 files changed, 972 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-stm32.txt
+ create mode 100644 drivers/i2c/busses/i2c-stm32f4.c
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-stm32.txt b/Documentation/devicetree/bindings/i2c/i2c-stm32.txt
-new file mode 100644
-index 0000000..78eaf7b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/i2c-stm32.txt
-@@ -0,0 +1,33 @@
-+* I2C controller embedded in STMicroelectronics STM32 I2C platform
-+
-+Required properties :
-+- compatible : Must be "st,stm32f4-i2c"
-+- reg : Offset and length of the register set for the device
-+- interrupts : Must contain the interrupt id for I2C event and then the
-+  interrupt id for I2C error.
-+- resets: Must contain the phandle to the reset controller.
-+- clocks: Must contain the input clock of the I2C instance.
-+- A pinctrl state named "default" must be defined to set pins in mode of
-+  operation for I2C transfer
-+- #address-cells = <1>;
-+- #size-cells = <0>;
-+
-+Optional properties :
-+- clock-frequency : Desired I2C bus clock frequency in Hz. If not specified,
-+  the default 100 kHz frequency will be used. As only Normal and Fast modes
-+  are supported, possible values are 100000 and 400000.
-+
-+Example :
-+
-+	i2c at 40005400 {
-+		compatible = "st,stm32f4-i2c";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x40005400 0x400>;
-+		interrupts = <31>,
-+			     <32>;
-+		resets = <&rcc 277>;
-+		clocks = <&rcc 0 149>;
-+		pinctrl-0 = <&i2c1_sda_pin>, <&i2c1_scl_pin>;
-+		pinctrl-names = "default";
-+	};
 -- 
 1.9.1
