@@ -1,56 +1,37 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Dec 2016 11:21:59 +0000
-Subject: [PATCH v4 11/12] arm64: dts: marvell: add sdhci support for
- Armada 7K/8K
-In-Reply-To: <2564fe18eb9cc8a0a1a3311cdf7e7141f35211bd.1481651244.git-series.gregory.clement@free-electrons.com>
+Date: Thu, 22 Dec 2016 11:25:28 +0000
+Subject: [PATCH v4 00/12] mmc: Add support to Marvell Xenon SD Host
+ Controller
+In-Reply-To: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
 References: <cover.67d726f70f6bd48d38a2023513f2711080bc66c8.1481651244.git-series.gregory.clement@free-electrons.com>
- <2564fe18eb9cc8a0a1a3311cdf7e7141f35211bd.1481651244.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20161222112159.GY14217@n2100.armlinux.org.uk>
+Message-ID: <20161222112528.GZ14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 13, 2016 at 06:48:40PM +0100, Gregory CLEMENT wrote:
-> diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> index 7b6136182ad0..181e8c5de3bf 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> @@ -229,6 +229,15 @@
->  
->  			};
->  
-> +			ap_sdhci0: sdhci at 6e0000 {
-> +				compatible = "marvell,armada-7000-sdhci";
-> +				reg = <0x6e0000 0x300>;
-> +				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-> +				clock-names = "core";
-> +				clocks = <&cpm_syscon0 1 4>;
-> +				status = "disabled";
-> +			};
-> +
->  			ap_syscon: system-controller at 6f4000 {
->  				compatible = "marvell,ap806-system-controller",
->  					     "syscon";
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> index e5e3ed678b6f..035b2b2fc9ca 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> @@ -164,6 +164,16 @@
->  				clocks = <&cpm_syscon0 1 21>;
->  				status = "disabled";
->  			};
-> +
-> +			cpm_sdhci0: sdhci at 780000 {
-> +				compatible = "marvell,armada-7000-sdhci";
-> +				reg = <0x780000 0x300>;
-> +				interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
-> +				clock-names = "core";
-> +				clocks = <&cpm_syscon0 1 4>;
-> +				status = "disabled";
-> +			};
-> +
+On Tue, Dec 13, 2016 at 06:48:29PM +0100, Gregory CLEMENT wrote:
+> This the forth version of the series adding support for the SDHCI
+> Xenon controller. It can be currently found on the Armada 37xx and the
+> Armada 7K/8K but will be also used in more Marvell SoC (and not only
+> the mvebu ones actually).
 
-One other point - aren't the SDHCI interfaces dma-coherent on the AP806
-and CP110?
+With the problems and niggles fixed, it seems to work here on my 8040
+board (along with dma-coherent):
+
+sdhci: Secure Digital Host Controller Interface driver
+sdhci: Copyright(c) Pierre Ossman
+sdhci-pltfm: SDHCI platform and OF driver helper
+mmc0: SDHCI controller on f06e0000.sdhci [f06e0000.sdhci] using ADMA 64-bit
+mmc0: new high speed MMC card at address 0001
+mmcblk0: mmc0:0001 8GND3R 7.28 GiB
+mmc1: SDHCI controller on f2780000.sdhci [f2780000.sdhci] using ADMA 64-bit
+mmcblk0boot0: mmc0:0001 8GND3R partition 1 4.00 MiB
+mmcblk0boot1: mmc0:0001 8GND3R partition 2 4.00 MiB
+mmcblk0rpmb: mmc0:0001 8GND3R partition 3 512 KiB
+mmc1: new high speed SDHC card at address 0001
+mmcblk1: mmc1:0001 00000 14.6 GiB
+ mmcblk1: p1 p2 p3
+
+Thanks.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
