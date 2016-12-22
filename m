@@ -1,118 +1,81 @@
-From: uwe@kleine-koenig.org (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 22 Dec 2016 10:43:27 +0100
-Subject: [PATCH v2] ARM: dts: turris-omnia: add support for ethernet switch
-Message-ID: <20161222094327.24051-1-uwe@kleine-koenig.org>
+From: xypron.glpk@gmx.de (Heinrich Schuchardt)
+Date: Thu, 22 Dec 2016 11:02:10 +0100
+Subject: [RFT PATCH] ARM64: dts: meson-gxbb: Add reserved memory zone and
+ usable memory range
+In-Reply-To: <56869b90-6bee-f6ae-a7b1-884b4c0d72c0@baylibre.com>
+References: <20161212101801.28491-1-narmstrong@baylibre.com>
+ <09bb78ed-c8ec-d21f-d464-16e55c481d4e@gmx.de>
+ <56869b90-6bee-f6ae-a7b1-884b4c0d72c0@baylibre.com>
+Message-ID: <2ac01237-a7f8-5b3b-0f97-dd49ce6623fb@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Turris Omnia features a Marvell MV88E7176 ethernet switch. Add it to
-the dts.
+On 12/14/2016 10:52 AM, Neil Armstrong wrote:
 
-Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
----
-Changes since (implicit) v1:
- - drop mdio bus and per port phy-handle as they match the default
-   setup.
+> Hi Heinrich,
+> 
+> Thanks for testing and for the report,
+> we are still struggling into finding what are these zones and how to label them correctly.
+> 
+> We need to identify the zones on all boards, the patch I provided works on a non-odroid-c2 and gxm and gxl boards.
+> 
+> Neil
+> 
+Hello Neil,
 
-One thing I was surprised is that the mv88e6xxx module isn't autoloaded
-by udev. Is this expected?
+the configuration below works for me on the Hardkernel Odroid C2.
+
+ramoops is needed for CONFIG_PSTORE_RAM.
+Debian Stretch has CONFIG_PSTORE_RAM=m. Same is true for Fedora.
+I have chosen the address arbitrarily. To accommodate 512 MB boards we
+would have to put it below 0x20000000.
+The size parameters are the same as in hisilicon/hi6220-hikey.dts and
+qcom-apq8064-asus-nexus7-flo.dts.
+
+linux,cma is used for contiguous memory assignment. I have taken the
+align parameter from arm-src-kernel-2016-08-18-26e194264c.tar.gz
+provided by Amlogic at
+http://openlinux.amlogic.com:8000/download/ARM/kernel/ .
+See Documentation/DMA-API.txt for the usage of align.
+They use the same value 0x400000 for all GXBB boards.
+So we want to put this zone into meson-gxbb.dtsi.
+
+secmon is used by drivers/firmware/meson/meson_sm.c.
+Amlogic uses the same address range for all 64bit boards.
+
+	memory at 0 {
+		device_type = "memory";
+		linux,usable-memory = <0x0 0x1000000 0x0 0x7f000000>;
+	};
+
+	reserved-memory {
+		#address-cells = <0x2>;
+		#size-cells = <0x2>;
+		ranges;
+
+		ramoops at 0x23f00000 {
+			compatible = "ramoops";
+			reg = <0x0 0x23f00000 0x0 0x100000>;
+			record-size = <0x20000>;
+			console-size = <0x20000>;
+			ftrace-size = <0x20000>;
+		};
+
+		secmon: secmon {
+			compatible = "amlogic, aml_secmon_memory";
+			reg = <0x0 0x10000000 0x0 0x200000>;
+			no-map;
+		};
+
+		linux,cma {
+			compatible = "shared-dma-pool";
+			reusable;
+			size = <0x0 0xbc00000>;
+			alignment = <0x0 0x400000>;
+			linux,cma-default;
+		};
+	};
 
 Best regards
-Uwe
 
- arch/arm/boot/dts/armada-385-turris-omnia.dts | 66 ++++++++++++++++++++++++++-
- 1 file changed, 64 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-index ab49acb2d452..f8e55fa7f0fa 100644
---- a/arch/arm/boot/dts/armada-385-turris-omnia.dts
-+++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-@@ -122,7 +122,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&ge0_rgmii_pins>;
- 	status = "okay";
--	phy-mode = "rgmii-id";
-+	phy-mode = "rgmii";
- 
- 	fixed-link {
- 		speed = <1000>;
-@@ -135,7 +135,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&ge1_rgmii_pins>;
- 	status = "okay";
--	phy-mode = "rgmii-id";
-+	phy-mode = "rgmii";
- 
- 	fixed-link {
- 		speed = <1000>;
-@@ -274,6 +274,68 @@
- 	};
- 
- 	/* Switch MV88E7176 at address 0x10 */
-+	switch at 10 {
-+		compatible = "marvell,mv88e6085";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		dsa,member = <0 0>;
-+
-+		reg = <0x10>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			ports at 0 {
-+				reg = <0>;
-+				label = "lan0";
-+			};
-+
-+			ports at 1 {
-+				reg = <1>;
-+				label = "lan1";
-+			};
-+
-+			ports at 2 {
-+				reg = <2>;
-+				label = "lan2";
-+			};
-+
-+			ports at 3 {
-+				reg = <3>;
-+				label = "lan3";
-+			};
-+
-+			ports at 4 {
-+				reg = <4>;
-+				label = "lan4";
-+			};
-+
-+			ports at 5 {
-+				reg = <5>;
-+				label = "cpu";
-+				ethernet = <&eth1>;
-+				phy-mode = "rgmii-id";
-+
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+
-+			ports at 6 {
-+				reg = <6>;
-+				label = "cpu";
-+				ethernet = <&eth0>;
-+				phy-mode = "rgmii-id";
-+
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+		};
-+	};
- };
- 
- &pinctrl {
--- 
-2.11.0
+Heinrich Schuchardt
