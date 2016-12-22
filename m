@@ -1,69 +1,103 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 22 Dec 2016 13:08:14 +0100
-Subject: [PATCH] clk: mvebu: adjust AP806 CPU clock frequencies to production
- chip
-Message-ID: <1482408494-7429-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 22 Dec 2016 13:11:26 +0100
+Subject: [PATCH 0/3] DMA Engine: switch PL330 driver to non-irq-safe runtime PM
+References: <CGME20161222121148epcas5p11d4e49a3724e375a989aa173f731346f@epcas5p1.samsung.com>
+Message-ID: <1482408689-21971-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adjusts the list of possible "Sample At Reset" values that
-define the CPU clock frequency of the AP806 (part of Marvell Armada
-7K/8K) to the values that have been validated with the production
-chip. Earlier values were preliminary.
+Hello,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/clk/mvebu/ap806-system-controller.c | 28 +++++++++++++++++++++++-----
- 1 file changed, 23 insertions(+), 5 deletions(-)
+This patchset changes the way the runtime PM is implemented in PL330 DMA
+engine driver. The main goal of such change is to add support for audio
+power domain to Exynos5 SoCs (5250, 542x, 5433, probably others) and let
+it to be properly turned off, when no audio is being used. Switching to
+non-irq-safe runtime PM is needed to properly let power domain to be
+turned off (irqsafe runtime PM keeps power domain turned on all the time)
+and to integrate with clock controller's runtime PM (this cannot be
+workarounded any other way, PL330 uses clocks from the controller, which
+belongs to the same power domain).
 
-diff --git a/drivers/clk/mvebu/ap806-system-controller.c b/drivers/clk/mvebu/ap806-system-controller.c
-index 02023ba..962e0c5 100644
---- a/drivers/clk/mvebu/ap806-system-controller.c
-+++ b/drivers/clk/mvebu/ap806-system-controller.c
-@@ -55,21 +55,39 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
- 
- 	freq_mode = reg & AP806_SAR_CLKFREQ_MODE_MASK;
- 	switch (freq_mode) {
--	case 0x0 ... 0x5:
-+	case 0x0:
-+	case 0x1:
- 		cpuclk_freq = 2000;
- 		break;
--	case 0x6 ... 0xB:
-+	case 0x6:
-+	case 0x7:
- 		cpuclk_freq = 1800;
- 		break;
--	case 0xC ... 0x11:
-+	case 0x4:
-+	case 0xB:
-+	case 0xD:
- 		cpuclk_freq = 1600;
- 		break;
--	case 0x12 ... 0x16:
-+	case 0x1a:
- 		cpuclk_freq = 1400;
- 		break;
--	case 0x17 ... 0x19:
-+	case 0x14:
-+	case 0x17:
- 		cpuclk_freq = 1300;
- 		break;
-+	case 0x19:
-+		cpuclk_freq = 1200;
-+		break;
-+	case 0x13:
-+	case 0x1d:
-+		cpuclk_freq = 1000;
-+		break;
-+	case 0x1c:
-+		cpuclk_freq = 800;
-+		break;
-+	case 0x1b:
-+		cpuclk_freq = 600;
-+		break;
- 	default:
- 		dev_err(&pdev->dev, "invalid SAR value\n");
- 		return -EINVAL;
+For more details of the proposed change to PL330 driver see patch #3.
+
+Audio power domain on Exynos5 SoCs contains following hardware modules:
+1. clock controller
+2. pin controller
+3. PL330 DMA controller
+4. I2S audio controller
+
+Patches for adding/fixing runtime PM for each of the above device will be
+handled separately.
+
+Runtime PM patches for clock controllers is possible and has been proposed
+in the following thread (pending review, patch for runtime PM for Exynos
+Audio subsystem will be added in v4 soon):
+https://www.spinics.net/lists/arm-kernel/msg538122.html
+
+Runtime PM support for Exynos pin controller will be posted soon in
+a separate thread.
+
+Exynos I2S driver already supports runtime PM, but some fixes are needed
+for it and they will be also posted soon.
+
+Patches are based on linux-next with my PL330 runtime PM fix patch
+applied (which I assume will be merged as a fix to v4.10):
+https://patchwork.kernel.org/patch/9477695/
+
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+
+
+Patch summary:
+
+Marek Szyprowski (3):
+  dmaengine: pl330: remove pdata based initialization
+  dmaengine: Forward slave device pointer to of_xlate callback
+  dmaengine: pl330: Don't require irq-safe runtime PM
+
+ drivers/dma/amba-pl08x.c        |   2 +-
+ drivers/dma/at_hdmac.c          |   4 +-
+ drivers/dma/at_xdmac.c          |   2 +-
+ drivers/dma/bcm2835-dma.c       |   2 +-
+ drivers/dma/coh901318.c         |   2 +-
+ drivers/dma/cppi41.c            |   2 +-
+ drivers/dma/dma-jz4780.c        |   2 +-
+ drivers/dma/dmaengine.c         |   2 +-
+ drivers/dma/dw/platform.c       |   2 +-
+ drivers/dma/edma.c              |   4 +-
+ drivers/dma/fsl-edma.c          |   2 +-
+ drivers/dma/img-mdc-dma.c       |   2 +-
+ drivers/dma/imx-dma.c           |   2 +-
+ drivers/dma/imx-sdma.c          |   2 +-
+ drivers/dma/k3dma.c             |   2 +-
+ drivers/dma/mmp_pdma.c          |   2 +-
+ drivers/dma/mmp_tdma.c          |   2 +-
+ drivers/dma/moxart-dma.c        |   2 +-
+ drivers/dma/mxs-dma.c           |   2 +-
+ drivers/dma/nbpfaxi.c           |   2 +-
+ drivers/dma/of-dma.c            |  20 +++--
+ drivers/dma/pl330.c             | 166 +++++++++++++++++++---------------------
+ drivers/dma/pxa_dma.c           |   2 +-
+ drivers/dma/qcom/bam_dma.c      |   2 +-
+ drivers/dma/sh/rcar-dmac.c      |   2 +-
+ drivers/dma/sh/shdma-of.c       |   2 +-
+ drivers/dma/sh/usb-dmac.c       |   2 +-
+ drivers/dma/sirf-dma.c          |   2 +-
+ drivers/dma/st_fdma.c           |   2 +-
+ drivers/dma/ste_dma40.c         |   2 +-
+ drivers/dma/stm32-dma.c         |   2 +-
+ drivers/dma/sun4i-dma.c         |   2 +-
+ drivers/dma/sun6i-dma.c         |   2 +-
+ drivers/dma/tegra20-apb-dma.c   |   2 +-
+ drivers/dma/tegra210-adma.c     |   2 +-
+ drivers/dma/xilinx/xilinx_dma.c |   2 +-
+ drivers/dma/xilinx/zynqmp_dma.c |   2 +-
+ drivers/dma/zx296702_dma.c      |   2 +-
+ include/linux/amba/pl330.h      |  35 ---------
+ include/linux/of_dma.h          |  17 ++--
+ 40 files changed, 139 insertions(+), 175 deletions(-)
+ delete mode 100644 include/linux/amba/pl330.h
+
 -- 
-2.7.4
+1.9.1
