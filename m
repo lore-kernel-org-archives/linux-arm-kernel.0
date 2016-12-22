@@ -1,163 +1,54 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Thu, 22 Dec 2016 17:38:01 +0100
-Subject: [PATCH v2 12/12] crypto: atmel-sha: add verbose debug facilities to
- print hw register names
-In-Reply-To: <cover.1482424395.git.cyrille.pitchen@atmel.com>
-References: <cover.1482424395.git.cyrille.pitchen@atmel.com>
-Message-ID: <78f3f2c7dff8a8c2aa3b08fd9cb84084f918ce5b.1482424395.git.cyrille.pitchen@atmel.com>
+From: mdf@kernel.org (mdf at kernel.org)
+Date: Thu, 22 Dec 2016 09:19:25 -0800
+Subject: [PATCH v2] ARM64: zynqmp: Fix i2c node's compatible string
+Message-ID: <1482427165-8951-1-git-send-email-mdf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When VERBOSE_DEBUG is defined and SHA_FLAGS_DUMP_REG flag is set in
-dd->flags, this patch prints the register names and values when performing
-IO accesses.
+From: Moritz Fischer <mdf@kernel.org>
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+The Zynq Ultrascale MP uses version 1.4 of the Cadence IP core
+which fixes some silicon bugs that needed software workarounds
+in Version 1.0 that was used on Zynq systems.
+
+Signed-off-by: Moritz Fischer <mdf@kernel.org>
+Cc: Michal Simek <michal.simek@xilinx.com>
+Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+Cc: Rob Herring <robh+dt@kernel.org>
 ---
- drivers/crypto/atmel-sha.c | 110 ++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 108 insertions(+), 2 deletions(-)
+Changes from v1:
 
-diff --git a/drivers/crypto/atmel-sha.c b/drivers/crypto/atmel-sha.c
-index cc5294dbead4..22d0c0c118da 100644
---- a/drivers/crypto/atmel-sha.c
-+++ b/drivers/crypto/atmel-sha.c
-@@ -51,6 +51,7 @@
- #define SHA_FLAGS_INIT			BIT(4)
- #define SHA_FLAGS_CPU			BIT(5)
- #define SHA_FLAGS_DMA_READY		BIT(6)
-+#define SHA_FLAGS_DUMP_REG	BIT(7)
+- Added fall through case to cdns,i2c-r1p10
+
+Cheers,
+
+Moritz
+
+---
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+index 68a90833..ee86d02 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
++++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+@@ -175,7 +175,7 @@
+ 		};
  
- /* bits[11:8] are reserved. */
+ 		i2c0: i2c at ff020000 {
+-			compatible = "cdns,i2c-r1p10";
++			compatible = "cdns,i2c-r1p14", "cdns,i2c-r1p10";
+ 			status = "disabled";
+ 			interrupt-parent = <&gic>;
+ 			interrupts = <0 17 4>;
+@@ -185,7 +185,7 @@
+ 		};
  
-@@ -167,14 +168,118 @@ static struct atmel_sha_drv atmel_sha = {
- 	.lock = __SPIN_LOCK_UNLOCKED(atmel_sha.lock),
- };
- 
-+#ifdef VERBOSE_DEBUG
-+static const char *atmel_sha_reg_name(u32 offset, char *tmp, size_t sz, bool wr)
-+{
-+	switch (offset) {
-+	case SHA_CR:
-+		return "CR";
-+
-+	case SHA_MR:
-+		return "MR";
-+
-+	case SHA_IER:
-+		return "IER";
-+
-+	case SHA_IDR:
-+		return "IDR";
-+
-+	case SHA_IMR:
-+		return "IMR";
-+
-+	case SHA_ISR:
-+		return "ISR";
-+
-+	case SHA_MSR:
-+		return "MSR";
-+
-+	case SHA_BCR:
-+		return "BCR";
-+
-+	case SHA_REG_DIN(0):
-+	case SHA_REG_DIN(1):
-+	case SHA_REG_DIN(2):
-+	case SHA_REG_DIN(3):
-+	case SHA_REG_DIN(4):
-+	case SHA_REG_DIN(5):
-+	case SHA_REG_DIN(6):
-+	case SHA_REG_DIN(7):
-+	case SHA_REG_DIN(8):
-+	case SHA_REG_DIN(9):
-+	case SHA_REG_DIN(10):
-+	case SHA_REG_DIN(11):
-+	case SHA_REG_DIN(12):
-+	case SHA_REG_DIN(13):
-+	case SHA_REG_DIN(14):
-+	case SHA_REG_DIN(15):
-+		snprintf(tmp, sz, "IDATAR[%u]", (offset - SHA_REG_DIN(0)) >> 2);
-+		break;
-+
-+	case SHA_REG_DIGEST(0):
-+	case SHA_REG_DIGEST(1):
-+	case SHA_REG_DIGEST(2):
-+	case SHA_REG_DIGEST(3):
-+	case SHA_REG_DIGEST(4):
-+	case SHA_REG_DIGEST(5):
-+	case SHA_REG_DIGEST(6):
-+	case SHA_REG_DIGEST(7):
-+	case SHA_REG_DIGEST(8):
-+	case SHA_REG_DIGEST(9):
-+	case SHA_REG_DIGEST(10):
-+	case SHA_REG_DIGEST(11):
-+	case SHA_REG_DIGEST(12):
-+	case SHA_REG_DIGEST(13):
-+	case SHA_REG_DIGEST(14):
-+	case SHA_REG_DIGEST(15):
-+		if (wr)
-+			snprintf(tmp, sz, "IDATAR[%u]",
-+				 16u + ((offset - SHA_REG_DIGEST(0)) >> 2));
-+		else
-+			snprintf(tmp, sz, "ODATAR[%u]",
-+				 (offset - SHA_REG_DIGEST(0)) >> 2);
-+		break;
-+
-+	case SHA_HW_VERSION:
-+		return "HWVER";
-+
-+	default:
-+		snprintf(tmp, sz, "0x%02x", offset);
-+		break;
-+	}
-+
-+	return tmp;
-+}
-+
-+#endif /* VERBOSE_DEBUG */
-+
- static inline u32 atmel_sha_read(struct atmel_sha_dev *dd, u32 offset)
- {
--	return readl_relaxed(dd->io_base + offset);
-+	u32 value = readl_relaxed(dd->io_base + offset);
-+
-+#ifdef VERBOSE_DEBUG
-+	if (dd->flags & SHA_FLAGS_DUMP_REG) {
-+		char tmp[16];
-+
-+		dev_vdbg(dd->dev, "read 0x%08x from %s\n", value,
-+			 atmel_sha_reg_name(offset, tmp, sizeof(tmp), false));
-+	}
-+#endif /* VERBOSE_DEBUG */
-+
-+	return value;
- }
- 
- static inline void atmel_sha_write(struct atmel_sha_dev *dd,
- 					u32 offset, u32 value)
- {
-+#ifdef VERBOSE_DEBUG
-+	if (dd->flags & SHA_FLAGS_DUMP_REG) {
-+		char tmp[16];
-+
-+		dev_vdbg(dd->dev, "write 0x%08x into %s\n", value,
-+			 atmel_sha_reg_name(offset, tmp, sizeof(tmp), true));
-+	}
-+#endif /* VERBOSE_DEBUG */
-+
- 	writel_relaxed(value, dd->io_base + offset);
- }
- 
-@@ -183,7 +288,8 @@ static inline int atmel_sha_complete(struct atmel_sha_dev *dd, int err)
- 	struct ahash_request *req = dd->req;
- 
- 	dd->flags &= ~(SHA_FLAGS_BUSY | SHA_FLAGS_FINAL | SHA_FLAGS_CPU |
--		       SHA_FLAGS_DMA_READY | SHA_FLAGS_OUTPUT_READY);
-+		       SHA_FLAGS_DMA_READY | SHA_FLAGS_OUTPUT_READY |
-+		       SHA_FLAGS_DUMP_REG);
- 
- 	clk_disable(dd->iclk);
- 
+ 		i2c1: i2c at ff030000 {
+-			compatible = "cdns,i2c-r1p10";
++			compatible = "cdns,i2c-r1p14", "cdns,i2c-r1p10";
+ 			status = "disabled";
+ 			interrupt-parent = <&gic>;
+ 			interrupts = <0 18 4>;
 -- 
 2.7.4
