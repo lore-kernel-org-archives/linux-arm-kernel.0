@@ -1,54 +1,67 @@
 From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Thu, 22 Dec 2016 14:34:59 +0100
-Subject: [PATCH v7 0/5] Add support for the STM32F4 I2C
-Message-ID: <1482413704-17531-1-git-send-email-cedric.madianga@gmail.com>
+Date: Thu, 22 Dec 2016 14:35:02 +0100
+Subject: [PATCH v7 3/5] ARM: dts: stm32: Add I2C1 support for STM32F429 SoC
+In-Reply-To: <1482413704-17531-1-git-send-email-cedric.madianga@gmail.com>
+References: <1482413704-17531-1-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <1482413704-17531-4-git-send-email-cedric.madianga@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for the I2C controller embedded in STM32F4xx SoC.
-It enables I2C transfer in interrupt mode with Standard-mode and Fast-mode bus
-speed.
+This patch adds I2C1 support for STM32F429 SoC
 
-Changes since v6:
-- Add commit message for the patches in defconfig, .dtsi and .dts files (Alex)
-- Order I2C instance base address in .dtsi file (Alex)
-- Add commit message for the patch in stm32429i-eval.dts  (Alex)
-- Add link to the STM32F4 Soc ref manual where I2C device is described (Uwe)
-- Use more usal way to define constants with several lines (Uwe)
-- Remove rate variable from stm32f4_i2c_timings as it is not used (Uwe)
-- Remove irq variable from stm32f4_i2c_dev struct are they are only needed
-  during probe (Uwe)
-- Add comment from datasheet to explain stm32f4_i2c_timings values (Uwe)
-- Rework i2c soft_reset implementation (Uwe)
-- Replace "it" by "irq" as it is a more usual abbreviation for interrupt (Uwe)
-- Add comment from datasheet to explain periph clk freq calculation (Uwe)
-- Use DIV_ROUND_UP instead of plain division when required (Uwe)
-- Add comment from datasheet to explain timing rise calculation (Uwe)
-- Rework timing rise calculation by using shorter computation (Uwe)
-- Remove (u8) cast when reading I2C data register (Uwe)
-- Rework isr_event routine to handle several events during one call of the
-  routine (Uwe)
-- Precise which type of irq is failed when a irq request error occurs (Uwe)
-- Use devm_request_irq() instead of devm_request_threaded_irq() to avoid
-  spurious evt irq when clearing status registers in threaded context
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+---
+ arch/arm/boot/dts/stm32f429.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-M'boumba Cedric Madianga (5):
-  dt-bindings: Document the STM32 I2C bindings
-  i2c: Add STM32F4 I2C driver
-  ARM: dts: stm32: Add I2C1 support for STM32F429 SoC
-  ARM: dts: stm32: Add I2C1 support for STM32429 eval board
-  ARM: configs: stm32: Add I2C support for STM32 defconfig
-
- .../devicetree/bindings/i2c/i2c-stm32.txt          |  33 +
- arch/arm/boot/dts/stm32429i-eval.dts               |   6 +
- arch/arm/boot/dts/stm32f429.dtsi                   |  23 +
- arch/arm/configs/stm32_defconfig                   |   3 +
- drivers/i2c/busses/Kconfig                         |  10 +
- drivers/i2c/busses/Makefile                        |   1 +
- drivers/i2c/busses/i2c-stm32f4.c                   | 896 +++++++++++++++++++++
- 7 files changed, 972 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-stm32.txt
- create mode 100644 drivers/i2c/busses/i2c-stm32f4.c
-
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 7de52ee..2277a2d 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -48,6 +48,7 @@
+ #include "skeleton.dtsi"
+ #include "armv7-m.dtsi"
+ #include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
++#include <dt-bindings/mfd/stm32f4-rcc.h>
+ 
+ / {
+ 	clocks {
+@@ -140,6 +141,18 @@
+ 			status = "disabled";
+ 		};
+ 
++		i2c1: i2c at 40005400 {
++			compatible = "st,stm32f4-i2c";
++			reg = <0x40005400 0x400>;
++			interrupts = <31>,
++				     <32>;
++			resets = <&rcc STM32F4_APB1_RESET(I2C1)>;
++			clocks = <&rcc 0 STM32F4_APB1_CLOCK(I2C1)>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
+ 		usart7: serial at 40007800 {
+ 			compatible = "st,stm32-usart", "st,stm32-uart";
+ 			reg = <0x40007800 0x400>;
+@@ -337,6 +350,16 @@
+ 					slew-rate = <2>;
+ 				};
+ 			};
++
++			i2c1_pins_b: i2c1 at 0 {
++				pins1 {
++					pinmux = <STM32F429_PB9_FUNC_I2C1_SDA>;
++					drive-open-drain;
++				};
++				pins2 {
++					pinmux = <STM32F429_PB6_FUNC_I2C1_SCL>;
++				};
++			};
+ 		};
+ 
+ 		rcc: rcc at 40023810 {
 -- 
 1.9.1
