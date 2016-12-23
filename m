@@ -1,311 +1,332 @@
-From: yuanzhichang@hisilicon.com (zhichang.yuan)
-Date: Fri, 23 Dec 2016 09:43:55 +0800
-Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
-In-Reply-To: <CACVXFVNS9n9_ty8y3CyqfRaLitqDKdk1mMOrQHM-enOgJtUBeQ@mail.gmail.com>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1478576829-112707-2-git-send-email-yuanzhichang@hisilicon.com>
- <CACVXFVNS9n9_ty8y3CyqfRaLitqDKdk1mMOrQHM-enOgJtUBeQ@mail.gmail.com>
-Message-ID: <585C815B.4030000@hisilicon.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 22 Dec 2016 17:53:17 -0800
+Subject: [PATCH 6/6] watchdog: ts4600: add driver for TS-4600 watchdog
+In-Reply-To: <20161214231237.17496-7-sebastien.bourdelin@savoirfairelinux.com>
+References: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
+ <20161214231237.17496-7-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <846414c0-f3b3-62ae-960b-56ae9edeeac8@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi?Ming,
+On 12/14/2016 03:12 PM, Sebastien Bourdelin wrote:
+> This watchdog is instantiated in a FPGA and can only be access using a
+> GPIOs bit-banged bus, called the NBUS by Technologic Systems.
+> The watchdog is made of only one register, called the feed register.
+> Writing to this register will re-arm the watchdog for a given time (and
+> enable it if it was disable). It can be disabled by writing a special
+> value into it.
+>
+> Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+> ---
+>  .../devicetree/bindings/watchdog/ts4600-wdt.txt    |  16 ++
+>  arch/arm/boot/dts/imx28-ts4600-common.dtsi         |   5 +
+>  drivers/watchdog/Kconfig                           |  10 +
+>  drivers/watchdog/Makefile                          |   1 +
+>  drivers/watchdog/ts4600_wdt.c                      | 213 +++++++++++++++++++++
+>  5 files changed, 245 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt
+>  create mode 100644 drivers/watchdog/ts4600_wdt.c
+>
+> diff --git a/Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt b/Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt
+> new file mode 100644
+> index 0000000..61d620e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt
+> @@ -0,0 +1,16 @@
+> +TS-4600 Technologic Systems Watchdog
+> +
+> +Required properties:
+> +- compatible: must be "technologic,ts4600-wdt"
+> +- reg: offset to the FPGA's watchdog register
+> +
+> +Optional property:
+> +- timeout-sec: contains the watchdog timeout in seconds.
+> +
+> +Example:
+> +
+> +wdt {
+> +	compatible = "technologic,ts4600-wdt";
+> +	reg = <0x2a>;
+> +	timeout-sec = <10>;
+> +};
+> diff --git a/arch/arm/boot/dts/imx28-ts4600-common.dtsi b/arch/arm/boot/dts/imx28-ts4600-common.dtsi
+> index b668933..dd7318c 100644
+> --- a/arch/arm/boot/dts/imx28-ts4600-common.dtsi
+> +++ b/arch/arm/boot/dts/imx28-ts4600-common.dtsi
+> @@ -116,6 +116,11 @@
+>  		strobe-gpios = <&gpio0 25 GPIO_ACTIVE_HIGH>;
+>  		ale-gpios    = <&gpio0 26 GPIO_ACTIVE_HIGH>;
+>  		rdy-gpios    = <&gpio0 21 GPIO_ACTIVE_HIGH>;
+> +
+> +		wdt at 2a {
+> +			compatible = "technologic,ts4600-wdt";
+> +			reg = <0x2a>;
+> +		};
+>  	};
+>
+>  };
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index 3eb58cb..7a8e176 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -500,6 +500,16 @@ config NUC900_WATCHDOG
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called nuc900_wdt.
+>
+> +config TS4600_WATCHDOG
+> +	tristate "TS-4600 Watchdog"
+> +	depends on HAS_IOMEM && OF
+> +	depends on SOC_IMX28 || COMPILE_TEST
 
+Asd 0day reports, this does not work.
 
-On 2016/12/22 16:15, Ming Lei wrote:
-> Hi Guys,
-> 
-> On Tue, Nov 8, 2016 at 11:47 AM, zhichang.yuan
-> <yuanzhichang@hisilicon.com> wrote:
->> For arm64, there is no I/O space as other architectural platforms, such as
->> X86. Most I/O accesses are achieved based on MMIO. But for some arm64 SoCs,
->> such as Hip06, when accessing some legacy ISA devices connected to LPC, those
->> known port addresses are used to control the corresponding target devices, for
->> example, 0x2f8 is for UART, 0xe4 is for ipmi-bt. It is different from the
->> normal MMIO mode in using.
->>
->> To drive these devices, this patch introduces a method named indirect-IO.
->> In this method the in/out pair in arch/arm64/include/asm/io.h will be
->> redefined. When upper layer drivers call in/out with those known legacy port
->> addresses to access the peripherals, the hooking functions corrresponding to
->> those target peripherals will be called. Through this way, those upper layer
->> drivers which depend on in/out can run on Hip06 without any changes.
->>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
->> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
->> ---
->>  arch/arm64/Kconfig             |  6 +++
->>  arch/arm64/include/asm/extio.h | 94 ++++++++++++++++++++++++++++++++++++++++++
->>  arch/arm64/include/asm/io.h    | 29 +++++++++++++
->>  arch/arm64/kernel/Makefile     |  1 +
->>  arch/arm64/kernel/extio.c      | 27 ++++++++++++
->>  5 files changed, 157 insertions(+)
-> 
-> When I applied these three patches against current linus tree and
-> enable CONFIG_HISILICON_LPC, the following build failure[1] is
-> triggered when running 'make modules'.
-> 
+> +	select WATCHDOG_CORE
+> +	help
+> +	  Technologic Systems TS-4600 has watchdog timer implemented in
+> +	  an external FPGA. Say Y here if you want to support for the
+> +	  watchdog timer on TS-4600 board.
+> +
+>  config TS4800_WATCHDOG
+>  	tristate "TS-4800 Watchdog"
+>  	depends on HAS_IOMEM && OF
+> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> index caa9f4a..d4b4bd2 100644
+> --- a/drivers/watchdog/Makefile
+> +++ b/drivers/watchdog/Makefile
+> @@ -61,6 +61,7 @@ obj-$(CONFIG_RN5T618_WATCHDOG) += rn5t618_wdt.o
+>  obj-$(CONFIG_COH901327_WATCHDOG) += coh901327_wdt.o
+>  obj-$(CONFIG_STMP3XXX_RTC_WATCHDOG) += stmp3xxx_rtc_wdt.o
+>  obj-$(CONFIG_NUC900_WATCHDOG) += nuc900_wdt.o
+> +obj-$(CONFIG_TS4600_WATCHDOG) += ts4600_wdt.o
+>  obj-$(CONFIG_TS4800_WATCHDOG) += ts4800_wdt.o
+>  obj-$(CONFIG_TS72XX_WATCHDOG) += ts72xx_wdt.o
+>  obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
+> diff --git a/drivers/watchdog/ts4600_wdt.c b/drivers/watchdog/ts4600_wdt.c
+> new file mode 100644
+> index 0000000..db91b40
+> --- /dev/null
+> +++ b/drivers/watchdog/ts4600_wdt.c
+> @@ -0,0 +1,213 @@
+> +/*
+> + * Watchdog driver for TS-4600 based boards
+> + *
+> + * Copyright (c) 2016 - Savoir-faire Linux
+> + * Author: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + *
+> + * The watchdog on the TS-4600 based boards is in an FPGA and can only be
+> + * accessed using a GPIO bit-banged bus called the NBUS by Technologic Systems.
+> + * The logic for the watchdog is the same then for the TS-4800 SoM, only the way
+> + * to access it change, therefore this driver is heavely based on the ts4800_wdt
+> + * driver from Damien Riegel <damien.riegel@savoirfairelinux.com>.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/ts-nbus.h>
+> +#include <linux/watchdog.h>
+> +
+> +static bool nowayout = WATCHDOG_NOWAYOUT;
+> +module_param(nowayout, bool, 0);
+> +MODULE_PARM_DESC(nowayout,
+> +	"Watchdog cannot be stopped once started (default="
+> +	__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+> +
+> +/* possible feed values */
+> +#define TS4600_WDT_FEED_2S       0x1
+> +#define TS4600_WDT_FEED_10S      0x2
+> +#define TS4600_WDT_DISABLE       0x3
+> +
+> +struct ts4600_wdt {
+> +	struct watchdog_device  wdd;
+> +	u32                     feed_offset;
+> +	u32                     feed_val;
+> +};
+> +
+> +/*
+> + * TS-4600 supports the following timeout values:
+> + *
+> + *   value desc
+> + *   ---------------------
+> + *     0    feed for 338ms
+> + *     1    feed for 2.706s
+> + *     2    feed for 10.824s
+> + *     3    disable watchdog
+> + *
+> + * Keep the regmap/timeout map ordered by timeout
+> + */
+> +static const struct {
+> +	const int timeout;
+> +	const int regval;
+> +} ts4600_wdt_map[] = {
+> +	{ 2,  TS4600_WDT_FEED_2S },
+> +	{ 10, TS4600_WDT_FEED_10S },
+> +};
+> +
+> +#define MAX_TIMEOUT_INDEX       (ARRAY_SIZE(ts4600_wdt_map) - 1)
+> +
+> +static void ts4600_write_feed(struct ts4600_wdt *wdt, u32 val)
+> +{
+> +	ts_nbus_write(wdt->feed_offset, val);
+> +}
+> +
+> +static int ts4600_wdt_start(struct watchdog_device *wdd)
+> +{
+> +	struct ts4600_wdt *wdt = watchdog_get_drvdata(wdd);
+> +
+> +	ts4600_write_feed(wdt, wdt->feed_val);
+> +
+> +	return 0;
+> +}
+> +
+> +static int ts4600_wdt_stop(struct watchdog_device *wdd)
+> +{
+> +	struct ts4600_wdt *wdt = watchdog_get_drvdata(wdd);
+> +
+> +	ts4600_write_feed(wdt, TS4600_WDT_DISABLE);
+> +	return 0;
+> +}
+> +
+> +static int ts4600_wdt_set_timeout(struct watchdog_device *wdd,
+> +				  unsigned int timeout)
+> +{
+> +	struct ts4600_wdt *wdt = watchdog_get_drvdata(wdd);
+> +	int i;
+> +
+> +	for (i = 0; i < MAX_TIMEOUT_INDEX; i++) {
+> +		if (ts4600_wdt_map[i].timeout >= timeout)
+> +			break;
+> +	}
 
-Thanks for your report!
+An if/else would be much simpler here.
 
-This patch has compilation issue on some architectures, sorry for the inconvenience caused by this!
-The ongoing v6 will solve these issues.
-I will trace this failure and provide a fix if you can not wait for the next version.
+> +
+> +	wdd->timeout = ts4600_wdt_map[i].timeout;
+> +	wdt->feed_val = ts4600_wdt_map[i].regval;
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct watchdog_ops ts4600_wdt_ops = {
+> +	.owner = THIS_MODULE,
+> +	.start = ts4600_wdt_start,
+> +	.stop = ts4600_wdt_stop,
+> +	.set_timeout = ts4600_wdt_set_timeout,
+> +};
+> +
+> +static const struct watchdog_info ts4600_wdt_info = {
+> +	.options = WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE | WDIOF_KEEPALIVEPING,
+> +	.identity = "TS-4600 Watchdog",
+> +};
+> +
+> +static int ts4600_wdt_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct watchdog_device *wdd;
+> +	struct ts4600_wdt *wdt;
+> +	u32 reg;
+> +	int ret;
+> +
+> +	ret = of_property_read_u32(np, "reg", &reg);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "missing reg property\n");
+> +		return ret;
+> +	}
+> +
+> +	/* check for the NBUS state and defer the probing if it is not ready */
+> +	if (!ts_nbus_is_ready())
+> +		return -EPROBE_DEFER;
+> +
+> +	/* allocate memory for watchdog struct */
+> +	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
+> +	if (!wdt)
+> +		return -ENOMEM;
+> +
+> +	/* set offset to know where to write */
+> +	wdt->feed_offset = reg;
+> +
+> +	/* Initialize struct watchdog_device */
+> +	wdd = &wdt->wdd;
+> +	wdd->parent = &pdev->dev;
+> +	wdd->info = &ts4600_wdt_info;
+> +	wdd->ops = &ts4600_wdt_ops;
+> +	wdd->min_timeout = ts4600_wdt_map[0].timeout;
+> +	wdd->max_timeout = ts4600_wdt_map[MAX_TIMEOUT_INDEX].timeout;
+> +
 
-Could you send me your .config in private? I don't want to bother all the hacker in the mail-list.
+Your call, but it might be better and more flexible to just use a single
+hardware timeout (such as the 2.x second one), provide it here as
+max_hw_heartbeat_ms, and let the kernel handle the actual (and larger)
+timeouts.
 
-
-Thanks,
-Zhichang
-
-> 
-> Thanks,
-> Ming
-> 
-> [1] 'make modules' failure log
-> 
->   Building modules, stage 2.
->   MODPOST 2260 modules
-> ERROR: "inb" [drivers/watchdog/wdt_pci.ko] undefined!
-> ERROR: "outb" [drivers/watchdog/wdt_pci.ko] undefined!
-> ERROR: "outb" [drivers/watchdog/pcwd_pci.ko] undefined!
-> ERROR: "inb" [drivers/watchdog/pcwd_pci.ko] undefined!
-> ERROR: "outw" [drivers/video/vgastate.ko] undefined!
-> ERROR: "outb" [drivers/video/vgastate.ko] undefined!
-> ERROR: "inb" [drivers/video/vgastate.ko] undefined!
-> ERROR: "outw" [drivers/video/fbdev/vt8623fb.ko] undefined!
-> ERROR: "inb" [drivers/video/fbdev/vt8623fb.ko] undefined!
-> ERROR: "outb" [drivers/video/fbdev/vt8623fb.ko] undefined!
-> ERROR: "outw" [drivers/video/fbdev/tridentfb.ko] undefined!
-> ERROR: "inb" [drivers/video/fbdev/tridentfb.ko] undefined!
-> ERROR: "outb" [drivers/video/fbdev/tridentfb.ko] undefined!
-> ERROR: "inb" [drivers/video/fbdev/tdfxfb.ko] undefined!
-> .....
-> ERROR: "inb" [drivers/ata/pata_cmd64x.ko] undefined!
-> ERROR: "inb" [drivers/ata/pata_artop.ko] undefined!
-> scripts/Makefile.modpost:91: recipe for target '__modpost' failed
-> make[1]: *** [__modpost] Error 1
-> Makefile:1196: recipe for target 'modules' failed
-> make: *** [modules] Error 2
-> 
-> 
->>  create mode 100644 arch/arm64/include/asm/extio.h
->>  create mode 100644 arch/arm64/kernel/extio.c
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 969ef88..b44070b 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -163,6 +163,12 @@ config ARCH_MMAP_RND_COMPAT_BITS_MIN
->>  config ARCH_MMAP_RND_COMPAT_BITS_MAX
->>         default 16
->>
->> +config ARM64_INDIRECT_PIO
->> +       bool "access peripherals with legacy I/O port"
->> +       help
->> +         Support special accessors for ISA I/O devices. This is needed for
->> +         SoCs that do not support standard read/write for the ISA range.
->> +
->>  config NO_IOPORT_MAP
->>         def_bool y if !PCI
->>
->> diff --git a/arch/arm64/include/asm/extio.h b/arch/arm64/include/asm/extio.h
->> new file mode 100644
->> index 0000000..6ae0787
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/extio.h
->> @@ -0,0 +1,94 @@
->> +/*
->> + * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
->> + * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#ifndef __LINUX_EXTIO_H
->> +#define __LINUX_EXTIO_H
->> +
->> +struct extio_ops {
->> +       unsigned long start;/* inclusive, sys io addr */
->> +       unsigned long end;/* inclusive, sys io addr */
->> +
->> +       u64 (*pfin)(void *devobj, unsigned long ptaddr, size_t dlen);
->> +       void (*pfout)(void *devobj, unsigned long ptaddr, u32 outval,
->> +                                       size_t dlen);
->> +       u64 (*pfins)(void *devobj, unsigned long ptaddr, void *inbuf,
->> +                               size_t dlen, unsigned int count);
->> +       void (*pfouts)(void *devobj, unsigned long ptaddr,
->> +                               const void *outbuf, size_t dlen,
->> +                               unsigned int count);
->> +       void *devpara;
->> +};
->> +
->> +extern struct extio_ops *arm64_extio_ops;
->> +
->> +#define DECLARE_EXTIO(bw, type)                                                \
->> +extern type in##bw(unsigned long addr);                                        \
->> +extern void out##bw(type value, unsigned long addr);                   \
->> +extern void ins##bw(unsigned long addr, void *buffer, unsigned int count);\
->> +extern void outs##bw(unsigned long addr, const void *buffer, unsigned int count);
->> +
->> +#define BUILD_EXTIO(bw, type)                                          \
->> +type in##bw(unsigned long addr)                                                \
->> +{                                                                      \
->> +       if (!arm64_extio_ops || arm64_extio_ops->start > addr ||        \
->> +                       arm64_extio_ops->end < addr)                    \
->> +               return read##bw(PCI_IOBASE + addr);                     \
->> +       return arm64_extio_ops->pfin ?                                  \
->> +               arm64_extio_ops->pfin(arm64_extio_ops->devpara,         \
->> +                       addr, sizeof(type)) : -1;                       \
->> +}                                                                      \
->> +                                                                       \
->> +void out##bw(type value, unsigned long addr)                           \
->> +{                                                                      \
->> +       if (!arm64_extio_ops || arm64_extio_ops->start > addr ||        \
->> +                       arm64_extio_ops->end < addr)                    \
->> +               write##bw(value, PCI_IOBASE + addr);                    \
->> +       else                                                            \
->> +               if (arm64_extio_ops->pfout)                             \
->> +                       arm64_extio_ops->pfout(arm64_extio_ops->devpara,\
->> +                               addr, value, sizeof(type));             \
->> +}                                                                      \
->> +                                                                       \
->> +void ins##bw(unsigned long addr, void *buffer, unsigned int count)     \
->> +{                                                                      \
->> +       if (!arm64_extio_ops || arm64_extio_ops->start > addr ||        \
->> +                       arm64_extio_ops->end < addr)                    \
->> +               reads##bw(PCI_IOBASE + addr, buffer, count);            \
->> +       else                                                            \
->> +               if (arm64_extio_ops->pfins)                             \
->> +                       arm64_extio_ops->pfins(arm64_extio_ops->devpara,\
->> +                               addr, buffer, sizeof(type), count);     \
->> +}                                                                      \
->> +                                                                       \
->> +void outs##bw(unsigned long addr, const void *buffer, unsigned int count)      \
->> +{                                                                      \
->> +       if (!arm64_extio_ops || arm64_extio_ops->start > addr ||        \
->> +                       arm64_extio_ops->end < addr)                    \
->> +               writes##bw(PCI_IOBASE + addr, buffer, count);           \
->> +       else                                                            \
->> +               if (arm64_extio_ops->pfouts)                            \
->> +                       arm64_extio_ops->pfouts(arm64_extio_ops->devpara,\
->> +                               addr, buffer, sizeof(type), count);     \
->> +}
->> +
->> +static inline void arm64_set_extops(struct extio_ops *ops)
->> +{
->> +       if (ops)
->> +               WRITE_ONCE(arm64_extio_ops, ops);
->> +}
->> +
->> +#endif /* __LINUX_EXTIO_H*/
->> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
->> index 0bba427..136735d 100644
->> --- a/arch/arm64/include/asm/io.h
->> +++ b/arch/arm64/include/asm/io.h
->> @@ -31,6 +31,7 @@
->>  #include <asm/early_ioremap.h>
->>  #include <asm/alternative.h>
->>  #include <asm/cpufeature.h>
->> +#include <asm/extio.h>
->>
->>  #include <xen/xen.h>
->>
->> @@ -149,6 +150,34 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
->>  #define IO_SPACE_LIMIT         (PCI_IO_SIZE - 1)
->>  #define PCI_IOBASE             ((void __iomem *)PCI_IO_START)
->>
->> +
->> +/*
->> + * redefine the in(s)b/out(s)b for indirect-IO.
->> + */
->> +#ifdef CONFIG_ARM64_INDIRECT_PIO
->> +#define inb inb
->> +#define outb outb
->> +#define insb insb
->> +#define outsb outsb
->> +/* external declaration */
->> +DECLARE_EXTIO(b, u8)
->> +
->> +#define inw inw
->> +#define outw outw
->> +#define insw insw
->> +#define outsw outsw
->> +
->> +DECLARE_EXTIO(w, u16)
->> +
->> +#define inl inl
->> +#define outl outl
->> +#define insl insl
->> +#define outsl outsl
->> +
->> +DECLARE_EXTIO(l, u32)
->> +#endif
->> +
->> +
->>  /*
->>   * String version of I/O memory access operations.
->>   */
->> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
->> index 7d66bba..60e0482 100644
->> --- a/arch/arm64/kernel/Makefile
->> +++ b/arch/arm64/kernel/Makefile
->> @@ -31,6 +31,7 @@ arm64-obj-$(CONFIG_COMPAT)            += sys32.o kuser32.o signal32.o         \
->>                                            sys_compat.o entry32.o
->>  arm64-obj-$(CONFIG_FUNCTION_TRACER)    += ftrace.o entry-ftrace.o
->>  arm64-obj-$(CONFIG_MODULES)            += arm64ksyms.o module.o
->> +arm64-obj-$(CONFIG_ARM64_INDIRECT_PIO) += extio.o
->>  arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)  += module-plts.o
->>  arm64-obj-$(CONFIG_PERF_EVENTS)                += perf_regs.o perf_callchain.o
->>  arm64-obj-$(CONFIG_HW_PERF_EVENTS)     += perf_event.o
->> diff --git a/arch/arm64/kernel/extio.c b/arch/arm64/kernel/extio.c
->> new file mode 100644
->> index 0000000..647b3fa
->> --- /dev/null
->> +++ b/arch/arm64/kernel/extio.c
->> @@ -0,0 +1,27 @@
->> +/*
->> + * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
->> + * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/io.h>
->> +
->> +struct extio_ops *arm64_extio_ops;
->> +
->> +
->> +BUILD_EXTIO(b, u8)
->> +
->> +BUILD_EXTIO(w, u16)
->> +
->> +BUILD_EXTIO(l, u32)
->> --
->> 1.9.1
->>
-> 
-> 
-> 
+> +	watchdog_set_drvdata(wdd, wdt);
+> +	watchdog_set_nowayout(wdd, nowayout);
+> +	watchdog_init_timeout(wdd, 0, &pdev->dev);
+> +
+> +	/*
+> +	 * As this watchdog supports only a few values, ts4600_wdt_set_timeout
+> +	 * must be called to initialize timeout and feed_val with valid values.
+> +	 * Default to maximum timeout if none, or an invalid one, is provided in
+> +	 * device tree.
+> +	 */
+> +	if (!wdd->timeout)
+> +		wdd->timeout = wdd->max_timeout;
+> +	ts4600_wdt_set_timeout(wdd, wdd->timeout);
+> +
+> +	/*
+> +	 * The feed register is write-only, so it is not possible to determine
+> +	 * watchdog's state. Disable it to be in a known state.
+> +	 */
+> +	ts4600_wdt_stop(wdd);
+> +
+> +	ret = watchdog_register_device(wdd);
+> +	if (ret) {
+> +		dev_err(&pdev->dev,
+> +			"failed to register watchdog device\n");
+> +		return ret;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, wdt);
+> +
+> +	dev_info(&pdev->dev,
+> +		 "initialized (timeout = %d sec, nowayout = %d)\n",
+> +		 wdd->timeout, nowayout);
+> +
+> +	return 0;
+> +}
+> +
+> +static int ts4600_wdt_remove(struct platform_device *pdev)
+> +{
+> +	struct ts4600_wdt *wdt = platform_get_drvdata(pdev);
+> +
+> +	watchdog_unregister_device(&wdt->wdd);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id ts4600_wdt_of_match[] = {
+> +	{ .compatible = "technologic,ts4600-wdt", },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, ts4600_wdt_of_match);
+> +
+> +static struct platform_driver ts4600_wdt_driver = {
+> +	.probe		= ts4600_wdt_probe,
+> +	.remove		= ts4600_wdt_remove,
+> +	.driver		= {
+> +		.name	= "ts4600_wdt",
+> +		.of_match_table = ts4600_wdt_of_match,
+> +	},
+> +};
+> +
+> +module_platform_driver(ts4600_wdt_driver);
+> +
+> +MODULE_AUTHOR("Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_ALIAS("platform:ts4600_wdt");
+>
