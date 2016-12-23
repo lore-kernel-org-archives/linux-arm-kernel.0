@@ -1,171 +1,60 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 23 Dec 2016 13:24:46 +0100
-Subject: [PATCH 6/9] pinctrl: samsung: Replace syscore ops with standard
- platform device pm_ops
+Date: Fri, 23 Dec 2016 13:24:44 +0100
+Subject: [PATCH 4/9] pinctrl: samsung: Use generic of_device_get_match_data
+ helper
 In-Reply-To: <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
 References: <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20161223122535epcas1p475bc33007e9ea9b206dec6d10d019d7f@epcas1p4.samsung.com>
-Message-ID: <1482495889-6201-7-git-send-email-m.szyprowski@samsung.com>
+ <CGME20161223122527epcas1p441f0ee34c5738645163ef40c94591183@epcas1p4.samsung.com>
+Message-ID: <1482495889-6201-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Once the dependency on PMU driver (for pad retention control) has been
-removed, there is no reason to use syscore_ops based suspend/resume.
-This patch replaces it with standard platform device pm_ops based solution.
+Replace custom code with generic helper.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/pinctrl/samsung/pinctrl-samsung.c | 72 ++++++-------------------------
- 1 file changed, 13 insertions(+), 59 deletions(-)
+ drivers/pinctrl/samsung/pinctrl-samsung.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-index cb425e6837f9..a7b7d75373f2 100644
+index 4d9262051ff1..a6c2ea74e0f3 100644
 --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
 +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-@@ -29,7 +29,6 @@
+@@ -27,6 +27,7 @@
+ #include <linux/err.h>
+ #include <linux/gpio.h>
  #include <linux/irqdomain.h>
- #include <linux/of_device.h>
++#include <linux/of_device.h>
  #include <linux/spinlock.h>
--#include <linux/syscore_ops.h>
+ #include <linux/syscore_ops.h>
  
- #include "../core.h"
- #include "pinctrl-samsung.h"
-@@ -49,9 +48,6 @@
- 	{ "samsung,pin-val", PINCFG_TYPE_DAT },
- };
- 
--/* Global list of devices (struct samsung_pinctrl_drv_data) */
--static LIST_HEAD(drvdata_list);
--
- static unsigned int pin_base;
- 
- static int samsung_get_group_count(struct pinctrl_dev *pctldev)
-@@ -1097,22 +1093,18 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, drvdata);
- 
--	/* Add to the global list */
--	list_add_tail(&drvdata->node, &drvdata_list);
--
+@@ -967,15 +968,13 @@ static int samsung_gpiolib_unregister(struct platform_device *pdev,
  	return 0;
  }
  
- #ifdef CONFIG_PM
+-static const struct of_device_id samsung_pinctrl_dt_match[];
 -
- /**
-- * samsung_pinctrl_suspend_dev - save pinctrl state for suspend for a device
-+ * samsung_pinctrl_suspend - save pinctrl state for suspend
-  *
-  * Save data for all banks handled by this device.
-  */
--static void samsung_pinctrl_suspend_dev(
--	struct samsung_pinctrl_drv_data *drvdata)
-+static int samsung_pinctrl_suspend(struct device *dev)
+ /* retrieve the soc specific data */
+ static const struct samsung_pin_ctrl *
+ samsung_pinctrl_get_soc_data(struct samsung_pinctrl_drv_data *d,
+ 			     struct platform_device *pdev)
  {
-+	struct samsung_pinctrl_drv_data *drvdata = dev_get_drvdata(dev);
- 	int i;
+ 	int id;
+-	const struct of_device_id *match;
++	const struct samsung_pin_ctrl *match_data;
+ 	struct device_node *node = pdev->dev.of_node;
+ 	struct device_node *np;
+ 	const struct samsung_pin_bank_data *bdata;
+@@ -990,8 +989,8 @@ static int samsung_gpiolib_unregister(struct platform_device *pdev,
+ 		dev_err(&pdev->dev, "failed to get alias id\n");
+ 		return ERR_PTR(-ENOENT);
+ 	}
+-	match = of_match_node(samsung_pinctrl_dt_match, node);
+-	ctrl = (struct samsung_pin_ctrl *)match->data + id;
++	match_data = of_device_get_match_data(&pdev->dev);
++	ctrl = match_data + id;
  
- 	for (i = 0; i < drvdata->nr_banks; i++) {
-@@ -1149,15 +1141,17 @@ static void samsung_pinctrl_suspend_dev(
- 	if (drvdata->retention_on)
- 		drvdata->retention_on(drvdata);
- 
-+	return 0;
- }
- 
- /**
-- * samsung_pinctrl_resume_dev - restore pinctrl state from suspend for a device
-+ * samsung_pinctrl_resume - restore pinctrl state from suspend
-  *
-  * Restore one of the banks that was saved during suspend.
-  */
--static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
-+static int samsung_pinctrl_resume(struct device *dev)
- {
-+	struct samsung_pinctrl_drv_data *drvdata = dev_get_drvdata(dev);
- 	int i;
- 
- 	if (drvdata->resume)
-@@ -1196,48 +1190,10 @@ static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
- 
- 	if (drvdata->retention_off)
- 		drvdata->retention_off(drvdata);
--}
--
--/**
-- * samsung_pinctrl_suspend - save pinctrl state for suspend
-- *
-- * Save data for all banks across all devices.
-- */
--static int samsung_pinctrl_suspend(void)
--{
--	struct samsung_pinctrl_drv_data *drvdata;
--
--	list_for_each_entry(drvdata, &drvdata_list, node) {
--		samsung_pinctrl_suspend_dev(drvdata);
--	}
--
- 	return 0;
- }
--
--/**
-- * samsung_pinctrl_resume - restore pinctrl state for suspend
-- *
-- * Restore data for all banks across all devices.
-- */
--static void samsung_pinctrl_resume(void)
--{
--	struct samsung_pinctrl_drv_data *drvdata;
--
--	list_for_each_entry_reverse(drvdata, &drvdata_list, node) {
--		samsung_pinctrl_resume_dev(drvdata);
--	}
--}
--
--#else
--#define samsung_pinctrl_suspend		NULL
--#define samsung_pinctrl_resume		NULL
- #endif
- 
--static struct syscore_ops samsung_pinctrl_syscore_ops = {
--	.suspend	= samsung_pinctrl_suspend,
--	.resume		= samsung_pinctrl_resume,
--};
--
- static const struct of_device_id samsung_pinctrl_dt_match[] = {
- #ifdef CONFIG_PINCTRL_EXYNOS
- 	{ .compatible = "samsung,exynos3250-pinctrl",
-@@ -1281,25 +1237,23 @@ static void samsung_pinctrl_resume(void)
- };
- MODULE_DEVICE_TABLE(of, samsung_pinctrl_dt_match);
- 
-+static const struct dev_pm_ops samsung_pinctrl_pm_ops = {
-+	SET_LATE_SYSTEM_SLEEP_PM_OPS(samsung_pinctrl_suspend,
-+				     samsung_pinctrl_resume)
-+};
-+
- static struct platform_driver samsung_pinctrl_driver = {
- 	.probe		= samsung_pinctrl_probe,
- 	.driver = {
- 		.name	= "samsung-pinctrl",
- 		.of_match_table = samsung_pinctrl_dt_match,
- 		.suppress_bind_attrs = true,
-+		.pm = &samsung_pinctrl_pm_ops,
- 	},
- };
- 
- static int __init samsung_pinctrl_drv_register(void)
- {
--	/*
--	 * Register syscore ops for save/restore of registers across suspend.
--	 * It's important to ensure that this driver is running at an earlier
--	 * initcall level than any arch-specific init calls that install syscore
--	 * ops that turn off pad retention (like exynos_pm_resume).
--	 */
--	register_syscore_ops(&samsung_pinctrl_syscore_ops);
--
- 	return platform_driver_register(&samsung_pinctrl_driver);
- }
- postcore_initcall(samsung_pinctrl_drv_register);
+ 	d->suspend = ctrl->suspend;
+ 	d->resume = ctrl->resume;
 -- 
 1.9.1
