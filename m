@@ -1,102 +1,76 @@
-From: jagan@openedev.com (Jagan Teki)
-Date: Fri, 23 Dec 2016 17:02:14 +0100
-Subject: [PATCH 1/2] ARM: dts: imx6dl: Add Engicam i.CoreM6 DualLite/Solo RQS
- initial support
-Message-ID: <1482508935-9414-1-git-send-email-jagan@openedev.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 23 Dec 2016 10:55:35 -0600
+Subject: [PATCH 1/2] soc: ti: Use remoteproc auto_boot feature
+In-Reply-To: <b7457597-d69c-4d2c-5229-0678d7c41f48@codeaurora.org>
+References: <1481846632-4778-1-git-send-email-spjoshi@codeaurora.org>
+ <1f5b2631-f744-a5c1-55c1-82eb27d5cbd7@ti.com> <20161222130246.GA8359@builder>
+ <b7457597-d69c-4d2c-5229-0678d7c41f48@codeaurora.org>
+Message-ID: <83ea95e2-58a1-b19b-2202-abc271bd241e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jagan Teki <jagan@amarulasolutions.com>
+Hi Sarang,
 
-i.CoreM6 DualLite/Solo modules are system on module solutions manufactured
-by Engicam with following characteristics:
-CPU           NXP i.MX6 DL, 800MHz
-RAM           1GB, 32, 64 bit, DDR3-800/1066
-NAND          SLC,512MB
-Power supply  Single 5V
-MAX LCD RES   FULLHD
+On 12/22/2016 06:07 PM, Sarangdhar Joshi wrote:
+> On 12/22/2016 5:02 AM, Bjorn Andersson wrote:
+>> On Wed 21 Dec 19:16 PST 2016, Suman Anna wrote:
+>>
+>>> Hi Sarang,
+>>>
+>>> On 12/15/2016 06:03 PM, Sarangdhar Joshi wrote:
+>>>> The function wkup_m3_rproc_boot_thread waits for asynchronous
+>>>> firmware loading to complete successfully before calling
+>>>> rproc_boot(). The same can be achieved by just setting
+>>>> rproc->auto_boot flag. Change this. As a result this change
+>>>> removes wkup_m3_rproc_boot_thread and moves m3_ipc->sync_complete
+>>>> initialization to the wkup_m3_ipc_probe().
+>>>>
+>>>> Other than the current usage, the firmware_loading_complete is
+>>>> only used in rproc_del() where it's no longer needed.  This
+>>>> change is in preparation for removing firmware_loading_complete
+>>>> completely.
+>>>
+>>> Based on the comments so far, I am assuming that you are dropping this
+>>> series.
+>>>
+>>
+>> Following up on those comments only revealed that we have several other
+>> similar race conditions, so I'm hoping that Sarangdhar will continue to
+>> work on fixing those - and in this process get rid of this completion.
+>>
+>>> In any case, this series did break our PM stack. We definitely don't
+>>> want to auto-boot the wkup_m3_rproc device, that responsibility will
+>>> need to stay with the wkup_m3_ipc driver.
+>>>
+>>
+>> Reviewing the wkup_m3 situation again I see that as we have moved the
+>> resource table parsing to the rproc_boot() path there's no longer any
+>> need for the wkup_m3_ipc driver to wait for the remoteproc-core-internal
+>> completion.
+>>
+>> If rproc_get_by_phandle() returns non-NULL it is initialized. We still
+>> don't want to call rproc_boot() from wkup_m3_ipc_probe(), so let's keep
+>> the wkup_m3_rproc_boot_thread().
+> 
+> Did you mean it's okay to call rproc_boot() from wkup_m3_ipc_probe()?
+> rproc_boot() calls request_firmware() anyways and so there is no need to
+> wait for completion of asynchronous firmware loading.
 
-and more info at
-http://www.engicam.com/en/products/embedded/som/standard/i-core-rqs-m6s-dl-d-q
+No, please retain the kthread. I think you miss the purpose of this wait
+for completion originally. Before all the core changes in 4.9, the
+resource table is parsed in the first asynchronous loading step, and we
+had to wait for that step to complete. Now that there's no table parsing
+during the request_firmware_no_wait() for non auto-boot, we can get away
+from the need for a synchronzition call.
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Matteo Lisi <matteo.lisi@engicam.com>
-Cc: Michael Trimarchi <michael@amarulasolutions.com>
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
- arch/arm/boot/dts/Makefile             |  1 +
- arch/arm/boot/dts/imx6dl-icore-rqs.dts | 51 ++++++++++++++++++++++++++++++++++
- 2 files changed, 52 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-icore-rqs.dts
+> 
+>>
+>> Sarangdhar, could you update the wkup_m3_ipc patch to just drop the
+>> wait_for_completion() call?
+> 
+> Sure, assuming we should still keep the rproc_boot() call in the kthread.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index cccdbcb..51f8dae 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -349,6 +349,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6dl-gw553x.dtb \
- 	imx6dl-hummingboard.dtb \
- 	imx6dl-icore.dtb \
-+	imx6dl-icore-rqs.dtb \
- 	imx6dl-nit6xlite.dtb \
- 	imx6dl-nitrogen6x.dtb \
- 	imx6dl-phytec-pbab01.dtb \
-diff --git a/arch/arm/boot/dts/imx6dl-icore-rqs.dts b/arch/arm/boot/dts/imx6dl-icore-rqs.dts
-new file mode 100644
-index 0000000..5c19927
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-icore-rqs.dts
-@@ -0,0 +1,51 @@
-+/*
-+ * Copyright (C) 2016 Amarula Solutions B.V.
-+ * Copyright (C) 2016 Engicam S.r.l.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6q.dtsi"
-+#include "imx6qdl-icore-rqs.dtsi"
-+
-+/ {
-+	model = "Engicam i.CoreM6 DualLite/Solo RQS Starter Kit";
-+	compatible = "engicam,imx6-icore-rqs", "fsl,imx6dl";
-+};
--- 
-1.9.1
+Yep.
+
+regards
+Suman
