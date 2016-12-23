@@ -1,53 +1,74 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 23 Dec 2016 20:48:42 +0100
-Subject: [PATCH 1/1] ARM64: dts: meson-gxbb-odroidc2: linux,usable-memory
-In-Reply-To: <20161223125213.5461-1-xypron.glpk@gmx.de>
-References: <20161223125213.5461-1-xypron.glpk@gmx.de>
-Message-ID: <585D7F9A.6030203@baylibre.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 23 Dec 2016 17:57:57 -0600
+Subject: [PATCH 1/2] soc: ti: Use remoteproc auto_boot feature
+In-Reply-To: <1f847af8-6bde-4645-aea4-7e9b02306e39@ti.com>
+References: <1481846632-4778-1-git-send-email-spjoshi@codeaurora.org>
+ <1f5b2631-f744-a5c1-55c1-82eb27d5cbd7@ti.com>
+ <9092e066-b2ad-ee42-de5f-d66b84a10cfd@codeaurora.org>
+ <1f847af8-6bde-4645-aea4-7e9b02306e39@ti.com>
+Message-ID: <6a5a9c8a-cca7-0740-4879-dd6c01e60548@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 23/12/2016 13:52, Heinrich Schuchardt a ?crit :
-> After reading the fdt u-boot overwrites the reg property of the
-> memory node with <0x0 0x0 0x0 0x78000000>.
+On 12/23/2016 11:05 AM, Suman Anna wrote:
+> Hi Sarang,
 > 
-> To override this setting we have to use the property
-> linux,usable-memory.
+>>>
+>>> On 12/15/2016 06:03 PM, Sarangdhar Joshi wrote:
+>>>> The function wkup_m3_rproc_boot_thread waits for asynchronous
+>>>> firmware loading to complete successfully before calling
+>>>> rproc_boot(). The same can be achieved by just setting
+>>>> rproc->auto_boot flag. Change this. As a result this change
+>>>> removes wkup_m3_rproc_boot_thread and moves m3_ipc->sync_complete
+>>>> initialization to the wkup_m3_ipc_probe().
+>>>>
+>>>> Other than the current usage, the firmware_loading_complete is
+>>>> only used in rproc_del() where it's no longer needed.  This
+>>>> change is in preparation for removing firmware_loading_complete
+>>>> completely.
+>>>
+>>> Based on the comments so far, I am assuming that you are dropping this
+>>> series.
+>>
+>> No, may not be dropping this. Will try to handle it differently in
+>> rproc_del() (probably by making use of some state flag).
+>>>
+>>> In any case, this series did break our PM stack. We definitely don't
+>>> want to auto-boot the wkup_m3_rproc device, that responsibility will
+>>> need to stay with the wkup_m3_ipc driver.
+>>
+>> Which scenario did it break? Booting up rproc device before
+>> wkup_m3_ipc_probe() causes issues?
 > 
-> If the first 16MB of the 2GB physical memory are used by
-> the Linux kernel oops occur on the Odroid C2.
+> Yes, our state machine requires the wkup_m3_ipc driver to control the
+> boot of the wkup_m3 remoteproc. The wkup_m3 is not a typical remoteproc,
+> it is our PM master and is responsible for putting the host processor
+> into suspend and waking it up in system suspend/cpuidle paths.
+> The remoteproc infrastructure is only used for load/boot, but the Linux
+> PM state machine and communication is all controlled by the wkup_m3_ipc
+> driver.
 > 
-> For the Odroid C2 this patch replaces
-> [RFT PATCH] ARM64: dts: meson-gxbb: Add reserved memory zone and
-> usable memory range
-> https://lkml.org/lkml/2016/12/12/127
+>>
+>> Nevertheless, I think Bjorn's suggestion of just dropping the call to
+>> wait_for_completion() and keeping kthread looks good, also because of
+>> the fact that rproc_boot() anyways calls request_firmware() and no
+>> longer needed to wait on asynchronous loading of firmware.
 > 
-> Fixes: 855960342d1e7 ARM64: dts: amlogic: add Hardkernel ODROID-C2
-> CC: Neil Armstrong <narmstrong@baylibre.com>
-> CC: Kevin Hilman <khilman@baylibre.com>
-> Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
-> ---
->  arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> index 238fbeacd330..82ab94417940 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> @@ -61,7 +61,7 @@
->  
->  	memory at 0 {
->  		device_type = "memory";
-> -		reg = <0x0 0x0 0x0 0x80000000>;
-> +		linux,usable-memory = <0x0 0x01000000 0x0 0x7f000000>;
->  	};
->  
->  	usb_otg_pwr: regulator-usb-pwrs {
-> 
+> Yeah, I will have to test this, but looking at current code, this should
+> mostly be ok because of the remoteproc core changes w.r.t resource table
+> parsing.
 
-Hi Heinrich,
+Tested with just the wait_for_completion() removed and it works fine. I
+can send a patch for the same if you prefer me to send it.
 
-Thanks a lot for testing and pushing this patch, indeed I missed this point abou u-boot overwriting reg.
+regards
+Suman
 
-I will test this next week, and hopefully get these merged.
-Neil
+> 
+> regards
+> Suman
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-remoteproc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
