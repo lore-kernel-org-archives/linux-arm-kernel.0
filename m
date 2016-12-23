@@ -1,68 +1,81 @@
-From: jerry.huang@nxp.com (Jerry Huang)
-Date: Fri, 23 Dec 2016 02:52:49 +0000
-Subject: [PATCH v3 2/3] USB3/DWC3: Add property "snps,
- incr-burst-type-adjustment" for INCR burst type
-In-Reply-To: <20161222184514.hfd4g7ifrz5cv627@rob-hp-laptop>
-References: <1482139554-13618-1-git-send-email-jerry.huang@nxp.com>
- <1482139554-13618-2-git-send-email-jerry.huang@nxp.com>
- <20161222184514.hfd4g7ifrz5cv627@rob-hp-laptop>
-Message-ID: <DB5PR0401MB1813E210B2ADE1C9493F7768FE950@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 23 Dec 2016 12:18:23 +0900
+Subject: [PATCH] arm64: dts: uniphier: add eMMC controller node for LD11/LD20
+Message-ID: <1482463103-28692-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Rob,
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: Friday, December 23, 2016 2:45 AM
-> To: Jerry Huang <jerry.huang@nxp.com>
-> Cc: balbi at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
-> will.deacon at arm.com; linux at armlinux.org.uk; devicetree at vger.kernel.org;
-> linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v3 2/3] USB3/DWC3: Add property "snps, incr-burst-
-> type-adjustment" for INCR burst type
-> 
-> On Mon, Dec 19, 2016 at 05:25:53PM +0800, Changming Huang wrote:
-> > New property "snps,incr-burst-type-adjustment = <x>, <y>" for USB3.0
-> DWC3.
-> > Field "x": 1/0 - undefined length INCR burst type enable or not; Field
-> > "y": INCR4/INCR8/INCR16/INCR32/INCR64/INCR128/INCR256 burst type.
-> >
-> > While enabling undefined length INCR burst type and INCR16 burst type,
-> > get better write performance on NXP Layerscape platform:
-> > around 3% improvement (from 364MB/s to 375MB/s).
-> >
-> > Signed-off-by: Changming Huang <jerry.huang@nxp.com>
-> > ---
-> > Changes in v3:
-> >   - add new property for INCR burst in usb node.
-> >
-> >  Documentation/devicetree/bindings/usb/dwc3.txt |    5 +++++
-> >  arch/arm/boot/dts/ls1021a.dtsi                 |    1 +
-> >  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |    3 +++
-> >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |    2 ++
-> >  4 files changed, 11 insertions(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt
-> > b/Documentation/devicetree/bindings/usb/dwc3.txt
-> > index e3e6983..8c405a3 100644
-> > --- a/Documentation/devicetree/bindings/usb/dwc3.txt
-> > +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
-> > @@ -55,6 +55,10 @@ Optional properties:
-> >  	fladj_30mhz_sdbnd signal is invalid or incorrect.
-> >
-> >   - <DEPRECATED> tx-fifo-resize: determines if the FIFO *has* to be
-> reallocated.
-> > + - snps,incr-burst-type-adjustment: Value for INCR burst type of
-> GSBUSCFG0
-> > +	register, undefined length INCR burst type enable and INCRx type.
-> > +	First field is for undefined length INCR burst type enable or not.
-> > +	Second field is for largest INCRx type enabled.
-> 
-> Why do you need the first field? Is the 2nd field used if the 1st is 0?
-> If not, then just use the presence of the property to enable or not.
-The first field is one switch.
-When it is 1, means undefined length INCR burst type enabled, we can use any length less than or equal to the largest-enabled burst length of INCR4/8/16/32/64/128/256. 
-When it is zero, means INCRx burst mode enabled, we can use one fixed burst length of 1/4/8/16/32/64/128/256 byte.
-So, the 2nd field is used if the 1st is 0, we need to select one largest burst length the USB controller can support.
-If we don't want to change the value of this register (use the default value), we don't need to add this property to usb node.
+Add Cadence's eMMC controller node for LD11/LD20.
+
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
+
+ arch/arm/boot/dts/uniphier-pinctrl.dtsi          |  5 +++++
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 12 ++++++++++++
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 12 ++++++++++++
+ 3 files changed, 29 insertions(+)
+
+diff --git a/arch/arm/boot/dts/uniphier-pinctrl.dtsi b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
+index 10a7110..be353af15 100644
+--- a/arch/arm/boot/dts/uniphier-pinctrl.dtsi
++++ b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
+@@ -43,6 +43,11 @@
+  */
+ 
+ &pinctrl {
++	pinctrl_emmc: emmc_grp {
++		groups = "emmc", "emmc_dat8";
++		function = "emmc";
++	};
++
+ 	pinctrl_i2c0: i2c0_grp {
+ 		groups = "i2c0";
+ 		function = "i2c0";
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+index 43b6583..e1e45b4 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+@@ -300,6 +300,18 @@
+ 			};
+ 		};
+ 
++		emmc: sdhc at 5a000000 {
++			compatible = "socionext,uniphier-sd4hc", "cdns,sd4hc";
++			reg = <0x5a000000 0x400>;
++			interrupts = <0 78 4>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_emmc>;
++			clocks = <&sys_clk 4>;
++			bus-width = <8>;
++			mmc-ddr-1_8v;
++			mmc-hs200-1_8v;
++		};
++
+ 		usb0: usb at 5a800100 {
+ 			compatible = "socionext,uniphier-ehci", "generic-ehci";
+ 			status = "disabled";
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+index fcaecc6..1e61a04 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+@@ -374,6 +374,18 @@
+ 			};
+ 		};
+ 
++		emmc: sdhc at 5a000000 {
++			compatible = "socionext,uniphier-sd4hc", "cdns,sd4hc";
++			reg = <0x5a000000 0x400>;
++			interrupts = <0 78 4>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_emmc>;
++			clocks = <&sys_clk 4>;
++			bus-width = <8>;
++			mmc-ddr-1_8v;
++			mmc-hs200-1_8v;
++		};
++
+ 		soc-glue at 5f800000 {
+ 			compatible = "socionext,uniphier-ld20-soc-glue",
+ 				     "simple-mfd", "syscon";
+-- 
+2.7.4
