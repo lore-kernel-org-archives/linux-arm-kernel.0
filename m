@@ -1,85 +1,75 @@
 From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Fri, 23 Dec 2016 15:04:28 +0800
-Subject: [PATCH v5 5/6] arm64: arch_timer: apci: Introduce a generic aquirk
- framework for erratum
-In-Reply-To: <1482476669-15596-1-git-send-email-dingtianhong@huawei.com>
-References: <1482476669-15596-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <1482476669-15596-6-git-send-email-dingtianhong@huawei.com>
+Date: Fri, 23 Dec 2016 15:04:23 +0800
+Subject: [PATCH v5 0/6] arm64: arch_timer: Add workaround for hisilicon-161601
+ erratum
+Message-ID: <1482476669-15596-1-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+Erratum Hisilicon-161601 says that the ARM generic timer counter "has the
+potential to contain an erroneous value when the timer value changes".
+Accesses to TVAL (both read and write) are also affected due to the implicit counter
+read.  Accesses to CVAL are not affected.
 
-Introduce a general quirk framework for each timer erratum in ACPI,
-which use the oem information in GTDT table for platform specific erratums.
-The struct gtdt_arch_timer_fixup is introduced to record the oem
-information to match the quirk and handle the erratum.
+The workaround is to reread the system count registers until the value of the second
+read is larger than the first one by less than 32, the system counter can be guaranteed
+not to return wrong value twice by back-to-back read and the error value is always larger
+than the correct one by 32. Writes to TVAL are replaced with an equivalent write to CVAL.
 
-v3: Introduce a generic aquick framework for erratum in ACPI mode.
+v2: Introducing a new generic erratum handling mechanism for fsl,a008585 and hisilicon,161601.
+    Significant rework based on feedback, including seperate the fsl erratum a008585
+    to another patch, update the erratum name and remove unwanted code.
+
+v3: Introducing the erratum_workaround_set_sne generic function for fsl erratum a008585
+    and make the #define __fsl_a008585_read_reg to be private to the .c file instead of
+    being globally visible. After discussion with Marc and Will, a consensus decision was
+    made to remove the commandline parameter for enabling fsl,erratum-a008585 erratum,
+    and make some generic name more specific, export timer_unstable_counter_workaround
+    for module access.
+    
+    Significant rework based on feedback, including fix some alignment problem, make the
+    #define __hisi_161601_read_reg to be private to the .c file instead of being globally
+    visible, add more accurate annotation and modify a bit of logical format to enable
+    arch_timer_read_ool_enabled, remove the kernel commandline parameter
+    clocksource.arm_arch_timer.hisilicon-161601.
+
+    Introduce a generic aquick framework for erratum in ACPI mode.
 
 v4: rename the quirk handler parameter to make it more generic, and
     avoid break loop when handling the quirk becasue it need to
     support multi quirks handler.
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
----
- drivers/clocksource/arm_arch_timer.c | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+    update some data structures for acpi mode. 
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 9a82496..212bfa5 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -1079,6 +1079,39 @@ static int __init arch_timer_mem_init(struct device_node *np)
- 		       arch_timer_mem_init);
- 
- #ifdef CONFIG_ACPI
-+struct gtdt_arch_timer_fixup {
-+	char oem_id[ACPI_OEM_ID_SIZE];
-+	char oem_table_id[ACPI_OEM_TABLE_ID_SIZE];
-+	u32 oem_revision;
-+
-+	/* quirk handler for arch timer erratum */
-+	void (*handler)(void *context);
-+	void *context;
-+};
-+
-+/* note: this needs to be updated according to the doc of OEM ID
-+ * and TABLE ID for different board.
-+ */
-+struct gtdt_arch_timer_fixup arch_timer_quirks[] __initdata = {
-+};
-+
-+void __init arch_timer_acpi_quirks_handler(char *oem_id,
-+					   char *oem_table_id,
-+					   u32 oem_revision)
-+{
-+	struct gtdt_arch_timer_fixup *quirks = arch_timer_quirks;
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(arch_timer_quirks); i++, quirks++) {
-+		if (!memcmp(quirks->oem_id, oem_id, ACPI_OEM_ID_SIZE) &&
-+		    !memcmp(quirks->oem_table_id, oem_table_id, ACPI_OEM_TABLE_ID_SIZE) &&
-+		    quirks->oem_revision == oem_revision) {
-+			if (quirks->handler && quirks->context)
-+				quirks->handler(quirks->context);
-+		}
-+	}
-+}
-+
- static int __init map_generic_timer_interrupt(u32 interrupt, u32 flags)
- {
- 	int trigger, polarity;
-@@ -1105,6 +1138,9 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 		return -EINVAL;
- 	}
- 
-+	arch_timer_acpi_quirks_handler(table->oem_id, table->oem_table_id,
-+				       table->oem_revision);
-+
- 	gtdt = container_of(table, struct acpi_table_gtdt, header);
- 
- 	arch_timers_present |= ARCH_CP15_TIMER;
+v5: Adapt the new kernel-parameters.txt for latest kernel version.
+    Set the retries of reread system counter to 50, because it is possible 
+    that some interrupts may lead to more than twice read errors and break the loop,
+    it will trigger the warning, so we set the number of retries far beyond the number of
+    iterations the loop has been observed to take.
+
+Ding Tianhong (4):
+  arm64: arch_timer: Add device tree binding for hisilicon-161601
+    erratum
+  arm64: arch_timer: Introduce a generic erratum handing mechanism for
+    fsl-a008585
+  arm64: arch_timer: Work around Erratum Hisilicon-161601
+  arm64: arch timer: Add timer erratum property for Hip05-d02 and
+    Hip06-d03
+
+Hanjun Guo (2):
+  arm64: arch_timer: apci: Introduce a generic aquirk framework for
+    erratum
+  arm64: arch_timer: acpi: add hisi timer errata data
+
+ Documentation/arm64/silicon-errata.txt             |   1 +
+ .../devicetree/bindings/arm/arch_timer.txt         |   8 +
+ Documentation/kernel-parameters.txt                |   9 -
+ arch/arm64/boot/dts/hisilicon/hip05.dtsi           |   1 +
+ arch/arm64/boot/dts/hisilicon/hip06.dtsi           |   1 +
+ arch/arm64/include/asm/arch_timer.h                |  38 ++--
+ drivers/clocksource/Kconfig                        |   9 +
+ drivers/clocksource/arm_arch_timer.c               | 197 +++++++++++++++++----
+ 8 files changed, 194 insertions(+), 70 deletions(-)
+
 -- 
 1.9.0
