@@ -1,438 +1,587 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 23 Dec 2016 11:38:19 +0100
-Subject: [PATCH 3/3] dmaengine: pl330: Don't require irq-safe runtime PM
-In-Reply-To: <20161223024832.GA4178@kozik-lap>
-References: <1482408689-21971-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20161222121159epcas1p2e64486c51ae3b824f35ffb082d04f178@epcas1p2.samsung.com>
- <1482408689-21971-4-git-send-email-m.szyprowski@samsung.com>
- <20161223024832.GA4178@kozik-lap>
-Message-ID: <7e12d7cc-2dc1-2708-cabe-987d650ba3c5@samsung.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 23 Dec 2016 16:26:27 +0530
+Subject: [PATCH] PCI: exynos: refactor exynos pcie driver
+References: <CGME20161223105411epcas1p3727f726e757ec6c6d7bff04a9af40077@epcas1p3.samsung.com>
+Message-ID: <1482490587-13611-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+From: Niyas Ahmed S T <niyas.ahmed@samsung.com>
+
+Currently Exynos PCIe driver is only supported for Exynos5440 SoC.
+This patch does refactoring of Exynos PCIe driver to extend support
+for other Exynos SoC.
+
+Following are the main changes done via this patch:
+1) It adds separate structs for memory, clock resources.
+2) It add exynos_pcie_ops struct which will allow us to support the
+differences in resources in different Exynos SoC.
+
+No functional change intended.
+
+Signed-off-by: Niyas Ahmed S T <niyas.ahmed@samsung.com>
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
+This patch set is prepared on top of Krzysztof's for-next and
+PCIe driver cleanup patch [1] by Jaehoon Chung.
+
+[1]: https://lkml.org/lkml/2016/12/19/44
 
 
-On 2016-12-23 03:48, Krzysztof Kozlowski wrote:
-> On Thu, Dec 22, 2016 at 01:11:29PM +0100, Marek Szyprowski wrote:
->> This patch replaces irq-safe runtime pm with non-irq-safe version.
->>
->> Till now non-irq-safe runtime PM implementation was only possible by calling
->> pm_runtime_get/put functions from alloc/free_chan_resources. All other DMA
->> engine API functions cannot be called from a context, which allows sleeping.
->> Such implementation in practice resulted in keeping PL330 DMA controller
->> device active almost all the time, because most of the slave device drivers
->> (DMA engine clients) acquired DMA channel in their probe() function and
->> released it during driver removal.
-> I think that is not accurate (unless something changed recently and I
-> missed it)... The runtime PM in pl330 was infact suspending device when
-> the queue was empty. It was working during the regular work of DMA and
-> slave devices.
->
-> Maybe your recent fix changed this?
+ drivers/pci/host/pci-exynos.c | 346 ++++++++++++++++++++++++++----------------
+ 1 file changed, 217 insertions(+), 129 deletions(-)
 
-Please note that the above description was about existing ways of 
-implementing
-non-irq-safe runtime pm in a dmaengine driver. PL330 was using irq-safe 
-runtime pm,
-which has other issues - the most significant one is keeping clocks 
-prepared all
-the time and keeping power domain turned on all the time. Both are real 
-blockers
-of taking advantages of the fact that there is a separate power domain 
-for audio
-hardware.
-
->> This patch provides a new approach.
-> Please say why this approach is better because the previous one - was
-> suspending the dma channel when not used. Otherwise, it would make no
-> sense of implement the irq-safe runtime PM at the beginning!
->
-> Of course, a change from irq-safe to non-irq-safe is a good reason to
-> implement changes. But that was not mentioned in the first paragraph at
-> all.
-
-The goal of this patchset is to add audio power domain support for 
-Exynos5 SoCs
-and let it to be turned off when no sound is being played/recorded. This 
-in turn
-requires all devices, which are a part of that power domain to implement 
-runtime
-pm support. Maybe I didn't state this strong enough, but I think that 
-there was
-such information in the commit message AND cover letter.
-
->> The main assumption for it is an
->> observation that there can be only one slave device using each DMA channel.
-> Wait, observation, real requirement or assumption?
->
-> Later in the code I see adding such requirement.
-
-Well, observation which result in assumption. I cannot imagine a 
-hardware which
-shares slave DMA channel between devices. Also none of the existing platform
-does it.
-
->> Using recently introduced device dependencies (links) infrastructure one can
->> ensure proper runtime PM state of PL330 DMA controller. In this approach in
->> pl330_alloc_chan_resources() function a new dependency is being created
->> between PL330 DMA controller device (as supplier) and given slave device
->> (as consumer). This way PL330 DMA controller device runtime active counter
->> is increased when the slave device is resumed and decreased the same time
->> when given slave device is put to suspend. This way it has been ensured to
->> keep PL330 DMA controller runtime active if there is an active used of any
->> of its DMA channels. Slave device pointer is initially stored in per-channel
->> data in of_dma_xlate callback. This is similar to what has been already
->> implemented in Exynos IOMMU driver in commit 2f5f44f205cc958b
->> ("iommu/exynos: Use device dependency links to control runtime pm").
-> Sounds convincing... Interesting approach!
->
-> My doubts are:
-> 1. What with more then one slave device? (assumption?)
-
-See above, there are no such cases.
-
-> 2. If slave device does not implement runtime PM, then pl330 will be
->     active all the time?
-
-Right, but the goal is to have runtime pm added to all devices in the 
-system.
-
-> 3. If slave device implements runtime PM in a way that it's enabled in
->     probe and released in remove, then pl330 will be active all the time?
-
-Then it will force power domain to be turned on all the time and even 
-optional
-fine-grained irq-safe runtiem pm in pl330 driver won't help much to 
-reduce power
-consumption. I assume that the real goal with runtime pm is to let 
-respective
-power domains to be turned off, what gives the best results in terms of 
-power
-saving.
-
->> If one requests memory-to-memory chanel, runtime active counter is
->> increased unconditionally. This might be a drawback of this approach, but
->> PL330 is not really used for memory-to-memory operations due to poor
->> performance in such operations compared to CPU.
->>
->> Introducing non-irq-safe runtime power management finally allows to turn
->> audio power domain off on Exynos5 SoCs.
-> ... and actually any domain which contained pl330 device so this is nice
-> benefit!
->
->> Removal of irq-safe runtime pm is based on the revert of the following
->> commits:
->> 1. "dmaengine: pl330: fix runtime pm support" commit <no stable id yet>
->> 2. "dmaengine: pl330: Fix hang on dmaengine_terminate_all on certain boards"
->>     commit 81cc6edc08705ac0146fe6ac14a0982a31ce6f3d
->> 3. "ARM: 8202/1: dmaengine: pl330: Add runtime Power Management support v12"
->>     commit ae43b3289186480f81c78bb63d788a85a3631f47
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>   drivers/dma/pl330.c | 133 +++++++++++++++++++++++++++-------------------------
->>   1 file changed, 70 insertions(+), 63 deletions(-)
->>
->> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
->> index 3c80e71..2cffbb4 100644
->> --- a/drivers/dma/pl330.c
->> +++ b/drivers/dma/pl330.c
->> @@ -268,9 +268,6 @@ enum pl330_byteswap {
->>   
->>   #define NR_DEFAULT_DESC	16
->>   
->> -/* Delay for runtime PM autosuspend, ms */
->> -#define PL330_AUTOSUSPEND_DELAY 20
->> -
->>   /* Populated by the PL330 core driver for DMA API driver's info */
->>   struct pl330_config {
->>   	u32	periph_id;
->> @@ -449,7 +446,8 @@ struct dma_pl330_chan {
->>   	bool cyclic;
->>   
->>   	/* for runtime pm tracking */
->> -	bool active;
->> +	struct device *slave;
->> +	struct device_link *slave_link;
->>   };
->>   
->>   struct pl330_dmac {
->> @@ -2015,7 +2013,6 @@ static void pl330_tasklet(unsigned long data)
->>   	struct dma_pl330_chan *pch = (struct dma_pl330_chan *)data;
->>   	struct dma_pl330_desc *desc, *_dt;
->>   	unsigned long flags;
->> -	bool power_down = false;
->>   
->>   	spin_lock_irqsave(&pch->lock, flags);
->>   
->> @@ -2030,18 +2027,10 @@ static void pl330_tasklet(unsigned long data)
->>   	/* Try to submit a req imm. next to the last completed cookie */
->>   	fill_queue(pch);
->>   
->> -	if (list_empty(&pch->work_list)) {
->> -		spin_lock(&pch->thread->dmac->lock);
->> -		_stop(pch->thread);
->> -		spin_unlock(&pch->thread->dmac->lock);
->> -		power_down = true;
->> -		pch->active = false;
->> -	} else {
->> -		/* Make sure the PL330 Channel thread is active */
->> -		spin_lock(&pch->thread->dmac->lock);
->> -		_start(pch->thread);
->> -		spin_unlock(&pch->thread->dmac->lock);
->> -	}
->> +	/* Make sure the PL330 Channel thread is active */
->> +	spin_lock(&pch->thread->dmac->lock);
->> +	_start(pch->thread);
->> +	spin_unlock(&pch->thread->dmac->lock);
->>   
->>   	while (!list_empty(&pch->completed_list)) {
->>   		struct dmaengine_desc_callback cb;
->> @@ -2054,13 +2043,6 @@ static void pl330_tasklet(unsigned long data)
->>   		if (pch->cyclic) {
->>   			desc->status = PREP;
->>   			list_move_tail(&desc->node, &pch->work_list);
->> -			if (power_down) {
->> -				pch->active = true;
->> -				spin_lock(&pch->thread->dmac->lock);
->> -				_start(pch->thread);
->> -				spin_unlock(&pch->thread->dmac->lock);
->> -				power_down = false;
->> -			}
->>   		} else {
->>   			desc->status = FREE;
->>   			list_move_tail(&desc->node, &pch->dmac->desc_pool);
->> @@ -2075,12 +2057,6 @@ static void pl330_tasklet(unsigned long data)
->>   		}
->>   	}
->>   	spin_unlock_irqrestore(&pch->lock, flags);
->> -
->> -	/* If work list empty, power down */
->> -	if (power_down) {
->> -		pm_runtime_mark_last_busy(pch->dmac->ddma.dev);
->> -		pm_runtime_put_autosuspend(pch->dmac->ddma.dev);
->> -	}
->>   }
->>   
->>   bool pl330_filter(struct dma_chan *chan, void *param)
->> @@ -2113,14 +2089,63 @@ static struct dma_chan *of_dma_pl330_xlate(struct of_phandle_args *dma_spec,
->>   	if (chan_id >= pl330->num_peripherals)
->>   		return NULL;
->>   
->> +	if (!pl330->peripherals[chan_id].slave)
->> +		pl330->peripherals[chan_id].slave = slave;
->> +	else if (pl330->peripherals[chan_id].slave != slave) {
->> +		dev_err(pl330->ddma.dev,
->> +			"Can't use same channel with multiple slave devices!\n");
->> +		return NULL;
->> +	}
-> This could be nicely split into separate patch.
-
-Okay, if you want, I can move this change to separate patch.
-
-> Best regards,
-> Krzysztof
->
->> +
->>   	return dma_get_slave_channel(&pl330->peripherals[chan_id].chan);
->>   }
->>   
->> +static int pl330_add_slave_link(struct pl330_dmac *pl330,
->> +				struct dma_pl330_chan *pch)
->> +{
->> +	struct device_link *link;
->> +	int i;
->> +
->> +	if (pch->slave_link)
->> +		return 0;
->> +
->> +	link = device_link_add(pch->slave, pl330->ddma.dev,
->> +				       DL_FLAG_PM_RUNTIME | DL_FLAG_RPM_ACTIVE);
->> +	if (!link)
->> +		return -ENODEV;
->> +
->> +	for (i = 0; i < pl330->num_peripherals; i++)
->> +		if (pl330->peripherals[i].slave == pch->slave)
->> +			pl330->peripherals[i].slave_link = link;
->> +	return 0;
->> +}
->> +
->> +static void pl330_del_slave_link(struct pl330_dmac *pl330,
->> +				 struct dma_pl330_chan *pch)
->> +{
->> +	struct device_link *link = pch->slave_link;
->> +	int i, count = 0;
->> +
->> +	for (i = 0; i < pl330->num_peripherals; i++)
->> +		if (pl330->peripherals[i].slave == pch->slave &&
->> +		    pl330->peripherals[i].thread)
->> +			count++;
->> +
->> +	if (count > 0)
->> +		return;
->> +
->> +	device_link_del(link);
->> +	for (i = 0; i < pl330->num_peripherals; i++)
->> +		if (pl330->peripherals[i].slave == pch->slave)
->> +			pch->slave_link = NULL;
->> +}
->> +
->>   static int pl330_alloc_chan_resources(struct dma_chan *chan)
->>   {
->>   	struct dma_pl330_chan *pch = to_pchan(chan);
->>   	struct pl330_dmac *pl330 = pch->dmac;
->>   	unsigned long flags;
->> +	int ret = 0;
->>   
->>   	spin_lock_irqsave(&pch->lock, flags);
->>   
->> @@ -2137,6 +2162,14 @@ static int pl330_alloc_chan_resources(struct dma_chan *chan)
->>   
->>   	spin_unlock_irqrestore(&pch->lock, flags);
->>   
->> +	if (pch->slave)
->> +		ret = pl330_add_slave_link(pl330, pch);
->> +	else
->> +		ret = pm_runtime_get_sync(pl330->ddma.dev);
->> +
->> +	if (ret < 0)
->> +		return ret;
->> +
->>   	return 1;
->>   }
->>   
->> @@ -2171,9 +2204,7 @@ static int pl330_terminate_all(struct dma_chan *chan)
->>   	unsigned long flags;
->>   	struct pl330_dmac *pl330 = pch->dmac;
->>   	LIST_HEAD(list);
->> -	bool power_down = false;
->>   
->> -	pm_runtime_get_sync(pl330->ddma.dev);
->>   	spin_lock_irqsave(&pch->lock, flags);
->>   	spin_lock(&pl330->lock);
->>   	_stop(pch->thread);
->> @@ -2182,8 +2213,6 @@ static int pl330_terminate_all(struct dma_chan *chan)
->>   	pch->thread->req[0].desc = NULL;
->>   	pch->thread->req[1].desc = NULL;
->>   	pch->thread->req_running = -1;
->> -	power_down = pch->active;
->> -	pch->active = false;
->>   
->>   	/* Mark all desc done */
->>   	list_for_each_entry(desc, &pch->submitted_list, node) {
->> @@ -2200,10 +2229,6 @@ static int pl330_terminate_all(struct dma_chan *chan)
->>   	list_splice_tail_init(&pch->work_list, &pl330->desc_pool);
->>   	list_splice_tail_init(&pch->completed_list, &pl330->desc_pool);
->>   	spin_unlock_irqrestore(&pch->lock, flags);
->> -	pm_runtime_mark_last_busy(pl330->ddma.dev);
->> -	if (power_down)
->> -		pm_runtime_put_autosuspend(pl330->ddma.dev);
->> -	pm_runtime_put_autosuspend(pl330->ddma.dev);
->>   
->>   	return 0;
->>   }
->> @@ -2221,7 +2246,6 @@ static int pl330_pause(struct dma_chan *chan)
->>   	struct pl330_dmac *pl330 = pch->dmac;
->>   	unsigned long flags;
->>   
->> -	pm_runtime_get_sync(pl330->ddma.dev);
->>   	spin_lock_irqsave(&pch->lock, flags);
->>   
->>   	spin_lock(&pl330->lock);
->> @@ -2229,8 +2253,6 @@ static int pl330_pause(struct dma_chan *chan)
->>   	spin_unlock(&pl330->lock);
->>   
->>   	spin_unlock_irqrestore(&pch->lock, flags);
->> -	pm_runtime_mark_last_busy(pl330->ddma.dev);
->> -	pm_runtime_put_autosuspend(pl330->ddma.dev);
->>   
->>   	return 0;
->>   }
->> @@ -2238,11 +2260,11 @@ static int pl330_pause(struct dma_chan *chan)
->>   static void pl330_free_chan_resources(struct dma_chan *chan)
->>   {
->>   	struct dma_pl330_chan *pch = to_pchan(chan);
->> +	struct pl330_dmac *pl330 = pch->dmac;
->>   	unsigned long flags;
->>   
->>   	tasklet_kill(&pch->task);
->>   
->> -	pm_runtime_get_sync(pch->dmac->ddma.dev);
->>   	spin_lock_irqsave(&pch->lock, flags);
->>   
->>   	pl330_release_channel(pch->thread);
->> @@ -2252,19 +2274,20 @@ static void pl330_free_chan_resources(struct dma_chan *chan)
->>   		list_splice_tail_init(&pch->work_list, &pch->dmac->desc_pool);
->>   
->>   	spin_unlock_irqrestore(&pch->lock, flags);
->> -	pm_runtime_mark_last_busy(pch->dmac->ddma.dev);
->> -	pm_runtime_put_autosuspend(pch->dmac->ddma.dev);
->> +
->> +	if (pch->slave)
->> +		pl330_del_slave_link(pl330, pch);
->> +	else
->> +		pm_runtime_put(pl330->ddma.dev);
->>   }
->>   
->>   static int pl330_get_current_xferred_count(struct dma_pl330_chan *pch,
->>   					   struct dma_pl330_desc *desc)
->>   {
->>   	struct pl330_thread *thrd = pch->thread;
->> -	struct pl330_dmac *pl330 = pch->dmac;
->>   	void __iomem *regs = thrd->dmac->base;
->>   	u32 val, addr;
->>   
->> -	pm_runtime_get_sync(pl330->ddma.dev);
->>   	val = addr = 0;
->>   	if (desc->rqcfg.src_inc) {
->>   		val = readl(regs + SA(thrd->id));
->> @@ -2273,8 +2296,6 @@ static int pl330_get_current_xferred_count(struct dma_pl330_chan *pch,
->>   		val = readl(regs + DA(thrd->id));
->>   		addr = desc->px.dst_addr;
->>   	}
->> -	pm_runtime_mark_last_busy(pch->dmac->ddma.dev);
->> -	pm_runtime_put_autosuspend(pl330->ddma.dev);
->>   
->>   	/* If DMAMOV hasn't finished yet, SAR/DAR can be zero */
->>   	if (!val)
->> @@ -2360,16 +2381,6 @@ static void pl330_issue_pending(struct dma_chan *chan)
->>   	unsigned long flags;
->>   
->>   	spin_lock_irqsave(&pch->lock, flags);
->> -	if (list_empty(&pch->work_list)) {
->> -		/*
->> -		 * Warn on nothing pending. Empty submitted_list may
->> -		 * break our pm_runtime usage counter as it is
->> -		 * updated on work_list emptiness status.
->> -		 */
->> -		WARN_ON(list_empty(&pch->submitted_list));
->> -		pch->active = true;
->> -		pm_runtime_get_sync(pch->dmac->ddma.dev);
->> -	}
->>   	list_splice_tail_init(&pch->submitted_list, &pch->work_list);
->>   	spin_unlock_irqrestore(&pch->lock, flags);
->>   
->> @@ -2987,11 +2998,7 @@ static int __maybe_unused pl330_resume(struct device *dev)
->>   		pcfg->data_buf_dep, pcfg->data_bus_width / 8, pcfg->num_chan,
->>   		pcfg->num_peri, pcfg->num_events);
->>   
->> -	pm_runtime_irq_safe(&adev->dev);
->> -	pm_runtime_use_autosuspend(&adev->dev);
->> -	pm_runtime_set_autosuspend_delay(&adev->dev, PL330_AUTOSUSPEND_DELAY);
->> -	pm_runtime_mark_last_busy(&adev->dev);
->> -	pm_runtime_put_autosuspend(&adev->dev);
->> +	pm_runtime_put(&adev->dev);
->>   
->>   	return 0;
->>   probe_err3:
->> -- 
->> 1.9.1
->>
->
->
-
-Best regards
+diff --git a/drivers/pci/host/pci-exynos.c b/drivers/pci/host/pci-exynos.c
+index 33562cf..2dc54f7 100644
+--- a/drivers/pci/host/pci-exynos.c
++++ b/drivers/pci/host/pci-exynos.c
+@@ -17,6 +17,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/of_device.h>
+ #include <linux/of_gpio.h>
+ #include <linux/pci.h>
+ #include <linux/platform_device.h>
+@@ -28,16 +29,6 @@
+ 
+ #define to_exynos_pcie(x)	container_of(x, struct exynos_pcie, pp)
+ 
+-struct exynos_pcie {
+-	struct pcie_port	pp;
+-	void __iomem		*elbi_base;	/* DT 0th resource */
+-	void __iomem		*phy_base;	/* DT 1st resource */
+-	void __iomem		*block_base;	/* DT 2nd resource */
+-	int			reset_gpio;
+-	struct clk		*clk;
+-	struct clk		*bus_clk;
+-};
+-
+ /* PCIe ELBI registers */
+ #define PCIE_IRQ_PULSE			0x000
+ #define IRQ_INTA_ASSERT			BIT(0)
+@@ -102,6 +93,122 @@ struct exynos_pcie {
+ #define PCIE_PHY_TRSV3_PD_TSV		BIT(7)
+ #define PCIE_PHY_TRSV3_LVCC		0x31c
+ 
++struct exynos_pcie_mem_res {
++	void __iomem *elbi_base; /* DT 0th resource: PCIE CTRL */
++	void __iomem *phy_base; /* DT 1st resource: PHY CTRL */
++	void __iomem *block_base; /* DT 2nd resource: PHY ADDITIONAL CTRL */
++};
++
++struct exynos_pcie_clk_res {
++	struct clk *clk;
++	struct clk *bus_clk;
++};
++
++struct exynos_pcie {
++	struct pcie_port		pp;
++	struct exynos_pcie_mem_res	*mem_res;
++	struct exynos_pcie_clk_res	*clk_res;
++	const struct exynos_pcie_ops	*ops;
++	int				reset_gpio;
++};
++
++struct exynos_pcie_ops {
++	int (*get_mem_resources)(struct platform_device *pdev,
++			struct exynos_pcie *ep);
++	int (*get_clk_resources)(struct exynos_pcie *ep);
++	int (*init_clk_resources)(struct exynos_pcie *ep);
++	void (*deinit_clk_resources)(struct exynos_pcie *ep);
++};
++
++static int exynos5440_pcie_get_mem_resources(struct platform_device *pdev,
++						struct exynos_pcie *ep)
++{
++	struct resource *res;
++	struct device *dev = ep->pp.dev;
++
++	ep->mem_res = devm_kzalloc(dev, sizeof(*ep->mem_res), GFP_KERNEL);
++	if (!ep->mem_res)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	ep->mem_res->elbi_base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(ep->mem_res->elbi_base))
++		return PTR_ERR(ep->mem_res->elbi_base);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	ep->mem_res->phy_base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(ep->mem_res->phy_base))
++		return PTR_ERR(ep->mem_res->phy_base);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
++	ep->mem_res->block_base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(ep->mem_res->block_base))
++		return PTR_ERR(ep->mem_res->block_base);
++
++	return 0;
++}
++
++static int exynos5440_pcie_get_clk_resources(struct exynos_pcie *ep)
++{
++	struct device *dev = ep->pp.dev;
++
++	ep->clk_res = devm_kzalloc(dev, sizeof(*ep->clk_res), GFP_KERNEL);
++	if (!ep->clk_res)
++		return -ENOMEM;
++
++	ep->clk_res->clk = devm_clk_get(dev, "pcie");
++	if (IS_ERR(ep->clk_res->clk)) {
++		dev_err(dev, "Failed to get pcie rc clock\n");
++		return PTR_ERR(ep->clk_res->clk);
++	}
++
++	ep->clk_res->bus_clk = devm_clk_get(dev, "pcie_bus");
++	if (IS_ERR(ep->clk_res->bus_clk)) {
++		dev_err(dev, "Failed to get pcie bus clock\n");
++		return PTR_ERR(ep->clk_res->bus_clk);
++	}
++
++	return 0;
++}
++
++static int exynos5440_pcie_init_clk_resources(struct exynos_pcie *ep)
++{
++	struct device *dev = ep->pp.dev;
++	int ret;
++
++	ret = clk_prepare_enable(ep->clk_res->clk);
++	if (ret) {
++		dev_err(dev, "cannot enable pcie rc clock");
++		return ret;
++	}
++
++	ret = clk_prepare_enable(ep->clk_res->bus_clk);
++	if (ret) {
++		dev_err(dev, "cannot enable pcie bus clock");
++		goto err_bus_clk;
++	}
++
++	return 0;
++
++err_bus_clk:
++	clk_disable_unprepare(ep->clk_res->clk);
++
++	return ret;
++}
++
++static void exynos5440_pcie_deinit_clk_resources(struct exynos_pcie *ep)
++{
++	clk_disable_unprepare(ep->clk_res->bus_clk);
++	clk_disable_unprepare(ep->clk_res->clk);
++}
++
++static const struct exynos_pcie_ops exynos5440_pcie_ops = {
++	.get_mem_resources	= exynos5440_pcie_get_mem_resources,
++	.get_clk_resources	= exynos5440_pcie_get_clk_resources,
++	.init_clk_resources	= exynos5440_pcie_init_clk_resources,
++	.deinit_clk_resources	= exynos5440_pcie_deinit_clk_resources,
++};
++
+ static void exynos_pcie_writel(void __iomem *base, u32 val, u32 reg)
+ {
+ 	writel(val, base + reg);
+@@ -116,155 +223,155 @@ static void exynos_pcie_sideband_dbi_w_mode(struct exynos_pcie *ep, bool on)
+ {
+ 	u32 val;
+ 
+-	val = exynos_pcie_readl(ep->elbi_base, PCIE_ELBI_SLV_AWMISC);
++	val = exynos_pcie_readl(ep->mem_res->elbi_base, PCIE_ELBI_SLV_AWMISC);
+ 	if (on)
+ 		val |= PCIE_ELBI_SLV_DBI_ENABLE;
+ 	else
+ 		val &= ~PCIE_ELBI_SLV_DBI_ENABLE;
+-	exynos_pcie_writel(ep->elbi_base, val, PCIE_ELBI_SLV_AWMISC);
++	exynos_pcie_writel(ep->mem_res->elbi_base, val, PCIE_ELBI_SLV_AWMISC);
+ }
+ 
+ static void exynos_pcie_sideband_dbi_r_mode(struct exynos_pcie *ep, bool on)
+ {
+ 	u32 val;
+ 
+-	val = exynos_pcie_readl(ep->elbi_base, PCIE_ELBI_SLV_ARMISC);
++	val = exynos_pcie_readl(ep->mem_res->elbi_base, PCIE_ELBI_SLV_ARMISC);
+ 	if (on)
+ 		val |= PCIE_ELBI_SLV_DBI_ENABLE;
+ 	else
+ 		val &= ~PCIE_ELBI_SLV_DBI_ENABLE;
+-	exynos_pcie_writel(ep->elbi_base, val, PCIE_ELBI_SLV_ARMISC);
++	exynos_pcie_writel(ep->mem_res->elbi_base, val, PCIE_ELBI_SLV_ARMISC);
+ }
+ 
+ static void exynos_pcie_assert_core_reset(struct exynos_pcie *ep)
+ {
+ 	u32 val;
+ 
+-	val = exynos_pcie_readl(ep->elbi_base, PCIE_CORE_RESET);
++	val = exynos_pcie_readl(ep->mem_res->elbi_base, PCIE_CORE_RESET);
+ 	val &= ~PCIE_CORE_RESET_ENABLE;
+-	exynos_pcie_writel(ep->elbi_base, val, PCIE_CORE_RESET);
+-	exynos_pcie_writel(ep->elbi_base, 0, PCIE_PWR_RESET);
+-	exynos_pcie_writel(ep->elbi_base, 0, PCIE_STICKY_RESET);
+-	exynos_pcie_writel(ep->elbi_base, 0, PCIE_NONSTICKY_RESET);
++	exynos_pcie_writel(ep->mem_res->elbi_base, val, PCIE_CORE_RESET);
++	exynos_pcie_writel(ep->mem_res->elbi_base, 0, PCIE_PWR_RESET);
++	exynos_pcie_writel(ep->mem_res->elbi_base, 0, PCIE_STICKY_RESET);
++	exynos_pcie_writel(ep->mem_res->elbi_base, 0, PCIE_NONSTICKY_RESET);
+ }
+ 
+ static void exynos_pcie_deassert_core_reset(struct exynos_pcie *ep)
+ {
+ 	u32 val;
+ 
+-	val = exynos_pcie_readl(ep->elbi_base, PCIE_CORE_RESET);
++	val = exynos_pcie_readl(ep->mem_res->elbi_base, PCIE_CORE_RESET);
+ 	val |= PCIE_CORE_RESET_ENABLE;
+ 
+-	exynos_pcie_writel(ep->elbi_base, val, PCIE_CORE_RESET);
+-	exynos_pcie_writel(ep->elbi_base, 1, PCIE_STICKY_RESET);
+-	exynos_pcie_writel(ep->elbi_base, 1, PCIE_NONSTICKY_RESET);
+-	exynos_pcie_writel(ep->elbi_base, 1, PCIE_APP_INIT_RESET);
+-	exynos_pcie_writel(ep->elbi_base, 0, PCIE_APP_INIT_RESET);
+-	exynos_pcie_writel(ep->block_base, 1, PCIE_PHY_MAC_RESET);
++	exynos_pcie_writel(ep->mem_res->elbi_base, val, PCIE_CORE_RESET);
++	exynos_pcie_writel(ep->mem_res->elbi_base, 1, PCIE_STICKY_RESET);
++	exynos_pcie_writel(ep->mem_res->elbi_base, 1, PCIE_NONSTICKY_RESET);
++	exynos_pcie_writel(ep->mem_res->elbi_base, 1, PCIE_APP_INIT_RESET);
++	exynos_pcie_writel(ep->mem_res->elbi_base, 0, PCIE_APP_INIT_RESET);
++	exynos_pcie_writel(ep->mem_res->block_base, 1, PCIE_PHY_MAC_RESET);
+ }
+ 
+ static void exynos_pcie_assert_phy_reset(struct exynos_pcie *ep)
+ {
+-	exynos_pcie_writel(ep->block_base, 0, PCIE_PHY_MAC_RESET);
+-	exynos_pcie_writel(ep->block_base, 1, PCIE_PHY_GLOBAL_RESET);
++	exynos_pcie_writel(ep->mem_res->block_base, 0, PCIE_PHY_MAC_RESET);
++	exynos_pcie_writel(ep->mem_res->block_base, 1, PCIE_PHY_GLOBAL_RESET);
+ }
+ 
+ static void exynos_pcie_deassert_phy_reset(struct exynos_pcie *ep)
+ {
+-	exynos_pcie_writel(ep->block_base, 0, PCIE_PHY_GLOBAL_RESET);
+-	exynos_pcie_writel(ep->elbi_base, 1, PCIE_PWR_RESET);
+-	exynos_pcie_writel(ep->block_base, 0, PCIE_PHY_COMMON_RESET);
+-	exynos_pcie_writel(ep->block_base, 0, PCIE_PHY_CMN_REG);
+-	exynos_pcie_writel(ep->block_base, 0, PCIE_PHY_TRSVREG_RESET);
+-	exynos_pcie_writel(ep->block_base, 0, PCIE_PHY_TRSV_RESET);
++	exynos_pcie_writel(ep->mem_res->block_base, 0, PCIE_PHY_GLOBAL_RESET);
++	exynos_pcie_writel(ep->mem_res->elbi_base, 1, PCIE_PWR_RESET);
++	exynos_pcie_writel(ep->mem_res->block_base, 0, PCIE_PHY_COMMON_RESET);
++	exynos_pcie_writel(ep->mem_res->block_base, 0, PCIE_PHY_CMN_REG);
++	exynos_pcie_writel(ep->mem_res->block_base, 0, PCIE_PHY_TRSVREG_RESET);
++	exynos_pcie_writel(ep->mem_res->block_base, 0, PCIE_PHY_TRSV_RESET);
+ }
+ 
+ static void exynos_pcie_power_on_phy(struct exynos_pcie *ep)
+ {
+ 	u32 val;
+ 
+-	val = exynos_pcie_readl(ep->phy_base, PCIE_PHY_COMMON_POWER);
++	val = exynos_pcie_readl(ep->mem_res->phy_base, PCIE_PHY_COMMON_POWER);
+ 	val &= ~PCIE_PHY_COMMON_PD_CMN;
+-	exynos_pcie_writel(ep->phy_base, val, PCIE_PHY_COMMON_POWER);
++	exynos_pcie_writel(ep->mem_res->phy_base, val, PCIE_PHY_COMMON_POWER);
+ 
+-	val = exynos_pcie_readl(ep->phy_base, PCIE_PHY_TRSV0_POWER);
++	val = exynos_pcie_readl(ep->mem_res->phy_base, PCIE_PHY_TRSV0_POWER);
+ 	val &= ~PCIE_PHY_TRSV0_PD_TSV;
+-	exynos_pcie_writel(ep->phy_base, val, PCIE_PHY_TRSV0_POWER);
++	exynos_pcie_writel(ep->mem_res->phy_base, val, PCIE_PHY_TRSV0_POWER);
+ 
+-	val = exynos_pcie_readl(ep->phy_base, PCIE_PHY_TRSV1_POWER);
++	val = exynos_pcie_readl(ep->mem_res->phy_base, PCIE_PHY_TRSV1_POWER);
+ 	val &= ~PCIE_PHY_TRSV1_PD_TSV;
+-	exynos_pcie_writel(ep->phy_base, val, PCIE_PHY_TRSV1_POWER);
++	exynos_pcie_writel(ep->mem_res->phy_base, val, PCIE_PHY_TRSV1_POWER);
+ 
+-	val = exynos_pcie_readl(ep->phy_base, PCIE_PHY_TRSV2_POWER);
++	val = exynos_pcie_readl(ep->mem_res->phy_base, PCIE_PHY_TRSV2_POWER);
+ 	val &= ~PCIE_PHY_TRSV2_PD_TSV;
+-	exynos_pcie_writel(ep->phy_base, val, PCIE_PHY_TRSV2_POWER);
++	exynos_pcie_writel(ep->mem_res->phy_base, val, PCIE_PHY_TRSV2_POWER);
+ 
+-	val = exynos_pcie_readl(ep->phy_base, PCIE_PHY_TRSV3_POWER);
++	val = exynos_pcie_readl(ep->mem_res->phy_base, PCIE_PHY_TRSV3_POWER);
+ 	val &= ~PCIE_PHY_TRSV3_PD_TSV;
+-	exynos_pcie_writel(ep->phy_base, val, PCIE_PHY_TRSV3_POWER);
++	exynos_pcie_writel(ep->mem_res->phy_base, val, PCIE_PHY_TRSV3_POWER);
+ }
+ 
+ static void exynos_pcie_power_off_phy(struct exynos_pcie *ep)
+ {
+ 	u32 val;
+ 
+-	val = exynos_pcie_readl(ep->phy_base, PCIE_PHY_COMMON_POWER);
++	val = exynos_pcie_readl(ep->mem_res->phy_base, PCIE_PHY_COMMON_POWER);
+ 	val |= PCIE_PHY_COMMON_PD_CMN;
+-	exynos_pcie_writel(ep->phy_base, val, PCIE_PHY_COMMON_POWER);
++	exynos_pcie_writel(ep->mem_res->phy_base, val, PCIE_PHY_COMMON_POWER);
+ 
+-	val = exynos_pcie_readl(ep->phy_base, PCIE_PHY_TRSV0_POWER);
++	val = exynos_pcie_readl(ep->mem_res->phy_base, PCIE_PHY_TRSV0_POWER);
+ 	val |= PCIE_PHY_TRSV0_PD_TSV;
+-	exynos_pcie_writel(ep->phy_base, val, PCIE_PHY_TRSV0_POWER);
++	exynos_pcie_writel(ep->mem_res->phy_base, val, PCIE_PHY_TRSV0_POWER);
+ 
+-	val = exynos_pcie_readl(ep->phy_base, PCIE_PHY_TRSV1_POWER);
++	val = exynos_pcie_readl(ep->mem_res->phy_base, PCIE_PHY_TRSV1_POWER);
+ 	val |= PCIE_PHY_TRSV1_PD_TSV;
+-	exynos_pcie_writel(ep->phy_base, val, PCIE_PHY_TRSV1_POWER);
++	exynos_pcie_writel(ep->mem_res->phy_base, val, PCIE_PHY_TRSV1_POWER);
+ 
+-	val = exynos_pcie_readl(ep->phy_base, PCIE_PHY_TRSV2_POWER);
++	val = exynos_pcie_readl(ep->mem_res->phy_base, PCIE_PHY_TRSV2_POWER);
+ 	val |= PCIE_PHY_TRSV2_PD_TSV;
+-	exynos_pcie_writel(ep->phy_base, val, PCIE_PHY_TRSV2_POWER);
++	exynos_pcie_writel(ep->mem_res->phy_base, val, PCIE_PHY_TRSV2_POWER);
+ 
+-	val = exynos_pcie_readl(ep->phy_base, PCIE_PHY_TRSV3_POWER);
++	val = exynos_pcie_readl(ep->mem_res->phy_base, PCIE_PHY_TRSV3_POWER);
+ 	val |= PCIE_PHY_TRSV3_PD_TSV;
+-	exynos_pcie_writel(ep->phy_base, val, PCIE_PHY_TRSV3_POWER);
++	exynos_pcie_writel(ep->mem_res->phy_base, val, PCIE_PHY_TRSV3_POWER);
+ }
+ 
+ static void exynos_pcie_init_phy(struct exynos_pcie *ep)
+ {
+ 	/* DCC feedback control off */
+-	exynos_pcie_writel(ep->phy_base, 0x29, PCIE_PHY_DCC_FEEDBACK);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0x29, PCIE_PHY_DCC_FEEDBACK);
+ 
+ 	/* set TX/RX impedance */
+-	exynos_pcie_writel(ep->phy_base, 0xd5, PCIE_PHY_IMPEDANCE);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0xd5, PCIE_PHY_IMPEDANCE);
+ 
+ 	/* set 50Mhz PHY clock */
+-	exynos_pcie_writel(ep->phy_base, 0x14, PCIE_PHY_PLL_DIV_0);
+-	exynos_pcie_writel(ep->phy_base, 0x12, PCIE_PHY_PLL_DIV_1);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0x14, PCIE_PHY_PLL_DIV_0);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0x12, PCIE_PHY_PLL_DIV_1);
+ 
+ 	/* set TX Differential output for lane 0 */
+-	exynos_pcie_writel(ep->phy_base, 0x7f, PCIE_PHY_TRSV0_DRV_LVL);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0x7f, PCIE_PHY_TRSV0_DRV_LVL);
+ 
+ 	/* set TX Pre-emphasis Level Control for lane 0 to minimum */
+-	exynos_pcie_writel(ep->phy_base, 0x0, PCIE_PHY_TRSV0_EMP_LVL);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0x0, PCIE_PHY_TRSV0_EMP_LVL);
+ 
+ 	/* set RX clock and data recovery bandwidth */
+-	exynos_pcie_writel(ep->phy_base, 0xe7, PCIE_PHY_PLL_BIAS);
+-	exynos_pcie_writel(ep->phy_base, 0x82, PCIE_PHY_TRSV0_RXCDR);
+-	exynos_pcie_writel(ep->phy_base, 0x82, PCIE_PHY_TRSV1_RXCDR);
+-	exynos_pcie_writel(ep->phy_base, 0x82, PCIE_PHY_TRSV2_RXCDR);
+-	exynos_pcie_writel(ep->phy_base, 0x82, PCIE_PHY_TRSV3_RXCDR);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0xe7, PCIE_PHY_PLL_BIAS);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0x82, PCIE_PHY_TRSV0_RXCDR);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0x82, PCIE_PHY_TRSV1_RXCDR);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0x82, PCIE_PHY_TRSV2_RXCDR);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0x82, PCIE_PHY_TRSV3_RXCDR);
+ 
+ 	/* change TX Pre-emphasis Level Control for lanes */
+-	exynos_pcie_writel(ep->phy_base, 0x39, PCIE_PHY_TRSV0_EMP_LVL);
+-	exynos_pcie_writel(ep->phy_base, 0x39, PCIE_PHY_TRSV1_EMP_LVL);
+-	exynos_pcie_writel(ep->phy_base, 0x39, PCIE_PHY_TRSV2_EMP_LVL);
+-	exynos_pcie_writel(ep->phy_base, 0x39, PCIE_PHY_TRSV3_EMP_LVL);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0x39, PCIE_PHY_TRSV0_EMP_LVL);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0x39, PCIE_PHY_TRSV1_EMP_LVL);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0x39, PCIE_PHY_TRSV2_EMP_LVL);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0x39, PCIE_PHY_TRSV3_EMP_LVL);
+ 
+ 	/* set LVCC */
+-	exynos_pcie_writel(ep->phy_base, 0x20, PCIE_PHY_TRSV0_LVCC);
+-	exynos_pcie_writel(ep->phy_base, 0xa0, PCIE_PHY_TRSV1_LVCC);
+-	exynos_pcie_writel(ep->phy_base, 0xa0, PCIE_PHY_TRSV2_LVCC);
+-	exynos_pcie_writel(ep->phy_base, 0xa0, PCIE_PHY_TRSV3_LVCC);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0x20, PCIE_PHY_TRSV0_LVCC);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0xa0, PCIE_PHY_TRSV1_LVCC);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0xa0, PCIE_PHY_TRSV2_LVCC);
++	exynos_pcie_writel(ep->mem_res->phy_base, 0xa0, PCIE_PHY_TRSV3_LVCC);
+ }
+ 
+ static void exynos_pcie_assert_reset(struct exynos_pcie *exynos_pcie)
+@@ -295,25 +402,27 @@ static int exynos_pcie_establish_link(struct exynos_pcie *exynos_pcie)
+ 	exynos_pcie_init_phy(exynos_pcie);
+ 
+ 	/* pulse for common reset */
+-	exynos_pcie_writel(exynos_pcie->block_base, 1, PCIE_PHY_COMMON_RESET);
++	exynos_pcie_writel(exynos_pcie->mem_res->block_base, 1,
++				PCIE_PHY_COMMON_RESET);
+ 	udelay(500);
+-	exynos_pcie_writel(exynos_pcie->block_base, 0, PCIE_PHY_COMMON_RESET);
++	exynos_pcie_writel(exynos_pcie->mem_res->block_base, 0,
++				PCIE_PHY_COMMON_RESET);
+ 
+ 	exynos_pcie_deassert_core_reset(exynos_pcie);
+ 	dw_pcie_setup_rc(pp);
+ 	exynos_pcie_assert_reset(exynos_pcie);
+ 
+ 	/* assert LTSSM enable */
+-	exynos_pcie_writel(exynos_pcie->elbi_base, PCIE_ELBI_LTSSM_ENABLE,
+-			  PCIE_APP_LTSSM_ENABLE);
++	exynos_pcie_writel(exynos_pcie->mem_res->elbi_base,
++			PCIE_ELBI_LTSSM_ENABLE, PCIE_APP_LTSSM_ENABLE);
+ 
+ 	/* check if the link is up or not */
+ 	if (!dw_pcie_wait_for_link(pp))
+ 		return 0;
+ 
+-	while (exynos_pcie_readl(exynos_pcie->phy_base,
++	while (exynos_pcie_readl(exynos_pcie->mem_res->phy_base,
+ 				PCIE_PHY_PLL_LOCKED) == 0) {
+-		val = exynos_pcie_readl(exynos_pcie->block_base,
++		val = exynos_pcie_readl(exynos_pcie->mem_res->block_base,
+ 				PCIE_PHY_PLL_LOCKED);
+ 		dev_info(dev, "PLL Locked: 0x%x\n", val);
+ 	}
+@@ -325,8 +434,8 @@ static void exynos_pcie_clear_irq_pulse(struct exynos_pcie *ep)
+ {
+ 	u32 val;
+ 
+-	val = exynos_pcie_readl(ep->elbi_base, PCIE_IRQ_PULSE);
+-	exynos_pcie_writel(ep->elbi_base, val, PCIE_IRQ_PULSE);
++	val = exynos_pcie_readl(ep->mem_res->elbi_base, PCIE_IRQ_PULSE);
++	exynos_pcie_writel(ep->mem_res->elbi_base, val, PCIE_IRQ_PULSE);
+ }
+ 
+ static void exynos_pcie_enable_irq_pulse(struct exynos_pcie *ep)
+@@ -336,7 +445,7 @@ static void exynos_pcie_enable_irq_pulse(struct exynos_pcie *ep)
+ 	/* enable INTX interrupt */
+ 	val = IRQ_INTA_ASSERT | IRQ_INTB_ASSERT |
+ 		IRQ_INTC_ASSERT | IRQ_INTD_ASSERT;
+-	exynos_pcie_writel(ep->elbi_base, val, PCIE_IRQ_EN_PULSE);
++	exynos_pcie_writel(ep->mem_res->elbi_base, val, PCIE_IRQ_EN_PULSE);
+ }
+ 
+ static irqreturn_t exynos_pcie_irq_handler(int irq, void *arg)
+@@ -363,9 +472,9 @@ static void exynos_pcie_msi_init(struct exynos_pcie *ep)
+ 	dw_pcie_msi_init(pp);
+ 
+ 	/* enable MSI interrupt */
+-	val = exynos_pcie_readl(ep->elbi_base, PCIE_IRQ_EN_LEVEL);
++	val = exynos_pcie_readl(ep->mem_res->elbi_base, PCIE_IRQ_EN_LEVEL);
+ 	val |= IRQ_MSI_ENABLE;
+-	exynos_pcie_writel(ep->elbi_base, val, PCIE_IRQ_EN_LEVEL);
++	exynos_pcie_writel(ep->mem_res->elbi_base, val, PCIE_IRQ_EN_LEVEL);
+ }
+ 
+ static void exynos_pcie_enable_interrupts(struct exynos_pcie *exynos_pcie)
+@@ -425,7 +534,8 @@ static int exynos_pcie_link_up(struct pcie_port *pp)
+ 	struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
+ 	u32 val;
+ 
+-	val = exynos_pcie_readl(exynos_pcie->elbi_base, PCIE_ELBI_RDLH_LINKUP);
++	val = exynos_pcie_readl(exynos_pcie->mem_res->elbi_base,
++					PCIE_ELBI_RDLH_LINKUP);
+ 	if (val == PCIE_ELBI_LTSSM_ENABLE)
+ 		return 1;
+ 
+@@ -503,7 +613,6 @@ static int __init exynos_pcie_probe(struct platform_device *pdev)
+ 	struct exynos_pcie *exynos_pcie;
+ 	struct pcie_port *pp;
+ 	struct device_node *np = dev->of_node;
+-	struct resource *res;
+ 	int ret;
+ 
+ 	exynos_pcie = devm_kzalloc(dev, sizeof(*exynos_pcie), GFP_KERNEL);
+@@ -513,59 +622,37 @@ static int __init exynos_pcie_probe(struct platform_device *pdev)
+ 	pp = &exynos_pcie->pp;
+ 	pp->dev = dev;
+ 
+-	exynos_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
+-
+-	exynos_pcie->clk = devm_clk_get(dev, "pcie");
+-	if (IS_ERR(exynos_pcie->clk)) {
+-		dev_err(dev, "Failed to get pcie rc clock\n");
+-		return PTR_ERR(exynos_pcie->clk);
+-	}
+-	ret = clk_prepare_enable(exynos_pcie->clk);
+-	if (ret)
+-		return ret;
++	exynos_pcie->ops = (const struct exynos_pcie_ops *)
++				of_device_get_match_data(dev);
+ 
+-	exynos_pcie->bus_clk = devm_clk_get(dev, "pcie_bus");
+-	if (IS_ERR(exynos_pcie->bus_clk)) {
+-		dev_err(dev, "Failed to get pcie bus clock\n");
+-		ret = PTR_ERR(exynos_pcie->bus_clk);
+-		goto fail_clk;
+-	}
+-	ret = clk_prepare_enable(exynos_pcie->bus_clk);
+-	if (ret)
+-		goto fail_clk;
++	exynos_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	exynos_pcie->elbi_base = devm_ioremap_resource(dev, res);
+-	if (IS_ERR(exynos_pcie->elbi_base)) {
+-		ret = PTR_ERR(exynos_pcie->elbi_base);
+-		goto fail_bus_clk;
++	if (exynos_pcie->ops && exynos_pcie->ops->get_mem_resources) {
++		ret = exynos_pcie->ops->get_mem_resources(pdev, exynos_pcie);
++		if (ret)
++			return ret;
+ 	}
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-	exynos_pcie->phy_base = devm_ioremap_resource(dev, res);
+-	if (IS_ERR(exynos_pcie->phy_base)) {
+-		ret = PTR_ERR(exynos_pcie->phy_base);
+-		goto fail_bus_clk;
+-	}
++	if (exynos_pcie->ops && exynos_pcie->ops->get_clk_resources) {
++		ret = exynos_pcie->ops->get_clk_resources(exynos_pcie);
++		if (ret)
++			return ret;
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+-	exynos_pcie->block_base = devm_ioremap_resource(dev, res);
+-	if (IS_ERR(exynos_pcie->block_base)) {
+-		ret = PTR_ERR(exynos_pcie->block_base);
+-		goto fail_bus_clk;
++		ret = exynos_pcie->ops->init_clk_resources(exynos_pcie);
++		if (ret)
++			return ret;
+ 	}
+ 
+ 	ret = exynos_add_pcie_port(exynos_pcie, pdev);
+ 	if (ret < 0)
+-		goto fail_bus_clk;
++		goto fail_probe;
+ 
+ 	platform_set_drvdata(pdev, exynos_pcie);
+ 	return 0;
+ 
+-fail_bus_clk:
+-	clk_disable_unprepare(exynos_pcie->bus_clk);
+-fail_clk:
+-	clk_disable_unprepare(exynos_pcie->clk);
++fail_probe:
++	if (exynos_pcie->ops && exynos_pcie->ops->deinit_clk_resources)
++		exynos_pcie->ops->deinit_clk_resources(exynos_pcie);
+ 	return ret;
+ }
+ 
+@@ -573,14 +660,15 @@ static int __exit exynos_pcie_remove(struct platform_device *pdev)
+ {
+ 	struct exynos_pcie *exynos_pcie = platform_get_drvdata(pdev);
+ 
+-	clk_disable_unprepare(exynos_pcie->bus_clk);
+-	clk_disable_unprepare(exynos_pcie->clk);
++	if (exynos_pcie->ops && exynos_pcie->ops->deinit_clk_resources)
++		exynos_pcie->ops->deinit_clk_resources(exynos_pcie);
+ 
+ 	return 0;
+ }
+ 
+ static const struct of_device_id exynos_pcie_of_match[] = {
+-	{ .compatible = "samsung,exynos5440-pcie", },
++	{	.compatible = "samsung,exynos5440-pcie",
++		.data = &exynos5440_pcie_ops },
+ 	{},
+ };
+ 
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+2.7.4
