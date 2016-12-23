@@ -1,22 +1,50 @@
-From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Fri, 23 Dec 2016 16:07:49 +0300
-Subject: arm64: mm: bug around swiotlb_dma_ops
-In-Reply-To: <549c88f2-4a17-1b92-4478-e58aa0dd104f@cogentembedded.com>
-References: <8862fe21-0a82-a09a-c1cb-aa79d46179ec@cogentembedded.com>
- <2687486.uRNLKRAd5t@wuerfel>
- <549c88f2-4a17-1b92-4478-e58aa0dd104f@cogentembedded.com>
-Message-ID: <63639fa4-240b-0f7b-1adb-b79b2f33bef8@cogentembedded.com>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Fri, 23 Dec 2016 14:09:21 +0100
+Subject: [PATCH v7 3/5] ARM: dts: stm32: Add I2C1 support for STM32F429 SoC
+In-Reply-To: <20161222191103.vzmfhnrtrzw2ivwa@pengutronix.de>
+References: <1482413704-17531-1-git-send-email-cedric.madianga@gmail.com>
+ <1482413704-17531-4-git-send-email-cedric.madianga@gmail.com>
+ <20161222191103.vzmfhnrtrzw2ivwa@pengutronix.de>
+Message-ID: <CAOAejn1zHMFNiGc-wVbbkC1-JFzG3sjnnUJogtCp9EeAkWsV5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> If trying to avoid big changes and only fixing particular problem with
-> particular device not working on arm64, I think best way is to
-> alter__swiotlb_dma_supported() in arch/arm64/mm/dma-mapping.c to detect
-> and decline (with -EIO) mask that is unsupported by device connection.
-> This will cover both dma_mask and coherent_dma_mask.
-> 
-> This has to be combined with some way to explicitly extract information
-> about limitations. Checking device parent's dma masks won't work unless
-> somebody bothers to populate them.
+Hi,
 
-I'm trying to bring together a patch doing this, will post that when ready
+
+2016-12-22 20:11 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello,
+>
+> On Thu, Dec 22, 2016 at 02:35:02PM +0100, M'boumba Cedric Madianga wrote:
+>> @@ -337,6 +350,16 @@
+>>                                       slew-rate = <2>;
+>>                               };
+>>                       };
+>> +
+>> +                     i2c1_pins_b: i2c1 at 0 {
+>> +                             pins1 {
+>> +                                     pinmux = <STM32F429_PB9_FUNC_I2C1_SDA>;
+>> +                                     drive-open-drain;
+>> +                             };
+>> +                             pins2 {
+>> +                                     pinmux = <STM32F429_PB6_FUNC_I2C1_SCL>;
+>> +                             };
+>
+> the second doesn't need the open-drain property? Why?
+I thought that open-drain was only needed for SDA line.
+But after double-checking I2C specification, it seems that SDA and SCL
+lines need open-drain or open-collector to perform the wired-AND
+function.
+I will do some trials with this config and will fix it in the V8.
+Thanks
+
+>
+>> +                     };
+>>               };
+>
+> Best regards
+> Uwe
+>
+> --
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
