@@ -1,61 +1,133 @@
-From: xypron.glpk@gmx.de (Heinrich Schuchardt)
-Date: Fri, 23 Dec 2016 16:01:08 +0100
-Subject: [PATCH 1/1] MMC: meson: avoid possible NULL dereference
-Message-ID: <20161223150108.9229-1-xypron.glpk@gmx.de>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Fri, 23 Dec 2016 16:13:24 +0100
+Subject: [RFC v4 15/16] vfio/type1: Check MSI remapping at irq domain level
+In-Reply-To: <CANHdaibH3GCFhM4nXh1KJoFhZCodtWo7KfP7AcSoVD0HwjDWfg@mail.gmail.com>
+References: <1481661034-3088-1-git-send-email-eric.auger@redhat.com>
+ <1481661034-3088-16-git-send-email-eric.auger@redhat.com>
+ <HE1PR04MB13219CC90CE2BBE62356D94CFF920@HE1PR04MB1321.eurprd04.prod.outlook.com>
+ <3ead0cc1-7798-3e39-da56-c18a5989c00c@redhat.com>
+ <CANHdaibH3GCFhM4nXh1KJoFhZCodtWo7KfP7AcSoVD0HwjDWfg@mail.gmail.com>
+Message-ID: <72057deb-cc71-33f1-e96a-ed2c96a99c3b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No actual segmentation faults were observed but the coding is
-at least inconsistent.
+Hi Geetha,
 
-irqreturn_t meson_mmc_irq():
+On 23/12/2016 14:33, Geetha Akula wrote:
+> Hi Eric,
+> 
+> Seeing same issue reported by Diana on ThunderX with you
+> v4.9-reserved-v4 branch.
+> Vfio passthough work fine when allow_unsafe_interrupts is set.
+Thank you for testing! I will fix the security assessment by better
+studying flag propagation in domain hierarchy.
 
-We should not dereference host before checking it.
+Best Regards
 
-meson_mmc_irq_thread():
+Eric
 
-If cmd or mrq are NULL we should not dereference them after
-writing a warning.
-
-Fixes: 51c5d8447bd7 MMC: meson: initial support for GX platforms
-Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
----
- drivers/mmc/host/meson-gx-mmc.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-index b352760c041e..09739352834c 100644
---- a/drivers/mmc/host/meson-gx-mmc.c
-+++ b/drivers/mmc/host/meson-gx-mmc.c
-@@ -578,13 +578,15 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
- {
- 	struct meson_host *host = dev_id;
- 	struct mmc_request *mrq;
--	struct mmc_command *cmd = host->cmd;
-+	struct mmc_command *cmd;
- 	u32 irq_en, status, raw_status;
- 	irqreturn_t ret = IRQ_HANDLED;
- 
- 	if (WARN_ON(!host))
- 		return IRQ_NONE;
- 
-+	cmd = host->cmd;
-+
- 	mrq = host->mrq;
- 
- 	if (WARN_ON(!mrq))
-@@ -670,10 +672,10 @@ static irqreturn_t meson_mmc_irq_thread(int irq, void *dev_id)
- 	int ret = IRQ_HANDLED;
- 
- 	if (WARN_ON(!mrq))
--		ret = IRQ_NONE;
-+		return IRQ_NONE;
- 
- 	if (WARN_ON(!cmd))
--		ret = IRQ_NONE;
-+		return IRQ_NONE;
- 
- 	data = cmd->data;
- 	if (data) {
--- 
-2.11.0
+> 
+> 
+> Thank you,
+> Geetha.
+> 
+> On Thu, Dec 22, 2016 at 6:32 PM, Auger Eric <eric.auger@redhat.com
+> <mailto:eric.auger@redhat.com>> wrote:
+> 
+>     Hi Diana,
+> 
+>     On 22/12/2016 13:41, Diana Madalina Craciun wrote:
+>     > Hi Eric,
+>     >
+>     > On 12/13/2016 10:32 PM, Eric Auger wrote:
+>     >> In case the IOMMU does not bypass MSI transactions (typical
+>     >> case on ARM), we check all MSI controllers are IRQ remapping
+>     >> capable. If not the IRQ assignment may be unsafe.
+>     >>
+>     >> At this stage the arm-smmu-(v3) still advertise the
+>     >> IOMMU_CAP_INTR_REMAP capability at IOMMU level. This will be
+>     >> removed in subsequent patches.
+>     >>
+>     >> Signed-off-by: Eric Auger <eric.auger@redhat.com
+>     <mailto:eric.auger@redhat.com>>
+>     >> ---
+>     >>  drivers/vfio/vfio_iommu_type1.c | 9 ++++++---
+>     >>  1 file changed, 6 insertions(+), 3 deletions(-)
+>     >>
+>     >> diff --git a/drivers/vfio/vfio_iommu_type1.c
+>     b/drivers/vfio/vfio_iommu_type1.c
+>     >> index d07fe73..a05648b 100644
+>     >> --- a/drivers/vfio/vfio_iommu_type1.c
+>     >> +++ b/drivers/vfio/vfio_iommu_type1.c
+>     >> @@ -37,6 +37,7 @@
+>     >>  #include <linux/vfio.h>
+>     >>  #include <linux/workqueue.h>
+>     >>  #include <linux/dma-iommu.h>
+>     >> +#include <linux/irqdomain.h>
+>     >>
+>     >>  #define DRIVER_VERSION  "0.2"
+>     >>  #define DRIVER_AUTHOR   "Alex Williamson
+>     <alex.williamson at redhat.com <mailto:alex.williamson@redhat.com>>"
+>     >> @@ -765,7 +766,7 @@ static int vfio_iommu_type1_attach_group(void
+>     *iommu_data,
+>     >>      struct vfio_domain *domain, *d;
+>     >>      struct bus_type *bus = NULL;
+>     >>      int ret;
+>     >> -    bool resv_msi;
+>     >> +    bool resv_msi, msi_remap;
+>     >>      phys_addr_t resv_msi_base;
+>     >>
+>     >>      mutex_lock(&iommu->lock);
+>     >> @@ -818,8 +819,10 @@ static int
+>     vfio_iommu_type1_attach_group(void *iommu_data,
+>     >>      INIT_LIST_HEAD(&domain->group_list);
+>     >>      list_add(&group->next, &domain->group_list);
+>     >>
+>     >> -    if (!allow_unsafe_interrupts &&
+>     >> -        !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
+>     >> +    msi_remap = resv_msi ? irq_domain_check_msi_remap() :
+>     >> +                           iommu_capable(bus, IOMMU_CAP_INTR_REMAP);
+>     >> +
+>     >> +    if (!allow_unsafe_interrupts && !msi_remap) {
+>     >>              pr_warn("%s: No interrupt remapping support.  Use
+>     the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU
+>     support on this platform\n",
+>     >>                     __func__);
+>     >>              ret = -EPERM;
+>     >
+>     > I tested your v4.9-reserved-v4 branch on a ITS capable hardware (NXP
+>     > LS2080), so I did not set allow_unsafe_interrupts. It fails here
+>     > complaining that the there is no interrupt remapping support. The
+>     > irq_domain_check_msi_remap function returns false as none of the
+>     checked
+>     > domains has the IRQ_DOMAIN_FLAG_MSI_REMAP flag set. I think the reason
+>     > is that the flags are not propagated through the domain hierarchy when
+>     > the domain is created.
+> 
+>     Hum OK. Please apologize for the inconvenience, all the more so this is
+>     the second time you report the same issue for different cause :-( At the
+>     moment I can't test on a GICv3 ITS based system. I will try to fix that
+>     though.
+> 
+>     I would like to get the confirmation introducing this flag is the right
+>     direction though.
+> 
+>     Thanks
+> 
+>     Eric
+>     >
+>     > Thanks,
+>     >
+>     > Diana
+>     >
+>     >
+>     >
+> 
+>     _______________________________________________
+>     linux-arm-kernel mailing list
+>     linux-arm-kernel at lists.infradead.org
+>     <mailto:linux-arm-kernel@lists.infradead.org>
+>     http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>     <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>
+> 
+> 
