@@ -1,76 +1,134 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Sat, 24 Dec 2016 00:14:58 +0900
-Subject: [PATCH v4] mm: pmd dirty emulation in page fault handler
-Message-ID: <1482506098-6149-1-git-send-email-minchan@kernel.org>
+From: Jose.Abreu@synopsys.com (Jose Abreu)
+Date: Fri, 23 Dec 2016 15:36:45 +0000
+Subject: [PATCH v2 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
+ stores scenario in vdma
+In-Reply-To: <1482483135-14767-3-git-send-email-appanad@xilinx.com>
+References: <1482483135-14767-1-git-send-email-appanad@xilinx.com>
+ <1482483135-14767-3-git-send-email-appanad@xilinx.com>
+Message-ID: <a269409d-103e-1650-5df6-cc8743ed62cf@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
-http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
+Hi Kedar,
 
-The problem is currently page fault handler doesn't supports dirty bit
-emulation of pmd for non-HW dirty-bit architecture so that application
-stucks until VM marked the pmd dirty.
 
-How the emulation work depends on the architecture. In case of arm64,
-when it set up pte firstly, it sets pte PTE_RDONLY to get a chance to
-mark the pte dirty via triggering page fault when store access happens.
-Once the page fault occurs, VM marks the pmd dirty and arch code for
-setting pmd will clear PTE_RDONLY for application to proceed.
+On 23-12-2016 08:52, Kedareswara rao Appana wrote:
+> When VDMA is configured for more than one frame in the h/w
+> for example h/w is configured for n number of frames and user
+> Submits n number of frames and triggered the DMA using issue_pending API.
+> In the current driver flow we are submitting one frame at a time
+> but we should submit all the n number of frames at one time as the h/w
+> Is configured for n number of frames.
+>
+> This patch fixes this issue.
+>
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+> Changes for v2:
+> ---> Fixed race conditions in the driver as suggested by Jose Abreu
+> ---> Fixed unnecessray if else checks in the vdma_start_transfer
+>      as suggested by Laurent Pinchart.
+>
+>  drivers/dma/xilinx/xilinx_dma.c | 54 +++++++++++++++++++++++------------------
+>  1 file changed, 31 insertions(+), 23 deletions(-)
+>
+> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+> index be7eb41..cf9edd8 100644
+> --- a/drivers/dma/xilinx/xilinx_dma.c
+> +++ b/drivers/dma/xilinx/xilinx_dma.c
+> @@ -1052,25 +1052,38 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
+>  	if (chan->has_sg) {
+>  		dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
+>  				tail_segment->phys);
+> +		list_splice_tail_init(&chan->pending_list, &chan->active_list);
+> +		chan->desc_pendingcount = 0;
+>  	} else {
+>  		struct xilinx_vdma_tx_segment *segment, *last = NULL;
+> -		int i = 0;
+> +		int i = 0, j = 0;
+>  
+>  		if (chan->desc_submitcount < chan->num_frms)
+>  			i = chan->desc_submitcount;
+>  
+> -		list_for_each_entry(segment, &desc->segments, node) {
+> -			if (chan->ext_addr)
+> -				vdma_desc_write_64(chan,
+> -					XILINX_VDMA_REG_START_ADDRESS_64(i++),
+> -					segment->hw.buf_addr,
+> -					segment->hw.buf_addr_msb);
+> -			else
+> -				vdma_desc_write(chan,
+> -					XILINX_VDMA_REG_START_ADDRESS(i++),
+> -					segment->hw.buf_addr);
+> -
+> -			last = segment;
+> +		for (j = 0; j < chan->num_frms; ) {
+> +			list_for_each_entry(segment, &desc->segments, node) {
+> +				if (chan->ext_addr)
+> +					vdma_desc_write_64(chan,
+> +					  XILINX_VDMA_REG_START_ADDRESS_64(i++),
+> +					  segment->hw.buf_addr,
+> +					  segment->hw.buf_addr_msb);
+> +				else
+> +					vdma_desc_write(chan,
+> +					    XILINX_VDMA_REG_START_ADDRESS(i++),
+> +					    segment->hw.buf_addr);
+> +
+> +				last = segment;
+> +			}
+> +			list_del(&desc->node);
+> +			list_add_tail(&desc->node, &chan->active_list);
+> +			j++;
+> +			if (list_empty(&chan->pending_list) ||
+> +			    (i == chan->num_frms))
+> +				break;
+> +			desc = list_first_entry(&chan->pending_list,
+> +						struct xilinx_dma_tx_descriptor,
+> +						node);
+>  		}
+>  
+>  		if (!last)
+> @@ -1081,20 +1094,14 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
+>  		vdma_desc_write(chan, XILINX_DMA_REG_FRMDLY_STRIDE,
+>  				last->hw.stride);
+>  		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last->hw.vsize);
 
-IOW, if VM doesn't mark the pmd dirty, application hangs forever by
-repeated fault(i.e., store op but the pmd is PTE_RDONLY).
+What if we reach here and j < num_frms? It can happen because if
+the pending list is empty the loop breaks. Then VDMA will start
+with framebuffers having address 0x0. You should only program
+vsize when j > num_frms or when we have already previously set
+the framebuffers (i.e. when submitcount has already been
+incremented num_frms at least once).
 
-This patch enables pmd dirty-bit emulation for those architectures.
+Best regards,
+Jose Miguel Abreu
 
-[1] b8d3c4c3009d, mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called
-
-Cc: Jason Evans <je@fb.com>
-Cc: Michal Hocko <mhocko@suse.com> 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: linux-arch at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: <stable@vger.kernel.org> [4.5+]
-Fixes: b8d3c4c3009d ("mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called")
-Reported-and-Tested-by: Andreas Schwab <schwab@suse.de>
-Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-Signed-off-by: Minchan Kim <minchan@kernel.org>
----
-  Merry Xmas!
-
-* from v3
-  * Elaborate description
-* from v2
-  * Add acked-by/tested-by
-* from v1
-  * Remove __handle_mm_fault part - Kirill
- mm/huge_memory.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/mm/huge_memory.c b/mm/huge_memory.c
-index 10eedbf..29ec8a4 100644
---- a/mm/huge_memory.c
-+++ b/mm/huge_memory.c
-@@ -883,15 +883,17 @@ void huge_pmd_set_accessed(struct vm_fault *vmf, pmd_t orig_pmd)
- {
- 	pmd_t entry;
- 	unsigned long haddr;
-+	bool write = vmf->flags & FAULT_FLAG_WRITE;
- 
- 	vmf->ptl = pmd_lock(vmf->vma->vm_mm, vmf->pmd);
- 	if (unlikely(!pmd_same(*vmf->pmd, orig_pmd)))
- 		goto unlock;
- 
- 	entry = pmd_mkyoung(orig_pmd);
-+	if (write)
-+		entry = pmd_mkdirty(entry);
- 	haddr = vmf->address & HPAGE_PMD_MASK;
--	if (pmdp_set_access_flags(vmf->vma, haddr, vmf->pmd, entry,
--				vmf->flags & FAULT_FLAG_WRITE))
-+	if (pmdp_set_access_flags(vmf->vma, haddr, vmf->pmd, entry, write))
- 		update_mmu_cache_pmd(vmf->vma, vmf->address, vmf->pmd);
- 
- unlock:
--- 
-2.7.4
+> -	}
+>  
+> -	chan->idle = false;
+> -	if (!chan->has_sg) {
+> -		list_del(&desc->node);
+> -		list_add_tail(&desc->node, &chan->active_list);
+> -		chan->desc_submitcount++;
+> -		chan->desc_pendingcount--;
+> +		chan->desc_submitcount += j;
+> +		chan->desc_pendingcount -= j;
+>  		if (chan->desc_submitcount == chan->num_frms)
+>  			chan->desc_submitcount = 0;
+> -	} else {
+> -		list_splice_tail_init(&chan->pending_list, &chan->active_list);
+> -		chan->desc_pendingcount = 0;
+>  	}
+> +
+> +	chan->idle = false;
+>  }
+>  
+>  /**
+> @@ -1342,6 +1349,7 @@ static int xilinx_dma_reset(struct xilinx_dma_chan *chan)
+>  
+>  	chan->err = false;
+>  	chan->idle = true;
+> +	chan->desc_submitcount = 0;
+>  
+>  	return err;
+>  }
