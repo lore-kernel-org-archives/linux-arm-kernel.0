@@ -1,220 +1,330 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Fri, 23 Dec 2016 15:04:26 +0800
-Subject: [PATCH v5 3/6] arm64: arch_timer: Work around Erratum Hisilicon-161601
-In-Reply-To: <1482476669-15596-1-git-send-email-dingtianhong@huawei.com>
-References: <1482476669-15596-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <1482476669-15596-4-git-send-email-dingtianhong@huawei.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Fri, 23 Dec 2016 15:24:38 +0800
+Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
+In-Reply-To: <585C815B.4030000@hisilicon.com>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1478576829-112707-2-git-send-email-yuanzhichang@hisilicon.com>
+ <CACVXFVNS9n9_ty8y3CyqfRaLitqDKdk1mMOrQHM-enOgJtUBeQ@mail.gmail.com>
+ <585C815B.4030000@hisilicon.com>
+Message-ID: <CACVXFVOfsVKpVt0p61kywT1D3YUYTEoi+tm1TK0opSt7xN5wtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Erratum Hisilicon-161601 says that the ARM generic timer counter "has the
-potential to contain an erroneous value when the timer value changes".
-Accesses to TVAL (both read and write) are also affected due to the implicit counter
-read.  Accesses to CVAL are not affected.
+On Fri, Dec 23, 2016 at 9:43 AM, zhichang.yuan
+<yuanzhichang@hisilicon.com> wrote:
+> Hi?Ming,
+>
+>
+> On 2016/12/22 16:15, Ming Lei wrote:
+>> Hi Guys,
+>>
+>> On Tue, Nov 8, 2016 at 11:47 AM, zhichang.yuan
+>> <yuanzhichang@hisilicon.com> wrote:
+>>> For arm64, there is no I/O space as other architectural platforms, such as
+>>> X86. Most I/O accesses are achieved based on MMIO. But for some arm64 SoCs,
+>>> such as Hip06, when accessing some legacy ISA devices connected to LPC, those
+>>> known port addresses are used to control the corresponding target devices, for
+>>> example, 0x2f8 is for UART, 0xe4 is for ipmi-bt. It is different from the
+>>> normal MMIO mode in using.
+>>>
+>>> To drive these devices, this patch introduces a method named indirect-IO.
+>>> In this method the in/out pair in arch/arm64/include/asm/io.h will be
+>>> redefined. When upper layer drivers call in/out with those known legacy port
+>>> addresses to access the peripherals, the hooking functions corrresponding to
+>>> those target peripherals will be called. Through this way, those upper layer
+>>> drivers which depend on in/out can run on Hip06 without any changes.
+>>>
+>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
+>>> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+>>> ---
+>>>  arch/arm64/Kconfig             |  6 +++
+>>>  arch/arm64/include/asm/extio.h | 94 ++++++++++++++++++++++++++++++++++++++++++
+>>>  arch/arm64/include/asm/io.h    | 29 +++++++++++++
+>>>  arch/arm64/kernel/Makefile     |  1 +
+>>>  arch/arm64/kernel/extio.c      | 27 ++++++++++++
+>>>  5 files changed, 157 insertions(+)
+>>
+>> When I applied these three patches against current linus tree and
+>> enable CONFIG_HISILICON_LPC, the following build failure[1] is
+>> triggered when running 'make modules'.
+>>
+>
+> Thanks for your report!
+>
+> This patch has compilation issue on some architectures, sorry for the inconvenience caused by this!
+> The ongoing v6 will solve these issues.
+> I will trace this failure and provide a fix if you can not wait for the next version.
+>
+> Could you send me your .config in private? I don't want to bother all the hacker in the mail-list.
+>
 
-The workaround is to reread the system count registers until the value of the second
-read is larger than the first one by less than 32, the system counter can be guaranteed
-not to return wrong value twice by back-to-back read and the error value is always larger
-than the correct one by 32. Writes to TVAL are replaced with an equivalent write to CVAL.
+Sure, please see the config in attachment.
 
-The workaround is enabled if the hisilicon,erratum-161601 property is found in
-the timer node in the device tree. This can be overridden with the
-clocksource.arm_arch_timer.hisilicon-161601 boot parameter, which allows KVM
-users to enable the workaround until a mechanism is implemented to
-automatically communicate this information.
+>
+> Thanks,
+> Zhichang
+>
+>>
+>> Thanks,
+>> Ming
+>>
+>> [1] 'make modules' failure log
+>>
+>>   Building modules, stage 2.
+>>   MODPOST 2260 modules
+>> ERROR: "inb" [drivers/watchdog/wdt_pci.ko] undefined!
+>> ERROR: "outb" [drivers/watchdog/wdt_pci.ko] undefined!
+>> ERROR: "outb" [drivers/watchdog/pcwd_pci.ko] undefined!
+>> ERROR: "inb" [drivers/watchdog/pcwd_pci.ko] undefined!
+>> ERROR: "outw" [drivers/video/vgastate.ko] undefined!
+>> ERROR: "outb" [drivers/video/vgastate.ko] undefined!
+>> ERROR: "inb" [drivers/video/vgastate.ko] undefined!
+>> ERROR: "outw" [drivers/video/fbdev/vt8623fb.ko] undefined!
+>> ERROR: "inb" [drivers/video/fbdev/vt8623fb.ko] undefined!
+>> ERROR: "outb" [drivers/video/fbdev/vt8623fb.ko] undefined!
+>> ERROR: "outw" [drivers/video/fbdev/tridentfb.ko] undefined!
+>> ERROR: "inb" [drivers/video/fbdev/tridentfb.ko] undefined!
+>> ERROR: "outb" [drivers/video/fbdev/tridentfb.ko] undefined!
+>> ERROR: "inb" [drivers/video/fbdev/tdfxfb.ko] undefined!
+>> .....
+>> ERROR: "inb" [drivers/ata/pata_cmd64x.ko] undefined!
+>> ERROR: "inb" [drivers/ata/pata_artop.ko] undefined!
+>> scripts/Makefile.modpost:91: recipe for target '__modpost' failed
+>> make[1]: *** [__modpost] Error 1
+>> Makefile:1196: recipe for target 'modules' failed
+>> make: *** [modules] Error 2
+>>
+>>
+>>>  create mode 100644 arch/arm64/include/asm/extio.h
+>>>  create mode 100644 arch/arm64/kernel/extio.c
+>>>
+>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>> index 969ef88..b44070b 100644
+>>> --- a/arch/arm64/Kconfig
+>>> +++ b/arch/arm64/Kconfig
+>>> @@ -163,6 +163,12 @@ config ARCH_MMAP_RND_COMPAT_BITS_MIN
+>>>  config ARCH_MMAP_RND_COMPAT_BITS_MAX
+>>>         default 16
+>>>
+>>> +config ARM64_INDIRECT_PIO
+>>> +       bool "access peripherals with legacy I/O port"
+>>> +       help
+>>> +         Support special accessors for ISA I/O devices. This is needed for
+>>> +         SoCs that do not support standard read/write for the ISA range.
+>>> +
+>>>  config NO_IOPORT_MAP
+>>>         def_bool y if !PCI
+>>>
+>>> diff --git a/arch/arm64/include/asm/extio.h b/arch/arm64/include/asm/extio.h
+>>> new file mode 100644
+>>> index 0000000..6ae0787
+>>> --- /dev/null
+>>> +++ b/arch/arm64/include/asm/extio.h
+>>> @@ -0,0 +1,94 @@
+>>> +/*
+>>> + * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
+>>> + * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>> + *
+>>> + * You should have received a copy of the GNU General Public License
+>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>> + */
+>>> +
+>>> +#ifndef __LINUX_EXTIO_H
+>>> +#define __LINUX_EXTIO_H
+>>> +
+>>> +struct extio_ops {
+>>> +       unsigned long start;/* inclusive, sys io addr */
+>>> +       unsigned long end;/* inclusive, sys io addr */
+>>> +
+>>> +       u64 (*pfin)(void *devobj, unsigned long ptaddr, size_t dlen);
+>>> +       void (*pfout)(void *devobj, unsigned long ptaddr, u32 outval,
+>>> +                                       size_t dlen);
+>>> +       u64 (*pfins)(void *devobj, unsigned long ptaddr, void *inbuf,
+>>> +                               size_t dlen, unsigned int count);
+>>> +       void (*pfouts)(void *devobj, unsigned long ptaddr,
+>>> +                               const void *outbuf, size_t dlen,
+>>> +                               unsigned int count);
+>>> +       void *devpara;
+>>> +};
+>>> +
+>>> +extern struct extio_ops *arm64_extio_ops;
+>>> +
+>>> +#define DECLARE_EXTIO(bw, type)                                                \
+>>> +extern type in##bw(unsigned long addr);                                        \
+>>> +extern void out##bw(type value, unsigned long addr);                   \
+>>> +extern void ins##bw(unsigned long addr, void *buffer, unsigned int count);\
+>>> +extern void outs##bw(unsigned long addr, const void *buffer, unsigned int count);
+>>> +
+>>> +#define BUILD_EXTIO(bw, type)                                          \
+>>> +type in##bw(unsigned long addr)                                                \
+>>> +{                                                                      \
+>>> +       if (!arm64_extio_ops || arm64_extio_ops->start > addr ||        \
+>>> +                       arm64_extio_ops->end < addr)                    \
+>>> +               return read##bw(PCI_IOBASE + addr);                     \
+>>> +       return arm64_extio_ops->pfin ?                                  \
+>>> +               arm64_extio_ops->pfin(arm64_extio_ops->devpara,         \
+>>> +                       addr, sizeof(type)) : -1;                       \
+>>> +}                                                                      \
+>>> +                                                                       \
+>>> +void out##bw(type value, unsigned long addr)                           \
+>>> +{                                                                      \
+>>> +       if (!arm64_extio_ops || arm64_extio_ops->start > addr ||        \
+>>> +                       arm64_extio_ops->end < addr)                    \
+>>> +               write##bw(value, PCI_IOBASE + addr);                    \
+>>> +       else                                                            \
+>>> +               if (arm64_extio_ops->pfout)                             \
+>>> +                       arm64_extio_ops->pfout(arm64_extio_ops->devpara,\
+>>> +                               addr, value, sizeof(type));             \
+>>> +}                                                                      \
+>>> +                                                                       \
+>>> +void ins##bw(unsigned long addr, void *buffer, unsigned int count)     \
+>>> +{                                                                      \
+>>> +       if (!arm64_extio_ops || arm64_extio_ops->start > addr ||        \
+>>> +                       arm64_extio_ops->end < addr)                    \
+>>> +               reads##bw(PCI_IOBASE + addr, buffer, count);            \
+>>> +       else                                                            \
+>>> +               if (arm64_extio_ops->pfins)                             \
+>>> +                       arm64_extio_ops->pfins(arm64_extio_ops->devpara,\
+>>> +                               addr, buffer, sizeof(type), count);     \
+>>> +}                                                                      \
+>>> +                                                                       \
+>>> +void outs##bw(unsigned long addr, const void *buffer, unsigned int count)      \
+>>> +{                                                                      \
+>>> +       if (!arm64_extio_ops || arm64_extio_ops->start > addr ||        \
+>>> +                       arm64_extio_ops->end < addr)                    \
+>>> +               writes##bw(PCI_IOBASE + addr, buffer, count);           \
+>>> +       else                                                            \
+>>> +               if (arm64_extio_ops->pfouts)                            \
+>>> +                       arm64_extio_ops->pfouts(arm64_extio_ops->devpara,\
+>>> +                               addr, buffer, sizeof(type), count);     \
+>>> +}
+>>> +
+>>> +static inline void arm64_set_extops(struct extio_ops *ops)
+>>> +{
+>>> +       if (ops)
+>>> +               WRITE_ONCE(arm64_extio_ops, ops);
+>>> +}
+>>> +
+>>> +#endif /* __LINUX_EXTIO_H*/
+>>> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+>>> index 0bba427..136735d 100644
+>>> --- a/arch/arm64/include/asm/io.h
+>>> +++ b/arch/arm64/include/asm/io.h
+>>> @@ -31,6 +31,7 @@
+>>>  #include <asm/early_ioremap.h>
+>>>  #include <asm/alternative.h>
+>>>  #include <asm/cpufeature.h>
+>>> +#include <asm/extio.h>
+>>>
+>>>  #include <xen/xen.h>
+>>>
+>>> @@ -149,6 +150,34 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+>>>  #define IO_SPACE_LIMIT         (PCI_IO_SIZE - 1)
+>>>  #define PCI_IOBASE             ((void __iomem *)PCI_IO_START)
+>>>
+>>> +
+>>> +/*
+>>> + * redefine the in(s)b/out(s)b for indirect-IO.
+>>> + */
+>>> +#ifdef CONFIG_ARM64_INDIRECT_PIO
+>>> +#define inb inb
+>>> +#define outb outb
+>>> +#define insb insb
+>>> +#define outsb outsb
+>>> +/* external declaration */
+>>> +DECLARE_EXTIO(b, u8)
+>>> +
+>>> +#define inw inw
+>>> +#define outw outw
+>>> +#define insw insw
+>>> +#define outsw outsw
+>>> +
+>>> +DECLARE_EXTIO(w, u16)
+>>> +
+>>> +#define inl inl
+>>> +#define outl outl
+>>> +#define insl insl
+>>> +#define outsl outsl
+>>> +
+>>> +DECLARE_EXTIO(l, u32)
+>>> +#endif
+>>> +
+>>> +
+>>>  /*
+>>>   * String version of I/O memory access operations.
+>>>   */
+>>> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+>>> index 7d66bba..60e0482 100644
+>>> --- a/arch/arm64/kernel/Makefile
+>>> +++ b/arch/arm64/kernel/Makefile
+>>> @@ -31,6 +31,7 @@ arm64-obj-$(CONFIG_COMPAT)            += sys32.o kuser32.o signal32.o         \
+>>>                                            sys_compat.o entry32.o
+>>>  arm64-obj-$(CONFIG_FUNCTION_TRACER)    += ftrace.o entry-ftrace.o
+>>>  arm64-obj-$(CONFIG_MODULES)            += arm64ksyms.o module.o
+>>> +arm64-obj-$(CONFIG_ARM64_INDIRECT_PIO) += extio.o
+>>>  arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)  += module-plts.o
+>>>  arm64-obj-$(CONFIG_PERF_EVENTS)                += perf_regs.o perf_callchain.o
+>>>  arm64-obj-$(CONFIG_HW_PERF_EVENTS)     += perf_event.o
+>>> diff --git a/arch/arm64/kernel/extio.c b/arch/arm64/kernel/extio.c
+>>> new file mode 100644
+>>> index 0000000..647b3fa
+>>> --- /dev/null
+>>> +++ b/arch/arm64/kernel/extio.c
+>>> @@ -0,0 +1,27 @@
+>>> +/*
+>>> + * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
+>>> + * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>> + *
+>>> + * You should have received a copy of the GNU General Public License
+>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>> + */
+>>> +
+>>> +#include <linux/io.h>
+>>> +
+>>> +struct extio_ops *arm64_extio_ops;
+>>> +
+>>> +
+>>> +BUILD_EXTIO(b, u8)
+>>> +
+>>> +BUILD_EXTIO(w, u16)
+>>> +
+>>> +BUILD_EXTIO(l, u32)
+>>> --
+>>> 1.9.1
+>>>
+>>
+>>
+>>
+>
 
-Fix some description for fsl erratum a008585.
 
-v2: Significant rework based on feedback, including seperate the fsl erratum a008585
-    to another patch, update the erratum name and remove unwanted code.
 
-v3: Significant rework based on feedback, including fix some alignment problem, make the
-    #define __hisi_161601_read_reg to be private to the .c file instead of being globally
-    visible, add more accurate annotation and modify a bit of logical format to enable
-    arch_timer_read_ool_enabled, remove the kernel commandline parameter
-    clocksource.arm_arch_timer.hisilicon-161601.
-
-v5: Theoretically the erratum should not occur more than twice in succession when reading
-    the system counter, but it is possible that some interrupts may lead to more than twice
-    read errors, triggering the warning, so setting the number of retries to 50 which is far
-    beyond the number of iterations the loop has been observed to take.
-
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
----
- Documentation/arm64/silicon-errata.txt |  1 +
- arch/arm64/include/asm/arch_timer.h    |  2 +-
- drivers/clocksource/Kconfig            |  9 +++++
- drivers/clocksource/arm_arch_timer.c   | 70 +++++++++++++++++++++++++++++++---
- 4 files changed, 76 insertions(+), 6 deletions(-)
-
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index 405da11..1c1a95f 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -63,3 +63,4 @@ stable kernels.
- | Cavium         | ThunderX SMMUv2 | #27704          | N/A		       |
- |                |                 |                 |                         |
- | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585     |
-+| Hisilicon      | Hip0{5,6,7}     | #161601         | HISILICON_ERRATUM_161601|
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index f882c7c..ebf4cde 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -29,7 +29,7 @@
- 
- #include <clocksource/arm_arch_timer.h>
- 
--#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585)
-+#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585) || IS_ENABLED(CONFIG_HISILICON_ERRATUM_161601)
- extern struct static_key_false arch_timer_read_ool_enabled;
- #define needs_unstable_timer_counter_workaround() \
- 	static_branch_unlikely(&arch_timer_read_ool_enabled)
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 4866f7a..162d820 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -335,6 +335,15 @@ config FSL_ERRATUM_A008585
- 	  value").  The workaround will only be active if the
- 	  fsl,erratum-a008585 property is found in the timer node.
- 
-+config HISILICON_ERRATUM_161601
-+	bool "Workaround for Hisilicon Erratum 161601"
-+	default y
-+	depends on ARM_ARCH_TIMER && ARM64
-+	help
-+	  This option enables a workaround for Hisilicon Erratum
-+	  161601. The workaround will be active if the hisilicon,erratum-161601
-+	  property is found in the timer node.
-+
- config ARM_GLOBAL_TIMER
- 	bool "Support for the ARM global timer" if COMPILE_TEST
- 	select CLKSRC_OF if OF
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index e7406ad..9a82496 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -95,15 +95,18 @@ static int __init early_evtstrm_cfg(char *buf)
-  * Architected system timer support.
-  */
- 
--#ifdef CONFIG_FSL_ERRATUM_A008585
-+#if CONFIG_FSL_ERRATUM_A008585 || IS_ENABLED(CONFIG_HISILICON_ERRATUM_161601)
- struct arch_timer_erratum_workaround *timer_unstable_counter_workaround = NULL;
- EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
- 
- #define        FSL_A008585	0x0001
-+#define        HISILICON_161601	0x0002
- 
- DEFINE_STATIC_KEY_FALSE(arch_timer_read_ool_enabled);
- EXPORT_SYMBOL_GPL(arch_timer_read_ool_enabled);
-+#endif
- 
-+#ifdef CONFIG_FSL_ERRATUM_A008585
- /*
-  * The number of retries is an arbitrary value well beyond the highest number
-  * of iterations the loop has been observed to take.
-@@ -145,6 +148,54 @@ static u64 fsl_a008585_read_cntvct_el0(void)
- };
- #endif /* CONFIG_FSL_ERRATUM_A008585 */
- 
-+#ifdef CONFIG_HISILICON_ERRATUM_161601
-+/*
-+ * Verify whether the value of the second read is larger than the first by
-+ * less than 32 is the only way to confirm the value is correct, so clear the
-+ * lower 5 bits to check whether the difference is greater than 32 or not.
-+ * Theoretically the erratum should not occur more than twice in succession
-+ * when reading the system counter, but it is possible that some interrupts
-+ * may lead to more than twice read errors, triggering the warning, so setting
-+ * the number of retries far beyond the number of iterations the loop has been
-+ * observed to take.
-+ */
-+#define __hisi_161601_read_reg(reg) ({				\
-+	u64 _old, _new;						\
-+	int _retries = 50;					\
-+								\
-+	do {							\
-+		_old = read_sysreg(reg);			\
-+		_new = read_sysreg(reg);			\
-+		_retries--;					\
-+	} while (unlikely((_new - _old) >> 5) && _retries);	\
-+								\
-+	WARN_ON_ONCE(!_retries);				\
-+	_new;							\
-+})
-+
-+static u32 hisi_161601_read_cntp_tval_el0(void)
-+{
-+	return __hisi_161601_read_reg(cntp_tval_el0);
-+}
-+
-+static  u32 hisi_161601_read_cntv_tval_el0(void)
-+{
-+	return __hisi_161601_read_reg(cntv_tval_el0);
-+}
-+
-+static u64 hisi_161601_read_cntvct_el0(void)
-+{
-+	return __hisi_161601_read_reg(cntvct_el0);
-+}
-+
-+static struct arch_timer_erratum_workaround arch_timer_hisi_161601 = {
-+	.erratum = HISILICON_161601,
-+	.read_cntp_tval_el0 = hisi_161601_read_cntp_tval_el0,
-+	.read_cntv_tval_el0 = hisi_161601_read_cntv_tval_el0,
-+	.read_cntvct_el0 = hisi_161601_read_cntvct_el0,
-+};
-+#endif /* CONFIG_HISILICON_ERRATUM_161601 */
-+
- static __always_inline
- void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val,
- 			  struct clock_event_device *clk)
-@@ -294,7 +345,7 @@ static __always_inline void set_next_event(const int access, unsigned long evt,
- 	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
- }
- 
--#ifdef CONFIG_FSL_ERRATUM_A008585
-+#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585) || IS_ENABLED(CONFIG_HISILICON_ERRATUM_161601)
- static __always_inline void erratum_set_next_event_generic(const int access,
- 		unsigned long evt, struct clock_event_device *clk)
- {
-@@ -358,7 +409,7 @@ static int arch_timer_set_next_event_phys_mem(unsigned long evt,
- 
- static void erratum_workaround_set_sne(struct clock_event_device *clk)
- {
--#ifdef CONFIG_FSL_ERRATUM_A008585
-+#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585) || IS_ENABLED(CONFIG_HISILICON_ERRATUM_161601)
- 	if (!static_branch_unlikely(&arch_timer_read_ool_enabled))
- 		return;
- 
-@@ -618,7 +669,7 @@ static void __init arch_counter_register(unsigned type)
- 
- 		clocksource_counter.archdata.vdso_direct = true;
- 
--#ifdef CONFIG_FSL_ERRATUM_A008585
-+#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585) || IS_ENABLED(CONFIG_HISILICON_ERRATUM_161601)
- 		/*
- 		 * Don't use the vdso fastpath if errata require using
- 		 * the out-of-line counter accessor.
-@@ -909,10 +960,19 @@ static int __init arch_timer_of_init(struct device_node *np)
- #ifdef CONFIG_FSL_ERRATUM_A008585
- 	if (!timer_unstable_counter_workaround && of_property_read_bool(np, "fsl,erratum-a008585"))
- 		timer_unstable_counter_workaround = &arch_timer_fsl_a008585;
-+#endif
-+
-+#ifdef CONFIG_HISILICON_ERRATUM_161601
-+	if (!timer_unstable_counter_workaround && of_property_read_bool(np, "hisilicon,erratum-161601"))
-+		timer_unstable_counter_workaround = &arch_timer_hisi_161601;
-+#endif
- 
-+#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585) || IS_ENABLED(CONFIG_HISILICON_ERRATUM_161601)
- 	if (timer_unstable_counter_workaround) {
- 		static_branch_enable(&arch_timer_read_ool_enabled);
--		pr_info("Enabling workaround for FSL erratum A-008585\n");
-+		pr_info("Enabling workaround for %s\n",
-+			timer_unstable_counter_workaround->erratum == FSL_A008585 ?
-+			"FSL ERRATUM A-008585" : "HISILICON ERRATUM 161601");
- 	}
- #endif
- 
--- 
-1.9.0
+Thanks,
+Ming Lei
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: config.tar.gz
+Type: application/x-gzip
+Size: 37193 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161223/4f3c2eff/attachment-0001.bin>
