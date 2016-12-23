@@ -1,71 +1,76 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 23 Dec 2016 13:24:49 +0100
-Subject: [PATCH 9/9] ARM: dts: exynos: Add audio power domain support to
- Exynos542x SoCs
-In-Reply-To: <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
-References: <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20161223122546epcas5p2ebbcb8ca510646698bbd1ddbe0a0e889@epcas5p2.samsung.com>
-Message-ID: <1482495889-6201-10-git-send-email-m.szyprowski@samsung.com>
+Date: Fri, 23 Dec 2016 13:24:40 +0100
+Subject: [PATCH 0/9] Runtime PM for Exynos pin controller driver
+References: <CGME20161223122513epcas1p394d93d72d2d32c8910aafd1f6cc6b5e2@epcas1p3.samsung.com>
+Message-ID: <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Audio power domain includes following hardware modules: Pin controller
-for GPZ bank, AudioSS clock controller, PL330 ADMA device and Exynos I2S
-controller.
+Hello,
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/boot/dts/exynos5420.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+This patchset is a next step to add support for audio power domain on
+Exynos5 SoCs.
 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index 0a7ecdd4c5de..1b6bd9aa42d1 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -188,6 +188,7 @@
- 			clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MAU_EPLL>,
- 				 <&clock CLK_SCLK_MAUDIO0>, <&clock CLK_SCLK_MAUPCM0>;
- 			clock-names = "pll_ref", "pll_in", "sclk_audio", "sclk_pcm_in";
-+			power-domains = <&mau_pd>;
- 		};
- 
- 		mfc: codec at 11000000 {
-@@ -317,6 +318,12 @@
- 			clock-names = "oscclk", "clk0", "clk1", "clk2", "asb0", "asb1";
- 		};
- 
-+		mau_pd: power-domain at 100440E0 {
-+			compatible = "samsung,exynos4210-pd";
-+			reg = <0x100440E0 0x20>;
-+			#power-domain-cells = <0>;
-+		};
-+
- 		pinctrl_0: pinctrl at 13400000 {
- 			compatible = "samsung,exynos5420-pinctrl";
- 			reg = <0x13400000 0x1000>;
-@@ -356,6 +363,7 @@
- 			reg = <0x03860000 0x1000>;
- 			interrupts = <0 47 IRQ_TYPE_LEVEL_HIGH>;
- 			samsung,pmu-syscon = <&pmu_system_controller>;
-+			power-domains = <&mau_pd>;
- 		};
- 
- 		amba {
-@@ -374,6 +382,7 @@
- 				#dma-cells = <1>;
- 				#dma-channels = <6>;
- 				#dma-requests = <16>;
-+				power-domains = <&mau_pd>;
- 			};
- 
- 			pdma0: pdma at 121A0000 {
-@@ -447,6 +456,7 @@
- 			pinctrl-names = "default", "sleep";
- 			pinctrl-0 = <&i2s0_bus>;
- 			pinctrl-1 = <&i2s0_bus_slp>;
-+			power-domains = <&mau_pd>;
- 			status = "disabled";
- 		};
- 
+Audio power domain on Exynos5 SoCs contains following hardware modules:
+1. clock controller
+2. pin controller
+3. PL330 DMA controller
+4. I2S audio controller
+
+Till now it was assumed that pin controller is located in the "always on"
+power domain and lacked runtime power management. This patch finally
+removes such assumption and adds runtime pm support and awareness to this
+driver. To achieve this, some changes in the Exynos platform support code
+were needed, like moving pad retention control to the pin controller driver.
+Some cleanup to the pin controller driver has been also done while changing
+the code. This new feature requires some additional information in the
+device tree, what is handled by patches 1,2 and 9.
+
+Please note that patches are ordered in such a way that the changes can be
+bisected, so the properties are added to dts before the code requiring them.
+
+The other patches related to enabling full support for audio power domain
+can be found here:
+1. PL330 ADMA controller non-irqsafe runtime PM:
+   https://www.spinics.net/lists/arm-kernel/msg550008.html
+2. Runtime PM for clock controllers (Exynos Audio subsystem will be added
+   in v4 soon): https://www.spinics.net/lists/arm-kernel/msg538122.html
+
+Patches are based on linux-next from 2016.12.22.
+
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+
+
+Patch summary:
+
+Marek Szyprowski (9):
+  ARM: dts: exynos: Add PMU syscon to pinctrl nodes
+  ARM: dts: exynos: Add pinctrl sleep state for 542x i2s module
+  pinctrl: samsung: Remove dead code
+  pinctrl: samsung: Use generic of_device_get_match_data helper
+  pinctrl: samsung: Move retention control from mach-exynos to the
+    pinctrl driver
+  pinctrl: samsung: Replace syscore ops with standard platform device
+    pm_ops
+  pinctrl: samsung: Add property to mark pad state as suitable for power
+    down
+  pinctrl: samsung: Add runtime PM support
+  ARM: dts: exynos: Add audio power domain support to Exynos542x SoCs
+
+ .../bindings/pinctrl/samsung-pinctrl.txt           |  12 ++
+ arch/arm/boot/dts/exynos3250.dtsi                  |   2 +
+ arch/arm/boot/dts/exynos4210.dtsi                  |   3 +
+ arch/arm/boot/dts/exynos4x12.dtsi                  |   3 +
+ arch/arm/boot/dts/exynos5250.dtsi                  |   4 +
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |  11 ++
+ arch/arm/boot/dts/exynos5420.dtsi                  |  18 ++-
+ arch/arm/mach-exynos/suspend.c                     |  64 ---------
+ drivers/pinctrl/samsung/pinctrl-exynos.c           | 148 +++++++++++++++++++++
+ drivers/pinctrl/samsung/pinctrl-samsung.c          | 126 ++++++++----------
+ drivers/pinctrl/samsung/pinctrl-samsung.h          |  15 +++
+ 11 files changed, 271 insertions(+), 135 deletions(-)
+
 -- 
 1.9.1
