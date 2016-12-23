@@ -1,59 +1,92 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 23 Dec 2016 11:01:13 +0100
-Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21,
- i.MX27 and i.MX31 SoCs
-In-Reply-To: <74751709-c32e-b1b3-4fa3-613f7d57d1d8@mleia.com>
-References: <20161211010648.6591-1-vz@mleia.com>
- <20161211093519.xrxxhrqpc7fmadfr@pengutronix.de>
- <d6d987f1-3461-214a-0ca1-16d310ddd370@mleia.com>
- <20161211102634.jn3awmlzdrm3pqai@pengutronix.de>
- <2fc2558d-fe05-14a7-745e-f71d2178bad6@mleia.com>
- <fe9b03bf-9c37-862f-b3aa-0f9b5a4dfefb@roeck-us.net>
- <bedae3d8-3057-36e4-1d89-ec41f9f1a25b@mleia.com>
- <20161223083256.3wdqou5xmhr7fidn@pengutronix.de>
- <74751709-c32e-b1b3-4fa3-613f7d57d1d8@mleia.com>
-Message-ID: <20161223100113.s57bi7257yero7f7@pengutronix.de>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Fri, 23 Dec 2016 15:47:55 +0530
+Subject: [PATCH v2 02/10] dt-bindings: hisi: Add Hisilicon HiP05/06/07
+ Djtag dts bindings
+In-Reply-To: <20161219163126.w6ibkd6ayvblkwqt@rob-hp-laptop>
+References: <1481129719-159487-1-git-send-email-anurup.m@huawei.com>
+ <20161219163126.w6ibkd6ayvblkwqt@rob-hp-laptop>
+Message-ID: <585CF9D3.2010002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 23, 2016 at 11:27:24AM +0200, Vladimir Zapolskiy wrote:
-> On 12/23/2016 10:32 AM, Uwe Kleine-K?nig wrote:
-> > Hello,
-> > 
-> > On Fri, Dec 23, 2016 at 10:20:20AM +0200, Vladimir Zapolskiy wrote:
-> >> On 12/23/2016 03:55 AM, Guenter Roeck wrote:
-> >>> What is the ultimate conclusion of this exchange ?
-> >>>
-> >>> Are we going to get another version of the patch, or did everyone agree that
-> >>> the patch is good as it is and does not require further changes ?
-> >>>
-> >>
-> >> I can not imagine a different fix.
-> > 
-> > my preferred fix would be:
-> > 
-> >  - add an imx35 compatible to all newer dtsi
-> >  - update the driver to only write the wmcr on imx35 compatible devices
-> >    adding only imx35.
-> > 
-> 
-> It breaks old DTS vs. new kernel compatibility, I've already mentioned this.
 
-Correct, and I didn't deny that. In my mail I pointed out the problem
-this imposes and I think it's small enough to not justify the complexity
-introduced in your proposed change.
 
-If we cannot agree then at least this needs to be better documented in
-the driver because otherwise someone makes a cleanup later dropping all
-the compatibles that are needed to keep backwards compatibility.
+On Monday 19 December 2016 10:01 PM, Rob Herring wrote:
+> On Wed, Dec 07, 2016 at 11:55:19AM -0500, Anurup M wrote:
+>> From: Tan Xiaojun <tanxiaojun@huawei.com>
+>>
+>> Add Hisilicon HiP05/06/07 Djtag dts bindings for CPU and IO Die
+>>
+>> Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
+>> Signed-off-by: Anurup M <anurup.m@huawei.com>
+>> ---
+>>   .../devicetree/bindings/arm/hisilicon/djtag.txt    | 41 ++++++++++++++++++++++
+>>   1 file changed, 41 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt b/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
+>> new file mode 100644
+>> index 0000000..733498e
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
+>> @@ -0,0 +1,41 @@
+>> +The Hisilicon Djtag is an independent component which connects with some other
+>> +components in the SoC by Debug Bus. The djtag is available in CPU and IO dies
+>> +in the chip. The djtag controls access to connecting modules of CPU and IO
+>> +dies.
+>> +The various connecting components in CPU die (like L3 cache, L3 cache PMU etc.)
+>> +are accessed by djtag during real time debugging. In IO die there are connecting
+>> +components like RSA. These components appear as devices atatched to djtag bus.
+>> +
+>> +Hisilicon HiP05/06 djtag for CPU and HiP05 IO die
+>> +Required properties:
+>> +  - compatible : "hisilicon,hisi-djtag-v1"
+> These need SoC specific compatible strings. They probably should
+> also include cpu or io in the compatible string. I would expect there
+> are things like events, triggers, or component connections for debug
+> that are SoC specifc.
 
-But my suggestion is to first do the minimal fix, and if in the next
-merge window people lament about breakages on their machine, we can
-still extend the simple fix to a fully backwards compatible change.
+Ok. Shall include SoC prefix in compatible string. e.g. 
+"hisilicon,hip06-djtag-v1".
+As the djtag driver handling is same for CPU and IO, I think I don't 
+need to include
+them in the compatible string. Please share your comment.
 
-Best regards
-Uwe
+Thanks,
+Anurup
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>> +  - reg : Register address and size
+>> +  - scl-id : The Super Cluster ID for CPU or IO die
+>> +
+>> +Hisilicon HiP06 djtag for IO die and HiP07 djtag for CPU and IO die
+>> +Required properties:
+>> +  - compatible : "hisilicon,hisi-djtag-v2"
+> Same here.
+>
+>> +  - reg : Register address and size
+>> +  - scl-id : The Super Cluster ID for CPU or IO die
+>> +
+>> +Example 1: Djtag for CPU die
+>> +
+>> +	/* for Hisilicon HiP05 djtag for CPU Die */
+>> +	djtag0: djtag at 80010000 {
+>> +		compatible = "hisilicon,hisi-djtag-v1";
+>> +		reg = <0x0 0x80010000 0x0 0x10000>;
+>> +		scl-id = <0x02>;
+>> +
+>> +		/* All connecting components will appear as child nodes */
+>> +	};
+>> +
+>> +Example 2: Djtag for IO die
+>> +
+>> +	/* for Hisilicon HiP05 djtag for IO Die */
+>> +	djtag1: djtag at d0000000 {
+>> +		compatible = "hisilicon,hisi-djtag-v1";
+>> +		reg = <0x0 0xd0000000 0x0 0x10000>;
+>> +		scl-id = <0x01>;
+>> +
+>> +		/* All connecting components will appear as child nodes */
+>> +	};
+>> -- 
+>> 2.1.4
+>>
