@@ -1,123 +1,57 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 23 Dec 2016 10:52:28 +0100
-Subject: [PATCH] dmaengine: pl330: Fix runtime PM support for terminated
- transfers
-In-Reply-To: <20161223023324.GA3860@kozik-lap>
-References: <1481884751-21411-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20161223023344epcas2p19d61e2e9749b2a5d2a910bef89a08616@epcas2p1.samsung.com>
- <20161223023324.GA3860@kozik-lap>
-Message-ID: <6b2f2e51-3fac-02d7-5827-b08b97c894c0@samsung.com>
+From: minchan@kernel.org (Minchan Kim)
+Date: Fri, 23 Dec 2016 18:53:36 +0900
+Subject: [PATCH] mm: pmd dirty emulation in page fault handler
+In-Reply-To: <20161223091725.GA23117@dhcp22.suse.cz>
+References: <1482364101-16204-1-git-send-email-minchan@kernel.org>
+ <20161222081713.GA32480@node.shutemov.name>
+ <20161222145203.GA18970@bbox>
+ <20161223091725.GA23117@dhcp22.suse.cz>
+Message-ID: <20161223095336.GA5305@bbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi,
 
+On Fri, Dec 23, 2016 at 10:17:25AM +0100, Michal Hocko wrote:
+> On Thu 22-12-16 23:52:03, Minchan Kim wrote:
+> [...]
+> > >From b3ec95c0df91ad113525968a4a6b53030fd0b48d Mon Sep 17 00:00:00 2001
+> > From: Minchan Kim <minchan@kernel.org>
+> > Date: Thu, 22 Dec 2016 23:43:49 +0900
+> > Subject: [PATCH v2] mm: pmd dirty emulation in page fault handler
+> > 
+> > Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
+> > http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
+> > 
+> > The problem is page fault handler supports only accessed flag emulation
+> > for THP page of SW-dirty/accessed architecture.
+> > 
+> > This patch enables dirty-bit emulation for those architectures.
+> > Without it, MADV_FREE makes application hang by repeated fault forever.
+> 
+> The changelog is rather terse and considering the issue is rather subtle
+> and it aims the stable tree I think it could see more information. How
+> do we end up looping in the page fault and why the dirty pmd stops it.
+> Could you update the changelog to be more verbose, please? I am still
+> digesting this patch but I believe it is correct fwiw...
+> 
 
-On 2016-12-23 03:33, Krzysztof Kozlowski wrote:
-> On Fri, Dec 16, 2016 at 11:39:11AM +0100, Marek Szyprowski wrote:
->> PL330 DMA engine driver is leaking a runtime reference after any terminated
->> DMA transactions. This patch fixes this issue by tracking runtime PM state
->> of the device and making additional call to pm_runtime_put() in terminate_all
->> callback if needed.
->>
->> Fixes: ae43b3289186 ("ARM: 8202/1: dmaengine: pl330: Add runtime Power Management support v12")
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>   drivers/dma/pl330.c | 11 +++++++++++
->>   1 file changed, 11 insertions(+)
->>
->> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
->> index 030fe05ed43b..9f3dbc8c63d2 100644
->> --- a/drivers/dma/pl330.c
->> +++ b/drivers/dma/pl330.c
->> @@ -448,6 +448,9 @@ struct dma_pl330_chan {
->>   
->>   	/* for cyclic capability */
->>   	bool cyclic;
->> +
->> +	/* for runtime pm tracking */
->> +	bool active;
->>   };
->>   
->>   struct pl330_dmac {
->> @@ -2031,6 +2034,7 @@ static void pl330_tasklet(unsigned long data)
->>   		_stop(pch->thread);
->>   		spin_unlock(&pch->thread->dmac->lock);
->>   		power_down = true;
->> +		pch->active = false;
->>   	} else {
->>   		/* Make sure the PL330 Channel thread is active */
->>   		spin_lock(&pch->thread->dmac->lock);
->> @@ -2050,6 +2054,7 @@ static void pl330_tasklet(unsigned long data)
->>   			desc->status = PREP;
->>   			list_move_tail(&desc->node, &pch->work_list);
->>   			if (power_down) {
->> +				pch->active = true;
-> It's been a while since I was playign with the driver so I don't
-> remember everything... but I can't get the logic behind this.
->
-> The device is marked as inactive and scheduled to power down. But you
-> mark chanel as active.
+How about this? Feel free to suggest better wording.
 
-Please look 3 lines further. The channel is started again (because this
-is cyclic request), so setting active to true is justified. Even power_down
-is then set to false.
+Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
+http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
 
-> Maybe it is correct but for me it is unreadable.
->
-> I understand that you wanted to mark the device as active at some point,
-> in case transfer was terminated?
+The problem is currently page fault handler doesn't supports dirty bit
+emulation of pte for non-HW dirty-bit architecture so that application
+stucks until VM marked the pmd dirty.
 
-Frankly, I have no idea how to explain it more clear. Cyclic transfers are
-automatically restarted, so the above logic simply keeps pch->active in sync
-with hardware operations.
+How the emulation work depends on the architecture. In case of arm64,
+when it set up pte firstly, it sets pte PTE_RDONLY to get a chance to
+mark the pte dirty via triggering page fault when store access happens.
+Once the page fault occurs, VM marks the pte dirty and arch code for
+setting pte will clear PTE_RDONLY for application to proceed.
 
->
-> Best regards,
-> Krzysztof
->
->>   				spin_lock(&pch->thread->dmac->lock);
->>   				_start(pch->thread);
->>   				spin_unlock(&pch->thread->dmac->lock);
->> @@ -2164,6 +2169,7 @@ static int pl330_terminate_all(struct dma_chan *chan)
->>   	unsigned long flags;
->>   	struct pl330_dmac *pl330 = pch->dmac;
->>   	LIST_HEAD(list);
->> +	bool power_down = false;
->>   
->>   	pm_runtime_get_sync(pl330->ddma.dev);
->>   	spin_lock_irqsave(&pch->lock, flags);
->> @@ -2174,6 +2180,8 @@ static int pl330_terminate_all(struct dma_chan *chan)
->>   	pch->thread->req[0].desc = NULL;
->>   	pch->thread->req[1].desc = NULL;
->>   	pch->thread->req_running = -1;
->> +	power_down = pch->active;
->> +	pch->active = false;
->>   
->>   	/* Mark all desc done */
->>   	list_for_each_entry(desc, &pch->submitted_list, node) {
->> @@ -2191,6 +2199,8 @@ static int pl330_terminate_all(struct dma_chan *chan)
->>   	list_splice_tail_init(&pch->completed_list, &pl330->desc_pool);
->>   	spin_unlock_irqrestore(&pch->lock, flags);
->>   	pm_runtime_mark_last_busy(pl330->ddma.dev);
->> +	if (power_down)
->> +		pm_runtime_put_autosuspend(pl330->ddma.dev);
->>   	pm_runtime_put_autosuspend(pl330->ddma.dev);
->>   
->>   	return 0;
->> @@ -2350,6 +2360,7 @@ static void pl330_issue_pending(struct dma_chan *chan)
->>   		 * updated on work_list emptiness status.
->>   		 */
->>   		WARN_ON(list_empty(&pch->submitted_list));
->> +		pch->active = true;
->>   		pm_runtime_get_sync(pch->dmac->ddma.dev);
->>   	}
->>   	list_splice_tail_init(&pch->submitted_list, &pch->work_list);
->> -- 
->> 1.9.1
->>
+IOW, if VM doesn't mark the pte dirty, application hangs forever by
+repeated fault(i.e., store op but the pte is PTE_RDONLY).
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+This patch enables dirty-bit emulation for those architectures.
