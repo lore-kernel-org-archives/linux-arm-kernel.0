@@ -1,71 +1,59 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Fri, 23 Dec 2016 12:54:21 +0100
-Subject: [PATCH] mm: pmd dirty emulation in page fault handler
-In-Reply-To: <20161223095336.GA5305@bbox>
-References: <1482364101-16204-1-git-send-email-minchan@kernel.org>
- <20161222081713.GA32480@node.shutemov.name>
- <20161222145203.GA18970@bbox>
- <20161223091725.GA23117@dhcp22.suse.cz>
- <20161223095336.GA5305@bbox>
-Message-ID: <20161223115421.GD23109@dhcp22.suse.cz>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 23 Dec 2016 13:24:42 +0100
+Subject: [PATCH 2/9] ARM: dts: exynos: Add pinctrl sleep state for 542x i2s
+ module
+In-Reply-To: <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
+References: <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20161223122520epcas1p443154371ae2f94b89e738051780a8e6b@epcas1p4.samsung.com>
+Message-ID: <1482495889-6201-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 23-12-16 18:53:36, Minchan Kim wrote:
-> Hi,
-> 
-> On Fri, Dec 23, 2016 at 10:17:25AM +0100, Michal Hocko wrote:
-> > On Thu 22-12-16 23:52:03, Minchan Kim wrote:
-> > [...]
-> > > >From b3ec95c0df91ad113525968a4a6b53030fd0b48d Mon Sep 17 00:00:00 2001
-> > > From: Minchan Kim <minchan@kernel.org>
-> > > Date: Thu, 22 Dec 2016 23:43:49 +0900
-> > > Subject: [PATCH v2] mm: pmd dirty emulation in page fault handler
-> > > 
-> > > Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
-> > > http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
-> > > 
-> > > The problem is page fault handler supports only accessed flag emulation
-> > > for THP page of SW-dirty/accessed architecture.
-> > > 
-> > > This patch enables dirty-bit emulation for those architectures.
-> > > Without it, MADV_FREE makes application hang by repeated fault forever.
-> > 
-> > The changelog is rather terse and considering the issue is rather subtle
-> > and it aims the stable tree I think it could see more information. How
-> > do we end up looping in the page fault and why the dirty pmd stops it.
-> > Could you update the changelog to be more verbose, please? I am still
-> > digesting this patch but I believe it is correct fwiw...
-> > 
-> 
-> How about this? Feel free to suggest better wording.
-> 
-> Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
-> http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
-> 
-> The problem is currently page fault handler doesn't supports dirty bit
-> emulation of pte for non-HW dirty-bit architecture so that application
+Add a special "sleep" state for Exynos I2S module. This state will be used
+to let I2S driver to notify pin controller that it is ready for turning
+power off, so the pin controller can also change its runtime state to
+suspended and in the result let power domain to turn off.
 
-s at pte@pmd@ ?
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi | 11 +++++++++++
+ arch/arm/boot/dts/exynos5420.dtsi         |  3 ++-
+ 2 files changed, 13 insertions(+), 1 deletion(-)
 
-> stucks until VM marked the pmd dirty.
-> 
-> How the emulation work depends on the architecture. In case of arm64,
-> when it set up pte firstly, it sets pte PTE_RDONLY to get a chance to
-> mark the pte dirty via triggering page fault when store access happens.
-> Once the page fault occurs, VM marks the pte dirty and arch code for
-> setting pte will clear PTE_RDONLY for application to proceed.
-> 
-> IOW, if VM doesn't mark the pte dirty, application hangs forever by
-> repeated fault(i.e., store op but the pte is PTE_RDONLY).
-> 
-> This patch enables dirty-bit emulation for those architectures.
-
-Yes this is helpful and much more clear, thank you. One thing that is
-still not clear to me is why cannot we handle that in the arch specific
-code. I mean what is the side effect of doing pmd_mkdirty for
-architectures which do not need it?
-
+diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+index 3924b4fafe72..52983b6a6859 100644
+--- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
++++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+@@ -720,4 +720,15 @@
+ 		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+ 		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV1>;
+ 	};
++
++	i2s0_bus_slp: i2s0-bus-slp {
++		samsung,pins = "gpz-0", "gpz-1", "gpz-2", "gpz-3",
++				"gpz-4", "gpz-5", "gpz-6";
++		samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
++		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
++		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV1>;
++		samsung,pin-con-pdn = <EXYNOS_PIN_PDN_INPUT>;
++		samsung,pin-pud-pdn = <EXYNOS_PIN_PULL_NONE>;
++		samsung,off-state;
++	};
+ };
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index 832cb56c514e..0a7ecdd4c5de 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -444,8 +444,9 @@
+ 			clock-output-names = "i2s_cdclk0";
+ 			#sound-dai-cells = <1>;
+ 			samsung,idma-addr = <0x03000000>;
+-			pinctrl-names = "default";
++			pinctrl-names = "default", "sleep";
+ 			pinctrl-0 = <&i2s0_bus>;
++			pinctrl-1 = <&i2s0_bus_slp>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
-Michal Hocko
-SUSE Labs
+1.9.1
