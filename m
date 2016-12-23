@@ -1,43 +1,44 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri, 23 Dec 2016 20:50:01 +0800
-Subject: [PATCH 2/2] arm64: allwinner: Kconfig: add essential pinctrl driver
- for H5
-In-Reply-To: <20161223125001.1176-1-icenowy@aosc.xyz>
-References: <20161223125001.1176-1-icenowy@aosc.xyz>
-Message-ID: <20161223125001.1176-2-icenowy@aosc.xyz>
+From: xypron.glpk@gmx.de (Heinrich Schuchardt)
+Date: Fri, 23 Dec 2016 13:52:13 +0100
+Subject: [PATCH 1/1] ARM64: dts: meson-gxbb-odroidc2: linux,usable-memory
+Message-ID: <20161223125213.5461-1-xypron.glpk@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H5 SoC has two pin controllers, one (in user manual called "CPUx") needs
-a slightly advanced driver, and the other (called "CPUs") is just equal
-to the on in H3, and the H3 driver can be just reused.
+After reading the fdt u-boot overwrites the reg property of the
+memory node with <0x0 0x0 0x0 0x78000000>.
 
-Select the two necessary pinctrl drivers when building kernel for
-Allwinner SoCs.
+To override this setting we have to use the property
+linux,usable-memory.
 
-Also add H5 in the option's description.
+If the first 16MB of the 2GB physical memory are used by
+the Linux kernel oops occur on the Odroid C2.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+For the Odroid C2 this patch replaces
+[RFT PATCH] ARM64: dts: meson-gxbb: Add reserved memory zone and
+usable memory range
+https://lkml.org/lkml/2016/12/12/127
+
+Fixes: 855960342d1e7 ARM64: dts: amlogic: add Hardkernel ODROID-C2
+CC: Neil Armstrong <narmstrong@baylibre.com>
+CC: Kevin Hilman <khilman@baylibre.com>
+Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
 ---
- arch/arm64/Kconfig.platforms | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 715ef1256838..e11523d204b5 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -5,8 +5,11 @@ config ARCH_SUNXI
- 	select GENERIC_IRQ_CHIP
- 	select PINCTRL
- 	select PINCTRL_SUN50I_A64
-+	select PINCTRL_SUN50I_H5
-+	select PINCTRL_SUN8I_H3_R
- 	help
--	  This enables support for Allwinner sunxi based SoCs like the A64.
-+	  This enables support for Allwinner sunxi based SoCs like the A64
-+	  and H5.
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+index 238fbeacd330..82ab94417940 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+@@ -61,7 +61,7 @@
  
- config ARCH_ALPINE
- 	bool "Annapurna Labs Alpine platform"
+ 	memory at 0 {
+ 		device_type = "memory";
+-		reg = <0x0 0x0 0x0 0x80000000>;
++		linux,usable-memory = <0x0 0x01000000 0x0 0x7f000000>;
+ 	};
+ 
+ 	usb_otg_pwr: regulator-usb-pwrs {
 -- 
 2.11.0
