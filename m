@@ -1,52 +1,61 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Fri, 23 Dec 2016 15:53:05 +0100
-Subject: [PATCH] mm: pmd dirty emulation in page fault handler
-In-Reply-To: <20161223140131.GA5724@bbox>
-References: <1482364101-16204-1-git-send-email-minchan@kernel.org>
- <20161222081713.GA32480@node.shutemov.name>
- <20161222145203.GA18970@bbox>
- <20161223091725.GA23117@dhcp22.suse.cz>
- <20161223095336.GA5305@bbox>
- <20161223115421.GD23109@dhcp22.suse.cz>
- <20161223140131.GA5724@bbox>
-Message-ID: <20161223145305.GF23109@dhcp22.suse.cz>
+From: xypron.glpk@gmx.de (Heinrich Schuchardt)
+Date: Fri, 23 Dec 2016 16:01:08 +0100
+Subject: [PATCH 1/1] MMC: meson: avoid possible NULL dereference
+Message-ID: <20161223150108.9229-1-xypron.glpk@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 23-12-16 23:01:31, Minchan Kim wrote:
-> On Fri, Dec 23, 2016 at 12:54:21PM +0100, Michal Hocko wrote:
-> > On Fri 23-12-16 18:53:36, Minchan Kim wrote:
-[...]
-> > > stucks until VM marked the pmd dirty.
-> > > 
-> > > How the emulation work depends on the architecture. In case of arm64,
-> > > when it set up pte firstly, it sets pte PTE_RDONLY to get a chance to
-> > > mark the pte dirty via triggering page fault when store access happens.
-> > > Once the page fault occurs, VM marks the pte dirty and arch code for
-> > > setting pte will clear PTE_RDONLY for application to proceed.
-> > > 
-> > > IOW, if VM doesn't mark the pte dirty, application hangs forever by
-> > > repeated fault(i.e., store op but the pte is PTE_RDONLY).
-> > > 
-> > > This patch enables dirty-bit emulation for those architectures.
-> > 
-> > Yes this is helpful and much more clear, thank you. One thing that is
-> > still not clear to me is why cannot we handle that in the arch specific
-> > code. I mean what is the side effect of doing pmd_mkdirty for
-> > architectures which do not need it?
-> 
-> For architecture which supports H/W access/dirty bit, it couldn't be
-> reached there code path so there is no side effect, I think.
+No actual segmentation faults were observed but the coding is
+at least inconsistent.
 
-ahh, I knew I was missing something. It definitely wasn't obvious to me
-and my x86 config it simply generates code to call
-huge_pmd_set_accessed.
+irqreturn_t meson_mmc_irq():
 
-> A thing
-> I can think of is just increasing code size little bit. Maybe, we
-> could optimize away some ifdef magic but not sure worth it.
+We should not dereference host before checking it.
 
-it is not
+meson_mmc_irq_thread():
+
+If cmd or mrq are NULL we should not dereference them after
+writing a warning.
+
+Fixes: 51c5d8447bd7 MMC: meson: initial support for GX platforms
+Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+---
+ drivers/mmc/host/meson-gx-mmc.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
+index b352760c041e..09739352834c 100644
+--- a/drivers/mmc/host/meson-gx-mmc.c
++++ b/drivers/mmc/host/meson-gx-mmc.c
+@@ -578,13 +578,15 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
+ {
+ 	struct meson_host *host = dev_id;
+ 	struct mmc_request *mrq;
+-	struct mmc_command *cmd = host->cmd;
++	struct mmc_command *cmd;
+ 	u32 irq_en, status, raw_status;
+ 	irqreturn_t ret = IRQ_HANDLED;
+ 
+ 	if (WARN_ON(!host))
+ 		return IRQ_NONE;
+ 
++	cmd = host->cmd;
++
+ 	mrq = host->mrq;
+ 
+ 	if (WARN_ON(!mrq))
+@@ -670,10 +672,10 @@ static irqreturn_t meson_mmc_irq_thread(int irq, void *dev_id)
+ 	int ret = IRQ_HANDLED;
+ 
+ 	if (WARN_ON(!mrq))
+-		ret = IRQ_NONE;
++		return IRQ_NONE;
+ 
+ 	if (WARN_ON(!cmd))
+-		ret = IRQ_NONE;
++		return IRQ_NONE;
+ 
+ 	data = cmd->data;
+ 	if (data) {
 -- 
-Michal Hocko
-SUSE Labs
+2.11.0
