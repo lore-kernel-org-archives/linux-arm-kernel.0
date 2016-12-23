@@ -1,133 +1,76 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 23 Dec 2016 16:13:24 +0100
-Subject: [RFC v4 15/16] vfio/type1: Check MSI remapping at irq domain level
-In-Reply-To: <CANHdaibH3GCFhM4nXh1KJoFhZCodtWo7KfP7AcSoVD0HwjDWfg@mail.gmail.com>
-References: <1481661034-3088-1-git-send-email-eric.auger@redhat.com>
- <1481661034-3088-16-git-send-email-eric.auger@redhat.com>
- <HE1PR04MB13219CC90CE2BBE62356D94CFF920@HE1PR04MB1321.eurprd04.prod.outlook.com>
- <3ead0cc1-7798-3e39-da56-c18a5989c00c@redhat.com>
- <CANHdaibH3GCFhM4nXh1KJoFhZCodtWo7KfP7AcSoVD0HwjDWfg@mail.gmail.com>
-Message-ID: <72057deb-cc71-33f1-e96a-ed2c96a99c3b@redhat.com>
+From: minchan@kernel.org (Minchan Kim)
+Date: Sat, 24 Dec 2016 00:14:58 +0900
+Subject: [PATCH v4] mm: pmd dirty emulation in page fault handler
+Message-ID: <1482506098-6149-1-git-send-email-minchan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geetha,
+Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
+http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
 
-On 23/12/2016 14:33, Geetha Akula wrote:
-> Hi Eric,
-> 
-> Seeing same issue reported by Diana on ThunderX with you
-> v4.9-reserved-v4 branch.
-> Vfio passthough work fine when allow_unsafe_interrupts is set.
-Thank you for testing! I will fix the security assessment by better
-studying flag propagation in domain hierarchy.
+The problem is currently page fault handler doesn't supports dirty bit
+emulation of pmd for non-HW dirty-bit architecture so that application
+stucks until VM marked the pmd dirty.
 
-Best Regards
+How the emulation work depends on the architecture. In case of arm64,
+when it set up pte firstly, it sets pte PTE_RDONLY to get a chance to
+mark the pte dirty via triggering page fault when store access happens.
+Once the page fault occurs, VM marks the pmd dirty and arch code for
+setting pmd will clear PTE_RDONLY for application to proceed.
 
-Eric
+IOW, if VM doesn't mark the pmd dirty, application hangs forever by
+repeated fault(i.e., store op but the pmd is PTE_RDONLY).
 
-> 
-> 
-> Thank you,
-> Geetha.
-> 
-> On Thu, Dec 22, 2016 at 6:32 PM, Auger Eric <eric.auger@redhat.com
-> <mailto:eric.auger@redhat.com>> wrote:
-> 
->     Hi Diana,
-> 
->     On 22/12/2016 13:41, Diana Madalina Craciun wrote:
->     > Hi Eric,
->     >
->     > On 12/13/2016 10:32 PM, Eric Auger wrote:
->     >> In case the IOMMU does not bypass MSI transactions (typical
->     >> case on ARM), we check all MSI controllers are IRQ remapping
->     >> capable. If not the IRQ assignment may be unsafe.
->     >>
->     >> At this stage the arm-smmu-(v3) still advertise the
->     >> IOMMU_CAP_INTR_REMAP capability at IOMMU level. This will be
->     >> removed in subsequent patches.
->     >>
->     >> Signed-off-by: Eric Auger <eric.auger@redhat.com
->     <mailto:eric.auger@redhat.com>>
->     >> ---
->     >>  drivers/vfio/vfio_iommu_type1.c | 9 ++++++---
->     >>  1 file changed, 6 insertions(+), 3 deletions(-)
->     >>
->     >> diff --git a/drivers/vfio/vfio_iommu_type1.c
->     b/drivers/vfio/vfio_iommu_type1.c
->     >> index d07fe73..a05648b 100644
->     >> --- a/drivers/vfio/vfio_iommu_type1.c
->     >> +++ b/drivers/vfio/vfio_iommu_type1.c
->     >> @@ -37,6 +37,7 @@
->     >>  #include <linux/vfio.h>
->     >>  #include <linux/workqueue.h>
->     >>  #include <linux/dma-iommu.h>
->     >> +#include <linux/irqdomain.h>
->     >>
->     >>  #define DRIVER_VERSION  "0.2"
->     >>  #define DRIVER_AUTHOR   "Alex Williamson
->     <alex.williamson at redhat.com <mailto:alex.williamson@redhat.com>>"
->     >> @@ -765,7 +766,7 @@ static int vfio_iommu_type1_attach_group(void
->     *iommu_data,
->     >>      struct vfio_domain *domain, *d;
->     >>      struct bus_type *bus = NULL;
->     >>      int ret;
->     >> -    bool resv_msi;
->     >> +    bool resv_msi, msi_remap;
->     >>      phys_addr_t resv_msi_base;
->     >>
->     >>      mutex_lock(&iommu->lock);
->     >> @@ -818,8 +819,10 @@ static int
->     vfio_iommu_type1_attach_group(void *iommu_data,
->     >>      INIT_LIST_HEAD(&domain->group_list);
->     >>      list_add(&group->next, &domain->group_list);
->     >>
->     >> -    if (!allow_unsafe_interrupts &&
->     >> -        !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
->     >> +    msi_remap = resv_msi ? irq_domain_check_msi_remap() :
->     >> +                           iommu_capable(bus, IOMMU_CAP_INTR_REMAP);
->     >> +
->     >> +    if (!allow_unsafe_interrupts && !msi_remap) {
->     >>              pr_warn("%s: No interrupt remapping support.  Use
->     the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU
->     support on this platform\n",
->     >>                     __func__);
->     >>              ret = -EPERM;
->     >
->     > I tested your v4.9-reserved-v4 branch on a ITS capable hardware (NXP
->     > LS2080), so I did not set allow_unsafe_interrupts. It fails here
->     > complaining that the there is no interrupt remapping support. The
->     > irq_domain_check_msi_remap function returns false as none of the
->     checked
->     > domains has the IRQ_DOMAIN_FLAG_MSI_REMAP flag set. I think the reason
->     > is that the flags are not propagated through the domain hierarchy when
->     > the domain is created.
-> 
->     Hum OK. Please apologize for the inconvenience, all the more so this is
->     the second time you report the same issue for different cause :-( At the
->     moment I can't test on a GICv3 ITS based system. I will try to fix that
->     though.
-> 
->     I would like to get the confirmation introducing this flag is the right
->     direction though.
-> 
->     Thanks
-> 
->     Eric
->     >
->     > Thanks,
->     >
->     > Diana
->     >
->     >
->     >
-> 
->     _______________________________________________
->     linux-arm-kernel mailing list
->     linux-arm-kernel at lists.infradead.org
->     <mailto:linux-arm-kernel@lists.infradead.org>
->     http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->     <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>
-> 
-> 
+This patch enables pmd dirty-bit emulation for those architectures.
+
+[1] b8d3c4c3009d, mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called
+
+Cc: Jason Evans <je@fb.com>
+Cc: Michal Hocko <mhocko@suse.com> 
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: linux-arch at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: <stable@vger.kernel.org> [4.5+]
+Fixes: b8d3c4c3009d ("mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called")
+Reported-and-Tested-by: Andreas Schwab <schwab@suse.de>
+Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+Signed-off-by: Minchan Kim <minchan@kernel.org>
+---
+  Merry Xmas!
+
+* from v3
+  * Elaborate description
+* from v2
+  * Add acked-by/tested-by
+* from v1
+  * Remove __handle_mm_fault part - Kirill
+ mm/huge_memory.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/mm/huge_memory.c b/mm/huge_memory.c
+index 10eedbf..29ec8a4 100644
+--- a/mm/huge_memory.c
++++ b/mm/huge_memory.c
+@@ -883,15 +883,17 @@ void huge_pmd_set_accessed(struct vm_fault *vmf, pmd_t orig_pmd)
+ {
+ 	pmd_t entry;
+ 	unsigned long haddr;
++	bool write = vmf->flags & FAULT_FLAG_WRITE;
+ 
+ 	vmf->ptl = pmd_lock(vmf->vma->vm_mm, vmf->pmd);
+ 	if (unlikely(!pmd_same(*vmf->pmd, orig_pmd)))
+ 		goto unlock;
+ 
+ 	entry = pmd_mkyoung(orig_pmd);
++	if (write)
++		entry = pmd_mkdirty(entry);
+ 	haddr = vmf->address & HPAGE_PMD_MASK;
+-	if (pmdp_set_access_flags(vmf->vma, haddr, vmf->pmd, entry,
+-				vmf->flags & FAULT_FLAG_WRITE))
++	if (pmdp_set_access_flags(vmf->vma, haddr, vmf->pmd, entry, write))
+ 		update_mmu_cache_pmd(vmf->vma, vmf->address, vmf->pmd);
+ 
+ unlock:
+-- 
+2.7.4
