@@ -1,86 +1,89 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Fri, 23 Dec 2016 23:01:31 +0900
-Subject: [PATCH] mm: pmd dirty emulation in page fault handler
-In-Reply-To: <20161223115421.GD23109@dhcp22.suse.cz>
-References: <1482364101-16204-1-git-send-email-minchan@kernel.org>
- <20161222081713.GA32480@node.shutemov.name>
- <20161222145203.GA18970@bbox>
- <20161223091725.GA23117@dhcp22.suse.cz>
- <20161223095336.GA5305@bbox>
- <20161223115421.GD23109@dhcp22.suse.cz>
-Message-ID: <20161223140131.GA5724@bbox>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 23 Dec 2016 15:11:39 +0100
+Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21,
+ i.MX27 and i.MX31 SoCs
+In-Reply-To: <7018c466-2467-a9fc-2382-889d3a62741e@mentor.com>
+References: <20161211093519.xrxxhrqpc7fmadfr@pengutronix.de>
+ <d6d987f1-3461-214a-0ca1-16d310ddd370@mleia.com>
+ <20161211102634.jn3awmlzdrm3pqai@pengutronix.de>
+ <2fc2558d-fe05-14a7-745e-f71d2178bad6@mleia.com>
+ <fe9b03bf-9c37-862f-b3aa-0f9b5a4dfefb@roeck-us.net>
+ <bedae3d8-3057-36e4-1d89-ec41f9f1a25b@mleia.com>
+ <20161223083256.3wdqou5xmhr7fidn@pengutronix.de>
+ <74751709-c32e-b1b3-4fa3-613f7d57d1d8@mleia.com>
+ <20161223100113.s57bi7257yero7f7@pengutronix.de>
+ <7018c466-2467-a9fc-2382-889d3a62741e@mentor.com>
+Message-ID: <20161223141139.rlsvoonih5lhnnpu@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 23, 2016 at 12:54:21PM +0100, Michal Hocko wrote:
-> On Fri 23-12-16 18:53:36, Minchan Kim wrote:
-> > Hi,
-> > 
-> > On Fri, Dec 23, 2016 at 10:17:25AM +0100, Michal Hocko wrote:
-> > > On Thu 22-12-16 23:52:03, Minchan Kim wrote:
-> > > [...]
-> > > > >From b3ec95c0df91ad113525968a4a6b53030fd0b48d Mon Sep 17 00:00:00 2001
-> > > > From: Minchan Kim <minchan@kernel.org>
-> > > > Date: Thu, 22 Dec 2016 23:43:49 +0900
-> > > > Subject: [PATCH v2] mm: pmd dirty emulation in page fault handler
-> > > > 
-> > > > Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
-> > > > http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
-> > > > 
-> > > > The problem is page fault handler supports only accessed flag emulation
-> > > > for THP page of SW-dirty/accessed architecture.
-> > > > 
-> > > > This patch enables dirty-bit emulation for those architectures.
-> > > > Without it, MADV_FREE makes application hang by repeated fault forever.
-> > > 
-> > > The changelog is rather terse and considering the issue is rather subtle
-> > > and it aims the stable tree I think it could see more information. How
-> > > do we end up looping in the page fault and why the dirty pmd stops it.
-> > > Could you update the changelog to be more verbose, please? I am still
-> > > digesting this patch but I believe it is correct fwiw...
-> > > 
-> > 
-> > How about this? Feel free to suggest better wording.
-> > 
-> > Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
-> > http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
-> > 
-> > The problem is currently page fault handler doesn't supports dirty bit
-> > emulation of pte for non-HW dirty-bit architecture so that application
+On Fri, Dec 23, 2016 at 01:21:20PM +0200, Vladimir Zapolskiy wrote:
+> Hi Uwe,
 > 
-> s at pte@pmd@ ?
-
-It would be more clear. Will update with it.
-
-> 
-> > stucks until VM marked the pmd dirty.
+> On 12/23/2016 12:01 PM, Uwe Kleine-K?nig wrote:
+> > On Fri, Dec 23, 2016 at 11:27:24AM +0200, Vladimir Zapolskiy wrote:
+> >> On 12/23/2016 10:32 AM, Uwe Kleine-K?nig wrote:
+> >>> Hello,
+> >>>
+> >>> On Fri, Dec 23, 2016 at 10:20:20AM +0200, Vladimir Zapolskiy wrote:
+> >>>> On 12/23/2016 03:55 AM, Guenter Roeck wrote:
+> >>>>> What is the ultimate conclusion of this exchange ?
+> >>>>>
+> >>>>> Are we going to get another version of the patch, or did everyone agree that
+> >>>>> the patch is good as it is and does not require further changes ?
+> >>>>>
+> >>>>
+> >>>> I can not imagine a different fix.
+> >>>
+> >>> my preferred fix would be:
+> >>>
+> >>>  - add an imx35 compatible to all newer dtsi
+> >>>  - update the driver to only write the wmcr on imx35 compatible devices
+> >>>    adding only imx35.
+> >>>
+> >>
+> >> It breaks old DTS vs. new kernel compatibility, I've already mentioned this.
 > > 
-> > How the emulation work depends on the architecture. In case of arm64,
-> > when it set up pte firstly, it sets pte PTE_RDONLY to get a chance to
-> > mark the pte dirty via triggering page fault when store access happens.
-> > Once the page fault occurs, VM marks the pte dirty and arch code for
-> > setting pte will clear PTE_RDONLY for application to proceed.
+> > Correct, and I didn't deny that. In my mail I pointed out the problem
+> > this imposes and I think it's small enough to not justify the complexity
+> > introduced in your proposed change.
 > > 
-> > IOW, if VM doesn't mark the pte dirty, application hangs forever by
-> > repeated fault(i.e., store op but the pte is PTE_RDONLY).
-> > 
-> > This patch enables dirty-bit emulation for those architectures.
 > 
-> Yes this is helpful and much more clear, thank you. One thing that is
-> still not clear to me is why cannot we handle that in the arch specific
-> code. I mean what is the side effect of doing pmd_mkdirty for
-> architectures which do not need it?
+> I can not statistically estimate well the severity of the problem which was
+> fixed by commit 5fe65ce7cc (all boards with a similar change not found in
+> a bootloader will be affected, I believe) multiplied by the rate of users,
+> who don't update DTB.
 
-For architecture which supports H/W access/dirty bit, it couldn't be
-reached there code path so there is no side effect, I think. A thing
-I can think of is just increasing code size little bit. Maybe, we
-could optimize away some ifdef magic but not sure worth it. We have
-been same way pte(not pmd) emulation handling for several decacdes.
-Anyway, it should be off-topic, I think.
+I think most people updating the kernel will update the dtb at the same
+time. And for those who don't it should be quickly obvious that
+something is wrong during development if the machine resets
+unexpectedly. Plus I think that most users are not affected anyhow
+(either because their bootloader fixes up accordingly or because most
+machines don't reset when the timer expires because the hardware isn't
+designed accordingly). After all between introduction of i.MX35/i.MX25
+(not later than Thu Jun 4 11:32:12 2009 +0200, commit
+8c25c36f33157a2e2a1fcd60b6dc00feace80631) and the broken commit
+5fe65ce7cc (Mon Sep 8 09:14:07 2014 +0200) it seems it wasn't an issue.
 
-Thanks.
+With my suggestion the situation on an affected machine with old dtb and
+new kernel is just as it was in these 5 years where nobody complained.
 
-> 
-> -- 
-> Michal Hocko
-> SUSE Labs
+It's fine to target a bugfree system, and if you want to target that
+that's applaudable. But then please make it easy for others after you to
+not undo your good and add a big comment to the compatible array of the
+driver explaining why they are all listed explicitly and how to prevent
+to have to expand the list further.
+
+So yes, my suggestion has a risk, but I think when weighting that
+against the overhead that is introduced in the driver, I'd go the
+simpler way. That's of course something personal and as it's you who
+seems to have in interest in fixing the driver, it's your way that
+matters more. And if you document your way good enough, I won't stop
+you.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
