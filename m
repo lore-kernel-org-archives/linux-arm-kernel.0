@@ -1,46 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 22 Dec 2016 16:10:25 +0100
-Subject: [PATCH 3/3] ARM: dts: sun5i: add support for Lichee Pi One board
-In-Reply-To: <718681482365231@web25g.yandex.ru>
-References: <20161221200235.11617-1-icenowy@aosc.xyz>
- <20161221200235.11617-3-icenowy@aosc.xyz>
- <20161221224159.wnziqeanjkp63y4o@lukather>
- <718681482365231@web25g.yandex.ru>
-Message-ID: <20161222151025.kz5cpjeivxiqyemw@lukather>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Fri, 23 Dec 2016 10:20:20 +0200
+Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21, i.MX27
+ and i.MX31 SoCs
+In-Reply-To: <fe9b03bf-9c37-862f-b3aa-0f9b5a4dfefb@roeck-us.net>
+References: <20161211010648.6591-1-vz@mleia.com>
+ <20161211093519.xrxxhrqpc7fmadfr@pengutronix.de>
+ <d6d987f1-3461-214a-0ca1-16d310ddd370@mleia.com>
+ <20161211102634.jn3awmlzdrm3pqai@pengutronix.de>
+ <2fc2558d-fe05-14a7-745e-f71d2178bad6@mleia.com>
+ <fe9b03bf-9c37-862f-b3aa-0f9b5a4dfefb@roeck-us.net>
+Message-ID: <bedae3d8-3057-36e4-1d89-ec41f9f1a25b@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2016 at 08:07:11AM +0800, Icenowy Zheng wrote:
+On 12/23/2016 03:55 AM, Guenter Roeck wrote:
+> On 12/11/2016 03:21 AM, Vladimir Zapolskiy wrote:
+>> On 12/11/2016 12:26 PM, Uwe Kleine-K?nig wrote:
+>>> Hello Vladimir,
+>>>
+>>> On Sun, Dec 11, 2016 at 12:01:08PM +0200, Vladimir Zapolskiy wrote:
+>>>> On 12/11/2016 11:35 AM, Uwe Kleine-K?nig wrote:
+>>>>> On Sun, Dec 11, 2016 at 03:06:48AM +0200, Vladimir Zapolskiy wrote:
+>>>>>> Power down counter enable/disable bit switch is located in WMCR
+>>>>>> register, but watchdog controllers found on legacy i.MX21, i.MX27 and
+>>>>>> i.MX31 SoCs don't have this register. As a result of writing data to
+>>>>>> the non-existing register on driver probe the SoC hangs up, to fix the
+>>>>>> problem add more OF compatible strings and on this basis get
+>>>>>> information about availability of the WMCR register.
+>>>>>>
+>>>>>> Fixes: 5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on boot")
+>>>>>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+>>>>>> ---
+>>>>
 > 
 > 
-> 22.12.2016, 06:42, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> > On Thu, Dec 22, 2016 at 04:02:35AM +0800, Icenowy Zheng wrote:
-> >> ?Lichee Pi One is a low-cost Allwinner A13-based development board, with
-> >> ?an AXP209 PMU, a USB2.0 OTG port, a USB2.0 host port (or an onboard
-> >> ?RTL8723BU Wi-Fi card), optional headers for LCD and CSI, two GPIO
-> >> ?headers and two MicroSD card slots (connected to mmc0 and mmc2, both
-> >> ?bootable).
-> >>
-> >> ?Add support for it.
-> >>
-> >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> >
-> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> What is the ultimate conclusion of this exchange ?
 > 
-> Excuse me. Who should apply it?
+> Are we going to get another version of the patch, or did everyone agree that
+> the patch is good as it is and does not require further changes ?
+> 
 
-Gaaah, sorry, I meant I applied it...
+I can not imagine a different fix.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161222/0d1bdac9/attachment.sig>
+--
+With best wishes,
+Vladimir
