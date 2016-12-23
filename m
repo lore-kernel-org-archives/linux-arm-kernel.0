@@ -1,44 +1,27 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Fri, 23 Dec 2016 15:04:24 +0800
-Subject: [PATCH v5 1/6] arm64: arch_timer: Add device tree binding for
- hisilicon-161601 erratum
-In-Reply-To: <1482476669-15596-1-git-send-email-dingtianhong@huawei.com>
-References: <1482476669-15596-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <1482476669-15596-2-git-send-email-dingtianhong@huawei.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 23 Dec 2016 08:20:26 +0100
+Subject: [PATCH] serial: 8250: use initializer instead of memset to clear
+ local struct
+In-Reply-To: <1482463308-28968-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1482463308-28968-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20161223072026.GA23895@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This erratum describes a bug in logic outside the core, so MIDR can't be
-used to identify its presence, and reading an SoC-specific revision
-register from common arch timer code would be awkward.  So, describe it
-in the device tree.
+On Fri, Dec 23, 2016 at 12:21:48PM +0900, Masahiro Yamada wrote:
+> Leave the way of zero-out to the compiler's decision; the compiler
+> may know a more optimized way than calling memset().
 
-v2: Use the new erratum name and update the description.
+But no, it doesn't, it will leave "blank" areas in the structure with
+bad data in it, which is why we do memset.  See the tree-wide fixups we
+made about a year ago for this very issue.  Are you sure none of these
+structures get copied to userspace?
 
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> It may end up with memset() for big structures like this after all,
+> but the code will be cleaner at least.
 
-diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
-index ad440a2..935f142 100644
---- a/Documentation/devicetree/bindings/arm/arch_timer.txt
-+++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-@@ -31,6 +31,14 @@ to deliver its interrupts via SPIs.
-   This also affects writes to the tval register, due to the implicit
-   counter read.
- 
-+- hisilicon,erratum-161601 : A boolean property. Indicates the presence of
-+  erratum 161601, which says that reading the counter is unreliable unless
-+  reading twice on the register and the value of the second read is larger
-+  than the first by less than 32. If the verification is unsuccessful, then
-+  discard the value of this read and repeat this procedure until the verification
-+  is successful.  This also affects writes to the tval register, due to the
-+  implicit counter read.
-+
- ** Optional properties:
- 
- - arm,cpu-registers-not-fw-configured : Firmware does not initialize
--- 
-1.9.0
+Please leave it as-is, unless you see a measured speedup.
+
+thanks,
+
+greg k-h
