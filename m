@@ -1,104 +1,86 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Fri, 23 Dec 2016 21:40:51 +0800
-Subject: [PATCH v3] i2c: designware: add reset interface
-Message-ID: <1482500451-30137-1-git-send-email-zhangfei.gao@linaro.org>
+From: minchan@kernel.org (Minchan Kim)
+Date: Fri, 23 Dec 2016 23:01:31 +0900
+Subject: [PATCH] mm: pmd dirty emulation in page fault handler
+In-Reply-To: <20161223115421.GD23109@dhcp22.suse.cz>
+References: <1482364101-16204-1-git-send-email-minchan@kernel.org>
+ <20161222081713.GA32480@node.shutemov.name>
+ <20161222145203.GA18970@bbox>
+ <20161223091725.GA23117@dhcp22.suse.cz>
+ <20161223095336.GA5305@bbox>
+ <20161223115421.GD23109@dhcp22.suse.cz>
+Message-ID: <20161223140131.GA5724@bbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platforms like hi3660 need do reset first to allow accessing registers
+On Fri, Dec 23, 2016 at 12:54:21PM +0100, Michal Hocko wrote:
+> On Fri 23-12-16 18:53:36, Minchan Kim wrote:
+> > Hi,
+> > 
+> > On Fri, Dec 23, 2016 at 10:17:25AM +0100, Michal Hocko wrote:
+> > > On Thu 22-12-16 23:52:03, Minchan Kim wrote:
+> > > [...]
+> > > > >From b3ec95c0df91ad113525968a4a6b53030fd0b48d Mon Sep 17 00:00:00 2001
+> > > > From: Minchan Kim <minchan@kernel.org>
+> > > > Date: Thu, 22 Dec 2016 23:43:49 +0900
+> > > > Subject: [PATCH v2] mm: pmd dirty emulation in page fault handler
+> > > > 
+> > > > Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
+> > > > http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
+> > > > 
+> > > > The problem is page fault handler supports only accessed flag emulation
+> > > > for THP page of SW-dirty/accessed architecture.
+> > > > 
+> > > > This patch enables dirty-bit emulation for those architectures.
+> > > > Without it, MADV_FREE makes application hang by repeated fault forever.
+> > > 
+> > > The changelog is rather terse and considering the issue is rather subtle
+> > > and it aims the stable tree I think it could see more information. How
+> > > do we end up looping in the page fault and why the dirty pmd stops it.
+> > > Could you update the changelog to be more verbose, please? I am still
+> > > digesting this patch but I believe it is correct fwiw...
+> > > 
+> > 
+> > How about this? Feel free to suggest better wording.
+> > 
+> > Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
+> > http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
+> > 
+> > The problem is currently page fault handler doesn't supports dirty bit
+> > emulation of pte for non-HW dirty-bit architecture so that application
+> 
+> s at pte@pmd@ ?
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Tested-by: Ramiro Oliveira <ramiro.oliveira@synopsys.com>
----
- drivers/i2c/busses/i2c-designware-core.h    |  1 +
- drivers/i2c/busses/i2c-designware-platdrv.c | 28 ++++++++++++++++++++++++----
- 2 files changed, 25 insertions(+), 4 deletions(-)
+It would be more clear. Will update with it.
 
-diff --git a/drivers/i2c/busses/i2c-designware-core.h b/drivers/i2c/busses/i2c-designware-core.h
-index 0d44d2a..94b14fa 100644
---- a/drivers/i2c/busses/i2c-designware-core.h
-+++ b/drivers/i2c/busses/i2c-designware-core.h
-@@ -80,6 +80,7 @@ struct dw_i2c_dev {
- 	void __iomem		*base;
- 	struct completion	cmd_complete;
- 	struct clk		*clk;
-+	struct reset_control	*rst;
- 	u32			(*get_clk_rate_khz) (struct dw_i2c_dev *dev);
- 	struct dw_pci_controller *controller;
- 	int			cmd_err;
-diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-index 0b42a12..1fbe66f 100644
---- a/drivers/i2c/busses/i2c-designware-platdrv.c
-+++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-@@ -38,6 +38,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/property.h>
- #include <linux/io.h>
-+#include <linux/reset.h>
- #include <linux/slab.h>
- #include <linux/acpi.h>
- #include <linux/platform_data/i2c-designware.h>
-@@ -176,6 +177,14 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
- 	dev->irq = irq;
- 	platform_set_drvdata(pdev, dev);
- 
-+	dev->rst = devm_reset_control_get_optional_exclusive(&pdev->dev, NULL);
-+	if (IS_ERR(dev->rst)) {
-+		if (PTR_ERR(dev->rst) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+	} else {
-+		reset_control_deassert(dev->rst);
-+	}
-+
- 	/* fast mode by default because of legacy reasons */
- 	dev->clk_freq = 400000;
- 
-@@ -207,12 +216,13 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
- 	    && dev->clk_freq != 1000000 && dev->clk_freq != 3400000) {
- 		dev_err(&pdev->dev,
- 			"Only 100kHz, 400kHz, 1MHz and 3.4MHz supported");
--		return -EINVAL;
-+		r = -EINVAL;
-+		goto exit_reset;
- 	}
- 
- 	r = i2c_dw_eval_lock_support(dev);
- 	if (r)
--		return r;
-+		goto exit_reset;
- 
- 	dev->functionality =
- 		I2C_FUNC_I2C |
-@@ -270,10 +280,18 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
- 	}
- 
- 	r = i2c_dw_probe(dev);
--	if (r && !dev->pm_runtime_disabled)
--		pm_runtime_disable(&pdev->dev);
-+	if (r)
-+		goto exit_probe;
- 
- 	return r;
-+
-+exit_probe:
-+	if (!dev->pm_runtime_disabled)
-+		pm_runtime_disable(&pdev->dev);
-+exit_reset:
-+	if (!IS_ERR_OR_NULL(dev->rst))
-+		reset_control_assert(dev->rst);
-+	return r;
- }
- 
- static int dw_i2c_plat_remove(struct platform_device *pdev)
-@@ -290,6 +308,8 @@ static int dw_i2c_plat_remove(struct platform_device *pdev)
- 	pm_runtime_put_sync(&pdev->dev);
- 	if (!dev->pm_runtime_disabled)
- 		pm_runtime_disable(&pdev->dev);
-+	if (!IS_ERR_OR_NULL(dev->rst))
-+		reset_control_assert(dev->rst);
- 
- 	return 0;
- }
--- 
-2.7.4
+> 
+> > stucks until VM marked the pmd dirty.
+> > 
+> > How the emulation work depends on the architecture. In case of arm64,
+> > when it set up pte firstly, it sets pte PTE_RDONLY to get a chance to
+> > mark the pte dirty via triggering page fault when store access happens.
+> > Once the page fault occurs, VM marks the pte dirty and arch code for
+> > setting pte will clear PTE_RDONLY for application to proceed.
+> > 
+> > IOW, if VM doesn't mark the pte dirty, application hangs forever by
+> > repeated fault(i.e., store op but the pte is PTE_RDONLY).
+> > 
+> > This patch enables dirty-bit emulation for those architectures.
+> 
+> Yes this is helpful and much more clear, thank you. One thing that is
+> still not clear to me is why cannot we handle that in the arch specific
+> code. I mean what is the side effect of doing pmd_mkdirty for
+> architectures which do not need it?
+
+For architecture which supports H/W access/dirty bit, it couldn't be
+reached there code path so there is no side effect, I think. A thing
+I can think of is just increasing code size little bit. Maybe, we
+could optimize away some ifdef magic but not sure worth it. We have
+been same way pte(not pmd) emulation handling for several decacdes.
+Anyway, it should be off-topic, I think.
+
+Thanks.
+
+> 
+> -- 
+> Michal Hocko
+> SUSE Labs
