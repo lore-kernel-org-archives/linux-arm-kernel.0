@@ -1,188 +1,120 @@
 From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Fri, 23 Dec 2016 14:22:13 +0530
-Subject: [PATCH v2 1/3] dmaengine: xilinx_dma: Check for channel idle state
- before submitting dma descriptor
+Date: Fri, 23 Dec 2016 14:22:14 +0530
+Subject: [PATCH v2 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
+ stores scenario in vdma
 In-Reply-To: <1482483135-14767-1-git-send-email-appanad@xilinx.com>
 References: <1482483135-14767-1-git-send-email-appanad@xilinx.com>
-Message-ID: <1482483135-14767-2-git-send-email-appanad@xilinx.com>
+Message-ID: <1482483135-14767-3-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add channel idle state to ensure that dma descriptor is not
-submitted when VDMA engine is in progress.
+When VDMA is configured for more than one frame in the h/w
+for example h/w is configured for n number of frames and user
+Submits n number of frames and triggered the DMA using issue_pending API.
+In the current driver flow we are submitting one frame at a time
+but we should submit all the n number of frames at one time as the h/w
+Is configured for n number of frames.
 
-Reviewed-by: Jose Abreu <joabreu@synopsys.com>
+This patch fixes this issue.
+
 Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 ---
-Changes fro v2:
----> Add idle check in the reset as suggested by Jose Abreu
----> Removed xilinx_dma_is_running/xilinx_dma_is_idle checks
-    in the driver and used common idle checks across the driver
-    as suggested by Laurent Pinchart.
+Changes for v2:
+---> Fixed race conditions in the driver as suggested by Jose Abreu
+---> Fixed unnecessray if else checks in the vdma_start_transfer
+     as suggested by Laurent Pinchart.
 
- drivers/dma/xilinx/xilinx_dma.c | 56 +++++++++++++----------------------------
- 1 file changed, 17 insertions(+), 39 deletions(-)
+ drivers/dma/xilinx/xilinx_dma.c | 54 +++++++++++++++++++++++------------------
+ 1 file changed, 31 insertions(+), 23 deletions(-)
 
 diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-index 8288fe4..be7eb41 100644
+index be7eb41..cf9edd8 100644
 --- a/drivers/dma/xilinx/xilinx_dma.c
 +++ b/drivers/dma/xilinx/xilinx_dma.c
-@@ -321,6 +321,7 @@ struct xilinx_dma_tx_descriptor {
-  * @cyclic: Check for cyclic transfers.
-  * @genlock: Support genlock mode
-  * @err: Channel has errors
-+ * @idle: Check for channel idle
-  * @tasklet: Cleanup work after irq
-  * @config: Device configuration info
-  * @flush_on_fsync: Flush on Frame sync
-@@ -351,6 +352,7 @@ struct xilinx_dma_chan {
- 	bool cyclic;
- 	bool genlock;
- 	bool err;
-+	bool idle;
- 	struct tasklet_struct tasklet;
- 	struct xilinx_vdma_config config;
- 	bool flush_on_fsync;
-@@ -920,32 +922,6 @@ static enum dma_status xilinx_dma_tx_status(struct dma_chan *dchan,
- }
+@@ -1052,25 +1052,38 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
+ 	if (chan->has_sg) {
+ 		dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
+ 				tail_segment->phys);
++		list_splice_tail_init(&chan->pending_list, &chan->active_list);
++		chan->desc_pendingcount = 0;
+ 	} else {
+ 		struct xilinx_vdma_tx_segment *segment, *last = NULL;
+-		int i = 0;
++		int i = 0, j = 0;
  
- /**
-- * xilinx_dma_is_running - Check if DMA channel is running
-- * @chan: Driver specific DMA channel
-- *
-- * Return: '1' if running, '0' if not.
-- */
--static bool xilinx_dma_is_running(struct xilinx_dma_chan *chan)
--{
--	return !(dma_ctrl_read(chan, XILINX_DMA_REG_DMASR) &
--		 XILINX_DMA_DMASR_HALTED) &&
--		(dma_ctrl_read(chan, XILINX_DMA_REG_DMACR) &
--		 XILINX_DMA_DMACR_RUNSTOP);
--}
+ 		if (chan->desc_submitcount < chan->num_frms)
+ 			i = chan->desc_submitcount;
+ 
+-		list_for_each_entry(segment, &desc->segments, node) {
+-			if (chan->ext_addr)
+-				vdma_desc_write_64(chan,
+-					XILINX_VDMA_REG_START_ADDRESS_64(i++),
+-					segment->hw.buf_addr,
+-					segment->hw.buf_addr_msb);
+-			else
+-				vdma_desc_write(chan,
+-					XILINX_VDMA_REG_START_ADDRESS(i++),
+-					segment->hw.buf_addr);
 -
--/**
-- * xilinx_dma_is_idle - Check if DMA channel is idle
-- * @chan: Driver specific DMA channel
-- *
-- * Return: '1' if idle, '0' if not.
-- */
--static bool xilinx_dma_is_idle(struct xilinx_dma_chan *chan)
--{
--	return dma_ctrl_read(chan, XILINX_DMA_REG_DMASR) &
--		XILINX_DMA_DMASR_IDLE;
--}
--
--/**
-  * xilinx_dma_halt - Halt DMA channel
-  * @chan: Driver specific DMA channel
-  */
-@@ -966,6 +942,7 @@ static void xilinx_dma_halt(struct xilinx_dma_chan *chan)
- 			chan, dma_ctrl_read(chan, XILINX_DMA_REG_DMASR));
- 		chan->err = true;
- 	}
-+	chan->idle = true;
- }
- 
- /**
-@@ -1007,6 +984,9 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
- 	if (chan->err)
- 		return;
- 
-+	if (!chan->idle)
-+		return;
+-			last = segment;
++		for (j = 0; j < chan->num_frms; ) {
++			list_for_each_entry(segment, &desc->segments, node) {
++				if (chan->ext_addr)
++					vdma_desc_write_64(chan,
++					  XILINX_VDMA_REG_START_ADDRESS_64(i++),
++					  segment->hw.buf_addr,
++					  segment->hw.buf_addr_msb);
++				else
++					vdma_desc_write(chan,
++					    XILINX_VDMA_REG_START_ADDRESS(i++),
++					    segment->hw.buf_addr);
 +
- 	if (list_empty(&chan->pending_list))
- 		return;
++				last = segment;
++			}
++			list_del(&desc->node);
++			list_add_tail(&desc->node, &chan->active_list);
++			j++;
++			if (list_empty(&chan->pending_list) ||
++			    (i == chan->num_frms))
++				break;
++			desc = list_first_entry(&chan->pending_list,
++						struct xilinx_dma_tx_descriptor,
++						node);
+ 		}
  
-@@ -1018,13 +998,6 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
- 	tail_segment = list_last_entry(&tail_desc->segments,
- 				       struct xilinx_vdma_tx_segment, node);
- 
--	/* If it is SG mode and hardware is busy, cannot submit */
--	if (chan->has_sg && xilinx_dma_is_running(chan) &&
--	    !xilinx_dma_is_idle(chan)) {
--		dev_dbg(chan->dev, "DMA controller still busy\n");
--		return;
--	}
--
- 	/*
- 	 * If hardware is idle, then all descriptors on the running lists are
- 	 * done, start new transfers
-@@ -1110,6 +1083,7 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
+ 		if (!last)
+@@ -1081,20 +1094,14 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
+ 		vdma_desc_write(chan, XILINX_DMA_REG_FRMDLY_STRIDE,
+ 				last->hw.stride);
  		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last->hw.vsize);
- 	}
- 
-+	chan->idle = false;
- 	if (!chan->has_sg) {
- 		list_del(&desc->node);
- 		list_add_tail(&desc->node, &chan->active_list);
-@@ -1136,6 +1110,9 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
- 	if (chan->err)
- 		return;
- 
-+	if (!chan->idle)
-+		return;
-+
- 	if (list_empty(&chan->pending_list))
- 		return;
- 
-@@ -1181,6 +1158,7 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
- 
- 	list_splice_tail_init(&chan->pending_list, &chan->active_list);
- 	chan->desc_pendingcount = 0;
-+	chan->idle = false;
- }
- 
- /**
-@@ -1196,15 +1174,11 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
- 	if (chan->err)
- 		return;
- 
--	if (list_empty(&chan->pending_list))
-+	if (!chan->idle)
- 		return;
- 
--	/* If it is SG mode and hardware is busy, cannot submit */
--	if (chan->has_sg && xilinx_dma_is_running(chan) &&
--	    !xilinx_dma_is_idle(chan)) {
--		dev_dbg(chan->dev, "DMA controller still busy\n");
-+	if (list_empty(&chan->pending_list))
- 		return;
 -	}
  
- 	head_desc = list_first_entry(&chan->pending_list,
- 				     struct xilinx_dma_tx_descriptor, node);
-@@ -1302,6 +1276,7 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
- 
- 	list_splice_tail_init(&chan->pending_list, &chan->active_list);
- 	chan->desc_pendingcount = 0;
+-	chan->idle = false;
+-	if (!chan->has_sg) {
+-		list_del(&desc->node);
+-		list_add_tail(&desc->node, &chan->active_list);
+-		chan->desc_submitcount++;
+-		chan->desc_pendingcount--;
++		chan->desc_submitcount += j;
++		chan->desc_pendingcount -= j;
+ 		if (chan->desc_submitcount == chan->num_frms)
+ 			chan->desc_submitcount = 0;
+-	} else {
+-		list_splice_tail_init(&chan->pending_list, &chan->active_list);
+-		chan->desc_pendingcount = 0;
+ 	}
++
 +	chan->idle = false;
  }
  
  /**
-@@ -1366,6 +1341,7 @@ static int xilinx_dma_reset(struct xilinx_dma_chan *chan)
- 	}
+@@ -1342,6 +1349,7 @@ static int xilinx_dma_reset(struct xilinx_dma_chan *chan)
  
  	chan->err = false;
-+	chan->idle = true;
+ 	chan->idle = true;
++	chan->desc_submitcount = 0;
  
  	return err;
  }
-@@ -1447,6 +1423,7 @@ static irqreturn_t xilinx_dma_irq_handler(int irq, void *data)
- 	if (status & XILINX_DMA_DMASR_FRM_CNT_IRQ) {
- 		spin_lock(&chan->lock);
- 		xilinx_dma_complete_descriptor(chan);
-+		chan->idle = true;
- 		chan->start_transfer(chan);
- 		spin_unlock(&chan->lock);
- 	}
-@@ -2327,6 +2304,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
- 	chan->has_sg = xdev->has_sg;
- 	chan->desc_pendingcount = 0x0;
- 	chan->ext_addr = xdev->ext_addr;
-+	chan->idle = true;
- 
- 	spin_lock_init(&chan->lock);
- 	INIT_LIST_HEAD(&chan->pending_list);
 -- 
 2.1.2
