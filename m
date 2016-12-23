@@ -1,388 +1,68 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 23 Dec 2016 04:48:32 +0200
-Subject: [PATCH 3/3] dmaengine: pl330: Don't require irq-safe runtime PM
-In-Reply-To: <1482408689-21971-4-git-send-email-m.szyprowski@samsung.com>
-References: <1482408689-21971-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20161222121159epcas1p2e64486c51ae3b824f35ffb082d04f178@epcas1p2.samsung.com>
- <1482408689-21971-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20161223024832.GA4178@kozik-lap>
+From: jerry.huang@nxp.com (Jerry Huang)
+Date: Fri, 23 Dec 2016 02:52:49 +0000
+Subject: [PATCH v3 2/3] USB3/DWC3: Add property "snps,
+ incr-burst-type-adjustment" for INCR burst type
+In-Reply-To: <20161222184514.hfd4g7ifrz5cv627@rob-hp-laptop>
+References: <1482139554-13618-1-git-send-email-jerry.huang@nxp.com>
+ <1482139554-13618-2-git-send-email-jerry.huang@nxp.com>
+ <20161222184514.hfd4g7ifrz5cv627@rob-hp-laptop>
+Message-ID: <DB5PR0401MB1813E210B2ADE1C9493F7768FE950@DB5PR0401MB1813.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2016 at 01:11:29PM +0100, Marek Szyprowski wrote:
-> This patch replaces irq-safe runtime pm with non-irq-safe version.
+Hi, Rob,
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Friday, December 23, 2016 2:45 AM
+> To: Jerry Huang <jerry.huang@nxp.com>
+> Cc: balbi at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
+> will.deacon at arm.com; linux at armlinux.org.uk; devicetree at vger.kernel.org;
+> linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v3 2/3] USB3/DWC3: Add property "snps, incr-burst-
+> type-adjustment" for INCR burst type
 > 
-> Till now non-irq-safe runtime PM implementation was only possible by calling
-> pm_runtime_get/put functions from alloc/free_chan_resources. All other DMA
-> engine API functions cannot be called from a context, which allows sleeping.
-> Such implementation in practice resulted in keeping PL330 DMA controller
-> device active almost all the time, because most of the slave device drivers
-> (DMA engine clients) acquired DMA channel in their probe() function and
-> released it during driver removal.
-
-I think that is not accurate (unless something changed recently and I
-missed it)... The runtime PM in pl330 was infact suspending device when
-the queue was empty. It was working during the regular work of DMA and
-slave devices.
-
-Maybe your recent fix changed this?
-
-> This patch provides a new approach.
-
-Please say why this approach is better because the previous one - was
-suspending the dma channel when not used. Otherwise, it would make no
-sense of implement the irq-safe runtime PM at the beginning!
-
-Of course, a change from irq-safe to non-irq-safe is a good reason to
-implement changes. But that was not mentioned in the first paragraph at
-all.
-
-> The main assumption for it is an
-> observation that there can be only one slave device using each DMA channel.
-
-Wait, observation, real requirement or assumption?
-
-Later in the code I see adding such requirement.
-
-> Using recently introduced device dependencies (links) infrastructure one can
-> ensure proper runtime PM state of PL330 DMA controller. In this approach in
-> pl330_alloc_chan_resources() function a new dependency is being created
-> between PL330 DMA controller device (as supplier) and given slave device
-> (as consumer). This way PL330 DMA controller device runtime active counter
-> is increased when the slave device is resumed and decreased the same time
-> when given slave device is put to suspend. This way it has been ensured to
-> keep PL330 DMA controller runtime active if there is an active used of any
-> of its DMA channels. Slave device pointer is initially stored in per-channel
-> data in of_dma_xlate callback. This is similar to what has been already
-> implemented in Exynos IOMMU driver in commit 2f5f44f205cc958b
-> ("iommu/exynos: Use device dependency links to control runtime pm").
-
-Sounds convincing... Interesting approach!
-
-My doubts are:
-1. What with more then one slave device? (assumption?)
-2. If slave device does not implement runtime PM, then pl330 will be
-   active all the time?
-3. If slave device implements runtime PM in a way that it's enabled in
-   probe and released in remove, then pl330 will be active all the time?
-
+> On Mon, Dec 19, 2016 at 05:25:53PM +0800, Changming Huang wrote:
+> > New property "snps,incr-burst-type-adjustment = <x>, <y>" for USB3.0
+> DWC3.
+> > Field "x": 1/0 - undefined length INCR burst type enable or not; Field
+> > "y": INCR4/INCR8/INCR16/INCR32/INCR64/INCR128/INCR256 burst type.
+> >
+> > While enabling undefined length INCR burst type and INCR16 burst type,
+> > get better write performance on NXP Layerscape platform:
+> > around 3% improvement (from 364MB/s to 375MB/s).
+> >
+> > Signed-off-by: Changming Huang <jerry.huang@nxp.com>
+> > ---
+> > Changes in v3:
+> >   - add new property for INCR burst in usb node.
+> >
+> >  Documentation/devicetree/bindings/usb/dwc3.txt |    5 +++++
+> >  arch/arm/boot/dts/ls1021a.dtsi                 |    1 +
+> >  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |    3 +++
+> >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |    2 ++
+> >  4 files changed, 11 insertions(+)
+> >
+> > diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt
+> > b/Documentation/devicetree/bindings/usb/dwc3.txt
+> > index e3e6983..8c405a3 100644
+> > --- a/Documentation/devicetree/bindings/usb/dwc3.txt
+> > +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
+> > @@ -55,6 +55,10 @@ Optional properties:
+> >  	fladj_30mhz_sdbnd signal is invalid or incorrect.
+> >
+> >   - <DEPRECATED> tx-fifo-resize: determines if the FIFO *has* to be
+> reallocated.
+> > + - snps,incr-burst-type-adjustment: Value for INCR burst type of
+> GSBUSCFG0
+> > +	register, undefined length INCR burst type enable and INCRx type.
+> > +	First field is for undefined length INCR burst type enable or not.
+> > +	Second field is for largest INCRx type enabled.
 > 
-> If one requests memory-to-memory chanel, runtime active counter is
-> increased unconditionally. This might be a drawback of this approach, but
-> PL330 is not really used for memory-to-memory operations due to poor
-> performance in such operations compared to CPU.
-> 
-> Introducing non-irq-safe runtime power management finally allows to turn
-> audio power domain off on Exynos5 SoCs.
-
-... and actually any domain which contained pl330 device so this is nice
-benefit!
-
-> 
-> Removal of irq-safe runtime pm is based on the revert of the following
-> commits:
-> 1. "dmaengine: pl330: fix runtime pm support" commit <no stable id yet>
-> 2. "dmaengine: pl330: Fix hang on dmaengine_terminate_all on certain boards"
->    commit 81cc6edc08705ac0146fe6ac14a0982a31ce6f3d
-> 3. "ARM: 8202/1: dmaengine: pl330: Add runtime Power Management support v12"
->    commit ae43b3289186480f81c78bb63d788a85a3631f47
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/dma/pl330.c | 133 +++++++++++++++++++++++++++-------------------------
->  1 file changed, 70 insertions(+), 63 deletions(-)
-> 
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 3c80e71..2cffbb4 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -268,9 +268,6 @@ enum pl330_byteswap {
->  
->  #define NR_DEFAULT_DESC	16
->  
-> -/* Delay for runtime PM autosuspend, ms */
-> -#define PL330_AUTOSUSPEND_DELAY 20
-> -
->  /* Populated by the PL330 core driver for DMA API driver's info */
->  struct pl330_config {
->  	u32	periph_id;
-> @@ -449,7 +446,8 @@ struct dma_pl330_chan {
->  	bool cyclic;
->  
->  	/* for runtime pm tracking */
-> -	bool active;
-> +	struct device *slave;
-> +	struct device_link *slave_link;
->  };
->  
->  struct pl330_dmac {
-> @@ -2015,7 +2013,6 @@ static void pl330_tasklet(unsigned long data)
->  	struct dma_pl330_chan *pch = (struct dma_pl330_chan *)data;
->  	struct dma_pl330_desc *desc, *_dt;
->  	unsigned long flags;
-> -	bool power_down = false;
->  
->  	spin_lock_irqsave(&pch->lock, flags);
->  
-> @@ -2030,18 +2027,10 @@ static void pl330_tasklet(unsigned long data)
->  	/* Try to submit a req imm. next to the last completed cookie */
->  	fill_queue(pch);
->  
-> -	if (list_empty(&pch->work_list)) {
-> -		spin_lock(&pch->thread->dmac->lock);
-> -		_stop(pch->thread);
-> -		spin_unlock(&pch->thread->dmac->lock);
-> -		power_down = true;
-> -		pch->active = false;
-> -	} else {
-> -		/* Make sure the PL330 Channel thread is active */
-> -		spin_lock(&pch->thread->dmac->lock);
-> -		_start(pch->thread);
-> -		spin_unlock(&pch->thread->dmac->lock);
-> -	}
-> +	/* Make sure the PL330 Channel thread is active */
-> +	spin_lock(&pch->thread->dmac->lock);
-> +	_start(pch->thread);
-> +	spin_unlock(&pch->thread->dmac->lock);
->  
->  	while (!list_empty(&pch->completed_list)) {
->  		struct dmaengine_desc_callback cb;
-> @@ -2054,13 +2043,6 @@ static void pl330_tasklet(unsigned long data)
->  		if (pch->cyclic) {
->  			desc->status = PREP;
->  			list_move_tail(&desc->node, &pch->work_list);
-> -			if (power_down) {
-> -				pch->active = true;
-> -				spin_lock(&pch->thread->dmac->lock);
-> -				_start(pch->thread);
-> -				spin_unlock(&pch->thread->dmac->lock);
-> -				power_down = false;
-> -			}
->  		} else {
->  			desc->status = FREE;
->  			list_move_tail(&desc->node, &pch->dmac->desc_pool);
-> @@ -2075,12 +2057,6 @@ static void pl330_tasklet(unsigned long data)
->  		}
->  	}
->  	spin_unlock_irqrestore(&pch->lock, flags);
-> -
-> -	/* If work list empty, power down */
-> -	if (power_down) {
-> -		pm_runtime_mark_last_busy(pch->dmac->ddma.dev);
-> -		pm_runtime_put_autosuspend(pch->dmac->ddma.dev);
-> -	}
->  }
->  
->  bool pl330_filter(struct dma_chan *chan, void *param)
-> @@ -2113,14 +2089,63 @@ static struct dma_chan *of_dma_pl330_xlate(struct of_phandle_args *dma_spec,
->  	if (chan_id >= pl330->num_peripherals)
->  		return NULL;
->  
-> +	if (!pl330->peripherals[chan_id].slave)
-> +		pl330->peripherals[chan_id].slave = slave;
-> +	else if (pl330->peripherals[chan_id].slave != slave) {
-> +		dev_err(pl330->ddma.dev,
-> +			"Can't use same channel with multiple slave devices!\n");
-> +		return NULL;
-> +	}
-
-This could be nicely split into separate patch.
-
-Best regards,
-Krzysztof
-
-> +
->  	return dma_get_slave_channel(&pl330->peripherals[chan_id].chan);
->  }
->  
-> +static int pl330_add_slave_link(struct pl330_dmac *pl330,
-> +				struct dma_pl330_chan *pch)
-> +{
-> +	struct device_link *link;
-> +	int i;
-> +
-> +	if (pch->slave_link)
-> +		return 0;
-> +
-> +	link = device_link_add(pch->slave, pl330->ddma.dev,
-> +				       DL_FLAG_PM_RUNTIME | DL_FLAG_RPM_ACTIVE);
-> +	if (!link)
-> +		return -ENODEV;
-> +
-> +	for (i = 0; i < pl330->num_peripherals; i++)
-> +		if (pl330->peripherals[i].slave == pch->slave)
-> +			pl330->peripherals[i].slave_link = link;
-> +	return 0;
-> +}
-> +
-> +static void pl330_del_slave_link(struct pl330_dmac *pl330,
-> +				 struct dma_pl330_chan *pch)
-> +{
-> +	struct device_link *link = pch->slave_link;
-> +	int i, count = 0;
-> +
-> +	for (i = 0; i < pl330->num_peripherals; i++)
-> +		if (pl330->peripherals[i].slave == pch->slave &&
-> +		    pl330->peripherals[i].thread)
-> +			count++;
-> +
-> +	if (count > 0)
-> +		return;
-> +
-> +	device_link_del(link);
-> +	for (i = 0; i < pl330->num_peripherals; i++)
-> +		if (pl330->peripherals[i].slave == pch->slave)
-> +			pch->slave_link = NULL;
-> +}
-> +
->  static int pl330_alloc_chan_resources(struct dma_chan *chan)
->  {
->  	struct dma_pl330_chan *pch = to_pchan(chan);
->  	struct pl330_dmac *pl330 = pch->dmac;
->  	unsigned long flags;
-> +	int ret = 0;
->  
->  	spin_lock_irqsave(&pch->lock, flags);
->  
-> @@ -2137,6 +2162,14 @@ static int pl330_alloc_chan_resources(struct dma_chan *chan)
->  
->  	spin_unlock_irqrestore(&pch->lock, flags);
->  
-> +	if (pch->slave)
-> +		ret = pl330_add_slave_link(pl330, pch);
-> +	else
-> +		ret = pm_runtime_get_sync(pl330->ddma.dev);
-> +
-> +	if (ret < 0)
-> +		return ret;
-> +
->  	return 1;
->  }
->  
-> @@ -2171,9 +2204,7 @@ static int pl330_terminate_all(struct dma_chan *chan)
->  	unsigned long flags;
->  	struct pl330_dmac *pl330 = pch->dmac;
->  	LIST_HEAD(list);
-> -	bool power_down = false;
->  
-> -	pm_runtime_get_sync(pl330->ddma.dev);
->  	spin_lock_irqsave(&pch->lock, flags);
->  	spin_lock(&pl330->lock);
->  	_stop(pch->thread);
-> @@ -2182,8 +2213,6 @@ static int pl330_terminate_all(struct dma_chan *chan)
->  	pch->thread->req[0].desc = NULL;
->  	pch->thread->req[1].desc = NULL;
->  	pch->thread->req_running = -1;
-> -	power_down = pch->active;
-> -	pch->active = false;
->  
->  	/* Mark all desc done */
->  	list_for_each_entry(desc, &pch->submitted_list, node) {
-> @@ -2200,10 +2229,6 @@ static int pl330_terminate_all(struct dma_chan *chan)
->  	list_splice_tail_init(&pch->work_list, &pl330->desc_pool);
->  	list_splice_tail_init(&pch->completed_list, &pl330->desc_pool);
->  	spin_unlock_irqrestore(&pch->lock, flags);
-> -	pm_runtime_mark_last_busy(pl330->ddma.dev);
-> -	if (power_down)
-> -		pm_runtime_put_autosuspend(pl330->ddma.dev);
-> -	pm_runtime_put_autosuspend(pl330->ddma.dev);
->  
->  	return 0;
->  }
-> @@ -2221,7 +2246,6 @@ static int pl330_pause(struct dma_chan *chan)
->  	struct pl330_dmac *pl330 = pch->dmac;
->  	unsigned long flags;
->  
-> -	pm_runtime_get_sync(pl330->ddma.dev);
->  	spin_lock_irqsave(&pch->lock, flags);
->  
->  	spin_lock(&pl330->lock);
-> @@ -2229,8 +2253,6 @@ static int pl330_pause(struct dma_chan *chan)
->  	spin_unlock(&pl330->lock);
->  
->  	spin_unlock_irqrestore(&pch->lock, flags);
-> -	pm_runtime_mark_last_busy(pl330->ddma.dev);
-> -	pm_runtime_put_autosuspend(pl330->ddma.dev);
->  
->  	return 0;
->  }
-> @@ -2238,11 +2260,11 @@ static int pl330_pause(struct dma_chan *chan)
->  static void pl330_free_chan_resources(struct dma_chan *chan)
->  {
->  	struct dma_pl330_chan *pch = to_pchan(chan);
-> +	struct pl330_dmac *pl330 = pch->dmac;
->  	unsigned long flags;
->  
->  	tasklet_kill(&pch->task);
->  
-> -	pm_runtime_get_sync(pch->dmac->ddma.dev);
->  	spin_lock_irqsave(&pch->lock, flags);
->  
->  	pl330_release_channel(pch->thread);
-> @@ -2252,19 +2274,20 @@ static void pl330_free_chan_resources(struct dma_chan *chan)
->  		list_splice_tail_init(&pch->work_list, &pch->dmac->desc_pool);
->  
->  	spin_unlock_irqrestore(&pch->lock, flags);
-> -	pm_runtime_mark_last_busy(pch->dmac->ddma.dev);
-> -	pm_runtime_put_autosuspend(pch->dmac->ddma.dev);
-> +
-> +	if (pch->slave)
-> +		pl330_del_slave_link(pl330, pch);
-> +	else
-> +		pm_runtime_put(pl330->ddma.dev);
->  }
->  
->  static int pl330_get_current_xferred_count(struct dma_pl330_chan *pch,
->  					   struct dma_pl330_desc *desc)
->  {
->  	struct pl330_thread *thrd = pch->thread;
-> -	struct pl330_dmac *pl330 = pch->dmac;
->  	void __iomem *regs = thrd->dmac->base;
->  	u32 val, addr;
->  
-> -	pm_runtime_get_sync(pl330->ddma.dev);
->  	val = addr = 0;
->  	if (desc->rqcfg.src_inc) {
->  		val = readl(regs + SA(thrd->id));
-> @@ -2273,8 +2296,6 @@ static int pl330_get_current_xferred_count(struct dma_pl330_chan *pch,
->  		val = readl(regs + DA(thrd->id));
->  		addr = desc->px.dst_addr;
->  	}
-> -	pm_runtime_mark_last_busy(pch->dmac->ddma.dev);
-> -	pm_runtime_put_autosuspend(pl330->ddma.dev);
->  
->  	/* If DMAMOV hasn't finished yet, SAR/DAR can be zero */
->  	if (!val)
-> @@ -2360,16 +2381,6 @@ static void pl330_issue_pending(struct dma_chan *chan)
->  	unsigned long flags;
->  
->  	spin_lock_irqsave(&pch->lock, flags);
-> -	if (list_empty(&pch->work_list)) {
-> -		/*
-> -		 * Warn on nothing pending. Empty submitted_list may
-> -		 * break our pm_runtime usage counter as it is
-> -		 * updated on work_list emptiness status.
-> -		 */
-> -		WARN_ON(list_empty(&pch->submitted_list));
-> -		pch->active = true;
-> -		pm_runtime_get_sync(pch->dmac->ddma.dev);
-> -	}
->  	list_splice_tail_init(&pch->submitted_list, &pch->work_list);
->  	spin_unlock_irqrestore(&pch->lock, flags);
->  
-> @@ -2987,11 +2998,7 @@ static int __maybe_unused pl330_resume(struct device *dev)
->  		pcfg->data_buf_dep, pcfg->data_bus_width / 8, pcfg->num_chan,
->  		pcfg->num_peri, pcfg->num_events);
->  
-> -	pm_runtime_irq_safe(&adev->dev);
-> -	pm_runtime_use_autosuspend(&adev->dev);
-> -	pm_runtime_set_autosuspend_delay(&adev->dev, PL330_AUTOSUSPEND_DELAY);
-> -	pm_runtime_mark_last_busy(&adev->dev);
-> -	pm_runtime_put_autosuspend(&adev->dev);
-> +	pm_runtime_put(&adev->dev);
->  
->  	return 0;
->  probe_err3:
-> -- 
-> 1.9.1
-> 
+> Why do you need the first field? Is the 2nd field used if the 1st is 0?
+> If not, then just use the presence of the property to enable or not.
+The first field is one switch.
+When it is 1, means undefined length INCR burst type enabled, we can use any length less than or equal to the largest-enabled burst length of INCR4/8/16/32/64/128/256. 
+When it is zero, means INCRx burst mode enabled, we can use one fixed burst length of 1/4/8/16/32/64/128/256 byte.
+So, the 2nd field is used if the 1st is 0, we need to select one largest burst length the USB controller can support.
+If we don't want to change the value of this register (use the default value), we don't need to add this property to usb node.
