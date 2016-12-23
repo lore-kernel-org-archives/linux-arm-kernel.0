@@ -1,76 +1,60 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Fri, 23 Dec 2016 10:55:35 -0600
+Date: Fri, 23 Dec 2016 11:05:58 -0600
 Subject: [PATCH 1/2] soc: ti: Use remoteproc auto_boot feature
-In-Reply-To: <b7457597-d69c-4d2c-5229-0678d7c41f48@codeaurora.org>
+In-Reply-To: <9092e066-b2ad-ee42-de5f-d66b84a10cfd@codeaurora.org>
 References: <1481846632-4778-1-git-send-email-spjoshi@codeaurora.org>
- <1f5b2631-f744-a5c1-55c1-82eb27d5cbd7@ti.com> <20161222130246.GA8359@builder>
- <b7457597-d69c-4d2c-5229-0678d7c41f48@codeaurora.org>
-Message-ID: <83ea95e2-58a1-b19b-2202-abc271bd241e@ti.com>
+ <1f5b2631-f744-a5c1-55c1-82eb27d5cbd7@ti.com>
+ <9092e066-b2ad-ee42-de5f-d66b84a10cfd@codeaurora.org>
+Message-ID: <1f847af8-6bde-4645-aea4-7e9b02306e39@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Sarang,
 
-On 12/22/2016 06:07 PM, Sarangdhar Joshi wrote:
-> On 12/22/2016 5:02 AM, Bjorn Andersson wrote:
->> On Wed 21 Dec 19:16 PST 2016, Suman Anna wrote:
 >>
->>> Hi Sarang,
+>> On 12/15/2016 06:03 PM, Sarangdhar Joshi wrote:
+>>> The function wkup_m3_rproc_boot_thread waits for asynchronous
+>>> firmware loading to complete successfully before calling
+>>> rproc_boot(). The same can be achieved by just setting
+>>> rproc->auto_boot flag. Change this. As a result this change
+>>> removes wkup_m3_rproc_boot_thread and moves m3_ipc->sync_complete
+>>> initialization to the wkup_m3_ipc_probe().
 >>>
->>> On 12/15/2016 06:03 PM, Sarangdhar Joshi wrote:
->>>> The function wkup_m3_rproc_boot_thread waits for asynchronous
->>>> firmware loading to complete successfully before calling
->>>> rproc_boot(). The same can be achieved by just setting
->>>> rproc->auto_boot flag. Change this. As a result this change
->>>> removes wkup_m3_rproc_boot_thread and moves m3_ipc->sync_complete
->>>> initialization to the wkup_m3_ipc_probe().
->>>>
->>>> Other than the current usage, the firmware_loading_complete is
->>>> only used in rproc_del() where it's no longer needed.  This
->>>> change is in preparation for removing firmware_loading_complete
->>>> completely.
->>>
->>> Based on the comments so far, I am assuming that you are dropping this
->>> series.
->>>
+>>> Other than the current usage, the firmware_loading_complete is
+>>> only used in rproc_del() where it's no longer needed.  This
+>>> change is in preparation for removing firmware_loading_complete
+>>> completely.
 >>
->> Following up on those comments only revealed that we have several other
->> similar race conditions, so I'm hoping that Sarangdhar will continue to
->> work on fixing those - and in this process get rid of this completion.
->>
->>> In any case, this series did break our PM stack. We definitely don't
->>> want to auto-boot the wkup_m3_rproc device, that responsibility will
->>> need to stay with the wkup_m3_ipc driver.
->>>
->>
->> Reviewing the wkup_m3 situation again I see that as we have moved the
->> resource table parsing to the rproc_boot() path there's no longer any
->> need for the wkup_m3_ipc driver to wait for the remoteproc-core-internal
->> completion.
->>
->> If rproc_get_by_phandle() returns non-NULL it is initialized. We still
->> don't want to call rproc_boot() from wkup_m3_ipc_probe(), so let's keep
->> the wkup_m3_rproc_boot_thread().
+>> Based on the comments so far, I am assuming that you are dropping this
+>> series.
 > 
-> Did you mean it's okay to call rproc_boot() from wkup_m3_ipc_probe()?
-> rproc_boot() calls request_firmware() anyways and so there is no need to
-> wait for completion of asynchronous firmware loading.
+> No, may not be dropping this. Will try to handle it differently in
+> rproc_del() (probably by making use of some state flag).
+>>
+>> In any case, this series did break our PM stack. We definitely don't
+>> want to auto-boot the wkup_m3_rproc device, that responsibility will
+>> need to stay with the wkup_m3_ipc driver.
+> 
+> Which scenario did it break? Booting up rproc device before
+> wkup_m3_ipc_probe() causes issues?
 
-No, please retain the kthread. I think you miss the purpose of this wait
-for completion originally. Before all the core changes in 4.9, the
-resource table is parsed in the first asynchronous loading step, and we
-had to wait for that step to complete. Now that there's no table parsing
-during the request_firmware_no_wait() for non auto-boot, we can get away
-from the need for a synchronzition call.
+Yes, our state machine requires the wkup_m3_ipc driver to control the
+boot of the wkup_m3 remoteproc. The wkup_m3 is not a typical remoteproc,
+it is our PM master and is responsible for putting the host processor
+into suspend and waking it up in system suspend/cpuidle paths.
+The remoteproc infrastructure is only used for load/boot, but the Linux
+PM state machine and communication is all controlled by the wkup_m3_ipc
+driver.
 
 > 
->>
->> Sarangdhar, could you update the wkup_m3_ipc patch to just drop the
->> wait_for_completion() call?
-> 
-> Sure, assuming we should still keep the rproc_boot() call in the kthread.
+> Nevertheless, I think Bjorn's suggestion of just dropping the call to
+> wait_for_completion() and keeping kthread looks good, also because of
+> the fact that rproc_boot() anyways calls request_firmware() and no
+> longer needed to wait on asynchronous loading of firmware.
 
-Yep.
+Yeah, I will have to test this, but looking at current code, this should
+mostly be ok because of the remoteproc core changes w.r.t resource table
+parsing.
 
 regards
 Suman
