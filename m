@@ -1,47 +1,64 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 23 Dec 2016 09:32:56 +0100
-Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21,
- i.MX27 and i.MX31 SoCs
-In-Reply-To: <bedae3d8-3057-36e4-1d89-ec41f9f1a25b@mleia.com>
-References: <20161211010648.6591-1-vz@mleia.com>
- <20161211093519.xrxxhrqpc7fmadfr@pengutronix.de>
- <d6d987f1-3461-214a-0ca1-16d310ddd370@mleia.com>
- <20161211102634.jn3awmlzdrm3pqai@pengutronix.de>
- <2fc2558d-fe05-14a7-745e-f71d2178bad6@mleia.com>
- <fe9b03bf-9c37-862f-b3aa-0f9b5a4dfefb@roeck-us.net>
- <bedae3d8-3057-36e4-1d89-ec41f9f1a25b@mleia.com>
-Message-ID: <20161223083256.3wdqou5xmhr7fidn@pengutronix.de>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Fri, 23 Dec 2016 08:49:07 +0000
+Subject: [PATCH 1/3] dmaengine: xilinx_dma: Check for channel idle state
+ before submitting dma descriptor
+In-Reply-To: <2156938.MvgiZll4tB@avalon>
+References: <1481814682-31780-1-git-send-email-appanad@xilinx.com>
+ <5248247.n0rV8xBPrZ@avalon>
+ <C246CAC1457055469EF09E3A7AC4E11A4A65D58E@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <2156938.MvgiZll4tB@avalon>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A65F569@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Laurent Pinchart,
 
-On Fri, Dec 23, 2016 at 10:20:20AM +0200, Vladimir Zapolskiy wrote:
-> On 12/23/2016 03:55 AM, Guenter Roeck wrote:
-> > What is the ultimate conclusion of this exchange ?
-> > 
-> > Are we going to get another version of the patch, or did everyone agree that
-> > the patch is good as it is and does not require further changes ?
-> > 
+	Sorry for the delay in the reply.
+	Thanks for the review...
 > 
-> I can not imagine a different fix.
+> Hi Kedar,
+> 
+> On Monday 19 Dec 2016 15:39:43 Appana Durga Kedareswara Rao wrote:
+> > Hi Laurent Pinchart,
+> >
+> > 	Thanks for the review...
+> >
+> > > > +	if (!chan->idle)
+> > > > +		return;
+> > >
+> > > Don't you need to perform the same check for the DMA and CDMA channels
+> ?
+> > > If so, shouldn't this be moved to common code ?
+> >
+> > Will fix it in v2...
+> >
+> > > There's another problem (not strictly introduced by this patch) I
+> > > wanted to mention. The append_desc_queue() function, called from
+> > > your tx_submit handler, appends descriptors to the pending_list. The
+> > > DMA engine API states that a transfer submitted by tx_submit will
+> > > not be executed until
+> > > .issue_pending() is called. However, if a transfer is in progress at
+> > > tx_submit time, I believe that the IRQ handler, at transfer
+> > > completion, will start the next transfer from the pending_list even
+> > > if
+> > > .issue_pending() hasn't been called for it.
+> > >
+> > > >  	if (list_empty(&chan->pending_list))
+> > > >  		return;
+> >
+> > If user submits more than h/w limit then that case only driver will
+> > process The descriptors from the pending_list for other cases the
+> > pending_list will be Empty so driver just returns from there.
+> 
+> I understand that, but that's not the problem. Your .tx_submit() handler calls
+> append_desc_queue() which adds the tx descriptor to the pending_list. If a
+> transfer is in progress at that time, I believe the transfer completion IRQ handler
+> will take the next descriptor from the pending_list and process it, even though
+> issue_pending() hasn't been called for it.
+> 
 
-my preferred fix would be:
+Thanks for the explanation...
+Agree will keep this my to-do list...
 
- - add an imx35 compatible to all newer dtsi
- - update the driver to only write the wmcr on imx35 compatible devices
-   adding only imx35.
-
-Compared to Vladimir's change this undoes 5fe65ce7ccbb ("watchdog:
-imx2_wdt: Disable power down counter on boot") on the newer generation
-SoCs until their dtb is updated. 5fe65ce7ccbb fixed a problem in 2014
-for these newer SoCs which wasn't urgent enough to be fixed earlier, so
-I'd say this isn't a big problem and in return the drivers and device
-trees stay simpler.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+Kedar.
