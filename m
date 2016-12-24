@@ -1,94 +1,68 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 24 Dec 2016 11:19:41 +0200
-Subject: [PATCH 3/3] dmaengine: pl330: Don't require irq-safe runtime PM
-In-Reply-To: <7e12d7cc-2dc1-2708-cabe-987d650ba3c5@samsung.com>
-References: <1482408689-21971-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20161222121159epcas1p2e64486c51ae3b824f35ffb082d04f178@epcas1p2.samsung.com>
- <1482408689-21971-4-git-send-email-m.szyprowski@samsung.com>
- <20161223024832.GA4178@kozik-lap>
- <7e12d7cc-2dc1-2708-cabe-987d650ba3c5@samsung.com>
-Message-ID: <20161224091941.GA4254@kozik-lap>
+Date: Sat, 24 Dec 2016 11:25:53 +0200
+Subject: [PATCH] PCI: exynos: refactor exynos pcie driver
+In-Reply-To: <1482490587-13611-1-git-send-email-pankaj.dubey@samsung.com>
+References: <CGME20161223105411epcas1p3727f726e757ec6c6d7bff04a9af40077@epcas1p3.samsung.com>
+ <1482490587-13611-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <20161224092553.GA4858@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 23, 2016 at 11:38:19AM +0100, Marek Szyprowski wrote:
+On Fri, Dec 23, 2016 at 04:26:27PM +0530, Pankaj Dubey wrote:
+> From: Niyas Ahmed S T <niyas.ahmed@samsung.com>
+> 
+> Currently Exynos PCIe driver is only supported for Exynos5440 SoC.
+> This patch does refactoring of Exynos PCIe driver to extend support
+> for other Exynos SoC.
+> 
+> Following are the main changes done via this patch:
+> 1) It adds separate structs for memory, clock resources.
+> 2) It add exynos_pcie_ops struct which will allow us to support the
+> differences in resources in different Exynos SoC.
+> 
+> No functional change intended.
+> 
+> Signed-off-by: Niyas Ahmed S T <niyas.ahmed@samsung.com>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+> This patch set is prepared on top of Krzysztof's for-next and
+> PCIe driver cleanup patch [1] by Jaehoon Chung.
+> 
+> [1]: https://lkml.org/lkml/2016/12/19/44
+> 
+> 
+>  drivers/pci/host/pci-exynos.c | 346 ++++++++++++++++++++++++++----------------
+>  1 file changed, 217 insertions(+), 129 deletions(-)
+
 
 (...)
 
-> >>The main assumption for it is an
-> >>observation that there can be only one slave device using each DMA channel.
-> >Wait, observation, real requirement or assumption?
-> >
-> >Later in the code I see adding such requirement.
-> 
-> Well, observation which result in assumption. I cannot imagine a hardware
-> which
-> shares slave DMA channel between devices. Also none of the existing platform
-> does it.
+  
+> @@ -573,14 +660,15 @@ static int __exit exynos_pcie_remove(struct platform_device *pdev)
+>  {
+>  	struct exynos_pcie *exynos_pcie = platform_get_drvdata(pdev);
+>  
+> -	clk_disable_unprepare(exynos_pcie->bus_clk);
+> -	clk_disable_unprepare(exynos_pcie->clk);
+> +	if (exynos_pcie->ops && exynos_pcie->ops->deinit_clk_resources)
+> +		exynos_pcie->ops->deinit_clk_resources(exynos_pcie);
+>  
+>  	return 0;
+>  }
+>  
+>  static const struct of_device_id exynos_pcie_of_match[] = {
+> -	{ .compatible = "samsung,exynos5440-pcie", },
+> +	{	.compatible = "samsung,exynos5440-pcie",
+> +		.data = &exynos5440_pcie_ops },
 
-OK for me.
+A nit, please put brackets in new lines, so:
+	{
+		...
+	},
 
-> 
-> >>Using recently introduced device dependencies (links) infrastructure one can
-> >>ensure proper runtime PM state of PL330 DMA controller. In this approach in
-> >>pl330_alloc_chan_resources() function a new dependency is being created
-> >>between PL330 DMA controller device (as supplier) and given slave device
-> >>(as consumer). This way PL330 DMA controller device runtime active counter
-> >>is increased when the slave device is resumed and decreased the same time
-> >>when given slave device is put to suspend. This way it has been ensured to
-> >>keep PL330 DMA controller runtime active if there is an active used of any
-> >>of its DMA channels. Slave device pointer is initially stored in per-channel
-> >>data in of_dma_xlate callback. This is similar to what has been already
-> >>implemented in Exynos IOMMU driver in commit 2f5f44f205cc958b
-> >>("iommu/exynos: Use device dependency links to control runtime pm").
-> >Sounds convincing... Interesting approach!
-> >
-> >My doubts are:
-> >1. What with more then one slave device? (assumption?)
-> 
-> See above, there are no such cases.
-> 
-> >2. If slave device does not implement runtime PM, then pl330 will be
-> >    active all the time?
-> 
-> Right, but the goal is to have runtime pm added to all devices in the
-> system.
-> 
-> >3. If slave device implements runtime PM in a way that it's enabled in
-> >    probe and released in remove, then pl330 will be active all the time?
-> 
-> Then it will force power domain to be turned on all the time and even
-> optional
-> fine-grained irq-safe runtiem pm in pl330 driver won't help much to reduce
-> power
-> consumption. I assume that the real goal with runtime pm is to let
-> respective
-> power domains to be turned off, what gives the best results in terms of
-> power
-> saving.
 
-Indeed existing runtime PM for pl330 was not bringing much benefits of
-its own - only clocks were enabled/disabled.
-
-Thanks for clarifications.
-
-(...)
-
-> >>@@ -2113,14 +2089,63 @@ static struct dma_chan *of_dma_pl330_xlate(struct of_phandle_args *dma_spec,
-> >>  	if (chan_id >= pl330->num_peripherals)
-> >>  		return NULL;
-> >>+	if (!pl330->peripherals[chan_id].slave)
-> >>+		pl330->peripherals[chan_id].slave = slave;
-> >>+	else if (pl330->peripherals[chan_id].slave != slave) {
-> >>+		dev_err(pl330->ddma.dev,
-> >>+			"Can't use same channel with multiple slave devices!\n");
-> >>+		return NULL;
-> >>+	}
-> >This could be nicely split into separate patch.
-> 
-> Okay, if you want, I can move this change to separate patch.
-
-Yes, please do it. Beside that patch looked fine to me.
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+I didn't do a thorough review, though.
 
 Best regards,
 Krzysztof
