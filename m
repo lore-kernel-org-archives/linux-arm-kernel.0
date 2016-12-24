@@ -1,30 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 24 Dec 2016 11:21:20 -0200
-Subject: [PATCH 2/2] mfd: mc13xxx: Pass the IRQF_TRIGGER_HIGH flag.
-In-Reply-To: <CAM=E1R4HarEBjCiGgG2AwnWqdLBGpLKPXAokEbZEdwXRUUa5Fw@mail.gmail.com>
-References: <1482182934-18559-1-git-send-email-lilja.magnus@gmail.com>
- <1482211233.10253607@f408.i.mail.ru>
- <CAM=E1R5=k5NXurdV=6TzE9bPH5M3zyFpUjuJpGd9ECKrdjaj7w@mail.gmail.com>
- <1482300049.831956101@f373.i.mail.ru>
- <CAM=E1R7mBa7PSyshR+VwbeCqqDytkTknNksWQmf3Yk2r0_nHZw@mail.gmail.com>
- <1bec9023-1869-2847-bea6-adebc5af0093@mleia.com>
- <CAOMZO5CifMQGu2dFAm4a5BTUrqdJS77k-n3daBR6qCqtdX_W-Q@mail.gmail.com>
- <9a7ab387-a3e5-913a-2204-2b337ba0f8aa@mleia.com>
- <CAM=E1R4HarEBjCiGgG2AwnWqdLBGpLKPXAokEbZEdwXRUUa5Fw@mail.gmail.com>
-Message-ID: <CAOMZO5B8fL6MmBViQLqtCtWnX8gSTkFaXJX+9tO-=bihJfFJNA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 24 Dec 2016 13:59:22 +0000
+Subject: [GIT PULL] efi: urgent fix for v4.10 with cc to stable
+Message-ID: <1482587963-20183-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2016 at 6:16 PM, Magnus Lilja <lilja.magnus@gmail.com> wrote:
+The following changes since commit 69973b830859bc6529a7a0468ba0d80ee5117826:
 
-> So, have we reached a conclusion that a solution based on the code
-> below is good enough for now? Further device tree development would
-> make it possible to support other triggers on i.MX31 boards. And any
-> board that already has dt support can override TRIGGER_HIGH since
-> irqd_get_trigger_type() will return something else than IRQ_TYPE_NONE.
+  Linux 4.9 (2016-12-11 11:17:54 -0800)
 
-I would say that you could send a v2 with the only difference being
-the commit log explaining which was the commit that caused the
-problem, add a Fixes tag and Cc: stable.
+are available in the git repository at:
 
-Thanks
+  git://git.kernel.org/pub/scm/linux/kernel/git/efi/efi.git tags/efi-urgent
+
+for you to fetch changes up to bcd5812b8bfb24783f09b53659fae54d1b02d0be:
+
+  efi/libstub: arm*: Pass latest memory map to the kernel (2016-12-24 13:19:28 +0000)
+
+----------------------------------------------------------------
+* One patch, addressing a major issue in a bugfix that went into stable,
+  where on ARM/arm64 systems, the EFI memory map address passed to the
+  kernel via the FDT may be different from the address of the buffer
+  containing the annotated EFI memory map.
+
+----------------------------------------------------------------
+Ard Biesheuvel (1):
+      efi/libstub: arm*: Pass latest memory map to the kernel
+
+ drivers/firmware/efi/libstub/efistub.h |  8 ----
+ drivers/firmware/efi/libstub/fdt.c     | 87 ++++++++++++++++++++++------------
+ 2 files changed, 56 insertions(+), 39 deletions(-)
