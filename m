@@ -1,40 +1,71 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 24 Dec 2016 15:47:19 +0900
-Subject: [PATCH] serial: 8250: use initializer instead of memset to clear
- local struct
-In-Reply-To: <20161223072026.GA23895@kroah.com>
-References: <1482463308-28968-1-git-send-email-yamada.masahiro@socionext.com>
- <20161223072026.GA23895@kroah.com>
-Message-ID: <CAK7LNARpDFDc9ntf3g03+Vz1gejzDVOpEkA1mRmA6sduNsDKWg@mail.gmail.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Sat, 24 Dec 2016 15:11:31 +0800
+Subject: [PATCH v5 6/6] arm64: arch_timer: acpi: add hisi timer errata data
+In-Reply-To: <1482476669-15596-7-git-send-email-dingtianhong@huawei.com>
+References: <1482476669-15596-1-git-send-email-dingtianhong@huawei.com>
+ <1482476669-15596-7-git-send-email-dingtianhong@huawei.com>
+Message-ID: <ad0eea28-3cf9-f114-3619-0c9c05af6110@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
 
 
-2016-12-23 16:20 GMT+09:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
-> On Fri, Dec 23, 2016 at 12:21:48PM +0900, Masahiro Yamada wrote:
->> Leave the way of zero-out to the compiler's decision; the compiler
->> may know a more optimized way than calling memset().
->
-> But no, it doesn't, it will leave "blank" areas in the structure with
-> bad data in it, which is why we do memset.  See the tree-wide fixups we
-> made about a year ago for this very issue.  Are you sure none of these
-> structures get copied to userspace?
+On 2016/12/23 15:04, Ding Tianhong wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
+> 
+> Add hisi timer specific erratum fixes.
+> 
+> v3: add hisilicon erratum 161601 for ACPI mode.
+> 
+> v4: update some data structures.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+> ---
+>  drivers/clocksource/arm_arch_timer.c | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 212bfa5..7b15d2a 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -1089,10 +1089,28 @@ struct gtdt_arch_timer_fixup {
+>  	void *context;
+>  };
+>  
+> +#ifdef CONFIG_HISILICON_ERRATUM_161601
+> +static void __init erratum_workaround_enable(void *context)
+> +{
+> +	u64 erratum = (u64) context;
+> +
+> +	if (erratum & HISILICON_161601) {
+> +		timer_unstable_counter_workaround = &arch_timer_hisi_161601;
+> +		static_branch_enable(&arch_timer_read_ool_enabled);
+> +		pr_info("Enabling workaround for HISILICON ERRATUM 161601\n");
+> +	}
 
-I have to admit no security consideration was in my mind.
 
-If we talk about the particular case of struct uart_8250_port,
-this structure is allocated in the stack temporarily,
-then serial8250_register_8250_port() copies its members to another
-structure one by one.  So no "blank" area is exposed to the user-space,
-I think.
+Use arch_timer_hisi_161601 for context instead of HISILICON_161601 directly,
+we can make erratum_workaround_enable more general.
 
-Having said that, we have no good reason to take a risk for this.
+> +}
+> +#endif
+> +
+>  /* note: this needs to be updated according to the doc of OEM ID
+>   * and TABLE ID for different board.
+>   */
+>  struct gtdt_arch_timer_fixup arch_timer_quirks[] __initdata = {
+> +#ifdef CONFIG_HISILICON_ERRATUM_161601
+> +	{"HISI", "hip05", 0, &erratum_workaround_enable, (void *) HISILICON_161601},
+> +	{"HISI", "hip06", 0, &erratum_workaround_enable, (void *) HISILICON_161601},
+> +	{"HISI", "hip07", 0, &erratum_workaround_enable, (void *) HISILICON_161601},
+> +#endif
 
-So, please feel free to discard this patch.
 
 
--- 
-Best Regards
-Masahiro Yamada
+
+
+>  };
+>  
+>  void __init arch_timer_acpi_quirks_handler(char *oem_id,
+> 
