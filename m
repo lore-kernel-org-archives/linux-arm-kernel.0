@@ -1,189 +1,151 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 24 Dec 2016 03:18:29 +0100
-Subject: [PATCH v2 4/4] clk: rockchip: add new pll-type for rk3328
-In-Reply-To: <1482112573-11613-5-git-send-email-zhangqing@rock-chips.com>
-References: <1482112573-11613-1-git-send-email-zhangqing@rock-chips.com>
- <1482112573-11613-5-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1864774.VdbssDBMbY@phil>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Sat, 24 Dec 2016 07:08:15 +0200
+Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21, i.MX27
+ and i.MX31 SoCs
+In-Reply-To: <20161223141139.rlsvoonih5lhnnpu@pengutronix.de>
+References: <20161211093519.xrxxhrqpc7fmadfr@pengutronix.de>
+ <d6d987f1-3461-214a-0ca1-16d310ddd370@mleia.com>
+ <20161211102634.jn3awmlzdrm3pqai@pengutronix.de>
+ <2fc2558d-fe05-14a7-745e-f71d2178bad6@mleia.com>
+ <fe9b03bf-9c37-862f-b3aa-0f9b5a4dfefb@roeck-us.net>
+ <bedae3d8-3057-36e4-1d89-ec41f9f1a25b@mleia.com>
+ <20161223083256.3wdqou5xmhr7fidn@pengutronix.de>
+ <74751709-c32e-b1b3-4fa3-613f7d57d1d8@mleia.com>
+ <20161223100113.s57bi7257yero7f7@pengutronix.de>
+ <7018c466-2467-a9fc-2382-889d3a62741e@mentor.com>
+ <20161223141139.rlsvoonih5lhnnpu@pengutronix.de>
+Message-ID: <c22600d5-f6b5-4c13-59b4-ba391ea29a4c@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Elaine,
+Hello Uwe,
 
-Am Montag, 19. Dezember 2016, 09:56:13 CET schrieb Elaine Zhang:
-> The rk3328's pll and clock are similar with rk3036's,
-> it different with pll_mode_mask,there are different
-> control registers bit,
-> so these should be independent and separate from
-> the series of rk3328s.
+On 12/23/2016 04:11 PM, Uwe Kleine-K?nig wrote:
+> On Fri, Dec 23, 2016 at 01:21:20PM +0200, Vladimir Zapolskiy wrote:
+>> Hi Uwe,
+>>
+>> On 12/23/2016 12:01 PM, Uwe Kleine-K?nig wrote:
+>>> On Fri, Dec 23, 2016 at 11:27:24AM +0200, Vladimir Zapolskiy wrote:
+>>>> On 12/23/2016 10:32 AM, Uwe Kleine-K?nig wrote:
+>>>>> Hello,
+>>>>>
+>>>>> On Fri, Dec 23, 2016 at 10:20:20AM +0200, Vladimir Zapolskiy wrote:
+>>>>>> On 12/23/2016 03:55 AM, Guenter Roeck wrote:
+>>>>>>> What is the ultimate conclusion of this exchange ?
+>>>>>>>
+>>>>>>> Are we going to get another version of the patch, or did everyone agree that
+>>>>>>> the patch is good as it is and does not require further changes ?
+>>>>>>>
+>>>>>>
+>>>>>> I can not imagine a different fix.
+>>>>>
+>>>>> my preferred fix would be:
+>>>>>
+>>>>>  - add an imx35 compatible to all newer dtsi
+>>>>>  - update the driver to only write the wmcr on imx35 compatible devices
+>>>>>    adding only imx35.
+>>>>>
+>>>>
+>>>> It breaks old DTS vs. new kernel compatibility, I've already mentioned this.
+>>>
+>>> Correct, and I didn't deny that. In my mail I pointed out the problem
+>>> this imposes and I think it's small enough to not justify the complexity
+>>> introduced in your proposed change.
+>>>
+>>
+>> I can not statistically estimate well the severity of the problem which was
+>> fixed by commit 5fe65ce7cc (all boards with a similar change not found in
+>> a bootloader will be affected, I believe) multiplied by the rate of users,
+>> who don't update DTB.
+> 
+> I think most people updating the kernel will update the dtb at the same
+> time. And for those who don't it should be quickly obvious that
+> something is wrong during development if the machine resets
+> unexpectedly. Plus I think that most users are not affected anyhow
+> (either because their bootloader fixes up accordingly or because most
+> machines don't reset when the timer expires because the hardware isn't
+> designed accordingly). After all between introduction of i.MX35/i.MX25
+> (not later than Thu Jun 4 11:32:12 2009 +0200, commit
+> 8c25c36f33157a2e2a1fcd60b6dc00feace80631) and the broken commit
+> 5fe65ce7cc (Mon Sep 8 09:14:07 2014 +0200) it seems it wasn't an issue.
+> 
+> With my suggestion the situation on an affected machine with old dtb and
+> new kernel is just as it was in these 5 years where nobody complained.
 
-not sure I understand this description. In the patch (and TRM excerpt) I see
-that the number of parents is down to only xin24m but the general handling is
-similar to the rk3036 and thus reuses its operations.
-
-The description makes it sound like there are operational differences (the
-"different control register bit" part), so could you clarify this a bit
-please?
-
-Also, please move the pll addition before the addition of the clock-controller
-in the series and move the pll-type addition also here from the controller
-patch.
-
-Some more below:
+Please feel free to send the revert of 5fe65ce7cc, if you think that
+the commit is unneeded.
 
 > 
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> ---
->  drivers/clk/rockchip/clk-pll.c | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
+> It's fine to target a bugfree system, and if you want to target that
+> that's applaudable. But then please make it easy for others after you to
+> not undo your good and add a big comment to the compatible array of the
+> driver explaining why they are all listed explicitly and how to prevent
+> to have to expand the list further.
+
+Please clarify, what do you mean here by "undo my good"? Revert my fix
+and break boot on i.MX31 again or something else?
+
 > 
-> diff --git a/drivers/clk/rockchip/clk-pll.c b/drivers/clk/rockchip/clk-pll.c
-> index 6ed605776abd..9650c75f61d1 100644
-> --- a/drivers/clk/rockchip/clk-pll.c
-> +++ b/drivers/clk/rockchip/clk-pll.c
-> @@ -29,6 +29,7 @@
->  #define PLL_MODE_SLOW		0x0
->  #define PLL_MODE_NORM		0x1
->  #define PLL_MODE_DEEP		0x2
-> +#define PLL_RK3328_MODE_MASK	0x1
+> So yes, my suggestion has a risk, but I think when weighting that
+> against the overhead that is introduced in the driver, I'd go the
+> simpler way.
+
+What overhead do you mean here? Prolonged time in a loop while finding
+a compatible by looking at 10 more values?
+
+That's the price of the accepted commit 5fe65ce7cc and overlooked
+incompatibilities in hardware while writing DTSI files for i.MX SoCs.
+
+> That's of course something personal and as it's you who
+> seems to have in interest in fixing the driver, it's your way that
+> matters more. And if you document your way good enough, I won't stop
+> you.
 > 
->  struct rockchip_clk_pll {
->  	struct clk_hw		hw;
-> @@ -865,13 +866,17 @@ struct clk *rockchip_clk_register_pll(struct
-> rockchip_clk_provider *ctx, pll_mux = &pll->pll_mux;
->  	pll_mux->reg = ctx->reg_base + mode_offset;
->  	pll_mux->shift = mode_shift;
-> -	pll_mux->mask = PLL_MODE_MASK;
-> +	if (pll_type == pll_rk3328)
-> +		pll_mux->mask = PLL_RK3328_MODE_MASK;
-> +	else
-> +		pll_mux->mask = PLL_MODE_MASK;
 
-you're missing the other parts handling parents, like num_parents check
-and the init.num_parents parameter.
+We're going round in circles. And I don't understand what do you mean
+by "documenting my way" here.
 
-The pll really has only one parent, xin24m, so we should handle this
-correctly in the code, instead of having 2 times xin24m in the parent
-array coming from the clock controller.
+For clarity I do NOT object against changes in DTS, I do NOT object
+to shrink the list of compatibles, I object to mix up the requested
+DTS changes for practically every i.MX powered board, bug fix and
+a new potential bug in one single change. The series of commits is
+generally good, but it lacks atomicity property of a fix, and in
+the middle of the series users have to update DTB, it is an overkill.
 
->  	pll_mux->flags = 0;
->  	pll_mux->lock = &ctx->lock;
->  	pll_mux->hw.init = &init;
-> 
->  	if (pll_type == pll_rk3036 ||
->  	    pll_type == pll_rk3066 ||
-> +	    pll_type == pll_rk3328 ||
->  	    pll_type == pll_rk3399)
->  		pll_mux->flags |= CLK_MUX_HIWORD_MASK;
-> 
-> @@ -929,6 +934,12 @@ struct clk *rockchip_clk_register_pll(struct
-> rockchip_clk_provider *ctx, else
->  			init.ops = &rockchip_rk3066_pll_clk_ops;
->  		break;
-> +	case pll_rk3328:
-> +		if (!pll->rate_table || IS_ERR(ctx->grf))
-> +			init.ops = &rockchip_rk3036_pll_clk_norate_ops;
-> +		else
-> +			init.ops = &rockchip_rk3036_pll_clk_ops;
-> +		break;
+Is it possible to change DTS *only* and fix kernel boot problem? NO.
+Is it possible to change driver *only* and fix kernel boot problem? YES.
+Conclusion: the problem is within the driver, to solve the problem
+it is sufficient to fix the driver.
 
-please don't duplicate the rk3036-ops assignment, when adding the
-pll_rk3328 option to the rk3036 part suffices.
+As I see it what you propose with involving DTS changes is a solution
+to *another* problem (boot time performance optimisation? amount of
+driver's lines of code? DTS beautification?).
 
-I'd think the pll-patch should look something like the
-following (untested, so please test):
---------------- 8< -----------------
-Subject: [PATCH] clk: rockchip: add new pll-type for rk3328
+And obviously it makes no sense to send a DTS change plus error-prone
+change plus the actual fix to linux-stable then, even if they are
+split by commits.
 
-The rk3328's pll and clock are similar with rk3036's,
-it different with pll_mode_mask,there are different
-control registers bit,
-so these should be independent and separate from
-the series of rk3328s.
+Uwe, I'm disappointed that we still did not come to a conclusion,
+would you agree to a compromise?
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/clk/rockchip/clk-pll.c | 18 ++++++++++++++----
- drivers/clk/rockchip/clk.h     |  1 +
- 2 files changed, 15 insertions(+), 4 deletions(-)
+I'll add a comment to v2:
 
-diff --git a/drivers/clk/rockchip/clk-pll.c b/drivers/clk/rockchip/clk-pll.c
-index 6ed6057..99ce483 100644
---- a/drivers/clk/rockchip/clk-pll.c
-+++ b/drivers/clk/rockchip/clk-pll.c
-@@ -29,6 +29,7 @@
- #define PLL_MODE_SLOW		0x0
- #define PLL_MODE_NORM		0x1
- #define PLL_MODE_DEEP		0x2
-+#define PLL_RK3328_MODE_MASK	0x1
- 
- struct rockchip_clk_pll {
- 	struct clk_hw		hw;
-@@ -848,8 +849,9 @@ struct clk *rockchip_clk_register_pll(struct rockchip_clk_provider *ctx,
- 	struct clk *pll_clk, *mux_clk;
- 	char pll_name[20];
- 
--	if (num_parents != 2) {
--		pr_err("%s: needs two parent clocks\n", __func__);
-+	if ((pll_type != pll_rk3328 && num_parents != 2) ||
-+	    (pll_type == pll_rk3328 && num_parents != 1)) {
-+		pr_err("%s: missing parent clocks\n", __func__);
- 		return ERR_PTR(-EINVAL);
- 	}
- 
-@@ -865,13 +867,17 @@ struct clk *rockchip_clk_register_pll(struct rockchip_clk_provider *ctx,
- 	pll_mux = &pll->pll_mux;
- 	pll_mux->reg = ctx->reg_base + mode_offset;
- 	pll_mux->shift = mode_shift;
--	pll_mux->mask = PLL_MODE_MASK;
-+	if (pll_type == pll_rk3328)
-+		pll_mux->mask = PLL_RK3328_MODE_MASK;
-+	else
-+		pll_mux->mask = PLL_MODE_MASK;
- 	pll_mux->flags = 0;
- 	pll_mux->lock = &ctx->lock;
- 	pll_mux->hw.init = &init;
- 
- 	if (pll_type == pll_rk3036 ||
- 	    pll_type == pll_rk3066 ||
-+	    pll_type == pll_rk3328 ||
- 	    pll_type == pll_rk3399)
- 		pll_mux->flags |= CLK_MUX_HIWORD_MASK;
- 
-@@ -884,7 +890,10 @@ struct clk *rockchip_clk_register_pll(struct rockchip_clk_provider *ctx,
- 	init.flags = CLK_SET_RATE_PARENT;
- 	init.ops = pll->pll_mux_ops;
- 	init.parent_names = pll_parents;
--	init.num_parents = ARRAY_SIZE(pll_parents);
-+	if (pll_type == pll_rk3328)
-+		init.num_parents = 2;
-+	else
-+		init.num_parents = ARRAY_SIZE(pll_parents);
- 
- 	mux_clk = clk_register(NULL, &pll_mux->hw);
- 	if (IS_ERR(mux_clk))
-@@ -918,6 +927,7 @@ struct clk *rockchip_clk_register_pll(struct rockchip_clk_provider *ctx,
- 
- 	switch (pll_type) {
- 	case pll_rk3036:
-+	case pll_rk3328:
- 		if (!pll->rate_table || IS_ERR(ctx->grf))
- 			init.ops = &rockchip_rk3036_pll_clk_norate_ops;
- 		else
-diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-index d67eecc..06acb7e 100644
---- a/drivers/clk/rockchip/clk.h
-+++ b/drivers/clk/rockchip/clk.h
-@@ -130,6 +130,7 @@ struct clk;
- enum rockchip_pll_type {
- 	pll_rk3036,
- 	pll_rk3066,
-+	pll_rk3328,
- 	pll_rk3399,
- };
- 
--- 
-2.10.2
+/*
+ * The list of compatibles is added to achieve backward compatibility
+ * between DTS and kernel while fixing the incompatibility between
+ * i.MX21/i.MX27/i.MX31 and i.MX25/i.MX35/etc. watchdog controllers.
+ *
+ * Please do *NOT* extend the list by adding a compatible value for
+ * a controller, which is compatible with one of the already listed.
+ *
+ * You may consider to shrink the list at your own risk, but this may
+ * break backward compatibility and users may have to update their DTB,
+ * which is good eventually.
+ */
 
---------------- 8< -----------------
+And you send the removal of the comment and compatibles as a *separate*
+change, if you find such a long list of compatibles redundant.
+
+--
+With best wishes,
+Vladimir
