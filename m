@@ -1,86 +1,72 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Sat, 24 Dec 2016 15:40:36 +0530
-Subject: [PATCH 0/9] Runtime PM for Exynos pin controller driver
-In-Reply-To: <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
-References: <CGME20161223122513epcas1p394d93d72d2d32c8910aafd1f6cc6b5e2@epcas1p3.samsung.com>
- <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CANAwSgRQuoriU923XT1B_0CVX2rzOR+8j2YHLMYRUu3gGySEBw@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sat, 24 Dec 2016 13:13:18 +0200
+Subject: [PATCH] dmaengine: pl330: Fix runtime PM support for terminated
+ transfers
+In-Reply-To: <6b2f2e51-3fac-02d7-5827-b08b97c894c0@samsung.com>
+References: <1481884751-21411-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20161223023344epcas2p19d61e2e9749b2a5d2a910bef89a08616@epcas2p1.samsung.com>
+ <20161223023324.GA3860@kozik-lap>
+ <6b2f2e51-3fac-02d7-5827-b08b97c894c0@samsung.com>
+Message-ID: <20161224111318.GA8343@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek
+On Fri, Dec 23, 2016 at 10:52:28AM +0100, Marek Szyprowski wrote:
+> Hi Krzysztof,
+> 
+> 
+> On 2016-12-23 03:33, Krzysztof Kozlowski wrote:
+> >On Fri, Dec 16, 2016 at 11:39:11AM +0100, Marek Szyprowski wrote:
+> >>PL330 DMA engine driver is leaking a runtime reference after any terminated
+> >>DMA transactions. This patch fixes this issue by tracking runtime PM state
+> >>of the device and making additional call to pm_runtime_put() in terminate_all
+> >>callback if needed.
+> >>
+> >>Fixes: ae43b3289186 ("ARM: 8202/1: dmaengine: pl330: Add runtime Power Management support v12")
+> >>Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >>---
+> >>  drivers/dma/pl330.c | 11 +++++++++++
+> >>  1 file changed, 11 insertions(+)
+> >>
+> >>diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> >>index 030fe05ed43b..9f3dbc8c63d2 100644
+> >>--- a/drivers/dma/pl330.c
+> >>+++ b/drivers/dma/pl330.c
+> >>@@ -448,6 +448,9 @@ struct dma_pl330_chan {
+> >>  	/* for cyclic capability */
+> >>  	bool cyclic;
+> >>+
+> >>+	/* for runtime pm tracking */
+> >>+	bool active;
+> >>  };
+> >>  struct pl330_dmac {
+> >>@@ -2031,6 +2034,7 @@ static void pl330_tasklet(unsigned long data)
+> >>  		_stop(pch->thread);
+> >>  		spin_unlock(&pch->thread->dmac->lock);
+> >>  		power_down = true;
+> >>+		pch->active = false;
+> >>  	} else {
+> >>  		/* Make sure the PL330 Channel thread is active */
+> >>  		spin_lock(&pch->thread->dmac->lock);
+> >>@@ -2050,6 +2054,7 @@ static void pl330_tasklet(unsigned long data)
+> >>  			desc->status = PREP;
+> >>  			list_move_tail(&desc->node, &pch->work_list);
+> >>  			if (power_down) {
+> >>+				pch->active = true;
+> >It's been a while since I was playign with the driver so I don't
+> >remember everything... but I can't get the logic behind this.
+> >
+> >The device is marked as inactive and scheduled to power down. But you
+> >mark chanel as active.
+> 
+> Please look 3 lines further. The channel is started again (because this
+> is cyclic request), so setting active to true is justified. Even power_down
+> is then set to false.
 
-On 23 December 2016 at 17:54, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> Hello,
->
-> This patchset is a next step to add support for audio power domain on
-> Exynos5 SoCs.
->
-> Audio power domain on Exynos5 SoCs contains following hardware modules:
-> 1. clock controller
-> 2. pin controller
-> 3. PL330 DMA controller
-> 4. I2S audio controller
->
-> Till now it was assumed that pin controller is located in the "always on"
-> power domain and lacked runtime power management. This patch finally
-> removes such assumption and adds runtime pm support and awareness to this
-> driver. To achieve this, some changes in the Exynos platform support code
-> were needed, like moving pad retention control to the pin controller driver.
-> Some cleanup to the pin controller driver has been also done while changing
-> the code. This new feature requires some additional information in the
-> device tree, what is handled by patches 1,2 and 9.
->
-> Please note that patches are ordered in such a way that the changes can be
-> bisected, so the properties are added to dts before the code requiring them.
->
-> The other patches related to enabling full support for audio power domain
-> can be found here:
-> 1. PL330 ADMA controller non-irqsafe runtime PM:
->    https://www.spinics.net/lists/arm-kernel/msg550008.html
-> 2. Runtime PM for clock controllers (Exynos Audio subsystem will be added
->    in v4 soon): https://www.spinics.net/lists/arm-kernel/msg538122.html
->
-> Patches are based on linux-next from 2016.12.22.
->
-> Best regards
-> Marek Szyprowski
-> Samsung R&D Institute Poland
->
->
-> Patch summary:
->
-> Marek Szyprowski (9):
->   ARM: dts: exynos: Add PMU syscon to pinctrl nodes
->   ARM: dts: exynos: Add pinctrl sleep state for 542x i2s module
->   pinctrl: samsung: Remove dead code
->   pinctrl: samsung: Use generic of_device_get_match_data helper
->   pinctrl: samsung: Move retention control from mach-exynos to the
->     pinctrl driver
->   pinctrl: samsung: Replace syscore ops with standard platform device
->     pm_ops
->   pinctrl: samsung: Add property to mark pad state as suitable for power
->     down
->   pinctrl: samsung: Add runtime PM support
->   ARM: dts: exynos: Add audio power domain support to Exynos542x SoCs
->
->  .../bindings/pinctrl/samsung-pinctrl.txt           |  12 ++
->  arch/arm/boot/dts/exynos3250.dtsi                  |   2 +
->  arch/arm/boot/dts/exynos4210.dtsi                  |   3 +
->  arch/arm/boot/dts/exynos4x12.dtsi                  |   3 +
->  arch/arm/boot/dts/exynos5250.dtsi                  |   4 +
->  arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |  11 ++
->  arch/arm/boot/dts/exynos5420.dtsi                  |  18 ++-
->  arch/arm/mach-exynos/suspend.c                     |  64 ---------
->  drivers/pinctrl/samsung/pinctrl-exynos.c           | 148 +++++++++++++++++++++
->  drivers/pinctrl/samsung/pinctrl-samsung.c          | 126 ++++++++----------
->  drivers/pinctrl/samsung/pinctrl-samsung.h          |  15 +++
->  11 files changed, 271 insertions(+), 135 deletions(-)
->
+Ahhh, damn the missing context. I looked at full source and it makes
+sense now.
 
-Is their core configuration missing to enable audio through HDMI on
-Odroid Boards.
-I could not get the sound working on Odroid XU4.
-.
--Best Regards
-Anand Moon
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+
+Best regards,
+Krzysztof
