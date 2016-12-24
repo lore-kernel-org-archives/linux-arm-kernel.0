@@ -1,218 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 24 Dec 2016 13:59:23 +0000
-Subject: [PATCH] efi/libstub: arm*: Pass latest memory map to the kernel
-In-Reply-To: <1482587963-20183-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1482587963-20183-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1482587963-20183-2-git-send-email-ard.biesheuvel@linaro.org>
+From: xypron.glpk@gmx.de (Heinrich Schuchardt)
+Date: Sat, 24 Dec 2016 15:00:28 +0100
+Subject: [BUG] ARM64: amlogic: gxbb: unhandled level 2 translation fault (11)
+Message-ID: <20161224140028.4205-1-xypron.glpk@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As reported by James, the current libstub code involving the annotated
-memory map only works somewhat correctly by accident, due to the fact
-that a pool allocation happens to be reused immediately, retaining its
-former contents on most implementations of the UEFI boot services.
+When trying to run sddm on an Hardkernel Odroid C2 I invariably run into the
+translation fault below.
 
-Instead of juggling memory maps, which makes the code more complex than
-it needs to be, simply put placeholder values into the FDT for the memory
-map parameters, and only write the actual values after ExitBootServices()
-has been called.
+The following mail thread relates this kind of problem to TLB (translation
+lookaside buffer) broadcasting.
 
-Reported-by: James Morse <james.morse@arm.com>
-Fixes: ed9cc156c42f ("efi/libstub: Use efi_exit_boot_services() in FDT")
-Cc: Matt Fleming <matt@codeblueprint.co.uk>
-Cc: Jeffrey Hugo <jhugo@codeaurora.org>
-Cc: James Morse <james.morse@arm.com>
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/firmware/efi/libstub/efistub.h |  8 ----
- drivers/firmware/efi/libstub/fdt.c     | 87 ++++++++++++++++++++++------------
- 2 files changed, 56 insertions(+), 39 deletions(-)
+https://lkml.org/lkml/2014/4/15/207
 
-diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
-index ee49cd23ee63..fac67992bede 100644
---- a/drivers/firmware/efi/libstub/efistub.h
-+++ b/drivers/firmware/efi/libstub/efistub.h
-@@ -30,14 +30,6 @@ efi_status_t efi_file_close(void *handle);
- 
- unsigned long get_dram_base(efi_system_table_t *sys_table_arg);
- 
--efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
--			unsigned long orig_fdt_size,
--			void *fdt, int new_fdt_size, char *cmdline_ptr,
--			u64 initrd_addr, u64 initrd_size,
--			efi_memory_desc_t *memory_map,
--			unsigned long map_size, unsigned long desc_size,
--			u32 desc_ver);
--
- efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 					    void *handle,
- 					    unsigned long *new_fdt_addr,
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index a6a93116a8f0..921dfa047202 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -16,13 +16,10 @@
- 
- #include "efistub.h"
- 
--efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
--			unsigned long orig_fdt_size,
--			void *fdt, int new_fdt_size, char *cmdline_ptr,
--			u64 initrd_addr, u64 initrd_size,
--			efi_memory_desc_t *memory_map,
--			unsigned long map_size, unsigned long desc_size,
--			u32 desc_ver)
-+static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
-+			       unsigned long orig_fdt_size,
-+			       void *fdt, int new_fdt_size, char *cmdline_ptr,
-+			       u64 initrd_addr, u64 initrd_size)
- {
- 	int node, num_rsv;
- 	int status;
-@@ -101,25 +98,23 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 	if (status)
- 		goto fdt_set_fail;
- 
--	fdt_val64 = cpu_to_fdt64((u64)(unsigned long)memory_map);
-+	fdt_val64 = U64_MAX; /* placeholder */
- 	status = fdt_setprop(fdt, node, "linux,uefi-mmap-start",
- 			     &fdt_val64,  sizeof(fdt_val64));
- 	if (status)
- 		goto fdt_set_fail;
- 
--	fdt_val32 = cpu_to_fdt32(map_size);
-+	fdt_val32 = U32_MAX; /* placeholder */
- 	status = fdt_setprop(fdt, node, "linux,uefi-mmap-size",
- 			     &fdt_val32,  sizeof(fdt_val32));
- 	if (status)
- 		goto fdt_set_fail;
- 
--	fdt_val32 = cpu_to_fdt32(desc_size);
- 	status = fdt_setprop(fdt, node, "linux,uefi-mmap-desc-size",
- 			     &fdt_val32, sizeof(fdt_val32));
- 	if (status)
- 		goto fdt_set_fail;
- 
--	fdt_val32 = cpu_to_fdt32(desc_ver);
- 	status = fdt_setprop(fdt, node, "linux,uefi-mmap-desc-ver",
- 			     &fdt_val32, sizeof(fdt_val32));
- 	if (status)
-@@ -148,6 +143,43 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 	return EFI_LOAD_ERROR;
- }
- 
-+static efi_status_t update_fdt_memmap(void *fdt, struct efi_boot_memmap *map)
-+{
-+	int node = fdt_path_offset(fdt, "/chosen");
-+	u64 fdt_val64;
-+	u32 fdt_val32;
-+	int err;
-+
-+	if (node < 0)
-+		return EFI_LOAD_ERROR;
-+
-+	fdt_val64 = cpu_to_fdt64((unsigned long)*map->map);
-+	err = fdt_setprop_inplace(fdt, node, "linux,uefi-mmap-start",
-+				  &fdt_val64, sizeof(fdt_val64));
-+	if (err)
-+		return EFI_LOAD_ERROR;
-+
-+	fdt_val32 = cpu_to_fdt32(*map->map_size);
-+	err = fdt_setprop_inplace(fdt, node, "linux,uefi-mmap-size",
-+				  &fdt_val32, sizeof(fdt_val32));
-+	if (err)
-+		return EFI_LOAD_ERROR;
-+
-+	fdt_val32 = cpu_to_fdt32(*map->desc_size);
-+	err = fdt_setprop_inplace(fdt, node, "linux,uefi-mmap-desc-size",
-+				  &fdt_val32, sizeof(fdt_val32));
-+	if (err)
-+		return EFI_LOAD_ERROR;
-+
-+	fdt_val32 = cpu_to_fdt32(*map->desc_ver);
-+	err = fdt_setprop_inplace(fdt, node, "linux,uefi-mmap-desc-ver",
-+				  &fdt_val32, sizeof(fdt_val32));
-+	if (err)
-+		return EFI_LOAD_ERROR;
-+
-+	return EFI_SUCCESS;
-+}
-+
- #ifndef EFI_FDT_ALIGN
- #define EFI_FDT_ALIGN EFI_PAGE_SIZE
- #endif
-@@ -243,20 +275,10 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 			goto fail;
- 		}
- 
--		/*
--		 * Now that we have done our final memory allocation (and free)
--		 * we can get the memory map key  needed for
--		 * exit_boot_services().
--		 */
--		status = efi_get_memory_map(sys_table, &map);
--		if (status != EFI_SUCCESS)
--			goto fail_free_new_fdt;
--
- 		status = update_fdt(sys_table,
- 				    (void *)fdt_addr, fdt_size,
- 				    (void *)*new_fdt_addr, new_fdt_size,
--				    cmdline_ptr, initrd_addr, initrd_size,
--				    memory_map, map_size, desc_size, desc_ver);
-+				    cmdline_ptr, initrd_addr, initrd_size);
- 
- 		/* Succeeding the first time is the expected case. */
- 		if (status == EFI_SUCCESS)
-@@ -266,20 +288,16 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 			/*
- 			 * We need to allocate more space for the new
- 			 * device tree, so free existing buffer that is
--			 * too small.  Also free memory map, as we will need
--			 * to get new one that reflects the free/alloc we do
--			 * on the device tree buffer.
-+			 * too small.
- 			 */
- 			efi_free(sys_table, new_fdt_size, *new_fdt_addr);
--			sys_table->boottime->free_pool(memory_map);
- 			new_fdt_size += EFI_PAGE_SIZE;
- 		} else {
- 			pr_efi_err(sys_table, "Unable to construct new device tree.\n");
--			goto fail_free_mmap;
-+			goto fail_free_new_fdt;
- 		}
- 	}
- 
--	sys_table->boottime->free_pool(memory_map);
- 	priv.runtime_map = runtime_map;
- 	priv.runtime_entry_count = &runtime_entry_count;
- 	status = efi_exit_boot_services(sys_table, handle, &map, &priv,
-@@ -288,6 +306,16 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 	if (status == EFI_SUCCESS) {
- 		efi_set_virtual_address_map_t *svam;
- 
-+		status = update_fdt_memmap((void *)*new_fdt_addr, &map);
-+		if (status != EFI_SUCCESS) {
-+			/*
-+			 * The kernel won't get far without the memory map, but
-+			 * may still be able to print something meaningful so
-+			 * return success here.
-+			 */
-+			return EFI_SUCCESS;
-+		}
-+
- 		/* Install the new virtual address map */
- 		svam = sys_table->runtime->set_virtual_address_map;
- 		status = svam(runtime_entry_count * desc_size, desc_size,
-@@ -319,9 +347,6 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 
- 	pr_efi_err(sys_table, "Exit boot services failed.\n");
- 
--fail_free_mmap:
--	sys_table->boottime->free_pool(memory_map);
--
- fail_free_new_fdt:
- 	efi_free(sys_table, new_fdt_size, *new_fdt_addr);
- 
--- 
-2.7.4
+[ 3163.014263] sddm[1851]: unhandled level 2 translation fault (11) at 0x00000160, esr 0x82000006
+[ 3163.017287] pgd = ffff80007bf86000
+[ 3163.020589] [00000160] *pgd=000000007a8a3003
+[ 3163.024733] , *pud=000000007be9c003
+[ 3163.028095] , *pmd=0000000000000000
+
+
+[ 3163.033026] CPU: 1 PID: 1851 Comm: sddm Not tainted 4.9.0-next-20161212-r022-arm64 #1
+[ 3163.040831] Hardware name: Hardkernel ODROID-C2 (DT)
+[ 3163.045698] task: ffff80007bc6d780 task.stack: ffff80007c524000
+[ 3163.051563] PC is at 0x160
+[ 3163.054231] LR is at 0xffff9a9fbc98
+[ 3163.057686] pc : [<0000000000000160>] lr : [<0000ffff9a9fbc98>] pstate: 40000000
+[ 3163.065022] sp : 0000ffffd7180130
+[ 3163.068281] x29: 0000ffffd7180130 x28: 0000ffffd7180288 
+[ 3163.073538] x27: 0000ffff9aa94000 x26: 0000000000000001 
+[ 3163.078798] x25: 0000000000000000 x24: 0000ffffd7180410 
+[ 3163.084060] x23: 000000000e0c2190 x22: 000000000e0ca5c0 
+[ 3163.089322] x21: 0000ffff9ac35000 x20: 0000000000454fa9 
+[ 3163.094583] x19: 0000000000454fa8 x18: 000000000e0b5938 
+[ 3163.099843] x17: 0000ffff9a3f2988 x16: 0000ffff9ac36aa0 
+[ 3163.105105] x15: 0000000000000000 x14: 0000000000000000 
+[ 3163.110367] x13: 6d00640064007300 x12: 0800000005000000 
+[ 3163.115627] x11: 0000040000000000 x10: 0000a00000000000 
+[ 3163.120889] x9 : 00003fffffffffff x8 : 0000000000000000 
+[ 3163.126150] x7 : 000000000e0cb520 x6 : 0000000000454fc0 
+[ 3163.131412] x5 : 0000ffffd717ffd8 x4 : 000000000e0cb510 
+[ 3163.136680] x3 : 0000000000000004 x2 : f2f9022b551b3900 
+[ 3163.141935] x1 : 0000000000000160 x0 : 000000000e0ca5c0 
+
+Best regards
+
+Heinrich Schuchardt
