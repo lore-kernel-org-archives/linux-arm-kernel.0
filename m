@@ -1,161 +1,40 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Sat, 24 Dec 2016 14:07:54 +0800
-Subject: [PATCH v5 3/6] arm64: arch_timer: Work around Erratum
- Hisilicon-161601
-In-Reply-To: <1482476669-15596-4-git-send-email-dingtianhong@huawei.com>
-References: <1482476669-15596-1-git-send-email-dingtianhong@huawei.com>
- <1482476669-15596-4-git-send-email-dingtianhong@huawei.com>
-Message-ID: <0d3cd010-bd70-dfb6-684a-f21019fde419@huawei.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 24 Dec 2016 15:47:19 +0900
+Subject: [PATCH] serial: 8250: use initializer instead of memset to clear
+ local struct
+In-Reply-To: <20161223072026.GA23895@kroah.com>
+References: <1482463308-28968-1-git-send-email-yamada.masahiro@socionext.com>
+ <20161223072026.GA23895@kroah.com>
+Message-ID: <CAK7LNARpDFDc9ntf3g03+Vz1gejzDVOpEkA1mRmA6sduNsDKWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Greg,
 
 
-On 2016/12/23 15:04, Ding Tianhong wrote:
-> Erratum Hisilicon-161601 says that the ARM generic timer counter "has the
-> potential to contain an erroneous value when the timer value changes".
-> Accesses to TVAL (both read and write) are also affected due to the implicit counter
-> read.  Accesses to CVAL are not affected.
-> 
-> The workaround is to reread the system count registers until the value of the second
-> read is larger than the first one by less than 32, the system counter can be guaranteed
-> not to return wrong value twice by back-to-back read and the error value is always larger
-> than the correct one by 32. Writes to TVAL are replaced with an equivalent write to CVAL.
-> 
-> The workaround is enabled if the hisilicon,erratum-161601 property is found in
-> the timer node in the device tree. This can be overridden with the
-> clocksource.arm_arch_timer.hisilicon-161601 boot parameter, which allows KVM
-> users to enable the workaround until a mechanism is implemented to
-> automatically communicate this information.
-> 
-> Fix some description for fsl erratum a008585.
-> 
-> v2: Significant rework based on feedback, including seperate the fsl erratum a008585
->     to another patch, update the erratum name and remove unwanted code.
-> 
-> v3: Significant rework based on feedback, including fix some alignment problem, make the
->     #define __hisi_161601_read_reg to be private to the .c file instead of being globally
->     visible, add more accurate annotation and modify a bit of logical format to enable
->     arch_timer_read_ool_enabled, remove the kernel commandline parameter
->     clocksource.arm_arch_timer.hisilicon-161601.
-> 
-> v5: Theoretically the erratum should not occur more than twice in succession when reading
->     the system counter, but it is possible that some interrupts may lead to more than twice
->     read errors, triggering the warning, so setting the number of retries to 50 which is far
->     beyond the number of iterations the loop has been observed to take.
-> 
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> ---
->  Documentation/arm64/silicon-errata.txt |  1 +
->  arch/arm64/include/asm/arch_timer.h    |  2 +-
->  drivers/clocksource/Kconfig            |  9 +++++
->  drivers/clocksource/arm_arch_timer.c   | 70 +++++++++++++++++++++++++++++++---
->  4 files changed, 76 insertions(+), 6 deletions(-)
-> 
-> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-> index 405da11..1c1a95f 100644
-> --- a/Documentation/arm64/silicon-errata.txt
-> +++ b/Documentation/arm64/silicon-errata.txt
-> @@ -63,3 +63,4 @@ stable kernels.
->  | Cavium         | ThunderX SMMUv2 | #27704          | N/A		       |
->  |                |                 |                 |                         |
->  | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585     |
-> +| Hisilicon      | Hip0{5,6,7}     | #161601         | HISILICON_ERRATUM_161601|
-> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index f882c7c..ebf4cde 100644
-> --- a/arch/arm64/include/asm/arch_timer.h
-> +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -29,7 +29,7 @@
->  
->  #include <clocksource/arm_arch_timer.h>
->  
-> -#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585)
-> +#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585) || IS_ENABLED(CONFIG_HISILICON_ERRATUM_161601)
->  extern struct static_key_false arch_timer_read_ool_enabled;
->  #define needs_unstable_timer_counter_workaround() \
->  	static_branch_unlikely(&arch_timer_read_ool_enabled)
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index 4866f7a..162d820 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -335,6 +335,15 @@ config FSL_ERRATUM_A008585
->  	  value").  The workaround will only be active if the
->  	  fsl,erratum-a008585 property is found in the timer node.
->  
-> +config HISILICON_ERRATUM_161601
-> +	bool "Workaround for Hisilicon Erratum 161601"
-> +	default y
-> +	depends on ARM_ARCH_TIMER && ARM64
-> +	help
-> +	  This option enables a workaround for Hisilicon Erratum
-> +	  161601. The workaround will be active if the hisilicon,erratum-161601
-> +	  property is found in the timer node.
-> +
->  config ARM_GLOBAL_TIMER
->  	bool "Support for the ARM global timer" if COMPILE_TEST
->  	select CLKSRC_OF if OF
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index e7406ad..9a82496 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -95,15 +95,18 @@ static int __init early_evtstrm_cfg(char *buf)
->   * Architected system timer support.
->   */
->  
-> -#ifdef CONFIG_FSL_ERRATUM_A008585
-> +#if CONFIG_FSL_ERRATUM_A008585 || IS_ENABLED(CONFIG_HISILICON_ERRATUM_161601)
->  struct arch_timer_erratum_workaround *timer_unstable_counter_workaround = NULL;
->  EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
->  
+2016-12-23 16:20 GMT+09:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
+> On Fri, Dec 23, 2016 at 12:21:48PM +0900, Masahiro Yamada wrote:
+>> Leave the way of zero-out to the compiler's decision; the compiler
+>> may know a more optimized way than calling memset().
+>
+> But no, it doesn't, it will leave "blank" areas in the structure with
+> bad data in it, which is why we do memset.  See the tree-wide fixups we
+> made about a year ago for this very issue.  Are you sure none of these
+> structures get copied to userspace?
+
+I have to admit no security consideration was in my mind.
+
+If we talk about the particular case of struct uart_8250_port,
+this structure is allocated in the stack temporarily,
+then serial8250_register_8250_port() copies its members to another
+structure one by one.  So no "blank" area is exposed to the user-space,
+I think.
+
+Having said that, we have no good reason to take a risk for this.
+
+So, please feel free to discard this patch.
 
 
->  #define        FSL_A008585	0x0001
-> +#define        HISILICON_161601	0x0002
-
-It looks like the DEFINE is useless?
-
-> +
-> +static struct arch_timer_erratum_workaround arch_timer_hisi_161601 = {
-> +	.erratum = HISILICON_161601,
-
-Just a errata description, eg.
-	.desc	= "HISILICON ERRATUM 161601"
-then....
-
-> +	.read_cntp_tval_el0 = hisi_161601_read_cntp_tval_el0,
-> +	.read_cntv_tval_el0 = hisi_161601_read_cntv_tval_el0,
-> +	.read_cntvct_el0 = hisi_161601_read_cntvct_el0,
-> +};
-> +#endif /* CONFIG_HISILICON_ERRATUM_161601 */
-[..]
-
-> -#ifdef CONFIG_FSL_ERRATUM_A008585
-> +#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585) || IS_ENABLED(CONFIG_HISILICON_ERRATUM_161601)
->  		/*
->  		 * Don't use the vdso fastpath if errata require using
->  		 * the out-of-line counter accessor.
-> @@ -909,10 +960,19 @@ static int __init arch_timer_of_init(struct device_node *np)
->  #ifdef CONFIG_FSL_ERRATUM_A008585
->  	if (!timer_unstable_counter_workaround && of_property_read_bool(np, "fsl,erratum-a008585"))
->  		timer_unstable_counter_workaround = &arch_timer_fsl_a008585;
-> +#endif
-> +
-> +#ifdef CONFIG_HISILICON_ERRATUM_161601
-> +	if (!timer_unstable_counter_workaround && of_property_read_bool(np, "hisilicon,erratum-161601"))
-> +		timer_unstable_counter_workaround = &arch_timer_hisi_161601;
-> +#endif
->  
-> +#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585) || IS_ENABLED(CONFIG_HISILICON_ERRATUM_161601)
->  	if (timer_unstable_counter_workaround) {
->  		static_branch_enable(&arch_timer_read_ool_enabled);
-> -		pr_info("Enabling workaround for FSL erratum A-008585\n");
-> +		pr_info("Enabling workaround for %s\n",
-> +			timer_unstable_counter_workaround->erratum == FSL_A008585 ?
-> +			"FSL ERRATUM A-008585" : "HISILICON ERRATUM 161601");
-
-......>		pr_info("Enabling workaround for %s\n", timer_unstable_counter_workaround->desc)
-
->  	}
->  #endif
->  
-> 
+-- 
+Best Regards
+Masahiro Yamada
