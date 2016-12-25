@@ -1,131 +1,35 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 25 Dec 2016 21:26:47 +0200
-Subject: [PATCH 8/9] pinctrl: samsung: Add runtime PM support
-In-Reply-To: <1482495889-6201-9-git-send-email-m.szyprowski@samsung.com>
-References: <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20161223122542epcas1p444c9d8c91c2983f9934e68a6bb882726@epcas1p4.samsung.com>
- <1482495889-6201-9-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20161225192647.omy6qnd6pe4aaoud@kozik-lap>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 25 Dec 2016 22:20:38 +0100
+Subject: [PATCH 1/4] serial: core: Add LED trigger support
+In-Reply-To: <20161124081748.fx3xm5ww64ngn5it@pengutronix.de>
+References: <20161123100106.15969-1-s.hauer@pengutronix.de>
+ <20161123100106.15969-2-s.hauer@pengutronix.de>
+ <e9fc12b8-d4a7-067d-ef87-03f0aae39bd7@gmail.com>
+ <20161124081748.fx3xm5ww64ngn5it@pengutronix.de>
+Message-ID: <20161225212038.GD26891@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 23, 2016 at 01:24:48PM +0100, Marek Szyprowski wrote:
-> This patch adds runtime power management support to Samsung pin controller
-> driver. It uses recently introduced property to mark some pin states as
-> suitable for power off. When all pins for given controller are set to this
-> special state, the controller is able to enter runtime suspend state. This
-> in turn might allow to turn respective power domain off to reduce power
-> consumption.
+Hi!
+
+> > Could we somehow remedy the lack of knowledge from the core as whether
+> > the HW sends/receives characters first before adding support for LED
+> > triggers? It would be more generic and future proof to require UART
+> > drivers to report to the core when they actually TX/RX, and then at the
+> > core level, utilize that knowledge to perform the LED trigger.
 > 
-> This patch moves saving driver state to runtime pm callbacks and implements
-> system sleep suspend/resume callbacks with pm_runtime_force_suspend/resume
-> helpers to keep the runtime pm state consistent with the hardware both
-> during runtime and system sleep transitions.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/pinctrl/samsung/pinctrl-samsung.c | 24 ++++++++++++++++++++++--
->  drivers/pinctrl/samsung/pinctrl-samsung.h |  1 +
->  2 files changed, 23 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-> index 301169d2b6e1..c741e93d65b8 100644
-> --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-> @@ -28,6 +28,7 @@
->  #include <linux/gpio.h>
->  #include <linux/irqdomain.h>
->  #include <linux/of_device.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/spinlock.h>
->  
->  #include "../core.h"
-> @@ -378,6 +379,17 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
->  		shift -= 32;
->  		reg += 4;
->  	}
-> +	if (func->rpm_active) {
-> +		if (!(bank->rpm_map & (1 << pin_offset))) {
-> +			bank->rpm_map |= 1 << pin_offset;
-> +			pm_runtime_get_sync(drvdata->dev);
-> +		}
-> +	} else {
-> +		if ((bank->rpm_map & (1 << pin_offset))) {
-> +			bank->rpm_map &= ~(1 << pin_offset);
-> +			pm_runtime_put(drvdata->dev);
-> +		}
-> +	}
->  
->  	spin_lock_irqsave(&bank->slock, flags);
->  
-> @@ -427,6 +439,8 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
->  	if (cfg_type >= PINCFG_TYPE_NUM || !type->fld_width[cfg_type])
->  		return -EINVAL;
->  
-> +	pm_runtime_get_sync(drvdata->dev);
-> +
->  	width = type->fld_width[cfg_type];
->  	cfg_reg = type->reg_offset[cfg_type];
->  
-> @@ -449,6 +463,8 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
->  
->  	spin_unlock_irqrestore(&bank->slock, flags);
->  
-> +	pm_runtime_put(drvdata->dev);
-> +
->  	return 0;
->  }
->  
-> @@ -1096,6 +1112,8 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
->  		ctrl->retention_init(drvdata);
->  
->  	platform_set_drvdata(pdev, drvdata);
-> +	pm_runtime_set_active(dev);
-> +	pm_runtime_enable(dev);
->  
->  	return 0;
->  }
-> @@ -1242,8 +1260,10 @@ static int samsung_pinctrl_resume(struct device *dev)
->  MODULE_DEVICE_TABLE(of, samsung_pinctrl_dt_match);
->  
->  static const struct dev_pm_ops samsung_pinctrl_pm_ops = {
-> -	SET_LATE_SYSTEM_SLEEP_PM_OPS(samsung_pinctrl_suspend,
-> -				     samsung_pinctrl_resume)
-> +	SET_RUNTIME_PM_OPS(samsung_pinctrl_suspend,
-> +			   samsung_pinctrl_resume, NULL)
-> +	SET_LATE_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-> +				     pm_runtime_force_resume)
->  };
->  
->  static struct platform_driver samsung_pinctrl_driver = {
-> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
-> index edeafa00abd3..ccb24ec46796 100644
-> --- a/drivers/pinctrl/samsung/pinctrl-samsung.h
-> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
-> @@ -172,6 +172,7 @@ struct samsung_pin_bank {
+> Maybe we could introduce a function to read from the TX FIFO. Having
+> open coded this in each and every driver is not nice anyway.
 
-A nit:
-Missing kernel doc update.
-
-It took me a while to understand the logic behind the rpm_active (the
-code is simple but logic was not that easy to see) but it looks good and
-sensible. I didn't find any issues with that approach except the usage
-of DT configuration as a "notification" mechanism.
-
-For this itself:
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-
-Best regards,
-Krzysztof
-
-
->  	const char	*name;
->  
->  	u32		pin_base;
-> +	u32		rpm_map;
->  	void		*soc_priv;
->  	struct device_node *of_node;
->  	struct samsung_pinctrl_drv_data *drvdata;
-> -- 
-> 1.9.1
-> 
+Yes, please.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161225/eb628365/attachment.sig>
