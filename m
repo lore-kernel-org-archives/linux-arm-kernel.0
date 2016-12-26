@@ -1,71 +1,151 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Mon, 26 Dec 2016 06:31:37 +0000
-Subject: [PATCH] coresight: fix kernel panic caused by invalid CPU
-Message-ID: <20161226063137.110016-1-wangnan0@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 26 Dec 2016 08:42:14 +0100
+Subject: [GIT PULL] Allwinner conversion to generic pin properties
+Message-ID: <20161226074214.sd53ozm6hvzkdb26@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit d52c9750f150 ("coresight: reset 'enable_sink' flag when need be")
-caused a kernel panic because of the using of an invalid value: after
-'for_each_cpu(cpu, mask)', value of local variable 'cpu' become invalid,
-causes following 'cpu_to_node' access invalid memory area.
+Hi Arnd, Olof,
 
-This patch brings the deleted 'cpu = cpumask_first(mask)' back.
+Like we discussed it last time, here is a pull request with the
+convertion patches to the generic pin properties for 4.10.
 
-Panic log:
+Thanks,
+Maxime
 
- $ perf record -e cs_etm// ls
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
- Unable to handle kernel paging request at virtual address fffe801804af4f10
- pgd = ffff8017ce031600
- [fffe801804af4f10] *pgd=0000000000000000, *pud=0000000000000000
- Internal error: Oops: 96000004 [#1] SMP
- Modules linked in:
- CPU: 33 PID: 1619 Comm: perf Not tainted 4.7.1+ #16
- Hardware name: Huawei Taishan 2280 /CH05TEVBA, BIOS 1.10 11/24/2016
- task: ffff8017cb0c8400 ti: ffff8017cb154000 task.ti: ffff8017cb154000
- PC is at tmc_alloc_etf_buffer+0x60/0xd4
- LR is at tmc_alloc_etf_buffer+0x44/0xd4
- pc : [<ffff000008633df8>] lr : [<ffff000008633ddc>] pstate: 60000145
- sp : ffff8017cb157b40
- x29: ffff8017cb157b40 x28: 0000000000000000
- ...skip...
- 7a60: ffff000008c64dc8 0000000000000006 0000000000000253 ffffffffffffffff
- 7a80: 0000000000000000 0000000000000000 ffff0000080872cc 0000000000000001
- [<ffff000008633df8>] tmc_alloc_etf_buffer+0x60/0xd4
- [<ffff000008632b9c>] etm_setup_aux+0x1dc/0x1e8
- [<ffff00000816eed4>] rb_alloc_aux+0x2b0/0x338
- [<ffff00000816a5e4>] perf_mmap+0x414/0x568
- [<ffff0000081ab694>] mmap_region+0x324/0x544
- [<ffff0000081abbe8>] do_mmap+0x334/0x3e0
- [<ffff000008191150>] vm_mmap_pgoff+0xa4/0xc8
- [<ffff0000081a9a30>] SyS_mmap_pgoff+0xb0/0x22c
- [<ffff0000080872e4>] sys_mmap+0x18/0x28
- [<ffff0000080843f0>] el0_svc_naked+0x24/0x28
- Code: 912040a5 d0001c00 f873d821 911c6000 (b8656822)
- ---[ end trace 98933da8f92b0c9a ]---
+  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 
-Signed-off-by: Wang Nan <wangnan0@huawei.com>
-Cc: Xia Kaixu <xiakaixu@huawei.com>
-Cc: Li Zefan <lizefan@huawei.com>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/hwtracing/coresight/coresight-etm-perf.c | 1 +
- 1 file changed, 1 insertion(+)
+are available in the git repository at:
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index 1774196..26cfac3 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -242,6 +242,7 @@ static void *etm_setup_aux(int event_cpu, void **pages,
- 	if (!sink_ops(sink)->alloc_buffer)
- 		goto err;
- 
-+	cpu = cpumask_first(mask);
- 	/* Get the AUX specific data from the sink buffer */
- 	event_data->snk_config =
- 			sink_ops(sink)->alloc_buffer(sink, cpu, pages,
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-generic-pinconf-for-4.10
+
+for you to fetch changes up to 1edcd36fcb48fe841bcc62eda36c105037d9583c:
+
+  ARM: sunxi: Convert pinctrl nodes to generic bindings (2016-12-26 08:27:11 +0100)
+
+----------------------------------------------------------------
+Allwinner conversion to generic pin muxing properties
+
+Here is a list of patches that converts the current DT to the generic pin
+control and muxing properties, now that the pinctrl driver supports it.
+
+----------------------------------------------------------------
+Maxime Ripard (3):
+      ARM: sunxi: Remove useless allwinner,drive property
+      ARM: sunxi: Remove useless allwinner,pull property
+      ARM: sunxi: Convert pinctrl nodes to generic bindings
+
+ arch/arm/boot/dts/sun4i-a10-a1000.dts              |  12 +-
+ arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts         |   2 +-
+ arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts    |  14 +-
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |  14 +-
+ arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts   |  38 ++-
+ arch/arm/boot/dts/sun4i-a10-gemei-g9.dts           |   6 +-
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts          |  12 +-
+ arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts       |  16 +-
+ arch/arm/boot/dts/sun4i-a10-inet1.dts              |  26 +-
+ arch/arm/boot/dts/sun4i-a10-inet97fv2.dts          |  14 +-
+ arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts       |  29 +--
+ arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts         |  12 +-
+ arch/arm/boot/dts/sun4i-a10-marsboard.dts          |  13 +-
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts         |   2 +-
+ arch/arm/boot/dts/sun4i-a10-mk802.dts              |  18 +-
+ arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts     |  27 +-
+ arch/arm/boot/dts/sun4i-a10-pcduino.dts            |  19 +-
+ arch/arm/boot/dts/sun4i-a10-pcduino2.dts           |   6 +-
+ arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts   |  32 +--
+ arch/arm/boot/dts/sun4i-a10.dtsi                   | 169 +++++--------
+ arch/arm/boot/dts/sun5i-a10s-auxtek-t003.dts       |  18 +-
+ arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts       |  29 +--
+ arch/arm/boot/dts/sun5i-a10s-mk802.dts             |  19 +-
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts   |  36 ++-
+ arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts      |  20 +-
+ arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts           |  21 +-
+ arch/arm/boot/dts/sun5i-a10s.dtsi                  |  43 ++--
+ .../boot/dts/sun5i-a13-empire-electronix-d709.dts  |  23 +-
+ arch/arm/boot/dts/sun5i-a13-hsg-h702.dts           |  22 +-
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts    |  40 ++-
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts          |  36 ++-
+ arch/arm/boot/dts/sun5i-a13-utoo-p66.dts           |  11 +-
+ arch/arm/boot/dts/sun5i-a13.dtsi                   |  24 +-
+ arch/arm/boot/dts/sun5i-gr8-chip-pro.dts           |  12 +-
+ arch/arm/boot/dts/sun5i-gr8-evb.dts                |  24 +-
+ arch/arm/boot/dts/sun5i-gr8.dtsi                   | 122 ++++-----
+ arch/arm/boot/dts/sun5i-r8-chip.dts                |  27 +-
+ .../boot/dts/sun5i-reference-design-tablet.dtsi    |  33 +--
+ arch/arm/boot/dts/sun5i.dtsi                       |  75 +++---
+ arch/arm/boot/dts/sun6i-a31-app4-evb1.dts          |   6 +-
+ arch/arm/boot/dts/sun6i-a31-colombus.dts           |  22 +-
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts        |  23 +-
+ arch/arm/boot/dts/sun6i-a31-i7.dts                 |  19 +-
+ arch/arm/boot/dts/sun6i-a31-m9.dts                 |  19 +-
+ arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts   |  19 +-
+ arch/arm/boot/dts/sun6i-a31.dtsi                   |  98 +++-----
+ arch/arm/boot/dts/sun6i-a31s-primo81.dts           |  20 +-
+ arch/arm/boot/dts/sun6i-a31s-sina31s.dts           |  13 +-
+ arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts   |  29 +--
+ .../dts/sun6i-a31s-yones-toptech-bs1078-v2.dts     |   9 +-
+ .../boot/dts/sun6i-reference-design-tablet.dtsi    |  14 +-
+ arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts   |  27 +-
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts           |  26 +-
+ arch/arm/boot/dts/sun7i-a20-bananapro.dts          |  37 +--
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |  13 +-
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |  38 +--
+ arch/arm/boot/dts/sun7i-a20-hummingbird.dts        |  24 +-
+ arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts          |  26 +-
+ arch/arm/boot/dts/sun7i-a20-itead-ibox.dts         |   7 +-
+ arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts          |  30 +--
+ arch/arm/boot/dts/sun7i-a20-m3.dts                 |   6 +-
+ arch/arm/boot/dts/sun7i-a20-mk808c.dts             |  12 +-
+ arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts     |  32 +--
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts     |  27 +-
+ .../boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts    |   6 +-
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts    |  33 +--
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts    |  28 +--
+ arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts      |  45 ++--
+ arch/arm/boot/dts/sun7i-a20-orangepi.dts           |  38 ++-
+ arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts      |  25 +-
+ arch/arm/boot/dts/sun7i-a20-pcduino3.dts           |  21 +-
+ arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts     |  25 +-
+ arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts   |  13 +-
+ arch/arm/boot/dts/sun7i-a20.dtsi                   | 277 ++++++++-------------
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi               |  99 +++-----
+ arch/arm/boot/dts/sun8i-a23-evb.dts                |   7 +-
+ .../boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts   |   8 +-
+ .../boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts   |   8 +-
+ arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts     |   9 +-
+ arch/arm/boot/dts/sun8i-a33-olinuxino.dts          |  18 +-
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     |  11 +-
+ arch/arm/boot/dts/sun8i-a33.dtsi                   |   6 +-
+ arch/arm/boot/dts/sun8i-a83t.dtsi                  |  21 +-
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    |  18 +-
+ arch/arm/boot/dts/sun8i-h3-nanopi.dtsi             |  18 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          |  26 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts       |  18 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        |  18 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts    |   4 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  18 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts       |  10 +-
+ arch/arm/boot/dts/sun8i-h3.dtsi                    | 104 +++-----
+ arch/arm/boot/dts/sun8i-q8-common.dtsi             |   9 +-
+ arch/arm/boot/dts/sun8i-r16-parrot.dts             |  36 ++-
+ .../boot/dts/sun8i-reference-design-tablet.dtsi    |  26 +-
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts        |  23 +-
+ arch/arm/boot/dts/sun9i-a80-optimus.dts            |  41 ++-
+ arch/arm/boot/dts/sun9i-a80.dtsi                   |  61 ++---
+ arch/arm/boot/dts/sunxi-common-regulators.dtsi     |  24 +-
+ 99 files changed, 1081 insertions(+), 1783 deletions(-)
+
 -- 
-2.10.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161226/d0e3042f/attachment.sig>
