@@ -1,79 +1,164 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 26 Dec 2016 12:38:39 -0800
-Subject: [PATCH v4 1/4] mtd: lart: Rename partition defines to be prefixed
- with PART_
+Date: Mon, 26 Dec 2016 12:38:41 -0800
+Subject: [PATCH v4 3/4] ARM: Add support for CONFIG_DEBUG_VIRTUAL
 In-Reply-To: <20161226203842.19457-1-f.fainelli@gmail.com>
 References: <20161209233628.6642-1-f.fainelli@gmail.com>
  <20161226203842.19457-1-f.fainelli@gmail.com>
-Message-ID: <20161226203842.19457-2-f.fainelli@gmail.com>
+Message-ID: <20161226203842.19457-4-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for defining KERNEL_START on ARM, rename KERNEL_START to
-PART_KERNEL_START, and to be consistent, do this for all
-partition-related constants.
+x86 has an option: CONFIG_DEBUG_VIRTUAL to do additional checks on
+virt_to_phys calls. The goal is to catch users who are calling
+virt_to_phys on non-linear addresses immediately. This includes caller
+using __virt_to_phys() on image addresses instead of __pa_symbol(). This
+is a generally useful debug feature to spot bad code (particulary in
+drivers).
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/mtd/devices/lart.c | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+ arch/arm/Kconfig              |  1 +
+ arch/arm/include/asm/memory.h | 16 +++++++++++--
+ arch/arm/mm/Makefile          |  1 +
+ arch/arm/mm/physaddr.c        | 55 +++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 71 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mm/physaddr.c
 
-diff --git a/drivers/mtd/devices/lart.c b/drivers/mtd/devices/lart.c
-index 82bd00af5cc3..268aae45b514 100644
---- a/drivers/mtd/devices/lart.c
-+++ b/drivers/mtd/devices/lart.c
-@@ -75,18 +75,18 @@ static char module_name[] = "lart";
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index b5d529fdffab..5e66173c5787 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2,6 +2,7 @@ config ARM
+ 	bool
+ 	default y
+ 	select ARCH_CLOCKSOURCE_DATA
++	select ARCH_HAS_DEBUG_VIRTUAL
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+ 	select ARCH_HAS_ELF_RANDOMIZE
+ 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index bee7511c5098..d90300193adf 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -213,7 +213,7 @@ extern const void *__pv_table_begin, *__pv_table_end;
+ 	: "r" (x), "I" (__PV_BITS_31_24)		\
+ 	: "cc")
  
- /* blob */
- #define NUM_BLOB_BLOCKS		FLASH_NUMBLOCKS_16m_PARAM
--#define BLOB_START			0x00000000
--#define BLOB_LEN			(NUM_BLOB_BLOCKS * FLASH_BLOCKSIZE_PARAM)
-+#define PART_BLOB_START		0x00000000
-+#define PART_BLOB_LEN		(NUM_BLOB_BLOCKS * FLASH_BLOCKSIZE_PARAM)
+-static inline phys_addr_t __virt_to_phys(unsigned long x)
++static inline phys_addr_t __virt_to_phys_nodebug(unsigned long x)
+ {
+ 	phys_addr_t t;
  
- /* kernel */
- #define NUM_KERNEL_BLOCKS	7
--#define KERNEL_START		(BLOB_START + BLOB_LEN)
--#define KERNEL_LEN			(NUM_KERNEL_BLOCKS * FLASH_BLOCKSIZE_MAIN)
-+#define PART_KERNEL_START	(PART_BLOB_START + PART_BLOB_LEN)
-+#define PART_KERNEL_LEN		(NUM_KERNEL_BLOCKS * FLASH_BLOCKSIZE_MAIN)
+@@ -245,7 +245,7 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+ #define PHYS_OFFSET	PLAT_PHYS_OFFSET
+ #define PHYS_PFN_OFFSET	((unsigned long)(PHYS_OFFSET >> PAGE_SHIFT))
  
- /* initial ramdisk */
- #define NUM_INITRD_BLOCKS	24
--#define INITRD_START		(KERNEL_START + KERNEL_LEN)
--#define INITRD_LEN			(NUM_INITRD_BLOCKS * FLASH_BLOCKSIZE_MAIN)
-+#define PART_INITRD_START	(PART_KERNEL_START + PART_KERNEL_LEN)
-+#define PART_INITRD_LEN		(NUM_INITRD_BLOCKS * FLASH_BLOCKSIZE_MAIN)
+-static inline phys_addr_t __virt_to_phys(unsigned long x)
++static inline phys_addr_t __virt_to_phys_nodebug(unsigned long x)
+ {
+ 	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
+ }
+@@ -261,6 +261,16 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+ 	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
+ 	 PHYS_PFN_OFFSET)
+ 
++#define __pa_symbol_nodebug(x)	__virt_to_phys_nodebug((x))
++
++#ifdef CONFIG_DEBUG_VIRTUAL
++extern phys_addr_t __virt_to_phys(unsigned long x);
++extern phys_addr_t __phys_addr_symbol(unsigned long x);
++#else
++#define __virt_to_phys(x)	__virt_to_phys_nodebug(x)
++#define __phys_addr_symbol(x)	__pa_symbol_nodebug(x)
++#endif
++
+ /*
+  * These are *only* valid on the kernel direct mapped RAM memory.
+  * Note: Drivers should NOT use these.  They are the wrong
+@@ -283,9 +293,11 @@ static inline void *phys_to_virt(phys_addr_t x)
+  * Drivers should NOT use these either.
+  */
+ #define __pa(x)			__virt_to_phys((unsigned long)(x))
++#define __pa_symbol(x)		__phys_addr_symbol(RELOC_HIDE((unsigned long)(x), 0))
+ #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
+ #define pfn_to_kaddr(pfn)	__va((phys_addr_t)(pfn) << PAGE_SHIFT)
+ 
++
+ extern long long arch_phys_to_idmap_offset;
  
  /*
-  * See section 4.0 in "3 Volt Fast Boot Block Flash Memory" Intel Datasheet
-@@ -587,20 +587,20 @@ static struct mtd_partition lart_partitions[] = {
- 	/* blob */
- 	{
- 		.name	= "blob",
--		.offset	= BLOB_START,
--		.size	= BLOB_LEN,
-+		.offset	= PART_BLOB_START,
-+		.size	= PART_BLOB_LEN,
- 	},
- 	/* kernel */
- 	{
- 		.name	= "kernel",
--		.offset	= KERNEL_START,		/* MTDPART_OFS_APPEND */
--		.size	= KERNEL_LEN,
-+		.offset	= PART_KERNEL_START,	/* MTDPART_OFS_APPEND */
-+		.size	= PART_KERNEL_LEN,
- 	},
- 	/* initial ramdisk / file system */
- 	{
- 		.name	= "file system",
--		.offset	= INITRD_START,		/* MTDPART_OFS_APPEND */
--		.size	= INITRD_LEN,		/* MTDPART_SIZ_FULL */
-+		.offset	= PART_INITRD_START,	/* MTDPART_OFS_APPEND */
-+		.size	= PART_INITRD_LEN,	/* MTDPART_SIZ_FULL */
- 	}
- };
- #define NUM_PARTITIONS ARRAY_SIZE(lart_partitions)
+diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+index e8698241ece9..b3dea80715b4 100644
+--- a/arch/arm/mm/Makefile
++++ b/arch/arm/mm/Makefile
+@@ -14,6 +14,7 @@ endif
+ 
+ obj-$(CONFIG_ARM_PTDUMP)	+= dump.o
+ obj-$(CONFIG_MODULES)		+= proc-syms.o
++obj-$(CONFIG_DEBUG_VIRTUAL)	+= physaddr.o
+ 
+ obj-$(CONFIG_ALIGNMENT_TRAP)	+= alignment.o
+ obj-$(CONFIG_HIGHMEM)		+= highmem.o
+diff --git a/arch/arm/mm/physaddr.c b/arch/arm/mm/physaddr.c
+new file mode 100644
+index 000000000000..f10bdcbcb155
+--- /dev/null
++++ b/arch/arm/mm/physaddr.c
+@@ -0,0 +1,55 @@
++#include <linux/bug.h>
++#include <linux/export.h>
++#include <linux/types.h>
++#include <linux/mmdebug.h>
++#include <linux/mm.h>
++
++#include <asm/sections.h>
++#include <asm/memory.h>
++#include <asm/fixmap.h>
++#include <asm/dma.h>
++
++#include "mm.h"
++
++static inline bool __virt_addr_valid(unsigned long x)
++{
++	/* high_memory does not get immediately defined, and there
++	 * are early callers of __pa() against PAGE_OFFSET
++	 */
++	if (!high_memory && x >= PAGE_OFFSET)
++		return true;
++
++	if (high_memory && x >= PAGE_OFFSET && x < (unsigned long)high_memory)
++		return true;
++
++	/* ARM uses the default per-CPU allocation routing which forces us to
++	 * have an explicit check here to avoid a false positive
++	 */
++	if (x == MAX_DMA_ADDRESS)
++		return true;
++
++	return false;
++}
++
++phys_addr_t __virt_to_phys(unsigned long x)
++{
++	WARN(!__virt_addr_valid(x),
++	     "virt_to_phys used for non-linear address: %pK (%pS)\n",
++	     (void *)x,
++	     (void *)x);
++
++	return __virt_to_phys_nodebug(x);
++}
++EXPORT_SYMBOL(__virt_to_phys);
++
++phys_addr_t __phys_addr_symbol(unsigned long x)
++{
++	/* This is bounds checking against the kernel image only.
++	 * __pa_symbol should only be used on kernel symbol addresses.
++	 */
++	VIRTUAL_BUG_ON(x < (unsigned long)KERNEL_START ||
++		       x > (unsigned long)KERNEL_END);
++
++	return __pa_symbol_nodebug(x);
++}
++EXPORT_SYMBOL(__phys_addr_symbol);
 -- 
 2.9.3
