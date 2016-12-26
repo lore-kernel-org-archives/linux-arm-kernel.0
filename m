@@ -1,117 +1,73 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon, 26 Dec 2016 12:12:06 -0500
-Subject: [RFC 8/8] KVM: arm/arm64: Emulate the EL1 phys timer register access
+Date: Mon, 26 Dec 2016 12:12:03 -0500
+Subject: [RFC 5/8] KVM: arm64: Add the EL1 physical timer access handler
 In-Reply-To: <1482772326-29110-1-git-send-email-jintack@cs.columbia.edu>
 References: <1482772326-29110-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1482772326-29110-9-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1482772326-29110-6-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Emulate read and write operations to CNTP_TVAL, CNTP_CVAL and CNTP_CTL.
-Now the VM is able to use the EL1 physical timer.
+KVM traps on the EL1 phys timer accesses from VMs, but it doesn't handle
+those traps. This results in terminating VMs. Instead, set a handler for
+the EL1 phys timer access, and inject an undefined exception as an
+intermediate step.
 
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm64/kvm/sys_regs.c    | 35 ++++++++++++++++++++++++++++++++---
- include/kvm/arm_arch_timer.h |  3 +++
- virt/kvm/arm/arch_timer.c    |  4 ++--
- 3 files changed, 37 insertions(+), 5 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index fd9e747..7cef94f 100644
+index 87e7e66..fd9e747 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -824,7 +824,15 @@ static bool access_cntp_tval(struct kvm_vcpu *vcpu,
- 		struct sys_reg_params *p,
- 		const struct sys_reg_desc *r)
- {
--	kvm_inject_undefined(vcpu);
-+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-+	cycle_t now = kvm_phys_timer_read();
-+
-+	if (p->is_write) {
-+		ptimer->cnt_cval = p->regval + now;
-+		kvm_timer_emulate(vcpu, ptimer);
-+	} else
-+		p->regval = ptimer->cnt_cval - now;
-+
- 	return true;
- }
+@@ -820,6 +820,30 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	  CRm((0b1100 | (((n) >> 3) & 0x3))), Op2(((n) & 0x7)),		\
+ 	  access_pmu_evtyper, reset_unknown, (PMEVTYPER0_EL0 + n), }
  
-@@ -832,7 +840,21 @@ static bool access_cntp_ctl(struct kvm_vcpu *vcpu,
- 		struct sys_reg_params *p,
- 		const struct sys_reg_desc *r)
- {
--	kvm_inject_undefined(vcpu);
-+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
++static bool access_cntp_tval(struct kvm_vcpu *vcpu,
++		struct sys_reg_params *p,
++		const struct sys_reg_desc *r)
++{
++	kvm_inject_undefined(vcpu);
++	return true;
++}
 +
-+	if (p->is_write) {
-+		/* ISTATUS bit is read-only */
-+		ptimer->cnt_ctl = p->regval & ~ARCH_TIMER_CTRL_IT_STAT;
-+		kvm_timer_emulate(vcpu, ptimer);
-+	} else {
-+		cycle_t now = kvm_phys_timer_read();
++static bool access_cntp_ctl(struct kvm_vcpu *vcpu,
++		struct sys_reg_params *p,
++		const struct sys_reg_desc *r)
++{
++	kvm_inject_undefined(vcpu);
++	return true;
++}
 +
-+		p->regval = ptimer->cnt_ctl;
-+		/* Set ISTATUS bit if it's expired */
-+		if (ptimer->cnt_cval <= now)
-+			p->regval |= ARCH_TIMER_CTRL_IT_STAT;
-+	}
++static bool access_cntp_cval(struct kvm_vcpu *vcpu,
++		struct sys_reg_params *p,
++		const struct sys_reg_desc *r)
++{
++	kvm_inject_undefined(vcpu);
++	return true;
++}
 +
- 	return true;
- }
+ /*
+  * Architected system registers.
+  * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
+@@ -1029,6 +1053,16 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b011),
+ 	  NULL, reset_unknown, TPIDRRO_EL0 },
  
-@@ -840,7 +862,14 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
- 		struct sys_reg_params *p,
- 		const struct sys_reg_desc *r)
- {
--	kvm_inject_undefined(vcpu);
-+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
++	/* CNTP_TVAL_EL0 */
++	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b0010), Op2(0b000),
++	  access_cntp_tval },
++	/* CNTP_CTL_EL0 */
++	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b0010), Op2(0b001),
++	  access_cntp_ctl },
++	/* CNTP_CVAL_EL0 */
++	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b0010), Op2(0b010),
++	  access_cntp_cval },
 +
-+	if (p->is_write) {
-+		ptimer->cnt_cval = p->regval;
-+		kvm_timer_emulate(vcpu, ptimer);
-+	} else
-+		p->regval = ptimer->cnt_cval;
-+
- 	return true;
- }
- 
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index 04ed9c1..776579b 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -75,6 +75,9 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
- 			   struct arch_timer_context *timer_ctx);
- void kvm_timer_schedule(struct kvm_vcpu *vcpu);
- void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
-+void kvm_timer_emulate(struct kvm_vcpu *vcpu, struct arch_timer_context *timer);
-+
-+cycle_t kvm_phys_timer_read(void);
- 
- void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
- 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index be8d953..7a161f8 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -39,7 +39,7 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
- 	vcpu_vtimer(vcpu)->active_cleared_last = false;
- }
- 
--static cycle_t kvm_phys_timer_read(void)
-+cycle_t kvm_phys_timer_read(void)
- {
- 	return timecounter->cc->read(timecounter->cc);
- }
-@@ -258,7 +258,7 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
-  * Schedule the background timer for the emulated timer. The background timer
-  * runs whenever vcpu is runnable and the timer is not expired.
-  */
--static void kvm_timer_emulate(struct kvm_vcpu *vcpu,
-+void kvm_timer_emulate(struct kvm_vcpu *vcpu,
- 		       struct arch_timer_context *timer_ctx)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	/* PMEVCNTRn_EL0 */
+ 	PMU_PMEVCNTR_EL0(0),
+ 	PMU_PMEVCNTR_EL0(1),
 -- 
 1.9.1
