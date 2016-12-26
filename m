@@ -1,24 +1,14 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 26 Dec 2016 15:55:15 +0100
-Subject: [RFC PATCH 0/7] ThunderX Embedded switch support
-In-Reply-To: <DM5PR07MB2842EC647393430BE559D5B78D960@DM5PR07MB2842.namprd07.prod.outlook.com>
-References: <1482310011-1862-1-git-send-email-satha.rao@caviumnetworks.com>
- <CA+sq2Cf3npwzZc2+qQXrNzVBWywn1iwSL_mXjpU1LzC+JFKdUA@mail.gmail.com>
- <DM5PR07MB2842EC647393430BE559D5B78D960@DM5PR07MB2842.namprd07.prod.outlook.com>
-Message-ID: <20161226145515.GD30335@lunn.ch>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 27 Dec 2016 00:25:12 +0800
+Subject: [PATCH 0/6] Allwinner H5 and Xunlong Orange Pi PC 2 support
+Message-ID: <20161226162518.5367-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 26, 2016 at 02:04:27PM +0000, Koteshwar Rao, Satha wrote:
-> Hi Sunil,
-> 
-> In RFC cover letter we explained the feature details, files organized based on their supporting functionality, let me know if you are interested in any specific details
+This patchset imports two necessary patches for Allwinner H5: CCU driver and
+the pinctrl driver, both are based on the H3 ones.
 
-Please don't top post. Also, please perform correct quoting of the
-email you are replying to.
+Some patches of H5 dtsi file are directly taken from Andre Przywara's kernel
+tree, but did more cleanup.
 
-As for getting patches merged, you will find it easier to get reviews
-if you have lots of small patches which are obviously correct, and
-each has a good change log entry describing the why as well as what.
-
-     Andrew
+The Orange Pi PC 2 dtsi file is also taken there.
