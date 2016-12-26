@@ -1,40 +1,31 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 26 Dec 2016 11:34:33 +0900
-Subject: [PATCH] clk: uniphier: remove unneeded #include <linux/delay.h>
-Message-ID: <1482719673-17573-1-git-send-email-yamada.masahiro@socionext.com>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Mon, 26 Dec 2016 11:45:26 +0800
+Subject: [PATCH v3 0/4] clk: rockchip: support clk controller for rk3328 SoC
+Message-ID: <1482723930-5876-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This include was needed to suppress build error when this driver
-was initially merged because <linux/regmap.h> did not include
-<linux/delay.h> at that time.  (developers' headache across
-sub-systems)
+Changes in v3:
+  fix up the pll type pll_rk3328 description and use.
+Changes in v2:
+  add bindings for rk3328 clock controller
 
-The root cause has been fixed by commit adf08d481b52 ("regmap:
-include <linux/delay.h> from include/linux/regmap.h"), so this
-line can be dropped now.
+Elaine Zhang (4):
+  clk: rockchip: add dt-binding header for rk3328
+  dt-bindings: add bindings for rk3328 clock controller
+  clk: rockchip: add clock controller for rk3328
+  clk: rockchip: add new pll-type for rk3328
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+ .../bindings/clock/rockchip,rk3328-cru.txt         |   57 ++
+ drivers/clk/rockchip/Makefile                      |    1 +
+ drivers/clk/rockchip/clk-pll.c                     |   16 +-
+ drivers/clk/rockchip/clk-rk3328.c                  | 1068 ++++++++++++++++++++
+ drivers/clk/rockchip/clk.h                         |   23 +
+ include/dt-bindings/clock/rk3328-cru.h             |  403 ++++++++
+ 6 files changed, 1565 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3328-cru.txt
+ create mode 100644 drivers/clk/rockchip/clk-rk3328.c
+ create mode 100644 include/dt-bindings/clock/rk3328-cru.h
 
-This patch must be applied on v4.10-rc1 or later
-so that you can see both commit d08f1f0d596c and adf08d481b52.
-
-
- drivers/clk/uniphier/clk-uniphier-cpugear.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/clk/uniphier/clk-uniphier-cpugear.c b/drivers/clk/uniphier/clk-uniphier-cpugear.c
-index 9bff26e..ec11f55 100644
---- a/drivers/clk/uniphier/clk-uniphier-cpugear.c
-+++ b/drivers/clk/uniphier/clk-uniphier-cpugear.c
-@@ -14,7 +14,6 @@
-  */
- 
- #include <linux/clk-provider.h>
--#include <linux/delay.h>
- #include <linux/device.h>
- #include <linux/regmap.h>
- 
 -- 
-2.7.4
+1.9.1
