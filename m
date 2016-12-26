@@ -1,43 +1,31 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Mon, 26 Dec 2016 17:31:27 +0800
-Subject: [PATCH v2 2/2] arm64: allwinner: Kconfig: add essential pinctrl
- driver for H5
-In-Reply-To: <20161226093127.5525-1-icenowy@aosc.xyz>
-References: <20161226093127.5525-1-icenowy@aosc.xyz>
-Message-ID: <20161226093127.5525-2-icenowy@aosc.xyz>
+From: puck.chen@hisilicon.com (Chen Feng)
+Date: Mon, 26 Dec 2016 17:36:11 +0800
+Subject: [RESEND 1/2] document: dt: add binding for Hi3660 SoC
+Message-ID: <1482744972-56622-1-git-send-email-puck.chen@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H5 SoC has two pin controllers, one (in user manual called "CPUx") needs
-a slightly advanced driver, and the other (called "CPUs") is just equal
-to the on in H3, and the H3 driver can be just reused.
+Add binding for hisilicon Hi3660 SoC and HiKey960 Board.
 
-Select the two necessary pinctrl drivers when building kernel for
-Allwinner SoCs.
-
-Also add H5 in the option's description.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
 ---
- arch/arm64/Kconfig.platforms | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 715ef1256838..e11523d204b5 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -5,8 +5,11 @@ config ARCH_SUNXI
- 	select GENERIC_IRQ_CHIP
- 	select PINCTRL
- 	select PINCTRL_SUN50I_A64
-+	select PINCTRL_SUN50I_H5
-+	select PINCTRL_SUN8I_H3_R
- 	help
--	  This enables support for Allwinner sunxi based SoCs like the A64.
-+	  This enables support for Allwinner sunxi based SoCs like the A64
-+	  and H5.
+diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+index 3f81575..7cf2847 100644
+--- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
++++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+@@ -8,6 +8,10 @@ Hi6220 SoC
+ Required root node properties:
+ 	- compatible = "hisilicon,hi6220";
  
- config ARCH_ALPINE
- 	bool "Annapurna Labs Alpine platform"
++Hi3660 SoC
++Required root node properties:
++	- compatible = "hisilicon,hi3660";
++
+ HiKey Board
+ Required root node properties:
+ 	- compatible = "hisilicon,hi6220-hikey", "hisilicon,hi6220";
 -- 
-2.11.0
+1.9.1
