@@ -1,69 +1,108 @@
 From: Satha.Rao@cavium.com (Koteshwar Rao, Satha)
-Date: Mon, 26 Dec 2016 14:20:21 +0000
-Subject: [RFC PATCH 1/7] PF driver modified to enable HW filter support,
- changes works in backward compatibility mode Enable required things in
- Makefile Enable LZ4 dependecy inside config file
-In-Reply-To: <CA+sq2CfwTN5u6nhxriqWqoFxsYHdEYikbjBgMCL2YwNXpqyQ=Q@mail.gmail.com>
-References: <1482310011-1862-1-git-send-email-satha.rao@caviumnetworks.com>
- <1482310011-1862-2-git-send-email-satha.rao@caviumnetworks.com>
- <CA+sq2CfwTN5u6nhxriqWqoFxsYHdEYikbjBgMCL2YwNXpqyQ=Q@mail.gmail.com>
-Message-ID: <DM5PR07MB28428EE7B1679FAEC78103AD8D960@DM5PR07MB2842.namprd07.prod.outlook.com>
+Date: Mon, 26 Dec 2016 14:21:57 +0000
+Subject: [RFC PATCH 3/7] Enable pause frame support
+In-Reply-To: <DM5PR07MB2889471E0668C95BD2A266709E930@DM5PR07MB2889.namprd07.prod.outlook.com>
+References: <1482310011-1862-1-git-send-email-satha.rao@caviumnetworks.com>,
+ <1482310011-1862-4-git-send-email-satha.rao@caviumnetworks.com>
+ <DM5PR07MB2889471E0668C95BD2A266709E930@DM5PR07MB2889.namprd07.prod.outlook.com>
+Message-ID: <DM5PR07MB28423DB384D388B4B9F9C6FB8D960@DM5PR07MB2842.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Responses inline
+Thanks Sunil, will fix this in next version
 
 Thanks,
 Satha
 
------Original Message-----
-From: Sunil Kovvuri [mailto:sunil.kovvuri at gmail.com] 
-Sent: Wednesday, December 21, 2016 5:05 AM
-To: Koteshwar Rao, Satha
-Cc: LKML; Goutham, Sunil; Robert Richter; David S. Miller; Daney, David; Vatsavayi, Raghu; Chickles, Derek; Romanov, Philip; Linux Netdev List; LAKML
-Subject: Re: [RFC PATCH 1/7] PF driver modified to enable HW filter support, changes works in backward compatibility mode Enable required things in Makefile Enable LZ4 dependecy inside config file
+From: Goutham, Sunil 
+Sent: Wednesday, December 21, 2016 1:20 AM
+To: Koteshwar Rao, Satha; linux-kernel at vger.kernel.org
+Cc: rric at kernel.org; davem at davemloft.net; Daney, David; Vatsavayi, Raghu; Chickles, Derek; Romanov, Philip; netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Subject: Re: [RFC PATCH 3/7] Enable pause frame support
 
->
->  #define NIC_MAX_RSS_HASH_BITS          8
->  #define NIC_MAX_RSS_IDR_TBL_SIZE       (1 << NIC_MAX_RSS_HASH_BITS)
-> +#define NIC_TNS_RSS_IDR_TBL_SIZE       5
+>>+#define? BGX_SMUX_CBFC_CTL???????????? 0x20218
 
-So you want to use only 5 queues per VF when TNS is enabled, is it ??
-There are 4096 RSS indices in total, for each VF you can use max 32.
-I guess you wanted to set no of hash bits to 5 instead of table size.
+These macros are already defined.
 
-SATHA>>> We enabled 8 queues for VF. Yes Macro name misleads it has to be hash bits, will change this in next version
+if you check 'net-next ' branch pause frame support has already been
+added. You should send patch on top it if you have further changes
+to the existing.
 
->  #define RSS_HASH_KEY_SIZE              5 /* 320 bit key */
->
->  struct nicvf_rss_info {
-> @@ -255,74 +258,6 @@ struct nicvf_drv_stats {
->         struct u64_stats_sync   syncp;
->  };
->
-> -struct nicvf {
-> -       struct nicvf            *pnicvf;
-> -       struct net_device       *netdev;
-> -       struct pci_dev          *pdev;
-> -       void __iomem            *reg_base;
+Thanks,
+Sunil.
 
-Didn't get why you moved this structure to the end of file.
-Looks like an unnecessary modification.
-SATHA>>> Previously we have some dependency, we look into this, and address in next verison
+________________________________________
+From: Koteshwar Rao, Satha
+Sent: Wednesday, December 21, 2016 2:16 PM
+To: linux-kernel at vger.kernel.org
+Cc: Goutham, Sunil; rric at kernel.org; davem at davemloft.net; Daney, David; Vatsavayi, Raghu; Chickles, Derek; Koteshwar Rao, Satha; Romanov, Philip; netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Subject: [RFC PATCH 3/7] Enable pause frame support 
+?
+---
+?drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 25 +++++++++++++++++++++++
+?drivers/net/ethernet/cavium/thunder/thunder_bgx.h |? 7 +++++++
+?2 files changed, 32 insertions(+)
 
-> +static unsigned int num_vfs;
-> +module_param(num_vfs, uint, 0644);
-> +MODULE_PARM_DESC(num_vfs, "Non zero positive value, specifies number 
-> +of VF's per physical port");
-
-So what if driver is built-in instead of module, I can't use TNS is it ?
-SATHA>>> Still you can enable this special features by passing boot argument "nicpf.num_vfs=X"
-
->
-> +/* Set RBDR Backpressure (RBDR_BP) and CQ backpressure (CQ_BP) of 
-> +vnic queues
-> + * to 129 each
-
-Why 129 ??
-RBDR minimum size is 8K buffers, why you want to assert BP when still ~4K buffers are available. Isn't 4K a huge number to start asserting backpressure ?
-SATHA>>> As CQ count was 4K entries, I used same BP value for both, will address this in next version
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index 050e21f..92d7e04 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -121,6 +121,31 @@ static int bgx_poll_reg(struct bgx *bgx, u8 lmac, u64 reg, u64 mask, bool zero)
+???????? return 1;
+?}
+?
++void enable_pause_frames(int node, int bgx_idx, int lmac)
++{
++?????? u64 reg_value = 0;
++?????? struct bgx *bgx = bgx_vnic[(node * MAX_BGX_PER_NODE) + bgx_idx];
++
++?????? reg_value =? bgx_reg_read(bgx, lmac, BGX_SMUX_TX_CTL);
++?????? /* Enable BGX()_SMU()_TX_CTL */
++?????? if (!(reg_value & L2P_BP_CONV))
++?????????????? bgx_reg_write(bgx, lmac, BGX_SMUX_TX_CTL,
++???????????????????????????? (reg_value | (L2P_BP_CONV)));
++
++?????? reg_value =? bgx_reg_read(bgx, lmac, BGX_SMUX_HG2_CTL);
++?????? /* Clear if BGX()_SMU()_HG2_CONTROL[HG2TX_EN] is set */
++?????? if (reg_value & SMUX_HG2_CTL_HG2TX_EN)
++?????????????? bgx_reg_write(bgx, lmac, BGX_SMUX_HG2_CTL,
++???????????????????????????? (reg_value & (~SMUX_HG2_CTL_HG2TX_EN)));
++
++?????? reg_value =? bgx_reg_read(bgx, lmac, BGX_SMUX_CBFC_CTL);
++?????? /* Clear if BGX()_SMU()_CBFC_CTL[TX_EN] is set */
++?????? if (reg_value & CBFC_CTL_TX_EN)
++?????????????? bgx_reg_write(bgx, lmac, BGX_SMUX_CBFC_CTL,
++???????????????????????????? (reg_value & (~CBFC_CTL_TX_EN)));
++}
++EXPORT_SYMBOL(enable_pause_frames);
++
+?/* Return number of BGX present in HW */
+?unsigned bgx_get_map(int node)
+?{
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+index 01cc7c8..5b57bd1 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+@@ -131,6 +131,11 @@
+?#define BGX_SMUX_TX_CTL???????????????? 0x20178
+?#define? SMU_TX_CTL_DIC_EN????????????????????? BIT_ULL(0)
+?#define? SMU_TX_CTL_UNI_EN????????????????????? BIT_ULL(1)
++#define? L2P_BP_CONV?????????????????????????? BIT_ULL(7)
++#define? BGX_SMUX_CBFC_CTL???????????? 0x20218
++#define? CBFC_CTL_TX_EN??????????????????????????????? BIT_ULL(1)
++#define? BGX_SMUX_HG2_CTL????????????? 0x20210
++#define SMUX_HG2_CTL_HG2TX_EN????????????????? BIT_ULL(18)
+?#define? SMU_TX_CTL_LNK_STATUS????????????????? (3ull << 4)
+?#define BGX_SMUX_TX_THRESH????????????? 0x20180
+?#define BGX_SMUX_CTL??????????????????? 0x20200
+@@ -212,6 +217,8 @@ void bgx_lmac_internal_loopback(int node, int bgx_idx,
+?
+?u64 bgx_get_rx_stats(int node, int bgx_idx, int lmac, int idx);
+?u64 bgx_get_tx_stats(int node, int bgx_idx, int lmac, int idx);
++void enable_pause_frames(int node, int bgx_idx, int lmac);
++
+?#define BGX_RX_STATS_COUNT 11
+?#define BGX_TX_STATS_COUNT 18
+?
+-- 
+1.8.3.1
