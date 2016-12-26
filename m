@@ -1,144 +1,78 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 26 Dec 2016 02:31:08 -0800
-Subject: [PATCH] arm64: Do not include linux/uaccess.h from assembler files
-Message-ID: <1482748268-10399-1-git-send-email-linux@roeck-us.net>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 26 Dec 2016 12:13:22 +0100
+Subject: [PATCH v3 2/4] dt-bindings: add bindings for rk3328 clock
+ controller
+In-Reply-To: <1482723930-5876-3-git-send-email-zhangqing@rock-chips.com>
+References: <1482723930-5876-1-git-send-email-zhangqing@rock-chips.com>
+ <1482723930-5876-3-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <74138347.WHV1Wnrpph@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Including linux/uaccess.h from assembler files in arm64 builds results
-in the following build errors.
+Hi Elaine,
 
-In file included from arm64/include/asm/asm-offsets.h:1:0,
-                 from arch/arm64/include/asm/assembler.h:26,
-		 from arch/arm64/include/asm/alternative.h:68,
-		 from arch/arm64/kernel/entry.S
+Am Montag, 26. Dezember 2016, 11:45:28 CET schrieb Elaine Zhang:
+> Add devicetree bindings for Rockchip cru which found on
+> Rockchip SoCs.
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> ---
+>  .../bindings/clock/rockchip,rk3328-cru.txt         | 57
+> ++++++++++++++++++++++ 1 file changed, 57 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/clock/rockchip,rk3328-cru.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3328-cru.txt
+> b/Documentation/devicetree/bindings/clock/rockchip,rk3328-cru.txt new file
+> mode 100644
+> index 000000000000..20053494d49f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/rockchip,rk3328-cru.txt
+> @@ -0,0 +1,57 @@
+> +* Rockchip RK3328 Clock and Reset Unit
+> +
+> +The RK3328 clock controller generates and supplies clock to various
+> +controllers within the SoC and also implements a reset controller for SoC
+> +peripherals.
+> +
+> +Required Properties:
+> +
+> +- compatible: should be "rockchip,rk3328-cru"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- #clock-cells: should be 1.
+> +- #reset-cells: should be 1.
+> +
+> +Optional Properties:
+> +
+> +- rockchip,grf: phandle to the syscon managing the "general register files"
+> +  If missing pll rates are not changeable, due to the missing pll lock
+> status. +
+> +Each clock is assigned an identifier and client nodes can use this
+> identifier +to specify the clock which they consume. All available clocks
+> are defined as +preprocessor macros in the dt-bindings/clock/rk3328-cru.h
+> headers and can be +used in device tree sources. Similar macros exist for
+> the reset sources in +these files.
+> +
+> +External clocks:
+> +
+> +There are several clocks that are generated outside the SoC. It is expected
+> +that they are defined using standard clock bindings with following
+> +clock-output-names:
+> + - "xin24m" - crystal input - required,
+> + - "clkin_i2s" - external I2S clock - optional,
+> + - "gmac_clkin" - external GMAC clock - optional
+> + - "phy_50m_out" - output clock of the pll in the mac phy
+> +
+> +Example: Clock controller node:
+> +
+> +	cru: clock-controller at ff440000 {
+> +		compatible = "rockchip,rk3328-cru", "rockchip,cru", "syscon";
 
-include/linux/sched/prio.h: Assembler messages:
-include/linux/sched/prio.h:47: Error:
-	unknown mnemonic `static' --
-		`static inline long nice_to_rlimit(long nice)'
-build/include/linux/sched/prio.h:48: Error:
-	junk at end of line, first unrecognized character is `{'
+Rob suggested dropping the "rockchip,cru" and "syscon" properties from the 
+example and I definitly agree with that.
 
-[and many more]
+Otherwise look ok to me.
 
-If asm/uaccess.h is not included, many of the affected files fail to build
-with errors such as the following.
 
-arch/arm64/lib/copy_to_user.S: Assembler messages:
-arch/arm64/lib/copy_to_user.S:66: Error:
-	unknown mnemonic `uaccess_enable_not_uao' --
-		`uaccess_enable_not_uao x3,x4'
-arch/arm64/lib/copy_template.S:71: Error:
-	unknown mnemonic `uao_user_alternative' --
-		`uao_user_alternative 9998f,strb,st trb,tmp1w,dst,#1'
-
-Either drop the include if unnecessary or, if needed, replace with
-asm/uaccess.h.
-
-Fixes: 7c0f6ba682b9 ("Replace <asm/uaccess.h> with <linux/uaccess.h> globally")
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
-Cc: Al Viro <viro@zeniv.linux.org.uk>
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
- arch/arm64/kernel/entry.S       | 1 -
- arch/arm64/lib/clear_user.S     | 2 +-
- arch/arm64/lib/copy_from_user.S | 2 +-
- arch/arm64/lib/copy_in_user.S   | 2 +-
- arch/arm64/lib/copy_to_user.S   | 2 +-
- arch/arm64/mm/cache.S           | 2 +-
- arch/arm64/xen/hypercall.S      | 2 +-
- 7 files changed, 6 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index a7504f40d7ee..fb93f8c25ff0 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -31,7 +31,6 @@
- #include <asm/memory.h>
- #include <asm/ptrace.h>
- #include <asm/thread_info.h>
--#include <linux/uaccess.h>
- #include <asm/unistd.h>
- 
- /*
-diff --git a/arch/arm64/lib/clear_user.S b/arch/arm64/lib/clear_user.S
-index add4a1334085..d7150e30438a 100644
---- a/arch/arm64/lib/clear_user.S
-+++ b/arch/arm64/lib/clear_user.S
-@@ -17,7 +17,7 @@
-  */
- #include <linux/linkage.h>
- 
--#include <linux/uaccess.h>
-+#include <asm/uaccess.h>
- 
- 	.text
- 
-diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
-index fd6cd05593f9..cfe13396085b 100644
---- a/arch/arm64/lib/copy_from_user.S
-+++ b/arch/arm64/lib/copy_from_user.S
-@@ -17,7 +17,7 @@
- #include <linux/linkage.h>
- 
- #include <asm/cache.h>
--#include <linux/uaccess.h>
-+#include <asm/uaccess.h>
- 
- /*
-  * Copy from user space to a kernel buffer (alignment handled by the hardware)
-diff --git a/arch/arm64/lib/copy_in_user.S b/arch/arm64/lib/copy_in_user.S
-index d828540ded6f..718b1c4e2f85 100644
---- a/arch/arm64/lib/copy_in_user.S
-+++ b/arch/arm64/lib/copy_in_user.S
-@@ -19,7 +19,7 @@
- #include <linux/linkage.h>
- 
- #include <asm/cache.h>
--#include <linux/uaccess.h>
-+#include <asm/uaccess.h>
- 
- /*
-  * Copy from user space to user space (alignment handled by the hardware)
-diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
-index 3e6ae2663b82..e99e31c9acac 100644
---- a/arch/arm64/lib/copy_to_user.S
-+++ b/arch/arm64/lib/copy_to_user.S
-@@ -17,7 +17,7 @@
- #include <linux/linkage.h>
- 
- #include <asm/cache.h>
--#include <linux/uaccess.h>
-+#include <asm/uaccess.h>
- 
- /*
-  * Copy to user space from a kernel buffer (alignment handled by the hardware)
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index 17f422a4dc55..da9576932322 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -23,7 +23,7 @@
- #include <asm/assembler.h>
- #include <asm/cpufeature.h>
- #include <asm/alternative.h>
--#include <linux/uaccess.h>
-+#include <asm/uaccess.h>
- 
- /*
-  *	flush_icache_range(start,end)
-diff --git a/arch/arm64/xen/hypercall.S b/arch/arm64/xen/hypercall.S
-index 47cf3f9d89ff..b41aff25426d 100644
---- a/arch/arm64/xen/hypercall.S
-+++ b/arch/arm64/xen/hypercall.S
-@@ -49,7 +49,7 @@
- 
- #include <linux/linkage.h>
- #include <asm/assembler.h>
--#include <linux/uaccess.h>
-+#include <asm/uaccess.h>
- #include <xen/interface/xen.h>
- 
- 
--- 
-2.7.4
+Heiko
