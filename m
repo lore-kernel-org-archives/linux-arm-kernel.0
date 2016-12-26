@@ -1,43 +1,17 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 27 Dec 2016 00:25:14 +0800
-Subject: [PATCH 2/6] arm64: allwinner: Kconfig: add essential pinctrl driver
- for H5
-In-Reply-To: <20161226162518.5367-1-icenowy@aosc.xyz>
-References: <20161226162518.5367-1-icenowy@aosc.xyz>
-Message-ID: <20161226162518.5367-3-icenowy@aosc.xyz>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 26 Dec 2016 14:27:32 -0200
+Subject: [PATCH v3 2/3] ARM: dts: imx6: Support Savageboard dual
+In-Reply-To: <20161209010436.7994-3-woogyom.kim@gmail.com>
+References: <20161209010436.7994-1-woogyom.kim@gmail.com>
+ <20161209010436.7994-3-woogyom.kim@gmail.com>
+Message-ID: <CAOMZO5Aup1xq4OzNhayyfMRmnd=zT+Jn31qs5q9GG=3cggsnBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H5 SoC has two pin controllers, one (in user manual called "CPUx") needs
-a slightly advanced driver, and the other (called "CPUs") is just equal
-to the on in H3, and the H3 driver can be just reused.
+On Thu, Dec 8, 2016 at 11:04 PM, Milo Kim <woogyom.kim@gmail.com> wrote:
+> Common savageboard DT file is used for board support.
+> Specify this dtb file for i.MX6Q build.
+>
+> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
 
-Select the two necessary pinctrl drivers when building kernel for
-Allwinner SoCs.
-
-Also add H5 in the option's description.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- arch/arm64/Kconfig.platforms | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 715ef1256838..e11523d204b5 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -5,8 +5,11 @@ config ARCH_SUNXI
- 	select GENERIC_IRQ_CHIP
- 	select PINCTRL
- 	select PINCTRL_SUN50I_A64
-+	select PINCTRL_SUN50I_H5
-+	select PINCTRL_SUN8I_H3_R
- 	help
--	  This enables support for Allwinner sunxi based SoCs like the A64.
-+	  This enables support for Allwinner sunxi based SoCs like the A64
-+	  and H5.
- 
- config ARCH_ALPINE
- 	bool "Annapurna Labs Alpine platform"
--- 
-2.11.0
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
