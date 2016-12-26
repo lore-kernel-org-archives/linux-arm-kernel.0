@@ -1,29 +1,39 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 26 Dec 2016 12:56:33 -0600
-Subject: v4.10-rc1 - build failure arm64?
-In-Reply-To: <20161226184951.GS1555@ZenIV.linux.org.uk>
-References: <9e720e28-469f-6a06-a97c-9d52ce951bfb@ti.com>
- <e47e230c-4e76-a7b7-a408-ada809a3b1b8@ti.com>
- <20161226184951.GS1555@ZenIV.linux.org.uk>
-Message-ID: <f37bbca1-83f9-508f-2321-0b0887a0e5f2@ti.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 27 Dec 2016 03:34:29 +0800
+Subject: [PATCH v2] ARM: dts: sunxi: Add num-cs for A20 spi nodes
+In-Reply-To: <20161226174748.17544-1-manu@bidouilliste.com>
+Message-ID: <201612270319.Q2vQftLu%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/26/2016 12:49 PM, Al Viro wrote:
-> On Mon, Dec 26, 2016 at 12:46:58PM -0600, Nishanth Menon wrote:
->
->> A bit of bisect later, looks like reverting the following commit allows the
->> build to proceed. -> note: there is no fail on multi_v7_defconfig or
->> omap2plus_defconfig even without the revert.
->
-> See git://git.kernel.org/pub/scm/linux/kernel/git/viro/vfs.git#arm64-fix
->
-Thanks. [1] does indeed fix the build fail I had noticed.
+Hi Emmanuel,
 
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.10-rc1 next-20161224]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-[1] 
-https://git.kernel.org/cgit/linux/kernel/git/viro/vfs.git/patch/?id=b4b8664d291ac1998e0f0bcdc96b6397f0fe68b3
+url:    https://github.com/0day-ci/linux/commits/Emmanuel-Vadot/ARM-dts-sunxi-Add-num-cs-for-A20-spi-nodes/20161227-015214
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm-at91_dt_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
--- 
-Regards,
-Nishanth Menon
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm/boot/dts/sun7i-a20.dtsi:874.13-14 syntax error
+   FATAL ERROR: Unable to parse input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 21781 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161227/708b3bf8/attachment-0001.gz>
