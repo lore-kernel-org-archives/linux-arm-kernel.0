@@ -1,77 +1,86 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 26 Dec 2016 14:44:26 +0900
-Subject: [PATCH 4/9] pinctrl: samsung: Use generic of_device_get_match_data
- helper
-In-Reply-To: <20161225125607.a66kwtweizran4qw@kozik-lap>
-References: <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20161223122527epcas1p441f0ee34c5738645163ef40c94591183@epcas1p4.samsung.com>
- <1482495889-6201-5-git-send-email-m.szyprowski@samsung.com>
- <20161225125607.a66kwtweizran4qw@kozik-lap>
-Message-ID: <CA+Ln22FfYkxJAOtpfr1UUai6vZej09NSZa6cz2cuO2aHN8Trmw@mail.gmail.com>
+Date: Mon, 26 Dec 2016 14:55:15 +0900
+Subject: [PATCH 5/9] pinctrl: samsung: Move retention control from
+ mach-exynos to the pinctrl driver
+In-Reply-To: <1482495889-6201-6-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20161223122531epcas1p4b8fad6664dad3408acb7a1b9f140884a@epcas1p4.samsung.com>
+ <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
+ <1482495889-6201-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CA+Ln22HQPHF_Vj0kS834SH=4=hcNOpe_vL8P3fbS-jFhQLVyXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-12-25 21:56 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
-> On Fri, Dec 23, 2016 at 01:24:44PM +0100, Marek Szyprowski wrote:
->> Replace custom code with generic helper.
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>  drivers/pinctrl/samsung/pinctrl-samsung.c | 9 ++++-----
->>  1 file changed, 4 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
->> index 4d9262051ff1..a6c2ea74e0f3 100644
->> --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
->> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
->> @@ -27,6 +27,7 @@
->>  #include <linux/err.h>
->>  #include <linux/gpio.h>
->>  #include <linux/irqdomain.h>
->> +#include <linux/of_device.h>
->>  #include <linux/spinlock.h>
->>  #include <linux/syscore_ops.h>
->>
->> @@ -967,15 +968,13 @@ static int samsung_gpiolib_unregister(struct platform_device *pdev,
->>       return 0;
->>  }
->>
->> -static const struct of_device_id samsung_pinctrl_dt_match[];
->> -
->>  /* retrieve the soc specific data */
->>  static const struct samsung_pin_ctrl *
->>  samsung_pinctrl_get_soc_data(struct samsung_pinctrl_drv_data *d,
->>                            struct platform_device *pdev)
->>  {
->>       int id;
->> -     const struct of_device_id *match;
->> +     const struct samsung_pin_ctrl *match_data;
->>       struct device_node *node = pdev->dev.of_node;
->>       struct device_node *np;
->>       const struct samsung_pin_bank_data *bdata;
->> @@ -990,8 +989,8 @@ static int samsung_gpiolib_unregister(struct platform_device *pdev,
->>               dev_err(&pdev->dev, "failed to get alias id\n");
->>               return ERR_PTR(-ENOENT);
->>       }
->> -     match = of_match_node(samsung_pinctrl_dt_match, node);
->> -     ctrl = (struct samsung_pin_ctrl *)match->data + id;
->> +     match_data = of_device_get_match_data(&pdev->dev);
->> +     ctrl = match_data + id;
->
-> Either you need a check for match_data != NULL or just remove match_data
-> and:
->         ctrl = of_device_get_match_data();
->         ctrl += id;
->
-> Actually match_data can be removed even with the check for non-NULL...
+Hi,
 
-I don't think this function can ever return NULL if the match array
-contains a non-NULL value for each compatible string and the driver
-can be probed only by DT.
-But you still need to cast the match data pointer to the correct type
-and using a variable for it IMHO makes the code cleaner.
+2016-12-23 21:24 GMT+09:00 Marek Szyprowski <m.szyprowski@samsung.com>:
+> Pad retention control after suspend/resume cycle should be done from pin
+> controller driver instead of PMU (power management unit) driver to avoid
+> possible ordering and logical dependencies. Till now it worked fine only
+> because PMU driver registered its sys_ops after pin controller.
+>
+> This patch moves pad retention control from PMU driver to Exynos pin
+> controller driver. This is a preparation for adding new features to Exynos
+> pin controller driver, like runtime power management and suspending
+> individual pin controllers, which might be a part of some power domain.
+>
 
-Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+It looks like this change will essentially break the compatibility
+with DTBs that don't have the pmu syscon specified in pin controller
+nodes.
+
+On the other hand, moving this code to where it actually belongs
+really makes sense, so maybe we could just avoid the need of having
+this property, by looking up the PMU manually, by hardcoded string or
+so, if the proper property is not present?
+
+[...]
+
+> diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+> index 1baf19eecabf..b7bd2e12a269 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+> @@ -43,6 +43,10 @@ Required Properties:
+>                 };
+>         };
+>
+> +- samsung,pmu-syscon: Phandle to the PMU system controller, to let driver
+> +  to control pad retention after system suspend/resume cycle (only for Exynos
+> +  SoC series).
+> +
+
+Ah, here it is. I think adding relevant binding documentation at the
+beginning of the series would make it much easier for reviewers to
+understand the change.
+
+>  - Pin banks as child nodes: Pin banks of the controller are represented by child
+>    nodes of the controller node. Bank name is taken from name of the node. Each
+>    bank node must contain following properties:
+
+[...]
+
+> +static void exynos_retention_audio_off(struct samsung_pinctrl_drv_data *drvdata)
+> +{
+> +       if (!IS_ERR(pmu_regs))
+
+nit: Negated conditions make the code more difficult to read. Also it
+would be consistent with exynos_retention_off() to just bail out if
+(IS_ERR(pmu_regs)).
+
+> +               regmap_write(pmu_regs, S5P_PAD_RET_MAUDIO_OPTION,
+> +                            EXYNOS_WAKEUP_FROM_LOWPWR);
+> +}
+
+[...]
+
+> @@ -1139,15 +1146,15 @@ static void samsung_pinctrl_suspend_dev(
+>
+>         if (drvdata->suspend)
+>                 drvdata->suspend(drvdata);
+> +       if (drvdata->retention_on)
+> +               drvdata->retention_on(drvdata);
+> +
+
+nit: Unnecessary blank line.
 
 Best regards,
 Tomasz
