@@ -1,245 +1,85 @@
-From: puck.chen@hisilicon.com (Chen Feng)
-Date: Mon, 26 Dec 2016 17:36:12 +0800
-Subject: [RESEND 2/2] arm64: dts: Add dts files for Hisilicon Hi3660 SoC
-In-Reply-To: <1482744972-56622-1-git-send-email-puck.chen@hisilicon.com>
-References: <1482744972-56622-1-git-send-email-puck.chen@hisilicon.com>
-Message-ID: <1482744972-56622-2-git-send-email-puck.chen@hisilicon.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 26 Dec 2016 11:41:42 +0200
+Subject: [PATCH 4/9] pinctrl: samsung: Use generic
+ of_device_get_match_data helper
+In-Reply-To: <CA+Ln22FfYkxJAOtpfr1UUai6vZej09NSZa6cz2cuO2aHN8Trmw@mail.gmail.com>
+References: <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20161223122527epcas1p441f0ee34c5738645163ef40c94591183@epcas1p4.samsung.com>
+ <1482495889-6201-5-git-send-email-m.szyprowski@samsung.com>
+ <20161225125607.a66kwtweizran4qw@kozik-lap>
+ <CA+Ln22FfYkxJAOtpfr1UUai6vZej09NSZa6cz2cuO2aHN8Trmw@mail.gmail.com>
+Message-ID: <20161226094142.hajrgye5632mgoup@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial dtsi file to support Hisilicon Hi3660 SoC with
-support of Octal core CPUs in two clusters(4 * A53 & 4 * A73).
+On Mon, Dec 26, 2016 at 02:44:26PM +0900, Tomasz Figa wrote:
+> 2016-12-25 21:56 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
+> > On Fri, Dec 23, 2016 at 01:24:44PM +0100, Marek Szyprowski wrote:
+> >> Replace custom code with generic helper.
+> >>
+> >> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >> ---
+> >>  drivers/pinctrl/samsung/pinctrl-samsung.c | 9 ++++-----
+> >>  1 file changed, 4 insertions(+), 5 deletions(-)
+> >>
+> >> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> >> index 4d9262051ff1..a6c2ea74e0f3 100644
+> >> --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
+> >> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> >> @@ -27,6 +27,7 @@
+> >>  #include <linux/err.h>
+> >>  #include <linux/gpio.h>
+> >>  #include <linux/irqdomain.h>
+> >> +#include <linux/of_device.h>
+> >>  #include <linux/spinlock.h>
+> >>  #include <linux/syscore_ops.h>
+> >>
+> >> @@ -967,15 +968,13 @@ static int samsung_gpiolib_unregister(struct platform_device *pdev,
+> >>       return 0;
+> >>  }
+> >>
+> >> -static const struct of_device_id samsung_pinctrl_dt_match[];
+> >> -
+> >>  /* retrieve the soc specific data */
+> >>  static const struct samsung_pin_ctrl *
+> >>  samsung_pinctrl_get_soc_data(struct samsung_pinctrl_drv_data *d,
+> >>                            struct platform_device *pdev)
+> >>  {
+> >>       int id;
+> >> -     const struct of_device_id *match;
+> >> +     const struct samsung_pin_ctrl *match_data;
+> >>       struct device_node *node = pdev->dev.of_node;
+> >>       struct device_node *np;
+> >>       const struct samsung_pin_bank_data *bdata;
+> >> @@ -990,8 +989,8 @@ static int samsung_gpiolib_unregister(struct platform_device *pdev,
+> >>               dev_err(&pdev->dev, "failed to get alias id\n");
+> >>               return ERR_PTR(-ENOENT);
+> >>       }
+> >> -     match = of_match_node(samsung_pinctrl_dt_match, node);
+> >> -     ctrl = (struct samsung_pin_ctrl *)match->data + id;
+> >> +     match_data = of_device_get_match_data(&pdev->dev);
+> >> +     ctrl = match_data + id;
+> >
+> > Either you need a check for match_data != NULL or just remove match_data
+> > and:
+> >         ctrl = of_device_get_match_data();
+> >         ctrl += id;
+> >
+> > Actually match_data can be removed even with the check for non-NULL...
+> 
+> I don't think this function can ever return NULL if the match array
+> contains a non-NULL value for each compatible string and the driver
+> can be probed only by DT.
 
-Also add dts file to support HiKey960 development board which
-based on Hi3660 SoC.
-The output console is earlycon "earlycon=pl011,0xfdf05000".
-And the con_init uart5 with a fixed clock, which already
-configured at bootloader.
+Practically it cannot (or it should not) but defensive coding is a good
+practice...
 
-When clock is available, the uart5 will be modified.
+> But you still need to cast the match data pointer to the correct type
+> and using a variable for it IMHO makes the code cleaner.
 
-Tested on HiKey960 Board.
+What do you mean by casting through variable? match_data and ctrl are
+the same type so there is no change by intermediate variable. It just
+obfuscates the code.
 
-Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
----
- arch/arm64/boot/dts/hisilicon/Makefile            |   1 +
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  34 +++++
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 156 ++++++++++++++++++++++
- 3 files changed, 191 insertions(+)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-
-diff --git a/arch/arm64/boot/dts/hisilicon/Makefile b/arch/arm64/boot/dts/hisilicon/Makefile
-index d5f43a0..b633b5d 100644
---- a/arch/arm64/boot/dts/hisilicon/Makefile
-+++ b/arch/arm64/boot/dts/hisilicon/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb
-+dtb-$(CONFIG_ARCH_HISI) += hi3660-hikey960.dtb
- dtb-$(CONFIG_ARCH_HISI) += hip05-d02.dtb
- dtb-$(CONFIG_ARCH_HISI) += hip06-d03.dtb
- 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-new file mode 100644
-index 0000000..3d7aead
---- /dev/null
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-@@ -0,0 +1,34 @@
-+/*
-+ * dts file for Hisilicon HiKey960 Development Board
-+ *
-+ * Copyright (C) 2016, Hisilicon Ltd.
-+ *
-+ */
-+
-+/dts-v1/;
-+
-+#include "hi3660.dtsi"
-+
-+/ {
-+	model = "HiKey960";
-+	compatible = "hisilicon,hi3660";
-+
-+	aliases {
-+		serial5 = &uart5;       /* console UART */
-+	};
-+
-+	chosen {
-+		stdout-path = "serial5:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x00400000 0x0 0xBFE00000>;
-+	};
-+
-+	soc {
-+		uart5: uart at fdf05000 {
-+			status = "ok";
-+		};
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-new file mode 100644
-index 0000000..7f9805c
---- /dev/null
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -0,0 +1,156 @@
-+/*
-+ * dts file for Hisilicon Hi3660 SoC
-+ *
-+ * Copyright (C) 2016, Hisilicon Ltd.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "hisilicon,hi3660";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu-map {
-+			cluster0 {
-+				core0 {
-+					cpu = <&cpu0>;
-+				};
-+				core1 {
-+					cpu = <&cpu1>;
-+				};
-+				core2 {
-+					cpu = <&cpu2>;
-+				};
-+				core3 {
-+					cpu = <&cpu3>;
-+				};
-+			};
-+			cluster1 {
-+				core0 {
-+					cpu = <&cpu4>;
-+				};
-+				core1 {
-+					cpu = <&cpu5>;
-+				};
-+				core2 {
-+					cpu = <&cpu6>;
-+				};
-+				core3 {
-+					cpu = <&cpu7>;
-+				};
-+			};
-+		};
-+
-+		cpu0: cpu at 0 {
-+			compatible = "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x0>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu1: cpu at 1 {
-+			compatible = "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x1>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu2: cpu at 2 {
-+			compatible = "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x2>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu3: cpu at 3 {
-+			compatible = "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x3>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu4: cpu at 100 {
-+			compatible = "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x100>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu5: cpu at 101 {
-+			compatible = "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x101>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu6: cpu at 102 {
-+			compatible = "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x102>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu7: cpu at 103 {
-+			compatible = "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x103>;
-+			enable-method = "psci";
-+		};
-+	};
-+
-+	gic: interrupt-controller at e82b0000 {
-+		compatible = "arm,gic-400";
-+		reg = <0x0 0xe82b1000 0 0x1000>, /* GICD */
-+		      <0x0 0xe82b2000 0 0x2000>, /* GICC */
-+		      <0x0 0xe82b4000 0 0x2000>, /* GICH */
-+		      <0x0 0xe82b6000 0 0x2000>; /* GICV */
-+		#address-cells = <0>;
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
-+		clock-frequency = <1920000>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		fixed_uart5: fixed_19_2M {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <19200000>;
-+			clock-output-names = "fixed:uart5";
-+		};
-+
-+		uart5: uart at fdf05000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x0 0xfdf05000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&fixed_uart5 &fixed_uart5>;
-+			clock-names = "uartclk", "apb_pclk";
-+			status = "ok";
-+		};
-+	};
-+};
--- 
-1.9.1
+BR,
+Krzysztof
