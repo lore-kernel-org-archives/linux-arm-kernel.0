@@ -1,137 +1,71 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 26 Dec 2016 15:11:16 +0900
-Subject: [PATCH 8/9] pinctrl: samsung: Add runtime PM support
-In-Reply-To: <1482495889-6201-9-git-send-email-m.szyprowski@samsung.com>
-References: <CGME20161223122542epcas1p444c9d8c91c2983f9934e68a6bb882726@epcas1p4.samsung.com>
- <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
- <1482495889-6201-9-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CA+Ln22HoCAwJSU23LhRkwjpe1iUhHi+BmH=ijGVCR7SfuDU+cw@mail.gmail.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Mon, 26 Dec 2016 06:31:37 +0000
+Subject: [PATCH] coresight: fix kernel panic caused by invalid CPU
+Message-ID: <20161226063137.110016-1-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Commit d52c9750f150 ("coresight: reset 'enable_sink' flag when need be")
+caused a kernel panic because of the using of an invalid value: after
+'for_each_cpu(cpu, mask)', value of local variable 'cpu' become invalid,
+causes following 'cpu_to_node' access invalid memory area.
 
-2016-12-23 21:24 GMT+09:00 Marek Szyprowski <m.szyprowski@samsung.com>:
-> This patch adds runtime power management support to Samsung pin controller
-> driver. It uses recently introduced property to mark some pin states as
-> suitable for power off. When all pins for given controller are set to this
-> special state, the controller is able to enter runtime suspend state. This
-> in turn might allow to turn respective power domain off to reduce power
-> consumption.
->
-> This patch moves saving driver state to runtime pm callbacks and implements
-> system sleep suspend/resume callbacks with pm_runtime_force_suspend/resume
-> helpers to keep the runtime pm state consistent with the hardware both
-> during runtime and system sleep transitions.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/pinctrl/samsung/pinctrl-samsung.c | 24 ++++++++++++++++++++++--
->  drivers/pinctrl/samsung/pinctrl-samsung.h |  1 +
->  2 files changed, 23 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-> index 301169d2b6e1..c741e93d65b8 100644
-> --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-> @@ -28,6 +28,7 @@
->  #include <linux/gpio.h>
->  #include <linux/irqdomain.h>
->  #include <linux/of_device.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/spinlock.h>
->
->  #include "../core.h"
-> @@ -378,6 +379,17 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
->                 shift -= 32;
->                 reg += 4;
->         }
+This patch brings the deleted 'cpu = cpumask_first(mask)' back.
 
-nit: IMHO a blank line here would look better.
+Panic log:
 
-> +       if (func->rpm_active) {
-> +               if (!(bank->rpm_map & (1 << pin_offset))) {
+ $ perf record -e cs_etm// ls
 
-I think rpm_map could benefit from generic bitmap helpers.
+ Unable to handle kernel paging request at virtual address fffe801804af4f10
+ pgd = ffff8017ce031600
+ [fffe801804af4f10] *pgd=0000000000000000, *pud=0000000000000000
+ Internal error: Oops: 96000004 [#1] SMP
+ Modules linked in:
+ CPU: 33 PID: 1619 Comm: perf Not tainted 4.7.1+ #16
+ Hardware name: Huawei Taishan 2280 /CH05TEVBA, BIOS 1.10 11/24/2016
+ task: ffff8017cb0c8400 ti: ffff8017cb154000 task.ti: ffff8017cb154000
+ PC is at tmc_alloc_etf_buffer+0x60/0xd4
+ LR is at tmc_alloc_etf_buffer+0x44/0xd4
+ pc : [<ffff000008633df8>] lr : [<ffff000008633ddc>] pstate: 60000145
+ sp : ffff8017cb157b40
+ x29: ffff8017cb157b40 x28: 0000000000000000
+ ...skip...
+ 7a60: ffff000008c64dc8 0000000000000006 0000000000000253 ffffffffffffffff
+ 7a80: 0000000000000000 0000000000000000 ffff0000080872cc 0000000000000001
+ [<ffff000008633df8>] tmc_alloc_etf_buffer+0x60/0xd4
+ [<ffff000008632b9c>] etm_setup_aux+0x1dc/0x1e8
+ [<ffff00000816eed4>] rb_alloc_aux+0x2b0/0x338
+ [<ffff00000816a5e4>] perf_mmap+0x414/0x568
+ [<ffff0000081ab694>] mmap_region+0x324/0x544
+ [<ffff0000081abbe8>] do_mmap+0x334/0x3e0
+ [<ffff000008191150>] vm_mmap_pgoff+0xa4/0xc8
+ [<ffff0000081a9a30>] SyS_mmap_pgoff+0xb0/0x22c
+ [<ffff0000080872e4>] sys_mmap+0x18/0x28
+ [<ffff0000080843f0>] el0_svc_naked+0x24/0x28
+ Code: 912040a5 d0001c00 f873d821 911c6000 (b8656822)
+ ---[ end trace 98933da8f92b0c9a ]---
 
-> +                       bank->rpm_map |= 1 << pin_offset;
-> +                       pm_runtime_get_sync(drvdata->dev);
-> +               }
-> +       } else {
-> +               if ((bank->rpm_map & (1 << pin_offset))) {
-> +                       bank->rpm_map &= ~(1 << pin_offset);
-> +                       pm_runtime_put(drvdata->dev);
-> +               }
-> +       }
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+Cc: Xia Kaixu <xiakaixu@huawei.com>
+Cc: Li Zefan <lizefan@huawei.com>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Then, the above could be simplified into:
-
-        if (func->rpm_active && !test_bit(pin_offset, &bank->rpm_map)) {
-                __set_bit(pin_offset, &bank->rpm_map);
-                pm_runtime_get_sync(drvdata->dev);
-        } else if (!func->rpm_active && test_bit(pin_offset, &bank->rpm_map) {
-                __clear_bit(pin_offset, &bank->rpm_map);
-                pm_runtime_put(drvdata->dev);
-        }
-
->
->         spin_lock_irqsave(&bank->slock, flags);
->
-> @@ -427,6 +439,8 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
->         if (cfg_type >= PINCFG_TYPE_NUM || !type->fld_width[cfg_type])
->                 return -EINVAL;
->
-> +       pm_runtime_get_sync(drvdata->dev);
-> +
->         width = type->fld_width[cfg_type];
->         cfg_reg = type->reg_offset[cfg_type];
->
-> @@ -449,6 +463,8 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
->
->         spin_unlock_irqrestore(&bank->slock, flags);
->
-> +       pm_runtime_put(drvdata->dev);
-> +
->         return 0;
->  }
->
-> @@ -1096,6 +1112,8 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
->                 ctrl->retention_init(drvdata);
->
->         platform_set_drvdata(pdev, drvdata);
-> +       pm_runtime_set_active(dev);
-> +       pm_runtime_enable(dev);
-
-Can we really enable this unconditionally on all platforms?
-
->
->         return 0;
->  }
-> @@ -1242,8 +1260,10 @@ static int samsung_pinctrl_resume(struct device *dev)
->  MODULE_DEVICE_TABLE(of, samsung_pinctrl_dt_match);
->
->  static const struct dev_pm_ops samsung_pinctrl_pm_ops = {
-> -       SET_LATE_SYSTEM_SLEEP_PM_OPS(samsung_pinctrl_suspend,
-> -                                    samsung_pinctrl_resume)
-> +       SET_RUNTIME_PM_OPS(samsung_pinctrl_suspend,
-> +                          samsung_pinctrl_resume, NULL)
-> +       SET_LATE_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-> +                                    pm_runtime_force_resume)
->  };
->
->  static struct platform_driver samsung_pinctrl_driver = {
-> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
-> index edeafa00abd3..ccb24ec46796 100644
-> --- a/drivers/pinctrl/samsung/pinctrl-samsung.h
-> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
-> @@ -172,6 +172,7 @@ struct samsung_pin_bank {
->         const char      *name;
->
->         u32             pin_base;
-> +       u32             rpm_map;
-
-This could be an unsigned long instead and then could benefit from the
-bitmap helpers.
-
-Best regards,
-Tomasz
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+index 1774196..26cfac3 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -242,6 +242,7 @@ static void *etm_setup_aux(int event_cpu, void **pages,
+ 	if (!sink_ops(sink)->alloc_buffer)
+ 		goto err;
+ 
++	cpu = cpumask_first(mask);
+ 	/* Get the AUX specific data from the sink buffer */
+ 	event_data->snk_config =
+ 			sink_ops(sink)->alloc_buffer(sink, cpu, pages,
+-- 
+2.10.1
