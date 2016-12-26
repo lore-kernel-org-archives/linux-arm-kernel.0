@@ -1,184 +1,186 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 26 Dec 2016 10:56:26 -0200
-Subject: [PATCH 5/6] ARM: mach-pcm037: Remove camera support
+Date: Mon, 26 Dec 2016 10:56:27 -0200
+Subject: [PATCH 6/6] ARM: mach-mx27_3ds: Remove camera support
 In-Reply-To: <1482756987-12414-1-git-send-email-festevam@gmail.com>
 References: <1482756987-12414-1-git-send-email-festevam@gmail.com>
-Message-ID: <1482756987-12414-5-git-send-email-festevam@gmail.com>
+Message-ID: <1482756987-12414-6-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+From: Fabio Estevam <fabio.estevam@nxp.com>>
 
-Since commit c93cc61475ebbe6e66 ("[media] staging/media: remove deprecated
-mx3 driver") the mx3 camera driver has been removed, so remove the camera
+Since commit 6b879edf75b316 ("[media] staging/media: remove deprecated
+mx2 driver") the mx2 camera driver has been removed, so remove the camera
 support from the board file as well.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/mach-imx/mach-pcm037.c | 99 -----------------------------------------
- 1 file changed, 99 deletions(-)
+ arch/arm/mach-imx/mach-mx27_3ds.c | 90 ---------------------------------------
+ 1 file changed, 90 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-pcm037.c b/arch/arm/mach-imx/mach-pcm037.c
-index 9f0f55b..173c2f3 100644
---- a/arch/arm/mach-imx/mach-pcm037.c
-+++ b/arch/arm/mach-imx/mach-pcm037.c
-@@ -31,17 +31,13 @@
- #include <linux/usb/otg.h>
- #include <linux/usb/ulpi.h>
- #include <linux/gfp.h>
--#include <linux/memblock.h>
+diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
+index 7ba651a..fcc55fc 100644
+--- a/arch/arm/mach-imx/mach-mx27_3ds.c
++++ b/arch/arm/mach-imx/mach-mx27_3ds.c
+@@ -31,7 +31,6 @@
  #include <linux/regulator/machine.h>
- #include <linux/regulator/fixed.h>
+ #include <linux/spi/l4f00242t03.h>
  
 -#include <media/soc_camera.h>
--
+ 
  #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- #include <asm/mach/map.h>
--#include <asm/memblock.h>
- 
- #include "common.h"
- #include "devices-imx31.h"
-@@ -289,34 +285,6 @@ static struct at24_platform_data board_eeprom = {
- 	.flags = AT24_FLAG_ADDR16,
+@@ -166,11 +165,6 @@ static const int mx27pdk_pins[] __initconst = {
+ 	PC19_PF_SSI4_CLK,
  };
  
--static int pcm037_camera_power(struct device *dev, int on)
+-static struct gpio mx27_3ds_camera_gpios[] = {
+-	{ CSI_PWRDWN, GPIOF_OUT_INIT_HIGH, "camera-power" },
+-	{ CSI_RESET, GPIOF_OUT_INIT_HIGH, "camera-reset" },
+-};
+-
+ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
+ };
+@@ -270,7 +264,6 @@ static struct regulator_init_data gpo_init = {
+ 
+ static struct regulator_consumer_supply vmmc1_consumers[] = {
+ 	REGULATOR_SUPPLY("vcore", "spi0.0"),
+-	REGULATOR_SUPPLY("cmos_2v8", "soc-camera-pdrv.0"),
+ };
+ 
+ static struct regulator_init_data vmmc1_init = {
+@@ -299,22 +292,6 @@ static struct regulator_init_data vgen_init = {
+ 	.consumer_supplies = vgen_consumers,
+ };
+ 
+-static struct regulator_consumer_supply vvib_consumers[] = {
+-	REGULATOR_SUPPLY("cmos_vcore", "soc-camera-pdrv.0"),
+-};
+-
+-static struct regulator_init_data vvib_init = {
+-	.constraints = {
+-		.min_uV = 1300000,
+-		.max_uV = 1300000,
+-		.apply_uV = 1,
+-		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
+-				  REGULATOR_CHANGE_STATUS,
+-	},
+-	.num_consumer_supplies = ARRAY_SIZE(vvib_consumers),
+-	.consumer_supplies = vvib_consumers,
+-};
+-
+ static struct mc13xxx_regulator_init_data mx27_3ds_regulators[] = {
+ 	{
+ 		.id = MC13783_REG_VMMC1,
+@@ -328,9 +305,6 @@ static struct mc13xxx_regulator_init_data mx27_3ds_regulators[] = {
+ 	}, {
+ 		.id = MC13783_REG_GPO3, /* Turn on 3.3V */
+ 		.init_data = &gpo_init,
+-	}, {
+-		.id = MC13783_REG_VVIB,  /* Power OV2640 */
+-		.init_data = &vvib_init,
+ 	},
+ };
+ 
+@@ -370,51 +344,6 @@ static const struct spi_imx_master spi2_pdata __initconst = {
+ 	.num_chipselect	= ARRAY_SIZE(spi2_chipselect),
+ };
+ 
+-static int mx27_3ds_camera_power(struct device *dev, int on)
 -{
--	/* disable or enable the camera in X7 or X8 PCM970 connector */
--	gpio_set_value(IOMUX_TO_GPIO(MX31_PIN_CSI_D5), !on);
+-	/* enable or disable the camera */
+-	pr_debug("%s: %s the camera\n", __func__, on ? "ENABLE" : "DISABLE");
+-	gpio_set_value(CSI_PWRDWN, on ? 0 : 1);
+-
+-	if (!on)
+-		goto out;
+-
+-	/* If enabled, give a reset impulse */
+-	gpio_set_value(CSI_RESET, 0);
+-	msleep(20);
+-	gpio_set_value(CSI_RESET, 1);
+-	msleep(100);
+-
+-out:
 -	return 0;
 -}
 -
--static struct i2c_board_info pcm037_i2c_camera[] = {
--	{
--		I2C_BOARD_INFO("mt9t031", 0x5d),
--	}, {
--		I2C_BOARD_INFO("mt9v022", 0x48),
--	},
+-static struct i2c_board_info mx27_3ds_i2c_camera = {
+-	I2C_BOARD_INFO("ov2640", 0x30),
 -};
 -
--static struct soc_camera_link iclink_mt9v022 = {
--	.bus_id		= 0,		/* Must match with the camera ID */
--	.board_info	= &pcm037_i2c_camera[1],
--	.i2c_adapter_id	= 2,
+-static struct regulator_bulk_data mx27_3ds_camera_regs[] = {
+-	{ .supply = "cmos_vcore" },
+-	{ .supply = "cmos_2v8" },
 -};
 -
--static struct soc_camera_link iclink_mt9t031 = {
--	.bus_id		= 0,		/* Must match with the camera ID */
--	.power		= pcm037_camera_power,
--	.board_info	= &pcm037_i2c_camera[0],
--	.i2c_adapter_id	= 2,
+-static struct soc_camera_link iclink_ov2640 = {
+-	.bus_id		= 0,
+-	.board_info	= &mx27_3ds_i2c_camera,
+-	.i2c_adapter_id	= 0,
+-	.power		= mx27_3ds_camera_power,
+-	.regulators	= mx27_3ds_camera_regs,
+-	.num_regulators	= ARRAY_SIZE(mx27_3ds_camera_regs),
 -};
 -
- static struct i2c_board_info pcm037_i2c_devices[] = {
- 	{
- 		I2C_BOARD_INFO("at24", 0x52), /* E0=0, E1=1, E2=0 */
-@@ -326,22 +294,6 @@ static struct i2c_board_info pcm037_i2c_devices[] = {
- 	}
- };
- 
--static struct platform_device pcm037_mt9t031 = {
+-static struct platform_device mx27_3ds_ov2640 = {
 -	.name	= "soc-camera-pdrv",
 -	.id	= 0,
 -	.dev	= {
--		.platform_data = &iclink_mt9t031,
+-		.platform_data = &iclink_ov2640,
 -	},
 -};
 -
--static struct platform_device pcm037_mt9v022 = {
--	.name	= "soc-camera-pdrv",
--	.id	= 1,
--	.dev	= {
--		.platform_data = &iclink_mt9v022,
--	},
--};
--
- /* Not connected by default */
- #ifdef PCM970_SDHC_RW_SWITCH
- static int pcm970_sdhc1_get_ro(struct device *dev)
-@@ -403,42 +355,9 @@ static const struct imxmmc_platform_data sdhc_pdata __initconst = {
- 	.exit = pcm970_sdhc1_exit,
+ static struct imx_fb_videomode mx27_3ds_modes[] = {
+ 	{	/* 480x640 @ 60 Hz */
+ 		.mode = {
+@@ -471,14 +400,6 @@ static struct spi_board_info mx27_3ds_spi_devs[] __initdata = {
+ 	},
  };
  
--struct mx3_camera_pdata camera_pdata __initdata = {
--	.flags		= MX3_CAMERA_DATAWIDTH_8 | MX3_CAMERA_DATAWIDTH_10,
--	.mclk_10khz	= 2000,
+-static struct platform_device *devices[] __initdata = {
+-	&mx27_3ds_ov2640,
 -};
 -
--static phys_addr_t mx3_camera_base __initdata;
--#define MX3_CAMERA_BUF_SIZE SZ_4M
+-static const struct mx2_camera_platform_data mx27_3ds_cam_pdata __initconst = {
+-	.clk = 26000000,
+-};
 -
--static int __init pcm037_init_camera(void)
--{
--	int dma, ret = -ENOMEM;
--	struct platform_device *pdev = imx31_alloc_mx3_camera(&camera_pdata);
--
--	if (IS_ERR(pdev))
--		return PTR_ERR(pdev);
--
--	dma = dma_declare_coherent_memory(&pdev->dev,
--					mx3_camera_base, mx3_camera_base,
--					MX3_CAMERA_BUF_SIZE,
--					DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
--	if (!(dma & DMA_MEMORY_MAP))
--		goto err;
--
--	ret = platform_device_add(pdev);
--	if (ret)
--err:
--		platform_device_put(pdev);
--
--	return ret;
--}
--
- static struct platform_device *devices[] __initdata = {
- 	&pcm037_flash,
- 	&pcm037_sram_device,
--	&pcm037_mt9t031,
--	&pcm037_mt9v022,
+ static const struct imxi2c_platform_data mx27_3ds_i2c0_data __initconst = {
+ 	.bitrate = 100000,
  };
+@@ -498,7 +419,6 @@ static void __init mx27pdk_init(void)
+ 	imx27_add_spi_imx0(&spi1_pdata);
  
- static const struct fb_videomode fb_modedb[] = {
-@@ -651,13 +570,6 @@ static void __init pcm037_timer_init(void)
- 	mx31_clocks_init(26000000);
- }
+ 	imx27_add_imx_i2c(0, &mx27_3ds_i2c0_data);
+-	platform_add_devices(devices, ARRAY_SIZE(devices));
+ 	imx27_add_imx_fb(&mx27_3ds_fb_data);
  
--static void __init pcm037_reserve(void)
--{
--	/* reserve 4 MiB for mx3-camera */
--	mx3_camera_base = arm_memblock_steal(MX3_CAMERA_BUF_SIZE,
--			MX3_CAMERA_BUF_SIZE);
--}
--
- static void __init pcm037_init_late(void)
+ 	imx27_add_imx_ssi(0, &mx27_3ds_ssi_pdata);
+@@ -506,8 +426,6 @@ static void __init mx27pdk_init(void)
+ 
+ static void __init mx27pdk_late_init(void)
  {
- 	int ret;
-@@ -677,16 +589,6 @@ static void __init pcm037_init_late(void)
- 
- 	imx31_add_mxc_mmc(0, &sdhc_pdata);
- 
--	/* CSI */
--	/* Camera power: default - off */
--	ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_CSI_D5), "mt9t031-power");
--	if (!ret)
--		gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_CSI_D5), 1);
--	else
--		iclink_mt9t031.power = NULL;
+-	int ret;
 -
--	pcm037_init_camera();
+ 	mx27_3ds_sdhc1_enable_level_translator();
+ 	imx27_add_mxc_mmc(0, &sdhc1_pdata);
+ 
+@@ -531,14 +449,6 @@ static void __init mx27pdk_late_init(void)
+ 	if (mxc_expio_init(MX27_CS5_BASE_ADDR, IMX_GPIO_NR(3, 28)))
+ 		pr_warn("Init of the debugboard failed, all devices on the debugboard are unusable.\n");
+ 
+-	ret = gpio_request_array(mx27_3ds_camera_gpios,
+-				 ARRAY_SIZE(mx27_3ds_camera_gpios));
+-	if (ret) {
+-		pr_err("Failed to request camera gpios");
+-		iclink_ov2640.power = NULL;
+-	}
 -
- 	pcm970_sja1000_resources[1].start =
- 			gpio_to_irq(IOMUX_TO_GPIO(IOMUX_PIN(48, 105)));
- 	pcm970_sja1000_resources[1].end =
-@@ -699,7 +601,6 @@ static void __init pcm037_init_late(void)
- MACHINE_START(PCM037, "Phytec Phycore pcm037")
- 	/* Maintainer: Pengutronix */
- 	.atag_offset = 0x100,
--	.reserve = pcm037_reserve,
- 	.map_io = mx31_map_io,
- 	.init_early = imx31_init_early,
- 	.init_irq = mx31_init_irq,
+-	imx27_add_mx2_camera(&mx27_3ds_cam_pdata);
+ 
+ 	imx_add_platform_device("imx_mc13783", 0, NULL, 0, NULL, 0);
+ }
 -- 
 2.7.4
