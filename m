@@ -1,113 +1,79 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 26 Dec 2016 12:38:38 -0800
-Subject: [PATCH v4 0/4] ARM: Add support for CONFIG_DEBUG_VIRTUAL
-In-Reply-To: <20161209233628.6642-1-f.fainelli@gmail.com>
+Date: Mon, 26 Dec 2016 12:38:39 -0800
+Subject: [PATCH v4 1/4] mtd: lart: Rename partition defines to be prefixed
+ with PART_
+In-Reply-To: <20161226203842.19457-1-f.fainelli@gmail.com>
 References: <20161209233628.6642-1-f.fainelli@gmail.com>
-Message-ID: <20161226203842.19457-1-f.fainelli@gmail.com>
+ <20161226203842.19457-1-f.fainelli@gmail.com>
+Message-ID: <20161226203842.19457-2-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+In preparation for defining KERNEL_START on ARM, rename KERNEL_START to
+PART_KERNEL_START, and to be consistent, do this for all
+partition-related constants.
 
-This patch series builds on top of Laura's [PATCHv5 00/10] CONFIG_DEBUG_VIRTUAL
-for arm64 to add support for CONFIG_DEBUG_VIRTUAL for ARM.
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ drivers/mtd/devices/lart.c | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
-This was tested on a Brahma B15 platform (ARMv7 + HIGHMEM + LPAE).
-
-Note that the treewide changes would involve a huge CC list, which
-is why it has been purposely trimmed to just focusing on the DEBUG_VIRTUAL
-aspect.
-
-Changes in v4:
-
-- added Boris' ack for the first patch
-- reworked the virtual address check based on Laura's suggestion to
-  make the code more readable
-
-Changes in v3:
-
-- fix build failures reported by Kbuild test robot
-
-Changes in v2:
-
-- Modified MTD LART driver not to create symbol conflicts with
-  KERNEL_START
-- Fixed patch that defines and uses KERNEL_START/END
-- Fixed __pa_symbol()'s definition
-- Inline __pa_symbol() check wihtin the VIRTUAL_BUG_ON statement
-- Simplified check for virtual addresses
-- Added a tree-wide patch changing SMP/PM implementations to use
-  __pa_symbol(), build tested against multi_v{5,7}_defconfig
-
-Florian Fainelli (4):
-  mtd: lart: Rename partition defines to be prefixed with PART_
-  ARM: Define KERNEL_START and KERNEL_END
-  ARM: Add support for CONFIG_DEBUG_VIRTUAL
-  ARM: treewide: Replace uses of virt_to_phys with __pa_symbol
-
- arch/arm/Kconfig                          |  1 +
- arch/arm/common/mcpm_entry.c              | 12 +++----
- arch/arm/include/asm/memory.h             | 23 +++++++++++--
- arch/arm/mach-alpine/platsmp.c            |  2 +-
- arch/arm/mach-axxia/platsmp.c             |  2 +-
- arch/arm/mach-bcm/bcm63xx_smp.c           |  2 +-
- arch/arm/mach-bcm/platsmp-brcmstb.c       |  2 +-
- arch/arm/mach-bcm/platsmp.c               |  4 +--
- arch/arm/mach-berlin/platsmp.c            |  2 +-
- arch/arm/mach-exynos/firmware.c           |  4 +--
- arch/arm/mach-exynos/mcpm-exynos.c        |  2 +-
- arch/arm/mach-exynos/platsmp.c            |  4 +--
- arch/arm/mach-exynos/pm.c                 |  6 ++--
- arch/arm/mach-exynos/suspend.c            |  6 ++--
- arch/arm/mach-hisi/platmcpm.c             |  2 +-
- arch/arm/mach-hisi/platsmp.c              |  6 ++--
- arch/arm/mach-imx/platsmp.c               |  2 +-
- arch/arm/mach-imx/pm-imx6.c               |  2 +-
- arch/arm/mach-imx/src.c                   |  2 +-
- arch/arm/mach-mediatek/platsmp.c          |  2 +-
- arch/arm/mach-mvebu/pm.c                  |  2 +-
- arch/arm/mach-mvebu/pmsu.c                |  2 +-
- arch/arm/mach-mvebu/system-controller.c   |  2 +-
- arch/arm/mach-omap2/control.c             |  8 ++---
- arch/arm/mach-omap2/omap-mpuss-lowpower.c |  8 ++---
- arch/arm/mach-omap2/omap-smp.c            |  4 +--
- arch/arm/mach-prima2/platsmp.c            |  2 +-
- arch/arm/mach-prima2/pm.c                 |  2 +-
- arch/arm/mach-pxa/palmz72.c               |  2 +-
- arch/arm/mach-pxa/pxa25x.c                |  2 +-
- arch/arm/mach-pxa/pxa27x.c                |  2 +-
- arch/arm/mach-pxa/pxa3xx.c                |  2 +-
- arch/arm/mach-realview/platsmp-dt.c       |  2 +-
- arch/arm/mach-rockchip/platsmp.c          |  4 +--
- arch/arm/mach-rockchip/pm.c               |  2 +-
- arch/arm/mach-s3c24xx/mach-jive.c         |  2 +-
- arch/arm/mach-s3c24xx/pm-s3c2410.c        |  2 +-
- arch/arm/mach-s3c24xx/pm-s3c2416.c        |  2 +-
- arch/arm/mach-s3c64xx/pm.c                |  2 +-
- arch/arm/mach-s5pv210/pm.c                |  2 +-
- arch/arm/mach-sa1100/pm.c                 |  2 +-
- arch/arm/mach-shmobile/platsmp-apmu.c     |  6 ++--
- arch/arm/mach-shmobile/platsmp-scu.c      |  4 +--
- arch/arm/mach-socfpga/platsmp.c           |  4 +--
- arch/arm/mach-spear/platsmp.c             |  2 +-
- arch/arm/mach-sti/platsmp.c               |  2 +-
- arch/arm/mach-sunxi/platsmp.c             |  4 +--
- arch/arm/mach-tango/platsmp.c             |  2 +-
- arch/arm/mach-tango/pm.c                  |  2 +-
- arch/arm/mach-tegra/reset.c               |  4 +--
- arch/arm/mach-ux500/platsmp.c             |  2 +-
- arch/arm/mach-vexpress/dcscb.c            |  2 +-
- arch/arm/mach-vexpress/platsmp.c          |  2 +-
- arch/arm/mach-vexpress/tc2_pm.c           |  4 +--
- arch/arm/mach-zx/platsmp.c                |  4 +--
- arch/arm/mach-zynq/platsmp.c              |  2 +-
- arch/arm/mm/Makefile                      |  1 +
- arch/arm/mm/init.c                        |  7 ++--
- arch/arm/mm/mmu.c                         |  6 +---
- arch/arm/mm/physaddr.c                    | 55 +++++++++++++++++++++++++++++++
- drivers/mtd/devices/lart.c                | 24 +++++++-------
- 61 files changed, 177 insertions(+), 108 deletions(-)
- create mode 100644 arch/arm/mm/physaddr.c
-
+diff --git a/drivers/mtd/devices/lart.c b/drivers/mtd/devices/lart.c
+index 82bd00af5cc3..268aae45b514 100644
+--- a/drivers/mtd/devices/lart.c
++++ b/drivers/mtd/devices/lart.c
+@@ -75,18 +75,18 @@ static char module_name[] = "lart";
+ 
+ /* blob */
+ #define NUM_BLOB_BLOCKS		FLASH_NUMBLOCKS_16m_PARAM
+-#define BLOB_START			0x00000000
+-#define BLOB_LEN			(NUM_BLOB_BLOCKS * FLASH_BLOCKSIZE_PARAM)
++#define PART_BLOB_START		0x00000000
++#define PART_BLOB_LEN		(NUM_BLOB_BLOCKS * FLASH_BLOCKSIZE_PARAM)
+ 
+ /* kernel */
+ #define NUM_KERNEL_BLOCKS	7
+-#define KERNEL_START		(BLOB_START + BLOB_LEN)
+-#define KERNEL_LEN			(NUM_KERNEL_BLOCKS * FLASH_BLOCKSIZE_MAIN)
++#define PART_KERNEL_START	(PART_BLOB_START + PART_BLOB_LEN)
++#define PART_KERNEL_LEN		(NUM_KERNEL_BLOCKS * FLASH_BLOCKSIZE_MAIN)
+ 
+ /* initial ramdisk */
+ #define NUM_INITRD_BLOCKS	24
+-#define INITRD_START		(KERNEL_START + KERNEL_LEN)
+-#define INITRD_LEN			(NUM_INITRD_BLOCKS * FLASH_BLOCKSIZE_MAIN)
++#define PART_INITRD_START	(PART_KERNEL_START + PART_KERNEL_LEN)
++#define PART_INITRD_LEN		(NUM_INITRD_BLOCKS * FLASH_BLOCKSIZE_MAIN)
+ 
+ /*
+  * See section 4.0 in "3 Volt Fast Boot Block Flash Memory" Intel Datasheet
+@@ -587,20 +587,20 @@ static struct mtd_partition lart_partitions[] = {
+ 	/* blob */
+ 	{
+ 		.name	= "blob",
+-		.offset	= BLOB_START,
+-		.size	= BLOB_LEN,
++		.offset	= PART_BLOB_START,
++		.size	= PART_BLOB_LEN,
+ 	},
+ 	/* kernel */
+ 	{
+ 		.name	= "kernel",
+-		.offset	= KERNEL_START,		/* MTDPART_OFS_APPEND */
+-		.size	= KERNEL_LEN,
++		.offset	= PART_KERNEL_START,	/* MTDPART_OFS_APPEND */
++		.size	= PART_KERNEL_LEN,
+ 	},
+ 	/* initial ramdisk / file system */
+ 	{
+ 		.name	= "file system",
+-		.offset	= INITRD_START,		/* MTDPART_OFS_APPEND */
+-		.size	= INITRD_LEN,		/* MTDPART_SIZ_FULL */
++		.offset	= PART_INITRD_START,	/* MTDPART_OFS_APPEND */
++		.size	= PART_INITRD_LEN,	/* MTDPART_SIZ_FULL */
+ 	}
+ };
+ #define NUM_PARTITIONS ARRAY_SIZE(lart_partitions)
 -- 
 2.9.3
