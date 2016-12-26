@@ -1,231 +1,66 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 27 Dec 2016 01:11:56 +0800
-Subject: [PATCH 6/6] arm64: dts: sunxi: add support for the Orange Pi PC 2
- board
-In-Reply-To: <20161226171156.11605-1-icenowy@aosc.xyz>
-References: <20161226171156.11605-1-icenowy@aosc.xyz>
-Message-ID: <20161226171156.11605-3-icenowy@aosc.xyz>
+From: jintack@cs.columbia.edu (Jintack Lim)
+Date: Mon, 26 Dec 2016 12:11:58 -0500
+Subject: [RFC 0/8] Provide the EL1 physical timer to the VM
+Message-ID: <1482772326-29110-1-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
+The ARM architecture defines the EL1 physical timer and the virtual
+timer, and it is reasonable for an OS to expect to be able to access
+both.  However, the current KVM implementation does not provide the EL1
+physical timer to VMs but terminates VMs on access to the timer.
 
-The Orange Pi PC 2 is a typical single board computer using the
-Allwinner H5 SoC. Apart from the usual suspects it features three
-separately driven USB ports and a Gigabit Ethernet port.
-Also it has a SPI NOR flash soldered, from which the board can boot
-from. This enables the SBC to behave like a "real computer" with
-built-in firmware.
+On VHE systems, this would be as simple as allowing full access to the
+EL1 physical timer to VMs because the KVM host does not use the EL1
+physical timer.  However, on non-VHE systems, the KVM host already uses
+the EL1 physical timer which prevents us from granting full access of
+the EL1 physical timer to VMs.
 
-Add the board specific .dts file, which includes the H5 .dtsi and
-enables the peripherals that we support so far.
+This patchset enables VMs to use the EL1 physical timer through
+trap-and-emulate.  The KVM host emulates each EL1 physical timer
+register access and sets up the background timer accordingly.  When the
+background timer expires, the KVM host injects EL1 physical timer
+interrupts to the VM.  Alternatively, it's also possible to allow VMs to
+access the EL1 physical timer without trapping.  However, this requires
+somehow using the EL2 physical timer for the Linux host while running
+the VM instead of the EL1 physical timer.  Right now I just implemented
+trap-and-emulate because this was straightforward to do, and I leave it
+to future work to determine if transferring the EL1 physical timer state
+to the EL2 timer provides any performance benefit.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 183 +++++++++++++++++++++
- 2 files changed, 184 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+This feature will be useful for any OS that wishes to access the EL1
+physical timer. Nested virtualization is one of those use cases. A
+nested hypervisor running inside a VM would think it has full access to
+the hardware and naturally tries to use the EL1 physical timer as Linux
+would do. Other nested hypervisors may try to use the EL2 physical timer
+as Xen would do, but supporting the EL2 physical timer to the VM is out
+of scope of this patchset. This patchset will make it easy to add the
+EL2 timer support in the future, though.
 
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index 1e29a5ae8282..b26bb46b934c 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-new file mode 100644
-index 000000000000..a29ca6b274bb
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-@@ -0,0 +1,183 @@
-+/*
-+ * Copyright (C) 2016 ARM Ltd.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun50i-h5.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Xunlong Orange Pi PC 2";
-+	compatible = "xunlong,orangepi-pc2", "allwinner,sun50i-h5";
-+
-+	reg_vcc3v3: vcc3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&leds_opc>, <&leds_r_opc>;
-+
-+		pwr_led {
-+			label = "orangepi:green:pwr";
-+			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+
-+		status_led {
-+			label = "orangepi:red:status";
-+			gpios = <&pio 0 15 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	r_gpio_keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sw_r_opc>;
-+
-+		sw4 {
-+			label = "sw4";
-+			linux,code = <BTN_0>;
-+			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&ehci2 {
-+	status = "okay";
-+};
-+
-+&ehci3 {
-+	status = "okay";
-+};
-+
-+&ir {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir_pins_a>;
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&ohci2 {
-+	status = "okay";
-+};
-+
-+&ohci3 {
-+	status = "okay";
-+};
-+
-+&pio {
-+	leds_opc: led_pins at 0 {
-+		allwinner,pins = "PA15";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&r_pio {
-+	leds_r_opc: led_pins at 0 {
-+		allwinner,pins = "PL10";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	sw_r_opc: key_pins at 0 {
-+		allwinner,pins = "PL3";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins>;
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins>;
-+};
-+
-+&usbphy {
-+	/* USB VBUS is always on */
-+	status = "okay";
-+};
+Note, Linux VMs booting in EL1 will be unaffected by this patch set and
+will continue to use only the virtual timer and this patch set will
+therefore not introduce any performance degredation as a result of
+trap-and-emulate.
+
+Jintack Lim (8):
+  KVM: arm/arm64: Abstract virtual timer context into separate structure
+  KVM: arm/arm64: Decouple kvm timer functions from virtual timer
+  KVM: arm/arm64: Add the EL1 physical timer context
+  KVM: arm/arm64: Initialize the emulated EL1 physical timer
+  KVM: arm64: Add the EL1 physical timer access handler
+  KVM: arm/arm64: Update the physical timer interrupt level
+  KVM: arm/arm64: Set up a background timer for the physical timer
+    emulation
+  KVM: arm/arm64: Emulate the EL1 phys timer register access
+
+ arch/arm/kvm/arm.c           |   3 +-
+ arch/arm/kvm/reset.c         |   9 +-
+ arch/arm64/kvm/reset.c       |   9 +-
+ arch/arm64/kvm/sys_regs.c    |  63 +++++++++++++
+ include/kvm/arm_arch_timer.h |  43 +++++----
+ virt/kvm/arm/arch_timer.c    | 214 ++++++++++++++++++++++++++++++-------------
+ virt/kvm/arm/hyp/timer-sr.c  |  16 ++--
+ 7 files changed, 264 insertions(+), 93 deletions(-)
+
 -- 
-2.11.0
+1.9.1
