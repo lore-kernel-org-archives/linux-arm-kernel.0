@@ -1,86 +1,23 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 26 Dec 2016 14:55:15 +0900
-Subject: [PATCH 5/9] pinctrl: samsung: Move retention control from
- mach-exynos to the pinctrl driver
-In-Reply-To: <1482495889-6201-6-git-send-email-m.szyprowski@samsung.com>
-References: <CGME20161223122531epcas1p4b8fad6664dad3408acb7a1b9f140884a@epcas1p4.samsung.com>
+Date: Mon, 26 Dec 2016 14:57:06 +0900
+Subject: [PATCH 6/9] pinctrl: samsung: Replace syscore ops with standard
+ platform device pm_ops
+In-Reply-To: <1482495889-6201-7-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20161223122535epcas1p475bc33007e9ea9b206dec6d10d019d7f@epcas1p4.samsung.com>
  <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
- <1482495889-6201-6-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CA+Ln22HQPHF_Vj0kS834SH=4=hcNOpe_vL8P3fbS-jFhQLVyXA@mail.gmail.com>
+ <1482495889-6201-7-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CA+Ln22G80htJ6Va4hSD7ML3=h5QKUhdHm9X3Znnj1KBjyOrROw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
 2016-12-23 21:24 GMT+09:00 Marek Szyprowski <m.szyprowski@samsung.com>:
-> Pad retention control after suspend/resume cycle should be done from pin
-> controller driver instead of PMU (power management unit) driver to avoid
-> possible ordering and logical dependencies. Till now it worked fine only
-> because PMU driver registered its sys_ops after pin controller.
->
-> This patch moves pad retention control from PMU driver to Exynos pin
-> controller driver. This is a preparation for adding new features to Exynos
-> pin controller driver, like runtime power management and suspending
-> individual pin controllers, which might be a part of some power domain.
->
+> Once the dependency on PMU driver (for pad retention control) has been
+> removed, there is no reason to use syscore_ops based suspend/resume.
 
-It looks like this change will essentially break the compatibility
-with DTBs that don't have the pmu syscon specified in pin controller
-nodes.
-
-On the other hand, moving this code to where it actually belongs
-really makes sense, so maybe we could just avoid the need of having
-this property, by looking up the PMU manually, by hardcoded string or
-so, if the proper property is not present?
-
-[...]
-
-> diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-> index 1baf19eecabf..b7bd2e12a269 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-> @@ -43,6 +43,10 @@ Required Properties:
->                 };
->         };
->
-> +- samsung,pmu-syscon: Phandle to the PMU system controller, to let driver
-> +  to control pad retention after system suspend/resume cycle (only for Exynos
-> +  SoC series).
-> +
-
-Ah, here it is. I think adding relevant binding documentation at the
-beginning of the series would make it much easier for reviewers to
-understand the change.
-
->  - Pin banks as child nodes: Pin banks of the controller are represented by child
->    nodes of the controller node. Bank name is taken from name of the node. Each
->    bank node must contain following properties:
-
-[...]
-
-> +static void exynos_retention_audio_off(struct samsung_pinctrl_drv_data *drvdata)
-> +{
-> +       if (!IS_ERR(pmu_regs))
-
-nit: Negated conditions make the code more difficult to read. Also it
-would be consistent with exynos_retention_off() to just bail out if
-(IS_ERR(pmu_regs)).
-
-> +               regmap_write(pmu_regs, S5P_PAD_RET_MAUDIO_OPTION,
-> +                            EXYNOS_WAKEUP_FROM_LOWPWR);
-> +}
-
-[...]
-
-> @@ -1139,15 +1146,15 @@ static void samsung_pinctrl_suspend_dev(
->
->         if (drvdata->suspend)
->                 drvdata->suspend(drvdata);
-> +       if (drvdata->retention_on)
-> +               drvdata->retention_on(drvdata);
-> +
-
-nit: Unnecessary blank line.
+Does it also hold true for other platforms using this driver? I.e.
+s3c24xx, s3c64xx and s5pv210?
 
 Best regards,
 Tomasz
