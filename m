@@ -1,105 +1,154 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Sun, 25 Dec 2016 23:08:15 +0100
-Subject: [PATCH] arm: dt: Initialize boot_command_line from CONFIG_CMDLINE
- in case DT does not provide /chosen/bootargs
-In-Reply-To: <201612161242.34764@pali>
-References: <1481749963-8664-1-git-send-email-pali.rohar@gmail.com>
- <20161215100931.GJ14217@n2100.armlinux.org.uk> <201612161242.34764@pali>
-Message-ID: <201612252308.15324@pali>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 26 Dec 2016 01:31:13 +0100
+Subject: [PATCH v5 09/14] ACPI: platform: setup MSI domain for ACPI based
+ platform device
+In-Reply-To: <585E24FB.9050805@huawei.com>
+References: <1482384922-21507-1-git-send-email-guohanjun@huawei.com>
+ <1482384922-21507-10-git-send-email-guohanjun@huawei.com>
+ <CAJZ5v0g4AoU-g4UWZFxLgQ_yfTC7KSBnZ_Ve945d+i58e=GuDQ@mail.gmail.com>
+ <585E24FB.9050805@huawei.com>
+Message-ID: <CAJZ5v0itKF-uo7vGxK3+-X4OwBVYPdBw-b8v-8-CTBygpKMGoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 December 2016 12:42:34 Pali Roh?r wrote:
-> On Thursday 15 December 2016 11:09:32 Russell King - ARM Linux wrote:
-> > > What is reason that CONFIG_CMDLINE is not supported for DT?
-> > 
-> > Sorry, that's my mistake - as you've pointed out above, it is
-> > supported but via generic code.  I was only looking at arch code
-> > when I made the statement.
-> > 
-> > This patch (untested) should solve it:
-> >  drivers/of/fdt.c | 40 ++++++++++++++++++++--------------------
-> >  1 file changed, 20 insertions(+), 20 deletions(-)
-> > 
-> > diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> > index c89d5d231a0e..fb89157332c6 100644
-> > --- a/drivers/of/fdt.c
-> > +++ b/drivers/of/fdt.c
-> > @@ -1073,26 +1073,6 @@ int __init
-> > early_init_dt_scan_chosen(unsigned long node, const char *uname,
-> > if (p != NULL && l > 0)
-> > 
-> >  		strlcpy(data, p, min((int)l, COMMAND_LINE_SIZE));
-> > 
-> > -	/*
-> > -	 * CONFIG_CMDLINE is meant to be a default in case nothing else
-> > -	 * managed to set the command line, unless CONFIG_CMDLINE_FORCE
-> > -	 * is set in which case we override whatever was found earlier.
-> > -	 */
-> > -#ifdef CONFIG_CMDLINE
-> > -#if defined(CONFIG_CMDLINE_EXTEND)
-> > -	strlcat(data, " ", COMMAND_LINE_SIZE);
-> > -	strlcat(data, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
-> > -#elif defined(CONFIG_CMDLINE_FORCE)
-> > -	strlcpy(data, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
-> > -#else
-> > -	/* No arguments from boot loader, use kernel's  cmdl*/
-> > -	if (!((char *)data)[0])
-> > -		strlcpy(data, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
-> > -#endif
-> > -#endif /* CONFIG_CMDLINE */
-> > -
-> > -	pr_debug("Command line is: %s\n", (char*)data);
-> > -
-> > 
-> >  	/* break now */
-> >  	return 1;
-> >  
-> >  }
-> > 
-> > @@ -1205,6 +1185,26 @@ void __init early_init_dt_scan_nodes(void)
-> > 
-> >  	/* Retrieve various information from the /chosen node */
-> >  	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
-> > 
-> > +	/*
-> > +	 * CONFIG_CMDLINE is meant to be a default in case nothing else
-> > +	 * managed to set the command line, unless CONFIG_CMDLINE_FORCE
-> > +	 * is set in which case we override whatever was found earlier.
-> > +	 */
-> > +#ifdef CONFIG_CMDLINE
-> > +#if defined(CONFIG_CMDLINE_EXTEND)
-> > +	strlcat(boot_command_line, " ", COMMAND_LINE_SIZE);
-> > +	strlcat(boot_command_line, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
-> > +#elif defined(CONFIG_CMDLINE_FORCE)
-> > +	strlcpy(boot_command_line, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
-> > +#else
-> > +	/* No arguments from boot loader, use kernel's cmdline */
-> > +	if (!boot_command_line[0])
-> > +		strlcpy(boot_command_line, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
-> > +#endif
-> > +#endif /* CONFIG_CMDLINE */
-> > +
-> > +	pr_debug("Command line is: %s\n", boot_command_line);
-> > +
-> > 
-> >  	/* Initialize {size,address}-cells info */
-> >  	of_scan_flat_dt(early_init_dt_scan_root, NULL);
-> 
-> Patch is working fine and fixes my problem. You can add my Tested-by.
+On Sat, Dec 24, 2016 at 8:34 AM, Hanjun Guo <guohanjun@huawei.com> wrote:
+> Hi Rafael,
+>
+> Thank you for your comments, when I was demoing your suggestion,
+> I got a little bit confusions, please see my comments below.
+>
 
-Russell, are you going to use your patch? Or original my? Or any other?
-If you need more testing or other data, let me know.
+[cut]
 
-I would like to see this problem (non working CONFIG_CMDLINE) fixed...
+>>> +
+>>> +/**
+>>>   * acpi_create_platform_device - Create platform device for ACPI device node
+>>>   * @adev: ACPI device node to create a platform device for.
+>>>   * @properties: Optional collection of build-in properties.
+>>> @@ -109,6 +119,7 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *adev,
+>>>         pdevinfo.num_res = count;
+>>>         pdevinfo.fwnode = acpi_fwnode_handle(adev);
+>>>         pdevinfo.properties = properties;
+>>> +       pdevinfo.pre_add_cb = acpi_platform_pre_add_cb;
+>> Why don't you point that directly to acpi_configure_pmsi_domain()?  It
+>> doesn't look like the wrapper is necessary at all.
+>
+> I was thinking that we can add something more in the future
+> if we need to extend the function of the callback, I can just
+> use acpi_configure_pmsi_domain() here.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161225/1962bb36/attachment.sig>
+So you can add the wrapper in the future just fine as well.  At this
+point it is just redundant.
+
+>>
+>> And I'm not sure why the new callback is necessary ->
+>
+> I was demoing your suggestion but...
+>
+>>
+>>>         if (acpi_dma_supported(adev))
+>>>                 pdevinfo.dma_mask = DMA_BIT_MASK(32);
+>>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+>>> index bc68d93..6b72fcb 100644
+>>> --- a/drivers/acpi/arm64/iort.c
+>>> +++ b/drivers/acpi/arm64/iort.c
+>>> @@ -527,6 +527,49 @@ struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id)
+>>>         return irq_find_matching_fwnode(handle, DOMAIN_BUS_PCI_MSI);
+>>>  }
+>>>
+>>> +/**
+>>> + * iort_get_platform_device_domain() - Find MSI domain related to a
+>>> + * platform device
+>>> + * @dev: the dev pointer associated with the platform device
+>>> + *
+>>> + * Returns: the MSI domain for this device, NULL otherwise
+>>> + */
+>>> +static struct irq_domain *iort_get_platform_device_domain(struct device *dev)
+>>> +{
+>>> +       struct acpi_iort_node *node, *msi_parent;
+>>> +       struct fwnode_handle *iort_fwnode;
+>>> +       struct acpi_iort_its_group *its;
+>>> +
+>>> +       /* find its associated iort node */
+>>> +       node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+>>> +                             iort_match_node_callback, dev);
+>>> +       if (!node)
+>>> +               return NULL;
+>>> +
+>>> +       /* then find its msi parent node */
+>>> +       msi_parent = iort_node_get_id(node, NULL, IORT_MSI_TYPE, 0);
+>>> +       if (!msi_parent)
+>>> +               return NULL;
+>>> +
+>>> +       /* Move to ITS specific data */
+>>> +       its = (struct acpi_iort_its_group *)msi_parent->node_data;
+>>> +
+>>> +       iort_fwnode = iort_find_domain_token(its->identifiers[0]);
+>>> +       if (!iort_fwnode)
+>>> +               return NULL;
+>>> +
+>>> +       return irq_find_matching_fwnode(iort_fwnode, DOMAIN_BUS_PLATFORM_MSI);
+>>> +}
+>>> +
+>>> +void acpi_configure_pmsi_domain(struct device *dev)
+>>> +{
+>>> +       struct irq_domain *msi_domain;
+>>> +
+>>> +       msi_domain = iort_get_platform_device_domain(dev);
+>>> +       if (msi_domain)
+>>> +               dev_set_msi_domain(dev, msi_domain);
+>>> +}
+>>> +
+>>>  static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+>>>  {
+>>>         u32 *rid = data;
+>>> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+>>> index c4af003..3e68f31 100644
+>>> --- a/drivers/base/platform.c
+>>> +++ b/drivers/base/platform.c
+>>> @@ -537,6 +537,9 @@ struct platform_device *platform_device_register_full(
+>>>                         goto err;
+>>>         }
+>>>
+>>> +       if (pdevinfo->pre_add_cb)
+>>> +               pdevinfo->pre_add_cb(&pdev->dev);
+>>> +
+>> -> because it looks like this might be done in acpi_platform_notify()
+>> for platform devices.
+>
+> It works and I just simply add the code below:
+>
+> diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
+> index f8d6564..e0cd649 100644
+> --- a/drivers/acpi/glue.c
+> +++ b/drivers/acpi/glue.c
+> @@ -13,6 +13,7 @@
+>  #include <linux/slab.h>
+>  #include <linux/rwsem.h>
+>  #include <linux/acpi.h>
+> +#include <linux/acpi_iort.h>
+>  #include <linux/dma-mapping.h>
+>
+>  #include "internal.h"
+> @@ -315,6 +316,8 @@ static int acpi_platform_notify(struct device *dev)
+>         if (!adev)
+>                 goto out;
+>
+> + acpi_configure_pmsi_domain(dev);
+> +
+
+But that should apply to platform devices only I suppose?
+
+>         if (type && type->setup)
+>                 type->setup(dev);
+>         else if (adev->handler && adev->handler->bind)
+>
+> Do you suggesting to configure the msi domain in this way?
+> or add the function in the type->setup() callback (which needs
+> to introduce a new acpi bus type)?
+
+A type->setup() would be somewhat cleaner I think, but then it's more
+code.  Whichever works better I guess. :-)
+
+Thanks,
+Rafael
