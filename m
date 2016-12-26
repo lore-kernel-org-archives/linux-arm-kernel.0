@@ -1,77 +1,24 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Mon, 26 Dec 2016 09:43:31 -0500
-Subject: [PATCH] PCI: exynos: refactor exynos pcie driver
-In-Reply-To: <e1f37a59-b633-7b9d-cc79-dbbb00a24cda@samsung.com>
-References: <CGME20161223105411epcas1p3727f726e757ec6c6d7bff04a9af40077@epcas1p3.samsung.com>
- <1482490587-13611-1-git-send-email-pankaj.dubey@samsung.com>
- <e1f37a59-b633-7b9d-cc79-dbbb00a24cda@samsung.com>
-Message-ID: <000201d25f86$6ee20bd0$4ca62370$@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 26 Dec 2016 15:55:15 +0100
+Subject: [RFC PATCH 0/7] ThunderX Embedded switch support
+In-Reply-To: <DM5PR07MB2842EC647393430BE559D5B78D960@DM5PR07MB2842.namprd07.prod.outlook.com>
+References: <1482310011-1862-1-git-send-email-satha.rao@caviumnetworks.com>
+ <CA+sq2Cf3npwzZc2+qQXrNzVBWywn1iwSL_mXjpU1LzC+JFKdUA@mail.gmail.com>
+ <DM5PR07MB2842EC647393430BE559D5B78D960@DM5PR07MB2842.namprd07.prod.outlook.com>
+Message-ID: <20161226145515.GD30335@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jaehoon Chung wtote:
+On Mon, Dec 26, 2016 at 02:04:27PM +0000, Koteshwar Rao, Satha wrote:
+> Hi Sunil,
 > 
-> Hi Pankaj,
-> 
-> On 12/23/2016 07:56 PM, Pankaj Dubey wrote:
-> > From: Niyas Ahmed S T <niyas.ahmed@samsung.com>
-> >
-> > Currently Exynos PCIe driver is only supported for Exynos5440 SoC.
-> > This patch does refactoring of Exynos PCIe driver to extend support
-> > for other Exynos SoC.
-> >
-> > Following are the main changes done via this patch:
-> > 1) It adds separate structs for memory, clock resources.
-> > 2) It add exynos_pcie_ops struct which will allow us to support the
-> > differences in resources in different Exynos SoC.
-> 
-> It's nice to me for reusing this file.
-> but after considering too many times, i decided not to use this file.
-> 
-> I'm not sure what block base is..actually this pci-exynos.c is really
-> black-box.
-> (No one maintains this file, even Samsung didn't care.)
-> Who is using this?
-> If Someone can share the information about exynos5440, i can refactor
-> everything.
-> Otherwise, there are two solution..
-> 
-> One is "adding the new pci-exynos.c" likes pci-exynos5433.c
+> In RFC cover letter we explained the feature details, files organized based on their supporting functionality, let me know if you are interested in any specific details
 
-As Bjorn mentioned earlier, I agree with this option.
+Please don't top post. Also, please perform correct quoting of the
+email you are replying to.
 
-> Other is "refactor this file" under assuming the each register's usage.
+As for getting patches merged, you will find it easier to get reviews
+if you have lots of small patches which are obviously correct, and
+each has a good change log entry describing the why as well as what.
 
-But, if possible, I prefer this option.
-I am not sure that it cannot make the code dirty.
-Maybe, you need to discuss with hardware design engineers.
-
-> 
-> I want to use the PHY generic Framework for EXYNOS PCIe.
-> 
-> If you or other guys really want to use the pci-exynos.c for other exynos,
-> I will rework with PHY generic framework. Then i will resend the my
-> patches as V2.
-
-When I submitted the pci-exynos.c, there was no PHY generic framework.
-But, currently, using PHY generic framework is mandatory, as other PCIe host
-driver did.
-I think that we should use PHY generic framework for new SoCs.
-
-> 
-> One more thing..Does anyone know what the usage of block base is?
-> Can i use that register as "syscon"?
-
-'Block' is very specific registers for 5440.
-Other Exynos SoCs do not use that registers.
-Actually, it is not the same with 'syscon'.
-But, you can assume 'block' as 'syscon'.
-
-Best regards,
-Jingoo Han
-
-> 
-> Best Regards,
-> Jaehoon Chung
-> 
-[.....]
+     Andrew
