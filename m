@@ -1,28 +1,21 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 27 Dec 2016 09:30:15 -0800
-Subject: [PATCH 0/9] ARM: omap: Add empty chosen node in SoCs top level
- DTSI
-In-Reply-To: <1482158681-4530-1-git-send-email-javier@osg.samsung.com>
-References: <1482158681-4530-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <20161227173015.GP4920@atomide.com>
+Date: Tue, 27 Dec 2016 09:34:49 -0800
+Subject: [PATCH] ARM: OMAP2+: PRM: Delete an error message for a failed
+ memory allocation
+In-Reply-To: <6212b730-8e09-bf87-2a6b-23df9bc43e2d@users.sourceforge.net>
+References: <6212b730-8e09-bf87-2a6b-23df9bc43e2d@users.sourceforge.net>
+Message-ID: <20161227173449.GR4920@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Javier Martinez Canillas <javier@osg.samsung.com> [161219 06:45]:
-> Hello Tony,
+* SF Markus Elfring <elfring@users.sourceforge.net> [161203 12:58]:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Sat, 3 Dec 2016 21:46:02 +0100
 > 
-> As discussed in [0], there's a regression when booting a kernel with a DTB
-> that doesn't have a pre-existing chosen node. This is usually not an issue
-> for most boards since u-boot creates an empty chosen node if isn't present
-> in the DTB.
-> 
-> But it can be an issue for others bootloaders as Pali pointed out with the
-> N9/900/950 phones and the Nokia Loader (NoLo).
-> 
-> This patch series add chosen nodes in the top level DTSI for all OMAP SoCs.
-> 
-> [0]: http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1294379.html
+> Omit an extra message for a memory allocation failure in this function.
 
-Applying these into omap-for-v4.10/fixes thanks.
+Applying into omap-for-v4.10/fixes.
+
+Regards,
 
 Tony
