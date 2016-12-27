@@ -1,19 +1,18 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 27 Dec 2016 17:00:01 +0800
-Subject: [PATCH v2 2/3] crypto: arm64/chacha20 - implement NEON version
- based on SSE3 code
-In-Reply-To: <1481294033-23508-3-git-send-email-ard.biesheuvel@linaro.org>
-References: <1481294033-23508-1-git-send-email-ard.biesheuvel@linaro.org>
- <1481294033-23508-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20161227090001.GB10121@gondor.apana.org.au>
+Date: Tue, 27 Dec 2016 17:03:55 +0800
+Subject: [PATCH] crypto: arm64/aes: reimplement bit-sliced ARM/NEON
+ implementation for arm64
+In-Reply-To: <1481564758-7275-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1481564758-7275-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20161227090355.GD10121@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2016 at 02:33:52PM +0000, Ard Biesheuvel wrote:
+On Mon, Dec 12, 2016 at 05:45:58PM +0000, Ard Biesheuvel wrote:
 >
-> +	.chunksize		= 4 * CHACHA20_BLOCK_SIZE,
+> +	.chunksize		= 8 * AES_BLOCK_SIZE,
 
-This should use a new attribute specific to the walk interface.
+Same comment as to the previous patches regarding chunksize.
 
 Cheers,
 -- 
