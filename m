@@ -1,28 +1,63 @@
 From: ping.bai@nxp.com (Bai Ping)
-Date: Tue, 27 Dec 2016 17:47:40 +0800
-Subject: [PATCH v2 02/12] driver: clocksource: add gpt timer for imx6sll
+Date: Tue, 27 Dec 2016 17:47:41 +0800
+Subject: [PATCH v2 03/12] Document: dt: binding: imx: update clock doc for
+ imx6sll
 In-Reply-To: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
 References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <1482832070-22668-3-git-send-email-ping.bai@nxp.com>
+Message-ID: <1482832070-22668-4-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpt timer support for i.MX6SLL.
+Add clock binding doc uppdate for imx6sll.
 
 Signed-off-by: Bai Ping <ping.bai@nxp.com>
 ---
- drivers/clocksource/timer-imx-gpt.c | 1 +
- 1 file changed, 1 insertion(+)
+ .../devicetree/bindings/clock/imx6sll-clock.txt    | 37 ++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx6sll-clock.txt
 
-diff --git a/drivers/clocksource/timer-imx-gpt.c b/drivers/clocksource/timer-imx-gpt.c
-index f595460..f71822d 100644
---- a/drivers/clocksource/timer-imx-gpt.c
-+++ b/drivers/clocksource/timer-imx-gpt.c
-@@ -556,4 +556,5 @@ static int __init imx6dl_timer_init_dt(struct device_node *np)
- CLOCKSOURCE_OF_DECLARE(imx6q_timer, "fsl,imx6q-gpt", imx31_timer_init_dt);
- CLOCKSOURCE_OF_DECLARE(imx6dl_timer, "fsl,imx6dl-gpt", imx6dl_timer_init_dt);
- CLOCKSOURCE_OF_DECLARE(imx6sl_timer, "fsl,imx6sl-gpt", imx6dl_timer_init_dt);
-+CLOCKSOURCE_OF_DECLARE(imx6sll_timer, "fsl,imx6sll-gpt", imx6dl_timer_init_dt);
- CLOCKSOURCE_OF_DECLARE(imx6sx_timer, "fsl,imx6sx-gpt", imx6dl_timer_init_dt);
+diff --git a/Documentation/devicetree/bindings/clock/imx6sll-clock.txt b/Documentation/devicetree/bindings/clock/imx6sll-clock.txt
+new file mode 100644
+index 0000000..3a46787
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/imx6sll-clock.txt
+@@ -0,0 +1,37 @@
++* Clock bindings for Freescale i.MX6 SLL
++
++Required properties:
++- compatible: Should be "fsl,imx6sll-ccm"
++- reg: Address and length of the register set
++- #clock-cells: Should be <1>
++- clocks: list of clock specifiers, must contain an entry for each required
++  entry in clock-names
++- clock-names: should include entries "ckil", "osc", "ipp_di0" and "ipp_di1"
++
++The clock consumer should specify the desired clock by having the clock
++ID in its "clocks" phandle cell.  See include/dt-bindings/clock/imx6sll-clock.h
++for the full list of i.MX6 SLL clock IDs.
++
++Examples:
++
++#include <dt-bindings/clock/imx6sll-clock.h>
++
++clks: ccm at 020c4000 {
++		compatible = "fsl,imx6sll-ccm";
++		reg = <0x020c4000 0x4000>;
++		interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
++		#clock-cells = <1>;
++		clocks = <&ckil>, <&osc>, <&ipp_di0>, <&ipp_di1>;
++		clock-names = "ckil", "osc", "ipp_di0", "ipp_di1";
++};
++
++uart1: serial at 02020000 {
++		compatible = "fsl,imx6sl-uart", "fsl,imx6q-uart", "fsl,imx21-uart";
++		reg = <0x02020000 0x4000>;
++		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&clks IMX6SLL_CLK_UART1_IPG>,
++			 <&clks IMX6SLL_CLK_UART1_SERIAL>;
++		clock-names = "ipg", "per";
++		status = "disabled";
++};
 -- 
 1.9.1
