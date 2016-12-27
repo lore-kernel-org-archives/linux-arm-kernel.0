@@ -1,56 +1,82 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 27 Dec 2016 07:07:40 +0200
-Subject: [PATCH v2] watchdog: constify watchdog_info structures
-In-Reply-To: <1482771911-13548-1-git-send-email-bhumirks@gmail.com>
-References: <1482771911-13548-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <20161227050740.fqpmxxqxtalkovka@tarshish>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Mon, 26 Dec 2016 21:58:29 -0800
+Subject: [PATCH 1/3 v2] iio: adc: add device tree bindings for Qualcomm
+ PM8xxx ADCs
+In-Reply-To: <1481842089-13999-1-git-send-email-linus.walleij@linaro.org>
+References: <1481842089-13999-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20161227055829.GB10531@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bhumika Goyal,
+On Thu 15 Dec 14:48 PST 2016, Linus Walleij wrote:
 
-On Mon, Dec 26, 2016 at 10:35:11PM +0530, Bhumika Goyal wrote:
-> Declare watchdog_info structures as const as they are only stored in the
-> info field of watchdog_device structures. This field is of type const
-> struct watchdog_info *, so watchdog_info structures having this property
-> can be declared const too.
-> Done using Coccinelle:
-> 
-> @r1 disable optional_qualifier@
-> identifier i;
-> position p;
-> @@
-> static struct watchdog_info i at p={...};
-> 
-> @ok@
-> identifier r1.i;
-> position p;
-> struct watchdog_device obj;
-> @@
-> obj.info=&i at p;
-> 
-> @bad@
-> position p!={r1.p,ok.p};
-> identifier r1.i;
-> @@
-> i at p
-> 
-> @depends on !bad disable optional_qualifier@
-> identifier r1.i;
-> @@
-> +const
-> struct watchdog_info i;
-> 
-> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+Sorry for taking so long time to give this a test.
 
-For digicolor_wdt.c:
+> ---
+>  .../bindings/iio/adc/qcom,pm8xxx-xoadc.txt         | 160 +++++++++++++++++++++
+>  1 file changed, 160 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iio/adc/qcom,pm8xxx-xoadc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/adc/qcom,pm8xxx-xoadc.txt b/Documentation/devicetree/bindings/iio/adc/qcom,pm8xxx-xoadc.txt
+[..]
+> +
+> +- reg: should contain the ADC base address in the PMIC, typically
+> +  0x197.
 
-Acked-by: Baruch Siach <baruch@tkos.co.il>
+xoadc-ref is "required" by the code (setting 2.2V on the dummy regulator
+returned in its absence will fail), so it should be mentioned here.
 
-Thanks,
-baruch
+On 8064 pm8921_l14 seems to be our reference, which is 1.8V.
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+[..]
+> +
+> +- qcom,ratiometric:
+> +  Value type: <empty>
+> +  Definition: Channel calibration type. If this property is specified
+> +          VADC will use the VDD reference (1.8V) and GND for channel
+> +          calibration. If the property is not found, the channel will be
+> +          calibrated with the 0.625V and 1.25V reference channels, also
+> +          known as an absolute calibration.
+
+So if I specify this property the reference should be 1.8V and if I
+specify qcom,ratiometric-ref I will override this? Also, the
+implementation requires that qcom,ratiometric-ref is specified if the
+boolean property is used.
+
+Am I missing something or should we just squash them?
+
+> +
+> +- qcom,ratiometric-ref:
+> +  Value type: <u32>
+> +  Definition: The reference voltage pair when using ratiometric
+> +          calibration:
+> +	  0 = XO_IN/XOADC_GND
+> +	  1 = PMIC_IN/XOADC_GND
+> +	  2 = PMIC_IN/BMS_CSP
+> +	  3 (invalid)
+> +	  4 = XOADC_GND/XOADC_GND
+> +	  5 = XOADC_VREF/XOADC_GND
+> +
+> +Example:
+> +
+> +xoadc: xoadc at 197 {
+> +	compatible = "qcom,pm8058-adc";
+> +	reg = <0x197>;
+> +	interrupt-parent = <&pm8058>;
+> +	interrupts = <76 1>;
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	#io-channel-cells = <1>;
+
+xoadc-ref-supply = <>;
+
+> +
+> +	vcoin {
+
+As the node has a "reg" you need to add @0 on these.
+
+> +		reg = <0x00>;
+> +	};
+
+Regards,
+Bjorn
