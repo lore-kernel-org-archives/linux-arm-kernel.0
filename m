@@ -1,32 +1,89 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 27 Dec 2016 11:17:45 +0100
-Subject: [PATCH 6/9] pinctrl: samsung: Replace syscore ops with standard
- platform device pm_ops
-In-Reply-To: <CA+Ln22G80htJ6Va4hSD7ML3=h5QKUhdHm9X3Znnj1KBjyOrROw@mail.gmail.com>
-References: <CGME20161223122535epcas1p475bc33007e9ea9b206dec6d10d019d7f@epcas1p4.samsung.com>
- <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
- <1482495889-6201-7-git-send-email-m.szyprowski@samsung.com>
- <CA+Ln22G80htJ6Va4hSD7ML3=h5QKUhdHm9X3Znnj1KBjyOrROw@mail.gmail.com>
-Message-ID: <742a6c77-3ae9-ce5f-984d-4da3cc790865@samsung.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Tue, 27 Dec 2016 11:17:56 +0100
+Subject: [PATCH v4] mm: pmd dirty emulation in page fault handler
+In-Reply-To: <1482506098-6149-1-git-send-email-minchan@kernel.org>
+References: <1482506098-6149-1-git-send-email-minchan@kernel.org>
+Message-ID: <20161227101755.GD1308@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Sat 24-12-16 00:14:58, Minchan Kim wrote:
+> Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
+> http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
+> 
+> The problem is currently page fault handler doesn't supports dirty bit
+> emulation of pmd for non-HW dirty-bit architecture so that application
+> stucks until VM marked the pmd dirty.
+> 
+> How the emulation work depends on the architecture. In case of arm64,
+> when it set up pte firstly, it sets pte PTE_RDONLY to get a chance to
+> mark the pte dirty via triggering page fault when store access happens.
+> Once the page fault occurs, VM marks the pmd dirty and arch code for
+> setting pmd will clear PTE_RDONLY for application to proceed.
+> 
+> IOW, if VM doesn't mark the pmd dirty, application hangs forever by
+> repeated fault(i.e., store op but the pmd is PTE_RDONLY).
+> 
+> This patch enables pmd dirty-bit emulation for those architectures.
 
+Thanks for extending the patch description again!
 
-On 2016-12-26 06:57, Tomasz Figa wrote:
-> 2016-12-23 21:24 GMT+09:00 Marek Szyprowski <m.szyprowski@samsung.com>:
->> Once the dependency on PMU driver (for pad retention control) has been
->> removed, there is no reason to use syscore_ops based suspend/resume.
-> Does it also hold true for other platforms using this driver? I.e.
-> s3c24xx, s3c64xx and s5pv210?
+> [1] b8d3c4c3009d, mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called
+> 
+> Cc: Jason Evans <je@fb.com>
+> Cc: Michal Hocko <mhocko@suse.com> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: linux-arch at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: <stable@vger.kernel.org> [4.5+]
+> Fixes: b8d3c4c3009d ("mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called")
+> Reported-and-Tested-by: Andreas Schwab <schwab@suse.de>
+> Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+> Signed-off-by: Minchan Kim <minchan@kernel.org>
 
-I've checked and I didn't find any code related to retention control in
-s3c24xx and 23c64xx, but you are right that I need to add support for
-s5pv210 (retention is controlled via S5P_OTHERS register). Thanks for
-pointing this.
+Acked-by: Michal Hocko <mhocko@suse.com>
 
-Best regards
+> ---
+>   Merry Xmas!
+> 
+> * from v3
+>   * Elaborate description
+> * from v2
+>   * Add acked-by/tested-by
+> * from v1
+>   * Remove __handle_mm_fault part - Kirill
+>  mm/huge_memory.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/mm/huge_memory.c b/mm/huge_memory.c
+> index 10eedbf..29ec8a4 100644
+> --- a/mm/huge_memory.c
+> +++ b/mm/huge_memory.c
+> @@ -883,15 +883,17 @@ void huge_pmd_set_accessed(struct vm_fault *vmf, pmd_t orig_pmd)
+>  {
+>  	pmd_t entry;
+>  	unsigned long haddr;
+> +	bool write = vmf->flags & FAULT_FLAG_WRITE;
+>  
+>  	vmf->ptl = pmd_lock(vmf->vma->vm_mm, vmf->pmd);
+>  	if (unlikely(!pmd_same(*vmf->pmd, orig_pmd)))
+>  		goto unlock;
+>  
+>  	entry = pmd_mkyoung(orig_pmd);
+> +	if (write)
+> +		entry = pmd_mkdirty(entry);
+>  	haddr = vmf->address & HPAGE_PMD_MASK;
+> -	if (pmdp_set_access_flags(vmf->vma, haddr, vmf->pmd, entry,
+> -				vmf->flags & FAULT_FLAG_WRITE))
+> +	if (pmdp_set_access_flags(vmf->vma, haddr, vmf->pmd, entry, write))
+>  		update_mmu_cache_pmd(vmf->vma, vmf->address, vmf->pmd);
+>  
+>  unlock:
+> -- 
+> 2.7.4
+> 
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Michal Hocko
+SUSE Labs
