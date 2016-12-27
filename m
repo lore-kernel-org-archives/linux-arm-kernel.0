@@ -1,21 +1,59 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 27 Dec 2016 17:03:55 +0800
-Subject: [PATCH] crypto: arm64/aes: reimplement bit-sliced ARM/NEON
- implementation for arm64
-In-Reply-To: <1481564758-7275-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1481564758-7275-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20161227090355.GD10121@gondor.apana.org.au>
+From: Minghuan.Lian@nxp.com (Minghuan Lian)
+Date: Tue, 27 Dec 2016 17:12:57 +0800
+Subject: [PATCH 1/9] irqchip/ls-scfg-msi: fix typo of MSI compatible strings
+Message-ID: <1482829985-24421-1-git-send-email-Minghuan.Lian@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2016 at 05:45:58PM +0000, Ard Biesheuvel wrote:
->
-> +	.chunksize		= 8 * AES_BLOCK_SIZE,
+The patch is to fix typo of the Layerscape SCFG MSI dts compatible
+strings. "1" is replaced by "l".
 
-Same comment as to the previous patches regarding chunksize.
+Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+---
+ .../devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt    | 6 +++---
+ drivers/irqchip/irq-ls-scfg-msi.c                                   | 6 ++++--
+ 2 files changed, 7 insertions(+), 5 deletions(-)
 
-Cheers,
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
+index 9e38949..2755cd1 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
+@@ -4,8 +4,8 @@ Required properties:
+ 
+ - compatible: should be "fsl,<soc-name>-msi" to identify
+ 	      Layerscape PCIe MSI controller block such as:
+-              "fsl,1s1021a-msi"
+-              "fsl,1s1043a-msi"
++              "fsl,ls1021a-msi"
++              "fsl,ls1043a-msi"
+ - msi-controller: indicates that this is a PCIe MSI controller node
+ - reg: physical base address of the controller and length of memory mapped.
+ - interrupts: an interrupt to the parent interrupt controller.
+@@ -23,7 +23,7 @@ MSI controller node
+ Examples:
+ 
+ 	msi1: msi-controller at 1571000 {
+-		compatible = "fsl,1s1043a-msi";
++		compatible = "fsl,ls1043a-msi";
+ 		reg = <0x0 0x1571000 0x0 0x8>,
+ 		msi-controller;
+ 		interrupts = <0 116 0x4>;
+diff --git a/drivers/irqchip/irq-ls-scfg-msi.c b/drivers/irqchip/irq-ls-scfg-msi.c
+index 02cca74c..cef67cc 100644
+--- a/drivers/irqchip/irq-ls-scfg-msi.c
++++ b/drivers/irqchip/irq-ls-scfg-msi.c
+@@ -219,8 +219,10 @@ static int ls_scfg_msi_remove(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id ls_scfg_msi_id[] = {
+-	{ .compatible = "fsl,1s1021a-msi", },
+-	{ .compatible = "fsl,1s1043a-msi", },
++	{ .compatible = "fsl,1s1021a-msi", }, /* a typo */
++	{ .compatible = "fsl,1s1043a-msi", }, /* a typo */
++	{ .compatible = "fsl,ls1021a-msi", },
++	{ .compatible = "fsl,ls1043a-msi", },
+ 	{},
+ };
+ 
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.9.1
