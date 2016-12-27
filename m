@@ -1,71 +1,220 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Tue, 27 Dec 2016 13:21:42 -0600
-Subject: [PATCH 2/4] ARM: dts: Add am335x-boneblack-wireless
-In-Reply-To: <20161227185645.GZ4920@atomide.com>
-References: <20161227175837.28970-1-robertcnelson@gmail.com>
- <20161227175837.28970-2-robertcnelson@gmail.com>
- <CAOCHtYjx+KD3iy1cssjCLN0xjXBGJFZ_e1Qw2zRGbV4=X0+bHg@mail.gmail.com>
- <20161227181429.GY4920@atomide.com> <20161227185645.GZ4920@atomide.com>
-Message-ID: <CAOCHtYgqvkqZ3ag1EgCj29EB5C58Rf8Mfhp8h_1ECc7G5wZwJA@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 27 Dec 2016 22:36:50 +0100
+Subject: [PATCH v3] ARM64: dts: marvell: Correct license text
+Message-ID: <20161227213650.16329-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2016 at 12:56 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Tony Lindgren <tony@atomide.com> [161227 10:15]:
->> * Robert Nelson <robertcnelson@gmail.com> [161227 10:02]:
->> > On Tue, Dec 27, 2016 at 11:58 AM, Robert Nelson <robertcnelson@gmail.com> wrote:
->> > > BeagleBone Black Wireless is clone of the BeagleBone Black (BBB) with the Ethernet
->> > > replaced by a TI wl1835 wireless module.
->> > >
->> > > This board can be indentified by the BWAx value after A335BNLT (BBB) in the at24 eeprom:
->> > > BWAx [aa 55 33 ee 41 33 33 35  42 4e 4c 54 42 57 41 35  |.U3.A335BNLTBWA5|]
->> > >
->> > > http://beagleboard.org/black-wireless
->> > > https://github.com/beagleboard/beaglebone-black-wireless
->> > >
->> > > firmware: https://github.com/beagleboard/beaglebone-black-wireless/tree/master/firmware
->> >
->> > Tony, this firmware should be there shortly, i have a pull request
->> > setup for Jason:
->> >
->> > https://github.com/beagleboard/beaglebone-black-wireless/pull/5
->>
->> OK great, good to have these working out of the box with mainline
->> kernel :)
->
-> Hmm so is this firmware file also something that should really be generated
-> separately for each board? Or can the same one be used for all BBB black
-> wireless and green boards?
->
-> See the LKML thread "[PATCH 0/6] wl1251: Fix MAC address for Nokia N900",
-> at least with wl1251 the calibration has been done for each n900 device
-> during production.
+The license text has been mangled at some point then copy pasted across
+multiple files. Restore it to what it should be.
+Note that this is not intended as a license change.
 
->From what i can tell from TI, it should be good for all wl1835 modules
-that use two wifi antenna's.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+Changes in v3:
+ - Rebased on v4.10-rc1 to fix espressobin
 
-(that's the magic in: WL1835MOD_INI_C2PC.ini)
+ arch/arm64/boot/dts/marvell/armada-371x.dtsi            | 10 +++++-----
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts          | 10 +++++-----
+ arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 10 +++++-----
+ arch/arm64/boot/dts/marvell/armada-372x.dtsi            | 10 +++++-----
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi            | 10 +++++-----
+ 5 files changed, 25 insertions(+), 25 deletions(-)
 
-We are using the same wl18xx-conf.bin firmware for:
-
-Original CircuitCo (now out of production) wl1835mod cape for BeagleBone Black
-updated GateWay Cape from embest (this was meant to replace the wl1835mod cape)
-
-SeeedStudio BeagleBone Green Wireless
-BeagleBone Black Wireless
-
-and the upcoming: (jason just sent me the next alpha, so i'll have a
-patch after i verify all changes..)
-BeagleBone Blue
-
-For FCC testing, this was the same firmware (wl18xx-conf.bin) that
-SeeedStudio used when they did the official FCC testing on the Green
-Wireless.  I believe GHI Electronics did the same with the BeagleBone
-Black Wireless, but i wasn't CC'ed in that email conversation, so i
-can't say with 100% certainty..
-
-Regards,
-
+diff --git a/arch/arm64/boot/dts/marvell/armada-371x.dtsi b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
+index c9e5325b8ac3..11226f7b9ed9 100644
+--- a/arch/arm64/boot/dts/marvell/armada-371x.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
+@@ -16,17 +16,17 @@
+  *     published by the Free Software Foundation; either version 2 of the
+  *     License, or (at your option) any later version.
+  *
+- *     This file is distributed in the hope that it will be useful
++ *     This file is distributed in the hope that it will be useful,
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+  *
+- * Or, alternatively
++ * Or, alternatively,
+  *
+  *  b) Permission is hereby granted, free of charge, to any person
+  *     obtaining a copy of this software and associated documentation
+  *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use
++ *     restriction, including without limitation the rights to use,
+  *     copy, modify, merge, publish, distribute, sublicense, and/or
+  *     sell copies of the Software, and to permit persons to whom the
+  *     Software is furnished to do so, subject to the following
+@@ -35,11 +35,11 @@
+  *     The above copyright notice and this permission notice shall be
+  *     included in all copies or substantial portions of the Software.
+  *
+- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+index 89de0a751093..f5f4c94f7070 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+@@ -15,17 +15,17 @@
+  *     published by the Free Software Foundation; either version 2 of the
+  *     License, or (at your option) any later version.
+  *
+- *     This file is distributed in the hope that it will be useful
++ *     This file is distributed in the hope that it will be useful,
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+  *
+- * Or, alternatively
++ * Or, alternatively,
+  *
+  *  b) Permission is hereby granted, free of charge, to any person
+  *     obtaining a copy of this software and associated documentation
+  *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use
++ *     restriction, including without limitation the rights to use,
+  *     copy, modify, merge, publish, distribute, sublicense, and/or
+  *     sell copies of the Software, and to permit persons to whom the
+  *     Software is furnished to do so, subject to the following
+@@ -34,11 +34,11 @@
+  *     The above copyright notice and this permission notice shall be
+  *     included in all copies or substantial portions of the Software.
+  *
+- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+index 83178d909fc2..d26139ad8331 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+@@ -14,17 +14,17 @@
+  *     published by the Free Software Foundation; either version 2 of the
+  *     License, or (at your option) any later version.
+  *
+- *     This file is distributed in the hope that it will be useful
++ *     This file is distributed in the hope that it will be useful,
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+  *
+- * Or, alternatively
++ * Or, alternatively,
+  *
+  *  b) Permission is hereby granted, free of charge, to any person
+  *     obtaining a copy of this software and associated documentation
+  *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use
++ *     restriction, including without limitation the rights to use,
+  *     copy, modify, merge, publish, distribute, sublicense, and/or
+  *     sell copies of the Software, and to permit persons to whom the
+  *     Software is furnished to do so, subject to the following
+@@ -33,11 +33,11 @@
+  *     The above copyright notice and this permission notice shall be
+  *     included in all copies or substantial portions of the Software.
+  *
+- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
+diff --git a/arch/arm64/boot/dts/marvell/armada-372x.dtsi b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
+index 5120296596c2..59d7557d3b1b 100644
+--- a/arch/arm64/boot/dts/marvell/armada-372x.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
+@@ -16,17 +16,17 @@
+  *     published by the Free Software Foundation; either version 2 of the
+  *     License, or (at your option) any later version.
+  *
+- *     This file is distributed in the hope that it will be useful
++ *     This file is distributed in the hope that it will be useful,
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+  *
+- * Or, alternatively
++ * Or, alternatively,
+  *
+  *  b) Permission is hereby granted, free of charge, to any person
+  *     obtaining a copy of this software and associated documentation
+  *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use
++ *     restriction, including without limitation the rights to use,
+  *     copy, modify, merge, publish, distribute, sublicense, and/or
+  *     sell copies of the Software, and to permit persons to whom the
+  *     Software is furnished to do so, subject to the following
+@@ -35,11 +35,11 @@
+  *     The above copyright notice and this permission notice shall be
+  *     included in all copies or substantial portions of the Software.
+  *
+- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index bab5c6ff5745..a02e9bcd190e 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -15,17 +15,17 @@
+  *     published by the Free Software Foundation; either version 2 of the
+  *     License, or (at your option) any later version.
+  *
+- *     This file is distributed in the hope that it will be useful
++ *     This file is distributed in the hope that it will be useful,
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+  *
+- * Or, alternatively
++ * Or, alternatively,
+  *
+  *  b) Permission is hereby granted, free of charge, to any person
+  *     obtaining a copy of this software and associated documentation
+  *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use
++ *     restriction, including without limitation the rights to use,
+  *     copy, modify, merge, publish, distribute, sublicense, and/or
+  *     sell copies of the Software, and to permit persons to whom the
+  *     Software is furnished to do so, subject to the following
+@@ -34,11 +34,11 @@
+  *     The above copyright notice and this permission notice shall be
+  *     included in all copies or substantial portions of the Software.
+  *
+- *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+  *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
 -- 
-Robert Nelson
-https://rcn-ee.com/
+2.11.0
