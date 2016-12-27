@@ -1,89 +1,54 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Tue, 27 Dec 2016 11:17:56 +0100
-Subject: [PATCH v4] mm: pmd dirty emulation in page fault handler
-In-Reply-To: <1482506098-6149-1-git-send-email-minchan@kernel.org>
-References: <1482506098-6149-1-git-send-email-minchan@kernel.org>
-Message-ID: <20161227101755.GD1308@dhcp22.suse.cz>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Tue, 27 Dec 2016 19:18:33 +0900
+Subject: [PATCH] PCI: exynos: refactor exynos pcie driver
+In-Reply-To: <58620B5A.1060900@samsung.com>
+References: <CGME20161223105411epcas1p3727f726e757ec6c6d7bff04a9af40077@epcas1p3.samsung.com>
+ <1482490587-13611-1-git-send-email-pankaj.dubey@samsung.com>
+ <e1f37a59-b633-7b9d-cc79-dbbb00a24cda@samsung.com>
+ <5860E6F7.2090703@samsung.com>
+ <79b89c49-a9de-3daa-9afa-b8f36304a226@samsung.com>
+ <5861CE23.9060202@samsung.com>
+ <6de4bc5b-05fb-793f-d3ab-b1c6ee19cfeb@samsung.com>
+ <58620B5A.1060900@samsung.com>
+Message-ID: <a4200793-19dd-3727-505c-5840a8ec72bb@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat 24-12-16 00:14:58, Minchan Kim wrote:
-> Andreas reported [1] made a test in jemalloc hang in THP mode in arm64.
-> http://lkml.kernel.org/r/mvmmvfy37g1.fsf at hawking.suse.de
-> 
-> The problem is currently page fault handler doesn't supports dirty bit
-> emulation of pmd for non-HW dirty-bit architecture so that application
-> stucks until VM marked the pmd dirty.
-> 
-> How the emulation work depends on the architecture. In case of arm64,
-> when it set up pte firstly, it sets pte PTE_RDONLY to get a chance to
-> mark the pte dirty via triggering page fault when store access happens.
-> Once the page fault occurs, VM marks the pmd dirty and arch code for
-> setting pmd will clear PTE_RDONLY for application to proceed.
-> 
-> IOW, if VM doesn't mark the pmd dirty, application hangs forever by
-> repeated fault(i.e., store op but the pmd is PTE_RDONLY).
-> 
-> This patch enables pmd dirty-bit emulation for those architectures.
+Dear Alim,
 
-Thanks for extending the patch description again!
-
-> [1] b8d3c4c3009d, mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called
+On 12/27/2016 03:34 PM, Alim Akhtar wrote:
+> Hi Jaehoon,
 > 
-> Cc: Jason Evans <je@fb.com>
-> Cc: Michal Hocko <mhocko@suse.com> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: linux-arch at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: <stable@vger.kernel.org> [4.5+]
-> Fixes: b8d3c4c3009d ("mm/huge_memory.c: don't split THP page when MADV_FREE syscall is called")
-> Reported-and-Tested-by: Andreas Schwab <schwab@suse.de>
-> Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-> Signed-off-by: Minchan Kim <minchan@kernel.org>
+[snip]
+>>
+>> Ah. Right..And i'm doing the refactoring to reuse the current pci-exynos.c.
+> There is a nice refactoring patch posted by Pankaj recently @
+> https://lkml.org/lkml/2016/12/23/73
+> I would suggest you to rebase your work on this top.
 
-Acked-by: Michal Hocko <mhocko@suse.com>
+Well, i don't think so. Pankaj's patch might be good way..but i can't agree about a few point.
+If based on Pankaj's patch, it's more complex..
 
-> ---
->   Merry Xmas!
-> 
-> * from v3
->   * Elaborate description
-> * from v2
->   * Add acked-by/tested-by
-> * from v1
->   * Remove __handle_mm_fault part - Kirill
->  mm/huge_memory.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/mm/huge_memory.c b/mm/huge_memory.c
-> index 10eedbf..29ec8a4 100644
-> --- a/mm/huge_memory.c
-> +++ b/mm/huge_memory.c
-> @@ -883,15 +883,17 @@ void huge_pmd_set_accessed(struct vm_fault *vmf, pmd_t orig_pmd)
->  {
->  	pmd_t entry;
->  	unsigned long haddr;
-> +	bool write = vmf->flags & FAULT_FLAG_WRITE;
->  
->  	vmf->ptl = pmd_lock(vmf->vma->vm_mm, vmf->pmd);
->  	if (unlikely(!pmd_same(*vmf->pmd, orig_pmd)))
->  		goto unlock;
->  
->  	entry = pmd_mkyoung(orig_pmd);
-> +	if (write)
-> +		entry = pmd_mkdirty(entry);
->  	haddr = vmf->address & HPAGE_PMD_MASK;
-> -	if (pmdp_set_access_flags(vmf->vma, haddr, vmf->pmd, entry,
-> -				vmf->flags & FAULT_FLAG_WRITE))
-> +	if (pmdp_set_access_flags(vmf->vma, haddr, vmf->pmd, entry, write))
->  		update_mmu_cache_pmd(vmf->vma, vmf->address, vmf->pmd);
->  
->  unlock:
-> -- 
-> 2.7.4
-> 
+why put the ops callback for getting clock and mem resource?
 
--- 
-Michal Hocko
-SUSE Labs
+If PHY generic framework is used, it's unnecessary. because it needs to get elbi and dbi resources.
+clock resources("pcie" and "pcie_bus") are general things.
+
+If Pankaj's patch is applied, also need to make the exynos5433_pcie_* callback functions?
+It doesn't make sense.
+
+I want to know maintainer's opinion..we can just touch a little for supporting All Exynos SoCs.
+
+Best Regards,
+Jaehoon Chung
+
+> 
+>> Maybe..Today or Tomorrow..I will send the patches..At that time, could you also check them?
+>> Any comments might be helpful to me! :)
+>>
+> Will wait for you patches :-)
+> 
+>> Best Regards,
+>> Jaehoon Chung
+>>
+[snip]
