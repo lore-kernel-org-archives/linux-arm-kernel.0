@@ -1,51 +1,67 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 27 Dec 2016 17:54:15 +0100
-Subject: [PATCH v2 06/11] net: mvpp2: simplify mvpp2_bm_bufs_add()
-In-Reply-To: <1482857660-16092-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1482857660-16092-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482857660-16092-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 27 Dec 2016 17:54:24 +0100
+Subject: [PATCH v2 03/16] net: mvpp2: add hw_version field in "struct mvpp2"
+In-Reply-To: <1482857677-16166-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1482857677-16166-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482857677-16166-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvpp2_bm_bufs_add() currently creates a fake cookie by calling
-mvpp2_bm_cookie_pool_set(), just to be able to call
-mvpp2_pool_refill(). But all what mvpp2_pool_refill() does is extract
-the pool ID from the cookie, and call mvpp2_bm_pool_put() with this ID.
+In preparation to the introduction for the support of PPv2.2 in the
+mvpp2 driver, this commit adds a hw_version field to the struct
+mvpp2, and uses the .data field of the DT match table to fill it in.
 
-Instead of doing this convoluted thing, just call mvpp2_bm_pool_put()
-directly, since we have the BM pool ID.
+Having the MVPP21 and MVPP22 definitions available will allow to start
+adding the necessary conditional code to support PPv2.2.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index bfa9f77..8174f40 100644
+index fd84923..bc359a9 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -3626,7 +3626,6 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
- {
- 	struct sk_buff *skb;
- 	int i, buf_size, total_size;
--	u32 bm;
- 	dma_addr_t phys_addr;
+@@ -25,6 +25,7 @@
+ #include <linux/of_mdio.h>
+ #include <linux/of_net.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/phy.h>
+ #include <linux/clk.h>
+ #include <linux/hrtimer.h>
+@@ -649,6 +650,9 @@ struct mvpp2 {
  
- 	buf_size = MVPP2_RX_BUF_SIZE(bm_pool->pkt_size);
-@@ -3640,13 +3639,12 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
- 		return 0;
- 	}
+ 	/* Tclk value */
+ 	u32 tclk;
++
++	/* HW version */
++	enum { MVPP21, MVPP22 } hw_version;
+ };
  
--	bm = mvpp2_bm_cookie_pool_set(0, bm_pool->id);
- 	for (i = 0; i < buf_num; i++) {
- 		skb = mvpp2_skb_alloc(port, bm_pool, &phys_addr, GFP_KERNEL);
- 		if (!skb)
- 			break;
+ struct mvpp2_pcpu_stats {
+@@ -6480,6 +6484,9 @@ static int mvpp2_probe(struct platform_device *pdev)
+ 	if (!priv)
+ 		return -ENOMEM;
  
--		mvpp2_pool_refill(port, bm, (u32)phys_addr, (u32)skb);
-+		mvpp2_bm_pool_put(port, bm_pool->id, (u32)phys_addr, (u32)skb);
- 	}
++	priv->hw_version =
++		(unsigned long)of_device_get_match_data(&pdev->dev);
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	priv->base = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(priv->base))
+@@ -6584,7 +6591,10 @@ static int mvpp2_remove(struct platform_device *pdev)
+ }
  
- 	/* Update BM driver with number of buffers added to pool */
+ static const struct of_device_id mvpp2_match[] = {
+-	{ .compatible = "marvell,armada-375-pp2" },
++	{
++		.compatible = "marvell,armada-375-pp2",
++		.data = (void *)MVPP21,
++	},
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, mvpp2_match);
 -- 
 2.7.4
