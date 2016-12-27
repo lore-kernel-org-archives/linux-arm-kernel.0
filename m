@@ -1,95 +1,49 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 27 Dec 2016 09:29:07 +0100
-Subject: [PATCH 0/9] Runtime PM for Exynos pin controller driver
-In-Reply-To: <CANAwSgRQuoriU923XT1B_0CVX2rzOR+8j2YHLMYRUu3gGySEBw@mail.gmail.com>
-References: <CGME20161223122513epcas1p394d93d72d2d32c8910aafd1f6cc6b5e2@epcas1p3.samsung.com>
- <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
- <CANAwSgRQuoriU923XT1B_0CVX2rzOR+8j2YHLMYRUu3gGySEBw@mail.gmail.com>
-Message-ID: <29869e29-8294-528e-fb95-e355a3844071@samsung.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Tue, 27 Dec 2016 16:57:45 +0800
+Subject: [PATCH] crypto: arm/aes-neonbs - process 8 blocks in parallel if
+ we can
+In-Reply-To: <1481291246-20216-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1481291246-20216-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20161227085745.GA10121@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anand,
+On Fri, Dec 09, 2016 at 01:47:26PM +0000, Ard Biesheuvel wrote:
+> The bit-sliced NEON implementation of AES only performs optimally if
+> it can process 8 blocks of input in parallel. This is due to the nature
+> of bit slicing, where the n-th bit of each byte of AES state of each input
+> block is collected into NEON register 'n', for registers q0 - q7.
+> 
+> This implies that the amount of work for the transform is fixed,
+> regardless of whether we are handling just one block or 8 in parallel.
+> 
+> So let's try a bit harder to iterate over the input in suitably sized
+> chunks, by increasing the chunksize to 8 * AES_BLOCK_SIZE, and tweaking
+> the loops to only process multiples of the chunk size, unless we are
+> handling the last chunk in the input stream.
+> 
+> Note that the skcipher walk API guarantees that a step in the walk never
+> returns less that 'chunksize' bytes if there are at least that many bytes
+> of input still available. However, it does *not* guarantee that those steps
+> produce an exact multiple of the chunk size.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
+I like this patch.  However, I had different plans for the chunksize
+attribute.  It's primarily meant to be a hint to the upper layer
+in case it does partial updates.  It's meant to provide the minimum
+number of bytes a partial update can carry without screwing up
+subsequent updates.
 
-On 2016-12-24 11:10, Anand Moon wrote:
-> Hi Marek
->
-> On 23 December 2016 at 17:54, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
->> Hello,
->>
->> This patchset is a next step to add support for audio power domain on
->> Exynos5 SoCs.
->>
->> Audio power domain on Exynos5 SoCs contains following hardware modules:
->> 1. clock controller
->> 2. pin controller
->> 3. PL330 DMA controller
->> 4. I2S audio controller
->>
->> Till now it was assumed that pin controller is located in the "always on"
->> power domain and lacked runtime power management. This patch finally
->> removes such assumption and adds runtime pm support and awareness to this
->> driver. To achieve this, some changes in the Exynos platform support code
->> were needed, like moving pad retention control to the pin controller driver.
->> Some cleanup to the pin controller driver has been also done while changing
->> the code. This new feature requires some additional information in the
->> device tree, what is handled by patches 1,2 and 9.
->>
->> Please note that patches are ordered in such a way that the changes can be
->> bisected, so the properties are added to dts before the code requiring them.
->>
->> The other patches related to enabling full support for audio power domain
->> can be found here:
->> 1. PL330 ADMA controller non-irqsafe runtime PM:
->>     https://www.spinics.net/lists/arm-kernel/msg550008.html
->> 2. Runtime PM for clock controllers (Exynos Audio subsystem will be added
->>     in v4 soon): https://www.spinics.net/lists/arm-kernel/msg538122.html
->>
->> Patches are based on linux-next from 2016.12.22.
->>
->> Best regards
->> Marek Szyprowski
->> Samsung R&D Institute Poland
->>
->>
->> Patch summary:
->>
->> Marek Szyprowski (9):
->>    ARM: dts: exynos: Add PMU syscon to pinctrl nodes
->>    ARM: dts: exynos: Add pinctrl sleep state for 542x i2s module
->>    pinctrl: samsung: Remove dead code
->>    pinctrl: samsung: Use generic of_device_get_match_data helper
->>    pinctrl: samsung: Move retention control from mach-exynos to the
->>      pinctrl driver
->>    pinctrl: samsung: Replace syscore ops with standard platform device
->>      pm_ops
->>    pinctrl: samsung: Add property to mark pad state as suitable for power
->>      down
->>    pinctrl: samsung: Add runtime PM support
->>    ARM: dts: exynos: Add audio power domain support to Exynos542x SoCs
->>
->>   .../bindings/pinctrl/samsung-pinctrl.txt           |  12 ++
->>   arch/arm/boot/dts/exynos3250.dtsi                  |   2 +
->>   arch/arm/boot/dts/exynos4210.dtsi                  |   3 +
->>   arch/arm/boot/dts/exynos4x12.dtsi                  |   3 +
->>   arch/arm/boot/dts/exynos5250.dtsi                  |   4 +
->>   arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |  11 ++
->>   arch/arm/boot/dts/exynos5420.dtsi                  |  18 ++-
->>   arch/arm/mach-exynos/suspend.c                     |  64 ---------
->>   drivers/pinctrl/samsung/pinctrl-exynos.c           | 148 +++++++++++++++++++++
->>   drivers/pinctrl/samsung/pinctrl-samsung.c          | 126 ++++++++----------
->>   drivers/pinctrl/samsung/pinctrl-samsung.h          |  15 +++
->>   11 files changed, 271 insertions(+), 135 deletions(-)
->>
-> Is their core configuration missing to enable audio through HDMI on
-> Odroid Boards.
-> I could not get the sound working on Odroid XU4.
+It just happens to be the same value that we were using during
+an skcipher walk.
 
-Audio support for HDMI on Exynos requires some additional code. We will take
-a look at this too.
+So I think for your case we should add a new attribute, perhaps
+walk_chunksize or walksize, which doesn't need to be exported to
+the outside at all and can then be used by the walk interface.
 
-Best regards
+Thanks,
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
