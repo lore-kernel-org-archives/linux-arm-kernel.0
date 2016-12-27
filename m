@@ -1,114 +1,95 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Tue, 27 Dec 2016 16:06:11 +0900
-Subject: [PATCH v3 3/3] ARM: DT: add power-off support to linkstation lsgl and
- kuroboxpro
-In-Reply-To: <20161227070611.14852-1-rogershimizu@gmail.com>
-References: <20161216100501.18173-1-rogershimizu@gmail.com>
- <20161227070611.14852-1-rogershimizu@gmail.com>
-Message-ID: <20161227070611.14852-4-rogershimizu@gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 27 Dec 2016 09:29:07 +0100
+Subject: [PATCH 0/9] Runtime PM for Exynos pin controller driver
+In-Reply-To: <CANAwSgRQuoriU923XT1B_0CVX2rzOR+8j2YHLMYRUu3gGySEBw@mail.gmail.com>
+References: <CGME20161223122513epcas1p394d93d72d2d32c8910aafd1f6cc6b5e2@epcas1p3.samsung.com>
+ <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
+ <CANAwSgRQuoriU923XT1B_0CVX2rzOR+8j2YHLMYRUu3gGySEBw@mail.gmail.com>
+Message-ID: <29869e29-8294-528e-fb95-e355a3844071@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A few models of Linkstation / KuroBox has micro-controller which
-controls the power (as well as FAN, but not related here), while
-others not. So remove the restart-poweroff driver in linkstation
-common dtsi file, and specify the proper power driver in dts
-of each device.
+Hi Anand,
 
-Devices need micro-controler to power-off:
-  - Linkstation LS-GL
-  - KuroBox Pro
-Device continues using original restart-poweroff driver:
-  - Linkstation LS-WTGL
 
-To: Jason Cooper <jason@lakedaemon.net>
-To: Andrew Lunn <andrew@lunn.ch>
-To: Gregory Clement <gregory.clement@free-electrons.com>
-To: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Ryan Tandy <ryan@nardis.ca>
-Cc: linux-pm at vger.kernel.org
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
+On 2016-12-24 11:10, Anand Moon wrote:
+> Hi Marek
+>
+> On 23 December 2016 at 17:54, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>> Hello,
+>>
+>> This patchset is a next step to add support for audio power domain on
+>> Exynos5 SoCs.
+>>
+>> Audio power domain on Exynos5 SoCs contains following hardware modules:
+>> 1. clock controller
+>> 2. pin controller
+>> 3. PL330 DMA controller
+>> 4. I2S audio controller
+>>
+>> Till now it was assumed that pin controller is located in the "always on"
+>> power domain and lacked runtime power management. This patch finally
+>> removes such assumption and adds runtime pm support and awareness to this
+>> driver. To achieve this, some changes in the Exynos platform support code
+>> were needed, like moving pad retention control to the pin controller driver.
+>> Some cleanup to the pin controller driver has been also done while changing
+>> the code. This new feature requires some additional information in the
+>> device tree, what is handled by patches 1,2 and 9.
+>>
+>> Please note that patches are ordered in such a way that the changes can be
+>> bisected, so the properties are added to dts before the code requiring them.
+>>
+>> The other patches related to enabling full support for audio power domain
+>> can be found here:
+>> 1. PL330 ADMA controller non-irqsafe runtime PM:
+>>     https://www.spinics.net/lists/arm-kernel/msg550008.html
+>> 2. Runtime PM for clock controllers (Exynos Audio subsystem will be added
+>>     in v4 soon): https://www.spinics.net/lists/arm-kernel/msg538122.html
+>>
+>> Patches are based on linux-next from 2016.12.22.
+>>
+>> Best regards
+>> Marek Szyprowski
+>> Samsung R&D Institute Poland
+>>
+>>
+>> Patch summary:
+>>
+>> Marek Szyprowski (9):
+>>    ARM: dts: exynos: Add PMU syscon to pinctrl nodes
+>>    ARM: dts: exynos: Add pinctrl sleep state for 542x i2s module
+>>    pinctrl: samsung: Remove dead code
+>>    pinctrl: samsung: Use generic of_device_get_match_data helper
+>>    pinctrl: samsung: Move retention control from mach-exynos to the
+>>      pinctrl driver
+>>    pinctrl: samsung: Replace syscore ops with standard platform device
+>>      pm_ops
+>>    pinctrl: samsung: Add property to mark pad state as suitable for power
+>>      down
+>>    pinctrl: samsung: Add runtime PM support
+>>    ARM: dts: exynos: Add audio power domain support to Exynos542x SoCs
+>>
+>>   .../bindings/pinctrl/samsung-pinctrl.txt           |  12 ++
+>>   arch/arm/boot/dts/exynos3250.dtsi                  |   2 +
+>>   arch/arm/boot/dts/exynos4210.dtsi                  |   3 +
+>>   arch/arm/boot/dts/exynos4x12.dtsi                  |   3 +
+>>   arch/arm/boot/dts/exynos5250.dtsi                  |   4 +
+>>   arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |  11 ++
+>>   arch/arm/boot/dts/exynos5420.dtsi                  |  18 ++-
+>>   arch/arm/mach-exynos/suspend.c                     |  64 ---------
+>>   drivers/pinctrl/samsung/pinctrl-exynos.c           | 148 +++++++++++++++++++++
+>>   drivers/pinctrl/samsung/pinctrl-samsung.c          | 126 ++++++++----------
+>>   drivers/pinctrl/samsung/pinctrl-samsung.h          |  15 +++
+>>   11 files changed, 271 insertions(+), 135 deletions(-)
+>>
+> Is their core configuration missing to enable audio through HDMI on
+> Odroid Boards.
+> I could not get the sound working on Odroid XU4.
 
-Reported-by: Ryan Tandy <ryan@nardis.ca>
-Tested-by: Ryan Tandy <ryan@nardis.ca>
-Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
----
- arch/arm/boot/dts/orion5x-kuroboxpro.dts         |  8 ++++++++
- arch/arm/boot/dts/orion5x-linkstation-lsgl.dts   | 10 ++++++++++
- arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts |  4 ++++
- arch/arm/boot/dts/orion5x-linkstation.dtsi       |  4 ----
- 4 files changed, 22 insertions(+), 4 deletions(-)
+Audio support for HDMI on Exynos requires some additional code. We will take
+a look at this too.
 
-diff --git a/arch/arm/boot/dts/orion5x-kuroboxpro.dts b/arch/arm/boot/dts/orion5x-kuroboxpro.dts
-index 1a672b098d0b..aba38d802bda 100644
---- a/arch/arm/boot/dts/orion5x-kuroboxpro.dts
-+++ b/arch/arm/boot/dts/orion5x-kuroboxpro.dts
-@@ -60,6 +60,14 @@
- 				 <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>,
- 				 <MBUS_ID(0x01, 0x0f) 0 0xf4000000 0x40000>,
- 				 <MBUS_ID(0x01, 0x1e) 0 0xfc000000 0x1000000>;
-+
-+		internal-regs {
-+			power_off {
-+				compatible = "linkstation,power-off";
-+				reg = <0x12100 0x100>;
-+				clocks = <&core_clk 0>;
-+			};
-+		};
- 	};
- 
- 	memory { /* 128 MB */
-diff --git a/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts b/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
-index 51dc734cd5b9..370fc17a6dd9 100644
---- a/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
-+++ b/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
-@@ -56,6 +56,16 @@
- 	model = "Buffalo Linkstation Pro/Live";
- 	compatible = "buffalo,lsgl", "marvell,orion5x-88f5182", "marvell,orion5x";
- 
-+	soc {
-+		internal-regs {
-+			power_off {
-+				compatible = "linkstation,power-off";
-+				reg = <0x12100 0x100>;
-+				clocks = <&core_clk 0>;
-+			};
-+		};
-+	};
-+
- 	memory { /* 128 MB */
- 		device_type = "memory";
- 		reg = <0x00000000 0x8000000>;
-diff --git a/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
-index 0eead400f427..571a71f5b7ad 100644
---- a/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
-+++ b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
-@@ -59,6 +59,10 @@
- 		reg = <0x00000000 0x4000000>;
- 	};
- 
-+	restart_poweroff {
-+		compatible = "restart-poweroff";
-+	};
-+
- 	gpio_keys {
- 		power-on-switch {
- 			gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
-diff --git a/arch/arm/boot/dts/orion5x-linkstation.dtsi b/arch/arm/boot/dts/orion5x-linkstation.dtsi
-index ed456ab35fd8..40770a8d4b36 100644
---- a/arch/arm/boot/dts/orion5x-linkstation.dtsi
-+++ b/arch/arm/boot/dts/orion5x-linkstation.dtsi
-@@ -57,10 +57,6 @@
- 				 <MBUS_ID(0x01, 0x0f) 0 0xf4000000 0x40000>;
- 	};
- 
--	restart_poweroff {
--		compatible = "restart-poweroff";
--	};
--
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
+Best regards
 -- 
-2.11.0
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
