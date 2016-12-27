@@ -1,47 +1,117 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 27 Dec 2016 18:06:33 +0800
-Subject: [PATCHv2] crypto: testmgr: Use heap buffer for acomp test input
-In-Reply-To: <1482352374-22750-1-git-send-email-labbott@redhat.com>
-References: <1482352374-22750-1-git-send-email-labbott@redhat.com>
-Message-ID: <20161227100633.GH10629@gondor.apana.org.au>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 27 Dec 2016 11:12:26 +0100
+Subject: [PATCH 5/9] pinctrl: samsung: Move retention control from
+ mach-exynos to the pinctrl driver
+In-Reply-To: <CA+Ln22HQPHF_Vj0kS834SH=4=hcNOpe_vL8P3fbS-jFhQLVyXA@mail.gmail.com>
+References: <CGME20161223122531epcas1p4b8fad6664dad3408acb7a1b9f140884a@epcas1p4.samsung.com>
+ <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
+ <1482495889-6201-6-git-send-email-m.szyprowski@samsung.com>
+ <CA+Ln22HQPHF_Vj0kS834SH=4=hcNOpe_vL8P3fbS-jFhQLVyXA@mail.gmail.com>
+Message-ID: <5d09e29f-5796-cce6-75d5-ed5a0145092f@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2016 at 12:32:54PM -0800, Laura Abbott wrote:
-> 
-> Christopher Covington reported a crash on aarch64 on recent Fedora
-> kernels:
-> 
-> kernel BUG at ./include/linux/scatterlist.h:140!
-> Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-> Modules linked in:
-> CPU: 2 PID: 752 Comm: cryptomgr_test Not tainted 4.9.0-11815-ge93b1cc #162
-> Hardware name: linux,dummy-virt (DT)
-> task: ffff80007c650080 task.stack: ffff800008910000
-> PC is at sg_init_one+0xa0/0xb8
-> LR is at sg_init_one+0x24/0xb8
-> ...
-> [<ffff000008398db8>] sg_init_one+0xa0/0xb8
-> [<ffff000008350a44>] test_acomp+0x10c/0x438
-> [<ffff000008350e20>] alg_test_comp+0xb0/0x118
-> [<ffff00000834f28c>] alg_test+0x17c/0x2f0
-> [<ffff00000834c6a4>] cryptomgr_test+0x44/0x50
-> [<ffff0000080dac70>] kthread+0xf8/0x128
-> [<ffff000008082ec0>] ret_from_fork+0x10/0x50
-> 
-> The test vectors used for input are part of the kernel image. These
-> inputs are passed as a buffer to sg_init_one which eventually blows up
-> with BUG_ON(!virt_addr_valid(buf)). On arm64, virt_addr_valid returns
-> false for the kernel image since virt_to_page will not return the
-> correct page. Fix this by copying the input vectors to heap buffer
-> before setting up the scatterlist.
-> 
-> Reported-by: Christopher Covington <cov@codeaurora.org>
-> Fixes: d7db7a882deb ("crypto: acomp - update testmgr with support for acomp")
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
+Hi Tomasz,
 
-Patch applied.  Thanks.
+
+On 2016-12-26 06:55, Tomasz Figa wrote:
+> 2016-12-23 21:24 GMT+09:00 Marek Szyprowski <m.szyprowski@samsung.com>:
+>> Pad retention control after suspend/resume cycle should be done from pin
+>> controller driver instead of PMU (power management unit) driver to avoid
+>> possible ordering and logical dependencies. Till now it worked fine only
+>> because PMU driver registered its sys_ops after pin controller.
+>>
+>> This patch moves pad retention control from PMU driver to Exynos pin
+>> controller driver. This is a preparation for adding new features to Exynos
+>> pin controller driver, like runtime power management and suspending
+>> individual pin controllers, which might be a part of some power domain.
+>>
+> It looks like this change will essentially break the compatibility
+> with DTBs that don't have the pmu syscon specified in pin controller
+> nodes.
+>
+> On the other hand, moving this code to where it actually belongs
+> really makes sense, so maybe we could just avoid the need of having
+> this property, by looking up the PMU manually, by hardcoded string or
+> so, if the proper property is not present?
+
+Well, once again the topic of mythical device tree compatibility appearch.
+
+There are imho following possibilities:
+
+1. https://patchwork.kernel.org/patch/9477963/ ("Explicitly mark Samsung
+    Exynos SoC bindings as unstable"), simply apply this approach and ignore
+    users, who don't update their device tree blobs (are there any??).
+
+2. Switch to syscon_regmap_lookup_by_compatible() lookup and hardcode PMU
+    compatible id for all Exynos SoCs in the pin control driver. Then maybe,
+    while unifying the code, switch other Exynos drivers to this approach
+    and remove PMU phandles from device tree to make the code a bit more
+    consistent across drivers and easier to understand.
+
+3. Mixed approach, which combines drawbacks of both approaches. Additional
+    dead code for handling mythical compatibility and harder to understand
+    relations between the drivers.
+
+
+> [...]
+>
+>> diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+>> index 1baf19eecabf..b7bd2e12a269 100644
+>> --- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+>> +++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+>> @@ -43,6 +43,10 @@ Required Properties:
+>>                  };
+>>          };
+>>
+>> +- samsung,pmu-syscon: Phandle to the PMU system controller, to let driver
+>> +  to control pad retention after system suspend/resume cycle (only for Exynos
+>> +  SoC series).
+>> +
+> Ah, here it is. I think adding relevant binding documentation at the
+> beginning of the series would make it much easier for reviewers to
+> understand the change.
+
+I already pointed that patches are ordered to make the changes 
+bisectable, what
+usually means that new properties are added first, before being required 
+by the
+drivers.
+
+>
+>>   - Pin banks as child nodes: Pin banks of the controller are represented by child
+>>     nodes of the controller node. Bank name is taken from name of the node. Each
+>>     bank node must contain following properties:
+> [...]
+>
+>> +static void exynos_retention_audio_off(struct samsung_pinctrl_drv_data *drvdata)
+>> +{
+>> +       if (!IS_ERR(pmu_regs))
+> nit: Negated conditions make the code more difficult to read. Also it
+> would be consistent with exynos_retention_off() to just bail out if
+> (IS_ERR(pmu_regs)).
+>
+>> +               regmap_write(pmu_regs, S5P_PAD_RET_MAUDIO_OPTION,
+>> +                            EXYNOS_WAKEUP_FROM_LOWPWR);
+>> +}
+> [...]
+>
+>> @@ -1139,15 +1146,15 @@ static void samsung_pinctrl_suspend_dev(
+>>
+>>          if (drvdata->suspend)
+>>                  drvdata->suspend(drvdata);
+>> +       if (drvdata->retention_on)
+>> +               drvdata->retention_on(drvdata);
+>> +
+> nit: Unnecessary blank line.
+>
+> Best regards,
+> Tomasz
+>
+>
+>
+
+Best regards
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
