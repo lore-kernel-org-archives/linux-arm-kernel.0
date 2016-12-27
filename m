@@ -1,51 +1,30 @@
 From: robertcnelson@gmail.com (Robert Nelson)
-Date: Tue, 27 Dec 2016 11:58:35 -0600
-Subject: [PATCH 2/4] ARM: dts: Add am335x-boneblack-wireless
+Date: Tue, 27 Dec 2016 11:58:36 -0600
+Subject: [PATCH 3/4] ARM: dts: Move most of am335x-bonegreen.dts to
+ am335x-bonegreen-common.dtsi
 In-Reply-To: <20161227175837.28970-1-robertcnelson@gmail.com>
 References: <20161227175837.28970-1-robertcnelson@gmail.com>
-Message-ID: <20161227175837.28970-2-robertcnelson@gmail.com>
+Message-ID: <20161227175837.28970-3-robertcnelson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BeagleBone Black Wireless is clone of the BeagleBone Black (BBB) with the Ethernet
-replaced by a TI wl1835 wireless module.
-
-This board can be indentified by the BWAx value after A335BNLT (BBB) in the at24 eeprom:
-BWAx [aa 55 33 ee 41 33 33 35  42 4e 4c 54 42 57 41 35  |.U3.A335BNLTBWA5|]
-
-http://beagleboard.org/black-wireless
-https://github.com/beagleboard/beaglebone-black-wireless
-
-firmware: https://github.com/beagleboard/beaglebone-black-wireless/tree/master/firmware
-wl18xx mac address: /proc/device-tree/ocp/ethernet at 4a100000/slave at 4a100200/mac-address
+This is going to be shared with the SeeedStudio BeagleBone Green Wireless
 
 Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
 CC: Tony Lindgren <tony@atomide.com>
 CC: Jason Kridner <jkridner@beagleboard.org>
 ---
- arch/arm/boot/dts/Makefile                      |   1 +
- arch/arm/boot/dts/am335x-boneblack-wireless.dts | 109 ++++++++++++++++++++++++
- 2 files changed, 110 insertions(+)
- create mode 100644 arch/arm/boot/dts/am335x-boneblack-wireless.dts
+ arch/arm/boot/dts/am335x-bonegreen-common.dtsi | 44 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/am335x-bonegreen.dts         | 38 +---------------------
+ 2 files changed, 45 insertions(+), 37 deletions(-)
+ create mode 100644 arch/arm/boot/dts/am335x-bonegreen-common.dtsi
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index cccdbcb557b6..9415a49bd11b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -563,6 +563,7 @@ dtb-$(CONFIG_SOC_AM33XX) += \
- 	am335x-base0033.dtb \
- 	am335x-bone.dtb \
- 	am335x-boneblack.dtb \
-+	am335x-boneblack-wireless.dtb \
- 	am335x-bonegreen.dtb \
- 	am335x-chiliboard.dtb \
- 	am335x-cm-t335.dtb \
-diff --git a/arch/arm/boot/dts/am335x-boneblack-wireless.dts b/arch/arm/boot/dts/am335x-boneblack-wireless.dts
+diff --git a/arch/arm/boot/dts/am335x-bonegreen-common.dtsi b/arch/arm/boot/dts/am335x-bonegreen-common.dtsi
 new file mode 100644
-index 000000000000..105bd10655f7
+index 000000000000..853e6d3a028d
 --- /dev/null
-+++ b/arch/arm/boot/dts/am335x-boneblack-wireless.dts
-@@ -0,0 +1,109 @@
++++ b/arch/arm/boot/dts/am335x-bonegreen-common.dtsi
+@@ -0,0 +1,44 @@
 +/*
 + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
 + *
@@ -53,107 +32,93 @@ index 000000000000..105bd10655f7
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
-+/dts-v1/;
 +
-+#include "am33xx.dtsi"
-+#include "am335x-bone-common.dtsi"
-+#include "am335x-boneblack-common.dtsi"
-+#include <dt-bindings/interrupt-controller/irq.h>
++&ldo3_reg {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-always-on;
++};
 +
-+/ {
-+	model = "TI AM335x BeagleBone Black Wireless";
-+	compatible = "ti,am335x-bone-black-wireless", "ti,am335x-bone-black", "ti,am335x-bone", "ti,am33xx";
++&mmc1 {
++	vmmc-supply = <&vmmcsd_fixed>;
++};
 +
-+	wlan_en_reg: fixedregulator at 2 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "wlan-en-regulator";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		startup-delay-us= <70000>;
-+
-+		/* WL_EN */
-+		gpio = <&gpio3 9 0>;
-+		enable-active-high;
-+	};
++&mmc2 {
++	vmmc-supply = <&vmmcsd_fixed>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&emmc_pins>;
++	bus-width = <8>;
++	status = "okay";
 +};
 +
 +&am33xx_pinmux {
-+	bt_pins: pinmux_bt_pins {
++	uart2_pins: uart2_pins {
 +		pinctrl-single,pins = <
-+			AM33XX_IOPAD(0x928, PIN_OUTPUT_PULLUP | MUX_MODE7)	/* gmii1_txd0.gpio0_28 - BT_EN */
-+		>;
-+	};
-+
-+	mmc3_pins: pinmux_mmc3_pins {
-+		pinctrl-single,pins = <
-+			AM33XX_IOPAD(0x93c, PIN_INPUT_PULLUP | MUX_MODE6 ) /* (L15) gmii1_rxd1.mmc2_clk */
-+			AM33XX_IOPAD(0x914, PIN_INPUT_PULLUP | MUX_MODE6 ) /* (J16) gmii1_txen.mmc2_cmd */
-+			AM33XX_IOPAD(0x918, PIN_INPUT_PULLUP | MUX_MODE5 ) /* (J17) gmii1_rxdv.mmc2_dat0 */
-+			AM33XX_IOPAD(0x91c, PIN_INPUT_PULLUP | MUX_MODE5 ) /* (J18) gmii1_txd3.mmc2_dat1 */
-+			AM33XX_IOPAD(0x920, PIN_INPUT_PULLUP | MUX_MODE5 ) /* (K15) gmii1_txd2.mmc2_dat2 */
-+			AM33XX_IOPAD(0x908, PIN_INPUT_PULLUP | MUX_MODE5 ) /* (H16) gmii1_col.mmc2_dat3 */
-+		>;
-+	};
-+
-+	uart3_pins: pinmux_uart3_pins {
-+		pinctrl-single,pins = <
-+			AM33XX_IOPAD(0x934, PIN_INPUT_PULLUP | MUX_MODE1)	/* gmii1_rxd3.uart3_rxd */
-+			AM33XX_IOPAD(0x938, PIN_OUTPUT_PULLDOWN | MUX_MODE1)	/* gmii1_rxd2.uart3_txd */
-+			AM33XX_IOPAD(0x948, PIN_INPUT | MUX_MODE3)		/* mdio_data.uart3_ctsn */
-+			AM33XX_IOPAD(0x94c, PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* mdio_clk.uart3_rtsn */
-+		>;
-+	};
-+
-+	wl18xx_pins: pinmux_wl18xx_pins {
-+		pinctrl-single,pins = <
-+			AM33XX_IOPAD(0x92c, PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* gmii1_txclk.gpio3_9 WL_EN */
-+			AM33XX_IOPAD(0x944, PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii1_refclk.gpio0_29 WL_IRQ */
-+			AM33XX_IOPAD(0x930, PIN_OUTPUT_PULLUP | MUX_MODE7)	/* gmii1_rxclk.gpio3_10 LS_BUF_EN */
++			AM33XX_IOPAD(0x950, PIN_INPUT | MUX_MODE1)	/* spi0_sclk.uart2_rxd */
++			AM33XX_IOPAD(0x954, PIN_OUTPUT | MUX_MODE1)	/* spi0_d0.uart2_txd */
 +		>;
 +	};
 +};
 +
-+&mac {
-+	status = "disabled";
-+};
-+
-+&mmc3 {
-+	dmas = <&edma_xbar 12 0 1
-+		&edma_xbar 13 0 2>;
-+	dma-names = "tx", "rx";
-+	status = "okay";
-+	vmmc-supply = <&wlan_en_reg>;
-+	bus-width = <4>;
-+	non-removable;
-+	cap-power-off-card;
-+	ti,needs-special-hs-handling;
-+	keep-power-in-suspend;
++&uart2 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc3_pins &wl18xx_pins>;
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	wlcore: wlcore at 2 {
-+		compatible = "ti,wl1835";
-+		reg = <2>;
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <29 IRQ_TYPE_EDGE_RISING>;
-+	};
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins &bt_pins>;
++	pinctrl-0 = <&uart2_pins>;
 +	status = "okay";
 +};
 +
-+&gpio3 {
-+	ls_buf_en {
-+		gpio-hog;
-+		gpios = <10 GPIO_ACTIVE_HIGH>;
-+		output-high;
-+		line-name = "LS_BUF_EN";
-+	};
++&rtc {
++	system-power-controller;
 +};
+diff --git a/arch/arm/boot/dts/am335x-bonegreen.dts b/arch/arm/boot/dts/am335x-bonegreen.dts
+index dce3c8657e04..a8b4d969ce2a 100644
+--- a/arch/arm/boot/dts/am335x-bonegreen.dts
++++ b/arch/arm/boot/dts/am335x-bonegreen.dts
+@@ -9,45 +9,9 @@
+ 
+ #include "am33xx.dtsi"
+ #include "am335x-bone-common.dtsi"
++#include "am335x-bonegreen-common.dtsi"
+ 
+ / {
+ 	model = "TI AM335x BeagleBone Green";
+ 	compatible = "ti,am335x-bone-green", "ti,am335x-bone-black", "ti,am335x-bone", "ti,am33xx";
+ };
+-
+-&ldo3_reg {
+-	regulator-min-microvolt = <1800000>;
+-	regulator-max-microvolt = <1800000>;
+-	regulator-always-on;
+-};
+-
+-&mmc1 {
+-	vmmc-supply = <&vmmcsd_fixed>;
+-};
+-
+-&mmc2 {
+-	vmmc-supply = <&vmmcsd_fixed>;
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&emmc_pins>;
+-	bus-width = <8>;
+-	status = "okay";
+-};
+-
+-&am33xx_pinmux {
+-	uart2_pins: uart2_pins {
+-		pinctrl-single,pins = <
+-			AM33XX_IOPAD(0x950, PIN_INPUT | MUX_MODE1)	/* spi0_sclk.uart2_rxd */
+-			AM33XX_IOPAD(0x954, PIN_OUTPUT | MUX_MODE1)	/* spi0_d0.uart2_txd */
+-		>;
+-	};
+-};
+-
+-&uart2 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&uart2_pins>;
+-	status = "okay";
+-};
+-
+-&rtc {
+-	system-power-controller;
+-};
 -- 
 2.11.0
