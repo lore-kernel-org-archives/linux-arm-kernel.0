@@ -1,23 +1,111 @@
-From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
-Date: Tue, 27 Dec 2016 16:41:15 +0200
-Subject: [PATCH v3 resend] i2c: designware: add reset interface
-In-Reply-To: <1482848560-3752-1-git-send-email-zhangfei.gao@linaro.org>
-References: <y> <1482848560-3752-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <2cc1faeb-1a1b-76e2-0b12-9918ac42861d@linux.intel.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 27 Dec 2016 17:33:31 +0200
+Subject: [PATCH 7/9] pinctrl: samsung: Add property to mark pad state as
+ suitable for power down
+In-Reply-To: <bd48fe32-5296-fc23-dbb8-d212292d76cd@samsung.com>
+References: <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20161223122538epcas5p29515ceff21963ab035b3b32878830ce2@epcas5p2.samsung.com>
+ <1482495889-6201-8-git-send-email-m.szyprowski@samsung.com>
+ <20161225191914.5bzl6fso36ozuum6@kozik-lap>
+ <bd48fe32-5296-fc23-dbb8-d212292d76cd@samsung.com>
+Message-ID: <20161227153331.jbh7ei6oh3obmnri@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/27/2016 04:22 PM, Zhangfei Gao wrote:
-> Some platforms like hi3660 need do reset first to allow accessing registers
->
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> Tested-by: Ramiro Oliveira <ramiro.oliveira@synopsys.com>
-> ---
-> rebase to 4.10-rc1
->
->  drivers/i2c/busses/i2c-designware-core.h    |  1 +
->  drivers/i2c/busses/i2c-designware-platdrv.c | 28 ++++++++++++++++++++++++----
->  2 files changed, 25 insertions(+), 4 deletions(-)
->
-Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
+On Tue, Dec 27, 2016 at 11:30:57AM +0100, Marek Szyprowski wrote:
+> Hi Krzysztof,
+> 
+> 
+> On 2016-12-25 20:19, Krzysztof Kozlowski wrote:
+> > On Fri, Dec 23, 2016 at 01:24:47PM +0100, Marek Szyprowski wrote:
+> > > Add support for special property "samsung,off-state", which indicates a special
+> > > state suitable for device's "sleep" state. Its pin values/properties should
+> > > match the configuration in power down mode. It indicates that pin controller
+> > > can notify runtime power management subsystem, that it is ready for runtime
+> > > suspend if its all pins are configured for such state. This in turn might
+> > > allow to turn respective power domain off to reduce power consumption.
+> > > 
+> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > ---
+> > >   Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt | 8 ++++++++
+> > >   drivers/pinctrl/samsung/pinctrl-samsung.c                     | 4 ++++
+> > >   drivers/pinctrl/samsung/pinctrl-samsung.h                     | 1 +
+> > >   3 files changed, 13 insertions(+)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+> > > index b7bd2e12a269..354eea0e7798 100644
+> > > --- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+> > > +++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+> > > @@ -105,6 +105,7 @@ Required Properties:
+> > >     - samsung,pin-drv: Drive strength configuration.
+> > >     - samsung,pin-pud-pdn: Pull up/down configuration in power down mode.
+> > >     - samsung,pin-drv-pdn: Drive strength configuration in power down mode.
+> > > +  - samsung,off-state: Mark this configuration as suitable for bank power off.
+> > >     The values specified by these config properties should be derived from the
+> > >     hardware manual and these values are programmed as-is into the pin
+> > > @@ -113,6 +114,13 @@ Required Properties:
+> > >     Note: A child should include atleast a pin function selection property or
+> > >     pin configuration property (one or more) or both.
+> > > +  Note: Special property "samsung,off-state" indicates that this state can
+> > > +  be used for device's "sleep" pins state. Its pin values/properties should
+> > > +  match the configuration in power down mode.
+> > Why power down values cannot be used for sleep state? Why you need
+> > separate pin control state? If pins values should match power down
+> > configuration, then they could just be added to default state, couldn't
+> > they?
+> 
+> Separate sleep state is needed because of the pin control bindings and
+> design.
+> 
+> A separate sleep state is required to let pin control client driver (in this
+> case
+> Exynos I2S driver) let to choose when it is okay to switch pads into sleep
+> state and I see no other way to achieve this.
+
+Maybe the pinctrl API should be extended for this? Doing this in DTS
+just for purpose of passing information between drivers (consumer and
+provider) looks odd.
+
+Anyway, you are proposing a new binding so please Cc devicetree mailing
+list and device tree maintainers.
+
+> > In the patch 2/9, existing configuration:
+> > 716         i2s0_bus: i2s0-bus {
+> > (...)
+> > 719                 samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
+> > 720                 samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+> > 721                 samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV1>;
+> > 722         };
+> > 
+> > additional configuration:
+> > +       i2s0_bus_slp: i2s0-bus-slp {
+> > +               samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
+> > +               samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+> > +               samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV1>;
+> > +               samsung,pin-con-pdn = <EXYNOS_PIN_PDN_INPUT>;
+> > +               samsung,pin-pud-pdn = <EXYNOS_PIN_PULL_NONE>;
+> > +               samsung,off-state;
+> > +       };
+> 
+> I agree that it would be possible to get rid of "samsung,off-state" property
+> and
+> just detect off state when func/pud pair matches power down func/pud.
+> 
+> > > It indicates that pin control
+> > > +  can notify runtime power management subsystem, that it is ready for runtime
+> > > +  suspend if its all pins are configured for such state. This in turn might
+> > > +  allow to turn respective power domain off to reduce power consumption.
+> > What do you mean by "notifying RPM subsystem"? Either this is
+> > description of hardware in certain mode (sleep state) or this is not
+> > device tree property.
+> 
+> Maybe I wrote the description with a view too limited to the kernel
+> operation
+> perspective, but if we remove the need to mark state as off, the above
+> description
+> will not be needed.
+
+But still it wouldn't be describing any hardware property, would it?
+
+Best regards,
+Krzysztof
