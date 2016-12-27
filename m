@@ -1,33 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 27 Dec 2016 10:14:30 -0800
-Subject: [PATCH 2/4] ARM: dts: Add am335x-boneblack-wireless
-In-Reply-To: <CAOCHtYjx+KD3iy1cssjCLN0xjXBGJFZ_e1Qw2zRGbV4=X0+bHg@mail.gmail.com>
-References: <20161227175837.28970-1-robertcnelson@gmail.com>
- <20161227175837.28970-2-robertcnelson@gmail.com>
- <CAOCHtYjx+KD3iy1cssjCLN0xjXBGJFZ_e1Qw2zRGbV4=X0+bHg@mail.gmail.com>
-Message-ID: <20161227181429.GY4920@atomide.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 27 Dec 2016 18:29:57 +0000
+Subject: [PATCH] irqchip: mxs: Enable SKIP_SET_WAKE and MASK_ON_SUSPEND
+Message-ID: <1482863397-11400-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Robert Nelson <robertcnelson@gmail.com> [161227 10:02]:
-> On Tue, Dec 27, 2016 at 11:58 AM, Robert Nelson <robertcnelson@gmail.com> wrote:
-> > BeagleBone Black Wireless is clone of the BeagleBone Black (BBB) with the Ethernet
-> > replaced by a TI wl1835 wireless module.
-> >
-> > This board can be indentified by the BWAx value after A335BNLT (BBB) in the at24 eeprom:
-> > BWAx [aa 55 33 ee 41 33 33 35  42 4e 4c 54 42 57 41 35  |.U3.A335BNLTBWA5|]
-> >
-> > http://beagleboard.org/black-wireless
-> > https://github.com/beagleboard/beaglebone-black-wireless
-> >
-> > firmware: https://github.com/beagleboard/beaglebone-black-wireless/tree/master/firmware
-> 
-> Tony, this firmware should be there shortly, i have a pull request
-> setup for Jason:
-> 
-> https://github.com/beagleboard/beaglebone-black-wireless/pull/5
+The ICOLL controller doesn't provide any facility to configure the
+wakeup sources. That's the reason why this implementation lacks
+the irq_set_wake implementation. But this prevent us from properly
+entering power management states like "suspend to idle".
 
-OK great, good to have these working out of the box with mainline
-kernel :)
+So enable the flags IRQCHIP_SKIP_SET_WAKE and
+IRQCHIP_MASK_ON_SUSPEND to let the irqchip core allows and handles
+the power management.
 
-Tony
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ drivers/irqchip/irq-mxs.c |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
+index 1730470..05fa9f7 100644
+--- a/drivers/irqchip/irq-mxs.c
++++ b/drivers/irqchip/irq-mxs.c
+@@ -131,12 +131,16 @@ static void asm9260_unmask_irq(struct irq_data *d)
+ 	.irq_ack = icoll_ack_irq,
+ 	.irq_mask = icoll_mask_irq,
+ 	.irq_unmask = icoll_unmask_irq,
++	.flags = IRQCHIP_MASK_ON_SUSPEND |
++		 IRQCHIP_SKIP_SET_WAKE,
+ };
+ 
+ static struct irq_chip asm9260_icoll_chip = {
+ 	.irq_ack = icoll_ack_irq,
+ 	.irq_mask = asm9260_mask_irq,
+ 	.irq_unmask = asm9260_unmask_irq,
++	.flags = IRQCHIP_MASK_ON_SUSPEND |
++		 IRQCHIP_SKIP_SET_WAKE,
+ };
+ 
+ asmlinkage void __exception_irq_entry icoll_handle_irq(struct pt_regs *regs)
+-- 
+1.7.9.5
