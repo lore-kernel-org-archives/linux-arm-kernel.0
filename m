@@ -1,63 +1,64 @@
 From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Tue, 27 Dec 2016 16:06:08 +0900
-Subject: [PATCH v3 0/3] make kurobox-pro be able to shutdown after device-tree
- migration
-In-Reply-To: <20161216100501.18173-1-rogershimizu@gmail.com>
+Date: Tue, 27 Dec 2016 16:06:10 +0900
+Subject: [PATCH v3 2/3] DT: bingdings: power: reset: add linkstation-reset doc
+In-Reply-To: <20161227070611.14852-1-rogershimizu@gmail.com>
 References: <20161216100501.18173-1-rogershimizu@gmail.com>
-Message-ID: <20161227070611.14852-1-rogershimizu@gmail.com>
+ <20161227070611.14852-1-rogershimizu@gmail.com>
+Message-ID: <20161227070611.14852-3-rogershimizu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kernel Maintainers,
+Add linkstation-reset doc to describe the newly added
+POWER_RESET_LINKSTATION driver, which controls magic command
+sending to UART1 to power-off Buffalo Linkstation / KuroBox
+and their variants.
 
-Kurobox-Pro (and variants) need more commands sending to UART1 to shutdown.
-So here I make this patch series to let current qnap-poweroff implementation
-be able to handle such case.
+To: Sebastian Reichel <sre@kernel.org>
+To: Rob Herring <robh+dt@kernel.org>
+To: Mark Rutland <mark.rutland@arm.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Ryan Tandy <ryan@nardis.ca>
+Cc: linux-pm at vger.kernel.org
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
 
-Here I give 3 patches, for 3 different kernel subsystems respectivelay:
-  - Patch 1/3: System reset/shutdown driver
-  - Patch 2/3: Open firmware and flattened device tree bindings
-  - Patch 3/3: ARM/Marvell Dove/MV78xx0/Orion SOC support
-
-Ryan Tandy, the issue reporter, and I have already tested those changes on
-Linkstation/KuroBoxPro devices, and confirmed it's working well.
-
-Merry Xmax and look forward to your feedback!
-
-Changes:
-  v0 => v1:
-  - Update 0003 to split kuroboxpro related code into kuroboxpro-common.c
-  v1 => v2:
-  - Split off linkstation/kuroboxpro related code to linkstation-reset.c
-    Because linkstation before kuroboxpro also need this driver to power
-    off properly. It's more proper to call it linkstation driver.
-  v2 => v3:
-  - Split off devicetree bindings doc into a separate patch.
-  - Add device-tree patch to make Linkstation LS-GL and KuroBox Pro to
-    use the newly created linkstation-reset driver.
-  - Remove the unused one-byte command sending case in linkstation-reset
-    driver.
-
-Cheers,
-Roger Shimizu, GMT +9 Tokyo
-PGP/GPG: 4096R/6C6ACD6417B3ACB1
-
-Roger Shimizu (3):
-  power: reset: add linkstation-reset driver
-  DT: bingdings: power: reset: add linkstation-reset doc
-  ARM: DT: add power-off support to linkstation lsgl and kuroboxpro
-
- .../bindings/power/reset/linkstation-reset.txt     |  26 ++
- arch/arm/boot/dts/orion5x-kuroboxpro.dts           |   8 +
- arch/arm/boot/dts/orion5x-linkstation-lsgl.dts     |  10 +
- arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts   |   4 +
- arch/arm/boot/dts/orion5x-linkstation.dtsi         |   4 -
- drivers/power/reset/Kconfig                        |  10 +
- drivers/power/reset/Makefile                       |   1 +
- drivers/power/reset/linkstation-reset.c            | 269 +++++++++++++++++++++
- 8 files changed, 328 insertions(+), 4 deletions(-)
+Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
+---
+ .../bindings/power/reset/linkstation-reset.txt     | 26 ++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/power/reset/linkstation-reset.txt
- create mode 100644 drivers/power/reset/linkstation-reset.c
 
+diff --git a/Documentation/devicetree/bindings/power/reset/linkstation-reset.txt b/Documentation/devicetree/bindings/power/reset/linkstation-reset.txt
+new file mode 100644
+index 000000000000..815e340318f3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/power/reset/linkstation-reset.txt
+@@ -0,0 +1,26 @@
++* Buffalo Linkstation Reset Driver
++
++Power of some Buffalo Linkstation or KuroBox Pro is managed by
++micro-controller, which connects to UART1. After being fed from UART1
++by a few magic numbers, the so-called power-off command,
++the micro-controller will turn power off the device.
++
++This is very similar to QNAP or Synology NAS devices, which is
++described in qnap-poweroff.txt, however the command is much simpler,
++only 1-byte long and without checksums.
++
++This driver adds a handler to pm_power_off which is called to turn the
++power off.
++
++Required Properties:
++- compatible: Should be "linkstation,power-off"
++- reg: Address and length of the register set for UART1
++- clocks: tclk clock
++
++Example:
++
++	reset {
++		compatible = "linkstation,power-off";
++		reg = <0x12100 0x100>;
++		clocks = <&core_clk 0>;
++	};
 -- 
 2.11.0
