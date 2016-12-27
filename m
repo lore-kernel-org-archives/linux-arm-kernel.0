@@ -1,54 +1,135 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Tue, 27 Dec 2016 19:18:33 +0900
-Subject: [PATCH] PCI: exynos: refactor exynos pcie driver
-In-Reply-To: <58620B5A.1060900@samsung.com>
-References: <CGME20161223105411epcas1p3727f726e757ec6c6d7bff04a9af40077@epcas1p3.samsung.com>
- <1482490587-13611-1-git-send-email-pankaj.dubey@samsung.com>
- <e1f37a59-b633-7b9d-cc79-dbbb00a24cda@samsung.com>
- <5860E6F7.2090703@samsung.com>
- <79b89c49-a9de-3daa-9afa-b8f36304a226@samsung.com>
- <5861CE23.9060202@samsung.com>
- <6de4bc5b-05fb-793f-d3ab-b1c6ee19cfeb@samsung.com>
- <58620B5A.1060900@samsung.com>
-Message-ID: <a4200793-19dd-3727-505c-5840a8ec72bb@samsung.com>
+From: manu@bidouilliste.com (Emmanuel Vadot)
+Date: Tue, 27 Dec 2016 11:22:38 +0100
+Subject: [PATCH] ARM: dts: sunxi: Use axp209.dtsi for Olinuxino Lime2
+Message-ID: <20161227102238.20110-1-manu@bidouilliste.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Alim,
+Use axp209.dtsi in sun7i-a20-olinuxino-lime2.dts and correct
+some regulators.
 
-On 12/27/2016 03:34 PM, Alim Akhtar wrote:
-> Hi Jaehoon,
-> 
-[snip]
->>
->> Ah. Right..And i'm doing the refactoring to reuse the current pci-exynos.c.
-> There is a nice refactoring patch posted by Pankaj recently @
-> https://lkml.org/lkml/2016/12/23/73
-> I would suggest you to rebase your work on this top.
+DCDC2 is used for vdd-cpu so it should never be bellow 1V and above 1.4V
+DCDC3 is used for VDD_INT so same as above.
+LD01 is used for the RTC, and should have a typical value of 1.3V
+LD02 is used for AVCC and should have a typical value of 3.0V
+LD03/4 are used for Port-E/Port-G Power pin, and the schematics recommands
+to set them to 2.8V as they can be used for CSI0/1.
 
-Well, i don't think so. Pankaj's patch might be good way..but i can't agree about a few point.
-If based on Pankaj's patch, it's more complex..
+Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
+---
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 90 ++++++++++++-------------
+ 1 file changed, 42 insertions(+), 48 deletions(-)
 
-why put the ops callback for getting clock and mem resource?
-
-If PHY generic framework is used, it's unnecessary. because it needs to get elbi and dbi resources.
-clock resources("pcie" and "pcie_bus") are general things.
-
-If Pankaj's patch is applied, also need to make the exynos5433_pcie_* callback functions?
-It doesn't make sense.
-
-I want to know maintainer's opinion..we can just touch a little for supporting All Exynos SoCs.
-
-Best Regards,
-Jaehoon Chung
-
-> 
->> Maybe..Today or Tomorrow..I will send the patches..At that time, could you also check them?
->> Any comments might be helpful to me! :)
->>
-> Will wait for you patches :-)
-> 
->> Best Regards,
->> Jaehoon Chung
->>
-[snip]
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+index d5c796c8d16f..5311dbce6fd9 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+@@ -112,57 +112,9 @@
+ 	status = "okay";
+ 
+ 	axp209: pmic at 34 {
+-		compatible = "x-powers,axp209";
+ 		reg = <0x34>;
+ 		interrupt-parent = <&nmi_intc>;
+ 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+-
+-		interrupt-controller;
+-		#interrupt-cells = <1>;
+-
+-		acin-supply = <&reg_axp_ipsout>;
+-		vin2-supply = <&reg_axp_ipsout>;
+-		vin3-supply = <&reg_axp_ipsout>;
+-		ldo24in-supply = <&reg_axp_ipsout>;
+-		ldo3in-supply = <&reg_axp_ipsout>;
+-
+-		regulators {
+-			vdd_rtc: ldo1 {
+-				regulator-min-microvolt = <1300000>;
+-				regulator-max-microvolt = <1300000>;
+-				regulator-always-on;
+-			};
+-
+-			avcc: ldo2 {
+-				regulator-min-microvolt = <1800000>;
+-				regulator-max-microvolt = <3300000>;
+-				regulator-always-on;
+-			};
+-
+-			vcc_csi0: ldo3 {
+-				regulator-min-microvolt = <700000>;
+-				regulator-max-microvolt = <3500000>;
+-				regulator-always-on;
+-			};
+-
+-			vcc_csi1: ldo4 {
+-				regulator-min-microvolt = <1250000>;
+-				regulator-max-microvolt = <3300000>;
+-				regulator-always-on;
+-			};
+-
+-			vdd_cpu: dcdc2 {
+-				regulator-min-microvolt = <700000>;
+-				regulator-max-microvolt = <2275000>;
+-				regulator-always-on;
+-			};
+-
+-			vdd_int: dcdc3 {
+-				regulator-min-microvolt = <700000>;
+-				regulator-max-microvolt = <3500000>;
+-				regulator-always-on;
+-			};
+-		};
+ 	};
+ };
+ 
+@@ -243,6 +195,48 @@
+ 	status = "okay";
+ };
+ 
++#include "axp209.dtsi"
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-dll";
++};
++
++&reg_ldo1 {
++	regulator-always-on;
++	regulator-min-microvolt = <1300000>;
++	regulator-max-microvolt = <1300000>;
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
++
++&reg_ldo3 {
++	regulator-min-microvolt = <2800000>;
++	regulator-max-microvolt = <2800000>;
++	regulator-name = "vddio-csi0";
++};
++
++&reg_ldo4 {
++	regulator-min-microvolt = <2800000>;
++	regulator-max-microvolt = <2800000>;
++	regulator-name = "vddio-csi1";
++};
++
+ &reg_usb0_vbus {
+ 	pinctrl-0 = <&usb0_vbus_pin_lime2>;
+ 	gpio = <&pio 2 17 GPIO_ACTIVE_HIGH>;
+-- 
+2.11.0
