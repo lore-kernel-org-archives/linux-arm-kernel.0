@@ -1,44 +1,53 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 27 Dec 2016 18:29:57 +0000
-Subject: [PATCH] irqchip: mxs: Enable SKIP_SET_WAKE and MASK_ON_SUSPEND
-Message-ID: <1482863397-11400-1-git-send-email-stefan.wahren@i2se.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 27 Dec 2016 18:35:46 +0000
+Subject: [PATCH] crypto: arm/aes-neonbs - process 8 blocks in parallel if
+ we can
+In-Reply-To: <20161227085745.GA10121@gondor.apana.org.au>
+References: <1481291246-20216-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20161227085745.GA10121@gondor.apana.org.au>
+Message-ID: <CAKv+Gu8OkOR3Xzx=XEOWyFpo6sLiq=WQrq0SauaY0V57uYetCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ICOLL controller doesn't provide any facility to configure the
-wakeup sources. That's the reason why this implementation lacks
-the irq_set_wake implementation. But this prevent us from properly
-entering power management states like "suspend to idle".
+On 27 December 2016 at 08:57, Herbert Xu <herbert@gondor.apana.org.au> wrote:
+> On Fri, Dec 09, 2016 at 01:47:26PM +0000, Ard Biesheuvel wrote:
+>> The bit-sliced NEON implementation of AES only performs optimally if
+>> it can process 8 blocks of input in parallel. This is due to the nature
+>> of bit slicing, where the n-th bit of each byte of AES state of each input
+>> block is collected into NEON register 'n', for registers q0 - q7.
+>>
+>> This implies that the amount of work for the transform is fixed,
+>> regardless of whether we are handling just one block or 8 in parallel.
+>>
+>> So let's try a bit harder to iterate over the input in suitably sized
+>> chunks, by increasing the chunksize to 8 * AES_BLOCK_SIZE, and tweaking
+>> the loops to only process multiples of the chunk size, unless we are
+>> handling the last chunk in the input stream.
+>>
+>> Note that the skcipher walk API guarantees that a step in the walk never
+>> returns less that 'chunksize' bytes if there are at least that many bytes
+>> of input still available. However, it does *not* guarantee that those steps
+>> produce an exact multiple of the chunk size.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+> I like this patch.  However, I had different plans for the chunksize
+> attribute.  It's primarily meant to be a hint to the upper layer
+> in case it does partial updates.  It's meant to provide the minimum
+> number of bytes a partial update can carry without screwing up
+> subsequent updates.
+>
+> It just happens to be the same value that we were using during
+> an skcipher walk.
+>
+> So I think for your case we should add a new attribute, perhaps
+> walk_chunksize or walksize, which doesn't need to be exported to
+> the outside at all and can then be used by the walk interface.
+>
 
-So enable the flags IRQCHIP_SKIP_SET_WAKE and
-IRQCHIP_MASK_ON_SUSPEND to let the irqchip core allows and handles
-the power management.
+OK, I will try to hack something up.
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- drivers/irqchip/irq-mxs.c |    4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
-index 1730470..05fa9f7 100644
---- a/drivers/irqchip/irq-mxs.c
-+++ b/drivers/irqchip/irq-mxs.c
-@@ -131,12 +131,16 @@ static void asm9260_unmask_irq(struct irq_data *d)
- 	.irq_ack = icoll_ack_irq,
- 	.irq_mask = icoll_mask_irq,
- 	.irq_unmask = icoll_unmask_irq,
-+	.flags = IRQCHIP_MASK_ON_SUSPEND |
-+		 IRQCHIP_SKIP_SET_WAKE,
- };
- 
- static struct irq_chip asm9260_icoll_chip = {
- 	.irq_ack = icoll_ack_irq,
- 	.irq_mask = asm9260_mask_irq,
- 	.irq_unmask = asm9260_unmask_irq,
-+	.flags = IRQCHIP_MASK_ON_SUSPEND |
-+		 IRQCHIP_SKIP_SET_WAKE,
- };
- 
- asmlinkage void __exception_irq_entry icoll_handle_irq(struct pt_regs *regs)
--- 
-1.7.9.5
+One thing to keep in mind though is that stacked chaining modes should
+present the data with the same granularity for optimal performance.
+E.g., xts(ecb(aes)) should pass 8 blocks at a time. How should this
+requirement be incorporated according to you?
