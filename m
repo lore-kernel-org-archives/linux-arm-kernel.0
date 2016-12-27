@@ -1,46 +1,53 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 27 Dec 2016 17:54:10 +0100
-Subject: [PATCH v2 01/11] net: mvpp2: handle too large value handling in
- mvpp2_rx_pkts_coal_set()
-In-Reply-To: <1482857660-16092-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1482857660-16092-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482857660-16092-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 27 Dec 2016 17:54:09 +0100
+Subject: [PATCH v2 00/11] net: mvpp2: misc improvements and preparation patches
+Message-ID: <1482857660-16092-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, mvpp2_rx_pkts_coal_set() does the following to avoid setting
-a too large value for the RX coalescing by packet number:
+Hello,
 
-  val = (pkts & MVPP2_OCCUPIED_THRESH_MASK);
+This series contains a number of misc improvements and preparation
+patches for an upcoming series that adds support for the new PPv2.2
+network controller to the mvpp2 driver.
 
-This means that if you set a value that is slightly higher the the
-maximum number of packets, you in fact get a very low value. It makes a
-lot more sense to simply check if the value is too high, and if it's too
-high, limit it to the maximum possible value.
+The most significant improvements are:
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/net/ethernet/marvell/mvpp2.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ - Switching to using build_skb(), which is necessary for the upcoming
+   PPv2.2 support, but anyway a good improvement to the current mvpp2
+   driver (supporting PPv2.1).
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 4fe430c..02d91e4 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -4381,11 +4381,11 @@ static void mvpp2_txp_max_tx_size_set(struct mvpp2_port *port)
- static void mvpp2_rx_pkts_coal_set(struct mvpp2_port *port,
- 				   struct mvpp2_rx_queue *rxq, u32 pkts)
- {
--	u32 val;
-+	if (pkts > MVPP2_OCCUPIED_THRESH_MASK)
-+		pkts = MVPP2_OCCUPIED_THRESH_MASK;
- 
--	val = (pkts & MVPP2_OCCUPIED_THRESH_MASK);
- 	mvpp2_write(port->priv, MVPP2_RXQ_NUM_REG, rxq->id);
--	mvpp2_write(port->priv, MVPP2_RXQ_THRESH_REG, val);
-+	mvpp2_write(port->priv, MVPP2_RXQ_THRESH_REG, pkts);
- 
- 	rxq->pkts_coal = pkts;
- }
+ - Making the driver build on 64-bit platforms.
+
+Changes since v1:
+
+ - This series is split as a separate series from the larger patch set
+   adding support for PPv2.2 in the mvpp2 driver, as requested by
+   David Miller.
+
+ - Rebased on top of v4.10-rc1.
+
+Thanks!
+
+Thomas
+
+Thomas Petazzoni (11):
+  net: mvpp2: handle too large value handling in
+    mvpp2_rx_pkts_coal_set()
+  net: mvpp2: handle too large value in mvpp2_rx_time_coal_set()
+  net: mvpp2: release reference to txq_cpu[] entry after unmapping
+  net: mvpp2: remove unused 'tx_skb' field of 'struct mvpp2_tx_queue'
+  net: mvpp2: drop useless fields in mvpp2_bm_pool and related code
+  net: mvpp2: simplify mvpp2_bm_bufs_add()
+  net: mvpp2: remove unused register definitions
+  net: mvpp2: fix indentation of MVPP2_EXT_GLOBAL_CTRL_DEFAULT
+  net: mvpp2: simplify MVPP2_PRS_RI_* definitions
+  net: mvpp2: switch to build_skb() in the RX path
+  net: mvpp2: enable building on 64-bit platforms
+
+ drivers/net/ethernet/marvell/Kconfig |   3 +-
+ drivers/net/ethernet/marvell/mvpp2.c | 161 ++++++++++++++++++++---------------
+ 2 files changed, 93 insertions(+), 71 deletions(-)
+
 -- 
 2.7.4
