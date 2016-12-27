@@ -1,73 +1,74 @@
-From: Minghuan.Lian@nxp.com (Minghuan Lian)
-Date: Tue, 27 Dec 2016 17:13:02 +0800
-Subject: [PATCH 6/9] arm64: dts: ls1046a: add MSI dts node
-In-Reply-To: <1482829985-24421-1-git-send-email-Minghuan.Lian@nxp.com>
-References: <1482829985-24421-1-git-send-email-Minghuan.Lian@nxp.com>
-Message-ID: <1482829985-24421-6-git-send-email-Minghuan.Lian@nxp.com>
+From: ping.bai@nxp.com (Bai Ping)
+Date: Tue, 27 Dec 2016 17:47:38 +0800
+Subject: [PATCH v2 00/12] Add basic code support for imx6sll 
+Message-ID: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LS1046a includes 3 MSI controllers.
-Each controller supports 128 interrupts.
+The i.MX 6SoloLiteLite application processors are NXP's
+latest additions to a growing family of multimedia-focused
+products offering high-performance processing optimized for
+lowest power consumption. The i.MX 6SoloLiteLite processors
+feature NXP's advanced implementation of the ARM Cortex-A9 core,
+which can be interfaced with LPDDR3 and LPDDR2 DRAM memory devices.
 
-Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
----
- .../interrupt-controller/fsl,ls-scfg-msi.txt       |  1 +
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     | 31 ++++++++++++++++++++++
- 2 files changed, 32 insertions(+)
+i.MX6SLL is a new SOC of the i.MX6 family, shares many common modules,
+so most of the MSL code can be resued from i.MX6 serious SOC.
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
-index 2755cd1..54597b0 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
-@@ -6,6 +6,7 @@ Required properties:
- 	      Layerscape PCIe MSI controller block such as:
-               "fsl,ls1021a-msi"
-               "fsl,ls1043a-msi"
-+	      "fsl,ls1046a-msi"
- - msi-controller: indicates that this is a PCIe MSI controller node
- - reg: physical base address of the controller and length of memory mapped.
- - interrupts: an interrupt to the parent interrupt controller.
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index 38806ca..49dbafc 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -511,5 +511,36 @@
- 			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&clockgen 4 1>;
- 		};
-+
-+		msi1: msi-controller at 1580000 {
-+			compatible = "fsl,ls1046a-msi";
-+			msi-controller;
-+			reg = <0x0 0x1580000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
-+		msi2: msi-controller at 1590000 {
-+			compatible = "fsl,ls1046a-msi";
-+			msi-controller;
-+			reg = <0x0 0x1590000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
-+		msi3: msi-controller at 15a0000 {
-+			compatible = "fsl,ls1046a-msi";
-+			msi-controller;
-+			reg = <0x0 0x15a0000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
- 	};
- };
+
+change for V2:
+    -  address comments in dts and dtsi from Fabio.
+    -  split the doc update into two patch, fix typo.
+    -  address comments in clock driver, add necessary 'const'qualifier.
+
+Bai Ping (12):
+  ARM: imx: Add basic msl support for imx6sll
+  driver: clocksource: add gpt timer for imx6sll
+  Document: dt: binding: imx: update clock doc for imx6sll
+  driver: clk: imx: Add clock driver for imx6sll
+  Document: dt: binding: imx: update pinctrl doc for imx6sll
+  driver: pinctrl: imx: Add pinctrl driver support for imx6sll
+  ARM: dts: imx: Add basic dtsi for imx6sll
+  ARM: dts: imx: Add imx6sll EVK board dts support
+  ARM: debug: Add low level debug support for imx6sll
+  ARM: imx: Add suspend/resume support for imx6sll
+  ARM: imx: correct i.mx6sll dram io low power mode
+  ARM: configs: enable imx6sll support in defconfig
+
+ .../devicetree/bindings/clock/imx6sll-clock.txt    |  37 +
+ .../bindings/pinctrl/fsl,imx6sll-pinctrl.txt       |  37 +
+ arch/arm/Kconfig.debug                             |   9 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/imx6sll-evk.dts                  | 474 +++++++++++
+ arch/arm/boot/dts/imx6sll-pinfunc.h                | 882 +++++++++++++++++++++
+ arch/arm/boot/dts/imx6sll.dtsi                     | 843 ++++++++++++++++++++
+ arch/arm/configs/imx_v6_v7_defconfig               |   1 +
+ arch/arm/include/debug/imx-uart.h                  |  10 +
+ arch/arm/mach-imx/Kconfig                          |   8 +
+ arch/arm/mach-imx/Makefile                         |   1 +
+ arch/arm/mach-imx/cpu.c                            |   3 +
+ arch/arm/mach-imx/cpuidle-imx6sl.c                 |   7 +-
+ arch/arm/mach-imx/gpc.c                            |   8 +
+ arch/arm/mach-imx/mach-imx6sl.c                    |  10 +-
+ arch/arm/mach-imx/mxc.h                            |   6 +
+ arch/arm/mach-imx/pm-imx6.c                        |  49 +-
+ arch/arm/mach-imx/suspend-imx6.S                   |  29 +-
+ drivers/clk/imx/Makefile                           |   1 +
+ drivers/clk/imx/clk-imx6sll.c                      | 369 +++++++++
+ drivers/clocksource/timer-imx-gpt.c                |   1 +
+ drivers/pinctrl/freescale/Kconfig                  |   7 +
+ drivers/pinctrl/freescale/Makefile                 |   1 +
+ drivers/pinctrl/freescale/pinctrl-imx6sll.c        | 385 +++++++++
+ include/dt-bindings/clock/imx6sll-clock.h          | 204 +++++
+ 25 files changed, 3352 insertions(+), 32 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx6sll-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6sll-pinctrl.txt
+ create mode 100644 arch/arm/boot/dts/imx6sll-evk.dts
+ create mode 100644 arch/arm/boot/dts/imx6sll-pinfunc.h
+ create mode 100644 arch/arm/boot/dts/imx6sll.dtsi
+ create mode 100644 drivers/clk/imx/clk-imx6sll.c
+ create mode 100644 drivers/pinctrl/freescale/pinctrl-imx6sll.c
+ create mode 100644 include/dt-bindings/clock/imx6sll-clock.h
+
 -- 
 1.9.1
