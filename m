@@ -1,31 +1,66 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 27 Dec 2016 17:54:16 +0100
-Subject: [PATCH v2 07/11] net: mvpp2: remove unused register definitions
-In-Reply-To: <1482857660-16092-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1482857660-16092-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482857660-16092-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 27 Dec 2016 17:54:21 +0100
+Subject: [PATCH v2 00/16] net: mvpp2: add basic support for PPv2.2
+Message-ID: <1482857677-16166-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/net/ethernet/marvell/mvpp2.c | 4 ----
- 1 file changed, 4 deletions(-)
+Hello,
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 8174f40..edffcc1 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -253,10 +253,6 @@
- #define MVPP2_SRC_ADDR_HIGH			0x28
- #define MVPP2_PHY_AN_CFG0_REG			0x34
- #define     MVPP2_PHY_AN_STOP_SMI0_MASK		BIT(7)
--#define MVPP2_MIB_COUNTERS_BASE(port)		(0x1000 + ((port) >> 1) * \
--						0x400 + (port) * 0x400)
--#define     MVPP2_MIB_LATE_COLLISION		0x7c
--#define MVPP2_ISR_SUM_MASK_REG			0x220c
- #define MVPP2_MNG_EXTENDED_GLOBAL_CTRL_REG	0x305c
- #define MVPP2_EXT_GLOBAL_CTRL_DEFAULT		0x27
- 
+The goal of this patch series is to add basic support for PPv2.2 in
+the existing mvpp2 driver. mvpp2 currently supported the PPv2.1
+version of the IP, used in the 32 bits Marvell Armada 375 SoC. PPv2.2
+is an evolution of this IP block, used in the 64 bits Marvell Armada
+7K/8K SoCs.
+
+In order to ease the review, the introduction of PPv2.2 support has
+been made into multiple small commits, with the final commit adding
+the compatible string that makes the PPv2.2 support actually
+usable. The series remain fully bisectable.
+
+This series depends on the series named "net: mvpp2: misc improvements
+and preparation patches".
+
+I'd like to thank Stefan Chulski and Marcin Wojtas, who helped me a
+lot in the development of this patch series, by reviewing the patches,
+and giving lots of useful hints to debug the driver on PPv2.2. Thanks!
+
+Changes since v1:
+
+ - Made a separate series from the set of patches doing preparation
+   changes/fixes to the mvpp2 driver.
+
+ - Rebased on top of v4.10-rc1.
+
+ - Update Kconfig text of the mvpp2 driver to mention the support for
+   Armada 7K and 8K (PPv2.2).
+
+Best regards,
+
+Thomas
+
+Thomas Petazzoni (16):
+  dt-bindings: net: update Marvell PPv2 binding for PPv2.2 support
+  net: mvpp2: add and use accessors for TX/RX descriptors
+  net: mvpp2: add hw_version field in "struct mvpp2"
+  net: mvpp2: introduce an intermediate union for the TX/RX descriptors
+  net: mvpp2: introduce PPv2.2 HW descriptors and adapt accessors
+  net: mvpp2: adjust the allocation/free of BM pools for PPv2.2
+  net: mvpp2: adapt the mvpp2_rxq_*_pool_set functions to PPv2.2
+  net: mvpp2: adapt mvpp2_defaults_set() to PPv2.2
+  net: mvpp2: adjust mvpp2_{rxq,txq}_init for PPv2.2
+  net: mvpp2: handle register mapping and access for PPv2.2
+  net: mvpp2: handle misc PPv2.1/PPv2.2 differences
+  net: mvpp2: add AXI bridge initialization for PPv2.2
+  net: mvpp2: rework RXQ interrupt group initialization for PPv2.2
+  net: mvpp2: adapt rxq distribution to PPv2.2
+  net: mvpp2: add support for an additional clock needed for PPv2.2
+  net: mvpp2: finally add the PPv2.2 compatible string
+
+ .../devicetree/bindings/net/marvell-pp2.txt        |  66 +-
+ drivers/net/ethernet/marvell/Kconfig               |   4 +-
+ drivers/net/ethernet/marvell/mvpp2.c               | 783 +++++++++++++++++----
+ 3 files changed, 700 insertions(+), 153 deletions(-)
+
 -- 
 2.7.4
