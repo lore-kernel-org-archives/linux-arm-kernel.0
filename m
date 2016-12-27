@@ -1,31 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Dec 2016 14:01:53 +0100
-Subject: [PATCH v2 06/12] driver: pinctrl: imx: Add pinctrl driver support
- for imx6sll
-In-Reply-To: <1482832070-22668-7-git-send-email-ping.bai@nxp.com>
-References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
- <1482832070-22668-7-git-send-email-ping.bai@nxp.com>
-Message-ID: <CACRpkdZYH-X=SG7AfCOgKA9U0WL9941e-zo_tgUF74mdns2_7Q@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 27 Dec 2016 14:35:54 +0100
+Subject: [PATCH] PCI: exynos: refactor exynos pcie driver
+In-Reply-To: <1482490587-13611-1-git-send-email-pankaj.dubey@samsung.com>
+References: <CGME20161223105411epcas1p3727f726e757ec6c6d7bff04a9af40077@epcas1p3.samsung.com>
+ <1482490587-13611-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <3335251.c58Y1Zf7PB@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2016 at 10:47 AM, Bai Ping <ping.bai@nxp.com> wrote:
 
-> Add pinctrl driver support for imx6sll.
->
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
-(...)
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -514,6 +514,7 @@ config SOC_IMX6SL
->
->  config SOC_IMX6SLL
->         bool "i.MX6 SoloLiteLite support"
-> +       select PINCTRL_IMX6SLL
+Hi,
 
-This needs to be separate so I can merge the pure pin control patch
-to my tree.
+On Friday, December 23, 2016 04:26:27 PM Pankaj Dubey wrote:
+> From: Niyas Ahmed S T <niyas.ahmed@samsung.com>
+> 
+> Currently Exynos PCIe driver is only supported for Exynos5440 SoC.
+> This patch does refactoring of Exynos PCIe driver to extend support
+> for other Exynos SoC.
+> 
+> Following are the main changes done via this patch:
+> 1) It adds separate structs for memory, clock resources.
+> 2) It add exynos_pcie_ops struct which will allow us to support the
+> differences in resources in different Exynos SoC.
+> 
+> No functional change intended.
+> 
+> Signed-off-by: Niyas Ahmed S T <niyas.ahmed@samsung.com>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 
-Apart from that, look into using generic pinconf.
+I would also like to see the explanation for 1) (as already
+requested by Jingoo).  Otherwise it all looks fine to me:
 
-Yours,
-Linus Walleij
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
