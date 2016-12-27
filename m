@@ -1,140 +1,93 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 27 Dec 2016 17:54:20 +0100
-Subject: [PATCH v2 11/11] net: mvpp2: enable building on 64-bit platforms
-In-Reply-To: <1482857660-16092-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1482857660-16092-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482857660-16092-12-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 27 Dec 2016 17:54:30 +0100
+Subject: [PATCH v2 09/16] net: mvpp2: adjust mvpp2_{rxq,txq}_init for PPv2.2
+In-Reply-To: <1482857677-16166-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1482857677-16166-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482857677-16166-10-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvpp2 is going to be extended to support the Marvell Armada 7K/8K
-platform, which is ARM64. As a preparation to this work, this commit
-enables building the mvpp2 driver on ARM64, by:
-
- - Adjusting the Kconfig dependency
-
- - Fixing the types used in the driver so that they are 32/64-bits
-   compliant. We use dma_addr_t for DMA addresses, and unsigned long
-   for virtual addresses.
-
-It is worth mentioning that after this commit, the driver is for now
-still only used on 32-bits platforms.
+In PPv2.2, the MVPP2_RXQ_DESC_ADDR_REG and MVPP2_TXQ_DESC_ADDR_REG
+registers have a slightly different layout, because they need to contain
+a 64-bit address for the RX and TX descriptor arrays. This commit
+adjusts those functions accordingly.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/Kconfig |  3 +--
- drivers/net/ethernet/marvell/mvpp2.c | 29 +++++++++++++++++------------
- 2 files changed, 18 insertions(+), 14 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 26 +++++++++++++++++++++-----
+ 1 file changed, 21 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/net/ethernet/marvell/Kconfig b/drivers/net/ethernet/marvell/Kconfig
-index f4b7cf1..d2555e8b 100644
---- a/drivers/net/ethernet/marvell/Kconfig
-+++ b/drivers/net/ethernet/marvell/Kconfig
-@@ -83,9 +83,8 @@ config MVNETA_BM
- 
- config MVPP2
- 	tristate "Marvell Armada 375 network interface support"
--	depends on MACH_ARMADA_375 || COMPILE_TEST
-+	depends on ARCH_MVEBU || COMPILE_TEST
- 	depends on HAS_DMA
--	depends on !64BIT
- 	select MVMDIO
- 	---help---
- 	  This driver supports the network interface units in the
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 1e08e8f..2268808 100644
+index 23f2368..22f7970 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -3388,7 +3388,8 @@ static int mvpp2_bm_pool_create(struct platform_device *pdev,
- 	if (!bm_pool->virt_addr)
- 		return -ENOMEM;
- 
--	if (!IS_ALIGNED((u32)bm_pool->virt_addr, MVPP2_BM_POOL_PTR_ALIGN)) {
-+	if (!IS_ALIGNED((unsigned long)bm_pool->virt_addr,
-+			MVPP2_BM_POOL_PTR_ALIGN)) {
- 		dma_free_coherent(&pdev->dev, size_bytes, bm_pool->virt_addr,
- 				  bm_pool->phys_addr);
- 		dev_err(&pdev->dev, "BM pool %d is not %d bytes aligned\n",
-@@ -3433,7 +3434,7 @@ static void mvpp2_bm_bufs_free(struct device *dev, struct mvpp2 *priv,
- 
- 	for (i = 0; i < bm_pool->buf_num; i++) {
- 		dma_addr_t buf_phys_addr;
--		u32 vaddr;
-+		unsigned long vaddr;
- 
- 		/* Get buffer virtual address (indirect access) */
- 		buf_phys_addr = mvpp2_read(priv,
-@@ -3596,14 +3597,15 @@ static inline u32 mvpp2_bm_cookie_pool_set(u32 cookie, int pool)
- }
- 
- /* Get pool number from a BM cookie */
--static inline int mvpp2_bm_cookie_pool_get(u32 cookie)
-+static inline int mvpp2_bm_cookie_pool_get(unsigned long cookie)
+@@ -102,6 +102,7 @@
+ /* Descriptor Manager Top Registers */
+ #define MVPP2_RXQ_NUM_REG			0x2040
+ #define MVPP2_RXQ_DESC_ADDR_REG			0x2044
++#define     MVPP22_DESC_ADDR_OFFS		8
+ #define MVPP2_RXQ_DESC_SIZE_REG			0x2048
+ #define     MVPP2_RXQ_DESC_SIZE_MASK		0x3ff0
+ #define MVPP2_RXQ_STATUS_UPDATE_REG(rxq)	(0x3000 + 4 * (rxq))
+@@ -143,6 +144,7 @@
+ #define MVPP2_TXQ_RSVD_CLR_REG			0x20b8
+ #define     MVPP2_TXQ_RSVD_CLR_OFFSET		16
+ #define MVPP2_AGGR_TXQ_DESC_ADDR_REG(cpu)	(0x2100 + 4 * (cpu))
++#define     MVPP22_AGGR_TXQ_DESC_ADDR_OFFS	8
+ #define MVPP2_AGGR_TXQ_DESC_SIZE_REG(cpu)	(0x2140 + 4 * (cpu))
+ #define     MVPP2_AGGR_TXQ_DESC_SIZE_MASK	0x3ff0
+ #define MVPP2_AGGR_TXQ_STATUS_REG(cpu)		(0x2180 + 4 * (cpu))
+@@ -4769,6 +4771,8 @@ static int mvpp2_aggr_txq_init(struct platform_device *pdev,
+ 			       int desc_num, int cpu,
+ 			       struct mvpp2 *priv)
  {
- 	return (cookie >> MVPP2_BM_COOKIE_POOL_OFFS) & 0xFF;
- }
++	u32 txq_phys;
++
+ 	/* Allocate memory for TX descriptors */
+ 	aggr_txq->descs = dma_alloc_coherent(&pdev->dev,
+ 				desc_num * MVPP2_DESC_ALIGNED_SIZE,
+@@ -4782,10 +4786,16 @@ static int mvpp2_aggr_txq_init(struct platform_device *pdev,
+ 	aggr_txq->next_desc_to_proc = mvpp2_read(priv,
+ 						 MVPP2_AGGR_TXQ_INDEX_REG(cpu));
  
- /* Release buffer to BM */
- static inline void mvpp2_bm_pool_put(struct mvpp2_port *port, int pool,
--				     u32 buf_phys_addr, u32 buf_virt_addr)
-+				     dma_addr_t buf_phys_addr,
-+				     unsigned long buf_virt_addr)
- {
- 	mvpp2_write(port->priv, MVPP2_BM_VIRT_RLS_REG, buf_virt_addr);
- 	mvpp2_write(port->priv, MVPP2_BM_PHY_RLS_REG(pool), buf_phys_addr);
-@@ -3611,7 +3613,8 @@ static inline void mvpp2_bm_pool_put(struct mvpp2_port *port, int pool,
- 
- /* Release multicast buffer */
- static void mvpp2_bm_pool_mc_put(struct mvpp2_port *port, int pool,
--				 u32 buf_phys_addr, u32 buf_virt_addr,
-+				 dma_addr_t buf_phys_addr,
-+				 unsigned long buf_virt_addr,
- 				 int mc_id)
- {
- 	u32 val = 0;
-@@ -3626,7 +3629,8 @@ static void mvpp2_bm_pool_mc_put(struct mvpp2_port *port, int pool,
- 
- /* Refill BM pool */
- static void mvpp2_pool_refill(struct mvpp2_port *port, u32 bm,
--			      u32 phys_addr, u32 cookie)
-+			      dma_addr_t phys_addr,
-+			      unsigned long cookie)
- {
- 	int pool = mvpp2_bm_cookie_pool_get(bm);
- 
-@@ -3657,7 +3661,8 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
- 		if (!buf)
- 			break;
- 
--		mvpp2_bm_pool_put(port, bm_pool->id, (u32)phys_addr, (u32)buf);
-+		mvpp2_bm_pool_put(port, bm_pool->id, phys_addr,
-+				  (unsigned long)buf);
- 	}
- 
- 	/* Update BM driver with number of buffers added to pool */
-@@ -5015,7 +5020,7 @@ static int mvpp2_rx_refill(struct mvpp2_port *port,
- 	if (!buf)
- 		return -ENOMEM;
- 
--	mvpp2_pool_refill(port, bm, (u32)phys_addr, (u32)buf);
-+	mvpp2_pool_refill(port, bm, phys_addr, (unsigned long)buf);
+-	/* Set Tx descriptors queue starting address */
+-	/* indirect access */
+-	mvpp2_write(priv, MVPP2_AGGR_TXQ_DESC_ADDR_REG(cpu),
+-		    aggr_txq->descs_phys);
++	/* Set Tx descriptors queue starting address indirect
++	 * access
++	 */
++	if (priv->hw_version == MVPP21)
++		txq_phys = aggr_txq->descs_phys;
++	else
++		txq_phys = aggr_txq->descs_phys >>
++			MVPP22_AGGR_TXQ_DESC_ADDR_OFFS;
++
++	mvpp2_write(priv, MVPP2_AGGR_TXQ_DESC_ADDR_REG(cpu), txq_phys);
+ 	mvpp2_write(priv, MVPP2_AGGR_TXQ_DESC_SIZE_REG(cpu), desc_num);
  
  	return 0;
- }
-@@ -5057,10 +5062,10 @@ static void mvpp2_buff_hdr_rx(struct mvpp2_port *port,
- 	struct mvpp2_buff_hdr *buff_hdr;
- 	struct sk_buff *skb;
- 	u32 rx_status = rx_desc->status;
--	u32 buff_phys_addr;
--	u32 buff_virt_addr;
--	u32 buff_phys_addr_next;
--	u32 buff_virt_addr_next;
-+	dma_addr_t buff_phys_addr;
-+	unsigned long buff_virt_addr;
-+	dma_addr_t buff_phys_addr_next;
-+	unsigned long buff_virt_addr_next;
- 	int mc_id;
- 	int pool_id;
+@@ -4796,6 +4806,8 @@ static int mvpp2_rxq_init(struct mvpp2_port *port,
+ 			  struct mvpp2_rx_queue *rxq)
+ 
+ {
++	u32 rxq_phys;
++
+ 	rxq->size = port->rx_ring_size;
+ 
+ 	/* Allocate memory for RX descriptors */
+@@ -4812,7 +4824,11 @@ static int mvpp2_rxq_init(struct mvpp2_port *port,
+ 
+ 	/* Set Rx descriptors queue starting address - indirect access */
+ 	mvpp2_write(port->priv, MVPP2_RXQ_NUM_REG, rxq->id);
+-	mvpp2_write(port->priv, MVPP2_RXQ_DESC_ADDR_REG, rxq->descs_phys);
++	if (port->priv->hw_version == MVPP21)
++		rxq_phys = rxq->descs_phys;
++	else
++		rxq_phys = rxq->descs_phys >> MVPP22_DESC_ADDR_OFFS;
++	mvpp2_write(port->priv, MVPP2_RXQ_DESC_ADDR_REG, rxq_phys);
+ 	mvpp2_write(port->priv, MVPP2_RXQ_DESC_SIZE_REG, rxq->size);
+ 	mvpp2_write(port->priv, MVPP2_RXQ_INDEX_REG, 0);
  
 -- 
 2.7.4
