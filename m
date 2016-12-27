@@ -1,104 +1,56 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 27 Dec 2016 09:51:01 +0530
-Subject: [PATCH] PCI: exynos: refactor exynos pcie driver
-In-Reply-To: <e1f37a59-b633-7b9d-cc79-dbbb00a24cda@samsung.com>
-References: <CGME20161223105411epcas1p3727f726e757ec6c6d7bff04a9af40077@epcas1p3.samsung.com>
- <1482490587-13611-1-git-send-email-pankaj.dubey@samsung.com>
- <e1f37a59-b633-7b9d-cc79-dbbb00a24cda@samsung.com>
-Message-ID: <CAGcde9EsO39B4CsPH2KrC=tJM4+SFaO4+P8frHTGB_13eBujqQ@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 27 Dec 2016 07:07:40 +0200
+Subject: [PATCH v2] watchdog: constify watchdog_info structures
+In-Reply-To: <1482771911-13548-1-git-send-email-bhumirks@gmail.com>
+References: <1482771911-13548-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <20161227050740.fqpmxxqxtalkovka@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaehoon,
+Hi Bhumika Goyal,
 
-On 26 December 2016 at 14:32, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Hi Pankaj,
->
-> On 12/23/2016 07:56 PM, Pankaj Dubey wrote:
->> From: Niyas Ahmed S T <niyas.ahmed@samsung.com>
->>
->> Currently Exynos PCIe driver is only supported for Exynos5440 SoC.
->> This patch does refactoring of Exynos PCIe driver to extend support
->> for other Exynos SoC.
->>
->> Following are the main changes done via this patch:
->> 1) It adds separate structs for memory, clock resources.
->> 2) It add exynos_pcie_ops struct which will allow us to support the
->> differences in resources in different Exynos SoC.
->
-> It's nice to me for reusing this file.
-> but after considering too many times, i decided not to use this file.
->
+On Mon, Dec 26, 2016 at 10:35:11PM +0530, Bhumika Goyal wrote:
+> Declare watchdog_info structures as const as they are only stored in the
+> info field of watchdog_device structures. This field is of type const
+> struct watchdog_info *, so watchdog_info structures having this property
+> can be declared const too.
+> Done using Coccinelle:
+> 
+> @r1 disable optional_qualifier@
+> identifier i;
+> position p;
+> @@
+> static struct watchdog_info i at p={...};
+> 
+> @ok@
+> identifier r1.i;
+> position p;
+> struct watchdog_device obj;
+> @@
+> obj.info=&i at p;
+> 
+> @bad@
+> position p!={r1.p,ok.p};
+> identifier r1.i;
+> @@
+> i at p
+> 
+> @depends on !bad disable optional_qualifier@
+> identifier r1.i;
+> @@
+> +const
+> struct watchdog_info i;
+> 
+> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 
-It would be better if we redesign/modify existing driver to support new single
-driver for all Exynos SoC.
+For digicolor_wdt.c:
 
-For this we can have internal discussion and design it so that it
-becomes suitable
-for other Exynos SoC PCIe controllers.
-
-> I'm not sure what block base is..actually this pci-exynos.c is really black-box.
-
-I saw Jingoo already explained about block base, so it may or may not be used in
-other exynos. If it is used they can reuse this variable and related
-code, if not the
-implementation of exynos_pcie_ops hooks should be written in such a way that
-ignores (do not initializes/uses) block_base.
-
-> (No one maintains this file, even Samsung didn't care.)
-> Who is using this?
-
-I feel now we we (you and me) will care for it, at least we have use
-case for this now :)
-
-> If Someone can share the information about exynos5440, i can refactor everything.
-> Otherwise, there are two solution..
->
-
-We also do not have access to exynos5440 hardware, but we do have access
-to exynos5440 UM, so we can see some details of these SFRs. Based on
-our understanding
-we refactored this code for making it more suitable for other SoC.
-
-Regarding phy_base and block_base as they are phy related it need to
-be replaced with phy driver, so for this we can reuse your RFC patch
-of pcie-phy. Even phy driver design should be
-such that it can support multiple Exynos SoC PCIe-Phy.
-
-> One is "adding the new pci-exynos.c" likes pci-exynos5433.c
-
-I know exynos5433 and exynos7 SoC have similar PCIe controller, although they
-may share comparatively less similarity with exynos5440. If start
-adding new file for
-each SoC we may end of lot of code duplication.
-
-> Other is "refactor this file" under assuming the each register's usage.
->
-
-IMHO, this would be good design decision.
-
-We have separate various resources of exynos_pcie struct such as iomem
-and clks for
-the timebeing, and these resources can be managed via exynos_pcie_ops
-which can have different implementation for different SoCs, we have
-freedom to handle these resources per SoC. If some SoCs share similar
-PCIe controller h/w design, code will be reused.
-
-> I want to use the PHY generic Framework for EXYNOS PCIe.
->
-> If you or other guys really want to use the pci-exynos.c for other exynos,
-> I will rework with PHY generic framework. Then i will resend the my patches as V2.
->
-> One more thing..Does anyone know what the usage of block base is?
-> Can i use that register as "syscon"?
->
-
-I think this is not exactly syscon, as it only be used in pcie-phy,
-so we can use this as child device of phy-device.
-
-> Best Regards,
-> Jaehoon Chung
->
+Acked-by: Baruch Siach <baruch@tkos.co.il>
 
 Thanks,
-Pankaj Dubey
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
