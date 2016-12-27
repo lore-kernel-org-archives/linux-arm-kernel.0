@@ -1,122 +1,91 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 27 Dec 2016 17:54:22 +0100
-Subject: [PATCH v2 01/16] dt-bindings: net: update Marvell PPv2 binding for
- PPv2.2 support
+Date: Tue, 27 Dec 2016 17:54:28 +0100
+Subject: [PATCH v2 07/16] net: mvpp2: adapt the mvpp2_rxq_*_pool_set functions
+ to PPv2.2
 In-Reply-To: <1482857677-16166-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1482857677-16166-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482857677-16166-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482857677-16166-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell PPv2 Device Tree binding was so far only used to describe
-the PPv2.1 network controller, used in the Marvell Armada 375.
-
-A new version of this IP block, PPv2.2 is used in the Marvell Armada
-7K/8K processor. This commit extends the existing binding so that it can
-also be used to describe PPv2.2 hardware.
+The MVPP2_RXQ_CONFIG_REG register has a slightly different layout
+between PPv2.1 and PPv2.2, so this commit adapts the functions modifying
+this register to accommodate for both the PPv2.1 and PPv2.2 cases.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- .../devicetree/bindings/net/marvell-pp2.txt        | 66 ++++++++++++++++++----
- 1 file changed, 55 insertions(+), 11 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 32 ++++++++++++++++++++------------
+ 1 file changed, 20 insertions(+), 12 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/marvell-pp2.txt b/Documentation/devicetree/bindings/net/marvell-pp2.txt
-index aa4f423..76071f3 100644
---- a/Documentation/devicetree/bindings/net/marvell-pp2.txt
-+++ b/Documentation/devicetree/bindings/net/marvell-pp2.txt
-@@ -1,17 +1,28 @@
--* Marvell Armada 375 Ethernet Controller (PPv2)
-+* Marvell Armada 375 Ethernet Controller (PPv2.1)
-+  Marvell Armada 7K/8K Ethernet Controller (PPv2.2)
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index 160b787..8fc818d 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -50,9 +50,11 @@
+ #define     MVPP2_SNOOP_PKT_SIZE_MASK		0x1ff
+ #define     MVPP2_SNOOP_BUF_HDR_MASK		BIT(9)
+ #define     MVPP2_RXQ_POOL_SHORT_OFFS		20
+-#define     MVPP2_RXQ_POOL_SHORT_MASK		0x700000
++#define     MVPP21_RXQ_POOL_SHORT_MASK		0x700000
++#define     MVPP22_RXQ_POOL_SHORT_MASK		0xf00000
+ #define     MVPP2_RXQ_POOL_LONG_OFFS		24
+-#define     MVPP2_RXQ_POOL_LONG_MASK		0x7000000
++#define     MVPP21_RXQ_POOL_LONG_MASK		0x7000000
++#define     MVPP22_RXQ_POOL_LONG_MASK		0xf000000
+ #define     MVPP2_RXQ_PACKET_OFFSET_OFFS	28
+ #define     MVPP2_RXQ_PACKET_OFFSET_MASK	0x70000000
+ #define     MVPP2_RXQ_DISABLE_MASK		BIT(31)
+@@ -3762,17 +3764,20 @@ static int mvpp2_bm_init(struct platform_device *pdev, struct mvpp2 *priv)
+ static void mvpp2_rxq_long_pool_set(struct mvpp2_port *port,
+ 				    int lrxq, int long_pool)
+ {
+-	u32 val;
++	u32 val, mask;
+ 	int prxq;
  
- Required properties:
+ 	/* Get queue physical ID */
+ 	prxq = port->rxqs[lrxq]->id;
  
--- compatible: should be "marvell,armada-375-pp2"
-+- compatible: should be one of:
-+    "marvell,armada-375-pp2"
-+    "marvell,armada-7k-pp2"
- - reg: addresses and length of the register sets for the device.
--  Must contain the following register sets:
-+  For "marvell,armada-375-pp2", must contain the following register
-+  sets:
- 	- common controller registers
- 	- LMS registers
--  In addition, at least one port register set is required.
--- clocks: a pointer to the reference clocks for this device, consequently:
--	- main controller clock
--	- GOP clock
--- clock-names: names of used clocks, must be "pp_clk" and "gop_clk".
-+	- one register area per Ethernet port
-+  For "marvell,armda-7k-pp2", must contain the following register
-+  sets:
-+        - common controller registers
-+	- per-port registers
-+
-+- clocks: pointers to the reference clocks for this device, consequently:
-+	- main controller clock (for both armada-375-pp2 and armada-7k-pp2)
-+	- GOP clock (for both armada-375-pp2 and armada-7k-pp2)
-+	- MG clock (only for armada-7k-pp2)
-+- clock-names: names of used clocks, must be "pp_clk", "gop_clk" and
-+  "mg_clk" (the latter only for armada-7k-pp2).
+-	val = mvpp2_read(port->priv, MVPP2_RXQ_CONFIG_REG(prxq));
+-	val &= ~MVPP2_RXQ_POOL_LONG_MASK;
+-	val |= ((long_pool << MVPP2_RXQ_POOL_LONG_OFFS) &
+-		    MVPP2_RXQ_POOL_LONG_MASK);
++	if (port->priv->hw_version == MVPP21)
++		mask = MVPP21_RXQ_POOL_LONG_MASK;
++	else
++		mask = MVPP22_RXQ_POOL_LONG_MASK;
  
- The ethernet ports are represented by subnodes. At least one port is
- required.
-@@ -19,8 +30,9 @@ required.
- Required properties (port):
++	val = mvpp2_read(port->priv, MVPP2_RXQ_CONFIG_REG(prxq));
++	val &= ~mask;
++	val |= (long_pool << MVPP2_RXQ_POOL_LONG_OFFS) & mask;
+ 	mvpp2_write(port->priv, MVPP2_RXQ_CONFIG_REG(prxq), val);
+ }
  
- - interrupts: interrupt for the port
--- port-id: should be '0' or '1' for ethernet ports, and '2' for the
--           loopback port
-+- port-id: ID of the port from the MAC point of view
-+- gop-port-id: only for marvell,armada-7k-pp2, ID of the port from the
-+  GOP (Group Of Ports) point of view
- - phy-mode: See ethernet.txt file in the same directory
+@@ -3780,17 +3785,20 @@ static void mvpp2_rxq_long_pool_set(struct mvpp2_port *port,
+ static void mvpp2_rxq_short_pool_set(struct mvpp2_port *port,
+ 				     int lrxq, int short_pool)
+ {
+-	u32 val;
++	u32 val, mask;
+ 	int prxq;
  
- Optional properties (port):
-@@ -31,7 +43,7 @@ Optional properties (port):
-   then fixed link is assumed, and the 'fixed-link' property is
-   mandatory.
+ 	/* Get queue physical ID */
+ 	prxq = port->rxqs[lrxq]->id;
  
--Example:
-+Example for marvell,armada-375-pp2:
+-	val = mvpp2_read(port->priv, MVPP2_RXQ_CONFIG_REG(prxq));
+-	val &= ~MVPP2_RXQ_POOL_SHORT_MASK;
+-	val |= ((short_pool << MVPP2_RXQ_POOL_SHORT_OFFS) &
+-		    MVPP2_RXQ_POOL_SHORT_MASK);
++	if (port->priv->hw_version == MVPP21)
++		mask = MVPP21_RXQ_POOL_SHORT_MASK;
++	else
++		mask = MVPP22_RXQ_POOL_SHORT_MASK;
  
- ethernet at f0000 {
- 	compatible = "marvell,armada-375-pp2";
-@@ -59,3 +71,35 @@ ethernet at f0000 {
- 		phy-mode = "gmii";
- 	};
- };
-+
-+Example for marvell,armada-7k-pp2:
-+
-+cpm_ethernet: ethernet at 0 {
-+	compatible = "marvell,armada-7k-pp22";
-+	reg = <0x0 0x100000>,
-+	      <0x100000 0x80000>;
-+	clocks = <&cpm_syscon0 1 3>, <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
-+	clock-names = "pp_clk", "gop_clk", "gp_clk";
-+	status = "disabled";
-+
-+	eth0: eth at 0 {
-+		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+		port-id = <0>;
-+		gop-port-id = <0>;
-+		status = "disabled";
-+	};
-+
-+	eth1: eth at 1 {
-+		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
-+		port-id = <1>;
-+		gop-port-id = <2>;
-+		status = "disabled";
-+	};
-+
-+	eth2: eth at 2 {
-+		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-+		port-id = <2>;
-+		gop-port-id = <3>;
-+		status = "disabled";
-+	};
-+};
++	val = mvpp2_read(port->priv, MVPP2_RXQ_CONFIG_REG(prxq));
++	val &= ~mask;
++	val |= (short_pool << MVPP2_RXQ_POOL_SHORT_OFFS) & mask;
+ 	mvpp2_write(port->priv, MVPP2_RXQ_CONFIG_REG(prxq), val);
+ }
+ 
 -- 
 2.7.4
