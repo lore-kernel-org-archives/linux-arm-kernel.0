@@ -1,40 +1,23 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 27 Dec 2016 14:26:35 +0000
-Subject: [PATCH 0/2] crypto: arm64/ARM: NEON accelerated ChaCha20
-In-Reply-To: <20161227100400.GA10629@gondor.apana.org.au>
-References: <1481207339-17332-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161227100400.GA10629@gondor.apana.org.au>
-Message-ID: <6124F827-BA28-4A3D-B05F-EBCB1323955D@linaro.org>
+From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
+Date: Tue, 27 Dec 2016 16:41:15 +0200
+Subject: [PATCH v3 resend] i2c: designware: add reset interface
+In-Reply-To: <1482848560-3752-1-git-send-email-zhangfei.gao@linaro.org>
+References: <y> <1482848560-3752-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <2cc1faeb-1a1b-76e2-0b12-9918ac42861d@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> On 27 Dec 2016, at 10:04, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> 
->> On Thu, Dec 08, 2016 at 02:28:57PM +0000, Ard Biesheuvel wrote:
->> Another port of existing x86 SSE code to NEON, again both for arm64 and ARM.
->> 
->> ChaCha20 is a stream cipher described in RFC 7539, and is intended to be
->> an efficient software implementable 'standby cipher', in case AES cannot
->> be used.
->> 
->> This NEON implementation is almost 2x as fast as the generic C code
->> (measured on Cortex-A57 using the arm64 version)
->> 
->> I'm aware that blkciphers are deprecated in favor of skciphers, but this
->> code (like the x86 version) uses the init and setkey routines of the generic
->> version, so it is probably better to port all implementations at once.
->> 
->> Ard Biesheuvel (2):
->>  crypto: arm64/chacha20 - implement NEON version based on SSE3 code
->>  crypto: arm/chacha20 - implement NEON version based on SSE3 code
-> 
-> Both patches applied.  Thanks.
-
-You just nacked the v2 of this series (due to the chunksize/walksize) and i rewrote them as skciphers as well
-
-> -- 
-> Email: Herbert Xu <herbert@gondor.apana.org.au>
-> Home Page: http://gondor.apana.org.au/~herbert/
-> PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+On 12/27/2016 04:22 PM, Zhangfei Gao wrote:
+> Some platforms like hi3660 need do reset first to allow accessing registers
+>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> Tested-by: Ramiro Oliveira <ramiro.oliveira@synopsys.com>
+> ---
+> rebase to 4.10-rc1
+>
+>  drivers/i2c/busses/i2c-designware-core.h    |  1 +
+>  drivers/i2c/busses/i2c-designware-platdrv.c | 28 ++++++++++++++++++++++++----
+>  2 files changed, 25 insertions(+), 4 deletions(-)
+>
+Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
