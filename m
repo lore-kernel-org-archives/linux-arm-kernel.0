@@ -1,103 +1,87 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 27 Dec 2016 17:54:36 +0100
-Subject: [PATCH v2 15/16] net: mvpp2: add support for an additional clock
- needed for PPv2.2
-In-Reply-To: <1482857677-16166-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1482857677-16166-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482857677-16166-16-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 27 Dec 2016 17:54:18 +0100
+Subject: [PATCH v2 09/11] net: mvpp2: simplify MVPP2_PRS_RI_* definitions
+In-Reply-To: <1482857660-16092-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1482857660-16092-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482857660-16092-10-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PPv2.2 variant of the network controller needs an additional
-clock, the "MG clock" in order for the IP block to operate
-properly. This commit adds support for this additional clock to the
-driver, reworking as needed the error handling path.
+Some of the MVPP2_PRS_RI_* definitions use the ~(value) syntax, which
+doesn't compile nicely on 64-bit. Moreover, those definitions are in
+fact unneeded, since they are always used in combination with a bit
+mask that ensures only the appropriate bits are modified.
+
+Therefore, such definitions should just be set to 0x0. For example:
+
+ #define MVPP2_PRS_RI_L2_CAST_MASK              0x600
+ #define MVPP2_PRS_RI_L2_UCAST                  ~(BIT(9) | BIT(10))
+ #define MVPP2_PRS_RI_L2_MCAST                  BIT(9)
+ #define MVPP2_PRS_RI_L2_BCAST                  BIT(10)
+
+becomes
+
+ #define MVPP2_PRS_RI_L2_CAST_MASK              0x600
+ #define MVPP2_PRS_RI_L2_UCAST                  0x0
+ #define MVPP2_PRS_RI_L2_MCAST                  BIT(9)
+ #define MVPP2_PRS_RI_L2_BCAST                  BIT(10)
+
+Because the values (MVPP2_PRS_RI_L2_UCAST, MVPP2_PRS_RI_L2_MCAST and
+MVPP2_PRS_RI_L2_BCAST) are always applied with
+MVPP2_PRS_RI_L2_CAST_MASK, and therefore there is no need for
+MVPP2_PRS_RI_L2_UCAST to be defined as ~(BIT(9) | BIT(10)).
+
+It fixes the following warnings when building the driver on a 64-bit
+platform (which is not possible as of this commit, but will be enabled
+in a follow-up commit):
+
+drivers/net/ethernet/marvell/mvpp2.c: In function ?mvpp2_prs_mac_promisc_set?:
+drivers/net/ethernet/marvell/mvpp2.c:524:33: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+ #define MVPP2_PRS_RI_L2_UCAST   ~(BIT(9) | BIT(10))
+                                 ^
+drivers/net/ethernet/marvell/mvpp2.c:1459:33: note: in expansion of macro ?MVPP2_PRS_RI_L2_UCAST?
+   mvpp2_prs_sram_ri_update(&pe, MVPP2_PRS_RI_L2_UCAST,
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 25 +++++++++++++++++++++----
- 1 file changed, 21 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 20e9429..194de00 100644
+index 36c73dc..58cf9af 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -702,6 +702,7 @@ struct mvpp2 {
- 	/* Common clocks */
- 	struct clk *pp_clk;
- 	struct clk *gop_clk;
-+	struct clk *mg_clk;
- 
- 	/* List of pointers to port structures */
- 	struct mvpp2_port **port_list;
-@@ -6899,6 +6900,18 @@ static int mvpp2_probe(struct platform_device *pdev)
- 	if (err < 0)
- 		goto err_pp_clk;
- 
-+	if (priv->hw_version == MVPP22) {
-+		priv->mg_clk = devm_clk_get(&pdev->dev, "mg_clk");
-+		if (IS_ERR(priv->mg_clk)) {
-+			err = PTR_ERR(priv->mg_clk);
-+			goto err_gop_clk;
-+		}
-+
-+		err = clk_prepare_enable(priv->mg_clk);
-+		if (err < 0)
-+			goto err_gop_clk;
-+	}
-+
- 	/* Get system's tclk rate */
- 	priv->tclk = clk_get_rate(priv->pp_clk);
- 
-@@ -6906,14 +6919,14 @@ static int mvpp2_probe(struct platform_device *pdev)
- 	err = mvpp2_init(pdev, priv);
- 	if (err < 0) {
- 		dev_err(&pdev->dev, "failed to initialize controller\n");
--		goto err_gop_clk;
-+		goto err_mg_clk;
- 	}
- 
- 	port_count = of_get_available_child_count(dn);
- 	if (port_count == 0) {
- 		dev_err(&pdev->dev, "no ports enabled\n");
- 		err = -ENODEV;
--		goto err_gop_clk;
-+		goto err_mg_clk;
- 	}
- 
- 	priv->port_list = devm_kcalloc(&pdev->dev, port_count,
-@@ -6921,19 +6934,22 @@ static int mvpp2_probe(struct platform_device *pdev)
- 				      GFP_KERNEL);
- 	if (!priv->port_list) {
- 		err = -ENOMEM;
--		goto err_gop_clk;
-+		goto err_mg_clk;
- 	}
- 
- 	/* Initialize ports */
- 	for_each_available_child_of_node(dn, port_node) {
- 		err = mvpp2_port_probe(pdev, port_node, priv);
- 		if (err < 0)
--			goto err_gop_clk;
-+			goto err_mg_clk;
- 	}
- 
- 	platform_set_drvdata(pdev, priv);
- 	return 0;
- 
-+err_mg_clk:
-+	if (priv->hw_version == MVPP22)
-+		clk_disable_unprepare(priv->mg_clk);
- err_gop_clk:
- 	clk_disable_unprepare(priv->gop_clk);
- err_pp_clk:
-@@ -6969,6 +6985,7 @@ static int mvpp2_remove(struct platform_device *pdev)
- 				  aggr_txq->descs_phys);
- 	}
- 
-+	clk_disable_unprepare(priv->mg_clk);
- 	clk_disable_unprepare(priv->pp_clk);
- 	clk_disable_unprepare(priv->gop_clk);
- 
+@@ -511,19 +511,19 @@ enum mvpp2_tag_type {
+ #define MVPP2_PRS_RI_MAC_ME_MASK		0x1
+ #define MVPP2_PRS_RI_DSA_MASK			0x2
+ #define MVPP2_PRS_RI_VLAN_MASK			0xc
+-#define MVPP2_PRS_RI_VLAN_NONE			~(BIT(2) | BIT(3))
++#define MVPP2_PRS_RI_VLAN_NONE			0x0
+ #define MVPP2_PRS_RI_VLAN_SINGLE		BIT(2)
+ #define MVPP2_PRS_RI_VLAN_DOUBLE		BIT(3)
+ #define MVPP2_PRS_RI_VLAN_TRIPLE		(BIT(2) | BIT(3))
+ #define MVPP2_PRS_RI_CPU_CODE_MASK		0x70
+ #define MVPP2_PRS_RI_CPU_CODE_RX_SPEC		BIT(4)
+ #define MVPP2_PRS_RI_L2_CAST_MASK		0x600
+-#define MVPP2_PRS_RI_L2_UCAST			~(BIT(9) | BIT(10))
++#define MVPP2_PRS_RI_L2_UCAST			0x0
+ #define MVPP2_PRS_RI_L2_MCAST			BIT(9)
+ #define MVPP2_PRS_RI_L2_BCAST			BIT(10)
+ #define MVPP2_PRS_RI_PPPOE_MASK			0x800
+ #define MVPP2_PRS_RI_L3_PROTO_MASK		0x7000
+-#define MVPP2_PRS_RI_L3_UN			~(BIT(12) | BIT(13) | BIT(14))
++#define MVPP2_PRS_RI_L3_UN			0x0
+ #define MVPP2_PRS_RI_L3_IP4			BIT(12)
+ #define MVPP2_PRS_RI_L3_IP4_OPT			BIT(13)
+ #define MVPP2_PRS_RI_L3_IP4_OTHER		(BIT(12) | BIT(13))
+@@ -531,7 +531,7 @@ enum mvpp2_tag_type {
+ #define MVPP2_PRS_RI_L3_IP6_EXT			(BIT(12) | BIT(14))
+ #define MVPP2_PRS_RI_L3_ARP			(BIT(13) | BIT(14))
+ #define MVPP2_PRS_RI_L3_ADDR_MASK		0x18000
+-#define MVPP2_PRS_RI_L3_UCAST			~(BIT(15) | BIT(16))
++#define MVPP2_PRS_RI_L3_UCAST			0x0
+ #define MVPP2_PRS_RI_L3_MCAST			BIT(15)
+ #define MVPP2_PRS_RI_L3_BCAST			(BIT(15) | BIT(16))
+ #define MVPP2_PRS_RI_IP_FRAG_MASK		0x20000
 -- 
 2.7.4
