@@ -1,35 +1,104 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Tue, 27 Dec 2016 09:49:57 +0530
-Subject: [RFC PATCH 1/7] PF driver modified to enable HW filter support,
- changes works in backward compatibility mode Enable required things in
- Makefile Enable LZ4 dependecy inside config file
-In-Reply-To: <DM5PR07MB28428EE7B1679FAEC78103AD8D960@DM5PR07MB2842.namprd07.prod.outlook.com>
-References: <1482310011-1862-1-git-send-email-satha.rao@caviumnetworks.com>
- <1482310011-1862-2-git-send-email-satha.rao@caviumnetworks.com>
- <CA+sq2CfwTN5u6nhxriqWqoFxsYHdEYikbjBgMCL2YwNXpqyQ=Q@mail.gmail.com>
- <DM5PR07MB28428EE7B1679FAEC78103AD8D960@DM5PR07MB2842.namprd07.prod.outlook.com>
-Message-ID: <CA+sq2Cc0L3hqV_TUxtf00-UnUs8gMJfjL7bZaGejGevDYn6mPg@mail.gmail.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 27 Dec 2016 09:51:01 +0530
+Subject: [PATCH] PCI: exynos: refactor exynos pcie driver
+In-Reply-To: <e1f37a59-b633-7b9d-cc79-dbbb00a24cda@samsung.com>
+References: <CGME20161223105411epcas1p3727f726e757ec6c6d7bff04a9af40077@epcas1p3.samsung.com>
+ <1482490587-13611-1-git-send-email-pankaj.dubey@samsung.com>
+ <e1f37a59-b633-7b9d-cc79-dbbb00a24cda@samsung.com>
+Message-ID: <CAGcde9EsO39B4CsPH2KrC=tJM4+SFaO4+P8frHTGB_13eBujqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>  #define NIC_MAX_RSS_HASH_BITS          8
->>  #define NIC_MAX_RSS_IDR_TBL_SIZE       (1 << NIC_MAX_RSS_HASH_BITS)
->> +#define NIC_TNS_RSS_IDR_TBL_SIZE       5
+Hi Jaehoon,
+
+On 26 December 2016 at 14:32, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Hi Pankaj,
 >
-> So you want to use only 5 queues per VF when TNS is enabled, is it ??
-> There are 4096 RSS indices in total, for each VF you can use max 32.
-> I guess you wanted to set no of hash bits to 5 instead of table size.
+> On 12/23/2016 07:56 PM, Pankaj Dubey wrote:
+>> From: Niyas Ahmed S T <niyas.ahmed@samsung.com>
+>>
+>> Currently Exynos PCIe driver is only supported for Exynos5440 SoC.
+>> This patch does refactoring of Exynos PCIe driver to extend support
+>> for other Exynos SoC.
+>>
+>> Following are the main changes done via this patch:
+>> 1) It adds separate structs for memory, clock resources.
+>> 2) It add exynos_pcie_ops struct which will allow us to support the
+>> differences in resources in different Exynos SoC.
 >
-> SATHA>>> We enabled 8 queues for VF. Yes Macro name misleads it has to be hash bits, will change this in next version
+> It's nice to me for reusing this file.
+> but after considering too many times, i decided not to use this file.
+>
 
-No, I am not referring to any discrepancy in naming the macro.
-If you check your code
+It would be better if we redesign/modify existing driver to support new single
+driver for all Exynos SoC.
 
-- hw->rss_ind_tbl_size = NIC_MAX_RSS_IDR_TBL_SIZE;
-+ hw->rss_ind_tbl_size = veb_enabled ? NIC_TNS_RSS_IDR_TBL_SIZE :
-+     NIC_MAX_RSS_IDR_TBL_SIZE;
+For this we can have internal discussion and design it so that it
+becomes suitable
+for other Exynos SoC PCIe controllers.
 
-You are setting RSS table size to 5, i.e RSS hash bits will be set to 2.
-Hence only 4 queues (not even 5 as i mentioned earlier). Please check
-'nicvf_rss_init' you will understand what i am saying.
-Have you tested and observed pkts in all 8 queues ?
+> I'm not sure what block base is..actually this pci-exynos.c is really black-box.
+
+I saw Jingoo already explained about block base, so it may or may not be used in
+other exynos. If it is used they can reuse this variable and related
+code, if not the
+implementation of exynos_pcie_ops hooks should be written in such a way that
+ignores (do not initializes/uses) block_base.
+
+> (No one maintains this file, even Samsung didn't care.)
+> Who is using this?
+
+I feel now we we (you and me) will care for it, at least we have use
+case for this now :)
+
+> If Someone can share the information about exynos5440, i can refactor everything.
+> Otherwise, there are two solution..
+>
+
+We also do not have access to exynos5440 hardware, but we do have access
+to exynos5440 UM, so we can see some details of these SFRs. Based on
+our understanding
+we refactored this code for making it more suitable for other SoC.
+
+Regarding phy_base and block_base as they are phy related it need to
+be replaced with phy driver, so for this we can reuse your RFC patch
+of pcie-phy. Even phy driver design should be
+such that it can support multiple Exynos SoC PCIe-Phy.
+
+> One is "adding the new pci-exynos.c" likes pci-exynos5433.c
+
+I know exynos5433 and exynos7 SoC have similar PCIe controller, although they
+may share comparatively less similarity with exynos5440. If start
+adding new file for
+each SoC we may end of lot of code duplication.
+
+> Other is "refactor this file" under assuming the each register's usage.
+>
+
+IMHO, this would be good design decision.
+
+We have separate various resources of exynos_pcie struct such as iomem
+and clks for
+the timebeing, and these resources can be managed via exynos_pcie_ops
+which can have different implementation for different SoCs, we have
+freedom to handle these resources per SoC. If some SoCs share similar
+PCIe controller h/w design, code will be reused.
+
+> I want to use the PHY generic Framework for EXYNOS PCIe.
+>
+> If you or other guys really want to use the pci-exynos.c for other exynos,
+> I will rework with PHY generic framework. Then i will resend the my patches as V2.
+>
+> One more thing..Does anyone know what the usage of block base is?
+> Can i use that register as "syscon"?
+>
+
+I think this is not exactly syscon, as it only be used in pcie-phy,
+so we can use this as child device of phy-device.
+
+> Best Regards,
+> Jaehoon Chung
+>
+
+Thanks,
+Pankaj Dubey
