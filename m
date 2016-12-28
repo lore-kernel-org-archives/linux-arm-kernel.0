@@ -1,24 +1,22 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 28 Dec 2016 17:23:28 +0800
-Subject: [PATCH] crypto: arm/aes-neonbs - process 8 blocks in parallel if
- we can
-In-Reply-To: <B32240B5-953F-42A2-A010-6FF64AC45859@linaro.org>
-References: <1481291246-20216-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161227085745.GA10121@gondor.apana.org.au>
- <CAKv+Gu8OkOR3Xzx=XEOWyFpo6sLiq=WQrq0SauaY0V57uYetCQ@mail.gmail.com>
- <20161228091020.GE11904@gondor.apana.org.au>
- <B32240B5-953F-42A2-A010-6FF64AC45859@linaro.org>
-Message-ID: <20161228092328.GA12494@gondor.apana.org.au>
+Date: Wed, 28 Dec 2016 17:25:13 +0800
+Subject: [PATCH v2 1/3] crypto: chacha20 - convert generic and x86
+ versions to skcipher
+In-Reply-To: <C46A3CDE-2329-4171-B4C5-071423EC3B4B@linaro.org>
+References: <1481294033-23508-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1481294033-23508-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20161227100452.GB10629@gondor.apana.org.au>
+ <20161228091801.GA12318@gondor.apana.org.au>
+ <C46A3CDE-2329-4171-B4C5-071423EC3B4B@linaro.org>
+Message-ID: <20161228092513.GA12546@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 28, 2016 at 09:19:32AM +0000, Ard Biesheuvel wrote:
+On Wed, Dec 28, 2016 at 09:23:07AM +0000, Ard Biesheuvel wrote:
 >
-> Ok, so that implies a field in the skcipher algo struct then, rather than some definition internal to the driver?
+> Ehm, could you keep this one and revert the other two instead please?  This patch will not change in the respin, and the other two are blkciphers rather than skciphers (and in the arm64 version, I optimized the asm code as well) so they will look rather different ( as they do in the nacked v2)
 
-Oh yes it should definitely be visible to other crypto API drivers
-and algorithms.  It's just that we don't want to export it outside
-of the crypto API, e.g., to IPsec or algif.
+OK I will keep this patch and revert the other two.
 
 Thanks,
 -- 
