@@ -1,59 +1,130 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 28 Dec 2016 17:46:32 +0100
-Subject: [PATCHv2 net-next 16/16] net: mvpp2: finally add the PPv2.2
- compatible string
+Date: Wed, 28 Dec 2016 17:46:28 +0100
+Subject: [PATCHv2 net-next 12/16] net: mvpp2: add AXI bridge initialization
+ for PPv2.2
 In-Reply-To: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482943592-12556-17-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482943592-12556-13-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the mvpp2 driver has been modified to accommodate the support
-for PPv2.2, we can finally advertise this support by adding the
-appropriate compatible string.
-
-At the same time, we update the Kconfig description of the MVPP2 driver.
+The PPv2.2 unit is connected to an AXI bus on Armada 7K/8K, so this
+commit adds the necessary initialization of the AXI bridge.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/Kconfig | 4 ++--
- drivers/net/ethernet/marvell/mvpp2.c | 4 ++++
- 2 files changed, 6 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 85 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 85 insertions(+)
 
-diff --git a/drivers/net/ethernet/marvell/Kconfig b/drivers/net/ethernet/marvell/Kconfig
-index d2555e8b..da6fb82 100644
---- a/drivers/net/ethernet/marvell/Kconfig
-+++ b/drivers/net/ethernet/marvell/Kconfig
-@@ -82,13 +82,13 @@ config MVNETA_BM
- 	  that all dependencies are met.
- 
- config MVPP2
--	tristate "Marvell Armada 375 network interface support"
-+	tristate "Marvell Armada 375/7K/8K network interface support"
- 	depends on ARCH_MVEBU || COMPILE_TEST
- 	depends on HAS_DMA
- 	select MVMDIO
- 	---help---
- 	  This driver supports the network interface units in the
--	  Marvell ARMADA 375 SoC.
-+	  Marvell ARMADA 375, 7K and 8K SoCs.
- 
- config PXA168_ETH
- 	tristate "Marvell pxa168 ethernet support"
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 194de00..9e744d2 100644
+index eb55576..d5b197d 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -6997,6 +6997,10 @@ static const struct of_device_id mvpp2_match[] = {
- 		.compatible = "marvell,armada-375-pp2",
- 		.data = (void *)MVPP21,
- 	},
-+	{
-+		.compatible = "marvell,armada-7k-pp22",
-+		.data = (void *)MVPP22,
-+	},
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, mvpp2_match);
+@@ -157,6 +157,34 @@
+ #define MVPP2_WIN_REMAP(w)			(0x4040 + ((w) << 2))
+ #define MVPP2_BASE_ADDR_ENABLE			0x4060
+ 
++/* AXI Bridge Registers */
++#define MVPP22_AXI_BM_WR_ATTR_REG		0x4100
++#define MVPP22_AXI_BM_RD_ATTR_REG		0x4104
++#define MVPP22_AXI_AGGRQ_DESCR_RD_ATTR_REG	0x4110
++#define MVPP22_AXI_TXQ_DESCR_WR_ATTR_REG	0x4114
++#define MVPP22_AXI_TXQ_DESCR_RD_ATTR_REG	0x4118
++#define MVPP22_AXI_RXQ_DESCR_WR_ATTR_REG	0x411c
++#define MVPP22_AXI_RX_DATA_WR_ATTR_REG		0x4120
++#define MVPP22_AXI_TX_DATA_RD_ATTR_REG		0x4130
++#define MVPP22_AXI_RD_NORMAL_CODE_REG		0x4150
++#define MVPP22_AXI_RD_SNOOP_CODE_REG		0x4154
++#define MVPP22_AXI_WR_NORMAL_CODE_REG		0x4160
++#define MVPP22_AXI_WR_SNOOP_CODE_REG		0x4164
++
++/* Values for AXI Bridge registers */
++#define MVPP22_AXI_ATTR_CACHE_OFFS		0
++#define MVPP22_AXI_ATTR_DOMAIN_OFFS		12
++
++#define MVPP22_AXI_CODE_CACHE_OFFS		0
++#define MVPP22_AXI_CODE_DOMAIN_OFFS		4
++
++#define MVPP22_AXI_CODE_CACHE_NON_CACHE		0x3
++#define MVPP22_AXI_CODE_CACHE_WR_CACHE		0x7
++#define MVPP22_AXI_CODE_CACHE_RD_CACHE		0xb
++
++#define MVPP22_AXI_CODE_DOMAIN_OUTER_DOM	2
++#define MVPP22_AXI_CODE_DOMAIN_SYSTEM		3
++
+ /* Interrupt Cause and Mask registers */
+ #define MVPP2_ISR_RX_THRESHOLD_REG(rxq)		(0x5200 + 4 * (rxq))
+ #define     MVPP2_MAX_ISR_RX_THRESHOLD		0xfffff0
+@@ -6640,6 +6668,60 @@ static void mvpp2_rx_fifo_init(struct mvpp2 *priv)
+ 	mvpp2_write(priv, MVPP2_RX_FIFO_INIT_REG, 0x1);
+ }
+ 
++static void mvpp2_axi_init(struct mvpp2 *priv)
++{
++	u32 val, rdval, wrval;
++
++	mvpp2_write(priv, MVPP22_BM_ADDR_HIGH_RLS_REG, 0x0);
++
++	/* AXI Bridge Configuration */
++
++	rdval = MVPP22_AXI_CODE_CACHE_RD_CACHE
++		<< MVPP22_AXI_ATTR_CACHE_OFFS;
++	rdval |= MVPP22_AXI_CODE_DOMAIN_OUTER_DOM
++		<< MVPP22_AXI_ATTR_DOMAIN_OFFS;
++
++	wrval = MVPP22_AXI_CODE_CACHE_WR_CACHE
++		<< MVPP22_AXI_ATTR_CACHE_OFFS;
++	wrval |= MVPP22_AXI_CODE_DOMAIN_OUTER_DOM
++		<< MVPP22_AXI_ATTR_DOMAIN_OFFS;
++
++	/* BM */
++	mvpp2_write(priv, MVPP22_AXI_BM_WR_ATTR_REG, wrval);
++	mvpp2_write(priv, MVPP22_AXI_BM_RD_ATTR_REG, rdval);
++
++	/* Descriptors */
++	mvpp2_write(priv, MVPP22_AXI_AGGRQ_DESCR_RD_ATTR_REG, rdval);
++	mvpp2_write(priv, MVPP22_AXI_TXQ_DESCR_WR_ATTR_REG, wrval);
++	mvpp2_write(priv, MVPP22_AXI_TXQ_DESCR_RD_ATTR_REG, rdval);
++	mvpp2_write(priv, MVPP22_AXI_RXQ_DESCR_WR_ATTR_REG, wrval);
++
++	/* Buffer Data */
++	mvpp2_write(priv, MVPP22_AXI_TX_DATA_RD_ATTR_REG, rdval);
++	mvpp2_write(priv, MVPP22_AXI_RX_DATA_WR_ATTR_REG, wrval);
++
++	val = MVPP22_AXI_CODE_CACHE_NON_CACHE
++		<< MVPP22_AXI_CODE_CACHE_OFFS;
++	val |= MVPP22_AXI_CODE_DOMAIN_SYSTEM
++		<< MVPP22_AXI_CODE_DOMAIN_OFFS;
++	mvpp2_write(priv, MVPP22_AXI_RD_NORMAL_CODE_REG, val);
++	mvpp2_write(priv, MVPP22_AXI_WR_NORMAL_CODE_REG, val);
++
++	val = MVPP22_AXI_CODE_CACHE_RD_CACHE
++		<< MVPP22_AXI_CODE_CACHE_OFFS;
++	val |= MVPP22_AXI_CODE_DOMAIN_OUTER_DOM
++		<< MVPP22_AXI_CODE_DOMAIN_OFFS;
++
++	mvpp2_write(priv, MVPP22_AXI_RD_SNOOP_CODE_REG, val);
++
++	val = MVPP22_AXI_CODE_CACHE_WR_CACHE
++		<< MVPP22_AXI_CODE_CACHE_OFFS;
++	val |= MVPP22_AXI_CODE_DOMAIN_OUTER_DOM
++		<< MVPP22_AXI_CODE_DOMAIN_OFFS;
++
++	mvpp2_write(priv, MVPP22_AXI_WR_SNOOP_CODE_REG, val);
++}
++
+ /* Initialize network controller common part HW */
+ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
+ {
+@@ -6659,6 +6741,9 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
+ 	if (dram_target_info)
+ 		mvpp2_conf_mbus_windows(dram_target_info, priv);
+ 
++	if (priv->hw_version == MVPP22)
++		mvpp2_axi_init(priv);
++
+ 	/* Disable HW PHY polling */
+ 	if (priv->hw_version == MVPP21) {
+ 		val = readl(priv->lms_base + MVPP2_PHY_AN_CFG0_REG);
 -- 
 2.7.4
