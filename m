@@ -1,66 +1,68 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 28 Dec 2016 17:46:16 +0100
-Subject: [PATCHv2 net-next 00/16] net: mvpp2: add basic support for PPv2.2
-Message-ID: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 28 Dec 2016 17:46:19 +0100
+Subject: [PATCHv2 net-next 03/16] net: mvpp2: add hw_version field in "struct
+ mvpp2"
+In-Reply-To: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482943592-12556-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+In preparation to the introduction for the support of PPv2.2 in the
+mvpp2 driver, this commit adds a hw_version field to the struct
+mvpp2, and uses the .data field of the DT match table to fill it in.
 
-The goal of this patch series is to add basic support for PPv2.2 in
-the existing mvpp2 driver. mvpp2 currently supported the PPv2.1
-version of the IP, used in the 32 bits Marvell Armada 375 SoC. PPv2.2
-is an evolution of this IP block, used in the 64 bits Marvell Armada
-7K/8K SoCs.
+Having the MVPP21 and MVPP22 definitions available will allow to start
+adding the necessary conditional code to support PPv2.2.
 
-In order to ease the review, the introduction of PPv2.2 support has
-been made into multiple small commits, with the final commit adding
-the compatible string that makes the PPv2.2 support actually
-usable. The series remain fully bisectable.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/mvpp2.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-This series depends on the series named "net: mvpp2: misc improvements
-and preparation patches".
-
-I'd like to thank Stefan Chulski and Marcin Wojtas, who helped me a
-lot in the development of this patch series, by reviewing the patches,
-and giving lots of useful hints to debug the driver on PPv2.2. Thanks!
-
-Changes since v1:
-
- - Made a separate series from the set of patches doing preparation
-   changes/fixes to the mvpp2 driver.
-
- - Rebased on top of v4.10-rc1.
-
- - Update Kconfig text of the mvpp2 driver to mention the support for
-   Armada 7K and 8K (PPv2.2).
-
-Best regards,
-
-Thomas
-
-Thomas Petazzoni (16):
-  dt-bindings: net: update Marvell PPv2 binding for PPv2.2 support
-  net: mvpp2: add and use accessors for TX/RX descriptors
-  net: mvpp2: add hw_version field in "struct mvpp2"
-  net: mvpp2: introduce an intermediate union for the TX/RX descriptors
-  net: mvpp2: introduce PPv2.2 HW descriptors and adapt accessors
-  net: mvpp2: adjust the allocation/free of BM pools for PPv2.2
-  net: mvpp2: adapt the mvpp2_rxq_*_pool_set functions to PPv2.2
-  net: mvpp2: adapt mvpp2_defaults_set() to PPv2.2
-  net: mvpp2: adjust mvpp2_{rxq,txq}_init for PPv2.2
-  net: mvpp2: handle register mapping and access for PPv2.2
-  net: mvpp2: handle misc PPv2.1/PPv2.2 differences
-  net: mvpp2: add AXI bridge initialization for PPv2.2
-  net: mvpp2: rework RXQ interrupt group initialization for PPv2.2
-  net: mvpp2: adapt rxq distribution to PPv2.2
-  net: mvpp2: add support for an additional clock needed for PPv2.2
-  net: mvpp2: finally add the PPv2.2 compatible string
-
- .../devicetree/bindings/net/marvell-pp2.txt        |  66 +-
- drivers/net/ethernet/marvell/Kconfig               |   4 +-
- drivers/net/ethernet/marvell/mvpp2.c               | 783 +++++++++++++++++----
- 3 files changed, 700 insertions(+), 153 deletions(-)
-
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index fd84923..bc359a9 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -25,6 +25,7 @@
+ #include <linux/of_mdio.h>
+ #include <linux/of_net.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/phy.h>
+ #include <linux/clk.h>
+ #include <linux/hrtimer.h>
+@@ -649,6 +650,9 @@ struct mvpp2 {
+ 
+ 	/* Tclk value */
+ 	u32 tclk;
++
++	/* HW version */
++	enum { MVPP21, MVPP22 } hw_version;
+ };
+ 
+ struct mvpp2_pcpu_stats {
+@@ -6480,6 +6484,9 @@ static int mvpp2_probe(struct platform_device *pdev)
+ 	if (!priv)
+ 		return -ENOMEM;
+ 
++	priv->hw_version =
++		(unsigned long)of_device_get_match_data(&pdev->dev);
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	priv->base = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(priv->base))
+@@ -6584,7 +6591,10 @@ static int mvpp2_remove(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id mvpp2_match[] = {
+-	{ .compatible = "marvell,armada-375-pp2" },
++	{
++		.compatible = "marvell,armada-375-pp2",
++		.data = (void *)MVPP21,
++	},
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, mvpp2_match);
 -- 
 2.7.4
