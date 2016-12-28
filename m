@@ -1,32 +1,31 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 28 Dec 2016 17:10:20 +0800
-Subject: [PATCH] crypto: arm/aes-neonbs - process 8 blocks in parallel if
- we can
-In-Reply-To: <CAKv+Gu8OkOR3Xzx=XEOWyFpo6sLiq=WQrq0SauaY0V57uYetCQ@mail.gmail.com>
-References: <1481291246-20216-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161227085745.GA10121@gondor.apana.org.au>
- <CAKv+Gu8OkOR3Xzx=XEOWyFpo6sLiq=WQrq0SauaY0V57uYetCQ@mail.gmail.com>
-Message-ID: <20161228091020.GE11904@gondor.apana.org.au>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 28 Dec 2016 09:11:03 +0000
+Subject: [PATCH 0/2] crypto: arm64/ARM: NEON accelerated ChaCha20
+In-Reply-To: <20161228090350.GD11904@gondor.apana.org.au>
+References: <1481207339-17332-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20161227100400.GA10629@gondor.apana.org.au>
+ <6124F827-BA28-4A3D-B05F-EBCB1323955D@linaro.org>
+ <20161228090350.GD11904@gondor.apana.org.au>
+Message-ID: <AA6F25FA-C998-462F-9E25-FF543BBE3EA7@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2016 at 06:35:46PM +0000, Ard Biesheuvel wrote:
->
-> OK, I will try to hack something up.
+
+> On 28 Dec 2016, at 09:03, Herbert Xu <herbert@gondor.apana.org.au> wrote:
 > 
-> One thing to keep in mind though is that stacked chaining modes should
-> present the data with the same granularity for optimal performance.
-> E.g., xts(ecb(aes)) should pass 8 blocks at a time. How should this
-> requirement be incorporated according to you?
+>> On Tue, Dec 27, 2016 at 02:26:35PM +0000, Ard Biesheuvel wrote:
+>> 
+>> You just nacked the v2 of this series (due to the chunksize/walksize) and i rewrote them as skciphers as well
+> 
+> Sorry.  Would you like me to revert or just send a new series
+> on top of this?
+> 
 
-xts tries to do a page at a time, which should be good enough, no?
+No worries. If you can, please drop them entirely, or revert them otherwise. I will resend after the holidays
 
-In general this parameter should be visible to internal API users
-such as xts so they could use it to determine how it wants to
-structure its walks.
 
-Cheers,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+> Thanks,
+> -- 
+> Email: Herbert Xu <herbert@gondor.apana.org.au>
+> Home Page: http://gondor.apana.org.au/~herbert/
+> PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
