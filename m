@@ -1,93 +1,139 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 28 Dec 2016 14:56:57 -0800
-Subject: [PATCH v6 11/25] usb: chipidea: vbus event may exist before starting
- gadget
+Date: Wed, 28 Dec 2016 14:56:50 -0800
+Subject: [PATCH v6 04/25] usb: chipidea: Only read/write OTGSC from one place
 In-Reply-To: <20161228225711.698-1-stephen.boyd@linaro.org>
 References: <20161228225711.698-1-stephen.boyd@linaro.org>
-Message-ID: <20161228225711.698-12-stephen.boyd@linaro.org>
+Message-ID: <20161228225711.698-5-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Chen <peter.chen@nxp.com>
+With the id and vbus detection done via extcon we need to make
+sure we poll the status of OTGSC properly by considering what the
+extcon is saying, and not just what the register is saying. Let's
+move this hw_wait_reg() function to the only place it's used and
+simplify it for polling the OTGSC register. Then we can make
+certain we only use the hw_read_otgsc() API to read OTGSC, which
+will make sure we properly handle extcon events.
 
-At some situations, the vbus may already be there before starting
-gadget. So we need to check vbus event after switch to gadget in
-order to handle missing vbus event. The typical use cases are plugging
-vbus cable before driver load or the vbus has already been there
-after stopping host but before starting gadget.
-
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
-Tested-by: Stephen Boyd <stephen.boyd@linaro.org>
-Reviewed-by: Stephen Boyd <stephen.boyd@linaro.org>
-[sboyd at codeaurora.org: Modify comment text per list discussion]
+Acked-by: Peter Chen <peter.chen@nxp.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: "Ivan T. Ivanov" <iivanov.xz@gmail.com>
+Fixes: 3ecb3e09b042 ("usb: chipidea: Use extcon framework for VBUS and ID detect")
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/chipidea/core.c |  4 ----
- drivers/usb/chipidea/otg.c  | 14 +++++++++-----
- drivers/usb/chipidea/udc.c  |  2 ++
- 3 files changed, 11 insertions(+), 9 deletions(-)
+ drivers/usb/chipidea/ci.h   |  3 ---
+ drivers/usb/chipidea/core.c | 32 --------------------------------
+ drivers/usb/chipidea/otg.c  | 34 ++++++++++++++++++++++++++++++----
+ 3 files changed, 30 insertions(+), 39 deletions(-)
 
+diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+index cd414559040f..05bc4d631cb9 100644
+--- a/drivers/usb/chipidea/ci.h
++++ b/drivers/usb/chipidea/ci.h
+@@ -428,9 +428,6 @@ int hw_port_test_set(struct ci_hdrc *ci, u8 mode);
+ 
+ u8 hw_port_test_get(struct ci_hdrc *ci);
+ 
+-int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
+-				u32 value, unsigned int timeout_ms);
+-
+ void ci_platform_configure(struct ci_hdrc *ci);
+ 
+ int dbg_create_files(struct ci_hdrc *ci);
 diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 8a020ebbbe2f..37f888e31f10 100644
+index 3dbb4a21ab44..6e0d614a8075 100644
 --- a/drivers/usb/chipidea/core.c
 +++ b/drivers/usb/chipidea/core.c
-@@ -979,10 +979,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 	}
+@@ -516,38 +516,6 @@ int hw_device_reset(struct ci_hdrc *ci)
+ 	return 0;
+ }
  
- 	if (!ci_otg_is_fsm_mode(ci)) {
--		/* only update vbus status for peripheral */
--		if (ci->role == CI_ROLE_GADGET)
--			ci_handle_vbus_change(ci);
+-/**
+- * hw_wait_reg: wait the register value
+- *
+- * Sometimes, it needs to wait register value before going on.
+- * Eg, when switch to device mode, the vbus value should be lower
+- * than OTGSC_BSV before connects to host.
+- *
+- * @ci: the controller
+- * @reg: register index
+- * @mask: mast bit
+- * @value: the bit value to wait
+- * @timeout_ms: timeout in millisecond
+- *
+- * This function returns an error code if timeout
+- */
+-int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
+-				u32 value, unsigned int timeout_ms)
+-{
+-	unsigned long elapse = jiffies + msecs_to_jiffies(timeout_ms);
 -
- 		ret = ci_role_start(ci, ci->role);
- 		if (ret) {
- 			dev_err(dev, "can't start %s role\n",
+-	while (hw_read(ci, reg, mask) != value) {
+-		if (time_after(jiffies, elapse)) {
+-			dev_err(ci->dev, "timeout waiting for %08x in %d\n",
+-					mask, reg);
+-			return -ETIMEDOUT;
+-		}
+-		msleep(20);
+-	}
+-
+-	return 0;
+-}
+-
+ static irqreturn_t ci_irq(int irq, void *data)
+ {
+ 	struct ci_hdrc *ci = data;
 diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-index 695f3fe3ae21..c972ed23b8ec 100644
+index 03b6743461d1..a829607c3e4d 100644
 --- a/drivers/usb/chipidea/otg.c
 +++ b/drivers/usb/chipidea/otg.c
-@@ -134,9 +134,9 @@ void ci_handle_vbus_change(struct ci_hdrc *ci)
- 	if (!ci->is_otg)
- 		return;
- 
--	if (hw_read_otgsc(ci, OTGSC_BSV))
-+	if (hw_read_otgsc(ci, OTGSC_BSV) && !ci->vbus_active)
- 		usb_gadget_vbus_connect(&ci->gadget);
--	else
-+	else if (!hw_read_otgsc(ci, OTGSC_BSV) && ci->vbus_active)
+@@ -104,7 +104,31 @@ void ci_handle_vbus_change(struct ci_hdrc *ci)
  		usb_gadget_vbus_disconnect(&ci->gadget);
  }
  
-@@ -175,10 +175,14 @@ static void ci_handle_id_switch(struct ci_hdrc *ci)
- 
+-#define CI_VBUS_STABLE_TIMEOUT_MS 5000
++/**
++ * When we switch to device mode, the vbus value should be lower
++ * than OTGSC_BSV before connecting to host.
++ *
++ * @ci: the controller
++ *
++ * This function returns an error code if timeout
++ */
++static int hw_wait_vbus_lower_bsv(struct ci_hdrc *ci)
++{
++	unsigned long elapse = jiffies + msecs_to_jiffies(5000);
++	u32 mask = OTGSC_BSV;
++
++	while (hw_read_otgsc(ci, mask)) {
++		if (time_after(jiffies, elapse)) {
++			dev_err(ci->dev, "timeout waiting for %08x in OTGSC\n",
++					mask);
++			return -ETIMEDOUT;
++		}
++		msleep(20);
++	}
++
++	return 0;
++}
++
+ static void ci_handle_id_switch(struct ci_hdrc *ci)
+ {
+ 	enum ci_role role = ci_otg_role(ci);
+@@ -116,9 +140,11 @@ static void ci_handle_id_switch(struct ci_hdrc *ci)
  		ci_role_stop(ci);
  
--		if (role == CI_ROLE_GADGET)
-+		if (role == CI_ROLE_GADGET &&
-+				IS_ERR(ci->platdata->vbus_extcon.edev))
- 			/*
--			 * wait vbus lower than OTGSC_BSV before connecting
--			 * to host
-+			 * wait vbus lower than OTGSC_BSV before connecting to
-+			 * host. If connecting status is from an external
-+			 * connector instead of register, we don't need to care
-+			 * vbus on the board, since it will not affect external
-+			 * connector status.
- 			 */
- 			hw_wait_vbus_lower_bsv(ci);
+ 		if (role == CI_ROLE_GADGET)
+-			/* wait vbus lower than OTGSC_BSV */
+-			hw_wait_reg(ci, OP_OTGSC, OTGSC_BSV, 0,
+-					CI_VBUS_STABLE_TIMEOUT_MS);
++			/*
++			 * wait vbus lower than OTGSC_BSV before connecting
++			 * to host
++			 */
++			hw_wait_vbus_lower_bsv(ci);
  
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index 732b281485de..0db56fb7e9e9 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -1961,6 +1961,8 @@ static int udc_id_switch_for_device(struct ci_hdrc *ci)
- 		/* Clear and enable BSV irq */
- 		hw_write_otgsc(ci, OTGSC_BSVIS | OTGSC_BSVIE,
- 					OTGSC_BSVIS | OTGSC_BSVIE);
-+	/* vbus change may has already been occurred */
-+	ci_handle_vbus_change(ci);
- 
- 	return 0;
- }
+ 		ci_role_start(ci, role);
+ 	}
 -- 
 2.10.0.297.gf6727b0
