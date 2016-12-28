@@ -1,48 +1,58 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Wed, 28 Dec 2016 13:46:46 +0800
-Subject: [PATCH 3/3] arm: dts: mt2701: Add power domain controller device node
-In-Reply-To: <1482904006-44232-1-git-send-email-jamesjj.liao@mediatek.com>
-References: <1482904006-44232-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1482904006-44232-4-git-send-email-jamesjj.liao@mediatek.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 28 Dec 2016 09:04:07 +0100
+Subject: [PATCH] arm64: Do not include linux/uaccess.h from assembler files
+In-Reply-To: <1482748268-10399-1-git-send-email-linux@roeck-us.net>
+References: <1482748268-10399-1-git-send-email-linux@roeck-us.net>
+Message-ID: <20161228090407.515543df@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add power domain controller node (scpsys) for MT2701.
+Hello,
 
-Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
----
- arch/arm/boot/dts/mt2701.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+On Mon, 26 Dec 2016 02:31:08 -0800, Guenter Roeck wrote:
+> Including linux/uaccess.h from assembler files in arm64 builds results
+> in the following build errors.
+> 
+> In file included from arm64/include/asm/asm-offsets.h:1:0,
+>                  from arch/arm64/include/asm/assembler.h:26,
+> 		 from arch/arm64/include/asm/alternative.h:68,
+> 		 from arch/arm64/kernel/entry.S
+> 
+> include/linux/sched/prio.h: Assembler messages:
+> include/linux/sched/prio.h:47: Error:
+> 	unknown mnemonic `static' --
+> 		`static inline long nice_to_rlimit(long nice)'
+> build/include/linux/sched/prio.h:48: Error:
+> 	junk at end of line, first unrecognized character is `{'
+> 
+> [and many more]
+> 
+> If asm/uaccess.h is not included, many of the affected files fail to build
+> with errors such as the following.
+> 
+> arch/arm64/lib/copy_to_user.S: Assembler messages:
+> arch/arm64/lib/copy_to_user.S:66: Error:
+> 	unknown mnemonic `uaccess_enable_not_uao' --
+> 		`uaccess_enable_not_uao x3,x4'
+> arch/arm64/lib/copy_template.S:71: Error:
+> 	unknown mnemonic `uao_user_alternative' --
+> 		`uao_user_alternative 9998f,strb,st trb,tmp1w,dst,#1'
+> 
+> Either drop the include if unnecessary or, if needed, replace with
+> asm/uaccess.h.
+> 
+> Fixes: 7c0f6ba682b9 ("Replace <asm/uaccess.h> with <linux/uaccess.h> globally")
+> Cc: Linus Torvalds <torvalds@linux-foundation.org>
+> Cc: Al Viro <viro@zeniv.linux.org.uk>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 150c48d..bdf8954 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -13,6 +13,7 @@
-  */
- 
- #include <dt-bindings/clock/mt2701-clk.h>
-+#include <dt-bindings/power/mt2701-power.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/reset/mt2701-resets.h>
-@@ -134,6 +135,17 @@
- 		reg = <0 0x10005000 0 0x1000>;
- 	};
- 
-+	scpsys: scpsys at 10006000 {
-+		compatible = "mediatek,mt2701-scpsys", "syscon";
-+		#power-domain-cells = <1>;
-+		reg = <0 0x10006000 0 0x1000>;
-+		infracfg = <&infracfg>;
-+		clocks = <&topckgen CLK_TOP_MM_SEL>,
-+			 <&topckgen CLK_TOP_MFG_SEL>,
-+			 <&topckgen CLK_TOP_ETHIF_SEL>;
-+		clock-names = "mm", "mfg", "ethif";
-+	};
-+
- 	watchdog: watchdog at 10007000 {
- 		compatible = "mediatek,mt2701-wdt",
- 			     "mediatek,mt6589-wdt";
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+ (fixes the arm64 build, result boot tested on real HW)
+
+Thanks,
+
+Thomas
 -- 
-1.9.1
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
