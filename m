@@ -1,54 +1,106 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 28 Dec 2016 17:46:24 +0100
-Subject: [PATCHv2 net-next 08/16] net: mvpp2: adapt mvpp2_defaults_set() to
- PPv2.2
+Date: Wed, 28 Dec 2016 17:46:27 +0100
+Subject: [PATCHv2 net-next 11/16] net: mvpp2: handle misc PPv2.1/PPv2.2
+ differences
 In-Reply-To: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482943592-12556-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482943592-12556-12-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit modifies the mvpp2_defaults_set() function to not do the
-loopback and FIFO threshold initialization, which are not needed for
-PPv2.2.
+This commit handles a few miscellaneous differences between PPv2.1 and
+PPv2.2 in different areas, where code done for PPv2.1 doesn't apply for
+PPv2.2 or needs to be adjusted (getting the MAC address, disabling PHY
+polling, etc.).
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 22 ++++++++++++----------
- 1 file changed, 12 insertions(+), 10 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 31 ++++++++++++++++++++++---------
+ 1 file changed, 22 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 8fc818d..23f2368 100644
+index 389cc62..eb55576 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -4205,16 +4205,18 @@ static void mvpp2_defaults_set(struct mvpp2_port *port)
- {
- 	int tx_port_num, val, queue, ptxq, lrxq;
+@@ -304,6 +304,9 @@
+ #define      MVPP2_GMAC_TX_FIFO_MIN_TH_MASK(v)	(((v) << 6) & \
+ 					MVPP2_GMAC_TX_FIFO_MIN_TH_ALL_MASK)
  
--	/* Configure port to loopback if needed */
--	if (port->flags & MVPP2_F_LOOPBACK)
--		mvpp2_port_loopback_set(port);
--
--	/* Update TX FIFO MIN Threshold */
--	val = readl(port->base + MVPP2_GMAC_PORT_FIFO_CFG_1_REG);
--	val &= ~MVPP2_GMAC_TX_FIFO_MIN_TH_ALL_MASK;
--	/* Min. TX threshold must be less than minimal packet length */
--	val |= MVPP2_GMAC_TX_FIFO_MIN_TH_MASK(64 - 4 - 2);
--	writel(val, port->base + MVPP2_GMAC_PORT_FIFO_CFG_1_REG);
-+	if (port->priv->hw_version == MVPP21) {
-+		/* Configure port to loopback if needed */
-+		if (port->flags & MVPP2_F_LOOPBACK)
-+			mvpp2_port_loopback_set(port);
++#define MVPP22_SMI_MISC_CFG_REG			0x2a204
++#define      MVPP22_SMI_POLLING_EN		BIT(10)
 +
-+		/* Update TX FIFO MIN Threshold */
-+		val = readl(port->base + MVPP2_GMAC_PORT_FIFO_CFG_1_REG);
-+		val &= ~MVPP2_GMAC_TX_FIFO_MIN_TH_ALL_MASK;
-+		/* Min. TX threshold must be less than minimal packet length */
-+		val |= MVPP2_GMAC_TX_FIFO_MIN_TH_MASK(64 - 4 - 2);
-+		writel(val, port->base + MVPP2_GMAC_PORT_FIFO_CFG_1_REG);
+ #define MVPP22_PORT_BASE			0x30e00
+ #define MVPP22_PORT_OFFSET			0x1000
+ 
+@@ -5823,7 +5826,7 @@ static int mvpp2_check_ringparam_valid(struct net_device *dev,
+ 	return 0;
+ }
+ 
+-static void mvpp2_get_mac_address(struct mvpp2_port *port, unsigned char *addr)
++static void mvpp21_get_mac_address(struct mvpp2_port *port, unsigned char *addr)
+ {
+ 	u32 mac_addr_l, mac_addr_m, mac_addr_h;
+ 
+@@ -6272,7 +6275,7 @@ static const struct ethtool_ops mvpp2_eth_tool_ops = {
+ 
+ /* Driver initialization */
+ 
+-static void mvpp2_port_power_up(struct mvpp2_port *port)
++static void mvpp21_port_power_up(struct mvpp2_port *port)
+ {
+ 	mvpp2_port_mii_set(port);
+ 	mvpp2_port_periodic_xon_disable(port);
+@@ -6491,7 +6494,8 @@ static int mvpp2_port_probe(struct platform_device *pdev,
+ 		mac_from = "device tree";
+ 		ether_addr_copy(dev->dev_addr, dt_mac_addr);
+ 	} else {
+-		mvpp2_get_mac_address(port, hw_mac_addr);
++		if (priv->hw_version == MVPP21)
++			mvpp21_get_mac_address(port, hw_mac_addr);
+ 		if (is_valid_ether_addr(hw_mac_addr)) {
+ 			mac_from = "hardware";
+ 			ether_addr_copy(dev->dev_addr, hw_mac_addr);
+@@ -6511,7 +6515,9 @@ static int mvpp2_port_probe(struct platform_device *pdev,
+ 		dev_err(&pdev->dev, "failed to init port %d\n", id);
+ 		goto err_free_stats;
+ 	}
+-	mvpp2_port_power_up(port);
++
++	if (priv->hw_version == MVPP21)
++		mvpp21_port_power_up(port);
+ 
+ 	port->pcpu = alloc_percpu(struct mvpp2_port_pcpu);
+ 	if (!port->pcpu) {
+@@ -6654,9 +6660,15 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
+ 		mvpp2_conf_mbus_windows(dram_target_info, priv);
+ 
+ 	/* Disable HW PHY polling */
+-	val = readl(priv->lms_base + MVPP2_PHY_AN_CFG0_REG);
+-	val |= MVPP2_PHY_AN_STOP_SMI0_MASK;
+-	writel(val, priv->lms_base + MVPP2_PHY_AN_CFG0_REG);
++	if (priv->hw_version == MVPP21) {
++		val = readl(priv->lms_base + MVPP2_PHY_AN_CFG0_REG);
++		val |= MVPP2_PHY_AN_STOP_SMI0_MASK;
++		writel(val, priv->lms_base + MVPP2_PHY_AN_CFG0_REG);
++	} else {
++		val = readl(priv->iface_base + MVPP22_SMI_MISC_CFG_REG);
++		val &= ~MVPP22_SMI_POLLING_EN;
++		writel(val, priv->iface_base + MVPP22_SMI_MISC_CFG_REG);
 +	}
  
- 	/* Disable Legacy WRR, Disable EJP, Release from reset */
- 	tx_port_num = mvpp2_egress_port(port);
+ 	/* Allocate and initialize aggregated TXQs */
+ 	priv->aggr_txqs = devm_kcalloc(&pdev->dev, num_present_cpus(),
+@@ -6681,8 +6693,9 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
+ 	for (i = 0; i < MVPP2_MAX_PORTS; i++)
+ 		mvpp2_write(priv, MVPP2_ISR_RXQ_GROUP_REG(i), rxq_number);
+ 
+-	writel(MVPP2_EXT_GLOBAL_CTRL_DEFAULT,
+-	       priv->lms_base + MVPP2_MNG_EXTENDED_GLOBAL_CTRL_REG);
++	if (priv->hw_version == MVPP21)
++		writel(MVPP2_EXT_GLOBAL_CTRL_DEFAULT,
++		       priv->lms_base + MVPP2_MNG_EXTENDED_GLOBAL_CTRL_REG);
+ 
+ 	/* Allow cache snoop when transmiting packets */
+ 	mvpp2_write(priv, MVPP2_TX_SNOOP_REG, 0x1);
 -- 
 2.7.4
