@@ -1,22 +1,34 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 28 Dec 2016 13:47:32 -0200
-Subject: [PATCH] irqchip: mxs: Enable SKIP_SET_WAKE and MASK_ON_SUSPEND
-In-Reply-To: <1482863397-11400-1-git-send-email-stefan.wahren@i2se.com>
-References: <1482863397-11400-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <CAOMZO5C-TyDk5=kCuraOb_L8icCPrvBKryhhn-s-C76EGta8=Q@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 28 Dec 2016 17:46:00 +0100
+Subject: [PATCHv2 net-next 04/11] net: mvpp2: remove unused 'tx_skb' field of
+ 'struct mvpp2_tx_queue'
+In-Reply-To: <1482943567-12483-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1482943567-12483-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482943567-12483-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2016 at 4:29 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> The ICOLL controller doesn't provide any facility to configure the
-> wakeup sources. That's the reason why this implementation lacks
-> the irq_set_wake implementation. But this prevent us from properly
-> entering power management states like "suspend to idle".
->
-> So enable the flags IRQCHIP_SKIP_SET_WAKE and
-> IRQCHIP_MASK_ON_SUSPEND to let the irqchip core allows and handles
-> the power management.
->
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+This commit remove a field of 'struct mvpp2_tx_queue' that is not used
+anywhere.
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/mvpp2.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index d098c7b..6720cdac 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -823,9 +823,6 @@ struct mvpp2_tx_queue {
+ 	/* Per-CPU control of physical Tx queues */
+ 	struct mvpp2_txq_pcpu __percpu *pcpu;
+ 
+-	/* Array of transmitted skb */
+-	struct sk_buff **tx_skb;
+-
+ 	u32 done_pkts_coal;
+ 
+ 	/* Virtual address of thex Tx DMA descriptors array */
+-- 
+2.7.4
