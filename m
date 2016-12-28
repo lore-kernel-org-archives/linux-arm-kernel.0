@@ -1,40 +1,25 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 28 Dec 2016 22:46:51 +0100
-Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21,
- i.MX27 and i.MX31 SoCs
-In-Reply-To: <CAOMZO5BD3Y6vXwt7_bdv_KyGvKSYru1vzDowsD81fzEbM4gHPA@mail.gmail.com>
-References: <fe9b03bf-9c37-862f-b3aa-0f9b5a4dfefb@roeck-us.net>
- <bedae3d8-3057-36e4-1d89-ec41f9f1a25b@mleia.com>
- <20161223083256.3wdqou5xmhr7fidn@pengutronix.de>
- <74751709-c32e-b1b3-4fa3-613f7d57d1d8@mleia.com>
- <20161223100113.s57bi7257yero7f7@pengutronix.de>
- <7018c466-2467-a9fc-2382-889d3a62741e@mentor.com>
- <20161223141139.rlsvoonih5lhnnpu@pengutronix.de>
- <c22600d5-f6b5-4c13-59b4-ba391ea29a4c@mleia.com>
- <20161228205419.la74jr4rfes7fa4v@pengutronix.de>
- <CAOMZO5BD3Y6vXwt7_bdv_KyGvKSYru1vzDowsD81fzEbM4gHPA@mail.gmail.com>
-Message-ID: <20161228214651.oncshkvksqep3krk@pengutronix.de>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Wed, 28 Dec 2016 14:06:18 -0800
+Subject: [PATCH v5 0/2] qcom OTG regulator support
+In-Reply-To: <20161018004251.28733-1-stephen.boyd@linaro.org>
+References: <20161018004251.28733-1-stephen.boyd@linaro.org>
+Message-ID: <CAJOFmgySF7T1N6PDiw2rsQ+n68_k7n_M0TzXZe4S7PxTHmRapA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 28, 2016 at 07:33:26PM -0200, Fabio Estevam wrote:
-> On Wed, Dec 28, 2016 at 6:54 PM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> 
-> > I'd do it the other way around and so get more and simpler patches:
-> >
-> >  - make driver aware of i.MX35
-> >  - fix dtsi to use i.MX35 type where applicable
-> 
-> This would not work for old dtb's as they are not aware of the  i.mx35 type.
+Hi Sebastian,
 
-Right, so they would fall back to the i.MX21 type and not profit from
-Markus' change until either the dtb is updated or the third commit is
-added. I'll try to contact Markus to ask if he remembers more details.
+On Mon, Oct 17, 2016 at 5:42 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
+> This is a resend/resurrection of Tim's patches to add support
+> for the OTG regulator on some of qcom's PMICs[1]. I've made
+> some minor modifications to the driver to make it work, but
+> otherwise it works fine with my USB otg testing. Changes
+> are noted in a maintainer tag.
+>
+> Tim, did you want to me to fix the name? I pulled these from patchwork
+> and it seems you sent it as "Bird, Tim" which may have not been
+> intentional.
+>
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Can this be picked up for v4.11? Tim hasn't responded so I assume it's
+fine with the name.
