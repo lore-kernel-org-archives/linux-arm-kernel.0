@@ -1,90 +1,215 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 28 Dec 2016 17:46:29 +0100
-Subject: [PATCHv2 net-next 13/16] net: mvpp2: rework RXQ interrupt group
- initialization for PPv2.2
+Date: Wed, 28 Dec 2016 17:46:21 +0100
+Subject: [PATCHv2 net-next 05/16] net: mvpp2: introduce PPv2.2 HW descriptors
+ and adapt accessors
 In-Reply-To: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482943592-12556-14-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482943592-12556-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adjusts how the MVPP2_ISR_RXQ_GROUP_REG register is
-configured, since it changed between PPv2.1 and PPv2.2.
+This commit adds the definition of the PPv2.2 HW descriptors, adjusts
+the mvpp2_tx_desc and mvpp2_rx_desc structures accordingly, and adapts
+the accessors to work on both PPv2.1 and PPv2.2.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 45 ++++++++++++++++++++++++++++++++----
- 1 file changed, 41 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 109 +++++++++++++++++++++++++++++++----
+ 1 file changed, 98 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index d5b197d..baad991 100644
+index a37ff50..0e00ec0 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -188,7 +188,21 @@
- /* Interrupt Cause and Mask registers */
- #define MVPP2_ISR_RX_THRESHOLD_REG(rxq)		(0x5200 + 4 * (rxq))
- #define     MVPP2_MAX_ISR_RX_THRESHOLD		0xfffff0
--#define MVPP2_ISR_RXQ_GROUP_REG(rxq)		(0x5400 + 4 * (rxq))
-+#define MVPP21_ISR_RXQ_GROUP_REG(rxq)		(0x5400 + 4 * (rxq))
-+
-+#define MVPP22_ISR_RXQ_GROUP_INDEX_REG          0x5400
-+#define MVPP22_ISR_RXQ_GROUP_INDEX_SUBGROUP_MASK 0xf
-+#define MVPP22_ISR_RXQ_GROUP_INDEX_GROUP_MASK   0x380
-+#define MVPP22_ISR_RXQ_GROUP_INDEX_GROUP_OFFSET 7
-+
-+#define MVPP22_ISR_RXQ_GROUP_INDEX_SUBGROUP_MASK 0xf
-+#define MVPP22_ISR_RXQ_GROUP_INDEX_GROUP_MASK   0x380
-+
-+#define MVPP22_ISR_RXQ_SUB_GROUP_CONFIG_REG     0x5404
-+#define MVPP22_ISR_RXQ_SUB_GROUP_STARTQ_MASK    0x1f
-+#define MVPP22_ISR_RXQ_SUB_GROUP_SIZE_MASK      0xf00
-+#define MVPP22_ISR_RXQ_SUB_GROUP_SIZE_OFFSET    8
-+
- #define MVPP2_ISR_ENABLE_REG(port)		(0x5420 + 4 * (port))
- #define     MVPP2_ISR_ENABLE_INTERRUPT(mask)	((mask) & 0xffff)
- #define     MVPP2_ISR_DISABLE_INTERRUPT(mask)	(((mask) << 16) & 0xffff0000)
-@@ -6385,7 +6399,18 @@ static int mvpp2_port_init(struct mvpp2_port *port)
- 	}
+@@ -773,18 +773,42 @@ struct mvpp21_rx_desc {
+ 	u32 reserved8;
+ };
  
- 	/* Configure Rx queue group interrupt for this port */
--	mvpp2_write(priv, MVPP2_ISR_RXQ_GROUP_REG(port->id), rxq_number);
-+	if (priv->hw_version == MVPP21)
-+		mvpp2_write(priv, MVPP21_ISR_RXQ_GROUP_REG(port->id),
-+			    rxq_number);
-+	else {
-+		u32 val;
++/* HW TX descriptor for PPv2.2 */
++struct mvpp22_tx_desc {
++	u32 command;
++	u8  packet_offset;
++	u8  phys_txq;
++	u16 data_size;
++	u64 reserved1;
++	u64 buf_phys_addr_ptp;
++	u64 buf_cookie_misc;
++};
 +
-+		val = (port->id << MVPP22_ISR_RXQ_GROUP_INDEX_GROUP_OFFSET);
-+		mvpp2_write(priv, MVPP22_ISR_RXQ_GROUP_INDEX_REG, val);
++/* HW RX descriptor for PPv2.2 */
++struct mvpp22_rx_desc {
++	u32 status;
++	u16 reserved1;
++	u16 data_size;
++	u32 reserved2;
++	u32 reserved3;
++	u64 buf_phys_addr_key_hash;
++	u64 buf_cookie_misc;
++};
 +
-+		val = (rxq_number << MVPP22_ISR_RXQ_SUB_GROUP_SIZE_OFFSET);
-+		mvpp2_write(priv, MVPP22_ISR_RXQ_SUB_GROUP_CONFIG_REG, val);
+ /* Opaque type used by the driver to manipulate the HW TX and RX
+  * descriptors
+  */
+ struct mvpp2_tx_desc {
+ 	union {
+ 		struct mvpp21_tx_desc pp21;
++		struct mvpp22_tx_desc pp22;
+ 	};
+ };
+ 
+ struct mvpp2_rx_desc {
+ 	union {
+ 		struct mvpp21_rx_desc pp21;
++		struct mvpp22_rx_desc pp22;
+ 	};
+ };
+ 
+@@ -991,72 +1015,135 @@ static u32 mvpp2_read(struct mvpp2 *priv, u32 offset)
+ static dma_addr_t mvpp2_txdesc_phys_addr_get(struct mvpp2_port *port,
+ 					     struct mvpp2_tx_desc *tx_desc)
+ {
+-	return tx_desc->pp21.buf_phys_addr;
++	if (port->priv->hw_version == MVPP21)
++		return tx_desc->pp21.buf_phys_addr;
++	else
++		return tx_desc->pp22.buf_phys_addr_ptp & DMA_BIT_MASK(40);
+ }
+ 
+ static void mvpp2_txdesc_phys_addr_set(struct mvpp2_port *port,
+ 				       struct mvpp2_tx_desc *tx_desc,
+ 				       dma_addr_t phys_addr)
+ {
+-	tx_desc->pp21.buf_phys_addr = phys_addr;
++	if (port->priv->hw_version == MVPP21) {
++		tx_desc->pp21.buf_phys_addr = phys_addr;
++	} else {
++		u64 val = (u64)phys_addr;
++
++		tx_desc->pp22.buf_phys_addr_ptp &= ~DMA_BIT_MASK(40);
++		tx_desc->pp22.buf_phys_addr_ptp |= val;
 +	}
+ }
  
- 	/* Create Rx descriptor rings */
- 	for (queue = 0; queue < rxq_number; queue++) {
-@@ -6775,8 +6800,20 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
- 	mvpp2_rx_fifo_init(priv);
+ static size_t mvpp2_txdesc_size_get(struct mvpp2_port *port,
+ 				    struct mvpp2_tx_desc *tx_desc)
+ {
+-	return tx_desc->pp21.data_size;
++	if (port->priv->hw_version == MVPP21)
++		return tx_desc->pp21.data_size;
++	else
++		return tx_desc->pp22.data_size;
+ }
  
- 	/* Reset Rx queue group interrupt configuration */
--	for (i = 0; i < MVPP2_MAX_PORTS; i++)
--		mvpp2_write(priv, MVPP2_ISR_RXQ_GROUP_REG(i), rxq_number);
-+	for (i = 0; i < MVPP2_MAX_PORTS; i++) {
-+		if (priv->hw_version == MVPP21)
-+			mvpp2_write(priv, MVPP21_ISR_RXQ_GROUP_REG(i),
-+				    rxq_number);
-+		else {
-+			u32 val;
+ static void mvpp2_txdesc_size_set(struct mvpp2_port *port,
+ 				  struct mvpp2_tx_desc *tx_desc,
+ 				  size_t size)
+ {
+-	tx_desc->pp21.data_size = size;
++	if (port->priv->hw_version == MVPP21)
++		tx_desc->pp21.data_size = size;
++	else
++		tx_desc->pp22.data_size = size;
+ }
+ 
+ static void mvpp2_txdesc_txq_set(struct mvpp2_port *port,
+ 				 struct mvpp2_tx_desc *tx_desc,
+ 				 unsigned int txq)
+ {
+-	tx_desc->pp21.phys_txq = txq;
++	if (port->priv->hw_version == MVPP21)
++		tx_desc->pp21.phys_txq = txq;
++	else
++		tx_desc->pp22.phys_txq = txq;
+ }
+ 
+ static void mvpp2_txdesc_cmd_set(struct mvpp2_port *port,
+ 				 struct mvpp2_tx_desc *tx_desc,
+ 				 unsigned int command)
+ {
+-	tx_desc->pp21.command = command;
++	if (port->priv->hw_version == MVPP21)
++		tx_desc->pp21.command = command;
++	else
++		tx_desc->pp22.command = command;
+ }
+ 
+ static void mvpp2_txdesc_offset_set(struct mvpp2_port *port,
+ 				    struct mvpp2_tx_desc *tx_desc,
+ 				    unsigned int offset)
+ {
+-	tx_desc->pp21.packet_offset = offset;
++	if (port->priv->hw_version == MVPP21)
++		tx_desc->pp21.packet_offset = offset;
++	else
++		tx_desc->pp22.packet_offset = offset;
+ }
+ 
+ static dma_addr_t mvpp2_rxdesc_phys_addr_get(struct mvpp2_port *port,
+ 					     struct mvpp2_rx_desc *rx_desc)
+ {
+-	return rx_desc->pp21.buf_phys_addr;
++	if (port->priv->hw_version == MVPP21)
++		return rx_desc->pp21.buf_phys_addr;
++	else
++		return rx_desc->pp22.buf_phys_addr_key_hash & DMA_BIT_MASK(40);
+ }
+ 
+ static unsigned long mvpp2_rxdesc_virt_addr_get(struct mvpp2_port *port,
+ 						struct mvpp2_rx_desc *rx_desc)
+ {
+-	return rx_desc->pp21.buf_cookie;
++	/* PPv2.1 can only be used on 32 bits architectures, and there
++	 * are 32 bits in buf_cookie which are enough to store the
++	 * full virtual address, so things are easy.
++	 */
++	if (port->priv->hw_version == MVPP21) {
++		return rx_desc->pp21.buf_cookie;
++	} else {
++		/* On PPv2.2, the situation is more complicated,
++		 * because there is only 40 bits to store the virtual
++		 * address, which is not sufficient. So on 64 bits
++		 * systems, we use phys_to_virt() to get the virtual
++		 * address from the physical address, which is fine
++		 * because the kernel linear mapping includes the
++		 * entire 40 bits physical address space. On 32 bits
++		 * systems however, we can't use phys_to_virt(), but
++		 * since virtual addresses are 32 bits only, there is
++		 * enough space in the RX descriptor for the full
++		 * virtual address.
++		 */
++#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
++		dma_addr_t dma_addr =
++			rx_desc->pp22.buf_phys_addr_key_hash & DMA_BIT_MASK(40);
++		phys_addr_t phys_addr =
++			dma_to_phys(port->dev->dev.parent, dma_addr);
 +
-+			val = (i << MVPP22_ISR_RXQ_GROUP_INDEX_GROUP_OFFSET);
-+			mvpp2_write(priv, MVPP22_ISR_RXQ_GROUP_INDEX_REG, val);
-+
-+			val = (rxq_number << MVPP22_ISR_RXQ_SUB_GROUP_SIZE_OFFSET);
-+			mvpp2_write(priv, MVPP22_ISR_RXQ_SUB_GROUP_CONFIG_REG, val);
-+		}
++		return (unsigned long)phys_to_virt(phys_addr);
++#else
++		return rx_desc->pp22.buf_cookie_misc & DMA_BIT_MASK(40);
++#endif
 +	}
+ }
  
- 	if (priv->hw_version == MVPP21)
- 		writel(MVPP2_EXT_GLOBAL_CTRL_DEFAULT,
+ static size_t mvpp2_rxdesc_size_get(struct mvpp2_port *port,
+ 				    struct mvpp2_rx_desc *rx_desc)
+ {
+-	return rx_desc->pp21.data_size;
++	if (port->priv->hw_version == MVPP21)
++		return rx_desc->pp21.data_size;
++	else
++		return rx_desc->pp22.data_size;
+ }
+ 
+ static u32 mvpp2_rxdesc_status_get(struct mvpp2_port *port,
+ 				   struct mvpp2_rx_desc *rx_desc)
+ {
+-	return rx_desc->pp21.status;
++	if (port->priv->hw_version == MVPP21)
++		return rx_desc->pp21.status;
++	else
++		return rx_desc->pp22.status;
+ }
+ 
+ static void mvpp2_txq_inc_get(struct mvpp2_txq_pcpu *txq_pcpu)
 -- 
 2.7.4
