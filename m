@@ -1,168 +1,29 @@
-From: jkridner@gmail.com (Jason Kridner)
-Date: Wed, 28 Dec 2016 15:26:32 -0600
-Subject: [PATCH 2/4] ARM: dts: Add am335x-boneblack-wireless
-In-Reply-To: <20161227175837.28970-2-robertcnelson@gmail.com>
-References: <20161227175837.28970-1-robertcnelson@gmail.com>
- <20161227175837.28970-2-robertcnelson@gmail.com>
-Message-ID: <CB5C8999-6CAE-41F6-85A6-D2A856BD8011@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 28 Dec 2016 19:33:26 -0200
+Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21, i.MX27
+ and i.MX31 SoCs
+In-Reply-To: <20161228205419.la74jr4rfes7fa4v@pengutronix.de>
+References: <20161211102634.jn3awmlzdrm3pqai@pengutronix.de>
+ <2fc2558d-fe05-14a7-745e-f71d2178bad6@mleia.com>
+ <fe9b03bf-9c37-862f-b3aa-0f9b5a4dfefb@roeck-us.net>
+ <bedae3d8-3057-36e4-1d89-ec41f9f1a25b@mleia.com>
+ <20161223083256.3wdqou5xmhr7fidn@pengutronix.de>
+ <74751709-c32e-b1b3-4fa3-613f7d57d1d8@mleia.com>
+ <20161223100113.s57bi7257yero7f7@pengutronix.de>
+ <7018c466-2467-a9fc-2382-889d3a62741e@mentor.com>
+ <20161223141139.rlsvoonih5lhnnpu@pengutronix.de>
+ <c22600d5-f6b5-4c13-59b4-ba391ea29a4c@mleia.com>
+ <20161228205419.la74jr4rfes7fa4v@pengutronix.de>
+Message-ID: <CAOMZO5BD3Y6vXwt7_bdv_KyGvKSYru1vzDowsD81fzEbM4gHPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Dec 28, 2016 at 6:54 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
+> I'd do it the other way around and so get more and simpler patches:
+>
+>  - make driver aware of i.MX35
+>  - fix dtsi to use i.MX35 type where applicable
 
-> On Dec 27, 2016, at 11:58 AM, Robert Nelson <robertcnelson@gmail.com> wrote:
-> 
-> BeagleBone Black Wireless is clone of the BeagleBone Black (BBB) with the Ethernet
-> replaced by a TI wl1835 wireless module.
-> 
-> This board can be indentified by the BWAx value after A335BNLT (BBB) in the at24 eeprom:
-> BWAx [aa 55 33 ee 41 33 33 35  42 4e 4c 54 42 57 41 35  |.U3.A335BNLTBWA5|]
-
-I believe the correct statement is BWxx, but BWBx reserves the option to be software incompatible in some way. My preference is to have it boot anyway, but I believe that is only dependent in the bootloader. 
-
-> 
-> http://beagleboard.org/black-wireless
-> https://github.com/beagleboard/beaglebone-black-wireless
-> 
-> firmware: https://github.com/beagleboard/beaglebone-black-wireless/tree/master/firmware
-> wl18xx mac address: /proc/device-tree/ocp/ethernet at 4a100000/slave at 4a100200/mac-address
-> 
-> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
-> CC: Tony Lindgren <tony@atomide.com>
-> CC: Jason Kridner <jkridner@beagleboard.org>
-> ---
-> arch/arm/boot/dts/Makefile                      |   1 +
-> arch/arm/boot/dts/am335x-boneblack-wireless.dts | 109 ++++++++++++++++++++++++
-> 2 files changed, 110 insertions(+)
-> create mode 100644 arch/arm/boot/dts/am335x-boneblack-wireless.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index cccdbcb557b6..9415a49bd11b 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -563,6 +563,7 @@ dtb-$(CONFIG_SOC_AM33XX) += \
->    am335x-base0033.dtb \
->    am335x-bone.dtb \
->    am335x-boneblack.dtb \
-> +    am335x-boneblack-wireless.dtb \
->    am335x-bonegreen.dtb \
->    am335x-chiliboard.dtb \
->    am335x-cm-t335.dtb \
-> diff --git a/arch/arm/boot/dts/am335x-boneblack-wireless.dts b/arch/arm/boot/dts/am335x-boneblack-wireless.dts
-> new file mode 100644
-> index 000000000000..105bd10655f7
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/am335x-boneblack-wireless.dts
-> @@ -0,0 +1,109 @@
-> +/*
-> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +/dts-v1/;
-> +
-> +#include "am33xx.dtsi"
-> +#include "am335x-bone-common.dtsi"
-> +#include "am335x-boneblack-common.dtsi"
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +
-> +/ {
-> +    model = "TI AM335x BeagleBone Black Wireless";
-> +    compatible = "ti,am335x-bone-black-wireless", "ti,am335x-bone-black", "ti,am335x-bone", "ti,am33xx";
-> +
-> +    wlan_en_reg: fixedregulator at 2 {
-> +        compatible = "regulator-fixed";
-> +        regulator-name = "wlan-en-regulator";
-> +        regulator-min-microvolt = <1800000>;
-> +        regulator-max-microvolt = <1800000>;
-> +        startup-delay-us= <70000>;
-> +
-> +        /* WL_EN */
-> +        gpio = <&gpio3 9 0>;
-> +        enable-active-high;
-> +    };
-> +};
-> +
-> +&am33xx_pinmux {
-> +    bt_pins: pinmux_bt_pins {
-> +        pinctrl-single,pins = <
-> +            AM33XX_IOPAD(0x928, PIN_OUTPUT_PULLUP | MUX_MODE7)    /* gmii1_txd0.gpio0_28 - BT_EN */
-> +        >;
-> +    };
-> +
-> +    mmc3_pins: pinmux_mmc3_pins {
-> +        pinctrl-single,pins = <
-> +            AM33XX_IOPAD(0x93c, PIN_INPUT_PULLUP | MUX_MODE6 ) /* (L15) gmii1_rxd1.mmc2_clk */
-> +            AM33XX_IOPAD(0x914, PIN_INPUT_PULLUP | MUX_MODE6 ) /* (J16) gmii1_txen.mmc2_cmd */
-> +            AM33XX_IOPAD(0x918, PIN_INPUT_PULLUP | MUX_MODE5 ) /* (J17) gmii1_rxdv.mmc2_dat0 */
-> +            AM33XX_IOPAD(0x91c, PIN_INPUT_PULLUP | MUX_MODE5 ) /* (J18) gmii1_txd3.mmc2_dat1 */
-> +            AM33XX_IOPAD(0x920, PIN_INPUT_PULLUP | MUX_MODE5 ) /* (K15) gmii1_txd2.mmc2_dat2 */
-> +            AM33XX_IOPAD(0x908, PIN_INPUT_PULLUP | MUX_MODE5 ) /* (H16) gmii1_col.mmc2_dat3 */
-> +        >;
-> +    };
-> +
-> +    uart3_pins: pinmux_uart3_pins {
-> +        pinctrl-single,pins = <
-> +            AM33XX_IOPAD(0x934, PIN_INPUT_PULLUP | MUX_MODE1)    /* gmii1_rxd3.uart3_rxd */
-> +            AM33XX_IOPAD(0x938, PIN_OUTPUT_PULLDOWN | MUX_MODE1)    /* gmii1_rxd2.uart3_txd */
-> +            AM33XX_IOPAD(0x948, PIN_INPUT | MUX_MODE3)        /* mdio_data.uart3_ctsn */
-> +            AM33XX_IOPAD(0x94c, PIN_OUTPUT_PULLDOWN | MUX_MODE3)    /* mdio_clk.uart3_rtsn */
-> +        >;
-> +    };
-> +
-> +    wl18xx_pins: pinmux_wl18xx_pins {
-> +        pinctrl-single,pins = <
-> +            AM33XX_IOPAD(0x92c, PIN_OUTPUT_PULLDOWN | MUX_MODE7)    /* gmii1_txclk.gpio3_9 WL_EN */
-> +            AM33XX_IOPAD(0x944, PIN_INPUT_PULLDOWN | MUX_MODE7)    /* rmii1_refclk.gpio0_29 WL_IRQ */
-> +            AM33XX_IOPAD(0x930, PIN_OUTPUT_PULLUP | MUX_MODE7)    /* gmii1_rxclk.gpio3_10 LS_BUF_EN */
-> +        >;
-> +    };
-> +};
-> +
-> +&mac {
-> +    status = "disabled";
-> +};
-> +
-> +&mmc3 {
-> +    dmas = <&edma_xbar 12 0 1
-> +        &edma_xbar 13 0 2>;
-> +    dma-names = "tx", "rx";
-> +    status = "okay";
-> +    vmmc-supply = <&wlan_en_reg>;
-> +    bus-width = <4>;
-> +    non-removable;
-> +    cap-power-off-card;
-> +    ti,needs-special-hs-handling;
-> +    keep-power-in-suspend;
-> +    pinctrl-names = "default";
-> +    pinctrl-0 = <&mmc3_pins &wl18xx_pins>;
-> +
-> +    #address-cells = <1>;
-> +    #size-cells = <0>;
-> +    wlcore: wlcore at 2 {
-> +        compatible = "ti,wl1835";
-> +        reg = <2>;
-> +        interrupt-parent = <&gpio0>;
-> +        interrupts = <29 IRQ_TYPE_EDGE_RISING>;
-> +    };
-> +};
-> +
-> +&uart3 {
-> +    pinctrl-names = "default";
-> +    pinctrl-0 = <&uart3_pins &bt_pins>;
-> +    status = "okay";
-> +};
-> +
-> +&gpio3 {
-> +    ls_buf_en {
-> +        gpio-hog;
-> +        gpios = <10 GPIO_ACTIVE_HIGH>;
-> +        output-high;
-> +        line-name = "LS_BUF_EN";
-> +    };
-> +};
-> -- 
-> 2.11.0
-> 
+This would not work for old dtb's as they are not aware of the  i.mx35 type.
