@@ -1,58 +1,86 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 28 Dec 2016 14:56:53 -0800
-Subject: [PATCH v6 07/25] usb: chipidea: Notify events when switching host mode
+Date: Wed, 28 Dec 2016 14:56:47 -0800
+Subject: [PATCH v6 01/25] of: device: Support loading a module with OF based
+ modalias
 In-Reply-To: <20161228225711.698-1-stephen.boyd@linaro.org>
 References: <20161228225711.698-1-stephen.boyd@linaro.org>
-Message-ID: <20161228225711.698-8-stephen.boyd@linaro.org>
+Message-ID: <20161228225711.698-2-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The chipidea/udc.c file sends a CI_HDRC_CONTROLLER_RESET_EVENT to
-the wrapper drivers when it calls hw_device_reset(), but that
-function is not called from chipidea/host.c. And the udc.c file
-sends the CI_HDRC_CONTROLLER_STOPPED_EVENT but the host.c file
-doesn't do anything.
+In the case of ULPI devices, we want to be able to load the
+driver before registering the device so that we don't get stuck
+in a loop waiting for the phy module to appear and failing usb
+controller probe. Currently we request the ulpi module via the
+ulpi ids, but in the DT case we might need to request it with the
+OF based modalias instead. Add a common function that allows
+anyone to request a module with the OF based modalias.
 
-The intent of the reset event is to allow the wrapper driver to
-do any wrapper specific things after the reset bit has been set
-in the usb command register. Therefore, add this event hook in
-the host role after we toggle that bit.
-
-Similarly, the intent of the stopped event is to allow the
-wrapper driver to do any wrapper specific things after the device
-is stopped. So when we stop the host role, send the stopped
-event.
-
-Acked-by: Peter Chen <peter.chen@nxp.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/chipidea/host.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/of/device.c       | 23 +++++++++++++++++++++++
+ include/linux/of_device.h |  6 ++++++
+ 2 files changed, 29 insertions(+)
 
-diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-index 111b0e0b8698..f884c0877bca 100644
---- a/drivers/usb/chipidea/host.c
-+++ b/drivers/usb/chipidea/host.c
-@@ -90,6 +90,9 @@ static int ehci_ci_reset(struct usb_hcd *hcd)
+diff --git a/drivers/of/device.c b/drivers/of/device.c
+index fd5cfad7c403..8a22a253a830 100644
+--- a/drivers/of/device.c
++++ b/drivers/of/device.c
+@@ -226,6 +226,29 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
+ 	return tsize;
+ }
  
- 	ehci->need_io_watchdog = 0;
- 
-+	if (ci->platdata->notify_event)
-+		ci->platdata->notify_event(ci, CI_HDRC_CONTROLLER_RESET_EVENT);
++int of_device_request_module(struct device *dev)
++{
++	char *str;
++	ssize_t size;
++	int ret;
 +
- 	ci_platform_configure(ci);
++	size = of_device_get_modalias(dev, NULL, 0);
++	if (size < 0)
++		return size;
++
++	str = kmalloc(size + 1, GFP_KERNEL);
++	if (!str)
++		return -ENOMEM;
++
++	of_device_get_modalias(dev, str, size);
++	str[size] = '\0';
++	ret = request_module(str);
++	kfree(str);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(of_device_request_module);
++
+ /**
+  * of_device_uevent - Display OF related uevent information
+  */
+diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+index cc7dd687a89d..e9afbcc8de12 100644
+--- a/include/linux/of_device.h
++++ b/include/linux/of_device.h
+@@ -37,6 +37,7 @@ extern const void *of_device_get_match_data(const struct device *dev);
  
- 	return ret;
-@@ -187,6 +190,9 @@ static void host_stop(struct ci_hdrc *ci)
- 	struct usb_hcd *hcd = ci->hcd;
+ extern ssize_t of_device_get_modalias(struct device *dev,
+ 					char *str, ssize_t len);
++extern int of_device_request_module(struct device *dev);
  
- 	if (hcd) {
-+		if (ci->platdata->notify_event)
-+			ci->platdata->notify_event(ci,
-+				CI_HDRC_CONTROLLER_STOPPED_EVENT);
- 		usb_remove_hcd(hcd);
- 		ci->role = CI_ROLE_END;
- 		synchronize_irq(ci->irq);
+ extern void of_device_uevent(struct device *dev, struct kobj_uevent_env *env);
+ extern int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env);
+@@ -78,6 +79,11 @@ static inline int of_device_get_modalias(struct device *dev,
+ 	return -ENODEV;
+ }
+ 
++static inline int of_device_request_module(struct device *dev)
++{
++	return -ENODEV;
++}
++
+ static inline int of_device_uevent_modalias(struct device *dev,
+ 				   struct kobj_uevent_env *env)
+ {
 -- 
 2.10.0.297.gf6727b0
