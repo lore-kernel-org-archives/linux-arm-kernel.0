@@ -1,65 +1,72 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Wed, 28 Dec 2016 13:46:45 +0800
-Subject: [PATCH 2/3] arm: dts: mt2701: Add subsystem clock controller device
- nodes
+Date: Wed, 28 Dec 2016 13:46:44 +0800
+Subject: [PATCH 1/3] arm: dts: mt2701: Sort DT nodes by register address
 In-Reply-To: <1482904006-44232-1-git-send-email-jamesjj.liao@mediatek.com>
 References: <1482904006-44232-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1482904006-44232-3-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1482904006-44232-2-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MT2701 subsystem clock controllers, inlcude mmsys, imgsys,
-vdecsys, hifsys, ethsys and bdpsys.
+This patch rearrange MT2701 DT nodes to keep them in ascending order.
 
 Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 ---
- arch/arm/boot/dts/mt2701.dtsi | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ arch/arm/boot/dts/mt2701.dtsi | 36 ++++++++++++++++++------------------
+ 1 file changed, 18 insertions(+), 18 deletions(-)
 
 diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 73f4b7c..150c48d 100644
+index 7eab6f4..73f4b7c 100644
 --- a/arch/arm/boot/dts/mt2701.dtsi
 +++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -214,4 +214,40 @@
- 		clock-names = "baud", "bus";
- 		status = "disabled";
+@@ -96,24 +96,6 @@
+ 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
  	};
-+
-+	mmsys: syscon at 14000000 {
-+		compatible = "mediatek,mt2701-mmsys", "syscon";
-+		reg = <0 0x14000000 0 0x1000>;
-+		#clock-cells = <1>;
+ 
+-	pio: pinctrl at 10005000 {
+-		compatible = "mediatek,mt2701-pinctrl";
+-		reg = <0 0x1000b000 0 0x1000>;
+-		mediatek,pctl-regmap = <&syscfg_pctl_a>;
+-		pins-are-numbered;
+-		gpio-controller;
+-		#gpio-cells = <2>;
+-		interrupt-controller;
+-		#interrupt-cells = <2>;
+-		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
+-	};
+-
+-	syscfg_pctl_a: syscfg at 10005000 {
+-		compatible = "mediatek,mt2701-pctl-a-syscfg", "syscon";
+-		reg = <0 0x10005000 0 0x1000>;
+-	};
+-
+ 	topckgen: syscon at 10000000 {
+ 		compatible = "mediatek,mt2701-topckgen", "syscon";
+ 		reg = <0 0x10000000 0 0x1000>;
+@@ -134,6 +116,24 @@
+ 		#reset-cells = <1>;
+ 	};
+ 
++	pio: pinctrl at 10005000 {
++		compatible = "mediatek,mt2701-pinctrl";
++		reg = <0 0x1000b000 0 0x1000>;
++		mediatek,pctl-regmap = <&syscfg_pctl_a>;
++		pins-are-numbered;
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
 +	};
 +
-+	imgsys: syscon at 15000000 {
-+		compatible = "mediatek,mt2701-imgsys", "syscon";
-+		reg = <0 0x15000000 0 0x1000>;
-+		#clock-cells = <1>;
++	syscfg_pctl_a: syscfg at 10005000 {
++		compatible = "mediatek,mt2701-pctl-a-syscfg", "syscon";
++		reg = <0 0x10005000 0 0x1000>;
 +	};
 +
-+	vdecsys: syscon at 16000000 {
-+		compatible = "mediatek,mt2701-vdecsys", "syscon";
-+		reg = <0 0x16000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	hifsys: syscon at 1a000000 {
-+		compatible = "mediatek,mt2701-hifsys", "syscon";
-+		reg = <0 0x1a000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	ethsys: syscon at 1b000000 {
-+		compatible = "mediatek,mt2701-ethsys", "syscon";
-+		reg = <0 0x1b000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	bdpsys: syscon at 1c000000 {
-+		compatible = "mediatek,mt2701-bdpsys", "syscon";
-+		reg = <0 0x1c000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
- };
+ 	watchdog: watchdog at 10007000 {
+ 		compatible = "mediatek,mt2701-wdt",
+ 			     "mediatek,mt6589-wdt";
 -- 
 1.9.1
