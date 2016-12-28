@@ -1,86 +1,131 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 28 Dec 2016 14:56:47 -0800
-Subject: [PATCH v6 01/25] of: device: Support loading a module with OF based
- modalias
+Date: Wed, 28 Dec 2016 14:56:51 -0800
+Subject: [PATCH v6 05/25] usb: chipidea: Handle extcon events properly
 In-Reply-To: <20161228225711.698-1-stephen.boyd@linaro.org>
 References: <20161228225711.698-1-stephen.boyd@linaro.org>
-Message-ID: <20161228225711.698-2-stephen.boyd@linaro.org>
+Message-ID: <20161228225711.698-6-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the case of ULPI devices, we want to be able to load the
-driver before registering the device so that we don't get stuck
-in a loop waiting for the phy module to appear and failing usb
-controller probe. Currently we request the ulpi module via the
-ulpi ids, but in the DT case we might need to request it with the
-OF based modalias instead. Add a common function that allows
-anyone to request a module with the OF based modalias.
+We're currently emulating the vbus and id interrupts in the OTGSC
+read API, but we also need to make sure that if we're handling
+the events with extcon that we don't enable the interrupts for
+those events in the hardware. Therefore, properly emulate this
+register if we're using extcon, but don't enable the interrupts.
+This allows me to get my cable connect/disconnect working
+properly without getting spurious interrupts on my device that
+uses an extcon for these two events.
 
-Acked-by: Rob Herring <robh@kernel.org>
-Cc: <devicetree@vger.kernel.org>
+Acked-by: Peter Chen <peter.chen@nxp.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: "Ivan T. Ivanov" <iivanov.xz@gmail.com>
+Fixes: 3ecb3e09b042 ("usb: chipidea: Use extcon framework for VBUS and ID detect")
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/of/device.c       | 23 +++++++++++++++++++++++
- include/linux/of_device.h |  6 ++++++
- 2 files changed, 29 insertions(+)
+ drivers/usb/chipidea/otg.c   | 46 +++++++++++++++++++++++++++++++++++++++-----
+ include/linux/usb/chipidea.h |  2 ++
+ 2 files changed, 43 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index fd5cfad7c403..8a22a253a830 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -226,6 +226,29 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
- 	return tsize;
+diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+index a829607c3e4d..0cf149edddd8 100644
+--- a/drivers/usb/chipidea/otg.c
++++ b/drivers/usb/chipidea/otg.c
+@@ -44,12 +44,15 @@ u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask)
+ 		else
+ 			val &= ~OTGSC_BSVIS;
+ 
+-		cable->changed = false;
+-
+ 		if (cable->state)
+ 			val |= OTGSC_BSV;
+ 		else
+ 			val &= ~OTGSC_BSV;
++
++		if (cable->enabled)
++			val |= OTGSC_BSVIE;
++		else
++			val &= ~OTGSC_BSVIE;
+ 	}
+ 
+ 	cable = &ci->platdata->id_extcon;
+@@ -59,15 +62,18 @@ u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask)
+ 		else
+ 			val &= ~OTGSC_IDIS;
+ 
+-		cable->changed = false;
+-
+ 		if (cable->state)
+ 			val |= OTGSC_ID;
+ 		else
+ 			val &= ~OTGSC_ID;
++
++		if (cable->enabled)
++			val |= OTGSC_IDIE;
++		else
++			val &= ~OTGSC_IDIE;
+ 	}
+ 
+-	return val;
++	return val & mask;
  }
  
-+int of_device_request_module(struct device *dev)
-+{
-+	char *str;
-+	ssize_t size;
-+	int ret;
-+
-+	size = of_device_get_modalias(dev, NULL, 0);
-+	if (size < 0)
-+		return size;
-+
-+	str = kmalloc(size + 1, GFP_KERNEL);
-+	if (!str)
-+		return -ENOMEM;
-+
-+	of_device_get_modalias(dev, str, size);
-+	str[size] = '\0';
-+	ret = request_module(str);
-+	kfree(str);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(of_device_request_module);
-+
  /**
-  * of_device_uevent - Display OF related uevent information
+@@ -77,6 +83,36 @@ u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask)
   */
-diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-index cc7dd687a89d..e9afbcc8de12 100644
---- a/include/linux/of_device.h
-+++ b/include/linux/of_device.h
-@@ -37,6 +37,7 @@ extern const void *of_device_get_match_data(const struct device *dev);
- 
- extern ssize_t of_device_get_modalias(struct device *dev,
- 					char *str, ssize_t len);
-+extern int of_device_request_module(struct device *dev);
- 
- extern void of_device_uevent(struct device *dev, struct kobj_uevent_env *env);
- extern int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env);
-@@ -78,6 +79,11 @@ static inline int of_device_get_modalias(struct device *dev,
- 	return -ENODEV;
+ void hw_write_otgsc(struct ci_hdrc *ci, u32 mask, u32 data)
+ {
++	struct ci_hdrc_cable *cable;
++
++	cable = &ci->platdata->vbus_extcon;
++	if (!IS_ERR(cable->edev)) {
++		if (data & mask & OTGSC_BSVIS)
++			cable->changed = false;
++
++		/* Don't enable vbus interrupt if using external notifier */
++		if (data & mask & OTGSC_BSVIE) {
++			cable->enabled = true;
++			data &= ~OTGSC_BSVIE;
++		} else if (mask & OTGSC_BSVIE) {
++			cable->enabled = false;
++		}
++	}
++
++	cable = &ci->platdata->id_extcon;
++	if (!IS_ERR(cable->edev)) {
++		if (data & mask & OTGSC_IDIS)
++			cable->changed = false;
++
++		/* Don't enable id interrupt if using external notifier */
++		if (data & mask & OTGSC_IDIE) {
++			cable->enabled = true;
++			data &= ~OTGSC_IDIE;
++		} else if (mask & OTGSC_IDIE) {
++			cable->enabled = false;
++		}
++	}
++
+ 	hw_write(ci, OP_OTGSC, mask | OTGSC_INT_STATUS_BITS, data);
  }
  
-+static inline int of_device_request_module(struct device *dev)
-+{
-+	return -ENODEV;
-+}
-+
- static inline int of_device_uevent_modalias(struct device *dev,
- 				   struct kobj_uevent_env *env)
- {
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 5dd75fa47dd8..f9be467d6695 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -14,6 +14,7 @@ struct ci_hdrc;
+  * struct ci_hdrc_cable - structure for external connector cable state tracking
+  * @state: current state of the line
+  * @changed: set to true when extcon event happen
++ * @enabled: set to true if we've enabled the vbus or id interrupt
+  * @edev: device which generate events
+  * @ci: driver state of the chipidea device
+  * @nb: hold event notification callback
+@@ -22,6 +23,7 @@ struct ci_hdrc;
+ struct ci_hdrc_cable {
+ 	bool				state;
+ 	bool				changed;
++	bool				enabled;
+ 	struct extcon_dev		*edev;
+ 	struct ci_hdrc			*ci;
+ 	struct notifier_block		nb;
 -- 
 2.10.0.297.gf6727b0
