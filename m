@@ -1,88 +1,104 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 28 Dec 2016 17:46:05 +0100
-Subject: [PATCHv2 net-next 09/11] net: mvpp2: simplify MVPP2_PRS_RI_*
- definitions
+Date: Wed, 28 Dec 2016 17:46:01 +0100
+Subject: [PATCHv2 net-next 05/11] net: mvpp2: drop useless fields in
+ mvpp2_bm_pool and related code
 In-Reply-To: <1482943567-12483-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1482943567-12483-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482943567-12483-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482943567-12483-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the MVPP2_PRS_RI_* definitions use the ~(value) syntax, which
-doesn't compile nicely on 64-bit. Moreover, those definitions are in
-fact unneeded, since they are always used in combination with a bit
-mask that ensures only the appropriate bits are modified.
+This commit drops dead code from the mvpp2 driver. The 'in_use' and
+'in_use_thresh' fields of 'struct mvpp2_bm_pool' are
+incremented/decremented/initialized in various places. But they are only
+used in one place:
 
-Therefore, such definitions should just be set to 0x0. For example:
+       if (is_recycle &&
+           (atomic_read(&bm_pool->in_use) < bm_pool->in_use_thresh))
+               return 0;
 
- #define MVPP2_PRS_RI_L2_CAST_MASK              0x600
- #define MVPP2_PRS_RI_L2_UCAST                  ~(BIT(9) | BIT(10))
- #define MVPP2_PRS_RI_L2_MCAST                  BIT(9)
- #define MVPP2_PRS_RI_L2_BCAST                  BIT(10)
-
-becomes
-
- #define MVPP2_PRS_RI_L2_CAST_MASK              0x600
- #define MVPP2_PRS_RI_L2_UCAST                  0x0
- #define MVPP2_PRS_RI_L2_MCAST                  BIT(9)
- #define MVPP2_PRS_RI_L2_BCAST                  BIT(10)
-
-Because the values (MVPP2_PRS_RI_L2_UCAST, MVPP2_PRS_RI_L2_MCAST and
-MVPP2_PRS_RI_L2_BCAST) are always applied with
-MVPP2_PRS_RI_L2_CAST_MASK, and therefore there is no need for
-MVPP2_PRS_RI_L2_UCAST to be defined as ~(BIT(9) | BIT(10)).
-
-It fixes the following warnings when building the driver on a 64-bit
-platform (which is not possible as of this commit, but will be enabled
-in a follow-up commit):
-
-drivers/net/ethernet/marvell/mvpp2.c: In function ?mvpp2_prs_mac_promisc_set?:
-drivers/net/ethernet/marvell/mvpp2.c:524:33: warning: large integer implicitly truncated to unsigned type [-Woverflow]
- #define MVPP2_PRS_RI_L2_UCAST   ~(BIT(9) | BIT(10))
-                                 ^
-drivers/net/ethernet/marvell/mvpp2.c:1459:33: note: in expansion of macro ?MVPP2_PRS_RI_L2_UCAST?
-   mvpp2_prs_sram_ri_update(&pe, MVPP2_PRS_RI_L2_UCAST,
+However 'is_recycle', passed as argument to mvpp2_rx_refill() is always
+false. So in fact, this code is never reached, and the 'is_recycle'
+argument is useless. So let's drop this code.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 18 +++---------------
+ 1 file changed, 3 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 36c73dc..58cf9af 100644
+index 6720cdac..bfa9f77 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -511,19 +511,19 @@ enum mvpp2_tag_type {
- #define MVPP2_PRS_RI_MAC_ME_MASK		0x1
- #define MVPP2_PRS_RI_DSA_MASK			0x2
- #define MVPP2_PRS_RI_VLAN_MASK			0xc
--#define MVPP2_PRS_RI_VLAN_NONE			~(BIT(2) | BIT(3))
-+#define MVPP2_PRS_RI_VLAN_NONE			0x0
- #define MVPP2_PRS_RI_VLAN_SINGLE		BIT(2)
- #define MVPP2_PRS_RI_VLAN_DOUBLE		BIT(3)
- #define MVPP2_PRS_RI_VLAN_TRIPLE		(BIT(2) | BIT(3))
- #define MVPP2_PRS_RI_CPU_CODE_MASK		0x70
- #define MVPP2_PRS_RI_CPU_CODE_RX_SPEC		BIT(4)
- #define MVPP2_PRS_RI_L2_CAST_MASK		0x600
--#define MVPP2_PRS_RI_L2_UCAST			~(BIT(9) | BIT(10))
-+#define MVPP2_PRS_RI_L2_UCAST			0x0
- #define MVPP2_PRS_RI_L2_MCAST			BIT(9)
- #define MVPP2_PRS_RI_L2_BCAST			BIT(10)
- #define MVPP2_PRS_RI_PPPOE_MASK			0x800
- #define MVPP2_PRS_RI_L3_PROTO_MASK		0x7000
--#define MVPP2_PRS_RI_L3_UN			~(BIT(12) | BIT(13) | BIT(14))
-+#define MVPP2_PRS_RI_L3_UN			0x0
- #define MVPP2_PRS_RI_L3_IP4			BIT(12)
- #define MVPP2_PRS_RI_L3_IP4_OPT			BIT(13)
- #define MVPP2_PRS_RI_L3_IP4_OTHER		(BIT(12) | BIT(13))
-@@ -531,7 +531,7 @@ enum mvpp2_tag_type {
- #define MVPP2_PRS_RI_L3_IP6_EXT			(BIT(12) | BIT(14))
- #define MVPP2_PRS_RI_L3_ARP			(BIT(13) | BIT(14))
- #define MVPP2_PRS_RI_L3_ADDR_MASK		0x18000
--#define MVPP2_PRS_RI_L3_UCAST			~(BIT(15) | BIT(16))
-+#define MVPP2_PRS_RI_L3_UCAST			0x0
- #define MVPP2_PRS_RI_L3_MCAST			BIT(15)
- #define MVPP2_PRS_RI_L3_BCAST			(BIT(15) | BIT(16))
- #define MVPP2_PRS_RI_IP_FRAG_MASK		0x20000
+@@ -930,10 +930,6 @@ struct mvpp2_bm_pool {
+ 
+ 	/* Ports using BM pool */
+ 	u32 port_map;
+-
+-	/* Occupied buffers indicator */
+-	atomic_t in_use;
+-	int in_use_thresh;
+ };
+ 
+ struct mvpp2_buff_hdr {
+@@ -3399,7 +3395,6 @@ static int mvpp2_bm_pool_create(struct platform_device *pdev,
+ 	bm_pool->size = size;
+ 	bm_pool->pkt_size = 0;
+ 	bm_pool->buf_num = 0;
+-	atomic_set(&bm_pool->in_use, 0);
+ 
+ 	return 0;
+ }
+@@ -3656,7 +3651,6 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
+ 
+ 	/* Update BM driver with number of buffers added to pool */
+ 	bm_pool->buf_num += i;
+-	bm_pool->in_use_thresh = bm_pool->buf_num / 4;
+ 
+ 	netdev_dbg(port->dev,
+ 		   "%s pool %d: pkt_size=%4d, buf_size=%4d, total_size=%4d\n",
+@@ -4997,23 +4991,18 @@ static void mvpp2_rx_csum(struct mvpp2_port *port, u32 status,
+ 
+ /* Reuse skb if possible, or allocate a new skb and add it to BM pool */
+ static int mvpp2_rx_refill(struct mvpp2_port *port,
+-			   struct mvpp2_bm_pool *bm_pool,
+-			   u32 bm, int is_recycle)
++			   struct mvpp2_bm_pool *bm_pool, u32 bm)
+ {
+ 	struct sk_buff *skb;
+ 	dma_addr_t phys_addr;
+ 
+-	if (is_recycle &&
+-	    (atomic_read(&bm_pool->in_use) < bm_pool->in_use_thresh))
+-		return 0;
+-
+ 	/* No recycle or too many buffers are in use, so allocate a new skb */
+ 	skb = mvpp2_skb_alloc(port, bm_pool, &phys_addr, GFP_ATOMIC);
+ 	if (!skb)
+ 		return -ENOMEM;
+ 
+ 	mvpp2_pool_refill(port, bm, (u32)phys_addr, (u32)skb);
+-	atomic_dec(&bm_pool->in_use);
++
+ 	return 0;
+ }
+ 
+@@ -5139,7 +5128,7 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
+ 
+ 		skb = (struct sk_buff *)rx_desc->buf_cookie;
+ 
+-		err = mvpp2_rx_refill(port, bm_pool, bm, 0);
++		err = mvpp2_rx_refill(port, bm_pool, bm);
+ 		if (err) {
+ 			netdev_err(port->dev, "failed to refill BM pools\n");
+ 			goto err_drop_frame;
+@@ -5150,7 +5139,6 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
+ 
+ 		rcvd_pkts++;
+ 		rcvd_bytes += rx_bytes;
+-		atomic_inc(&bm_pool->in_use);
+ 
+ 		skb_reserve(skb, MVPP2_MH_SIZE);
+ 		skb_put(skb, rx_bytes);
 -- 
 2.7.4
