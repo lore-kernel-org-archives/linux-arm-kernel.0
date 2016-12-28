@@ -1,43 +1,40 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 29 Dec 2016 00:35:07 +0300
-Subject: [PATCH] ARM: dts: r8a7794: link DU to VSPD
-In-Reply-To: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
-References: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
-Message-ID: <1524349.7vYNCWaVjE@wasted.cogentembedded.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 28 Dec 2016 22:46:51 +0100
+Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21,
+ i.MX27 and i.MX31 SoCs
+In-Reply-To: <CAOMZO5BD3Y6vXwt7_bdv_KyGvKSYru1vzDowsD81fzEbM4gHPA@mail.gmail.com>
+References: <fe9b03bf-9c37-862f-b3aa-0f9b5a4dfefb@roeck-us.net>
+ <bedae3d8-3057-36e4-1d89-ec41f9f1a25b@mleia.com>
+ <20161223083256.3wdqou5xmhr7fidn@pengutronix.de>
+ <74751709-c32e-b1b3-4fa3-613f7d57d1d8@mleia.com>
+ <20161223100113.s57bi7257yero7f7@pengutronix.de>
+ <7018c466-2467-a9fc-2382-889d3a62741e@mentor.com>
+ <20161223141139.rlsvoonih5lhnnpu@pengutronix.de>
+ <c22600d5-f6b5-4c13-59b4-ba391ea29a4c@mleia.com>
+ <20161228205419.la74jr4rfes7fa4v@pengutronix.de>
+ <CAOMZO5BD3Y6vXwt7_bdv_KyGvKSYru1vzDowsD81fzEbM4gHPA@mail.gmail.com>
+Message-ID: <20161228214651.oncshkvksqep3krk@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the "vsps" property to the DU device node in order to link this node to
-the (single) VSPD node.
+On Wed, Dec 28, 2016 at 07:33:26PM -0200, Fabio Estevam wrote:
+> On Wed, Dec 28, 2016 at 6:54 PM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> 
+> > I'd do it the other way around and so get more and simpler patches:
+> >
+> >  - make driver aware of i.MX35
+> >  - fix dtsi to use i.MX35 type where applicable
+> 
+> This would not work for old dtb's as they are not aware of the  i.mx35 type.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Right, so they would fall back to the i.MX21 type and not profit from
+Markus' change until either the dtb is updated or the third commit is
+added. I'll try to contact Markus to ask if he remembers more details.
 
----
-This patch is against the 'renesas-devel-20161220-v4.9' of Simon Horman's
-'renesas.git' repo.  It's  only meaningful if the "Enable R8A7794 DU VSPD
-compositor" DU driver patches are applied...
+Best regards
+Uwe
 
- arch/arm/boot/dts/r8a7794.dtsi |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-@@ -908,7 +908,7 @@
- 		power-domains = <&sysc R8A7794_PD_ALWAYS_ON>;
- 	};
- 
--	vsp1 at fe930000 {
-+	vspd0: vsp1 at fe930000 {
- 		compatible = "renesas,vsp1";
- 		reg = <0 0xfe930000 0 0x8000>;
- 		interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
-@@ -925,6 +925,7 @@
- 		clocks = <&mstp7_clks R8A7794_CLK_DU0>,
- 			 <&mstp7_clks R8A7794_CLK_DU0>;
- 		clock-names = "du.0", "du.1";
-+		vsps = <&vspd0>;
- 		status = "disabled";
- 
- 		ports {
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
