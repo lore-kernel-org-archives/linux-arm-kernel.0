@@ -1,51 +1,52 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 28 Dec 2016 14:56:54 -0800
-Subject: [PATCH v6 08/25] usb: chipidea: Remove locking in ci_udc_start()
+Date: Wed, 28 Dec 2016 14:57:09 -0800
+Subject: [PATCH v6 23/25] usb: chipidea: Pullup D+ in device mode via phy APIs
 In-Reply-To: <20161228225711.698-1-stephen.boyd@linaro.org>
 References: <20161228225711.698-1-stephen.boyd@linaro.org>
-Message-ID: <20161228225711.698-9-stephen.boyd@linaro.org>
+Message-ID: <20161228225711.698-24-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't call hw_device_reset() with the ci->lock held, so it
-doesn't seem like this lock here is protecting anything. Let's
-just remove it. This allows us to call sleeping functions like
-phy_init() from within the CI_HDRC_CONTROLLER_RESET_EVENT hook.
+If the phy supports it, call phy_set_mode() to pull up D+ when
+required by setting the mode to PHY_MODE_USB_DEVICE. If we want
+to remove the pullup, set the mode to PHY_MODE_USB_HOST.
 
-Acked-by: Peter Chen <peter.chen@nxp.com>
+Cc: Peter Chen <peter.chen@nxp.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/chipidea/udc.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/usb/chipidea/udc.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index cf132f057137..732b281485de 100644
+index 0d532a724d48..6d61fa0689b0 100644
 --- a/drivers/usb/chipidea/udc.c
 +++ b/drivers/usb/chipidea/udc.c
-@@ -1725,7 +1725,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
- 			 struct usb_gadget_driver *driver)
- {
- 	struct ci_hdrc *ci = container_of(gadget, struct ci_hdrc, gadget);
--	unsigned long flags;
- 	int retval = -ENOMEM;
- 
- 	if (driver->disconnect == NULL)
-@@ -1752,7 +1751,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
+@@ -18,6 +18,7 @@
+ #include <linux/kernel.h>
+ #include <linux/slab.h>
+ #include <linux/pm_runtime.h>
++#include <linux/phy/phy.h>
+ #include <linux/usb/ch9.h>
+ #include <linux/usb/gadget.h>
+ #include <linux/usb/otg-fsm.h>
+@@ -1609,10 +1610,15 @@ static int ci_udc_pullup(struct usb_gadget *_gadget, int is_on)
+ 		return 0;
  
  	pm_runtime_get_sync(&ci->gadget.dev);
- 	if (ci->vbus_active) {
--		spin_lock_irqsave(&ci->lock, flags);
- 		hw_device_reset(ci);
- 	} else {
- 		usb_udc_vbus_handler(&ci->gadget, false);
-@@ -1761,7 +1759,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
- 	}
+-	if (is_on)
++	if (is_on) {
++		if (ci->phy)
++			phy_set_mode(ci->phy, PHY_MODE_USB_DEVICE);
+ 		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
+-	else
++	} else {
+ 		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
++		if (ci->phy)
++			phy_set_mode(ci->phy, PHY_MODE_USB_HOST);
++	}
+ 	pm_runtime_put_sync(&ci->gadget.dev);
  
- 	retval = hw_device_state(ci, ci->ep0out->qh.dma);
--	spin_unlock_irqrestore(&ci->lock, flags);
- 	if (retval)
- 		pm_runtime_put_sync(&ci->gadget.dev);
- 
+ 	return 0;
 -- 
 2.10.0.297.gf6727b0
