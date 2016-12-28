@@ -1,40 +1,58 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 28 Dec 2016 14:56:48 -0800
-Subject: [PATCH v6 02/25] of: device: Export of_device_{get_modalias,
- uvent_modalias} to modules
+Date: Wed, 28 Dec 2016 14:56:53 -0800
+Subject: [PATCH v6 07/25] usb: chipidea: Notify events when switching host mode
 In-Reply-To: <20161228225711.698-1-stephen.boyd@linaro.org>
 References: <20161228225711.698-1-stephen.boyd@linaro.org>
-Message-ID: <20161228225711.698-3-stephen.boyd@linaro.org>
+Message-ID: <20161228225711.698-8-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ULPI bus can be built as a module, and it will soon be
-calling these functions when it supports probing devices from DT.
-Export them so they can be used by the ULPI module.
+The chipidea/udc.c file sends a CI_HDRC_CONTROLLER_RESET_EVENT to
+the wrapper drivers when it calls hw_device_reset(), but that
+function is not called from chipidea/host.c. And the udc.c file
+sends the CI_HDRC_CONTROLLER_STOPPED_EVENT but the host.c file
+doesn't do anything.
 
-Acked-by: Rob Herring <robh@kernel.org>
-Cc: <devicetree@vger.kernel.org>
+The intent of the reset event is to allow the wrapper driver to
+do any wrapper specific things after the reset bit has been set
+in the usb command register. Therefore, add this event hook in
+the host role after we toggle that bit.
+
+Similarly, the intent of the stopped event is to allow the
+wrapper driver to do any wrapper specific things after the device
+is stopped. So when we stop the host role, send the stopped
+event.
+
+Acked-by: Peter Chen <peter.chen@nxp.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/of/device.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/usb/chipidea/host.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 8a22a253a830..b1e6bebda3f3 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -225,6 +225,7 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index 111b0e0b8698..f884c0877bca 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -90,6 +90,9 @@ static int ehci_ci_reset(struct usb_hcd *hcd)
  
- 	return tsize;
- }
-+EXPORT_SYMBOL_GPL(of_device_get_modalias);
+ 	ehci->need_io_watchdog = 0;
  
- int of_device_request_module(struct device *dev)
- {
-@@ -310,3 +311,4 @@ int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env)
++	if (ci->platdata->notify_event)
++		ci->platdata->notify_event(ci, CI_HDRC_CONTROLLER_RESET_EVENT);
++
+ 	ci_platform_configure(ci);
  
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(of_device_uevent_modalias);
+ 	return ret;
+@@ -187,6 +190,9 @@ static void host_stop(struct ci_hdrc *ci)
+ 	struct usb_hcd *hcd = ci->hcd;
+ 
+ 	if (hcd) {
++		if (ci->platdata->notify_event)
++			ci->platdata->notify_event(ci,
++				CI_HDRC_CONTROLLER_STOPPED_EVENT);
+ 		usb_remove_hcd(hcd);
+ 		ci->role = CI_ROLE_END;
+ 		synchronize_irq(ci->irq);
 -- 
 2.10.0.297.gf6727b0
