@@ -1,39 +1,43 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 28 Dec 2016 17:18:01 +0800
-Subject: [PATCH v2 1/3] crypto: chacha20 - convert generic and x86
- versions to skcipher
-In-Reply-To: <20161227100452.GB10629@gondor.apana.org.au>
-References: <1481294033-23508-1-git-send-email-ard.biesheuvel@linaro.org>
- <1481294033-23508-2-git-send-email-ard.biesheuvel@linaro.org>
- <20161227100452.GB10629@gondor.apana.org.au>
-Message-ID: <20161228091801.GA12318@gondor.apana.org.au>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 28 Dec 2016 09:19:32 +0000
+Subject: [PATCH] crypto: arm/aes-neonbs - process 8 blocks in parallel if
+ we can
+In-Reply-To: <20161228091020.GE11904@gondor.apana.org.au>
+References: <1481291246-20216-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20161227085745.GA10121@gondor.apana.org.au>
+ <CAKv+Gu8OkOR3Xzx=XEOWyFpo6sLiq=WQrq0SauaY0V57uYetCQ@mail.gmail.com>
+ <20161228091020.GE11904@gondor.apana.org.au>
+Message-ID: <B32240B5-953F-42A2-A010-6FF64AC45859@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2016 at 06:04:52PM +0800, Herbert Xu wrote:
-> On Fri, Dec 09, 2016 at 02:33:51PM +0000, Ard Biesheuvel wrote:
-> > This converts the ChaCha20 code from a blkcipher to a skcipher, which
-> > is now the preferred way to implement symmetric block and stream ciphers.
-> > 
-> > This ports the generic and x86 versions at the same time because the
-> > latter reuses routines of the former.
-> > 
-> > Note that the skcipher_walk() API guarantees that all presented blocks
-> > except the final one are a multiple of the chunk size, so we can simplify
-> > the encrypt() routine somewhat.
-> > 
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+> On 28 Dec 2016, at 09:10, Herbert Xu <herbert@gondor.apana.org.au> wrote:
 > 
-> Patch applied.  Thanks.
+>> On Tue, Dec 27, 2016 at 06:35:46PM +0000, Ard Biesheuvel wrote:
+>> 
+>> OK, I will try to hack something up.
+>> 
+>> One thing to keep in mind though is that stacked chaining modes should
+>> present the data with the same granularity for optimal performance.
+>> E.g., xts(ecb(aes)) should pass 8 blocks at a time. How should this
+>> requirement be incorporated according to you?
+> 
+> xts tries to do a page at a time, which should be good enough, no?
+> 
 
-I'm reverting this patch because it breaks the build on ARM without
-the two subsequent patches.
+Yes, if the xts chaining mode driver invokes the ecb transform with that granularity, it should be fine. Note that this is a theoretical
+concern for this mode in particular, given that the bit sliced aes code implements the xts bits as well
 
-When resubmitting please make sure that the kernel can build and
-work after each patch.  Otherwise git bisections will fail.
+> In general this parameter should be visible to internal API users
+> such as xts so they could use it to determine how it wants to
+> structure its walks.
+> 
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Ok, so that implies a field in the skcipher algo struct then, rather than some definition internal to the driver?
+
+> Cheers,
+> -- 
+> Email: Herbert Xu <herbert@gondor.apana.org.au>
+> Home Page: http://gondor.apana.org.au/~herbert/
+> PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
