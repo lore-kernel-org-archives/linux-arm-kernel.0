@@ -1,58 +1,31 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 28 Dec 2016 09:04:07 +0100
-Subject: [PATCH] arm64: Do not include linux/uaccess.h from assembler files
-In-Reply-To: <1482748268-10399-1-git-send-email-linux@roeck-us.net>
-References: <1482748268-10399-1-git-send-email-linux@roeck-us.net>
-Message-ID: <20161228090407.515543df@free-electrons.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 28 Dec 2016 09:15:25 +0100
+Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
+References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
+Message-ID: <20161228081524.GA3826@netboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Dec 14, 2016 at 02:56:14PM +0200, Andrei Pistirica wrote:
+> Note 1: Kbuild uses "select" instead of "imply", and the macb maintainer agreed
+>         to make the change when it will be available in net-next.
 
-On Mon, 26 Dec 2016 02:31:08 -0800, Guenter Roeck wrote:
-> Including linux/uaccess.h from assembler files in arm64 builds results
-> in the following build errors.
-> 
-> In file included from arm64/include/asm/asm-offsets.h:1:0,
->                  from arch/arm64/include/asm/assembler.h:26,
-> 		 from arch/arm64/include/asm/alternative.h:68,
-> 		 from arch/arm64/kernel/entry.S
-> 
-> include/linux/sched/prio.h: Assembler messages:
-> include/linux/sched/prio.h:47: Error:
-> 	unknown mnemonic `static' --
-> 		`static inline long nice_to_rlimit(long nice)'
-> build/include/linux/sched/prio.h:48: Error:
-> 	junk at end of line, first unrecognized character is `{'
-> 
-> [and many more]
-> 
-> If asm/uaccess.h is not included, many of the affected files fail to build
-> with errors such as the following.
-> 
-> arch/arm64/lib/copy_to_user.S: Assembler messages:
-> arch/arm64/lib/copy_to_user.S:66: Error:
-> 	unknown mnemonic `uaccess_enable_not_uao' --
-> 		`uaccess_enable_not_uao x3,x4'
-> arch/arm64/lib/copy_template.S:71: Error:
-> 	unknown mnemonic `uao_user_alternative' --
-> 		`uao_user_alternative 9998f,strb,st trb,tmp1w,dst,#1'
-> 
-> Either drop the include if unnecessary or, if needed, replace with
-> asm/uaccess.h.
-> 
-> Fixes: 7c0f6ba682b9 ("Replace <asm/uaccess.h> with <linux/uaccess.h> globally")
-> Cc: Linus Torvalds <torvalds@linux-foundation.org>
-> Cc: Al Viro <viro@zeniv.linux.org.uk>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> +config MACB_USE_HWSTAMP
+> +	bool "Use IEEE 1588 hwstamp"
+> +	depends on MACB
+> +	default y
+> +	select PTP_1588_CLOCK
 
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
- (fixes the arm64 build, result boot tested on real HW)
+The imply key word has been merged as of:
+
+    237e3ad Kconfig: Introduce the "imply" keyword
+
+Please use it.
 
 Thanks,
+Richard
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+
+> +	---help---
+> +	  Enable IEEE 1588 Precision Time Protocol (PTP) support for MACB.
