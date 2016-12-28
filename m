@@ -1,60 +1,22 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 28 Dec 2016 08:43:10 +0530
-Subject: [PATCH] PCI: exynos: refactor exynos pcie driver
-In-Reply-To: <3335251.c58Y1Zf7PB@amdc3058>
-References: <CGME20161223105411epcas1p3727f726e757ec6c6d7bff04a9af40077@epcas1p3.samsung.com>
- <1482490587-13611-1-git-send-email-pankaj.dubey@samsung.com>
- <3335251.c58Y1Zf7PB@amdc3058>
-Message-ID: <CAGcde9HCrcjW5FC3Bh=2er=AVFNpraf_iP9kL7jWTTq_G6a39w@mail.gmail.com>
+From: tanxiaojun@huawei.com (Tan Xiaojun)
+Date: Wed, 28 Dec 2016 11:42:12 +0800
+Subject: [QUESTION] Arm64: Query L3 cache info via DT
+Message-ID: <58633494.9030708@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomiej,
+Hi.
 
-On 27 December 2016 at 19:05, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
->
-> Hi,
->
-> On Friday, December 23, 2016 04:26:27 PM Pankaj Dubey wrote:
->> From: Niyas Ahmed S T <niyas.ahmed@samsung.com>
->>
->> Currently Exynos PCIe driver is only supported for Exynos5440 SoC.
->> This patch does refactoring of Exynos PCIe driver to extend support
->> for other Exynos SoC.
->>
->> Following are the main changes done via this patch:
->> 1) It adds separate structs for memory, clock resources.
->> 2) It add exynos_pcie_ops struct which will allow us to support the
->> differences in resources in different Exynos SoC.
->>
->> No functional change intended.
->>
->> Signed-off-by: Niyas Ahmed S T <niyas.ahmed@samsung.com>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->
-> I would also like to see the explanation for 1) (as already
-> requested by Jingoo).  Otherwise it all looks fine to me:
->
-> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->
+I saw you discussed how to achieve querying cache information and tend to implement the external ones(like L3 cache) via DT a few months ago.
 
-Thanks for review and Reviewed-by tag.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/405399.html
 
-In other thread as a reply to Jaehoon, I have explained reason behind
-point no 1, I hope this reason is sufficient to separate these
-resources from main exynos_pcie structs.
+Are these implementations progressing? Forgive me to take the liberty to ask, we care about this thing.
 
-Thanks,
-Pankaj Dubey
+If you've already implemented some codes, we can help with testing (in Hisilicon D02, D03, D05) after you send it to the mail-list.
 
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+We can try our best to help if there is any difficulty.
+
+
+Thanks.
+Xiaojun.
