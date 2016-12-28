@@ -1,150 +1,32 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 28 Dec 2016 14:57:05 -0800
-Subject: [PATCH v6 19/25] usb: chipidea: msm: Add reset controller for PHY POR
- bit
-In-Reply-To: <20161228225711.698-1-stephen.boyd@linaro.org>
-References: <20161228225711.698-1-stephen.boyd@linaro.org>
-Message-ID: <20161228225711.698-20-stephen.boyd@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 28 Dec 2016 21:39:51 -0200
+Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21, i.MX27
+ and i.MX31 SoCs
+In-Reply-To: <20161228214651.oncshkvksqep3krk@pengutronix.de>
+References: <fe9b03bf-9c37-862f-b3aa-0f9b5a4dfefb@roeck-us.net>
+ <bedae3d8-3057-36e4-1d89-ec41f9f1a25b@mleia.com>
+ <20161223083256.3wdqou5xmhr7fidn@pengutronix.de>
+ <74751709-c32e-b1b3-4fa3-613f7d57d1d8@mleia.com>
+ <20161223100113.s57bi7257yero7f7@pengutronix.de>
+ <7018c466-2467-a9fc-2382-889d3a62741e@mentor.com>
+ <20161223141139.rlsvoonih5lhnnpu@pengutronix.de>
+ <c22600d5-f6b5-4c13-59b4-ba391ea29a4c@mleia.com>
+ <20161228205419.la74jr4rfes7fa4v@pengutronix.de>
+ <CAOMZO5BD3Y6vXwt7_bdv_KyGvKSYru1vzDowsD81fzEbM4gHPA@mail.gmail.com>
+ <20161228214651.oncshkvksqep3krk@pengutronix.de>
+Message-ID: <CAOMZO5CBfiRMicxvGyHrm-rQFzn8yEQyb5=t49PBr6rdpZYPug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MSM chipidea wrapper has two bits that are used to reset the
-first or second phy. Add support for these bits via the reset
-controller framework, so that phy drivers can reset their
-hardware at the right time during initialization.
+On Wed, Dec 28, 2016 at 7:46 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-Acked-by: Peter Chen <peter.chen@nxp.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
----
- drivers/usb/chipidea/Kconfig       |  1 +
- drivers/usb/chipidea/ci_hdrc_msm.c | 50 ++++++++++++++++++++++++++++++++++++--
- 2 files changed, 49 insertions(+), 2 deletions(-)
+> Right, so they would fall back to the i.MX21 type and not profit from
+> Markus' change until either the dtb is updated or the third commit is
+> added. I'll try to contact Markus to ask if he remembers more details.
 
-diff --git a/drivers/usb/chipidea/Kconfig b/drivers/usb/chipidea/Kconfig
-index 19c20eaa23f2..fc96f5cdcb5c 100644
---- a/drivers/usb/chipidea/Kconfig
-+++ b/drivers/usb/chipidea/Kconfig
-@@ -2,6 +2,7 @@ config USB_CHIPIDEA
- 	tristate "ChipIdea Highspeed Dual Role Controller"
- 	depends on ((USB_EHCI_HCD && USB_GADGET) || (USB_EHCI_HCD && !USB_GADGET) || (!USB_EHCI_HCD && USB_GADGET)) && HAS_DMA
- 	select EXTCON
-+	select RESET_CONTROLLER
- 	help
- 	  Say Y here if your system has a dual role high speed USB
- 	  controller based on ChipIdea silicon IP. It supports:
-diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
-index 2489a63d3e75..fe96df7b530c 100644
---- a/drivers/usb/chipidea/ci_hdrc_msm.c
-+++ b/drivers/usb/chipidea/ci_hdrc_msm.c
-@@ -14,6 +14,7 @@
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
- #include <linux/io.h>
-+#include <linux/reset-controller.h>
- #include <linux/extcon.h>
- #include <linux/of.h>
- 
-@@ -31,8 +32,10 @@
- #define HSPHY_SESS_VLD_CTRL		BIT(25)
- 
- /* Vendor base starts at 0x200 beyond CI base */
-+#define HS_PHY_CTRL			0x0040
- #define HS_PHY_SEC_CTRL			0x0078
- #define HS_PHY_DIG_CLAMP_N		BIT(16)
-+#define HS_PHY_POR_ASSERT		BIT(0)
- 
- struct ci_hdrc_msm {
- 	struct platform_device *ci;
-@@ -40,11 +43,43 @@ struct ci_hdrc_msm {
- 	struct clk *iface_clk;
- 	struct clk *fs_clk;
- 	struct ci_hdrc_platform_data pdata;
-+	struct reset_controller_dev rcdev;
- 	bool secondary_phy;
- 	bool hsic;
- 	void __iomem *base;
- };
- 
-+static int
-+ci_hdrc_msm_por_reset(struct reset_controller_dev *r, unsigned long id)
-+{
-+	struct ci_hdrc_msm *ci_msm = container_of(r, struct ci_hdrc_msm, rcdev);
-+	void __iomem *addr = ci_msm->base;
-+	u32 val;
-+
-+	if (id)
-+		addr += HS_PHY_SEC_CTRL;
-+	else
-+		addr += HS_PHY_CTRL;
-+
-+	val = readl_relaxed(addr);
-+	val |= HS_PHY_POR_ASSERT;
-+	writel(val, addr);
-+	/*
-+	 * wait for minimum 10 microseconds as suggested by manual.
-+	 * Use a slightly larger value since the exact value didn't
-+	 * work 100% of the time.
-+	 */
-+	udelay(12);
-+	val &= ~HS_PHY_POR_ASSERT;
-+	writel(val, addr);
-+
-+	return 0;
-+}
-+
-+static const struct reset_control_ops ci_hdrc_msm_reset_ops = {
-+	.reset = ci_hdrc_msm_por_reset,
-+};
-+
- static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
- {
- 	struct device *dev = ci->dev->parent;
-@@ -186,10 +221,18 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
- 	if (!ci->base)
- 		return -ENOMEM;
- 
--	ret = clk_prepare_enable(ci->fs_clk);
-+	ci->rcdev.owner = THIS_MODULE;
-+	ci->rcdev.ops = &ci_hdrc_msm_reset_ops;
-+	ci->rcdev.of_node = pdev->dev.of_node;
-+	ci->rcdev.nr_resets = 2;
-+	ret = reset_controller_register(&ci->rcdev);
- 	if (ret)
- 		return ret;
- 
-+	ret = clk_prepare_enable(ci->fs_clk);
-+	if (ret)
-+		goto err_fs;
-+
- 	reset_control_assert(reset);
- 	usleep_range(10000, 12000);
- 	reset_control_deassert(reset);
-@@ -198,7 +241,7 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
- 
- 	ret = clk_prepare_enable(ci->core_clk);
- 	if (ret)
--		return ret;
-+		goto err_fs;
- 
- 	ret = clk_prepare_enable(ci->iface_clk);
- 	if (ret)
-@@ -236,6 +279,8 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
- 	clk_disable_unprepare(ci->iface_clk);
- err_iface:
- 	clk_disable_unprepare(ci->core_clk);
-+err_fs:
-+	reset_controller_unregister(&ci->rcdev);
- 	return ret;
- }
- 
-@@ -247,6 +292,7 @@ static int ci_hdrc_msm_remove(struct platform_device *pdev)
- 	ci_hdrc_remove_device(ci->ci);
- 	clk_disable_unprepare(ci->iface_clk);
- 	clk_disable_unprepare(ci->core_clk);
-+	reset_controller_unregister(&ci->rcdev);
- 
- 	return 0;
- }
--- 
-2.10.0.297.gf6727b0
+There is no profit from Markus' change for mx21/mx27/mx31.
+
+As Vladimir explained in his commit log these SoCs do not have the
+WMCR register, which causes a hang on these SoCs when we try to write
+to it.
