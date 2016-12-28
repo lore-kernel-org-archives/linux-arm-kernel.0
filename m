@@ -1,34 +1,46 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 28 Dec 2016 17:46:00 +0100
-Subject: [PATCHv2 net-next 04/11] net: mvpp2: remove unused 'tx_skb' field of
- 'struct mvpp2_tx_queue'
+Date: Wed, 28 Dec 2016 17:45:57 +0100
+Subject: [PATCHv2 net-next 01/11] net: mvpp2: handle too large value handling
+ in mvpp2_rx_pkts_coal_set()
 In-Reply-To: <1482943567-12483-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1482943567-12483-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482943567-12483-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1482943567-12483-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit remove a field of 'struct mvpp2_tx_queue' that is not used
-anywhere.
+Currently, mvpp2_rx_pkts_coal_set() does the following to avoid setting
+a too large value for the RX coalescing by packet number:
+
+  val = (pkts & MVPP2_OCCUPIED_THRESH_MASK);
+
+This means that if you set a value that is slightly higher the the
+maximum number of packets, you in fact get a very low value. It makes a
+lot more sense to simply check if the value is too high, and if it's too
+high, limit it to the maximum possible value.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index d098c7b..6720cdac 100644
+index 4fe430c..02d91e4 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -823,9 +823,6 @@ struct mvpp2_tx_queue {
- 	/* Per-CPU control of physical Tx queues */
- 	struct mvpp2_txq_pcpu __percpu *pcpu;
+@@ -4381,11 +4381,11 @@ static void mvpp2_txp_max_tx_size_set(struct mvpp2_port *port)
+ static void mvpp2_rx_pkts_coal_set(struct mvpp2_port *port,
+ 				   struct mvpp2_rx_queue *rxq, u32 pkts)
+ {
+-	u32 val;
++	if (pkts > MVPP2_OCCUPIED_THRESH_MASK)
++		pkts = MVPP2_OCCUPIED_THRESH_MASK;
  
--	/* Array of transmitted skb */
--	struct sk_buff **tx_skb;
--
- 	u32 done_pkts_coal;
+-	val = (pkts & MVPP2_OCCUPIED_THRESH_MASK);
+ 	mvpp2_write(port->priv, MVPP2_RXQ_NUM_REG, rxq->id);
+-	mvpp2_write(port->priv, MVPP2_RXQ_THRESH_REG, val);
++	mvpp2_write(port->priv, MVPP2_RXQ_THRESH_REG, pkts);
  
- 	/* Virtual address of thex Tx DMA descriptors array */
+ 	rxq->pkts_coal = pkts;
+ }
 -- 
 2.7.4
