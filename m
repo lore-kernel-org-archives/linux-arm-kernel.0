@@ -1,40 +1,51 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 28 Dec 2016 14:57:08 -0800
-Subject: [PATCH v6 22/25] usb: chipidea: Drop lock across event_notify during
- gadget stop
+Date: Wed, 28 Dec 2016 14:56:54 -0800
+Subject: [PATCH v6 08/25] usb: chipidea: Remove locking in ci_udc_start()
 In-Reply-To: <20161228225711.698-1-stephen.boyd@linaro.org>
 References: <20161228225711.698-1-stephen.boyd@linaro.org>
-Message-ID: <20161228225711.698-23-stephen.boyd@linaro.org>
+Message-ID: <20161228225711.698-9-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CI_HDRC_CONTROLLER_STOPPED_EVENT may want to call sleeping
-APIs similar to how _gadget_stop_activity() may. Let's drop the
-lock across the event so that glue drivers can make sleeping
-calls.
+We don't call hw_device_reset() with the ci->lock held, so it
+doesn't seem like this lock here is protecting anything. Let's
+just remove it. This allows us to call sleeping functions like
+phy_init() from within the CI_HDRC_CONTROLLER_RESET_EVENT hook.
 
-Cc: Peter Chen <peter.chen@nxp.com>
+Acked-by: Peter Chen <peter.chen@nxp.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/chipidea/udc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/usb/chipidea/udc.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
 diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index 0db56fb7e9e9..0d532a724d48 100644
+index cf132f057137..732b281485de 100644
 --- a/drivers/usb/chipidea/udc.c
 +++ b/drivers/usb/chipidea/udc.c
-@@ -1793,10 +1793,10 @@ static int ci_udc_stop(struct usb_gadget *gadget)
+@@ -1725,7 +1725,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
+ 			 struct usb_gadget_driver *driver)
+ {
+ 	struct ci_hdrc *ci = container_of(gadget, struct ci_hdrc, gadget);
+-	unsigned long flags;
+ 	int retval = -ENOMEM;
  
+ 	if (driver->disconnect == NULL)
+@@ -1752,7 +1751,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
+ 
+ 	pm_runtime_get_sync(&ci->gadget.dev);
  	if (ci->vbus_active) {
- 		hw_device_state(ci, 0);
-+		spin_unlock_irqrestore(&ci->lock, flags);
- 		if (ci->platdata->notify_event)
- 			ci->platdata->notify_event(ci,
- 			CI_HDRC_CONTROLLER_STOPPED_EVENT);
--		spin_unlock_irqrestore(&ci->lock, flags);
- 		_gadget_stop_activity(&ci->gadget);
- 		spin_lock_irqsave(&ci->lock, flags);
- 		pm_runtime_put(&ci->gadget.dev);
+-		spin_lock_irqsave(&ci->lock, flags);
+ 		hw_device_reset(ci);
+ 	} else {
+ 		usb_udc_vbus_handler(&ci->gadget, false);
+@@ -1761,7 +1759,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
+ 	}
+ 
+ 	retval = hw_device_state(ci, ci->ep0out->qh.dma);
+-	spin_unlock_irqrestore(&ci->lock, flags);
+ 	if (retval)
+ 		pm_runtime_put_sync(&ci->gadget.dev);
+ 
 -- 
 2.10.0.297.gf6727b0
