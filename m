@@ -1,232 +1,66 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 28 Dec 2016 17:46:06 +0100
-Subject: [PATCHv2 net-next 10/11] net: mvpp2: switch to build_skb() in the RX
- path
-In-Reply-To: <1482943567-12483-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1482943567-12483-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482943567-12483-11-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 28 Dec 2016 17:46:16 +0100
+Subject: [PATCHv2 net-next 00/16] net: mvpp2: add basic support for PPv2.2
+Message-ID: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adapts the mvpp2 RX path to use the build_skb() method. Not
-only build_skb() is now the recommended mechanism, but it also
-simplifies the addition of support for the PPv2.2 variant.
+Hello,
 
-Indeed, without build_skb(), we have to keep track for each RX
-descriptor of the physical address of the packet buffer, and the virtual
-address of the SKB. However, in PPv2.2 running on 64 bits platform,
-there is not enough space in the descriptor to store the virtual address
-of the SKB. So having to take care only of the address of the packet
-buffer, and building the SKB upon reception helps in supporting PPv2.2.
+The goal of this patch series is to add basic support for PPv2.2 in
+the existing mvpp2 driver. mvpp2 currently supported the PPv2.1
+version of the IP, used in the 32 bits Marvell Armada 375 SoC. PPv2.2
+is an evolution of this IP block, used in the 64 bits Marvell Armada
+7K/8K SoCs.
 
-The implementation is fairly straightforward:
+In order to ease the review, the introduction of PPv2.2 support has
+been made into multiple small commits, with the final commit adding
+the compatible string that makes the PPv2.2 support actually
+usable. The series remain fully bisectable.
 
- - mvpp2_skb_alloc() is renamed to mvpp2_buf_alloc() and no longer
-   allocates a SKB. Instead, it allocates a buffer using the new
-   mvpp2_frag_alloc() function, with enough space for the data and SKB.
+This series depends on the series named "net: mvpp2: misc improvements
+and preparation patches".
 
- - The initialization of the RX buffers in mvpp2_bm_bufs_add() as well
-   as the refill of the RX buffers in mvpp2_rx_refill() is adjusted
-   accordingly.
+I'd like to thank Stefan Chulski and Marcin Wojtas, who helped me a
+lot in the development of this patch series, by reviewing the patches,
+and giving lots of useful hints to debug the driver on PPv2.2. Thanks!
 
- - Finally, the mvpp2_rx() is modified to use build_skb().
+Changes since v1:
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/net/ethernet/marvell/mvpp2.c | 77 +++++++++++++++++++++++++-----------
- 1 file changed, 55 insertions(+), 22 deletions(-)
+ - Made a separate series from the set of patches doing preparation
+   changes/fixes to the mvpp2 driver.
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 58cf9af..1e08e8f 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -918,6 +918,7 @@ struct mvpp2_bm_pool {
- 	int buf_size;
- 	/* Packet size */
- 	int pkt_size;
-+	int frag_size;
- 
- 	/* BPPE virtual base address */
- 	u32 *virt_addr;
-@@ -3354,6 +3355,22 @@ static void mvpp2_cls_oversize_rxq_set(struct mvpp2_port *port)
- 	mvpp2_write(port->priv, MVPP2_CLS_SWFWD_PCTRL_REG, val);
- }
- 
-+static void *mvpp2_frag_alloc(const struct mvpp2_bm_pool *pool)
-+{
-+	if (likely(pool->frag_size <= PAGE_SIZE))
-+		return netdev_alloc_frag(pool->frag_size);
-+	else
-+		return kmalloc(pool->frag_size, GFP_ATOMIC);
-+}
-+
-+static void mvpp2_frag_free(const struct mvpp2_bm_pool *pool, void *data)
-+{
-+	if (likely(pool->frag_size <= PAGE_SIZE))
-+		skb_free_frag(data);
-+	else
-+		kfree(data);
-+}
-+
- /* Buffer Manager configuration routines */
- 
- /* Create pool */
-@@ -3428,7 +3445,8 @@ static void mvpp2_bm_bufs_free(struct device *dev, struct mvpp2 *priv,
- 
- 		if (!vaddr)
- 			break;
--		dev_kfree_skb_any((struct sk_buff *)vaddr);
-+
-+		mvpp2_frag_free(bm_pool, (void *)vaddr);
- 	}
- 
- 	/* Update BM driver with number of buffers removed from pool */
-@@ -3542,29 +3560,28 @@ static void mvpp2_rxq_short_pool_set(struct mvpp2_port *port,
- 	mvpp2_write(port->priv, MVPP2_RXQ_CONFIG_REG(prxq), val);
- }
- 
--/* Allocate skb for BM pool */
--static struct sk_buff *mvpp2_skb_alloc(struct mvpp2_port *port,
--				       struct mvpp2_bm_pool *bm_pool,
--				       dma_addr_t *buf_phys_addr,
--				       gfp_t gfp_mask)
-+static void *mvpp2_buf_alloc(struct mvpp2_port *port,
-+			     struct mvpp2_bm_pool *bm_pool,
-+			     dma_addr_t *buf_phys_addr,
-+			     gfp_t gfp_mask)
- {
--	struct sk_buff *skb;
- 	dma_addr_t phys_addr;
-+	void *data;
- 
--	skb = __dev_alloc_skb(bm_pool->pkt_size, gfp_mask);
--	if (!skb)
-+	data = mvpp2_frag_alloc(bm_pool);
-+	if (!data)
- 		return NULL;
- 
--	phys_addr = dma_map_single(port->dev->dev.parent, skb->head,
-+	phys_addr = dma_map_single(port->dev->dev.parent, data,
- 				   MVPP2_RX_BUF_SIZE(bm_pool->pkt_size),
- 				    DMA_FROM_DEVICE);
- 	if (unlikely(dma_mapping_error(port->dev->dev.parent, phys_addr))) {
--		dev_kfree_skb_any(skb);
-+		mvpp2_frag_free(bm_pool, data);
- 		return NULL;
- 	}
- 	*buf_phys_addr = phys_addr;
- 
--	return skb;
-+	return data;
- }
- 
- /* Set pool number in a BM cookie */
-@@ -3620,9 +3637,9 @@ static void mvpp2_pool_refill(struct mvpp2_port *port, u32 bm,
- static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
- 			     struct mvpp2_bm_pool *bm_pool, int buf_num)
- {
--	struct sk_buff *skb;
- 	int i, buf_size, total_size;
- 	dma_addr_t phys_addr;
-+	void *buf;
- 
- 	buf_size = MVPP2_RX_BUF_SIZE(bm_pool->pkt_size);
- 	total_size = MVPP2_RX_TOTAL_SIZE(buf_size);
-@@ -3636,11 +3653,11 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
- 	}
- 
- 	for (i = 0; i < buf_num; i++) {
--		skb = mvpp2_skb_alloc(port, bm_pool, &phys_addr, GFP_KERNEL);
--		if (!skb)
-+		buf = mvpp2_buf_alloc(port, bm_pool, &phys_addr, GFP_KERNEL);
-+		if (!buf)
- 			break;
- 
--		mvpp2_bm_pool_put(port, bm_pool->id, (u32)phys_addr, (u32)skb);
-+		mvpp2_bm_pool_put(port, bm_pool->id, (u32)phys_addr, (u32)buf);
- 	}
- 
- 	/* Update BM driver with number of buffers added to pool */
-@@ -3696,6 +3713,9 @@ mvpp2_bm_pool_use(struct mvpp2_port *port, int pool, enum mvpp2_bm_type type,
- 					   port->priv, new_pool);
- 
- 		new_pool->pkt_size = pkt_size;
-+		new_pool->frag_size =
-+			SKB_DATA_ALIGN(MVPP2_RX_BUF_SIZE(pkt_size)) +
-+			MVPP2_SKB_SHINFO_SIZE;
- 
- 		/* Allocate buffers for this pool */
- 		num = mvpp2_bm_bufs_add(port, new_pool, pkts_num);
-@@ -4987,15 +5007,15 @@ static void mvpp2_rx_csum(struct mvpp2_port *port, u32 status,
- static int mvpp2_rx_refill(struct mvpp2_port *port,
- 			   struct mvpp2_bm_pool *bm_pool, u32 bm)
- {
--	struct sk_buff *skb;
- 	dma_addr_t phys_addr;
-+	void *buf;
- 
- 	/* No recycle or too many buffers are in use, so allocate a new skb */
--	skb = mvpp2_skb_alloc(port, bm_pool, &phys_addr, GFP_ATOMIC);
--	if (!skb)
-+	buf = mvpp2_buf_alloc(port, bm_pool, &phys_addr, GFP_ATOMIC);
-+	if (!buf)
- 		return -ENOMEM;
- 
--	mvpp2_pool_refill(port, bm, (u32)phys_addr, (u32)skb);
-+	mvpp2_pool_refill(port, bm, (u32)phys_addr, (u32)buf);
- 
- 	return 0;
- }
-@@ -5087,14 +5107,17 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
- 		struct mvpp2_rx_desc *rx_desc = mvpp2_rxq_next_desc_get(rxq);
- 		struct mvpp2_bm_pool *bm_pool;
- 		struct sk_buff *skb;
-+		unsigned int frag_size;
- 		dma_addr_t phys_addr;
- 		u32 bm, rx_status;
- 		int pool, rx_bytes, err;
-+		void *data;
- 
- 		rx_done++;
- 		rx_status = rx_desc->status;
- 		rx_bytes = rx_desc->data_size - MVPP2_MH_SIZE;
- 		phys_addr = rx_desc->buf_phys_addr;
-+		data = (void *)rx_desc->buf_cookie;
- 
- 		bm = mvpp2_bm_cookie_build(rx_desc);
- 		pool = mvpp2_bm_cookie_pool_get(bm);
-@@ -5115,12 +5138,22 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
- 			dev->stats.rx_errors++;
- 			mvpp2_rx_error(port, rx_desc);
- 			/* Return the buffer to the pool */
-+
- 			mvpp2_pool_refill(port, bm, rx_desc->buf_phys_addr,
- 					  rx_desc->buf_cookie);
- 			continue;
- 		}
- 
--		skb = (struct sk_buff *)rx_desc->buf_cookie;
-+		if (bm_pool->frag_size > PAGE_SIZE)
-+			frag_size = 0;
-+		else
-+			frag_size = bm_pool->frag_size;
-+
-+		skb = build_skb(data, frag_size);
-+		if (!skb) {
-+			netdev_warn(port->dev, "skb build failed\n");
-+			goto err_drop_frame;
-+		}
- 
- 		err = mvpp2_rx_refill(port, bm_pool, bm);
- 		if (err) {
-@@ -5134,7 +5167,7 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
- 		rcvd_pkts++;
- 		rcvd_bytes += rx_bytes;
- 
--		skb_reserve(skb, MVPP2_MH_SIZE);
-+		skb_reserve(skb, MVPP2_MH_SIZE + NET_SKB_PAD);
- 		skb_put(skb, rx_bytes);
- 		skb->protocol = eth_type_trans(skb, dev);
- 		mvpp2_rx_csum(port, rx_status, skb);
+ - Rebased on top of v4.10-rc1.
+
+ - Update Kconfig text of the mvpp2 driver to mention the support for
+   Armada 7K and 8K (PPv2.2).
+
+Best regards,
+
+Thomas
+
+Thomas Petazzoni (16):
+  dt-bindings: net: update Marvell PPv2 binding for PPv2.2 support
+  net: mvpp2: add and use accessors for TX/RX descriptors
+  net: mvpp2: add hw_version field in "struct mvpp2"
+  net: mvpp2: introduce an intermediate union for the TX/RX descriptors
+  net: mvpp2: introduce PPv2.2 HW descriptors and adapt accessors
+  net: mvpp2: adjust the allocation/free of BM pools for PPv2.2
+  net: mvpp2: adapt the mvpp2_rxq_*_pool_set functions to PPv2.2
+  net: mvpp2: adapt mvpp2_defaults_set() to PPv2.2
+  net: mvpp2: adjust mvpp2_{rxq,txq}_init for PPv2.2
+  net: mvpp2: handle register mapping and access for PPv2.2
+  net: mvpp2: handle misc PPv2.1/PPv2.2 differences
+  net: mvpp2: add AXI bridge initialization for PPv2.2
+  net: mvpp2: rework RXQ interrupt group initialization for PPv2.2
+  net: mvpp2: adapt rxq distribution to PPv2.2
+  net: mvpp2: add support for an additional clock needed for PPv2.2
+  net: mvpp2: finally add the PPv2.2 compatible string
+
+ .../devicetree/bindings/net/marvell-pp2.txt        |  66 +-
+ drivers/net/ethernet/marvell/Kconfig               |   4 +-
+ drivers/net/ethernet/marvell/mvpp2.c               | 783 +++++++++++++++++----
+ 3 files changed, 700 insertions(+), 153 deletions(-)
+
 -- 
 2.7.4
