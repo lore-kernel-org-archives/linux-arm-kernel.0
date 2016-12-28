@@ -1,221 +1,90 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 28 Dec 2016 07:26:27 -0800
-Subject: [PATCH v2] watchdog: constify watchdog_info structures
-In-Reply-To: <1482771911-13548-1-git-send-email-bhumirks@gmail.com>
-References: <1482771911-13548-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <b38885cd-5654-3e1e-8ef3-a2f96d9b82f5@roeck-us.net>
+From: ayaka@soulik.info (Randy Li)
+Date: Wed, 28 Dec 2016 23:34:48 +0800
+Subject: [PATCH] Revert "mmc: dw_mmc-rockchip: add runtime PM support"
+Message-ID: <1482939288-14950-1-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/26/2016 09:05 AM, Bhumika Goyal wrote:
-> Declare watchdog_info structures as const as they are only stored in the
-> info field of watchdog_device structures. This field is of type const
-> struct watchdog_info *, so watchdog_info structures having this property
-> can be declared const too.
-> Done using Coccinelle:
->
-> @r1 disable optional_qualifier@
-> identifier i;
-> position p;
-> @@
-> static struct watchdog_info i at p={...};
->
-> @ok@
-> identifier r1.i;
-> position p;
-> struct watchdog_device obj;
-> @@
-> obj.info=&i at p;
->
-> @bad@
-> position p!={r1.p,ok.p};
-> identifier r1.i;
-> @@
-> i at p
->
-> @depends on !bad disable optional_qualifier@
-> identifier r1.i;
-> @@
-> +const
-> struct watchdog_info i;
->
-> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+This reverts commit f90142683f04bcb0729bf0df67a5e29562b725b9.
+It is reported that making RK3288 can't boot from eMMC/MMC.
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Signed-off-by: Randy Li <ayaka@soulik.info>
+---
+ drivers/mmc/host/dw_mmc-rockchip.c | 41 +++-----------------------------------
+ 1 file changed, 3 insertions(+), 38 deletions(-)
 
-> ---
-> Changes in v2:
->   * Drop "drivers:" from the subject line.
->   * Remove the file size details.
->
->  drivers/watchdog/bcm7038_wdt.c   | 2 +-
->  drivers/watchdog/bcm_kona_wdt.c  | 2 +-
->  drivers/watchdog/cadence_wdt.c   | 2 +-
->  drivers/watchdog/da9052_wdt.c    | 2 +-
->  drivers/watchdog/da9055_wdt.c    | 2 +-
->  drivers/watchdog/digicolor_wdt.c | 2 +-
->  drivers/watchdog/imgpdc_wdt.c    | 2 +-
->  drivers/watchdog/kempld_wdt.c    | 2 +-
->  drivers/watchdog/lpc18xx_wdt.c   | 2 +-
->  drivers/watchdog/rn5t618_wdt.c   | 2 +-
->  drivers/watchdog/sbsa_gwdt.c     | 2 +-
->  drivers/watchdog/w83627hf_wdt.c  | 2 +-
->  12 files changed, 12 insertions(+), 12 deletions(-)
->
-> diff --git a/drivers/watchdog/bcm7038_wdt.c b/drivers/watchdog/bcm7038_wdt.c
-> index e238df4..37c6a49 100644
-> --- a/drivers/watchdog/bcm7038_wdt.c
-> +++ b/drivers/watchdog/bcm7038_wdt.c
-> @@ -101,7 +101,7 @@ static unsigned int bcm7038_wdt_get_timeleft(struct watchdog_device *wdog)
->  	return time_left / wdt->rate;
->  }
->
-> -static struct watchdog_info bcm7038_wdt_info = {
-> +static const struct watchdog_info bcm7038_wdt_info = {
->  	.identity	= "Broadcom BCM7038 Watchdog Timer",
->  	.options	= WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
->  				WDIOF_MAGICCLOSE
-> diff --git a/drivers/watchdog/bcm_kona_wdt.c b/drivers/watchdog/bcm_kona_wdt.c
-> index e0c9842..76b0080 100644
-> --- a/drivers/watchdog/bcm_kona_wdt.c
-> +++ b/drivers/watchdog/bcm_kona_wdt.c
-> @@ -274,7 +274,7 @@ static int bcm_kona_wdt_stop(struct watchdog_device *wdog)
->  	.get_timeleft =	bcm_kona_wdt_get_timeleft,
->  };
->
-> -static struct watchdog_info bcm_kona_wdt_info = {
-> +static const struct watchdog_info bcm_kona_wdt_info = {
->  	.options =	WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE |
->  			WDIOF_KEEPALIVEPING,
->  	.identity =	"Broadcom Kona Watchdog Timer",
-> diff --git a/drivers/watchdog/cadence_wdt.c b/drivers/watchdog/cadence_wdt.c
-> index 98acef7..8d61e8b 100644
-> --- a/drivers/watchdog/cadence_wdt.c
-> +++ b/drivers/watchdog/cadence_wdt.c
-> @@ -262,7 +262,7 @@ static irqreturn_t cdns_wdt_irq_handler(int irq, void *dev_id)
->   * Info structure used to indicate the features supported by the device
->   * to the upper layers. This is defined in watchdog.h header file.
->   */
-> -static struct watchdog_info cdns_wdt_info = {
-> +static const struct watchdog_info cdns_wdt_info = {
->  	.identity	= "cdns_wdt watchdog",
->  	.options	= WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
->  			  WDIOF_MAGICCLOSE,
-> diff --git a/drivers/watchdog/da9052_wdt.c b/drivers/watchdog/da9052_wdt.c
-> index 2fc19a3..d86a57e 100644
-> --- a/drivers/watchdog/da9052_wdt.c
-> +++ b/drivers/watchdog/da9052_wdt.c
-> @@ -140,7 +140,7 @@ static int da9052_wdt_ping(struct watchdog_device *wdt_dev)
->  	return ret;
->  }
->
-> -static struct watchdog_info da9052_wdt_info = {
-> +static const struct watchdog_info da9052_wdt_info = {
->  	.options	= WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
->  	.identity	= "DA9052 Watchdog",
->  };
-> diff --git a/drivers/watchdog/da9055_wdt.c b/drivers/watchdog/da9055_wdt.c
-> index 8377c43..4f30818 100644
-> --- a/drivers/watchdog/da9055_wdt.c
-> +++ b/drivers/watchdog/da9055_wdt.c
-> @@ -108,7 +108,7 @@ static int da9055_wdt_stop(struct watchdog_device *wdt_dev)
->  	return da9055_wdt_set_timeout(wdt_dev, 0);
->  }
->
-> -static struct watchdog_info da9055_wdt_info = {
-> +static const struct watchdog_info da9055_wdt_info = {
->  	.options	= WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
->  	.identity	= "DA9055 Watchdog",
->  };
-> diff --git a/drivers/watchdog/digicolor_wdt.c b/drivers/watchdog/digicolor_wdt.c
-> index 77df772..dfe7294 100644
-> --- a/drivers/watchdog/digicolor_wdt.c
-> +++ b/drivers/watchdog/digicolor_wdt.c
-> @@ -105,7 +105,7 @@ static unsigned int dc_wdt_get_timeleft(struct watchdog_device *wdog)
->  	.restart        = dc_wdt_restart,
->  };
->
-> -static struct watchdog_info dc_wdt_info = {
-> +static const struct watchdog_info dc_wdt_info = {
->  	.options	= WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE
->  			| WDIOF_KEEPALIVEPING,
->  	.identity	= "Conexant Digicolor Watchdog",
-> diff --git a/drivers/watchdog/imgpdc_wdt.c b/drivers/watchdog/imgpdc_wdt.c
-> index 516fbef..6ed39de 100644
-> --- a/drivers/watchdog/imgpdc_wdt.c
-> +++ b/drivers/watchdog/imgpdc_wdt.c
-> @@ -161,7 +161,7 @@ static int pdc_wdt_restart(struct watchdog_device *wdt_dev,
->  	return 0;
->  }
->
-> -static struct watchdog_info pdc_wdt_info = {
-> +static const struct watchdog_info pdc_wdt_info = {
->  	.identity	= "IMG PDC Watchdog",
->  	.options	= WDIOF_SETTIMEOUT |
->  			  WDIOF_KEEPALIVEPING |
-> diff --git a/drivers/watchdog/kempld_wdt.c b/drivers/watchdog/kempld_wdt.c
-> index 8e302d0..73c46b3 100644
-> --- a/drivers/watchdog/kempld_wdt.c
-> +++ b/drivers/watchdog/kempld_wdt.c
-> @@ -422,7 +422,7 @@ static int kempld_wdt_probe_stages(struct watchdog_device *wdd)
->  	return 0;
->  }
->
-> -static struct watchdog_info kempld_wdt_info = {
-> +static const struct watchdog_info kempld_wdt_info = {
->  	.identity	= "KEMPLD Watchdog",
->  	.options	= WDIOF_SETTIMEOUT |
->  			WDIOF_KEEPALIVEPING |
-> diff --git a/drivers/watchdog/lpc18xx_wdt.c b/drivers/watchdog/lpc18xx_wdt.c
-> index fd171e6..3b8bb59 100644
-> --- a/drivers/watchdog/lpc18xx_wdt.c
-> +++ b/drivers/watchdog/lpc18xx_wdt.c
-> @@ -181,7 +181,7 @@ static int lpc18xx_wdt_restart(struct watchdog_device *wdt_dev,
->  	return 0;
->  }
->
-> -static struct watchdog_info lpc18xx_wdt_info = {
-> +static const struct watchdog_info lpc18xx_wdt_info = {
->  	.identity	= "NXP LPC18xx Watchdog",
->  	.options	= WDIOF_SETTIMEOUT |
->  			  WDIOF_KEEPALIVEPING |
-> diff --git a/drivers/watchdog/rn5t618_wdt.c b/drivers/watchdog/rn5t618_wdt.c
-> index 0805ee2..e60f557 100644
-> --- a/drivers/watchdog/rn5t618_wdt.c
-> +++ b/drivers/watchdog/rn5t618_wdt.c
-> @@ -130,7 +130,7 @@ static int rn5t618_wdt_ping(struct watchdog_device *wdt_dev)
->  				  RN5T618_PWRIRQ_IR_WDOG, 0);
->  }
->
-> -static struct watchdog_info rn5t618_wdt_info = {
-> +static const struct watchdog_info rn5t618_wdt_info = {
->  	.options	= WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE |
->  			  WDIOF_KEEPALIVEPING,
->  	.identity	= DRIVER_NAME,
-> diff --git a/drivers/watchdog/sbsa_gwdt.c b/drivers/watchdog/sbsa_gwdt.c
-> index ce0c38b..e9966bc 100644
-> --- a/drivers/watchdog/sbsa_gwdt.c
-> +++ b/drivers/watchdog/sbsa_gwdt.c
-> @@ -207,7 +207,7 @@ static irqreturn_t sbsa_gwdt_interrupt(int irq, void *dev_id)
->  	return IRQ_HANDLED;
->  }
->
-> -static struct watchdog_info sbsa_gwdt_info = {
-> +static const struct watchdog_info sbsa_gwdt_info = {
->  	.identity	= WATCHDOG_NAME,
->  	.options	= WDIOF_SETTIMEOUT |
->  			  WDIOF_KEEPALIVEPING |
-> diff --git a/drivers/watchdog/w83627hf_wdt.c b/drivers/watchdog/w83627hf_wdt.c
-> index ef2ecaf..98fd186 100644
-> --- a/drivers/watchdog/w83627hf_wdt.c
-> +++ b/drivers/watchdog/w83627hf_wdt.c
-> @@ -297,7 +297,7 @@ static unsigned int wdt_get_time(struct watchdog_device *wdog)
->   *	Kernel Interfaces
->   */
->
-> -static struct watchdog_info wdt_info = {
-> +static const struct watchdog_info wdt_info = {
->  	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
->  	.identity = "W83627HF Watchdog",
->  };
->
+diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
+index 9a46e46..3189234 100644
+--- a/drivers/mmc/host/dw_mmc-rockchip.c
++++ b/drivers/mmc/host/dw_mmc-rockchip.c
+@@ -14,7 +14,6 @@
+ #include <linux/mmc/dw_mmc.h>
+ #include <linux/of_address.h>
+ #include <linux/mmc/slot-gpio.h>
+-#include <linux/pm_runtime.h>
+ #include <linux/slab.h>
+ 
+ #include "dw_mmc.h"
+@@ -327,7 +326,6 @@ static int dw_mci_rockchip_probe(struct platform_device *pdev)
+ {
+ 	const struct dw_mci_drv_data *drv_data;
+ 	const struct of_device_id *match;
+-	int ret;
+ 
+ 	if (!pdev->dev.of_node)
+ 		return -ENODEV;
+@@ -335,49 +333,16 @@ static int dw_mci_rockchip_probe(struct platform_device *pdev)
+ 	match = of_match_node(dw_mci_rockchip_match, pdev->dev.of_node);
+ 	drv_data = match->data;
+ 
+-	pm_runtime_get_noresume(&pdev->dev);
+-	pm_runtime_set_active(&pdev->dev);
+-	pm_runtime_enable(&pdev->dev);
+-	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+-	pm_runtime_use_autosuspend(&pdev->dev);
+-
+-	ret = dw_mci_pltfm_register(pdev, drv_data);
+-	if (ret) {
+-		pm_runtime_disable(&pdev->dev);
+-		pm_runtime_set_suspended(&pdev->dev);
+-		pm_runtime_put_noidle(&pdev->dev);
+-		return ret;
+-	}
+-
+-	pm_runtime_put_autosuspend(&pdev->dev);
+-
+-	return 0;
++	return dw_mci_pltfm_register(pdev, drv_data);
+ }
+ 
+-static int dw_mci_rockchip_remove(struct platform_device *pdev)
+-{
+-	pm_runtime_get_sync(&pdev->dev);
+-	pm_runtime_disable(&pdev->dev);
+-	pm_runtime_put_noidle(&pdev->dev);
+-
+-	return dw_mci_pltfm_remove(pdev);
+-}
+-
+-static const struct dev_pm_ops dw_mci_rockchip_dev_pm_ops = {
+-	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
+-				pm_runtime_force_resume)
+-	SET_RUNTIME_PM_OPS(dw_mci_runtime_suspend,
+-			   dw_mci_runtime_resume,
+-			   NULL)
+-};
+-
+ static struct platform_driver dw_mci_rockchip_pltfm_driver = {
+ 	.probe		= dw_mci_rockchip_probe,
+-	.remove		= dw_mci_rockchip_remove,
++	.remove		= dw_mci_pltfm_remove,
+ 	.driver		= {
+ 		.name		= "dwmmc_rockchip",
+ 		.of_match_table	= dw_mci_rockchip_match,
+-		.pm		= &dw_mci_rockchip_dev_pm_ops,
++		.pm		= &dw_mci_pltfm_pmops,
+ 	},
+ };
+ 
+-- 
+2.7.4
