@@ -1,23 +1,44 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 28 Dec 2016 12:06:44 -0500 (EST)
-Subject: [PATCHv2 net-next 00/16] net: mvpp2: add basic support for PPv2.2
-In-Reply-To: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20161228.120644.1166014191192724301.davem@davemloft.net>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 28 Dec 2016 19:50:25 +0200
+Subject: [RESEND v2] dt-bindings: video: exynos7-decon: Remove obsolete
+ samsung, power-domain property
+Message-ID: <20161228175025.5581-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Date: Wed, 28 Dec 2016 17:46:16 +0100
+The samsung,power-domain property is obsolete since commit 0da658704136
+("ARM: dts: convert to generic power domain bindings for exynos DT").
+Replace it with generic one.
 
-> This series depends on the series named "net: mvpp2: misc improvements
-> and preparation patches".
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Acked-by: Rob Herring <robh@kernel.org>
 
-Please in the future only submit one patch series at a time.
+---
 
-If I've told you that a large patch series is hard to review and that
-therefore one should keep each submitted series small and to a
-reasonable size, that is completely undermined when you submit
-multiple series to work around that request.
+Changes since v1:
+1. Just add the acks/reviews.
 
-Thank you.
+I though it will be applied by Exynos DRM maintainer but there was no
+response.
+Dear Rob, could you pick it up?
+---
+ Documentation/devicetree/bindings/display/exynos/exynos7-decon.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/display/exynos/exynos7-decon.txt b/Documentation/devicetree/bindings/display/exynos/exynos7-decon.txt
+index 3938caacf11c..8346fb18a358 100644
+--- a/Documentation/devicetree/bindings/display/exynos/exynos7-decon.txt
++++ b/Documentation/devicetree/bindings/display/exynos/exynos7-decon.txt
+@@ -33,7 +33,7 @@ Required properties:
+ - i80-if-timings: timing configuration for lcd i80 interface support.
+ 
+ Optional Properties:
+-- samsung,power-domain: a phandle to DECON power domain node.
++- power-domains: a phandle to DECON power domain node.
+ - display-timings: timing settings for DECON, as described in document [1].
+ 		Can be used in case timings cannot be provided otherwise
+ 		or to override timings provided by the panel.
+-- 
+2.9.3
