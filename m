@@ -1,49 +1,54 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 28 Dec 2016 17:45:58 +0100
-Subject: [PATCHv2 net-next 02/11] net: mvpp2: handle too large value in
- mvpp2_rx_time_coal_set()
-In-Reply-To: <1482943567-12483-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1482943567-12483-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1482943567-12483-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 28 Dec 2016 17:45:56 +0100
+Subject: [PATCHv2 net-next 00/11] net: mvpp2: misc improvements and
+ preparation patches
+Message-ID: <1482943567-12483-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When configuring the MVPP2_ISR_RX_THRESHOLD_REG with the RX coalescing
-time threshold, we do not check for the maximum allowed value supported
-by the driver, which means we might overflow and use a bogus value. This
-commit adds a check for this situation, and if a value higher than what
-is supported by the hardware is provided, then we use the maximum value
-supported by the hardware.
+Hello,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/net/ethernet/marvell/mvpp2.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+This series contains a number of misc improvements and preparation
+patches for an upcoming series that adds support for the new PPv2.2
+network controller to the mvpp2 driver.
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 02d91e4..a1ba89f 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -154,6 +154,7 @@
- 
- /* Interrupt Cause and Mask registers */
- #define MVPP2_ISR_RX_THRESHOLD_REG(rxq)		(0x5200 + 4 * (rxq))
-+#define     MVPP2_MAX_ISR_RX_THRESHOLD		0xfffff0
- #define MVPP2_ISR_RXQ_GROUP_REG(rxq)		(0x5400 + 4 * (rxq))
- #define MVPP2_ISR_ENABLE_REG(port)		(0x5420 + 4 * (port))
- #define     MVPP2_ISR_ENABLE_INTERRUPT(mask)	((mask) & 0xffff)
-@@ -4397,6 +4398,12 @@ static void mvpp2_rx_time_coal_set(struct mvpp2_port *port,
- 	u32 val;
- 
- 	val = (port->priv->tclk / USEC_PER_SEC) * usec;
-+
-+	if (val > MVPP2_MAX_ISR_RX_THRESHOLD) {
-+		val = MVPP2_MAX_ISR_RX_THRESHOLD;
-+		usec = (val * USEC_PER_SEC) / port->priv->tclk;
-+	}
-+
- 	mvpp2_write(port->priv, MVPP2_ISR_RX_THRESHOLD_REG(rxq->id), val);
- 
- 	rxq->time_coal = usec;
+The most significant improvements are:
+
+ - Switching to using build_skb(), which is necessary for the upcoming
+   PPv2.2 support, but anyway a good improvement to the current mvpp2
+   driver (supporting PPv2.1).
+
+ - Making the driver build on 64-bit platforms.
+
+Changes since v1:
+
+ - This series is split as a separate series from the larger patch set
+   adding support for PPv2.2 in the mvpp2 driver, as requested by
+   David Miller.
+
+ - Rebased on top of v4.10-rc1.
+
+Thanks!
+
+Thomas
+
+Thomas Petazzoni (11):
+  net: mvpp2: handle too large value handling in
+    mvpp2_rx_pkts_coal_set()
+  net: mvpp2: handle too large value in mvpp2_rx_time_coal_set()
+  net: mvpp2: release reference to txq_cpu[] entry after unmapping
+  net: mvpp2: remove unused 'tx_skb' field of 'struct mvpp2_tx_queue'
+  net: mvpp2: drop useless fields in mvpp2_bm_pool and related code
+  net: mvpp2: simplify mvpp2_bm_bufs_add()
+  net: mvpp2: remove unused register definitions
+  net: mvpp2: fix indentation of MVPP2_EXT_GLOBAL_CTRL_DEFAULT
+  net: mvpp2: simplify MVPP2_PRS_RI_* definitions
+  net: mvpp2: switch to build_skb() in the RX path
+  net: mvpp2: enable building on 64-bit platforms
+
+ drivers/net/ethernet/marvell/Kconfig |   3 +-
+ drivers/net/ethernet/marvell/mvpp2.c | 161 ++++++++++++++++++++---------------
+ 2 files changed, 93 insertions(+), 71 deletions(-)
+
 -- 
 2.7.4
