@@ -1,31 +1,43 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 29 Dec 2016 21:05:14 +0100
-Subject: [PATCH 00/39] ARM: dts: mvebu: Fix license text
-In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
-Message-ID: <CACna6rw7pJmNA2U9rLFRPMU2XWYkpavP+td73ACiYv7NcD9Aeg@mail.gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Thu, 29 Dec 2016 04:06:11 -0800
+Subject: [PATCH v2] ARM: dts: qcom: apq8064: Add missing scm clock
+Message-ID: <20161229120611.7948-1-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 December 2016 at 23:37, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> When the license was switched to dual GPLv2/X11, the text that was used
-> was missing a few characters. Fix that now.
->
-> I'll let the maintainers decide whether this change requires an ack of
-> every contributors. It has been separated with that in mind if
-> necessary.
+As per the device tree binding the apq8064 scm node requires the core
+clock to be specified, so add this.
 
-Acked-by: Rafa? Mi?ecki <zajec5@gmail.com>
-for patches I was cc-ed in, I think a complete list is:
-01
-05
-08
-10
-14
-15
-20
-23
-24
-26
-34
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+
+Changes since v1:
+- Changed clock to Daytona Fabric
+
+ arch/arm/boot/dts/qcom-apq8064.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index 1dbe697b2e90..a27cc96ac069 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -4,6 +4,7 @@
+ #include <dt-bindings/clock/qcom,gcc-msm8960.h>
+ #include <dt-bindings/reset/qcom,gcc-msm8960.h>
+ #include <dt-bindings/clock/qcom,mmcc-msm8960.h>
++#include <dt-bindings/clock/qcom,rpmcc.h>
+ #include <dt-bindings/soc/qcom,gsbi.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+@@ -303,6 +304,9 @@
+ 	firmware {
+ 		scm {
+ 			compatible = "qcom,scm-apq8064";
++
++			clocks = <&rpmcc RPM_DAYTONA_FABRIC_CLK>;
++			clock-names = "core";
+ 		};
+ 	};
+ 
+-- 
+2.11.0
