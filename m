@@ -1,95 +1,205 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 29 Dec 2016 14:53:57 +0100
-Subject: [PATCH 0/4] video/exynos/cec: add HDMI state notifier & use in
- s5p-cec
-In-Reply-To: <20161213150813.37966-1-hverkuil@xs4all.nl>
-References: <CGME20161213150827epcas1p3155035a3c8affb78fb7a3c5b4b60007b@epcas1p3.samsung.com>
- <20161213150813.37966-1-hverkuil@xs4all.nl>
-Message-ID: <0b71ac14-a97a-1eba-26dc-6cf85bab7aa2@samsung.com>
+From: jh80.chung@gmail.com (Jaehoon Chung)
+Date: Thu, 29 Dec 2016 23:04:24 +0900
+Subject: [PATCH] Revert "mmc: dw_mmc-rockchip: add runtime PM support"
+In-Reply-To: <6ccade72-ae20-2ffa-1504-2536b9f03adf@soulik.info>
+References: <CGME20161228153516epcas2p253c6bc0371ab0df464573b63218795ef@epcas2p2.samsung.com>
+ <1482939288-14950-1-git-send-email-ayaka@soulik.info>
+ <e0cc8029-0155-4879-a643-ddc4239a55ab@samsung.com>
+ <7e37b8ad-39d0-3a94-f75a-2166ae2caf10@samsung.com>
+ <7fb90b9e-75c3-0184-4f0a-d4113899b860@rock-chips.com>
+ <04b667d9-2591-51ff-e024-047bbb6e17c3@rock-chips.com>
+ <6ccade72-ae20-2ffa-1504-2536b9f03adf@soulik.info>
+Message-ID: <95648282-38f5-42c2-fd8b-ab603eb3a168@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+Hi,
 
+On 12/29/2016 09:55 PM, ayaka wrote:
+> [    5.849733] rk_gmac-dwmac ff290000.ethernet (unnamed net_device) (uninitialized): Enable RX Mitigation via HW Watchdog Timer
+> [    5.944512] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot req 50000000Hz, actual 50000000HZ div = 0)
+> [    5.958249] mmc1: new ultra high speed DDR50 SDIO card at address 0001
+> [    6.294548] dwmmc_rockchip ff0f0000.dwmmc: Successfully tuned phase to 177
+> [    6.301591] mmc2: new HS200 MMC card at address 0001
+> [    6.306758] mmc_host mmc0: Bus speed (slot 0) = 300000Hz (slot req 300000Hz, actual 300000HZ div = 0)
+> [    6.316830] mmcblk2: mmc2:0001 AGND3R 14.6 GiB
+> [    6.321881] mmcblk2boot0: mmc2:0001 AGND3R partition 1 4.00 MiB
+> [    6.328331] mmcblk2boot1: mmc2:0001 AGND3R partition 2 4.00 MiB
+> [    6.334792] mmcblk2rpmb: mmc2:0001 AGND3R partition 3 4.00 MiB
+> [    6.344295]  mmcblk2: p1 p2 p3 p4 p5 p6 p7
+> [    6.469892] mmc_host mmc0: Bus speed (slot 0) = 200000Hz (slot req 200000Hz, actual 200000HZ div = 0)
+> [    6.621888] mmc_host mmc0: Bus speed (slot 0) = 187500Hz (slot req 100000Hz, actual 93750HZ div = 1)
+> [    6.917883] libphy: stmmac: probed
+> [    6.921319] rk_gmac-dwmac ff290000.ethernet eth0: PHY ID 001cc915 at 0 IRQ POLL (stmmac-0:00) active
+> [    6.930476] rk_gmac-dwmac ff290000.ethernet eth0: PHY ID 001cc915 at 2 IRQ POLL (stmmac-0:02)
+> [    6.939757] input: gpio-keys as /devices/platform/gpio-keys/input/input0
+> [    6.946937] rtc-hym8563 0-0051: no valid clock/calendar values available
+> [    6.953694] rtc-hym8563 0-0051: hctosys: unable to read the hardware clock
+> [    6.961262] vcc_sd: disabling
+> [    6.964275] dovdd_1v8: disabling
+> [    6.967527] dvdd_1v2: disabling
+> [    6.971006] vdd10_lcd: disabling
+> [    6.974701] vcc18_lcd: disabling
+> [    6.978467] ttyS2 - failed to request DMA
+> [    7.101883] mmc_host mmc0: Bus speed (slot 0) = 400000Hz (slot req 400000Hz, actual 400000HZ div = 0)
+> [    7.253874] mmc_host mmc0: Bus speed (slot 0) = 300000Hz (slot req 300000Hz, actual 300000HZ div = 0)
+> [    7.405883] mmc_host mmc0: Bus speed (slot 0) = 200000Hz (slot req 200000Hz, actual 200000HZ div = 0)
+> [    7.557885] mmc_host mmc0: Bus speed (slot 0) = 187500Hz (slot req 100000Hz, actual 93750HZ div = 1)
+> [    8.037872] mmc_host mmc0: Bus speed (slot 0) = 400000Hz (slot req 400000Hz, actual 400000HZ div = 0)
+> [    8.189877] mmc_host mmc0: Bus speed (slot 0) = 300000Hz (slot req 300000Hz, actual 300000HZ div = 0)
+> [    8.341881] mmc_host mmc0: Bus speed (slot 0) = 200000Hz (slot req 200000Hz, actual 200000HZ div = 0)
+> [    8.493884] mmc_host mmc0: Bus speed (slot 0) = 187500Hz (slot req 100000Hz, actual 93750HZ div = 1)
+> [    8.973871] mmc_host mmc0: Bus speed (slot 0) = 400000Hz (slot req 400000Hz, actual 400000HZ div = 0)
+> [    9.125876] mmc_host mmc0: Bus speed (slot 0) = 300000Hz (slot req 300000Hz, actual 300000HZ div = 0)
+> [    9.277884] mmc_host mmc0: Bus speed (slot 0) = 200000Hz (slot req 200000Hz, actual 200000HZ div = 0)
+> [    9.429882] mmc_host mmc0: Bus speed (slot 0) = 187500Hz (slot req 100000Hz, actual 93750HZ div = 1)
+> 
+> looping here
+> 
+> If I revert that patch, there are still lots of Bus speed messages, but finally would enter into system.
+> 
+Plz..Don't put the comment on the top.
 
-On 2016-12-13 16:08, Hans Verkuil wrote:
-> From: Hans Verkuil <hans.verkuil@cisco.com>
->
-> This patch series adds the HDMI notifier code, based on Russell's code:
->
-> https://patchwork.kernel.org/patch/9277043/
->
-> It adds support for it to the exynos_hdmi drm driver, adds support for
-> it to the CEC framework and finally adds support to the s5p-cec driver,
-> which now can be moved out of staging.
->
-> Tested with my Odroid U3 exynos4 devboard.
->
-> Comments are welcome. I'd like to get this in for the 4.11 kernel as
-> this is a missing piece needed to integrate CEC drivers.
->
-> Benjamin, can you look at doing the same notifier integration for your
-> st-cec driver as is done for s5p-cec? It would be good to be able to
-> move st-cec out of staging at the same time.
+Which kernel did you use?
 
-Thanks for working on this and taking it from by TODO list! :)
-
-Please add:
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-If you plan to send an updated version, please send it also to
-linux-samsung-soc at vger.kernel.org, Krzysztof and Inki to get their acks
-for the bindings, dtsi and drm parts.
-
-This HDMI notifier framework will probably be also useful for integrating
-HDMI audio support for Samsung ASoC driver.
-
-> Regards,
->
-> 	Hans
->
-> Hans Verkuil (4):
->    video: add HDMI state notifier support
->    exynos_hdmi: add HDMI notifier support
->    cec: integrate HDMI notifier support
->    s5p-cec: add hdmi-notifier support, move out of staging
->
->   .../devicetree/bindings/media/s5p-cec.txt          |   2 +
->   arch/arm/boot/dts/exynos4.dtsi                     |   1 +
->   drivers/gpu/drm/exynos/Kconfig                     |   1 +
->   drivers/gpu/drm/exynos/exynos_hdmi.c               |  24 +++-
->   drivers/media/cec/cec-core.c                       |  50 ++++++++
->   drivers/media/platform/Kconfig                     |  18 +++
->   drivers/media/platform/Makefile                    |   1 +
->   .../media => media/platform}/s5p-cec/Makefile      |   0
->   .../platform}/s5p-cec/exynos_hdmi_cec.h            |   0
->   .../platform}/s5p-cec/exynos_hdmi_cecctrl.c        |   0
->   .../media => media/platform}/s5p-cec/regs-cec.h    |   0
->   .../media => media/platform}/s5p-cec/s5p_cec.c     |  35 +++++-
->   .../media => media/platform}/s5p-cec/s5p_cec.h     |   3 +
->   drivers/staging/media/Kconfig                      |   2 -
->   drivers/staging/media/Makefile                     |   1 -
->   drivers/staging/media/s5p-cec/Kconfig              |   9 --
->   drivers/staging/media/s5p-cec/TODO                 |   7 --
->   drivers/video/Kconfig                              |   3 +
->   drivers/video/Makefile                             |   1 +
->   drivers/video/hdmi-notifier.c                      | 134 +++++++++++++++++++++
->   include/linux/hdmi-notifier.h                      | 109 +++++++++++++++++
->   include/media/cec.h                                |  15 +++
->   22 files changed, 389 insertions(+), 27 deletions(-)
->   rename drivers/{staging/media => media/platform}/s5p-cec/Makefile (100%)
->   rename drivers/{staging/media => media/platform}/s5p-cec/exynos_hdmi_cec.h (100%)
->   rename drivers/{staging/media => media/platform}/s5p-cec/exynos_hdmi_cecctrl.c (100%)
->   rename drivers/{staging/media => media/platform}/s5p-cec/regs-cec.h (100%)
->   rename drivers/{staging/media => media/platform}/s5p-cec/s5p_cec.c (89%)
->   rename drivers/{staging/media => media/platform}/s5p-cec/s5p_cec.h (97%)
->   delete mode 100644 drivers/staging/media/s5p-cec/Kconfig
->   delete mode 100644 drivers/staging/media/s5p-cec/TODO
->   create mode 100644 drivers/video/hdmi-notifier.c
->   create mode 100644 include/linux/hdmi-notifier.h
->
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+> 
+> On 12/29/2016 06:25 PM, Randy Li wrote:
+>>
+>>
+>> On 12/29/2016 03:25 PM, Shawn Lin wrote:
+>>> On 2016/12/29 15:13, Jaehoon Chung wrote:
+>>>> On 12/29/2016 12:02 PM, Jaehoon Chung wrote:
+>>>>> Hi Randy,
+>>>>>
+>>>>> On 12/29/2016 12:34 AM, Randy Li wrote:
+>>>>>> This reverts commit f90142683f04bcb0729bf0df67a5e29562b725b9.
+>>>>>> It is reported that making RK3288 can't boot from eMMC/MMC.
+>>>>>
+>>>>> Could you explain in more detail?
+>>>>> As you mentioned, this patch is making that RK3288 can't boot..then why?
+>>>>> Good way should be that finds the main reason and fixes it.
+>>>>> Not just revert.
+>>>>
+>>>> To Shawn,
+>>>>
+>>>> Could you check this? If you have rk3288..
+>>>> If it's not working fine, it needs to revert this patch until finding
+>>>> the problem.
+>>>>
+>>>
+>>> Hrmm.....as that patchset was tested based on rk3288 and rk3368, so I
+>>> need to know which board Randy are using now and could you share some
+>> Sorry, XZY has asked me about this in the morning and I answer him that I would give a feedback at home, so I didn't notice this mail.
+>> The board is Firefly reload. but the reporter told me that Firefly release also have the same problem.
+>>> log?
+>>>
+>>> I will have a look at it.
+>>>
+>>>
+>>>> Best Regards,
+>>>> Jaehoon Chung
+>>>>
+>>>>>
+>>>>> Best Regards,
+>>>>> Jaehoon Chung
+>>>>>
+>>>>>>
+>>>>>> Signed-off-by: Randy Li <ayaka@soulik.info>
+>>>>>> ---
+>>>>>>  drivers/mmc/host/dw_mmc-rockchip.c | 41
+>>>>>> +++-----------------------------------
+>>>>>>  1 file changed, 3 insertions(+), 38 deletions(-)
+>>>>>>
+>>>>>> diff --git a/drivers/mmc/host/dw_mmc-rockchip.c
+>>>>>> b/drivers/mmc/host/dw_mmc-rockchip.c
+>>>>>> index 9a46e46..3189234 100644
+>>>>>> --- a/drivers/mmc/host/dw_mmc-rockchip.c
+>>>>>> +++ b/drivers/mmc/host/dw_mmc-rockchip.c
+>>>>>> @@ -14,7 +14,6 @@
+>>>>>>  #include <linux/mmc/dw_mmc.h>
+>>>>>>  #include <linux/of_address.h>
+>>>>>>  #include <linux/mmc/slot-gpio.h>
+>>>>>> -#include <linux/pm_runtime.h>
+>>>>>>  #include <linux/slab.h>
+>>>>>>
+>>>>>>  #include "dw_mmc.h"
+>>>>>> @@ -327,7 +326,6 @@ static int dw_mci_rockchip_probe(struct
+>>>>>> platform_device *pdev)
+>>>>>>  {
+>>>>>>      const struct dw_mci_drv_data *drv_data;
+>>>>>>      const struct of_device_id *match;
+>>>>>> -    int ret;
+>>>>>>
+>>>>>>      if (!pdev->dev.of_node)
+>>>>>>          return -ENODEV;
+>>>>>> @@ -335,49 +333,16 @@ static int dw_mci_rockchip_probe(struct
+>>>>>> platform_device *pdev)
+>>>>>>      match = of_match_node(dw_mci_rockchip_match, pdev->dev.of_node);
+>>>>>>      drv_data = match->data;
+>>>>>>
+>>>>>> -    pm_runtime_get_noresume(&pdev->dev);
+>>>>>> -    pm_runtime_set_active(&pdev->dev);
+>>>>>> -    pm_runtime_enable(&pdev->dev);
+>>>>>> -    pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+>>>>>> -    pm_runtime_use_autosuspend(&pdev->dev);
+>>>>>> -
+>>>>>> -    ret = dw_mci_pltfm_register(pdev, drv_data);
+>>>>>> -    if (ret) {
+>>>>>> -        pm_runtime_disable(&pdev->dev);
+>>>>>> -        pm_runtime_set_suspended(&pdev->dev);
+>>>>>> -        pm_runtime_put_noidle(&pdev->dev);
+>>>>>> -        return ret;
+>>>>>> -    }
+>>>>>> -
+>>>>>> -    pm_runtime_put_autosuspend(&pdev->dev);
+>>>>>> -
+>>>>>> -    return 0;
+>>>>>> +    return dw_mci_pltfm_register(pdev, drv_data);
+>>>>>>  }
+>>>>>>
+>>>>>> -static int dw_mci_rockchip_remove(struct platform_device *pdev)
+>>>>>> -{
+>>>>>> -    pm_runtime_get_sync(&pdev->dev);
+>>>>>> -    pm_runtime_disable(&pdev->dev);
+>>>>>> -    pm_runtime_put_noidle(&pdev->dev);
+>>>>>> -
+>>>>>> -    return dw_mci_pltfm_remove(pdev);
+>>>>>> -}
+>>>>>> -
+>>>>>> -static const struct dev_pm_ops dw_mci_rockchip_dev_pm_ops = {
+>>>>>> -    SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
+>>>>>> -                pm_runtime_force_resume)
+>>>>>> -    SET_RUNTIME_PM_OPS(dw_mci_runtime_suspend,
+>>>>>> -               dw_mci_runtime_resume,
+>>>>>> -               NULL)
+>>>>>> -};
+>>>>>> -
+>>>>>>  static struct platform_driver dw_mci_rockchip_pltfm_driver = {
+>>>>>>      .probe        = dw_mci_rockchip_probe,
+>>>>>> -    .remove        = dw_mci_rockchip_remove,
+>>>>>> +    .remove        = dw_mci_pltfm_remove,
+>>>>>>      .driver        = {
+>>>>>>          .name        = "dwmmc_rockchip",
+>>>>>>          .of_match_table    = dw_mci_rockchip_match,
+>>>>>> -        .pm        = &dw_mci_rockchip_dev_pm_ops,
+>>>>>> +        .pm        = &dw_mci_pltfm_pmops,
+>>>>>>      },
+>>>>>>  };
+>>>>>>
+>>>>>>
+>>>>>
+>>>>> -- 
+>>>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>>>>> the body of a message to majordomo at vger.kernel.org
+>>>>> More majordomo info at http://vger.kernel.org/majordomo-info.html
+>>>>>
+>>>>> .
+>>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>
+>>>
+>>
+> 
