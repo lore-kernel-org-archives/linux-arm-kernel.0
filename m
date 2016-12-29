@@ -1,42 +1,46 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 30 Dec 2016 00:14:11 +0100
-Subject: 4.10-rc1 on Nokia N900: regression, WARN_ON() omap_l3_smx.c
-Message-ID: <20161229231411.GA6865@amd>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 29 Dec 2016 17:27:24 -0600
+Subject: [Patch v2 0/2] Support ARM SMCC SoC vendor quirks
+Message-ID: <1483054046-3327-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+At least one SoC vendor (Qualcomm) requires additional processing done
+during ARM SMCCC calls.  As such, an additional parameter to the
+arm_smccc_smc is required to be able to handle SoC specific quirks.
 
-I forgot I had v4.10-rc1 running, and now I got warning on all the
-consoles (hand-copied).
+The Qualcomm quirk is necessary due to the fact that the scm call can
+be interrupted on Qualcomm ARM64 platforms.  When this occurs, the
+call must be restarted using information that was passed back during
+the original smc call.
 
+The first patch in this series adds a quirk structure and also adds a
+quirk paramter to arm_smccc_smc calls.  I added macros to allow users
+to choose the API they need.  This keeps all of the current users who
+do not need quirks from having to change anything.
 
-Unhandled fault: external abort on non-linefetch (0x1028) at
-0xfa0ab060
-...
-Comm: kworker/0:0 Not tainted.
-Workqueue: events musb_irq_work
-...
-PC is at musb_default_readb().
-...
-WARNING: CPU: 0 ... at drivers/bus/omap_l3_smx.c:166
-omap3_l3_app_irq+0xcc/...
-Tainted: GDW.
+The second patch adds the Qualcomm quirk and also implements the
+Qualcomm firmware changes required to handle the restarting of the
+interrupted SMC call.
 
-I do have patches to allow nfsroot over usb. But they worked ok in
-v4.9... Does anyone see it, too?
+The original patch set for the SMCCC session ID is located at:
+https://lkml.org/lkml/2016/8/20/7
 
-Best regards,
+Changes from v1:
+  - Add macros to handle both use cases per review comments
 
-									Pavel
+Andy Gross (2):
+  arm: kernel: Add SMC structure parameter
+  firmware: qcom: scm: Fix interrupted SCM calls
+
+ arch/arm/kernel/armksyms.c      |  2 +-
+ arch/arm/kernel/smccc-call.S    |  7 ++++---
+ arch/arm64/kernel/arm64ksyms.c  |  2 +-
+ arch/arm64/kernel/asm-offsets.c |  7 +++++--
+ arch/arm64/kernel/smccc-call.S  | 16 ++++++++++++----
+ drivers/firmware/qcom_scm-64.c  | 13 ++++++++++---
+ include/linux/arm-smccc.h       | 39 ++++++++++++++++++++++++++++++++-------
+ 7 files changed, 65 insertions(+), 21 deletions(-)
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161230/ea397025/attachment.sig>
+1.9.1
