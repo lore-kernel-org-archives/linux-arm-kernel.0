@@ -1,22 +1,42 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 29 Dec 2016 17:08:21 -0600
-Subject: [PATCH v2 2/5] arm64: Work around Falkor erratum 1003
-In-Reply-To: <20161229224335.13531-2-cov@codeaurora.org>
-References: <20161229224335.13531-1-cov@codeaurora.org>
- <20161229224335.13531-2-cov@codeaurora.org>
-Message-ID: <ac275374-2aa6-43ec-25c9-6a3fec4ceedc@codeaurora.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 30 Dec 2016 00:14:11 +0100
+Subject: 4.10-rc1 on Nokia N900: regression, WARN_ON() omap_l3_smx.c
+Message-ID: <20161229231411.GA6865@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/29/2016 04:43 PM, Christopher Covington wrote:
-> +config QCOM_FALKOR_E1003_RESERVED_ASID
-> +	int
-> +	default 1
-> +	depends on QCOM_FALKOR_ERRATUM_1003
+Hi!
 
-Also, since this can't be changed via the menu, why bother putting it in?
+I forgot I had v4.10-rc1 running, and now I got warning on all the
+consoles (hand-copied).
+
+
+Unhandled fault: external abort on non-linefetch (0x1028) at
+0xfa0ab060
+...
+Comm: kworker/0:0 Not tainted.
+Workqueue: events musb_irq_work
+...
+PC is at musb_default_readb().
+...
+WARNING: CPU: 0 ... at drivers/bus/omap_l3_smx.c:166
+omap3_l3_app_irq+0xcc/...
+Tainted: GDW.
+
+I do have patches to allow nfsroot over usb. But they worked ok in
+v4.9... Does anyone see it, too?
+
+Best regards,
+
+									Pavel
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161230/ea397025/attachment.sig>
