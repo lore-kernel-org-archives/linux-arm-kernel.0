@@ -1,43 +1,37 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 29 Dec 2016 12:13:25 +0000
-Subject: [PATCH] crypto: arm/aes-neonbs - process 8 blocks in parallel if
- we can
-In-Reply-To: <20161229022348.GA13402@gondor.apana.org.au>
-References: <1481291246-20216-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161227085745.GA10121@gondor.apana.org.au>
- <CAKv+Gu8OkOR3Xzx=XEOWyFpo6sLiq=WQrq0SauaY0V57uYetCQ@mail.gmail.com>
- <20161228091020.GE11904@gondor.apana.org.au>
- <B32240B5-953F-42A2-A010-6FF64AC45859@linaro.org>
- <20161228092328.GA12494@gondor.apana.org.au>
- <CAKv+Gu__722s0JkpTzqDu7MmrzSMQ9jJQn=RYnxgSyV+P6MZRQ@mail.gmail.com>
- <20161229022348.GA13402@gondor.apana.org.au>
-Message-ID: <CAKv+Gu_jUfq2j1oYhHBZsM2NZrCK4VS-WmwEK9ozy8bZGJxszw@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 29 Dec 2016 14:41:05 +0200
+Subject: [PATCH] ARM: s3c2410_defconfig: Fix invalid values for NF_CT_PROTO_*
+Message-ID: <20161229124105.8391-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 December 2016 at 02:23, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> On Wed, Dec 28, 2016 at 07:50:44PM +0000, Ard Biesheuvel wrote:
->>
->> So about this chunksize, is it ever expected to assume other values
->> than 1 (for stream ciphers) or the block size (for block ciphers)?
->> Having block size, IV size *and* chunk size fields may be confusing to
->> some already, so if the purpose of chunk size can be fulfilled by a
->> single 'stream cipher' flag, perhaps we should change that first.
->
-> For users (such as algif) it's much more convenient to have a size
-> rather than a flag because that's what they need to determine the
-> minimum size for partial updates.
->
-> For implementors you don't need to specify the chunksize at all
-> unless you're a stream cipher (or some other case in future where
-> the minimum partial update size is not equal to your block size).
->
+NF_CT_PROTO_DCCP/SCTP/UDPLITE were switched from tristate to boolean so
+defconfig needs to be adjusted to silence warnings:
+	warning: symbol value 'm' invalid for NF_CT_PROTO_DCCP
+	warning: symbol value 'm' invalid for NF_CT_PROTO_SCTP
+	warning: symbol value 'm' invalid for NF_CT_PROTO_UDPLITE
 
-OK, fair enough. So I will add a field 'walksize' to the skcipher_alg
-struct in my proposal. I think the walk logic itself needs to change
-very little, though: we can simply set the walk's chunksize to the
-skcipher's walksize if it exceeds its chunksize (and walksize %
-chunksize should be 0 in any case, and walksize should default to the
-chunksize if not supplied)
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ arch/arm/configs/s3c2410_defconfig | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-If this sounds reasonable to you, I will hack something up next week.
+diff --git a/arch/arm/configs/s3c2410_defconfig b/arch/arm/configs/s3c2410_defconfig
+index 4364040ed696..1e6c48dd7b11 100644
+--- a/arch/arm/configs/s3c2410_defconfig
++++ b/arch/arm/configs/s3c2410_defconfig
+@@ -86,9 +86,9 @@ CONFIG_IPV6_TUNNEL=m
+ CONFIG_NETFILTER=y
+ CONFIG_NF_CONNTRACK=m
+ CONFIG_NF_CONNTRACK_EVENTS=y
+-CONFIG_NF_CT_PROTO_DCCP=m
+-CONFIG_NF_CT_PROTO_SCTP=m
+-CONFIG_NF_CT_PROTO_UDPLITE=m
++CONFIG_NF_CT_PROTO_DCCP=y
++CONFIG_NF_CT_PROTO_SCTP=y
++CONFIG_NF_CT_PROTO_UDPLITE=y
+ CONFIG_NF_CONNTRACK_AMANDA=m
+ CONFIG_NF_CONNTRACK_FTP=m
+ CONFIG_NF_CONNTRACK_H323=m
+-- 
+2.9.3
