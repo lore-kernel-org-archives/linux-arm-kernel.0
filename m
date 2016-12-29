@@ -1,30 +1,37 @@
-From: b18965@freescale.com (Alison Wang)
-Date: Thu, 29 Dec 2016 08:58:22 +0800
-Subject: [PATCH] mtd: nand: Update dependency of IFC for LS1021A
-Message-ID: <1482973102-47659-1-git-send-email-b18965@freescale.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 29 Dec 2016 10:23:48 +0800
+Subject: [PATCH] crypto: arm/aes-neonbs - process 8 blocks in parallel if
+ we can
+In-Reply-To: <CAKv+Gu__722s0JkpTzqDu7MmrzSMQ9jJQn=RYnxgSyV+P6MZRQ@mail.gmail.com>
+References: <1481291246-20216-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20161227085745.GA10121@gondor.apana.org.au>
+ <CAKv+Gu8OkOR3Xzx=XEOWyFpo6sLiq=WQrq0SauaY0V57uYetCQ@mail.gmail.com>
+ <20161228091020.GE11904@gondor.apana.org.au>
+ <B32240B5-953F-42A2-A010-6FF64AC45859@linaro.org>
+ <20161228092328.GA12494@gondor.apana.org.au>
+ <CAKv+Gu__722s0JkpTzqDu7MmrzSMQ9jJQn=RYnxgSyV+P6MZRQ@mail.gmail.com>
+Message-ID: <20161229022348.GA13402@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As NAND support for Freescale/NXP IFC controller is available on
-LS1021A, the dependency for LS1021A is added.
+On Wed, Dec 28, 2016 at 07:50:44PM +0000, Ard Biesheuvel wrote:
+> 
+> So about this chunksize, is it ever expected to assume other values
+> than 1 (for stream ciphers) or the block size (for block ciphers)?
+> Having block size, IV size *and* chunk size fields may be confusing to
+> some already, so if the purpose of chunk size can be fulfilled by a
+> single 'stream cipher' flag, perhaps we should change that first.
 
-Signed-off-by: Alison Wang <alison.wang@nxp.com>
----
- drivers/mtd/nand/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+For users (such as algif) it's much more convenient to have a size
+rather than a flag because that's what they need to determine the
+minimum size for partial updates.
 
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 353a9dd..85e3860 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -441,7 +441,7 @@ config MTD_NAND_FSL_ELBC
- 
- config MTD_NAND_FSL_IFC
- 	tristate "NAND support for Freescale IFC controller"
--	depends on FSL_SOC || ARCH_LAYERSCAPE
-+	depends on FSL_SOC || ARCH_LAYERSCAPE || SOC_LS1021A
- 	select FSL_IFC
- 	select MEMORY
- 	help
+For implementors you don't need to specify the chunksize at all
+unless you're a stream cipher (or some other case in future where
+the minimum partial update size is not equal to your block size).
+
+Cheers,
 -- 
-2.1.0.27.g96db324
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
