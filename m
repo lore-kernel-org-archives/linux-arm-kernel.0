@@ -1,313 +1,291 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 29 Dec 2016 19:14:30 +0800
-Subject: [PATCH v2] drm: zte: support hdmi audio through spdif
-Message-ID: <1483010070-9063-1-git-send-email-shawnguo@kernel.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 29 Dec 2016 12:40:29 +0100
+Subject: [PATCH v2 2/2] mmc: host: s3cmci: allow probing from device tree
+In-Reply-To: <1481289284-19919-3-git-send-email-sergio.prado@e-labworks.com>
+References: <1481289284-19919-1-git-send-email-sergio.prado@e-labworks.com>
+ <1481289284-19919-3-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <CAPDyKFof0xx0VyAs+jOy0Qe6UDe0DRYTpda0X_seWP+8ao4Ytw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
+On 9 December 2016 at 14:14, Sergio Prado <sergio.prado@e-labworks.com> wrote:
+> Allows configuring Samsung S3C24XX MMC/SD/SDIO controller using a device
+> tree.
+>
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+> ---
+>  drivers/mmc/host/s3cmci.c | 155 +++++++++++++++++++++++++++++++++++++++-------
+>  1 file changed, 131 insertions(+), 24 deletions(-)
+>
+> diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
+> index 932a4b1fed33..bfeb90e8ffee 100644
+> --- a/drivers/mmc/host/s3cmci.c
+> +++ b/drivers/mmc/host/s3cmci.c
+> @@ -23,6 +23,9 @@
+>  #include <linux/gpio.h>
+>  #include <linux/irq.h>
+>  #include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_gpio.h>
+>
+>  #include <plat/gpio-cfg.h>
+>  #include <mach/dma.h>
+> @@ -127,6 +130,22 @@ enum dbg_channels {
+>         dbg_conf  = (1 << 8),
+>  };
+>
+> +struct s3cmci_drv_data {
+> +       int is2440;
 
-It enables HDMI audio support through SPDIF interface based on generic
-hdmi-audio-codec driver.  The HDMI hardware supports more audio
-interfaces than SPDIF, like I2S, which may be added later.
+This doesn't say much.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
-Changes for v2:
- - Distll the function zx_hdmi_audio_get_n() per Sean's suggestion and
-   make it inline.
- - Fix the operator typo on N_SVAL2 register write.
+Please use a more descriptive variable name and rename the struct to
+perhaps "variant_data", because I guess that is what this is?
 
- drivers/gpu/drm/zte/Kconfig        |   1 +
- drivers/gpu/drm/zte/zx_hdmi.c      | 148 +++++++++++++++++++++++++++++++++++++
- drivers/gpu/drm/zte/zx_hdmi_regs.h |  14 ++++
- drivers/gpu/drm/zte/zx_vou.c       |   9 +++
- drivers/gpu/drm/zte/zx_vou.h       |  10 +++
- drivers/gpu/drm/zte/zx_vou_regs.h  |   2 +
- 6 files changed, 184 insertions(+)
+> +};
+> +
+> +static const struct s3cmci_drv_data s3c2410_s3cmci_drv_data = {
+> +       .is2440 = 0,
+> +};
+> +
+> +static const struct s3cmci_drv_data s3c2412_s3cmci_drv_data = {
+> +       .is2440 = 1,
+> +};
+> +
+> +static const struct s3cmci_drv_data s3c2440_s3cmci_drv_data = {
+> +       .is2440 = 1,
+> +};
+> +
+>  static const int dbgmap_err   = dbg_fail;
+>  static const int dbgmap_info  = dbg_info | dbg_conf;
+>  static const int dbgmap_debug = dbg_err | dbg_debug;
+> @@ -1241,8 +1260,9 @@ static void s3cmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>         case MMC_POWER_ON:
+>         case MMC_POWER_UP:
+>                 /* Configure GPE5...GPE10 pins in SD mode */
+> -               s3c_gpio_cfgall_range(S3C2410_GPE(5), 6, S3C_GPIO_SFN(2),
+> -                                     S3C_GPIO_PULL_NONE);
+> +               if (!host->pdev->dev.of_node)
+> +                       s3c_gpio_cfgall_range(S3C2410_GPE(5), 6, S3C_GPIO_SFN(2),
+> +                                             S3C_GPIO_PULL_NONE);
+>
+>                 if (host->pdata->set_power)
+>                         host->pdata->set_power(ios->power_mode, ios->vdd);
+> @@ -1254,7 +1274,8 @@ static void s3cmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>
+>         case MMC_POWER_OFF:
+>         default:
+> -               gpio_direction_output(S3C2410_GPE(5), 0);
+> +               if (!host->pdev->dev.of_node)
+> +                       gpio_direction_output(S3C2410_GPE(5), 0);
+>
+>                 if (host->is2440)
+>                         mci_con |= S3C2440_SDICON_SDRESET;
+> @@ -1544,21 +1565,12 @@ static inline void s3cmci_debugfs_remove(struct s3cmci_host *host) { }
+>
+>  #endif /* CONFIG_DEBUG_FS */
+>
+> -static int s3cmci_probe(struct platform_device *pdev)
+> +static int s3cmci_probe_pdata(struct s3cmci_host *host)
+>  {
+> -       struct s3cmci_host *host;
+> -       struct mmc_host *mmc;
+> -       int ret;
+> -       int is2440;
+> -       int i;
+> +       struct platform_device *pdev = host->pdev;
+> +       int i, ret;
+>
+> -       is2440 = platform_get_device_id(pdev)->driver_data;
+> -
+> -       mmc = mmc_alloc_host(sizeof(struct s3cmci_host), &pdev->dev);
+> -       if (!mmc) {
+> -               ret = -ENOMEM;
+> -               goto probe_out;
+> -       }
+> +       host->is2440 = platform_get_device_id(pdev)->driver_data;
+>
+>         for (i = S3C2410_GPE(5); i <= S3C2410_GPE(10); i++) {
+>                 ret = gpio_request(i, dev_name(&pdev->dev));
+> @@ -1568,14 +1580,90 @@ static int s3cmci_probe(struct platform_device *pdev)
+>                         for (i--; i >= S3C2410_GPE(5); i--)
+>                                 gpio_free(i);
+>
+> -                       goto probe_free_host;
+> +                       return ret;
+>                 }
+>         }
+>
+> +       return 0;
+> +}
+> +
+> +static int s3cmci_probe_dt(struct s3cmci_host *host)
+> +{
+> +       struct platform_device *pdev = host->pdev;
+> +       struct s3c24xx_mci_pdata *pdata;
+> +       const struct s3cmci_drv_data *drvdata;
+> +       struct mmc_host *mmc = host->mmc;
+> +       int gpio, ret;
+> +
+> +       drvdata = of_device_get_match_data(&pdev->dev);
+> +       if (!drvdata)
+> +               return -ENODEV;
+> +
+> +       host->is2440 = drvdata->is2440;
 
-diff --git a/drivers/gpu/drm/zte/Kconfig b/drivers/gpu/drm/zte/Kconfig
-index 4065b2840f1c..ed6de4b10c74 100644
---- a/drivers/gpu/drm/zte/Kconfig
-+++ b/drivers/gpu/drm/zte/Kconfig
-@@ -4,5 +4,6 @@ config DRM_ZTE
- 	select DRM_KMS_CMA_HELPER
- 	select DRM_KMS_FB_HELPER
- 	select DRM_KMS_HELPER
-+	select SND_SOC_HDMI_CODEC if SND_SOC
- 	help
- 	  Choose this option to enable DRM on ZTE ZX SoCs.
-diff --git a/drivers/gpu/drm/zte/zx_hdmi.c b/drivers/gpu/drm/zte/zx_hdmi.c
-index 6bf6c364811e..c20121846073 100644
---- a/drivers/gpu/drm/zte/zx_hdmi.c
-+++ b/drivers/gpu/drm/zte/zx_hdmi.c
-@@ -25,6 +25,8 @@
- #include <drm/drm_of.h>
- #include <drm/drmP.h>
- 
-+#include <sound/hdmi-codec.h>
-+
- #include "zx_hdmi_regs.h"
- #include "zx_vou.h"
- 
-@@ -49,6 +51,7 @@ struct zx_hdmi {
- 	bool sink_is_hdmi;
- 	bool sink_has_audio;
- 	const struct vou_inf *inf;
-+	struct platform_device *audio_pdev;
- };
- 
- #define to_zx_hdmi(x) container_of(x, struct zx_hdmi, x)
-@@ -366,6 +369,142 @@ static irqreturn_t zx_hdmi_irq_handler(int irq, void *dev_id)
- 	return IRQ_NONE;
- }
- 
-+static int zx_hdmi_audio_startup(struct device *dev, void *data)
-+{
-+	struct zx_hdmi *hdmi = dev_get_drvdata(dev);
-+	struct drm_encoder *encoder = &hdmi->encoder;
-+
-+	vou_inf_hdmi_audio_sel(encoder->crtc, VOU_HDMI_AUD_SPDIF);
-+
-+	return 0;
-+}
-+
-+static void zx_hdmi_audio_shutdown(struct device *dev, void *data)
-+{
-+	struct zx_hdmi *hdmi = dev_get_drvdata(dev);
-+
-+	/* Disable audio input */
-+	hdmi_writeb_mask(hdmi, AUD_EN, AUD_IN_EN, 0);
-+}
-+
-+static inline int zx_hdmi_audio_get_n(unsigned int fs)
-+{
-+	unsigned int n;
-+
-+	if (fs && (fs % 44100) == 0)
-+		n = 6272 * (fs / 44100);
-+	else
-+		n = fs * 128 / 1000;
-+
-+	return n;
-+}
-+
-+static int zx_hdmi_audio_hw_params(struct device *dev,
-+				   void *data,
-+				   struct hdmi_codec_daifmt *daifmt,
-+				   struct hdmi_codec_params *params)
-+{
-+	struct zx_hdmi *hdmi = dev_get_drvdata(dev);
-+	struct hdmi_audio_infoframe *cea = &params->cea;
-+	union hdmi_infoframe frame;
-+	int n;
-+
-+	/* We only support spdif for now */
-+	if (daifmt->fmt != HDMI_SPDIF) {
-+		DRM_DEV_ERROR(hdmi->dev, "invalid daifmt %d\n", daifmt->fmt);
-+		return -EINVAL;
-+	}
-+
-+	switch (params->sample_width) {
-+	case 16:
-+		hdmi_writeb_mask(hdmi, TPI_AUD_CONFIG, SPDIF_SAMPLE_SIZE_MASK,
-+				 SPDIF_SAMPLE_SIZE_16BIT);
-+		break;
-+	case 20:
-+		hdmi_writeb_mask(hdmi, TPI_AUD_CONFIG, SPDIF_SAMPLE_SIZE_MASK,
-+				 SPDIF_SAMPLE_SIZE_20BIT);
-+		break;
-+	case 24:
-+		hdmi_writeb_mask(hdmi, TPI_AUD_CONFIG, SPDIF_SAMPLE_SIZE_MASK,
-+				 SPDIF_SAMPLE_SIZE_24BIT);
-+		break;
-+	default:
-+		DRM_DEV_ERROR(hdmi->dev, "invalid sample width %d\n",
-+			      params->sample_width);
-+		return -EINVAL;
-+	}
-+
-+	/* CTS is calculated by hardware, and we only need to take care of N */
-+	n = zx_hdmi_audio_get_n(params->sample_rate);
-+	hdmi_writeb(hdmi, N_SVAL1, n & 0xff);
-+	hdmi_writeb(hdmi, N_SVAL2, (n >> 8) & 0xff);
-+	hdmi_writeb(hdmi, N_SVAL3, (n >> 16) & 0xf);
-+
-+	/* Enable spdif mode */
-+	hdmi_writeb_mask(hdmi, AUD_MODE, SPDIF_EN, SPDIF_EN);
-+
-+	/* Enable audio input */
-+	hdmi_writeb_mask(hdmi, AUD_EN, AUD_IN_EN, AUD_IN_EN);
-+
-+	memcpy(&frame.audio, cea, sizeof(*cea));
-+
-+	return zx_hdmi_infoframe_trans(hdmi, &frame, FSEL_AUDIO);
-+}
-+
-+static int zx_hdmi_audio_digital_mute(struct device *dev, void *data,
-+				      bool enable)
-+{
-+	struct zx_hdmi *hdmi = dev_get_drvdata(dev);
-+
-+	if (enable)
-+		hdmi_writeb_mask(hdmi, TPI_AUD_CONFIG, TPI_AUD_MUTE,
-+				 TPI_AUD_MUTE);
-+	else
-+		hdmi_writeb_mask(hdmi, TPI_AUD_CONFIG, TPI_AUD_MUTE, 0);
-+
-+	return 0;
-+}
-+
-+static int zx_hdmi_audio_get_eld(struct device *dev, void *data,
-+				 uint8_t *buf, size_t len)
-+{
-+	struct zx_hdmi *hdmi = dev_get_drvdata(dev);
-+	struct drm_connector *connector = &hdmi->connector;
-+
-+	memcpy(buf, connector->eld, min(sizeof(connector->eld), len));
-+
-+	return 0;
-+}
-+
-+static const struct hdmi_codec_ops zx_hdmi_codec_ops = {
-+	.audio_startup = zx_hdmi_audio_startup,
-+	.hw_params = zx_hdmi_audio_hw_params,
-+	.audio_shutdown = zx_hdmi_audio_shutdown,
-+	.digital_mute = zx_hdmi_audio_digital_mute,
-+	.get_eld = zx_hdmi_audio_get_eld,
-+};
-+
-+static struct hdmi_codec_pdata zx_hdmi_codec_pdata = {
-+	.ops = &zx_hdmi_codec_ops,
-+	.spdif = 1,
-+};
-+
-+static int zx_hdmi_audio_register(struct zx_hdmi *hdmi)
-+{
-+	struct platform_device *pdev;
-+
-+	pdev = platform_device_register_data(hdmi->dev, HDMI_CODEC_DRV_NAME,
-+					     PLATFORM_DEVID_AUTO,
-+					     &zx_hdmi_codec_pdata,
-+					     sizeof(zx_hdmi_codec_pdata));
-+	if (IS_ERR(pdev))
-+		return PTR_ERR(pdev);
-+
-+	hdmi->audio_pdev = pdev;
-+
-+	return 0;
-+}
-+
- static int zx_hdmi_i2c_read(struct zx_hdmi *hdmi, struct i2c_msg *msg)
- {
- 	int len = msg->len;
-@@ -566,6 +705,12 @@ static int zx_hdmi_bind(struct device *dev, struct device *master, void *data)
- 		return ret;
- 	}
- 
-+	ret = zx_hdmi_audio_register(hdmi);
-+	if (ret) {
-+		DRM_DEV_ERROR(dev, "failed to register audio: %d\n", ret);
-+		return ret;
-+	}
-+
- 	ret = zx_hdmi_register(drm, hdmi);
- 	if (ret) {
- 		DRM_DEV_ERROR(dev, "failed to register hdmi: %d\n", ret);
-@@ -590,6 +735,9 @@ static void zx_hdmi_unbind(struct device *dev, struct device *master,
- 
- 	hdmi->connector.funcs->destroy(&hdmi->connector);
- 	hdmi->encoder.funcs->destroy(&hdmi->encoder);
-+
-+	if (hdmi->audio_pdev)
-+		platform_device_unregister(hdmi->audio_pdev);
- }
- 
- static const struct component_ops zx_hdmi_component_ops = {
-diff --git a/drivers/gpu/drm/zte/zx_hdmi_regs.h b/drivers/gpu/drm/zte/zx_hdmi_regs.h
-index de911f66b658..c6d5d8211725 100644
---- a/drivers/gpu/drm/zte/zx_hdmi_regs.h
-+++ b/drivers/gpu/drm/zte/zx_hdmi_regs.h
-@@ -52,5 +52,19 @@
- #define TPI_INFO_TRANS_RPT		BIT(6)
- #define TPI_DDC_MASTER_EN		0x06f8
- #define HW_DDC_MASTER			BIT(7)
-+#define N_SVAL1				0xa03
-+#define N_SVAL2				0xa04
-+#define N_SVAL3				0xa05
-+#define AUD_EN				0xa13
-+#define AUD_IN_EN			BIT(0)
-+#define AUD_MODE			0xa14
-+#define SPDIF_EN			BIT(1)
-+#define TPI_AUD_CONFIG			0xa62
-+#define SPDIF_SAMPLE_SIZE_SHIFT		6
-+#define SPDIF_SAMPLE_SIZE_MASK		(0x3 << SPDIF_SAMPLE_SIZE_SHIFT)
-+#define SPDIF_SAMPLE_SIZE_16BIT		(0x1 << SPDIF_SAMPLE_SIZE_SHIFT)
-+#define SPDIF_SAMPLE_SIZE_20BIT		(0x2 << SPDIF_SAMPLE_SIZE_SHIFT)
-+#define SPDIF_SAMPLE_SIZE_24BIT		(0x3 << SPDIF_SAMPLE_SIZE_SHIFT)
-+#define TPI_AUD_MUTE			BIT(4)
- 
- #endif /* __ZX_HDMI_REGS_H__ */
-diff --git a/drivers/gpu/drm/zte/zx_vou.c b/drivers/gpu/drm/zte/zx_vou.c
-index 73fe15c17c32..f89ad7f72fdb 100644
---- a/drivers/gpu/drm/zte/zx_vou.c
-+++ b/drivers/gpu/drm/zte/zx_vou.c
-@@ -119,6 +119,15 @@ static inline struct zx_vou_hw *crtc_to_vou(struct drm_crtc *crtc)
- 	return zcrtc->vou;
- }
- 
-+void vou_inf_hdmi_audio_sel(struct drm_crtc *crtc,
-+			    enum vou_inf_hdmi_audio aud)
-+{
-+	struct zx_crtc *zcrtc = to_zx_crtc(crtc);
-+	struct zx_vou_hw *vou = zcrtc->vou;
-+
-+	zx_writel_mask(vou->vouctl + VOU_INF_HDMI_CTRL, VOU_HDMI_AUD_MASK, aud);
-+}
-+
- void vou_inf_enable(const struct vou_inf *inf, struct drm_crtc *crtc)
- {
- 	struct zx_crtc *zcrtc = to_zx_crtc(crtc);
-diff --git a/drivers/gpu/drm/zte/zx_vou.h b/drivers/gpu/drm/zte/zx_vou.h
-index 349e06cd86f4..e571b888a3ca 100644
---- a/drivers/gpu/drm/zte/zx_vou.h
-+++ b/drivers/gpu/drm/zte/zx_vou.h
-@@ -30,6 +30,14 @@ enum vou_inf_data_sel {
- 	VOU_RGB_666	= 3,
- };
- 
-+enum vou_inf_hdmi_audio {
-+	VOU_HDMI_AUD_SPDIF	= BIT(0),
-+	VOU_HDMI_AUD_I2S	= BIT(1),
-+	VOU_HDMI_AUD_DSD	= BIT(2),
-+	VOU_HDMI_AUD_HBR	= BIT(3),
-+	VOU_HDMI_AUD_PARALLEL	= BIT(4),
-+};
-+
- struct vou_inf {
- 	enum vou_inf_id id;
- 	enum vou_inf_data_sel data_sel;
-@@ -37,6 +45,8 @@ struct vou_inf {
- 	u32 clocks_sel_bits;
- };
- 
-+void vou_inf_hdmi_audio_sel(struct drm_crtc *crtc,
-+			    enum vou_inf_hdmi_audio aud);
- void vou_inf_enable(const struct vou_inf *inf, struct drm_crtc *crtc);
- void vou_inf_disable(const struct vou_inf *inf, struct drm_crtc *crtc);
- 
-diff --git a/drivers/gpu/drm/zte/zx_vou_regs.h b/drivers/gpu/drm/zte/zx_vou_regs.h
-index f44e7a4ae441..15b73cd3a612 100644
---- a/drivers/gpu/drm/zte/zx_vou_regs.h
-+++ b/drivers/gpu/drm/zte/zx_vou_regs.h
-@@ -150,6 +150,8 @@
- #define VOU_CLK_GL0_SEL			BIT(4)
- #define VOU_CLK_REQEN			0x20
- #define VOU_CLK_EN			0x24
-+#define VOU_INF_HDMI_CTRL		0x30
-+#define VOU_HDMI_AUD_MASK		0x1f
- 
- /* OTFPPU_CTRL registers */
- #define OTFPPU_RSZ_DATA_SOURCE		0x04
--- 
-1.9.1
+Instead of copying only the member, perhaps assign a host->variant
+pointer to the drvdata instead, as that allows to extend the
+information for the variant to cover more things than only "is2440",
+while going forward.
+
+In other words:
+
+host->variant = of_device_get_match_data(&pdev->dev);
+
+> +
+> +       ret = mmc_of_parse(mmc);
+> +       if (ret)
+> +               return ret;
+> +
+> +       pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +       if (!pdata)
+> +               return -ENOMEM;
+> +
+> +       pdata->ocr_avail = mmc->ocr_avail;
+> +
+> +       if (mmc->caps2 & MMC_CAP2_NO_WRITE_PROTECT)
+> +               pdata->no_wprotect = 1;
+> +
+> +       if (mmc->caps & MMC_CAP_NEEDS_POLL)
+> +               pdata->no_detect = 1;
+> +
+> +       if (mmc->caps2 & MMC_CAP2_RO_ACTIVE_HIGH)
+> +               pdata->wprotect_invert = 1;
+> +
+> +       if (mmc->caps2 & MMC_CAP2_CD_ACTIVE_HIGH)
+> +               pdata->detect_invert = 1;
+> +
+> +       gpio = of_get_named_gpio(pdev->dev.of_node, "cd-gpios", 0);
+
+This should already be covered via mmc_of_parse().
+
+> +       if (gpio_is_valid(gpio)) {
+> +               pdata->gpio_detect = gpio;
+> +               gpio_free(gpio);
+> +       }
+> +
+> +       gpio = of_get_named_gpio(pdev->dev.of_node, "wp-gpios", 0);
+
+This should already be covered via mmc_of_parse().
+
+> +       if (gpio_is_valid(gpio)) {
+> +               pdata->gpio_wprotect = gpio;
+> +               gpio_free(gpio);
+> +       }
+> +
+> +       pdev->dev.platform_data = pdata;
+> +
+> +       return 0;
+> +}
+> +
+> +static int s3cmci_probe(struct platform_device *pdev)
+> +{
+> +       struct s3cmci_host *host;
+> +       struct mmc_host *mmc;
+> +       int ret;
+> +       int i;
+> +
+> +       mmc = mmc_alloc_host(sizeof(struct s3cmci_host), &pdev->dev);
+> +       if (!mmc) {
+> +               ret = -ENOMEM;
+> +               goto probe_out;
+> +       }
+> +
+>         host = mmc_priv(mmc);
+>         host->mmc       = mmc;
+>         host->pdev      = pdev;
+> -       host->is2440    = is2440;
+> +
+> +       if (pdev->dev.of_node)
+> +               ret = s3cmci_probe_dt(host);
+> +       else
+> +               ret = s3cmci_probe_pdata(host);
+> +
+> +       if (ret)
+> +               goto probe_free_host;
+>
+>         host->pdata = pdev->dev.platform_data;
+>         if (!host->pdata) {
+> @@ -1586,7 +1674,7 @@ static int s3cmci_probe(struct platform_device *pdev)
+>         spin_lock_init(&host->complete_lock);
+>         tasklet_init(&host->pio_tasklet, pio_tasklet, (unsigned long) host);
+>
+> -       if (is2440) {
+> +       if (host->is2440) {
+>                 host->sdiimsk   = S3C2440_SDIIMSK;
+>                 host->sdidata   = S3C2440_SDIDATA;
+>                 host->clk_div   = 1;
+> @@ -1789,8 +1877,9 @@ static int s3cmci_probe(struct platform_device *pdev)
+>         release_mem_region(host->mem->start, resource_size(host->mem));
+>
+>   probe_free_gpio:
+> -       for (i = S3C2410_GPE(5); i <= S3C2410_GPE(10); i++)
+> -               gpio_free(i);
+> +       if (!pdev->dev.of_node)
+> +               for (i = S3C2410_GPE(5); i <= S3C2410_GPE(10); i++)
+> +                       gpio_free(i);
+>
+>   probe_free_host:
+>         mmc_free_host(mmc);
+> @@ -1837,9 +1926,9 @@ static int s3cmci_remove(struct platform_device *pdev)
+>         if (!pd->no_detect)
+>                 gpio_free(pd->gpio_detect);
+>
+> -       for (i = S3C2410_GPE(5); i <= S3C2410_GPE(10); i++)
+> -               gpio_free(i);
+> -
+> +       if (!pdev->dev.of_node)
+> +               for (i = S3C2410_GPE(5); i <= S3C2410_GPE(10); i++)
+> +                       gpio_free(i);
+>
+>         iounmap(host->base);
+>         release_mem_region(host->mem->start, resource_size(host->mem));
+> @@ -1848,6 +1937,23 @@ static int s3cmci_remove(struct platform_device *pdev)
+>         return 0;
+>  }
+>
+> +static const struct of_device_id s3cmci_dt_match[] = {
+> +       {
+> +               .compatible = "samsung,s3c2410-sdi",
+> +               .data = &s3c2410_s3cmci_drv_data,
+> +       },
+> +       {
+> +               .compatible = "samsung,s3c2412-sdi",
+> +               .data = &s3c2412_s3cmci_drv_data,
+> +       },
+> +       {
+> +               .compatible = "samsung,s3c2440-sdi",
+> +               .data = &s3c2440_s3cmci_drv_data,
+> +       },
+> +       { /* sentinel */ },
+> +};
+> +MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
+> +
+>  static const struct platform_device_id s3cmci_driver_ids[] = {
+>         {
+>                 .name   = "s3c2410-sdi",
+> @@ -1867,6 +1973,7 @@ static int s3cmci_remove(struct platform_device *pdev)
+>  static struct platform_driver s3cmci_driver = {
+>         .driver = {
+>                 .name   = "s3c-sdi",
+> +               .of_match_table = s3cmci_dt_match,
+>         },
+>         .id_table       = s3cmci_driver_ids,
+>         .probe          = s3cmci_probe,
+> --
+> 1.9.1
+>
+
+Kind regards
+Uffe
