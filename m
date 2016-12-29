@@ -1,26 +1,67 @@
 From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Thu, 29 Dec 2016 10:33:23 +0800
-Subject: [PATCH v2 0/2] add clk-hi3660
-Message-ID: <1482978805-6981-1-git-send-email-zhangfei.gao@linaro.org>
+Date: Thu, 29 Dec 2016 10:33:24 +0800
+Subject: [PATCH v2 1/2] dt-bindings: Document the hi3660 clock bindings
+In-Reply-To: <1482978805-6981-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1482978805-6981-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <1482978805-6981-2-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Address comments from Rob and Stephen.
-Rebase to 4.10-rc1
+Add DT bindings documentation for hi3660 SoC clock.
 
-Zhangfei Gao (2):
-  dt-bindings: Document the hi3660 clock bindings
-  clk: hisilicon: Add clock driver for hi3660 SoC
-
- .../devicetree/bindings/clock/hi3660-clock.txt     |  42 ++
- drivers/clk/hisilicon/Kconfig                      |   7 +
- drivers/clk/hisilicon/Makefile                     |   1 +
- drivers/clk/hisilicon/clk-hi3660.c                 | 592 +++++++++++++++++++++
- include/dt-bindings/clock/hi3660-clock.h           | 194 +++++++
- 5 files changed, 836 insertions(+)
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+---
+ .../devicetree/bindings/clock/hi3660-clock.txt     | 42 ++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/hi3660-clock.txt
- create mode 100644 drivers/clk/hisilicon/clk-hi3660.c
- create mode 100644 include/dt-bindings/clock/hi3660-clock.h
 
+diff --git a/Documentation/devicetree/bindings/clock/hi3660-clock.txt b/Documentation/devicetree/bindings/clock/hi3660-clock.txt
+new file mode 100644
+index 0000000..cc9b86c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/hi3660-clock.txt
+@@ -0,0 +1,42 @@
++* Hisilicon Hi3660 Clock Controller
++
++The Hi3660 clock controller generates and supplies clock to various
++controllers within the Hi3660 SoC.
++
++Required Properties:
++
++- compatible: the compatible should be one of the following strings to
++	indicate the clock controller functionality.
++
++	- "hisilicon,hi3660-crgctrl"
++	- "hisilicon,hi3660-pctrl"
++	- "hisilicon,hi3660-pmuctrl"
++	- "hisilicon,hi3660-sctrl"
++	- "hisilicon,hi3660-iomcu"
++
++- reg: physical base address of the controller and length of memory mapped
++  region.
++
++- #clock-cells: should be 1.
++
++Each clock is assigned an identifier and client nodes use this identifier
++to specify the clock which they consume.
++
++All these identifier could be found in <dt-bindings/clock/hi3660-clock.h>.
++
++Examples:
++	crg_ctrl: clock-controller at fff35000 {
++		compatible = "hisilicon,hi3660-crgctrl", "syscon";
++		reg = <0x0 0xfff35000 0x0 0x1000>;
++		#clock-cells = <1>;
++	};
++
++	uart0: serial at fdf02000 {
++		compatible = "arm,pl011", "arm,primecell";
++		reg = <0x0 0xfdf02000 0x0 0x1000>;
++		interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&crg_ctrl HI3660_CLK_MUX_UART0>,
++			 <&crg_ctrl HI3660_PCLK>;
++		clock-names = "uartclk", "apb_pclk";
++		status = "disabled";
++	};
 -- 
 2.7.4
