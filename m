@@ -1,36 +1,45 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 29 Dec 2016 13:43:46 +0200
-Subject: [PATCH 7/8] ARM: s3c64xx: Drop initialization of unused struct
- s3c_audio_pdata fields
-In-Reply-To: <0bb15f0e-7033-4cb3-5aba-0bb61fdfc467@samsung.com>
-References: <1478791076-19528-1-git-send-email-s.nawrocki@samsung.com>
- <1478791076-19528-8-git-send-email-s.nawrocki@samsung.com>
- <20161228175344.3krz2hqrem56ypg6@kozik-lap>
- <CGME20161229103055epcas1p1dc69aec56d462e8c1605fe9e47ded562@epcas1p1.samsung.com>
- <0bb15f0e-7033-4cb3-5aba-0bb61fdfc467@samsung.com>
-Message-ID: <20161229114346.hmq4bzzc3w2ylr3d@kozik-lap>
+Date: Thu, 29 Dec 2016 13:50:59 +0200
+Subject: [PATCH 1/4] pinctrl: dt-bindings: samsung: add drive strength
+ macros for Exynos5433
+In-Reply-To: <20161229084211.20442-2-andi.shyti@samsung.com>
+References: <20161229084211.20442-1-andi.shyti@samsung.com>
+ <CGME20161229084221epcas5p43926b87dccbee0db4045faa5ddca565d@epcas5p4.samsung.com>
+ <20161229084211.20442-2-andi.shyti@samsung.com>
+Message-ID: <20161229115059.ncvtakz32vhcfsij@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 29, 2016 at 11:30:49AM +0100, Sylwester Nawrocki wrote:
-> On 12/28/2016 06:53 PM, Krzysztof Kozlowski wrote:
-> > On Thu, Nov 10, 2016 at 04:17:55PM +0100, Sylwester Nawrocki wrote:
-> >> Remove initialization of dma_{filter, playback, capture, capture_mic}
-> >> fields where it is not used any more.
-> >>
-> >> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> >> ---
-> >>  arch/arm/mach-s3c64xx/dev-audio.c | 19 -------------------
-> >>  1 file changed, 19 deletions(-)
-> >>
-> > Sylwester,
-> > 
-> > This and 8/8 should be safe to apply, right?
+On Thu, Dec 29, 2016 at 05:42:08PM +0900, Andi Shyti wrote:
+> Commit 5db7e3bb87df ("pinctrl: dt-bindings: samsung: Add header with
+> values used for configuration") has added a header file for defining the
+> pinctrl values in order to avoid hardcoded settings in the Exynos
+> DTS related files.
 > 
-> Yes, I think both patches can be applied safely now.
-> Thanks for getting back to this.
+> Extend samsung.h to the Exynos5433 for drive strength values
+> which are strictly related to the particular SoC and may defer
+> from others.
+> 
+> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> ---
+>  include/dt-bindings/pinctrl/samsung.h | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/include/dt-bindings/pinctrl/samsung.h b/include/dt-bindings/pinctrl/samsung.h
+> index 6276eb785e2b..58868313d64b 100644
+> --- a/include/dt-bindings/pinctrl/samsung.h
+> +++ b/include/dt-bindings/pinctrl/samsung.h
+> @@ -45,6 +45,12 @@
+>  #define EXYNOS5420_PIN_DRV_LV3		2
+>  #define EXYNOS5420_PIN_DRV_LV4		3
+>  
+> +/* Drive strengths for Exynos5433 */
+> +#define EXYNOS5433_PIN_DRV_LV1		0
+> +#define EXYNOS5433_PIN_DRV_LV2		1
+> +#define EXYNOS5433_PIN_DRV_LV3		2
+> +#define EXYNOS5433_PIN_DRV_LV4		3
 
-Thanks, applied both.
+Same values as existing. No need to re-define these.
 
 Best regards,
 Krzysztof
