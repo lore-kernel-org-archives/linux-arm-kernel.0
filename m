@@ -1,123 +1,31 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Thu, 29 Dec 2016 17:27:26 -0600
-Subject: [Patch v2 2/2] firmware: qcom: scm: Fix interrupted SCM calls
-In-Reply-To: <1483054046-3327-1-git-send-email-andy.gross@linaro.org>
-References: <1483054046-3327-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <1483054046-3327-3-git-send-email-andy.gross@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 29 Dec 2016 21:40:00 -0200
+Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21, i.MX27
+ and i.MX31 SoCs
+In-Reply-To: <20161229220445.x23gcp5aaw2fz7cv@pengutronix.de>
+References: <20161223083256.3wdqou5xmhr7fidn@pengutronix.de>
+ <74751709-c32e-b1b3-4fa3-613f7d57d1d8@mleia.com>
+ <20161223100113.s57bi7257yero7f7@pengutronix.de>
+ <7018c466-2467-a9fc-2382-889d3a62741e@mentor.com>
+ <20161223141139.rlsvoonih5lhnnpu@pengutronix.de>
+ <c22600d5-f6b5-4c13-59b4-ba391ea29a4c@mleia.com>
+ <20161228205419.la74jr4rfes7fa4v@pengutronix.de>
+ <CAOMZO5BD3Y6vXwt7_bdv_KyGvKSYru1vzDowsD81fzEbM4gHPA@mail.gmail.com>
+ <20161228214651.oncshkvksqep3krk@pengutronix.de>
+ <CAOMZO5CBfiRMicxvGyHrm-rQFzn8yEQyb5=t49PBr6rdpZYPug@mail.gmail.com>
+ <20161229220445.x23gcp5aaw2fz7cv@pengutronix.de>
+Message-ID: <CAOMZO5CuUM3e9LRZCV4NprzCxR2d=XCib013=YUdL0qQnNA2nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a Qualcomm specific quirk to the arm_smccc_smc call.
+On Thu, Dec 29, 2016 at 8:04 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-On Qualcomm ARM64 platforms, the SMC call can return before it has
-completed.  If this occurs, the call can be restarted, but it requires
-using the returned session ID value from the interrupted SMC call.
+> Ack. If you teach the driver now about i.MX35 and only make use of the WMCR
+> register on this one, the possible breakage is that this register isn't
+> written to on the i.MX35 type until the dtb is updated.
 
-The quirk stores off the session ID from the interrupted call in the
-quirk structure so that it can be used by the caller.
+So basically you are saying that you don't care about old dtb compatibility.
 
-This patch folds in a fix given by Sricharan R:
-https://lkml.org/lkml/2016/9/28/272
-
-Signed-off-by: Andy Gross <andy.gross@linaro.org>
----
- arch/arm64/kernel/smccc-call.S |  9 ++++++++-
- drivers/firmware/qcom_scm-64.c | 13 ++++++++++---
- include/linux/arm-smccc.h      | 11 ++++++++---
- 3 files changed, 26 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
-index 6290696..72ecdca 100644
---- a/arch/arm64/kernel/smccc-call.S
-+++ b/arch/arm64/kernel/smccc-call.S
-@@ -12,6 +12,7 @@
-  *
-  */
- #include <linux/linkage.h>
-+#include <linux/arm-smccc.h>
- #include <asm/asm-offsets.h>
- 
- 	.macro SMCCC instr
-@@ -20,7 +21,13 @@
- 	ldr	x4, [sp]
- 	stp	x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
- 	stp	x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
--	ret
-+	ldr	x4, [sp, #8]
-+	cbz	x4, 1f /* no quirk structure */
-+	ldr	x9, [x4, #ARM_SMCCC_QUIRK_ID_OFFS]
-+	cmp	x9, #ARM_SMCCC_QUIRK_QCOM_A6
-+	b.ne	1f
-+	str	x6, [x4, ARM_SMCCC_QUIRK_STATE_OFFS]
-+1:	ret
- 	.cfi_endproc
- 	.endm
- 
-diff --git a/drivers/firmware/qcom_scm-64.c b/drivers/firmware/qcom_scm-64.c
-index 4a0f5ea..1e2e519 100644
---- a/drivers/firmware/qcom_scm-64.c
-+++ b/drivers/firmware/qcom_scm-64.c
-@@ -91,6 +91,7 @@ static int qcom_scm_call(struct device *dev, u32 svc_id, u32 cmd_id,
- 	dma_addr_t args_phys = 0;
- 	void *args_virt = NULL;
- 	size_t alloc_len;
-+	struct arm_smccc_quirk quirk = {.id = ARM_SMCCC_QUIRK_QCOM_A6};
- 
- 	if (unlikely(arglen > N_REGISTER_ARGS)) {
- 		alloc_len = N_EXT_QCOM_SCM_ARGS * sizeof(u64);
-@@ -131,10 +132,16 @@ static int qcom_scm_call(struct device *dev, u32 svc_id, u32 cmd_id,
- 					 qcom_smccc_convention,
- 					 ARM_SMCCC_OWNER_SIP, fn_id);
- 
-+		quirk.state.a6 = 0;
-+
- 		do {
--			arm_smccc_smc(cmd, desc->arginfo, desc->args[0],
--				      desc->args[1], desc->args[2], x5, 0, 0,
--				      res);
-+			arm_smccc_smc_quirk(cmd, desc->arginfo, desc->args[0],
-+				      desc->args[1], desc->args[2], x5,
-+				      quirk.state.a6, 0, res, &quirk);
-+
-+			if (res->a0 == QCOM_SCM_INTERRUPTED)
-+				cmd = res->a0;
-+
- 		} while (res->a0 == QCOM_SCM_INTERRUPTED);
- 
- 		mutex_unlock(&qcom_scm_lock);
-diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-index cde4f1f..64d0454 100644
---- a/include/linux/arm-smccc.h
-+++ b/include/linux/arm-smccc.h
-@@ -14,9 +14,6 @@
- #ifndef __LINUX_ARM_SMCCC_H
- #define __LINUX_ARM_SMCCC_H
- 
--#include <linux/linkage.h>
--#include <linux/types.h>
--
- /*
-  * This file provides common defines for ARM SMC Calling Convention as
-  * specified in
-@@ -60,6 +57,13 @@
- #define ARM_SMCCC_OWNER_TRUSTED_OS	50
- #define ARM_SMCCC_OWNER_TRUSTED_OS_END	63
- 
-+#define ARM_SMCCC_QUIRK_NONE		0
-+#define ARM_SMCCC_QUIRK_QCOM_A6		1 /* Save/restore register a6 */
-+
-+#ifndef __ASSEMBLY__
-+
-+#include <linux/linkage.h>
-+#include <linux/types.h>
- /**
-  * struct arm_smccc_res - Result from SMC/HVC call
-  * @a0-a3 result values from registers 0 to 3
-@@ -121,4 +125,5 @@ asmlinkage void arm_smccc_hvc(unsigned long a0, unsigned long a1,
- #define arm_smccc_smc_quirk(a0, a1, a2, a3, a4, a5, a6, a7, res, quirk) \
- 	__arm_smccc_smc(a0, a1, a2, a3, a4, a5, a6, a7, res, quirk)
- 
-+#endif /*__ASSEMBLY__*/
- #endif /*__LINUX_ARM_SMCCC_H*/
--- 
-1.9.1
+As far as I can see this is the reason we have not made any progress
+with this patch since September.
