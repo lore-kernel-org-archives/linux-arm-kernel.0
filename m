@@ -1,32 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 28 Dec 2016 21:39:51 -0200
-Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21, i.MX27
- and i.MX31 SoCs
-In-Reply-To: <20161228214651.oncshkvksqep3krk@pengutronix.de>
-References: <fe9b03bf-9c37-862f-b3aa-0f9b5a4dfefb@roeck-us.net>
- <bedae3d8-3057-36e4-1d89-ec41f9f1a25b@mleia.com>
- <20161223083256.3wdqou5xmhr7fidn@pengutronix.de>
- <74751709-c32e-b1b3-4fa3-613f7d57d1d8@mleia.com>
- <20161223100113.s57bi7257yero7f7@pengutronix.de>
- <7018c466-2467-a9fc-2382-889d3a62741e@mentor.com>
- <20161223141139.rlsvoonih5lhnnpu@pengutronix.de>
- <c22600d5-f6b5-4c13-59b4-ba391ea29a4c@mleia.com>
- <20161228205419.la74jr4rfes7fa4v@pengutronix.de>
- <CAOMZO5BD3Y6vXwt7_bdv_KyGvKSYru1vzDowsD81fzEbM4gHPA@mail.gmail.com>
- <20161228214651.oncshkvksqep3krk@pengutronix.de>
-Message-ID: <CAOMZO5CBfiRMicxvGyHrm-rQFzn8yEQyb5=t49PBr6rdpZYPug@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 28 Dec 2016 16:01:35 -0800
+Subject: [PATCH 0/2] ARM: orion5x: Move micon code to a MFD driver
+Message-ID: <20161229000137.5553-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 28, 2016 at 7:46 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
+Hi all,
 
-> Right, so they would fall back to the i.MX21 type and not profit from
-> Markus' change until either the dtb is updated or the third commit is
-> added. I'll try to contact Markus to ask if he remembers more details.
+This patch series removes some duplicate code between the Kurobox and the
+Terastation Pro 2 since they both use the same on-board microcontroller (micon)
+attached to their UART1 for system restart.
 
-There is no profit from Markus' change for mx21/mx27/mx31.
+Future patches will add support for the LEDs, temperature, FAN that the micro
+controller provides.
 
-As Vladimir explained in his commit log these SoCs do not have the
-WMCR register, which causes a hang on these SoCs when we try to write
-to it.
+Florian Fainelli (2):
+  mfd: micon: Add Buffalo Kurobox Pro, Terastation II Pro/Live driver
+  ARM: orion5x: Utilize micon MFD driver
+
+ arch/arm/mach-orion5x/Kconfig                  |   4 +
+ arch/arm/mach-orion5x/kurobox_pro-setup.c      | 149 +++---------------
+ arch/arm/mach-orion5x/terastation_pro2-setup.c | 149 +++---------------
+ drivers/mfd/Kconfig                            |   8 +
+ drivers/mfd/Makefile                           |   2 +
+ drivers/mfd/micon.c                            | 204 +++++++++++++++++++++++++
+ include/linux/platform_data/micon.h            |  10 ++
+ 7 files changed, 264 insertions(+), 262 deletions(-)
+ create mode 100644 drivers/mfd/micon.c
+ create mode 100644 include/linux/platform_data/micon.h
+
+-- 
+2.9.3
