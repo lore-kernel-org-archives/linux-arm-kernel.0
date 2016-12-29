@@ -1,107 +1,62 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 29 Dec 2016 17:43:35 -0500
-Subject: [PATCH v2 5/5] arm64: Work around Falkor erratum 1009
-In-Reply-To: <20161229224335.13531-1-cov@codeaurora.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 29 Dec 2016 17:02:40 -0600
+Subject: [PATCH v2 2/5] arm64: Work around Falkor erratum 1003
+In-Reply-To: <20161229224335.13531-2-cov@codeaurora.org>
 References: <20161229224335.13531-1-cov@codeaurora.org>
-Message-ID: <20161229224335.13531-5-cov@codeaurora.org>
+ <20161229224335.13531-2-cov@codeaurora.org>
+Message-ID: <1dfdc578-e0f8-1320-d223-c9c55e70ca93@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During a TLB invalidate sequence targeting the inner shareable
-domain, Falkor may prematurely complete the DSB before all loads
-and stores using the old translation are observed; instruction
-fetches are not subject to the conditions of this erratum.
+On 12/29/2016 04:43 PM, Christopher Covington wrote:
+> -| Implementor    | Component       | Erratum ID      | Kconfig                 |
+> -+----------------+-----------------+-----------------+-------------------------+
+> -| ARM            | Cortex-A53      | #826319         | ARM64_ERRATUM_826319    |
+> -| ARM            | Cortex-A53      | #827319         | ARM64_ERRATUM_827319    |
+> -| ARM            | Cortex-A53      | #824069         | ARM64_ERRATUM_824069    |
+> -| ARM            | Cortex-A53      | #819472         | ARM64_ERRATUM_819472    |
+> -| ARM            | Cortex-A53      | #845719         | ARM64_ERRATUM_845719    |
+> -| ARM            | Cortex-A53      | #843419         | ARM64_ERRATUM_843419    |
+> -| ARM            | Cortex-A57      | #832075         | ARM64_ERRATUM_832075    |
+> -| ARM            | Cortex-A57      | #852523         | N/A                     |
+> -| ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220    |
+> -| ARM            | Cortex-A72      | #853709         | N/A                     |
+> -| ARM            | MMU-500         | #841119,#826419 | N/A                     |
+> -|                |                 |                 |                         |
+> -| Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375    |
+> -| Cavium         | ThunderX ITS    | #23144          | CAVIUM_ERRATUM_23144    |
+> -| Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154    |
+> -| Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456    |
+> -| Cavium         | ThunderX SMMUv2 | #27704          | N/A		       |
+> -|                |                 |                 |                         |
+> -| Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585     |
+> +| Implementor   | Component       | Erratum ID      | Kconfig                  |
+> ++---------------+-----------------+-----------------+--------------------------+
+> +| ARM           | Cortex-A53      | #826319         | ARM64_ERRATUM_826319     |
+> +| ARM           | Cortex-A53      | #827319         | ARM64_ERRATUM_827319     |
+> +| ARM           | Cortex-A53      | #824069         | ARM64_ERRATUM_824069     |
+> +| ARM           | Cortex-A53      | #819472         | ARM64_ERRATUM_819472     |
+> +| ARM           | Cortex-A53      | #845719         | ARM64_ERRATUM_845719     |
+> +| ARM           | Cortex-A53      | #843419         | ARM64_ERRATUM_843419     |
+> +| ARM           | Cortex-A57      | #832075         | ARM64_ERRATUM_832075     |
+> +| ARM           | Cortex-A57      | #852523         | N/A                      |
+> +| ARM           | Cortex-A57      | #834220         | ARM64_ERRATUM_834220     |
+> +| ARM           | Cortex-A72      | #853709         | N/A                      |
+> +| ARM           | MMU-500         | #841119,#826419 | N/A                      |
+> +|               |                 |                 |                          |
+> +| Cavium        | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375     |
+> +| Cavium        | ThunderX ITS    | #23144          | CAVIUM_ERRATUM_23144     |
+> +| Cavium        | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154     |
+> +| Cavium        | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456     |
+> +| Cavium        | ThunderX SMMUv2 | #27704          | N/A                      |
+> +|               |                 |                 |                          |
+> +| Freescale/NXP | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585      |
+> +| Qualcomm      | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003 |
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
+Looks like you've made an unrelated whitespace change that affected the entire table,
+not just the line you're adding.
 
-Change-Id: I25e86b068addd68cdfba5a11142b9fc37312b1ee
----
- Documentation/arm64/silicon-errata.txt |  1 +
- arch/arm64/Kconfig                     | 10 ++++++++++
- arch/arm64/include/asm/cpucaps.h       |  3 ++-
- arch/arm64/include/asm/tlbflush.h      |  5 ++++-
- arch/arm64/kernel/cpu_errata.c         |  7 +++++++
- 5 files changed, 24 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index 7151aed..98bef2a 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -64,3 +64,4 @@ stable kernels.
- |               |                 |                 |                          |
- | Freescale/NXP | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585      |
- | Qualcomm      | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003 |
-+| Qualcomm      | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009 |
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7ce4a4b..567651b 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -495,6 +495,16 @@ config QCOM_FALKOR_E1003_RESERVED_ASID
- 	default 1
- 	depends on QCOM_FALKOR_ERRATUM_1003
- 
-+config QCOM_FALKOR_ERRATUM_1009
-+	bool "Falkor E1009: Prematurely complete a DSB after a TLBI"
-+	default y
-+	help
-+	  Falkor CPU may prematurely complete a DSB following a TLBI xxIS
-+	  invalidate maintenance operations. Repeat the TLBI operation one
-+	  more time to fix the issue.
-+
-+	  If unsure, say Y.
-+
- endmenu
- 
- 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index 5aaf7ee..55bcd02 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -36,7 +36,8 @@
- #define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
- #define ARM64_HAS_NO_FPSIMD			16
- #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	17
-+#define ARM64_WORKAROUND_REPEAT_TLBI		18
- 
--#define ARM64_NCAPS				18
-+#define ARM64_NCAPS				19
- 
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-index f28813c..7313cd3 100644
---- a/arch/arm64/include/asm/tlbflush.h
-+++ b/arch/arm64/include/asm/tlbflush.h
-@@ -85,7 +85,10 @@
- 			asm (__TLBI_INSTR(op, ##__VA_ARGS__)		       \
- 			__TLBI_IO(op, ##__VA_ARGS__));			       \
- 		asm volatile (	     as			"\ndsb " #attr "\n"    \
--		: : : "memory"); } while (0)
-+			ALTERNATIVE("nop"		"\nnop"	       "\n",   \
-+			__TLBI_INSTR(op, ##__VA_ARGS__)	"\ndsb " #attr "\n",   \
-+			ARM64_WORKAROUND_REPEAT_TLBI)			       \
-+		__TLBI_IO(op, ##__VA_ARGS__) : "memory"); } while (0)
- 
- #define __tlbi_dsb(...)	__tlbi_asm_dsb("", ##__VA_ARGS__)
- 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 787b542..e644364 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -137,6 +137,13 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		MIDR_RANGE(MIDR_QCOM_FALKOR_V1, 0x00, 0x00),
- 	},
- #endif
-+#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1009
-+	{
-+		.desc = "Qualcomm Falkor erratum 1009",
-+		.capability = ARM64_WORKAROUND_REPEAT_TLBI,
-+		MIDR_RANGE(MIDR_QCOM_FALKOR_V1, 0x00, 0x00),
-+	},
-+#endif
- 	{
- 	}
- };
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora
-Forum, a Linux Foundation Collaborative Project.
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
