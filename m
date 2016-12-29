@@ -1,389 +1,545 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Thu, 29 Dec 2016 14:27:32 -0800
-Subject: [PATCH 17/20] media: imx: Add video switch subdev driver
+Date: Thu, 29 Dec 2016 14:27:31 -0800
+Subject: [PATCH 16/20] media: imx: Add MIPI CSI-2 Receiver subdev driver
 In-Reply-To: <1483050455-10683-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1483050455-10683-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1483050455-10683-18-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1483050455-10683-17-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Zabel <p.zabel@pengutronix.de>
+Adds MIPI CSI-2 Receiver subdev driver. This subdev is required
+for sensors with a MIPI CSI2 interface.
 
-This driver can handle SoC internal and extern video bus multiplexers,
-controlled either by register bit fields or by GPIO.
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- drivers/staging/media/imx/Makefile           |   1 +
- drivers/staging/media/imx/imx-video-switch.c | 349 +++++++++++++++++++++++++++
- 2 files changed, 350 insertions(+)
- create mode 100644 drivers/staging/media/imx/imx-video-switch.c
+ drivers/staging/media/imx/Makefile        |   1 +
+ drivers/staging/media/imx/imx-mipi-csi2.c | 509 ++++++++++++++++++++++++++++++
+ 2 files changed, 510 insertions(+)
+ create mode 100644 drivers/staging/media/imx/imx-mipi-csi2.c
 
 diff --git a/drivers/staging/media/imx/Makefile b/drivers/staging/media/imx/Makefile
-index 0decef7..e3d6d8d 100644
+index fe9e992..0decef7 100644
 --- a/drivers/staging/media/imx/Makefile
 +++ b/drivers/staging/media/imx/Makefile
-@@ -10,3 +10,4 @@ obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-csi.o
+@@ -9,3 +9,4 @@ obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-ic.o
+ obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-csi.o
  obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-smfc.o
  obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-camif.o
- obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-mipi-csi2.o
-+obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-video-switch.o
-diff --git a/drivers/staging/media/imx/imx-video-switch.c b/drivers/staging/media/imx/imx-video-switch.c
++obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-mipi-csi2.o
+diff --git a/drivers/staging/media/imx/imx-mipi-csi2.c b/drivers/staging/media/imx/imx-mipi-csi2.c
 new file mode 100644
-index 0000000..33e3652
+index 0000000..84df16e
 --- /dev/null
-+++ b/drivers/staging/media/imx/imx-video-switch.c
-@@ -0,0 +1,349 @@
++++ b/drivers/staging/media/imx/imx-mipi-csi2.c
+@@ -0,0 +1,509 @@
 +/*
-+ * devicetree probed mediacontrol video multiplexer.
++ * MIPI CSI-2 Receiver Subdev for Freescale i.MX5/6 SOC.
 + *
-+ * Copyright (C) 2013 Sascha Hauer, Pengutronix
-+ * Copyright (c) 2016 Mentor Graphics Inc.
++ * Copyright (c) 2012-2014 Mentor Graphics Inc.
 + *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
 + */
-+
-+#include <linux/err.h>
-+#include <linux/mfd/syscon.h>
 +#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/gpio/consumer.h>
++#include <linux/export.h>
++#include <linux/types.h>
++#include <linux/init.h>
 +#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/of_graph.h>
-+#include <media/v4l2-subdev.h>
++#include <linux/err.h>
++#include <linux/delay.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/clk.h>
++#include <linux/list.h>
++#include <linux/irq.h>
++#include <linux/of_device.h>
++#include <media/v4l2-device.h>
 +#include <media/v4l2-of.h>
++#include <media/v4l2-subdev.h>
++#include <media/v4l2-async.h>
++#include <asm/mach/irq.h>
++#include <video/imx-ipu-v3.h>
 +#include "imx-media.h"
 +
-+struct vidsw {
-+	struct device *dev;
-+	struct imx_media_dev *md;
-+	struct v4l2_subdev subdev;
-+	struct media_pad *pads;
-+	struct v4l2_mbus_framefmt *format_mbus;
-+	struct v4l2_of_endpoint *endpoint;
-+	struct regmap_field *field;
-+	struct gpio_desc *gpio;
-+	int output_pad;
-+	int numpads;
-+	int active;
++/*
++ * there must be 5 pads: 1 input pad from sensor, and
++ * the 4 virtual channel output pads
++ */
++#define CSI2_NUM_SINK_PADS  1
++#define CSI2_NUM_SRC_PADS   4
++#define CSI2_NUM_PADS       5
++
++struct imxcsi2_dev {
++	struct device          *dev;
++	struct imx_media_dev   *md;
++	struct v4l2_subdev      sd;
++	struct media_pad       pad[CSI2_NUM_PADS];
++	struct v4l2_mbus_framefmt format_mbus;
++	struct v4l2_subdev     *src_sd;
++	struct v4l2_subdev     *sink_sd[CSI2_NUM_SRC_PADS];
++	int                    input_pad;
++	struct clk             *dphy_clk;
++	struct clk             *cfg_clk;
++	struct clk             *pix_clk; /* what is this? */
++	void __iomem           *base;
++	int                     intr1;
++	int                     intr2;
++	struct v4l2_of_bus_mipi_csi2 bus;
++	bool                    on;
++	bool                    stream_on;
 +};
 +
-+#define to_vidsw(sd) container_of(sd, struct vidsw, subdev)
++#define DEVICE_NAME "imx-mipi-csi2"
 +
-+static int vidsw_set_mux(struct vidsw *vidsw, int input_index)
++/* Register offsets */
++#define CSI2_VERSION            0x000
++#define CSI2_N_LANES            0x004
++#define CSI2_PHY_SHUTDOWNZ      0x008
++#define CSI2_DPHY_RSTZ          0x00c
++#define CSI2_RESETN             0x010
++#define CSI2_PHY_STATE          0x014
++#define CSI2_DATA_IDS_1         0x018
++#define CSI2_DATA_IDS_2         0x01c
++#define CSI2_ERR1               0x020
++#define CSI2_ERR2               0x024
++#define CSI2_MSK1               0x028
++#define CSI2_MSK2               0x02c
++#define CSI2_PHY_TST_CTRL0      0x030
++#define CSI2_PHY_TST_CTRL1      0x034
++#define CSI2_SFT_RESET          0xf00
++
++static inline struct imxcsi2_dev *sd_to_dev(struct v4l2_subdev *sdev)
 +{
-+	if (vidsw->active >= 0) {
-+		if (vidsw->active == input_index)
-+			return 0;
-+		else
-+			return -EBUSY;
++	return container_of(sdev, struct imxcsi2_dev, sd);
++}
++
++static inline u32 imxcsi2_read(struct imxcsi2_dev *csi2, unsigned int regoff)
++{
++	return readl(csi2->base + regoff);
++}
++
++static inline void imxcsi2_write(struct imxcsi2_dev *csi2, u32 val,
++				 unsigned int regoff)
++{
++	writel(val, csi2->base + regoff);
++}
++
++static void imxcsi2_set_lanes(struct imxcsi2_dev *csi2)
++{
++	int lanes = csi2->bus.num_data_lanes;
++
++	imxcsi2_write(csi2, lanes - 1, CSI2_N_LANES);
++}
++
++static void imxcsi2_enable(struct imxcsi2_dev *csi2, bool enable)
++{
++	if (enable) {
++		imxcsi2_write(csi2, 0xffffffff, CSI2_PHY_SHUTDOWNZ);
++		imxcsi2_write(csi2, 0xffffffff, CSI2_DPHY_RSTZ);
++		imxcsi2_write(csi2, 0xffffffff, CSI2_RESETN);
++	} else {
++		imxcsi2_write(csi2, 0x0, CSI2_PHY_SHUTDOWNZ);
++		imxcsi2_write(csi2, 0x0, CSI2_DPHY_RSTZ);
++		imxcsi2_write(csi2, 0x0, CSI2_RESETN);
++	}
++}
++
++static void imxcsi2_reset(struct imxcsi2_dev *csi2)
++{
++	imxcsi2_enable(csi2, false);
++
++	imxcsi2_write(csi2, 0x00000001, CSI2_PHY_TST_CTRL0);
++	imxcsi2_write(csi2, 0x00000000, CSI2_PHY_TST_CTRL1);
++	imxcsi2_write(csi2, 0x00000000, CSI2_PHY_TST_CTRL0);
++	imxcsi2_write(csi2, 0x00000002, CSI2_PHY_TST_CTRL0);
++	imxcsi2_write(csi2, 0x00010044, CSI2_PHY_TST_CTRL1);
++	imxcsi2_write(csi2, 0x00000000, CSI2_PHY_TST_CTRL0);
++	imxcsi2_write(csi2, 0x00000014, CSI2_PHY_TST_CTRL1);
++	imxcsi2_write(csi2, 0x00000002, CSI2_PHY_TST_CTRL0);
++	imxcsi2_write(csi2, 0x00000000, CSI2_PHY_TST_CTRL0);
++
++	imxcsi2_enable(csi2, true);
++}
++
++static int imxcsi2_dphy_wait(struct imxcsi2_dev *csi2)
++{
++	u32 reg;
++	int i;
++
++	/* wait for mipi sensor ready */
++	for (i = 0; i < 50; i++) {
++		reg = imxcsi2_read(csi2, CSI2_PHY_STATE);
++		if (reg != 0x200)
++			break;
++		usleep_range(10000, 20000);
 +	}
 +
-+	vidsw->active = input_index;
++	if (i >= 50) {
++		v4l2_err(&csi2->sd,
++			 "wait for clock lane timeout, phy_state = 0x%08x\n",
++			 reg);
++		return -ETIME;
++	}
 +
-+	dev_dbg(vidsw->dev, "setting %d active\n", vidsw->active);
++	/* wait for mipi stable */
++	for (i = 0; i < 50; i++) {
++		reg = imxcsi2_read(csi2, CSI2_ERR1);
++		if (reg == 0x0)
++			break;
++		usleep_range(10000, 20000);
++	}
 +
-+	if (vidsw->field)
-+		regmap_field_write(vidsw->field, vidsw->active);
-+	else if (vidsw->gpio)
-+		gpiod_set_value(vidsw->gpio, vidsw->active);
++	if (i >= 50) {
++		v4l2_err(&csi2->sd,
++			 "wait for controller timeout, err1 = 0x%08x\n",
++			 reg);
++		return -ETIME;
++	}
++
++	/* finally let's wait for active clock on the clock lane */
++	for (i = 0; i < 50; i++) {
++		reg = imxcsi2_read(csi2, CSI2_PHY_STATE);
++		if (reg & (1 << 8))
++			break;
++		usleep_range(10000, 20000);
++	}
++
++	if (i >= 50) {
++		v4l2_err(&csi2->sd,
++			 "wait for active clock timeout, phy_state = 0x%08x\n",
++			 reg);
++		return -ETIME;
++	}
++
++	v4l2_info(&csi2->sd, "ready, dphy version 0x%x\n",
++		  imxcsi2_read(csi2, CSI2_VERSION));
 +
 +	return 0;
 +}
-+
-+static int vidsw_link_setup(struct media_entity *entity,
-+			    const struct media_pad *local,
-+			    const struct media_pad *remote, u32 flags)
-+{
-+	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(entity);
-+	struct vidsw *vidsw = to_vidsw(sd);
-+
-+	dev_dbg(vidsw->dev, "link setup %s -> %s", remote->entity->name,
-+		local->entity->name);
-+
-+	if (local->flags & MEDIA_PAD_FL_SINK) {
-+		if (!(flags & MEDIA_LNK_FL_ENABLED)) {
-+			if (local->index == vidsw->active) {
-+				dev_dbg(vidsw->dev, "going inactive\n");
-+				vidsw->active = -1;
-+			}
-+			return 0;
-+		}
-+
-+		return vidsw_set_mux(vidsw, local->index);
-+	}
-+
-+	return 0;
-+}
-+
-+static struct media_entity_operations vidsw_ops = {
-+	.link_setup = vidsw_link_setup,
-+	.link_validate = v4l2_subdev_link_validate,
-+};
 +
 +/*
-+ * retrieve our pads parsed from the OF graph by the media device
++ * V4L2 subdev operations
 + */
-+static int vidsw_registered(struct v4l2_subdev *sd)
++
++static int imxcsi2_link_setup(struct media_entity *entity,
++			      const struct media_pad *local,
++			      const struct media_pad *remote, u32 flags)
 +{
-+	struct vidsw *vidsw = container_of(sd, struct vidsw, subdev);
-+	struct device_node *np = vidsw->dev->of_node;
-+	struct imx_media_subdev *imxsd;
-+	struct device_node *epnode;
-+	struct imx_media_pad *pad;
-+	int i, ret;
++	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(entity);
++	struct imxcsi2_dev *csi2 = sd_to_dev(sd);
++	struct v4l2_subdev *remote_sd;
 +
-+	vidsw->md = dev_get_drvdata(sd->v4l2_dev->dev);
++	dev_dbg(csi2->dev, "link setup %s -> %s", remote->entity->name,
++		local->entity->name);
 +
-+	imxsd = imx_media_find_subdev_by_sd(vidsw->md, sd);
-+	if (IS_ERR(imxsd))
-+		return PTR_ERR(imxsd);
++	remote_sd = media_entity_to_v4l2_subdev(remote->entity);
 +
-+	if (imxsd->num_sink_pads < 2 || imxsd->num_src_pads != 1)
-+		return -EINVAL;
-+
-+	vidsw->numpads = imxsd->num_sink_pads + imxsd->num_src_pads;
-+
-+	vidsw->pads = devm_kzalloc(vidsw->dev,
-+				   vidsw->numpads * sizeof(*vidsw->pads),
-+				   GFP_KERNEL);
-+	if (!vidsw->pads)
-+		return -ENOMEM;
-+
-+	vidsw->endpoint = devm_kzalloc(vidsw->dev,
-+				       vidsw->numpads * sizeof(*vidsw->endpoint),
-+				       GFP_KERNEL);
-+	if (!vidsw->endpoint)
-+		return -ENOMEM;
-+
-+	vidsw->format_mbus = devm_kzalloc(vidsw->dev,
-+					  vidsw->numpads *
-+					  sizeof(*vidsw->format_mbus),
-+					  GFP_KERNEL);
-+	if (!vidsw->format_mbus)
-+		return -ENOMEM;
-+
-+	epnode = NULL;
-+	for (i = 0; i < vidsw->numpads; i++) {
-+		pad = &imxsd->pad[i];
-+		vidsw->pads[i] = pad->pad;
-+
-+		epnode = of_graph_get_next_endpoint(np, epnode);
-+		if (!epnode)
-+			return -EINVAL;
-+
-+		v4l2_of_parse_endpoint(epnode, &vidsw->endpoint[i]);
-+		of_node_put(epnode);
-+
-+		/* set a default mbus format  */
-+		ret = imx_media_init_mbus_fmt(vidsw->format_mbus,
-+					      640, 480, 0, V4L2_FIELD_NONE,
-+					      NULL);
-+		if (ret)
-+			return ret;
++	if (local->flags & MEDIA_PAD_FL_SOURCE) {
++		if (flags & MEDIA_LNK_FL_ENABLED) {
++			if (csi2->sink_sd[local->index])
++				return -EBUSY;
++			csi2->sink_sd[local->index] = remote_sd;
++		} else {
++			csi2->sink_sd[local->index] = NULL;
++		}
++	} else {
++		if (flags & MEDIA_LNK_FL_ENABLED) {
++			if (csi2->src_sd)
++				return -EBUSY;
++			csi2->src_sd = remote_sd;
++		} else {
++			csi2->src_sd = NULL;
++		}
 +	}
 +
-+	/*
-+	 * the last endpoint must define the mux output pad,
-+	 * the rest are the mux input pads.
-+	 */
-+	vidsw->output_pad = vidsw->numpads - 1;
-+	if (!(vidsw->pads[vidsw->output_pad].flags & MEDIA_PAD_FL_SOURCE))
-+		return -EINVAL;
-+
-+	return media_entity_pads_init(&sd->entity, vidsw->numpads, vidsw->pads);
++	return 0;
 +}
 +
-+static int vidsw_g_mbus_config(struct v4l2_subdev *sd,
-+			       struct v4l2_mbus_config *cfg)
++static int imxcsi2_s_power(struct v4l2_subdev *sd, int on)
 +{
-+	struct vidsw *vidsw = container_of(sd, struct vidsw, subdev);
++	struct imxcsi2_dev *csi2 = sd_to_dev(sd);
 +
-+	dev_dbg(vidsw->dev, "reporting configration %d\n", vidsw->active);
++	if (on && !csi2->on) {
++		v4l2_info(&csi2->sd, "power ON\n");
++		clk_prepare_enable(csi2->cfg_clk);
++		clk_prepare_enable(csi2->dphy_clk);
++		imxcsi2_set_lanes(csi2);
++		imxcsi2_reset(csi2);
++	} else if (!on && csi2->on) {
++		v4l2_info(&csi2->sd, "power OFF\n");
++		imxcsi2_enable(csi2, false);
++		clk_disable_unprepare(csi2->dphy_clk);
++		clk_disable_unprepare(csi2->cfg_clk);
++	}
 +
-+	/* Mirror the input side on the output side */
-+	cfg->type = vidsw->endpoint[vidsw->active].bus_type;
-+	if (cfg->type == V4L2_MBUS_PARALLEL || cfg->type == V4L2_MBUS_BT656)
-+		cfg->flags = vidsw->endpoint[vidsw->active].bus.parallel.flags;
++	csi2->on = on;
++	return 0;
++}
++
++static int imxcsi2_s_stream(struct v4l2_subdev *sd, int enable)
++{
++	struct imxcsi2_dev *csi2 = sd_to_dev(sd);
++	int i, ret = 0;
++
++	if (!csi2->src_sd)
++		return -EPIPE;
++	for (i = 0; i < CSI2_NUM_SRC_PADS; i++) {
++		if (csi2->sink_sd[i])
++			break;
++	}
++	if (i >= CSI2_NUM_SRC_PADS)
++		return -EPIPE;
++
++	v4l2_info(sd, "stream %s\n", enable ? "ON" : "OFF");
++
++	if (enable && !csi2->stream_on) {
++		clk_prepare_enable(csi2->pix_clk);
++		ret = imxcsi2_dphy_wait(csi2);
++		if (ret)
++			clk_disable_unprepare(csi2->pix_clk);
++	} else if (!enable && csi2->stream_on) {
++		clk_disable_unprepare(csi2->pix_clk);
++	}
++
++	if (!ret)
++		csi2->stream_on = enable;
++	return ret;
++}
++
++static int imxcsi2_get_fmt(struct v4l2_subdev *sd,
++			   struct v4l2_subdev_pad_config *cfg,
++			   struct v4l2_subdev_format *sdformat)
++{
++	struct imxcsi2_dev *csi2 = sd_to_dev(sd);
++
++	sdformat->format = csi2->format_mbus;
 +
 +	return 0;
 +}
 +
-+static const struct v4l2_subdev_video_ops vidsw_subdev_video_ops = {
-+	.g_mbus_config = vidsw_g_mbus_config,
-+};
-+
-+static int vidsw_get_format(struct v4l2_subdev *sd,
-+			    struct v4l2_subdev_pad_config *cfg,
-+			    struct v4l2_subdev_format *sdformat)
++static int imxcsi2_set_fmt(struct v4l2_subdev *sd,
++			   struct v4l2_subdev_pad_config *cfg,
++			   struct v4l2_subdev_format *sdformat)
 +{
-+	struct vidsw *vidsw = container_of(sd, struct vidsw, subdev);
++	struct imxcsi2_dev *csi2 = sd_to_dev(sd);
 +
-+	sdformat->format = vidsw->format_mbus[sdformat->pad];
-+
-+	return 0;
-+}
-+
-+static int vidsw_set_format(struct v4l2_subdev *sd,
-+			    struct v4l2_subdev_pad_config *cfg,
-+			    struct v4l2_subdev_format *sdformat)
-+{
-+	struct vidsw *vidsw = container_of(sd, struct vidsw, subdev);
-+
-+	if (sdformat->pad >= vidsw->numpads)
++	if (sdformat->pad >= CSI2_NUM_PADS)
 +		return -EINVAL;
 +
-+	/* Output pad mirrors active input pad, no limitations on input pads */
-+	if (sdformat->pad == vidsw->output_pad && vidsw->active >= 0)
-+		sdformat->format = vidsw->format_mbus[vidsw->active];
++	if (csi2->stream_on)
++		return -EBUSY;
++
++	/* Output pads mirror active input pad, no limits on input pads */
++	if (sdformat->pad != csi2->input_pad)
++		sdformat->format = csi2->format_mbus;
 +
 +	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY)
 +		cfg->try_fmt = sdformat->format;
 +	else
-+		vidsw->format_mbus[sdformat->pad] = sdformat->format;
++		csi2->format_mbus = sdformat->format;
 +
 +	return 0;
 +}
 +
-+static struct v4l2_subdev_pad_ops vidsw_pad_ops = {
-+	.get_fmt = vidsw_get_format,
-+	.set_fmt = vidsw_set_format,
-+};
-+
-+static struct v4l2_subdev_ops vidsw_subdev_ops = {
-+	.pad = &vidsw_pad_ops,
-+	.video = &vidsw_subdev_video_ops,
-+};
-+
-+static struct v4l2_subdev_internal_ops vidsw_internal_ops = {
-+	.registered = vidsw_registered,
-+};
-+
-+static int of_get_reg_field(struct device_node *node, struct reg_field *field)
++/*
++ * retrieve our pads parsed from the OF graph by the media device
++ */
++static int imxcsi2_registered(struct v4l2_subdev *sd)
 +{
-+	u32 reg_bit_mask[2];
-+	int ret;
++	struct imxcsi2_dev *csi2 = sd_to_dev(sd);
++	struct imx_media_subdev *imxsd;
++	struct imx_media_pad *pad;
++	int i, ret;
 +
-+	ret = of_property_read_u32_array(node, "reg", reg_bit_mask, 2);
-+	if (ret < 0)
-+		return ret;
++	/* get media device */
++	csi2->md = dev_get_drvdata(sd->v4l2_dev->dev);
 +
-+	field->reg = reg_bit_mask[0];
-+	field->lsb = __ffs(reg_bit_mask[1]);
-+	field->msb = __fls(reg_bit_mask[1]);
++	imxsd = imx_media_find_subdev_by_sd(csi2->md, sd);
++	if (IS_ERR(imxsd))
++		return PTR_ERR(imxsd);
 +
-+	return 0;
-+}
++	if (imxsd->num_sink_pads != 1 || imxsd->num_src_pads != 4)
++		return -EINVAL;
 +
-+static int vidsw_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct reg_field field;
-+	struct vidsw *vidsw;
-+	struct regmap *map;
-+	int ret;
-+
-+	vidsw = devm_kzalloc(&pdev->dev, sizeof(*vidsw), GFP_KERNEL);
-+	if (!vidsw)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, vidsw);
-+
-+	v4l2_subdev_init(&vidsw->subdev, &vidsw_subdev_ops);
-+	v4l2_set_subdevdata(&vidsw->subdev, &pdev->dev);
-+	vidsw->subdev.internal_ops = &vidsw_internal_ops;
-+	vidsw->subdev.entity.ops = &vidsw_ops;
-+	snprintf(vidsw->subdev.name, sizeof(vidsw->subdev.name), "%s",
-+		 np->name);
-+	/* FIXME: this is a video mux, function isn't right */
-+	vidsw->subdev.entity.function = MEDIA_ENT_F_PROC_VIDEO_PIXEL_FORMATTER;
-+	vidsw->subdev.grp_id = IMX_MEDIA_GRP_ID_VIDMUX;
-+	vidsw->subdev.flags = V4L2_SUBDEV_FL_HAS_DEVNODE;
-+	vidsw->subdev.dev = &pdev->dev;
-+	vidsw->dev = &pdev->dev;
-+
-+	vidsw->active = -1;
-+
-+	ret = of_get_reg_field(np, &field);
-+	if (ret == 0) {
-+		struct device_node *gpr_np = of_get_parent(np);
-+		if (!gpr_np) {
-+			dev_err(&pdev->dev,
-+				"Failed to get parent syscon node\n");
-+			return -ENODEV;
-+		}
-+		map = syscon_node_to_regmap(gpr_np);
-+		of_node_put(gpr_np);
-+		if (IS_ERR(map)) {
-+			dev_err(&pdev->dev,
-+				"Failed to get syscon register map\n");
-+			return PTR_ERR(map);
-+		}
-+
-+		vidsw->field = devm_regmap_field_alloc(&pdev->dev, map, field);
-+		if (IS_ERR(vidsw->field)) {
-+			dev_err(&pdev->dev,
-+				"Failed to allocate regmap field\n");
-+			return PTR_ERR(vidsw->field);
-+		}
-+	} else {
-+		vidsw->gpio = devm_gpiod_get_optional(&pdev->dev, "mux",
-+						      GPIOD_OUT_LOW);
-+		if (IS_ERR(vidsw->gpio)) {
-+			dev_err(&pdev->dev, "request for gpio failed\n");
-+			return PTR_ERR(vidsw->gpio);
-+		}
-+
-+		if (!vidsw->gpio)
-+			dev_warn(&pdev->dev, "no control gpio defined\n");
++	for (i = 0; i < CSI2_NUM_PADS; i++) {
++		pad = &imxsd->pad[i];
++		csi2->pad[i] = pad->pad;
++		if (csi2->pad[i].flags & MEDIA_PAD_FL_SINK)
++			csi2->input_pad = i;
 +	}
 +
-+	return v4l2_async_register_subdev(&vidsw->subdev);
++	/* set a default mbus format  */
++	ret = imx_media_init_mbus_fmt(&csi2->format_mbus,
++				      640, 480, 0, V4L2_FIELD_NONE, NULL);
++	if (ret)
++		return ret;
++
++	return media_entity_pads_init(&sd->entity, CSI2_NUM_PADS, csi2->pad);
 +}
 +
-+static int vidsw_remove(struct platform_device *pdev)
-+{
-+	struct vidsw *vidsw = platform_get_drvdata(pdev);
-+	struct v4l2_subdev *sd = &vidsw->subdev;
++static struct media_entity_operations imxcsi2_entity_ops = {
++	.link_setup = imxcsi2_link_setup,
++	.link_validate = v4l2_subdev_link_validate,
++};
 +
-+	v4l2_async_unregister_subdev(sd);
-+	media_entity_cleanup(&sd->entity);
++static struct v4l2_subdev_core_ops imxcsi2_core_ops = {
++	.s_power = imxcsi2_s_power,
++};
++
++static struct v4l2_subdev_video_ops imxcsi2_video_ops = {
++	.s_stream = imxcsi2_s_stream,
++};
++
++static struct v4l2_subdev_pad_ops imxcsi2_pad_ops = {
++	.get_fmt = imxcsi2_get_fmt,
++	.set_fmt = imxcsi2_set_fmt,
++};
++
++static struct v4l2_subdev_ops imxcsi2_subdev_ops = {
++	.core = &imxcsi2_core_ops,
++	.video = &imxcsi2_video_ops,
++	.pad = &imxcsi2_pad_ops,
++};
++
++static struct v4l2_subdev_internal_ops imxcsi2_internal_ops = {
++	.registered = imxcsi2_registered,
++};
++
++static int imxcsi2_parse_endpoints(struct imxcsi2_dev *csi2)
++{
++	struct device_node *node = csi2->dev->of_node;
++	struct device_node *epnode;
++	struct v4l2_of_endpoint ep;
++	int ret = 0;
++
++	epnode = of_graph_get_next_endpoint(node, NULL);
++	if (!epnode) {
++		v4l2_err(&csi2->sd, "failed to get endpoint node\n");
++		return -EINVAL;
++	}
++
++	v4l2_of_parse_endpoint(epnode, &ep);
++	if (ep.bus_type != V4L2_MBUS_CSI2) {
++		v4l2_err(&csi2->sd, "invalid bus type, must be MIPI CSI2\n");
++		ret = -EINVAL;
++		goto out;
++	}
++
++	csi2->bus = ep.bus.mipi_csi2;
++
++	v4l2_info(&csi2->sd, "data lanes: %d\n", csi2->bus.num_data_lanes);
++	v4l2_info(&csi2->sd, "flags: 0x%08x\n", csi2->bus.flags);
++out:
++	of_node_put(epnode);
++	return ret;
++}
++
++static int imxcsi2_probe(struct platform_device *pdev)
++{
++	struct imxcsi2_dev *csi2;
++	struct resource *res;
++	int ret;
++
++	csi2 = devm_kzalloc(&pdev->dev, sizeof(*csi2), GFP_KERNEL);
++	if (!csi2)
++		return -ENOMEM;
++
++	csi2->dev = &pdev->dev;
++
++	v4l2_subdev_init(&csi2->sd, &imxcsi2_subdev_ops);
++	v4l2_set_subdevdata(&csi2->sd, &pdev->dev);
++	csi2->sd.internal_ops = &imxcsi2_internal_ops;
++	csi2->sd.entity.ops = &imxcsi2_entity_ops;
++	csi2->sd.dev = &pdev->dev;
++	csi2->sd.owner = THIS_MODULE;
++	csi2->sd.flags = V4L2_SUBDEV_FL_HAS_DEVNODE;
++	strcpy(csi2->sd.name, DEVICE_NAME);
++	/* FIXME: this is a mipi-csi2 receiver, function isn't right */
++	csi2->sd.entity.function = MEDIA_ENT_F_ATV_DECODER;
++	csi2->sd.grp_id = IMX_MEDIA_GRP_ID_CSI2;
++
++	ret = imxcsi2_parse_endpoints(csi2);
++	if (ret)
++		return ret;
++
++	csi2->cfg_clk = devm_clk_get(&pdev->dev, "cfg_clk");
++	if (IS_ERR(csi2->cfg_clk)) {
++		v4l2_err(&csi2->sd, "failed to get cfg clock\n");
++		ret = PTR_ERR(csi2->cfg_clk);
++		return ret;
++	}
++
++	csi2->dphy_clk = devm_clk_get(&pdev->dev, "dphy_clk");
++	if (IS_ERR(csi2->dphy_clk)) {
++		v4l2_err(&csi2->sd, "failed to get dphy clock\n");
++		ret = PTR_ERR(csi2->dphy_clk);
++		return ret;
++	}
++
++	csi2->pix_clk = devm_clk_get(&pdev->dev, "pix_clk");
++	if (IS_ERR(csi2->pix_clk)) {
++		v4l2_err(&csi2->sd, "failed to get pixel clock\n");
++		ret = PTR_ERR(csi2->pix_clk);
++		return ret;
++	}
++
++	csi2->intr1 = platform_get_irq(pdev, 0);
++	csi2->intr2 = platform_get_irq(pdev, 1);
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++
++	if (!res || csi2->intr1 < 0 || csi2->intr2 < 0) {
++		v4l2_err(&csi2->sd, "failed to get platform resources\n");
++		return -ENODEV;
++	}
++
++	csi2->base = devm_ioremap(&pdev->dev, res->start, PAGE_SIZE);
++	if (!csi2->base) {
++		v4l2_err(&csi2->sd, "failed to map CSI-2 registers\n");
++		return -ENOMEM;
++	}
++
++	platform_set_drvdata(pdev, &csi2->sd);
++
++	return v4l2_async_register_subdev(&csi2->sd);
++}
++
++static int imxcsi2_remove(struct platform_device *pdev)
++{
++	struct v4l2_subdev *sd = platform_get_drvdata(pdev);
++	struct imxcsi2_dev *csi2 = sd_to_dev(sd);
++
++	imxcsi2_s_power(sd, 0);
++
++	v4l2_async_unregister_subdev(&csi2->sd);
++	media_entity_cleanup(&csi2->sd.entity);
 +	v4l2_device_unregister_subdev(sd);
 +
 +	return 0;
 +}
 +
-+static const struct of_device_id vidsw_dt_ids[] = {
-+	{ .compatible = "imx-video-mux", },
++static const struct of_device_id imxcsi2_dt_ids[] = {
++	{ .compatible = "fsl,imx-mipi-csi2", },
 +	{ /* sentinel */ }
 +};
-+MODULE_DEVICE_TABLE(of, vidsw_dt_ids);
++MODULE_DEVICE_TABLE(of, imxcsi2_dt_ids);
 +
-+static struct platform_driver vidsw_driver = {
-+	.probe		= vidsw_probe,
-+	.remove		= vidsw_remove,
-+	.driver		= {
-+		.of_match_table = vidsw_dt_ids,
-+		.name	= "imx-video-mux",
-+		.owner	= THIS_MODULE,
++static struct platform_driver imxcsi2_driver = {
++	.driver = {
++		.name = DEVICE_NAME,
++		.owner = THIS_MODULE,
++		.of_match_table = imxcsi2_dt_ids,
 +	},
++	.probe = imxcsi2_probe,
++	.remove = imxcsi2_remove,
 +};
 +
-+module_platform_driver(vidsw_driver);
++module_platform_driver(imxcsi2_driver);
 +
-+MODULE_DESCRIPTION("i.MX video stream multiplexer");
-+MODULE_AUTHOR("Sascha Hauer, Pengutronix");
++MODULE_DESCRIPTION("i.MX5/6 MIPI CSI-2 Receiver driver");
 +MODULE_AUTHOR("Steve Longerbeam <steve_longerbeam@mentor.com>");
 +MODULE_LICENSE("GPL");
++
 -- 
 2.7.4
