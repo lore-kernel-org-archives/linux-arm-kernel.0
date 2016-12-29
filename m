@@ -1,55 +1,38 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 29 Dec 2016 18:39:31 +0900
-Subject: [1/4] pinctrl: dt-bindings: samsung: add drive strength macros for
- Exynos5433
-In-Reply-To: <20161229084211.20442-2-andi.shyti@samsung.com>
-References: <20161229084211.20442-2-andi.shyti@samsung.com>
- <CGME20161229093931epcas1p11b118da454a0dbf3a798ba406f35ce54@epcas1p1.samsung.com>
-Message-ID: <b855ad96-9dd6-9cc3-2353-576d1bd302d8@samsung.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 29 Dec 2016 17:52:37 +0800
+Subject: [PATCH] mtd: nand: Update dependency of IFC for LS1021A
+In-Reply-To: <1482973102-47659-1-git-send-email-b18965@freescale.com>
+Message-ID: <201612291704.0tMw9Uis%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/29/2016 05:42 PM, Andi Shyti wrote:
-> Commit 5db7e3bb87df ("pinctrl: dt-bindings: samsung: Add header with
-> values used for configuration") has added a header file for defining the
-> pinctrl values in order to avoid hardcoded settings in the Exynos
-> DTS related files.
-> 
-> Extend samsung.h to the Exynos5433 for drive strength values
-> which are strictly related to the particular SoC and may defer
-> from others.
-> 
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> ---
->  include/dt-bindings/pinctrl/samsung.h | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/include/dt-bindings/pinctrl/samsung.h b/include/dt-bindings/pinctrl/samsung.h
-> index 6276eb785e2b..58868313d64b 100644
-> --- a/include/dt-bindings/pinctrl/samsung.h
-> +++ b/include/dt-bindings/pinctrl/samsung.h
-> @@ -45,6 +45,12 @@
->  #define EXYNOS5420_PIN_DRV_LV3		2
->  #define EXYNOS5420_PIN_DRV_LV4		3
->  
-> +/* Drive strengths for Exynos5433 */
-> +#define EXYNOS5433_PIN_DRV_LV1		0
-> +#define EXYNOS5433_PIN_DRV_LV2		1
-> +#define EXYNOS5433_PIN_DRV_LV3		2
-> +#define EXYNOS5433_PIN_DRV_LV4		3
+Hi Alison,
 
-Well, i'm not sure..but you needs to compare the other Exynos5 series.
-it's difference bit Offset. Did you check it?
+[auto build test WARNING on mtd/master]
+[also build test WARNING on v4.10-rc1 next-20161224]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-I didn't check pinctrl file..if it doesn't apply any exynos5433 pinctrl for drv_strength.
-it will work wrong..
+url:    https://github.com/0day-ci/linux/commits/Alison-Wang/mtd-nand-Update-dependency-of-IFC-for-LS1021A/20161229-125233
+base:   git://git.infradead.org/linux-mtd.git master
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Best Regards,
-Jaehoon Chung
+All warnings (new ones prefixed by >>):
 
-> +
->  #define EXYNOS_PIN_FUNC_INPUT		0
->  #define EXYNOS_PIN_FUNC_OUTPUT		1
->  #define EXYNOS_PIN_FUNC_2		2
-> 
-> 
+warning: (MTD_NAND_FSL_IFC) selects FSL_IFC which has unmet direct dependencies (MEMORY && (FSL_SOC || ARCH_LAYERSCAPE))
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 59438 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161229/8afb2f05/attachment-0001.gz>
