@@ -1,58 +1,62 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 29 Dec 2016 17:23:34 +0100
-Subject: [PATCH 2/2] ARM: dts: Add CPU OPPs for Exynos4412 Prime
-In-Reply-To: <1840714.lHhVv9oNko@amdc3058>
-References: <1483018611-27998-1-git-send-email-b.zolnierkie@samsung.com>
- <1483018611-27998-3-git-send-email-b.zolnierkie@samsung.com>
- <20161229144908.6gkvjpso7ikdmfp7@kozik-lap>
- <CGME20161229150623epcas1p2b2f0fbb6f9ddd11caffdc93487e2cf77@epcas1p2.samsung.com>
- <1840714.lHhVv9oNko@amdc3058>
-Message-ID: <6892749a-a8bd-cfb3-551c-f0b1ca6d2b84@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 29 Dec 2016 19:23:02 +0100
+Subject: [PATCH v1] mtd: nand: tango: Update DT binding description
+In-Reply-To: <ba47f2f1-bcdc-91e8-ed79-153931ccdad8@sigmadesigns.com>
+References: <ba47f2f1-bcdc-91e8-ed79-153931ccdad8@sigmadesigns.com>
+Message-ID: <20161229192302.5c94ecdb@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/29/2016 04:06 PM, Bartlomiej Zolnierkiewicz wrote:
->>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->>> ---
->>>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  4 +--
->>>  arch/arm/boot/dts/exynos4412-odroidu3.dts       |  5 +--
->>>  arch/arm/boot/dts/exynos4412-odroidx2.dts       |  1 +
->>>  arch/arm/boot/dts/exynos4412-prime.dtsi         | 41 +++++++++++++++++++++++++
->>>  arch/arm/boot/dts/exynos4412.dtsi               |  2 +-
->>>  5 files changed, 48 insertions(+), 5 deletions(-)
->>>  create mode 100644 arch/arm/boot/dts/exynos4412-prime.dtsi
->>>
->> Looks okay. Is the clock patch needed for this?
-> Yep.
+On Mon, 19 Dec 2016 15:30:12 +0100
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> wrote:
 
-I applied the clock patch and here is a stable tag if it needs
-to be pulled as a dependency.
+> Visually separate register ranges (address/size pairs) in reg prop.
+> Change DMA channel name, for consistency with other drivers.
+> 
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> ---
+>  Documentation/devicetree/bindings/mtd/tango-nand.txt | 6 +++---
+>  drivers/mtd/nand/tango_nand.c                        | 2 +-
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/tango-nand.txt b/Documentation/devicetree/bindings/mtd/tango-nand.txt
+> index ad5a02f2ac8c..cd1bf2ac9055 100644
+> --- a/Documentation/devicetree/bindings/mtd/tango-nand.txt
+> +++ b/Documentation/devicetree/bindings/mtd/tango-nand.txt
+> @@ -5,7 +5,7 @@ Required properties:
+>  - compatible: "sigma,smp8758-nand"
+>  - reg: address/size of nfc_reg, nfc_mem, and pbus_reg
+>  - dmas: reference to the DMA channel used by the controller
+> -- dma-names: "nfc_sbox"
+> +- dma-names: "rxtx"
 
+You probably want to fix the driver accordingly ;-).
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
-
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-
-are available in the git repository at:
-
-  git://linuxtv.org/snawrocki/samsung.git tags/clk-v4.11-exynos4-pll
-
-for you to fetch changes up to c369596f895be88d09f4165b223fa31c64aaefd4:
-
-  clk: samsung: Add CPU clk configuration data for Exynos4412 Prime (2016-12-29
-16:34:06 +0100)
-
-----------------------------------------------------------------
-Addition of the CPU clock configuration data for Exynos4412
-Prime SoC variant.
-
-----------------------------------------------------------------
-Bartlomiej Zolnierkiewicz (1):
-      clk: samsung: Add CPU clk configuration data for Exynos4412 Prime
-
- drivers/clk/samsung/clk-exynos4.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
--- 
-Regards,
-Sylwester
+>  - clocks: reference to the system clock
+>  - #address-cells: <1>
+>  - #size-cells: <0>
+> @@ -17,9 +17,9 @@ Example:
+>  
+>  	nandc: nand-controller at 2c000 {
+>  		compatible = "sigma,smp8758-nand";
+> -		reg = <0x2c000 0x30 0x2d000 0x800 0x20000 0x1000>;
+> +		reg = <0x2c000 0x30>, <0x2d000 0x800>, <0x20000 0x1000>;
+>  		dmas = <&dma0 3>;
+> -		dma-names = "nfc_sbox";
+> +		dma-names = "rxtx";
+>  		clocks = <&clkgen SYS_CLK>;
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> diff --git a/drivers/mtd/nand/tango_nand.c b/drivers/mtd/nand/tango_nand.c
+> index cc23db64f0ca..51dc88d6b8da 100644
+> --- a/drivers/mtd/nand/tango_nand.c
+> +++ b/drivers/mtd/nand/tango_nand.c
+> @@ -629,7 +629,7 @@ static int tango_nand_probe(struct platform_device *pdev)
+>  	if (IS_ERR(clk))
+>  		return PTR_ERR(clk);
+>  
+> -	nfc->chan = dma_request_chan(&pdev->dev, "nfc_sbox");
+> +	nfc->chan = dma_request_chan(&pdev->dev, "rxtx");
+>  	if (IS_ERR(nfc->chan))
+>  		return PTR_ERR(nfc->chan);
+>  
