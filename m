@@ -1,93 +1,115 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 29 Dec 2016 19:33:53 +0900
-Subject: [PATCH 1/4] pinctrl: dt-bindings: samsung: add drive strength
- macros for Exynos5433
-In-Reply-To: <37b86cdb-b5e9-a5fa-fbb1-46e8d8c90cd8@samsung.com>
-References: <20161229084211.20442-1-andi.shyti@samsung.com>
- <CGME20161229084221epcas5p43926b87dccbee0db4045faa5ddca565d@epcas5p4.samsung.com>
- <20161229084211.20442-2-andi.shyti@samsung.com>
- <37b86cdb-b5e9-a5fa-fbb1-46e8d8c90cd8@samsung.com>
-Message-ID: <6bf77b57-c2a4-2dff-9763-1cd1bfa23b9d@samsung.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 29 Dec 2016 19:12:32 +0800
+Subject: [PATCH] drm: zte: support hdmi audio through spdif
+In-Reply-To: <CAOw6vbJzKeiTW9haRmiFhJv44pRSMNvvpFUg-4LcfxSuRzo17w@mail.gmail.com>
+References: <1482412319-6304-1-git-send-email-shawnguo@kernel.org>
+ <CAOw6vbJzKeiTW9haRmiFhJv44pRSMNvvpFUg-4LcfxSuRzo17w@mail.gmail.com>
+Message-ID: <20161229111230.GA6177@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andi,
-
-On 2016? 12? 29? 18:17, Chanwoo Choi wrote:
-> Hi Andi,
+On Thu, Dec 22, 2016 at 10:18:00AM -0500, Sean Paul wrote:
+> On Thu, Dec 22, 2016 at 8:11 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > +static int zx_hdmi_audio_get_n(unsigned int fs)
+> > +{
+> > +       unsigned int n;
+> > +
+> > +       switch (fs) {
+> > +       case 32000:
+> > +               n = 4096;
+> > +               break;
+> > +       case 44100:
+> > +               n = 6272;
+> > +               break;
+> > +       case 48000:
+> > +               n = 6144;
+> > +               break;
+> > +       case 88200:
+> > +               n = 6272 * 2;
+> > +               break;
+> > +       case 96000:
+> > +               n = 6144 * 2;
+> > +               break;
+> > +       case 176400:
+> > +               n = 6272 * 4;
+> > +               break;
+> > +       case 192000:
+> > +               n = 6144 * 4;
+> > +               break;
+> > +       default:
+> > +               n = fs * 128 / 1000;
 > 
-> On 2016? 12? 29? 17:42, Andi Shyti wrote:
->> Commit 5db7e3bb87df ("pinctrl: dt-bindings: samsung: Add header with
->> values used for configuration") has added a header file for defining the
->> pinctrl values in order to avoid hardcoded settings in the Exynos
->> DTS related files.
->>
->> Extend samsung.h to the Exynos5433 for drive strength values
->> which are strictly related to the particular SoC and may defer
->> from others.
->>
->> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
->> ---
->>  include/dt-bindings/pinctrl/samsung.h | 6 ++++++
->>  1 file changed, 6 insertions(+)
->>
->> diff --git a/include/dt-bindings/pinctrl/samsung.h b/include/dt-bindings/pinctrl/samsung.h
->> index 6276eb785e2b..58868313d64b 100644
->> --- a/include/dt-bindings/pinctrl/samsung.h
->> +++ b/include/dt-bindings/pinctrl/samsung.h
->> @@ -45,6 +45,12 @@
->>  #define EXYNOS5420_PIN_DRV_LV3		2
->>  #define EXYNOS5420_PIN_DRV_LV4		3
->>  
->> +/* Drive strengths for Exynos5433 */
->> +#define EXYNOS5433_PIN_DRV_LV1		0
->> +#define EXYNOS5433_PIN_DRV_LV2		1
->> +#define EXYNOS5433_PIN_DRV_LV3		2
->> +#define EXYNOS5433_PIN_DRV_LV4		3
+> It seems like this could be distilled down to:
 > 
-> Exynos5433 has the same value with EXYNOS5420. So, I'd like you to use the EXYNOS5420_PIN_DRV_LVx instead of separate the definitions.
+> if (fs && (fs % 44100) == 0)
+>         n = 6272 * (fs / 44100);
+> else
+>         n = fs * 128 / 1000;
 
-I found the problem to handle the *_DRV register of Exynos5433. Because Exynos5433 has the different width length of *_DRV (PINCFG_TYPE_DRV) bitfields from Exynos542x as following. When I was sending the exynos5433 pinctrl patches, I was missing this issue.
-
-Exynos5422/Exynos5410 have two different bitfields in the same register to set the DRV_LVx as following:
-(n=0 to 7)
-[2n+1:2n] : 2bits
- 0x0 = 1x,
- 0x1 = 2x,
- 0x2 = 3x,
- 0x3 = 4x,
-
-[n+16:16]
- 0x0 = Fast Slew Rate,
- 0x1 = Slow Slew Rate,
-
-But, Exynos5433 has the following value for PIN_DRV_LVx without additional bitfields to separate 'Fast Slew Rate' and 'Slow Slew Rate'. Just exynos5433 defines the 'Fast Slew Rate(0x0 ~ 0x5)' and 'Slow Slew Rate (0x8 ~ 0xF)'.
-(n=0 to 7)
-[4n+3:4n] : 4 bits
-0x0 = Fast Slew Rate 1x
-0x1 = Fast Slew Rate 2x
-0x2 = Fast Slew Rate 3x
-0x3 = Fast Slew Rate 4x
-0x4 = Fast Slew Rate 5x
-0x5 = Fast Slew Rate 6x
-0x8 = Slow Slew Rate 1x
-0x9 = Slow Slew Rate 2x
-0xA = Slow Slew Rate 3x
-0xB = Slow Slew Rate 4x
-0xC = Slow Slew Rate 5x
-0xF = Slow Slew Rate 6x
-
-So, before this patch, we have to fix it to support the DRV reigster of Exynos5433.
-I'll fix it.
+Nice!  Thanks for the suggestion.
 
 > 
->> +
->>  #define EXYNOS_PIN_FUNC_INPUT		0
->>  #define EXYNOS_PIN_FUNC_OUTPUT		1
->>  #define EXYNOS_PIN_FUNC_2		2
->>
+> > +       }
+> > +
+> > +       return n;
+> > +}
+> > +
+> > +static int zx_hdmi_audio_hw_params(struct device *dev,
+> > +                                  void *data,
+> > +                                  struct hdmi_codec_daifmt *daifmt,
+> > +                                  struct hdmi_codec_params *params)
+> > +{
+> > +       struct zx_hdmi *hdmi = dev_get_drvdata(dev);
+> > +       struct hdmi_audio_infoframe *cea = &params->cea;
+> > +       union hdmi_infoframe frame;
+> > +       int n;
+> > +
+> > +       /* We only support spdif for now */
+> > +       if (daifmt->fmt != HDMI_SPDIF) {
+> > +               DRM_DEV_ERROR(hdmi->dev, "invalid daifmt %d\n", daifmt->fmt);
+> > +               return -EINVAL;
+> > +       }
+> > +
+> > +       switch (params->sample_width) {
+> > +       case 16:
+> > +               hdmi_writeb_mask(hdmi, TPI_AUD_CONFIG, SPDIF_SAMPLE_SIZE_MASK,
+> > +                                SPDIF_SAMPLE_SIZE_16BIT);
+> > +               break;
+> > +       case 20:
+> > +               hdmi_writeb_mask(hdmi, TPI_AUD_CONFIG, SPDIF_SAMPLE_SIZE_MASK,
+> > +                                SPDIF_SAMPLE_SIZE_20BIT);
+> > +               break;
+> > +       case 24:
+> > +               hdmi_writeb_mask(hdmi, TPI_AUD_CONFIG, SPDIF_SAMPLE_SIZE_MASK,
+> > +                                SPDIF_SAMPLE_SIZE_24BIT);
+> > +               break;
+> > +       default:
+> > +               DRM_DEV_ERROR(hdmi->dev, "invalid sample width %d\n",
+> > +                             params->sample_width);
+> > +               return -EINVAL;
+> > +       }
+> > +
+> > +       /* CTS is calculated by hardware, and we only need to take care of N */
+> > +       n = zx_hdmi_audio_get_n(params->sample_rate);
+> > +       hdmi_writeb(hdmi, N_SVAL1, n & 0xff);
+> > +       hdmi_writeb(hdmi, N_SVAL2, (n >> 8) && 0xff);
 > 
+> s/&&/&/ ?
 
--- 
-Regards,
-Chanwoo Choi
+Oops!  Thanks for catching it.
+
+Shawn
+
+> 
+> > +       hdmi_writeb(hdmi, N_SVAL3, (n >> 16) & 0xf);
+> > +
+> > +       /* Enable spdif mode */
+> > +       hdmi_writeb_mask(hdmi, AUD_MODE, SPDIF_EN, SPDIF_EN);
+> > +
+> > +       /* Enable audio input */
+> > +       hdmi_writeb_mask(hdmi, AUD_EN, AUD_IN_EN, AUD_IN_EN);
+> > +
+> > +       memcpy(&frame.audio, cea, sizeof(*cea));
+> > +
+> > +       return zx_hdmi_infoframe_trans(hdmi, &frame, FSEL_AUDIO);
+> > +}
