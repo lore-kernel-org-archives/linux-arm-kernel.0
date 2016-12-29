@@ -1,26 +1,31 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Thu, 29 Dec 2016 20:07:45 +0100
-Subject: [PATCH 4/6] ARM: mach-mx35_3ds: Remove camera support
-In-Reply-To: <CAOMZO5CF8QiJ21VbJCs4nj-WiAnfhsU0v7XpLGM3rcN1GoPiMQ@mail.gmail.com>
-References: <1482756987-12414-1-git-send-email-festevam@gmail.com>
- <1482756987-12414-4-git-send-email-festevam@gmail.com>
- <CAM=E1R64X6o0o604gGiU4+uQ6W_PUSbzgpaAYWSYEiSz_D8uGQ@mail.gmail.com>
- <CAOMZO5CF8QiJ21VbJCs4nj-WiAnfhsU0v7XpLGM3rcN1GoPiMQ@mail.gmail.com>
-Message-ID: <CAM=E1R4a6Qd1ib-cmRi4PzuDXPDwLEarHOxc6aDDVLDZcWvVeQ@mail.gmail.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Thu, 29 Dec 2016 21:05:14 +0100
+Subject: [PATCH 00/39] ARM: dts: mvebu: Fix license text
+In-Reply-To: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
+References: <20161214223746.23066-1-alexandre.belloni@free-electrons.com>
+Message-ID: <CACna6rw7pJmNA2U9rLFRPMU2XWYkpavP+td73ACiYv7NcD9Aeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 December 2016 at 19:55, Fabio Estevam <festevam@gmail.com> wrote:
-> On Thu, Dec 29, 2016 at 4:41 PM, Magnus Lilja <lilja.magnus@gmail.com> wrote:
+On 14 December 2016 at 23:37, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> When the license was switched to dual GPLv2/X11, the text that was used
+> was missing a few characters. Fix that now.
 >
->> Umm, did you really mean to remove VAUDIO/vaudio_init stuff in this
->> camera related patch?
->
-> VAUDIO is the MC13783 PMIC output name, but despite its name it has no
-> relationship with the audio circuitry on mx35pdk board.
->
-> It powers the OV2640 camera on this board, so it is safe to remove it.
+> I'll let the maintainers decide whether this change requires an ack of
+> every contributors. It has been separated with that in mind if
+> necessary.
 
-Ok, good, so vcam is used for something else than camera then?
-
-/Magnus
+Acked-by: Rafa? Mi?ecki <zajec5@gmail.com>
+for patches I was cc-ed in, I think a complete list is:
+01
+05
+08
+10
+14
+15
+20
+23
+24
+26
+34
