@@ -1,43 +1,23 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu, 29 Dec 2016 04:06:11 -0800
-Subject: [PATCH v2] ARM: dts: qcom: apq8064: Add missing scm clock
-Message-ID: <20161229120611.7948-1-bjorn.andersson@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 29 Dec 2016 18:22:54 -0200
+Subject: [PATCH 4/6] ARM: mach-mx35_3ds: Remove camera support
+In-Reply-To: <CAM=E1R4a6Qd1ib-cmRi4PzuDXPDwLEarHOxc6aDDVLDZcWvVeQ@mail.gmail.com>
+References: <1482756987-12414-1-git-send-email-festevam@gmail.com>
+ <1482756987-12414-4-git-send-email-festevam@gmail.com>
+ <CAM=E1R64X6o0o604gGiU4+uQ6W_PUSbzgpaAYWSYEiSz_D8uGQ@mail.gmail.com>
+ <CAOMZO5CF8QiJ21VbJCs4nj-WiAnfhsU0v7XpLGM3rcN1GoPiMQ@mail.gmail.com>
+ <CAM=E1R4a6Qd1ib-cmRi4PzuDXPDwLEarHOxc6aDDVLDZcWvVeQ@mail.gmail.com>
+Message-ID: <CAOMZO5AYMoT58YeOnF2U-07Wp+ENf2308ozDY=oO+MLwd4zCRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per the device tree binding the apq8064 scm node requires the core
-clock to be specified, so add this.
+On Thu, Dec 29, 2016 at 5:07 PM, Magnus Lilja <lilja.magnus@gmail.com> wrote:
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
----
+> Ok, good, so vcam is used for something else than camera then?
 
-Changes since v1:
-- Changed clock to Daytona Fabric
+Yes, vcam is used to power de sgtl5000 codec:
 
- arch/arm/boot/dts/qcom-apq8064.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 1dbe697b2e90..a27cc96ac069 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -4,6 +4,7 @@
- #include <dt-bindings/clock/qcom,gcc-msm8960.h>
- #include <dt-bindings/reset/qcom,gcc-msm8960.h>
- #include <dt-bindings/clock/qcom,mmcc-msm8960.h>
-+#include <dt-bindings/clock/qcom,rpmcc.h>
- #include <dt-bindings/soc/qcom,gsbi.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-@@ -303,6 +304,9 @@
- 	firmware {
- 		scm {
- 			compatible = "qcom,scm-apq8064";
-+
-+			clocks = <&rpmcc RPM_DAYTONA_FABRIC_CLK>;
-+			clock-names = "core";
- 		};
- 	};
- 
--- 
-2.11.0
+static struct regulator_consumer_supply vcam_consumers[] = {
+/* sgtl5000 */
+REGULATOR_SUPPLY("VDDA", "0-000a"),
+};
