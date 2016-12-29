@@ -1,104 +1,38 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 29 Dec 2016 12:02:01 +0900
-Subject: [PATCH] Revert "mmc: dw_mmc-rockchip: add runtime PM support"
-In-Reply-To: <1482939288-14950-1-git-send-email-ayaka@soulik.info>
-References: <CGME20161228153516epcas2p253c6bc0371ab0df464573b63218795ef@epcas2p2.samsung.com>
- <1482939288-14950-1-git-send-email-ayaka@soulik.info>
-Message-ID: <e0cc8029-0155-4879-a643-ddc4239a55ab@samsung.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Wed, 28 Dec 2016 21:14:32 -0600
+Subject: [1/5] ARM: dts: qcom: apq8064: Add missing scm clock
+In-Reply-To: <20161221114939.19973-1-bjorn.andersson@linaro.org>
+References: <20161221114939.19973-1-bjorn.andersson@linaro.org>
+Message-ID: <20161229031432.GA18506@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Randy,
-
-On 12/29/2016 12:34 AM, Randy Li wrote:
-> This reverts commit f90142683f04bcb0729bf0df67a5e29562b725b9.
-> It is reported that making RK3288 can't boot from eMMC/MMC.
-
-Could you explain in more detail?
-As you mentioned, this patch is making that RK3288 can't boot..then why?
-Good way should be that finds the main reason and fixes it.
-Not just revert.
-
-Best Regards,
-Jaehoon Chung
-
+On Wed, Dec 21, 2016 at 03:49:35AM -0800, Bjorn Andersson wrote:
+> As per the device tree binding the apq8064 scm node requires the core
+> clock to be specified, so add this.
 > 
-> Signed-off-by: Randy Li <ayaka@soulik.info>
+> Cc: John Stultz <john.stultz@linaro.org>
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 > ---
->  drivers/mmc/host/dw_mmc-rockchip.c | 41 +++-----------------------------------
->  1 file changed, 3 insertions(+), 38 deletions(-)
+>  arch/arm/boot/dts/qcom-apq8064.dtsi | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
-> index 9a46e46..3189234 100644
-> --- a/drivers/mmc/host/dw_mmc-rockchip.c
-> +++ b/drivers/mmc/host/dw_mmc-rockchip.c
-> @@ -14,7 +14,6 @@
->  #include <linux/mmc/dw_mmc.h>
->  #include <linux/of_address.h>
->  #include <linux/mmc/slot-gpio.h>
-> -#include <linux/pm_runtime.h>
->  #include <linux/slab.h>
->  
->  #include "dw_mmc.h"
-> @@ -327,7 +326,6 @@ static int dw_mci_rockchip_probe(struct platform_device *pdev)
->  {
->  	const struct dw_mci_drv_data *drv_data;
->  	const struct of_device_id *match;
-> -	int ret;
->  
->  	if (!pdev->dev.of_node)
->  		return -ENODEV;
-> @@ -335,49 +333,16 @@ static int dw_mci_rockchip_probe(struct platform_device *pdev)
->  	match = of_match_node(dw_mci_rockchip_match, pdev->dev.of_node);
->  	drv_data = match->data;
->  
-> -	pm_runtime_get_noresume(&pdev->dev);
-> -	pm_runtime_set_active(&pdev->dev);
-> -	pm_runtime_enable(&pdev->dev);
-> -	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
-> -	pm_runtime_use_autosuspend(&pdev->dev);
-> -
-> -	ret = dw_mci_pltfm_register(pdev, drv_data);
-> -	if (ret) {
-> -		pm_runtime_disable(&pdev->dev);
-> -		pm_runtime_set_suspended(&pdev->dev);
-> -		pm_runtime_put_noidle(&pdev->dev);
-> -		return ret;
-> -	}
-> -
-> -	pm_runtime_put_autosuspend(&pdev->dev);
-> -
-> -	return 0;
-> +	return dw_mci_pltfm_register(pdev, drv_data);
->  }
->  
-> -static int dw_mci_rockchip_remove(struct platform_device *pdev)
-> -{
-> -	pm_runtime_get_sync(&pdev->dev);
-> -	pm_runtime_disable(&pdev->dev);
-> -	pm_runtime_put_noidle(&pdev->dev);
-> -
-> -	return dw_mci_pltfm_remove(pdev);
-> -}
-> -
-> -static const struct dev_pm_ops dw_mci_rockchip_dev_pm_ops = {
-> -	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-> -				pm_runtime_force_resume)
-> -	SET_RUNTIME_PM_OPS(dw_mci_runtime_suspend,
-> -			   dw_mci_runtime_resume,
-> -			   NULL)
-> -};
-> -
->  static struct platform_driver dw_mci_rockchip_pltfm_driver = {
->  	.probe		= dw_mci_rockchip_probe,
-> -	.remove		= dw_mci_rockchip_remove,
-> +	.remove		= dw_mci_pltfm_remove,
->  	.driver		= {
->  		.name		= "dwmmc_rockchip",
->  		.of_match_table	= dw_mci_rockchip_match,
-> -		.pm		= &dw_mci_rockchip_dev_pm_ops,
-> +		.pm		= &dw_mci_pltfm_pmops,
->  	},
->  };
->  
-> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> index 268bd470c865..78bf155a52f3 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
+> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> @@ -303,6 +303,9 @@
+>  	firmware {
+>  		scm {
+>  			compatible = "qcom,scm-apq8064";
+> +
+> +			clocks = <&gcc CE3_CORE_CLK>;
+> +			clock-names = "core";
+
+Isn't this supposed to be the DFAB clk?  The RPM one?  I think that's why we let
+the clock just fall through optionally before the recent changes that broke
+this.
+
+Regards,
+
+Andy
