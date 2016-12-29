@@ -1,37 +1,26 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 29 Dec 2016 10:23:48 +0800
-Subject: [PATCH] crypto: arm/aes-neonbs - process 8 blocks in parallel if
- we can
-In-Reply-To: <CAKv+Gu__722s0JkpTzqDu7MmrzSMQ9jJQn=RYnxgSyV+P6MZRQ@mail.gmail.com>
-References: <1481291246-20216-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161227085745.GA10121@gondor.apana.org.au>
- <CAKv+Gu8OkOR3Xzx=XEOWyFpo6sLiq=WQrq0SauaY0V57uYetCQ@mail.gmail.com>
- <20161228091020.GE11904@gondor.apana.org.au>
- <B32240B5-953F-42A2-A010-6FF64AC45859@linaro.org>
- <20161228092328.GA12494@gondor.apana.org.au>
- <CAKv+Gu__722s0JkpTzqDu7MmrzSMQ9jJQn=RYnxgSyV+P6MZRQ@mail.gmail.com>
-Message-ID: <20161229022348.GA13402@gondor.apana.org.au>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Thu, 29 Dec 2016 10:33:23 +0800
+Subject: [PATCH v2 0/2] add clk-hi3660
+Message-ID: <1482978805-6981-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 28, 2016 at 07:50:44PM +0000, Ard Biesheuvel wrote:
-> 
-> So about this chunksize, is it ever expected to assume other values
-> than 1 (for stream ciphers) or the block size (for block ciphers)?
-> Having block size, IV size *and* chunk size fields may be confusing to
-> some already, so if the purpose of chunk size can be fulfilled by a
-> single 'stream cipher' flag, perhaps we should change that first.
+Address comments from Rob and Stephen.
+Rebase to 4.10-rc1
 
-For users (such as algif) it's much more convenient to have a size
-rather than a flag because that's what they need to determine the
-minimum size for partial updates.
+Zhangfei Gao (2):
+  dt-bindings: Document the hi3660 clock bindings
+  clk: hisilicon: Add clock driver for hi3660 SoC
 
-For implementors you don't need to specify the chunksize at all
-unless you're a stream cipher (or some other case in future where
-the minimum partial update size is not equal to your block size).
+ .../devicetree/bindings/clock/hi3660-clock.txt     |  42 ++
+ drivers/clk/hisilicon/Kconfig                      |   7 +
+ drivers/clk/hisilicon/Makefile                     |   1 +
+ drivers/clk/hisilicon/clk-hi3660.c                 | 592 +++++++++++++++++++++
+ include/dt-bindings/clock/hi3660-clock.h           | 194 +++++++
+ 5 files changed, 836 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/hi3660-clock.txt
+ create mode 100644 drivers/clk/hisilicon/clk-hi3660.c
+ create mode 100644 include/dt-bindings/clock/hi3660-clock.h
 
-Cheers,
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.7.4
