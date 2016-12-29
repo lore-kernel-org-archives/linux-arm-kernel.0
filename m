@@ -1,27 +1,28 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 29 Dec 2016 15:27:12 +0100
-Subject: Linux fails to start secondary cores when system resumes from
- Suspend-to-RAM
-In-Reply-To: <9134f2dd-73f6-73d5-30a0-3129d5440d0a@free.fr>
-References: <d4db03ce-80fc-2968-c5c2-84f79272ce8d@free.fr>
- <CADjb_WQ8ZTtcXYQ_3iobLCW7+rnG8FqyFQ1E47AZVGxP0JyB0w@mail.gmail.com>
- <8c3c6592-1e9a-10d3-2a89-c22a2a23cf4b@free.fr>
- <9134f2dd-73f6-73d5-30a0-3129d5440d0a@free.fr>
-Message-ID: <4dc90086-180d-df9a-297f-6f4680de7bdd@free.fr>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 29 Dec 2016 09:44:59 -0500
+Subject: [PATCH v5 09/14] ACPI: platform: setup MSI domain for ACPI based
+ platform device
+In-Reply-To: <586072E9.3060609@huawei.com>
+References: <1482384922-21507-1-git-send-email-guohanjun@huawei.com>
+ <1482384922-21507-10-git-send-email-guohanjun@huawei.com>
+ <CAJZ5v0g4AoU-g4UWZFxLgQ_yfTC7KSBnZ_Ve945d+i58e=GuDQ@mail.gmail.com>
+ <585E24FB.9050805@huawei.com>
+ <CAJZ5v0itKF-uo7vGxK3+-X4OwBVYPdBw-b8v-8-CTBygpKMGoQ@mail.gmail.com>
+ <586072E9.3060609@huawei.com>
+Message-ID: <9aa650ad-a32d-e942-1c6b-b069c8a2b87a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2016 at 11:18 PM, Mason wrote:
+On 12/25/2016 8:31 PM, Hanjun Guo wrote:
+>> A type->setup() would be somewhat cleaner I think, but then it's more
+>> code.  Whichever works better I guess. :-)
+> Agree, I will demo the type->setup() way and send out the patch for review,
+> also I find one minor issue for the IORT code, will update that also for next
+> version.
 
-> However, while Linux successfully starts the secondary cores when
-> the system first boots, it fails when the system resumes from "S3".
+Can you provide details on what the minor issue is with the IORT code?
 
-Oh boy...
-
-Turns out the firmware was, in fact, (upon resume) stomping over parts
-of the Linux memory image in RAM, triggering all kinds of "interesting"
-nasal demons when Linux ran (or, more accurately, limped).
-
-The guilty party will be properly dealt with. (Where's my foam bat?)
-
-Regards.
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
