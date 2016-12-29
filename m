@@ -1,198 +1,114 @@
-From: ayaka@soulik.info (ayaka)
-Date: Thu, 29 Dec 2016 23:07:23 +0800
-Subject: [PATCH] Revert "mmc: dw_mmc-rockchip: add runtime PM support"
-In-Reply-To: <95648282-38f5-42c2-fd8b-ab603eb3a168@gmail.com>
-References: <CGME20161228153516epcas2p253c6bc0371ab0df464573b63218795ef@epcas2p2.samsung.com>
- <1482939288-14950-1-git-send-email-ayaka@soulik.info>
- <e0cc8029-0155-4879-a643-ddc4239a55ab@samsung.com>
- <7e37b8ad-39d0-3a94-f75a-2166ae2caf10@samsung.com>
- <7fb90b9e-75c3-0184-4f0a-d4113899b860@rock-chips.com>
- <04b667d9-2591-51ff-e024-047bbb6e17c3@rock-chips.com>
- <6ccade72-ae20-2ffa-1504-2536b9f03adf@soulik.info>
- <95648282-38f5-42c2-fd8b-ab603eb3a168@gmail.com>
-Message-ID: <0ccf164f-0d35-9cc3-f288-9b582db23efb@soulik.info>
+From: bvantiel@gmail.com (Bas van Tiel)
+Date: Thu, 29 Dec 2016 17:38:14 +0100
+Subject: Unhandled level 2 translation fault (11) at 0x000000b8, esr
+ 0x92000046, rpi3 (aarch64)
+Message-ID: <CAGDbNAD7-TM6+x0A3FebTOPYmqQqbm1w29ZwH+9qePaAvhxTKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+when using a signal handler as a way to context switch between
+different usercontexts a reproducible exception occurs on my rpi3 in
+64-bit mode. (https://gist.github.com/DanGe42/7148946)
 
-On 12/29/2016 10:04 PM, Jaehoon Chung wrote:
-> Hi,
->
-> On 12/29/2016 09:55 PM, ayaka wrote:
->> [    5.849733] rk_gmac-dwmac ff290000.ethernet (unnamed net_device) (uninitialized): Enable RX Mitigation via HW Watchdog Timer
->> [    5.944512] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot req 50000000Hz, actual 50000000HZ div = 0)
->> [    5.958249] mmc1: new ultra high speed DDR50 SDIO card at address 0001
->> [    6.294548] dwmmc_rockchip ff0f0000.dwmmc: Successfully tuned phase to 177
->> [    6.301591] mmc2: new HS200 MMC card at address 0001
->> [    6.306758] mmc_host mmc0: Bus speed (slot 0) = 300000Hz (slot req 300000Hz, actual 300000HZ div = 0)
->> [    6.316830] mmcblk2: mmc2:0001 AGND3R 14.6 GiB
->> [    6.321881] mmcblk2boot0: mmc2:0001 AGND3R partition 1 4.00 MiB
->> [    6.328331] mmcblk2boot1: mmc2:0001 AGND3R partition 2 4.00 MiB
->> [    6.334792] mmcblk2rpmb: mmc2:0001 AGND3R partition 3 4.00 MiB
->> [    6.344295]  mmcblk2: p1 p2 p3 p4 p5 p6 p7
->> [    6.469892] mmc_host mmc0: Bus speed (slot 0) = 200000Hz (slot req 200000Hz, actual 200000HZ div = 0)
->> [    6.621888] mmc_host mmc0: Bus speed (slot 0) = 187500Hz (slot req 100000Hz, actual 93750HZ div = 1)
->> [    6.917883] libphy: stmmac: probed
->> [    6.921319] rk_gmac-dwmac ff290000.ethernet eth0: PHY ID 001cc915 at 0 IRQ POLL (stmmac-0:00) active
->> [    6.930476] rk_gmac-dwmac ff290000.ethernet eth0: PHY ID 001cc915 at 2 IRQ POLL (stmmac-0:02)
->> [    6.939757] input: gpio-keys as /devices/platform/gpio-keys/input/input0
->> [    6.946937] rtc-hym8563 0-0051: no valid clock/calendar values available
->> [    6.953694] rtc-hym8563 0-0051: hctosys: unable to read the hardware clock
->> [    6.961262] vcc_sd: disabling
->> [    6.964275] dovdd_1v8: disabling
->> [    6.967527] dvdd_1v2: disabling
->> [    6.971006] vdd10_lcd: disabling
->> [    6.974701] vcc18_lcd: disabling
->> [    6.978467] ttyS2 - failed to request DMA
->> [    7.101883] mmc_host mmc0: Bus speed (slot 0) = 400000Hz (slot req 400000Hz, actual 400000HZ div = 0)
->> [    7.253874] mmc_host mmc0: Bus speed (slot 0) = 300000Hz (slot req 300000Hz, actual 300000HZ div = 0)
->> [    7.405883] mmc_host mmc0: Bus speed (slot 0) = 200000Hz (slot req 200000Hz, actual 200000HZ div = 0)
->> [    7.557885] mmc_host mmc0: Bus speed (slot 0) = 187500Hz (slot req 100000Hz, actual 93750HZ div = 1)
->> [    8.037872] mmc_host mmc0: Bus speed (slot 0) = 400000Hz (slot req 400000Hz, actual 400000HZ div = 0)
->> [    8.189877] mmc_host mmc0: Bus speed (slot 0) = 300000Hz (slot req 300000Hz, actual 300000HZ div = 0)
->> [    8.341881] mmc_host mmc0: Bus speed (slot 0) = 200000Hz (slot req 200000Hz, actual 200000HZ div = 0)
->> [    8.493884] mmc_host mmc0: Bus speed (slot 0) = 187500Hz (slot req 100000Hz, actual 93750HZ div = 1)
->> [    8.973871] mmc_host mmc0: Bus speed (slot 0) = 400000Hz (slot req 400000Hz, actual 400000HZ div = 0)
->> [    9.125876] mmc_host mmc0: Bus speed (slot 0) = 300000Hz (slot req 300000Hz, actual 300000HZ div = 0)
->> [    9.277884] mmc_host mmc0: Bus speed (slot 0) = 200000Hz (slot req 200000Hz, actual 200000HZ div = 0)
->> [    9.429882] mmc_host mmc0: Bus speed (slot 0) = 187500Hz (slot req 100000Hz, actual 93750HZ div = 1)
->>
->> looping here
->>
->> If I revert that patch, there are still lots of Bus speed messages, but finally would enter into system.
->>
-> Plz..Don't put the comment on the top.
->
-> Which kernel did you use?
-Add linux-next specific files for 20161224
->
->> On 12/29/2016 06:25 PM, Randy Li wrote:
->>>
->>> On 12/29/2016 03:25 PM, Shawn Lin wrote:
->>>> On 2016/12/29 15:13, Jaehoon Chung wrote:
->>>>> On 12/29/2016 12:02 PM, Jaehoon Chung wrote:
->>>>>> Hi Randy,
->>>>>>
->>>>>> On 12/29/2016 12:34 AM, Randy Li wrote:
->>>>>>> This reverts commit f90142683f04bcb0729bf0df67a5e29562b725b9.
->>>>>>> It is reported that making RK3288 can't boot from eMMC/MMC.
->>>>>> Could you explain in more detail?
->>>>>> As you mentioned, this patch is making that RK3288 can't boot..then why?
->>>>>> Good way should be that finds the main reason and fixes it.
->>>>>> Not just revert.
->>>>> To Shawn,
->>>>>
->>>>> Could you check this? If you have rk3288..
->>>>> If it's not working fine, it needs to revert this patch until finding
->>>>> the problem.
->>>>>
->>>> Hrmm.....as that patchset was tested based on rk3288 and rk3368, so I
->>>> need to know which board Randy are using now and could you share some
->>> Sorry, XZY has asked me about this in the morning and I answer him that I would give a feedback at home, so I didn't notice this mail.
->>> The board is Firefly reload. but the reporter told me that Firefly release also have the same problem.
->>>> log?
->>>>
->>>> I will have a look at it.
->>>>
->>>>
->>>>> Best Regards,
->>>>> Jaehoon Chung
->>>>>
->>>>>> Best Regards,
->>>>>> Jaehoon Chung
->>>>>>
->>>>>>> Signed-off-by: Randy Li <ayaka@soulik.info>
->>>>>>> ---
->>>>>>>   drivers/mmc/host/dw_mmc-rockchip.c | 41
->>>>>>> +++-----------------------------------
->>>>>>>   1 file changed, 3 insertions(+), 38 deletions(-)
->>>>>>>
->>>>>>> diff --git a/drivers/mmc/host/dw_mmc-rockchip.c
->>>>>>> b/drivers/mmc/host/dw_mmc-rockchip.c
->>>>>>> index 9a46e46..3189234 100644
->>>>>>> --- a/drivers/mmc/host/dw_mmc-rockchip.c
->>>>>>> +++ b/drivers/mmc/host/dw_mmc-rockchip.c
->>>>>>> @@ -14,7 +14,6 @@
->>>>>>>   #include <linux/mmc/dw_mmc.h>
->>>>>>>   #include <linux/of_address.h>
->>>>>>>   #include <linux/mmc/slot-gpio.h>
->>>>>>> -#include <linux/pm_runtime.h>
->>>>>>>   #include <linux/slab.h>
->>>>>>>
->>>>>>>   #include "dw_mmc.h"
->>>>>>> @@ -327,7 +326,6 @@ static int dw_mci_rockchip_probe(struct
->>>>>>> platform_device *pdev)
->>>>>>>   {
->>>>>>>       const struct dw_mci_drv_data *drv_data;
->>>>>>>       const struct of_device_id *match;
->>>>>>> -    int ret;
->>>>>>>
->>>>>>>       if (!pdev->dev.of_node)
->>>>>>>           return -ENODEV;
->>>>>>> @@ -335,49 +333,16 @@ static int dw_mci_rockchip_probe(struct
->>>>>>> platform_device *pdev)
->>>>>>>       match = of_match_node(dw_mci_rockchip_match, pdev->dev.of_node);
->>>>>>>       drv_data = match->data;
->>>>>>>
->>>>>>> -    pm_runtime_get_noresume(&pdev->dev);
->>>>>>> -    pm_runtime_set_active(&pdev->dev);
->>>>>>> -    pm_runtime_enable(&pdev->dev);
->>>>>>> -    pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
->>>>>>> -    pm_runtime_use_autosuspend(&pdev->dev);
->>>>>>> -
->>>>>>> -    ret = dw_mci_pltfm_register(pdev, drv_data);
->>>>>>> -    if (ret) {
->>>>>>> -        pm_runtime_disable(&pdev->dev);
->>>>>>> -        pm_runtime_set_suspended(&pdev->dev);
->>>>>>> -        pm_runtime_put_noidle(&pdev->dev);
->>>>>>> -        return ret;
->>>>>>> -    }
->>>>>>> -
->>>>>>> -    pm_runtime_put_autosuspend(&pdev->dev);
->>>>>>> -
->>>>>>> -    return 0;
->>>>>>> +    return dw_mci_pltfm_register(pdev, drv_data);
->>>>>>>   }
->>>>>>>
->>>>>>> -static int dw_mci_rockchip_remove(struct platform_device *pdev)
->>>>>>> -{
->>>>>>> -    pm_runtime_get_sync(&pdev->dev);
->>>>>>> -    pm_runtime_disable(&pdev->dev);
->>>>>>> -    pm_runtime_put_noidle(&pdev->dev);
->>>>>>> -
->>>>>>> -    return dw_mci_pltfm_remove(pdev);
->>>>>>> -}
->>>>>>> -
->>>>>>> -static const struct dev_pm_ops dw_mci_rockchip_dev_pm_ops = {
->>>>>>> -    SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
->>>>>>> -                pm_runtime_force_resume)
->>>>>>> -    SET_RUNTIME_PM_OPS(dw_mci_runtime_suspend,
->>>>>>> -               dw_mci_runtime_resume,
->>>>>>> -               NULL)
->>>>>>> -};
->>>>>>> -
->>>>>>>   static struct platform_driver dw_mci_rockchip_pltfm_driver = {
->>>>>>>       .probe        = dw_mci_rockchip_probe,
->>>>>>> -    .remove        = dw_mci_rockchip_remove,
->>>>>>> +    .remove        = dw_mci_pltfm_remove,
->>>>>>>       .driver        = {
->>>>>>>           .name        = "dwmmc_rockchip",
->>>>>>>           .of_match_table    = dw_mci_rockchip_match,
->>>>>>> -        .pm        = &dw_mci_rockchip_dev_pm_ops,
->>>>>>> +        .pm        = &dw_mci_pltfm_pmops,
->>>>>>>       },
->>>>>>>   };
->>>>>>>
->>>>>>>
->>>>>> -- 
->>>>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
->>>>>> the body of a message to majordomo at vger.kernel.org
->>>>>> More majordomo info at http://vger.kernel.org/majordomo-info.html
->>>>>>
->>>>>> .
->>>>>>
->>>>>
->>>>>
->>>>>
->>>>
+Running the context_demo program as a 32-bit ARM executable on a
+64-bit kernel is OK, running as a 32 || 64 bit executable on an x86
+kernel is OK.
+
+In the first exception the PC doesn?t look correct, and the *pmd is 0.
+The 2nd exception happens after running the program again, the PC is 0x0.
+
+A successful function trace was not possible -> complete kernel hangup
+when enabling.
+
+Is there another way to gather more information about what is happening?
+
+Linux (none) 4.10.0-rc1-v8+ #3 SMP PREEMPT Thu Dec 29 12:10:12 CET
+2016 aarch64 GNU/Linux
+
+[   46.350738] a.out[196]: unhandled level 2 translation fault (11) at
+0x000000b8, esr 0x92000046
+[   46.360516] pgd = ffffffc0392cb000
+[   46.365377] [000000b8] *pgd=00000000392ec003
+[   46.365381] , *pud=00000000392ec003
+[   46.370878] , *pmd=0000000000000000
+[   46.375907]
+[   46.383974]
+[   46.389107] CPU: 0 PID: 196 Comm: a.out Not tainted 4.10.0-rc1-v8+ #3
+[   46.397949] Hardware name: Raspberry Pi 3 Model B (DT)
+[   46.406218] task: ffffffc039ad6580 task.stack: ffffffc039bfc000
+[   46.413892] PC is at 0x7fb4e34810
+[   46.418230] LR is at 0x400b84
+[   46.422956] pc : [<0000007fb4e34810>] lr : [<0000000000400b84>]
+pstate: 60000000
+[   46.431522] sp : 0000000000413350
+[   46.436480] x29: 0000000000413350 x28: 0000000000000016
+[   46.443142] x27: 0000000000000000 x26: 0000000000000020
+[   46.451908] x25: 0000007fb4f35488 x24: 0000000000415f00
+[   46.459641] x23: 0000000000000016 x22: 0000000000400b84
+[   46.469198] x21: 0000000000413670 x20: 0000000000417030
+[   46.476970] x19: 0000000000001000 x18: 0000000000000000
+[   46.484744] x17: 0000007fb4e34810 x16: 0000000000411270
+[   46.492175] x15: 00000000000005f1 x14: 0000000000000000
+[   46.498884] x13: 0000000000000000 x12: 0000000000000000
+[   46.506013] x11: 0000000000000020 x10: 0101010101010101
+[   46.517164] x9 : 0000000000413670 x8 : 00000000ffffffe0
+[   46.525541] x7 : 0000000000413350 x6 : 0000000000413350
+[   46.533495] x5 : 00000000ffffffe0 x4 : 0000000000413730
+[   46.544052] x3 : 0000000000000008 x2 : 0000000000000000
+[   46.552211] x1 : 0000000000413670 x0 : 0000000000000000
+[   46.558668]
+
+2nd time startup of the executable
+
+[  262.565147] a.out[201]: unhandled level 2 translation fault (11) at
+0x00000000, esr 0x82000006
+[  262.575243] pgd = ffffffc03939a000
+[  262.579948] [00000000] *pgd=000000003938f003
+[  262.579951] , *pud=000000003938f003
+[  262.586040] , *pmd=0000000000000000
+[  262.590479]
+[  262.598234]
+[  262.601108] CPU: 0 PID: 201 Comm: a.out Not tainted 4.10.0-rc1-v8+ #3
+[  262.609086] Hardware name: Raspberry Pi 3 Model B (DT)
+[  262.615731] task: ffffffc03904a600 task.stack: ffffffc039bfc000
+[  262.621768] PC is at 0x0
+[  262.624300] LR is at 0x0
+[  262.626835] pc : [<0000000000000000>] lr : [<0000000000000000>]
+pstate: 60000000
+[  262.634437] sp : 00000000004159c0
+[  262.637753] x29: 0000000000000000 x28: 0000000000000000
+[  262.643242] x27: 0000000000000000 x26: 0000000000000000
+[  262.648554] x25: 0000000000000000 x24: 0000000000000000
+[  262.654033] x23: 0000000000000000 x22: 0000000000000000
+[  262.659349] x21: 00000000004008f0 x20: 0000000000000000
+[  262.664825] x19: 0000000000000000 x18: 0000000000000000
+[  262.670145] x17: 0000007fb065b620 x16: 0000000000400b84
+[  262.675622] x15: 00000000000003d1 x14: 0000000000000000
+[  262.680938] x13: 0000000000000000 x12: 0000000000000000
+[  262.686413] x11: 0000000000000020 x10: 0101010101010101
+[  262.691835] x9 : 00000000004112c0 x8 : 0000000000000087
+[  262.697159] x7 : 0000000000000000 x6 : 0000000000000000
+[  262.702634] x5 : 0000000000000000 x4 : 0000000000000000
+[  262.707949] x3 : 0000000000000000 x2 : 0000000000000000
+[  262.713424] x1 : 0000000000000000 x0 : 0000000000000000
+[  262.718739]
+
+rpi3:
+minimal kernel (64-bit, cortex-a53, little endian, 4Kb page,
+initramfs), different kernels tried 4.8/4.9/4.10.0-rc1-v8+ the same
+result occurs, also with different compilers.
+
+kernel, aarch64-linux-gnu-gcc (Linaro GCC 6.2-2016.11) 6.2.1 20161016
+application, aarch64-linux-gnu-gcc (Linaro GCC 6.2-2016.11) 6.2.1 20161016
+
+The only item I found by reading through the different source-files was the
+structure definition of struct kernel_rt_sigframe
+(http://osxr.org:8080/glibc/source/ports/sysdeps/unix/sysv/linux/aarch64/kernel_rt_sigframe.h?v=glibc-2.18)
+compared to the struct rt_sigframe (linux/arch/arm64/signal.c).
+
+Any help or pointers to solve this issue are welcome,
+
+regards
+Bas
