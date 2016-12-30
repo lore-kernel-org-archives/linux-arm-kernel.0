@@ -1,38 +1,47 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 30 Dec 2016 18:40:53 +0800
-Subject: [PATCH v5 09/14] ACPI: platform: setup MSI domain for ACPI based
- platform device
-In-Reply-To: <9aa650ad-a32d-e942-1c6b-b069c8a2b87a@codeaurora.org>
-References: <1482384922-21507-1-git-send-email-guohanjun@huawei.com>
- <1482384922-21507-10-git-send-email-guohanjun@huawei.com>
- <CAJZ5v0g4AoU-g4UWZFxLgQ_yfTC7KSBnZ_Ve945d+i58e=GuDQ@mail.gmail.com>
- <585E24FB.9050805@huawei.com>
- <CAJZ5v0itKF-uo7vGxK3+-X4OwBVYPdBw-b8v-8-CTBygpKMGoQ@mail.gmail.com>
- <586072E9.3060609@huawei.com>
- <9aa650ad-a32d-e942-1c6b-b069c8a2b87a@codeaurora.org>
-Message-ID: <586639B5.8010705@huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 30 Dec 2016 19:26:38 +0800
+Subject: [PATCH 2/3][v2] arm64: freescale: ls2080a: Split devicetree for
+ code resuability
+In-Reply-To: <1480325824-14649-3-git-send-email-abhimanyu.saini@nxp.com>
+References: <1480325824-14649-1-git-send-email-abhimanyu.saini@nxp.com>
+ <1480325824-14649-3-git-send-email-abhimanyu.saini@nxp.com>
+Message-ID: <20161230112635.GQ6177@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/12/29 22:44, Sinan Kaya wrote:
-> On 12/25/2016 8:31 PM, Hanjun Guo wrote:
->>> A type->setup() would be somewhat cleaner I think, but then it's more
->>> code.  Whichever works better I guess. :-)
->> Agree, I will demo the type->setup() way and send out the patch for review,
->> also I find one minor issue for the IORT code, will update that also for next
->> version.
-> Can you provide details on what the minor issue is with the IORT code?
+On Mon, Nov 28, 2016 at 03:07:03PM +0530, Abhimanyu Saini wrote:
+> LS2088A and LS2080A are similar SoCs with a few differences like
+> ARM cores etc.
+> 
+> Reorganize the LS2080A device tree to move the common nodes to:
+> 	- fsl-ls2080a-ls2088a.dtsi
+> 	- fsl-ls2080a-ls2088a-rdb.dts
+> 	- fsl-ls2080a-ls2088a-qds.dts
 
-It's about the mapping of NC (named component) -> SMMU -> ITS, we can
-describe it as two ID mappings:
- - NC->SMMU
- - NC->ITS
-And the code for now can work perfect for such id mappings, but if we
-want to support chained mapping NC  -> SMMU -> ITS, we need to add
-extra code which in my [PATCH v5 10/14] ACPI: ARM64: IORT: rework
-iort_node_get_id() for NC->SMMU->ITS case, but I just scanned the first
-id mapping for now, I think I need to scan all the id mappings (but seems
-single id mappings don't need to do that, I will investigate it more).
+I do not quite like the naming of these files.  Will the following one
+be better?
 
-Thanks
-Hanjun
+ - fsl-ls208xa.dtsi
+ - fsl-ls208xa-rdb.dtsi
+ - fsl-ls208xa-qds.dtsi
+
+Also if a DTS file is only to be included by another one, not to
+generate a DTB, we name it .dtsi rather than .dts.
+
+Shawn
+
+> 
+> Signed-off-by: Abhimanyu Saini <abhimanyu.saini@nxp.com>
+> Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
+> Signed-off-by: Ashish Kumar <ashish.kumar@nxp.com>
+> ---
+>  .../boot/dts/freescale/fsl-ls2080a-ls2088a-qds.dts | 196 ++++++
+>  .../boot/dts/freescale/fsl-ls2080a-ls2088a-rdb.dts | 152 +++++
+>  .../boot/dts/freescale/fsl-ls2080a-ls2088a.dtsi    | 727 +++++++++++++++++++++
+>  arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts  | 154 +----
+>  arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts  | 110 +---
+>  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     | 706 +-------------------
+>  6 files changed, 1100 insertions(+), 945 deletions(-)
+>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2080a-ls2088a-qds.dts
+>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2080a-ls2088a-rdb.dts
+>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2080a-ls2088a.dtsi
