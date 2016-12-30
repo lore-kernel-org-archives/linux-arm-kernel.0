@@ -1,49 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 30 Dec 2016 11:42:11 -0800
-Subject: [linux-sunxi] [PATCH 1/2] drivers: pinctrl: add driver for
- Allwinner H5 SoC
-In-Reply-To: <CACRpkdYQhfid3VRcaj=7as_+Zg=pX3Svp9FJ_W_Ft8nVuoZqKQ@mail.gmail.com>
-References: <20161223125001.1176-1-icenowy@aosc.xyz>
- <1280f095-ab03-93f8-14d2-99d13ba1ce55@arm.com>
- <CACRpkdYQhfid3VRcaj=7as_+Zg=pX3Svp9FJ_W_Ft8nVuoZqKQ@mail.gmail.com>
-Message-ID: <20161230194210.GE3940@atomide.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Fri, 30 Dec 2016 04:06:55 -0800
+Subject: [PATCH] drivers: remoteproc: constify rproc_ops structures
+In-Reply-To: <1481974176-19912-1-git-send-email-bhumirks@gmail.com>
+References: <1481974176-19912-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <20161230120655.GB9118@builder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [161230 04:56]:
-> On Mon, Dec 26, 2016 at 3:33 PM, Andr? Przywara <andre.przywara@arm.com> wrote:
-> 
-> > So while this patch technically looks correct, I was wondering if we
-> > should really explore the possibility of making the whole of sunxi
-> > pinctrl DT controlled.
-> > I brought this up a while ago, but people weren't overly enthusiastic
-> > about it, though their argument weren't really convincing to me[1].
-> >
-> > So:
-> > As this "driver" here is basically a table linking GPIO bit settings
-> > (the actual mux value) to names and every pin we care about needs to be
-> > enumerated in the DT anyway, why not just add something like:
-> > allwinner,pinmux = <4>;
-> > to each pin(group) in the DT and get rid of this "driver" file here
-> > entirely?
-> 
-> I'm open to that if you can use pinctrl-single which is in the kernel
-> for this purpose only, and is used with both OMAPs and HiSilicon.
-> 
-> It recently was improved and will be improved more in this cycle,
-> see for example:
-> commit 42124bc598f64f84b3335d5a058304207695b84f
-> pinctrl: Introduce generic #pinctrl-cells and pinctrl_parse_index_with_args
-> 
-> > (...) Also I guess the common sunxi
-> > pinctrl driver code needs some significant rework.
-> 
-> I would guess is just needs replacing with pinctrl-single in that case.
+On Sat 17 Dec 03:29 PST 2016, Bhumika Goyal wrote:
 
-And if pinctrl-single won't work then it is now also be easier to make
-hardware specific drivers too using #pinctrl-cells + GENERIC_PINCTRL_GROUPS +
-GENERIC_PINMUX_FUNCTIONS.
+> Declare rproc_ops structures as const as they are only passed as an
+> argument to the function rproc_alloc. This argument is of type const, so
+> rproc_ops structures having this property can be declared const too.
+> Done using Coccinelle:
+> 
+> @r1 disable optional_qualifier @
+> identifier i;
+> position p;
+> @@
+> static struct rproc_ops i at p = {...};
+> 
+> @ok1@
+> identifier r1.i;
+> position p;
+> @@
+> rproc_alloc(...,&i at p,...)
+> 
+> @bad@
+> position p!={r1.p,ok1.p};
+> identifier r1.i;
+> @@
+> i at p
+> 
+> @depends on !bad disable optional_qualifier@
+> identifier r1.i;
+> @@
+> +const
+> struct rproc_ops i;
+> 
+> File sizes before:
+>    text	   data	    bss	    dec	    hex	filename
+>    1258	    416	      0	   1674	    68a remoteproc/omap_remoteproc.o
+>    2402	    240	      0	   2642	    a52 remoteproc/st_remoteproc.o
+>    2064	    272	      0	   2336	    920 remoteproc/st_slim_rproc.o
+>    2160	    240	      0	   2400	    960 remoteproc/wkup_m3_rproc.o
+> 
+> File sizes after:
+>    text	   data	    bss	    dec	    hex	filename
+>    1297	    368	      0	   1665	    681 remoteproc/omap_remoteproc.o
+>    2434	    192	      0	   2626	    a42 remoteproc/st_remoteproc.o
+>    2112	    240	      0	   2352	    930 remoteproc/st_slim_rproc.o
+>    2200	    192	      0	   2392	    958 remoteproc/wkup_m3_rproc.o
+> 
+> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+
+Thanks Bhumika, this looks good.
+
+But as Suman already asked. Is there any reason why da8xx_remoteproc.c
+did not get updated? It looks like the same change would apply there.
+
+
+Unless I'm missing something, please update the patch and I'll be happy
+to apply it.
 
 Regards,
-
-Tony
+Bjorn
