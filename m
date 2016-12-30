@@ -1,31 +1,59 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 29 Dec 2016 21:40:00 -0200
-Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21, i.MX27
- and i.MX31 SoCs
-In-Reply-To: <20161229220445.x23gcp5aaw2fz7cv@pengutronix.de>
-References: <20161223083256.3wdqou5xmhr7fidn@pengutronix.de>
- <74751709-c32e-b1b3-4fa3-613f7d57d1d8@mleia.com>
- <20161223100113.s57bi7257yero7f7@pengutronix.de>
- <7018c466-2467-a9fc-2382-889d3a62741e@mentor.com>
- <20161223141139.rlsvoonih5lhnnpu@pengutronix.de>
- <c22600d5-f6b5-4c13-59b4-ba391ea29a4c@mleia.com>
- <20161228205419.la74jr4rfes7fa4v@pengutronix.de>
- <CAOMZO5BD3Y6vXwt7_bdv_KyGvKSYru1vzDowsD81fzEbM4gHPA@mail.gmail.com>
- <20161228214651.oncshkvksqep3krk@pengutronix.de>
- <CAOMZO5CBfiRMicxvGyHrm-rQFzn8yEQyb5=t49PBr6rdpZYPug@mail.gmail.com>
- <20161229220445.x23gcp5aaw2fz7cv@pengutronix.de>
-Message-ID: <CAOMZO5CuUM3e9LRZCV4NprzCxR2d=XCib013=YUdL0qQnNA2nw@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 30 Dec 2016 08:46:17 +0800
+Subject: [PATCH] arm64: dts: ls1046a: add qdma device tree node
+In-Reply-To: <1479180277-3823-1-git-send-email-hongbo.zhang@nxp.com>
+References: <1479180277-3823-1-git-send-email-hongbo.zhang@nxp.com>
+Message-ID: <20161230004613.GB6177@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 29, 2016 at 8:04 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
+On Tue, Nov 15, 2016 at 11:24:37AM +0800, hongbo.zhang at nxp.com wrote:
+> From: Hongbo Zhang <hongbo.zhang@nxp.com>
+> 
+> The drivers/dma/fsl-qdma.c works for ls1046a too, this patch adds
 
-> Ack. If you teach the driver now about i.MX35 and only make use of the WMCR
-> register on this one, the possible breakage is that this register isn't
-> written to on the i.MX35 type until the dtb is updated.
+I cannot find this driver on v4.10-rc1.  Please send me DTS changes only
+after the driver and bindings part land on mainline.
 
-So basically you are saying that you don't care about old dtb compatibility.
+Shawn
 
-As far as I can see this is the reason we have not made any progress
-with this patch since September.
+> device tree node for it.
+> 
+> Signed-off-by: Hongbo Zhang <hongbo.zhang@nxp.com>
+> ---
+>  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> index 38806ca..6edf7cf 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> @@ -511,5 +511,19 @@
+>  			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+>  			clocks = <&clockgen 4 1>;
+>  		};
+> +
+> +		qdma: qdma at 8380000 {
+> +			compatible = "fsl,ls1046a-qdma", "fsl,ls1021a-qdma";
+> +			reg = <0x0 0x838f000 0x0 0x11000 /* Controller regs */
+> +			       0x0 0x83a0000 0x0 0x40000>; /* Block regs */
+> +			interrupts = <0 152 0x4>,
+> +				     <0 39 0x4>;
+> +			interrupt-names = "qdma-error", "qdma-queue";
+> +			channels = <8>;
+> +			queues = <2>;
+> +			status-sizes = <64>;
+> +			queue-sizes = <64 64>;
+> +			big-endian;
+> +		};
+>  	};
+>  };
+> -- 
+> 2.1.4
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
