@@ -1,177 +1,72 @@
-From: xypron.glpk@gmx.de (Heinrich Schuchardt)
-Date: Fri, 30 Dec 2016 13:18:03 +0100
-Subject: [BUG] ARM64: amlogic: gxbb: unhandled level 2 translation fault
- (11)
-In-Reply-To: <c91b83af-0eb8-c519-3428-12f34b04d725@baylibre.com>
-References: <20161224140028.4205-1-xypron.glpk@gmx.de>
- <478f1429-03f2-a944-8d47-3757a4d44a40@baylibre.com>
- <130a3716-a643-d14f-fd7c-9ad3bb67f3a7@gmx.de>
- <c9e66a1f-a53f-9993-dd15-5e566c5f46f0@baylibre.com>
- <c91b83af-0eb8-c519-3428-12f34b04d725@baylibre.com>
-Message-ID: <e9dd4e98-683b-2643-124c-6b7f05d719f3@gmx.de>
+From: bvantiel@gmail.com (Bas van Tiel)
+Date: Fri, 30 Dec 2016 13:21:00 +0100
+Subject: Unhandled level 2 translation fault (11) at 0x000000b8, esr
+ 0x92000046, rpi3 (aarch64)
+In-Reply-To: <20161230151323.583b7ac5@xhacker>
+References: <CAGDbNAD7-TM6+x0A3FebTOPYmqQqbm1w29ZwH+9qePaAvhxTKw@mail.gmail.com>
+ <20161230151323.583b7ac5@xhacker>
+Message-ID: <CAGDbNAAGqFqt7X+=XYRLAp=L_fTv9dAAe=wu4T_W-FCGqnYHHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/30/2016 10:44 AM, Neil Armstrong wrote:
-> On 12/30/2016 09:51 AM, Neil Armstrong wrote:
->> On 12/29/2016 10:18 PM, Heinrich Schuchardt wrote:
->>> On 12/29/2016 10:07 AM, Neil Armstrong wrote:
->>>> On 12/24/2016 03:00 PM, Heinrich Schuchardt wrote:
->>>>> When trying to run sddm on an Hardkernel Odroid C2 I invariably run into the
->>>>> translation fault below.
->>>>>
->>>>> The following mail thread relates this kind of problem to TLB (translation
->>>>> lookaside buffer) broadcasting.
->>>>>
->>>>> https://lkml.org/lkml/2014/4/15/207
->>>>>
->>>>> [ 3163.014263] sddm[1851]: unhandled level 2 translation fault (11) at 0x00000160, esr 0x82000006
->>>>> [ 3163.017287] pgd = ffff80007bf86000
->>>>> [ 3163.020589] [00000160] *pgd=000000007a8a3003
->>>>> [ 3163.024733] , *pud=000000007be9c003
->>>>> [ 3163.028095] , *pmd=0000000000000000
->>>>>
->>>>>
->>>>> [ 3163.033026] CPU: 1 PID: 1851 Comm: sddm Not tainted 4.9.0-next-20161212-r022-arm64 #1
->>>>> [ 3163.040831] Hardware name: Hardkernel ODROID-C2 (DT)
->>>>> [ 3163.045698] task: ffff80007bc6d780 task.stack: ffff80007c524000
->>>>> [ 3163.051563] PC is at 0x160
->>>>> [ 3163.054231] LR is at 0xffff9a9fbc98
->>>>> [ 3163.057686] pc : [<0000000000000160>] lr : [<0000ffff9a9fbc98>] pstate: 40000000
->>>>> [ 3163.065022] sp : 0000ffffd7180130
->>>>> [ 3163.068281] x29: 0000ffffd7180130 x28: 0000ffffd7180288 
->>>>> [ 3163.073538] x27: 0000ffff9aa94000 x26: 0000000000000001 
->>>>> [ 3163.078798] x25: 0000000000000000 x24: 0000ffffd7180410 
->>>>> [ 3163.084060] x23: 000000000e0c2190 x22: 000000000e0ca5c0 
->>>>> [ 3163.089322] x21: 0000ffff9ac35000 x20: 0000000000454fa9 
->>>>> [ 3163.094583] x19: 0000000000454fa8 x18: 000000000e0b5938 
->>>>> [ 3163.099843] x17: 0000ffff9a3f2988 x16: 0000ffff9ac36aa0 
->>>>> [ 3163.105105] x15: 0000000000000000 x14: 0000000000000000 
->>>>> [ 3163.110367] x13: 6d00640064007300 x12: 0800000005000000 
->>>>> [ 3163.115627] x11: 0000040000000000 x10: 0000a00000000000 
->>>>> [ 3163.120889] x9 : 00003fffffffffff x8 : 0000000000000000 
->>>>> [ 3163.126150] x7 : 000000000e0cb520 x6 : 0000000000454fc0 
->>>>> [ 3163.131412] x5 : 0000ffffd717ffd8 x4 : 000000000e0cb510 
->>>>> [ 3163.136680] x3 : 0000000000000004 x2 : f2f9022b551b3900 
->>>>> [ 3163.141935] x1 : 0000000000000160 x0 : 000000000e0ca5c0 
->>>>>
->>>>> Best regards
->>>>>
->>>>> Heinrich Schuchardt
->>>>
->>>> Hi Heinrich,
->>>>
->>>> I personally never had this issue even while loading huge applications loke LibreOffice and Gnome environment.
->>>>
->>>> I will have a look and try to reproduce this issue, can you provide us your configuration and user-space complete use case ?
->>>>
->>>> Neil
->>>>
->>>
->>> Hello Neil,
->>>
->>> the kernel is build with
->>> https://github.com/xypron/kernel-odroid-c2/tree/f8d565ff755e92fd585f5ae10123ce20abe03968
->>>
->>> Especially look at the patch directory and config/config-next-20161212.
->>>
->>> The userland is Debian Stretch with this package:
->>> https://packages.debian.org/stretch/sddm
->>>
->>> The link
->>> https://www.spinics.net/lists/arm-kernel/msg550204.html
->>> that you mention in a separate mail just links to this very thread due
->>> to linux-arm-kernel at lists.infradead.org being in copy.
->>>
->>> Best regards
->>>
->>> Heinrich Schuchardt
->>>
->>
 >> Hi,
 >>
->> Thanks for the details, but why do you use the next-20161212 tag ? does it work with 4.10-rc1 or previous next tags ?
+>> when using a signal handler as a way to context switch between
+>> different usercontexts a reproducible exception occurs on my rpi3 in
+>> 64-bit mode. (https://gist.github.com/DanGe42/7148946)
 >>
->> Neil
+>> Running the context_demo program as a 32-bit ARM executable on a
+>> 64-bit kernel is OK, running as a 32 || 64 bit executable on an x86
+>> kernel is OK.
 >>
-> 
-> Hi Heinrich,
-> 
-> I'm able to reproduce the bug using SDMM from Ubuntu running a 4.10-rc1 patched with memory zones :
-> [   17.988446] sddm-greeter[2366]: unhandled level 2 translation fault (11) at 0x00000000, esr 0x92000006
-> [   17.988451] pgd = ffff80003c3ee000
-> [   17.988472] [00000000] *pgd=00000000398bd003
-> [   17.988474] , *pud=00000000398bf003
-> [   17.990477] , *pmd=0000000000000000
-> 
-> 
-> [   17.990485] CPU: 3 PID: 2366 Comm: sddm-greeter Not tainted 4.10.0-rc1-00004-gd3f812382-dirty #488
-> [   17.990487] Hardware name: Amlogic Meson GXBB P200 Development Board (DT)
-> [   17.990489] task: ffff80003c160000 task.stack: ffff80003c314000
-> [   17.990493] PC is at 0xffffb2999994
-> [   17.990495] LR is at 0xffffb299f774
-> [   17.990497] pc : [<0000ffffb2999994>] lr : [<0000ffffb299f774>] pstate: 20000000
-> [   17.990503] sp : 0000ffffd2d1d5b0
-> [   17.990504] x29: 0000ffffd2d1d5b0 x28: 0000ffffad10e010
-> [   17.990508] x27: 0000000009c376d0 x26: 0000000000000001
-> [   17.990511] x25: 0000ffffb2b67000 x24: 0000ffffad10e010
-> [   17.990514] x23: 0000000000000000 x22: 0000000000000000
-> [   17.990517] x21: 0000000009c376d0 x20: 0000ffffb2fcdcb8
-> [   17.990520] x19: 0000ffffb2b2b000 x18: 0000000009c78450
-> [   17.990523] x17: 0000ffffb2b68068 x16: 0000ffffb2022158
-> [   17.990526] x15: 0000ffffb2fcd000 x14: 0000000000000000
-> [   17.990529] x13: aaaaaaaaaaaaaaab x12: 0000000000010000
-> [   17.990532] x11: 0000000000000008 x10: 0000000009c3b980
-> [   17.990535] x9 : 0000000009c38c40 x8 : 0000ffffd2d1d4e0
-> [   17.990538] x7 : 0000000000000000 x6 : 0000000009c3b998
-> [   17.990541] x5 : 0000000009c3b980 x4 : 0000800000000000
-> [   17.990544] x3 : 00000000fffffff0 x2 : 0000ffffad10e010
-> [   17.990547] x1 : 0000000009c379d8 x0 : 0000000000000000
-> 
-> Looking about other occurrence of such error, it seems it may be a issue from sdmm instead.
-> 
-> I'll continue searching,
-> Neil
-> 
-> 
-Hello Neil,
+>> In the first exception the PC doesn?t look correct, and the *pmd is 0.
+>> The 2nd exception happens after running the program again, the PC is 0x0.
+>>
+>> A successful function trace was not possible -> complete kernel hangup
+>> when enabling.
+>>
+>> Is there another way to gather more information about what is happening?
+>
+> I can reproduce Segmentation fault with your program on Marvell berlin SoCs
+> my kernel version is 4.1, I didn't tested 4.9, 4.10-rc1 etc..
+>
+> Then I increased the STACKSIZE from 4096 to 8192 in context_demo.c,
+> everything works fine now. Maybe arm64 need a bit larger signalstack?
+>
 
-I am seeing a simular error when I try to use x2go
+yes, increased STACKSIZE to 8192 helps on 4.9/4,10-rc1 but after a
+while the exception still occurs, although the message is different.
+The *pmd is not 0 in this case.
 
-to have a remote desktop on the Odroid C2.
+to trigger this scenario:
+- INTERVAL set to 500 [ns]
+- kernel with maxcpus=0
+- start a 'find /' command in the shell in parallel of the program
+- stdout, stderr > redirected to file.
 
-[47912.997112] fuse init (API version 7.26)
-[47913.405815] x2goagent[28395]: unhandled level 0 translation fault
-(11) at 0x3042415a74614c, esr 0x82000004
-[47913.409849] pgd = ffff800079a11000
-[47913.413704] [3042415a74614c] *pgd=0000000000000000
+[  850.581983] a.out[173]: unhandled level 3 permission fault (11) at
+0x004391f0, esr 0x8200000f
+[  850.591833] pgd = ffffffc039311000
+[  850.596725] [004391f0] *pgd=0000000039340003
+[  850.602145] , *pud=0000000039340003
+[  850.608352] , *pmd=000000003922c003
+[  850.611963] , *pte=00e80000359c0f53
+[  850.618111]
+[  850.621102]
+[  850.624032] CPU: 0 PID: 173 Comm: a.out Not tainted 4.9.0-v8+ #5
+[  850.631314] Hardware name: Raspberry Pi 3 Model B (DT)
+[  850.637925] task: ffffffc039a13100 task.stack: ffffffc039a14000
+[  850.645314] PC is at 0x4391f0
+[  850.649783] LR is at 0x4391f0
+[  850.654035] pc : [<00000000004391f0>] lr : [<00000000004391f0>]
+pstate: 60000000
+[  850.662920] sp : 0000000000420da0
+[  850.667516] x29: 00000000004391f0 x28: 0000000000000000
+[  850.677145] x27: 0000000000000000 x26: 0000000000000000
 
+When I taskset the context_demo program to other cores that are
+completely isolated (CONFIG_NO_HZ_FULL, isolcpus=1,2,3) it will run
+continuously with the modified STACKSIZE.
 
-[47913.420673] CPU: 1 PID: 28395 Comm: x2goagent Not tainted
-4.9.0-next-20161212-r024-arm64 #1
-[47913.428992] Hardware name: Hardkernel ODROID-C2 (DT)
-[47913.433906] task: ffff80007c670000 task.stack: ffff800079e6c000
-[47913.439747] PC is at 0x3042415a74614c
-[47913.443400] LR is at 0x323042415a74614c
-[47913.447194] pc : [<003042415a74614c>] lr : [<323042415a74614c>]
-pstate: 80000000
-[47913.454528] sp : 0000ffffd7240140
-[47913.457789] x29: 313042414c74614c x28: 000000000000007f
-[47913.463016] x27: 000000000000007f x26: 0000000000000001
-[47913.468278] x25: 0000000000000000 x24: 0000aaaaee52a7e0
-[47913.473540] x23: 0000ffffd7240310 x22: 363042414274614c
-[47913.478800] x21: 353042415674614c x20: 343042414374614c
-[47913.484061] x19: 333042415874614c x18: 0000000000000000
-[47913.489324] x17: 0000ffffb1ce2da0 x16: 0000000000000000
-[47913.494589] x15: 0000000000000434 x14: 000000000000001f
-[47913.499852] x13: 0000aaaa00703f00 x12: 0000003ff8081fff
-[47913.505114] x11: 0000000000000000 x10: 0000000000000002
-[47913.510373] x9 : 0000000000000010 x8 : 0000000000000042
-[47913.515633] x7 : 011cff0800001fff x6 : 0000022300090101
-[47913.520904] x5 : 000000000000088c x4 : 0000000000000007
-[47913.526158] x3 : 0000aaaae52c1db0 x2 : 0000aaaae573a5a0
-[47913.531417] x1 : 0000000000000000 x0 : 0000000000000000
-
-Best regards
-
-Heinrich Schuchardt
+regards
+Bas
