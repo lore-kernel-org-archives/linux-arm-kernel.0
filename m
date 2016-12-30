@@ -1,68 +1,82 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 30 Dec 2016 13:19:10 +0900
-Subject: [PATCH v2] usb: musb: sunxi: Uses the resource-managed extcon API when
- registering extcon notifier
-References: <CGME20161230041914epcas5p24826e70fd5de710818687e55579757ba@epcas5p2.samsung.com>
-Message-ID: <1483071550-8683-1-git-send-email-cw00.choi@samsung.com>
+From: bibby.hsieh@mediatek.com (Bibby Hsieh)
+Date: Fri, 30 Dec 2016 14:26:23 +0800
+Subject: [PATCH v2] drm/mediatek: Support UYVY and YUYV format for overlay
+Message-ID: <1483079183-38637-1-git-send-email-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch just uses the resource-managed extcon API when registering
-the extcon notifier.
+MT8173 overlay can support UYVY and YUYV format,
+we add the format in DRM driver.
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Bin Liu <b-liu@ti.com>
+Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
 ---
-Changes from v1:
-- Rebase this patch based on v4.10-rc1.
-- Add acked-by tag from Maxime Ripard and Bin Lin.
-- Drop the phy/power-supply/chipidea patches.
+ drivers/gpu/drm/mediatek/mtk_disp_ovl.c  | 21 +++++++++++++++++++++
+ drivers/gpu/drm/mediatek/mtk_drm_plane.c |  2 ++
+ 2 files changed, 23 insertions(+)
 
- drivers/usb/musb/sunxi.c | 12 +++---------
- 1 file changed, 3 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-index d0be0eadd0d9..2332294dee0f 100644
---- a/drivers/usb/musb/sunxi.c
-+++ b/drivers/usb/musb/sunxi.c
-@@ -251,14 +251,14 @@ static int sunxi_musb_init(struct musb *musb)
- 	writeb(SUNXI_MUSB_VEND0_PIO_MODE, musb->mregs + SUNXI_MUSB_VEND0);
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+index c703102..de05845 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+@@ -40,10 +40,13 @@
+ #define	OVL_RDMA_MEM_GMC	0x40402020
  
- 	/* Register notifier before calling phy_init() */
--	ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
--				       &glue->host_nb);
-+	ret = devm_extcon_register_notifier(glue->dev, glue->extcon,
-+					EXTCON_USB_HOST, &glue->host_nb);
- 	if (ret)
- 		goto error_reset_assert;
+ #define OVL_CON_BYTE_SWAP	BIT(24)
++#define OVL_CON_MTX_YUV_TO_RGB	(6 << 16)
+ #define OVL_CON_CLRFMT_RGB565	(0 << 12)
+ #define OVL_CON_CLRFMT_RGB888	(1 << 12)
+ #define OVL_CON_CLRFMT_RGBA8888	(2 << 12)
+ #define OVL_CON_CLRFMT_ARGB8888	(3 << 12)
++#define OVL_CON_CLRFMT_UYVY	(4 << 12)
++#define OVL_CON_CLRFMT_YUYV	(5 << 12)
+ #define	OVL_CON_AEN		BIT(8)
+ #define	OVL_CON_ALPHA		0xff
  
- 	ret = phy_init(glue->phy);
- 	if (ret)
--		goto error_unregister_notifier;
-+		goto error_reset_assert;
+@@ -162,6 +165,21 @@ static unsigned int ovl_fmt_convert(unsigned int fmt)
+ 	case DRM_FORMAT_XBGR8888:
+ 	case DRM_FORMAT_ABGR8888:
+ 		return OVL_CON_CLRFMT_RGBA8888 | OVL_CON_BYTE_SWAP;
++	case DRM_FORMAT_UYVY:
++		return OVL_CON_CLRFMT_UYVY;
++	case DRM_FORMAT_YUYV:
++		return OVL_CON_CLRFMT_YUYV;
++	}
++}
++
++static bool ovl_yuv_space(unsigned int fmt)
++{
++	switch (fmt) {
++	case DRM_FORMAT_UYVY:
++	case DRM_FORMAT_YUYV:
++		return true;
++	default:
++		return false;
+ 	}
+ }
  
- 	musb->isr = sunxi_musb_interrupt;
+@@ -183,6 +201,9 @@ static void mtk_ovl_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
+ 	if (idx != 0)
+ 		con |= OVL_CON_AEN | OVL_CON_ALPHA;
  
-@@ -267,9 +267,6 @@ static int sunxi_musb_init(struct musb *musb)
++	if (ovl_yuv_space(fmt))
++		con |= OVL_CON_MTX_YUV_TO_RGB;
++
+ 	writel_relaxed(con, comp->regs + DISP_REG_OVL_CON(idx));
+ 	writel_relaxed(pitch, comp->regs + DISP_REG_OVL_PITCH(idx));
+ 	writel_relaxed(src_size, comp->regs + DISP_REG_OVL_SRC_SIZE(idx));
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+index c461a23..8c02d1d 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+@@ -28,6 +28,8 @@
+ 	DRM_FORMAT_XRGB8888,
+ 	DRM_FORMAT_ARGB8888,
+ 	DRM_FORMAT_RGB565,
++	DRM_FORMAT_UYVY,
++	DRM_FORMAT_YUYV,
+ };
  
- 	return 0;
- 
--error_unregister_notifier:
--	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
--				   &glue->host_nb);
- error_reset_assert:
- 	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
- 		reset_control_assert(glue->rst);
-@@ -293,9 +290,6 @@ static int sunxi_musb_exit(struct musb *musb)
- 
- 	phy_exit(glue->phy);
- 
--	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
--				   &glue->host_nb);
--
- 	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
- 		reset_control_assert(glue->rst);
- 
+ static void mtk_plane_reset(struct drm_plane *plane)
 -- 
 1.9.1
