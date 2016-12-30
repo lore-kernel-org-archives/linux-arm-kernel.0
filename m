@@ -1,37 +1,28 @@
-From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
-Date: Fri, 30 Dec 2016 16:56:56 +0800
-Subject: [PATCH v5 03/14] ACPI: ARM64: IORT: add missing comment for
- iort_dev_find_its_id()
-In-Reply-To: <1482384922-21507-4-git-send-email-guohanjun@huawei.com>
-References: <1482384922-21507-1-git-send-email-guohanjun@huawei.com>
- <1482384922-21507-4-git-send-email-guohanjun@huawei.com>
-Message-ID: <58662158.2050007@hisilicon.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 30 Dec 2016 10:00:16 +0100
+Subject: [PATCH 6/6] ARM64: dts: marvell: armada37xx: add pinctrl
+ definition
+In-Reply-To: <20161222172501.16121-7-gregory.clement@free-electrons.com>
+References: <20161222172501.16121-1-gregory.clement@free-electrons.com>
+ <20161222172501.16121-7-gregory.clement@free-electrons.com>
+Message-ID: <CACRpkdZwAY-1c+ZkDhrWn-pov6OX3idHNzC6Kq86oit9cL3SeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/12/22 13:35, Hanjun Guo wrote:
-> From: Hanjun Guo <hanjun.guo@linaro.org>
+On Thu, Dec 22, 2016 at 6:25 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+
+> Start to populate the device tree of the Armada 37xx with the pincontrol
+> configuration used on the board providing a dts.
 >
-> We are missing req_id's comment for iort_dev_find_its_id(),
-> add it back.
->
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Tomasz Nowicki <tn@semihalf.com>
-> ---
->   drivers/acpi/arm64/iort.c | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index 46e2d82..174e983 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -446,6 +446,7 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
->   /**
->    * iort_dev_find_its_id() - Find the ITS identifier for a device
->    * @dev: The device.
-> + * @req_id: Device's Requster ID
->    * @idx: Index of the ITS identifier list.
->    * @its_id: ITS identifier.
->    *
-Tested-by:  Xinwei Kong <kong.kongxinwei@hisilicon.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+>  arch/arm64/boot/dts/marvell/armada-3720-db.dts |  8 +++++++
+
+Maybe you want to take this opportunity to add gpio-line-names = ...;
+to the armada 3720 pinctrl/gpiochip nodes?
+
+Yours,
+Linus Walleij
