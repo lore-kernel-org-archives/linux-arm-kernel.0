@@ -1,82 +1,62 @@
-From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Fri, 30 Dec 2016 14:26:23 +0800
-Subject: [PATCH v2] drm/mediatek: Support UYVY and YUYV format for overlay
-Message-ID: <1483079183-38637-1-git-send-email-bibby.hsieh@mediatek.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 30 Dec 2016 15:37:41 +0900
+Subject: [PATCH v2 2/4] pinctrl: dt-bindings: samsung: add drive strength
+ macros for Exynos5433
+In-Reply-To: <20161230041421.24448-3-andi.shyti@samsung.com>
+References: <20161230041421.24448-1-andi.shyti@samsung.com>
+ <CGME20161230041427epcas1p1e4d0dd5e7f9928664c664b7850dbd87a@epcas1p1.samsung.com>
+ <20161230041421.24448-3-andi.shyti@samsung.com>
+Message-ID: <586600B5.1000903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MT8173 overlay can support UYVY and YUYV format,
-we add the format in DRM driver.
+Hi Andi,
 
-Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
----
- drivers/gpu/drm/mediatek/mtk_disp_ovl.c  | 21 +++++++++++++++++++++
- drivers/gpu/drm/mediatek/mtk_drm_plane.c |  2 ++
- 2 files changed, 23 insertions(+)
+On 2016? 12? 30? 13:14, Andi Shyti wrote:
+> Commit 5db7e3bb87df ("pinctrl: dt-bindings: samsung: Add header with
+> values used for configuration") has added a header file for defining the
+> pinctrl values in order to avoid hardcoded settings in the Exynos
+> DTS related files.
+> 
+> Extend samsung.h to the Exynos5433 for drive strength values
+> which are strictly related to the particular SoC and may defer
+> from others.
+> 
+> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> ---
+>  include/dt-bindings/pinctrl/samsung.h | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/include/dt-bindings/pinctrl/samsung.h b/include/dt-bindings/pinctrl/samsung.h
+> index 6276eb785e2b..e0ebb20ffdd3 100644
+> --- a/include/dt-bindings/pinctrl/samsung.h
+> +++ b/include/dt-bindings/pinctrl/samsung.h
+> @@ -45,6 +45,20 @@
+>  #define EXYNOS5420_PIN_DRV_LV3		2
+>  #define EXYNOS5420_PIN_DRV_LV4		3
+>  
+> +/* Drive strengths for Exynos5433 */
+> +#define EXYNOS5433_PIN_DRV_FAST_SR1	0
+> +#define EXYNOS5433_PIN_DRV_FAST_SR2	1
+> +#define EXYNOS5433_PIN_DRV_FAST_SR3	2
+> +#define EXYNOS5433_PIN_DRV_FAST_SR4	3
+> +#define EXYNOS5433_PIN_DRV_FAST_SR5	4
+> +#define EXYNOS5433_PIN_DRV_FAST_SR6	5
+> +#define EXYNOS5433_PIN_DRV_SLOW_SR1	8
+> +#define EXYNOS5433_PIN_DRV_SLOW_SR2	9
+> +#define EXYNOS5433_PIN_DRV_SLOW_SR3	0xa
+> +#define EXYNOS5433_PIN_DRV_SLOW_SR4	0xb
+> +#define EXYNOS5433_PIN_DRV_SLOW_SR5	0xc
+> +#define EXYNOS5433_PIN_DRV_SLOW_SR6	0xf
+> +
+>  #define EXYNOS_PIN_FUNC_INPUT		0
+>  #define EXYNOS_PIN_FUNC_OUTPUT		1
+>  #define EXYNOS_PIN_FUNC_2		2
+> 
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-index c703102..de05845 100644
---- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-+++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-@@ -40,10 +40,13 @@
- #define	OVL_RDMA_MEM_GMC	0x40402020
- 
- #define OVL_CON_BYTE_SWAP	BIT(24)
-+#define OVL_CON_MTX_YUV_TO_RGB	(6 << 16)
- #define OVL_CON_CLRFMT_RGB565	(0 << 12)
- #define OVL_CON_CLRFMT_RGB888	(1 << 12)
- #define OVL_CON_CLRFMT_RGBA8888	(2 << 12)
- #define OVL_CON_CLRFMT_ARGB8888	(3 << 12)
-+#define OVL_CON_CLRFMT_UYVY	(4 << 12)
-+#define OVL_CON_CLRFMT_YUYV	(5 << 12)
- #define	OVL_CON_AEN		BIT(8)
- #define	OVL_CON_ALPHA		0xff
- 
-@@ -162,6 +165,21 @@ static unsigned int ovl_fmt_convert(unsigned int fmt)
- 	case DRM_FORMAT_XBGR8888:
- 	case DRM_FORMAT_ABGR8888:
- 		return OVL_CON_CLRFMT_RGBA8888 | OVL_CON_BYTE_SWAP;
-+	case DRM_FORMAT_UYVY:
-+		return OVL_CON_CLRFMT_UYVY;
-+	case DRM_FORMAT_YUYV:
-+		return OVL_CON_CLRFMT_YUYV;
-+	}
-+}
-+
-+static bool ovl_yuv_space(unsigned int fmt)
-+{
-+	switch (fmt) {
-+	case DRM_FORMAT_UYVY:
-+	case DRM_FORMAT_YUYV:
-+		return true;
-+	default:
-+		return false;
- 	}
- }
- 
-@@ -183,6 +201,9 @@ static void mtk_ovl_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
- 	if (idx != 0)
- 		con |= OVL_CON_AEN | OVL_CON_ALPHA;
- 
-+	if (ovl_yuv_space(fmt))
-+		con |= OVL_CON_MTX_YUV_TO_RGB;
-+
- 	writel_relaxed(con, comp->regs + DISP_REG_OVL_CON(idx));
- 	writel_relaxed(pitch, comp->regs + DISP_REG_OVL_PITCH(idx));
- 	writel_relaxed(src_size, comp->regs + DISP_REG_OVL_SRC_SIZE(idx));
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-index c461a23..8c02d1d 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-@@ -28,6 +28,8 @@
- 	DRM_FORMAT_XRGB8888,
- 	DRM_FORMAT_ARGB8888,
- 	DRM_FORMAT_RGB565,
-+	DRM_FORMAT_UYVY,
-+	DRM_FORMAT_YUYV,
- };
- 
- static void mtk_plane_reset(struct drm_plane *plane)
+Looks good to me. ('SR' means "Slew Rate".)
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+
 -- 
-1.9.1
+Regards,
+Chanwoo Choi
