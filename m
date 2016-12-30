@@ -1,23 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Dec 2016 09:07:30 +0100
-Subject: [PATCH] pinctrl: stm32: activate strict mux mode
-In-Reply-To: <1481725456-1030-1-git-send-email-gabriel.fernandez@st.com>
-References: <1481725456-1030-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <CACRpkdaNTk27t40K=q95Pqk0gv_dt2N3MF6_FsAu7vdb9uHnig@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 30 Dec 2016 13:37:20 +0530
+Subject: [PATCH] ARM: dts: am572x-idk: Add gpios property to control
+ PCIE_RESETn
+Message-ID: <1483085240-16102-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2016 at 3:24 PM,  <gabriel.fernandez@st.com> wrote:
+Add 'gpios' property to pcie1 dt node and populate it with
+GPIO3_23 in order to drive PCIE_RESETn high.
 
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
->
-> This activates strict mode muxing for the STM32 pin controllers,
-> as these do not allow GPIO and functions to use the same pin
-> simultaneously.
->
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+This gets PCIe cards to be detected in AM572X IDK board.
 
-Patch applied with Patrice's ACK.
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/am572x-idk.dts |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/am572x-idk.dts b/arch/arm/boot/dts/am572x-idk.dts
+index 27d9149..1540f7a 100644
+--- a/arch/arm/boot/dts/am572x-idk.dts
++++ b/arch/arm/boot/dts/am572x-idk.dts
+@@ -87,3 +87,7 @@
+ &sn65hvs882 {
+ 	load-gpios = <&gpio3 19 GPIO_ACTIVE_LOW>;
+ };
++
++&pcie1 {
++	gpios = <&gpio3 23 GPIO_ACTIVE_HIGH>;
++};
+-- 
+1.7.9.5
