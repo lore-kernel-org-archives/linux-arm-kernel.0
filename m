@@ -1,37 +1,60 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Dec 2016 14:02:56 +0100
-Subject: [PATCH V1] pinctrl:pxa:pinctrl-pxa2xx:- No need of devm functions
-In-Reply-To: <87o9zvw69a.fsf@belgarion.home>
-References: <1481207730-6332-1-git-send-email-arvind.yadav.cs@gmail.com>
- <CACRpkdY8mwHD1yyHZSHsDsJNPjrgLTfEok38FNons6oabn5ZPw@mail.gmail.com>
- <87o9zvw69a.fsf@belgarion.home>
-Message-ID: <CACRpkdYaBmoik8W81h=2RH0_Q2MJPjSRTtgKb3tkwwAsKbFVAg@mail.gmail.com>
+Date: Fri, 30 Dec 2016 14:17:38 +0100
+Subject: [PATCH 10/20] gpio: pca953x: Add optional reset gpio control
+In-Reply-To: <1483050455-10683-11-git-send-email-steve_longerbeam@mentor.com>
+References: <1483050455-10683-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483050455-10683-11-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <CACRpkdZG2j4_LwP8KUVBTOtXma75YvYtC6CW1QqYwOm-MOZgHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 29, 2016 at 8:20 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Linus Walleij <linus.walleij@linaro.org> writes:
->
->> On Thu, Dec 8, 2016 at 3:35 PM, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
->>
->>> In functions pxa2xx_build_functions, the memory allocated for
->>> 'functions' is live within the function only. After the
->>> allocation it is immediately freed with devm_kfree. There is
->>> no need to allocate memory for 'functions' with devm function
->>> so replace devm_kcalloc  with kcalloc and devm_kfree with kfree.
->>>
->>> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
->>
->> I want the maintainer Robert Jarzmik to review this before I do anything
->
-> Hi Linus,
->
-> I did review, on December the 10th. I wasn't very enthusiastic about the patch,
-> if you check back my reply.
+On Thu, Dec 29, 2016 at 11:27 PM, Steve Longerbeam
+<slongerbeam@gmail.com> wrote:
 
-Sorry I missed it (mail overload as usual).
+> Add optional reset-gpios pin control. If present, de-assert the
+> specified reset gpio pin to bring the chip out of reset.
+>
+> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: linux-gpio at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
 
-OK dropping this.
+This seems like a separate patch from the other 19 patches so please send it
+separately so I can handle logistics easier in the future.
+
+
+> @@ -133,6 +134,7 @@ struct pca953x_chip {
+>         const char *const *names;
+>         unsigned long driver_data;
+>         struct regulator *regulator;
+> +       struct gpio_desc *reset_gpio;
+
+Why do you even keep this around in the device state container?
+
+As you only use it in the probe() function, use a local variable.
+
+The descriptor will be free():ed by the devm infrastructure anyways.
+
+> +               /* see if we need to de-assert a reset pin */
+> +               chip->reset_gpio = devm_gpiod_get_optional(&client->dev,
+> +                                                          "reset",
+> +                                                          GPIOD_OUT_LOW);
+> +               if (IS_ERR(chip->reset_gpio)) {
+> +                       dev_err(&client->dev, "request for reset pin failed\n");
+> +                       return PTR_ERR(chip->reset_gpio);
+> +               }
+
+Nice.
+
+> +               if (chip->reset_gpio) {
+> +                       /* bring chip out of reset */
+> +                       dev_info(&client->dev, "releasing reset\n");
+> +                       gpiod_set_value(chip->reset_gpio, 0);
+> +               }
+
+Is this really needed given that you set it low in the
+devm_gpiod_get_optional()?
 
 Yours,
 Linus Walleij
