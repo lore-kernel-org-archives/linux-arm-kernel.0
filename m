@@ -1,220 +1,384 @@
 From: andi.shyti@samsung.com (Andi Shyti)
-Date: Fri, 30 Dec 2016 13:14:18 +0900
-Subject: [PATCH v2 1/4] pinctrl: samsung: Fix the width of PINCFG_TYPE_DRV
- bitfields for Exynos5433
+Date: Fri, 30 Dec 2016 13:14:21 +0900
+Subject: [PATCH v2 4/4] ARM64: dts: TM2: comply to the samsung pinctrl naming
+ convention
 In-Reply-To: <20161230041421.24448-1-andi.shyti@samsung.com>
 References: <20161230041421.24448-1-andi.shyti@samsung.com>
- <CGME20161230041426epcas1p1f827d3cee8b607d81e9921b412ddf301@epcas1p1.samsung.com>
-Message-ID: <20161230041421.24448-2-andi.shyti@samsung.com>
+ <CGME20161230041427epcas1p135fd1703c0bb0cc47a60f4c619b49973@epcas1p1.samsung.com>
+Message-ID: <20161230041421.24448-5-andi.shyti@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chanwoo Choi <cw00.choi@samsung.com>
+Change the PIN() macro definition so that it can use the macros
+from pinctrl/samsung.h header file.
 
-This patch fixes the wrong width of PINCFG_TYPE_DRV bitfields for Exynos5433
-because PINCFG_TYPE_DRV of Exynos5433 has 4bit fields in the *_DRV
-registers. Usually, other Exynos have 2bit field for PINCFG_TYPE_DRV.
-
-Fixes: 3c5ecc9ed353 ("pinctrl: exynos: Add support for Exynos5433")
-Cc: stable at vger.kernel.org
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Krzysztof Kozlowski <krzk@kernel.org>
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
 ---
- drivers/pinctrl/samsung/pinctrl-exynos.c | 91 ++++++++++++++++++--------------
- drivers/pinctrl/samsung/pinctrl-exynos.h | 31 +++++++++++
- 2 files changed, 82 insertions(+), 40 deletions(-)
+ arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi |  25 +-
+ arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 254 ++++++++++-----------
+ 2 files changed, 133 insertions(+), 146 deletions(-)
 
-diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-index 12f7d1eb65bc..07409fde02b2 100644
---- a/drivers/pinctrl/samsung/pinctrl-exynos.c
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -56,6 +56,17 @@ static const struct samsung_pin_bank_type bank_type_alive = {
- 	.reg_offset = { 0x00, 0x04, 0x08, 0x0c, },
- };
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
+index 2af854b11644..d49879bd34bb 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
+@@ -14,25 +14,12 @@
  
-+/* Exynos5433 has the 4bit widths for PINCFG_TYPE_DRV bitfields. */
-+static const struct samsung_pin_bank_type exynos5433_bank_type_off = {
-+	.fld_width = { 4, 1, 2, 4, 2, 2, },
-+	.reg_offset = { 0x00, 0x04, 0x08, 0x0c, 0x10, 0x14, },
-+};
+ #include <dt-bindings/pinctrl/samsung.h>
+ 
+-#define PIN_PULL_NONE		0
+-#define PIN_PULL_DOWN		1
+-#define PIN_PULL_UP		3
+-
+-#define PIN_DRV_LV1		0
+-#define PIN_DRV_LV2		2
+-#define PIN_DRV_LV3		1
+-#define PIN_DRV_LV4		3
+-
+-#define PIN_IN			0
+-#define PIN_OUT			1
+-#define PIN_FUNC1		2
+-
+-#define PIN(_func, _pin, _pull, _drv)			\
+-	_pin {						\
+-		samsung,pins = #_pin;			\
+-		samsung,pin-function = <PIN_ ##_func>;	\
+-		samsung,pin-pud = <PIN_PULL_ ##_pull>;	\
+-		samsung,pin-drv = <PIN_DRV_ ##_drv>;	\
++#define PIN(_func, _pin, _pull, _drv)					\
++	_pin {								\
++		samsung,pins = #_pin;					\
++		samsung,pin-function = <EXYNOS_PIN_FUNC_ ##_func>;	\
++		samsung,pin-pud = <EXYNOS_PIN_PULL_ ##_pull>;		\
++		samsung,pin-drv = <EXYNOS5433_PIN_DRV_ ##_drv>;		\
+ 	}
+ 
+ &pinctrl_alive {
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+index f21bdc2ff834..66c4d5959881 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
++++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+@@ -742,77 +742,77 @@
+ 	pinctrl-0 = <&initial_alive>;
+ 
+ 	initial_alive: initial-state {
+-		PIN(IN, gpa0-0, DOWN, LV1);
+-		PIN(IN, gpa0-1, NONE, LV1);
+-		PIN(IN, gpa0-2, DOWN, LV1);
+-		PIN(IN, gpa0-3, NONE, LV1);
+-		PIN(IN, gpa0-4, NONE, LV1);
+-		PIN(IN, gpa0-5, DOWN, LV1);
+-		PIN(IN, gpa0-6, NONE, LV1);
+-		PIN(IN, gpa0-7, NONE, LV1);
+-
+-		PIN(IN, gpa1-0, UP, LV1);
+-		PIN(IN, gpa1-1, NONE, LV1);
+-		PIN(IN, gpa1-2, NONE, LV1);
+-		PIN(IN, gpa1-3, DOWN, LV1);
+-		PIN(IN, gpa1-4, DOWN, LV1);
+-		PIN(IN, gpa1-5, NONE, LV1);
+-		PIN(IN, gpa1-6, NONE, LV1);
+-		PIN(IN, gpa1-7, NONE, LV1);
+-
+-		PIN(IN, gpa2-0, NONE, LV1);
+-		PIN(IN, gpa2-1, NONE, LV1);
+-		PIN(IN, gpa2-2, NONE, LV1);
+-		PIN(IN, gpa2-3, DOWN, LV1);
+-		PIN(IN, gpa2-4, NONE, LV1);
+-		PIN(IN, gpa2-5, DOWN, LV1);
+-		PIN(IN, gpa2-6, DOWN, LV1);
+-		PIN(IN, gpa2-7, NONE, LV1);
+-
+-		PIN(IN, gpa3-0, DOWN, LV1);
+-		PIN(IN, gpa3-1, DOWN, LV1);
+-		PIN(IN, gpa3-2, NONE, LV1);
+-		PIN(IN, gpa3-3, DOWN, LV1);
+-		PIN(IN, gpa3-4, NONE, LV1);
+-		PIN(IN, gpa3-5, DOWN, LV1);
+-		PIN(IN, gpa3-6, DOWN, LV1);
+-		PIN(IN, gpa3-7, DOWN, LV1);
+-
+-		PIN(IN, gpf1-0, NONE, LV1);
+-		PIN(IN, gpf1-1, NONE, LV1);
+-		PIN(IN, gpf1-2, DOWN, LV1);
+-		PIN(IN, gpf1-4, UP, LV1);
+-		PIN(OUT, gpf1-5, NONE, LV1);
+-		PIN(IN, gpf1-6, DOWN, LV1);
+-		PIN(IN, gpf1-7, DOWN, LV1);
+-
+-		PIN(IN, gpf2-0, DOWN, LV1);
+-		PIN(IN, gpf2-1, DOWN, LV1);
+-		PIN(IN, gpf2-2, DOWN, LV1);
+-		PIN(IN, gpf2-3, DOWN, LV1);
+-
+-		PIN(IN, gpf3-0, DOWN, LV1);
+-		PIN(IN, gpf3-1, DOWN, LV1);
+-		PIN(IN, gpf3-2, NONE, LV1);
+-		PIN(IN, gpf3-3, DOWN, LV1);
+-
+-		PIN(IN, gpf4-0, DOWN, LV1);
+-		PIN(IN, gpf4-1, DOWN, LV1);
+-		PIN(IN, gpf4-2, DOWN, LV1);
+-		PIN(IN, gpf4-3, DOWN, LV1);
+-		PIN(IN, gpf4-4, DOWN, LV1);
+-		PIN(IN, gpf4-5, DOWN, LV1);
+-		PIN(IN, gpf4-6, DOWN, LV1);
+-		PIN(IN, gpf4-7, DOWN, LV1);
+-
+-		PIN(IN, gpf5-0, DOWN, LV1);
+-		PIN(IN, gpf5-1, DOWN, LV1);
+-		PIN(IN, gpf5-2, DOWN, LV1);
+-		PIN(IN, gpf5-3, DOWN, LV1);
+-		PIN(OUT, gpf5-4, NONE, LV1);
+-		PIN(IN, gpf5-5, DOWN, LV1);
+-		PIN(IN, gpf5-6, DOWN, LV1);
+-		PIN(IN, gpf5-7, DOWN, LV1);
++		PIN(INPUT, gpa0-0, DOWN, FAST_SR1);
++		PIN(INPUT, gpa0-1, NONE, FAST_SR1);
++		PIN(INPUT, gpa0-2, DOWN, FAST_SR1);
++		PIN(INPUT, gpa0-3, NONE, FAST_SR1);
++		PIN(INPUT, gpa0-4, NONE, FAST_SR1);
++		PIN(INPUT, gpa0-5, DOWN, FAST_SR1);
++		PIN(INPUT, gpa0-6, NONE, FAST_SR1);
++		PIN(INPUT, gpa0-7, NONE, FAST_SR1);
 +
-+static const struct samsung_pin_bank_type exynos5433_bank_type_alive = {
-+	.fld_width = { 4, 1, 2, 4, },
-+	.reg_offset = { 0x00, 0x04, 0x08, 0x0c, },
-+};
++		PIN(INPUT, gpa1-0, UP, FAST_SR1);
++		PIN(INPUT, gpa1-1, NONE, FAST_SR1);
++		PIN(INPUT, gpa1-2, NONE, FAST_SR1);
++		PIN(INPUT, gpa1-3, DOWN, FAST_SR1);
++		PIN(INPUT, gpa1-4, DOWN, FAST_SR1);
++		PIN(INPUT, gpa1-5, NONE, FAST_SR1);
++		PIN(INPUT, gpa1-6, NONE, FAST_SR1);
++		PIN(INPUT, gpa1-7, NONE, FAST_SR1);
 +
- static void exynos_irq_mask(struct irq_data *irqd)
- {
- 	struct irq_chip *chip = irq_data_get_irq_chip(irqd);
-@@ -1335,82 +1346,82 @@ const struct samsung_pin_ctrl exynos5420_pin_ctrl[] __initconst = {
- 
- /* pin banks of exynos5433 pin-controller - ALIVE */
- static const struct samsung_pin_bank_data exynos5433_pin_banks0[] = {
--	EXYNOS_PIN_BANK_EINTW(8, 0x000, "gpa0", 0x00),
--	EXYNOS_PIN_BANK_EINTW(8, 0x020, "gpa1", 0x04),
--	EXYNOS_PIN_BANK_EINTW(8, 0x040, "gpa2", 0x08),
--	EXYNOS_PIN_BANK_EINTW(8, 0x060, "gpa3", 0x0c),
--	EXYNOS_PIN_BANK_EINTW_EXT(8, 0x020, "gpf1", 0x1004, 1),
--	EXYNOS_PIN_BANK_EINTW_EXT(4, 0x040, "gpf2", 0x1008, 1),
--	EXYNOS_PIN_BANK_EINTW_EXT(4, 0x060, "gpf3", 0x100c, 1),
--	EXYNOS_PIN_BANK_EINTW_EXT(8, 0x080, "gpf4", 0x1010, 1),
--	EXYNOS_PIN_BANK_EINTW_EXT(8, 0x0a0, "gpf5", 0x1014, 1),
-+	EXYNOS5433_PIN_BANK_EINTW(8, 0x000, "gpa0", 0x00),
-+	EXYNOS5433_PIN_BANK_EINTW(8, 0x020, "gpa1", 0x04),
-+	EXYNOS5433_PIN_BANK_EINTW(8, 0x040, "gpa2", 0x08),
-+	EXYNOS5433_PIN_BANK_EINTW(8, 0x060, "gpa3", 0x0c),
-+	EXYNOS5433_PIN_BANK_EINTW_EXT(8, 0x020, "gpf1", 0x1004, 1),
-+	EXYNOS5433_PIN_BANK_EINTW_EXT(4, 0x040, "gpf2", 0x1008, 1),
-+	EXYNOS5433_PIN_BANK_EINTW_EXT(4, 0x060, "gpf3", 0x100c, 1),
-+	EXYNOS5433_PIN_BANK_EINTW_EXT(8, 0x080, "gpf4", 0x1010, 1),
-+	EXYNOS5433_PIN_BANK_EINTW_EXT(8, 0x0a0, "gpf5", 0x1014, 1),
- };
- 
- /* pin banks of exynos5433 pin-controller - AUD */
- static const struct samsung_pin_bank_data exynos5433_pin_banks1[] = {
--	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz0", 0x00),
--	EXYNOS_PIN_BANK_EINTG(4, 0x020, "gpz1", 0x04),
-+	EXYNOS5433_PIN_BANK_EINTG(7, 0x000, "gpz0", 0x00),
-+	EXYNOS5433_PIN_BANK_EINTG(4, 0x020, "gpz1", 0x04),
- };
- 
- /* pin banks of exynos5433 pin-controller - CPIF */
- static const struct samsung_pin_bank_data exynos5433_pin_banks2[] = {
--	EXYNOS_PIN_BANK_EINTG(2, 0x000, "gpv6", 0x00),
-+	EXYNOS5433_PIN_BANK_EINTG(2, 0x000, "gpv6", 0x00),
- };
- 
- /* pin banks of exynos5433 pin-controller - eSE */
- static const struct samsung_pin_bank_data exynos5433_pin_banks3[] = {
--	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj2", 0x00),
-+	EXYNOS5433_PIN_BANK_EINTG(3, 0x000, "gpj2", 0x00),
- };
- 
- /* pin banks of exynos5433 pin-controller - FINGER */
- static const struct samsung_pin_bank_data exynos5433_pin_banks4[] = {
--	EXYNOS_PIN_BANK_EINTG(4, 0x000, "gpd5", 0x00),
-+	EXYNOS5433_PIN_BANK_EINTG(4, 0x000, "gpd5", 0x00),
- };
- 
- /* pin banks of exynos5433 pin-controller - FSYS */
- static const struct samsung_pin_bank_data exynos5433_pin_banks5[] = {
--	EXYNOS_PIN_BANK_EINTG(6, 0x000, "gph1", 0x00),
--	EXYNOS_PIN_BANK_EINTG(7, 0x020, "gpr4", 0x04),
--	EXYNOS_PIN_BANK_EINTG(5, 0x040, "gpr0", 0x08),
--	EXYNOS_PIN_BANK_EINTG(8, 0x060, "gpr1", 0x0c),
--	EXYNOS_PIN_BANK_EINTG(2, 0x080, "gpr2", 0x10),
--	EXYNOS_PIN_BANK_EINTG(8, 0x0a0, "gpr3", 0x14),
-+	EXYNOS5433_PIN_BANK_EINTG(6, 0x000, "gph1", 0x00),
-+	EXYNOS5433_PIN_BANK_EINTG(7, 0x020, "gpr4", 0x04),
-+	EXYNOS5433_PIN_BANK_EINTG(5, 0x040, "gpr0", 0x08),
-+	EXYNOS5433_PIN_BANK_EINTG(8, 0x060, "gpr1", 0x0c),
-+	EXYNOS5433_PIN_BANK_EINTG(2, 0x080, "gpr2", 0x10),
-+	EXYNOS5433_PIN_BANK_EINTG(8, 0x0a0, "gpr3", 0x14),
- };
- 
- /* pin banks of exynos5433 pin-controller - IMEM */
- static const struct samsung_pin_bank_data exynos5433_pin_banks6[] = {
--	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpf0", 0x00),
-+	EXYNOS5433_PIN_BANK_EINTG(8, 0x000, "gpf0", 0x00),
- };
- 
- /* pin banks of exynos5433 pin-controller - NFC */
- static const struct samsung_pin_bank_data exynos5433_pin_banks7[] = {
--	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj0", 0x00),
-+	EXYNOS5433_PIN_BANK_EINTG(3, 0x000, "gpj0", 0x00),
- };
- 
- /* pin banks of exynos5433 pin-controller - PERIC */
- static const struct samsung_pin_bank_data exynos5433_pin_banks8[] = {
--	EXYNOS_PIN_BANK_EINTG(6, 0x000, "gpv7", 0x00),
--	EXYNOS_PIN_BANK_EINTG(5, 0x020, "gpb0", 0x04),
--	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpc0", 0x08),
--	EXYNOS_PIN_BANK_EINTG(2, 0x060, "gpc1", 0x0c),
--	EXYNOS_PIN_BANK_EINTG(6, 0x080, "gpc2", 0x10),
--	EXYNOS_PIN_BANK_EINTG(8, 0x0a0, "gpc3", 0x14),
--	EXYNOS_PIN_BANK_EINTG(2, 0x0c0, "gpg0", 0x18),
--	EXYNOS_PIN_BANK_EINTG(4, 0x0e0, "gpd0", 0x1c),
--	EXYNOS_PIN_BANK_EINTG(6, 0x100, "gpd1", 0x20),
--	EXYNOS_PIN_BANK_EINTG(8, 0x120, "gpd2", 0x24),
--	EXYNOS_PIN_BANK_EINTG(5, 0x140, "gpd4", 0x28),
--	EXYNOS_PIN_BANK_EINTG(2, 0x160, "gpd8", 0x2c),
--	EXYNOS_PIN_BANK_EINTG(7, 0x180, "gpd6", 0x30),
--	EXYNOS_PIN_BANK_EINTG(3, 0x1a0, "gpd7", 0x34),
--	EXYNOS_PIN_BANK_EINTG(5, 0x1c0, "gpg1", 0x38),
--	EXYNOS_PIN_BANK_EINTG(2, 0x1e0, "gpg2", 0x3c),
--	EXYNOS_PIN_BANK_EINTG(8, 0x200, "gpg3", 0x40),
-+	EXYNOS5433_PIN_BANK_EINTG(6, 0x000, "gpv7", 0x00),
-+	EXYNOS5433_PIN_BANK_EINTG(5, 0x020, "gpb0", 0x04),
-+	EXYNOS5433_PIN_BANK_EINTG(8, 0x040, "gpc0", 0x08),
-+	EXYNOS5433_PIN_BANK_EINTG(2, 0x060, "gpc1", 0x0c),
-+	EXYNOS5433_PIN_BANK_EINTG(6, 0x080, "gpc2", 0x10),
-+	EXYNOS5433_PIN_BANK_EINTG(8, 0x0a0, "gpc3", 0x14),
-+	EXYNOS5433_PIN_BANK_EINTG(2, 0x0c0, "gpg0", 0x18),
-+	EXYNOS5433_PIN_BANK_EINTG(4, 0x0e0, "gpd0", 0x1c),
-+	EXYNOS5433_PIN_BANK_EINTG(6, 0x100, "gpd1", 0x20),
-+	EXYNOS5433_PIN_BANK_EINTG(8, 0x120, "gpd2", 0x24),
-+	EXYNOS5433_PIN_BANK_EINTG(5, 0x140, "gpd4", 0x28),
-+	EXYNOS5433_PIN_BANK_EINTG(2, 0x160, "gpd8", 0x2c),
-+	EXYNOS5433_PIN_BANK_EINTG(7, 0x180, "gpd6", 0x30),
-+	EXYNOS5433_PIN_BANK_EINTG(3, 0x1a0, "gpd7", 0x34),
-+	EXYNOS5433_PIN_BANK_EINTG(5, 0x1c0, "gpg1", 0x38),
-+	EXYNOS5433_PIN_BANK_EINTG(2, 0x1e0, "gpg2", 0x3c),
-+	EXYNOS5433_PIN_BANK_EINTG(8, 0x200, "gpg3", 0x40),
- };
- 
- /* pin banks of exynos5433 pin-controller - TOUCH */
- static const struct samsung_pin_bank_data exynos5433_pin_banks9[] = {
--	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj1", 0x00),
-+	EXYNOS5433_PIN_BANK_EINTG(3, 0x000, "gpj1", 0x00),
- };
- 
- /*
-diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.h b/drivers/pinctrl/samsung/pinctrl-exynos.h
-index 5821525a2c84..a473092fb8d2 100644
---- a/drivers/pinctrl/samsung/pinctrl-exynos.h
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos.h
-@@ -90,6 +90,37 @@
- 		.pctl_res_idx   = pctl_idx,             \
- 	}						\
- 
-+#define EXYNOS5433_PIN_BANK_EINTG(pins, reg, id, offs)		\
-+	{							\
-+		.type		= &exynos5433_bank_type_off,	\
-+		.pctl_offset	= reg,				\
-+		.nr_pins	= pins,				\
-+		.eint_type	= EINT_TYPE_GPIO,		\
-+		.eint_offset	= offs,				\
-+		.name		= id				\
-+	}
++		PIN(INPUT, gpa2-0, NONE, FAST_SR1);
++		PIN(INPUT, gpa2-1, NONE, FAST_SR1);
++		PIN(INPUT, gpa2-2, NONE, FAST_SR1);
++		PIN(INPUT, gpa2-3, DOWN, FAST_SR1);
++		PIN(INPUT, gpa2-4, NONE, FAST_SR1);
++		PIN(INPUT, gpa2-5, DOWN, FAST_SR1);
++		PIN(INPUT, gpa2-6, DOWN, FAST_SR1);
++		PIN(INPUT, gpa2-7, NONE, FAST_SR1);
 +
-+#define EXYNOS5433_PIN_BANK_EINTW(pins, reg, id, offs)		\
-+	{							\
-+		.type		= &exynos5433_bank_type_alive,	\
-+		.pctl_offset	= reg,				\
-+		.nr_pins	= pins,				\
-+		.eint_type	= EINT_TYPE_WKUP,		\
-+		.eint_offset	= offs,				\
-+		.name		= id				\
-+	}
++		PIN(INPUT, gpa3-0, DOWN, FAST_SR1);
++		PIN(INPUT, gpa3-1, DOWN, FAST_SR1);
++		PIN(INPUT, gpa3-2, NONE, FAST_SR1);
++		PIN(INPUT, gpa3-3, DOWN, FAST_SR1);
++		PIN(INPUT, gpa3-4, NONE, FAST_SR1);
++		PIN(INPUT, gpa3-5, DOWN, FAST_SR1);
++		PIN(INPUT, gpa3-6, DOWN, FAST_SR1);
++		PIN(INPUT, gpa3-7, DOWN, FAST_SR1);
 +
-+#define EXYNOS5433_PIN_BANK_EINTW_EXT(pins, reg, id, offs, pctl_idx) \
-+	{							\
-+		.type           = &exynos5433_bank_type_alive,	\
-+		.pctl_offset    = reg,				\
-+		.nr_pins        = pins,				\
-+		.eint_type      = EINT_TYPE_WKUP,		\
-+		.eint_offset    = offs,				\
-+		.name           = id,				\
-+		.pctl_res_idx   = pctl_idx,			\
-+	}							\
++		PIN(INPUT, gpf1-0, NONE, FAST_SR1);
++		PIN(INPUT, gpf1-1, NONE, FAST_SR1);
++		PIN(INPUT, gpf1-2, DOWN, FAST_SR1);
++		PIN(INPUT, gpf1-4, UP, FAST_SR1);
++		PIN(OUTPUT, gpf1-5, NONE, FAST_SR1);
++		PIN(INPUT, gpf1-6, DOWN, FAST_SR1);
++		PIN(INPUT, gpf1-7, DOWN, FAST_SR1);
 +
- /**
-  * struct exynos_weint_data: irq specific data for all the wakeup interrupts
-  * generated by the external wakeup interrupt controller.
++		PIN(INPUT, gpf2-0, DOWN, FAST_SR1);
++		PIN(INPUT, gpf2-1, DOWN, FAST_SR1);
++		PIN(INPUT, gpf2-2, DOWN, FAST_SR1);
++		PIN(INPUT, gpf2-3, DOWN, FAST_SR1);
++
++		PIN(INPUT, gpf3-0, DOWN, FAST_SR1);
++		PIN(INPUT, gpf3-1, DOWN, FAST_SR1);
++		PIN(INPUT, gpf3-2, NONE, FAST_SR1);
++		PIN(INPUT, gpf3-3, DOWN, FAST_SR1);
++
++		PIN(INPUT, gpf4-0, DOWN, FAST_SR1);
++		PIN(INPUT, gpf4-1, DOWN, FAST_SR1);
++		PIN(INPUT, gpf4-2, DOWN, FAST_SR1);
++		PIN(INPUT, gpf4-3, DOWN, FAST_SR1);
++		PIN(INPUT, gpf4-4, DOWN, FAST_SR1);
++		PIN(INPUT, gpf4-5, DOWN, FAST_SR1);
++		PIN(INPUT, gpf4-6, DOWN, FAST_SR1);
++		PIN(INPUT, gpf4-7, DOWN, FAST_SR1);
++
++		PIN(INPUT, gpf5-0, DOWN, FAST_SR1);
++		PIN(INPUT, gpf5-1, DOWN, FAST_SR1);
++		PIN(INPUT, gpf5-2, DOWN, FAST_SR1);
++		PIN(INPUT, gpf5-3, DOWN, FAST_SR1);
++		PIN(OUTPUT, gpf5-4, NONE, FAST_SR1);
++		PIN(INPUT, gpf5-5, DOWN, FAST_SR1);
++		PIN(INPUT, gpf5-6, DOWN, FAST_SR1);
++		PIN(INPUT, gpf5-7, DOWN, FAST_SR1);
+ 	};
+ 
+ 	te_irq: te_irq {
+@@ -826,8 +826,8 @@
+ 	pinctrl-0 = <&initial_cpif>;
+ 
+ 	initial_cpif: initial-state {
+-		PIN(IN, gpv6-0, DOWN, LV1);
+-		PIN(IN, gpv6-1, DOWN, LV1);
++		PIN(INPUT, gpv6-0, DOWN, FAST_SR1);
++		PIN(INPUT, gpv6-1, DOWN, FAST_SR1);
+ 	};
+ };
+ 
+@@ -836,9 +836,9 @@
+ 	pinctrl-0 = <&initial_ese>;
+ 
+ 	initial_ese: initial-state {
+-		PIN(IN, gpj2-0, DOWN, LV1);
+-		PIN(IN, gpj2-1, DOWN, LV1);
+-		PIN(IN, gpj2-2, DOWN, LV1);
++		PIN(INPUT, gpj2-0, DOWN, FAST_SR1);
++		PIN(INPUT, gpj2-1, DOWN, FAST_SR1);
++		PIN(INPUT, gpj2-2, DOWN, FAST_SR1);
+ 	};
+ };
+ 
+@@ -847,11 +847,11 @@
+ 	pinctrl-0 = <&initial_fsys>;
+ 
+ 	initial_fsys: initial-state {
+-		PIN(IN, gpr3-0, NONE, LV1);
+-		PIN(IN, gpr3-1, DOWN, LV1);
+-		PIN(IN, gpr3-2, DOWN, LV1);
+-		PIN(IN, gpr3-3, DOWN, LV1);
+-		PIN(IN, gpr3-7, NONE, LV1);
++		PIN(INPUT, gpr3-0, NONE, FAST_SR1);
++		PIN(INPUT, gpr3-1, DOWN, FAST_SR1);
++		PIN(INPUT, gpr3-2, DOWN, FAST_SR1);
++		PIN(INPUT, gpr3-3, DOWN, FAST_SR1);
++		PIN(INPUT, gpr3-7, NONE, FAST_SR1);
+ 	};
+ };
+ 
+@@ -860,14 +860,14 @@
+ 	pinctrl-0 = <&initial_imem>;
+ 
+ 	initial_imem: initial-state {
+-		PIN(IN, gpf0-0, UP, LV1);
+-		PIN(IN, gpf0-1, UP, LV1);
+-		PIN(IN, gpf0-2, DOWN, LV1);
+-		PIN(IN, gpf0-3, UP, LV1);
+-		PIN(IN, gpf0-4, DOWN, LV1);
+-		PIN(IN, gpf0-5, NONE, LV1);
+-		PIN(IN, gpf0-6, DOWN, LV1);
+-		PIN(IN, gpf0-7, UP, LV1);
++		PIN(INPUT, gpf0-0, UP, FAST_SR1);
++		PIN(INPUT, gpf0-1, UP, FAST_SR1);
++		PIN(INPUT, gpf0-2, DOWN, FAST_SR1);
++		PIN(INPUT, gpf0-3, UP, FAST_SR1);
++		PIN(INPUT, gpf0-4, DOWN, FAST_SR1);
++		PIN(INPUT, gpf0-5, NONE, FAST_SR1);
++		PIN(INPUT, gpf0-6, DOWN, FAST_SR1);
++		PIN(INPUT, gpf0-7, UP, FAST_SR1);
+ 	};
+ };
+ 
+@@ -876,7 +876,7 @@
+ 	pinctrl-0 = <&initial_nfc>;
+ 
+ 	initial_nfc: initial-state {
+-		PIN(IN, gpj0-2, DOWN, LV1);
++		PIN(INPUT, gpj0-2, DOWN, FAST_SR1);
+ 	};
+ };
+ 
+@@ -885,54 +885,54 @@
+ 	pinctrl-0 = <&initial_peric>;
+ 
+ 	initial_peric: initial-state {
+-		PIN(IN, gpv7-0, DOWN, LV1);
+-		PIN(IN, gpv7-1, DOWN, LV1);
+-		PIN(IN, gpv7-2, NONE, LV1);
+-		PIN(IN, gpv7-3, DOWN, LV1);
+-		PIN(IN, gpv7-4, DOWN, LV1);
+-		PIN(IN, gpv7-5, DOWN, LV1);
++		PIN(INPUT, gpv7-0, DOWN, FAST_SR1);
++		PIN(INPUT, gpv7-1, DOWN, FAST_SR1);
++		PIN(INPUT, gpv7-2, NONE, FAST_SR1);
++		PIN(INPUT, gpv7-3, DOWN, FAST_SR1);
++		PIN(INPUT, gpv7-4, DOWN, FAST_SR1);
++		PIN(INPUT, gpv7-5, DOWN, FAST_SR1);
+ 
+-		PIN(IN, gpb0-4, DOWN, LV1);
++		PIN(INPUT, gpb0-4, DOWN, FAST_SR1);
+ 
+-		PIN(IN, gpc0-2, DOWN, LV1);
+-		PIN(IN, gpc0-5, DOWN, LV1);
+-		PIN(IN, gpc0-7, DOWN, LV1);
++		PIN(INPUT, gpc0-2, DOWN, FAST_SR1);
++		PIN(INPUT, gpc0-5, DOWN, FAST_SR1);
++		PIN(INPUT, gpc0-7, DOWN, FAST_SR1);
+ 
+-		PIN(IN, gpc1-1, DOWN, LV1);
++		PIN(INPUT, gpc1-1, DOWN, FAST_SR1);
+ 
+-		PIN(IN, gpc3-4, NONE, LV1);
+-		PIN(IN, gpc3-5, NONE, LV1);
+-		PIN(IN, gpc3-6, NONE, LV1);
+-		PIN(IN, gpc3-7, NONE, LV1);
++		PIN(INPUT, gpc3-4, NONE, FAST_SR1);
++		PIN(INPUT, gpc3-5, NONE, FAST_SR1);
++		PIN(INPUT, gpc3-6, NONE, FAST_SR1);
++		PIN(INPUT, gpc3-7, NONE, FAST_SR1);
+ 
+-		PIN(OUT, gpg0-0, NONE, LV1);
+-		PIN(FUNC1, gpg0-1, DOWN, LV1);
++		PIN(OUTPUT, gpg0-0, NONE, FAST_SR1);
++		PIN(2, gpg0-1, DOWN, FAST_SR1);
+ 
+-		PIN(IN, gpd2-5, DOWN, LV1);
++		PIN(INPUT, gpd2-5, DOWN, FAST_SR1);
+ 
+-		PIN(IN, gpd4-0, NONE, LV1);
+-		PIN(IN, gpd4-1, DOWN, LV1);
+-		PIN(IN, gpd4-2, DOWN, LV1);
+-		PIN(IN, gpd4-3, DOWN, LV1);
+-		PIN(IN, gpd4-4, DOWN, LV1);
++		PIN(INPUT, gpd4-0, NONE, FAST_SR1);
++		PIN(INPUT, gpd4-1, DOWN, FAST_SR1);
++		PIN(INPUT, gpd4-2, DOWN, FAST_SR1);
++		PIN(INPUT, gpd4-3, DOWN, FAST_SR1);
++		PIN(INPUT, gpd4-4, DOWN, FAST_SR1);
+ 
+-		PIN(IN, gpd6-3, DOWN, LV1);
++		PIN(INPUT, gpd6-3, DOWN, FAST_SR1);
+ 
+-		PIN(IN, gpd8-1, UP, LV1);
++		PIN(INPUT, gpd8-1, UP, FAST_SR1);
+ 
+-		PIN(IN, gpg1-0, DOWN, LV1);
+-		PIN(IN, gpg1-1, DOWN, LV1);
+-		PIN(IN, gpg1-2, DOWN, LV1);
+-		PIN(IN, gpg1-3, DOWN, LV1);
+-		PIN(IN, gpg1-4, DOWN, LV1);
++		PIN(INPUT, gpg1-0, DOWN, FAST_SR1);
++		PIN(INPUT, gpg1-1, DOWN, FAST_SR1);
++		PIN(INPUT, gpg1-2, DOWN, FAST_SR1);
++		PIN(INPUT, gpg1-3, DOWN, FAST_SR1);
++		PIN(INPUT, gpg1-4, DOWN, FAST_SR1);
+ 
+-		PIN(IN, gpg2-0, DOWN, LV1);
+-		PIN(IN, gpg2-1, DOWN, LV1);
++		PIN(INPUT, gpg2-0, DOWN, FAST_SR1);
++		PIN(INPUT, gpg2-1, DOWN, FAST_SR1);
+ 
+-		PIN(IN, gpg3-0, DOWN, LV1);
+-		PIN(IN, gpg3-1, DOWN, LV1);
+-		PIN(IN, gpg3-5, DOWN, LV1);
+-		PIN(IN, gpg3-7, DOWN, LV1);
++		PIN(INPUT, gpg3-0, DOWN, FAST_SR1);
++		PIN(INPUT, gpg3-1, DOWN, FAST_SR1);
++		PIN(INPUT, gpg3-5, DOWN, FAST_SR1);
++		PIN(INPUT, gpg3-7, DOWN, FAST_SR1);
+ 	};
+ };
+ 
+@@ -941,7 +941,7 @@
+ 	pinctrl-0 = <&initial_touch>;
+ 
+ 	initial_touch: initial-state {
+-		PIN(IN, gpj1-2, DOWN, LV1);
++		PIN(INPUT, gpj1-2, DOWN, FAST_SR1);
+ 	};
+ };
+ 
 -- 
 2.11.0
