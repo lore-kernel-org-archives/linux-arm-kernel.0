@@ -1,91 +1,81 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 30 Dec 2016 09:51:13 +0100
-Subject: [BUG] ARM64: amlogic: gxbb: unhandled level 2 translation fault
- (11)
-In-Reply-To: <130a3716-a643-d14f-fd7c-9ad3bb67f3a7@gmx.de>
-References: <20161224140028.4205-1-xypron.glpk@gmx.de>
- <478f1429-03f2-a944-8d47-3757a4d44a40@baylibre.com>
- <130a3716-a643-d14f-fd7c-9ad3bb67f3a7@gmx.de>
-Message-ID: <c9e66a1f-a53f-9993-dd15-5e566c5f46f0@baylibre.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 30 Dec 2016 09:51:51 +0100
+Subject: [PATCH 3/6] pinctrl: armada-37xx: Add gpio support
+In-Reply-To: <20161222172501.16121-4-gregory.clement@free-electrons.com>
+References: <20161222172501.16121-1-gregory.clement@free-electrons.com>
+ <20161222172501.16121-4-gregory.clement@free-electrons.com>
+Message-ID: <CACRpkdY_68=5oBN3TLs_ohc0gc2=yiG3qizg7MGh4F7Z+-ZzSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/29/2016 10:18 PM, Heinrich Schuchardt wrote:
-> On 12/29/2016 10:07 AM, Neil Armstrong wrote:
->> On 12/24/2016 03:00 PM, Heinrich Schuchardt wrote:
->>> When trying to run sddm on an Hardkernel Odroid C2 I invariably run into the
->>> translation fault below.
->>>
->>> The following mail thread relates this kind of problem to TLB (translation
->>> lookaside buffer) broadcasting.
->>>
->>> https://lkml.org/lkml/2014/4/15/207
->>>
->>> [ 3163.014263] sddm[1851]: unhandled level 2 translation fault (11) at 0x00000160, esr 0x82000006
->>> [ 3163.017287] pgd = ffff80007bf86000
->>> [ 3163.020589] [00000160] *pgd=000000007a8a3003
->>> [ 3163.024733] , *pud=000000007be9c003
->>> [ 3163.028095] , *pmd=0000000000000000
->>>
->>>
->>> [ 3163.033026] CPU: 1 PID: 1851 Comm: sddm Not tainted 4.9.0-next-20161212-r022-arm64 #1
->>> [ 3163.040831] Hardware name: Hardkernel ODROID-C2 (DT)
->>> [ 3163.045698] task: ffff80007bc6d780 task.stack: ffff80007c524000
->>> [ 3163.051563] PC is at 0x160
->>> [ 3163.054231] LR is at 0xffff9a9fbc98
->>> [ 3163.057686] pc : [<0000000000000160>] lr : [<0000ffff9a9fbc98>] pstate: 40000000
->>> [ 3163.065022] sp : 0000ffffd7180130
->>> [ 3163.068281] x29: 0000ffffd7180130 x28: 0000ffffd7180288 
->>> [ 3163.073538] x27: 0000ffff9aa94000 x26: 0000000000000001 
->>> [ 3163.078798] x25: 0000000000000000 x24: 0000ffffd7180410 
->>> [ 3163.084060] x23: 000000000e0c2190 x22: 000000000e0ca5c0 
->>> [ 3163.089322] x21: 0000ffff9ac35000 x20: 0000000000454fa9 
->>> [ 3163.094583] x19: 0000000000454fa8 x18: 000000000e0b5938 
->>> [ 3163.099843] x17: 0000ffff9a3f2988 x16: 0000ffff9ac36aa0 
->>> [ 3163.105105] x15: 0000000000000000 x14: 0000000000000000 
->>> [ 3163.110367] x13: 6d00640064007300 x12: 0800000005000000 
->>> [ 3163.115627] x11: 0000040000000000 x10: 0000a00000000000 
->>> [ 3163.120889] x9 : 00003fffffffffff x8 : 0000000000000000 
->>> [ 3163.126150] x7 : 000000000e0cb520 x6 : 0000000000454fc0 
->>> [ 3163.131412] x5 : 0000ffffd717ffd8 x4 : 000000000e0cb510 
->>> [ 3163.136680] x3 : 0000000000000004 x2 : f2f9022b551b3900 
->>> [ 3163.141935] x1 : 0000000000000160 x0 : 000000000e0ca5c0 
->>>
->>> Best regards
->>>
->>> Heinrich Schuchardt
->>
->> Hi Heinrich,
->>
->> I personally never had this issue even while loading huge applications loke LibreOffice and Gnome environment.
->>
->> I will have a look and try to reproduce this issue, can you provide us your configuration and user-space complete use case ?
->>
->> Neil
->>
-> 
-> Hello Neil,
-> 
-> the kernel is build with
-> https://github.com/xypron/kernel-odroid-c2/tree/f8d565ff755e92fd585f5ae10123ce20abe03968
-> 
-> Especially look at the patch directory and config/config-next-20161212.
-> 
-> The userland is Debian Stretch with this package:
-> https://packages.debian.org/stretch/sddm
-> 
-> The link
-> https://www.spinics.net/lists/arm-kernel/msg550204.html
-> that you mention in a separate mail just links to this very thread due
-> to linux-arm-kernel at lists.infradead.org being in copy.
-> 
-> Best regards
-> 
-> Heinrich Schuchardt
-> 
+On Thu, Dec 22, 2016 at 6:24 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
 
-Hi,
+> GPIO management is pretty simple and is part of the same IP than the pin
+> controller for the Armada 37xx SoCs.  This patch adds the GPIO support to
+> the pinctrl-armada-37xx.c file, it also allows sharing common functions
+> between the gpiolib and the pinctrl drivers.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Thanks for the details, but why do you use the next-20161212 tag ? does it work with 4.10-rc1 or previous next tags ?
+Some remarks:
 
-Neil
+> +static int armada_37xx_gpio_get_direction(struct gpio_chip *chip,
+> +                                         unsigned int offset)
+> +{
+> +       struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
+> +       unsigned int reg = OUTPUT_EN;
+> +       unsigned int val, mask;
+> +
+> +       if (offset >= GPIO_PER_REG) {
+> +               offset -= GPIO_PER_REG;
+> +               reg += sizeof(u32);
+> +       }
+
+Add a comment saying we never have more than two registers?
+If there would be three registers this would fail, right?
+
+> +       mask = BIT(offset);
+> +
+> +       regmap_read(info->regmap, reg, &val);
+>
+> +       return (val & mask) == 0;
+
+Use this:
+
+return !(val & mask);
+
+> +static int armada_37xx_gpio_get(struct gpio_chip *chip, unsigned int offset)
+> +{
+> +       struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
+> +       unsigned int reg = INPUT_VAL;
+> +       unsigned int val, mask;
+> +
+> +       if (offset >= GPIO_PER_REG) {
+> +               offset -= GPIO_PER_REG;
+> +               reg += sizeof(u32);
+> +       }
+> +       mask = BIT(offset);
+
+This code is repeating. Break out a static (inline?) helper to do this.
+
+> +static int armada_37xx_gpiolib_register(struct platform_device *pdev,
+> +                                       struct armada_37xx_pinctrl *info)
+
+Nit: gpiochip_register or so is more to the point.
+
+> +       ret = gpiochip_add_pin_range(&info->gpio_chip, dev_name(dev), 0,
+> +                                    pinbase, info->data->nr_pins);
+> +       if (ret)
+> +               return ret;
+
+Why do you do this?
+
+Why not just put the ranges into the device tree? We already support
+this in the gpiolib core and it is helpful.
+
+See Documentation/devicetree/bindings/gpio/gpio.txt
+and other DTS files for gpio-ranges.
+
+Yours,
+Linus Walleij
