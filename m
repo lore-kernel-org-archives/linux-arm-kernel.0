@@ -1,25 +1,119 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Dec 2016 10:03:36 +0100
-Subject: [PATCH 3/5] pinctrl: mvebu: pinctrl driver for 98DX3236 SoC
-In-Reply-To: <20161222041328.3303-4-chris.packham@alliedtelesis.co.nz>
-References: <20161222041328.3303-1-chris.packham@alliedtelesis.co.nz>
- <20161222041328.3303-4-chris.packham@alliedtelesis.co.nz>
-Message-ID: <CACRpkdY75CfP82zr_a4+tn0S=GHRDnM=DPr_2zRf_XYsLEo6+w@mail.gmail.com>
+From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
+Date: Fri, 30 Dec 2016 16:58:28 +0800
+Subject: [PATCH v5 10/14] ACPI: ARM64: IORT: rework iort_node_get_id() for
+ NC->SMMU->ITS case
+In-Reply-To: <1482384922-21507-11-git-send-email-guohanjun@huawei.com>
+References: <1482384922-21507-1-git-send-email-guohanjun@huawei.com>
+ <1482384922-21507-11-git-send-email-guohanjun@huawei.com>
+Message-ID: <586621B4.9050704@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2016 at 5:13 AM, Chris Packham
-<chris.packham@alliedtelesis.co.nz> wrote:
-
-> From: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
+On 2016/12/22 13:35, Hanjun Guo wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
 >
-> This pinctrl driver supports the 98DX3236, 98DX3336 and 98DX4251 SoCs
-> from Marvell.
+> iort_node_get_id() for now only support NC(named componant)->SMMU
+> or NC->ITS cases, we also have other device topology such NC->
+> SMMU->ITS, so rework iort_node_get_id() for those cases.
 >
-> Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-
-Looks good to me, Sebastian and/or Thomas P can you ACK this patch?
-
-Yours,
-Linus Walleij
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>   drivers/acpi/arm64/iort.c | 59 ++++++++++++++++++++++++++---------------------
+>   1 file changed, 33 insertions(+), 26 deletions(-)
+>
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index 6b72fcb..9b3f268 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -292,22 +292,28 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
+>   	return status;
+>   }
+>   
+> -static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
+> -		       u32 *rid_out)
+> +static int iort_id_single_map(struct acpi_iort_id_mapping *map, u8 type,
+> +			      u32 *rid_out)
+>   {
+>   	/* Single mapping does not care for input id */
+>   	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
+>   		if (type == ACPI_IORT_NODE_NAMED_COMPONENT ||
+>   		    type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
+> -			*rid_out = map->output_base;
+> +			if (rid_out)
+> +				*rid_out = map->output_base;
+>   			return 0;
+>   		}
+>   
+>   		pr_warn(FW_BUG "[map %p] SINGLE MAPPING flag not allowed for node type %d, skipping ID map\n",
+>   			map, type);
+> -		return -ENXIO;
+>   	}
+>   
+> +	return -ENXIO;
+> +}
+> +
+> +static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
+> +		       u32 *rid_out)
+> +{
+>   	if (rid_in < map->input_base ||
+>   	    (rid_in >= map->input_base + map->id_count))
+>   		return -ENXIO;
+> @@ -324,33 +330,34 @@ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
+>   	struct acpi_iort_node *parent;
+>   	struct acpi_iort_id_mapping *map;
+>   
+> -	if (!node->mapping_offset || !node->mapping_count ||
+> -				     index >= node->mapping_count)
+> -		return NULL;
+> -
+> -	map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
+> -			   node->mapping_offset);
+> +	while (node) {
+> +		if (!node->mapping_offset || !node->mapping_count ||
+> +					     index >= node->mapping_count)
+> +			return NULL;
+>   
+> -	/* Firmware bug! */
+> -	if (!map->output_reference) {
+> -		pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
+> -		       node, node->type);
+> -		return NULL;
+> -	}
+> +		map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
+> +				   node->mapping_offset);
+>   
+> -	parent = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
+> -			       map->output_reference);
+> +		/* Firmware bug! */
+> +		if (!map->output_reference) {
+> +			pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
+> +			       node, node->type);
+> +			return NULL;
+> +		}
+>   
+> -	if (!(IORT_TYPE_MASK(parent->type) & type_mask))
+> -		return NULL;
+> +		parent = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
+> +				      map->output_reference);
+>   
+> -	if (map[index].flags & ACPI_IORT_ID_SINGLE_MAPPING) {
+> -		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
+> -		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
+> -			if (id_out)
+> -				*id_out = map[index].output_base;
+> -			return parent;
+> +		/* go upstream to find its parent */
+> +		if (!(IORT_TYPE_MASK(parent->type) & type_mask)) {
+> +			node = parent;
+> +			continue;
+>   		}
+> +
+> +		if (iort_id_single_map(&map[index], node->type, id_out))
+> +			break;
+> +
+> +		return parent;
+>   	}
+>   
+>   	return NULL;
+Tested-by:  Xinwei Kong <kong.kongxinwei@hisilicon.com>
