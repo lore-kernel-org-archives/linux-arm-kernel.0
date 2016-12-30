@@ -1,53 +1,54 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 30 Dec 2016 15:24:32 +0000
-Subject: [PATCH 1/2] mmc: sdhci-iproc: Apply caps from bcm2835-mmc driver
-In-Reply-To: <1483111474-29907-1-git-send-email-stefan.wahren@i2se.com>
-References: <1483111474-29907-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1483111474-29907-2-git-send-email-stefan.wahren@i2se.com>
+Date: Fri, 30 Dec 2016 15:24:31 +0000
+Subject: [PATCH 0/2] mmc: sdhci-iproc: Improve bcm2835 performance
+Message-ID: <1483111474-29907-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the mmc module on bcm2835 neither provide a capabilities register nor 
-free documentation we must rely on the downstream implementation [1].
+The sdhci-iproc waste a lot performance potential on bcm2835 because of
+missing capabilities in the platform data. This patch series tries to fix
+this.
 
-So enable the following capabilities for bcm2835:
+Raspberry Pi Zero with a class 10 sdhc card
 
-MMC_CAP_MMC_HIGHSPEED
-MMC_CAP_SD_HIGHSPEED
-MMC_CAP_DRIVER_TYPE_A
-MMC_CAP_DRIVER_TYPE_C
+Before:
+dd if=/dev/zero conv=fdatasync of=test bs=8k count=10000
+81920000 Bytes (82 MB), 11,0044 s, 7,4 MB/s
 
-[1] - https://github.com/raspberrypi/linux/blob/rpi-4.4.y/drivers/mmc/host/bcm2835-mmc.c
+sudo dd if=/dev/mmcblk0p1 of=/dev/null
+62914560 Bytes (63 MB), 5,83784 s, 10,8 MB/s
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- drivers/mmc/host/sdhci-iproc.c |    9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+After:
+dd if=/dev/zero conv=fdatasync of=test bs=8k count=10000
+81920000 Bytes (82 MB), 9,76938 s, 8,4 MB/s
 
-diff --git a/drivers/mmc/host/sdhci-iproc.c b/drivers/mmc/host/sdhci-iproc.c
-index d7046d6..30b3fdf 100644
---- a/drivers/mmc/host/sdhci-iproc.c
-+++ b/drivers/mmc/host/sdhci-iproc.c
-@@ -211,14 +211,17 @@ static void sdhci_iproc_writeb(struct sdhci_host *host, u8 val, int reg)
- static const struct sdhci_pltfm_data sdhci_bcm2835_pltfm_data = {
- 	.quirks = SDHCI_QUIRK_BROKEN_CARD_DETECTION |
- 		  SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
--		  SDHCI_QUIRK_MISSING_CAPS,
-+		  SDHCI_QUIRK_MISSING_CAPS |
-+		  SDHCI_QUIRK_NO_HISPD_BIT,
- 	.ops = &sdhci_iproc_32only_ops,
- };
- 
- static const struct sdhci_iproc_data bcm2835_data = {
- 	.pdata = &sdhci_bcm2835_pltfm_data,
--	.caps = SDHCI_CAN_VDD_330,
--	.caps1 = 0x00000000,
-+	.caps = SDHCI_CAN_VDD_330 |
-+		SDHCI_CAN_DO_HISPD,
-+	.caps1 = SDHCI_DRIVER_TYPE_A |
-+		 SDHCI_DRIVER_TYPE_C,
- 	.mmc_caps = 0x00000000,
- };
- 
+sudo dd if=/dev/mmcblk0p1 of=/dev/null
+62914560 Bytes (63 MB), 4,73651 s, 13,3 MB/s
+
+Raspberry Pi Compute Module
+
+Before:
+dd if=/dev/zero conv=fdatasync of=test bs=8k count=10000
+81920000 Bytes (82 MB), 27,4257 s, 3,0 MB/s
+
+sudo dd if=/dev/mmcblk0p1 of=/dev/null
+66060288 Bytes (66 MB), 21,4365 s, 3,1 MB/s
+
+After:
+dd if=/dev/zero conv=fdatasync of=test bs=8k count=10000
+81920000 Bytes (82 MB), 7,19661 s, 11,4 MB/s
+
+sudo dd if=/dev/mmcblk0p1 of=/dev/null
+66060288 Bytes (66 MB), 4,76453 s, 13,9 MB/s
+
+Any tests with a Raspberry Pi 3 (SD and Wifi over SDIO) are welcome.
+
+Stefan Wahren (2):
+  mmc: sdhci-iproc: Apply caps from bcm2835-mmc driver
+  mmc: sdhci-iproc: Increase max_blk_size for bcm2835
+
+ drivers/mmc/host/sdhci-iproc.c |   11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
 -- 
 1.7.9.5
