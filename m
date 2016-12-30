@@ -1,37 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Dec 2016 10:23:05 +0100
-Subject: [PATCH 7/9] pinctrl: samsung: Add property to mark pad state as
- suitable for power down
-In-Reply-To: <20161227153331.jbh7ei6oh3obmnri@kozik-lap>
-References: <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20161223122538epcas5p29515ceff21963ab035b3b32878830ce2@epcas5p2.samsung.com>
- <1482495889-6201-8-git-send-email-m.szyprowski@samsung.com>
- <20161225191914.5bzl6fso36ozuum6@kozik-lap>
- <bd48fe32-5296-fc23-dbb8-d212292d76cd@samsung.com>
- <20161227153331.jbh7ei6oh3obmnri@kozik-lap>
-Message-ID: <CACRpkdYzGjxyePcc-WiWDoX9rF6mP+mqCtk=zBUGb0-DvAjxvA@mail.gmail.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Fri, 30 Dec 2016 11:24:50 +0200
+Subject: [PATCH 4/4] video: ARM CLCD: add support of an optional GPIO to
+ enable panel
+In-Reply-To: <CACRpkdb5Ojs+meXZKwJP3oDcYAnnrXgqBaXmCcgmgxJM=GkBGA@mail.gmail.com>
+References: <20161221032717.13154-1-vz@mleia.com>
+ <20161221032717.13154-5-vz@mleia.com>
+ <CACRpkdb5Ojs+meXZKwJP3oDcYAnnrXgqBaXmCcgmgxJM=GkBGA@mail.gmail.com>
+Message-ID: <7ac1d3ba-394c-f7de-268c-59a63eb27e8c@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2016 at 4:33 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On Tue, Dec 27, 2016 at 11:30:57AM +0100, Marek Szyprowski wrote:
-
->> Separate sleep state is needed because of the pin control bindings and
->> design.
+On 12/30/2016 10:20 AM, Linus Walleij wrote:
+> On Wed, Dec 21, 2016 at 4:27 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
+> 
+>> The change adds handling of "enable-gpios" property of panel-dpi device
+>> node used with an ARM CLCD controller, note that the property already has
+>> a description in display/panel/panel-dpi.txt documentation and it founds
+>> practical usage while describing some panel devices connected to other
+>> types of display controllers.
 >>
->> A separate sleep state is required to let pin control client driver (in this
->> case
->> Exynos I2S driver) let to choose when it is okay to switch pads into sleep
->> state and I see no other way to achieve this.
->
-> Maybe the pinctrl API should be extended for this? Doing this in DTS
-> just for purpose of passing information between drivers (consumer and
-> provider) looks odd.
+>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> 
+> So as you may have seen I already handle a RESET GPIO in the
+> Nomadik TPG110 panel subddriver in
+> drivers/video/fbdev/amba-clcd-nomadik.c
+> 
+> So is this all your panel needs?
 
-I don't understand what is going on but you are all smart people so I
-guess you're right :)
+I need "enable-gpios" property to define a GPIO, which literally enables
+(powers up) a panel as a separate attached PCB.
 
-Tell me if I can help clarifying something...
+To some extend "enable-gpios" property can be replaced by "power" property
+with a phandle to a GPIO voltage regulator.
 
-Yours,
-Linus Walleij
+You may look at drivers/gpu/drm/panel/panel-simple.c, both "enable-gpios"
+and "power" properties are defined for simple panels.
+
+> 
+> I guess it is OK for simple panels.
+> 
+
+--
+With best wishes,
+Vladimir
