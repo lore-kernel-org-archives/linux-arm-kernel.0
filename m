@@ -1,27 +1,100 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Dec 2016 14:32:39 +0100
-Subject: [PATCH v2 3/4] ARM64: dts: exynos5433: use macros for pinctrl
- configuration on Exynos5433
-In-Reply-To: <20161230041421.24448-4-andi.shyti@samsung.com>
-References: <CGME20161230041427epcas1p1151d6e28fac143c63efaf4f7c8ed432d@epcas1p1.samsung.com>
- <20161230041421.24448-1-andi.shyti@samsung.com>
- <20161230041421.24448-4-andi.shyti@samsung.com>
-Message-ID: <CACRpkdaz9AyFJs1Th_SVexqKaP-=iPF0G-1YXOCoSmrQH8ZHDA@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 30 Dec 2016 14:33:32 +0100
+Subject: [PATCH v4 0/4] Add runtime PM support for clocks (on Exynos SoC
+ example)
+References: <CGME20161230133344eucas1p21d107e1cf3096916aad1944f7e002bf9@eucas1p2.samsung.com>
+Message-ID: <1483104816-20885-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 30, 2016 at 5:14 AM, Andi Shyti <andi.shyti@samsung.com> wrote:
+Dear All,
 
-> Use the macros defined in include/dt-bindings/pinctrl/samsung.h
-> instead of hardcoded values.
->
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+This patchset adds runtime PM support to common clock framework. This is an
+attempt to implement support for clock controllers, which belongs to a power
+domain. This approach works surprisingly well on Exynos 5433 SoC, what allowed
+us to solve various freeze/crash issues related to power management.
 
-These look fine, but that this and the other DTS patch through ARM SoC.
+The main idea behind this patchset is to keep clock's controller power domain
+enabled every time when at least one of its clock is enabled or access to its
+registers is being made. Clock controller driver (clock provider) can
+supply a struct device pointer, which is the used by clock core for tracking and
+managing clock's controller runtime pm state. Each clk_prepare() operation will
+first call pm_runtime_get_sync() on the supplied device, while clk_unprepare()
+will do pm_runtime_put() at the end.
 
-If you also need the headerfile patch (patch 2) to go through ARM SoC
-that is fine,
-I can take it out of pinctrl if you want.
+This runtime PM feature has been tested with Exynos4412 (not included in this
+patchset) and Exynos5433 clocks drivers. Both have some clocks, which belongs to
+respective power domains and need special handling during power on/off
+procedures. Till now it wasn't handled at all, what caused various problems.
 
-Yours,
-Linus Walleij
+Patches for clocks drivers change the way the clock provider is initialized.
+Instead of CLK_OF_DECLARE based initialization, a complete platform device driver
+infrastructure is being used. This is needed to let driver to use runtime PM
+feature and integrate with generic power domains. The side-effect of this change
+is a delay in clock provider registeration during system boot, so early
+initialized drivers might get EPROBEDEFER error when requesting their clocks.
+This is an issue for IOMMU drivers, so this patchset will be fully functional
+once the deferred probe for IOMMU will be merged.
+
+Patches are based on vanilla v4.10-rc1 kernel.
+
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+
+Changelog:
+
+v4:
+- Removed patch for Exynos4412 clocks from the patchset. DT bindings for power
+  domain for ISP sub-controller needs more discussion. It will be handled
+  separately when the runtime PM for clocks feature gets merged.
+- Added patch with runtime PM support for Exynos AudioSS clock controller driver
+  (needed to enable audio power domain on Exynos5 series).
+- Fixes in Exynos5433 driver:
+	1. added missing clock for Audio CMU
+	2. added support for FSYS CMU
+	3. improved support for DISP CMU (thanks to Andrzej Hajda for
+	   investigating that).
+- Rebased onto v4.10-rc1
+- Waiting for a review...
+
+v3: http://www.spinics.net/lists/arm-kernel/msg538122.html
+- Removed CLK_RUNTIME_PM flag, core now simply checks if runtime pm is enabled
+  for the provided device during clock registration as suggested by Ulf
+- Simplified code for exynos4412 isp clock driver registration
+- Resolved some other minor issues pointed by Ulf clk core code
+- Rebased onto v4.9-rc1 and new version of IOMMU deferred probe patchset
+
+v2: https://www.spinics.net/lists/arm-kernel/msg532798.html
+- Simplified clk_pm_runtime_get/put functions, removed workaround for devices
+  with disabled runtime pm. Such workaround is no longer needed since commit
+  4d23a5e84806b202d9231929c9507ef7cf7a0185 ("PM / Domains: Allow runtime PM
+  during system PM phases").
+- Added CLK_RUNTIME_PM flag to indicate clocks, for which clock core should
+  call runtime pm functions. This solves problem with clocks, for which struct
+  device is already registered, but no runtime pm is enabled.
+- Extended commit messages according to Ulf suggestions.
+- Fixed some style issues pointed by Barlomiej.
+
+v1: http://www.spinics.net/lists/arm-kernel/msg528128.html
+- initial version
+
+
+Marek Szyprowski (4):
+  clk: Add support for runtime PM
+  clk: samsung: Add support for runtime PM
+  clk: samsung: exynos5433: Add runtime PM support
+  clk: samsung: exynos-audss: Use runtime PM
+
+ .../devicetree/bindings/clock/clk-exynos-audss.txt |   6 +
+ .../devicetree/bindings/clock/exynos5433-clock.txt |  16 +
+ drivers/clk/clk.c                                  | 111 +++++-
+ drivers/clk/samsung/clk-exynos-audss.c             |  62 +--
+ drivers/clk/samsung/clk-exynos5433.c               | 415 ++++++++++++++++-----
+ drivers/clk/samsung/clk-pll.c                      |   2 +-
+ drivers/clk/samsung/clk.c                          |  12 +-
+ drivers/clk/samsung/clk.h                          |   7 +
+ 8 files changed, 504 insertions(+), 127 deletions(-)
+
+-- 
+1.9.1
