@@ -1,63 +1,67 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Fri, 30 Dec 2016 16:43:33 +0100
-Subject: [PATCH v2] mfd: mc13xxx: Set the irq type.
-Message-ID: <1483112613-18092-1-git-send-email-lilja.magnus@gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 30 Dec 2016 17:53:12 +0200
+Subject: [GIT PULL] ARM: exynos: Late mach/soc for v4.10
+In-Reply-To: <1482003132-8844-1-git-send-email-krzk@kernel.org>
+References: <1482003132-8844-1-git-send-email-krzk@kernel.org>
+Message-ID: <20161230155312.oupgyip7wtqwcuy2@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 10f9edaeaa30 ("mfd: mc13xxx: Use regmap irq framework for
-interrupts") removed the passing of the IRQF_TRIGGER_HIGH flag when
-registering the interrupt.
-This commit fixes that problem by setting the IRQF_TRIGGER_HIGH flag in
-case no irq type is set via irqd framework (e.g. device tree). In the
-latter case the irq flag from irqd is used.
+On Sat, Dec 17, 2016 at 09:32:12PM +0200, Krzysztof Kozlowski wrote:
+> Hi,
+> 
+> 
+> After our discussions about not-breaking out-of-tree DTB with SCU
+> change in DeviceTree, I prepared an updated pull request without
+> the questioned changes.
+> 
+> Ten days ago I prepared a tag, pushed it... and apparently forgot to send pull
+> request. At least, I don't have such email in my outbox. Dunno.
+> 
+> So let's send it now, better late then never. With just few commits (without
+> the DT SCU changes). These were sitting in the next for very long.
+> 
 
-Tested on i.MX31 PDK hardware.
+Any comments on this? I guess it won't come as late-late-4.10, so can
+you pull it for v4.11?
 
-Fixes: 10f9edaeaa30 ("mfd: mc13xxx: Use regmap irq framework for interrupts")
-Cc: <stable@vger.kernel.org> # 3.18.x
-Cc: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
----
-Changes from v1 (which was part of a patch series):
-  - Now uses irqd_-functions to check if irq type is defined
-  - Added Fixes: and Cc: to stable kernel.
+Best regards,
+Krzysztof
 
- drivers/mfd/mc13xxx-core.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-index d7f54e4..e1757ea 100644
---- a/drivers/mfd/mc13xxx-core.c
-+++ b/drivers/mfd/mc13xxx-core.c
-@@ -15,6 +15,7 @@
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/mfd/core.h>
-+#include <linux/irq.h>
- 
- #include "mc13xxx.h"
- 
-@@ -410,6 +411,7 @@ int mc13xxx_common_init(struct device *dev)
- 	struct mc13xxx *mc13xxx = dev_get_drvdata(dev);
- 	u32 revision;
- 	int i, ret;
-+	unsigned int flags;
- 
- 	mc13xxx->dev = dev;
- 
-@@ -440,7 +442,11 @@ int mc13xxx_common_init(struct device *dev)
- 	mc13xxx->irq_chip.irqs = mc13xxx->irqs;
- 	mc13xxx->irq_chip.num_irqs = ARRAY_SIZE(mc13xxx->irqs);
- 
--	ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq, IRQF_ONESHOT,
-+	flags = irqd_get_trigger_type(irq_get_irq_data(mc13xxx->irq));
-+	flags = (flags == IRQ_TYPE_NONE) ? IRQF_TRIGGER_HIGH : flags;
-+
-+	ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq,
-+				  IRQF_ONESHOT | flags,
- 				  0, &mc13xxx->irq_chip, &mc13xxx->irq_data);
- 	if (ret)
- 		return ret;
--- 
-2.7.4
+> Best regards,
+> Krzysztof
+> 
+> 
+> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+> 
+>   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.10-2
+> 
+> for you to fetch changes up to da6b21e97e39d42f90ab490ce7b54a0fe2c3fe35:
+> 
+>   ARM: Drop fixed 200 Hz timer requirement from Samsung platforms (2016-12-07 18:42:11 +0200)
+> 
+> ----------------------------------------------------------------
+> Samsung mach/soc update for v4.10:
+> 1. Minor cleanup in smp_operations.
+> 2. Another step in switching s3c24xx to new DMA API.
+> 3. Drop fixed requirement for HZ=200 on Samsung platforms.
+> 
+> ----------------------------------------------------------------
+> Krzysztof Kozlowski (1):
+>       ARM: Drop fixed 200 Hz timer requirement from Samsung platforms
+> 
+> Pankaj Dubey (1):
+>       ARM: EXYNOS: Remove smp_init_cpus hook from platsmp.c
+> 
+> Sylwester Nawrocki (1):
+>       ARM: S3C24XX: Add DMA slave maps for remaining s3c24xx SoCs
+> 
+>  arch/arm/Kconfig               |  3 +-
+>  arch/arm/mach-exynos/platsmp.c | 31 -----------------
+>  arch/arm/mach-s3c24xx/common.c | 76 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 77 insertions(+), 33 deletions(-)
