@@ -1,310 +1,63 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Fri, 30 Dec 2016 19:01:06 +0000
-Subject: [PATCH 2/3 v2] iio: adc: break out common code from SPMI VADC
-In-Reply-To: <1481842105-14047-1-git-send-email-linus.walleij@linaro.org>
-References: <1481842105-14047-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <717ea1c4-33af-f0ca-e018-5d7ac87506e1@kernel.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 30 Dec 2016 11:15:30 -0800
+Subject: [PATCH] trace: extend trace_clock to support arch_arm clock
+ counter
+In-Reply-To: <20161220170458.GM10132@arm.com>
+References: <1480666495-26536-1-git-send-email-sramana@codeaurora.org>
+ <20161202110845.GC8266@arm.com> <5843D587.5010407@codeaurora.org>
+ <20161206121346.GF2498@arm.com> <584E2F40.10904@codeaurora.org>
+ <20161212104243.GA21248@arm.com> <58529799.9060206@codeaurora.org>
+ <20161220170458.GM10132@arm.com>
+Message-ID: <20161230191530.GI17126@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/16 22:48, Linus Walleij wrote:
-> The SPMI VADC and the earlier XOADC share a subset of
-> common code, so to be able to use the same code in both
-> drivers, we break out a separate file with the common code,
-> prefix exported functions that are no longer static with
-> qcom_* and bake an object qcom-vadc.o that contains both
-> files: qcom-vadc-common.o and qcom-spmi-vadc.o.
+On 12/20, Will Deacon wrote:
+> On Thu, Dec 15, 2016 at 06:46:09PM +0530, Srinivas Ramana wrote:
+> > On 12/12/2016 04:12 PM, Will Deacon wrote:
+> > >On Mon, Dec 12, 2016 at 10:31:52AM +0530, Srinivas Ramana wrote:
+> > >>On 12/06/2016 05:43 PM, Will Deacon wrote:
+> > >>>Does this mean we need a way to expose the frequency to userspace, too?
+> > >>
+> > >>Not really. The CNTFRQ_EL0 of timer subsystem holds the clock frequency of
+> > >>system timer and is available to EL0.
+> > >
+> > >Experience shows that CNTFRQ_EL0 is often unreliable, and the frequency
+> > >can be overridden by the device-tree. There are also systems where the
+> > >counter stops ticking across suspend. Whilst both of these can be considered
+> > >"broken", I suspect we want runtime buy-in from the arch-timer driver
+> > >before registering this trace_clock.
+> > 
+> > Agree. It doesnt seem like architecture mandates initializing this.
+> > For those systems where tick would stop, if not arch counter, i assume there
+> > is some counter which falls in 'always ON' domain without which they cant
+> > keep track of time.
 > 
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-arm-msm at vger.kernel.org
-> Cc: Ivan T. Ivanov <iivanov.xz@gmail.com>
-> Cc: Andy Gross <andy.gross@linaro.org>
-> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-Looks superficially fine, but I'm guessing will need a respin
-as we have a fair bit of new stuff (and a couple of fixes) going
-through this driver at the moment.
+> We just need to avoid exposing this trace clock if the frequency was
+> provided by firmware.
+> 
 
-All but the two fixes I posted a few mins ago are in my testing
-branch and should go to Greg once I have confirmed testing on
-those two fixes.
+We would need to know the frequency if we wanted to convert the
+counter values into seconds. In our case, we don't really care to
+do that. All we want to do is compare events in the ftrace log
+with events in other hw subsystem logs. If we have the raw
+counter value there then it makes it simple to compare the two
+and debug problems. Now that isn't to say that it would be useful
+to convert the counter value into seconds, but it doesn't look to
+be a prerequisite of registering the trace clock.
 
-Jonathan
-> ---
-> ChangeLog v1->v2:
-> - No changes just reposting
-> ---
->  drivers/iio/adc/Makefile           |  3 +-
->  drivers/iio/adc/qcom-spmi-vadc.c   | 95 +++-----------------------------------
->  drivers/iio/adc/qcom-vadc-common.c | 38 +++++++++++++++
->  drivers/iio/adc/qcom-vadc-common.h | 69 +++++++++++++++++++++++++++
->  4 files changed, 116 insertions(+), 89 deletions(-)
->  create mode 100644 drivers/iio/adc/qcom-vadc-common.c
->  create mode 100644 drivers/iio/adc/qcom-vadc-common.h
-> 
-> diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-> index 7a40c04c311f..f9468d228b1e 100644
-> --- a/drivers/iio/adc/Makefile
-> +++ b/drivers/iio/adc/Makefile
-> @@ -38,7 +38,8 @@ obj-$(CONFIG_MXS_LRADC) += mxs-lradc.o
->  obj-$(CONFIG_NAU7802) += nau7802.o
->  obj-$(CONFIG_PALMAS_GPADC) += palmas_gpadc.o
->  obj-$(CONFIG_QCOM_SPMI_IADC) += qcom-spmi-iadc.o
-> -obj-$(CONFIG_QCOM_SPMI_VADC) += qcom-spmi-vadc.o
-> +qcom-vadc-y := qcom-vadc-common.o
-> +obj-$(CONFIG_QCOM_SPMI_VADC) += qcom-vadc.o qcom-spmi-vadc.o
->  obj-$(CONFIG_ROCKCHIP_SARADC) += rockchip_saradc.o
->  obj-$(CONFIG_STX104) += stx104.o
->  obj-$(CONFIG_TI_ADC081C) += ti-adc081c.o
-> diff --git a/drivers/iio/adc/qcom-spmi-vadc.c b/drivers/iio/adc/qcom-spmi-vadc.c
-> index c2babe50a0d8..74d21afa34a9 100644
-> --- a/drivers/iio/adc/qcom-spmi-vadc.c
-> +++ b/drivers/iio/adc/qcom-spmi-vadc.c
-> @@ -28,6 +28,8 @@
->  
->  #include <dt-bindings/iio/qcom,spmi-vadc.h>
->  
-> +#include "qcom-vadc-common.h"
-> +
->  /* VADC register and bit definitions */
->  #define VADC_REVISION2				0x1
->  #define VADC_REVISION2_SUPPORTED_VADC		1
-> @@ -75,69 +77,9 @@
->  
->  #define VADC_DATA				0x60	/* 16 bits */
->  
-> -#define VADC_CONV_TIME_MIN_US			2000
-> -#define VADC_CONV_TIME_MAX_US			2100
-> -
-> -/* Min ADC code represents 0V */
-> -#define VADC_MIN_ADC_CODE			0x6000
-> -/* Max ADC code represents full-scale range of 1.8V */
-> -#define VADC_MAX_ADC_CODE			0xa800
-> -
-> -#define VADC_ABSOLUTE_RANGE_UV			625000
-> -#define VADC_RATIOMETRIC_RANGE_UV		1800000
-> -
-> -#define VADC_DEF_PRESCALING			0 /* 1:1 */
-> -#define VADC_DEF_DECIMATION			0 /* 512 */
-> -#define VADC_DEF_HW_SETTLE_TIME			0 /* 0 us */
-> -#define VADC_DEF_AVG_SAMPLES			0 /* 1 sample */
-> -#define VADC_DEF_CALIB_TYPE			VADC_CALIB_ABSOLUTE
-> -
-> -#define VADC_DECIMATION_MIN			512
-> -#define VADC_DECIMATION_MAX			4096
-> -
-> -#define VADC_HW_SETTLE_DELAY_MAX		10000
-> -#define VADC_AVG_SAMPLES_MAX			512
-> -
-> -#define KELVINMIL_CELSIUSMIL			273150
-> -
->  #define VADC_CHAN_MIN			VADC_USBIN
->  #define VADC_CHAN_MAX			VADC_LR_MUX3_BUF_PU1_PU2_XO_THERM
->  
-> -/*
-> - * VADC_CALIB_ABSOLUTE: uses the 625mV and 1.25V as reference channels.
-> - * VADC_CALIB_RATIOMETRIC: uses the reference voltage (1.8V) and GND for
-> - * calibration.
-> - */
-> -enum vadc_calibration {
-> -	VADC_CALIB_ABSOLUTE = 0,
-> -	VADC_CALIB_RATIOMETRIC
-> -};
-> -
-> -/**
-> - * struct vadc_linear_graph - Represent ADC characteristics.
-> - * @dy: numerator slope to calculate the gain.
-> - * @dx: denominator slope to calculate the gain.
-> - * @gnd: A/D word of the ground reference used for the channel.
-> - *
-> - * Each ADC device has different offset and gain parameters which are
-> - * computed to calibrate the device.
-> - */
-> -struct vadc_linear_graph {
-> -	s32 dy;
-> -	s32 dx;
-> -	s32 gnd;
-> -};
-> -
-> -/**
-> - * struct vadc_prescale_ratio - Represent scaling ratio for ADC input.
-> - * @num: the inverse numerator of the gain applied to the input channel.
-> - * @den: the inverse denominator of the gain applied to the input channel.
-> - */
-> -struct vadc_prescale_ratio {
-> -	u32 num;
-> -	u32 den;
-> -};
-> -
->  /**
->   * struct vadc_channel_prop - VADC channel property.
->   * @channel: channel number, refer to the channel list.
-> @@ -471,33 +413,10 @@ static int vadc_measure_ref_points(struct vadc_priv *vadc)
->  static s32 vadc_calibrate(struct vadc_priv *vadc,
->  			  const struct vadc_channel_prop *prop, u16 adc_code)
->  {
-> -	const struct vadc_prescale_ratio *prescale;
-> -	s64 voltage;
-> -
-> -	voltage = adc_code - vadc->graph[prop->calibration].gnd;
-> -	voltage *= vadc->graph[prop->calibration].dx;
-> -	voltage = div64_s64(voltage, vadc->graph[prop->calibration].dy);
-> -
-> -	if (prop->calibration == VADC_CALIB_ABSOLUTE)
-> -		voltage += vadc->graph[prop->calibration].dx;
-> -
-> -	if (voltage < 0)
-> -		voltage = 0;
-> -
-> -	prescale = &vadc_prescale_ratios[prop->prescale];
-> -
-> -	voltage = voltage * prescale->den;
-> -
-> -	return div64_s64(voltage, prescale->num);
-> -}
-> -
-> -static int vadc_decimation_from_dt(u32 value)
-> -{
-> -	if (!is_power_of_2(value) || value < VADC_DECIMATION_MIN ||
-> -	    value > VADC_DECIMATION_MAX)
-> -		return -EINVAL;
-> -
-> -	return __ffs64(value / VADC_DECIMATION_MIN);
-> +	return qcom_vadc_calibrate(&vadc_prescale_ratios[prop->prescale],
-> +				   &vadc->graph[prop->calibration],
-> +				   (prop->calibration == VADC_CALIB_ABSOLUTE),
-> +				   adc_code);
->  }
->  
->  static int vadc_prescaling_from_dt(u32 num, u32 den)
-> @@ -752,7 +671,7 @@ static int vadc_get_dt_channel_data(struct device *dev,
->  
->  	ret = of_property_read_u32(node, "qcom,decimation", &value);
->  	if (!ret) {
-> -		ret = vadc_decimation_from_dt(value);
-> +		ret = qcom_vadc_decimation_from_dt(value);
->  		if (ret < 0) {
->  			dev_err(dev, "%02x invalid decimation %d\n",
->  				chan, value);
-> diff --git a/drivers/iio/adc/qcom-vadc-common.c b/drivers/iio/adc/qcom-vadc-common.c
-> new file mode 100644
-> index 000000000000..f67fc5e2a702
-> --- /dev/null
-> +++ b/drivers/iio/adc/qcom-vadc-common.c
-> @@ -0,0 +1,38 @@
-> +#include <linux/kernel.h>
-> +#include <linux/bitops.h>
-> +#include <linux/math64.h>
-> +#include <linux/log2.h>
-> +#include <linux/err.h>
-> +
-> +#include "qcom-vadc-common.h"
-> +
-> +s32 qcom_vadc_calibrate(const struct vadc_prescale_ratio *prescale,
-> +			const struct vadc_linear_graph *graph,
-> +			bool absolute,
-> +			u16 adc_code)
-> +{
-> +	s64 voltage;
-> +
-> +	voltage = adc_code - graph->gnd;
-> +	voltage *= graph->dx;
-> +	voltage = div64_s64(voltage, graph->dy);
-> +
-> +	if (absolute)
-> +		voltage += graph->dx;
-> +
-> +	if (voltage < 0)
-> +		voltage = 0;
-> +
-> +	voltage = voltage * prescale->den;
-> +
-> +	return div64_s64(voltage, prescale->num);
-> +}
-> +
-> +int qcom_vadc_decimation_from_dt(u32 value)
-> +{
-> +	if (!is_power_of_2(value) || value < VADC_DECIMATION_MIN ||
-> +	    value > VADC_DECIMATION_MAX)
-> +		return -EINVAL;
-> +
-> +	return __ffs64(value / VADC_DECIMATION_MIN);
-> +}
-> diff --git a/drivers/iio/adc/qcom-vadc-common.h b/drivers/iio/adc/qcom-vadc-common.h
-> new file mode 100644
-> index 000000000000..b41cb501eef8
-> --- /dev/null
-> +++ b/drivers/iio/adc/qcom-vadc-common.h
-> @@ -0,0 +1,69 @@
-> +/*
-> + * Code shared between the different Qualcomm PMIC voltage ADCs
-> + */
-> +
-> +#define VADC_CONV_TIME_MIN_US			2000
-> +#define VADC_CONV_TIME_MAX_US			2100
-> +
-> +/* Min ADC code represents 0V */
-> +#define VADC_MIN_ADC_CODE			0x6000
-> +/* Max ADC code represents full-scale range of 1.8V */
-> +#define VADC_MAX_ADC_CODE			0xa800
-> +
-> +#define VADC_ABSOLUTE_RANGE_UV			625000
-> +#define VADC_RATIOMETRIC_RANGE_UV		1800000
-> +
-> +#define VADC_DEF_PRESCALING			0 /* 1:1 */
-> +#define VADC_DEF_DECIMATION			0 /* 512 */
-> +#define VADC_DEF_HW_SETTLE_TIME			0 /* 0 us */
-> +#define VADC_DEF_AVG_SAMPLES			0 /* 1 sample */
-> +#define VADC_DEF_CALIB_TYPE			VADC_CALIB_ABSOLUTE
-> +
-> +#define VADC_DECIMATION_MIN			512
-> +#define VADC_DECIMATION_MAX			4096
-> +
-> +#define VADC_HW_SETTLE_DELAY_MAX		10000
-> +#define VADC_AVG_SAMPLES_MAX			512
-> +
-> +#define KELVINMIL_CELSIUSMIL			273150
-> +
-> +/*
-> + * VADC_CALIB_ABSOLUTE: uses the 625mV and 1.25V as reference channels.
-> + * VADC_CALIB_RATIOMETRIC: uses the reference voltage (1.8V) and GND for
-> + * calibration.
-> + */
-> +enum vadc_calibration {
-> +	VADC_CALIB_ABSOLUTE = 0,
-> +	VADC_CALIB_RATIOMETRIC
-> +};
-> +
-> +/**
-> + * struct vadc_linear_graph - Represent ADC characteristics.
-> + * @dy: numerator slope to calculate the gain.
-> + * @dx: denominator slope to calculate the gain.
-> + * @gnd: A/D word of the ground reference used for the channel.
-> + *
-> + * Each ADC device has different offset and gain parameters which are
-> + * computed to calibrate the device.
-> + */
-> +struct vadc_linear_graph {
-> +	s32 dy;
-> +	s32 dx;
-> +	s32 gnd;
-> +};
-> +
-> +/**
-> + * struct vadc_prescale_ratio - Represent scaling ratio for ADC input.
-> + * @num: the inverse numerator of the gain applied to the input channel.
-> + * @den: the inverse denominator of the gain applied to the input channel.
-> + */
-> +struct vadc_prescale_ratio {
-> +	u32 num;
-> +	u32 den;
-> +};
-> +
-> +s32 qcom_vadc_calibrate(const struct vadc_prescale_ratio *prescale,
-> +			const struct vadc_linear_graph *graph,
-> +			bool absolute,
-> +			u16 adc_code);
-> +int qcom_vadc_decimation_from_dt(u32 value);
-> 
+If we want to expose the counter frequency to userspace we could
+make a sysfs attribute for that and have userspace rely on it
+instead of CNTFRQ_EL0. Or if we can make CNTFRQ_EL0 accesses trap
+(forgive me for not looking at the ARM ARM right now) we can
+emulate it based on the DT property.
+
+And for systems where the counter stops during suspend, I imagine
+the only problem would be tracing across suspend would show a
+clock that doesn't keep counting while suspended. sched_clock()
+already exhibits that behavior, so I'm not sure we've lost
+anything here.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
