@@ -1,43 +1,34 @@
-From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
-Date: Fri, 30 Dec 2016 17:00:34 +0800
-Subject: [PATCH v5 08/14] ACPI: ARM64: IORT: rework iort_node_get_id()
-In-Reply-To: <1482384922-21507-9-git-send-email-guohanjun@huawei.com>
-References: <1482384922-21507-1-git-send-email-guohanjun@huawei.com>
- <1482384922-21507-9-git-send-email-guohanjun@huawei.com>
-Message-ID: <58662232.2010001@hisilicon.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 30 Dec 2016 10:19:23 +0100
+Subject: [PATCH 5/9] pinctrl: samsung: Move retention control from
+ mach-exynos to the pinctrl driver
+In-Reply-To: <1482495889-6201-6-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20161223122531epcas1p4b8fad6664dad3408acb7a1b9f140884a@epcas1p4.samsung.com>
+ <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
+ <1482495889-6201-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CACRpkdYHxCmvtnCRD3E2+Ct7yzUeg6tkEKr46nK8ATJPqfPcjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/12/22 13:35, Hanjun Guo wrote:
-> From: Hanjun Guo <hanjun.guo@linaro.org>
+On Fri, Dec 23, 2016 at 1:24 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+
+> Pad retention control after suspend/resume cycle should be done from pin
+> controller driver instead of PMU (power management unit) driver to avoid
+> possible ordering and logical dependencies. Till now it worked fine only
+> because PMU driver registered its sys_ops after pin controller.
 >
-> iort_node_get_id() has two output, one is the mapped ids,
-> the other is the referenced parent node which is returned
-> from the function.
+> This patch moves pad retention control from PMU driver to Exynos pin
+> controller driver. This is a preparation for adding new features to Exynos
+> pin controller driver, like runtime power management and suspending
+> individual pin controllers, which might be a part of some power domain.
 >
-> For now we need a API just return its parent node for
-> single mapping, so just update this function slightly then
-> reuse it later.
->
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   drivers/acpi/arm64/iort.c | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index ab7bae7..bc68d93 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -347,7 +347,8 @@ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
->   	if (map[index].flags & ACPI_IORT_ID_SINGLE_MAPPING) {
->   		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
->   		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
-> -			*id_out = map[index].output_base;
-> +			if (id_out)
-> +				*id_out = map[index].output_base;
->   			return parent;
->   		}
->   	}
-Tested-by:  Xinwei Kong <kong.kongxinwei@hisilicon.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
+Clear and elegant.
+
+I will need an ACK from some ARM SoC person on this so they are
+aware that we rip code out of mach-* to pinctrl.
+
+Yours,
+Linus Walleij
