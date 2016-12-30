@@ -1,32 +1,21 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 30 Dec 2016 13:37:20 +0530
-Subject: [PATCH] ARM: dts: am572x-idk: Add gpios property to control
- PCIE_RESETn
-Message-ID: <1483085240-16102-1-git-send-email-kishon@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 30 Dec 2016 09:13:42 +0100
+Subject: [PATCH 1/2] pinctrl: sirf: atlas7: Add missing 'of_node_put()'
+In-Reply-To: <20161220054043.25417-1-christophe.jaillet@wanadoo.fr>
+References: <20161220054043.25417-1-christophe.jaillet@wanadoo.fr>
+Message-ID: <CACRpkdZP1E6Br=oiqxR1hOxSacUBDCkKW5dhuiXBvxrERXpx0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add 'gpios' property to pcie1 dt node and populate it with
-GPIO3_23 in order to drive PCIE_RESETn high.
+On Tue, Dec 20, 2016 at 6:40 AM, Christophe JAILLET
+<christophe.jaillet@wanadoo.fr> wrote:
 
-This gets PCIe cards to be detected in AM572X IDK board.
+> Reference to 'sys2pci_np' should be dropped in all cases here, not only in
+> error handling path.
+>
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/am572x-idk.dts |    4 ++++
- 1 file changed, 4 insertions(+)
+Patch applied.
 
-diff --git a/arch/arm/boot/dts/am572x-idk.dts b/arch/arm/boot/dts/am572x-idk.dts
-index 27d9149..1540f7a 100644
---- a/arch/arm/boot/dts/am572x-idk.dts
-+++ b/arch/arm/boot/dts/am572x-idk.dts
-@@ -87,3 +87,7 @@
- &sn65hvs882 {
- 	load-gpios = <&gpio3 19 GPIO_ACTIVE_LOW>;
- };
-+
-+&pcie1 {
-+	gpios = <&gpio3 23 GPIO_ACTIVE_HIGH>;
-+};
--- 
-1.7.9.5
+Yours,
+Linus Walleij
