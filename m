@@ -1,59 +1,42 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Sat, 31 Dec 2016 00:08:43 +0900
-Subject: [PATCH v2 4/5] arm64: dts: exynos5433: Add bus dt node using
- VDD_INT for Exynos5433
-In-Reply-To: <20161230145155.ecobfvtspviehlos@kozik-lap>
-References: <1481173091-9728-1-git-send-email-cw00.choi@samsung.com>
- <1481173091-9728-5-git-send-email-cw00.choi@samsung.com>
- <CGME20161208175257epcas2p333f794a00f433dd8312a5faa088a5f34@epcas2p3.samsung.com>
- <20161208175243.GA9451@kozik-lap> <5865B165.3010203@samsung.com>
- <20161230145155.ecobfvtspviehlos@kozik-lap>
-Message-ID: <CAGTfZH0Q4UmbVH3SnuvGJ5-wSSPvgn7PANtAQuA5Lnz5qOL1fw@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 30 Dec 2016 17:09:32 +0200
+Subject: [PATCH v2 1/4] pinctrl: samsung: Fix the width of
+ PINCFG_TYPE_DRV bitfields for Exynos5433
+In-Reply-To: <CACRpkdbR3x14h38Gg7qpeWnswwD9qsS0zDUrrXCEJH-AdEB+cQ@mail.gmail.com>
+References: <CGME20161230041426epcas1p1f827d3cee8b607d81e9921b412ddf301@epcas1p1.samsung.com>
+ <20161230041421.24448-1-andi.shyti@samsung.com>
+ <20161230041421.24448-2-andi.shyti@samsung.com>
+ <CACRpkdbR3x14h38Gg7qpeWnswwD9qsS0zDUrrXCEJH-AdEB+cQ@mail.gmail.com>
+Message-ID: <20161230150932.q7kadv4ouhdrkqea@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-12-30 23:51 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
-> On Fri, Dec 30, 2016 at 09:59:17AM +0900, Chanwoo Choi wrote:
->> Hi Krzysztof,
->>
->> On 2016? 12? 09? 02:52, Krzysztof Kozlowski wrote:
->> > On Thu, Dec 08, 2016 at 01:58:10PM +0900, Chanwoo Choi wrote:
->> >> This patch adds the bus nodes using VDD_INT for Exynos5433 SoC.
->> >> Exynos5433 has the following AMBA AXI buses to translate data
->> >> between DRAM and sub-blocks.
->> >>
->> >> Following list specify the detailed correlation between sub-block and clock:
->> >> - CLK_ACLK_G2D_{400|266}  : Bus clock for G2D (2D graphic engine)
->> >> - CLK_ACLK_MSCL_400       : Bus clock for MSCL (Memory to memory Scaler)
->> >> - CLK_ACLK_GSCL_333       : Bus clock for GSCL (General Scaler)
->> >> - CLK_SCLK_JPEG_MSCL      : Bus clock for JPEG
->> >> - CLK_ACLK_MFC_400        : Bus clock for MFC (Multi Format Codec)
->> >> - CLK_ACLK_HEVC_400       : Bus clock for HEVC (High Efficient Video Codec)
->> >> - CLK_ACLK_BUS0_400       : NoC(Network On Chip)'s bus clock for PERIC/PERIS/FSYS/MSCL
->> >> - CLK_ACLK_BUS1_400       : NoC's bus clock for MFC/HEVC/G3D
->> >> - CLK_ACLK_BUS2_400       : NoC's bus clock for GSCL/DISP/G2D/CAM0/CAM1/ISP
->> >>
->> >> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> >> ---
->> >>  arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi | 197 +++++++++++++++++++++++++
->> >>  arch/arm64/boot/dts/exynos/exynos5433.dtsi     |   1 +
->> >>  2 files changed, 198 insertions(+)
->> >>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi
->> >
->> > For the reference:
->> > Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
->> >
->> > I'll queue it for v4.11, after this merge window.
->>
->> Could you please pick this patch3/4/5?
->> These patches were already reviewed by you.
->
-> Not yet. I wanted to apply them few days ago but arm64 build is broken
-> in 4.10-rc1 so I cannot auto-build them in my system. The arm64 is fixed
-> already so I will apply them on top of 4.10-rc2 (when released).
+On Fri, Dec 30, 2016 at 02:28:52PM +0100, Linus Walleij wrote:
+> On Fri, Dec 30, 2016 at 5:14 AM, Andi Shyti <andi.shyti@samsung.com> wrote:
+> 
+> > From: Chanwoo Choi <cw00.choi@samsung.com>
+> >
+> > This patch fixes the wrong width of PINCFG_TYPE_DRV bitfields for Exynos5433
+> > because PINCFG_TYPE_DRV of Exynos5433 has 4bit fields in the *_DRV
+> > registers. Usually, other Exynos have 2bit field for PINCFG_TYPE_DRV.
+> >
+> > Fixes: 3c5ecc9ed353 ("pinctrl: exynos: Add support for Exynos5433")
+> > Cc: stable at vger.kernel.org
+> > Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> > Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> > Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Kukjin Kim <kgene@kernel.org>
+> > Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> 
+> Nominally I think you should sign this off too Andi, as you are in the delivery
+> path.
+> 
+> Patch applied for fixes.
 
-OK. Thanks for reply.
+That has to be signed by Andi... otherwise the chain is broken (and
+there could be changes added inside).
 
--- 
-Best Regards,
-Chanwoo Choi
+Best regards,
+Krzysztof
