@@ -1,44 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Dec 2016 10:07:01 +0100
-Subject: [PATCH v7 3/5] ARM: dts: stm32: Add I2C1 support for STM32F429 SoC
-In-Reply-To: <CAOAejn1zHMFNiGc-wVbbkC1-JFzG3sjnnUJogtCp9EeAkWsV5A@mail.gmail.com>
-References: <1482413704-17531-1-git-send-email-cedric.madianga@gmail.com>
- <1482413704-17531-4-git-send-email-cedric.madianga@gmail.com>
- <20161222191103.vzmfhnrtrzw2ivwa@pengutronix.de>
- <CAOAejn1zHMFNiGc-wVbbkC1-JFzG3sjnnUJogtCp9EeAkWsV5A@mail.gmail.com>
-Message-ID: <CACRpkdaNyL2iV+risLudW=O55w81-AuEZhMwRu9NLdXpnC2r1w@mail.gmail.com>
+From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
+Date: Fri, 30 Dec 2016 16:56:43 +0800
+Subject: [PATCH v5 02/14] irqchip: gic-v3-its: keep the head file include
+ in alphabetic order
+In-Reply-To: <1482384922-21507-3-git-send-email-guohanjun@huawei.com>
+References: <1482384922-21507-1-git-send-email-guohanjun@huawei.com>
+ <1482384922-21507-3-git-send-email-guohanjun@huawei.com>
+Message-ID: <5866214B.8090803@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 23, 2016 at 2:09 PM, M'boumba Cedric Madianga
-<cedric.madianga@gmail.com> wrote:
-> 2016-12-22 20:11 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
->> On Thu, Dec 22, 2016 at 02:35:02PM +0100, M'boumba Cedric Madianga wrote:
->>> @@ -337,6 +350,16 @@
->>>                                       slew-rate = <2>;
->>>                               };
->>>                       };
->>> +
->>> +                     i2c1_pins_b: i2c1 at 0 {
->>> +                             pins1 {
->>> +                                     pinmux = <STM32F429_PB9_FUNC_I2C1_SDA>;
->>> +                                     drive-open-drain;
->>> +                             };
->>> +                             pins2 {
->>> +                                     pinmux = <STM32F429_PB6_FUNC_I2C1_SCL>;
->>> +                             };
->>
->> the second doesn't need the open-drain property? Why?
+On 2016/12/22 13:35, Hanjun Guo wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
 >
-> I thought that open-drain was only needed for SDA line.
-> But after double-checking I2C specification, it seems that SDA and SCL
-> lines need open-drain or open-collector to perform the wired-AND
-> function.
-
-I think I2C SDA/SCL must be open drain by definition.
-
-It also requires pull-up resistors, I guess you have these mounted on the board
-so you do not need pull-up from the pin controller?
-
-Yours,
-Linus Walleij
+> The head file is strictly in alphabetic order now, so let's
+> be the rule breaker. As acpi_iort.h includes acpi.h so remove
+> the duplidate acpi.h inclusion as well.
+>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Tomasz Nowicki <tn@semihalf.com>
+> ---
+>   drivers/irqchip/irq-gic-v3-its.c | 3 +--
+>   1 file changed, 1 insertion(+), 2 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 69b040f..f471939 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -15,14 +15,13 @@
+>    * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>    */
+>   
+> -#include <linux/acpi.h>
+> +#include <linux/acpi_iort.h>
+>   #include <linux/bitmap.h>
+>   #include <linux/cpu.h>
+>   #include <linux/delay.h>
+>   #include <linux/dma-iommu.h>
+>   #include <linux/interrupt.h>
+>   #include <linux/irqdomain.h>
+> -#include <linux/acpi_iort.h>
+>   #include <linux/log2.h>
+>   #include <linux/mm.h>
+>   #include <linux/msi.h>
+Tested-by:  Xinwei Kong <kong.kongxinwei@hisilicon.com>
