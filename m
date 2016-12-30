@@ -1,112 +1,59 @@
-From: randy.li@rock-chips.com (Randy Li)
-Date: Fri, 30 Dec 2016 10:44:40 +0800
-Subject: [PATCH] Revert "mmc: dw_mmc-rockchip: add runtime PM support"
-In-Reply-To: <20afb1da-9e45-f515-01bf-2f5365d20d61@samsung.com>
-References: <CGME20161228153516epcas2p253c6bc0371ab0df464573b63218795ef@epcas2p2.samsung.com>
- <1482939288-14950-1-git-send-email-ayaka@soulik.info>
- <e0cc8029-0155-4879-a643-ddc4239a55ab@samsung.com>
- <7e37b8ad-39d0-3a94-f75a-2166ae2caf10@samsung.com>
- <7fb90b9e-75c3-0184-4f0a-d4113899b860@rock-chips.com>
- <04b667d9-2591-51ff-e024-047bbb6e17c3@rock-chips.com>
- <6ccade72-ae20-2ffa-1504-2536b9f03adf@soulik.info>
- <95648282-38f5-42c2-fd8b-ab603eb3a168@gmail.com>
- <0ccf164f-0d35-9cc3-f288-9b582db23efb@soulik.info>
- <20afb1da-9e45-f515-01bf-2f5365d20d61@samsung.com>
-Message-ID: <8f8c66f1-82d6-5151-ff64-ef62596aa10d@rock-chips.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 30 Dec 2016 10:44:23 +0800
+Subject: [PATCH v2 2/5] arm64: Work around Falkor erratum 1003
+In-Reply-To: <20161229224335.13531-2-cov@codeaurora.org>
+Message-ID: <201612301000.Aevrg8rZ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Shanker,
 
+[auto build test ERROR on next-20161224]
+[also build test ERROR on v4.10-rc1]
+[cannot apply to arm64/for-next/core v4.9-rc8 v4.9-rc7 v4.9-rc6]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-On 12/30/2016 10:35 AM, Jaehoon Chung wrote:
-> On 12/30/2016 12:07 AM, ayaka wrote:
->>
->>
->> On 12/29/2016 10:04 PM, Jaehoon Chung wrote:
->>> Hi,
->>>
->>> On 12/29/2016 09:55 PM, ayaka wrote:
->>>> [    5.849733] rk_gmac-dwmac ff290000.ethernet (unnamed net_device) (uninitialized): Enable RX Mitigation via HW Watchdog Timer
->>>> [    5.944512] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot req 50000000Hz, actual 50000000HZ div = 0)
->>>> [    5.958249] mmc1: new ultra high speed DDR50 SDIO card at address 0001
->>>> [    6.294548] dwmmc_rockchip ff0f0000.dwmmc: Successfully tuned phase to 177
->>>> [    6.301591] mmc2: new HS200 MMC card at address 0001
->>>> [    6.306758] mmc_host mmc0: Bus speed (slot 0) = 300000Hz (slot req 300000Hz, actual 300000HZ div = 0)
->>>> [    6.316830] mmcblk2: mmc2:0001 AGND3R 14.6 GiB
->>>> [    6.321881] mmcblk2boot0: mmc2:0001 AGND3R partition 1 4.00 MiB
->>>> [    6.328331] mmcblk2boot1: mmc2:0001 AGND3R partition 2 4.00 MiB
->>>> [    6.334792] mmcblk2rpmb: mmc2:0001 AGND3R partition 3 4.00 MiB
->>>> [    6.344295]  mmcblk2: p1 p2 p3 p4 p5 p6 p7
->>>> [    6.469892] mmc_host mmc0: Bus speed (slot 0) = 200000Hz (slot req 200000Hz, actual 200000HZ div = 0)
->>>> [    6.621888] mmc_host mmc0: Bus speed (slot 0) = 187500Hz (slot req 100000Hz, actual 93750HZ div = 1)
->>>> [    6.917883] libphy: stmmac: probed
->>>> [    6.921319] rk_gmac-dwmac ff290000.ethernet eth0: PHY ID 001cc915 at 0 IRQ POLL (stmmac-0:00) active
->>>> [    6.930476] rk_gmac-dwmac ff290000.ethernet eth0: PHY ID 001cc915 at 2 IRQ POLL (stmmac-0:02)
->>>> [    6.939757] input: gpio-keys as /devices/platform/gpio-keys/input/input0
->>>> [    6.946937] rtc-hym8563 0-0051: no valid clock/calendar values available
->>>> [    6.953694] rtc-hym8563 0-0051: hctosys: unable to read the hardware clock
->>>> [    6.961262] vcc_sd: disabling
->>>> [    6.964275] dovdd_1v8: disabling
->>>> [    6.967527] dvdd_1v2: disabling
->>>> [    6.971006] vdd10_lcd: disabling
->>>> [    6.974701] vcc18_lcd: disabling
->>>> [    6.978467] ttyS2 - failed to request DMA
->>>> [    7.101883] mmc_host mmc0: Bus speed (slot 0) = 400000Hz (slot req 400000Hz, actual 400000HZ div = 0)
->>>> [    7.253874] mmc_host mmc0: Bus speed (slot 0) = 300000Hz (slot req 300000Hz, actual 300000HZ div = 0)
->>>> [    7.405883] mmc_host mmc0: Bus speed (slot 0) = 200000Hz (slot req 200000Hz, actual 200000HZ div = 0)
->>>> [    7.557885] mmc_host mmc0: Bus speed (slot 0) = 187500Hz (slot req 100000Hz, actual 93750HZ div = 1)
->>>> [    8.037872] mmc_host mmc0: Bus speed (slot 0) = 400000Hz (slot req 400000Hz, actual 400000HZ div = 0)
->>>> [    8.189877] mmc_host mmc0: Bus speed (slot 0) = 300000Hz (slot req 300000Hz, actual 300000HZ div = 0)
->>>> [    8.341881] mmc_host mmc0: Bus speed (slot 0) = 200000Hz (slot req 200000Hz, actual 200000HZ div = 0)
->>>> [    8.493884] mmc_host mmc0: Bus speed (slot 0) = 187500Hz (slot req 100000Hz, actual 93750HZ div = 1)
->>>> [    8.973871] mmc_host mmc0: Bus speed (slot 0) = 400000Hz (slot req 400000Hz, actual 400000HZ div = 0)
->>>> [    9.125876] mmc_host mmc0: Bus speed (slot 0) = 300000Hz (slot req 300000Hz, actual 300000HZ div = 0)
->>>> [    9.277884] mmc_host mmc0: Bus speed (slot 0) = 200000Hz (slot req 200000Hz, actual 200000HZ div = 0)
->>>> [    9.429882] mmc_host mmc0: Bus speed (slot 0) = 187500Hz (slot req 100000Hz, actual 93750HZ div = 1)
->>>>
->>>> looping here
->>>>
->>>> If I revert that patch, there are still lots of Bus speed messages, but finally would enter into system.
->>>>
->>> Plz..Don't put the comment on the top.
->>>
->>> Which kernel did you use?
->> Add linux-next specific files for 20161224
->
-> mmc0 is what card? Is it polling for detecting card?
-> (It seems the SD-card..right?)
-Yes, but the Firefly release won't show that, just stop at "ttyS2 - 
-failed to request DMA". I check both the firefly reload and firefly 
-release, they both have a cd line for them, so it won't be poll mode.
-> Those logs should be polled for detecting mmc0 card..Hmm..I sent the patch for disabling log message when polling.
-> If this log is displayed, then my patch might be some wrong.. :(
->
-> Best Regards,
-> Jaehoon Chung
->
->>>
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>
->
-> [snip]
->
->>
->>
->>
->>
->
->
+url:    https://github.com/0day-ci/linux/commits/Christopher-Covington/arm64-Define-Falkor-v1-CPU/20161230-081412
+config: arm64-allnoconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
--- 
-Randy Li
-The third produce department
-===========================================================================
-This email message, including any attachments, is for the sole
-use of the intended recipient(s) and may contain confidential and
-privileged information. Any unauthorized review, use, disclosure or
-distribution is prohibited. If you are not the intended recipient, please
-contact the sender by reply e-mail and destroy all copies of the original
-message. [Fuzhou Rockchip Electronics, INC. China mainland]
-===========================================================================
+All errors (new ones prefixed by >>):
+
+   arch/arm64/mm/context.c: In function 'flush_context':
+>> arch/arm64/mm/context.c:93:13: error: 'CONFIG_QCOM_FALKOR_E1003_RESERVED_ASID' undeclared (first use in this function)
+      __set_bit(CONFIG_QCOM_FALKOR_E1003_RESERVED_ASID, asid_map);
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   arch/arm64/mm/context.c:93:13: note: each undeclared identifier is reported only once for each function it appears in
+   arch/arm64/mm/context.c: In function 'asids_init':
+   arch/arm64/mm/context.c:255:13: error: 'CONFIG_QCOM_FALKOR_E1003_RESERVED_ASID' undeclared (first use in this function)
+      __set_bit(CONFIG_QCOM_FALKOR_E1003_RESERVED_ASID, asid_map);
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+vim +/CONFIG_QCOM_FALKOR_E1003_RESERVED_ASID +93 arch/arm64/mm/context.c
+
+    87		/* Update the list of reserved ASIDs and the ASID bitmap. */
+    88		bitmap_clear(asid_map, 0, NUM_USER_ASIDS);
+    89	
+    90		/* Reserve ASID for Falkor erratum 1003 */
+    91		if (IS_ENABLED(CONFIG_QCOM_FALKOR_ERRATUM_1003) &&
+    92		    cpus_have_cap(ARM64_WORKAROUND_QCOM_FALKOR_E1003))
+  > 93			__set_bit(CONFIG_QCOM_FALKOR_E1003_RESERVED_ASID, asid_map);
+    94	
+    95		/*
+    96		 * Ensure the generation bump is observed before we xchg the
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 6340 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161230/abb6797a/attachment.gz>
