@@ -1,240 +1,133 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Fri, 30 Dec 2016 20:38:15 +0000
-Subject: [PATCH v6 2/8] MFD: add STM32 Timers driver
-In-Reply-To: <1481292919-26587-3-git-send-email-benjamin.gaignard@st.com>
-References: <1481292919-26587-1-git-send-email-benjamin.gaignard@st.com>
- <1481292919-26587-3-git-send-email-benjamin.gaignard@st.com>
-Message-ID: <47085504-26d3-ed34-07cc-373401e0d98a@kernel.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 30 Dec 2016 13:10:43 -0800
+Subject: [GIT PULL] omap fixes for v4.10-rc cycle
+Message-ID: <pull-1483125642-152778>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/16 14:15, Benjamin Gaignard wrote:
-> This hardware block could at used at same time for PWM generation
-> and IIO timers.
-> PWM and IIO timer configuration are mixed in the same registers
-> so we need a multi fonction driver to be able to share those registers.
-fonction -> function
-> 
-> version 6:
-> - rename files to stm32-timers
-> - rename functions to stm32_timers_xxx
-> 
-> version 5:
-> - fix Lee comments about detect function
-> - add missing dependency on REGMAP_MMIO
-> 
-> version 4:
-> - add a function to detect Auto Reload Register (ARR) size
-> - rename the structure shared with other drivers
-> 
-> version 2:
-> - rename driver "stm32-gptimer" to be align with SoC documentation
-> - only keep one compatible
-> - use of_platform_populate() instead of devm_mfd_add_devices()
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> ---
->  drivers/mfd/Kconfig              | 11 ++++++
->  drivers/mfd/Makefile             |  2 +
->  drivers/mfd/stm32-timers.c       | 80 ++++++++++++++++++++++++++++++++++++++++
->  include/linux/mfd/stm32-timers.h | 71 +++++++++++++++++++++++++++++++++++
->  4 files changed, 164 insertions(+)
->  create mode 100644 drivers/mfd/stm32-timers.c
->  create mode 100644 include/linux/mfd/stm32-timers.h
-> 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index c6df644..4ec1906 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -1607,6 +1607,17 @@ config MFD_STW481X
->  	  in various ST Microelectronics and ST-Ericsson embedded
->  	  Nomadik series.
->  
-> +config MFD_STM32_TIMERS
-> +	tristate "Support for STM32 Timers"
-> +	depends on (ARCH_STM32 && OF) || COMPILE_TEST
-> +	select MFD_CORE
-> +	select REGMAP
-> +	select REGMAP_MMIO
-> +	help
-> +	  Select this option to enable STM32 timers driver used
-> +	  for PWM and IIO Timer. This driver allow to share the
-> +	  registers between the others drivers.
-> +
->  menu "Multimedia Capabilities Port drivers"
->  	depends on ARCH_SA1100
->  
-> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> index 9834e66..11a52f8 100644
-> --- a/drivers/mfd/Makefile
-> +++ b/drivers/mfd/Makefile
-> @@ -211,3 +211,5 @@ obj-$(CONFIG_INTEL_SOC_PMIC)	+= intel-soc-pmic.o
->  obj-$(CONFIG_MFD_MT6397)	+= mt6397-core.o
->  
->  obj-$(CONFIG_MFD_ALTERA_A10SR)	+= altera-a10sr.o
-> +
-> +obj-$(CONFIG_MFD_STM32_TIMERS) 	+= stm32-timers.o
-> diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
-> new file mode 100644
-> index 0000000..68d115e
-> --- /dev/null
-> +++ b/drivers/mfd/stm32-timers.c
-> @@ -0,0 +1,80 @@
-> +/*
-> + * Copyright (C) STMicroelectronics 2016
-> + *
-> + * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
-> + *
-> + * License terms:  GNU General Public License (GPL), version 2
-> + */
-> +
-> +#include <linux/mfd/stm32-timers.h>
-> +#include <linux/module.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/reset.h>
-> +
-> +static const struct regmap_config stm32_timers_regmap_cfg = {
-> +	.reg_bits = 32,
-> +	.val_bits = 32,
-> +	.reg_stride = sizeof(u32),
-> +	.max_register = 0x400,
-> +};
-> +
-> +static void stm32_timers_get_arr_size(struct stm32_timers *ddata)
-> +{
-> +	/*
-> +	 * Only the available bits will be written so when readback
-> +	 * we get the maximum value of auto reload register
-> +	 */
-> +	regmap_write(ddata->regmap, TIM_ARR, ~0L);
-> +	regmap_read(ddata->regmap, TIM_ARR, &ddata->max_arr);
-> +	regmap_write(ddata->regmap, TIM_ARR, 0x0);
-> +}
-> +
-> +static int stm32_timers_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct stm32_timers *ddata;
-> +	struct resource *res;
-> +	void __iomem *mmio;
-> +
-> +	ddata = devm_kzalloc(dev, sizeof(*ddata), GFP_KERNEL);
-> +	if (!ddata)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	mmio = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(mmio))
-> +		return PTR_ERR(mmio);
-> +
-> +	ddata->regmap = devm_regmap_init_mmio_clk(dev, "clk_int", mmio,
-> +						  &stm32_timers_regmap_cfg);
-> +	if (IS_ERR(ddata->regmap))
-> +		return PTR_ERR(ddata->regmap);
-> +
-> +	ddata->clk = devm_clk_get(dev, NULL);
-> +	if (IS_ERR(ddata->clk))
-> +		return PTR_ERR(ddata->clk);
-> +
-> +	stm32_timers_get_arr_size(ddata);
-> +
-> +	platform_set_drvdata(pdev, ddata);
-> +
-> +	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
-> +}
-> +
-> +static const struct of_device_id stm32_timers_of_match[] = {
-> +	{ .compatible = "st,stm32-timers", },
-> +	{ /* end node */ },
-> +};
-> +MODULE_DEVICE_TABLE(of, stm32_timers_of_match);
-> +
-> +static struct platform_driver stm32_timers_driver = {
-> +	.probe = stm32_timers_probe,
-> +	.driver	= {
-> +		.name = "stm32-timers",
-> +		.of_match_table = stm32_timers_of_match,
-> +	},
-> +};
-> +module_platform_driver(stm32_timers_driver);
-> +
-> +MODULE_DESCRIPTION("STMicroelectronics STM32 Timers");
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/include/linux/mfd/stm32-timers.h b/include/linux/mfd/stm32-timers.h
-> new file mode 100644
-> index 0000000..d030004
-> --- /dev/null
-> +++ b/include/linux/mfd/stm32-timers.h
-> @@ -0,0 +1,71 @@
-> +/*
-> + * Copyright (C) STMicroelectronics 2016
-> + *
-> + * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
-> + *
-> + * License terms:  GNU General Public License (GPL), version 2
-> + */
-> +
-> +#ifndef _LINUX_STM32_GPTIMER_H_
-> +#define _LINUX_STM32_GPTIMER_H_
-> +
-> +#include <linux/clk.h>
-> +#include <linux/regmap.h>
-> +
-> +#define TIM_CR1		0x00	/* Control Register 1      */
-> +#define TIM_CR2		0x04	/* Control Register 2      */
-> +#define TIM_SMCR	0x08	/* Slave mode control reg  */
-> +#define TIM_DIER	0x0C	/* DMA/interrupt register  */
-> +#define TIM_SR		0x10	/* Status register	   */
-> +#define TIM_EGR		0x14	/* Event Generation Reg    */
-> +#define TIM_CCMR1	0x18	/* Capt/Comp 1 Mode Reg    */
-> +#define TIM_CCMR2	0x1C	/* Capt/Comp 2 Mode Reg    */
-> +#define TIM_CCER	0x20	/* Capt/Comp Enable Reg    */
-> +#define TIM_PSC		0x28	/* Prescaler               */
-> +#define TIM_ARR		0x2c	/* Auto-Reload Register    */
-> +#define TIM_CCR1	0x34	/* Capt/Comp Register 1    */
-> +#define TIM_CCR2	0x38	/* Capt/Comp Register 2    */
-> +#define TIM_CCR3	0x3C	/* Capt/Comp Register 3    */
-> +#define TIM_CCR4	0x40	/* Capt/Comp Register 4    */
-> +#define TIM_BDTR	0x44	/* Break and Dead-Time Reg */
-> +
-> +#define TIM_CR1_CEN	BIT(0)	/* Counter Enable	   */
-> +#define TIM_CR1_ARPE	BIT(7)	/* Auto-reload Preload Ena */
-> +#define TIM_CR2_MMS	(BIT(4) | BIT(5) | BIT(6)) /* Master mode selection */
-> +#define TIM_SMCR_SMS	(BIT(0) | BIT(1) | BIT(2)) /* Slave mode selection */
-> +#define TIM_SMCR_TS	(BIT(4) | BIT(5) | BIT(6)) /* Trigger selection */
-> +#define TIM_DIER_UIE	BIT(0)	/* Update interrupt	   */
-> +#define TIM_SR_UIF	BIT(0)	/* Update interrupt flag   */
-> +#define TIM_EGR_UG	BIT(0)	/* Update Generation       */
-> +#define TIM_CCMR_PE	BIT(3)	/* Channel Preload Enable  */
-> +#define TIM_CCMR_M1	(BIT(6) | BIT(5))  /* Channel PWM Mode 1 */
-> +#define TIM_CCER_CC1E	BIT(0)	/* Capt/Comp 1  out Ena    */
-> +#define TIM_CCER_CC1P	BIT(1)	/* Capt/Comp 1  Polarity   */
-> +#define TIM_CCER_CC1NE	BIT(2)	/* Capt/Comp 1N out Ena    */
-> +#define TIM_CCER_CC1NP	BIT(3)	/* Capt/Comp 1N Polarity   */
-> +#define TIM_CCER_CC2E	BIT(4)	/* Capt/Comp 2  out Ena    */
-> +#define TIM_CCER_CC3E	BIT(8)	/* Capt/Comp 3  out Ena    */
-> +#define TIM_CCER_CC4E	BIT(12)	/* Capt/Comp 4  out Ena    */
-> +#define TIM_CCER_CCXE	(BIT(0) | BIT(4) | BIT(8) | BIT(12))
-> +#define TIM_BDTR_BKE	BIT(12) /* Break input enable	   */
-> +#define TIM_BDTR_BKP	BIT(13) /* Break input polarity	   */
-> +#define TIM_BDTR_AOE	BIT(14)	/* Automatic Output Enable */
-> +#define TIM_BDTR_MOE	BIT(15)	/* Main Output Enable      */
-> +#define TIM_BDTR_BKF	(BIT(16) | BIT(17) | BIT(18) | BIT(19))
-> +#define TIM_BDTR_BK2F	(BIT(20) | BIT(21) | BIT(22) | BIT(23))
-> +#define TIM_BDTR_BK2E	BIT(24) /* Break 2 input enable	   */
-> +#define TIM_BDTR_BK2P	BIT(25) /* Break 2 input polarity  */
-> +
-> +#define MAX_TIM_PSC		0xFFFF
-> +#define TIM_CR2_MMS_SHIFT	4
-> +#define TIM_SMCR_TS_SHIFT	4
-> +#define TIM_BDTR_BKF_MASK	0xF
-> +#define TIM_BDTR_BKF_SHIFT	16
-> +#define TIM_BDTR_BK2F_SHIFT	20
-> +
-> +struct stm32_timers {
-> +	struct clk *clk;
-> +	struct regmap *regmap;
-> +	u32 max_arr;
-> +};
-> +#endif
-> 
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+
+  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.10/fixes-rc1
+
+for you to fetch changes up to 1a38de880992764d4bd5bccbd306b87d860e377d:
+
+  ARM: dts: am572x-idk: Add gpios property to control PCIE_RESETn (2016-12-30 10:59:56 -0800)
+
+----------------------------------------------------------------
+Fist set of fixes for omaps for v4.10-rc cycle, mostly
+to deal with various regressions noticed during the merge
+window and to fix various device tree configurations for
+boards. Also included is removal of mach-omap2/gpio.c that
+is now dead code with device tree based booting that should
+be OK for the early -rc cycle:
+
+- A series of fixes to add empty chosen node to fix regressions
+  caused for bootloaders that don't create chosen node as the
+  decompressor needs the chosen node to merge command line and
+  ATAGs into it
+
+- Fix missing logicpd-som-lv-37xx-devkit.dtb entry in Makefile
+
+- Fix regression for am437x timers
+
+- Fix wrong strcat for non-NULL terminated string
+
+- A series of changes to fix tps65217 interrupts to not use
+  defines as we don't do that for interrupts
+
+- Two patches to fix USB VBUS detection on am57xx-idk and force it
+  to peripheral mode until dwc3 role detection is working
+
+- Add missing dra72-evm-tps65917 missing voltage supplies
+  accidentally left out of an earlier patch
+
+- Fix n900 eMMC detection when booted on qemu
+
+- Remove unwanted pr_err on failed memory allocation for
+  prm_common.c
+
+- Remove legacy mach-omap2/gpio.c that now is dead code
+  since we boot mach-omap2 in device tree only mode
+
+- Fix am572x-idk pcie1 by adding the missing gpio reset pin
+
+----------------------------------------------------------------
+Adam Ford (1):
+      ARM: dts: omap3: Add DTS for Logic PD SOM-LV 37xx Dev Kit
+
+Grygorii Strashko (2):
+      ARM: OMAP2+: Remove legacy gpio code
+      ARM: omap2+: am437x: rollback to use omap3_gptimer_timer_init()
+
+Javier Martinez Canillas (9):
+      ARM: dts: omap2: Add an empty chosen node to top level DTSI
+      ARM: dts: omap3: Add an empty chosen node to top level DTSI
+      ARM: dts: omap4: Add an empty chosen node to top level DTSI
+      ARM: dts: omap5: Add an empty chosen node to top level DTSI
+      ARM: dts: am33xx: Add an empty chosen node to top level DTSI
+      ARM: dts: am4372: Add an empty chosen node to top level DTSI
+      ARM: dts: dm814x: Add an empty chosen node to top level DTSI
+      ARM: dts: dm816x: Add an empty chosen node to top level DTSI
+      ARM: dts: dra7: Add an empty chosen node to top level DTSI
+
+Kishon Vijay Abraham I (1):
+      ARM: dts: am572x-idk: Add gpios property to control PCIE_RESETn
+
+Lokesh Vutla (1):
+      ARM: dts: dra72-evm-tps65917: Add voltage supplies to usb_phy, mmc, dss
+
+Maninder Singh (1):
+      ARM: omap2+: fixing wrong strcat for Non-NULL terminated string
+
+Markus Elfring (1):
+      ARM: OMAP2+: PRM: Delete an error message for a failed memory allocation
+
+Milo Kim (4):
+      ARM: dts: am335x: Fix the interrupt name of TPS65217
+      dt-bindings: mfd: Remove TPS65217 interrupts
+      dt-bindings: power/supply: Update TPS65217 properties
+      dt-bindings: input: Specify the interrupt number of TPS65217 power button
+
+Pali Roh?r (1):
+      ARM: dts: n900: Mark eMMC slot with no-sdio and no-sd flags
+
+Roger Quadros (2):
+      ARM: dts: am57xx-idk: Support VBUS detection on USB2 port
+      ARM: dts: am57xx-idk: Put USB2 port in peripheral mode
+
+Tony Lindgren (1):
+      Merge branch 'omap-for-v4.10/legacy' into omap-for-v4.10/fixes
+
+ .../bindings/input/tps65218-pwrbutton.txt          |   4 +-
+ .../bindings/power/supply/tps65217_charger.txt     |   7 +-
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/am335x-bone-common.dtsi          |   8 +-
+ arch/arm/boot/dts/am33xx.dtsi                      |   1 +
+ arch/arm/boot/dts/am4372.dtsi                      |   1 +
+ arch/arm/boot/dts/am571x-idk.dts                   |  10 +-
+ arch/arm/boot/dts/am572x-idk.dts                   |  14 +-
+ arch/arm/boot/dts/am57xx-idk-common.dtsi           |   9 +-
+ arch/arm/boot/dts/dm814x.dtsi                      |   1 +
+ arch/arm/boot/dts/dm816x.dtsi                      |   1 +
+ arch/arm/boot/dts/dra7.dtsi                        |   1 +
+ arch/arm/boot/dts/dra72-evm-tps65917.dtsi          |  16 +++
+ arch/arm/boot/dts/omap2.dtsi                       |   1 +
+ arch/arm/boot/dts/omap3-n900.dts                   |   2 +
+ arch/arm/boot/dts/omap3.dtsi                       |   1 +
+ arch/arm/boot/dts/omap4.dtsi                       |   1 +
+ arch/arm/boot/dts/omap5.dtsi                       |   1 +
+ arch/arm/mach-omap2/Makefile                       |   2 +-
+ arch/arm/mach-omap2/board-generic.c                |   2 +-
+ arch/arm/mach-omap2/gpio.c                         | 160 ---------------------
+ arch/arm/mach-omap2/omap_hwmod.c                   |   8 +-
+ arch/arm/mach-omap2/omap_hwmod_common_data.h       |   4 -
+ arch/arm/mach-omap2/prm_common.c                   |   4 +-
+ arch/arm/mach-omap2/timer.c                        |   9 +-
+ include/dt-bindings/mfd/tps65217.h                 |  26 ----
+ 26 files changed, 74 insertions(+), 221 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/gpio.c
+ delete mode 100644 include/dt-bindings/mfd/tps65217.h
