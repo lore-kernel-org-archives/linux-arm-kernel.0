@@ -1,81 +1,56 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Dec 2016 09:51:51 +0100
-Subject: [PATCH 3/6] pinctrl: armada-37xx: Add gpio support
-In-Reply-To: <20161222172501.16121-4-gregory.clement@free-electrons.com>
+Date: Fri, 30 Dec 2016 09:58:06 +0100
+Subject: [PATCH 4/6] pinctrl: aramda-37xx: Add irqchip support
+In-Reply-To: <20161222172501.16121-5-gregory.clement@free-electrons.com>
 References: <20161222172501.16121-1-gregory.clement@free-electrons.com>
- <20161222172501.16121-4-gregory.clement@free-electrons.com>
-Message-ID: <CACRpkdY_68=5oBN3TLs_ohc0gc2=yiG3qizg7MGh4F7Z+-ZzSg@mail.gmail.com>
+ <20161222172501.16121-5-gregory.clement@free-electrons.com>
+Message-ID: <CACRpkdbR-WRT0rJp2CuN6CkZF=J35JUgGHjW7beyaimipz0ehw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Dec 22, 2016 at 6:24 PM, Gregory CLEMENT
 <gregory.clement@free-electrons.com> wrote:
 
-> GPIO management is pretty simple and is part of the same IP than the pin
-> controller for the Armada 37xx SoCs.  This patch adds the GPIO support to
-> the pinctrl-armada-37xx.c file, it also allows sharing common functions
-> between the gpiolib and the pinctrl drivers.
+> The Armada 37xx SoCs can handle interrupt through GPIO. However it can
+> only manage the edge ones.
+>
+> The way the interrupt are managed are classical so we can use the generic
+> interrupt chip model.
+>
+> The only unusual "feature" is that many interrupts are connected to the
+> parent interrupt controller. But we do not take advantage of this and use
+> the chained irq with all of them.
 >
 > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Some remarks:
+So this is very simple and should use GPIOLIB_IRQCHIP.
 
-> +static int armada_37xx_gpio_get_direction(struct gpio_chip *chip,
-> +                                         unsigned int offset)
+Begin with select GPIOLIB_IRQCHIP in your Kconfig and then look
+at conversions such as commit 85ae9e512f437cd09bf61564bdba29ab88bab3e3
+("pinctrl: bcm2835: switch to GPIOLIB_IRQCHIP")
+for inspiration.
+
+> @@ -64,6 +71,8 @@ struct armada_37xx_pinctrl {
+>         struct armada_37xx_pin_data     *data;
+>         struct device                   *dev;
+>         struct gpio_chip                gpio_chip;
+> +       struct irq_chip                 irq_chip;
+> +       struct irq_domain               *domain;
+
+You don't need a domain when using GPIOLIB_IRQCHIP
+
+> +static int armada_37xx_gpio_to_irq(struct gpio_chip *chip, unsigned int offset)
 > +{
 > +       struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-> +       unsigned int reg = OUTPUT_EN;
-> +       unsigned int val, mask;
 > +
-> +       if (offset >= GPIO_PER_REG) {
-> +               offset -= GPIO_PER_REG;
-> +               reg += sizeof(u32);
-> +       }
+> +       return irq_create_mapping(info->domain, offset);
+> +}
 
-Add a comment saying we never have more than two registers?
-If there would be three registers this would fail, right?
+Nor this.
 
-> +       mask = BIT(offset);
-> +
-> +       regmap_read(info->regmap, reg, &val);
->
-> +       return (val & mask) == 0;
-
-Use this:
-
-return !(val & mask);
-
-> +static int armada_37xx_gpio_get(struct gpio_chip *chip, unsigned int offset)
-> +{
-> +       struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-> +       unsigned int reg = INPUT_VAL;
-> +       unsigned int val, mask;
-> +
-> +       if (offset >= GPIO_PER_REG) {
-> +               offset -= GPIO_PER_REG;
-> +               reg += sizeof(u32);
-> +       }
-> +       mask = BIT(offset);
-
-This code is repeating. Break out a static (inline?) helper to do this.
-
-> +static int armada_37xx_gpiolib_register(struct platform_device *pdev,
-> +                                       struct armada_37xx_pinctrl *info)
-
-Nit: gpiochip_register or so is more to the point.
-
-> +       ret = gpiochip_add_pin_range(&info->gpio_chip, dev_name(dev), 0,
-> +                                    pinbase, info->data->nr_pins);
-> +       if (ret)
-> +               return ret;
-
-Why do you do this?
-
-Why not just put the ranges into the device tree? We already support
-this in the gpiolib core and it is helpful.
-
-See Documentation/devicetree/bindings/gpio/gpio.txt
-and other DTS files for gpio-ranges.
+The irqchip code should be pretty much the same but you need to
+dereference gpio_chip from chip data and pick the irqchip from
+there.
 
 Yours,
 Linus Walleij
