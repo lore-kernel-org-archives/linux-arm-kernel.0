@@ -1,31 +1,40 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Dec 2016 09:20:53 +0100
-Subject: [PATCH 4/4] video: ARM CLCD: add support of an optional GPIO to
+Date: Fri, 30 Dec 2016 09:23:59 +0100
+Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
  enable panel
-In-Reply-To: <20161221032717.13154-5-vz@mleia.com>
+In-Reply-To: <20161221032717.13154-1-vz@mleia.com>
 References: <20161221032717.13154-1-vz@mleia.com>
- <20161221032717.13154-5-vz@mleia.com>
-Message-ID: <CACRpkdb5Ojs+meXZKwJP3oDcYAnnrXgqBaXmCcgmgxJM=GkBGA@mail.gmail.com>
+Message-ID: <CACRpkdZE6VgJA27+Wh=Gxd7yOXpLMyT7yCB2PYA36y0gvosHFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Dec 21, 2016 at 4:27 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
 
-> The change adds handling of "enable-gpios" property of panel-dpi device
-> node used with an ARM CLCD controller, note that the property already has
-> a description in display/panel/panel-dpi.txt documentation and it founds
-> practical usage while describing some panel devices connected to other
-> types of display controllers.
+> The changeset contains a number of cleanups, changed semantics of
+> init_panel() callback, which allows to simplify getting of panel
+> properties from panel device tree node, and a handling of optional
+> "enable-gpios" panel property, the latter is described in
+> display/panel/panel-dpi.txt device tree binding documentation, but
+> it has been unsupported by the ARM CLCD driver.
 >
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> Vladimir Zapolskiy (4):
+>   video: ARM CLCD: sort included headers out alphabetically
+>   video: ARM CLCD: use panel device node for panel initialization
+>   video: ARM CLCD: use panel device node for getting backlight and mode
+>   video: ARM CLCD: add support of an optional GPIO to enable panel
 
-So as you may have seen I already handle a RESET GPIO in the
-Nomadik TPG110 panel subddriver in
-drivers/video/fbdev/amba-clcd-nomadik.c
+As you may have seen Tomi has stepped down as FBDEV maintainer and
+this subsystem is now orphaned.
 
-So is this all your panel needs?
+I guess Andrew Morton merges patches for it in this case, he usually does.
 
-I guess it is OK for simple panels.
+But what we should actually do is create a new DRM driver for CLCD
+in drivers/gpu/drm/arm/clcd*
+
+It's maybe not a small undertaking :(
+
+But in case you're interested in the job, I will pitch in and test the result
+on all ARM reference designs plus Nomadik.
 
 Yours,
 Linus Walleij
