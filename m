@@ -1,20 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Dec 2016 09:15:26 +0100
-Subject: [PATCH 2/2] pinctrl: sirf: atlas7: Improve code layout
-In-Reply-To: <20161220054122.25508-1-christophe.jaillet@wanadoo.fr>
-References: <20161220054122.25508-1-christophe.jaillet@wanadoo.fr>
-Message-ID: <CACRpkdaJvm6c1uGs34tWz3-6uzN_sX++O3dWN-_pvVpMQqkAUg@mail.gmail.com>
+Date: Fri, 30 Dec 2016 09:20:53 +0100
+Subject: [PATCH 4/4] video: ARM CLCD: add support of an optional GPIO to
+ enable panel
+In-Reply-To: <20161221032717.13154-5-vz@mleia.com>
+References: <20161221032717.13154-1-vz@mleia.com>
+ <20161221032717.13154-5-vz@mleia.com>
+Message-ID: <CACRpkdb5Ojs+meXZKwJP3oDcYAnnrXgqBaXmCcgmgxJM=GkBGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2016 at 6:41 AM, Christophe JAILLET
-<christophe.jaillet@wanadoo.fr> wrote:
+On Wed, Dec 21, 2016 at 4:27 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
 
-> Add some tab in order to improve indentation.
+> The change adds handling of "enable-gpios" property of panel-dpi device
+> node used with an ARM CLCD controller, note that the property already has
+> a description in display/panel/panel-dpi.txt documentation and it founds
+> practical usage while describing some panel devices connected to other
+> types of display controllers.
 >
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 
-Patch applied.
+So as you may have seen I already handle a RESET GPIO in the
+Nomadik TPG110 panel subddriver in
+drivers/video/fbdev/amba-clcd-nomadik.c
+
+So is this all your panel needs?
+
+I guess it is OK for simple panels.
 
 Yours,
 Linus Walleij
