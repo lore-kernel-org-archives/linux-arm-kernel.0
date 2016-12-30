@@ -1,67 +1,61 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 30 Dec 2016 17:53:12 +0200
-Subject: [GIT PULL] ARM: exynos: Late mach/soc for v4.10
-In-Reply-To: <1482003132-8844-1-git-send-email-krzk@kernel.org>
-References: <1482003132-8844-1-git-send-email-krzk@kernel.org>
-Message-ID: <20161230155312.oupgyip7wtqwcuy2@kozik-lap>
+From: dsafonov@virtuozzo.com (Dmitry Safonov)
+Date: Fri, 30 Dec 2016 18:56:30 +0300
+Subject: [RFC 0/4] x86: keep TASK_SIZE in sync with mm->task_size
+Message-ID: <20161230155634.8692-1-dsafonov@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 17, 2016 at 09:32:12PM +0200, Krzysztof Kozlowski wrote:
-> Hi,
-> 
-> 
-> After our discussions about not-breaking out-of-tree DTB with SCU
-> change in DeviceTree, I prepared an updated pull request without
-> the questioned changes.
-> 
-> Ten days ago I prepared a tag, pushed it... and apparently forgot to send pull
-> request. At least, I don't have such email in my outbox. Dunno.
-> 
-> So let's send it now, better late then never. With just few commits (without
-> the DT SCU changes). These were sitting in the next for very long.
-> 
+At this moment, we have following task_size-related things:
+- TASK_SIZE_OF() macro, which is unused;
+- current->mm->task_size which is used in half and TASK_SIZE() macro
+  which is used in the other half of code
+- TIF_ADDR32, which is used to detect 32-bit address space and is
+  x86-specific, where some other arches misused TIF_32BIT
+- personality ADDR_LIMIT_32BIT, which is used on arm/alpha
+- ADDR_LIMIT_3GB, which is x86-specific and can be used to change
+  running task's TASK_SIZE 3GB <-> 4GB
 
-Any comments on this? I guess it won't come as late-late-4.10, so can
-you pull it for v4.11?
+This patches set removes unused definition of TASK_SIZE_OF (1),
+defines TASK_SIZE macro as current->mm->task_size (3).
+I would suggest define TASK_SIZE this way in generic version,
+but currently I test it only on x86.
+It also frees thread info flag (2) and adds arch_prctl()
+on x86_64 to get/set current virtual address space size - as
+it's needed by now only for CRIU, hide it under CHECKPOINT_RESTORE
+config.
+Hope those patches will help to clean task_size-related code
+at least a bit (and helps me to restore vaddr limits).
 
-Best regards,
-Krzysztof
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: Andy Lutomirski <luto@kernel.org>
+Cc: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+Cc: x86 at kernel.org
 
+Dmitry Safonov (4):
+  mm: remove unused TASK_SIZE_OF()
+  x86/thread_info: kill TIF_ADDR32 in favour of ADDR_LIMIT_32BIT
+  x86/mm: define TASK_SIZE as current->mm->task_size
+  x86/arch_prctl: add ARCH_{GET,SET}_TASK_SIZE
 
-> Best regards,
-> Krzysztof
-> 
-> 
-> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-> 
->   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.10-2
-> 
-> for you to fetch changes up to da6b21e97e39d42f90ab490ce7b54a0fe2c3fe35:
-> 
->   ARM: Drop fixed 200 Hz timer requirement from Samsung platforms (2016-12-07 18:42:11 +0200)
-> 
-> ----------------------------------------------------------------
-> Samsung mach/soc update for v4.10:
-> 1. Minor cleanup in smp_operations.
-> 2. Another step in switching s3c24xx to new DMA API.
-> 3. Drop fixed requirement for HZ=200 on Samsung platforms.
-> 
-> ----------------------------------------------------------------
-> Krzysztof Kozlowski (1):
->       ARM: Drop fixed 200 Hz timer requirement from Samsung platforms
-> 
-> Pankaj Dubey (1):
->       ARM: EXYNOS: Remove smp_init_cpus hook from platsmp.c
-> 
-> Sylwester Nawrocki (1):
->       ARM: S3C24XX: Add DMA slave maps for remaining s3c24xx SoCs
-> 
->  arch/arm/Kconfig               |  3 +-
->  arch/arm/mach-exynos/platsmp.c | 31 -----------------
->  arch/arm/mach-s3c24xx/common.c | 76 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 77 insertions(+), 33 deletions(-)
+ arch/arm64/include/asm/memory.h       |  2 --
+ arch/mips/include/asm/processor.h     |  3 ---
+ arch/parisc/include/asm/processor.h   |  3 +--
+ arch/powerpc/include/asm/processor.h  |  3 +--
+ arch/s390/include/asm/processor.h     |  3 +--
+ arch/sparc/include/asm/processor_64.h |  3 ---
+ arch/x86/include/asm/elf.h            |  7 +++++--
+ arch/x86/include/asm/processor.h      | 19 +++++++++----------
+ arch/x86/include/asm/thread_info.h    |  4 +---
+ arch/x86/include/uapi/asm/prctl.h     |  3 +++
+ arch/x86/kernel/process_64.c          | 17 +++++++++++++++--
+ arch/x86/kernel/sys_x86_64.c          |  4 ++--
+ arch/x86/um/asm/segment.h             |  2 +-
+ arch/x86/xen/mmu.c                    |  4 ++--
+ fs/exec.c                             | 17 +++++++++++------
+ include/linux/sched.h                 |  4 ----
+ 16 files changed, 52 insertions(+), 46 deletions(-)
+
+-- 
+2.11.0
