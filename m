@@ -1,85 +1,37 @@
 From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
-Date: Fri, 30 Dec 2016 16:57:48 +0800
-Subject: [PATCH v5 07/14] irqchip: gicv3-its: platform-msi: scan MADT to
- create platform msi domain
-In-Reply-To: <1482384922-21507-8-git-send-email-guohanjun@huawei.com>
+Date: Fri, 30 Dec 2016 16:56:56 +0800
+Subject: [PATCH v5 03/14] ACPI: ARM64: IORT: add missing comment for
+ iort_dev_find_its_id()
+In-Reply-To: <1482384922-21507-4-git-send-email-guohanjun@huawei.com>
 References: <1482384922-21507-1-git-send-email-guohanjun@huawei.com>
- <1482384922-21507-8-git-send-email-guohanjun@huawei.com>
-Message-ID: <5866218C.2050901@hisilicon.com>
+ <1482384922-21507-4-git-send-email-guohanjun@huawei.com>
+Message-ID: <58662158.2050007@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 2016/12/22 13:35, Hanjun Guo wrote:
 > From: Hanjun Guo <hanjun.guo@linaro.org>
 >
-> With the introduction of its_pmsi_init_one(), we can add some code
-> on top for ACPI support of platform MSI.
->
-> We are scanning the MADT table to get the ITS entry(ies), then use
-> the information to create the platform msi domain for devices connect
-> to it, just like the PCI MSI for ITS did.
+> We are missing req_id's comment for iort_dev_find_its_id(),
+> add it back.
 >
 > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Sinan Kaya <okaya@codeaurora.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > Cc: Tomasz Nowicki <tn@semihalf.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
 > ---
->   drivers/irqchip/irq-gic-v3-its-platform-msi.c | 36 +++++++++++++++++++++++++++
->   1 file changed, 36 insertions(+)
+>   drivers/acpi/arm64/iort.c | 1 +
+>   1 file changed, 1 insertion(+)
 >
-> diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-> index ff72704..0be0437 100644
-> --- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-> +++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-> @@ -105,6 +105,41 @@ static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
->   	return 0;
->   }
->   
-> +#ifdef CONFIG_ACPI
-> +static int __init
-> +its_pmsi_parse_madt(struct acpi_subtable_header *header,
-> +			const unsigned long end)
-> +{
-> +	struct acpi_madt_generic_translator *its_entry;
-> +	struct fwnode_handle *domain_handle;
-> +	const char *node_name;
-> +	int err = -ENXIO;
-> +
-> +	its_entry = (struct acpi_madt_generic_translator *)header;
-> +	node_name = kasprintf(GFP_KERNEL, "ITS at 0x%lx",
-> +			      (long)its_entry->base_address);
-> +	domain_handle = iort_find_domain_token(its_entry->translation_id);
-> +	if (!domain_handle) {
-> +		pr_err("%s: Unable to locate ITS domain handle\n", node_name);
-> +		goto out;
-> +	}
-> +
-> +	err = its_pmsi_init_one(domain_handle, node_name);
-> +
-> +out:
-> +	kfree(node_name);
-> +	return err;
-> +}
-> +
-> +static void __init its_acpi_pmsi_init(void)
-> +{
-> +	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
-> +			      its_pmsi_parse_madt, 0);
-> +}
-> +#else
-> +static inline void its_acpi_pmsi_init(void) { }
-> +#endif
-> +
->   static void __init its_pmsi_of_init(void)
->   {
->   	struct device_node *np;
-> @@ -121,6 +156,7 @@ static void __init its_pmsi_of_init(void)
->   static int __init its_pmsi_init(void)
->   {
->   	its_pmsi_of_init();
-> +	its_acpi_pmsi_init();
->   	return 0;
->   }
->   early_initcall(its_pmsi_init);
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index 46e2d82..174e983 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -446,6 +446,7 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+>   /**
+>    * iort_dev_find_its_id() - Find the ITS identifier for a device
+>    * @dev: The device.
+> + * @req_id: Device's Requster ID
+>    * @idx: Index of the ITS identifier list.
+>    * @its_id: ITS identifier.
+>    *
 Tested-by:  Xinwei Kong <kong.kongxinwei@hisilicon.com>
