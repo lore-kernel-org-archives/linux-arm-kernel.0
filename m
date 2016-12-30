@@ -1,52 +1,68 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Fri, 30 Dec 2016 13:14:19 +0900
-Subject: [PATCH v2 2/4] pinctrl: dt-bindings: samsung: add drive strength
- macros for Exynos5433
-In-Reply-To: <20161230041421.24448-1-andi.shyti@samsung.com>
-References: <20161230041421.24448-1-andi.shyti@samsung.com>
- <CGME20161230041427epcas1p1e4d0dd5e7f9928664c664b7850dbd87a@epcas1p1.samsung.com>
-Message-ID: <20161230041421.24448-3-andi.shyti@samsung.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 30 Dec 2016 13:19:10 +0900
+Subject: [PATCH v2] usb: musb: sunxi: Uses the resource-managed extcon API when
+ registering extcon notifier
+References: <CGME20161230041914epcas5p24826e70fd5de710818687e55579757ba@epcas5p2.samsung.com>
+Message-ID: <1483071550-8683-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 5db7e3bb87df ("pinctrl: dt-bindings: samsung: Add header with
-values used for configuration") has added a header file for defining the
-pinctrl values in order to avoid hardcoded settings in the Exynos
-DTS related files.
+This patch just uses the resource-managed extcon API when registering
+the extcon notifier.
 
-Extend samsung.h to the Exynos5433 for drive strength values
-which are strictly related to the particular SoC and may defer
-from others.
-
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Bin Liu <b-liu@ti.com>
 ---
- include/dt-bindings/pinctrl/samsung.h | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Changes from v1:
+- Rebase this patch based on v4.10-rc1.
+- Add acked-by tag from Maxime Ripard and Bin Lin.
+- Drop the phy/power-supply/chipidea patches.
 
-diff --git a/include/dt-bindings/pinctrl/samsung.h b/include/dt-bindings/pinctrl/samsung.h
-index 6276eb785e2b..e0ebb20ffdd3 100644
---- a/include/dt-bindings/pinctrl/samsung.h
-+++ b/include/dt-bindings/pinctrl/samsung.h
-@@ -45,6 +45,20 @@
- #define EXYNOS5420_PIN_DRV_LV3		2
- #define EXYNOS5420_PIN_DRV_LV4		3
+ drivers/usb/musb/sunxi.c | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+index d0be0eadd0d9..2332294dee0f 100644
+--- a/drivers/usb/musb/sunxi.c
++++ b/drivers/usb/musb/sunxi.c
+@@ -251,14 +251,14 @@ static int sunxi_musb_init(struct musb *musb)
+ 	writeb(SUNXI_MUSB_VEND0_PIO_MODE, musb->mregs + SUNXI_MUSB_VEND0);
  
-+/* Drive strengths for Exynos5433 */
-+#define EXYNOS5433_PIN_DRV_FAST_SR1	0
-+#define EXYNOS5433_PIN_DRV_FAST_SR2	1
-+#define EXYNOS5433_PIN_DRV_FAST_SR3	2
-+#define EXYNOS5433_PIN_DRV_FAST_SR4	3
-+#define EXYNOS5433_PIN_DRV_FAST_SR5	4
-+#define EXYNOS5433_PIN_DRV_FAST_SR6	5
-+#define EXYNOS5433_PIN_DRV_SLOW_SR1	8
-+#define EXYNOS5433_PIN_DRV_SLOW_SR2	9
-+#define EXYNOS5433_PIN_DRV_SLOW_SR3	0xa
-+#define EXYNOS5433_PIN_DRV_SLOW_SR4	0xb
-+#define EXYNOS5433_PIN_DRV_SLOW_SR5	0xc
-+#define EXYNOS5433_PIN_DRV_SLOW_SR6	0xf
-+
- #define EXYNOS_PIN_FUNC_INPUT		0
- #define EXYNOS_PIN_FUNC_OUTPUT		1
- #define EXYNOS_PIN_FUNC_2		2
+ 	/* Register notifier before calling phy_init() */
+-	ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
+-				       &glue->host_nb);
++	ret = devm_extcon_register_notifier(glue->dev, glue->extcon,
++					EXTCON_USB_HOST, &glue->host_nb);
+ 	if (ret)
+ 		goto error_reset_assert;
+ 
+ 	ret = phy_init(glue->phy);
+ 	if (ret)
+-		goto error_unregister_notifier;
++		goto error_reset_assert;
+ 
+ 	musb->isr = sunxi_musb_interrupt;
+ 
+@@ -267,9 +267,6 @@ static int sunxi_musb_init(struct musb *musb)
+ 
+ 	return 0;
+ 
+-error_unregister_notifier:
+-	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
+-				   &glue->host_nb);
+ error_reset_assert:
+ 	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
+ 		reset_control_assert(glue->rst);
+@@ -293,9 +290,6 @@ static int sunxi_musb_exit(struct musb *musb)
+ 
+ 	phy_exit(glue->phy);
+ 
+-	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
+-				   &glue->host_nb);
+-
+ 	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
+ 		reset_control_assert(glue->rst);
+ 
 -- 
-2.11.0
+1.9.1
