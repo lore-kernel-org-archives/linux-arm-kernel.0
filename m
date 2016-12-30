@@ -1,78 +1,93 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 30 Dec 2016 12:46:49 +0300
-Subject: [PATCH 1/2] arm64: dma_mapping: allow PCI host driver to limit
- DMA mask
-In-Reply-To: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
-References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
-Message-ID: <b83c353c-c054-4378-9308-e625c460bdd9@cogentembedded.com>
+From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
+Date: Fri, 30 Dec 2016 16:59:02 +0800
+Subject: [PATCH v5 13/14] irqchip: mbigen: introduce
+ mbigen_of_create_domain()
+In-Reply-To: <1482384922-21507-14-git-send-email-guohanjun@huawei.com>
+References: <1482384922-21507-1-git-send-email-guohanjun@huawei.com>
+ <1482384922-21507-14-git-send-email-guohanjun@huawei.com>
+Message-ID: <586621D6.3060705@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
-
-On 12/29/2016 11:45 PM, Nikita Yushchenko wrote:
-
-> It is possible that PCI device supports 64-bit DMA addressing, and thus
-> it's driver sets device's dma_mask to DMA_BIT_MASK(64), however PCI host
-
-    Its.
-
-> bridge has limitations on inbound transactions addressing. Example of
-> such setup is NVME
-
-    Isn't it called NVMe?
-
-> SSD device connected to RCAR PCIe controller.
-
-    R=Car.
-
-> Previously there was attempt to handle this via bus notifier: after
-> driver is attached to PCI device, bridge driver gets notifier callback,
-> and resets dma_mask from there. However, this is racy: PCI device driver
-> could already allocate buffers and/or start i/o in probe routine.
-> In NVME case, i/o is started in workqueue context, and this race gives
-> "sometimes works, sometimes not" effect.
+On 2016/12/22 13:35, Hanjun Guo wrote:
+> From: Kefeng Wang <wangkefeng.wang@huawei.com>
 >
-> Proper solution should make driver's dma_set_mask() call to fail if host
-> bridge can't support mask being set.
+> Introduce mbigen_of_create_domain() to consolidate OF related
+> code and prepare for ACPI later, no funtional change.
 >
-> This patch makes __swiotlb_dma_supported() to check mask being set for
-
-    "To" not needed here.
-
-> PCI device against dma_mask of struct device corresponding to PCI host
-> bridge (one with name "pciXXXX:YY"), if that dma_mask is set.
->
-> This is the least destructive approach: currently dma_mask of that device
-> object is not used anyhow, thus all existing setups will work as before,
-> and modification is required only in actually affected components -
-> driver of particular PCI host bridge, and dma_map_ops of particular
-> platform.
->
-> Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Ma Jun <majun258@huawei.com>
 > ---
->  arch/arm64/mm/dma-mapping.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
+>   drivers/irqchip/irq-mbigen.c | 42 +++++++++++++++++++++++++++---------------
+>   1 file changed, 27 insertions(+), 15 deletions(-)
 >
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index 290a84f..49645277 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-[...]
-> @@ -347,6 +348,16 @@ static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
->
->  static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
->  {
-> +#ifdef CONFIG_PCI
-> +	if (dev_is_pci(hwdev)) {
-> +		struct pci_dev *pdev = to_pci_dev(hwdev);
-> +		struct pci_host_bridge *br = pci_find_host_bridge(pdev->bus);
+> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+> index c01ab41..4e11da5 100644
+> --- a/drivers/irqchip/irq-mbigen.c
+> +++ b/drivers/irqchip/irq-mbigen.c
+> @@ -236,27 +236,15 @@ static int mbigen_irq_domain_alloc(struct irq_domain *domain,
+>   	.free		= irq_domain_free_irqs_common,
+>   };
+>   
+> -static int mbigen_device_probe(struct platform_device *pdev)
+> +static int mbigen_of_create_domain(struct platform_device *pdev,
+> +				   struct mbigen_device *mgn_chip)
+>   {
+> -	struct mbigen_device *mgn_chip;
+> +	struct device *parent;
+>   	struct platform_device *child;
+>   	struct irq_domain *domain;
+>   	struct device_node *np;
+> -	struct device *parent;
+> -	struct resource *res;
+>   	u32 num_pins;
+>   
+> -	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
+> -	if (!mgn_chip)
+> -		return -ENOMEM;
+> -
+> -	mgn_chip->pdev = pdev;
+> -
+> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	mgn_chip->base = devm_ioremap_resource(&pdev->dev, res);
+> -	if (IS_ERR(mgn_chip->base))
+> -		return PTR_ERR(mgn_chip->base);
+> -
+>   	for_each_child_of_node(pdev->dev.of_node, np) {
+>   		if (!of_property_read_bool(np, "interrupt-controller"))
+>   			continue;
+> @@ -280,6 +268,30 @@ static int mbigen_device_probe(struct platform_device *pdev)
+>   			return -ENOMEM;
+>   	}
+>   
+> +	return 0;
+> +}
 > +
-> +		if (br->dev.dma_mask && (*br->dev.dma_mask) &&
-> +				(mask & (*br->dev.dma_mask)) != mask)
-
-    Hum, inner parens not necessary?
-
-[...]
-
-MBR, Sergei
+> +static int mbigen_device_probe(struct platform_device *pdev)
+> +{
+> +	struct mbigen_device *mgn_chip;
+> +	struct resource *res;
+> +	int err;
+> +
+> +	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
+> +	if (!mgn_chip)
+> +		return -ENOMEM;
+> +
+> +	mgn_chip->pdev = pdev;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	mgn_chip->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+> +	if (IS_ERR(mgn_chip->base))
+> +		return PTR_ERR(mgn_chip->base);
+> +
+> +	err = mbigen_of_create_domain(pdev, mgn_chip);
+> +	if (err)
+> +		return err;
+> +
+>   	platform_set_drvdata(pdev, mgn_chip);
+>   	return 0;
+>   }
+Tested-by:  Xinwei Kong <kong.kongxinwei@hisilicon.com>
