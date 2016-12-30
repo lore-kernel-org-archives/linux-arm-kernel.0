@@ -1,40 +1,37 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Dec 2016 09:23:59 +0100
-Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
- enable panel
-In-Reply-To: <20161221032717.13154-1-vz@mleia.com>
-References: <20161221032717.13154-1-vz@mleia.com>
-Message-ID: <CACRpkdZE6VgJA27+Wh=Gxd7yOXpLMyT7yCB2PYA36y0gvosHFQ@mail.gmail.com>
+Date: Fri, 30 Dec 2016 09:35:27 +0100
+Subject: [PATCH 1/6] pinctrl: dt-bindings: Add documentation for Armada
+ 37xx pin controllers
+In-Reply-To: <20161222172501.16121-2-gregory.clement@free-electrons.com>
+References: <20161222172501.16121-1-gregory.clement@free-electrons.com>
+ <20161222172501.16121-2-gregory.clement@free-electrons.com>
+Message-ID: <CACRpkdY_yUpo1nkbr0T-FZVSRFynuLSZ_6etho0hHk+otaUiYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2016 at 4:27 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
+On Thu, Dec 22, 2016 at 6:24 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
 
-> The changeset contains a number of cleanups, changed semantics of
-> init_panel() callback, which allows to simplify getting of panel
-> properties from panel device tree node, and a handling of optional
-> "enable-gpios" panel property, the latter is described in
-> display/panel/panel-dpi.txt device tree binding documentation, but
-> it has been unsupported by the ARM CLCD driver.
+> Document the device tree binding for the pin controllers found on the
+> Armada 37xx SoCs.
 >
-> Vladimir Zapolskiy (4):
->   video: ARM CLCD: sort included headers out alphabetically
->   video: ARM CLCD: use panel device node for panel initialization
->   video: ARM CLCD: use panel device node for getting backlight and mode
->   video: ARM CLCD: add support of an optional GPIO to enable panel
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+(...)
 
-As you may have seen Tomi has stepped down as FBDEV maintainer and
-this subsystem is now orphaned.
+> +Required properties for pinctrl driver:
+> +- compatible:  "marvell,armada3710-sb-pinctrl" for the south bridge
+> +               "marvell,armada3710-nb-pinctrl" for the north bridge
+> +- reg: The first set of register are for pinctrl/gpio and the second
+> +  set for the interrupt controller
+> +- interrupts: list of the interrupt use by the gpio
 
-I guess Andrew Morton merges patches for it in this case, he usually does.
+While this makes sense on its own, it doesn't match the code you sent.
 
-But what we should actually do is create a new DRM driver for CLCD
-in drivers/gpu/drm/arm/clcd*
+The code uses syscon and regmap inside a simple-mfd node, not reg.
 
-It's maybe not a small undertaking :(
+Please clarify how this works so we can see what is going on.
 
-But in case you're interested in the job, I will pitch in and test the result
-on all ARM reference designs plus Nomadik.
+The syscon part doesn't seem optional at all.
 
 Yours,
 Linus Walleij
