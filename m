@@ -1,54 +1,202 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 30 Dec 2016 16:51:55 +0200
-Subject: [PATCH v2 4/5] arm64: dts: exynos5433: Add bus dt node using
- VDD_INT for Exynos5433
-In-Reply-To: <5865B165.3010203@samsung.com>
-References: <1481173091-9728-1-git-send-email-cw00.choi@samsung.com>
- <1481173091-9728-5-git-send-email-cw00.choi@samsung.com>
- <CGME20161208175257epcas2p333f794a00f433dd8312a5faa088a5f34@epcas2p3.samsung.com>
- <20161208175243.GA9451@kozik-lap> <5865B165.3010203@samsung.com>
-Message-ID: <20161230145155.ecobfvtspviehlos@kozik-lap>
+From: xypron.glpk@gmx.de (Heinrich Schuchardt)
+Date: Fri, 30 Dec 2016 15:51:37 +0100
+Subject: [PATCH v2] ARM64: dts: meson-gx: Add reserved memory zone and
+ usable memory range
+In-Reply-To: <1483105232-6242-1-git-send-email-narmstrong@baylibre.com>
+References: <1483105232-6242-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <5c99bc3d-58ae-0434-4b68-bc0445f928ad@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 30, 2016 at 09:59:17AM +0900, Chanwoo Choi wrote:
-> Hi Krzysztof,
+On 12/30/2016 02:40 PM, Neil Armstrong wrote:
+> The Amlogic Meson GXBB/GXL/GXM secure monitor uses part of the memory space,
+> this patch adds this reserved zone and redefines the usable memory range.
 > 
-> On 2016? 12? 09? 02:52, Krzysztof Kozlowski wrote:
-> > On Thu, Dec 08, 2016 at 01:58:10PM +0900, Chanwoo Choi wrote:
-> >> This patch adds the bus nodes using VDD_INT for Exynos5433 SoC.
-> >> Exynos5433 has the following AMBA AXI buses to translate data
-> >> between DRAM and sub-blocks.
-> >>
-> >> Following list specify the detailed correlation between sub-block and clock:
-> >> - CLK_ACLK_G2D_{400|266}  : Bus clock for G2D (2D graphic engine)
-> >> - CLK_ACLK_MSCL_400       : Bus clock for MSCL (Memory to memory Scaler)
-> >> - CLK_ACLK_GSCL_333       : Bus clock for GSCL (General Scaler)
-> >> - CLK_SCLK_JPEG_MSCL      : Bus clock for JPEG
-> >> - CLK_ACLK_MFC_400        : Bus clock for MFC (Multi Format Codec)
-> >> - CLK_ACLK_HEVC_400       : Bus clock for HEVC (High Efficient Video Codec)
-> >> - CLK_ACLK_BUS0_400       : NoC(Network On Chip)'s bus clock for PERIC/PERIS/FSYS/MSCL
-> >> - CLK_ACLK_BUS1_400       : NoC's bus clock for MFC/HEVC/G3D
-> >> - CLK_ACLK_BUS2_400       : NoC's bus clock for GSCL/DISP/G2D/CAM0/CAM1/ISP
-> >>
-> >> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> >> ---
-> >>  arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi | 197 +++++++++++++++++++++++++
-> >>  arch/arm64/boot/dts/exynos/exynos5433.dtsi     |   1 +
-> >>  2 files changed, 198 insertions(+)
-> >>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi
-> > 
-> > For the reference:
-> > Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-> > 
-> > I'll queue it for v4.11, after this merge window.
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+> Changes since v1 at [1] :
+>  - Renamed reg into linux,usable-memory to ovveride u-boot memory
+>  - only kept secmon memory zone
 > 
-> Could you please pick this patch3/4/5?
-> These patches were already reviewed by you.
+>  [1] http://lkml.kernel.org/r/20161212101801.28491-1-narmstrong at baylibre.com
+> 
+>  arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi       |  2 +-
+>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi                 | 12 ++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    |  2 +-
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts       |  2 +-
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi          |  2 +-
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts  |  2 +-
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts   |  2 +-
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts |  2 +-
+>  arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts     |  2 +-
+>  arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts      |  2 +-
+>  arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts       |  2 +-
+>  11 files changed, 22 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
+> index 7a078be..ca3c7fa 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
+> @@ -56,7 +56,7 @@
+>  
+>  	memory at 0 {
+>  		device_type = "memory";
+> -		reg = <0x0 0x0 0x0 0x80000000>;
+> +		linux,usable-memory = <0x0 0x1000000 0x0 0x7f000000>;
+>  	};
+>  
+>  	vddio_boot: regulator-vddio_boot {
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+> index eada0b5..7f244b5 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+> @@ -55,6 +55,18 @@
+>  	#address-cells = <2>;
+>  	#size-cells = <2>;
+>  
+> +	reserved-memory {
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges;
+> +
+> +		/* global autoconfigured region for contiguous allocations */
 
-Not yet. I wanted to apply them few days ago but arm64 build is broken
-in 4.10-rc1 so I cannot auto-build them in my system. The arm64 is fixed
-already so I will apply them on top of 4.10-rc2 (when released).
+This comment does not make sense here. It is what you would write over a
+compatible to "shared-dma-pool" region. Cf. hi6220-hikey.dts
 
-Best regards,
-Krzysztof
+I suggest you use
+/* Amlogic Meson GXBB/GXL/GXM secure monitor reserved memory */
+instead.
+
+Doesn't firmware/meson/meson_sm.c already reserve a communication area
+to secmon with quite a different address range?
+So where is this new region secmon set up? And where is it used?
+
+Best regards
+
+Heinrich
+
+> +		secmon: secmon {
+> +			reg = <0x0 0x10000000 0x0 0x200000>;
+> +			no-map;
+> +		};
+> +	};
+> +
+>  	cpus {
+>  		#address-cells = <0x2>;
+>  		#size-cells = <0x0>;
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+> index 4cbd626..c7f008a 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+> @@ -62,7 +62,7 @@
+>  
+>  	memory at 0 {
+>  		device_type = "memory";
+> -		reg = <0x0 0x0 0x0 0x40000000>;
+> +		linux,usable-memory = <0x0 0x1000000 0x0 0x3f000000>;
+>  	};
+>  
+>  	leds {
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> index 238fbea..546cbe4 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> @@ -61,7 +61,7 @@
+>  
+>  	memory at 0 {
+>  		device_type = "memory";
+> -		reg = <0x0 0x0 0x0 0x80000000>;
+> +		linux,usable-memory = <0x0 0x1000000 0x0 0x7f000000>;
+>  	};
+>  
+>  	usb_otg_pwr: regulator-usb-pwrs {
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+> index 4a96e0f..1fdf6da 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+> @@ -55,7 +55,7 @@
+>  
+>  	memory at 0 {
+>  		device_type = "memory";
+> -		reg = <0x0 0x0 0x0 0x40000000>;
+> +		linux,usable-memory = <0x0 0x1000000 0x0 0x3f000000>;
+>  	};
+>  
+>  	usb_pwr: regulator-usb-pwrs {
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
+> index 62fb496..6ac5c89 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
+> @@ -50,6 +50,6 @@
+>  
+>  	memory at 0 {
+>  		device_type = "memory";
+> -		reg = <0x0 0x0 0x0 0x80000000>;
+> +		linux,usable-memory = <0x0 0x1000000 0x0 0x7f000000>;
+>  	};
+>  };
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
+> index 9a9663a..58be8b4 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
+> @@ -50,6 +50,6 @@
+>  
+>  	memory at 0 {
+>  		device_type = "memory";
+> -		reg = <0x0 0x0 0x0 0x40000000>;
+> +		linux,usable-memory = <0x0 0x1000000 0x0 0x3f000000>;
+>  	};
+>  };
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
+> index 2fe167b..010cb29 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
+> @@ -50,6 +50,6 @@
+>  
+>  	memory at 0 {
+>  		device_type = "memory";
+> -		reg = <0x0 0x0 0x0 0x80000000>;
+> +		linux,usable-memory = <0x0 0x1000000 0x0 0x7f000000>;
+>  	};
+>  };
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts
+> index cea4a3e..fb4a89b 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts
+> @@ -60,7 +60,7 @@
+>  
+>  	memory at 0 {
+>  		device_type = "memory";
+> -		reg = <0x0 0x0 0x0 0x80000000>;
+> +		linux,usable-memory = <0x0 0x1000000 0x0 0x7f000000>;
+>  	};
+>  
+>  	vddio_card: gpio-regulator {
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+> index 9639f01..908894c 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+> @@ -59,7 +59,7 @@
+>  
+>  	memory at 0 {
+>  		device_type = "memory";
+> -		reg = <0x0 0x0 0x0 0x80000000>;
+> +		linux,usable-memory = <0x0 0x1000000 0x0 0x7f000000>;
+>  	};
+>  };
+>  
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
+> index 5a337d3..2077385 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
+> @@ -62,7 +62,7 @@
+>  
+>  	memory at 0 {
+>  		device_type = "memory";
+> -		reg = <0x0 0x0 0x0 0x80000000>;
+> +		linux,usable-memory = <0x0 0x1000000 0x0 0x7f000000>;
+>  	};
+>  
+>  	vddio_boot: regulator-vddio-boot {
+> 
