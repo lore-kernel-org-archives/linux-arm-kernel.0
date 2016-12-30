@@ -1,56 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Dec 2016 09:58:06 +0100
-Subject: [PATCH 4/6] pinctrl: aramda-37xx: Add irqchip support
-In-Reply-To: <20161222172501.16121-5-gregory.clement@free-electrons.com>
-References: <20161222172501.16121-1-gregory.clement@free-electrons.com>
- <20161222172501.16121-5-gregory.clement@free-electrons.com>
-Message-ID: <CACRpkdbR-WRT0rJp2CuN6CkZF=J35JUgGHjW7beyaimipz0ehw@mail.gmail.com>
+From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
+Date: Fri, 30 Dec 2016 16:56:28 +0800
+Subject: [PATCH v5 01/14] ACPI: ARM64: IORT: minor cleanup for
+ iort_match_node_callback()
+In-Reply-To: <1482384922-21507-2-git-send-email-guohanjun@huawei.com>
+References: <1482384922-21507-1-git-send-email-guohanjun@huawei.com>
+ <1482384922-21507-2-git-send-email-guohanjun@huawei.com>
+Message-ID: <5866213C.9010203@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2016 at 6:24 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-
-> The Armada 37xx SoCs can handle interrupt through GPIO. However it can
-> only manage the edge ones.
+On 2016/12/22 13:35, Hanjun Guo wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
 >
-> The way the interrupt are managed are classical so we can use the generic
-> interrupt chip model.
+> Cleanup iort_match_node_callback() a little bit to reduce
+> some lines of code, aslo fix the indentation in iort_scan_node().
 >
-> The only unusual "feature" is that many interrupts are connected to the
-> parent interrupt controller. But we do not take advantage of this and use
-> the chained irq with all of them.
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Tomasz Nowicki <tn@semihalf.com>
+> ---
+>   drivers/acpi/arm64/iort.c | 10 +++-------
+>   1 file changed, 3 insertions(+), 7 deletions(-)
 >
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-So this is very simple and should use GPIOLIB_IRQCHIP.
-
-Begin with select GPIOLIB_IRQCHIP in your Kconfig and then look
-at conversions such as commit 85ae9e512f437cd09bf61564bdba29ab88bab3e3
-("pinctrl: bcm2835: switch to GPIOLIB_IRQCHIP")
-for inspiration.
-
-> @@ -64,6 +71,8 @@ struct armada_37xx_pinctrl {
->         struct armada_37xx_pin_data     *data;
->         struct device                   *dev;
->         struct gpio_chip                gpio_chip;
-> +       struct irq_chip                 irq_chip;
-> +       struct irq_domain               *domain;
-
-You don't need a domain when using GPIOLIB_IRQCHIP
-
-> +static int armada_37xx_gpio_to_irq(struct gpio_chip *chip, unsigned int offset)
-> +{
-> +       struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-> +
-> +       return irq_create_mapping(info->domain, offset);
-> +}
-
-Nor this.
-
-The irqchip code should be pretty much the same but you need to
-dereference gpio_chip from chip data and pick the irqchip from
-there.
-
-Yours,
-Linus Walleij
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index e0d2e6e..46e2d82 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -225,7 +225,7 @@ static struct acpi_iort_node *iort_scan_node(enum acpi_iort_node_type type,
+>   
+>   		if (iort_node->type == type &&
+>   		    ACPI_SUCCESS(callback(iort_node, context)))
+> -				return iort_node;
+> +			return iort_node;
+>   
+>   		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
+>   					 iort_node->length);
+> @@ -253,17 +253,15 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
+>   					    void *context)
+>   {
+>   	struct device *dev = context;
+> -	acpi_status status;
+> +	acpi_status status = AE_NOT_FOUND;
+>   
+>   	if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT) {
+>   		struct acpi_buffer buf = { ACPI_ALLOCATE_BUFFER, NULL };
+>   		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
+>   		struct acpi_iort_named_component *ncomp;
+>   
+> -		if (!adev) {
+> -			status = AE_NOT_FOUND;
+> +		if (!adev)
+>   			goto out;
+> -		}
+>   
+>   		status = acpi_get_name(adev->handle, ACPI_FULL_PATHNAME, &buf);
+>   		if (ACPI_FAILURE(status)) {
+> @@ -289,8 +287,6 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
+>   		 */
+>   		status = pci_rc->pci_segment_number == pci_domain_nr(bus) ?
+>   							AE_OK : AE_NOT_FOUND;
+> -	} else {
+> -		status = AE_NOT_FOUND;
+>   	}
+>   out:
+>   	return status;
+Tested-by:  Xinwei Kong <kong.kongxinwei@hisilicon.com>
