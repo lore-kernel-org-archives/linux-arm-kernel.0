@@ -1,119 +1,44 @@
-From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
-Date: Fri, 30 Dec 2016 16:58:28 +0800
-Subject: [PATCH v5 10/14] ACPI: ARM64: IORT: rework iort_node_get_id() for
- NC->SMMU->ITS case
-In-Reply-To: <1482384922-21507-11-git-send-email-guohanjun@huawei.com>
-References: <1482384922-21507-1-git-send-email-guohanjun@huawei.com>
- <1482384922-21507-11-git-send-email-guohanjun@huawei.com>
-Message-ID: <586621B4.9050704@hisilicon.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 30 Dec 2016 10:07:01 +0100
+Subject: [PATCH v7 3/5] ARM: dts: stm32: Add I2C1 support for STM32F429 SoC
+In-Reply-To: <CAOAejn1zHMFNiGc-wVbbkC1-JFzG3sjnnUJogtCp9EeAkWsV5A@mail.gmail.com>
+References: <1482413704-17531-1-git-send-email-cedric.madianga@gmail.com>
+ <1482413704-17531-4-git-send-email-cedric.madianga@gmail.com>
+ <20161222191103.vzmfhnrtrzw2ivwa@pengutronix.de>
+ <CAOAejn1zHMFNiGc-wVbbkC1-JFzG3sjnnUJogtCp9EeAkWsV5A@mail.gmail.com>
+Message-ID: <CACRpkdaNyL2iV+risLudW=O55w81-AuEZhMwRu9NLdXpnC2r1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/12/22 13:35, Hanjun Guo wrote:
-> From: Hanjun Guo <hanjun.guo@linaro.org>
+On Fri, Dec 23, 2016 at 2:09 PM, M'boumba Cedric Madianga
+<cedric.madianga@gmail.com> wrote:
+> 2016-12-22 20:11 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+>> On Thu, Dec 22, 2016 at 02:35:02PM +0100, M'boumba Cedric Madianga wrote:
+>>> @@ -337,6 +350,16 @@
+>>>                                       slew-rate = <2>;
+>>>                               };
+>>>                       };
+>>> +
+>>> +                     i2c1_pins_b: i2c1 at 0 {
+>>> +                             pins1 {
+>>> +                                     pinmux = <STM32F429_PB9_FUNC_I2C1_SDA>;
+>>> +                                     drive-open-drain;
+>>> +                             };
+>>> +                             pins2 {
+>>> +                                     pinmux = <STM32F429_PB6_FUNC_I2C1_SCL>;
+>>> +                             };
+>>
+>> the second doesn't need the open-drain property? Why?
 >
-> iort_node_get_id() for now only support NC(named componant)->SMMU
-> or NC->ITS cases, we also have other device topology such NC->
-> SMMU->ITS, so rework iort_node_get_id() for those cases.
->
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->   drivers/acpi/arm64/iort.c | 59 ++++++++++++++++++++++++++---------------------
->   1 file changed, 33 insertions(+), 26 deletions(-)
->
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index 6b72fcb..9b3f268 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -292,22 +292,28 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
->   	return status;
->   }
->   
-> -static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
-> -		       u32 *rid_out)
-> +static int iort_id_single_map(struct acpi_iort_id_mapping *map, u8 type,
-> +			      u32 *rid_out)
->   {
->   	/* Single mapping does not care for input id */
->   	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
->   		if (type == ACPI_IORT_NODE_NAMED_COMPONENT ||
->   		    type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
-> -			*rid_out = map->output_base;
-> +			if (rid_out)
-> +				*rid_out = map->output_base;
->   			return 0;
->   		}
->   
->   		pr_warn(FW_BUG "[map %p] SINGLE MAPPING flag not allowed for node type %d, skipping ID map\n",
->   			map, type);
-> -		return -ENXIO;
->   	}
->   
-> +	return -ENXIO;
-> +}
-> +
-> +static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
-> +		       u32 *rid_out)
-> +{
->   	if (rid_in < map->input_base ||
->   	    (rid_in >= map->input_base + map->id_count))
->   		return -ENXIO;
-> @@ -324,33 +330,34 @@ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
->   	struct acpi_iort_node *parent;
->   	struct acpi_iort_id_mapping *map;
->   
-> -	if (!node->mapping_offset || !node->mapping_count ||
-> -				     index >= node->mapping_count)
-> -		return NULL;
-> -
-> -	map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
-> -			   node->mapping_offset);
-> +	while (node) {
-> +		if (!node->mapping_offset || !node->mapping_count ||
-> +					     index >= node->mapping_count)
-> +			return NULL;
->   
-> -	/* Firmware bug! */
-> -	if (!map->output_reference) {
-> -		pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
-> -		       node, node->type);
-> -		return NULL;
-> -	}
-> +		map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
-> +				   node->mapping_offset);
->   
-> -	parent = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
-> -			       map->output_reference);
-> +		/* Firmware bug! */
-> +		if (!map->output_reference) {
-> +			pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
-> +			       node, node->type);
-> +			return NULL;
-> +		}
->   
-> -	if (!(IORT_TYPE_MASK(parent->type) & type_mask))
-> -		return NULL;
-> +		parent = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
-> +				      map->output_reference);
->   
-> -	if (map[index].flags & ACPI_IORT_ID_SINGLE_MAPPING) {
-> -		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
-> -		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
-> -			if (id_out)
-> -				*id_out = map[index].output_base;
-> -			return parent;
-> +		/* go upstream to find its parent */
-> +		if (!(IORT_TYPE_MASK(parent->type) & type_mask)) {
-> +			node = parent;
-> +			continue;
->   		}
-> +
-> +		if (iort_id_single_map(&map[index], node->type, id_out))
-> +			break;
-> +
-> +		return parent;
->   	}
->   
->   	return NULL;
-Tested-by:  Xinwei Kong <kong.kongxinwei@hisilicon.com>
+> I thought that open-drain was only needed for SDA line.
+> But after double-checking I2C specification, it seems that SDA and SCL
+> lines need open-drain or open-collector to perform the wired-AND
+> function.
+
+I think I2C SDA/SCL must be open drain by definition.
+
+It also requires pull-up resistors, I guess you have these mounted on the board
+so you do not need pull-up from the pin controller?
+
+Yours,
+Linus Walleij
