@@ -1,48 +1,93 @@
 From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
-Date: Fri, 30 Dec 2016 16:58:40 +0800
-Subject: [PATCH v5 11/14] msi: platform: make
- platform_msi_create_device_domain() ACPI aware
-In-Reply-To: <1482384922-21507-12-git-send-email-guohanjun@huawei.com>
+Date: Fri, 30 Dec 2016 16:57:37 +0800
+Subject: [PATCH v5 06/14] irqchip: gicv3-its: platform-msi: refactor
+ its_pmsi_init() to prepare for ACPI
+In-Reply-To: <1482384922-21507-7-git-send-email-guohanjun@huawei.com>
 References: <1482384922-21507-1-git-send-email-guohanjun@huawei.com>
- <1482384922-21507-12-git-send-email-guohanjun@huawei.com>
-Message-ID: <586621C0.10108@hisilicon.com>
+ <1482384922-21507-7-git-send-email-guohanjun@huawei.com>
+Message-ID: <58662181.2010409@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 2016/12/22 13:35, Hanjun Guo wrote:
 > From: Hanjun Guo <hanjun.guo@linaro.org>
 >
-> With the platform msi domain created for ITS, irqchip such as
-> mbi-gen connecting ITS, which needs ctreate its own irqdomain.
->
-> Fortunately with the platform msi support upstreamed by Marc,
-> we just need to add minor code to make it run properly.
->
-> platform_msi_create_device_domain() is almost ready for ACPI use
-> except of_node_to_fwnode() is for dt only, make it ACPI aware then
-> things will work in both DTS and ACPI.
+> Introduce its_pmsi_init_one() to refactor the code to isolate
+> ACPI&DT common code to prepare for ACPI later.
 >
 > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Tested-by: Sinan Kaya <okaya@codeaurora.org>
 > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Greg KH <gregkh@linuxfoundation.org>
+> Cc: Tomasz Nowicki <tn@semihalf.com>
 > Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Greg KH <gregkh@linuxfoundation.org>
 > ---
->   drivers/base/platform-msi.c | 3 +--
->   1 file changed, 1 insertion(+), 2 deletions(-)
+>   drivers/irqchip/irq-gic-v3-its-platform-msi.c | 45 ++++++++++++++++-----------
+>   1 file changed, 27 insertions(+), 18 deletions(-)
 >
-> diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
-> index be6a599..035ca3b 100644
-> --- a/drivers/base/platform-msi.c
-> +++ b/drivers/base/platform-msi.c
-> @@ -345,8 +345,7 @@ struct irq_domain *
+> diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+> index 16587a9..ff72704 100644
+> --- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+> +++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+> @@ -84,34 +84,43 @@ static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
+>   	{},
+>   };
 >   
->   	data->host_data = host_data;
->   	domain = irq_domain_create_hierarchy(dev->msi_domain, 0, nvec,
-> -					     of_node_to_fwnode(dev->of_node),
-> -					     ops, data);
-> +					     dev->fwnode, ops, data);
->   	if (!domain)
->   		goto free_priv;
+> -static int __init its_pmsi_init(void)
+> +static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
+> +				const char *name)
+>   {
+> -	struct device_node *np;
+>   	struct irq_domain *parent;
 >   
+> +	parent = irq_find_matching_fwnode(fwnode, DOMAIN_BUS_NEXUS);
+> +	if (!parent || !msi_get_domain_info(parent)) {
+> +		pr_err("%s: unable to locate ITS domain\n", name);
+> +		return -ENXIO;
+> +	}
+> +
+> +	if (!platform_msi_create_irq_domain(fwnode, &its_pmsi_domain_info,
+> +					    parent)) {
+> +		pr_err("%s: unable to create platform domain\n", name);
+> +		return -ENXIO;
+> +	}
+> +
+> +	pr_info("Platform MSI: %s domain created\n", name);
+> +	return 0;
+> +}
+> +
+> +static void __init its_pmsi_of_init(void)
+> +{
+> +	struct device_node *np;
+> +
+>   	for (np = of_find_matching_node(NULL, its_device_id); np;
+>   	     np = of_find_matching_node(np, its_device_id)) {
+>   		if (!of_property_read_bool(np, "msi-controller"))
+>   			continue;
+>   
+> -		parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
+> -		if (!parent || !msi_get_domain_info(parent)) {
+> -			pr_err("%s: unable to locate ITS domain\n",
+> -			       np->full_name);
+> -			continue;
+> -		}
+> -
+> -		if (!platform_msi_create_irq_domain(of_node_to_fwnode(np),
+> -						    &its_pmsi_domain_info,
+> -						    parent)) {
+> -			pr_err("%s: unable to create platform domain\n",
+> -			       np->full_name);
+> -			continue;
+> -		}
+> -
+> -		pr_info("Platform MSI: %s domain created\n", np->full_name);
+> +		its_pmsi_init_one(of_node_to_fwnode(np), np->full_name);
+>   	}
+> +}
+>   
+> +static int __init its_pmsi_init(void)
+> +{
+> +	its_pmsi_of_init();
+>   	return 0;
+>   }
+>   early_initcall(its_pmsi_init);
 Tested-by:  Xinwei Kong <kong.kongxinwei@hisilicon.com>
