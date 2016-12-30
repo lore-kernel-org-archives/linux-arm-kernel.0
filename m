@@ -1,147 +1,127 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 30 Dec 2016 18:50:44 +0800
-Subject: [PATCH v5 09/14] ACPI: platform: setup MSI domain for ACPI based
- platform device
-In-Reply-To: <586072E9.3060609@huawei.com>
-References: <1482384922-21507-1-git-send-email-guohanjun@huawei.com>
- <1482384922-21507-10-git-send-email-guohanjun@huawei.com>
- <CAJZ5v0g4AoU-g4UWZFxLgQ_yfTC7KSBnZ_Ve945d+i58e=GuDQ@mail.gmail.com>
- <585E24FB.9050805@huawei.com>
- <CAJZ5v0itKF-uo7vGxK3+-X4OwBVYPdBw-b8v-8-CTBygpKMGoQ@mail.gmail.com>
- <586072E9.3060609@huawei.com>
-Message-ID: <58663C04.9000603@huawei.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 30 Dec 2016 12:55:27 +0100
+Subject: [PATCH 7/9] pinctrl: samsung: Add property to mark pad state as
+ suitable for power down
+In-Reply-To: <20161227153331.jbh7ei6oh3obmnri@kozik-lap>
+References: <1482495889-6201-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20161223122538epcas5p29515ceff21963ab035b3b32878830ce2@epcas5p2.samsung.com>
+ <1482495889-6201-8-git-send-email-m.szyprowski@samsung.com>
+ <20161225191914.5bzl6fso36ozuum6@kozik-lap>
+ <bd48fe32-5296-fc23-dbb8-d212292d76cd@samsung.com>
+ <20161227153331.jbh7ei6oh3obmnri@kozik-lap>
+Message-ID: <bad5ef6a-6132-2029-8581-2e8b27f7a2bd@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+Hi Krzysztof,
 
-On 2016/12/26 9:31, Hanjun Guo wrote:
-[cut]
->
-> +       if (pdevinfo->pre_add_cb)
-> +               pdevinfo->pre_add_cb(&pdev->dev);
-> +
->>>> -> because it looks like this might be done in acpi_platform_notify()
->>>> for platform devices.
->>> It works and I just simply add the code below:
+On 2016-12-27 16:33, Krzysztof Kozlowski wrote:
+> On Tue, Dec 27, 2016 at 11:30:57AM +0100, Marek Szyprowski wrote:
+>> On 2016-12-25 20:19, Krzysztof Kozlowski wrote:
+>>> On Fri, Dec 23, 2016 at 01:24:47PM +0100, Marek Szyprowski wrote:
+>>>> Add support for special property "samsung,off-state", which indicates a special
+>>>> state suitable for device's "sleep" state. Its pin values/properties should
+>>>> match the configuration in power down mode. It indicates that pin controller
+>>>> can notify runtime power management subsystem, that it is ready for runtime
+>>>> suspend if its all pins are configured for such state. This in turn might
+>>>> allow to turn respective power domain off to reduce power consumption.
+>>>>
+>>>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>>> ---
+>>>>    Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt | 8 ++++++++
+>>>>    drivers/pinctrl/samsung/pinctrl-samsung.c                     | 4 ++++
+>>>>    drivers/pinctrl/samsung/pinctrl-samsung.h                     | 1 +
+>>>>    3 files changed, 13 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+>>>> index b7bd2e12a269..354eea0e7798 100644
+>>>> --- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+>>>> +++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+>>>> @@ -105,6 +105,7 @@ Required Properties:
+>>>>      - samsung,pin-drv: Drive strength configuration.
+>>>>      - samsung,pin-pud-pdn: Pull up/down configuration in power down mode.
+>>>>      - samsung,pin-drv-pdn: Drive strength configuration in power down mode.
+>>>> +  - samsung,off-state: Mark this configuration as suitable for bank power off.
+>>>>      The values specified by these config properties should be derived from the
+>>>>      hardware manual and these values are programmed as-is into the pin
+>>>> @@ -113,6 +114,13 @@ Required Properties:
+>>>>      Note: A child should include atleast a pin function selection property or
+>>>>      pin configuration property (one or more) or both.
+>>>> +  Note: Special property "samsung,off-state" indicates that this state can
+>>>> +  be used for device's "sleep" pins state. Its pin values/properties should
+>>>> +  match the configuration in power down mode.
+>>> Why power down values cannot be used for sleep state? Why you need
+>>> separate pin control state? If pins values should match power down
+>>> configuration, then they could just be added to default state, couldn't
+>>> they?
+>> Separate sleep state is needed because of the pin control bindings and
+>> design.
+>>
+>> A separate sleep state is required to let pin control client driver (in this
+>> case
+>> Exynos I2S driver) let to choose when it is okay to switch pads into sleep
+>> state and I see no other way to achieve this.
+> Maybe the pinctrl API should be extended for this? Doing this in DTS
+> just for purpose of passing information between drivers (consumer and
+> provider) looks odd.
+
+Well, I don't know if it is odd or not, but that's how it is used now 
+and I see
+no reason to reinvent wheel. Please check it yourself:
+$ git grep \"sleep\" arch/arm/boot/dts | wc -l
+101
+
+> Anyway, you are proposing a new binding so please Cc devicetree mailing
+> list and device tree maintainers.
+
+I'm just using the generic pinctrl bindings, but it might make some sense to
+add a note to Exynos i2s driver that a sleep pin control state is needed if
+one wants to get power domain to be turned off.
+
+>>> In the patch 2/9, existing configuration:
+>>> 716         i2s0_bus: i2s0-bus {
+>>> (...)
+>>> 719                 samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
+>>> 720                 samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+>>> 721                 samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV1>;
+>>> 722         };
 >>>
->>> diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
->>> index f8d6564..e0cd649 100644
->>> --- a/drivers/acpi/glue.c
->>> +++ b/drivers/acpi/glue.c
->>> @@ -13,6 +13,7 @@
->>>  #include <linux/slab.h>
->>>  #include <linux/rwsem.h>
->>>  #include <linux/acpi.h>
->>> +#include <linux/acpi_iort.h>
->>>  #include <linux/dma-mapping.h>
->>>
->>>  #include "internal.h"
->>> @@ -315,6 +316,8 @@ static int acpi_platform_notify(struct device *dev)
->>>         if (!adev)
->>>                 goto out;
->>>
->>> + acpi_configure_pmsi_domain(dev);
->>> +
->> But that should apply to platform devices only I suppose?
-> Yes, it's only for the platform device.
->
->>>         if (type && type->setup)
->>>                 type->setup(dev);
->>>         else if (adev->handler && adev->handler->bind)
->>>
->>> Do you suggesting to configure the msi domain in this way?
->>> or add the function in the type->setup() callback (which needs
->>> to introduce a new acpi bus type)?
->> A type->setup() would be somewhat cleaner I think, but then it's more
->> code.  Whichever works better I guess. :-)
-> Agree, I will demo the type->setup() way and send out the patch for review,
-> also I find one minor issue for the IORT code, will update that also for next
-> version.
+>>> additional configuration:
+>>> +       i2s0_bus_slp: i2s0-bus-slp {
+>>> +               samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
+>>> +               samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+>>> +               samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV1>;
+>>> +               samsung,pin-con-pdn = <EXYNOS_PIN_PDN_INPUT>;
+>>> +               samsung,pin-pud-pdn = <EXYNOS_PIN_PULL_NONE>;
+>>> +               samsung,off-state;
+>>> +       };
+>> I agree that it would be possible to get rid of "samsung,off-state" property
+>> and
+>> just detect off state when func/pud pair matches power down func/pud.
+>>
+>>>> It indicates that pin control
+>>>> +  can notify runtime power management subsystem, that it is ready for runtime
+>>>> +  suspend if its all pins are configured for such state. This in turn might
+>>>> +  allow to turn respective power domain off to reduce power consumption.
+>>> What do you mean by "notifying RPM subsystem"? Either this is
+>>> description of hardware in certain mode (sleep state) or this is not
+>>> device tree property.
+>> Maybe I wrote the description with a view too limited to the kernel
+>> operation
+>> perspective, but if we remove the need to mark state as off, the above
+>> description
+>> will not be needed.
+> But still it wouldn't be describing any hardware property, would it?
 
-Just demo the code and find out it's seems to cut the feet to the type->setup() code,
-because we need a match function (it's ok) and a find_companion() (we don't need that
-and make the code worse because we will call the find_companion callback which it not needed
-for platform devices:
+Well, it somehow describes the hardware, because the pin state when it 
+is allowed
+to turn off the power domain is board specific. I should move that part 
+to the
+Odroid dts, because there might be a board which require other pin 
+values in power
+down mode.
 
-diff --git a/drivers/acpi/acpi_platform.c b/drivers/acpi/acpi_platform.c
-index 96983c9..654021d9b 100644
---- a/drivers/acpi/acpi_platform.c
-+++ b/drivers/acpi/acpi_platform.c
-@@ -138,3 +138,31 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *adev,
-        return pdev;
- }
- EXPORT_SYMBOL_GPL(acpi_create_platform_device);
-+
-+static bool platform_acpi_bus_match(struct device *dev)
-+{
-+ return dev->bus == &platform_bus_type;
-+}
-+
-+static struct acpi_device *platform_acpi_bus_find_companion(struct device *dev)
-+{
-+ /* demo code, do nothing here */
-+ return NULL;
-+}
-+
-+static void platform_acpi_setup(struct device *dev)
-+{
-+ acpi_configure_pmsi_domain(dev);
-+}
-+
-+static struct acpi_bus_type acpi_platform_bus = {
-+ .name = "Platform",
-+ .match = platform_acpi_bus_match,
-+ .find_companion = platform_acpi_bus_find_companion,
-+ .setup = platform_acpi_setup,
-+};
-+
-+int acpi_platform_bus_register(void)
-+{
-+ return register_acpi_bus_type(&acpi_platform_bus);
-+}
-diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
-index 95855cb..0a0a639 100644
---- a/drivers/acpi/bus.c
-+++ b/drivers/acpi/bus.c
-@@ -1199,6 +1199,7 @@ static int __init acpi_init(void)
-        }
- 
-        pci_mmcfg_late_init();
-+ acpi_platform_bus_register();
-        acpi_iort_init();
-        acpi_scan_init();
-        acpi_ec_init();
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 809b536..1d05f92 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -597,6 +597,8 @@ extern bool acpi_driver_match_device(struct device *dev,
- 
- struct platform_device *acpi_create_platform_device(struct acpi_device *,
-                                                    struct property_entry *);
-+int acpi_platform_bus_register(void);
-+
- #define ACPI_PTR(_ptr) (_ptr)
- 
- static inline void acpi_device_set_enumerated(struct acpi_device *adev)
-
-
-So how about just add the code as below?
-
-diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
-index 11e63dd..37a8dfe 100644
---- a/drivers/acpi/glue.c
-+++ b/drivers/acpi/glue.c
-@@ -316,7 +316,8 @@ static int acpi_platform_notify(struct device *dev)
-        if (!adev)
-                goto out;
- 
-+ if (dev->bus == &platform_bus_type)
-+         acpi_configure_pmsi_domain(dev);
- 
-        if (type && type->setup)
-                type->setup(dev);
-
-Thanks
-Hanjun
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
