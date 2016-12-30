@@ -1,162 +1,83 @@
-From: dsafonov@virtuozzo.com (Dmitry Safonov)
-Date: Fri, 30 Dec 2016 18:56:31 +0300
-Subject: [RFC 1/4] mm: remove unused TASK_SIZE_OF()
-In-Reply-To: <20161230155634.8692-1-dsafonov@virtuozzo.com>
-References: <20161230155634.8692-1-dsafonov@virtuozzo.com>
-Message-ID: <20161230155634.8692-2-dsafonov@virtuozzo.com>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Fri, 30 Dec 2016 09:46:13 -0800
+Subject: [PATCH v3] ARM: dts: imx6: Disable "weim" node in the dtsi files
+In-Reply-To: <1483092543-14233-1-git-send-email-festevam@gmail.com>
+References: <1483092543-14233-1-git-send-email-festevam@gmail.com>
+Message-ID: <14e3f942-13fc-7c4e-d782-26e6322cce2c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All users of TASK_SIZE_OF(tsk) have migrated to mm->task_size or
-TASK_SIZE_MAX since:
-commit d696ca016d57 ("x86/fsgsbase/64: Use TASK_SIZE_MAX for
-FSBASE/GSBASE upper limits"),
-commit a06db751c321 ("pagemap: check permissions and capabilities at
-open time"),
+Thanks Fabio.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Ralf Baechle <ralf@linux-mips.org>
-Cc: "James E.J. Bottomley" <jejb@parisc-linux.org>
-Cc: Helge Deller <deller@gmx.de>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Michael Ellerman <mpe@ellerman.id.au>
-Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-Cc: "David S. Miller" <davem@davemloft.net>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-mips at linux-mips.org
-Cc: linux-parisc at vger.kernel.org
-Cc: linuxppc-dev at lists.ozlabs.org
-Cc: linux-s390 at vger.kernel.org
-Cc: sparclinux at vger.kernel.org
-Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
----
- arch/arm64/include/asm/memory.h       | 2 --
- arch/mips/include/asm/processor.h     | 3 ---
- arch/parisc/include/asm/processor.h   | 3 +--
- arch/powerpc/include/asm/processor.h  | 3 +--
- arch/s390/include/asm/processor.h     | 3 +--
- arch/sparc/include/asm/processor_64.h | 3 ---
- arch/x86/include/asm/processor.h      | 2 --
- include/linux/sched.h                 | 4 ----
- 8 files changed, 3 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index bfe632808d77..329bb4fd543c 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -80,8 +80,6 @@
- #define TASK_SIZE_32		UL(0x100000000)
- #define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
- 				TASK_SIZE_32 : TASK_SIZE_64)
--#define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
--				TASK_SIZE_32 : TASK_SIZE_64)
- #else
- #define TASK_SIZE		TASK_SIZE_64
- #endif /* CONFIG_COMPAT */
-diff --git a/arch/mips/include/asm/processor.h b/arch/mips/include/asm/processor.h
-index 95b8c471f572..c2827a5507d4 100644
---- a/arch/mips/include/asm/processor.h
-+++ b/arch/mips/include/asm/processor.h
-@@ -73,9 +73,6 @@ extern unsigned int vced_count, vcei_count;
- #define TASK_SIZE (test_thread_flag(TIF_32BIT_ADDR) ? TASK_SIZE32 : TASK_SIZE64)
- #define STACK_TOP_MAX	TASK_SIZE64
- 
--#define TASK_SIZE_OF(tsk)						\
--	(test_tsk_thread_flag(tsk, TIF_32BIT_ADDR) ? TASK_SIZE32 : TASK_SIZE64)
--
- #define TASK_IS_32BIT_ADDR test_thread_flag(TIF_32BIT_ADDR)
- 
- #endif
-diff --git a/arch/parisc/include/asm/processor.h b/arch/parisc/include/asm/processor.h
-index a3661ee6b060..8b51ddae8e4a 100644
---- a/arch/parisc/include/asm/processor.h
-+++ b/arch/parisc/include/asm/processor.h
-@@ -32,8 +32,7 @@
- 
- #define HAVE_ARCH_PICK_MMAP_LAYOUT
- 
--#define TASK_SIZE_OF(tsk)       ((tsk)->thread.task_size)
--#define TASK_SIZE	        TASK_SIZE_OF(current)
-+#define TASK_SIZE	        (current->thread.task_size)
- #define TASK_UNMAPPED_BASE      (current->thread.map_base)
- 
- #define DEFAULT_TASK_SIZE32	(0xFFF00000UL)
-diff --git a/arch/powerpc/include/asm/processor.h b/arch/powerpc/include/asm/processor.h
-index 1ba814436c73..04e575ead590 100644
---- a/arch/powerpc/include/asm/processor.h
-+++ b/arch/powerpc/include/asm/processor.h
-@@ -111,9 +111,8 @@ void release_thread(struct task_struct *);
-  */
- #define TASK_SIZE_USER32 (0x0000000100000000UL - (1*PAGE_SIZE))
- 
--#define TASK_SIZE_OF(tsk) (test_tsk_thread_flag(tsk, TIF_32BIT) ? \
-+#define TASK_SIZE	(test_thread_flag(TIF_32BIT) ? \
- 		TASK_SIZE_USER32 : TASK_SIZE_USER64)
--#define TASK_SIZE	  TASK_SIZE_OF(current)
- 
- /* This decides where the kernel will search for a free chunk of vm
-  * space during mmap's.
-diff --git a/arch/s390/include/asm/processor.h b/arch/s390/include/asm/processor.h
-index 6bca916a5ba0..c53e8e2a51ac 100644
---- a/arch/s390/include/asm/processor.h
-+++ b/arch/s390/include/asm/processor.h
-@@ -89,10 +89,9 @@ extern void execve_tail(void);
-  * User space process size: 2GB for 31 bit, 4TB or 8PT for 64 bit.
-  */
- 
--#define TASK_SIZE_OF(tsk)	((tsk)->mm->context.asce_limit)
- #define TASK_UNMAPPED_BASE	(test_thread_flag(TIF_31BIT) ? \
- 					(1UL << 30) : (1UL << 41))
--#define TASK_SIZE		TASK_SIZE_OF(current)
-+#define TASK_SIZE		(current->mm->context.asce_limit)
- #define TASK_MAX_SIZE		(1UL << 53)
- 
- #define STACK_TOP		(1UL << (test_thread_flag(TIF_31BIT) ? 31:42))
-diff --git a/arch/sparc/include/asm/processor_64.h b/arch/sparc/include/asm/processor_64.h
-index 6448cfc8292f..6ce1a75d7a24 100644
---- a/arch/sparc/include/asm/processor_64.h
-+++ b/arch/sparc/include/asm/processor_64.h
-@@ -36,9 +36,6 @@
- #define VPTE_SIZE	(1 << (VA_BITS - PAGE_SHIFT + 3))
- #endif
- 
--#define TASK_SIZE_OF(tsk) \
--	(test_tsk_thread_flag(tsk,TIF_32BIT) ? \
--	 (1UL << 32UL) : ((unsigned long)-VPTE_SIZE))
- #define TASK_SIZE \
- 	(test_thread_flag(TIF_32BIT) ? \
- 	 (1UL << 32UL) : ((unsigned long)-VPTE_SIZE))
-diff --git a/arch/x86/include/asm/processor.h b/arch/x86/include/asm/processor.h
-index eaf100508c36..090a860b792a 100644
---- a/arch/x86/include/asm/processor.h
-+++ b/arch/x86/include/asm/processor.h
-@@ -819,8 +819,6 @@ static inline void spin_lock_prefetch(const void *x)
- 
- #define TASK_SIZE		(test_thread_flag(TIF_ADDR32) ? \
- 					IA32_PAGE_OFFSET : TASK_SIZE_MAX)
--#define TASK_SIZE_OF(child)	((test_tsk_thread_flag(child, TIF_ADDR32)) ? \
--					IA32_PAGE_OFFSET : TASK_SIZE_MAX)
- 
- #define STACK_TOP		TASK_SIZE
- #define STACK_TOP_MAX		TASK_SIZE_MAX
-diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 4d1905245c7a..7a2e2f3f38a3 100644
---- a/include/linux/sched.h
-+++ b/include/linux/sched.h
-@@ -3610,10 +3610,6 @@ static inline void inc_syscw(struct task_struct *tsk)
- }
- #endif
- 
--#ifndef TASK_SIZE_OF
--#define TASK_SIZE_OF(tsk)	TASK_SIZE
--#endif
--
- #ifdef CONFIG_MEMCG
- extern void mm_update_next_owner(struct mm_struct *mm);
- #else
--- 
-2.11.0
+On 12/30/2016 02:09 AM, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+>
+> Commit 1be81ea5860744520 ("ARM: dts: imx6: Add imx-weim parameters to
+> dtsi's") causes the following probe error when the weim node is not
+> present on the board dts (such as imx6q-sabresd):
+>
+> imx-weim 21b8000.weim: Invalid 'ranges' configuration
+> imx-weim: probe of 21b8000.weim failed with error -22
+>
+> There is no need to always enable the "weim" node on mx6. Do the same
+> as in the other i.MX dtsi files where "weim" is disabled and only gets
+> enabled on a per dts basis.
+>
+> All the imx6 weim dts users explicitily provide 'status = "okay"', so
+> this change has no impact on current imx6 weim users.
+>
+> If a board does not use the weim driver it will not describe its 'ranges'
+> property, so simply disable the 'weim' node in the imx6 dtsi files to
+> avoid such probe error message.
+>
+> Fixes: 1be81ea5860744520 ("ARM: dts: imx6: Add imx-weim parameters to dtsi's")
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+> Changes since v2:
+> - Fix the error message by disabling weim at dtsi level.
+>
+>  arch/arm/boot/dts/imx6qdl.dtsi | 1 +
+>  arch/arm/boot/dts/imx6sl.dtsi  | 1 +
+>  arch/arm/boot/dts/imx6sx.dtsi  | 1 +
+>  3 files changed, 3 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index 53e6e63..89b834f 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -1100,6 +1100,7 @@
+>  				interrupts = <0 14 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks IMX6QDL_CLK_EIM_SLOW>;
+>  				fsl,weim-cs-gpr = <&gpr>;
+> +				status = "disabled";
+>  			};
+>  
+>  			ocotp: ocotp at 021bc000 {
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> index 4fd6de2..19cbd87 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -900,6 +900,7 @@
+>  				reg = <0x021b8000 0x4000>;
+>  				interrupts = <0 14 IRQ_TYPE_LEVEL_HIGH>;
+>  				fsl,weim-cs-gpr = <&gpr>;
+> +				status = "disabled";
+>  			};
+>  
+>  			ocotp: ocotp at 021bc000 {
+> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+> index 076a30f..10f3330 100644
+> --- a/arch/arm/boot/dts/imx6sx.dtsi
+> +++ b/arch/arm/boot/dts/imx6sx.dtsi
+> @@ -977,6 +977,7 @@
+>  				interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks IMX6SX_CLK_EIM_SLOW>;
+>  				fsl,weim-cs-gpr = <&gpr>;
+> +				status = "disabled";
+>  			};
+>  
+>  			ocotp: ocotp at 021bc000 {
+I like this solution much better!
+
+Joshua
