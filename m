@@ -1,52 +1,37 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 30 Dec 2016 21:01:06 +0800
-Subject: [PATCH 2/3] ARM: dts: imx6ul: Add OCOTP node
-In-Reply-To: <1480689949-17957-2-git-send-email-d.schultz@phytec.de>
-References: <1480689949-17957-1-git-send-email-d.schultz@phytec.de>
- <1480689949-17957-2-git-send-email-d.schultz@phytec.de>
-Message-ID: <20161230130105.GS6177@dragon>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 30 Dec 2016 14:02:56 +0100
+Subject: [PATCH V1] pinctrl:pxa:pinctrl-pxa2xx:- No need of devm functions
+In-Reply-To: <87o9zvw69a.fsf@belgarion.home>
+References: <1481207730-6332-1-git-send-email-arvind.yadav.cs@gmail.com>
+ <CACRpkdY8mwHD1yyHZSHsDsJNPjrgLTfEok38FNons6oabn5ZPw@mail.gmail.com>
+ <87o9zvw69a.fsf@belgarion.home>
+Message-ID: <CACRpkdYaBmoik8W81h=2RH0_Q2MJPjSRTtgKb3tkwwAsKbFVAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 03:45:48PM +0100, Daniel Schultz wrote:
-> This device node adds OCOTP for the i.MX6UL SoC.
-> 
-> Signed-off-by: Daniel Schultz <d.schultz@phytec.de>
+On Thu, Dec 29, 2016 at 8:20 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Linus Walleij <linus.walleij@linaro.org> writes:
+>
+>> On Thu, Dec 8, 2016 at 3:35 PM, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
+>>
+>>> In functions pxa2xx_build_functions, the memory allocated for
+>>> 'functions' is live within the function only. After the
+>>> allocation it is immediately freed with devm_kfree. There is
+>>> no need to allocate memory for 'functions' with devm function
+>>> so replace devm_kcalloc  with kcalloc and devm_kfree with kfree.
+>>>
+>>> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+>>
+>> I want the maintainer Robert Jarzmik to review this before I do anything
+>
+> Hi Linus,
+>
+> I did review, on December the 10th. I wasn't very enthusiastic about the patch,
+> if you check back my reply.
 
-Bai Ping (Cc'ed here) from NXP is sending similar patches [1].  DTS
-change looks good to me, but I will not apply it until the driver and
-bindings get accepted.
+Sorry I missed it (mail overload as usual).
 
-Shawn
+OK dropping this.
 
-[1] https://www.spinics.net/lists/arm-kernel/msg540900.html
-
-> ---
->  arch/arm/boot/dts/imx6ul.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-> index c5c05fd..ee53795 100644
-> --- a/arch/arm/boot/dts/imx6ul.dtsi
-> +++ b/arch/arm/boot/dts/imx6ul.dtsi
-> @@ -849,6 +849,12 @@
->  				reg = <0x021b0000 0x4000>;
->  			};
->  
-> +			ocotp: ocotp at 021bc000 {
-> +				compatible = "fsl,imx6ul-ocotp";
-> +				reg = <0x021bc000 0x4000>;
-> +				clocks = <&clks IMX6UL_CLK_OCOTP>;
-> +			};
-> +
->  			lcdif: lcdif at 021c8000 {
->  				compatible = "fsl,imx6ul-lcdif", "fsl,imx28-lcdif";
->  				reg = <0x021c8000 0x4000>;
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Yours,
+Linus Walleij
