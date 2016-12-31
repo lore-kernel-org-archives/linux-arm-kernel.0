@@ -1,106 +1,92 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Fri, 30 Dec 2016 18:11:05 -0800
-Subject: How should we handle variable address space sizes (Re: [RFC 3/4]
- x86/mm: define TASK_SIZE as current->mm->task_size)
-Message-ID: <CALCETrXMCVOmVcQYxF_ghPdEjLuNNqbcnoRKRVpJegsQ=SPEFQ@mail.gmail.com>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Sat, 31 Dec 2016 16:13:44 +0530
+Subject: [PATCH] drivers: remoteproc: constify rproc_ops structures
+In-Reply-To: <20161230120655.GB9118@builder>
+References: <1481974176-19912-1-git-send-email-bhumirks@gmail.com>
+ <20161230120655.GB9118@builder>
+Message-ID: <CAOH+1jH=Y+1Nxe2L4d6OaC95dc-ORsuqsOYSNP5_8NYJVz-A4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 30, 2016 at 7:56 AM, Dmitry Safonov <dsafonov@virtuozzo.com> wrote:
-> Keep task's virtual address space size as mm_struct field which
-> exists for a long time - it's initialized in setup_new_exec()
-> depending on the new task's personality.
-> This way TASK_SIZE will always be the same as current->mm->task_size.
-> Previously, there could be an issue about different values of
-> TASK_SIZE and current->mm->task_size: e.g, a 32-bit process can unset
-> ADDR_LIMIT_3GB personality (with personality syscall) and
-> so TASK_SIZE will be 4Gb, which is larger than mm->task_size = 3Gb.
-> As TASK_SIZE *and* current->mm->task_size are used both in code
-> frequently, this difference creates a subtle situations, for example:
-> one can mmap addresses > 3Gb, but they will be hidden in
-> /proc/pid/pagemap as it checks mm->task_size.
-> I've moved initialization of mm->task_size earlier in setup_new_exec()
-> as arch_pick_mmap_layout() initializes mmap_legacy_base with
-> TASK_UNMAPPED_BASE, which depends on TASK_SIZE.
+On Fri, Dec 30, 2016 at 5:36 PM, Bjorn Andersson
+<bjorn.andersson@linaro.org> wrote:
+> On Sat 17 Dec 03:29 PST 2016, Bhumika Goyal wrote:
+>
+>> Declare rproc_ops structures as const as they are only passed as an
+>> argument to the function rproc_alloc. This argument is of type const, so
+>> rproc_ops structures having this property can be declared const too.
+>> Done using Coccinelle:
+>>
+>> @r1 disable optional_qualifier @
+>> identifier i;
+>> position p;
+>> @@
+>> static struct rproc_ops i at p = {...};
+>>
+>> @ok1@
+>> identifier r1.i;
+>> position p;
+>> @@
+>> rproc_alloc(...,&i at p,...)
+>>
+>> @bad@
+>> position p!={r1.p,ok1.p};
+>> identifier r1.i;
+>> @@
+>> i at p
+>>
+>> @depends on !bad disable optional_qualifier@
+>> identifier r1.i;
+>> @@
+>> +const
+>> struct rproc_ops i;
+>>
+>> File sizes before:
+>>    text          data     bss     dec     hex filename
+>>    1258           416       0    1674     68a remoteproc/omap_remoteproc.o
+>>    2402           240       0    2642     a52 remoteproc/st_remoteproc.o
+>>    2064           272       0    2336     920 remoteproc/st_slim_rproc.o
+>>    2160           240       0    2400     960 remoteproc/wkup_m3_rproc.o
+>>
+>> File sizes after:
+>>    text          data     bss     dec     hex filename
+>>    1297           368       0    1665     681 remoteproc/omap_remoteproc.o
+>>    2434           192       0    2626     a42 remoteproc/st_remoteproc.o
+>>    2112           240       0    2352     930 remoteproc/st_slim_rproc.o
+>>    2200           192       0    2392     958 remoteproc/wkup_m3_rproc.o
+>>
+>> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+>
+> Thanks Bhumika, this looks good.
+>
+> But as Suman already asked. Is there any reason why da8xx_remoteproc.c
+> did not get updated? It looks like the same change would apply there.
+>
+>
 
-I don't like this patch so much because I think that we should figure
-out how this will all work in the long run first.  I've added some
-more people to the thread because other arches have similar issues and
-because x86 is about to get considerably more complicated (choices
-include 3GB, 4GB, 47-bit, and 56-bit (the latter IIRC)).
+The reason I did not sent a patch for that driver is because the .o
+file is not obtained. This is output I get when I try to compile the
+da8xx_remoteproc.o file.
 
-Here are a few of my thoughts on the matter.  This isn't all that well
-thought out:
+drivers/remoteproc/da8xx_remoteproc.c:22:72: fatal error:
+mach/clock.h: No such file or directory
+ #include <mach/clock.h>   /* for davinci_clk_reset_assert/deassert() */
+                                                                        ^
+compilation terminated.
+make[1]: *** [drivers/remoteproc/da8xx_remoteproc.o] Error 1
+make: *** [drivers/remoteproc/da8xx_remoteproc.o] Error 2
 
-The address space limit, especially if CRIU is in play, isn't really a
-hard limit.  For example, you could allocate high memory then lower
-the limit.  Similarly, I see no reason that an x32 program should be
-forbidden from mapping some high addresses or, similarly, that an i386
-program can't (if it really wanted to) do a 64-bit mmap() and get a
-high address.
+I also tried running the commands  make.cross ARCH=arm allyesconfig;
+make.cross ARCH=arm drivers/remoteproc/da8xx_remoteproc.o but still
+the error remains the same.
 
-On that note, can we just *delete* the task_size check from pagemap?
-It's been there since the very beginning:
+Could you please suggest me what to do in this case?
 
-commit 85863e475e59afb027b0113290e3796ee6020b7d
-Author: Matt Mackall <mpm@selenic.com>
-Date:   Mon Feb 4 22:29:04 2008 -0800
+Thanks,
+Bhumika
 
-    maps4: add /proc/pid/pagemap interface
-
-and there's no explanation for why it's needed.
-
-So maybe we should have a *number* (not a bit) that indicates the
-maximum address that mmap() will return unless an override is in use.
-Since common practice seems to be to stick this in the personality
-field, we may need some fancy encoding.  Executing a setuid binary
-needs to reset to the default, and personality handles that.
-
-We should also probably come up with a reasonable set of getters and
-setters for CRIU and otherwise.  I can think of the following
-questions that might be asked:
-
- - What is the highest currently mapped VA?  (/proc can already answer
-this.  If needed, a prctl could be added, too.  Using /proc is a bit
-tricky due to out-of-range "gate areas", e.g. the x86 vsyscall page.)
-
- - What is the highest address that mmap() will return without being
-forced?  On x86 and sparc, this could plausbly be extra complicated
-because there are multiple "mmap()" syscalls (32-bit vs 64-bit), so an
-i386 process could theoretically have a limit of 2^47-1, for example.
-I doubt this matters much.  I'm also not sure whether this should be
-per-task or per-mm.  I can see legitimate use cases to set this to
-unusual numbers.  For example, some x86 program could want 2^51-1
-because it wants that many high bits free, even though this doesn't
-correspond to any particular hardware paging mode.  This probably
-wants a getter and a setter.
-
- - What is the highest address that the hardware is capable of?  (By
-this, I mean with the kernel's adjustments applied.  x86_64 is
-currently capable of 2^47-1, but we artificially cap it to 2^47-4097
-due to Intel having screwed up SYSRET.)  This is just TASK_SIZE_MAX.
-I'm not sure we need a getter or a setter, since it doesn't seem all
-that useful to know.
-
-We still need to see if there should be some way for an ELF binary to
-be tagged with its maximum supported virtual address.  If we do this,
-I would suggest an ELF note as a straw-man initial proposal.  ELF
-notes are nice because I think they can be generated cleanly from C or
-asm without modifying binutils.
-
-I wouldn't mind seeing TASK_SIZE go away completely in the long run,
-since it's not clearly defined what it does.  Also, it's worth noting
-that, in the absence of userspace making assumptions, no limit is
-needed at all.  A 32-bit or x32 program should *automatically* get a
-limited address simply by virtue of making an mmap() syscall with the
-32-bit or x32 ABI.
-
-Thoughts?
-
-P.S. If we add an ELF note saying "supports 57 bits", I think we
-should also add an ELF note saying "doesn't use vsyscalls", but that's
-a bit off topic.
-
-P.P.S. We can efficiently turn vsyscalls off per process.  I even have
-code for it.  It's a bit tricky and abuses some paging bits, but it
-works.
+> Unless I'm missing something, please update the patch and I'll be happy
+> to apply it.
+>
+> Regards,
+> Bjorn
