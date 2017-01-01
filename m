@@ -1,76 +1,48 @@
 From: peter.senna@collabora.com (Peter Senna Tschudin)
-Date: Sun,  1 Jan 2017 21:24:29 +0100
-Subject: [PATCH V7 1/4] Documentation/devicetree/bindings: b850v3_lvds_dp
+Date: Sun,  1 Jan 2017 21:24:30 +0100
+Subject: [PATCH V7 2/4] MAINTAINERS: Add entry for GE B850v3 LVDS/DP++ Bridge
 In-Reply-To: <cover.1483301745.git.peter.senna@collabora.com>
 References: <cover.1483301745.git.peter.senna@collabora.com>
-Message-ID: <21ea1b0795bdaa30ca475d6ce675b620b2b644ed.1483301745.git.peter.senna@collabora.com>
+Message-ID: <597f32d0aac5f87b88b88d99b2e8622ffe71a165.1483301745.git.peter.senna@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Devicetree bindings documentation for the GE B850v3 LVDS/DP++
-display bridge.
+Update the MAINTAINERS file for the GE B850v3 LVDS/DP++ Bridge.
 
 Cc: Martyn Welch <martyn.welch@collabora.co.uk>
 Cc: Martin Donnelly <martin.donnelly@ge.com>
-Cc: Javier Martinez Canillas <javier@dowhile0.org>
+Cc: Daniel Vetter <daniel.vetter@ffwll.ch>
 Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Cc: Philipp Zabel <p.zabel@pengutronix.de>
 Cc: Rob Herring <robh@kernel.org>
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
+CC: David Airlie <airlied@linux.ie>
+CC: Thierry Reding <treding@nvidia.com>
+CC: Thierry Reding <thierry.reding@gmail.com>
+CC: Archit Taneja <architt@codeaurora.org>
 Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
 ---
-There was an Acked-by from Rob Herring <robh@kernel.org> for V6, but I changed
-the bindings to use i2c_new_secondary_device() so I removed it from the commit
-message.
+ MAINTAINERS | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
- .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 39 ++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
-
-diff --git a/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
-new file mode 100644
-index 0000000..1bc6ebf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
-@@ -0,0 +1,39 @@
-+Driver for GE B850v3 LVDS/DP++ display bridge
+diff --git a/MAINTAINERS b/MAINTAINERS
+index fdd9d5e3..1d3f17a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -5371,6 +5371,14 @@ W:	https://linuxtv.org
+ S:	Maintained
+ F:	drivers/media/radio/radio-gemtek*
+ 
++GENERAL ELECTRIC B850V3 LVDS/DP++ BRIDGE
++M:	Peter Senna Tschudin <peter.senna@collabora.com>
++M:	Martin Donnelly <martin.donnelly@ge.com>
++M:	Martyn Welch <martyn.welch@collabora.co.uk>
++S:	Maintained
++F:	drivers/gpu/drm/bridge/ge_b850v3_dp2.c
++F:	Documentation/devicetree/bindings/ge/b850v3_dp2_bridge.txt
 +
-+Required properties:
-+  - compatible : should be "ge,b850v3-lvds-dp".
-+  - reg : should contain the main address which is used to ack the
-+    interrupts and address for edid.
-+  - reg-names : comma separeted list of register names. Valid values
-+    are "main", and "edid".
-+  - interrupt-parent : phandle of the interrupt controller that services
-+    interrupts to the device
-+  - interrupts : one interrupt should be described here, as in
-+    <0 IRQ_TYPE_LEVEL_HIGH>.
-+  - port : should describe the video signal connection between the host
-+    and the bridge.
-+
-+Example:
-+
-+&mux2_i2c2 {
-+	status = "okay";
-+	clock-frequency = <100000>;
-+
-+	b850v3-lvds-dp-bridge at 73  {
-+		compatible = "ge,b850v3-lvds-dp";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg = <0x73 0x72>;
-+		reg-names = "main", "edid";
-+
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		port {
-+			b850v3_dp_bridge_in: endpoint {
-+				remote-endpoint = <&lvds0_out>;
-+			};
-+		};
-+	};
-+};
+ GENERIC GPIO I2C DRIVER
+ M:	Haavard Skinnemoen <hskinnemoen@gmail.com>
+ S:	Supported
 -- 
 2.5.5
