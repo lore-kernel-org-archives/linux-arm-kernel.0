@@ -1,136 +1,82 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Sun,  1 Jan 2017 16:13:37 +0530
-Subject: [PATCH v2] drivers: remoteproc: constify rproc_ops structures
-Message-ID: <1483267417-7850-1-git-send-email-bhumirks@gmail.com>
+From: peter.senna@collabora.com (Peter Senna Tschudin)
+Date: Sun,  1 Jan 2017 21:24:28 +0100
+Subject: [PATCH V7 0/4] Add driver for GE B850v3 LVDS/DP++ Bridge
+Message-ID: <cover.1483301745.git.peter.senna@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare rproc_ops structures as const as they are only passed as an
-argument to the function rproc_alloc. This argument is of type const, so
-rproc_ops structures having this property can be declared const too.
-Done using Coccinelle:
+The series adds a driver that creates a drm_bridge and a drm_connector for the
+LVDS to DP++ display bridge of the GE B850v3.
 
-@r1 disable optional_qualifier @
-identifier i;
-position p;
-@@
-static struct rproc_ops i at p = {...};
+There are two physical bridges on the video signal pipeline: a STDP4028(LVDS to
+DP) and a STDP2690(DP to DP++).  The hardware and firmware made it complicated
+for this binding to comprise two device tree nodes, as the design goal is to
+configure both bridges based on the LVDS signal, which leave the driver
+powerless to control the video processing pipeline. The two bridges behaves as
+a single bridge, and the driver is only needed for telling the host about EDID /
+HPD, and for giving the host powers to ack interrupts. The video signal
+pipeline is as follows:
 
-@ok1@
-identifier r1.i;
-position p;
-@@
-rproc_alloc(...,&i at p,...)
+  Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
 
-@bad@
-position p!={r1.p,ok1.p};
-identifier r1.i;
-@@
-i at p
+This series depends on commit dc80d7038883 ("drm/imx-ldb: Add support to
+drm-bridge") which is already on linux-next.
 
-@depends on !bad disable optional_qualifier@
-identifier r1.i;
-@@
-+const
-struct rproc_ops i;
+The patches from the series:
+ [1/4] Devicetree documentation for the GE B850v3 LVDS/DP++ Bridge
 
-File size details:
+ [2/4] Update the MAINTAINERS file
 
-Size of the file remoteproc/da8xx_remoteproc.o remains the same before and
-after applying the changes.
+ [3/4] Add the driver, make changes to Kconfig and Makefile
 
-   text	   data	    bss	    dec	    hex	filename
-   1312	    100	      4	   1416	    588 remoteproc/da8xx_remoteproc.o
-   1312	    100	      4	   1416	    588 remoteproc/da8xx_remoteproc.o
+ [4/4] Make the changes to the B850v3 dts file to enable the GE B850v3
+       LVDS/DP++ Bridge.
 
-    970	    240	      0	   1210	    4ba remoteproc/omap_remoteproc.o
-   1002	    192	      0	   1194	    4aa remoteproc/omap_remoteproc.o
+Tested on next20161224.
 
-   1901	    240	      0	   2141	    85d remoteproc/st_remoteproc.o
-   1933	    192	      0	   2125	    84d remoteproc/st_remoteproc.o
+Changes from V6:
+ - Removed check for pixel clock as the bridge supports up to 330Mhz while the
+   host is limited to 264 MHz in very specific conditions.
+ - Added a second mutex to avoid concurrency issues while acking interrupts
+   from threaded interrupt handlers.
+ - Renamed the edid mutex to be more descriptive.
+ - Added a .detach() function that disables the interrupts.
+ - Adopted i2c_new_secondary_device() and updated the dts and documentation to
+   match the new method.
+ - Removed useless test to drm_bridge_add()
+ - Did some refactoring around devm_request_threaded_irq()
+ - Added a missing call to i2c_unregister_device() on the i2c_driver.remove()
+   function.
 
-   1288	     96	      0	   1384	    568 remoteproc/st_slim_rproc.o
-   1320	     64	      0	   1384	    568 remoteproc/st_slim_rproc.o
+Changes from V5:
+ - Change to MAINTAINERS in a separate patch
+ - Reworked interrupt handler initialization
+ - Removed useless calls to: drm_connector_register(),
+   drm_helper_hpd_irq_event(), and drm_bridge_enable()
 
-   2121	    240	      0	   2361	    939 remoteproc/wkup_m3_rproc.o
-   2161	    192	      0	   2353	    931 remoteproc/wkup_m3_rproc.o
+Changes from V4:
+ - Renamed the i2c_driver.name from "ge,b850v3-lvds-dp" to "b850v3-lvds-dp" to
+   remove the comma from the driver name
 
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
----
-Changes in v2:
- * Apply the changes to the file da8xx_remoteproc.c as well.
+Changes from V3:
+ - Removed the patch that was configuring the mapping between IPUs and external
+   displays on the dts file
 
- drivers/remoteproc/da8xx_remoteproc.c | 2 +-
- drivers/remoteproc/omap_remoteproc.c  | 2 +-
- drivers/remoteproc/st_remoteproc.c    | 2 +-
- drivers/remoteproc/st_slim_rproc.c    | 2 +-
- drivers/remoteproc/wkup_m3_rproc.c    | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+Peter Senna Tschudin (4):
+  Documentation/devicetree/bindings: b850v3_lvds_dp
+  MAINTAINERS: Add entry for GE B850v3 LVDS/DP++ Bridge
+  drm/bridge: Add driver for GE B850v3 LVDS/DP++ Bridge
+  dts/imx6q-b850v3: Use GE B850v3 LVDS/DP++ Bridge
 
-diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
-index 1afac8f..3814de2 100644
---- a/drivers/remoteproc/da8xx_remoteproc.c
-+++ b/drivers/remoteproc/da8xx_remoteproc.c
-@@ -151,7 +151,7 @@ static void da8xx_rproc_kick(struct rproc *rproc, int vqid)
- 	writel(SYSCFG_CHIPSIG2, drproc->chipsig);
- }
- 
--static struct rproc_ops da8xx_rproc_ops = {
-+static const struct rproc_ops da8xx_rproc_ops = {
- 	.start = da8xx_rproc_start,
- 	.stop = da8xx_rproc_stop,
- 	.kick = da8xx_rproc_kick,
-diff --git a/drivers/remoteproc/omap_remoteproc.c b/drivers/remoteproc/omap_remoteproc.c
-index fa63bf2..a96ce90 100644
---- a/drivers/remoteproc/omap_remoteproc.c
-+++ b/drivers/remoteproc/omap_remoteproc.c
-@@ -177,7 +177,7 @@ static int omap_rproc_stop(struct rproc *rproc)
- 	return 0;
- }
- 
--static struct rproc_ops omap_rproc_ops = {
-+static const struct rproc_ops omap_rproc_ops = {
- 	.start		= omap_rproc_start,
- 	.stop		= omap_rproc_stop,
- 	.kick		= omap_rproc_kick,
-diff --git a/drivers/remoteproc/st_remoteproc.c b/drivers/remoteproc/st_remoteproc.c
-index da4e152..f21787b 100644
---- a/drivers/remoteproc/st_remoteproc.c
-+++ b/drivers/remoteproc/st_remoteproc.c
-@@ -107,7 +107,7 @@ static int st_rproc_stop(struct rproc *rproc)
- 	return sw_err ?: pwr_err;
- }
- 
--static struct rproc_ops st_rproc_ops = {
-+static const struct rproc_ops st_rproc_ops = {
- 	.start		= st_rproc_start,
- 	.stop		= st_rproc_stop,
- };
-diff --git a/drivers/remoteproc/st_slim_rproc.c b/drivers/remoteproc/st_slim_rproc.c
-index 507716c..6cfd862 100644
---- a/drivers/remoteproc/st_slim_rproc.c
-+++ b/drivers/remoteproc/st_slim_rproc.c
-@@ -200,7 +200,7 @@ static void *slim_rproc_da_to_va(struct rproc *rproc, u64 da, int len)
- 	return va;
- }
- 
--static struct rproc_ops slim_rproc_ops = {
-+static const struct rproc_ops slim_rproc_ops = {
- 	.start		= slim_rproc_start,
- 	.stop		= slim_rproc_stop,
- 	.da_to_va       = slim_rproc_da_to_va,
-diff --git a/drivers/remoteproc/wkup_m3_rproc.c b/drivers/remoteproc/wkup_m3_rproc.c
-index 18175d0..1ada0e5 100644
---- a/drivers/remoteproc/wkup_m3_rproc.c
-+++ b/drivers/remoteproc/wkup_m3_rproc.c
-@@ -111,7 +111,7 @@ static void *wkup_m3_rproc_da_to_va(struct rproc *rproc, u64 da, int len)
- 	return va;
- }
- 
--static struct rproc_ops wkup_m3_rproc_ops = {
-+static const struct rproc_ops wkup_m3_rproc_ops = {
- 	.start		= wkup_m3_rproc_start,
- 	.stop		= wkup_m3_rproc_stop,
- 	.da_to_va	= wkup_m3_rproc_da_to_va,
+ .../devicetree/bindings/ge/b850v3-lvds-dp.txt      |  39 +++
+ MAINTAINERS                                        |   8 +
+ arch/arm/boot/dts/imx6q-b850v3.dts                 |  30 ++
+ drivers/gpu/drm/bridge/Kconfig                     |  11 +
+ drivers/gpu/drm/bridge/Makefile                    |   1 +
+ drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c         | 384 +++++++++++++++++++++
+ 6 files changed, 473 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+ create mode 100644 drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c
+
 -- 
-1.9.1
+2.5.5
