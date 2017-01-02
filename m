@@ -1,26 +1,45 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 2 Jan 2017 14:22:06 +0530
-Subject: [PATCH v4 1/4] ARM: da850: fix infinite loop in clk_set_rate()
-In-Reply-To: <1481124138-27337-2-git-send-email-bgolaszewski@baylibre.com>
-References: <1481124138-27337-1-git-send-email-bgolaszewski@baylibre.com>
- <1481124138-27337-2-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <b04c878f-97cf-f0a1-4968-154d96eda8d4@ti.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 2 Jan 2017 09:59:24 +0100
+Subject: [PATCH 3/8] ARM: dts: armada-388-clearfog: Utilize new DSA binding
+In-Reply-To: <20170102022249.10657-4-f.fainelli@gmail.com>
+References: <20170102022249.10657-1-f.fainelli@gmail.com>
+ <20170102022249.10657-4-f.fainelli@gmail.com>
+Message-ID: <0997385a-700c-bbcc-4194-77f641885cbd@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 December 2016 08:52 PM, Bartosz Golaszewski wrote:
-> The aemif clock is added twice to the lookup table in da850.c. This
-> breaks the children list of pll0_sysclk3 as we're using the same list
-> links in struct clk. When calling clk_set_rate(), we get stuck in
-> propagate_rate().
-> 
-> Create a separate clock for nand, inheriting the rate of the aemif
-> clock and retrieve it in the davinci_nand module.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Hi Florian,
 
-Applied to fixes branch. The prefix for mach-davinci patches is "ARM:
-davinci: ...". I fixed it up when applying. Please take care for future.
+On 01/02/2017 03:22 AM, Florian Fainelli wrote:
+> Utilize the new DSA binding, introduced with commit 8c5ad1d6179d ("net:
+> dsa: Document new binding"). The legacy binding node is kept included, but is
+> marked disabled.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  arch/arm/boot/dts/armada-388-clearfog.dts | 65 +++++++++++++++++++++++++++++++
+>  1 file changed, 65 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-388-clearfog.dts b/arch/arm/boot/dts/armada-388-clearfog.dts
+> index 71ce201c903e..35207aa1f4ec 100644
+> --- a/arch/arm/boot/dts/armada-388-clearfog.dts
+> +++ b/arch/arm/boot/dts/armada-388-clearfog.dts
+> @@ -351,6 +351,8 @@
+>  	};
+>  
+>  	dsa at 0 {
+> +		status = "okay";
 
-Thanks,
-Sekhar
+I think you wanted "disabled" here !
+
+> +
+>  		compatible = "marvell,dsa";
+>  		dsa,ethernet = <&eth1>;
+>  		dsa,mii-bus = <&mdio>;
+> @@ -444,3 +446,66 @@
+>  		status = "disabled";
+>  	};
+>  };
+[...]
+
+Neil
