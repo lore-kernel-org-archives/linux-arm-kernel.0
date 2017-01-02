@@ -1,15 +1,27 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 2 Jan 2017 17:19:28 +0800
-Subject: [PATCH] ARM: dts: imx28: Add simple-card support
-In-Reply-To: <20161220153516.19222-1-joerg.krause@embedded.rocks>
-References: <20161220153516.19222-1-joerg.krause@embedded.rocks>
-Message-ID: <20170102091927.GJ20956@dragon>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 02 Jan 2017 10:20:21 +0100
+Subject: [GIT PULL] ARM: exynos: Late mach/soc for v4.10
+In-Reply-To: <20161230155312.oupgyip7wtqwcuy2@kozik-lap>
+References: <1482003132-8844-1-git-send-email-krzk@kernel.org>
+ <20161230155312.oupgyip7wtqwcuy2@kozik-lap>
+ <CGME20170102092044epcas1p3cbe831b7b6528f818b034d73c85dbe7d@epcas1p3.samsung.com>
+Message-ID: <5b0e55c8-01db-3f02-3526-2f71f4a73d88@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2016 at 04:35:16PM +0100, J?rg Krause wrote:
-> Add simple-card support to SAIF0 and SAIF1.
+On 12/30/2016 04:53 PM, Krzysztof Kozlowski wrote:
 > 
-> Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
+> Any comments on this? I guess it won't come as late-late-4.10, so can
+> you pull it for v4.11?
+ 
+>> Sylwester Nawrocki (1):
+>>       ARM: S3C24XX: Add DMA slave maps for remaining s3c24xx SoCs
 
-Applied, thanks.
+We need this patch in v4.10 to avoid possible I2S and MMC regressions
+on selected s3c24xx SoC, since the DMA clients are already modified.
+If the patch goes in only for v4.11 it would be good to mark it for 
+inclusion in v4.10 stable kernels.  
+
+--
+Thanks, 
+Sylwester
