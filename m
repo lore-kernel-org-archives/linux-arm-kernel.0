@@ -1,179 +1,282 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 02 Jan 2017 15:27:26 +0000
-Subject: [PATCH 4/5] ARM: dts: armada388-clearfog: move ethernet related nodes
+Date: Mon, 02 Jan 2017 15:27:21 +0000
+Subject: [PATCH 3/5] ARM: dts: armada388-clearfog: move I2C nodes
 In-Reply-To: <E1cO4UH-0008SR-GW@rmk-PC.armlinux.org.uk>
 References: <E1cO4UH-0008SR-GW@rmk-PC.armlinux.org.uk>
-Message-ID: <E1cO4WE-00006H-UI@rmk-PC.armlinux.org.uk>
+Message-ID: <E1cO4W9-000069-IZ@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the ethernet, buffer manager, and mdio nodes over to use label form
-to reference the devices rather than replicating the device path.
+Move the I2C nodes over to use the label form to reference the I2C
+controllers, rather than replicating the device node path.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/boot/dts/armada-388-clearfog.dtsi         | 44 +++++++------
- .../arm/boot/dts/armada-38x-solidrun-microsom.dtsi | 76 +++++++++++-----------
- 2 files changed, 60 insertions(+), 60 deletions(-)
+ arch/arm/boot/dts/armada-388-clearfog.dtsi | 245 ++++++++++++++---------------
+ 1 file changed, 120 insertions(+), 125 deletions(-)
 
 diff --git a/arch/arm/boot/dts/armada-388-clearfog.dtsi b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-index eeb845bbe3f3..6149699eefc2 100644
+index 7946400b4bf2..eeb845bbe3f3 100644
 --- a/arch/arm/boot/dts/armada-388-clearfog.dtsi
 +++ b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-@@ -71,27 +71,6 @@
+@@ -92,131 +92,6 @@
+ 				};
+ 			};
  
- 	soc {
- 		internal-regs {
--			ethernet at 30000 {
--				phy-mode = "sgmii";
--				buffer-manager = <&bm>;
--				bm,pool-long = <2>;
--				bm,pool-short = <1>;
+-			i2c at 11000 {
+-				/* Is there anything on this? */
+-				clock-frequency = <100000>;
+-				pinctrl-0 = <&i2c0_pins>;
+-				pinctrl-names = "default";
 -				status = "okay";
+-
+-				/*
+-				 * PCA9655 GPIO expander, up to 1MHz clock.
+-				 *  0-CON3 CLKREQ#
+-				 *  1-CON3 PERST#
+-				 *  2-
+-				 *  3-CON3 W_DISABLE
+-				 *  4-
+-				 *  5-USB3 overcurrent
+-				 *  6-USB3 power
+-				 *  7-
+-				 *  8-JP4 P1
+-				 *  9-JP4 P4
+-				 * 10-JP4 P5
+-				 * 11-m.2 DEVSLP
+-				 * 12-SFP_LOS
+-				 * 13-SFP_TX_FAULT
+-				 * 14-SFP_TX_DISABLE
+-				 * 15-SFP_MOD_DEF0
+-				 */
+-				expander0: gpio-expander at 20 {
+-					/*
+-					 * This is how it should be:
+-					 * compatible = "onnn,pca9655",
+-					 *	 "nxp,pca9555";
+-					 * but you can't do this because of
+-					 * the way I2C works.
+-					 */
+-					compatible = "nxp,pca9555";
+-					gpio-controller;
+-					#gpio-cells = <2>;
+-					reg = <0x20>;
+-
+-					pcie1_0_clkreq {
+-						gpio-hog;
+-						gpios = <0 GPIO_ACTIVE_LOW>;
+-						input;
+-						line-name = "pcie1.0-clkreq";
+-					};
+-					pcie1_0_w_disable {
+-						gpio-hog;
+-						gpios = <3 GPIO_ACTIVE_LOW>;
+-						output-low;
+-						line-name = "pcie1.0-w-disable";
+-					};
+-					usb3_ilimit {
+-						gpio-hog;
+-						gpios = <5 GPIO_ACTIVE_LOW>;
+-						input;
+-						line-name = "usb3-current-limit";
+-					};
+-					usb3_power {
+-						gpio-hog;
+-						gpios = <6 GPIO_ACTIVE_HIGH>;
+-						output-high;
+-						line-name = "usb3-power";
+-					};
+-					m2_devslp {
+-						gpio-hog;
+-						gpios = <11 GPIO_ACTIVE_HIGH>;
+-						output-low;
+-						line-name = "m.2 devslp";
+-					};
+-					sfp_los {
+-						/* SFP loss of signal */
+-						gpio-hog;
+-						gpios = <12 GPIO_ACTIVE_HIGH>;
+-						input;
+-						line-name = "sfp-los";
+-					};
+-					sfp_tx_fault {
+-						/* SFP laser fault */
+-						gpio-hog;
+-						gpios = <13 GPIO_ACTIVE_HIGH>;
+-						input;
+-						line-name = "sfp-tx-fault";
+-					};
+-					sfp_tx_disable {
+-						/* SFP transmit disable */
+-						gpio-hog;
+-						gpios = <14 GPIO_ACTIVE_HIGH>;
+-						output-low;
+-						line-name = "sfp-tx-disable";
+-					};
+-					sfp_mod_def0 {
+-						/* SFP module present */
+-						gpio-hog;
+-						gpios = <15 GPIO_ACTIVE_LOW>;
+-						input;
+-						line-name = "sfp-mod-def0";
+-					};
+-				};
+-
+-				/* The MCP3021 is 100kHz clock only */
+-				mikrobus_adc: mcp3021 at 4c {
+-					compatible = "microchip,mcp3021";
+-					reg = <0x4c>;
+-				};
+-
+-				/* Also something at 0x64 */
 -			};
 -
--			ethernet at 34000 {
--				phy-mode = "sgmii";
--				buffer-manager = <&bm>;
--				bm,pool-long = <3>;
--				bm,pool-short = <1>;
+-			i2c at 11100 {
+-				/*
+-				 * Routed to SFP, mikrobus, and PCIe.
+-				 * SFP limits this to 100kHz, and requires
+-				 *  an AT24C01A/02/04 with address pins tied
+-				 *  low, which takes addresses 0x50 and 0x51.
+-				 * Mikrobus doesn't specify beyond an I2C
+-				 *  bus being present.
+-				 * PCIe uses ARP to assign addresses, or
+-				 *  0x63-0x64.
+-				 */
+-				clock-frequency = <100000>;
+-				pinctrl-0 = <&clearfog_i2c1_pins>;
+-				pinctrl-names = "default";
 -				status = "okay";
--
--				fixed-link {
--					speed = <1000>;
--					full-duplex;
--				};
 -			};
 -
  			sata at a8000 {
  				/* pinctrl? */
  				status = "okay";
-@@ -147,6 +126,29 @@
+@@ -272,6 +147,126 @@
  	};
  };
  
-+&eth1 {
-+	/* ethernet at 30000 */
-+	bm,pool-long = <2>;
-+	bm,pool-short = <1>;
-+	buffer-manager = <&bm>;
-+	phy-mode = "sgmii";
-+	status = "okay";
-+};
-+
-+&eth2 {
-+	/* ethernet at 34000 */
-+	bm,pool-long = <3>;
-+	bm,pool-short = <1>;
-+	buffer-manager = <&bm>;
-+	phy-mode = "sgmii";
-+	status = "okay";
-+
-+	fixed-link {
-+		speed = <1000>;
-+		full-duplex;
-+	};
-+};
-+
- &i2c0 {
- 	/* Is there anything on this? */
- 	clock-frequency = <100000>;
-diff --git a/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi b/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-index e397421d1531..681962a6395b 100644
---- a/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-+++ b/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-@@ -62,38 +62,6 @@
- 			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
- 
- 		internal-regs {
--			ethernet at 70000 {
--				pinctrl-0 = <&ge0_rgmii_pins>;
--				pinctrl-names = "default";
--				phy = <&phy_dedicated>;
--				phy-mode = "rgmii-id";
--				buffer-manager = <&bm>;
--				bm,pool-long = <0>;
--				bm,pool-short = <1>;
--				status = "okay";
--			};
--
--			mdio at 72004 {
--				/*
--				 * Add the phy clock here, so the phy can be
--				 * accessed to read its IDs prior to binding
--				 * with the driver.
--				 */
--				pinctrl-0 = <&mdio_pins &microsom_phy_clk_pins>;
--				pinctrl-names = "default";
--
--				phy_dedicated: ethernet-phy at 0 {
--					/*
--					 * Annoyingly, the marvell phy driver
--					 * configures the LED register, rather
--					 * than preserving reset-loaded setting.
--					 * We undo that rubbish here.
--					 */
--					marvell,reg-init = <3 16 0 0x101e>;
--					reg = <0>;
--				};
--			};
--
- 			rtc at a3800 {
- 				/*
- 				 * If the rtc doesn't work, run "date reset"
-@@ -107,16 +75,46 @@
- 				pinctrl-names = "default";
- 				status = "okay";
- 			};
--
--			bm at c8000 {
--				status = "okay";
--			};
- 		};
-+	};
-+};
- 
--		bm-bppi {
--			status = "okay";
--		};
-+&bm {
-+	status = "okay";
-+};
-+
-+&bm_bppi {
-+	status = "okay";
-+};
-+
-+&eth0 {
-+	/* ethernet at 70000 */
-+	pinctrl-0 = <&ge0_rgmii_pins>;
++&i2c0 {
++	/* Is there anything on this? */
++	clock-frequency = <100000>;
++	pinctrl-0 = <&i2c0_pins>;
 +	pinctrl-names = "default";
-+	phy = <&phy_dedicated>;
-+	phy-mode = "rgmii-id";
-+	buffer-manager = <&bm>;
-+	bm,pool-long = <0>;
-+	bm,pool-short = <1>;
 +	status = "okay";
-+};
 +
-+&mdio {
 +	/*
-+	 * Add the phy clock here, so the phy can be accessed to read its
-+	 * IDs prior to binding with the driver.
++	 * PCA9655 GPIO expander, up to 1MHz clock.
++	 *  0-CON3 CLKREQ#
++	 *  1-CON3 PERST#
++	 *  2-
++	 *  3-CON3 W_DISABLE
++	 *  4-
++	 *  5-USB3 overcurrent
++	 *  6-USB3 power
++	 *  7-
++	 *  8-JP4 P1
++	 *  9-JP4 P4
++	 * 10-JP4 P5
++	 * 11-m.2 DEVSLP
++	 * 12-SFP_LOS
++	 * 13-SFP_TX_FAULT
++	 * 14-SFP_TX_DISABLE
++	 * 15-SFP_MOD_DEF0
 +	 */
-+	pinctrl-0 = <&mdio_pins &microsom_phy_clk_pins>;
-+	pinctrl-names = "default";
- 
-+	phy_dedicated: ethernet-phy at 0 {
++	expander0: gpio-expander at 20 {
 +		/*
-+		 * Annoyingly, the marvell phy driver configures the LED
-+		 * register, rather than preserving reset-loaded setting.
-+		 * We undo that rubbish here.
++		 * This is how it should be:
++		 * compatible = "onnn,pca9655", "nxp,pca9555";
++		 * but you can't do this because of the way I2C works.
 +		 */
-+		marvell,reg-init = <3 16 0 0x101e>;
-+		reg = <0>;
- 	};
- };
- 
++		compatible = "nxp,pca9555";
++		gpio-controller;
++		#gpio-cells = <2>;
++		reg = <0x20>;
++
++		pcie1_0_clkreq {
++			gpio-hog;
++			gpios = <0 GPIO_ACTIVE_LOW>;
++			input;
++			line-name = "pcie1.0-clkreq";
++		};
++		pcie1_0_w_disable {
++			gpio-hog;
++			gpios = <3 GPIO_ACTIVE_LOW>;
++			output-low;
++			line-name = "pcie1.0-w-disable";
++		};
++		usb3_ilimit {
++			gpio-hog;
++			gpios = <5 GPIO_ACTIVE_LOW>;
++			input;
++			line-name = "usb3-current-limit";
++		};
++		usb3_power {
++			gpio-hog;
++			gpios = <6 GPIO_ACTIVE_HIGH>;
++			output-high;
++			line-name = "usb3-power";
++		};
++		m2_devslp {
++			gpio-hog;
++			gpios = <11 GPIO_ACTIVE_HIGH>;
++			output-low;
++			line-name = "m.2 devslp";
++		};
++		sfp_los {
++			/* SFP loss of signal */
++			gpio-hog;
++			gpios = <12 GPIO_ACTIVE_HIGH>;
++			input;
++			line-name = "sfp-los";
++		};
++		sfp_tx_fault {
++			/* SFP laser fault */
++			gpio-hog;
++			gpios = <13 GPIO_ACTIVE_HIGH>;
++			input;
++			line-name = "sfp-tx-fault";
++		};
++		sfp_tx_disable {
++			/* SFP transmit disable */
++			gpio-hog;
++			gpios = <14 GPIO_ACTIVE_HIGH>;
++			output-low;
++			line-name = "sfp-tx-disable";
++		};
++		sfp_mod_def0 {
++			/* SFP module present */
++			gpio-hog;
++			gpios = <15 GPIO_ACTIVE_LOW>;
++			input;
++			line-name = "sfp-mod-def0";
++		};
++	};
++
++	/* The MCP3021 is 100kHz clock only */
++	mikrobus_adc: mcp3021 at 4c {
++		compatible = "microchip,mcp3021";
++		reg = <0x4c>;
++	};
++
++	/* Also something at 0x64 */
++};
++
++&i2c1 {
++	/*
++	 * Routed to SFP, mikrobus, and PCIe.
++	 * SFP limits this to 100kHz, and requires an AT24C01A/02/04 with
++	 *  address pins tied low, which takes addresses 0x50 and 0x51.
++	 * Mikrobus doesn't specify beyond an I2C bus being present.
++	 * PCIe uses ARP to assign addresses, or 0x63-0x64.
++	 */
++	clock-frequency = <100000>;
++	pinctrl-0 = <&clearfog_i2c1_pins>;
++	pinctrl-names = "default";
++	status = "okay";
++};
++
+ &pinctrl {
+ 	clearfog_i2c1_pins: i2c1-pins {
+ 		/* SFP, PCIe, mSATA, mikrobus */
 -- 
 2.7.4
