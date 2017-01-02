@@ -1,26 +1,21 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 2 Jan 2017 17:03:03 +0100
-Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
-In-Reply-To: <CAFcVECLg-hXvfgwRW-fxi+N0k=7pTaEMhS5EMXV9_OO+xGRUqA@mail.gmail.com>
-References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
- <BN3PR07MB2516815EDE69ACDCE27F81A3C96F0@BN3PR07MB2516.namprd07.prod.outlook.com>
- <20170102113155.GA16373@localhost.localdomain>
- <CAFcVECLg-hXvfgwRW-fxi+N0k=7pTaEMhS5EMXV9_OO+xGRUqA@mail.gmail.com>
-Message-ID: <20170102160303.GC3609@localhost.localdomain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 02 Jan 2017 17:05:32 +0100
+Subject: [PATCH] crypto: picoxcell - Fix module autoload for non-OF
+ registration
+In-Reply-To: <1483371482-4956-1-git-send-email-javier@osg.samsung.com>
+References: <1483371482-4956-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <2761495.aqgObxUbGB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2017 at 05:13:34PM +0530, Harini Katakam wrote:
-> From the revision history of Cadence spec, all versions starting
-> r1p02 have ability to include timestamp in descriptors.
+On Monday, January 2, 2017 12:38:02 PM CET Javier Martinez Canillas wrote:
+> If the driver is built as a module, autoload won't work because the module
+> alias information is not filled. So user-space can't match the registered
+> device with the corresponding module if the device isn't registered via OF.
+> 
+> Export the module alias information using the MODULE_DEVICE_TABLE() macro.
 
-So why not add code to read the version, hm?
+I think we can just remove the table, as the platform only supports
+booting through DT anyway.
 
-> For previous versions the event register is the only option.
-
-And is it true that the regsiters do not latch the time stamp?
-
-If so, then the IP core is more than useless.
-
-Thanks,
-Richard
+	Arnd
