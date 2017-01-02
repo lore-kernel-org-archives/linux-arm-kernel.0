@@ -1,80 +1,322 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Mon, 2 Jan 2017 08:52:41 -0800
-Subject: How should we handle variable address space sizes (Re: [RFC 3/4]
- x86/mm: define TASK_SIZE as current->mm->task_size)
-In-Reply-To: <20170102094907.GC30735@node.shutemov.name>
-References: <CALCETrXMCVOmVcQYxF_ghPdEjLuNNqbcnoRKRVpJegsQ=SPEFQ@mail.gmail.com>
- <20170102094907.GC30735@node.shutemov.name>
-Message-ID: <CALCETrU+BJ2JDRocBy-6SD_G6FbD+Ez_yb1QJ6Z1KXBjVzKOHg@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 02 Jan 2017 08:51:06 -0800
+Subject: [PATCH 30/37] ARM: dts: vf*-colibri: Correct license text
+In-Reply-To: <20161214235746.7108-31-alexandre.belloni@free-electrons.com>
+References: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
+ <20161214235746.7108-31-alexandre.belloni@free-electrons.com>
+Message-ID: <5e8ccdaf8022be395ab5ad3fc705d5b2@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 2, 2017 at 1:49 AM, Kirill A. Shutemov <kirill@shutemov.name> wrote:
-> On Fri, Dec 30, 2016 at 06:11:05PM -0800, Andy Lutomirski wrote:
->> On Fri, Dec 30, 2016 at 7:56 AM, Dmitry Safonov <dsafonov@virtuozzo.com> wrote:
->> > Keep task's virtual address space size as mm_struct field which
->> > exists for a long time - it's initialized in setup_new_exec()
->> > depending on the new task's personality.
->> > This way TASK_SIZE will always be the same as current->mm->task_size.
->> > Previously, there could be an issue about different values of
->> > TASK_SIZE and current->mm->task_size: e.g, a 32-bit process can unset
->> > ADDR_LIMIT_3GB personality (with personality syscall) and
->> > so TASK_SIZE will be 4Gb, which is larger than mm->task_size = 3Gb.
->> > As TASK_SIZE *and* current->mm->task_size are used both in code
->> > frequently, this difference creates a subtle situations, for example:
->> > one can mmap addresses > 3Gb, but they will be hidden in
->> > /proc/pid/pagemap as it checks mm->task_size.
->> > I've moved initialization of mm->task_size earlier in setup_new_exec()
->> > as arch_pick_mmap_layout() initializes mmap_legacy_base with
->> > TASK_UNMAPPED_BASE, which depends on TASK_SIZE.
->>
->> I don't like this patch so much because I think that we should figure
->> out how this will all work in the long run first.  I've added some
->> more people to the thread because other arches have similar issues and
->> because x86 is about to get considerably more complicated (choices
->> include 3GB, 4GB, 47-bit, and 56-bit (the latter IIRC)).
->>
->> Here are a few of my thoughts on the matter.  This isn't all that well
->> thought out:
->>
->> The address space limit, especially if CRIU is in play, isn't really a
->> hard limit.  For example, you could allocate high memory then lower
->> the limit.  Similarly, I see no reason that an x32 program should be
->> forbidden from mapping some high addresses or, similarly, that an i386
->> program can't (if it really wanted to) do a 64-bit mmap() and get a
->> high address.
->>
->> On that note, can we just *delete* the task_size check from pagemap?
->> It's been there since the very beginning:
->>
->> commit 85863e475e59afb027b0113290e3796ee6020b7d
->> Author: Matt Mackall <mpm@selenic.com>
->> Date:   Mon Feb 4 22:29:04 2008 -0800
->>
->>     maps4: add /proc/pid/pagemap interface
->>
->> and there's no explanation for why it's needed.
->>
->> So maybe we should have a *number* (not a bit) that indicates the
->> maximum address that mmap() will return unless an override is in use.
->> Since common practice seems to be to stick this in the personality
->> field, we may need some fancy encoding.  Executing a setuid binary
->> needs to reset to the default, and personality handles that.
->
-> If we want to be able to specify arbitrary address as maximum, a fancy
-> encoding would need to claim 51 bits (63 VA - 12 in-page address) on x86
-> from the persona flag.
-> To me, it's stretching personality interface too far.
->
-> Maybe it's easier to reset the rlimit for suid binaries?
+On 2016-12-14 15:57, Alexandre Belloni wrote:
+> The license test has been mangled at some point then copy pasted across
+> multiple files. Restore it to what it should be.
+> Note that this is not intended as a license change.
 
-I guess I don't see why rlimit makes any sense, though.  It's not a
-resource utilization control, hard vs soft limits make very little
-sense, requiring capabilities to exceed the hard limit doesn't help
-anything, and it's only useful to preserve it across execve() to work
-around bugs.
+Hm, I introduced the Licence change for the Vybrid device trees, and
+confirm that this was an oversight on my side.
 
-So if it's going to be a number, let's just make it be a new number
-with a new API to control it.
+FWIW, the patches I  have been involved with (30/31/32/34/35/37):
 
---Andy
+Acked-by: Stefan Agner <stefan@agner.ch>
+
+--
+Stefan
+
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+> Cc: Cory Tusar <cory.tusar@pid1solutions.com>
+> Cc: Sanchayan Maity <maitysanchayan@gmail.com>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/vf-colibri-eval-v3.dtsi   | 10 +++++-----
+>  arch/arm/boot/dts/vf-colibri.dtsi           | 10 +++++-----
+>  arch/arm/boot/dts/vf500-colibri-eval-v3.dts | 10 +++++-----
+>  arch/arm/boot/dts/vf500-colibri.dtsi        | 10 +++++-----
+>  arch/arm/boot/dts/vf610-colibri-eval-v3.dts | 10 +++++-----
+>  arch/arm/boot/dts/vf610-colibri.dtsi        | 10 +++++-----
+>  arch/arm/boot/dts/vf610m4-colibri.dts       | 10 +++++-----
+>  7 files changed, 35 insertions(+), 35 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+> b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+> index 1e0b823f7e8f..091b738041a0 100644
+> --- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+> +++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+> @@ -10,17 +10,17 @@
+>   *     modify it under the terms of the GNU General Public License
+>   *     version 2 as published by the Free Software Foundation.
+>   *
+> - *     This file is distributed in the hope that it will be useful
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+> - * Or, alternatively
+> + * Or, alternatively,
+>   *
+>   *  b) Permission is hereby granted, free of charge, to any person
+>   *     obtaining a copy of this software and associated documentation
+>   *     files (the "Software"), to deal in the Software without
+> - *     restriction, including without limitation the rights to use
+> + *     restriction, including without limitation the rights to use,
+>   *     copy, modify, merge, publish, distribute, sublicense, and/or
+>   *     sell copies of the Software, and to permit persons to whom the
+>   *     Software is furnished to do so, subject to the following
+> @@ -29,11 +29,11 @@
+>   *     The above copyright notice and this permission notice shall be
+>   *     included in all copies or substantial portions of the Software.
+>   *
+> - *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>   *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>   *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>   *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> - *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>   *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>   *     OTHER DEALINGS IN THE SOFTWARE.
+> diff --git a/arch/arm/boot/dts/vf-colibri.dtsi
+> b/arch/arm/boot/dts/vf-colibri.dtsi
+> index b7417094dc11..31356fdcde97 100644
+> --- a/arch/arm/boot/dts/vf-colibri.dtsi
+> +++ b/arch/arm/boot/dts/vf-colibri.dtsi
+> @@ -10,17 +10,17 @@
+>   *     modify it under the terms of the GNU General Public License
+>   *     version 2 as published by the Free Software Foundation.
+>   *
+> - *     This file is distributed in the hope that it will be useful
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+> - * Or, alternatively
+> + * Or, alternatively,
+>   *
+>   *  b) Permission is hereby granted, free of charge, to any person
+>   *     obtaining a copy of this software and associated documentation
+>   *     files (the "Software"), to deal in the Software without
+> - *     restriction, including without limitation the rights to use
+> + *     restriction, including without limitation the rights to use,
+>   *     copy, modify, merge, publish, distribute, sublicense, and/or
+>   *     sell copies of the Software, and to permit persons to whom the
+>   *     Software is furnished to do so, subject to the following
+> @@ -29,11 +29,11 @@
+>   *     The above copyright notice and this permission notice shall be
+>   *     included in all copies or substantial portions of the Software.
+>   *
+> - *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>   *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>   *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>   *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> - *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>   *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>   *     OTHER DEALINGS IN THE SOFTWARE.
+> diff --git a/arch/arm/boot/dts/vf500-colibri-eval-v3.dts
+> b/arch/arm/boot/dts/vf500-colibri-eval-v3.dts
+> index b3aeab58f718..076998968fb5 100644
+> --- a/arch/arm/boot/dts/vf500-colibri-eval-v3.dts
+> +++ b/arch/arm/boot/dts/vf500-colibri-eval-v3.dts
+> @@ -10,17 +10,17 @@
+>   *     modify it under the terms of the GNU General Public License
+>   *     version 2 as published by the Free Software Foundation.
+>   *
+> - *     This file is distributed in the hope that it will be useful
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+> - * Or, alternatively
+> + * Or, alternatively,
+>   *
+>   *  b) Permission is hereby granted, free of charge, to any person
+>   *     obtaining a copy of this software and associated documentation
+>   *     files (the "Software"), to deal in the Software without
+> - *     restriction, including without limitation the rights to use
+> + *     restriction, including without limitation the rights to use,
+>   *     copy, modify, merge, publish, distribute, sublicense, and/or
+>   *     sell copies of the Software, and to permit persons to whom the
+>   *     Software is furnished to do so, subject to the following
+> @@ -29,11 +29,11 @@
+>   *     The above copyright notice and this permission notice shall be
+>   *     included in all copies or substantial portions of the Software.
+>   *
+> - *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>   *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>   *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>   *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> - *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>   *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>   *     OTHER DEALINGS IN THE SOFTWARE.
+> diff --git a/arch/arm/boot/dts/vf500-colibri.dtsi
+> b/arch/arm/boot/dts/vf500-colibri.dtsi
+> index 1a8a0efa19a6..515c4d2f28b0 100644
+> --- a/arch/arm/boot/dts/vf500-colibri.dtsi
+> +++ b/arch/arm/boot/dts/vf500-colibri.dtsi
+> @@ -10,17 +10,17 @@
+>   *     modify it under the terms of the GNU General Public License
+>   *     version 2 as published by the Free Software Foundation.
+>   *
+> - *     This file is distributed in the hope that it will be useful
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+> - * Or, alternatively
+> + * Or, alternatively,
+>   *
+>   *  b) Permission is hereby granted, free of charge, to any person
+>   *     obtaining a copy of this software and associated documentation
+>   *     files (the "Software"), to deal in the Software without
+> - *     restriction, including without limitation the rights to use
+> + *     restriction, including without limitation the rights to use,
+>   *     copy, modify, merge, publish, distribute, sublicense, and/or
+>   *     sell copies of the Software, and to permit persons to whom the
+>   *     Software is furnished to do so, subject to the following
+> @@ -29,11 +29,11 @@
+>   *     The above copyright notice and this permission notice shall be
+>   *     included in all copies or substantial portions of the Software.
+>   *
+> - *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>   *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>   *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>   *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> - *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>   *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>   *     OTHER DEALINGS IN THE SOFTWARE.
+> diff --git a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+> b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+> index dbca4f86fdbb..ef9b4d6209f6 100644
+> --- a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+> +++ b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+> @@ -10,17 +10,17 @@
+>   *     modify it under the terms of the GNU General Public License
+>   *     version 2 as published by the Free Software Foundation.
+>   *
+> - *     This file is distributed in the hope that it will be useful
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+> - * Or, alternatively
+> + * Or, alternatively,
+>   *
+>   *  b) Permission is hereby granted, free of charge, to any person
+>   *     obtaining a copy of this software and associated documentation
+>   *     files (the "Software"), to deal in the Software without
+> - *     restriction, including without limitation the rights to use
+> + *     restriction, including without limitation the rights to use,
+>   *     copy, modify, merge, publish, distribute, sublicense, and/or
+>   *     sell copies of the Software, and to permit persons to whom the
+>   *     Software is furnished to do so, subject to the following
+> @@ -29,11 +29,11 @@
+>   *     The above copyright notice and this permission notice shall be
+>   *     included in all copies or substantial portions of the Software.
+>   *
+> - *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>   *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>   *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>   *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> - *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>   *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>   *     OTHER DEALINGS IN THE SOFTWARE.
+> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi
+> b/arch/arm/boot/dts/vf610-colibri.dtsi
+> index 9ec9e337f5a8..395812c52933 100644
+> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
+> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
+> @@ -10,17 +10,17 @@
+>   *     modify it under the terms of the GNU General Public License
+>   *     version 2 as published by the Free Software Foundation.
+>   *
+> - *     This file is distributed in the hope that it will be useful
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+> - * Or, alternatively
+> + * Or, alternatively,
+>   *
+>   *  b) Permission is hereby granted, free of charge, to any person
+>   *     obtaining a copy of this software and associated documentation
+>   *     files (the "Software"), to deal in the Software without
+> - *     restriction, including without limitation the rights to use
+> + *     restriction, including without limitation the rights to use,
+>   *     copy, modify, merge, publish, distribute, sublicense, and/or
+>   *     sell copies of the Software, and to permit persons to whom the
+>   *     Software is furnished to do so, subject to the following
+> @@ -29,11 +29,11 @@
+>   *     The above copyright notice and this permission notice shall be
+>   *     included in all copies or substantial portions of the Software.
+>   *
+> - *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>   *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>   *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>   *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> - *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>   *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>   *     OTHER DEALINGS IN THE SOFTWARE.
+> diff --git a/arch/arm/boot/dts/vf610m4-colibri.dts
+> b/arch/arm/boot/dts/vf610m4-colibri.dts
+> index 2931a80caccb..7198e8cceb0d 100644
+> --- a/arch/arm/boot/dts/vf610m4-colibri.dts
+> +++ b/arch/arm/boot/dts/vf610m4-colibri.dts
+> @@ -13,17 +13,17 @@
+>   *     published by the Free Software Foundation; either version 2 of the
+>   *     License, or (at your option) any later version.
+>   *
+> - *     This file is distributed in the hope that it will be useful
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+> - * Or, alternatively
+> + * Or, alternatively,
+>   *
+>   *  b) Permission is hereby granted, free of charge, to any person
+>   *     obtaining a copy of this software and associated documentation
+>   *     files (the "Software"), to deal in the Software without
+> - *     restriction, including without limitation the rights to use
+> + *     restriction, including without limitation the rights to use,
+>   *     copy, modify, merge, publish, distribute, sublicense, and/or
+>   *     sell copies of the Software, and to permit persons to whom the
+>   *     Software is furnished to do so, subject to the following
+> @@ -32,11 +32,11 @@
+>   *     The above copyright notice and this permission notice shall be
+>   *     included in all copies or substantial portions of the Software.
+>   *
+> - *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>   *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>   *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>   *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> - *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>   *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>   *     OTHER DEALINGS IN THE SOFTWARE.
