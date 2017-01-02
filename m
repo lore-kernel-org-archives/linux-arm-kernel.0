@@ -1,113 +1,26 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 2 Jan 2017 17:23:05 +0800
-Subject: [PATCH 1/2] ARM: dts: imx6dl: Add Engicam i.CoreM6 DualLite/Solo
- RQS initial support
-In-Reply-To: <1482508935-9414-1-git-send-email-jagan@openedev.com>
-References: <1482508935-9414-1-git-send-email-jagan@openedev.com>
-Message-ID: <20170102092304.GK20956@dragon>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Mon, 2 Jan 2017 10:26:33 +0100
+Subject: [PATCH 0/9] dmaengine: stm32-dma: Bug fixes and improvements
+ series
+In-Reply-To: <20170102041433.GM3573@localhost>
+References: <1481636451-27863-1-git-send-email-cedric.madianga@gmail.com>
+ <20170102041433.GM3573@localhost>
+Message-ID: <CAOAejn2+f+a_AsTPDwyqmr-DSzLcqsVNcgUvq0NNJk3xWRLBJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 23, 2016 at 05:02:14PM +0100, Jagan Teki wrote:
-> From: Jagan Teki <jagan@amarulasolutions.com>
-> 
-> i.CoreM6 DualLite/Solo modules are system on module solutions manufactured
-> by Engicam with following characteristics:
-> CPU           NXP i.MX6 DL, 800MHz
-> RAM           1GB, 32, 64 bit, DDR3-800/1066
-> NAND          SLC,512MB
-> Power supply  Single 5V
-> MAX LCD RES   FULLHD
-> 
-> and more info at
-> http://www.engicam.com/en/products/embedded/som/standard/i-core-rqs-m6s-dl-d-q
-> 
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Matteo Lisi <matteo.lisi@engicam.com>
-> Cc: Michael Trimarchi <michael@amarulasolutions.com>
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
->  arch/arm/boot/dts/Makefile             |  1 +
->  arch/arm/boot/dts/imx6dl-icore-rqs.dts | 51 ++++++++++++++++++++++++++++++++++
->  2 files changed, 52 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6dl-icore-rqs.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index cccdbcb..51f8dae 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -349,6 +349,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->  	imx6dl-gw553x.dtb \
->  	imx6dl-hummingboard.dtb \
->  	imx6dl-icore.dtb \
-> +	imx6dl-icore-rqs.dtb \
->  	imx6dl-nit6xlite.dtb \
->  	imx6dl-nitrogen6x.dtb \
->  	imx6dl-phytec-pbab01.dtb \
-> diff --git a/arch/arm/boot/dts/imx6dl-icore-rqs.dts b/arch/arm/boot/dts/imx6dl-icore-rqs.dts
-> new file mode 100644
-> index 0000000..5c19927
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6dl-icore-rqs.dts
-> @@ -0,0 +1,51 @@
-> +/*
-> + * Copyright (C) 2016 Amarula Solutions B.V.
-> + * Copyright (C) 2016 Engicam S.r.l.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License
-> + *     version 2 as published by the Free Software Foundation.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
+Hi Vinod,
 
-Please take a look at the following patch.
+> So you should order fixes first and then new additions.
+> Fixes go in for current release whereas the rest for next one.
+Ok thanks for the info.
 
-https://patchwork.kernel.org/patch/9475057/
+> I have applied two to fixes and rest to updated, patch 5 didn't apply, please
+> resend that one.
+I have tried to apply patch 5 on top of slave-dma/fixes branch but I
+don't have any issue.
+So, I am going to resend this patch in order to be sure that there is no diff.
 
-Shawn
+Best regards,
 
-> +
-> +/dts-v1/;
-> +
-> +#include "imx6q.dtsi"
-> +#include "imx6qdl-icore-rqs.dtsi"
-> +
-> +/ {
-> +	model = "Engicam i.CoreM6 DualLite/Solo RQS Starter Kit";
-> +	compatible = "engicam,imx6-icore-rqs", "fsl,imx6dl";
-> +};
-> -- 
-> 1.9.1
-> 
+Cedric
