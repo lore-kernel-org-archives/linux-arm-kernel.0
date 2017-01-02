@@ -1,723 +1,837 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  2 Jan 2017 18:21:05 +0000
-Subject: [PATCH 3/6] crypto: arm/chacha20 - implement NEON version based on
- SSE3 code
-In-Reply-To: <1483381268-12987-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1483381268-12987-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1483381268-12987-4-git-send-email-ard.biesheuvel@linaro.org>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Mon, 2 Jan 2017 18:22:26 +0000
+Subject: [PATCH v6 6/8] IIO: add STM32 timer trigger driver
+In-Reply-To: <CA+M3ks7O_6cWZLAAjEvPD-DQBmU--qrsuh1HfcTa9eLqaT-+fQ@mail.gmail.com>
+References: <1481292919-26587-1-git-send-email-benjamin.gaignard@st.com>
+ <1481292919-26587-7-git-send-email-benjamin.gaignard@st.com>
+ <70f15b07-55d9-bd0d-25c7-712363e30974@kernel.org>
+ <CA+M3ks7O_6cWZLAAjEvPD-DQBmU--qrsuh1HfcTa9eLqaT-+fQ@mail.gmail.com>
+Message-ID: <c46e6e59-b5b6-39e6-d6f4-5ca4539f746c@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a straight port to ARM/NEON of the x86 SSE3 implementation
-of the ChaCha20 stream cipher. It uses the new skcipher walksize
-attribute to process the input in strides of 4x the block size.
+On 02/01/17 08:46, Benjamin Gaignard wrote:
+> 2016-12-30 22:12 GMT+01:00 Jonathan Cameron <jic23@kernel.org>:
+>> On 09/12/16 14:15, Benjamin Gaignard wrote:
+>>> Timers IPs can be used to generate triggers for other IPs like
+>>> DAC, ADC or other timers.
+>>> Each trigger may result of timer internals signals like counter enable,
+>>> reset or edge, this configuration could be done through "master_mode"
+>>> device attribute.
+>>>
+>>> A timer device could be triggered by other timers, we use the trigger
+>>> name and is_stm32_iio_timer_trigger() function to distinguish them
+>>> and configure IP input switch.
+>>>
+>>> Timer may also decide on which event (edge, level) they could
+>>> be activated by a trigger, this configuration is done by writing in
+>>> "slave_mode" device attribute.
+>>>
+>>> Since triggers could also be used by DAC or ADC their names are defined
+>>> in include/ nux/iio/timer/stm32-timer-trigger.h so those IPs will be able
+>>> to configure themselves in valid_trigger function
+>>>
+>>> Trigger have a "sampling_frequency" attribute which allow to configure
+>>> timer sampling frequency without using PWM interface
+>>>
+>>> version 5:
+>>> - simplify tables of triggers
+>>> - only create an IIO device when needed
+>>>
+>>> version 4:
+>>> - get triggers configuration from "reg" in DT
+>>> - add tables of triggers
+>>> - sampling frequency is enable/disable when writing in trigger
+>>>   sampling_frequency attribute
+>>> - no more use of interruptions
+>>>
+>>> version 3:
+>>> - change compatible to "st,stm32-timer-trigger"
+>>> - fix attributes access right
+>>> - use string instead of int for master_mode and slave_mode
+>>> - document device attributes in sysfs-bus-iio-timer-stm32
+>>>
+>>> version 2:
+>>> - keep only one compatible
+>>> - use st,input-triggers-names and st,output-triggers-names
+>>>   to know which triggers are accepted and/or create by the device
+>> Firstly, sorry it has taken me so long to get back to this.
+>>
+>> I'm still not keen on this use of iio_device elements just to act as
+>> glue between triggers.  I think we need to work out a more light weight
+>> way to do this.  As you are only using them for validation and to provide
+>> somewhere to hang the control attibutes off, there is nothing stopping us
+>> moving that over to the iio_trigger instead which would avoid the messy
+>> duality going on here.
+> 
+> I have add an iio_device because each hardware can generate multiple
+> triggers (up to 5: trgo, ch 1...4) and slave_mode attribute will impact all the
+> triggers of a device. For me it was making sense to centralize that in an
+> iio_device rather than having an attribute "shared" (from hardware
+> point of view)
+> on multiple triggers.
+> Since master_mode attribute is only used by trgo and not impact ch1...4
+> triggers I will move it to trigger instead of the iio_device.
+> 
+> I also wanted to be able to connect triggers on a iio_device as I
+> could do for an
+> ADC with a command like 'echo "tim1_trgo" > iio_deviceX/trigger/current_trigger'
+This is interesting, but with a bit of refactoring I would think it would
+be possible to share some of that code thus allowing non IIO devices to
+bind to triggers.  Ultimately I want to be able to bind a trigger to
+a trigger - I appreciate here the topology is more limited than that
+so some complexity comes in.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/crypto/Kconfig              |   6 +
- arch/arm/crypto/Makefile             |   2 +
- arch/arm/crypto/chacha20-neon-core.S | 524 ++++++++++++++++++++
- arch/arm/crypto/chacha20-neon-glue.c | 128 +++++
- 4 files changed, 660 insertions(+)
+My gut feeling is that representing that topology explicitly is hard
+to do in a remotely general way, but lets try it and see.
+We run into this sort of interdependency issue between different bits of
+the hardware all the time.  Setting a value somewhere effects the configuration
+elsewhere - often the best plan is to just let that happen and leave it up to
+userspace to check for changes if it cares.
 
-diff --git a/arch/arm/crypto/Kconfig b/arch/arm/crypto/Kconfig
-index 13f1b4c289d4..2f3339f015d3 100644
---- a/arch/arm/crypto/Kconfig
-+++ b/arch/arm/crypto/Kconfig
-@@ -130,4 +130,10 @@ config CRYPTO_CRC32_ARM_CE
- 	depends on KERNEL_MODE_NEON && CRC32
- 	select CRYPTO_HASH
- 
-+config CRYPTO_CHACHA20_NEON
-+	tristate "NEON accelerated ChaCha20 symmetric cipher"
-+	depends on KERNEL_MODE_NEON
-+	select CRYPTO_BLKCIPHER
-+	select CRYPTO_CHACHA20
-+
- endif
-diff --git a/arch/arm/crypto/Makefile b/arch/arm/crypto/Makefile
-index b578a1820ab1..8d74e55eacd4 100644
---- a/arch/arm/crypto/Makefile
-+++ b/arch/arm/crypto/Makefile
-@@ -8,6 +8,7 @@ obj-$(CONFIG_CRYPTO_SHA1_ARM) += sha1-arm.o
- obj-$(CONFIG_CRYPTO_SHA1_ARM_NEON) += sha1-arm-neon.o
- obj-$(CONFIG_CRYPTO_SHA256_ARM) += sha256-arm.o
- obj-$(CONFIG_CRYPTO_SHA512_ARM) += sha512-arm.o
-+obj-$(CONFIG_CRYPTO_CHACHA20_NEON) += chacha20-neon.o
- 
- ce-obj-$(CONFIG_CRYPTO_AES_ARM_CE) += aes-arm-ce.o
- ce-obj-$(CONFIG_CRYPTO_SHA1_ARM_CE) += sha1-arm-ce.o
-@@ -40,6 +41,7 @@ aes-arm-ce-y	:= aes-ce-core.o aes-ce-glue.o
- ghash-arm-ce-y	:= ghash-ce-core.o ghash-ce-glue.o
- crct10dif-arm-ce-y	:= crct10dif-ce-core.o crct10dif-ce-glue.o
- crc32-arm-ce-y:= crc32-ce-core.o crc32-ce-glue.o
-+chacha20-neon-y := chacha20-neon-core.o chacha20-neon-glue.o
- 
- quiet_cmd_perl = PERL    $@
-       cmd_perl = $(PERL) $(<) > $(@)
-diff --git a/arch/arm/crypto/chacha20-neon-core.S b/arch/arm/crypto/chacha20-neon-core.S
-new file mode 100644
-index 000000000000..ff1d337bdb4a
---- /dev/null
-+++ b/arch/arm/crypto/chacha20-neon-core.S
-@@ -0,0 +1,524 @@
-+/*
-+ * ChaCha20 256-bit cipher algorithm, RFC7539, ARM NEON functions
-+ *
-+ * Copyright (C) 2016 Linaro, Ltd. <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Based on:
-+ * ChaCha20 256-bit cipher algorithm, RFC7539, x64 SSE3 functions
-+ *
-+ * Copyright (C) 2015 Martin Willi
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/linkage.h>
-+
-+	.text
-+	.fpu		neon
-+	.align		5
-+
-+ENTRY(chacha20_block_xor_neon)
-+	// r0: Input state matrix, s
-+	// r1: 1 data block output, o
-+	// r2: 1 data block input, i
-+
-+	//
-+	// This function encrypts one ChaCha20 block by loading the state matrix
-+	// in four NEON registers. It performs matrix operation on four words in
-+	// parallel, but requireds shuffling to rearrange the words after each
-+	// round.
-+	//
-+
-+	// x0..3 = s0..3
-+	add		ip, r0, #0x20
-+	vld1.32		{q0-q1}, [r0]
-+	vld1.32		{q2-q3}, [ip]
-+
-+	vmov		q8, q0
-+	vmov		q9, q1
-+	vmov		q10, q2
-+	vmov		q11, q3
-+
-+	mov		r3, #10
-+
-+.Ldoubleround:
-+	// x0 += x1, x3 = rotl32(x3 ^ x0, 16)
-+	vadd.i32	q0, q0, q1
-+	veor		q4, q3, q0
-+	vshl.u32	q3, q4, #16
-+	vsri.u32	q3, q4, #16
-+
-+	// x2 += x3, x1 = rotl32(x1 ^ x2, 12)
-+	vadd.i32	q2, q2, q3
-+	veor		q4, q1, q2
-+	vshl.u32	q1, q4, #12
-+	vsri.u32	q1, q4, #20
-+
-+	// x0 += x1, x3 = rotl32(x3 ^ x0, 8)
-+	vadd.i32	q0, q0, q1
-+	veor		q4, q3, q0
-+	vshl.u32	q3, q4, #8
-+	vsri.u32	q3, q4, #24
-+
-+	// x2 += x3, x1 = rotl32(x1 ^ x2, 7)
-+	vadd.i32	q2, q2, q3
-+	veor		q4, q1, q2
-+	vshl.u32	q1, q4, #7
-+	vsri.u32	q1, q4, #25
-+
-+	// x1 = shuffle32(x1, MASK(0, 3, 2, 1))
-+	vext.8		q1, q1, q1, #4
-+	// x2 = shuffle32(x2, MASK(1, 0, 3, 2))
-+	vext.8		q2, q2, q2, #8
-+	// x3 = shuffle32(x3, MASK(2, 1, 0, 3))
-+	vext.8		q3, q3, q3, #12
-+
-+	// x0 += x1, x3 = rotl32(x3 ^ x0, 16)
-+	vadd.i32	q0, q0, q1
-+	veor		q4, q3, q0
-+	vshl.u32	q3, q4, #16
-+	vsri.u32	q3, q4, #16
-+
-+	// x2 += x3, x1 = rotl32(x1 ^ x2, 12)
-+	vadd.i32	q2, q2, q3
-+	veor		q4, q1, q2
-+	vshl.u32	q1, q4, #12
-+	vsri.u32	q1, q4, #20
-+
-+	// x0 += x1, x3 = rotl32(x3 ^ x0, 8)
-+	vadd.i32	q0, q0, q1
-+	veor		q4, q3, q0
-+	vshl.u32	q3, q4, #8
-+	vsri.u32	q3, q4, #24
-+
-+	// x2 += x3, x1 = rotl32(x1 ^ x2, 7)
-+	vadd.i32	q2, q2, q3
-+	veor		q4, q1, q2
-+	vshl.u32	q1, q4, #7
-+	vsri.u32	q1, q4, #25
-+
-+	// x1 = shuffle32(x1, MASK(2, 1, 0, 3))
-+	vext.8		q1, q1, q1, #12
-+	// x2 = shuffle32(x2, MASK(1, 0, 3, 2))
-+	vext.8		q2, q2, q2, #8
-+	// x3 = shuffle32(x3, MASK(0, 3, 2, 1))
-+	vext.8		q3, q3, q3, #4
-+
-+	subs		r3, r3, #1
-+	bne		.Ldoubleround
-+
-+	add		ip, r2, #0x20
-+	vld1.8		{q4-q5}, [r2]
-+	vld1.8		{q6-q7}, [ip]
-+
-+	// o0 = i0 ^ (x0 + s0)
-+	vadd.i32	q0, q0, q8
-+	veor		q0, q0, q4
-+
-+	// o1 = i1 ^ (x1 + s1)
-+	vadd.i32	q1, q1, q9
-+	veor		q1, q1, q5
-+
-+	// o2 = i2 ^ (x2 + s2)
-+	vadd.i32	q2, q2, q10
-+	veor		q2, q2, q6
-+
-+	// o3 = i3 ^ (x3 + s3)
-+	vadd.i32	q3, q3, q11
-+	veor		q3, q3, q7
-+
-+	add		ip, r1, #0x20
-+	vst1.8		{q0-q1}, [r1]
-+	vst1.8		{q2-q3}, [ip]
-+
-+	bx		lr
-+ENDPROC(chacha20_block_xor_neon)
-+
-+	.align		5
-+ENTRY(chacha20_4block_xor_neon)
-+	push		{r4-r6, lr}
-+	mov		ip, sp			// preserve the stack pointer
-+	sub		r3, sp, #0x20		// allocate a 32 byte buffer
-+	bic		r3, r3, #0x1f		// aligned to 32 bytes
-+	mov		sp, r3
-+
-+	// r0: Input state matrix, s
-+	// r1: 4 data blocks output, o
-+	// r2: 4 data blocks input, i
-+
-+	//
-+	// This function encrypts four consecutive ChaCha20 blocks by loading
-+	// the state matrix in NEON registers four times. The algorithm performs
-+	// each operation on the corresponding word of each state matrix, hence
-+	// requires no word shuffling. For final XORing step we transpose the
-+	// matrix by interleaving 32- and then 64-bit words, which allows us to
-+	// do XOR in NEON registers.
-+	//
-+
-+	// x0..15[0-3] = s0..3[0..3]
-+	add		r3, r0, #0x20
-+	vld1.32		{q0-q1}, [r0]
-+	vld1.32		{q2-q3}, [r3]
-+
-+	adr		r3, CTRINC
-+	vdup.32		q15, d7[1]
-+	vdup.32		q14, d7[0]
-+	vld1.32		{q11}, [r3, :128]
-+	vdup.32		q13, d6[1]
-+	vdup.32		q12, d6[0]
-+	vadd.i32	q12, q12, q11		// x12 += counter values 0-3
-+	vdup.32		q11, d5[1]
-+	vdup.32		q10, d5[0]
-+	vdup.32		q9, d4[1]
-+	vdup.32		q8, d4[0]
-+	vdup.32		q7, d3[1]
-+	vdup.32		q6, d3[0]
-+	vdup.32		q5, d2[1]
-+	vdup.32		q4, d2[0]
-+	vdup.32		q3, d1[1]
-+	vdup.32		q2, d1[0]
-+	vdup.32		q1, d0[1]
-+	vdup.32		q0, d0[0]
-+
-+	mov		r3, #10
-+
-+.Ldoubleround4:
-+	// x0 += x4, x12 = rotl32(x12 ^ x0, 16)
-+	// x1 += x5, x13 = rotl32(x13 ^ x1, 16)
-+	// x2 += x6, x14 = rotl32(x14 ^ x2, 16)
-+	// x3 += x7, x15 = rotl32(x15 ^ x3, 16)
-+	vadd.i32	q0, q0, q4
-+	vadd.i32	q1, q1, q5
-+	vadd.i32	q2, q2, q6
-+	vadd.i32	q3, q3, q7
-+
-+	veor		q12, q12, q0
-+	veor		q13, q13, q1
-+	veor		q14, q14, q2
-+	veor		q15, q15, q3
-+
-+	vrev32.16	q12, q12
-+	vrev32.16	q13, q13
-+	vrev32.16	q14, q14
-+	vrev32.16	q15, q15
-+
-+	// x8 += x12, x4 = rotl32(x4 ^ x8, 12)
-+	// x9 += x13, x5 = rotl32(x5 ^ x9, 12)
-+	// x10 += x14, x6 = rotl32(x6 ^ x10, 12)
-+	// x11 += x15, x7 = rotl32(x7 ^ x11, 12)
-+	vadd.i32	q8, q8, q12
-+	vadd.i32	q9, q9, q13
-+	vadd.i32	q10, q10, q14
-+	vadd.i32	q11, q11, q15
-+
-+	vst1.32		{q8-q9}, [sp, :256]
-+
-+	veor		q8, q4, q8
-+	veor		q9, q5, q9
-+	vshl.u32	q4, q8, #12
-+	vshl.u32	q5, q9, #12
-+	vsri.u32	q4, q8, #20
-+	vsri.u32	q5, q9, #20
-+
-+	veor		q8, q6, q10
-+	veor		q9, q7, q11
-+	vshl.u32	q6, q8, #12
-+	vshl.u32	q7, q9, #12
-+	vsri.u32	q6, q8, #20
-+	vsri.u32	q7, q9, #20
-+
-+	// x0 += x4, x12 = rotl32(x12 ^ x0, 8)
-+	// x1 += x5, x13 = rotl32(x13 ^ x1, 8)
-+	// x2 += x6, x14 = rotl32(x14 ^ x2, 8)
-+	// x3 += x7, x15 = rotl32(x15 ^ x3, 8)
-+	vadd.i32	q0, q0, q4
-+	vadd.i32	q1, q1, q5
-+	vadd.i32	q2, q2, q6
-+	vadd.i32	q3, q3, q7
-+
-+	veor		q8, q12, q0
-+	veor		q9, q13, q1
-+	vshl.u32	q12, q8, #8
-+	vshl.u32	q13, q9, #8
-+	vsri.u32	q12, q8, #24
-+	vsri.u32	q13, q9, #24
-+
-+	veor		q8, q14, q2
-+	veor		q9, q15, q3
-+	vshl.u32	q14, q8, #8
-+	vshl.u32	q15, q9, #8
-+	vsri.u32	q14, q8, #24
-+	vsri.u32	q15, q9, #24
-+
-+	vld1.32		{q8-q9}, [sp, :256]
-+
-+	// x8 += x12, x4 = rotl32(x4 ^ x8, 7)
-+	// x9 += x13, x5 = rotl32(x5 ^ x9, 7)
-+	// x10 += x14, x6 = rotl32(x6 ^ x10, 7)
-+	// x11 += x15, x7 = rotl32(x7 ^ x11, 7)
-+	vadd.i32	q8, q8, q12
-+	vadd.i32	q9, q9, q13
-+	vadd.i32	q10, q10, q14
-+	vadd.i32	q11, q11, q15
-+
-+	vst1.32		{q8-q9}, [sp, :256]
-+
-+	veor		q8, q4, q8
-+	veor		q9, q5, q9
-+	vshl.u32	q4, q8, #7
-+	vshl.u32	q5, q9, #7
-+	vsri.u32	q4, q8, #25
-+	vsri.u32	q5, q9, #25
-+
-+	veor		q8, q6, q10
-+	veor		q9, q7, q11
-+	vshl.u32	q6, q8, #7
-+	vshl.u32	q7, q9, #7
-+	vsri.u32	q6, q8, #25
-+	vsri.u32	q7, q9, #25
-+
-+	vld1.32		{q8-q9}, [sp, :256]
-+
-+	// x0 += x5, x15 = rotl32(x15 ^ x0, 16)
-+	// x1 += x6, x12 = rotl32(x12 ^ x1, 16)
-+	// x2 += x7, x13 = rotl32(x13 ^ x2, 16)
-+	// x3 += x4, x14 = rotl32(x14 ^ x3, 16)
-+	vadd.i32	q0, q0, q5
-+	vadd.i32	q1, q1, q6
-+	vadd.i32	q2, q2, q7
-+	vadd.i32	q3, q3, q4
-+
-+	veor		q15, q15, q0
-+	veor		q12, q12, q1
-+	veor		q13, q13, q2
-+	veor		q14, q14, q3
-+
-+	vrev32.16	q15, q15
-+	vrev32.16	q12, q12
-+	vrev32.16	q13, q13
-+	vrev32.16	q14, q14
-+
-+	// x10 += x15, x5 = rotl32(x5 ^ x10, 12)
-+	// x11 += x12, x6 = rotl32(x6 ^ x11, 12)
-+	// x8 += x13, x7 = rotl32(x7 ^ x8, 12)
-+	// x9 += x14, x4 = rotl32(x4 ^ x9, 12)
-+	vadd.i32	q10, q10, q15
-+	vadd.i32	q11, q11, q12
-+	vadd.i32	q8, q8, q13
-+	vadd.i32	q9, q9, q14
-+
-+	vst1.32		{q8-q9}, [sp, :256]
-+
-+	veor		q8, q7, q8
-+	veor		q9, q4, q9
-+	vshl.u32	q7, q8, #12
-+	vshl.u32	q4, q9, #12
-+	vsri.u32	q7, q8, #20
-+	vsri.u32	q4, q9, #20
-+
-+	veor		q8, q5, q10
-+	veor		q9, q6, q11
-+	vshl.u32	q5, q8, #12
-+	vshl.u32	q6, q9, #12
-+	vsri.u32	q5, q8, #20
-+	vsri.u32	q6, q9, #20
-+
-+	// x0 += x5, x15 = rotl32(x15 ^ x0, 8)
-+	// x1 += x6, x12 = rotl32(x12 ^ x1, 8)
-+	// x2 += x7, x13 = rotl32(x13 ^ x2, 8)
-+	// x3 += x4, x14 = rotl32(x14 ^ x3, 8)
-+	vadd.i32	q0, q0, q5
-+	vadd.i32	q1, q1, q6
-+	vadd.i32	q2, q2, q7
-+	vadd.i32	q3, q3, q4
-+
-+	veor		q8, q15, q0
-+	veor		q9, q12, q1
-+	vshl.u32	q15, q8, #8
-+	vshl.u32	q12, q9, #8
-+	vsri.u32	q15, q8, #24
-+	vsri.u32	q12, q9, #24
-+
-+	veor		q8, q13, q2
-+	veor		q9, q14, q3
-+	vshl.u32	q13, q8, #8
-+	vshl.u32	q14, q9, #8
-+	vsri.u32	q13, q8, #24
-+	vsri.u32	q14, q9, #24
-+
-+	vld1.32		{q8-q9}, [sp, :256]
-+
-+	// x10 += x15, x5 = rotl32(x5 ^ x10, 7)
-+	// x11 += x12, x6 = rotl32(x6 ^ x11, 7)
-+	// x8 += x13, x7 = rotl32(x7 ^ x8, 7)
-+	// x9 += x14, x4 = rotl32(x4 ^ x9, 7)
-+	vadd.i32	q10, q10, q15
-+	vadd.i32	q11, q11, q12
-+	vadd.i32	q8, q8, q13
-+	vadd.i32	q9, q9, q14
-+
-+	vst1.32		{q8-q9}, [sp, :256]
-+
-+	veor		q8, q7, q8
-+	veor		q9, q4, q9
-+	vshl.u32	q7, q8, #7
-+	vshl.u32	q4, q9, #7
-+	vsri.u32	q7, q8, #25
-+	vsri.u32	q4, q9, #25
-+
-+	veor		q8, q5, q10
-+	veor		q9, q6, q11
-+	vshl.u32	q5, q8, #7
-+	vshl.u32	q6, q9, #7
-+	vsri.u32	q5, q8, #25
-+	vsri.u32	q6, q9, #25
-+
-+	subs		r3, r3, #1
-+	beq		0f
-+
-+	vld1.32		{q8-q9}, [sp, :256]
-+	b		.Ldoubleround4
-+
-+	// x0[0-3] += s0[0]
-+	// x1[0-3] += s0[1]
-+	// x2[0-3] += s0[2]
-+	// x3[0-3] += s0[3]
-+0:	ldmia		r0!, {r3-r6}
-+	vdup.32		q8, r3
-+	vdup.32		q9, r4
-+	vadd.i32	q0, q0, q8
-+	vadd.i32	q1, q1, q9
-+	vdup.32		q8, r5
-+	vdup.32		q9, r6
-+	vadd.i32	q2, q2, q8
-+	vadd.i32	q3, q3, q9
-+
-+	// x4[0-3] += s1[0]
-+	// x5[0-3] += s1[1]
-+	// x6[0-3] += s1[2]
-+	// x7[0-3] += s1[3]
-+	ldmia		r0!, {r3-r6}
-+	vdup.32		q8, r3
-+	vdup.32		q9, r4
-+	vadd.i32	q4, q4, q8
-+	vadd.i32	q5, q5, q9
-+	vdup.32		q8, r5
-+	vdup.32		q9, r6
-+	vadd.i32	q6, q6, q8
-+	vadd.i32	q7, q7, q9
-+
-+	// interleave 32-bit words in state n, n+1
-+	vzip.32		q0, q1
-+	vzip.32		q2, q3
-+	vzip.32		q4, q5
-+	vzip.32		q6, q7
-+
-+	// interleave 64-bit words in state n, n+2
-+	vswp		d1, d4
-+	vswp		d3, d6
-+	vswp		d9, d12
-+	vswp		d11, d14
-+
-+	// xor with corresponding input, write to output
-+	vld1.8		{q8-q9}, [r2]!
-+	veor		q8, q8, q0
-+	veor		q9, q9, q4
-+	vst1.8		{q8-q9}, [r1]!
-+
-+	vld1.32		{q8-q9}, [sp, :256]
-+
-+	// x8[0-3] += s2[0]
-+	// x9[0-3] += s2[1]
-+	// x10[0-3] += s2[2]
-+	// x11[0-3] += s2[3]
-+	ldmia		r0!, {r3-r6}
-+	vdup.32		q0, r3
-+	vdup.32		q4, r4
-+	vadd.i32	q8, q8, q0
-+	vadd.i32	q9, q9, q4
-+	vdup.32		q0, r5
-+	vdup.32		q4, r6
-+	vadd.i32	q10, q10, q0
-+	vadd.i32	q11, q11, q4
-+
-+	// x12[0-3] += s3[0]
-+	// x13[0-3] += s3[1]
-+	// x14[0-3] += s3[2]
-+	// x15[0-3] += s3[3]
-+	ldmia		r0!, {r3-r6}
-+	vdup.32		q0, r3
-+	vdup.32		q4, r4
-+	adr		r3, CTRINC
-+	vadd.i32	q12, q12, q0
-+	vld1.32		{q0}, [r3, :128]
-+	vadd.i32	q13, q13, q4
-+	vadd.i32	q12, q12, q0		// x12 += counter values 0-3
-+
-+	vdup.32		q0, r5
-+	vdup.32		q4, r6
-+	vadd.i32	q14, q14, q0
-+	vadd.i32	q15, q15, q4
-+
-+	// interleave 32-bit words in state n, n+1
-+	vzip.32		q8, q9
-+	vzip.32		q10, q11
-+	vzip.32		q12, q13
-+	vzip.32		q14, q15
-+
-+	// interleave 64-bit words in state n, n+2
-+	vswp		d17, d20
-+	vswp		d19, d22
-+	vswp		d25, d28
-+	vswp		d27, d30
-+
-+	vmov		q4, q1
-+
-+	vld1.8		{q0-q1}, [r2]!
-+	veor		q0, q0, q8
-+	veor		q1, q1, q12
-+	vst1.8		{q0-q1}, [r1]!
-+
-+	vld1.8		{q0-q1}, [r2]!
-+	veor		q0, q0, q2
-+	veor		q1, q1, q6
-+	vst1.8		{q0-q1}, [r1]!
-+
-+	vld1.8		{q0-q1}, [r2]!
-+	veor		q0, q0, q10
-+	veor		q1, q1, q14
-+	vst1.8		{q0-q1}, [r1]!
-+
-+	vld1.8		{q0-q1}, [r2]!
-+	veor		q0, q0, q4
-+	veor		q1, q1, q5
-+	vst1.8		{q0-q1}, [r1]!
-+
-+	vld1.8		{q0-q1}, [r2]!
-+	veor		q0, q0, q9
-+	veor		q1, q1, q13
-+	vst1.8		{q0-q1}, [r1]!
-+
-+	vld1.8		{q0-q1}, [r2]!
-+	veor		q0, q0, q3
-+	veor		q1, q1, q7
-+	vst1.8		{q0-q1}, [r1]!
-+
-+	vld1.8		{q0-q1}, [r2]
-+	veor		q0, q0, q11
-+	veor		q1, q1, q15
-+	vst1.8		{q0-q1}, [r1]
-+
-+	mov		sp, ip
-+	pop		{r4-r6, pc}
-+ENDPROC(chacha20_4block_xor_neon)
-+
-+	.align		4
-+CTRINC:	.word		0, 1, 2, 3
-+
-diff --git a/arch/arm/crypto/chacha20-neon-glue.c b/arch/arm/crypto/chacha20-neon-glue.c
-new file mode 100644
-index 000000000000..592f75ae4fa1
---- /dev/null
-+++ b/arch/arm/crypto/chacha20-neon-glue.c
-@@ -0,0 +1,128 @@
-+/*
-+ * ChaCha20 256-bit cipher algorithm, RFC7539, ARM NEON functions
-+ *
-+ * Copyright (C) 2016 Linaro, Ltd. <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Based on:
-+ * ChaCha20 256-bit cipher algorithm, RFC7539, SIMD glue code
-+ *
-+ * Copyright (C) 2015 Martin Willi
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <crypto/algapi.h>
-+#include <crypto/chacha20.h>
-+#include <crypto/internal/skcipher.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+
-+#include <asm/hwcap.h>
-+#include <asm/neon.h>
-+#include <asm/simd.h>
-+
-+asmlinkage void chacha20_block_xor_neon(u32 *state, u8 *dst, const u8 *src);
-+asmlinkage void chacha20_4block_xor_neon(u32 *state, u8 *dst, const u8 *src);
-+
-+static void chacha20_doneon(u32 *state, u8 *dst, const u8 *src,
-+			    unsigned int bytes)
-+{
-+	u8 buf[CHACHA20_BLOCK_SIZE];
-+
-+	while (bytes >= CHACHA20_BLOCK_SIZE * 4) {
-+		chacha20_4block_xor_neon(state, dst, src);
-+		bytes -= CHACHA20_BLOCK_SIZE * 4;
-+		src += CHACHA20_BLOCK_SIZE * 4;
-+		dst += CHACHA20_BLOCK_SIZE * 4;
-+		state[12] += 4;
-+	}
-+	while (bytes >= CHACHA20_BLOCK_SIZE) {
-+		chacha20_block_xor_neon(state, dst, src);
-+		bytes -= CHACHA20_BLOCK_SIZE;
-+		src += CHACHA20_BLOCK_SIZE;
-+		dst += CHACHA20_BLOCK_SIZE;
-+		state[12]++;
-+	}
-+	if (bytes) {
-+		memcpy(buf, src, bytes);
-+		chacha20_block_xor_neon(state, buf, buf);
-+		memcpy(dst, buf, bytes);
-+	}
-+}
-+
-+static int chacha20_neon(struct skcipher_request *req)
-+{
-+	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
-+	struct chacha20_ctx *ctx = crypto_skcipher_ctx(tfm);
-+	struct skcipher_walk walk;
-+	u32 state[16];
-+	int err;
-+
-+	if (req->cryptlen <= CHACHA20_BLOCK_SIZE || !may_use_simd())
-+		return crypto_chacha20_crypt(req);
-+
-+	err = skcipher_walk_virt(&walk, req, true);
-+
-+	crypto_chacha20_init(state, ctx, walk.iv);
-+
-+	kernel_neon_begin();
-+	while (walk.nbytes > 0) {
-+		unsigned int nbytes = walk.nbytes;
-+
-+		if (nbytes < walk.total)
-+			nbytes = round_down(nbytes, walk.stride);
-+
-+		chacha20_doneon(state, walk.dst.virt.addr, walk.src.virt.addr,
-+				nbytes);
-+		err = skcipher_walk_done(&walk, walk.nbytes - nbytes);
-+	}
-+	kernel_neon_end();
-+
-+	return err;
-+}
-+
-+static struct skcipher_alg alg = {
-+	.base.cra_name		= "chacha20",
-+	.base.cra_driver_name	= "chacha20-neon",
-+	.base.cra_priority	= 300,
-+	.base.cra_blocksize	= 1,
-+	.base.cra_ctxsize	= sizeof(struct chacha20_ctx),
-+	.base.cra_alignmask	= 1,
-+	.base.cra_module	= THIS_MODULE,
-+
-+	.min_keysize		= CHACHA20_KEY_SIZE,
-+	.max_keysize		= CHACHA20_KEY_SIZE,
-+	.ivsize			= CHACHA20_IV_SIZE,
-+	.chunksize		= CHACHA20_BLOCK_SIZE,
-+	.walksize		= 4 * CHACHA20_BLOCK_SIZE,
-+	.setkey			= crypto_chacha20_setkey,
-+	.encrypt		= chacha20_neon,
-+	.decrypt		= chacha20_neon,
-+};
-+
-+static int __init chacha20_simd_mod_init(void)
-+{
-+	if (!(elf_hwcap & HWCAP_NEON))
-+		return -ENODEV;
-+
-+	return crypto_register_skcipher(&alg);
-+}
-+
-+static void __exit chacha20_simd_mod_fini(void)
-+{
-+	crypto_unregister_skcipher(&alg);
-+}
-+
-+module_init(chacha20_simd_mod_init);
-+module_exit(chacha20_simd_mod_fini);
-+
-+MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS_CRYPTO("chacha20");
--- 
-2.7.4
+> If I change that to parent_trigger attribute it change this behavior
+> and I will have to
+> duplicated what is done in iio_trigger_write_current() to find and
+> validate triggers.
+I get the reasoning, but we still end up with something represented
+by an IIO device that isn't providing any channels at all. It's simply
+using some of the infrastructure.  To my mind it is 'something else'
+and should be represented as such.  I have no problem at all with
+you registering additional elements in /sysfs/bus/iio/ to represent
+these shared elements - we already have drivers that do that to
+provide some centralized infrastructure (e.g. the sysfs-trigger)
+
+I'm worried about the scope spread we get for an IIO device otherwise.
+They serve a well defined purpose at the moment, and that isn't what
+is happening here.
+
+So my gut feeling is we are better deliberately not representing the
+inter dependence and claiming all triggers we are creating are
+independent.  That way we can have a nice generic infrastructure
+that will work in all cases (be it pushing the sanity checking to
+userspace).
+
+So each trigger has direct access to what controls it.  Changing anything
+can effect other triggers in weird ways.
+
+I'm finding it hard to see anything else generalizing sufficiently
+as we'll always get cases where we can't represent the topology without
+diving into the complexity of something like the media controller
+framework.
+
+Jonathan
+> 
+>> I might still be missing something though!
+>>
+>> You would only I think need 3 attributes
+>>
+>> parrent_trigger
+>> and something like your master_mode and slave_mode attributes.
+>>
+>> The parrent_trigger would need some validation etc, but if we keep it
+>> within this driver initially that won't be hard to do. Checking the device
+>> parent matches will do most of it.
+>>
+>> Jonathan
+>>>
+>>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>>> ---
+>>>  .../ABI/testing/sysfs-bus-iio-timer-stm32          |  55 +++
+>>>  drivers/iio/Kconfig                                |   2 +-
+>>>  drivers/iio/Makefile                               |   1 +
+>>>  drivers/iio/timer/Kconfig                          |  13 +
+>>>  drivers/iio/timer/Makefile                         |   1 +
+>>>  drivers/iio/timer/stm32-timer-trigger.c            | 466 +++++++++++++++++++++
+>>>  drivers/iio/trigger/Kconfig                        |   1 -
+>>>  include/linux/iio/timer/stm32-timer-trigger.h      |  62 +++
+>>>  8 files changed, 599 insertions(+), 2 deletions(-)
+>>>  create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-timer-stm32
+>>>  create mode 100644 drivers/iio/timer/Kconfig
+>>>  create mode 100644 drivers/iio/timer/Makefile
+>>>  create mode 100644 drivers/iio/timer/stm32-timer-trigger.c
+>>>  create mode 100644 include/linux/iio/timer/stm32-timer-trigger.h
+>>>
+>>> diff --git a/Documentation/ABI/testing/sysfs-bus-iio-timer-stm32 b/Documentation/ABI/testing/sysfs-bus-iio-timer-stm32
+>>> new file mode 100644
+>>> index 0000000..26583dd
+>>> --- /dev/null
+>>> +++ b/Documentation/ABI/testing/sysfs-bus-iio-timer-stm32
+>>> @@ -0,0 +1,55 @@
+>>> +What:                /sys/bus/iio/devices/iio:deviceX/master_mode_available
+>>> +KernelVersion:       4.10
+>>> +Contact:     benjamin.gaignard at st.com
+>>> +Description:
+>>> +             Reading returns the list possible master modes which are:
+>>> +             - "reset"     : The UG bit from the TIMx_EGR register is used as trigger output (TRGO).
+>>> +             - "enable"    : The Counter Enable signal CNT_EN is used as trigger output.
+>>> +             - "update"    : The update event is selected as trigger output.
+>>> +                             For instance a master timer can then be used as a prescaler for a slave timer.
+>>> +             - "compare_pulse" : The trigger output send a positive pulse when the CC1IF flag is to be set.
+>>> +             - "OC1REF"    : OC1REF signal is used as trigger output.
+>>> +             - "OC2REF"    : OC2REF signal is used as trigger output.
+>>> +             - "OC3REF"    : OC3REF signal is used as trigger output.
+>>> +             - "OC4REF"    : OC4REF signal is used as trigger output.
+>>> +
+>>> +What:                /sys/bus/iio/devices/iio:deviceX/master_mode
+>>> +KernelVersion:       4.10
+>>> +Contact:     benjamin.gaignard at st.com
+>>> +Description:
+>>> +             Reading returns the current master modes.
+>>> +             Writing set the master mode
+>>> +
+>>> +What:                /sys/bus/iio/devices/iio:deviceX/slave_mode_available
+>>> +KernelVersion:       4.10
+>>> +Contact:     benjamin.gaignard at st.com
+>>> +Description:
+>>> +             Reading returns the list possible slave modes which are:
+>>> +             - "disabled"  : The prescaler is clocked directly by the internal clock.
+>>> +             - "encoder_1" : Counter counts up/down on TI2FP1 edge depending on TI1FP2 level.
+>>> +             - "encoder_2" : Counter counts up/down on TI1FP2 edge depending on TI2FP1 level.
+>>> +             - "encoder_3" : Counter counts up/down on both TI1FP1 and TI2FP2 edges depending
+>>> +                             on the level of the other input.
+>>> +             - "reset"     : Rising edge of the selected trigger input reinitializes the counter
+>>> +                             and generates an update of the registers.
+>>> +             - "gated"     : The counter clock is enabled when the trigger input is high.
+>>> +                             The counter stops (but is not reset) as soon as the trigger becomes low.
+>>> +                             Both start and stop of the counter are controlled.
+>>> +             - "trigger"   : The counter starts at a rising edge of the trigger TRGI (but it is not
+>>> +                             reset). Only the start of the counter is controlled.
+>>> +             - "external_clock": Rising edges of the selected trigger (TRGI) clock the counter.
+>>> +
+>>> +What:                /sys/bus/iio/devices/iio:deviceX/slave_mode
+>>> +KernelVersion:       4.10
+>>> +Contact:     benjamin.gaignard at st.com
+>>> +Description:
+>>> +             Reading returns the current slave mode.
+>>> +             Writing set the slave mode
+>>> +
+>>> +What:                /sys/bus/iio/devices/triggerX/sampling_frequency
+>>> +KernelVersion:       4.10
+>>> +Contact:     benjamin.gaignard at st.com
+>>> +Description:
+>>> +             Reading returns the current sampling frequency.
+>>> +             Writing an value different of 0 set and start sampling.
+>>> +             Writing 0 stop sampling.
+>>> diff --git a/drivers/iio/Kconfig b/drivers/iio/Kconfig
+>>> index 6743b18..2de2a80 100644
+>>> --- a/drivers/iio/Kconfig
+>>> +++ b/drivers/iio/Kconfig
+>>> @@ -90,5 +90,5 @@ source "drivers/iio/potentiometer/Kconfig"
+>>>  source "drivers/iio/pressure/Kconfig"
+>>>  source "drivers/iio/proximity/Kconfig"
+>>>  source "drivers/iio/temperature/Kconfig"
+>>> -
+>>> +source "drivers/iio/timer/Kconfig"
+>>>  endif # IIO
+>>> diff --git a/drivers/iio/Makefile b/drivers/iio/Makefile
+>>> index 87e4c43..b797c08 100644
+>>> --- a/drivers/iio/Makefile
+>>> +++ b/drivers/iio/Makefile
+>>> @@ -32,4 +32,5 @@ obj-y += potentiometer/
+>>>  obj-y += pressure/
+>>>  obj-y += proximity/
+>>>  obj-y += temperature/
+>>> +obj-y += timer/
+>>>  obj-y += trigger/
+>>> diff --git a/drivers/iio/timer/Kconfig b/drivers/iio/timer/Kconfig
+>>> new file mode 100644
+>>> index 0000000..e3c21f2
+>>> --- /dev/null
+>>> +++ b/drivers/iio/timer/Kconfig
+>>> @@ -0,0 +1,13 @@
+>>> +#
+>>> +# Timers drivers
+>>> +
+>>> +menu "Timers"
+>>> +
+>>> +config IIO_STM32_TIMER_TRIGGER
+>>> +     tristate "STM32 Timer Trigger"
+>>> +     depends on (ARCH_STM32 && OF && MFD_STM32_TIMERS) || COMPILE_TEST
+>>> +     select IIO_TRIGGERED_EVENT
+>>> +     help
+>>> +       Select this option to enable STM32 Timer Trigger
+>>> +
+>>> +endmenu
+>>> diff --git a/drivers/iio/timer/Makefile b/drivers/iio/timer/Makefile
+>>> new file mode 100644
+>>> index 0000000..4ad95ec9
+>>> --- /dev/null
+>>> +++ b/drivers/iio/timer/Makefile
+>>> @@ -0,0 +1 @@
+>>> +obj-$(CONFIG_IIO_STM32_TIMER_TRIGGER) += stm32-timer-trigger.o
+>>> diff --git a/drivers/iio/timer/stm32-timer-trigger.c b/drivers/iio/timer/stm32-timer-trigger.c
+>>> new file mode 100644
+>>> index 0000000..8d16e8f
+>>> --- /dev/null
+>>> +++ b/drivers/iio/timer/stm32-timer-trigger.c
+>>> @@ -0,0 +1,466 @@
+>>> +/*
+>>> + * Copyright (C) STMicroelectronics 2016
+>>> + *
+>>> + * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
+>>> + *
+>>> + * License terms:  GNU General Public License (GPL), version 2
+>>> + */
+>>> +
+>>> +#include <linux/iio/iio.h>
+>>> +#include <linux/iio/sysfs.h>
+>>> +#include <linux/iio/timer/stm32-timer-trigger.h>
+>>> +#include <linux/iio/trigger.h>
+>>> +#include <linux/iio/triggered_event.h>
+>>> +#include <linux/interrupt.h>
+>>> +#include <linux/mfd/stm32-timers.h>
+>>> +#include <linux/module.h>
+>>> +#include <linux/platform_device.h>
+>>> +
+>>> +#define MAX_TRIGGERS 6
+>>> +#define MAX_VALIDS 5
+>>> +
+>>> +/* List the triggers created by each timer */
+>>> +static const void *triggers_table[][MAX_TRIGGERS] = {
+>>> +     { TIM1_TRGO, TIM1_CH1, TIM1_CH2, TIM1_CH3, TIM1_CH4,},
+>>> +     { TIM2_TRGO, TIM2_CH1, TIM2_CH2, TIM2_CH3, TIM2_CH4,},
+>>> +     { TIM3_TRGO, TIM3_CH1, TIM3_CH2, TIM3_CH3, TIM3_CH4,},
+>>> +     { TIM4_TRGO, TIM4_CH1, TIM4_CH2, TIM4_CH3, TIM4_CH4,},
+>>> +     { TIM5_TRGO, TIM5_CH1, TIM5_CH2, TIM5_CH3, TIM5_CH4,},
+>>> +     { TIM6_TRGO,},
+>>> +     { TIM7_TRGO,},
+>>> +     { TIM8_TRGO, TIM8_CH1, TIM8_CH2, TIM8_CH3, TIM8_CH4,},
+>>> +     { TIM9_TRGO, TIM9_CH1, TIM9_CH2,},
+>>> +     { TIM12_TRGO, TIM12_CH1, TIM12_CH2,},
+>>> +};
+>>> +
+>>> +/* List the triggers accepted by each timer */
+>>> +static const void *valids_table[][MAX_VALIDS] = {
+>>> +     { TIM5_TRGO, TIM2_TRGO, TIM4_TRGO, TIM3_TRGO,},
+>>> +     { TIM1_TRGO, TIM8_TRGO, TIM3_TRGO, TIM4_TRGO,},
+>>> +     { TIM1_TRGO, TIM8_TRGO, TIM5_TRGO, TIM4_TRGO,},
+>>> +     { TIM1_TRGO, TIM2_TRGO, TIM3_TRGO, TIM8_TRGO,},
+>>> +     { TIM2_TRGO, TIM3_TRGO, TIM4_TRGO, TIM8_TRGO,},
+>>> +     { }, /* timer 6 */
+>>> +     { }, /* timer 7 */
+>>> +     { TIM1_TRGO, TIM2_TRGO, TIM4_TRGO, TIM5_TRGO,},
+>>> +     { TIM2_TRGO, TIM3_TRGO,},
+>>> +     { TIM4_TRGO, TIM5_TRGO,},
+>>> +};
+>>> +
+>>> +struct stm32_timer_trigger {
+>>> +     struct device *dev;
+>>> +     struct regmap *regmap;
+>>> +     struct clk *clk;
+>>> +     u32 max_arr;
+>>> +     const void *triggers;
+>>> +     const void *valids;
+>>> +};
+>>> +
+>>> +static int stm32_timer_start(struct stm32_timer_trigger *priv,
+>>> +                          unsigned int frequency)
+>>> +{
+>>> +     unsigned long long prd, div;
+>>> +     int prescaler = 0;
+>>> +     u32 ccer, cr1;
+>>> +
+>>> +     /* Period and prescaler values depends of clock rate */
+>>> +     div = (unsigned long long)clk_get_rate(priv->clk);
+>>> +
+>>> +     do_div(div, frequency);
+>>> +
+>>> +     prd = div;
+>>> +
+>>> +     /*
+>>> +      * Increase prescaler value until we get a result that fit
+>>> +      * with auto reload register maximum value.
+>>> +      */
+>>> +     while (div > priv->max_arr) {
+>>> +             prescaler++;
+>>> +             div = prd;
+>>> +             do_div(div, (prescaler + 1));
+>>> +     }
+>>> +     prd = div;
+>>> +
+>>> +     if (prescaler > MAX_TIM_PSC) {
+>>> +             dev_err(priv->dev, "prescaler exceeds the maximum value\n");
+>>> +             return -EINVAL;
+>>> +     }
+>>> +
+>>> +     /* Check if nobody else use the timer */
+>>> +     regmap_read(priv->regmap, TIM_CCER, &ccer);
+>>> +     if (ccer & TIM_CCER_CCXE)
+>>> +             return -EBUSY;
+>>> +
+>>> +     regmap_read(priv->regmap, TIM_CR1, &cr1);
+>>> +     if (!(cr1 & TIM_CR1_CEN))
+>>> +             clk_enable(priv->clk);
+>>> +
+>>> +     regmap_write(priv->regmap, TIM_PSC, prescaler);
+>>> +     regmap_write(priv->regmap, TIM_ARR, prd - 1);
+>>> +     regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, TIM_CR1_ARPE);
+>>> +
+>>> +     /* Force master mode to update mode */
+>>> +     regmap_update_bits(priv->regmap, TIM_CR2, TIM_CR2_MMS, 0x20);
+>>> +
+>>> +     /* Make sure that registers are updated */
+>>> +     regmap_update_bits(priv->regmap, TIM_EGR, TIM_EGR_UG, TIM_EGR_UG);
+>>> +
+>>> +     /* Enable controller */
+>>> +     regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, TIM_CR1_CEN);
+>>> +
+>>> +     return 0;
+>>> +}
+>>> +
+>>> +static void stm32_timer_stop(struct stm32_timer_trigger *priv)
+>>> +{
+>>> +     u32 ccer, cr1;
+>>> +
+>>> +     regmap_read(priv->regmap, TIM_CCER, &ccer);
+>>> +     if (ccer & TIM_CCER_CCXE)
+>>> +             return;
+>>> +
+>>> +     regmap_read(priv->regmap, TIM_CR1, &cr1);
+>>> +     if (cr1 & TIM_CR1_CEN)
+>>> +             clk_disable(priv->clk);
+>>> +
+>>> +     /* Stop timer */
+>>> +     regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, 0);
+>>> +     regmap_write(priv->regmap, TIM_PSC, 0);
+>>> +     regmap_write(priv->regmap, TIM_ARR, 0);
+>>> +}
+>>> +
+>>> +static ssize_t stm32_tt_store_frequency(struct device *dev,
+>>> +                                     struct device_attribute *attr,
+>>> +                                     const char *buf, size_t len)
+>>> +{
+>>> +     struct iio_trigger *trig = to_iio_trigger(dev);
+>>> +     struct stm32_timer_trigger *priv = iio_trigger_get_drvdata(trig);
+>>> +     unsigned int freq;
+>>> +     int ret;
+>>> +
+>>> +     ret = kstrtouint(buf, 10, &freq);
+>>> +     if (ret)
+>>> +             return ret;
+>>> +
+>>> +     if (freq == 0) {
+>>> +             stm32_timer_stop(priv);
+>>> +     } else {
+>>> +             ret = stm32_timer_start(priv, freq);
+>>> +             if (ret)
+>>> +                     return ret;
+>>> +     }
+>>> +
+>>> +     return len;
+>>> +}
+>>> +
+>>> +static ssize_t stm32_tt_read_frequency(struct device *dev,
+>>> +                                    struct device_attribute *attr, char *buf)
+>>> +{
+>>> +     struct iio_trigger *trig = to_iio_trigger(dev);
+>>> +     struct stm32_timer_trigger *priv = iio_trigger_get_drvdata(trig);
+>>> +     u32 psc, arr, cr1;
+>>> +     unsigned long long freq = 0;
+>>> +
+>>> +     regmap_read(priv->regmap, TIM_CR1, &cr1);
+>>> +     regmap_read(priv->regmap, TIM_PSC, &psc);
+>>> +     regmap_read(priv->regmap, TIM_ARR, &arr);
+>>> +
+>>> +     if (psc && arr && (cr1 & TIM_CR1_CEN)) {
+>>> +             freq = (unsigned long long)clk_get_rate(priv->clk);
+>>> +             do_div(freq, psc);
+>>> +             do_div(freq, arr);
+>>> +     }
+>>> +
+>>> +     return sprintf(buf, "%d\n", (unsigned int)freq);
+>>> +}
+>>> +
+>>> +static IIO_DEV_ATTR_SAMP_FREQ(0660,
+>>> +                           stm32_tt_read_frequency,
+>>> +                           stm32_tt_store_frequency);
+>>> +
+>>> +static struct attribute *stm32_trigger_attrs[] = {
+>>> +     &iio_dev_attr_sampling_frequency.dev_attr.attr,
+>>> +     NULL,
+>>> +};
+>>> +
+>>> +static const struct attribute_group stm32_trigger_attr_group = {
+>>> +     .attrs = stm32_trigger_attrs,
+>>> +};
+>>> +
+>>> +static const struct attribute_group *stm32_trigger_attr_groups[] = {
+>>> +     &stm32_trigger_attr_group,
+>>> +     NULL,
+>>> +};
+>>> +
+>>> +static char *master_mode_table[] = {
+>>> +     "reset",
+>>> +     "enable",
+>>> +     "update",
+>>> +     "compare_pulse",
+>>> +     "OC1REF",
+>>> +     "OC2REF",
+>>> +     "OC3REF",
+>>> +     "OC4REF"
+>>> +};
+>>> +
+>>> +static ssize_t stm32_tt_show_master_mode(struct device *dev,
+>>> +                                      struct device_attribute *attr,
+>>> +                                      char *buf)
+>>> +{
+>>> +     struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+>>> +     struct stm32_timer_trigger *priv = iio_priv(indio_dev);
+>>> +     u32 cr2;
+>>> +
+>>> +     regmap_read(priv->regmap, TIM_CR2, &cr2);
+>>> +     cr2 = (cr2 & TIM_CR2_MMS) >> TIM_CR2_MMS_SHIFT;
+>>> +
+>>> +     return snprintf(buf, PAGE_SIZE, "%s\n", master_mode_table[cr2]);
+>>> +}
+>>> +
+>>> +static ssize_t stm32_tt_store_master_mode(struct device *dev,
+>>> +                                       struct device_attribute *attr,
+>>> +                                       const char *buf, size_t len)
+>>> +{
+>>> +     struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+>>> +     struct stm32_timer_trigger *priv = iio_priv(indio_dev);
+>>> +     int i;
+>>> +
+>>> +     for (i = 0; i < ARRAY_SIZE(master_mode_table); i++) {
+>>> +             if (!strncmp(master_mode_table[i], buf,
+>>> +                          strlen(master_mode_table[i]))) {
+>>> +                     regmap_update_bits(priv->regmap, TIM_CR2,
+>>> +                                        TIM_CR2_MMS, i << TIM_CR2_MMS_SHIFT);
+>>> +                     return len;
+>>> +             }
+>>> +     }
+>>> +
+>>> +     return -EINVAL;
+>>> +}
+>>> +
+>>> +static IIO_CONST_ATTR(master_mode_available,
+>>> +     "reset enable update compare_pulse OC1REF OC2REF OC3REF OC4REF");
+>>> +
+>>> +static IIO_DEVICE_ATTR(master_mode, 0660,
+>>> +                    stm32_tt_show_master_mode,
+>>> +                    stm32_tt_store_master_mode,
+>>> +                    0);
+>>> +
+>>> +static char *slave_mode_table[] = {
+>>> +     "disabled",
+>>> +     "encoder_1",
+>>> +     "encoder_2",
+>>> +     "encoder_3",
+>>> +     "reset",
+>>> +     "gated",
+>>> +     "trigger",
+>>> +     "external_clock",
+>>> +};
+>>> +
+>>> +static ssize_t stm32_tt_show_slave_mode(struct device *dev,
+>>> +                                     struct device_attribute *attr,
+>>> +                                     char *buf)
+>>> +{
+>>> +     struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+>>> +     struct stm32_timer_trigger *priv = iio_priv(indio_dev);
+>>> +     u32 smcr;
+>>> +
+>>> +     regmap_read(priv->regmap, TIM_SMCR, &smcr);
+>>> +     smcr &= TIM_SMCR_SMS;
+>>> +
+>>> +     return snprintf(buf, PAGE_SIZE, "%s\n", slave_mode_table[smcr]);
+>>> +}
+>>> +
+>>> +static ssize_t stm32_tt_store_slave_mode(struct device *dev,
+>>> +                                      struct device_attribute *attr,
+>>> +                                      const char *buf, size_t len)
+>>> +{
+>>> +     struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+>>> +     struct stm32_timer_trigger *priv = iio_priv(indio_dev);
+>>> +     int i;
+>>> +
+>>> +     for (i = 0; i < ARRAY_SIZE(slave_mode_table); i++) {
+>>> +             if (!strncmp(slave_mode_table[i], buf,
+>>> +                          strlen(slave_mode_table[i]))) {
+>>> +                     regmap_update_bits(priv->regmap,
+>>> +                                        TIM_SMCR, TIM_SMCR_SMS, i);
+>>> +                     return len;
+>>> +             }
+>>> +     }
+>>> +
+>>> +     return -EINVAL;
+>>> +}
+>>> +
+>>> +static IIO_CONST_ATTR(slave_mode_available,
+>>> +"disabled encoder_1 encoder_2 encoder_3 reset gated trigger external_clock");
+>>> +
+>>> +static IIO_DEVICE_ATTR(slave_mode, 0660,
+>>> +                    stm32_tt_show_slave_mode,
+>>> +                    stm32_tt_store_slave_mode,
+>>> +                    0);
+>>> +
+>>> +static struct attribute *stm32_timer_attrs[] = {
+>>> +     &iio_dev_attr_master_mode.dev_attr.attr,
+>>> +     &iio_const_attr_master_mode_available.dev_attr.attr,
+>>> +     &iio_dev_attr_slave_mode.dev_attr.attr,
+>>> +     &iio_const_attr_slave_mode_available.dev_attr.attr,
+>>> +     NULL,
+>>> +};
+>>> +
+>>> +static const struct attribute_group stm32_timer_attr_group = {
+>>> +     .attrs = stm32_timer_attrs,
+>>> +};
+>>> +
+>>> +static const struct iio_trigger_ops timer_trigger_ops = {
+>>> +     .owner = THIS_MODULE,
+>>> +};
+>>> +
+>>> +static int stm32_setup_iio_triggers(struct stm32_timer_trigger *priv)
+>>> +{
+>>> +     int ret;
+>>> +     const char * const *cur = priv->triggers;
+>>> +
+>>> +     while (cur && *cur) {
+>>> +             struct iio_trigger *trig;
+>>> +
+>>> +             trig = devm_iio_trigger_alloc(priv->dev, "%s", *cur);
+>>> +             if  (!trig)
+>>> +                     return -ENOMEM;
+>>> +
+>>> +             trig->dev.parent = priv->dev->parent;
+>>> +             trig->ops = &timer_trigger_ops;
+>>> +             trig->dev.groups = stm32_trigger_attr_groups;
+>>> +             iio_trigger_set_drvdata(trig, priv);
+>>> +
+>>> +             ret = devm_iio_trigger_register(priv->dev, trig);
+>>> +             if (ret)
+>>> +                     return ret;
+>>> +             cur++;
+>>> +     }
+>>> +
+>>> +     return 0;
+>>> +}
+>>> +
+>>> +/**
+>>> + * is_stm32_timer_trigger
+>>> + * @trig: trigger to be checked
+>>> + *
+>>> + * return true if the trigger is a valid stm32 iio timer trigger
+>>> + * either return false
+>>> + */
+>>> +bool is_stm32_timer_trigger(struct iio_trigger *trig)
+>>> +{
+>>> +     return (trig->ops == &timer_trigger_ops);
+>>> +}
+>>> +EXPORT_SYMBOL(is_stm32_timer_trigger);
+>>> +
+>>> +static int stm32_validate_trigger(struct iio_dev *indio_dev,
+>>> +                               struct iio_trigger *trig)
+>>> +{
+>>> +     struct stm32_timer_trigger *priv = iio_priv(indio_dev);
+>>> +     const char * const *cur = priv->valids;
+>>> +     unsigned int i = 0;
+>>> +
+>>> +     if (!is_stm32_timer_trigger(trig))
+>>> +             return -EINVAL;
+>>> +
+>>> +     while (cur && *cur) {
+>>> +             if (!strncmp(trig->name, *cur, strlen(trig->name))) {
+>>> +                     regmap_update_bits(priv->regmap,
+>>> +                                        TIM_SMCR, TIM_SMCR_TS,
+>>> +                                        i << TIM_SMCR_TS_SHIFT);
+>>> +                     return 0;
+>>> +             }
+>>> +             cur++;
+>>> +             i++;
+>>> +     }
+>>> +
+>>> +     return -EINVAL;
+>>> +}
+>>> +
+>>> +static const struct iio_info stm32_trigger_info = {
+>>> +     .driver_module = THIS_MODULE,
+>>> +     .validate_trigger = stm32_validate_trigger,
+>>> +     .attrs = &stm32_timer_attr_group,
+>>> +};
+>>> +
+>>> +static struct stm32_timer_trigger *stm32_setup_iio_device(struct device *dev)
+>>> +{
+>>> +     struct iio_dev *indio_dev;
+>>> +     int ret;
+>>> +
+>>> +     indio_dev = devm_iio_device_alloc(dev,
+>>> +                                       sizeof(struct stm32_timer_trigger));
+>>> +     if (!indio_dev)
+>>> +             return NULL;
+>>> +
+>>> +     indio_dev->name = dev_name(dev);
+>>> +     indio_dev->dev.parent = dev;
+>>> +     indio_dev->info = &stm32_trigger_info;
+>>> +     indio_dev->modes = INDIO_EVENT_TRIGGERED;
+>>> +     indio_dev->num_channels = 0;
+>>> +     indio_dev->dev.of_node = dev->of_node;
+>>> +
+>>> +     ret = devm_iio_device_register(dev, indio_dev);
+>>> +     if (ret)
+>>> +             return NULL;
+>>> +
+>>> +     return iio_priv(indio_dev);
+>>> +}
+>>> +
+>>> +static int stm32_timer_trigger_probe(struct platform_device *pdev)
+>>> +{
+>>> +     struct device *dev = &pdev->dev;
+>>> +     struct stm32_timer_trigger *priv;
+>>> +     struct stm32_timers *ddata = dev_get_drvdata(pdev->dev.parent);
+>>> +     unsigned int index;
+>>> +     int ret;
+>>> +
+>>> +     if (of_property_read_u32(dev->of_node, "reg", &index))
+>>> +             return -EINVAL;
+>>> +
+>>> +     if (index >= ARRAY_SIZE(triggers_table))
+>>> +             return -EINVAL;
+>>> +
+>>> +     /* Create an IIO device only if we have triggers to be validated */
+>>> +     if (*valids_table[index])
+>>> +             priv = stm32_setup_iio_device(dev);
+>>
+>> I still don't like this. Really feels like we shouldn't be creating an
+>> iio device with all the bagage that carries just to allow us to do the
+>> trigger trees.  We ought to have a much more light weight solution for this
+>> functionality - we aren't typically even using the interrupt tree stuff
+>> that the triggers for devices are all really about.
+>>
+>> A simpler approach of allowing each trigger the option of a parent seems like
+>> it would be cleaner.  Could be done entirely within this driver in the first
+>> instance.  Basically it would just look like your master and slave attributes
+>> but have those under triggerX not iio:deviceX.
+>>
+>> We can work out how to make it more generic later - including perhaps the
+>> option to trigger from triggers outside this driver, using some parallel
+>> infrastructure to the device triggering.
+>>
+>>
+>>> +     else
+>>> +             priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+>>> +
+>>> +     if (!priv)
+>>> +             return -ENOMEM;
+>>> +
+>>> +     priv->dev = dev;
+>>> +     priv->regmap = ddata->regmap;
+>>> +     priv->clk = ddata->clk;
+>>> +     priv->max_arr = ddata->max_arr;
+>>> +     priv->triggers = triggers_table[index];
+>>> +     priv->valids = valids_table[index];
+>>> +
+>>> +     ret = stm32_setup_iio_triggers(priv);
+>>> +     if (ret)
+>>> +             return ret;
+>>> +
+>>> +     platform_set_drvdata(pdev, priv);
+>>> +
+>>> +     return 0;
+>>> +}
+>>> +
+>>> +static const struct of_device_id stm32_trig_of_match[] = {
+>>> +     { .compatible = "st,stm32-timer-trigger", },
+>>> +     { /* end node */ },
+>>> +};
+>>> +MODULE_DEVICE_TABLE(of, stm32_trig_of_match);
+>>> +
+>>> +static struct platform_driver stm32_timer_trigger_driver = {
+>>> +     .probe = stm32_timer_trigger_probe,
+>>> +     .driver = {
+>>> +             .name = "stm32-timer-trigger",
+>>> +             .of_match_table = stm32_trig_of_match,
+>>> +     },
+>>> +};
+>>> +module_platform_driver(stm32_timer_trigger_driver);
+>>> +
+>>> +MODULE_ALIAS("platform: stm32-timer-trigger");
+>>> +MODULE_DESCRIPTION("STMicroelectronics STM32 Timer Trigger driver");
+>>> +MODULE_LICENSE("GPL v2");
+>>> diff --git a/drivers/iio/trigger/Kconfig b/drivers/iio/trigger/Kconfig
+>>> index 809b2e7..f2af4fe 100644
+>>> --- a/drivers/iio/trigger/Kconfig
+>>> +++ b/drivers/iio/trigger/Kconfig
+>>> @@ -46,5 +46,4 @@ config IIO_SYSFS_TRIGGER
+>>>
+>>>         To compile this driver as a module, choose M here: the
+>>>         module will be called iio-trig-sysfs.
+>>> -
+>> Clean this up.
+> 
+> ok
+> 
+>>>  endmenu
+>>> diff --git a/include/linux/iio/timer/stm32-timer-trigger.h b/include/linux/iio/timer/stm32-timer-trigger.h
+>>> new file mode 100644
+>>> index 0000000..55535ae
+>>> --- /dev/null
+>>> +++ b/include/linux/iio/timer/stm32-timer-trigger.h
+>>> @@ -0,0 +1,62 @@
+>>> +/*
+>>> + * Copyright (C) STMicroelectronics 2016
+>>> + *
+>>> + * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
+>>> + *
+>>> + * License terms:  GNU General Public License (GPL), version 2
+>>> + */
+>>> +
+>>> +#ifndef _STM32_TIMER_TRIGGER_H_
+>>> +#define _STM32_TIMER_TRIGGER_H_
+>>> +
+>>> +#define TIM1_TRGO    "tim1_trgo"
+>>> +#define TIM1_CH1     "tim1_ch1"
+>>> +#define TIM1_CH2     "tim1_ch2"
+>>> +#define TIM1_CH3     "tim1_ch3"
+>>> +#define TIM1_CH4     "tim1_ch4"
+>>> +
+>>> +#define TIM2_TRGO    "tim2_trgo"
+>>> +#define TIM2_CH1     "tim2_ch1"
+>>> +#define TIM2_CH2     "tim2_ch2"
+>>> +#define TIM2_CH3     "tim2_ch3"
+>>> +#define TIM2_CH4     "tim2_ch4"
+>>> +
+>>> +#define TIM3_TRGO    "tim3_trgo"
+>>> +#define TIM3_CH1     "tim3_ch1"
+>>> +#define TIM3_CH2     "tim3_ch2"
+>>> +#define TIM3_CH3     "tim3_ch3"
+>>> +#define TIM3_CH4     "tim3_ch4"
+>>> +
+>>> +#define TIM4_TRGO    "tim4_trgo"
+>>> +#define TIM4_CH1     "tim4_ch1"
+>>> +#define TIM4_CH2     "tim4_ch2"
+>>> +#define TIM4_CH3     "tim4_ch3"
+>>> +#define TIM4_CH4     "tim4_ch4"
+>>> +
+>>> +#define TIM5_TRGO    "tim5_trgo"
+>>> +#define TIM5_CH1     "tim5_ch1"
+>>> +#define TIM5_CH2     "tim5_ch2"
+>>> +#define TIM5_CH3     "tim5_ch3"
+>>> +#define TIM5_CH4     "tim5_ch4"
+>>> +
+>>> +#define TIM6_TRGO    "tim6_trgo"
+>>> +
+>>> +#define TIM7_TRGO    "tim7_trgo"
+>>> +
+>>> +#define TIM8_TRGO    "tim8_trgo"
+>>> +#define TIM8_CH1     "tim8_ch1"
+>>> +#define TIM8_CH2     "tim8_ch2"
+>>> +#define TIM8_CH3     "tim8_ch3"
+>>> +#define TIM8_CH4     "tim8_ch4"
+>>> +
+>>> +#define TIM9_TRGO    "tim9_trgo"
+>>> +#define TIM9_CH1     "tim9_ch1"
+>>> +#define TIM9_CH2     "tim9_ch2"
+>>> +
+>>> +#define TIM12_TRGO   "tim12_trgo"
+>>> +#define TIM12_CH1    "tim12_ch1"
+>>> +#define TIM12_CH2    "tim12_ch2"
+>>> +
+>>> +bool is_stm32_timer_trigger(struct iio_trigger *trig);
+>>> +
+>>> +#endif
+>>>
+>>
+> 
+> 
+> 
