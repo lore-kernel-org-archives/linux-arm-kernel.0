@@ -1,328 +1,42 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 2 Jan 2017 14:52:40 +0800
-Subject: [PATCH v3 1/3] ARM: dts: imx6: Add Savageboard common file
-In-Reply-To: <20161209010436.7994-2-woogyom.kim@gmail.com>
-References: <20161209010436.7994-1-woogyom.kim@gmail.com>
- <20161209010436.7994-2-woogyom.kim@gmail.com>
-Message-ID: <20170102065239.GC20956@dragon>
+From: heiko.carstens@de.ibm.com (Heiko Carstens)
+Date: Mon, 2 Jan 2017 07:57:13 +0100
+Subject: [RFC 1/4] mm: remove unused TASK_SIZE_OF()
+In-Reply-To: <20161230155634.8692-2-dsafonov@virtuozzo.com>
+References: <20161230155634.8692-1-dsafonov@virtuozzo.com>
+ <20161230155634.8692-2-dsafonov@virtuozzo.com>
+Message-ID: <20170102065713.GB4779@osiris>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2016 at 10:04:34AM +0900, Milo Kim wrote:
-> * Memory
->   memblock for DDR3 1GB
+On Fri, Dec 30, 2016 at 06:56:31PM +0300, Dmitry Safonov wrote:
+> All users of TASK_SIZE_OF(tsk) have migrated to mm->task_size or
+> TASK_SIZE_MAX since:
+> commit d696ca016d57 ("x86/fsgsbase/64: Use TASK_SIZE_MAX for
+> FSBASE/GSBASE upper limits"),
+> commit a06db751c321 ("pagemap: check permissions and capabilities at
+> open time"),
 > 
-> * Regulator
->   3.3V for panel and backlight.
-> 
-> * Display
->   Enable HDMI and LVDS panel. Savageboard supports AVIC TM097TDH02 panel
->   which is compatible with Hannstar HSD100PXN1, so reuse it.
-> 
-> * Clock
->   The commit d28be499c45e6 is applied to support LVDS and HDMI output
->   simultaneously.
-> 
-> * Pinmux
->   eMMC, ethernet, HDMI, I2C, power button, PWM, SD card and UART.
-> 
-> * Others
->   Enable ethernet, UART1 debug, USB host, USDHC3 for microSD card and
->   USDHC4 for built-in eMMC storage.
-> 
-> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
 > ---
->  arch/arm/boot/dts/imx6qdl-savageboard.dtsi | 262 +++++++++++++++++++++++++++++
->  1 file changed, 262 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6qdl-savageboard.dtsi
+...
+
+> diff --git a/arch/s390/include/asm/processor.h b/arch/s390/include/asm/processor.h
+> index 6bca916a5ba0..c53e8e2a51ac 100644
+> --- a/arch/s390/include/asm/processor.h
+> +++ b/arch/s390/include/asm/processor.h
+> @@ -89,10 +89,9 @@ extern void execve_tail(void);
+>   * User space process size: 2GB for 31 bit, 4TB or 8PT for 64 bit.
+>   */
 > 
-> diff --git a/arch/arm/boot/dts/imx6qdl-savageboard.dtsi b/arch/arm/boot/dts/imx6qdl-savageboard.dtsi
-> new file mode 100644
-> index 0000000..a7a7e1d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6qdl-savageboard.dtsi
-> @@ -0,0 +1,262 @@
-> +/*
-> + * Copyright (C) 2016 Milo Kim <woogyom.kim@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License
-> + *     version 2 as published by the Free Software Foundation.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-
-The copyright text needs to be corrected as below.
-
-https://patchwork.kernel.org/patch/9475057/
-
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +
-> +/ {
-> +	chosen {
-> +		stdout-path = &uart1;
-> +	};
-> +
-> +	memory at 10000000 {
-> +		device_type = "memory";
-> +		reg = <0x10000000 0x40000000>;
-> +	};
-> +
-> +	backlight: panel_bl {
-
-The node name should be as generic as possible, while label name can be
-specific.  That said, the following one should be better.
-
-	panel_bl: backlight
-
-> +		compatible = "pwm-backlight";
-> +		brightness-levels = <0 4 8 16 32 64 128 255>;
-> +		default-brightness-level = <4>;
-> +		power-supply = <&reg_3p3v>;
-> +		pwms = <&pwm1 0 10000>;
-> +	};
-> +
-> +	gpio-keys {
-> +		compatible = "gpio-keys";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_gpio_keys>;
-> +
-> +		power {
-> +			gpios = <&gpio3 7 GPIO_ACTIVE_LOW>;
-> +			label = "Power Button";
-> +			linux,code = <KEY_POWER>;
-> +			wakeup-source;
-> +		};
-> +	};
-> +
-> +	panel {
-> +		compatible = "avic, tm097tdh02", "hannstar,hsd100pxn1";
-
-"avic, tm097tdh02" is an undocumented compatible.
-
-> +		backlight = <&backlight>;
-> +		power-supply = <&reg_3p3v>;
-> +
-> +		port {
-> +			panel_in: endpoint {
-> +				remote-endpoint = <&lvds0_out>;
-> +			};
-> +		};
-> +	};
-> +
-> +	reg_3p3v: regulator-3p3v {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "3P3V";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		regulator-always-on;
-> +	};
-> +};
-> +
-> +&clks {
-> +	assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
-> +			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
-> +	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
-> +				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
-> +};
-> +
-> +&fec {
-> +	phy-mode = "rgmii";
-> +	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_LOW>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_enet>;
-> +	status = "okay";
-> +};
-> +
-> +&hdmi {
-> +	ddc-i2c-bus = <&i2c2>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hdmi_tx_cec>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c2 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c2>;
-> +	status = "okay";
-> +};
-> +
-> +&ldb {
-> +	status = "okay";
-> +
-> +	lvds-channel at 0 {
-> +		reg = <0>;
-> +		status = "okay";
-> +
-> +		port at 4 {
-> +			reg = <4>;
-> +
-> +			lvds0_out: endpoint {
-> +				remote-endpoint = <&panel_in>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&pwm1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_pwm1>;
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart1>;
-> +	status = "okay";
-> +};
-> +
-> +&usbh1 {
-> +	status = "okay";
-> +};
-> +
-> +/* SD card */
-> +&usdhc3 {
-> +	bus-width = <4>;
-> +	cd-gpios = <&gpio2 0 GPIO_ACTIVE_LOW>;
-> +	no-1-8-v;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_sd>;
-> +	status = "okay";
-> +};
-> +
-> +/* eMMC */
-> +&usdhc4 {
-> +	bus-width = <8>;
-> +	keep-power-in-suspend;
-> +	no-1-8-v;
-> +	non-removable;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_emmc>;
-> +	status = "okay";
-> +};
-> +
-> +&iomuxc {
-> +	pinctrl_emmc: emmcgrp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_SD4_CMD__SD4_CMD		0x17059
-> +			MX6QDL_PAD_SD4_CLK__SD4_CLK		0x10059
-> +			MX6QDL_PAD_SD4_DAT0__SD4_DATA0		0x17059
-> +			MX6QDL_PAD_SD4_DAT1__SD4_DATA1		0x17059
-> +			MX6QDL_PAD_SD4_DAT2__SD4_DATA2		0x17059
-> +			MX6QDL_PAD_SD4_DAT3__SD4_DATA3		0x17059
-> +			MX6QDL_PAD_SD4_DAT4__SD4_DATA4		0x17059
-> +			MX6QDL_PAD_SD4_DAT5__SD4_DATA5		0x17059
-> +			MX6QDL_PAD_SD4_DAT6__SD4_DATA6		0x17059
-> +			MX6QDL_PAD_SD4_DAT7__SD4_DATA7		0x17059
-> +		>;
-> +	};
-> +
-> +	pinctrl_enet: enetgrp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-> +			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-> +			MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b030
-> +			MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b030
-> +			MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b030
-> +			MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b030
-> +			MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b030
-> +			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b030
-> +			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
-> +			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b030
-> +			MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b030
-> +			MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b030
-> +			MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b030
-> +			MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b030
-> +			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b030
-> +			/* PHY reset */
-> +			MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25	0x1b0b0
-> +		>;
-> +	};
-> +
-> +	pinctrl_hdmi_tx_cec: hdmitxcecgrp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE	0x1f8b0
-> +		>;
-> +	};
-> +
-> +	pinctrl_i2c2: i2c2grp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
-> +			MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
-> +		>;
-> +	};
-> +
-> +	pinctrl_gpio_keys: gpiokeysgrp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_EIM_DA7__GPIO3_IO07		0x1b0b1
-> +		>;
-> +	};
-
-The pinctrl entries are well sorted alphabetically except this one.
-
-Shawn
-
-> +
-> +	pinctrl_pwm1: pwm1grp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_SD1_DAT3__PWM1_OUT		0x1b0b1
-> +		>;
-> +	};
-> +
-> +	pinctrl_sd: sdgrp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
-> +			MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10059
-> +			MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17059
-> +			MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
-> +			MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
-> +			MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
-> +			/* CD pin */
-> +			MX6QDL_PAD_NANDF_D0__GPIO2_IO00		0x1b0b1
-> +		>;
-> +	};
-> +
-> +	pinctrl_uart1: uart1grp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
-> +			MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0b1
-> +		>;
-> +	};
-> +};
-> -- 
-> 2.9.3
+> -#define TASK_SIZE_OF(tsk)	((tsk)->mm->context.asce_limit)
+>  #define TASK_UNMAPPED_BASE	(test_thread_flag(TIF_31BIT) ? \
+>  					(1UL << 30) : (1UL << 41))
+> -#define TASK_SIZE		TASK_SIZE_OF(current)
+> +#define TASK_SIZE		(current->mm->context.asce_limit)
+>  #define TASK_MAX_SIZE		(1UL << 53)
 > 
+>  #define STACK_TOP		(1UL << (test_thread_flag(TIF_31BIT) ? 31:42))
+
+FWIW, for the s390 part:
+
+Acked-by: Heiko Carstens <heiko.carstens@de.ibm.com>
