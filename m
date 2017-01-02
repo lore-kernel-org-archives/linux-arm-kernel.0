@@ -1,59 +1,52 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 2 Jan 2017 23:48:30 +0100
-Subject: 4.10-rc1 on Nokia N900: regression, WARN_ON() omap_l3_smx.c
-In-Reply-To: <20170102181058.GF9325@atomide.com>
-References: <20161229231411.GA6865@amd>
- <20170102181058.GF9325@atomide.com>
-Message-ID: <20170102224830.GB6817@amd>
+From: mike.leach@linaro.org (Mike Leach)
+Date: Mon,  2 Jan 2017 22:55:19 +0000
+Subject: [PATCH] coresight: etm4x: Fix enabling of cycle accurate tracing in
+ perf.
+Message-ID: <1483397719-22235-1-git-send-email-mike.leach@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Using perf record 'cyclacc' option in cs_etm event was not setting up cycle
+accurate trace correctly.
 
-> > I forgot I had v4.10-rc1 running, and now I got warning on all the
-> > consoles (hand-copied).
-> > 
-> > 
-> > Unhandled fault: external abort on non-linefetch (0x1028) at
-> > 0xfa0ab060
-> > ...
-> > Comm: kworker/0:0 Not tainted.
-> > Workqueue: events musb_irq_work
-> > ...
-> > PC is at musb_default_readb().
-> > ...
-> 
-> This means the clocks are not enabled at that point.
-> 
-> > WARNING: CPU: 0 ... at drivers/bus/omap_l3_smx.c:166
-> > omap3_l3_app_irq+0xcc/...
-> > Tainted: GDW.
-> 
-> If you comment out postcore_initcall_sync(omap3_l3_init);
-> in drivers/bus/omap_l3_smx.c you'll see the proper stack
-> trace instead of the l3 interrupt trace. The system will
-> hang at that point most likely.
-> 
-> > I do have patches to allow nfsroot over usb. But they worked ok in
-> > v4.9... Does anyone see it, too?
-> 
-> Hmm not much has changed since v4.9. Are you sure you
-> had v4.9 or some earlier v4.9-rc version?
+Corrects bit set in TRCCONFIGR to enable cycle accurate trace.
+Programs TRCCCCTLR with a valid threshold value as required by ETMv4 spec.
 
-I believe v4.9 works.
+Signed-off-by: Mike Leach <mike.leach@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-etm4x.c | 7 +++++--
+ drivers/hwtracing/coresight/coresight-etm4x.h | 1 +
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
-But... this may be tricky to reproduce. It happened once so
-far... after I reconnected N900 to computer when it was running for a
-while. I do have USB cable with power meter on it, thus "flakey". Lets
-see if it reappears...
-								Pavel
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 4db8d6a..07be032 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -216,8 +216,11 @@ static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
+ 		goto out;
+ 
+ 	/* Go from generic option to ETMv4 specifics */
+-	if (attr->config & BIT(ETM_OPT_CYCACC))
+-		config->cfg |= ETMv4_MODE_CYCACC;
++	if (attr->config & BIT(ETM_OPT_CYCACC)) {
++		config->cfg |= BIT(4);
++		/* TRM: Must program this for cycacc to work */
++		config->ccctlr = ETM_CYC_THRESHOLD_DEFAULT;
++	}
+ 	if (attr->config & BIT(ETM_OPT_TS))
+ 		config->cfg |= ETMv4_MODE_TIMESTAMP;
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
+index ba8d3f8..8a62c6c 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.h
++++ b/drivers/hwtracing/coresight/coresight-etm4x.h
+@@ -146,6 +146,7 @@
+ #define ETM_ARCH_V4			0x40
+ #define ETMv4_SYNC_MASK			0x1F
+ #define ETM_CYC_THRESHOLD_MASK		0xFFF
++#define ETM_CYC_THRESHOLD_DEFAULT       256
+ #define ETMv4_EVENT_MASK		0xFF
+ #define ETM_CNTR_MAX_VAL		0xFFFF
+ #define ETM_TRACEID_MASK		0x3f
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170102/09a252bc/attachment.sig>
+2.7.4
