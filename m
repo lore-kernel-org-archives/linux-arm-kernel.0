@@ -1,771 +1,29 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 02 Jan 2017 14:58:52 +0000
-Subject: [PATCH 3/9] ARM: dts: armada388-clearfog: split clearfog DTS file
+Date: Mon, 02 Jan 2017 14:58:57 +0000
+Subject: [PATCH 4/9] ARM: dts: armada388-clearfog: move DSA switch
 In-Reply-To: <E1cO43Q-0007yJ-ON@rmk-PC.armlinux.org.uk>
 References: <E1cO43Q-0007yJ-ON@rmk-PC.armlinux.org.uk>
-Message-ID: <E1cO44a-00082U-16@rmk-PC.armlinux.org.uk>
+Message-ID: <E1cO44f-00082b-5n@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two versions of the clearfog - a base and a pro model.  The
-base model has an additional PHY on eth1, replacing the DSA switch on
-the pro model.  MPP assignments are slightly different.  The base model
-also omits the second PCIe, and footprint for a PIC microcontroller.
-
-In order to cater for these differences, move all the existing clearfog
-support to a dtsi file before starting to modify it, to make the
-following changes more clear.
+Move the DSA switch configuration to the clearfog .dts file as this is
+only present on the pro models.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/boot/dts/armada-388-clearfog.dts  | 378 +------------------------
- arch/arm/boot/dts/armada-388-clearfog.dtsi | 425 +++++++++++++++++++++++++++++
- 2 files changed, 427 insertions(+), 376 deletions(-)
- create mode 100644 arch/arm/boot/dts/armada-388-clearfog.dtsi
+ arch/arm/boot/dts/armada-388-clearfog.dts  | 75 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/armada-388-clearfog.dtsi | 69 ---------------------------
+ 2 files changed, 75 insertions(+), 69 deletions(-)
 
 diff --git a/arch/arm/boot/dts/armada-388-clearfog.dts b/arch/arm/boot/dts/armada-388-clearfog.dts
-index 9bf399dd1786..c5f2ca5f6144 100644
+index c5f2ca5f6144..a1176d23a444 100644
 --- a/arch/arm/boot/dts/armada-388-clearfog.dts
 +++ b/arch/arm/boot/dts/armada-388-clearfog.dts
-@@ -1,5 +1,5 @@
- /*
-- * Device Tree file for SolidRun Clearfog revision A1 rev 2.0 (88F6828)
-+ * Device Tree file for SolidRun Clearfog Pro revision A1 rev 2.0 (88F6828)
-  *
-  *  Copyright (C) 2015 Russell King
-  *
-@@ -47,384 +47,10 @@
-  */
- 
- /dts-v1/;
--#include "armada-388.dtsi"
--#include "armada-38x-solidrun-microsom.dtsi"
-+#include "armada-388-clearfog.dtsi"
- 
- / {
+@@ -53,4 +53,79 @@
  	model = "SolidRun Clearfog A1";
  	compatible = "solidrun,clearfog-a1", "marvell,armada388",
  		"marvell,armada385", "marvell,armada380";
--
--	aliases {
--		/* So that mvebu u-boot can update the MAC addresses */
--		ethernet1 = &eth0;
--		ethernet2 = &eth1;
--		ethernet3 = &eth2;
--	};
--
--	chosen {
--		stdout-path = "serial0:115200n8";
--	};
--
--	reg_3p3v: regulator-3p3v {
--		compatible = "regulator-fixed";
--		regulator-name = "3P3V";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--		regulator-always-on;
--	};
--
--	soc {
--		internal-regs {
--			ethernet at 30000 {
--				phy-mode = "sgmii";
--				buffer-manager = <&bm>;
--				bm,pool-long = <2>;
--				bm,pool-short = <1>;
--				status = "okay";
--
--				fixed-link {
--					speed = <1000>;
--					full-duplex;
--				};
--			};
--
--			ethernet at 34000 {
--				phy-mode = "sgmii";
--				buffer-manager = <&bm>;
--				bm,pool-long = <3>;
--				bm,pool-short = <1>;
--				status = "okay";
--
--				fixed-link {
--					speed = <1000>;
--					full-duplex;
--				};
--			};
--
--			i2c at 11000 {
--				/* Is there anything on this? */
--				clock-frequency = <100000>;
--				pinctrl-0 = <&i2c0_pins>;
--				pinctrl-names = "default";
--				status = "okay";
--
--				/*
--				 * PCA9655 GPIO expander, up to 1MHz clock.
--				 *  0-CON3 CLKREQ#
--				 *  1-CON3 PERST#
--				 *  2-CON2 PERST#
--				 *  3-CON3 W_DISABLE
--				 *  4-CON2 CLKREQ#
--				 *  5-USB3 overcurrent
--				 *  6-USB3 power
--				 *  7-CON2 W_DISABLE
--				 *  8-JP4 P1
--				 *  9-JP4 P4
--				 * 10-JP4 P5
--				 * 11-m.2 DEVSLP
--				 * 12-SFP_LOS
--				 * 13-SFP_TX_FAULT
--				 * 14-SFP_TX_DISABLE
--				 * 15-SFP_MOD_DEF0
--				 */
--				expander0: gpio-expander at 20 {
--					/*
--					 * This is how it should be:
--					 * compatible = "onnn,pca9655",
--					 *	 "nxp,pca9555";
--					 * but you can't do this because of
--					 * the way I2C works.
--					 */
--					compatible = "nxp,pca9555";
--					gpio-controller;
--					#gpio-cells = <2>;
--					reg = <0x20>;
--
--					pcie1_0_clkreq {
--						gpio-hog;
--						gpios = <0 GPIO_ACTIVE_LOW>;
--						input;
--						line-name = "pcie1.0-clkreq";
--					};
--					pcie1_0_w_disable {
--						gpio-hog;
--						gpios = <3 GPIO_ACTIVE_LOW>;
--						output-low;
--						line-name = "pcie1.0-w-disable";
--					};
--					pcie2_0_clkreq {
--						gpio-hog;
--						gpios = <4 GPIO_ACTIVE_LOW>;
--						input;
--						line-name = "pcie2.0-clkreq";
--					};
--					pcie2_0_w_disable {
--						gpio-hog;
--						gpios = <7 GPIO_ACTIVE_LOW>;
--						output-low;
--						line-name = "pcie2.0-w-disable";
--					};
--					usb3_ilimit {
--						gpio-hog;
--						gpios = <5 GPIO_ACTIVE_LOW>;
--						input;
--						line-name = "usb3-current-limit";
--					};
--					usb3_power {
--						gpio-hog;
--						gpios = <6 GPIO_ACTIVE_HIGH>;
--						output-high;
--						line-name = "usb3-power";
--					};
--					m2_devslp {
--						gpio-hog;
--						gpios = <11 GPIO_ACTIVE_HIGH>;
--						output-low;
--						line-name = "m.2 devslp";
--					};
--					sfp_los {
--						/* SFP loss of signal */
--						gpio-hog;
--						gpios = <12 GPIO_ACTIVE_HIGH>;
--						input;
--						line-name = "sfp-los";
--					};
--					sfp_tx_fault {
--						/* SFP laser fault */
--						gpio-hog;
--						gpios = <13 GPIO_ACTIVE_HIGH>;
--						input;
--						line-name = "sfp-tx-fault";
--					};
--					sfp_tx_disable {
--						/* SFP transmit disable */
--						gpio-hog;
--						gpios = <14 GPIO_ACTIVE_HIGH>;
--						output-low;
--						line-name = "sfp-tx-disable";
--					};
--					sfp_mod_def0 {
--						/* SFP module present */
--						gpio-hog;
--						gpios = <15 GPIO_ACTIVE_LOW>;
--						input;
--						line-name = "sfp-mod-def0";
--					};
--				};
--
--				/* The MCP3021 is 100kHz clock only */
--				mikrobus_adc: mcp3021 at 4c {
--					compatible = "microchip,mcp3021";
--					reg = <0x4c>;
--				};
--
--				/* Also something at 0x64 */
--			};
--
--			i2c at 11100 {
--				/*
--				 * Routed to SFP, mikrobus, and PCIe.
--				 * SFP limits this to 100kHz, and requires
--				 *  an AT24C01A/02/04 with address pins tied
--				 *  low, which takes addresses 0x50 and 0x51.
--				 * Mikrobus doesn't specify beyond an I2C
--				 *  bus being present.
--				 * PCIe uses ARP to assign addresses, or
--				 *  0x63-0x64.
--				 */
--				clock-frequency = <100000>;
--				pinctrl-0 = <&clearfog_i2c1_pins>;
--				pinctrl-names = "default";
--				status = "okay";
--			};
--
--			pinctrl at 18000 {
--				clearfog_dsa0_clk_pins: clearfog-dsa0-clk-pins {
--					marvell,pins = "mpp46";
--					marvell,function = "ref";
--				};
--				clearfog_dsa0_pins: clearfog-dsa0-pins {
--					marvell,pins = "mpp23", "mpp41";
--					marvell,function = "gpio";
--				};
--				clearfog_i2c1_pins: i2c1-pins {
--					/* SFP, PCIe, mSATA, mikrobus */
--					marvell,pins = "mpp26", "mpp27";
--					marvell,function = "i2c1";
--				};
--				clearfog_sdhci_cd_pins: clearfog-sdhci-cd-pins {
--					marvell,pins = "mpp20";
--					marvell,function = "gpio";
--				};
--				clearfog_spi1_cs_pins: spi1-cs-pins {
--					marvell,pins = "mpp55";
--					marvell,function = "spi1";
--				};
--				mikro_pins: mikro-pins {
--					/* int: mpp22 rst: mpp29 */
--					marvell,pins = "mpp22", "mpp29";
--					marvell,function = "gpio";
--				};
--				mikro_spi_pins: mikro-spi-pins {
--					marvell,pins = "mpp43";
--					marvell,function = "spi1";
--				};
--				mikro_uart_pins: mikro-uart-pins {
--					marvell,pins = "mpp24", "mpp25";
--					marvell,function = "ua1";
--				};
--				rear_button_pins: rear-button-pins {
--					marvell,pins = "mpp34";
--					marvell,function = "gpio";
--				};
--			};
--
--			sata at a8000 {
--				/* pinctrl? */
--				status = "okay";
--			};
--
--			sata at e0000 {
--				/* pinctrl? */
--				status = "okay";
--			};
--
--			sdhci at d8000 {
--				bus-width = <4>;
--				cd-gpios = <&gpio0 20 GPIO_ACTIVE_LOW>;
--				no-1-8-v;
--				pinctrl-0 = <&microsom_sdhci_pins
--					     &clearfog_sdhci_cd_pins>;
--				pinctrl-names = "default";
--				status = "okay";
--				vmmc = <&reg_3p3v>;
--				wp-inverted;
--			};
--
--			serial at 12100 {
--				/* mikrobus uart */
--				pinctrl-0 = <&mikro_uart_pins>;
--				pinctrl-names = "default";
--				status = "okay";
--			};
--
--			usb at 58000 {
--				/* CON3, nearest  power. */
--				status = "okay";
--			};
--
--			usb3 at f0000 {
--				/* CON2, nearest CPU, USB2 only. */
--				status = "okay";
--			};
--
--			usb3 at f8000 {
--				/* CON7 */
--				status = "okay";
--			};
--		};
--
--		pcie-controller {
--			status = "okay";
--			/*
--			 * The two PCIe units are accessible through
--			 * the mini-PCIe connectors on the board.
--			 */
--			pcie at 2,0 {
--				/* Port 1, Lane 0. CON3, nearest power. */
--				reset-gpios = <&expander0 1 GPIO_ACTIVE_LOW>;
--				status = "okay";
--			};
--			pcie at 3,0 {
--				/* Port 2, Lane 0. CON2, nearest CPU. */
--				reset-gpios = <&expander0 2 GPIO_ACTIVE_LOW>;
--				status = "okay";
--			};
--		};
--	};
--
--	dsa at 0 {
--		compatible = "marvell,dsa";
--		dsa,ethernet = <&eth1>;
--		dsa,mii-bus = <&mdio>;
--		pinctrl-0 = <&clearfog_dsa0_clk_pins &clearfog_dsa0_pins>;
--		pinctrl-names = "default";
--		#address-cells = <2>;
--		#size-cells = <0>;
--
--		switch at 0 {
--			#address-cells = <1>;
--			#size-cells = <0>;
--			reg = <4 0>;
--
--			port at 0 {
--				reg = <0>;
--				label = "lan5";
--			};
--
--			port at 1 {
--				reg = <1>;
--				label = "lan4";
--			};
--
--			port at 2 {
--				reg = <2>;
--				label = "lan3";
--			};
--
--			port at 3 {
--				reg = <3>;
--				label = "lan2";
--			};
--
--			port at 4 {
--				reg = <4>;
--				label = "lan1";
--			};
--
--			port at 5 {
--				reg = <5>;
--				label = "cpu";
--			};
--
--			port at 6 {
--				/* 88E1512 external phy */
--				reg = <6>;
--				label = "lan6";
--				fixed-link {
--					speed = <1000>;
--					full-duplex;
--				};
--			};
--		};
--	};
--
--	gpio-keys {
--		compatible = "gpio-keys";
--		pinctrl-0 = <&rear_button_pins>;
--		pinctrl-names = "default";
--
--		button_0 {
--			/* The rear SW3 button */
--			label = "Rear Button";
--			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
--			linux,can-disable;
--			linux,code = <BTN_0>;
--		};
--	};
--};
--
--&spi1 {
--	/*
--	 * Add SPI CS pins for clearfog:
--	 * CS0: W25Q32 (not populated on uSOM)
--	 * CS1:
--	 * CS2: mikrobus
--	 */
--	pinctrl-0 = <&spi1_pins
--		     &clearfog_spi1_cs_pins
--		     &mikro_spi_pins>;
--	pinctrl-names = "default";
--	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/armada-388-clearfog.dtsi b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-new file mode 100644
-index 000000000000..59438777287a
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-@@ -0,0 +1,425 @@
-+/*
-+ * Device Tree include file for SolidRun Clearfog 88F6828 based boards
-+ *
-+ *  Copyright (C) 2015 Russell King
-+ *
-+ * This board is in development; the contents of this file work with
-+ * the A1 rev 2.0 of the board, which does not represent final
-+ * production board.  Things will change, don't expect this file to
-+ * remain compatible info the future.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "armada-388.dtsi"
-+#include "armada-38x-solidrun-microsom.dtsi"
-+
-+/ {
-+	aliases {
-+		/* So that mvebu u-boot can update the MAC addresses */
-+		ethernet1 = &eth0;
-+		ethernet2 = &eth1;
-+		ethernet3 = &eth2;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	reg_3p3v: regulator-3p3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3P3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
-+
-+	soc {
-+		internal-regs {
-+			ethernet at 30000 {
-+				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
-+				bm,pool-short = <1>;
-+				status = "okay";
-+
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+
-+			ethernet at 34000 {
-+				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <3>;
-+				bm,pool-short = <1>;
-+				status = "okay";
-+
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+
-+			i2c at 11000 {
-+				/* Is there anything on this? */
-+				clock-frequency = <100000>;
-+				pinctrl-0 = <&i2c0_pins>;
-+				pinctrl-names = "default";
-+				status = "okay";
-+
-+				/*
-+				 * PCA9655 GPIO expander, up to 1MHz clock.
-+				 *  0-CON3 CLKREQ#
-+				 *  1-CON3 PERST#
-+				 *  2-CON2 PERST#
-+				 *  3-CON3 W_DISABLE
-+				 *  4-CON2 CLKREQ#
-+				 *  5-USB3 overcurrent
-+				 *  6-USB3 power
-+				 *  7-CON2 W_DISABLE
-+				 *  8-JP4 P1
-+				 *  9-JP4 P4
-+				 * 10-JP4 P5
-+				 * 11-m.2 DEVSLP
-+				 * 12-SFP_LOS
-+				 * 13-SFP_TX_FAULT
-+				 * 14-SFP_TX_DISABLE
-+				 * 15-SFP_MOD_DEF0
-+				 */
-+				expander0: gpio-expander at 20 {
-+					/*
-+					 * This is how it should be:
-+					 * compatible = "onnn,pca9655",
-+					 *	 "nxp,pca9555";
-+					 * but you can't do this because of
-+					 * the way I2C works.
-+					 */
-+					compatible = "nxp,pca9555";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					reg = <0x20>;
-+
-+					pcie1_0_clkreq {
-+						gpio-hog;
-+						gpios = <0 GPIO_ACTIVE_LOW>;
-+						input;
-+						line-name = "pcie1.0-clkreq";
-+					};
-+					pcie1_0_w_disable {
-+						gpio-hog;
-+						gpios = <3 GPIO_ACTIVE_LOW>;
-+						output-low;
-+						line-name = "pcie1.0-w-disable";
-+					};
-+					pcie2_0_clkreq {
-+						gpio-hog;
-+						gpios = <4 GPIO_ACTIVE_LOW>;
-+						input;
-+						line-name = "pcie2.0-clkreq";
-+					};
-+					pcie2_0_w_disable {
-+						gpio-hog;
-+						gpios = <7 GPIO_ACTIVE_LOW>;
-+						output-low;
-+						line-name = "pcie2.0-w-disable";
-+					};
-+					usb3_ilimit {
-+						gpio-hog;
-+						gpios = <5 GPIO_ACTIVE_LOW>;
-+						input;
-+						line-name = "usb3-current-limit";
-+					};
-+					usb3_power {
-+						gpio-hog;
-+						gpios = <6 GPIO_ACTIVE_HIGH>;
-+						output-high;
-+						line-name = "usb3-power";
-+					};
-+					m2_devslp {
-+						gpio-hog;
-+						gpios = <11 GPIO_ACTIVE_HIGH>;
-+						output-low;
-+						line-name = "m.2 devslp";
-+					};
-+					sfp_los {
-+						/* SFP loss of signal */
-+						gpio-hog;
-+						gpios = <12 GPIO_ACTIVE_HIGH>;
-+						input;
-+						line-name = "sfp-los";
-+					};
-+					sfp_tx_fault {
-+						/* SFP laser fault */
-+						gpio-hog;
-+						gpios = <13 GPIO_ACTIVE_HIGH>;
-+						input;
-+						line-name = "sfp-tx-fault";
-+					};
-+					sfp_tx_disable {
-+						/* SFP transmit disable */
-+						gpio-hog;
-+						gpios = <14 GPIO_ACTIVE_HIGH>;
-+						output-low;
-+						line-name = "sfp-tx-disable";
-+					};
-+					sfp_mod_def0 {
-+						/* SFP module present */
-+						gpio-hog;
-+						gpios = <15 GPIO_ACTIVE_LOW>;
-+						input;
-+						line-name = "sfp-mod-def0";
-+					};
-+				};
-+
-+				/* The MCP3021 is 100kHz clock only */
-+				mikrobus_adc: mcp3021 at 4c {
-+					compatible = "microchip,mcp3021";
-+					reg = <0x4c>;
-+				};
-+
-+				/* Also something at 0x64 */
-+			};
-+
-+			i2c at 11100 {
-+				/*
-+				 * Routed to SFP, mikrobus, and PCIe.
-+				 * SFP limits this to 100kHz, and requires
-+				 *  an AT24C01A/02/04 with address pins tied
-+				 *  low, which takes addresses 0x50 and 0x51.
-+				 * Mikrobus doesn't specify beyond an I2C
-+				 *  bus being present.
-+				 * PCIe uses ARP to assign addresses, or
-+				 *  0x63-0x64.
-+				 */
-+				clock-frequency = <100000>;
-+				pinctrl-0 = <&clearfog_i2c1_pins>;
-+				pinctrl-names = "default";
-+				status = "okay";
-+			};
-+
-+			pinctrl at 18000 {
-+				clearfog_dsa0_clk_pins: clearfog-dsa0-clk-pins {
-+					marvell,pins = "mpp46";
-+					marvell,function = "ref";
-+				};
-+				clearfog_dsa0_pins: clearfog-dsa0-pins {
-+					marvell,pins = "mpp23", "mpp41";
-+					marvell,function = "gpio";
-+				};
-+				clearfog_i2c1_pins: i2c1-pins {
-+					/* SFP, PCIe, mSATA, mikrobus */
-+					marvell,pins = "mpp26", "mpp27";
-+					marvell,function = "i2c1";
-+				};
-+				clearfog_sdhci_cd_pins: clearfog-sdhci-cd-pins {
-+					marvell,pins = "mpp20";
-+					marvell,function = "gpio";
-+				};
-+				clearfog_spi1_cs_pins: spi1-cs-pins {
-+					marvell,pins = "mpp55";
-+					marvell,function = "spi1";
-+				};
-+				mikro_pins: mikro-pins {
-+					/* int: mpp22 rst: mpp29 */
-+					marvell,pins = "mpp22", "mpp29";
-+					marvell,function = "gpio";
-+				};
-+				mikro_spi_pins: mikro-spi-pins {
-+					marvell,pins = "mpp43";
-+					marvell,function = "spi1";
-+				};
-+				mikro_uart_pins: mikro-uart-pins {
-+					marvell,pins = "mpp24", "mpp25";
-+					marvell,function = "ua1";
-+				};
-+				rear_button_pins: rear-button-pins {
-+					marvell,pins = "mpp34";
-+					marvell,function = "gpio";
-+				};
-+			};
-+
-+			sata at a8000 {
-+				/* pinctrl? */
-+				status = "okay";
-+			};
-+
-+			sata at e0000 {
-+				/* pinctrl? */
-+				status = "okay";
-+			};
-+
-+			sdhci at d8000 {
-+				bus-width = <4>;
-+				cd-gpios = <&gpio0 20 GPIO_ACTIVE_LOW>;
-+				no-1-8-v;
-+				pinctrl-0 = <&microsom_sdhci_pins
-+					     &clearfog_sdhci_cd_pins>;
-+				pinctrl-names = "default";
-+				status = "okay";
-+				vmmc = <&reg_3p3v>;
-+				wp-inverted;
-+			};
-+
-+			serial at 12100 {
-+				/* mikrobus uart */
-+				pinctrl-0 = <&mikro_uart_pins>;
-+				pinctrl-names = "default";
-+				status = "okay";
-+			};
-+
-+			usb at 58000 {
-+				/* CON3, nearest  power. */
-+				status = "okay";
-+			};
-+
-+			usb3 at f0000 {
-+				/* CON2, nearest CPU, USB2 only. */
-+				status = "okay";
-+			};
-+
-+			usb3 at f8000 {
-+				/* CON7 */
-+				status = "okay";
-+			};
-+		};
-+
-+		pcie-controller {
-+			status = "okay";
-+			/*
-+			 * The two PCIe units are accessible through
-+			 * the mini-PCIe connectors on the board.
-+			 */
-+			pcie at 2,0 {
-+				/* Port 1, Lane 0. CON3, nearest power. */
-+				reset-gpios = <&expander0 1 GPIO_ACTIVE_LOW>;
-+				status = "okay";
-+			};
-+			pcie at 3,0 {
-+				/* Port 2, Lane 0. CON2, nearest CPU. */
-+				reset-gpios = <&expander0 2 GPIO_ACTIVE_LOW>;
-+				status = "okay";
-+			};
-+		};
-+	};
 +
 +	dsa at 0 {
 +		compatible = "marvell,dsa";
@@ -822,34 +80,119 @@ index 000000000000..59438777287a
 +			};
 +		};
 +	};
++};
 +
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		pinctrl-0 = <&rear_button_pins>;
-+		pinctrl-names = "default";
-+
-+		button_0 {
-+			/* The rear SW3 button */
-+			label = "Rear Button";
-+			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
-+			linux,can-disable;
-+			linux,code = <BTN_0>;
-+		};
++&eth1 {
++	/* ethernet at 30000 */
++	fixed-link {
++		speed = <1000>;
++		full-duplex;
 +	};
 +};
 +
-+&spi1 {
-+	/*
-+	 * Add SPI CS pins for clearfog:
-+	 * CS0: W25Q32 (not populated on uSOM)
-+	 * CS1:
-+	 * CS2: mikrobus
-+	 */
-+	pinctrl-0 = <&spi1_pins
-+		     &clearfog_spi1_cs_pins
-+		     &mikro_spi_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+};
++&pinctrl {
++	clearfog_dsa0_clk_pins: clearfog-dsa0-clk-pins {
++		marvell,pins = "mpp46";
++		marvell,function = "ref";
++	};
++	clearfog_dsa0_pins: clearfog-dsa0-pins {
++		marvell,pins = "mpp23", "mpp41";
++		marvell,function = "gpio";
++	};
+ };
+diff --git a/arch/arm/boot/dts/armada-388-clearfog.dtsi b/arch/arm/boot/dts/armada-388-clearfog.dtsi
+index 59438777287a..fb02997a52a1 100644
+--- a/arch/arm/boot/dts/armada-388-clearfog.dtsi
++++ b/arch/arm/boot/dts/armada-388-clearfog.dtsi
+@@ -77,11 +77,6 @@
+ 				bm,pool-long = <2>;
+ 				bm,pool-short = <1>;
+ 				status = "okay";
+-
+-				fixed-link {
+-					speed = <1000>;
+-					full-duplex;
+-				};
+ 			};
+ 
+ 			ethernet at 34000 {
+@@ -235,14 +230,6 @@
+ 			};
+ 
+ 			pinctrl at 18000 {
+-				clearfog_dsa0_clk_pins: clearfog-dsa0-clk-pins {
+-					marvell,pins = "mpp46";
+-					marvell,function = "ref";
+-				};
+-				clearfog_dsa0_pins: clearfog-dsa0-pins {
+-					marvell,pins = "mpp23", "mpp41";
+-					marvell,function = "gpio";
+-				};
+ 				clearfog_i2c1_pins: i2c1-pins {
+ 					/* SFP, PCIe, mSATA, mikrobus */
+ 					marvell,pins = "mpp26", "mpp27";
+@@ -339,62 +326,6 @@
+ 		};
+ 	};
+ 
+-	dsa at 0 {
+-		compatible = "marvell,dsa";
+-		dsa,ethernet = <&eth1>;
+-		dsa,mii-bus = <&mdio>;
+-		pinctrl-0 = <&clearfog_dsa0_clk_pins &clearfog_dsa0_pins>;
+-		pinctrl-names = "default";
+-		#address-cells = <2>;
+-		#size-cells = <0>;
+-
+-		switch at 0 {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			reg = <4 0>;
+-
+-			port at 0 {
+-				reg = <0>;
+-				label = "lan5";
+-			};
+-
+-			port at 1 {
+-				reg = <1>;
+-				label = "lan4";
+-			};
+-
+-			port at 2 {
+-				reg = <2>;
+-				label = "lan3";
+-			};
+-
+-			port at 3 {
+-				reg = <3>;
+-				label = "lan2";
+-			};
+-
+-			port at 4 {
+-				reg = <4>;
+-				label = "lan1";
+-			};
+-
+-			port at 5 {
+-				reg = <5>;
+-				label = "cpu";
+-			};
+-
+-			port at 6 {
+-				/* 88E1512 external phy */
+-				reg = <6>;
+-				label = "lan6";
+-				fixed-link {
+-					speed = <1000>;
+-					full-duplex;
+-				};
+-			};
+-		};
+-	};
+-
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
+ 		pinctrl-0 = <&rear_button_pins>;
 -- 
 2.7.4
