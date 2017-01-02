@@ -1,36 +1,48 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Mon, 2 Jan 2017 16:49:16 +0900
-Subject: [PATCH v3 1/3] ARM: dts: imx6: Add Savageboard common file
-In-Reply-To: <20170102074422.GH20956@dragon>
-References: <20161209010436.7994-1-woogyom.kim@gmail.com>
- <20161209010436.7994-2-woogyom.kim@gmail.com> <20170102065239.GC20956@dragon>
- <450d89c7-7459-6369-3a07-cc60d70de0db@gmail.com>
- <20170102074422.GH20956@dragon>
-Message-ID: <2de3ba17-91d7-65c2-9a8e-897a8b96d8d8@gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 2 Jan 2017 13:34:29 +0530
+Subject: [v2, 1/4] ARM: davinci: da8xx-dt: Add ti-aemif lookup for clock
+ matching
+In-Reply-To: <33cf2e96-6551-df6a-8a30-bf2c3aeabfee@lechnology.com>
+References: <20160810110032.29295-2-kbeldan@baylibre.com>
+ <33cf2e96-6551-df6a-8a30-bf2c3aeabfee@lechnology.com>
+Message-ID: <72eb6441-6463-abd8-65e6-06772b925999@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 01/02/2017 04:44 PM, Shawn Guo wrote:
-> On Mon, Jan 02, 2017 at 04:31:07PM +0900, Milo Kim wrote:
+On Saturday 31 December 2016 06:22 AM, David Lechner wrote:
+> On 08/10/2016 06:00 AM, Karl Beldan wrote:
+>> Many davinci boards (da830 and da850 families) don't have their clocks
+>> in DT yet and won't be successful in getting an unnamed aemif clock
+>> without explicitly registering them via clk_lookups, failing the
+>> ti-aemif memory driver probe.
 >>
->> On 01/02/2017 03:52 PM, Shawn Guo wrote:
->>>> +	panel {
->>>> +		compatible = "avic, tm097tdh02", "hannstar,hsd100pxn1";
->>> "avic, tm097tdh02" is an undocumented compatible.
->>>
+>> The current aemif lookup entry resolving to the same clock:
+>>     'CLK(NULL,               "aemif",        &aemif_clk)'
+>> remains, as it is currently used (davinci_nand is getting a named clock
+>> "aemif").
 >>
->> AVIC TM097TDH02 panel is compatible with Hannstar HSD100PXN1, so I
->> reuse it. It's the same rule as the usage of imx6q I2C controller.
+>> This change will allow to switch from the mach-davinci aemif code to
+>> the ti-aemif memory driver.
 >>
->> 	i2c2: i2c at 021a4000 {
->> 		compatible = "fsl,imx6q-i2c", "fsl,imx21-i2c";
->> 	};
->
-> Forgot to ask, is the "avic" Shanghai AVIC Optoelectronics Co., Ltd. as
-> documented in vendor-prefixes.txt?
+>> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+>> ---
+> 
+> FYI, I can't boot LEGO MINDSTORMS EV3 (AM1908) with a v4.9 mainline
+> kernel. I did a git bisect and traced it down to this patch. I'm
+> guessing that simply reverting it will break other things.
+> 
+> The problem is that &aemif_clk is a node in a linked list and points to
+> itself, which creates an infinite loop when looking up the usb clocks
+> that are later in the list.
+> 
+> I thought there was a patch to fix this properly from one of the Bay
+> Libre guys to fix this already, but I can't seem to find it at the
+> moment. When it is found, it would be good to have it applied to the 4.9
+> stable and 4.10 mainline trees.
 
-Yes, right.
+Yes, a patch was submitted. It is pending in my queue since I need to do
+a few experiments myself to determine if its the best solution possible.
+Thanks for the heads-up on need to mark it for v4.9 stable. Will do.
 
-Best regards,
-Milo
+Thanks,
+Sekhar
