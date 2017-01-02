@@ -1,32 +1,31 @@
 From: michael@amarulasolutions.com (Michael Trimarchi)
-Date: Mon, 2 Jan 2017 09:21:41 +0100
-Subject: [PATCH 16/37] ARM: dts: imx6qdl-icore-rqs: Correct license text
-In-Reply-To: <20161214235746.7108-17-alexandre.belloni@free-electrons.com>
+Date: Mon, 2 Jan 2017 09:22:24 +0100
+Subject: [PATCH 23/37] ARM: dts: imx6q-icore-rqs: Correct license text
+In-Reply-To: <20161214235746.7108-24-alexandre.belloni@free-electrons.com>
 References: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
- <20161214235746.7108-17-alexandre.belloni@free-electrons.com>
-Message-ID: <20170102082140.GA4277@panicking>
+ <20161214235746.7108-24-alexandre.belloni@free-electrons.com>
+Message-ID: <20170102082222.GB4277@panicking>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2016 at 12:57:25AM +0100, Alexandre Belloni wrote:
+On Thu, Dec 15, 2016 at 12:57:32AM +0100, Alexandre Belloni wrote:
 > The license test has been mangled at some point then copy pasted across
 > multiple files. Restore it to what it should be.
 > Note that this is not intended as a license change.
 > 
 > Cc: Michael Trimarchi <michael@amarulasolutions.com>
-> Cc: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
 > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > ---
->  arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi | 10 +++++-----
+>  arch/arm/boot/dts/imx6q-icore-rqs.dts | 10 +++++-----
 >  1 file changed, 5 insertions(+), 5 deletions(-)
 > 
 
 Acked-by: Michael Trimarchi <michael@amarulasolutions.com>
 
-> diff --git a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-> index d5c3aa88adbe..ed60d72b06b9 100644
-> --- a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+> diff --git a/arch/arm/boot/dts/imx6q-icore-rqs.dts b/arch/arm/boot/dts/imx6q-icore-rqs.dts
+> index 005318865f66..45be9745c0e6 100644
+> --- a/arch/arm/boot/dts/imx6q-icore-rqs.dts
+> +++ b/arch/arm/boot/dts/imx6q-icore-rqs.dts
 > @@ -10,17 +10,17 @@
 >   *     modify it under the terms of the GNU General Public License
 >   *     version 2 as published by the Free Software Foundation.
