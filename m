@@ -1,45 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 2 Jan 2017 10:10:59 -0800
-Subject: 4.10-rc1 on Nokia N900: regression, WARN_ON() omap_l3_smx.c
-In-Reply-To: <20161229231411.GA6865@amd>
-References: <20161229231411.GA6865@amd>
-Message-ID: <20170102181058.GF9325@atomide.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Mon, 2 Jan 2017 10:19:55 -0800
+Subject: [PATCH] pinctrl: qcom: msm8660: rename some SDC1->SDC4
+In-Reply-To: <20170102084228.7890-1-linus.walleij@linaro.org>
+References: <20170102084228.7890-1-linus.walleij@linaro.org>
+Message-ID: <20170102181955.GB23061@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [161229 15:14]:
-> Hi!
+On Mon 02 Jan 00:42 PST 2017, Linus Walleij wrote:
+
+> These four pins are for SDC4, not SDC1. They are grouped for
+> SDC4 later in the file so this must be a typo.
 > 
-> I forgot I had v4.10-rc1 running, and now I got warning on all the
-> consoles (hand-copied).
-> 
-> 
-> Unhandled fault: external abort on non-linefetch (0x1028) at
-> 0xfa0ab060
-> ...
-> Comm: kworker/0:0 Not tainted.
-> Workqueue: events musb_irq_work
-> ...
-> PC is at musb_default_readb().
-> ...
+> Cc: Bj?rn Andersson <bjorn.andersson@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-This means the clocks are not enabled at that point.
-
-> WARNING: CPU: 0 ... at drivers/bus/omap_l3_smx.c:166
-> omap3_l3_app_irq+0xcc/...
-> Tainted: GDW.
-
-If you comment out postcore_initcall_sync(omap3_l3_init);
-in drivers/bus/omap_l3_smx.c you'll see the proper stack
-trace instead of the l3 interrupt trace. The system will
-hang at that point most likely.
-
-> I do have patches to allow nfsroot over usb. But they worked ok in
-> v4.9... Does anyone see it, too?
-
-Hmm not much has changed since v4.9. Are you sure you
-had v4.9 or some earlier v4.9-rc version?
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
 Regards,
+Bjorn
 
-Tony
+> ---
+>  drivers/pinctrl/qcom/pinctrl-msm8660.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/qcom/pinctrl-msm8660.c b/drivers/pinctrl/qcom/pinctrl-msm8660.c
+> index 5591d093bf78..bb71dd1e6279 100644
+> --- a/drivers/pinctrl/qcom/pinctrl-msm8660.c
+> +++ b/drivers/pinctrl/qcom/pinctrl-msm8660.c
+> @@ -193,9 +193,9 @@ static const struct pinctrl_pin_desc msm8660_pins[] = {
+>  	PINCTRL_PIN(171, "GPIO_171"),
+>  	PINCTRL_PIN(172, "GPIO_172"),
+>  
+> -	PINCTRL_PIN(173, "SDC1_CLK"),
+> -	PINCTRL_PIN(174, "SDC1_CMD"),
+> -	PINCTRL_PIN(175, "SDC1_DATA"),
+> +	PINCTRL_PIN(173, "SDC4_CLK"),
+> +	PINCTRL_PIN(174, "SDC4_CMD"),
+> +	PINCTRL_PIN(175, "SDC4_DATA"),
+>  	PINCTRL_PIN(176, "SDC3_CLK"),
+>  	PINCTRL_PIN(177, "SDC3_CMD"),
+>  	PINCTRL_PIN(178, "SDC3_DATA"),
+> -- 
+> 2.9.3
+> 
