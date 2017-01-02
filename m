@@ -1,47 +1,44 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Jan 2017 14:22:28 +0000
-Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
- enable panel
-In-Reply-To: <CACRpkdZE6VgJA27+Wh=Gxd7yOXpLMyT7yCB2PYA36y0gvosHFQ@mail.gmail.com>
-References: <20161221032717.13154-1-vz@mleia.com>
- <CACRpkdZE6VgJA27+Wh=Gxd7yOXpLMyT7yCB2PYA36y0gvosHFQ@mail.gmail.com>
-Message-ID: <20170102142228.GI14217@n2100.armlinux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 2 Jan 2017 15:34:32 +0100
+Subject: [PATCH 15/20] ARM/hw_breakpoint: Convert to hotplug state machine
+In-Reply-To: <CACRpkdZE+h0+3EizLCMUr-e-4pv4w9iAatSqL8k0Ovd2iUaS8Q@mail.gmail.com>
+References: <20161117183541.8588-1-bigeasy@linutronix.de>
+ <20161117183541.8588-16-bigeasy@linutronix.de>
+ <CACRpkdZE+h0+3EizLCMUr-e-4pv4w9iAatSqL8k0Ovd2iUaS8Q@mail.gmail.com>
+Message-ID: <CACRpkda2gdjM--LSoJTL0dvqyw796w1hMSAhUQwv9X0EPzJHig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 30, 2016 at 09:23:59AM +0100, Linus Walleij wrote:
-> On Wed, Dec 21, 2016 at 4:27 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
-> 
-> > The changeset contains a number of cleanups, changed semantics of
-> > init_panel() callback, which allows to simplify getting of panel
-> > properties from panel device tree node, and a handling of optional
-> > "enable-gpios" panel property, the latter is described in
-> > display/panel/panel-dpi.txt device tree binding documentation, but
-> > it has been unsupported by the ARM CLCD driver.
-> >
-> > Vladimir Zapolskiy (4):
-> >   video: ARM CLCD: sort included headers out alphabetically
-> >   video: ARM CLCD: use panel device node for panel initialization
-> >   video: ARM CLCD: use panel device node for getting backlight and mode
-> >   video: ARM CLCD: add support of an optional GPIO to enable panel
-> 
-> As you may have seen Tomi has stepped down as FBDEV maintainer and
-> this subsystem is now orphaned.
-> 
-> I guess Andrew Morton merges patches for it in this case, he usually does.
-> 
-> But what we should actually do is create a new DRM driver for CLCD
-> in drivers/gpu/drm/arm/clcd*
-> 
-> It's maybe not a small undertaking :(
-> 
-> But in case you're interested in the job, I will pitch in and test the result
-> on all ARM reference designs plus Nomadik.
+On Mon, Jan 2, 2017 at 3:15 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-A DRM driver for it would probably be a good idea, but dealing with all
-the weird and wonderful connection arrangements may not be that easy...
+> Something hits a brick wall when initializing the hardware breakpoints.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Should be noted that since I'm not using the breakpoints, the dirtyfix is to put
+
+return 0;
+
+in the first line of arch_hw_breakpoint_init() in
+arch/arm/kernel/hw_breakpoint.c
+
+I suspect that is not an accepable solution ...
+
+It hangs at PC is at write_wb_reg+0x20c/0x330
+Which is c03101dc, and looks like this in objdump -d:
+
+c031020c:       ee001eba        mcr     14, 0, r1, cr0, cr10, {5}
+c0310210:       eaffffb3        b       c03100e4 <write_wb_reg+0x114>
+c0310214:       ee001eb9        mcr     14, 0, r1, cr0, cr9, {5}
+c0310218:       eaffffb1        b       c03100e4 <write_wb_reg+0x114>
+c031021c:       ee001eb8        mcr     14, 0, r1, cr0, cr8, {5}
+c0310220:       eaffffaf        b       c03100e4 <write_wb_reg+0x114>
+c0310224:       ee001eb7        mcr     14, 0, r1, cr0, cr7, {5}
+c0310228:       eaffffad        b       c03100e4 <write_wb_reg+0x114>
+c031022c:       ee001eb6        mcr     14, 0, r1, cr0, cr6, {5}
+c0310230:       eaffffab        b       c03100e4 <write_wb_reg+0x114>
+c0310234:       ee001eb5        mcr     14, 0, r1, cr0, cr5, {5}
+c0310238:       eaffffa9        b       c03100e4 <write_wb_reg+0x114>
+
+No idea if this helps.
+
+Yours,
+Linus Walleij
