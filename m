@@ -1,53 +1,32 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 2 Jan 2017 15:47:07 +0100
-Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
-In-Reply-To: <20170102113155.GA16373@localhost.localdomain>
-References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
- <BN3PR07MB2516815EDE69ACDCE27F81A3C96F0@BN3PR07MB2516.namprd07.prod.outlook.com>
- <20170102113155.GA16373@localhost.localdomain>
-Message-ID: <0717c63b-2e29-9ad1-7f01-39817980933f@atmel.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Mon, 02 Jan 2017 14:55:32 +0000
+Subject: [PATCH] ARM: dts: armada388-clearfog: fix SPI flash #size-cells
+Message-ID: <E1cO41M-0007xc-Id@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 02/01/2017 ? 12:31, Richard Cochran a ?crit :
-> On Mon, Jan 02, 2017 at 09:36:10AM +0000, Rafal Ozieblo wrote:
->> According Cadence Hardware team:
->> "It is just that some customers prefer to have the time in the descriptors as that is provided per frame.
->> The registers are simply overwritten when a new event frame is transmitted/received and so software could miss it."
->> The question is are you sure that you read timestamp for current frame? (not for the next frame).
-> 
-> AFAICT, having the time stamp in the descriptor is not universally
-> supported.  Looking at the Xilinx Zynq 7000 TRM, I can't find any
-> mention of this.
+The SPI flash #size-cells is specified in the binding documentation to
+have value 1, but we were setting it to zero.  This wasn't causing any
+problem as we do not list any partitions, but it's worth specifying
+correctly if we're going to specify it at all.
 
-This is why I proposed to address options incrementally: without
-timestamp support in descriptor (this patch series), then adding this
-feature in another patch series.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/boot/dts/armada-388-clearfog.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Rafal, this is why Andrei noted that the case covered by this series is
-not adapted to GEM-GXL and doesn't address the "timestamp in descriptor"
-case.
-
-> This Cadence IP core is a complete disaster.
-
-Well, it evolved and propose several options to different SoC
-integrators. This is not something unusual...
-I suspect as well that some other network adapters have the same
-weakness concerning PTP timestamp in single register as the early
-revisions of this IP.
-
-> Unless someone can tell us how this IP works in all of its
-> incarnations, this series is going nowhere.
-
-We're already as v4 (thanks to your fruitful contributions BTW) for this
-series and will try to add features for other IP options & revisions
-incrementally.
-I suspect that Rafal tend to jump too quickly to the latest IP revisions
-and add more options to this series: let's not try to pour too much
-things into this code right now.
-
-FYI, Andrei will be back online next week.
-
-Regards,
+diff --git a/arch/arm/boot/dts/armada-388-clearfog.dts b/arch/arm/boot/dts/armada-388-clearfog.dts
+index 71ce201c903e..3e7c3a6237c3 100644
+--- a/arch/arm/boot/dts/armada-388-clearfog.dts
++++ b/arch/arm/boot/dts/armada-388-clearfog.dts
+@@ -437,7 +437,7 @@
+ 
+ 	spi-flash at 0 {
+ 		#address-cells = <1>;
+-		#size-cells = <0>;
++		#size-cells = <1>;
+ 		compatible = "w25q32", "jedec,spi-nor";
+ 		reg = <0>; /* Chip select 0 */
+ 		spi-max-frequency = <3000000>;
 -- 
-Nicolas Ferre
+2.7.4
