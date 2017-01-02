@@ -1,62 +1,43 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Mon,  2 Jan 2017 22:57:03 +0200
-Subject: [PATCH 1/3] ARM: OMAP1: USB: tidy up logging output
-Message-ID: <20170102205705.19001-1-aaro.koskinen@iki.fi>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 2 Jan 2017 21:06:04 +0000
+Subject: [PATCH 1/5] ARM: wire up HWCAP2 feature bits to the CPU modalias
+In-Reply-To: <20161031161319.GF1041@n2100.armlinux.org.uk>
+References: <1476787939-21889-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1476787939-21889-2-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu_y7e=sJT+7FNj846NczgpNOdVx53SDC7dupmN-3ztNwA@mail.gmail.com>
+ <20161031161319.GF1041@n2100.armlinux.org.uk>
+Message-ID: <CAKv+Gu-hLD0xnLyywceJvPiB8ZkENNwWZTM--OHFvzw6MahYmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KERN_CONT/pr_cont is now required to continue log messages, use that.
+On 31 October 2016 at 16:13, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Sat, Oct 29, 2016 at 11:08:36AM +0100, Ard Biesheuvel wrote:
+>> On 18 October 2016 at 11:52, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> > Wire up the generic support for exposing CPU feature bits via the
+>> > modalias in /sys/device/system/cpu. This allows udev to automatically
+>> > load modules for things like crypto algorithms that are implemented
+>> > using optional instructions.
+>> >
+>> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> > ---
+>> >  arch/arm/Kconfig                  |  1 +
+>> >  arch/arm/include/asm/cpufeature.h | 32 ++++++++++++++++++++
+>> >  2 files changed, 33 insertions(+)
+>> >
+>>
+>> Russell,
+>>
+>> do you have any concerns regarding this patch? If not, I will drop it
+>> into the patch system.
+>
+> It's still something I need to look at... I've been offline last week,
+> and sort-of offline the previous week, so I'm catching up.
+>
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
----
- arch/arm/mach-omap1/usb.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+Hi Russell,
 
-diff --git a/arch/arm/mach-omap1/usb.c b/arch/arm/mach-omap1/usb.c
-index 2506e59..d4aa118 100644
---- a/arch/arm/mach-omap1/usb.c
-+++ b/arch/arm/mach-omap1/usb.c
-@@ -95,17 +95,17 @@ omap_otg_init(struct omap_usb_config *config)
- 
- 	printk("USB: hmc %d", config->hmc_mode);
- 	if (!alt_pingroup)
--		printk(", usb2 alt %d wires", config->pins[2]);
-+		pr_cont(", usb2 alt %d wires", config->pins[2]);
- 	else if (config->pins[0])
--		printk(", usb0 %d wires%s", config->pins[0],
-+		pr_cont(", usb0 %d wires%s", config->pins[0],
- 			is_usb0_device(config) ? " (dev)" : "");
- 	if (config->pins[1])
--		printk(", usb1 %d wires", config->pins[1]);
-+		pr_cont(", usb1 %d wires", config->pins[1]);
- 	if (!alt_pingroup && config->pins[2])
--		printk(", usb2 %d wires", config->pins[2]);
-+		pr_cont(", usb2 %d wires", config->pins[2]);
- 	if (config->otg)
--		printk(", Mini-AB on usb%d", config->otg - 1);
--	printk("\n");
-+		pr_cont(", Mini-AB on usb%d", config->otg - 1);
-+	pr_cont("\n");
- 
- 	if (cpu_class_is_omap1()) {
- 		u16 w;
-@@ -573,13 +573,13 @@ static void __init omap_1510_usb_init(struct omap_usb_config *config)
- 
- 	printk("USB: hmc %d", config->hmc_mode);
- 	if (config->pins[0])
--		printk(", usb0 %d wires%s", config->pins[0],
-+		pr_cont(", usb0 %d wires%s", config->pins[0],
- 			is_usb0_device(config) ? " (dev)" : "");
- 	if (config->pins[1])
--		printk(", usb1 %d wires", config->pins[1]);
-+		pr_cont(", usb1 %d wires", config->pins[1]);
- 	if (config->pins[2])
--		printk(", usb2 %d wires", config->pins[2]);
--	printk("\n");
-+		pr_cont(", usb2 %d wires", config->pins[2]);
-+	pr_cont("\n");
- 
- 	/* use DPLL for 48 MHz function clock */
- 	pr_debug("APLL %04x DPLL %04x REQ %04x\n", omap_readw(ULPD_APLL_CTRL),
--- 
-2.9.2
+Any thoughts yet?
+
+Thanks,
+Ard.
