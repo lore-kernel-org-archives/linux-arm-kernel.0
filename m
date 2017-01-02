@@ -1,84 +1,42 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon,  2 Jan 2017 21:31:38 +0800
-Subject: [PATCH v6 07/14] irqchip: gicv3-its: platform-msi: scan MADT to
- create platform msi domain
+Date: Mon,  2 Jan 2017 21:31:39 +0800
+Subject: [PATCH v6 08/14] ACPI: ARM64: IORT: rework iort_node_get_id()
 In-Reply-To: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
 References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1483363905-2806-8-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1483363905-2806-9-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the introduction of its_pmsi_init_one(), we can add some code
-on top for ACPI support of platform MSI.
+iort_node_get_id() has two output, one is the mapped ids,
+the other is the referenced parent node which is returned
+from the function.
 
-We are scanning the MADT table to get the ITS entry(ies), then use
-the information to create the platform msi domain for devices connect
-to it, just like the PCI MSI for ITS did.
+For now we need a API just return its parent node for
+single mapping, so just update this function slightly then
+reuse it later.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Sinan Kaya <okaya@codeaurora.org>
 Tested-by: Majun <majun258@huawei.com>
 Tested-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Tomasz Nowicki <tn@semihalf.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- drivers/irqchip/irq-gic-v3-its-platform-msi.c | 36 +++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ drivers/acpi/arm64/iort.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-index ff72704..0be0437 100644
---- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-@@ -105,6 +105,41 @@ static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
- 	return 0;
- }
- 
-+#ifdef CONFIG_ACPI
-+static int __init
-+its_pmsi_parse_madt(struct acpi_subtable_header *header,
-+			const unsigned long end)
-+{
-+	struct acpi_madt_generic_translator *its_entry;
-+	struct fwnode_handle *domain_handle;
-+	const char *node_name;
-+	int err = -ENXIO;
-+
-+	its_entry = (struct acpi_madt_generic_translator *)header;
-+	node_name = kasprintf(GFP_KERNEL, "ITS at 0x%lx",
-+			      (long)its_entry->base_address);
-+	domain_handle = iort_find_domain_token(its_entry->translation_id);
-+	if (!domain_handle) {
-+		pr_err("%s: Unable to locate ITS domain handle\n", node_name);
-+		goto out;
-+	}
-+
-+	err = its_pmsi_init_one(domain_handle, node_name);
-+
-+out:
-+	kfree(node_name);
-+	return err;
-+}
-+
-+static void __init its_acpi_pmsi_init(void)
-+{
-+	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
-+			      its_pmsi_parse_madt, 0);
-+}
-+#else
-+static inline void its_acpi_pmsi_init(void) { }
-+#endif
-+
- static void __init its_pmsi_of_init(void)
- {
- 	struct device_node *np;
-@@ -121,6 +156,7 @@ static void __init its_pmsi_of_init(void)
- static int __init its_pmsi_init(void)
- {
- 	its_pmsi_of_init();
-+	its_acpi_pmsi_init();
- 	return 0;
- }
- early_initcall(its_pmsi_init);
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index ab7bae7..bc68d93 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -347,7 +347,8 @@ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
+ 	if (map[index].flags & ACPI_IORT_ID_SINGLE_MAPPING) {
+ 		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
+ 		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
+-			*id_out = map[index].output_base;
++			if (id_out)
++				*id_out = map[index].output_base;
+ 			return parent;
+ 		}
+ 	}
 -- 
 1.9.1
