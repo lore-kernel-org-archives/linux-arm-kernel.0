@@ -1,76 +1,52 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 02 Jan 2017 15:27:32 +0000
-Subject: [PATCH 5/5] ARM: dts: armada388-clearfog: move uart nodes
-In-Reply-To: <E1cO4UH-0008SR-GW@rmk-PC.armlinux.org.uk>
-References: <E1cO4UH-0008SR-GW@rmk-PC.armlinux.org.uk>
-Message-ID: <E1cO4WK-00006O-3M@rmk-PC.armlinux.org.uk>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon,  2 Jan 2017 12:38:02 -0300
+Subject: [PATCH] crypto: picoxcell - Fix module autoload for non-OF
+ registration
+Message-ID: <1483371482-4956-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the uart nodes over to use the label form to reference the serial
-devices, rather than replicating the device node path.
+If the driver is built as a module, autoload won't work because the module
+alias information is not filled. So user-space can't match the registered
+device with the corresponding module if the device isn't registered via OF.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Export the module alias information using the MODULE_DEVICE_TABLE() macro.
+
+Before this patch:
+
+$ modinfo drivers/crypto/picoxcell_crypto.ko | grep alias
+alias:          of:N*T*Cpicochip,spacc-l2C*
+alias:          of:N*T*Cpicochip,spacc-l2
+alias:          of:N*T*Cpicochip,spacc-ipsecC*
+alias:          of:N*T*Cpicochip,spacc-ipsec
+
+After this patch:
+
+$ modinfo drivers/crypto/picoxcell_crypto.ko | grep alias
+alias:          of:N*T*Cpicochip,spacc-l2C*
+alias:          of:N*T*Cpicochip,spacc-l2
+alias:          of:N*T*Cpicochip,spacc-ipsecC*
+alias:          of:N*T*Cpicochip,spacc-ipsec
+alias:          platform:picochip,spacc-l2
+alias:          platform:picochip,spacc-ipsec
+
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
- arch/arm/boot/dts/armada-388-clearfog.dtsi          | 14 +++++++-------
- arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi | 12 ++++++------
- 2 files changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-388-clearfog.dtsi b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-index 6149699eefc2..0f5938bede53 100644
---- a/arch/arm/boot/dts/armada-388-clearfog.dtsi
-+++ b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-@@ -93,13 +93,6 @@
- 				wp-inverted;
- 			};
+ drivers/crypto/picoxcell_crypto.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/crypto/picoxcell_crypto.c b/drivers/crypto/picoxcell_crypto.c
+index 47576098831f..64449b7c00af 100644
+--- a/drivers/crypto/picoxcell_crypto.c
++++ b/drivers/crypto/picoxcell_crypto.c
+@@ -1808,6 +1808,7 @@ static const struct platform_device_id spacc_id_table[] = {
+ 	{ "picochip,spacc-l2", },
+ 	{ }
+ };
++MODULE_DEVICE_TABLE(platform, spacc_id_table);
  
--			serial at 12100 {
--				/* mikrobus uart */
--				pinctrl-0 = <&mikro_uart_pins>;
--				pinctrl-names = "default";
--				status = "okay";
--			};
--
- 			usb at 58000 {
- 				/* CON3, nearest  power. */
- 				status = "okay";
-@@ -305,3 +298,10 @@
- 	pinctrl-names = "default";
- 	status = "okay";
- };
-+
-+&uart1 {
-+	/* mikrobus uart */
-+	pinctrl-0 = <&mikro_uart_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi b/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-index 681962a6395b..458884ff4c8c 100644
---- a/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-+++ b/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-@@ -69,12 +69,6 @@
- 				 */
- 				status = "okay";
- 			};
--
--			serial at 12000 {
--				pinctrl-0 = <&uart0_pins>;
--				pinctrl-names = "default";
--				status = "okay";
--			};
- 		};
- 	};
- };
-@@ -144,3 +138,9 @@
- 		status = "disabled";
- 	};
- };
-+
-+&uart0 {
-+	pinctrl-0 = <&uart0_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+};
+ static struct platform_driver spacc_driver = {
+ 	.probe		= spacc_probe,
 -- 
 2.7.4
