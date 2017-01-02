@@ -1,17 +1,18 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 2 Jan 2017 08:35:21 -0200
-Subject: [PATCH] ARM: imx: Add rtc support to i.MX31 PDK board.
-In-Reply-To: <1483352282-28970-1-git-send-email-lilja.magnus@gmail.com>
-References: <1483352282-28970-1-git-send-email-lilja.magnus@gmail.com>
-Message-ID: <CAOMZO5AC3JpDvYaezzR2Wm63=i9p9p4K2xyH9uTTXFawnWLUuw@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 2 Jan 2017 16:08:49 +0530
+Subject: [PATCH] ARM: dts: da850-lcdk: add gpio-keys
+In-Reply-To: <1482141234-11546-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1482141234-11546-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <94114225-66c8-8bd5-1f17-01fabd870857@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 2, 2017 at 8:18 AM, Magnus Lilja <lilja.magnus@gmail.com> wrote:
-> Enable support for i.MX31 RTC on the PDK board.
->
-> Tested on actual hardware.
->
-> Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
+On Monday 19 December 2016 03:23 PM, Bartosz Golaszewski wrote:
+> Add a gpio-keys node for two user buttons present on the board.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Applied to v4.11/dt
+
+Thanks,
+Sekhar
