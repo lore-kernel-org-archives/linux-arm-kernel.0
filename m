@@ -1,58 +1,26 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Mon, 2 Jan 2017 16:00:51 +0000
-Subject: [PATCH v2 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
- stores scenario in vdma
-In-Reply-To: <45807619-bf6a-0174-c102-12c03aeb575c@synopsys.com>
-References: <1482483135-14767-1-git-send-email-appanad@xilinx.com>
- <1482483135-14767-3-git-send-email-appanad@xilinx.com>
- <a269409d-103e-1650-5df6-cc8743ed62cf@synopsys.com>
- <C246CAC1457055469EF09E3A7AC4E11A4A65FFE9@XAP-PVEXMBX01.xlnx.xilinx.com>
- <45807619-bf6a-0174-c102-12c03aeb575c@synopsys.com>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A66012C@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Mon, 2 Jan 2017 17:03:03 +0100
+Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <CAFcVECLg-hXvfgwRW-fxi+N0k=7pTaEMhS5EMXV9_OO+xGRUqA@mail.gmail.com>
+References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
+ <BN3PR07MB2516815EDE69ACDCE27F81A3C96F0@BN3PR07MB2516.namprd07.prod.outlook.com>
+ <20170102113155.GA16373@localhost.localdomain>
+ <CAFcVECLg-hXvfgwRW-fxi+N0k=7pTaEMhS5EMXV9_OO+xGRUqA@mail.gmail.com>
+Message-ID: <20170102160303.GC3609@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jose Miguel Abreu,
+On Mon, Jan 02, 2017 at 05:13:34PM +0530, Harini Katakam wrote:
+> From the revision history of Cadence spec, all versions starting
+> r1p02 have ability to include timestamp in descriptors.
 
-	Thanks for the review...
+So why not add code to read the version, hm?
 
-[snip]...
-> 
-> I just noticed there is a write to XILINX_DMA_REG_FRMSTORE which, by the
-> description in the VDMA databook, allows to modify the total number of
-> framebuffers.
-> 
-> Does it correct this situation: Lets assume VDMA has 10 framebuffers in HW and
-> user only submits 5 descriptors. Then vsize will be programmed and VDMA will
-> start. The VDMA will start in fb 1, then 2, ... until 5 its all ok. But then after the fb
-> 5 the VDMA will jump to fb 6, this fb will have no address because the user only
-> submitted 5 addresses so VDMA will try to write to location 0x0 of system mem
-> (if using S2MM channel). ?
-> 
-> If so then there is no race condition, but the HW image that I have does not
-> have this register enabled so I was getting this result (memory corruption
-> because not all framebuffers had addresses set).
+> For previous versions the event register is the only option.
 
-Thanks for the explanation. 
-Agree the issue that you mentioned won't come when XILINX_DMA_REG_FRMSTORE
-(C_ENABLE_DEBUG_INFO_5 and C_ENABLE_DEBUG_INFO_13) Register is enabled in the IP.
-But this register won't get enabled with the default IP configuration (C_ENABLE_DEBUG_INFO_5 and C_ENABLE_DEBUG_INFO_13).
+And is it true that the regsiters do not latch the time stamp?
 
-When user is not enabled XILINX_DMA_REG_FRMSTORE in the h/w and submits frames less than h/w capable.
-The solution that I am thinking is to throw an error in the driver saying that either enable the
-num frame store feature in the IP or submit the frames up to h/w capable what do you think???
+If so, then the IP core is more than useless.
 
-Regards,
-Kedar.
-
-> 
-> Best regards,
-> Jose Miguel Abreu
-> 
-> >
-> > Regards,
-> > Kedar.
-> >
-> >> Best regards,
-> >> Jose Miguel Abreu
-> >>
+Thanks,
+Richard
