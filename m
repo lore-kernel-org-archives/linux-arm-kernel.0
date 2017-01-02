@@ -1,81 +1,36 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Mon,  2 Jan 2017 10:33:27 +0100
-Subject: [PATCH RESEND] dmaengine: stm32-dma: Rework starting transfer
- management
-Message-ID: <1483349607-16870-1-git-send-email-cedric.madianga@gmail.com>
+From: rafalo@cadence.com (Rafal Ozieblo)
+Date: Mon, 2 Jan 2017 09:36:10 +0000
+Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
+References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com> 
+Message-ID: <BN3PR07MB2516815EDE69ACDCE27F81A3C96F0@BN3PR07MB2516.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch reworks the way to manage transfer starting.
-Now, starting DMA is only allowed when the channel is not busy.
-Then, stm32_dma_start_transfer is declared as void.
-At least, after each transfer completion, we start the next transfer if a
-new descriptor as been queued in the issued list during an ongoing
-transfer.
-
-Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-Reviewed-by: Ludovic BARRE <ludovic.barre@st.com>
----
- drivers/dma/stm32-dma.c | 20 +++++++++-----------
- 1 file changed, 9 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
-index 3056ce7..adb846c 100644
---- a/drivers/dma/stm32-dma.c
-+++ b/drivers/dma/stm32-dma.c
-@@ -421,7 +421,7 @@ static void stm32_dma_dump_reg(struct stm32_dma_chan *chan)
- 	dev_dbg(chan2dev(chan), "SFCR:  0x%08x\n", sfcr);
- }
- 
--static int stm32_dma_start_transfer(struct stm32_dma_chan *chan)
-+static void stm32_dma_start_transfer(struct stm32_dma_chan *chan)
- {
- 	struct stm32_dma_device *dmadev = stm32_dma_get_dev(chan);
- 	struct virt_dma_desc *vdesc;
-@@ -432,12 +432,12 @@ static int stm32_dma_start_transfer(struct stm32_dma_chan *chan)
- 
- 	ret = stm32_dma_disable_chan(chan);
- 	if (ret < 0)
--		return ret;
-+		return;
- 
- 	if (!chan->desc) {
- 		vdesc = vchan_next_desc(&chan->vchan);
- 		if (!vdesc)
--			return -EPERM;
-+			return;
- 
- 		chan->desc = to_stm32_dma_desc(vdesc);
- 		chan->next_sg = 0;
-@@ -471,7 +471,7 @@ static int stm32_dma_start_transfer(struct stm32_dma_chan *chan)
- 
- 	chan->busy = true;
- 
--	return 0;
-+	dev_dbg(chan2dev(chan), "vchan %p: started\n", &chan->vchan);
- }
- 
- static void stm32_dma_configure_next_sg(struct stm32_dma_chan *chan)
-@@ -552,15 +552,13 @@ static void stm32_dma_issue_pending(struct dma_chan *c)
- {
- 	struct stm32_dma_chan *chan = to_stm32_dma_chan(c);
- 	unsigned long flags;
--	int ret;
- 
- 	spin_lock_irqsave(&chan->vchan.lock, flags);
--	if (!chan->busy) {
--		if (vchan_issue_pending(&chan->vchan) && !chan->desc) {
--			ret = stm32_dma_start_transfer(chan);
--			if ((!ret) && (chan->desc->cyclic))
--				stm32_dma_configure_next_sg(chan);
--		}
-+	if (vchan_issue_pending(&chan->vchan) && !chan->desc && !chan->busy) {
-+		dev_dbg(chan2dev(chan), "vchan %p: issued\n", &chan->vchan);
-+		stm32_dma_start_transfer(chan);
-+		if (chan->desc->cyclic)
-+			stm32_dma_configure_next_sg(chan);
- 	}
- 	spin_unlock_irqrestore(&chan->vchan.lock, flags);
- }
--- 
-1.9.1
+> -----Original Message-----
+> From: Rafal Ozieblo 
+> Sent: 28 grudnia 2016 14:23
+> Subject: RE: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
+> 
+> > +static void gem_ptp_tx_hwtstamp(struct macb *bp, struct sk_buff *skb,
+> > +				int peer_ev)
+> > +{
+> > +	struct skb_shared_hwtstamps *shhwtstamps = skb_hwtstamps(skb);
+> > +	struct timespec64 ts;
+> > +	u64 ns;
+> > +
+> > +	/* PTP Peer Event Frame packets */
+> > +	if (peer_ev) {
+> > +		ts.tv_sec = gem_readl(bp, PEFTSL);
+> > +		ts.tv_nsec = gem_readl(bp, PEFTN);
+> > +
+> > +	/* PTP Event Frame packets */
+> > +	} else {
+> > +		ts.tv_sec = gem_readl(bp, EFTSL);
+> > +		ts.tv_nsec = gem_readl(bp, EFTN);
+> > +	}
+> I'm wondering what is a difference between timestamp in transmit buffer descriptor (Word 2 and 3) and PTP Event Frame Transmitted Seconds/Nanoseconds Register (0x1E0, 0x1E4).
+> 
+According Cadence Hardware team:
+"It is just that some customers prefer to have the time in the descriptors as that is provided per frame.
+The registers are simply overwritten when a new event frame is transmitted/received and so software could miss it."
+The question is are you sure that you read timestamp for current frame? (not for the next frame).
