@@ -1,48 +1,33 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon,  2 Jan 2017 14:06:58 -0300
-Subject: [PATCH 2/3] crypto: picoxcell - Remove platform device ID table
-In-Reply-To: <1483376819-26726-1-git-send-email-javier@osg.samsung.com>
-References: <1483376819-26726-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1483376819-26726-3-git-send-email-javier@osg.samsung.com>
+Date: Mon,  2 Jan 2017 14:06:56 -0300
+Subject: [PATCH 0/3] crypto: picoxcell - Cleanups removing non-DT code
+Message-ID: <1483376819-26726-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver is only used in the picoxcell platform and this is DT-only.
+Hello,
 
-So only a OF device ID table is needed and there's no need to have a
-platform device ID table. This patch removes the unneeded table.
+This small series contains a couple of cleanups that removes some driver's code
+that isn't needed due the driver being for a DT-only platform.
 
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
+The changes were suggested by Arnd Bergmann as a response to a previous patch:
+https://lkml.org/lkml/2017/1/2/342
 
- drivers/crypto/picoxcell_crypto.c | 7 -------
- 1 file changed, 7 deletions(-)
+Patch #1 allows the driver to be built when the COMPILE_TEST option is enabled.
+Patch #2 removes the platform ID table since isn't needed for DT-only drivers.
+Patch #3 removes a wrapper function that's also not needed if driver is DT-only.
 
-diff --git a/drivers/crypto/picoxcell_crypto.c b/drivers/crypto/picoxcell_crypto.c
-index 47576098831f..539effbbfc7a 100644
---- a/drivers/crypto/picoxcell_crypto.c
-+++ b/drivers/crypto/picoxcell_crypto.c
-@@ -1803,12 +1803,6 @@ static int spacc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static const struct platform_device_id spacc_id_table[] = {
--	{ "picochip,spacc-ipsec", },
--	{ "picochip,spacc-l2", },
--	{ }
--};
--
- static struct platform_driver spacc_driver = {
- 	.probe		= spacc_probe,
- 	.remove		= spacc_remove,
-@@ -1819,7 +1813,6 @@ static struct platform_driver spacc_driver = {
- #endif /* CONFIG_PM */
- 		.of_match_table	= of_match_ptr(spacc_of_id_table),
- 	},
--	.id_table	= spacc_id_table,
- };
- 
- module_platform_driver(spacc_driver);
+Best regards,
+
+
+Javier Martinez Canillas (3):
+  crypto: picoxcell - Allow driver to build COMPILE_TEST is enabled
+  crypto: picoxcell - Remove platform device ID table
+  crypto: picoxcell - Remove spacc_is_compatible() wrapper function
+
+ drivers/crypto/Kconfig            |  2 +-
+ drivers/crypto/picoxcell_crypto.c | 28 +++-------------------------
+ 2 files changed, 4 insertions(+), 26 deletions(-)
+
 -- 
 2.7.4
