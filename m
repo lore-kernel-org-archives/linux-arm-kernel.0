@@ -1,30 +1,105 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Mon, 2 Jan 2017 14:31:31 +0100
-Subject: [PATCH v7 2/5] i2c: Add STM32F4 I2C driver
-In-Reply-To: <CAOAejn1ocTSvdPWnZ-+DwMfJj45cXXEDc1+=B5d3zCy2Pw+0-A@mail.gmail.com>
-References: <1482413704-17531-1-git-send-email-cedric.madianga@gmail.com>
- <1482413704-17531-3-git-send-email-cedric.madianga@gmail.com>
- <20161223090019.a3jkhpb3abgjqi55@pengutronix.de>
- <CAOAejn3sc1F8T_rbSTr6-wBNncNwObeK+c6=_Q0BMahDdHXxQA@mail.gmail.com>
- <20161228212139.adkixdgvmtj2ukjs@pengutronix.de>
- <CAOAejn1ocTSvdPWnZ-+DwMfJj45cXXEDc1+=B5d3zCy2Pw+0-A@mail.gmail.com>
-Message-ID: <CAOAejn3cxJdXd4i2OQk_fUiZwzUd7-U7Fi-haHUsvWg4xu_uzw@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon,  2 Jan 2017 21:31:31 +0800
+Subject: [PATCH v6 00/14] ACPI platform MSI support and its example mbigen
+Message-ID: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Uwe,
+v5 -> v6:
+	- Call acpi_configure_pmsi_domain() for platform devices in
+	  acpi_platform_notify() as it's cleaner (suggested by Rafael)
+	- Remove the "u8 type" for iort_id_map() because it's unused
+	- Rebase on top of 4.10-rc2
+	- Collect test and review tags
 
->> Is it possible to make it more obvious by doing:
->>
->>         status = read_from_status_register() & read_from_interrupt_enable_register();
->>
->> at a single place?
-Contrary to what I said previously I have to keep possible_status
-variable as for one irq enabled we allow several events.
-For example, ITBUFEN allows to generate an irq for RXNE and for TXE events.
-So, using status = read_from_status_register() &
-read_from_interrupt_enable_register(); is not possible.
+v4 -> v5:
+	- Add mbigen support back with tested on with Agustin's patchset,
+	  and it's a good example of how ACPI platform MSI works
+	- rebased on top of lastest Linus tree (commit 52bce91 splice: reinstate SIGPIPE/EPIPE handling)
 
-Best regards,
+v3 -> v4:
+        - Drop mbi-gen patches to just submit platform msi support because
+          will rebase mbi-gen patches on top of Agustin's patchset, and discusion
+          is going there.
+        - Add a patch to support device topology such as NC(named componant, paltform device)
+          ->SMMU->ITS which suggested by Lorenzo;
+        - rebased on top of Lorenzo's v9 of ACPI IORT ARM SMMU support;
+        - rebased on top of 4.9-rc7
 
-Cedric
+v2 -> v3:
+        - Drop RFC tag
+        - Rebase against v4.9-rc2 and Lorenzo's v6 of ACPI IORT ARM SMMU support [1]
+        - Add 3 cleanup patches (patch 1, 2, 3)
+        - Drop arch_init call patch from last version
+        - Introduce a callback for platform device to set msi domain
+        - Introduce a new API to get paltform device's domain instead of
+          reusing the PCI one in previous version
+        - Add a patch to rework iort_node_get_id()
+
+[1]: http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1251993.html
+
+v1 -> v2:
+        - Fix the bug of if multi Interrupt() resoures in single _PRS,
+          we need to calculate all the irq numbers (I missed it in previous
+          version);
+        - Rebased on Marc's irq/irqchip-4.9 branch and Lorenzo's v5
+          SMMU patches (also Robin's SMMu patches)
+        - Add patch irqchip: mbigen: promote mbigen init.
+
+With platform msi support landed in the kernel, and the introduction
+of IORT for GICv3 ITS (PCI MSI) and SMMU, the framework for platform msi
+is ready, this patch set add few patches to enable the ACPI platform
+msi support.
+
+For platform device connecting to ITS on arm platform, we have IORT
+table with the named componant node to describe the mappings of paltform
+device and ITS, so we can retrieve the dev id and find its parent
+irqdomain (ITS) from IORT table (simlar with the ACPI ITS support).
+
+The fisrt 3 patches are cleanups;
+
+Patch 4,5 are refactoring its_pmsi_prepare() for both DT and ACPI
+then retrieve the dev id from iort;
+
+Patch 6,7 to create platform msi domain to ACPI case which scanned
+the MADT table;
+
+Patch 8,9,10,11 to setup the msi domain for platform device based
+on IORT table.
+
+Patch 12,13,14 convert DT based mbigen driver to support ACPI/DT.
+
+Thanks
+Hanjun
+
+Hanjun Guo (12):
+  ACPI: ARM64: IORT: minor cleanup for iort_match_node_callback()
+  irqchip: gic-v3-its: keep the head file include in alphabetic order
+  ACPI: ARM64: IORT: add missing comment for iort_dev_find_its_id()
+  irqchip: gicv3-its: platform-msi: refactor its_pmsi_prepare()
+  ACPI: platform-msi: retrieve dev id from IORT
+  irqchip: gicv3-its: platform-msi: refactor its_pmsi_init() to prepare
+    for ACPI
+  irqchip: gicv3-its: platform-msi: scan MADT to create platform msi
+    domain
+  ACPI: ARM64: IORT: rework iort_node_get_id()
+  ACPI: platform: setup MSI domain for ACPI based platform device
+  ACPI: ARM64: IORT: rework iort_node_get_id() for NC->SMMU->ITS case
+  msi: platform: make platform_msi_create_device_domain() ACPI aware
+  irqchip: mbigen: Add ACPI support
+
+Kefeng Wang (2):
+  irqchip: mbigen: drop module owner
+  irqchip: mbigen: introduce mbigen_of_create_domain()
+
+ drivers/acpi/arm64/iort.c                     | 140 ++++++++++++++++++++------
+ drivers/acpi/glue.c                           |   6 ++
+ drivers/base/platform-msi.c                   |   3 +-
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c | 106 ++++++++++++++-----
+ drivers/irqchip/irq-gic-v3-its.c              |   3 +-
+ drivers/irqchip/irq-mbigen.c                  | 109 ++++++++++++++++----
+ include/linux/acpi_iort.h                     |  11 ++
+ 7 files changed, 299 insertions(+), 79 deletions(-)
+
+-- 
+1.9.1
