@@ -1,43 +1,25 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 2 Jan 2017 21:06:04 +0000
-Subject: [PATCH 1/5] ARM: wire up HWCAP2 feature bits to the CPU modalias
-In-Reply-To: <20161031161319.GF1041@n2100.armlinux.org.uk>
-References: <1476787939-21889-1-git-send-email-ard.biesheuvel@linaro.org>
- <1476787939-21889-2-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_y7e=sJT+7FNj846NczgpNOdVx53SDC7dupmN-3ztNwA@mail.gmail.com>
- <20161031161319.GF1041@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu-hLD0xnLyywceJvPiB8ZkENNwWZTM--OHFvzw6MahYmw@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 2 Jan 2017 19:09:41 -0200
+Subject: [PATCH 00/20] i.MX Media Driver
+In-Reply-To: <1483050455-10683-1-git-send-email-steve_longerbeam@mentor.com>
+References: <1483050455-10683-1-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <CAOMZO5DM4aRwzCWkRoZLmbCxn155YL+CUR_gJyDh+FjzSKD3PQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 October 2016 at 16:13, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Sat, Oct 29, 2016 at 11:08:36AM +0100, Ard Biesheuvel wrote:
->> On 18 October 2016 at 11:52, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > Wire up the generic support for exposing CPU feature bits via the
->> > modalias in /sys/device/system/cpu. This allows udev to automatically
->> > load modules for things like crypto algorithms that are implemented
->> > using optional instructions.
->> >
->> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> > ---
->> >  arch/arm/Kconfig                  |  1 +
->> >  arch/arm/include/asm/cpufeature.h | 32 ++++++++++++++++++++
->> >  2 files changed, 33 insertions(+)
->> >
->>
->> Russell,
->>
->> do you have any concerns regarding this patch? If not, I will drop it
->> into the patch system.
+Hi Steve,
+
+On Thu, Dec 29, 2016 at 8:27 PM, Steve Longerbeam <slongerbeam@gmail.com> wrote:
+> This is a media driver for video capture on i.MX.
 >
-> It's still something I need to look at... I've been offline last week,
-> and sort-of offline the previous week, so I'm catching up.
+> Refer to Documentation/media/v4l-drivers/imx.rst for example capture
+> pipelines on SabreSD, SabreAuto, and SabreLite reference platforms.
 >
+> This patchset includes the OF graph layout as proposed by Philipp Zabel,
+> with only minor changes which are enumerated in the patch header.
 
-Hi Russell,
+Patches 13, 14 and 19 miss your Signed-off-by tag.
 
-Any thoughts yet?
+Tested the whole series on a mx6qsabresd:
 
-Thanks,
-Ard.
+Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
