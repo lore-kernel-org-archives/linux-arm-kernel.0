@@ -1,135 +1,179 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 02 Jan 2017 15:27:16 +0000
-Subject: [PATCH 2/5] ARM: dts: armada388-clearfog: move device specific
- pinctrl nodes
+Date: Mon, 02 Jan 2017 15:27:26 +0000
+Subject: [PATCH 4/5] ARM: dts: armada388-clearfog: move ethernet related nodes
 In-Reply-To: <E1cO4UH-0008SR-GW@rmk-PC.armlinux.org.uk>
 References: <E1cO4UH-0008SR-GW@rmk-PC.armlinux.org.uk>
-Message-ID: <E1cO4W4-000060-EK@rmk-PC.armlinux.org.uk>
+Message-ID: <E1cO4WE-00006H-UI@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the device specific pinctrl nodes over to use the label form to
-reference the pin mux controller, rather than replicating the device
-node path.
+Move the ethernet, buffer manager, and mdio nodes over to use label form
+to reference the devices rather than replicating the device path.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/boot/dts/armada-388-clearfog.dtsi         | 50 +++++++++++-----------
- .../arm/boot/dts/armada-38x-solidrun-microsom.dtsi | 27 ++++++------
- 2 files changed, 38 insertions(+), 39 deletions(-)
+ arch/arm/boot/dts/armada-388-clearfog.dtsi         | 44 +++++++------
+ .../arm/boot/dts/armada-38x-solidrun-microsom.dtsi | 76 +++++++++++-----------
+ 2 files changed, 60 insertions(+), 60 deletions(-)
 
 diff --git a/arch/arm/boot/dts/armada-388-clearfog.dtsi b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-index 770d4bff6884..7946400b4bf2 100644
+index eeb845bbe3f3..6149699eefc2 100644
 --- a/arch/arm/boot/dts/armada-388-clearfog.dtsi
 +++ b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-@@ -217,31 +217,6 @@
- 				status = "okay";
- 			};
+@@ -71,27 +71,6 @@
  
--			pinctrl at 18000 {
--				clearfog_i2c1_pins: i2c1-pins {
--					/* SFP, PCIe, mSATA, mikrobus */
--					marvell,pins = "mpp26", "mpp27";
--					marvell,function = "i2c1";
--				};
--				clearfog_sdhci_cd_pins: clearfog-sdhci-cd-pins {
--					marvell,pins = "mpp20";
--					marvell,function = "gpio";
--				};
--				mikro_pins: mikro-pins {
--					/* int: mpp22 rst: mpp29 */
--					marvell,pins = "mpp22", "mpp29";
--					marvell,function = "gpio";
--				};
--				mikro_spi_pins: mikro-spi-pins {
--					marvell,pins = "mpp43";
--					marvell,function = "spi1";
--				};
--				mikro_uart_pins: mikro-uart-pins {
--					marvell,pins = "mpp24", "mpp25";
--					marvell,function = "ua1";
+ 	soc {
+ 		internal-regs {
+-			ethernet at 30000 {
+-				phy-mode = "sgmii";
+-				buffer-manager = <&bm>;
+-				bm,pool-long = <2>;
+-				bm,pool-short = <1>;
+-				status = "okay";
+-			};
+-
+-			ethernet at 34000 {
+-				phy-mode = "sgmii";
+-				buffer-manager = <&bm>;
+-				bm,pool-long = <3>;
+-				bm,pool-short = <1>;
+-				status = "okay";
+-
+-				fixed-link {
+-					speed = <1000>;
+-					full-duplex;
 -				};
 -			};
 -
  			sata at a8000 {
  				/* pinctrl? */
  				status = "okay";
-@@ -297,6 +272,31 @@
+@@ -147,6 +126,29 @@
  	};
  };
  
-+&pinctrl {
-+	clearfog_i2c1_pins: i2c1-pins {
-+		/* SFP, PCIe, mSATA, mikrobus */
-+		marvell,pins = "mpp26", "mpp27";
-+		marvell,function = "i2c1";
-+	};
-+	clearfog_sdhci_cd_pins: clearfog-sdhci-cd-pins {
-+		marvell,pins = "mpp20";
-+		marvell,function = "gpio";
-+	};
-+	mikro_pins: mikro-pins {
-+		/* int: mpp22 rst: mpp29 */
-+		marvell,pins = "mpp22", "mpp29";
-+		marvell,function = "gpio";
-+	};
-+	mikro_spi_pins: mikro-spi-pins {
-+		marvell,pins = "mpp43";
-+		marvell,function = "spi1";
-+	};
-+	mikro_uart_pins: mikro-uart-pins {
-+		marvell,pins = "mpp24", "mpp25";
-+		marvell,function = "ua1";
++&eth1 {
++	/* ethernet at 30000 */
++	bm,pool-long = <2>;
++	bm,pool-short = <1>;
++	buffer-manager = <&bm>;
++	phy-mode = "sgmii";
++	status = "okay";
++};
++
++&eth2 {
++	/* ethernet at 34000 */
++	bm,pool-long = <3>;
++	bm,pool-short = <1>;
++	buffer-manager = <&bm>;
++	phy-mode = "sgmii";
++	status = "okay";
++
++	fixed-link {
++		speed = <1000>;
++		full-duplex;
 +	};
 +};
 +
- &spi1 {
- 	/*
- 	 * Add SPI CS pins for clearfog:
+ &i2c0 {
+ 	/* Is there anything on this? */
+ 	clock-frequency = <100000>;
 diff --git a/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi b/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-index 6608657b9994..e397421d1531 100644
+index e397421d1531..681962a6395b 100644
 --- a/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
 +++ b/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-@@ -94,20 +94,6 @@
- 				};
- 			};
+@@ -62,38 +62,6 @@
+ 			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
  
--			pinctrl at 18000 {
--				microsom_phy_clk_pins: microsom-phy-clk-pins {
--					marvell,pins = "mpp45";
--					marvell,function = "ref";
--				};
--				/* Optional eMMC */
--				microsom_sdhci_pins: microsom-sdhci-pins {
--					marvell,pins = "mpp21", "mpp28",
--						       "mpp37", "mpp38",
--						       "mpp39", "mpp40";
--					marvell,function = "sd0";
+ 		internal-regs {
+-			ethernet at 70000 {
+-				pinctrl-0 = <&ge0_rgmii_pins>;
+-				pinctrl-names = "default";
+-				phy = <&phy_dedicated>;
+-				phy-mode = "rgmii-id";
+-				buffer-manager = <&bm>;
+-				bm,pool-long = <0>;
+-				bm,pool-short = <1>;
+-				status = "okay";
+-			};
+-
+-			mdio at 72004 {
+-				/*
+-				 * Add the phy clock here, so the phy can be
+-				 * accessed to read its IDs prior to binding
+-				 * with the driver.
+-				 */
+-				pinctrl-0 = <&mdio_pins &microsom_phy_clk_pins>;
+-				pinctrl-names = "default";
+-
+-				phy_dedicated: ethernet-phy at 0 {
+-					/*
+-					 * Annoyingly, the marvell phy driver
+-					 * configures the LED register, rather
+-					 * than preserving reset-loaded setting.
+-					 * We undo that rubbish here.
+-					 */
+-					marvell,reg-init = <3 16 0 0x101e>;
+-					reg = <0>;
 -				};
 -			};
 -
  			rtc at a3800 {
  				/*
  				 * If the rtc doesn't work, run "date reset"
-@@ -134,6 +120,19 @@
+@@ -107,16 +75,46 @@
+ 				pinctrl-names = "default";
+ 				status = "okay";
+ 			};
+-
+-			bm at c8000 {
+-				status = "okay";
+-			};
+ 		};
++	};
++};
+ 
+-		bm-bppi {
+-			status = "okay";
+-		};
++&bm {
++	status = "okay";
++};
++
++&bm_bppi {
++	status = "okay";
++};
++
++&eth0 {
++	/* ethernet at 70000 */
++	pinctrl-0 = <&ge0_rgmii_pins>;
++	pinctrl-names = "default";
++	phy = <&phy_dedicated>;
++	phy-mode = "rgmii-id";
++	buffer-manager = <&bm>;
++	bm,pool-long = <0>;
++	bm,pool-short = <1>;
++	status = "okay";
++};
++
++&mdio {
++	/*
++	 * Add the phy clock here, so the phy can be accessed to read its
++	 * IDs prior to binding with the driver.
++	 */
++	pinctrl-0 = <&mdio_pins &microsom_phy_clk_pins>;
++	pinctrl-names = "default";
+ 
++	phy_dedicated: ethernet-phy at 0 {
++		/*
++		 * Annoyingly, the marvell phy driver configures the LED
++		 * register, rather than preserving reset-loaded setting.
++		 * We undo that rubbish here.
++		 */
++		marvell,reg-init = <3 16 0 0x101e>;
++		reg = <0>;
  	};
  };
  
-+&pinctrl {
-+	microsom_phy_clk_pins: microsom-phy-clk-pins {
-+		marvell,pins = "mpp45";
-+		marvell,function = "ref";
-+	};
-+	/* Optional eMMC */
-+	microsom_sdhci_pins: microsom-sdhci-pins {
-+		marvell,pins = "mpp21", "mpp28", "mpp37",
-+			       "mpp38", "mpp39", "mpp40";
-+		marvell,function = "sd0";
-+	};
-+};
-+
- &spi1 {
- 	/* The microsom has an optional W25Q32 on board, connected to CS0 */
- 	pinctrl-0 = <&spi1_pins>;
 -- 
 2.7.4
