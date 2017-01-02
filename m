@@ -1,46 +1,47 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 2 Jan 2017 19:36:51 +0200
-Subject: [PATCH] cpufreq: s3c64xx: remove incorrect __init annotation
-In-Reply-To: <20170102070903.GC8588@vireshk-i7>
-References: <20161216090625.2235668-1-arnd@arndb.de>
- <20170102070903.GC8588@vireshk-i7>
-Message-ID: <20170102173651.hvsfalhcmisv4mtv@kozik-lap>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 2 Jan 2017 14:49:57 -0300
+Subject: [PATCH 0/3] crypto: picoxcell - Cleanups removing non-DT code
+In-Reply-To: <2309314.lMWYhcWsTB@wuerfel>
+References: <1483376819-26726-1-git-send-email-javier@osg.samsung.com>
+ <2309314.lMWYhcWsTB@wuerfel>
+Message-ID: <5cbfeb40-f3c3-8473-24af-f302e3c6f02b@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2017 at 12:39:03PM +0530, Viresh Kumar wrote:
-> On 16-12-16, 10:06, Arnd Bergmann wrote:
-> > s3c64xx_cpufreq_config_regulator is incorrectly annotated
-> > as __init, since the caller is also not init:
-> > 
-> > WARNING: vmlinux.o(.text+0x92fe1c): Section mismatch in reference from the function s3c64xx_cpufreq_driver_init() to the function .init.text:s3c64xx_cpufreq_config_regulator()
-> > 
-> > With modern gcc versions, the function gets inline, so we don't
-> > see the warning, this only happens with gcc-4.6 and older.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> >  drivers/cpufreq/s3c64xx-cpufreq.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/cpufreq/s3c64xx-cpufreq.c b/drivers/cpufreq/s3c64xx-cpufreq.c
-> > index 176e84cc3991..0cb9040eca49 100644
-> > --- a/drivers/cpufreq/s3c64xx-cpufreq.c
-> > +++ b/drivers/cpufreq/s3c64xx-cpufreq.c
-> > @@ -107,7 +107,7 @@ static int s3c64xx_cpufreq_set_target(struct cpufreq_policy *policy,
-> >  }
-> >  
-> >  #ifdef CONFIG_REGULATOR
-> > -static void __init s3c64xx_cpufreq_config_regulator(void)
-> > +static void s3c64xx_cpufreq_config_regulator(void)
-> >  {
-> >  	int count, v, i, found;
-> >  	struct cpufreq_frequency_table *freq;
-> 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Hello Arnd,
 
-Rafael,
-Are you going to pick it up?
+On 01/02/2017 02:10 PM, Arnd Bergmann wrote:
+> On Monday, January 2, 2017 2:06:56 PM CET Javier Martinez Canillas wrote:
+>>
+>> This small series contains a couple of cleanups that removes some driver's code
+>> that isn't needed due the driver being for a DT-only platform.
+>>
+>> The changes were suggested by Arnd Bergmann as a response to a previous patch:
+>> https://lkml.org/lkml/2017/1/2/342
+>>
+>> Patch #1 allows the driver to be built when the COMPILE_TEST option is enabled.
+>> Patch #2 removes the platform ID table since isn't needed for DT-only drivers.
+>> Patch #3 removes a wrapper function that's also not needed if driver is DT-only.
+>>
+>>
+> 
+> Looks good, but I don't know if the first patch causes some build warnings
+
+Thanks for looking at the patches.
+
+> on non-ARM platforms, better wait at least for the 0-day build results,
+> and maybe build-test on x86-32 and x86-64.
+> 
+
+I should had mentioned that I built tested for arm, arm64, x86-32 and x86-64,
+and saw now issues. But I agree with you that it's better to wait for the
+0-day builder in case it reports issues on some platforms.
+
+> 	Arnd
+> 
 
 Best regards,
-Krzysztof
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
