@@ -1,20 +1,21 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 2 Jan 2017 10:54:43 +0530
-Subject: [PATCH 1/3] dma: zx: rename zx296702_dma.c to zx_dma.c
-In-Reply-To: <1481810617-7650-1-git-send-email-shawnguo@kernel.org>
-References: <1481810617-7650-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <20170102052443.GS3573@localhost>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 2 Jan 2017 14:04:16 +0800
+Subject: [PATCH] ARM: dts: imx6sx-udoo-neo: Pass the 'phy-reset-duration'
+ property
+In-Reply-To: <1480966119-17350-1-git-send-email-festevam@gmail.com>
+References: <1480966119-17350-1-git-send-email-festevam@gmail.com>
+Message-ID: <20170102060415.GA5700@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2016 at 10:03:35PM +0800, Shawn Guo wrote:
-> From: Shawn Guo <shawn.guo@linaro.org>
+On Mon, Dec 05, 2016 at 05:28:39PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> ZTE ZX dma driver is not ZX296702 specific.  It works for not only
-> ZX296702 but also other ZTE ZX family platforms like ZX296718.  Let's
-> rename the file to reflect that.
+> imx6sx-udoo-neo has a KSZ8091 Ethernet PHY, which requires the reset
+> signal to be low for at least 10ms.
+> 
+> Pass the 'phy-reset-duration' property to reflect such requirement.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Applied all after fixing subsystem name
-
--- 
-~Vinod
+Applied, thanks.
