@@ -1,39 +1,121 @@
-From: harinikatakamlinux@gmail.com (Harini Katakam)
-Date: Mon, 2 Jan 2017 17:13:34 +0530
-Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
-In-Reply-To: <20170102113155.GA16373@localhost.localdomain>
-References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
- <BN3PR07MB2516815EDE69ACDCE27F81A3C96F0@BN3PR07MB2516.namprd07.prod.outlook.com>
- <20170102113155.GA16373@localhost.localdomain>
-Message-ID: <CAFcVECLg-hXvfgwRW-fxi+N0k=7pTaEMhS5EMXV9_OO+xGRUqA@mail.gmail.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Mon, 2 Jan 2017 11:46:30 +0000
+Subject: [PATCH v2 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
+ stores scenario in vdma
+In-Reply-To: <a269409d-103e-1650-5df6-cc8743ed62cf@synopsys.com>
+References: <1482483135-14767-1-git-send-email-appanad@xilinx.com>
+ <1482483135-14767-3-git-send-email-appanad@xilinx.com>
+ <a269409d-103e-1650-5df6-cc8743ed62cf@synopsys.com>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A65FFE9@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+Hi Jose Miguel Abreu,
+	
+	Thanks for the review....
+Sorry for the delay in the reply please see comments inline...
 
-On Mon, Jan 2, 2017 at 5:01 PM, Richard Cochran
-<richardcochran@gmail.com> wrote:
-> On Mon, Jan 02, 2017 at 09:36:10AM +0000, Rafal Ozieblo wrote:
->> According Cadence Hardware team:
->> "It is just that some customers prefer to have the time in the descriptors as that is provided per frame.
->> The registers are simply overwritten when a new event frame is transmitted/received and so software could miss it."
->> The question is are you sure that you read timestamp for current frame? (not for the next frame).
->
-> AFAICT, having the time stamp in the descriptor is not universally
-> supported.  Looking at the Xilinx Zynq 7000 TRM, I can't find any
-> mention of this.
->
-> This Cadence IP core is a complete disaster.
->
-> Unless someone can tell us how this IP works in all of its
-> incarnations, this series is going nowhere.
+> >  	if (chan->has_sg) {
+> >  		dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
+> >  				tail_segment->phys);
+> > +		list_splice_tail_init(&chan->pending_list, &chan->active_list);
+> > +		chan->desc_pendingcount = 0;
+> >  	} else {
+> >  		struct xilinx_vdma_tx_segment *segment, *last = NULL;
+> > -		int i = 0;
+> > +		int i = 0, j = 0;
+> >
+> >  		if (chan->desc_submitcount < chan->num_frms)
+> >  			i = chan->desc_submitcount;
+> >
+> > -		list_for_each_entry(segment, &desc->segments, node) {
+> > -			if (chan->ext_addr)
+> > -				vdma_desc_write_64(chan,
+> > -
+> 	XILINX_VDMA_REG_START_ADDRESS_64(i++),
+> > -					segment->hw.buf_addr,
+> > -					segment->hw.buf_addr_msb);
+> > -			else
+> > -				vdma_desc_write(chan,
+> > -
+> 	XILINX_VDMA_REG_START_ADDRESS(i++),
+> > -					segment->hw.buf_addr);
+> > -
+> > -			last = segment;
+> > +		for (j = 0; j < chan->num_frms; ) {
+> > +			list_for_each_entry(segment, &desc->segments, node)
+> {
+> > +				if (chan->ext_addr)
+> > +					vdma_desc_write_64(chan,
+> > +
+> XILINX_VDMA_REG_START_ADDRESS_64(i++),
+> > +					  segment->hw.buf_addr,
+> > +					  segment->hw.buf_addr_msb);
+> > +				else
+> > +					vdma_desc_write(chan,
+> > +
+> XILINX_VDMA_REG_START_ADDRESS(i++),
+> > +					    segment->hw.buf_addr);
+> > +
+> > +				last = segment;
+> > +			}
+> > +			list_del(&desc->node);
+> > +			list_add_tail(&desc->node, &chan->active_list);
+> > +			j++;
+> > +			if (list_empty(&chan->pending_list) ||
+> > +			    (i == chan->num_frms))
+> > +				break;
+> > +			desc = list_first_entry(&chan->pending_list,
+> > +						struct
+> xilinx_dma_tx_descriptor,
+> > +						node);
+> >  		}
+> >
+> >  		if (!last)
+> > @@ -1081,20 +1094,14 @@ static void xilinx_vdma_start_transfer(struct
+> xilinx_dma_chan *chan)
+> >  		vdma_desc_write(chan, XILINX_DMA_REG_FRMDLY_STRIDE,
+> >  				last->hw.stride);
+> >  		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last-
+> >hw.vsize);
+> 
+> What if we reach here and j < num_frms? It can happen because if
+> the pending list is empty the loop breaks. Then VDMA will start
+> with framebuffers having address 0x0. You should only program
+> vsize when j > num_frms or when we have already previously set
+> the framebuffers (i.e. when submitcount has already been
+> incremented num_frms at least once).
 
->From the revision history of Cadence spec, all versions starting
-r1p02 have ability to include timestamp in descriptors.
-For previous versions the event register is the only option.
-But yes, there have been multiple enhancements and
-bug fixes in this IP w.r.t PTP making each implementation
-different.
+In case of j < num_frms VDMA won't start the frame buffer having address 0
+As we are programming the VDMA buffer address based on the desc_submitcount value only i.e. i.
 
+Code snippet in the driver doing this:
+                         list_for_each_entry(segment, &desc->segments, node) {
+                                if (chan->ext_addr)
+                                        vdma_desc_write_64(chan,
+                                          XILINX_VDMA_REG_START_ADDRESS_64(i++),
+                                          segment->hw.buf_addr,
+                                          segment->hw.buf_addr_msb);
+                                else
+                                        vdma_desc_write(chan,
+                                            XILINX_VDMA_REG_START_ADDRESS(i++),
+                                            segment->hw.buf_addr);
+
+                                last = segment;
+                        } 
+
+Initially desc_submitcount will be zero.
+Let's assume h/w is configured for 10 frames and user submitted only 5 frames.
+And triggered the VDMA h/w using issue_pending in this case desc_submitcount will be 5.
+desc_submitcount will become zero again only when
+User submits more frames than h/w capable or user submit frames up to h/w capable.
+
+If my understanding is wrong could you please elaborate the race condition that you are talking above?
+	
 Regards,
-Harini
+Kedar.
+
+> 
+> Best regards,
+> Jose Miguel Abreu
+> 
