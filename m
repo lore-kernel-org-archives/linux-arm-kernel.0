@@ -1,38 +1,73 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 2 Jan 2017 13:36:40 +0530
-Subject: [3/3] ARM: da850: Add ti, da830-uart compatible for serial ports
-In-Reply-To: <2982bdd0-0997-f4a7-71c3-9d232237cc23@ti.com>
-References: <1482265384-715-4-git-send-email-david@lechnology.com>
- <2982bdd0-0997-f4a7-71c3-9d232237cc23@ti.com>
-Message-ID: <11bdcd56-de34-a5ff-7af5-24e4a0e8cd2c@ti.com>
+From: michael@amarulasolutions.com (Michael Trimarchi)
+Date: Mon, 2 Jan 2017 09:21:41 +0100
+Subject: [PATCH 16/37] ARM: dts: imx6qdl-icore-rqs: Correct license text
+In-Reply-To: <20161214235746.7108-17-alexandre.belloni@free-electrons.com>
+References: <20161214235746.7108-1-alexandre.belloni@free-electrons.com>
+ <20161214235746.7108-17-alexandre.belloni@free-electrons.com>
+Message-ID: <20170102082140.GA4277@panicking>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 December 2016 09:36 PM, Franklin S Cooper Jr wrote:
+On Thu, Dec 15, 2016 at 12:57:25AM +0100, Alexandre Belloni wrote:
+> The license test has been mangled at some point then copy pasted across
+> multiple files. Restore it to what it should be.
+> Note that this is not intended as a license change.
 > 
+> Cc: Michael Trimarchi <michael@amarulasolutions.com>
+> Cc: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
 > 
-> On 12/20/2016 02:23 PM, David Lechner wrote:
->> TI DA8xx/OMAPL13x/AM17xx/AM18xx SoCs have extra UART registers beyond
-> 
-> Similar comment about adding Keystone SoCs to the list of SoCs.
-> 
->> the standard 8250 registers, so we need a new compatible string to
->> indicate this. Also, at least one of these registers uses the full 32
->> bits, so we need to specify reg-io-width in addition to reg-shift.
->>
->> "ns16550a" is left in the compatible specification since it does work
->> as long as the bootloader configures the SoC UART power management
->> registers.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> ---
->>  arch/arm/boot/dts/da850.dtsi | 9 ++++++---
-> 
-> Similar changes should be made to the various Keystone dtsi files.
 
-That will be a different patch though since the two changes will go
-through different trees. And I strongly suspect David does not have
-access to a keystone board. So it will have to be done by someone at TI.
+Acked-by: Michael Trimarchi <michael@amarulasolutions.com>
 
-Thanks,
-Sekhar
+> diff --git a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+> index d5c3aa88adbe..ed60d72b06b9 100644
+> --- a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+> @@ -10,17 +10,17 @@
+>   *     modify it under the terms of the GNU General Public License
+>   *     version 2 as published by the Free Software Foundation.
+>   *
+> - *     This file is distributed in the hope that it will be useful
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+> - * Or, alternatively
+> + * Or, alternatively,
+>   *
+>   *  b) Permission is hereby granted, free of charge, to any person
+>   *     obtaining a copy of this software and associated documentation
+>   *     files (the "Software"), to deal in the Software without
+> - *     restriction, including without limitation the rights to use
+> + *     restriction, including without limitation the rights to use,
+>   *     copy, modify, merge, publish, distribute, sublicense, and/or
+>   *     sell copies of the Software, and to permit persons to whom the
+>   *     Software is furnished to do so, subject to the following
+> @@ -29,11 +29,11 @@
+>   *     The above copyright notice and this permission notice shall be
+>   *     included in all copies or substantial portions of the Software.
+>   *
+> - *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>   *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>   *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>   *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> - *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>   *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>   *     OTHER DEALINGS IN THE SOFTWARE.
+> -- 
+> 2.10.2
+> 
+
+-- 
+| Michael Nazzareno Trimarchi                     Amarula Solutions BV |
+| COO  -  Founder                                      Cruquiuskade 47 |
+| +31(0)851119172                                 Amsterdam 1018 AM NL |
+|                  [`as] http://www.amarulasolutions.com               |
