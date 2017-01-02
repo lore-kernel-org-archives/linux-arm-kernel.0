@@ -1,47 +1,19 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 2 Jan 2017 14:49:57 -0300
-Subject: [PATCH 0/3] crypto: picoxcell - Cleanups removing non-DT code
-In-Reply-To: <2309314.lMWYhcWsTB@wuerfel>
-References: <1483376819-26726-1-git-send-email-javier@osg.samsung.com>
- <2309314.lMWYhcWsTB@wuerfel>
-Message-ID: <5cbfeb40-f3c3-8473-24af-f302e3c6f02b@osg.samsung.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Mon, 2 Jan 2017 01:54:55 -0800
+Subject: [PATCH v2] drivers: remoteproc: constify rproc_ops structures
+In-Reply-To: <1483267417-7850-1-git-send-email-bhumirks@gmail.com>
+References: <1483267417-7850-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <20170102095455.GA22853@builder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+On Sun 01 Jan 02:43 PST 2017, Bhumika Goyal wrote:
 
-On 01/02/2017 02:10 PM, Arnd Bergmann wrote:
-> On Monday, January 2, 2017 2:06:56 PM CET Javier Martinez Canillas wrote:
->>
->> This small series contains a couple of cleanups that removes some driver's code
->> that isn't needed due the driver being for a DT-only platform.
->>
->> The changes were suggested by Arnd Bergmann as a response to a previous patch:
->> https://lkml.org/lkml/2017/1/2/342
->>
->> Patch #1 allows the driver to be built when the COMPILE_TEST option is enabled.
->> Patch #2 removes the platform ID table since isn't needed for DT-only drivers.
->> Patch #3 removes a wrapper function that's also not needed if driver is DT-only.
->>
->>
-> 
-> Looks good, but I don't know if the first patch causes some build warnings
+> Declare rproc_ops structures as const as they are only passed as an
+> argument to the function rproc_alloc. This argument is of type const, so
+> rproc_ops structures having this property can be declared const too.
 
-Thanks for looking at the patches.
+Thanks Bhumika, applied.
 
-> on non-ARM platforms, better wait at least for the 0-day build results,
-> and maybe build-test on x86-32 and x86-64.
-> 
-
-I should had mentioned that I built tested for arm, arm64, x86-32 and x86-64,
-and saw now issues. But I agree with you that it's better to wait for the
-0-day builder in case it reports issues on some platforms.
-
-> 	Arnd
-> 
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Regards,
+Bjorn
