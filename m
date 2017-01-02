@@ -1,70 +1,44 @@
 From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Mon, 2 Jan 2017 12:49:07 +0300
-Subject: How should we handle variable address space sizes (Re: [RFC 3/4]
- x86/mm: define TASK_SIZE as current->mm->task_size)
-In-Reply-To: <CALCETrXMCVOmVcQYxF_ghPdEjLuNNqbcnoRKRVpJegsQ=SPEFQ@mail.gmail.com>
-References: <CALCETrXMCVOmVcQYxF_ghPdEjLuNNqbcnoRKRVpJegsQ=SPEFQ@mail.gmail.com>
-Message-ID: <20170102094907.GC30735@node.shutemov.name>
+Date: Mon, 2 Jan 2017 12:53:42 +0300
+Subject: [RFC 1/4] mm: remove unused TASK_SIZE_OF()
+In-Reply-To: <20161230155634.8692-2-dsafonov@virtuozzo.com>
+References: <20161230155634.8692-1-dsafonov@virtuozzo.com>
+ <20161230155634.8692-2-dsafonov@virtuozzo.com>
+Message-ID: <20170102095342.GD30735@node.shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 30, 2016 at 06:11:05PM -0800, Andy Lutomirski wrote:
-> On Fri, Dec 30, 2016 at 7:56 AM, Dmitry Safonov <dsafonov@virtuozzo.com> wrote:
-> > Keep task's virtual address space size as mm_struct field which
-> > exists for a long time - it's initialized in setup_new_exec()
-> > depending on the new task's personality.
-> > This way TASK_SIZE will always be the same as current->mm->task_size.
-> > Previously, there could be an issue about different values of
-> > TASK_SIZE and current->mm->task_size: e.g, a 32-bit process can unset
-> > ADDR_LIMIT_3GB personality (with personality syscall) and
-> > so TASK_SIZE will be 4Gb, which is larger than mm->task_size = 3Gb.
-> > As TASK_SIZE *and* current->mm->task_size are used both in code
-> > frequently, this difference creates a subtle situations, for example:
-> > one can mmap addresses > 3Gb, but they will be hidden in
-> > /proc/pid/pagemap as it checks mm->task_size.
-> > I've moved initialization of mm->task_size earlier in setup_new_exec()
-> > as arch_pick_mmap_layout() initializes mmap_legacy_base with
-> > TASK_UNMAPPED_BASE, which depends on TASK_SIZE.
+On Fri, Dec 30, 2016 at 06:56:31PM +0300, Dmitry Safonov wrote:
+> All users of TASK_SIZE_OF(tsk) have migrated to mm->task_size or
+> TASK_SIZE_MAX since:
+> commit d696ca016d57 ("x86/fsgsbase/64: Use TASK_SIZE_MAX for
+> FSBASE/GSBASE upper limits"),
+> commit a06db751c321 ("pagemap: check permissions and capabilities at
+> open time"),
 > 
-> I don't like this patch so much because I think that we should figure
-> out how this will all work in the long run first.  I've added some
-> more people to the thread because other arches have similar issues and
-> because x86 is about to get considerably more complicated (choices
-> include 3GB, 4GB, 47-bit, and 56-bit (the latter IIRC)).
-> 
-> Here are a few of my thoughts on the matter.  This isn't all that well
-> thought out:
-> 
-> The address space limit, especially if CRIU is in play, isn't really a
-> hard limit.  For example, you could allocate high memory then lower
-> the limit.  Similarly, I see no reason that an x32 program should be
-> forbidden from mapping some high addresses or, similarly, that an i386
-> program can't (if it really wanted to) do a 64-bit mmap() and get a
-> high address.
-> 
-> On that note, can we just *delete* the task_size check from pagemap?
-> It's been there since the very beginning:
-> 
-> commit 85863e475e59afb027b0113290e3796ee6020b7d
-> Author: Matt Mackall <mpm@selenic.com>
-> Date:   Mon Feb 4 22:29:04 2008 -0800
-> 
->     maps4: add /proc/pid/pagemap interface
-> 
-> and there's no explanation for why it's needed.
-> 
-> So maybe we should have a *number* (not a bit) that indicates the
-> maximum address that mmap() will return unless an override is in use.
-> Since common practice seems to be to stick this in the personality
-> field, we may need some fancy encoding.  Executing a setuid binary
-> needs to reset to the default, and personality handles that.
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Ralf Baechle <ralf@linux-mips.org>
+> Cc: "James E.J. Bottomley" <jejb@parisc-linux.org>
+> Cc: Helge Deller <deller@gmx.de>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Michael Ellerman <mpe@ellerman.id.au>
+> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+> Cc: "David S. Miller" <davem@davemloft.net>
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-mips at linux-mips.org
+> Cc: linux-parisc at vger.kernel.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-s390 at vger.kernel.org
+> Cc: sparclinux at vger.kernel.org
+> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
 
-If we want to be able to specify arbitrary address as maximum, a fancy
-encoding would need to claim 51 bits (63 VA - 12 in-page address) on x86
-from the persona flag.
-To me, it's stretching personality interface too far.
+I've noticed this too.
 
-Maybe it's easier to reset the rlimit for suid binaries?
+Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
 
 -- 
  Kirill A. Shutemov
