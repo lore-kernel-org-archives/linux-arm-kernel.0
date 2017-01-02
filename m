@@ -1,44 +1,46 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 2 Jan 2017 19:35:16 +0200
-Subject: [GIT PULL] ARM: exynos: Late mach/soc for v4.10
-In-Reply-To: <c727069c-c21e-be4d-89f9-f27e1c6b9af2@samsung.com>
-References: <1482003132-8844-1-git-send-email-krzk@kernel.org>
- <20161230155312.oupgyip7wtqwcuy2@kozik-lap>
- <CGME20170102092044epcas1p3cbe831b7b6528f818b034d73c85dbe7d@epcas1p3.samsung.com>
- <5b0e55c8-01db-3f02-3526-2f71f4a73d88@samsung.com>
- <20170102155654.oey6c542vjcqyit2@kozik-lap>
- <c727069c-c21e-be4d-89f9-f27e1c6b9af2@samsung.com>
-Message-ID: <20170102173516.kr43qt2udaaa7m3f@kozik-lap>
+Date: Mon, 2 Jan 2017 19:36:51 +0200
+Subject: [PATCH] cpufreq: s3c64xx: remove incorrect __init annotation
+In-Reply-To: <20170102070903.GC8588@vireshk-i7>
+References: <20161216090625.2235668-1-arnd@arndb.de>
+ <20170102070903.GC8588@vireshk-i7>
+Message-ID: <20170102173651.hvsfalhcmisv4mtv@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2017 at 06:25:44PM +0100, Sylwester Nawrocki wrote:
-> On 01/02/2017 04:56 PM, Krzysztof Kozlowski wrote:
-> > On Mon, Jan 02, 2017 at 10:20:21AM +0100, Sylwester Nawrocki wrote:
-> >> On 12/30/2016 04:53 PM, Krzysztof Kozlowski wrote:
-> >>> Any comments on this? I guess it won't come as late-late-4.10, so can
-> >>> you pull it for v4.11?
-> >>  
-> >>>> Sylwester Nawrocki (1):
-> >>>>       ARM: S3C24XX: Add DMA slave maps for remaining s3c24xx SoCs
-> >> We need this patch in v4.10 to avoid possible I2S and MMC regressions
-> >> on selected s3c24xx SoC, since the DMA clients are already modified.
-> >> If the patch goes in only for v4.11 it would be good to mark it for 
-> >> inclusion in v4.10 stable kernels.  
-> >
-> > You didn't mention any strict dependencies when sending this patch...
-> > What do you mean by "needing patch in v4.10"? Is the code already
-> > not bisectable? Already broken?
+On Mon, Jan 02, 2017 at 12:39:03PM +0530, Viresh Kumar wrote:
+> On 16-12-16, 10:06, Arnd Bergmann wrote:
+> > s3c64xx_cpufreq_config_regulator is incorrectly annotated
+> > as __init, since the caller is also not init:
+> > 
+> > WARNING: vmlinux.o(.text+0x92fe1c): Section mismatch in reference from the function s3c64xx_cpufreq_driver_init() to the function .init.text:s3c64xx_cpufreq_config_regulator()
+> > 
+> > With modern gcc versions, the function gets inline, so we don't
+> > see the warning, this only happens with gcc-4.6 and older.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> >  drivers/cpufreq/s3c64xx-cpufreq.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/cpufreq/s3c64xx-cpufreq.c b/drivers/cpufreq/s3c64xx-cpufreq.c
+> > index 176e84cc3991..0cb9040eca49 100644
+> > --- a/drivers/cpufreq/s3c64xx-cpufreq.c
+> > +++ b/drivers/cpufreq/s3c64xx-cpufreq.c
+> > @@ -107,7 +107,7 @@ static int s3c64xx_cpufreq_set_target(struct cpufreq_policy *policy,
+> >  }
+> >  
+> >  #ifdef CONFIG_REGULATOR
+> > -static void __init s3c64xx_cpufreq_config_regulator(void)
+> > +static void s3c64xx_cpufreq_config_regulator(void)
+> >  {
+> >  	int count, v, i, found;
+> >  	struct cpufreq_frequency_table *freq;
 > 
-> Yes, unfortunately on s3c2410, s3c2412 and s3c2443.  I didn't notice
-> when sending patches for the s3c24xx-iis and s3c2440-sdi drivers 
-> the dma_slave maps were only added for s3c2440 (commit 34681d84a0f7cc2
-> dmaengine: s3c24xx: Add dma_slave_map for s3c2440 devices) and not for
-> remaining SoCs covered by these DMA client drivers.
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Okay, so either entire pull goes into v4.10 or I will need a resend of
-this one patch with a little bit extended message why this is a v4.10
-fix.
+Rafael,
+Are you going to pick it up?
 
-BR,
+Best regards,
 Krzysztof
