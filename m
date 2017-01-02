@@ -1,184 +1,60 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Mon, 2 Jan 2017 18:52:45 +0530
-Subject: [PATCH V7 5/8] arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED
-In-Reply-To: <0f67b88d-5b93-f9a8-7c70-900170a4e9c2@arm.com>
-References: <1481567927-14791-1-git-send-email-sricharan@codeaurora.org>
- <1481567927-14791-6-git-send-email-sricharan@codeaurora.org>
- <7d09fc5a-9425-c171-e469-2759534de2dc@arm.com>
- <002301d2554e$89112d20$9b338760$@codeaurora.org>
- <4e6ebf88-0138-afce-d752-56b66d69772f@arm.com>
- <005f01d25571$3f75b5f0$be6121d0$@codeaurora.org>
- <0f67b88d-5b93-f9a8-7c70-900170a4e9c2@arm.com>
-Message-ID: <000101d264fb$53c453b0$fb4cfb10$@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Jan 2017 13:27:20 +0000
+Subject: [PATCH] serial: 8250: use initializer instead of memset to clear
+ local struct
+In-Reply-To: <20161223072026.GA23895@kroah.com>
+References: <1482463308-28968-1-git-send-email-yamada.masahiro@socionext.com>
+ <20161223072026.GA23895@kroah.com>
+Message-ID: <20170102132719.GD14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Fri, Dec 23, 2016 at 08:20:26AM +0100, Greg Kroah-Hartman wrote:
+> On Fri, Dec 23, 2016 at 12:21:48PM +0900, Masahiro Yamada wrote:
+> > Leave the way of zero-out to the compiler's decision; the compiler
+> > may know a more optimized way than calling memset().
+> 
+> But no, it doesn't, it will leave "blank" areas in the structure with
+> bad data in it, which is why we do memset.  See the tree-wide fixups we
+> made about a year ago for this very issue.  Are you sure none of these
+> structures get copied to userspace?
+> 
+> > It may end up with memset() for big structures like this after all,
+> > but the code will be cleaner at least.
+> 
+> Please leave it as-is, unless you see a measured speedup.
 
->>
->> <snip..>
->>
->>>>>>>  		return prot | IOMMU_READ | IOMMU_WRITE;
->>>>>>
->>>>>> ...and applying against -next now also needs this hunk:
->>>>>>
->>>>>> @@ -639,7 +639,7 @@ dma_addr_t iommu_dma_map_resource(struct device
->>>>>> *dev, phys_addr_t phys,
->>>>>> 		size_t size, enum dma_data_direction dir, unsigned long attrs)
->>>>>> {
->>>>>> 	return __iommu_dma_map(dev, phys, size,
->>>>>> -			dma_direction_to_prot(dir, false) | IOMMU_MMIO);
->>>>>> +			dma_info_to_prot(dir, false, attrs) | IOMMU_MMIO);
->>>>>> }
->>>>>>
->>>>>> void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
->>>>>>
->>>>>> With those two issues fixed up, I've given the series (applied to
->>>>>> next-20161213) a spin on a SMMUv3/PL330 fast model and it still checks out.
->>>>>>
->>>>>
->>>>> oops, sorry that i missed this in rebase. I can repost now with this fixed,
->>>>> 'checks out' you mean something is not working correct ?
->>>>
->>>> No, I mean it _is_ still correct - I guess that's more of an idiom than
->>>> I thought :)
->>>>
->>>
->>> ha ok, thanks for the testing as well. I will just send a v8 with those two fixed now.
->>
->> Just while checking that i have not missed anything else, realized that the
->> dma-mapping apis in arm as to be modified to pass the PRIVILIGED attributes
->> as well. While my testing path was using the iommu_map directly i was not
->> seeing this, but then i did a patch like below. I will just figure out another
->> other codebase where the master uses the dma apis, test and add it in the
->> V8 that i would send.
->
->True, adding support to 32-bit as well can't hurt, and I guess it's
->equally relevant to QC's GPU use-case. I haven't considered it myself
->because AArch32 is immune to the specific PL330 problem which caught me
->out - that subtle corner of VMSAv8 is unique to AArch64.
->
->> From: Sricharan R <sricharan@codeaurora.org>
->> Date: Tue, 13 Dec 2016 23:25:01 +0530
->> Subject: [PATCH V8 6/9] arm/dma-mapping: Implement DMA_ATTR_PRIVILEGED
->>
->> The newly added DMA_ATTR_PRIVILEGED is useful for creating mappings that
->> are only accessible to privileged DMA engines.  Implementing it in dma-mapping
->> for it to get used from the dma mappings apis.
->>
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->>  arch/arm/mm/dma-mapping.c | 24 +++++++++++++++---------
->>  1 file changed, 15 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->> index ab77100..e0d9923 100644
->> --- a/arch/arm/mm/dma-mapping.c
->> +++ b/arch/arm/mm/dma-mapping.c
->> @@ -1394,7 +1394,8 @@ static int __iommu_free_buffer(struct device *dev, struct page **pages,
->>   * Create a mapping in device IO address space for specified pages
->>   */
->>  static dma_addr_t
->> -__iommu_create_mapping(struct device *dev, struct page **pages, size_t size)
->> +__iommu_create_mapping(struct device *dev, struct page **pages, size_t size,
->> +		       unsigned long attrs)
->>  {
->>  	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
->>  	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
->> @@ -1419,7 +1420,7 @@ static int __iommu_free_buffer(struct device *dev, struct page **pages,
->>
->>  		len = (j - i) << PAGE_SHIFT;
->>  		ret = iommu_map(mapping->domain, iova, phys, len,
->> -				IOMMU_READ|IOMMU_WRITE);
->> +				__dma_info_to_prot(DMA_BIRECTIONAL, attrs));
->>  		if (ret < 0)
->>  			goto fail;
->>  		iova += len;
->> @@ -1476,7 +1477,8 @@ static struct page **__iommu_get_pages(void *cpu_addr, unsigned long attrs)
->>  }
->>
->>  static void *__iommu_alloc_simple(struct device *dev, size_t size, gfp_t gfp,
->> -				  dma_addr_t *handle, int coherent_flag)
->> +				  dma_addr_t *handle, int coherent_flag,
->> +				  unsigned long attrs)
->>  {
->>  	struct page *page;
->>  	void *addr;
->> @@ -1488,7 +1490,7 @@ static void *__iommu_alloc_simple(struct device *dev, size_t size, gfp_t gfp,
->>  	if (!addr)
->>  		return NULL;
->>
->> -	*handle = __iommu_create_mapping(dev, &page, size);
->> +	*handle = __iommu_create_mapping(dev, &page, size, attrs);
->>  	if (*handle == DMA_ERROR_CODE)
->>  		goto err_mapping;
->>
->> @@ -1522,7 +1524,8 @@ static void *__arm_iommu_alloc_attrs(struct device *dev, size_t size,
->>
->>  	if (coherent_flag  == COHERENT || !gfpflags_allow_blocking(gfp))
->>  		return __iommu_alloc_simple(dev, size, gfp, handle,
->> -					    coherent_flag);
->> +					    coherent_flag,
->> +					    attrs);
->
->Super-nit: unnecessary line break.
->
->>
->>  	/*
->>  	 * Following is a work-around (a.k.a. hack) to prevent pages
->> @@ -1672,10 +1675,13 @@ static int arm_iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
->>  					 GFP_KERNEL);
->>  }
->>
->> -static int __dma_direction_to_prot(enum dma_data_direction dir)
->> +static int __dma_info_to_prot(enum dma_data_direction dir, unsigned long attrs)
->>  {
->>  	int prot;
->>
->> +	if (attrs & DMA_ATTR_PRIVILEGED)
->> +		prot |= IOMMU_PRIV;
->> +
->>  	switch (dir) {
->>  	case DMA_BIDIRECTIONAL:
->>  		prot = IOMMU_READ | IOMMU_WRITE;
->> @@ -1722,7 +1728,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
->>  		if (!is_coherent && (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
->>  			__dma_page_cpu_to_dev(sg_page(s), s->offset, s->length, dir);
->>
->> -		prot = __dma_direction_to_prot(dir);
->> +		prot = __dma_info_to_prot(dir, attrs);
->>
->>  		ret = iommu_map(mapping->domain, iova, phys, len, prot);
->>  		if (ret < 0)
->> @@ -1930,7 +1936,7 @@ static dma_addr_t arm_coherent_iommu_map_page(struct device *dev, struct page *p
->>  	if (dma_addr == DMA_ERROR_CODE)
->>  		return dma_addr;
->>
->> -	prot = __dma_direction_to_prot(dir);
->> +	prot = __dma_info_to_prot(dir, attrs);
->>
->>  	ret = iommu_map(mapping->domain, dma_addr, page_to_phys(page), len, prot);
->>  	if (ret < 0)
->> @@ -2036,7 +2042,7 @@ static dma_addr_t arm_iommu_map_resource(struct device *dev,
->>  	if (dma_addr == DMA_ERROR_CODE)
->>  		return dma_addr;
->>
->> -	prot = __dma_direction_to_prot(dir) | IOMMU_MMIO;
->> +	prot = __dma_info_to_prot(dir, attrs) | IOMMU_MMIO;
->>
->>  	ret = iommu_map(mapping->domain, dma_addr, addr, len, prot);
->>  	if (ret < 0)
->>
->
->Looks reasonable to me. Assuming it survives testing:
->
->Acked-by: Robin Murphy <robin.murphy@arm.com>
+We can probably have both... we have an "optimisation" in ARM for
+zero-based memset()s which was beneficial with older compilers, but
+I suspect GCC 4 does a much better job itself of optimising
+memset().  arch/arm/include/asm/string.h:
 
-Posted V8 [1]. I changed a few more things after the testing,
-though functionally the same. So have not taken your ack and
-would be nice to have it once again
+#define memset(p,v,n)                                                   \
+        ({                                                              \
+                void *__p = (p); size_t __n = n;                        \
+                if ((__n) != 0) {                                       \
+                        if (__builtin_constant_p((v)) && (v) == 0)      \
+                                __memzero((__p),(__n));                 \
+                        else                                            \
+                                memset((__p),(v),(__n));                \
+                }                                                       \
+                (__p);                                                  \
+        })
 
-[1] https://lkml.org/lkml/2017/1/2/224
+I suspect we should get rid of that with GCC >= 4.
 
-Regards,
- Sricharan
+I also suspect that it'll make no difference for uart_8250_port, as
+it's rather large, but for smaller structures (eg, up to a cache line)
+GCC can probably optimise to inline initialisation.
+
+So, probably something for resulting code and performance analysis...
+
+It's worth noting that 32-bit x86 always uses __builtin_memset() for
+memset() on GCC >= 4, so GCC's memset() optimisations must be safe for
+structures copied to userspace, or if not, 32-bit x86 is probably
+rather buggy.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
