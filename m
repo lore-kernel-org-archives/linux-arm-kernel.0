@@ -1,168 +1,85 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon,  2 Jan 2017 21:31:45 +0800
-Subject: [PATCH v6 14/14] irqchip: mbigen: Add ACPI support
-In-Reply-To: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
-References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1483363905-2806-15-git-send-email-hanjun.guo@linaro.org>
+From: Jose.Abreu@synopsys.com (Jose Abreu)
+Date: Mon, 2 Jan 2017 13:34:51 +0000
+Subject: [PATCH v2 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
+ stores scenario in vdma
+In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A65FFE9@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1482483135-14767-1-git-send-email-appanad@xilinx.com>
+ <1482483135-14767-3-git-send-email-appanad@xilinx.com>
+ <a269409d-103e-1650-5df6-cc8743ed62cf@synopsys.com>
+ <C246CAC1457055469EF09E3A7AC4E11A4A65FFE9@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <45807619-bf6a-0174-c102-12c03aeb575c@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the preparation of platform msi support and interrupt producer
-in DSDT, we can add mbigen ACPI support now.
+Hi Kedar,
 
-We are using _PRS methd to indicate number of irq pins instead
-of num_pins in DT to avoid _DSD usage in this case.
 
-For mbi-gen,
-    Device(MBI0) {
-          Name(_HID, "HISI0152")
-          Name(_UID, Zero)
-          Name(_CRS, ResourceTemplate() {
-                  Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
-          })
+On 02-01-2017 11:46, Appana Durga Kedareswara Rao wrote:
+> Hi Jose Miguel Abreu,
+> 	
+> 	Thanks for the review....
+> Sorry for the delay in the reply please see comments inline...
+>
+>>
 
-          Name (_PRS, ResourceTemplate() {
-		  Interrupt(ResourceProducer,...) {12,14,....}
-          })
-    }
+[snip]
 
-For devices,
+>> What if we reach here and j < num_frms? It can happen because if
+>> the pending list is empty the loop breaks. Then VDMA will start
+>> with framebuffers having address 0x0. You should only program
+>> vsize when j > num_frms or when we have already previously set
+>> the framebuffers (i.e. when submitcount has already been
+>> incremented num_frms at least once).
+> In case of j < num_frms VDMA won't start the frame buffer having address 0
+> As we are programming the VDMA buffer address based on the desc_submitcount value only i.e. i.
+>
+> Code snippet in the driver doing this:
+>                          list_for_each_entry(segment, &desc->segments, node) {
+>                                 if (chan->ext_addr)
+>                                         vdma_desc_write_64(chan,
+>                                           XILINX_VDMA_REG_START_ADDRESS_64(i++),
+>                                           segment->hw.buf_addr,
+>                                           segment->hw.buf_addr_msb);
+>                                 else
+>                                         vdma_desc_write(chan,
+>                                             XILINX_VDMA_REG_START_ADDRESS(i++),
+>                                             segment->hw.buf_addr);
+>
+>                                 last = segment;
+>                         } 
+>
+> Initially desc_submitcount will be zero.
+> Let's assume h/w is configured for 10 frames and user submitted only 5 frames.
+> And triggered the VDMA h/w using issue_pending in this case desc_submitcount will be 5.
+> desc_submitcount will become zero again only when
+> User submits more frames than h/w capable or user submit frames up to h/w capable.
+>
+> If my understanding is wrong could you please elaborate the race condition that you are talking above?
 
-   Device(COM0) {
-          Name(_HID, "ACPIIDxx")
-          Name(_UID, Zero)
-          Name(_CRS, ResourceTemplate() {
-                 Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
-		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12}
-          })
-    }
+I just noticed there is a write to XILINX_DMA_REG_FRMSTORE which,
+by the description in the VDMA databook, allows to modify the
+total number of framebuffers.
 
-With the helpe of platform msi and interrupt producer, then devices
-will get the virq from mbi-gen's irqdomain.
+Does it correct this situation: Lets assume VDMA has 10
+framebuffers in HW and user only submits 5 descriptors. Then
+vsize will be programmed and VDMA will start. The VDMA will start
+in fb 1, then 2, ... until 5 its all ok. But then after the fb 5
+the VDMA will jump to fb 6, this fb will have no address because
+the user only submitted 5 addresses so VDMA will try to write to
+location 0x0 of system mem (if using S2MM channel). ?
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Reviewed-by: Majun <majun258@huawei.com>
-Tested-by: Majun <majun258@huawei.com>
-Tested-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
----
- drivers/irqchip/irq-mbigen.c | 70 ++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 67 insertions(+), 3 deletions(-)
+If so then there is no race condition, but the HW image that I
+have does not have this register enabled so I was getting this
+result (memory corruption because not all framebuffers had
+addresses set).
 
-diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-index 4e11da5..17d35fa 100644
---- a/drivers/irqchip/irq-mbigen.c
-+++ b/drivers/irqchip/irq-mbigen.c
-@@ -16,6 +16,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/acpi.h>
- #include <linux/interrupt.h>
- #include <linux/irqchip.h>
- #include <linux/module.h>
-@@ -180,7 +181,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
- 				    unsigned long *hwirq,
- 				    unsigned int *type)
- {
--	if (is_of_node(fwspec->fwnode)) {
-+	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
- 		if (fwspec->param_count != 2)
- 			return -EINVAL;
- 
-@@ -271,6 +272,54 @@ static int mbigen_of_create_domain(struct platform_device *pdev,
- 	return 0;
- }
- 
-+#ifdef CONFIG_ACPI
-+static acpi_status mbigen_acpi_process_resource(struct acpi_resource *ares,
-+					     void *context)
-+{
-+	struct acpi_resource_extended_irq *ext_irq;
-+	u32 *num_irqs = context;
-+
-+	switch (ares->type) {
-+	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
-+		ext_irq = &ares->data.extended_irq;
-+		*num_irqs += ext_irq->interrupt_count;
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	return AE_OK;
-+}
-+
-+static int mbigen_acpi_create_domain(struct platform_device *pdev,
-+				     struct mbigen_device *mgn_chip)
-+{
-+	struct irq_domain *domain;
-+	u32 num_msis = 0;
-+	acpi_status status;
-+
-+	status = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), METHOD_NAME__PRS,
-+				     mbigen_acpi_process_resource, &num_msis);
-+        if (ACPI_FAILURE(status) || num_msis == 0)
-+		return -EINVAL;
-+
-+	domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
-+						   mbigen_write_msg,
-+						   &mbigen_domain_ops,
-+						   mgn_chip);
-+	if (!domain)
-+		return -ENOMEM;
-+
-+	return 0;
-+}
-+#else
-+static int mbigen_acpi_create_domain(struct platform_device *pdev,
-+				     struct mbigen_device *mgn_chip)
-+{
-+	return -ENODEV;
-+}
-+#endif
-+
- static int mbigen_device_probe(struct platform_device *pdev)
- {
- 	struct mbigen_device *mgn_chip;
-@@ -288,9 +337,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
- 	if (IS_ERR(mgn_chip->base))
- 		return PTR_ERR(mgn_chip->base);
- 
--	err = mbigen_of_create_domain(pdev, mgn_chip);
--	if (err)
-+	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
-+		err = mbigen_of_create_domain(pdev, mgn_chip);
-+	else if (ACPI_COMPANION(&pdev->dev))
-+		err = mbigen_acpi_create_domain(pdev, mgn_chip);
-+	else
-+		err = -EINVAL;
-+
-+	if (err) {
-+		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain", mgn_chip->base);
- 		return err;
-+	}
- 
- 	platform_set_drvdata(pdev, mgn_chip);
- 	return 0;
-@@ -302,10 +359,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
- };
- MODULE_DEVICE_TABLE(of, mbigen_of_match);
- 
-+static const struct acpi_device_id mbigen_acpi_match[] = {
-+        { "HISI0152", 0 },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
-+
- static struct platform_driver mbigen_platform_driver = {
- 	.driver = {
- 		.name		= "Hisilicon MBIGEN-V2",
- 		.of_match_table	= mbigen_of_match,
-+		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
- 	},
- 	.probe			= mbigen_device_probe,
- };
--- 
-1.9.1
+Best regards,
+Jose Miguel Abreu
+
+> 	
+> Regards,
+> Kedar.
+>
+>> Best regards,
+>> Jose Miguel Abreu
+>>
