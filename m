@@ -1,75 +1,47 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 2 Jan 2017 15:16:46 +0100
-Subject: [PATCH] tty/serial: atmel_serial: BUG: stop DMA from transmitting
- in stop_tx
-In-Reply-To: <059a5366-c0d4-ab89-d64a-dcf007bc9e91@atmel.com>
-References: <20161213162756.16139-1-richard.genoud@gmail.com>
- <059a5366-c0d4-ab89-d64a-dcf007bc9e91@atmel.com>
-Message-ID: <CACQ1gAiVc56TosMLMB-GSYW9M5m3Zy04RoPr=raoW-PpYEkgXA@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Jan 2017 14:22:28 +0000
+Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
+ enable panel
+In-Reply-To: <CACRpkdZE6VgJA27+Wh=Gxd7yOXpLMyT7yCB2PYA36y0gvosHFQ@mail.gmail.com>
+References: <20161221032717.13154-1-vz@mleia.com>
+ <CACRpkdZE6VgJA27+Wh=Gxd7yOXpLMyT7yCB2PYA36y0gvosHFQ@mail.gmail.com>
+Message-ID: <20170102142228.GI14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-01-02 12:13 GMT+01:00 Nicolas Ferre <nicolas.ferre@atmel.com>:
-> Le 13/12/2016 ? 17:27, Richard Genoud a ?crit :
->> If we don't disable the transmitter in atmel_stop_tx, the DMA buffer
->> continues to send data until it is emptied.
->> This cause problems with the flow control (CTS is asserted and data are
->> still sent).
->>
->> So, disabling the transmitter in atmel_stop_tx is a sane thing to do.
->>
->> Tested on at91sam9g35-cm(DMA)
->> Tested for regressions on sama5d2-xplained(Fifo) and at91sam9g20ek(PDC)
->>
->> Cc: <stable@vger.kernel.org> (beware, this won't apply before 4.3)
->> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->
->> ---
->>  drivers/tty/serial/atmel_serial.c | 11 +++++++++++
->>  1 file changed, 11 insertions(+)
->>
->> NB: this is not for the 4.10 merge window, I'm just sending it now to
->> have some comments if someone is againts it.
->>
->> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
->> index 168b10cad47b..f9d42de5ab2d 100644
->> --- a/drivers/tty/serial/atmel_serial.c
->> +++ b/drivers/tty/serial/atmel_serial.c
->> @@ -481,6 +481,14 @@ static void atmel_stop_tx(struct uart_port *port)
->>               /* disable PDC transmit */
->>               atmel_uart_writel(port, ATMEL_PDC_PTCR, ATMEL_PDC_TXTDIS);
->>       }
->> +
->> +     /*
->> +      * Disable the transmitter.
->> +      * This is mandatory when DMA is used, otherwise the DMA buffer
->> +      * is fully transmitted.
->> +      */
->> +     atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXDIS);
->> +
->>       /* Disable interrupts */
->>       atmel_uart_writel(port, ATMEL_US_IDR, atmel_port->tx_done_mask);
->>
->> @@ -513,6 +521,9 @@ static void atmel_start_tx(struct uart_port *port)
->>
->>       /* Enable interrupts */
->>       atmel_uart_writel(port, ATMEL_US_IER, atmel_port->tx_done_mask);
->> +
->> +     /* re-enable the transmitter */
->> +     atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
->>  }
->>
->>  /*
->>
->
->
-> --
-> Nicolas Ferre
+On Fri, Dec 30, 2016 at 09:23:59AM +0100, Linus Walleij wrote:
+> On Wed, Dec 21, 2016 at 4:27 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
+> 
+> > The changeset contains a number of cleanups, changed semantics of
+> > init_panel() callback, which allows to simplify getting of panel
+> > properties from panel device tree node, and a handling of optional
+> > "enable-gpios" panel property, the latter is described in
+> > display/panel/panel-dpi.txt device tree binding documentation, but
+> > it has been unsupported by the ARM CLCD driver.
+> >
+> > Vladimir Zapolskiy (4):
+> >   video: ARM CLCD: sort included headers out alphabetically
+> >   video: ARM CLCD: use panel device node for panel initialization
+> >   video: ARM CLCD: use panel device node for getting backlight and mode
+> >   video: ARM CLCD: add support of an optional GPIO to enable panel
+> 
+> As you may have seen Tomi has stepped down as FBDEV maintainer and
+> this subsystem is now orphaned.
+> 
+> I guess Andrew Morton merges patches for it in this case, he usually does.
+> 
+> But what we should actually do is create a new DRM driver for CLCD
+> in drivers/gpu/drm/arm/clcd*
+> 
+> It's maybe not a small undertaking :(
+> 
+> But in case you're interested in the job, I will pitch in and test the result
+> on all ARM reference designs plus Nomadik.
 
-Greg, could you also take this patch in your tree ?
+A DRM driver for it would probably be a good idea, but dealing with all
+the weird and wonderful connection arrangements may not be that easy...
 
-Thanks !
-
-Richard.
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
