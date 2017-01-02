@@ -1,30 +1,18 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Mon,  2 Jan 2017 11:18:02 +0100
-Subject: [PATCH] ARM: imx: Add rtc support to i.MX31 PDK board.
-Message-ID: <1483352282-28970-1-git-send-email-lilja.magnus@gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 2 Jan 2017 15:53:26 +0530
+Subject: [PATCH] bus: da850-mstpri: fix my e-mail address
+In-Reply-To: <1482141491-26924-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1482141491-26924-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <2443f51b-4020-2c91-1bfe-eabaa7bab513@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable support for i.MX31 RTC on the PDK board.
+On Monday 19 December 2016 03:28 PM, Bartosz Golaszewski wrote:
+> I noticed my e-mail address is wrong in this one. This patch fixes it.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Tested on actual hardware.
+Applied to v4.11/fixes-non-critical
 
-Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
----
- arch/arm/mach-imx/mach-mx31_3ds.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
-index 12b8a52..c6a12ac 100644
---- a/arch/arm/mach-imx/mach-mx31_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx31_3ds.c
-@@ -710,6 +710,7 @@ static void __init mx31_3ds_init(void)
- 	imx31_add_imx_keypad(&mx31_3ds_keymap_data);
- 
- 	imx31_add_imx2_wdt();
-+	imx31_add_mxc_rtc();
- 	imx31_add_imx_i2c0(&mx31_3ds_i2c0_data);
- 
- 	imx31_add_spi_imx0(&spi0_pdata);
--- 
-2.7.4
+Thanks,
+Sekhar
