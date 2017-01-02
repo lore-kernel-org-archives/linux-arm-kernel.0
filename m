@@ -1,98 +1,41 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 2 Jan 2017 15:03:04 +0800
-Subject: [PATCH v3 2/3] ARM: dts: imx6: Support Savageboard dual
-In-Reply-To: <20161209010436.7994-3-woogyom.kim@gmail.com>
-References: <20161209010436.7994-1-woogyom.kim@gmail.com>
- <20161209010436.7994-3-woogyom.kim@gmail.com>
-Message-ID: <20170102070302.GD20956@dragon>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 2 Jan 2017 12:39:03 +0530
+Subject: [PATCH] cpufreq: s3c64xx: remove incorrect __init annotation
+In-Reply-To: <20161216090625.2235668-1-arnd@arndb.de>
+References: <20161216090625.2235668-1-arnd@arndb.de>
+Message-ID: <20170102070903.GC8588@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2016 at 10:04:35AM +0900, Milo Kim wrote:
-> Common savageboard DT file is used for board support.
-> Specify this dtb file for i.MX6Q build.
+On 16-12-16, 10:06, Arnd Bergmann wrote:
+> s3c64xx_cpufreq_config_regulator is incorrectly annotated
+> as __init, since the caller is also not init:
 > 
-> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+> WARNING: vmlinux.o(.text+0x92fe1c): Section mismatch in reference from the function s3c64xx_cpufreq_driver_init() to the function .init.text:s3c64xx_cpufreq_config_regulator()
+> 
+> With modern gcc versions, the function gets inline, so we don't
+> see the warning, this only happens with gcc-4.6 and older.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  arch/arm/boot/dts/Makefile               |  1 +
->  arch/arm/boot/dts/imx6dl-savageboard.dts | 50 ++++++++++++++++++++++++++++++++
->  2 files changed, 51 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6dl-savageboard.dts
+>  drivers/cpufreq/s3c64xx-cpufreq.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index c558ba7..64660c7 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -348,6 +348,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->  	imx6dl-sabreauto.dtb \
->  	imx6dl-sabrelite.dtb \
->  	imx6dl-sabresd.dtb \
-> +	imx6dl-savageboard.dtb \
->  	imx6dl-ts4900.dtb \
->  	imx6dl-tx6dl-comtft.dtb \
->  	imx6dl-tx6s-8034.dtb \
-> diff --git a/arch/arm/boot/dts/imx6dl-savageboard.dts b/arch/arm/boot/dts/imx6dl-savageboard.dts
-> new file mode 100644
-> index 0000000..2cac30d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6dl-savageboard.dts
-> @@ -0,0 +1,50 @@
-> +/*
-> + * Copyright (C) 2016 Milo Kim <woogyom.kim@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License
-> + *     version 2 as published by the Free Software Foundation.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "imx6dl.dtsi"
-> +#include "imx6qdl-savageboard.dtsi"
-> +
-> +/ {
-> +	model = "Poslab SavageBoard Dual";
-> +	compatible = "poslab,imx6dl-savageboard", "fsl,imx6dl";
+> diff --git a/drivers/cpufreq/s3c64xx-cpufreq.c b/drivers/cpufreq/s3c64xx-cpufreq.c
+> index 176e84cc3991..0cb9040eca49 100644
+> --- a/drivers/cpufreq/s3c64xx-cpufreq.c
+> +++ b/drivers/cpufreq/s3c64xx-cpufreq.c
+> @@ -107,7 +107,7 @@ static int s3c64xx_cpufreq_set_target(struct cpufreq_policy *policy,
+>  }
+>  
+>  #ifdef CONFIG_REGULATOR
+> -static void __init s3c64xx_cpufreq_config_regulator(void)
+> +static void s3c64xx_cpufreq_config_regulator(void)
+>  {
+>  	int count, v, i, found;
+>  	struct cpufreq_frequency_table *freq;
 
-It seems that 'poslab' should be added to
-Documentation/devicetree/bindings/vendor-prefixes.txt.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Shawn
-
-> +};
-> -- 
-> 2.9.3
-> 
+-- 
+viresh
