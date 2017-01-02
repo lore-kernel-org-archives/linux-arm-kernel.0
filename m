@@ -1,36 +1,70 @@
-From: rafalo@cadence.com (Rafal Ozieblo)
-Date: Mon, 2 Jan 2017 09:36:10 +0000
-Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
-References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com> 
-Message-ID: <BN3PR07MB2516815EDE69ACDCE27F81A3C96F0@BN3PR07MB2516.namprd07.prod.outlook.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Mon, 2 Jan 2017 12:49:07 +0300
+Subject: How should we handle variable address space sizes (Re: [RFC 3/4]
+ x86/mm: define TASK_SIZE as current->mm->task_size)
+In-Reply-To: <CALCETrXMCVOmVcQYxF_ghPdEjLuNNqbcnoRKRVpJegsQ=SPEFQ@mail.gmail.com>
+References: <CALCETrXMCVOmVcQYxF_ghPdEjLuNNqbcnoRKRVpJegsQ=SPEFQ@mail.gmail.com>
+Message-ID: <20170102094907.GC30735@node.shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Rafal Ozieblo 
-> Sent: 28 grudnia 2016 14:23
-> Subject: RE: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
+On Fri, Dec 30, 2016 at 06:11:05PM -0800, Andy Lutomirski wrote:
+> On Fri, Dec 30, 2016 at 7:56 AM, Dmitry Safonov <dsafonov@virtuozzo.com> wrote:
+> > Keep task's virtual address space size as mm_struct field which
+> > exists for a long time - it's initialized in setup_new_exec()
+> > depending on the new task's personality.
+> > This way TASK_SIZE will always be the same as current->mm->task_size.
+> > Previously, there could be an issue about different values of
+> > TASK_SIZE and current->mm->task_size: e.g, a 32-bit process can unset
+> > ADDR_LIMIT_3GB personality (with personality syscall) and
+> > so TASK_SIZE will be 4Gb, which is larger than mm->task_size = 3Gb.
+> > As TASK_SIZE *and* current->mm->task_size are used both in code
+> > frequently, this difference creates a subtle situations, for example:
+> > one can mmap addresses > 3Gb, but they will be hidden in
+> > /proc/pid/pagemap as it checks mm->task_size.
+> > I've moved initialization of mm->task_size earlier in setup_new_exec()
+> > as arch_pick_mmap_layout() initializes mmap_legacy_base with
+> > TASK_UNMAPPED_BASE, which depends on TASK_SIZE.
 > 
-> > +static void gem_ptp_tx_hwtstamp(struct macb *bp, struct sk_buff *skb,
-> > +				int peer_ev)
-> > +{
-> > +	struct skb_shared_hwtstamps *shhwtstamps = skb_hwtstamps(skb);
-> > +	struct timespec64 ts;
-> > +	u64 ns;
-> > +
-> > +	/* PTP Peer Event Frame packets */
-> > +	if (peer_ev) {
-> > +		ts.tv_sec = gem_readl(bp, PEFTSL);
-> > +		ts.tv_nsec = gem_readl(bp, PEFTN);
-> > +
-> > +	/* PTP Event Frame packets */
-> > +	} else {
-> > +		ts.tv_sec = gem_readl(bp, EFTSL);
-> > +		ts.tv_nsec = gem_readl(bp, EFTN);
-> > +	}
-> I'm wondering what is a difference between timestamp in transmit buffer descriptor (Word 2 and 3) and PTP Event Frame Transmitted Seconds/Nanoseconds Register (0x1E0, 0x1E4).
+> I don't like this patch so much because I think that we should figure
+> out how this will all work in the long run first.  I've added some
+> more people to the thread because other arches have similar issues and
+> because x86 is about to get considerably more complicated (choices
+> include 3GB, 4GB, 47-bit, and 56-bit (the latter IIRC)).
 > 
-According Cadence Hardware team:
-"It is just that some customers prefer to have the time in the descriptors as that is provided per frame.
-The registers are simply overwritten when a new event frame is transmitted/received and so software could miss it."
-The question is are you sure that you read timestamp for current frame? (not for the next frame).
+> Here are a few of my thoughts on the matter.  This isn't all that well
+> thought out:
+> 
+> The address space limit, especially if CRIU is in play, isn't really a
+> hard limit.  For example, you could allocate high memory then lower
+> the limit.  Similarly, I see no reason that an x32 program should be
+> forbidden from mapping some high addresses or, similarly, that an i386
+> program can't (if it really wanted to) do a 64-bit mmap() and get a
+> high address.
+> 
+> On that note, can we just *delete* the task_size check from pagemap?
+> It's been there since the very beginning:
+> 
+> commit 85863e475e59afb027b0113290e3796ee6020b7d
+> Author: Matt Mackall <mpm@selenic.com>
+> Date:   Mon Feb 4 22:29:04 2008 -0800
+> 
+>     maps4: add /proc/pid/pagemap interface
+> 
+> and there's no explanation for why it's needed.
+> 
+> So maybe we should have a *number* (not a bit) that indicates the
+> maximum address that mmap() will return unless an override is in use.
+> Since common practice seems to be to stick this in the personality
+> field, we may need some fancy encoding.  Executing a setuid binary
+> needs to reset to the default, and personality handles that.
+
+If we want to be able to specify arbitrary address as maximum, a fancy
+encoding would need to claim 51 bits (63 VA - 12 in-page address) on x86
+from the persona flag.
+To me, it's stretching personality interface too far.
+
+Maybe it's easier to reset the rlimit for suid binaries?
+
+-- 
+ Kirill A. Shutemov
