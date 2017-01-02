@@ -1,601 +1,119 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Mon, 2 Jan 2017 14:20:08 +0200
-Subject: [PATCH] DTS: MCCMON6: IMX: Provide support for iMX6Q based
- Liebherr mccmon6 board
-In-Reply-To: <1482794396-16153-1-git-send-email-l.majewski@majess.pl>
-References: <1482794396-16153-1-git-send-email-l.majewski@majess.pl>
-Message-ID: <610d3784-ee2e-c213-2a8c-6db6d7af578b@mentor.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Mon,  2 Jan 2017 18:42:35 +0530
+Subject: [PATCH V8 0/9] Add support for privileged mappings
+Message-ID: <1483362764-11990-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lukasz,
+This series is a resend of the V5 that Mitch sent sometime back [2]
+All the patches are the same and i have just rebased. Redid patch [3],
+as it does not apply in this code base. Added a couple of more patches
+[4], [5] from Robin for adding the privileged attributes to armv7s format
+and arm-smmuv3 revert. Added a patch for passing in the privileged
+attributes from arm32 dma-mapping apis as well.
 
-On 12/27/2016 01:19 AM, Lukasz Majewski wrote:
-> Signed-off-by: Lukasz Majewski <l.majewski@majess.pl>
+The following patch to the ARM SMMU driver:
 
-please add a commit message with a short description of the change.
+    commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
+    Author: Robin Murphy <robin.murphy@arm.com>
+    Date:   Tue Jan 26 18:06:34 2016 +0000
+    
+        iommu/arm-smmu: Treat all device transactions as unprivileged
 
-Also change subject line to "ARM: dts: imx6q: Add mccmon6 board support".
+started forcing all SMMU transactions to come through as "unprivileged".
+The rationale given was that:
 
-> ---
-> MCCMON6 board support depends on following patches:
-> 
-> 1. "video: backlight: pwm_bl: Initialize fb_bl_on[x] and use_count during pwm_backlight_probe()"
-> 	http://patchwork.ozlabs.org/patch/708844/
-> 
-> 2. "pwm: imx: Provide atomic operation for IMX PWM driver"
-> 	http://patchwork.ozlabs.org/patch/708847/ - http://patchwork.ozlabs.org/patch/708843/
-> 
-> 
-> ---
->  arch/arm/boot/dts/Makefile          |   1 +
->  arch/arm/boot/dts/imx6q-mccmon6.dts | 469 ++++++++++++++++++++++++++++++++++++
->  2 files changed, 470 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6q-mccmon6.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index c558ba7..7ce1080 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -382,6 +382,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->  	imx6q-h100.dtb \
->  	imx6q-hummingboard.dtb \
->  	imx6q-icore-rqs.dtb \
-> +	imx6q-mccmon6.dtb \
->  	imx6q-marsboard.dtb \
+  (1) There is no way in the IOMMU API to even request privileged
+      mappings.
 
-Please add a new line preserving alphabetical order.
+  (2) It's difficult to implement a DMA mapper that correctly models the
+      ARM VMSAv8 behavior of unprivileged-writeable =>
+      privileged-execute-never.
 
->  	imx6q-nitrogen6x.dtb \
->  	imx6q-nitrogen6_max.dtb \
-> diff --git a/arch/arm/boot/dts/imx6q-mccmon6.dts b/arch/arm/boot/dts/imx6q-mccmon6.dts
-> new file mode 100644
-> index 0000000..7445d01
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-mccmon6.dts
-> @@ -0,0 +1,469 @@
-> +/*
-> + * Copyright 2016
+This series rectifies (1) by introducing an IOMMU API for privileged
+mappings and implements it in io-pgtable-arm.
 
-Copyright holder is missing.
+This series rectifies (2) by introducing a new dma attribute
+(DMA_ATTR_PRIVILEGED) for users of the DMA API that need privileged
+mappings which are inaccessible to lesser-privileged execution levels, and
+implements it in the arm64 IOMMU DMA mapper.  The one known user (pl330.c)
+is converted over to the new attribute.
 
-> + *
-> + * Author: Lukasz Majewski <l.majewski@majess.pl>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
+Jordan and Jeremy can provide more info on the use case if needed, but the
+high level is that it's a security feature to prevent attacks such as [1].
 
-Please add an empty line here to improve readability.
+Note that, i tested this on arm64 with arm-smmuv2, short descriptor changes,
+tested this on arm32 platform as well and do not have an platform to test
+this with arm-smmuv3.
 
-> +/dts-v1/;
+[1] https://github.com/robclark/kilroy
+[2] https://lkml.org/lkml/2016/7/27/590
+[3] https://patchwork.kernel.org/patch/9250493/
+[4] http://www.linux-arm.org/git?p=linux-rm.git;a=commit;h=1291bd74f05d31da1dab3df02987cba5bd25849b
+[5] http://www.linux-arm.org/git?p=linux-rm.git;a=commit;h=a79c1c6333f26849dba418cd92de26b60f5954f3
 
-Please add an empty line here to improve readability.
+Changelog:
+ v7..v8
+    - Added a patch for passing in the privileged attributes from arm32
+      dma-mapping apis as well.
 
-> +#include "imx6q.dtsi"
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/pwm/pwm.h>
-> +
-> +/ {
-> +	model = "Monitor6 i.MX6 Quad Board";
+ v6..v7
+    - Added couple of more patches, picked up acks, updated commit log
 
-Missing hardware vendor name.
+ v5..v6
+    - Rebased all the patches and redid 6/6 as it does not apply in
+      this code base. 
 
-> +	compatible = "mccmon6", "fsl,imx6q";
+ v4..v5
+    - Simplified patch 4/6 (suggested by Robin Murphy).
 
-Missing hardware vendor prefix before "mccmon6".
+ v3..v4
+    - Rebased and reworked on linux next due to the dma attrs rework going
+      on over there.  Patches changed: 3/6, 4/6, and 5/6.
 
-> +
-> +	memory {
-> +		reg = <0x10000000 0x80000000>;
-> +	};
-> +
-> +	ethernet0 {
-> +		status = "okay";
-> +	};
+ v2..v3
+    - Incorporated feedback from Robin:
+      * Various comments and re-wordings.
+      * Use existing bit definitions for IOMMU_PRIV implementation
+        in io-pgtable-arm.
+      * Renamed and redocumented dma_direction_to_prot.
+      * Don't worry about executability in new DMA attr.
 
-It looks like a useless device node, you have a description of &fec already.
+ v1..v2
+    - Added a new DMA attribute to make executable privileged mappings
+      work, and use that in the pl330 driver (suggested by Will).
 
-> +
-> +	backlight_lvds: backlight {
-> +		compatible = "pwm-backlight";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_display>;
+Jeremy Gebben (1):
+  iommu/io-pgtable-arm: add support for the IOMMU_PRIV flag
 
-I would recommend to rename "pinctrl_display" to "pinctrl_backlight".
+Mitchel Humpherys (4):
+  iommu: add IOMMU_PRIV attribute
+  common: DMA-mapping: add DMA_ATTR_PRIVILEGED attribute
+  arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED
+  dmaengine: pl330: Make sure microcode is privileged
 
-> +		pwms = <&pwm2 0 5000000 PWM_POLARITY_INVERTED>;
+Robin Murphy (2):
+  iommu/io-pgtable-arm-v7s: Add support for the IOMMU_PRIV flag
+  Revert "iommu/arm-smmu: Set PRIVCFG in stage 1 STEs"
 
-This should work when extension to the i.MX PWM driver is merged.
+Sricharan R (2):
+  arm/dma-mapping: Implement DMA_ATTR_PRIVILEGED
+  iommu/arm-smmu: Set privileged attribute to 'default' instead of
+    'unprivileged'
 
-> +		brightness-levels = <  0   1   2   3   4   5   6   7   8   9
-> +				      10  11  12  13  14  15  16  17  18  19
-> +				      20  21  22  23  24  25  26  27  28  29
-> +				      30  31  32  33  34  35  36  37  38  39
-> +				      40  41  42  43  44  45  46  47  48  49
-> +				      50  51  52  53  54  55  56  57  58  59
-> +				      60  61  62  63  64  65  66  67  68  69
-> +				      70  71  72  73  74  75  76  77  78  79
-> +				      80  81  82  83  84  85  86  87  88  89
-> +				      90  91  92  93  94  95  96  97  98  99
-> +				     100 101 102 103 104 105 106 107 108 109
-> +				     110 111 112 113 114 115 116 117 118 119
-> +				     120 121 122 123 124 125 126 127 128 129
-> +				     130 131 132 133 134 135 136 137 138 139
-> +				     140 141 142 143 144 145 146 147 148 149
-> +				     150 151 152 153 154 155 156 157 158 159
-> +				     160 161 162 163 164 165 166 167 168 169
-> +				     170 171 172 173 174 175 176 177 178 179
-> +				     180 181 182 183 184 185 186 187 188 189
-> +				     190 191 192 193 194 195 196 197 198 199
-> +				     200 201 202 203 204 205 206 207 208 209
-> +				     210 211 212 213 214 215 216 217 218 219
-> +				     220 221 222 223 224 225 226 227 228 229
-> +				     230 231 232 233 234 235 236 237 238 239
-> +				     240 241 242 243 244 245 246 247 248 249
-> +				     250 251 252 253 254 255>;
+ Documentation/DMA-attributes.txt   | 10 +++++++
+ arch/arm/mm/dma-mapping.c          | 60 +++++++++++++++++++-------------------
+ arch/arm64/mm/dma-mapping.c        |  6 ++--
+ drivers/dma/pl330.c                |  5 ++--
+ drivers/iommu/arm-smmu-v3.c        |  7 +----
+ drivers/iommu/arm-smmu.c           |  2 +-
+ drivers/iommu/dma-iommu.c          | 12 ++++++--
+ drivers/iommu/io-pgtable-arm-v7s.c |  6 +++-
+ drivers/iommu/io-pgtable-arm.c     |  5 +++-
+ include/linux/dma-iommu.h          |  3 +-
+ include/linux/dma-mapping.h        |  7 +++++
+ include/linux/iommu.h              |  1 +
+ 12 files changed, 76 insertions(+), 48 deletions(-)
 
-I'm not sure that actually need such a long list of brightness levels.
-
-> +		default-brightness-level = <50>;
-> +		enable-gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
-> +	};
-> +
-> +	reg_lvds: regulator-lvds {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "lvds_ppen";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		regulator-boot-on;
-> +		gpio = <&gpio1 19 GPIO_ACTIVE_HIGH>;
-> +		enable-active-high;
-> +	};
-> +
-> +	panel-lvds0 {
-> +		compatible = "innolux,g121x1-l03";
-> +		backlight = <&backlight_lvds>;
-> +		power-supply = <&reg_lvds>;
-> +
-> +		port {
-> +			panel_in_lvds0: endpoint {
-> +				remote-endpoint = <&lvds0_out>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&i2c1 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c1>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c2 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c2>;
-> +	status = "okay";
-> +
-> +	pmic: pfuze100 at 08 {
-> +		compatible = "fsl,pfuze100";
-> +		reg = <0x08>;
-> +
-> +		regulators {
-> +			sw1a_reg: sw1ab {
-> +				regulator-min-microvolt = <300000>;
-> +				regulator-max-microvolt = <1875000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +				regulator-ramp-delay = <6250>;
-> +			};
-> +
-> +			sw1c_reg: sw1c {
-> +				regulator-min-microvolt = <300000>;
-> +				regulator-max-microvolt = <1875000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +				regulator-ramp-delay = <6250>;
-> +			};
-> +
-> +			sw2_reg: sw2 {
-> +				regulator-min-microvolt = <800000>;
-> +				regulator-max-microvolt = <3950000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			sw3a_reg: sw3a {
-> +				regulator-min-microvolt = <400000>;
-> +				regulator-max-microvolt = <1975000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			sw3b_reg: sw3b {
-> +				regulator-min-microvolt = <400000>;
-> +				regulator-max-microvolt = <1975000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			sw4_reg: sw4 {
-> +				regulator-min-microvolt = <800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +			};
-> +
-> +			swbst_reg: swbst {
-> +				regulator-min-microvolt = <5000000>;
-> +				regulator-max-microvolt = <5150000>;
-> +			};
-> +
-> +			snvs_reg: vsnvs {
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <3000000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vref_reg: vrefddr {
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vgen1_reg: vgen1 {
-> +				regulator-min-microvolt = <800000>;
-> +				regulator-max-microvolt = <1550000>;
-> +			};
-> +
-> +			vgen2_reg: vgen2 {
-> +				regulator-min-microvolt = <800000>;
-> +				regulator-max-microvolt = <1550000>;
-> +			};
-> +
-> +			vgen3_reg: vgen3 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +			};
-> +
-> +			vgen4_reg: vgen4 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vgen5_reg: vgen5 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vgen6_reg: vgen6 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&iomuxc {
-> +	pinctrl-names = "default";
-> +
-> +	imx6q-mccmon6 {
-> +
-
-Please drop the empty line above.
-
-> +		pinctrl_enet: enetgrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-> +				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
-> +				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
-> +				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
-> +				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
-> +				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
-> +				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
-> +				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
-> +				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
-> +				MX6QDL_PAD_GPIO_16__ENET_REF_CLK 0x4001b0a8
-> +				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c1: i2c1grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_CSI0_DAT9__I2C1_SCL	0x4001b8b1
-> +				MX6QDL_PAD_CSI0_DAT8__I2C1_SDA	0x4001b8b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c2: i2c2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_COL3__I2C2_SCL	0x4001b8b1
-> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA	0x4001b8b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart1: uart1grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
-> +				MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc2: usdhc2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD2_CMD__SD2_CMD		0x17059
-> +				MX6QDL_PAD_SD2_CLK__SD2_CLK		0x10059
-> +				MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x17059
-> +				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
-> +				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
-> +				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc3: usdhc3grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
-> +				MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10059
-> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17059
-> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
-> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
-> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
-> +				MX6QDL_PAD_SD3_DAT4__SD3_DATA4		0x17059
-> +				MX6QDL_PAD_SD3_DAT5__SD3_DATA5		0x17059
-> +				MX6QDL_PAD_SD3_DAT6__SD3_DATA6		0x17059
-> +				MX6QDL_PAD_SD3_DAT7__SD3_DATA7		0x17059
-> +				MX6QDL_PAD_SD3_RST__SD3_RESET		0x17059
-> +			>;
-> +		};
-> +
-> +		pinctrl_weim_cs0: weimcs0grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_CS0__EIM_CS0_B		0xb0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_weim_nor: weimnorgrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_OE__EIM_OE_B		0xb0b1
-> +				MX6QDL_PAD_EIM_RW__EIM_RW		0xb0b1
-> +				MX6QDL_PAD_EIM_WAIT__EIM_WAIT_B	0xb060
-> +				MX6QDL_PAD_EIM_D16__EIM_DATA16		0x1b0b0
-> +				MX6QDL_PAD_EIM_D17__EIM_DATA17		0x1b0b0
-> +				MX6QDL_PAD_EIM_D18__EIM_DATA18		0x1b0b0
-> +				MX6QDL_PAD_EIM_D19__EIM_DATA19		0x1b0b0
-> +				MX6QDL_PAD_EIM_D20__EIM_DATA20		0x1b0b0
-> +				MX6QDL_PAD_EIM_D21__EIM_DATA21		0x1b0b0
-> +				MX6QDL_PAD_EIM_D22__EIM_DATA22		0x1b0b0
-> +				MX6QDL_PAD_EIM_D23__EIM_DATA23		0x1b0b0
-> +				MX6QDL_PAD_EIM_D24__EIM_DATA24		0x1b0b0
-> +				MX6QDL_PAD_EIM_D25__EIM_DATA25		0x1b0b0
-> +				MX6QDL_PAD_EIM_D26__EIM_DATA26		0x1b0b0
-> +				MX6QDL_PAD_EIM_D27__EIM_DATA27		0x1b0b0
-> +				MX6QDL_PAD_EIM_D28__EIM_DATA28		0x1b0b0
-> +				MX6QDL_PAD_EIM_D29__EIM_DATA29		0x1b0b0
-> +				MX6QDL_PAD_EIM_D30__EIM_DATA30		0x1b0b0
-> +				MX6QDL_PAD_EIM_D31__EIM_DATA31		0x1b0b0
-> +				MX6QDL_PAD_EIM_A23__EIM_ADDR23		0xb0b1
-> +				MX6QDL_PAD_EIM_A22__EIM_ADDR22		0xb0b1
-> +				MX6QDL_PAD_EIM_A21__EIM_ADDR21		0xb0b1
-> +				MX6QDL_PAD_EIM_A20__EIM_ADDR20		0xb0b1
-> +				MX6QDL_PAD_EIM_A19__EIM_ADDR19		0xb0b1
-> +				MX6QDL_PAD_EIM_A18__EIM_ADDR18		0xb0b1
-> +				MX6QDL_PAD_EIM_A17__EIM_ADDR17		0xb0b1
-> +				MX6QDL_PAD_EIM_A16__EIM_ADDR16		0xb0b1
-> +				MX6QDL_PAD_EIM_DA15__EIM_AD15		0xb0b1
-> +				MX6QDL_PAD_EIM_DA14__EIM_AD14		0xb0b1
-> +				MX6QDL_PAD_EIM_DA13__EIM_AD13		0xb0b1
-> +				MX6QDL_PAD_EIM_DA12__EIM_AD12		0xb0b1
-> +				MX6QDL_PAD_EIM_DA11__EIM_AD11		0xb0b1
-> +				MX6QDL_PAD_EIM_DA10__EIM_AD10		0xb0b1
-> +				MX6QDL_PAD_EIM_DA9__EIM_AD09		0xb0b1
-> +				MX6QDL_PAD_EIM_DA8__EIM_AD08		0xb0b1
-> +				MX6QDL_PAD_EIM_DA7__EIM_AD07		0xb0b1
-> +				MX6QDL_PAD_EIM_DA6__EIM_AD06		0xb0b1
-> +				MX6QDL_PAD_EIM_DA5__EIM_AD05		0xb0b1
-> +				MX6QDL_PAD_EIM_DA4__EIM_AD04		0xb0b1
-> +				MX6QDL_PAD_EIM_DA3__EIM_AD03		0xb0b1
-> +				MX6QDL_PAD_EIM_DA2__EIM_AD02		0xb0b1
-> +				MX6QDL_PAD_EIM_DA1__EIM_AD01		0xb0b1
-> +				MX6QDL_PAD_EIM_DA0__EIM_AD00		0xb0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_ecspi3: ecspi3grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_DISP0_DAT2__ECSPI3_MISO	0x100b1
-> +				MX6QDL_PAD_DISP0_DAT1__ECSPI3_MOSI	0x100b1
-> +				MX6QDL_PAD_DISP0_DAT0__ECSPI3_SCLK	0x100b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_ecspi3_cs: ecspi3cs {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24 0x80000000
-> +			>;
-> +		};
-> +		pinctrl_ecspi3_flwp: ecspi3flwp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_DISP0_DAT6__GPIO4_IO27 0x80000000
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart4: uart4grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
-> +				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
-> +				MX6QDL_PAD_CSI0_DAT16__UART4_RTS_B	0x1b0b1
-> +				MX6QDL_PAD_CSI0_DAT17__UART4_CTS_B	0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_display: dispgrp {
-> +			fsl,pins = <
-> +				/* BLEN_OUT */
-> +				MX6QDL_PAD_GPIO_2__GPIO1_IO02    0x1b0b0
-> +				/* LVDS_PPEN_OUT */
-> +				MX6QDL_PAD_SD1_DAT2__GPIO1_IO19   0x1b0b0
-
-This GPIO should be moved to a pinctrl group of regulator-lvds device node.
-
-> +			>;
-> +		};
-> +
-> +		pinctrl_pwm2: pwm2grp {
-> +			fsl,pins = <
-> +				 MX6QDL_PAD_GPIO_1__PWM2_OUT	0x1b0b1
-> +			>;
-> +		};
-
-Please sort out all pinctrl_* nodes alphabetically.
-
-> +	};
-> +};
-> +
-> +&fec {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_enet>;
-> +	phy-mode = "rgmii";
-> +	phy-reset-gpios = <&gpio1 27 0>;
-
-GPIO1_27 has no pad configuration in pinctrl_enet.
-
-> +	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
-> +			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart1>;
-
-Should you add "uart-has-rtscts" property?
-
-> +	status = "okay";
-> +};
-> +
-> +&usdhc2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc2>;
-> +	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
-
-bus-width = <4>;
-
-You should consider to add the GPIO1_4 into pinctrl_usdhc2 group.
-
-> +	status = "okay";
-> +};
-> +
-> +&usdhc3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc3>;
-> +	bus-width = <8>;
-> +	status = "okay";
-
-No "cd-gpios" property, should you add "non-removable" property then?
-
-> +};
-> +
-> +&weim {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_weim_nor &pinctrl_weim_cs0>;
-> +	#address-cells = <2>;
-> +	#size-cells = <1>;
-> +	ranges = <0 0 0x08000000 0x08000000>;
-> +	status = "okay";
-> +
-> +	nor at 0,0 {
-> +		compatible = "cfi-flash";
-> +		reg = <0 0 0x02000000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		bank-width = <2>;
-> +		use-advanced-sector-protection;
-> +		fsl,weim-cs-timing = <0x00620081 0x00000001 0x1c022000
-> +				0x0000c000 0x1404a38e 0x00000000>;
-> +	};
-> +};
-> +
-> +&ecspi3 {
-> +	fsl,spi-num-chipselects = <1>;
-
-This property is obsoleted, please remove it.
-
-> +	cs-gpios = <&gpio4 24 0>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_ecspi3 &pinctrl_ecspi3_cs &pinctrl_ecspi3_flwp>;
-> +	status = "okay";
-> +
-> +	flash: s25sl032p at 0 {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "spansion,s25sl032p", "jedec,spi-nor";
-> +		spi-max-frequency = <40000000>;
-> +		reg = <0>;
-> +	};
-> +};
-> +
-> +&uart4 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart4>;
-> +	status = "okay";
-
-Should you add "uart-has-rtscts" property?
-
-> +};
-> +
-> +&ldb {
-> +	status = "okay";
-> +
-> +	lvds0: lvds-channel at 0 {
-> +		fsl,data-mapping = "spwg";
-> +		fsl,data-width = <24>;
-> +		status = "okay";
-> +
-> +		port at 4 {
-> +			reg = <4>;
-> +
-> +			lvds0_out: endpoint {
-> +				remote-endpoint = <&panel_in_lvds0>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&pwm2 {
-> +	#pwm-cells = <3>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_pwm2>;
-> +	status = "okay";
-> +};
-> 
-
-Please sort out all device nodes but &iomuxc alphabetically:
-
-* iomuxc
-* ecspi3
-* fec
-* i2c1
-* i2c2
-* ldb
-* pwm2
-* uart1
-* uart4
-* usdhc2
-* usdhc3
-* weim
-
---
-With best wishes,
-Vladimir
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
