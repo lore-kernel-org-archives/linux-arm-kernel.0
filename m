@@ -1,187 +1,101 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon,  2 Jan 2017 23:03:46 +0000
-Subject: [PATCH 5/5] arm64: dts: add BananaPi-M64 support
-In-Reply-To: <1483398226-29321-1-git-send-email-andre.przywara@arm.com>
-References: <1483398226-29321-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1483398226-29321-6-git-send-email-andre.przywara@arm.com>
+From: hpa@zytor.com (hpa at zytor.com)
+Date: Mon, 02 Jan 2017 15:06:16 -0800
+Subject: How should we handle variable address space sizes (Re: [RFC 3/4]
+ x86/mm: define TASK_SIZE as current->mm->task_size)
+In-Reply-To: <CALCETrU+BJ2JDRocBy-6SD_G6FbD+Ez_yb1QJ6Z1KXBjVzKOHg@mail.gmail.com>
+References: <CALCETrXMCVOmVcQYxF_ghPdEjLuNNqbcnoRKRVpJegsQ=SPEFQ@mail.gmail.com>
+ <20170102094907.GC30735@node.shutemov.name>
+ <CALCETrU+BJ2JDRocBy-6SD_G6FbD+Ez_yb1QJ6Z1KXBjVzKOHg@mail.gmail.com>
+Message-ID: <1A0BF94E-2F42-4721-AEA1-27C048F7EAD6@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Banana Pi M64 board is a typical single board computer based on the
-Allwinner A64 SoC. Aside from the usual peripherals it features eMMC
-storage, which is connected to the 8-bit capable SDHC2 controller.
-Also it has a soldered WiFi/Bluetooth chip, so we enable UART1 and SDHC1
-as those two interfaces are connected to it.
+On January 2, 2017 8:52:41 AM PST, Andy Lutomirski <luto@amacapital.net> wrote:
+>On Mon, Jan 2, 2017 at 1:49 AM, Kirill A. Shutemov
+><kirill@shutemov.name> wrote:
+>> On Fri, Dec 30, 2016 at 06:11:05PM -0800, Andy Lutomirski wrote:
+>>> On Fri, Dec 30, 2016 at 7:56 AM, Dmitry Safonov
+><dsafonov@virtuozzo.com> wrote:
+>>> > Keep task's virtual address space size as mm_struct field which
+>>> > exists for a long time - it's initialized in setup_new_exec()
+>>> > depending on the new task's personality.
+>>> > This way TASK_SIZE will always be the same as
+>current->mm->task_size.
+>>> > Previously, there could be an issue about different values of
+>>> > TASK_SIZE and current->mm->task_size: e.g, a 32-bit process can
+>unset
+>>> > ADDR_LIMIT_3GB personality (with personality syscall) and
+>>> > so TASK_SIZE will be 4Gb, which is larger than mm->task_size =
+>3Gb.
+>>> > As TASK_SIZE *and* current->mm->task_size are used both in code
+>>> > frequently, this difference creates a subtle situations, for
+>example:
+>>> > one can mmap addresses > 3Gb, but they will be hidden in
+>>> > /proc/pid/pagemap as it checks mm->task_size.
+>>> > I've moved initialization of mm->task_size earlier in
+>setup_new_exec()
+>>> > as arch_pick_mmap_layout() initializes mmap_legacy_base with
+>>> > TASK_UNMAPPED_BASE, which depends on TASK_SIZE.
+>>>
+>>> I don't like this patch so much because I think that we should
+>figure
+>>> out how this will all work in the long run first.  I've added some
+>>> more people to the thread because other arches have similar issues
+>and
+>>> because x86 is about to get considerably more complicated (choices
+>>> include 3GB, 4GB, 47-bit, and 56-bit (the latter IIRC)).
+>>>
+>>> Here are a few of my thoughts on the matter.  This isn't all that
+>well
+>>> thought out:
+>>>
+>>> The address space limit, especially if CRIU is in play, isn't really
+>a
+>>> hard limit.  For example, you could allocate high memory then lower
+>>> the limit.  Similarly, I see no reason that an x32 program should be
+>>> forbidden from mapping some high addresses or, similarly, that an
+>i386
+>>> program can't (if it really wanted to) do a 64-bit mmap() and get a
+>>> high address.
+>>>
+>>> On that note, can we just *delete* the task_size check from pagemap?
+>>> It's been there since the very beginning:
+>>>
+>>> commit 85863e475e59afb027b0113290e3796ee6020b7d
+>>> Author: Matt Mackall <mpm@selenic.com>
+>>> Date:   Mon Feb 4 22:29:04 2008 -0800
+>>>
+>>>     maps4: add /proc/pid/pagemap interface
+>>>
+>>> and there's no explanation for why it's needed.
+>>>
+>>> So maybe we should have a *number* (not a bit) that indicates the
+>>> maximum address that mmap() will return unless an override is in
+>use.
+>>> Since common practice seems to be to stick this in the personality
+>>> field, we may need some fancy encoding.  Executing a setuid binary
+>>> needs to reset to the default, and personality handles that.
+>>
+>> If we want to be able to specify arbitrary address as maximum, a
+>fancy
+>> encoding would need to claim 51 bits (63 VA - 12 in-page address) on
+>x86
+>> from the persona flag.
+>> To me, it's stretching personality interface too far.
+>>
+>> Maybe it's easier to reset the rlimit for suid binaries?
+>
+>I guess I don't see why rlimit makes any sense, though.  It's not a
+>resource utilization control, hard vs soft limits make very little
+>sense, requiring capabilities to exceed the hard limit doesn't help
+>anything, and it's only useful to preserve it across execve() to work
+>around bugs.
+>
+>So if it's going to be a number, let's just make it be a new number
+>with a new API to control it.
+>
+>--Andy
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 125 +++++++++++++++++++++
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      |  10 ++
- 3 files changed, 136 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index 1e29a5a..51ecb04 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-new file mode 100644
-index 0000000..941ea07
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-@@ -0,0 +1,125 @@
-+/*
-+ * Copyright (c) 2016 ARM Ltd.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "sun50i-a64.dtsi"
-+
-+/ {
-+	model = "BananaPi-M64";
-+	compatible = "sinovoip,bananapi-m64", "allwinner,sun50i-a64";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	reg_vcc3v3: vcc3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins_4>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
-+	status = "okay";
-+};
-+
-+&i2c1_pins {
-+	bias-pull-up;
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins>, <&mmc0_default_cd_pin>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	cd-gpios = <&pio 5 6 0>;
-+	cd-inverted;
-+	disable-wp;
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <8>;
-+	non-removable;
-+	cap-mmc-hw-reset;
-+	status = "okay";
-+};
-+
-+&mmc2_pins {
-+	/* Increase drive strength for DDR modes */
-+	drive-strength = <40>;
-+	/* eMMC is missing pull-ups */
-+	bias-pull-up;
-+};
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index c680566..9de96ba 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -151,6 +151,16 @@
- 				function = "uart0";
- 			};
- 
-+			uart1_pins: uart1 at 0 {
-+				pins = "PG6", "PG7";
-+				function = "uart1";
-+			};
-+
-+			uart1_pins_4: uart1_4 at 0 {
-+				pins = "PG6", "PG7", "PG8", "PG9";
-+				function = "uart1";
-+			};
-+
- 			mmc0_pins: mmc0 at 0 {
- 				pins = "PF0", "PF1", "PF2", "PF3", "PF4", "PF5";
- 				function = "mmc0";
+It's an API that already exists, that's the plus. Hard and soft limits *do* make sense IMO.
 -- 
-2.8.2
+Sent from my Android device with K-9 Mail. Please excuse my brevity.
