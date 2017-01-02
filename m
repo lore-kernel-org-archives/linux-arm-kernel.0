@@ -1,9 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sun,  1 Jan 2017 18:22:46 -0800
-Subject: [PATCH 5/8] ARM: dts: kirkwood-dir665: Utilize new DSA binding
+Date: Sun,  1 Jan 2017 18:22:43 -0800
+Subject: [PATCH 2/8] ARM: dts: armada-38x: Utilize new DSA binding
 In-Reply-To: <20170102022249.10657-1-f.fainelli@gmail.com>
 References: <20170102022249.10657-1-f.fainelli@gmail.com>
-Message-ID: <20170102022249.10657-6-f.fainelli@gmail.com>
+Message-ID: <20170102022249.10657-3-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,75 +13,79 @@ disabled.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/boot/dts/kirkwood-dir665.dts | 49 +++++++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+ arch/arm/boot/dts/armada-385-linksys.dtsi | 52 ++++++++++++++++++++++++++++++-
+ 1 file changed, 51 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-dir665.dts b/arch/arm/boot/dts/kirkwood-dir665.dts
-index 41acbb6dd6ab..4d2b15d6244a 100644
---- a/arch/arm/boot/dts/kirkwood-dir665.dts
-+++ b/arch/arm/boot/dts/kirkwood-dir665.dts
-@@ -194,6 +194,8 @@
+diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
+index 8f0e508f64ae..20d5e8b00f2d 100644
+--- a/arch/arm/boot/dts/armada-385-linksys.dtsi
++++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
+@@ -103,8 +103,56 @@
+ 				};
+ 			};
+ 
+-			mdio {
++			mdio at 72004 {
+ 				status = "okay";
++
++				switch at 0 {
++					compatible = "marvell,mv88e6095";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					ports {
++						#address-cells = <1>;
++						#size-cells = <0>;
++
++						port at 0 {
++							reg = <0>;
++							label = "lan4";
++						};
++
++						port at 1 {
++							reg = <1>;
++							label = "lan3";
++						};
++
++						port at 2 {
++							reg = <2>;
++							label = "lan2";
++						};
++
++						port at 3 {
++							reg = <3>;
++							label = "lan1";
++						};
++
++						port at 4 {
++							reg = <4>;
++							label = "wan";
++						};
++
++						port at 5 {
++							reg = <5>;
++							label = "cpu";
++							ethernet = <&eth2>;
++
++							fixed-link {
++								speed = <1000>;
++								full-duplex;
++							};
++						};
++					};
++				};
+ 			};
+ 
+ 			sata at a8000 {
+@@ -261,6 +309,8 @@
  	};
  
- 	dsa {
+ 	dsa at 0 {
 +		status = "disabled";
 +
  		compatible = "marvell,dsa";
  		#address-cells = <2>;
  		#size-cells = <0>;
-@@ -241,6 +243,53 @@
- 
- &mdio {
- 	status = "okay";
-+
-+	switch at 0 {
-+		compatible = "marvell,mv88e6085";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				label = "lan4";
-+			};
-+
-+			port at 1 {
-+			       reg = <1>;
-+			       label = "lan3";
-+			};
-+
-+			port at 2 {
-+			       reg = <2>;
-+			       label = "lan2";
-+			};
-+
-+			port at 3 {
-+			       reg = <3>;
-+			       label = "lan1";
-+			};
-+
-+			port at 4 {
-+				reg = <4>;
-+				label = "wan";
-+			};
-+
-+			port at 6 {
-+				reg = <6>;
-+				label = "cpu";
-+				ethernet = <&eth0port>;
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+		};
-+	};
- };
- 
- /* eth0 is connected to a Marvell 88E6171 switch, without a PHY. So set
 -- 
 2.9.3
