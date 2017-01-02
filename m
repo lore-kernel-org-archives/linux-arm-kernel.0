@@ -1,42 +1,98 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Mon, 2 Jan 2017 07:57:13 +0100
-Subject: [RFC 1/4] mm: remove unused TASK_SIZE_OF()
-In-Reply-To: <20161230155634.8692-2-dsafonov@virtuozzo.com>
-References: <20161230155634.8692-1-dsafonov@virtuozzo.com>
- <20161230155634.8692-2-dsafonov@virtuozzo.com>
-Message-ID: <20170102065713.GB4779@osiris>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 2 Jan 2017 15:03:04 +0800
+Subject: [PATCH v3 2/3] ARM: dts: imx6: Support Savageboard dual
+In-Reply-To: <20161209010436.7994-3-woogyom.kim@gmail.com>
+References: <20161209010436.7994-1-woogyom.kim@gmail.com>
+ <20161209010436.7994-3-woogyom.kim@gmail.com>
+Message-ID: <20170102070302.GD20956@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 30, 2016 at 06:56:31PM +0300, Dmitry Safonov wrote:
-> All users of TASK_SIZE_OF(tsk) have migrated to mm->task_size or
-> TASK_SIZE_MAX since:
-> commit d696ca016d57 ("x86/fsgsbase/64: Use TASK_SIZE_MAX for
-> FSBASE/GSBASE upper limits"),
-> commit a06db751c321 ("pagemap: check permissions and capabilities at
-> open time"),
+On Fri, Dec 09, 2016 at 10:04:35AM +0900, Milo Kim wrote:
+> Common savageboard DT file is used for board support.
+> Specify this dtb file for i.MX6Q build.
 > 
-> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
+> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
 > ---
-...
-
-> diff --git a/arch/s390/include/asm/processor.h b/arch/s390/include/asm/processor.h
-> index 6bca916a5ba0..c53e8e2a51ac 100644
-> --- a/arch/s390/include/asm/processor.h
-> +++ b/arch/s390/include/asm/processor.h
-> @@ -89,10 +89,9 @@ extern void execve_tail(void);
->   * User space process size: 2GB for 31 bit, 4TB or 8PT for 64 bit.
->   */
+>  arch/arm/boot/dts/Makefile               |  1 +
+>  arch/arm/boot/dts/imx6dl-savageboard.dts | 50 ++++++++++++++++++++++++++++++++
+>  2 files changed, 51 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6dl-savageboard.dts
 > 
-> -#define TASK_SIZE_OF(tsk)	((tsk)->mm->context.asce_limit)
->  #define TASK_UNMAPPED_BASE	(test_thread_flag(TIF_31BIT) ? \
->  					(1UL << 30) : (1UL << 41))
-> -#define TASK_SIZE		TASK_SIZE_OF(current)
-> +#define TASK_SIZE		(current->mm->context.asce_limit)
->  #define TASK_MAX_SIZE		(1UL << 53)
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index c558ba7..64660c7 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -348,6 +348,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+>  	imx6dl-sabreauto.dtb \
+>  	imx6dl-sabrelite.dtb \
+>  	imx6dl-sabresd.dtb \
+> +	imx6dl-savageboard.dtb \
+>  	imx6dl-ts4900.dtb \
+>  	imx6dl-tx6dl-comtft.dtb \
+>  	imx6dl-tx6s-8034.dtb \
+> diff --git a/arch/arm/boot/dts/imx6dl-savageboard.dts b/arch/arm/boot/dts/imx6dl-savageboard.dts
+> new file mode 100644
+> index 0000000..2cac30d
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6dl-savageboard.dts
+> @@ -0,0 +1,50 @@
+> +/*
+> + * Copyright (C) 2016 Milo Kim <woogyom.kim@gmail.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "imx6dl.dtsi"
+> +#include "imx6qdl-savageboard.dtsi"
+> +
+> +/ {
+> +	model = "Poslab SavageBoard Dual";
+> +	compatible = "poslab,imx6dl-savageboard", "fsl,imx6dl";
+
+It seems that 'poslab' should be added to
+Documentation/devicetree/bindings/vendor-prefixes.txt.
+
+Shawn
+
+> +};
+> -- 
+> 2.9.3
 > 
->  #define STACK_TOP		(1UL << (test_thread_flag(TIF_31BIT) ? 31:42))
-
-FWIW, for the s390 part:
-
-Acked-by: Heiko Carstens <heiko.carstens@de.ibm.com>
