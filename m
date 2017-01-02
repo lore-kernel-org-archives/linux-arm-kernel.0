@@ -1,105 +1,67 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon,  2 Jan 2017 21:31:31 +0800
-Subject: [PATCH v6 00/14] ACPI platform MSI support and its example mbigen
-Message-ID: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
+Date: Mon,  2 Jan 2017 21:31:32 +0800
+Subject: [PATCH v6 01/14] ACPI: ARM64: IORT: minor cleanup for
+ iort_match_node_callback()
+In-Reply-To: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
+References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1483363905-2806-2-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v5 -> v6:
-	- Call acpi_configure_pmsi_domain() for platform devices in
-	  acpi_platform_notify() as it's cleaner (suggested by Rafael)
-	- Remove the "u8 type" for iort_id_map() because it's unused
-	- Rebase on top of 4.10-rc2
-	- Collect test and review tags
+Cleanup iort_match_node_callback() a little bit to reduce
+some lines of code, aslo fix the indentation in iort_scan_node().
 
-v4 -> v5:
-	- Add mbigen support back with tested on with Agustin's patchset,
-	  and it's a good example of how ACPI platform MSI works
-	- rebased on top of lastest Linus tree (commit 52bce91 splice: reinstate SIGPIPE/EPIPE handling)
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Tested-by: Majun <majun258@huawei.com>
+Tested-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Tomasz Nowicki <tn@semihalf.com>
+---
+ drivers/acpi/arm64/iort.c | 10 +++-------
+ 1 file changed, 3 insertions(+), 7 deletions(-)
 
-v3 -> v4:
-        - Drop mbi-gen patches to just submit platform msi support because
-          will rebase mbi-gen patches on top of Agustin's patchset, and discusion
-          is going there.
-        - Add a patch to support device topology such as NC(named componant, paltform device)
-          ->SMMU->ITS which suggested by Lorenzo;
-        - rebased on top of Lorenzo's v9 of ACPI IORT ARM SMMU support;
-        - rebased on top of 4.9-rc7
-
-v2 -> v3:
-        - Drop RFC tag
-        - Rebase against v4.9-rc2 and Lorenzo's v6 of ACPI IORT ARM SMMU support [1]
-        - Add 3 cleanup patches (patch 1, 2, 3)
-        - Drop arch_init call patch from last version
-        - Introduce a callback for platform device to set msi domain
-        - Introduce a new API to get paltform device's domain instead of
-          reusing the PCI one in previous version
-        - Add a patch to rework iort_node_get_id()
-
-[1]: http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1251993.html
-
-v1 -> v2:
-        - Fix the bug of if multi Interrupt() resoures in single _PRS,
-          we need to calculate all the irq numbers (I missed it in previous
-          version);
-        - Rebased on Marc's irq/irqchip-4.9 branch and Lorenzo's v5
-          SMMU patches (also Robin's SMMu patches)
-        - Add patch irqchip: mbigen: promote mbigen init.
-
-With platform msi support landed in the kernel, and the introduction
-of IORT for GICv3 ITS (PCI MSI) and SMMU, the framework for platform msi
-is ready, this patch set add few patches to enable the ACPI platform
-msi support.
-
-For platform device connecting to ITS on arm platform, we have IORT
-table with the named componant node to describe the mappings of paltform
-device and ITS, so we can retrieve the dev id and find its parent
-irqdomain (ITS) from IORT table (simlar with the ACPI ITS support).
-
-The fisrt 3 patches are cleanups;
-
-Patch 4,5 are refactoring its_pmsi_prepare() for both DT and ACPI
-then retrieve the dev id from iort;
-
-Patch 6,7 to create platform msi domain to ACPI case which scanned
-the MADT table;
-
-Patch 8,9,10,11 to setup the msi domain for platform device based
-on IORT table.
-
-Patch 12,13,14 convert DT based mbigen driver to support ACPI/DT.
-
-Thanks
-Hanjun
-
-Hanjun Guo (12):
-  ACPI: ARM64: IORT: minor cleanup for iort_match_node_callback()
-  irqchip: gic-v3-its: keep the head file include in alphabetic order
-  ACPI: ARM64: IORT: add missing comment for iort_dev_find_its_id()
-  irqchip: gicv3-its: platform-msi: refactor its_pmsi_prepare()
-  ACPI: platform-msi: retrieve dev id from IORT
-  irqchip: gicv3-its: platform-msi: refactor its_pmsi_init() to prepare
-    for ACPI
-  irqchip: gicv3-its: platform-msi: scan MADT to create platform msi
-    domain
-  ACPI: ARM64: IORT: rework iort_node_get_id()
-  ACPI: platform: setup MSI domain for ACPI based platform device
-  ACPI: ARM64: IORT: rework iort_node_get_id() for NC->SMMU->ITS case
-  msi: platform: make platform_msi_create_device_domain() ACPI aware
-  irqchip: mbigen: Add ACPI support
-
-Kefeng Wang (2):
-  irqchip: mbigen: drop module owner
-  irqchip: mbigen: introduce mbigen_of_create_domain()
-
- drivers/acpi/arm64/iort.c                     | 140 ++++++++++++++++++++------
- drivers/acpi/glue.c                           |   6 ++
- drivers/base/platform-msi.c                   |   3 +-
- drivers/irqchip/irq-gic-v3-its-platform-msi.c | 106 ++++++++++++++-----
- drivers/irqchip/irq-gic-v3-its.c              |   3 +-
- drivers/irqchip/irq-mbigen.c                  | 109 ++++++++++++++++----
- include/linux/acpi_iort.h                     |  11 ++
- 7 files changed, 299 insertions(+), 79 deletions(-)
-
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index e0d2e6e..46e2d82 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -225,7 +225,7 @@ static struct acpi_iort_node *iort_scan_node(enum acpi_iort_node_type type,
+ 
+ 		if (iort_node->type == type &&
+ 		    ACPI_SUCCESS(callback(iort_node, context)))
+-				return iort_node;
++			return iort_node;
+ 
+ 		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
+ 					 iort_node->length);
+@@ -253,17 +253,15 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
+ 					    void *context)
+ {
+ 	struct device *dev = context;
+-	acpi_status status;
++	acpi_status status = AE_NOT_FOUND;
+ 
+ 	if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT) {
+ 		struct acpi_buffer buf = { ACPI_ALLOCATE_BUFFER, NULL };
+ 		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
+ 		struct acpi_iort_named_component *ncomp;
+ 
+-		if (!adev) {
+-			status = AE_NOT_FOUND;
++		if (!adev)
+ 			goto out;
+-		}
+ 
+ 		status = acpi_get_name(adev->handle, ACPI_FULL_PATHNAME, &buf);
+ 		if (ACPI_FAILURE(status)) {
+@@ -289,8 +287,6 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
+ 		 */
+ 		status = pci_rc->pci_segment_number == pci_domain_nr(bus) ?
+ 							AE_OK : AE_NOT_FOUND;
+-	} else {
+-		status = AE_NOT_FOUND;
+ 	}
+ out:
+ 	return status;
 -- 
 1.9.1
