@@ -1,67 +1,29 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 2 Jan 2017 12:13:45 +0100
-Subject: [PATCH] tty/serial: atmel_serial: BUG: stop DMA from transmitting
- in stop_tx
-In-Reply-To: <20161213162756.16139-1-richard.genoud@gmail.com>
-References: <20161213162756.16139-1-richard.genoud@gmail.com>
-Message-ID: <059a5366-c0d4-ab89-d64a-dcf007bc9e91@atmel.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 2 Jan 2017 16:46:11 +0530
+Subject: [PATCH v7 4/5] ARM: dts: da850-lcdk: add the vga-bridge node
+In-Reply-To: <0ad07b84-7f5a-6467-e310-52c3efc66d3d@ti.com>
+References: <1481623759-12786-1-git-send-email-bgolaszewski@baylibre.com>
+ <1481623759-12786-5-git-send-email-bgolaszewski@baylibre.com>
+ <0ad07b84-7f5a-6467-e310-52c3efc66d3d@ti.com>
+Message-ID: <0e2d1472-5200-915d-2b0c-ddfe7657bdd1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 13/12/2016 ? 17:27, Richard Genoud a ?crit :
-> If we don't disable the transmitter in atmel_stop_tx, the DMA buffer
-> continues to send data until it is emptied.
-> This cause problems with the flow control (CTS is asserted and data are
-> still sent).
+On Wednesday 14 December 2016 03:24 PM, Tomi Valkeinen wrote:
+> On 13/12/16 12:09, Bartosz Golaszewski wrote:
+>> Add the vga-bridge node to the board DT together with corresponding
+>> ports and vga connector. This allows to retrieve the edid info from
+>> the display automatically.
+>>
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>> ---
+>>  arch/arm/boot/dts/da850-lcdk.dts | 51 ++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 51 insertions(+)
 > 
-> So, disabling the transmitter in atmel_stop_tx is a sane thing to do.
-> 
-> Tested on at91sam9g35-cm(DMA)
-> Tested for regressions on sama5d2-xplained(Fifo) and at91sam9g20ek(PDC)
-> 
-> Cc: <stable@vger.kernel.org> (beware, this won't apply before 4.3)
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> Reviewed-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Applied to v4.11/dt with Tomi's reviewed-by.
 
-> ---
->  drivers/tty/serial/atmel_serial.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> NB: this is not for the 4.10 merge window, I'm just sending it now to
-> have some comments if someone is againts it.
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index 168b10cad47b..f9d42de5ab2d 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -481,6 +481,14 @@ static void atmel_stop_tx(struct uart_port *port)
->  		/* disable PDC transmit */
->  		atmel_uart_writel(port, ATMEL_PDC_PTCR, ATMEL_PDC_TXTDIS);
->  	}
-> +
-> +	/*
-> +	 * Disable the transmitter.
-> +	 * This is mandatory when DMA is used, otherwise the DMA buffer
-> +	 * is fully transmitted.
-> +	 */
-> +	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXDIS);
-> +
->  	/* Disable interrupts */
->  	atmel_uart_writel(port, ATMEL_US_IDR, atmel_port->tx_done_mask);
->  
-> @@ -513,6 +521,9 @@ static void atmel_start_tx(struct uart_port *port)
->  
->  	/* Enable interrupts */
->  	atmel_uart_writel(port, ATMEL_US_IER, atmel_port->tx_done_mask);
-> +
-> +	/* re-enable the transmitter */
-> +	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
->  }
->  
->  /*
-> 
-
-
--- 
-Nicolas Ferre
+Thanks,
+Sekhar
