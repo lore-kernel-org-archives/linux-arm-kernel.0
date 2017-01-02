@@ -1,176 +1,77 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  2 Jan 2017 18:21:04 +0000
-Subject: [PATCH 2/6] crypto: arm/aes-neonbs - process 8 blocks in parallel if
- we can
+Date: Mon,  2 Jan 2017 18:21:07 +0000
+Subject: [PATCH 5/6] crypto: arm64/aes-blk - expose AES-CTR as synchronous
+ cipher as well
 In-Reply-To: <1483381268-12987-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1483381268-12987-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1483381268-12987-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1483381268-12987-6-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bit-sliced NEON implementation of AES only performs optimally if
-it can process 8 blocks of input in parallel. This is due to the nature
-of bit slicing, where the n-th bit of each byte of AES state of each input
-block is collected into NEON register 'n', for registers q0 - q7.
+In addition to wrapping the AES-CTR cipher into the async SIMD wrapper,
+which exposes it as an async skcipher that defers processing to process
+context, expose our AES-CTR implementation directly as a synchronous cipher
+as well, but with a lower priority.
 
-This implies that the amount of work for the transform is fixed,
-regardless of whether we are handling just one block or 8 in parallel.
-
-So let's try a bit harder to iterate over the input in suitably sized
-chunks, by setting the newly introduced walksize attribute to 8x the value
-of AES_BLOCK_SIZE, and tweaking the loops to only process multiples of the
-walk size, unless we are handling the last chunk in the input stream.
-
-Note that the skcipher walk API guarantees that a step in the walk never
-returns less than 'walksize' bytes if there are at least that many bytes
-of input still available. However, it does *not* guarantee that those steps
-produce an exact multiple of the walk size.
+This makes the AES-CTR transform usable in places where synchronous
+transforms are required, such as the MAC802.11 encryption code, which
+executes in sotfirq context, where SIMD processing is allowed on arm64.
+Users of the async transform will keep the existing behavior.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/crypto/aesbs-glue.c | 67 +++++++++++---------
- 1 file changed, 38 insertions(+), 29 deletions(-)
+ arch/arm64/crypto/aes-glue.c | 25 ++++++++++++++++++--
+ 1 file changed, 23 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/crypto/aesbs-glue.c b/arch/arm/crypto/aesbs-glue.c
-index d8e06de72ef3..f3019333c2eb 100644
---- a/arch/arm/crypto/aesbs-glue.c
-+++ b/arch/arm/crypto/aesbs-glue.c
-@@ -121,39 +121,26 @@ static int aesbs_cbc_encrypt(struct skcipher_request *req)
- 	return crypto_cbc_encrypt_walk(req, aesbs_encrypt_one);
- }
- 
--static inline void aesbs_decrypt_one(struct crypto_skcipher *tfm,
--				     const u8 *src, u8 *dst)
--{
--	struct aesbs_cbc_ctx *ctx = crypto_skcipher_ctx(tfm);
--
--	AES_decrypt(src, dst, &ctx->dec.rk);
--}
--
- static int aesbs_cbc_decrypt(struct skcipher_request *req)
+diff --git a/arch/arm64/crypto/aes-glue.c b/arch/arm64/crypto/aes-glue.c
+index 4e3f8adb1793..5164aaf82c6a 100644
+--- a/arch/arm64/crypto/aes-glue.c
++++ b/arch/arm64/crypto/aes-glue.c
+@@ -327,6 +327,23 @@ static struct skcipher_alg aes_algs[] = { {
+ 	.decrypt	= ctr_encrypt,
+ }, {
+ 	.base = {
++		.cra_name		= "ctr(aes)",
++		.cra_driver_name	= "ctr-aes-" MODE,
++		.cra_priority		= PRIO - 1,
++		.cra_blocksize		= 1,
++		.cra_ctxsize		= sizeof(struct crypto_aes_ctx),
++		.cra_alignmask		= 7,
++		.cra_module		= THIS_MODULE,
++	},
++	.min_keysize	= AES_MIN_KEY_SIZE,
++	.max_keysize	= AES_MAX_KEY_SIZE,
++	.ivsize		= AES_BLOCK_SIZE,
++	.chunksize	= AES_BLOCK_SIZE,
++	.setkey		= skcipher_aes_setkey,
++	.encrypt	= ctr_encrypt,
++	.decrypt	= ctr_encrypt,
++}, {
++	.base = {
+ 		.cra_name		= "__xts(aes)",
+ 		.cra_driver_name	= "__xts-aes-" MODE,
+ 		.cra_priority		= PRIO,
+@@ -350,8 +367,9 @@ static void aes_exit(void)
  {
- 	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
- 	struct aesbs_cbc_ctx *ctx = crypto_skcipher_ctx(tfm);
- 	struct skcipher_walk walk;
--	unsigned int nbytes;
- 	int err;
+ 	int i;
  
--	for (err = skcipher_walk_virt(&walk, req, false);
--	     (nbytes = walk.nbytes); err = skcipher_walk_done(&walk, nbytes)) {
--		u32 blocks = nbytes / AES_BLOCK_SIZE;
--		u8 *dst = walk.dst.virt.addr;
--		u8 *src = walk.src.virt.addr;
--		u8 *iv = walk.iv;
--
--		if (blocks >= 8) {
--			kernel_neon_begin();
--			bsaes_cbc_encrypt(src, dst, nbytes, &ctx->dec, iv);
--			kernel_neon_end();
--			nbytes %= AES_BLOCK_SIZE;
--			continue;
--		}
-+	err = skcipher_walk_virt(&walk, req, false);
-+
-+	while (walk.nbytes) {
-+		unsigned int nbytes = walk.nbytes;
-+
-+		if (nbytes < walk.total)
-+			nbytes = round_down(nbytes, walk.stride);
+-	for (i = 0; i < ARRAY_SIZE(aes_simd_algs) && aes_simd_algs[i]; i++)
+-		simd_skcipher_free(aes_simd_algs[i]);
++	for (i = 0; i < ARRAY_SIZE(aes_simd_algs); i++)
++		if (aes_simd_algs[i])
++			simd_skcipher_free(aes_simd_algs[i]);
  
--		nbytes = crypto_cbc_decrypt_blocks(&walk, tfm,
--						   aesbs_decrypt_one);
-+		kernel_neon_begin();
-+		bsaes_cbc_encrypt(walk.src.virt.addr, walk.dst.virt.addr,
-+				  nbytes, &ctx->dec, walk.iv);
-+		kernel_neon_end();
-+		err = skcipher_walk_done(&walk, walk.nbytes - nbytes);
- 	}
- 	return err;
+ 	crypto_unregister_skciphers(aes_algs, ARRAY_SIZE(aes_algs));
  }
-@@ -186,6 +173,12 @@ static int aesbs_ctr_encrypt(struct skcipher_request *req)
- 		__be32 *ctr = (__be32 *)walk.iv;
- 		u32 headroom = UINT_MAX - be32_to_cpu(ctr[3]);
+@@ -370,6 +388,9 @@ static int __init aes_init(void)
+ 		return err;
  
-+		if (walk.nbytes < walk.total) {
-+			blocks = round_down(blocks,
-+					    walk.stride / AES_BLOCK_SIZE);
-+			tail = walk.nbytes - blocks * AES_BLOCK_SIZE;
-+		}
+ 	for (i = 0; i < ARRAY_SIZE(aes_algs); i++) {
++		if (!(aes_algs[i].base.cra_flags & CRYPTO_ALG_INTERNAL))
++			continue;
 +
- 		/* avoid 32 bit counter overflow in the NEON code */
- 		if (unlikely(headroom < blocks)) {
- 			blocks = headroom + 1;
-@@ -198,6 +191,9 @@ static int aesbs_ctr_encrypt(struct skcipher_request *req)
- 		kernel_neon_end();
- 		inc_be128_ctr(ctr, blocks);
- 
-+		if (tail > 0 && tail < AES_BLOCK_SIZE)
-+			break;
-+
- 		err = skcipher_walk_done(&walk, tail);
- 	}
- 	if (walk.nbytes) {
-@@ -227,11 +223,16 @@ static int aesbs_xts_encrypt(struct skcipher_request *req)
- 	AES_encrypt(walk.iv, walk.iv, &ctx->twkey);
- 
- 	while (walk.nbytes) {
-+		unsigned int nbytes = walk.nbytes;
-+
-+		if (nbytes < walk.total)
-+			nbytes = round_down(nbytes, walk.stride);
-+
- 		kernel_neon_begin();
- 		bsaes_xts_encrypt(walk.src.virt.addr, walk.dst.virt.addr,
--				  walk.nbytes, &ctx->enc, walk.iv);
-+				  nbytes, &ctx->enc, walk.iv);
- 		kernel_neon_end();
--		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
-+		err = skcipher_walk_done(&walk, walk.nbytes - nbytes);
- 	}
- 	return err;
- }
-@@ -249,11 +250,16 @@ static int aesbs_xts_decrypt(struct skcipher_request *req)
- 	AES_encrypt(walk.iv, walk.iv, &ctx->twkey);
- 
- 	while (walk.nbytes) {
-+		unsigned int nbytes = walk.nbytes;
-+
-+		if (nbytes < walk.total)
-+			nbytes = round_down(nbytes, walk.stride);
-+
- 		kernel_neon_begin();
- 		bsaes_xts_decrypt(walk.src.virt.addr, walk.dst.virt.addr,
--				  walk.nbytes, &ctx->dec, walk.iv);
-+				  nbytes, &ctx->dec, walk.iv);
- 		kernel_neon_end();
--		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
-+		err = skcipher_walk_done(&walk, walk.nbytes - nbytes);
- 	}
- 	return err;
- }
-@@ -272,6 +278,7 @@ static struct skcipher_alg aesbs_algs[] = { {
- 	.min_keysize	= AES_MIN_KEY_SIZE,
- 	.max_keysize	= AES_MAX_KEY_SIZE,
- 	.ivsize		= AES_BLOCK_SIZE,
-+	.walksize	= 8 * AES_BLOCK_SIZE,
- 	.setkey		= aesbs_cbc_set_key,
- 	.encrypt	= aesbs_cbc_encrypt,
- 	.decrypt	= aesbs_cbc_decrypt,
-@@ -290,6 +297,7 @@ static struct skcipher_alg aesbs_algs[] = { {
- 	.max_keysize	= AES_MAX_KEY_SIZE,
- 	.ivsize		= AES_BLOCK_SIZE,
- 	.chunksize	= AES_BLOCK_SIZE,
-+	.walksize	= 8 * AES_BLOCK_SIZE,
- 	.setkey		= aesbs_ctr_set_key,
- 	.encrypt	= aesbs_ctr_encrypt,
- 	.decrypt	= aesbs_ctr_encrypt,
-@@ -307,6 +315,7 @@ static struct skcipher_alg aesbs_algs[] = { {
- 	.min_keysize	= 2 * AES_MIN_KEY_SIZE,
- 	.max_keysize	= 2 * AES_MAX_KEY_SIZE,
- 	.ivsize		= AES_BLOCK_SIZE,
-+	.walksize	= 8 * AES_BLOCK_SIZE,
- 	.setkey		= aesbs_xts_set_key,
- 	.encrypt	= aesbs_xts_encrypt,
- 	.decrypt	= aesbs_xts_decrypt,
+ 		algname = aes_algs[i].base.cra_name + 2;
+ 		drvname = aes_algs[i].base.cra_driver_name + 2;
+ 		basename = aes_algs[i].base.cra_driver_name;
 -- 
 2.7.4
