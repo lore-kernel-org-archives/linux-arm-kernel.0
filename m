@@ -1,18 +1,17 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 2 Jan 2017 15:53:26 +0530
-Subject: [PATCH] bus: da850-mstpri: fix my e-mail address
-In-Reply-To: <1482141491-26924-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1482141491-26924-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <2443f51b-4020-2c91-1bfe-eabaa7bab513@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 2 Jan 2017 08:35:21 -0200
+Subject: [PATCH] ARM: imx: Add rtc support to i.MX31 PDK board.
+In-Reply-To: <1483352282-28970-1-git-send-email-lilja.magnus@gmail.com>
+References: <1483352282-28970-1-git-send-email-lilja.magnus@gmail.com>
+Message-ID: <CAOMZO5AC3JpDvYaezzR2Wm63=i9p9p4K2xyH9uTTXFawnWLUuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 December 2016 03:28 PM, Bartosz Golaszewski wrote:
-> I noticed my e-mail address is wrong in this one. This patch fixes it.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Mon, Jan 2, 2017 at 8:18 AM, Magnus Lilja <lilja.magnus@gmail.com> wrote:
+> Enable support for i.MX31 RTC on the PDK board.
+>
+> Tested on actual hardware.
+>
+> Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
 
-Applied to v4.11/fixes-non-critical
-
-Thanks,
-Sekhar
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
