@@ -1,44 +1,34 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Mon, 2 Jan 2017 12:53:42 +0300
-Subject: [RFC 1/4] mm: remove unused TASK_SIZE_OF()
-In-Reply-To: <20161230155634.8692-2-dsafonov@virtuozzo.com>
-References: <20161230155634.8692-1-dsafonov@virtuozzo.com>
- <20161230155634.8692-2-dsafonov@virtuozzo.com>
-Message-ID: <20170102095342.GD30735@node.shutemov.name>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 2 Jan 2017 15:42:47 +0530
+Subject: [PATCH v4 4/4] ARM: da850: fix da850_set_pll0rate()
+In-Reply-To: <1481124138-27337-5-git-send-email-bgolaszewski@baylibre.com>
+References: <1481124138-27337-1-git-send-email-bgolaszewski@baylibre.com>
+ <1481124138-27337-5-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <a04624ec-6c6e-6a5b-0626-cc3520cccb29@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 30, 2016 at 06:56:31PM +0300, Dmitry Safonov wrote:
-> All users of TASK_SIZE_OF(tsk) have migrated to mm->task_size or
-> TASK_SIZE_MAX since:
-> commit d696ca016d57 ("x86/fsgsbase/64: Use TASK_SIZE_MAX for
-> FSBASE/GSBASE upper limits"),
-> commit a06db751c321 ("pagemap: check permissions and capabilities at
-> open time"),
+On Wednesday 07 December 2016 08:52 PM, Bartosz Golaszewski wrote:
+> This function is confusing - its second argument is an index to the
+> freq table, not the requested clock rate in Hz, but it's used as the
+> set_rate callback for the pll0 clock. It leads to an oops when the
+> caller doesn't know the internals and passes the rate in Hz as
+> argument instead of the cpufreq index since this argument isn't bounds
+> checked either.
 > 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Ralf Baechle <ralf@linux-mips.org>
-> Cc: "James E.J. Bottomley" <jejb@parisc-linux.org>
-> Cc: Helge Deller <deller@gmx.de>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Michael Ellerman <mpe@ellerman.id.au>
-> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-> Cc: "David S. Miller" <davem@davemloft.net>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-mips at linux-mips.org
-> Cc: linux-parisc at vger.kernel.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux-s390 at vger.kernel.org
-> Cc: sparclinux at vger.kernel.org
-> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
+> Fix it by iterating over the array of supported frequencies and
+> selecting a one that matches or returning -EINVAL for unsupported
+> rates.
+> 
+> Also: update the davinci cpufreq driver. It's the only user of this
+> clock and currently it passes the cpufreq table index to
+> clk_set_rate(), which is confusing. Make it pass the requested clock
+> rate in Hz.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-I've noticed this too.
+Applied to v4.11/fixes-non-critical
 
-Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-
--- 
- Kirill A. Shutemov
+Thanks,
+Sekhar
