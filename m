@@ -1,22 +1,20 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 2 Jan 2017 10:49:19 +0530
-Subject: [PATCH] dmaengine: ipu: Make sure the interrupt routine checks
- all interrupts.
-In-Reply-To: <1482354838-22615-1-git-send-email-lilja.magnus@gmail.com>
-References: <1482354838-22615-1-git-send-email-lilja.magnus@gmail.com>
-Message-ID: <20170102051918.GR3573@localhost>
+Date: Mon, 2 Jan 2017 10:54:43 +0530
+Subject: [PATCH 1/3] dma: zx: rename zx296702_dma.c to zx_dma.c
+In-Reply-To: <1481810617-7650-1-git-send-email-shawnguo@kernel.org>
+References: <1481810617-7650-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <20170102052443.GS3573@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2016 at 10:13:58PM +0100, Magnus Lilja wrote:
-> Commit 3d8cc00073d6 ("dmaengine: ipu: Consolidate duplicated irq handlers")
-> consolidated the two interrupts routines into one, but the remaining
-> interrupt routine only checks the status of the error interrupts, not the
-> normal interrupts.
+On Thu, Dec 15, 2016 at 10:03:35PM +0800, Shawn Guo wrote:
+> From: Shawn Guo <shawn.guo@linaro.org>
 > 
-> This patch fixes that problem (tested on i.MX31 PDK board).
+> ZTE ZX dma driver is not ZX296702 specific.  It works for not only
+> ZX296702 but also other ZTE ZX family platforms like ZX296718.  Let's
+> rename the file to reflect that.
 
-Applied thnx
+Applied all after fixing subsystem name
 
 -- 
 ~Vinod
