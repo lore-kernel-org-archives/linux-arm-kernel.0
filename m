@@ -1,29 +1,67 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 2 Jan 2017 16:38:00 +0530
-Subject: [PATCH v7 3/5] drm: bridge: add support for TI ths8135
-In-Reply-To: <dbb47a8f-07be-19d6-e77b-f5c06fd39c61@codeaurora.org>
-References: <1481623759-12786-1-git-send-email-bgolaszewski@baylibre.com>
- <1481623759-12786-4-git-send-email-bgolaszewski@baylibre.com>
- <dbb47a8f-07be-19d6-e77b-f5c06fd39c61@codeaurora.org>
-Message-ID: <0b47c27e-cda4-b5f6-ff3c-da74c40ed204@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 2 Jan 2017 12:13:45 +0100
+Subject: [PATCH] tty/serial: atmel_serial: BUG: stop DMA from transmitting
+ in stop_tx
+In-Reply-To: <20161213162756.16139-1-richard.genoud@gmail.com>
+References: <20161213162756.16139-1-richard.genoud@gmail.com>
+Message-ID: <059a5366-c0d4-ab89-d64a-dcf007bc9e91@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Archit,
-
-On Wednesday 14 December 2016 10:35 AM, Archit Taneja wrote:
+Le 13/12/2016 ? 17:27, Richard Genoud a ?crit :
+> If we don't disable the transmitter in atmel_stop_tx, the DMA buffer
+> continues to send data until it is emptied.
+> This cause problems with the flow control (CTS is asserted and data are
+> still sent).
 > 
+> So, disabling the transmitter in atmel_stop_tx is a sane thing to do.
 > 
-> On 12/13/2016 03:39 PM, Bartosz Golaszewski wrote:
->> THS8135 is a configurable video DAC, but no configuration is actually
->> necessary to make it work.
->>
->> For now use the dumb-vga-dac driver to support it.
+> Tested on at91sam9g35-cm(DMA)
+> Tested for regressions on sama5d2-xplained(Fifo) and at91sam9g20ek(PDC)
 > 
-> Queued to drm-misc-next
+> Cc: <stable@vger.kernel.org> (beware, this won't apply before 4.3)
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 
-This patch and 2/5 are not in v4.10 kernel. Did you mean to queue them
-to v4.10?
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Thanks,
-Sekhar
+> ---
+>  drivers/tty/serial/atmel_serial.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> NB: this is not for the 4.10 merge window, I'm just sending it now to
+> have some comments if someone is againts it.
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 168b10cad47b..f9d42de5ab2d 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -481,6 +481,14 @@ static void atmel_stop_tx(struct uart_port *port)
+>  		/* disable PDC transmit */
+>  		atmel_uart_writel(port, ATMEL_PDC_PTCR, ATMEL_PDC_TXTDIS);
+>  	}
+> +
+> +	/*
+> +	 * Disable the transmitter.
+> +	 * This is mandatory when DMA is used, otherwise the DMA buffer
+> +	 * is fully transmitted.
+> +	 */
+> +	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXDIS);
+> +
+>  	/* Disable interrupts */
+>  	atmel_uart_writel(port, ATMEL_US_IDR, atmel_port->tx_done_mask);
+>  
+> @@ -513,6 +521,9 @@ static void atmel_start_tx(struct uart_port *port)
+>  
+>  	/* Enable interrupts */
+>  	atmel_uart_writel(port, ATMEL_US_IER, atmel_port->tx_done_mask);
+> +
+> +	/* re-enable the transmitter */
+> +	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
+>  }
+>  
+>  /*
+> 
+
+
+-- 
+Nicolas Ferre
