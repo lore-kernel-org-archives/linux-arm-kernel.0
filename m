@@ -1,45 +1,41 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 2 Jan 2017 09:59:24 +0100
-Subject: [PATCH 3/8] ARM: dts: armada-388-clearfog: Utilize new DSA binding
-In-Reply-To: <20170102022249.10657-4-f.fainelli@gmail.com>
-References: <20170102022249.10657-1-f.fainelli@gmail.com>
- <20170102022249.10657-4-f.fainelli@gmail.com>
-Message-ID: <0997385a-700c-bbcc-4194-77f641885cbd@baylibre.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 2 Jan 2017 10:01:24 +0100
+Subject: [PATCH] mtd: nand: Update dependency of IFC for LS1021A
+In-Reply-To: <201612291704.0tMw9Uis%fengguang.wu@intel.com>
+References: <1482973102-47659-1-git-send-email-b18965@freescale.com>
+ <201612291704.0tMw9Uis%fengguang.wu@intel.com>
+Message-ID: <20170102100124.78ca7d7e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Hi Alison,
 
-On 01/02/2017 03:22 AM, Florian Fainelli wrote:
-> Utilize the new DSA binding, introduced with commit 8c5ad1d6179d ("net:
-> dsa: Document new binding"). The legacy binding node is kept included, but is
-> marked disabled.
+On Thu, 29 Dec 2016 17:52:37 +0800
+kbuild test robot <lkp@intel.com> wrote:
+
+> Hi Alison,
 > 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  arch/arm/boot/dts/armada-388-clearfog.dts | 65 +++++++++++++++++++++++++++++++
->  1 file changed, 65 insertions(+)
+> [auto build test WARNING on mtd/master]
+> [also build test WARNING on v4.10-rc1 next-20161224]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 > 
-> diff --git a/arch/arm/boot/dts/armada-388-clearfog.dts b/arch/arm/boot/dts/armada-388-clearfog.dts
-> index 71ce201c903e..35207aa1f4ec 100644
-> --- a/arch/arm/boot/dts/armada-388-clearfog.dts
-> +++ b/arch/arm/boot/dts/armada-388-clearfog.dts
-> @@ -351,6 +351,8 @@
->  	};
->  
->  	dsa at 0 {
-> +		status = "okay";
+> url:    https://github.com/0day-ci/linux/commits/Alison-Wang/mtd-nand-Update-dependency-of-IFC-for-LS1021A/20161229-125233
+> base:   git://git.infradead.org/linux-mtd.git master
+> config: arm-allmodconfig (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm 
+> 
+> All warnings (new ones prefixed by >>):
+> 
+> warning: (MTD_NAND_FSL_IFC) selects FSL_IFC which has unmet direct dependencies (MEMORY && (FSL_SOC || ARCH_LAYERSCAPE))
 
-I think you wanted "disabled" here !
+Do you have another patch adding the '||?SOC_LS1021A' dependency on
+FSL_IFC? If so, please send both patches in the same series.
 
-> +
->  		compatible = "marvell,dsa";
->  		dsa,ethernet = <&eth1>;
->  		dsa,mii-bus = <&mdio>;
-> @@ -444,3 +446,66 @@
->  		status = "disabled";
->  	};
->  };
-[...]
+Thanks,
 
-Neil
+Boris
