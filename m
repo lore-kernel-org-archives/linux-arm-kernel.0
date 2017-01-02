@@ -1,102 +1,23 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sun,  1 Jan 2017 18:22:49 -0800
-Subject: [PATCH 8/8] ARM: dts: kirkwood-rd88f6281: Utilize new DSA binding
-In-Reply-To: <20170102022249.10657-1-f.fainelli@gmail.com>
-References: <20170102022249.10657-1-f.fainelli@gmail.com>
-Message-ID: <20170102022249.10657-9-f.fainelli@gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 2 Jan 2017 09:44:34 +0530
+Subject: [PATCH 0/9] dmaengine: stm32-dma: Bug fixes and improvements
+ series
+In-Reply-To: <1481636451-27863-1-git-send-email-cedric.madianga@gmail.com>
+References: <1481636451-27863-1-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <20170102041433.GM3573@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Utilize the new DSA binding, introduced with commit 8c5ad1d6179d ("net: dsa:
-Document new binding"). The legacy binding node is kept included, but is marked
-disabled.
+On Tue, Dec 13, 2016 at 02:40:42PM +0100, M'boumba Cedric Madianga wrote:
+> This patchset adds bug fixes reported by devices using STM32 DMA and some
+> improvements mainly linked to dmaengine framework evolution.
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts | 11 ++++++++
- arch/arm/boot/dts/kirkwood-rd88f6281.dtsi   | 44 +++++++++++++++++++++++++++++
- 2 files changed, 55 insertions(+)
+So you should order fixes first and then new additions.
 
-diff --git a/arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts b/arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts
-index 1a797381d3d4..57cfcc2941cd 100644
---- a/arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts
-+++ b/arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts
-@@ -33,3 +33,14 @@
- &eth1 {
-       status = "disabled";
- };
-+
-+&switch {
-+	reg = <0>;
-+
-+	ports {
-+		port at 4 {
-+			reg = <4>;
-+			label = "wan";
-+		};
-+	};	
-+};
-diff --git a/arch/arm/boot/dts/kirkwood-rd88f6281.dtsi b/arch/arm/boot/dts/kirkwood-rd88f6281.dtsi
-index d5aacf137e40..91f5da5dae5f 100644
---- a/arch/arm/boot/dts/kirkwood-rd88f6281.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-rd88f6281.dtsi
-@@ -54,6 +54,8 @@
- 	};
- 
- 	dsa {
-+		status = "disabled";
-+
- 		compatible = "marvell,dsa";
- 		#address-cells = <2>;
- 		#size-cells = <0>;
-@@ -115,6 +117,48 @@
- 
- &mdio {
- 	status = "okay";
-+
-+	switch: switch at 0 {
-+		compatible = "marvell,mv88e6085";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				label = "lan1";
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				label = "lan2";
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				label = "lan3";
-+			};
-+
-+			port at 3 {
-+				reg = <3>;
-+				label = "lan4";
-+			};
-+
-+			port at 5 {
-+				reg = <5>;
-+				label = "cpu";
-+				ethernet = <&eth0port>;
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+
-+		};
-+	};
- };
- 
- &eth0 {
+Fixes go in for current release whereas the rest for next one.
+
+I have applied two to fixes and rest to updated, patch 5 didn't apply, please
+resend that one.
+
 -- 
-2.9.3
+~Vinod
