@@ -1,41 +1,51 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 2 Jan 2017 10:01:24 +0100
-Subject: [PATCH] mtd: nand: Update dependency of IFC for LS1021A
-In-Reply-To: <201612291704.0tMw9Uis%fengguang.wu@intel.com>
-References: <1482973102-47659-1-git-send-email-b18965@freescale.com>
- <201612291704.0tMw9Uis%fengguang.wu@intel.com>
-Message-ID: <20170102100124.78ca7d7e@bbrezillon>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 2 Jan 2017 11:08:44 +0200
+Subject: [BISECTED] v4.9: OMAP MMC regression
+In-Reply-To: <20161222205843.md4uggwyegcfuk3j@raspberrypi-2.musicnaut.iki.fi>
+References: <20161217220120.xgyzq2hwxn3lsmm2@raspberrypi-2.musicnaut.iki.fi>
+ <20161222205843.md4uggwyegcfuk3j@raspberrypi-2.musicnaut.iki.fi>
+Message-ID: <92c33052-0469-1a17-a5fe-f18e88515d9b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alison,
 
-On Thu, 29 Dec 2016 17:52:37 +0800
-kbuild test robot <lkp@intel.com> wrote:
 
-> Hi Alison,
+On 12/22/2016 10:58 PM, Aaro Koskinen wrote:
+> Hi,
 > 
-> [auto build test WARNING on mtd/master]
-> [also build test WARNING on v4.10-rc1 next-20161224]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> On Sun, Dec 18, 2016 at 12:01:21AM +0200, Aaro Koskinen wrote:
+>> OMAP MMC is silently missing when booting v4.9 on Nokia 770 (OMAP1).
+>>
+>> Bisected to:
+>>
+>> commit 2d1a9a946faebfedd660a1f1c2b90984fff41f91
+>> Author: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> Date:   Wed Jul 20 11:50:29 2016 +0300
+>>
+>>     dmaengine: omap-dma: Dynamically allocate memory for lch_map
+>>
+>> Reveting the commit makes MMC to appear and work again...
 > 
-> url:    https://github.com/0day-ci/linux/commits/Alison-Wang/mtd-nand-Update-dependency-of-IFC-for-LS1021A/20161229-125233
-> base:   git://git.infradead.org/linux-mtd.git master
-> config: arm-allmodconfig (attached as .config)
-> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm 
+> This commit basically reduces dma_requests count to 17 (from 127)
+> on OMAP1.
 > 
-> All warnings (new ones prefixed by >>):
+> This cannot be correct, since OMAP1 MMC is using requests (from
+> omap1_init_mmc):
 > 
-> warning: (MTD_NAND_FSL_IFC) selects FSL_IFC which has unmet direct dependencies (MEMORY && (FSL_SOC || ARCH_LAYERSCAPE))
+>                         rx_req = 22;
+>                         tx_req = 21;
+> [...]
+>                         rx_req = 55;
+>                         tx_req = 54;
+> 
+> MMC probe will fail because omap_dma_filter_fn() will fail during
+> dma_request_chan().
+> 
+> I think 2d1a9a946faebfedd660a1f1c2b90984fff41f91 should be reverted.
+> I cannot anymore boot my 770 with >= 4.9 kernel.
 
-Do you have another patch adding the '||?SOC_LS1021A' dependency on
-FSL_IFC? If so, please send both patches in the same series.
+I rather fix this instead of reverting the commit, I will send a patch
+today for this.
 
-Thanks,
-
-Boris
+-- 
+P?ter
