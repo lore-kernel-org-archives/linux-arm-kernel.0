@@ -1,50 +1,25 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Mon, 2 Jan 2017 22:19:29 +0100
-Subject: [PATCH] cpufreq: s3c64xx: remove incorrect __init annotation
-In-Reply-To: <20170102173651.hvsfalhcmisv4mtv@kozik-lap>
-References: <20161216090625.2235668-1-arnd@arndb.de>
- <20170102070903.GC8588@vireshk-i7>
- <20170102173651.hvsfalhcmisv4mtv@kozik-lap>
-Message-ID: <CAJZ5v0jaKnn+LTTdpgxaFLNaYSuqV8d9PKphOnHrPw0Zp_Uj5w@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 2 Jan 2017 22:24:32 +0100
+Subject: [PATCH 0/2] ARM: orion5x: Move micon code to a MFD driver
+In-Reply-To: <20161229000137.5553-1-f.fainelli@gmail.com>
+References: <20161229000137.5553-1-f.fainelli@gmail.com>
+Message-ID: <20170102212432.GB15213@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 2, 2017 at 6:36 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On Mon, Jan 02, 2017 at 12:39:03PM +0530, Viresh Kumar wrote:
->> On 16-12-16, 10:06, Arnd Bergmann wrote:
->> > s3c64xx_cpufreq_config_regulator is incorrectly annotated
->> > as __init, since the caller is also not init:
->> >
->> > WARNING: vmlinux.o(.text+0x92fe1c): Section mismatch in reference from the function s3c64xx_cpufreq_driver_init() to the function .init.text:s3c64xx_cpufreq_config_regulator()
->> >
->> > With modern gcc versions, the function gets inline, so we don't
->> > see the warning, this only happens with gcc-4.6 and older.
->> >
->> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> > ---
->> >  drivers/cpufreq/s3c64xx-cpufreq.c | 2 +-
->> >  1 file changed, 1 insertion(+), 1 deletion(-)
->> >
->> > diff --git a/drivers/cpufreq/s3c64xx-cpufreq.c b/drivers/cpufreq/s3c64xx-cpufreq.c
->> > index 176e84cc3991..0cb9040eca49 100644
->> > --- a/drivers/cpufreq/s3c64xx-cpufreq.c
->> > +++ b/drivers/cpufreq/s3c64xx-cpufreq.c
->> > @@ -107,7 +107,7 @@ static int s3c64xx_cpufreq_set_target(struct cpufreq_policy *policy,
->> >  }
->> >
->> >  #ifdef CONFIG_REGULATOR
->> > -static void __init s3c64xx_cpufreq_config_regulator(void)
->> > +static void s3c64xx_cpufreq_config_regulator(void)
->> >  {
->> >     int count, v, i, found;
->> >     struct cpufreq_frequency_table *freq;
->>
->> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->
-> Rafael,
-> Are you going to pick it up?
+On Wed, Dec 28, 2016 at 04:01:35PM -0800, Florian Fainelli wrote:
+> Hi all,
+> 
+> This patch series removes some duplicate code between the Kurobox and the
+> Terastation Pro 2 since they both use the same on-board microcontroller (micon)
+> attached to their UART1 for system restart.
+> 
+> Future patches will add support for the LEDs, temperature, FAN that the micro
+> controller provides.
 
-I thought I did, didn't I?
+Hi Florian
 
-Thanks,
-Rafael
+Are you coordinating with Roger Shimizu <rogershimizu@gmail.com>. He
+has a conflicting patchset doing something similar/different.
+
+    Andrew
