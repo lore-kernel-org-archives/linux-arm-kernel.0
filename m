@@ -1,23 +1,24 @@
 From: jagan@openedev.com (Jagan Teki)
-Date: Mon,  2 Jan 2017 14:40:18 +0100
-Subject: [PATCH v2 1/3] ARM: dts: imx6dl: Add Engicam i.CoreM6 DualLite/Solo
- RQS initial support
-Message-ID: <1483364420-10012-1-git-send-email-jagan@openedev.com>
+Date: Mon,  2 Jan 2017 14:40:20 +0100
+Subject: [PATCH v2 3/3] ARM: dts: imx6ul: Add Engicam Is.IoT MX6UL initial
+ support
+In-Reply-To: <1483364420-10012-1-git-send-email-jagan@openedev.com>
+References: <1483364420-10012-1-git-send-email-jagan@openedev.com>
+Message-ID: <1483364420-10012-3-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-i.CoreM6 DualLite/Solo modules are system on module solutions manufactured
-by Engicam with following characteristics:
-CPU           NXP i.MX6 DL, 800MHz
-RAM           1GB, 32, 64 bit, DDR3-800/1066
-NAND          SLC,512MB
-Power supply  Single 5V
-MAX LCD RES   FULLHD
-
-and more info at
-http://www.engicam.com/en/products/embedded/som/standard/i-core-rqs-m6s-dl-d-q
+Is.IoT MX6UL modules are system on module solutions manufactured by
+Engicam for IOT connectivity applications with following characteristics:
+CPU     NXP i.MX6UL (G2) Cortex-A7 at 528 MHz
+RAM     Up to 512 MB LvDDR3 at 800MT/s
+NAND    256MB (option)
+eMMC    4GB (option)
+LCD     18 bit parallel
+BT      2.1+EDR,Bluetooth 3.0, Bluetooth 4.1 (Bluetooth low energy)
+WLAN    IEEE 802.11 b/g/n (single stream n)
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Matteo Lisi <matteo.lisi@engicam.com>
@@ -25,31 +26,31 @@ Cc: Michael Trimarchi <michael@amarulasolutions.com>
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v2:
-- Update correct licenece notes
+- Newly added patch 
 
- arch/arm/boot/dts/Makefile             |  1 +
- arch/arm/boot/dts/imx6dl-icore-rqs.dts | 51 ++++++++++++++++++++++++++++++++++
- 2 files changed, 52 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-icore-rqs.dts
+ arch/arm/boot/dts/Makefile         |   1 +
+ arch/arm/boot/dts/imx6ul-isiot.dts | 119 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 120 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6ul-isiot.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index cccdbcb..51f8dae 100644
+index 51f8dae..bb1a172 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -349,6 +349,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6dl-gw553x.dtb \
- 	imx6dl-hummingboard.dtb \
- 	imx6dl-icore.dtb \
-+	imx6dl-icore-rqs.dtb \
- 	imx6dl-nit6xlite.dtb \
- 	imx6dl-nitrogen6x.dtb \
- 	imx6dl-phytec-pbab01.dtb \
-diff --git a/arch/arm/boot/dts/imx6dl-icore-rqs.dts b/arch/arm/boot/dts/imx6dl-icore-rqs.dts
+@@ -435,6 +435,7 @@ dtb-$(CONFIG_SOC_IMX6SX) += \
+ dtb-$(CONFIG_SOC_IMX6UL) += \
+ 	imx6ul-14x14-evk.dtb \
+ 	imx6ul-geam-kit.dtb \
++	imx6ul-isiot.dtb \
+ 	imx6ul-liteboard.dtb \
+ 	imx6ul-pico-hobbit.dtb \
+ 	imx6ul-tx6ul-0010.dtb \
+diff --git a/arch/arm/boot/dts/imx6ul-isiot.dts b/arch/arm/boot/dts/imx6ul-isiot.dts
 new file mode 100644
-index 0000000..cf42c2f
+index 0000000..b37db73
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-icore-rqs.dts
-@@ -0,0 +1,51 @@
++++ b/arch/arm/boot/dts/imx6ul-isiot.dts
+@@ -0,0 +1,119 @@
 +/*
 + * Copyright (C) 2016 Amarula Solutions B.V.
 + * Copyright (C) 2016 Engicam S.r.l.
@@ -94,12 +95,80 @@ index 0000000..cf42c2f
 +
 +/dts-v1/;
 +
-+#include "imx6q.dtsi"
-+#include "imx6qdl-icore-rqs.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include "imx6ul.dtsi"
 +
 +/ {
-+	model = "Engicam i.CoreM6 DualLite/Solo RQS Starter Kit";
-+	compatible = "engicam,imx6-icore-rqs", "fsl,imx6dl";
++	model = "Engicam Is.IoT MX6UL Starter kit";
++	compatible = "engicam,imx6ul-isiot", "fsl,imx6ul";
++
++	memory {
++		reg = <0x80000000 0x20000000>;
++	};
++
++	chosen {
++		stdout-path = &uart1;
++	};
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	status = "okay";
++};
++
++&usdhc1 {
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc1>;
++	pinctrl-1 = <&pinctrl_usdhc1_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc1_200mhz>;
++	cd-gpios = <&gpio1 19 GPIO_ACTIVE_LOW>;
++	bus-width = <4>;
++	no-1-8-v;
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl_uart1: uart1grp {
++		fsl,pins = <
++			MX6UL_PAD_UART1_TX_DATA__UART1_DCE_TX 0x1b0b1
++			MX6UL_PAD_UART1_RX_DATA__UART1_DCE_RX 0x1b0b1
++		>;
++	};
++
++	pinctrl_usdhc1: usdhc1grp {
++		fsl,pins = <
++			MX6UL_PAD_SD1_CMD__USDHC1_CMD     0x17059
++			MX6UL_PAD_SD1_CLK__USDHC1_CLK     0x10059
++			MX6UL_PAD_SD1_DATA0__USDHC1_DATA0 0x17059
++			MX6UL_PAD_SD1_DATA1__USDHC1_DATA1 0x17059
++			MX6UL_PAD_SD1_DATA2__USDHC1_DATA2 0x17059
++			MX6UL_PAD_SD1_DATA3__USDHC1_DATA3 0x17059
++		>;
++	};
++
++	pinctrl_usdhc1_100mhz: usdhc1grp100mhz {
++		fsl,pins = <
++			MX6UL_PAD_SD1_CMD__USDHC1_CMD     0x170b9
++			MX6UL_PAD_SD1_CLK__USDHC1_CLK     0x100b9
++			MX6UL_PAD_SD1_DATA0__USDHC1_DATA0 0x170b9
++			MX6UL_PAD_SD1_DATA1__USDHC1_DATA1 0x170b9
++			MX6UL_PAD_SD1_DATA2__USDHC1_DATA2 0x170b9
++			MX6UL_PAD_SD1_DATA3__USDHC1_DATA3 0x170b9
++		>;
++	};
++
++	pinctrl_usdhc1_200mhz: usdhc1grp200mhz {
++		fsl,pins = <
++			MX6UL_PAD_SD1_CMD__USDHC1_CMD     0x170f9
++			MX6UL_PAD_SD1_CLK__USDHC1_CLK     0x100f9
++			MX6UL_PAD_SD1_DATA0__USDHC1_DATA0 0x170f9
++			MX6UL_PAD_SD1_DATA1__USDHC1_DATA1 0x170f9
++			MX6UL_PAD_SD1_DATA2__USDHC1_DATA2 0x170f9
++			MX6UL_PAD_SD1_DATA3__USDHC1_DATA3 0x170f9
++		>;
++	};
 +};
 -- 
 1.9.1
