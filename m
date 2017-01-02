@@ -1,101 +1,57 @@
-From: hpa@zytor.com (hpa at zytor.com)
-Date: Mon, 02 Jan 2017 15:06:16 -0800
-Subject: How should we handle variable address space sizes (Re: [RFC 3/4]
- x86/mm: define TASK_SIZE as current->mm->task_size)
-In-Reply-To: <CALCETrU+BJ2JDRocBy-6SD_G6FbD+Ez_yb1QJ6Z1KXBjVzKOHg@mail.gmail.com>
-References: <CALCETrXMCVOmVcQYxF_ghPdEjLuNNqbcnoRKRVpJegsQ=SPEFQ@mail.gmail.com>
- <20170102094907.GC30735@node.shutemov.name>
- <CALCETrU+BJ2JDRocBy-6SD_G6FbD+Ez_yb1QJ6Z1KXBjVzKOHg@mail.gmail.com>
-Message-ID: <1A0BF94E-2F42-4721-AEA1-27C048F7EAD6@zytor.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Jan 2017 23:40:13 +0000
+Subject: [PATCH 1/5] ARM: wire up HWCAP2 feature bits to the CPU modalias
+In-Reply-To: <CAKv+Gu-hLD0xnLyywceJvPiB8ZkENNwWZTM--OHFvzw6MahYmw@mail.gmail.com>
+References: <1476787939-21889-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1476787939-21889-2-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu_y7e=sJT+7FNj846NczgpNOdVx53SDC7dupmN-3ztNwA@mail.gmail.com>
+ <20161031161319.GF1041@n2100.armlinux.org.uk>
+ <CAKv+Gu-hLD0xnLyywceJvPiB8ZkENNwWZTM--OHFvzw6MahYmw@mail.gmail.com>
+Message-ID: <20170102234013.GK14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On January 2, 2017 8:52:41 AM PST, Andy Lutomirski <luto@amacapital.net> wrote:
->On Mon, Jan 2, 2017 at 1:49 AM, Kirill A. Shutemov
-><kirill@shutemov.name> wrote:
->> On Fri, Dec 30, 2016 at 06:11:05PM -0800, Andy Lutomirski wrote:
->>> On Fri, Dec 30, 2016 at 7:56 AM, Dmitry Safonov
-><dsafonov@virtuozzo.com> wrote:
->>> > Keep task's virtual address space size as mm_struct field which
->>> > exists for a long time - it's initialized in setup_new_exec()
->>> > depending on the new task's personality.
->>> > This way TASK_SIZE will always be the same as
->current->mm->task_size.
->>> > Previously, there could be an issue about different values of
->>> > TASK_SIZE and current->mm->task_size: e.g, a 32-bit process can
->unset
->>> > ADDR_LIMIT_3GB personality (with personality syscall) and
->>> > so TASK_SIZE will be 4Gb, which is larger than mm->task_size =
->3Gb.
->>> > As TASK_SIZE *and* current->mm->task_size are used both in code
->>> > frequently, this difference creates a subtle situations, for
->example:
->>> > one can mmap addresses > 3Gb, but they will be hidden in
->>> > /proc/pid/pagemap as it checks mm->task_size.
->>> > I've moved initialization of mm->task_size earlier in
->setup_new_exec()
->>> > as arch_pick_mmap_layout() initializes mmap_legacy_base with
->>> > TASK_UNMAPPED_BASE, which depends on TASK_SIZE.
->>>
->>> I don't like this patch so much because I think that we should
->figure
->>> out how this will all work in the long run first.  I've added some
->>> more people to the thread because other arches have similar issues
->and
->>> because x86 is about to get considerably more complicated (choices
->>> include 3GB, 4GB, 47-bit, and 56-bit (the latter IIRC)).
->>>
->>> Here are a few of my thoughts on the matter.  This isn't all that
->well
->>> thought out:
->>>
->>> The address space limit, especially if CRIU is in play, isn't really
->a
->>> hard limit.  For example, you could allocate high memory then lower
->>> the limit.  Similarly, I see no reason that an x32 program should be
->>> forbidden from mapping some high addresses or, similarly, that an
->i386
->>> program can't (if it really wanted to) do a 64-bit mmap() and get a
->>> high address.
->>>
->>> On that note, can we just *delete* the task_size check from pagemap?
->>> It's been there since the very beginning:
->>>
->>> commit 85863e475e59afb027b0113290e3796ee6020b7d
->>> Author: Matt Mackall <mpm@selenic.com>
->>> Date:   Mon Feb 4 22:29:04 2008 -0800
->>>
->>>     maps4: add /proc/pid/pagemap interface
->>>
->>> and there's no explanation for why it's needed.
->>>
->>> So maybe we should have a *number* (not a bit) that indicates the
->>> maximum address that mmap() will return unless an override is in
->use.
->>> Since common practice seems to be to stick this in the personality
->>> field, we may need some fancy encoding.  Executing a setuid binary
->>> needs to reset to the default, and personality handles that.
->>
->> If we want to be able to specify arbitrary address as maximum, a
->fancy
->> encoding would need to claim 51 bits (63 VA - 12 in-page address) on
->x86
->> from the persona flag.
->> To me, it's stretching personality interface too far.
->>
->> Maybe it's easier to reset the rlimit for suid binaries?
->
->I guess I don't see why rlimit makes any sense, though.  It's not a
->resource utilization control, hard vs soft limits make very little
->sense, requiring capabilities to exceed the hard limit doesn't help
->anything, and it's only useful to preserve it across execve() to work
->around bugs.
->
->So if it's going to be a number, let's just make it be a new number
->with a new API to control it.
->
->--Andy
+On Mon, Jan 02, 2017 at 09:06:04PM +0000, Ard Biesheuvel wrote:
+> On 31 October 2016 at 16:13, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > On Sat, Oct 29, 2016 at 11:08:36AM +0100, Ard Biesheuvel wrote:
+> >> On 18 October 2016 at 11:52, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> >> > Wire up the generic support for exposing CPU feature bits via the
+> >> > modalias in /sys/device/system/cpu. This allows udev to automatically
+> >> > load modules for things like crypto algorithms that are implemented
+> >> > using optional instructions.
+> >> >
+> >> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> > ---
+> >> >  arch/arm/Kconfig                  |  1 +
+> >> >  arch/arm/include/asm/cpufeature.h | 32 ++++++++++++++++++++
+> >> >  2 files changed, 33 insertions(+)
+> >> >
+> >>
+> >> Russell,
+> >>
+> >> do you have any concerns regarding this patch? If not, I will drop it
+> >> into the patch system.
+> >
+> > It's still something I need to look at... I've been offline last week,
+> > and sort-of offline the previous week, so I'm catching up.
+> >
+> 
+> Hi Russell,
+> 
+> Any thoughts yet?
 
-It's an API that already exists, that's the plus. Hard and soft limits *do* make sense IMO.
+None, and the patch is well buried now that it'll take me a while to
+find... back in mid-October?  Yea, I'll have to drop everything and
+go digging through my mailboxes to find it... and I'm just catching
+up (again) after a week and a bit's time offline - yep, it's wonderful
+timing.  Sorry, no time to look at it right now, you're not the only
+one wanting my attention at the moment.
+
+Please try again in about a week's time - don't leave it a few months,
+and please include the patch.
+
 -- 
-Sent from my Android device with K-9 Mail. Please excuse my brevity.
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
