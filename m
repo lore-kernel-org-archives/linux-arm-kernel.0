@@ -1,60 +1,30 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Jan 2017 13:27:20 +0000
-Subject: [PATCH] serial: 8250: use initializer instead of memset to clear
- local struct
-In-Reply-To: <20161223072026.GA23895@kroah.com>
-References: <1482463308-28968-1-git-send-email-yamada.masahiro@socionext.com>
- <20161223072026.GA23895@kroah.com>
-Message-ID: <20170102132719.GD14217@n2100.armlinux.org.uk>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Mon, 2 Jan 2017 14:31:31 +0100
+Subject: [PATCH v7 2/5] i2c: Add STM32F4 I2C driver
+In-Reply-To: <CAOAejn1ocTSvdPWnZ-+DwMfJj45cXXEDc1+=B5d3zCy2Pw+0-A@mail.gmail.com>
+References: <1482413704-17531-1-git-send-email-cedric.madianga@gmail.com>
+ <1482413704-17531-3-git-send-email-cedric.madianga@gmail.com>
+ <20161223090019.a3jkhpb3abgjqi55@pengutronix.de>
+ <CAOAejn3sc1F8T_rbSTr6-wBNncNwObeK+c6=_Q0BMahDdHXxQA@mail.gmail.com>
+ <20161228212139.adkixdgvmtj2ukjs@pengutronix.de>
+ <CAOAejn1ocTSvdPWnZ-+DwMfJj45cXXEDc1+=B5d3zCy2Pw+0-A@mail.gmail.com>
+Message-ID: <CAOAejn3cxJdXd4i2OQk_fUiZwzUd7-U7Fi-haHUsvWg4xu_uzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 23, 2016 at 08:20:26AM +0100, Greg Kroah-Hartman wrote:
-> On Fri, Dec 23, 2016 at 12:21:48PM +0900, Masahiro Yamada wrote:
-> > Leave the way of zero-out to the compiler's decision; the compiler
-> > may know a more optimized way than calling memset().
-> 
-> But no, it doesn't, it will leave "blank" areas in the structure with
-> bad data in it, which is why we do memset.  See the tree-wide fixups we
-> made about a year ago for this very issue.  Are you sure none of these
-> structures get copied to userspace?
-> 
-> > It may end up with memset() for big structures like this after all,
-> > but the code will be cleaner at least.
-> 
-> Please leave it as-is, unless you see a measured speedup.
+Hello Uwe,
 
-We can probably have both... we have an "optimisation" in ARM for
-zero-based memset()s which was beneficial with older compilers, but
-I suspect GCC 4 does a much better job itself of optimising
-memset().  arch/arm/include/asm/string.h:
+>> Is it possible to make it more obvious by doing:
+>>
+>>         status = read_from_status_register() & read_from_interrupt_enable_register();
+>>
+>> at a single place?
+Contrary to what I said previously I have to keep possible_status
+variable as for one irq enabled we allow several events.
+For example, ITBUFEN allows to generate an irq for RXNE and for TXE events.
+So, using status = read_from_status_register() &
+read_from_interrupt_enable_register(); is not possible.
 
-#define memset(p,v,n)                                                   \
-        ({                                                              \
-                void *__p = (p); size_t __n = n;                        \
-                if ((__n) != 0) {                                       \
-                        if (__builtin_constant_p((v)) && (v) == 0)      \
-                                __memzero((__p),(__n));                 \
-                        else                                            \
-                                memset((__p),(v),(__n));                \
-                }                                                       \
-                (__p);                                                  \
-        })
+Best regards,
 
-I suspect we should get rid of that with GCC >= 4.
-
-I also suspect that it'll make no difference for uart_8250_port, as
-it's rather large, but for smaller structures (eg, up to a cache line)
-GCC can probably optimise to inline initialisation.
-
-So, probably something for resulting code and performance analysis...
-
-It's worth noting that 32-bit x86 always uses __builtin_memset() for
-memset() on GCC >= 4, so GCC's memset() optimisations must be safe for
-structures copied to userspace, or if not, 32-bit x86 is probably
-rather buggy.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Cedric
