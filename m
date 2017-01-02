@@ -1,31 +1,30 @@
-From: peter.senna@collabora.co.uk (Peter Senna Tschudin)
-Date: Mon, 02 Jan 2017 11:26:36 +0000
-Subject: =?utf-8?q?Re=3A?==?utf-8?q?_=5BPATCH?= V7 =?utf-8?q?3=2F4=5D?=
- =?utf-8?q?_drm=2Fbridge=3A?= Add driver for GE B850v3
- =?utf-8?q?LVDS=2FDP++?= Bridge
-In-Reply-To: <4232c88a99f44a24287d04d74b891e2eb139864c.1483301745.git.peter.senna@collabora.com>
-Message-ID: <6187-586a3900-3-4c1baf00@27351102>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 2 Jan 2017 16:59:35 +0530
+Subject: [PATCH v7 5/5] ARM: dts: da850: specify the maximum pixel clock
+ rate for tilcdc
+In-Reply-To: <1481623759-12786-6-git-send-email-bgolaszewski@baylibre.com>
+References: <1481623759-12786-1-git-send-email-bgolaszewski@baylibre.com>
+ <1481623759-12786-6-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <778cfd63-823c-7bf6-dc9d-0f2dcb43e129@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-On 01 January, 2017 21:24 CET, Peter Senna Tschudin <peter.senna@collabora.com> wrote: 
+On Tuesday 13 December 2016 03:39 PM, Bartosz Golaszewski wrote:
+> At maximum CPU frequency of 300 MHz the maximum pixel clock frequency
+> is 37.5 MHz[1]. We must filter out any mode for which the calculated
+> pixel clock rate would exceed this value.
+> 
+> Specify the max-pixelclock property for the display node for
+> da850-lcdk.
+> 
+> [1] http://processors.wiki.ti.com/index.php/OMAP-L1x/C674x/AM1x_LCD_Controller_(LCDC)_Throughput_and_Optimization_Techniques
 
-[ ... ] 
+This wiki page is not really a TI datasheet and can change without
+notice. I changed this to refer to
+http://www.ti.com/lit/ds/symlink/am1808.pdf (SPRS653E, revised March
+2014), table 6-110.
 
-> +static void ge_b850v3_lvds_dp_detach(struct drm_bridge *bridge)
-> +{
-> +	struct ge_b850v3_lvds_dp *ptn_bridge
-> +			= bridge_to_ge_b850v3_lvds_dp(bridge);
-> +	struct i2c_client *ge_b850v3_lvds_dp_i2c
-> +			= ptn_bridge->ge_b850v3_lvds_dp_i2c;
-> +
-> +	/* Disable interrupts */
-> +	i2c_smbus_write_word_data(ge_b850v3_lvds_dp_i2c,
-> +			STDP4028_DPTX_IRQ_EN_REG, ~STDP4028_DPTX_IRQ_CONFIG);
+Applied to v4.11/dt
 
- ~STDP4028_DPTX_IRQ_CONFIG? Argh! Will fix this and resend after reviews...
-
-[ ... ] 
- 
- 
+Thanks,
+Sekhar
