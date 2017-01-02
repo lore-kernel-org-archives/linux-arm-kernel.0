@@ -1,10 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sun,  1 Jan 2017 18:22:48 -0800
-Subject: [PATCH 7/8] ARM: dts: kirkwood-mv88f6281gtw-ge: Utilize new DSA
- binding
+Date: Sun,  1 Jan 2017 18:22:47 -0800
+Subject: [PATCH 6/8] ARM: dts: kirkwood-linksys-viper: Utilize new DSA binding
 In-Reply-To: <20170102022249.10657-1-f.fainelli@gmail.com>
 References: <20170102022249.10657-1-f.fainelli@gmail.com>
-Message-ID: <20170102022249.10657-8-f.fainelli@gmail.com>
+Message-ID: <20170102022249.10657-7-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,32 +13,32 @@ disabled.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 49 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-linksys-viper.dts | 49 ++++++++++++++++++++++++++++
  1 file changed, 49 insertions(+)
 
-diff --git a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-index 172a38c0b8a9..5622115158ab 100644
---- a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-+++ b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-@@ -112,6 +112,8 @@
+diff --git a/arch/arm/boot/dts/kirkwood-linksys-viper.dts b/arch/arm/boot/dts/kirkwood-linksys-viper.dts
+index 345fcac48dc7..df7851820507 100644
+--- a/arch/arm/boot/dts/kirkwood-linksys-viper.dts
++++ b/arch/arm/boot/dts/kirkwood-linksys-viper.dts
+@@ -70,6 +70,8 @@
  	};
  
  	dsa {
 +		status = "disabled";
 +
  		compatible = "marvell,dsa";
- 		#address-cells = <1>;
+ 		#address-cells = <2>;
  		#size-cells = <0>;
-@@ -159,6 +161,53 @@
+@@ -207,6 +209,53 @@
  
  &mdio {
  	status = "okay";
 +
-+	switch at 0 {
++	switch at 10 {
 +		compatible = "marvell,mv88e6085";
 +		#address-cells = <1>;
 +		#size-cells = <0>;
-+		reg = <0>;
++		reg = <16>;
 +
 +		ports {
 +			#address-cells = <1>;
@@ -47,27 +46,27 @@ index 172a38c0b8a9..5622115158ab 100644
 +
 +			port at 0 {
 +				reg = <0>;
-+				label = "lan1";
++				label = "ethernet1";
 +			};
 +
 +			port at 1 {
 +				reg = <1>;
-+				label = "lan2";
++				label = "ethernet2";
 +			};
 +
 +			port at 2 {
 +				reg = <2>;
-+				label = "lan3";
++				label = "ethernet3";
 +			};
 +
 +			port at 3 {
 +				reg = <3>;
-+				label = "lan4";
++				label = "ethernet4";
 +			};
 +
 +			port at 4 {
 +				reg = <4>;
-+				label = "wan";
++				label = "internet";
 +			};
 +
 +			port at 5 {
@@ -80,9 +79,9 @@ index 172a38c0b8a9..5622115158ab 100644
 +				};
 +			};
 +		};
-+	};	
++	};
  };
  
- &eth0 {
+ &uart0 {
 -- 
 2.9.3
