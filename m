@@ -1,32 +1,31 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 02 Jan 2017 14:55:32 +0000
-Subject: [PATCH] ARM: dts: armada388-clearfog: fix SPI flash #size-cells
-Message-ID: <E1cO41M-0007xc-Id@rmk-PC.armlinux.org.uk>
+Date: Mon, 02 Jan 2017 14:57:40 +0000
+Subject: [PATCH 0/9] ARM: dts: armada388: Introduce Clearfog Base DT
+References: <E1cO41M-0007xc-Id@rmk-PC.armlinux.org.uk>
+Message-ID: <E1cO43Q-0007yJ-ON@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SPI flash #size-cells is specified in the binding documentation to
-have value 1, but we were setting it to zero.  This wasn't causing any
-problem as we do not list any partitions, but it's worth specifying
-correctly if we're going to specify it at all.
+This patch series, based upon the previously submitted fix for the SPI
+flash, reworks the Clearfog DT files to add support for the SolidRun
+Clearfog Base platform.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/boot/dts/armada-388-clearfog.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The conventional model is now known as the "Clearfog Pro" module, which
+has the DSA switch and two PCIe sockets.  The base model is a smaller
+board without the DSA switch, replacing it with a second copper gigabit
+port, and only one PCIe socket.
 
-diff --git a/arch/arm/boot/dts/armada-388-clearfog.dts b/arch/arm/boot/dts/armada-388-clearfog.dts
-index 71ce201c903e..3e7c3a6237c3 100644
---- a/arch/arm/boot/dts/armada-388-clearfog.dts
-+++ b/arch/arm/boot/dts/armada-388-clearfog.dts
-@@ -437,7 +437,7 @@
- 
- 	spi-flash at 0 {
- 		#address-cells = <1>;
--		#size-cells = <0>;
-+		#size-cells = <1>;
- 		compatible = "w25q32", "jedec,spi-nor";
- 		reg = <0>; /* Chip select 0 */
- 		spi-max-frequency = <3000000>;
--- 
-2.7.4
+We retain the original DT file (named armada-388-clearfog.dtb) for
+compatibility with existing installations - not only the filename,
+but also the board name exposed in userspace.
+
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/armada-388-clearfog-base.dts     |  94 ++++++
+ arch/arm/boot/dts/armada-388-clearfog-pro.dts      |  55 ++++
+ arch/arm/boot/dts/armada-388-clearfog.dts          | 364 ++++-----------------
+ arch/arm/boot/dts/armada-388-clearfog.dtsi         | 310 ++++++++++++++++++
+ .../arm/boot/dts/armada-38x-solidrun-microsom.dtsi |  21 ++
+ 6 files changed, 548 insertions(+), 298 deletions(-)
+ create mode 100644 arch/arm/boot/dts/armada-388-clearfog-base.dts
+ create mode 100644 arch/arm/boot/dts/armada-388-clearfog-pro.dts
+ create mode 100644 arch/arm/boot/dts/armada-388-clearfog.dtsi
