@@ -1,56 +1,41 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Tue, 03 Jan 2017 19:25:48 +0900
-Subject: [PATCH 3/4] arm64: dts: exynos: make tm2 and tm2e independent from
- each other
-In-Reply-To: <CAJKOXPeEE1VwAUSAOpfyX+t58zKeAT1fe3ybp0BoQiiDBb4Uqg@mail.gmail.com>
-References: <CGME20170103075734epcas5p43a9743131f63affd0a438d2ed342f22e@epcas5p4.samsung.com>
- <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
- <1483430237-26823-4-git-send-email-jcsing.lee@samsung.com>
- <CAJKOXPev9m07_dQWAvJ+=MKnbT0TFERKOtjWUDU+WXdGAiRyDA@mail.gmail.com>
- <20170103095842.h3hl64amje4qv4ts@gangnam.samsung>
- <CAJKOXPeEE1VwAUSAOpfyX+t58zKeAT1fe3ybp0BoQiiDBb4Uqg@mail.gmail.com>
-Message-ID: <20170103102548.73jg6qddlcthe2mu@gangnam.samsung>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 3 Jan 2017 10:28:00 +0000
+Subject: [GIT PULL] firmware: SCPI: fixes for v4.10
+Message-ID: <11909baf-8ab3-7e53-ef22-2988571392f5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> > Currently tm2e dts includes tm2 but there are some differences
-> >> > between the two boards and tm2 has some properties that tm2e
-> >> > doesn't have.
-> >> >
-> >> > That's why it's important to keep the two dts files independent
-> >> > and put all the commonalities in a tm2-common.dtsi file.
-> >> >
-> >> > Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> >> > Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
-> >> > ---
-> >> >  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 1046 ++++++++++++++++++++
-> >> >  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 1033 +------------------
-> >> >  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |    2 +-
-> >> >  3 files changed, 1049 insertions(+), 1032 deletions(-)
-> >> >  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-> >>
-> >> I would like to see here the rename and diff from it. Not entire delta
-> >> (deletions and addons). It is not possible to compare it... I think
-> >> git supports it by default with similarity of 50%.
-> >
-> > I understand, it's indeed quite cryptic to understand. But all
-> > the diff algorithms (patience, minimal, histogram, myers) give
-> > the same result. I don't know how to make it better.
-> >
-> > I could split this patch, but this also means breaking tm2's
-> > functionality, which looks worse.
-> >
-> > Please tell me if you know a better way for generating the patch.
-> 
-> git format-patch -M95%?
+Hi ARM SoC Team,
 
-Same thing with all M values.
+Please pull !
 
-Because exynos5433-tm2.dts results modified, while
-exynos5433-tm2-common.dtsi is new. Even though I did:
+Regards,
+Sudeep
 
-1. mv exynos5433-tm2.dts exynos5433-tm2-common.dtsi
-2. copied pieces from exynos5433-tm2-common.dtsi to a new
-   exynos5433-tm2.dts
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
-Andi
+  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
+tags/scpi-fixes-4.10
+
+for you to fetch changes up to a766347b15c01507db9bf01f9b7021be5a776691:
+
+  firmware: arm_scpi: fix reading sensor values on pre-1.0 SCPI
+firmwares (2016-12-30 14:53:36 +0000)
+
+----------------------------------------------------------------
+SCPI fix for v4.10
+
+A simple fix for reading only lower 32-bit sensor values on pre-1.0 SCPI
+firmwares so that upper 32-bit (garbage) value is discarded properly.
+
+----------------------------------------------------------------
+Martin Blumenstingl (1):
+      firmware: arm_scpi: fix reading sensor values on pre-1.0 SCPI
+firmwares
+
+ drivers/firmware/arm_scpi.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
