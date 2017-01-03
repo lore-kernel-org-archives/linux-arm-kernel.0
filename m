@@ -1,34 +1,129 @@
-From: meng.yi@nxp.com (Meng Yi)
-Date: Tue, 3 Jan 2017 02:24:04 +0000
-Subject: [PATCH] arm64/dts/ls2080a-rdb: remove disable status of pca9547
-In-Reply-To: <20170102091705.GI20956@dragon>
-References: <1482213787-27814-1-git-send-email-meng.yi@nxp.com>
- <20170102091705.GI20956@dragon>
-Message-ID: <HE1PR0401MB2634D7F342D979D4FC36389AEC6E0@HE1PR0401MB2634.eurprd04.prod.outlook.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 3 Jan 2017 10:52:12 +0800
+Subject: [PATCH 3/5] arm64: dts: sun50i: add MMC nodes
+In-Reply-To: <1483398226-29321-4-git-send-email-andre.przywara@arm.com>
+References: <1483398226-29321-1-git-send-email-andre.przywara@arm.com>
+ <1483398226-29321-4-git-send-email-andre.przywara@arm.com>
+Message-ID: <CAGb2v65GJFTnQZtWHCS7CAtA+Dry94o77aakPLr938BpQksLog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Tue, Jan 3, 2017 at 7:03 AM, Andre Przywara <andre.przywara@arm.com> wrote:
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Monday, January 02, 2017 5:17 PM
-> To: Meng Yi <meng.yi@nxp.com>
-> Cc: robh+dt at kernel.org; Stuart Yoder <stuart.yoder@nxp.com>; linux-
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] arm64/dts/ls2080a-rdb: remove disable status of pca9547
-> 
-> On Tue, Dec 20, 2016 at 02:03:07PM +0800, Meng Yi wrote:
-> > pca9547 won't probed since its status property is disabled.
-> > while there are devices connected to it, we need remove status
-> > property to let ds3232 and adt7461 probed correctly.
-> >
-> > Signed-off-by: Meng Yi <meng.yi@nxp.com>
-> 
-> Changed subject prefix to 'arm64: dts: ls2080a-rdb: ', and applied the patch.
-> 
-> Shawn
+A commit message explaining the mmc controllers would be nice.
 
-Thanks!
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 67 +++++++++++++++++++++++++++
+>  1 file changed, 67 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> index e0dcab8..c680566 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> @@ -150,6 +150,32 @@
+>                                 pins = "PB8", "PB9";
+>                                 function = "uart0";
+>                         };
+> +
+> +                       mmc0_pins: mmc0 at 0 {
+> +                               pins = "PF0", "PF1", "PF2", "PF3", "PF4", "PF5";
+> +                               function = "mmc0";
+> +                               drive-strength = <30>;
+> +                       };
+> +
+> +                       mmc0_default_cd_pin: mmc0_cd_pin at 0 {
+> +                               pins = "PF6";
+> +                               function = "gpio_in";
+> +                               bias-pull-up;
+> +                       };
 
-Meng
+We are starting to drop pinmux nodes for gpio usage.
+
+> +
+> +                       mmc1_pins: mmc1 at 0 {
+> +                               pins = "PG0", "PG1", "PG2", "PG3", "PG4", "PG5";
+> +                               function = "mmc1";
+> +                               drive-strength = <30>;
+> +                       };
+> +
+> +                       mmc2_pins: mmc2 at 0 {
+> +                               pins = "PC1", "PC5", "PC6", "PC8", "PC9",
+> +                                      "PC10", "PC11", "PC12", "PC13", "PC14",
+> +                                      "PC15", "PC16";
+> +                               function = "mmc2";
+> +                               drive-strength = <30>;
+> +                       };
+
+Moreover I think you should split out the pinmux nodes to a separate patch.
+
+>                 };
+>
+>                 uart0: serial at 1c28000 {
+> @@ -240,6 +266,47 @@
+>                         #size-cells = <0>;
+>                 };
+>
+> +               mmc0: mmc at 1c0f000 {
+> +                       compatible = "allwinner,sun50i-a64-mmc",
+> +                                    "allwinner,sun5i-a13-mmc";
+
+Given that sun5i doesn't support mmc delay timings, and the A64 has
+calibration and delay timings, I wouldn't call them compatible.
+
+Or are you claiming that for the A64 has a delay of 0 for the
+currently supported speeds, so the calibration doesn't really
+matter? If so this should be mentioned in the commit message.
+
+> +                       reg = <0x01c0f000 0x1000>;
+> +                       clocks = <&ccu 31>, <&ccu 75>;
+
+The clock / reset index macros are in the tree now.
+Please switch to them.
+
+ChenYu
+
+> +                       clock-names = "ahb", "mmc";
+> +                       resets = <&ccu 8>;
+> +                       reset-names = "ahb";
+> +                       interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+> +                       status = "disabled";
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +               };
+> +
+> +               mmc1: mmc at 1c10000 {
+> +                       compatible = "allwinner,sun50i-a64-mmc",
+> +                                    "allwinner,sun5i-a13-mmc";
+> +                       reg = <0x01c10000 0x1000>;
+> +                       clocks = <&ccu 32>, <&ccu 76>;
+> +                       clock-names = "ahb", "mmc";
+> +                       resets = <&ccu 9>;
+> +                       reset-names = "ahb";
+> +                       interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+> +                       status = "disabled";
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +               };
+> +
+> +               mmc2: mmc at 1c11000 {
+> +                       compatible = "allwinner,sun50i-a64-emmc";
+> +                       reg = <0x01c11000 0x1000>;
+> +                       clocks = <&ccu 33>, <&ccu 77>;
+> +                       clock-names = "ahb", "mmc";
+> +                       resets = <&ccu 10>;
+> +                       reset-names = "ahb";
+> +                       interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+> +                       status = "disabled";
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +               };
+> +
+>                 gic: interrupt-controller at 1c81000 {
+>                         compatible = "arm,gic-400";
+>                         reg = <0x01c81000 0x1000>,
+> --
+> 2.8.2
+>
