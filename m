@@ -1,81 +1,147 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 3 Jan 2017 14:08:39 +0000
-Subject: [PATCH v6 01/14] ACPI: ARM64: IORT: minor cleanup for
- iort_match_node_callback()
-In-Reply-To: <1483363905-2806-2-git-send-email-hanjun.guo@linaro.org>
-References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
- <1483363905-2806-2-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20170103140839.GC7478@red-moon>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Tue, 3 Jan 2017 23:08:53 +0900
+Subject: [PATCH v3 1/3] power: reset: add linkstation-reset driver
+In-Reply-To: <20170103130916.GA30197@lunn.ch>
+References: <20161216100501.18173-1-rogershimizu@gmail.com>
+ <20161227070611.14852-1-rogershimizu@gmail.com>
+ <20161227070611.14852-2-rogershimizu@gmail.com>
+ <fff132e9-a178-6948-676e-6a4d24b6c4d6@gmail.com>
+ <20170103130916.GA30197@lunn.ch>
+Message-ID: <CAEQ9gE=MoQcr3eX0DAxZtvx0FW9pzgkUGjdxKHcsKwH7_+UsUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2017 at 09:31:32PM +0800, Hanjun Guo wrote:
-> Cleanup iort_match_node_callback() a little bit to reduce
-> some lines of code, aslo fix the indentation in iort_scan_node().
+Dear Florian, Andrew,
 
-s/aslo/also
+Thanks for your email!
 
-"Also" in a commit log is a sign a patch should be split and that's what
-you should do even though I know it is tempting to merge all trivial
-changes into one single patch.
+On Tue, Jan 3, 2017 at 2:19 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>
+> Interestingly, I submitted a patch doing nearly the same thing recently
+> after hacking on a Buffalo Terastation Pro II two days after yours
+> without seeing yours:
+>
+> https://lkml.org/lkml/2016/12/28/273
 
-Make it two patches please.
+Glad to know there's other developer working on linkstation/kurobox platform!
 
-Thanks,
-Lorenzo
+> Some comments below.
+>
+>> +
+>> +static void __iomem *base;
+>> +static unsigned long tclk;
+>> +static const struct reset_cfg *cfg;
+>
+> How about avoiding the singletons here and pass this down from the
+> platform driver's private data after we (see below) also make use of a
+> reboot notifier?
 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Majun <majun258@huawei.com>
-> Tested-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  drivers/acpi/arm64/iort.c | 10 +++-------
->  1 file changed, 3 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index e0d2e6e..46e2d82 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -225,7 +225,7 @@ static struct acpi_iort_node *iort_scan_node(enum acpi_iort_node_type type,
->  
->  		if (iort_node->type == type &&
->  		    ACPI_SUCCESS(callback(iort_node, context)))
-> -				return iort_node;
-> +			return iort_node;
->  
->  		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
->  					 iort_node->length);
-> @@ -253,17 +253,15 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
->  					    void *context)
->  {
->  	struct device *dev = context;
-> -	acpi_status status;
-> +	acpi_status status = AE_NOT_FOUND;
->  
->  	if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT) {
->  		struct acpi_buffer buf = { ACPI_ALLOCATE_BUFFER, NULL };
->  		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
->  		struct acpi_iort_named_component *ncomp;
->  
-> -		if (!adev) {
-> -			status = AE_NOT_FOUND;
-> +		if (!adev)
->  			goto out;
-> -		}
->  
->  		status = acpi_get_name(adev->handle, ACPI_FULL_PATHNAME, &buf);
->  		if (ACPI_FAILURE(status)) {
-> @@ -289,8 +287,6 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
->  		 */
->  		status = pci_rc->pci_segment_number == pci_domain_nr(bus) ?
->  							AE_OK : AE_NOT_FOUND;
-> -	} else {
-> -		status = AE_NOT_FOUND;
->  	}
->  out:
->  	return status;
-> -- 
-> 1.9.1
-> 
+I see your patches. Indeed, it's a good idea to avoid the singletons
+and use private data instead.
+
+>> +static int linkstation_reset_probe(struct platform_device *pdev)
+>> +{
+>> +     struct device_node *np = pdev->dev.of_node;
+>> +     struct resource *res;
+>> +     struct clk *clk;
+>> +     char symname[KSYM_NAME_LEN];
+>> +
+>> +     const struct of_device_id *match =
+>> +             of_match_node(linkstation_reset_of_match_table, np);
+>> +     cfg = match->data;
+>> +
+>> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +     if (!res) {
+>> +             dev_err(&pdev->dev, "Missing resource");
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+>> +     if (!base) {
+>> +             dev_err(&pdev->dev, "Unable to map resource");
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     /* We need to know tclk in order to calculate the UART divisor */
+>> +     clk = devm_clk_get(&pdev->dev, NULL);
+>> +     if (IS_ERR(clk)) {
+>> +             dev_err(&pdev->dev, "Clk missing");
+>> +             return PTR_ERR(clk);
+>> +     }
+>> +
+>> +     tclk = clk_get_rate(clk);
+>
+> Does this work with the Terastation II which has not been converted to
+> DT yet? Is tclk available through the CLK API there?
+
+I have no idea whether device-based legacy code and make use of power
+reset driver.
+Maybe Sebastian Reichel can offer a comment?
+
+However, I think Terastation II should convert to DT first.
+If you're willing to test, I can help to provide a dts/dtb.
+(If you use Debian, I can even provide DEB of kernel image and
+flash-kernel patch, which is easy for you to test)
+
+On Tue, Jan 3, 2017 at 10:09 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> > +
+>> > +   /* Check that nothing else has already setup a handler */
+>> > +   if (pm_power_off) {
+>> > +           lookup_symbol_name((ulong)pm_power_off, symname);
+>> > +           dev_err(&pdev->dev,
+>> > +                   "pm_power_off already claimed %p %s",
+>> > +                   pm_power_off, symname);
+>> > +           return -EBUSY;
+>> > +   }
+>> > +   pm_power_off = linkstation_reset;
+>>
+>> That seems a bit complicated, why not just assume that there will be
+>> either this driver used, or not at all?
+>
+> That is probably my fault. This is a copy from code i wrote many years
+> ago for the QNAP. I guess at the time i was battling with two
+> different pm_power_off handlers, so put in this code.
+>
+>> Also, you are supposed to register a reboot notifier to which you can
+>> pass private context:
+>
+> At the time i wrote the QNAP code, this did not exist. So maybe my
+> code is no longer a good example to copy.
+
+Really appreciated, Andrew!
+I'll modify this part in next series.
+
+BTW. the private data passing to reboot notifier can be shared to
+power-off function as well?
+Do you have example?
+
+> https://lkml.org/lkml/2016/12/28/275
+>
+> As indicated in my patch series, the UART1-attached micro controller
+> does a lot more things that just providing reboot, which is why I chose
+> to move this code to a MFD driver, as the starting point before adding
+> support for LEDs, FAN, PWM, beeper which would be other types of devices.
+>
+> Is adding support for other peripherals on your TODO as well?
+
+Except reset feature (power-off and reboot), other feature, such as
+LEDs / FAN speed / buttons, is managed by user-land program micro-evtd
+[0][1].
+Since the upstream [1] is not active anymore, Ryan Tandy (in CC) and I
+are maintaining it in Debian [0].
+
+[0] https://tracker.debian.org/pkg/micro-evtd
+[1] https://sourceforge.net/projects/ppc-evtd
+
+micro-evtd worked well for device-based legacy code, but after DT
+conversion, Ryan found the device cannot shutdown properly (reboot is
+OK).
+That why I created this patch series.
+I think for such old hardware and mature user-land program, it doesn't
+deserve the effort to implement those again in kernel side.
+What do you think?
+
+Cheers,
+-- 
+Roger Shimizu, GMT +9 Tokyo
+PGP/GPG: 4096R/6C6ACD6417B3ACB1
