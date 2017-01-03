@@ -1,113 +1,22 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 3 Jan 2017 18:31:36 +0200
-Subject: [PATCH 3/4] arm64: dts: exynos: make tm2 and tm2e independent
- from each other
-In-Reply-To: <CAGTfZH0tnjkqF_7DChLSvzs3C369mkb_HZmyrf3cc0T-UcBZ4A@mail.gmail.com>
-References: <1483430237-26823-4-git-send-email-jcsing.lee@samsung.com>
- <CAJKOXPev9m07_dQWAvJ+=MKnbT0TFERKOtjWUDU+WXdGAiRyDA@mail.gmail.com>
- <20170103095842.h3hl64amje4qv4ts@gangnam.samsung>
- <CAJKOXPeEE1VwAUSAOpfyX+t58zKeAT1fe3ybp0BoQiiDBb4Uqg@mail.gmail.com>
- <20170103102548.73jg6qddlcthe2mu@gangnam.samsung>
- <CAGTfZH3ez4DPTE7-bDeayjhSGxJ_8Mj1MQz1M7O1qhwOGOnmMQ@mail.gmail.com>
- <20170103115530.zhjwn7bzmqmumy23@gangnam.samsung>
- <ff876454-b49f-3d63-d76e-012dd303b0e7@osg.samsung.com>
- <20170103144056.4ft2ohmhgmezeney@jack.zhora.eu>
- <CAGTfZH0tnjkqF_7DChLSvzs3C369mkb_HZmyrf3cc0T-UcBZ4A@mail.gmail.com>
-Message-ID: <20170103163136.rzoswklqevoeugn4@kozik-lap>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 3 Jan 2017 17:32:22 +0100
+Subject: [PATCH 0/8] ARM: dts: Switch to new DSA binding
+In-Reply-To: <87eg0kf75m.fsf@free-electrons.com>
+References: <20170102022249.10657-1-f.fainelli@gmail.com>
+ <87eg0kf75m.fsf@free-electrons.com>
+Message-ID: <20170103163222.GD32450@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 12:29:23AM +0900, Chanwoo Choi wrote:
-> Hi Andi,
-> 
-> 2017-01-03 23:40 GMT+09:00 Andi Shyti <andi@etezian.org>:
-> > Hi,
-> >
-> >> FWIW, I also agree with Chanwoo that the difference is too small to
-> >> need a common .dtsi file.
-> >
-> > in principle I don't like "switching on and off" properties by
-> > overwriting them with "status = disable", unless it's really
-> > necessary (and this case is not). Even for small differences. It
-> > makes the DTS harder to read and duplicates nodes with different
-> > values throughout the DTS include chain.
+> The series looks OK. However I would like to have a reviewed by from
+> Andrew who know well the mvebu platform and the DSA subsystem.
 
-I agree.
+Hi Gregory
 
-> >
-> > In my opinion this approach should be discouraged.
-> >
-> > Besides, there are other overwritten differences in tm2e.dts that
-> > I think should be separated as well. The "common" file approach is
-> > widely used in arm/boot/dts/exynos* files.
+Yes, i was planning on reviewing, and testing on at least three of
+these platforms.
 
-I agree. Mostly we use:
-1. Common DTSI and final addons/customizations in DTS.
-2. Several common DTSI for specific parts (like sound).
+Since this is mvebu/arm-soc and not netdev, i may take a week or so
+before i get around to it. netdev is too fast some times.
 
-> > The "status = disable" looks to me more like a temporary hack
-> > rather than a permanent solution.
-> >
-> > In any case, still up to you :)
-> >
-> > Andi
-> 
-> I think that "status=disabled" of hsi2c_9 is not hack. The overwrite
-> is possible for Device-tree. But, there is just difference how to
-> support them with some method.
-> 
-> Except for touchkey, all peripheral device are same on both tm2 and
-> tm2e. There are only small difference for a few property value.
-> 
-> To understand the difference between tm2 and tm2e, I made the patch
-> (it is not complete version). If we implement the following patch, we
-> support both tm2 and tm2e. So, I think that it is not complex to
-> understand the h/w difference between tm2 and tm2e.
-
-The difference below (I removed it from the quote) is indeed very small,
-thanks Chanwoo for pointing this. However having common DTSI should not
-end with much bigger final diff between files. I mean that it should be
-the same amount of lines in total...
-
-Actually, after applying this patch, the final exynos5433-tm2e.dts is
-exactly the same as before. To me, this is a indication that a common
-file is a good approach.
-
-
->From a separate Javier's mail:
-> On 01/03/2017 11:40 AM, Andi Shyti wrote:
-> > Hi,
-> > 
-> >> FWIW, I also agree with Chanwoo that the difference is too small to
-> >> need a common .dtsi file.
-> > 
-> > in principle I don't like "switching on and off" properties by
-> > overwriting them with "status = disable", unless it's really
-> 
-> This is a very good point. It would had been different if it was the
-> opposite and tm2e had to enable the device node, but disabling it is
-> indeed more confusing.
-> On 01/03/2017 11:40 AM, Andi Shyti wrote:
-> > Hi,
-> > 
-> >> FWIW, I also agree with Chanwoo that the difference is too small to
-> >> need a common .dtsi file.
-> > 
-> > in principle I don't like "switching on and off" properties by
-> > overwriting them with "status = disable", unless it's really
-> 
-> This is a very good point. It would had been different if it was the
-> opposite and tm2e had to enable the device node, but disabling it is
-> indeed more confusing.
-
-I agree, 'status = disable' in final DTS is not a common pattern and
-to me when reading, it makes me wonder what was the author's intention.
-
-Also including a DTS in DTS is not a common pattern, neither. It appears
-(git grep include arch/arm/boot/dts | grep 'dts"') in few places but it
-is not obvious. At least to me.
-
-Overall, I prefer the common approach.
-
-Best regards,
-Krzysztof
+      Andrew
