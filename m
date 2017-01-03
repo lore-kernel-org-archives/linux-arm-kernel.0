@@ -1,69 +1,60 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 3 Jan 2017 15:22:06 +0100
-Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
-In-Reply-To: <BN3PR07MB25168573DD82F1681CDC8437C96E0@BN3PR07MB2516.namprd07.prod.outlook.com>
-References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
- <BN3PR07MB2516815EDE69ACDCE27F81A3C96F0@BN3PR07MB2516.namprd07.prod.outlook.com>
- <20170102113155.GA16373@localhost.localdomain>
- <0717c63b-2e29-9ad1-7f01-39817980933f@atmel.com>
- <20170102161359.GD3609@localhost.localdomain>
- <CAFcVECK1vt7Hu4tgSZ2+kKpMxoT-wpikMDq65HaxRv-EMgobHA@mail.gmail.com>
- <BN3PR07MB25168573DD82F1681CDC8437C96E0@BN3PR07MB2516.namprd07.prod.outlook.com>
-Message-ID: <bba29875-cc47-17a6-4104-5e8c46402f7d@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue,  3 Jan 2017 14:27:26 +0000
+Subject: [PATCH] arm64: mm: fix show_pte KERN_CONT fallout
+Message-ID: <1483453646-13617-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/01/2017 ? 11:47, Rafal Ozieblo a ?crit :
->> From: Harini Katakam [mailto:harinikatakamlinux at gmail.com] 
->> Sent: 3 stycznia 2017 06:06
->> Subject: Re: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
->>
->> Hi Richard,
->>
->> On Mon, Jan 2, 2017 at 9:43 PM, Richard Cochran <richardcochran@gmail.com> wrote:
->>> On Mon, Jan 02, 2017 at 03:47:07PM +0100, Nicolas Ferre wrote:
->>>> Le 02/01/2017 ? 12:31, Richard Cochran a ?crit :
->>>>> This Cadence IP core is a complete disaster.
->>>>
->>>> Well, it evolved and propose several options to different SoC 
->>>> integrators. This is not something unusual...
->>>> I suspect as well that some other network adapters have the same 
->>>> weakness concerning PTP timestamp in single register as the early 
->>>> revisions of this IP.
->>>
->>> It appears that this core can neither latch the time on read or write, 
->>> or even latch time stamps.  I have worked with many different PTP HW 
->>> implementations, even early ones like on the ixp4xx, and it is no 
->>> exaggeration to say that this one is uniquely broken.
->>>
->>>> I suspect that Rafal tend to jump too quickly to the latest IP 
->>>> revisions and add more options to this series: let's not try to pour 
->>>> too much things into this code right now.
->>>
->>> Why can't you check the IP version in the driver?
->>
->> There is an IP revision register but it would be probably be
->> better to rely on "caps" from the compatibility strings - to cover SoC specific
->> implementations. Also, when this extended BD is added (with timestamp),
->> additional words will need to be added statically which will be
->> consistent with Andrei's CONFIG_ checks.
-> We can distinguish IP cores with and without PTP support by reading
-> Design Configuration Register. But to distinguish IP cores with
-> timestamps in buffer descriptors and which support only event
-> registers, we can only check IP version by reading the revision ID
-> register and base on that.
-> I agree with Harini, compatibility strings could be better. But we
-> might end up with many different configuration in the future.
+Recent changes made KERN_CONT mandatory for continued lines. In the
+absence of KERN_CONT, a newline may be implicit inserted by the core
+printk code.
 
-Compatibility strings and associated configurations are cheap. It's not
-a problem to have many different configurations and clearer for this
-particular "composite" feature.
+In show_pte, we (erroneously) use printk without KERN_CONT for continued
+prints, resulting in output being split across a number of lines, and
+not matching the intended output, e.g.
 
-> We could use only descriptor approach but there are many Atmel's
-> cores on the market which support only event registers.
+[ff000000000000] *pgd=00000009f511b003
+, *pud=00000009f4a80003
+, *pmd=0000000000000000
 
-Yes and once in silicon, it's hard to modify ;-)
+Fix this by using pr_cont() for all the continuations.
 
-Regards,
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/mm/fault.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index a78a5c4..156169c 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -88,21 +88,21 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+ 			break;
+ 
+ 		pud = pud_offset(pgd, addr);
+-		printk(", *pud=%016llx", pud_val(*pud));
++		pr_cont(", *pud=%016llx", pud_val(*pud));
+ 		if (pud_none(*pud) || pud_bad(*pud))
+ 			break;
+ 
+ 		pmd = pmd_offset(pud, addr);
+-		printk(", *pmd=%016llx", pmd_val(*pmd));
++		pr_cont(", *pmd=%016llx", pmd_val(*pmd));
+ 		if (pmd_none(*pmd) || pmd_bad(*pmd))
+ 			break;
+ 
+ 		pte = pte_offset_map(pmd, addr);
+-		printk(", *pte=%016llx", pte_val(*pte));
++		pr_cont(", *pte=%016llx", pte_val(*pte));
+ 		pte_unmap(pte);
+ 	} while(0);
+ 
+-	printk("\n");
++	pr_cont("\n");
+ }
+ 
+ #ifdef CONFIG_ARM64_HW_AFDBM
 -- 
-Nicolas Ferre
+1.9.1
