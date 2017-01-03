@@ -1,58 +1,101 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue,  3 Jan 2017 23:25:33 +0800
-Subject: [PATCH 3/4] ARM: dts: sunxi: add usb_otg and usbphy node for V3s SoC
-In-Reply-To: <20170103152534.20118-1-icenowy@aosc.xyz>
-References: <20170103152534.20118-1-icenowy@aosc.xyz>
-Message-ID: <20170103152534.20118-4-icenowy@aosc.xyz>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 3 Jan 2017 15:30:50 +0000
+Subject: [PATCH 2/5] mfd: twl: remove useless header
+In-Reply-To: <20161126181326.14951-3-Nicolae_Rosia@mentor.com>
+References: <20161126181326.14951-1-Nicolae_Rosia@mentor.com>
+ <20161126181326.14951-3-Nicolae_Rosia@mentor.com>
+Message-ID: <20170103153050.GH2977@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V3s SoC features a USB PHY controller and a MUSB OTG controller.
+On Sat, 26 Nov 2016, Nicolae Rosia wrote:
 
-Add device nodes for them.
+> This header has one user, twl-core.c .
+> Remove it before it gets more users.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- arch/arm/boot/dts/sun8i-v3s.dtsi | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+The header is not useless.  It prevents us from having to place
+external prototypes into C files.
 
-diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
-index 084da7474afb..ebefc0fefef2 100644
---- a/arch/arm/boot/dts/sun8i-v3s.dtsi
-+++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
-@@ -153,6 +153,33 @@
- 			#size-cells = <0>;
- 		};
- 
-+		usb_otg: usb at 01c19000 {
-+			compatible = "allwinner,sun8i-h3-musb";
-+			reg = <0x01c19000 0x0400>;
-+			clocks = <&ccu CLK_BUS_OTG>;
-+			resets = <&ccu RST_BUS_OTG>;
-+			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "mc";
-+			phys = <&usbphy 0>;
-+			phy-names = "usb";
-+			extcon = <&usbphy 0>;
-+			status = "disabled";
-+		};
-+
-+		usbphy: phy at 01c19400 {
-+			compatible = "allwinner,sun8i-v3s-usb-phy";
-+			reg = <0x01c19400 0x2c>,
-+			      <0x01c1a800 0x4>;
-+			reg-names = "phy_ctrl",
-+				    "pmu0";
-+			clocks = <&ccu CLK_USB_PHY0>;
-+			clock-names = "usb0_phy";
-+			resets = <&ccu RST_USB_PHY0>;
-+			reset-names = "usb0_reset";
-+			status = "disabled";
-+			#phy-cells = <1>;
-+		};
-+
- 		ccu: clock at 01c20000 {
- 			compatible = "allwinner,sun8i-v3s-ccu";
- 			reg = <0x01c20000 0x400>;
+> Signed-off-by: Nicolae Rosia <Nicolae_Rosia@mentor.com>
+> ---
+>  drivers/mfd/twl-core.c    |  8 ++++++--
+>  drivers/mfd/twl-core.h    | 10 ----------
+>  drivers/mfd/twl4030-irq.c |  2 --
+>  drivers/mfd/twl6030-irq.c |  2 --
+>  4 files changed, 6 insertions(+), 16 deletions(-)
+>  delete mode 100644 drivers/mfd/twl-core.h
+> 
+> diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
+> index 48b0668..e16084e 100644
+> --- a/drivers/mfd/twl-core.c
+> +++ b/drivers/mfd/twl-core.c
+> @@ -52,8 +52,6 @@
+>  /* Register descriptions for audio */
+>  #include <linux/mfd/twl4030-audio.h>
+>  
+> -#include "twl-core.h"
+> -
+>  /*
+>   * The TWL4030 "Triton 2" is one of a family of a multi-function "Power
+>   * Management and System Companion Device" chips originally designed for
+> @@ -150,6 +148,12 @@
+>  
+>  /*----------------------------------------------------------------------*/
+>  
+> +int twl6030_init_irq(struct device *dev, int irq_num);
+> +int twl6030_exit_irq(void);
+> +int twl4030_init_irq(struct device *dev, int irq_num);
+> +int twl4030_exit_irq(void);
+> +int twl4030_init_chip_irq(const char *chip);
+> +
+>  /* Structure for each TWL4030/TWL6030 Slave */
+>  struct twl_client {
+>  	struct i2c_client *client;
+> diff --git a/drivers/mfd/twl-core.h b/drivers/mfd/twl-core.h
+> deleted file mode 100644
+> index 6ff99dc..0000000
+> --- a/drivers/mfd/twl-core.h
+> +++ /dev/null
+> @@ -1,10 +0,0 @@
+> -#ifndef __TWL_CORE_H__
+> -#define __TWL_CORE_H__
+> -
+> -extern int twl6030_init_irq(struct device *dev, int irq_num);
+> -extern int twl6030_exit_irq(void);
+> -extern int twl4030_init_irq(struct device *dev, int irq_num);
+> -extern int twl4030_exit_irq(void);
+> -extern int twl4030_init_chip_irq(const char *chip);
+> -
+> -#endif /*  __TWL_CORE_H__ */
+> diff --git a/drivers/mfd/twl4030-irq.c b/drivers/mfd/twl4030-irq.c
+> index b46c0cf..000c231 100644
+> --- a/drivers/mfd/twl4030-irq.c
+> +++ b/drivers/mfd/twl4030-irq.c
+> @@ -35,8 +35,6 @@
+>  #include <linux/irqdomain.h>
+>  #include <linux/i2c/twl.h>
+>  
+> -#include "twl-core.h"
+> -
+>  /*
+>   * TWL4030 IRQ handling has two stages in hardware, and thus in software.
+>   * The Primary Interrupt Handler (PIH) stage exposes status bits saying
+> diff --git a/drivers/mfd/twl6030-irq.c b/drivers/mfd/twl6030-irq.c
+> index 5357450..63eca76 100644
+> --- a/drivers/mfd/twl6030-irq.c
+> +++ b/drivers/mfd/twl6030-irq.c
+> @@ -42,8 +42,6 @@
+>  #include <linux/irqdomain.h>
+>  #include <linux/of_device.h>
+>  
+> -#include "twl-core.h"
+> -
+>  /*
+>   * TWL6030 (unlike its predecessors, which had two level interrupt handling)
+>   * three interrupt registers INT_STS_A, INT_STS_B and INT_STS_C.
+
 -- 
-2.11.0
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
