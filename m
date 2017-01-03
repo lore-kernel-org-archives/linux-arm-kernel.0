@@ -1,56 +1,54 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 3 Jan 2017 11:05:33 -0600
-Subject: [v2, 1/4] ARM: davinci: da8xx-dt: Add ti-aemif lookup for clock
- matching
-In-Reply-To: <7dbaaf44-09b8-ad27-b829-afbfa50f7aa7@ti.com>
-References: <20160810110032.29295-2-kbeldan@baylibre.com>
- <33cf2e96-6551-df6a-8a30-bf2c3aeabfee@lechnology.com>
- <72eb6441-6463-abd8-65e6-06772b925999@ti.com>
- <7dbaaf44-09b8-ad27-b829-afbfa50f7aa7@ti.com>
-Message-ID: <40a6fd6d-9107-1620-014a-fa2f22d5cc23@lechnology.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 3 Jan 2017 11:09:52 -0600
+Subject: [PATCH v3 2/3] DT: bingdings: power: reset: add
+ linkstation-reset doc
+In-Reply-To: <20161227070611.14852-3-rogershimizu@gmail.com>
+References: <20161216100501.18173-1-rogershimizu@gmail.com>
+ <20161227070611.14852-1-rogershimizu@gmail.com>
+ <20161227070611.14852-3-rogershimizu@gmail.com>
+Message-ID: <20170103170952.7svgaa247ewlht7f@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2017 02:58 AM, Sekhar Nori wrote:
-> On Monday 02 January 2017 01:34 PM, Sekhar Nori wrote:
->> On Saturday 31 December 2016 06:22 AM, David Lechner wrote:
->>> On 08/10/2016 06:00 AM, Karl Beldan wrote:
->>>> Many davinci boards (da830 and da850 families) don't have their clocks
->>>> in DT yet and won't be successful in getting an unnamed aemif clock
->>>> without explicitly registering them via clk_lookups, failing the
->>>> ti-aemif memory driver probe.
->>>>
->>>> The current aemif lookup entry resolving to the same clock:
->>>>     'CLK(NULL,               "aemif",        &aemif_clk)'
->>>> remains, as it is currently used (davinci_nand is getting a named clock
->>>> "aemif").
->>>>
->>>> This change will allow to switch from the mach-davinci aemif code to
->>>> the ti-aemif memory driver.
->>>>
->>>> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
->>>> ---
->>>
->>> FYI, I can't boot LEGO MINDSTORMS EV3 (AM1908) with a v4.9 mainline
->>> kernel. I did a git bisect and traced it down to this patch. I'm
->>> guessing that simply reverting it will break other things.
->>>
->>> The problem is that &aemif_clk is a node in a linked list and points to
->>> itself, which creates an infinite loop when looking up the usb clocks
->>> that are later in the list.
->>>
->>> I thought there was a patch to fix this properly from one of the Bay
->>> Libre guys to fix this already, but I can't seem to find it at the
->>> moment. When it is found, it would be good to have it applied to the 4.9
->>> stable and 4.10 mainline trees.
->>
->> Yes, a patch was submitted. It is pending in my queue since I need to do
->> a few experiments myself to determine if its the best solution possible.
->> Thanks for the heads-up on need to mark it for v4.9 stable. Will do.
->
-> The master branch of my tree should have the patch included. If you can
-> test and confirm it works fine on the lego platform, it will be great.
->
+On Tue, Dec 27, 2016 at 04:06:10PM +0900, Roger Shimizu wrote:
+> Add linkstation-reset doc to describe the newly added
+> POWER_RESET_LINKSTATION driver, which controls magic command
+> sending to UART1 to power-off Buffalo Linkstation / KuroBox
+> and their variants.
+> 
+> To: Sebastian Reichel <sre@kernel.org>
+> To: Rob Herring <robh+dt@kernel.org>
+> To: Mark Rutland <mark.rutland@arm.com>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Ryan Tandy <ryan@nardis.ca>
+> Cc: linux-pm at vger.kernel.org
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> 
+> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
+> ---
+>  .../bindings/power/reset/linkstation-reset.txt     | 26 ++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power/reset/linkstation-reset.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/power/reset/linkstation-reset.txt b/Documentation/devicetree/bindings/power/reset/linkstation-reset.txt
+> new file mode 100644
+> index 000000000000..815e340318f3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/reset/linkstation-reset.txt
+> @@ -0,0 +1,26 @@
+> +* Buffalo Linkstation Reset Driver
+> +
+> +Power of some Buffalo Linkstation or KuroBox Pro is managed by
+> +micro-controller, which connects to UART1. After being fed from UART1
+> +by a few magic numbers, the so-called power-off command,
+> +the micro-controller will turn power off the device.
 
-Tested "ARM: davinci: da850: fix infinite loop in clk_set_rate()" 
-working on LEGO Mindstorms with a 4.9.0 kernel.
+This needs to model the uC connected to the UART rather than some node 
+that defines only some portion of the functionality. I'm working on 
+bindings and proper bus support for this[1], but it's not done yet. 
+Though, the binding side is pretty simple.
+
+Rob
+
+[1] https://git.kernel.org/cgit/linux/kernel/git/robh/linux.git/log/?h=serial-bus-v2
