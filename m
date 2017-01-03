@@ -1,54 +1,110 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 3 Jan 2017 21:20:08 +0200
-Subject: [PATCH] cpufreq: s3c64xx: remove incorrect __init annotation
-In-Reply-To: <CAJZ5v0jaKnn+LTTdpgxaFLNaYSuqV8d9PKphOnHrPw0Zp_Uj5w@mail.gmail.com>
-References: <20161216090625.2235668-1-arnd@arndb.de>
- <20170102070903.GC8588@vireshk-i7>
- <20170102173651.hvsfalhcmisv4mtv@kozik-lap>
- <CAJZ5v0jaKnn+LTTdpgxaFLNaYSuqV8d9PKphOnHrPw0Zp_Uj5w@mail.gmail.com>
-Message-ID: <20170103192008.3taowqq4kjggv6fh@kozik-lap>
+From: uwe@kleine-koenig.org (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue,  3 Jan 2017 20:35:01 +0100
+Subject: [PATCH v3] ARM: dts: turris-omnia: add support for ethernet switch
+In-Reply-To: <20170103152107.GA32450@lunn.ch>
+References: <20170103152107.GA32450@lunn.ch>
+Message-ID: <20170103193501.4827-1-uwe@kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2017 at 10:19:29PM +0100, Rafael J. Wysocki wrote:
-> On Mon, Jan 2, 2017 at 6:36 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> > On Mon, Jan 02, 2017 at 12:39:03PM +0530, Viresh Kumar wrote:
-> >> On 16-12-16, 10:06, Arnd Bergmann wrote:
-> >> > s3c64xx_cpufreq_config_regulator is incorrectly annotated
-> >> > as __init, since the caller is also not init:
-> >> >
-> >> > WARNING: vmlinux.o(.text+0x92fe1c): Section mismatch in reference from the function s3c64xx_cpufreq_driver_init() to the function .init.text:s3c64xx_cpufreq_config_regulator()
-> >> >
-> >> > With modern gcc versions, the function gets inline, so we don't
-> >> > see the warning, this only happens with gcc-4.6 and older.
-> >> >
-> >> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> >> > ---
-> >> >  drivers/cpufreq/s3c64xx-cpufreq.c | 2 +-
-> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >> >
-> >> > diff --git a/drivers/cpufreq/s3c64xx-cpufreq.c b/drivers/cpufreq/s3c64xx-cpufreq.c
-> >> > index 176e84cc3991..0cb9040eca49 100644
-> >> > --- a/drivers/cpufreq/s3c64xx-cpufreq.c
-> >> > +++ b/drivers/cpufreq/s3c64xx-cpufreq.c
-> >> > @@ -107,7 +107,7 @@ static int s3c64xx_cpufreq_set_target(struct cpufreq_policy *policy,
-> >> >  }
-> >> >
-> >> >  #ifdef CONFIG_REGULATOR
-> >> > -static void __init s3c64xx_cpufreq_config_regulator(void)
-> >> > +static void s3c64xx_cpufreq_config_regulator(void)
-> >> >  {
-> >> >     int count, v, i, found;
-> >> >     struct cpufreq_frequency_table *freq;
-> >>
-> >> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> >
-> > Rafael,
-> > Are you going to pick it up?
-> 
-> I thought I did, didn't I?
+The Turris Omnia features a Marvell MV88E6176 ethernet switch. Add it to
+the dts.
 
-Right, you did. I missed that. Thanks!
+Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+---
+Changes since (implicit) v1:
+ - drop mdio bus and per port phy-handle as they match the default
+   setup.
 
-Best regards,
-Krzysztof
+Changes since v2:
+ - Fix switch type in comment and commit log
+ - drop 2nd cpu port
+
+ arch/arm/boot/dts/armada-385-turris-omnia.dts | 58 +++++++++++++++++++++++++--
+ 1 file changed, 55 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
+index ab49acb2d452..28eede180e4f 100644
+--- a/arch/arm/boot/dts/armada-385-turris-omnia.dts
++++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
+@@ -122,7 +122,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&ge0_rgmii_pins>;
+ 	status = "okay";
+-	phy-mode = "rgmii-id";
++	phy-mode = "rgmii";
+ 
+ 	fixed-link {
+ 		speed = <1000>;
+@@ -135,7 +135,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&ge1_rgmii_pins>;
+ 	status = "okay";
+-	phy-mode = "rgmii-id";
++	phy-mode = "rgmii";
+ 
+ 	fixed-link {
+ 		speed = <1000>;
+@@ -273,7 +273,59 @@
+ 		/* irq is connected to &pcawan pin 7 */
+ 	};
+ 
+-	/* Switch MV88E7176 at address 0x10 */
++	/* Switch MV88E6176 at address 0x10 */
++	switch at 10 {
++		compatible = "marvell,mv88e6085";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		dsa,member = <0 0>;
++
++		reg = <0x10>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			ports at 0 {
++				reg = <0>;
++				label = "lan0";
++			};
++
++			ports at 1 {
++				reg = <1>;
++				label = "lan1";
++			};
++
++			ports at 2 {
++				reg = <2>;
++				label = "lan2";
++			};
++
++			ports at 3 {
++				reg = <3>;
++				label = "lan3";
++			};
++
++			ports at 4 {
++				reg = <4>;
++				label = "lan4";
++			};
++
++			ports at 5 {
++				reg = <5>;
++				label = "cpu";
++				ethernet = <&eth1>;
++				phy-mode = "rgmii-id";
++
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++				};
++			};
++
++			/* port 6 is connected to eth0 */
++		};
++	};
+ };
+ 
+ &pinctrl {
+-- 
+2.11.0
