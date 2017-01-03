@@ -1,33 +1,35 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Tue, 3 Jan 2017 13:20:48 +0000
-Subject: [RESEND PATCH 0/6] apalis-tk1: updates for v1.1 hw
-In-Reply-To: <20161124010456.24604-1-marcel@ziswiler.com>
-References: <20161124010456.24604-1-marcel@ziswiler.com>
-Message-ID: <1483449646.2745.1.camel@toradex.com>
+From: colin.king@canonical.com (Colin King)
+Date: Tue,  3 Jan 2017 13:21:22 +0000
+Subject: [PATCH] crypto: mediatek: don't return garbage err on successful
+ return
+Message-ID: <20170103132122.26900-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-11-24 at 02:04 +0100, marcel at ziswiler.com wrote:
-> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> 
-> 
-> This series updates the device tree for the upcoming V1.1 HW samples.
-> All changes are purely opportunistic meaning they fix stuff which on
-> older HW was anyway broken so there should be no backwards
-> compatibility issues.
-> 
-> 
-> Marcel Ziswiler (6):
-> ? apalis-tk1: remove spurious new lines
-> ? apalis-tk1: temp alert pull-up
-> ? apalis-tk1: optional displayport hot-plug detect
-> ? apalis-tk1: adjust pin muxing for v1.1 hw
-> ? apalis-tk1: working sd card detect on v1.1 hw
-> ? apalis-tk1: update compatibility comment
-> 
-> ?arch/arm/boot/dts/tegra124-apalis-eval.dts | 11 +----
-> ?arch/arm/boot/dts/tegra124-apalis.dtsi?????| 73 +++++++++++---------
-> ----------
-> ?2 files changed, 29 insertions(+), 55 deletions(-)
+From: Colin Ian King <colin.king@canonical.com>
 
-Ping.
+In the case where keylen <= bs mtk_sha_setkey returns an uninitialized
+return value in err.  Fix this by returning 0 instead of err.
+
+Issue detected by static analysis with cppcheck.
+
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/crypto/mediatek/mtk-sha.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/crypto/mediatek/mtk-sha.c b/drivers/crypto/mediatek/mtk-sha.c
+index 8951363..8e1b440 100644
+--- a/drivers/crypto/mediatek/mtk-sha.c
++++ b/drivers/crypto/mediatek/mtk-sha.c
+@@ -878,7 +878,7 @@ static int mtk_sha_setkey(struct crypto_ahash *tfm,
+ 		bctx->opad[i] ^= 0x5c;
+ 	}
+ 
+-	return err;
++	return 0;
+ }
+ 
+ static int mtk_sha_export(struct ahash_request *req, void *out)
+-- 
+2.10.2
