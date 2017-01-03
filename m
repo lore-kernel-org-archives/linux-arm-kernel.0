@@ -1,81 +1,32 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Tue, 3 Jan 2017 10:29:33 -0800
-Subject: [RFC, PATCHv2 29/29] mm, x86: introduce RLIMIT_VADDR
-In-Reply-To: <3492795.xaneWtGxgW@wuerfel>
-References: <20161227015413.187403-1-kirill.shutemov@linux.intel.com>
- <2736959.3MfCab47fD@wuerfel>
- <CALCETrV_qejd-Ozqo4vTqz=LuukMUPeQ7EVUQbfTxs_xNbO3oQ@mail.gmail.com>
- <3492795.xaneWtGxgW@wuerfel>
-Message-ID: <CALCETrUCdu3kTBU09gXaSppO7VCm+872zkGnovaZKTXBbY2wTg@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 3 Jan 2017 19:30:32 +0100
+Subject: [PATCH 0/6] staging: vchiq_arm: Fine-tuning for some function
+ implementations
+In-Reply-To: <87r34kniic.fsf@eliezer.anholt.net>
+References: <5acd65e7-0b5d-0972-5e1a-6e87d71dc1a4@users.sourceforge.net>
+ <87r34kniic.fsf@eliezer.anholt.net>
+Message-ID: <20170103183032.GA4426@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 3, 2017 at 5:18 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday, January 2, 2017 10:08:28 PM CET Andy Lutomirski wrote:
->>
->> > This seems to nicely address the same problem on arm64, which has
->> > run into the same issue due to the various page table formats
->> > that can currently be chosen at compile time.
->>
->> On further reflection, I think this has very little to do with paging
->> formats except insofar as paging formats make us notice the problem.
->> The issue is that user code wants to be able to assume an upper limit
->> on an address, and it gets an upper limit right now that depends on
->> architecture due to paging formats.  But someone really might want to
->> write a *portable* 64-bit program that allocates memory with the high
->> 16 bits clear.  So let's add such a mechanism directly.
->>
->> As a thought experiment, what if x86_64 simply never allocated "high"
->> (above 2^47-1) addresses unless a new mmap-with-explicit-limit syscall
->> were used?  Old glibc would continue working.  Old VMs would work.
->> New programs that want to use ginormous mappings would have to use the
->> new syscall.  This would be totally stateless and would have no issues
->> with CRIU.
->
-> I can see this working well for the 47-bit addressing default, but
-> what about applications that actually rely on 39-bit addressing
-> (I'd have to double-check, but I think this was the limit that
-> people were most interested in for arm64)?
->
-> 39 bits seems a little small to make that the default for everyone
-> who doesn't pass the extra flag. Having to pass another flag to
-> limit the addresses introduces other problems (e.g. mmap from
-> library call that doesn't pass that flag).
+On Tue, Jan 03, 2017 at 09:46:51AM -0800, Eric Anholt wrote:
+> SF Markus Elfring <elfring@users.sourceforge.net> writes:
+> 
+> > From: Markus Elfring <elfring@users.sourceforge.net>
+> > Date: Sat, 31 Dec 2016 22:42:34 +0100
+> >
+> > Some update suggestions were taken into account
+> > from static source code analysis.
+> 
+> This series is:
+> 
+> Reviewed-by: Eric Anholt <eric@anholt.net>
 
-That's a fair point.  Maybe my straw man isn't so good.
+Nice, but I have a blacklist from this patch author, and have told them
+numerous times that I no longer accept patches from them.  If you think
+they are worthy, please resend them with your reviewed-by on them, but I
+will warn you, I've blacklisted them for a reason...
 
->
->> If necessary, we could also have a prctl that changes a
->> "personality-like" limit that is in effect when the old mmap was used.
->> I say "personality-like" because it would reset under exactly the same
->> conditions that personality resets itself.
->
-> For "personality-like", it would still have to interact
-> with the existing PER_LINUX32 and PER_LINUX32_3GB flags that
-> do the exact same thing, so actually using personality might
-> be better.
->
-> We still have a few bits in the personality arguments, and
-> we could combine them with the existing ADDR_LIMIT_3GB
-> and ADDR_LIMIT_32BIT flags that are mutually exclusive by
-> definition, such as
->
->         ADDR_LIMIT_32BIT =      0x0800000, /* existing */
->         ADDR_LIMIT_3GB   =      0x8000000, /* existing */
->         ADDR_LIMIT_39BIT =      0x0010000, /* next free bit */
->         ADDR_LIMIT_42BIT =      0x8010000,
->         ADDR_LIMIT_47BIT =      0x0810000,
->         ADDR_LIMIT_48BIT =      0x8810000,
->
-> This would probably take only one or two personality bits for the
-> limits that are interesting in practice.
+good luck!
 
-Hmm.  What if we approached this a bit differently?  We could add a
-single new personality bit ADDR_LIMIT_EXPLICIT.  Setting this bit
-cause PER_LINUX32_3GB etc to be automatically cleared.  When
-ADDR_LIMIT_EXPLICIT is in effect, prctl can set a 64-bit numeric
-limit.  If ADDR_LIMIT_EXPLICIT is cleared, the prctl value stops being
-settable and reading it via prctl returns whatever is implied by the
-other personality bits.
-
---Andy
+greg k-h
