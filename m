@@ -1,47 +1,105 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 3 Jan 2017 11:18:15 +0000
-Subject: [PATCH 1/2] arm64: setup: introduce kaslr_offset()
-In-Reply-To: <4094c1ef-0a75-7076-58e0-52ece326188b@linux.com>
-References: <1481417456-28826-1-git-send-email-alex.popov@linux.com>
- <1481417456-28826-2-git-send-email-alex.popov@linux.com>
- <20161222061857.GA26502@yury-N73SV>
- <4094c1ef-0a75-7076-58e0-52ece326188b@linux.com>
-Message-ID: <db9266fb-5c6e-5dfb-2aac-4165c6b2b337@nvidia.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 3 Jan 2017 19:20:57 +0800
+Subject: [arm-platforms:kvm-arm64/gicv4-wip 26/39]
+ drivers/irqchip/irq-gic-v3-its.c:2053:3: error: implicit declaration of
+ function 'writeq_relaxed'
+Message-ID: <201701031954.tzozHjZJ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will, Catalin,
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv4-wip
+head:   ff003d7a3416337cc037320bfd175aaee79f05ae
+commit: 0c2bc9e2fd28b4be9bc1f4e7442e0926714994d3 [26/39] irqchip/gic-v3-its: Add VPE scheduling
+config: arm-multi_v7_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 0c2bc9e2fd28b4be9bc1f4e7442e0926714994d3
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-On 22/12/16 12:51, Alexander Popov wrote:
-> On 22.12.2016 09:18, Yury Norov wrote:
->> On Sun, Dec 11, 2016 at 03:50:55AM +0300, Alexander Popov wrote:
->>> Introduce kaslr_offset() similarly to x86_64 for fixing kcov.
-> 
-> [...]
-> 
->> Hi Alexander,
->>
->> I found today's linux-next master broken:
-> 
-> [...]
-> 
->> It looks like you declare kaslr_offset() twice - in this patch, and in 7ede8665f
->> (arm64: setup: introduce kaslr_offset()). 
-> 
-> Hello Yury,
-> 
-> There was a race during applying this patch. So currently linux-next has 2 versions of it.
-> 
-> The first one is 1a339a14b1f2c7a0dfdd6db79eee1e55d3cec357, which is original.
-> The second one is 7ede8665f27cde7da69e8b2fbeaa1ed0664879c5, updated by Will Deacon and
-> applied to the mainline.
-> 
-> I'm sorry for that. The first one should be definitely dropped.
+All error/warnings (new ones prefixed by >>):
 
-Looks like this is still broken in today's -next.
+   In file included from include/linux/kernel.h:10:0,
+                    from include/linux/list.h:8,
+                    from include/linux/resource_ext.h:17,
+                    from include/linux/acpi.h:26,
+                    from drivers/irqchip/irq-gic-v3-its.c:18:
+   drivers/irqchip/irq-gic-v3-its.c: In function 'its_vpe_set_vcpu_affinity':
+>> include/linux/bitops.h:22:27: warning: right shift count is negative [-Wshift-count-negative]
+     (((~0UL) << (l)) & (~0UL >> (BITS_PER_LONG - 1 - (h))))
+                              ^
+>> drivers/irqchip/irq-gic-v3-its.c:2049:4: note: in expansion of macro 'GENMASK'
+       GENMASK(51, 12);
+       ^~~~~~~
+>> drivers/irqchip/irq-gic-v3-its.c:2053:3: error: implicit declaration of function 'writeq_relaxed' [-Werror=implicit-function-declaration]
+      writeq_relaxed(val, gic_data_rdist_vlpi_base() + GICR_VPROPBASER);
+      ^~~~~~~~~~~~~~
+   In file included from include/linux/kernel.h:10:0,
+                    from include/linux/list.h:8,
+                    from include/linux/resource_ext.h:17,
+                    from include/linux/acpi.h:26,
+                    from drivers/irqchip/irq-gic-v3-its.c:18:
+>> include/linux/bitops.h:22:27: warning: right shift count is negative [-Wshift-count-negative]
+     (((~0UL) << (l)) & (~0UL >> (BITS_PER_LONG - 1 - (h))))
+                              ^
+   drivers/irqchip/irq-gic-v3-its.c:2055:54: note: in expansion of macro 'GENMASK'
+      val  = virt_to_phys(page_address(vpe->vpt_page)) & GENMASK(51, 16);
+                                                         ^~~~~~~
+>> drivers/irqchip/irq-gic-v3-its.c:2069:9: error: implicit declaration of function 'readq_relaxed' [-Werror=implicit-function-declaration]
+      val = readq_relaxed(gic_data_rdist_vlpi_base() + GICR_VPENDBASER);
+            ^~~~~~~~~~~~~
+   In file included from drivers/irqchip/irq-gic-v3-its.c:38:0:
+   drivers/irqchip/irq-gic-v3-its.c: In function 'its_probe_one':
+   include/linux/irqchip/arm-gic-v3.h:308:32: warning: left shift count >= width of type [-Wshift-count-overflow]
+    #define GITS_TYPER_VMOVP  (1UL << 37)
+                                   ^
+   drivers/irqchip/irq-gic-v3-its.c:2416:30: note: in expansion of macro 'GITS_TYPER_VMOVP'
+     if (its->is_v4 && !(typer & GITS_TYPER_VMOVP)) {
+                                 ^~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
 
-Cheers
-Jon
+vim +/writeq_relaxed +2053 drivers/irqchip/irq-gic-v3-its.c
 
--- 
-nvpublic
+  2043	
+  2044		switch (info->cmd_type) {
+  2045		case SCHEDULE_VPE:
+  2046		{
+  2047			/* Schedule the VPE */
+  2048			val  = virt_to_phys(page_address(vpe->its_vm->vprop_page)) &
+> 2049				GENMASK(51, 12);
+  2050			val |= (LPI_NRBITS - 1) & GICR_VPROPBASER_IDBITS_MASK;
+  2051			val |= GICR_VPROPBASER_RaWb;
+  2052			val |= GICR_VPROPBASER_InnerShareable;
+> 2053			writeq_relaxed(val, gic_data_rdist_vlpi_base() + GICR_VPROPBASER);
+  2054	
+  2055			val  = virt_to_phys(page_address(vpe->vpt_page)) & GENMASK(51, 16);
+  2056			val |= GICR_VPENDBASER_WaWb;
+  2057			val |= GICR_VPENDBASER_NonShareable;
+  2058			val |= GICR_PENDBASER_PendingLast;
+  2059			val |= vpe->idai ? GICR_PENDBASER_IDAI : 0;
+  2060			val |= GICR_PENDBASER_Valid;
+  2061			writeq_relaxed(val, gic_data_rdist_vlpi_base() + GICR_VPENDBASER);
+  2062	
+  2063			return 0;
+  2064		}
+  2065	
+  2066		case DESCHEDULE_VPE:
+  2067		{
+  2068			/* We're being scheduled out */
+> 2069			val = readq_relaxed(gic_data_rdist_vlpi_base() + GICR_VPENDBASER);
+  2070			val &= ~GICR_PENDBASER_Valid;
+  2071			writeq_relaxed(val, gic_data_rdist_vlpi_base() + GICR_VPENDBASER);
+  2072	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 39862 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170103/e7d8f8c7/attachment-0001.gz>
