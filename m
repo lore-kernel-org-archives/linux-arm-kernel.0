@@ -1,41 +1,24 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 3 Jan 2017 10:28:00 +0000
-Subject: [GIT PULL] firmware: SCPI: fixes for v4.10
-Message-ID: <11909baf-8ab3-7e53-ef22-2988571392f5@arm.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Tue, 3 Jan 2017 11:29:58 +0100
+Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <CAFcVECK1vt7Hu4tgSZ2+kKpMxoT-wpikMDq65HaxRv-EMgobHA@mail.gmail.com>
+References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
+ <BN3PR07MB2516815EDE69ACDCE27F81A3C96F0@BN3PR07MB2516.namprd07.prod.outlook.com>
+ <20170102113155.GA16373@localhost.localdomain>
+ <0717c63b-2e29-9ad1-7f01-39817980933f@atmel.com>
+ <20170102161359.GD3609@localhost.localdomain>
+ <CAFcVECK1vt7Hu4tgSZ2+kKpMxoT-wpikMDq65HaxRv-EMgobHA@mail.gmail.com>
+Message-ID: <20170103102958.GC24780@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC Team,
+On Tue, Jan 03, 2017 at 10:36:11AM +0530, Harini Katakam wrote:
+> I understand that it is not accurate - it is an initial version.
 
-Please pull !
+Why do you say, "it is an initial version?"
 
-Regards,
-Sudeep
+The Atmel device has this IP core burned in.  The core is hopelessly
+broken, and it cannot be fixed in SW either, so what is your point?
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
-
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
-tags/scpi-fixes-4.10
-
-for you to fetch changes up to a766347b15c01507db9bf01f9b7021be5a776691:
-
-  firmware: arm_scpi: fix reading sensor values on pre-1.0 SCPI
-firmwares (2016-12-30 14:53:36 +0000)
-
-----------------------------------------------------------------
-SCPI fix for v4.10
-
-A simple fix for reading only lower 32-bit sensor values on pre-1.0 SCPI
-firmwares so that upper 32-bit (garbage) value is discarded properly.
-
-----------------------------------------------------------------
-Martin Blumenstingl (1):
-      firmware: arm_scpi: fix reading sensor values on pre-1.0 SCPI
-firmwares
-
- drivers/firmware/arm_scpi.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+Thanks,
+Richard
