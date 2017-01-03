@@ -1,43 +1,38 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Jan 2017 21:31:18 +0000
-Subject: [PATCH] rtc: armada38x: add __ro_after_init to armada38x_rtc_ops
-In-Reply-To: <CAGXu5jJLA=GcOhV5Z_6AOGa1KhW7fXtqBGrewEeViaJ9TiE-aw@mail.gmail.com>
-References: <1482751862-18699-1-git-send-email-bhumirks@gmail.com>
- <20170102140654.GF14217@n2100.armlinux.org.uk>
- <CAGXu5jJLA=GcOhV5Z_6AOGa1KhW7fXtqBGrewEeViaJ9TiE-aw@mail.gmail.com>
-Message-ID: <20170103213118.GM14217@n2100.armlinux.org.uk>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 03 Jan 2017 22:54:19 +0100
+Subject: [PATCH 2/2] isdn: i4l: move active-isdn drivers to staging
+In-Reply-To: <3286019.I2UkVCJq41@wuerfel>
+References: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
+ <1456945629-1793533-2-git-send-email-arnd@arndb.de>
+ <20170103152436.GA26156@kroah.com> <3286019.I2UkVCJq41@wuerfel>
+Message-ID: <1483480459.10534.8.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 01:18:29PM -0800, Kees Cook wrote:
-> On Mon, Jan 2, 2017 at 6:06 AM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > On Mon, Dec 26, 2016 at 05:01:02PM +0530, Bhumika Goyal wrote:
-> >> The object armada38x_rtc_ops of type rtc_class_ops structure is not
-> >> modified after getting initialized by armada38x_rtc_probe. Apart from
-> >> getting referenced in init it is also passed as an argument to the function
-> >> devm_rtc_device_register but this argument is of type const struct
-> >> rtc_class_ops *. Therefore add __ro_after_init to its declaration.
-> >
-> > What I'd prefer here is for the structure to be duplicated, with one
-> > copy having the alarm methods and one which does not.  Both can then
-> > be made "const" (so placed into the read-only section at link time)
-> > and the probe function select between the two.
-> >
-> > I think that's a cleaner and better solution, even though it's
-> > slightly larger.
-> >
-> > I'm not a fan of __ro_after_init being used where other solutions are
-> > possible.
+On Tue, 2017-01-03 at 22:19 +0100, Arnd Bergmann wrote:
+> Sounds good to me. My original series contained four more patches that
+> I did not post again after there was some concern[1] that we did not
+> come to a conclusion on:
 > 
-> Can the pointer that points to the struct rtc_class_ops be made ro_after_init?
+> isdn: gigaset: remove i4l code
 
-It's passed into the RTC core code, and probably stored in some dynamically
-allocated object, so probably no.  It's the same class of problem as every
-file_operations pointer in the kernel, or the thousand other operations
-structure pointers that a running kernel has.
+Let me repeat that I'm fine with a patch that does that.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> isdn: move isdnhdlc out of i4l
+> isdn: i4l: move hisax driver to staging
+> isdn: move i4l to staging
+> 
+> I can post those as well, at least I think the first two are helpful
+> for untangling i4l from the rest of ISDN.  I also still think that
+> moving hisax and i4l to staging is reasonable given the state of
+> that code, even if there are a couple of users today.
+
+There are? And even if there are: is there any reason to expect that moving
+the rest of i4l to staging will result in anything other than a stream of
+checkpatch cleanups?
+
+How often did a bunch of drivers re-enter the tree after being sent to
+staging?
+
+
+Paul Bolle
