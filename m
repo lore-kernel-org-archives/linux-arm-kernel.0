@@ -1,121 +1,49 @@
-From: o.schinagl@ultimaker.com (Olliver Schinagl)
-Date: Tue, 3 Jan 2017 16:56:16 +0100
-Subject: [PATCH] pwm: sunxi: wait for the READY bit
-In-Reply-To: <20170103145732.2108-1-alexandre.belloni@free-electrons.com>
-References: <20170103145732.2108-1-alexandre.belloni@free-electrons.com>
-Message-ID: <73f5fc87-717f-2238-b653-1b117359cbb8@schinagl.nl>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 03 Jan 2017 16:58:21 +0100
+Subject: [PATCH] arm64: defconfig: enable XORv2 for Marvell Armada 7K/8K
+In-Reply-To: <1482420258-13888-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Thu, 22 Dec 2016 16:24:18 +0100")
+References: <1482420258-13888-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <87r34kf84i.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Alexandre,
+Hi Thomas,
+ 
+ On jeu., d?c. 22 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-I've sent several patches regarding pwm a while ago, sadly you never 
-responded [0]. So I guess this is a follow up from that?
-
-I couldn't quickly find the resubmitted version however.
-
-Anyway, see below for my comments.
-
-On 03-01-17 15:57, Alexandre Belloni wrote:
-> Most of the call sites in the kernel are not really prepared to handle
-> -EBUSY when calling pwm_config(). This means that they will either fail
-> silently or fail without letting the user retry at a later time.
+> This commit enables the XORv2 DMA driver, which is used on the ARM64
+> Marvell Armada 7K and 8K platforms.
 >
-> This can be seen for example when using pwm-backlight (the most common use
-> case for this driver). It will first call pwm_config() with a 0 duty cycle
-> and disable the pwm. Then it will call pwm_config() that fails because the
-> pwm had no chance to update its period internally and
-> pwm_enable() ending up with a duty cycle of 0.
->
-> Instead, actually wait for the RDY bit to go low before continuing.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+Applied on mvebu/defconfig64
+
+Thanks,
+
+Gregory
 > ---
->  drivers/pwm/pwm-sun4i.c | 26 ++++++++++++++++----------
->  1 file changed, 16 insertions(+), 10 deletions(-)
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 >
-> diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-> index b0803f6c64d9..be489388e006 100644
-> --- a/drivers/pwm/pwm-sun4i.c
-> +++ b/drivers/pwm/pwm-sun4i.c
-> @@ -10,6 +10,7 @@
->  #include <linux/clk.h>
->  #include <linux/err.h>
->  #include <linux/io.h>
-> +#include <linux/iopoll.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> @@ -103,7 +104,7 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->  	u32 prd, dty, val, clk_gate;
->  	u64 clk_rate, div = 0;
->  	unsigned int prescaler = 0;
-> -	int err;
-> +	int err = 0;
->
->  	clk_rate = clk_get_rate(sun4i_pwm->clk);
->
-> @@ -154,18 +155,22 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->  	spin_lock(&sun4i_pwm->ctrl_lock);
->  	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
->
-> -	if (sun4i_pwm->data->has_rdy && (val & PWM_RDY(pwm->hwpwm))) {
-> -		spin_unlock(&sun4i_pwm->ctrl_lock);
-> -		clk_disable_unprepare(sun4i_pwm->clk);
-> -		return -EBUSY;
-> -	}
-> -
->  	clk_gate = val & BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-> -	if (clk_gate) {
-> -		val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-> +
-> +	if (sun4i_pwm->data->has_rdy && (val & PWM_RDY(pwm->hwpwm))) {
-> +		val |= BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
->  		sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
-> +
-> +		err = readl_poll_timeout(sun4i_pwm->base + PWM_CTRL_REG, val,
-> +					 !(val & PWM_RDY(pwm->hwpwm)), 400,
-> +					 500000);
-> +		if (err)
-> +			goto finish;
->  	}
->
-What happens on sun4i here? sun4i does not have the RDY flag, but it 
-does need the PWM_CLK_GATING to be active.
-
-maybe only the readl_poll_timeout() should be guarded by the has_rdy, 
-where you poll the register as you do now, and in the else just have a 
-'known safe delay' to emulate the has_rdy behavior? I'm guessing a few 
-clock cycles of the PWM block. I don't think the documentation states 
-how long this could/should be.
-
-With my 'wait before disable' patch [1] I run into the same issue, I 
-think. We do not know how long to wait before the hardware is ready.
-
-> +	val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-> +	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
-> +
->  	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
->  	val &= ~BIT_CH(PWM_PRESCAL_MASK, pwm->hwpwm);
->  	val |= BIT_CH(prescaler, pwm->hwpwm);
-> @@ -174,6 +179,7 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->  	val = (dty & PWM_DTY_MASK) | PWM_PRD(prd);
->  	sun4i_pwm_writel(sun4i_pwm, val, PWM_CH_PRD(pwm->hwpwm));
->
-> +finish:
->  	if (clk_gate) {
->  		val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
->  		val |= clk_gate;
-> @@ -183,7 +189,7 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->  	spin_unlock(&sun4i_pwm->ctrl_lock);
->  	clk_disable_unprepare(sun4i_pwm->clk);
->
-> -	return 0;
-> +	return err;
->  }
->
->  static int sun4i_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index dab2cb0..f8b6435 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -371,6 +371,7 @@ CONFIG_RTC_DRV_TEGRA=y
+>  CONFIG_RTC_DRV_XGENE=y
+>  CONFIG_RTC_DRV_S3C=y
+>  CONFIG_DMADEVICES=y
+> +CONFIG_MV_XOR_V2=y
+>  CONFIG_PL330_DMA=y
+>  CONFIG_TEGRA20_APB_DMA=y
+>  CONFIG_QCOM_BAM_DMA=y
+> -- 
+> 2.7.4
 >
 
-[0] https://patchwork.kernel.org/patch/9299635/
-[1] https://lkml.org/lkml/2016/9/26/91
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
