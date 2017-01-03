@@ -1,60 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue,  3 Jan 2017 14:27:26 +0000
-Subject: [PATCH] arm64: mm: fix show_pte KERN_CONT fallout
-Message-ID: <1483453646-13617-1-git-send-email-mark.rutland@arm.com>
+From: andi@etezian.org (Andi Shyti)
+Date: Tue, 3 Jan 2017 23:40:56 +0900
+Subject: [PATCH 3/4] arm64: dts: exynos: make tm2 and tm2e independent
+ from each other
+In-Reply-To: <ff876454-b49f-3d63-d76e-012dd303b0e7@osg.samsung.com>
+References: <CGME20170103075734epcas5p43a9743131f63affd0a438d2ed342f22e@epcas5p4.samsung.com>
+ <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
+ <1483430237-26823-4-git-send-email-jcsing.lee@samsung.com>
+ <CAJKOXPev9m07_dQWAvJ+=MKnbT0TFERKOtjWUDU+WXdGAiRyDA@mail.gmail.com>
+ <20170103095842.h3hl64amje4qv4ts@gangnam.samsung>
+ <CAJKOXPeEE1VwAUSAOpfyX+t58zKeAT1fe3ybp0BoQiiDBb4Uqg@mail.gmail.com>
+ <20170103102548.73jg6qddlcthe2mu@gangnam.samsung>
+ <CAGTfZH3ez4DPTE7-bDeayjhSGxJ_8Mj1MQz1M7O1qhwOGOnmMQ@mail.gmail.com>
+ <20170103115530.zhjwn7bzmqmumy23@gangnam.samsung>
+ <ff876454-b49f-3d63-d76e-012dd303b0e7@osg.samsung.com>
+Message-ID: <20170103144056.4ft2ohmhgmezeney@jack.zhora.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent changes made KERN_CONT mandatory for continued lines. In the
-absence of KERN_CONT, a newline may be implicit inserted by the core
-printk code.
+Hi,
 
-In show_pte, we (erroneously) use printk without KERN_CONT for continued
-prints, resulting in output being split across a number of lines, and
-not matching the intended output, e.g.
+> FWIW, I also agree with Chanwoo that the difference is too small to
+> need a common .dtsi file.
 
-[ff000000000000] *pgd=00000009f511b003
-, *pud=00000009f4a80003
-, *pmd=0000000000000000
+in principle I don't like "switching on and off" properties by
+overwriting them with "status = disable", unless it's really
+necessary (and this case is not). Even for small differences. It
+makes the DTS harder to read and duplicates nodes with different
+values throughout the DTS include chain.
 
-Fix this by using pr_cont() for all the continuations.
+In my opinion this approach should be discouraged.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/fault.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Besides, there are other overwritten differences in tm2e.dts that
+I think should be separated as well. The "common" file approach is
+widely used in arm/boot/dts/exynos* files.
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index a78a5c4..156169c 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -88,21 +88,21 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
- 			break;
- 
- 		pud = pud_offset(pgd, addr);
--		printk(", *pud=%016llx", pud_val(*pud));
-+		pr_cont(", *pud=%016llx", pud_val(*pud));
- 		if (pud_none(*pud) || pud_bad(*pud))
- 			break;
- 
- 		pmd = pmd_offset(pud, addr);
--		printk(", *pmd=%016llx", pmd_val(*pmd));
-+		pr_cont(", *pmd=%016llx", pmd_val(*pmd));
- 		if (pmd_none(*pmd) || pmd_bad(*pmd))
- 			break;
- 
- 		pte = pte_offset_map(pmd, addr);
--		printk(", *pte=%016llx", pte_val(*pte));
-+		pr_cont(", *pte=%016llx", pte_val(*pte));
- 		pte_unmap(pte);
- 	} while(0);
- 
--	printk("\n");
-+	pr_cont("\n");
- }
- 
- #ifdef CONFIG_ARM64_HW_AFDBM
--- 
-1.9.1
+The "status = disable" looks to me more like a temporary hack
+rather than a permanent solution.
+
+In any case, still up to you :)
+
+Andi
