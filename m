@@ -1,87 +1,53 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Tue, 3 Jan 2017 21:24:09 +0800
-Subject: [PATCH v5 0/6] arm64: arch_timer: Add workaround for
- hisilicon-161601 erratum
-In-Reply-To: <586B7709.1080600@huawei.com>
-References: <1482476669-15596-1-git-send-email-dingtianhong@huawei.com>
- <586B7709.1080600@huawei.com>
-Message-ID: <4b3749b4-f18f-0ba9-0c32-18ef5679d48a@huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 3 Jan 2017 21:30:47 +0800
+Subject: [PATCH 1/2] ARM: dts: imx6qdl-nitrogen6_max: fix sgtl5000
+ pinctrl init
+In-Reply-To: <20170103115530.vngqbev7nsavgtdc@t450s.lan>
+References: <20170103112247.4563-1-gary.bisson@boundarydevices.com>
+ <20170103112247.4563-2-gary.bisson@boundarydevices.com>
+ <20170103114316.GC20956@dragon>
+ <20170103115530.vngqbev7nsavgtdc@t450s.lan>
+Message-ID: <20170103133045.GD20956@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jan 03, 2017 at 12:55:49PM +0100, Gary Bisson wrote:
+> Hi Shawn,
+> 
+> On Tue, Jan 03, 2017 at 07:43:17PM +0800, Shawn Guo wrote:
+> > On Tue, Jan 03, 2017 at 12:22:46PM +0100, Gary Bisson wrote:
+> > > This patch fixes the following error:
+> > > sgtl5000 0-000a: Error reading chip id -6
+> > > imx-sgtl5000 sound: ASoC: CODEC DAI sgtl5000 not registered
+> > > imx-sgtl5000 sound: snd_soc_register_card failed (-517)
+> > > 
+> > > The problem was that the pinctrl group was linked to the sound driver
+> > > instead of the codec node. Since the codec is probed first, the sys_mclk
+> > > was missing and it would therefore fail to initialize.
+> > > 
+> > > Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+> > 
+> > Should we have it go as a fix for v4.10-rc cycles?  In that case, please
+> > add a Fixes: tag.  Also, do we need to apply it for stable kernel?
+> 
+> Sure it'd be great if it could be in v4.10.
+> Fixes: b32e700256bc ("ARM: dts: imx: add Boundary Devices Nitrogen6_Max board")
+> 
+> As for stable kernel, I guess it wouldn't hurt but it's not mandatory in
+> my opinion.
 
+I wouldn't bother stable kernel then.
 
-On 2017/1/3 18:03, Hanjun Guo wrote:
-> Hi Ding,
 > 
-> On 2016/12/23 15:04, Ding Tianhong wrote:
->> Erratum Hisilicon-161601 says that the ARM generic timer counter "has the
->> potential to contain an erroneous value when the timer value changes".
->> Accesses to TVAL (both read and write) are also affected due to the implicit counter
->> read.  Accesses to CVAL are not affected.
->>
->> The workaround is to reread the system count registers until the value of the second
->> read is larger than the first one by less than 32, the system counter can be guaranteed
->> not to return wrong value twice by back-to-back read and the error value is always larger
->> than the correct one by 32. Writes to TVAL are replaced with an equivalent write to CVAL.
->>
->> v2: Introducing a new generic erratum handling mechanism for fsl,a008585 and hisilicon,161601.
->>     Significant rework based on feedback, including seperate the fsl erratum a008585
->>     to another patch, update the erratum name and remove unwanted code.
->>
->> v3: Introducing the erratum_workaround_set_sne generic function for fsl erratum a008585
->>     and make the #define __fsl_a008585_read_reg to be private to the .c file instead of
->>     being globally visible. After discussion with Marc and Will, a consensus decision was
->>     made to remove the commandline parameter for enabling fsl,erratum-a008585 erratum,
->>     and make some generic name more specific, export timer_unstable_counter_workaround
->>     for module access.
->>     
->>     Significant rework based on feedback, including fix some alignment problem, make the
->>     #define __hisi_161601_read_reg to be private to the .c file instead of being globally
->>     visible, add more accurate annotation and modify a bit of logical format to enable
->>     arch_timer_read_ool_enabled, remove the kernel commandline parameter
->>     clocksource.arm_arch_timer.hisilicon-161601.
->>
->>     Introduce a generic aquick framework for erratum in ACPI mode.
->>
->> v4: rename the quirk handler parameter to make it more generic, and
->>     avoid break loop when handling the quirk becasue it need to
->>     support multi quirks handler.
->>
->>     update some data structures for acpi mode. 
->>
->> v5: Adapt the new kernel-parameters.txt for latest kernel version.
->>     Set the retries of reread system counter to 50, because it is possible 
->>     that some interrupts may lead to more than twice read errors and break the loop,
->>     it will trigger the warning, so we set the number of retries far beyond the number of
->>     iterations the loop has been observed to take.
->>
->> Ding Tianhong (4):
->>   arm64: arch_timer: Add device tree binding for hisilicon-161601
->>     erratum
->>   arm64: arch_timer: Introduce a generic erratum handing mechanism for
->>     fsl-a008585
->>   arm64: arch_timer: Work around Erratum Hisilicon-161601
->>   arm64: arch timer: Add timer erratum property for Hip05-d02 and
->>     Hip06-d03
->>
->> Hanjun Guo (2):
->>   arm64: arch_timer: apci: Introduce a generic aquirk framework for
->>     erratum
->>   arm64: arch_timer: acpi: add hisi timer errata data
-> 
-> Since the ACPI code is conflict with Fuwei's GTDT patch set, let's split this patch
-> set into two parts, one is the DT based code, and the other is the ACPI part,
-> I will rebase ACPI code on top of Fuwei's patch set so please go upstream first.
-> 
+> Do you want me to re-send with the Fixes line?
 
-Hi Hanjuno<
+No.  I can add the Fixes tag.
 
-OK, I will remove the last 2 patch and resend a new version only support DT.
+> What about the SOM2
+> patch, should it include a Fixes line although it works thanks to
+> U-Boot?
 
-> Thanks
-> Hanjun
-> 
-> 
-> .
-> 
+Yes, please give me the Fixes tag, and I will send both patches for
+v4.10 inclusion.
+
+Shawn
