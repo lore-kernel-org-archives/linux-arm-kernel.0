@@ -1,103 +1,82 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Tue,  3 Jan 2017 12:57:19 -0800
-Subject: [PATCH v2 09/19] ARM: dts: imx6-sabreauto: add the ADV7180 video
- decoder
+Date: Tue,  3 Jan 2017 12:57:29 -0800
+Subject: [PATCH v2 19/19] ARM: imx_v6_v7_defconfig: Enable staging video4linux
+ drivers
 In-Reply-To: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1483477049-19056-10-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1483477049-19056-20-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enables the ADV7180 decoder sensor. The ADV7180 connects to the
-parallel-bus mux input on ipu1_csi0_mux.
-
-On the sabreauto, two analog video inputs are routed to the ADV7180,
-composite on Ain1, and composite on Ain3. Those inputs are defined
-via inputs and input-names under the ADV7180 node. The ADV7180 power
-pin is via max7310_b port expander.
+Enable imx v4l2 staging drivers. For video capture on
+the SabreAuto, the ADV7180 video decoder also requires the
+i2c-mux-gpio and the max7310 port expander. The Sabrelite
+requires PWM clocks for the OV5640.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 56 ++++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+ arch/arm/configs/imx_v6_v7_defconfig | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index 83ac2ff..30ee378 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -147,10 +147,42 @@
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 			};
-+
-+			camera: adv7180 at 21 {
-+				compatible = "adi,adv7180";
-+				reg = <0x21>;
-+				powerdown-gpios = <&max7310_b 2 GPIO_ACTIVE_LOW>;
-+				interrupt-parent = <&gpio1>;
-+				interrupts = <27 0x8>;
-+				inputs = <0x00 0x02>;
-+				input-names = "ADV7180 Composite on Ain1",
-+						"ADV7180 Composite on Ain3";
-+
-+				port {
-+					adv7180_to_ipu1_csi0_mux: endpoint {
-+						remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
-+						bus-width = <8>;
-+					};
-+				};
-+			};
- 		};
- 	};
- };
- 
-+&ipu1_csi0_from_ipu1_csi0_mux {
-+	bus-width = <8>;
-+};
-+
-+&ipu1_csi0_mux_from_parallel_sensor {
-+	remote-endpoint = <&adv7180_to_ipu1_csi0_mux>;
-+	bus-width = <8>;
-+};
-+
-+&ipu1_csi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ipu1_csi0>;
-+};
-+
- &clks {
- 	assigned-clocks = <&clks IMX6QDL_PLL4_BYPASS_SRC>,
- 			  <&clks IMX6QDL_PLL4_BYPASS>,
-@@ -451,6 +483,30 @@
- 			>;
- 		};
- 
-+		pinctrl_ipu1_csi0: ipu1grp-csi0 {
-+			fsl,pins = <
-+				MX6QDL_PAD_CSI0_DAT4__IPU1_CSI0_DATA04   0x80000000
-+				MX6QDL_PAD_CSI0_DAT5__IPU1_CSI0_DATA05   0x80000000
-+				MX6QDL_PAD_CSI0_DAT6__IPU1_CSI0_DATA06   0x80000000
-+				MX6QDL_PAD_CSI0_DAT7__IPU1_CSI0_DATA07   0x80000000
-+				MX6QDL_PAD_CSI0_DAT8__IPU1_CSI0_DATA08   0x80000000
-+				MX6QDL_PAD_CSI0_DAT9__IPU1_CSI0_DATA09   0x80000000
-+				MX6QDL_PAD_CSI0_DAT10__IPU1_CSI0_DATA10  0x80000000
-+				MX6QDL_PAD_CSI0_DAT11__IPU1_CSI0_DATA11  0x80000000
-+				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12  0x80000000
-+				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13  0x80000000
-+				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14  0x80000000
-+				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15  0x80000000
-+				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16  0x80000000
-+				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17  0x80000000
-+				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18  0x80000000
-+				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19  0x80000000
-+				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK 0x80000000
-+				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC    0x80000000
-+				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC   0x80000000
-+			>;
-+		};
-+
- 		pinctrl_pwm3: pwm1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index cbe7faf..5da4d8e 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -51,6 +51,7 @@ CONFIG_PREEMPT_VOLUNTARY=y
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ CONFIG_CMA=y
++CONFIG_FORCE_MAX_ZONEORDER=14
+ CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
+ CONFIG_KEXEC=y
+ CONFIG_CPU_FREQ=y
+@@ -181,6 +182,7 @@ CONFIG_SERIAL_FSL_LPUART=y
+ CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
+ # CONFIG_I2C_COMPAT is not set
+ CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_MUX=y
+ CONFIG_I2C_MUX_GPIO=y
+ # CONFIG_I2C_HELPER_AUTO is not set
+ CONFIG_I2C_ALGOPCF=m
+@@ -194,11 +196,11 @@ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_MC9S08DZ60=y
+ CONFIG_GPIO_PCA953X=y
+ CONFIG_GPIO_STMPE=y
+-CONFIG_POWER_SUPPLY=y
+ CONFIG_POWER_RESET=y
+ CONFIG_POWER_RESET_IMX=y
+ CONFIG_POWER_RESET_SYSCON=y
+ CONFIG_POWER_RESET_SYSCON_POWEROFF=y
++CONFIG_POWER_SUPPLY=y
+ CONFIG_SENSORS_GPIO_FAN=y
+ CONFIG_SENSORS_IIO_HWMON=y
+ CONFIG_THERMAL=y
+@@ -221,6 +223,8 @@ CONFIG_REGULATOR_PFUZE100=y
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_MEDIA_RC_SUPPORT=y
++CONFIG_MEDIA_CONTROLLER=y
++CONFIG_VIDEO_V4L2_SUBDEV_API=y
+ CONFIG_RC_DEVICES=y
+ CONFIG_IR_GPIO_CIR=y
+ CONFIG_MEDIA_USB_SUPPORT=y
+@@ -229,6 +233,8 @@ CONFIG_V4L_PLATFORM_DRIVERS=y
+ CONFIG_SOC_CAMERA=y
+ CONFIG_V4L_MEM2MEM_DRIVERS=y
+ CONFIG_VIDEO_CODA=y
++# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
++CONFIG_VIDEO_ADV7180=m
+ CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_IMX_IPUV3_CORE=y
+ CONFIG_DRM=y
+@@ -338,6 +344,8 @@ CONFIG_FSL_EDMA=y
+ CONFIG_IMX_SDMA=y
+ CONFIG_MXS_DMA=y
+ CONFIG_STAGING=y
++CONFIG_STAGING_MEDIA=y
++CONFIG_COMMON_CLK_PWM=y
+ CONFIG_IIO=y
+ CONFIG_VF610_ADC=y
+ CONFIG_MPL3115=y
 -- 
 2.7.4
