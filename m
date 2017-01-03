@@ -1,87 +1,111 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 03 Jan 2017 16:20:34 +0100
-Subject: [PATCH v7 3/4] arm64: dts: marvell: Add I2C definitions for the
- Armada 3700
-In-Reply-To: <20161201110440.27530-4-romain.perier@free-electrons.com> (Romain
- Perier's message of "Thu, 1 Dec 2016 12:04:39 +0100")
-References: <20161201110440.27530-1-romain.perier@free-electrons.com>
- <20161201110440.27530-4-romain.perier@free-electrons.com>
-Message-ID: <8760lwgofx.fsf@free-electrons.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 3 Jan 2017 16:21:07 +0100
+Subject: [PATCH v2] ARM: dts: turris-omnia: add support for ethernet switch
+In-Reply-To: <20161222094327.24051-1-uwe@kleine-koenig.org>
+References: <20161222094327.24051-1-uwe@kleine-koenig.org>
+Message-ID: <20170103152107.GA32450@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
- 
- On jeu., d?c. 01 2016, Romain Perier <romain.perier@free-electrons.com> wrote:
-
-> The Armada 3700 has two i2c bus interface units, this commit adds the
-> definitions of the corresponding device nodes. It also enables the node
-> on the development board for this SoC.
->
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Applied on mvebu/dt64
-
-Thanks,
-
-Gregory
-
+On Thu, Dec 22, 2016 at 10:43:27AM +0100, Uwe Kleine-K?nig wrote:
+> The Turris Omnia features a Marvell MV88E7176 ethernet switch. Add it to
+> the dts.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
 > ---
->  arch/arm64/boot/dts/marvell/armada-3720-db.dts |  4 ++++
->  arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 18 ++++++++++++++++++
->  2 files changed, 22 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-> index 1372e9a6..16d84af 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-> @@ -62,6 +62,10 @@
->  	};
->  };
->  
-> +&i2c0 {
-> +	status = "okay";
-> +};
-> +
->  /* CON3 */
->  &sata {
+> Changes since (implicit) v1:
+>  - drop mdio bus and per port phy-handle as they match the default
+>    setup.
+> 
+> One thing I was surprised is that the mv88e6xxx module isn't autoloaded
+> by udev. Is this expected?
+> 
+> Best regards
+> Uwe
+> 
+>  arch/arm/boot/dts/armada-385-turris-omnia.dts | 66 ++++++++++++++++++++++++++-
+>  1 file changed, 64 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
+> index ab49acb2d452..f8e55fa7f0fa 100644
+> --- a/arch/arm/boot/dts/armada-385-turris-omnia.dts
+> +++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
+> @@ -122,7 +122,7 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&ge0_rgmii_pins>;
 >  	status = "okay";
-> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> index e9bd587..1b0fd21 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> @@ -98,6 +98,24 @@
->  			/* 32M internal register @ 0xd000_0000 */
->  			ranges = <0x0 0x0 0xd0000000 0x2000000>;
+> -	phy-mode = "rgmii-id";
+> +	phy-mode = "rgmii";
 >  
-> +			i2c0: i2c at 11000 {
-> +				compatible = "marvell,armada-3700-i2c";
-> +				reg = <0x11000 0x24>;
-> +				clocks = <&nb_periph_clk 10>;
-> +				interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-> +				mrvl,i2c-fast-mode;
-> +				status = "disabled";
-> +			};
-> +
-> +			i2c1: i2c at 11080 {
-> +				compatible = "marvell,armada-3700-i2c";
-> +				reg = <0x11080 0x24>;
-> +				clocks = <&nb_periph_clk 9>;
-> +				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-> +				mrvl,i2c-fast-mode;
-> +				status = "disabled";
-> +			};
-> +
->  			uart0: serial at 12000 {
->  				compatible = "marvell,armada-3700-uart";
->  				reg = <0x12000 0x400>;
-> -- 
-> 2.9.3
->
+>  	fixed-link {
+>  		speed = <1000>;
+> @@ -135,7 +135,7 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&ge1_rgmii_pins>;
+>  	status = "okay";
+> -	phy-mode = "rgmii-id";
+> +	phy-mode = "rgmii";
+>  
+>  	fixed-link {
+>  		speed = <1000>;
+> @@ -274,6 +274,68 @@
+>  	};
+>  
+>  	/* Switch MV88E7176 at address 0x10 */
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Hi Uwe
+
+You probably have the switch model wrong in this comment. 6176 not
+7176?
+
+> +	switch at 10 {
+> +		compatible = "marvell,mv88e6085";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		dsa,member = <0 0>;
+> +
+> +		reg = <0x10>;
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+
+...
+
+> +			ports at 5 {
+> +				reg = <5>;
+> +				label = "cpu";
+> +				ethernet = <&eth1>;
+> +				phy-mode = "rgmii-id";
+> +
+> +				fixed-link {
+> +					speed = <1000>;
+> +					full-duplex;
+> +				};
+> +			};
+> +
+> +			ports at 6 {
+> +				reg = <6>;
+> +				label = "cpu";
+> +				ethernet = <&eth0>;
+> +				phy-mode = "rgmii-id";
+> +
+> +				fixed-link {
+> +					speed = <1000>;
+> +					full-duplex;
+> +				};
+> +			};
+
+Humm, we need to be careful here. I hope multi CPU will come soon. But
+we have not yet defined how the binding will look. I expect it does
+look a lot like this, but there are probably additional properties,
+like linking user ports to cpu ports.
+
+What i'm worried about is future backwards compatibility. There is a
+danger that this DT will trigger some of the multi CPU code, but it is
+missing other required properties, and so stops working.
+
+It would be safer if you just had a comment about the second CPU port.
+
+   Thanks
+	Andrew
