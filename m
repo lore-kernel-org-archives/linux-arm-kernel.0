@@ -1,46 +1,32 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 3 Jan 2017 21:54:37 +0100
-Subject: [Question] New mmap64 syscall?
-In-Reply-To: <14981df2-b120-17c3-a5a8-5cbbd2008c4f@redhat.com>
-References: <20161206185440.GA4654@yury-N73SV>
- <f544bcc3-8aae-1bd0-b744-9964fc038a51@redhat.com>
- <20161207154811.GA15248@yury-N73SV>
- <14981df2-b120-17c3-a5a8-5cbbd2008c4f@redhat.com>
-Message-ID: <20170103205437.GA22548@amd>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue,  3 Jan 2017 12:56:48 -0800
+Subject: [PATCH 0/2] Memblock cleanup plus memory removal fix
+Message-ID: <1483477010-18986-1-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+During the course of https://marc.info/?l=linux-arm-kernel&m=148145259511248,
+Grygorii Strashko reminded me of another issue where I proposed a patch but
+never followed up on it. The patch in
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296978.html
+did some cleanup and renaming of sanity_check_meminfo. I think this makes the
+code more readable so I'd like to resurect it and rebase my fix
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/474060.html
+on top of it.
 
-> >Hi Florian,
-> >
-> >I frankly don't understand what you mean, All syscalls you mentioned
-> >doesn't take off_t or other 64-bit arguments. 'VM changes' - virtual
-> >memory? If so, I don't see any changes in VM with this approach, just
-> >correct handling of big offsets.
-> 
-> What I was trying to suggest is a completely different interface which is
-> not subject to register size constraints and which has been requested before
-> (a mechanism for batching mm updates).
+Thanks,
+Laura
 
-While I agree that batching might be good idea, I believe mmap64()
-makes sense, too. Yes, I guess libc could do the translation, but
-indirection will cost some performance, and will be problematic for
-stuff such as strace.
+Laura Abbott (2):
+  arm: Cleanup sanity_check_meminfo
+  arm: Adjust memory boundaries after reservations
 
-...actually, with strace and batched interface, it will be impossible
-to see what is going on because of races. So I'm not sure if I like
-the batched interface at all...
+ arch/arm/kernel/setup.c | 12 ++++++++--
+ arch/arm/mm/mmu.c       | 62 +++++++++++++++++--------------------------------
+ arch/arm/mm/nommu.c     |  8 +++----
+ 3 files changed, 35 insertions(+), 47 deletions(-)
 
-Best regards,
-								Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170103/fa7b7a22/attachment.sig>
+2.7.4
