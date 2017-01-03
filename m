@@ -1,25 +1,55 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 3 Jan 2017 14:12:56 +0100
-Subject: [PATCH v3 2/3] DT: bingdings: power: reset: add
- linkstation-reset doc
-In-Reply-To: <519e07d0-9b73-4445-ec5e-7ea2cbc1b814@gmail.com>
-References: <20161216100501.18173-1-rogershimizu@gmail.com>
- <20161227070611.14852-1-rogershimizu@gmail.com>
- <20161227070611.14852-3-rogershimizu@gmail.com>
- <519e07d0-9b73-4445-ec5e-7ea2cbc1b814@gmail.com>
-Message-ID: <20170103131256.GB30197@lunn.ch>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 3 Jan 2017 10:14:34 -0300
+Subject: [PATCH 4/4] arm64: dts: exynos: Add tm2 touchkey node
+In-Reply-To: <1483430237-26823-5-git-send-email-jcsing.lee@samsung.com>
+References: <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
+ <CGME20170103075734epcas5p439b05860a3238ce638f683d9687786a3@epcas5p4.samsung.com>
+ <1483430237-26823-5-git-send-email-jcsing.lee@samsung.com>
+Message-ID: <58437de5-a837-9b34-da30-f8bc911b0854@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +
-> > +Required Properties:
-> > +- compatible: Should be "linkstation,power-off"
-> > +- reg: Address and length of the register set for UART1
+Hello Jaechul,
+
+On 01/03/2017 04:57 AM, Jaechul Lee wrote:
+> Add DT node support for TM2 touchkey device.
 > 
-> Humm, should we instead have a phandle to the uart1 node?
+> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
+> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
+> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> ---
+>  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+> index 887a1f1..ef7d21c 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+> @@ -18,3 +18,15 @@
+>  	compatible = "samsung,tm2e", "samsung,exynos5433";
+>  };
+>  
+> +&hsi2c_9 {
+> +	status = "okay";
+> +
+> +	touchkey at 20 {
+> +		compatible = "samsung,tm2-touchkey";
+> +		reg = <0x20>;
+> +		interrupt-parent = <&gpa3>;
+> +		interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
+> +		vcc-supply = <&ldo32_reg>;
+> +		vdd-supply = <&ldo33_reg>;
+> +	};
+> +};
+> 
 
-Probably. Again, this is to do with copying the QNAP driver. I was
-young, new to device tree, and i just did a logical conversion of the
-existing code, and did not at the time understand phandles, etc.
+If you re-spin with the changes suggested by Chanwoo instead
+of the commont .dtsi, feel free to add:
 
-	 Andrew
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
