@@ -1,57 +1,44 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 3 Jan 2017 19:43:17 +0800
-Subject: [PATCH 1/2] ARM: dts: imx6qdl-nitrogen6_max: fix sgtl5000
- pinctrl init
-In-Reply-To: <20170103112247.4563-2-gary.bisson@boundarydevices.com>
-References: <20170103112247.4563-1-gary.bisson@boundarydevices.com>
- <20170103112247.4563-2-gary.bisson@boundarydevices.com>
-Message-ID: <20170103114316.GC20956@dragon>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 3 Jan 2017 12:46:14 +0100
+Subject: [PATCH v2 2/2] mtd: nand: Update dependency of IFC for LS1021A
+In-Reply-To: <1483411266-45875-2-git-send-email-b18965@freescale.com>
+References: <1483411266-45875-1-git-send-email-b18965@freescale.com>
+ <1483411266-45875-2-git-send-email-b18965@freescale.com>
+Message-ID: <4e04eb5e-fb53-f71e-ee49-0872a6c11e97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 12:22:46PM +0100, Gary Bisson wrote:
-> This patch fixes the following error:
-> sgtl5000 0-000a: Error reading chip id -6
-> imx-sgtl5000 sound: ASoC: CODEC DAI sgtl5000 not registered
-> imx-sgtl5000 sound: snd_soc_register_card failed (-517)
-> 
-> The problem was that the pinctrl group was linked to the sound driver
-> instead of the codec node. Since the codec is probed first, the sys_mclk
-> was missing and it would therefore fail to initialize.
-> 
-> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+On 01/03/2017 03:41 AM, Alison Wang wrote:
+> As NAND support for Freescale/NXP IFC controller is available on
+> LS1021A, the dependency for LS1021A is added.
 
-Should we have it go as a fix for v4.10-rc cycles?  In that case, please
-add a Fixes: tag.  Also, do we need to apply it for stable kernel?
+Does LS stand for LayerScape ? Yes it does. So why does ARCH_LAYERSCAPE
+not cover LS1021 ?
 
-Shawn
-
+> Signed-off-by: Alison Wang <alison.wang@nxp.com>
 > ---
->  arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> Changes in v2:
+> - None
 > 
-> diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-> index 34887a10c5f1..47ba97229a48 100644
-> --- a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-> @@ -319,8 +319,6 @@
->  		compatible = "fsl,imx6q-nitrogen6_max-sgtl5000",
->  			     "fsl,imx-audio-sgtl5000";
->  		model = "imx6q-nitrogen6_max-sgtl5000";
-> -		pinctrl-names = "default";
-> -		pinctrl-0 = <&pinctrl_sgtl5000>;
->  		ssi-controller = <&ssi1>;
->  		audio-codec = <&codec>;
->  		audio-routing =
-> @@ -402,6 +400,8 @@
+>  drivers/mtd/nand/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+> index 353a9dd..85e3860 100644
+> --- a/drivers/mtd/nand/Kconfig
+> +++ b/drivers/mtd/nand/Kconfig
+> @@ -441,7 +441,7 @@ config MTD_NAND_FSL_ELBC
 >  
->  	codec: sgtl5000 at 0a {
->  		compatible = "fsl,sgtl5000";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_sgtl5000>;
->  		reg = <0x0a>;
->  		clocks = <&clks IMX6QDL_CLK_CKO>;
->  		VDDA-supply = <&reg_2p5v>;
-> -- 
-> 2.11.0
+>  config MTD_NAND_FSL_IFC
+>  	tristate "NAND support for Freescale IFC controller"
+> -	depends on FSL_SOC || ARCH_LAYERSCAPE
+> +	depends on FSL_SOC || ARCH_LAYERSCAPE || SOC_LS1021A
+>  	select FSL_IFC
+>  	select MEMORY
+>  	help
 > 
+
+
+-- 
+Best regards,
+Marek Vasut
