@@ -1,89 +1,78 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 3 Jan 2017 16:51:27 -0600
-Subject: [PATCH V7 1/4] Documentation/devicetree/bindings: b850v3_lvds_dp
-In-Reply-To: <21ea1b0795bdaa30ca475d6ce675b620b2b644ed.1483301745.git.peter.senna@collabora.com>
-References: <cover.1483301745.git.peter.senna@collabora.com>
- <21ea1b0795bdaa30ca475d6ce675b620b2b644ed.1483301745.git.peter.senna@collabora.com>
-Message-ID: <20170103225127.jn36tatufdfz2k5q@rob-hp-laptop>
+Date: Tue, 3 Jan 2017 16:56:23 -0600
+Subject: [PATCH v3 02/10] dt-bindings: hisi: Add Hisilicon HiP05/06/07
+ Djtag dts bindings
+In-Reply-To: <1483339743-23881-1-git-send-email-anurup.m@huawei.com>
+References: <1483339743-23881-1-git-send-email-anurup.m@huawei.com>
+Message-ID: <20170103225623.ynhc7n267jpzu44z@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 01, 2017 at 09:24:29PM +0100, Peter Senna Tschudin wrote:
-> Devicetree bindings documentation for the GE B850v3 LVDS/DP++
-> display bridge.
+On Mon, Jan 02, 2017 at 01:49:03AM -0500, Anurup M wrote:
+> From: Tan Xiaojun <tanxiaojun@huawei.com>
 > 
-> Cc: Martyn Welch <martyn.welch@collabora.co.uk>
-> Cc: Martin Donnelly <martin.donnelly@ge.com>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+> Add Hisilicon HiP05/06/07 Djtag dts bindings for CPU and IO Die
+> 
+> Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
+> Signed-off-by: Anurup M <anurup.m@huawei.com>
 > ---
-> There was an Acked-by from Rob Herring <robh@kernel.org> for V6, but I changed
-> the bindings to use i2c_new_secondary_device() so I removed it from the commit
-> message.
+>  .../devicetree/bindings/arm/hisilicon/djtag.txt    | 41 ++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
 > 
->  .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 39 ++++++++++++++++++++++
-
-Generally, bindings are not organized by vendor. Put in 
-bindings/display/bridge/... instead.
-
->  1 file changed, 39 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt b/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
 > new file mode 100644
-> index 0000000..1bc6ebf
+> index 0000000..bbe8b45
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
-> @@ -0,0 +1,39 @@
-> +Driver for GE B850v3 LVDS/DP++ display bridge
+> +++ b/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
+> @@ -0,0 +1,41 @@
+> +The Hisilicon Djtag is an independent component which connects with some other
+> +components in the SoC by Debug Bus. The djtag is available in CPU and IO dies
+> +in the chip. The djtag controls access to connecting modules of CPU and IO
+> +dies.
+> +The various connecting components in CPU die (like L3 cache, L3 cache PMU etc.)
+> +are accessed by djtag during real time debugging. In IO die there are connecting
+> +components like RSA. These components appear as devices attached to djtag bus.
 > +
+> +Hisilicon HiP05/06/07 djtag for CPU and IO die
 > +Required properties:
-> +  - compatible : should be "ge,b850v3-lvds-dp".
+> +  - compatible : The value should be as follows
+> +	(a) "hisilicon,hip05-djtag-v1" for CPU and IO die which use v1 hw in
+> +	    HiP05 chipset.
 
-Isn't '-lvds-dp' redundant? The part# should be enough.
+You don't need to distinguish the CPU and IO blocks?
 
-> +  - reg : should contain the main address which is used to ack the
-> +    interrupts and address for edid.
-> +  - reg-names : comma separeted list of register names. Valid values
+> +	(b) "hisilicon,hip06-djtag-v1" for CPU die which use v1 hw in HiP06 chipset.
+> +	(c) "hisilicon,hip06-djtag-v2" for IO die which use v2 hw in HiP06 chipset.
+> +	(d) "hisilicon,hip07-djtag-v2" for CPU and IO die which use v2 hw in
+> +	    HiP07 chipset.
+> +  - reg : Register address and size
+> +  - hisi-scl-id : The Super Cluster ID for CPU or IO die
 
-s/separeted/separated/
+Still needs a vendor prefix. i.e. hisilicon,scl-id
 
-> +    are "main", and "edid".
-> +  - interrupt-parent : phandle of the interrupt controller that services
-> +    interrupts to the device
-> +  - interrupts : one interrupt should be described here, as in
-> +    <0 IRQ_TYPE_LEVEL_HIGH>.
-> +  - port : should describe the video signal connection between the host
-> +    and the bridge.
 > +
-> +Example:
+> +Example 1: Djtag for CPU die
 > +
-> +&mux2_i2c2 {
-> +	status = "okay";
-> +	clock-frequency = <100000>;
+> +	/* for Hisilicon HiP05 djtag for CPU Die */
+> +	djtag0: djtag at 80010000 {
+> +		compatible = "hisilicon,hip05-djtag-v1";
+> +		reg = <0x0 0x80010000 0x0 0x10000>;
+> +		hisi-scl-id = <0x02>;
 > +
-> +	b850v3-lvds-dp-bridge at 73  {
-> +		compatible = "ge,b850v3-lvds-dp";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		reg = <0x73 0x72>;
-> +		reg-names = "main", "edid";
-> +
-> +		interrupt-parent = <&gpio2>;
-> +		interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
-> +
-> +		port {
-> +			b850v3_dp_bridge_in: endpoint {
-> +				remote-endpoint = <&lvds0_out>;
-> +			};
-> +		};
+> +		/* All connecting components will appear as child nodes */
 > +	};
-> +};
+> +
+> +Example 2: Djtag for IO die
+> +
+> +	/* for Hisilicon HiP05 djtag for IO Die */
+> +	djtag1: djtag at d0000000 {
+> +		compatible = "hisilicon,hip05-djtag-v1";
+> +		reg = <0x0 0xd0000000 0x0 0x10000>;
+> +		hisi-scl-id = <0x01>;
+> +
+> +		/* All connecting components will appear as child nodes */
+> +	};
 > -- 
-> 2.5.5
+> 2.1.4
 > 
