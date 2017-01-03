@@ -1,46 +1,54 @@
-From: rafalo@cadence.com (Rafal Ozieblo)
-Date: Tue, 3 Jan 2017 10:47:56 +0000
-Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
-In-Reply-To: <CAFcVECK1vt7Hu4tgSZ2+kKpMxoT-wpikMDq65HaxRv-EMgobHA@mail.gmail.com>
-References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
- <BN3PR07MB2516815EDE69ACDCE27F81A3C96F0@BN3PR07MB2516.namprd07.prod.outlook.com>
- <20170102113155.GA16373@localhost.localdomain>
- <0717c63b-2e29-9ad1-7f01-39817980933f@atmel.com>
- <20170102161359.GD3609@localhost.localdomain>
- <CAFcVECK1vt7Hu4tgSZ2+kKpMxoT-wpikMDq65HaxRv-EMgobHA@mail.gmail.com>
-Message-ID: <BN3PR07MB25168573DD82F1681CDC8437C96E0@BN3PR07MB2516.namprd07.prod.outlook.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 3 Jan 2017 11:47:46 +0100
+Subject: [PATCH] mtd: nand: lpc32xx: fix invalid error handling of a
+ requested irq
+In-Reply-To: <72ab91ec-a919-af42-8a82-f5d99b245edf@mleia.com>
+References: <20161205014710.2015-1-vz@mleia.com>
+ <20170103101259.0ec123df@bbrezillon>
+ <72ab91ec-a919-af42-8a82-f5d99b245edf@mleia.com>
+Message-ID: <20170103114746.141d7d7d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: Harini Katakam [mailto:harinikatakamlinux at gmail.com] 
->Sent: 3 stycznia 2017 06:06
->Subject: Re: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
->
->Hi Richard,
->
->On Mon, Jan 2, 2017 at 9:43 PM, Richard Cochran <richardcochran@gmail.com> wrote:
->> On Mon, Jan 02, 2017 at 03:47:07PM +0100, Nicolas Ferre wrote:
->>> Le 02/01/2017 ? 12:31, Richard Cochran a ?crit :
->>> > This Cadence IP core is a complete disaster.
->>>
->>> Well, it evolved and propose several options to different SoC 
->>> integrators. This is not something unusual...
->>> I suspect as well that some other network adapters have the same 
->>> weakness concerning PTP timestamp in single register as the early 
->>> revisions of this IP.
->>
->> It appears that this core can neither latch the time on read or write, 
->> or even latch time stamps.  I have worked with many different PTP HW 
->> implementations, even early ones like on the ixp4xx, and it is no 
->> exaggeration to say that this one is uniquely broken.
->>
->>> I suspect that Rafal tend to jump too quickly to the latest IP 
->>> revisions and add more options to this series: let's not try to pour 
->>> too much things into this code right now.
->>
->> Why can't you check the IP version in the driver?
->
->There is an IP revision register but it would be probably be better to rely on "caps" from the compatibility strings - to cover SoC specific implementations. Also, when this extended BD is added (with timestamp), additional words will need to be added statically which will be consistent with Andrei's CONFIG_ checks.
-We can distinguish IP cores with and without PTP support by reading Design Configuration Register. But to distinguish IP cores with timestamps in buffer descriptors and which support only event registers, we can only check IP version by reading the revision ID register and base on that.
-I agree with Harini, compatibility strings could be better. But we might end up with many different configuration in the future.
-We could use only descriptor approach but there are many Atmel's cores on the market which support only event registers.
+On Tue, 3 Jan 2017 12:16:26 +0200
+Vladimir Zapolskiy <vz@mleia.com> wrote:
+
+> Hi Boris,
+> 
+> On 01/03/2017 11:12 AM, Boris Brezillon wrote:
+> > Hi Vladimir
+> > 
+> > On Mon,  5 Dec 2016 03:47:10 +0200
+> > Vladimir Zapolskiy <vz@mleia.com> wrote:
+> >   
+> >> Semantics of NR_IRQS is different on machines with SPARSE_IRQ option
+> >> disabled or enabled, in the latter case IRQs are allocated starting
+> >> at least from the value specified by NR_IRQS and going upwards, so
+> >> the check of (irq >= NR_IRQ) to decide about an error code returned by
+> >> platform_get_irq() is completely invalid, don't attempt to overrule
+> >> irq subsystem in the driver.
+> >>
+> >> The change fixes LPC32xx NAND MLC driver initialization on boot.  
+> > 
+> > Do you need to backport this fix to stable releases? If that's the
+> > case, I'll add the Cc: stable tag when applying.  
+> 
+> that will be great if you can add
+> 
+> Cc: stable at kernel.org # v4.7+
+> 
+> Please feel free to add also the tag
+> 
+> Fixes: 8cb17b5ed017 ("irqchip: Add LPC32xx interrupt controller driver")
+
+Applied to nand/next (this patch will appear in 4.11).
+
+Thanks,
+
+Boris
+
+> 
+> --
+> With best wishes,
+> Vladimir
+> 
