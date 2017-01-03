@@ -1,110 +1,78 @@
-From: uwe@kleine-koenig.org (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue,  3 Jan 2017 20:35:01 +0100
-Subject: [PATCH v3] ARM: dts: turris-omnia: add support for ethernet switch
-In-Reply-To: <20170103152107.GA32450@lunn.ch>
-References: <20170103152107.GA32450@lunn.ch>
-Message-ID: <20170103193501.4827-1-uwe@kleine-koenig.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 3 Jan 2017 20:01:24 +0000
+Subject: [PATCH 0/6] crypto: ARM/arm64 - AES and ChaCha20 updates for v4.11
+In-Reply-To: <1483381268-12987-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1483381268-12987-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu8wWW-c6dYcsRtD8LK4nrP=6pQwb63OkJTyGTYhK3Ryyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Turris Omnia features a Marvell MV88E6176 ethernet switch. Add it to
-the dts.
+On 2 January 2017 at 18:21, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> This series adds SIMD implementations for arm64 and ARM of ChaCha20 (*),
+> and a port of the ARM bit-sliced AES algorithm to arm64, and
+>
+> Patch #1 is a prerequisite for the AES-XTS implementation in #6, which needs
+> a secondary AES transform to generate the initial tweak.
+>
 
-Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
----
-Changes since (implicit) v1:
- - drop mdio bus and per port phy-handle as they match the default
-   setup.
+Herbert,
 
-Changes since v2:
- - Fix switch type in comment and commit log
- - drop 2nd cpu port
+I actually have a scalar AES implementation for arm64 which I could
+use instead, making this patch unnecessary.
 
- arch/arm/boot/dts/armada-385-turris-omnia.dts | 58 +++++++++++++++++++++++++--
- 1 file changed, 55 insertions(+), 3 deletions(-)
+I could respin the entire series, or you could simply disregard #1 and
+#6 for now, whichever you prefer.
 
-diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-index ab49acb2d452..28eede180e4f 100644
---- a/arch/arm/boot/dts/armada-385-turris-omnia.dts
-+++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-@@ -122,7 +122,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&ge0_rgmii_pins>;
- 	status = "okay";
--	phy-mode = "rgmii-id";
-+	phy-mode = "rgmii";
- 
- 	fixed-link {
- 		speed = <1000>;
-@@ -135,7 +135,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&ge1_rgmii_pins>;
- 	status = "okay";
--	phy-mode = "rgmii-id";
-+	phy-mode = "rgmii";
- 
- 	fixed-link {
- 		speed = <1000>;
-@@ -273,7 +273,59 @@
- 		/* irq is connected to &pcawan pin 7 */
- 	};
- 
--	/* Switch MV88E7176 at address 0x10 */
-+	/* Switch MV88E6176 at address 0x10 */
-+	switch at 10 {
-+		compatible = "marvell,mv88e6085";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		dsa,member = <0 0>;
-+
-+		reg = <0x10>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			ports at 0 {
-+				reg = <0>;
-+				label = "lan0";
-+			};
-+
-+			ports at 1 {
-+				reg = <1>;
-+				label = "lan1";
-+			};
-+
-+			ports at 2 {
-+				reg = <2>;
-+				label = "lan2";
-+			};
-+
-+			ports at 3 {
-+				reg = <3>;
-+				label = "lan3";
-+			};
-+
-+			ports at 4 {
-+				reg = <4>;
-+				label = "lan4";
-+			};
-+
-+			ports at 5 {
-+				reg = <5>;
-+				label = "cpu";
-+				ethernet = <&eth1>;
-+				phy-mode = "rgmii-id";
-+
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+
-+			/* port 6 is connected to eth0 */
-+		};
-+	};
- };
- 
- &pinctrl {
--- 
-2.11.0
+Thanks,
+Ard.
+
+
+> Patch #2 optimizes the bit-sliced AES glue code for ARM to iterate over the
+> input in the most efficient manner possible.
+>
+> Patch #3 adds a NEON implementation of ChaCha20 for ARM.
+>
+> Patch #4 adds a NEON implementation of ChaCha20 for arm64.
+>
+> Patch #5 modifies the existing NEON and ARMv8 Crypto Extensions implementations
+> of AES-CTR to be available as a synchronous skcipher as well. This is intended
+> for the mac80211 code, which uses synchronous encapsulations of ctr(aes)
+> [ccm, gcm] in softirq context, which supports SIMD algorithms on arm64.
+>
+> Patch #6 adds a port of the ARM bit-sliced AES code to arm64, in ECB, CTR
+> and XTS modes.
+>
+> Ard Biesheuvel (6):
+>   crypto: generic/aes - export encrypt and decrypt entry points
+>   crypto: arm/aes-neonbs - process 8 blocks in parallel if we can
+>   crypto: arm/chacha20 - implement NEON version based on SSE3 code
+>   crypto: arm64/chacha20 - implement NEON version based on SSE3 code
+>   crypto: arm64/aes-blk - expose AES-CTR as synchronous cipher as well
+>   crypto: arm64/aes - reimplement bit-sliced ARM/NEON implementation for
+>     arm64
+>
+>  arch/arm/crypto/Kconfig                |   6 +
+>  arch/arm/crypto/Makefile               |   2 +
+>  arch/arm/crypto/aesbs-glue.c           |  67 +-
+>  arch/arm/crypto/chacha20-neon-core.S   | 524 ++++++++++++
+>  arch/arm/crypto/chacha20-neon-glue.c   | 128 +++
+>  arch/arm64/crypto/Kconfig              |  13 +
+>  arch/arm64/crypto/Makefile             |   6 +
+>  arch/arm64/crypto/aes-glue.c           |  25 +-
+>  arch/arm64/crypto/aes-neonbs-core.S    | 879 ++++++++++++++++++++
+>  arch/arm64/crypto/aes-neonbs-glue.c    | 344 ++++++++
+>  arch/arm64/crypto/chacha20-neon-core.S | 450 ++++++++++
+>  arch/arm64/crypto/chacha20-neon-glue.c | 127 +++
+>  crypto/aes_generic.c                   |  10 +-
+>  include/crypto/aes.h                   |   3 +
+>  14 files changed, 2549 insertions(+), 35 deletions(-)
+>  create mode 100644 arch/arm/crypto/chacha20-neon-core.S
+>  create mode 100644 arch/arm/crypto/chacha20-neon-glue.c
+>  create mode 100644 arch/arm64/crypto/aes-neonbs-core.S
+>  create mode 100644 arch/arm64/crypto/aes-neonbs-glue.c
+>  create mode 100644 arch/arm64/crypto/chacha20-neon-core.S
+>  create mode 100644 arch/arm64/crypto/chacha20-neon-glue.c
+>
+> --
+> 2.7.4
+>
