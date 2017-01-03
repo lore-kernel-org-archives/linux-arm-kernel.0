@@ -1,39 +1,37 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Tue,  3 Jan 2017 09:21:47 -0800
-Subject: [PATCHv6 05/11] mm: Introduce lm_alias
+Date: Tue,  3 Jan 2017 09:21:49 -0800
+Subject: [PATCHv6 07/11] drivers: firmware: psci: Use __pa_symbol for kernel
+ symbol
 In-Reply-To: <1483464113-1587-1-git-send-email-labbott@redhat.com>
 References: <1483464113-1587-1-git-send-email-labbott@redhat.com>
-Message-ID: <1483464113-1587-6-git-send-email-labbott@redhat.com>
+Message-ID: <1483464113-1587-8-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Certain architectures may have the kernel image mapped separately to
-alias the linear map. Introduce a macro lm_alias to translate a kernel
-image symbol into its linear alias. This is used in part with work to
-add CONFIG_DEBUG_VIRTUAL support for arm64.
+__pa_symbol is technically the macro that should be used for kernel
+symbols. Switch to this as a pre-requisite for DEBUG_VIRTUAL which
+will do bounds checking.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
- include/linux/mm.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/firmware/psci.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/mm.h b/include/linux/mm.h
-index fe6b403..5dc9c46 100644
---- a/include/linux/mm.h
-+++ b/include/linux/mm.h
-@@ -76,6 +76,10 @@ extern int mmap_rnd_compat_bits __read_mostly;
- #define page_to_virt(x)	__va(PFN_PHYS(page_to_pfn(x)))
- #endif
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 6c60a50..66a8793 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -383,7 +383,7 @@ static int psci_suspend_finisher(unsigned long index)
+ 	u32 *state = __this_cpu_read(psci_power_state);
  
-+#ifndef lm_alias
-+#define lm_alias(x)	__va(__pa_symbol(x))
-+#endif
-+
- /*
-  * To prevent common memory management code establishing
-  * a zero page mapping on a read fault.
+ 	return psci_ops.cpu_suspend(state[index - 1],
+-				    virt_to_phys(cpu_resume));
++				    __pa_symbol(cpu_resume));
+ }
+ 
+ int psci_cpu_suspend_enter(unsigned long index)
 -- 
 2.7.4
