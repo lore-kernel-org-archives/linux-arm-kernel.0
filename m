@@ -1,242 +1,697 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Tue,  3 Jan 2017 12:57:14 -0800
-Subject: [PATCH v2 04/19] ARM: dts: imx6-sabrelite: add OV5642 and OV5640
- camera sensors
+Date: Tue,  3 Jan 2017 12:57:21 -0800
+Subject: [PATCH v2 11/19] media: imx: Add CSI subdev driver
 In-Reply-To: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1483477049-19056-5-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1483477049-19056-12-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enables the OV5642 parallel-bus sensor, and the OV5640 MIPI CSI-2 sensor.
-Both hang off the same i2c2 bus, so they require different (and non-
-default) i2c slave addresses.
-
-The OV5642 connects to the parallel-bus mux input port on ipu1_csi0_mux.
-
-The OV5640 connects to the input port on the MIPI CSI-2 receiver on
-mipi_csi. It is set to transmit over MIPI virtual channel 1.
-
-Note there is a pin conflict with GPIO6. This pin functions as a power
-input pin to the OV5642, but ENET uses it as the h/w workaround for
-erratum ERR006687, to wake-up the ARM cores on normal RX and TX packet
-done events (see 6261c4c8). So workaround 6261c4c8 is reverted here to
-support the OV5642, and the "fsl,err006687-workaround-present" boolean
-also must be removed. The result is that the CPUidle driver will no longer
-allow entering the deep idle states on the sabrelite.
+This is a media entity subdevice for the i.MX Camera
+Serial Interface module.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- arch/arm/boot/dts/imx6dl-sabrelite.dts   |   5 ++
- arch/arm/boot/dts/imx6q-sabrelite.dts    |   6 ++
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 122 ++++++++++++++++++++++++++++++-
- 3 files changed, 129 insertions(+), 4 deletions(-)
+ drivers/staging/media/imx/Kconfig   |  13 +
+ drivers/staging/media/imx/Makefile  |   2 +
+ drivers/staging/media/imx/imx-csi.c | 638 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 653 insertions(+)
+ create mode 100644 drivers/staging/media/imx/imx-csi.c
 
-diff --git a/arch/arm/boot/dts/imx6dl-sabrelite.dts b/arch/arm/boot/dts/imx6dl-sabrelite.dts
-index 0f06ca5..fec2524 100644
---- a/arch/arm/boot/dts/imx6dl-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6dl-sabrelite.dts
-@@ -48,3 +48,8 @@
- 	model = "Freescale i.MX6 DualLite SABRE Lite Board";
- 	compatible = "fsl,imx6dl-sabrelite", "fsl,imx6dl";
- };
-+
-+&ipu1_csi1_from_ipu1_csi1_mux {
-+	data-lanes = <0 1>;
-+	clock-lanes = <2>;
-+};
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index 66d10d8..9e2d26d 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -52,3 +52,9 @@
- &sata {
- 	status = "okay";
- };
-+
-+&ipu1_csi1_from_mipi_vc1 {
-+	data-lanes = <0 1>;
-+	clock-lanes = <2>;
-+};
-+
-diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-index 1f9076e..4a50bb1 100644
---- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-@@ -39,6 +39,8 @@
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
-+
-+#include <dt-bindings/clock/imx6qdl-clock.h>
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/input/input.h>
+diff --git a/drivers/staging/media/imx/Kconfig b/drivers/staging/media/imx/Kconfig
+index bfde58d..ce2d2c8 100644
+--- a/drivers/staging/media/imx/Kconfig
++++ b/drivers/staging/media/imx/Kconfig
+@@ -6,3 +6,16 @@ config VIDEO_IMX_MEDIA
+ 	  Say yes here to enable support for video4linux media controller
+ 	  driver for the i.MX5/6 SOC.
  
-@@ -96,6 +98,15 @@
- 		};
- 	};
++if VIDEO_IMX_MEDIA
++menu "i.MX5/6 Media Sub devices"
++
++config VIDEO_IMX_CAMERA
++	tristate "i.MX5/6 Camera driver"
++	depends on VIDEO_IMX_MEDIA && VIDEO_DEV && I2C
++	select VIDEOBUF2_DMA_CONTIG
++	default y
++	---help---
++	  A video4linux camera capture driver for i.MX5/6.
++
++endmenu
++endif
+diff --git a/drivers/staging/media/imx/Makefile b/drivers/staging/media/imx/Makefile
+index ef9f11b..133672a 100644
+--- a/drivers/staging/media/imx/Makefile
++++ b/drivers/staging/media/imx/Makefile
+@@ -4,3 +4,5 @@ imx-media-objs := imx-media-dev.o imx-media-fim.o imx-media-internal-sd.o \
+ obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media.o
+ obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-common.o
  
-+	mipi_xclk: mipi_xclk {
-+		compatible = "pwm-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <22000000>;
-+		clock-output-names = "mipi_pwm3";
-+		pwms = <&pwm3 0 45>; /* 1 / 45 ns = 22 MHz */
-+		status = "okay";
-+	};
++obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-csi.o
 +
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 		pinctrl-names = "default";
-@@ -220,6 +231,22 @@
- 	};
- };
- 
-+&ipu1_csi0_from_ipu1_csi0_mux {
-+	bus-width = <8>;
-+	data-shift = <12>; /* Lines 19:12 used */
-+	hsync-active = <1>;
-+	vync-active = <1>;
-+};
+diff --git a/drivers/staging/media/imx/imx-csi.c b/drivers/staging/media/imx/imx-csi.c
+new file mode 100644
+index 0000000..975eafb
+--- /dev/null
++++ b/drivers/staging/media/imx/imx-csi.c
+@@ -0,0 +1,638 @@
++/*
++ * V4L2 Capture CSI Subdev for Freescale i.MX5/6 SOC
++ *
++ * Copyright (c) 2014-2016 Mentor Graphics Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <media/v4l2-device.h>
++#include <media/v4l2-subdev.h>
++#include <media/videobuf2-dma-contig.h>
++#include <media/v4l2-of.h>
++#include <media/v4l2-ctrls.h>
++#include <video/imx-ipu-v3.h>
++#include "imx-media.h"
 +
-+&ipu1_csi0_mux_from_parallel_sensor {
-+	remote-endpoint = <&ov5642_to_ipu1_csi0_mux>;
-+};
++#define CSI_NUM_PADS 2
 +
-+&ipu1_csi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ipu1_csi0>;
-+};
++struct csi_priv {
++	struct device *dev;
++	struct ipu_soc *ipu;
++	struct imx_media_dev *md;
++	struct v4l2_subdev sd;
++	struct media_pad pad[CSI_NUM_PADS];
++	struct v4l2_mbus_framefmt format_mbus[CSI_NUM_PADS];
++	struct v4l2_mbus_config sensor_mbus_cfg;
++	struct v4l2_rect crop;
++	struct ipu_csi *csi;
++	int csi_id;
++	int input_pad;
++	int output_pad;
++	bool power_on;  /* power is on */
++	bool stream_on; /* streaming is on */
 +
- &audmux {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_audmux>;
-@@ -271,9 +298,6 @@
- 	txd1-skew-ps = <0>;
- 	txd2-skew-ps = <0>;
- 	txd3-skew-ps = <0>;
--	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
--			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
--	fsl,err006687-workaround-present;
- 	status = "okay";
- };
- 
-@@ -302,6 +326,52 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_i2c2>;
- 	status = "okay";
++	/* the sink for the captured frames */
++	struct v4l2_subdev *sink_sd;
++	enum ipu_csi_dest dest;
++	struct v4l2_subdev *src_sd;
 +
-+	camera: ov5642 at 42 {
-+		compatible = "ovti,ov5642";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_ov5642>;
-+		clocks = <&clks IMX6QDL_CLK_CKO2>;
-+		clock-names = "xclk";
-+		reg = <0x42>;
-+		xclk = <24000000>;
-+		reset-gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
-+		pwdn-gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;
-+		gp-gpios = <&gpio1 16 GPIO_ACTIVE_HIGH>;
++	struct v4l2_ctrl_handler ctrl_hdlr;
++	struct imx_media_fim *fim;
 +
-+		port {
-+			ov5642_to_ipu1_csi0_mux: endpoint {
-+				remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
-+				bus-width = <8>;
-+				hsync-active = <1>;
-+				vsync-active = <1>;
-+			};
-+		};
-+	};
-+
-+	mipi_camera: ov5640 at 40 {
-+		compatible = "ovti,ov5640_mipi";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_ov5640>;
-+		clocks = <&mipi_xclk>;
-+		clock-names = "xclk";
-+		reg = <0x40>;
-+		xclk = <22000000>;
-+		reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>; /* NANDF_D5 */
-+		pwdn-gpios = <&gpio6 9 GPIO_ACTIVE_HIGH>; /* NANDF_WP_B */
-+
-+		port {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			ov5640_to_mipi_csi: endpoint at 1 {
-+				reg = <1>;
-+				remote-endpoint = <&mipi_csi_from_mipi_sensor>;
-+				data-lanes = <0 1>;
-+				clock-lanes = <2>;
-+			};
-+		};
-+	};
- };
- 
- &i2c3 {
-@@ -374,7 +444,6 @@
- 				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b030
- 				/* Phy reset */
- 				MX6QDL_PAD_EIM_D23__GPIO3_IO23		0x000b0
--				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
- 			>;
- 		};
- 
-@@ -449,6 +518,39 @@
- 			>;
- 		};
- 
-+		pinctrl_ov5642: ov5642grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_DAT0__GPIO1_IO16 0x80000000
-+				MX6QDL_PAD_GPIO_6__GPIO1_IO06   0x80000000
-+				MX6QDL_PAD_GPIO_8__GPIO1_IO08   0x80000000
-+				MX6QDL_PAD_GPIO_3__CCM_CLKO2    0x80000000
-+			>;
-+		};
-+
-+		pinctrl_ipu1_csi0: ipu1grp-csi0 {
-+			fsl,pins = <
-+				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12    0x80000000
-+				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13    0x80000000
-+				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14    0x80000000
-+				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15    0x80000000
-+				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16    0x80000000
-+				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17    0x80000000
-+				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18    0x80000000
-+				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19    0x80000000
-+				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK   0x80000000
-+				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC      0x80000000
-+				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC     0x80000000
-+				MX6QDL_PAD_CSI0_DATA_EN__IPU1_CSI0_DATA_EN 0x80000000
-+			>;
-+		};
-+
-+                pinctrl_ov5640: ov5640grp {
-+                        fsl,pins = <
-+				MX6QDL_PAD_NANDF_D5__GPIO2_IO05 0x000b0
-+				MX6QDL_PAD_NANDF_WP_B__GPIO6_IO09 0x0b0b0
-+                        >;
-+                };
-+
- 		pinctrl_pwm1: pwm1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD1_DAT3__PWM1_OUT 0x1b0b1
-@@ -605,3 +707,15 @@
- 	vmmc-supply = <&reg_3p3v>;
- 	status = "okay";
- };
-+
-+&mipi_csi {
-+        status = "okay";
++	/* the attached sensor at stream on */
++	struct imx_media_subdev *sensor;
 +};
 +
-+/* Incoming port from sensor */
-+&mipi_csi_from_mipi_sensor {
-+        remote-endpoint = <&ov5640_to_mipi_csi>;
-+        data-lanes = <0 1>;
-+        clock-lanes = <2>;
++static inline struct csi_priv *sd_to_dev(struct v4l2_subdev *sdev)
++{
++	return container_of(sdev, struct csi_priv, sd);
++}
++
++/* Update the CSI whole sensor and active windows */
++static int csi_setup(struct csi_priv *priv)
++{
++	struct v4l2_mbus_framefmt infmt;
++
++	ipu_csi_set_window(priv->csi, &priv->crop);
++
++	/*
++	 * the ipu-csi doesn't understand ALTERNATE, but it only
++	 * needs to know whether the stream is interlaced, so set
++	 * to INTERLACED if infmt field is ALTERNATE.
++	 */
++	infmt = priv->format_mbus[priv->input_pad];
++	if (infmt.field == V4L2_FIELD_ALTERNATE)
++		infmt.field = V4L2_FIELD_INTERLACED;
++
++	ipu_csi_init_interface(priv->csi, &priv->sensor_mbus_cfg, &infmt);
++
++	ipu_csi_set_dest(priv->csi, priv->dest);
++
++	ipu_csi_dump(priv->csi);
++
++	return 0;
++}
++
++static int csi_start(struct csi_priv *priv)
++{
++	int ret;
++
++	if (!priv->sensor) {
++		v4l2_err(&priv->sd, "no sensor attached\n");
++		return -EINVAL;
++	}
++
++	ret = csi_setup(priv);
++	if (ret)
++		return ret;
++
++	/* start the frame interval monitor */
++	ret = imx_media_fim_set_stream(priv->fim, priv->sensor, true);
++	if (ret)
++		return ret;
++
++	ret = ipu_csi_enable(priv->csi);
++	if (ret) {
++		v4l2_err(&priv->sd, "CSI enable error: %d\n", ret);
++		return ret;
++	}
++
++	return 0;
++}
++
++static void csi_stop(struct csi_priv *priv)
++{
++	/* stop the frame interval monitor */
++	imx_media_fim_set_stream(priv->fim, priv->sensor, false);
++
++	ipu_csi_disable(priv->csi);
++}
++
++static int csi_s_stream(struct v4l2_subdev *sd, int enable)
++{
++	struct csi_priv *priv = v4l2_get_subdevdata(sd);
++	int ret = 0;
++
++	if (!priv->src_sd || !priv->sink_sd)
++		return -EPIPE;
++
++	v4l2_info(sd, "stream %s\n", enable ? "ON" : "OFF");
++
++	if (enable && !priv->stream_on)
++		ret = csi_start(priv);
++	else if (!enable && priv->stream_on)
++		csi_stop(priv);
++
++	if (!ret)
++		priv->stream_on = enable;
++	return ret;
++}
++
++static int csi_s_power(struct v4l2_subdev *sd, int on)
++{
++	struct csi_priv *priv = v4l2_get_subdevdata(sd);
++	int ret = 0;
++
++	v4l2_info(sd, "power %s\n", on ? "ON" : "OFF");
++
++	if (on != priv->power_on)
++		ret = imx_media_fim_set_power(priv->fim, on);
++
++	if (!ret)
++		priv->power_on = on;
++	return ret;
++}
++
++static int csi_link_setup(struct media_entity *entity,
++			  const struct media_pad *local,
++			  const struct media_pad *remote, u32 flags)
++{
++	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(entity);
++	struct csi_priv *priv = v4l2_get_subdevdata(sd);
++	struct v4l2_subdev *remote_sd;
++
++	dev_dbg(priv->dev, "link setup %s -> %s", remote->entity->name,
++		local->entity->name);
++
++	remote_sd = media_entity_to_v4l2_subdev(remote->entity);
++
++	if (local->flags & MEDIA_PAD_FL_SINK) {
++		if (flags & MEDIA_LNK_FL_ENABLED) {
++			if (priv->src_sd)
++				return -EBUSY;
++			priv->src_sd = remote_sd;
++		} else {
++			priv->src_sd = NULL;
++			return 0;
++		}
++
++		return 0;
++	}
++
++	if (flags & MEDIA_LNK_FL_ENABLED) {
++		if (priv->sink_sd)
++			return -EBUSY;
++		priv->sink_sd = remote_sd;
++	} else {
++		priv->sink_sd = NULL;
++		return 0;
++	}
++
++	/* set CSI destination */
++	switch (remote_sd->grp_id) {
++	case IMX_MEDIA_GRP_ID_SMFC0:
++	case IMX_MEDIA_GRP_ID_SMFC1:
++	case IMX_MEDIA_GRP_ID_SMFC2:
++	case IMX_MEDIA_GRP_ID_SMFC3:
++		priv->dest = IPU_CSI_DEST_IDMAC;
++		break;
++	case IMX_MEDIA_GRP_ID_IC_PRPVF:
++		priv->dest = IPU_CSI_DEST_VDIC;
++		break;
++	case IMX_MEDIA_GRP_ID_IC_PRPENC:
++		priv->dest = IPU_CSI_DEST_IC;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int csi_link_validate(struct v4l2_subdev *sd,
++			     struct media_link *link,
++			     struct v4l2_subdev_format *source_fmt,
++			     struct v4l2_subdev_format *sink_fmt)
++{
++	struct csi_priv *priv = v4l2_get_subdevdata(sd);
++	bool is_csi2;
++	int ret;
++
++	ret = v4l2_subdev_link_validate_default(sd, link, source_fmt, sink_fmt);
++	if (ret)
++		return ret;
++
++	priv->sensor = __imx_media_find_sensor(priv->md, &priv->sd.entity);
++	if (IS_ERR(priv->sensor)) {
++		v4l2_err(&priv->sd, "no sensor attached\n");
++		ret = PTR_ERR(priv->sensor);
++		priv->sensor = NULL;
++		return ret;
++	}
++
++	ret = v4l2_subdev_call(priv->sensor->sd, video, g_mbus_config,
++			       &priv->sensor_mbus_cfg);
++	if (ret)
++		return ret;
++
++	is_csi2 = (priv->sensor_mbus_cfg.type == V4L2_MBUS_CSI2);
++
++	if (is_csi2) {
++		int vc_num = 0;
++		/*
++		 * NOTE! It seems the virtual channels from the mipi csi-2
++		 * receiver are used only for routing by the video mux's,
++		 * or for hard-wired routing to the CSI's. Once the stream
++		 * enters the CSI's however, they are treated internally
++		 * in the IPU as virtual channel 0.
++		 */
++#if 0
++		vc_num = imx_media_find_mipi_csi2_channel(priv->md,
++							  &priv->sd.entity);
++		if (vc_num < 0)
++			return vc_num;
++#endif
++		ipu_csi_set_mipi_datatype(priv->csi, vc_num,
++					  &priv->format_mbus[priv->input_pad]);
++	}
++
++	/* select either parallel or MIPI-CSI2 as input to CSI */
++	ipu_set_csi_src_mux(priv->ipu, priv->csi_id, is_csi2);
++
++	return 0;
++}
++
++static int csi_eof_isr(struct v4l2_subdev *sd, u32 status, bool *handled)
++{
++	struct csi_priv *priv = v4l2_get_subdevdata(sd);
++	struct timespec cur_ts;
++
++	ktime_get_ts(&cur_ts);
++
++	/* call frame interval monitor */
++	imx_media_fim_eof_monitor(priv->fim, &cur_ts);
++
++	return 0;
++}
++
++static int csi_try_crop(struct csi_priv *priv, struct v4l2_rect *crop)
++{
++	struct v4l2_mbus_framefmt *infmt;
++	struct imx_media_subdev *sensor;
++	v4l2_std_id std;
++	int ret;
++
++	sensor = imx_media_find_sensor(priv->md, &priv->sd.entity);
++	if (IS_ERR(sensor)) {
++		v4l2_err(&priv->sd, "no sensor attached\n");
++		return PTR_ERR(sensor);
++	}
++
++	ret = v4l2_subdev_call(sensor->sd, video, g_mbus_config,
++			       &priv->sensor_mbus_cfg);
++	if (ret)
++		return ret;
++
++	infmt = &priv->format_mbus[priv->input_pad];
++
++	crop->width = min_t(__u32, infmt->width, crop->width);
++	if (crop->left + crop->width > infmt->width)
++		crop->left = infmt->width - crop->width;
++	/* adjust crop left/width to h/w alignment restrictions */
++	crop->left &= ~0x3;
++	crop->width &= ~0x7;
++
++	/*
++	 * FIXME: not sure why yet, but on interlaced bt.656,
++	 * changing the vertical cropping causes loss of vertical
++	 * sync, so fix it to NTSC/PAL active lines. NTSC contains
++	 * 2 extra lines of active video that need to be cropped.
++	 */
++	if (priv->sensor_mbus_cfg.type == V4L2_MBUS_BT656) {
++		ret = v4l2_subdev_call(sensor->sd, video, g_std, &std);
++		if (ret)
++			return ret;
++		if (std & V4L2_STD_525_60) {
++			crop->top = 2;
++			crop->height = 480;
++		} else {
++			crop->top = 0;
++			crop->height = 576;
++		}
++	} else {
++		crop->height = min_t(__u32, infmt->height, crop->height);
++		if (crop->top + crop->height > infmt->height)
++			crop->top = infmt->height - crop->height;
++	}
++
++	return 0;
++}
++
++static int csi_get_fmt(struct v4l2_subdev *sd,
++		       struct v4l2_subdev_pad_config *cfg,
++		       struct v4l2_subdev_format *sdformat)
++{
++	struct csi_priv *priv = v4l2_get_subdevdata(sd);
++
++	if (sdformat->pad >= CSI_NUM_PADS)
++		return -EINVAL;
++
++	sdformat->format = priv->format_mbus[sdformat->pad];
++
++	return 0;
++}
++
++static int csi_set_fmt(struct v4l2_subdev *sd,
++		       struct v4l2_subdev_pad_config *cfg,
++		       struct v4l2_subdev_format *sdformat)
++{
++	struct csi_priv *priv = v4l2_get_subdevdata(sd);
++	struct v4l2_mbus_framefmt *infmt, *outfmt;
++	struct v4l2_rect crop;
++	int ret;
++
++	if (sdformat->pad >= CSI_NUM_PADS)
++		return -EINVAL;
++
++	if (priv->stream_on)
++		return -EBUSY;
++
++	infmt = &priv->format_mbus[priv->input_pad];
++	outfmt = &priv->format_mbus[priv->output_pad];
++
++	if (sdformat->pad == priv->output_pad) {
++		sdformat->format.code = infmt->code;
++		sdformat->format.field = infmt->field;
++		crop.left = priv->crop.left;
++		crop.top = priv->crop.top;
++		crop.width = sdformat->format.width;
++		crop.height = sdformat->format.height;
++		ret = csi_try_crop(priv, &crop);
++		if (ret)
++			return ret;
++		sdformat->format.width = crop.width;
++		sdformat->format.height = crop.height;
++	}
++
++	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
++		cfg->try_fmt = sdformat->format;
++	} else {
++		priv->format_mbus[sdformat->pad] = sdformat->format;
++		/* Update the crop window if this is output pad  */
++		if (sdformat->pad == priv->output_pad)
++			priv->crop = crop;
++	}
++
++	return 0;
++}
++
++static int csi_get_selection(struct v4l2_subdev *sd,
++			     struct v4l2_subdev_pad_config *cfg,
++			     struct v4l2_subdev_selection *sel)
++{
++	struct csi_priv *priv = v4l2_get_subdevdata(sd);
++	struct v4l2_mbus_framefmt *infmt;
++
++	if (sel->pad != priv->output_pad)
++		return -EINVAL;
++
++	infmt = &priv->format_mbus[priv->input_pad];
++
++	switch (sel->target) {
++	case V4L2_SEL_TGT_CROP_BOUNDS:
++		sel->r.left = 0;
++		sel->r.top = 0;
++		sel->r.width = infmt->width;
++		sel->r.height = infmt->height;
++		break;
++	case V4L2_SEL_TGT_CROP:
++		sel->r = priv->crop;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int csi_set_selection(struct v4l2_subdev *sd,
++			     struct v4l2_subdev_pad_config *cfg,
++			     struct v4l2_subdev_selection *sel)
++{
++	struct csi_priv *priv = v4l2_get_subdevdata(sd);
++	struct v4l2_mbus_framefmt *outfmt;
++	int ret;
++
++	if (sel->pad != priv->output_pad ||
++	    sel->target != V4L2_SEL_TGT_CROP)
++		return -EINVAL;
++
++	if (priv->stream_on)
++		return -EBUSY;
++
++	/*
++	 * Modifying the crop rectangle always changes the format on the source
++	 * pad. If the KEEP_CONFIG flag is set, just return the current crop
++	 * rectangle.
++	 */
++	if (sel->flags & V4L2_SEL_FLAG_KEEP_CONFIG) {
++		sel->r = priv->crop;
++		if (sel->which == V4L2_SUBDEV_FORMAT_TRY)
++			cfg->try_crop = sel->r;
++		return 0;
++	}
++
++	outfmt = &priv->format_mbus[priv->output_pad];
++
++	ret = csi_try_crop(priv, &sel->r);
++	if (ret)
++		return ret;
++
++	if (sel->which == V4L2_SUBDEV_FORMAT_TRY) {
++		cfg->try_crop = sel->r;
++	} else {
++		priv->crop = sel->r;
++		/* Update the source format */
++		outfmt->width = sel->r.width;
++		outfmt->height = sel->r.height;
++	}
++
++	return 0;
++}
++
++/*
++ * retrieve our pads parsed from the OF graph by the media device
++ */
++static int csi_registered(struct v4l2_subdev *sd)
++{
++	struct csi_priv *priv = v4l2_get_subdevdata(sd);
++	struct imx_media_subdev *imxsd;
++	struct imx_media_pad *pad;
++	int i, ret;
++
++	/* get media device */
++	priv->md = dev_get_drvdata(sd->v4l2_dev->dev);
++
++	/* get handle to IPU CSI */
++	priv->csi = ipu_csi_get(priv->ipu, priv->csi_id);
++	if (IS_ERR(priv->csi)) {
++		v4l2_err(&priv->sd, "failed to get CSI %d\n", priv->csi_id);
++		return PTR_ERR(priv->csi);
++	}
++
++	imxsd = imx_media_find_subdev_by_sd(priv->md, sd);
++	if (IS_ERR(imxsd)) {
++		ret = PTR_ERR(imxsd);
++		goto put_csi;
++	}
++
++	if (imxsd->num_sink_pads != 1 || imxsd->num_src_pads != 1) {
++		ret = -EINVAL;
++		goto put_csi;
++	}
++
++	for (i = 0; i < CSI_NUM_PADS; i++) {
++		pad = &imxsd->pad[i];
++		priv->pad[i] = pad->pad;
++		if (priv->pad[i].flags & MEDIA_PAD_FL_SINK)
++			priv->input_pad = i;
++		else
++			priv->output_pad = i;
++
++		/* set a default mbus format  */
++		ret = imx_media_init_mbus_fmt(&priv->format_mbus[i],
++					      640, 480, 0, V4L2_FIELD_NONE,
++					      NULL);
++		if (ret)
++			goto put_csi;
++	}
++
++	priv->fim = imx_media_fim_init(&priv->sd);
++	if (IS_ERR(priv->fim)) {
++		ret = PTR_ERR(priv->fim);
++		goto put_csi;
++	}
++
++	ret = media_entity_pads_init(&sd->entity, CSI_NUM_PADS, priv->pad);
++	if (ret)
++		goto free_fim;
++
++	return 0;
++free_fim:
++	imx_media_fim_free(priv->fim);
++put_csi:
++	ipu_csi_put(priv->csi);
++	return ret;
++}
++
++static struct media_entity_operations csi_entity_ops = {
++	.link_setup = csi_link_setup,
++	.link_validate = v4l2_subdev_link_validate,
 +};
 +
++static struct v4l2_subdev_core_ops csi_core_ops = {
++	.s_power = csi_s_power,
++	.interrupt_service_routine = csi_eof_isr,
++};
++
++static struct v4l2_subdev_video_ops csi_video_ops = {
++	.s_stream = csi_s_stream,
++};
++
++static struct v4l2_subdev_pad_ops csi_pad_ops = {
++	.get_fmt = csi_get_fmt,
++	.set_fmt = csi_set_fmt,
++	.get_selection = csi_get_selection,
++	.set_selection = csi_set_selection,
++	.link_validate = csi_link_validate,
++};
++
++static struct v4l2_subdev_ops csi_subdev_ops = {
++	.core = &csi_core_ops,
++	.video = &csi_video_ops,
++	.pad = &csi_pad_ops,
++};
++
++static struct v4l2_subdev_internal_ops csi_internal_ops = {
++	.registered = csi_registered,
++};
++
++static int imx_csi_probe(struct platform_device *pdev)
++{
++	struct ipu_client_platformdata *pdata;
++	struct csi_priv *priv;
++	int ret;
++
++	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, &priv->sd);
++	priv->dev = &pdev->dev;
++
++	/* get parent IPU */
++	priv->ipu = dev_get_drvdata(priv->dev->parent);
++
++	/* get our CSI id */
++	pdata = priv->dev->platform_data;
++	priv->csi_id = pdata->csi;
++
++	v4l2_subdev_init(&priv->sd, &csi_subdev_ops);
++	v4l2_set_subdevdata(&priv->sd, priv);
++	priv->sd.internal_ops = &csi_internal_ops;
++	priv->sd.entity.ops = &csi_entity_ops;
++	/* FIXME: this the right function? */
++	priv->sd.entity.function = MEDIA_ENT_F_PROC_VIDEO_PIXEL_FORMATTER;
++	priv->sd.grp_id = priv->csi_id ?
++		IMX_MEDIA_GRP_ID_CSI1 : IMX_MEDIA_GRP_ID_CSI0;
++	priv->sd.dev = &pdev->dev;
++	priv->sd.owner = THIS_MODULE;
++	priv->sd.flags = V4L2_SUBDEV_FL_HAS_DEVNODE | V4L2_SUBDEV_FL_HAS_EVENTS;
++	imx_media_grp_id_to_sd_name(priv->sd.name, sizeof(priv->sd.name),
++				    priv->sd.grp_id, ipu_get_num(priv->ipu));
++
++	v4l2_ctrl_handler_init(&priv->ctrl_hdlr, 0);
++	priv->sd.ctrl_handler = &priv->ctrl_hdlr;
++
++	ret = v4l2_async_register_subdev(&priv->sd);
++	if (ret)
++		goto free_ctrls;
++
++	return 0;
++free_ctrls:
++	v4l2_ctrl_handler_free(&priv->ctrl_hdlr);
++	return ret;
++}
++
++static int imx_csi_remove(struct platform_device *pdev)
++{
++	struct v4l2_subdev *sd = platform_get_drvdata(pdev);
++	struct csi_priv *priv = sd_to_dev(sd);
++
++	imx_media_fim_free(priv->fim);
++	v4l2_async_unregister_subdev(&priv->sd);
++	media_entity_cleanup(&priv->sd.entity);
++	v4l2_device_unregister_subdev(sd);
++
++	if (!IS_ERR_OR_NULL(priv->csi))
++		ipu_csi_put(priv->csi);
++
++	return 0;
++}
++
++static const struct platform_device_id imx_csi_ids[] = {
++	{ .name = "imx-ipuv3-csi" },
++	{ },
++};
++MODULE_DEVICE_TABLE(platform, imx_csi_ids);
++
++static struct platform_driver imx_csi_driver = {
++	.probe = imx_csi_probe,
++	.remove = imx_csi_remove,
++	.id_table = imx_csi_ids,
++	.driver = {
++		.name = "imx-ipuv3-csi",
++		.owner = THIS_MODULE,
++	},
++};
++module_platform_driver(imx_csi_driver);
++
++MODULE_DESCRIPTION("i.MX CSI subdev driver");
++MODULE_AUTHOR("Steve Longerbeam <steve_longerbeam@mentor.com>");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:imx-ipuv3-csi");
 -- 
 2.7.4
