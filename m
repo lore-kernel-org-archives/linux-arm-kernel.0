@@ -1,54 +1,305 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 3 Jan 2017 11:32:59 +0000
-Subject: [PATCH 1/2] arm64: setup: introduce kaslr_offset()
-In-Reply-To: <db9266fb-5c6e-5dfb-2aac-4165c6b2b337@nvidia.com>
-References: <1481417456-28826-1-git-send-email-alex.popov@linux.com>
- <1481417456-28826-2-git-send-email-alex.popov@linux.com>
- <20161222061857.GA26502@yury-N73SV>
- <4094c1ef-0a75-7076-58e0-52ece326188b@linux.com>
- <db9266fb-5c6e-5dfb-2aac-4165c6b2b337@nvidia.com>
-Message-ID: <20170103113259.GF6986@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 3 Jan 2017 19:32:41 +0800
+Subject: [PATCH v4 1/3] soc: zte: pm_domains: Prepare for supporting
+ ARMv8 zx2967 family
+In-Reply-To: <1483426577-5470-1-git-send-email-baoyou.xie@linaro.org>
+References: <1483426577-5470-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170103113239.GA20956@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 11:18:15AM +0000, Jon Hunter wrote:
-> On 22/12/16 12:51, Alexander Popov wrote:
-> > On 22.12.2016 09:18, Yury Norov wrote:
-> >> On Sun, Dec 11, 2016 at 03:50:55AM +0300, Alexander Popov wrote:
-> >>> Introduce kaslr_offset() similarly to x86_64 for fixing kcov.
-> > 
-> > [...]
-> > 
-> >> Hi Alexander,
-> >>
-> >> I found today's linux-next master broken:
-> > 
-> > [...]
-> > 
-> >> It looks like you declare kaslr_offset() twice - in this patch, and in 7ede8665f
-> >> (arm64: setup: introduce kaslr_offset()). 
-> > 
-> > Hello Yury,
-> > 
-> > There was a race during applying this patch. So currently linux-next has 2 versions of it.
-> > 
-> > The first one is 1a339a14b1f2c7a0dfdd6db79eee1e55d3cec357, which is original.
-> > The second one is 7ede8665f27cde7da69e8b2fbeaa1ed0664879c5, updated by Will Deacon and
-> > applied to the mainline.
-> > 
-> > I'm sorry for that. The first one should be definitely dropped.
+On Tue, Jan 03, 2017 at 02:56:15PM +0800, Baoyou Xie wrote:
+> The ARMv8 zx2967 family (296718, 296716 etc) uses different value
+> for controlling the power domain on/off registers, Choose the
+> value depending on the compatible.
 > 
-> Looks like this is still broken in today's -next.
+> Multiple domains are prepared for the family, this patch prepares
+> the common functions.
+> 
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> ---
+>  drivers/soc/Kconfig                 |   1 +
+>  drivers/soc/Makefile                |   1 +
+>  drivers/soc/zte/Kconfig             |  13 ++++
+>  drivers/soc/zte/Makefile            |   4 ++
+>  drivers/soc/zte/zx2967_pm_domains.c | 138 ++++++++++++++++++++++++++++++++++++
+>  drivers/soc/zte/zx2967_pm_domains.h |  45 ++++++++++++
+>  6 files changed, 202 insertions(+)
+>  create mode 100644 drivers/soc/zte/Kconfig
+>  create mode 100644 drivers/soc/zte/Makefile
+>  create mode 100644 drivers/soc/zte/zx2967_pm_domains.c
+>  create mode 100644 drivers/soc/zte/zx2967_pm_domains.h
+> 
+> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+> index f31bceb..f09023f 100644
+> --- a/drivers/soc/Kconfig
+> +++ b/drivers/soc/Kconfig
+> @@ -11,5 +11,6 @@ source "drivers/soc/tegra/Kconfig"
+>  source "drivers/soc/ti/Kconfig"
+>  source "drivers/soc/ux500/Kconfig"
+>  source "drivers/soc/versatile/Kconfig"
+> +source "drivers/soc/zte/Kconfig"
+>  
+>  endmenu
+> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+> index 50c23d0..05eae52 100644
+> --- a/drivers/soc/Makefile
+> +++ b/drivers/soc/Makefile
+> @@ -16,3 +16,4 @@ obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
+>  obj-$(CONFIG_SOC_TI)		+= ti/
+>  obj-$(CONFIG_ARCH_U8500)	+= ux500/
+>  obj-$(CONFIG_PLAT_VERSATILE)	+= versatile/
+> +obj-$(CONFIG_ARCH_ZX)		+= zte/
+> diff --git a/drivers/soc/zte/Kconfig b/drivers/soc/zte/Kconfig
+> new file mode 100644
+> index 0000000..20bde38
+> --- /dev/null
+> +++ b/drivers/soc/zte/Kconfig
+> @@ -0,0 +1,13 @@
+> +#
+> +# ZTE SoC drivers
+> +#
+> +menuconfig SOC_ZTE
+> +	bool "ZTE SoC driver support"
+> +
+> +if SOC_ZTE
+> +
+> +config ZX2967_PM_DOMAINS
+> +	bool "ZX2967 PM domains"
+> +	depends on PM_GENERIC_DOMAINS
+> +
+> +endif
+> diff --git a/drivers/soc/zte/Makefile b/drivers/soc/zte/Makefile
+> new file mode 100644
+> index 0000000..8a37f2f
+> --- /dev/null
+> +++ b/drivers/soc/zte/Makefile
+> @@ -0,0 +1,4 @@
+> +#
+> +# ZTE SOC drivers
+> +#
+> +obj-$(CONFIG_ZX2967_PM_DOMAINS) += zx2967_pm_domains.o
+> diff --git a/drivers/soc/zte/zx2967_pm_domains.c b/drivers/soc/zte/zx2967_pm_domains.c
+> new file mode 100644
+> index 0000000..98b3b5f
+> --- /dev/null
+> +++ b/drivers/soc/zte/zx2967_pm_domains.c
+> @@ -0,0 +1,138 @@
+> +/*
+> + * Copyright (C) 2015 ZTE Ltd.
 
-I think this is coming in via akpm's tree, so there's nothing we can do
-about it from the arm64 side :/
+What about year 2017?
 
-Andrew -- please can you drop 1a339a14b1f2 ("arm64: setup: introduce
-kaslr_offset()") from your -next branch? It's superceded by
-7ede8665f27c ("arm64: setup: introduce kaslr_offset()"), which landed
-in mainline for -rc1, so you'll need to pick that up if you want your
-branch to build on its own.
+> + *
+> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
+> + * License terms: GNU General Public License (GPL) version 2
+> + */
+> +#include <linux/delay.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
 
-Thanks,
+Can we have a newline between system and local includes?
 
-Will
+> +#include "zx2967_pm_domains.h"
+> +
+> +#define PCU_DM_CLKEN(zpd)	((zpd)->reg_offset[REG_CLKEN])
+> +#define PCU_DM_ISOEN(zpd)	((zpd)->reg_offset[REG_ISOEN])
+> +#define PCU_DM_RSTEN(zpd)	((zpd)->reg_offset[REG_RSTEN])
+> +#define PCU_DM_PWREN(zpd)	((zpd)->reg_offset[REG_PWREN])
+> +#define PCU_DM_PWRDN(zpd)	((zpd)->reg_offset[REG_PWRDN])
+> +#define PCU_DM_ACK_SYNC(zpd)	((zpd)->reg_offset[REG_ACK_SYNC])
+> +
+> +static void __iomem *pcubase;
+> +
+> +int zx2967_power_on(struct generic_pm_domain *domain)
+> +{
+> +	struct zx2967_pm_domain *zpd = (struct zx2967_pm_domain *)domain;
+> +	unsigned long loop = 1000;
+> +	u32 val;
+> +
+> +	val = readl_relaxed(pcubase + PCU_DM_PWREN(zpd));
+> +	if (zpd->polarity == PWREN)
+> +		val |= BIT(zpd->bit);
+> +	else
+> +		val &= ~BIT(zpd->bit);
+> +	writel_relaxed(val, pcubase + PCU_DM_PWRDN(zpd));
+
+Hmm, do you really want to read val from PCU_DM_PWREN and then write
+back to PCU_DM_PWRDN?  They are two different registers or same one?  A
+bit confused here.
+
+> +
+> +	do {
+> +		udelay(1);
+> +		val = readl_relaxed(pcubase + PCU_DM_ACK_SYNC(zpd))
+> +				   & BIT(zpd->bit);
+> +	} while (--loop && !val);
+> +
+> +	if (!loop) {
+> +		pr_err("Error: %s %s fail\n", __func__, domain->name);
+> +		return -EIO;
+> +	}
+> +
+> +	val = readl_relaxed(pcubase + PCU_DM_RSTEN(zpd));
+> +	val |= BIT(zpd->bit);
+> +	writel_relaxed(val, pcubase + PCU_DM_RSTEN(zpd));
+> +	udelay(5);
+> +
+> +	val = readl_relaxed(pcubase + PCU_DM_ISOEN(zpd));
+> +	val &= ~BIT(zpd->bit);
+> +	writel_relaxed(val, pcubase + PCU_DM_ISOEN(zpd));
+> +	udelay(5);
+> +
+> +	val = readl_relaxed(pcubase + PCU_DM_CLKEN(zpd));
+> +	val |= BIT(zpd->bit);
+> +	writel_relaxed(val, pcubase + PCU_DM_CLKEN(zpd));
+> +	udelay(5);
+> +
+> +	pr_debug("normal poweron %s\n", domain->name);
+> +
+> +	return 0;
+> +}
+> +
+> +int zx2967_power_off(struct generic_pm_domain *domain)
+> +{
+> +	struct zx2967_pm_domain *zpd = (struct zx2967_pm_domain *)domain;
+> +	unsigned long loop = 1000;
+> +	u32 val;
+> +
+> +	val = readl_relaxed(pcubase + PCU_DM_CLKEN(zpd));
+> +	val &= ~BIT(zpd->bit);
+> +	writel_relaxed(val, pcubase + PCU_DM_CLKEN(zpd));
+> +	udelay(5);
+> +
+> +	val = readl_relaxed(pcubase + PCU_DM_ISOEN(zpd));
+> +	val |= BIT(zpd->bit);
+> +	writel_relaxed(val, pcubase + PCU_DM_ISOEN(zpd));
+> +	udelay(5);
+> +
+> +	val = readl_relaxed(pcubase + PCU_DM_RSTEN(zpd));
+> +	val &= ~BIT(zpd->bit);
+> +	writel_relaxed(val, pcubase + PCU_DM_RSTEN(zpd));
+> +	udelay(5);
+> +
+> +	val = readl_relaxed(pcubase + PCU_DM_PWREN(zpd));
+> +	if (zpd->polarity == PWREN)
+> +		val &= ~BIT(zpd->bit);
+> +	else
+> +		val |= BIT(zpd->bit);
+> +	writel_relaxed(val, pcubase + PCU_DM_PWRDN(zpd));
+
+Ditto
+
+> +
+> +	do {
+> +		udelay(1);
+> +		val = readl_relaxed(pcubase + PCU_DM_ACK_SYNC(zpd))
+> +				   & BIT(zpd->bit);
+> +	} while (--loop && val);
+> +
+> +	if (!loop) {
+> +		pr_err("Error: %s %s fail\n", __func__, domain->name);
+> +		return -EIO;
+> +	}
+> +
+> +	pr_debug("normal poweroff %s\n", domain->name);
+> +
+> +	return 0;
+> +}
+> +
+> +int zx2967_pd_probe(struct platform_device *pdev,
+> +		   struct generic_pm_domain **zx_pm_domains,
+> +		   int domain_num)
+
+Please fix the indentation as below.
+
+int zx2967_pd_probe(struct platform_device *pdev,
+		    struct generic_pm_domain **zx_pm_domains,
+		    int domain_num)
+
+> +{
+> +	struct genpd_onecell_data *genpd_data;
+> +	struct resource *res;
+> +	int i;
+> +
+> +	genpd_data = devm_kzalloc(&pdev->dev, sizeof(*genpd_data), GFP_KERNEL);
+> +	if (!genpd_data)
+> +		return -ENOMEM;
+> +
+> +	genpd_data->domains = zx_pm_domains;
+> +	genpd_data->num_domains = domain_num;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	pcubase = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(pcubase)) {
+> +		dev_err(&pdev->dev, "ioremap fail.\n");
+> +		return PTR_ERR(pcubase);
+> +	}
+> +
+> +	for (i = 0; i < domain_num; ++i)
+> +		pm_genpd_init(zx_pm_domains[i], NULL, false);
+> +
+> +	of_genpd_add_provider_onecell(pdev->dev.of_node, genpd_data);
+> +	dev_info(&pdev->dev, "powerdomain init ok\n");
+> +	return 0;
+> +}
+> diff --git a/drivers/soc/zte/zx2967_pm_domains.h b/drivers/soc/zte/zx2967_pm_domains.h
+> new file mode 100644
+> index 0000000..35938c3
+> --- /dev/null
+> +++ b/drivers/soc/zte/zx2967_pm_domains.h
+> @@ -0,0 +1,45 @@
+> +/*
+> + * Header for ZTE's Power Domain Driver support
+> + *
+> + * Copyright (C) 2015 ZTE Ltd.
+> + *
+> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
+> + * License terms: GNU General Public License (GPL) version 2
+> + */
+> +
+> +#ifndef __ZTE_ZX2967_PM_DOMAIN_H
+> +#define __ZTE_ZX2967_PM_DOMAIN_H
+> +
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_domain.h>
+> +
+> +enum {
+> +	REG_CLKEN,
+> +	REG_ISOEN,
+> +	REG_RSTEN,
+> +	REG_PWREN,
+> +	REG_PWRDN,
+> +	REG_ACK_SYNC,
+> +
+> +	/* The size of the array - must be last */
+> +	REG_ARRAY_SIZE,
+> +};
+> +
+> +enum zx2967_power_polarity {
+> +	PWREN,
+> +	PWRDN,
+> +};
+> +
+> +struct zx2967_pm_domain {
+> +	struct generic_pm_domain dm;
+> +	const u16 bit;
+> +	const enum zx2967_power_polarity polarity;
+> +	const u16 *reg_offset;
+> +};
+> +
+> +extern int zx2967_power_on(struct generic_pm_domain *domain);
+> +extern int zx2967_power_off(struct generic_pm_domain *domain);
+> +extern int zx2967_pd_probe(struct platform_device *pdev,
+> +			  struct generic_pm_domain **zx_pm_domains,
+> +			  int domain_num);
+
+Have a newline here.
+
+Shawn
+
+> +#endif /* __ZTE_ZX2967_PM_DOMAIN_H */
+> -- 
+> 2.7.4
+> 
