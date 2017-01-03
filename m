@@ -1,54 +1,56 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 3 Jan 2017 18:59:20 +0200
-Subject: [PATCH 2/4] input: tm2-touchkey: Add touchkey driver support for
- TM2
-In-Reply-To: <1483430237-26823-3-git-send-email-jcsing.lee@samsung.com>
-References: <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
- <CGME20170103075733epcas5p4a065198d4abf35081024af95055c67d2@epcas5p4.samsung.com>
- <1483430237-26823-3-git-send-email-jcsing.lee@samsung.com>
-Message-ID: <20170103165920.4tmpr3skgzb2dfah@kozik-lap>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 3 Jan 2017 11:05:33 -0600
+Subject: [v2, 1/4] ARM: davinci: da8xx-dt: Add ti-aemif lookup for clock
+ matching
+In-Reply-To: <7dbaaf44-09b8-ad27-b829-afbfa50f7aa7@ti.com>
+References: <20160810110032.29295-2-kbeldan@baylibre.com>
+ <33cf2e96-6551-df6a-8a30-bf2c3aeabfee@lechnology.com>
+ <72eb6441-6463-abd8-65e6-06772b925999@ti.com>
+ <7dbaaf44-09b8-ad27-b829-afbfa50f7aa7@ti.com>
+Message-ID: <40a6fd6d-9107-1620-014a-fa2f22d5cc23@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 04:57:15PM +0900, Jaechul Lee wrote:
-> This patch adds support for the TM2 touch key and led
-> functionlity.
-> 
-> The driver interfaces with userspace through an input device and
-> reports KEY_PHONE and KEY_BACK event types. LED brightness can be
-> controlled by "/sys/class/leds/tm2-touchkey/brightness".
-> 
-> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
-> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
-> ---
->  drivers/input/keyboard/Kconfig        |  11 ++
->  drivers/input/keyboard/Makefile       |   1 +
->  drivers/input/keyboard/tm2-touchkey.c | 326 ++++++++++++++++++++++++++++++++++
->  3 files changed, 338 insertions(+)
->  create mode 100644 drivers/input/keyboard/tm2-touchkey.c
-> 
-> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
-> index cbd75cf..72c0ba1 100644
-> --- a/drivers/input/keyboard/Kconfig
-> +++ b/drivers/input/keyboard/Kconfig
-> @@ -666,6 +666,17 @@ config KEYBOARD_TC3589X
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called tc3589x-keypad.
->  
-> +config KEYBOARD_TM2_TOUCHKEY
-> +	tristate "tm2-touchkey support"
-> +	depends on I2C
-> +	help
-> +	  Say Y here to enable the tm2-touchkey.
+On 01/03/2017 02:58 AM, Sekhar Nori wrote:
+> On Monday 02 January 2017 01:34 PM, Sekhar Nori wrote:
+>> On Saturday 31 December 2016 06:22 AM, David Lechner wrote:
+>>> On 08/10/2016 06:00 AM, Karl Beldan wrote:
+>>>> Many davinci boards (da830 and da850 families) don't have their clocks
+>>>> in DT yet and won't be successful in getting an unnamed aemif clock
+>>>> without explicitly registering them via clk_lookups, failing the
+>>>> ti-aemif memory driver probe.
+>>>>
+>>>> The current aemif lookup entry resolving to the same clock:
+>>>>     'CLK(NULL,               "aemif",        &aemif_clk)'
+>>>> remains, as it is currently used (davinci_nand is getting a named clock
+>>>> "aemif").
+>>>>
+>>>> This change will allow to switch from the mach-davinci aemif code to
+>>>> the ti-aemif memory driver.
+>>>>
+>>>> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+>>>> ---
+>>>
+>>> FYI, I can't boot LEGO MINDSTORMS EV3 (AM1908) with a v4.9 mainline
+>>> kernel. I did a git bisect and traced it down to this patch. I'm
+>>> guessing that simply reverting it will break other things.
+>>>
+>>> The problem is that &aemif_clk is a node in a linked list and points to
+>>> itself, which creates an infinite loop when looking up the usb clocks
+>>> that are later in the list.
+>>>
+>>> I thought there was a patch to fix this properly from one of the Bay
+>>> Libre guys to fix this already, but I can't seem to find it at the
+>>> moment. When it is found, it would be good to have it applied to the 4.9
+>>> stable and 4.10 mainline trees.
+>>
+>> Yes, a patch was submitted. It is pending in my queue since I need to do
+>> a few experiments myself to determine if its the best solution possible.
+>> Thanks for the heads-up on need to mark it for v4.9 stable. Will do.
+>
+> The master branch of my tree should have the patch included. If you can
+> test and confirm it works fine on the lego platform, it will be great.
+>
 
-The ending full stop is not needed.
-
-> +	  touchkey driver for tm2. This driver can enable
-> +	  the interrupt and make input events and control led brightness.
-
-This sentence needs improvements. How about just:
-"Beside input device, this driver provides also brightness control for
-LEDs on touch keys."
-
-Best regards,
-Krzysztof
+Tested "ARM: davinci: da850: fix infinite loop in clk_set_rate()" 
+working on LEGO Mindstorms with a 4.9.0 kernel.
