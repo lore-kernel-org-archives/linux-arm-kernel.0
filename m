@@ -1,27 +1,27 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 3 Jan 2017 10:24:59 +0100
-Subject: [RFC PATCH] sched: Remove set_task_state()
-In-Reply-To: <1483121873-21528-1-git-send-email-dave@stgolabs.net>
-References: <1483121873-21528-1-git-send-email-dave@stgolabs.net>
-Message-ID: <20170103092459.GB3093@worktop>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 3 Jan 2017 10:24:05 +0100
+Subject: [PATCH] serial: mxs-auart: support CMSPAR termios cflag
+In-Reply-To: <20161212072101.9909-1-weo@reccoware.de>
+Message-ID: <bd44dfdb-7266-f7f0-4f17-066d79d14ebf@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 30, 2016 at 10:17:53AM -0800, Davidlohr Bueso wrote:
+Hi Wolfgang,
 
-> -			set_task_state(current, TASK_RUNNING);
-> +			set_current_state(TASK_RUNNING);
+> If CMSPAR is set in the c_cflag of termios, "stick" parity is enabled.
 
-Obviously good.
+you can have my
 
-> -		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
-> +		set_current_state(TASK_UNINTERRUPTIBLE);
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
 
-Not so much..
+for this version 2 from 12.12.2016.
 
+But in order to increase the chance that your patch get merged, please
+resend your patch:
+* with the correct version in your subject line
+* not during the merge window
+* with my Acked-by
+* with a copy to linux-serial at vger.kernel.org
 
-So while I fully support this move, should we not first clean up the
-code and also remove all the local 'tsk = current' variables such that
-all replacements end up being obvious?
-
-In any case, would be good to hear from arm64 folks.
+Thanks
+Stefan
