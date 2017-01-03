@@ -1,80 +1,111 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue,  3 Jan 2017 23:25:31 +0800
-Subject: [PATCH 1/4] phy: sun4i-usb: add support for V3s USB PHY
+Date: Tue,  3 Jan 2017 23:25:32 +0800
+Subject: [PATCH 2/4] musb: sunxi: add support for the variant in H3/V3s SoC
 In-Reply-To: <20170103152534.20118-1-icenowy@aosc.xyz>
 References: <20170103152534.20118-1-icenowy@aosc.xyz>
-Message-ID: <20170103152534.20118-2-icenowy@aosc.xyz>
+Message-ID: <20170103152534.20118-3-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner V3s come with a USB PHY controller slightly different to other
-SoCs, with only one PHY.
+Allwinner H3/V3s features a variant of MUSB controller, which lacks one
+endpoint.
 
 Add support for it.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
- Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt |  1 +
- drivers/phy/phy-sun4i-usb.c                             | 14 +++++++++++++-
- 2 files changed, 14 insertions(+), 1 deletion(-)
+ .../bindings/usb/allwinner,sun4i-a10-musb.txt      |  4 +--
+ drivers/usb/musb/sunxi.c                           | 35 ++++++++++++++++++++--
+ 2 files changed, 35 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-index 287150db6db4..e42334258185 100644
---- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-@@ -10,6 +10,7 @@ Required properties:
-   * allwinner,sun8i-a23-usb-phy
-   * allwinner,sun8i-a33-usb-phy
-   * allwinner,sun8i-h3-usb-phy
-+  * allwinner,sun8i-v3s-usb-phy
-   * allwinner,sun50i-a64-usb-phy
- - reg : a list of offset + length pairs
- - reg-names :
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index bf28a0fdd569..4102841a8ad2 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -99,6 +99,7 @@ enum sun4i_usb_phy_type {
- 	sun6i_a31_phy,
- 	sun8i_a33_phy,
- 	sun8i_h3_phy,
-+	sun8i_v3s_phy,
- 	sun50i_a64_phy,
+diff --git a/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt b/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
+index 862cd7c79805..d9b42da016f3 100644
+--- a/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
++++ b/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
+@@ -2,8 +2,8 @@ Allwinner sun4i A10 musb DRC/OTG controller
+ -------------------------------------------
+ 
+ Required properties:
+- - compatible      : "allwinner,sun4i-a10-musb", "allwinner,sun6i-a31-musb"
+-                     or "allwinner,sun8i-a33-musb"
++ - compatible      : "allwinner,sun4i-a10-musb", "allwinner,sun6i-a31-musb",
++                     "allwinner,sun8i-a33-musb" or "allwinner,sun8i-h3-musb"
+  - reg             : mmio address range of the musb controller
+  - clocks          : clock specifier for the musb controller ahb gate clock
+  - reset           : reset specifier for the ahb reset (A31 and newer only)
+diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+index d0be0eadd0d9..48ecb1580817 100644
+--- a/drivers/usb/musb/sunxi.c
++++ b/drivers/usb/musb/sunxi.c
+@@ -645,6 +645,20 @@ static struct musb_fifo_cfg sunxi_musb_mode_cfg[] = {
+ 	MUSB_EP_FIFO_SINGLE(5, FIFO_RX, 512),
  };
  
-@@ -188,7 +189,8 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
- 	spin_lock_irqsave(&phy_data->reg_lock, flags);
- 
- 	if (phy_data->cfg->type == sun8i_a33_phy ||
--	    phy_data->cfg->type == sun50i_a64_phy) {
-+	    phy_data->cfg->type == sun50i_a64_phy ||
-+	    phy_data->cfg->type == sun8i_v3s_phy) {
- 		/* A33 or A64 needs us to set phyctl to 0 explicitly */
- 		writel(0, phyctl);
- 	}
-@@ -825,6 +827,15 @@ static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
- 	.enable_pmu_unk1 = true,
- };
- 
-+static const struct sun4i_usb_phy_cfg sun8i_v3s_cfg = {
-+	.num_phys = 1,
-+	.type = sun8i_v3s_phy,
-+	.disc_thresh = 3,
-+	.phyctl_offset = REG_PHYCTL_A33,
-+	.dedicated_clocks = true,
-+	.enable_pmu_unk1 = true,
++/* H3/V3s OTG supports only 4 endpoints */
++#define SUNXI_MUSB_MAX_EP_NUM_H3	5
++
++static struct musb_fifo_cfg sunxi_musb_mode_cfg_h3[] = {
++	MUSB_EP_FIFO_SINGLE(1, FIFO_TX, 512),
++	MUSB_EP_FIFO_SINGLE(1, FIFO_RX, 512),
++	MUSB_EP_FIFO_SINGLE(2, FIFO_TX, 512),
++	MUSB_EP_FIFO_SINGLE(2, FIFO_RX, 512),
++	MUSB_EP_FIFO_SINGLE(3, FIFO_TX, 512),
++	MUSB_EP_FIFO_SINGLE(3, FIFO_RX, 512),
++	MUSB_EP_FIFO_SINGLE(4, FIFO_TX, 512),
++	MUSB_EP_FIFO_SINGLE(4, FIFO_RX, 512),
 +};
 +
- static const struct sun4i_usb_phy_cfg sun50i_a64_cfg = {
- 	.num_phys = 2,
- 	.type = sun50i_a64_phy,
-@@ -842,6 +853,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
- 	{ .compatible = "allwinner,sun8i-a23-usb-phy", .data = &sun8i_a23_cfg },
- 	{ .compatible = "allwinner,sun8i-a33-usb-phy", .data = &sun8i_a33_cfg },
- 	{ .compatible = "allwinner,sun8i-h3-usb-phy", .data = &sun8i_h3_cfg },
-+	{ .compatible = "allwinner,sun8i-v3s-usb-phy", .data = &sun8i_v3s_cfg },
- 	{ .compatible = "allwinner,sun50i-a64-usb-phy",
- 	  .data = &sun50i_a64_cfg},
- 	{ },
+ static struct musb_hdrc_config sunxi_musb_hdrc_config = {
+ 	.fifo_cfg       = sunxi_musb_mode_cfg,
+ 	.fifo_cfg_size  = ARRAY_SIZE(sunxi_musb_mode_cfg),
+@@ -656,6 +670,18 @@ static struct musb_hdrc_config sunxi_musb_hdrc_config = {
+ 	.dma		= 0,
+ };
+ 
++static struct musb_hdrc_config sunxi_musb_hdrc_config_h3 = {
++	.fifo_cfg       = sunxi_musb_mode_cfg_h3,
++	.fifo_cfg_size  = ARRAY_SIZE(sunxi_musb_mode_cfg_h3),
++	.multipoint	= true,
++	.dyn_fifo	= true,
++	.soft_con       = true,
++	.num_eps	= SUNXI_MUSB_MAX_EP_NUM_H3,
++	.ram_bits	= SUNXI_MUSB_RAM_BITS,
++	.dma		= 0,
++};
++
++
+ static int sunxi_musb_probe(struct platform_device *pdev)
+ {
+ 	struct musb_hdrc_platform_data	pdata;
+@@ -698,7 +724,10 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 	pdata.platform_ops	= &sunxi_musb_ops;
+-	pdata.config		= &sunxi_musb_hdrc_config;
++	if (!of_device_is_compatible(np, "allwinner,sun8i-h3-musb"))
++		pdata.config = &sunxi_musb_hdrc_config;
++	else
++		pdata.config = &sunxi_musb_hdrc_config_h3;
+ 
+ 	glue->dev = &pdev->dev;
+ 	INIT_WORK(&glue->work, sunxi_musb_work);
+@@ -710,7 +739,8 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+ 	if (of_device_is_compatible(np, "allwinner,sun6i-a31-musb"))
+ 		set_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags);
+ 
+-	if (of_device_is_compatible(np, "allwinner,sun8i-a33-musb")) {
++	if (of_device_is_compatible(np, "allwinner,sun8i-a33-musb") ||
++	    of_device_is_compatible(np, "allwinner,sun8i-h3-musb")) {
+ 		set_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags);
+ 		set_bit(SUNXI_MUSB_FL_NO_CONFIGDATA, &glue->flags);
+ 	}
+@@ -804,6 +834,7 @@ static const struct of_device_id sunxi_musb_match[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-musb", },
+ 	{ .compatible = "allwinner,sun6i-a31-musb", },
+ 	{ .compatible = "allwinner,sun8i-a33-musb", },
++	{ .compatible = "allwinner,sun8i-h3-musb", },
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, sunxi_musb_match);
 -- 
 2.11.0
