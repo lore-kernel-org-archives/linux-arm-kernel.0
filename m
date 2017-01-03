@@ -1,139 +1,70 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 3 Jan 2017 15:40:51 +0000
-Subject: [PATCH 3/5] mfd: twl: move structure definitions to a public
- header
-In-Reply-To: <20161126181326.14951-4-Nicolae_Rosia@mentor.com>
-References: <20161126181326.14951-1-Nicolae_Rosia@mentor.com>
- <20161126181326.14951-4-Nicolae_Rosia@mentor.com>
-Message-ID: <20170103154051.GI2977@dell>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 3 Jan 2017 15:37:22 +0000
+Subject: [sample] A sample program for MRS emulation
+In-Reply-To: <20161130162720.GN1574@e103592.cambridge.arm.com>
+References: <1480518901-18544-1-git-send-email-suzuki.poulose@arm.com>
+ <1480518901-18544-11-git-send-email-suzuki.poulose@arm.com>
+ <20161130162720.GN1574@e103592.cambridge.arm.com>
+Message-ID: <008f25f9-662c-fbed-1623-520f424b74d6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 26 Nov 2016, Nicolae Rosia wrote:
+On 30/11/16 16:27, Dave Martin wrote:
+> On Wed, Nov 30, 2016 at 03:15:01PM +0000, Suzuki K Poulose wrote:
+>> Here is a sample program which demonstrates how to use mrs
+>> emulation to fetch the ID registers.
+>
+> Are we planning to add this in Documentation/?  If so, we might want
+> some tweaks (noted below).
 
-> We want to get rid of exported symbols and have
-> the child devices use structure members directly.
-> Move the structure definitions to header and set
-> drvdata so child devices can access it.
+Dave,
 
-  < Please use all 75 chars allocated to the commitlog before line wrapping >
+Thanks for taking a look. Apologies for the late response. We could
+either add it to the Documentation or stick it into samples/. I prefer
+the Documentation, as it would help the text.
 
-> Signed-off-by: Nicolae Rosia <Nicolae_Rosia@mentor.com>
-> ---
->  drivers/mfd/twl-core.c       | 27 ++++-----------------------
->  include/linux/mfd/twl-core.h | 35 +++++++++++++++++++++++++++++++++++
->  2 files changed, 39 insertions(+), 23 deletions(-)
->  create mode 100644 include/linux/mfd/twl-core.h
-> 
-> diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
-> index e16084e..409b836 100644
-> --- a/drivers/mfd/twl-core.c
-> +++ b/drivers/mfd/twl-core.c
-> @@ -48,6 +48,7 @@
->  
->  #include <linux/i2c.h>
->  #include <linux/i2c/twl.h>
-> +#include <linux/mfd/twl-core.h>
->  
->  /* Register descriptions for audio */
->  #include <linux/mfd/twl4030-audio.h>
-> @@ -154,28 +155,7 @@ int twl4030_init_irq(struct device *dev, int irq_num);
->  int twl4030_exit_irq(void);
->  int twl4030_init_chip_irq(const char *chip);
->  
-> -/* Structure for each TWL4030/TWL6030 Slave */
-> -struct twl_client {
-> -	struct i2c_client *client;
-> -	struct regmap *regmap;
-> -};
-> -
-> -/* mapping the module id to slave id and base address */
-> -struct twl_mapping {
-> -	unsigned char sid;	/* Slave ID */
-> -	unsigned char base;	/* base address */
-> -};
-> -
-> -struct twl_private {
-> -	bool ready; /* The core driver is ready to be used */
-> -	u32 twl_idcode; /* TWL IDCODE Register value */
-> -	unsigned int twl_id;
-> -
-> -	struct twl_mapping *twl_map;
-> -	struct twl_client *twl_modules;
-> -};
-> -
-> -static struct twl_private *twl_priv;
-> +static struct twlcore *twl_priv;
+>
+>>
+>> ----8>----
+>> /*
+>>  * Sample program to demonstrate the MRS emulation
+>>  * ABI.
+>
+> overwrapped?
 
-I'm guessing when you remove the exported functions, you can remove this?
+will fix it.
 
->  static struct twl_mapping twl4030_map[] = {
->  	/*
-> @@ -745,7 +725,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
->  		goto free;
->  	}
->  
-> -	twl_priv = devm_kzalloc(&client->dev, sizeof(struct twl_private),
-> +	twl_priv = devm_kzalloc(&client->dev, sizeof(struct twlcore),
->  				GFP_KERNEL);
->  	if (!twl_priv) {
->  		status = -ENOMEM;
-> @@ -803,6 +783,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
->  	}
->  
->  	twl_priv->ready = true;
-> +	dev_set_drvdata(&client->dev, twl_priv);
->  
->  	/* setup clock framework */
->  	clocks_init(&pdev->dev);
-> diff --git a/include/linux/mfd/twl-core.h b/include/linux/mfd/twl-core.h
-> new file mode 100644
-> index 0000000..d1c01b3
-> --- /dev/null
-> +++ b/include/linux/mfd/twl-core.h
-> @@ -0,0 +1,35 @@
-> +/*
-> + * MFD core driver for the Texas Instruments TWL PMIC family
-> + *
-> + * Copyright (C) 2016 Nicolae Rosia <nicolae.rosia@gmail.com>
+>
 
-Your sign-off and SoB are different?  Why?
+>> int main()
+>
+> (void)
+>
+>> {
+>
+> We don't wan't people using the MRS emulation without checking for its
+> availability first.
+>
+> Something like this may work (untested), with the caveat that getauxval()
+> is a GNU libc extension, and other environments may require a different
+> mechanism to obtain the hwcaps.
+>
 
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __TWL_CORE_H__
-> +#define __TWL_CORE_H__
+Makes sense.
 
-_MFD_
+> --8<--
+>
+> #include <sys/auxv.h>
+> #include <asm/hwcap.h>
+>
+> /* ... */
+>
+> 	if (!getauxval(AT_HWCAP) & HWCAP_CPUID) {
+> 		fputs("CPUID registers unavailable\n", stderr);
+> 		return 1;
+> 	}
+>
+> -->8--
 
-> +/* Structure for each TWL4030/TWL6030 Slave */
-> +struct twl_client {
-> +	struct i2c_client *client;
-> +	struct regmap *regmap;
-> +};
-> +
-> +/* mapping the module id to slave id and base address */
-> +struct twl_mapping {
-> +	unsigned char sid; /* Slave ID */
-> +	unsigned char base; /* base address */
-> +};
-> +
-> +struct twlcore {
-> +	bool ready; /* The core driver is ready to be used */
-> +	u32 twl_idcode; /* TWL IDCODE Register value */
-> +	unsigned int twl_id;
-> +
-> +	struct twl_mapping *twl_map;
-> +	struct twl_client *twl_modules;
-> +};
-> +
-> +#endif
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Cheers
+Suzuki
