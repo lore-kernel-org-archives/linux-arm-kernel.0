@@ -1,39 +1,48 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 3 Jan 2017 14:33:00 +0530
-Subject: [PATCH v6 0/5] davinci: VPIF: add DT support
-In-Reply-To: <d4b0501a-f83a-c8b1-e460-1ba50f68cca7@xs4all.nl>
-References: <20161207183025.20684-1-khilman@baylibre.com>
- <d4b0501a-f83a-c8b1-e460-1ba50f68cca7@xs4all.nl>
-Message-ID: <4a03b56e-1e01-8b2c-c2a1-1b72d30f103a@ti.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 3 Jan 2017 10:04:39 +0100
+Subject: [PATCH v2 1/2] mtd: ifc: Update dependency of IFC for LS1021A
+In-Reply-To: <1483411266-45875-1-git-send-email-b18965@freescale.com>
+References: <1483411266-45875-1-git-send-email-b18965@freescale.com>
+Message-ID: <20170103100439.6e7360c6@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+Hi Alison,
 
-On Friday 16 December 2016 03:17 PM, Hans Verkuil wrote:
-> On 07/12/16 19:30, Kevin Hilman wrote:
->> Prepare the groundwork for adding DT support for davinci VPIF drivers.
->> This series does some fixups/cleanups and then adds the DT binding and
->> DT compatible string matching for DT probing.
->>
->> The controversial part from previous versions around async subdev
->> parsing, and specifically hard-coding the input/output routing of
->> subdevs, has been left out of this series.  That part can be done as a
->> follow-on step after agreement has been reached on the path forward.
->> With this version, platforms can still use the VPIF capture/display
->> drivers, but must provide platform_data for the subdevs and subdev
->> routing.
->>
->> Tested video capture to memory on da850-lcdk board using composite
->> input.
+The subject prefix should be "memory: " and not "mtd: ifc: ".
+
+Looks good otherwise.
+
+No need to resend, I can fix that when applying.
+
+Regards,
+
+Boris
+
+On Tue, 3 Jan 2017 10:41:05 +0800
+Alison Wang <b18965@freescale.com> wrote:
+
+> As Freescale/NXP IFC controller is available on LS1021A, the dependency
+> for LS1021A is added.
 > 
-> Other than the comment for the first patch this series looks good.
+> Signed-off-by: Alison Wang <alison.wang@nxp.com>
+> ---
+> Changes in v2:
+> - New patch
 > 
-> So once that's addressed I'll queue it up for 4.11.
-
-Can you provide an immutable commit (as it will reach v4.11) with with
-this series applied? I have some platform changes to queue for v4.11
-that depend on the driver updates.
-
-Thanks,
-Sekhar
+>  drivers/memory/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
+> index ec80e35..fff8345 100644
+> --- a/drivers/memory/Kconfig
+> +++ b/drivers/memory/Kconfig
+> @@ -115,7 +115,7 @@ config FSL_CORENET_CF
+>  
+>  config FSL_IFC
+>  	bool
+> -	depends on FSL_SOC || ARCH_LAYERSCAPE
+> +	depends on FSL_SOC || ARCH_LAYERSCAPE || SOC_LS1021A
+>  
+>  config JZ4780_NEMC
+>  	bool "Ingenic JZ4780 SoC NEMC driver"
