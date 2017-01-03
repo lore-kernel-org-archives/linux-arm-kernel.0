@@ -1,37 +1,77 @@
-From: jkridner@gmail.com (Jason Kridner)
-Date: Tue, 3 Jan 2017 15:29:41 -0500
-Subject: [PATCH 2/4] ARM: dts: Add am335x-boneblack-wireless
-In-Reply-To: <20170103201103.GB25222@atomide.com>
-References: <20161227175837.28970-1-robertcnelson@gmail.com>
- <20161227175837.28970-2-robertcnelson@gmail.com>
- <CB5C8999-6CAE-41F6-85A6-D2A856BD8011@gmail.com>
- <20170103201103.GB25222@atomide.com>
-Message-ID: <2D5ABB5A-E332-4D77-89EA-9DBF9A2FECFB@gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 3 Jan 2017 13:37:05 -0700
+Subject: [PATCH] coresight: fix kernel panic caused by invalid CPU
+In-Reply-To: <20161226063137.110016-1-wangnan0@huawei.com>
+References: <20161226063137.110016-1-wangnan0@huawei.com>
+Message-ID: <CANLsYky=URDp64M_A87+9JMZqTzouC5P5biT-vCWuYoQ8GZd+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 25 December 2016 at 23:31, Wang Nan <wangnan0@huawei.com> wrote:
+> Commit d52c9750f150 ("coresight: reset 'enable_sink' flag when need be")
+> caused a kernel panic because of the using of an invalid value: after
+> 'for_each_cpu(cpu, mask)', value of local variable 'cpu' become invalid,
+> causes following 'cpu_to_node' access invalid memory area.
+>
+> This patch brings the deleted 'cpu = cpumask_first(mask)' back.
+>
+> Panic log:
+>
+>  $ perf record -e cs_etm// ls
+>
+>  Unable to handle kernel paging request at virtual address fffe801804af4f10
+>  pgd = ffff8017ce031600
+>  [fffe801804af4f10] *pgd=0000000000000000, *pud=0000000000000000
+>  Internal error: Oops: 96000004 [#1] SMP
+>  Modules linked in:
+>  CPU: 33 PID: 1619 Comm: perf Not tainted 4.7.1+ #16
+>  Hardware name: Huawei Taishan 2280 /CH05TEVBA, BIOS 1.10 11/24/2016
+>  task: ffff8017cb0c8400 ti: ffff8017cb154000 task.ti: ffff8017cb154000
+>  PC is at tmc_alloc_etf_buffer+0x60/0xd4
+>  LR is at tmc_alloc_etf_buffer+0x44/0xd4
+>  pc : [<ffff000008633df8>] lr : [<ffff000008633ddc>] pstate: 60000145
+>  sp : ffff8017cb157b40
+>  x29: ffff8017cb157b40 x28: 0000000000000000
+>  ...skip...
+>  7a60: ffff000008c64dc8 0000000000000006 0000000000000253 ffffffffffffffff
+>  7a80: 0000000000000000 0000000000000000 ffff0000080872cc 0000000000000001
+>  [<ffff000008633df8>] tmc_alloc_etf_buffer+0x60/0xd4
+>  [<ffff000008632b9c>] etm_setup_aux+0x1dc/0x1e8
+>  [<ffff00000816eed4>] rb_alloc_aux+0x2b0/0x338
+>  [<ffff00000816a5e4>] perf_mmap+0x414/0x568
+>  [<ffff0000081ab694>] mmap_region+0x324/0x544
+>  [<ffff0000081abbe8>] do_mmap+0x334/0x3e0
+>  [<ffff000008191150>] vm_mmap_pgoff+0xa4/0xc8
+>  [<ffff0000081a9a30>] SyS_mmap_pgoff+0xb0/0x22c
+>  [<ffff0000080872e4>] sys_mmap+0x18/0x28
+>  [<ffff0000080843f0>] el0_svc_naked+0x24/0x28
+>  Code: 912040a5 d0001c00 f873d821 911c6000 (b8656822)
+>  ---[ end trace 98933da8f92b0c9a ]---
+>
+> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+> Cc: Xia Kaixu <xiakaixu@huawei.com>
+> Cc: Li Zefan <lizefan@huawei.com>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/hwtracing/coresight/coresight-etm-perf.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> index 1774196..26cfac3 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> @@ -242,6 +242,7 @@ static void *etm_setup_aux(int event_cpu, void **pages,
+>         if (!sink_ops(sink)->alloc_buffer)
+>                 goto err;
+>
+> +       cpu = cpumask_first(mask);
+>         /* Get the AUX specific data from the sink buffer */
+>         event_data->snk_config =
+>                         sink_ops(sink)->alloc_buffer(sink, cpu, pages,
+> --
+> 2.10.1
+>
 
-
-> On Jan 3, 2017, at 3:11 PM, Tony Lindgren <tony@atomide.com> wrote:
-> 
-> * Jason Kridner <jkridner@gmail.com> [161228 13:27]:
->> 
->> 
->>> On Dec 27, 2016, at 11:58 AM, Robert Nelson <robertcnelson@gmail.com> wrote:
->>> 
->>> BeagleBone Black Wireless is clone of the BeagleBone Black (BBB) with the Ethernet
->>> replaced by a TI wl1835 wireless module.
->>> 
->>> This board can be indentified by the BWAx value after A335BNLT (BBB) in the at24 eeprom:
->>> BWAx [aa 55 33 ee 41 33 33 35  42 4e 4c 54 42 57 41 35  |.U3.A335BNLTBWA5|]
->> 
->> I believe the correct statement is BWxx, but BWBx reserves the option to be software incompatible in some way. My preference is to have it boot anyway, but I believe that is only dependent in the bootloader. 
-> 
-> So does this patch need updating for that?
-
-No, it is bootloader controlled. 
-
-> 
-> Regards,
-> 
-> Tony
+Applied - thanks.
