@@ -1,25 +1,26 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 3 Jan 2017 11:49:09 -0600
-Subject: [PATCH v2 04/12] driver: clk: imx: Add clock driver for imx6sll
-In-Reply-To: <1482832070-22668-5-git-send-email-ping.bai@nxp.com>
-References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
- <1482832070-22668-5-git-send-email-ping.bai@nxp.com>
-Message-ID: <20170103174909.3a5qtds4fpmgzhxs@rob-hp-laptop>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 03 Jan 2017 10:04:28 -0800
+Subject: [PATCH 2/2] mmc: sdhci-iproc: Increase max_blk_size for bcm2835
+In-Reply-To: <1483111474-29907-3-git-send-email-stefan.wahren@i2se.com>
+References: <1483111474-29907-1-git-send-email-stefan.wahren@i2se.com>
+ <1483111474-29907-3-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <87o9zonhoz.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2016 at 05:47:42PM +0800, Bai Ping wrote:
-> Add clk driver support for imx6sll.
-> 
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> ---
->  drivers/clk/imx/Makefile                  |   1 +
->  drivers/clk/imx/clk-imx6sll.c             | 369 ++++++++++++++++++++++++++++++
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
->  include/dt-bindings/clock/imx6sll-clock.h | 204 +++++++++++++++++
+> According to the BCM2835 datasheet the maximum block size for the
+> eMMC module is restricted to the internal data FIFO which is 1024 byte.
+> But this is still an improvement to the default of 512 byte.
 
-This should be part of the binding doc patch.
+Confirmed that the internal FIFOs are 1k.
 
->  3 files changed, 574 insertions(+)
->  create mode 100644 drivers/clk/imx/clk-imx6sll.c
->  create mode 100644 include/dt-bindings/clock/imx6sll-clock.h
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170103/e734aeda/attachment.sig>
