@@ -1,42 +1,60 @@
-From: andi@etezian.org (Andi Shyti)
-Date: Tue, 3 Jan 2017 23:40:56 +0900
-Subject: [PATCH 3/4] arm64: dts: exynos: make tm2 and tm2e independent
- from each other
-In-Reply-To: <ff876454-b49f-3d63-d76e-012dd303b0e7@osg.samsung.com>
-References: <CGME20170103075734epcas5p43a9743131f63affd0a438d2ed342f22e@epcas5p4.samsung.com>
- <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
- <1483430237-26823-4-git-send-email-jcsing.lee@samsung.com>
- <CAJKOXPev9m07_dQWAvJ+=MKnbT0TFERKOtjWUDU+WXdGAiRyDA@mail.gmail.com>
- <20170103095842.h3hl64amje4qv4ts@gangnam.samsung>
- <CAJKOXPeEE1VwAUSAOpfyX+t58zKeAT1fe3ybp0BoQiiDBb4Uqg@mail.gmail.com>
- <20170103102548.73jg6qddlcthe2mu@gangnam.samsung>
- <CAGTfZH3ez4DPTE7-bDeayjhSGxJ_8Mj1MQz1M7O1qhwOGOnmMQ@mail.gmail.com>
- <20170103115530.zhjwn7bzmqmumy23@gangnam.samsung>
- <ff876454-b49f-3d63-d76e-012dd303b0e7@osg.samsung.com>
-Message-ID: <20170103144056.4ft2ohmhgmezeney@jack.zhora.eu>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue,  3 Jan 2017 15:54:54 +0100
+Subject: [PATCH v2 0/3] video/sti/cec: add HPD notifier support
+Message-ID: <1483455297-2286-1-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch series following what Hans is doing on exynos to support
+hotplug detect notifier code.
 
-> FWIW, I also agree with Chanwoo that the difference is too small to
-> need a common .dtsi file.
+It add support of HPD in sti_hdmi drm driver and stih-cec driver which
+move out of staging.
 
-in principle I don't like "switching on and off" properties by
-overwriting them with "status = disable", unless it's really
-necessary (and this case is not). Even for small differences. It
-makes the DTS harder to read and duplicates nodes with different
-values throughout the DTS include chain.
+Those patches should be applied on top of Hans branch exynos4-cec.
 
-In my opinion this approach should be discouraged.
+I have tested hdmi notifier by pluging/unpluging HDMI cable and check
+the value of the physical address with "cec-ctl --tuner".
+"cec-compliance -A" is also functional.
 
-Besides, there are other overwritten differences in tm2e.dts that
-I think should be separated as well. The "common" file approach is
-widely used in arm/boot/dts/exynos* files.
+version 2:
+- use HPD notifier instead of HDMI notifier
+- move stih-cec out of staging
+- rebase code on top of git://linuxtv.org/hverkuil/media_tree.git exynos4-cec
+  branch
+- split DT modifications in a separate patch
 
-The "status = disable" looks to me more like a temporary hack
-rather than a permanent solution.
+Regards,
+Benjamin
 
-In any case, still up to you :)
+Benjamin Gaignard (3):
+  sti: hdmi: add HPD notifier support
+  stih-cec: add HPD notifier support
+  arm: sti: update sti-cec for HPD notifier support
 
-Andi
+ .../devicetree/bindings/media/stih-cec.txt         |   2 +
+ arch/arm/boot/dts/stih407-family.dtsi              |  12 -
+ arch/arm/boot/dts/stih410.dtsi                     |  13 +
+ drivers/gpu/drm/sti/Kconfig                        |   1 +
+ drivers/gpu/drm/sti/sti_hdmi.c                     |  14 +
+ drivers/gpu/drm/sti/sti_hdmi.h                     |   3 +
+ drivers/media/platform/Kconfig                     |  10 +
+ drivers/media/platform/Makefile                    |   1 +
+ drivers/media/platform/sti/cec/Makefile            |   1 +
+ drivers/media/platform/sti/cec/stih-cec.c          | 404 +++++++++++++++++++++
+ drivers/staging/media/Kconfig                      |   2 -
+ drivers/staging/media/Makefile                     |   1 -
+ drivers/staging/media/st-cec/Kconfig               |   8 -
+ drivers/staging/media/st-cec/Makefile              |   1 -
+ drivers/staging/media/st-cec/TODO                  |   7 -
+ drivers/staging/media/st-cec/stih-cec.c            | 379 -------------------
+ 16 files changed, 449 insertions(+), 410 deletions(-)
+ create mode 100644 drivers/media/platform/sti/cec/Makefile
+ create mode 100644 drivers/media/platform/sti/cec/stih-cec.c
+ delete mode 100644 drivers/staging/media/st-cec/Kconfig
+ delete mode 100644 drivers/staging/media/st-cec/Makefile
+ delete mode 100644 drivers/staging/media/st-cec/TODO
+ delete mode 100644 drivers/staging/media/st-cec/stih-cec.c
+
+-- 
+1.9.1
