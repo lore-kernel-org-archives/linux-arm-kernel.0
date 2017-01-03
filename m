@@ -1,59 +1,47 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  3 Jan 2017 18:10:23 +0000
-Subject: [RFC PATCH 06/10] perf/core: Export AUX buffer helpers to modules
+Date: Tue,  3 Jan 2017 18:10:27 +0000
+Subject: [RFC PATCH 10/10] dt-bindings: Document devicetree binding for ARM SPE
 In-Reply-To: <1483467027-14547-1-git-send-email-will.deacon@arm.com>
 References: <1483467027-14547-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1483467027-14547-7-git-send-email-will.deacon@arm.com>
+Message-ID: <1483467027-14547-11-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Perf PMU drivers using AUX buffers cannot be built as modules unless
-the AUX helpers are exported.
+This patch documents the devicetree binding in use for ARM SPE.
 
-This patch exports perf_aux_output_{begin,end,skip} and perf_get_aux to
-modules.
-
-Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Rob Herring <robh@kernel.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- kernel/events/ring_buffer.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ Documentation/devicetree/bindings/arm/spe-pmu.txt | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/spe-pmu.txt
 
-diff --git a/kernel/events/ring_buffer.c b/kernel/events/ring_buffer.c
-index 257fa460b846..13b8a46bd517 100644
---- a/kernel/events/ring_buffer.c
-+++ b/kernel/events/ring_buffer.c
-@@ -397,6 +397,7 @@ void *perf_aux_output_begin(struct perf_output_handle *handle,
- 
- 	return NULL;
- }
-+EXPORT_SYMBOL(perf_aux_output_begin);
- 
- /*
-  * Commit the data written by hardware into the ring buffer by adjusting
-@@ -458,6 +459,7 @@ void perf_aux_output_end(struct perf_output_handle *handle, unsigned long size,
- 	rb_free_aux(rb);
- 	ring_buffer_put(rb);
- }
-+EXPORT_SYMBOL(perf_aux_output_end);
- 
- /*
-  * Skip over a given number of bytes in the AUX buffer, due to, for example,
-@@ -486,6 +488,7 @@ int perf_aux_output_skip(struct perf_output_handle *handle, unsigned long size)
- 
- 	return 0;
- }
-+EXPORT_SYMBOL(perf_aux_output_skip);
- 
- void *perf_get_aux(struct perf_output_handle *handle)
- {
-@@ -495,6 +498,7 @@ void *perf_get_aux(struct perf_output_handle *handle)
- 
- 	return handle->rb->aux_priv;
- }
-+EXPORT_SYMBOL(perf_get_aux);
- 
- #define PERF_AUX_GFP	(GFP_KERNEL | __GFP_ZERO | __GFP_NOWARN | __GFP_NORETRY)
- 
+diff --git a/Documentation/devicetree/bindings/arm/spe-pmu.txt b/Documentation/devicetree/bindings/arm/spe-pmu.txt
+new file mode 100644
+index 000000000000..d6540b491af4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/spe-pmu.txt
+@@ -0,0 +1,20 @@
++* ARMv8.2 Statistical Profiling Extension (SPE) Performance Monitor Units (PMU)
++
++ARMv8.2 introduces the optional Statistical Profiling Extension for collecting
++performance sample data using an in-memory trace buffer.
++
++** SPE Required properties:
++
++- compatible : should be one of:
++	       "arm,arm-spe-pmu-v1"
++
++- interrupts : Exactly 1 PPI must be listed. For heterogeneous systems where
++               SPE is only supported on a subset of the CPUs, please consult
++	       the arm,gic-v3 binding for details on describing a PPI partition.
++
++** Example:
++
++spe-pmu {
++        compatible = "arm,arm-spe-pmu-v1";
++        interrupts = <GIC_PPI 05 IRQ_TYPE_EDGE_RISING &part1>;
++};
 -- 
 2.1.4
