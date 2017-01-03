@@ -1,43 +1,40 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  3 Jan 2017 09:21:19 +0100
-Subject: [PATCH] pinctrl: amd: fix compilation warning
-Message-ID: <20170103082119.11958-1-linus.walleij@linaro.org>
+Date: Tue, 3 Jan 2017 09:24:34 +0100
+Subject: [PATCH v2 3/4] ARM64: dts: exynos5433: use macros for pinctrl
+ configuration on Exynos5433
+In-Reply-To: <20161230151724.5wlp4hbphasmw3rg@kozik-lap>
+References: <CGME20161230041427epcas1p1151d6e28fac143c63efaf4f7c8ed432d@epcas1p1.samsung.com>
+ <20161230041421.24448-1-andi.shyti@samsung.com>
+ <20161230041421.24448-4-andi.shyti@samsung.com>
+ <CACRpkdaz9AyFJs1Th_SVexqKaP-=iPF0G-1YXOCoSmrQH8ZHDA@mail.gmail.com>
+ <20161230151724.5wlp4hbphasmw3rg@kozik-lap>
+Message-ID: <CACRpkdbX_MuLSCerq08-1VZV6VJfynjkv1QOr7ssOCGvM5aB_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3bfd44306c65 ("pinctrl: amd: Add support for additional GPIO")
-created the following warning:
+On Fri, Dec 30, 2016 at 4:17 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Fri, Dec 30, 2016 at 02:32:39PM +0100, Linus Walleij wrote:
+>> On Fri, Dec 30, 2016 at 5:14 AM, Andi Shyti <andi.shyti@samsung.com> wrote:
+>>
+>> > Use the macros defined in include/dt-bindings/pinctrl/samsung.h
+>> > instead of hardcoded values.
+>> >
+>> > Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+>>
+>> These look fine, but that this and the other DTS patch through ARM SoC.
+>>
+>> If you also need the headerfile patch (patch 2) to go through ARM SoC
+>> that is fine,
+>> I can take it out of pinctrl if you want.
+>
+> Yes, I need the header. It would be much appreciated if you could
+> provide a tag or stable branch with it.
 
-drivers/pinctrl/pinctrl-amd.c: In function 'amd_gpio_dbg_show':
-drivers/pinctrl/pinctrl-amd.c:210:3: warning: 'pin_num' may be used uninitialized in this function [-Wmaybe-uninitialized]
-   for (; i < pin_num; i++) {
-   ^
-drivers/pinctrl/pinctrl-amd.c:172:21: warning: 'i' may be used uninitialized in this function [-Wmaybe-uninitialized]
-  unsigned int bank, i, pin_num;
-                     ^
-Fix this by adding a guarding default case for illegal
-bank numbers.
+Nah better just merge that patch into the ARM SoC tree only.
 
-Cc: S-k Shyam-sundar <Shyam-sundar.S-k@amd.com>
-Cc: Nehal Shah <Nehal-bakulchandra.Shah@amd.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/pinctrl-amd.c | 3 +++
- 1 file changed, 3 insertions(+)
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-diff --git a/drivers/pinctrl/pinctrl-amd.c b/drivers/pinctrl/pinctrl-amd.c
-index 47b17100410e..c2203699f1ab 100644
---- a/drivers/pinctrl/pinctrl-amd.c
-+++ b/drivers/pinctrl/pinctrl-amd.c
-@@ -206,6 +206,9 @@ static void amd_gpio_dbg_show(struct seq_file *s, struct gpio_chip *gc)
- 			i = 192;
- 			pin_num = AMD_GPIO_PINS_BANK3 + i;
- 			break;
-+		default:
-+			/* Illegal bank number, ignore */
-+			continue;
- 		}
- 		for (; i < pin_num; i++) {
- 			seq_printf(s, "pin%d\t", i);
--- 
-2.9.3
+I'll remove it from the pinctrl tree.
+
+Yours,
+Linus Walleij
