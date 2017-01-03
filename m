@@ -1,82 +1,21 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Tue, 03 Jan 2017 10:22:00 -0500
-Subject: [PATCH 1/3] dt: pwm: lpc32xx: add description of clocks and
- #pwm-cells properties
-In-Reply-To: <5a865e27-e673-2f45-6c71-ca1e7d92a346@mleia.com>
-References: <20161205014237.1689-1-vz@mleia.com>
- <20161205014237.1689-2-vz@mleia.com>
- <20161209214137.2hdugl5rmnwjrus4@rob-hp-laptop>
- <015305d5-c22f-52da-9605-f2c19e3108b1@mleia.com>
- <5a865e27-e673-2f45-6c71-ca1e7d92a346@mleia.com>
-Message-ID: <1483456920.7643.1.camel@localhost>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 3 Jan 2017 09:24:05 -0600
+Subject: [PATCH v1 2/3] dt-bindings: add binding for rk3328 power domains
+In-Reply-To: <1482464872-12954-3-git-send-email-zhangqing@rock-chips.com>
+References: <1482464872-12954-1-git-send-email-zhangqing@rock-chips.com>
+ <1482464872-12954-3-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <20170103152405.mdxrcf254kuqekom@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Fri, Dec 23, 2016 at 11:47:51AM +0800, Elaine Zhang wrote:
+> Add binding documentation for the power domains
+> found on Rockchip RK3328 SoCs.
+> But RK3328 SoC just support idle, not support pd.
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> ---
+>  Documentation/devicetree/bindings/soc/rockchip/power_domain.txt | 3 +++
+>  1 file changed, 3 insertions(+)
 
-On Wed, 2016-12-21 at 05:30 +0200, Vladimir Zapolskiy wrote:
-> On 12/10/2016 01:51 AM, Vladimir Zapolskiy wrote:
-> > Hi Rob,
-> > 
-> > On 12/09/2016 11:41 PM, Rob Herring wrote:
-> >> On Mon, Dec 05, 2016 at 03:42:37AM +0200, Vladimir Zapolskiy wrote:
-> >>> NXP LPC32xx SoCs have two simple independent PWM controllers with a single
-> >>> output each, in this case there is no need to specify PWM channel argument
-> >>> on client side, one cell for setting PWM output frequency is sufficient.
-> >>>
-> >>> Another added to the description property 'clocks' has a standard meaning
-> >>> of a controller supply clock, in the LPC32xx User's Manual the clock is
-> >>> denoted as PWM1_CLK or PWM2_CLK clock.
-> >>>
-> >>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> >>> ---
-> >>>  Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt | 7 +++++++
-> >>>  1 file changed, 7 insertions(+)
-> >>>
-> >>> diff --git a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-> >>> index 74b5bc5..523d796 100644
-> >>> --- a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-> >>> +++ b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-> >>> @@ -3,15 +3,22 @@ LPC32XX PWM controller
-> >>>  Required properties:
-> >>>  - compatible: should be "nxp,lpc3220-pwm"
-> >>>  - reg: physical base address and length of the controller's registers
-> >>> +- clocks: clock phandle and clock specifier pair
-> >>> +- #pwm-cells: should be 1, the cell is used to specify the period in
-> >>> +  nanoseconds.
-> >>
-> >> This use of the cell is a bit odd as the period is s/w config and this 
-> >> would typically be a channel selection or such.
-> > 
-> > this is a classic PWM channel configuration property for PWM consumers
-> > described in DT, for instance PWM frequency for display panel backlight
-> > on boot.
-> > 
-> > I think >90% of PWM controllers with device tree bindings have this
-> > argument in #pwm-cells, from bindings/pwm/pwm.txt :
-> > 
-> >     pwm-specifier typically encodes the chip-relative PWM number and
-> >     the PWM period in nanoseconds.
-> > 
-> > You also may skim through phandle arguments of 'pwms' property,
-> > commonly the second argument is the requested frequency.
-> > 
-> > In this particular case I just drop PWM channel number, because
-> > the LPC32xx PWM controller has a single output channel.
-> > 
-> >> What if I want user specified/changed periods?
-> >>
-> > 
-> > The preset period still can be changed over sysfs in runtime.
-> 
-> Rob, have I managed to answer your questions?
-> 
-> If you accept my clarification, could you please ack the change?
-> 
-> --
-> With best wishes,
-> Vladimir
-> 
-ping
-
-Sylvain
+Acked-by: Rob Herring <robh@kernel.org>
