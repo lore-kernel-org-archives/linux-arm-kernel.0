@@ -1,37 +1,69 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Tue, 3 Jan 2017 23:11:19 +0900
-Subject: [PATCH v3 2/3] DT: bingdings: power: reset: add linkstation-reset
- doc
-In-Reply-To: <20170103131256.GB30197@lunn.ch>
-References: <20161216100501.18173-1-rogershimizu@gmail.com>
- <20161227070611.14852-1-rogershimizu@gmail.com>
- <20161227070611.14852-3-rogershimizu@gmail.com>
- <519e07d0-9b73-4445-ec5e-7ea2cbc1b814@gmail.com>
- <20170103131256.GB30197@lunn.ch>
-Message-ID: <CAEQ9gEnKSDefeF_5WVRiu8pw5gnBWRoqYgMufoowox1ArD6e7w@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 3 Jan 2017 15:22:06 +0100
+Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <BN3PR07MB25168573DD82F1681CDC8437C96E0@BN3PR07MB2516.namprd07.prod.outlook.com>
+References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
+ <BN3PR07MB2516815EDE69ACDCE27F81A3C96F0@BN3PR07MB2516.namprd07.prod.outlook.com>
+ <20170102113155.GA16373@localhost.localdomain>
+ <0717c63b-2e29-9ad1-7f01-39817980933f@atmel.com>
+ <20170102161359.GD3609@localhost.localdomain>
+ <CAFcVECK1vt7Hu4tgSZ2+kKpMxoT-wpikMDq65HaxRv-EMgobHA@mail.gmail.com>
+ <BN3PR07MB25168573DD82F1681CDC8437C96E0@BN3PR07MB2516.namprd07.prod.outlook.com>
+Message-ID: <bba29875-cc47-17a6-4104-5e8c46402f7d@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Florian, Andrew,
-
-Thanks for your comments!
-
-On Tue, Jan 3, 2017 at 10:12 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->> > +
->> > +Required Properties:
->> > +- compatible: Should be "linkstation,power-off"
->> > +- reg: Address and length of the register set for UART1
+Le 03/01/2017 ? 11:47, Rafal Ozieblo a ?crit :
+>> From: Harini Katakam [mailto:harinikatakamlinux at gmail.com] 
+>> Sent: 3 stycznia 2017 06:06
+>> Subject: Re: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
 >>
->> Humm, should we instead have a phandle to the uart1 node?
->
-> Probably. Again, this is to do with copying the QNAP driver. I was
-> young, new to device tree, and i just did a logical conversion of the
-> existing code, and did not at the time understand phandles, etc.
+>> Hi Richard,
+>>
+>> On Mon, Jan 2, 2017 at 9:43 PM, Richard Cochran <richardcochran@gmail.com> wrote:
+>>> On Mon, Jan 02, 2017 at 03:47:07PM +0100, Nicolas Ferre wrote:
+>>>> Le 02/01/2017 ? 12:31, Richard Cochran a ?crit :
+>>>>> This Cadence IP core is a complete disaster.
+>>>>
+>>>> Well, it evolved and propose several options to different SoC 
+>>>> integrators. This is not something unusual...
+>>>> I suspect as well that some other network adapters have the same 
+>>>> weakness concerning PTP timestamp in single register as the early 
+>>>> revisions of this IP.
+>>>
+>>> It appears that this core can neither latch the time on read or write, 
+>>> or even latch time stamps.  I have worked with many different PTP HW 
+>>> implementations, even early ones like on the ixp4xx, and it is no 
+>>> exaggeration to say that this one is uniquely broken.
+>>>
+>>>> I suspect that Rafal tend to jump too quickly to the latest IP 
+>>>> revisions and add more options to this series: let's not try to pour 
+>>>> too much things into this code right now.
+>>>
+>>> Why can't you check the IP version in the driver?
+>>
+>> There is an IP revision register but it would be probably be
+>> better to rely on "caps" from the compatibility strings - to cover SoC specific
+>> implementations. Also, when this extended BD is added (with timestamp),
+>> additional words will need to be added statically which will be
+>> consistent with Andrei's CONFIG_ checks.
+> We can distinguish IP cores with and without PTP support by reading
+> Design Configuration Register. But to distinguish IP cores with
+> timestamps in buffer descriptors and which support only event
+> registers, we can only check IP version by reading the revision ID
+> register and base on that.
+> I agree with Harini, compatibility strings could be better. But we
+> might end up with many different configuration in the future.
 
-Can you tell me where should I place this document?
-or simply remove it?
+Compatibility strings and associated configurations are cheap. It's not
+a problem to have many different configurations and clearer for this
+particular "composite" feature.
 
-Cheers,
+> We could use only descriptor approach but there are many Atmel's
+> cores on the market which support only event registers.
+
+Yes and once in silicon, it's hard to modify ;-)
+
+Regards,
 -- 
-Roger Shimizu, GMT +9 Tokyo
-PGP/GPG: 4096R/6C6ACD6417B3ACB1
+Nicolas Ferre
