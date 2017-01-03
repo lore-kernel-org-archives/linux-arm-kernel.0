@@ -1,19 +1,29 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 3 Jan 2017 21:10:26 +0100
-Subject: [PATCH v3] ARM: dts: turris-omnia: add support for ethernet switch
-In-Reply-To: <20170103193501.4827-1-uwe@kleine-koenig.org>
-References: <20170103152107.GA32450@lunn.ch>
- <20170103193501.4827-1-uwe@kleine-koenig.org>
-Message-ID: <20170103201026.GC8765@lunn.ch>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 3 Jan 2017 12:11:03 -0800
+Subject: [PATCH 2/4] ARM: dts: Add am335x-boneblack-wireless
+In-Reply-To: <CB5C8999-6CAE-41F6-85A6-D2A856BD8011@gmail.com>
+References: <20161227175837.28970-1-robertcnelson@gmail.com>
+ <20161227175837.28970-2-robertcnelson@gmail.com>
+ <CB5C8999-6CAE-41F6-85A6-D2A856BD8011@gmail.com>
+Message-ID: <20170103201103.GB25222@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 08:35:01PM +0100, Uwe Kleine-K?nig wrote:
-> The Turris Omnia features a Marvell MV88E6176 ethernet switch. Add it to
-> the dts.
+* Jason Kridner <jkridner@gmail.com> [161228 13:27]:
 > 
-> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> 
+> > On Dec 27, 2016, at 11:58 AM, Robert Nelson <robertcnelson@gmail.com> wrote:
+> > 
+> > BeagleBone Black Wireless is clone of the BeagleBone Black (BBB) with the Ethernet
+> > replaced by a TI wl1835 wireless module.
+> > 
+> > This board can be indentified by the BWAx value after A335BNLT (BBB) in the at24 eeprom:
+> > BWAx [aa 55 33 ee 41 33 33 35  42 4e 4c 54 42 57 41 35  |.U3.A335BNLTBWA5|]
+> 
+> I believe the correct statement is BWxx, but BWBx reserves the option to be software incompatible in some way. My preference is to have it boot anyway, but I believe that is only dependent in the bootloader. 
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+So does this patch need updating for that?
 
-    Andrew
+Regards,
+
+Tony
