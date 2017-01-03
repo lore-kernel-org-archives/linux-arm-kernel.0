@@ -1,34 +1,49 @@
-From: steve_longerbeam@mentor.com (Steve Longerbeam)
-Date: Tue, 3 Jan 2017 12:50:35 -0800
-Subject: [PATCH 00/20] i.MX Media Driver
-In-Reply-To: <CAOMZO5DM4aRwzCWkRoZLmbCxn155YL+CUR_gJyDh+FjzSKD3PQ@mail.gmail.com>
-References: <1483050455-10683-1-git-send-email-steve_longerbeam@mentor.com>
- <CAOMZO5DM4aRwzCWkRoZLmbCxn155YL+CUR_gJyDh+FjzSKD3PQ@mail.gmail.com>
-Message-ID: <183d9b6e-c195-128b-e74b-9103a3402dab@mentor.com>
+From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
+Date: Tue,  3 Jan 2017 21:52:38 +0100 (CET)
+Subject: [PATCH net-next v2 19/27] net/bpf_jit: ARM: split VLAN_PRESENT bit
+ handling from VLAN_TCI
+In-Reply-To: <cover.1483475202.git.mirq-linux@rere.qmqm.pl>
+References: <cover.1483475202.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <15c9c9a610e892b6639b04dd5cf1523091f6ac1d.1483475202.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+---
+ arch/arm/net/bpf_jit_32.c | 17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
 
-
-On 01/02/2017 01:09 PM, Fabio Estevam wrote:
-> Hi Steve,
->
-> On Thu, Dec 29, 2016 at 8:27 PM, Steve Longerbeam <slongerbeam@gmail.com> wrote:
->> This is a media driver for video capture on i.MX.
->>
->> Refer to Documentation/media/v4l-drivers/imx.rst for example capture
->> pipelines on SabreSD, SabreAuto, and SabreLite reference platforms.
->>
->> This patchset includes the OF graph layout as proposed by Philipp Zabel,
->> with only minor changes which are enumerated in the patch header.
-> Patches 13, 14 and 19 miss your Signed-off-by tag.
-
-thanks for catching. I've added them to version 2.
-
-Steve
-
->
-> Tested the whole series on a mx6qsabresd:
->
-> Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index 93d0b6d0b63e..6dbc60241f9d 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -915,17 +915,20 @@ static int build_body(struct jit_ctx *ctx)
+ 			emit(ARM_LDR_I(r_A, r_skb, off), ctx);
+ 			break;
+ 		case BPF_ANC | SKF_AD_VLAN_TAG:
+-		case BPF_ANC | SKF_AD_VLAN_TAG_PRESENT:
+ 			ctx->seen |= SEEN_SKB;
+ 			BUILD_BUG_ON(FIELD_SIZEOF(struct sk_buff, vlan_tci) != 2);
+ 			off = offsetof(struct sk_buff, vlan_tci);
+ 			emit(ARM_LDRH_I(r_A, r_skb, off), ctx);
+-			if (code == (BPF_ANC | SKF_AD_VLAN_TAG))
+-				OP_IMM3(ARM_AND, r_A, r_A, ~VLAN_TAG_PRESENT, ctx);
+-			else {
+-				OP_IMM3(ARM_LSR, r_A, r_A, 12, ctx);
+-				OP_IMM3(ARM_AND, r_A, r_A, 0x1, ctx);
+-			}
++#ifdef VLAN_TAG_PRESENT
++			OP_IMM3(ARM_AND, r_A, r_A, ~VLAN_TAG_PRESENT, ctx);
++#endif
++			break;
++		case BPF_ANC | SKF_AD_VLAN_TAG_PRESENT:
++			off = PKT_VLAN_PRESENT_OFFSET();
++			emit(ARM_LDRB_I(r_A, r_skb, off), ctx);
++			if (PKT_VLAN_PRESENT_BIT)
++				OP_IMM3(ARM_LSR, r_A, r_A, PKT_VLAN_PRESENT_BIT, ctx);
++			OP_IMM3(ARM_AND, r_A, r_A, 0x1, ctx);
+ 			break;
+ 		case BPF_ANC | SKF_AD_PKTTYPE:
+ 			ctx->seen |= SEEN_SKB;
+-- 
+2.11.0
