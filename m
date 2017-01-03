@@ -1,23 +1,25 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 3 Jan 2017 19:08:12 +0800
-Subject: [PATCH v4 2/3] soc: zte: pm_domains: Add support for zx296718
- board
-In-Reply-To: <1483426577-5470-2-git-send-email-baoyou.xie@linaro.org>
-References: <1483426577-5470-1-git-send-email-baoyou.xie@linaro.org>
- <1483426577-5470-2-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20170103110810.GZ20956@dragon>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Tue, 3 Jan 2017 12:14:47 +0100
+Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <BN3PR07MB25168573DD82F1681CDC8437C96E0@BN3PR07MB2516.namprd07.prod.outlook.com>
+References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
+ <BN3PR07MB2516815EDE69ACDCE27F81A3C96F0@BN3PR07MB2516.namprd07.prod.outlook.com>
+ <20170102113155.GA16373@localhost.localdomain>
+ <0717c63b-2e29-9ad1-7f01-39817980933f@atmel.com>
+ <20170102161359.GD3609@localhost.localdomain>
+ <CAFcVECK1vt7Hu4tgSZ2+kKpMxoT-wpikMDq65HaxRv-EMgobHA@mail.gmail.com>
+ <BN3PR07MB25168573DD82F1681CDC8437C96E0@BN3PR07MB2516.namprd07.prod.outlook.com>
+Message-ID: <20170103111447.GA26488@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 02:56:16PM +0800, Baoyou Xie wrote:
-> This patch introduces the power domain driver of zx296718
-> which belongs to zte's zx2967 family.
-> 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+On Tue, Jan 03, 2017 at 10:47:56AM +0000, Rafal Ozieblo wrote:
+> We could use only descriptor approach but there are many Atmel's cores on the market which support only event registers.
 
-It seems that none of the review comments I put on v3 [1] gets addressed
-in this version.  You missed them?
+As I said in my other reply in this thread, the Atmel cores cannot
+possibly be made to work correctly.
 
-Shawn
+Sad, but true.
 
-[1] http://www.spinics.net/lists/arm-kernel/msg547691.html
+Thanks,
+Richard
