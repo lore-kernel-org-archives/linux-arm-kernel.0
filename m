@@ -1,32 +1,36 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue,  3 Jan 2017 10:20:54 +0100
-Subject: [PATCH] drm/meson: Fix plane atomic check when no crtc for the plane
-Message-ID: <1483435254-27955-1-git-send-email-narmstrong@baylibre.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 3 Jan 2017 14:50:53 +0530
+Subject: [PATCH] ARM: davinci_all_defconfig: enable dumb vga-dac drm bridge
+In-Reply-To: <1480065182-7095-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1480065182-7095-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <213a0474-b548-88fb-062b-958a905d1ea7@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When no CRTC is associated with the plane, the meson_plane_atomic_check()
-call breaks the kernel with an Oops.
+On Friday 25 November 2016 02:43 PM, Bartosz Golaszewski wrote:
+> This enables the dumb-vga-dac driver by default for davinci boards.
+> 
+> The driver is needed for tilcdc support on da850-lcdk board.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/configs/davinci_all_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+> index b5e978f..ab1bf18 100644
+> --- a/arch/arm/configs/davinci_all_defconfig
+> +++ b/arch/arm/configs/davinci_all_defconfig
+> @@ -127,6 +127,8 @@ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+>  CONFIG_REGULATOR_TPS6507X=y
+>  CONFIG_DRM=m
+>  CONFIG_DRM_TILCDC=m
+> +CONFIG_DRM_BRIDGE=y
 
-Fixes: bbbe775ec5b5 ("drm: Add support for Amlogic Meson Graphic Controller")
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/gpu/drm/meson/meson_plane.c | 3 +++
- 1 file changed, 3 insertions(+)
+DRM_BRIDGE is a 'def_bool y'. So no need to explicitly enable it. And
+actually it will get dropped with the next savedefconfig refresh anyway.
 
-diff --git a/drivers/gpu/drm/meson/meson_plane.c b/drivers/gpu/drm/meson/meson_plane.c
-index 4942ca0..7890e30 100644
---- a/drivers/gpu/drm/meson/meson_plane.c
-+++ b/drivers/gpu/drm/meson/meson_plane.c
-@@ -51,6 +51,9 @@ static int meson_plane_atomic_check(struct drm_plane *plane,
- 	struct drm_crtc_state *crtc_state;
- 	struct drm_rect clip = { 0, };
- 
-+	if (!state->crtc)
-+		return 0;
-+
- 	crtc_state = drm_atomic_get_crtc_state(state->state, state->crtc);
- 	if (IS_ERR(crtc_state))
- 		return PTR_ERR(crtc_state);
--- 
-1.9.1
+Applying this patch with this line dropped.
+
+Thanks,
+Sekhar
