@@ -1,83 +1,108 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 3 Jan 2017 15:25:53 -0800
-Subject: [PATCHv6 00/11] CONFIG_DEBUG_VIRTUAL for arm64
-In-Reply-To: <edc8eaa2-5414-506c-1dad-f2404ef19c81@gmail.com>
-References: <1483464113-1587-1-git-send-email-labbott@redhat.com>
- <edc8eaa2-5414-506c-1dad-f2404ef19c81@gmail.com>
-Message-ID: <b3de65da-8a74-2510-268e-34516cc2de77@redhat.com>
+From: peter.senna@collabora.co.uk (Peter Senna Tschudin)
+Date: Tue, 03 Jan 2017 23:34:04 +0000
+Subject: =?utf-8?q?Re=3A?==?utf-8?q?_=5BPATCH?= V7 =?utf-8?q?1=2F4=5D?=
+ =?utf-8?q?_Documentation=2Fdevicetree=2Fbindings=3A?=
+ =?utf-8?q?_b850v3=5Flvds=5Fdp?=
+In-Reply-To: <20170103225127.jn36tatufdfz2k5q@rob-hp-laptop>
+Message-ID: <529b-586c3500-5-5e05b080@98620974>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2017 02:56 PM, Florian Fainelli wrote:
-> On 01/03/2017 09:21 AM, Laura Abbott wrote:
->> Happy New Year!
->>
->> This is a very minor rebase from v5. It only moves a few headers around.
->> I think this series should be ready to be queued up for 4.11.
-> 
-> FWIW:
-> 
-> Tested-by: Florian Fainelli <f.fainelli@gmail.com>
-> 
+ Hi Rob,
 
-Thanks!
+Thank you for the review.
 
-> How do we get this series included? I would like to get the ARM 32-bit
-> counterpart included as well (will resubmit rebased shortly), but I have
-> no clue which tree this should be going through.
+On 03 January, 2017 23:51 CET, Rob Herring <robh@kernel.org> wrote: 
+ 
+> On Sun, Jan 01, 2017 at 09:24:29PM +0100, Peter Senna Tschudin wrote:
+> > Devicetree bindings documentation for the GE B850v3 LVDS/DP++
+> > display bridge.
+> > 
+> > Cc: Martyn Welch <martyn.welch@collabora.co.uk>
+> > Cc: Martin Donnelly <martin.donnelly@ge.com>
+> > Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> > Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> > Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> > Cc: Rob Herring <robh@kernel.org>
+> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+> > ---
+> > There was an Acked-by from Rob Herring <robh@kernel.org> for V6, but I changed
+> > the bindings to use i2c_new_secondary_device() so I removed it from the commit
+> > message.
+> > 
+> >  .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 39 ++++++++++++++++++++++
 > 
+> Generally, bindings are not organized by vendor. Put in 
+> bindings/display/bridge/... instead.
 
-I was assuming this would go through the arm64 tree unless Catalin/Will
-have an objection to that.
+Will change that.
 
-> Thanks!
 > 
->>
->> Thanks,
->> Laura
->>
->> Laura Abbott (11):
->>   lib/Kconfig.debug: Add ARCH_HAS_DEBUG_VIRTUAL
->>   mm/cma: Cleanup highmem check
->>   arm64: Move some macros under #ifndef __ASSEMBLY__
->>   arm64: Add cast for virt_to_pfn
->>   mm: Introduce lm_alias
->>   arm64: Use __pa_symbol for kernel symbols
->>   drivers: firmware: psci: Use __pa_symbol for kernel symbol
->>   kexec: Switch to __pa_symbol
->>   mm/kasan: Switch to using __pa_symbol and lm_alias
->>   mm/usercopy: Switch to using lm_alias
->>   arm64: Add support for CONFIG_DEBUG_VIRTUAL
->>
->>  arch/arm64/Kconfig                        |  1 +
->>  arch/arm64/include/asm/kvm_mmu.h          |  4 +-
->>  arch/arm64/include/asm/memory.h           | 66 +++++++++++++++++++++----------
->>  arch/arm64/include/asm/mmu_context.h      |  6 +--
->>  arch/arm64/include/asm/pgtable.h          |  2 +-
->>  arch/arm64/kernel/acpi_parking_protocol.c |  3 +-
->>  arch/arm64/kernel/cpu-reset.h             |  2 +-
->>  arch/arm64/kernel/cpufeature.c            |  3 +-
->>  arch/arm64/kernel/hibernate.c             | 20 +++-------
->>  arch/arm64/kernel/insn.c                  |  2 +-
->>  arch/arm64/kernel/psci.c                  |  3 +-
->>  arch/arm64/kernel/setup.c                 |  9 +++--
->>  arch/arm64/kernel/smp_spin_table.c        |  3 +-
->>  arch/arm64/kernel/vdso.c                  |  8 +++-
->>  arch/arm64/mm/Makefile                    |  2 +
->>  arch/arm64/mm/init.c                      | 12 +++---
->>  arch/arm64/mm/kasan_init.c                | 22 +++++++----
->>  arch/arm64/mm/mmu.c                       | 33 ++++++++++------
->>  arch/arm64/mm/physaddr.c                  | 30 ++++++++++++++
->>  arch/x86/Kconfig                          |  1 +
->>  drivers/firmware/psci.c                   |  2 +-
->>  include/linux/mm.h                        |  4 ++
->>  kernel/kexec_core.c                       |  2 +-
->>  lib/Kconfig.debug                         |  5 ++-
->>  mm/cma.c                                  | 15 +++----
->>  mm/kasan/kasan_init.c                     | 15 +++----
->>  mm/usercopy.c                             |  4 +-
->>  27 files changed, 180 insertions(+), 99 deletions(-)
->>  create mode 100644 arch/arm64/mm/physaddr.c
->>
+> >  1 file changed, 39 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+> > new file mode 100644
+> > index 0000000..1bc6ebf
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+> > @@ -0,0 +1,39 @@
+> > +Driver for GE B850v3 LVDS/DP++ display bridge
+> > +
+> > +Required properties:
+> > +  - compatible : should be "ge,b850v3-lvds-dp".
 > 
+> Isn't '-lvds-dp' redundant? The part# should be enough.
+
+b850v3 is the name of the product, this is why the proposed name. What about, b850v3-dp2 dp2 indicating the second DP output?
+
 > 
+> > +  - reg : should contain the main address which is used to ack the
+> > +    interrupts and address for edid.
+> > +  - reg-names : comma separeted list of register names. Valid values
+> 
+> s/separeted/separated/
+
+argh, sorry for this. Will fix it.
+
+> 
+> > +    are "main", and "edid".
+> > +  - interrupt-parent : phandle of the interrupt controller that services
+> > +    interrupts to the device
+> > +  - interrupts : one interrupt should be described here, as in
+> > +    <0 IRQ_TYPE_LEVEL_HIGH>.
+> > +  - port : should describe the video signal connection between the host
+> > +    and the bridge.
+> > +
+> > +Example:
+> > +
+> > +&mux2_i2c2 {
+> > +	status = "okay";
+> > +	clock-frequency = <100000>;
+> > +
+> > +	b850v3-lvds-dp-bridge at 73  {
+> > +		compatible = "ge,b850v3-lvds-dp";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		reg = <0x73 0x72>;
+> > +		reg-names = "main", "edid";
+> > +
+> > +		interrupt-parent = <&gpio2>;
+> > +		interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
+> > +
+> > +		port {
+> > +			b850v3_dp_bridge_in: endpoint {
+> > +				remote-endpoint = <&lvds0_out>;
+> > +			};
+> > +		};
+> > +	};
+> > +};
+> > -- 
+> > 2.5.5
+> > 
+ 
+ 
+ 
+ 
