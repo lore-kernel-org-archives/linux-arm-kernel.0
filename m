@@ -1,37 +1,52 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 3 Jan 2017 13:18:29 -0800
-Subject: [PATCH] rtc: armada38x: add __ro_after_init to armada38x_rtc_ops
-In-Reply-To: <20170102140654.GF14217@n2100.armlinux.org.uk>
-References: <1482751862-18699-1-git-send-email-bhumirks@gmail.com>
- <20170102140654.GF14217@n2100.armlinux.org.uk>
-Message-ID: <CAGXu5jJLA=GcOhV5Z_6AOGa1KhW7fXtqBGrewEeViaJ9TiE-aw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Jan 2017 22:19:29 +0100
+Subject: [PATCH 2/2] isdn: i4l: move active-isdn drivers to staging
+In-Reply-To: <20170103152436.GA26156@kroah.com>
+References: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
+ <1456945629-1793533-2-git-send-email-arnd@arndb.de>
+ <20170103152436.GA26156@kroah.com>
+Message-ID: <3286019.I2UkVCJq41@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 2, 2017 at 6:06 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Mon, Dec 26, 2016 at 05:01:02PM +0530, Bhumika Goyal wrote:
->> The object armada38x_rtc_ops of type rtc_class_ops structure is not
->> modified after getting initialized by armada38x_rtc_probe. Apart from
->> getting referenced in init it is also passed as an argument to the function
->> devm_rtc_device_register but this argument is of type const struct
->> rtc_class_ops *. Therefore add __ro_after_init to its declaration.
->
-> What I'd prefer here is for the structure to be duplicated, with one
-> copy having the alarm methods and one which does not.  Both can then
-> be made "const" (so placed into the read-only section at link time)
-> and the probe function select between the two.
->
-> I think that's a cleaner and better solution, even though it's
-> slightly larger.
->
-> I'm not a fan of __ro_after_init being used where other solutions are
-> possible.
+On Tuesday, January 3, 2017 4:24:36 PM CET Greg Kroah-Hartman wrote:
+> On Wed, Mar 02, 2016 at 08:06:46PM +0100, Arnd Bergmann wrote:
+> > The icn, act2000 and pcbit drivers are all for very old hardware,
+> > and it is highly unlikely that anyone is actually still using them
+> > on modern kernels, if at all.
+> > 
+> > All three drivers apparently are for hardware that predates PCI
+> > being the common connector, as they are ISA-only and active
+> > PCI ISDN cards were widely available in the 1990s.
+> > 
+> > Looking through the git logs, it I cannot find any indication of a
+> > patch to any of these drivers that has been tested on real hardware,
+> > only cleanups or global API changes.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Acked-by: Karsten Keil <isdn@linux-pingi.de>
+> 
+> This patch got added in the 4.6 kernel release.  As I am now taking
+> patches for 4.11-rc1, I figure it is time to just delete the
+> drivers/staging/i4l/ directory now, given that no one has really done
+> anything with it.  If people show up that wish to maintain it, I'll be
+> glad to revert it, or if someone really screams in the next week.
+> Otherwise it's time to just move on 
 
-Can the pointer that points to the struct rtc_class_ops be made ro_after_init?
+Sounds good to me. My original series contained four more patches that
+I did not post again after there was some concern[1] that we did not
+come to a conclusion on:
 
--Kees
+isdn: gigaset: remove i4l code
+isdn: move isdnhdlc out of i4l
+isdn: i4l: move hisax driver to staging
+isdn: move i4l to staging
 
--- 
-Kees Cook
-Nexus Security
+I can post those as well, at least I think the first two are helpful
+for untangling i4l from the rest of ISDN.  I also still think that
+moving hisax and i4l to staging is reasonable given the state of
+that code, even if there are a couple of users today.
+
+	Arnd
+
+[1] https://lkml.org/lkml/2016/3/4/762
