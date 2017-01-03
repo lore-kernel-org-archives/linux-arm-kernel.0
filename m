@@ -1,114 +1,62 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Tue, 3 Jan 2017 10:27:22 -0800
-Subject: [RFC, PATCHv2 29/29] mm, x86: introduce RLIMIT_VADDR
-In-Reply-To: <20170103160457.GB17319@node.shutemov.name>
-References: <20161227015413.187403-1-kirill.shutemov@linux.intel.com>
- <20161227015413.187403-30-kirill.shutemov@linux.intel.com>
- <2736959.3MfCab47fD@wuerfel>
- <CALCETrV_qejd-Ozqo4vTqz=LuukMUPeQ7EVUQbfTxs_xNbO3oQ@mail.gmail.com>
- <20170103160457.GB17319@node.shutemov.name>
-Message-ID: <CALCETrW3=SsQeC-gWOVqwTtg022+gHei=xfUc2ei3kkX0CACpg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue,  3 Jan 2017 18:27:01 +0000
+Subject: [PATCH] arm64: restore get_current() optimisation
+Message-ID: <1483468021-8237-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 3, 2017 at 8:04 AM, Kirill A. Shutemov <kirill@shutemov.name> wrote:
-> On Mon, Jan 02, 2017 at 10:08:28PM -0800, Andy Lutomirski wrote:
->> On Mon, Jan 2, 2017 at 12:44 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Tuesday, December 27, 2016 4:54:13 AM CET Kirill A. Shutemov wrote:
->> >> As with other resources you can set the limit lower than current usage.
->> >> It would affect only future virtual address space allocations.
->>
->> I still don't buy all these use cases:
->>
->> >>
->> >> Use-cases for new rlimit:
->> >>
->> >>   - Bumping the soft limit to RLIM_INFINITY, allows current process all
->> >>     its children to use addresses above 47-bits.
->>
->> OK, I get this, but only as a workaround for programs that make
->> assumptions about the address space and don't use some mechanism (to
->> be designed?) to work correctly in spite of a larger address space.
->
-> I guess you've misread the case. It's opt-in for large adrress space, not
-> other way around.
->
-> I believe 47-bit VA by default is right way to go to make the transition
-> without breaking userspace.
+Hi Catalin,
 
-What I meant was: setting the rlimit to anything other than -1ULL is a
-workaround, but otherwise I agree.  This still makes little sense if
-set by PAM or other conventional rlimit tools.
+My THREAD_INFO_IN_TASK series had an unintended performance regression in
+get_current() / current_thread_info(). Could you please take the below as a
+fix for the next rc?
 
->> >>
->> >>   - Lowering the hard limit to 47-bits would prevent current process all
->> >>     its children to use addresses above 47-bits, unless a process has
->> >>     CAP_SYS_RESOURCES.
->>
->> I've tried and I can't imagine any reason to do this.
->
-> That's just if something went wrong and we want to stop an application
-> from use addresses above 47-bit.
+Thanks,
+Mark.
 
-But CAP_SYS_RESOURCES still makes no sense in this context.
+---->8----
+Commit c02433dd6de32f04 ("arm64: split thread_info from task stack")
+inverted the relationship between get_current() and
+current_thread_info(), with sp_el0 now holding the current task_struct
+rather than the current thead_info. The new implementation of
+get_current() prevents the compiler from being able to optimize repeated
+calls to either, resulting in a noticeable penalty in some
+microbenchmarks.
 
->
->> >>   - It?s also can be handy to lower hard or soft limit to arbitrary
->> >>     address. User-mode emulation in QEMU may lower the limit to 32-bit
->> >>     to emulate 32-bit machine on 64-bit host.
->>
->> I don't understand.  QEMU user-mode emulation intercepts all syscalls.
->> What QEMU would *actually* want is a way to say "allocate me some
->> memory with the high N bits clear".  mmap-via-int80 on x86 should be
->> fixed to do this, but a new syscall with an explicit parameter would
->> work, as would a prctl changing the current limit.
->
-> Look at mess in mmap_find_vma(). QEmu has to guess where is free virtual
-> memory. That's unnessesary complex.
->
-> prctl would work for this too. new-mmap would *not*: there are more ways
-> to allocate vitual address space: shmat(), mremap(). Changing all of them
-> just for this is stupid.
+This patch restores the previous optimisation by implementing
+get_current() in the same way as our old current_thread_info(), using a
+non-volatile asm statement.
 
-Fair enough.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: Davidlohr Bueso <dbueso@suse.de>
+---
+ arch/arm64/include/asm/current.h | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-Except that mmap-via-int80, shmat-via-int80, etc should still work (if
-I understand what qemu needs correctly), as would the prctl.
-
->
->> >>
->> >> TODO:
->> >>   - port to non-x86;
->> >>
->> >> Not-yet-signed-off-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
->> >> Cc: linux-api at vger.kernel.org
->> >
->> > This seems to nicely address the same problem on arm64, which has
->> > run into the same issue due to the various page table formats
->> > that can currently be chosen at compile time.
->>
->> On further reflection, I think this has very little to do with paging
->> formats except insofar as paging formats make us notice the problem.
->> The issue is that user code wants to be able to assume an upper limit
->> on an address, and it gets an upper limit right now that depends on
->> architecture due to paging formats.  But someone really might want to
->> write a *portable* 64-bit program that allocates memory with the high
->> 16 bits clear.  So let's add such a mechanism directly.
->>
->> As a thought experiment, what if x86_64 simply never allocated "high"
->> (above 2^47-1) addresses unless a new mmap-with-explicit-limit syscall
->> were used?  Old glibc would continue working.  Old VMs would work.
->> New programs that want to use ginormous mappings would have to use the
->> new syscall.  This would be totally stateless and would have no issues
->> with CRIU.
->
-> Except, we need more than mmap as I mentioned.
->
-> And what about stack? I'm not sure that everybody would be happy with
-> stack in the middle of address space.
-
-I would, personally.  I think that, for very large address spaces, we
-should allocate a large block of stack and get rid of the "stack grows
-down forever" legacy idea.  Then we would never need to worry about
-the stack eventually hitting some other allocation.  And 2^57 bytes is
-hilariously large for a default stack.
+diff --git a/arch/arm64/include/asm/current.h b/arch/arm64/include/asm/current.h
+index f2bcbe2..86c4041 100644
+--- a/arch/arm64/include/asm/current.h
++++ b/arch/arm64/include/asm/current.h
+@@ -9,9 +9,17 @@
+ 
+ struct task_struct;
+ 
++/*
++ * We don't use read_sysreg() as we want the compiler to cache the value where
++ * possible.
++ */
+ static __always_inline struct task_struct *get_current(void)
+ {
+-	return (struct task_struct *)read_sysreg(sp_el0);
++	unsigned long sp_el0;
++
++	asm ("mrs %0, sp_el0" : "=r" (sp_el0));
++
++	return (struct task_struct *)sp_el0;
+ }
+ 
+ #define current get_current()
+-- 
+1.9.1
