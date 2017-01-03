@@ -1,52 +1,57 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  3 Jan 2017 18:10:19 +0000
-Subject: [RFC PATCH 02/10] arm64: cpufeature: Don't enforce system-wide SPE
- capability
+Date: Tue,  3 Jan 2017 18:10:21 +0000
+Subject: [RFC PATCH 04/10] arm64: head.S: Enable EL1 (host) access to SPE when
+ entered at EL2
 In-Reply-To: <1483467027-14547-1-git-send-email-will.deacon@arm.com>
 References: <1483467027-14547-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1483467027-14547-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1483467027-14547-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The statistical profiling extension (SPE) is an optional feature of
-ARMv8.1 and is unlikely to be supported by all of the CPUs in a
-heterogeneous system.
+The SPE architecture requires each exception level to enable access
+to the SPE controls for the exception level below it, since additional
+context-switch logic may be required to handle the buffer safely.
 
-This patch updates the cpufeature checks so that such systems are not
-tainted as unsupported.
+This patch allows EL1 (host) access to the SPE controls when entered at
+EL2.
 
-Reviewed-by: Suzuki Poulose <suzuki.poulose@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/sysreg.h | 1 +
- arch/arm64/kernel/cpufeature.c  | 3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/head.S | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 98ae03f8eedd..e156e7793a65 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -190,6 +190,7 @@
- #define ID_AA64MMFR2_CNP_SHIFT		0
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 4b1abac3485a..6a97831dcf3b 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -592,8 +592,8 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
+ #endif
  
- /* id_aa64dfr0 */
-+#define ID_AA64DFR0_PMSVER_SHIFT	32
- #define ID_AA64DFR0_CTX_CMPS_SHIFT	28
- #define ID_AA64DFR0_WRPS_SHIFT		20
- #define ID_AA64DFR0_BRPS_SHIFT		12
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 47d0226620e8..c18eb78d3a00 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -180,7 +180,8 @@ static const struct arm64_ftr_bits ftr_id_mmfr0[] = {
- };
+ 	/* EL2 debug */
+-	mrs	x0, id_aa64dfr0_el1		// Check ID_AA64DFR0_EL1 PMUVer
+-	sbfx	x0, x0, #8, #4
++	mrs	x1, id_aa64dfr0_el1		// Check ID_AA64DFR0_EL1 PMUVer
++	sbfx	x0, x1, #8, #4
+ 	cmp	x0, #1
+ 	b.lt	4f				// Skip if no PMU present
+ 	mrs	x0, pmcr_el0			// Disable debug access traps
+@@ -601,6 +601,16 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
+ 4:
+ 	csel	x0, xzr, x0, lt			// all PMU counters from EL1
+ 	msr	mdcr_el2, x0			// (if they exist)
++	/* Statistical profiling */
++	ubfx	x0, x1, #32, #4			// Check ID_AA64DFR0_EL1 PMSVer
++	cbz	x0, 5f				// Skip if SPE not present
++	mrs	x0, mdcr_el2			// Preserve HPMN field
++	cmp	x2, xzr				// If VHE is not enabled,
++	mov	x1, #3				// use EL1&0 translations,
++	cinc	x1, x1, ne			// otherwise use EL2 and
++	bfi	x0, x1, #12, #3			// enable/disable access
++	msr	mdcr_el2, x0			// traps accordingly.
++5:
  
- static const struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
-+	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 36, 28, 0),
-+	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64DFR0_PMSVER_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
+ 	/* Stage-2 translation */
+ 	msr	vttbr_el2, xzr
 -- 
 2.1.4
