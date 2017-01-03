@@ -1,159 +1,35 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Tue, 3 Jan 2017 10:48:04 +0000
-Subject: [PATCH 3/5] arm64: dts: sun50i: add MMC nodes
-In-Reply-To: <CAGb2v65GJFTnQZtWHCS7CAtA+Dry94o77aakPLr938BpQksLog@mail.gmail.com>
-References: <1483398226-29321-1-git-send-email-andre.przywara@arm.com>
- <1483398226-29321-4-git-send-email-andre.przywara@arm.com>
- <CAGb2v65GJFTnQZtWHCS7CAtA+Dry94o77aakPLr938BpQksLog@mail.gmail.com>
-Message-ID: <d4c2233c-95aa-4d72-1501-9ecb62f6cd82@arm.com>
+From: harinikatakamlinux@gmail.com (Harini Katakam)
+Date: Tue, 3 Jan 2017 16:18:58 +0530
+Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <20170103102958.GC24780@localhost.localdomain>
+References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
+ <BN3PR07MB2516815EDE69ACDCE27F81A3C96F0@BN3PR07MB2516.namprd07.prod.outlook.com>
+ <20170102113155.GA16373@localhost.localdomain>
+ <0717c63b-2e29-9ad1-7f01-39817980933f@atmel.com>
+ <20170102161359.GD3609@localhost.localdomain>
+ <CAFcVECK1vt7Hu4tgSZ2+kKpMxoT-wpikMDq65HaxRv-EMgobHA@mail.gmail.com>
+ <20170103102958.GC24780@localhost.localdomain>
+Message-ID: <CAFcVECLqnOx9cJay_2j1QPwUpE5PrLYf28Sh43D-Otz_Z35Q3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/17 02:52, Chen-Yu Tsai wrote:
+Hi Richard,
 
-Hi,
+On Tue, Jan 3, 2017 at 3:59 PM, Richard Cochran
+<richardcochran@gmail.com> wrote:
+> On Tue, Jan 03, 2017 at 10:36:11AM +0530, Harini Katakam wrote:
+>> I understand that it is not accurate - it is an initial version.
+>
+> Why do you say, "it is an initial version?"
+>
+> The Atmel device has this IP core burned in.  The core is hopelessly
+> broken, and it cannot be fixed in SW either, so what is your point?
+>
 
-> On Tue, Jan 3, 2017 at 7:03 AM, Andre Przywara <andre.przywara@arm.com> wrote:
-> 
-> A commit message explaining the mmc controllers would be nice.
+I'm sorry - I just meant that this was before many necessary
+enhancements and fixes.
+Newer SoCs including ZynqMP (for which the original series was sent)
+have the descriptor based approach which is reliable.
 
-OK.
-
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 67 +++++++++++++++++++++++++++
->>  1 file changed, 67 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->> index e0dcab8..c680566 100644
->> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->> @@ -150,6 +150,32 @@
->>                                 pins = "PB8", "PB9";
->>                                 function = "uart0";
->>                         };
->> +
->> +                       mmc0_pins: mmc0 at 0 {
->> +                               pins = "PF0", "PF1", "PF2", "PF3", "PF4", "PF5";
->> +                               function = "mmc0";
->> +                               drive-strength = <30>;
->> +                       };
->> +
->> +                       mmc0_default_cd_pin: mmc0_cd_pin at 0 {
->> +                               pins = "PF6";
->> +                               function = "gpio_in";
->> +                               bias-pull-up;
->> +                       };
-> 
-> We are starting to drop pinmux nodes for gpio usage.
-
-And replacing them with what?
-Or do you mean they go in the individual board .dts files?
-In this case I believe having a default pin defined here would help to
-define it in every .dts.
-
->> +
->> +                       mmc1_pins: mmc1 at 0 {
->> +                               pins = "PG0", "PG1", "PG2", "PG3", "PG4", "PG5";
->> +                               function = "mmc1";
->> +                               drive-strength = <30>;
->> +                       };
->> +
->> +                       mmc2_pins: mmc2 at 0 {
->> +                               pins = "PC1", "PC5", "PC6", "PC8", "PC9",
->> +                                      "PC10", "PC11", "PC12", "PC13", "PC14",
->> +                                      "PC15", "PC16";
->> +                               function = "mmc2";
->> +                               drive-strength = <30>;
->> +                       };
-> 
-> Moreover I think you should split out the pinmux nodes to a separate patch.
-
-I can surely do, just wondering what's the rationale is behind that?
-
-> 
->>                 };
->>
->>                 uart0: serial at 1c28000 {
->> @@ -240,6 +266,47 @@
->>                         #size-cells = <0>;
->>                 };
->>
->> +               mmc0: mmc at 1c0f000 {
->> +                       compatible = "allwinner,sun50i-a64-mmc",
->> +                                    "allwinner,sun5i-a13-mmc";
-> 
-> Given that sun5i doesn't support mmc delay timings, and the A64 has
-> calibration and delay timings, I wouldn't call them compatible.
-> 
-> Or are you claiming that for the A64 has a delay of 0 for the
-> currently supported speeds, so the calibration doesn't really
-> matter? If so this should be mentioned in the commit message.
-
-Yes, that's my observation: Driving it with sun5-a13-mmc just works.
-This sun5i driver version does not (and will never) support higher
-transfer modes anyway, so for that subset they are compatible. This
-opens up the door to other operating systems not having a particular
-driver for the A64, for instance, also older Linux kernels.
-I know that sunxi doesn't use this compatible feature much, but IMHO we
-should really start thinking about the DT not just being Linux specific
-- or even being specific to a certain Linux version. And this case here
-is a good example: An A13 MMC driver can drive this device - if there is
-no better driver (an A64 one) available.
-
-> 
->> +                       reg = <0x01c0f000 0x1000>;
->> +                       clocks = <&ccu 31>, <&ccu 75>;
-> 
-> The clock / reset index macros are in the tree now.
-> Please switch to them.
-
-The include file is in the tree, but it isn't used in the current HEAD
-(as in #included and the actual macros being used in the .dtsi).
-So I was wondering if there is a patch pending for that?
-
-Cheers,
-Andre
-
->> +                       clock-names = "ahb", "mmc";
->> +                       resets = <&ccu 8>;
->> +                       reset-names = "ahb";
->> +                       interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
->> +                       status = "disabled";
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +               };
->> +
->> +               mmc1: mmc at 1c10000 {
->> +                       compatible = "allwinner,sun50i-a64-mmc",
->> +                                    "allwinner,sun5i-a13-mmc";
->> +                       reg = <0x01c10000 0x1000>;
->> +                       clocks = <&ccu 32>, <&ccu 76>;
->> +                       clock-names = "ahb", "mmc";
->> +                       resets = <&ccu 9>;
->> +                       reset-names = "ahb";
->> +                       interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
->> +                       status = "disabled";
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +               };
->> +
->> +               mmc2: mmc at 1c11000 {
->> +                       compatible = "allwinner,sun50i-a64-emmc";
->> +                       reg = <0x01c11000 0x1000>;
->> +                       clocks = <&ccu 33>, <&ccu 77>;
->> +                       clock-names = "ahb", "mmc";
->> +                       resets = <&ccu 10>;
->> +                       reset-names = "ahb";
->> +                       interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
->> +                       status = "disabled";
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +               };
->> +
->>                 gic: interrupt-controller at 1c81000 {
->>                         compatible = "arm,gic-400";
->>                         reg = <0x01c81000 0x1000>,
->> --
->> 2.8.2
->>
+Regards,
+Harini
