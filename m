@@ -1,66 +1,54 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 3 Jan 2017 09:57:34 -0700
-Subject: [PATCH] coresight: etm4x: Fix enabling of cycle accurate tracing
- in perf.
-In-Reply-To: <1483397719-22235-1-git-send-email-mike.leach@linaro.org>
-References: <1483397719-22235-1-git-send-email-mike.leach@linaro.org>
-Message-ID: <20170103165734.GA3775@linaro.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 3 Jan 2017 18:59:20 +0200
+Subject: [PATCH 2/4] input: tm2-touchkey: Add touchkey driver support for
+ TM2
+In-Reply-To: <1483430237-26823-3-git-send-email-jcsing.lee@samsung.com>
+References: <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
+ <CGME20170103075733epcas5p4a065198d4abf35081024af95055c67d2@epcas5p4.samsung.com>
+ <1483430237-26823-3-git-send-email-jcsing.lee@samsung.com>
+Message-ID: <20170103165920.4tmpr3skgzb2dfah@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2017 at 10:55:19PM +0000, Mike Leach wrote:
-> Using perf record 'cyclacc' option in cs_etm event was not setting up cycle
-> accurate trace correctly.
+On Tue, Jan 03, 2017 at 04:57:15PM +0900, Jaechul Lee wrote:
+> This patch adds support for the TM2 touch key and led
+> functionlity.
 > 
-> Corrects bit set in TRCCONFIGR to enable cycle accurate trace.
-> Programs TRCCCCTLR with a valid threshold value as required by ETMv4 spec.
-
-This look good - just a tiny blip below.
-
+> The driver interfaces with userspace through an input device and
+> reports KEY_PHONE and KEY_BACK event types. LED brightness can be
+> controlled by "/sys/class/leds/tm2-touchkey/brightness".
 > 
-> Signed-off-by: Mike Leach <mike.leach@linaro.org>
+> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
+> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
 > ---
->  drivers/hwtracing/coresight/coresight-etm4x.c | 7 +++++--
->  drivers/hwtracing/coresight/coresight-etm4x.h | 1 +
->  2 files changed, 6 insertions(+), 2 deletions(-)
+>  drivers/input/keyboard/Kconfig        |  11 ++
+>  drivers/input/keyboard/Makefile       |   1 +
+>  drivers/input/keyboard/tm2-touchkey.c | 326 ++++++++++++++++++++++++++++++++++
+>  3 files changed, 338 insertions(+)
+>  create mode 100644 drivers/input/keyboard/tm2-touchkey.c
 > 
-> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-> index 4db8d6a..07be032 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm4x.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-> @@ -216,8 +216,11 @@ static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
->  		goto out;
+> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+> index cbd75cf..72c0ba1 100644
+> --- a/drivers/input/keyboard/Kconfig
+> +++ b/drivers/input/keyboard/Kconfig
+> @@ -666,6 +666,17 @@ config KEYBOARD_TC3589X
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called tc3589x-keypad.
 >  
->  	/* Go from generic option to ETMv4 specifics */
-> -	if (attr->config & BIT(ETM_OPT_CYCACC))
-> -		config->cfg |= ETMv4_MODE_CYCACC;
-> +	if (attr->config & BIT(ETM_OPT_CYCACC)) {
-> +		config->cfg |= BIT(4);
-> +		/* TRM: Must program this for cycacc to work */
-> +		config->ccctlr = ETM_CYC_THRESHOLD_DEFAULT;
-> +	}
->  	if (attr->config & BIT(ETM_OPT_TS))
->  		config->cfg |= ETMv4_MODE_TIMESTAMP;
->  
-> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
-> index ba8d3f8..8a62c6c 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm4x.h
-> +++ b/drivers/hwtracing/coresight/coresight-etm4x.h
-> @@ -146,6 +146,7 @@
->  #define ETM_ARCH_V4			0x40
->  #define ETMv4_SYNC_MASK			0x1F
->  #define ETM_CYC_THRESHOLD_MASK		0xFFF
-> +#define ETM_CYC_THRESHOLD_DEFAULT       256
+> +config KEYBOARD_TM2_TOUCHKEY
+> +	tristate "tm2-touchkey support"
+> +	depends on I2C
+> +	help
+> +	  Say Y here to enable the tm2-touchkey.
 
-If only to be consistent with the rest of the defines, please write this value
-in base-16.
+The ending full stop is not needed.
 
-Thanks,
-Mathieu
+> +	  touchkey driver for tm2. This driver can enable
+> +	  the interrupt and make input events and control led brightness.
 
->  #define ETMv4_EVENT_MASK		0xFF
->  #define ETM_CNTR_MAX_VAL		0xFFFF
->  #define ETM_TRACEID_MASK		0x3f
-> -- 
-> 2.7.4
-> 
+This sentence needs improvements. How about just:
+"Beside input device, this driver provides also brightness control for
+LEDs on touch keys."
+
+Best regards,
+Krzysztof
