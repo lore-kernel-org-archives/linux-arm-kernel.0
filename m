@@ -1,129 +1,33 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 3 Jan 2017 10:52:12 +0800
-Subject: [PATCH 3/5] arm64: dts: sun50i: add MMC nodes
-In-Reply-To: <1483398226-29321-4-git-send-email-andre.przywara@arm.com>
-References: <1483398226-29321-1-git-send-email-andre.przywara@arm.com>
- <1483398226-29321-4-git-send-email-andre.przywara@arm.com>
-Message-ID: <CAGb2v65GJFTnQZtWHCS7CAtA+Dry94o77aakPLr938BpQksLog@mail.gmail.com>
+From: b18965@freescale.com (Alison Wang)
+Date: Tue, 3 Jan 2017 10:41:05 +0800
+Subject: [PATCH v2 1/2] mtd: ifc: Update dependency of IFC for LS1021A
+Message-ID: <1483411266-45875-1-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+As Freescale/NXP IFC controller is available on LS1021A, the dependency
+for LS1021A is added.
 
-On Tue, Jan 3, 2017 at 7:03 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+Signed-off-by: Alison Wang <alison.wang@nxp.com>
+---
+Changes in v2:
+- New patch
 
-A commit message explaining the mmc controllers would be nice.
+ drivers/memory/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 67 +++++++++++++++++++++++++++
->  1 file changed, 67 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index e0dcab8..c680566 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -150,6 +150,32 @@
->                                 pins = "PB8", "PB9";
->                                 function = "uart0";
->                         };
-> +
-> +                       mmc0_pins: mmc0 at 0 {
-> +                               pins = "PF0", "PF1", "PF2", "PF3", "PF4", "PF5";
-> +                               function = "mmc0";
-> +                               drive-strength = <30>;
-> +                       };
-> +
-> +                       mmc0_default_cd_pin: mmc0_cd_pin at 0 {
-> +                               pins = "PF6";
-> +                               function = "gpio_in";
-> +                               bias-pull-up;
-> +                       };
-
-We are starting to drop pinmux nodes for gpio usage.
-
-> +
-> +                       mmc1_pins: mmc1 at 0 {
-> +                               pins = "PG0", "PG1", "PG2", "PG3", "PG4", "PG5";
-> +                               function = "mmc1";
-> +                               drive-strength = <30>;
-> +                       };
-> +
-> +                       mmc2_pins: mmc2 at 0 {
-> +                               pins = "PC1", "PC5", "PC6", "PC8", "PC9",
-> +                                      "PC10", "PC11", "PC12", "PC13", "PC14",
-> +                                      "PC15", "PC16";
-> +                               function = "mmc2";
-> +                               drive-strength = <30>;
-> +                       };
-
-Moreover I think you should split out the pinmux nodes to a separate patch.
-
->                 };
->
->                 uart0: serial at 1c28000 {
-> @@ -240,6 +266,47 @@
->                         #size-cells = <0>;
->                 };
->
-> +               mmc0: mmc at 1c0f000 {
-> +                       compatible = "allwinner,sun50i-a64-mmc",
-> +                                    "allwinner,sun5i-a13-mmc";
-
-Given that sun5i doesn't support mmc delay timings, and the A64 has
-calibration and delay timings, I wouldn't call them compatible.
-
-Or are you claiming that for the A64 has a delay of 0 for the
-currently supported speeds, so the calibration doesn't really
-matter? If so this should be mentioned in the commit message.
-
-> +                       reg = <0x01c0f000 0x1000>;
-> +                       clocks = <&ccu 31>, <&ccu 75>;
-
-The clock / reset index macros are in the tree now.
-Please switch to them.
-
-ChenYu
-
-> +                       clock-names = "ahb", "mmc";
-> +                       resets = <&ccu 8>;
-> +                       reset-names = "ahb";
-> +                       interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
-> +                       status = "disabled";
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +               };
-> +
-> +               mmc1: mmc at 1c10000 {
-> +                       compatible = "allwinner,sun50i-a64-mmc",
-> +                                    "allwinner,sun5i-a13-mmc";
-> +                       reg = <0x01c10000 0x1000>;
-> +                       clocks = <&ccu 32>, <&ccu 76>;
-> +                       clock-names = "ahb", "mmc";
-> +                       resets = <&ccu 9>;
-> +                       reset-names = "ahb";
-> +                       interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
-> +                       status = "disabled";
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +               };
-> +
-> +               mmc2: mmc at 1c11000 {
-> +                       compatible = "allwinner,sun50i-a64-emmc";
-> +                       reg = <0x01c11000 0x1000>;
-> +                       clocks = <&ccu 33>, <&ccu 77>;
-> +                       clock-names = "ahb", "mmc";
-> +                       resets = <&ccu 10>;
-> +                       reset-names = "ahb";
-> +                       interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-> +                       status = "disabled";
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +               };
-> +
->                 gic: interrupt-controller at 1c81000 {
->                         compatible = "arm,gic-400";
->                         reg = <0x01c81000 0x1000>,
-> --
-> 2.8.2
->
+diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
+index ec80e35..fff8345 100644
+--- a/drivers/memory/Kconfig
++++ b/drivers/memory/Kconfig
+@@ -115,7 +115,7 @@ config FSL_CORENET_CF
+ 
+ config FSL_IFC
+ 	bool
+-	depends on FSL_SOC || ARCH_LAYERSCAPE
++	depends on FSL_SOC || ARCH_LAYERSCAPE || SOC_LS1021A
+ 
+ config JZ4780_NEMC
+ 	bool "Ingenic JZ4780 SoC NEMC driver"
+-- 
+2.1.0.27.g96db324
