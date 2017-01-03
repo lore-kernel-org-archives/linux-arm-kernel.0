@@ -1,83 +1,26 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 3 Jan 2017 09:15:29 -0300
-Subject: [PATCH 3/4] arm64: dts: exynos: make tm2 and tm2e independent
- from each other
-In-Reply-To: <20170103115530.zhjwn7bzmqmumy23@gangnam.samsung>
-References: <CGME20170103075734epcas5p43a9743131f63affd0a438d2ed342f22e@epcas5p4.samsung.com>
- <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
- <1483430237-26823-4-git-send-email-jcsing.lee@samsung.com>
- <CAJKOXPev9m07_dQWAvJ+=MKnbT0TFERKOtjWUDU+WXdGAiRyDA@mail.gmail.com>
- <20170103095842.h3hl64amje4qv4ts@gangnam.samsung>
- <CAJKOXPeEE1VwAUSAOpfyX+t58zKeAT1fe3ybp0BoQiiDBb4Uqg@mail.gmail.com>
- <20170103102548.73jg6qddlcthe2mu@gangnam.samsung>
- <CAGTfZH3ez4DPTE7-bDeayjhSGxJ_8Mj1MQz1M7O1qhwOGOnmMQ@mail.gmail.com>
- <20170103115530.zhjwn7bzmqmumy23@gangnam.samsung>
-Message-ID: <ff876454-b49f-3d63-d76e-012dd303b0e7@osg.samsung.com>
+Date: Tue, 3 Jan 2017 09:26:03 -0300
+Subject: [PATCH 1/4] input: Add support for the tm2 touchkey device driver
+In-Reply-To: <1483430237-26823-2-git-send-email-jcsing.lee@samsung.com>
+References: <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
+ <CGME20170103075733epcas5p47dff8d21854938b2439c9843d91bc301@epcas5p4.samsung.com>
+ <1483430237-26823-2-git-send-email-jcsing.lee@samsung.com>
+Message-ID: <13e6be6c-a960-9806-3c72-0b2ed82b9d78@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andi,
+Hello Jaechul,
 
-On 01/03/2017 08:55 AM, Andi Shyti wrote:
-> Hi Chanwoo,
+On 01/03/2017 04:57 AM, Jaechul Lee wrote:
+> This patch adds the binding description of the tm2 touchkey
+> device driver.
 > 
->>>>>>> Currently tm2e dts includes tm2 but there are some differences
->>>>>>> between the two boards and tm2 has some properties that tm2e
->>>>>>> doesn't have.
->>>>>>>
->>>>>>> That's why it's important to keep the two dts files independent
->>>>>>> and put all the commonalities in a tm2-common.dtsi file.
->>>>>>>
->>>>>>> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
->>>>>>> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
->>>>>>> ---
->>>>>>>  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 1046 ++++++++++++++++++++
->>>>>>>  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 1033 +------------------
->>>>>>>  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |    2 +-
->>>>>>>  3 files changed, 1049 insertions(+), 1032 deletions(-)
->>>>>>>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
->>>>>>
-> 
-> [...]
-> 
->>> Because exynos5433-tm2.dts results modified, while
->>> exynos5433-tm2-common.dtsi is new. Even though I did:
->>>
->>> 1. mv exynos5433-tm2.dts exynos5433-tm2-common.dtsi
->>> 2. copied pieces from exynos5433-tm2-common.dtsi to a new
->>>    exynos5433-tm2.dts
->>
->> I think that exynos5433-tm2-common.dtsi is not necessary because there
->> is small difference between TM2 and TM2E.
->>
->> I explain the detailed difference between TM2 and TM2E and then reply
->> how to support the TM2E board with existing exynos5433-tm2.dts file
->> without exynos5433-tm2-common.dtsi.
->>
->> Difference and the way to support TM2E with existing
->> exynos5433-tm2.dts file as following:
->> - hsi2c_9 is either used or not. TM2 uses the hsi2c_9 node for
->> touchkey. but TM2E do not use the hsi2c_9.
->>    : We can just disable the hsi2c_9 node on tm2e.dts as following:
->>
->>    &hsi2c_9 {
->>          status = "disable";
->>    };
-> 
-> I thought about this alternative too, it just looked cleaner to
-> me to have a tm2-common.dtsi file.
-> 
-> Anyway, as you guys wish. If for you and Krzysztof is better this
-> way, we can drop this patch and add the above lines in the current
-> Jaechul's patch 4/4.
->
+> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
+> ---
 
-FWIW, I also agree with Chanwoo that the difference is too small to
-need a common .dtsi file.
- 
-> Thanks,
-> Andi
-> 
+Patch looks good to me.
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
 Best regards,
 -- 
