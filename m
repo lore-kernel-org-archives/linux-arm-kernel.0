@@ -1,31 +1,56 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Tue, 3 Jan 2017 11:20:44 +0100
-Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
-In-Reply-To: <CAFcVECK1vt7Hu4tgSZ2+kKpMxoT-wpikMDq65HaxRv-EMgobHA@mail.gmail.com>
-References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
- <BN3PR07MB2516815EDE69ACDCE27F81A3C96F0@BN3PR07MB2516.namprd07.prod.outlook.com>
- <20170102113155.GA16373@localhost.localdomain>
- <0717c63b-2e29-9ad1-7f01-39817980933f@atmel.com>
- <20170102161359.GD3609@localhost.localdomain>
- <CAFcVECK1vt7Hu4tgSZ2+kKpMxoT-wpikMDq65HaxRv-EMgobHA@mail.gmail.com>
-Message-ID: <20170103102044.GB24780@localhost.localdomain>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Tue, 03 Jan 2017 19:25:48 +0900
+Subject: [PATCH 3/4] arm64: dts: exynos: make tm2 and tm2e independent from
+ each other
+In-Reply-To: <CAJKOXPeEE1VwAUSAOpfyX+t58zKeAT1fe3ybp0BoQiiDBb4Uqg@mail.gmail.com>
+References: <CGME20170103075734epcas5p43a9743131f63affd0a438d2ed342f22e@epcas5p4.samsung.com>
+ <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
+ <1483430237-26823-4-git-send-email-jcsing.lee@samsung.com>
+ <CAJKOXPev9m07_dQWAvJ+=MKnbT0TFERKOtjWUDU+WXdGAiRyDA@mail.gmail.com>
+ <20170103095842.h3hl64amje4qv4ts@gangnam.samsung>
+ <CAJKOXPeEE1VwAUSAOpfyX+t58zKeAT1fe3ybp0BoQiiDBb4Uqg@mail.gmail.com>
+Message-ID: <20170103102548.73jg6qddlcthe2mu@gangnam.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 10:36:11AM +0530, Harini Katakam wrote:
-> I understand that it is not accurate - it is an initial version.
+> >> > Currently tm2e dts includes tm2 but there are some differences
+> >> > between the two boards and tm2 has some properties that tm2e
+> >> > doesn't have.
+> >> >
+> >> > That's why it's important to keep the two dts files independent
+> >> > and put all the commonalities in a tm2-common.dtsi file.
+> >> >
+> >> > Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> >> > Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
+> >> > ---
+> >> >  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 1046 ++++++++++++++++++++
+> >> >  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 1033 +------------------
+> >> >  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |    2 +-
+> >> >  3 files changed, 1049 insertions(+), 1032 deletions(-)
+> >> >  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+> >>
+> >> I would like to see here the rename and diff from it. Not entire delta
+> >> (deletions and addons). It is not possible to compare it... I think
+> >> git supports it by default with similarity of 50%.
+> >
+> > I understand, it's indeed quite cryptic to understand. But all
+> > the diff algorithms (patience, minimal, histogram, myers) give
+> > the same result. I don't know how to make it better.
+> >
+> > I could split this patch, but this also means breaking tm2's
+> > functionality, which looks worse.
+> >
+> > Please tell me if you know a better way for generating the patch.
+> 
+> git format-patch -M95%?
 
-No, it is not inaccurate at all, it is WRONG.
+Same thing with all M values.
 
-This means that time stamps will be randomly associated with PTP
-network packets.  To the application, the protocol will appear to
-work, but the time stamp information (and thus the synchronization)
-will be wrong.
+Because exynos5433-tm2.dts results modified, while
+exynos5433-tm2-common.dtsi is new. Even though I did:
 
-To me, this is unacceptable, and I will push back on this driver
-getting merged.
+1. mv exynos5433-tm2.dts exynos5433-tm2-common.dtsi
+2. copied pieces from exynos5433-tm2-common.dtsi to a new
+   exynos5433-tm2.dts
 
-[ In contrast, the descriptor based approach would be ok, afaict. ]
-
-Thanks,
-Richard
+Andi
