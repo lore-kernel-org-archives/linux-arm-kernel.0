@@ -1,156 +1,80 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 3 Jan 2017 10:39:05 -0800
-Subject: [PATCH v3 1/3] power: reset: add linkstation-reset driver
-In-Reply-To: <CAEQ9gE=MoQcr3eX0DAxZtvx0FW9pzgkUGjdxKHcsKwH7_+UsUw@mail.gmail.com>
-References: <20161216100501.18173-1-rogershimizu@gmail.com>
- <20161227070611.14852-1-rogershimizu@gmail.com>
- <20161227070611.14852-2-rogershimizu@gmail.com>
- <fff132e9-a178-6948-676e-6a4d24b6c4d6@gmail.com>
- <20170103130916.GA30197@lunn.ch>
- <CAEQ9gE=MoQcr3eX0DAxZtvx0FW9pzgkUGjdxKHcsKwH7_+UsUw@mail.gmail.com>
-Message-ID: <37480c0b-0539-a214-d863-02bf82cdddb9@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 3 Jan 2017 18:44:44 +0000
+Subject: [PATCH 1/2] arm64: dma_mapping: allow PCI host driver to limit
+ DMA mask
+In-Reply-To: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
+References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
+Message-ID: <20170103184444.GP6986@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2017 06:08 AM, Roger Shimizu wrote:
-> Dear Florian, Andrew,
+On Thu, Dec 29, 2016 at 11:45:03PM +0300, Nikita Yushchenko wrote:
+> It is possible that PCI device supports 64-bit DMA addressing, and thus
+> it's driver sets device's dma_mask to DMA_BIT_MASK(64), however PCI host
+> bridge has limitations on inbound transactions addressing. Example of
+> such setup is NVME SSD device connected to RCAR PCIe controller.
 > 
-> Thanks for your email!
+> Previously there was attempt to handle this via bus notifier: after
+> driver is attached to PCI device, bridge driver gets notifier callback,
+> and resets dma_mask from there. However, this is racy: PCI device driver
+> could already allocate buffers and/or start i/o in probe routine.
+> In NVME case, i/o is started in workqueue context, and this race gives
+> "sometimes works, sometimes not" effect.
 > 
-> On Tue, Jan 3, 2017 at 2:19 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>
->> Interestingly, I submitted a patch doing nearly the same thing recently
->> after hacking on a Buffalo Terastation Pro II two days after yours
->> without seeing yours:
->>
->> https://lkml.org/lkml/2016/12/28/273
+> Proper solution should make driver's dma_set_mask() call to fail if host
+> bridge can't support mask being set.
 > 
-> Glad to know there's other developer working on linkstation/kurobox platform!
+> This patch makes __swiotlb_dma_supported() to check mask being set for
+> PCI device against dma_mask of struct device corresponding to PCI host
+> bridge (one with name "pciXXXX:YY"), if that dma_mask is set.
 > 
->> Some comments below.
->>
->>> +
->>> +static void __iomem *base;
->>> +static unsigned long tclk;
->>> +static const struct reset_cfg *cfg;
->>
->> How about avoiding the singletons here and pass this down from the
->> platform driver's private data after we (see below) also make use of a
->> reboot notifier?
+> This is the least destructive approach: currently dma_mask of that device
+> object is not used anyhow, thus all existing setups will work as before,
+> and modification is required only in actually affected components -
+> driver of particular PCI host bridge, and dma_map_ops of particular
+> platform.
 > 
-> I see your patches. Indeed, it's a good idea to avoid the singletons
-> and use private data instead.
+> Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
+> ---
+>  arch/arm64/mm/dma-mapping.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
 > 
->>> +static int linkstation_reset_probe(struct platform_device *pdev)
->>> +{
->>> +     struct device_node *np = pdev->dev.of_node;
->>> +     struct resource *res;
->>> +     struct clk *clk;
->>> +     char symname[KSYM_NAME_LEN];
->>> +
->>> +     const struct of_device_id *match =
->>> +             of_match_node(linkstation_reset_of_match_table, np);
->>> +     cfg = match->data;
->>> +
->>> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>> +     if (!res) {
->>> +             dev_err(&pdev->dev, "Missing resource");
->>> +             return -EINVAL;
->>> +     }
->>> +
->>> +     base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
->>> +     if (!base) {
->>> +             dev_err(&pdev->dev, "Unable to map resource");
->>> +             return -EINVAL;
->>> +     }
->>> +
->>> +     /* We need to know tclk in order to calculate the UART divisor */
->>> +     clk = devm_clk_get(&pdev->dev, NULL);
->>> +     if (IS_ERR(clk)) {
->>> +             dev_err(&pdev->dev, "Clk missing");
->>> +             return PTR_ERR(clk);
->>> +     }
->>> +
->>> +     tclk = clk_get_rate(clk);
->>
->> Does this work with the Terastation II which has not been converted to
->> DT yet? Is tclk available through the CLK API there?
-> 
-> I have no idea whether device-based legacy code and make use of power
-> reset driver.
-> Maybe Sebastian Reichel can offer a comment?
-> 
-> However, I think Terastation II should convert to DT first.
-> If you're willing to test, I can help to provide a dts/dtb.
-> (If you use Debian, I can even provide DEB of kernel image and
-> flash-kernel patch, which is easy for you to test)
-> 
-> On Tue, Jan 3, 2017 at 10:09 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->>>> +
->>>> +   /* Check that nothing else has already setup a handler */
->>>> +   if (pm_power_off) {
->>>> +           lookup_symbol_name((ulong)pm_power_off, symname);
->>>> +           dev_err(&pdev->dev,
->>>> +                   "pm_power_off already claimed %p %s",
->>>> +                   pm_power_off, symname);
->>>> +           return -EBUSY;
->>>> +   }
->>>> +   pm_power_off = linkstation_reset;
->>>
->>> That seems a bit complicated, why not just assume that there will be
->>> either this driver used, or not at all?
->>
->> That is probably my fault. This is a copy from code i wrote many years
->> ago for the QNAP. I guess at the time i was battling with two
->> different pm_power_off handlers, so put in this code.
->>
->>> Also, you are supposed to register a reboot notifier to which you can
->>> pass private context:
->>
->> At the time i wrote the QNAP code, this did not exist. So maybe my
->> code is no longer a good example to copy.
-> 
-> Really appreciated, Andrew!
-> I'll modify this part in next series.
-> 
-> BTW. the private data passing to reboot notifier can be shared to
-> power-off function as well?
-> Do you have example?
-> 
->> https://lkml.org/lkml/2016/12/28/275
->>
->> As indicated in my patch series, the UART1-attached micro controller
->> does a lot more things that just providing reboot, which is why I chose
->> to move this code to a MFD driver, as the starting point before adding
->> support for LEDs, FAN, PWM, beeper which would be other types of devices.
->>
->> Is adding support for other peripherals on your TODO as well?
-> 
-> Except reset feature (power-off and reboot), other feature, such as
-> LEDs / FAN speed / buttons, is managed by user-land program micro-evtd
-> [0][1].
-> Since the upstream [1] is not active anymore, Ryan Tandy (in CC) and I
-> are maintaining it in Debian [0].
-> 
-> [0] https://tracker.debian.org/pkg/micro-evtd
-> [1] https://sourceforge.net/projects/ppc-evtd
-> 
-> micro-evtd worked well for device-based legacy code, but after DT
-> conversion, Ryan found the device cannot shutdown properly (reboot is
-> OK).
-> That why I created this patch series.
-> I think for such old hardware and mature user-land program, it doesn't
-> deserve the effort to implement those again in kernel side.
-> What do you think?
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 290a84f..49645277 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/dma-contiguous.h>
+>  #include <linux/vmalloc.h>
+>  #include <linux/swiotlb.h>
+> +#include <linux/pci.h>
+>  
+>  #include <asm/cacheflush.h>
+>  
+> @@ -347,6 +348,16 @@ static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
+>  
+>  static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
+>  {
+> +#ifdef CONFIG_PCI
+> +	if (dev_is_pci(hwdev)) {
+> +		struct pci_dev *pdev = to_pci_dev(hwdev);
+> +		struct pci_host_bridge *br = pci_find_host_bridge(pdev->bus);
+> +
+> +		if (br->dev.dma_mask && (*br->dev.dma_mask) &&
+> +				(mask & (*br->dev.dma_mask)) != mask)
+> +			return 0;
+> +	}
+> +#endif
 
-An argument could be made that these are hardware peripherals, and so
-the kernel is the best place to abstract support for that, and present
-you with the standard device drive model for such kind of peripherals.
+Hmm, but this makes it look like the problem is both arm64 and swiotlb
+specific, when in reality it's not. Perhaps another hack you could try
+would be to register a PCI bus notifier in the host bridge looking for
+BUS_NOTIFY_BIND_DRIVER, then you could proxy the DMA ops for each child
+device before the driver has probed, but adding a dma_set_mask callback
+to limit the mask to what you need?
 
-We don't have to do everything at the same time, so first things first,
-get the reboot working, have me convert the Terastation over to Device
-Tree and then we can decide what to do with these additional peripherals.
+I agree that it would be better if dma_set_mask handled all of this
+transparently, but it's all based on the underlying ops rather than the
+bus type.
 
-Thanks!
--- 
-Florian
+Will
