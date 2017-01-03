@@ -1,41 +1,94 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue,  3 Jan 2017 23:25:34 +0800
-Subject: [PATCH 4/4] ARM: dts: sun8i: add OTG function to Lichee Pi Zero
-In-Reply-To: <20170103152534.20118-1-icenowy@aosc.xyz>
-References: <20170103152534.20118-1-icenowy@aosc.xyz>
-Message-ID: <20170103152534.20118-5-icenowy@aosc.xyz>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Wed, 4 Jan 2017 00:29:23 +0900
+Subject: [PATCH 3/4] arm64: dts: exynos: make tm2 and tm2e independent
+ from each other
+In-Reply-To: <20170103144056.4ft2ohmhgmezeney@jack.zhora.eu>
+References: <CGME20170103075734epcas5p43a9743131f63affd0a438d2ed342f22e@epcas5p4.samsung.com>
+ <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
+ <1483430237-26823-4-git-send-email-jcsing.lee@samsung.com>
+ <CAJKOXPev9m07_dQWAvJ+=MKnbT0TFERKOtjWUDU+WXdGAiRyDA@mail.gmail.com>
+ <20170103095842.h3hl64amje4qv4ts@gangnam.samsung>
+ <CAJKOXPeEE1VwAUSAOpfyX+t58zKeAT1fe3ybp0BoQiiDBb4Uqg@mail.gmail.com>
+ <20170103102548.73jg6qddlcthe2mu@gangnam.samsung>
+ <CAGTfZH3ez4DPTE7-bDeayjhSGxJ_8Mj1MQz1M7O1qhwOGOnmMQ@mail.gmail.com>
+ <20170103115530.zhjwn7bzmqmumy23@gangnam.samsung>
+ <ff876454-b49f-3d63-d76e-012dd303b0e7@osg.samsung.com>
+ <20170103144056.4ft2ohmhgmezeney@jack.zhora.eu>
+Message-ID: <CAGTfZH0tnjkqF_7DChLSvzs3C369mkb_HZmyrf3cc0T-UcBZ4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lichee Pi Zero features a USB OTG port.
+Hi Andi,
 
-Add support for it.
+2017-01-03 23:40 GMT+09:00 Andi Shyti <andi@etezian.org>:
+> Hi,
+>
+>> FWIW, I also agree with Chanwoo that the difference is too small to
+>> need a common .dtsi file.
+>
+> in principle I don't like "switching on and off" properties by
+> overwriting them with "status = disable", unless it's really
+> necessary (and this case is not). Even for small differences. It
+> makes the DTS harder to read and duplicates nodes with different
+> values throughout the DTS include chain.
+>
+> In my opinion this approach should be discouraged.
+>
+> Besides, there are other overwritten differences in tm2e.dts that
+> I think should be separated as well. The "common" file approach is
+> widely used in arm/boot/dts/exynos* files.
+>
+> The "status = disable" looks to me more like a temporary hack
+> rather than a permanent solution.
+>
+> In any case, still up to you :)
+>
+> Andi
 
-Note: in order to use the Host mode, the board must be powered via the
-+5V and GND pins.
+I think that "status=disabled" of hsi2c_9 is not hack. The overwrite
+is possible for Device-tree. But, there is just difference how to
+support them with some method.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Except for touchkey, all peripheral device are same on both tm2 and
+tm2e. There are only small difference for a few property value.
 
-diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-index 0099affc6ce3..3d9168cbaeca 100644
---- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-@@ -71,3 +71,13 @@
- 	pinctrl-names = "default";
- 	status = "okay";
+To understand the difference between tm2 and tm2e, I made the patch
+(it is not complete version). If we implement the following patch, we
+support both tm2 and tm2e. So, I think that it is not complex to
+understand the h/w difference between tm2 and tm2e.
+
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
+b/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
+index 1db4e7f..09b6935 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
++++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
+@@ -18,6 +18,17 @@
+        compatible = "samsung,tm2e", "samsung,exynos5433";
+ };
+
++&display_timings {
++       clock-frequency = <16523724>;
++       hactive = <1600>;
++};
++
++&hsi2c_9 {
++        /* TM2E don't use the separate touchkey device. Instead, touchscreen
++         * device support the touchkey device.*/
++       status = "disabled";
++};
++
+ &ldo23_reg {
+        regulator-name = "CAM_SEN_CORE_1.025V_AP";
+        regulator-max-microvolt = <1050000>;
+@@ -39,3 +50,7 @@
+        regulator-min-microvolt = <3300000>;
+        regulator-max-microvolt = <3300000>;
  };
 +
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
++&touchscreen {
++       x-size = "1599";
 +};
-+
-+&usbphy {
-+	usb0_id_det-gpio = <&pio 5 6 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
+
 -- 
-2.11.0
+Best Regards,
+Chanwoo Choi
