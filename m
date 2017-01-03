@@ -1,101 +1,91 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 3 Jan 2017 14:26:35 +0800
-Subject: [PATCH 1/2] arm64:dt:ls1046a: Add TMU device tree support for
- LS1046A
-In-Reply-To: <AM4PR0401MB1843C415E2CF7D58BD5A1064EB6E0@AM4PR0401MB1843.eurprd04.prod.outlook.com>
-References: <1481167706-44234-1-git-send-email-hongtao.jia@nxp.com>
- <20170102062433.GA20956@dragon>
- <AM4PR0401MB1843C415E2CF7D58BD5A1064EB6E0@AM4PR0401MB1843.eurprd04.prod.outlook.com>
-Message-ID: <20170103062633.GR20956@dragon>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 3 Jan 2017 14:27:37 +0800
+Subject: [PATCH v2] drm/mediatek: Support UYVY and YUYV format for overlay
+In-Reply-To: <1483079183-38637-1-git-send-email-bibby.hsieh@mediatek.com>
+References: <1483079183-38637-1-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <CAGS+omDHrYnUeRybHt+FtmjLS8d6jO-3==DYYCzbuhFZJME_Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 03:49:33AM +0000, Troy Jia wrote:
-> > > @@ -279,6 +282,82 @@
-> > >  			clocks = <&sysclk>;
-> > >  		};
-> > >
-> > > +		tmu: tmu at 1f00000 {
-> > > +			compatible = "fsl,qoriq-tmu";
-> > > +			reg = <0x0 0x1f00000 0x0 0x10000>;
-> > > +			interrupts = <0 33 0x4>;
-> > > +			fsl,tmu-range = <0xb0000 0x9002a 0x6004c 0x30062>;
-> > > +			fsl,tmu-calibration = <0x00000000 0x00000026
-> > > +					       0x00000001 0x0000002d
-> > > +					       0x00000002 0x00000032
-> > > +					       0x00000003 0x00000039
-> > > +					       0x00000004 0x0000003f
-> > > +					       0x00000005 0x00000046
-> > > +					       0x00000006 0x0000004d
-> > > +					       0x00000007 0x00000054
-> > > +					       0x00000008 0x0000005a
-> > > +					       0x00000009 0x00000061
-> > > +					       0x0000000a 0x0000006a
-> > > +					       0x0000000b 0x00000071
-> > > +
-> > 
-> > Instead of a newline, can we have a single line comment here to tell how these
-> > calibration data is grouped?
-> 
-> Each group represent one temperature range. It's a good idea to add comment here.
-> Could I just add one comment like below to clarify all four groups?
-> /* Each calibration data group represent one temperature range. There are four ranges in total */
+On Fri, Dec 30, 2016 at 2:26 PM, Bibby Hsieh <bibby.hsieh@mediatek.com> wrote:
+>
+> MT8173 overlay can support UYVY and YUYV format,
+> we add the format in DRM driver.
+>
+> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_disp_ovl.c  | 21 +++++++++++++++++++++
+>  drivers/gpu/drm/mediatek/mtk_drm_plane.c |  2 ++
+>  2 files changed, 23 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> index c703102..de05845 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> @@ -40,10 +40,13 @@
+>  #define        OVL_RDMA_MEM_GMC        0x40402020
+>
+>  #define OVL_CON_BYTE_SWAP      BIT(24)
+> +#define OVL_CON_MTX_YUV_TO_RGB (6 << 16)
+>  #define OVL_CON_CLRFMT_RGB565  (0 << 12)
+>  #define OVL_CON_CLRFMT_RGB888  (1 << 12)
+>  #define OVL_CON_CLRFMT_RGBA8888        (2 << 12)
+>  #define OVL_CON_CLRFMT_ARGB8888        (3 << 12)
+> +#define OVL_CON_CLRFMT_UYVY    (4 << 12)
+> +#define OVL_CON_CLRFMT_YUYV    (5 << 12)
 
-Probably the following form?
+Why not just add " | OVL_CON_MTX_YUV_TO_RGB" here in the definition of
+these two constants, instead of adding a helper function?
 
-	/* Calibration data group 1 */
-	...
-	/* Calibration data group 2 */
-	...
-	/* Calibration data group 3 */
-	...
-	/* Calibration data group 4 */
-	...
-
-
-> 
-> > 
-> > > +					       0x00010000 0x00000025
-> > > +					       0x00010001 0x0000002c
-> > > +					       0x00010002 0x00000035
-> > > +					       0x00010003 0x0000003d
-> > > +					       0x00010004 0x00000045
-> > > +					       0x00010005 0x0000004e
-> > > +					       0x00010006 0x00000057
-> > > +					       0x00010007 0x00000061
-> > > +					       0x00010008 0x0000006b
-> > > +					       0x00010009 0x00000076
-> > > +
-> > > +					       0x00020000 0x00000029
-> > > +					       0x00020001 0x00000033
-> > > +					       0x00020002 0x0000003d
-> > > +					       0x00020003 0x00000049
-> > > +					       0x00020004 0x00000056
-> > > +					       0x00020005 0x00000061
-> > > +					       0x00020006 0x0000006d
-> > > +
-> > > +					       0x00030000 0x00000021
-> > > +					       0x00030001 0x0000002a
-> > > +					       0x00030002 0x0000003c
-> > > +					       0x00030003 0x0000004e>;
-> > > +			big-endian;
-> > > +			#thermal-sensor-cells = <1>;
-> > > +		};
-> > > +
-> > > +		thermal-zones {
-> > > +			cpu_thermal: cpu-thermal {
-> > > +				polling-delay-passive = <1000>;
-> > > +				polling-delay = <5000>;
-> > > +
-> > 
-> > We usually do not have newline between properties but nodes, or between
-> > property list and child node.
-> 
-> I just follow the style of thermal binding of
-> Documentation/devicetree/bindings/thermal/thermal.txt.
-
-Different subsystem or binding examples use different style, but when we
-put things together in the platform dts, we would like to have them in a
-unified style.
-
-Shawn
+>  #define        OVL_CON_AEN             BIT(8)
+>  #define        OVL_CON_ALPHA           0xff
+>
+> @@ -162,6 +165,21 @@ static unsigned int ovl_fmt_convert(unsigned int fmt)
+>         case DRM_FORMAT_XBGR8888:
+>         case DRM_FORMAT_ABGR8888:
+>                 return OVL_CON_CLRFMT_RGBA8888 | OVL_CON_BYTE_SWAP;
+> +       case DRM_FORMAT_UYVY:
+> +               return OVL_CON_CLRFMT_UYVY;
+> +       case DRM_FORMAT_YUYV:
+> +               return OVL_CON_CLRFMT_YUYV;
+> +       }
+> +}
+> +
+> +static bool ovl_yuv_space(unsigned int fmt)
+> +{
+> +       switch (fmt) {
+> +       case DRM_FORMAT_UYVY:
+> +       case DRM_FORMAT_YUYV:
+> +               return true;
+> +       default:
+> +               return false;
+>         }
+>  }
+>
+> @@ -183,6 +201,9 @@ static void mtk_ovl_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
+>         if (idx != 0)
+>                 con |= OVL_CON_AEN | OVL_CON_ALPHA;
+>
+> +       if (ovl_yuv_space(fmt))
+> +               con |= OVL_CON_MTX_YUV_TO_RGB;
+> +
+>         writel_relaxed(con, comp->regs + DISP_REG_OVL_CON(idx));
+>         writel_relaxed(pitch, comp->regs + DISP_REG_OVL_PITCH(idx));
+>         writel_relaxed(src_size, comp->regs + DISP_REG_OVL_SRC_SIZE(idx));
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> index c461a23..8c02d1d 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> @@ -28,6 +28,8 @@
+>         DRM_FORMAT_XRGB8888,
+>         DRM_FORMAT_ARGB8888,
+>         DRM_FORMAT_RGB565,
+> +       DRM_FORMAT_UYVY,
+> +       DRM_FORMAT_YUYV,
+>  };
+>
+>  static void mtk_plane_reset(struct drm_plane *plane)
+> --
+> 1.9.1
+>
