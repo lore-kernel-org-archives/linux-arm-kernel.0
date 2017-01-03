@@ -1,34 +1,49 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 3 Jan 2017 10:59:42 +0800
-Subject: [PATCH v3] ARM: dts: imx6: Disable "weim" node in the dtsi files
-In-Reply-To: <1483092543-14233-1-git-send-email-festevam@gmail.com>
-References: <1483092543-14233-1-git-send-email-festevam@gmail.com>
-Message-ID: <20170103025940.GN20956@dragon>
+From: hs.liao@mediatek.com (HS Liao)
+Date: Tue, 3 Jan 2017 11:05:47 +0800
+Subject: [PATCH v19 0/4] Mediatek MT8173 CMDQ support
+Message-ID: <1483412751-28690-1-git-send-email-hs.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 30, 2016 at 08:09:03AM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> Commit 1be81ea5860744520 ("ARM: dts: imx6: Add imx-weim parameters to
-> dtsi's") causes the following probe error when the weim node is not
-> present on the board dts (such as imx6q-sabresd):
-> 
-> imx-weim 21b8000.weim: Invalid 'ranges' configuration
-> imx-weim: probe of 21b8000.weim failed with error -22
-> 
-> There is no need to always enable the "weim" node on mx6. Do the same
-> as in the other i.MX dtsi files where "weim" is disabled and only gets
-> enabled on a per dts basis.
-> 
-> All the imx6 weim dts users explicitily provide 'status = "okay"', so
-> this change has no impact on current imx6 weim users.
-> 
-> If a board does not use the weim driver it will not describe its 'ranges'
-> property, so simply disable the 'weim' node in the imx6 dtsi files to
-> avoid such probe error message.
-> 
-> Fixes: 1be81ea5860744520 ("ARM: dts: imx6: Add imx-weim parameters to dtsi's")
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Applied, thanks.
+Hi,
+
+This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
+to help write registers with critical time limitation, such as
+updating display configuration during the vblank. It controls Global
+Command Engine (GCE) hardware to achieve this requirement.
+
+These patches have a build dependency on top of v4.10-rc1.
+
+Changes since v18:
+ - add "select MAILBOX" into CMDQ helper
+ - remove power saving part to prevent a potential bug
+
+Best regards,
+HS Liao
+
+HS Liao (4):
+  dt-bindings: soc: Add documentation for the MediaTek GCE unit
+  mailbox: mediatek: Add Mediatek CMDQ driver
+  arm64: dts: mt8173: Add GCE node
+  soc: mediatek: Add Mediatek CMDQ helper
+
+ .../devicetree/bindings/mailbox/mtk-gce.txt        |  43 ++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  10 +
+ drivers/mailbox/Kconfig                            |  10 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/mtk-cmdq-mailbox.c                 | 596 +++++++++++++++++++++
+ drivers/soc/mediatek/Kconfig                       |  12 +
+ drivers/soc/mediatek/Makefile                      |   1 +
+ drivers/soc/mediatek/mtk-cmdq-helper.c             | 310 +++++++++++
+ include/linux/mailbox/mtk-cmdq-mailbox.h           |  75 +++
+ include/linux/soc/mediatek/mtk-cmdq.h              | 174 ++++++
+ 10 files changed, 1233 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/mtk-gce.txt
+ create mode 100644 drivers/mailbox/mtk-cmdq-mailbox.c
+ create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
+ create mode 100644 include/linux/mailbox/mtk-cmdq-mailbox.h
+ create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
+
+-- 
+1.9.1
