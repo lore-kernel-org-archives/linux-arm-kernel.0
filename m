@@ -1,68 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 03 Jan 2017 14:18:01 +0100
-Subject: [RFC, PATCHv2 29/29] mm, x86: introduce RLIMIT_VADDR
-In-Reply-To: <CALCETrV_qejd-Ozqo4vTqz=LuukMUPeQ7EVUQbfTxs_xNbO3oQ@mail.gmail.com>
-References: <20161227015413.187403-1-kirill.shutemov@linux.intel.com>
- <2736959.3MfCab47fD@wuerfel>
- <CALCETrV_qejd-Ozqo4vTqz=LuukMUPeQ7EVUQbfTxs_xNbO3oQ@mail.gmail.com>
-Message-ID: <3492795.xaneWtGxgW@wuerfel>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Tue, 3 Jan 2017 13:20:48 +0000
+Subject: [RESEND PATCH 0/6] apalis-tk1: updates for v1.1 hw
+In-Reply-To: <20161124010456.24604-1-marcel@ziswiler.com>
+References: <20161124010456.24604-1-marcel@ziswiler.com>
+Message-ID: <1483449646.2745.1.camel@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, January 2, 2017 10:08:28 PM CET Andy Lutomirski wrote:
+On Thu, 2016-11-24 at 02:04 +0100, marcel at ziswiler.com wrote:
+> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 > 
-> > This seems to nicely address the same problem on arm64, which has
-> > run into the same issue due to the various page table formats
-> > that can currently be chosen at compile time.
 > 
-> On further reflection, I think this has very little to do with paging
-> formats except insofar as paging formats make us notice the problem.
-> The issue is that user code wants to be able to assume an upper limit
-> on an address, and it gets an upper limit right now that depends on
-> architecture due to paging formats.  But someone really might want to
-> write a *portable* 64-bit program that allocates memory with the high
-> 16 bits clear.  So let's add such a mechanism directly.
+> This series updates the device tree for the upcoming V1.1 HW samples.
+> All changes are purely opportunistic meaning they fix stuff which on
+> older HW was anyway broken so there should be no backwards
+> compatibility issues.
 > 
-> As a thought experiment, what if x86_64 simply never allocated "high"
-> (above 2^47-1) addresses unless a new mmap-with-explicit-limit syscall
-> were used?  Old glibc would continue working.  Old VMs would work.
-> New programs that want to use ginormous mappings would have to use the
-> new syscall.  This would be totally stateless and would have no issues
-> with CRIU.
+> 
+> Marcel Ziswiler (6):
+> ? apalis-tk1: remove spurious new lines
+> ? apalis-tk1: temp alert pull-up
+> ? apalis-tk1: optional displayport hot-plug detect
+> ? apalis-tk1: adjust pin muxing for v1.1 hw
+> ? apalis-tk1: working sd card detect on v1.1 hw
+> ? apalis-tk1: update compatibility comment
+> 
+> ?arch/arm/boot/dts/tegra124-apalis-eval.dts | 11 +----
+> ?arch/arm/boot/dts/tegra124-apalis.dtsi?????| 73 +++++++++++---------
+> ----------
+> ?2 files changed, 29 insertions(+), 55 deletions(-)
 
-I can see this working well for the 47-bit addressing default, but
-what about applications that actually rely on 39-bit addressing
-(I'd have to double-check, but I think this was the limit that
-people were most interested in for arm64)?
-
-39 bits seems a little small to make that the default for everyone
-who doesn't pass the extra flag. Having to pass another flag to
-limit the addresses introduces other problems (e.g. mmap from
-library call that doesn't pass that flag).
-
-> If necessary, we could also have a prctl that changes a
-> "personality-like" limit that is in effect when the old mmap was used.
-> I say "personality-like" because it would reset under exactly the same
-> conditions that personality resets itself.
-
-For "personality-like", it would still have to interact
-with the existing PER_LINUX32 and PER_LINUX32_3GB flags that
-do the exact same thing, so actually using personality might
-be better.
-
-We still have a few bits in the personality arguments, and
-we could combine them with the existing ADDR_LIMIT_3GB
-and ADDR_LIMIT_32BIT flags that are mutually exclusive by
-definition, such as
-
-        ADDR_LIMIT_32BIT =      0x0800000, /* existing */
-        ADDR_LIMIT_3GB   =      0x8000000, /* existing */
-        ADDR_LIMIT_39BIT =      0x0010000, /* next free bit */
-        ADDR_LIMIT_42BIT =      0x8010000,
-        ADDR_LIMIT_47BIT =      0x0810000,
-        ADDR_LIMIT_48BIT =      0x8810000,
-
-This would probably take only one or two personality bits for the
-limits that are interesting in practice.
-
-	Arnd
+Ping.
