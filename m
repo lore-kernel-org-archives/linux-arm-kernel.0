@@ -1,33 +1,46 @@
-From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Tue,  3 Jan 2017 21:52:38 +0100 (CET)
-Subject: [PATCH net-next v2 18/27] net/skbuff: add macros for VLAN_PRESENT bit
-In-Reply-To: <cover.1483475202.git.mirq-linux@rere.qmqm.pl>
-References: <cover.1483475202.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <719ecd1e2cb20316daf110de4dc865593c7bed9d.1483475202.git.mirq-linux@rere.qmqm.pl>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 3 Jan 2017 21:54:37 +0100
+Subject: [Question] New mmap64 syscall?
+In-Reply-To: <14981df2-b120-17c3-a5a8-5cbbd2008c4f@redhat.com>
+References: <20161206185440.GA4654@yury-N73SV>
+ <f544bcc3-8aae-1bd0-b744-9964fc038a51@redhat.com>
+ <20161207154811.GA15248@yury-N73SV>
+ <14981df2-b120-17c3-a5a8-5cbbd2008c4f@redhat.com>
+Message-ID: <20170103205437.GA22548@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
----
- include/linux/skbuff.h | 6 ++++++
- 1 file changed, 6 insertions(+)
 
-diff --git a/include/linux/skbuff.h b/include/linux/skbuff.h
-index b53c0cfd417e..168c3e486bd4 100644
---- a/include/linux/skbuff.h
-+++ b/include/linux/skbuff.h
-@@ -768,6 +768,12 @@ struct sk_buff {
- 	__u32			priority;
- 	int			skb_iif;
- 	__u32			hash;
-+#define PKT_VLAN_PRESENT_BIT	4	// CFI (12-th bit) in TCI
-+#ifdef __BIG_ENDIAN
-+#define PKT_VLAN_PRESENT_OFFSET()	offsetof(struct sk_buff, vlan_tci)
-+#else
-+#define PKT_VLAN_PRESENT_OFFSET()	(offsetof(struct sk_buff, vlan_tci) + 1)
-+#endif
- 	__be16			vlan_proto;
- 	__u16			vlan_tci;
- #if defined(CONFIG_NET_RX_BUSY_POLL) || defined(CONFIG_XPS)
+
+> >Hi Florian,
+> >
+> >I frankly don't understand what you mean, All syscalls you mentioned
+> >doesn't take off_t or other 64-bit arguments. 'VM changes' - virtual
+> >memory? If so, I don't see any changes in VM with this approach, just
+> >correct handling of big offsets.
+> 
+> What I was trying to suggest is a completely different interface which is
+> not subject to register size constraints and which has been requested before
+> (a mechanism for batching mm updates).
+
+While I agree that batching might be good idea, I believe mmap64()
+makes sense, too. Yes, I guess libc could do the translation, but
+indirection will cost some performance, and will be problematic for
+stuff such as strace.
+
+...actually, with strace and batched interface, it will be impossible
+to see what is going on because of races. So I'm not sure if I like
+the batched interface at all...
+
+Best regards,
+								Pavel
 -- 
-2.11.0
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170103/fa7b7a22/attachment.sig>
