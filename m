@@ -1,94 +1,54 @@
 From: peter.chen@nxp.com (Peter Chen)
-Date: Tue, 3 Jan 2017 14:33:28 +0800
-Subject: [PATCH 5/8] usb: chipidea: let chipidea core device of_node equal's
- glue layer device of_node
+Date: Tue, 3 Jan 2017 14:33:29 +0800
+Subject: [PATCH 6/8] ARM: dts: imx6qdl: Enable usb node children with <reg>
 In-Reply-To: <1483425211-14473-1-git-send-email-peter.chen@nxp.com>
 References: <1483425211-14473-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1483425211-14473-6-git-send-email-peter.chen@nxp.com>
+Message-ID: <1483425211-14473-7-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Chen <peter.chen@freescale.com>
+From: Joshua Clayton <stillcompiling@gmail.com>
 
-At device tree, we have no device node for chipidea core,
-the glue layer's node is the parent node for host and udc
-device. But in related driver, the parent device is chipidea
-core. So, in order to let the common driver get parent's node,
-we let the core's device node equals glue layer device node.
+Give usb nodes #address and #size attributes, so that a child node
+representing a permanently connected device such as an onboard hub may
+be addressed with a <reg> attribute
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
-Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
-Tested-by Joshua Clayton <stillcompiling@gmail.com>
+Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+Signed-off-by: Peter Chen <peter.chen@nxp.com>
 ---
- drivers/usb/chipidea/core.c | 27 ++++++++++++++++++++++-----
- 1 file changed, 22 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/imx6qdl.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 3dbb4a2..fdffc67 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -928,6 +928,16 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 53e6e63..e6725f1 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -936,6 +936,8 @@
  
-+	/*
-+	 * At device tree, we have no device node for chipidea core,
-+	 * the glue layer's node is the parent node for host and udc
-+	 * device. But in related driver, the parent device is chipidea
-+	 * core. So, in order to let the common driver get parent's node,
-+	 * we let the core's device node equals glue layer's node.
-+	 */
-+	if (dev->parent && dev->parent->of_node)
-+		dev->of_node = dev->parent->of_node;
-+
- 	if (ci->platdata->phy) {
- 		ci->phy = ci->platdata->phy;
- 	} else if (ci->platdata->usb_phy) {
-@@ -938,11 +948,15 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 			usbh1: usb at 02184200 {
+ 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x02184200 0x200>;
+ 				interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
+@@ -950,6 +952,8 @@
  
- 		/* if both generic PHY and USB PHY layers aren't enabled */
- 		if (PTR_ERR(ci->phy) == -ENOSYS &&
--				PTR_ERR(ci->usb_phy) == -ENXIO)
--			return -ENXIO;
-+				PTR_ERR(ci->usb_phy) == -ENXIO) {
-+			ret = -ENXIO;
-+			goto clear_of_node;
-+		}
+ 			usbh2: usb at 02184400 {
+ 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x02184400 0x200>;
+ 				interrupts = <0 41 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
+@@ -963,6 +967,8 @@
  
--		if (IS_ERR(ci->phy) && IS_ERR(ci->usb_phy))
--			return -EPROBE_DEFER;
-+		if (IS_ERR(ci->phy) && IS_ERR(ci->usb_phy)) {
-+			ret = -EPROBE_DEFER;
-+			goto clear_of_node;
-+		}
- 
- 		if (IS_ERR(ci->phy))
- 			ci->phy = NULL;
-@@ -953,7 +967,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 	ret = ci_usb_phy_init(ci);
- 	if (ret) {
- 		dev_err(dev, "unable to init phy: %d\n", ret);
--		return ret;
-+		goto clear_of_node;
- 	}
- 
- 	ci->hw_bank.phys = res->start;
-@@ -1059,6 +1073,8 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 	ci_role_destroy(ci);
- deinit_phy:
- 	ci_usb_phy_exit(ci);
-+clear_of_node:
-+	dev->of_node = NULL;
- 
- 	return ret;
- }
-@@ -1077,6 +1093,7 @@ static int ci_hdrc_remove(struct platform_device *pdev)
- 	ci_extcon_unregister(ci);
- 	ci_role_destroy(ci);
- 	ci_hdrc_enter_lpm(ci, true);
-+	ci->dev->of_node = NULL;
- 	ci_usb_phy_exit(ci);
- 
- 	return 0;
+ 			usbh3: usb at 02184600 {
+ 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x02184600 0x200>;
+ 				interrupts = <0 42 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
 -- 
 2.7.4
