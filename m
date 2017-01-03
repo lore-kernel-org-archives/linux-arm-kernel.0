@@ -1,77 +1,20 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 3 Jan 2017 13:37:05 -0700
-Subject: [PATCH] coresight: fix kernel panic caused by invalid CPU
-In-Reply-To: <20161226063137.110016-1-wangnan0@huawei.com>
-References: <20161226063137.110016-1-wangnan0@huawei.com>
-Message-ID: <CANLsYky=URDp64M_A87+9JMZqTzouC5P5biT-vCWuYoQ8GZd+w@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 3 Jan 2017 14:40:13 -0600
+Subject: [PATCH v2 1/2] dt-bindings: Document the hi3660 clock bindings
+In-Reply-To: <1482978805-6981-2-git-send-email-zhangfei.gao@linaro.org>
+References: <1482978805-6981-1-git-send-email-zhangfei.gao@linaro.org>
+ <1482978805-6981-2-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20170103204013.cz5cmmiabuzqy5bk@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 December 2016 at 23:31, Wang Nan <wangnan0@huawei.com> wrote:
-> Commit d52c9750f150 ("coresight: reset 'enable_sink' flag when need be")
-> caused a kernel panic because of the using of an invalid value: after
-> 'for_each_cpu(cpu, mask)', value of local variable 'cpu' become invalid,
-> causes following 'cpu_to_node' access invalid memory area.
->
-> This patch brings the deleted 'cpu = cpumask_first(mask)' back.
->
-> Panic log:
->
->  $ perf record -e cs_etm// ls
->
->  Unable to handle kernel paging request at virtual address fffe801804af4f10
->  pgd = ffff8017ce031600
->  [fffe801804af4f10] *pgd=0000000000000000, *pud=0000000000000000
->  Internal error: Oops: 96000004 [#1] SMP
->  Modules linked in:
->  CPU: 33 PID: 1619 Comm: perf Not tainted 4.7.1+ #16
->  Hardware name: Huawei Taishan 2280 /CH05TEVBA, BIOS 1.10 11/24/2016
->  task: ffff8017cb0c8400 ti: ffff8017cb154000 task.ti: ffff8017cb154000
->  PC is at tmc_alloc_etf_buffer+0x60/0xd4
->  LR is at tmc_alloc_etf_buffer+0x44/0xd4
->  pc : [<ffff000008633df8>] lr : [<ffff000008633ddc>] pstate: 60000145
->  sp : ffff8017cb157b40
->  x29: ffff8017cb157b40 x28: 0000000000000000
->  ...skip...
->  7a60: ffff000008c64dc8 0000000000000006 0000000000000253 ffffffffffffffff
->  7a80: 0000000000000000 0000000000000000 ffff0000080872cc 0000000000000001
->  [<ffff000008633df8>] tmc_alloc_etf_buffer+0x60/0xd4
->  [<ffff000008632b9c>] etm_setup_aux+0x1dc/0x1e8
->  [<ffff00000816eed4>] rb_alloc_aux+0x2b0/0x338
->  [<ffff00000816a5e4>] perf_mmap+0x414/0x568
->  [<ffff0000081ab694>] mmap_region+0x324/0x544
->  [<ffff0000081abbe8>] do_mmap+0x334/0x3e0
->  [<ffff000008191150>] vm_mmap_pgoff+0xa4/0xc8
->  [<ffff0000081a9a30>] SyS_mmap_pgoff+0xb0/0x22c
->  [<ffff0000080872e4>] sys_mmap+0x18/0x28
->  [<ffff0000080843f0>] el0_svc_naked+0x24/0x28
->  Code: 912040a5 d0001c00 f873d821 911c6000 (b8656822)
->  ---[ end trace 98933da8f92b0c9a ]---
->
-> Signed-off-by: Wang Nan <wangnan0@huawei.com>
-> Cc: Xia Kaixu <xiakaixu@huawei.com>
-> Cc: Li Zefan <lizefan@huawei.com>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
+On Thu, Dec 29, 2016 at 10:33:24AM +0800, Zhangfei Gao wrote:
+> Add DT bindings documentation for hi3660 SoC clock.
+> 
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 > ---
->  drivers/hwtracing/coresight/coresight-etm-perf.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> index 1774196..26cfac3 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> @@ -242,6 +242,7 @@ static void *etm_setup_aux(int event_cpu, void **pages,
->         if (!sink_ops(sink)->alloc_buffer)
->                 goto err;
->
-> +       cpu = cpumask_first(mask);
->         /* Get the AUX specific data from the sink buffer */
->         event_data->snk_config =
->                         sink_ops(sink)->alloc_buffer(sink, cpu, pages,
-> --
-> 2.10.1
->
+>  .../devicetree/bindings/clock/hi3660-clock.txt     | 42 ++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/hi3660-clock.txt
 
-Applied - thanks.
+Acked-by: Rob Herring <robh@kernel.org>
