@@ -1,62 +1,81 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue,  3 Jan 2017 18:27:01 +0000
-Subject: [PATCH] arm64: restore get_current() optimisation
-Message-ID: <1483468021-8237-1-git-send-email-mark.rutland@arm.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Tue, 3 Jan 2017 10:29:33 -0800
+Subject: [RFC, PATCHv2 29/29] mm, x86: introduce RLIMIT_VADDR
+In-Reply-To: <3492795.xaneWtGxgW@wuerfel>
+References: <20161227015413.187403-1-kirill.shutemov@linux.intel.com>
+ <2736959.3MfCab47fD@wuerfel>
+ <CALCETrV_qejd-Ozqo4vTqz=LuukMUPeQ7EVUQbfTxs_xNbO3oQ@mail.gmail.com>
+ <3492795.xaneWtGxgW@wuerfel>
+Message-ID: <CALCETrUCdu3kTBU09gXaSppO7VCm+872zkGnovaZKTXBbY2wTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+On Tue, Jan 3, 2017 at 5:18 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday, January 2, 2017 10:08:28 PM CET Andy Lutomirski wrote:
+>>
+>> > This seems to nicely address the same problem on arm64, which has
+>> > run into the same issue due to the various page table formats
+>> > that can currently be chosen at compile time.
+>>
+>> On further reflection, I think this has very little to do with paging
+>> formats except insofar as paging formats make us notice the problem.
+>> The issue is that user code wants to be able to assume an upper limit
+>> on an address, and it gets an upper limit right now that depends on
+>> architecture due to paging formats.  But someone really might want to
+>> write a *portable* 64-bit program that allocates memory with the high
+>> 16 bits clear.  So let's add such a mechanism directly.
+>>
+>> As a thought experiment, what if x86_64 simply never allocated "high"
+>> (above 2^47-1) addresses unless a new mmap-with-explicit-limit syscall
+>> were used?  Old glibc would continue working.  Old VMs would work.
+>> New programs that want to use ginormous mappings would have to use the
+>> new syscall.  This would be totally stateless and would have no issues
+>> with CRIU.
+>
+> I can see this working well for the 47-bit addressing default, but
+> what about applications that actually rely on 39-bit addressing
+> (I'd have to double-check, but I think this was the limit that
+> people were most interested in for arm64)?
+>
+> 39 bits seems a little small to make that the default for everyone
+> who doesn't pass the extra flag. Having to pass another flag to
+> limit the addresses introduces other problems (e.g. mmap from
+> library call that doesn't pass that flag).
 
-My THREAD_INFO_IN_TASK series had an unintended performance regression in
-get_current() / current_thread_info(). Could you please take the below as a
-fix for the next rc?
+That's a fair point.  Maybe my straw man isn't so good.
 
-Thanks,
-Mark.
+>
+>> If necessary, we could also have a prctl that changes a
+>> "personality-like" limit that is in effect when the old mmap was used.
+>> I say "personality-like" because it would reset under exactly the same
+>> conditions that personality resets itself.
+>
+> For "personality-like", it would still have to interact
+> with the existing PER_LINUX32 and PER_LINUX32_3GB flags that
+> do the exact same thing, so actually using personality might
+> be better.
+>
+> We still have a few bits in the personality arguments, and
+> we could combine them with the existing ADDR_LIMIT_3GB
+> and ADDR_LIMIT_32BIT flags that are mutually exclusive by
+> definition, such as
+>
+>         ADDR_LIMIT_32BIT =      0x0800000, /* existing */
+>         ADDR_LIMIT_3GB   =      0x8000000, /* existing */
+>         ADDR_LIMIT_39BIT =      0x0010000, /* next free bit */
+>         ADDR_LIMIT_42BIT =      0x8010000,
+>         ADDR_LIMIT_47BIT =      0x0810000,
+>         ADDR_LIMIT_48BIT =      0x8810000,
+>
+> This would probably take only one or two personality bits for the
+> limits that are interesting in practice.
 
----->8----
-Commit c02433dd6de32f04 ("arm64: split thread_info from task stack")
-inverted the relationship between get_current() and
-current_thread_info(), with sp_el0 now holding the current task_struct
-rather than the current thead_info. The new implementation of
-get_current() prevents the compiler from being able to optimize repeated
-calls to either, resulting in a noticeable penalty in some
-microbenchmarks.
+Hmm.  What if we approached this a bit differently?  We could add a
+single new personality bit ADDR_LIMIT_EXPLICIT.  Setting this bit
+cause PER_LINUX32_3GB etc to be automatically cleared.  When
+ADDR_LIMIT_EXPLICIT is in effect, prctl can set a 64-bit numeric
+limit.  If ADDR_LIMIT_EXPLICIT is cleared, the prctl value stops being
+settable and reading it via prctl returns whatever is implied by the
+other personality bits.
 
-This patch restores the previous optimisation by implementing
-get_current() in the same way as our old current_thread_info(), using a
-non-volatile asm statement.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Reported-by: Davidlohr Bueso <dbueso@suse.de>
----
- arch/arm64/include/asm/current.h | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/current.h b/arch/arm64/include/asm/current.h
-index f2bcbe2..86c4041 100644
---- a/arch/arm64/include/asm/current.h
-+++ b/arch/arm64/include/asm/current.h
-@@ -9,9 +9,17 @@
- 
- struct task_struct;
- 
-+/*
-+ * We don't use read_sysreg() as we want the compiler to cache the value where
-+ * possible.
-+ */
- static __always_inline struct task_struct *get_current(void)
- {
--	return (struct task_struct *)read_sysreg(sp_el0);
-+	unsigned long sp_el0;
-+
-+	asm ("mrs %0, sp_el0" : "=r" (sp_el0));
-+
-+	return (struct task_struct *)sp_el0;
- }
- 
- #define current get_current()
--- 
-1.9.1
+--Andy
