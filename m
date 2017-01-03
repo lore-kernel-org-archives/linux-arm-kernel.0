@@ -1,23 +1,19 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 3 Jan 2017 11:21:01 +0530
-Subject: [PATCH v2 2/4] ARM: davinci_all_defconfig: enable video capture
- as modules
-In-Reply-To: <20161207193137.27947-3-khilman@baylibre.com>
-References: <20161207193137.27947-1-khilman@baylibre.com>
- <20161207193137.27947-3-khilman@baylibre.com>
-Message-ID: <1feba594-e425-02dd-2b8e-c42dc9ee26e6@ti.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 3 Jan 2017 13:53:28 +0800
+Subject: [PATCH v2 1/6] ARM: mach-mx31_3ds: Remove camera support
+In-Reply-To: <1483097613-21481-1-git-send-email-festevam@gmail.com>
+References: <1483097613-21481-1-git-send-email-festevam@gmail.com>
+Message-ID: <20170103055327.GP20956@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 December 2016 01:01 AM, Kevin Hilman wrote:
-> Enable media support and V4L2 capture, along with video decoders used
-> on da850 platforms.
+On Fri, Dec 30, 2016 at 09:33:28AM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> Tested on da850-lcdk.
+> Since commit c93cc61475ebbe6e66 ("[media] staging/media: remove deprecated
+> mx3 driver") the mx3 camera driver has been removed, so remove the camera
+> support from the board file as well.
 > 
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Applied to v4.11/defconfig
-
-Thanks,
-Sekhar
+Applied all, thanks.
