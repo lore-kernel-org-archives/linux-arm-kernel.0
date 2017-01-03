@@ -1,29 +1,20 @@
-From: ping.bai@nxp.com (Jacky Bai)
-Date: Tue, 3 Jan 2017 01:01:47 +0000
-Subject: [PATCH 2/2] ARM: imx: Add speed grading check for imx6ul
-In-Reply-To: <20161230115717.GR6177@dragon>
-References: <1480475098-2037-1-git-send-email-ping.bai@nxp.com>
- <1480475098-2037-2-git-send-email-ping.bai@nxp.com>
- <20161230115717.GR6177@dragon>
-Message-ID: <AM3PR04MB530A48CFF0C4089F762ACA6876E0@AM3PR04MB530.eurprd04.prod.outlook.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 3 Jan 2017 09:23:51 +0800
+Subject: [PATCH] ARM: dts: imx: remove obsoleted property
+ fsl,spi-num-chipselects
+In-Reply-To: <20161224054354.28289-1-vz@mleia.com>
+References: <20161224054354.28289-1-vz@mleia.com>
+Message-ID: <20170103012350.GL20956@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wed, Nov 30, 2016 at 11:04:58AM +0800, Bai Ping wrote:
-> > On i.MX6UL, it has two type of part, the difference is the max ARM
-> > frequency that can run at(528MHz/700MHz).
-> > The part can be identified by part marking for speed grading fuse.
-> > This patch add speed grading check to disable the unsupported OPP
-> > dynamically.
-> >
-> > Signed-off-by: Bai Ping <ping.bai@nxp.com>
+On Sat, Dec 24, 2016 at 07:43:54AM +0200, Vladimir Zapolskiy wrote:
+> Since commit b36581df7e78 ("spi: imx: Using existing properties for
+> chipselects") the device tree property 'fsl,spi-num-chipselects' is
+> unused and it is already marked as obsolete in device tree binding
+> documentation. Remove the property from the existing DTS files to
+> avoid its reoccurence on copying.
 > 
-> We chose to handle such speed grading thing in IMX platform code with the
-> assumption that this is a special case for i.MX6Q only.  No, I'm not going to take
-> such code for any other i.MX6 SoCs.  Please patch cpufreq driver to handle the
-> speed grading check.
-> 
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 
-Thanks, I will try to add in cpufreq.
-
-> Shawn
+Applied, thanks.
