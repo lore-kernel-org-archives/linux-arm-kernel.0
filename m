@@ -1,95 +1,40 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue,  3 Jan 2017 15:57:32 +0100
-Subject: [PATCH] pwm: sunxi: wait for the READY bit
-Message-ID: <20170103145732.2108-1-alexandre.belloni@free-electrons.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 3 Jan 2017 11:57:37 -0300
+Subject: [PATCH 3/4] arm64: dts: exynos: make tm2 and tm2e independent
+ from each other
+In-Reply-To: <20170103144056.4ft2ohmhgmezeney@jack.zhora.eu>
+References: <CGME20170103075734epcas5p43a9743131f63affd0a438d2ed342f22e@epcas5p4.samsung.com>
+ <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
+ <1483430237-26823-4-git-send-email-jcsing.lee@samsung.com>
+ <CAJKOXPev9m07_dQWAvJ+=MKnbT0TFERKOtjWUDU+WXdGAiRyDA@mail.gmail.com>
+ <20170103095842.h3hl64amje4qv4ts@gangnam.samsung>
+ <CAJKOXPeEE1VwAUSAOpfyX+t58zKeAT1fe3ybp0BoQiiDBb4Uqg@mail.gmail.com>
+ <20170103102548.73jg6qddlcthe2mu@gangnam.samsung>
+ <CAGTfZH3ez4DPTE7-bDeayjhSGxJ_8Mj1MQz1M7O1qhwOGOnmMQ@mail.gmail.com>
+ <20170103115530.zhjwn7bzmqmumy23@gangnam.samsung>
+ <ff876454-b49f-3d63-d76e-012dd303b0e7@osg.samsung.com>
+ <20170103144056.4ft2ohmhgmezeney@jack.zhora.eu>
+Message-ID: <d7bfdbc5-cb9d-81ca-2300-a035098e5884@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the call sites in the kernel are not really prepared to handle
--EBUSY when calling pwm_config(). This means that they will either fail
-silently or fail without letting the user retry at a later time.
+Hello Andi,
 
-This can be seen for example when using pwm-backlight (the most common use
-case for this driver). It will first call pwm_config() with a 0 duty cycle
-and disable the pwm. Then it will call pwm_config() that fails because the
-pwm had no chance to update its period internally and
-pwm_enable() ending up with a duty cycle of 0.
+On 01/03/2017 11:40 AM, Andi Shyti wrote:
+> Hi,
+> 
+>> FWIW, I also agree with Chanwoo that the difference is too small to
+>> need a common .dtsi file.
+> 
+> in principle I don't like "switching on and off" properties by
+> overwriting them with "status = disable", unless it's really
 
-Instead, actually wait for the RDY bit to go low before continuing.
+This is a very good point. It would had been different if it was the
+opposite and tm2e had to enable the device node, but disabling it is
+indeed more confusing.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/pwm/pwm-sun4i.c | 26 ++++++++++++++++----------
- 1 file changed, 16 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-index b0803f6c64d9..be489388e006 100644
---- a/drivers/pwm/pwm-sun4i.c
-+++ b/drivers/pwm/pwm-sun4i.c
-@@ -10,6 +10,7 @@
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/io.h>
-+#include <linux/iopoll.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-@@ -103,7 +104,7 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	u32 prd, dty, val, clk_gate;
- 	u64 clk_rate, div = 0;
- 	unsigned int prescaler = 0;
--	int err;
-+	int err = 0;
- 
- 	clk_rate = clk_get_rate(sun4i_pwm->clk);
- 
-@@ -154,18 +155,22 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	spin_lock(&sun4i_pwm->ctrl_lock);
- 	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
- 
--	if (sun4i_pwm->data->has_rdy && (val & PWM_RDY(pwm->hwpwm))) {
--		spin_unlock(&sun4i_pwm->ctrl_lock);
--		clk_disable_unprepare(sun4i_pwm->clk);
--		return -EBUSY;
--	}
--
- 	clk_gate = val & BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
--	if (clk_gate) {
--		val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-+
-+	if (sun4i_pwm->data->has_rdy && (val & PWM_RDY(pwm->hwpwm))) {
-+		val |= BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
- 		sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
-+
-+		err = readl_poll_timeout(sun4i_pwm->base + PWM_CTRL_REG, val,
-+					 !(val & PWM_RDY(pwm->hwpwm)), 400,
-+					 500000);
-+		if (err)
-+			goto finish;
- 	}
- 
-+	val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-+	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
-+
- 	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
- 	val &= ~BIT_CH(PWM_PRESCAL_MASK, pwm->hwpwm);
- 	val |= BIT_CH(prescaler, pwm->hwpwm);
-@@ -174,6 +179,7 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	val = (dty & PWM_DTY_MASK) | PWM_PRD(prd);
- 	sun4i_pwm_writel(sun4i_pwm, val, PWM_CH_PRD(pwm->hwpwm));
- 
-+finish:
- 	if (clk_gate) {
- 		val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
- 		val |= clk_gate;
-@@ -183,7 +189,7 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	spin_unlock(&sun4i_pwm->ctrl_lock);
- 	clk_disable_unprepare(sun4i_pwm->clk);
- 
--	return 0;
-+	return err;
- }
- 
- static int sun4i_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
+Best regards,
 -- 
-2.11.0
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
