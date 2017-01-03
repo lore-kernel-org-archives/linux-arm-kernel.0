@@ -1,78 +1,76 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 3 Jan 2017 16:56:23 -0600
-Subject: [PATCH v3 02/10] dt-bindings: hisi: Add Hisilicon HiP05/06/07
- Djtag dts bindings
-In-Reply-To: <1483339743-23881-1-git-send-email-anurup.m@huawei.com>
-References: <1483339743-23881-1-git-send-email-anurup.m@huawei.com>
-Message-ID: <20170103225623.ynhc7n267jpzu44z@rob-hp-laptop>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 3 Jan 2017 14:56:49 -0800
+Subject: [PATCHv6 00/11] CONFIG_DEBUG_VIRTUAL for arm64
+In-Reply-To: <1483464113-1587-1-git-send-email-labbott@redhat.com>
+References: <1483464113-1587-1-git-send-email-labbott@redhat.com>
+Message-ID: <edc8eaa2-5414-506c-1dad-f2404ef19c81@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2017 at 01:49:03AM -0500, Anurup M wrote:
-> From: Tan Xiaojun <tanxiaojun@huawei.com>
+On 01/03/2017 09:21 AM, Laura Abbott wrote:
+> Happy New Year!
 > 
-> Add Hisilicon HiP05/06/07 Djtag dts bindings for CPU and IO Die
+> This is a very minor rebase from v5. It only moves a few headers around.
+> I think this series should be ready to be queued up for 4.11.
+
+FWIW:
+
+Tested-by: Florian Fainelli <f.fainelli@gmail.com>
+
+How do we get this series included? I would like to get the ARM 32-bit
+counterpart included as well (will resubmit rebased shortly), but I have
+no clue which tree this should be going through.
+
+Thanks!
+
 > 
-> Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
-> Signed-off-by: Anurup M <anurup.m@huawei.com>
-> ---
->  .../devicetree/bindings/arm/hisilicon/djtag.txt    | 41 ++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
+> Thanks,
+> Laura
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt b/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
-> new file mode 100644
-> index 0000000..bbe8b45
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
-> @@ -0,0 +1,41 @@
-> +The Hisilicon Djtag is an independent component which connects with some other
-> +components in the SoC by Debug Bus. The djtag is available in CPU and IO dies
-> +in the chip. The djtag controls access to connecting modules of CPU and IO
-> +dies.
-> +The various connecting components in CPU die (like L3 cache, L3 cache PMU etc.)
-> +are accessed by djtag during real time debugging. In IO die there are connecting
-> +components like RSA. These components appear as devices attached to djtag bus.
-> +
-> +Hisilicon HiP05/06/07 djtag for CPU and IO die
-> +Required properties:
-> +  - compatible : The value should be as follows
-> +	(a) "hisilicon,hip05-djtag-v1" for CPU and IO die which use v1 hw in
-> +	    HiP05 chipset.
-
-You don't need to distinguish the CPU and IO blocks?
-
-> +	(b) "hisilicon,hip06-djtag-v1" for CPU die which use v1 hw in HiP06 chipset.
-> +	(c) "hisilicon,hip06-djtag-v2" for IO die which use v2 hw in HiP06 chipset.
-> +	(d) "hisilicon,hip07-djtag-v2" for CPU and IO die which use v2 hw in
-> +	    HiP07 chipset.
-> +  - reg : Register address and size
-> +  - hisi-scl-id : The Super Cluster ID for CPU or IO die
-
-Still needs a vendor prefix. i.e. hisilicon,scl-id
-
-> +
-> +Example 1: Djtag for CPU die
-> +
-> +	/* for Hisilicon HiP05 djtag for CPU Die */
-> +	djtag0: djtag at 80010000 {
-> +		compatible = "hisilicon,hip05-djtag-v1";
-> +		reg = <0x0 0x80010000 0x0 0x10000>;
-> +		hisi-scl-id = <0x02>;
-> +
-> +		/* All connecting components will appear as child nodes */
-> +	};
-> +
-> +Example 2: Djtag for IO die
-> +
-> +	/* for Hisilicon HiP05 djtag for IO Die */
-> +	djtag1: djtag at d0000000 {
-> +		compatible = "hisilicon,hip05-djtag-v1";
-> +		reg = <0x0 0xd0000000 0x0 0x10000>;
-> +		hisi-scl-id = <0x01>;
-> +
-> +		/* All connecting components will appear as child nodes */
-> +	};
-> -- 
-> 2.1.4
+> Laura Abbott (11):
+>   lib/Kconfig.debug: Add ARCH_HAS_DEBUG_VIRTUAL
+>   mm/cma: Cleanup highmem check
+>   arm64: Move some macros under #ifndef __ASSEMBLY__
+>   arm64: Add cast for virt_to_pfn
+>   mm: Introduce lm_alias
+>   arm64: Use __pa_symbol for kernel symbols
+>   drivers: firmware: psci: Use __pa_symbol for kernel symbol
+>   kexec: Switch to __pa_symbol
+>   mm/kasan: Switch to using __pa_symbol and lm_alias
+>   mm/usercopy: Switch to using lm_alias
+>   arm64: Add support for CONFIG_DEBUG_VIRTUAL
 > 
+>  arch/arm64/Kconfig                        |  1 +
+>  arch/arm64/include/asm/kvm_mmu.h          |  4 +-
+>  arch/arm64/include/asm/memory.h           | 66 +++++++++++++++++++++----------
+>  arch/arm64/include/asm/mmu_context.h      |  6 +--
+>  arch/arm64/include/asm/pgtable.h          |  2 +-
+>  arch/arm64/kernel/acpi_parking_protocol.c |  3 +-
+>  arch/arm64/kernel/cpu-reset.h             |  2 +-
+>  arch/arm64/kernel/cpufeature.c            |  3 +-
+>  arch/arm64/kernel/hibernate.c             | 20 +++-------
+>  arch/arm64/kernel/insn.c                  |  2 +-
+>  arch/arm64/kernel/psci.c                  |  3 +-
+>  arch/arm64/kernel/setup.c                 |  9 +++--
+>  arch/arm64/kernel/smp_spin_table.c        |  3 +-
+>  arch/arm64/kernel/vdso.c                  |  8 +++-
+>  arch/arm64/mm/Makefile                    |  2 +
+>  arch/arm64/mm/init.c                      | 12 +++---
+>  arch/arm64/mm/kasan_init.c                | 22 +++++++----
+>  arch/arm64/mm/mmu.c                       | 33 ++++++++++------
+>  arch/arm64/mm/physaddr.c                  | 30 ++++++++++++++
+>  arch/x86/Kconfig                          |  1 +
+>  drivers/firmware/psci.c                   |  2 +-
+>  include/linux/mm.h                        |  4 ++
+>  kernel/kexec_core.c                       |  2 +-
+>  lib/Kconfig.debug                         |  5 ++-
+>  mm/cma.c                                  | 15 +++----
+>  mm/kasan/kasan_init.c                     | 15 +++----
+>  mm/usercopy.c                             |  4 +-
+>  27 files changed, 180 insertions(+), 99 deletions(-)
+>  create mode 100644 arch/arm64/mm/physaddr.c
+> 
+
+
+-- 
+Florian
