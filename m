@@ -1,111 +1,82 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 3 Jan 2017 16:21:07 +0100
-Subject: [PATCH v2] ARM: dts: turris-omnia: add support for ethernet switch
-In-Reply-To: <20161222094327.24051-1-uwe@kleine-koenig.org>
-References: <20161222094327.24051-1-uwe@kleine-koenig.org>
-Message-ID: <20170103152107.GA32450@lunn.ch>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Tue, 03 Jan 2017 10:22:00 -0500
+Subject: [PATCH 1/3] dt: pwm: lpc32xx: add description of clocks and
+ #pwm-cells properties
+In-Reply-To: <5a865e27-e673-2f45-6c71-ca1e7d92a346@mleia.com>
+References: <20161205014237.1689-1-vz@mleia.com>
+ <20161205014237.1689-2-vz@mleia.com>
+ <20161209214137.2hdugl5rmnwjrus4@rob-hp-laptop>
+ <015305d5-c22f-52da-9605-f2c19e3108b1@mleia.com>
+ <5a865e27-e673-2f45-6c71-ca1e7d92a346@mleia.com>
+Message-ID: <1483456920.7643.1.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2016 at 10:43:27AM +0100, Uwe Kleine-K?nig wrote:
-> The Turris Omnia features a Marvell MV88E7176 ethernet switch. Add it to
-> the dts.
+Hi Rob,
+
+On Wed, 2016-12-21 at 05:30 +0200, Vladimir Zapolskiy wrote:
+> On 12/10/2016 01:51 AM, Vladimir Zapolskiy wrote:
+> > Hi Rob,
+> > 
+> > On 12/09/2016 11:41 PM, Rob Herring wrote:
+> >> On Mon, Dec 05, 2016 at 03:42:37AM +0200, Vladimir Zapolskiy wrote:
+> >>> NXP LPC32xx SoCs have two simple independent PWM controllers with a single
+> >>> output each, in this case there is no need to specify PWM channel argument
+> >>> on client side, one cell for setting PWM output frequency is sufficient.
+> >>>
+> >>> Another added to the description property 'clocks' has a standard meaning
+> >>> of a controller supply clock, in the LPC32xx User's Manual the clock is
+> >>> denoted as PWM1_CLK or PWM2_CLK clock.
+> >>>
+> >>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> >>> ---
+> >>>  Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt | 7 +++++++
+> >>>  1 file changed, 7 insertions(+)
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
+> >>> index 74b5bc5..523d796 100644
+> >>> --- a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
+> >>> +++ b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
+> >>> @@ -3,15 +3,22 @@ LPC32XX PWM controller
+> >>>  Required properties:
+> >>>  - compatible: should be "nxp,lpc3220-pwm"
+> >>>  - reg: physical base address and length of the controller's registers
+> >>> +- clocks: clock phandle and clock specifier pair
+> >>> +- #pwm-cells: should be 1, the cell is used to specify the period in
+> >>> +  nanoseconds.
+> >>
+> >> This use of the cell is a bit odd as the period is s/w config and this 
+> >> would typically be a channel selection or such.
+> > 
+> > this is a classic PWM channel configuration property for PWM consumers
+> > described in DT, for instance PWM frequency for display panel backlight
+> > on boot.
+> > 
+> > I think >90% of PWM controllers with device tree bindings have this
+> > argument in #pwm-cells, from bindings/pwm/pwm.txt :
+> > 
+> >     pwm-specifier typically encodes the chip-relative PWM number and
+> >     the PWM period in nanoseconds.
+> > 
+> > You also may skim through phandle arguments of 'pwms' property,
+> > commonly the second argument is the requested frequency.
+> > 
+> > In this particular case I just drop PWM channel number, because
+> > the LPC32xx PWM controller has a single output channel.
+> > 
+> >> What if I want user specified/changed periods?
+> >>
+> > 
+> > The preset period still can be changed over sysfs in runtime.
 > 
-> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
-> ---
-> Changes since (implicit) v1:
->  - drop mdio bus and per port phy-handle as they match the default
->    setup.
+> Rob, have I managed to answer your questions?
 > 
-> One thing I was surprised is that the mv88e6xxx module isn't autoloaded
-> by udev. Is this expected?
+> If you accept my clarification, could you please ack the change?
 > 
-> Best regards
-> Uwe
+> --
+> With best wishes,
+> Vladimir
 > 
->  arch/arm/boot/dts/armada-385-turris-omnia.dts | 66 ++++++++++++++++++++++++++-
->  1 file changed, 64 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-> index ab49acb2d452..f8e55fa7f0fa 100644
-> --- a/arch/arm/boot/dts/armada-385-turris-omnia.dts
-> +++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-> @@ -122,7 +122,7 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&ge0_rgmii_pins>;
->  	status = "okay";
-> -	phy-mode = "rgmii-id";
-> +	phy-mode = "rgmii";
->  
->  	fixed-link {
->  		speed = <1000>;
-> @@ -135,7 +135,7 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&ge1_rgmii_pins>;
->  	status = "okay";
-> -	phy-mode = "rgmii-id";
-> +	phy-mode = "rgmii";
->  
->  	fixed-link {
->  		speed = <1000>;
-> @@ -274,6 +274,68 @@
->  	};
->  
->  	/* Switch MV88E7176 at address 0x10 */
+ping
 
-Hi Uwe
-
-You probably have the switch model wrong in this comment. 6176 not
-7176?
-
-> +	switch at 10 {
-> +		compatible = "marvell,mv88e6085";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		dsa,member = <0 0>;
-> +
-> +		reg = <0x10>;
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-
-...
-
-> +			ports at 5 {
-> +				reg = <5>;
-> +				label = "cpu";
-> +				ethernet = <&eth1>;
-> +				phy-mode = "rgmii-id";
-> +
-> +				fixed-link {
-> +					speed = <1000>;
-> +					full-duplex;
-> +				};
-> +			};
-> +
-> +			ports at 6 {
-> +				reg = <6>;
-> +				label = "cpu";
-> +				ethernet = <&eth0>;
-> +				phy-mode = "rgmii-id";
-> +
-> +				fixed-link {
-> +					speed = <1000>;
-> +					full-duplex;
-> +				};
-> +			};
-
-Humm, we need to be careful here. I hope multi CPU will come soon. But
-we have not yet defined how the binding will look. I expect it does
-look a lot like this, but there are probably additional properties,
-like linking user ports to cpu ports.
-
-What i'm worried about is future backwards compatibility. There is a
-danger that this DT will trigger some of the multi CPU code, but it is
-missing other required properties, and so stops working.
-
-It would be safer if you just had a comment about the second CPU port.
-
-   Thanks
-	Andrew
+Sylvain
