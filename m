@@ -1,48 +1,23 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 3 Jan 2017 11:54:08 +0800
-Subject: [PATCH v2 2/2] mfd: axp20x: Fix AXP806 access errors on cold boot
-In-Reply-To: <20161214174053.qsm6umlgtdivevwt@sirena.org.uk>
-References: <20161123031616.10114-1-wens@csie.org>
- <20161123031616.10114-3-wens@csie.org>
- <20161209112018.GL3625@dell.home>
- <20161213164742.4ztisstxifatlm5a@sirena.org.uk>
- <CAGb2v66vggNNfFrAiNKKGXY0ayiG1qh5tcRok2NLTRkVHWKFeg@mail.gmail.com>
- <20161214174053.qsm6umlgtdivevwt@sirena.org.uk>
-Message-ID: <CAGb2v64U1adw6Y8Sq6Ysi5VQicGY=TWCNvbydcqKAPjXXG4uxg@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 3 Jan 2017 09:27:04 +0530
+Subject: [PATCH RESEND] dmaengine: stm32-dma: Rework starting transfer
+ management
+In-Reply-To: <1483349607-16870-1-git-send-email-cedric.madianga@gmail.com>
+References: <1483349607-16870-1-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <20170103035703.GE3573@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 15, 2016 at 1:40 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Dec 14, 2016 at 09:52:31PM +0800, Chen-Yu Tsai wrote:
->
->> What this patch does is make sure the registers match, to guarantee
->> access, and then reinitialize the regmap cache to get rid of any
->> stale data.
->
-> So what you're saying is that previous writes may have been ignored?
+On Mon, Jan 02, 2017 at 10:33:27AM +0100, M'boumba Cedric Madianga wrote:
+> This patch reworks the way to manage transfer starting.
+> Now, starting DMA is only allowed when the channel is not busy.
+> Then, stm32_dma_start_transfer is declared as void.
+> At least, after each transfer completion, we start the next transfer if a
+> new descriptor as been queued in the issued list during an ongoing
+> transfer.
 
-Sorry for the late reply.
+ah sorry, i missed to push topic/stm32-dma. can you rebase onnthis and
+resend again. Btw this fails as as well..
 
-Yes, any previous reads and writes may have been ignored. I'm not sure
-if regmap cache prefetches any registers. Last I checked it didn't.
-
->> > If the chip has been reset then you'd want to reset the cache too.  I've
->> > no idea if that's needed here or not though, it depends what happens to
->> > the global state of the chip when this reconfiguration happens.
->
->> It is not a reset in the general sense. I suppose a better way would
->> be to do an explicit write to the register first, then initialize
->> the regmap. I'd have to export the write function from the RSB bus
->> driver first though.
->
-> Surely just doing a write immediately after initializing the regmap
-> would have the same effect?  That'd ensure that the hardware has the
-> desired value before there are any other writes.  But I might be missing
-> something here.
-
-So I just tested this. Dropping both the regcache_sync_region() and
-regmap_reinit_cache() is ok.
-
-I'll send a revised patch.
-
-ChenYu
+-- 
+~Vinod
