@@ -1,60 +1,86 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 3 Jan 2017 12:17:03 +0000
-Subject: [PATCH v4 0/5] mfd: dt: Add bindings for the Aspeed MFDs
-In-Reply-To: <4e69b379-299f-ebf3-3a61-9ac1bcaba7b3@acm.org>
-References: <20161220071535.27542-1-andrew@aj.id.au>
- <4e69b379-299f-ebf3-3a61-9ac1bcaba7b3@acm.org>
-Message-ID: <20170103121703.GD2977@dell>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 3 Jan 2017 09:15:29 -0300
+Subject: [PATCH 3/4] arm64: dts: exynos: make tm2 and tm2e independent
+ from each other
+In-Reply-To: <20170103115530.zhjwn7bzmqmumy23@gangnam.samsung>
+References: <CGME20170103075734epcas5p43a9743131f63affd0a438d2ed342f22e@epcas5p4.samsung.com>
+ <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
+ <1483430237-26823-4-git-send-email-jcsing.lee@samsung.com>
+ <CAJKOXPev9m07_dQWAvJ+=MKnbT0TFERKOtjWUDU+WXdGAiRyDA@mail.gmail.com>
+ <20170103095842.h3hl64amje4qv4ts@gangnam.samsung>
+ <CAJKOXPeEE1VwAUSAOpfyX+t58zKeAT1fe3ybp0BoQiiDBb4Uqg@mail.gmail.com>
+ <20170103102548.73jg6qddlcthe2mu@gangnam.samsung>
+ <CAGTfZH3ez4DPTE7-bDeayjhSGxJ_8Mj1MQz1M7O1qhwOGOnmMQ@mail.gmail.com>
+ <20170103115530.zhjwn7bzmqmumy23@gangnam.samsung>
+Message-ID: <ff876454-b49f-3d63-d76e-012dd303b0e7@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Dec 2016, Corey Minyard wrote:
+Hello Andi,
 
-> It looks like this is ready.  Should I take this in the IPMI tree, or is
-> there a better tree for it?
+On 01/03/2017 08:55 AM, Andi Shyti wrote:
+> Hi Chanwoo,
+> 
+>>>>>>> Currently tm2e dts includes tm2 but there are some differences
+>>>>>>> between the two boards and tm2 has some properties that tm2e
+>>>>>>> doesn't have.
+>>>>>>>
+>>>>>>> That's why it's important to keep the two dts files independent
+>>>>>>> and put all the commonalities in a tm2-common.dtsi file.
+>>>>>>>
+>>>>>>> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+>>>>>>> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
+>>>>>>> ---
+>>>>>>>  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 1046 ++++++++++++++++++++
+>>>>>>>  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 1033 +------------------
+>>>>>>>  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |    2 +-
+>>>>>>>  3 files changed, 1049 insertions(+), 1032 deletions(-)
+>>>>>>>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+>>>>>>
+> 
+> [...]
+> 
+>>> Because exynos5433-tm2.dts results modified, while
+>>> exynos5433-tm2-common.dtsi is new. Even though I did:
+>>>
+>>> 1. mv exynos5433-tm2.dts exynos5433-tm2-common.dtsi
+>>> 2. copied pieces from exynos5433-tm2-common.dtsi to a new
+>>>    exynos5433-tm2.dts
+>>
+>> I think that exynos5433-tm2-common.dtsi is not necessary because there
+>> is small difference between TM2 and TM2E.
+>>
+>> I explain the detailed difference between TM2 and TM2E and then reply
+>> how to support the TM2E board with existing exynos5433-tm2.dts file
+>> without exynos5433-tm2-common.dtsi.
+>>
+>> Difference and the way to support TM2E with existing
+>> exynos5433-tm2.dts file as following:
+>> - hsi2c_9 is either used or not. TM2 uses the hsi2c_9 node for
+>> touchkey. but TM2E do not use the hsi2c_9.
+>>    : We can just disable the hsi2c_9 node on tm2e.dts as following:
+>>
+>>    &hsi2c_9 {
+>>          status = "disable";
+>>    };
+> 
+> I thought about this alternative too, it just looked cleaner to
+> me to have a tm2-common.dtsi file.
+> 
+> Anyway, as you guys wish. If for you and Krzysztof is better this
+> way, we can drop this patch and add the above lines in the current
+> Jaechul's patch 4/4.
+>
 
-Please refrain from top posting.
-
-Judging by the diff, it looks like the MFD tree would be the most
-appropriate place to merge these into.
-
-> On 12/20/2016 01:15 AM, Andrew Jeffery wrote:
-> > Hi Lee,
-> > 
-> > Here's v4 of the Aspeed LPC MFD devicetree bindings series. v3 can be found at:
-> > 
-> >    https://lkml.org/lkml/2016/12/5/835
-> > 
-> > Changes since v3:
-> > 
-> > * Based on Arnd's argument[1], drop the addition of the mfd/syscon bindings
-> >    directory as well as the the last patch in v3, which moved a number of
-> >    existing bindings. Eventually the Aspeed display controller will have a
-> >    device-specific driver so it doesn't belong there either.
-> > 
-> > * Add a compatible string for the AST2400 in the LPC Host Controller bindings
-> >    as requested by Joel and slightly tweak the reg description for Rob.
-> > 
-> > [1] https://lkml.org/lkml/2016/12/13/202
-> > 
-> > Andrew Jeffery (5):
-> >    mfd: dt: Fix "indicates" typo in mfd bindings document
-> >    mfd: dt: ranges, #address-cells and #size-cells as optional properties
-> >    mfd: dt: Add Aspeed Low Pin Count Controller bindings
-> >    mfd: dt: Add bindings for the Aspeed LPC Host Controller (LHC)
-> >    mfd: dt: Add bindings for the Aspeed SoC Display Controller (GFX)
-> > 
-> >   .../devicetree/bindings/mfd/aspeed-gfx.txt         |  17 +++
-> >   .../devicetree/bindings/mfd/aspeed-lpc.txt         | 137 +++++++++++++++++++++
-> >   Documentation/devicetree/bindings/mfd/mfd.txt      |  12 +-
-> >   3 files changed, 165 insertions(+), 1 deletion(-)
-> >   create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-gfx.txt
-> >   create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
-> > 
+FWIW, I also agree with Chanwoo that the difference is too small to
+need a common .dtsi file.
+ 
+> Thanks,
+> Andi
 > 
 
+Best regards,
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
