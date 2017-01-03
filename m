@@ -1,94 +1,139 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Wed, 4 Jan 2017 00:29:23 +0900
-Subject: [PATCH 3/4] arm64: dts: exynos: make tm2 and tm2e independent
- from each other
-In-Reply-To: <20170103144056.4ft2ohmhgmezeney@jack.zhora.eu>
-References: <CGME20170103075734epcas5p43a9743131f63affd0a438d2ed342f22e@epcas5p4.samsung.com>
- <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
- <1483430237-26823-4-git-send-email-jcsing.lee@samsung.com>
- <CAJKOXPev9m07_dQWAvJ+=MKnbT0TFERKOtjWUDU+WXdGAiRyDA@mail.gmail.com>
- <20170103095842.h3hl64amje4qv4ts@gangnam.samsung>
- <CAJKOXPeEE1VwAUSAOpfyX+t58zKeAT1fe3ybp0BoQiiDBb4Uqg@mail.gmail.com>
- <20170103102548.73jg6qddlcthe2mu@gangnam.samsung>
- <CAGTfZH3ez4DPTE7-bDeayjhSGxJ_8Mj1MQz1M7O1qhwOGOnmMQ@mail.gmail.com>
- <20170103115530.zhjwn7bzmqmumy23@gangnam.samsung>
- <ff876454-b49f-3d63-d76e-012dd303b0e7@osg.samsung.com>
- <20170103144056.4ft2ohmhgmezeney@jack.zhora.eu>
-Message-ID: <CAGTfZH0tnjkqF_7DChLSvzs3C369mkb_HZmyrf3cc0T-UcBZ4A@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 3 Jan 2017 15:40:51 +0000
+Subject: [PATCH 3/5] mfd: twl: move structure definitions to a public
+ header
+In-Reply-To: <20161126181326.14951-4-Nicolae_Rosia@mentor.com>
+References: <20161126181326.14951-1-Nicolae_Rosia@mentor.com>
+ <20161126181326.14951-4-Nicolae_Rosia@mentor.com>
+Message-ID: <20170103154051.GI2977@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andi,
+On Sat, 26 Nov 2016, Nicolae Rosia wrote:
 
-2017-01-03 23:40 GMT+09:00 Andi Shyti <andi@etezian.org>:
-> Hi,
->
->> FWIW, I also agree with Chanwoo that the difference is too small to
->> need a common .dtsi file.
->
-> in principle I don't like "switching on and off" properties by
-> overwriting them with "status = disable", unless it's really
-> necessary (and this case is not). Even for small differences. It
-> makes the DTS harder to read and duplicates nodes with different
-> values throughout the DTS include chain.
->
-> In my opinion this approach should be discouraged.
->
-> Besides, there are other overwritten differences in tm2e.dts that
-> I think should be separated as well. The "common" file approach is
-> widely used in arm/boot/dts/exynos* files.
->
-> The "status = disable" looks to me more like a temporary hack
-> rather than a permanent solution.
->
-> In any case, still up to you :)
->
-> Andi
+> We want to get rid of exported symbols and have
+> the child devices use structure members directly.
+> Move the structure definitions to header and set
+> drvdata so child devices can access it.
 
-I think that "status=disabled" of hsi2c_9 is not hack. The overwrite
-is possible for Device-tree. But, there is just difference how to
-support them with some method.
+  < Please use all 75 chars allocated to the commitlog before line wrapping >
 
-Except for touchkey, all peripheral device are same on both tm2 and
-tm2e. There are only small difference for a few property value.
+> Signed-off-by: Nicolae Rosia <Nicolae_Rosia@mentor.com>
+> ---
+>  drivers/mfd/twl-core.c       | 27 ++++-----------------------
+>  include/linux/mfd/twl-core.h | 35 +++++++++++++++++++++++++++++++++++
+>  2 files changed, 39 insertions(+), 23 deletions(-)
+>  create mode 100644 include/linux/mfd/twl-core.h
+> 
+> diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
+> index e16084e..409b836 100644
+> --- a/drivers/mfd/twl-core.c
+> +++ b/drivers/mfd/twl-core.c
+> @@ -48,6 +48,7 @@
+>  
+>  #include <linux/i2c.h>
+>  #include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl-core.h>
+>  
+>  /* Register descriptions for audio */
+>  #include <linux/mfd/twl4030-audio.h>
+> @@ -154,28 +155,7 @@ int twl4030_init_irq(struct device *dev, int irq_num);
+>  int twl4030_exit_irq(void);
+>  int twl4030_init_chip_irq(const char *chip);
+>  
+> -/* Structure for each TWL4030/TWL6030 Slave */
+> -struct twl_client {
+> -	struct i2c_client *client;
+> -	struct regmap *regmap;
+> -};
+> -
+> -/* mapping the module id to slave id and base address */
+> -struct twl_mapping {
+> -	unsigned char sid;	/* Slave ID */
+> -	unsigned char base;	/* base address */
+> -};
+> -
+> -struct twl_private {
+> -	bool ready; /* The core driver is ready to be used */
+> -	u32 twl_idcode; /* TWL IDCODE Register value */
+> -	unsigned int twl_id;
+> -
+> -	struct twl_mapping *twl_map;
+> -	struct twl_client *twl_modules;
+> -};
+> -
+> -static struct twl_private *twl_priv;
+> +static struct twlcore *twl_priv;
 
-To understand the difference between tm2 and tm2e, I made the patch
-(it is not complete version). If we implement the following patch, we
-support both tm2 and tm2e. So, I think that it is not complex to
-understand the h/w difference between tm2 and tm2e.
+I'm guessing when you remove the exported functions, you can remove this?
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
-b/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
-index 1db4e7f..09b6935 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
-+++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
-@@ -18,6 +18,17 @@
-        compatible = "samsung,tm2e", "samsung,exynos5433";
- };
+>  static struct twl_mapping twl4030_map[] = {
+>  	/*
+> @@ -745,7 +725,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+>  		goto free;
+>  	}
+>  
+> -	twl_priv = devm_kzalloc(&client->dev, sizeof(struct twl_private),
+> +	twl_priv = devm_kzalloc(&client->dev, sizeof(struct twlcore),
+>  				GFP_KERNEL);
+>  	if (!twl_priv) {
+>  		status = -ENOMEM;
+> @@ -803,6 +783,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+>  	}
+>  
+>  	twl_priv->ready = true;
+> +	dev_set_drvdata(&client->dev, twl_priv);
+>  
+>  	/* setup clock framework */
+>  	clocks_init(&pdev->dev);
+> diff --git a/include/linux/mfd/twl-core.h b/include/linux/mfd/twl-core.h
+> new file mode 100644
+> index 0000000..d1c01b3
+> --- /dev/null
+> +++ b/include/linux/mfd/twl-core.h
+> @@ -0,0 +1,35 @@
+> +/*
+> + * MFD core driver for the Texas Instruments TWL PMIC family
+> + *
+> + * Copyright (C) 2016 Nicolae Rosia <nicolae.rosia@gmail.com>
 
-+&display_timings {
-+       clock-frequency = <16523724>;
-+       hactive = <1600>;
-+};
-+
-+&hsi2c_9 {
-+        /* TM2E don't use the separate touchkey device. Instead, touchscreen
-+         * device support the touchkey device.*/
-+       status = "disabled";
-+};
-+
- &ldo23_reg {
-        regulator-name = "CAM_SEN_CORE_1.025V_AP";
-        regulator-max-microvolt = <1050000>;
-@@ -39,3 +50,7 @@
-        regulator-min-microvolt = <3300000>;
-        regulator-max-microvolt = <3300000>;
- };
-+
-+&touchscreen {
-+       x-size = "1599";
-+};
+Your sign-off and SoB are different?  Why?
+
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __TWL_CORE_H__
+> +#define __TWL_CORE_H__
+
+_MFD_
+
+> +/* Structure for each TWL4030/TWL6030 Slave */
+> +struct twl_client {
+> +	struct i2c_client *client;
+> +	struct regmap *regmap;
+> +};
+> +
+> +/* mapping the module id to slave id and base address */
+> +struct twl_mapping {
+> +	unsigned char sid; /* Slave ID */
+> +	unsigned char base; /* base address */
+> +};
+> +
+> +struct twlcore {
+> +	bool ready; /* The core driver is ready to be used */
+> +	u32 twl_idcode; /* TWL IDCODE Register value */
+> +	unsigned int twl_id;
+> +
+> +	struct twl_mapping *twl_map;
+> +	struct twl_client *twl_modules;
+> +};
+> +
+> +#endif
 
 -- 
-Best Regards,
-Chanwoo Choi
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
