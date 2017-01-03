@@ -1,56 +1,35 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Tue,  3 Jan 2017 09:21:44 -0800
-Subject: [PATCHv6 02/11] mm/cma: Cleanup highmem check
+Date: Tue,  3 Jan 2017 09:21:46 -0800
+Subject: [PATCHv6 04/11] arm64: Add cast for virt_to_pfn
 In-Reply-To: <1483464113-1587-1-git-send-email-labbott@redhat.com>
 References: <1483464113-1587-1-git-send-email-labbott@redhat.com>
-Message-ID: <1483464113-1587-3-git-send-email-labbott@redhat.com>
+Message-ID: <1483464113-1587-5-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-6b101e2a3ce4 ("mm/CMA: fix boot regression due to physical address of
-high_memory") added checks to use __pa_nodebug on x86 since
-CONFIG_DEBUG_VIRTUAL complains about high_memory not being linearlly
-mapped. arm64 is now getting support for CONFIG_DEBUG_VIRTUAL as well.
-Rather than add an explosion of arches to the #ifdef, switch to an
-alternate method to calculate the physical start of highmem using
-the page before highmem starts. This avoids the need for the #ifdef and
-extra __pa_nodebug calls.
+virt_to_pfn lacks a cast at the top level. Don't rely on __virt_to_phys
+and explicitly cast to unsigned long.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
- mm/cma.c | 15 +++++----------
- 1 file changed, 5 insertions(+), 10 deletions(-)
+ arch/arm64/include/asm/memory.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/mm/cma.c b/mm/cma.c
-index c960459..94b3460 100644
---- a/mm/cma.c
-+++ b/mm/cma.c
-@@ -235,18 +235,13 @@ int __init cma_declare_contiguous(phys_addr_t base,
- 	phys_addr_t highmem_start;
- 	int ret = 0;
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index f80a8e4..cd6e3ee 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -209,7 +209,7 @@ static inline void *phys_to_virt(phys_addr_t x)
+ #define __pa(x)			__virt_to_phys((unsigned long)(x))
+ #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
+ #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
+-#define virt_to_pfn(x)      __phys_to_pfn(__virt_to_phys(x))
++#define virt_to_pfn(x)      __phys_to_pfn(__virt_to_phys((unsigned long)(x)))
  
--#ifdef CONFIG_X86
- 	/*
--	 * high_memory isn't direct mapped memory so retrieving its physical
--	 * address isn't appropriate.  But it would be useful to check the
--	 * physical address of the highmem boundary so it's justifiable to get
--	 * the physical address from it.  On x86 there is a validation check for
--	 * this case, so the following workaround is needed to avoid it.
-+	 * We can't use __pa(high_memory) directly, since high_memory
-+	 * isn't a valid direct map VA, and DEBUG_VIRTUAL will (validly)
-+	 * complain. Find the boundary by adding one to the last valid
-+	 * address.
- 	 */
--	highmem_start = __pa_nodebug(high_memory);
--#else
--	highmem_start = __pa(high_memory);
--#endif
-+	highmem_start = __pa(high_memory - 1) + 1;
- 	pr_debug("%s(size %pa, base %pa, limit %pa alignment %pa)\n",
- 		__func__, &size, &base, &limit, &alignment);
- 
+ /*
+  *  virt_to_page(k)	convert a _valid_ virtual address to struct page *
 -- 
 2.7.4
