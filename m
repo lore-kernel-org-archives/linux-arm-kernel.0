@@ -1,47 +1,50 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 03 Jan 2017 11:12:10 +0200
-Subject: [PATCH v6 0/5] davinci: VPIF: add DT support
-In-Reply-To: <4a03b56e-1e01-8b2c-c2a1-1b72d30f103a@ti.com>
-References: <20161207183025.20684-1-khilman@baylibre.com>
- <d4b0501a-f83a-c8b1-e460-1ba50f68cca7@xs4all.nl>
- <4a03b56e-1e01-8b2c-c2a1-1b72d30f103a@ti.com>
-Message-ID: <57057847.C5XnZnHN9E@avalon>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 3 Jan 2017 10:12:59 +0100
+Subject: [PATCH] mtd: nand: lpc32xx: fix invalid error handling of a
+ requested irq
+In-Reply-To: <20161205014710.2015-1-vz@mleia.com>
+References: <20161205014710.2015-1-vz@mleia.com>
+Message-ID: <20170103101259.0ec123df@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+Hi Vladimir
 
-On Tuesday 03 Jan 2017 14:33:00 Sekhar Nori wrote:
-> On Friday 16 December 2016 03:17 PM, Hans Verkuil wrote:
-> > On 07/12/16 19:30, Kevin Hilman wrote:
-> >> Prepare the groundwork for adding DT support for davinci VPIF drivers.
-> >> This series does some fixups/cleanups and then adds the DT binding and
-> >> DT compatible string matching for DT probing.
-> >> 
-> >> The controversial part from previous versions around async subdev
-> >> parsing, and specifically hard-coding the input/output routing of
-> >> subdevs, has been left out of this series.  That part can be done as a
-> >> follow-on step after agreement has been reached on the path forward.
-> >> With this version, platforms can still use the VPIF capture/display
-> >> drivers, but must provide platform_data for the subdevs and subdev
-> >> routing.
-> >> 
-> >> Tested video capture to memory on da850-lcdk board using composite
-> >> input.
-> > 
-> > Other than the comment for the first patch this series looks good.
-> > 
-> > So once that's addressed I'll queue it up for 4.11.
+On Mon,  5 Dec 2016 03:47:10 +0200
+Vladimir Zapolskiy <vz@mleia.com> wrote:
+
+> Semantics of NR_IRQS is different on machines with SPARSE_IRQ option
+> disabled or enabled, in the latter case IRQs are allocated starting
+> at least from the value specified by NR_IRQS and going upwards, so
+> the check of (irq >= NR_IRQ) to decide about an error code returned by
+> platform_get_irq() is completely invalid, don't attempt to overrule
+> irq subsystem in the driver.
 > 
-> Can you provide an immutable commit (as it will reach v4.11) with with
-> this series applied? I have some platform changes to queue for v4.11
-> that depend on the driver updates.
+> The change fixes LPC32xx NAND MLC driver initialization on boot.
 
-I don't think that's possible, given that Mauro rewrites all patches when 
-handling pull requests to prepend [media] to the subject line and to add his 
-SoB. Only Mauro can thus provide a stable branch, Hans can't.
+Do you need to backport this fix to stable releases? If that's the
+case, I'll add the Cc: stable tag when applying.
 
--- 
-Regards,
+Thanks,
 
-Laurent Pinchart
+Boris
+
+> 
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> ---
+>  drivers/mtd/nand/lpc32xx_mlc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/nand/lpc32xx_mlc.c b/drivers/mtd/nand/lpc32xx_mlc.c
+> index 8523881..bc6e49a 100644
+> --- a/drivers/mtd/nand/lpc32xx_mlc.c
+> +++ b/drivers/mtd/nand/lpc32xx_mlc.c
+> @@ -776,7 +776,7 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
+>  	init_completion(&host->comp_controller);
+>  
+>  	host->irq = platform_get_irq(pdev, 0);
+> -	if ((host->irq < 0) || (host->irq >= NR_IRQS)) {
+> +	if (host->irq < 0) {
+>  		dev_err(&pdev->dev, "failed to get platform irq\n");
+>  		res = -EINVAL;
+>  		goto err_exit3;
