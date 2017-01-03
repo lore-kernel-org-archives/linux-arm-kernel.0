@@ -1,46 +1,28 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Tue, 03 Jan 2017 18:58:42 +0900
-Subject: [PATCH 3/4] arm64: dts: exynos: make tm2 and tm2e independent from
- each other
-In-Reply-To: <CAJKOXPev9m07_dQWAvJ+=MKnbT0TFERKOtjWUDU+WXdGAiRyDA@mail.gmail.com>
-References: <CGME20170103075734epcas5p43a9743131f63affd0a438d2ed342f22e@epcas5p4.samsung.com>
- <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
- <1483430237-26823-4-git-send-email-jcsing.lee@samsung.com>
- <CAJKOXPev9m07_dQWAvJ+=MKnbT0TFERKOtjWUDU+WXdGAiRyDA@mail.gmail.com>
-Message-ID: <20170103095842.h3hl64amje4qv4ts@gangnam.samsung>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Tue, 3 Jan 2017 11:01:14 +0100
+Subject: [PATCH v1] mtd: nand: tango: Reset pbus to raw mode in probe
+Message-ID: <e73bf318-c715-af8c-3fdc-3c5c93a13472@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Linux should not expect the boot loader to properly configure the
+peripheral bus "pad mode", so reset PBUS_PAD_MODE to raw.
 
-> > Currently tm2e dts includes tm2 but there are some differences
-> > between the two boards and tm2 has some properties that tm2e
-> > doesn't have.
-> >
-> > That's why it's important to keep the two dts files independent
-> > and put all the commonalities in a tm2-common.dtsi file.
-> >
-> > Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> > Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
-> > ---
-> >  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 1046 ++++++++++++++++++++
-> >  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 1033 +------------------
-> >  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |    2 +-
-> >  3 files changed, 1049 insertions(+), 1032 deletions(-)
-> >  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-> 
-> I would like to see here the rename and diff from it. Not entire delta
-> (deletions and addons). It is not possible to compare it... I think
-> git supports it by default with similarity of 50%.
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+ drivers/mtd/nand/tango_nand.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-I understand, it's indeed quite cryptic to understand. But all
-the diff algorithms (patience, minimal, histogram, myers) give
-the same result. I don't know how to make it better.
-
-I could split this patch, but this also means breaking tm2's
-functionality, which looks worse.
-
-Please tell me if you know a better way for generating the patch.
-
-Thanks,
-Andi
+diff --git a/drivers/mtd/nand/tango_nand.c b/drivers/mtd/nand/tango_nand.c
+index d370c0382808..2456640fe4d5 100644
+--- a/drivers/mtd/nand/tango_nand.c
++++ b/drivers/mtd/nand/tango_nand.c
+@@ -644,6 +644,8 @@ static int tango_nand_probe(struct platform_device *pdev)
+ 	if (IS_ERR(nfc->pbus_base))
+ 		return PTR_ERR(nfc->pbus_base);
+ 
++	writel_relaxed(MODE_RAW, nfc->pbus_base + PBUS_PAD_MODE);
++
+ 	clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(clk))
+ 		return PTR_ERR(clk);
