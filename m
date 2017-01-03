@@ -1,127 +1,657 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 3 Jan 2017 10:51:49 +0100
-Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
-In-Reply-To: <20161215185717.GM14217@n2100.armlinux.org.uk>
-References: <20161213113044.GC19985@leverpostej>
- <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
- <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
- <20161215113539.GK14217@n2100.armlinux.org.uk>
- <06fca797-da5d-f7f2-eecb-9b1b33b7e83f@arm.com>
- <20161215151548.GL14217@n2100.armlinux.org.uk>
- <c21d6514-44a2-ba88-0fe5-d14d5897cc48@arm.com>
- <20161215185717.GM14217@n2100.armlinux.org.uk>
-Message-ID: <20170103095149.GA14242@cbox>
+From: harninder.rai@nxp.com (Harninder Rai)
+Date: Tue, 3 Jan 2017 15:27:31 +0530
+Subject: [PATCH v4] arm64: Add DTS support for FSL's LS1012A SoC
+Message-ID: <1483437451-20971-1-git-send-email-harninder.rai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+LS1012A features an advanced 64-bit ARM v8 CortexA53 processor
+with 32 KB of parity protected L1-I cache, 32 KB of ECC protected
+L1-D cache, as well as 256 KB of ECC protected L2 cache.
 
-On Thu, Dec 15, 2016 at 06:57:18PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Dec 15, 2016 at 03:37:15PM +0000, Marc Zyngier wrote:
-> > On 15/12/16 15:15, Russell King - ARM Linux wrote:
-> > > On Thu, Dec 15, 2016 at 11:46:41AM +0000, Marc Zyngier wrote:
-> > >> On 15/12/16 11:35, Russell King - ARM Linux wrote:
-> > >>> On Thu, Dec 15, 2016 at 11:18:48AM +0000, Marc Zyngier wrote:
-> > >>>> On 14/12/16 10:46, Russell King wrote:
-> > >>>>> @@ -231,10 +244,14 @@ ENDPROC(__hyp_stub_do_trap)
-> > >>>>>   * initialisation entry point.
-> > >>>>>   */
-> > >>>>>  ENTRY(__hyp_get_vectors)
-> > >>>>> -	mov	r0, #-1
-> > >>>>> +	mov	r0, #HVC_GET_VECTORS
-> > >>>>
-> > >>>> This breaks the KVM implementation of __hyp_get_vectors, easily fixed
-> > >>>> with the following patchlet:
-> > >>>
-> > >>> Right, so what Mark said is wrong:
-> > >>>
-> > >>> "The hyp-stub is part of the kernel image, and the API is private to
-> > >>>  that particular image, so we can change things -- there's no ABI to
-> > >>>  worry about."
-> > >>
-> > >> I think Mark is right. The API *is* private to the kernel, and KVM being
-> > >> the only in-kernel hypervisor on ARM, this is not an ABI.
-> > > 
-> > > Again, that's wrong.
-> > > 
-> > > We have two hypervisors in the kernel.  One is KVM, the other is the
-> > > stub.  Sure, the stub isn't a full implementation of a hypervisor, but
-> > > it is nevertheless, for the purposes of _this_ discussion, a hypervisor
-> > > of sorts.
-> > > 
-> > > The reason that both are included is because they both appear to share
-> > > a common interface (although that's totally not documented anywhere.)
-> > 
-> > And this interface exists for the sole purpose of enabling KVM. Call it
-> > a hypervisor if you wish, but its usefulness is doubtful on its own.
-> > 
-> > >>> So no, I'm going with my original patch (which TI has tested) which is
-> > >>> the minimal change, and if we _then_ want to rework the HYP mode
-> > >>> interfaces, that's the time to do the other changes when more people
-> > >>> (such as KVM folk) are paying attention and we can come to a cross-
-> > >>> hypervisor agreement on what the interface should be.
-> > >>
-> > >> Given that there is a single in-kernel hypervisor, I can't really see
-> > >> who we're going to agree anything with...
-> > > 
-> > > As far as I can see, the hyp-stub falls under ARM arch maintanence.
-> > > KVM falls under KVM people.  Two different groups, we need agreement
-> > > between them what a sane API for both "hypervisors" should be.
-> > 
-> > Well, I though we had the right level of discussion by reviewing your
-> > patches and coming up with improvements. If you're after something else,
-> > please let me know.
-> 
-> What I'm after is a meaningful discussion between ARM arch maintainers
-> and KVM maintainers - so far all I see are people on the ARM side of
-> things.
+Features summary
+ One 64-bit ARM-v8 Cortex-A53 core with the following capabilities
+  - Arranged as a cluster of one core supporting a 256 KB L2 cache with ECC
+    protection
+  - Speed up to 800 MHz
+  - Parity-protected 32 KB L1 instruction cache and 32 KB L1 data cache
+  - Neon SIMD engine
+  - ARM v8 cryptography extensions
+ One 16-bit DDR3L SDRAM memory controller
+ ARM core-link CCI-400 cache coherent interconnect
+ Cryptography acceleration (SEC)
+ One Configurable x3 SerDes
+ One PCI Express Gen2 controller, supporting x1 operation
+ One serial ATA (SATA Gen 3.0) controller
+ One USB 3.0/2.0 controller with integrated PHY
 
-I think your patches look fine, and I agree with your suggestions on
-improving the hyp ABI and documenting it.
+ Following levels of DTSI/DTS files have been created for the LS1012A
+   SoC family:
 
-Marc found a small problem for KVM with your patch and offered a simple
-fix.  I don't really see a bigger problem here?
+           - fsl-ls1012a.dtsi:
+                   DTS-Include file for FSL LS1012A SoC.
 
-> 
-> I've also yet to have any response on some of the KVM questions I raised
-> earlier in this thread - again, silence from KVM people.
+           - fsl-ls1012a-frdm.dts:
+                   DTS file for FSL LS1012A FRDM board.
 
-Sorry about my silence, I was really busy leading up to Christmas and
-was offline for most of the Christmas and new years days.
+           - fsl-ls1012a-qds.dts:
+                   DTS file for FSL LS1012A QDS board.
 
-I've gone back over the thread and haven't been able to spot anything
-that wasn't already answered by Marc (who also maintains KVM so would be
-one of the KVM people).  Could you let me know which questions remain
-unanswered and I can try to help?
+           - fsl-ls1012a-rdb.dts:
+                    DTS file for FSL LS1012A RDB board.
 
-> 
-> What's also coming clear is that there's very few people who understand
-> all the interactions here, and the whole thing seems to be an undocumented
-> mess.  
+Signed-off-by: Harninder Rai <harninder.rai@nxp.com>
+Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
+---
+Changes in v4: Incorporated Shawn's comments
+- Convert "regulator_3p3v: regulator" to "reg_3p3v: regulator-3p3v"
+- Add "status = "disabled"" property in sata and duart nodes
 
-I think the hyp stub has just served a very limited purpose so far, and
-therefore is a somewhat immature implementation.  Now we've discovered a
-need to clean it up, and we're all for that.  Again, I don't think the
-problem is any larger than that, we just need to fix it, and it seems to
-me everyone is willing to work on that.  Marc even offered to work on
-your suggestion to support the general hyp ABI commands in KVM.
+Changes in v3: Incorporated Leo's comments
+- Change PPI interrupts to IRQ_TYPE_LEVEL_LOW and
+- SPI interrupts to IRQ_TYPE_LEVEL_HIGH
 
-[...]
-> 
-> So, I want KVM further changes to come through my tree once this merge
-> window is over 
+Changes in v2: Incorporated Shawn's comments
+- Brief introduction of the SoC in commit message
+- Alphabetic ordering of labeled nodes
+- Better naming to be used for regulator node
+- Make timer node's comments more readable
+- Sort nodes with unit-address in order of the address
 
-I think we should try to separate the discussion of fixing an immediate
-problem with the hyp code, and that of how to maintain things.  I think
-we're already on the right track to fix the former.
+ arch/arm64/boot/dts/freescale/Makefile             |   3 +
+ arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts | 115 ++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts  | 128 +++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts  |  59 +++++
+ arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     | 247 +++++++++++++++++++++
+ 5 files changed, 552 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
 
-Before we start changing up maintainerships (which I personally think
-work fine as it is) I would encourage you to just comment on patches
-touching arch/arm that you are unhappy with.
-
-We have been cc'ing all our changes to lakml and we've tried to cc you
-specifically on anything touching arch/arm, and we will listen to any
-suggestions you may have.
-
-Thanks,
--Christoffer
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+index 6602718..39db645 100644
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -1,3 +1,6 @@
++dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-frdm.dtb
++dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-qds.dtb
++dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-rdb.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-qds.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-rdb.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1046a-qds.dtb
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
+new file mode 100644
+index 0000000..a619f64
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
+@@ -0,0 +1,115 @@
++/*
++ * Device Tree file for Freescale LS1012A Freedom Board.
++ *
++ * Copyright 2016, Freescale Semiconductor
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPLv2 or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++/dts-v1/;
++
++#include "fsl-ls1012a.dtsi"
++
++/ {
++	model = "LS1012A Freedom Board";
++	compatible = "fsl,ls1012a-frdm", "fsl,ls1012a";
++
++	sys_mclk: clock-mclk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <25000000>;
++	};
++
++	reg_1p8v: regulator-1p8v {
++		compatible = "regulator-fixed";
++		regulator-name = "1P8V";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++	};
++
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,widgets =
++			"Microphone", "Microphone Jack",
++			"Headphone", "Headphone Jack",
++			"Speaker", "Speaker Ext",
++			"Line", "Line In Jack";
++		simple-audio-card,routing =
++			"MIC_IN", "Microphone Jack",
++			"Microphone Jack", "Mic Bias",
++			"LINE_IN", "Line In Jack",
++			"Headphone Jack", "HP_OUT",
++			"Speaker Ext", "LINE_OUT";
++
++		simple-audio-card,cpu {
++			sound-dai = <&sai2>;
++			frame-master;
++			bitclock-master;
++		};
++
++		simple-audio-card,codec {
++			sound-dai = <&codec>;
++			frame-master;
++			bitclock-master;
++			system-clock-frequency = <25000000>;
++		};
++	};
++};
++
++&duart0 {
++	status = "okay";
++};
++
++&i2c0 {
++	status = "okay";
++
++	codec: sgtl5000 at a {
++		#sound-dai-cells = <0>;
++		compatible = "fsl,sgtl5000";
++		reg = <0xa>;
++		VDDA-supply = <&reg_1p8v>;
++		VDDIO-supply = <&reg_1p8v>;
++		clocks = <&sys_mclk>;
++	};
++};
++
++&sai2 {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
+new file mode 100644
+index 0000000..14a67f1
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
+@@ -0,0 +1,128 @@
++/*
++ * Device Tree file for Freescale LS1012A QDS Board.
++ *
++ * Copyright 2016, Freescale Semiconductor
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPLv2 or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++/dts-v1/;
++
++#include "fsl-ls1012a.dtsi"
++
++/ {
++	model = "LS1012A QDS Board";
++	compatible = "fsl,ls1012a-qds", "fsl,ls1012a";
++
++	sys_mclk: clock-mclk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24576000>;
++	};
++
++	reg_3p3v: regulator-3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,widgets =
++			"Microphone", "Microphone Jack",
++			"Headphone", "Headphone Jack",
++			"Speaker", "Speaker Ext",
++			"Line", "Line In Jack";
++		simple-audio-card,routing =
++			"MIC_IN", "Microphone Jack",
++			"Microphone Jack", "Mic Bias",
++			"LINE_IN", "Line In Jack",
++			"Headphone Jack", "HP_OUT",
++			"Speaker Ext", "LINE_OUT";
++
++		simple-audio-card,cpu {
++			sound-dai = <&sai2>;
++			frame-master;
++			bitclock-master;
++		};
++
++		simple-audio-card,codec {
++			sound-dai = <&codec>;
++			frame-master;
++			bitclock-master;
++			system-clock-frequency = <24576000>;
++		};
++	};
++};
++
++&duart0 {
++	status = "okay";
++};
++
++&i2c0 {
++	status = "okay";
++
++	pca9547 at 77 {
++		compatible = "nxp,pca9547";
++		reg = <0x77>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		i2c at 4 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x4>;
++
++			codec: sgtl5000 at a {
++				#sound-dai-cells = <0>;
++				compatible = "fsl,sgtl5000";
++				reg = <0xa>;
++				VDDA-supply = <&reg_3p3v>;
++				VDDIO-supply = <&reg_3p3v>;
++				clocks = <&sys_mclk>;
++			};
++		};
++	};
++};
++
++&sai2 {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
+new file mode 100644
+index 0000000..62c5c71
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
+@@ -0,0 +1,59 @@
++/*
++ * Device Tree file for Freescale LS1012A RDB Board.
++ *
++ * Copyright 2016, Freescale Semiconductor
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPLv2 or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++/dts-v1/;
++
++#include "fsl-ls1012a.dtsi"
++
++/ {
++	model = "LS1012A RDB Board";
++	compatible = "fsl,ls1012a-rdb", "fsl,ls1012a";
++};
++
++&duart0 {
++	status = "okay";
++};
++
++&i2c0 {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+new file mode 100644
+index 0000000..cffebb4
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+@@ -0,0 +1,247 @@
++/*
++ * Device Tree Include file for Freescale Layerscape-1012A family SoC.
++ *
++ * Copyright 2016, Freescale Semiconductor
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPLv2 or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include <dt-bindings/interrupt-controller/irq.h>
++
++/ {
++	compatible = "fsl,ls1012a";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53";
++			reg = <0x0>;
++			clocks = <&clockgen 1 0>;
++			#cooling-cells = <2>;
++		};
++	};
++
++	sysclk: sysclk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <100000000>;
++		clock-output-names = "sysclk";
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <1 13 IRQ_TYPE_LEVEL_LOW>,/* Physical Secure PPI */
++			     <1 14 IRQ_TYPE_LEVEL_LOW>,/* Physical Non-Secure PPI */
++			     <1 11 IRQ_TYPE_LEVEL_LOW>,/* Virtual PPI */
++			     <1 10 IRQ_TYPE_LEVEL_LOW>;/* Hypervisor PPI */
++	};
++
++	pmu {
++		compatible = "arm,armv8-pmuv3";
++		interrupts = <0 106 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
++	gic: interrupt-controller at 1400000 {
++		compatible = "arm,gic-400";
++		#interrupt-cells = <3>;
++		interrupt-controller;
++		reg = <0x0 0x1401000 0 0x1000>, /* GICD */
++		      <0x0 0x1402000 0 0x2000>, /* GICC */
++		      <0x0 0x1404000 0 0x2000>, /* GICH */
++		      <0x0 0x1406000 0 0x2000>; /* GICV */
++		interrupts = <1 9 IRQ_TYPE_LEVEL_LOW>;
++	};
++
++	reboot {
++		compatible = "syscon-reboot";
++		regmap = <&dcfg>;
++		offset = <0xb0>;
++		mask = <0x02>;
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		scfg: scfg at 1570000 {
++			compatible = "fsl,ls1012a-scfg", "syscon";
++			reg = <0x0 0x1570000 0x0 0x10000>;
++			big-endian;
++		};
++
++		dcfg: dcfg at 1ee0000 {
++			compatible = "fsl,ls1012a-dcfg",
++				     "syscon";
++			reg = <0x0 0x1ee0000 0x0 0x10000>;
++			big-endian;
++		};
++
++		clockgen: clocking at 1ee1000 {
++			compatible = "fsl,ls1012a-clockgen";
++			reg = <0x0 0x1ee1000 0x0 0x1000>;
++			#clock-cells = <2>;
++			clocks = <&sysclk>;
++		};
++
++		i2c0: i2c at 2180000 {
++			compatible = "fsl,vf610-i2c";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x0 0x2180000 0x0 0x10000>;
++			interrupts = <0 56 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clockgen 4 0>;
++			status = "disabled";
++		};
++
++		i2c1: i2c at 2190000 {
++			compatible = "fsl,vf610-i2c";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x0 0x2190000 0x0 0x10000>;
++			interrupts = <0 57 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clockgen 4 0>;
++			status = "disabled";
++		};
++
++		duart0: serial at 21c0500 {
++			compatible = "fsl,ns16550", "ns16550a";
++			reg = <0x00 0x21c0500 0x0 0x100>;
++			interrupts = <0 54 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clockgen 4 0>;
++			status = "disabled";
++		};
++
++		duart1: serial at 21c0600 {
++			compatible = "fsl,ns16550", "ns16550a";
++			reg = <0x00 0x21c0600 0x0 0x100>;
++			interrupts = <0 54 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clockgen 4 0>;
++			status = "disabled";
++		};
++
++		gpio0: gpio at 2300000 {
++			compatible = "fsl,qoriq-gpio";
++			reg = <0x0 0x2300000 0x0 0x10000>;
++			interrupts = <0 66 IRQ_TYPE_LEVEL_HIGH>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio1: gpio at 2310000 {
++			compatible = "fsl,qoriq-gpio";
++			reg = <0x0 0x2310000 0x0 0x10000>;
++			interrupts = <0 67 IRQ_TYPE_LEVEL_HIGH>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		wdog0: wdog at 2ad0000 {
++			compatible = "fsl,ls1012a-wdt",
++				     "fsl,imx21-wdt";
++			reg = <0x0 0x2ad0000 0x0 0x10000>;
++			interrupts = <0 83 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clockgen 4 0>;
++			big-endian;
++		};
++
++		sai1: sai at 2b50000 {
++			#sound-dai-cells = <0>;
++			compatible = "fsl,vf610-sai";
++			reg = <0x0 0x2b50000 0x0 0x10000>;
++			interrupts = <0 148 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clockgen 4 3>, <&clockgen 4 3>,
++				 <&clockgen 4 3>, <&clockgen 4 3>;
++			clock-names = "bus", "mclk1", "mclk2", "mclk3";
++			dma-names = "tx", "rx";
++			dmas = <&edma0 1 47>,
++			       <&edma0 1 46>;
++			status = "disabled";
++		};
++
++		sai2: sai at 2b60000 {
++			#sound-dai-cells = <0>;
++			compatible = "fsl,vf610-sai";
++			reg = <0x0 0x2b60000 0x0 0x10000>;
++			interrupts = <0 149 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clockgen 4 3>, <&clockgen 4 3>,
++				 <&clockgen 4 3>, <&clockgen 4 3>;
++			clock-names = "bus", "mclk1", "mclk2", "mclk3";
++			dma-names = "tx", "rx";
++			dmas = <&edma0 1 45>,
++			       <&edma0 1 44>;
++			status = "disabled";
++		};
++
++		edma0: edma at 2c00000 {
++			#dma-cells = <2>;
++			compatible = "fsl,vf610-edma";
++			reg = <0x0 0x2c00000 0x0 0x10000>,
++			      <0x0 0x2c10000 0x0 0x10000>,
++			      <0x0 0x2c20000 0x0 0x10000>;
++			interrupts = <0 103 IRQ_TYPE_LEVEL_HIGH>,
++				     <0 103 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "edma-tx", "edma-err";
++			dma-channels = <32>;
++			big-endian;
++			clock-names = "dmamux0", "dmamux1";
++			clocks = <&clockgen 4 3>,
++				 <&clockgen 4 3>;
++		};
++
++		sata: sata at 3200000 {
++			compatible = "fsl,ls1012a-ahci", "fsl,ls1043a-ahci";
++			reg = <0x0 0x3200000 0x0 0x10000>;
++			interrupts = <0 69 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clockgen 4 0>;
++			status = "disabled";
++		};
++	};
++};
+-- 
+1.9.1
