@@ -1,45 +1,47 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue,  3 Jan 2017 23:16:24 +0800
-Subject: [PATCH 0/5] add support for Allwinner V3s SoC
-Message-ID: <20170103151629.19447-1-icenowy@aosc.xyz>
+Date: Tue,  3 Jan 2017 23:16:25 +0800
+Subject: [PATCH 1/5] arm: sunxi: add support for V3s SoC
+In-Reply-To: <20170103151629.19447-1-icenowy@aosc.xyz>
+References: <20170103151629.19447-1-icenowy@aosc.xyz>
+Message-ID: <20170103151629.19447-2-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner produced a single-core Cortex-A7 SoC, V3s, with integrated 64MiB DDR2
-DRAM, and in LQFP package. With such a package, it has been easier for hackers
-to DIY a board (no BGA needed, and no DRAM wiring needed).
+Allwinner V3s is a low-end single-core Cortex-A7 SoC, with 64MB
+integrated DRAM, and several peripherals.
 
-Add support for this SoC, as well as one board with it (Lichee Pi Zero).
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+ Documentation/arm/sunxi/README | 4 ++++
+ arch/arm/mach-sunxi/sunxi.c    | 1 +
+ 2 files changed, 5 insertions(+)
 
-Icenowy Zheng (5):
-  arm: sunxi: add support for V3s SoC
-  clk: sunxi-ng: add support for V3s CCU
-  pinctrl: sunxi: add driver for V3s SoC
-  ARM: dts: sunxi: add dtsi file for V3s SoC
-  ARM: dts: sunxi: add support for Lichee Pi Zero board
-
- Documentation/arm/sunxi/README                |   4 +
- arch/arm/boot/dts/Makefile                    |   3 +-
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts |  73 ++++
- arch/arm/boot/dts/sun8i-v3s.dtsi              | 257 +++++++++++
- arch/arm/mach-sunxi/sunxi.c                   |   1 +
- drivers/clk/sunxi-ng/Kconfig                  |  11 +
- drivers/clk/sunxi-ng/Makefile                 |   1 +
- drivers/clk/sunxi-ng/ccu-sun8i-v3s.c          | 590 ++++++++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-sun8i-v3s.h          |  63 +++
- drivers/pinctrl/sunxi/Kconfig                 |   4 +
- drivers/pinctrl/sunxi/Makefile                |   1 +
- drivers/pinctrl/sunxi/pinctrl-sun8i-v3s.c     | 321 ++++++++++++++
- include/dt-bindings/clock/sun8i-v3s-ccu.h     | 107 +++++
- include/dt-bindings/reset/sun8i-v3s-ccu.h     |  78 ++++
- 14 files changed, 1513 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
- create mode 100644 arch/arm/boot/dts/sun8i-v3s.dtsi
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-v3s.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-v3s.h
- create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun8i-v3s.c
- create mode 100644 include/dt-bindings/clock/sun8i-v3s-ccu.h
- create mode 100644 include/dt-bindings/reset/sun8i-v3s-ccu.h
-
+diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+index cd0243302bc1..91ec8f2055be 100644
+--- a/Documentation/arm/sunxi/README
++++ b/Documentation/arm/sunxi/README
+@@ -67,6 +67,10 @@ SunXi family
+         + Datasheet
+           http://dl.linux-sunxi.org/H3/Allwinner_H3_Datasheet_V1.0.pdf
+ 
++      - Allwinner V3s (sun8i)
++        + Datasheet
++          https://www.goprawn.com/forum/allwinner-cams/783-allwinner-v3s-soc-datasheet
++
+     * Quad ARM Cortex-A15, Quad ARM Cortex-A7 based SoCs
+       - Allwinner A80
+         + Datasheet
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 2e2bde271205..f246bfc6cfe4 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -64,6 +64,7 @@ static const char * const sun8i_board_dt_compat[] = {
+ 	"allwinner,sun8i-a33",
+ 	"allwinner,sun8i-a83t",
+ 	"allwinner,sun8i-h3",
++	"allwinner,sun8i-v3s",
+ 	NULL,
+ };
+ 
 -- 
 2.11.0
