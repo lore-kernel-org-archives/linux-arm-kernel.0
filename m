@@ -1,49 +1,31 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 03 Jan 2017 16:58:21 +0100
-Subject: [PATCH] arm64: defconfig: enable XORv2 for Marvell Armada 7K/8K
-In-Reply-To: <1482420258-13888-1-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Thu, 22 Dec 2016 16:24:18 +0100")
-References: <1482420258-13888-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87r34kf84i.fsf@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 3 Jan 2017 15:57:56 +0000
+Subject: [PATCH v2 4/5] arm64: Use __tlbi_dsb() macros in KVM code
+In-Reply-To: <20161229224335.13531-4-cov@codeaurora.org>
+References: <20161229224335.13531-1-cov@codeaurora.org>
+ <20161229224335.13531-4-cov@codeaurora.org>
+Message-ID: <20170103155756.GB14183@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On jeu., d?c. 22 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+On Thu, Dec 29, 2016 at 05:43:34PM -0500, Christopher Covington wrote:
+> Refactor the KVM code to use the newly introduced __tlbi_dsb macros, which
+> will allow an errata workaround that repeats tlbi dsb sequences to only
+> change one location. This is not intended to change the generated assembly
+> and comparing before and after vmlinux objdump shows no functional changes.
 
-> This commit enables the XORv2 DMA driver, which is used on the ARM64
-> Marvell Armada 7K and 8K platforms.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> @@ -40,9 +41,7 @@ void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>  	 * complete (S1 + S2) walk based on the old Stage-2 mapping if
+>  	 * the Stage-1 invalidation happened first.
+>  	 */
+> -	dsb(ish);
 
-Applied on mvebu/defconfig64
+Looks like this got accidentally removed. AFAICT it is still necessary.
+
+> -	asm volatile("tlbi vmalle1is" : : );
+> -	dsb(ish);
+> +	__tlbi_dsb(vmalle1is, ish);
+>  	isb();
 
 Thanks,
-
-Gregory
-> ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index dab2cb0..f8b6435 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -371,6 +371,7 @@ CONFIG_RTC_DRV_TEGRA=y
->  CONFIG_RTC_DRV_XGENE=y
->  CONFIG_RTC_DRV_S3C=y
->  CONFIG_DMADEVICES=y
-> +CONFIG_MV_XOR_V2=y
->  CONFIG_PL330_DMA=y
->  CONFIG_TEGRA20_APB_DMA=y
->  CONFIG_QCOM_BAM_DMA=y
-> -- 
-> 2.7.4
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Mark.
