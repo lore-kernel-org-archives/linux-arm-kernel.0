@@ -1,192 +1,66 @@
-From: yong.mao@mediatek.com (Yong Mao)
-Date: Tue, 3 Jan 2017 17:14:10 +0800
-Subject: [PATCH 1/4] mmc: mediatek: Fix CMD6 timeout issue
-In-Reply-To: <CAPDyKFosQkxaFAKo0dm0TajgXqKG7XqRM1tTqR2vTsHzVrocfQ@mail.gmail.com>
-References: <1478585341-6749-1-git-send-email-yong.mao@mediatek.com>
- <1478585341-6749-2-git-send-email-yong.mao@mediatek.com>
- <CAPDyKFosQkxaFAKo0dm0TajgXqKG7XqRM1tTqR2vTsHzVrocfQ@mail.gmail.com>
-Message-ID: <1483434850.656.16.camel@mhfsdcap03>
+From: alison.wang@nxp.com (Alison Wang)
+Date: Tue, 3 Jan 2017 09:19:22 +0000
+Subject: [PATCH v2 1/2] mtd: ifc: Update dependency of IFC for LS1021A
+In-Reply-To: <20170103100439.6e7360c6@bbrezillon>
+References: <1483411266-45875-1-git-send-email-b18965@freescale.com>
+ <20170103100439.6e7360c6@bbrezillon>
+Message-ID: <DB6PR0401MB2584447FAAD7E79FC0A87977F46E0@DB6PR0401MB2584.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-12-01 at 10:51 +0100, Ulf Hansson wrote:
-> On 8 November 2016 at 07:08, Yong Mao <yong.mao@mediatek.com> wrote:
-> > From: yong mao <yong.mao@mediatek.com>
+Ok, I see. Thanks.
+
+
+Best Regards,
+Alison Wang
+
+> -----Original Message-----
+> From: Boris Brezillon [mailto:boris.brezillon at free-electrons.com]
+> Sent: Tuesday, January 03, 2017 5:05 PM
+> To: Alison Wang <b18965@freescale.com>
+> Cc: marek.vasut at gmail.com; cyrille.pitchen at atmel.com; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> mtd at lists.infradead.org; dwmw2 at infradead.org;
+> computersforpeace at gmail.com; Alison Wang <alison.wang@nxp.com>
+> Subject: Re: [PATCH v2 1/2] mtd: ifc: Update dependency of IFC for
+> LS1021A
+> 
+> Hi Alison,
+> 
+> The subject prefix should be "memory: " and not "mtd: ifc: ".
+> 
+> Looks good otherwise.
+> 
+> No need to resend, I can fix that when applying.
+> 
+> Regards,
+> 
+> Boris
+> 
+> On Tue, 3 Jan 2017 10:41:05 +0800
+> Alison Wang <b18965@freescale.com> wrote:
+> 
+> > As Freescale/NXP IFC controller is available on LS1021A, the
+> > dependency for LS1021A is added.
 > >
-> > When initializing EMMC, after switch to HS400,
-> > it will issue CMD6 to change ext_csd, if first CMD6 got CRC
-> > error, the repeat CMD6 may get timeout, that's
-> > because SDCBSY was cleared by msdc_reset_hw()
-> 
-> Sorry for the delay!
-> 
-> We have recently been re-working the sequence for how to deal more
-> properly with CMD6 in the mmc core.
-> 
-> The changes done so far should mostly concern switches to HS and HS
-> DDR, but I think you should run a re-test to make sure you still hit
-> the same problems.
-> 
-Happy New Year!
-
-The issue we met is not only just for CMD6, but also for other R1B CMD.
-Your new changes does not cover all of these cases.
-We would like to make error handle in the core layer to deal with these
-issues.
-
-I had submitted a new path ([PATCH v2] Fix CMD6 timeout issue) to you,
-please help to review it.
-Thanks.
-
-
-> >
-> > Signed-off-by: Yong Mao <yong.mao@mediatek.com>
-> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> > Signed-off-by: Alison Wang <alison.wang@nxp.com>
 > > ---
-> >  drivers/mmc/host/mtk-sd.c |   77 ++++++++++++++++++++++++++++++---------------
-> >  1 file changed, 51 insertions(+), 26 deletions(-)
+> > Changes in v2:
+> > - New patch
 > >
-> > diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> > index 84e9afc..b29683b 100644
-> > --- a/drivers/mmc/host/mtk-sd.c
-> > +++ b/drivers/mmc/host/mtk-sd.c
-> > @@ -826,6 +826,15 @@ static bool msdc_cmd_done(struct msdc_host *host, int events,
-> >         return true;
-> >  }
+> >  drivers/memory/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
 > >
-> > +static int msdc_card_busy(struct mmc_host *mmc)
-> > +{
-> > +       struct msdc_host *host = mmc_priv(mmc);
-> > +       u32 status = readl(host->base + MSDC_PS);
-> > +
-> > +       /* check if data0 is low */
-> > +       return !(status & BIT(16));
-> > +}
-> > +
-> >  /* It is the core layer's responsibility to ensure card status
-> >   * is correct before issue a request. but host design do below
-> >   * checks recommended.
-> 
-> Hmm. Why?
-> 
-> I think you should rely on the mmc core to invoke the ->card_busy()
-> ops instead. The core knows better when it's needed.
-> 
-> Perhaps that may also resolve some of these issues for you!?
-In my latest patch, msdc_card_busy will not be used in mtk-sd.c
-directly. It only can be invoked by ->card_busy() in the mmc core.
-
-
-> 
-> > @@ -835,10 +844,20 @@ static inline bool msdc_cmd_is_ready(struct msdc_host *host,
-> >  {
-> >         /* The max busy time we can endure is 20ms */
-> >         unsigned long tmo = jiffies + msecs_to_jiffies(20);
-> > +       u32 count = 0;
-> > +
-> > +       if (in_interrupt()) {
-> > +               while ((readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) &&
-> > +                      (count < 1000)) {
-> > +                       udelay(1);
-> > +                       count++;
-> 
-> This seems like a bad idea, "busy-wait" in irq context is never a good idea.
-Thanks. The modification here is not for the current issue.
-I will submit a new patch to discuss with you.
-
-
-> > +               }
-> > +       } else {
-> > +               while ((readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) &&
-> > +                      time_before(jiffies, tmo))
-> > +                       cpu_relax();
-> > +       }
+> > diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig index
+> > ec80e35..fff8345 100644
+> > --- a/drivers/memory/Kconfig
+> > +++ b/drivers/memory/Kconfig
+> > @@ -115,7 +115,7 @@ config FSL_CORENET_CF
 > >
-> > -       while ((readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) &&
-> > -                       time_before(jiffies, tmo))
-> > -               cpu_relax();
-> >         if (readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) {
-> >                 dev_err(host->dev, "CMD bus busy detected\n");
-> >                 host->error |= REQ_CMD_BUSY;
-> > @@ -846,17 +865,35 @@ static inline bool msdc_cmd_is_ready(struct msdc_host *host,
-> >                 return false;
-> >         }
+> >  config FSL_IFC
+> >  	bool
+> > -	depends on FSL_SOC || ARCH_LAYERSCAPE
+> > +	depends on FSL_SOC || ARCH_LAYERSCAPE || SOC_LS1021A
 > >
-> > -       if (mmc_resp_type(cmd) == MMC_RSP_R1B || cmd->data) {
-> > -               tmo = jiffies + msecs_to_jiffies(20);
-> > -               /* R1B or with data, should check SDCBUSY */
-> > -               while ((readl(host->base + SDC_STS) & SDC_STS_SDCBUSY) &&
-> > -                               time_before(jiffies, tmo))
-> > -                       cpu_relax();
-> > -               if (readl(host->base + SDC_STS) & SDC_STS_SDCBUSY) {
-> > -                       dev_err(host->dev, "Controller busy detected\n");
-> > -                       host->error |= REQ_CMD_BUSY;
-> > -                       msdc_cmd_done(host, MSDC_INT_CMDTMO, mrq, cmd);
-> > -                       return false;
-> > +       if (cmd->opcode != MMC_SEND_STATUS) {
-> > +               count = 0;
-> > +               /* Consider that CMD6 crc error before card was init done,
-> > +                * mmc_retune() will return directly as host->card is null.
-> > +                * and CMD6 will retry 3 times, must ensure card is in transfer
-> > +                * state when retry.
-> > +                */
-> > +               tmo = jiffies + msecs_to_jiffies(60 * 1000);
-> > +               while (1) {
-> > +                       if (msdc_card_busy(host->mmc)) {
-> > +                               if (in_interrupt()) {
-> > +                                       udelay(1);
-> > +                                       count++;
-> > +                               } else {
-> > +                                       msleep_interruptible(10);
-> > +                               }
-> > +                       } else {
-> > +                               break;
-> > +                       }
-> > +                       /* Timeout if the device never
-> > +                        * leaves the program state.
-> > +                        */
-> > +                       if (count > 1000 || time_after(jiffies, tmo)) {
-> > +                               pr_err("%s: Card stuck in programming state! %s\n",
-> > +                                      mmc_hostname(host->mmc), __func__);
-> > +                               host->error |= REQ_CMD_BUSY;
-> > +                               msdc_cmd_done(host, MSDC_INT_CMDTMO, mrq, cmd);
-> > +                               return false;
-> > +                       }
-> 
-> This hole new code is a hack, that shouldn't be needed in the host driver.
-> 
-> I think we need to investigate and fix the issue in the mmc core
-> layer, to make this work for your host driver. That instead of doing a
-> work around in the host.
-> 
-I had already make some modification on the mmc core to resolve these
-issues in the latest patch.
-
-> >                 }
-> >         }
-> >         return true;
-> > @@ -1070,18 +1107,6 @@ static int msdc_ops_switch_volt(struct mmc_host *mmc, struct mmc_ios *ios)
-> >         return ret;
-> >  }
-> >
-> > -static int msdc_card_busy(struct mmc_host *mmc)
-> > -{
-> > -       struct msdc_host *host = mmc_priv(mmc);
-> > -       u32 status = readl(host->base + MSDC_PS);
-> > -
-> > -       /* check if any pin between dat[0:3] is low */
-> > -       if (((status >> 16) & 0xf) != 0xf)
-> > -               return 1;
-> > -
-> > -       return 0;
-> > -}
-> > -
-> >  static void msdc_request_timeout(struct work_struct *work)
-> >  {
-> >         struct msdc_host *host = container_of(work, struct msdc_host,
-> > --
-> > 1.7.9.5
-> >
-> 
-> Kind regards
-> Uffe
+> >  config JZ4780_NEMC
+> >  	bool "Ingenic JZ4780 SoC NEMC driver"
