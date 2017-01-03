@@ -1,101 +1,138 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 3 Jan 2017 14:13:52 -0600
-Subject: [PATCH 1/2] arm64: dma_mapping: allow PCI host driver to limit
- DMA mask
-In-Reply-To: <ead2ff8d-fbd3-3109-51e2-41937e9c944d@cogentembedded.com>
-References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
- <20170103184444.GP6986@arm.com>
- <ead2ff8d-fbd3-3109-51e2-41937e9c944d@cogentembedded.com>
-Message-ID: <9382563b-44ab-47a8-14d0-1fdaf49f8c5d@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 3 Jan 2017 14:18:42 -0600
+Subject: [PATCHv2 net-next 01/16] dt-bindings: net: update Marvell PPv2
+ binding for PPv2.2 support
+In-Reply-To: <1482943592-12556-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1482943592-12556-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170103201842.hdg2uzzesog2jund@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 01/03/2017 01:01 PM, Nikita Yushchenko wrote:
->>> It is possible that PCI device supports 64-bit DMA addressing, and thus
->>> it's driver sets device's dma_mask to DMA_BIT_MASK(64), however PCI host
->>> bridge has limitations on inbound transactions addressing. Example of
->>> such setup is NVME SSD device connected to RCAR PCIe controller.
->>>
->>> Previously there was attempt to handle this via bus notifier: after
->>> driver is attached to PCI device, bridge driver gets notifier callback,
->>> and resets dma_mask from there. However, this is racy: PCI device driver
->>> could already allocate buffers and/or start i/o in probe routine.
->>> In NVME case, i/o is started in workqueue context, and this race gives
->>> "sometimes works, sometimes not" effect.
->>>
->>> Proper solution should make driver's dma_set_mask() call to fail if host
->>> bridge can't support mask being set.
->>>
->>> This patch makes __swiotlb_dma_supported() to check mask being set for
->>> PCI device against dma_mask of struct device corresponding to PCI host
->>> bridge (one with name "pciXXXX:YY"), if that dma_mask is set.
->>>
->>> This is the least destructive approach: currently dma_mask of that device
->>> object is not used anyhow, thus all existing setups will work as before,
->>> and modification is required only in actually affected components -
->>> driver of particular PCI host bridge, and dma_map_ops of particular
->>> platform.
->>>
->>> Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
->>> ---
->>>  arch/arm64/mm/dma-mapping.c | 11 +++++++++++
->>>  1 file changed, 11 insertions(+)
->>>
->>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->>> index 290a84f..49645277 100644
->>> --- a/arch/arm64/mm/dma-mapping.c
->>> +++ b/arch/arm64/mm/dma-mapping.c
->>> @@ -28,6 +28,7 @@
->>>  #include <linux/dma-contiguous.h>
->>>  #include <linux/vmalloc.h>
->>>  #include <linux/swiotlb.h>
->>> +#include <linux/pci.h>
->>>  
->>>  #include <asm/cacheflush.h>
->>>  
->>> @@ -347,6 +348,16 @@ static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
->>>  
->>>  static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
->>>  {
->>> +#ifdef CONFIG_PCI
->>> +	if (dev_is_pci(hwdev)) {
->>> +		struct pci_dev *pdev = to_pci_dev(hwdev);
->>> +		struct pci_host_bridge *br = pci_find_host_bridge(pdev->bus);
->>> +
->>> +		if (br->dev.dma_mask && (*br->dev.dma_mask) &&
->>> +				(mask & (*br->dev.dma_mask)) != mask)
->>> +			return 0;
->>> +	}
->>> +#endif
->>
->> Hmm, but this makes it look like the problem is both arm64 and swiotlb
->> specific, when in reality it's not. Perhaps another hack you could try
->> would be to register a PCI bus notifier in the host bridge looking for
->> BUS_NOTIFY_BIND_DRIVER, then you could proxy the DMA ops for each child
->> device before the driver has probed, but adding a dma_set_mask callback
->> to limit the mask to what you need?
+On Wed, Dec 28, 2016 at 05:46:17PM +0100, Thomas Petazzoni wrote:
+> The Marvell PPv2 Device Tree binding was so far only used to describe
+> the PPv2.1 network controller, used in the Marvell Armada 375.
 > 
-> This is what Renesas BSP tries to do and it does not work.
+> A new version of this IP block, PPv2.2 is used in the Marvell Armada
+> 7K/8K processor. This commit extends the existing binding so that it can
+> also be used to describe PPv2.2 hardware.
 > 
-> BUS_NOTIFY_BIND_DRIVER arrives after driver's probe routine exits, but
-> i/o can be started before that.
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  .../devicetree/bindings/net/marvell-pp2.txt        | 66 ++++++++++++++++++----
+>  1 file changed, 55 insertions(+), 11 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/net/marvell-pp2.txt b/Documentation/devicetree/bindings/net/marvell-pp2.txt
+> index aa4f423..76071f3 100644
+> --- a/Documentation/devicetree/bindings/net/marvell-pp2.txt
+> +++ b/Documentation/devicetree/bindings/net/marvell-pp2.txt
+> @@ -1,17 +1,28 @@
+> -* Marvell Armada 375 Ethernet Controller (PPv2)
+> +* Marvell Armada 375 Ethernet Controller (PPv2.1)
+> +  Marvell Armada 7K/8K Ethernet Controller (PPv2.2)
+>  
+>  Required properties:
+>  
+> -- compatible: should be "marvell,armada-375-pp2"
+> +- compatible: should be one of:
+> +    "marvell,armada-375-pp2"
+> +    "marvell,armada-7k-pp2"
+>  - reg: addresses and length of the register sets for the device.
+> -  Must contain the following register sets:
+> +  For "marvell,armada-375-pp2", must contain the following register
+> +  sets:
+>  	- common controller registers
+>  	- LMS registers
+> -  In addition, at least one port register set is required.
+> -- clocks: a pointer to the reference clocks for this device, consequently:
+> -	- main controller clock
+> -	- GOP clock
+> -- clock-names: names of used clocks, must be "pp_clk" and "gop_clk".
+> +	- one register area per Ethernet port
+> +  For "marvell,armda-7k-pp2", must contain the following register
+> +  sets:
+> +        - common controller registers
+> +	- per-port registers
+> +
+> +- clocks: pointers to the reference clocks for this device, consequently:
+> +	- main controller clock (for both armada-375-pp2 and armada-7k-pp2)
+> +	- GOP clock (for both armada-375-pp2 and armada-7k-pp2)
+> +	- MG clock (only for armada-7k-pp2)
+> +- clock-names: names of used clocks, must be "pp_clk", "gop_clk" and
+> +  "mg_clk" (the latter only for armada-7k-pp2).
+>  
+>  The ethernet ports are represented by subnodes. At least one port is
+>  required.
+> @@ -19,8 +30,9 @@ required.
+>  Required properties (port):
+>  
+>  - interrupts: interrupt for the port
+> -- port-id: should be '0' or '1' for ethernet ports, and '2' for the
+> -           loopback port
+> +- port-id: ID of the port from the MAC point of view
+> +- gop-port-id: only for marvell,armada-7k-pp2, ID of the port from the
+> +  GOP (Group Of Ports) point of view
 
-Hm. This is strange statement:
- really_probe
- |->driver_sysfs_add
-    |-> blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
- 					     BUS_NOTIFY_BIND_DRIVER, dev);
-...
- |- ret = drv->probe(dev);
-...
- |- driver_bound(dev);
-    |- blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
-					     BUS_NOTIFY_BOUND_DRIVER, dev);
+What GOP is needs a better explanation. Why doesn't 375 need this?
 
-Am I missing smth?
+>  - phy-mode: See ethernet.txt file in the same directory
+>  
+>  Optional properties (port):
+> @@ -31,7 +43,7 @@ Optional properties (port):
+>    then fixed link is assumed, and the 'fixed-link' property is
+>    mandatory.
+>  
+> -Example:
+> +Example for marvell,armada-375-pp2:
+>  
+>  ethernet at f0000 {
+>  	compatible = "marvell,armada-375-pp2";
+> @@ -59,3 +71,35 @@ ethernet at f0000 {
+>  		phy-mode = "gmii";
+>  	};
+>  };
+> +
+> +Example for marvell,armada-7k-pp2:
+> +
+> +cpm_ethernet: ethernet at 0 {
+> +	compatible = "marvell,armada-7k-pp22";
+> +	reg = <0x0 0x100000>,
+> +	      <0x100000 0x80000>;
+> +	clocks = <&cpm_syscon0 1 3>, <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
+> +	clock-names = "pp_clk", "gop_clk", "gp_clk";
+> +	status = "disabled";
 
--- 
-regards,
--grygorii
+Drop status from examples.
+
+> +
+> +	eth0: eth at 0 {
+
+unit address requires a reg property. Or this can be 'eth0' instead.
+
+> +		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+> +		port-id = <0>;
+> +		gop-port-id = <0>;
+> +		status = "disabled";
+> +	};
+> +
+> +	eth1: eth at 1 {
+> +		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+> +		port-id = <1>;
+> +		gop-port-id = <2>;
+> +		status = "disabled";
+> +	};
+> +
+> +	eth2: eth at 2 {
+> +		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
+> +		port-id = <2>;
+> +		gop-port-id = <3>;
+> +		status = "disabled";
+> +	};
+> +};
+> -- 
+> 2.7.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
