@@ -1,59 +1,104 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 3 Jan 2017 09:33:36 +0000
-Subject: [PATCH 15/20] ARM/hw_breakpoint: Convert to hotplug state machine
-In-Reply-To: <CACRpkdaxAPSU-XPQrgVRoBecAD1ZpVVP4qPe59af-yy11WqBQw@mail.gmail.com>
-References: <20161117183541.8588-1-bigeasy@linutronix.de>
- <20161117183541.8588-16-bigeasy@linutronix.de>
- <CACRpkdZE+h0+3EizLCMUr-e-4pv4w9iAatSqL8k0Ovd2iUaS8Q@mail.gmail.com>
- <CACRpkda2gdjM--LSoJTL0dvqyw796w1hMSAhUQwv9X0EPzJHig@mail.gmail.com>
- <20170102150015.GJ14217@n2100.armlinux.org.uk>
- <CACRpkdaxAPSU-XPQrgVRoBecAD1ZpVVP4qPe59af-yy11WqBQw@mail.gmail.com>
-Message-ID: <20170103093335.GA5605@leverpostej>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 3 Jan 2017 10:37:46 +0100
+Subject: [PATCH v6 05/14] ACPI: platform-msi: retrieve dev id from IORT
+In-Reply-To: <13cb0c87-e1c0-c4d6-4793-a3edd20944dc@semihalf.com>
+References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
+ <1483363905-2806-6-git-send-email-hanjun.guo@linaro.org>
+ <13cb0c87-e1c0-c4d6-4793-a3edd20944dc@semihalf.com>
+Message-ID: <4ab6a7e3-7aa3-367d-a333-effb24399fd5@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03.01.2017 09:43, Tomasz Nowicki wrote:
+> On 02.01.2017 14:31, Hanjun Guo wrote:
+>> For devices connecting to ITS, it needs dev id to identify
+>> itself, and this dev id is represented in the IORT table in
+>> named componant node [1] for platform devices, so in this
+>> patch we will scan the IORT to retrieve device's dev id.
+>>
+>> Introduce iort_pmsi_get_dev_id() with pointer dev passed
+>> in for that purpose.
+>>
+>> [1]:
+>> https://static.docs.arm.com/den0049/b/DEN0049B_IO_Remapping_Table.pdf
+>>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Tested-by: Sinan Kaya <okaya@codeaurora.org>
+>> Tested-by: Majun <majun258@huawei.com>
+>> Tested-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Tomasz Nowicki <tn@semihalf.com>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> ---
+>>  drivers/acpi/arm64/iort.c                     | 26
+>> ++++++++++++++++++++++++++
+>>  drivers/irqchip/irq-gic-v3-its-platform-msi.c |  4 +++-
+>>  include/linux/acpi_iort.h                     |  8 ++++++++
+>>  3 files changed, 37 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+>> index 174e983..ab7bae7 100644
+>> --- a/drivers/acpi/arm64/iort.c
+>> +++ b/drivers/acpi/arm64/iort.c
+>> @@ -444,6 +444,32 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+>>  }
+>>
+>>  /**
+>> + * iort_pmsi_get_dev_id() - Get the device id for a device
+>> + * @dev: The device for which the mapping is to be done.
+>> + * @dev_id: The device ID found.
+>> + *
+>> + * Returns: 0 for successful find a dev id, errors otherwise
+>> + */
+>> +int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
+>> +{
+>> +    struct acpi_iort_node *node;
+>> +
+>> +    if (!iort_table)
+>> +        return -ENODEV;
+>> +
+>> +    node = iort_find_dev_node(dev);
+>> +    if (!node) {
+>> +        dev_err(dev, "can't find related IORT node\n");
+>> +        return -ENODEV;
+>> +    }
+>> +
+>> +    if(!iort_node_get_id(node, dev_id, IORT_MSI_TYPE, 0))
+>> +        return -ENODEV;
+>> +
+>> +    return 0;
+>> +}
+>> +
+>> +/**
+> Giving that you are extending this to NC->
+> SMMU->ITS case in later patch, we can use existing helpers from iort.c,
+> like that:
+>
+> +/**
+> + * iort_pmsi_get_dev_id() - Get the device id for a device
+> + * @dev: The device for which the mapping is to be done.
+> + * @dev_id: The device ID found.
+> + *
+> + * Returns: 0 for successful find a dev id, errors otherwise
+> + */
+> +int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
+> +{
+> +    struct acpi_iort_node *node;
+> +
+> +    node = iort_find_dev_node(dev);
+> +    if (!node)
+> +        return -ENODEV;
+> +
+> +    if (!iort_node_map_rid(node, 0, dev_id, IORT_MSI_TYPE))
+> +        return -ENODEV;
+> +
+> +    return 0;
+> +}
+>
+> Correct me if I am wrong.
+>
 
-On Mon, Jan 02, 2017 at 09:15:29PM +0100, Linus Walleij wrote:
-> On Mon, Jan 2, 2017 at 4:00 PM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > On Mon, Jan 02, 2017 at 03:34:32PM +0100, Linus Walleij wrote:
-> >> in the first line of arch_hw_breakpoint_init() in
-> >> arch/arm/kernel/hw_breakpoint.c
-> >>
-> >> I suspect that is not an accepable solution ...
-> >>
-> >> It hangs at PC is at write_wb_reg+0x20c/0x330
-> >> Which is c03101dc, and looks like this in objdump -d:
-> >>
-> >> c031020c:       ee001eba        mcr     14, 0, r1, cr0, cr10, {5}
-> >> c0310210:       eaffffb3        b       c03100e4 <write_wb_reg+0x114>
-> >
-> > ... and this is several instructions after the address you mention above.
-> > Presumably c03101dc is accessing a higher numbered register?
-> 
-> Ah sorry. It looks like this:
-> 
-> c03101dc:       ee001ed0        mcr     14, 0, r1, cr0, cr0, {6}
-> c03101e0:       eaffffbf        b       c03100e4 <write_wb_reg+0x114>
-> c03101e4:       ee001ebf        mcr     14, 0, r1, cr0, cr15, {5}
-> c03101e8:       eaffffbd        b       c03100e4 <write_wb_reg+0x114>
-> c03101ec:       ee001ebe        mcr     14, 0, r1, cr0, cr14, {5}
-> c03101f0:       eaffffbb        b       c03100e4 <write_wb_reg+0x114>
-> c03101f4:       ee001ebd        mcr     14, 0, r1, cr0, cr13, {5}
-> c03101f8:       eaffffb9        b       c03100e4 <write_wb_reg+0x114>
+"0" as rid_in for iort_node_map_rid() isn't good idea, sorry...
 
-FWIW, I was tracking an issue in this area before the holiday.
-
-It looked like DBGPRSR.SPD is set unexpectedly over the default idle
-path (i.e. WFI), causing the (otherwise valid) register accesses above
-to be handled as undefined.
-
-I haven't looked at the patch in detail, but I guess that it allows idle
-to occur between reset_ctrl_regs() and arch_hw_breakpoint_init().
-
-Reading DBGPRSR should clear SPD; but I'm not sure if other debug state
-is affected.
-
-Thanks,
-Mark.
+Tomasz
