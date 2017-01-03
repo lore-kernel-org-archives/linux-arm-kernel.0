@@ -1,80 +1,219 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  3 Jan 2017 18:10:17 +0000
-Subject: [RFC PATCH 00/10] Add support for the ARMv8.2 Statistical Profiling
- Extension
-Message-ID: <1483467027-14547-1-git-send-email-will.deacon@arm.com>
+Date: Tue,  3 Jan 2017 18:10:20 +0000
+Subject: [RFC PATCH 03/10] arm64: KVM: Save/restore the host SPE state when
+ entering/leaving a VM
+In-Reply-To: <1483467027-14547-1-git-send-email-will.deacon@arm.com>
+References: <1483467027-14547-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1483467027-14547-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The SPE buffer is virtually addressed, using the page tables of the CPU
+MMU. Unusually, this means that the EL0/1 page table may be live whilst
+we're executing at EL2 on non-VHE configurations. When VHE is in use,
+we can use the same property to profile the guest behind its back.
 
-This RFC series adds support for the ARMv8.2 Statistical Profiling
-Extension (SPE) to Linux in the form of a perf PMU driver. There aren't
-any userspace patches for perf tool yet, but Kim (on CC) is working on
-those and I thought posting the kernel side as an RFC was still worth it
-in the meantime.
+This patch adds the relevant disabling and flushing code to KVM so that
+the host can make use of SPE without corrupting guest memory, and any
+attempts by a guest to use SPE will result in a trap.
 
-The series is structured as:
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Alex Benn?e <alex.bennee@linaro.org>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/kvm_arm.h  |  3 ++
+ arch/arm64/include/asm/kvm_host.h |  7 ++++-
+ arch/arm64/kvm/debug.c            |  6 ++++
+ arch/arm64/kvm/hyp/debug-sr.c     | 66 +++++++++++++++++++++++++++++++++++++--
+ arch/arm64/kvm/hyp/switch.c       | 13 +++++++-
+ 5 files changed, 91 insertions(+), 4 deletions(-)
 
-  1-2: Tweak arm64 CPU feature detection to support heterogeneous
-       configurations where CPUs have differ in debug and profiling
-       capabilities.
-
-  3-4: Add EL2 SPE support (KVM world switch and initialisation)
-
-  5-6: Export some functions to modules, so this driver can be built as
-       a loadable module.
-
-  7-8: Introduce PERF_AUX_FLAG_COLLISION
-
-  9-10: Add the actual PMU driver and devicetree binding
-
-Like intel-pt, the interface to the PMU is via the perf AUX area and the
-profiling hardware writes directly to the pages mapped by userspace. The
-hardware capabilities (caps/) and config field encodings (format/) are
-advertised via sysfs.
-
-Patches based on v4.10-rc2 and tested on an ARM FastModel.
-
-Will
-
---->8
-
-Will Deacon (10):
-  arm64: cpufeature: allow for version discrepancy in PMU
-    implementations
-  arm64: cpufeature: Don't enforce system-wide SPE capability
-  arm64: KVM: Save/restore the host SPE state when entering/leaving a VM
-  arm64: head.S: Enable EL1 (host) access to SPE when entered at EL2
-  genirq: export irq_get_percpu_devid_partition to modules
-  perf/core: Export AUX buffer helpers to modules
-  perf: Directly pass PERF_AUX_* flags to perf_aux_output_end
-  perf/core: Add PERF_AUX_FLAG_COLLISION to report colliding samples
-  drivers/perf: Add support for ARMv8.2 Statistical Profiling Extension
-  dt-bindings: Document devicetree binding for ARM SPE
-
- Documentation/devicetree/bindings/arm/spe-pmu.txt |   20 +
- arch/arm64/include/asm/kvm_arm.h                  |    3 +
- arch/arm64/include/asm/kvm_host.h                 |    7 +-
- arch/arm64/include/asm/sysreg.h                   |    1 +
- arch/arm64/kernel/cpufeature.c                    |    9 +-
- arch/arm64/kernel/head.S                          |   14 +-
- arch/arm64/kvm/debug.c                            |    6 +
- arch/arm64/kvm/hyp/debug-sr.c                     |   66 +-
- arch/arm64/kvm/hyp/switch.c                       |   13 +-
- arch/x86/events/intel/bts.c                       |   11 +-
- arch/x86/events/intel/pt.c                        |   11 +-
- drivers/hwtracing/coresight/coresight-etm-perf.c  |    5 +-
- drivers/perf/Kconfig                              |    8 +
- drivers/perf/Makefile                             |    1 +
- drivers/perf/arm_spe_pmu.c                        | 1247 +++++++++++++++++++++
- include/linux/perf_event.h                        |    4 +-
- include/uapi/linux/perf_event.h                   |    1 +
- kernel/events/ring_buffer.c                       |   16 +-
- kernel/irq/irqdesc.c                              |    1 +
- 19 files changed, 1416 insertions(+), 28 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/spe-pmu.txt
- create mode 100644 drivers/perf/arm_spe_pmu.c
-
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 2a2752b5b6aa..6e99978e83bd 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -188,6 +188,9 @@
+ #define CPTR_EL2_DEFAULT	0x000033ff
+ 
+ /* Hyp Debug Configuration Register bits */
++#define MDCR_EL2_TPMS		(1 << 14)
++#define MDCR_EL2_E2PB_MASK	(UL(0x3))
++#define MDCR_EL2_E2PB_SHIFT	(UL(12))
+ #define MDCR_EL2_TDRA		(1 << 11)
+ #define MDCR_EL2_TDOSA		(1 << 10)
+ #define MDCR_EL2_TDA		(1 << 9)
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index e5050388e062..443b387021f2 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -229,7 +229,12 @@ struct kvm_vcpu_arch {
+ 
+ 	/* Pointer to host CPU context */
+ 	kvm_cpu_context_t *host_cpu_context;
+-	struct kvm_guest_debug_arch host_debug_state;
++	struct {
++		/* {Break,watch}point registers */
++		struct kvm_guest_debug_arch regs;
++		/* Statistical profiling extension */
++		u64 pmscr_el1;
++	} host_debug_state;
+ 
+ 	/* VGIC state */
+ 	struct vgic_cpu vgic_cpu;
+diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+index 47e5f0feaee8..dbadfaf850a7 100644
+--- a/arch/arm64/kvm/debug.c
++++ b/arch/arm64/kvm/debug.c
+@@ -95,6 +95,7 @@ void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu)
+  *  - Performance monitors (MDCR_EL2_TPM/MDCR_EL2_TPMCR)
+  *  - Debug ROM Address (MDCR_EL2_TDRA)
+  *  - OS related registers (MDCR_EL2_TDOSA)
++ *  - Statistical profiler (MDCR_EL2_TPMS/MDCR_EL2_E2PB)
+  *
+  * Additionally, KVM only traps guest accesses to the debug registers if
+  * the guest is not actively using them (see the KVM_ARM64_DEBUG_DIRTY
+@@ -110,8 +111,13 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
+ 
+ 	trace_kvm_arm_setup_debug(vcpu, vcpu->guest_debug);
+ 
++	/*
++	 * This also clears MDCR_EL2_E2PB_MASK to disable guest access
++	 * to the profiling buffer.
++	 */
+ 	vcpu->arch.mdcr_el2 = __this_cpu_read(mdcr_el2) & MDCR_EL2_HPMN_MASK;
+ 	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TPM |
++				MDCR_EL2_TPMS |
+ 				MDCR_EL2_TPMCR |
+ 				MDCR_EL2_TDRA |
+ 				MDCR_EL2_TDOSA);
+diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+index 4ba5c9095d03..f5154ed3da6c 100644
+--- a/arch/arm64/kvm/hyp/debug-sr.c
++++ b/arch/arm64/kvm/hyp/debug-sr.c
+@@ -65,6 +65,66 @@
+ 	default:	write_debug(ptr[0], reg, 0);			\
+ 	}
+ 
++#define PMSCR_EL1		sys_reg(3, 0, 9, 9, 0)
++
++#define PMBLIMITR_EL1		sys_reg(3, 0, 9, 10, 0)
++#define PMBLIMITR_EL1_E		BIT(0)
++
++#define PMBIDR_EL1		sys_reg(3, 0, 9, 10, 7)
++#define PMBIDR_EL1_P		BIT(4)
++
++#define psb_csync()		asm volatile("hint #17")
++
++static void __hyp_text __debug_save_spe_vhe(u64 *pmscr_el1)
++{
++	/* The vcpu can run. but it can't hide. */
++}
++
++static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
++{
++	u64 reg;
++
++	/* SPE present on this CPU? */
++	if (!cpuid_feature_extract_unsigned_field(read_sysreg(id_aa64dfr0_el1),
++						  ID_AA64DFR0_PMSVER_SHIFT))
++		return;
++
++	/* Yes; is it owned by EL3? */
++	reg = read_sysreg_s(PMBIDR_EL1);
++	if (reg & PMBIDR_EL1_P)
++		return;
++
++	/* No; is the host actually using the thing? */
++	reg = read_sysreg_s(PMBLIMITR_EL1);
++	if (!(reg & PMBLIMITR_EL1_E))
++		return;
++
++	/* Yes; save the control register and disable data generation */
++	*pmscr_el1 = read_sysreg_s(PMSCR_EL1);
++	write_sysreg_s(0, PMSCR_EL1);
++	isb();
++
++	/* Now drain all buffered data to memory */
++	psb_csync();
++	dsb(nsh);
++}
++
++static hyp_alternate_select(__debug_save_spe,
++			    __debug_save_spe_nvhe, __debug_save_spe_vhe,
++			    ARM64_HAS_VIRT_HOST_EXTN);
++
++static void __hyp_text __debug_restore_spe(u64 pmscr_el1)
++{
++	if (!pmscr_el1)
++		return;
++
++	/* The host page table is installed, but not yet synchronised */
++	isb();
++
++	/* Re-enable data generation */
++	write_sysreg_s(pmscr_el1, PMSCR_EL1);
++}
++
+ void __hyp_text __debug_save_state(struct kvm_vcpu *vcpu,
+ 				   struct kvm_guest_debug_arch *dbg,
+ 				   struct kvm_cpu_context *ctxt)
+@@ -118,13 +178,15 @@ void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
+ 	    (vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_MDE))
+ 		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
+ 
+-	__debug_save_state(vcpu, &vcpu->arch.host_debug_state,
++	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
+ 			   kern_hyp_va(vcpu->arch.host_cpu_context));
++	__debug_save_spe()(&vcpu->arch.host_debug_state.pmscr_el1);
+ }
+ 
+ void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
+ {
+-	__debug_restore_state(vcpu, &vcpu->arch.host_debug_state,
++	__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
++	__debug_restore_state(vcpu, &vcpu->arch.host_debug_state.regs,
+ 			      kern_hyp_va(vcpu->arch.host_cpu_context));
+ 
+ 	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 75e83dd40d43..1ee5b06d81e5 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -103,7 +103,13 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ static void __hyp_text __deactivate_traps_vhe(void)
+ {
+ 	extern char vectors[];	/* kernel exception vectors */
++	u64 mdcr_el2 = read_sysreg(mdcr_el2);
+ 
++	mdcr_el2 &= MDCR_EL2_HPMN_MASK |
++		    MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT |
++		    MDCR_EL2_TPMS;
++
++	write_sysreg(mdcr_el2, mdcr_el2);
+ 	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+ 	write_sysreg(CPACR_EL1_FPEN, cpacr_el1);
+ 	write_sysreg(vectors, vbar_el1);
+@@ -111,6 +117,12 @@ static void __hyp_text __deactivate_traps_vhe(void)
+ 
+ static void __hyp_text __deactivate_traps_nvhe(void)
+ {
++	u64 mdcr_el2 = read_sysreg(mdcr_el2);
++
++	mdcr_el2 &= MDCR_EL2_HPMN_MASK;
++	mdcr_el2 |= MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT;
++
++	write_sysreg(mdcr_el2, mdcr_el2);
+ 	write_sysreg(HCR_RW, hcr_el2);
+ 	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
+ }
+@@ -132,7 +144,6 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+ 
+ 	__deactivate_traps_arch()();
+ 	write_sysreg(0, hstr_el2);
+-	write_sysreg(read_sysreg(mdcr_el2) & MDCR_EL2_HPMN_MASK, mdcr_el2);
+ 	write_sysreg(0, pmuserenr_el0);
+ }
+ 
 -- 
 2.1.4
