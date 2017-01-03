@@ -1,86 +1,45 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 03 Jan 2017 16:14:52 +0100
-Subject: [PATCH v4 4/4] arm64: dts: marvell: Enable spi0 on the board
- Armada-3720-db
-In-Reply-To: <20161208145847.7794-5-romain.perier@free-electrons.com> (Romain
- Perier's message of "Thu, 8 Dec 2016 15:58:47 +0100")
-References: <20161208145847.7794-1-romain.perier@free-electrons.com>
- <20161208145847.7794-5-romain.perier@free-electrons.com>
-Message-ID: <87a8b8gopf.fsf@free-electrons.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue,  3 Jan 2017 23:16:24 +0800
+Subject: [PATCH 0/5] add support for Allwinner V3s SoC
+Message-ID: <20170103151629.19447-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
- 
- On jeu., d?c. 08 2016, Romain Perier <romain.perier@free-electrons.com> wrote:
+Allwinner produced a single-core Cortex-A7 SoC, V3s, with integrated 64MiB DDR2
+DRAM, and in LQFP package. With such a package, it has been easier for hackers
+to DIY a board (no BGA needed, and no DRAM wiring needed).
 
-> This commit enables the device node spi0 on the official development
-> board for the Marvell Armada 3700. It also adds sub-node for the 128Mb
-> SPI-NOR present on the board.
->
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
-> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Add support for this SoC, as well as one board with it (Lichee Pi Zero).
 
-Applied on mvebu/dt64
+Icenowy Zheng (5):
+  arm: sunxi: add support for V3s SoC
+  clk: sunxi-ng: add support for V3s CCU
+  pinctrl: sunxi: add driver for V3s SoC
+  ARM: dts: sunxi: add dtsi file for V3s SoC
+  ARM: dts: sunxi: add support for Lichee Pi Zero board
 
-Thanks,
-
-Gregory
-> ---
->
-> Changes in v3:
->  - Added tag "Tested-by" by Gregory
->
->  arch/arm64/boot/dts/marvell/armada-3720-db.dts | 30 ++++++++++++++++++++++++++
->  1 file changed, 30 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-> index 1372e9a6..0c4eb98 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-> @@ -67,6 +67,36 @@
->  	status = "okay";
->  };
->  
-> +&spi0 {
-> +	status = "okay";
-> +
-> +	m25p80 at 0 {
-> +		compatible = "jedec,spi-nor";
-> +		reg = <0>;
-> +		spi-max-frequency = <108000000>;
-> +		spi-rx-bus-width = <4>;
-> +		spi-tx-bus-width = <4>;
-> +
-> +		partitions {
-> +			compatible = "fixed-partitions";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			partition at 0 {
-> +				label = "bootloader";
-> +				reg = <0x0 0x200000>;
-> +			};
-> +			partition at 200000 {
-> +				label = "U-boot Env";
-> +				reg = <0x200000 0x10000>;
-> +			};
-> +			partition at 210000 {
-> +				label = "Linux";
-> +				reg = <0x210000 0xDF0000>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
->  /* Exported on the micro USB connector CON32 through an FTDI */
->  &uart0 {
->  	status = "okay";
-> -- 
-> 2.9.3
->
+ Documentation/arm/sunxi/README                |   4 +
+ arch/arm/boot/dts/Makefile                    |   3 +-
+ arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts |  73 ++++
+ arch/arm/boot/dts/sun8i-v3s.dtsi              | 257 +++++++++++
+ arch/arm/mach-sunxi/sunxi.c                   |   1 +
+ drivers/clk/sunxi-ng/Kconfig                  |  11 +
+ drivers/clk/sunxi-ng/Makefile                 |   1 +
+ drivers/clk/sunxi-ng/ccu-sun8i-v3s.c          | 590 ++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-v3s.h          |  63 +++
+ drivers/pinctrl/sunxi/Kconfig                 |   4 +
+ drivers/pinctrl/sunxi/Makefile                |   1 +
+ drivers/pinctrl/sunxi/pinctrl-sun8i-v3s.c     | 321 ++++++++++++++
+ include/dt-bindings/clock/sun8i-v3s-ccu.h     | 107 +++++
+ include/dt-bindings/reset/sun8i-v3s-ccu.h     |  78 ++++
+ 14 files changed, 1513 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+ create mode 100644 arch/arm/boot/dts/sun8i-v3s.dtsi
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-v3s.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-v3s.h
+ create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun8i-v3s.c
+ create mode 100644 include/dt-bindings/clock/sun8i-v3s-ccu.h
+ create mode 100644 include/dt-bindings/reset/sun8i-v3s-ccu.h
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.11.0
