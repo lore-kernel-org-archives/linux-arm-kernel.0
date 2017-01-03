@@ -1,115 +1,87 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue,  3 Jan 2017 23:16:29 +0800
-Subject: [PATCH 5/5] ARM: dts: sunxi: add support for Lichee Pi Zero board
-In-Reply-To: <20170103151629.19447-1-icenowy@aosc.xyz>
-References: <20170103151629.19447-1-icenowy@aosc.xyz>
-Message-ID: <20170103151629.19447-6-icenowy@aosc.xyz>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 03 Jan 2017 16:20:34 +0100
+Subject: [PATCH v7 3/4] arm64: dts: marvell: Add I2C definitions for the
+ Armada 3700
+In-Reply-To: <20161201110440.27530-4-romain.perier@free-electrons.com> (Romain
+ Perier's message of "Thu, 1 Dec 2016 12:04:39 +0100")
+References: <20161201110440.27530-1-romain.perier@free-electrons.com>
+ <20161201110440.27530-4-romain.perier@free-electrons.com>
+Message-ID: <8760lwgofx.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lichee Pi Zero is a small-sized V3s board, which is
-breadboard-compatible, and with a MicroUSB port with both OTG function
-and power function.
+Hi Romain,
+ 
+ On jeu., d?c. 01 2016, Romain Perier <romain.perier@free-electrons.com> wrote:
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- arch/arm/boot/dts/Makefile                    |  3 +-
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 73 +++++++++++++++++++++++++++
- 2 files changed, 75 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+> The Armada 3700 has two i2c bus interface units, this commit adds the
+> definitions of the corresponding device nodes. It also enables the node
+> on the development board for this SoC.
+>
+> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index cccdbcb557b6..3e099e9b1ad7 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -853,7 +853,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-h3-orangepi-pc-plus.dtb \
- 	sun8i-h3-orangepi-plus.dtb \
- 	sun8i-h3-orangepi-plus2e.dtb \
--	sun8i-r16-parrot.dtb
-+	sun8i-r16-parrot.dtb \
-+	sun8i-v3s-licheepi-zero.dtb
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
- 	sun9i-a80-cubieboard4.dtb
-diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-new file mode 100644
-index 000000000000..0099affc6ce3
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-@@ -0,0 +1,73 @@
-+/*
-+ * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.xyz>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun8i-v3s.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+/ {
-+	model = "Lichee Pi Zero";
-+	compatible = "licheepi,licheepi-zero", "allwinner,sun8i-v3s";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-0 = <&mmc0_pins_a>;
-+	pinctrl-names = "default";
-+	broken-cd;
-+	bus-width = <4>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-0 = <&uart0_pins_a>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+};
+Applied on mvebu/dt64
+
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm64/boot/dts/marvell/armada-3720-db.dts |  4 ++++
+>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 18 ++++++++++++++++++
+>  2 files changed, 22 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+> index 1372e9a6..16d84af 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+> @@ -62,6 +62,10 @@
+>  	};
+>  };
+>  
+> +&i2c0 {
+> +	status = "okay";
+> +};
+> +
+>  /* CON3 */
+>  &sata {
+>  	status = "okay";
+> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> index e9bd587..1b0fd21 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> @@ -98,6 +98,24 @@
+>  			/* 32M internal register @ 0xd000_0000 */
+>  			ranges = <0x0 0x0 0xd0000000 0x2000000>;
+>  
+> +			i2c0: i2c at 11000 {
+> +				compatible = "marvell,armada-3700-i2c";
+> +				reg = <0x11000 0x24>;
+> +				clocks = <&nb_periph_clk 10>;
+> +				interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+> +				mrvl,i2c-fast-mode;
+> +				status = "disabled";
+> +			};
+> +
+> +			i2c1: i2c at 11080 {
+> +				compatible = "marvell,armada-3700-i2c";
+> +				reg = <0x11080 0x24>;
+> +				clocks = <&nb_periph_clk 9>;
+> +				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+> +				mrvl,i2c-fast-mode;
+> +				status = "disabled";
+> +			};
+> +
+>  			uart0: serial at 12000 {
+>  				compatible = "marvell,armada-3700-uart";
+>  				reg = <0x12000 0x400>;
+> -- 
+> 2.9.3
+>
+
 -- 
-2.11.0
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
