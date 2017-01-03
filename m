@@ -1,305 +1,57 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 3 Jan 2017 19:32:41 +0800
-Subject: [PATCH v4 1/3] soc: zte: pm_domains: Prepare for supporting
- ARMv8 zx2967 family
-In-Reply-To: <1483426577-5470-1-git-send-email-baoyou.xie@linaro.org>
-References: <1483426577-5470-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20170103113239.GA20956@dragon>
+Date: Tue, 3 Jan 2017 19:43:17 +0800
+Subject: [PATCH 1/2] ARM: dts: imx6qdl-nitrogen6_max: fix sgtl5000
+ pinctrl init
+In-Reply-To: <20170103112247.4563-2-gary.bisson@boundarydevices.com>
+References: <20170103112247.4563-1-gary.bisson@boundarydevices.com>
+ <20170103112247.4563-2-gary.bisson@boundarydevices.com>
+Message-ID: <20170103114316.GC20956@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 02:56:15PM +0800, Baoyou Xie wrote:
-> The ARMv8 zx2967 family (296718, 296716 etc) uses different value
-> for controlling the power domain on/off registers, Choose the
-> value depending on the compatible.
+On Tue, Jan 03, 2017 at 12:22:46PM +0100, Gary Bisson wrote:
+> This patch fixes the following error:
+> sgtl5000 0-000a: Error reading chip id -6
+> imx-sgtl5000 sound: ASoC: CODEC DAI sgtl5000 not registered
+> imx-sgtl5000 sound: snd_soc_register_card failed (-517)
 > 
-> Multiple domains are prepared for the family, this patch prepares
-> the common functions.
+> The problem was that the pinctrl group was linked to the sound driver
+> instead of the codec node. Since the codec is probed first, the sys_mclk
+> was missing and it would therefore fail to initialize.
 > 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-> ---
->  drivers/soc/Kconfig                 |   1 +
->  drivers/soc/Makefile                |   1 +
->  drivers/soc/zte/Kconfig             |  13 ++++
->  drivers/soc/zte/Makefile            |   4 ++
->  drivers/soc/zte/zx2967_pm_domains.c | 138 ++++++++++++++++++++++++++++++++++++
->  drivers/soc/zte/zx2967_pm_domains.h |  45 ++++++++++++
->  6 files changed, 202 insertions(+)
->  create mode 100644 drivers/soc/zte/Kconfig
->  create mode 100644 drivers/soc/zte/Makefile
->  create mode 100644 drivers/soc/zte/zx2967_pm_domains.c
->  create mode 100644 drivers/soc/zte/zx2967_pm_domains.h
-> 
-> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-> index f31bceb..f09023f 100644
-> --- a/drivers/soc/Kconfig
-> +++ b/drivers/soc/Kconfig
-> @@ -11,5 +11,6 @@ source "drivers/soc/tegra/Kconfig"
->  source "drivers/soc/ti/Kconfig"
->  source "drivers/soc/ux500/Kconfig"
->  source "drivers/soc/versatile/Kconfig"
-> +source "drivers/soc/zte/Kconfig"
->  
->  endmenu
-> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-> index 50c23d0..05eae52 100644
-> --- a/drivers/soc/Makefile
-> +++ b/drivers/soc/Makefile
-> @@ -16,3 +16,4 @@ obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
->  obj-$(CONFIG_SOC_TI)		+= ti/
->  obj-$(CONFIG_ARCH_U8500)	+= ux500/
->  obj-$(CONFIG_PLAT_VERSATILE)	+= versatile/
-> +obj-$(CONFIG_ARCH_ZX)		+= zte/
-> diff --git a/drivers/soc/zte/Kconfig b/drivers/soc/zte/Kconfig
-> new file mode 100644
-> index 0000000..20bde38
-> --- /dev/null
-> +++ b/drivers/soc/zte/Kconfig
-> @@ -0,0 +1,13 @@
-> +#
-> +# ZTE SoC drivers
-> +#
-> +menuconfig SOC_ZTE
-> +	bool "ZTE SoC driver support"
-> +
-> +if SOC_ZTE
-> +
-> +config ZX2967_PM_DOMAINS
-> +	bool "ZX2967 PM domains"
-> +	depends on PM_GENERIC_DOMAINS
-> +
-> +endif
-> diff --git a/drivers/soc/zte/Makefile b/drivers/soc/zte/Makefile
-> new file mode 100644
-> index 0000000..8a37f2f
-> --- /dev/null
-> +++ b/drivers/soc/zte/Makefile
-> @@ -0,0 +1,4 @@
-> +#
-> +# ZTE SOC drivers
-> +#
-> +obj-$(CONFIG_ZX2967_PM_DOMAINS) += zx2967_pm_domains.o
-> diff --git a/drivers/soc/zte/zx2967_pm_domains.c b/drivers/soc/zte/zx2967_pm_domains.c
-> new file mode 100644
-> index 0000000..98b3b5f
-> --- /dev/null
-> +++ b/drivers/soc/zte/zx2967_pm_domains.c
-> @@ -0,0 +1,138 @@
-> +/*
-> + * Copyright (C) 2015 ZTE Ltd.
+> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
 
-What about year 2017?
-
-> + *
-> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
-> + * License terms: GNU General Public License (GPL) version 2
-> + */
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-
-Can we have a newline between system and local includes?
-
-> +#include "zx2967_pm_domains.h"
-> +
-> +#define PCU_DM_CLKEN(zpd)	((zpd)->reg_offset[REG_CLKEN])
-> +#define PCU_DM_ISOEN(zpd)	((zpd)->reg_offset[REG_ISOEN])
-> +#define PCU_DM_RSTEN(zpd)	((zpd)->reg_offset[REG_RSTEN])
-> +#define PCU_DM_PWREN(zpd)	((zpd)->reg_offset[REG_PWREN])
-> +#define PCU_DM_PWRDN(zpd)	((zpd)->reg_offset[REG_PWRDN])
-> +#define PCU_DM_ACK_SYNC(zpd)	((zpd)->reg_offset[REG_ACK_SYNC])
-> +
-> +static void __iomem *pcubase;
-> +
-> +int zx2967_power_on(struct generic_pm_domain *domain)
-> +{
-> +	struct zx2967_pm_domain *zpd = (struct zx2967_pm_domain *)domain;
-> +	unsigned long loop = 1000;
-> +	u32 val;
-> +
-> +	val = readl_relaxed(pcubase + PCU_DM_PWREN(zpd));
-> +	if (zpd->polarity == PWREN)
-> +		val |= BIT(zpd->bit);
-> +	else
-> +		val &= ~BIT(zpd->bit);
-> +	writel_relaxed(val, pcubase + PCU_DM_PWRDN(zpd));
-
-Hmm, do you really want to read val from PCU_DM_PWREN and then write
-back to PCU_DM_PWRDN?  They are two different registers or same one?  A
-bit confused here.
-
-> +
-> +	do {
-> +		udelay(1);
-> +		val = readl_relaxed(pcubase + PCU_DM_ACK_SYNC(zpd))
-> +				   & BIT(zpd->bit);
-> +	} while (--loop && !val);
-> +
-> +	if (!loop) {
-> +		pr_err("Error: %s %s fail\n", __func__, domain->name);
-> +		return -EIO;
-> +	}
-> +
-> +	val = readl_relaxed(pcubase + PCU_DM_RSTEN(zpd));
-> +	val |= BIT(zpd->bit);
-> +	writel_relaxed(val, pcubase + PCU_DM_RSTEN(zpd));
-> +	udelay(5);
-> +
-> +	val = readl_relaxed(pcubase + PCU_DM_ISOEN(zpd));
-> +	val &= ~BIT(zpd->bit);
-> +	writel_relaxed(val, pcubase + PCU_DM_ISOEN(zpd));
-> +	udelay(5);
-> +
-> +	val = readl_relaxed(pcubase + PCU_DM_CLKEN(zpd));
-> +	val |= BIT(zpd->bit);
-> +	writel_relaxed(val, pcubase + PCU_DM_CLKEN(zpd));
-> +	udelay(5);
-> +
-> +	pr_debug("normal poweron %s\n", domain->name);
-> +
-> +	return 0;
-> +}
-> +
-> +int zx2967_power_off(struct generic_pm_domain *domain)
-> +{
-> +	struct zx2967_pm_domain *zpd = (struct zx2967_pm_domain *)domain;
-> +	unsigned long loop = 1000;
-> +	u32 val;
-> +
-> +	val = readl_relaxed(pcubase + PCU_DM_CLKEN(zpd));
-> +	val &= ~BIT(zpd->bit);
-> +	writel_relaxed(val, pcubase + PCU_DM_CLKEN(zpd));
-> +	udelay(5);
-> +
-> +	val = readl_relaxed(pcubase + PCU_DM_ISOEN(zpd));
-> +	val |= BIT(zpd->bit);
-> +	writel_relaxed(val, pcubase + PCU_DM_ISOEN(zpd));
-> +	udelay(5);
-> +
-> +	val = readl_relaxed(pcubase + PCU_DM_RSTEN(zpd));
-> +	val &= ~BIT(zpd->bit);
-> +	writel_relaxed(val, pcubase + PCU_DM_RSTEN(zpd));
-> +	udelay(5);
-> +
-> +	val = readl_relaxed(pcubase + PCU_DM_PWREN(zpd));
-> +	if (zpd->polarity == PWREN)
-> +		val &= ~BIT(zpd->bit);
-> +	else
-> +		val |= BIT(zpd->bit);
-> +	writel_relaxed(val, pcubase + PCU_DM_PWRDN(zpd));
-
-Ditto
-
-> +
-> +	do {
-> +		udelay(1);
-> +		val = readl_relaxed(pcubase + PCU_DM_ACK_SYNC(zpd))
-> +				   & BIT(zpd->bit);
-> +	} while (--loop && val);
-> +
-> +	if (!loop) {
-> +		pr_err("Error: %s %s fail\n", __func__, domain->name);
-> +		return -EIO;
-> +	}
-> +
-> +	pr_debug("normal poweroff %s\n", domain->name);
-> +
-> +	return 0;
-> +}
-> +
-> +int zx2967_pd_probe(struct platform_device *pdev,
-> +		   struct generic_pm_domain **zx_pm_domains,
-> +		   int domain_num)
-
-Please fix the indentation as below.
-
-int zx2967_pd_probe(struct platform_device *pdev,
-		    struct generic_pm_domain **zx_pm_domains,
-		    int domain_num)
-
-> +{
-> +	struct genpd_onecell_data *genpd_data;
-> +	struct resource *res;
-> +	int i;
-> +
-> +	genpd_data = devm_kzalloc(&pdev->dev, sizeof(*genpd_data), GFP_KERNEL);
-> +	if (!genpd_data)
-> +		return -ENOMEM;
-> +
-> +	genpd_data->domains = zx_pm_domains;
-> +	genpd_data->num_domains = domain_num;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	pcubase = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(pcubase)) {
-> +		dev_err(&pdev->dev, "ioremap fail.\n");
-> +		return PTR_ERR(pcubase);
-> +	}
-> +
-> +	for (i = 0; i < domain_num; ++i)
-> +		pm_genpd_init(zx_pm_domains[i], NULL, false);
-> +
-> +	of_genpd_add_provider_onecell(pdev->dev.of_node, genpd_data);
-> +	dev_info(&pdev->dev, "powerdomain init ok\n");
-> +	return 0;
-> +}
-> diff --git a/drivers/soc/zte/zx2967_pm_domains.h b/drivers/soc/zte/zx2967_pm_domains.h
-> new file mode 100644
-> index 0000000..35938c3
-> --- /dev/null
-> +++ b/drivers/soc/zte/zx2967_pm_domains.h
-> @@ -0,0 +1,45 @@
-> +/*
-> + * Header for ZTE's Power Domain Driver support
-> + *
-> + * Copyright (C) 2015 ZTE Ltd.
-> + *
-> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
-> + * License terms: GNU General Public License (GPL) version 2
-> + */
-> +
-> +#ifndef __ZTE_ZX2967_PM_DOMAIN_H
-> +#define __ZTE_ZX2967_PM_DOMAIN_H
-> +
-> +#include <linux/platform_device.h>
-> +#include <linux/pm_domain.h>
-> +
-> +enum {
-> +	REG_CLKEN,
-> +	REG_ISOEN,
-> +	REG_RSTEN,
-> +	REG_PWREN,
-> +	REG_PWRDN,
-> +	REG_ACK_SYNC,
-> +
-> +	/* The size of the array - must be last */
-> +	REG_ARRAY_SIZE,
-> +};
-> +
-> +enum zx2967_power_polarity {
-> +	PWREN,
-> +	PWRDN,
-> +};
-> +
-> +struct zx2967_pm_domain {
-> +	struct generic_pm_domain dm;
-> +	const u16 bit;
-> +	const enum zx2967_power_polarity polarity;
-> +	const u16 *reg_offset;
-> +};
-> +
-> +extern int zx2967_power_on(struct generic_pm_domain *domain);
-> +extern int zx2967_power_off(struct generic_pm_domain *domain);
-> +extern int zx2967_pd_probe(struct platform_device *pdev,
-> +			  struct generic_pm_domain **zx_pm_domains,
-> +			  int domain_num);
-
-Have a newline here.
+Should we have it go as a fix for v4.10-rc cycles?  In that case, please
+add a Fixes: tag.  Also, do we need to apply it for stable kernel?
 
 Shawn
 
-> +#endif /* __ZTE_ZX2967_PM_DOMAIN_H */
+> ---
+>  arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
+> index 34887a10c5f1..47ba97229a48 100644
+> --- a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
+> @@ -319,8 +319,6 @@
+>  		compatible = "fsl,imx6q-nitrogen6_max-sgtl5000",
+>  			     "fsl,imx-audio-sgtl5000";
+>  		model = "imx6q-nitrogen6_max-sgtl5000";
+> -		pinctrl-names = "default";
+> -		pinctrl-0 = <&pinctrl_sgtl5000>;
+>  		ssi-controller = <&ssi1>;
+>  		audio-codec = <&codec>;
+>  		audio-routing =
+> @@ -402,6 +400,8 @@
+>  
+>  	codec: sgtl5000 at 0a {
+>  		compatible = "fsl,sgtl5000";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_sgtl5000>;
+>  		reg = <0x0a>;
+>  		clocks = <&clks IMX6QDL_CLK_CKO>;
+>  		VDDA-supply = <&reg_2p5v>;
 > -- 
-> 2.7.4
+> 2.11.0
 > 
