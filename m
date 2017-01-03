@@ -1,42 +1,31 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Tue, 3 Jan 2017 12:16:26 +0200
-Subject: [PATCH] mtd: nand: lpc32xx: fix invalid error handling of a
- requested irq
-In-Reply-To: <20170103101259.0ec123df@bbrezillon>
-References: <20161205014710.2015-1-vz@mleia.com>
- <20170103101259.0ec123df@bbrezillon>
-Message-ID: <72ab91ec-a919-af42-8a82-f5d99b245edf@mleia.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Tue, 3 Jan 2017 11:20:44 +0100
+Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <CAFcVECK1vt7Hu4tgSZ2+kKpMxoT-wpikMDq65HaxRv-EMgobHA@mail.gmail.com>
+References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
+ <BN3PR07MB2516815EDE69ACDCE27F81A3C96F0@BN3PR07MB2516.namprd07.prod.outlook.com>
+ <20170102113155.GA16373@localhost.localdomain>
+ <0717c63b-2e29-9ad1-7f01-39817980933f@atmel.com>
+ <20170102161359.GD3609@localhost.localdomain>
+ <CAFcVECK1vt7Hu4tgSZ2+kKpMxoT-wpikMDq65HaxRv-EMgobHA@mail.gmail.com>
+Message-ID: <20170103102044.GB24780@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Tue, Jan 03, 2017 at 10:36:11AM +0530, Harini Katakam wrote:
+> I understand that it is not accurate - it is an initial version.
 
-On 01/03/2017 11:12 AM, Boris Brezillon wrote:
-> Hi Vladimir
-> 
-> On Mon,  5 Dec 2016 03:47:10 +0200
-> Vladimir Zapolskiy <vz@mleia.com> wrote:
-> 
->> Semantics of NR_IRQS is different on machines with SPARSE_IRQ option
->> disabled or enabled, in the latter case IRQs are allocated starting
->> at least from the value specified by NR_IRQS and going upwards, so
->> the check of (irq >= NR_IRQ) to decide about an error code returned by
->> platform_get_irq() is completely invalid, don't attempt to overrule
->> irq subsystem in the driver.
->>
->> The change fixes LPC32xx NAND MLC driver initialization on boot.
-> 
-> Do you need to backport this fix to stable releases? If that's the
-> case, I'll add the Cc: stable tag when applying.
+No, it is not inaccurate at all, it is WRONG.
 
-that will be great if you can add
+This means that time stamps will be randomly associated with PTP
+network packets.  To the application, the protocol will appear to
+work, but the time stamp information (and thus the synchronization)
+will be wrong.
 
-Cc: stable at kernel.org # v4.7+
+To me, this is unacceptable, and I will push back on this driver
+getting merged.
 
-Please feel free to add also the tag
+[ In contrast, the descriptor based approach would be ok, afaict. ]
 
-Fixes: 8cb17b5ed017 ("irqchip: Add LPC32xx interrupt controller driver")
-
---
-With best wishes,
-Vladimir
+Thanks,
+Richard
