@@ -1,115 +1,114 @@
-From: o.schinagl@ultimaker.com (Olliver Schinagl)
-Date: Tue, 3 Jan 2017 16:59:57 +0100
-Subject: [PATCH 1/2] pwm: sunxi: allow the pwm to finish its pulse before
- disable
-In-Reply-To: <20161212122427.4ixo7terrlvnuqmd@lukather>
-References: <1472147411-30424-1-git-send-email-oliver@schinagl.nl>
- <1472147411-30424-2-git-send-email-oliver@schinagl.nl>
- <20160826221900.GG3165@lukather>
- <afcb938d-d2df-4740-6c85-cdf2766f671c@schinagl.nl>
- <20161212122427.4ixo7terrlvnuqmd@lukather>
-Message-ID: <627ddbeb-d199-e2df-2073-090216a9fb0b@schinagl.nl>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Tue, 3 Jan 2017 19:04:57 +0300
+Subject: [RFC, PATCHv2 29/29] mm, x86: introduce RLIMIT_VADDR
+In-Reply-To: <CALCETrV_qejd-Ozqo4vTqz=LuukMUPeQ7EVUQbfTxs_xNbO3oQ@mail.gmail.com>
+References: <20161227015413.187403-1-kirill.shutemov@linux.intel.com>
+ <20161227015413.187403-30-kirill.shutemov@linux.intel.com>
+ <2736959.3MfCab47fD@wuerfel>
+ <CALCETrV_qejd-Ozqo4vTqz=LuukMUPeQ7EVUQbfTxs_xNbO3oQ@mail.gmail.com>
+Message-ID: <20170103160457.GB17319@node.shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Maxime,
+On Mon, Jan 02, 2017 at 10:08:28PM -0800, Andy Lutomirski wrote:
+> On Mon, Jan 2, 2017 at 12:44 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday, December 27, 2016 4:54:13 AM CET Kirill A. Shutemov wrote:
+> >> As with other resources you can set the limit lower than current usage.
+> >> It would affect only future virtual address space allocations.
+> 
+> I still don't buy all these use cases:
+> 
+> >>
+> >> Use-cases for new rlimit:
+> >>
+> >>   - Bumping the soft limit to RLIM_INFINITY, allows current process all
+> >>     its children to use addresses above 47-bits.
+> 
+> OK, I get this, but only as a workaround for programs that make
+> assumptions about the address space and don't use some mechanism (to
+> be designed?) to work correctly in spite of a larger address space.
 
-Happy new year! I'm sorry that I missed your previous mail! I completely 
-looked over it. Sorry!
+I guess you've misread the case. It's opt-in for large adrress space, not
+other way around.
 
-On 12-12-16 13:24, Maxime Ripard wrote:
-> On Thu, Dec 08, 2016 at 02:23:39PM +0100, Olliver Schinagl wrote:
->> Hey Maxime,
->>
->> first off, also sorry for the slow delay :) (pun not intended)
->>
->> On 27-08-16 00:19, Maxime Ripard wrote:
->>> On Thu, Aug 25, 2016 at 07:50:10PM +0200, Olliver Schinagl wrote:
->>>> When we inform the PWM block to stop toggeling the output, we may end up
->>>> in a state where the output is not what we would expect (e.g. not the
->>>> low-pulse) but whatever the output was at when the clock got disabled.
->>>>
->>>> To counter this we have to wait for maximally the time of one whole
->>>> period to ensure the pwm hardware was able to finish. Since we already
->>>> told the PWM hardware to disable it self, it will not continue toggling
->>>> but merly finish its current pulse.
->>>>
->>>> If a whole period is considered to much, it may be contemplated to use a
->>>> half period + a little bit to ensure we get passed the transition.
->>>>
->>>> Signed-off-by: Olliver Schinagl<oliver@schinagl.nl>
->>>> ---
->>>>   drivers/pwm/pwm-sun4i.c | 11 +++++++++++
->>>>   1 file changed, 11 insertions(+)
->>>>
->>>> diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
->>>> index 03a99a5..5e97c8a 100644
->>>> --- a/drivers/pwm/pwm-sun4i.c
->>>> +++ b/drivers/pwm/pwm-sun4i.c
->>>> @@ -8,6 +8,7 @@
->>>>   #include <linux/bitops.h>
->>>>   #include <linux/clk.h>
->>>> +#include <linux/delay.h>
->>>>   #include <linux/err.h>
->>>>   #include <linux/io.h>
->>>>   #include <linux/module.h>
->>>> @@ -245,6 +246,16 @@ static void sun4i_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->>>>   	spin_lock(&sun4i_pwm->ctrl_lock);
->>>>   	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
->>>>   	val &= ~BIT_CH(PWM_EN, pwm->hwpwm);
->>>> +	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
->>>> +	spin_unlock(&sun4i_pwm->ctrl_lock);
->>>> +
->>>> +	/* Allow for the PWM hardware to finish its last toggle. The pulse
->>>> +	 * may have just started and thus we should wait a full period.
->>>> +	 */
->>>> +	ndelay(pwm_get_period(pwm));
->>> Can't that use the ready bit as well?
->>
->> I started to implement our earlier discussed suggestions, but I do not think
->> they will work. The read bit is not to let the user know it is ready with
->> all of its commands, but only if the period registers are ready. I think it
->> is some write lock while it copies the data into its internal control loop.
->> From the manual:
->> PWM0 period register ready.
->> 0: PWM0 period register is ready to write,
->> 1: PWM0 period register is busy.
->>
->>
->> So no, I don't think i can use the ready bit here at all. The only thing we
->> can do here, but I doubt it's worth it, is to read the period register,
->> caluclate a time from it, and then ndelay(pwm_get_period(pwm) - ran_time)
->>
->> The only 'win' then is that we could are potentially not waiting the full
->> pwm period, but only a fraction of it. Since we are disabling the hardware
->> (for power reasons) anyway, I don't think this is any significant win,
->> except for extreme situations. E.g. we have a pwm period of 10 seconds, we
->> disable it after 9.9 second, and now we have to wait for 10 seconds before
->> the pwm_disable is finally done. So this could in that case be reduced to
->> then only wait for 0.2 seconds since it is 'done' sooner.
->>
->> However that optimization is also not 'free'. We have to read the period
->> register and calculate back the time. I suggest to do that when reworking
->> this driver to work with atomic mode, and merge this patch 'as is' to
->> atleast fix te bug where simply not finish properly.
->
-> That whole discussion made me realise something that is really
-> bad. AFAIK, pwm_get_period returns a 32 bits register, which means a
-> theorical period of 4s. Busy looping during 4 seconds is already very
-> bad, as you basically kill one CPU during that time, but doing so in a
-> (potentially) atomic context is even worse.
-Well technically, isn't it a 16 bit register? (half for the period, 
-other half for the duty cycle?) Anyway, I think the delay can be far 
-exceeding 4 seconds (though I haven't checked what the PWM delay max 
-option is).
+I believe 47-bit VA by default is right way to go to make the transition
+without breaking userspace.
 
-Anyway, you are right, we should absolutely not do this!
+> >>   - Bumping the soft limit to RLIM_INFINITY after fork(2), but before
+> >>     exec(2) allows the child to use addresses above 47-bits.
+> 
+> Ditto.
+> 
+> >>
+> >>   - Lowering the hard limit to 47-bits would prevent current process all
+> >>     its children to use addresses above 47-bits, unless a process has
+> >>     CAP_SYS_RESOURCES.
+> 
+> I've tried and I can't imagine any reason to do this.
 
->
-> NACK.
-Absolutely! But what do you suggest? Would usleep (or msleep) instead of 
-the ndelay work properly?
+That's just if something went wrong and we want to stop an application
+from use addresses above 47-bit.
 
->
-> Maxime
->
+> >>   - It?s also can be handy to lower hard or soft limit to arbitrary
+> >>     address. User-mode emulation in QEMU may lower the limit to 32-bit
+> >>     to emulate 32-bit machine on 64-bit host.
+> 
+> I don't understand.  QEMU user-mode emulation intercepts all syscalls.
+> What QEMU would *actually* want is a way to say "allocate me some
+> memory with the high N bits clear".  mmap-via-int80 on x86 should be
+> fixed to do this, but a new syscall with an explicit parameter would
+> work, as would a prctl changing the current limit.
+
+Look at mess in mmap_find_vma(). QEmu has to guess where is free virtual
+memory. That's unnessesary complex.
+
+prctl would work for this too. new-mmap would *not*: there are more ways
+to allocate vitual address space: shmat(), mremap(). Changing all of them
+just for this is stupid.
+
+> >>
+> >> TODO:
+> >>   - port to non-x86;
+> >>
+> >> Not-yet-signed-off-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+> >> Cc: linux-api at vger.kernel.org
+> >
+> > This seems to nicely address the same problem on arm64, which has
+> > run into the same issue due to the various page table formats
+> > that can currently be chosen at compile time.
+> 
+> On further reflection, I think this has very little to do with paging
+> formats except insofar as paging formats make us notice the problem.
+> The issue is that user code wants to be able to assume an upper limit
+> on an address, and it gets an upper limit right now that depends on
+> architecture due to paging formats.  But someone really might want to
+> write a *portable* 64-bit program that allocates memory with the high
+> 16 bits clear.  So let's add such a mechanism directly.
+> 
+> As a thought experiment, what if x86_64 simply never allocated "high"
+> (above 2^47-1) addresses unless a new mmap-with-explicit-limit syscall
+> were used?  Old glibc would continue working.  Old VMs would work.
+> New programs that want to use ginormous mappings would have to use the
+> new syscall.  This would be totally stateless and would have no issues
+> with CRIU.
+
+Except, we need more than mmap as I mentioned.
+
+And what about stack? I'm not sure that everybody would be happy with
+stack in the middle of address space.
+
+> If necessary, we could also have a prctl that changes a
+> "personality-like" limit that is in effect when the old mmap was used.
+> I say "personality-like" because it would reset under exactly the same
+> conditions that personality resets itself.
+> 
+> Thoughts?
+> 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+
+-- 
+ Kirill A. Shutemov
