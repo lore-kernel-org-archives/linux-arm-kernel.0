@@ -1,45 +1,127 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Tue, 03 Jan 2017 18:45:43 +0900
-Subject: [PATCH v2 1/4] pinctrl: samsung: Fix the width of PINCFG_TYPE_DRV
- bitfields for Exynos5433
-In-Reply-To: <20161230150932.q7kadv4ouhdrkqea@kozik-lap>
-References: <CGME20161230041426epcas1p1f827d3cee8b607d81e9921b412ddf301@epcas1p1.samsung.com>
- <20161230041421.24448-1-andi.shyti@samsung.com>
- <20161230041421.24448-2-andi.shyti@samsung.com>
- <CACRpkdbR3x14h38Gg7qpeWnswwD9qsS0zDUrrXCEJH-AdEB+cQ@mail.gmail.com>
- <20161230150932.q7kadv4ouhdrkqea@kozik-lap>
-Message-ID: <20170103094543.ccb353srxszkovip@gangnam.samsung>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 3 Jan 2017 10:51:49 +0100
+Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
+In-Reply-To: <20161215185717.GM14217@n2100.armlinux.org.uk>
+References: <20161213113044.GC19985@leverpostej>
+ <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
+ <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
+ <20161215113539.GK14217@n2100.armlinux.org.uk>
+ <06fca797-da5d-f7f2-eecb-9b1b33b7e83f@arm.com>
+ <20161215151548.GL14217@n2100.armlinux.org.uk>
+ <c21d6514-44a2-ba88-0fe5-d14d5897cc48@arm.com>
+ <20161215185717.GM14217@n2100.armlinux.org.uk>
+Message-ID: <20170103095149.GA14242@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus and Krzysztof,
+Hi Russell,
 
-> > > From: Chanwoo Choi <cw00.choi@samsung.com>
-> > >
-> > > This patch fixes the wrong width of PINCFG_TYPE_DRV bitfields for Exynos5433
-> > > because PINCFG_TYPE_DRV of Exynos5433 has 4bit fields in the *_DRV
-> > > registers. Usually, other Exynos have 2bit field for PINCFG_TYPE_DRV.
-> > >
-> > > Fixes: 3c5ecc9ed353 ("pinctrl: exynos: Add support for Exynos5433")
-> > > Cc: stable at vger.kernel.org
-> > > Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> > > Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> > > Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> > > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > > Cc: Kukjin Kim <kgene@kernel.org>
-> > > Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> > > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+On Thu, Dec 15, 2016 at 06:57:18PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Dec 15, 2016 at 03:37:15PM +0000, Marc Zyngier wrote:
+> > On 15/12/16 15:15, Russell King - ARM Linux wrote:
+> > > On Thu, Dec 15, 2016 at 11:46:41AM +0000, Marc Zyngier wrote:
+> > >> On 15/12/16 11:35, Russell King - ARM Linux wrote:
+> > >>> On Thu, Dec 15, 2016 at 11:18:48AM +0000, Marc Zyngier wrote:
+> > >>>> On 14/12/16 10:46, Russell King wrote:
+> > >>>>> @@ -231,10 +244,14 @@ ENDPROC(__hyp_stub_do_trap)
+> > >>>>>   * initialisation entry point.
+> > >>>>>   */
+> > >>>>>  ENTRY(__hyp_get_vectors)
+> > >>>>> -	mov	r0, #-1
+> > >>>>> +	mov	r0, #HVC_GET_VECTORS
+> > >>>>
+> > >>>> This breaks the KVM implementation of __hyp_get_vectors, easily fixed
+> > >>>> with the following patchlet:
+> > >>>
+> > >>> Right, so what Mark said is wrong:
+> > >>>
+> > >>> "The hyp-stub is part of the kernel image, and the API is private to
+> > >>>  that particular image, so we can change things -- there's no ABI to
+> > >>>  worry about."
+> > >>
+> > >> I think Mark is right. The API *is* private to the kernel, and KVM being
+> > >> the only in-kernel hypervisor on ARM, this is not an ABI.
+> > > 
+> > > Again, that's wrong.
+> > > 
+> > > We have two hypervisors in the kernel.  One is KVM, the other is the
+> > > stub.  Sure, the stub isn't a full implementation of a hypervisor, but
+> > > it is nevertheless, for the purposes of _this_ discussion, a hypervisor
+> > > of sorts.
+> > > 
+> > > The reason that both are included is because they both appear to share
+> > > a common interface (although that's totally not documented anywhere.)
 > > 
-> > Nominally I think you should sign this off too Andi, as you are in the delivery
-> > path.
+> > And this interface exists for the sole purpose of enabling KVM. Call it
+> > a hypervisor if you wish, but its usefulness is doubtful on its own.
 > > 
-> > Patch applied for fixes.
+> > >>> So no, I'm going with my original patch (which TI has tested) which is
+> > >>> the minimal change, and if we _then_ want to rework the HYP mode
+> > >>> interfaces, that's the time to do the other changes when more people
+> > >>> (such as KVM folk) are paying attention and we can come to a cross-
+> > >>> hypervisor agreement on what the interface should be.
+> > >>
+> > >> Given that there is a single in-kernel hypervisor, I can't really see
+> > >> who we're going to agree anything with...
+> > > 
+> > > As far as I can see, the hyp-stub falls under ARM arch maintanence.
+> > > KVM falls under KVM people.  Two different groups, we need agreement
+> > > between them what a sane API for both "hypervisors" should be.
+> > 
+> > Well, I though we had the right level of discussion by reviewing your
+> > patches and coming up with improvements. If you're after something else,
+> > please let me know.
 > 
-> That has to be signed by Andi... otherwise the chain is broken (and
-> there could be changes added inside).
+> What I'm after is a meaningful discussion between ARM arch maintainers
+> and KVM maintainers - so far all I see are people on the ARM side of
+> things.
 
-yes, sorry about this. If Linus wants and it's not too late, he
-can add my signed off at the bottom.
+I think your patches look fine, and I agree with your suggestions on
+improving the hyp ABI and documenting it.
+
+Marc found a small problem for KVM with your patch and offered a simple
+fix.  I don't really see a bigger problem here?
+
+> 
+> I've also yet to have any response on some of the KVM questions I raised
+> earlier in this thread - again, silence from KVM people.
+
+Sorry about my silence, I was really busy leading up to Christmas and
+was offline for most of the Christmas and new years days.
+
+I've gone back over the thread and haven't been able to spot anything
+that wasn't already answered by Marc (who also maintains KVM so would be
+one of the KVM people).  Could you let me know which questions remain
+unanswered and I can try to help?
+
+> 
+> What's also coming clear is that there's very few people who understand
+> all the interactions here, and the whole thing seems to be an undocumented
+> mess.  
+
+I think the hyp stub has just served a very limited purpose so far, and
+therefore is a somewhat immature implementation.  Now we've discovered a
+need to clean it up, and we're all for that.  Again, I don't think the
+problem is any larger than that, we just need to fix it, and it seems to
+me everyone is willing to work on that.  Marc even offered to work on
+your suggestion to support the general hyp ABI commands in KVM.
+
+[...]
+> 
+> So, I want KVM further changes to come through my tree once this merge
+> window is over 
+
+I think we should try to separate the discussion of fixing an immediate
+problem with the hyp code, and that of how to maintain things.  I think
+we're already on the right track to fix the former.
+
+Before we start changing up maintainerships (which I personally think
+work fine as it is) I would encourage you to just comment on patches
+touching arch/arm that you are unhappy with.
+
+We have been cc'ing all our changes to lakml and we've tried to cc you
+specifically on anything touching arch/arm, and we will listen to any
+suggestions you may have.
 
 Thanks,
-Andi
+-Christoffer
