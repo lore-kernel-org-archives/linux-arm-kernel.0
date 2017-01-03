@@ -1,38 +1,48 @@
-From: hongtao.jia@nxp.com (Troy Jia)
-Date: Tue, 3 Jan 2017 03:52:05 +0000
-Subject: [PATCH 2/2] arm64:dt:ls1012a: Add TMU device tree support for
- LS1012A
-In-Reply-To: <20170102062553.GB20956@dragon>
-References: <1481167706-44234-1-git-send-email-hongtao.jia@nxp.com>
- <1481167706-44234-2-git-send-email-hongtao.jia@nxp.com>
- <20170102062553.GB20956@dragon>
-Message-ID: <AM4PR0401MB18435E55CC6DCB36F83456E0EB6E0@AM4PR0401MB1843.eurprd04.prod.outlook.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 3 Jan 2017 11:54:08 +0800
+Subject: [PATCH v2 2/2] mfd: axp20x: Fix AXP806 access errors on cold boot
+In-Reply-To: <20161214174053.qsm6umlgtdivevwt@sirena.org.uk>
+References: <20161123031616.10114-1-wens@csie.org>
+ <20161123031616.10114-3-wens@csie.org>
+ <20161209112018.GL3625@dell.home>
+ <20161213164742.4ztisstxifatlm5a@sirena.org.uk>
+ <CAGb2v66vggNNfFrAiNKKGXY0ayiG1qh5tcRok2NLTRkVHWKFeg@mail.gmail.com>
+ <20161214174053.qsm6umlgtdivevwt@sirena.org.uk>
+Message-ID: <CAGb2v64U1adw6Y8Sq6Ysi5VQicGY=TWCNvbydcqKAPjXXG4uxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Dec 15, 2016 at 1:40 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, Dec 14, 2016 at 09:52:31PM +0800, Chen-Yu Tsai wrote:
+>
+>> What this patch does is make sure the registers match, to guarantee
+>> access, and then reinitialize the regmap cache to get rid of any
+>> stale data.
+>
+> So what you're saying is that previous writes may have been ignored?
 
+Sorry for the late reply.
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Monday, January 02, 2017 2:26 PM
-> To: Troy Jia <hongtao.jia@nxp.com>
-> Cc: rui.zhang at intel.com; edubezval at gmail.com; robh+dt at kernel.org; Scott Wood
-> <scott.wood@nxp.com>; devicetree at vger.kernel.org; linux-
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 2/2] arm64:dt:ls1012a: Add TMU device tree support for
-> LS1012A
-> 
-> On Thu, Dec 08, 2016 at 11:28:26AM +0800, Jia Hongtao wrote:
-> > Also add nodes and properties for thermal management support.
-> >
-> > Signed-off-by: Jia Hongtao <hongtao.jia@nxp.com>
-> > ---
-> > Depend on patch "[v3] arm64: Add DTS support for FSL's LS1012A SoC".
-> > https://patchwork.kernel.org/patch/9462399/
-> 
-> Please send me the patch only after the dependent one is already accepted.
-> 
+Yes, any previous reads and writes may have been ignored. I'm not sure
+if regmap cache prefetches any registers. Last I checked it didn't.
 
-I will hold the patch until the platform support is accepted.
-Thanks.
--Hongtao.
+>> > If the chip has been reset then you'd want to reset the cache too.  I've
+>> > no idea if that's needed here or not though, it depends what happens to
+>> > the global state of the chip when this reconfiguration happens.
+>
+>> It is not a reset in the general sense. I suppose a better way would
+>> be to do an explicit write to the register first, then initialize
+>> the regmap. I'd have to export the write function from the RSB bus
+>> driver first though.
+>
+> Surely just doing a write immediately after initializing the regmap
+> would have the same effect?  That'd ensure that the hardware has the
+> desired value before there are any other writes.  But I might be missing
+> something here.
+
+So I just tested this. Dropping both the regcache_sync_region() and
+regmap_reinit_cache() is ok.
+
+I'll send a revised patch.
+
+ChenYu
