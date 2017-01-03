@@ -1,114 +1,112 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Tue, 3 Jan 2017 19:04:57 +0300
-Subject: [RFC, PATCHv2 29/29] mm, x86: introduce RLIMIT_VADDR
-In-Reply-To: <CALCETrV_qejd-Ozqo4vTqz=LuukMUPeQ7EVUQbfTxs_xNbO3oQ@mail.gmail.com>
-References: <20161227015413.187403-1-kirill.shutemov@linux.intel.com>
- <20161227015413.187403-30-kirill.shutemov@linux.intel.com>
- <2736959.3MfCab47fD@wuerfel>
- <CALCETrV_qejd-Ozqo4vTqz=LuukMUPeQ7EVUQbfTxs_xNbO3oQ@mail.gmail.com>
-Message-ID: <20170103160457.GB17319@node.shutemov.name>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 03 Jan 2017 17:14:08 +0100
+Subject: [PATCH 2/8] ARM: dts: armada-38x: Utilize new DSA binding
+In-Reply-To: <20170102022249.10657-3-f.fainelli@gmail.com> (Florian Fainelli's
+ message of "Sun, 1 Jan 2017 18:22:43 -0800")
+References: <20170102022249.10657-1-f.fainelli@gmail.com>
+ <20170102022249.10657-3-f.fainelli@gmail.com>
+Message-ID: <87inpwf7e7.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2017 at 10:08:28PM -0800, Andy Lutomirski wrote:
-> On Mon, Jan 2, 2017 at 12:44 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday, December 27, 2016 4:54:13 AM CET Kirill A. Shutemov wrote:
-> >> As with other resources you can set the limit lower than current usage.
-> >> It would affect only future virtual address space allocations.
-> 
-> I still don't buy all these use cases:
-> 
-> >>
-> >> Use-cases for new rlimit:
-> >>
-> >>   - Bumping the soft limit to RLIM_INFINITY, allows current process all
-> >>     its children to use addresses above 47-bits.
-> 
-> OK, I get this, but only as a workaround for programs that make
-> assumptions about the address space and don't use some mechanism (to
-> be designed?) to work correctly in spite of a larger address space.
+Hi Florian,
 
-I guess you've misread the case. It's opt-in for large adrress space, not
-other way around.
+You should use the board name in the topic, ie:
+"ARM: dts: armada-385-linksys: Utilize new DSA binding"
 
-I believe 47-bit VA by default is right way to go to make the transition
-without breaking userspace.
+Thanks,
 
-> >>   - Bumping the soft limit to RLIM_INFINITY after fork(2), but before
-> >>     exec(2) allows the child to use addresses above 47-bits.
-> 
-> Ditto.
-> 
-> >>
-> >>   - Lowering the hard limit to 47-bits would prevent current process all
-> >>     its children to use addresses above 47-bits, unless a process has
-> >>     CAP_SYS_RESOURCES.
-> 
-> I've tried and I can't imagine any reason to do this.
+Gregory
 
-That's just if something went wrong and we want to stop an application
-from use addresses above 47-bit.
 
-> >>   - It?s also can be handy to lower hard or soft limit to arbitrary
-> >>     address. User-mode emulation in QEMU may lower the limit to 32-bit
-> >>     to emulate 32-bit machine on 64-bit host.
-> 
-> I don't understand.  QEMU user-mode emulation intercepts all syscalls.
-> What QEMU would *actually* want is a way to say "allocate me some
-> memory with the high N bits clear".  mmap-via-int80 on x86 should be
-> fixed to do this, but a new syscall with an explicit parameter would
-> work, as would a prctl changing the current limit.
+ On lun., janv. 02 2017, Florian Fainelli <f.fainelli@gmail.com> wrote:
 
-Look at mess in mmap_find_vma(). QEmu has to guess where is free virtual
-memory. That's unnessesary complex.
-
-prctl would work for this too. new-mmap would *not*: there are more ways
-to allocate vitual address space: shmat(), mremap(). Changing all of them
-just for this is stupid.
-
-> >>
-> >> TODO:
-> >>   - port to non-x86;
-> >>
-> >> Not-yet-signed-off-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-> >> Cc: linux-api at vger.kernel.org
-> >
-> > This seems to nicely address the same problem on arm64, which has
-> > run into the same issue due to the various page table formats
-> > that can currently be chosen at compile time.
-> 
-> On further reflection, I think this has very little to do with paging
-> formats except insofar as paging formats make us notice the problem.
-> The issue is that user code wants to be able to assume an upper limit
-> on an address, and it gets an upper limit right now that depends on
-> architecture due to paging formats.  But someone really might want to
-> write a *portable* 64-bit program that allocates memory with the high
-> 16 bits clear.  So let's add such a mechanism directly.
-> 
-> As a thought experiment, what if x86_64 simply never allocated "high"
-> (above 2^47-1) addresses unless a new mmap-with-explicit-limit syscall
-> were used?  Old glibc would continue working.  Old VMs would work.
-> New programs that want to use ginormous mappings would have to use the
-> new syscall.  This would be totally stateless and would have no issues
-> with CRIU.
-
-Except, we need more than mmap as I mentioned.
-
-And what about stack? I'm not sure that everybody would be happy with
-stack in the middle of address space.
-
-> If necessary, we could also have a prctl that changes a
-> "personality-like" limit that is in effect when the old mmap was used.
-> I say "personality-like" because it would reset under exactly the same
-> conditions that personality resets itself.
-> 
-> Thoughts?
-> 
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+> Utilize the new DSA binding, introduced with commit 8c5ad1d6179d ("net: dsa:
+> Document new binding"). The legacy binding node is kept included, but is marked
+> disabled.
+>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  arch/arm/boot/dts/armada-385-linksys.dtsi | 52 ++++++++++++++++++++++++++++++-
+>  1 file changed, 51 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
+> index 8f0e508f64ae..20d5e8b00f2d 100644
+> --- a/arch/arm/boot/dts/armada-385-linksys.dtsi
+> +++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
+> @@ -103,8 +103,56 @@
+>  				};
+>  			};
+>  
+> -			mdio {
+> +			mdio at 72004 {
+>  				status = "okay";
+> +
+> +				switch at 0 {
+> +					compatible = "marvell,mv88e6095";
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +					reg = <0>;
+> +
+> +					ports {
+> +						#address-cells = <1>;
+> +						#size-cells = <0>;
+> +
+> +						port at 0 {
+> +							reg = <0>;
+> +							label = "lan4";
+> +						};
+> +
+> +						port at 1 {
+> +							reg = <1>;
+> +							label = "lan3";
+> +						};
+> +
+> +						port at 2 {
+> +							reg = <2>;
+> +							label = "lan2";
+> +						};
+> +
+> +						port at 3 {
+> +							reg = <3>;
+> +							label = "lan1";
+> +						};
+> +
+> +						port at 4 {
+> +							reg = <4>;
+> +							label = "wan";
+> +						};
+> +
+> +						port at 5 {
+> +							reg = <5>;
+> +							label = "cpu";
+> +							ethernet = <&eth2>;
+> +
+> +							fixed-link {
+> +								speed = <1000>;
+> +								full-duplex;
+> +							};
+> +						};
+> +					};
+> +				};
+>  			};
+>  
+>  			sata at a8000 {
+> @@ -261,6 +309,8 @@
+>  	};
+>  
+>  	dsa at 0 {
+> +		status = "disabled";
+> +
+>  		compatible = "marvell,dsa";
+>  		#address-cells = <2>;
+>  		#size-cells = <0>;
+> -- 
+> 2.9.3
+>
 
 -- 
- Kirill A. Shutemov
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
