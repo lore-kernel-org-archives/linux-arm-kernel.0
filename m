@@ -1,66 +1,70 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 3 Jan 2017 18:41:16 +0200
-Subject: [PATCH 3/4] arm64: dts: exynos: make tm2 and tm2e independent
- from each other
-In-Reply-To: <20170103102548.73jg6qddlcthe2mu@gangnam.samsung>
-References: <CGME20170103075734epcas5p43a9743131f63affd0a438d2ed342f22e@epcas5p4.samsung.com>
- <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
- <1483430237-26823-4-git-send-email-jcsing.lee@samsung.com>
- <CAJKOXPev9m07_dQWAvJ+=MKnbT0TFERKOtjWUDU+WXdGAiRyDA@mail.gmail.com>
- <20170103095842.h3hl64amje4qv4ts@gangnam.samsung>
- <CAJKOXPeEE1VwAUSAOpfyX+t58zKeAT1fe3ybp0BoQiiDBb4Uqg@mail.gmail.com>
- <20170103102548.73jg6qddlcthe2mu@gangnam.samsung>
-Message-ID: <20170103164116.qkvpwvm27gdefvhy@kozik-lap>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 3 Jan 2017 17:44:53 +0100
+Subject: [PATCH] pwm: sunxi: wait for the READY bit
+In-Reply-To: <73f5fc87-717f-2238-b653-1b117359cbb8@schinagl.nl>
+References: <20170103145732.2108-1-alexandre.belloni@free-electrons.com>
+ <73f5fc87-717f-2238-b653-1b117359cbb8@schinagl.nl>
+Message-ID: <20170103164453.wtdi4mxdxogbx4i5@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 07:25:48PM +0900, Andi Shyti wrote:
-> > >> > Currently tm2e dts includes tm2 but there are some differences
-> > >> > between the two boards and tm2 has some properties that tm2e
-> > >> > doesn't have.
-> > >> >
-> > >> > That's why it's important to keep the two dts files independent
-> > >> > and put all the commonalities in a tm2-common.dtsi file.
-> > >> >
-> > >> > Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> > >> > Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
-> > >> > ---
-> > >> >  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 1046 ++++++++++++++++++++
-> > >> >  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 1033 +------------------
-> > >> >  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |    2 +-
-> > >> >  3 files changed, 1049 insertions(+), 1032 deletions(-)
-> > >> >  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-> > >>
-> > >> I would like to see here the rename and diff from it. Not entire delta
-> > >> (deletions and addons). It is not possible to compare it... I think
-> > >> git supports it by default with similarity of 50%.
-> > >
-> > > I understand, it's indeed quite cryptic to understand. But all
-> > > the diff algorithms (patience, minimal, histogram, myers) give
-> > > the same result. I don't know how to make it better.
-> > >
-> > > I could split this patch, but this also means breaking tm2's
-> > > functionality, which looks worse.
-> > >
-> > > Please tell me if you know a better way for generating the patch.
+On 03/01/2017 at 16:56:16 +0100, Olliver Schinagl wrote :
+> Hey Alexandre,
+> 
+> I've sent several patches regarding pwm a while ago, sadly you never
+> responded [0]. So I guess this is a follow up from that?
+> 
+
+Well, we had the issue and I just had a bit of time to look at it. As I
+remembered you kind of had the same issue, I chose to Cc you.
+
+> I couldn't quickly find the resubmitted version however.
+> 
+
+Was there a new version?
+
+> >  	clk_gate = val & BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+> > -	if (clk_gate) {
+> > -		val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+> > +
+> > +	if (sun4i_pwm->data->has_rdy && (val & PWM_RDY(pwm->hwpwm))) {
+> > +		val |= BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+> >  		sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
+> > +
+> > +		err = readl_poll_timeout(sun4i_pwm->base + PWM_CTRL_REG, val,
+> > +					 !(val & PWM_RDY(pwm->hwpwm)), 400,
+> > +					 500000);
+> > +		if (err)
+> > +			goto finish;
+> >  	}
 > > 
-> > git format-patch -M95%?
+> What happens on sun4i here? sun4i does not have the RDY flag, but it does
+> need the PWM_CLK_GATING to be active.
 > 
-> Same thing with all M values.
+
+Does it actually need it? The datasheet doesn't say anything about it.
+I'm actually wondering what happens if the period is written twice in a
+row without waiting. If the latest period is used, maybe we don't
+actually care.
+
+> maybe only the readl_poll_timeout() should be guarded by the has_rdy, where
+> you poll the register as you do now, and in the else just have a 'known safe
+> delay' to emulate the has_rdy behavior? I'm guessing a few clock cycles of
+> the PWM block. I don't think the documentation states how long this
+> could/should be.
 > 
-> Because exynos5433-tm2.dts results modified, while
-> exynos5433-tm2-common.dtsi is new. Even though I did:
+
+My guess is that the IP is waiting for the current period to finish
+before updating the period internally. That would be the sane way to do it but
+maybe I'm an optimist.
+
+> With my 'wait before disable' patch [1] I run into the same issue, I think.
+> We do not know how long to wait before the hardware is ready.
 > 
-> 1. mv exynos5433-tm2.dts exynos5433-tm2-common.dtsi
-> 2. copied pieces from exynos5433-tm2-common.dtsi to a new
->    exynos5433-tm2.dts
 
-mv/etc won't help. You need to convince git format-patch that it is
-rename. For that, you need -B so copy will be considered a rename
-(otherwise rename will be detected only if a file is removed), so:
-	git format-patch -B50% -1
+Up to 196.8s if I'm right...
 
-Please resend with this approach.
-
-Best regards,
-Krzysztof
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
