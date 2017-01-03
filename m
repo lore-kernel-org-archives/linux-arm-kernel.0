@@ -1,88 +1,39 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue,  3 Jan 2017 12:56:50 -0800
-Subject: [PATCH 2/2] arm: Adjust memory boundaries after reservations
-In-Reply-To: <1483477010-18986-1-git-send-email-labbott@redhat.com>
-References: <1483477010-18986-1-git-send-email-labbott@redhat.com>
-Message-ID: <1483477010-18986-3-git-send-email-labbott@redhat.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Tue,  3 Jan 2017 12:57:11 -0800
+Subject: [PATCH v2 01/19] ARM: dts: imx6qdl: Add compatible, clocks,
+ irqs to MIPI CSI-2 node
+In-Reply-To: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
+References: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1483477049-19056-2-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add to the MIPI CSI2 receiver node: compatible string, interrupt sources,
+clocks.
 
-adjust_lowmem_bounds is responsible for setting up the boundary for
-lowmem/hihgmme. This needs to be setup before memblock reservations can
-occur. At the time memblock reservations can occur, memory can also be
-removed from the system. The lowmem/highmem boundary and end of memory
-may be affected by this but it is currently not recalculated. On some
-systems this may be harmless, on o thers this may result in incorrect
-ranges being passed to the main memory allocator. Correct this by
-recalculating the lowmem/highmem boundary after all reservations have
-been made.
-
-Signed-off-by: Laura Abbott <labbott@redhat.com>
+Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- arch/arm/kernel/setup.c | 8 ++++++++
- arch/arm/mm/mmu.c       | 9 ++++++---
- 2 files changed, 14 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/imx6qdl.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 8a8051c..4625115 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -1093,8 +1093,16 @@ void __init setup_arch(char **cmdline_p)
- 	setup_dma_zone(mdesc);
- 	xen_early_init();
- 	efi_init();
-+	/*
-+	 * Make sure the calcualtion for lowmem/highmem is set appropriately
-+	 * before reserving/allocating any mmeory
-+	 */
- 	adjust_lowmem_bounds();
- 	arm_memblock_init(mdesc);
-+	/*
-+	 * Memory may have been removed so recalculate the bounds.
-+	 */
-+	adjust_lowmem_bounds();
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 53e6e63..7b546e3 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1125,7 +1125,14 @@
+ 			};
  
- 	early_ioremap_reset();
+ 			mipi_csi: mipi at 021dc000 {
++				compatible = "fsl,imx-mipi-csi2";
+ 				reg = <0x021dc000 0x4000>;
++				interrupts = <0 100 0x04>, <0 101 0x04>;
++				clocks = <&clks IMX6QDL_CLK_HSI_TX>,
++					 <&clks IMX6QDL_CLK_VIDEO_27M>,
++					 <&clks IMX6QDL_CLK_EIM_SEL>;
++				clock-names = "dphy_clk", "cfg_clk", "pix_clk";
++				status = "disabled";
+ 			};
  
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 32ecdfd..3f12a64 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1157,6 +1157,7 @@ void __init adjust_lowmem_bounds(void)
- 	phys_addr_t memblock_limit = 0;
- 	u64 vmalloc_limit;
- 	struct memblock_region *reg;
-+	phys_addr_t lowmem_limit = 0;
- 
- 	/*
- 	 * Let's use our own (unoptimized) equivalent of __pa() that is
-@@ -1173,8 +1174,8 @@ void __init adjust_lowmem_bounds(void)
- 
- 
- 		if (reg->base < vmalloc_limit) {
--			if (block_end > arm_lowmem_limit)
--				arm_lowmem_limit = min(
-+			if (block_end > lowmem_limit)
-+				lowmem_limit = min(
- 						(phys_addr_t)vmalloc_limit,
- 						block_end);
- 
-@@ -1195,12 +1196,14 @@ void __init adjust_lowmem_bounds(void)
- 				if (!IS_ALIGNED(block_start, PMD_SIZE))
- 					memblock_limit = block_start;
- 				else if (!IS_ALIGNED(block_end, PMD_SIZE))
--					memblock_limit = arm_lowmem_limit;
-+					memblock_limit = lowmem_limit;
- 			}
- 
- 		}
- 	}
- 
-+	arm_lowmem_limit = lowmem_limit;
-+
- 	high_memory = __va(arm_lowmem_limit - 1) + 1;
- 
- 	/*
+ 			mipi_dsi: mipi at 021e0000 {
 -- 
 2.7.4
