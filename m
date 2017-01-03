@@ -1,18 +1,14 @@
 From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Tue, 3 Jan 2017 22:00:50 +0300
+Date: Tue, 3 Jan 2017 22:01:46 +0300
 Subject: [PATCH 1/2] arm64: dma_mapping: allow PCI host driver to limit
  DMA mask
 In-Reply-To: <20170103184444.GP6986@arm.com>
 References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
  <20170103184444.GP6986@arm.com>
-Message-ID: <1ea67064-a180-b829-09d9-44805796697d@cogentembedded.com>
+Message-ID: <ead2ff8d-fbd3-3109-51e2-41937e9c944d@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-03.01.2017 21:44, Will Deacon ?????:
-> On Thu, Dec 29, 2016 at 11:45:03PM +0300, Nikita Yushchenko wrote:
 >> It is possible that PCI device supports 64-bit DMA addressing, and thus
 >> it's driver sets device's dma_mask to DMA_BIT_MASK(64), however PCI host
 >> bridge has limitations on inbound transactions addressing. Example of
