@@ -1,43 +1,54 @@
 From: jcsing.lee@samsung.com (Jaechul Lee)
-Date: Tue, 03 Jan 2017 16:57:13 +0900
-Subject: [PATCH 0/4] Add touch key driver support for TM2
-References: <CGME20170103075733epcas5p48985c789a816f1f2eae84c52e070cc14@epcas5p4.samsung.com>
-Message-ID: <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
+Date: Tue, 03 Jan 2017 16:57:14 +0900
+Subject: [PATCH 1/4] input: Add support for the tm2 touchkey device driver
+In-Reply-To: <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
+References: <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
+ <CGME20170103075733epcas5p47dff8d21854938b2439c9843d91bc301@epcas5p4.samsung.com>
+Message-ID: <1483430237-26823-2-git-send-email-jcsing.lee@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds the binding description of the tm2 touchkey
+device driver.
 
-This patchset adds support for the tm2 touchkey device.
-
-The driver has been ported from Tizen Kernel, originally written
-by Beomho. I ported it to the latest mainline Kernel.
-
-dts has been separated between tm2 and tm2e because touchkey is present in tm2
-but not tm2e.
-
-Best Regards,
-Jaechul
-
-Andi Shyti (1):
-  arm64: dts: exynos: make tm2 and tm2e independent from each other
-
-Jaechul Lee (3):
-  input: Add support for the tm2 touchkey device driver
-  input: tm2-touchkey: Add touchkey driver support for TM2
-  arm64: dts: exynos: Add tm2 touchkey node
-
- .../bindings/input/samsung,tm2-touchkey.txt        |   27 +
- .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 1046 ++++++++++++++++++++
- arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 1037 +------------------
- arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |    2 +-
- drivers/input/keyboard/Kconfig                     |   11 +
- drivers/input/keyboard/Makefile                    |    1 +
- drivers/input/keyboard/tm2-touchkey.c              |  326 ++++++
- 7 files changed, 1422 insertions(+), 1028 deletions(-)
+Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
+---
+ .../bindings/input/samsung,tm2-touchkey.txt        | 27 ++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/input/samsung,tm2-touchkey.txt
- create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
- create mode 100644 drivers/input/keyboard/tm2-touchkey.c
 
+diff --git a/Documentation/devicetree/bindings/input/samsung,tm2-touchkey.txt b/Documentation/devicetree/bindings/input/samsung,tm2-touchkey.txt
+new file mode 100644
+index 0000000..4de1af0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/samsung,tm2-touchkey.txt
+@@ -0,0 +1,27 @@
++Samsung tm2-touchkey
++
++Required properties:
++- compatible: must be "samsung,tm2-touchkey"
++- reg: I2C address of the chip.
++- interrupt-parent: a phandle for the interrupt controller (see interrupt
++	binding[0]).
++- interrupts: interrupt to which the chip is connected (see interrupt
++	binding[0]).
++- vcc-supply : internal regulator output. 1.8V
++- vdd-supply : power supply for IC 3.3V
++
++[0]: Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
++
++Example:
++	&i2c0 {
++		/* ... */
++
++		touchkey at 20 {
++			compatible = "samsung,tm2-touchkey";
++			reg = <0x20>;
++			interrupt-parent = <&gpa3>;
++			interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
++			vcc-supply=<&ldo32_reg>;
++			vdd-supply=<&ldo33_reg>;
++		};
++	};
 -- 
 2.7.4
