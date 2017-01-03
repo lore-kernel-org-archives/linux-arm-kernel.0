@@ -1,70 +1,53 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Tue, 3 Jan 2017 09:34:59 +0100
-Subject: [PATCH v1] mtd: nand: tango: Update DT binding description
-In-Reply-To: <20161229192302.5c94ecdb@bbrezillon>
-References: <ba47f2f1-bcdc-91e8-ed79-153931ccdad8@sigmadesigns.com>
- <20161229192302.5c94ecdb@bbrezillon>
-Message-ID: <24522cc9-9d9a-980d-8cd2-18fb0de19a5f@sigmadesigns.com>
+From: Nehal-bakulchandra.Shah@amd.com (Shah, Nehal-bakulchandra)
+Date: Tue, 3 Jan 2017 08:37:38 +0000
+Subject: [PATCH] pinctrl: amd: fix compilation warning
+In-Reply-To: <20170103082119.11958-1-linus.walleij@linaro.org>
+References: <20170103082119.11958-1-linus.walleij@linaro.org>
+Message-ID: <MWHPR12MB13571FD8C404270F47F5D9FBA06E0@MWHPR12MB1357.namprd12.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/12/2016 19:23, Boris Brezillon wrote:
-> On Mon, 19 Dec 2016 15:30:12 +0100
-> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> wrote:
-> 
->> Visually separate register ranges (address/size pairs) in reg prop.
->> Change DMA channel name, for consistency with other drivers.
->>
->> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->> ---
->>  Documentation/devicetree/bindings/mtd/tango-nand.txt | 6 +++---
->>  drivers/mtd/nand/tango_nand.c                        | 2 +-
->>  2 files changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/mtd/tango-nand.txt b/Documentation/devicetree/bindings/mtd/tango-nand.txt
->> index ad5a02f2ac8c..cd1bf2ac9055 100644
->> --- a/Documentation/devicetree/bindings/mtd/tango-nand.txt
->> +++ b/Documentation/devicetree/bindings/mtd/tango-nand.txt
->> @@ -5,7 +5,7 @@ Required properties:
->>  - compatible: "sigma,smp8758-nand"
->>  - reg: address/size of nfc_reg, nfc_mem, and pbus_reg
->>  - dmas: reference to the DMA channel used by the controller
->> -- dma-names: "nfc_sbox"
->> +- dma-names: "rxtx"
-> 
-> You probably want to fix the driver accordingly ;-).
+Thanks Linus for fixing this.
 
-I'm confused...
+Nehal
 
-Did you miss the change (below) to drivers/mtd/nand/tango_nand.c
-fixing the driver as well as the documentation?
+-----Original Message-----
+From: Linus Walleij [mailto:linus.walleij at linaro.org] 
+Sent: Tuesday, January 3, 2017 1:51 PM
+To: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Cc: linux-gpio at vger.kernel.org; Linus Walleij <linus.walleij@linaro.org>; S-k, Shyam-sundar <Shyam-sundar.S-k@amd.com>; Shah, Nehal-bakulchandra <Nehal-bakulchandra.Shah@amd.com>
+Subject: [PATCH] pinctrl: amd: fix compilation warning
 
+3bfd44306c65 ("pinctrl: amd: Add support for additional GPIO") created the following warning:
 
->>  - clocks: reference to the system clock
->>  - #address-cells: <1>
->>  - #size-cells: <0>
->> @@ -17,9 +17,9 @@ Example:
->>  
->>  	nandc: nand-controller at 2c000 {
->>  		compatible = "sigma,smp8758-nand";
->> -		reg = <0x2c000 0x30 0x2d000 0x800 0x20000 0x1000>;
->> +		reg = <0x2c000 0x30>, <0x2d000 0x800>, <0x20000 0x1000>;
->>  		dmas = <&dma0 3>;
->> -		dma-names = "nfc_sbox";
->> +		dma-names = "rxtx";
->>  		clocks = <&clkgen SYS_CLK>;
->>  		#address-cells = <1>;
->>  		#size-cells = <0>;
->> diff --git a/drivers/mtd/nand/tango_nand.c b/drivers/mtd/nand/tango_nand.c
->> index cc23db64f0ca..51dc88d6b8da 100644
->> --- a/drivers/mtd/nand/tango_nand.c
->> +++ b/drivers/mtd/nand/tango_nand.c
->> @@ -629,7 +629,7 @@ static int tango_nand_probe(struct platform_device *pdev)
->>  	if (IS_ERR(clk))
->>  		return PTR_ERR(clk);
->>  
->> -	nfc->chan = dma_request_chan(&pdev->dev, "nfc_sbox");
->> +	nfc->chan = dma_request_chan(&pdev->dev, "rxtx");
->>  	if (IS_ERR(nfc->chan))
->>  		return PTR_ERR(nfc->chan);
->>  
+drivers/pinctrl/pinctrl-amd.c: In function 'amd_gpio_dbg_show':
+drivers/pinctrl/pinctrl-amd.c:210:3: warning: 'pin_num' may be used uninitialized in this function [-Wmaybe-uninitialized]
+   for (; i < pin_num; i++) {
+   ^
+drivers/pinctrl/pinctrl-amd.c:172:21: warning: 'i' may be used uninitialized in this function [-Wmaybe-uninitialized]
+  unsigned int bank, i, pin_num;
+                     ^
+Fix this by adding a guarding default case for illegal bank numbers.
+
+Cc: S-k Shyam-sundar <Shyam-sundar.S-k@amd.com>
+Cc: Nehal Shah <Nehal-bakulchandra.Shah@amd.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-amd.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/pinctrl/pinctrl-amd.c b/drivers/pinctrl/pinctrl-amd.c index 47b17100410e..c2203699f1ab 100644
+--- a/drivers/pinctrl/pinctrl-amd.c
++++ b/drivers/pinctrl/pinctrl-amd.c
+@@ -206,6 +206,9 @@ static void amd_gpio_dbg_show(struct seq_file *s, struct gpio_chip *gc)
+ 			i = 192;
+ 			pin_num = AMD_GPIO_PINS_BANK3 + i;
+ 			break;
++		default:
++			/* Illegal bank number, ignore */
++			continue;
+ 		}
+ 		for (; i < pin_num; i++) {
+ 			seq_printf(s, "pin%d\t", i);
+--
+2.9.3
