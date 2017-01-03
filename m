@@ -1,41 +1,64 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 3 Jan 2017 11:44:47 -0600
-Subject: [PATCH 7/9] irqchip/ls-scfg-msi: add LS1046a MSI support
-In-Reply-To: <1482829985-24421-7-git-send-email-Minghuan.Lian@nxp.com>
-References: <1482829985-24421-1-git-send-email-Minghuan.Lian@nxp.com>
- <1482829985-24421-7-git-send-email-Minghuan.Lian@nxp.com>
-Message-ID: <20170103174447.cy4b7nafea7s4hwf@rob-hp-laptop>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 3 Jan 2017 17:49:06 +0000
+Subject: [PATCH v3 4/6] mfd: dt: Add bindings for the Aspeed LPC Host
+ Controller (LHC)
+In-Reply-To: <20161206025321.1792-5-andrew@aj.id.au>
+References: <20161206025321.1792-1-andrew@aj.id.au>
+ <20161206025321.1792-5-andrew@aj.id.au>
+Message-ID: <20170103174906.GB27589@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2016 at 05:13:03PM +0800, Minghuan Lian wrote:
-> LS1046a includes 4 MSIRs, each MSIR is assigned a dedicate GIC
-> SPI interrupt and provides 32 MSI interrupts. Compared to previous
-> MSI, LS1046a's IBS(interrupt bit select) shift is changed to 2 and
-> total MSI interrupt number is changed to 128.
+On Tue, 06 Dec 2016, Andrew Jeffery wrote:
+
+> The LPC bus pinmux configuration on fifth generation Aspeed SoCs depends
+> on bits in both the System Control Unit and the LPC Host Controller.
 > 
-> The patch adds structure 'ls_scfg_msir' to describe MSIR setting and
-> 'ibs_shift' to store the different value between the SoCs.
+> The Aspeed LPC Host Controller is described as a child node of the
+> LPC host-range syscon device for arbitration of access by the host
+> controller and pinmux drivers.
 > 
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+
+Applied with Acks, thanks.
+
 > ---
->  .../interrupt-controller/fsl,ls-scfg-msi.txt       |   2 +-
->  drivers/irqchip/irq-ls-scfg-msi.c                  | 161 ++++++++++++++++-----
->  2 files changed, 127 insertions(+), 36 deletions(-)
+>  .../devicetree/bindings/mfd/aspeed-lpc.txt         | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
-> index 54597b0..dde4552 100644
-> --- a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
-> @@ -6,7 +6,7 @@ Required properties:
->  	      Layerscape PCIe MSI controller block such as:
->                "fsl,ls1021a-msi"
->                "fsl,ls1043a-msi"
-> -	      "fsl,ls1046a-msi"
-> +              "fsl,ls1046a-msi"
+> diff --git a/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt b/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
+> index a97131aba446..9de318ef72da 100644
+> --- a/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
+> +++ b/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
+> @@ -109,3 +109,25 @@ lpc: lpc at 1e789000 {
+>  	};
+>  };
+>  
+> +Host Node Children
+> +==================
+> +
+> +LPC Host Controller
+> +-------------------
+> +
+> +The Aspeed LPC Host Controller configures the Low Pin Count (LPC) bus behaviour
+> +between the host and the baseboard management controller. The registers exist
+> +in the "host" portion of the Aspeed LPC controller, which must be the parent of
+> +the LPC host controller node.
+> +
+> +Required properties:
+> +- compatible:		"aspeed,ast2500-lhc";
+> +- reg:			contains offset/length value of the LHC memory
+> +			region.
+> +
+> +Example:
+> +
+> +lhc: lhc at 20 {
+> +	compatible = "aspeed,ast2500-lhc";
+> +	reg = <0x20 0x24 0x48 0x8>;
+> +};
 
-This hunk goes in the previous patch...
-
->  - msi-controller: indicates that this is a PCIe MSI controller node
->  - reg: physical base address of the controller and length of memory mapped.
->  - interrupts: an interrupt to the parent interrupt controller.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
