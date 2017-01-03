@@ -1,38 +1,29 @@
 From: ping.bai@nxp.com (Jacky Bai)
-Date: Tue, 3 Jan 2017 01:00:52 +0000
-Subject: [PATCH v2 06/12] driver: pinctrl: imx: Add pinctrl driver support
- for imx6sll
-In-Reply-To: <CACRpkdZYH-X=SG7AfCOgKA9U0WL9941e-zo_tgUF74mdns2_7Q@mail.gmail.com>
-References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
- <1482832070-22668-7-git-send-email-ping.bai@nxp.com>
- <CACRpkdZYH-X=SG7AfCOgKA9U0WL9941e-zo_tgUF74mdns2_7Q@mail.gmail.com>
-Message-ID: <AM3PR04MB530275E01245160E8A441E5876E0@AM3PR04MB530.eurprd04.prod.outlook.com>
+Date: Tue, 3 Jan 2017 01:01:47 +0000
+Subject: [PATCH 2/2] ARM: imx: Add speed grading check for imx6ul
+In-Reply-To: <20161230115717.GR6177@dragon>
+References: <1480475098-2037-1-git-send-email-ping.bai@nxp.com>
+ <1480475098-2037-2-git-send-email-ping.bai@nxp.com>
+ <20161230115717.GR6177@dragon>
+Message-ID: <AM3PR04MB530A48CFF0C4089F762ACA6876E0@AM3PR04MB530.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCH v2 06/12] driver: pinctrl: imx: Add pinctrl driver support for
-> imx6sll
-> 
-> On Tue, Dec 27, 2016 at 10:47 AM, Bai Ping <ping.bai@nxp.com> wrote:
-> 
-> > Add pinctrl driver support for imx6sll.
+> On Wed, Nov 30, 2016 at 11:04:58AM +0800, Bai Ping wrote:
+> > On i.MX6UL, it has two type of part, the difference is the max ARM
+> > frequency that can run at(528MHz/700MHz).
+> > The part can be identified by part marking for speed grading fuse.
+> > This patch add speed grading check to disable the unsupported OPP
+> > dynamically.
 > >
 > > Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> (...)
-> > +++ b/arch/arm/mach-imx/Kconfig
-> > @@ -514,6 +514,7 @@ config SOC_IMX6SL
-> >
-> >  config SOC_IMX6SLL
-> >         bool "i.MX6 SoloLiteLite support"
-> > +       select PINCTRL_IMX6SLL
 > 
-> This needs to be separate so I can merge the pure pin control patch to my tree.
-> 
-> Apart from that, look into using generic pinconf.
+> We chose to handle such speed grading thing in IMX platform code with the
+> assumption that this is a special case for i.MX6Q only.  No, I'm not going to take
+> such code for any other i.MX6 SoCs.  Please patch cpufreq driver to handle the
+> speed grading check.
 > 
 
-Thanks for review, I will try to use generic pinconf
+Thanks, I will try to add in cpufreq.
 
-
-> Yours,
-> Linus Walleij
+> Shawn
