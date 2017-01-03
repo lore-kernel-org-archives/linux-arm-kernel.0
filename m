@@ -1,23 +1,57 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 3 Jan 2017 09:27:04 +0530
-Subject: [PATCH RESEND] dmaengine: stm32-dma: Rework starting transfer
- management
-In-Reply-To: <1483349607-16870-1-git-send-email-cedric.madianga@gmail.com>
-References: <1483349607-16870-1-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <20170103035703.GE3573@localhost>
+From: harinikatakamlinux@gmail.com (Harini Katakam)
+Date: Tue, 3 Jan 2017 10:36:11 +0530
+Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <20170102161359.GD3609@localhost.localdomain>
+References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
+ <BN3PR07MB2516815EDE69ACDCE27F81A3C96F0@BN3PR07MB2516.namprd07.prod.outlook.com>
+ <20170102113155.GA16373@localhost.localdomain>
+ <0717c63b-2e29-9ad1-7f01-39817980933f@atmel.com>
+ <20170102161359.GD3609@localhost.localdomain>
+Message-ID: <CAFcVECK1vt7Hu4tgSZ2+kKpMxoT-wpikMDq65HaxRv-EMgobHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2017 at 10:33:27AM +0100, M'boumba Cedric Madianga wrote:
-> This patch reworks the way to manage transfer starting.
-> Now, starting DMA is only allowed when the channel is not busy.
-> Then, stm32_dma_start_transfer is declared as void.
-> At least, after each transfer completion, we start the next transfer if a
-> new descriptor as been queued in the issued list during an ongoing
-> transfer.
+Hi Richard,
 
-ah sorry, i missed to push topic/stm32-dma. can you rebase onnthis and
-resend again. Btw this fails as as well..
+On Mon, Jan 2, 2017 at 9:43 PM, Richard Cochran
+<richardcochran@gmail.com> wrote:
+> On Mon, Jan 02, 2017 at 03:47:07PM +0100, Nicolas Ferre wrote:
+>> Le 02/01/2017 ? 12:31, Richard Cochran a ?crit :
+>> > This Cadence IP core is a complete disaster.
+>>
+>> Well, it evolved and propose several options to different SoC
+>> integrators. This is not something unusual...
+>> I suspect as well that some other network adapters have the same
+>> weakness concerning PTP timestamp in single register as the early
+>> revisions of this IP.
+>
+> It appears that this core can neither latch the time on read or write,
+> or even latch time stamps.  I have worked with many different PTP HW
+> implementations, even early ones like on the ixp4xx, and it is no
+> exaggeration to say that this one is uniquely broken.
+>
+>> I suspect that Rafal tend to jump too quickly to the latest IP revisions
+>> and add more options to this series: let's not try to pour too much
+>> things into this code right now.
+>
+> Why can't you check the IP version in the driver?
 
--- 
-~Vinod
+There is an IP revision register but it would be probably be better
+to rely on "caps" from the compatibility strings - to cover SoC
+specific implementations. Also, when this extended BD is
+added (with timestamp), additional words will need to be added
+statically which will be consistent with Andrei's CONFIG_
+checks.
+
+>
+> And is it really true that the registers don't latch the time stamps,
+> as Rafal said?  If so, then we cannot accept the non-descriptor driver
+> version, since it cannot possibly work correctly.
+>
+
+AFAIK, the two sets of registers only hold the timestamp till the next
+event (or peer event) packet comes in.
+I understand that it is not accurate - it is an initial version.
+
+Regards,
+Harini
