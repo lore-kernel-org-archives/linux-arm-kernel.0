@@ -1,27 +1,57 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 3 Jan 2017 11:46:01 -0600
-Subject: [PATCH 8/9] irqchip/ls-scfg-msi: add LS1043a v1.1 MSI support
-In-Reply-To: <1482829985-24421-8-git-send-email-Minghuan.Lian@nxp.com>
-References: <1482829985-24421-1-git-send-email-Minghuan.Lian@nxp.com>
- <1482829985-24421-8-git-send-email-Minghuan.Lian@nxp.com>
-Message-ID: <20170103174601.jbmqo7iataemzyxc@rob-hp-laptop>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 3 Jan 2017 17:49:54 +0000
+Subject: [PATCH v3 5/6] mfd: dt: Add bindings for the Aspeed SoC Display
+ Controller (GFX)
+In-Reply-To: <20161206025321.1792-6-andrew@aj.id.au>
+References: <20161206025321.1792-1-andrew@aj.id.au>
+ <20161206025321.1792-6-andrew@aj.id.au>
+Message-ID: <20170103174954.GF27589@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2016 at 05:13:04PM +0800, Minghuan Lian wrote:
-> A MSI controller of LS1043a v1.0 only includes one MSIR and
-> is assigned one GIC interrupt. In order to support affinity,
-> LS1043a v1.1 MSI is assigned 4 MSIRs and 4 GIC interrupts.
-> But the MSIR has the different offset and only supports 8 MSIs.
-> The bits between variable bit_start and bit_end in structure
-> ls_scfg_msir are used to show 8 MSI interrupts. msir_irqs and
-> msir_base are added to describe the difference of MSI between
-> LS1043a v1.1 and other SoCs.
-> 
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
-> ---
->  .../interrupt-controller/fsl,ls-scfg-msi.txt       |  1 +
->  drivers/irqchip/irq-ls-scfg-msi.c                  | 45 +++++++++++++++++++---
->  2 files changed, 40 insertions(+), 6 deletions(-)
+On Tue, 06 Dec 2016, Andrew Jeffery wrote:
 
-Acked-by: Rob Herring <robh@kernel.org> 
+> The Aspeed SoC Display Controller is presented as a syscon device to
+> arbitrate access by display and pinmux drivers. Video pinmux
+> configuration on fifth generation SoCs depends on bits in both the
+> System Control Unit and the Display Controller.
+> 
+> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> Acked-by: Rob Herring <robh@kernel.org>
+
+Applied with Acks, thanks.
+
+> ---
+>  .../devicetree/bindings/mfd/syscon/aspeed-gfx.txt       | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/syscon/aspeed-gfx.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/syscon/aspeed-gfx.txt b/Documentation/devicetree/bindings/mfd/syscon/aspeed-gfx.txt
+> new file mode 100644
+> index 000000000000..aea5370efd97
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/syscon/aspeed-gfx.txt
+> @@ -0,0 +1,17 @@
+> +* Device tree bindings for Aspeed SoC Display Controller (GFX)
+> +
+> +The Aspeed SoC Display Controller primarily does as its name suggests, but also
+> +participates in pinmux requests on the g5 SoCs. It is therefore considered a
+> +syscon device.
+> +
+> +Required properties:
+> +- compatible:		"aspeed,ast2500-gfx", "syscon"
+> +- reg:			contains offset/length value of the GFX memory
+> +			region.
+> +
+> +Example:
+> +
+> +gfx: display at 1e6e6000 {
+> +	compatible = "aspeed,ast2500-gfx", "syscon";
+> +	reg = <0x1e6e6000 0x1000>;
+> +};
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
