@@ -1,30 +1,35 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 3 Jan 2017 18:49:55 +0200
-Subject: [PATCH 4/4] arm64: dts: exynos: Add tm2 touchkey node
-In-Reply-To: <1483430237-26823-5-git-send-email-jcsing.lee@samsung.com>
-References: <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
- <CGME20170103075734epcas5p439b05860a3238ce638f683d9687786a3@epcas5p4.samsung.com>
- <1483430237-26823-5-git-send-email-jcsing.lee@samsung.com>
-Message-ID: <20170103164955.2oqyd2du2dom7wym@kozik-lap>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Tue, 3 Jan 2017 17:51:05 +0100
+Subject: [PATCH RESEND] dmaengine: stm32-dma: Rework starting transfer
+ management
+In-Reply-To: <20170103035703.GE3573@localhost>
+References: <1483349607-16870-1-git-send-email-cedric.madianga@gmail.com>
+ <20170103035703.GE3573@localhost>
+Message-ID: <CAOAejn2=xksxXmfzVRJV-5hAkbNyPX88vWUyPkGdh+ynoTkCdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 04:57:17PM +0900, Jaechul Lee wrote:
-> Add DT node support for TM2 touchkey device.
-> 
-> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
-> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+Hi Vinod,
 
-The order of sign-offs should follow the order of "who touched it". I
-assume that the real order was like this:
-1. Initially create by Beomho,
-2. Adjustments by Andi,
-3. Final adjustments and sending by you.
+> ah sorry, i missed to push topic/stm32-dma. can you rebase onnthis and
+> resend again. Btw this fails as as well..
+I have tried again and I don't have any issue.
+Please see below my way of working and let me know if there is
+something I don't understand:
 
-If that is correct then the order should be 1->2->3.
-
-Beside of that, patch looks good.
+slave-dma git://git.infradead.org/users/vkoul/slave-dma.git
+$ git fetch slave-dma
+$ git checkout -b dma-fixes slave-dma/topic/dma-fixes
+$ git checkout -b dma-stm32 slave-dma/topic/stm32-dma
+$ git rebase dma-fixes
+First, rewinding head to replay your work on top of it...
+Applying: dmaengine: stm32-dma: Fix typo in Kconfig
+Applying: dt-bindings: stm32-dma: Fix typo regarding DMA client binding
+Applying: dmaengine: stm32-dma: Rework starting transfer management
+Applying: dmaengine: stm32-dma: Fix residue computation issue in cyclic mode
+Applying: dmaengine: stm32-dma: Add synchronization support
+Applying: dmaengine: stm32-dma: Add max_burst support
 
 Best regards,
-Krzysztof
+
+Cedric
