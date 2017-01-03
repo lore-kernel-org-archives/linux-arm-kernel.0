@@ -1,70 +1,54 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue,  3 Jan 2017 17:12:31 -0200
-Subject: [PATCH] ARM: dts: imx53-qsb: Provide the TVE DAC regulators
-Message-ID: <1483470751-8073-1-git-send-email-festevam@gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 3 Jan 2017 21:20:08 +0200
+Subject: [PATCH] cpufreq: s3c64xx: remove incorrect __init annotation
+In-Reply-To: <CAJZ5v0jaKnn+LTTdpgxaFLNaYSuqV8d9PKphOnHrPw0Zp_Uj5w@mail.gmail.com>
+References: <20161216090625.2235668-1-arnd@arndb.de>
+ <20170102070903.GC8588@vireshk-i7>
+ <20170102173651.hvsfalhcmisv4mtv@kozik-lap>
+ <CAJZ5v0jaKnn+LTTdpgxaFLNaYSuqV8d9PKphOnHrPw0Zp_Uj5w@mail.gmail.com>
+Message-ID: <20170103192008.3taowqq4kjggv6fh@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On Mon, Jan 02, 2017 at 10:19:29PM +0100, Rafael J. Wysocki wrote:
+> On Mon, Jan 2, 2017 at 6:36 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > On Mon, Jan 02, 2017 at 12:39:03PM +0530, Viresh Kumar wrote:
+> >> On 16-12-16, 10:06, Arnd Bergmann wrote:
+> >> > s3c64xx_cpufreq_config_regulator is incorrectly annotated
+> >> > as __init, since the caller is also not init:
+> >> >
+> >> > WARNING: vmlinux.o(.text+0x92fe1c): Section mismatch in reference from the function s3c64xx_cpufreq_driver_init() to the function .init.text:s3c64xx_cpufreq_config_regulator()
+> >> >
+> >> > With modern gcc versions, the function gets inline, so we don't
+> >> > see the warning, this only happens with gcc-4.6 and older.
+> >> >
+> >> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> >> > ---
+> >> >  drivers/cpufreq/s3c64xx-cpufreq.c | 2 +-
+> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >> >
+> >> > diff --git a/drivers/cpufreq/s3c64xx-cpufreq.c b/drivers/cpufreq/s3c64xx-cpufreq.c
+> >> > index 176e84cc3991..0cb9040eca49 100644
+> >> > --- a/drivers/cpufreq/s3c64xx-cpufreq.c
+> >> > +++ b/drivers/cpufreq/s3c64xx-cpufreq.c
+> >> > @@ -107,7 +107,7 @@ static int s3c64xx_cpufreq_set_target(struct cpufreq_policy *policy,
+> >> >  }
+> >> >
+> >> >  #ifdef CONFIG_REGULATOR
+> >> > -static void __init s3c64xx_cpufreq_config_regulator(void)
+> >> > +static void s3c64xx_cpufreq_config_regulator(void)
+> >> >  {
+> >> >     int count, v, i, found;
+> >> >     struct cpufreq_frequency_table *freq;
+> >>
+> >> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> >
+> > Rafael,
+> > Are you going to pick it up?
+> 
+> I thought I did, didn't I?
 
-On imx53-qsb the TVE DAC regulator comes from:
+Right, you did. I missed that. Thanks!
 
-- LDO7 on the board with the Dialog DA9052 PMIC
-- VDAC on the board with the MC34708 PMIC
-
-Pass them in the 'dac-supply' node.
-
-While at it, remove the 'regulator-always-on/regulator-boot-on'
-properties as the TVE driver will properly handle it.
-
-Tested on a imx53-qsb board with a Dialog DA9052 PMIC.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx53-qsb.dts  | 5 ++++-
- arch/arm/boot/dts/imx53-qsrb.dts | 6 ++++--
- 2 files changed, 8 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-index 3799396..f4c158c 100644
---- a/arch/arm/boot/dts/imx53-qsb.dts
-+++ b/arch/arm/boot/dts/imx53-qsb.dts
-@@ -90,7 +90,6 @@
- 			ldo7_reg: ldo7 {
- 				regulator-min-microvolt = <1200000>;
- 				regulator-max-microvolt = <3600000>;
--				regulator-always-on;
- 			};
- 
- 			ldo8_reg: ldo8 {
-@@ -113,3 +112,7 @@
- 		};
- 	};
- };
-+
-+&tve {
-+	dac-supply = <&ldo7_reg>;
-+};
-diff --git a/arch/arm/boot/dts/imx53-qsrb.dts b/arch/arm/boot/dts/imx53-qsrb.dts
-index 96d7eed..479ca4c 100644
---- a/arch/arm/boot/dts/imx53-qsrb.dts
-+++ b/arch/arm/boot/dts/imx53-qsrb.dts
-@@ -130,8 +130,6 @@
- 				regulator-name = "VDAC";
- 				regulator-min-microvolt = <2500000>;
- 				regulator-max-microvolt = <2775000>;
--				regulator-boot-on;
--				regulator-always-on;
- 			};
- 
- 			vgen1_reg: vgen1 {
-@@ -152,3 +150,7 @@
- 		};
- 	};
- };
-+
-+&tve {
-+	dac-supply = <&vdac_reg>;
-+};
--- 
-2.7.4
+Best regards,
+Krzysztof
