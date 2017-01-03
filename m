@@ -1,41 +1,47 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Tue, 3 Jan 2017 14:09:16 -0800
-Subject: [RFC, PATCHv2 29/29] mm, x86: introduce RLIMIT_VADDR
-In-Reply-To: <21511994.eBlbEPoKOz@wuerfel>
-References: <20161227015413.187403-1-kirill.shutemov@linux.intel.com>
- <3492795.xaneWtGxgW@wuerfel>
- <CALCETrUCdu3kTBU09gXaSppO7VCm+872zkGnovaZKTXBbY2wTg@mail.gmail.com>
- <21511994.eBlbEPoKOz@wuerfel>
-Message-ID: <CALCETrXmdAnbgjsxw=qTbP2PhVCzE8v3y5XMt8DVa4P9DowsGA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Jan 2017 23:25:04 +0100
+Subject: [PATCH 2/2] isdn: i4l: move active-isdn drivers to staging
+In-Reply-To: <1483480459.10534.8.camel@tiscali.nl>
+References: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
+ <3286019.I2UkVCJq41@wuerfel> <1483480459.10534.8.camel@tiscali.nl>
+Message-ID: <3780968.pTT7cvIH4p@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 3, 2017 at 2:07 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday, January 3, 2017 10:29:33 AM CET Andy Lutomirski wrote:
->>
->> Hmm.  What if we approached this a bit differently?  We could add a
->> single new personality bit ADDR_LIMIT_EXPLICIT.  Setting this bit
->> cause PER_LINUX32_3GB etc to be automatically cleared.
->
-> Both the ADDR_LIMIT_32BIT and ADDR_LIMIT_3GB flags I guess?
+On Tuesday, January 3, 2017 10:54:19 PM CET Paul Bolle wrote:
+> On Tue, 2017-01-03 at 22:19 +0100, Arnd Bergmann wrote:
+> > isdn: move isdnhdlc out of i4l
+> > isdn: i4l: move hisax driver to staging
+> > isdn: move i4l to staging
+> > 
+> > I can post those as well, at least I think the first two are helpful
+> > for untangling i4l from the rest of ISDN.  I also still think that
+> > moving hisax and i4l to staging is reasonable given the state of
+> > that code, even if there are a couple of users today.
+> 
+> There are? And even if there are: is there any reason to expect that moving
+> the rest of i4l to staging will result in anything other than a stream of
+> checkpatch cleanups?
 
-Yes.
+To clarify: Karsten's concern was about the loss of features that are
+present in i4l but not in mISDN. There were active users of those features
+last year, so I assumed that there are still a few this year. However,
+whether any of those users would ever need to move to a 4.11 kernel or
+newer is an entirely different question.
 
->
->> When
->> ADDR_LIMIT_EXPLICIT is in effect, prctl can set a 64-bit numeric
->> limit.  If ADDR_LIMIT_EXPLICIT is cleared, the prctl value stops being
->> settable and reading it via prctl returns whatever is implied by the
->> other personality bits.
->
-> I don't see anything wrong with it, but I'm a bit confused now
-> what this would be good for, compared to using just prctl.
->
-> Is this about setuid clearing the personality but not the prctl,
-> or something else?
+As far as I'm concerned, we are totally fine as long as there exists a
+longterm supported kernel that has i4l in drivers/staging. If we move
+i4l to staging for v4.11 with the intention of removing it after the
+2018 longterm release (i.e. after Deutsche Telekom turns off their
+ISDN network), that gives us at least until 2020. I assume there will
+be at least one older kernel with a longer end-of-support date.
 
-It's to avid ambiguity as to what happens if you set ADDR_LIMIT_32BIT
-and use the prctl.  ISTM it would be nice for the semantics to be
-fully defined in all cases.
+> How often did a bunch of drivers re-enter the tree after being sent to
+> staging?
 
---Andy
+Greg can probably answer that. I'm sure it's either never or very rare.
+The only case of removed code coming back later is arch/h8300, which
+was removed in 2013 and replaced with a much nicer implementation
+in 2015.
+
+	Arnd
