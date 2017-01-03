@@ -1,42 +1,60 @@
-From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Tue, 3 Jan 2017 12:55:49 +0100
-Subject: [PATCH 1/2] ARM: dts: imx6qdl-nitrogen6_max: fix sgtl5000
- pinctrl init
-In-Reply-To: <20170103114316.GC20956@dragon>
-References: <20170103112247.4563-1-gary.bisson@boundarydevices.com>
- <20170103112247.4563-2-gary.bisson@boundarydevices.com>
- <20170103114316.GC20956@dragon>
-Message-ID: <20170103115530.vngqbev7nsavgtdc@t450s.lan>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 3 Jan 2017 12:17:03 +0000
+Subject: [PATCH v4 0/5] mfd: dt: Add bindings for the Aspeed MFDs
+In-Reply-To: <4e69b379-299f-ebf3-3a61-9ac1bcaba7b3@acm.org>
+References: <20161220071535.27542-1-andrew@aj.id.au>
+ <4e69b379-299f-ebf3-3a61-9ac1bcaba7b3@acm.org>
+Message-ID: <20170103121703.GD2977@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Thu, 22 Dec 2016, Corey Minyard wrote:
 
-On Tue, Jan 03, 2017 at 07:43:17PM +0800, Shawn Guo wrote:
-> On Tue, Jan 03, 2017 at 12:22:46PM +0100, Gary Bisson wrote:
-> > This patch fixes the following error:
-> > sgtl5000 0-000a: Error reading chip id -6
-> > imx-sgtl5000 sound: ASoC: CODEC DAI sgtl5000 not registered
-> > imx-sgtl5000 sound: snd_soc_register_card failed (-517)
+> It looks like this is ready.  Should I take this in the IPMI tree, or is
+> there a better tree for it?
+
+Please refrain from top posting.
+
+Judging by the diff, it looks like the MFD tree would be the most
+appropriate place to merge these into.
+
+> On 12/20/2016 01:15 AM, Andrew Jeffery wrote:
+> > Hi Lee,
 > > 
-> > The problem was that the pinctrl group was linked to the sound driver
-> > instead of the codec node. Since the codec is probed first, the sys_mclk
-> > was missing and it would therefore fail to initialize.
+> > Here's v4 of the Aspeed LPC MFD devicetree bindings series. v3 can be found at:
 > > 
-> > Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+> >    https://lkml.org/lkml/2016/12/5/835
+> > 
+> > Changes since v3:
+> > 
+> > * Based on Arnd's argument[1], drop the addition of the mfd/syscon bindings
+> >    directory as well as the the last patch in v3, which moved a number of
+> >    existing bindings. Eventually the Aspeed display controller will have a
+> >    device-specific driver so it doesn't belong there either.
+> > 
+> > * Add a compatible string for the AST2400 in the LPC Host Controller bindings
+> >    as requested by Joel and slightly tweak the reg description for Rob.
+> > 
+> > [1] https://lkml.org/lkml/2016/12/13/202
+> > 
+> > Andrew Jeffery (5):
+> >    mfd: dt: Fix "indicates" typo in mfd bindings document
+> >    mfd: dt: ranges, #address-cells and #size-cells as optional properties
+> >    mfd: dt: Add Aspeed Low Pin Count Controller bindings
+> >    mfd: dt: Add bindings for the Aspeed LPC Host Controller (LHC)
+> >    mfd: dt: Add bindings for the Aspeed SoC Display Controller (GFX)
+> > 
+> >   .../devicetree/bindings/mfd/aspeed-gfx.txt         |  17 +++
+> >   .../devicetree/bindings/mfd/aspeed-lpc.txt         | 137 +++++++++++++++++++++
+> >   Documentation/devicetree/bindings/mfd/mfd.txt      |  12 +-
+> >   3 files changed, 165 insertions(+), 1 deletion(-)
+> >   create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-gfx.txt
+> >   create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
+> > 
 > 
-> Should we have it go as a fix for v4.10-rc cycles?  In that case, please
-> add a Fixes: tag.  Also, do we need to apply it for stable kernel?
 
-Sure it'd be great if it could be in v4.10.
-Fixes: b32e700256bc ("ARM: dts: imx: add Boundary Devices Nitrogen6_Max board")
-
-As for stable kernel, I guess it wouldn't hurt but it's not mandatory in
-my opinion.
-
-Do you want me to re-send with the Fixes line? What about the SOM2
-patch, should it include a Fixes line although it works thanks to
-U-Boot?
-
-Thanks,
-Gary
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
