@@ -1,50 +1,192 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 3 Jan 2017 10:12:59 +0100
-Subject: [PATCH] mtd: nand: lpc32xx: fix invalid error handling of a
- requested irq
-In-Reply-To: <20161205014710.2015-1-vz@mleia.com>
-References: <20161205014710.2015-1-vz@mleia.com>
-Message-ID: <20170103101259.0ec123df@bbrezillon>
+From: yong.mao@mediatek.com (Yong Mao)
+Date: Tue, 3 Jan 2017 17:14:10 +0800
+Subject: [PATCH 1/4] mmc: mediatek: Fix CMD6 timeout issue
+In-Reply-To: <CAPDyKFosQkxaFAKo0dm0TajgXqKG7XqRM1tTqR2vTsHzVrocfQ@mail.gmail.com>
+References: <1478585341-6749-1-git-send-email-yong.mao@mediatek.com>
+ <1478585341-6749-2-git-send-email-yong.mao@mediatek.com>
+ <CAPDyKFosQkxaFAKo0dm0TajgXqKG7XqRM1tTqR2vTsHzVrocfQ@mail.gmail.com>
+Message-ID: <1483434850.656.16.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir
-
-On Mon,  5 Dec 2016 03:47:10 +0200
-Vladimir Zapolskiy <vz@mleia.com> wrote:
-
-> Semantics of NR_IRQS is different on machines with SPARSE_IRQ option
-> disabled or enabled, in the latter case IRQs are allocated starting
-> at least from the value specified by NR_IRQS and going upwards, so
-> the check of (irq >= NR_IRQ) to decide about an error code returned by
-> platform_get_irq() is completely invalid, don't attempt to overrule
-> irq subsystem in the driver.
+On Thu, 2016-12-01 at 10:51 +0100, Ulf Hansson wrote:
+> On 8 November 2016 at 07:08, Yong Mao <yong.mao@mediatek.com> wrote:
+> > From: yong mao <yong.mao@mediatek.com>
+> >
+> > When initializing EMMC, after switch to HS400,
+> > it will issue CMD6 to change ext_csd, if first CMD6 got CRC
+> > error, the repeat CMD6 may get timeout, that's
+> > because SDCBSY was cleared by msdc_reset_hw()
 > 
-> The change fixes LPC32xx NAND MLC driver initialization on boot.
+> Sorry for the delay!
+> 
+> We have recently been re-working the sequence for how to deal more
+> properly with CMD6 in the mmc core.
+> 
+> The changes done so far should mostly concern switches to HS and HS
+> DDR, but I think you should run a re-test to make sure you still hit
+> the same problems.
+> 
+Happy New Year!
 
-Do you need to backport this fix to stable releases? If that's the
-case, I'll add the Cc: stable tag when applying.
+The issue we met is not only just for CMD6, but also for other R1B CMD.
+Your new changes does not cover all of these cases.
+We would like to make error handle in the core layer to deal with these
+issues.
 
-Thanks,
+I had submitted a new path ([PATCH v2] Fix CMD6 timeout issue) to you,
+please help to review it.
+Thanks.
 
-Boris
+
+> >
+> > Signed-off-by: Yong Mao <yong.mao@mediatek.com>
+> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> > ---
+> >  drivers/mmc/host/mtk-sd.c |   77 ++++++++++++++++++++++++++++++---------------
+> >  1 file changed, 51 insertions(+), 26 deletions(-)
+> >
+> > diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> > index 84e9afc..b29683b 100644
+> > --- a/drivers/mmc/host/mtk-sd.c
+> > +++ b/drivers/mmc/host/mtk-sd.c
+> > @@ -826,6 +826,15 @@ static bool msdc_cmd_done(struct msdc_host *host, int events,
+> >         return true;
+> >  }
+> >
+> > +static int msdc_card_busy(struct mmc_host *mmc)
+> > +{
+> > +       struct msdc_host *host = mmc_priv(mmc);
+> > +       u32 status = readl(host->base + MSDC_PS);
+> > +
+> > +       /* check if data0 is low */
+> > +       return !(status & BIT(16));
+> > +}
+> > +
+> >  /* It is the core layer's responsibility to ensure card status
+> >   * is correct before issue a request. but host design do below
+> >   * checks recommended.
+> 
+> Hmm. Why?
+> 
+> I think you should rely on the mmc core to invoke the ->card_busy()
+> ops instead. The core knows better when it's needed.
+> 
+> Perhaps that may also resolve some of these issues for you!?
+In my latest patch, msdc_card_busy will not be used in mtk-sd.c
+directly. It only can be invoked by ->card_busy() in the mmc core.
+
 
 > 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> ---
->  drivers/mtd/nand/lpc32xx_mlc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> > @@ -835,10 +844,20 @@ static inline bool msdc_cmd_is_ready(struct msdc_host *host,
+> >  {
+> >         /* The max busy time we can endure is 20ms */
+> >         unsigned long tmo = jiffies + msecs_to_jiffies(20);
+> > +       u32 count = 0;
+> > +
+> > +       if (in_interrupt()) {
+> > +               while ((readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) &&
+> > +                      (count < 1000)) {
+> > +                       udelay(1);
+> > +                       count++;
 > 
-> diff --git a/drivers/mtd/nand/lpc32xx_mlc.c b/drivers/mtd/nand/lpc32xx_mlc.c
-> index 8523881..bc6e49a 100644
-> --- a/drivers/mtd/nand/lpc32xx_mlc.c
-> +++ b/drivers/mtd/nand/lpc32xx_mlc.c
-> @@ -776,7 +776,7 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
->  	init_completion(&host->comp_controller);
->  
->  	host->irq = platform_get_irq(pdev, 0);
-> -	if ((host->irq < 0) || (host->irq >= NR_IRQS)) {
-> +	if (host->irq < 0) {
->  		dev_err(&pdev->dev, "failed to get platform irq\n");
->  		res = -EINVAL;
->  		goto err_exit3;
+> This seems like a bad idea, "busy-wait" in irq context is never a good idea.
+Thanks. The modification here is not for the current issue.
+I will submit a new patch to discuss with you.
+
+
+> > +               }
+> > +       } else {
+> > +               while ((readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) &&
+> > +                      time_before(jiffies, tmo))
+> > +                       cpu_relax();
+> > +       }
+> >
+> > -       while ((readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) &&
+> > -                       time_before(jiffies, tmo))
+> > -               cpu_relax();
+> >         if (readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) {
+> >                 dev_err(host->dev, "CMD bus busy detected\n");
+> >                 host->error |= REQ_CMD_BUSY;
+> > @@ -846,17 +865,35 @@ static inline bool msdc_cmd_is_ready(struct msdc_host *host,
+> >                 return false;
+> >         }
+> >
+> > -       if (mmc_resp_type(cmd) == MMC_RSP_R1B || cmd->data) {
+> > -               tmo = jiffies + msecs_to_jiffies(20);
+> > -               /* R1B or with data, should check SDCBUSY */
+> > -               while ((readl(host->base + SDC_STS) & SDC_STS_SDCBUSY) &&
+> > -                               time_before(jiffies, tmo))
+> > -                       cpu_relax();
+> > -               if (readl(host->base + SDC_STS) & SDC_STS_SDCBUSY) {
+> > -                       dev_err(host->dev, "Controller busy detected\n");
+> > -                       host->error |= REQ_CMD_BUSY;
+> > -                       msdc_cmd_done(host, MSDC_INT_CMDTMO, mrq, cmd);
+> > -                       return false;
+> > +       if (cmd->opcode != MMC_SEND_STATUS) {
+> > +               count = 0;
+> > +               /* Consider that CMD6 crc error before card was init done,
+> > +                * mmc_retune() will return directly as host->card is null.
+> > +                * and CMD6 will retry 3 times, must ensure card is in transfer
+> > +                * state when retry.
+> > +                */
+> > +               tmo = jiffies + msecs_to_jiffies(60 * 1000);
+> > +               while (1) {
+> > +                       if (msdc_card_busy(host->mmc)) {
+> > +                               if (in_interrupt()) {
+> > +                                       udelay(1);
+> > +                                       count++;
+> > +                               } else {
+> > +                                       msleep_interruptible(10);
+> > +                               }
+> > +                       } else {
+> > +                               break;
+> > +                       }
+> > +                       /* Timeout if the device never
+> > +                        * leaves the program state.
+> > +                        */
+> > +                       if (count > 1000 || time_after(jiffies, tmo)) {
+> > +                               pr_err("%s: Card stuck in programming state! %s\n",
+> > +                                      mmc_hostname(host->mmc), __func__);
+> > +                               host->error |= REQ_CMD_BUSY;
+> > +                               msdc_cmd_done(host, MSDC_INT_CMDTMO, mrq, cmd);
+> > +                               return false;
+> > +                       }
+> 
+> This hole new code is a hack, that shouldn't be needed in the host driver.
+> 
+> I think we need to investigate and fix the issue in the mmc core
+> layer, to make this work for your host driver. That instead of doing a
+> work around in the host.
+> 
+I had already make some modification on the mmc core to resolve these
+issues in the latest patch.
+
+> >                 }
+> >         }
+> >         return true;
+> > @@ -1070,18 +1107,6 @@ static int msdc_ops_switch_volt(struct mmc_host *mmc, struct mmc_ios *ios)
+> >         return ret;
+> >  }
+> >
+> > -static int msdc_card_busy(struct mmc_host *mmc)
+> > -{
+> > -       struct msdc_host *host = mmc_priv(mmc);
+> > -       u32 status = readl(host->base + MSDC_PS);
+> > -
+> > -       /* check if any pin between dat[0:3] is low */
+> > -       if (((status >> 16) & 0xf) != 0xf)
+> > -               return 1;
+> > -
+> > -       return 0;
+> > -}
+> > -
+> >  static void msdc_request_timeout(struct work_struct *work)
+> >  {
+> >         struct msdc_host *host = container_of(work, struct msdc_host,
+> > --
+> > 1.7.9.5
+> >
+> 
+> Kind regards
+> Uffe
