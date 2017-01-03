@@ -1,57 +1,127 @@
-From: harinikatakamlinux@gmail.com (Harini Katakam)
-Date: Tue, 3 Jan 2017 10:36:11 +0530
-Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
-In-Reply-To: <20170102161359.GD3609@localhost.localdomain>
-References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
- <BN3PR07MB2516815EDE69ACDCE27F81A3C96F0@BN3PR07MB2516.namprd07.prod.outlook.com>
- <20170102113155.GA16373@localhost.localdomain>
- <0717c63b-2e29-9ad1-7f01-39817980933f@atmel.com>
- <20170102161359.GD3609@localhost.localdomain>
-Message-ID: <CAFcVECK1vt7Hu4tgSZ2+kKpMxoT-wpikMDq65HaxRv-EMgobHA@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 2 Jan 2017 21:19:10 -0800
+Subject: [PATCH v3 1/3] power: reset: add linkstation-reset driver
+In-Reply-To: <20161227070611.14852-2-rogershimizu@gmail.com>
+References: <20161216100501.18173-1-rogershimizu@gmail.com>
+ <20161227070611.14852-1-rogershimizu@gmail.com>
+ <20161227070611.14852-2-rogershimizu@gmail.com>
+Message-ID: <fff132e9-a178-6948-676e-6a4d24b6c4d6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+Hi Roger,
 
-On Mon, Jan 2, 2017 at 9:43 PM, Richard Cochran
-<richardcochran@gmail.com> wrote:
-> On Mon, Jan 02, 2017 at 03:47:07PM +0100, Nicolas Ferre wrote:
->> Le 02/01/2017 ? 12:31, Richard Cochran a ?crit :
->> > This Cadence IP core is a complete disaster.
->>
->> Well, it evolved and propose several options to different SoC
->> integrators. This is not something unusual...
->> I suspect as well that some other network adapters have the same
->> weakness concerning PTP timestamp in single register as the early
->> revisions of this IP.
->
-> It appears that this core can neither latch the time on read or write,
-> or even latch time stamps.  I have worked with many different PTP HW
-> implementations, even early ones like on the ixp4xx, and it is no
-> exaggeration to say that this one is uniquely broken.
->
->> I suspect that Rafal tend to jump too quickly to the latest IP revisions
->> and add more options to this series: let's not try to pour too much
->> things into this code right now.
->
-> Why can't you check the IP version in the driver?
+On 12/26/2016 11:06 PM, Roger Shimizu wrote:
+> Buffalo Linkstation / KuroBox and their variants need magic command
+> sending to UART1 to power-off.
+> 
+> Power driver linkstation-reset implements the magic command and I/O
+> routine, which come from files listed below:
+>   - arch/arm/mach-orion5x/kurobox_pro-setup.c
+>   - arch/arm/mach-orion5x/terastation_pro2-setup.c
 
-There is an IP revision register but it would be probably be better
-to rely on "caps" from the compatibility strings - to cover SoC
-specific implementations. Also, when this extended BD is
-added (with timestamp), additional words will need to be added
-statically which will be consistent with Andrei's CONFIG_
-checks.
+Interestingly, I submitted a patch doing nearly the same thing recently
+after hacking on a Buffalo Terastation Pro II two days after yours
+without seeing yours:
 
->
-> And is it really true that the registers don't latch the time stamps,
-> as Rafal said?  If so, then we cannot accept the non-descriptor driver
-> version, since it cannot possibly work correctly.
->
+https://lkml.org/lkml/2016/12/28/273
 
-AFAIK, the two sets of registers only hold the timestamp till the next
-event (or peer event) packet comes in.
-I understand that it is not accurate - it is an initial version.
+Some comments below.
 
-Regards,
-Harini
+> +
+> +static void __iomem *base;
+> +static unsigned long tclk;
+> +static const struct reset_cfg *cfg;
+
+How about avoiding the singletons here and pass this down from the
+platform driver's private data after we (see below) also make use of a
+reboot notifier?
+
+> +
+> +static void linkstation_reset(void)
+> +{
+> +	const unsigned divisor = ((tclk + (8 * cfg->baud)) / (16 * cfg->baud));
+> +	int i;
+> +
+> +	pr_err("%s: triggering power-off...\n", __func__);
+> +
+> +	/* hijack UART1 and reset into sane state */
+> +	writel(0x83, UART1_REG(LCR));
+> +	writel(divisor & 0xff, UART1_REG(DLL));
+> +	writel((divisor >> 8) & 0xff, UART1_REG(DLM));
+> +	writel(cfg->magic[0], UART1_REG(LCR));
+> +	writel(cfg->magic[1], UART1_REG(IER));
+> +	writel(cfg->magic[2], UART1_REG(FCR));
+> +	writel(cfg->magic[3], UART1_REG(MCR));
+> +
+> +	/* send the power-off command to PIC */
+> +	for(i = 0; cfg->cmd[i][0] > 0; i ++) {
+> +		/* [0] is size of the command; command starts from [1] */
+> +		uart1_micon_send(base, &(cfg->cmd[i][1]), cfg->cmd[i][0]);
+> +	}
+> +}
+> +
+> +static int linkstation_reset_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct resource *res;
+> +	struct clk *clk;
+> +	char symname[KSYM_NAME_LEN];
+> +
+> +	const struct of_device_id *match =
+> +		of_match_node(linkstation_reset_of_match_table, np);
+> +	cfg = match->data;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(&pdev->dev, "Missing resource");
+> +		return -EINVAL;
+> +	}
+> +
+> +	base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+> +	if (!base) {
+> +		dev_err(&pdev->dev, "Unable to map resource");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* We need to know tclk in order to calculate the UART divisor */
+> +	clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(clk)) {
+> +		dev_err(&pdev->dev, "Clk missing");
+> +		return PTR_ERR(clk);
+> +	}
+> +
+> +	tclk = clk_get_rate(clk);
+
+Does this work with the Terastation II which has not been converted to
+DT yet? Is tclk available through the CLK API there?
+
+> +
+> +	/* Check that nothing else has already setup a handler */
+> +	if (pm_power_off) {
+> +		lookup_symbol_name((ulong)pm_power_off, symname);
+> +		dev_err(&pdev->dev,
+> +			"pm_power_off already claimed %p %s",
+> +			pm_power_off, symname);
+> +		return -EBUSY;
+> +	}
+> +	pm_power_off = linkstation_reset;
+
+That seems a bit complicated, why not just assume that there will be
+either this driver used, or not at all?
+
+Also, you are supposed to register a reboot notifier to which you can
+pass private context:
+
+https://lkml.org/lkml/2016/12/28/275
+
+As indicated in my patch series, the UART1-attached micro controller
+does a lot more things that just providing reboot, which is why I chose
+to move this code to a MFD driver, as the starting point before adding
+support for LEDs, FAN, PWM, beeper which would be other types of devices.
+
+Is adding support for other peripherals on your TODO as well?
+
+Thanks!
+-- 
+Florian
