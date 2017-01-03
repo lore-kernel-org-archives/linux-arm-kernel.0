@@ -1,55 +1,68 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 3 Jan 2017 10:14:34 -0300
-Subject: [PATCH 4/4] arm64: dts: exynos: Add tm2 touchkey node
-In-Reply-To: <1483430237-26823-5-git-send-email-jcsing.lee@samsung.com>
-References: <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
- <CGME20170103075734epcas5p439b05860a3238ce638f683d9687786a3@epcas5p4.samsung.com>
- <1483430237-26823-5-git-send-email-jcsing.lee@samsung.com>
-Message-ID: <58437de5-a837-9b34-da30-f8bc911b0854@osg.samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Jan 2017 14:18:01 +0100
+Subject: [RFC, PATCHv2 29/29] mm, x86: introduce RLIMIT_VADDR
+In-Reply-To: <CALCETrV_qejd-Ozqo4vTqz=LuukMUPeQ7EVUQbfTxs_xNbO3oQ@mail.gmail.com>
+References: <20161227015413.187403-1-kirill.shutemov@linux.intel.com>
+ <2736959.3MfCab47fD@wuerfel>
+ <CALCETrV_qejd-Ozqo4vTqz=LuukMUPeQ7EVUQbfTxs_xNbO3oQ@mail.gmail.com>
+Message-ID: <3492795.xaneWtGxgW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jaechul,
-
-On 01/03/2017 04:57 AM, Jaechul Lee wrote:
-> Add DT node support for TM2 touchkey device.
+On Monday, January 2, 2017 10:08:28 PM CET Andy Lutomirski wrote:
 > 
-> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
-> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> ---
->  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+> > This seems to nicely address the same problem on arm64, which has
+> > run into the same issue due to the various page table formats
+> > that can currently be chosen at compile time.
 > 
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-> index 887a1f1..ef7d21c 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-> @@ -18,3 +18,15 @@
->  	compatible = "samsung,tm2e", "samsung,exynos5433";
->  };
->  
-> +&hsi2c_9 {
-> +	status = "okay";
-> +
-> +	touchkey at 20 {
-> +		compatible = "samsung,tm2-touchkey";
-> +		reg = <0x20>;
-> +		interrupt-parent = <&gpa3>;
-> +		interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
-> +		vcc-supply = <&ldo32_reg>;
-> +		vdd-supply = <&ldo33_reg>;
-> +	};
-> +};
+> On further reflection, I think this has very little to do with paging
+> formats except insofar as paging formats make us notice the problem.
+> The issue is that user code wants to be able to assume an upper limit
+> on an address, and it gets an upper limit right now that depends on
+> architecture due to paging formats.  But someone really might want to
+> write a *portable* 64-bit program that allocates memory with the high
+> 16 bits clear.  So let's add such a mechanism directly.
 > 
+> As a thought experiment, what if x86_64 simply never allocated "high"
+> (above 2^47-1) addresses unless a new mmap-with-explicit-limit syscall
+> were used?  Old glibc would continue working.  Old VMs would work.
+> New programs that want to use ginormous mappings would have to use the
+> new syscall.  This would be totally stateless and would have no issues
+> with CRIU.
 
-If you re-spin with the changes suggested by Chanwoo instead
-of the commont .dtsi, feel free to add:
+I can see this working well for the 47-bit addressing default, but
+what about applications that actually rely on 39-bit addressing
+(I'd have to double-check, but I think this was the limit that
+people were most interested in for arm64)?
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+39 bits seems a little small to make that the default for everyone
+who doesn't pass the extra flag. Having to pass another flag to
+limit the addresses introduces other problems (e.g. mmap from
+library call that doesn't pass that flag).
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+> If necessary, we could also have a prctl that changes a
+> "personality-like" limit that is in effect when the old mmap was used.
+> I say "personality-like" because it would reset under exactly the same
+> conditions that personality resets itself.
+
+For "personality-like", it would still have to interact
+with the existing PER_LINUX32 and PER_LINUX32_3GB flags that
+do the exact same thing, so actually using personality might
+be better.
+
+We still have a few bits in the personality arguments, and
+we could combine them with the existing ADDR_LIMIT_3GB
+and ADDR_LIMIT_32BIT flags that are mutually exclusive by
+definition, such as
+
+        ADDR_LIMIT_32BIT =      0x0800000, /* existing */
+        ADDR_LIMIT_3GB   =      0x8000000, /* existing */
+        ADDR_LIMIT_39BIT =      0x0010000, /* next free bit */
+        ADDR_LIMIT_42BIT =      0x8010000,
+        ADDR_LIMIT_47BIT =      0x0810000,
+        ADDR_LIMIT_48BIT =      0x8810000,
+
+This would probably take only one or two personality bits for the
+limits that are interesting in practice.
+
+	Arnd
