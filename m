@@ -1,39 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 3 Jan 2017 12:43:44 -0800
-Subject: [PATCH 2/4] ARM: dts: Add am335x-boneblack-wireless
-In-Reply-To: <2D5ABB5A-E332-4D77-89EA-9DBF9A2FECFB@gmail.com>
-References: <20161227175837.28970-1-robertcnelson@gmail.com>
- <20161227175837.28970-2-robertcnelson@gmail.com>
- <CB5C8999-6CAE-41F6-85A6-D2A856BD8011@gmail.com>
- <20170103201103.GB25222@atomide.com>
- <2D5ABB5A-E332-4D77-89EA-9DBF9A2FECFB@gmail.com>
-Message-ID: <20170103204343.GC25222@atomide.com>
+From: steve_longerbeam@mentor.com (Steve Longerbeam)
+Date: Tue, 3 Jan 2017 12:50:35 -0800
+Subject: [PATCH 00/20] i.MX Media Driver
+In-Reply-To: <CAOMZO5DM4aRwzCWkRoZLmbCxn155YL+CUR_gJyDh+FjzSKD3PQ@mail.gmail.com>
+References: <1483050455-10683-1-git-send-email-steve_longerbeam@mentor.com>
+ <CAOMZO5DM4aRwzCWkRoZLmbCxn155YL+CUR_gJyDh+FjzSKD3PQ@mail.gmail.com>
+Message-ID: <183d9b6e-c195-128b-e74b-9103a3402dab@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jason Kridner <jkridner@gmail.com> [170103 12:30]:
-> 
-> 
-> > On Jan 3, 2017, at 3:11 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > 
-> > * Jason Kridner <jkridner@gmail.com> [161228 13:27]:
-> >> 
-> >> 
-> >>> On Dec 27, 2016, at 11:58 AM, Robert Nelson <robertcnelson@gmail.com> wrote:
-> >>> 
-> >>> BeagleBone Black Wireless is clone of the BeagleBone Black (BBB) with the Ethernet
-> >>> replaced by a TI wl1835 wireless module.
-> >>> 
-> >>> This board can be indentified by the BWAx value after A335BNLT (BBB) in the at24 eeprom:
-> >>> BWAx [aa 55 33 ee 41 33 33 35  42 4e 4c 54 42 57 41 35  |.U3.A335BNLTBWA5|]
-> >> 
-> >> I believe the correct statement is BWxx, but BWBx reserves the option to be software incompatible in some way. My preference is to have it boot anyway, but I believe that is only dependent in the bootloader. 
-> > 
-> > So does this patch need updating for that?
-> 
-> No, it is bootloader controlled. 
+Hi Fabio,
 
-What about the patch description? Does it need updating or is that
-an Acked-by?
 
-Tony
+On 01/02/2017 01:09 PM, Fabio Estevam wrote:
+> Hi Steve,
+>
+> On Thu, Dec 29, 2016 at 8:27 PM, Steve Longerbeam <slongerbeam@gmail.com> wrote:
+>> This is a media driver for video capture on i.MX.
+>>
+>> Refer to Documentation/media/v4l-drivers/imx.rst for example capture
+>> pipelines on SabreSD, SabreAuto, and SabreLite reference platforms.
+>>
+>> This patchset includes the OF graph layout as proposed by Philipp Zabel,
+>> with only minor changes which are enumerated in the patch header.
+> Patches 13, 14 and 19 miss your Signed-off-by tag.
+
+thanks for catching. I've added them to version 2.
+
+Steve
+
+>
+> Tested the whole series on a mx6qsabresd:
+>
+> Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
