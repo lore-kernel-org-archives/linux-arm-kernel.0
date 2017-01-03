@@ -1,52 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 03 Jan 2017 22:19:29 +0100
-Subject: [PATCH 2/2] isdn: i4l: move active-isdn drivers to staging
-In-Reply-To: <20170103152436.GA26156@kroah.com>
-References: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
- <1456945629-1793533-2-git-send-email-arnd@arndb.de>
- <20170103152436.GA26156@kroah.com>
-Message-ID: <3286019.I2UkVCJq41@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 3 Jan 2017 15:23:46 -0600
+Subject: [PATCH v3 2/3] USB3/DWC3: Add property "snps,
+ incr-burst-type-adjustment" for INCR burst type
+In-Reply-To: <DB5PR0401MB1813E210B2ADE1C9493F7768FE950@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+References: <1482139554-13618-1-git-send-email-jerry.huang@nxp.com>
+ <1482139554-13618-2-git-send-email-jerry.huang@nxp.com>
+ <20161222184514.hfd4g7ifrz5cv627@rob-hp-laptop>
+ <DB5PR0401MB1813E210B2ADE1C9493F7768FE950@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+Message-ID: <CAL_JsqJuifiSQAt-6FgtYYSukAnjzOLuTGEsO-Spn5LxkU-iwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 3, 2017 4:24:36 PM CET Greg Kroah-Hartman wrote:
-> On Wed, Mar 02, 2016 at 08:06:46PM +0100, Arnd Bergmann wrote:
-> > The icn, act2000 and pcbit drivers are all for very old hardware,
-> > and it is highly unlikely that anyone is actually still using them
-> > on modern kernels, if at all.
-> > 
-> > All three drivers apparently are for hardware that predates PCI
-> > being the common connector, as they are ISA-only and active
-> > PCI ISDN cards were widely available in the 1990s.
-> > 
-> > Looking through the git logs, it I cannot find any indication of a
-> > patch to any of these drivers that has been tested on real hardware,
-> > only cleanups or global API changes.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Acked-by: Karsten Keil <isdn@linux-pingi.de>
-> 
-> This patch got added in the 4.6 kernel release.  As I am now taking
-> patches for 4.11-rc1, I figure it is time to just delete the
-> drivers/staging/i4l/ directory now, given that no one has really done
-> anything with it.  If people show up that wish to maintain it, I'll be
-> glad to revert it, or if someone really screams in the next week.
-> Otherwise it's time to just move on 
+On Thu, Dec 22, 2016 at 8:52 PM, Jerry Huang <jerry.huang@nxp.com> wrote:
+> Hi, Rob,
+>> -----Original Message-----
+>> From: Rob Herring [mailto:robh at kernel.org]
+>> Sent: Friday, December 23, 2016 2:45 AM
+>> To: Jerry Huang <jerry.huang@nxp.com>
+>> Cc: balbi at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
+>> will.deacon at arm.com; linux at armlinux.org.uk; devicetree at vger.kernel.org;
+>> linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+>> kernel at lists.infradead.org
+>> Subject: Re: [PATCH v3 2/3] USB3/DWC3: Add property "snps, incr-burst-
+>> type-adjustment" for INCR burst type
+>>
+>> On Mon, Dec 19, 2016 at 05:25:53PM +0800, Changming Huang wrote:
+>> > New property "snps,incr-burst-type-adjustment = <x>, <y>" for USB3.0
+>> DWC3.
+>> > Field "x": 1/0 - undefined length INCR burst type enable or not; Field
+>> > "y": INCR4/INCR8/INCR16/INCR32/INCR64/INCR128/INCR256 burst type.
+>> >
+>> > While enabling undefined length INCR burst type and INCR16 burst type,
+>> > get better write performance on NXP Layerscape platform:
+>> > around 3% improvement (from 364MB/s to 375MB/s).
+>> >
+>> > Signed-off-by: Changming Huang <jerry.huang@nxp.com>
+>> > ---
+>> > Changes in v3:
+>> >   - add new property for INCR burst in usb node.
+>> >
+>> >  Documentation/devicetree/bindings/usb/dwc3.txt |    5 +++++
+>> >  arch/arm/boot/dts/ls1021a.dtsi                 |    1 +
+>> >  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |    3 +++
+>> >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |    2 ++
+>> >  4 files changed, 11 insertions(+)
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt
+>> > b/Documentation/devicetree/bindings/usb/dwc3.txt
+>> > index e3e6983..8c405a3 100644
+>> > --- a/Documentation/devicetree/bindings/usb/dwc3.txt
+>> > +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
+>> > @@ -55,6 +55,10 @@ Optional properties:
+>> >     fladj_30mhz_sdbnd signal is invalid or incorrect.
+>> >
+>> >   - <DEPRECATED> tx-fifo-resize: determines if the FIFO *has* to be
+>> reallocated.
+>> > + - snps,incr-burst-type-adjustment: Value for INCR burst type of
+>> GSBUSCFG0
+>> > +   register, undefined length INCR burst type enable and INCRx type.
+>> > +   First field is for undefined length INCR burst type enable or not.
+>> > +   Second field is for largest INCRx type enabled.
+>>
+>> Why do you need the first field? Is the 2nd field used if the 1st is 0?
+>> If not, then just use the presence of the property to enable or not.
+> The first field is one switch.
+> When it is 1, means undefined length INCR burst type enabled, we can use any length less than or equal to the largest-enabled burst length of INCR4/8/16/32/64/128/256.
+> When it is zero, means INCRx burst mode enabled, we can use one fixed burst length of 1/4/8/16/32/64/128/256 byte.
+> So, the 2nd field is used if the 1st is 0, we need to select one largest burst length the USB controller can support.
+> If we don't want to change the value of this register (use the default value), we don't need to add this property to usb node.
 
-Sounds good to me. My original series contained four more patches that
-I did not post again after there was some concern[1] that we did not
-come to a conclusion on:
+Just make this a single value with 0 meaning INCR and 4/8/16/etc being INCRx.
 
-isdn: gigaset: remove i4l code
-isdn: move isdnhdlc out of i4l
-isdn: i4l: move hisax driver to staging
-isdn: move i4l to staging
-
-I can post those as well, at least I think the first two are helpful
-for untangling i4l from the rest of ISDN.  I also still think that
-moving hisax and i4l to staging is reasonable given the state of
-that code, even if there are a couple of users today.
-
-	Arnd
-
-[1] https://lkml.org/lkml/2016/3/4/762
+Rob
