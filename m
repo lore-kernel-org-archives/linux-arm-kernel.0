@@ -1,20 +1,43 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Tue, 03 Jan 2017 17:16:24 +0900
-Subject: [PATCH 3/4] arm64: dts: exynos: make tm2 and tm2e independent from
- each other
-In-Reply-To: <1483430237-26823-4-git-send-email-jcsing.lee@samsung.com>
-References: <1483430237-26823-1-git-send-email-jcsing.lee@samsung.com>
- <CGME20170103075734epcas5p43a9743131f63affd0a438d2ed342f22e@epcas5p4.samsung.com>
- <1483430237-26823-4-git-send-email-jcsing.lee@samsung.com>
-Message-ID: <20170103081624.wo3molbmpxtvafcz@gangnam.samsung>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue,  3 Jan 2017 09:21:19 +0100
+Subject: [PATCH] pinctrl: amd: fix compilation warning
+Message-ID: <20170103082119.11958-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+3bfd44306c65 ("pinctrl: amd: Add support for additional GPIO")
+created the following warning:
 
-> +	compatible = "samsung,tm2e", "samsung,exynos5433";
+drivers/pinctrl/pinctrl-amd.c: In function 'amd_gpio_dbg_show':
+drivers/pinctrl/pinctrl-amd.c:210:3: warning: 'pin_num' may be used uninitialized in this function [-Wmaybe-uninitialized]
+   for (; i < pin_num; i++) {
+   ^
+drivers/pinctrl/pinctrl-amd.c:172:21: warning: 'i' may be used uninitialized in this function [-Wmaybe-uninitialized]
+  unsigned int bank, i, pin_num;
+                     ^
+Fix this by adding a guarding default case for illegal
+bank numbers.
 
-this is supposed to be "samsung,tm2".
-Will wait for other comments and fix it in v2.
+Cc: S-k Shyam-sundar <Shyam-sundar.S-k@amd.com>
+Cc: Nehal Shah <Nehal-bakulchandra.Shah@amd.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-amd.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Andi
+diff --git a/drivers/pinctrl/pinctrl-amd.c b/drivers/pinctrl/pinctrl-amd.c
+index 47b17100410e..c2203699f1ab 100644
+--- a/drivers/pinctrl/pinctrl-amd.c
++++ b/drivers/pinctrl/pinctrl-amd.c
+@@ -206,6 +206,9 @@ static void amd_gpio_dbg_show(struct seq_file *s, struct gpio_chip *gc)
+ 			i = 192;
+ 			pin_num = AMD_GPIO_PINS_BANK3 + i;
+ 			break;
++		default:
++			/* Illegal bank number, ignore */
++			continue;
+ 		}
+ 		for (; i < pin_num; i++) {
+ 			seq_printf(s, "pin%d\t", i);
+-- 
+2.9.3
