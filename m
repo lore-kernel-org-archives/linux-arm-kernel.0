@@ -1,54 +1,42 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 3 Jan 2017 20:26:10 +0800
-Subject: [PATCH v4 2/3] soc: zte: pm_domains: Add support for zx296718
- board
-In-Reply-To: <1483426577-5470-2-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <201701032003.qkbw7vjv%fengguang.wu@intel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 3 Jan 2017 12:31:20 +0000
+Subject: [RESEND PATCH 1/2] arm64: change from CONT_PMD_SHIFT to
+ CONT_PTE_SHIFT
+In-Reply-To: <1481725151-20549-2-git-send-email-zhongjiang@huawei.com>
+References: <1481725151-20549-1-git-send-email-zhongjiang@huawei.com>
+ <1481725151-20549-2-git-send-email-zhongjiang@huawei.com>
+Message-ID: <20170103123120.GA1244@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baoyou,
+On Wed, Dec 14, 2016 at 10:19:10PM +0800, zhongjiang wrote:
+> From: zhong jiang <zhongjiang@huawei.com>
+> 
+> I think that CONT_PTE_SHIFT is more reasonable even if they are some
+> value. and the patch is not any functional change.
+> 
+> Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+> ---
+>  arch/arm64/mm/hugetlbpage.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+> index 2e49bd2..0a4c97b 100644
+> --- a/arch/arm64/mm/hugetlbpage.c
+> +++ b/arch/arm64/mm/hugetlbpage.c
+> @@ -323,7 +323,7 @@ static __init int setup_hugepagesz(char *opt)
+>  static __init int add_default_hugepagesz(void)
+>  {
+>  	if (size_to_hstate(CONT_PTES * PAGE_SIZE) == NULL)
+> -		hugetlb_add_hstate(CONT_PMD_SHIFT);
+> +		hugetlb_add_hstate(CONT_PTE_SHIFT);
+>  	return 0;
+>  }
+>  arch_initcall(add_default_hugepagesz);
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.10-rc2 next-20161224]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+It looks like I fixed this already when I merged some other hugetlb
+patches. See commit 6ed0038d5ecb ("arm64: Fix typo in
+add_default_hugepagesz() for 64K pages").
 
-url:    https://github.com/0day-ci/linux/commits/Baoyou-Xie/soc-zte-pm_domains-Prepare-for-supporting-ARMv8-zx2967-family/20170103-181714
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
->> drivers/soc/zte/zx296718_pm_domains.c:7:47: fatal error: dt-bindings/soc/zx2967,pm_domains.h: No such file or directory
-    #include <dt-bindings/soc/zx2967,pm_domains.h>
-                                                  ^
-   compilation terminated.
-
-vim +7 drivers/soc/zte/zx296718_pm_domains.c
-
-     1	/*
-     2	 * Copyright (C) 2015 ZTE Ltd.
-     3	 *
-     4	 * Author: Baoyou Xie <baoyou.xie@linaro.org>
-     5	 * License terms: GNU General Public License (GPL) version 2
-     6	 */
-   > 7	#include <dt-bindings/soc/zx2967,pm_domains.h>
-     8	#include "zx2967_pm_domains.h"
-     9	
-    10	static u16 zx296718_offsets[REG_ARRAY_SIZE] = {
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 60343 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170103/2d453a38/attachment-0001.gz>
+-- 
+Catalin
