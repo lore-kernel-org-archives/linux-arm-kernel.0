@@ -1,153 +1,72 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Wed, 4 Jan 2017 14:33:07 +0200
-Subject: [PATCH v2 05/19] ARM: dts: imx6-sabresd: add OV5642 and OV5640
- camera sensors
-In-Reply-To: <1483477049-19056-6-git-send-email-steve_longerbeam@mentor.com>
-References: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
- <1483477049-19056-6-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <c8c09060-dd6b-f495-da7d-b1f9fad79b89@mentor.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 04 Jan 2017 17:26:08 +0100
+Subject: [PATCH 1/5] ARM: dts: armada388-clearfog: add phy reset gpio-hog
+In-Reply-To: <E1cO4Vz-00005t-8n@rmk-PC.armlinux.org.uk> (Russell King's
+ message of "Mon, 02 Jan 2017 15:27:11 +0000")
+References: <E1cO4UH-0008SR-GW@rmk-PC.armlinux.org.uk>
+ <E1cO4Vz-00005t-8n@rmk-PC.armlinux.org.uk>
+Message-ID: <871swig5b3.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2017 10:57 PM, Steve Longerbeam wrote:
-> Enables the OV5642 parallel-bus sensor, and the OV5640 MIPI CSI-2 sensor.
-> 
-> The OV5642 connects to the parallel-bus mux input port on ipu1_csi0_mux.
-> 
-> The OV5640 connects to the input port on the MIPI CSI-2 receiver on
-> mipi_csi. It is set to transmit over MIPI virtual channel 1.
-> 
-> Until the OV5652 sensor module compatible with the SabreSD becomes
-> available for testing, the ov5642 node is currently disabled.
-> 
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+Hi Russell,
+ 
+ On lun., janv. 02 2017, Russell King <rmk+kernel@armlinux.org.uk> wrote:
+
+
+It would be nice to have some word here about this patch. Especially why
+we need it now. I guess it is for being less dependent on the
+initialization done by the bootloader but maybe you have other reasons.
+
+Thanks,
+
+Gregory
+
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 > ---
-
-[snip]
-
-> +
-> +	camera: ov5642 at 3c {
-
-ov5642: camera at 3c
-
-> +		compatible = "ovti,ov5642";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_ov5642>;
-> +		clocks = <&clks IMX6QDL_CLK_CKO>;
-> +		clock-names = "xclk";
-> +		reg = <0x3c>;
-> +		xclk = <24000000>;
-> +		DOVDD-supply = <&vgen4_reg>; /* 1.8v */
-> +		AVDD-supply = <&vgen5_reg>;  /* 2.8v, rev C board is VGEN3
-> +						rev B board is VGEN5 */
-> +		DVDD-supply = <&vgen2_reg>;  /* 1.5v*/
-> +		pwdn-gpios = <&gpio1 16 GPIO_ACTIVE_HIGH>; /* SD1_DAT0 */
-> +		reset-gpios = <&gpio1 17 GPIO_ACTIVE_LOW>; /* SD1_DAT1 */
-
-Comments about SD1_* pad names are redundant.
-
-> +		status = "disabled";
-
-Why is it disabled here?
-
-> +
-> +		port {
-> +			ov5642_to_ipu1_csi0_mux: endpoint {
-> +				remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
-> +				bus-width = <8>;
-> +				hsync-active = <1>;
-> +				vsync-active = <1>;
-> +			};
-> +		};
-> +	};
+>  arch/arm/boot/dts/armada-388-clearfog-base.dts | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/armada-388-clearfog-base.dts b/arch/arm/boot/dts/armada-388-clearfog-base.dts
+> index f86e1876fb38..da788ea40717 100644
+> --- a/arch/arm/boot/dts/armada-388-clearfog-base.dts
+> +++ b/arch/arm/boot/dts/armada-388-clearfog-base.dts
+> @@ -74,7 +74,17 @@
+>  	phy = <&phy1>;
 >  };
 >  
->  &i2c2 {
-> @@ -322,6 +376,34 @@
->  			};
->  		};
->  	};
-> +
-> +	mipi_camera: ov5640 at 3c {
-
-ov5640: camera at 3c
-
-> +		compatible = "ovti,ov5640_mipi";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_ov5640>;
-> +		reg = <0x3c>;
-> +		clocks = <&clks IMX6QDL_CLK_CKO>;
-> +		clock-names = "xclk";
-> +		xclk = <24000000>;
-> +		DOVDD-supply = <&vgen4_reg>; /* 1.8v */
-> +		AVDD-supply = <&vgen5_reg>;  /* 2.8v, rev C board is VGEN3
-> +						rev B board is VGEN5 */
-> +		DVDD-supply = <&vgen2_reg>;  /* 1.5v*/
-> +		pwdn-gpios = <&gpio1 19 GPIO_ACTIVE_HIGH>; /* SD1_DAT2 */
-> +		reset-gpios = <&gpio1 20 GPIO_ACTIVE_LOW>; /* SD1_CLK */
-
-Comments about SD1_* pad names are redundant.
-
-> +
-> +		port {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			ov5640_to_mipi_csi: endpoint at 1 {
-> +				reg = <1>;
-> +				remote-endpoint = <&mipi_csi_from_mipi_sensor>;
-> +				data-lanes = <0 1>;
-> +				clock-lanes = <2>;
-> +			};
-> +		};
+> +&gpio0 {
+> +	phy1_reset {
+> +		gpio-hog;
+> +		gpios = <19 GPIO_ACTIVE_LOW>;
+> +		output-low;
+> +		line-name = "phy1-reset";
 > +	};
+> +};
+> +
+>  &mdio {
+> +	pinctrl-0 = <&mdio_pins &microsom_phy_clk_pins &clearfog_phy_pins>;
+>  	phy1: ethernet-phy at 1 {
+>  		/*
+>  		 * Annoyingly, the marvell phy driver configures the LED
+> @@ -87,6 +97,11 @@
 >  };
 >  
->  &i2c3 {
-> @@ -426,6 +508,36 @@
->  			>;
->  		};
->  
-> +		pinctrl_ov5640: ov5640grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD1_DAT2__GPIO1_IO19 0x80000000
-> +				MX6QDL_PAD_SD1_CLK__GPIO1_IO20  0x80000000
-> +			>;
-> +		};
-> +
-> +		pinctrl_ov5642: ov5642grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD1_DAT0__GPIO1_IO16 0x80000000
-> +				MX6QDL_PAD_SD1_DAT1__GPIO1_IO17 0x80000000
-> +			>;
-> +		};
-> +
-> +		pinctrl_ipu1_csi0: ipu1grp-csi0 {
+>  &pinctrl {
+> +	/* phy1 reset */
+> +	clearfog_phy_pins: clearfog-phy-pins {
+> +		marvell,pins = "mpp19";
+> +		marvell,function = "gpio";
+> +	};
+>  	rear_button_pins: rear-button-pins {
+>  		marvell,pins = "mpp44";
+>  		marvell,function = "gpio";
+> -- 
+> 2.7.4
+>
 
-Please rename the node name to ipu1csi0grp.
-
-Please add new pin control groups preserving the alphanimerical order.
-
-> +			fsl,pins = <
-> +				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12    0x80000000
-> +				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13    0x80000000
-> +				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14    0x80000000
-> +				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15    0x80000000
-> +				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16    0x80000000
-> +				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17    0x80000000
-> +				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18    0x80000000
-> +				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19    0x80000000
-> +				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK   0x80000000
-> +				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC      0x80000000
-> +				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC     0x80000000
-> +			>;
-> +		};
-> +
->  		pinctrl_pcie: pciegrp {
->  			fsl,pins = <
->  				MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x1b0b0
-> 
-
---
-With best wishes,
-Vladimir
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
