@@ -1,56 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Jan 2017 11:36:45 +0000
-Subject: [PATCH v4 5/5] mfd: dt: Add bindings for the Aspeed SoC Display
- Controller (GFX)
-In-Reply-To: <20161220071535.27542-6-andrew@aj.id.au>
-References: <20161220071535.27542-1-andrew@aj.id.au>
- <20161220071535.27542-6-andrew@aj.id.au>
-Message-ID: <20170104113645.GF27589@dell>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 4 Jan 2017 12:27:58 +0100
+Subject: [PATCH 15/20] ARM/hw_breakpoint: Convert to hotplug state machine
+In-Reply-To: <20170103093335.GA5605@leverpostej>
+References: <20161117183541.8588-1-bigeasy@linutronix.de>
+ <20161117183541.8588-16-bigeasy@linutronix.de>
+ <CACRpkdZE+h0+3EizLCMUr-e-4pv4w9iAatSqL8k0Ovd2iUaS8Q@mail.gmail.com>
+ <CACRpkda2gdjM--LSoJTL0dvqyw796w1hMSAhUQwv9X0EPzJHig@mail.gmail.com>
+ <20170102150015.GJ14217@n2100.armlinux.org.uk>
+ <CACRpkdaxAPSU-XPQrgVRoBecAD1ZpVVP4qPe59af-yy11WqBQw@mail.gmail.com>
+ <20170103093335.GA5605@leverpostej>
+Message-ID: <20170104112758.cmehc4romofv3nbp@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Dec 2016, Andrew Jeffery wrote:
+On 2017-01-03 09:33:36 [+0000], Mark Rutland wrote:
+> Hi,
+Hi,
 
-> The Aspeed SoC Display Controller is presented as a syscon device to
-> arbitrate access by display and pinmux drivers. Video pinmux
-> configuration on fifth generation SoCs depends on bits in both the
-> System Control Unit and the Display Controller.
+> It looked like DBGPRSR.SPD is set unexpectedly over the default idle
+> path (i.e. WFI), causing the (otherwise valid) register accesses above
+> to be handled as undefined.
 > 
-> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
->  Documentation/devicetree/bindings/mfd/aspeed-gfx.txt | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-gfx.txt
+> I haven't looked at the patch in detail, but I guess that it allows idle
+> to occur between reset_ctrl_regs() and arch_hw_breakpoint_init().
 
-Applied, thanks.
+This could be possible. The callback is installed and the per-CPU thread
+is woken up to handle it. It starts with the lowest CPU and loops for
+all present CPUs. While waiting the thread to complete the callback, it
+could go idle. See the for_each_present_cpu() loop in
+__cpuhp_setup_state() and cpuhp_invoke_ap_callback() kicks the thread
+(cpuhp_thread_fun()) and waits for its completion.
+So the difference to on_each_cpu() is that the latter performs a busy
+loop while waiting for function to complete on other CPUs.
 
-> diff --git a/Documentation/devicetree/bindings/mfd/aspeed-gfx.txt b/Documentation/devicetree/bindings/mfd/aspeed-gfx.txt
-> new file mode 100644
-> index 000000000000..aea5370efd97
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/aspeed-gfx.txt
-> @@ -0,0 +1,17 @@
-> +* Device tree bindings for Aspeed SoC Display Controller (GFX)
-> +
-> +The Aspeed SoC Display Controller primarily does as its name suggests, but also
-> +participates in pinmux requests on the g5 SoCs. It is therefore considered a
-> +syscon device.
-> +
-> +Required properties:
-> +- compatible:		"aspeed,ast2500-gfx", "syscon"
-> +- reg:			contains offset/length value of the GFX memory
-> +			region.
-> +
-> +Example:
-> +
-> +gfx: display at 1e6e6000 {
-> +	compatible = "aspeed,ast2500-gfx", "syscon";
-> +	reg = <0x1e6e6000 0x1000>;
-> +};
+> Reading DBGPRSR should clear SPD; but I'm not sure if other debug state
+> is affected.
+> 
+> Thanks,
+> Mark.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Sebastian
