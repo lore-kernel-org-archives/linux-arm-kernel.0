@@ -1,24 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Jan 2017 16:14:00 +0100
-Subject: [GIT PULL] ARM: exynos: Late mach/soc for v4.10
-In-Reply-To: <1482003132-8844-1-git-send-email-krzk@kernel.org>
-References: <1482003132-8844-1-git-send-email-krzk@kernel.org>
-Message-ID: <2234017.fClA8kpiX3@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Jan 2017 15:12:36 +0000
+Subject: [PATCH] arm64: Don't trace __switch_to if function graph tracer
+ is enabled
+In-Reply-To: <1482360288-124624-1-git-send-email-joelaf@google.com>
+References: <1482360288-124624-1-git-send-email-joelaf@google.com>
+Message-ID: <20170104151235.GI18193@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, December 17, 2016 9:32:12 PM CET Krzysztof Kozlowski wrote:
-> After our discussions about not-breaking out-of-tree DTB with SCU
-> change in DeviceTree, I prepared an updated pull request without
-> the questioned changes.
+On Wed, Dec 21, 2016 at 02:44:46PM -0800, Joel Fernandes wrote:
+> Function graph tracer shows negative time (wrap around) when tracing
+> __switch_to if the nosleep-time trace option is enabled.
 > 
-> Ten days ago I prepared a tag, pushed it... and apparently forgot to send pull
-> request. At least, I don't have such email in my outbox. Dunno.
+> Time compensation for nosleep-time is done by an ftrace probe on
+> sched_switch. This doesn't work well for the following events (with
+> letters representing timestamps):
+> A - sched switch probe called for task T switch out
+> B - __switch_to calltime is recorded
+> C - sched_switch probe called for task T switch in
+> D - __switch_to rettime is recorded
 > 
-> So let's send it now, better late then never. With just few commits (without
-> the DT SCU changes). These were sitting in the next for very long.
+> If C - A > D - B, then we end up over compensating for the time spent in
+> __switch_to giving rise to negative times in the trace output.
+> 
+> On x86, __switch_to is not traced if function graph tracer is enabled.
+> Do the same for arm64 as well.
+> 
+> Cc: Todd Kjos <tkjos@google.com>
+> Cc: Steven Rostedt <rostedt@goodmis.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Joel Fernandes <joelaf@google.com>
+> ---
+>  arch/arm64/kernel/process.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Sorry for the delay. The patches in here are all straightforward, so
-I'm applying them for fixes now.
+Thanks, queued for 4.11.
 
-	Arnd
+Will
