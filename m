@@ -1,65 +1,131 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 4 Jan 2017 14:39:39 -0800
-Subject: [PATCH] arm64: errata: Check for --fix-cortex-a53-843419 and
- --fix-cortex-a53
-In-Reply-To: <20170104114920.GB18193@arm.com>
-References: <20161031194414.61287-1-code@mmayer.net>
- <20161102210331.GJ22791@arm.com>
- <CAGt4E5tKHNQw=eLzFx-+g6yLwJ=xCTQEqNZHFZu6aOVpKm7X7w@mail.gmail.com>
- <20161102212747.GL22791@arm.com>
- <CAGt4E5sxMcyizwAjwEZd6zepOAyr05WCgtstoRDfNjkNQtnJCA@mail.gmail.com>
- <2d72cbbb-df03-267c-53b0-e3083a746175@gmail.com>
- <20161103141559.GQ22791@arm.com>
- <ae71bdc0-23c7-ce0d-7264-930ab7f405ec@gmail.com>
- <c4f5b650-b210-8332-e6f2-4ad9634818b9@gmail.com>
- <20170104114920.GB18193@arm.com>
-Message-ID: <a45e7e0b-0e94-547e-7763-fd5aee38ef08@gmail.com>
+Date: Wed,  4 Jan 2017 14:39:51 -0800
+Subject: [PATCH v6 0/4] ARM: Add support for CONFIG_DEBUG_VIRTUAL
+In-Reply-To: <20170104011417.1496-1-f.fainelli@gmail.com>
+References: <20170104011417.1496-1-f.fainelli@gmail.com>
+Message-ID: <20170104223955.22859-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2017 03:49 AM, Will Deacon wrote:
-> Hi Florian,
-> 
-> On Wed, Dec 28, 2016 at 12:17:23PM -0800, Florian Fainelli wrote:
->> On 11/03/2016 10:20 AM, Florian Fainelli wrote:
->>> On 11/03/2016 07:16 AM, Will Deacon wrote:
->>>> If you can't change toolchain and you want this worked around, why can't you
->>>> either build gold with it enabled by default, or pass the extra flag on the
->>>> command line to the kernel build system?
->>>
->>> Because that creates a distribution problem and now we have to document
->>> this for people who want to build a kernel on their own, without
->>> necessarily understanding if this is something they might need, or why
->>> this is needed, and why the kernel is not taking care of that on its
->>> own? So yes, this comes down to who is responsible for what, in that
->>> case the kernel's Makefile is the best place where to put such knowledge
->>> as to which workaround needs to be enabled by the linker and it
->>> simplifies things a lot for people.
->>
->> Was this convincing enough for Catalin to pick Markus' patch or does
->> that mean this patch needs to remain out of tree for us because of using
->> a slightly older toolchain?
-> 
-> I thought more about this last night, and there are two questions that
-> might sway me:
-> 
->   1. How prevalent is the binary toolchain with this issue? Is it, for
->      example, shipping as part of a publicly available LTS distribution?
->      I know you quoted some Linaro build, but I can't actually find those
->      binaries on their website.
+This patch series builds on top of Laura's [PATCHv6 00/10] CONFIG_DEBUG_VIRTUAL
+for arm64 to add support for CONFIG_DEBUG_VIRTUAL for ARM.
 
-The toolchain is available for download from Broadcom's website at
-https://www.broadcom.com/support/download-search/?pg=Broadband:+CPE-Gateway,+Infrastructure,+and+Set-top+Box&pf=Set-top+Box+Solutions
-(working on the download agreement as we speak) and is used by the large
-majority of our customers today, it's hard to give you numbers, but
-several hundreds if not more people definitively use it AFAICT.
+This was tested on a Brahma B15 platform (ARMv7 + HIGHMEM + LPAE).
 
-> 
->   2. Could we extend the Makefile magic to detect that, not only is
->      --fix-cortex-a53-843419 unsupported, but also that the linker is
->      in fact gold?
+Note that the treewide changes would involve a huge CC list, which
+is why it has been purposely trimmed to just focusing on the DEBUG_VIRTUAL
+aspect.
 
-I suppose we could do that, Markus do you mind update your original
-patch? Thanks!
+Catalin, provided that you take Laura's series, I suppose I would submit
+this one through Russell's patch system if that's okay with everyone?
+
+Thanks!
+
+Changes in v6:
+
+- utilize KERNEL_END in lieu of _end in arm_memblock_init, thanks Hartley!
+
+- utilize Laura's comment suggestion against MAX_DMA_ADDRESS
+
+- added Laura's Acked-by to patch 3 and Reviewed-by to patch 4
+
+Changes in v5:
+
+- rebased against Laura's [PATCHv6 00/10] CONFIG_DEBUG_VIRTUAL
+  for arm64 and v4.10-rc2
+
+- added Russell's acked-by for patches 2 through 4
+
+Changes in v4:
+
+- added Boris' ack for the first patch
+- reworked the virtual address check based on Laura's suggestion to
+  make the code more readable
+
+Changes in v3:
+
+- fix build failures reported by Kbuild test robot
+
+Changes in v2:
+
+- Modified MTD LART driver not to create symbol conflicts with
+  KERNEL_START
+- Fixed patch that defines and uses KERNEL_START/END
+- Fixed __pa_symbol()'s definition
+- Inline __pa_symbol() check wihtin the VIRTUAL_BUG_ON statement
+- Simplified check for virtual addresses
+- Added a tree-wide patch changing SMP/PM implementations to use
+  __pa_symbol(), build tested against multi_v{5,7}_defconfig
+
+Florian Fainelli (4):
+  mtd: lart: Rename partition defines to be prefixed with PART_
+  ARM: Define KERNEL_START and KERNEL_END
+  ARM: Add support for CONFIG_DEBUG_VIRTUAL
+  ARM: treewide: Replace uses of virt_to_phys with __pa_symbol
+
+ arch/arm/Kconfig                          |  1 +
+ arch/arm/common/mcpm_entry.c              | 12 +++----
+ arch/arm/include/asm/memory.h             | 23 +++++++++++--
+ arch/arm/mach-alpine/platsmp.c            |  2 +-
+ arch/arm/mach-axxia/platsmp.c             |  2 +-
+ arch/arm/mach-bcm/bcm63xx_smp.c           |  2 +-
+ arch/arm/mach-bcm/platsmp-brcmstb.c       |  2 +-
+ arch/arm/mach-bcm/platsmp.c               |  4 +--
+ arch/arm/mach-berlin/platsmp.c            |  2 +-
+ arch/arm/mach-exynos/firmware.c           |  4 +--
+ arch/arm/mach-exynos/mcpm-exynos.c        |  2 +-
+ arch/arm/mach-exynos/platsmp.c            |  4 +--
+ arch/arm/mach-exynos/pm.c                 |  6 ++--
+ arch/arm/mach-exynos/suspend.c            |  6 ++--
+ arch/arm/mach-hisi/platmcpm.c             |  2 +-
+ arch/arm/mach-hisi/platsmp.c              |  6 ++--
+ arch/arm/mach-imx/platsmp.c               |  2 +-
+ arch/arm/mach-imx/pm-imx6.c               |  2 +-
+ arch/arm/mach-imx/src.c                   |  2 +-
+ arch/arm/mach-mediatek/platsmp.c          |  2 +-
+ arch/arm/mach-mvebu/pm.c                  |  2 +-
+ arch/arm/mach-mvebu/pmsu.c                |  2 +-
+ arch/arm/mach-mvebu/system-controller.c   |  2 +-
+ arch/arm/mach-omap2/control.c             |  8 ++---
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c | 12 +++----
+ arch/arm/mach-omap2/omap-smp.c            |  4 +--
+ arch/arm/mach-prima2/platsmp.c            |  2 +-
+ arch/arm/mach-prima2/pm.c                 |  2 +-
+ arch/arm/mach-pxa/palmz72.c               |  2 +-
+ arch/arm/mach-pxa/pxa25x.c                |  2 +-
+ arch/arm/mach-pxa/pxa27x.c                |  2 +-
+ arch/arm/mach-pxa/pxa3xx.c                |  2 +-
+ arch/arm/mach-realview/platsmp-dt.c       |  2 +-
+ arch/arm/mach-rockchip/platsmp.c          |  4 +--
+ arch/arm/mach-rockchip/pm.c               |  2 +-
+ arch/arm/mach-s3c24xx/mach-jive.c         |  2 +-
+ arch/arm/mach-s3c24xx/pm-s3c2410.c        |  2 +-
+ arch/arm/mach-s3c24xx/pm-s3c2416.c        |  2 +-
+ arch/arm/mach-s3c64xx/pm.c                |  2 +-
+ arch/arm/mach-s5pv210/pm.c                |  2 +-
+ arch/arm/mach-sa1100/pm.c                 |  2 +-
+ arch/arm/mach-shmobile/platsmp-apmu.c     |  6 ++--
+ arch/arm/mach-shmobile/platsmp-scu.c      |  4 +--
+ arch/arm/mach-socfpga/platsmp.c           |  4 +--
+ arch/arm/mach-spear/platsmp.c             |  2 +-
+ arch/arm/mach-sti/platsmp.c               |  2 +-
+ arch/arm/mach-sunxi/platsmp.c             |  4 +--
+ arch/arm/mach-tango/platsmp.c             |  2 +-
+ arch/arm/mach-tango/pm.c                  |  2 +-
+ arch/arm/mach-tegra/reset.c               |  4 +--
+ arch/arm/mach-ux500/platsmp.c             |  2 +-
+ arch/arm/mach-vexpress/dcscb.c            |  2 +-
+ arch/arm/mach-vexpress/platsmp.c          |  2 +-
+ arch/arm/mach-vexpress/tc2_pm.c           |  4 +--
+ arch/arm/mach-zx/platsmp.c                |  4 +--
+ arch/arm/mach-zynq/platsmp.c              |  2 +-
+ arch/arm/mm/Makefile                      |  1 +
+ arch/arm/mm/init.c                        |  7 ++--
+ arch/arm/mm/mmu.c                         |  6 +---
+ arch/arm/mm/physaddr.c                    | 55 +++++++++++++++++++++++++++++++
+ drivers/mtd/devices/lart.c                | 24 +++++++-------
+ 61 files changed, 179 insertions(+), 110 deletions(-)
+ create mode 100644 arch/arm/mm/physaddr.c
+
 -- 
-Florian
+2.9.3
