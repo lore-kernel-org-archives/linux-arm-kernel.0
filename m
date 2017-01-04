@@ -1,98 +1,68 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Wed,  4 Jan 2017 13:32:24 +0000
-Subject: [PATCH v5 15/17] vfio/type1: Allow transparent MSI IOVA allocation
-In-Reply-To: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
-References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1483536746-2725-16-git-send-email-eric.auger@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 4 Jan 2017 07:14:10 -0600
+Subject: [PATCH 07/22] dt-bindings: power: supply: add AXP20X/AXP22X AC
+ power supply
+In-Reply-To: <20170102163723.7939-8-quentin.schulz@free-electrons.com>
+References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
+ <20170102163723.7939-8-quentin.schulz@free-electrons.com>
+Message-ID: <20170104131410.mni7opxnouzagypu@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When attaching a group to the container, check the group's
-reserved regions and test whether the IOMMU translates MSI
-transactions. If yes, we initialize an IOVA allocator through
-the iommu_get_msi_cookie API. This will allow the MSI IOVAs
-to be transparently allocated on MSI controller's compose().
+On Mon, Jan 02, 2017 at 05:37:07PM +0100, Quentin Schulz wrote:
+> The X-Powers AXP20X and AXP22X PMICs have an AC entry to supply power to
+> the board. They have a few registers dedicated to the status of the AC
+> power supply.
+> 
+> This adds the DT binding documentation for the AC power supply for
+> AXP20X and AXP22X PMICs.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+>  .../bindings/power/supply/axp20x_ac_power.txt      | 28 ++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
+> new file mode 100644
+> index 0000000..16d0de4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
+> @@ -0,0 +1,28 @@
+> +AXP20X and AXP22X PMICs' AC power supply
+> +
+> +Required Properties:
+> + - compatible: One of:
+> +			"x-powers,axp202-ac-power-supply"
+> +			"x-powers,axp221-ac-power-supply"
+> +
+> +More Required Properties for AXP20X PMICs:
+> + - io-channels: phandles to ACIN voltage and current ADC channels
+> + - io-channel-names = "acin_v", "acin_i";
+> +
+> +This node is a subnode of the axp20x PMIC.
+> +
+> +The AXP20X can read the current current and voltage supplied by AC by
+> +reading ADC channels from the AXP20X ADC.
+> +
+> +The AXP22X is only able to tell if an AC power supply is present and
+> +usable.
+> +
+> +Example:
+> +
+> +&axp209 {
+> +	ac_power_supply: ac_power_supply {
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
+power-supply {
 
----
+> +		compatible = "x-powers,axp202-ac-power-supply";
+> +		io-channels = <&axp209_adc 0>, <&axp209_adc 1>;
 
-v3 -> v4:
-- test region's type: IOMMU_RESV_MSI
-- restructure the code to prepare for safety assessment
-- reword title
----
- drivers/vfio/vfio_iommu_type1.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+Is this assignment fixed? If so, then it doesn't need to be in DT.
 
-diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index f3726ba..b473ef80 100644
---- a/drivers/vfio/vfio_iommu_type1.c
-+++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -39,6 +39,7 @@
- #include <linux/pid_namespace.h>
- #include <linux/mdev.h>
- #include <linux/notifier.h>
-+#include <linux/dma-iommu.h>
- 
- #define DRIVER_VERSION  "0.2"
- #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
-@@ -1177,6 +1178,28 @@ static struct vfio_group *find_iommu_group(struct vfio_domain *domain,
- 	return NULL;
- }
- 
-+static bool vfio_iommu_has_resv_msi(struct iommu_group *group,
-+				    phys_addr_t *base)
-+{
-+	struct list_head group_resv_regions;
-+	struct iommu_resv_region *region, *next;
-+	bool ret = false;
-+
-+	INIT_LIST_HEAD(&group_resv_regions);
-+	iommu_get_group_resv_regions(group, &group_resv_regions);
-+	list_for_each_entry(region, &group_resv_regions, list) {
-+		if (region->type & IOMMU_RESV_MSI) {
-+			*base = region->start;
-+			ret = true;
-+			goto out;
-+		}
-+	}
-+out:
-+	list_for_each_entry_safe(region, next, &group_resv_regions, list)
-+		kfree(region);
-+	return ret;
-+}
-+
- static int vfio_iommu_type1_attach_group(void *iommu_data,
- 					 struct iommu_group *iommu_group)
- {
-@@ -1185,6 +1208,8 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
- 	struct vfio_domain *domain, *d;
- 	struct bus_type *bus = NULL, *mdev_bus;
- 	int ret;
-+	bool resv_msi;
-+	phys_addr_t resv_msi_base;
- 
- 	mutex_lock(&iommu->lock);
- 
-@@ -1254,6 +1279,8 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
- 	if (ret)
- 		goto out_domain;
- 
-+	resv_msi = vfio_iommu_has_resv_msi(iommu_group, &resv_msi_base);
-+
- 	INIT_LIST_HEAD(&domain->group_list);
- 	list_add(&group->next, &domain->group_list);
- 
-@@ -1300,6 +1327,9 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
- 	if (ret)
- 		goto out_detach;
- 
-+	if (resv_msi && iommu_get_msi_cookie(domain->domain, resv_msi_base))
-+		goto out_detach;
-+
- 	list_add(&domain->next, &iommu->domain_list);
- 
- 	mutex_unlock(&iommu->lock);
--- 
-1.9.1
+> +		io-channel-names = "acin_v", "acin_i";
+> +	};
+> +};
+> -- 
+> 2.9.3
+> 
