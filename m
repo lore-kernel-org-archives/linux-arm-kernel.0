@@ -1,67 +1,114 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 4 Jan 2017 11:30:25 +0000
-Subject: [PATCH v2 2/2] arm: perf: Mark as non-removable
-In-Reply-To: <2559413.O5mI12kdOo@ws-stein>
-References: <20161221150340.25657-1-alexander.stein@systec-electronic.com>
- <20161221150340.25657-3-alexander.stein@systec-electronic.com>
- <20161222224547.GA30170@remoulade> <2559413.O5mI12kdOo@ws-stein>
-Message-ID: <20170104113025.GE8329@leverpostej>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Wed, 4 Jan 2017 14:41:37 +0200
+Subject: [PATCH v2 09/19] ARM: dts: imx6-sabreauto: add the ADV7180 video
+ decoder
+In-Reply-To: <1483477049-19056-10-git-send-email-steve_longerbeam@mentor.com>
+References: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483477049-19056-10-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <acbdc873-3166-f56d-e6d1-948becb1a57c@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 10:19:46AM +0100, Alexander Stein wrote:
-> On Thursday 22 December 2016 22:48:32, Mark Rutland wrote:
-> > On Wed, Dec 21, 2016 at 04:03:40PM +0100, Alexander Stein wrote:
-
-> > More generally, updating each and every driver in this manner seems like a
-> > scattergun approach that is tiresome and error prone.
-> > 
-> > IMO, it would be vastly better for a higher layer to enforce that we don't
-> > attempt to unbind drivers where the driver does not have a remove callback,
-> > as is the case here (and I suspect most over cases where
-> > DEBUG_TEST_DRIVER_REMOVE is blowing up).
+On 01/03/2017 10:57 PM, Steve Longerbeam wrote:
+> Enables the ADV7180 decoder sensor. The ADV7180 connects to the
+> parallel-bus mux input on ipu1_csi0_mux.
 > 
-> You mean something like this?
-> > diff --git a/drivers/base/driver.c b/drivers/base/driver.c
-> > index 4eabfe2..3b6c1a2d 100644
-> > --- a/drivers/base/driver.c
-> > +++ b/drivers/base/driver.c
-> > @@ -158,6 +158,9 @@ int driver_register(struct device_driver *drv)
-> > 
-> >                 printk(KERN_WARNING "Driver '%s' needs updating - please use
-> >                 "
-> >                 
-> >                         "bus_type methods\n", drv->name);
-> > 
-> > +       if (!drv->remove)
-> > +               drv->suppress_bind_attrs = true;
-> > +
-> > 
-> >         other = driver_find(drv->name, drv->bus);
-> >         if (other) {
-> >         
-> >                 printk(KERN_ERR "Error: Driver '%s' is already registered, "
-
-Something of that sort, yes. Or have a bus-level callback so that the
-bus can reject it dynamically (without having to alter the drv attrs).
-
-> > Is there any reason that can't be enforced at the bus layer, say?
+> On the sabreauto, two analog video inputs are routed to the ADV7180,
+> composite on Ain1, and composite on Ain3. Those inputs are defined
+> via inputs and input-names under the ADV7180 node. The ADV7180 power
+> pin is via max7310_b port expander.
 > 
-> I'm not sure if the change above works with remove functions set in struct 
-> bus_type too.
-> But on the other hand this would hide errors in drivers which are actually 
-> removable but do not cleanup properly which DEBUG_TEST_DRIVER_REMOVE tries to 
-> detect.
-> By setting .suppress_bind_attrs = true explicitely you state "This 
-> driver cannot be removed!", so the remove callback is not missing by accident.
+> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 56 ++++++++++++++++++++++++++++++++
+>  1 file changed, 56 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> index 83ac2ff..30ee378 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> @@ -147,10 +147,42 @@
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+>  			};
+> +
+> +			camera: adv7180 at 21 {
 
-I'm not sure I follow. If the remove callback is accidentally missing,
-the driver is not "actually removable" today -- there's either no remove
-code, or it's not been wired up (the latter of which will likely result
-in a compiler warning about an unused function).
+adv7180: camera at 21
 
-Aborting the remove early in those cases is much safer than forcefully
-removing a driver without a remove callback.
+> +				compatible = "adi,adv7180";
+> +				reg = <0x21>;
+> +				powerdown-gpios = <&max7310_b 2 GPIO_ACTIVE_LOW>;
+> +				interrupt-parent = <&gpio1>;
+> +				interrupts = <27 0x8>;
+> +				inputs = <0x00 0x02>;
+> +				input-names = "ADV7180 Composite on Ain1",
+> +						"ADV7180 Composite on Ain3";
+> +
+> +				port {
+> +					adv7180_to_ipu1_csi0_mux: endpoint {
+> +						remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
+> +						bus-width = <8>;
+> +					};
+> +				};
+> +			};
+>  		};
+>  	};
+>  };
+>  
+> +&ipu1_csi0_from_ipu1_csi0_mux {
+> +	bus-width = <8>;
+> +};
+> +
+> +&ipu1_csi0_mux_from_parallel_sensor {
+> +	remote-endpoint = <&adv7180_to_ipu1_csi0_mux>;
+> +	bus-width = <8>;
+> +};
+> +
+> +&ipu1_csi0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ipu1_csi0>;
+> +};
+> +
+>  &clks {
+>  	assigned-clocks = <&clks IMX6QDL_PLL4_BYPASS_SRC>,
+>  			  <&clks IMX6QDL_PLL4_BYPASS>,
+> @@ -451,6 +483,30 @@
+>  			>;
+>  		};
+>  
+> +		pinctrl_ipu1_csi0: ipu1grp-csi0 {
 
-Thanks,
-Mark.
+Please rename node name to ipu1csi0grp.
+
+> +			fsl,pins = <
+> +				MX6QDL_PAD_CSI0_DAT4__IPU1_CSI0_DATA04   0x80000000
+> +				MX6QDL_PAD_CSI0_DAT5__IPU1_CSI0_DATA05   0x80000000
+> +				MX6QDL_PAD_CSI0_DAT6__IPU1_CSI0_DATA06   0x80000000
+> +				MX6QDL_PAD_CSI0_DAT7__IPU1_CSI0_DATA07   0x80000000
+> +				MX6QDL_PAD_CSI0_DAT8__IPU1_CSI0_DATA08   0x80000000
+> +				MX6QDL_PAD_CSI0_DAT9__IPU1_CSI0_DATA09   0x80000000
+> +				MX6QDL_PAD_CSI0_DAT10__IPU1_CSI0_DATA10  0x80000000
+> +				MX6QDL_PAD_CSI0_DAT11__IPU1_CSI0_DATA11  0x80000000
+> +				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12  0x80000000
+> +				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13  0x80000000
+> +				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14  0x80000000
+> +				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15  0x80000000
+> +				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16  0x80000000
+> +				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17  0x80000000
+> +				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18  0x80000000
+> +				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19  0x80000000
+> +				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK 0x80000000
+> +				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC    0x80000000
+> +				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC   0x80000000
+> +			>;
+> +		};
+> +
+>  		pinctrl_pwm3: pwm1grp {
+>  			fsl,pins = <
+>  				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
+> 
+
+--
+With best wishes,
+Vladimir
