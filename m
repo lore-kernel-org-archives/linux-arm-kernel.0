@@ -1,41 +1,25 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Jan 2017 11:44:50 +0000
-Subject: [PATCHv6 00/11] CONFIG_DEBUG_VIRTUAL for arm64
-In-Reply-To: <b3de65da-8a74-2510-268e-34516cc2de77@redhat.com>
-References: <1483464113-1587-1-git-send-email-labbott@redhat.com>
- <edc8eaa2-5414-506c-1dad-f2404ef19c81@gmail.com>
- <b3de65da-8a74-2510-268e-34516cc2de77@redhat.com>
-Message-ID: <20170104114449.GA18193@arm.com>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Wed, 4 Jan 2017 12:43:32 +0100 (CET)
+Subject: [PATCH] rtc: armada38x: add __ro_after_init to armada38x_rtc_ops
+In-Reply-To: <20170104110750.dtu54t74qkuuvkvq@piout.net>
+References: <1482751862-18699-1-git-send-email-bhumirks@gmail.com>
+ <20170102140654.GF14217@n2100.armlinux.org.uk>
+ <CAGXu5jJLA=GcOhV5Z_6AOGa1KhW7fXtqBGrewEeViaJ9TiE-aw@mail.gmail.com>
+ <20170103213118.GM14217@n2100.armlinux.org.uk>
+ <20170103215421.GN14217@n2100.armlinux.org.uk>
+ <alpine.DEB.2.20.1701041155380.3073@hadrien>
+ <20170104110750.dtu54t74qkuuvkvq@piout.net>
+Message-ID: <alpine.DEB.2.20.1701041242080.3073@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 03:25:53PM -0800, Laura Abbott wrote:
-> On 01/03/2017 02:56 PM, Florian Fainelli wrote:
-> > On 01/03/2017 09:21 AM, Laura Abbott wrote:
-> >> Happy New Year!
-> >>
-> >> This is a very minor rebase from v5. It only moves a few headers around.
-> >> I think this series should be ready to be queued up for 4.11.
-> > 
-> > FWIW:
-> > 
-> > Tested-by: Florian Fainelli <f.fainelli@gmail.com>
-> > 
-> 
-> Thanks!
-> 
-> > How do we get this series included? I would like to get the ARM 32-bit
-> > counterpart included as well (will resubmit rebased shortly), but I have
-> > no clue which tree this should be going through.
-> > 
-> 
-> I was assuming this would go through the arm64 tree unless Catalin/Will
-> have an objection to that.
+> The question was whether the point to the rtc_class_ops could be made
+> __ro_after_init. And Russell is right, it is pointed to by the ops
+> pointer in a struct rtc_device and that struct is dynamically allocated
+> in rtc_device_register().
 
-Yup, I was planning to pick it up for 4.11.
+OK, I think it's a terminology issue.  You mean the structure that
+contains the pointer, and not the pointer itself, which is already const.
 
-Florian -- does your series depend on this? If so, then I'll need to
-co-ordinate with Russell (probably via a shared branch that we both pull)
-if you're aiming for 4.11 too.
-
-Will
+thanks,
+julia
