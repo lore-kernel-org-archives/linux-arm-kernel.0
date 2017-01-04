@@ -1,37 +1,35 @@
-From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
-Date: Wed, 04 Jan 2017 12:38:30 -0500
-Subject: [PATCH 3/8] ARM: dts: armada-388-clearfog: Utilize new DSA binding
-In-Reply-To: <5a40436a-ebad-8a94-c5c5-546ba33ba545@gmail.com>
-References: <20170102022249.10657-1-f.fainelli@gmail.com>
- <20170102022249.10657-4-f.fainelli@gmail.com>
- <87shoyeo2j.fsf@free-electrons.com>
- <5a40436a-ebad-8a94-c5c5-546ba33ba545@gmail.com>
-Message-ID: <87fuky7mjt.fsf@weeman.i-did-not-set--mail-host-address--so-tickle-me>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Jan 2017 17:33:46 +0000
+Subject: [Patch v2 2/2] firmware: qcom: scm: Fix interrupted SCM calls
+In-Reply-To: <1483054046-3327-3-git-send-email-andy.gross@linaro.org>
+References: <1483054046-3327-1-git-send-email-andy.gross@linaro.org>
+ <1483054046-3327-3-git-send-email-andy.gross@linaro.org>
+Message-ID: <20170104173346.GN18193@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian, All,
+On Thu, Dec 29, 2016 at 05:27:26PM -0600, Andy Gross wrote:
+> This patch adds a Qualcomm specific quirk to the arm_smccc_smc call.
+> 
+> On Qualcomm ARM64 platforms, the SMC call can return before it has
+> completed.  If this occurs, the call can be restarted, but it requires
+> using the returned session ID value from the interrupted SMC call.
+> 
+> The quirk stores off the session ID from the interrupted call in the
+> quirk structure so that it can be used by the caller.
+> 
+> This patch folds in a fix given by Sricharan R:
+> https://lkml.org/lkml/2016/9/28/272
+> 
+> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> ---
+>  arch/arm64/kernel/smccc-call.S |  9 ++++++++-
+>  drivers/firmware/qcom_scm-64.c | 13 ++++++++++---
+>  include/linux/arm-smccc.h      | 11 ++++++++---
+>  3 files changed, 26 insertions(+), 7 deletions(-)
 
-Florian Fainelli <f.fainelli@gmail.com> writes:
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 
->> However is there a way to be sure that the new binding is used?
->
-> The best way is probably to make sure that your switch device appears
-> parented to the MDIO bus driver under /sys/class/mdio_bus/*mvmdio*.
-> Alternatively, if you see a message like:
->
-> DSA: switch 0 0 parsed
->
-> in your dmesg, that would also be indicative of using the new binding
-> and corresponding code.
+Thanks for sticking with this, it looks good to me now.
 
-That makes me think that we should either remove, or use different
-values for the version described in net/dsa/dsa.c:
-
-    char dsa_driver_version[] = "0.1";
-
-Today this is absolutely useless and erroneous.
-
-Thanks,
-
-        Vivien
+Will
