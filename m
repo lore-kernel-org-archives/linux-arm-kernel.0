@@ -1,111 +1,45 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 4 Jan 2017 15:11:56 +0100
-Subject: [PATCH v5 13/17] irqdomain: irq_domain_check_msi_remap
-In-Reply-To: <ecb7ddf6-074f-50e4-6402-d59ceb1edd1d@arm.com>
-References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
- <1483536746-2725-14-git-send-email-eric.auger@redhat.com>
- <ecb7ddf6-074f-50e4-6402-d59ceb1edd1d@arm.com>
-Message-ID: <df8e7fdb-4048-3169-c758-c2a64119a321@redhat.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 4 Jan 2017 14:41:31 +0100
+Subject: [PATCH v3] ARM: dts: turris-omnia: add support for ethernet switch
+In-Reply-To: <e1dae939-e209-eccc-00df-b996d03cb8db@suse.de>
+References: <20170103152107.GA32450@lunn.ch>
+ <20170103193501.4827-1-uwe@kleine-koenig.org>
+ <e1dae939-e209-eccc-00df-b996d03cb8db@suse.de>
+Message-ID: <20170104134131.GJ10768@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Wed, Jan 04, 2017 at 11:49:12AM +0100, Andreas F?rber wrote:
+> Hi Uwe,
+> 
+> Am 03.01.2017 um 20:35 schrieb Uwe Kleine-K?nig:
+> > The Turris Omnia features a Marvell MV88E6176 ethernet switch. Add it to
+> > the dts.
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> 
+> It's still not working for me on next-20170104 with this v3.
+> Are there any other patches needed?
+> 
+> Should all ports LAN0-LAN4 work with the commented-out second cpu node?
+> 
+> I've been using the WAN port (eth2) just fine. (=eth1 in OpenWrt)
+> 
+> With this patch, eth0 and eth1 are shown as UP by default. If however I
+> enslave eth0 and eth1 in a br-lan bridge, as seen under OpenWrt for
+> eth0+eth2, then eth1 is DOWN while eth0 remains UP, and br-lan remains
+> DOWN. Same issue if I drop eth0 from the bridge - after a reboot eth1 is
+> UP but br-lan is still DOWN.
+> I had to manually enable CONFIG_BRIDGE, so maybe I'm missing more kernel
+> options? Or did you simply not try using a bridge?
 
-On 04/01/2017 14:46, Marc Zyngier wrote:
-> Hi Eric,
-> 
-> On 04/01/17 13:32, Eric Auger wrote:
->> This new function checks whether all platform and PCI
->> MSI domains implement IRQ remapping. This is useful to
->> understand whether VFIO passthrough is safe with respect
->> to interrupts.
->>
->> On ARM typically an MSI controller can sit downstream
->> to the IOMMU without preventing VFIO passthrough.
->> As such any assigned device can write into the MSI doorbell.
->> In case the MSI controller implements IRQ remapping, assigned
->> devices will not be able to trigger interrupts towards the
->> host. On the contrary, the assignment must be emphasized as
->> unsafe with respect to interrupts.
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->>
->> v4 -> v5:
->> - Handle DOMAIN_BUS_FSL_MC_MSI domains
->> - Check parents
->> ---
->>  include/linux/irqdomain.h |  1 +
->>  kernel/irq/irqdomain.c    | 41 +++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 42 insertions(+)
->>
->> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
->> index ab017b2..281a40f 100644
->> --- a/include/linux/irqdomain.h
->> +++ b/include/linux/irqdomain.h
->> @@ -219,6 +219,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
->>  					 void *host_data);
->>  extern struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
->>  						   enum irq_domain_bus_token bus_token);
->> +extern bool irq_domain_check_msi_remap(void);
->>  extern void irq_set_default_host(struct irq_domain *host);
->>  extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
->>  				  irq_hw_number_t hwirq, int node,
->> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
->> index 8c0a0ae..700caea 100644
->> --- a/kernel/irq/irqdomain.c
->> +++ b/kernel/irq/irqdomain.c
->> @@ -278,6 +278,47 @@ struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
->>  EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
->>  
->>  /**
->> + * irq_domain_is_msi_remap - Check if @domain or any parent
->> + * has MSI remapping support
->> + * @domain: domain pointer
->> + */
->> +static bool irq_domain_is_msi_remap(struct irq_domain *domain)
->> +{
->> +	struct irq_domain *h = domain;
->> +
->> +	for (; h; h = h->parent) {
->> +		if (h->flags & IRQ_DOMAIN_FLAG_MSI_REMAP)
->> +			return true;
->> +	}
->> +	return false;
->> +}
->> +
->> +/**
->> + * irq_domain_check_msi_remap() - Checks whether all MSI
->> + * irq domains implement IRQ remapping
->> + */
->> +bool irq_domain_check_msi_remap(void)
->> +{
->> +	struct irq_domain *h;
->> +	bool ret = true;
->> +
->> +	mutex_lock(&irq_domain_mutex);
->> +	list_for_each_entry(h, &irq_domain_list, link) {
->> +		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
->> +		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI) ||
->> +		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI)) &&
->> +		     !irq_domain_is_msi_remap(h)) {
-> 
-> (h->bus_token & DOMAIN_BUS_PCI_MSI) and co looks quite wrong. bus_token
-> is not a bitmap, and DOMAIN_BUS_* not a single bit value (see enum
-> irq_domain_bus_token). Surely this should read
-> (h->bus_token == DOMAIN_BUS_PCI_MSI).
-Oh I did not notice that. Thanks.
+That is not how you use DSA. It is very different to how OpenWRT
+swconfig works. The mainline kernel philosophy is that switch
+interfaces are just normal linux interfaces.
 
-Any other comments on the irqdomain side? Do you think the current
-approach consisting in looking at those bus tokens and their parents
-looks good?
+You need eth0 up, in order that the slave interfaces work. But then
+you can use the slave interfaces just like normal Linux
+interfaces. You can put an IP address on them. You can put them into a
+bridge, etc. But leave eth0 alone, other than having it up.
 
-Thanks
-
-Eric
-> 
-> Thanks,
-> 
-> 	M.
-> 
+	Andrew
