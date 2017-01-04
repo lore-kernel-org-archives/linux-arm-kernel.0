@@ -1,90 +1,37 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed,  4 Jan 2017 13:34:14 +0000
-Subject: [PATCH 4/4] ARM: dts: apq8064: Add ADM configuration node
-In-Reply-To: <1483536854-21389-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1483536854-21389-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1483536854-21389-4-git-send-email-srinivas.kandagatla@linaro.org>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 4 Jan 2017 17:28:32 +0530
+Subject: arm64: virt_to_page() does not return right page for a kernel
+ image address
+In-Reply-To: <20170104111119.GD8329@leverpostej>
+References: <CAHB_GuqqXqVu4i4eCZ3V_d8JbdSO6rjWpA_B0NMJsNc_Zw0Niw@mail.gmail.com>
+ <20170104111119.GD8329@leverpostej>
+Message-ID: <c23ad459-9dab-2085-2e0d-91ad4cedc987@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Ivan T. Ivanov" <ivan.ivanov@linaro.org>
+Hi Mark,
 
-Add Application Data Mover (DMA) device node.
-Connect GSBI6 UARTDM RX and TX channels to it.
+On Wednesday 04 January 2017 04:41 PM, Mark Rutland wrote:
+> Other than the (new) crypto test and the (not yet upstream) kdump
+> patches, does any code rely on virt_to_page() working for a kernel image
+> address? If so, and if we cannot fix those in the short term, we may
+> want to temporarily revert commit 9f2875912dac35d9 until those are fixed
+> up.
+>
+> Regardless, I think that the kdump code should not rely on
+> virt_to_page() for a kernel image (or kmap) result.
 
-Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |  4 ++++
- arch/arm/boot/dts/qcom-apq8064.dtsi        | 28 ++++++++++++++++++++++++++++
- 2 files changed, 32 insertions(+)
+Its not the kdump code which is relying on virt_to_page() for a kernel 
+image.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-index 881ce70..eec67cd 100644
---- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-@@ -234,6 +234,10 @@
- 			};
- 		};
- 
-+		adm: dma at 18320000 {
-+			status = "okay";
-+		};
-+
- 		sata_phy0: phy at 1b400000 {
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index e68a8a1..8a7c325 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -564,6 +564,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
-+			syscon-tcsr = <&tcsr>;
- 
- 			gsbi6_serial: serial at 16540000 {
- 				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
-@@ -572,6 +573,13 @@
- 				interrupts = <0 156 0x0>;
- 				clocks = <&gcc GSBI6_UART_CLK>, <&gcc GSBI6_H_CLK>;
- 				clock-names = "core", "iface";
-+
-+				qcom,rx-crci = <11>;
-+				qcom,tx-crci = <6>;
-+
-+				dmas = <&adm 6>, <&adm 7>;
-+				dma-names = "rx", "tx";
-+
- 				status = "disabled";
- 			};
- 
-@@ -1059,6 +1067,26 @@
- 			};
- 		};
- 
-+		adm: dma at 18320000 {
-+			compatible = "qcom,adm";
-+			reg = <0x18320000 0xE0000>;
-+			interrupts = <GIC_SPI 171 IRQ_TYPE_NONE>;
-+			#dma-cells = <1>;
-+
-+			clocks = <&gcc ADM0_CLK>, <&gcc ADM0_PBUS_CLK>;
-+			clock-names = "core", "iface";
-+
-+			resets = <&gcc ADM0_RESET>,
-+				 <&gcc ADM0_PBUS_RESET>,
-+				 <&gcc ADM0_C0_RESET>,
-+				 <&gcc ADM0_C1_RESET>,
-+				 <&gcc ADM0_C2_RESET>;
-+			reset-names = "clk", "pbus", "c0", "c1", "c2";
-+			qcom,ee = <1>;
-+
-+			status = "disabled";
-+		};
-+
- 		tcsr: syscon at 1a400000 {
- 			compatible = "qcom,tcsr-apq8064", "syscon";
- 			reg = <0x1a400000 0x100>;
--- 
-2.10.1
+Its only crypto test which does that. In the first kernel (none kdump 
+case) also crypto test gets a wrong kmap_atomic() address, however 
+luckily there exists an entry for that address in page table and so a 
+valid corresponding physical location. Therefore, it is just that we do 
+not see the crash. I see still the crypto test failure print in the 1st 
+kernel.
+However, in crash kernel there was no valid physical address and so the 
+kernel crashed.
+
+
+~Pratyush
