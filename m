@@ -1,91 +1,43 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Jan 2017 10:21:57 +0000
-Subject: [PATCH 2/4] dt-bindings: mfd: Remove TPS65217 interrupts
-In-Reply-To: <20161209062833.5768-3-woogyom.kim@gmail.com>
-References: <20161209062833.5768-1-woogyom.kim@gmail.com>
- <20161209062833.5768-3-woogyom.kim@gmail.com>
-Message-ID: <20170104102157.GU27589@dell>
+Date: Wed, 4 Jan 2017 10:58:33 +0000
+Subject: [PATCH v9 2/3] mfd: Kconfig: MFD_SUN4I_GPADC depends on
+ !TOUCHSCREN_SUN4I_GPADC
+In-Reply-To: <20161213143332.24988-3-quentin.schulz@free-electrons.com>
+References: <20161213143332.24988-1-quentin.schulz@free-electrons.com>
+ <20161213143332.24988-3-quentin.schulz@free-electrons.com>
+Message-ID: <20170104105833.GY27589@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 09 Dec 2016, Milo Kim wrote:
+On Tue, 13 Dec 2016, Quentin Schulz wrote:
 
-> Interrupt numbers are from the datasheet, so no need to keep them in
-> the ABI. Use the number in the DT file.
+> MFD_SUN4I_GPADC and TOUCHSCREEN_SUN4I are incompatible (both are drivers
+> for Allwinner SoCs' ADC). This makes sure TOUCHSCREEN_SUN4I isn't
+> enabled while MFD_SUN4I_GPADC is enabled.
 > 
-> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 > ---
->  arch/arm/boot/dts/am335x-bone-common.dtsi |  8 +++-----
->  include/dt-bindings/mfd/tps65217.h        | 26 --------------------------
->  2 files changed, 3 insertions(+), 31 deletions(-)
->  delete mode 100644 include/dt-bindings/mfd/tps65217.h
+> 
+> added in v8. I wrongly put the XOR dependance for SUN4I_GPADC and
+> TOUCHSCREEN_SUN4I instead of for MFD_SUN4I_GPADC and TOUCHSCREEN_SUN4I.
+> 
+>  drivers/mfd/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Applied, thanks.
 
-I'm happy for this to go in via your respective ARM tree.
-
-> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> index 14b6269..3e32dd1 100644
-> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> @@ -6,8 +6,6 @@
->   * published by the Free Software Foundation.
->   */
->  
-> -#include <dt-bindings/mfd/tps65217.h>
-> -
->  / {
->  	cpus {
->  		cpu at 0 {
-> @@ -319,13 +317,13 @@
->  	ti,pmic-shutdown-controller;
->  
->  	charger {
-> -		interrupts = <TPS65217_IRQ_AC>, <TPS65217_IRQ_USB>;
-> -		interrupt-names = "AC", "USB";
-> +		interrupts = <0>, <1>;
-> +		interrupt-names = "USB", "AC";
->  		status = "okay";
->  	};
->  
->  	pwrbutton {
-> -		interrupts = <TPS65217_IRQ_PB>;
-> +		interrupts = <2>;
->  		status = "okay";
->  	};
->  
-> diff --git a/include/dt-bindings/mfd/tps65217.h b/include/dt-bindings/mfd/tps65217.h
-> deleted file mode 100644
-> index cafb9e6..0000000
-> --- a/include/dt-bindings/mfd/tps65217.h
-> +++ /dev/null
-> @@ -1,26 +0,0 @@
-> -/*
-> - * This header provides macros for TI TPS65217 DT bindings.
-> - *
-> - * Copyright (C) 2016 Texas Instruments
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful, but
-> - * WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> - * General Public License for more details.
-> - *
-> - * You should have received a copy of the GNU General Public License along with
-> - * this program.  If not, see <http://www.gnu.org/licenses/>.
-> - */
-> -
-> -#ifndef __DT_BINDINGS_TPS65217_H__
-> -#define __DT_BINDINGS_TPS65217_H__
-> -
-> -#define TPS65217_IRQ_USB	0
-> -#define TPS65217_IRQ_AC		1
-> -#define TPS65217_IRQ_PB		2
-> -
-> -#endif
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 443ee50..e803884 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -45,6 +45,7 @@ config MFD_SUN4I_GPADC
+>  	select MFD_CORE
+>  	select REGMAP_MMIO
+>  	depends on ARCH_SUNXI || COMPILE_TEST
+> +	depends on !TOUCHSCREEN_SUN4I
+>  	help
+>  	  Select this to get support for Allwinner SoCs (A10, A13 and A31) ADC.
+>  	  This driver will only map the hardware interrupt and registers, you
 
 -- 
 Lee Jones
