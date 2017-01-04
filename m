@@ -1,148 +1,63 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue,  3 Jan 2017 19:25:41 -0800
-Subject: [PATCH 2/4] watchdog: coh901327_wdt: Keep clock enabled after loading
- driver
-In-Reply-To: <1483500343-27113-1-git-send-email-linux@roeck-us.net>
-References: <1483500343-27113-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1483500343-27113-2-git-send-email-linux@roeck-us.net>
+From: woogyom.kim@gmail.com (Milo Kim)
+Date: Wed,  4 Jan 2017 13:55:50 +0900
+Subject: [PATCH v4 0/3] ARM: dts: imx6: Support Poslab Savageboard dual & quad
+Message-ID: <20170104045553.26576-1-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling the clock before accessing chip registers and disabling it
-afterwards does not really make sense and only adds complexity to
-the driver. In addition to that, a comment int the driver suggests
-that it does not serve a useful purpose either.
+Poslab Savageboard is the i.MX6 SoC base, but BSP code from the vendor is 
+not mainline u-boot and kernel. Personal reason of using this board is 
+testing etnaviv user-space driver, so I re-write device tree files based on
+mainline kernel for the first step.
 
-"The watchdog block is of course always clocked, the
- clk_enable()/clk_disable() calls are mainly for performing reference
- counting higher up in the clock hierarchy."
+This patchset includes common DT file, dual and quad board files.
 
-Just keep the clock enabled instead.
+Supported components are
+  - Display: HDMI and LVDS panel
+  - eMMC and SD card
+  - Ethernet
+  - Pinmux configuration
+  - SATA: only for Savageboard quad
+  - UART1 for debug console
+  - USB host
 
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
- drivers/watchdog/coh901327_wdt.c | 21 +--------------------
- 1 file changed, 1 insertion(+), 20 deletions(-)
+Missing features are
+  - Audio (WM8903)
+  - USB OTG
+  - PMIC WM8326: default settings are used so no issue to bring-up the system
+  - MIPI DSI and CSI
 
-diff --git a/drivers/watchdog/coh901327_wdt.c b/drivers/watchdog/coh901327_wdt.c
-index dc97b2fd6c49..1385a920df4f 100644
---- a/drivers/watchdog/coh901327_wdt.c
-+++ b/drivers/watchdog/coh901327_wdt.c
-@@ -74,11 +74,6 @@ static int irq;
- static void __iomem *virtbase;
- static struct device *parent;
- 
--/*
-- * The watchdog block is of course always clocked, the
-- * clk_enable()/clk_disable() calls are mainly for performing reference
-- * counting higher up in the clock hierarchy.
-- */
- static struct clk *clk;
- 
- /*
-@@ -90,7 +85,6 @@ static void coh901327_enable(u16 timeout)
- 	unsigned long freq;
- 	unsigned long delay_ns;
- 
--	clk_enable(clk);
- 	/* Restart timer if it is disabled */
- 	val = readw(virtbase + U300_WDOG_D2R);
- 	if (val == U300_WDOG_D2R_DISABLE_STATUS_DISABLED)
-@@ -118,7 +112,6 @@ static void coh901327_enable(u16 timeout)
- 	 */
- 	(void) readw(virtbase + U300_WDOG_CR);
- 	val = readw(virtbase + U300_WDOG_D2R);
--	clk_disable(clk);
- 	if (val != U300_WDOG_D2R_DISABLE_STATUS_ENABLED)
- 		dev_err(parent,
- 			"%s(): watchdog not enabled! D2R value %04x\n",
-@@ -129,7 +122,6 @@ static void coh901327_disable(void)
- {
- 	u16 val;
- 
--	clk_enable(clk);
- 	/* Disable the watchdog interrupt if it is active */
- 	writew(0x0000U, virtbase + U300_WDOG_IMR);
- 	/* If the watchdog is currently enabled, attempt to disable it */
-@@ -144,7 +136,6 @@ static void coh901327_disable(void)
- 		       virtbase + U300_WDOG_D2R);
- 	}
- 	val = readw(virtbase + U300_WDOG_D2R);
--	clk_disable(clk);
- 	if (val != U300_WDOG_D2R_DISABLE_STATUS_DISABLED)
- 		dev_err(parent,
- 			"%s(): watchdog not disabled! D2R value %04x\n",
-@@ -165,11 +156,9 @@ static int coh901327_stop(struct watchdog_device *wdt_dev)
- 
- static int coh901327_ping(struct watchdog_device *wdd)
- {
--	clk_enable(clk);
- 	/* Feed the watchdog */
- 	writew(U300_WDOG_FR_FEED_RESTART_TIMER,
- 	       virtbase + U300_WDOG_FR);
--	clk_disable(clk);
- 	return 0;
- }
- 
-@@ -177,13 +166,11 @@ static int coh901327_settimeout(struct watchdog_device *wdt_dev,
- 				unsigned int time)
- {
- 	wdt_dev->timeout = time;
--	clk_enable(clk);
- 	/* Set new timeout value */
- 	writew(time * 100, virtbase + U300_WDOG_TR);
- 	/* Feed the dog */
- 	writew(U300_WDOG_FR_FEED_RESTART_TIMER,
- 	       virtbase + U300_WDOG_FR);
--	clk_disable(clk);
- 	return 0;
- }
- 
-@@ -191,13 +178,11 @@ static unsigned int coh901327_gettimeleft(struct watchdog_device *wdt_dev)
- {
- 	u16 val;
- 
--	clk_enable(clk);
- 	/* Read repeatedly until the value is stable! */
- 	val = readw(virtbase + U300_WDOG_CR);
- 	while (val & U300_WDOG_CR_VALID_IND)
- 		val = readw(virtbase + U300_WDOG_CR);
- 	val &= U300_WDOG_CR_COUNT_VALUE_MASK;
--	clk_disable(clk);
- 	if (val != 0)
- 		val /= 100;
- 
-@@ -221,13 +206,11 @@ static irqreturn_t coh901327_interrupt(int irq, void *data)
- 	 * to prevent a watchdog reset by feeding the watchdog at this
- 	 * point.
- 	 */
--	clk_enable(clk);
- 	val = readw(virtbase + U300_WDOG_IER);
- 	if (val == U300_WDOG_IER_WILL_BARK_IRQ_EVENT_IND)
- 		writew(U300_WDOG_IER_WILL_BARK_IRQ_ACK_ENABLE,
- 		       virtbase + U300_WDOG_IER);
- 	writew(0x0000U, virtbase + U300_WDOG_IMR);
--	clk_disable(clk);
- 	dev_crit(parent, "watchdog is barking!\n");
- 	return IRQ_HANDLED;
- }
-@@ -263,7 +246,7 @@ static int __exit coh901327_remove(struct platform_device *pdev)
- 	watchdog_unregister_device(&coh901327_wdt);
- 	coh901327_disable();
- 	free_irq(irq, pdev);
--	clk_unprepare(clk);
-+	clk_disable_unprepare(clk);
- 	clk_put(clk);
- 	iounmap(virtbase);
- 	release_mem_region(phybase, physize);
-@@ -352,8 +335,6 @@ static int __init coh901327_probe(struct platform_device *pdev)
- 		goto out_no_irq;
- 	}
- 
--	clk_disable(clk);
--
- 	ret = watchdog_init_timeout(&coh901327_wdt, margin, &pdev->dev);
- 	if (ret < 0)
- 		coh901327_wdt.timeout = 60;
+Patches are tested on the Savageboard quad but the dual version should work 
+because the only difference between dual and quad is SATA support.
+
+More information in http://www.savageboard.org
+
+v4:
+  Fix the license text and add the vendor prefix.
+  Use generic node name for the backlight panel.
+  Sort alphabetically for the pinctrl nodes.
+  Remove unnecessary pinmux of HDMI CEC.
+
+v3:
+  Specify the dtbs for i.MX6 build.
+
+v2:
+  Fix DT node for regulator, phy-reset-gpios and iomuxc node.
+
+Milo Kim (3):
+  ARM: dts: imx6: Add Savageboard common file
+  ARM: dts: imx6: Support Savageboard dual
+  ARM: dts: imx6: Support Savageboard quad
+
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/imx6dl-savageboard.dts           |  51 +++++
+ arch/arm/boot/dts/imx6q-savageboard.dts            |  55 +++++
+ arch/arm/boot/dts/imx6qdl-savageboard.dtsi         | 255 +++++++++++++++++++++
+ 5 files changed, 364 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-savageboard.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-savageboard.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-savageboard.dtsi
+
 -- 
-2.7.4
+2.11.0
