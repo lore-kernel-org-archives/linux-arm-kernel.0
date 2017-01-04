@@ -1,70 +1,197 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 4 Jan 2017 11:11:19 +0000
-Subject: arm64: virt_to_page() does not return right page for a kernel
- image address
-In-Reply-To: <CAHB_GuqqXqVu4i4eCZ3V_d8JbdSO6rjWpA_B0NMJsNc_Zw0Niw@mail.gmail.com>
-References: <CAHB_GuqqXqVu4i4eCZ3V_d8JbdSO6rjWpA_B0NMJsNc_Zw0Niw@mail.gmail.com>
-Message-ID: <20170104111119.GD8329@leverpostej>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Wed, 4 Jan 2017 19:05:53 +0530
+Subject: [PATCH v4 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
+ stores scenario in vdma
+In-Reply-To: <1483536954-27203-1-git-send-email-appanad@xilinx.com>
+References: <1483536954-27203-1-git-send-email-appanad@xilinx.com>
+Message-ID: <1483536954-27203-3-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 11:19:38AM +0530, Pratyush Anand wrote:
-> Hi,
+When VDMA is configured for more than one frame in the h/w
+for example h/w is configured for n number of frames and user
+Submits n number of frames and triggered the DMA using issue_pending API.
+In the current driver flow we are submitting one frame at a time
+but we should submit all the n number of frames at one time as the h/w
+Is configured for n number of frames.
 
-Hi,
+This patch fixes this issue.
 
-> I noticed that on arm64 kmap_atomic() does not return correct address
-> corresponding to a page located in data section. It causes crash in
-> kdump kernel with v29 kdump patches. crash happens in a newly
-> implemented crypto test [1], and the same test fails(even though it
-> does not crash) in 1st kernel as well.
-> 
-> Further debugging showed that the physical address returned by
-> virt_to_phys(kaddr)  and virt_to_phys(kmap_atomic(virt_to_page(kaddr))
-> + offset_in_page(kaddr)) are not same.
+Reviewed-by: Jose Abreu <joabreu@synopsys.com>
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+Changes for v4:
+---> Add Check for framestore configuration on Transmit case as well
+     as suggested by Jose Abreu.
+---> Modified the dev_dbg checks to dev_warn checks as suggested
+     by Jose Abreu. 
+Changes for v3:
+---> Added Checks for frame store configuration. If frame store
+     Configuration is not present at the h/w level and user
+     Submits less frames added debug prints in the driver as relevant.
+Changes for v2:
+---> Fixed race conditions in the driver as suggested by Jose Abreu
+---> Fixed unnecessray if else checks in the vdma_start_transfer
+     as suggested by Laurent Pinchart.
 
-As I mentioned over IRC, virt_to_phys() on a kmap*() result is wrong
-anyway. A kmap() results is not guaranteed to be a linear map address,
-even if that's the trivial implementation used today.
+ .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |  2 +
+ drivers/dma/xilinx/xilinx_dma.c                    | 79 +++++++++++++++-------
+ 2 files changed, 58 insertions(+), 23 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+index a2b8bfa..1f65e09 100644
+--- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
++++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+@@ -66,6 +66,8 @@ Optional child node properties:
+ Optional child node properties for VDMA:
+ - xlnx,genlock-mode: Tells Genlock synchronization is
+ 	enabled/disabled in hardware.
++- xlnx,fstore-config: Tells Whether Frame Store Configuration is
++	enabled/disabled in hardware.
+ Optional child node properties for AXI DMA:
+ -dma-channels: Number of dma channels in child node.
  
-> Mark Rutland thinks(IRC :#armlinux) that _virt_to_pgoff *only* handles
-> linear addresses, and not kernel image addresses. However, we have to
-> ask if it should?
-
->From Ard's commit, the intention is clearly that it should not,
-especially given the update to virt_addr_valid(). With Larua's
-DEBUG_VIRTUAL updates, we can use lm_alias() to get a linear map address
-before using virt_to_page().
-
-Other than the (new) crypto test and the (not yet upstream) kdump
-patches, does any code rely on virt_to_page() working for a kernel image
-address? If so, and if we cannot fix those in the short term, we may
-want to temporarily revert commit 9f2875912dac35d9 until those are fixed
-up.
-
-Regardless, I think that the kdump code should not rely on
-virt_to_page() for a kernel image (or kmap) result.
-
-Thanks,
-Mark.
-
-> Meanwhile, I reverted commit [2] and then everything worked fine
-> *atleast* in my case. But, I am not sure if that could be the right
-> and best solution.
-> 
-> Opinion?
-> 
-> ~Pratyush
-> 
-> [1]
-> commit d7db7a882debaffc78f91aabedee973aa1f73390
-> Author: Giovanni Cabiddu <giovanni.cabiddu@intel.com>
-> Date:   Fri Oct 21 13:19:54 2016 +0100
-> 
->     crypto: acomp - update testmgr with support for acomp
-> 
-> [2]commit 9f2875912dac35d9272a82ea9eec9e5884b42cd2
-> Author: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Date:   Wed Mar 30 16:46:01 2016 +0200
-> 
->     arm64: mm: restrict virt_to_page() to the linear mapping
+diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+index be7eb41..4fb34da 100644
+--- a/drivers/dma/xilinx/xilinx_dma.c
++++ b/drivers/dma/xilinx/xilinx_dma.c
+@@ -322,6 +322,7 @@ struct xilinx_dma_tx_descriptor {
+  * @genlock: Support genlock mode
+  * @err: Channel has errors
+  * @idle: Check for channel idle
++ * @has_fstoreconfig: Check for frame store configuration
+  * @tasklet: Cleanup work after irq
+  * @config: Device configuration info
+  * @flush_on_fsync: Flush on Frame sync
+@@ -353,6 +354,7 @@ struct xilinx_dma_chan {
+ 	bool genlock;
+ 	bool err;
+ 	bool idle;
++	bool has_fstoreconfig;
+ 	struct tasklet_struct tasklet;
+ 	struct xilinx_vdma_config config;
+ 	bool flush_on_fsync;
+@@ -990,6 +992,27 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
+ 	if (list_empty(&chan->pending_list))
+ 		return;
+ 
++	/*
++	 * Note: When VDMA is built with default h/w configuration
++	 * User should submit frames upto H/W configured.
++	 * If users submits less than h/w configured
++	 * VDMA engine tries to write to a invalid location
++	 * Results undefined behaviour/memory corruption.
++	 *
++	 * If user would like to submit frames less than h/w capable
++	 * On S2MM side please enable debug info 13 at the h/w level
++	 * On MM2S side please enable debug info 6 at the h/w level
++	 * It will allows the frame buffers numbers to be modified at runtime.
++	 */
++	if (!chan->has_fstoreconfig &&
++	     chan->desc_pendingcount < chan->num_frms) {
++		dev_warn(chan->dev, "Frame Store Configuration is not enabled at the\n");
++		dev_warn(chan->dev, "H/w level enable Debug info 13 or 6 at the h/w level\n");
++		dev_warn(chan->dev, "OR Submit the frames upto h/w Capable\n\r");
++
++		return;
++	}
++
+ 	desc = list_first_entry(&chan->pending_list,
+ 				struct xilinx_dma_tx_descriptor, node);
+ 	tail_desc = list_last_entry(&chan->pending_list,
+@@ -1052,25 +1075,38 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
+ 	if (chan->has_sg) {
+ 		dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
+ 				tail_segment->phys);
++		list_splice_tail_init(&chan->pending_list, &chan->active_list);
++		chan->desc_pendingcount = 0;
+ 	} else {
+ 		struct xilinx_vdma_tx_segment *segment, *last = NULL;
+-		int i = 0;
++		int i = 0, j = 0;
+ 
+ 		if (chan->desc_submitcount < chan->num_frms)
+ 			i = chan->desc_submitcount;
+ 
+-		list_for_each_entry(segment, &desc->segments, node) {
+-			if (chan->ext_addr)
+-				vdma_desc_write_64(chan,
+-					XILINX_VDMA_REG_START_ADDRESS_64(i++),
+-					segment->hw.buf_addr,
+-					segment->hw.buf_addr_msb);
+-			else
+-				vdma_desc_write(chan,
+-					XILINX_VDMA_REG_START_ADDRESS(i++),
+-					segment->hw.buf_addr);
+-
+-			last = segment;
++		for (j = 0; j < chan->num_frms; ) {
++			list_for_each_entry(segment, &desc->segments, node) {
++				if (chan->ext_addr)
++					vdma_desc_write_64(chan,
++					  XILINX_VDMA_REG_START_ADDRESS_64(i++),
++					  segment->hw.buf_addr,
++					  segment->hw.buf_addr_msb);
++				else
++					vdma_desc_write(chan,
++					    XILINX_VDMA_REG_START_ADDRESS(i++),
++					    segment->hw.buf_addr);
++
++				last = segment;
++			}
++			list_del(&desc->node);
++			list_add_tail(&desc->node, &chan->active_list);
++			j++;
++			if (list_empty(&chan->pending_list) ||
++			    (i == chan->num_frms))
++				break;
++			desc = list_first_entry(&chan->pending_list,
++						struct xilinx_dma_tx_descriptor,
++						node);
+ 		}
+ 
+ 		if (!last)
+@@ -1081,20 +1117,14 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
+ 		vdma_desc_write(chan, XILINX_DMA_REG_FRMDLY_STRIDE,
+ 				last->hw.stride);
+ 		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last->hw.vsize);
+-	}
+ 
+-	chan->idle = false;
+-	if (!chan->has_sg) {
+-		list_del(&desc->node);
+-		list_add_tail(&desc->node, &chan->active_list);
+-		chan->desc_submitcount++;
+-		chan->desc_pendingcount--;
++		chan->desc_submitcount += j;
++		chan->desc_pendingcount -= j;
+ 		if (chan->desc_submitcount == chan->num_frms)
+ 			chan->desc_submitcount = 0;
+-	} else {
+-		list_splice_tail_init(&chan->pending_list, &chan->active_list);
+-		chan->desc_pendingcount = 0;
+ 	}
++
++	chan->idle = false;
+ }
+ 
+ /**
+@@ -1342,6 +1372,7 @@ static int xilinx_dma_reset(struct xilinx_dma_chan *chan)
+ 
+ 	chan->err = false;
+ 	chan->idle = true;
++	chan->desc_submitcount = 0;
+ 
+ 	return err;
+ }
+@@ -2315,6 +2346,8 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
+ 	has_dre = of_property_read_bool(node, "xlnx,include-dre");
+ 
+ 	chan->genlock = of_property_read_bool(node, "xlnx,genlock-mode");
++	chan->has_fstoreconfig = of_property_read_bool(node,
++						       "xlnx,fstore-config");
+ 
+ 	err = of_property_read_u32(node, "xlnx,datawidth", &value);
+ 	if (err) {
+-- 
+2.1.2
