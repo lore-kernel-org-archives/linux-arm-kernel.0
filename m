@@ -1,41 +1,31 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed,  4 Jan 2017 13:34:13 +0000
-Subject: [PATCH 3/4] ARM: dts: sd-600eval: enable 1.8v regulator on LS
- expansion
-In-Reply-To: <1483536854-21389-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1483536854-21389-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1483536854-21389-3-git-send-email-srinivas.kandagatla@linaro.org>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Wed,  4 Jan 2017 13:32:23 +0000
+Subject: [PATCH v5 14/17] irqchip/gicv3-its: Sets IRQ_DOMAIN_FLAG_MSI_REMAP
+In-Reply-To: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
+References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1483536746-2725-15-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables 1.8v regulator on LS expansion, which should be
-always on according to 96boards spec.
+The GICv3 ITS is MSI remapping capable. Let's advertise
+this property so that VFIO passthrough can assess IRQ safety.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
 ---
- arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/irqchip/irq-gic-v3-its.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts b/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
-index 4e908af..40f7168 100644
---- a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
-@@ -132,6 +132,16 @@
- 					bias-pull-down;
- 				};
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 69b040f..9d4fefc 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1642,6 +1642,7 @@ static int its_init_domain(struct fwnode_handle *handle, struct its_node *its)
  
-+				/**
-+				 * 1.8v required on LS expansion
-+				 * for mezzanine boards
-+				 */
-+				l15 {
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
- 				l23 {
- 					regulator-min-microvolt = <1700000>;
- 					regulator-max-microvolt = <1900000>;
+ 	inner_domain->parent = its_parent;
+ 	inner_domain->bus_token = DOMAIN_BUS_NEXUS;
++	inner_domain->flags |= IRQ_DOMAIN_FLAG_MSI_REMAP;
+ 	info->ops = &its_msi_domain_ops;
+ 	info->data = its;
+ 	inner_domain->host_data = info;
 -- 
-2.10.1
+1.9.1
