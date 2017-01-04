@@ -1,60 +1,57 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed,  4 Jan 2017 17:48:58 +0000
-Subject: [PATCH v3 0/9] arm64: Expose CPUID registers via emulation
-Message-ID: <1483552147-9605-1-git-send-email-suzuki.poulose@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Jan 2017 18:17:18 +0000
+Subject: [PATCH v2 2/2] arm: perf: Mark as non-removable
+In-Reply-To: <20170104114612.GF8329@leverpostej>
+References: <20161221150340.25657-1-alexander.stein@systec-electronic.com>
+ <20161221150340.25657-3-alexander.stein@systec-electronic.com>
+ <20161222224547.GA30170@remoulade> <2559413.O5mI12kdOo@ws-stein>
+ <20170104113025.GE8329@leverpostej>
+ <20170104114056.GO14217@n2100.armlinux.org.uk>
+ <20170104114612.GF8329@leverpostej>
+Message-ID: <20170104181717.GT18193@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds a new ABI to expose the CPU feature registers
-to the user space via emulation of MRS instruction. The system exposes
-only a limited set of feature values (See the documentation patch)
-from the cpufeature infrastructure. The feature bits that are not
-exposed are set to the 'safe value' which implies 'not supported'.
+On Wed, Jan 04, 2017 at 11:46:13AM +0000, Mark Rutland wrote:
+> On Wed, Jan 04, 2017 at 11:40:56AM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Jan 04, 2017 at 11:30:25AM +0000, Mark Rutland wrote:
+> > > On Wed, Jan 04, 2017 at 10:19:46AM +0100, Alexander Stein wrote:
+> > > > I'm not sure if the change above works with remove functions set in struct 
+> > > > bus_type too.
+> > > > But on the other hand this would hide errors in drivers which are actually 
+> > > > removable but do not cleanup properly which DEBUG_TEST_DRIVER_REMOVE tries to 
+> > > > detect.
+> > > > By setting .suppress_bind_attrs = true explicitely you state "This 
+> > > > driver cannot be removed!", so the remove callback is not missing by accident.
+> > > 
+> > > I'm not sure I follow. If the remove callback is accidentally missing,
+> > > the driver is not "actually removable" today -- there's either no remove
+> > > code, or it's not been wired up (the latter of which will likely result
+> > > in a compiler warning about an unused function).
+> > > 
+> > > Aborting the remove early in those cases is much safer than forcefully
+> > > removing a driver without a remove callback.
+> > 
+> > Drivers without a remove function may be removable - there's more layers
+> > than just the driver - there's the bus layer as well, which may or may
+> > not direct to a private-bus pointer.
+> 
+> Sure; which is why I initially suggested doing something at the bus
+> layer. That way, each layer could do any necessary check, and/or
+> delegate to a callback for the layer below.
+> 
+> > There's no real way for the core driver model code to know whether the
+> > lack of the ->remove in the struct device_driver is something that
+> > prevents a driver being removed, or whether it's handled via some other
+> > method.  Eg, platform drivers.
+> 
+> While true today, my suggestion is to add the infrastrucutre such that
+> it can. That seems nicer to me than each driver having to retain
+> (redundant) state.
+> 
+> Regardless, this patch itself is fine.
 
-Apart from the selected feature registers, we expose MIDR_EL1 (Main
-ID Register). The user should be aware that, reading MIDR_EL1 can be
-tricky on a heterogeneous system (just like getcpu()). We export the
-value of the current CPU where 'MRS' is executed.
+Well, it's also largely incomplete as you point out, so I don't think
+we gain an awful lot from merging it as-is.
 
-Applies on v4.10-rc2.
-
-Changes since V2:
- - Mark DCZID_EL0 fields visible, as the register is already accessible
-   to EL0.
- - Included the sample program to demonstrate the use of the new ABI in
-   documentation.
- - Fixed minor coding style issues.
-
-Changes since V1:
-  - Drop mask for Op0 in sys_reg()
-  - Fix documentation
-  - Change safe value of MPIDR to drop MT support
-  - Do not emulate AArch32 ID registers
-
-Mark Rutland (2):
-  arm64: cpufeature: treat unknown fields as RES0
-  arm64: cpufeature: remove explicit RAZ fields
-
-Suzuki K Poulose (7):
-  arm64: cpufeature: Cleanup feature bit tables
-  arm64: cpufeature: Document the rules of safe value for features
-  arm64: cpufeature: Define helpers for sys_reg id
-  arm64: Add helper to decode register from instruction
-  arm64: cpufeature: Track user visible fields
-  arm64: cpufeature: Expose CPUID registers by emulation
-  arm64: Documentation - Expose CPU feature registers
-
- Documentation/arm64/cpu-feature-registers.txt | 265 ++++++++++++++++++++
- arch/arm64/include/asm/cpufeature.h           |  27 +-
- arch/arm64/include/asm/insn.h                 |   2 +
- arch/arm64/include/asm/sysreg.h               |  25 +-
- arch/arm64/include/uapi/asm/hwcap.h           |   1 +
- arch/arm64/kernel/cpufeature.c                | 340 +++++++++++++++++---------
- arch/arm64/kernel/cpuinfo.c                   |   1 +
- arch/arm64/kernel/insn.c                      |  29 +++
- arch/arm64/kernel/traps.c                     |   2 +-
- 9 files changed, 571 insertions(+), 121 deletions(-)
- create mode 100644 Documentation/arm64/cpu-feature-registers.txt
-
--- 
-2.7.4
+Will
