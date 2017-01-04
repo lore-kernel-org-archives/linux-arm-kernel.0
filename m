@@ -1,132 +1,60 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed,  4 Jan 2017 13:28:36 -0800
-Subject: [PATCH 2/4] watchdog: bcm2835_wdt: Use watchdog core to install
- restart handler
-In-Reply-To: <1483565318-25578-1-git-send-email-linux@roeck-us.net>
-References: <1483565318-25578-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1483565318-25578-2-git-send-email-linux@roeck-us.net>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 4 Jan 2017 13:53:55 -0800
+Subject: [PATCH] rtc: armada38x: add __ro_after_init to armada38x_rtc_ops
+In-Reply-To: <20170104130628.GQ14217@n2100.armlinux.org.uk>
+References: <1482751862-18699-1-git-send-email-bhumirks@gmail.com>
+ <20170102140654.GF14217@n2100.armlinux.org.uk>
+ <CAGXu5jJLA=GcOhV5Z_6AOGa1KhW7fXtqBGrewEeViaJ9TiE-aw@mail.gmail.com>
+ <20170103213118.GM14217@n2100.armlinux.org.uk>
+ <20170103215421.GN14217@n2100.armlinux.org.uk>
+ <alpine.DEB.2.20.1701041155380.3073@hadrien>
+ <20170104110750.dtu54t74qkuuvkvq@piout.net>
+ <alpine.DEB.2.20.1701041242080.3073@hadrien>
+ <20170104121425.GP14217@n2100.armlinux.org.uk>
+ <alpine.DEB.2.20.1701041320140.3073@hadrien>
+ <20170104130628.GQ14217@n2100.armlinux.org.uk>
+Message-ID: <CAGXu5jLe6RNa6xrefB--w3M+ECRkMMDZWoyAOp5gA1h6W-1vMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the infrastructure provided by the watchdog core to install
-the restart handler.
+On Wed, Jan 4, 2017 at 5:06 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Wed, Jan 04, 2017 at 01:23:41PM +0100, Julia Lawall wrote:
+>> Basically, the strategy of the patch is that one may consider it
+>> preferable to duplicate the structure for the different alternatives,
+>> rather than use __ro_after_init.  Perhaps if the structure were larger,
+>> then __ro_after_init would be a better choice?
+>
+> It depends on not just the size, but how many members need to be
+> modified, and obviously whether there are likely to be more than one
+> user of the structure as well.
+>
+> So I'd say __ro_after_init rarely makes sense for an operations
+> structure - the only case I can see is:
+>
+> - a large structure
+> - only a small number of elements need to be modified
+> - it is only single-use
+>
+> which is probably quite rare - this one falls into two out of those
+> three.
+>
+> There's another consideration (imho) too - we may wish, at a later
+> date, to make .text and .rodata both read-only from the start of the
+> kernel to harden the kernel against possibly init-time exploitation.
+> (Think about a buggy built-in driver with emulated hardware - much the
+> same problem that Kees is trying to address in one of his recent patch
+> sets but with hotplugged hardware while a screen-saver is active.)
+> Having function pointers in .rodata rather than the ro-after-init
+> section would provide better protection.
 
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
- drivers/watchdog/bcm2835_wdt.c | 54 +++++++++++++++++++++---------------------
- 1 file changed, 27 insertions(+), 27 deletions(-)
+Agreed: I'd much prefer things just be const. :) As to my confusing
+question, I hadn't looked at how where the pointers to the structure
+was being stored, so I was just asking if it, too, could be const,
+which it can't, and that's fine here.
 
-diff --git a/drivers/watchdog/bcm2835_wdt.c b/drivers/watchdog/bcm2835_wdt.c
-index c32c45bd8b09..2bc7d195f0a4 100644
---- a/drivers/watchdog/bcm2835_wdt.c
-+++ b/drivers/watchdog/bcm2835_wdt.c
-@@ -14,7 +14,6 @@
-  */
- 
- #include <linux/delay.h>
--#include <linux/reboot.h>
- #include <linux/types.h>
- #include <linux/module.h>
- #include <linux/io.h>
-@@ -49,7 +48,6 @@
- struct bcm2835_wdt {
- 	void __iomem		*base;
- 	spinlock_t		lock;
--	struct notifier_block	restart_handler;
- };
- 
- static unsigned int heartbeat;
-@@ -99,11 +97,37 @@ static unsigned int bcm2835_wdt_get_timeleft(struct watchdog_device *wdog)
- 	return WDOG_TICKS_TO_SECS(ret & PM_WDOG_TIME_SET);
- }
- 
-+static void __bcm2835_restart(struct bcm2835_wdt *wdt)
-+{
-+	u32 val;
-+
-+	/* use a timeout of 10 ticks (~150us) */
-+	writel_relaxed(10 | PM_PASSWORD, wdt->base + PM_WDOG);
-+	val = readl_relaxed(wdt->base + PM_RSTC);
-+	val &= PM_RSTC_WRCFG_CLR;
-+	val |= PM_PASSWORD | PM_RSTC_WRCFG_FULL_RESET;
-+	writel_relaxed(val, wdt->base + PM_RSTC);
-+
-+	/* No sleeping, possibly atomic. */
-+	mdelay(1);
-+}
-+
-+static int bcm2835_restart(struct watchdog_device *wdog,
-+			   unsigned long action, void *data)
-+{
-+	struct bcm2835_wdt *wdt = watchdog_get_drvdata(wdog);
-+
-+	__bcm2835_restart(wdt);
-+
-+	return 0;
-+}
-+
- static const struct watchdog_ops bcm2835_wdt_ops = {
- 	.owner =	THIS_MODULE,
- 	.start =	bcm2835_wdt_start,
- 	.stop =		bcm2835_wdt_stop,
- 	.get_timeleft =	bcm2835_wdt_get_timeleft,
-+	.restart =	bcm2835_restart,
- };
- 
- static const struct watchdog_info bcm2835_wdt_info = {
-@@ -120,26 +144,6 @@ static struct watchdog_device bcm2835_wdt_wdd = {
- 	.timeout =	WDOG_TICKS_TO_SECS(PM_WDOG_TIME_SET),
- };
- 
--static int
--bcm2835_restart(struct notifier_block *this, unsigned long mode, void *cmd)
--{
--	struct bcm2835_wdt *wdt = container_of(this, struct bcm2835_wdt,
--					       restart_handler);
--	u32 val;
--
--	/* use a timeout of 10 ticks (~150us) */
--	writel_relaxed(10 | PM_PASSWORD, wdt->base + PM_WDOG);
--	val = readl_relaxed(wdt->base + PM_RSTC);
--	val &= PM_RSTC_WRCFG_CLR;
--	val |= PM_PASSWORD | PM_RSTC_WRCFG_FULL_RESET;
--	writel_relaxed(val, wdt->base + PM_RSTC);
--
--	/* No sleeping, possibly atomic. */
--	mdelay(1);
--
--	return 0;
--}
--
- /*
-  * We can't really power off, but if we do the normal reset scheme, and
-  * indicate to bootcode.bin not to reboot, then most of the chip will be
-@@ -163,7 +167,7 @@ static void bcm2835_power_off(void)
- 	writel_relaxed(val, wdt->base + PM_RSTS);
- 
- 	/* Continue with normal reset mechanism */
--	bcm2835_restart(&wdt->restart_handler, REBOOT_HARD, NULL);
-+	__bcm2835_restart(wdt);
- }
- 
- static int bcm2835_wdt_probe(struct platform_device *pdev)
-@@ -208,9 +212,6 @@ static int bcm2835_wdt_probe(struct platform_device *pdev)
- 		return err;
- 	}
- 
--	wdt->restart_handler.notifier_call = bcm2835_restart;
--	wdt->restart_handler.priority = 128;
--	register_restart_handler(&wdt->restart_handler);
- 	if (pm_power_off == NULL)
- 		pm_power_off = bcm2835_power_off;
- 
-@@ -222,7 +223,6 @@ static int bcm2835_wdt_remove(struct platform_device *pdev)
- {
- 	struct bcm2835_wdt *wdt = platform_get_drvdata(pdev);
- 
--	unregister_restart_handler(&wdt->restart_handler);
- 	if (pm_power_off == bcm2835_power_off)
- 		pm_power_off = NULL;
- 	watchdog_unregister_device(&bcm2835_wdt_wdd);
+-Kees
+
 -- 
-2.7.4
+Kees Cook
+Nexus Security
