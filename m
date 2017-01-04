@@ -1,46 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Jan 2017 17:33:52 +0000
-Subject: [Patch v2 1/2] arm: kernel: Add SMC structure parameter
-In-Reply-To: <1483054046-3327-2-git-send-email-andy.gross@linaro.org>
-References: <1483054046-3327-1-git-send-email-andy.gross@linaro.org>
- <1483054046-3327-2-git-send-email-andy.gross@linaro.org>
-Message-ID: <20170104173352.GO18193@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed,  4 Jan 2017 10:22:28 -0700
+Subject: [PATCH] coresight: etm4x: Fix timestamp configuration when working
+ from perf
+Message-ID: <1483550548-14034-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 29, 2016 at 05:27:25PM -0600, Andy Gross wrote:
-> This patch adds a quirk parameter to the arm_smccc_smc call.  The quirk
-> structure allows for specialized SMC operations due to SoC specific
-> requirements.  The current arm_smccc_smc is renamed and macros are used
-> instead to specify the standard arm_smccc_smc or the arm_smccc_smc_quirk
-> function.
-> 
-> This patch and partial implementation was suggested by Will Deacon.
-> 
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> ---
->  arch/arm/kernel/armksyms.c      |  2 +-
->  arch/arm/kernel/smccc-call.S    |  7 ++++---
->  arch/arm64/kernel/arm64ksyms.c  |  2 +-
->  arch/arm64/kernel/asm-offsets.c |  7 +++++--
->  arch/arm64/kernel/smccc-call.S  |  7 ++++---
->  include/linux/arm-smccc.h       | 28 ++++++++++++++++++++++++----
->  6 files changed, 39 insertions(+), 14 deletions(-)
+When using the ETM4x tracers from the perf interface two trace options are
+available: cycle accurate and timestamp.
 
-[...]
+Enabling the timestamp feature is done by setting TRCCONFIGR.TS (bit 11).
+The position of the timestamp bit in that register coincidentally happens
+to be the same as what was chosen to enable timestamping from the 'mode'
+sysFS entry.  The code does the right thing but the semantic is wrong.
 
-> @@ -101,4 +115,10 @@ asmlinkage void arm_smccc_hvc(unsigned long a0, unsigned long a1,
->  			unsigned long a5, unsigned long a6, unsigned long a7,
->  			struct arm_smccc_res *res);
->  
-> +#define arm_smccc_smc(a0, a1, a2, a3, a4, a5, a6, a7, res) \
-> +	__arm_smccc_smc(a0, a1, a2, a3, a4, a5, a6, a7, res, NULL)
-> +
-> +#define arm_smccc_smc_quirk(a0, a1, a2, a3, a4, a5, a6, a7, res, quirk) \
-> +	__arm_smccc_smc(a0, a1, a2, a3, a4, a5, a6, a7, res, quirk)
+This patch sets TRCCONFIGR.TS explicitly, as it is done from the sysFS
+interface.  That way timestamps are set the same way from both perf and
+sysFS and there is no misunderstanding as to what is intended.
 
-This might be a bit cleaner with a variadic macro, but either way:
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-etm4x.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-
-Will
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index f432febdda49..d1340fb4e457 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -222,7 +222,8 @@ static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
+ 		config->ccctlr = ETM_CYC_THRESHOLD_DEFAULT;
+ 	}
+ 	if (attr->config & BIT(ETM_OPT_TS))
+-		config->cfg |= ETMv4_MODE_TIMESTAMP;
++		/* bit[11], Global timestamp tracing bit */
++		config->cfg |= BIT(11);
+ 
+ out:
+ 	return ret;
+-- 
+2.7.4
