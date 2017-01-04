@@ -1,75 +1,31 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed,  4 Jan 2017 13:35:02 +0000
-Subject: [PATCH 6/6] arm64: dts: db820c: add support to volume up key
+Date: Wed,  4 Jan 2017 13:34:57 +0000
+Subject: [PATCH 1/6] arm64: dts: db820c: fix gpio pinctrl name correctly
 In-Reply-To: <1483536902-21450-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1483536902-21450-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1483536902-21450-7-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1483536902-21450-2-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to volume-up key found on the board.
+Fix typo in node name to reflect the correct pin name.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- .../arm64/boot/dts/qcom/apq8096-db820c-pmic-pins.dtsi | 12 ++++++++++++
- arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi          | 19 +++++++++++++++++++
- 2 files changed, 31 insertions(+)
+ arch/arm64/boot/dts/qcom/apq8096-db820c-pmic-pins.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c-pmic-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c-pmic-pins.dtsi
-index 6c1628c..b1142c4 100644
+index 0de9517..6c1628c 100644
 --- a/arch/arm64/boot/dts/qcom/apq8096-db820c-pmic-pins.dtsi
 +++ b/arch/arm64/boot/dts/qcom/apq8096-db820c-pmic-pins.dtsi
-@@ -12,4 +12,16 @@
- 			power-source = <2>; // PM8994_GPIO_S4, 1.8V
- 		};
- 	};
-+
-+	volume_up_gpio: pm8996_gpio2 {
-+		pinconf {
-+			pins = "gpio2";
-+			function = "normal";
-+			input-enable;
-+			drive-push-pull;
-+			bias-pull-up;
-+			qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
-+			power-source = <PM8994_GPIO_S4>; // 1.8V
-+		};
-+	};
- };
-diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-index 422959b..d2196fc 100644
---- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-@@ -15,6 +15,8 @@
- #include "pm8994.dtsi"
- #include "apq8096-db820c-pins.dtsi"
- #include "apq8096-db820c-pmic-pins.dtsi"
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
+@@ -5,7 +5,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&ls_exp_gpio_f>;
  
- / {
- 	aliases {
-@@ -87,4 +89,21 @@
- 			status = "okay";
- 		};
- 	};
-+
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		autorepeat;
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&volume_up_gpio>;
-+
-+		button at 0 {
-+			label = "Volume Up";
-+			linux,code = <KEY_VOLUMEUP>;
-+			gpios = <&pm8994_gpios 2 GPIO_ACTIVE_LOW>;
-+		};
-+	};
- };
+-	ls_exp_gpio_f: pm8916_mpp4 {
++	ls_exp_gpio_f: pm8994_gpio5 {
+ 		pinconf {
+ 			pins = "gpio5";
+ 			output-low;
 -- 
 2.10.1
