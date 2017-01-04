@@ -1,57 +1,37 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 4 Jan 2017 17:58:22 +0000
-Subject: [PATCH v6 08/14] ACPI: ARM64: IORT: rework iort_node_get_id()
-In-Reply-To: <1483363905-2806-9-git-send-email-hanjun.guo@linaro.org>
-References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
- <1483363905-2806-9-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20170104175822.GD8604@red-moon>
+From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
+Date: Wed, 04 Jan 2017 12:48:20 -0500
+Subject: [PATCH 3/8] ARM: dts: armada-388-clearfog: Utilize new DSA binding
+In-Reply-To: <20170104174248.GG5517@lunn.ch>
+References: <20170102022249.10657-1-f.fainelli@gmail.com>
+ <20170102022249.10657-4-f.fainelli@gmail.com>
+ <87shoyeo2j.fsf@free-electrons.com>
+ <5a40436a-ebad-8a94-c5c5-546ba33ba545@gmail.com>
+ <87fuky7mjt.fsf@weeman.i-did-not-set--mail-host-address--so-tickle-me>
+ <20170104174248.GG5517@lunn.ch>
+Message-ID: <87bmvmvhqz.fsf@weeman.i-did-not-set--mail-host-address--so-tickle-me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2017 at 09:31:39PM +0800, Hanjun Guo wrote:
-> iort_node_get_id() has two output, one is the mapped ids,
-> the other is the referenced parent node which is returned
-> from the function.
-> 
-> For now we need a API just return its parent node for
-> single mapping, so just update this function slightly then
-> reuse it later.
+Hi Andrew,
 
-I think we need to fix iort_node_get_id() first though, I am referring
-to the index usage in relation to acpi_iort_id_mapping.output_reference
-and related parent pointer retrieval as you reported to me, I am happy
-to send it upstream independently.
+Andrew Lunn <andrew@lunn.ch> writes:
 
-As for this patch it is ok even though we can create an API that
-just retrieve a node parent without fiddling about with passing
-a NULL pointer for the id_out to achieve the same.
+>> That makes me think that we should either remove, or use different
+>> values for the version described in net/dsa/dsa.c:
+>> 
+>>     char dsa_driver_version[] = "0.1";
+>> 
+>> Today this is absolutely useless and erroneous.
+>
+> I think it has been useless for over 9 years.
+
+Do we want to get rid of it, or do we want to have a string version per
+DSA implementation? (old vs. new bindings).
+
+I don't like the actual way to distinguish between the two (grep'ing
+dmesg as Florian shown). Maybe a pr_info in dsa2.c would be enough to
+inform about DSA "v2". What do you guys prefer?
 
 Thanks,
-Lorenzo
 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Majun <majun258@huawei.com>
-> Tested-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/acpi/arm64/iort.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index ab7bae7..bc68d93 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -347,7 +347,8 @@ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
->  	if (map[index].flags & ACPI_IORT_ID_SINGLE_MAPPING) {
->  		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
->  		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
-> -			*id_out = map[index].output_base;
-> +			if (id_out)
-> +				*id_out = map[index].output_base;
->  			return parent;
->  		}
->  	}
-> -- 
-> 1.9.1
-> 
+        Vivien
