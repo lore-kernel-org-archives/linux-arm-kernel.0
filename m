@@ -1,75 +1,25 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Jan 2017 19:14:14 +0000
-Subject: [RFC PATCH 09/10] drivers/perf: Add support for ARMv8.2
- Statistical Profiling Extension
-In-Reply-To: <20170104103713.GH25813@worktop.programming.kicks-ass.net>
-References: <1483467027-14547-1-git-send-email-will.deacon@arm.com>
- <1483467027-14547-10-git-send-email-will.deacon@arm.com>
- <20170104103713.GH25813@worktop.programming.kicks-ass.net>
-Message-ID: <20170104191414.GU18193@arm.com>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Wed, 4 Jan 2017 10:47:09 -0800
+Subject: [PATCH 2/2] mmc: sdhci-iproc: Increase max_blk_size for bcm2835
+In-Reply-To: <87o9zonhoz.fsf@eliezer.anholt.net>
+References: <1483111474-29907-1-git-send-email-stefan.wahren@i2se.com>
+ <1483111474-29907-3-git-send-email-stefan.wahren@i2se.com>
+ <87o9zonhoz.fsf@eliezer.anholt.net>
+Message-ID: <046f69e9-f84c-fbdc-755a-694b6174e90f@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
 
-On Wed, Jan 04, 2017 at 11:37:13AM +0100, Peter Zijlstra wrote:
-> On Tue, Jan 03, 2017 at 06:10:26PM +0000, Will Deacon wrote:
-> > The ARMv8.2 architecture introduces the Statistical Profiling Extension
-> > (SPE). SPE provides a way to configure and collect profiling samples
-> > from the CPU in the form of a trace buffer, which can be mapped directly
-> > into userspace using the perf AUX buffer infrastructure.
-> > 
-> > This patch adds support for SPE in the form of a new perf driver.
-> > 
-> 
-> Can you give a little high level overview of what exactly SPE is?
 
-Sure, I can try, although there is no public documentation yet so it's a
-bit fiddly.
-
-SPE can be used to profile a population of operations in the CPU pipeline
-after instruction decode. These are either architected instructions (i.e.
-a dynamic instruction trace) or CPU-specific uops and the choice is fixed
-statically in the hardware and advertised to userspace via caps/. Sampling
-is controlled using a sampling interval, similar to a regular PMU counter,
-but also with an optional random perturbation to avoid falling into patterns
-where you continuously profile the same instruction in a hot loop.
-
-After each operation is decoded, the interval counter is decremented. When
-it hits zero, an operation is chosen for profiling and tracked within the
-pipeline until it retires. Along the way, information such as TLB lookups,
-cache misses, time spent to issue etc is captured in the form of a sample.
-The sample is then filtered according to certain criteria (e.g. load
-latency) that can be specified in the event config (described under
-format/) and, if the sample satisfies the filter, it is written out to
-memory as a record, otherwise it is discarded. Only one operation can
-be sampled at a time.
-
-The in-memory buffer is linear and virtually addressed, raising an
-interrupt when it fills up. The PMU driver handles these interrupts to
-give the appearance of a ring buffer, as expected by the AUX code.
-
-The in-memory trace-like format is self-describing (though not parseable
-in reverse) and written as a series of records, with each record
-corresponding to a sample and consisting of a sequence of packets. These
-packets are defined by the architecture, although some have CPU-specific
-fields for recording information specific to the microarchitecture.
-
-As a simple example, a record generated for a branch instruction may
-consist of the following packets:
-
-  0 (Address) : Virtual PC of the branch instruction
-  1 (Type)    : Conditional direct branch
-  2 (Counter) : Number of cycles taken from Dispatch to Issue
-  3 (Address) : Virtual branch target + condition flags
-  4 (Counter) : Number of cycles taken from Dispatch to Complete
-  5 (Events)  : Mispredicted as not-taken
-  6 (END)     : End of record
-
-You can also toggle things like timestamp packets in each record.
-
-Since SPE is an optional extension to the architecture, I'm sure there
-will be big.LITTLE systems where only one of the clusters has SPE support,
-so the driver is slightly complicated by handling that.
-
-Will
+On 17-01-03 10:04 AM, Eric Anholt wrote:
+> Stefan Wahren <stefan.wahren@i2se.com> writes:
+>
+>> According to the BCM2835 datasheet the maximum block size for the
+>> eMMC module is restricted to the internal data FIFO which is 1024 byte.
+>> But this is still an improvement to the default of 512 byte.
+>
+> Confirmed that the internal FIFOs are 1k.
+>
+> Reviewed-by: Eric Anholt <eric@anholt.net>
+>
+Acked-by: Scott Branden <scott.branden@broadcom.com>
