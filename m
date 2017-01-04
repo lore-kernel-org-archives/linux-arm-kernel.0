@@ -1,58 +1,59 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 04 Jan 2017 10:16:06 -0800
-Subject: [PATCH 1/2] mmc: sdhci-iproc: Apply caps from bcm2835-mmc driver
-In-Reply-To: <1751352115.251342.1483474996021@email.1und1.de>
-References: <1483111474-29907-1-git-send-email-stefan.wahren@i2se.com>
- <1483111474-29907-2-git-send-email-stefan.wahren@i2se.com>
- <87lgusngn7.fsf@eliezer.anholt.net>
- <1751352115.251342.1483474996021@email.1und1.de>
-Message-ID: <871swi8zdl.fsf@eliezer.anholt.net>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 4 Jan 2017 10:39:05 -0800
+Subject: arm64: virt_to_page() does not return right page for a kernel
+ image address
+In-Reply-To: <20170104121326.GA28876@e104818-lin.cambridge.arm.com>
+References: <CAHB_GuqqXqVu4i4eCZ3V_d8JbdSO6rjWpA_B0NMJsNc_Zw0Niw@mail.gmail.com>
+ <20170104121326.GA28876@e104818-lin.cambridge.arm.com>
+Message-ID: <322d61f1-0b72-6125-f5cd-153e0baad733@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+On 01/04/2017 04:13 AM, Catalin Marinas wrote:
+> On Wed, Jan 04, 2017 at 11:19:38AM +0530, Pratyush Anand wrote:
+>> I noticed that on arm64 kmap_atomic() does not return correct address
+>> corresponding to a page located in data section. It causes crash in
+>> kdump kernel with v29 kdump patches. crash happens in a newly
+>> implemented crypto test [1], and the same test fails(even though it
+>> does not crash) in 1st kernel as well.
+>>
+>> Further debugging showed that the physical address returned by
+>> virt_to_phys(kaddr)  and virt_to_phys(kmap_atomic(virt_to_page(kaddr))
+>> + offset_in_page(kaddr)) are not same.
+>>
 
-> Hi Eric,
->
->> Eric Anholt <eric@anholt.net> hat am 3. Januar 2017 um 19:27 geschrieben:
->> 
->> 
->> Stefan Wahren <stefan.wahren@i2se.com> writes:
->> 
->> > Since the mmc module on bcm2835 neither provide a capabilities register nor 
->> > free documentation we must rely on the downstream implementation [1].
->> 
->> Yeah, caps reg is wired to 0, but it can do high speed.
->> 
->> Since we're VDD_330 only, I'm not sure the driver type flags do
->> anything, but I'm still good with having consistency.
->
-> yes, the driver type flags currently have no benefit.
->
->> 
->> Reviewed-by: Eric Anholt <eric@anholt.net>
->> 
->> Interested in porting over the DMA support? :)
->
-> AFAIK the sdhci doesn't support external DMA (required for bcm2835).
-> So DMA support would result in a new driver, which i'm currently not interested.
->
-> But i've prepared a fixup patch series for the sdhost driver i want to send to Gerd.
->
->> 
->> I also noticed that the emmc wrapper module claims it can run with a
->> clock from 50-100mhz, and the arasan says it can run at up to 50, 52, or
->> 208mhz depending on SD/MMC mode.  Could we get a boost from running the
->> module at a higher clock rate?
->
-> Sorry, i can't follow. Do you mean DDR mode?
+I think the underlying issue has been resolved but in general, relying
+on virt_to_phys(kmap_atomic(page)) to work at all doesn't seem
+correct. On arm64 and other !CONFIG_HIGHMEM systems this currently
+returns the page_address but if it's actually remapped this isn't
+going to work.
 
-Apparently I what I was reading about was SDR104 mode, which also
-requires 1.8V.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170104/2cf80251/attachment.sig>
+>> Mark Rutland thinks(IRC :#armlinux) that _virt_to_pgoff *only* handles
+>> linear addresses, and not kernel image addresses. However, we have to
+>> ask if it should?
+> 
+> It looks like we have a different behaviour for virt_to_page() depending
+> on whether CONFIG_SPARSEMEM_VMEMMAP is defined.
+> 
+
+Yes, and I think the !CONFIG_SPARSEMEM_VMEMMAP is doing the correct
+thing.
+
+> We've had some discussions about a month ago on whether we should allow
+> virt_to_phys() on kernel addresses and requiring that __pa_symbol() is
+> used instead but I forgot on what the decision was (if any). It seems
+> that we have other cases as well that need to be addressed, in which
+> case it may be better to simply allow virt_to_page/phys on kernel
+> symbols.
+> 
+
+So far we've been able to enforce virt_to_phys to be used only on
+linear addresses and require __pa_symbol be used on kernel image symbols.
+This may change once CONFIG_DEBUG_VIRTUAL gets more testing though.
+
+This really needs to be documented somewhere though. I've added this
+to my TODO list along with generally documenting some of the
+virt<->phys<->page since none of that is well specified anywhere.
+
+Thanks,
+Laura
