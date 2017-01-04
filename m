@@ -1,257 +1,130 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 4 Jan 2017 10:37:57 +0800
-Subject: [PATCH 3/5] arm64: dts: sun50i: add MMC nodes
-In-Reply-To: <6e90ad76-8f25-538a-433e-ab31e8fab526@arm.com>
-References: <1483398226-29321-1-git-send-email-andre.przywara@arm.com>
- <1483398226-29321-4-git-send-email-andre.przywara@arm.com>
- <CAGb2v65GJFTnQZtWHCS7CAtA+Dry94o77aakPLr938BpQksLog@mail.gmail.com>
- <d4c2233c-95aa-4d72-1501-9ecb62f6cd82@arm.com>
- <CAGb2v65GAvyDn1oMXy2cpOD5PFRoYYOk-VbsMPAX3SNFz2ukLg@mail.gmail.com>
- <6e90ad76-8f25-538a-433e-ab31e8fab526@arm.com>
-Message-ID: <CAGb2v65hmQPdt6tG9vx2Bfw0Y8zH+mYojdYUKtb1zPona2efLw@mail.gmail.com>
+From: hongtao.jia@nxp.com (Jia Hongtao)
+Date: Wed, 4 Jan 2017 10:36:25 +0800
+Subject: [PATCH V3] arm64: dts: ls1046a: Add TMU device tree support
+Message-ID: <1483497385-22121-1-git-send-email-hongtao.jia@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 4, 2017 at 8:22 AM, Andr? Przywara <andre.przywara@arm.com> wrote:
-> On 03/01/17 13:28, Chen-Yu Tsai wrote:
->> On Tue, Jan 3, 2017 at 6:48 PM, Andr? Przywara <andre.przywara@arm.com> wrote:
->>> On 03/01/17 02:52, Chen-Yu Tsai wrote:
->
-> Hi Chen-Yu,
->
->>>> On Tue, Jan 3, 2017 at 7:03 AM, Andre Przywara <andre.przywara@arm.com> wrote:
->>>>
->>>> A commit message explaining the mmc controllers would be nice.
->>>
->>> OK.
->>>
->>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>>>> ---
->>>>>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 67 +++++++++++++++++++++++++++
->>>>>  1 file changed, 67 insertions(+)
->>>>>
->>>>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>>>> index e0dcab8..c680566 100644
->>>>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>>>> @@ -150,6 +150,32 @@
->>>>>                                 pins = "PB8", "PB9";
->>>>>                                 function = "uart0";
->>>>>                         };
->>>>> +
->>>>> +                       mmc0_pins: mmc0 at 0 {
->>>>> +                               pins = "PF0", "PF1", "PF2", "PF3", "PF4", "PF5";
->>>>> +                               function = "mmc0";
->>>>> +                               drive-strength = <30>;
->>>>> +                       };
->>>>> +
->>>>> +                       mmc0_default_cd_pin: mmc0_cd_pin at 0 {
->>>>> +                               pins = "PF6";
->>>>> +                               function = "gpio_in";
->>>>> +                               bias-pull-up;
->>>>> +                       };
->>>>
->>>> We are starting to drop pinmux nodes for gpio usage.
->>>
->>> And replacing them with what?
->>> Or do you mean they go in the individual board .dts files?
->>> In this case I believe having a default pin defined here would help to
->>> define it in every .dts.
->>
->> Nope. I meant dropping them. Pinmux and gpio are orthogonal. One should not
->> need to specify a gpio pinmux to use it as a gpio. We added them because in
->> the past nothing was preventing someone from claiming an already muxed pin
->> as a gpio. On some platforms this is fine. For sunxi, this breaks the system,
->> as the gpio functions are muxed in.
->>
->> The idea moving forward is that these cases should be guarded in the driver.
->
-> Ah, OK, you mean just referencing the pin like:
->         cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
-> in the board DT is enough? And the driver claiming it will (eventually?)
-> prevent users from using them via the sysfs interface then?
+Also add nodes and properties for thermal management support.
 
-cd-gpios = ....
+Signed-off-by: Jia Hongtao <hongtao.jia@nxp.com>
+---
+Changes for V3:
+* Update the subject title according to Shawn Guo's comment.
+* Fix some style issue.
 
-should be enough to block other devices from claiming a pinmux (pinctrl-N = ...)
-on the same pin, or vice versa, whichever claimed it first in kernel space.
+Changes for V2:
+* Update the subject title according to Shawn Guo's comment.
+* Add comments for calibration data groups.
+* Update "thermal-zones" property in a unified style with platform dts.
 
-Same goes for a pin already claimed by a device through a pinmux. It should
-not be claimable as a gpio through the sysfs interface.
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 80 ++++++++++++++++++++++++++
+ 1 file changed, 80 insertions(+)
 
->> Of course we would have to deal with existing dtbs, but lets not add any more.
->>
->>>>> +
->>>>> +                       mmc1_pins: mmc1 at 0 {
->>>>> +                               pins = "PG0", "PG1", "PG2", "PG3", "PG4", "PG5";
->>>>> +                               function = "mmc1";
->>>>> +                               drive-strength = <30>;
->>>>> +                       };
->>>>> +
->>>>> +                       mmc2_pins: mmc2 at 0 {
->>>>> +                               pins = "PC1", "PC5", "PC6", "PC8", "PC9",
->>>>> +                                      "PC10", "PC11", "PC12", "PC13", "PC14",
->>>>> +                                      "PC15", "PC16";
->>>>> +                               function = "mmc2";
->>>>> +                               drive-strength = <30>;
->>>>> +                       };
->>>>
->>>> Moreover I think you should split out the pinmux nodes to a separate patch.
->>>
->>> I can surely do, just wondering what's the rationale is behind that?
->>
->> More or less the "do one thing in one patch" rationale. Of course you can
->> claim these are the defaults used in the reference design and pretty much
->> every board out there. Then it makes sense to do them together. :)
->
-> Mmmh, probably a misunderstanding, but:
-> Those pins are the possible pins that expose the MMC interface. Those
-> nodes here name them to allow easy and concise reference by a board DT
-> (as in the following patch).
-> And in fact in case of the A64 there are _no_ alternative muxes for the
-> three MMC controllers: SDC0 is only on PF0-5, SDC1 on PG0-PG5 and SDC2
-> on PC1-PC16.
-> So it's not a board design question, apart from using a controller or not.
->
-> That's why I rather keep them together with the MMC controller nodes.
-
-Cool. Please mention this in the commit log, as in they are the only
-possible choice.S ince they are the only choices, please drop the @0
-in the node name.
-
-And you might want to rename mmc2_pins to something like
-"mmc2_8bit_pins: mmc2_8bit". Who knows, someone might consider using
-it for an SD card or SDIO, and the remaining pins for something else.
-
->>>>
->>>>>                 };
->>>>>
->>>>>                 uart0: serial at 1c28000 {
->>>>> @@ -240,6 +266,47 @@
->>>>>                         #size-cells = <0>;
->>>>>                 };
->>>>>
->>>>> +               mmc0: mmc at 1c0f000 {
->>>>> +                       compatible = "allwinner,sun50i-a64-mmc",
->>>>> +                                    "allwinner,sun5i-a13-mmc";
->>>>
->>>> Given that sun5i doesn't support mmc delay timings, and the A64 has
->>>> calibration and delay timings, I wouldn't call them compatible.
->>>>
->>>> Or are you claiming that for the A64 has a delay of 0 for the
->>>> currently supported speeds, so the calibration doesn't really
->>>> matter? If so this should be mentioned in the commit message.
->>>
->>> Yes, that's my observation: Driving it with sun5-a13-mmc just works.
->>> This sun5i driver version does not (and will never) support higher
->>> transfer modes anyway, so for that subset they are compatible. This
->>> opens up the door to other operating systems not having a particular
->>> driver for the A64, for instance, also older Linux kernels.
->>> I know that sunxi doesn't use this compatible feature much, but IMHO we
->>> should really start thinking about the DT not just being Linux specific
->>> - or even being specific to a certain Linux version. And this case here
->>> is a good example: An A13 MMC driver can drive this device - if there is
->>> no better driver (an A64 one) available.
->>
->> Cool. Please put this in the commit log. :)
->
-> Noted for a repost.
->
->>>
->>>>
->>>>> +                       reg = <0x01c0f000 0x1000>;
->>>>> +                       clocks = <&ccu 31>, <&ccu 75>;
->>>>
->>>> The clock / reset index macros are in the tree now.
->>>> Please switch to them.
->>>
->>> The include file is in the tree, but it isn't used in the current HEAD
->>> (as in #included and the actual macros being used in the .dtsi).
->>> So I was wondering if there is a patch pending for that?
->>
->> Not yet I think. Perhaps Maxime will do one once he gets back from vacation?
->
-> Seems like everybody hopes for it and nobody bothers with this rather
-> trivial patch ;-)
-
-A bit of context here. This was changed _after_ the A64 patches were
-pulled into arm-soc, by the arm-soc maintainers, to avoid ugly cross
-tree merges. The idea was to change them back after -rc1. I don't know
-if a patch to do that is ready though.
-
-> Frankly I am not overly keen on having all those defines in the DTs,
-> which rely on a bunch of include files scattered over the Linux include
-> tree. This makes it unnecessarily complicated to compile this out of
-> tree or move it over to some other piece of software (other OS, U-Boot).
-> Also it gives people the impression that it's fine to change the
-> definition in the include file at will (because it looks like Linux
-> territory).
-
-The dt-bindings related header files are split into a separate directory.
-They are also included in the separate devicetree repository:
-
-    https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/
-
-And no, I don't think it implies that it's fine to change it. The
-include/dt-bindings/ subdirectory is part of the device tree bindings,
-just like Documentation/devicetree/bindings. Does the latter give the
-impression that it is fine to change it, because it's in the docs?
-
-> Eventually some file has to hold the actual hardware information, I
-> don't see why this shouldn't be the one .dtsi file. Reading that the
-> clock for MMC controller 0 is MMC0_CLK isn't very informative.
-
-For me, it makes it much easier to review, than say a plain number,
-which I would have to dig through some file, probably the clock driver,
-to check if it matches.
-
-Regards
-ChenYu
-
-> Cheers,
-> Andre.
->
->>>>> +                       clock-names = "ahb", "mmc";
->>>>> +                       resets = <&ccu 8>;
->>>>> +                       reset-names = "ahb";
->>>>> +                       interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
->>>>> +                       status = "disabled";
->>>>> +                       #address-cells = <1>;
->>>>> +                       #size-cells = <0>;
->>>>> +               };
->>>>> +
->>>>> +               mmc1: mmc at 1c10000 {
->>>>> +                       compatible = "allwinner,sun50i-a64-mmc",
->>>>> +                                    "allwinner,sun5i-a13-mmc";
->>>>> +                       reg = <0x01c10000 0x1000>;
->>>>> +                       clocks = <&ccu 32>, <&ccu 76>;
->>>>> +                       clock-names = "ahb", "mmc";
->>>>> +                       resets = <&ccu 9>;
->>>>> +                       reset-names = "ahb";
->>>>> +                       interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
->>>>> +                       status = "disabled";
->>>>> +                       #address-cells = <1>;
->>>>> +                       #size-cells = <0>;
->>>>> +               };
->>>>> +
->>>>> +               mmc2: mmc at 1c11000 {
->>>>> +                       compatible = "allwinner,sun50i-a64-emmc";
->>>>> +                       reg = <0x01c11000 0x1000>;
->>>>> +                       clocks = <&ccu 33>, <&ccu 77>;
->>>>> +                       clock-names = "ahb", "mmc";
->>>>> +                       resets = <&ccu 10>;
->>>>> +                       reset-names = "ahb";
->>>>> +                       interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
->>>>> +                       status = "disabled";
->>>>> +                       #address-cells = <1>;
->>>>> +                       #size-cells = <0>;
->>>>> +               };
->>>>> +
->>>>>                 gic: interrupt-controller at 1c81000 {
->>>>>                         compatible = "arm,gic-400";
->>>>>                         reg = <0x01c81000 0x1000>,
->>>>> --
->>>>> 2.8.2
->>>>>
->>>
->
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+index 38806ca..4a164b8 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+@@ -45,6 +45,7 @@
+  */
+ 
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/thermal/thermal.h>
+ 
+ / {
+ 	compatible = "fsl,ls1046a";
+@@ -67,6 +68,7 @@
+ 			clocks = <&clockgen 1 0>;
+ 			next-level-cache = <&l2>;
+ 			cpu-idle-states = <&CPU_PH20>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+@@ -279,6 +281,84 @@
+ 			clocks = <&sysclk>;
+ 		};
+ 
++		tmu: tmu at 1f00000 {
++			compatible = "fsl,qoriq-tmu";
++			reg = <0x0 0x1f00000 0x0 0x10000>;
++			interrupts = <0 33 0x4>;
++			fsl,tmu-range = <0xb0000 0x9002a 0x6004c 0x30062>;
++			fsl,tmu-calibration =
++				/* Calibration data group 1 */
++				<0x00000000 0x00000026
++				0x00000001 0x0000002d
++				0x00000002 0x00000032
++				0x00000003 0x00000039
++				0x00000004 0x0000003f
++				0x00000005 0x00000046
++				0x00000006 0x0000004d
++				0x00000007 0x00000054
++				0x00000008 0x0000005a
++				0x00000009 0x00000061
++				0x0000000a 0x0000006a
++				0x0000000b 0x00000071
++				/* Calibration data group 2 */
++				0x00010000 0x00000025
++				0x00010001 0x0000002c
++				0x00010002 0x00000035
++				0x00010003 0x0000003d
++				0x00010004 0x00000045
++				0x00010005 0x0000004e
++				0x00010006 0x00000057
++				0x00010007 0x00000061
++				0x00010008 0x0000006b
++				0x00010009 0x00000076
++				/* Calibration data group 3 */
++				0x00020000 0x00000029
++				0x00020001 0x00000033
++				0x00020002 0x0000003d
++				0x00020003 0x00000049
++				0x00020004 0x00000056
++				0x00020005 0x00000061
++				0x00020006 0x0000006d
++				/* Calibration data group 4 */
++				0x00030000 0x00000021
++				0x00030001 0x0000002a
++				0x00030002 0x0000003c
++				0x00030003 0x0000004e>;
++			big-endian;
++			#thermal-sensor-cells = <1>;
++		};
++
++		thermal-zones {
++			cpu_thermal: cpu-thermal {
++				polling-delay-passive = <1000>;
++				polling-delay = <5000>;
++				thermal-sensors = <&tmu 3>;
++
++				trips {
++					cpu_alert: cpu-alert {
++						temperature = <85000>;
++						hysteresis = <2000>;
++						type = "passive";
++					};
++
++					cpu_crit: cpu-crit {
++						temperature = <95000>;
++						hysteresis = <2000>;
++						type = "critical";
++					};
++				};
++
++				cooling-maps {
++					map0 {
++						trip = <&cpu_alert>;
++						cooling-device =
++							<&cpu0 THERMAL_NO_LIMIT
++							THERMAL_NO_LIMIT>;
++					};
++				};
++			};
++		};
++
+ 		dspi: dspi at 2100000 {
+ 			compatible = "fsl,ls1021a-v1.0-dspi";
+ 			#address-cells = <1>;
+-- 
+2.1.0.27.g96db324
