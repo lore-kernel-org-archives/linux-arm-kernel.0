@@ -1,39 +1,34 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Wed, 4 Jan 2017 13:54:09 -0800
-Subject: [PATCH v3 0/4] ARM: K2G: Add support for TI-SCI Generic PM Domains
-In-Reply-To: <20170104205536.15963-1-d-gerlach@ti.com>
-References: <20170104205536.15963-1-d-gerlach@ti.com>
-Message-ID: <6fc7a6cb-1856-1377-b00c-8166dbb23ea2@oracle.com>
+From: jonathan.richardson@broadcom.com (Jonathan Richardson)
+Date: Wed, 4 Jan 2017 13:58:01 -0800
+Subject: [PATCH v1 1/4] dt-bindings: Document Broadcom iProc mailbox
+ controller driver
+In-Reply-To: <CABb+yY2-M29qkrctNZfV1eJJzOguKkTTn5KfhdAHQ2aixCyU_A@mail.gmail.com>
+References: <1476817238-1226-1-git-send-email-jonathan.richardson@broadcom.com>
+ <1476817238-1226-2-git-send-email-jonathan.richardson@broadcom.com>
+ <CABb+yY2-M29qkrctNZfV1eJJzOguKkTTn5KfhdAHQ2aixCyU_A@mail.gmail.com>
+Message-ID: <39cf1b8d-0ab2-6f21-abf2-b5ba2de9a9b1@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/4/2017 12:55 PM, Dave Gerlach wrote:
-> Hi,
-> This is v3 of the series to add support for TI-SCI Generic PM Domains.
-> Previous versions can be found here:
->
-> v2: https://www.spinics.net/lists/kernel/msg2364612.html
-> v1: http://www.spinics.net/lists/arm-kernel/msg525204.html
->
-> This version is rebased on v4.10-rc2 but is the same as v2 with the
-> exception of patch 2 in which the devicetree binding documentation
-> needed to be updated to show the k2g_pds node should be a child of
-> the pmmc node. Apart from that, the acks provided by Ulf were added
-> to patches 1 and 3.
->
-> Now that the TI-SCI series has been merged [1] this series will be ready
-> to go in with an ack on the DT binding. Rob had raised some questions on
-> the necessity ti,sci-id property but I believe these were properly
-> addressed during the discussion of v2 so hopefully an ack is in order now.
->
-How do you plan to merge this series with below patch ?
 
->   PM / Domains: Add generic data pointer to genpd data struct
-I think this one goes via Rafael's tree. If you want me to merge this
-along with other patches then will need his ack.
 
-Other way is to get that merged first via Rafael's tree and then
-the remainder series.
+On 16-11-16 07:13 PM, Jassi Brar wrote:
+> On Wed, Oct 19, 2016 at 12:30 AM, Jonathan Richardson
+> <jonathan.richardson@broadcom.com> wrote:
+> 
+>> Reviewed-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
+>> Tested-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
+>> Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com>
+>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+>> Reviewed-by: Shreesha Rajashekar <shreesha.rajashekar@broadcom.com>
+>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>> Signed-off-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
+>> ---
+> Wow, heavily endorsed! :)   Some log explaining the node, would have
+> been nice. Especially how mailbox acts as an interrupt controller.
+> 
+I agree. I'll add it to the binding for the suggested new mailbox irq
+controller driver.
 
-Regards,
-Santosh
+> Thanks.
+> 
