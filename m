@@ -1,82 +1,112 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Wed,  4 Jan 2017 13:32:20 +0000
-Subject: [PATCH v5 11/17] iommu/arm-smmu-v3: Implement reserved region get/put
- callbacks
-In-Reply-To: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
-References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1483536746-2725-12-git-send-email-eric.auger@redhat.com>
+Date: Wed,  4 Jan 2017 13:32:09 +0000
+Subject: [PATCH v5 00/17] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
+ reserved regions
+Message-ID: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iommu/arm-smmu: Implement reserved region get/put callbacks
+Following LPC discussions, we now report reserved regions through
+iommu-group sysfs reserved_regions attribute file.
 
-The get() populates the list with the MSI IOVA reserved window.
+Reserved regions are populated through the IOMMU get_resv_region
+callback (former get_dm_regions), now implemented by amd-iommu,
+intel-iommu and arm-smmu:
+- the intel-iommu reports the [0xfee00000 - 0xfeefffff] MSI window
+  as an IOMMU_RESV_NOMAP reserved region.
+- the amd-iommu reports device direct mapped regions, the MSI region
+  and HT regions.
+- the arm-smmu reports the MSI window (arbitrarily located at
+  0x8000000 and 1MB large).
 
-At the moment an arbitray MSI IOVA window is set at 0x8000000
-of size 1MB. This will allow to report those info in iommu-group
-sysfs.
+Unsafe interrupt assignment is tested by enumerating all MSI irq
+domains and checking MSI remapping is supported in the above hierarchy.
+This check is done in case we detect the iommu translates MSI
+(an IOMMU_RESV_MSI window exists). Otherwise the IRQ remapping
+capability is checked at IOMMU level. Obviously this is a defensive
+IRQ safety assessment: Assuming there are several MSI controllers
+in the system and at least one does not implement IRQ remapping,
+the assignment will be considered as unsafe (even if this controller
+is not acessible from the assigned devices).
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
+The series integrates a not officially posted patch from Robin:
+"iommu/dma: Allow MSI-only cookies".
 
----
+Best Regards
 
-v4: creation
----
- drivers/iommu/arm-smmu-v3.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+Eric
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 4d6ec44..6c4111c 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -412,6 +412,9 @@
- /* High-level queue structures */
- #define ARM_SMMU_POLL_TIMEOUT_US	100
- 
-+#define MSI_IOVA_BASE			0x8000000
-+#define MSI_IOVA_LENGTH			0x100000
-+
- static bool disable_bypass;
- module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
- MODULE_PARM_DESC(disable_bypass,
-@@ -1883,6 +1886,29 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
- 	return iommu_fwspec_add_ids(dev, args->args, 1);
- }
- 
-+static void arm_smmu_get_resv_regions(struct device *dev,
-+				      struct list_head *head)
-+{
-+	struct iommu_resv_region *region;
-+	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-+
-+	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
-+					 prot, IOMMU_RESV_MSI);
-+	if (!region)
-+		return;
-+
-+	list_add_tail(&region->list, head);
-+}
-+
-+static void arm_smmu_put_resv_regions(struct device *dev,
-+				      struct list_head *head)
-+{
-+	struct iommu_resv_region *entry, *next;
-+
-+	list_for_each_entry_safe(entry, next, head, list)
-+		kfree(entry);
-+}
-+
- static struct iommu_ops arm_smmu_ops = {
- 	.capable		= arm_smmu_capable,
- 	.domain_alloc		= arm_smmu_domain_alloc,
-@@ -1898,6 +1924,8 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
- 	.domain_get_attr	= arm_smmu_domain_get_attr,
- 	.domain_set_attr	= arm_smmu_domain_set_attr,
- 	.of_xlate		= arm_smmu_of_xlate,
-+	.get_resv_regions	= arm_smmu_get_resv_regions,
-+	.put_resv_regions	= arm_smmu_put_resv_regions,
- 	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
- };
- 
+Git: complete series available at
+https://github.com/eauger/linux/tree/v4.10-rc2-reserved-v5
+
+History:
+
+RFCv4 -> PATCHv5
+- fix IRQ security assessment by looking at irq domain parents
+- check DOMAIN_BUS_FSL_MC_MSI irq domains
+- AMD MSI and HT regions are exposed in iommu group sysfs
+
+RFCv3 -> RFCv4:
+- arm-smmu driver does not register PCI host bridge windows as
+  reserved regions anymore
+- Implement reserved region get/put callbacks also in arm-smmuv3
+- take the iommu_group lock on iommu_get_group_resv_regions
+- add a type field in iommu_resv_region instead of using prot
+- init the region list_head in iommu_alloc_resv_region, also
+  add type parameter
+- iommu_insert_resv_region manage overlaps and sort reserved
+  windows
+- address IRQ safety assessment by enumerating all the MSI irq
+  domains and checking the MSI_REMAP flag
+- update Documentation/ABI/testing/sysfs-kernel-iommu_groups
+
+RFC v2 -> v3:
+- switch to an iommu-group sysfs API
+- use new dummy allocator provided by Robin
+- dummy allocator initialized by vfio-iommu-type1 after enumerating
+  the reserved regions
+- at the moment ARM MSI base address/size is left unchanged compared
+  to v2
+- we currently report reserved regions and not usable IOVA regions as
+  requested by Alex
+
+RFC v1 -> v2:
+- fix intel_add_reserved_regions
+- add mutex lock/unlock in vfio_iommu_type1
+
+
+Eric Auger (17):
+  iommu/dma: Allow MSI-only cookies
+  iommu: Rename iommu_dm_regions into iommu_resv_regions
+  iommu: Add a new type field in iommu_resv_region
+  iommu: iommu_alloc_resv_region
+  iommu: Only map direct mapped regions
+  iommu: iommu_get_group_resv_regions
+  iommu: Implement reserved_regions iommu-group sysfs file
+  iommu/vt-d: Implement reserved region get/put callbacks
+  iommu/amd: Declare MSI and HT regions as reserved IOVA regions
+  iommu/arm-smmu: Implement reserved region get/put callbacks
+  iommu/arm-smmu-v3: Implement reserved region get/put callbacks
+  irqdomain: Add IRQ_DOMAIN_FLAG_MSI_REMAP value
+  irqdomain: irq_domain_check_msi_remap
+  irqchip/gicv3-its: Sets IRQ_DOMAIN_FLAG_MSI_REMAP
+  vfio/type1: Allow transparent MSI IOVA allocation
+  vfio/type1: Check MSI remapping at irq domain level
+  iommu/arm-smmu: Do not advertise IOMMU_CAP_INTR_REMAP anymore
+
+ drivers/iommu/amd_iommu.c        |  54 +++++++++-----
+ drivers/iommu/arm-smmu-v3.c      |  30 +++++++-
+ drivers/iommu/arm-smmu.c         |  30 +++++++-
+ drivers/iommu/dma-iommu.c        | 116 ++++++++++++++++++++++++------
+ drivers/iommu/intel-iommu.c      |  50 +++++++++----
+ drivers/iommu/iommu.c            | 152 ++++++++++++++++++++++++++++++++++++---
+ drivers/irqchip/irq-gic-v3-its.c |   1 +
+ drivers/vfio/vfio_iommu_type1.c  |  34 ++++++++-
+ include/linux/dma-iommu.h        |   7 ++
+ include/linux/iommu.h            |  46 ++++++++----
+ include/linux/irqdomain.h        |   4 ++
+ kernel/irq/irqdomain.c           |  41 +++++++++++
+ 12 files changed, 481 insertions(+), 84 deletions(-)
+
 -- 
 1.9.1
