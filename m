@@ -1,190 +1,51 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Wed, 4 Jan 2017 09:20:01 -0800
-Subject: [PATCH v5 3/4] ARM: Add support for CONFIG_DEBUG_VIRTUAL
-In-Reply-To: <20170104011417.1496-4-f.fainelli@gmail.com>
-References: <edc8eaa2-5414-506c-1dad-f2404ef19c81@gmail.com>
- <20170104011417.1496-1-f.fainelli@gmail.com>
- <20170104011417.1496-4-f.fainelli@gmail.com>
-Message-ID: <54226b74-85c2-d6c8-6e36-05b840d39734@redhat.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Wed, 4 Jan 2017 17:00:50 +0000
+Subject: [PATCH v4 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
+ stores scenario in vdma
+In-Reply-To: <20170104152613.hhdptwsyg73ev3dz@rob-hp-laptop>
+References: <1483536954-27203-1-git-send-email-appanad@xilinx.com>
+ <1483536954-27203-3-git-send-email-appanad@xilinx.com>
+ <20170104152613.hhdptwsyg73ev3dz@rob-hp-laptop>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A660958@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2017 05:14 PM, Florian Fainelli wrote:
-> x86 has an option: CONFIG_DEBUG_VIRTUAL to do additional checks on
-> virt_to_phys calls. The goal is to catch users who are calling
-> virt_to_phys on non-linear addresses immediately. This includes caller
-> using __virt_to_phys() on image addresses instead of __pa_symbol(). This
-> is a generally useful debug feature to spot bad code (particulary in
-> drivers).
+Hi Rob,
+
+	Thanks for the review....
+
+> On Wed, Jan 04, 2017 at 07:05:53PM +0530, Kedareswara rao Appana wrote:
+> > When VDMA is configured for more than one frame in the h/w for example
+> > h/w is configured for n number of frames and user Submits n number of
+> > frames and triggered the DMA using issue_pending API.
+> > In the current driver flow we are submitting one frame at a time but
+> > we should submit all the n number of frames at one time as the h/w Is
+> > configured for n number of frames.
 > 
-> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> Please fix run-on sentences, capitalization, and word wrapping.
 
-This mostly looks good with a few comments below
+Sure will fix in the next version....
 
-> ---
->  arch/arm/Kconfig              |  1 +
->  arch/arm/include/asm/memory.h | 16 +++++++++++--
->  arch/arm/mm/Makefile          |  1 +
->  arch/arm/mm/physaddr.c        | 55 +++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 71 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm/mm/physaddr.c
+[Snip]
+-- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> > +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> > @@ -66,6 +66,8 @@ Optional child node properties:
+> >  Optional child node properties for VDMA:
+> >  - xlnx,genlock-mode: Tells Genlock synchronization is
+> >  	enabled/disabled in hardware.
+> > +- xlnx,fstore-config: Tells Whether Frame Store Configuration is
+> > +	enabled/disabled in hardware.
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 5fab553fd03a..4700294f4e09 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -2,6 +2,7 @@ config ARM
->  	bool
->  	default y
->  	select ARCH_CLOCKSOURCE_DATA
-> +	select ARCH_HAS_DEBUG_VIRTUAL
->  	select ARCH_HAS_DEVMEM_IS_ALLOWED
->  	select ARCH_HAS_ELF_RANDOMIZE
->  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index bee7511c5098..d90300193adf 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -213,7 +213,7 @@ extern const void *__pv_table_begin, *__pv_table_end;
->  	: "r" (x), "I" (__PV_BITS_31_24)		\
->  	: "cc")
->  
-> -static inline phys_addr_t __virt_to_phys(unsigned long x)
-> +static inline phys_addr_t __virt_to_phys_nodebug(unsigned long x)
->  {
->  	phys_addr_t t;
->  
-> @@ -245,7 +245,7 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
->  #define PHYS_OFFSET	PLAT_PHYS_OFFSET
->  #define PHYS_PFN_OFFSET	((unsigned long)(PHYS_OFFSET >> PAGE_SHIFT))
->  
-> -static inline phys_addr_t __virt_to_phys(unsigned long x)
-> +static inline phys_addr_t __virt_to_phys_nodebug(unsigned long x)
->  {
->  	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
->  }
-> @@ -261,6 +261,16 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
->  	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
->  	 PHYS_PFN_OFFSET)
->  
-> +#define __pa_symbol_nodebug(x)	__virt_to_phys_nodebug((x))
-> +
-> +#ifdef CONFIG_DEBUG_VIRTUAL
-> +extern phys_addr_t __virt_to_phys(unsigned long x);
-> +extern phys_addr_t __phys_addr_symbol(unsigned long x);
-> +#else
-> +#define __virt_to_phys(x)	__virt_to_phys_nodebug(x)
-> +#define __phys_addr_symbol(x)	__pa_symbol_nodebug(x)
-> +#endif
-> +
->  /*
->   * These are *only* valid on the kernel direct mapped RAM memory.
->   * Note: Drivers should NOT use these.  They are the wrong
-> @@ -283,9 +293,11 @@ static inline void *phys_to_virt(phys_addr_t x)
->   * Drivers should NOT use these either.
->   */
->  #define __pa(x)			__virt_to_phys((unsigned long)(x))
-> +#define __pa_symbol(x)		__phys_addr_symbol(RELOC_HIDE((unsigned long)(x), 0))
->  #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
->  #define pfn_to_kaddr(pfn)	__va((phys_addr_t)(pfn) << PAGE_SHIFT)
->  
-> +
+> What's the default (when not present)? That should be the most common case.
+> Looks like the code treats this as bool, but that's not clear here. The name is not
+> clear what it is doing. Enabling or disabling the feature?
 
-Extra blank here
+Default value is zero...
+When this property is present it tells hardware is configured for frame store configuration.
 
->  extern long long arch_phys_to_idmap_offset;
->  
->  /*
-> diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-> index e8698241ece9..b3dea80715b4 100644
-> --- a/arch/arm/mm/Makefile
-> +++ b/arch/arm/mm/Makefile
-> @@ -14,6 +14,7 @@ endif
->  
->  obj-$(CONFIG_ARM_PTDUMP)	+= dump.o
->  obj-$(CONFIG_MODULES)		+= proc-syms.o
-> +obj-$(CONFIG_DEBUG_VIRTUAL)	+= physaddr.o
->  
->  obj-$(CONFIG_ALIGNMENT_TRAP)	+= alignment.o
->  obj-$(CONFIG_HIGHMEM)		+= highmem.o
-> diff --git a/arch/arm/mm/physaddr.c b/arch/arm/mm/physaddr.c
-> new file mode 100644
-> index 000000000000..f10bdcbcb155
-> --- /dev/null
-> +++ b/arch/arm/mm/physaddr.c
-> @@ -0,0 +1,55 @@
-> +#include <linux/bug.h>
-> +#include <linux/export.h>
-> +#include <linux/types.h>
-> +#include <linux/mmdebug.h>
-> +#include <linux/mm.h>
-> +
-> +#include <asm/sections.h>
-> +#include <asm/memory.h>
-> +#include <asm/fixmap.h>
-> +#include <asm/dma.h>
-> +
-> +#include "mm.h"
-> +
-> +static inline bool __virt_addr_valid(unsigned long x)
-> +{
-> +	/* high_memory does not get immediately defined, and there
-> +	 * are early callers of __pa() against PAGE_OFFSET
-> +	 */
+Will fix the explanation part in the next version like below.
+ xlnx,fstore-config: Tells hardware is configured for frame store configuration.
+Is the above explanation clear???
 
-Nit: All the comments in this file should have the text starting on
-the next line after the /*
-
-> +	if (!high_memory && x >= PAGE_OFFSET)
-> +		return true;
-> +
-> +	if (high_memory && x >= PAGE_OFFSET && x < (unsigned long)high_memory)
-> +		return true;
-> +
-> +	/* ARM uses the default per-CPU allocation routing which forces us to
-> +	 * have an explicit check here to avoid a false positive
-> +	 */
-
-This comment isn't fully descriptive, MAX_DMA_ADDRESS could be used in more
-places than just per-CPU allocation. Suggestion:
-
-/*
- * MAX_DMA_ADDRESS is a virtual address that may not correspond to an actual
- * physical address. Enough code relies on __pa(MAX_DMA_ADDRESS) that we just
- * need to work around it and always return true.
- */
-
-> +	if (x == MAX_DMA_ADDRESS)
-> +		return true;
-> +
-> +	return false;
-> +}
-> +
-> +phys_addr_t __virt_to_phys(unsigned long x)
-> +{
-> +	WARN(!__virt_addr_valid(x),
-> +	     "virt_to_phys used for non-linear address: %pK (%pS)\n",
-> +	     (void *)x,
-> +	     (void *)x);
-> +
-> +	return __virt_to_phys_nodebug(x);
-> +}
-> +EXPORT_SYMBOL(__virt_to_phys);
-> +
-> +phys_addr_t __phys_addr_symbol(unsigned long x)
-> +{
-> +	/* This is bounds checking against the kernel image only.
-> +	 * __pa_symbol should only be used on kernel symbol addresses.
-> +	 */
-> +	VIRTUAL_BUG_ON(x < (unsigned long)KERNEL_START ||
-> +		       x > (unsigned long)KERNEL_END);
-> +
-> +	return __pa_symbol_nodebug(x);
-> +}
-> +EXPORT_SYMBOL(__phys_addr_symbol);
-> 
-
-With those comments, you can add
-
-Acked-by: Laura Abbott <labbott@redhat.com>
+Regards,
+Kedar.
