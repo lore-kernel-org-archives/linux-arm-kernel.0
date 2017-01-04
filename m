@@ -1,40 +1,90 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Wed, 4 Jan 2017 11:49:12 +0100
-Subject: [PATCH v3] ARM: dts: turris-omnia: add support for ethernet switch
-In-Reply-To: <20170103193501.4827-1-uwe@kleine-koenig.org>
-References: <20170103152107.GA32450@lunn.ch>
- <20170103193501.4827-1-uwe@kleine-koenig.org>
-Message-ID: <e1dae939-e209-eccc-00df-b996d03cb8db@suse.de>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed,  4 Jan 2017 13:34:14 +0000
+Subject: [PATCH 4/4] ARM: dts: apq8064: Add ADM configuration node
+In-Reply-To: <1483536854-21389-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1483536854-21389-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1483536854-21389-4-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+From: "Ivan T. Ivanov" <ivan.ivanov@linaro.org>
 
-Am 03.01.2017 um 20:35 schrieb Uwe Kleine-K?nig:
-> The Turris Omnia features a Marvell MV88E6176 ethernet switch. Add it to
-> the dts.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+Add Application Data Mover (DMA) device node.
+Connect GSBI6 UARTDM RX and TX channels to it.
 
-It's still not working for me on next-20170104 with this v3.
-Are there any other patches needed?
+Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+---
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |  4 ++++
+ arch/arm/boot/dts/qcom-apq8064.dtsi        | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+)
 
-Should all ports LAN0-LAN4 work with the commented-out second cpu node?
-
-I've been using the WAN port (eth2) just fine. (=eth1 in OpenWrt)
-
-With this patch, eth0 and eth1 are shown as UP by default. If however I
-enslave eth0 and eth1 in a br-lan bridge, as seen under OpenWrt for
-eth0+eth2, then eth1 is DOWN while eth0 remains UP, and br-lan remains
-DOWN. Same issue if I drop eth0 from the bridge - after a reboot eth1 is
-UP but br-lan is still DOWN.
-I had to manually enable CONFIG_BRIDGE, so maybe I'm missing more kernel
-options? Or did you simply not try using a bridge?
-
-Regards,
-Andreas
-
+diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+index 881ce70..eec67cd 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+@@ -234,6 +234,10 @@
+ 			};
+ 		};
+ 
++		adm: dma at 18320000 {
++			status = "okay";
++		};
++
+ 		sata_phy0: phy at 1b400000 {
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index e68a8a1..8a7c325 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -564,6 +564,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			ranges;
++			syscon-tcsr = <&tcsr>;
+ 
+ 			gsbi6_serial: serial at 16540000 {
+ 				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
+@@ -572,6 +573,13 @@
+ 				interrupts = <0 156 0x0>;
+ 				clocks = <&gcc GSBI6_UART_CLK>, <&gcc GSBI6_H_CLK>;
+ 				clock-names = "core", "iface";
++
++				qcom,rx-crci = <11>;
++				qcom,tx-crci = <6>;
++
++				dmas = <&adm 6>, <&adm 7>;
++				dma-names = "rx", "tx";
++
+ 				status = "disabled";
+ 			};
+ 
+@@ -1059,6 +1067,26 @@
+ 			};
+ 		};
+ 
++		adm: dma at 18320000 {
++			compatible = "qcom,adm";
++			reg = <0x18320000 0xE0000>;
++			interrupts = <GIC_SPI 171 IRQ_TYPE_NONE>;
++			#dma-cells = <1>;
++
++			clocks = <&gcc ADM0_CLK>, <&gcc ADM0_PBUS_CLK>;
++			clock-names = "core", "iface";
++
++			resets = <&gcc ADM0_RESET>,
++				 <&gcc ADM0_PBUS_RESET>,
++				 <&gcc ADM0_C0_RESET>,
++				 <&gcc ADM0_C1_RESET>,
++				 <&gcc ADM0_C2_RESET>;
++			reset-names = "clk", "pbus", "c0", "c1", "c2";
++			qcom,ee = <1>;
++
++			status = "disabled";
++		};
++
+ 		tcsr: syscon at 1a400000 {
+ 			compatible = "qcom,tcsr-apq8064", "syscon";
+ 			reg = <0x1a400000 0x100>;
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.10.1
