@@ -1,113 +1,25 @@
-From: clemens.gruber@pqgruber.com (Clemens Gruber)
-Date: Wed, 4 Jan 2017 17:00:24 +0100
-Subject: imx: RS-485 problems during TX, maybe DMA related
-Message-ID: <20170104160024.GA13442@archie.localdomain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Jan 2017 16:44:28 +0100
+Subject: [GIT PULL] DaVinci fixes for v4.10
+In-Reply-To: <20170104121354.8467-1-nsekhar@ti.com>
+References: <20170104121354.8467-1-nsekhar@ti.com>
+Message-ID: <2124849.yfmiIrzMNA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday, January 4, 2017 5:43:54 PM CET Sekhar Nori wrote:
+> This pull request contains fixes for the following issues
+> 
+> 1) Fix two instances of infinite loop occurring in
+>    clock list for DA850. This fixes kernel hangs in some
+>    instances and so have been marked for stable kernel.
+> 
+> 2) Fix for sleeping function called from atomic context
+>    with USB 2.0 clock management code introduced in v4.10
+>    merge window.
+> 
+> 
 
-I observed odd behavior of the current tty/serial/imx.c driver in RS-485
-mode.
+Pulled into fixes, thanks!
 
-RX works fine, but TX does not: When sending data, it arrives multiple
-times and with data from previous transmissions at the end, after a
-delay.
-
-# My setup
-
-Hardware:
-i.MX6Q board with UARTn_RX_DATA, _TX_DATA and _CTS_B connected to a
-RS-485 half-duplex transceiver (Exar SP3082E), pins RXD, TXD and DE
-respectively. (DE is active-high, _CTS_B is inverted on the board)
-I am using an external USB-to-RS-485 converter connected to my PC to
-conduct the tests.
-
-Firmware:
-I tried both the original ROM SDMA scripts and also the RAM scripts from
-Freescale (placed in firmware/imx), but there was no difference, except
-for a DMA transaction error message going away (appeared when writing too
-much data too fast into a device configured with too low baud rate).
-So I switched back to the pure mainline 4.9 kernel with SDMA using the
-scripts from ROM.
-
-Software:
-Mainline Linux 4.9 with serial_rs485 flags: rs485 (SER_RS485_ENABLED),
--rs485rtsonsend (~SER_RS485_RTS_ON_SEND), rs485rtsaftersend and
-rs485rxduringtx. I only enabled rs485rxduringtx, because otherwise it
-would not work at all. But I am still unsure why it is needed for
-half-duplex RS-485.
-
-# The tests
-
-1) On the board: echo A > /dev/ttymxc4
-2) On my PC: A \n A \n appears immediately
-             (about 4s delay)
-             A \n
-             (about 4s delay)
-             A \n
-
-Kernel log on the board:
-[   29.059983] imx-uart 21f4000.serial: TX: prepare to send 2 bytes by DMA.
-[   29.067166] imx-uart 21f4000.serial: we finish the TX DMA.
-[   29.073057] imx-uart 21f4000.serial: TX: prepare to send 4094 bytes by DMA.
-[   33.359405] imx-uart 21f4000.serial: we finish the TX DMA.
-[   33.365173] imx-uart 21f4000.serial: TX: prepare to send 4072 bytes by DMA.
-[   37.603551] imx-uart 21f4000.serial: we finish the TX DMA.
-
-3) On the board: echo B > /dev/ttymxc4
-4) On my PC: B \n B \n appears immediately
-             (about 4s delay)
-             A \n B \n
-             (about 4s delay)
-             A \n B \n
-Kernel log:
-[   66.000296] imx-uart 21f4000.serial: TX: prepare to send 2 bytes by DMA.
-[   66.007110] imx-uart 21f4000.serial: we finish the TX DMA.
-[   66.012841] imx-uart 21f4000.serial: TX: prepare to send 4094 bytes by DMA.
-[   70.297051] imx-uart 21f4000.serial: we finish the TX DMA.
-[   70.302798] imx-uart 21f4000.serial: TX: prepare to send 4072 bytes by DMA.
-[   74.539094] imx-uart 21f4000.serial: we finish the TX DMA.
-
-And so on..
-( If I continue with a echo C > /dev/ttymxc4, the last characters are
-  A \n B \n C )
-
---
-
-To illustrate the behavior, I recorded the signals on the transceiver
-pins with a logic analyzer:
-https://pqgruber.com/rs485_results.png
-I triggered only on the raising and on the falling edge of DE, so I only
-captured the first and the last characters for the first two tests and
-not all three events per test.
-
-I also enabled the DMA debug options in the kernel if that is helpful,
-here is the full log during the two tests:
-https://gist.github.com/clemensg/1ac5ee8a8ea32acc9145c5aa8407aea5
-
---
-
-Do you have an idea, what's wrong here?
-
-Also: If you are using RS-485 with the imx driver on a recent kernel,
-please let me know if it is working for you and if you can reproduce the
-behavior.
-
-Thanks,
-Clemens
-
---
-
-PS:
-
-Because I assumed that the error has something to do with DMA, I
-commented out the call to imx_uart_dma_init.
-Then, transmitting and receiving data over RS-485 works! Verified with
-the logic analyzer and the RS-485-to-USB adapter.
-
-However, if trying to send large amounts of data in a short time,
-sometimes I get an "Unhandled fault: imprecise external abort (0x1406)".
-But the back trace is not very helpful and probably not related
-(it is different every time), the last time I tried, the PC was at
-_raw_spin_unlock_irqrestore, called from hrtimer_start_range_ns.
+	Arnd
