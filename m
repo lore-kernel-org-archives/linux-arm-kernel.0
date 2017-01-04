@@ -1,169 +1,97 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 4 Jan 2017 13:56:39 +0000
-Subject: [PATCH v3] arm64: mm: Fix NOMAP page initialization
-In-Reply-To: <20161216165437.21612-1-rrichter@cavium.com>
-References: <20161216165437.21612-1-rrichter@cavium.com>
-Message-ID: <CAKv+Gu_SmTNguC=tSCwYOL2kx-DogLvSYRZc56eGP=JhdrUOsA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 4 Jan 2017 13:56:44 +0000
+Subject: [PATCH 15/20] ARM/hw_breakpoint: Convert to hotplug state machine
+In-Reply-To: <20170103093335.GA5605@leverpostej>
+References: <20161117183541.8588-1-bigeasy@linutronix.de>
+ <20161117183541.8588-16-bigeasy@linutronix.de>
+ <CACRpkdZE+h0+3EizLCMUr-e-4pv4w9iAatSqL8k0Ovd2iUaS8Q@mail.gmail.com>
+ <CACRpkda2gdjM--LSoJTL0dvqyw796w1hMSAhUQwv9X0EPzJHig@mail.gmail.com>
+ <20170102150015.GJ14217@n2100.armlinux.org.uk>
+ <CACRpkdaxAPSU-XPQrgVRoBecAD1ZpVVP4qPe59af-yy11WqBQw@mail.gmail.com>
+ <20170103093335.GA5605@leverpostej>
+Message-ID: <20170104135644.GA29212@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 December 2016 at 16:54, Robert Richter <rrichter@cavium.com> wrote:
-> On ThunderX systems with certain memory configurations we see the
-> following BUG_ON():
->
->  kernel BUG at mm/page_alloc.c:1848!
->
-> This happens for some configs with 64k page size enabled. The BUG_ON()
-> checks if start and end page of a memmap range belongs to the same
-> zone.
->
-> The BUG_ON() check fails if a memory zone contains NOMAP regions. In
-> this case the node information of those pages is not initialized. This
-> causes an inconsistency of the page links with wrong zone and node
-> information for that pages. NOMAP pages from node 1 still point to the
-> mem zone from node 0 and have the wrong nid assigned.
->
-> The reason for the mis-configuration is a change in pfn_valid() which
-> reports pages marked NOMAP as invalid:
->
->  68709f45385a arm64: only consider memblocks with NOMAP cleared for linear mapping
->
-> This causes pages marked as nomap being no longer reassigned to the
-> new zone in memmap_init_zone() by calling __init_single_pfn().
->
-> Fixing this by implementing an arm64 specific early_pfn_valid(). This
-> causes all pages of sections with memory including NOMAP ranges to be
-> initialized by __init_single_page() and ensures consistency of page
-> links to zone, node and section.
->
+On Tue, Jan 03, 2017 at 09:33:36AM +0000, Mark Rutland wrote:
+> Hi,
+> 
+> On Mon, Jan 02, 2017 at 09:15:29PM +0100, Linus Walleij wrote:
+> > On Mon, Jan 2, 2017 at 4:00 PM, Russell King - ARM Linux
+> > <linux@armlinux.org.uk> wrote:
+> > > On Mon, Jan 02, 2017 at 03:34:32PM +0100, Linus Walleij wrote:
+> > >> in the first line of arch_hw_breakpoint_init() in
+> > >> arch/arm/kernel/hw_breakpoint.c
+> > >>
+> > >> I suspect that is not an accepable solution ...
+> > >>
+> > >> It hangs at PC is at write_wb_reg+0x20c/0x330
+> > >> Which is c03101dc, and looks like this in objdump -d:
+> > >>
+> > >> c031020c:       ee001eba        mcr     14, 0, r1, cr0, cr10, {5}
+> > >> c0310210:       eaffffb3        b       c03100e4 <write_wb_reg+0x114>
+> > >
+> > > ... and this is several instructions after the address you mention above.
+> > > Presumably c03101dc is accessing a higher numbered register?
+> > 
+> > Ah sorry. It looks like this:
+> > 
+> > c03101dc:       ee001ed0        mcr     14, 0, r1, cr0, cr0, {6}
+> > c03101e0:       eaffffbf        b       c03100e4 <write_wb_reg+0x114>
+> > c03101e4:       ee001ebf        mcr     14, 0, r1, cr0, cr15, {5}
+> > c03101e8:       eaffffbd        b       c03100e4 <write_wb_reg+0x114>
+> > c03101ec:       ee001ebe        mcr     14, 0, r1, cr0, cr14, {5}
+> > c03101f0:       eaffffbb        b       c03100e4 <write_wb_reg+0x114>
+> > c03101f4:       ee001ebd        mcr     14, 0, r1, cr0, cr13, {5}
+> > c03101f8:       eaffffb9        b       c03100e4 <write_wb_reg+0x114>
+> 
+> FWIW, I was tracking an issue in this area before the holiday.
+> 
+> It looked like DBGPRSR.SPD is set unexpectedly over the default idle
+> path (i.e. WFI), causing the (otherwise valid) register accesses above
+> to be handled as undefined.
+> 
+> I haven't looked at the patch in detail, but I guess that it allows idle
+> to occur between reset_ctrl_regs() and arch_hw_breakpoint_init().
 
-I like this solution a lot better than the first one, but I am still
-somewhat uneasy about having the kernel reason about attributes of
-pages it should not touch in the first place. But the fact that
-early_pfn_valid() is only used a single time in the whole kernel does
-give some confidence that we are not simply moving the problem
-elsewhere.
+I've just reproduced this locally on my dragonboard APQ8060.
 
-Given that you are touching arch/arm/ as well as arch/arm64, could you
-explain why only arm64 needs this treatment? Is it simply because we
-don't have NUMA support there?
+It looks like the write_wb_reg() call that's exploding is from
+get_max_wp_len(), which we call immediately after registering the
+dbg_reset_online callback. Clearing DBGPRSR.SPD before the write_wb_reg() hides
+the problem, so I suspect we're seeing the issue I mentioned above -- it just
+so happens that we go idle in a new place.
 
-Considering that Hisilicon D05 suffered from the same issue, I would
-like to get some coverage there as well. Hanjun, is this something you
-can arrange? Thanks
+The below hack allows boot to continue, but is not a real fix. I'm not
+immediately sure what to do.
 
+Linus, I wasn't able to get ethernet working. Do I need anything on top
+of v4.10-rc2 && multi_v7_defconfig?
 
-> The HAVE_ARCH_PFN_VALID config option now requires an explicit
-> definiton of early_pfn_valid() in the same way as pfn_valid(). This
-> allows a customized implementation of early_pfn_valid() which
-> redirects to valid_section() for arm64. This is the same as for the
-> generic pfn_valid() implementation.
->
-> v3:
->
->  * Use valid_section() which is the same as the default pfn_valid()
->    implementation to initialize
->  * Added Ack for arm/ changes.
->
-> v2:
->
->  * Use pfn_present() instead of memblock_is_memory() to support also
->    non-memory NOMAP holes
->
-> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
-> ---
->  arch/arm/include/asm/page.h   |  1 +
->  arch/arm64/include/asm/page.h |  2 ++
->  arch/arm64/mm/init.c          | 15 +++++++++++++++
->  include/linux/mmzone.h        |  5 ++++-
->  4 files changed, 22 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
-> index 4355f0ec44d6..79761bd55f94 100644
-> --- a/arch/arm/include/asm/page.h
-> +++ b/arch/arm/include/asm/page.h
-> @@ -158,6 +158,7 @@ typedef struct page *pgtable_t;
->
->  #ifdef CONFIG_HAVE_ARCH_PFN_VALID
->  extern int pfn_valid(unsigned long);
-> +#define early_pfn_valid(pfn)   pfn_valid(pfn)
->  #endif
->
->  #include <asm/memory.h>
-> diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
-> index 8472c6def5ef..17ceb7435ded 100644
-> --- a/arch/arm64/include/asm/page.h
-> +++ b/arch/arm64/include/asm/page.h
-> @@ -49,6 +49,8 @@ typedef struct page *pgtable_t;
->
->  #ifdef CONFIG_HAVE_ARCH_PFN_VALID
->  extern int pfn_valid(unsigned long);
-> +extern int early_pfn_valid(unsigned long);
-> +#define early_pfn_valid early_pfn_valid
->  #endif
->
->  #include <asm/memory.h>
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 212c4d1e2f26..8ff62a7ff634 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -145,11 +145,26 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
->  #endif /* CONFIG_NUMA */
->
->  #ifdef CONFIG_HAVE_ARCH_PFN_VALID
-> +
->  int pfn_valid(unsigned long pfn)
->  {
->         return memblock_is_map_memory(pfn << PAGE_SHIFT);
->  }
->  EXPORT_SYMBOL(pfn_valid);
-> +
-> +/*
-> + * This is the same as the generic pfn_valid() implementation. We use
-> + * valid_section() here to make sure all pages of a section including
-> + * NOMAP pages are initialized with __init_single_page().
-> + */
-> +int early_pfn_valid(unsigned long pfn)
-> +{
-> +       if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
-> +               return 0;
-> +       return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
-> +}
-> +EXPORT_SYMBOL(early_pfn_valid);
-> +
->  #endif
->
->  #ifndef CONFIG_SPARSEMEM
-> diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-> index 0f088f3a2fed..bedcf8a95881 100644
-> --- a/include/linux/mmzone.h
-> +++ b/include/linux/mmzone.h
-> @@ -1170,12 +1170,16 @@ static inline struct mem_section *__pfn_to_section(unsigned long pfn)
->  }
->
->  #ifndef CONFIG_HAVE_ARCH_PFN_VALID
-> +
->  static inline int pfn_valid(unsigned long pfn)
->  {
->         if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
->                 return 0;
->         return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
->  }
-> +
-> +#define early_pfn_valid(pfn)   pfn_valid(pfn)
-> +
->  #endif
->
->  static inline int pfn_present(unsigned long pfn)
-> @@ -1200,7 +1204,6 @@ static inline int pfn_present(unsigned long pfn)
->  #define pfn_to_nid(pfn)                (0)
->  #endif
->
-> -#define early_pfn_valid(pfn)   pfn_valid(pfn)
->  void sparse_init(void);
->  #else
->  #define sparse_init()  do {} while (0)
-> --
-> 2.11.0
->
+Thanks,
+Mark.
+
+---->8----
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index 188180b..a0982ab 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -302,7 +302,7 @@ int hw_breakpoint_slots(int type)
+  */
+ static u8 get_max_wp_len(void)
+ {
+-       u32 ctrl_reg;
++       u32 ctrl_reg, val;
+        struct arch_hw_breakpoint_ctrl ctrl;
+        u8 size = 4;
+ 
+@@ -313,6 +313,9 @@ static u8 get_max_wp_len(void)
+        ctrl.len = ARM_BREAKPOINT_LEN_8;
+        ctrl_reg = encode_ctrl_reg(ctrl);
+ 
++       /* HACK: CLEAR SPD */
++       ARM_DBG_READ(c1, c5, 4, val);
++
+        write_wb_reg(ARM_BASE_WVR, 0);
+        write_wb_reg(ARM_BASE_WCR, ctrl_reg);
+        if ((read_wb_reg(ARM_BASE_WCR) & ctrl_reg) == ctrl_reg)
