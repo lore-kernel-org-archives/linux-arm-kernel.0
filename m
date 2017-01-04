@@ -1,77 +1,42 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed,  4 Jan 2017 13:34:12 +0000
-Subject: [PATCH 2/4] ARM: dts: sd-600eval: add hdmi support
-In-Reply-To: <1483536854-21389-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1483536854-21389-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1483536854-21389-2-git-send-email-srinivas.kandagatla@linaro.org>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Wed,  4 Jan 2017 19:48:10 +0800
+Subject: [PATCH v6 1/5] dt-bindings: zte: documents zx2967 power domain driver
+ bindings
+Message-ID: <1483530494-14177-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- .../arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts | 44 ++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+This patch documents devicetree tree bindings for the ZTE zx2967
+power domain driver.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts b/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
-index 39ae2bc..4e908af 100644
---- a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
-@@ -39,6 +39,17 @@
- 
- 	};
- 
-+	hdmi-out {
-+		compatible = "hdmi-connector";
-+		type = "a";
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+---
+ Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt
+
+diff --git a/Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt b/Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt
+new file mode 100644
+index 0000000..1476318
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt
+@@ -0,0 +1,17 @@
++* ZTE 2967 SoC Power Domains
 +
-+		port {
-+			hdmi_con: endpoint {
-+				remote-endpoint = <&hdmi_out>;
-+			};
-+		};
++2967 processors include support for multiple power domains which are used
++to gate power to one or more peripherals on the processor.
++
++Required Properties:
++- compatible: should be one of the following.
++    * zte,zx296718-pcu - for zx296718 board's power domain.
++- reg: physical base address of the controller and length of memory mapped
++    region.
++
++Example:
++
++	pcu_domain: pcu at 0x00117000 {
++		compatible = "zte,zx296718-pcu";
++		reg = <0x00117000 0x1000>;
 +	};
-+
- 	soc {
- 		rpm at 108000 {
- 			regulators {
-@@ -347,5 +358,38 @@
- 				cd-gpios	= <&tlmm_pinmux 26 GPIO_ACTIVE_HIGH>;
- 			};
- 		};
-+
-+		hdmi-tx at 4a00000 {
-+			status = "okay";
-+			core-vdda-supply = <&pm8921_hdmi_switch>;
-+			hdmi-mux-supply = <&vcc3v3>;
-+
-+			hpd-gpio = <&tlmm_pinmux 72 GPIO_ACTIVE_HIGH>;
-+
-+			ports {
-+				port at 1 {
-+					endpoint {
-+						remote-endpoint = <&hdmi_con>;
-+					};
-+				};
-+			};
-+		};
-+
-+		hdmi-phy at 4a00400 {
-+			status = "okay";
-+			core-vdda-supply = <&pm8921_hdmi_switch>;
-+		};
-+
-+		mdp at 5100000 {
-+			status = "okay";
-+
-+			ports {
-+				port at 3 {
-+					endpoint {
-+						remote-endpoint = <&hdmi_in>;
-+					};
-+				};
-+			};
-+		};
- 	};
- };
 -- 
-2.10.1
+2.7.4
