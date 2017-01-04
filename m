@@ -1,52 +1,21 @@
-From: mike.leach@linaro.org (Mike Leach)
-Date: Wed,  4 Jan 2017 09:47:11 +0000
-Subject: [PATCH v2] coresight: etm4x: Fix enabling of cycle accurate tracing
- in perf.
-Message-ID: <1483523231-23993-1-git-send-email-mike.leach@linaro.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed,  4 Jan 2017 10:55:50 +0100
+Subject: [PATCH 0/2] drm/meson: Fix CVBS initialization
+Message-ID: <1483523752-14705-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using perf record 'cyclacc' option in cs_etm event was not setting up cycle
-accurate trace correctly.
+This serie fixes the CVBS initialization when HDMI is already configured
+by the bootloader and fixes the CVBS vdac disable register values.
 
-Corrects bit set in TRCCONFIGR to enable cycle accurate trace.
-Programs TRCCCCTLR with a valid threshold value as required by ETMv4 spec.
+Neil Armstrong (2):
+  drm/meson: Fix CVBS initialization when HDMI is configured by
+    bootloader
+  drm/meson: Fix CVBS VDAC disable
 
-Signed-off-by: Mike Leach <mike.leach@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etm4x.c | 7 +++++--
- drivers/hwtracing/coresight/coresight-etm4x.h | 1 +
- 2 files changed, 6 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/meson/meson_venc.c      | 19 +++++++++++++++++++
+ drivers/gpu/drm/meson/meson_venc_cvbs.c |  2 +-
+ 2 files changed, 20 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 4db8d6a..c5a65d1 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -216,8 +216,11 @@ static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
- 		goto out;
- 
- 	/* Go from generic option to ETMv4 specifics */
--	if (attr->config & BIT(ETM_OPT_CYCACC))
--		config->cfg |= ETMv4_MODE_CYCACC;
-+	if (attr->config & BIT(ETM_OPT_CYCACC)) {
-+		config->cfg |= BIT(4);
-+		/* TRM: Must program this for cycacc to work */
-+		config->ccctlr = ETM_CYC_THRESHOLD_DEFAULT;
-+	}
- 	if (attr->config & BIT(ETM_OPT_TS))
- 		config->cfg |= ETMv4_MODE_TIMESTAMP;
- 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
-index ba8d3f8..b3b5ea7 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.h
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.h
-@@ -146,6 +146,7 @@
- #define ETM_ARCH_V4			0x40
- #define ETMv4_SYNC_MASK			0x1F
- #define ETM_CYC_THRESHOLD_MASK		0xFFF
-+#define ETM_CYC_THRESHOLD_DEFAULT       0x100
- #define ETMv4_EVENT_MASK		0xFF
- #define ETM_CNTR_MAX_VAL		0xFFFF
- #define ETM_TRACEID_MASK		0x3f
 -- 
-2.7.4
+1.9.1
