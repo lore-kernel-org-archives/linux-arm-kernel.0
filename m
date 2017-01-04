@@ -1,190 +1,61 @@
-From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Wed, 4 Jan 2017 12:24:05 +0530
-Subject: [PATCH v3 1/3] dmaengine: xilinx_dma: Check for channel idle state
- before submitting dma descriptor
-In-Reply-To: <1483512847-25710-1-git-send-email-appanad@xilinx.com>
-References: <1483512847-25710-1-git-send-email-appanad@xilinx.com>
-Message-ID: <1483512847-25710-2-git-send-email-appanad@xilinx.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Wed, 4 Jan 2017 06:57:05 +0000
+Subject: [PATCH v2 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
+ stores scenario in vdma
+In-Reply-To: <a8f5c216-cac0-daf9-a880-3820ae9b5e13@synopsys.com>
+References: <1482483135-14767-1-git-send-email-appanad@xilinx.com>
+ <1482483135-14767-3-git-send-email-appanad@xilinx.com>
+ <a269409d-103e-1650-5df6-cc8743ed62cf@synopsys.com>
+ <C246CAC1457055469EF09E3A7AC4E11A4A65FFE9@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <45807619-bf6a-0174-c102-12c03aeb575c@synopsys.com>
+ <C246CAC1457055469EF09E3A7AC4E11A4A66012C@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <a8f5c216-cac0-daf9-a880-3820ae9b5e13@synopsys.com>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A660647@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add channel idle state to ensure that dma descriptor is not
-submitted when VDMA engine is in progress.
+Hi Jose Miguel Abreu,
 
-Reviewed-by: Jose Abreu <joabreu@synopsys.com>
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
----
-Changes for v3:
----> None.
-Changes for v2:
----> Add idle check in the reset as suggested by Jose Abreu
----> Removed xilinx_dma_is_running/xilinx_dma_is_idle checks
-    in the driver and used common idle checks across the driver
-    as suggested by Laurent Pinchart.
+	Thanks for the review...
 
- drivers/dma/xilinx/xilinx_dma.c | 56 +++++++++++++----------------------------
- 1 file changed, 17 insertions(+), 39 deletions(-)
+> >> If so then there is no race condition, but the HW image that I have
+> >> does not have this register enabled so I was getting this result
+> >> (memory corruption because not all framebuffers had addresses set).
+> > Thanks for the explanation.
+> > Agree the issue that you mentioned won't come when
+> > XILINX_DMA_REG_FRMSTORE
+> > (C_ENABLE_DEBUG_INFO_5 and C_ENABLE_DEBUG_INFO_13) Register is
+> enabled in the IP.
+> > But this register won't get enabled with the default IP configuration
+> (C_ENABLE_DEBUG_INFO_5 and C_ENABLE_DEBUG_INFO_13).
+> >
+> > When user is not enabled XILINX_DMA_REG_FRMSTORE in the h/w and
+> submits frames less than h/w capable.
+> > The solution that I am thinking is to throw an error in the driver
+> > saying that either enable the num frame store feature in the IP or submit the
+> frames up to h/w capable what do you think???
+> 
+> Sounds fine by me.
 
-diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-index 8288fe4..be7eb41 100644
---- a/drivers/dma/xilinx/xilinx_dma.c
-+++ b/drivers/dma/xilinx/xilinx_dma.c
-@@ -321,6 +321,7 @@ struct xilinx_dma_tx_descriptor {
-  * @cyclic: Check for cyclic transfers.
-  * @genlock: Support genlock mode
-  * @err: Channel has errors
-+ * @idle: Check for channel idle
-  * @tasklet: Cleanup work after irq
-  * @config: Device configuration info
-  * @flush_on_fsync: Flush on Frame sync
-@@ -351,6 +352,7 @@ struct xilinx_dma_chan {
- 	bool cyclic;
- 	bool genlock;
- 	bool err;
-+	bool idle;
- 	struct tasklet_struct tasklet;
- 	struct xilinx_vdma_config config;
- 	bool flush_on_fsync;
-@@ -920,32 +922,6 @@ static enum dma_status xilinx_dma_tx_status(struct dma_chan *dchan,
- }
- 
- /**
-- * xilinx_dma_is_running - Check if DMA channel is running
-- * @chan: Driver specific DMA channel
-- *
-- * Return: '1' if running, '0' if not.
-- */
--static bool xilinx_dma_is_running(struct xilinx_dma_chan *chan)
--{
--	return !(dma_ctrl_read(chan, XILINX_DMA_REG_DMASR) &
--		 XILINX_DMA_DMASR_HALTED) &&
--		(dma_ctrl_read(chan, XILINX_DMA_REG_DMACR) &
--		 XILINX_DMA_DMACR_RUNSTOP);
--}
--
--/**
-- * xilinx_dma_is_idle - Check if DMA channel is idle
-- * @chan: Driver specific DMA channel
-- *
-- * Return: '1' if idle, '0' if not.
-- */
--static bool xilinx_dma_is_idle(struct xilinx_dma_chan *chan)
--{
--	return dma_ctrl_read(chan, XILINX_DMA_REG_DMASR) &
--		XILINX_DMA_DMASR_IDLE;
--}
--
--/**
-  * xilinx_dma_halt - Halt DMA channel
-  * @chan: Driver specific DMA channel
-  */
-@@ -966,6 +942,7 @@ static void xilinx_dma_halt(struct xilinx_dma_chan *chan)
- 			chan, dma_ctrl_read(chan, XILINX_DMA_REG_DMASR));
- 		chan->err = true;
- 	}
-+	chan->idle = true;
- }
- 
- /**
-@@ -1007,6 +984,9 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
- 	if (chan->err)
- 		return;
- 
-+	if (!chan->idle)
-+		return;
-+
- 	if (list_empty(&chan->pending_list))
- 		return;
- 
-@@ -1018,13 +998,6 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
- 	tail_segment = list_last_entry(&tail_desc->segments,
- 				       struct xilinx_vdma_tx_segment, node);
- 
--	/* If it is SG mode and hardware is busy, cannot submit */
--	if (chan->has_sg && xilinx_dma_is_running(chan) &&
--	    !xilinx_dma_is_idle(chan)) {
--		dev_dbg(chan->dev, "DMA controller still busy\n");
--		return;
--	}
--
- 	/*
- 	 * If hardware is idle, then all descriptors on the running lists are
- 	 * done, start new transfers
-@@ -1110,6 +1083,7 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
- 		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last->hw.vsize);
- 	}
- 
-+	chan->idle = false;
- 	if (!chan->has_sg) {
- 		list_del(&desc->node);
- 		list_add_tail(&desc->node, &chan->active_list);
-@@ -1136,6 +1110,9 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
- 	if (chan->err)
- 		return;
- 
-+	if (!chan->idle)
-+		return;
-+
- 	if (list_empty(&chan->pending_list))
- 		return;
- 
-@@ -1181,6 +1158,7 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
- 
- 	list_splice_tail_init(&chan->pending_list, &chan->active_list);
- 	chan->desc_pendingcount = 0;
-+	chan->idle = false;
- }
- 
- /**
-@@ -1196,15 +1174,11 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
- 	if (chan->err)
- 		return;
- 
--	if (list_empty(&chan->pending_list))
-+	if (!chan->idle)
- 		return;
- 
--	/* If it is SG mode and hardware is busy, cannot submit */
--	if (chan->has_sg && xilinx_dma_is_running(chan) &&
--	    !xilinx_dma_is_idle(chan)) {
--		dev_dbg(chan->dev, "DMA controller still busy\n");
-+	if (list_empty(&chan->pending_list))
- 		return;
--	}
- 
- 	head_desc = list_first_entry(&chan->pending_list,
- 				     struct xilinx_dma_tx_descriptor, node);
-@@ -1302,6 +1276,7 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
- 
- 	list_splice_tail_init(&chan->pending_list, &chan->active_list);
- 	chan->desc_pendingcount = 0;
-+	chan->idle = false;
- }
- 
- /**
-@@ -1366,6 +1341,7 @@ static int xilinx_dma_reset(struct xilinx_dma_chan *chan)
- 	}
- 
- 	chan->err = false;
-+	chan->idle = true;
- 
- 	return err;
- }
-@@ -1447,6 +1423,7 @@ static irqreturn_t xilinx_dma_irq_handler(int irq, void *data)
- 	if (status & XILINX_DMA_DMASR_FRM_CNT_IRQ) {
- 		spin_lock(&chan->lock);
- 		xilinx_dma_complete_descriptor(chan);
-+		chan->idle = true;
- 		chan->start_transfer(chan);
- 		spin_unlock(&chan->lock);
- 	}
-@@ -2327,6 +2304,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
- 	chan->has_sg = xdev->has_sg;
- 	chan->desc_pendingcount = 0x0;
- 	chan->ext_addr = xdev->ext_addr;
-+	chan->idle = true;
- 
- 	spin_lock_init(&chan->lock);
- 	INIT_LIST_HEAD(&chan->pending_list);
--- 
-2.1.2
+Thanks posted the v3 series please review when you have some time...
+
+Regards,
+Kedar.
+
+> 
+> Best regards,
+> Jose Miguel Abreu
+> 
+> >
+> > Regards,
+> > Kedar.
+> >
+> >> Best regards,
+> >> Jose Miguel Abreu
+> >>
+> >>> Regards,
+> >>> Kedar.
+> >>>
+> >>>> Best regards,
+> >>>> Jose Miguel Abreu
+> >>>>
