@@ -1,54 +1,41 @@
 From: woogyom.kim@gmail.com (Milo Kim)
-Date: Wed,  4 Jan 2017 13:55:52 +0900
-Subject: [PATCH v4 2/3] ARM: dts: imx6: Support Savageboard dual
+Date: Wed,  4 Jan 2017 13:55:53 +0900
+Subject: [PATCH v4 3/3] ARM: dts: imx6: Support Savageboard quad
 In-Reply-To: <20170104045553.26576-1-woogyom.kim@gmail.com>
 References: <20170104045553.26576-1-woogyom.kim@gmail.com>
-Message-ID: <20170104045553.26576-3-woogyom.kim@gmail.com>
+Message-ID: <20170104045553.26576-4-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Common savageboard DT file is used for board support.
-Add the vendor name and specify the dtb file for i.MX6Q build.
+Use common board file and support SATA interface additionally.
+Specify the dtb file for i.MX6 build.
 
 Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
 ---
- .../devicetree/bindings/vendor-prefixes.txt        |  1 +
- arch/arm/boot/dts/Makefile                         |  1 +
- arch/arm/boot/dts/imx6dl-savageboard.dts           | 51 ++++++++++++++++++++++
- 3 files changed, 53 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-savageboard.dts
+ arch/arm/boot/dts/Makefile              |  1 +
+ arch/arm/boot/dts/imx6q-savageboard.dts | 55 +++++++++++++++++++++++++++++++++
+ 2 files changed, 56 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-savageboard.dts
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 16d3b5e7f5d1..88c33d827e51 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -227,6 +227,7 @@ pine64	Pine64
- pixcir  PIXCIR MICROELECTRONICS Co., Ltd
- plathome	Plat'Home Co., Ltd.
- plda	PLDA
-+poslab  Poslab Technology Co., Ltd.
- powervr	PowerVR (deprecated, use img)
- pulsedlight	PulsedLight, Inc
- qca	Qualcomm Atheros, Inc.
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index cccdbcb557b6..fb7f904a5235 100644
+index fb7f904a5235..2f21e59adc1e 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -357,6 +357,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6dl-sabreauto.dtb \
- 	imx6dl-sabrelite.dtb \
- 	imx6dl-sabresd.dtb \
-+	imx6dl-savageboard.dtb \
- 	imx6dl-ts4900.dtb \
- 	imx6dl-tx6dl-comtft.dtb \
- 	imx6dl-tx6s-8034.dtb \
-diff --git a/arch/arm/boot/dts/imx6dl-savageboard.dts b/arch/arm/boot/dts/imx6dl-savageboard.dts
+@@ -403,6 +403,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-sabreauto.dtb \
+ 	imx6q-sabrelite.dtb \
+ 	imx6q-sabresd.dtb \
++	imx6q-savageboard.dtb \
+ 	imx6q-sbc6x.dtb \
+ 	imx6q-tbs2910.dtb \
+ 	imx6q-ts4900.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-savageboard.dts b/arch/arm/boot/dts/imx6q-savageboard.dts
 new file mode 100644
-index 000000000000..b95469c520a4
+index 000000000000..717ac62fc2cf
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-savageboard.dts
-@@ -0,0 +1,51 @@
++++ b/arch/arm/boot/dts/imx6q-savageboard.dts
+@@ -0,0 +1,55 @@
 +/*
 + * Copyright (C) 2017 Milo Kim <woogyom.kim@gmail.com>
 + *
@@ -93,12 +80,16 @@ index 000000000000..b95469c520a4
 +
 +/dts-v1/;
 +
-+#include "imx6dl.dtsi"
++#include "imx6q.dtsi"
 +#include "imx6qdl-savageboard.dtsi"
 +
 +/ {
-+	model = "Poslab SavageBoard Dual";
-+	compatible = "poslab,imx6dl-savageboard", "fsl,imx6dl";
++	model = "Poslab SavageBoard Quad";
++	compatible = "poslab,imx6q-savageboard", "fsl,imx6q";
++};
++
++&sata {
++	status = "okay";
 +};
 -- 
 2.11.0
