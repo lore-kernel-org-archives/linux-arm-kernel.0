@@ -1,37 +1,94 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 4 Jan 2017 12:13:27 +0000
-Subject: arm64: virt_to_page() does not return right page for a kernel
- image address
-In-Reply-To: <CAHB_GuqqXqVu4i4eCZ3V_d8JbdSO6rjWpA_B0NMJsNc_Zw0Niw@mail.gmail.com>
-References: <CAHB_GuqqXqVu4i4eCZ3V_d8JbdSO6rjWpA_B0NMJsNc_Zw0Niw@mail.gmail.com>
-Message-ID: <20170104121326.GA28876@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Jan 2017 15:46:17 +0100
+Subject: [PATCH 1/2] arm64: dma_mapping: allow PCI host driver to limit
+ DMA mask
+In-Reply-To: <412396ac-4535-08a3-e4c7-dd8d0078a518@cogentembedded.com>
+References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
+ <2104402.puPT8SttTe@wuerfel>
+ <412396ac-4535-08a3-e4c7-dd8d0078a518@cogentembedded.com>
+Message-ID: <3158203.Yc9Qgx82xo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 11:19:38AM +0530, Pratyush Anand wrote:
-> I noticed that on arm64 kmap_atomic() does not return correct address
-> corresponding to a page located in data section. It causes crash in
-> kdump kernel with v29 kdump patches. crash happens in a newly
-> implemented crypto test [1], and the same test fails(even though it
-> does not crash) in 1st kernel as well.
+On Wednesday, January 4, 2017 5:30:19 PM CET Nikita Yushchenko wrote:
+> >> For OF platforms, this is called via of_dma_configure(), that checks
+> >> dma-ranges of node that is *parent* for host bridge. Host bridge
+> >> currently does not control this at all.
+> > 
+> > We need to think about this a bit. Is it actually the PCI host
+> > bridge that limits the ranges here, or the bus that it is connected
+> > to. In the latter case, the caller needs to be adapted to handle
+> > both.
 > 
-> Further debugging showed that the physical address returned by
-> virt_to_phys(kaddr)  and virt_to_phys(kmap_atomic(virt_to_page(kaddr))
-> + offset_in_page(kaddr)) are not same.
+> In r-car case, I'm not sure what is the source of limitation at physical
+> level.
 > 
-> Mark Rutland thinks(IRC :#armlinux) that _virt_to_pgoff *only* handles
-> linear addresses, and not kernel image addresses. However, we have to
-> ask if it should?
+> pcie-rcar driver configures ranges for PCIe inbound transactions based
+> on dma-ranges property in it's device tree node. In the current device
+> tree for this platform, that only contains one range and it is in lower
+> memory.
+> 
+> NVMe driver tries i/o to kmalloc()ed area. That returns 0x5xxxxxxxx
+> addresses here. As a quick experiment, I tried to add second range to
+> pcie-rcar's dma-ranges to cover 0x5xxxxxxxx area - but that did not make
+> DMA to high addresses working.
+> 
+> My current understanding is that host bridge hardware module can't
+> handle inbound transactions to PCI addresses above 4G - and this
+> limitations comes from host bridge itself.
+> 
+> I've read somewhere in the lists that pcie-rcar hardware is "32-bit" -
+> but I don't remember where, and don't know lowlevel details. Maybe
+> somebody from linux-renesas can elaborate?
 
-It looks like we have a different behaviour for virt_to_page() depending
-on whether CONFIG_SPARSEMEM_VMEMMAP is defined.
+Just a guess, but if the inbound translation windows in the host
+bridge are wider than 32-bit, the reason for setting up a single
+32-bit window is probably because that is what the parent bus supports.
 
-We've had some discussions about a month ago on whether we should allow
-virt_to_phys() on kernel addresses and requiring that __pa_symbol() is
-used instead but I forgot on what the decision was (if any). It seems
-that we have other cases as well that need to be addressed, in which
-case it may be better to simply allow virt_to_page/phys on kernel
-symbols.
+> >> In current device trees no dma-ranges is defined for nodes that are
+> >> parents to pci host bridges. This will make of_dma_configure() to fall
+> >> back to 32-bit size for all devices on all current platforms.  Thus
+> >> applying this patch will immediately break 64-bit dma masks on all
+> >> hardware that supports it.
+> > 
+> > No, it won't break it, it will just fall back to swiotlb for all the
+> > ones that are lacking the dma-ranges property. I think this is correct
+> > behavior.
+> 
+> I'd say - for all ones that have parents without dma-ranges property.
+> 
+> As of 4.10-rc2, I see only two definitions of wide parent dma-ranges
+> under arch/arm64/boot/dts/ - in amd/amd-seattle-soc.dtsi and
+> apm/apm-storm.dtsi
+> 
+> Are these the only arm64 platforms that can to DMA to high addresses?
+> I'm not arm64 expert but I'd be surprised if that's the case.
 
--- 
-Catalin
+It's likely that a few others also do high DMA, but a lot of arm64
+chips are actually derived from earlier 32-bit chips and don't
+even support any RAM above 4GB, as well as having a lot of 32-bit
+DMA masters.
+
+> >> Also related: dma-ranges property used by several pci host bridges is
+> >> *not* compatible with "legacy" dma-ranges parsed by of_get_dma_range() -
+> >> former uses additional flags word at beginning.
+> > 
+> > Can you elaborate? Do we have PCI host bridges that use wrongly formatted
+> > dma-ranges properties?
+> 
+> of_dma_get_range() expects <dma_addr cpu_addr size> format.
+> 
+> pcie-rcar.c, pci-rcar-gen2.c, pci-xgene.c and pcie-iproc.c from
+> drivers/pci/host/ all parse dma-ranges using of_pci_range_parser that
+> uses <flags pci-addr cpu-addr size> format - i.e. something different
+> from what of_dma_get_range() uses.
+
+The "dma_addr" here is expressed in terms of #address-cells of the
+bus it is in, and that is "3" in case of PCI, where the first 32-bit
+word is a bit pattern containing various things, and the other two
+cells are a 64-bit address. I think this is correct, but we may
+need to add some special handling for parsing PCI host bridges
+in of_dma_get_range, to ensure we actually look at translations for
+the memory space.
+
+	Arnd
