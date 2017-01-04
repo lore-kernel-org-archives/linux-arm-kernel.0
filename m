@@ -1,35 +1,28 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Wed, 4 Jan 2017 10:14:04 +0000
-Subject: [PATCH v2 09/11] net: mvpp2: simplify MVPP2_PRS_RI_* definitions
-In-Reply-To: <1482857660-16092-10-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1482857660-16092-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482857660-16092-10-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DB02555FB@AcuExch.aculab.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 4 Jan 2017 08:16:26 -0600
+Subject: [PATCH v3 1/2] Doc: devicetree: bindings: Add vendor prefix
+ entry - lwn
+In-Reply-To: <1483440381-24268-1-git-send-email-lukma@denx.de>
+References: <1483440381-24268-1-git-send-email-lukma@denx.de>
+Message-ID: <20170104141626.yrtlmlstm5wbdbfy@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni
-> Sent: 27 December 2016 16:54
-> Some of the MVPP2_PRS_RI_* definitions use the ~(value) syntax, which
-> doesn't compile nicely on 64-bit. Moreover, those definitions are in
-> fact unneeded, since they are always used in combination with a bit
-> mask that ensures only the appropriate bits are modified.
+On Tue, Jan 03, 2017 at 11:46:20AM +0100, Lukasz Majewski wrote:
+> This patch adds entry for LWN - the Liebherr-Werk Nenzing GmbH company to
+> vendor-prefixes.txt file.
 > 
-> Therefore, such definitions should just be set to 0x0. For example:
+> Signed-off-by: Lukasz Majewski <lukma@denx.de>
+> ---
+> Changes for v3:
+> - Update to v4.10-rc2
 > 
->  #define MVPP2_PRS_RI_L2_CAST_MASK              0x600
->  #define MVPP2_PRS_RI_L2_UCAST                  ~(BIT(9) | BIT(10))
->  #define MVPP2_PRS_RI_L2_MCAST                  BIT(9)
->  #define MVPP2_PRS_RI_L2_BCAST                  BIT(10)
-> 
-> becomes
-> 
->  #define MVPP2_PRS_RI_L2_CAST_MASK              0x600
->  #define MVPP2_PRS_RI_L2_UCAST                  0x0
->  #define MVPP2_PRS_RI_L2_MCAST                  BIT(9)
->  #define MVPP2_PRS_RI_L2_BCAST                  BIT(10)
-...
-Shouldn't MVPP2_PRS_RI_L2_CAST_MASK be defined as
-(MVPP2_PRS_RI_L2_MCAST | MVPP2_PRS_RI_L2_BCAST)?
+> Changes for v2:
+> - New patch
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-	David
+I guess LWN.net will never make any devices...
+
+Acked-by: Rob Herring <robh@kernel.org>
