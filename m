@@ -1,40 +1,32 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed,  4 Jan 2017 13:35:31 +0000
-Subject: [PATCH 3/5] ARM: qcom_defconfig: add pcie and atl1c ethernet configs
-In-Reply-To: <1483536933-21503-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1483536933-21503-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1483536933-21503-4-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Wed,  4 Jan 2017 13:34:56 +0000
+Subject: [PATCH 0/6] arm64: dts: DB410c and DB820c dt patches
+Message-ID: <1483536902-21450-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IFC6410 board has PCIE based ATL1C ethernet controller, so enable related configs.
+These patches to add support to digital audio, Coresight, Volume up Key on DB410c.
+and a Fix and adds Volume up key for DB820c.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm/configs/qcom_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+Ivan T. Ivanov (3):
+  arm64: dts: apq8016-sbc: Add Volume Up key device node
+  arm64: dts: apq8016-sbc: Limit MPP4 high state to 1.8V
+  arm64: dts: msm8916: Add CoreSight components
 
-diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-index 9b2a1f0..255b9f6 100644
---- a/arch/arm/configs/qcom_defconfig
-+++ b/arch/arm/configs/qcom_defconfig
-@@ -24,6 +24,9 @@ CONFIG_ARCH_MSM8X60=y
- CONFIG_ARCH_MSM8960=y
- CONFIG_ARCH_MSM8974=y
- CONFIG_ARCH_MDM9615=y
-+CONFIG_PCI=y
-+CONFIG_PCI_MSI=y
-+CONFIG_PCIE_QCOM=y
- CONFIG_SMP=y
- CONFIG_HAVE_ARM_ARCH_TIMER=y
- CONFIG_PREEMPT=y
-@@ -70,6 +73,7 @@ CONFIG_SCSI_LOGGING=y
- CONFIG_SCSI_SCAN_ASYNC=y
- CONFIG_NETDEVICES=y
- CONFIG_DUMMY=y
-+CONFIG_ATL1C=y
- CONFIG_KS8851=y
- CONFIG_MDIO_BITBANG=y
- CONFIG_MDIO_GPIO=y
--- 
+Srinivas Kandagatla (3):
+  arm64: dts: db820c: fix gpio pinctrl name correctly
+  arm64: dts: apq8016-sbc: add support to hdmi audio via adv7533
+  arm64: dts: db820c: add support to volume up key
+
+ .../arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi |  13 ++
+ arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi |  13 ++
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi          |  28 +++
+ .../boot/dts/qcom/apq8096-db820c-pmic-pins.dtsi    |  14 +-
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi       |  19 ++
+ arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi    | 254 +++++++++++++++++++++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |   3 +-
+ 7 files changed, 342 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
+
+--
 2.10.1
