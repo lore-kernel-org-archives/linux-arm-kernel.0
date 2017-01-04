@@ -1,81 +1,63 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Wed,  4 Jan 2017 11:36:07 +0100
-Subject: [PATCH 2/2] ARM: da850: add the nand dev_id to the clock lookup table
-In-Reply-To: <1483526167-24209-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1483526167-24209-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1483526167-24209-3-git-send-email-bgolaszewski@baylibre.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 4 Jan 2017 11:56:02 +0000
+Subject: [PATCH 04/22] mfd: axp20x: add ADC cells for AXP20X and AXP22X
+ PMICs
+In-Reply-To: <20170102163723.7939-5-quentin.schulz@free-electrons.com>
+References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
+ <20170102163723.7939-5-quentin.schulz@free-electrons.com>
+Message-ID: <20170104115602.GB24058@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The aemif driver can now access struct of_dev_auxdata (using platform
-data).
+On Mon, 02 Jan 2017, Quentin Schulz wrote:
 
-Add the device id to the clock lookup table for the nand clock and
-create a separate lookup table for aemif subnodes.
+> This adds the AXP20X/AXP22x ADCs driver to the mfd cells of the AXP209,
+> AXP221 and AXP223 MFD.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+>  drivers/mfd/axp20x.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/da850.c    | 10 +---------
- arch/arm/mach-davinci/da8xx-dt.c | 12 +++++++++++-
- 2 files changed, 12 insertions(+), 10 deletions(-)
+Applied, thanks.
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 55f6e11..7475f02 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -557,15 +557,7 @@ static struct clk_lookup da850_clks[] = {
- 	CLK("da830-mmc.0",	NULL,		&mmcsd0_clk),
- 	CLK("da830-mmc.1",	NULL,		&mmcsd1_clk),
- 	CLK("ti-aemif",		NULL,		&aemif_clk),
--	/*
--	 * The only user of this clock is davinci_nand and it get's it through
--	 * con_id. The nand node itself is created from within the aemif
--	 * driver to guarantee that it's probed after the aemif timing
--	 * parameters are configured. of_dev_auxdata is not accessible from
--	 * the aemif driver and can't be passed to of_platform_populate(). For
--	 * that reason we're leaving the dev_id here as NULL.
--	 */
--	CLK(NULL,		"aemif",	&aemif_nand_clk),
-+	CLK("davinci-nand.0",	"aemif",	&aemif_nand_clk),
- 	CLK("ohci-da8xx",	"usb11",	&usb11_clk),
- 	CLK("musb-da8xx",	"usb20",	&usb20_clk),
- 	CLK("spi_davinci.0",	NULL,		&spi0_clk),
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index 9ee44da..06205fe 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -11,6 +11,7 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/irqdomain.h>
-+#include <linux/platform_data/ti-aemif.h>
- 
- #include <asm/mach/arch.h>
- 
-@@ -18,6 +19,15 @@
- #include "cp_intc.h"
- #include <mach/da8xx.h>
- 
-+static struct of_dev_auxdata da850_aemif_auxdata_lookup[] = {
-+	OF_DEV_AUXDATA("ti,davinci-nand", 0x62000000, "davinci-nand.0", NULL),
-+	{}
-+};
-+
-+static struct aemif_platform_data aemif_data = {
-+	.dev_lookup = da850_aemif_auxdata_lookup,
-+};
-+
- static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
- 	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01e28000, "i2c_davinci.2", NULL),
-@@ -37,7 +47,7 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,davinci-dm6467-emac", 0x01e20000, "davinci_emac.1",
- 		       NULL),
- 	OF_DEV_AUXDATA("ti,da830-mcasp-audio", 0x01d00000, "davinci-mcasp.0", NULL),
--	OF_DEV_AUXDATA("ti,da850-aemif", 0x68000000, "ti-aemif", NULL),
-+	OF_DEV_AUXDATA("ti,da850-aemif", 0x68000000, "ti-aemif", &aemif_data),
- 	OF_DEV_AUXDATA("ti,da850-tilcdc", 0x01e13000, "da8xx_lcdc.0", NULL),
- 	OF_DEV_AUXDATA("ti,da830-ohci", 0x01e25000, "ohci-da8xx", NULL),
- 	OF_DEV_AUXDATA("ti,da830-musb", 0x01e00000, "musb-da8xx", NULL),
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index a33db5e..31a84d81 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -582,6 +582,9 @@ static struct mfd_cell axp20x_cells[] = {
+>  	}, {
+>  		.name		= "axp20x-regulator",
+>  	}, {
+> +		.name		= "axp20x-adc",
+> +		.of_compatible	= "x-powers,axp209-adc",
+> +	}, {
+>  		.name		= "axp20x-ac-power-supply",
+>  		.of_compatible	= "x-powers,axp202-ac-power-supply",
+>  		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
+> @@ -602,6 +605,9 @@ static struct mfd_cell axp221_cells[] = {
+>  	}, {
+>  		.name		= "axp20x-regulator",
+>  	}, {
+> +		.name		= "axp20x-adc",
+> +		.of_compatible	= "x-powers,axp221-adc"
+> +	}, {
+>  		.name		= "axp20x-usb-power-supply",
+>  		.of_compatible	= "x-powers,axp221-usb-power-supply",
+>  		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
+> @@ -615,6 +621,9 @@ static struct mfd_cell axp223_cells[] = {
+>  		.num_resources		= ARRAY_SIZE(axp22x_pek_resources),
+>  		.resources		= axp22x_pek_resources,
+>  	}, {
+> +		.name		= "axp20x-adc",
+> +		.of_compatible	= "x-powers,axp221-adc"
+> +	}, {
+>  		.name			= "axp20x-regulator",
+>  	}, {
+>  		.name		= "axp20x-usb-power-supply",
+
 -- 
-2.9.3
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
