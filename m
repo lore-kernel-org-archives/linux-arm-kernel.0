@@ -1,60 +1,172 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 4 Jan 2017 13:53:55 -0800
-Subject: [PATCH] rtc: armada38x: add __ro_after_init to armada38x_rtc_ops
-In-Reply-To: <20170104130628.GQ14217@n2100.armlinux.org.uk>
-References: <1482751862-18699-1-git-send-email-bhumirks@gmail.com>
- <20170102140654.GF14217@n2100.armlinux.org.uk>
- <CAGXu5jJLA=GcOhV5Z_6AOGa1KhW7fXtqBGrewEeViaJ9TiE-aw@mail.gmail.com>
- <20170103213118.GM14217@n2100.armlinux.org.uk>
- <20170103215421.GN14217@n2100.armlinux.org.uk>
- <alpine.DEB.2.20.1701041155380.3073@hadrien>
- <20170104110750.dtu54t74qkuuvkvq@piout.net>
- <alpine.DEB.2.20.1701041242080.3073@hadrien>
- <20170104121425.GP14217@n2100.armlinux.org.uk>
- <alpine.DEB.2.20.1701041320140.3073@hadrien>
- <20170104130628.GQ14217@n2100.armlinux.org.uk>
-Message-ID: <CAGXu5jLe6RNa6xrefB--w3M+ECRkMMDZWoyAOp5gA1h6W-1vMA@mail.gmail.com>
+From: jonathan.richardson@broadcom.com (Jonathan Richardson)
+Date: Wed, 4 Jan 2017 13:53:54 -0800
+Subject: [PATCH v1 2/4] mailbox: Add iProc mailbox controller driver
+In-Reply-To: <CABb+yY3ga7CgZaRi_5Qu4UXNjGdhuLHM0gZjrwusFSLfCuc5cQ@mail.gmail.com>
+References: <1476817238-1226-1-git-send-email-jonathan.richardson@broadcom.com>
+ <1476817238-1226-3-git-send-email-jonathan.richardson@broadcom.com>
+ <CABb+yY3ga7CgZaRi_5Qu4UXNjGdhuLHM0gZjrwusFSLfCuc5cQ@mail.gmail.com>
+Message-ID: <a425f241-7088-a769-8eac-ba431f61c998@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 4, 2017 at 5:06 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Wed, Jan 04, 2017 at 01:23:41PM +0100, Julia Lawall wrote:
->> Basically, the strategy of the patch is that one may consider it
->> preferable to duplicate the structure for the different alternatives,
->> rather than use __ro_after_init.  Perhaps if the structure were larger,
->> then __ro_after_init would be a better choice?
->
-> It depends on not just the size, but how many members need to be
-> modified, and obviously whether there are likely to be more than one
-> user of the structure as well.
->
-> So I'd say __ro_after_init rarely makes sense for an operations
-> structure - the only case I can see is:
->
-> - a large structure
-> - only a small number of elements need to be modified
-> - it is only single-use
->
-> which is probably quite rare - this one falls into two out of those
-> three.
->
-> There's another consideration (imho) too - we may wish, at a later
-> date, to make .text and .rodata both read-only from the start of the
-> kernel to harden the kernel against possibly init-time exploitation.
-> (Think about a buggy built-in driver with emulated hardware - much the
-> same problem that Kees is trying to address in one of his recent patch
-> sets but with hotplugged hardware while a screen-saver is active.)
-> Having function pointers in .rodata rather than the ro-after-init
-> section would provide better protection.
 
-Agreed: I'd much prefer things just be const. :) As to my confusing
-question, I hadn't looked at how where the pointers to the structure
-was being stored, so I was just asking if it, too, could be const,
-which it can't, and that's fine here.
 
--Kees
+On 16-11-16 07:40 PM, Jassi Brar wrote:
+> Hi Jonathan,
 
--- 
-Kees Cook
-Nexus Security
+Hi Jassi. Thanks for the review. I was away so sorry for the slow reply.
+
+> 
+> On Wed, Oct 19, 2016 at 12:30 AM, Jonathan Richardson
+> <jonathan.richardson@broadcom.com> wrote:
+>> The Broadcom iProc mailbox controller handles all communication with a
+>> Cortex-M0 MCU processor that provides support for power, clock, and
+>> reset management.
+>>
+>> Tested-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
+>> Reviewed-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
+>> Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com>
+>> Reviewed-by: Shreesha Rajashekar <shreesha.rajashekar@broadcom.com>
+>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>> Signed-off-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
+>> ---
+>>  drivers/mailbox/Kconfig             |  10 +
+>>  drivers/mailbox/Makefile            |   2 +
+>>  drivers/mailbox/bcm-iproc-mailbox.c | 422 ++++++++++++++++++++++++++++++++++++
+>>  include/linux/bcm_iproc_mailbox.h   |  32 +++
+>>
+> This should be include/linux/mailbox/bcm_iproc_mailbox.h
+I'll move it.
+
+> 
+> 
+>> +++ b/drivers/mailbox/bcm-iproc-mailbox.c
+>> @@ -0,0 +1,422 @@
+>> +/*
+>> + * Copyright (C) 2016 Broadcom.
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License as
+>> + * published by the Free Software Foundation version 2.
+>> + *
+>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+>> + * kind, whether express or implied; without even the implied warranty
+>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +#include <linux/kernel.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/module.h>
+>> +#include <linux/irq.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/io.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/irqchip/chained_irq.h>
+>> +#include <linux/notifier.h>
+>> +#include <linux/reboot.h>
+>> +#include <linux/mailbox_controller.h>
+>> +#include <linux/mailbox_client.h>
+>>
+> Need of mailbox_controller.h & client.h is a bad sign.
+
+The controller is using this only for the tx_tout value from the client
+to determine a reasonable timeout period. We could use a fixed value in
+the controller instead.
+> 
+>> +
+>> +static int iproc_mbox_send_data_m0_imp(struct iproc_mbox *mbox,
+>> +       struct iproc_mbox_msg *msg, int max_retries, int poll_period_us)
+>> +{
+>> +       unsigned long flags;
+>> +       u32 val;
+>> +       int err = 0;
+>> +       int retries;
+>> +
+>> +       spin_lock_irqsave(&mbox->lock, flags);
+>> +
+>> +       dev_dbg(mbox->dev, "Send msg to M0: cmd=0x%x, param=0x%x, wait_ack=%d\n",
+>> +               msg->cmd, msg->param, msg->wait_ack);
+>> +
+>> +       writel(msg->cmd, mbox->base + IPROC_CRMU_MAILBOX0_OFFSET);
+>> +       writel(msg->param, mbox->base + IPROC_CRMU_MAILBOX1_OFFSET);
+>> +
+>> +       if (msg->wait_ack) {
+>> +               err = msg->reply_code = -ETIMEDOUT;
+>> +               for (retries = 0; retries < max_retries; retries++) {
+>> +                       val = readl(mbox->base + IPROC_CRMU_MAILBOX0_OFFSET);
+>> +                       if (val & M0_IPC_CMD_DONE_MASK) {
+>> +                               /*
+>> +                                * M0 replied - save reply code and
+>> +                                * clear error.
+>> +                                */
+>> +                               msg->reply_code = (val &
+>> +                                       M0_IPC_CMD_REPLY_MASK) >>
+>> +                                       M0_IPC_CMD_REPLY_SHIFT;
+>> +                               err = 0;
+>> +                               break;
+>> +                       }
+>> +                       udelay(poll_period_us);
+>> +               }
+>> +       }
+>> +
+>> +       spin_unlock_irqrestore(&mbox->lock, flags);
+>> +
+>> +       return err;
+>> +}
+>> +
+> OK, so this is the real message passing voodoo.
+> 
+>> +static void iproc_mbox_aon_gpio_forwarding_enable(struct iproc_mbox *mbox,
+>> +       bool en)
+>> +{
+>> +       struct iproc_mbox_msg msg;
+>> +       const int max_retries = 5;
+>> +       const int poll_period_us = 200;
+>> +
+>> +       msg.cmd = M0_IPC_M0_CMD_AON_GPIO_FORWARDING_ENABLE;
+>> +       msg.param = en ? 1 : 0;
+>> +       msg.wait_ack = true;
+>> +
+>> +       iproc_mbox_send_data_m0_imp(mbox, &msg, max_retries, poll_period_us);
+>> +}
+>> +
+>> +static void iproc_mbox_irq_unmask(struct irq_data *d)
+>> +{
+>> +       struct iproc_mbox *iproc_mbox = irq_data_get_irq_chip_data(d);
+>> +
+>> +       iproc_mbox_aon_gpio_forwarding_enable(iproc_mbox, true);
+>> +}
+>> +
+>> +static void iproc_mbox_irq_mask(struct irq_data *d)
+>> +{
+>> +       /* Do nothing - Mask callback is not required, since upon GPIO event,
+>> +        * M0 disables GPIO forwarding to A9. Hence, GPIO forwarding is already
+>> +        * disabled  when in mbox irq handler, and no other mbox events from M0
+>> +        * to A9 are expected until GPIO forwarding is enabled following
+>> +        * iproc_mbox_irq_unmask()
+>> +        */
+>> +}
+>> +
+>> +static struct irq_chip iproc_mbox_irq_chip = {
+>> +       .name = "bcm-iproc-mbox",
+>> +       .irq_mask = iproc_mbox_irq_mask,
+>> +       .irq_unmask = iproc_mbox_irq_unmask,
+>> +};
+>> +
+> .... these are simply using the mailbox controllers directly. So you
+> are actually clubbing a mailbox client (interrupt controller) with the
+> provider (mailbox) here.
+> 
+> I think you need move the IRQ controller part under drivers/irqchip/
+> that uses the mailbox api to manage its 'irq lines'.
+> 
+Should be straight forward to change.
+
+Thanks.
+
+> Thanks.
+> 
