@@ -1,95 +1,36 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Wed,  4 Jan 2017 13:55:53 +0900
-Subject: [PATCH v4 3/3] ARM: dts: imx6: Support Savageboard quad
-In-Reply-To: <20170104045553.26576-1-woogyom.kim@gmail.com>
-References: <20170104045553.26576-1-woogyom.kim@gmail.com>
-Message-ID: <20170104045553.26576-4-woogyom.kim@gmail.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Wed, 4 Jan 2017 10:39:40 +0530
+Subject: [PATCH] ARM: dts: am335x-icev2: Remove the duplicated pinmux setting
+Message-ID: <20170104050940.25698-1-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use common board file and support SATA interface additionally.
-Specify the dtb file for i.MX6 build.
+There is no mmc sd card detect on am335x-ice board. But the spi0_cs1
+pin being configured as mmcsd_cd. Removing it fixes the below warning
+during boot.
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+[1.401303] pinctrl-single 44e10800.pinmux: pin 44e10960.0 already requested by 48030000.spi; cannot claim for 48060000.mmc
+
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- arch/arm/boot/dts/Makefile              |  1 +
- arch/arm/boot/dts/imx6q-savageboard.dts | 55 +++++++++++++++++++++++++++++++++
- 2 files changed, 56 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-savageboard.dts
+Logs:
+Before this patch: http://pastebin.ubuntu.com/23737509/
+After this patch: http://pastebin.ubuntu.com/23737467/
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index fb7f904a5235..2f21e59adc1e 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -403,6 +403,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-sabreauto.dtb \
- 	imx6q-sabrelite.dtb \
- 	imx6q-sabresd.dtb \
-+	imx6q-savageboard.dtb \
- 	imx6q-sbc6x.dtb \
- 	imx6q-tbs2910.dtb \
- 	imx6q-ts4900.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-savageboard.dts b/arch/arm/boot/dts/imx6q-savageboard.dts
-new file mode 100644
-index 000000000000..717ac62fc2cf
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-savageboard.dts
-@@ -0,0 +1,55 @@
-+/*
-+ * Copyright (C) 2017 Milo Kim <woogyom.kim@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6q.dtsi"
-+#include "imx6qdl-savageboard.dtsi"
-+
-+/ {
-+	model = "Poslab SavageBoard Quad";
-+	compatible = "poslab,imx6q-savageboard", "fsl,imx6q";
-+};
-+
-+&sata {
-+	status = "okay";
-+};
+ arch/arm/boot/dts/am335x-icev2.dts | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/am335x-icev2.dts b/arch/arm/boot/dts/am335x-icev2.dts
+index 1463df3b5b19..8ed46f9d79b7 100644
+--- a/arch/arm/boot/dts/am335x-icev2.dts
++++ b/arch/arm/boot/dts/am335x-icev2.dts
+@@ -170,7 +170,6 @@
+ 			AM33XX_IOPAD(0x8fc, PIN_INPUT_PULLUP | MUX_MODE0) /* (G16) mmc0_dat0.mmc0_dat0 */
+ 			AM33XX_IOPAD(0x900, PIN_INPUT_PULLUP | MUX_MODE0) /* (G17) mmc0_clk.mmc0_clk */
+ 			AM33XX_IOPAD(0x904, PIN_INPUT_PULLUP | MUX_MODE0) /* (G18) mmc0_cmd.mmc0_cmd */
+-			AM33XX_IOPAD(0x960, PIN_INPUT_PULLUP | MUX_MODE5) /* (C15) spi0_cs1.mmc0_sdcd */
+ 		>;
+ 	};
+ 
 -- 
 2.11.0
