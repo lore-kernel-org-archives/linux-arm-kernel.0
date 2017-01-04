@@ -1,45 +1,140 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Jan 2017 15:23:06 +0000
-Subject: [PATCH] arm64: restore get_current() optimisation
-In-Reply-To: <1483468021-8237-1-git-send-email-mark.rutland@arm.com>
-References: <1483468021-8237-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170104152305.GL18193@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 4 Jan 2017 15:11:35 +0000
+Subject: [PATCH] iommu: Drop the of_iommu_{set/get}_ops() interface
+In-Reply-To: <20170103173456.18154-1-lorenzo.pieralisi@arm.com>
+References: <20170103173456.18154-1-lorenzo.pieralisi@arm.com>
+Message-ID: <c61db43c-82b1-b4c9-63cb-a8c78878cb39@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 06:27:01PM +0000, Mark Rutland wrote:
-> Hi Catalin,
+[+Yong Wu for mtk_iommu]
+
+On 03/01/17 17:34, Lorenzo Pieralisi wrote:
+> With the introduction of the new iommu_{register/get}_instance()
+> interface in commit e4f10ffe4c9b ("iommu: Make of_iommu_set/get_ops() DT
+> agnostic") (based on struct fwnode_handle as look-up token, so firmware
+> agnostic) to register IOMMU instances with the core IOMMU layer there is
+> no reason to keep the old OF based interface around any longer.
 > 
-> My THREAD_INFO_IN_TASK series had an unintended performance regression in
-> get_current() / current_thread_info(). Could you please take the below as a
-> fix for the next rc?
+> Convert all the IOMMU drivers (and OF IOMMU core code) that rely on the
+> of_iommu_{set/get}_ops() to the new kernel interface to register/retrieve
+> IOMMU instances and remove the of_iommu_{set/get}_ops() remaining glue
+> code in order to complete the interface rework.
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+Looking at before-and-after disassemblies, of_iommu.o is binary
+identical, and exynos-iommu.o differs only in the use of dev->fwnode
+rather than &dev->of_node->fwnode (and is binary identical if I hack it
+back to the latter). I'm not sure why the (GCC 6.2) codegen for
+mtk_iommu.o changes quite so much when merely replacing a callsite with
+the contents of its static inline callee, but it does :/
+
+Robin.
+
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+> Exynos, msm and mtk code compile tested only owing to lack of
+> test platforms, I would appreciate some help in testing this
+> patch on those platforms before merging it even if it is just
+> a simple interface conversion.
 > 
 > Thanks,
-> Mark.
+> Lorenzo
 > 
-> ---->8----
-> Commit c02433dd6de32f04 ("arm64: split thread_info from task stack")
-> inverted the relationship between get_current() and
-> current_thread_info(), with sp_el0 now holding the current task_struct
-> rather than the current thead_info. The new implementation of
-> get_current() prevents the compiler from being able to optimize repeated
-> calls to either, resulting in a noticeable penalty in some
-> microbenchmarks.
+>  drivers/iommu/exynos-iommu.c |  2 +-
+>  drivers/iommu/msm_iommu.c    |  2 +-
+>  drivers/iommu/mtk_iommu.c    |  2 +-
+>  drivers/iommu/of_iommu.c     |  4 ++--
+>  include/linux/of_iommu.h     | 11 -----------
+>  5 files changed, 5 insertions(+), 16 deletions(-)
 > 
-> This patch restores the previous optimisation by implementing
-> get_current() in the same way as our old current_thread_info(), using a
-> non-volatile asm statement.
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index 57ba0d3..b79e4c4 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -628,7 +628,7 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+>  
+>  	pm_runtime_enable(dev);
+>  
+> -	of_iommu_set_ops(dev->of_node, &exynos_iommu_ops);
+> +	iommu_register_instance(dev->fwnode, &exynos_iommu_ops);
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
+> index b09692b..9cd3cee 100644
+> --- a/drivers/iommu/msm_iommu.c
+> +++ b/drivers/iommu/msm_iommu.c
+> @@ -737,7 +737,7 @@ static int msm_iommu_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	list_add(&iommu->dev_node, &qcom_iommu_devices);
+> -	of_iommu_set_ops(pdev->dev.of_node, &msm_iommu_ops);
+> +	iommu_register_instance(pdev->dev.fwnode, &msm_iommu_ops);
+>  
+>  	pr_info("device mapped at %p, irq %d with %d ctx banks\n",
+>  		iommu->base, iommu->irq, iommu->ncb);
+> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+> index 1479c76..0596ab2 100644
+> --- a/drivers/iommu/mtk_iommu.c
+> +++ b/drivers/iommu/mtk_iommu.c
+> @@ -655,7 +655,7 @@ static int mtk_iommu_init_fn(struct device_node *np)
+>  		return ret;
+>  	}
+>  
+> -	of_iommu_set_ops(np, &mtk_iommu_ops);
+> +	iommu_register_instance(&np->fwnode, &mtk_iommu_ops);
+>  	return 0;
+>  }
+>  
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index 0f57ddc..d7f480a 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -127,7 +127,7 @@ static const struct iommu_ops
+>  			   "iommu-map-mask", &iommu_spec.np, iommu_spec.args))
+>  		return NULL;
+>  
+> -	ops = of_iommu_get_ops(iommu_spec.np);
+> +	ops = iommu_get_instance(&iommu_spec.np->fwnode);
+>  	if (!ops || !ops->of_xlate ||
+>  	    iommu_fwspec_init(&pdev->dev, &iommu_spec.np->fwnode, ops) ||
+>  	    ops->of_xlate(&pdev->dev, &iommu_spec))
+> @@ -157,7 +157,7 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
+>  					   "#iommu-cells", idx,
+>  					   &iommu_spec)) {
+>  		np = iommu_spec.np;
+> -		ops = of_iommu_get_ops(np);
+> +		ops = iommu_get_instance(&np->fwnode);
+>  
+>  		if (!ops || !ops->of_xlate ||
+>  		    iommu_fwspec_init(dev, &np->fwnode, ops) ||
+> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+> index 6a7fc50..13394ac 100644
+> --- a/include/linux/of_iommu.h
+> +++ b/include/linux/of_iommu.h
+> @@ -31,17 +31,6 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
+>  
+>  #endif	/* CONFIG_OF_IOMMU */
+>  
+> -static inline void of_iommu_set_ops(struct device_node *np,
+> -				    const struct iommu_ops *ops)
+> -{
+> -	iommu_register_instance(&np->fwnode, ops);
+> -}
+> -
+> -static inline const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+> -{
+> -	return iommu_get_instance(&np->fwnode);
+> -}
+> -
+>  extern struct of_device_id __iommu_of_table;
+>  
+>  typedef int (*of_iommu_init_fn)(struct device_node *);
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Reported-by: Davidlohr Bueso <dbueso@suse.de>
-> ---
->  arch/arm64/include/asm/current.h | 10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Thanks for putting this back like it was!
-
-Will
