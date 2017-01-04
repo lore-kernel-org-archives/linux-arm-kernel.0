@@ -1,233 +1,98 @@
-From: manish.narani@xilinx.com (Manish Narani)
-Date: Wed, 4 Jan 2017 18:52:58 +0530
-Subject: [RFC PATCH] usb: dwc3: gadget: add support for OTG in gadget framework
-In-Reply-To: <1483536181-22356-1-git-send-email-mnarani@xilinx.com>
-References: <1483536181-22356-1-git-send-email-mnarani@xilinx.com>
-Message-ID: <1483536181-22356-4-git-send-email-mnarani@xilinx.com>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Wed,  4 Jan 2017 13:32:24 +0000
+Subject: [PATCH v5 15/17] vfio/type1: Allow transparent MSI IOVA allocation
+In-Reply-To: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
+References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1483536746-2725-16-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for OTG in DWC3 gadget framework. This
-also adds support for HNP polling by host while in OTG mode.
+When attaching a group to the container, check the group's
+reserved regions and test whether the IOMMU translates MSI
+transactions. If yes, we initialize an IOVA allocator through
+the iommu_get_msi_cookie API. This will allow the MSI IOVAs
+to be transparently allocated on MSI controller's compose().
 
-Modifications in couple of functions to make it in sync with
-OTG driver while keeping its original functionality intact.
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
-Signed-off-by: Manish Narani <mnarani@xilinx.com>
 ---
- drivers/usb/dwc3/ep0.c    | 49 +++++++++++++++++++++++---
- drivers/usb/dwc3/gadget.c | 87 +++++++++++++++++++++++++++++++++++++++--------
- 2 files changed, 116 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/usb/dwc3/ep0.c b/drivers/usb/dwc3/ep0.c
-index 4878d18..aa78c1b 100644
---- a/drivers/usb/dwc3/ep0.c
-+++ b/drivers/usb/dwc3/ep0.c
-@@ -334,6 +334,8 @@ static int dwc3_ep0_handle_status(struct dwc3 *dwc,
- 				usb_status |= 1 << USB_DEV_STAT_U2_ENABLED;
- 		}
+v3 -> v4:
+- test region's type: IOMMU_RESV_MSI
+- restructure the code to prepare for safety assessment
+- reword title
+---
+ drivers/vfio/vfio_iommu_type1.c | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index f3726ba..b473ef80 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -39,6 +39,7 @@
+ #include <linux/pid_namespace.h>
+ #include <linux/mdev.h>
+ #include <linux/notifier.h>
++#include <linux/dma-iommu.h>
  
-+		usb_status |= dwc->remote_wakeup << USB_DEVICE_REMOTE_WAKEUP;
-+
- 		break;
- 
- 	case USB_RECIP_INTERFACE:
-@@ -448,11 +450,45 @@ static int dwc3_ep0_handle_device(struct dwc3 *dwc,
- 
- 	switch (wValue) {
- 	case USB_DEVICE_REMOTE_WAKEUP:
-+		if (set)
-+			dwc->remote_wakeup = 1;
-+		else
-+			dwc->remote_wakeup = 0;
- 		break;
--	/*
--	 * 9.4.1 says only only for SS, in AddressState only for
--	 * default control pipe
--	 */
-+	case USB_DEVICE_B_HNP_ENABLE:
-+		dev_dbg(dwc->dev,
-+			"SET_FEATURE: USB_DEVICE_B_HNP_ENABLE\n");
-+		if (set && dwc->gadget.is_otg) {
-+			if (dwc->gadget.host_request_flag) {
-+				struct usb_phy *phy =
-+					usb_get_phy(USB_PHY_TYPE_USB3);
-+
-+				dwc->gadget.b_hnp_enable = 0;
-+				dwc->gadget.host_request_flag = 0;
-+				otg_start_hnp(phy->otg);
-+				usb_put_phy(phy);
-+			} else {
-+				dwc->gadget.b_hnp_enable = 1;
-+			}
-+		} else
-+			return -EINVAL;
-+		break;
-+
-+	case USB_DEVICE_A_HNP_SUPPORT:
-+		/* RH port supports HNP */
-+		dev_dbg(dwc->dev,
-+			"SET_FEATURE: USB_DEVICE_A_HNP_SUPPORT\n");
-+		break;
-+
-+	case USB_DEVICE_A_ALT_HNP_SUPPORT:
-+		/* other RH port does */
-+		dev_dbg(dwc->dev,
-+			"SET_FEATURE: USB_DEVICE_A_ALT_HNP_SUPPORT\n");
-+		break;
-+		/*
-+		 * 9.4.1 says only only for SS, in AddressState only for
-+		 * default control pipe
-+		 */
- 	case USB_DEVICE_U1_ENABLE:
- 		ret = dwc3_ep0_handle_u1(dwc, state, set);
- 		break;
-@@ -759,7 +795,10 @@ static int dwc3_ep0_std_request(struct dwc3 *dwc, struct usb_ctrlrequest *ctrl)
- 
- 	switch (ctrl->bRequest) {
- 	case USB_REQ_GET_STATUS:
--		ret = dwc3_ep0_handle_status(dwc, ctrl);
-+		if (le16_to_cpu(ctrl->wIndex) == OTG_STS_SELECTOR)
-+			ret = dwc3_ep0_delegate_req(dwc, ctrl);
-+		else
-+			ret = dwc3_ep0_handle_status(dwc, ctrl);
- 		break;
- 	case USB_REQ_CLEAR_FEATURE:
- 		ret = dwc3_ep0_handle_feature(dwc, ctrl, 0);
-diff --git a/drivers/usb/dwc3/gadget.c b/drivers/usb/dwc3/gadget.c
-index 6785595..3b0b771 100644
---- a/drivers/usb/dwc3/gadget.c
-+++ b/drivers/usb/dwc3/gadget.c
-@@ -34,6 +34,7 @@
- #include "core.h"
- #include "gadget.h"
- #include "io.h"
-+#include "otg.h"
- 
- /**
-  * dwc3_gadget_set_test_mode - Enables USB2 Test Modes
-@@ -1792,25 +1793,51 @@ static int dwc3_gadget_start(struct usb_gadget *g,
- 	int			ret = 0;
- 	int			irq;
- 
--	irq = dwc->irq_gadget;
--	ret = request_threaded_irq(irq, dwc3_interrupt, dwc3_thread_interrupt,
--			IRQF_SHARED, "dwc3", dwc->ev_buf);
--	if (ret) {
--		dev_err(dwc->dev, "failed to request irq #%d --> %d\n",
--				irq, ret);
--		goto err0;
--	}
--
- 	spin_lock_irqsave(&dwc->lock, flags);
- 	if (dwc->gadget_driver) {
- 		dev_err(dwc->dev, "%s is already bound to %s\n",
- 				dwc->gadget.name,
- 				dwc->gadget_driver->driver.name);
- 		ret = -EBUSY;
--		goto err1;
-+		goto err0;
- 	}
- 
--	dwc->gadget_driver	= driver;
-+	if (g->is_otg) {
-+		static struct usb_gadget_driver *prev_driver;
-+		/* There are two instances where OTG functionality is enabled :
-+		 * 1. This function will be called from OTG driver to start the
-+		 * gadget
-+		 * 2. This function will be called by the Linux Class Driver to
-+		 * start the gadget
-+		 * Below code will keep synchronization between these calls. The
-+		 * "driver" argument will be NULL when it is called from the OTG
-+		 * driver, so we are maintaning a global variable "prev_driver"
-+		 * to assign value of argument "driver" (from class driver) to
-+		 * dwc->gadget_driver when it is called from OTG.
-+		 */
-+		if (driver) {
-+			prev_driver	= driver;
-+			if (dwc->otg) {
-+				struct dwc3_otg		*otg = dwc->otg;
-+
-+				if ((otg->host_started ||
-+						(!otg->peripheral_started)))
-+					goto err0;
-+			}
-+			dwc->gadget_driver	= driver;
-+		} else
-+			dwc->gadget_driver	= prev_driver;
-+	} else
-+		dwc->gadget_driver	= driver;
-+
-+	irq = dwc->irq_gadget;
-+	ret = request_threaded_irq(irq, dwc3_interrupt, dwc3_thread_interrupt,
-+			IRQF_SHARED, "dwc3", dwc->ev_buf);
-+	if (ret) {
-+		dev_err(dwc->dev, "failed to request irq #%d --> %d\n",
-+				irq, ret);
-+		goto err0;
-+	}
- 
- 	if (pm_runtime_active(dwc->dev))
- 		__dwc3_gadget_start(dwc);
-@@ -1819,11 +1846,9 @@ static int dwc3_gadget_start(struct usb_gadget *g,
- 
- 	return 0;
- 
--err1:
--	spin_unlock_irqrestore(&dwc->lock, flags);
--	free_irq(irq, dwc);
--
- err0:
-+	dwc->gadget_driver = NULL;
-+	spin_unlock_irqrestore(&dwc->lock, flags);
- 	return ret;
+ #define DRIVER_VERSION  "0.2"
+ #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+@@ -1177,6 +1178,28 @@ static struct vfio_group *find_iommu_group(struct vfio_domain *domain,
+ 	return NULL;
  }
  
-@@ -2977,6 +3002,18 @@ int dwc3_gadget_init(struct dwc3 *dwc)
- 
- 	dwc->irq_gadget = irq;
- 
-+	if (dwc->dr_mode == USB_DR_MODE_OTG) {
-+		struct usb_phy *phy;
-+		/* Switch otg to peripheral mode */
-+		phy = usb_get_phy(USB_PHY_TYPE_USB3);
-+		if (!IS_ERR(phy)) {
-+			if (phy && phy->otg)
-+				otg_set_peripheral(phy->otg,
-+						(struct usb_gadget *)(long)1);
-+			usb_put_phy(phy);
++static bool vfio_iommu_has_resv_msi(struct iommu_group *group,
++				    phys_addr_t *base)
++{
++	struct list_head group_resv_regions;
++	struct iommu_resv_region *region, *next;
++	bool ret = false;
++
++	INIT_LIST_HEAD(&group_resv_regions);
++	iommu_get_group_resv_regions(group, &group_resv_regions);
++	list_for_each_entry(region, &group_resv_regions, list) {
++		if (region->type & IOMMU_RESV_MSI) {
++			*base = region->start;
++			ret = true;
++			goto out;
 +		}
 +	}
++out:
++	list_for_each_entry_safe(region, next, &group_resv_regions, list)
++		kfree(region);
++	return ret;
++}
 +
- 	dwc->ctrl_req = dma_alloc_coherent(dwc->sysdev, sizeof(*dwc->ctrl_req),
- 			&dwc->ctrl_req_addr, GFP_KERNEL);
- 	if (!dwc->ctrl_req) {
-@@ -3066,6 +3103,26 @@ int dwc3_gadget_init(struct dwc3 *dwc)
- 		goto err5;
- 	}
+ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 					 struct iommu_group *iommu_group)
+ {
+@@ -1185,6 +1208,8 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 	struct vfio_domain *domain, *d;
+ 	struct bus_type *bus = NULL, *mdev_bus;
+ 	int ret;
++	bool resv_msi;
++	phys_addr_t resv_msi_base;
  
-+	if (dwc->dr_mode == USB_DR_MODE_OTG) {
-+		struct usb_phy *phy;
-+
-+		phy = usb_get_phy(USB_PHY_TYPE_USB3);
-+		if (!IS_ERR(phy)) {
-+			if (phy && phy->otg) {
-+				ret = otg_set_peripheral(phy->otg,
-+						&dwc->gadget);
-+				if (ret) {
-+					usb_put_phy(phy);
-+					phy = NULL;
-+					goto err5;
-+				}
-+			} else {
-+				usb_put_phy(phy);
-+				phy = NULL;
-+			}
-+		}
-+	}
-+
- 	return 0;
+ 	mutex_lock(&iommu->lock);
  
- err5:
+@@ -1254,6 +1279,8 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 	if (ret)
+ 		goto out_domain;
+ 
++	resv_msi = vfio_iommu_has_resv_msi(iommu_group, &resv_msi_base);
++
+ 	INIT_LIST_HEAD(&domain->group_list);
+ 	list_add(&group->next, &domain->group_list);
+ 
+@@ -1300,6 +1327,9 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 	if (ret)
+ 		goto out_detach;
+ 
++	if (resv_msi && iommu_get_msi_cookie(domain->domain, resv_msi_base))
++		goto out_detach;
++
+ 	list_add(&domain->next, &iommu->domain_list);
+ 
+ 	mutex_unlock(&iommu->lock);
 -- 
-2.1.1
+1.9.1
