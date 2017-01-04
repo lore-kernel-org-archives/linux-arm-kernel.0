@@ -1,73 +1,94 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  4 Jan 2017 10:30:46 +0100
-Subject: [PATCH 2/2] ARM: dts: OX820: Update with dt-bindings includes
-In-Reply-To: <20170104093046.12428-1-narmstrong@baylibre.com>
-References: <20170104093046.12428-1-narmstrong@baylibre.com>
-Message-ID: <20170104093046.12428-3-narmstrong@baylibre.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 4 Jan 2017 09:45:37 +0000
+Subject: [PATCH v2 06/11] mfd: axp20x: add separate MFD cell for AXP223
+In-Reply-To: <20161209110419.28981-7-quentin.schulz@free-electrons.com>
+References: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
+ <20161209110419.28981-7-quentin.schulz@free-electrons.com>
+Message-ID: <20170104094537.GS27589@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add OX820 dt-bindings includes files for clocks and resets, replace
-resets numbers by human readable defines.
+On Fri, 09 Dec 2016, Quentin Schulz wrote:
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm/boot/dts/ox820.dtsi | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+> The AXP223 shares most of its logic with the AXP221 but has some
+> differences for the VBUS power supply driver. Thus, to probe the driver
+> with the correct compatible, the AXP221 and the AXP223 now have separate
+> MFD cells.
+> 
+> AXP221 MFD cells are renamed from axp22x_cells to axp221_cells to avoid
+> confusion.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> 
+> v2:
+>  - correct indentation,
+>  - renaming axp22x_cells to axp221_cells to avoid confusion between axp22x,
+> axp221 and axp223
+> 
+>  drivers/mfd/axp20x.c | 28 ++++++++++++++++++++++++----
+>  1 file changed, 24 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ox820.dtsi b/arch/arm/boot/dts/ox820.dtsi
-index e40f282..4592075 100644
---- a/arch/arm/boot/dts/ox820.dtsi
-+++ b/arch/arm/boot/dts/ox820.dtsi
-@@ -8,6 +8,8 @@
- 
- /include/ "skeleton.dtsi"
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/oxsemi,ox820.h>
-+#include <dt-bindings/reset/oxsemi,ox820.h>
- 
- / {
- 	compatible = "oxsemi,ox820";
-@@ -83,8 +85,8 @@
- 		nandc: nand-controller at 41000000 {
- 			compatible = "oxsemi,ox820-nand";
- 			reg = <0x41000000 0x100000>;
--			clocks = <&stdclk 11>;
--			resets = <&reset 15>;
-+			clocks = <&stdclk CLK_820_NAND>;
-+			resets = <&reset RESET_NAND>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			status = "disabled";
-@@ -99,9 +101,9 @@
- 			mac-address = [000000000000]; /* Filled in by U-Boot */
- 			phy-mode = "rgmii";
- 
--			clocks = <&stdclk 9>, <&gmacclk>;
-+			clocks = <&stdclk CLK_820_ETHA>, <&gmacclk>;
- 			clock-names = "gmac", "stmmaceth";
--			resets = <&reset 6>;
-+			resets = <&reset RESET_MAC>;
- 
- 			/* Regmap for sys registers */
- 			oxsemi,sys-ctrl = <&sys>;
-@@ -208,7 +210,7 @@
- 			       no-loopback-test;
- 			       status = "disabled";
- 			       clocks = <&sysclk>;
--			       resets = <&reset 17>;
-+			       resets = <&reset RESET_UART1>;
- 			};
- 
- 			uart1: serial at 300000 {
-@@ -222,7 +224,7 @@
- 			       no-loopback-test;
- 			       status = "disabled";
- 			       clocks = <&sysclk>;
--			       resets = <&reset 18>;
-+			       resets = <&reset RESET_UART2>;
- 			};
- 
- 			rps at 400000 {
+Applied, thanks.
+
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 6ee2cc6..b31f123 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -591,7 +591,22 @@ static struct mfd_cell axp20x_cells[] = {
+>  	},
+>  };
+>  
+> -static struct mfd_cell axp22x_cells[] = {
+> +static struct mfd_cell axp221_cells[] = {
+> +	{
+> +		.name		= "axp20x-pek",
+> +		.num_resources	= ARRAY_SIZE(axp22x_pek_resources),
+> +		.resources	= axp22x_pek_resources,
+> +	}, {
+> +		.name		= "axp20x-regulator",
+> +	}, {
+> +		.name		= "axp20x-usb-power-supply",
+> +		.of_compatible	= "x-powers,axp221-usb-power-supply",
+> +		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
+> +		.resources	= axp22x_usb_power_supply_resources,
+> +	},
+> +};
+> +
+> +static struct mfd_cell axp223_cells[] = {
+>  	{
+>  		.name			= "axp20x-pek",
+>  		.num_resources		= ARRAY_SIZE(axp22x_pek_resources),
+> @@ -600,7 +615,7 @@ static struct mfd_cell axp22x_cells[] = {
+>  		.name			= "axp20x-regulator",
+>  	}, {
+>  		.name		= "axp20x-usb-power-supply",
+> -		.of_compatible	= "x-powers,axp221-usb-power-supply",
+> +		.of_compatible	= "x-powers,axp223-usb-power-supply",
+>  		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
+>  		.resources	= axp22x_usb_power_supply_resources,
+>  	},
+> @@ -793,9 +808,14 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
+>  		axp20x->regmap_irq_chip = &axp20x_regmap_irq_chip;
+>  		break;
+>  	case AXP221_ID:
+> +		axp20x->nr_cells = ARRAY_SIZE(axp221_cells);
+> +		axp20x->cells = axp221_cells;
+> +		axp20x->regmap_cfg = &axp22x_regmap_config;
+> +		axp20x->regmap_irq_chip = &axp22x_regmap_irq_chip;
+> +		break;
+>  	case AXP223_ID:
+> -		axp20x->nr_cells = ARRAY_SIZE(axp22x_cells);
+> -		axp20x->cells = axp22x_cells;
+> +		axp20x->nr_cells = ARRAY_SIZE(axp223_cells);
+> +		axp20x->cells = axp223_cells;
+>  		axp20x->regmap_cfg = &axp22x_regmap_config;
+>  		axp20x->regmap_irq_chip = &axp22x_regmap_irq_chip;
+>  		break;
+
 -- 
-2.7.0
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
