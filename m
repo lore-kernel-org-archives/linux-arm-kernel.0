@@ -1,101 +1,257 @@
-From: jerry.huang@nxp.com (Jerry Huang)
-Date: Wed, 4 Jan 2017 02:24:59 +0000
-Subject: [PATCH v3 2/3] USB3/DWC3: Add property "snps,
- incr-burst-type-adjustment" for INCR burst type
-In-Reply-To: <CAL_JsqJuifiSQAt-6FgtYYSukAnjzOLuTGEsO-Spn5LxkU-iwQ@mail.gmail.com>
-References: <1482139554-13618-1-git-send-email-jerry.huang@nxp.com>
- <1482139554-13618-2-git-send-email-jerry.huang@nxp.com>
- <20161222184514.hfd4g7ifrz5cv627@rob-hp-laptop>
- <DB5PR0401MB1813E210B2ADE1C9493F7768FE950@DB5PR0401MB1813.eurprd04.prod.outlook.com>
- <CAL_JsqJuifiSQAt-6FgtYYSukAnjzOLuTGEsO-Spn5LxkU-iwQ@mail.gmail.com>
-Message-ID: <DB5PR0401MB181361EBAD1B2BFA8DC5ED7AFE610@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 4 Jan 2017 10:37:57 +0800
+Subject: [PATCH 3/5] arm64: dts: sun50i: add MMC nodes
+In-Reply-To: <6e90ad76-8f25-538a-433e-ab31e8fab526@arm.com>
+References: <1483398226-29321-1-git-send-email-andre.przywara@arm.com>
+ <1483398226-29321-4-git-send-email-andre.przywara@arm.com>
+ <CAGb2v65GJFTnQZtWHCS7CAtA+Dry94o77aakPLr938BpQksLog@mail.gmail.com>
+ <d4c2233c-95aa-4d72-1501-9ecb62f6cd82@arm.com>
+ <CAGb2v65GAvyDn1oMXy2cpOD5PFRoYYOk-VbsMPAX3SNFz2ukLg@mail.gmail.com>
+ <6e90ad76-8f25-538a-433e-ab31e8fab526@arm.com>
+Message-ID: <CAGb2v65hmQPdt6tG9vx2Bfw0Y8zH+mYojdYUKtb1zPona2efLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Rob,
+On Wed, Jan 4, 2017 at 8:22 AM, Andr? Przywara <andre.przywara@arm.com> wrote:
+> On 03/01/17 13:28, Chen-Yu Tsai wrote:
+>> On Tue, Jan 3, 2017 at 6:48 PM, Andr? Przywara <andre.przywara@arm.com> wrote:
+>>> On 03/01/17 02:52, Chen-Yu Tsai wrote:
+>
+> Hi Chen-Yu,
+>
+>>>> On Tue, Jan 3, 2017 at 7:03 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+>>>>
+>>>> A commit message explaining the mmc controllers would be nice.
+>>>
+>>> OK.
+>>>
+>>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>>>> ---
+>>>>>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 67 +++++++++++++++++++++++++++
+>>>>>  1 file changed, 67 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>>>>> index e0dcab8..c680566 100644
+>>>>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>>>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>>>>> @@ -150,6 +150,32 @@
+>>>>>                                 pins = "PB8", "PB9";
+>>>>>                                 function = "uart0";
+>>>>>                         };
+>>>>> +
+>>>>> +                       mmc0_pins: mmc0 at 0 {
+>>>>> +                               pins = "PF0", "PF1", "PF2", "PF3", "PF4", "PF5";
+>>>>> +                               function = "mmc0";
+>>>>> +                               drive-strength = <30>;
+>>>>> +                       };
+>>>>> +
+>>>>> +                       mmc0_default_cd_pin: mmc0_cd_pin at 0 {
+>>>>> +                               pins = "PF6";
+>>>>> +                               function = "gpio_in";
+>>>>> +                               bias-pull-up;
+>>>>> +                       };
+>>>>
+>>>> We are starting to drop pinmux nodes for gpio usage.
+>>>
+>>> And replacing them with what?
+>>> Or do you mean they go in the individual board .dts files?
+>>> In this case I believe having a default pin defined here would help to
+>>> define it in every .dts.
+>>
+>> Nope. I meant dropping them. Pinmux and gpio are orthogonal. One should not
+>> need to specify a gpio pinmux to use it as a gpio. We added them because in
+>> the past nothing was preventing someone from claiming an already muxed pin
+>> as a gpio. On some platforms this is fine. For sunxi, this breaks the system,
+>> as the gpio functions are muxed in.
+>>
+>> The idea moving forward is that these cases should be guarded in the driver.
+>
+> Ah, OK, you mean just referencing the pin like:
+>         cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
+> in the board DT is enough? And the driver claiming it will (eventually?)
+> prevent users from using them via the sysfs interface then?
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: Wednesday, January 04, 2017 5:24 AM
-> To: Jerry Huang <jerry.huang@nxp.com>
-> Cc: balbi at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
-> will.deacon at arm.com; linux at armlinux.org.uk; devicetree at vger.kernel.org;
-> linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v3 2/3] USB3/DWC3: Add property "snps, incr-burst-
-> type-adjustment" for INCR burst type
-> 
-> On Thu, Dec 22, 2016 at 8:52 PM, Jerry Huang <jerry.huang@nxp.com> wrote:
-> > Hi, Rob,
-> >> -----Original Message-----
-> >> From: Rob Herring [mailto:robh at kernel.org]
-> >> Sent: Friday, December 23, 2016 2:45 AM
-> >> To: Jerry Huang <jerry.huang@nxp.com>
-> >> Cc: balbi at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
-> >> will.deacon at arm.com; linux at armlinux.org.uk;
-> >> devicetree at vger.kernel.org; linux-usb at vger.kernel.org;
-> >> linux-kernel at vger.kernel.org; linux-arm- kernel at lists.infradead.org
-> >> Subject: Re: [PATCH v3 2/3] USB3/DWC3: Add property "snps,
-> >> incr-burst- type-adjustment" for INCR burst type
-> >>
-> >> On Mon, Dec 19, 2016 at 05:25:53PM +0800, Changming Huang wrote:
-> >> > New property "snps,incr-burst-type-adjustment = <x>, <y>" for
-> >> > USB3.0
-> >> DWC3.
-> >> > Field "x": 1/0 - undefined length INCR burst type enable or not;
-> >> > Field
-> >> > "y": INCR4/INCR8/INCR16/INCR32/INCR64/INCR128/INCR256 burst type.
-> >> >
-> >> > While enabling undefined length INCR burst type and INCR16 burst
-> >> > type, get better write performance on NXP Layerscape platform:
-> >> > around 3% improvement (from 364MB/s to 375MB/s).
-> >> >
-> >> > Signed-off-by: Changming Huang <jerry.huang@nxp.com>
-> >> > ---
-> >> > Changes in v3:
-> >> >   - add new property for INCR burst in usb node.
-> >> >
-> >> >  Documentation/devicetree/bindings/usb/dwc3.txt |    5 +++++
-> >> >  arch/arm/boot/dts/ls1021a.dtsi                 |    1 +
-> >> >  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |    3 +++
-> >> >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |    2 ++
-> >> >  4 files changed, 11 insertions(+)
-> >> >
-> >> > diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt
-> >> > b/Documentation/devicetree/bindings/usb/dwc3.txt
-> >> > index e3e6983..8c405a3 100644
-> >> > --- a/Documentation/devicetree/bindings/usb/dwc3.txt
-> >> > +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
-> >> > @@ -55,6 +55,10 @@ Optional properties:
-> >> >     fladj_30mhz_sdbnd signal is invalid or incorrect.
-> >> >
-> >> >   - <DEPRECATED> tx-fifo-resize: determines if the FIFO *has* to be
-> >> reallocated.
-> >> > + - snps,incr-burst-type-adjustment: Value for INCR burst type of
-> >> GSBUSCFG0
-> >> > +   register, undefined length INCR burst type enable and INCRx type.
-> >> > +   First field is for undefined length INCR burst type enable or not.
-> >> > +   Second field is for largest INCRx type enabled.
-> >>
-> >> Why do you need the first field? Is the 2nd field used if the 1st is 0?
-> >> If not, then just use the presence of the property to enable or not.
-> > The first field is one switch.
-> > When it is 1, means undefined length INCR burst type enabled, we can use
-> any length less than or equal to the largest-enabled burst length of
-> INCR4/8/16/32/64/128/256.
-> > When it is zero, means INCRx burst mode enabled, we can use one fixed
-> burst length of 1/4/8/16/32/64/128/256 byte.
-> > So, the 2nd field is used if the 1st is 0, we need to select one largest burst
-> length the USB controller can support.
-> > If we don't want to change the value of this register (use the default value),
-> we don't need to add this property to usb node.
-> 
-> Just make this a single value with 0 meaning INCR and 4/8/16/etc being INCRx.
-Maybe, I didn't describe it clearly. 
-According to DWC3 spec, the value "0" of field INCRBrstEna means INCRx burst mode, 1 means INCR burst mode.
-Regardless of the value of INCRBrstEna [bit0], we need to modify the other field bit[1,2,3,4,5,6,7] to one INCR burst type  for the platform supported.
-Ad you mentioned, if we just use a single value with 0 meaning INCR and 4/8/16/etc being INCRx.
-I understand totally that when it is none-zero, we can use it for INCR burst mode. 
-Then, when it is 0, how to select the INCRx value?
+cd-gpios = ....
 
-So, I think we still need two vaue to specify INCRBrstEna and INCRx burst type.
+should be enough to block other devices from claiming a pinmux (pinctrl-N = ...)
+on the same pin, or vice versa, whichever claimed it first in kernel space.
+
+Same goes for a pin already claimed by a device through a pinmux. It should
+not be claimable as a gpio through the sysfs interface.
+
+>> Of course we would have to deal with existing dtbs, but lets not add any more.
+>>
+>>>>> +
+>>>>> +                       mmc1_pins: mmc1 at 0 {
+>>>>> +                               pins = "PG0", "PG1", "PG2", "PG3", "PG4", "PG5";
+>>>>> +                               function = "mmc1";
+>>>>> +                               drive-strength = <30>;
+>>>>> +                       };
+>>>>> +
+>>>>> +                       mmc2_pins: mmc2 at 0 {
+>>>>> +                               pins = "PC1", "PC5", "PC6", "PC8", "PC9",
+>>>>> +                                      "PC10", "PC11", "PC12", "PC13", "PC14",
+>>>>> +                                      "PC15", "PC16";
+>>>>> +                               function = "mmc2";
+>>>>> +                               drive-strength = <30>;
+>>>>> +                       };
+>>>>
+>>>> Moreover I think you should split out the pinmux nodes to a separate patch.
+>>>
+>>> I can surely do, just wondering what's the rationale is behind that?
+>>
+>> More or less the "do one thing in one patch" rationale. Of course you can
+>> claim these are the defaults used in the reference design and pretty much
+>> every board out there. Then it makes sense to do them together. :)
+>
+> Mmmh, probably a misunderstanding, but:
+> Those pins are the possible pins that expose the MMC interface. Those
+> nodes here name them to allow easy and concise reference by a board DT
+> (as in the following patch).
+> And in fact in case of the A64 there are _no_ alternative muxes for the
+> three MMC controllers: SDC0 is only on PF0-5, SDC1 on PG0-PG5 and SDC2
+> on PC1-PC16.
+> So it's not a board design question, apart from using a controller or not.
+>
+> That's why I rather keep them together with the MMC controller nodes.
+
+Cool. Please mention this in the commit log, as in they are the only
+possible choice.S ince they are the only choices, please drop the @0
+in the node name.
+
+And you might want to rename mmc2_pins to something like
+"mmc2_8bit_pins: mmc2_8bit". Who knows, someone might consider using
+it for an SD card or SDIO, and the remaining pins for something else.
+
+>>>>
+>>>>>                 };
+>>>>>
+>>>>>                 uart0: serial at 1c28000 {
+>>>>> @@ -240,6 +266,47 @@
+>>>>>                         #size-cells = <0>;
+>>>>>                 };
+>>>>>
+>>>>> +               mmc0: mmc at 1c0f000 {
+>>>>> +                       compatible = "allwinner,sun50i-a64-mmc",
+>>>>> +                                    "allwinner,sun5i-a13-mmc";
+>>>>
+>>>> Given that sun5i doesn't support mmc delay timings, and the A64 has
+>>>> calibration and delay timings, I wouldn't call them compatible.
+>>>>
+>>>> Or are you claiming that for the A64 has a delay of 0 for the
+>>>> currently supported speeds, so the calibration doesn't really
+>>>> matter? If so this should be mentioned in the commit message.
+>>>
+>>> Yes, that's my observation: Driving it with sun5-a13-mmc just works.
+>>> This sun5i driver version does not (and will never) support higher
+>>> transfer modes anyway, so for that subset they are compatible. This
+>>> opens up the door to other operating systems not having a particular
+>>> driver for the A64, for instance, also older Linux kernels.
+>>> I know that sunxi doesn't use this compatible feature much, but IMHO we
+>>> should really start thinking about the DT not just being Linux specific
+>>> - or even being specific to a certain Linux version. And this case here
+>>> is a good example: An A13 MMC driver can drive this device - if there is
+>>> no better driver (an A64 one) available.
+>>
+>> Cool. Please put this in the commit log. :)
+>
+> Noted for a repost.
+>
+>>>
+>>>>
+>>>>> +                       reg = <0x01c0f000 0x1000>;
+>>>>> +                       clocks = <&ccu 31>, <&ccu 75>;
+>>>>
+>>>> The clock / reset index macros are in the tree now.
+>>>> Please switch to them.
+>>>
+>>> The include file is in the tree, but it isn't used in the current HEAD
+>>> (as in #included and the actual macros being used in the .dtsi).
+>>> So I was wondering if there is a patch pending for that?
+>>
+>> Not yet I think. Perhaps Maxime will do one once he gets back from vacation?
+>
+> Seems like everybody hopes for it and nobody bothers with this rather
+> trivial patch ;-)
+
+A bit of context here. This was changed _after_ the A64 patches were
+pulled into arm-soc, by the arm-soc maintainers, to avoid ugly cross
+tree merges. The idea was to change them back after -rc1. I don't know
+if a patch to do that is ready though.
+
+> Frankly I am not overly keen on having all those defines in the DTs,
+> which rely on a bunch of include files scattered over the Linux include
+> tree. This makes it unnecessarily complicated to compile this out of
+> tree or move it over to some other piece of software (other OS, U-Boot).
+> Also it gives people the impression that it's fine to change the
+> definition in the include file at will (because it looks like Linux
+> territory).
+
+The dt-bindings related header files are split into a separate directory.
+They are also included in the separate devicetree repository:
+
+    https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/
+
+And no, I don't think it implies that it's fine to change it. The
+include/dt-bindings/ subdirectory is part of the device tree bindings,
+just like Documentation/devicetree/bindings. Does the latter give the
+impression that it is fine to change it, because it's in the docs?
+
+> Eventually some file has to hold the actual hardware information, I
+> don't see why this shouldn't be the one .dtsi file. Reading that the
+> clock for MMC controller 0 is MMC0_CLK isn't very informative.
+
+For me, it makes it much easier to review, than say a plain number,
+which I would have to dig through some file, probably the clock driver,
+to check if it matches.
+
+Regards
+ChenYu
+
+> Cheers,
+> Andre.
+>
+>>>>> +                       clock-names = "ahb", "mmc";
+>>>>> +                       resets = <&ccu 8>;
+>>>>> +                       reset-names = "ahb";
+>>>>> +                       interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+>>>>> +                       status = "disabled";
+>>>>> +                       #address-cells = <1>;
+>>>>> +                       #size-cells = <0>;
+>>>>> +               };
+>>>>> +
+>>>>> +               mmc1: mmc at 1c10000 {
+>>>>> +                       compatible = "allwinner,sun50i-a64-mmc",
+>>>>> +                                    "allwinner,sun5i-a13-mmc";
+>>>>> +                       reg = <0x01c10000 0x1000>;
+>>>>> +                       clocks = <&ccu 32>, <&ccu 76>;
+>>>>> +                       clock-names = "ahb", "mmc";
+>>>>> +                       resets = <&ccu 9>;
+>>>>> +                       reset-names = "ahb";
+>>>>> +                       interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+>>>>> +                       status = "disabled";
+>>>>> +                       #address-cells = <1>;
+>>>>> +                       #size-cells = <0>;
+>>>>> +               };
+>>>>> +
+>>>>> +               mmc2: mmc at 1c11000 {
+>>>>> +                       compatible = "allwinner,sun50i-a64-emmc";
+>>>>> +                       reg = <0x01c11000 0x1000>;
+>>>>> +                       clocks = <&ccu 33>, <&ccu 77>;
+>>>>> +                       clock-names = "ahb", "mmc";
+>>>>> +                       resets = <&ccu 10>;
+>>>>> +                       reset-names = "ahb";
+>>>>> +                       interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+>>>>> +                       status = "disabled";
+>>>>> +                       #address-cells = <1>;
+>>>>> +                       #size-cells = <0>;
+>>>>> +               };
+>>>>> +
+>>>>>                 gic: interrupt-controller at 1c81000 {
+>>>>>                         compatible = "arm,gic-400";
+>>>>>                         reg = <0x01c81000 0x1000>,
+>>>>> --
+>>>>> 2.8.2
+>>>>>
+>>>
+>
