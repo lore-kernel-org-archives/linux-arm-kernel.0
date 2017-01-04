@@ -1,31 +1,32 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Wed,  4 Jan 2017 13:32:23 +0000
-Subject: [PATCH v5 14/17] irqchip/gicv3-its: Sets IRQ_DOMAIN_FLAG_MSI_REMAP
-In-Reply-To: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
-References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1483536746-2725-15-git-send-email-eric.auger@redhat.com>
+From: manish.narani@xilinx.com (Manish Narani)
+Date: Wed, 4 Jan 2017 18:52:55 +0530
+Subject: [RFC PATCH] arch: arm64: dts: add USB OTG interrupts support in
+ ZynqMP device tree
+Message-ID: <1483536181-22356-1-git-send-email-mnarani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GICv3 ITS is MSI remapping capable. Let's advertise
-this property so that VFIO passthrough can assess IRQ safety.
+This patch adds OTG interrupt support in device tree. It will add
+an extra interrupt line number dedicated to OTG events. This will
+enable OTG interrupts to serve in DWC3 OTG driver.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Manish Narani <mnarani@xilinx.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 69b040f..9d4fefc 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1642,6 +1642,7 @@ static int its_init_domain(struct fwnode_handle *handle, struct its_node *its)
- 
- 	inner_domain->parent = its_parent;
- 	inner_domain->bus_token = DOMAIN_BUS_NEXUS;
-+	inner_domain->flags |= IRQ_DOMAIN_FLAG_MSI_REMAP;
- 	info->ops = &its_msi_domain_ops;
- 	info->data = its;
- 	inner_domain->host_data = info;
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+index 68a90833..ce9ad02 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
++++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+@@ -351,7 +351,7 @@
+ 			compatible = "snps,dwc3";
+ 			status = "disabled";
+ 			interrupt-parent = <&gic>;
+-			interrupts = <0 65 4>;
++			interrupts = <0 65 4>, <0 69 4>;
+ 			reg = <0x0 0xfe200000 0x0 0x40000>;
+ 			clock-names = "clk_xin", "clk_ahb";
+ 		};
 -- 
-1.9.1
+2.1.1
