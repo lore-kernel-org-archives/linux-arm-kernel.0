@@ -1,214 +1,233 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Wed, 4 Jan 2017 00:22:15 +0000
-Subject: [PATCH 3/5] arm64: dts: sun50i: add MMC nodes
-In-Reply-To: <CAGb2v65GAvyDn1oMXy2cpOD5PFRoYYOk-VbsMPAX3SNFz2ukLg@mail.gmail.com>
-References: <1483398226-29321-1-git-send-email-andre.przywara@arm.com>
- <1483398226-29321-4-git-send-email-andre.przywara@arm.com>
- <CAGb2v65GJFTnQZtWHCS7CAtA+Dry94o77aakPLr938BpQksLog@mail.gmail.com>
- <d4c2233c-95aa-4d72-1501-9ecb62f6cd82@arm.com>
- <CAGb2v65GAvyDn1oMXy2cpOD5PFRoYYOk-VbsMPAX3SNFz2ukLg@mail.gmail.com>
-Message-ID: <6e90ad76-8f25-538a-433e-ab31e8fab526@arm.com>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Wed,  4 Jan 2017 08:19:16 +0800
+Subject: [PATCH v5 3/4] soc: zte: pm_domains: Add support for zx296718 board
+In-Reply-To: <1483489157-10782-1-git-send-email-baoyou.xie@linaro.org>
+References: <1483489157-10782-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <1483489157-10782-3-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/17 13:28, Chen-Yu Tsai wrote:
-> On Tue, Jan 3, 2017 at 6:48 PM, Andr? Przywara <andre.przywara@arm.com> wrote:
->> On 03/01/17 02:52, Chen-Yu Tsai wrote:
+This patch introduces the power domain driver of zx296718
+which belongs to zte's zx2967 family.
 
-Hi Chen-Yu,
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+Reviewed-by: Shawn Guo <shawnguo@kernel.org>
+Reviewed-by: Jun Nie <jun.nie@linaro.org>
+---
+ drivers/soc/zte/Makefile              |   2 +-
+ drivers/soc/zte/zx296718_pm_domains.c | 194 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 195 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/soc/zte/zx296718_pm_domains.c
 
->>> On Tue, Jan 3, 2017 at 7:03 AM, Andre Przywara <andre.przywara@arm.com> wrote:
->>>
->>> A commit message explaining the mmc controllers would be nice.
->>
->> OK.
->>
->>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>>> ---
->>>>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 67 +++++++++++++++++++++++++++
->>>>  1 file changed, 67 insertions(+)
->>>>
->>>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>>> index e0dcab8..c680566 100644
->>>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>>> @@ -150,6 +150,32 @@
->>>>                                 pins = "PB8", "PB9";
->>>>                                 function = "uart0";
->>>>                         };
->>>> +
->>>> +                       mmc0_pins: mmc0 at 0 {
->>>> +                               pins = "PF0", "PF1", "PF2", "PF3", "PF4", "PF5";
->>>> +                               function = "mmc0";
->>>> +                               drive-strength = <30>;
->>>> +                       };
->>>> +
->>>> +                       mmc0_default_cd_pin: mmc0_cd_pin at 0 {
->>>> +                               pins = "PF6";
->>>> +                               function = "gpio_in";
->>>> +                               bias-pull-up;
->>>> +                       };
->>>
->>> We are starting to drop pinmux nodes for gpio usage.
->>
->> And replacing them with what?
->> Or do you mean they go in the individual board .dts files?
->> In this case I believe having a default pin defined here would help to
->> define it in every .dts.
-> 
-> Nope. I meant dropping them. Pinmux and gpio are orthogonal. One should not
-> need to specify a gpio pinmux to use it as a gpio. We added them because in
-> the past nothing was preventing someone from claiming an already muxed pin
-> as a gpio. On some platforms this is fine. For sunxi, this breaks the system,
-> as the gpio functions are muxed in.
-> 
-> The idea moving forward is that these cases should be guarded in the driver.
-
-Ah, OK, you mean just referencing the pin like:
-        cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
-in the board DT is enough? And the driver claiming it will (eventually?)
-prevent users from using them via the sysfs interface then?
-
-> Of course we would have to deal with existing dtbs, but lets not add any more.
-> 
->>>> +
->>>> +                       mmc1_pins: mmc1 at 0 {
->>>> +                               pins = "PG0", "PG1", "PG2", "PG3", "PG4", "PG5";
->>>> +                               function = "mmc1";
->>>> +                               drive-strength = <30>;
->>>> +                       };
->>>> +
->>>> +                       mmc2_pins: mmc2 at 0 {
->>>> +                               pins = "PC1", "PC5", "PC6", "PC8", "PC9",
->>>> +                                      "PC10", "PC11", "PC12", "PC13", "PC14",
->>>> +                                      "PC15", "PC16";
->>>> +                               function = "mmc2";
->>>> +                               drive-strength = <30>;
->>>> +                       };
->>>
->>> Moreover I think you should split out the pinmux nodes to a separate patch.
->>
->> I can surely do, just wondering what's the rationale is behind that?
-> 
-> More or less the "do one thing in one patch" rationale. Of course you can
-> claim these are the defaults used in the reference design and pretty much
-> every board out there. Then it makes sense to do them together. :)
-
-Mmmh, probably a misunderstanding, but:
-Those pins are the possible pins that expose the MMC interface. Those
-nodes here name them to allow easy and concise reference by a board DT
-(as in the following patch).
-And in fact in case of the A64 there are _no_ alternative muxes for the
-three MMC controllers: SDC0 is only on PF0-5, SDC1 on PG0-PG5 and SDC2
-on PC1-PC16.
-So it's not a board design question, apart from using a controller or not.
-
-That's why I rather keep them together with the MMC controller nodes.
-
->>>
->>>>                 };
->>>>
->>>>                 uart0: serial at 1c28000 {
->>>> @@ -240,6 +266,47 @@
->>>>                         #size-cells = <0>;
->>>>                 };
->>>>
->>>> +               mmc0: mmc at 1c0f000 {
->>>> +                       compatible = "allwinner,sun50i-a64-mmc",
->>>> +                                    "allwinner,sun5i-a13-mmc";
->>>
->>> Given that sun5i doesn't support mmc delay timings, and the A64 has
->>> calibration and delay timings, I wouldn't call them compatible.
->>>
->>> Or are you claiming that for the A64 has a delay of 0 for the
->>> currently supported speeds, so the calibration doesn't really
->>> matter? If so this should be mentioned in the commit message.
->>
->> Yes, that's my observation: Driving it with sun5-a13-mmc just works.
->> This sun5i driver version does not (and will never) support higher
->> transfer modes anyway, so for that subset they are compatible. This
->> opens up the door to other operating systems not having a particular
->> driver for the A64, for instance, also older Linux kernels.
->> I know that sunxi doesn't use this compatible feature much, but IMHO we
->> should really start thinking about the DT not just being Linux specific
->> - or even being specific to a certain Linux version. And this case here
->> is a good example: An A13 MMC driver can drive this device - if there is
->> no better driver (an A64 one) available.
-> 
-> Cool. Please put this in the commit log. :)
-
-Noted for a repost.
-
->>
->>>
->>>> +                       reg = <0x01c0f000 0x1000>;
->>>> +                       clocks = <&ccu 31>, <&ccu 75>;
->>>
->>> The clock / reset index macros are in the tree now.
->>> Please switch to them.
->>
->> The include file is in the tree, but it isn't used in the current HEAD
->> (as in #included and the actual macros being used in the .dtsi).
->> So I was wondering if there is a patch pending for that?
-> 
-> Not yet I think. Perhaps Maxime will do one once he gets back from vacation?
-
-Seems like everybody hopes for it and nobody bothers with this rather
-trivial patch ;-)
-Frankly I am not overly keen on having all those defines in the DTs,
-which rely on a bunch of include files scattered over the Linux include
-tree. This makes it unnecessarily complicated to compile this out of
-tree or move it over to some other piece of software (other OS, U-Boot).
-Also it gives people the impression that it's fine to change the
-definition in the include file at will (because it looks like Linux
-territory).
-Eventually some file has to hold the actual hardware information, I
-don't see why this shouldn't be the one .dtsi file. Reading that the
-clock for MMC controller 0 is MMC0_CLK isn't very informative.
-
-Cheers,
-Andre.
-
->>>> +                       clock-names = "ahb", "mmc";
->>>> +                       resets = <&ccu 8>;
->>>> +                       reset-names = "ahb";
->>>> +                       interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
->>>> +                       status = "disabled";
->>>> +                       #address-cells = <1>;
->>>> +                       #size-cells = <0>;
->>>> +               };
->>>> +
->>>> +               mmc1: mmc at 1c10000 {
->>>> +                       compatible = "allwinner,sun50i-a64-mmc",
->>>> +                                    "allwinner,sun5i-a13-mmc";
->>>> +                       reg = <0x01c10000 0x1000>;
->>>> +                       clocks = <&ccu 32>, <&ccu 76>;
->>>> +                       clock-names = "ahb", "mmc";
->>>> +                       resets = <&ccu 9>;
->>>> +                       reset-names = "ahb";
->>>> +                       interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
->>>> +                       status = "disabled";
->>>> +                       #address-cells = <1>;
->>>> +                       #size-cells = <0>;
->>>> +               };
->>>> +
->>>> +               mmc2: mmc at 1c11000 {
->>>> +                       compatible = "allwinner,sun50i-a64-emmc";
->>>> +                       reg = <0x01c11000 0x1000>;
->>>> +                       clocks = <&ccu 33>, <&ccu 77>;
->>>> +                       clock-names = "ahb", "mmc";
->>>> +                       resets = <&ccu 10>;
->>>> +                       reset-names = "ahb";
->>>> +                       interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
->>>> +                       status = "disabled";
->>>> +                       #address-cells = <1>;
->>>> +                       #size-cells = <0>;
->>>> +               };
->>>> +
->>>>                 gic: interrupt-controller at 1c81000 {
->>>>                         compatible = "arm,gic-400";
->>>>                         reg = <0x01c81000 0x1000>,
->>>> --
->>>> 2.8.2
->>>>
->>
+diff --git a/drivers/soc/zte/Makefile b/drivers/soc/zte/Makefile
+index 8a37f2f..f399553 100644
+--- a/drivers/soc/zte/Makefile
++++ b/drivers/soc/zte/Makefile
+@@ -1,4 +1,4 @@
+ #
+ # ZTE SOC drivers
+ #
+-obj-$(CONFIG_ZX2967_PM_DOMAINS) += zx2967_pm_domains.o
++obj-$(CONFIG_ZX2967_PM_DOMAINS) += zx2967_pm_domains.o zx296718_pm_domains.o
+diff --git a/drivers/soc/zte/zx296718_pm_domains.c b/drivers/soc/zte/zx296718_pm_domains.c
+new file mode 100644
+index 0000000..626e6ce
+--- /dev/null
++++ b/drivers/soc/zte/zx296718_pm_domains.c
+@@ -0,0 +1,194 @@
++/*
++ * Copyright (C) 2017 ZTE Ltd.
++ *
++ * Author: Baoyou Xie <baoyou.xie@linaro.org>
++ * License terms: GNU General Public License (GPL) version 2
++ */
++#include <dt-bindings/soc/zte,pm_domains.h>
++#include "zx2967_pm_domains.h"
++
++static u16 zx296718_offsets[REG_ARRAY_SIZE] = {
++	[REG_CLKEN] = 0x18,
++	[REG_ISOEN] = 0x1c,
++	[REG_RSTEN] = 0x20,
++	[REG_PWREN] = 0x24,
++	[REG_ACK_SYNC] = 0x28,
++};
++
++enum {
++	PCU_DM_VOU = 0,
++	PCU_DM_SAPPU,
++	PCU_DM_VDE,
++	PCU_DM_VCE,
++	PCU_DM_HDE,
++	PCU_DM_VIU,
++	PCU_DM_USB20,
++	PCU_DM_USB21,
++	PCU_DM_USB30,
++	PCU_DM_HSIC,
++	PCU_DM_GMAC,
++	PCU_DM_TS,
++};
++
++static struct zx2967_pm_domain vou_domain = {
++	.dm = {
++		.name		= "vou_domain",
++		.power_off	= zx2967_power_off,
++		.power_on	= zx2967_power_on,
++	},
++	.bit = PCU_DM_VOU,
++	.polarity = PWREN,
++	.reg_offset = zx296718_offsets,
++};
++static struct zx2967_pm_domain sappu_domain = {
++	.dm = {
++		.name		= "sappu_domain",
++		.power_off	= zx2967_power_off,
++		.power_on	= zx2967_power_on,
++	},
++	.bit = PCU_DM_SAPPU,
++	.polarity = PWREN,
++	.reg_offset = zx296718_offsets,
++};
++static struct zx2967_pm_domain vde_domain = {
++	.dm = {
++		.name		= "vde_domain",
++		.power_off	= zx2967_power_off,
++		.power_on	= zx2967_power_on,
++	},
++	.bit = PCU_DM_VDE,
++	.polarity = PWREN,
++	.reg_offset = zx296718_offsets,
++};
++static struct zx2967_pm_domain vce_domain = {
++	.dm = {
++		.name		= "vce_domain",
++		.power_off	= zx2967_power_off,
++		.power_on	= zx2967_power_on,
++	},
++	.bit = PCU_DM_VCE,
++	.polarity = PWREN,
++	.reg_offset = zx296718_offsets,
++};
++static struct zx2967_pm_domain hde_domain = {
++	.dm = {
++		.name		= "hde_domain",
++		.power_off	= zx2967_power_off,
++		.power_on	= zx2967_power_on,
++	},
++	.bit = PCU_DM_HDE,
++	.polarity = PWREN,
++	.reg_offset = zx296718_offsets,
++};
++
++static struct zx2967_pm_domain viu_domain = {
++	.dm = {
++		.name		= "viu_domain",
++		.power_off	= zx2967_power_off,
++		.power_on	= zx2967_power_on,
++	},
++	.bit = PCU_DM_VIU,
++	.polarity = PWREN,
++	.reg_offset = zx296718_offsets,
++};
++static struct zx2967_pm_domain usb20_domain = {
++	.dm = {
++		.name		= "usb20_domain",
++		.power_off	= zx2967_power_off,
++		.power_on	= zx2967_power_on,
++	},
++	.bit = PCU_DM_USB20,
++	.polarity = PWREN,
++	.reg_offset = zx296718_offsets,
++};
++static struct zx2967_pm_domain usb21_domain = {
++	.dm = {
++		.name		= "usb21_domain",
++		.power_off	= zx2967_power_off,
++		.power_on	= zx2967_power_on,
++	},
++	.bit = PCU_DM_USB21,
++	.polarity = PWREN,
++	.reg_offset = zx296718_offsets,
++};
++static struct zx2967_pm_domain usb30_domain = {
++	.dm = {
++		.name		= "usb30_domain",
++		.power_off	= zx2967_power_off,
++		.power_on	= zx2967_power_on,
++	},
++	.bit = PCU_DM_USB30,
++	.polarity = PWREN,
++	.reg_offset = zx296718_offsets,
++};
++static struct zx2967_pm_domain hsic_domain = {
++	.dm = {
++		.name		= "hsic_domain",
++		.power_off	= zx2967_power_off,
++		.power_on	= zx2967_power_on,
++	},
++	.bit = PCU_DM_HSIC,
++	.polarity = PWREN,
++	.reg_offset = zx296718_offsets,
++};
++static struct zx2967_pm_domain gmac_domain = {
++	.dm = {
++		.name		= "gmac_domain",
++		.power_off	= zx2967_power_off,
++		.power_on	= zx2967_power_on,
++	},
++	.bit = PCU_DM_GMAC,
++	.polarity = PWREN,
++	.reg_offset = zx296718_offsets,
++};
++static struct zx2967_pm_domain ts_domain = {
++	.dm = {
++		.name		= "ts_domain",
++		.power_off	= zx2967_power_off,
++		.power_on	= zx2967_power_on,
++	},
++	.bit = PCU_DM_TS,
++	.polarity = PWREN,
++	.reg_offset = zx296718_offsets,
++};
++struct generic_pm_domain *zx296718_pm_domains[] = {
++	[DM_ZX296718_SAPPU] = &sappu_domain.dm,
++	[DM_ZX296718_VDE] = &vde_domain.dm,
++	[DM_ZX296718_VCE] = &vce_domain.dm,
++	[DM_ZX296718_HDE] = &hde_domain.dm,
++	[DM_ZX296718_VIU] = &viu_domain.dm,
++	[DM_ZX296718_USB20] = &usb20_domain.dm,
++	[DM_ZX296718_USB21] = &usb21_domain.dm,
++	[DM_ZX296718_USB30] = &usb30_domain.dm,
++	[DM_ZX296718_HSIC] = &hsic_domain.dm,
++	[DM_ZX296718_GMAC] = &gmac_domain.dm,
++	[DM_ZX296718_TS] = &ts_domain.dm,
++	[DM_ZX296718_VOU] = &vou_domain.dm,
++};
++
++static int zx296718_pd_probe(struct platform_device *pdev)
++{
++	return zx2967_pd_probe(pdev,
++			  zx296718_pm_domains,
++			  ARRAY_SIZE(zx296718_pm_domains));
++}
++
++static const struct of_device_id zx296718_pm_domain_matches[] = {
++	{ .compatible = "zte,zx296718-pcu", },
++	{ },
++};
++
++static struct platform_driver zx296718_pd_driver = {
++	.driver = {
++		.name = "zx-powerdomain",
++		.owner = THIS_MODULE,
++		.of_match_table = zx296718_pm_domain_matches,
++	},
++	.probe = zx296718_pd_probe,
++};
++
++static int __init zx296718_pd_init(void)
++{
++	return platform_driver_register(&zx296718_pd_driver);
++}
++subsys_initcall(zx296718_pd_init);
+-- 
+2.7.4
