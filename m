@@ -1,32 +1,75 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed,  4 Jan 2017 13:34:56 +0000
-Subject: [PATCH 0/6] arm64: dts: DB410c and DB820c dt patches
-Message-ID: <1483536902-21450-1-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Wed,  4 Jan 2017 13:35:02 +0000
+Subject: [PATCH 6/6] arm64: dts: db820c: add support to volume up key
+In-Reply-To: <1483536902-21450-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1483536902-21450-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1483536902-21450-7-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches to add support to digital audio, Coresight, Volume up Key on DB410c.
-and a Fix and adds Volume up key for DB820c.
+This patch adds support to volume-up key found on the board.
 
-Ivan T. Ivanov (3):
-  arm64: dts: apq8016-sbc: Add Volume Up key device node
-  arm64: dts: apq8016-sbc: Limit MPP4 high state to 1.8V
-  arm64: dts: msm8916: Add CoreSight components
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ .../arm64/boot/dts/qcom/apq8096-db820c-pmic-pins.dtsi | 12 ++++++++++++
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi          | 19 +++++++++++++++++++
+ 2 files changed, 31 insertions(+)
 
-Srinivas Kandagatla (3):
-  arm64: dts: db820c: fix gpio pinctrl name correctly
-  arm64: dts: apq8016-sbc: add support to hdmi audio via adv7533
-  arm64: dts: db820c: add support to volume up key
-
- .../arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi |  13 ++
- arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi |  13 ++
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi          |  28 +++
- .../boot/dts/qcom/apq8096-db820c-pmic-pins.dtsi    |  14 +-
- arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi       |  19 ++
- arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi    | 254 +++++++++++++++++++++
- arch/arm64/boot/dts/qcom/msm8916.dtsi              |   3 +-
- 7 files changed, 342 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
-
---
+diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c-pmic-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c-pmic-pins.dtsi
+index 6c1628c..b1142c4 100644
+--- a/arch/arm64/boot/dts/qcom/apq8096-db820c-pmic-pins.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8096-db820c-pmic-pins.dtsi
+@@ -12,4 +12,16 @@
+ 			power-source = <2>; // PM8994_GPIO_S4, 1.8V
+ 		};
+ 	};
++
++	volume_up_gpio: pm8996_gpio2 {
++		pinconf {
++			pins = "gpio2";
++			function = "normal";
++			input-enable;
++			drive-push-pull;
++			bias-pull-up;
++			qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
++			power-source = <PM8994_GPIO_S4>; // 1.8V
++		};
++	};
+ };
+diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+index 422959b..d2196fc 100644
+--- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+@@ -15,6 +15,8 @@
+ #include "pm8994.dtsi"
+ #include "apq8096-db820c-pins.dtsi"
+ #include "apq8096-db820c-pmic-pins.dtsi"
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	aliases {
+@@ -87,4 +89,21 @@
+ 			status = "okay";
+ 		};
+ 	};
++
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		autorepeat;
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&volume_up_gpio>;
++
++		button at 0 {
++			label = "Volume Up";
++			linux,code = <KEY_VOLUMEUP>;
++			gpios = <&pm8994_gpios 2 GPIO_ACTIVE_LOW>;
++		};
++	};
+ };
+-- 
 2.10.1
