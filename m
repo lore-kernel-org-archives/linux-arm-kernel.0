@@ -1,45 +1,35 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Wed, 04 Jan 2017 15:31:26 +0200
-Subject: [RFC PATCH] usb: dwc3: add support for OTG driver compilation
-In-Reply-To: <1483536181-22356-2-git-send-email-mnarani@xilinx.com>
-References: <1483536181-22356-1-git-send-email-mnarani@xilinx.com>
- <1483536181-22356-2-git-send-email-mnarani@xilinx.com>
-Message-ID: <87r34jvtn5.fsf@linux.intel.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 4 Jan 2017 14:55:33 -0600
+Subject: [PATCH v3 1/4] PM / Domains: Add generic data pointer to genpd data
+ struct
+In-Reply-To: <20170104205536.15963-1-d-gerlach@ti.com>
+References: <20170104205536.15963-1-d-gerlach@ti.com>
+Message-ID: <20170104205536.15963-2-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add a void *data pointer to struct generic_pm_domain_data. Because this
+exists for each device associated with a genpd it will allow us to
+assign per-device data if needed on a platform for control of that
+specific device.
 
-Hi,
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ include/linux/pm_domain.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-Manish Narani <manish.narani@xilinx.com> writes:
-> This patch adds support for OTG driver compilation and object
-> file creation
->
-> Signed-off-by: Manish Narani <mnarani@xilinx.com>
-> ---
->  drivers/usb/dwc3/Makefile | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/drivers/usb/dwc3/Makefile b/drivers/usb/dwc3/Makefile
-> index ffca340..2d269ad 100644
-> --- a/drivers/usb/dwc3/Makefile
-> +++ b/drivers/usb/dwc3/Makefile
-> @@ -17,6 +17,10 @@ ifneq ($(filter y,$(CONFIG_USB_DWC3_GADGET) $(CONFIG_USB_DWC3_DUAL_ROLE)),)
->  	dwc3-y				+= gadget.o ep0.o
->  endif
->  
-> +ifneq ($(CONFIG_USB_DWC3_DUAL_ROLE),)
-> +	dwc3-y				+= otg.o
-> +endif
-
-you just broke compilation
-
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 81ece61075df..73c9dba5cfcc 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -117,6 +117,7 @@ struct generic_pm_domain_data {
+ 	struct pm_domain_data base;
+ 	struct gpd_timing_data td;
+ 	struct notifier_block nb;
++	void *data;
+ };
+ 
+ #ifdef CONFIG_PM_GENERIC_DOMAINS
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170104/5e6aebb4/attachment.sig>
+2.11.0
