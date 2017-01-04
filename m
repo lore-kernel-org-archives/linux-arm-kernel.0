@@ -1,63 +1,75 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 4 Jan 2017 12:07:50 +0100
-Subject: [PATCH] rtc: armada38x: add __ro_after_init to armada38x_rtc_ops
-In-Reply-To: <alpine.DEB.2.20.1701041155380.3073@hadrien>
-References: <1482751862-18699-1-git-send-email-bhumirks@gmail.com>
- <20170102140654.GF14217@n2100.armlinux.org.uk>
- <CAGXu5jJLA=GcOhV5Z_6AOGa1KhW7fXtqBGrewEeViaJ9TiE-aw@mail.gmail.com>
- <20170103213118.GM14217@n2100.armlinux.org.uk>
- <20170103215421.GN14217@n2100.armlinux.org.uk>
- <alpine.DEB.2.20.1701041155380.3073@hadrien>
-Message-ID: <20170104110750.dtu54t74qkuuvkvq@piout.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 4 Jan 2017 11:09:59 +0000
+Subject: [PATCH v2] mfd: mc13xxx: Set the irq type.
+In-Reply-To: <1483112613-18092-1-git-send-email-lilja.magnus@gmail.com>
+References: <1483112613-18092-1-git-send-email-lilja.magnus@gmail.com>
+Message-ID: <20170104110959.GZ27589@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/2017 at 11:57:00 +0100, Julia Lawall wrote :
-> 
-> 
-> On Tue, 3 Jan 2017, Russell King - ARM Linux wrote:
-> 
-> > On Tue, Jan 03, 2017 at 09:31:18PM +0000, Russell King - ARM Linux wrote:
-> > > On Tue, Jan 03, 2017 at 01:18:29PM -0800, Kees Cook wrote:
-> > > > On Mon, Jan 2, 2017 at 6:06 AM, Russell King - ARM Linux
-> > > > <linux@armlinux.org.uk> wrote:
-> > > > > On Mon, Dec 26, 2016 at 05:01:02PM +0530, Bhumika Goyal wrote:
-> > > > >> The object armada38x_rtc_ops of type rtc_class_ops structure is not
-> > > > >> modified after getting initialized by armada38x_rtc_probe. Apart from
-> > > > >> getting referenced in init it is also passed as an argument to the function
-> > > > >> devm_rtc_device_register but this argument is of type const struct
-> > > > >> rtc_class_ops *. Therefore add __ro_after_init to its declaration.
-> > > > >
-> > > > > What I'd prefer here is for the structure to be duplicated, with one
-> > > > > copy having the alarm methods and one which does not.  Both can then
-> > > > > be made "const" (so placed into the read-only section at link time)
-> > > > > and the probe function select between the two.
-> > > > >
-> > > > > I think that's a cleaner and better solution, even though it's
-> > > > > slightly larger.
-> > > > >
-> > > > > I'm not a fan of __ro_after_init being used where other solutions are
-> > > > > possible.
-> > > >
-> > > > Can the pointer that points to the struct rtc_class_ops be made ro_after_init?
-> > >
-> > > It's passed into the RTC core code, and probably stored in some dynamically
-> > > allocated object, so probably no.  It's the same class of problem as every
-> > > file_operations pointer in the kernel, or the thousand other operations
-> > > structure pointers that a running kernel has.
-> 
-> I'm not sure to understand the question and the response.  A quick check
-> with grep suggests that most rtc_class_ops pointers are already const.
-> There seem to be just some instances in specific drivers that are not.
-> 
+On Fri, 30 Dec 2016, Magnus Lilja wrote:
 
-The question was whether the point to the rtc_class_ops could be made
-__ro_after_init. And Russell is right, it is pointed to by the ops
-pointer in a struct rtc_device and that struct is dynamically allocated
-in rtc_device_register().
+> Commit 10f9edaeaa30 ("mfd: mc13xxx: Use regmap irq framework for
+> interrupts") removed the passing of the IRQF_TRIGGER_HIGH flag when
+> registering the interrupt.
+> This commit fixes that problem by setting the IRQF_TRIGGER_HIGH flag in
+> case no irq type is set via irqd framework (e.g. device tree). In the
+> latter case the irq flag from irqd is used.
 
+This looks like a hack.
+
+Why can't you set the trigger type in Device Tree instead?
+
+> Tested on i.MX31 PDK hardware.
+> 
+> Fixes: 10f9edaeaa30 ("mfd: mc13xxx: Use regmap irq framework for interrupts")
+> Cc: <stable@vger.kernel.org> # 3.18.x
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
+> ---
+> Changes from v1 (which was part of a patch series):
+>   - Now uses irqd_-functions to check if irq type is defined
+>   - Added Fixes: and Cc: to stable kernel.
+> 
+>  drivers/mfd/mc13xxx-core.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
+> index d7f54e4..e1757ea 100644
+> --- a/drivers/mfd/mc13xxx-core.c
+> +++ b/drivers/mfd/mc13xxx-core.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/of_device.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/mfd/core.h>
+> +#include <linux/irq.h>
+>  
+>  #include "mc13xxx.h"
+>  
+> @@ -410,6 +411,7 @@ int mc13xxx_common_init(struct device *dev)
+>  	struct mc13xxx *mc13xxx = dev_get_drvdata(dev);
+>  	u32 revision;
+>  	int i, ret;
+> +	unsigned int flags;
+>  
+>  	mc13xxx->dev = dev;
+>  
+> @@ -440,7 +442,11 @@ int mc13xxx_common_init(struct device *dev)
+>  	mc13xxx->irq_chip.irqs = mc13xxx->irqs;
+>  	mc13xxx->irq_chip.num_irqs = ARRAY_SIZE(mc13xxx->irqs);
+>  
+> -	ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq, IRQF_ONESHOT,
+> +	flags = irqd_get_trigger_type(irq_get_irq_data(mc13xxx->irq));
+> +	flags = (flags == IRQ_TYPE_NONE) ? IRQF_TRIGGER_HIGH : flags;
+> +
+> +	ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq,
+> +				  IRQF_ONESHOT | flags,
+>  				  0, &mc13xxx->irq_chip, &mc13xxx->irq_data);
+>  	if (ret)
+>  		return ret;
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
