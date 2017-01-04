@@ -1,60 +1,102 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 4 Jan 2017 13:50:20 +0000
-Subject: [PATCH 2/2] arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA
-In-Reply-To: <20170104132831.GD18193@arm.com>
-References: <1481706707-6211-1-git-send-email-ard.biesheuvel@linaro.org>
- <1481706707-6211-3-git-send-email-ard.biesheuvel@linaro.org>
- <20170104132831.GD18193@arm.com>
-Message-ID: <CAKv+Gu8MdpVDCSjfum7AMtbgR6cTP5H+67svhDSu6bkaijvvyg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Jan 2017 13:54:13 +0000
+Subject: [PATCH V6 04/10] arm64: exception: handle Synchronous External
+ Abort
+In-Reply-To: <1481147303-7979-5-git-send-email-tbaicar@codeaurora.org>
+References: <1481147303-7979-1-git-send-email-tbaicar@codeaurora.org>
+ <1481147303-7979-5-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <20170104135413.GE18193@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 January 2017 at 13:28, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Dec 14, 2016 at 09:11:47AM +0000, Ard Biesheuvel wrote:
->> The NUMA code may get confused by the presence of NOMAP regions within
->> zones, resulting in spurious BUG() checks where the node id deviates
->> from the containing zone's node id.
->>
->> Since the kernel has no business reasoning about node ids of pages it
->> does not own in the first place, enable CONFIG_HOLES_IN_ZONE to ensure
->> that such pages are disregarded.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/Kconfig | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 111742126897..0472afe64d55 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -614,6 +614,10 @@ config NEED_PER_CPU_EMBED_FIRST_CHUNK
->>       def_bool y
->>       depends on NUMA
->>
->> +config HOLES_IN_ZONE
->> +     def_bool y
->> +     depends on NUMA
->> +
->>  source kernel/Kconfig.preempt
->>  source kernel/Kconfig.hz
->
-> I'm happy to apply this, but I'll hold off until the first patch is queued
-> somewhere, since this doesn't help without the VM_BUG_ON being moved.
->
-> Alternatively, I can queue both if somebody from the mm camp acks the
-> first patch.
->
+On Wed, Dec 07, 2016 at 02:48:17PM -0700, Tyler Baicar wrote:
+> SEA exceptions are often caused by an uncorrected hardware
+> error, and are handled when data abort and instruction abort
+> exception classes have specific values for their Fault Status
+> Code.
+> When SEA occurs, before killing the process, go through
+> the handlers registered in the notification list.
+> Update fault_info[] with specific SEA faults so that the
+> new SEA handler is used.
+> 
+> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+> ---
+>  arch/arm64/include/asm/system_misc.h | 13 ++++++++
+>  arch/arm64/mm/fault.c                | 58 +++++++++++++++++++++++++++++-------
+>  2 files changed, 61 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+> index 57f110b..9040e1d 100644
+> --- a/arch/arm64/include/asm/system_misc.h
+> +++ b/arch/arm64/include/asm/system_misc.h
+> @@ -64,4 +64,17 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+>  
+>  #endif	/* __ASSEMBLY__ */
+>  
+> +/*
+> + * The functions below are used to register and unregister callbacks
+> + * that are to be invoked when a Synchronous External Abort (SEA)
+> + * occurs. An SEA is raised by certain fault status codes that have
+> + * either data or instruction abort as the exception class, and
+> + * callbacks may be registered to parse or handle such hardware errors.
+> + *
+> + * Registered callbacks are run in an interrupt/atomic context. They
+> + * are not allowed to block or sleep.
+> + */
+> +int register_synchronous_ext_abort_notifier(struct notifier_block *nb);
+> +void unregister_synchronous_ext_abort_notifier(struct notifier_block *nb);
 
-Actually, I am not convinced the discussion is finalized. These
-patches do fix the issue, but Robert also suggested an alternative fix
-which may be preferable.
+I think that we may as well use the "SEA" acronym consistently in code,
+expanding it only for strings and comments, so these can be renamed to
+{register,unregister}_sea_notifier. That said, what is the use of having a
+notifier chain here as well as in the ghes code? If the ghes code is the
+only place to register a notifier, we may as well start simple and call that
+code directly, like we call handle_mm_fault directly for data aborts.
 
-http://marc.info/?l=linux-arm-kernel&m=148190753510107&w=2
+>  static const struct fault_info {
+>  	int	(*fn)(unsigned long addr, unsigned int esr, struct pt_regs *regs);
+>  	int	sig;
+> @@ -502,22 +540,22 @@ static const struct fault_info {
+>  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
+>  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 permission fault"	},
+>  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 permission fault"	},
+> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort"	},
+> +	{ do_synch_ext_abort,	SIGBUS,  0,		"synchronous external abort"	},
 
-I haven't responded to it yet, due to the holidays, but I'd like to
-explore that solution a bit further before applying anything, if you
-don't mind.
+Again, just stick with do_sea for the function name...
 
-Thanks,
-Ard.
+>  	{ do_bad,		SIGBUS,  0,		"unknown 17"			},
+>  	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
+>  	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
+> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
+> +	{ do_synch_ext_abort,	SIGBUS,  0,		"level 0 SEA (trans tbl walk)"	},
+
+... but there's no need to abbreviate "translation table walk" here. Long
+strings that run over 80 chars are fine. Similarly for "SEA".
+
+> +	{ do_synch_ext_abort,	SIGBUS,  0,		"level 1 SEA (trans tbl walk)"	},
+> +	{ do_synch_ext_abort,	SIGBUS,  0,		"level 2 SEA (trans tbl walk)"	},
+> +	{ do_synch_ext_abort,	SIGBUS,  0,		"level 3 SEA (trans tbl walk)"	},
+> +	{ do_synch_ext_abort,	SIGBUS,  0,		"synchronous parity or ECC err" },
+>  	{ do_bad,		SIGBUS,  0,		"unknown 25"			},
+>  	{ do_bad,		SIGBUS,  0,		"unknown 26"			},
+>  	{ do_bad,		SIGBUS,  0,		"unknown 27"			},
+> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
+> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
+> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
+> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
+> +	{ do_synch_ext_abort,	SIGBUS,  0,		"level 0 synch parity error"	},
+> +	{ do_synch_ext_abort,	SIGBUS,  0,		"level 1 synch parity error"	},
+> +	{ do_synch_ext_abort,	SIGBUS,  0,		"level 2 synch parity error"	},
+> +	{ do_synch_ext_abort,	SIGBUS,  0,		"level 3 synch parity error"	},
+
+Please keep mention of "translation table walk", since we have exception
+levels too and it's confusing just saying "level n".
+
+Will
