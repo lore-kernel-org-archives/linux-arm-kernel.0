@@ -1,34 +1,40 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 4 Jan 2017 15:56:15 +0800
-Subject: [PATCH v6 01/14] ACPI: ARM64: IORT: minor cleanup for
- iort_match_node_callback()
-In-Reply-To: <20170103140839.GC7478@red-moon>
-References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
- <1483363905-2806-2-git-send-email-hanjun.guo@linaro.org>
- <20170103140839.GC7478@red-moon>
-Message-ID: <49365234-2f2f-1607-e520-b98b61e1b5e9@linaro.org>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Wed, 4 Jan 2017 13:30:28 +0530
+Subject: [PATCH] iommu: Drop the of_iommu_{set/get}_ops() interface
+In-Reply-To: <20170103173456.18154-1-lorenzo.pieralisi@arm.com>
+References: <20170103173456.18154-1-lorenzo.pieralisi@arm.com>
+Message-ID: <002c01d26660$a1bf2d40$e53d87c0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Lorenzo,
 
-On 2017/1/3 22:08, Lorenzo Pieralisi wrote:
-> On Mon, Jan 02, 2017 at 09:31:32PM +0800, Hanjun Guo wrote:
->> Cleanup iort_match_node_callback() a little bit to reduce
->> some lines of code, aslo fix the indentation in iort_scan_node().
+>With the introduction of the new iommu_{register/get}_instance()
+>interface in commit e4f10ffe4c9b ("iommu: Make of_iommu_set/get_ops() DT
+>agnostic") (based on struct fwnode_handle as look-up token, so firmware
+>agnostic) to register IOMMU instances with the core IOMMU layer there is
+>no reason to keep the old OF based interface around any longer.
 >
-> s/aslo/also
+>Convert all the IOMMU drivers (and OF IOMMU core code) that rely on the
+>of_iommu_{set/get}_ops() to the new kernel interface to register/retrieve
+>IOMMU instances and remove the of_iommu_{set/get}_ops() remaining glue
+>code in order to complete the interface rework.
 >
-> "Also" in a commit log is a sign a patch should be split and that's what
-> you should do even though I know it is tempting to merge all trivial
-> changes into one single patch.
+>Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>Cc: Matthias Brugger <matthias.bgg@gmail.com>
+>Cc: Will Deacon <will.deacon@arm.com>
+>Cc: Robin Murphy <robin.murphy@arm.com>
+>Cc: Joerg Roedel <joro@8bytes.org>
+>Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+>---
+>Exynos, msm and mtk code compile tested only owing to lack of
+>test platforms, I would appreciate some help in testing this
+>patch on those platforms before merging it even if it is just
+>a simple interface conversion.
 >
-> Make it two patches please.
 
-Will do, thanks!
+For msm,
+Tested-by: Sricharan R <sricharan@codeaurora.org>
 
-Do you have more comments regarding this patch set? I will
-incorporate all the comments and send out a new version.
-
-Thanks
-Hanjun
+Regards,
+ Sricharan
