@@ -1,95 +1,53 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  4 Jan 2017 12:05:27 +0000
-Subject: [PATCH] mailbox: sti: Fix mbox-names copy and paste error
-Message-ID: <20170104120527.24806-1-lee.jones@linaro.org>
+Date: Wed, 4 Jan 2017 11:57:16 +0000
+Subject: [PATCH 15/22] mfd: axp20x: add CHRG_CTRL1 to writeable regs for
+ AXP20X/AXP22X
+In-Reply-To: <20170102163723.7939-16-quentin.schulz@free-electrons.com>
+References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
+ <20170102163723.7939-16-quentin.schulz@free-electrons.com>
+Message-ID: <20170104115716.GE24058@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to an over-sight, mbox-names has become mbox-name in some instances.
+On Mon, 02 Jan 2017, Quentin Schulz wrote:
 
-Let's put it right.
+> The CHR_CTRL1 register is made of 7 read-write bits with one being used
+> to set the target voltage for battery charging.
+> 
+> This adds the CHRG_CTRL1 register to the list of writeable registers for
+> AXP20X and AXP22X PMICs.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+>  drivers/mfd/axp20x.c | 2 ++
+>  1 file changed, 2 insertions(+)
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- Documentation/devicetree/bindings/mailbox/sti-mailbox.txt | 4 ++--
- arch/arm/boot/dts/stih407-family.dtsi                     | 8 ++++----
- drivers/mailbox/mailbox-sti.c                             | 2 +-
- 3 files changed, 7 insertions(+), 7 deletions(-)
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+  
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 65c57d0..19bdba3 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -66,6 +66,7 @@ static const struct regmap_access_table axp152_volatile_table = {
+>  static const struct regmap_range axp20x_writeable_ranges[] = {
+>  	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
+>  	regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
+> +	regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL1),
+>  	regmap_reg_range(AXP20X_DCDC_MODE, AXP20X_FG_RES),
+>  	regmap_reg_range(AXP20X_RDC_H, AXP20X_OCV(AXP20X_OCV_MAX)),
+>  };
+> @@ -94,6 +95,7 @@ static const struct regmap_access_table axp20x_volatile_table = {
+>  static const struct regmap_range axp22x_writeable_ranges[] = {
+>  	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
+>  	regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
+> +	regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL1),
+>  	regmap_reg_range(AXP20X_DCDC_MODE, AXP22X_BATLOW_THRES1),
+>  };
+>  
 
-diff --git a/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
-index 351f612..648d176 100644
---- a/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
-+++ b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
-@@ -9,7 +9,7 @@ Controller
- Required properties:
- - compatible		: Should be "st,stih407-mailbox"
- - reg			: Offset and length of the device's register set
--- mbox-name		: Name of the mailbox
-+- mbox-names		: Name of the mailbox
- - #mbox-cells:		: Must be 2
- 			  <&phandle instance channel direction>
- 			    phandle   : Label name of controller
-@@ -26,7 +26,7 @@ mailbox0: mailbox at 0  {
- 	reg		= <0x08f00000 0x1000>;
- 	interrupts	= <GIC_SPI 1 IRQ_TYPE_NONE>;
- 	#mbox-cells	= <2>;
--	mbox-name	= "a9";
-+	mbox-names	= "a9";
- };
- 
- Client
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index c8b2944..00c67d4 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -787,7 +787,7 @@
- 			reg		= <0x8f00000 0x1000>;
- 			interrupts	= <GIC_SPI 1 IRQ_TYPE_NONE>;
- 			#mbox-cells	= <2>;
--			mbox-name	= "a9";
-+			mbox-names	= "a9";
- 			status		= "okay";
- 		};
- 
-@@ -795,7 +795,7 @@
- 			compatible	= "st,stih407-mailbox";
- 			reg		= <0x8f01000 0x1000>;
- 			#mbox-cells	= <2>;
--			mbox-name	= "st231_gp_1";
-+			mbox-names	= "st231_gp_1";
- 			status		= "okay";
- 		};
- 
-@@ -803,7 +803,7 @@
- 			compatible	= "st,stih407-mailbox";
- 			reg		= <0x8f02000 0x1000>;
- 			#mbox-cells	= <2>;
--			mbox-name	= "st231_gp_0";
-+			mbox-names	= "st231_gp_0";
- 			status		= "okay";
- 		};
- 
-@@ -811,7 +811,7 @@
- 			compatible	= "st,stih407-mailbox";
- 			reg		= <0x8f03000 0x1000>;
- 			#mbox-cells	= <2>;
--			mbox-name	= "st231_audio_video";
-+			mbox-names	= "st231_audio_video";
- 			status		= "okay";
- 		};
- 
-diff --git a/drivers/mailbox/mailbox-sti.c b/drivers/mailbox/mailbox-sti.c
-index 41bcd33..e532a98 100644
---- a/drivers/mailbox/mailbox-sti.c
-+++ b/drivers/mailbox/mailbox-sti.c
-@@ -434,7 +434,7 @@ static int sti_mbox_probe(struct platform_device *pdev)
- 	if (IS_ERR(mdev->base))
- 		return PTR_ERR(mdev->base);
- 
--	ret = of_property_read_string(np, "mbox-name", &mdev->name);
-+	ret = of_property_read_string(np, "mbox-names", &mdev->name);
- 	if (ret)
- 		mdev->name = np->full_name;
- 
 -- 
-2.10.2
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
