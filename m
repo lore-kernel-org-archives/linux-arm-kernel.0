@@ -1,71 +1,100 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Jan 2017 14:29:01 +0100
-Subject: [PATCH 1/2] arm64: dma_mapping: allow PCI host driver to limit
- DMA mask
-In-Reply-To: <4bbc3494-bf95-9765-ccaf-cc3b3e1cd297@cogentembedded.com>
-References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
- <5224989.KFLmAz9Gqk@wuerfel>
- <4bbc3494-bf95-9765-ccaf-cc3b3e1cd297@cogentembedded.com>
-Message-ID: <2104402.puPT8SttTe@wuerfel>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Wed,  4 Jan 2017 13:32:22 +0000
+Subject: [PATCH v5 13/17] irqdomain: irq_domain_check_msi_remap
+In-Reply-To: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
+References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1483536746-2725-14-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, January 4, 2017 9:24:09 AM CET Nikita Yushchenko wrote:
-> > commit 9a57d58d116800a535510053136c6dd7a9c26e25
-> > Author: Arnd Bergmann <arnd@arndb.de>
-> > Date:   Tue Nov 17 14:06:55 2015 +0100
-> > 
-> >     [EXPERIMENTAL] ARM64: check implement dma_set_mask
-> >     
-> >     Needs work for coherent mask
-> >     
-> >     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Unfortunately this is far incomplete
-> 
-> > @@ -957,6 +983,18 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> >  	if (!dev->archdata.dma_ops)
-> >  		dev->archdata.dma_ops = &swiotlb_dma_ops;
-> >  
-> > +	/*
-> > +	 * we don't yet support buses that have a non-zero mapping.
-> > +	 *  Let's hope we won't need it
-> > +	 */
-> > +	WARN_ON(dma_base != 0);
-> > +
-> > +	/*
-> > +	 * Whatever the parent bus can set. A device must not set
-> > +	 * a DMA mask larger than this.
-> > +	 */
-> > +	dev->archdata.parent_dma_mask = size;
-> > +
-> 
-> ... because size/mask passed here for PCI devices are meaningless.
-> 
-> For OF platforms, this is called via of_dma_configure(), that checks
-> dma-ranges of node that is *parent* for host bridge. Host bridge
-> currently does not control this at all.
+This new function checks whether all platform and PCI
+MSI domains implement IRQ remapping. This is useful to
+understand whether VFIO passthrough is safe with respect
+to interrupts.
 
-We need to think about this a bit. Is it actually the PCI host
-bridge that limits the ranges here, or the bus that it is connected
-to. In the latter case, the caller needs to be adapted to handle
-both.
+On ARM typically an MSI controller can sit downstream
+to the IOMMU without preventing VFIO passthrough.
+As such any assigned device can write into the MSI doorbell.
+In case the MSI controller implements IRQ remapping, assigned
+devices will not be able to trigger interrupts towards the
+host. On the contrary, the assignment must be emphasized as
+unsafe with respect to interrupts.
 
-> In current device trees no dma-ranges is defined for nodes that are
-> parents to pci host bridges. This will make of_dma_configure() to fall
-> back to 32-bit size for all devices on all current platforms.  Thus
-> applying this patch will immediately break 64-bit dma masks on all
-> hardware that supports it.
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
-No, it won't break it, it will just fall back to swiotlb for all the
-ones that are lacking the dma-ranges property. I think this is correct
-behavior.
+---
 
-> Also related: dma-ranges property used by several pci host bridges is
-> *not* compatible with "legacy" dma-ranges parsed by of_get_dma_range() -
-> former uses additional flags word at beginning.
+v4 -> v5:
+- Handle DOMAIN_BUS_FSL_MC_MSI domains
+- Check parents
+---
+ include/linux/irqdomain.h |  1 +
+ kernel/irq/irqdomain.c    | 41 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+)
 
-Can you elaborate? Do we have PCI host bridges that use wrongly formatted
-dma-ranges properties?
-
-	Arnd
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index ab017b2..281a40f 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -219,6 +219,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
+ 					 void *host_data);
+ extern struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+ 						   enum irq_domain_bus_token bus_token);
++extern bool irq_domain_check_msi_remap(void);
+ extern void irq_set_default_host(struct irq_domain *host);
+ extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
+ 				  irq_hw_number_t hwirq, int node,
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 8c0a0ae..700caea 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -278,6 +278,47 @@ struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+ EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
+ 
+ /**
++ * irq_domain_is_msi_remap - Check if @domain or any parent
++ * has MSI remapping support
++ * @domain: domain pointer
++ */
++static bool irq_domain_is_msi_remap(struct irq_domain *domain)
++{
++	struct irq_domain *h = domain;
++
++	for (; h; h = h->parent) {
++		if (h->flags & IRQ_DOMAIN_FLAG_MSI_REMAP)
++			return true;
++	}
++	return false;
++}
++
++/**
++ * irq_domain_check_msi_remap() - Checks whether all MSI
++ * irq domains implement IRQ remapping
++ */
++bool irq_domain_check_msi_remap(void)
++{
++	struct irq_domain *h;
++	bool ret = true;
++
++	mutex_lock(&irq_domain_mutex);
++	list_for_each_entry(h, &irq_domain_list, link) {
++		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
++		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI) ||
++		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI)) &&
++		     !irq_domain_is_msi_remap(h)) {
++			ret = false;
++			goto out;
++		}
++	}
++out:
++	mutex_unlock(&irq_domain_mutex);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(irq_domain_check_msi_remap);
++
++/**
+  * irq_set_default_host() - Set a "default" irq domain
+  * @domain: default domain pointer
+  *
+-- 
+1.9.1
