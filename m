@@ -1,53 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Jan 2017 11:49:21 +0000
-Subject: [PATCH] arm64: errata: Check for --fix-cortex-a53-843419 and
- --fix-cortex-a53
-In-Reply-To: <c4f5b650-b210-8332-e6f2-4ad9634818b9@gmail.com>
-References: <20161031194414.61287-1-code@mmayer.net>
- <20161102210331.GJ22791@arm.com>
- <CAGt4E5tKHNQw=eLzFx-+g6yLwJ=xCTQEqNZHFZu6aOVpKm7X7w@mail.gmail.com>
- <20161102212747.GL22791@arm.com>
- <CAGt4E5sxMcyizwAjwEZd6zepOAyr05WCgtstoRDfNjkNQtnJCA@mail.gmail.com>
- <2d72cbbb-df03-267c-53b0-e3083a746175@gmail.com>
- <20161103141559.GQ22791@arm.com>
- <ae71bdc0-23c7-ce0d-7264-930ab7f405ec@gmail.com>
- <c4f5b650-b210-8332-e6f2-4ad9634818b9@gmail.com>
-Message-ID: <20170104114920.GB18193@arm.com>
+From: manish.narani@xilinx.com (Manish Narani)
+Date: Wed, 4 Jan 2017 18:52:59 +0530
+Subject: [RFC PATCH] usb: dwc3: host: add support for OTG in DWC3 host driver
+In-Reply-To: <1483536181-22356-1-git-send-email-mnarani@xilinx.com>
+References: <1483536181-22356-1-git-send-email-mnarani@xilinx.com>
+Message-ID: <1483536181-22356-5-git-send-email-mnarani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+This patch adds support for OTG host mode initialization in DWC3
+host driver. Before the host initialization sequence begins. The
+driver has to make sure the no OTG peripheral mode is enabled.
 
-On Wed, Dec 28, 2016 at 12:17:23PM -0800, Florian Fainelli wrote:
-> On 11/03/2016 10:20 AM, Florian Fainelli wrote:
-> > On 11/03/2016 07:16 AM, Will Deacon wrote:
-> >> If you can't change toolchain and you want this worked around, why can't you
-> >> either build gold with it enabled by default, or pass the extra flag on the
-> >> command line to the kernel build system?
-> > 
-> > Because that creates a distribution problem and now we have to document
-> > this for people who want to build a kernel on their own, without
-> > necessarily understanding if this is something they might need, or why
-> > this is needed, and why the kernel is not taking care of that on its
-> > own? So yes, this comes down to who is responsible for what, in that
-> > case the kernel's Makefile is the best place where to put such knowledge
-> > as to which workaround needs to be enabled by the linker and it
-> > simplifies things a lot for people.
-> 
-> Was this convincing enough for Catalin to pick Markus' patch or does
-> that mean this patch needs to remain out of tree for us because of using
-> a slightly older toolchain?
+Signed-off-by: Manish Narani <mnarani@xilinx.com>
+---
+ drivers/usb/dwc3/host.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-I thought more about this last night, and there are two questions that
-might sway me:
-
-  1. How prevalent is the binary toolchain with this issue? Is it, for
-     example, shipping as part of a publicly available LTS distribution?
-     I know you quoted some Linaro build, but I can't actually find those
-     binaries on their website.
-
-  2. Could we extend the Makefile magic to detect that, not only is
-     --fix-cortex-a53-843419 unsupported, but also that the linker is
-     in fact gold?
-
-Will
+diff --git a/drivers/usb/dwc3/host.c b/drivers/usb/dwc3/host.c
+index 487f0ff..4caa3fe 100644
+--- a/drivers/usb/dwc3/host.c
++++ b/drivers/usb/dwc3/host.c
+@@ -16,6 +16,8 @@
+  */
+ 
+ #include <linux/platform_device.h>
++#include <linux/usb.h>
++#include <linux/usb/hcd.h>
+ 
+ #include "core.h"
+ 
+@@ -111,6 +113,18 @@ int dwc3_host_init(struct dwc3 *dwc)
+ 	phy_create_lookup(dwc->usb3_generic_phy, "usb3-phy",
+ 			  dev_name(dwc->dev));
+ 
++	if (dwc->dr_mode == USB_DR_MODE_OTG) {
++		struct usb_phy *phy;
++		/* Switch otg to host mode */
++		phy = usb_get_phy(USB_PHY_TYPE_USB3);
++		if (!IS_ERR(phy)) {
++			if (phy && phy->otg)
++				otg_set_host(phy->otg,
++						(struct usb_bus *)(long)1);
++			usb_put_phy(phy);
++		}
++	}
++
+ 	ret = platform_device_add(xhci);
+ 	if (ret) {
+ 		dev_err(dwc->dev, "failed to register xHCI device\n");
+-- 
+2.1.1
