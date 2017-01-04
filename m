@@ -1,52 +1,23 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 4 Jan 2017 10:23:45 +0000
-Subject: [RFC PATCH 01/10] arm64: cpufeature: allow for version
- discrepancy in PMU implementations
-In-Reply-To: <1483467027-14547-2-git-send-email-will.deacon@arm.com>
-References: <1483467027-14547-1-git-send-email-will.deacon@arm.com>
- <1483467027-14547-2-git-send-email-will.deacon@arm.com>
-Message-ID: <20170104102345.GB8329@leverpostej>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 4 Jan 2017 08:38:52 -0600
+Subject: [PATCH resend v4 2/3] ARM: dts: imx6: Support Savageboard dual
+In-Reply-To: <20170104070436.3425-1-woogyom.kim@gmail.com>
+References: <20170104070436.3425-1-woogyom.kim@gmail.com>
+Message-ID: <20170104143852.dkc2pfcighl7p3la@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 06:10:18PM +0000, Will Deacon wrote:
-> Perf already supports multiple PMU instances for heterogeneous systems,
-> so there's no need to be strict in the cpufeature checking, particularly
-> as the PMU extension is optional in the architecture.
+On Wed, Jan 04, 2017 at 04:04:36PM +0900, Milo Kim wrote:
+> Common savageboard DT file is used for board support.
+> Add the vendor name and specify the dtb file for i.MX6Q build.
 > 
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-There are remaining issues with PMU support exposed to KVM guests in
-hetereogeneous systems, but I think that's a larger issue with KVM and
-heterogeneous CPUs (and we're already aware of it), so FWIW:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
 > ---
->  arch/arm64/kernel/cpufeature.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index fdf8f045929f..47d0226620e8 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -184,7 +184,11 @@ static const struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
->  	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
-> -	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
-> +	/*
-> +	 * We can instantiate multiple PMU instances with different levels
-> +	 * of support.
-> +	 * */
-> +	S_ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
->  	ARM64_FTR_END,
-> -- 
-> 2.1.4
-> 
+>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+>  arch/arm/boot/dts/Makefile                         |  1 +
+>  arch/arm/boot/dts/imx6dl-savageboard.dts           | 51 ++++++++++++++++++++++
+>  3 files changed, 53 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6dl-savageboard.dts
+
+Acked-by: Rob Herring <robh@kernel.org>
