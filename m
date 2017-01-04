@@ -1,62 +1,51 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Wed, 4 Jan 2017 15:58:12 +0000
-Subject: [PATCH v5 2/4] ARM: Define KERNEL_START and KERNEL_END
-In-Reply-To: <20170104011417.1496-3-f.fainelli@gmail.com>
-References: <edc8eaa2-5414-506c-1dad-f2404ef19c81@gmail.com>
- <20170104011417.1496-1-f.fainelli@gmail.com>
- <20170104011417.1496-3-f.fainelli@gmail.com>
-Message-ID: <SN1PR0101MB15656D0B421E37BC4813F560D0610@SN1PR0101MB1565.prod.exchangelabs.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 4 Jan 2017 16:01:07 +0000
+Subject: [PATCH] mailbox: sti: Fix mbox-names copy and paste error
+In-Reply-To: <20170104145732.7yiqbi7rf7m6lem4@rob-hp-laptop>
+References: <20170104120527.24806-1-lee.jones@linaro.org>
+ <20170104145732.7yiqbi7rf7m6lem4@rob-hp-laptop>
+Message-ID: <20170104160107.GD24225@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 03, 2017 6:14 PM, Florian Fainelli wrote:
->
-> In preparation for adding CONFIG_DEBUG_VIRTUAL support, define a set of
-> common constants: KERNEL_START and KERNEL_END which abstract
-> CONFIG_XIP_KERNEL vs. !CONFIG_XIP_KERNEL. Update the code where
-> relevant.
->
-> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  arch/arm/include/asm/memory.h | 7 +++++++
->  arch/arm/mm/init.c            | 7 ++-----
->  arch/arm/mm/mmu.c             | 6 +-----
->  3 files changed, 10 insertions(+), 10 deletions(-)
->
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 76cbd9c674df..bee7511c5098 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -111,6 +111,13 @@
->  
->  #endif /* !CONFIG_MMU */
->  
-> +#ifdef CONFIG_XIP_KERNEL
-> +#define KERNEL_START		_sdata
-> +#else
-> +#define KERNEL_START		_stext
-> +#endif
-> +#define KERNEL_END		_end
-> +
->  /*
->   * We fix the TCM memories max 32 KiB ITCM resp DTCM at these
->   * locations
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 370581aeb871..c87d0d5b65f2 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -230,11 +230,8 @@ phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
->  void __init arm_memblock_init(const struct machine_desc *mdesc)
->  {
->  	/* Register the kernel text, kernel data and initrd with memblock. */
-> -#ifdef CONFIG_XIP_KERNEL
-> -	memblock_reserve(__pa(_sdata), _end - _sdata);
-> -#else
-> -	memblock_reserve(__pa(_stext), _end - _stext);
-> -#endif
-> +	memblock_reserve(__pa(KERNEL_START), _end - KERNEL_START);
+On Wed, 04 Jan 2017, Rob Herring wrote:
 
-Shouldn't the '_end' above be 'KERNEL_END'?
+> On Wed, Jan 04, 2017 at 12:05:27PM +0000, Lee Jones wrote:
+> > Due to an over-sight, mbox-names has become mbox-name in some instances.
+> > 
+> > Let's put it right.
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  Documentation/devicetree/bindings/mailbox/sti-mailbox.txt | 4 ++--
+> >  arch/arm/boot/dts/stih407-family.dtsi                     | 8 ++++----
+> >  drivers/mailbox/mailbox-sti.c                             | 2 +-
+> >  3 files changed, 7 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+> > index 351f612..648d176 100644
+> > --- a/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+> > +++ b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+> > @@ -9,7 +9,7 @@ Controller
+> >  Required properties:
+> >  - compatible		: Should be "st,stih407-mailbox"
+> >  - reg			: Offset and length of the device's register set
+> > -- mbox-name		: Name of the mailbox
+> > +- mbox-names		: Name of the mailbox
+> 
+> It's worse than this. mbox-names is for the mailbox client side.
 
-Hartley
+Ah yes, of course.  False alarm.
+
+Let's just leave it as it is. ;)
+
+I'll reply to the reporter directly.
+
+> This should just be dropped. Plus, *-names is pointless when there
+> is only 1 element.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
