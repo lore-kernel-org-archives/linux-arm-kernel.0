@@ -1,102 +1,169 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Jan 2017 13:54:13 +0000
-Subject: [PATCH V6 04/10] arm64: exception: handle Synchronous External
- Abort
-In-Reply-To: <1481147303-7979-5-git-send-email-tbaicar@codeaurora.org>
-References: <1481147303-7979-1-git-send-email-tbaicar@codeaurora.org>
- <1481147303-7979-5-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20170104135413.GE18193@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 4 Jan 2017 13:56:39 +0000
+Subject: [PATCH v3] arm64: mm: Fix NOMAP page initialization
+In-Reply-To: <20161216165437.21612-1-rrichter@cavium.com>
+References: <20161216165437.21612-1-rrichter@cavium.com>
+Message-ID: <CAKv+Gu_SmTNguC=tSCwYOL2kx-DogLvSYRZc56eGP=JhdrUOsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 02:48:17PM -0700, Tyler Baicar wrote:
-> SEA exceptions are often caused by an uncorrected hardware
-> error, and are handled when data abort and instruction abort
-> exception classes have specific values for their Fault Status
-> Code.
-> When SEA occurs, before killing the process, go through
-> the handlers registered in the notification list.
-> Update fault_info[] with specific SEA faults so that the
-> new SEA handler is used.
-> 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+On 16 December 2016 at 16:54, Robert Richter <rrichter@cavium.com> wrote:
+> On ThunderX systems with certain memory configurations we see the
+> following BUG_ON():
+>
+>  kernel BUG at mm/page_alloc.c:1848!
+>
+> This happens for some configs with 64k page size enabled. The BUG_ON()
+> checks if start and end page of a memmap range belongs to the same
+> zone.
+>
+> The BUG_ON() check fails if a memory zone contains NOMAP regions. In
+> this case the node information of those pages is not initialized. This
+> causes an inconsistency of the page links with wrong zone and node
+> information for that pages. NOMAP pages from node 1 still point to the
+> mem zone from node 0 and have the wrong nid assigned.
+>
+> The reason for the mis-configuration is a change in pfn_valid() which
+> reports pages marked NOMAP as invalid:
+>
+>  68709f45385a arm64: only consider memblocks with NOMAP cleared for linear mapping
+>
+> This causes pages marked as nomap being no longer reassigned to the
+> new zone in memmap_init_zone() by calling __init_single_pfn().
+>
+> Fixing this by implementing an arm64 specific early_pfn_valid(). This
+> causes all pages of sections with memory including NOMAP ranges to be
+> initialized by __init_single_page() and ensures consistency of page
+> links to zone, node and section.
+>
+
+I like this solution a lot better than the first one, but I am still
+somewhat uneasy about having the kernel reason about attributes of
+pages it should not touch in the first place. But the fact that
+early_pfn_valid() is only used a single time in the whole kernel does
+give some confidence that we are not simply moving the problem
+elsewhere.
+
+Given that you are touching arch/arm/ as well as arch/arm64, could you
+explain why only arm64 needs this treatment? Is it simply because we
+don't have NUMA support there?
+
+Considering that Hisilicon D05 suffered from the same issue, I would
+like to get some coverage there as well. Hanjun, is this something you
+can arrange? Thanks
+
+
+> The HAVE_ARCH_PFN_VALID config option now requires an explicit
+> definiton of early_pfn_valid() in the same way as pfn_valid(). This
+> allows a customized implementation of early_pfn_valid() which
+> redirects to valid_section() for arm64. This is the same as for the
+> generic pfn_valid() implementation.
+>
+> v3:
+>
+>  * Use valid_section() which is the same as the default pfn_valid()
+>    implementation to initialize
+>  * Added Ack for arm/ changes.
+>
+> v2:
+>
+>  * Use pfn_present() instead of memblock_is_memory() to support also
+>    non-memory NOMAP holes
+>
+> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
 > ---
->  arch/arm64/include/asm/system_misc.h | 13 ++++++++
->  arch/arm64/mm/fault.c                | 58 +++++++++++++++++++++++++++++-------
->  2 files changed, 61 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-> index 57f110b..9040e1d 100644
-> --- a/arch/arm64/include/asm/system_misc.h
-> +++ b/arch/arm64/include/asm/system_misc.h
-> @@ -64,4 +64,17 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
->  
->  #endif	/* __ASSEMBLY__ */
->  
+>  arch/arm/include/asm/page.h   |  1 +
+>  arch/arm64/include/asm/page.h |  2 ++
+>  arch/arm64/mm/init.c          | 15 +++++++++++++++
+>  include/linux/mmzone.h        |  5 ++++-
+>  4 files changed, 22 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
+> index 4355f0ec44d6..79761bd55f94 100644
+> --- a/arch/arm/include/asm/page.h
+> +++ b/arch/arm/include/asm/page.h
+> @@ -158,6 +158,7 @@ typedef struct page *pgtable_t;
+>
+>  #ifdef CONFIG_HAVE_ARCH_PFN_VALID
+>  extern int pfn_valid(unsigned long);
+> +#define early_pfn_valid(pfn)   pfn_valid(pfn)
+>  #endif
+>
+>  #include <asm/memory.h>
+> diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
+> index 8472c6def5ef..17ceb7435ded 100644
+> --- a/arch/arm64/include/asm/page.h
+> +++ b/arch/arm64/include/asm/page.h
+> @@ -49,6 +49,8 @@ typedef struct page *pgtable_t;
+>
+>  #ifdef CONFIG_HAVE_ARCH_PFN_VALID
+>  extern int pfn_valid(unsigned long);
+> +extern int early_pfn_valid(unsigned long);
+> +#define early_pfn_valid early_pfn_valid
+>  #endif
+>
+>  #include <asm/memory.h>
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 212c4d1e2f26..8ff62a7ff634 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -145,11 +145,26 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
+>  #endif /* CONFIG_NUMA */
+>
+>  #ifdef CONFIG_HAVE_ARCH_PFN_VALID
+> +
+>  int pfn_valid(unsigned long pfn)
+>  {
+>         return memblock_is_map_memory(pfn << PAGE_SHIFT);
+>  }
+>  EXPORT_SYMBOL(pfn_valid);
+> +
 > +/*
-> + * The functions below are used to register and unregister callbacks
-> + * that are to be invoked when a Synchronous External Abort (SEA)
-> + * occurs. An SEA is raised by certain fault status codes that have
-> + * either data or instruction abort as the exception class, and
-> + * callbacks may be registered to parse or handle such hardware errors.
-> + *
-> + * Registered callbacks are run in an interrupt/atomic context. They
-> + * are not allowed to block or sleep.
+> + * This is the same as the generic pfn_valid() implementation. We use
+> + * valid_section() here to make sure all pages of a section including
+> + * NOMAP pages are initialized with __init_single_page().
 > + */
-> +int register_synchronous_ext_abort_notifier(struct notifier_block *nb);
-> +void unregister_synchronous_ext_abort_notifier(struct notifier_block *nb);
-
-I think that we may as well use the "SEA" acronym consistently in code,
-expanding it only for strings and comments, so these can be renamed to
-{register,unregister}_sea_notifier. That said, what is the use of having a
-notifier chain here as well as in the ghes code? If the ghes code is the
-only place to register a notifier, we may as well start simple and call that
-code directly, like we call handle_mm_fault directly for data aborts.
-
->  static const struct fault_info {
->  	int	(*fn)(unsigned long addr, unsigned int esr, struct pt_regs *regs);
->  	int	sig;
-> @@ -502,22 +540,22 @@ static const struct fault_info {
->  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
->  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 permission fault"	},
->  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 permission fault"	},
-> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort"	},
-> +	{ do_synch_ext_abort,	SIGBUS,  0,		"synchronous external abort"	},
-
-Again, just stick with do_sea for the function name...
-
->  	{ do_bad,		SIGBUS,  0,		"unknown 17"			},
->  	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
->  	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
-> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
-> +	{ do_synch_ext_abort,	SIGBUS,  0,		"level 0 SEA (trans tbl walk)"	},
-
-... but there's no need to abbreviate "translation table walk" here. Long
-strings that run over 80 chars are fine. Similarly for "SEA".
-
-> +	{ do_synch_ext_abort,	SIGBUS,  0,		"level 1 SEA (trans tbl walk)"	},
-> +	{ do_synch_ext_abort,	SIGBUS,  0,		"level 2 SEA (trans tbl walk)"	},
-> +	{ do_synch_ext_abort,	SIGBUS,  0,		"level 3 SEA (trans tbl walk)"	},
-> +	{ do_synch_ext_abort,	SIGBUS,  0,		"synchronous parity or ECC err" },
->  	{ do_bad,		SIGBUS,  0,		"unknown 25"			},
->  	{ do_bad,		SIGBUS,  0,		"unknown 26"			},
->  	{ do_bad,		SIGBUS,  0,		"unknown 27"			},
-> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
-> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
-> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
-> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
-> +	{ do_synch_ext_abort,	SIGBUS,  0,		"level 0 synch parity error"	},
-> +	{ do_synch_ext_abort,	SIGBUS,  0,		"level 1 synch parity error"	},
-> +	{ do_synch_ext_abort,	SIGBUS,  0,		"level 2 synch parity error"	},
-> +	{ do_synch_ext_abort,	SIGBUS,  0,		"level 3 synch parity error"	},
-
-Please keep mention of "translation table walk", since we have exception
-levels too and it's confusing just saying "level n".
-
-Will
+> +int early_pfn_valid(unsigned long pfn)
+> +{
+> +       if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
+> +               return 0;
+> +       return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
+> +}
+> +EXPORT_SYMBOL(early_pfn_valid);
+> +
+>  #endif
+>
+>  #ifndef CONFIG_SPARSEMEM
+> diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+> index 0f088f3a2fed..bedcf8a95881 100644
+> --- a/include/linux/mmzone.h
+> +++ b/include/linux/mmzone.h
+> @@ -1170,12 +1170,16 @@ static inline struct mem_section *__pfn_to_section(unsigned long pfn)
+>  }
+>
+>  #ifndef CONFIG_HAVE_ARCH_PFN_VALID
+> +
+>  static inline int pfn_valid(unsigned long pfn)
+>  {
+>         if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
+>                 return 0;
+>         return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
+>  }
+> +
+> +#define early_pfn_valid(pfn)   pfn_valid(pfn)
+> +
+>  #endif
+>
+>  static inline int pfn_present(unsigned long pfn)
+> @@ -1200,7 +1204,6 @@ static inline int pfn_present(unsigned long pfn)
+>  #define pfn_to_nid(pfn)                (0)
+>  #endif
+>
+> -#define early_pfn_valid(pfn)   pfn_valid(pfn)
+>  void sparse_init(void);
+>  #else
+>  #define sparse_init()  do {} while (0)
+> --
+> 2.11.0
+>
