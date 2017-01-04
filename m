@@ -1,94 +1,52 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Jan 2017 09:45:37 +0000
-Subject: [PATCH v2 06/11] mfd: axp20x: add separate MFD cell for AXP223
-In-Reply-To: <20161209110419.28981-7-quentin.schulz@free-electrons.com>
-References: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
- <20161209110419.28981-7-quentin.schulz@free-electrons.com>
-Message-ID: <20170104094537.GS27589@dell>
+From: mike.leach@linaro.org (Mike Leach)
+Date: Wed,  4 Jan 2017 09:47:11 +0000
+Subject: [PATCH v2] coresight: etm4x: Fix enabling of cycle accurate tracing
+ in perf.
+Message-ID: <1483523231-23993-1-git-send-email-mike.leach@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 09 Dec 2016, Quentin Schulz wrote:
+Using perf record 'cyclacc' option in cs_etm event was not setting up cycle
+accurate trace correctly.
 
-> The AXP223 shares most of its logic with the AXP221 but has some
-> differences for the VBUS power supply driver. Thus, to probe the driver
-> with the correct compatible, the AXP221 and the AXP223 now have separate
-> MFD cells.
-> 
-> AXP221 MFD cells are renamed from axp22x_cells to axp221_cells to avoid
-> confusion.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> 
-> v2:
->  - correct indentation,
->  - renaming axp22x_cells to axp221_cells to avoid confusion between axp22x,
-> axp221 and axp223
-> 
->  drivers/mfd/axp20x.c | 28 ++++++++++++++++++++++++----
->  1 file changed, 24 insertions(+), 4 deletions(-)
+Corrects bit set in TRCCONFIGR to enable cycle accurate trace.
+Programs TRCCCCTLR with a valid threshold value as required by ETMv4 spec.
 
-Applied, thanks.
+Signed-off-by: Mike Leach <mike.leach@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-etm4x.c | 7 +++++--
+ drivers/hwtracing/coresight/coresight-etm4x.h | 1 +
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index 6ee2cc6..b31f123 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -591,7 +591,22 @@ static struct mfd_cell axp20x_cells[] = {
->  	},
->  };
->  
-> -static struct mfd_cell axp22x_cells[] = {
-> +static struct mfd_cell axp221_cells[] = {
-> +	{
-> +		.name		= "axp20x-pek",
-> +		.num_resources	= ARRAY_SIZE(axp22x_pek_resources),
-> +		.resources	= axp22x_pek_resources,
-> +	}, {
-> +		.name		= "axp20x-regulator",
-> +	}, {
-> +		.name		= "axp20x-usb-power-supply",
-> +		.of_compatible	= "x-powers,axp221-usb-power-supply",
-> +		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
-> +		.resources	= axp22x_usb_power_supply_resources,
-> +	},
-> +};
-> +
-> +static struct mfd_cell axp223_cells[] = {
->  	{
->  		.name			= "axp20x-pek",
->  		.num_resources		= ARRAY_SIZE(axp22x_pek_resources),
-> @@ -600,7 +615,7 @@ static struct mfd_cell axp22x_cells[] = {
->  		.name			= "axp20x-regulator",
->  	}, {
->  		.name		= "axp20x-usb-power-supply",
-> -		.of_compatible	= "x-powers,axp221-usb-power-supply",
-> +		.of_compatible	= "x-powers,axp223-usb-power-supply",
->  		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
->  		.resources	= axp22x_usb_power_supply_resources,
->  	},
-> @@ -793,9 +808,14 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
->  		axp20x->regmap_irq_chip = &axp20x_regmap_irq_chip;
->  		break;
->  	case AXP221_ID:
-> +		axp20x->nr_cells = ARRAY_SIZE(axp221_cells);
-> +		axp20x->cells = axp221_cells;
-> +		axp20x->regmap_cfg = &axp22x_regmap_config;
-> +		axp20x->regmap_irq_chip = &axp22x_regmap_irq_chip;
-> +		break;
->  	case AXP223_ID:
-> -		axp20x->nr_cells = ARRAY_SIZE(axp22x_cells);
-> -		axp20x->cells = axp22x_cells;
-> +		axp20x->nr_cells = ARRAY_SIZE(axp223_cells);
-> +		axp20x->cells = axp223_cells;
->  		axp20x->regmap_cfg = &axp22x_regmap_config;
->  		axp20x->regmap_irq_chip = &axp22x_regmap_irq_chip;
->  		break;
-
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 4db8d6a..c5a65d1 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -216,8 +216,11 @@ static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
+ 		goto out;
+ 
+ 	/* Go from generic option to ETMv4 specifics */
+-	if (attr->config & BIT(ETM_OPT_CYCACC))
+-		config->cfg |= ETMv4_MODE_CYCACC;
++	if (attr->config & BIT(ETM_OPT_CYCACC)) {
++		config->cfg |= BIT(4);
++		/* TRM: Must program this for cycacc to work */
++		config->ccctlr = ETM_CYC_THRESHOLD_DEFAULT;
++	}
+ 	if (attr->config & BIT(ETM_OPT_TS))
+ 		config->cfg |= ETMv4_MODE_TIMESTAMP;
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
+index ba8d3f8..b3b5ea7 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.h
++++ b/drivers/hwtracing/coresight/coresight-etm4x.h
+@@ -146,6 +146,7 @@
+ #define ETM_ARCH_V4			0x40
+ #define ETMv4_SYNC_MASK			0x1F
+ #define ETM_CYC_THRESHOLD_MASK		0xFFF
++#define ETM_CYC_THRESHOLD_DEFAULT       0x100
+ #define ETMv4_EVENT_MASK		0xFF
+ #define ETM_CNTR_MAX_VAL		0xFFFF
+ #define ETM_TRACEID_MASK		0x3f
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.7.4
