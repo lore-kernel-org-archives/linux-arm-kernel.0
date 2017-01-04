@@ -1,68 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 4 Jan 2017 10:53:49 +0000
-Subject: [RFC PATCH 02/10] arm64: cpufeature: Don't enforce system-wide
- SPE capability
-In-Reply-To: <1483467027-14547-3-git-send-email-will.deacon@arm.com>
-References: <1483467027-14547-1-git-send-email-will.deacon@arm.com>
- <1483467027-14547-3-git-send-email-will.deacon@arm.com>
-Message-ID: <20170104105349.GC8329@leverpostej>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Wed, 4 Jan 2017 11:49:12 +0100
+Subject: [PATCH v3] ARM: dts: turris-omnia: add support for ethernet switch
+In-Reply-To: <20170103193501.4827-1-uwe@kleine-koenig.org>
+References: <20170103152107.GA32450@lunn.ch>
+ <20170103193501.4827-1-uwe@kleine-koenig.org>
+Message-ID: <e1dae939-e209-eccc-00df-b996d03cb8db@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 06:10:19PM +0000, Will Deacon wrote:
-> The statistical profiling extension (SPE) is an optional feature of
-> ARMv8.1 and is unlikely to be supported by all of the CPUs in a
-> heterogeneous system.
+Hi Uwe,
+
+Am 03.01.2017 um 20:35 schrieb Uwe Kleine-K?nig:
+> The Turris Omnia features a Marvell MV88E6176 ethernet switch. Add it to
+> the dts.
 > 
-> This patch updates the cpufeature checks so that such systems are not
-> tainted as unsupported.
-> 
-> Reviewed-by: Suzuki Poulose <suzuki.poulose@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
 
-I couldn't find this in the ARMV8.1 supplement, but it is in the SPE
-spec. FWIW:
+It's still not working for me on next-20170104 with this v3.
+Are there any other patches needed?
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Should all ports LAN0-LAN4 work with the commented-out second cpu node?
 
-> ---
->  arch/arm64/include/asm/sysreg.h | 1 +
->  arch/arm64/kernel/cpufeature.c  | 3 ++-
->  2 files changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 98ae03f8eedd..e156e7793a65 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -190,6 +190,7 @@
->  #define ID_AA64MMFR2_CNP_SHIFT		0
->  
->  /* id_aa64dfr0 */
-> +#define ID_AA64DFR0_PMSVER_SHIFT	32
->  #define ID_AA64DFR0_CTX_CMPS_SHIFT	28
->  #define ID_AA64DFR0_WRPS_SHIFT		20
->  #define ID_AA64DFR0_BRPS_SHIFT		12
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 47d0226620e8..c18eb78d3a00 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -180,7 +180,8 @@ static const struct arm64_ftr_bits ftr_id_mmfr0[] = {
->  };
->  
->  static const struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
-> -	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
-> +	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 36, 28, 0),
+I've been using the WAN port (eth2) just fine. (=eth1 in OpenWrt)
 
-As a heads-up, this line will disappear with Suzuki's cpufeature updates
-series, so you may spot a clash later on.
+With this patch, eth0 and eth1 are shown as UP by default. If however I
+enslave eth0 and eth1 in a br-lan bridge, as seen under OpenWrt for
+eth0+eth2, then eth1 is DOWN while eth0 remains UP, and br-lan remains
+DOWN. Same issue if I drop eth0 from the bridge - after a reboot eth1 is
+UP but br-lan is still DOWN.
+I had to manually enable CONFIG_BRIDGE, so maybe I'm missing more kernel
+options? Or did you simply not try using a bridge?
 
-Thanks,
-Mark.
+Regards,
+Andreas
 
-> +	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64DFR0_PMSVER_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
-> -- 
-> 2.1.4
-> 
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
