@@ -1,70 +1,43 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Wed,  4 Jan 2017 13:32:13 +0000
-Subject: [PATCH v5 04/17] iommu: iommu_alloc_resv_region
-In-Reply-To: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
-References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1483536746-2725-5-git-send-email-eric.auger@redhat.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Jan 2017 11:40:56 +0000
+Subject: [PATCH v2 2/2] arm: perf: Mark as non-removable
+In-Reply-To: <20170104113025.GE8329@leverpostej>
+References: <20161221150340.25657-1-alexander.stein@systec-electronic.com>
+ <20161221150340.25657-3-alexander.stein@systec-electronic.com>
+ <20161222224547.GA30170@remoulade> <2559413.O5mI12kdOo@ws-stein>
+ <20170104113025.GE8329@leverpostej>
+Message-ID: <20170104114056.GO14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new helper serving the purpose to allocate a reserved
-region. This will be used in iommu driver implementing reserved
-region callbacks.
+On Wed, Jan 04, 2017 at 11:30:25AM +0000, Mark Rutland wrote:
+> On Wed, Jan 04, 2017 at 10:19:46AM +0100, Alexander Stein wrote:
+> > I'm not sure if the change above works with remove functions set in struct 
+> > bus_type too.
+> > But on the other hand this would hide errors in drivers which are actually 
+> > removable but do not cleanup properly which DEBUG_TEST_DRIVER_REMOVE tries to 
+> > detect.
+> > By setting .suppress_bind_attrs = true explicitely you state "This 
+> > driver cannot be removed!", so the remove callback is not missing by accident.
+> 
+> I'm not sure I follow. If the remove callback is accidentally missing,
+> the driver is not "actually removable" today -- there's either no remove
+> code, or it's not been wired up (the latter of which will likely result
+> in a compiler warning about an unused function).
+> 
+> Aborting the remove early in those cases is much safer than forcefully
+> removing a driver without a remove callback.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Drivers without a remove function may be removable - there's more layers
+than just the driver - there's the bus layer as well, which may or may
+not direct to a private-bus pointer.
 
----
+There's no real way for the core driver model code to know whether the
+lack of the ->remove in the struct device_driver is something that
+prevents a driver being removed, or whether it's handled via some other
+method.  Eg, platform drivers.
 
-v3 -> v4:
-- add INIT_LIST_HEAD(&region->list)
-- use int for prot param and add int type param
-- remove implementation outside of CONFIG_IOMMU_API
----
- drivers/iommu/iommu.c | 18 ++++++++++++++++++
- include/linux/iommu.h |  2 ++
- 2 files changed, 20 insertions(+)
-
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 1cee5c3..927878d 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -1575,6 +1575,24 @@ void iommu_put_resv_regions(struct device *dev, struct list_head *list)
- 		ops->put_resv_regions(dev, list);
- }
- 
-+struct iommu_resv_region *iommu_alloc_resv_region(phys_addr_t start,
-+						  size_t length,
-+						  int prot, int type)
-+{
-+	struct iommu_resv_region *region;
-+
-+	region = kzalloc(sizeof(*region), GFP_KERNEL);
-+	if (!region)
-+		return NULL;
-+
-+	INIT_LIST_HEAD(&region->list);
-+	region->start = start;
-+	region->length = length;
-+	region->prot = prot;
-+	region->type = type;
-+	return region;
-+}
-+
- /* Request that a device is direct mapped by the IOMMU */
- int iommu_request_dm_for_dev(struct device *dev)
- {
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 9128a8d..e97a877 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -244,6 +244,8 @@ extern void iommu_set_fault_handler(struct iommu_domain *domain,
- extern void iommu_get_resv_regions(struct device *dev, struct list_head *list);
- extern void iommu_put_resv_regions(struct device *dev, struct list_head *list);
- extern int iommu_request_dm_for_dev(struct device *dev);
-+extern struct iommu_resv_region *
-+iommu_alloc_resv_region(phys_addr_t start, size_t length, int prot, int type);
- 
- extern int iommu_attach_group(struct iommu_domain *domain,
- 			      struct iommu_group *group);
 -- 
-1.9.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
