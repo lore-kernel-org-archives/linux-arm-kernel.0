@@ -1,92 +1,46 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Wed,  4 Jan 2017 13:32:18 +0000
-Subject: [PATCH v5 09/17] iommu/amd: Declare MSI and HT regions as reserved
- IOVA regions
-In-Reply-To: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
-References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1483536746-2725-10-git-send-email-eric.auger@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Jan 2017 13:28:31 +0000
+Subject: [PATCH 2/2] arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA
+In-Reply-To: <1481706707-6211-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1481706707-6211-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1481706707-6211-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170104132831.GD18193@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch registers the MSI and HT regions as non mappable
-reserved regions. They will be exposed in the iommu-group sysfs.
+On Wed, Dec 14, 2016 at 09:11:47AM +0000, Ard Biesheuvel wrote:
+> The NUMA code may get confused by the presence of NOMAP regions within
+> zones, resulting in spurious BUG() checks where the node id deviates
+> from the containing zone's node id.
+> 
+> Since the kernel has no business reasoning about node ids of pages it
+> does not own in the first place, enable CONFIG_HOLES_IN_ZONE to ensure
+> that such pages are disregarded.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/Kconfig | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 111742126897..0472afe64d55 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -614,6 +614,10 @@ config NEED_PER_CPU_EMBED_FIRST_CHUNK
+>  	def_bool y
+>  	depends on NUMA
+>  
+> +config HOLES_IN_ZONE
+> +	def_bool y
+> +	depends on NUMA
+> +
+>  source kernel/Kconfig.preempt
+>  source kernel/Kconfig.hz
 
-For direct-mapped regions let's also use iommu_alloc_resv_region().
+I'm happy to apply this, but I'll hold off until the first patch is queued
+somewhere, since this doesn't help without the VM_BUG_ON being moved.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Alternatively, I can queue both if somebody from the mm camp acks the
+first patch.
 
----
-
-v5: creation
----
- drivers/iommu/amd_iommu.c | 37 ++++++++++++++++++++++++++-----------
- 1 file changed, 26 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
-index c6c3f1e..24c752d 100644
---- a/drivers/iommu/amd_iommu.c
-+++ b/drivers/iommu/amd_iommu.c
-@@ -3164,6 +3164,7 @@ static bool amd_iommu_capable(enum iommu_cap cap)
- static void amd_iommu_get_resv_regions(struct device *dev,
- 				       struct list_head *head)
- {
-+	struct iommu_resv_region *region;
- 	struct unity_map_entry *entry;
- 	int devid;
- 
-@@ -3172,28 +3173,42 @@ static void amd_iommu_get_resv_regions(struct device *dev,
- 		return;
- 
- 	list_for_each_entry(entry, &amd_iommu_unity_map, list) {
--		struct iommu_resv_region *region;
-+		size_t length;
-+		int prot = 0;
- 
- 		if (devid < entry->devid_start || devid > entry->devid_end)
- 			continue;
- 
--		region = kzalloc(sizeof(*region), GFP_KERNEL);
-+		length = entry->address_end - entry->address_start;
-+		if (entry->prot & IOMMU_PROT_IR)
-+			prot |= IOMMU_READ;
-+		if (entry->prot & IOMMU_PROT_IW)
-+			prot |= IOMMU_WRITE;
-+
-+		region = iommu_alloc_resv_region(entry->address_start,
-+						 length, prot,
-+						 IOMMU_RESV_DIRECT);
- 		if (!region) {
- 			pr_err("Out of memory allocating dm-regions for %s\n",
- 				dev_name(dev));
- 			return;
- 		}
--
--		region->start = entry->address_start;
--		region->length = entry->address_end - entry->address_start;
--		region->type = IOMMU_RESV_DIRECT;
--		if (entry->prot & IOMMU_PROT_IR)
--			region->prot |= IOMMU_READ;
--		if (entry->prot & IOMMU_PROT_IW)
--			region->prot |= IOMMU_WRITE;
--
- 		list_add_tail(&region->list, head);
- 	}
-+
-+	region = iommu_alloc_resv_region(MSI_RANGE_START,
-+					 MSI_RANGE_END - MSI_RANGE_START + 1,
-+					 0, IOMMU_RESV_NOMAP);
-+	if (!region)
-+		return;
-+	list_add_tail(&region->list, head);
-+
-+	region = iommu_alloc_resv_region(HT_RANGE_START,
-+					 HT_RANGE_END - HT_RANGE_START + 1,
-+					 0, IOMMU_RESV_NOMAP);
-+	if (!region)
-+		return;
-+	list_add_tail(&region->list, head);
- }
- 
- static void amd_iommu_put_resv_regions(struct device *dev,
--- 
-1.9.1
+Will
