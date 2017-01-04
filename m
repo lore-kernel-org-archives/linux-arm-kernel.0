@@ -1,312 +1,190 @@
 From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Wed, 4 Jan 2017 12:24:07 +0530
-Subject: [PATCH v3 3/3] dmaengine: xilinx_dma: Fix race condition in the
- driver for multiple descriptor scenario
+Date: Wed, 4 Jan 2017 12:24:05 +0530
+Subject: [PATCH v3 1/3] dmaengine: xilinx_dma: Check for channel idle state
+ before submitting dma descriptor
 In-Reply-To: <1483512847-25710-1-git-send-email-appanad@xilinx.com>
 References: <1483512847-25710-1-git-send-email-appanad@xilinx.com>
-Message-ID: <1483512847-25710-4-git-send-email-appanad@xilinx.com>
+Message-ID: <1483512847-25710-2-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When driver is handling AXI DMA SoftIP
-When user submits multiple descriptors back to back on the S2MM(recv)
-side with the current driver flow the last buffer descriptor next bd
-points to a invalid location resulting the invalid data or errors in the
-DMA engine.
+Add channel idle state to ensure that dma descriptor is not
+submitted when VDMA engine is in progress.
 
-This patch fixes this issue by creating a BD Chain during
-channel allocation itself and use those BD's.
-
+Reviewed-by: Jose Abreu <joabreu@synopsys.com>
 Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 ---
 Changes for v3:
 ---> None.
 Changes for v2:
----> None.
+---> Add idle check in the reset as suggested by Jose Abreu
+---> Removed xilinx_dma_is_running/xilinx_dma_is_idle checks
+    in the driver and used common idle checks across the driver
+    as suggested by Laurent Pinchart.
 
- drivers/dma/xilinx/xilinx_dma.c | 133 +++++++++++++++++++++++++---------------
- 1 file changed, 83 insertions(+), 50 deletions(-)
+ drivers/dma/xilinx/xilinx_dma.c | 56 +++++++++++++----------------------------
+ 1 file changed, 17 insertions(+), 39 deletions(-)
 
 diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-index 7cd8e08..822ccf00 100644
+index 8288fe4..be7eb41 100644
 --- a/drivers/dma/xilinx/xilinx_dma.c
 +++ b/drivers/dma/xilinx/xilinx_dma.c
-@@ -163,6 +163,7 @@
- #define XILINX_DMA_BD_SOP		BIT(27)
- #define XILINX_DMA_BD_EOP		BIT(26)
- #define XILINX_DMA_COALESCE_MAX		255
-+#define XILINX_DMA_NUM_DESCS		255
- #define XILINX_DMA_NUM_APP_WORDS	5
- 
- /* Multi-Channel DMA Descriptor offsets*/
-@@ -310,6 +311,7 @@ struct xilinx_dma_tx_descriptor {
-  * @pending_list: Descriptors waiting
-  * @active_list: Descriptors ready to submit
-  * @done_list: Complete descriptors
-+ * @free_seg_list: Free descriptors
-  * @common: DMA common channel
-  * @desc_pool: Descriptors pool
-  * @dev: The dma device
-@@ -331,7 +333,9 @@ struct xilinx_dma_tx_descriptor {
-  * @desc_submitcount: Descriptor h/w submitted count
-  * @residue: Residue for AXI DMA
-  * @seg_v: Statically allocated segments base
-+ * @seg_p: Physical allocated segments base
-  * @cyclic_seg_v: Statically allocated segment base for cyclic transfers
-+ * @cyclic_seg_p: Physical allocated segments base for cyclic dma
-  * @start_transfer: Differentiate b/w DMA IP's transfer
-  */
- struct xilinx_dma_chan {
-@@ -342,6 +346,7 @@ struct xilinx_dma_chan {
- 	struct list_head pending_list;
- 	struct list_head active_list;
- 	struct list_head done_list;
-+	struct list_head free_seg_list;
- 	struct dma_chan common;
- 	struct dma_pool *desc_pool;
- 	struct device *dev;
-@@ -363,7 +368,9 @@ struct xilinx_dma_chan {
- 	u32 desc_submitcount;
- 	u32 residue;
- 	struct xilinx_axidma_tx_segment *seg_v;
-+	dma_addr_t seg_p;
- 	struct xilinx_axidma_tx_segment *cyclic_seg_v;
-+	dma_addr_t cyclic_seg_p;
- 	void (*start_transfer)(struct xilinx_dma_chan *chan);
- 	u16 tdest;
- };
-@@ -569,17 +576,31 @@ static struct xilinx_axidma_tx_segment *
- xilinx_axidma_alloc_tx_segment(struct xilinx_dma_chan *chan)
- {
- 	struct xilinx_axidma_tx_segment *segment;
--	dma_addr_t phys;
--
--	segment = dma_pool_zalloc(chan->desc_pool, GFP_ATOMIC, &phys);
--	if (!segment)
--		return NULL;
-+	unsigned long flags;
- 
--	segment->phys = phys;
-+	spin_lock_irqsave(&chan->lock, flags);
-+	if (!list_empty(&chan->free_seg_list)) {
-+		segment = list_first_entry(&chan->free_seg_list,
-+					   struct xilinx_axidma_tx_segment,
-+					   node);
-+		list_del(&segment->node);
-+	}
-+	spin_unlock_irqrestore(&chan->lock, flags);
- 
- 	return segment;
+@@ -321,6 +321,7 @@ struct xilinx_dma_tx_descriptor {
+  * @cyclic: Check for cyclic transfers.
+  * @genlock: Support genlock mode
+  * @err: Channel has errors
++ * @idle: Check for channel idle
+  * @tasklet: Cleanup work after irq
+  * @config: Device configuration info
+  * @flush_on_fsync: Flush on Frame sync
+@@ -351,6 +352,7 @@ struct xilinx_dma_chan {
+ 	bool cyclic;
+ 	bool genlock;
+ 	bool err;
++	bool idle;
+ 	struct tasklet_struct tasklet;
+ 	struct xilinx_vdma_config config;
+ 	bool flush_on_fsync;
+@@ -920,32 +922,6 @@ static enum dma_status xilinx_dma_tx_status(struct dma_chan *dchan,
  }
  
-+static void xilinx_dma_clean_hw_desc(struct xilinx_axidma_desc_hw *hw)
-+{
-+	u32 next_desc = hw->next_desc;
-+	u32 next_desc_msb = hw->next_desc_msb;
-+
-+	memset(hw, 0, sizeof(struct xilinx_axidma_desc_hw));
-+
-+	hw->next_desc = next_desc;
-+	hw->next_desc_msb = next_desc_msb;
-+}
-+
  /**
-  * xilinx_dma_free_tx_segment - Free transaction segment
+- * xilinx_dma_is_running - Check if DMA channel is running
+- * @chan: Driver specific DMA channel
+- *
+- * Return: '1' if running, '0' if not.
+- */
+-static bool xilinx_dma_is_running(struct xilinx_dma_chan *chan)
+-{
+-	return !(dma_ctrl_read(chan, XILINX_DMA_REG_DMASR) &
+-		 XILINX_DMA_DMASR_HALTED) &&
+-		(dma_ctrl_read(chan, XILINX_DMA_REG_DMACR) &
+-		 XILINX_DMA_DMACR_RUNSTOP);
+-}
+-
+-/**
+- * xilinx_dma_is_idle - Check if DMA channel is idle
+- * @chan: Driver specific DMA channel
+- *
+- * Return: '1' if idle, '0' if not.
+- */
+-static bool xilinx_dma_is_idle(struct xilinx_dma_chan *chan)
+-{
+-	return dma_ctrl_read(chan, XILINX_DMA_REG_DMASR) &
+-		XILINX_DMA_DMASR_IDLE;
+-}
+-
+-/**
+  * xilinx_dma_halt - Halt DMA channel
   * @chan: Driver specific DMA channel
-@@ -588,7 +609,9 @@ xilinx_axidma_alloc_tx_segment(struct xilinx_dma_chan *chan)
- static void xilinx_dma_free_tx_segment(struct xilinx_dma_chan *chan,
- 				struct xilinx_axidma_tx_segment *segment)
- {
--	dma_pool_free(chan->desc_pool, segment, segment->phys);
-+	xilinx_dma_clean_hw_desc(&segment->hw);
-+
-+	list_add_tail(&segment->node, &chan->free_seg_list);
+  */
+@@ -966,6 +942,7 @@ static void xilinx_dma_halt(struct xilinx_dma_chan *chan)
+ 			chan, dma_ctrl_read(chan, XILINX_DMA_REG_DMASR));
+ 		chan->err = true;
+ 	}
++	chan->idle = true;
  }
  
  /**
-@@ -713,16 +736,26 @@ static void xilinx_dma_free_descriptors(struct xilinx_dma_chan *chan)
- static void xilinx_dma_free_chan_resources(struct dma_chan *dchan)
- {
- 	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
-+	unsigned long flags;
- 
- 	dev_dbg(chan->dev, "Free all channel resources.\n");
- 
- 	xilinx_dma_free_descriptors(chan);
-+
- 	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
--		xilinx_dma_free_tx_segment(chan, chan->cyclic_seg_v);
--		xilinx_dma_free_tx_segment(chan, chan->seg_v);
-+		spin_lock_irqsave(&chan->lock, flags);
-+		INIT_LIST_HEAD(&chan->free_seg_list);
-+		spin_unlock_irqrestore(&chan->lock, flags);
-+
-+		/* Free Memory that is allocated for cyclic DMA Mode */
-+		dma_free_coherent(chan->dev, sizeof(*chan->cyclic_seg_v),
-+				  chan->cyclic_seg_v, chan->cyclic_seg_p);
-+	}
-+
-+	if (chan->xdev->dma_config->dmatype != XDMA_TYPE_AXIDMA) {
-+		dma_pool_destroy(chan->desc_pool);
-+		chan->desc_pool = NULL;
- 	}
--	dma_pool_destroy(chan->desc_pool);
--	chan->desc_pool = NULL;
- }
- 
- /**
-@@ -805,6 +838,7 @@ static void xilinx_dma_do_tasklet(unsigned long data)
- static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
- {
- 	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
-+	int i;
- 
- 	/* Has this channel already been allocated? */
- 	if (chan->desc_pool)
-@@ -815,11 +849,30 @@ static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
- 	 * for meeting Xilinx VDMA specification requirement.
- 	 */
- 	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
--		chan->desc_pool = dma_pool_create("xilinx_dma_desc_pool",
--				   chan->dev,
--				   sizeof(struct xilinx_axidma_tx_segment),
--				   __alignof__(struct xilinx_axidma_tx_segment),
--				   0);
-+		/* Allocate the buffer descriptors. */
-+		chan->seg_v = dma_zalloc_coherent(chan->dev,
-+						  sizeof(*chan->seg_v) *
-+						  XILINX_DMA_NUM_DESCS,
-+						  &chan->seg_p, GFP_KERNEL);
-+		if (!chan->seg_v) {
-+			dev_err(chan->dev,
-+				"unable to allocate channel %d descriptors\n",
-+				chan->id);
-+			return -ENOMEM;
-+		}
-+
-+		for (i = 0; i < XILINX_DMA_NUM_DESCS; i++) {
-+			chan->seg_v[i].hw.next_desc =
-+			lower_32_bits(chan->seg_p + sizeof(*chan->seg_v) *
-+				((i + 1) % XILINX_DMA_NUM_DESCS));
-+			chan->seg_v[i].hw.next_desc_msb =
-+			upper_32_bits(chan->seg_p + sizeof(*chan->seg_v) *
-+				((i + 1) % XILINX_DMA_NUM_DESCS));
-+			chan->seg_v[i].phys = chan->seg_p +
-+				sizeof(*chan->seg_v) * i;
-+			list_add_tail(&chan->seg_v[i].node,
-+				      &chan->free_seg_list);
-+		}
- 	} else if (chan->xdev->dma_config->dmatype == XDMA_TYPE_CDMA) {
- 		chan->desc_pool = dma_pool_create("xilinx_cdma_desc_pool",
- 				   chan->dev,
-@@ -834,7 +887,8 @@ static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
- 				     0);
- 	}
- 
--	if (!chan->desc_pool) {
-+	if (!chan->desc_pool &&
-+	    (chan->xdev->dma_config->dmatype != XDMA_TYPE_AXIDMA)) {
- 		dev_err(chan->dev,
- 			"unable to allocate channel %d descriptor pool\n",
- 			chan->id);
-@@ -843,22 +897,20 @@ static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
- 
- 	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
- 		/*
--		 * For AXI DMA case after submitting a pending_list, keep
--		 * an extra segment allocated so that the "next descriptor"
--		 * pointer on the tail descriptor always points to a
--		 * valid descriptor, even when paused after reaching taildesc.
--		 * This way, it is possible to issue additional
--		 * transfers without halting and restarting the channel.
--		 */
--		chan->seg_v = xilinx_axidma_alloc_tx_segment(chan);
--
--		/*
- 		 * For cyclic DMA mode we need to program the tail Descriptor
- 		 * register with a value which is not a part of the BD chain
- 		 * so allocating a desc segment during channel allocation for
- 		 * programming tail descriptor.
- 		 */
--		chan->cyclic_seg_v = xilinx_axidma_alloc_tx_segment(chan);
-+		chan->cyclic_seg_v = dma_zalloc_coherent(chan->dev,
-+					sizeof(*chan->cyclic_seg_v),
-+					&chan->cyclic_seg_p, GFP_KERNEL);
-+		if (!chan->cyclic_seg_v) {
-+			dev_err(chan->dev,
-+				"unable to allocate desc segment for cyclic DMA\n");
-+			return -ENOMEM;
-+		}
-+		chan->cyclic_seg_v->phys = chan->cyclic_seg_p;
- 	}
- 
- 	dma_cookie_init(dchan);
-@@ -1197,7 +1249,7 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
- static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
- {
- 	struct xilinx_dma_tx_descriptor *head_desc, *tail_desc;
--	struct xilinx_axidma_tx_segment *tail_segment, *old_head, *new_head;
-+	struct xilinx_axidma_tx_segment *tail_segment;
- 	u32 reg;
- 
+@@ -1007,6 +984,9 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
  	if (chan->err)
-@@ -1216,21 +1268,6 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
- 	tail_segment = list_last_entry(&tail_desc->segments,
- 				       struct xilinx_axidma_tx_segment, node);
+ 		return;
  
--	if (chan->has_sg && !chan->xdev->mcdma) {
--		old_head = list_first_entry(&head_desc->segments,
--					struct xilinx_axidma_tx_segment, node);
--		new_head = chan->seg_v;
--		/* Copy Buffer Descriptor fields. */
--		new_head->hw = old_head->hw;
--
--		/* Swap and save new reserve */
--		list_replace_init(&old_head->node, &new_head->node);
--		chan->seg_v = old_head;
--
--		tail_segment->hw.next_desc = chan->seg_v->phys;
--		head_desc->async_tx.phys = new_head->phys;
++	if (!chan->idle)
++		return;
++
+ 	if (list_empty(&chan->pending_list))
+ 		return;
+ 
+@@ -1018,13 +998,6 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
+ 	tail_segment = list_last_entry(&tail_desc->segments,
+ 				       struct xilinx_vdma_tx_segment, node);
+ 
+-	/* If it is SG mode and hardware is busy, cannot submit */
+-	if (chan->has_sg && xilinx_dma_is_running(chan) &&
+-	    !xilinx_dma_is_idle(chan)) {
+-		dev_dbg(chan->dev, "DMA controller still busy\n");
+-		return;
 -	}
 -
- 	reg = dma_ctrl_read(chan, XILINX_DMA_REG_DMACR);
+ 	/*
+ 	 * If hardware is idle, then all descriptors on the running lists are
+ 	 * done, start new transfers
+@@ -1110,6 +1083,7 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
+ 		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last->hw.vsize);
+ 	}
  
- 	if (chan->desc_pendingcount <= XILINX_DMA_COALESCE_MAX) {
-@@ -1728,7 +1765,7 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
- {
- 	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
- 	struct xilinx_dma_tx_descriptor *desc;
--	struct xilinx_axidma_tx_segment *segment = NULL, *prev = NULL;
-+	struct xilinx_axidma_tx_segment *segment = NULL;
- 	u32 *app_w = (u32 *)context;
- 	struct scatterlist *sg;
- 	size_t copy;
-@@ -1779,10 +1816,6 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
- 					       XILINX_DMA_NUM_APP_WORDS);
- 			}
++	chan->idle = false;
+ 	if (!chan->has_sg) {
+ 		list_del(&desc->node);
+ 		list_add_tail(&desc->node, &chan->active_list);
+@@ -1136,6 +1110,9 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
+ 	if (chan->err)
+ 		return;
  
--			if (prev)
--				prev->hw.next_desc = segment->phys;
--
--			prev = segment;
- 			sg_used += copy;
++	if (!chan->idle)
++		return;
++
+ 	if (list_empty(&chan->pending_list))
+ 		return;
  
- 			/*
-@@ -1796,7 +1829,6 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
- 	segment = list_first_entry(&desc->segments,
- 				   struct xilinx_axidma_tx_segment, node);
- 	desc->async_tx.phys = segment->phys;
--	prev->hw.next_desc = segment->phys;
+@@ -1181,6 +1158,7 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
  
- 	/* For the last DMA_MEM_TO_DEV transfer, set EOP */
- 	if (chan->direction == DMA_MEM_TO_DEV) {
-@@ -2340,6 +2372,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
+ 	list_splice_tail_init(&chan->pending_list, &chan->active_list);
+ 	chan->desc_pendingcount = 0;
++	chan->idle = false;
+ }
+ 
+ /**
+@@ -1196,15 +1174,11 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
+ 	if (chan->err)
+ 		return;
+ 
+-	if (list_empty(&chan->pending_list))
++	if (!chan->idle)
+ 		return;
+ 
+-	/* If it is SG mode and hardware is busy, cannot submit */
+-	if (chan->has_sg && xilinx_dma_is_running(chan) &&
+-	    !xilinx_dma_is_idle(chan)) {
+-		dev_dbg(chan->dev, "DMA controller still busy\n");
++	if (list_empty(&chan->pending_list))
+ 		return;
+-	}
+ 
+ 	head_desc = list_first_entry(&chan->pending_list,
+ 				     struct xilinx_dma_tx_descriptor, node);
+@@ -1302,6 +1276,7 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
+ 
+ 	list_splice_tail_init(&chan->pending_list, &chan->active_list);
+ 	chan->desc_pendingcount = 0;
++	chan->idle = false;
+ }
+ 
+ /**
+@@ -1366,6 +1341,7 @@ static int xilinx_dma_reset(struct xilinx_dma_chan *chan)
+ 	}
+ 
+ 	chan->err = false;
++	chan->idle = true;
+ 
+ 	return err;
+ }
+@@ -1447,6 +1423,7 @@ static irqreturn_t xilinx_dma_irq_handler(int irq, void *data)
+ 	if (status & XILINX_DMA_DMASR_FRM_CNT_IRQ) {
+ 		spin_lock(&chan->lock);
+ 		xilinx_dma_complete_descriptor(chan);
++		chan->idle = true;
+ 		chan->start_transfer(chan);
+ 		spin_unlock(&chan->lock);
+ 	}
+@@ -2327,6 +2304,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
+ 	chan->has_sg = xdev->has_sg;
+ 	chan->desc_pendingcount = 0x0;
+ 	chan->ext_addr = xdev->ext_addr;
++	chan->idle = true;
+ 
+ 	spin_lock_init(&chan->lock);
  	INIT_LIST_HEAD(&chan->pending_list);
- 	INIT_LIST_HEAD(&chan->done_list);
- 	INIT_LIST_HEAD(&chan->active_list);
-+	INIT_LIST_HEAD(&chan->free_seg_list);
- 
- 	/* Retrieve the channel properties from the device tree */
- 	has_dre = of_property_read_bool(node, "xlnx,include-dre");
 -- 
 2.1.2
