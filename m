@@ -1,35 +1,64 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 4 Jan 2017 14:55:33 -0600
-Subject: [PATCH v3 1/4] PM / Domains: Add generic data pointer to genpd data
- struct
-In-Reply-To: <20170104205536.15963-1-d-gerlach@ti.com>
-References: <20170104205536.15963-1-d-gerlach@ti.com>
-Message-ID: <20170104205536.15963-2-d-gerlach@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 4 Jan 2017 14:39:50 -0600
+Subject: [PATCH V7 1/4] Documentation/devicetree/bindings: b850v3_lvds_dp
+In-Reply-To: <529b-586c3500-5-5e05b080@98620974>
+References: <20170103225127.jn36tatufdfz2k5q@rob-hp-laptop>
+ <529b-586c3500-5-5e05b080@98620974>
+Message-ID: <CAL_JsqJk=QZ20VmV5uE1ta2T0TEO3rvWFbiGsJpH1e3-ojnBfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a void *data pointer to struct generic_pm_domain_data. Because this
-exists for each device associated with a genpd it will allow us to
-assign per-device data if needed on a platform for control of that
-specific device.
+On Tue, Jan 3, 2017 at 5:34 PM, Peter Senna Tschudin
+<peter.senna@collabora.co.uk> wrote:
+>  Hi Rob,
+>
+> Thank you for the review.
+>
+> On 03 January, 2017 23:51 CET, Rob Herring <robh@kernel.org> wrote:
+>
+>> On Sun, Jan 01, 2017 at 09:24:29PM +0100, Peter Senna Tschudin wrote:
+>> > Devicetree bindings documentation for the GE B850v3 LVDS/DP++
+>> > display bridge.
+>> >
+>> > Cc: Martyn Welch <martyn.welch@collabora.co.uk>
+>> > Cc: Martin Donnelly <martin.donnelly@ge.com>
+>> > Cc: Javier Martinez Canillas <javier@dowhile0.org>
+>> > Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+>> > Cc: Philipp Zabel <p.zabel@pengutronix.de>
+>> > Cc: Rob Herring <robh@kernel.org>
+>> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+>> > Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+>> > ---
+>> > There was an Acked-by from Rob Herring <robh@kernel.org> for V6, but I changed
+>> > the bindings to use i2c_new_secondary_device() so I removed it from the commit
+>> > message.
+>> >
+>> >  .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 39 ++++++++++++++++++++++
+>>
+>> Generally, bindings are not organized by vendor. Put in
+>> bindings/display/bridge/... instead.
+>
+> Will change that.
+>
+>>
+>> >  1 file changed, 39 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+>> > new file mode 100644
+>> > index 0000000..1bc6ebf
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+>> > @@ -0,0 +1,39 @@
+>> > +Driver for GE B850v3 LVDS/DP++ display bridge
+>> > +
+>> > +Required properties:
+>> > +  - compatible : should be "ge,b850v3-lvds-dp".
+>>
+>> Isn't '-lvds-dp' redundant? The part# should be enough.
+>
+> b850v3 is the name of the product, this is why the proposed name. What about, b850v3-dp2 dp2 indicating the second DP output?
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- include/linux/pm_domain.h | 1 +
- 1 file changed, 1 insertion(+)
+Humm, b850v3 is the board name? This node should be the name of the bridge chip.
 
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 81ece61075df..73c9dba5cfcc 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -117,6 +117,7 @@ struct generic_pm_domain_data {
- 	struct pm_domain_data base;
- 	struct gpd_timing_data td;
- 	struct notifier_block nb;
-+	void *data;
- };
- 
- #ifdef CONFIG_PM_GENERIC_DOMAINS
--- 
-2.11.0
+Rob
