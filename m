@@ -1,56 +1,119 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Jan 2017 11:57:31 +0000
-Subject: [PATCH 16/22] mfd: axp20x: add V_OFF to writeable regs for
- AXP20X and AXP22X
-In-Reply-To: <20170102163723.7939-17-quentin.schulz@free-electrons.com>
-References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
- <20170102163723.7939-17-quentin.schulz@free-electrons.com>
-Message-ID: <20170104115731.GF24058@dell>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 4 Jan 2017 11:47:52 +0000
+Subject: [QUESTION] Arm64: Query L3 cache info via DT
+In-Reply-To: <58633494.9030708@huawei.com>
+References: <58633494.9030708@huawei.com>
+Message-ID: <81784854-11f8-468a-a280-69be0a714a3b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 02 Jan 2017, Quentin Schulz wrote:
 
-> The V_OFF register has its first 3 read-write bits for the minimal
-> voltage (Voff) of the battery before the system is automatically shut
-> down due to the power being too low.
+Hi Tan,
+
+On 28/12/16 03:42, Tan Xiaojun wrote:
+> Hi.
 > 
-> This adds V_OFF register to the writeable registers of AXP20X and AXP22X
-> PMICs.
+> I saw you discussed how to achieve querying cache information and
+> tend to implement the external ones(like L3 cache) via DT a few
+> months ago.
 > 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> ---
->  drivers/mfd/axp20x.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/405399.html
+>
+>  Are these implementations progressing? Forgive me to take the
+> liberty to ask, we care about this thing.
+> 
 
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-  
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index 19bdba3..7f0f05f 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -65,7 +65,7 @@ static const struct regmap_access_table axp152_volatile_table = {
->  
->  static const struct regmap_range axp20x_writeable_ranges[] = {
->  	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
-> -	regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
-> +	regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_V_OFF),
->  	regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL1),
->  	regmap_reg_range(AXP20X_DCDC_MODE, AXP20X_FG_RES),
->  	regmap_reg_range(AXP20X_RDC_H, AXP20X_OCV(AXP20X_OCV_MAX)),
-> @@ -94,7 +94,7 @@ static const struct regmap_access_table axp20x_volatile_table = {
->  /* AXP22x ranges are shared with the AXP809, as they cover the same range */
->  static const struct regmap_range axp22x_writeable_ranges[] = {
->  	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
-> -	regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
-> +	regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_V_OFF),
->  	regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL1),
->  	regmap_reg_range(AXP20X_DCDC_MODE, AXP22X_BATLOW_THRES1),
->  };
+Yes the support to override the cache properties for DT was added in v4.10
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+However, it still depends on the the sysreg to get the total levels of
+caches supported in the system. You may need to tweak a bit around that
+to support what you need.
+
+> If you've already implemented some codes, we can help with testing
+> (in Hisilicon D02, D03, D05) after you send it to the mail-list.
+> 
+
+Sure, that would help.
+
+> We can try our best to help if there is any difficulty.
+
+OK, you can start trying the patch below :). It's not even compile
+tested, so you make have to make some changes necessary. I just wanted
+to put my thoughts here. Make sure all the L3 cacheinfo is present in DT.
+
+Regards,
+Sudeep
+
+
+--
+
+diff --git i/arch/arm64/kernel/cacheinfo.c w/arch/arm64/kernel/cacheinfo.c
+index 9617301f76b5..88fbcd368104 100644
+--- i/arch/arm64/kernel/cacheinfo.c
++++ w/arch/arm64/kernel/cacheinfo.c
+@@ -84,7 +84,7 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
+
+ static int __init_cache_level(unsigned int cpu)
+ {
+-	unsigned int ctype, level, leaves;
++	unsigned int ctype, level, leaves, of_level;
+ 	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+
+ 	for (level = 1, leaves = 0; level <= MAX_CACHE_LEVEL; level++) {
+@@ -97,6 +97,17 @@ static int __init_cache_level(unsigned int cpu)
+ 		leaves += (ctype == CACHE_TYPE_SEPARATE) ? 2 : 1;
+ 	}
+
++	of_level = of_count_cache_levels(cpu);
++	if (level < of_level) {
++		/*
++		 * some external caches not specified in CLIDR_EL1
++		 * the information may be available in the device tree
++		 * only unified external caches are considered here
++		 */
++		level = of_level;
++		leaves += (of_level - level);
++	}
++
+ 	this_cpu_ci->num_levels = level;
+ 	this_cpu_ci->num_leaves = leaves;
+ 	return 0;
+diff --git i/drivers/of/base.c w/drivers/of/base.c
+index d4bea3c797d6..8007f3b06cb8 100644
+--- i/drivers/of/base.c
++++ w/drivers/of/base.c
+@@ -2267,6 +2267,20 @@ struct device_node *of_find_next_cache_node(const
+struct device_node *np)
+ 	return NULL;
+ }
+
++int of_count_cache_levels(unsigned int cpu)
++{
++	int level = 0;
++	struct device *cpu_dev = get_cpu_device(cpu);
++	struct device_node *np = cpu_dev->of_node;
++
++	while (np) {
++		level++;
++		np = of_find_next_cache_node(np);
++	}
++
++	return level;
++}
++
+ /**
+  * of_graph_parse_endpoint() - parse common endpoint node properties
+  * @node: pointer to endpoint device_node
+diff --git i/include/linux/of.h w/include/linux/of.h
+index d72f01009297..c8597ae71ff3 100644
+--- i/include/linux/of.h
++++ w/include/linux/of.h
+@@ -280,6 +280,7 @@ extern struct device_node
+*of_get_child_by_name(const struct device_node *node,
+
+ /* cache lookup */
+ extern struct device_node *of_find_next_cache_node(const struct
+device_node *);
++extern int of_count_cache_levels(unsigned int cpu);
+ extern struct device_node *of_find_node_with_property(
+ 	struct device_node *from, const char *prop_name);
