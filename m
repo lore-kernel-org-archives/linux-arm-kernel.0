@@ -1,42 +1,47 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Wed, 4 Jan 2017 16:12:56 +0900
-Subject: [PATCH v4 2/3] ARM: dts: imx6: Support Savageboard dual
-In-Reply-To: <20170104045553.26576-3-woogyom.kim@gmail.com>
-References: <20170104045553.26576-1-woogyom.kim@gmail.com>
- <20170104045553.26576-3-woogyom.kim@gmail.com>
-Message-ID: <5594e81c-a647-7d78-03bf-4ae10961fc17@gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 4 Jan 2017 08:29:10 +0100
+Subject: [PATCH v6 06/14] irqchip: gicv3-its: platform-msi: refactor
+ its_pmsi_init() to prepare for ACPI
+In-Reply-To: <601cbdf2-823d-8bde-bbd9-fcc6a1c67f2c@linaro.org>
+References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
+ <1483363905-2806-7-git-send-email-hanjun.guo@linaro.org>
+ <8cdc4bfa-18a3-b9f6-aaba-0efe1f75fb40@semihalf.com>
+ <601cbdf2-823d-8bde-bbd9-fcc6a1c67f2c@linaro.org>
+Message-ID: <b51b7be9-f8ee-57f9-6d53-6e8bd73dd431@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 01/04/2017 01:55 PM, Milo Kim wrote:
-> Common savageboard DT file is used for board support.
-> Add the vendor name and specify the dtb file for i.MX6Q build.
+On 04.01.2017 08:02, Hanjun Guo wrote:
+> Hi Tomasz,
 >
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
-> ---
->  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->  arch/arm/boot/dts/Makefile                         |  1 +
->  arch/arm/boot/dts/imx6dl-savageboard.dts           | 51 ++++++++++++++++++++++
->  3 files changed, 53 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6dl-savageboard.dts
+> On 2017/1/3 15:41, Tomasz Nowicki wrote:
+>> Hi,
+>>
+>> Can we merge patch 4 & 6 into one patch so that we keep refactoring part
+>> as one piece ? I do not see a reason to keep them separate or have patch
+>> 5 in between. You can refactor what needs to be refactored, add
+>> necessary functions to iort.c and then support ACPI for
+>> irq-gic-v3-its-platform-msi.c
 >
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 16d3b5e7f5d1..88c33d827e51 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -227,6 +227,7 @@ pine64	Pine64
->  pixcir  PIXCIR MICROELECTRONICS Co., Ltd
->  plathome	Plat'Home Co., Ltd.
->  plda	PLDA
-> +poslab  Poslab Technology Co., Ltd.
+> There are two functions here,
+>  - retrieve the dev id from IORT which was DT based only;
+>
+>  - init the platform msi domain from MADT;
+>
+> For each of them split it into two steps,
+>  - refactor the code for ACPI later and it's easy for review
+>    because wen can easily to figure out it has functional
+>    change or not
+>
+>  - add ACPI functionality
+>
+> Does it make sense?
 
-I should input tab here instead of spaces, so updated single patch was 
-just sent. Please refer to the patch named "[PATCH resend v4 2/3] ARM: 
-dts: imx6: Support Savageboard dual".
+It is up to Marc, but personally I prefer:
+1. Refactor dev id retrieving and init function in one patch and 
+highlight no functional changes in changelog
+2. Crate necessary infrastructure in iort.c
+3. Then add ACPI support to irq-gic-v3-its-platform-msi.c
 
-Sorry for the inconvenience.
-
-Best regards,
-Milo
+Thanks,
+Tomasz
