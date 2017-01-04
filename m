@@ -1,118 +1,101 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Wed, 4 Jan 2017 02:16:23 +0000
-Subject: [PATCH v2 9/9] ARM: sunxi: Convert pinctrl nodes to generic
- bindings
-In-Reply-To: <CAGb2v67_4iriM2WS33hUWzNZY8R2WvGjqzntGBPGmNkr1Ryr_w@mail.gmail.com>
-References: <cover.7edc6c25be8a5e2efdda6a82e102dbf7ece6aa64.1476200742.git-series.maxime.ripard@free-electrons.com>
- <e32d044d2d967f24f12d83eea50e7f14f2ae1073.1476200742.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v67_4iriM2WS33hUWzNZY8R2WvGjqzntGBPGmNkr1Ryr_w@mail.gmail.com>
-Message-ID: <58723369-50ad-1792-9be1-c277eb719044@arm.com>
+From: jerry.huang@nxp.com (Jerry Huang)
+Date: Wed, 4 Jan 2017 02:24:59 +0000
+Subject: [PATCH v3 2/3] USB3/DWC3: Add property "snps,
+ incr-burst-type-adjustment" for INCR burst type
+In-Reply-To: <CAL_JsqJuifiSQAt-6FgtYYSukAnjzOLuTGEsO-Spn5LxkU-iwQ@mail.gmail.com>
+References: <1482139554-13618-1-git-send-email-jerry.huang@nxp.com>
+ <1482139554-13618-2-git-send-email-jerry.huang@nxp.com>
+ <20161222184514.hfd4g7ifrz5cv627@rob-hp-laptop>
+ <DB5PR0401MB1813E210B2ADE1C9493F7768FE950@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+ <CAL_JsqJuifiSQAt-6FgtYYSukAnjzOLuTGEsO-Spn5LxkU-iwQ@mail.gmail.com>
+Message-ID: <DB5PR0401MB181361EBAD1B2BFA8DC5ED7AFE610@DB5PR0401MB1813.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/10/16 08:43, Chen-Yu Tsai wrote:
+Hi, Rob,
 
-Hi Maxime, Chen-Yu,
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Wednesday, January 04, 2017 5:24 AM
+> To: Jerry Huang <jerry.huang@nxp.com>
+> Cc: balbi at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
+> will.deacon at arm.com; linux at armlinux.org.uk; devicetree at vger.kernel.org;
+> linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v3 2/3] USB3/DWC3: Add property "snps, incr-burst-
+> type-adjustment" for INCR burst type
+> 
+> On Thu, Dec 22, 2016 at 8:52 PM, Jerry Huang <jerry.huang@nxp.com> wrote:
+> > Hi, Rob,
+> >> -----Original Message-----
+> >> From: Rob Herring [mailto:robh at kernel.org]
+> >> Sent: Friday, December 23, 2016 2:45 AM
+> >> To: Jerry Huang <jerry.huang@nxp.com>
+> >> Cc: balbi at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
+> >> will.deacon at arm.com; linux at armlinux.org.uk;
+> >> devicetree at vger.kernel.org; linux-usb at vger.kernel.org;
+> >> linux-kernel at vger.kernel.org; linux-arm- kernel at lists.infradead.org
+> >> Subject: Re: [PATCH v3 2/3] USB3/DWC3: Add property "snps,
+> >> incr-burst- type-adjustment" for INCR burst type
+> >>
+> >> On Mon, Dec 19, 2016 at 05:25:53PM +0800, Changming Huang wrote:
+> >> > New property "snps,incr-burst-type-adjustment = <x>, <y>" for
+> >> > USB3.0
+> >> DWC3.
+> >> > Field "x": 1/0 - undefined length INCR burst type enable or not;
+> >> > Field
+> >> > "y": INCR4/INCR8/INCR16/INCR32/INCR64/INCR128/INCR256 burst type.
+> >> >
+> >> > While enabling undefined length INCR burst type and INCR16 burst
+> >> > type, get better write performance on NXP Layerscape platform:
+> >> > around 3% improvement (from 364MB/s to 375MB/s).
+> >> >
+> >> > Signed-off-by: Changming Huang <jerry.huang@nxp.com>
+> >> > ---
+> >> > Changes in v3:
+> >> >   - add new property for INCR burst in usb node.
+> >> >
+> >> >  Documentation/devicetree/bindings/usb/dwc3.txt |    5 +++++
+> >> >  arch/arm/boot/dts/ls1021a.dtsi                 |    1 +
+> >> >  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |    3 +++
+> >> >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |    2 ++
+> >> >  4 files changed, 11 insertions(+)
+> >> >
+> >> > diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt
+> >> > b/Documentation/devicetree/bindings/usb/dwc3.txt
+> >> > index e3e6983..8c405a3 100644
+> >> > --- a/Documentation/devicetree/bindings/usb/dwc3.txt
+> >> > +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
+> >> > @@ -55,6 +55,10 @@ Optional properties:
+> >> >     fladj_30mhz_sdbnd signal is invalid or incorrect.
+> >> >
+> >> >   - <DEPRECATED> tx-fifo-resize: determines if the FIFO *has* to be
+> >> reallocated.
+> >> > + - snps,incr-burst-type-adjustment: Value for INCR burst type of
+> >> GSBUSCFG0
+> >> > +   register, undefined length INCR burst type enable and INCRx type.
+> >> > +   First field is for undefined length INCR burst type enable or not.
+> >> > +   Second field is for largest INCRx type enabled.
+> >>
+> >> Why do you need the first field? Is the 2nd field used if the 1st is 0?
+> >> If not, then just use the presence of the property to enable or not.
+> > The first field is one switch.
+> > When it is 1, means undefined length INCR burst type enabled, we can use
+> any length less than or equal to the largest-enabled burst length of
+> INCR4/8/16/32/64/128/256.
+> > When it is zero, means INCRx burst mode enabled, we can use one fixed
+> burst length of 1/4/8/16/32/64/128/256 byte.
+> > So, the 2nd field is used if the 1st is 0, we need to select one largest burst
+> length the USB controller can support.
+> > If we don't want to change the value of this register (use the default value),
+> we don't need to add this property to usb node.
+> 
+> Just make this a single value with 0 meaning INCR and 4/8/16/etc being INCRx.
+Maybe, I didn't describe it clearly. 
+According to DWC3 spec, the value "0" of field INCRBrstEna means INCRx burst mode, 1 means INCR burst mode.
+Regardless of the value of INCRBrstEna [bit0], we need to modify the other field bit[1,2,3,4,5,6,7] to one INCR burst type  for the platform supported.
+Ad you mentioned, if we just use a single value with 0 meaning INCR and 4/8/16/etc being INCRx.
+I understand totally that when it is none-zero, we can use it for INCR burst mode. 
+Then, when it is 0, how to select the INCRx value?
 
-I just stumbled over this patch in Maxime's -next tree and think I
-missed it before. I guess it's a bit late, but I just wanted to express
-my concerns and write out the issues with the current DT approach:
-
-> On Tue, Oct 11, 2016 at 11:46 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> Now that we can handle the generic pinctrl bindings, convert our DT to it.
-
-Do we really want to do this? This makes the new DTs incompatible to
-older kernels, for no good reasons. Or are there any? Does this "lock
-muxed pins" functionality (users cannot export GPIOs which are used by a
-driver) rely on the new binding?
-
-Anyway ...
-I understand that in sunxi world a kernel is always accompanied by a
-matching .dtb, but we should really get away from this, as this doesn't
-scale and more importantly creates big headaches in arm64 world:
-
-1) Scaling: Providing a board .dtb together with a kernel puts the
-burden of board support to each distribution, which means that _every_
-distribution needs to ship matching DTs for _every_ board. There are a
-lot of Allwinner boards (around 100 these days?), I am not sure every
-distribution seriously wants to put every .dtb into some bootloader
-accessible directory. Also this kind of defeats the original DT idea,
-where the .dtb is provided by firmware and a generic kernel just works
-with whatever it gets presented.
-Either distributions will not support certain boards because of this or
-there is a lot of maintenance churn in distros.
-Yes, arm(32) has lived with this for years, but that doesn't mean we
-need to keep it this way.
-
-2) Firmware DT: We start to see more and more Allwinner boards with SPI
-flash now, which is supposed to hold some firmware bits. This gives the
-ultimate opportunity to store the DT in there as well. BUT this relies
-on there being _one_ DT (to rule them all). I don't see issues with
-older DTs not having full functionality on newer kernels (this would be
-a reason for a firmware update), but there should at any given time _one
-best_ DT which is a candidate for being burned into the flash.
-Otherwise people are stuck with a certain kernel version (range).
-As an example in this case: Kernel 4.9 is LTS and will probably be
-elected by Debian to be _the_ kernel for the next release and supported
-over several years. But it relies on an old style DT (allwinner,pins
-properties), newer pinctrl DT nodes will be rejected by the driver.
-But for new features (upcoming HDMI support for H3, for instance) to be
-usable a newer DT is required, even if an old kernel will ignore those
-features. So if the flash provides a new DT, we cannot boot stable
-Debian, whereas if the flash provides a legacy DT, we cannot use new
-features in newer kernels.
-Not changing the DT in a way that breaks forward compatibility can be
-done, for instance we just drop this patch here. For new SoCs (like A64
-or H5, where there are no backward compatibility issues) we can happily
-use the new bindings in the official DTs, but for anything already
-supported by older kernels we just stick which what we have. We have to
-keep the old support code in anyway.
-Yes, providing both forward and backward compatibility is not going to
-be a walk in the park, but is inevitable if we want to get those board
-out of the toy area. Other platform can cope with this.
-
-3) On EFI setups the generation(!) of the DT is actually done in EFI
-firmware (very much like in the original PowerPC OF setup). It is
-expected that the generation relies on a static DT scaffold, but
-firmware is free to add or remove nodes. Providing different DTs for
-each kernel is hard to integrate into this approach.
-
-4) Generic boot images: On the x86 side everybody expects this just to
-work: You put in a generic USB stick with one (or two) generic kernels
-and it just boots, without this installation having to know each
-supported machine beforehand. It even works with machines newer than the
-distro. While the last is hard work, it can be done, but only if the DT
-is provided by firmware, which requires there to be one best DT for each
-board.
-
-5) arm64: Distributions providing support for arm64 machines generally
-do not seem to provide DTs, because most platform do not require them
-to. It is not clear that every distribution will do so for the sake or
-supporting Allwinner boards.
-
-6) Other OSes (or U-Boot) are affected by this as well. Eventually this
-will lead them to create their own DTs (and their own bindings?), which
-makes this situation really a mess. We can hardly request them to stick
-with the Linux bindings if we break them regularly.
-
-7) Dynamic DT alteration (by firmware/U-Boot and using overlays, for
-instance), will be much easier if the DT is originally stored in the
-firmware and snippets are stored there as well. This is for instance a
-use case for the (optional) WiFi module on the Pine64.
-
-8) Those patches also create a lot of potential merge conflicts, since
-they touch almost every sunxi DT file. They are trivial to solve,
-probably, but still tend to create a lot of work and cause nuisance for
-other people (as proven with the A64 CCU driver in this cycle).
-
-So can I ask that we start taking this seriously and stop doing things
-which prevent Allwinner boards from being supported properly?
-Which would first involve dropping this very patch?
-Having done breakage in the past (with "allwinner,sun7i-a20-mmc", for
-instance) is no excuse for doing it again. And especially I want to
-avoid this habit creeping into the arm64 world (thinking about the H5
-here, which may be impacted by this very patch, for instance).
-
-Cheers,
-Andre.
+So, I think we still need two vaue to specify INCRBrstEna and INCRx burst type.
