@@ -1,51 +1,46 @@
-From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Wed,  4 Jan 2017 02:18:26 +0100 (CET)
-Subject: [PATCH net-next 2/6] net/bpf_jit: ARM: split VLAN_PRESENT bit
- handling from VLAN_TCI
-In-Reply-To: <cover.1483492355.git.mirq-linux@rere.qmqm.pl>
-References: <cover.1483492355.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <83e17cf9afe848670ef908da458754e589592bf5.1483492355.git.mirq-linux@rere.qmqm.pl>
+From: alison.wang@nxp.com (Alison Wang)
+Date: Wed, 4 Jan 2017 01:46:11 +0000
+Subject: [PATCH v2 2/2] mtd: nand: Update dependency of IFC for LS1021A
+In-Reply-To: <4e04eb5e-fb53-f71e-ee49-0872a6c11e97@gmail.com>
+References: <1483411266-45875-1-git-send-email-b18965@freescale.com>
+ <1483411266-45875-2-git-send-email-b18965@freescale.com>
+ <4e04eb5e-fb53-f71e-ee49-0872a6c11e97@gmail.com>
+Message-ID: <DB6PR0401MB2584606EC932BF1FAED788E1F4610@DB6PR0401MB2584.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
----
-v2: remove one insn for big-endians
+> On 01/03/2017 03:41 AM, Alison Wang wrote:
+> > As NAND support for Freescale/NXP IFC controller is available on
+> > LS1021A, the dependency for LS1021A is added.
+> 
+> Does LS stand for LayerScape ? Yes it does. So why does ARCH_LAYERSCAPE
+> not cover LS1021 ?
+[Alison Wang] LS1021A is an earlier product and is not compatible with later Layerscape architecture. So ARCH_LAYERSCAPE can't cover LS1021A.
 
- arch/arm/net/bpf_jit_32.c | 16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
+> 
+> > Signed-off-by: Alison Wang <alison.wang@nxp.com>
+> > ---
+> > Changes in v2:
+> > - None
+> >
+> >  drivers/mtd/nand/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+> index
+> > 353a9dd..85e3860 100644
+> > --- a/drivers/mtd/nand/Kconfig
+> > +++ b/drivers/mtd/nand/Kconfig
+> > @@ -441,7 +441,7 @@ config MTD_NAND_FSL_ELBC
+> >
+> >  config MTD_NAND_FSL_IFC
+> >  	tristate "NAND support for Freescale IFC controller"
+> > -	depends on FSL_SOC || ARCH_LAYERSCAPE
+> > +	depends on FSL_SOC || ARCH_LAYERSCAPE || SOC_LS1021A
+> >  	select FSL_IFC
+> >  	select MEMORY
+> >  	help
+> >
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 93d0b6d0b63e..0700cbbe4f14 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -915,17 +915,21 @@ static int build_body(struct jit_ctx *ctx)
- 			emit(ARM_LDR_I(r_A, r_skb, off), ctx);
- 			break;
- 		case BPF_ANC | SKF_AD_VLAN_TAG:
--		case BPF_ANC | SKF_AD_VLAN_TAG_PRESENT:
- 			ctx->seen |= SEEN_SKB;
- 			BUILD_BUG_ON(FIELD_SIZEOF(struct sk_buff, vlan_tci) != 2);
- 			off = offsetof(struct sk_buff, vlan_tci);
- 			emit(ARM_LDRH_I(r_A, r_skb, off), ctx);
--			if (code == (BPF_ANC | SKF_AD_VLAN_TAG))
--				OP_IMM3(ARM_AND, r_A, r_A, ~VLAN_TAG_PRESENT, ctx);
--			else {
--				OP_IMM3(ARM_LSR, r_A, r_A, 12, ctx);
-+#ifdef VLAN_TAG_PRESENT
-+			OP_IMM3(ARM_AND, r_A, r_A, ~VLAN_TAG_PRESENT, ctx);
-+#endif
-+			break;
-+		case BPF_ANC | SKF_AD_VLAN_TAG_PRESENT:
-+			off = PKT_VLAN_PRESENT_OFFSET();
-+			emit(ARM_LDRB_I(r_A, r_skb, off), ctx);
-+			if (PKT_VLAN_PRESENT_BIT)
-+				OP_IMM3(ARM_LSR, r_A, r_A, PKT_VLAN_PRESENT_BIT, ctx);
-+			if (PKT_VLAN_PRESENT_BIT < 7)
- 				OP_IMM3(ARM_AND, r_A, r_A, 0x1, ctx);
--			}
- 			break;
- 		case BPF_ANC | SKF_AD_PKTTYPE:
- 			ctx->seen |= SEEN_SKB;
--- 
-2.11.0
+Best Regards,
+Alison Wang
