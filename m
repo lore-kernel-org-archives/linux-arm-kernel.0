@@ -1,61 +1,90 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Jan 2017 11:57:01 +0000
-Subject: [PATCH 09/22] mfd: axp20x: add AC power supply cells for AXP22X
- PMICs
-In-Reply-To: <20170102163723.7939-10-quentin.schulz@free-electrons.com>
-References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
- <20170102163723.7939-10-quentin.schulz@free-electrons.com>
-Message-ID: <20170104115701.GD24058@dell>
+From: manish.narani@xilinx.com (Manish Narani)
+Date: Wed, 4 Jan 2017 18:53:01 +0530
+Subject: [RFC PATCH] usb: host: xhci: plat: add support for otg_set_host() call
+In-Reply-To: <1483536181-22356-1-git-send-email-mnarani@xilinx.com>
+References: <1483536181-22356-1-git-send-email-mnarani@xilinx.com>
+Message-ID: <1483536181-22356-7-git-send-email-mnarani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 02 Jan 2017, Quentin Schulz wrote:
+This patch will add support for OTG host initialization. This will
+help OTG drivers to populate their host subsystem.
 
-> The X-Powers AXP20X and AXP22X PMICs expose the status of AC power
-> supply.
-> 
-> This adds the AC power supply driver to the MFD cells of the AXP22X
-> PMICs.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> ---
->  drivers/mfd/axp20x.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+Signed-off-by: Manish Narani <mnarani@xilinx.com>
+---
+ drivers/usb/host/xhci-plat.c | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-  
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index 31a84d81..65c57d0 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -608,6 +608,11 @@ static struct mfd_cell axp221_cells[] = {
->  		.name		= "axp20x-adc",
->  		.of_compatible	= "x-powers,axp221-adc"
->  	}, {
-> +		.name		= "axp20x-ac-power-supply",
-> +		.of_compatible	= "x-powers,axp221-ac-power-supply",
-> +		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
-> +		.resources	= axp20x_ac_power_supply_resources,
-> +	}, {
->  		.name		= "axp20x-usb-power-supply",
->  		.of_compatible	= "x-powers,axp221-usb-power-supply",
->  		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
-> @@ -626,6 +631,11 @@ static struct mfd_cell axp223_cells[] = {
->  	}, {
->  		.name			= "axp20x-regulator",
->  	}, {
-> +		.name		= "axp20x-ac-power-supply",
-> +		.of_compatible	= "x-powers,axp221-ac-power-supply",
-> +		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
-> +		.resources	= axp20x_ac_power_supply_resources,
-> +	}, {
->  		.name		= "axp20x-usb-power-supply",
->  		.of_compatible	= "x-powers,axp223-usb-power-supply",
->  		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
-
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index ddfab30..aa08bdd 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -19,6 +19,7 @@
+ #include <linux/usb/phy.h>
+ #include <linux/slab.h>
+ #include <linux/acpi.h>
++#include <linux/usb/otg.h>
+ 
+ #include "xhci.h"
+ #include "xhci-plat.h"
+@@ -144,6 +145,37 @@ static const struct of_device_id usb_xhci_of_match[] = {
+ MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
+ #endif
+ 
++static int usb_otg_set_host(struct device *dev, struct usb_hcd *hcd, bool yes)
++{
++	int ret = 0;
++
++	hcd->usb_phy = usb_get_phy(USB_PHY_TYPE_USB3);
++	if (!IS_ERR_OR_NULL(hcd->usb_phy) && hcd->usb_phy->otg) {
++		dev_dbg(dev, "%s otg support available\n", __func__);
++		if (yes) {
++			if (otg_set_host(hcd->usb_phy->otg, &hcd->self)) {
++				dev_err(dev, "%s otg_set_host failed\n",
++						__func__);
++				usb_put_phy(hcd->usb_phy);
++				goto disable_phy;
++			}
++		} else {
++			ret = otg_set_host(hcd->usb_phy->otg, NULL);
++			usb_put_phy(hcd->usb_phy);
++			goto disable_phy;
++		}
++
++	} else
++		goto disable_phy;
++
++	return 0;
++
++disable_phy:
++	hcd->usb_phy = NULL;
++
++	return ret;
++}
++
+ static int xhci_plat_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id *match;
+@@ -255,6 +287,11 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto dealloc_usb2_hcd;
+ 
++	ret = usb_otg_set_host(&pdev->dev, hcd, 1);
++	if (ret)
++		goto dealloc_usb2_hcd;
++
++
+ 	return 0;
+ 
+ 
+@@ -283,6 +320,8 @@ static int xhci_plat_remove(struct platform_device *dev)
+ 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+ 	struct clk *clk = xhci->clk;
+ 
++	usb_otg_set_host(&dev->dev, hcd, 0);
++
+ 	usb_remove_hcd(xhci->shared_hcd);
+ 	usb_phy_shutdown(hcd->usb_phy);
+ 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.1.1
