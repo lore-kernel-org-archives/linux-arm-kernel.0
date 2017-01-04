@@ -1,51 +1,94 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 4 Jan 2017 12:06:02 +0000
-Subject: arm64: virt_to_page() does not return right page for a kernel
- image address
-In-Reply-To: <c23ad459-9dab-2085-2e0d-91ad4cedc987@redhat.com>
-References: <CAHB_GuqqXqVu4i4eCZ3V_d8JbdSO6rjWpA_B0NMJsNc_Zw0Niw@mail.gmail.com>
- <20170104111119.GD8329@leverpostej>
- <c23ad459-9dab-2085-2e0d-91ad4cedc987@redhat.com>
-Message-ID: <20170104120602.GG8329@leverpostej>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 4 Jan 2017 10:21:57 +0000
+Subject: [PATCH 2/4] dt-bindings: mfd: Remove TPS65217 interrupts
+In-Reply-To: <20161209062833.5768-3-woogyom.kim@gmail.com>
+References: <20161209062833.5768-1-woogyom.kim@gmail.com>
+ <20161209062833.5768-3-woogyom.kim@gmail.com>
+Message-ID: <20170104102157.GU27589@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 05:28:32PM +0530, Pratyush Anand wrote:
-> Hi Mark,
+On Fri, 09 Dec 2016, Milo Kim wrote:
 
-Hi Pratyush,
-
-> On Wednesday 04 January 2017 04:41 PM, Mark Rutland wrote:
-> >Other than the (new) crypto test and the (not yet upstream) kdump
-> >patches, does any code rely on virt_to_page() working for a kernel image
-> >address? If so, and if we cannot fix those in the short term, we may
-> >want to temporarily revert commit 9f2875912dac35d9 until those are fixed
-> >up.
-> >
-> >Regardless, I think that the kdump code should not rely on
-> >virt_to_page() for a kernel image (or kmap) result.
+> Interrupt numbers are from the datasheet, so no need to keep them in
+> the ABI. Use the number in the DT file.
 > 
-> Its not the kdump code which is relying on virt_to_page() for a
-> kernel image.
+> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+> ---
+>  arch/arm/boot/dts/am335x-bone-common.dtsi |  8 +++-----
+>  include/dt-bindings/mfd/tps65217.h        | 26 --------------------------
+>  2 files changed, 3 insertions(+), 31 deletions(-)
+>  delete mode 100644 include/dt-bindings/mfd/tps65217.h
 
-Sorry, I had misread the above. I understand now.
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-> Its only crypto test which does that. In the first kernel (none
-> kdump case) also crypto test gets a wrong kmap_atomic() address,
-> however luckily there exists an entry for that address in page table
-> and so a valid corresponding physical location. Therefore, it is
-> just that we do not see the crash. I see still the crypto test
-> failure print in the 1st kernel.
-> However, in crash kernel there was no valid physical address and so
-> the kernel crashed.
+I'm happy for this to go in via your respective ARM tree.
 
-So it seems we need to fix the crypto test.
+> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> index 14b6269..3e32dd1 100644
+> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
+> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> @@ -6,8 +6,6 @@
+>   * published by the Free Software Foundation.
+>   */
+>  
+> -#include <dt-bindings/mfd/tps65217.h>
+> -
+>  / {
+>  	cpus {
+>  		cpu at 0 {
+> @@ -319,13 +317,13 @@
+>  	ti,pmic-shutdown-controller;
+>  
+>  	charger {
+> -		interrupts = <TPS65217_IRQ_AC>, <TPS65217_IRQ_USB>;
+> -		interrupt-names = "AC", "USB";
+> +		interrupts = <0>, <1>;
+> +		interrupt-names = "USB", "AC";
+>  		status = "okay";
+>  	};
+>  
+>  	pwrbutton {
+> -		interrupts = <TPS65217_IRQ_PB>;
+> +		interrupts = <2>;
+>  		status = "okay";
+>  	};
+>  
+> diff --git a/include/dt-bindings/mfd/tps65217.h b/include/dt-bindings/mfd/tps65217.h
+> deleted file mode 100644
+> index cafb9e6..0000000
+> --- a/include/dt-bindings/mfd/tps65217.h
+> +++ /dev/null
+> @@ -1,26 +0,0 @@
+> -/*
+> - * This header provides macros for TI TPS65217 DT bindings.
+> - *
+> - * Copyright (C) 2016 Texas Instruments
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful, but
+> - * WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> - * General Public License for more details.
+> - *
+> - * You should have received a copy of the GNU General Public License along with
+> - * this program.  If not, see <http://www.gnu.org/licenses/>.
+> - */
+> -
+> -#ifndef __DT_BINDINGS_TPS65217_H__
+> -#define __DT_BINDINGS_TPS65217_H__
+> -
+> -#define TPS65217_IRQ_USB	0
+> -#define TPS65217_IRQ_AC		1
+> -#define TPS65217_IRQ_PB		2
+> -
+> -#endif
 
-Looking at crypto/testmgr.c, I can't spot the kmap_atomic() or the
-page_address()/virt_to_page(). I guess that's hidden behind helpers,
-which might also be used elsewhere?
-
-Could you elaborate on where exactly the problem is in the crypto test?
-
-Thanks,
-Mark.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
