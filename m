@@ -1,42 +1,61 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 04 Jan 2017 17:31:05 +0100
-Subject: [PATCH 0/5] ARM: dts: armada388: rework clearfog's .dtsi
- references
-In-Reply-To: <E1cO4UH-0008SR-GW@rmk-PC.armlinux.org.uk> (Russell King's
- message of "Mon, 02 Jan 2017 15:25:25 +0000")
-References: <E1cO454-00083C-Tj@rmk-PC.armlinux.org.uk>
- <E1cO4UH-0008SR-GW@rmk-PC.armlinux.org.uk>
-Message-ID: <87wpeaeqie.fsf@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 4 Jan 2017 16:04:06 +0000
+Subject: mbox-name vs. mbox-names (was: Re: [PATCH v4 1/5] mailbox: dt:
+ Supply bindings for ST's Mailbox IP)
+In-Reply-To: <20161024084107.GD14477@dell>
+References: <CAMuHMdXqOZ=eKJ=SkY4TM=fu8qnZ2gLmh-2iH0jB2pAu_v2vNg@mail.gmail.com>
+ <20161024084107.GD14477@dell>
+Message-ID: <20170104160406.GE24225@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
- 
- On lun., janv. 02 2017, Russell King <rmk+kernel@armlinux.org.uk> wrote:
+On Mon, 24 Oct 2016, Lee Jones wrote:
 
-> This patch series, based upon the previous series adding Clearfog Base
-> support, reworks the clearfog .dtsi file to reference nodes by label
-> rather than by path.
->
-> Not everything is moved - just those which had labels at the time the
-> patches were created.
+> On Fri, 21 Oct 2016, Geert Uytterhoeven wrote:
+> 
+> > On Fri, Oct 16, 2015 at 9:21 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > >  .../devicetree/bindings/mailbox/sti-mailbox.txt    | 51 ++++++++++++++++++++++
+> > >  1 file changed, 51 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+> > > new file mode 100644
+> > > index 0000000..b61eec9
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+> > > @@ -0,0 +1,51 @@
+> > > +ST Microelectronics Mailbox Driver
+> > > +
+> > > +Each ST Mailbox IP currently consists of 4 instances of 32 channels.  Messages
+> > > +are passed between Application and Remote processors using shared memory.
+> > > +
+> > > +Controller
+> > > +----------
+> > > +
+> > > +Required properties:
+> > > +- compatible           : Should be "st,stih407-mailbox"
+> > > +- reg                  : Offset and length of the device's register set
+> > > +- mbox-name            : Name of the mailbox
+> > 
+> > All other mailbox drivers use "mbox-names". Oops, it's in v4.9-rc1...
+> > 
+> > Can we still fix that?
+> 
+> So long as all the fixes; changes to the driver and DT are merged in a
+> single kernel release, we can change it.
 
-All the series is applied on mvebu/dt, however I would like to have a
-commit log for the first patch before pushing it to arm-soc.
+Scrap that, change of plan. Actually current code is correct.
 
-Thanks,
+mbox-name does not have the same functionality as mbox-names.
 
-Gregory
-
-
->
->  arch/arm/boot/dts/armada-388-clearfog-base.dts     |  15 +
->  arch/arm/boot/dts/armada-388-clearfog.dtsi         | 353 ++++++++++-----------
->  .../arm/boot/dts/armada-38x-solidrun-microsom.dtsi | 113 ++++---
->  3 files changed, 245 insertions(+), 236 deletions(-)
+mbox-names is a client-side property used to request channels, where
+as mbox-name is used to provide a better user-readable name other than
+mailbox{0..x}.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
