@@ -1,87 +1,64 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Wed, 4 Jan 2017 18:32:55 +0100
-Subject: [PATCH v2] mfd: mc13xxx: Set the irq type.
-In-Reply-To: <20170104110959.GZ27589@dell>
-References: <1483112613-18092-1-git-send-email-lilja.magnus@gmail.com>
- <20170104110959.GZ27589@dell>
-Message-ID: <CAM=E1R59oKhT3b8=nJ3Utg4cPi0Z6oiLkj8DU7grg6T+2CoMAw@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 4 Jan 2017 16:49:41 +0000
+Subject: [PATCH v6 11/14] msi: platform: make
+ platform_msi_create_device_domain() ACPI aware
+In-Reply-To: <1483363905-2806-12-git-send-email-hanjun.guo@linaro.org>
+References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
+ <1483363905-2806-12-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20170104164941.GB8604@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jan 02, 2017 at 09:31:42PM +0800, Hanjun Guo wrote:
+> With the platform msi domain created for ITS, irqchip such as
+> mbi-gen connecting ITS, which needs ctreate its own irqdomain.
 
-On 4 January 2017 at 12:09, Lee Jones <lee.jones@linaro.org> wrote:
-> On Fri, 30 Dec 2016, Magnus Lilja wrote:
->
->> Commit 10f9edaeaa30 ("mfd: mc13xxx: Use regmap irq framework for
->> interrupts") removed the passing of the IRQF_TRIGGER_HIGH flag when
->> registering the interrupt.
->> This commit fixes that problem by setting the IRQF_TRIGGER_HIGH flag in
->> case no irq type is set via irqd framework (e.g. device tree). In the
->> latter case the irq flag from irqd is used.
->
-> This looks like a hack.
->
-> Why can't you set the trigger type in Device Tree instead?
+This patch touches generic platform-msi code, there is nothing ITS
+and mbi-gen specific that has to be known here.
 
-The i.MX31 PDK board has not, like many (all?) i.MX31 boards, not been
-converted to use device tree yet. I think there is work in progress in
-this area. However, as the IRQF_TRIGGER problem also affects several
-stable kernel series (since 3.18.x) I thought it was worthwhile to fix
-this.
+> Fortunately with the platform msi support upstreamed by Marc,
+> we just need to add minor code to make it run properly.
 
-Regards, Magnus
+Do you really think that anyone reading this log can easily
+make use of this statement ?
 
->> Tested on i.MX31 PDK hardware.
->>
->> Fixes: 10f9edaeaa30 ("mfd: mc13xxx: Use regmap irq framework for interrupts")
->> Cc: <stable@vger.kernel.org> # 3.18.x
->> Cc: Lee Jones <lee.jones@linaro.org>
->> Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
->> ---
->> Changes from v1 (which was part of a patch series):
->>   - Now uses irqd_-functions to check if irq type is defined
->>   - Added Fixes: and Cc: to stable kernel.
->>
->>  drivers/mfd/mc13xxx-core.c | 8 +++++++-
->>  1 file changed, 7 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
->> index d7f54e4..e1757ea 100644
->> --- a/drivers/mfd/mc13xxx-core.c
->> +++ b/drivers/mfd/mc13xxx-core.c
->> @@ -15,6 +15,7 @@
->>  #include <linux/of_device.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/mfd/core.h>
->> +#include <linux/irq.h>
->>
->>  #include "mc13xxx.h"
->>
->> @@ -410,6 +411,7 @@ int mc13xxx_common_init(struct device *dev)
->>       struct mc13xxx *mc13xxx = dev_get_drvdata(dev);
->>       u32 revision;
->>       int i, ret;
->> +     unsigned int flags;
->>
->>       mc13xxx->dev = dev;
->>
->> @@ -440,7 +442,11 @@ int mc13xxx_common_init(struct device *dev)
->>       mc13xxx->irq_chip.irqs = mc13xxx->irqs;
->>       mc13xxx->irq_chip.num_irqs = ARRAY_SIZE(mc13xxx->irqs);
->>
->> -     ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq, IRQF_ONESHOT,
->> +     flags = irqd_get_trigger_type(irq_get_irq_data(mc13xxx->irq));
->> +     flags = (flags == IRQ_TYPE_NONE) ? IRQF_TRIGGER_HIGH : flags;
->> +
->> +     ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq,
->> +                               IRQF_ONESHOT | flags,
->>                                 0, &mc13xxx->irq_chip, &mc13xxx->irq_data);
->>       if (ret)
->>               return ret;
->
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+> platform_msi_create_device_domain() is almost ready for ACPI use
+> except of_node_to_fwnode() is for dt only, make it ACPI aware then
+> things will work in both DTS and ACPI.
+
+This commit log is unreadable and the readable bits do not contain
+information that can be used for the purpose a commit log is made
+for.
+
+Please rewrite it in a way that can be used in the future to understand
+what this patch does and why you want it in the kernel, thanks.
+
+Lorenzo
+
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Tested-by: Majun <majun258@huawei.com>
+> Tested-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Greg KH <gregkh@linuxfoundation.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> ---
+>  drivers/base/platform-msi.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
+> index be6a599..035ca3b 100644
+> --- a/drivers/base/platform-msi.c
+> +++ b/drivers/base/platform-msi.c
+> @@ -345,8 +345,7 @@ struct irq_domain *
+>  
+>  	data->host_data = host_data;
+>  	domain = irq_domain_create_hierarchy(dev->msi_domain, 0, nvec,
+> -					     of_node_to_fwnode(dev->of_node),
+> -					     ops, data);
+> +					     dev->fwnode, ops, data);
+>  	if (!domain)
+>  		goto free_priv;
+>  
+> -- 
+> 1.9.1
+> 
