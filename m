@@ -1,65 +1,47 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 4 Jan 2017 09:26:13 -0600
-Subject: [PATCH v4 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
- stores scenario in vdma
-In-Reply-To: <1483536954-27203-3-git-send-email-appanad@xilinx.com>
-References: <1483536954-27203-1-git-send-email-appanad@xilinx.com>
- <1483536954-27203-3-git-send-email-appanad@xilinx.com>
-Message-ID: <20170104152613.hhdptwsyg73ev3dz@rob-hp-laptop>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Jan 2017 15:19:39 +0000
+Subject: [PATCH] iommu: Drop the of_iommu_{set/get}_ops() interface
+In-Reply-To: <20170103173456.18154-1-lorenzo.pieralisi@arm.com>
+References: <20170103173456.18154-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20170104151939.GK18193@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 07:05:53PM +0530, Kedareswara rao Appana wrote:
-> When VDMA is configured for more than one frame in the h/w
-> for example h/w is configured for n number of frames and user
-> Submits n number of frames and triggered the DMA using issue_pending API.
-> In the current driver flow we are submitting one frame at a time
-> but we should submit all the n number of frames at one time as the h/w
-> Is configured for n number of frames.
-
-Please fix run-on sentences, capitalization, and word wrapping.
-
+On Tue, Jan 03, 2017 at 05:34:56PM +0000, Lorenzo Pieralisi wrote:
+> With the introduction of the new iommu_{register/get}_instance()
+> interface in commit e4f10ffe4c9b ("iommu: Make of_iommu_set/get_ops() DT
+> agnostic") (based on struct fwnode_handle as look-up token, so firmware
+> agnostic) to register IOMMU instances with the core IOMMU layer there is
+> no reason to keep the old OF based interface around any longer.
 > 
-> This patch fixes this issue.
+> Convert all the IOMMU drivers (and OF IOMMU core code) that rely on the
+> of_iommu_{set/get}_ops() to the new kernel interface to register/retrieve
+> IOMMU instances and remove the of_iommu_{set/get}_ops() remaining glue
+> code in order to complete the interface rework.
 > 
-> Reviewed-by: Jose Abreu <joabreu@synopsys.com>
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
 > ---
-> Changes for v4:
-> ---> Add Check for framestore configuration on Transmit case as well
->      as suggested by Jose Abreu.
-> ---> Modified the dev_dbg checks to dev_warn checks as suggested
->      by Jose Abreu. 
-> Changes for v3:
-> ---> Added Checks for frame store configuration. If frame store
->      Configuration is not present at the h/w level and user
->      Submits less frames added debug prints in the driver as relevant.
-> Changes for v2:
-> ---> Fixed race conditions in the driver as suggested by Jose Abreu
-> ---> Fixed unnecessray if else checks in the vdma_start_transfer
->      as suggested by Laurent Pinchart.
+> Exynos, msm and mtk code compile tested only owing to lack of
+> test platforms, I would appreciate some help in testing this
+> patch on those platforms before merging it even if it is just
+> a simple interface conversion.
 > 
->  .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |  2 +
->  drivers/dma/xilinx/xilinx_dma.c                    | 79 +++++++++++++++-------
->  2 files changed, 58 insertions(+), 23 deletions(-)
+> Thanks,
+> Lorenzo
 > 
-> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> index a2b8bfa..1f65e09 100644
-> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> @@ -66,6 +66,8 @@ Optional child node properties:
->  Optional child node properties for VDMA:
->  - xlnx,genlock-mode: Tells Genlock synchronization is
->  	enabled/disabled in hardware.
-> +- xlnx,fstore-config: Tells Whether Frame Store Configuration is
-> +	enabled/disabled in hardware.
+>  drivers/iommu/exynos-iommu.c |  2 +-
+>  drivers/iommu/msm_iommu.c    |  2 +-
+>  drivers/iommu/mtk_iommu.c    |  2 +-
+>  drivers/iommu/of_iommu.c     |  4 ++--
+>  include/linux/of_iommu.h     | 11 -----------
+>  5 files changed, 5 insertions(+), 16 deletions(-)
 
-What's the default (when not present)? That should be the most 
-common case. Looks like the code treats this as bool, but that's 
-not clear here. The name is not clear what it is doing. Enabling or 
-disabling the feature?
+Thanks for following up with this cleanup, Lorenzo. I'll queue it locally,
+and send it to Joerg for 4.11 if he doesn't apply it manually before then.
 
-
->  Optional child node properties for AXI DMA:
->  -dma-channels: Number of dma channels in child node.
->  
+Will
