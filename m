@@ -1,44 +1,29 @@
-From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Wed,  4 Jan 2017 08:19:17 +0800
-Subject: [PATCH v5 4/4] MAINTAINERS: add zx2967 SoC drivers to ARM ZTE
- architecture
-In-Reply-To: <1483489157-10782-1-git-send-email-baoyou.xie@linaro.org>
-References: <1483489157-10782-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <1483489157-10782-4-git-send-email-baoyou.xie@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 3 Jan 2017 16:41:48 -0800
+Subject: [PATCH 2/4] ARM: dts: Add am335x-boneblack-wireless
+In-Reply-To: <CA+T6QPnTS-XyV0G9X78hAh=D79TkZkU+evN2RA6VF3f_jyBtkA@mail.gmail.com>
+References: <20161227175837.28970-1-robertcnelson@gmail.com>
+ <20161227175837.28970-2-robertcnelson@gmail.com>
+ <CB5C8999-6CAE-41F6-85A6-D2A856BD8011@gmail.com>
+ <20170103201103.GB25222@atomide.com>
+ <2D5ABB5A-E332-4D77-89EA-9DBF9A2FECFB@gmail.com>
+ <20170103204343.GC25222@atomide.com>
+ <CA+T6QPnTS-XyV0G9X78hAh=D79TkZkU+evN2RA6VF3f_jyBtkA@mail.gmail.com>
+Message-ID: <20170104004147.GD25222@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the ZTE SoC drivers as maintained by ARM ZTE
-architecture maintainers, as they're parts of the core IP.
+* Jason Kridner <jkridner@gmail.com> [170103 12:58]:
+> Asked-by: Jason Kridner <jdk@ti.com>
+> 
+> Sorry for the phone mailer (HTML).
 
-By the way, this patch adds the maintainer for ARM
-ZTE architecture to Baoyou Xie.
+OK fixed that to Acked-by :) Applied into omap-for-v4.11/dt and pushed
+out.
 
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
----
- MAINTAINERS | 4 ++++
- 1 file changed, 4 insertions(+)
+BBB Green Wireless seems to work nicely for WLAN out of the box with
+these patches :)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ad199da..64f04df 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1975,12 +1975,16 @@ F:	arch/arm/mach-pxa/include/mach/z2.h
- 
- ARM/ZTE ARCHITECTURE
- M:	Jun Nie <jun.nie@linaro.org>
-+M:	Baoyou Xie <baoyou.xie@linaro.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-zx/
- F:	drivers/clk/zte/
-+F:	drivers/soc/zte/
- F:	Documentation/devicetree/bindings/arm/zte.txt
- F:	Documentation/devicetree/bindings/clock/zx296702-clk.txt
-+F:	Documentation/devicetree/bindings/soc/zte/
-+F:	include/dt-bindings/soc/zx*.h
- 
- ARM/ZYNQ ARCHITECTURE
- M:	Michal Simek <michal.simek@xilinx.com>
--- 
-2.7.4
+Regards,
+
+Tony
