@@ -1,59 +1,111 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 04 Jan 2017 16:48:20 +0100
-Subject: [PATCH 0/9] ARM: dts: armada388: Introduce Clearfog Base DT
-In-Reply-To: <E1cO43Q-0007yJ-ON@rmk-PC.armlinux.org.uk> (Russell King's
- message of "Mon, 02 Jan 2017 14:57:40 +0000")
-References: <E1cO41M-0007xc-Id@rmk-PC.armlinux.org.uk>
- <E1cO43Q-0007yJ-ON@rmk-PC.armlinux.org.uk>
-Message-ID: <8760lug723.fsf@free-electrons.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 4 Jan 2017 15:11:56 +0100
+Subject: [PATCH v5 13/17] irqdomain: irq_domain_check_msi_remap
+In-Reply-To: <ecb7ddf6-074f-50e4-6402-d59ceb1edd1d@arm.com>
+References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
+ <1483536746-2725-14-git-send-email-eric.auger@redhat.com>
+ <ecb7ddf6-074f-50e4-6402-d59ceb1edd1d@arm.com>
+Message-ID: <df8e7fdb-4048-3169-c758-c2a64119a321@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
- 
- On lun., janv. 02 2017, Russell King <rmk+kernel@armlinux.org.uk> wrote:
+Hi Marc,
 
-> This patch series, based upon the previously submitted fix for the SPI
-> flash, reworks the Clearfog DT files to add support for the SolidRun
-> Clearfog Base platform.
->
-> The conventional model is now known as the "Clearfog Pro" module, which
-> has the DSA switch and two PCIe sockets.  The base model is a smaller
-> board without the DSA switch, replacing it with a second copper gigabit
-> port, and only one PCIe socket.
->
-> We retain the original DT file (named armada-388-clearfog.dtb) for
-> compatibility with existing installations - not only the filename,
-> but also the board name exposed in userspace.
+On 04/01/2017 14:46, Marc Zyngier wrote:
+> Hi Eric,
+> 
+> On 04/01/17 13:32, Eric Auger wrote:
+>> This new function checks whether all platform and PCI
+>> MSI domains implement IRQ remapping. This is useful to
+>> understand whether VFIO passthrough is safe with respect
+>> to interrupts.
+>>
+>> On ARM typically an MSI controller can sit downstream
+>> to the IOMMU without preventing VFIO passthrough.
+>> As such any assigned device can write into the MSI doorbell.
+>> In case the MSI controller implements IRQ remapping, assigned
+>> devices will not be able to trigger interrupts towards the
+>> host. On the contrary, the assignment must be emphasized as
+>> unsafe with respect to interrupts.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
+>> ---
+>>
+>> v4 -> v5:
+>> - Handle DOMAIN_BUS_FSL_MC_MSI domains
+>> - Check parents
+>> ---
+>>  include/linux/irqdomain.h |  1 +
+>>  kernel/irq/irqdomain.c    | 41 +++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 42 insertions(+)
+>>
+>> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+>> index ab017b2..281a40f 100644
+>> --- a/include/linux/irqdomain.h
+>> +++ b/include/linux/irqdomain.h
+>> @@ -219,6 +219,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
+>>  					 void *host_data);
+>>  extern struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+>>  						   enum irq_domain_bus_token bus_token);
+>> +extern bool irq_domain_check_msi_remap(void);
+>>  extern void irq_set_default_host(struct irq_domain *host);
+>>  extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
+>>  				  irq_hw_number_t hwirq, int node,
+>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+>> index 8c0a0ae..700caea 100644
+>> --- a/kernel/irq/irqdomain.c
+>> +++ b/kernel/irq/irqdomain.c
+>> @@ -278,6 +278,47 @@ struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+>>  EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
+>>  
+>>  /**
+>> + * irq_domain_is_msi_remap - Check if @domain or any parent
+>> + * has MSI remapping support
+>> + * @domain: domain pointer
+>> + */
+>> +static bool irq_domain_is_msi_remap(struct irq_domain *domain)
+>> +{
+>> +	struct irq_domain *h = domain;
+>> +
+>> +	for (; h; h = h->parent) {
+>> +		if (h->flags & IRQ_DOMAIN_FLAG_MSI_REMAP)
+>> +			return true;
+>> +	}
+>> +	return false;
+>> +}
+>> +
+>> +/**
+>> + * irq_domain_check_msi_remap() - Checks whether all MSI
+>> + * irq domains implement IRQ remapping
+>> + */
+>> +bool irq_domain_check_msi_remap(void)
+>> +{
+>> +	struct irq_domain *h;
+>> +	bool ret = true;
+>> +
+>> +	mutex_lock(&irq_domain_mutex);
+>> +	list_for_each_entry(h, &irq_domain_list, link) {
+>> +		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
+>> +		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI) ||
+>> +		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI)) &&
+>> +		     !irq_domain_is_msi_remap(h)) {
+> 
+> (h->bus_token & DOMAIN_BUS_PCI_MSI) and co looks quite wrong. bus_token
+> is not a bitmap, and DOMAIN_BUS_* not a single bit value (see enum
+> irq_domain_bus_token). Surely this should read
+> (h->bus_token == DOMAIN_BUS_PCI_MSI).
+Oh I did not notice that. Thanks.
 
+Any other comments on the irqdomain side? Do you think the current
+approach consisting in looking at those bus tokens and their parents
+looks good?
 
-All the series applied on mvebu/dt.
+Thanks
 
-I amended the last two patches because the license text was mangled as
-spotted by Alexandre Belloni, so I fixed it while applying the patches.
-
-
-Thanks,
-
-Gregory
-
-
->
->  arch/arm/boot/dts/Makefile                         |   2 +
->  arch/arm/boot/dts/armada-388-clearfog-base.dts     |  94 ++++++
->  arch/arm/boot/dts/armada-388-clearfog-pro.dts      |  55 ++++
->  arch/arm/boot/dts/armada-388-clearfog.dts          | 364 ++++-----------------
->  arch/arm/boot/dts/armada-388-clearfog.dtsi         | 310 ++++++++++++++++++
->  .../arm/boot/dts/armada-38x-solidrun-microsom.dtsi |  21 ++
->  6 files changed, 548 insertions(+), 298 deletions(-)
->  create mode 100644 arch/arm/boot/dts/armada-388-clearfog-base.dts
->  create mode 100644 arch/arm/boot/dts/armada-388-clearfog-pro.dts
->  create mode 100644 arch/arm/boot/dts/armada-388-clearfog.dtsi
->
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Eric
+> 
+> Thanks,
+> 
+> 	M.
+> 
