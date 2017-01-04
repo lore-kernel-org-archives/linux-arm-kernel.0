@@ -1,55 +1,49 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 03 Jan 2017 21:35:00 -0800
-Subject: [GIT PULL] Amlogic fixes for v4.10-rc
-Message-ID: <7hk2abgzgb.fsf@baylibre.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Wed,  4 Jan 2017 11:04:40 +0530
+Subject: [PATCH v3 0/2] Broadcom FlexRM ring manager support
+Message-ID: <1483508082-7008-1-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+The Broadcom FlexRM ring manager provides producer-consumer style
+ring interface for offload engines on Broadcom iProc SoCs. We can
+have one or more instances of Broadcom FlexRM ring manager in a SoC.
 
-This pull has one real fix, as a couple non-critical ones.  The DRM
-DT/defconfig patches are coming now because I didn't expect the new
-driver to make it for the v4.10 merge window, but since it did[1], the
-DT and defconfig should go into the same release.
+This patchset adds a mailbox driver for Broadcom FlexRM ring manager
+which can be used by offload engine drivers as mailbox clients.
 
-Thanks,
+The Broadcom FlexRM mailbox driver is feature complete for RAID and
+Crypto offload engines. We will have incremental patches in-future
+for ring-level statistics using debugfs and minor optimizations.
 
-Kevin
+This patchset is based on Linux-4.10-rc2 and it is also available
+at flexrm-v3 branch of https://github.com/Broadcom/arm64-linux.git
 
-[1] bbbe775ec5b5 drm: Add support for Amlogic Meson Graphic Controller
+Changes since v2:
+ - Rebased patches for Linux-4.10-rc2
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+Changes since v1:
+ - Use compatile string as brcm,iproc-flexrm-mbox
+ - Rephrase commit message and text in DT bindings patch
 
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+Anup Patel (2):
+  mailbox: Add driver for Broadcom FlexRM ring manager
+  dt-bindings: Add DT bindings info for FlexRM ring manager
 
-are available in the git repository at:
+ .../bindings/mailbox/brcm,iproc-flexrm-mbox.txt    |  60 ++
+ drivers/mailbox/Kconfig                            |  11 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/mailbox-flexrm/Makefile            |   6 +
+ drivers/mailbox/mailbox-flexrm/flexrm-desc.c       | 764 +++++++++++++++++++
+ drivers/mailbox/mailbox-flexrm/flexrm-desc.h       |  47 ++
+ drivers/mailbox/mailbox-flexrm/flexrm-main.c       | 829 +++++++++++++++++++++
+ include/linux/mailbox/brcm-message.h               |  14 +-
+ 8 files changed, 1729 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
+ create mode 100644 drivers/mailbox/mailbox-flexrm/Makefile
+ create mode 100644 drivers/mailbox/mailbox-flexrm/flexrm-desc.c
+ create mode 100644 drivers/mailbox/mailbox-flexrm/flexrm-desc.h
+ create mode 100644 drivers/mailbox/mailbox-flexrm/flexrm-main.c
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-fixes
-
-for you to fetch changes up to fcdaf1a2a7a042a290f4c7de28bcdebd5de18445:
-
-  ARM64: defconfig: enable DRM_MESON as module (2017-01-03 09:31:13 -0800)
-
-----------------------------------------------------------------
-Amlogic fixes for v4.10
-- DT: GXL: fix GPIO include
-- add DT and defconfig for newly merged DRM driver
-
-----------------------------------------------------------------
-Kevin Hilman (2):
-      ARM64: dts: meson-gxl: fix GPIO include
-      ARM64: defconfig: enable DRM_MESON as module
-
-Neil Armstrong (1):
-      ARM64: dts: meson-gx: Add Graphic Controller nodes
-
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi              | 16 ++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts | 16 ++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi       | 16 ++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi            |  4 ++++
- arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts  | 16 ++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi             |  6 +++++-
- arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts    | 16 ++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxm.dtsi             |  4 ++++
- arch/arm64/configs/defconfig                           |  1 +
- 9 files changed, 94 insertions(+), 1 deletion(-)
+-- 
+2.7.4
