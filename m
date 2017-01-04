@@ -1,195 +1,113 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 4 Jan 2017 16:58:39 +0100
-Subject: [PATCH v5 13/17] irqdomain: irq_domain_check_msi_remap
-In-Reply-To: <c9c4c159-60ea-8501-5dc2-17bbb24ddfab@arm.com>
-References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
- <1483536746-2725-14-git-send-email-eric.auger@redhat.com>
- <ecb7ddf6-074f-50e4-6402-d59ceb1edd1d@arm.com>
- <df8e7fdb-4048-3169-c758-c2a64119a321@redhat.com>
- <c9c4c159-60ea-8501-5dc2-17bbb24ddfab@arm.com>
-Message-ID: <817fdda2-6083-069c-40b8-e9f5c5ca576f@redhat.com>
+From: clemens.gruber@pqgruber.com (Clemens Gruber)
+Date: Wed, 4 Jan 2017 17:00:24 +0100
+Subject: imx: RS-485 problems during TX, maybe DMA related
+Message-ID: <20170104160024.GA13442@archie.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi,
 
-On 04/01/2017 16:27, Marc Zyngier wrote:
-> On 04/01/17 14:11, Auger Eric wrote:
->> Hi Marc,
->>
->> On 04/01/2017 14:46, Marc Zyngier wrote:
->>> Hi Eric,
->>>
->>> On 04/01/17 13:32, Eric Auger wrote:
->>>> This new function checks whether all platform and PCI
->>>> MSI domains implement IRQ remapping. This is useful to
->>>> understand whether VFIO passthrough is safe with respect
->>>> to interrupts.
->>>>
->>>> On ARM typically an MSI controller can sit downstream
->>>> to the IOMMU without preventing VFIO passthrough.
->>>> As such any assigned device can write into the MSI doorbell.
->>>> In case the MSI controller implements IRQ remapping, assigned
->>>> devices will not be able to trigger interrupts towards the
->>>> host. On the contrary, the assignment must be emphasized as
->>>> unsafe with respect to interrupts.
->>>>
->>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>>>
->>>> ---
->>>>
->>>> v4 -> v5:
->>>> - Handle DOMAIN_BUS_FSL_MC_MSI domains
->>>> - Check parents
->>>> ---
->>>>  include/linux/irqdomain.h |  1 +
->>>>  kernel/irq/irqdomain.c    | 41 +++++++++++++++++++++++++++++++++++++++++
->>>>  2 files changed, 42 insertions(+)
->>>>
->>>> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
->>>> index ab017b2..281a40f 100644
->>>> --- a/include/linux/irqdomain.h
->>>> +++ b/include/linux/irqdomain.h
->>>> @@ -219,6 +219,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
->>>>  					 void *host_data);
->>>>  extern struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
->>>>  						   enum irq_domain_bus_token bus_token);
->>>> +extern bool irq_domain_check_msi_remap(void);
->>>>  extern void irq_set_default_host(struct irq_domain *host);
->>>>  extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
->>>>  				  irq_hw_number_t hwirq, int node,
->>>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
->>>> index 8c0a0ae..700caea 100644
->>>> --- a/kernel/irq/irqdomain.c
->>>> +++ b/kernel/irq/irqdomain.c
->>>> @@ -278,6 +278,47 @@ struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
->>>>  EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
->>>>  
->>>>  /**
->>>> + * irq_domain_is_msi_remap - Check if @domain or any parent
->>>> + * has MSI remapping support
->>>> + * @domain: domain pointer
->>>> + */
->>>> +static bool irq_domain_is_msi_remap(struct irq_domain *domain)
->>>> +{
->>>> +	struct irq_domain *h = domain;
->>>> +
->>>> +	for (; h; h = h->parent) {
->>>> +		if (h->flags & IRQ_DOMAIN_FLAG_MSI_REMAP)
->>>> +			return true;
->>>> +	}
->>>> +	return false;
->>>> +}
->>>> +
->>>> +/**
->>>> + * irq_domain_check_msi_remap() - Checks whether all MSI
->>>> + * irq domains implement IRQ remapping
->>>> + */
->>>> +bool irq_domain_check_msi_remap(void)
->>>> +{
->>>> +	struct irq_domain *h;
->>>> +	bool ret = true;
->>>> +
->>>> +	mutex_lock(&irq_domain_mutex);
->>>> +	list_for_each_entry(h, &irq_domain_list, link) {
->>>> +		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
->>>> +		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI) ||
->>>> +		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI)) &&
->>>> +		     !irq_domain_is_msi_remap(h)) {
->>>
->>> (h->bus_token & DOMAIN_BUS_PCI_MSI) and co looks quite wrong. bus_token
->>> is not a bitmap, and DOMAIN_BUS_* not a single bit value (see enum
->>> irq_domain_bus_token). Surely this should read
->>> (h->bus_token == DOMAIN_BUS_PCI_MSI).
->> Oh I did not notice that. Thanks.
->>
->> Any other comments on the irqdomain side? Do you think the current
->> approach consisting in looking at those bus tokens and their parents
->> looks good?
-> 
-> To be completely honest, I don't like it much, as having to enumerate
-> all the bus types can come up with could become quite a burden in the
-> long run. I'd rather be able to identify MSI capable domains by
-> construction. I came up with the following approach (fully untested):
-> 
-> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-> index 281a40f..7779796 100644
-> --- a/include/linux/irqdomain.h
-> +++ b/include/linux/irqdomain.h
-> @@ -183,8 +183,11 @@ enum {
->  	/* Irq domain is an IPI domain with single virq */
->  	IRQ_DOMAIN_FLAG_IPI_SINGLE	= (1 << 3),
->  
-> +	/* Irq domain implements MSIs */
-> +	IRQ_DOMAIN_FLAG_MSI		= (1 << 4),
-> +
->  	/* Irq domain is MSI remapping capable */
-> -	IRQ_DOMAIN_FLAG_MSI_REMAP	= (1 << 4),
-> +	IRQ_DOMAIN_FLAG_MSI_REMAP	= (1 << 5),
->  
->  	/*
->  	 * Flags starting from IRQ_DOMAIN_FLAG_NONCORE are reserved
-> @@ -450,6 +453,11 @@ static inline bool irq_domain_is_ipi_single(struct irq_domain *domain)
->  {
->  	return domain->flags & IRQ_DOMAIN_FLAG_IPI_SINGLE;
->  }
-> +
-> +static inline bool irq_domain_is_msi(struct irq_domain *domain)
-> +{
-> +	return domain->flags & IRQ_DOMAIN_FLAG_MSI;
-> +}
->  #else	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
->  static inline void irq_domain_activate_irq(struct irq_data *data) { }
->  static inline void irq_domain_deactivate_irq(struct irq_data *data) { }
-> @@ -481,6 +489,11 @@ static inline bool irq_domain_is_ipi_single(struct irq_domain *domain)
->  {
->  	return false;
->  }
-> +
-> +static inline bool irq_domain_is_msi(struct irq_domain *domain)
-> +{
-> +	return false;
-> +}
->  #endif	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
->  
->  #else /* CONFIG_IRQ_DOMAIN */
-> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-> index 700caea..33b6921 100644
-> --- a/kernel/irq/irqdomain.c
-> +++ b/kernel/irq/irqdomain.c
-> @@ -304,10 +304,7 @@ bool irq_domain_check_msi_remap(void)
->  
->  	mutex_lock(&irq_domain_mutex);
->  	list_for_each_entry(h, &irq_domain_list, link) {
-> -		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
-> -		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI) ||
-> -		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI)) &&
-> -		     !irq_domain_is_msi_remap(h)) {
-> +		if (irq_domain_is_msi(h) && !irq_domain_is_msi_remap(h)) {
->  			ret = false;
->  			goto out;
->  		}
-> diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-> index ee23006..b637263 100644
-> --- a/kernel/irq/msi.c
-> +++ b/kernel/irq/msi.c
-> @@ -270,7 +270,7 @@ struct irq_domain *msi_create_irq_domain(struct fwnode_handle *fwnode,
->  	if (info->flags & MSI_FLAG_USE_DEF_CHIP_OPS)
->  		msi_domain_update_chip_ops(info);
->  
-> -	return irq_domain_create_hierarchy(parent, 0, 0, fwnode,
-> +	return irq_domain_create_hierarchy(parent, IRQ_DOMAIN_FLAG_MSI, 0, fwnode,
->  					   &msi_domain_ops, info);
->  }
->  
-> 
-> 
-> Thoughts?
-No objection from my side. I will respin and test.
+I observed odd behavior of the current tty/serial/imx.c driver in RS-485
+mode.
 
-Thanks
+RX works fine, but TX does not: When sending data, it arrives multiple
+times and with data from previous transmissions at the end, after a
+delay.
 
-Eric
-> 
-> 	M.
-> 
+# My setup
+
+Hardware:
+i.MX6Q board with UARTn_RX_DATA, _TX_DATA and _CTS_B connected to a
+RS-485 half-duplex transceiver (Exar SP3082E), pins RXD, TXD and DE
+respectively. (DE is active-high, _CTS_B is inverted on the board)
+I am using an external USB-to-RS-485 converter connected to my PC to
+conduct the tests.
+
+Firmware:
+I tried both the original ROM SDMA scripts and also the RAM scripts from
+Freescale (placed in firmware/imx), but there was no difference, except
+for a DMA transaction error message going away (appeared when writing too
+much data too fast into a device configured with too low baud rate).
+So I switched back to the pure mainline 4.9 kernel with SDMA using the
+scripts from ROM.
+
+Software:
+Mainline Linux 4.9 with serial_rs485 flags: rs485 (SER_RS485_ENABLED),
+-rs485rtsonsend (~SER_RS485_RTS_ON_SEND), rs485rtsaftersend and
+rs485rxduringtx. I only enabled rs485rxduringtx, because otherwise it
+would not work at all. But I am still unsure why it is needed for
+half-duplex RS-485.
+
+# The tests
+
+1) On the board: echo A > /dev/ttymxc4
+2) On my PC: A \n A \n appears immediately
+             (about 4s delay)
+             A \n
+             (about 4s delay)
+             A \n
+
+Kernel log on the board:
+[   29.059983] imx-uart 21f4000.serial: TX: prepare to send 2 bytes by DMA.
+[   29.067166] imx-uart 21f4000.serial: we finish the TX DMA.
+[   29.073057] imx-uart 21f4000.serial: TX: prepare to send 4094 bytes by DMA.
+[   33.359405] imx-uart 21f4000.serial: we finish the TX DMA.
+[   33.365173] imx-uart 21f4000.serial: TX: prepare to send 4072 bytes by DMA.
+[   37.603551] imx-uart 21f4000.serial: we finish the TX DMA.
+
+3) On the board: echo B > /dev/ttymxc4
+4) On my PC: B \n B \n appears immediately
+             (about 4s delay)
+             A \n B \n
+             (about 4s delay)
+             A \n B \n
+Kernel log:
+[   66.000296] imx-uart 21f4000.serial: TX: prepare to send 2 bytes by DMA.
+[   66.007110] imx-uart 21f4000.serial: we finish the TX DMA.
+[   66.012841] imx-uart 21f4000.serial: TX: prepare to send 4094 bytes by DMA.
+[   70.297051] imx-uart 21f4000.serial: we finish the TX DMA.
+[   70.302798] imx-uart 21f4000.serial: TX: prepare to send 4072 bytes by DMA.
+[   74.539094] imx-uart 21f4000.serial: we finish the TX DMA.
+
+And so on..
+( If I continue with a echo C > /dev/ttymxc4, the last characters are
+  A \n B \n C )
+
+--
+
+To illustrate the behavior, I recorded the signals on the transceiver
+pins with a logic analyzer:
+https://pqgruber.com/rs485_results.png
+I triggered only on the raising and on the falling edge of DE, so I only
+captured the first and the last characters for the first two tests and
+not all three events per test.
+
+I also enabled the DMA debug options in the kernel if that is helpful,
+here is the full log during the two tests:
+https://gist.github.com/clemensg/1ac5ee8a8ea32acc9145c5aa8407aea5
+
+--
+
+Do you have an idea, what's wrong here?
+
+Also: If you are using RS-485 with the imx driver on a recent kernel,
+please let me know if it is working for you and if you can reproduce the
+behavior.
+
+Thanks,
+Clemens
+
+--
+
+PS:
+
+Because I assumed that the error has something to do with DMA, I
+commented out the call to imx_uart_dma_init.
+Then, transmitting and receiving data over RS-485 works! Verified with
+the logic analyzer and the RS-485-to-USB adapter.
+
+However, if trying to send large amounts of data in a short time,
+sometimes I get an "Unhandled fault: imprecise external abort (0x1406)".
+But the back trace is not very helpful and probably not related
+(it is different every time), the last time I tried, the PC was at
+_raw_spin_unlock_irqrestore, called from hrtimer_start_range_ns.
