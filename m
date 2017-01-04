@@ -1,29 +1,50 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 4 Jan 2017 08:07:50 -0600
-Subject: [PATCH 2/5] drivers: mmc: sunxi: limit A64 MMC2 to 8K DMA buffer
-In-Reply-To: <1483398226-29321-3-git-send-email-andre.przywara@arm.com>
-References: <1483398226-29321-1-git-send-email-andre.przywara@arm.com>
- <1483398226-29321-3-git-send-email-andre.przywara@arm.com>
-Message-ID: <20170104140750.7qs4pvggwjdj5cma@rob-hp-laptop>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 4 Jan 2017 13:05:41 -0800
+Subject: [PATCH v2] ARM: dts: Add missing CPU frequencies for
+ Exynos5422/5800
+In-Reply-To: <20161229141707.qjrtjz7dik6a7l5s@kozik-lap>
+References: <10512254.nyUcL0zgTP@amdc3058>
+ <CAD=FV=Wo273T20fe8D2v5Pn1HYR==7PHtr7WZGwzFPRspAYPzg@mail.gmail.com>
+ <20161229141707.qjrtjz7dik6a7l5s@kozik-lap>
+Message-ID: <CAD=FV=WM_K_f0NQ0mxB55Ksbqg1gYJHs5d66ARYsa1=5hKLjXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2017 at 11:03:43PM +0000, Andre Przywara wrote:
-> From: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Unlike the A64 user manual reports, the third MMC controller on the
-> A64 (and the only one capable of 8-bit HS400 eMMC transfers) has a
-> DMA buffer size limit of 8KB (much like the very old Allwinner SoCs).
-> This does not affect the other two controllers, so introduce a new
-> DT compatible string to let the driver use different settings for that
-> particular device. This will also help to enable the high-speed transfer
-> modes of that controller later.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt | 1 +
->  drivers/mmc/host/sunxi-mmc.c                        | 7 +++++++
->  2 files changed, 8 insertions(+)
+Hi,
 
-Acked-by: Rob Herring <robh@kernel.org>
+On Thu, Dec 29, 2016 at 6:17 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Thu, Dec 15, 2016 at 04:54:30PM -0800, Doug Anderson wrote:
+>> > Index: b/arch/arm/boot/dts/exynos5800.dtsi
+>> > ===================================================================
+>> > --- a/arch/arm/boot/dts/exynos5800.dtsi 2016-12-15 12:43:54.365955950 +0100
+>> > +++ b/arch/arm/boot/dts/exynos5800.dtsi 2016-12-15 12:43:54.361955949 +0100
+>> > @@ -24,6 +24,16 @@
+>> >  };
+>> >
+>> >  &cluster_a15_opp_table {
+>> > +       opp at 2000000000 {
+>> > +               opp-hz = /bits/ 64 <2000000000>;
+>> > +               opp-microvolt = <1250000>;
+>> > +               clock-latency-ns = <140000>;
+>> > +       };
+>> > +       opp at 1900000000 {
+>> > +               opp-hz = /bits/ 64 <1900000000>;
+>> > +               opp-microvolt = <1250000>;
+>> > +               clock-latency-ns = <140000>;
+>> > +       };
+>>
+>> I don't think the voltages you listed are high enough for all peach pi
+>> boards for A15 at 1.9 GHz and 2.0 GHz, at least based on the research
+>> I did.  See my response to v1.
+>
+> I wanted to apply this but saw this remaining issue. Javier tested it
+> on Peach Pi so is this concern still valid?
+
+I'm not sure.  It's been years since I did anything with exynos, so I
+won't stand in the way if everyone else agrees that this patch is
+good, but I will point out that testing on a single Peach Pi board is
+not really enough given the massive difference in voltage needed
+between the highest ASV group and the lowest (a whopping 112.5 mV from
+looking in the Chrome OS source tree).
+
+-Doug
