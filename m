@@ -1,72 +1,99 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 04 Jan 2017 17:26:08 +0100
-Subject: [PATCH 1/5] ARM: dts: armada388-clearfog: add phy reset gpio-hog
-In-Reply-To: <E1cO4Vz-00005t-8n@rmk-PC.armlinux.org.uk> (Russell King's
- message of "Mon, 02 Jan 2017 15:27:11 +0000")
-References: <E1cO4UH-0008SR-GW@rmk-PC.armlinux.org.uk>
- <E1cO4Vz-00005t-8n@rmk-PC.armlinux.org.uk>
-Message-ID: <871swig5b3.fsf@free-electrons.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed,  4 Jan 2017 13:28:38 -0800
+Subject: [PATCH 4/4] watchdog: tangox: Use watchdog core to install restart
+ handler
+In-Reply-To: <1483565318-25578-1-git-send-email-linux@roeck-us.net>
+References: <1483565318-25578-1-git-send-email-linux@roeck-us.net>
+Message-ID: <1483565318-25578-4-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Use the infrastructure provided by the watchdog core to install
+the restart handler.
+
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+ drivers/watchdog/tangox_wdt.c | 32 +++++++++++---------------------
+ 1 file changed, 11 insertions(+), 21 deletions(-)
+
+diff --git a/drivers/watchdog/tangox_wdt.c b/drivers/watchdog/tangox_wdt.c
+index 202c4b9cc921..49e6e805db7c 100644
+--- a/drivers/watchdog/tangox_wdt.c
++++ b/drivers/watchdog/tangox_wdt.c
+@@ -15,9 +15,7 @@
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
+-#include <linux/notifier.h>
+ #include <linux/platform_device.h>
+-#include <linux/reboot.h>
+ #include <linux/watchdog.h>
  
- On lun., janv. 02 2017, Russell King <rmk+kernel@armlinux.org.uk> wrote:
-
-
-It would be nice to have some word here about this patch. Especially why
-we need it now. I guess it is for being less dependent on the
-initialization done by the bootloader but maybe you have other reasons.
-
-Thanks,
-
-Gregory
-
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  arch/arm/boot/dts/armada-388-clearfog-base.dts | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/armada-388-clearfog-base.dts b/arch/arm/boot/dts/armada-388-clearfog-base.dts
-> index f86e1876fb38..da788ea40717 100644
-> --- a/arch/arm/boot/dts/armada-388-clearfog-base.dts
-> +++ b/arch/arm/boot/dts/armada-388-clearfog-base.dts
-> @@ -74,7 +74,17 @@
->  	phy = <&phy1>;
->  };
->  
-> +&gpio0 {
-> +	phy1_reset {
-> +		gpio-hog;
-> +		gpios = <19 GPIO_ACTIVE_LOW>;
-> +		output-low;
-> +		line-name = "phy1-reset";
-> +	};
-> +};
-> +
->  &mdio {
-> +	pinctrl-0 = <&mdio_pins &microsom_phy_clk_pins &clearfog_phy_pins>;
->  	phy1: ethernet-phy at 1 {
->  		/*
->  		 * Annoyingly, the marvell phy driver configures the LED
-> @@ -87,6 +97,11 @@
->  };
->  
->  &pinctrl {
-> +	/* phy1 reset */
-> +	clearfog_phy_pins: clearfog-phy-pins {
-> +		marvell,pins = "mpp19";
-> +		marvell,function = "gpio";
-> +	};
->  	rear_button_pins: rear-button-pins {
->  		marvell,pins = "mpp44";
->  		marvell,function = "gpio";
-> -- 
-> 2.7.4
->
-
+ #define DEFAULT_TIMEOUT 30
+@@ -47,7 +45,6 @@ struct tangox_wdt_device {
+ 	void __iomem *base;
+ 	unsigned long clk_rate;
+ 	struct clk *clk;
+-	struct notifier_block restart;
+ };
+ 
+ static int tangox_wdt_set_timeout(struct watchdog_device *wdt,
+@@ -96,24 +93,24 @@ static const struct watchdog_info tangox_wdt_info = {
+ 	.identity = "tangox watchdog",
+ };
+ 
++static int tangox_wdt_restart(struct watchdog_device *wdt,
++			      unsigned long action, void *data)
++{
++	struct tangox_wdt_device *dev = watchdog_get_drvdata(wdt);
++
++	writel(1, dev->base + WD_COUNTER);
++
++	return 0;
++}
++
+ static const struct watchdog_ops tangox_wdt_ops = {
+ 	.start		= tangox_wdt_start,
+ 	.stop		= tangox_wdt_stop,
+ 	.set_timeout	= tangox_wdt_set_timeout,
+ 	.get_timeleft	= tangox_wdt_get_timeleft,
++	.restart	= tangox_wdt_restart,
+ };
+ 
+-static int tangox_wdt_restart(struct notifier_block *nb, unsigned long action,
+-			      void *data)
+-{
+-	struct tangox_wdt_device *dev =
+-		container_of(nb, struct tangox_wdt_device, restart);
+-
+-	writel(1, dev->base + WD_COUNTER);
+-
+-	return NOTIFY_DONE;
+-}
+-
+ static int tangox_wdt_probe(struct platform_device *pdev)
+ {
+ 	struct tangox_wdt_device *dev;
+@@ -180,12 +177,6 @@ static int tangox_wdt_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, dev);
+ 
+-	dev->restart.notifier_call = tangox_wdt_restart;
+-	dev->restart.priority = 128;
+-	err = register_restart_handler(&dev->restart);
+-	if (err)
+-		dev_warn(&pdev->dev, "failed to register restart handler\n");
+-
+ 	dev_info(&pdev->dev, "SMP86xx/SMP87xx watchdog registered\n");
+ 
+ 	return 0;
+@@ -202,7 +193,6 @@ static int tangox_wdt_remove(struct platform_device *pdev)
+ 	tangox_wdt_stop(&dev->wdt);
+ 	clk_disable_unprepare(dev->clk);
+ 
+-	unregister_restart_handler(&dev->restart);
+ 	watchdog_unregister_device(&dev->wdt);
+ 
+ 	return 0;
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.7.4
