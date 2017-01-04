@@ -1,40 +1,62 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Wed, 4 Jan 2017 08:50:15 -0800
-Subject: [PATCH 1/2] arm: Cleanup sanity_check_meminfo
-In-Reply-To: <alpine.LFD.2.20.1701031958100.21662@knanqh.ubzr>
-References: <1483477010-18986-1-git-send-email-labbott@redhat.com>
- <1483477010-18986-2-git-send-email-labbott@redhat.com>
- <alpine.LFD.2.20.1701031958100.21662@knanqh.ubzr>
-Message-ID: <d4a0af0f-902a-967c-721b-d97905010e45@redhat.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 4 Jan 2017 16:42:32 +0000
+Subject: [PATCH 1/5] ARM: wire up HWCAP2 feature bits to the CPU modalias
+In-Reply-To: <20170102234013.GK14217@n2100.armlinux.org.uk>
+References: <1476787939-21889-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1476787939-21889-2-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu_y7e=sJT+7FNj846NczgpNOdVx53SDC7dupmN-3ztNwA@mail.gmail.com>
+ <20161031161319.GF1041@n2100.armlinux.org.uk>
+ <CAKv+Gu-hLD0xnLyywceJvPiB8ZkENNwWZTM--OHFvzw6MahYmw@mail.gmail.com>
+ <20170102234013.GK14217@n2100.armlinux.org.uk>
+Message-ID: <CAKv+Gu8nKFYBarBgy16xgR35eMYdYipxtnGmMOOWWh4ekXnmfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2017 05:12 PM, Nicolas Pitre wrote:
-> On Tue, 3 Jan 2017, Laura Abbott wrote:
-> 
+On 2 January 2017 at 23:40, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Mon, Jan 02, 2017 at 09:06:04PM +0000, Ard Biesheuvel wrote:
+>> On 31 October 2016 at 16:13, Russell King - ARM Linux
+>> <linux@armlinux.org.uk> wrote:
+>> > On Sat, Oct 29, 2016 at 11:08:36AM +0100, Ard Biesheuvel wrote:
+>> >> On 18 October 2016 at 11:52, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> >> > Wire up the generic support for exposing CPU feature bits via the
+>> >> > modalias in /sys/device/system/cpu. This allows udev to automatically
+>> >> > load modules for things like crypto algorithms that are implemented
+>> >> > using optional instructions.
+>> >> >
+>> >> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >> > ---
+>> >> >  arch/arm/Kconfig                  |  1 +
+>> >> >  arch/arm/include/asm/cpufeature.h | 32 ++++++++++++++++++++
+>> >> >  2 files changed, 33 insertions(+)
+>> >> >
+>> >>
+>> >> Russell,
+>> >>
+>> >> do you have any concerns regarding this patch? If not, I will drop it
+>> >> into the patch system.
+>> >
+>> > It's still something I need to look at... I've been offline last week,
+>> > and sort-of offline the previous week, so I'm catching up.
+>> >
 >>
->> The logic for sanity_check_meminfo has become difficult to
->> follow. Clean up the code so it's more obvious what the code
->> is actually trying to do.
-> 
-> Absolutely. This function has a long history of subtle bugs ... and 
-> broken fixes.
-> 
->> +		if (reg->base < vmalloc_limit) {
->> +			if (block_end > arm_lowmem_limit)
->> +				arm_lowmem_limit = min(
->> +						(phys_addr_t)vmalloc_limit,
->> +						block_end);
-> 
-> Just to illustrate how subtle this can be, the above would reintroduce a 
-> bug that was fixed in commit b9a019899f.
-> 
-> 
-> Nicolas
-> 
+>> Hi Russell,
+>>
+>> Any thoughts yet?
+>
+> None, and the patch is well buried now that it'll take me a while to
+> find... back in mid-October?  Yea, I'll have to drop everything and
+> go digging through my mailboxes to find it... and I'm just catching
+> up (again) after a week and a bit's time offline - yep, it's wonderful
+> timing.  Sorry, no time to look at it right now, you're not the only
+> one wanting my attention at the moment.
+>
 
-Yup, I saw that commit and thought "I need to keep the fix". And yet I
-still managed to get it wrong. I'll fix in a v2.
+No worries. It is not exactly urgent, but it is a useful enhancement
+nonetheless.
 
-Thanks,
-Laura
+> Please try again in about a week's time - don't leave it a few months,
+> and please include the patch.
+>
+
+OK
