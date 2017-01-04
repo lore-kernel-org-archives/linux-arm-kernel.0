@@ -1,69 +1,58 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Jan 2017 11:56:37 +0000
-Subject: [PATCH 04/22] mfd: axp20x: add ADC cells for AXP20X and AXP22X
+Date: Wed, 4 Jan 2017 11:57:01 +0000
+Subject: [PATCH 09/22] mfd: axp20x: add AC power supply cells for AXP22X
  PMICs
-In-Reply-To: <20170104115602.GB24058@dell>
+In-Reply-To: <20170102163723.7939-10-quentin.schulz@free-electrons.com>
 References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
- <20170102163723.7939-5-quentin.schulz@free-electrons.com>
- <20170104115602.GB24058@dell>
-Message-ID: <20170104115637.GC24058@dell>
+ <20170102163723.7939-10-quentin.schulz@free-electrons.com>
+Message-ID: <20170104115701.GD24058@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 04 Jan 2017, Lee Jones wrote:
+On Mon, 02 Jan 2017, Quentin Schulz wrote:
 
-> On Mon, 02 Jan 2017, Quentin Schulz wrote:
+> The X-Powers AXP20X and AXP22X PMICs expose the status of AC power
+> supply.
 > 
-> > This adds the AXP20X/AXP22x ADCs driver to the mfd cells of the AXP209,
-> > AXP221 and AXP223 MFD.
-> > 
-> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> > ---
-> >  drivers/mfd/axp20x.c | 9 +++++++++
-> >  1 file changed, 9 insertions(+)
+> This adds the AC power supply driver to the MFD cells of the AXP22X
+> PMICs.
 > 
-> Applied, thanks.
-
-Whoops, wrong key combo!  Should have been:
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+>  drivers/mfd/axp20x.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 
 For my own reference:
   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-
-> > diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> > index a33db5e..31a84d81 100644
-> > --- a/drivers/mfd/axp20x.c
-> > +++ b/drivers/mfd/axp20x.c
-> > @@ -582,6 +582,9 @@ static struct mfd_cell axp20x_cells[] = {
-> >  	}, {
-> >  		.name		= "axp20x-regulator",
-> >  	}, {
-> > +		.name		= "axp20x-adc",
-> > +		.of_compatible	= "x-powers,axp209-adc",
-> > +	}, {
-> >  		.name		= "axp20x-ac-power-supply",
-> >  		.of_compatible	= "x-powers,axp202-ac-power-supply",
-> >  		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
-> > @@ -602,6 +605,9 @@ static struct mfd_cell axp221_cells[] = {
-> >  	}, {
-> >  		.name		= "axp20x-regulator",
-> >  	}, {
-> > +		.name		= "axp20x-adc",
-> > +		.of_compatible	= "x-powers,axp221-adc"
-> > +	}, {
-> >  		.name		= "axp20x-usb-power-supply",
-> >  		.of_compatible	= "x-powers,axp221-usb-power-supply",
-> >  		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
-> > @@ -615,6 +621,9 @@ static struct mfd_cell axp223_cells[] = {
-> >  		.num_resources		= ARRAY_SIZE(axp22x_pek_resources),
-> >  		.resources		= axp22x_pek_resources,
-> >  	}, {
-> > +		.name		= "axp20x-adc",
-> > +		.of_compatible	= "x-powers,axp221-adc"
-> > +	}, {
-> >  		.name			= "axp20x-regulator",
-> >  	}, {
-> >  		.name		= "axp20x-usb-power-supply",
-> 
+  
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 31a84d81..65c57d0 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -608,6 +608,11 @@ static struct mfd_cell axp221_cells[] = {
+>  		.name		= "axp20x-adc",
+>  		.of_compatible	= "x-powers,axp221-adc"
+>  	}, {
+> +		.name		= "axp20x-ac-power-supply",
+> +		.of_compatible	= "x-powers,axp221-ac-power-supply",
+> +		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
+> +		.resources	= axp20x_ac_power_supply_resources,
+> +	}, {
+>  		.name		= "axp20x-usb-power-supply",
+>  		.of_compatible	= "x-powers,axp221-usb-power-supply",
+>  		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
+> @@ -626,6 +631,11 @@ static struct mfd_cell axp223_cells[] = {
+>  	}, {
+>  		.name			= "axp20x-regulator",
+>  	}, {
+> +		.name		= "axp20x-ac-power-supply",
+> +		.of_compatible	= "x-powers,axp221-ac-power-supply",
+> +		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
+> +		.resources	= axp20x_ac_power_supply_resources,
+> +	}, {
+>  		.name		= "axp20x-usb-power-supply",
+>  		.of_compatible	= "x-powers,axp223-usb-power-supply",
+>  		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
 
 -- 
 Lee Jones
