@@ -1,86 +1,67 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 4 Jan 2017 10:33:51 +0000
-Subject: [RFC v2 PATCH 1/3] ARM: NOMMU: introduce dma operations for noMMU
-In-Reply-To: <CA+M3ks7Kzskb-VBQQdC2cNC52kro+6g2M6n5Rw4_vz-T4xn_eg@mail.gmail.com>
-References: <1481636704-18948-1-git-send-email-vladimir.murzin@arm.com>
- <1481636704-18948-2-git-send-email-vladimir.murzin@arm.com>
- <CA+M3ks7Kzskb-VBQQdC2cNC52kro+6g2M6n5Rw4_vz-T4xn_eg@mail.gmail.com>
-Message-ID: <9c957673-64ba-67ca-46a0-2bde26c95d9c@arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 4 Jan 2017 18:19:11 +0800
+Subject: [PATCH v6 06/14] irqchip: gicv3-its: platform-msi: refactor
+ its_pmsi_init() to prepare for ACPI
+In-Reply-To: <e08b5583-bb82-4676-2370-1147d79416ac@arm.com>
+References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
+ <1483363905-2806-7-git-send-email-hanjun.guo@linaro.org>
+ <8cdc4bfa-18a3-b9f6-aaba-0efe1f75fb40@semihalf.com>
+ <601cbdf2-823d-8bde-bbd9-fcc6a1c67f2c@linaro.org>
+ <b51b7be9-f8ee-57f9-6d53-6e8bd73dd431@semihalf.com>
+ <254387f0-1f63-4c83-ef90-570ef072cddf@linaro.org>
+ <e08b5583-bb82-4676-2370-1147d79416ac@arm.com>
+Message-ID: <6a16a21d-f8c0-a836-22b9-e18a4f13c38e@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Benjamin,
+On 2017/1/4 17:02, Marc Zyngier wrote:
+> On 04/01/17 08:25, Hanjun Guo wrote:
+>> On 2017/1/4 15:29, Tomasz Nowicki wrote:
+>>> On 04.01.2017 08:02, Hanjun Guo wrote:
+>>>> Hi Tomasz,
+>>>>
+>>>> On 2017/1/3 15:41, Tomasz Nowicki wrote:
+>>>>> Hi,
+>>>>>
+>>>>> Can we merge patch 4 & 6 into one patch so that we keep refactoring part
+>>>>> as one piece ? I do not see a reason to keep them separate or have patch
+>>>>> 5 in between. You can refactor what needs to be refactored, add
+>>>>> necessary functions to iort.c and then support ACPI for
+>>>>> irq-gic-v3-its-platform-msi.c
+>>>>
+>>>> There are two functions here,
+>>>>  - retrieve the dev id from IORT which was DT based only;
+>>>>
+>>>>  - init the platform msi domain from MADT;
+>>>>
+>>>> For each of them split it into two steps,
+>>>>  - refactor the code for ACPI later and it's easy for review
+>>>>    because wen can easily to figure out it has functional
+>>>>    change or not
+>>>>
+>>>>  - add ACPI functionality
+>>>>
+>>>> Does it make sense?
+>>>
+>>> It is up to Marc, but personally I prefer:
+>>> 1. Refactor dev id retrieving and init function in one patch and
+>>> highlight no functional changes in changelog
+>>> 2. Crate necessary infrastructure in iort.c
+>>> 3. Then add ACPI support to irq-gic-v3-its-platform-msi.c
+>>
+>> I have no strong preferences, and it's easy to do so as just
+>> need to squash/reorder the patches.
+>>
+>> Marc, Lorenzo, could you give some suggestions here?
+>
+> I think it'd make the reviewing easier to have patches that are
+> semantically grouped together (all the ACPI IORT together, for example).
+>
+> It would help understanding where you're aiming at instead of jumping
+> from irqchip to ACPI and back every other patch...
 
-On 02/01/17 15:26, Benjamin Gaignard wrote:
-> Hello Vladimir,
-> 
-> I have tested your patch on my setup (stm32f4: no MMU, no MPU) where
-> I'm writing display driver.
-> This driver use dma_alloc_wc() and dma_mmap_wc() for frame buffer
-> allocation and mmapping.
-> 
-> In dma-mapping-nommu.c you haven't implement dma_map_ops.mmap so
-> obviously my driver
-> doesn't work with your code.
-> In current implementation it is buggy too but I submit a patch to fix
-> that problem:
-> http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8633/1
-> 
-> Could it be possible for you to include mmap support in dma-mapping-nommu.c ?
-> 
+OK, I will reorder the patches and address the comments, then post
+a new version.
 
-IIRC, stm32f4 is Cortex-M4, so no cache support and it means that it uses
-dma_noop_ops. I offloaded mmap to common implementation, but completely forgot
-it has the same restriction as arm counterpart. Regardless, thanks for
-noticing that!
-
-It seems that I need to check that mapping is done from DMA coherent area (I'm
-moving to dma-coherent and here we have dma_mmap_from_coherent for that) and
-something like bellow for dma_noop_ops:
-
-diff --git a/lib/dma-noop.c b/lib/dma-noop.c
-index 3d766e7..d838b88 100644
---- a/lib/dma-noop.c
-+++ b/lib/dma-noop.c
-@@ -64,6 +64,25 @@ static int dma_noop_supported(struct device *dev, u64 mask)
- 	return 1;
- }
- 
-+static int dma_noop_mmap(struct device *dev, struct vm_area_struct *vma,
-+			 void *cpu_addr, dma_addr_t dma_addr, size_t size)
-+{
-+	unsigned long user_count = vma_pages(vma);
-+	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-+	unsigned long pfn = page_to_pfn(virt_to_page(cpu_addr));
-+	unsigned long off = vma->vm_pgoff;
-+	int ret = -ENXIO;
-+
-+	if (off < count && user_count <= (count - off)) {
-+		ret = remap_pfn_range(vma, vma->vm_start,
-+				      pfn + off,
-+				      user_count << PAGE_SHIFT,
-+				      vma->vm_page_prot);
-+	}
-+
-+	return ret;
-+}
-+
- struct dma_map_ops dma_noop_ops = {
- 	.alloc			= dma_noop_alloc,
- 	.free			= dma_noop_free,
-@@ -71,6 +90,7 @@ struct dma_map_ops dma_noop_ops = {
- 	.map_sg			= dma_noop_map_sg,
- 	.mapping_error		= dma_noop_mapping_error,
- 	.dma_supported		= dma_noop_supported,
-+	.mmap			= dma_noop_mmap,
- };
- 
- EXPORT_SYMBOL(dma_noop_ops);
-
-I'd be glad to hear if it works for you.
-
-Cheers
-Vladimir
-
-> Regards,
-> Benjamin
+Thanks
+Hanjun
