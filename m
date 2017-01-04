@@ -1,55 +1,50 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 4 Jan 2017 08:54:28 -0600
-Subject: [PATCH v6 1/5] dt-bindings: zte: documents zx2967 power domain
- driver bindings
-In-Reply-To: <1483530494-14177-1-git-send-email-baoyou.xie@linaro.org>
-References: <1483530494-14177-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20170104145428.b7dqxu34gp2nwup2@rob-hp-laptop>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 4 Jan 2017 14:34:42 +0000
+Subject: [PATCH v6 03/14] ACPI: ARM64: IORT: add missing comment for
+ iort_dev_find_its_id()
+In-Reply-To: <1483363905-2806-4-git-send-email-hanjun.guo@linaro.org>
+References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
+ <1483363905-2806-4-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20170104143442.GA8604@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 07:48:10PM +0800, Baoyou Xie wrote:
-> This patch documents devicetree tree bindings for the ZTE zx2967
-> power domain driver.
-> 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+On Mon, Jan 02, 2017 at 09:31:34PM +0800, Hanjun Guo wrote:
+> We are missing req_id's comment for iort_dev_find_its_id(),
+> add it back.
+
+"Add missing req_id parameter to the iort_dev_find_its_id() function
+kernel-doc comment."
+
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Tested-by: Majun <majun258@huawei.com>
+> Tested-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Tomasz Nowicki <tn@semihalf.com>
 > ---
->  Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt
+>  drivers/acpi/arm64/iort.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt b/Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt
-> new file mode 100644
-> index 0000000..1476318
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt
-> @@ -0,0 +1,17 @@
-> +* ZTE 2967 SoC Power Domains
-> +
-> +2967 processors include support for multiple power domains which are used
-> +to gate power to one or more peripherals on the processor.
-> +
-> +Required Properties:
-> +- compatible: should be one of the following.
-> +    * zte,zx296718-pcu - for zx296718 board's power domain.
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index 46e2d82..174e983 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -446,6 +446,7 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+>  /**
+>   * iort_dev_find_its_id() - Find the ITS identifier for a device
+>   * @dev: The device.
+> + * @req_id: Device's Requster ID
 
-board? I'd expect this is for an SoC?
+s/Requster/Requester
 
-> +- reg: physical base address of the controller and length of memory mapped
-> +    region.
+We can send it upstream independently along with some other patches
+in this series but I will have a look at the whole series first.
 
-#power-domain-cells needed?
+Lorenzo
 
-> +
-> +Example:
-> +
-> +	pcu_domain: pcu at 0x00117000 {
-
-pcu at 117000
-
-> +		compatible = "zte,zx296718-pcu";
-> +		reg = <0x00117000 0x1000>;
-> +	};
+>   * @idx: Index of the ITS identifier list.
+>   * @its_id: ITS identifier.
+>   *
 > -- 
-> 2.7.4
+> 1.9.1
 > 
