@@ -1,56 +1,99 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 4 Jan 2017 14:45:44 +0100
-Subject: [PATCH] drm/meson: Fix plane atomic check when no crtc for the
- plane
-In-Reply-To: <20170104132737.GF31595@intel.com>
-References: <1483435254-27955-1-git-send-email-narmstrong@baylibre.com>
- <20170104132737.GF31595@intel.com>
-Message-ID: <50f16b43-331a-5549-478c-83583f275f91@baylibre.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 4 Jan 2017 13:46:22 +0000
+Subject: [PATCH v5 13/17] irqdomain: irq_domain_check_msi_remap
+In-Reply-To: <1483536746-2725-14-git-send-email-eric.auger@redhat.com>
+References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
+ <1483536746-2725-14-git-send-email-eric.auger@redhat.com>
+Message-ID: <ecb7ddf6-074f-50e4-6402-d59ceb1edd1d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2017 02:27 PM, Ville Syrj?l? wrote:
-> On Tue, Jan 03, 2017 at 10:20:54AM +0100, Neil Armstrong wrote:
->> When no CRTC is associated with the plane, the meson_plane_atomic_check()
->> call breaks the kernel with an Oops.
->>
->> Fixes: bbbe775ec5b5 ("drm: Add support for Amlogic Meson Graphic Controller")
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->>  drivers/gpu/drm/meson/meson_plane.c | 3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/meson/meson_plane.c b/drivers/gpu/drm/meson/meson_plane.c
->> index 4942ca0..7890e30 100644
->> --- a/drivers/gpu/drm/meson/meson_plane.c
->> +++ b/drivers/gpu/drm/meson/meson_plane.c
->> @@ -51,6 +51,9 @@ static int meson_plane_atomic_check(struct drm_plane *plane,
->>  	struct drm_crtc_state *crtc_state;
->>  	struct drm_rect clip = { 0, };
->>  
->> +	if (!state->crtc)
->> +		return 0;
->> +
+Hi Eric,
+
+On 04/01/17 13:32, Eric Auger wrote:
+> This new function checks whether all platform and PCI
+> MSI domains implement IRQ remapping. This is useful to
+> understand whether VFIO passthrough is safe with respect
+> to interrupts.
 > 
-> Since you're not going to call drm_plane_helper_check_state() you will
-> fail to update plane_state->visible.
-
-Indeed I forgot about that, but i's not necessary yet since visibility is not yet handled.
-
+> On ARM typically an MSI controller can sit downstream
+> to the IOMMU without preventing VFIO passthrough.
+> As such any assigned device can write into the MSI doorbell.
+> In case the MSI controller implements IRQ remapping, assigned
+> devices will not be able to trigger interrupts towards the
+> host. On the contrary, the assignment must be emphasized as
+> unsafe with respect to interrupts.
 > 
-> What i915 does in this case is look for state->crtc first, and if that's
-> NULL it'll pick the crtc from the old state (plane->state->crtc). It
-> looks a bit ugly, but maybe we should hide it in a small helper function
-> that could be used by all drivers?
-
-Yes, an helper would be helpful.
-
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
 > 
->>  	crtc_state = drm_atomic_get_crtc_state(state->state, state->crtc);
->>  	if (IS_ERR(crtc_state))
->>  		return PTR_ERR(crtc_state);
->> -- 
->> 1.9.1
+> ---
+> 
+> v4 -> v5:
+> - Handle DOMAIN_BUS_FSL_MC_MSI domains
+> - Check parents
+> ---
+>  include/linux/irqdomain.h |  1 +
+>  kernel/irq/irqdomain.c    | 41 +++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 42 insertions(+)
+> 
+> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+> index ab017b2..281a40f 100644
+> --- a/include/linux/irqdomain.h
+> +++ b/include/linux/irqdomain.h
+> @@ -219,6 +219,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
+>  					 void *host_data);
+>  extern struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+>  						   enum irq_domain_bus_token bus_token);
+> +extern bool irq_domain_check_msi_remap(void);
+>  extern void irq_set_default_host(struct irq_domain *host);
+>  extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
+>  				  irq_hw_number_t hwirq, int node,
+> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> index 8c0a0ae..700caea 100644
+> --- a/kernel/irq/irqdomain.c
+> +++ b/kernel/irq/irqdomain.c
+> @@ -278,6 +278,47 @@ struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+>  EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
+>  
+>  /**
+> + * irq_domain_is_msi_remap - Check if @domain or any parent
+> + * has MSI remapping support
+> + * @domain: domain pointer
+> + */
+> +static bool irq_domain_is_msi_remap(struct irq_domain *domain)
+> +{
+> +	struct irq_domain *h = domain;
+> +
+> +	for (; h; h = h->parent) {
+> +		if (h->flags & IRQ_DOMAIN_FLAG_MSI_REMAP)
+> +			return true;
+> +	}
+> +	return false;
+> +}
+> +
+> +/**
+> + * irq_domain_check_msi_remap() - Checks whether all MSI
+> + * irq domains implement IRQ remapping
+> + */
+> +bool irq_domain_check_msi_remap(void)
+> +{
+> +	struct irq_domain *h;
+> +	bool ret = true;
+> +
+> +	mutex_lock(&irq_domain_mutex);
+> +	list_for_each_entry(h, &irq_domain_list, link) {
+> +		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
+> +		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI) ||
+> +		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI)) &&
+> +		     !irq_domain_is_msi_remap(h)) {
+
+(h->bus_token & DOMAIN_BUS_PCI_MSI) and co looks quite wrong. bus_token
+is not a bitmap, and DOMAIN_BUS_* not a single bit value (see enum
+irq_domain_bus_token). Surely this should read
+(h->bus_token == DOMAIN_BUS_PCI_MSI).
 
 Thanks,
-Neil
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
