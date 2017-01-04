@@ -1,187 +1,93 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Wed, 4 Jan 2017 14:25:17 +0200
-Subject: [PATCH v2 04/19] ARM: dts: imx6-sabrelite: add OV5642 and OV5640
- camera sensors
-In-Reply-To: <1483477049-19056-5-git-send-email-steve_longerbeam@mentor.com>
-References: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
- <1483477049-19056-5-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <0a343705-1d38-9fe2-6419-56ab9bdfb0c2@mentor.com>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Wed, 4 Jan 2017 13:23:41 +0100 (CET)
+Subject: [PATCH] rtc: armada38x: add __ro_after_init to armada38x_rtc_ops
+In-Reply-To: <20170104121425.GP14217@n2100.armlinux.org.uk>
+References: <1482751862-18699-1-git-send-email-bhumirks@gmail.com>
+ <20170102140654.GF14217@n2100.armlinux.org.uk>
+ <CAGXu5jJLA=GcOhV5Z_6AOGa1KhW7fXtqBGrewEeViaJ9TiE-aw@mail.gmail.com>
+ <20170103213118.GM14217@n2100.armlinux.org.uk>
+ <20170103215421.GN14217@n2100.armlinux.org.uk>
+ <alpine.DEB.2.20.1701041155380.3073@hadrien>
+ <20170104110750.dtu54t74qkuuvkvq@piout.net>
+ <alpine.DEB.2.20.1701041242080.3073@hadrien>
+ <20170104121425.GP14217@n2100.armlinux.org.uk>
+Message-ID: <alpine.DEB.2.20.1701041320140.3073@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
 
-On 01/03/2017 10:57 PM, Steve Longerbeam wrote:
-> Enables the OV5642 parallel-bus sensor, and the OV5640 MIPI CSI-2 sensor.
-> Both hang off the same i2c2 bus, so they require different (and non-
-> default) i2c slave addresses.
-> 
-> The OV5642 connects to the parallel-bus mux input port on ipu1_csi0_mux.
-> 
-> The OV5640 connects to the input port on the MIPI CSI-2 receiver on
-> mipi_csi. It is set to transmit over MIPI virtual channel 1.
-> 
-> Note there is a pin conflict with GPIO6. This pin functions as a power
-> input pin to the OV5642, but ENET uses it as the h/w workaround for
-> erratum ERR006687, to wake-up the ARM cores on normal RX and TX packet
-> done events (see 6261c4c8). So workaround 6261c4c8 is reverted here to
-> support the OV5642, and the "fsl,err006687-workaround-present" boolean
-> also must be removed. The result is that the CPUidle driver will no longer
-> allow entering the deep idle states on the sabrelite.
 
-For me it sounds like a candidate of its own separate change.
+On Wed, 4 Jan 2017, Russell King - ARM Linux wrote:
 
-> 
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> ---
+> On Wed, Jan 04, 2017 at 12:43:32PM +0100, Julia Lawall wrote:
+> > > The question was whether the point to the rtc_class_ops could be made
+> > > __ro_after_init. And Russell is right, it is pointed to by the ops
+> > > pointer in a struct rtc_device and that struct is dynamically allocated
+> > > in rtc_device_register().
+> >
+> > OK, I think it's a terminology issue.  You mean the structure that
+> > contains the pointer, and not the pointer itself, which is already const.
+>
+> That statement is really ambiguous, and really doesn't help the cause -
+> we have several structures here which contain pointers and it's far from
+> clear which you're talking about:
+>
+> - The armada38x_rtc_ops and armada38x_rtc_ops_noirq structures contain
+>   pointers to functions.
+> - The dynamically allocated struct rtc_device contains an ops pointer,
+>   which will point at one or other of these two structures.
+>
+> Now, as soon as we make armada38x_rtc_ops and armada38x_rtc_ops_noirq
+> const, if the pointer is passed through any function call where the
+> argument is not also marked const, or is assigned to a pointer that is
+> not marked const (without an explicit cast), the compiler will complain.
+> Remember that a const pointer (iow, const void *ptr) is just a hint to
+> the compiler that "ptr" _may_ point at read-only data, and dereferences
+> of the pointer are not allowed to write - it's just syntactic checking.
+>
+> Given that this is stuff we should all know, I'm not quite sure what
+> people are getting in a tiz over... I'm finding it worrying that I'm
+> even writing this mail, reviewing this stuff!  _Really_ worried that
+> Kees even brought it up in the first place - I suspect that came from
+> a misunderstanding of my suggestion which is why I later provided the
+> suggestion in patch form.
+>
+> What I suggested, and what my patch does is:
+>
+> 1. It places both the armada38x_rtc_ops and armada38x_rtc_ops_noirq
+>    structures into the .rodata section, which will be protected from
+>    writes by hardware when appropriate kernel options are enabled.
+>
+> 2. The driver does _not_ store a local pointer to this memory at a
+>    static address which could be subsequently modified (*).
+>
+> 3. The only pointer to this memory is during driver initialisation
+>    (which may well reside in a CPU register only) before being passed
+>    to the RTC subsystem.
+>
+> 4. The RTC subsystem dynamically allocates a struct rtc_device
+>    structure (in rtc_device_register()) where it eventually stores
+>    this pointer.  This pointer is already marked const.  This structure
+>    contains read/write data, and can't be marked read-only, just in the
+>    same way as "struct file" can't be.
+>
+> The whole __ro_after_init thing is completely irrelevant and a total
+> distraction at this point - there is nothing that you could add a
+> __ro_after_init annotation to after my patch in regard of these ops
+> structures.
+>
+> * - however, a compiler may decide to store the addresses of these
+> structures as a literal constant near the function, but with RONX
+> protection for the .text section, this memory is also read-only, and
+> so can't be modified.
 
-[snip]
+Thanks for the explanation.  I understood the patch, just not Kees's
+question.
 
->  &audmux {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_audmux>;
-> @@ -271,9 +298,6 @@
->  	txd1-skew-ps = <0>;
->  	txd2-skew-ps = <0>;
->  	txd3-skew-ps = <0>;
-> -	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
-> -			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+Basically, the strategy of the patch is that one may consider it
+preferable to duplicate the structure for the different alternatives,
+rather than use __ro_after_init.  Perhaps if the structure were larger,
+then __ro_after_init would be a better choice?
 
-Like you say in the commit message this is a partial revert of 6261c4c8f13e
-("ARM: dts: imx6qdl-sabrelite: use GPIO_6 for FEC interrupt.")
-
-> -	fsl,err006687-workaround-present;
-
-This is a partial revert of a28eeb43ee57 ("ARM: dts: imx6: tag boards that
-have the HW workaround for ERR006687").
-
-The change should be split and reviewed separately in my opinion, also
-cc Gary Bisson <gary.bisson@boundarydevices.com> for SabreLite changes.
-
->  	status = "okay";
->  };
->  
-> @@ -302,6 +326,52 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_i2c2>;
->  	status = "okay";
-> +
-> +	camera: ov5642 at 42 {
-> +		compatible = "ovti,ov5642";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_ov5642>;
-> +		clocks = <&clks IMX6QDL_CLK_CKO2>;
-> +		clock-names = "xclk";
-> +		reg = <0x42>;
-> +		xclk = <24000000>;
-> +		reset-gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
-> +		pwdn-gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;
-> +		gp-gpios = <&gpio1 16 GPIO_ACTIVE_HIGH>;
-> +
-> +		port {
-> +			ov5642_to_ipu1_csi0_mux: endpoint {
-> +				remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
-> +				bus-width = <8>;
-> +				hsync-active = <1>;
-> +				vsync-active = <1>;
-> +			};
-> +		};
-> +	};
-> +
-> +	mipi_camera: ov5640 at 40 {
-
-Please reorder device nodes by address value, also according to ePAPR
-node names should be generic, labels can be specific:
-
-	ov5640: camera at 40 {
-		...
-	};
-
-	ov5642: camera at 42 {
-		...
-	};
-
-> +		compatible = "ovti,ov5640_mipi";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_ov5640>;
-> +		clocks = <&mipi_xclk>;
-> +		clock-names = "xclk";
-> +		reg = <0x40>;
-> +		xclk = <22000000>;
-> +		reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>; /* NANDF_D5 */
-> +		pwdn-gpios = <&gpio6 9 GPIO_ACTIVE_HIGH>; /* NANDF_WP_B */
-> +
-> +		port {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			ov5640_to_mipi_csi: endpoint at 1 {
-> +				reg = <1>;
-> +				remote-endpoint = <&mipi_csi_from_mipi_sensor>;
-> +				data-lanes = <0 1>;
-> +				clock-lanes = <2>;
-> +			};
-> +		};
-> +	};
->  };
->  
->  &i2c3 {
-> @@ -374,7 +444,6 @@
->  				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b030
->  				/* Phy reset */
->  				MX6QDL_PAD_EIM_D23__GPIO3_IO23		0x000b0
-> -				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
-
-Yep.
-
->  			>;
->  		};
->  
-> @@ -449,6 +518,39 @@
->  			>;
->  		};
->  
-> +		pinctrl_ov5642: ov5642grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD1_DAT0__GPIO1_IO16 0x80000000
-> +				MX6QDL_PAD_GPIO_6__GPIO1_IO06   0x80000000
-> +				MX6QDL_PAD_GPIO_8__GPIO1_IO08   0x80000000
-> +				MX6QDL_PAD_GPIO_3__CCM_CLKO2    0x80000000
-> +			>;
-> +		};
-> +
-> +		pinctrl_ipu1_csi0: ipu1grp-csi0 {
-
-Please rename node name to ipu1csi0grp.
-
-> +			fsl,pins = <
-> +				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12    0x80000000
-> +				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13    0x80000000
-> +				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14    0x80000000
-> +				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15    0x80000000
-> +				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16    0x80000000
-> +				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17    0x80000000
-> +				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18    0x80000000
-> +				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19    0x80000000
-> +				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK   0x80000000
-> +				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC      0x80000000
-> +				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC     0x80000000
-> +				MX6QDL_PAD_CSI0_DATA_EN__IPU1_CSI0_DATA_EN 0x80000000
-> +			>;
-> +		};
-> +
-> +                pinctrl_ov5640: ov5640grp {
-> +                        fsl,pins = <
-> +				MX6QDL_PAD_NANDF_D5__GPIO2_IO05 0x000b0
-> +				MX6QDL_PAD_NANDF_WP_B__GPIO6_IO09 0x0b0b0
-> +                        >;
-> +                };
-> +
-
-Indentation issues above, please use tabs instead of spaces.
-
-Also please add new pin control groups preserving the alphanimerical order.
-
---
-With best wishes,
-Vladimir
+thanks,
+julia
