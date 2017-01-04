@@ -1,63 +1,33 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed,  4 Jan 2017 17:55:27 +0900
-Subject: [PATCH 3/3] linux/const.h: move BIT(_ULL) to linux/const.h for use in
- assembly
+Date: Wed,  4 Jan 2017 17:55:26 +0900
+Subject: [PATCH 2/3] linux/const.h: refactor _BITUL and _BITULL a bit
 In-Reply-To: <1483520127-29316-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1483520127-29316-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1483520127-29316-4-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1483520127-29316-3-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 2fc016c5bd8a ("linux/const.h: Add _BITUL() and _BITULL()")
-introduced _BITUL() and _BITULL().  Its git-log says the difference
-from the already existing BIT() are:
-
-  1. The namespace is such that they can be used in uapi definitions.
-  2. The type is set with the _AC() macro to allow it to be used in
-     assembly.
-  3. The type is explicitly specified to be UL or ULL.
-
-However, I found _BITUL() is often used for "2. use in assembly",
-while "1. use in uapi" is unneeded.  If we address only "2.", we can
-improve the existing BIT() for that.  It will allow us to replace
-many _BITUL() instances with BIT(), i.e. avoid needless use of
-underscore-prefixed macros, in the end, for better de-couple of
-userspace/kernel headers.
+Minor cleanups available by _UL and _ULL.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- include/linux/bitops.h | 3 +--
- include/linux/const.h  | 3 +++
- 2 files changed, 4 insertions(+), 2 deletions(-)
+ include/uapi/linux/const.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/bitops.h b/include/linux/bitops.h
-index a83c822..5f45fa5 100644
---- a/include/linux/bitops.h
-+++ b/include/linux/bitops.h
-@@ -1,10 +1,9 @@
- #ifndef _LINUX_BITOPS_H
- #define _LINUX_BITOPS_H
-+#include <linux/const.h>
- #include <asm/types.h>
+diff --git a/include/uapi/linux/const.h b/include/uapi/linux/const.h
+index 76fb0f9..13e5165 100644
+--- a/include/uapi/linux/const.h
++++ b/include/uapi/linux/const.h
+@@ -24,7 +24,7 @@
+ #define _UL(x)		(_AC(x, UL))
+ #define _ULL(x)		(_AC(x, ULL))
  
- #ifdef	__KERNEL__
--#define BIT(nr)			(1UL << (nr))
--#define BIT_ULL(nr)		(1ULL << (nr))
- #define BIT_MASK(nr)		(1UL << ((nr) % BITS_PER_LONG))
- #define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
- #define BIT_ULL_MASK(nr)	(1ULL << ((nr) % BITS_PER_LONG_LONG))
-diff --git a/include/linux/const.h b/include/linux/const.h
-index 7b55a55..200892d 100644
---- a/include/linux/const.h
-+++ b/include/linux/const.h
-@@ -6,4 +6,7 @@
- #define UL(x)		(_UL(x))
- #define ULL(x)		(_ULL(x))
+-#define _BITUL(x)	(_AC(1,UL) << (x))
+-#define _BITULL(x)	(_AC(1,ULL) << (x))
++#define _BITUL(x)	(_UL(1) << (x))
++#define _BITULL(x)	(_ULL(1) << (x))
  
-+#define BIT(x)		(_BITUL(x))
-+#define BIT_ULL(x)	(_BITULL(x))
-+
- #endif /* _LINUX_CONST_H */
+ #endif /* _UAPI_LINUX_CONST_H */
 -- 
 2.7.4
