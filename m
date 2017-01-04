@@ -1,45 +1,55 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 4 Jan 2017 14:41:31 +0100
-Subject: [PATCH v3] ARM: dts: turris-omnia: add support for ethernet switch
-In-Reply-To: <e1dae939-e209-eccc-00df-b996d03cb8db@suse.de>
-References: <20170103152107.GA32450@lunn.ch>
- <20170103193501.4827-1-uwe@kleine-koenig.org>
- <e1dae939-e209-eccc-00df-b996d03cb8db@suse.de>
-Message-ID: <20170104134131.GJ10768@lunn.ch>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Wed, 4 Jan 2017 14:41:16 +0100 (CET)
+Subject: [PATCH] rtc: armada38x: add __ro_after_init to armada38x_rtc_ops
+In-Reply-To: <20170104130628.GQ14217@n2100.armlinux.org.uk>
+References: <1482751862-18699-1-git-send-email-bhumirks@gmail.com>
+ <20170102140654.GF14217@n2100.armlinux.org.uk>
+ <CAGXu5jJLA=GcOhV5Z_6AOGa1KhW7fXtqBGrewEeViaJ9TiE-aw@mail.gmail.com>
+ <20170103213118.GM14217@n2100.armlinux.org.uk>
+ <20170103215421.GN14217@n2100.armlinux.org.uk>
+ <alpine.DEB.2.20.1701041155380.3073@hadrien>
+ <20170104110750.dtu54t74qkuuvkvq@piout.net>
+ <alpine.DEB.2.20.1701041242080.3073@hadrien>
+ <20170104121425.GP14217@n2100.armlinux.org.uk>
+ <alpine.DEB.2.20.1701041320140.3073@hadrien>
+ <20170104130628.GQ14217@n2100.armlinux.org.uk>
+Message-ID: <alpine.DEB.2.20.1701041441020.3073@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 11:49:12AM +0100, Andreas F?rber wrote:
-> Hi Uwe,
-> 
-> Am 03.01.2017 um 20:35 schrieb Uwe Kleine-K?nig:
-> > The Turris Omnia features a Marvell MV88E6176 ethernet switch. Add it to
-> > the dts.
-> > 
-> > Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
-> 
-> It's still not working for me on next-20170104 with this v3.
-> Are there any other patches needed?
-> 
-> Should all ports LAN0-LAN4 work with the commented-out second cpu node?
-> 
-> I've been using the WAN port (eth2) just fine. (=eth1 in OpenWrt)
-> 
-> With this patch, eth0 and eth1 are shown as UP by default. If however I
-> enslave eth0 and eth1 in a br-lan bridge, as seen under OpenWrt for
-> eth0+eth2, then eth1 is DOWN while eth0 remains UP, and br-lan remains
-> DOWN. Same issue if I drop eth0 from the bridge - after a reboot eth1 is
-> UP but br-lan is still DOWN.
-> I had to manually enable CONFIG_BRIDGE, so maybe I'm missing more kernel
-> options? Or did you simply not try using a bridge?
 
-That is not how you use DSA. It is very different to how OpenWRT
-swconfig works. The mainline kernel philosophy is that switch
-interfaces are just normal linux interfaces.
 
-You need eth0 up, in order that the slave interfaces work. But then
-you can use the slave interfaces just like normal Linux
-interfaces. You can put an IP address on them. You can put them into a
-bridge, etc. But leave eth0 alone, other than having it up.
+On Wed, 4 Jan 2017, Russell King - ARM Linux wrote:
 
-	Andrew
+> On Wed, Jan 04, 2017 at 01:23:41PM +0100, Julia Lawall wrote:
+> > Basically, the strategy of the patch is that one may consider it
+> > preferable to duplicate the structure for the different alternatives,
+> > rather than use __ro_after_init.  Perhaps if the structure were larger,
+> > then __ro_after_init would be a better choice?
+>
+> It depends on not just the size, but how many members need to be
+> modified, and obviously whether there are likely to be more than one
+> user of the structure as well.
+>
+> So I'd say __ro_after_init rarely makes sense for an operations
+> structure - the only case I can see is:
+>
+> - a large structure
+> - only a small number of elements need to be modified
+> - it is only single-use
+>
+> which is probably quite rare - this one falls into two out of those
+> three.
+>
+> There's another consideration (imho) too - we may wish, at a later
+> date, to make .text and .rodata both read-only from the start of the
+> kernel to harden the kernel against possibly init-time exploitation.
+> (Think about a buggy built-in driver with emulated hardware - much the
+> same problem that Kees is trying to address in one of his recent patch
+> sets but with hotplugged hardware while a screen-saver is active.)
+> Having function pointers in .rodata rather than the ro-after-init
+> section would provide better protection.
+
+OK, thanks for the explanations.
+
+julia
