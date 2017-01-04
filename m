@@ -1,67 +1,55 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 4 Jan 2017 13:29:46 +0800
-Subject: [PATCH v5 1/4] soc: zte: Add header for PM domains specifiers
-In-Reply-To: <1483489157-10782-1-git-send-email-baoyou.xie@linaro.org>
-References: <1483489157-10782-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20170104052945.GE20956@dragon>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 03 Jan 2017 21:35:00 -0800
+Subject: [GIT PULL] Amlogic fixes for v4.10-rc
+Message-ID: <7hk2abgzgb.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 08:19:14AM +0800, Baoyou Xie wrote:
-> This patch adds header with values used for ZTE 2967
-> SoC's power domain driver.
-> 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-> Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+Arnd, Olof,
 
-The tags like Reviewed-by, Acked-by etc, can only be added into your
-patch after people give it explicitly.  One of the examples is that Jun
-Nie gave his Reviewed-by tag on your "[PATCH v2 2/2] soc: zte:
-pm_domains: Add support for zx296718 board".
+This pull has one real fix, as a couple non-critical ones.  The DRM
+DT/defconfig patches are coming now because I didn't expect the new
+driver to make it for the v4.10 merge window, but since it did[1], the
+DT and defconfig should go into the same release.
 
-https://www.spinics.net/lists/arm-kernel/msg547282.html
+Thanks,
 
-I did not give my Reviewed-by tag on list, so you shouldn't add it here.
-Actually, in case of this patch series, I will probably apply them
-through ZTE -> arm-soc tree, when I feel it's ready.  So I'm do not even
-need to give the Reviewed-by tag.
+Kevin
 
-Shawn
+[1] bbbe775ec5b5 drm: Add support for Amlogic Meson Graphic Controller
 
-> ---
->  include/dt-bindings/soc/zte,pm_domains.h | 23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
->  create mode 100644 include/dt-bindings/soc/zte,pm_domains.h
-> 
-> diff --git a/include/dt-bindings/soc/zte,pm_domains.h b/include/dt-bindings/soc/zte,pm_domains.h
-> new file mode 100644
-> index 0000000..01e9abc
-> --- /dev/null
-> +++ b/include/dt-bindings/soc/zte,pm_domains.h
-> @@ -0,0 +1,23 @@
-> +/*
-> + * Copyright (C) 2017 Linaro Ltd.
-> + *
-> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
-> + * License terms: GNU General Public License (GPL) version 2
-> + */
-> +#ifndef _DT_BINDINGS_SOC_ZTE_PM_DOMAINS_H
-> +#define _DT_BINDINGS_SOC_ZTE_PM_DOMAINS_H
-> +
-> +#define DM_ZX296718_SAPPU	0
-> +#define DM_ZX296718_VDE		1  /* g1v6 */
-> +#define DM_ZX296718_VCE		2  /* h1v6 */
-> +#define DM_ZX296718_HDE		3  /* g2v2 */
-> +#define DM_ZX296718_VIU		4
-> +#define DM_ZX296718_USB20	5
-> +#define DM_ZX296718_USB21	6
-> +#define DM_ZX296718_USB30	7
-> +#define DM_ZX296718_HSIC	8
-> +#define DM_ZX296718_GMAC	9
-> +#define DM_ZX296718_TS		10
-> +#define DM_ZX296718_VOU		11
-> +
-> +#endif /* _DT_BINDINGS_SOC_ZTE_PM_DOMAINS_H */
-> -- 
-> 2.7.4
-> 
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+
+  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-fixes
+
+for you to fetch changes up to fcdaf1a2a7a042a290f4c7de28bcdebd5de18445:
+
+  ARM64: defconfig: enable DRM_MESON as module (2017-01-03 09:31:13 -0800)
+
+----------------------------------------------------------------
+Amlogic fixes for v4.10
+- DT: GXL: fix GPIO include
+- add DT and defconfig for newly merged DRM driver
+
+----------------------------------------------------------------
+Kevin Hilman (2):
+      ARM64: dts: meson-gxl: fix GPIO include
+      ARM64: defconfig: enable DRM_MESON as module
+
+Neil Armstrong (1):
+      ARM64: dts: meson-gx: Add Graphic Controller nodes
+
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi              | 16 ++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts | 16 ++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi       | 16 ++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi            |  4 ++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts  | 16 ++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi             |  6 +++++-
+ arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts    | 16 ++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxm.dtsi             |  4 ++++
+ arch/arm64/configs/defconfig                           |  1 +
+ 9 files changed, 94 insertions(+), 1 deletion(-)
