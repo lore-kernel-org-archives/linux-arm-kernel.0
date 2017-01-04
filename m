@@ -1,30 +1,51 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Wed, 4 Jan 2017 17:19:59 +0300
-Subject: [RFC, PATCHv2 29/29] mm, x86: introduce RLIMIT_VADDR
-In-Reply-To: <CALCETrW3=SsQeC-gWOVqwTtg022+gHei=xfUc2ei3kkX0CACpg@mail.gmail.com>
-References: <20161227015413.187403-1-kirill.shutemov@linux.intel.com>
- <20161227015413.187403-30-kirill.shutemov@linux.intel.com>
- <2736959.3MfCab47fD@wuerfel>
- <CALCETrV_qejd-Ozqo4vTqz=LuukMUPeQ7EVUQbfTxs_xNbO3oQ@mail.gmail.com>
- <20170103160457.GB17319@node.shutemov.name>
- <CALCETrW3=SsQeC-gWOVqwTtg022+gHei=xfUc2ei3kkX0CACpg@mail.gmail.com>
-Message-ID: <20170104141959.GC17319@node.shutemov.name>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Wed,  4 Jan 2017 13:32:26 +0000
+Subject: [PATCH v5 17/17] iommu/arm-smmu: Do not advertise
+ IOMMU_CAP_INTR_REMAP anymore
+In-Reply-To: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
+References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1483536746-2725-18-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 10:27:22AM -0800, Andy Lutomirski wrote:
-> On Tue, Jan 3, 2017 at 8:04 AM, Kirill A. Shutemov <kirill@shutemov.name> wrote:
-> > And what about stack? I'm not sure that everybody would be happy with
-> > stack in the middle of address space.
-> 
-> I would, personally.  I think that, for very large address spaces, we
-> should allocate a large block of stack and get rid of the "stack grows
-> down forever" legacy idea.  Then we would never need to worry about
-> the stack eventually hitting some other allocation.  And 2^57 bytes is
-> hilariously large for a default stack.
+IOMMU_CAP_INTR_REMAP has been advertised in arm-smmu(-v3) although
+on ARM this property is not attached to the IOMMU but rather is
+implemented in the MSI controller (GICv3 ITS).
 
-The stack in the middle of address space can prevent creating other huuuge
-contiguous mapping. Databases may want this.
+Now vfio_iommu_type1 takes into account the MSI domain MSI remapping
+capability, let's correct this.
 
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 2 --
+ drivers/iommu/arm-smmu.c    | 2 --
+ 2 files changed, 4 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 6c4111c..d9cf6cb 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1375,8 +1375,6 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+ 	switch (cap) {
+ 	case IOMMU_CAP_CACHE_COHERENCY:
+ 		return true;
+-	case IOMMU_CAP_INTR_REMAP:
+-		return true; /* MSIs are just memory writes */
+ 	case IOMMU_CAP_NOEXEC:
+ 		return true;
+ 	default:
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index a354572..13d2600 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1374,8 +1374,6 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+ 		 * requests.
+ 		 */
+ 		return true;
+-	case IOMMU_CAP_INTR_REMAP:
+-		return true; /* MSIs are just memory writes */
+ 	case IOMMU_CAP_NOEXEC:
+ 		return true;
+ 	default:
 -- 
- Kirill A. Shutemov
+1.9.1
