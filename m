@@ -1,63 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Jan 2017 11:56:02 +0000
-Subject: [PATCH 04/22] mfd: axp20x: add ADC cells for AXP20X and AXP22X
- PMICs
-In-Reply-To: <20170102163723.7939-5-quentin.schulz@free-electrons.com>
-References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
- <20170102163723.7939-5-quentin.schulz@free-electrons.com>
-Message-ID: <20170104115602.GB24058@dell>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed,  4 Jan 2017 13:35:32 +0000
+Subject: [PATCH 4/5] ARM: qcom_defconfig: add ahci configs
+In-Reply-To: <1483536933-21503-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1483536933-21503-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1483536933-21503-5-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 02 Jan 2017, Quentin Schulz wrote:
+This patch enables configs required to get SATA functionality working on
+IFC6410 board.
 
-> This adds the AXP20X/AXP22x ADCs driver to the mfd cells of the AXP209,
-> AXP221 and AXP223 MFD.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> ---
->  drivers/mfd/axp20x.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ arch/arm/configs/qcom_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Applied, thanks.
-
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index a33db5e..31a84d81 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -582,6 +582,9 @@ static struct mfd_cell axp20x_cells[] = {
->  	}, {
->  		.name		= "axp20x-regulator",
->  	}, {
-> +		.name		= "axp20x-adc",
-> +		.of_compatible	= "x-powers,axp209-adc",
-> +	}, {
->  		.name		= "axp20x-ac-power-supply",
->  		.of_compatible	= "x-powers,axp202-ac-power-supply",
->  		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
-> @@ -602,6 +605,9 @@ static struct mfd_cell axp221_cells[] = {
->  	}, {
->  		.name		= "axp20x-regulator",
->  	}, {
-> +		.name		= "axp20x-adc",
-> +		.of_compatible	= "x-powers,axp221-adc"
-> +	}, {
->  		.name		= "axp20x-usb-power-supply",
->  		.of_compatible	= "x-powers,axp221-usb-power-supply",
->  		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
-> @@ -615,6 +621,9 @@ static struct mfd_cell axp223_cells[] = {
->  		.num_resources		= ARRAY_SIZE(axp22x_pek_resources),
->  		.resources		= axp22x_pek_resources,
->  	}, {
-> +		.name		= "axp20x-adc",
-> +		.of_compatible	= "x-powers,axp221-adc"
-> +	}, {
->  		.name			= "axp20x-regulator",
->  	}, {
->  		.name		= "axp20x-usb-power-supply",
-
+diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
+index 255b9f6..f3d1114 100644
+--- a/arch/arm/configs/qcom_defconfig
++++ b/arch/arm/configs/qcom_defconfig
+@@ -71,6 +71,9 @@ CONFIG_CHR_DEV_SCH=y
+ CONFIG_SCSI_CONSTANTS=y
+ CONFIG_SCSI_LOGGING=y
+ CONFIG_SCSI_SCAN_ASYNC=y
++CONFIG_ATA=y
++CONFIG_SATA_AHCI=y
++CONFIG_SATA_AHCI_PLATFORM=y
+ CONFIG_NETDEVICES=y
+ CONFIG_DUMMY=y
+ CONFIG_ATL1C=y
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.10.1
