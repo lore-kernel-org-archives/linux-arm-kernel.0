@@ -1,65 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 4 Jan 2017 09:02:40 +0000
-Subject: [PATCH v6 06/14] irqchip: gicv3-its: platform-msi: refactor
- its_pmsi_init() to prepare for ACPI
-In-Reply-To: <254387f0-1f63-4c83-ef90-570ef072cddf@linaro.org>
-References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
- <1483363905-2806-7-git-send-email-hanjun.guo@linaro.org>
- <8cdc4bfa-18a3-b9f6-aaba-0efe1f75fb40@semihalf.com>
- <601cbdf2-823d-8bde-bbd9-fcc6a1c67f2c@linaro.org>
- <b51b7be9-f8ee-57f9-6d53-6e8bd73dd431@semihalf.com>
- <254387f0-1f63-4c83-ef90-570ef072cddf@linaro.org>
-Message-ID: <e08b5583-bb82-4676-2370-1147d79416ac@arm.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 4 Jan 2017 10:10:20 +0100
+Subject: [PATCH] drm/meson: Fix plane atomic check when no crtc for the
+ plane
+In-Reply-To: <1483435254-27955-1-git-send-email-narmstrong@baylibre.com>
+References: <1483435254-27955-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20170104091020.rvikywzzfsqxxp5t@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/17 08:25, Hanjun Guo wrote:
-> On 2017/1/4 15:29, Tomasz Nowicki wrote:
->> On 04.01.2017 08:02, Hanjun Guo wrote:
->>> Hi Tomasz,
->>>
->>> On 2017/1/3 15:41, Tomasz Nowicki wrote:
->>>> Hi,
->>>>
->>>> Can we merge patch 4 & 6 into one patch so that we keep refactoring part
->>>> as one piece ? I do not see a reason to keep them separate or have patch
->>>> 5 in between. You can refactor what needs to be refactored, add
->>>> necessary functions to iort.c and then support ACPI for
->>>> irq-gic-v3-its-platform-msi.c
->>>
->>> There are two functions here,
->>>  - retrieve the dev id from IORT which was DT based only;
->>>
->>>  - init the platform msi domain from MADT;
->>>
->>> For each of them split it into two steps,
->>>  - refactor the code for ACPI later and it's easy for review
->>>    because wen can easily to figure out it has functional
->>>    change or not
->>>
->>>  - add ACPI functionality
->>>
->>> Does it make sense?
->>
->> It is up to Marc, but personally I prefer:
->> 1. Refactor dev id retrieving and init function in one patch and
->> highlight no functional changes in changelog
->> 2. Crate necessary infrastructure in iort.c
->> 3. Then add ACPI support to irq-gic-v3-its-platform-msi.c
+On Tue, Jan 03, 2017 at 10:20:54AM +0100, Neil Armstrong wrote:
+> When no CRTC is associated with the plane, the meson_plane_atomic_check()
+> call breaks the kernel with an Oops.
 > 
-> I have no strong preferences, and it's easy to do so as just
-> need to squash/reorder the patches.
+> Fixes: bbbe775ec5b5 ("drm: Add support for Amlogic Meson Graphic Controller")
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+
+Makes sense, pls send a pull request with this to Dave.
+-Daniel
+
+> ---
+>  drivers/gpu/drm/meson/meson_plane.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> Marc, Lorenzo, could you give some suggestions here?
+> diff --git a/drivers/gpu/drm/meson/meson_plane.c b/drivers/gpu/drm/meson/meson_plane.c
+> index 4942ca0..7890e30 100644
+> --- a/drivers/gpu/drm/meson/meson_plane.c
+> +++ b/drivers/gpu/drm/meson/meson_plane.c
+> @@ -51,6 +51,9 @@ static int meson_plane_atomic_check(struct drm_plane *plane,
+>  	struct drm_crtc_state *crtc_state;
+>  	struct drm_rect clip = { 0, };
+>  
+> +	if (!state->crtc)
+> +		return 0;
+> +
+>  	crtc_state = drm_atomic_get_crtc_state(state->state, state->crtc);
+>  	if (IS_ERR(crtc_state))
+>  		return PTR_ERR(crtc_state);
+> -- 
+> 1.9.1
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-I think it'd make the reviewing easier to have patches that are
-semantically grouped together (all the ACPI IORT together, for example).
-
-It would help understanding where you're aiming at instead of jumping
-from irqchip to ACPI and back every other patch...
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
