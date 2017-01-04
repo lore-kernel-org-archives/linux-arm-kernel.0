@@ -1,31 +1,123 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 3 Jan 2017 20:12:42 -0500 (EST)
-Subject: [PATCH 1/2] arm: Cleanup sanity_check_meminfo
-In-Reply-To: <1483477010-18986-2-git-send-email-labbott@redhat.com>
-References: <1483477010-18986-1-git-send-email-labbott@redhat.com>
- <1483477010-18986-2-git-send-email-labbott@redhat.com>
-Message-ID: <alpine.LFD.2.20.1701031958100.21662@knanqh.ubzr>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue,  3 Jan 2017 17:14:13 -0800
+Subject: [PATCH v5 0/4] ARM: Add support for CONFIG_DEBUG_VIRTUAL
+In-Reply-To: <edc8eaa2-5414-506c-1dad-f2404ef19c81@gmail.com>
+References: <edc8eaa2-5414-506c-1dad-f2404ef19c81@gmail.com>
+Message-ID: <20170104011417.1496-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Jan 2017, Laura Abbott wrote:
+This patch series builds on top of Laura's [PATCHv6 00/10] CONFIG_DEBUG_VIRTUAL
+for arm64 to add support for CONFIG_DEBUG_VIRTUAL for ARM.
 
-> 
-> The logic for sanity_check_meminfo has become difficult to
-> follow. Clean up the code so it's more obvious what the code
-> is actually trying to do.
+This was tested on a Brahma B15 platform (ARMv7 + HIGHMEM + LPAE).
 
-Absolutely. This function has a long history of subtle bugs ... and 
-broken fixes.
+Note that the treewide changes would involve a huge CC list, which
+is why it has been purposely trimmed to just focusing on the DEBUG_VIRTUAL
+aspect.
 
-> +		if (reg->base < vmalloc_limit) {
-> +			if (block_end > arm_lowmem_limit)
-> +				arm_lowmem_limit = min(
-> +						(phys_addr_t)vmalloc_limit,
-> +						block_end);
+Catalin, provided that you take Laura's series, I suppose I would submit
+this one through Russell's patch system if that's okay with everyone?
 
-Just to illustrate how subtle this can be, the above would reintroduce a 
-bug that was fixed in commit b9a019899f.
+Thanks!
 
+Changes in v5:
 
-Nicolas
+- rebased against Laura's [PATCHv6 00/10] CONFIG_DEBUG_VIRTUAL
+  for arm64 and v4.10-rc2
+
+- added Russell's acked-by for patches 2 through 4
+
+Changes in v4:
+
+- added Boris' ack for the first patch
+- reworked the virtual address check based on Laura's suggestion to
+  make the code more readable
+
+Changes in v3:
+
+- fix build failures reported by Kbuild test robot
+
+Changes in v2:
+
+- Modified MTD LART driver not to create symbol conflicts with
+  KERNEL_START
+- Fixed patch that defines and uses KERNEL_START/END
+- Fixed __pa_symbol()'s definition
+- Inline __pa_symbol() check wihtin the VIRTUAL_BUG_ON statement
+- Simplified check for virtual addresses
+- Added a tree-wide patch changing SMP/PM implementations to use
+  __pa_symbol(), build tested against multi_v{5,7}_defconfig
+
+Florian Fainelli (4):
+  mtd: lart: Rename partition defines to be prefixed with PART_
+  ARM: Define KERNEL_START and KERNEL_END
+  ARM: Add support for CONFIG_DEBUG_VIRTUAL
+  ARM: treewide: Replace uses of virt_to_phys with __pa_symbol
+
+ arch/arm/Kconfig                          |  1 +
+ arch/arm/common/mcpm_entry.c              | 12 +++----
+ arch/arm/include/asm/memory.h             | 23 +++++++++++--
+ arch/arm/mach-alpine/platsmp.c            |  2 +-
+ arch/arm/mach-axxia/platsmp.c             |  2 +-
+ arch/arm/mach-bcm/bcm63xx_smp.c           |  2 +-
+ arch/arm/mach-bcm/platsmp-brcmstb.c       |  2 +-
+ arch/arm/mach-bcm/platsmp.c               |  4 +--
+ arch/arm/mach-berlin/platsmp.c            |  2 +-
+ arch/arm/mach-exynos/firmware.c           |  4 +--
+ arch/arm/mach-exynos/mcpm-exynos.c        |  2 +-
+ arch/arm/mach-exynos/platsmp.c            |  4 +--
+ arch/arm/mach-exynos/pm.c                 |  6 ++--
+ arch/arm/mach-exynos/suspend.c            |  6 ++--
+ arch/arm/mach-hisi/platmcpm.c             |  2 +-
+ arch/arm/mach-hisi/platsmp.c              |  6 ++--
+ arch/arm/mach-imx/platsmp.c               |  2 +-
+ arch/arm/mach-imx/pm-imx6.c               |  2 +-
+ arch/arm/mach-imx/src.c                   |  2 +-
+ arch/arm/mach-mediatek/platsmp.c          |  2 +-
+ arch/arm/mach-mvebu/pm.c                  |  2 +-
+ arch/arm/mach-mvebu/pmsu.c                |  2 +-
+ arch/arm/mach-mvebu/system-controller.c   |  2 +-
+ arch/arm/mach-omap2/control.c             |  8 ++---
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c | 12 +++----
+ arch/arm/mach-omap2/omap-smp.c            |  4 +--
+ arch/arm/mach-prima2/platsmp.c            |  2 +-
+ arch/arm/mach-prima2/pm.c                 |  2 +-
+ arch/arm/mach-pxa/palmz72.c               |  2 +-
+ arch/arm/mach-pxa/pxa25x.c                |  2 +-
+ arch/arm/mach-pxa/pxa27x.c                |  2 +-
+ arch/arm/mach-pxa/pxa3xx.c                |  2 +-
+ arch/arm/mach-realview/platsmp-dt.c       |  2 +-
+ arch/arm/mach-rockchip/platsmp.c          |  4 +--
+ arch/arm/mach-rockchip/pm.c               |  2 +-
+ arch/arm/mach-s3c24xx/mach-jive.c         |  2 +-
+ arch/arm/mach-s3c24xx/pm-s3c2410.c        |  2 +-
+ arch/arm/mach-s3c24xx/pm-s3c2416.c        |  2 +-
+ arch/arm/mach-s3c64xx/pm.c                |  2 +-
+ arch/arm/mach-s5pv210/pm.c                |  2 +-
+ arch/arm/mach-sa1100/pm.c                 |  2 +-
+ arch/arm/mach-shmobile/platsmp-apmu.c     |  6 ++--
+ arch/arm/mach-shmobile/platsmp-scu.c      |  4 +--
+ arch/arm/mach-socfpga/platsmp.c           |  4 +--
+ arch/arm/mach-spear/platsmp.c             |  2 +-
+ arch/arm/mach-sti/platsmp.c               |  2 +-
+ arch/arm/mach-sunxi/platsmp.c             |  4 +--
+ arch/arm/mach-tango/platsmp.c             |  2 +-
+ arch/arm/mach-tango/pm.c                  |  2 +-
+ arch/arm/mach-tegra/reset.c               |  4 +--
+ arch/arm/mach-ux500/platsmp.c             |  2 +-
+ arch/arm/mach-vexpress/dcscb.c            |  2 +-
+ arch/arm/mach-vexpress/platsmp.c          |  2 +-
+ arch/arm/mach-vexpress/tc2_pm.c           |  4 +--
+ arch/arm/mach-zx/platsmp.c                |  4 +--
+ arch/arm/mach-zynq/platsmp.c              |  2 +-
+ arch/arm/mm/Makefile                      |  1 +
+ arch/arm/mm/init.c                        |  7 ++--
+ arch/arm/mm/mmu.c                         |  6 +---
+ arch/arm/mm/physaddr.c                    | 55 +++++++++++++++++++++++++++++++
+ drivers/mtd/devices/lart.c                | 24 +++++++-------
+ 61 files changed, 179 insertions(+), 110 deletions(-)
+ create mode 100644 arch/arm/mm/physaddr.c
+
+-- 
+2.9.3
