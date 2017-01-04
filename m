@@ -1,75 +1,99 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Jan 2017 11:09:59 +0000
-Subject: [PATCH v2] mfd: mc13xxx: Set the irq type.
-In-Reply-To: <1483112613-18092-1-git-send-email-lilja.magnus@gmail.com>
-References: <1483112613-18092-1-git-send-email-lilja.magnus@gmail.com>
-Message-ID: <20170104110959.GZ27589@dell>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Wed,  4 Jan 2017 11:36:06 +0100
+Subject: [PATCH 1/2] memory: aemif: allow passing device lookup table as
+ platform data
+In-Reply-To: <1483526167-24209-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1483526167-24209-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1483526167-24209-2-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Dec 2016, Magnus Lilja wrote:
+TI aemif driver creates its own subnodes of the device tree in order
+to guarantee that all child devices are probed after the AEMIF timing
+parameters are configured.
 
-> Commit 10f9edaeaa30 ("mfd: mc13xxx: Use regmap irq framework for
-> interrupts") removed the passing of the IRQF_TRIGGER_HIGH flag when
-> registering the interrupt.
-> This commit fixes that problem by setting the IRQF_TRIGGER_HIGH flag in
-> case no irq type is set via irqd framework (e.g. device tree). In the
-> latter case the irq flag from irqd is used.
+Some devices (e.g. da850) use struct of_dev_auxdata for clock lookup
+but nodes created from within the aemif driver can't access the lookup
+table.
 
-This looks like a hack.
+Create a platform data structure that holds a pointer to
+of_dev_auxdata so that we can use it with of_platform_populate().
 
-Why can't you set the trigger type in Device Tree instead?
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ drivers/memory/ti-aemif.c              |  8 +++++++-
+ include/linux/platform_data/ti-aemif.h | 23 +++++++++++++++++++++++
+ 2 files changed, 30 insertions(+), 1 deletion(-)
+ create mode 100644 include/linux/platform_data/ti-aemif.h
 
-> Tested on i.MX31 PDK hardware.
-> 
-> Fixes: 10f9edaeaa30 ("mfd: mc13xxx: Use regmap irq framework for interrupts")
-> Cc: <stable@vger.kernel.org> # 3.18.x
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
-> ---
-> Changes from v1 (which was part of a patch series):
->   - Now uses irqd_-functions to check if irq type is defined
->   - Added Fixes: and Cc: to stable kernel.
-> 
->  drivers/mfd/mc13xxx-core.c | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-> index d7f54e4..e1757ea 100644
-> --- a/drivers/mfd/mc13xxx-core.c
-> +++ b/drivers/mfd/mc13xxx-core.c
-> @@ -15,6 +15,7 @@
->  #include <linux/of_device.h>
->  #include <linux/platform_device.h>
->  #include <linux/mfd/core.h>
-> +#include <linux/irq.h>
->  
->  #include "mc13xxx.h"
->  
-> @@ -410,6 +411,7 @@ int mc13xxx_common_init(struct device *dev)
->  	struct mc13xxx *mc13xxx = dev_get_drvdata(dev);
->  	u32 revision;
->  	int i, ret;
-> +	unsigned int flags;
->  
->  	mc13xxx->dev = dev;
->  
-> @@ -440,7 +442,11 @@ int mc13xxx_common_init(struct device *dev)
->  	mc13xxx->irq_chip.irqs = mc13xxx->irqs;
->  	mc13xxx->irq_chip.num_irqs = ARRAY_SIZE(mc13xxx->irqs);
->  
-> -	ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq, IRQF_ONESHOT,
-> +	flags = irqd_get_trigger_type(irq_get_irq_data(mc13xxx->irq));
-> +	flags = (flags == IRQ_TYPE_NONE) ? IRQF_TRIGGER_HIGH : flags;
-> +
-> +	ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq,
-> +				  IRQF_ONESHOT | flags,
->  				  0, &mc13xxx->irq_chip, &mc13xxx->irq_data);
->  	if (ret)
->  		return ret;
-
+diff --git a/drivers/memory/ti-aemif.c b/drivers/memory/ti-aemif.c
+index a579a0f..22c1aee 100644
+--- a/drivers/memory/ti-aemif.c
++++ b/drivers/memory/ti-aemif.c
+@@ -20,6 +20,7 @@
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
++#include <linux/platform_data/ti-aemif.h>
+ 
+ #define TA_SHIFT	2
+ #define RHOLD_SHIFT	4
+@@ -335,6 +336,8 @@ static int aemif_probe(struct platform_device *pdev)
+ 	struct device_node *np = dev->of_node;
+ 	struct device_node *child_np;
+ 	struct aemif_device *aemif;
++	struct aemif_platform_data *pdata;
++	struct of_dev_auxdata *dev_lookup;
+ 
+ 	if (np == NULL)
+ 		return 0;
+@@ -343,6 +346,9 @@ static int aemif_probe(struct platform_device *pdev)
+ 	if (!aemif)
+ 		return -ENOMEM;
+ 
++	pdata = dev_get_platdata(&pdev->dev);
++	dev_lookup = pdata ? pdata->dev_lookup : NULL;
++
+ 	platform_set_drvdata(pdev, aemif);
+ 
+ 	aemif->clk = devm_clk_get(dev, NULL);
+@@ -390,7 +396,7 @@ static int aemif_probe(struct platform_device *pdev)
+ 	 * parameters are set.
+ 	 */
+ 	for_each_available_child_of_node(np, child_np) {
+-		ret = of_platform_populate(child_np, NULL, NULL, dev);
++		ret = of_platform_populate(child_np, NULL, dev_lookup, dev);
+ 		if (ret < 0)
+ 			goto error;
+ 	}
+diff --git a/include/linux/platform_data/ti-aemif.h b/include/linux/platform_data/ti-aemif.h
+new file mode 100644
+index 0000000..ac72e11
+--- /dev/null
++++ b/include/linux/platform_data/ti-aemif.h
+@@ -0,0 +1,23 @@
++/*
++ * TI DaVinci AEMIF platform glue.
++ *
++ * Copyright (C) 2017 BayLibre SAS
++ *
++ * Author:
++ *   Bartosz Golaszewski <bgolaszewski@baylibre.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __TI_DAVINCI_AEMIF_DATA_H__
++#define __TI_DAVINCI_AEMIF_DATA_H__
++
++#include <linux/of_platform.h>
++
++struct aemif_platform_data {
++	struct of_dev_auxdata *dev_lookup;
++};
++
++#endif /* __TI_DAVINCI_AEMIF_DATA_H__ */
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.9.3
