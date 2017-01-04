@@ -1,64 +1,64 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 4 Jan 2017 14:39:50 -0600
-Subject: [PATCH V7 1/4] Documentation/devicetree/bindings: b850v3_lvds_dp
-In-Reply-To: <529b-586c3500-5-5e05b080@98620974>
-References: <20170103225127.jn36tatufdfz2k5q@rob-hp-laptop>
- <529b-586c3500-5-5e05b080@98620974>
-Message-ID: <CAL_JsqJk=QZ20VmV5uE1ta2T0TEO3rvWFbiGsJpH1e3-ojnBfA@mail.gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Wed,  4 Jan 2017 14:30:13 -0600
+Subject: [PATCH v2 3/4] ARM: da850: Add ti,
+ da830-uart compatible for serial ports
+In-Reply-To: <1483561814-21953-1-git-send-email-david@lechnology.com>
+References: <1483561814-21953-1-git-send-email-david@lechnology.com>
+Message-ID: <1483561814-21953-4-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 3, 2017 at 5:34 PM, Peter Senna Tschudin
-<peter.senna@collabora.co.uk> wrote:
->  Hi Rob,
->
-> Thank you for the review.
->
-> On 03 January, 2017 23:51 CET, Rob Herring <robh@kernel.org> wrote:
->
->> On Sun, Jan 01, 2017 at 09:24:29PM +0100, Peter Senna Tschudin wrote:
->> > Devicetree bindings documentation for the GE B850v3 LVDS/DP++
->> > display bridge.
->> >
->> > Cc: Martyn Welch <martyn.welch@collabora.co.uk>
->> > Cc: Martin Donnelly <martin.donnelly@ge.com>
->> > Cc: Javier Martinez Canillas <javier@dowhile0.org>
->> > Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
->> > Cc: Philipp Zabel <p.zabel@pengutronix.de>
->> > Cc: Rob Herring <robh@kernel.org>
->> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
->> > Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
->> > ---
->> > There was an Acked-by from Rob Herring <robh@kernel.org> for V6, but I changed
->> > the bindings to use i2c_new_secondary_device() so I removed it from the commit
->> > message.
->> >
->> >  .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 39 ++++++++++++++++++++++
->>
->> Generally, bindings are not organized by vendor. Put in
->> bindings/display/bridge/... instead.
->
-> Will change that.
->
->>
->> >  1 file changed, 39 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
->> > new file mode 100644
->> > index 0000000..1bc6ebf
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
->> > @@ -0,0 +1,39 @@
->> > +Driver for GE B850v3 LVDS/DP++ display bridge
->> > +
->> > +Required properties:
->> > +  - compatible : should be "ge,b850v3-lvds-dp".
->>
->> Isn't '-lvds-dp' redundant? The part# should be enough.
->
-> b850v3 is the name of the product, this is why the proposed name. What about, b850v3-dp2 dp2 indicating the second DP output?
+TI DA8xx/OMAPL13x/AM17xx/AM18xx SoCs have extra UART registers beyond
+the standard 8250 registers, so we need a new compatible string to
+indicate this. Also, at least one of these registers uses the full 32
+bits, so we need to specify reg-io-width in addition to reg-shift.
 
-Humm, b850v3 is the board name? This node should be the name of the bridge chip.
+"ns16550a" is left in the compatible specification since it does work
+as long as the bootloader configures the SoC UART power management
+registers.
 
-Rob
+Signed-off-by: David Lechner <david@lechnology.com>
+---
+
+v2 changes:
+* None
+
+
+ arch/arm/boot/dts/da850.dtsi | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 104155d..f6cd212 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -266,22 +266,25 @@
+ 			interrupt-names = "edm3_tcerrint";
+ 		};
+ 		serial0: serial at 42000 {
+-			compatible = "ns16550a";
++			compatible = "ti,da830-uart", "ns16550a";
+ 			reg = <0x42000 0x100>;
++			reg-io-width = <4>;
+ 			reg-shift = <2>;
+ 			interrupts = <25>;
+ 			status = "disabled";
+ 		};
+ 		serial1: serial at 10c000 {
+-			compatible = "ns16550a";
++			compatible = "ti,da830-uart", "ns16550a";
+ 			reg = <0x10c000 0x100>;
++			reg-io-width = <4>;
+ 			reg-shift = <2>;
+ 			interrupts = <53>;
+ 			status = "disabled";
+ 		};
+ 		serial2: serial at 10d000 {
+-			compatible = "ns16550a";
++			compatible = "ti,da830-uart", "ns16550a";
+ 			reg = <0x10d000 0x100>;
++			reg-io-width = <4>;
+ 			reg-shift = <2>;
+ 			interrupts = <61>;
+ 			status = "disabled";
+-- 
+2.7.4
