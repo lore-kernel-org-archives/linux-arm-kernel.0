@@ -1,99 +1,132 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Wed,  4 Jan 2017 13:32:17 +0000
-Subject: [PATCH v5 08/17] iommu/vt-d: Implement reserved region get/put
- callbacks
-In-Reply-To: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
-References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1483536746-2725-9-git-send-email-eric.auger@redhat.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed,  4 Jan 2017 13:28:36 -0800
+Subject: [PATCH 2/4] watchdog: bcm2835_wdt: Use watchdog core to install
+ restart handler
+In-Reply-To: <1483565318-25578-1-git-send-email-linux@roeck-us.net>
+References: <1483565318-25578-1-git-send-email-linux@roeck-us.net>
+Message-ID: <1483565318-25578-2-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch registers the [FEE0_0000h - FEF0_000h] 1MB MSI range
-as a reserved region. This will allow to report that range
-in the iommu-group sysfs.
+Use the infrastructure provided by the watchdog core to install
+the restart handler.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
+ drivers/watchdog/bcm2835_wdt.c | 54 +++++++++++++++++++++---------------------
+ 1 file changed, 27 insertions(+), 27 deletions(-)
 
-RFCv2 -> RFCv3:
-- use get/put_resv_region callbacks.
-
-RFC v1 -> RFC v2:
-- fix intel_iommu_add_reserved_regions name
-- use IOAPIC_RANGE_START and IOAPIC_RANGE_END defines
-- return if the MSI region is already registered;
----
- drivers/iommu/intel-iommu.c | 50 +++++++++++++++++++++++++++++++++------------
- 1 file changed, 37 insertions(+), 13 deletions(-)
-
-diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
-index c66c273..4080207 100644
---- a/drivers/iommu/intel-iommu.c
-+++ b/drivers/iommu/intel-iommu.c
-@@ -5184,6 +5184,28 @@ static void intel_iommu_remove_device(struct device *dev)
- 	iommu_device_unlink(iommu->iommu_dev, dev);
- }
+diff --git a/drivers/watchdog/bcm2835_wdt.c b/drivers/watchdog/bcm2835_wdt.c
+index c32c45bd8b09..2bc7d195f0a4 100644
+--- a/drivers/watchdog/bcm2835_wdt.c
++++ b/drivers/watchdog/bcm2835_wdt.c
+@@ -14,7 +14,6 @@
+  */
  
-+static void intel_iommu_get_resv_regions(struct device *device,
-+					 struct list_head *head)
-+{
-+	struct iommu_resv_region *reg;
-+
-+	reg = iommu_alloc_resv_region(IOAPIC_RANGE_START,
-+				      IOAPIC_RANGE_END - IOAPIC_RANGE_START + 1,
-+				      0, IOMMU_RESV_NOMAP);
-+	if (!reg)
-+		return;
-+	list_add_tail(&reg->list, head);
-+}
-+
-+static void intel_iommu_put_resv_regions(struct device *dev,
-+					 struct list_head *head)
-+{
-+	struct iommu_resv_region *entry, *next;
-+
-+	list_for_each_entry_safe(entry, next, head, list)
-+		kfree(entry);
-+}
-+
- #ifdef CONFIG_INTEL_IOMMU_SVM
- int intel_iommu_enable_pasid(struct intel_iommu *iommu, struct intel_svm_dev *sdev)
- {
-@@ -5293,19 +5315,21 @@ struct intel_iommu *intel_svm_device_to_iommu(struct device *dev)
- #endif /* CONFIG_INTEL_IOMMU_SVM */
- 
- static const struct iommu_ops intel_iommu_ops = {
--	.capable	= intel_iommu_capable,
--	.domain_alloc	= intel_iommu_domain_alloc,
--	.domain_free	= intel_iommu_domain_free,
--	.attach_dev	= intel_iommu_attach_device,
--	.detach_dev	= intel_iommu_detach_device,
--	.map		= intel_iommu_map,
--	.unmap		= intel_iommu_unmap,
--	.map_sg		= default_iommu_map_sg,
--	.iova_to_phys	= intel_iommu_iova_to_phys,
--	.add_device	= intel_iommu_add_device,
--	.remove_device	= intel_iommu_remove_device,
--	.device_group   = pci_device_group,
--	.pgsize_bitmap	= INTEL_IOMMU_PGSIZES,
-+	.capable		= intel_iommu_capable,
-+	.domain_alloc		= intel_iommu_domain_alloc,
-+	.domain_free		= intel_iommu_domain_free,
-+	.attach_dev		= intel_iommu_attach_device,
-+	.detach_dev		= intel_iommu_detach_device,
-+	.map			= intel_iommu_map,
-+	.unmap			= intel_iommu_unmap,
-+	.map_sg			= default_iommu_map_sg,
-+	.iova_to_phys		= intel_iommu_iova_to_phys,
-+	.add_device		= intel_iommu_add_device,
-+	.remove_device		= intel_iommu_remove_device,
-+	.get_resv_regions	= intel_iommu_get_resv_regions,
-+	.put_resv_regions	= intel_iommu_put_resv_regions,
-+	.device_group		= pci_device_group,
-+	.pgsize_bitmap		= INTEL_IOMMU_PGSIZES,
+ #include <linux/delay.h>
+-#include <linux/reboot.h>
+ #include <linux/types.h>
+ #include <linux/module.h>
+ #include <linux/io.h>
+@@ -49,7 +48,6 @@
+ struct bcm2835_wdt {
+ 	void __iomem		*base;
+ 	spinlock_t		lock;
+-	struct notifier_block	restart_handler;
  };
  
- static void quirk_iommu_g4x_gfx(struct pci_dev *dev)
+ static unsigned int heartbeat;
+@@ -99,11 +97,37 @@ static unsigned int bcm2835_wdt_get_timeleft(struct watchdog_device *wdog)
+ 	return WDOG_TICKS_TO_SECS(ret & PM_WDOG_TIME_SET);
+ }
+ 
++static void __bcm2835_restart(struct bcm2835_wdt *wdt)
++{
++	u32 val;
++
++	/* use a timeout of 10 ticks (~150us) */
++	writel_relaxed(10 | PM_PASSWORD, wdt->base + PM_WDOG);
++	val = readl_relaxed(wdt->base + PM_RSTC);
++	val &= PM_RSTC_WRCFG_CLR;
++	val |= PM_PASSWORD | PM_RSTC_WRCFG_FULL_RESET;
++	writel_relaxed(val, wdt->base + PM_RSTC);
++
++	/* No sleeping, possibly atomic. */
++	mdelay(1);
++}
++
++static int bcm2835_restart(struct watchdog_device *wdog,
++			   unsigned long action, void *data)
++{
++	struct bcm2835_wdt *wdt = watchdog_get_drvdata(wdog);
++
++	__bcm2835_restart(wdt);
++
++	return 0;
++}
++
+ static const struct watchdog_ops bcm2835_wdt_ops = {
+ 	.owner =	THIS_MODULE,
+ 	.start =	bcm2835_wdt_start,
+ 	.stop =		bcm2835_wdt_stop,
+ 	.get_timeleft =	bcm2835_wdt_get_timeleft,
++	.restart =	bcm2835_restart,
+ };
+ 
+ static const struct watchdog_info bcm2835_wdt_info = {
+@@ -120,26 +144,6 @@ static struct watchdog_device bcm2835_wdt_wdd = {
+ 	.timeout =	WDOG_TICKS_TO_SECS(PM_WDOG_TIME_SET),
+ };
+ 
+-static int
+-bcm2835_restart(struct notifier_block *this, unsigned long mode, void *cmd)
+-{
+-	struct bcm2835_wdt *wdt = container_of(this, struct bcm2835_wdt,
+-					       restart_handler);
+-	u32 val;
+-
+-	/* use a timeout of 10 ticks (~150us) */
+-	writel_relaxed(10 | PM_PASSWORD, wdt->base + PM_WDOG);
+-	val = readl_relaxed(wdt->base + PM_RSTC);
+-	val &= PM_RSTC_WRCFG_CLR;
+-	val |= PM_PASSWORD | PM_RSTC_WRCFG_FULL_RESET;
+-	writel_relaxed(val, wdt->base + PM_RSTC);
+-
+-	/* No sleeping, possibly atomic. */
+-	mdelay(1);
+-
+-	return 0;
+-}
+-
+ /*
+  * We can't really power off, but if we do the normal reset scheme, and
+  * indicate to bootcode.bin not to reboot, then most of the chip will be
+@@ -163,7 +167,7 @@ static void bcm2835_power_off(void)
+ 	writel_relaxed(val, wdt->base + PM_RSTS);
+ 
+ 	/* Continue with normal reset mechanism */
+-	bcm2835_restart(&wdt->restart_handler, REBOOT_HARD, NULL);
++	__bcm2835_restart(wdt);
+ }
+ 
+ static int bcm2835_wdt_probe(struct platform_device *pdev)
+@@ -208,9 +212,6 @@ static int bcm2835_wdt_probe(struct platform_device *pdev)
+ 		return err;
+ 	}
+ 
+-	wdt->restart_handler.notifier_call = bcm2835_restart;
+-	wdt->restart_handler.priority = 128;
+-	register_restart_handler(&wdt->restart_handler);
+ 	if (pm_power_off == NULL)
+ 		pm_power_off = bcm2835_power_off;
+ 
+@@ -222,7 +223,6 @@ static int bcm2835_wdt_remove(struct platform_device *pdev)
+ {
+ 	struct bcm2835_wdt *wdt = platform_get_drvdata(pdev);
+ 
+-	unregister_restart_handler(&wdt->restart_handler);
+ 	if (pm_power_off == bcm2835_power_off)
+ 		pm_power_off = NULL;
+ 	watchdog_unregister_device(&bcm2835_wdt_wdd);
 -- 
-1.9.1
+2.7.4
