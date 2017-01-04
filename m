@@ -1,126 +1,95 @@
-From: manish.narani@xilinx.com (Manish Narani)
-Date: Wed, 4 Jan 2017 18:52:57 +0530
-Subject: [RFC PATCH] usb: dwc3: core: add OTG support function calls and
- modifications
-In-Reply-To: <1483536181-22356-1-git-send-email-mnarani@xilinx.com>
-References: <1483536181-22356-1-git-send-email-mnarani@xilinx.com>
-Message-ID: <1483536181-22356-3-git-send-email-mnarani@xilinx.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed,  4 Jan 2017 12:05:27 +0000
+Subject: [PATCH] mailbox: sti: Fix mbox-names copy and paste error
+Message-ID: <20170104120527.24806-1-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds function call to initialize OTG driver. This patch
-also adds support for OTG device structure in DWC3 device.
+Due to an over-sight, mbox-names has become mbox-name in some instances.
 
-Modifications to event buffer related functions which are called
-from OTG driver upon requirement.
+Let's put it right.
 
-Signed-off-by: Manish Narani <mnarani@xilinx.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/usb/dwc3/core.c | 17 ++++++++++++-----
- drivers/usb/dwc3/core.h | 14 ++++++++++++++
- 2 files changed, 26 insertions(+), 5 deletions(-)
+ Documentation/devicetree/bindings/mailbox/sti-mailbox.txt | 4 ++--
+ arch/arm/boot/dts/stih407-family.dtsi                     | 8 ++++----
+ drivers/mailbox/mailbox-sti.c                             | 2 +-
+ 3 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-index 369bab1..9ab9c5b 100644
---- a/drivers/usb/dwc3/core.c
-+++ b/drivers/usb/dwc3/core.c
-@@ -240,7 +240,7 @@ static struct dwc3_event_buffer *dwc3_alloc_one_event_buffer(struct dwc3 *dwc,
-  * dwc3_free_event_buffers - frees all allocated event buffers
-  * @dwc: Pointer to our controller context structure
-  */
--static void dwc3_free_event_buffers(struct dwc3 *dwc)
-+void dwc3_free_event_buffers(struct dwc3 *dwc)
- {
- 	struct dwc3_event_buffer	*evt;
+diff --git a/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+index 351f612..648d176 100644
+--- a/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
++++ b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+@@ -9,7 +9,7 @@ Controller
+ Required properties:
+ - compatible		: Should be "st,stih407-mailbox"
+ - reg			: Offset and length of the device's register set
+-- mbox-name		: Name of the mailbox
++- mbox-names		: Name of the mailbox
+ - #mbox-cells:		: Must be 2
+ 			  <&phandle instance channel direction>
+ 			    phandle   : Label name of controller
+@@ -26,7 +26,7 @@ mailbox0: mailbox at 0  {
+ 	reg		= <0x08f00000 0x1000>;
+ 	interrupts	= <GIC_SPI 1 IRQ_TYPE_NONE>;
+ 	#mbox-cells	= <2>;
+-	mbox-name	= "a9";
++	mbox-names	= "a9";
+ };
  
-@@ -257,7 +257,7 @@ static void dwc3_free_event_buffers(struct dwc3 *dwc)
-  * Returns 0 on success otherwise negative errno. In the error case, dwc
-  * may contain some buffers allocated but not all which were requested.
-  */
--static int dwc3_alloc_event_buffers(struct dwc3 *dwc, unsigned length)
-+int dwc3_alloc_event_buffers(struct dwc3 *dwc, unsigned length)
- {
- 	struct dwc3_event_buffer *evt;
+ Client
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index c8b2944..00c67d4 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -787,7 +787,7 @@
+ 			reg		= <0x8f00000 0x1000>;
+ 			interrupts	= <GIC_SPI 1 IRQ_TYPE_NONE>;
+ 			#mbox-cells	= <2>;
+-			mbox-name	= "a9";
++			mbox-names	= "a9";
+ 			status		= "okay";
+ 		};
  
-@@ -277,7 +277,7 @@ static int dwc3_alloc_event_buffers(struct dwc3 *dwc, unsigned length)
-  *
-  * Returns 0 on success otherwise negative errno.
-  */
--static int dwc3_event_buffers_setup(struct dwc3 *dwc)
-+int dwc3_event_buffers_setup(struct dwc3 *dwc)
- {
- 	struct dwc3_event_buffer	*evt;
+@@ -795,7 +795,7 @@
+ 			compatible	= "st,stih407-mailbox";
+ 			reg		= <0x8f01000 0x1000>;
+ 			#mbox-cells	= <2>;
+-			mbox-name	= "st231_gp_1";
++			mbox-names	= "st231_gp_1";
+ 			status		= "okay";
+ 		};
  
-@@ -862,10 +862,10 @@ static int dwc3_core_init_mode(struct dwc3 *dwc)
- 		}
- 		break;
- 	case USB_DR_MODE_OTG:
--		ret = dwc3_host_init(dwc);
-+		ret = dwc3_otg_init(dwc);
- 		if (ret) {
- 			if (ret != -EPROBE_DEFER)
--				dev_err(dev, "failed to initialize host\n");
-+				dev_err(dev, "failed to initialize otg\n");
- 			return ret;
- 		}
+@@ -803,7 +803,7 @@
+ 			compatible	= "st,stih407-mailbox";
+ 			reg		= <0x8f02000 0x1000>;
+ 			#mbox-cells	= <2>;
+-			mbox-name	= "st231_gp_0";
++			mbox-names	= "st231_gp_0";
+ 			status		= "okay";
+ 		};
  
-@@ -875,6 +875,13 @@ static int dwc3_core_init_mode(struct dwc3 *dwc)
- 				dev_err(dev, "failed to initialize gadget\n");
- 			return ret;
- 		}
-+
-+		ret = dwc3_host_init(dwc);
-+		if (ret) {
-+			if (ret != -EPROBE_DEFER)
-+				dev_err(dev, "failed to initialize host\n");
-+			return ret;
-+		}
- 		break;
- 	default:
- 		dev_err(dev, "Unsupported mode of operation %d\n", dwc->dr_mode);
-diff --git a/drivers/usb/dwc3/core.h b/drivers/usb/dwc3/core.h
-index de5a857..6b92064 100644
---- a/drivers/usb/dwc3/core.h
-+++ b/drivers/usb/dwc3/core.h
-@@ -887,6 +887,8 @@ struct dwc3 {
- 	struct usb_gadget	gadget;
- 	struct usb_gadget_driver *gadget_driver;
+@@ -811,7 +811,7 @@
+ 			compatible	= "st,stih407-mailbox";
+ 			reg		= <0x8f03000 0x1000>;
+ 			#mbox-cells	= <2>;
+-			mbox-name	= "st231_audio_video";
++			mbox-names	= "st231_audio_video";
+ 			status		= "okay";
+ 		};
  
-+	struct dwc3_otg		*otg;
-+
- 	struct usb_phy		*usb2_phy;
- 	struct usb_phy		*usb3_phy;
+diff --git a/drivers/mailbox/mailbox-sti.c b/drivers/mailbox/mailbox-sti.c
+index 41bcd33..e532a98 100644
+--- a/drivers/mailbox/mailbox-sti.c
++++ b/drivers/mailbox/mailbox-sti.c
+@@ -434,7 +434,7 @@ static int sti_mbox_probe(struct platform_device *pdev)
+ 	if (IS_ERR(mdev->base))
+ 		return PTR_ERR(mdev->base);
  
-@@ -987,6 +989,7 @@ struct dwc3 {
- 	unsigned		setup_packet_pending:1;
- 	unsigned		three_stage_setup:1;
- 	unsigned		usb3_lpm_capable:1;
-+	unsigned		remote_wakeup:1;
+-	ret = of_property_read_string(np, "mbox-name", &mdev->name);
++	ret = of_property_read_string(np, "mbox-names", &mdev->name);
+ 	if (ret)
+ 		mdev->name = np->full_name;
  
- 	unsigned		disable_scramble_quirk:1;
- 	unsigned		u2exit_lfps_quirk:1;
-@@ -1220,6 +1223,13 @@ static inline int dwc3_send_gadget_generic_command(struct dwc3 *dwc,
- { return 0; }
- #endif
- 
-+#if IS_ENABLED(CONFIG_USB_DWC3_DUAL_ROLE)
-+int dwc3_otg_init(struct dwc3 *dwc);
-+#else
-+static inline int dwc3_otg_init(struct dwc3 *dwc)
-+{ return 0; }
-+#endif
-+
- /* power management interface */
- #if !IS_ENABLED(CONFIG_USB_DWC3_HOST)
- int dwc3_gadget_suspend(struct dwc3 *dwc);
-@@ -1251,4 +1261,8 @@ static inline void dwc3_ulpi_exit(struct dwc3 *dwc)
- { }
- #endif
- 
-+int dwc3_alloc_event_buffers(struct dwc3 *dwc, unsigned length);
-+void dwc3_free_event_buffers(struct dwc3 *dwc);
-+int dwc3_event_buffers_setup(struct dwc3 *dwc);
-+
- #endif /* __DRIVERS_USB_DWC3_CORE_H */
 -- 
-2.1.1
+2.10.2
