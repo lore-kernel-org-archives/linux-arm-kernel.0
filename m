@@ -1,63 +1,29 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 4 Jan 2017 14:06:47 +0000
-Subject: [PATCH v2 3/3] ARM: dts: imx: Add ocotp node for imx6ul
-In-Reply-To: <20161230022527.GH6177@dragon>
-References: <1479344899-3141-1-git-send-email-ping.bai@nxp.com>
- <1479344899-3141-3-git-send-email-ping.bai@nxp.com>
- <20161230022527.GH6177@dragon>
-Message-ID: <8badaf4a-01c9-95e0-ada1-41e7a81fe35e@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 4 Jan 2017 08:07:50 -0600
+Subject: [PATCH 2/5] drivers: mmc: sunxi: limit A64 MMC2 to 8K DMA buffer
+In-Reply-To: <1483398226-29321-3-git-send-email-andre.przywara@arm.com>
+References: <1483398226-29321-1-git-send-email-andre.przywara@arm.com>
+ <1483398226-29321-3-git-send-email-andre.przywara@arm.com>
+Message-ID: <20170104140750.7qs4pvggwjdj5cma@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jan 02, 2017 at 11:03:43PM +0000, Andre Przywara wrote:
+> From: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> Unlike the A64 user manual reports, the third MMC controller on the
+> A64 (and the only one capable of 8-bit HS400 eMMC transfers) has a
+> DMA buffer size limit of 8KB (much like the very old Allwinner SoCs).
+> This does not affect the other two controllers, so introduce a new
+> DT compatible string to let the driver use different settings for that
+> particular device. This will also help to enable the high-speed transfer
+> modes of that controller later.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt | 1 +
+>  drivers/mmc/host/sunxi-mmc.c                        | 7 +++++++
+>  2 files changed, 8 insertions(+)
 
-
-On 30/12/16 02:25, Shawn Guo wrote:
-> On Thu, Nov 17, 2016 at 09:08:19AM +0800, Bai Ping wrote:
->> Add ocotp node for i.MX6UL SOC.
->>
->> Signed-off-by: Bai Ping <ping.bai@nxp.com>
->
-> The DTS change looks good to me.  But I cannot apply it until the driver
-> and bindings part get accepted.  You should figure out who is collecting
-> nvmem patches.  It seems to be Greg Kroah-Hartman, who is not on copy.
-Sorry for delay in response,
-
-I will take care of the 1/3 and 2/3 nvmem patches.
-
-Thanks,
-srini
-
->
-
-
-> Shawn
->
->> ---
->>  arch/arm/boot/dts/imx6ul.dtsi | 6 ++++++
->>  1 file changed, 6 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
->> index c5c05fd..c6f6613 100644
->> --- a/arch/arm/boot/dts/imx6ul.dtsi
->> +++ b/arch/arm/boot/dts/imx6ul.dtsi
->> @@ -849,6 +849,12 @@
->>  				reg = <0x021b0000 0x4000>;
->>  			};
->>
->> +			ocotp: ocotp-ctrl at 021bc000 {
->> +				compatible = "fsl,imx6ul-ocotp", "syscon";
->> +				reg = <0x021bc000 0x4000>;
->> +				clocks = <&clks IMX6UL_CLK_OCOTP>;
->> +			};
->> +
->>  			lcdif: lcdif at 021c8000 {
->>  				compatible = "fsl,imx6ul-lcdif", "fsl,imx28-lcdif";
->>  				reg = <0x021c8000 0x4000>;
->> --
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Acked-by: Rob Herring <robh@kernel.org>
