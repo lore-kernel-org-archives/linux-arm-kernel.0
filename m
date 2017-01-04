@@ -1,167 +1,34 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Wed, 4 Jan 2017 16:23:47 +0200
-Subject: [PATCH v2 12/19] media: imx: Add SMFC subdev driver
-In-Reply-To: <1483477049-19056-13-git-send-email-steve_longerbeam@mentor.com>
-References: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
- <1483477049-19056-13-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <13ff9579-ce8e-9272-ee44-9b597631f6b5@mentor.com>
+From: joerg.krause@embedded.rocks (=?UTF-8?q?J=C3=B6rg=20Krause?=)
+Date: Wed,  4 Jan 2017 15:22:50 +0100
+Subject: [PATCH 2/2] ARM: dts: sun7i: Enable audio codec on Banana Pro
+In-Reply-To: <20170104142250.22171-1-joerg.krause@embedded.rocks>
+References: <20170104142250.22171-1-joerg.krause@embedded.rocks>
+Message-ID: <20170104142250.22171-2-joerg.krause@embedded.rocks>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2017 10:57 PM, Steve Longerbeam wrote:
-> This is a media entity subdevice driver for the i.MX Sensor Multi-FIFO
-> Controller module. Video frames are received from the CSI and can
-> be routed to various sinks including the i.MX Image Converter for
-> scaling, color-space conversion, motion compensated deinterlacing,
-> and image rotation.
-> 
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> ---
->  drivers/staging/media/imx/Makefile   |   1 +
->  drivers/staging/media/imx/imx-smfc.c | 739 +++++++++++++++++++++++++++++++++++
->  2 files changed, 740 insertions(+)
->  create mode 100644 drivers/staging/media/imx/imx-smfc.c
-> 
-> diff --git a/drivers/staging/media/imx/Makefile b/drivers/staging/media/imx/Makefile
-> index 133672a..3559d7b 100644
-> --- a/drivers/staging/media/imx/Makefile
-> +++ b/drivers/staging/media/imx/Makefile
-> @@ -5,4 +5,5 @@ obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media.o
->  obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-common.o
->  
->  obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-csi.o
-> +obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-smfc.o
+This commit enables the on-chip audio codec present on the A20 SoC
+on the Banana Pro board.
 
-May be
+Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
+---
+ arch/arm/boot/dts/sun7i-a20-bananapro.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-csi.o imx-smfc.o
-
->  
-> diff --git a/drivers/staging/media/imx/imx-smfc.c b/drivers/staging/media/imx/imx-smfc.c
-> new file mode 100644
-> index 0000000..565048c
-> --- /dev/null
-> +++ b/drivers/staging/media/imx/imx-smfc.c
-> @@ -0,0 +1,739 @@
-> +/*
-> + * V4L2 Capture SMFC Subdev for Freescale i.MX5/6 SOC
-> + *
-> + * This subdevice handles capture of raw/unconverted video frames
-> + * from the CSI, directly to memory via the Sensor Multi-FIFO Controller.
-> + *
-> + * Copyright (c) 2012-2016 Mentor Graphics Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +#include <linux/module.h>
-> +#include <linux/delay.h>
-> +#include <linux/fs.h>
-> +#include <linux/timer.h>
-> +#include <linux/sched.h>
-> +#include <linux/slab.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pinctrl/consumer.h>
-> +#include <media/v4l2-device.h>
-> +#include <media/v4l2-ioctl.h>
-> +#include <media/videobuf2-dma-contig.h>
-> +#include <media/v4l2-subdev.h>
-> +#include <media/v4l2-of.h>
-> +#include <media/v4l2-ctrls.h>
-
-Please sort the list of headers alphabetically.
-
-> +#include <media/imx.h>
-> +#include "imx-media.h"
-> +
-
-[snip]
-
-> +static irqreturn_t imx_smfc_eof_interrupt(int irq, void *dev_id)
-> +{
-> +	struct imx_smfc_priv *priv = dev_id;
-> +	struct imx_media_dma_buf *done, *next;
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&priv->irqlock, flags);
-
-spin_lock(&priv->irqlock) should be sufficient.
-
-> +
-> +	if (priv->last_eof) {
-> +		complete(&priv->last_eof_comp);
-> +		priv->last_eof = false;
-> +		goto unlock;
-> +	}
-> +
-> +	/* inform CSI of this EOF so it can monitor frame intervals */
-> +	v4l2_subdev_call(priv->src_sd, core, interrupt_service_routine,
-> +			 0, NULL);
-> +
-> +	done = imx_media_dma_buf_get_active(priv->out_ring);
-> +	/* give the completed buffer to the sink  */
-> +	if (!WARN_ON(!done))
-> +		imx_media_dma_buf_done(done, IMX_MEDIA_BUF_STATUS_DONE);
-> +
-> +	/* priv->next buffer is now the active one */
-> +	imx_media_dma_buf_set_active(priv->next);
-> +
-> +	/* bump the EOF timeout timer */
-> +	mod_timer(&priv->eof_timeout_timer,
-> +		  jiffies + msecs_to_jiffies(IMX_MEDIA_EOF_TIMEOUT));
-> +
-> +	if (ipu_idmac_buffer_is_ready(priv->smfc_ch, priv->ipu_buf_num))
-> +		ipu_idmac_clear_buffer(priv->smfc_ch, priv->ipu_buf_num);
-> +
-> +	/* get next queued buffer */
-> +	next = imx_media_dma_buf_get_next_queued(priv->out_ring);
-> +
-> +	ipu_cpmem_set_buffer(priv->smfc_ch, priv->ipu_buf_num, next->phys);
-> +	ipu_idmac_select_buffer(priv->smfc_ch, priv->ipu_buf_num);
-> +
-> +	/* toggle IPU double-buffer index */
-> +	priv->ipu_buf_num ^= 1;
-> +	priv->next = next;
-> +
-> +unlock:
-> +	spin_unlock_irqrestore(&priv->irqlock, flags);
-> +	return IRQ_HANDLED;
-> +}
-> +
-
-[snip]
-
-> +
-> +static const struct platform_device_id imx_smfc_ids[] = {
-> +	{ .name = "imx-ipuv3-smfc" },
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(platform, imx_smfc_ids);
-> +
-> +static struct platform_driver imx_smfc_driver = {
-> +	.probe = imx_smfc_probe,
-> +	.remove = imx_smfc_remove,
-> +	.id_table = imx_smfc_ids,
-> +	.driver = {
-> +		.name = "imx-ipuv3-smfc",
-> +		.owner = THIS_MODULE,
-
-You can drop owner assignment.
-
-> +	},
-> +};
-> +module_platform_driver(imx_smfc_driver);
-> +
-> +MODULE_DESCRIPTION("i.MX SMFC subdev driver");
-> +MODULE_AUTHOR("Steve Longerbeam <steve_longerbeam@mentor.com>");
-> +MODULE_LICENSE("GPL");
-> +MODULE_ALIAS("platform:imx-ipuv3-smfc");
-> 
-
---
-With best wishes,
-Vladimir
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapro.dts b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+index 439ad50dcd4a..797de4c352a5 100644
+--- a/arch/arm/boot/dts/sun7i-a20-bananapro.dts
++++ b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+@@ -100,6 +100,10 @@
+ 	status = "okay";
+ };
+ 
++&codec {
++	status = "okay";
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+-- 
+2.11.0
