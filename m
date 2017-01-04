@@ -1,62 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 4 Jan 2017 07:58:37 -0800
-Subject: [GIT PULL] omap fixes for v4.10-rc cycle
-In-Reply-To: <3791843.yGbamM6pzm@wuerfel>
-References: <3791843.yGbamM6pzm@wuerfel>
-Message-ID: <20170104155837.GE25222@atomide.com>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Wed, 4 Jan 2017 15:58:12 +0000
+Subject: [PATCH v5 2/4] ARM: Define KERNEL_START and KERNEL_END
+In-Reply-To: <20170104011417.1496-3-f.fainelli@gmail.com>
+References: <edc8eaa2-5414-506c-1dad-f2404ef19c81@gmail.com>
+ <20170104011417.1496-1-f.fainelli@gmail.com>
+ <20170104011417.1496-3-f.fainelli@gmail.com>
+Message-ID: <SN1PR0101MB15656D0B421E37BC4813F560D0610@SN1PR0101MB1565.prod.exchangelabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [170104 07:18]:
-> On Friday, December 30, 2016 1:10:43 PM CET Tony Lindgren wrote:
-> > Fist set of fixes for omaps for v4.10-rc cycle, mostly
-> > to deal with various regressions noticed during the merge
-> > window and to fix various device tree configurations for
-> > boards. Also included is removal of mach-omap2/gpio.c that
-> > is now dead code with device tree based booting that should
-> > be OK for the early -rc cycle:
-> > 
-> > - A series of fixes to add empty chosen node to fix regressions
-> >   caused for bootloaders that don't create chosen node as the
-> >   decompressor needs the chosen node to merge command line and
-> >   ATAGs into it
-> > 
-> > - Fix missing logicpd-som-lv-37xx-devkit.dtb entry in Makefile
-> > 
-> > - Fix regression for am437x timers
-> > 
-> > - Fix wrong strcat for non-NULL terminated string
-> > 
-> > - A series of changes to fix tps65217 interrupts to not use
-> >   defines as we don't do that for interrupts
-> > 
-> > - Two patches to fix USB VBUS detection on am57xx-idk and force it
-> >   to peripheral mode until dwc3 role detection is working
-> > 
-> > - Add missing dra72-evm-tps65917 missing voltage supplies
-> >   accidentally left out of an earlier patch
-> > 
-> > - Fix n900 eMMC detection when booted on qemu
-> > 
-> > - Remove unwanted pr_err on failed memory allocation for
-> >   prm_common.c
-> > 
-> > - Remove legacy mach-omap2/gpio.c that now is dead code
-> >   since we boot mach-omap2 in device tree only mode
-> > 
-> > - Fix am572x-idk pcie1 by adding the missing gpio reset pin
-> 
-> I think I would have preferred to see the gpio.c removal as
-> a fixes-non-critical patch for 4.11 instead, but I don't feel
-> like making you respin the pull request for that, since I
-> really want to get the other fixes merged for -rc3.
+On Tuesday, January 03, 2017 6:14 PM, Florian Fainelli wrote:
+>
+> In preparation for adding CONFIG_DEBUG_VIRTUAL support, define a set of
+> common constants: KERNEL_START and KERNEL_END which abstract
+> CONFIG_XIP_KERNEL vs. !CONFIG_XIP_KERNEL. Update the code where
+> relevant.
+>
+> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  arch/arm/include/asm/memory.h | 7 +++++++
+>  arch/arm/mm/init.c            | 7 ++-----
+>  arch/arm/mm/mmu.c             | 6 +-----
+>  3 files changed, 10 insertions(+), 10 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index 76cbd9c674df..bee7511c5098 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -111,6 +111,13 @@
+>  
+>  #endif /* !CONFIG_MMU */
+>  
+> +#ifdef CONFIG_XIP_KERNEL
+> +#define KERNEL_START		_sdata
+> +#else
+> +#define KERNEL_START		_stext
+> +#endif
+> +#define KERNEL_END		_end
+> +
+>  /*
+>   * We fix the TCM memories max 32 KiB ITCM resp DTCM at these
+>   * locations
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 370581aeb871..c87d0d5b65f2 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -230,11 +230,8 @@ phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
+>  void __init arm_memblock_init(const struct machine_desc *mdesc)
+>  {
+>  	/* Register the kernel text, kernel data and initrd with memblock. */
+> -#ifdef CONFIG_XIP_KERNEL
+> -	memblock_reserve(__pa(_sdata), _end - _sdata);
+> -#else
+> -	memblock_reserve(__pa(_stext), _end - _stext);
+> -#endif
+> +	memblock_reserve(__pa(KERNEL_START), _end - KERNEL_START);
 
-Sorry yeah I had that queued for v4.11 but I forgot it and then
-the holidays came.. Anyways it's been sitting in Linux next since
-late November so should be safe to merge.
+Shouldn't the '_end' above be 'KERNEL_END'?
 
-> Pulled everything into fixes now.
-
-Thanks,
-
-Tony
+Hartley
