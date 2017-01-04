@@ -1,88 +1,60 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Wed, 04 Jan 2017 10:19:46 +0100
-Subject: [PATCH v2 2/2] arm: perf: Mark as non-removable
-In-Reply-To: <20161222224547.GA30170@remoulade>
-References: <20161221150340.25657-1-alexander.stein@systec-electronic.com>
- <20161221150340.25657-3-alexander.stein@systec-electronic.com>
- <20161222224547.GA30170@remoulade>
-Message-ID: <2559413.O5mI12kdOo@ws-stein>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 4 Jan 2017 10:27:32 +0100
+Subject: [PATCH 1/3] linux/const.h: move UL() macro to
+ include/linux/const.h
+In-Reply-To: <1483520127-29316-2-git-send-email-yamada.masahiro@socionext.com>
+References: <1483520127-29316-1-git-send-email-yamada.masahiro@socionext.com>
+ <1483520127-29316-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAMuHMdVyzF4xFPotburrP+cihjfyCDfHeAt4bienLG9kdG_zSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Yamada-san,
 
-On Thursday 22 December 2016 22:48:32, Mark Rutland wrote:
-> On Wed, Dec 21, 2016 at 04:03:40PM +0100, Alexander Stein wrote:
-> > This driver can only built into the kernel. So disallow driver bind/unbind
-> > and also prevent a kernel error in case DEBUG_TEST_DRIVER_REMOVE is
-> > enabled.
-> > 
-> > Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
-> > ---
-> > 
-> >  arch/arm/kernel/perf_event_v7.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/kernel/perf_event_v7.c
-> > b/arch/arm/kernel/perf_event_v7.c index b942349..795e373 100644
-> > --- a/arch/arm/kernel/perf_event_v7.c
-> > +++ b/arch/arm/kernel/perf_event_v7.c
-> > @@ -2029,6 +2029,7 @@ static int armv7_pmu_device_probe(struct
-> > platform_device *pdev)> 
-> >  static struct platform_driver armv7_pmu_driver = {
-> >  
-> >  	.driver		= {
-> >  	
-> >  		.name	= "armv7-pmu",
-> > 
-> > +		.suppress_bind_attrs = true,
-> > 
-> >  		.of_match_table = armv7_pmu_of_device_ids,
-> >  	
-> >  	},
-> 
-> While this patch looks correct, the other perf_event_* drivers (e.g. those
-> under arch/arm/) will need similar treatment.
+On Wed, Jan 4, 2017 at 9:55 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> Some architectures are duplicating the definition of UL():
+>
+>   #define UL(x) _AC(x, UL)
+>
+> This is not actually arch-specific, so it will be useful to move it
+> to a common header.  Currently, we only have the uapi variant for
+> linux/const.h, so I am creating include/linux/const.h.
+>
+> I am also adding _UL(x), _ULL(x), ULL(x) because _AC() is used for
+> UL in most places (and ULL in some places).  I expect _AC(..., UL)
+> will be replaced with _UL(...) or UL(...).  The underscore-prefixed
+> one should be used for exported headers.
+>
+> Note:
+> I renamed UL(x) in arch/m68k/mm/init.c, where it is used for a
+> different meaning.
 
-Yep, but this is the only one I can actually test.
+Shouldn't that be a separate (prerequisite) patch?
 
-> More generally, updating each and every driver in this manner seems like a
-> scattergun approach that is tiresome and error prone.
-> 
-> IMO, it would be vastly better for a higher layer to enforce that we don't
-> attempt to unbind drivers where the driver does not have a remove callback,
-> as is the case here (and I suspect most over cases where
-> DEBUG_TEST_DRIVER_REMOVE is blowing up).
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+>
+>  arch/arm/include/asm/memory.h       | 6 ------
+>  arch/arm64/include/asm/memory.h     | 6 ------
+>  arch/m68k/mm/init.c                 | 6 +++---
+>  arch/unicore32/include/asm/memory.h | 6 ------
+>  include/linux/const.h               | 9 +++++++++
+>  include/uapi/linux/const.h          | 9 ++++++---
+>  6 files changed, 18 insertions(+), 24 deletions(-)
+>  create mode 100644 include/linux/const.h
 
-You mean something like this?
-> diff --git a/drivers/base/driver.c b/drivers/base/driver.c
-> index 4eabfe2..3b6c1a2d 100644
-> --- a/drivers/base/driver.c
-> +++ b/drivers/base/driver.c
-> @@ -158,6 +158,9 @@ int driver_register(struct device_driver *drv)
-> 
->                 printk(KERN_WARNING "Driver '%s' needs updating - please use
->                 "
->                 
->                         "bus_type methods\n", drv->name);
-> 
-> +       if (!drv->remove)
-> +               drv->suppress_bind_attrs = true;
-> +
-> 
->         other = driver_find(drv->name, drv->bus);
->         if (other) {
->         
->                 printk(KERN_ERR "Error: Driver '%s' is already registered, "
+For the m68k change:
 
-> Is there any reason that can't be enforced at the bus layer, say?
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-I'm not sure if the change above works with remove functions set in struct 
-bus_type too.
-But on the other hand this would hide errors in drivers which are actually 
-removable but do not cleanup properly which DEBUG_TEST_DRIVER_REMOVE tries to 
-detect. By setting .suppress_bind_attrs = true explicitely you state "This 
-driver cannot be removed!", so the remove callback is not missing by accident.
+Gr{oetje,eeting}s,
 
-Best regards,
-Alexander
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
