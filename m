@@ -1,99 +1,60 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 4 Jan 2017 13:46:22 +0000
-Subject: [PATCH v5 13/17] irqdomain: irq_domain_check_msi_remap
-In-Reply-To: <1483536746-2725-14-git-send-email-eric.auger@redhat.com>
-References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
- <1483536746-2725-14-git-send-email-eric.auger@redhat.com>
-Message-ID: <ecb7ddf6-074f-50e4-6402-d59ceb1edd1d@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 4 Jan 2017 13:50:20 +0000
+Subject: [PATCH 2/2] arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA
+In-Reply-To: <20170104132831.GD18193@arm.com>
+References: <1481706707-6211-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1481706707-6211-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20170104132831.GD18193@arm.com>
+Message-ID: <CAKv+Gu8MdpVDCSjfum7AMtbgR6cTP5H+67svhDSu6bkaijvvyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On 4 January 2017 at 13:28, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Dec 14, 2016 at 09:11:47AM +0000, Ard Biesheuvel wrote:
+>> The NUMA code may get confused by the presence of NOMAP regions within
+>> zones, resulting in spurious BUG() checks where the node id deviates
+>> from the containing zone's node id.
+>>
+>> Since the kernel has no business reasoning about node ids of pages it
+>> does not own in the first place, enable CONFIG_HOLES_IN_ZONE to ensure
+>> that such pages are disregarded.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/Kconfig | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 111742126897..0472afe64d55 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -614,6 +614,10 @@ config NEED_PER_CPU_EMBED_FIRST_CHUNK
+>>       def_bool y
+>>       depends on NUMA
+>>
+>> +config HOLES_IN_ZONE
+>> +     def_bool y
+>> +     depends on NUMA
+>> +
+>>  source kernel/Kconfig.preempt
+>>  source kernel/Kconfig.hz
+>
+> I'm happy to apply this, but I'll hold off until the first patch is queued
+> somewhere, since this doesn't help without the VM_BUG_ON being moved.
+>
+> Alternatively, I can queue both if somebody from the mm camp acks the
+> first patch.
+>
 
-On 04/01/17 13:32, Eric Auger wrote:
-> This new function checks whether all platform and PCI
-> MSI domains implement IRQ remapping. This is useful to
-> understand whether VFIO passthrough is safe with respect
-> to interrupts.
-> 
-> On ARM typically an MSI controller can sit downstream
-> to the IOMMU without preventing VFIO passthrough.
-> As such any assigned device can write into the MSI doorbell.
-> In case the MSI controller implements IRQ remapping, assigned
-> devices will not be able to trigger interrupts towards the
-> host. On the contrary, the assignment must be emphasized as
-> unsafe with respect to interrupts.
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
-> ---
-> 
-> v4 -> v5:
-> - Handle DOMAIN_BUS_FSL_MC_MSI domains
-> - Check parents
-> ---
->  include/linux/irqdomain.h |  1 +
->  kernel/irq/irqdomain.c    | 41 +++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 42 insertions(+)
-> 
-> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-> index ab017b2..281a40f 100644
-> --- a/include/linux/irqdomain.h
-> +++ b/include/linux/irqdomain.h
-> @@ -219,6 +219,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
->  					 void *host_data);
->  extern struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
->  						   enum irq_domain_bus_token bus_token);
-> +extern bool irq_domain_check_msi_remap(void);
->  extern void irq_set_default_host(struct irq_domain *host);
->  extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
->  				  irq_hw_number_t hwirq, int node,
-> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-> index 8c0a0ae..700caea 100644
-> --- a/kernel/irq/irqdomain.c
-> +++ b/kernel/irq/irqdomain.c
-> @@ -278,6 +278,47 @@ struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
->  EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
->  
->  /**
-> + * irq_domain_is_msi_remap - Check if @domain or any parent
-> + * has MSI remapping support
-> + * @domain: domain pointer
-> + */
-> +static bool irq_domain_is_msi_remap(struct irq_domain *domain)
-> +{
-> +	struct irq_domain *h = domain;
-> +
-> +	for (; h; h = h->parent) {
-> +		if (h->flags & IRQ_DOMAIN_FLAG_MSI_REMAP)
-> +			return true;
-> +	}
-> +	return false;
-> +}
-> +
-> +/**
-> + * irq_domain_check_msi_remap() - Checks whether all MSI
-> + * irq domains implement IRQ remapping
-> + */
-> +bool irq_domain_check_msi_remap(void)
-> +{
-> +	struct irq_domain *h;
-> +	bool ret = true;
-> +
-> +	mutex_lock(&irq_domain_mutex);
-> +	list_for_each_entry(h, &irq_domain_list, link) {
-> +		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
-> +		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI) ||
-> +		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI)) &&
-> +		     !irq_domain_is_msi_remap(h)) {
+Actually, I am not convinced the discussion is finalized. These
+patches do fix the issue, but Robert also suggested an alternative fix
+which may be preferable.
 
-(h->bus_token & DOMAIN_BUS_PCI_MSI) and co looks quite wrong. bus_token
-is not a bitmap, and DOMAIN_BUS_* not a single bit value (see enum
-irq_domain_bus_token). Surely this should read
-(h->bus_token == DOMAIN_BUS_PCI_MSI).
+http://marc.info/?l=linux-arm-kernel&m=148190753510107&w=2
+
+I haven't responded to it yet, due to the holidays, but I'd like to
+explore that solution a bit further before applying anything, if you
+don't mind.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Ard.
