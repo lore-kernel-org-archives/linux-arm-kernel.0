@@ -1,43 +1,53 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Jan 2017 11:40:56 +0000
-Subject: [PATCH v2 2/2] arm: perf: Mark as non-removable
-In-Reply-To: <20170104113025.GE8329@leverpostej>
-References: <20161221150340.25657-1-alexander.stein@systec-electronic.com>
- <20161221150340.25657-3-alexander.stein@systec-electronic.com>
- <20161222224547.GA30170@remoulade> <2559413.O5mI12kdOo@ws-stein>
- <20170104113025.GE8329@leverpostej>
-Message-ID: <20170104114056.GO14217@n2100.armlinux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 04 Jan 2017 11:37:06 +0100
+Subject: [PATCH] ARM: dts: armada388-clearfog: fix SPI flash #size-cells
+In-Reply-To: <E1cO41M-0007xc-Id@rmk-PC.armlinux.org.uk> (Russell King's
+ message of "Mon, 02 Jan 2017 14:55:32 +0000")
+References: <E1cO41M-0007xc-Id@rmk-PC.armlinux.org.uk>
+Message-ID: <87a8b7f6wd.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 11:30:25AM +0000, Mark Rutland wrote:
-> On Wed, Jan 04, 2017 at 10:19:46AM +0100, Alexander Stein wrote:
-> > I'm not sure if the change above works with remove functions set in struct 
-> > bus_type too.
-> > But on the other hand this would hide errors in drivers which are actually 
-> > removable but do not cleanup properly which DEBUG_TEST_DRIVER_REMOVE tries to 
-> > detect.
-> > By setting .suppress_bind_attrs = true explicitely you state "This 
-> > driver cannot be removed!", so the remove callback is not missing by accident.
-> 
-> I'm not sure I follow. If the remove callback is accidentally missing,
-> the driver is not "actually removable" today -- there's either no remove
-> code, or it's not been wired up (the latter of which will likely result
-> in a compiler warning about an unused function).
-> 
-> Aborting the remove early in those cases is much safer than forcefully
-> removing a driver without a remove callback.
+Hi Russell,
+ 
+ On lun., janv. 02 2017, Russell King <rmk+kernel@armlinux.org.uk> wrote:
 
-Drivers without a remove function may be removable - there's more layers
-than just the driver - there's the bus layer as well, which may or may
-not direct to a private-bus pointer.
+> The SPI flash #size-cells is specified in the binding documentation to
+> have value 1, but we were setting it to zero.  This wasn't causing any
+> problem as we do not list any partitions, but it's worth specifying
+> correctly if we're going to specify it at all.
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-There's no real way for the core driver model code to know whether the
-lack of the ->remove in the struct device_driver is something that
-prevents a driver being removed, or whether it's handled via some other
-method.  Eg, platform drivers.
+Applied on mvebu/dt
+
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm/boot/dts/armada-388-clearfog.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-388-clearfog.dts b/arch/arm/boot/dts/armada-388-clearfog.dts
+> index 71ce201c903e..3e7c3a6237c3 100644
+> --- a/arch/arm/boot/dts/armada-388-clearfog.dts
+> +++ b/arch/arm/boot/dts/armada-388-clearfog.dts
+> @@ -437,7 +437,7 @@
+>  
+>  	spi-flash at 0 {
+>  		#address-cells = <1>;
+> -		#size-cells = <0>;
+> +		#size-cells = <1>;
+>  		compatible = "w25q32", "jedec,spi-nor";
+>  		reg = <0>; /* Chip select 0 */
+>  		spi-max-frequency = <3000000>;
+> -- 
+> 2.7.4
+>
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
