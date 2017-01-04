@@ -1,35 +1,75 @@
-From: david@lechnology.com (David Lechner)
-Date: Wed,  4 Jan 2017 14:30:11 -0600
-Subject: [PATCH v2 1/4] doc: DT: Add ti,da830-uart to serial/8250 bindings
-In-Reply-To: <1483561814-21953-1-git-send-email-david@lechnology.com>
-References: <1483561814-21953-1-git-send-email-david@lechnology.com>
-Message-ID: <1483561814-21953-2-git-send-email-david@lechnology.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Jan 2017 19:14:14 +0000
+Subject: [RFC PATCH 09/10] drivers/perf: Add support for ARMv8.2
+ Statistical Profiling Extension
+In-Reply-To: <20170104103713.GH25813@worktop.programming.kicks-ass.net>
+References: <1483467027-14547-1-git-send-email-will.deacon@arm.com>
+ <1483467027-14547-10-git-send-email-will.deacon@arm.com>
+ <20170104103713.GH25813@worktop.programming.kicks-ass.net>
+Message-ID: <20170104191414.GU18193@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the ti,da830-uart compatible string to serial 8250 UART bindings.
+Hi Peter,
 
-Signed-off-by: David Lechner <david@lechnology.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
+On Wed, Jan 04, 2017 at 11:37:13AM +0100, Peter Zijlstra wrote:
+> On Tue, Jan 03, 2017 at 06:10:26PM +0000, Will Deacon wrote:
+> > The ARMv8.2 architecture introduces the Statistical Profiling Extension
+> > (SPE). SPE provides a way to configure and collect profiling samples
+> > from the CPU in the form of a trace buffer, which can be mapped directly
+> > into userspace using the perf AUX buffer infrastructure.
+> > 
+> > This patch adds support for SPE in the form of a new perf driver.
+> > 
+> 
+> Can you give a little high level overview of what exactly SPE is?
 
-v2 changes:
-* picked up Acked-by:
+Sure, I can try, although there is no public documentation yet so it's a
+bit fiddly.
 
- Documentation/devicetree/bindings/serial/8250.txt | 1 +
- 1 file changed, 1 insertion(+)
+SPE can be used to profile a population of operations in the CPU pipeline
+after instruction decode. These are either architected instructions (i.e.
+a dynamic instruction trace) or CPU-specific uops and the choice is fixed
+statically in the hardware and advertised to userspace via caps/. Sampling
+is controlled using a sampling interval, similar to a regular PMU counter,
+but also with an optional random perturbation to avoid falling into patterns
+where you continuously profile the same instruction in a hot loop.
 
-diff --git a/Documentation/devicetree/bindings/serial/8250.txt b/Documentation/devicetree/bindings/serial/8250.txt
-index f86bb06..10276a4 100644
---- a/Documentation/devicetree/bindings/serial/8250.txt
-+++ b/Documentation/devicetree/bindings/serial/8250.txt
-@@ -19,6 +19,7 @@ Required properties:
- 	- "altr,16550-FIFO128"
- 	- "fsl,16550-FIFO64"
- 	- "fsl,ns16550"
-+	- "ti,da830-uart"
- 	- "serial" if the port type is unknown.
- - reg : offset and length of the register set for the device.
- - interrupts : should contain uart interrupt.
--- 
-2.7.4
+After each operation is decoded, the interval counter is decremented. When
+it hits zero, an operation is chosen for profiling and tracked within the
+pipeline until it retires. Along the way, information such as TLB lookups,
+cache misses, time spent to issue etc is captured in the form of a sample.
+The sample is then filtered according to certain criteria (e.g. load
+latency) that can be specified in the event config (described under
+format/) and, if the sample satisfies the filter, it is written out to
+memory as a record, otherwise it is discarded. Only one operation can
+be sampled at a time.
+
+The in-memory buffer is linear and virtually addressed, raising an
+interrupt when it fills up. The PMU driver handles these interrupts to
+give the appearance of a ring buffer, as expected by the AUX code.
+
+The in-memory trace-like format is self-describing (though not parseable
+in reverse) and written as a series of records, with each record
+corresponding to a sample and consisting of a sequence of packets. These
+packets are defined by the architecture, although some have CPU-specific
+fields for recording information specific to the microarchitecture.
+
+As a simple example, a record generated for a branch instruction may
+consist of the following packets:
+
+  0 (Address) : Virtual PC of the branch instruction
+  1 (Type)    : Conditional direct branch
+  2 (Counter) : Number of cycles taken from Dispatch to Issue
+  3 (Address) : Virtual branch target + condition flags
+  4 (Counter) : Number of cycles taken from Dispatch to Complete
+  5 (Events)  : Mispredicted as not-taken
+  6 (END)     : End of record
+
+You can also toggle things like timestamp packets in each record.
+
+Since SPE is an optional extension to the architecture, I'm sure there
+will be big.LITTLE systems where only one of the clusters has SPE support,
+so the driver is slightly complicated by handling that.
+
+Will
