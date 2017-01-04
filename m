@@ -1,53 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 4 Jan 2017 11:46:13 +0000
-Subject: [PATCH v2 2/2] arm: perf: Mark as non-removable
-In-Reply-To: <20170104114056.GO14217@n2100.armlinux.org.uk>
-References: <20161221150340.25657-1-alexander.stein@systec-electronic.com>
- <20161221150340.25657-3-alexander.stein@systec-electronic.com>
- <20161222224547.GA30170@remoulade> <2559413.O5mI12kdOo@ws-stein>
- <20170104113025.GE8329@leverpostej>
- <20170104114056.GO14217@n2100.armlinux.org.uk>
-Message-ID: <20170104114612.GF8329@leverpostej>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 4 Jan 2017 11:36:45 +0000
+Subject: [PATCH v4 5/5] mfd: dt: Add bindings for the Aspeed SoC Display
+ Controller (GFX)
+In-Reply-To: <20161220071535.27542-6-andrew@aj.id.au>
+References: <20161220071535.27542-1-andrew@aj.id.au>
+ <20161220071535.27542-6-andrew@aj.id.au>
+Message-ID: <20170104113645.GF27589@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 11:40:56AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 04, 2017 at 11:30:25AM +0000, Mark Rutland wrote:
-> > On Wed, Jan 04, 2017 at 10:19:46AM +0100, Alexander Stein wrote:
-> > > I'm not sure if the change above works with remove functions set in struct 
-> > > bus_type too.
-> > > But on the other hand this would hide errors in drivers which are actually 
-> > > removable but do not cleanup properly which DEBUG_TEST_DRIVER_REMOVE tries to 
-> > > detect.
-> > > By setting .suppress_bind_attrs = true explicitely you state "This 
-> > > driver cannot be removed!", so the remove callback is not missing by accident.
-> > 
-> > I'm not sure I follow. If the remove callback is accidentally missing,
-> > the driver is not "actually removable" today -- there's either no remove
-> > code, or it's not been wired up (the latter of which will likely result
-> > in a compiler warning about an unused function).
-> > 
-> > Aborting the remove early in those cases is much safer than forcefully
-> > removing a driver without a remove callback.
+On Tue, 20 Dec 2016, Andrew Jeffery wrote:
+
+> The Aspeed SoC Display Controller is presented as a syscon device to
+> arbitrate access by display and pinmux drivers. Video pinmux
+> configuration on fifth generation SoCs depends on bits in both the
+> System Control Unit and the Display Controller.
 > 
-> Drivers without a remove function may be removable - there's more layers
-> than just the driver - there's the bus layer as well, which may or may
-> not direct to a private-bus pointer.
+> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+>  Documentation/devicetree/bindings/mfd/aspeed-gfx.txt | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-gfx.txt
 
-Sure; which is why I initially suggested doing something at the bus
-layer. That way, each layer could do any necessary check, and/or
-delegate to a callback for the layer below.
+Applied, thanks.
 
-> There's no real way for the core driver model code to know whether the
-> lack of the ->remove in the struct device_driver is something that
-> prevents a driver being removed, or whether it's handled via some other
-> method.  Eg, platform drivers.
+> diff --git a/Documentation/devicetree/bindings/mfd/aspeed-gfx.txt b/Documentation/devicetree/bindings/mfd/aspeed-gfx.txt
+> new file mode 100644
+> index 000000000000..aea5370efd97
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/aspeed-gfx.txt
+> @@ -0,0 +1,17 @@
+> +* Device tree bindings for Aspeed SoC Display Controller (GFX)
+> +
+> +The Aspeed SoC Display Controller primarily does as its name suggests, but also
+> +participates in pinmux requests on the g5 SoCs. It is therefore considered a
+> +syscon device.
+> +
+> +Required properties:
+> +- compatible:		"aspeed,ast2500-gfx", "syscon"
+> +- reg:			contains offset/length value of the GFX memory
+> +			region.
+> +
+> +Example:
+> +
+> +gfx: display at 1e6e6000 {
+> +	compatible = "aspeed,ast2500-gfx", "syscon";
+> +	reg = <0x1e6e6000 0x1000>;
+> +};
 
-While true today, my suggestion is to add the infrastrucutre such that
-it can. That seems nicer to me than each driver having to retain
-(redundant) state.
-
-Regardless, this patch itself is fine.
-
-Thanks,
-Mark.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
