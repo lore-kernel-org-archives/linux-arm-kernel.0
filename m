@@ -1,95 +1,88 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 4 Jan 2017 08:37:52 -0600
-Subject: [PATCH v3 2/2] dt-bindings: Add DT bindings info for FlexRM ring
- manager
-In-Reply-To: <1483508082-7008-3-git-send-email-anup.patel@broadcom.com>
-References: <1483508082-7008-1-git-send-email-anup.patel@broadcom.com>
- <1483508082-7008-3-git-send-email-anup.patel@broadcom.com>
-Message-ID: <20170104143752.bl47gdfczbnfy6b3@rob-hp-laptop>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Wed,  4 Jan 2017 13:32:19 +0000
+Subject: [PATCH v5 10/17] iommu/arm-smmu: Implement reserved region get/put
+ callbacks
+In-Reply-To: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
+References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1483536746-2725-11-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 11:04:42AM +0530, Anup Patel wrote:
-> This patch adds device tree bindings document for the FlexRM
-> ring manager found on Broadcom iProc SoCs.
-> 
-> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> ---
->  .../bindings/mailbox/brcm,iproc-flexrm-mbox.txt    | 60 ++++++++++++++++++++++
->  1 file changed, 60 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
-> new file mode 100644
-> index 0000000..ca51a39
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
-> @@ -0,0 +1,60 @@
-> +Broadcom FlexRM Ring Manager
-> +============================
-> +The Broadcom FlexRM ring manager provides a set of rings which can be
-> +used to submit work to offload engines. An SoC may have multiple FlexRM
-> +hardware blocks. There is one device tree entry per FlexRM block. The
-> +FlexRM driver will create a mailbox-controller instance for given FlexRM
-> +hardware block where each mailbox channel is a separate FlexRM ring.
-> +
-> +Required properties:
-> +--------------------
-> +- compatible:	Should be "brcm,iproc-flexrm-mbox"
-> +- reg:		Specifies base physical address and size of the FlexRM
-> +		ring registers
-> +- msi-parent:	Phandles (and potential Device IDs) to MSI controllers
-> +		The FlexRM engine will send MSIs (instead of wired
-> +		interrupts) to CPU. There is one MSI for each FlexRM ring.
-> +		Refer devicetree/bindings/interrupt-controller/msi.txt
-> +- #mbox-cells:	Specifies the number of cells needed to encode a mailbox
-> +		channel. This should be 3.
-> +
-> +		The 1st cell is the mailbox channel number.
-> +
-> +		The 2nd cell contains MSI completion threshold. This is the
-> +		number of completion messages for which FlexRM will inject
-> +		one MSI interrupt to CPU.
-> +
-> +		The 3nd cell contains MSI timer value representing time for
-> +		which FlexRM will wait to accumulate N completion messages
-> +		where N is the value specified by 2nd cell above. If FlexRM
-> +		does not get required number of completion messages in time
-> +		specified by this cell then it will inject one MSI interrupt
-> +		to CPU provided atleast one completion message is available.
-> +
-> +Optional properties:
-> +--------------------
-> +- dma-coherent:	Present if DMA operations made by the FlexRM engine (such
-> +		as DMA descriptor access, access to buffers pointed by DMA
-> +		descriptors and read/write pointer updates to DDR) are
-> +		cache coherent with the CPU.
-> +
-> +Example:
-> +--------
-> +crypto_mbox: mbox at 67000000 {
-> +	compatible = "brcm,iproc-flexrm-mbox";
-> +	reg = <0x67000000 0x200000>;
-> +	msi-parent = <&gic_its 0x7f00>;
-> +	#mbox-cells = <3>;
-> +};
-> +
-> +crypto_client {
+The get() populates the list with the MSI IOVA reserved window.
 
-crypto@<addr>
+At the moment an arbitray MSI IOVA window is set at 0x8000000
+of size 1MB. This will allow to report those info in iommu-group
+sysfs.
 
-> +	...
-> +	mboxes = <&crypto_mbox 0 0x1 0xffff>,
-> +		 <&crypto_mbox 1 0x1 0xffff>,
-> +		 <&crypto_mbox 16 0x1 0xffff>,
-> +		 <&crypto_mbox 17 0x1 0xffff>,
-> +		 <&crypto_mbox 30 0x1 0xffff>,
-> +		 <&crypto_mbox 31 0x1 0xffff>;
-> +	};
-> +	...
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
-Please somewhat fully list the contents for node.
+---
 
-Rob
+v3 -> v4:
+- do not handle PCI host bridge windows anymore
+- encode prot
+
+RFC v2 -> v3:
+- use existing get/put_resv_regions
+
+RFC v1 -> v2:
+- use defines for MSI IOVA base and length
+---
+ drivers/iommu/arm-smmu.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index a60cded..a354572 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -281,6 +281,9 @@ enum arm_smmu_s2cr_privcfg {
+ 
+ #define FSYNR0_WNR			(1 << 4)
+ 
++#define MSI_IOVA_BASE			0x8000000
++#define MSI_IOVA_LENGTH			0x100000
++
+ static int force_stage;
+ module_param(force_stage, int, S_IRUGO);
+ MODULE_PARM_DESC(force_stage,
+@@ -1549,6 +1552,29 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+ 	return iommu_fwspec_add_ids(dev, &fwid, 1);
+ }
+ 
++static void arm_smmu_get_resv_regions(struct device *dev,
++				      struct list_head *head)
++{
++	struct iommu_resv_region *region;
++	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
++
++	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
++					 prot, IOMMU_RESV_MSI);
++	if (!region)
++		return;
++
++	list_add_tail(&region->list, head);
++}
++
++static void arm_smmu_put_resv_regions(struct device *dev,
++				      struct list_head *head)
++{
++	struct iommu_resv_region *entry, *next;
++
++	list_for_each_entry_safe(entry, next, head, list)
++		kfree(entry);
++}
++
+ static struct iommu_ops arm_smmu_ops = {
+ 	.capable		= arm_smmu_capable,
+ 	.domain_alloc		= arm_smmu_domain_alloc,
+@@ -1564,6 +1590,8 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+ 	.domain_get_attr	= arm_smmu_domain_get_attr,
+ 	.domain_set_attr	= arm_smmu_domain_set_attr,
+ 	.of_xlate		= arm_smmu_of_xlate,
++	.get_resv_regions	= arm_smmu_get_resv_regions,
++	.put_resv_regions	= arm_smmu_put_resv_regions,
+ 	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
+ };
+ 
+-- 
+1.9.1
