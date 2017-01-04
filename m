@@ -1,214 +1,317 @@
-From: Jose.Abreu@synopsys.com (Jose Abreu)
-Date: Wed, 4 Jan 2017 09:59:44 +0000
-Subject: [PATCH v3 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
- stores scenario in vdma
-In-Reply-To: <1483512847-25710-3-git-send-email-appanad@xilinx.com>
-References: <1483512847-25710-1-git-send-email-appanad@xilinx.com>
- <1483512847-25710-3-git-send-email-appanad@xilinx.com>
-Message-ID: <df3662de-fa3b-b33e-ebf5-88802aea5c49@synopsys.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Wed, 4 Jan 2017 15:44:33 +0200
+Subject: [PATCH v2 11/19] media: imx: Add CSI subdev driver
+In-Reply-To: <1483477049-19056-12-git-send-email-steve_longerbeam@mentor.com>
+References: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483477049-19056-12-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <21b54a7b-1254-a14f-767c-c92feed7433d@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kedar,
-
-
-On 04-01-2017 06:54, Kedareswara rao Appana wrote:
-> When VDMA is configured for more than one frame in the h/w
-> for example h/w is configured for n number of frames and user
-> Submits n number of frames and triggered the DMA using issue_pending API.
-> In the current driver flow we are submitting one frame at a time
-> but we should submit all the n number of frames at one time as the h/w
-> Is configured for n number of frames.
->
-> This patch fixes this issue.
->
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-
-Looks fine. I have a couple of minor comments, if you address
-them you can add "Reviewed-by: Jose Abreu <joabreu@synopsys.com>"
-in next version.
-
+On 01/03/2017 10:57 PM, Steve Longerbeam wrote:
+> This is a media entity subdevice for the i.MX Camera
+> Serial Interface module.
+> 
+> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 > ---
-> Changes for v3:
-> ---> Added Checks for frame store configuration. If frame store
->      Configuration is not present at the h/w level and user
->      Submits less frames added debug prints in the driver as relevant.
-> Changes for v2:
-> ---> Fixed race conditions in the driver as suggested by Jose Abreu
-> ---> Fixed unnecessray if else checks in the vdma_start_transfer
->      as suggested by Laurent Pinchart.
->
->  .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |  2 +
->  drivers/dma/xilinx/xilinx_dma.c                    | 78 +++++++++++++++-------
->  2 files changed, 57 insertions(+), 23 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> index a2b8bfa..1f65e09 100644
-> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> @@ -66,6 +66,8 @@ Optional child node properties:
->  Optional child node properties for VDMA:
->  - xlnx,genlock-mode: Tells Genlock synchronization is
->  	enabled/disabled in hardware.
-> +- xlnx,fstore-config: Tells Whether Frame Store Configuration is
-> +	enabled/disabled in hardware.
->  Optional child node properties for AXI DMA:
->  -dma-channels: Number of dma channels in child node.
->  
-> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-> index be7eb41..7cd8e08 100644
-> --- a/drivers/dma/xilinx/xilinx_dma.c
-> +++ b/drivers/dma/xilinx/xilinx_dma.c
-> @@ -322,6 +322,7 @@ struct xilinx_dma_tx_descriptor {
->   * @genlock: Support genlock mode
->   * @err: Channel has errors
->   * @idle: Check for channel idle
-> + * @has_fstoreconfig: Check for frame store configuration
->   * @tasklet: Cleanup work after irq
->   * @config: Device configuration info
->   * @flush_on_fsync: Flush on Frame sync
-> @@ -353,6 +354,7 @@ struct xilinx_dma_chan {
->  	bool genlock;
->  	bool err;
->  	bool idle;
-> +	bool has_fstoreconfig;
->  	struct tasklet_struct tasklet;
->  	struct xilinx_vdma_config config;
->  	bool flush_on_fsync;
-> @@ -990,6 +992,26 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
->  	if (list_empty(&chan->pending_list))
->  		return;
->  
+
+[snip]
+
+> diff --git a/drivers/staging/media/imx/imx-csi.c b/drivers/staging/media/imx/imx-csi.c
+> new file mode 100644
+> index 0000000..975eafb
+> --- /dev/null
+> +++ b/drivers/staging/media/imx/imx-csi.c
+> @@ -0,0 +1,638 @@
+> +/*
+> + * V4L2 Capture CSI Subdev for Freescale i.MX5/6 SOC
+> + *
+> + * Copyright (c) 2014-2016 Mentor Graphics Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <media/v4l2-device.h>
+> +#include <media/v4l2-subdev.h>
+> +#include <media/videobuf2-dma-contig.h>
+> +#include <media/v4l2-of.h>
+> +#include <media/v4l2-ctrls.h>
+
+Please add the headers alphabetically ordered.
+
+> +#include <video/imx-ipu-v3.h>
+> +#include "imx-media.h"
+> +
+> +#define CSI_NUM_PADS 2
+> +
+> +struct csi_priv {
+> +	struct device *dev;
+> +	struct ipu_soc *ipu;
+> +	struct imx_media_dev *md;
+> +	struct v4l2_subdev sd;
+> +	struct media_pad pad[CSI_NUM_PADS];
+> +	struct v4l2_mbus_framefmt format_mbus[CSI_NUM_PADS];
+> +	struct v4l2_mbus_config sensor_mbus_cfg;
+> +	struct v4l2_rect crop;
+> +	struct ipu_csi *csi;
+> +	int csi_id;
+> +	int input_pad;
+> +	int output_pad;
+> +	bool power_on;  /* power is on */
+> +	bool stream_on; /* streaming is on */
+> +
+> +	/* the sink for the captured frames */
+> +	struct v4l2_subdev *sink_sd;
+> +	enum ipu_csi_dest dest;
+> +	struct v4l2_subdev *src_sd;
+> +
+> +	struct v4l2_ctrl_handler ctrl_hdlr;
+> +	struct imx_media_fim *fim;
+> +
+> +	/* the attached sensor at stream on */
+> +	struct imx_media_subdev *sensor;
+> +};
+> +
+> +static inline struct csi_priv *sd_to_dev(struct v4l2_subdev *sdev)
+> +{
+> +	return container_of(sdev, struct csi_priv, sd);
+> +}
+> +
+> +/* Update the CSI whole sensor and active windows */
+> +static int csi_setup(struct csi_priv *priv)
+> +{
+> +	struct v4l2_mbus_framefmt infmt;
+> +
+> +	ipu_csi_set_window(priv->csi, &priv->crop);
+> +
 > +	/*
-> +	 * Note: When VDMA is built with default h/w configuration
-> +	 * On the S2MM(recv) side user should submit frames upto
-> +	 * H/W configured. If users submits less than h/w configured
-> +	 * VDMA engine tries to write to a invalid location
-> +	 * Results undefined behaviour/memory corruption.
-> +	 *
-> +	 * If user would like to submit frames less than h/w capable
-> +	 * On S2MM side please enable debug info 13 at the h/w level
-> +	 * It will allows the frame buffers numbers to be modified at runtime.
+> +	 * the ipu-csi doesn't understand ALTERNATE, but it only
+> +	 * needs to know whether the stream is interlaced, so set
+> +	 * to INTERLACED if infmt field is ALTERNATE.
 > +	 */
-> +	if (!chan->has_fstoreconfig && chan->direction == DMA_DEV_TO_MEM &&
-> +	    chan->desc_pendingcount < chan->num_frms) {
-> +		dev_dbg(chan->dev, "Frame Store Configuration is not enabled at the");
-> +		dev_dbg(chan->dev, " H/w level enable Debug info 13 at the h/w level");
-> +		dev_dbg(chan->dev, " OR Submit the frames upto h/w Capable\n\r");
+> +	infmt = priv->format_mbus[priv->input_pad];
+> +	if (infmt.field == V4L2_FIELD_ALTERNATE)
+> +		infmt.field = V4L2_FIELD_INTERLACED;
 > +
-> +		return;
+> +	ipu_csi_init_interface(priv->csi, &priv->sensor_mbus_cfg, &infmt);
+> +
+> +	ipu_csi_set_dest(priv->csi, priv->dest);
+> +
+> +	ipu_csi_dump(priv->csi);
+> +
+> +	return 0;
+> +}
+> +
+> +static int csi_start(struct csi_priv *priv)
+> +{
+> +	int ret;
+> +
+> +	if (!priv->sensor) {
+> +		v4l2_err(&priv->sd, "no sensor attached\n");
+> +		return -EINVAL;
 > +	}
+> +
+> +	ret = csi_setup(priv);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* start the frame interval monitor */
+> +	ret = imx_media_fim_set_stream(priv->fim, priv->sensor, true);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = ipu_csi_enable(priv->csi);
+> +	if (ret) {
+> +		v4l2_err(&priv->sd, "CSI enable error: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	return 0;
 
-Hmm, may dev_warn would be more suitable because with dev_dbg and
-no dynamic debug enabled user will not know what happened. Also,
-I am aware that in direction DMA_MEM_TO_DEV there will be no
-corruption in PC side but it will be corruption in VDMA side
-because it will read from invalid memory locations. Maybe drop
-the check for channel direction.
+if (ret)
+	v4l2_err(&priv->sd, "CSI enable error: %d\n", ret);
 
-I am also not fancy about dropping prints that are not grep'able
-(you do not break line in each print so a user searching for the
-whole string will not find it). Try to do a line break in each
-print or change the string to be smaller.
+return ret;
 
-Best regards,
-Jose Miguel Abreu
+> +}
+> +
+> +static void csi_stop(struct csi_priv *priv)
+> +{
+> +	/* stop the frame interval monitor */
+> +	imx_media_fim_set_stream(priv->fim, priv->sensor, false);
+> +
+> +	ipu_csi_disable(priv->csi);
+> +}
+> +
+> +static int csi_s_stream(struct v4l2_subdev *sd, int enable)
+> +{
+> +	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+> +	int ret = 0;
+> +
+> +	if (!priv->src_sd || !priv->sink_sd)
+> +		return -EPIPE;
+> +
+> +	v4l2_info(sd, "stream %s\n", enable ? "ON" : "OFF");
+> +
+> +	if (enable && !priv->stream_on)
+> +		ret = csi_start(priv);
+> +	else if (!enable && priv->stream_on)
+> +		csi_stop(priv);
+> +
+> +	if (!ret)
+> +		priv->stream_on = enable;
+> +	return ret;
+> +}
+> +
+> +static int csi_s_power(struct v4l2_subdev *sd, int on)
+> +{
+> +	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+> +	int ret = 0;
+> +
+> +	v4l2_info(sd, "power %s\n", on ? "ON" : "OFF");
+> +
+> +	if (on != priv->power_on)
+> +		ret = imx_media_fim_set_power(priv->fim, on);
+> +
+> +	if (!ret)
+> +		priv->power_on = on;
+> +	return ret;
+> +}
+> +
+> +static int csi_link_setup(struct media_entity *entity,
+> +			  const struct media_pad *local,
+> +			  const struct media_pad *remote, u32 flags)
+> +{
+> +	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(entity);
+> +	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+> +	struct v4l2_subdev *remote_sd;
+> +
+> +	dev_dbg(priv->dev, "link setup %s -> %s", remote->entity->name,
+> +		local->entity->name);
+> +
+> +	remote_sd = media_entity_to_v4l2_subdev(remote->entity);
+> +
+> +	if (local->flags & MEDIA_PAD_FL_SINK) {
+> +		if (flags & MEDIA_LNK_FL_ENABLED) {
+> +			if (priv->src_sd)
+> +				return -EBUSY;
+> +			priv->src_sd = remote_sd;
+> +		} else {
+> +			priv->src_sd = NULL;
+> +			return 0;
+
+You can remove the return above.
+
+> +		}
+> +
+> +		return 0;
+> +	}
+> +
+
+[snip]
 
 > +
->  	desc = list_first_entry(&chan->pending_list,
->  				struct xilinx_dma_tx_descriptor, node);
->  	tail_desc = list_last_entry(&chan->pending_list,
-> @@ -1052,25 +1074,38 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
->  	if (chan->has_sg) {
->  		dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
->  				tail_segment->phys);
-> +		list_splice_tail_init(&chan->pending_list, &chan->active_list);
-> +		chan->desc_pendingcount = 0;
->  	} else {
->  		struct xilinx_vdma_tx_segment *segment, *last = NULL;
-> -		int i = 0;
-> +		int i = 0, j = 0;
->  
->  		if (chan->desc_submitcount < chan->num_frms)
->  			i = chan->desc_submitcount;
->  
-> -		list_for_each_entry(segment, &desc->segments, node) {
-> -			if (chan->ext_addr)
-> -				vdma_desc_write_64(chan,
-> -					XILINX_VDMA_REG_START_ADDRESS_64(i++),
-> -					segment->hw.buf_addr,
-> -					segment->hw.buf_addr_msb);
-> -			else
-> -				vdma_desc_write(chan,
-> -					XILINX_VDMA_REG_START_ADDRESS(i++),
-> -					segment->hw.buf_addr);
-> -
-> -			last = segment;
-> +		for (j = 0; j < chan->num_frms; ) {
-> +			list_for_each_entry(segment, &desc->segments, node) {
-> +				if (chan->ext_addr)
-> +					vdma_desc_write_64(chan,
-> +					  XILINX_VDMA_REG_START_ADDRESS_64(i++),
-> +					  segment->hw.buf_addr,
-> +					  segment->hw.buf_addr_msb);
-> +				else
-> +					vdma_desc_write(chan,
-> +					    XILINX_VDMA_REG_START_ADDRESS(i++),
-> +					    segment->hw.buf_addr);
+> +static int imx_csi_probe(struct platform_device *pdev)
+> +{
+> +	struct ipu_client_platformdata *pdata;
+> +	struct csi_priv *priv;
+> +	int ret;
 > +
-> +				last = segment;
-> +			}
-> +			list_del(&desc->node);
-> +			list_add_tail(&desc->node, &chan->active_list);
-> +			j++;
-> +			if (list_empty(&chan->pending_list) ||
-> +			    (i == chan->num_frms))
-> +				break;
-> +			desc = list_first_entry(&chan->pending_list,
-> +						struct xilinx_dma_tx_descriptor,
-> +						node);
->  		}
->  
->  		if (!last)
-> @@ -1081,20 +1116,14 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
->  		vdma_desc_write(chan, XILINX_DMA_REG_FRMDLY_STRIDE,
->  				last->hw.stride);
->  		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last->hw.vsize);
-> -	}
->  
-> -	chan->idle = false;
-> -	if (!chan->has_sg) {
-> -		list_del(&desc->node);
-> -		list_add_tail(&desc->node, &chan->active_list);
-> -		chan->desc_submitcount++;
-> -		chan->desc_pendingcount--;
-> +		chan->desc_submitcount += j;
-> +		chan->desc_pendingcount -= j;
->  		if (chan->desc_submitcount == chan->num_frms)
->  			chan->desc_submitcount = 0;
-> -	} else {
-> -		list_splice_tail_init(&chan->pending_list, &chan->active_list);
-> -		chan->desc_pendingcount = 0;
->  	}
+> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
 > +
-> +	chan->idle = false;
->  }
->  
->  /**
-> @@ -1342,6 +1371,7 @@ static int xilinx_dma_reset(struct xilinx_dma_chan *chan)
->  
->  	chan->err = false;
->  	chan->idle = true;
-> +	chan->desc_submitcount = 0;
->  
->  	return err;
->  }
-> @@ -2315,6 +2345,8 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
->  	has_dre = of_property_read_bool(node, "xlnx,include-dre");
->  
->  	chan->genlock = of_property_read_bool(node, "xlnx,genlock-mode");
-> +	chan->has_fstoreconfig = of_property_read_bool(node,
-> +						       "xlnx,fstore-config");
->  
->  	err = of_property_read_u32(node, "xlnx,datawidth", &value);
->  	if (err) {
+> +	platform_set_drvdata(pdev, &priv->sd);
+> +	priv->dev = &pdev->dev;
+> +
+> +	/* get parent IPU */
+> +	priv->ipu = dev_get_drvdata(priv->dev->parent);
+> +
+> +	/* get our CSI id */
+> +	pdata = priv->dev->platform_data;
+> +	priv->csi_id = pdata->csi;
+> +
+> +	v4l2_subdev_init(&priv->sd, &csi_subdev_ops);
+> +	v4l2_set_subdevdata(&priv->sd, priv);
+> +	priv->sd.internal_ops = &csi_internal_ops;
+> +	priv->sd.entity.ops = &csi_entity_ops;
+> +	/* FIXME: this the right function? */
+> +	priv->sd.entity.function = MEDIA_ENT_F_PROC_VIDEO_PIXEL_FORMATTER;
+> +	priv->sd.grp_id = priv->csi_id ?
+> +		IMX_MEDIA_GRP_ID_CSI1 : IMX_MEDIA_GRP_ID_CSI0;
+> +	priv->sd.dev = &pdev->dev;
+> +	priv->sd.owner = THIS_MODULE;
+> +	priv->sd.flags = V4L2_SUBDEV_FL_HAS_DEVNODE | V4L2_SUBDEV_FL_HAS_EVENTS;
+> +	imx_media_grp_id_to_sd_name(priv->sd.name, sizeof(priv->sd.name),
+> +				    priv->sd.grp_id, ipu_get_num(priv->ipu));
+> +
+> +	v4l2_ctrl_handler_init(&priv->ctrl_hdlr, 0);
+> +	priv->sd.ctrl_handler = &priv->ctrl_hdlr;
+> +
+> +	ret = v4l2_async_register_subdev(&priv->sd);
+> +	if (ret)
+> +		goto free_ctrls;
+> +
+> +	return 0;
+> +free_ctrls:
+> +	v4l2_ctrl_handler_free(&priv->ctrl_hdlr);
+> +	return ret;
+
+This is a functionally equal and simplified version:
+
+if (ret)
+	v4l2_ctrl_handler_free(&priv->ctrl_hdlr);
+
+return ret;
+
+> +}
+> +
+> +static int imx_csi_remove(struct platform_device *pdev)
+> +{
+> +	struct v4l2_subdev *sd = platform_get_drvdata(pdev);
+> +	struct csi_priv *priv = sd_to_dev(sd);
+> +
+> +	imx_media_fim_free(priv->fim);
+> +	v4l2_async_unregister_subdev(&priv->sd);
+> +	media_entity_cleanup(&priv->sd.entity);
+> +	v4l2_device_unregister_subdev(sd);
+> +
+> +	if (!IS_ERR_OR_NULL(priv->csi))
+> +		ipu_csi_put(priv->csi);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct platform_device_id imx_csi_ids[] = {
+> +	{ .name = "imx-ipuv3-csi" },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(platform, imx_csi_ids);
+> +
+> +static struct platform_driver imx_csi_driver = {
+> +	.probe = imx_csi_probe,
+> +	.remove = imx_csi_remove,
+> +	.id_table = imx_csi_ids,
+> +	.driver = {
+> +		.name = "imx-ipuv3-csi",
+> +		.owner = THIS_MODULE,
+
+Please drop .owner.
+
+> +	},
+> +};
+> +module_platform_driver(imx_csi_driver);
+> +
+> +MODULE_DESCRIPTION("i.MX CSI subdev driver");
+> +MODULE_AUTHOR("Steve Longerbeam <steve_longerbeam@mentor.com>");
+> +MODULE_LICENSE("GPL");
+> +MODULE_ALIAS("platform:imx-ipuv3-csi");
+> 
+
+--
+With best wishes,
+Vladimir
