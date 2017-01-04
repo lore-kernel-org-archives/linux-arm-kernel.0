@@ -1,99 +1,30 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed,  4 Jan 2017 13:28:38 -0800
-Subject: [PATCH 4/4] watchdog: tangox: Use watchdog core to install restart
- handler
-In-Reply-To: <1483565318-25578-1-git-send-email-linux@roeck-us.net>
-References: <1483565318-25578-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1483565318-25578-4-git-send-email-linux@roeck-us.net>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Wed, 4 Jan 2017 17:19:59 +0300
+Subject: [RFC, PATCHv2 29/29] mm, x86: introduce RLIMIT_VADDR
+In-Reply-To: <CALCETrW3=SsQeC-gWOVqwTtg022+gHei=xfUc2ei3kkX0CACpg@mail.gmail.com>
+References: <20161227015413.187403-1-kirill.shutemov@linux.intel.com>
+ <20161227015413.187403-30-kirill.shutemov@linux.intel.com>
+ <2736959.3MfCab47fD@wuerfel>
+ <CALCETrV_qejd-Ozqo4vTqz=LuukMUPeQ7EVUQbfTxs_xNbO3oQ@mail.gmail.com>
+ <20170103160457.GB17319@node.shutemov.name>
+ <CALCETrW3=SsQeC-gWOVqwTtg022+gHei=xfUc2ei3kkX0CACpg@mail.gmail.com>
+Message-ID: <20170104141959.GC17319@node.shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the infrastructure provided by the watchdog core to install
-the restart handler.
+On Tue, Jan 03, 2017 at 10:27:22AM -0800, Andy Lutomirski wrote:
+> On Tue, Jan 3, 2017 at 8:04 AM, Kirill A. Shutemov <kirill@shutemov.name> wrote:
+> > And what about stack? I'm not sure that everybody would be happy with
+> > stack in the middle of address space.
+> 
+> I would, personally.  I think that, for very large address spaces, we
+> should allocate a large block of stack and get rid of the "stack grows
+> down forever" legacy idea.  Then we would never need to worry about
+> the stack eventually hitting some other allocation.  And 2^57 bytes is
+> hilariously large for a default stack.
 
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
- drivers/watchdog/tangox_wdt.c | 32 +++++++++++---------------------
- 1 file changed, 11 insertions(+), 21 deletions(-)
+The stack in the middle of address space can prevent creating other huuuge
+contiguous mapping. Databases may want this.
 
-diff --git a/drivers/watchdog/tangox_wdt.c b/drivers/watchdog/tangox_wdt.c
-index 202c4b9cc921..49e6e805db7c 100644
---- a/drivers/watchdog/tangox_wdt.c
-+++ b/drivers/watchdog/tangox_wdt.c
-@@ -15,9 +15,7 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/moduleparam.h>
--#include <linux/notifier.h>
- #include <linux/platform_device.h>
--#include <linux/reboot.h>
- #include <linux/watchdog.h>
- 
- #define DEFAULT_TIMEOUT 30
-@@ -47,7 +45,6 @@ struct tangox_wdt_device {
- 	void __iomem *base;
- 	unsigned long clk_rate;
- 	struct clk *clk;
--	struct notifier_block restart;
- };
- 
- static int tangox_wdt_set_timeout(struct watchdog_device *wdt,
-@@ -96,24 +93,24 @@ static const struct watchdog_info tangox_wdt_info = {
- 	.identity = "tangox watchdog",
- };
- 
-+static int tangox_wdt_restart(struct watchdog_device *wdt,
-+			      unsigned long action, void *data)
-+{
-+	struct tangox_wdt_device *dev = watchdog_get_drvdata(wdt);
-+
-+	writel(1, dev->base + WD_COUNTER);
-+
-+	return 0;
-+}
-+
- static const struct watchdog_ops tangox_wdt_ops = {
- 	.start		= tangox_wdt_start,
- 	.stop		= tangox_wdt_stop,
- 	.set_timeout	= tangox_wdt_set_timeout,
- 	.get_timeleft	= tangox_wdt_get_timeleft,
-+	.restart	= tangox_wdt_restart,
- };
- 
--static int tangox_wdt_restart(struct notifier_block *nb, unsigned long action,
--			      void *data)
--{
--	struct tangox_wdt_device *dev =
--		container_of(nb, struct tangox_wdt_device, restart);
--
--	writel(1, dev->base + WD_COUNTER);
--
--	return NOTIFY_DONE;
--}
--
- static int tangox_wdt_probe(struct platform_device *pdev)
- {
- 	struct tangox_wdt_device *dev;
-@@ -180,12 +177,6 @@ static int tangox_wdt_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, dev);
- 
--	dev->restart.notifier_call = tangox_wdt_restart;
--	dev->restart.priority = 128;
--	err = register_restart_handler(&dev->restart);
--	if (err)
--		dev_warn(&pdev->dev, "failed to register restart handler\n");
--
- 	dev_info(&pdev->dev, "SMP86xx/SMP87xx watchdog registered\n");
- 
- 	return 0;
-@@ -202,7 +193,6 @@ static int tangox_wdt_remove(struct platform_device *pdev)
- 	tangox_wdt_stop(&dev->wdt);
- 	clk_disable_unprepare(dev->clk);
- 
--	unregister_restart_handler(&dev->restart);
- 	watchdog_unregister_device(&dev->wdt);
- 
- 	return 0;
 -- 
-2.7.4
+ Kirill A. Shutemov
