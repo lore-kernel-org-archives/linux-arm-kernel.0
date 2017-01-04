@@ -1,21 +1,68 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  4 Jan 2017 10:30:44 +0100
-Subject: [PATCH 0/2] ARM: dts: oxnas: Update with dt-bindings
-Message-ID: <20170104093046.12428-1-narmstrong@baylibre.com>
+Date: Wed,  4 Jan 2017 10:30:45 +0100
+Subject: [PATCH 1/2] ARM: dts: OX810: Update with dt-bindings includes
+In-Reply-To: <20170104093046.12428-1-narmstrong@baylibre.com>
+References: <20170104093046.12428-1-narmstrong@baylibre.com>
+Message-ID: <20170104093046.12428-2-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchsets updates the OX810SE and OX820 dtsi with the reset and
-clock dt-bindings includes then replaces magic values with bindings
-defines.
+Add OX810SE dt-bindings includes files for clocks and resets, replace
+resets numbers by human readable defines.
 
-Neil Armstrong (2):
-  ARM: dts: OX810: Update with dt-bindings includes
-  ARM: dts: OX820: Update with dt-bindings includes
-
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
  arch/arm/boot/dts/ox810se.dtsi | 10 ++++++----
- arch/arm/boot/dts/ox820.dtsi   | 14 ++++++++------
- 2 files changed, 14 insertions(+), 10 deletions(-)
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/boot/dts/ox810se.dtsi b/arch/arm/boot/dts/ox810se.dtsi
+index ce13705..46aa6db 100644
+--- a/arch/arm/boot/dts/ox810se.dtsi
++++ b/arch/arm/boot/dts/ox810se.dtsi
+@@ -7,6 +7,8 @@
+  */
+ 
+ /include/ "skeleton.dtsi"
++#include <dt-bindings/clock/oxsemi,ox810se.h>
++#include <dt-bindings/reset/oxsemi,ox810se.h>
+ 
+ / {
+ 	compatible = "oxsemi,ox810se";
+@@ -242,7 +244,7 @@
+ 			       current-speed = <115200>;
+ 			       no-loopback-test;
+ 			       status = "disabled";
+-			       resets = <&reset 17>;
++			       resets = <&reset RESET_UART1>;
+ 			};
+ 
+ 			uart1: serial at 300000 {
+@@ -256,7 +258,7 @@
+ 			       current-speed = <115200>;
+ 			       no-loopback-test;
+ 			       status = "disabled";
+-			       resets = <&reset 18>;
++			       resets = <&reset RESET_UART2>;
+ 			};
+ 
+ 			uart2: serial at 900000 {
+@@ -270,7 +272,7 @@
+ 			       current-speed = <115200>;
+ 			       no-loopback-test;
+ 			       status = "disabled";
+-			       resets = <&reset 22>;
++			       resets = <&reset RESET_UART3>;
+ 			};
+ 
+ 			uart3: serial at a00000 {
+@@ -284,7 +286,7 @@
+ 			       current-speed = <115200>;
+ 			       no-loopback-test;
+ 			       status = "disabled";
+-			       resets = <&reset 23>;
++			       resets = <&reset RESET_UART4>;
+ 			};
+ 		};
+ 
 -- 
 2.7.0
