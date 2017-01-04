@@ -1,50 +1,101 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed,  4 Jan 2017 13:35:00 +0000
-Subject: [PATCH 4/6] arm64: dts: apq8016-sbc: Limit MPP4 high state to 1.8V
-In-Reply-To: <1483536902-21450-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1483536902-21450-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1483536902-21450-5-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Wed,  4 Jan 2017 13:34:11 +0000
+Subject: [PATCH 1/4] ARM: dts: move hdmi pinctrl out of board file.
+Message-ID: <1483536854-21389-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Ivan T. Ivanov" <ivan.ivanov@linaro.org>
+This patch moves hdmi pinctrl defination from board file to soc level
+pinctrl file. If not this pinctrl setup will be duplicated across all
+the apq8064 based board files.
 
-96Boards specs require all GPIO signals to be at 1.8V.
-Limit MPP4, which is PIN28 on J8, to 1.8V(L5).
-
-Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 22 ----------------------
+ arch/arm/boot/dts/qcom-apq8064-pins.dtsi   | 19 +++++++++++++++++++
+ arch/arm/boot/dts/qcom-apq8064.dtsi        |  2 ++
+ 3 files changed, 21 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-index f881437..d946408 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-@@ -1,4 +1,5 @@
- #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
-+#include <dt-bindings/pinctrl/qcom,pmic-mpp.h>
+diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+index 3d37cab..881ce70 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+@@ -75,25 +75,6 @@
+ 					bias-disable;
+ 				};
+ 			};
+-
+-			hdmi_pinctrl: hdmi-pinctrl {
+-				mux {
+-					pins = "gpio70", "gpio71", "gpio72";
+-					function = "hdmi";
+-				};
+-
+-				pinconf_ddc {
+-					pins = "gpio70", "gpio71";
+-					bias-pull-up;
+-					drive-strength = <2>;
+-				};
+-
+-				pinconf_hpd {
+-					pins = "gpio72";
+-					bias-pull-down;
+-					drive-strength = <16>;
+-				};
+-			};
+ 		};
  
- &pm8916_gpios {
+ 		rpm at 108000 {
+@@ -368,9 +349,6 @@
  
-@@ -30,6 +31,18 @@
+ 			hpd-gpios = <&tlmm_pinmux 72 GPIO_ACTIVE_HIGH>;
  
- &pm8916_mpps {
- 
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ls_exp_gpio_f>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&hdmi_pinctrl>;
+-
+ 			ports {
+ 				port at 0 {
+ 					endpoint {
+diff --git a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
+index 6b801e7..cba4450 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
+@@ -284,4 +284,23 @@
+ 			bias-disable = <0>;
+ 		};
+ 	};
 +
-+	ls_exp_gpio_f: pm8916_mpp4 {
-+		pinconf {
-+			pins = "mpp4";
-+			function = "digital";
-+			output-low;
-+			power-source = <PM8916_MPP_L5>;	// 1.8V
++	hdmi_pinctrl: hdmi-pinctrl {
++		mux {
++			pins = "gpio70", "gpio71", "gpio72";
++			function = "hdmi";
++		};
++
++		pinconf_ddc {
++			pins = "gpio70", "gpio71";
++			bias-pull-up;
++			drive-strength = <2>;
++		};
++
++		pinconf_hpd {
++			pins = "gpio72";
++			bias-pull-down;
++			drive-strength = <16>;
 +		};
 +	};
-+
- 	pm8916_mpps_leds: pm8916_mpps_leds {
- 		pinconf {
- 			pins = "mpp2", "mpp3";
+ };
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index 407a461..e68a8a1 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -1327,6 +1327,8 @@
+ 
+ 		hdmi: hdmi-tx at 4a00000 {
+ 			compatible = "qcom,hdmi-tx-8960";
++			pinctrl-names = "default";
++			pinctrl-0 = <&hdmi_pinctrl>;
+ 			reg = <0x04a00000 0x2f0>;
+ 			reg-names = "core_physical";
+ 			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
 -- 
 2.10.1
