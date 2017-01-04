@@ -1,61 +1,39 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Wed, 4 Jan 2017 06:57:05 +0000
-Subject: [PATCH v2 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
- stores scenario in vdma
-In-Reply-To: <a8f5c216-cac0-daf9-a880-3820ae9b5e13@synopsys.com>
-References: <1482483135-14767-1-git-send-email-appanad@xilinx.com>
- <1482483135-14767-3-git-send-email-appanad@xilinx.com>
- <a269409d-103e-1650-5df6-cc8743ed62cf@synopsys.com>
- <C246CAC1457055469EF09E3A7AC4E11A4A65FFE9@XAP-PVEXMBX01.xlnx.xilinx.com>
- <45807619-bf6a-0174-c102-12c03aeb575c@synopsys.com>
- <C246CAC1457055469EF09E3A7AC4E11A4A66012C@XAP-PVEXMBX01.xlnx.xilinx.com>
- <a8f5c216-cac0-daf9-a880-3820ae9b5e13@synopsys.com>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A660647@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 4 Jan 2017 15:02:13 +0800
+Subject: [PATCH v6 06/14] irqchip: gicv3-its: platform-msi: refactor
+ its_pmsi_init() to prepare for ACPI
+In-Reply-To: <8cdc4bfa-18a3-b9f6-aaba-0efe1f75fb40@semihalf.com>
+References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
+ <1483363905-2806-7-git-send-email-hanjun.guo@linaro.org>
+ <8cdc4bfa-18a3-b9f6-aaba-0efe1f75fb40@semihalf.com>
+Message-ID: <601cbdf2-823d-8bde-bbd9-fcc6a1c67f2c@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jose Miguel Abreu,
+Hi Tomasz,
 
-	Thanks for the review...
+On 2017/1/3 15:41, Tomasz Nowicki wrote:
+> Hi,
+>
+> Can we merge patch 4 & 6 into one patch so that we keep refactoring part
+> as one piece ? I do not see a reason to keep them separate or have patch
+> 5 in between. You can refactor what needs to be refactored, add
+> necessary functions to iort.c and then support ACPI for
+> irq-gic-v3-its-platform-msi.c
 
-> >> If so then there is no race condition, but the HW image that I have
-> >> does not have this register enabled so I was getting this result
-> >> (memory corruption because not all framebuffers had addresses set).
-> > Thanks for the explanation.
-> > Agree the issue that you mentioned won't come when
-> > XILINX_DMA_REG_FRMSTORE
-> > (C_ENABLE_DEBUG_INFO_5 and C_ENABLE_DEBUG_INFO_13) Register is
-> enabled in the IP.
-> > But this register won't get enabled with the default IP configuration
-> (C_ENABLE_DEBUG_INFO_5 and C_ENABLE_DEBUG_INFO_13).
-> >
-> > When user is not enabled XILINX_DMA_REG_FRMSTORE in the h/w and
-> submits frames less than h/w capable.
-> > The solution that I am thinking is to throw an error in the driver
-> > saying that either enable the num frame store feature in the IP or submit the
-> frames up to h/w capable what do you think???
-> 
-> Sounds fine by me.
+There are two functions here,
+  - retrieve the dev id from IORT which was DT based only;
 
-Thanks posted the v3 series please review when you have some time...
+  - init the platform msi domain from MADT;
 
-Regards,
-Kedar.
+For each of them split it into two steps,
+  - refactor the code for ACPI later and it's easy for review
+    because wen can easily to figure out it has functional
+    change or not
 
-> 
-> Best regards,
-> Jose Miguel Abreu
-> 
-> >
-> > Regards,
-> > Kedar.
-> >
-> >> Best regards,
-> >> Jose Miguel Abreu
-> >>
-> >>> Regards,
-> >>> Kedar.
-> >>>
-> >>>> Best regards,
-> >>>> Jose Miguel Abreu
-> >>>>
+  - add ACPI functionality
+
+Does it make sense?
+
+Thanks
+Hanjun
