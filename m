@@ -1,34 +1,52 @@
-From: manish.narani@xilinx.com (Manish Narani)
-Date: Wed, 4 Jan 2017 18:52:56 +0530
-Subject: [RFC PATCH] usb: dwc3: add support for OTG driver compilation
-In-Reply-To: <1483536181-22356-1-git-send-email-mnarani@xilinx.com>
-References: <1483536181-22356-1-git-send-email-mnarani@xilinx.com>
-Message-ID: <1483536181-22356-2-git-send-email-mnarani@xilinx.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 4 Jan 2017 10:23:45 +0000
+Subject: [RFC PATCH 01/10] arm64: cpufeature: allow for version
+ discrepancy in PMU implementations
+In-Reply-To: <1483467027-14547-2-git-send-email-will.deacon@arm.com>
+References: <1483467027-14547-1-git-send-email-will.deacon@arm.com>
+ <1483467027-14547-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20170104102345.GB8329@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for OTG driver compilation and object
-file creation
+On Tue, Jan 03, 2017 at 06:10:18PM +0000, Will Deacon wrote:
+> Perf already supports multiple PMU instances for heterogeneous systems,
+> so there's no need to be strict in the cpufeature checking, particularly
+> as the PMU extension is optional in the architecture.
+> 
+> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Signed-off-by: Manish Narani <mnarani@xilinx.com>
----
- drivers/usb/dwc3/Makefile | 4 ++++
- 1 file changed, 4 insertions(+)
+There are remaining issues with PMU support exposed to KVM guests in
+hetereogeneous systems, but I think that's a larger issue with KVM and
+heterogeneous CPUs (and we're already aware of it), so FWIW:
 
-diff --git a/drivers/usb/dwc3/Makefile b/drivers/usb/dwc3/Makefile
-index ffca340..2d269ad 100644
---- a/drivers/usb/dwc3/Makefile
-+++ b/drivers/usb/dwc3/Makefile
-@@ -17,6 +17,10 @@ ifneq ($(filter y,$(CONFIG_USB_DWC3_GADGET) $(CONFIG_USB_DWC3_DUAL_ROLE)),)
- 	dwc3-y				+= gadget.o ep0.o
- endif
- 
-+ifneq ($(CONFIG_USB_DWC3_DUAL_ROLE),)
-+	dwc3-y				+= otg.o
-+endif
-+
- ifneq ($(CONFIG_USB_DWC3_ULPI),)
- 	dwc3-y				+= ulpi.o
- endif
--- 
-2.1.1
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+> ---
+>  arch/arm64/kernel/cpufeature.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index fdf8f045929f..47d0226620e8 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -184,7 +184,11 @@ static const struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
+>  	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
+> -	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
+> +	/*
+> +	 * We can instantiate multiple PMU instances with different levels
+> +	 * of support.
+> +	 * */
+> +	S_ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
+>  	ARM64_FTR_END,
+> -- 
+> 2.1.4
+> 
