@@ -1,37 +1,38 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 4 Jan 2017 14:55:36 -0600
-Subject: [PATCH v3 4/4] ARM: keystone: Drop PM domain support for k2g
-In-Reply-To: <20170104205536.15963-1-d-gerlach@ti.com>
-References: <20170104205536.15963-1-d-gerlach@ti.com>
-Message-ID: <20170104205536.15963-5-d-gerlach@ti.com>
+From: david@lechnology.com (David Lechner)
+Date: Wed,  4 Jan 2017 14:30:10 -0600
+Subject: [PATCH v2 0/4] TI DA8xx/OMAPL13x/AM17xx/AM18xx/C66x UART
+Message-ID: <1483561814-21953-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-K2G will use a different power domain driver than the rest of the
-keystone family in order to make use of the TI SCI protocol so prevent
-the standard keystone pm_domain code from registering itself in
-preparation for a new driver.
+This series adds a new UART port type for TI DA8xx/OMAPL13x/AM17xx/AM18xx/C66x
+UART. This SoCs have a non-standard register for UART power management that
+needs special handling in the UART driver.
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- arch/arm/mach-keystone/pm_domain.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+v2 changes:
+* Added references to C66x SoC in various places, which I assume is an OK
+  shorthand for TI Keystone processors.
+* New patch for Keystone device tree. This is untested as I don't have any
+  Keystone boards.
 
-diff --git a/arch/arm/mach-keystone/pm_domain.c b/arch/arm/mach-keystone/pm_domain.c
-index 8cbb35765a19..fe57e2692629 100644
---- a/arch/arm/mach-keystone/pm_domain.c
-+++ b/arch/arm/mach-keystone/pm_domain.c
-@@ -32,7 +32,9 @@ static struct pm_clk_notifier_block platform_domain_notifier = {
- };
- 
- static const struct of_device_id of_keystone_table[] = {
--	{.compatible = "ti,keystone"},
-+	{.compatible = "ti,k2hk"},
-+	{.compatible = "ti,k2e"},
-+	{.compatible = "ti,k2l"},
- 	{ /* end of list */ },
- };
- 
+
+David Lechner (4):
+  doc: DT: Add ti,da830-uart to serial/8250 bindings
+  serial: 8250: Add new port type for TI
+    DA8xx/OMAPL13x/AM17xx/AM18xx/C66x
+  ARM: da850: Add ti,da830-uart compatible for serial ports
+  ARM: dts: keystone: Add "ti,da830-uart" compatible string
+
+ Documentation/devicetree/bindings/serial/8250.txt |  1 +
+ arch/arm/boot/dts/da850.dtsi                      |  9 ++++++---
+ arch/arm/boot/dts/keystone-k2g.dtsi               |  2 +-
+ arch/arm/boot/dts/keystone-k2l.dtsi               |  4 ++--
+ arch/arm/boot/dts/keystone.dtsi                   |  4 ++--
+ drivers/tty/serial/8250/8250_of.c                 |  1 +
+ drivers/tty/serial/8250/8250_port.c               | 22 ++++++++++++++++++++++
+ include/uapi/linux/serial_core.h                  |  3 ++-
+ include/uapi/linux/serial_reg.h                   |  8 ++++++++
+ 9 files changed, 45 insertions(+), 9 deletions(-)
+
 -- 
-2.11.0
+2.7.4
