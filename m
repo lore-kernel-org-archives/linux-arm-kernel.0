@@ -1,71 +1,87 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 4 Jan 2017 09:36:39 -0800
-Subject: [PATCH v5 2/4] ARM: Define KERNEL_START and KERNEL_END
-In-Reply-To: <SN1PR0101MB15656D0B421E37BC4813F560D0610@SN1PR0101MB1565.prod.exchangelabs.com>
-References: <edc8eaa2-5414-506c-1dad-f2404ef19c81@gmail.com>
- <20170104011417.1496-1-f.fainelli@gmail.com>
- <20170104011417.1496-3-f.fainelli@gmail.com>
- <SN1PR0101MB15656D0B421E37BC4813F560D0610@SN1PR0101MB1565.prod.exchangelabs.com>
-Message-ID: <764f7a9d-243b-617d-3bb6-30b4e5bf4025@gmail.com>
+From: lilja.magnus@gmail.com (Magnus Lilja)
+Date: Wed, 4 Jan 2017 18:32:55 +0100
+Subject: [PATCH v2] mfd: mc13xxx: Set the irq type.
+In-Reply-To: <20170104110959.GZ27589@dell>
+References: <1483112613-18092-1-git-send-email-lilja.magnus@gmail.com>
+ <20170104110959.GZ27589@dell>
+Message-ID: <CAM=E1R59oKhT3b8=nJ3Utg4cPi0Z6oiLkj8DU7grg6T+2CoMAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2017 07:58 AM, Hartley Sweeten wrote:
-> On Tuesday, January 03, 2017 6:14 PM, Florian Fainelli wrote:
+Hi,
+
+On 4 January 2017 at 12:09, Lee Jones <lee.jones@linaro.org> wrote:
+> On Fri, 30 Dec 2016, Magnus Lilja wrote:
+>
+>> Commit 10f9edaeaa30 ("mfd: mc13xxx: Use regmap irq framework for
+>> interrupts") removed the passing of the IRQF_TRIGGER_HIGH flag when
+>> registering the interrupt.
+>> This commit fixes that problem by setting the IRQF_TRIGGER_HIGH flag in
+>> case no irq type is set via irqd framework (e.g. device tree). In the
+>> latter case the irq flag from irqd is used.
+>
+> This looks like a hack.
+>
+> Why can't you set the trigger type in Device Tree instead?
+
+The i.MX31 PDK board has not, like many (all?) i.MX31 boards, not been
+converted to use device tree yet. I think there is work in progress in
+this area. However, as the IRQF_TRIGGER problem also affects several
+stable kernel series (since 3.18.x) I thought it was worthwhile to fix
+this.
+
+Regards, Magnus
+
+>> Tested on i.MX31 PDK hardware.
 >>
->> In preparation for adding CONFIG_DEBUG_VIRTUAL support, define a set of
->> common constants: KERNEL_START and KERNEL_END which abstract
->> CONFIG_XIP_KERNEL vs. !CONFIG_XIP_KERNEL. Update the code where
->> relevant.
->>
->> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>> Fixes: 10f9edaeaa30 ("mfd: mc13xxx: Use regmap irq framework for interrupts")
+>> Cc: <stable@vger.kernel.org> # 3.18.x
+>> Cc: Lee Jones <lee.jones@linaro.org>
+>> Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
 >> ---
->>  arch/arm/include/asm/memory.h | 7 +++++++
->>  arch/arm/mm/init.c            | 7 ++-----
->>  arch/arm/mm/mmu.c             | 6 +-----
->>  3 files changed, 10 insertions(+), 10 deletions(-)
+>> Changes from v1 (which was part of a patch series):
+>>   - Now uses irqd_-functions to check if irq type is defined
+>>   - Added Fixes: and Cc: to stable kernel.
 >>
->> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
->> index 76cbd9c674df..bee7511c5098 100644
->> --- a/arch/arm/include/asm/memory.h
->> +++ b/arch/arm/include/asm/memory.h
->> @@ -111,6 +111,13 @@
->>  
->>  #endif /* !CONFIG_MMU */
->>  
->> +#ifdef CONFIG_XIP_KERNEL
->> +#define KERNEL_START		_sdata
->> +#else
->> +#define KERNEL_START		_stext
->> +#endif
->> +#define KERNEL_END		_end
+>>  drivers/mfd/mc13xxx-core.c | 8 +++++++-
+>>  1 file changed, 7 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
+>> index d7f54e4..e1757ea 100644
+>> --- a/drivers/mfd/mc13xxx-core.c
+>> +++ b/drivers/mfd/mc13xxx-core.c
+>> @@ -15,6 +15,7 @@
+>>  #include <linux/of_device.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/mfd/core.h>
+>> +#include <linux/irq.h>
+>>
+>>  #include "mc13xxx.h"
+>>
+>> @@ -410,6 +411,7 @@ int mc13xxx_common_init(struct device *dev)
+>>       struct mc13xxx *mc13xxx = dev_get_drvdata(dev);
+>>       u32 revision;
+>>       int i, ret;
+>> +     unsigned int flags;
+>>
+>>       mc13xxx->dev = dev;
+>>
+>> @@ -440,7 +442,11 @@ int mc13xxx_common_init(struct device *dev)
+>>       mc13xxx->irq_chip.irqs = mc13xxx->irqs;
+>>       mc13xxx->irq_chip.num_irqs = ARRAY_SIZE(mc13xxx->irqs);
+>>
+>> -     ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq, IRQF_ONESHOT,
+>> +     flags = irqd_get_trigger_type(irq_get_irq_data(mc13xxx->irq));
+>> +     flags = (flags == IRQ_TYPE_NONE) ? IRQF_TRIGGER_HIGH : flags;
 >> +
->>  /*
->>   * We fix the TCM memories max 32 KiB ITCM resp DTCM at these
->>   * locations
->> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
->> index 370581aeb871..c87d0d5b65f2 100644
->> --- a/arch/arm/mm/init.c
->> +++ b/arch/arm/mm/init.c
->> @@ -230,11 +230,8 @@ phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
->>  void __init arm_memblock_init(const struct machine_desc *mdesc)
->>  {
->>  	/* Register the kernel text, kernel data and initrd with memblock. */
->> -#ifdef CONFIG_XIP_KERNEL
->> -	memblock_reserve(__pa(_sdata), _end - _sdata);
->> -#else
->> -	memblock_reserve(__pa(_stext), _end - _stext);
->> -#endif
->> +	memblock_reserve(__pa(KERNEL_START), _end - KERNEL_START);
-> 
-> Shouldn't the '_end' above be 'KERNEL_END'?
-
-I sort of intentionally not changed that line in order not to make the
-line exceed 80 columns and make checkpatch whine about it, but if you
-think this is clearer, I can add this change, since I need to respin to
-address Laura's feedback anyway.
-
-Thanks!
--- 
-Florian
+>> +     ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq,
+>> +                               IRQF_ONESHOT | flags,
+>>                                 0, &mc13xxx->irq_chip, &mc13xxx->irq_data);
+>>       if (ret)
+>>               return ret;
+>
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
