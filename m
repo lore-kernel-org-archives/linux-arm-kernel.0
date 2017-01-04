@@ -1,36 +1,24 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Jan 2017 15:16:14 +0000
-Subject: [PATCH] arm64: mm: fix show_pte KERN_CONT fallout
-In-Reply-To: <1483453646-13617-1-git-send-email-mark.rutland@arm.com>
-References: <1483453646-13617-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170104151614.GJ18193@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Jan 2017 16:14:00 +0100
+Subject: [GIT PULL] ARM: exynos: Late mach/soc for v4.10
+In-Reply-To: <1482003132-8844-1-git-send-email-krzk@kernel.org>
+References: <1482003132-8844-1-git-send-email-krzk@kernel.org>
+Message-ID: <2234017.fClA8kpiX3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 02:27:26PM +0000, Mark Rutland wrote:
-> Recent changes made KERN_CONT mandatory for continued lines. In the
-> absence of KERN_CONT, a newline may be implicit inserted by the core
-> printk code.
+On Saturday, December 17, 2016 9:32:12 PM CET Krzysztof Kozlowski wrote:
+> After our discussions about not-breaking out-of-tree DTB with SCU
+> change in DeviceTree, I prepared an updated pull request without
+> the questioned changes.
 > 
-> In show_pte, we (erroneously) use printk without KERN_CONT for continued
-> prints, resulting in output being split across a number of lines, and
-> not matching the intended output, e.g.
+> Ten days ago I prepared a tag, pushed it... and apparently forgot to send pull
+> request. At least, I don't have such email in my outbox. Dunno.
 > 
-> [ff000000000000] *pgd=00000009f511b003
-> , *pud=00000009f4a80003
-> , *pmd=0000000000000000
-> 
-> Fix this by using pr_cont() for all the continuations.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/mm/fault.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+> So let's send it now, better late then never. With just few commits (without
+> the DT SCU changes). These were sitting in the next for very long.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Sorry for the delay. The patches in here are all straightforward, so
+I'm applying them for fixes now.
 
-Catalin can pick this one up for 4.10.
-
-Will
+	Arnd
