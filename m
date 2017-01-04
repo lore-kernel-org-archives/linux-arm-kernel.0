@@ -1,29 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 3 Jan 2017 16:41:48 -0800
-Subject: [PATCH 2/4] ARM: dts: Add am335x-boneblack-wireless
-In-Reply-To: <CA+T6QPnTS-XyV0G9X78hAh=D79TkZkU+evN2RA6VF3f_jyBtkA@mail.gmail.com>
-References: <20161227175837.28970-1-robertcnelson@gmail.com>
- <20161227175837.28970-2-robertcnelson@gmail.com>
- <CB5C8999-6CAE-41F6-85A6-D2A856BD8011@gmail.com>
- <20170103201103.GB25222@atomide.com>
- <2D5ABB5A-E332-4D77-89EA-9DBF9A2FECFB@gmail.com>
- <20170103204343.GC25222@atomide.com>
- <CA+T6QPnTS-XyV0G9X78hAh=D79TkZkU+evN2RA6VF3f_jyBtkA@mail.gmail.com>
-Message-ID: <20170104004147.GD25222@atomide.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 3 Jan 2017 20:12:42 -0500 (EST)
+Subject: [PATCH 1/2] arm: Cleanup sanity_check_meminfo
+In-Reply-To: <1483477010-18986-2-git-send-email-labbott@redhat.com>
+References: <1483477010-18986-1-git-send-email-labbott@redhat.com>
+ <1483477010-18986-2-git-send-email-labbott@redhat.com>
+Message-ID: <alpine.LFD.2.20.1701031958100.21662@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jason Kridner <jkridner@gmail.com> [170103 12:58]:
-> Asked-by: Jason Kridner <jdk@ti.com>
+On Tue, 3 Jan 2017, Laura Abbott wrote:
+
 > 
-> Sorry for the phone mailer (HTML).
+> The logic for sanity_check_meminfo has become difficult to
+> follow. Clean up the code so it's more obvious what the code
+> is actually trying to do.
 
-OK fixed that to Acked-by :) Applied into omap-for-v4.11/dt and pushed
-out.
+Absolutely. This function has a long history of subtle bugs ... and 
+broken fixes.
 
-BBB Green Wireless seems to work nicely for WLAN out of the box with
-these patches :)
+> +		if (reg->base < vmalloc_limit) {
+> +			if (block_end > arm_lowmem_limit)
+> +				arm_lowmem_limit = min(
+> +						(phys_addr_t)vmalloc_limit,
+> +						block_end);
 
-Regards,
+Just to illustrate how subtle this can be, the above would reintroduce a 
+bug that was fixed in commit b9a019899f.
 
-Tony
+
+Nicolas
