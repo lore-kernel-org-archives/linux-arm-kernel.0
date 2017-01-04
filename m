@@ -1,41 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Jan 2017 11:23:35 +0000
-Subject: [PATCH v4 1/5] mfd: dt: Fix "indicates" typo in mfd bindings
- document
-In-Reply-To: <20161220071535.27542-2-andrew@aj.id.au>
-References: <20161220071535.27542-1-andrew@aj.id.au>
- <20161220071535.27542-2-andrew@aj.id.au>
-Message-ID: <20170104112335.GB27589@dell>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Wed,  4 Jan 2017 13:32:25 +0000
+Subject: [PATCH v5 16/17] vfio/type1: Check MSI remapping at irq domain level
+In-Reply-To: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
+References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1483536746-2725-17-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Dec 2016, Andrew Jeffery wrote:
+In case the IOMMU does not bypass MSI transactions (typical
+case on ARM), we check all MSI controllers are IRQ remapping
+capable. If not the IRQ assignment may be unsafe.
 
-> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
->  Documentation/devicetree/bindings/mfd/mfd.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+At this stage the arm-smmu-(v3) still advertise the
+IOMMU_CAP_INTR_REMAP capability at IOMMU level. This will be
+removed in subsequent patches.
 
-Applied, thanks.
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+---
+ drivers/vfio/vfio_iommu_type1.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-> diff --git a/Documentation/devicetree/bindings/mfd/mfd.txt b/Documentation/devicetree/bindings/mfd/mfd.txt
-> index af9d6931a1a2..f1fceeda12f1 100644
-> --- a/Documentation/devicetree/bindings/mfd/mfd.txt
-> +++ b/Documentation/devicetree/bindings/mfd/mfd.txt
-> @@ -19,7 +19,7 @@ Optional properties:
->  
->  - compatible : "simple-mfd" - this signifies that the operating system should
->    consider all subnodes of the MFD device as separate devices akin to how
-> -  "simple-bus" inidicates when to see subnodes as children for a simple
-> +  "simple-bus" indicates when to see subnodes as children for a simple
->    memory-mapped bus. For more complex devices, when the nexus driver has to
->    probe registers to figure out what child devices exist etc, this should not
->    be used. In the latter case the child devices will be determined by the
-
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index b473ef80..efcf7c3 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -40,6 +40,7 @@
+ #include <linux/mdev.h>
+ #include <linux/notifier.h>
+ #include <linux/dma-iommu.h>
++#include <linux/irqdomain.h>
+ 
+ #define DRIVER_VERSION  "0.2"
+ #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+@@ -1285,7 +1286,8 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 	list_add(&group->next, &domain->group_list);
+ 
+ 	if (!allow_unsafe_interrupts &&
+-	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
++	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP) &&
++	    (resv_msi && !irq_domain_check_msi_remap())) {
+ 		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
+ 		       __func__);
+ 		ret = -EPERM;
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
