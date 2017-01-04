@@ -1,51 +1,42 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Wed, 4 Jan 2017 17:00:50 +0000
-Subject: [PATCH v4 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
- stores scenario in vdma
-In-Reply-To: <20170104152613.hhdptwsyg73ev3dz@rob-hp-laptop>
-References: <1483536954-27203-1-git-send-email-appanad@xilinx.com>
- <1483536954-27203-3-git-send-email-appanad@xilinx.com>
- <20170104152613.hhdptwsyg73ev3dz@rob-hp-laptop>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A660958@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 04 Jan 2017 17:31:05 +0100
+Subject: [PATCH 0/5] ARM: dts: armada388: rework clearfog's .dtsi
+ references
+In-Reply-To: <E1cO4UH-0008SR-GW@rmk-PC.armlinux.org.uk> (Russell King's
+ message of "Mon, 02 Jan 2017 15:25:25 +0000")
+References: <E1cO454-00083C-Tj@rmk-PC.armlinux.org.uk>
+ <E1cO4UH-0008SR-GW@rmk-PC.armlinux.org.uk>
+Message-ID: <87wpeaeqie.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Russell,
+ 
+ On lun., janv. 02 2017, Russell King <rmk+kernel@armlinux.org.uk> wrote:
 
-	Thanks for the review....
+> This patch series, based upon the previous series adding Clearfog Base
+> support, reworks the clearfog .dtsi file to reference nodes by label
+> rather than by path.
+>
+> Not everything is moved - just those which had labels at the time the
+> patches were created.
 
-> On Wed, Jan 04, 2017 at 07:05:53PM +0530, Kedareswara rao Appana wrote:
-> > When VDMA is configured for more than one frame in the h/w for example
-> > h/w is configured for n number of frames and user Submits n number of
-> > frames and triggered the DMA using issue_pending API.
-> > In the current driver flow we are submitting one frame at a time but
-> > we should submit all the n number of frames at one time as the h/w Is
-> > configured for n number of frames.
-> 
-> Please fix run-on sentences, capitalization, and word wrapping.
+All the series is applied on mvebu/dt, however I would like to have a
+commit log for the first patch before pushing it to arm-soc.
 
-Sure will fix in the next version....
+Thanks,
 
-[Snip]
--- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> > +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> > @@ -66,6 +66,8 @@ Optional child node properties:
-> >  Optional child node properties for VDMA:
-> >  - xlnx,genlock-mode: Tells Genlock synchronization is
-> >  	enabled/disabled in hardware.
-> > +- xlnx,fstore-config: Tells Whether Frame Store Configuration is
-> > +	enabled/disabled in hardware.
-> 
-> What's the default (when not present)? That should be the most common case.
-> Looks like the code treats this as bool, but that's not clear here. The name is not
-> clear what it is doing. Enabling or disabling the feature?
+Gregory
 
-Default value is zero...
-When this property is present it tells hardware is configured for frame store configuration.
 
-Will fix the explanation part in the next version like below.
- xlnx,fstore-config: Tells hardware is configured for frame store configuration.
-Is the above explanation clear???
+>
+>  arch/arm/boot/dts/armada-388-clearfog-base.dts     |  15 +
+>  arch/arm/boot/dts/armada-388-clearfog.dtsi         | 353 ++++++++++-----------
+>  .../arm/boot/dts/armada-38x-solidrun-microsom.dtsi | 113 ++++---
+>  3 files changed, 245 insertions(+), 236 deletions(-)
 
-Regards,
-Kedar.
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
