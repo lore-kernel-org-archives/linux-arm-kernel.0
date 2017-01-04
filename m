@@ -1,67 +1,71 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 4 Jan 2017 18:19:11 +0800
-Subject: [PATCH v6 06/14] irqchip: gicv3-its: platform-msi: refactor
- its_pmsi_init() to prepare for ACPI
-In-Reply-To: <e08b5583-bb82-4676-2370-1147d79416ac@arm.com>
-References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
- <1483363905-2806-7-git-send-email-hanjun.guo@linaro.org>
- <8cdc4bfa-18a3-b9f6-aaba-0efe1f75fb40@semihalf.com>
- <601cbdf2-823d-8bde-bbd9-fcc6a1c67f2c@linaro.org>
- <b51b7be9-f8ee-57f9-6d53-6e8bd73dd431@semihalf.com>
- <254387f0-1f63-4c83-ef90-570ef072cddf@linaro.org>
- <e08b5583-bb82-4676-2370-1147d79416ac@arm.com>
-Message-ID: <6a16a21d-f8c0-a836-22b9-e18a4f13c38e@linaro.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 4 Jan 2017 09:36:39 -0800
+Subject: [PATCH v5 2/4] ARM: Define KERNEL_START and KERNEL_END
+In-Reply-To: <SN1PR0101MB15656D0B421E37BC4813F560D0610@SN1PR0101MB1565.prod.exchangelabs.com>
+References: <edc8eaa2-5414-506c-1dad-f2404ef19c81@gmail.com>
+ <20170104011417.1496-1-f.fainelli@gmail.com>
+ <20170104011417.1496-3-f.fainelli@gmail.com>
+ <SN1PR0101MB15656D0B421E37BC4813F560D0610@SN1PR0101MB1565.prod.exchangelabs.com>
+Message-ID: <764f7a9d-243b-617d-3bb6-30b4e5bf4025@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/1/4 17:02, Marc Zyngier wrote:
-> On 04/01/17 08:25, Hanjun Guo wrote:
->> On 2017/1/4 15:29, Tomasz Nowicki wrote:
->>> On 04.01.2017 08:02, Hanjun Guo wrote:
->>>> Hi Tomasz,
->>>>
->>>> On 2017/1/3 15:41, Tomasz Nowicki wrote:
->>>>> Hi,
->>>>>
->>>>> Can we merge patch 4 & 6 into one patch so that we keep refactoring part
->>>>> as one piece ? I do not see a reason to keep them separate or have patch
->>>>> 5 in between. You can refactor what needs to be refactored, add
->>>>> necessary functions to iort.c and then support ACPI for
->>>>> irq-gic-v3-its-platform-msi.c
->>>>
->>>> There are two functions here,
->>>>  - retrieve the dev id from IORT which was DT based only;
->>>>
->>>>  - init the platform msi domain from MADT;
->>>>
->>>> For each of them split it into two steps,
->>>>  - refactor the code for ACPI later and it's easy for review
->>>>    because wen can easily to figure out it has functional
->>>>    change or not
->>>>
->>>>  - add ACPI functionality
->>>>
->>>> Does it make sense?
->>>
->>> It is up to Marc, but personally I prefer:
->>> 1. Refactor dev id retrieving and init function in one patch and
->>> highlight no functional changes in changelog
->>> 2. Crate necessary infrastructure in iort.c
->>> 3. Then add ACPI support to irq-gic-v3-its-platform-msi.c
+On 01/04/2017 07:58 AM, Hartley Sweeten wrote:
+> On Tuesday, January 03, 2017 6:14 PM, Florian Fainelli wrote:
 >>
->> I have no strong preferences, and it's easy to do so as just
->> need to squash/reorder the patches.
+>> In preparation for adding CONFIG_DEBUG_VIRTUAL support, define a set of
+>> common constants: KERNEL_START and KERNEL_END which abstract
+>> CONFIG_XIP_KERNEL vs. !CONFIG_XIP_KERNEL. Update the code where
+>> relevant.
 >>
->> Marc, Lorenzo, could you give some suggestions here?
->
-> I think it'd make the reviewing easier to have patches that are
-> semantically grouped together (all the ACPI IORT together, for example).
->
-> It would help understanding where you're aiming at instead of jumping
-> from irqchip to ACPI and back every other patch...
+>> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>> ---
+>>  arch/arm/include/asm/memory.h | 7 +++++++
+>>  arch/arm/mm/init.c            | 7 ++-----
+>>  arch/arm/mm/mmu.c             | 6 +-----
+>>  3 files changed, 10 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+>> index 76cbd9c674df..bee7511c5098 100644
+>> --- a/arch/arm/include/asm/memory.h
+>> +++ b/arch/arm/include/asm/memory.h
+>> @@ -111,6 +111,13 @@
+>>  
+>>  #endif /* !CONFIG_MMU */
+>>  
+>> +#ifdef CONFIG_XIP_KERNEL
+>> +#define KERNEL_START		_sdata
+>> +#else
+>> +#define KERNEL_START		_stext
+>> +#endif
+>> +#define KERNEL_END		_end
+>> +
+>>  /*
+>>   * We fix the TCM memories max 32 KiB ITCM resp DTCM at these
+>>   * locations
+>> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+>> index 370581aeb871..c87d0d5b65f2 100644
+>> --- a/arch/arm/mm/init.c
+>> +++ b/arch/arm/mm/init.c
+>> @@ -230,11 +230,8 @@ phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
+>>  void __init arm_memblock_init(const struct machine_desc *mdesc)
+>>  {
+>>  	/* Register the kernel text, kernel data and initrd with memblock. */
+>> -#ifdef CONFIG_XIP_KERNEL
+>> -	memblock_reserve(__pa(_sdata), _end - _sdata);
+>> -#else
+>> -	memblock_reserve(__pa(_stext), _end - _stext);
+>> -#endif
+>> +	memblock_reserve(__pa(KERNEL_START), _end - KERNEL_START);
+> 
+> Shouldn't the '_end' above be 'KERNEL_END'?
 
-OK, I will reorder the patches and address the comments, then post
-a new version.
+I sort of intentionally not changed that line in order not to make the
+line exceed 80 columns and make checkpatch whine about it, but if you
+think this is clearer, I can add this change, since I need to respin to
+address Laura's feedback anyway.
 
-Thanks
-Hanjun
+Thanks!
+-- 
+Florian
