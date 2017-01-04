@@ -1,44 +1,53 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 4 Jan 2017 17:43:54 +0530
-Subject: [GIT PULL] DaVinci fixes for v4.10
-Message-ID: <20170104121354.8467-1-nsekhar@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Jan 2017 12:16:41 +0000
+Subject: [PATCH 1/2] mm: don't dereference struct page fields of invalid
+ pages
+In-Reply-To: <1481706707-6211-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1481706707-6211-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1481706707-6211-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170104121641.GC18193@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
+On Wed, Dec 14, 2016 at 09:11:46AM +0000, Ard Biesheuvel wrote:
+> The VM_BUG_ON() check in move_freepages() checks whether the node
+> id of a page matches the node id of its zone. However, it does this
+> before having checked whether the struct page pointer refers to a
+> valid struct page to begin with. This is guaranteed in most cases,
+> but may not be the case if CONFIG_HOLES_IN_ZONE=y.
+> 
+> So reorder the VM_BUG_ON() with the pfn_valid_within() check.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  mm/page_alloc.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> index f64e7bcb43b7..4e298e31fa86 100644
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -1864,14 +1864,14 @@ int move_freepages(struct zone *zone,
+>  #endif
+>  
+>  	for (page = start_page; page <= end_page;) {
+> -		/* Make sure we are not inadvertently changing nodes */
+> -		VM_BUG_ON_PAGE(page_to_nid(page) != zone_to_nid(zone), page);
+> -
+>  		if (!pfn_valid_within(page_to_pfn(page))) {
+>  			page++;
+>  			continue;
+>  		}
+>  
+> +		/* Make sure we are not inadvertently changing nodes */
+> +		VM_BUG_ON_PAGE(page_to_nid(page) != zone_to_nid(zone), page);
+> +
+>  		if (!PageBuddy(page)) {
+>  			page++;
+>  			continue;
 
-  Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-are available in the git repository at:
+I'm guessing akpm can pick this up as a non-urgent fix.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.10
-
-for you to fetch changes up to d1df1e01af1d7c91e48204b9eb8b9f20cdb90700:
-
-  ARM: davinci: da8xx: Fix sleeping function called from invalid context (2017-01-02 16:15:07 +0530)
-
-----------------------------------------------------------------
-This pull request contains fixes for the following issues
-
-1) Fix two instances of infinite loop occurring in
-   clock list for DA850. This fixes kernel hangs in some
-   instances and so have been marked for stable kernel.
-
-2) Fix for sleeping function called from atomic context
-   with USB 2.0 clock management code introduced in v4.10
-   merge window.
-
-----------------------------------------------------------------
-Alexandre Bailon (2):
-      ARM: davinci: Make __clk_{enable,disable} functions public
-      ARM: davinci: da8xx: Fix sleeping function called from invalid context
-
-Bartosz Golaszewski (2):
-      ARM: davinci: da850: fix infinite loop in clk_set_rate()
-      ARM: davinci: da850: don't add emac clock to lookup table twice
-
- arch/arm/mach-davinci/clock.c     | 12 ++++++------
- arch/arm/mach-davinci/clock.h     |  2 ++
- arch/arm/mach-davinci/da850.c     | 32 ++++++++++++++++++++++++++++++--
- arch/arm/mach-davinci/usb-da8xx.c | 34 +++++++++++++++-------------------
- 4 files changed, 53 insertions(+), 27 deletions(-)
+Will
