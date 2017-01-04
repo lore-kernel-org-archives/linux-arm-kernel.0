@@ -1,90 +1,51 @@
-From: manish.narani@xilinx.com (Manish Narani)
-Date: Wed, 4 Jan 2017 18:53:01 +0530
-Subject: [RFC PATCH] usb: host: xhci: plat: add support for otg_set_host() call
-In-Reply-To: <1483536181-22356-1-git-send-email-mnarani@xilinx.com>
-References: <1483536181-22356-1-git-send-email-mnarani@xilinx.com>
-Message-ID: <1483536181-22356-7-git-send-email-mnarani@xilinx.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Jan 2017 13:06:28 +0000
+Subject: [PATCH] rtc: armada38x: add __ro_after_init to armada38x_rtc_ops
+In-Reply-To: <alpine.DEB.2.20.1701041320140.3073@hadrien>
+References: <1482751862-18699-1-git-send-email-bhumirks@gmail.com>
+ <20170102140654.GF14217@n2100.armlinux.org.uk>
+ <CAGXu5jJLA=GcOhV5Z_6AOGa1KhW7fXtqBGrewEeViaJ9TiE-aw@mail.gmail.com>
+ <20170103213118.GM14217@n2100.armlinux.org.uk>
+ <20170103215421.GN14217@n2100.armlinux.org.uk>
+ <alpine.DEB.2.20.1701041155380.3073@hadrien>
+ <20170104110750.dtu54t74qkuuvkvq@piout.net>
+ <alpine.DEB.2.20.1701041242080.3073@hadrien>
+ <20170104121425.GP14217@n2100.armlinux.org.uk>
+ <alpine.DEB.2.20.1701041320140.3073@hadrien>
+Message-ID: <20170104130628.GQ14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch will add support for OTG host initialization. This will
-help OTG drivers to populate their host subsystem.
+On Wed, Jan 04, 2017 at 01:23:41PM +0100, Julia Lawall wrote:
+> Basically, the strategy of the patch is that one may consider it
+> preferable to duplicate the structure for the different alternatives,
+> rather than use __ro_after_init.  Perhaps if the structure were larger,
+> then __ro_after_init would be a better choice?
 
-Signed-off-by: Manish Narani <mnarani@xilinx.com>
----
- drivers/usb/host/xhci-plat.c | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+It depends on not just the size, but how many members need to be
+modified, and obviously whether there are likely to be more than one
+user of the structure as well.
 
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index ddfab30..aa08bdd 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -19,6 +19,7 @@
- #include <linux/usb/phy.h>
- #include <linux/slab.h>
- #include <linux/acpi.h>
-+#include <linux/usb/otg.h>
- 
- #include "xhci.h"
- #include "xhci-plat.h"
-@@ -144,6 +145,37 @@ static const struct of_device_id usb_xhci_of_match[] = {
- MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
- #endif
- 
-+static int usb_otg_set_host(struct device *dev, struct usb_hcd *hcd, bool yes)
-+{
-+	int ret = 0;
-+
-+	hcd->usb_phy = usb_get_phy(USB_PHY_TYPE_USB3);
-+	if (!IS_ERR_OR_NULL(hcd->usb_phy) && hcd->usb_phy->otg) {
-+		dev_dbg(dev, "%s otg support available\n", __func__);
-+		if (yes) {
-+			if (otg_set_host(hcd->usb_phy->otg, &hcd->self)) {
-+				dev_err(dev, "%s otg_set_host failed\n",
-+						__func__);
-+				usb_put_phy(hcd->usb_phy);
-+				goto disable_phy;
-+			}
-+		} else {
-+			ret = otg_set_host(hcd->usb_phy->otg, NULL);
-+			usb_put_phy(hcd->usb_phy);
-+			goto disable_phy;
-+		}
-+
-+	} else
-+		goto disable_phy;
-+
-+	return 0;
-+
-+disable_phy:
-+	hcd->usb_phy = NULL;
-+
-+	return ret;
-+}
-+
- static int xhci_plat_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *match;
-@@ -255,6 +287,11 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto dealloc_usb2_hcd;
- 
-+	ret = usb_otg_set_host(&pdev->dev, hcd, 1);
-+	if (ret)
-+		goto dealloc_usb2_hcd;
-+
-+
- 	return 0;
- 
- 
-@@ -283,6 +320,8 @@ static int xhci_plat_remove(struct platform_device *dev)
- 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
- 	struct clk *clk = xhci->clk;
- 
-+	usb_otg_set_host(&dev->dev, hcd, 0);
-+
- 	usb_remove_hcd(xhci->shared_hcd);
- 	usb_phy_shutdown(hcd->usb_phy);
- 
+So I'd say __ro_after_init rarely makes sense for an operations
+structure - the only case I can see is:
+
+- a large structure
+- only a small number of elements need to be modified
+- it is only single-use
+
+which is probably quite rare - this one falls into two out of those
+three.
+
+There's another consideration (imho) too - we may wish, at a later
+date, to make .text and .rodata both read-only from the start of the
+kernel to harden the kernel against possibly init-time exploitation.
+(Think about a buggy built-in driver with emulated hardware - much the
+same problem that Kees is trying to address in one of his recent patch
+sets but with hotplugged hardware while a screen-saver is active.)
+Having function pointers in .rodata rather than the ro-after-init
+section would provide better protection.
+
 -- 
-2.1.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
