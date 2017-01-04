@@ -1,32 +1,28 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  4 Jan 2017 10:55:52 +0100
-Subject: [PATCH 2/2] drm/meson: Fix CVBS VDAC disable
-In-Reply-To: <1483523752-14705-1-git-send-email-narmstrong@baylibre.com>
-References: <1483523752-14705-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1483523752-14705-3-git-send-email-narmstrong@baylibre.com>
+Date: Wed, 4 Jan 2017 10:57:13 +0100
+Subject: [PATCH] drm/meson: Fix plane atomic check when no crtc for the
+ plane
+In-Reply-To: <20170104091020.rvikywzzfsqxxp5t@phenom.ffwll.local>
+References: <1483435254-27955-1-git-send-email-narmstrong@baylibre.com>
+ <20170104091020.rvikywzzfsqxxp5t@phenom.ffwll.local>
+Message-ID: <21996aca-9bcb-fe88-390b-79c28189b27d@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit fixes the VDAC disabling register write values.
+On 01/04/2017 10:10 AM, Daniel Vetter wrote:
+> On Tue, Jan 03, 2017 at 10:20:54AM +0100, Neil Armstrong wrote:
+>> When no CRTC is associated with the plane, the meson_plane_atomic_check()
+>> call breaks the kernel with an Oops.
+>>
+>> Fixes: bbbe775ec5b5 ("drm: Add support for Amlogic Meson Graphic Controller")
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> 
+> Makes sense, pls send a pull request with this to Dave.
+> -Daniel
 
-Fixes: bbbe775ec5b5 ("drm: Add support for Amlogic Meson Graphic Controller")
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/gpu/drm/meson/meson_venc_cvbs.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Hi Daniel,
 
-diff --git a/drivers/gpu/drm/meson/meson_venc_cvbs.c b/drivers/gpu/drm/meson/meson_venc_cvbs.c
-index c809c08..a2bcc70 100644
---- a/drivers/gpu/drm/meson/meson_venc_cvbs.c
-+++ b/drivers/gpu/drm/meson/meson_venc_cvbs.c
-@@ -167,7 +167,7 @@ static void meson_venc_cvbs_encoder_disable(struct drm_encoder *encoder)
- 
- 	/* Disable CVBS VDAC */
- 	regmap_write(priv->hhi, HHI_VDAC_CNTL0, 0);
--	regmap_write(priv->hhi, HHI_VDAC_CNTL1, 0);
-+	regmap_write(priv->hhi, HHI_VDAC_CNTL1, 8);
- }
- 
- static void meson_venc_cvbs_encoder_enable(struct drm_encoder *encoder)
--- 
-1.9.1
+OK, I will push this one with the CVBS fixes I just pushed.
+
+Thanks,
+Neil
