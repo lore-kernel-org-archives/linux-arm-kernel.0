@@ -1,53 +1,24 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Jan 2017 12:16:41 +0000
-Subject: [PATCH 1/2] mm: don't dereference struct page fields of invalid
- pages
-In-Reply-To: <1481706707-6211-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1481706707-6211-1-git-send-email-ard.biesheuvel@linaro.org>
- <1481706707-6211-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170104121641.GC18193@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 4 Jan 2017 11:33:22 +0100
+Subject: [PATCH v2 2/5] arm64: Work around Falkor erratum 1003
+In-Reply-To: <20161229224335.13531-2-cov@codeaurora.org>
+References: <20161229224335.13531-1-cov@codeaurora.org>
+ <20161229224335.13531-2-cov@codeaurora.org>
+Message-ID: <20170104103322.GA20461@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2016 at 09:11:46AM +0000, Ard Biesheuvel wrote:
-> The VM_BUG_ON() check in move_freepages() checks whether the node
-> id of a page matches the node id of its zone. However, it does this
-> before having checked whether the struct page pointer refers to a
-> valid struct page to begin with. This is guaranteed in most cases,
-> but may not be the case if CONFIG_HOLES_IN_ZONE=y.
+On Thu, Dec 29, 2016 at 05:43:32PM -0500, Christopher Covington wrote:
+> From: Shanker Donthineni <shankerd@codeaurora.org>
 > 
-> So reorder the VM_BUG_ON() with the pfn_valid_within() check.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  mm/page_alloc.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-> index f64e7bcb43b7..4e298e31fa86 100644
-> --- a/mm/page_alloc.c
-> +++ b/mm/page_alloc.c
-> @@ -1864,14 +1864,14 @@ int move_freepages(struct zone *zone,
->  #endif
->  
->  	for (page = start_page; page <= end_page;) {
-> -		/* Make sure we are not inadvertently changing nodes */
-> -		VM_BUG_ON_PAGE(page_to_nid(page) != zone_to_nid(zone), page);
-> -
->  		if (!pfn_valid_within(page_to_pfn(page))) {
->  			page++;
->  			continue;
->  		}
->  
-> +		/* Make sure we are not inadvertently changing nodes */
-> +		VM_BUG_ON_PAGE(page_to_nid(page) != zone_to_nid(zone), page);
-> +
->  		if (!PageBuddy(page)) {
->  			page++;
->  			continue;
+> On the Qualcomm Datacenter Technologies Falkor v1 CPU, memory accesses may
+> allocate TLB entries using an incorrect ASID when TTBRx_EL1 is being
+> updated. Changing the TTBRx_EL1[ASID] and TTBRx_EL1[BADDR] fields
+> separately using a reserved ASID will ensure that there are no TLB entries
+> with incorrect ASID after changing the the ASID.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+When we restore guest state in KVM, we completely save and restore
+TTBRx_EL1 from EL2. Would that be affected by this erratum?
 
-I'm guessing akpm can pick this up as a non-urgent fix.
-
-Will
+Thanks,
+-Christoffer
