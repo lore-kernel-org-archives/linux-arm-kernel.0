@@ -1,50 +1,95 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 4 Jan 2017 14:34:42 +0000
-Subject: [PATCH v6 03/14] ACPI: ARM64: IORT: add missing comment for
- iort_dev_find_its_id()
-In-Reply-To: <1483363905-2806-4-git-send-email-hanjun.guo@linaro.org>
-References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
- <1483363905-2806-4-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20170104143442.GA8604@red-moon>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 4 Jan 2017 08:37:52 -0600
+Subject: [PATCH v3 2/2] dt-bindings: Add DT bindings info for FlexRM ring
+ manager
+In-Reply-To: <1483508082-7008-3-git-send-email-anup.patel@broadcom.com>
+References: <1483508082-7008-1-git-send-email-anup.patel@broadcom.com>
+ <1483508082-7008-3-git-send-email-anup.patel@broadcom.com>
+Message-ID: <20170104143752.bl47gdfczbnfy6b3@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2017 at 09:31:34PM +0800, Hanjun Guo wrote:
-> We are missing req_id's comment for iort_dev_find_its_id(),
-> add it back.
-
-"Add missing req_id parameter to the iort_dev_find_its_id() function
-kernel-doc comment."
-
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Majun <majun258@huawei.com>
-> Tested-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Tomasz Nowicki <tn@semihalf.com>
+On Wed, Jan 04, 2017 at 11:04:42AM +0530, Anup Patel wrote:
+> This patch adds device tree bindings document for the FlexRM
+> ring manager found on Broadcom iProc SoCs.
+> 
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
 > ---
->  drivers/acpi/arm64/iort.c | 1 +
->  1 file changed, 1 insertion(+)
+>  .../bindings/mailbox/brcm,iproc-flexrm-mbox.txt    | 60 ++++++++++++++++++++++
+>  1 file changed, 60 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
 > 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index 46e2d82..174e983 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -446,6 +446,7 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
->  /**
->   * iort_dev_find_its_id() - Find the ITS identifier for a device
->   * @dev: The device.
-> + * @req_id: Device's Requster ID
+> diff --git a/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
+> new file mode 100644
+> index 0000000..ca51a39
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
+> @@ -0,0 +1,60 @@
+> +Broadcom FlexRM Ring Manager
+> +============================
+> +The Broadcom FlexRM ring manager provides a set of rings which can be
+> +used to submit work to offload engines. An SoC may have multiple FlexRM
+> +hardware blocks. There is one device tree entry per FlexRM block. The
+> +FlexRM driver will create a mailbox-controller instance for given FlexRM
+> +hardware block where each mailbox channel is a separate FlexRM ring.
+> +
+> +Required properties:
+> +--------------------
+> +- compatible:	Should be "brcm,iproc-flexrm-mbox"
+> +- reg:		Specifies base physical address and size of the FlexRM
+> +		ring registers
+> +- msi-parent:	Phandles (and potential Device IDs) to MSI controllers
+> +		The FlexRM engine will send MSIs (instead of wired
+> +		interrupts) to CPU. There is one MSI for each FlexRM ring.
+> +		Refer devicetree/bindings/interrupt-controller/msi.txt
+> +- #mbox-cells:	Specifies the number of cells needed to encode a mailbox
+> +		channel. This should be 3.
+> +
+> +		The 1st cell is the mailbox channel number.
+> +
+> +		The 2nd cell contains MSI completion threshold. This is the
+> +		number of completion messages for which FlexRM will inject
+> +		one MSI interrupt to CPU.
+> +
+> +		The 3nd cell contains MSI timer value representing time for
+> +		which FlexRM will wait to accumulate N completion messages
+> +		where N is the value specified by 2nd cell above. If FlexRM
+> +		does not get required number of completion messages in time
+> +		specified by this cell then it will inject one MSI interrupt
+> +		to CPU provided atleast one completion message is available.
+> +
+> +Optional properties:
+> +--------------------
+> +- dma-coherent:	Present if DMA operations made by the FlexRM engine (such
+> +		as DMA descriptor access, access to buffers pointed by DMA
+> +		descriptors and read/write pointer updates to DDR) are
+> +		cache coherent with the CPU.
+> +
+> +Example:
+> +--------
+> +crypto_mbox: mbox at 67000000 {
+> +	compatible = "brcm,iproc-flexrm-mbox";
+> +	reg = <0x67000000 0x200000>;
+> +	msi-parent = <&gic_its 0x7f00>;
+> +	#mbox-cells = <3>;
+> +};
+> +
+> +crypto_client {
 
-s/Requster/Requester
+crypto@<addr>
 
-We can send it upstream independently along with some other patches
-in this series but I will have a look at the whole series first.
+> +	...
+> +	mboxes = <&crypto_mbox 0 0x1 0xffff>,
+> +		 <&crypto_mbox 1 0x1 0xffff>,
+> +		 <&crypto_mbox 16 0x1 0xffff>,
+> +		 <&crypto_mbox 17 0x1 0xffff>,
+> +		 <&crypto_mbox 30 0x1 0xffff>,
+> +		 <&crypto_mbox 31 0x1 0xffff>;
+> +	};
+> +	...
 
-Lorenzo
+Please somewhat fully list the contents for node.
 
->   * @idx: Index of the ITS identifier list.
->   * @its_id: ITS identifier.
->   *
-> -- 
-> 1.9.1
-> 
+Rob
