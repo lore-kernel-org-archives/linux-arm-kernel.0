@@ -1,187 +1,65 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 4 Jan 2017 15:27:02 +0000
-Subject: [PATCH v5 13/17] irqdomain: irq_domain_check_msi_remap
-In-Reply-To: <df8e7fdb-4048-3169-c758-c2a64119a321@redhat.com>
-References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
- <1483536746-2725-14-git-send-email-eric.auger@redhat.com>
- <ecb7ddf6-074f-50e4-6402-d59ceb1edd1d@arm.com>
- <df8e7fdb-4048-3169-c758-c2a64119a321@redhat.com>
-Message-ID: <c9c4c159-60ea-8501-5dc2-17bbb24ddfab@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 4 Jan 2017 09:26:13 -0600
+Subject: [PATCH v4 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
+ stores scenario in vdma
+In-Reply-To: <1483536954-27203-3-git-send-email-appanad@xilinx.com>
+References: <1483536954-27203-1-git-send-email-appanad@xilinx.com>
+ <1483536954-27203-3-git-send-email-appanad@xilinx.com>
+Message-ID: <20170104152613.hhdptwsyg73ev3dz@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/17 14:11, Auger Eric wrote:
-> Hi Marc,
+On Wed, Jan 04, 2017 at 07:05:53PM +0530, Kedareswara rao Appana wrote:
+> When VDMA is configured for more than one frame in the h/w
+> for example h/w is configured for n number of frames and user
+> Submits n number of frames and triggered the DMA using issue_pending API.
+> In the current driver flow we are submitting one frame at a time
+> but we should submit all the n number of frames at one time as the h/w
+> Is configured for n number of frames.
+
+Please fix run-on sentences, capitalization, and word wrapping.
+
 > 
-> On 04/01/2017 14:46, Marc Zyngier wrote:
->> Hi Eric,
->>
->> On 04/01/17 13:32, Eric Auger wrote:
->>> This new function checks whether all platform and PCI
->>> MSI domains implement IRQ remapping. This is useful to
->>> understand whether VFIO passthrough is safe with respect
->>> to interrupts.
->>>
->>> On ARM typically an MSI controller can sit downstream
->>> to the IOMMU without preventing VFIO passthrough.
->>> As such any assigned device can write into the MSI doorbell.
->>> In case the MSI controller implements IRQ remapping, assigned
->>> devices will not be able to trigger interrupts towards the
->>> host. On the contrary, the assignment must be emphasized as
->>> unsafe with respect to interrupts.
->>>
->>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>>
->>> ---
->>>
->>> v4 -> v5:
->>> - Handle DOMAIN_BUS_FSL_MC_MSI domains
->>> - Check parents
->>> ---
->>>  include/linux/irqdomain.h |  1 +
->>>  kernel/irq/irqdomain.c    | 41 +++++++++++++++++++++++++++++++++++++++++
->>>  2 files changed, 42 insertions(+)
->>>
->>> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
->>> index ab017b2..281a40f 100644
->>> --- a/include/linux/irqdomain.h
->>> +++ b/include/linux/irqdomain.h
->>> @@ -219,6 +219,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
->>>  					 void *host_data);
->>>  extern struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
->>>  						   enum irq_domain_bus_token bus_token);
->>> +extern bool irq_domain_check_msi_remap(void);
->>>  extern void irq_set_default_host(struct irq_domain *host);
->>>  extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
->>>  				  irq_hw_number_t hwirq, int node,
->>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
->>> index 8c0a0ae..700caea 100644
->>> --- a/kernel/irq/irqdomain.c
->>> +++ b/kernel/irq/irqdomain.c
->>> @@ -278,6 +278,47 @@ struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
->>>  EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
->>>  
->>>  /**
->>> + * irq_domain_is_msi_remap - Check if @domain or any parent
->>> + * has MSI remapping support
->>> + * @domain: domain pointer
->>> + */
->>> +static bool irq_domain_is_msi_remap(struct irq_domain *domain)
->>> +{
->>> +	struct irq_domain *h = domain;
->>> +
->>> +	for (; h; h = h->parent) {
->>> +		if (h->flags & IRQ_DOMAIN_FLAG_MSI_REMAP)
->>> +			return true;
->>> +	}
->>> +	return false;
->>> +}
->>> +
->>> +/**
->>> + * irq_domain_check_msi_remap() - Checks whether all MSI
->>> + * irq domains implement IRQ remapping
->>> + */
->>> +bool irq_domain_check_msi_remap(void)
->>> +{
->>> +	struct irq_domain *h;
->>> +	bool ret = true;
->>> +
->>> +	mutex_lock(&irq_domain_mutex);
->>> +	list_for_each_entry(h, &irq_domain_list, link) {
->>> +		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
->>> +		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI) ||
->>> +		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI)) &&
->>> +		     !irq_domain_is_msi_remap(h)) {
->>
->> (h->bus_token & DOMAIN_BUS_PCI_MSI) and co looks quite wrong. bus_token
->> is not a bitmap, and DOMAIN_BUS_* not a single bit value (see enum
->> irq_domain_bus_token). Surely this should read
->> (h->bus_token == DOMAIN_BUS_PCI_MSI).
-> Oh I did not notice that. Thanks.
+> This patch fixes this issue.
 > 
-> Any other comments on the irqdomain side? Do you think the current
-> approach consisting in looking at those bus tokens and their parents
-> looks good?
+> Reviewed-by: Jose Abreu <joabreu@synopsys.com>
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+> Changes for v4:
+> ---> Add Check for framestore configuration on Transmit case as well
+>      as suggested by Jose Abreu.
+> ---> Modified the dev_dbg checks to dev_warn checks as suggested
+>      by Jose Abreu. 
+> Changes for v3:
+> ---> Added Checks for frame store configuration. If frame store
+>      Configuration is not present at the h/w level and user
+>      Submits less frames added debug prints in the driver as relevant.
+> Changes for v2:
+> ---> Fixed race conditions in the driver as suggested by Jose Abreu
+> ---> Fixed unnecessray if else checks in the vdma_start_transfer
+>      as suggested by Laurent Pinchart.
+> 
+>  .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |  2 +
+>  drivers/dma/xilinx/xilinx_dma.c                    | 79 +++++++++++++++-------
+>  2 files changed, 58 insertions(+), 23 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> index a2b8bfa..1f65e09 100644
+> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> @@ -66,6 +66,8 @@ Optional child node properties:
+>  Optional child node properties for VDMA:
+>  - xlnx,genlock-mode: Tells Genlock synchronization is
+>  	enabled/disabled in hardware.
+> +- xlnx,fstore-config: Tells Whether Frame Store Configuration is
+> +	enabled/disabled in hardware.
 
-To be completely honest, I don't like it much, as having to enumerate
-all the bus types can come up with could become quite a burden in the
-long run. I'd rather be able to identify MSI capable domains by
-construction. I came up with the following approach (fully untested):
-
-diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index 281a40f..7779796 100644
---- a/include/linux/irqdomain.h
-+++ b/include/linux/irqdomain.h
-@@ -183,8 +183,11 @@ enum {
- 	/* Irq domain is an IPI domain with single virq */
- 	IRQ_DOMAIN_FLAG_IPI_SINGLE	= (1 << 3),
- 
-+	/* Irq domain implements MSIs */
-+	IRQ_DOMAIN_FLAG_MSI		= (1 << 4),
-+
- 	/* Irq domain is MSI remapping capable */
--	IRQ_DOMAIN_FLAG_MSI_REMAP	= (1 << 4),
-+	IRQ_DOMAIN_FLAG_MSI_REMAP	= (1 << 5),
- 
- 	/*
- 	 * Flags starting from IRQ_DOMAIN_FLAG_NONCORE are reserved
-@@ -450,6 +453,11 @@ static inline bool irq_domain_is_ipi_single(struct irq_domain *domain)
- {
- 	return domain->flags & IRQ_DOMAIN_FLAG_IPI_SINGLE;
- }
-+
-+static inline bool irq_domain_is_msi(struct irq_domain *domain)
-+{
-+	return domain->flags & IRQ_DOMAIN_FLAG_MSI;
-+}
- #else	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
- static inline void irq_domain_activate_irq(struct irq_data *data) { }
- static inline void irq_domain_deactivate_irq(struct irq_data *data) { }
-@@ -481,6 +489,11 @@ static inline bool irq_domain_is_ipi_single(struct irq_domain *domain)
- {
- 	return false;
- }
-+
-+static inline bool irq_domain_is_msi(struct irq_domain *domain)
-+{
-+	return false;
-+}
- #endif	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
- 
- #else /* CONFIG_IRQ_DOMAIN */
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 700caea..33b6921 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -304,10 +304,7 @@ bool irq_domain_check_msi_remap(void)
- 
- 	mutex_lock(&irq_domain_mutex);
- 	list_for_each_entry(h, &irq_domain_list, link) {
--		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
--		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI) ||
--		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI)) &&
--		     !irq_domain_is_msi_remap(h)) {
-+		if (irq_domain_is_msi(h) && !irq_domain_is_msi_remap(h)) {
- 			ret = false;
- 			goto out;
- 		}
-diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-index ee23006..b637263 100644
---- a/kernel/irq/msi.c
-+++ b/kernel/irq/msi.c
-@@ -270,7 +270,7 @@ struct irq_domain *msi_create_irq_domain(struct fwnode_handle *fwnode,
- 	if (info->flags & MSI_FLAG_USE_DEF_CHIP_OPS)
- 		msi_domain_update_chip_ops(info);
- 
--	return irq_domain_create_hierarchy(parent, 0, 0, fwnode,
-+	return irq_domain_create_hierarchy(parent, IRQ_DOMAIN_FLAG_MSI, 0, fwnode,
- 					   &msi_domain_ops, info);
- }
- 
+What's the default (when not present)? That should be the most 
+common case. Looks like the code treats this as bool, but that's 
+not clear here. The name is not clear what it is doing. Enabling or 
+disabling the feature?
 
 
-Thoughts?
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>  Optional child node properties for AXI DMA:
+>  -dma-channels: Number of dma channels in child node.
+>  
