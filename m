@@ -1,101 +1,41 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed,  4 Jan 2017 13:34:11 +0000
-Subject: [PATCH 1/4] ARM: dts: move hdmi pinctrl out of board file.
-Message-ID: <1483536854-21389-1-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Wed,  4 Jan 2017 13:34:13 +0000
+Subject: [PATCH 3/4] ARM: dts: sd-600eval: enable 1.8v regulator on LS
+ expansion
+In-Reply-To: <1483536854-21389-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1483536854-21389-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1483536854-21389-3-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves hdmi pinctrl defination from board file to soc level
-pinctrl file. If not this pinctrl setup will be duplicated across all
-the apq8064 based board files.
+This patch enables 1.8v regulator on LS expansion, which should be
+always on according to 96boards spec.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 22 ----------------------
- arch/arm/boot/dts/qcom-apq8064-pins.dtsi   | 19 +++++++++++++++++++
- arch/arm/boot/dts/qcom-apq8064.dtsi        |  2 ++
- 3 files changed, 21 insertions(+), 22 deletions(-)
+ arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-index 3d37cab..881ce70 100644
---- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-@@ -75,25 +75,6 @@
- 					bias-disable;
+diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts b/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
+index 4e908af..40f7168 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
+@@ -132,6 +132,16 @@
+ 					bias-pull-down;
  				};
- 			};
--
--			hdmi_pinctrl: hdmi-pinctrl {
--				mux {
--					pins = "gpio70", "gpio71", "gpio72";
--					function = "hdmi";
--				};
--
--				pinconf_ddc {
--					pins = "gpio70", "gpio71";
--					bias-pull-up;
--					drive-strength = <2>;
--				};
--
--				pinconf_hpd {
--					pins = "gpio72";
--					bias-pull-down;
--					drive-strength = <16>;
--				};
--			};
- 		};
  
- 		rpm at 108000 {
-@@ -368,9 +349,6 @@
- 
- 			hpd-gpios = <&tlmm_pinmux 72 GPIO_ACTIVE_HIGH>;
- 
--			pinctrl-names = "default";
--			pinctrl-0 = <&hdmi_pinctrl>;
--
- 			ports {
- 				port at 0 {
- 					endpoint {
-diff --git a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-index 6b801e7..cba4450 100644
---- a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-@@ -284,4 +284,23 @@
- 			bias-disable = <0>;
- 		};
- 	};
++				/**
++				 * 1.8v required on LS expansion
++				 * for mezzanine boards
++				 */
++				l15 {
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
 +
-+	hdmi_pinctrl: hdmi-pinctrl {
-+		mux {
-+			pins = "gpio70", "gpio71", "gpio72";
-+			function = "hdmi";
-+		};
-+
-+		pinconf_ddc {
-+			pins = "gpio70", "gpio71";
-+			bias-pull-up;
-+			drive-strength = <2>;
-+		};
-+
-+		pinconf_hpd {
-+			pins = "gpio72";
-+			bias-pull-down;
-+			drive-strength = <16>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 407a461..e68a8a1 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -1327,6 +1327,8 @@
- 
- 		hdmi: hdmi-tx at 4a00000 {
- 			compatible = "qcom,hdmi-tx-8960";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&hdmi_pinctrl>;
- 			reg = <0x04a00000 0x2f0>;
- 			reg-names = "core_physical";
- 			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+ 				l23 {
+ 					regulator-min-microvolt = <1700000>;
+ 					regulator-max-microvolt = <1900000>;
 -- 
 2.10.1
