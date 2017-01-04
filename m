@@ -1,49 +1,53 @@
-From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Wed,  4 Jan 2017 19:48:12 +0800
-Subject: [PATCH v6 3/5] soc: zte: Add header for PM domains specifiers
-In-Reply-To: <1483530494-14177-1-git-send-email-baoyou.xie@linaro.org>
-References: <1483530494-14177-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <1483530494-14177-3-git-send-email-baoyou.xie@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Jan 2017 11:49:21 +0000
+Subject: [PATCH] arm64: errata: Check for --fix-cortex-a53-843419 and
+ --fix-cortex-a53
+In-Reply-To: <c4f5b650-b210-8332-e6f2-4ad9634818b9@gmail.com>
+References: <20161031194414.61287-1-code@mmayer.net>
+ <20161102210331.GJ22791@arm.com>
+ <CAGt4E5tKHNQw=eLzFx-+g6yLwJ=xCTQEqNZHFZu6aOVpKm7X7w@mail.gmail.com>
+ <20161102212747.GL22791@arm.com>
+ <CAGt4E5sxMcyizwAjwEZd6zepOAyr05WCgtstoRDfNjkNQtnJCA@mail.gmail.com>
+ <2d72cbbb-df03-267c-53b0-e3083a746175@gmail.com>
+ <20161103141559.GQ22791@arm.com>
+ <ae71bdc0-23c7-ce0d-7264-930ab7f405ec@gmail.com>
+ <c4f5b650-b210-8332-e6f2-4ad9634818b9@gmail.com>
+Message-ID: <20170104114920.GB18193@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds header with values used for ZTE 2967
-SoC's power domain driver.
+Hi Florian,
 
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
----
- include/dt-bindings/soc/zte,pm_domains.h | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 include/dt-bindings/soc/zte,pm_domains.h
+On Wed, Dec 28, 2016 at 12:17:23PM -0800, Florian Fainelli wrote:
+> On 11/03/2016 10:20 AM, Florian Fainelli wrote:
+> > On 11/03/2016 07:16 AM, Will Deacon wrote:
+> >> If you can't change toolchain and you want this worked around, why can't you
+> >> either build gold with it enabled by default, or pass the extra flag on the
+> >> command line to the kernel build system?
+> > 
+> > Because that creates a distribution problem and now we have to document
+> > this for people who want to build a kernel on their own, without
+> > necessarily understanding if this is something they might need, or why
+> > this is needed, and why the kernel is not taking care of that on its
+> > own? So yes, this comes down to who is responsible for what, in that
+> > case the kernel's Makefile is the best place where to put such knowledge
+> > as to which workaround needs to be enabled by the linker and it
+> > simplifies things a lot for people.
+> 
+> Was this convincing enough for Catalin to pick Markus' patch or does
+> that mean this patch needs to remain out of tree for us because of using
+> a slightly older toolchain?
 
-diff --git a/include/dt-bindings/soc/zte,pm_domains.h b/include/dt-bindings/soc/zte,pm_domains.h
-new file mode 100644
-index 0000000..01e9abc
---- /dev/null
-+++ b/include/dt-bindings/soc/zte,pm_domains.h
-@@ -0,0 +1,23 @@
-+/*
-+ * Copyright (C) 2017 Linaro Ltd.
-+ *
-+ * Author: Baoyou Xie <baoyou.xie@linaro.org>
-+ * License terms: GNU General Public License (GPL) version 2
-+ */
-+#ifndef _DT_BINDINGS_SOC_ZTE_PM_DOMAINS_H
-+#define _DT_BINDINGS_SOC_ZTE_PM_DOMAINS_H
-+
-+#define DM_ZX296718_SAPPU	0
-+#define DM_ZX296718_VDE		1  /* g1v6 */
-+#define DM_ZX296718_VCE		2  /* h1v6 */
-+#define DM_ZX296718_HDE		3  /* g2v2 */
-+#define DM_ZX296718_VIU		4
-+#define DM_ZX296718_USB20	5
-+#define DM_ZX296718_USB21	6
-+#define DM_ZX296718_USB30	7
-+#define DM_ZX296718_HSIC	8
-+#define DM_ZX296718_GMAC	9
-+#define DM_ZX296718_TS		10
-+#define DM_ZX296718_VOU		11
-+
-+#endif /* _DT_BINDINGS_SOC_ZTE_PM_DOMAINS_H */
--- 
-2.7.4
+I thought more about this last night, and there are two questions that
+might sway me:
+
+  1. How prevalent is the binary toolchain with this issue? Is it, for
+     example, shipping as part of a publicly available LTS distribution?
+     I know you quoted some Linaro build, but I can't actually find those
+     binaries on their website.
+
+  2. Could we extend the Makefile magic to detect that, not only is
+     --fix-cortex-a53-843419 unsupported, but also that the linker is
+     in fact gold?
+
+Will
