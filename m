@@ -1,51 +1,56 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed,  4 Jan 2017 17:49:02 +0000
-Subject: [PATCH v3 4/9] arm64: cpufeature: Document the rules of safe value
- for features
+Date: Wed,  4 Jan 2017 17:49:03 +0000
+Subject: [PATCH v3 5/9] arm64: cpufeature: Define helpers for sys_reg id
 In-Reply-To: <1483552147-9605-1-git-send-email-suzuki.poulose@arm.com>
 References: <1483552147-9605-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1483552147-9605-5-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1483552147-9605-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the rules for choosing the safe value for different types
-of features.
+Define helper macros to extract op0, op1, CRn, CRm & op2
+for a given sys_reg id. While at it remove the explicit
+masking only used for Op0.
 
-Cc: Dave Martin <dave.martin@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/sysreg.h | 21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index b4989df..fb76c81 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -29,7 +29,21 @@
- #include <linux/jump_label.h>
- #include <linux/kernel.h>
- 
--/* CPU feature register tracking */
-+/*
-+ * CPU feature register tracking
-+ *
-+ * The safe value of a CPUID feature field is dependent on the implications
-+ * of the values assigned to it by the architecture. Based on the relationship
-+ * between the values, the features are classified into 3 types.
-+ *
-+ * a) LOWER_SAFE - The value 'n+1' indicates, value 'n' and some
-+ *    additional features. (where n >= 0). The smaller value (n) is
-+ *    considered safer in this case.
-+ * b) HIGHER_SAFE - The value 'n+1' is safer than 'n' (for n>= 0).
-+ * c) EXACT - If the values of the feature don't have any relationship,
-+ *    a predefined safe value is used.
-+ */
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 98ae03f..cf43064 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -32,8 +32,27 @@
+  *	[11-8]  : CRm
+  *	[7-5]   : Op2
+  */
++#define Op0_shift	19
++#define Op0_mask	0x3
++#define Op1_shift	16
++#define Op1_mask	0x7
++#define CRn_shift	12
++#define CRn_mask	0xf
++#define CRm_shift	8
++#define CRm_mask	0xf
++#define Op2_shift	5
++#define Op2_mask	0x7
 +
- enum ftr_type {
- 	FTR_EXACT,	/* Use a predefined safe value */
- 	FTR_LOWER_SAFE,	/* Smaller value is safe */
+ #define sys_reg(op0, op1, crn, crm, op2) \
+-	((((op0)&3)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
++	(((op0) << Op0_shift) | ((op1) << Op1_shift) | \
++	 ((crn) << CRn_shift) | ((crm) << CRm_shift) | \
++	 ((op2) << Op2_shift))
++
++#define sys_reg_Op0(id)	(((id) >> Op0_shift) & Op0_mask)
++#define sys_reg_Op1(id)	(((id) >> Op1_shift) & Op1_mask)
++#define sys_reg_CRn(id)	(((id) >> CRn_shift) & CRn_mask)
++#define sys_reg_CRm(id)	(((id) >> CRm_shift) & CRm_mask)
++#define sys_reg_Op2(id)	(((id) >> Op2_shift) & Op2_mask)
+ 
+ #ifndef CONFIG_BROKEN_GAS_INST
+ 
 -- 
 2.7.4
