@@ -1,197 +1,66 @@
-From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Wed, 4 Jan 2017 19:05:53 +0530
-Subject: [PATCH v4 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
- stores scenario in vdma
-In-Reply-To: <1483536954-27203-1-git-send-email-appanad@xilinx.com>
-References: <1483536954-27203-1-git-send-email-appanad@xilinx.com>
-Message-ID: <1483536954-27203-3-git-send-email-appanad@xilinx.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 4 Jan 2017 11:57:51 +0000
+Subject: [PATCH 18/22] mfd: axp20x: add MFD cells for AXP20X and AXP22X
+ battery driver
+In-Reply-To: <20170102163723.7939-19-quentin.schulz@free-electrons.com>
+References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
+ <20170102163723.7939-19-quentin.schulz@free-electrons.com>
+Message-ID: <20170104115751.GG24058@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When VDMA is configured for more than one frame in the h/w
-for example h/w is configured for n number of frames and user
-Submits n number of frames and triggered the DMA using issue_pending API.
-In the current driver flow we are submitting one frame at a time
-but we should submit all the n number of frames at one time as the h/w
-Is configured for n number of frames.
+On Mon, 02 Jan 2017, Quentin Schulz wrote:
 
-This patch fixes this issue.
+> The X-Powers AXP20X and AXP22X PMICs can have a battery as power supply.
+> 
+> This patch adds the AXP20X/AXP22X battery driver to the MFD cells of the
+> AXP209, AXP221 and AXP223 MFD.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+>  drivers/mfd/axp20x.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 
-Reviewed-by: Jose Abreu <joabreu@synopsys.com>
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
----
-Changes for v4:
----> Add Check for framestore configuration on Transmit case as well
-     as suggested by Jose Abreu.
----> Modified the dev_dbg checks to dev_warn checks as suggested
-     by Jose Abreu. 
-Changes for v3:
----> Added Checks for frame store configuration. If frame store
-     Configuration is not present at the h/w level and user
-     Submits less frames added debug prints in the driver as relevant.
-Changes for v2:
----> Fixed race conditions in the driver as suggested by Jose Abreu
----> Fixed unnecessray if else checks in the vdma_start_transfer
-     as suggested by Laurent Pinchart.
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+  
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 7f0f05f..8730fc2 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -587,6 +587,9 @@ static struct mfd_cell axp20x_cells[] = {
+>  		.name		= "axp20x-adc",
+>  		.of_compatible	= "x-powers,axp209-adc",
+>  	}, {
+> +		.name		= "axp20x-battery-power-supply",
+> +		.of_compatible	= "x-powers,axp209-battery-power-supply",
+> +	}, {
+>  		.name		= "axp20x-ac-power-supply",
+>  		.of_compatible	= "x-powers,axp202-ac-power-supply",
+>  		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
+> @@ -615,6 +618,9 @@ static struct mfd_cell axp221_cells[] = {
+>  		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
+>  		.resources	= axp20x_ac_power_supply_resources,
+>  	}, {
+> +		.name		= "axp20x-battery-power-supply",
+> +		.of_compatible	= "x-powers,axp221-battery-power-supply",
+> +	}, {
+>  		.name		= "axp20x-usb-power-supply",
+>  		.of_compatible	= "x-powers,axp221-usb-power-supply",
+>  		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
+> @@ -631,6 +637,9 @@ static struct mfd_cell axp223_cells[] = {
+>  		.name		= "axp20x-adc",
+>  		.of_compatible	= "x-powers,axp221-adc"
+>  	}, {
+> +		.name		= "axp20x-battery-power-supply",
+> +		.of_compatible	= "x-powers,axp221-battery-power-supply",
+> +	}, {
+>  		.name			= "axp20x-regulator",
+>  	}, {
+>  		.name		= "axp20x-ac-power-supply",
 
- .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |  2 +
- drivers/dma/xilinx/xilinx_dma.c                    | 79 +++++++++++++++-------
- 2 files changed, 58 insertions(+), 23 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-index a2b8bfa..1f65e09 100644
---- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-+++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-@@ -66,6 +66,8 @@ Optional child node properties:
- Optional child node properties for VDMA:
- - xlnx,genlock-mode: Tells Genlock synchronization is
- 	enabled/disabled in hardware.
-+- xlnx,fstore-config: Tells Whether Frame Store Configuration is
-+	enabled/disabled in hardware.
- Optional child node properties for AXI DMA:
- -dma-channels: Number of dma channels in child node.
- 
-diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-index be7eb41..4fb34da 100644
---- a/drivers/dma/xilinx/xilinx_dma.c
-+++ b/drivers/dma/xilinx/xilinx_dma.c
-@@ -322,6 +322,7 @@ struct xilinx_dma_tx_descriptor {
-  * @genlock: Support genlock mode
-  * @err: Channel has errors
-  * @idle: Check for channel idle
-+ * @has_fstoreconfig: Check for frame store configuration
-  * @tasklet: Cleanup work after irq
-  * @config: Device configuration info
-  * @flush_on_fsync: Flush on Frame sync
-@@ -353,6 +354,7 @@ struct xilinx_dma_chan {
- 	bool genlock;
- 	bool err;
- 	bool idle;
-+	bool has_fstoreconfig;
- 	struct tasklet_struct tasklet;
- 	struct xilinx_vdma_config config;
- 	bool flush_on_fsync;
-@@ -990,6 +992,27 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
- 	if (list_empty(&chan->pending_list))
- 		return;
- 
-+	/*
-+	 * Note: When VDMA is built with default h/w configuration
-+	 * User should submit frames upto H/W configured.
-+	 * If users submits less than h/w configured
-+	 * VDMA engine tries to write to a invalid location
-+	 * Results undefined behaviour/memory corruption.
-+	 *
-+	 * If user would like to submit frames less than h/w capable
-+	 * On S2MM side please enable debug info 13 at the h/w level
-+	 * On MM2S side please enable debug info 6 at the h/w level
-+	 * It will allows the frame buffers numbers to be modified at runtime.
-+	 */
-+	if (!chan->has_fstoreconfig &&
-+	     chan->desc_pendingcount < chan->num_frms) {
-+		dev_warn(chan->dev, "Frame Store Configuration is not enabled at the\n");
-+		dev_warn(chan->dev, "H/w level enable Debug info 13 or 6 at the h/w level\n");
-+		dev_warn(chan->dev, "OR Submit the frames upto h/w Capable\n\r");
-+
-+		return;
-+	}
-+
- 	desc = list_first_entry(&chan->pending_list,
- 				struct xilinx_dma_tx_descriptor, node);
- 	tail_desc = list_last_entry(&chan->pending_list,
-@@ -1052,25 +1075,38 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
- 	if (chan->has_sg) {
- 		dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
- 				tail_segment->phys);
-+		list_splice_tail_init(&chan->pending_list, &chan->active_list);
-+		chan->desc_pendingcount = 0;
- 	} else {
- 		struct xilinx_vdma_tx_segment *segment, *last = NULL;
--		int i = 0;
-+		int i = 0, j = 0;
- 
- 		if (chan->desc_submitcount < chan->num_frms)
- 			i = chan->desc_submitcount;
- 
--		list_for_each_entry(segment, &desc->segments, node) {
--			if (chan->ext_addr)
--				vdma_desc_write_64(chan,
--					XILINX_VDMA_REG_START_ADDRESS_64(i++),
--					segment->hw.buf_addr,
--					segment->hw.buf_addr_msb);
--			else
--				vdma_desc_write(chan,
--					XILINX_VDMA_REG_START_ADDRESS(i++),
--					segment->hw.buf_addr);
--
--			last = segment;
-+		for (j = 0; j < chan->num_frms; ) {
-+			list_for_each_entry(segment, &desc->segments, node) {
-+				if (chan->ext_addr)
-+					vdma_desc_write_64(chan,
-+					  XILINX_VDMA_REG_START_ADDRESS_64(i++),
-+					  segment->hw.buf_addr,
-+					  segment->hw.buf_addr_msb);
-+				else
-+					vdma_desc_write(chan,
-+					    XILINX_VDMA_REG_START_ADDRESS(i++),
-+					    segment->hw.buf_addr);
-+
-+				last = segment;
-+			}
-+			list_del(&desc->node);
-+			list_add_tail(&desc->node, &chan->active_list);
-+			j++;
-+			if (list_empty(&chan->pending_list) ||
-+			    (i == chan->num_frms))
-+				break;
-+			desc = list_first_entry(&chan->pending_list,
-+						struct xilinx_dma_tx_descriptor,
-+						node);
- 		}
- 
- 		if (!last)
-@@ -1081,20 +1117,14 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
- 		vdma_desc_write(chan, XILINX_DMA_REG_FRMDLY_STRIDE,
- 				last->hw.stride);
- 		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last->hw.vsize);
--	}
- 
--	chan->idle = false;
--	if (!chan->has_sg) {
--		list_del(&desc->node);
--		list_add_tail(&desc->node, &chan->active_list);
--		chan->desc_submitcount++;
--		chan->desc_pendingcount--;
-+		chan->desc_submitcount += j;
-+		chan->desc_pendingcount -= j;
- 		if (chan->desc_submitcount == chan->num_frms)
- 			chan->desc_submitcount = 0;
--	} else {
--		list_splice_tail_init(&chan->pending_list, &chan->active_list);
--		chan->desc_pendingcount = 0;
- 	}
-+
-+	chan->idle = false;
- }
- 
- /**
-@@ -1342,6 +1372,7 @@ static int xilinx_dma_reset(struct xilinx_dma_chan *chan)
- 
- 	chan->err = false;
- 	chan->idle = true;
-+	chan->desc_submitcount = 0;
- 
- 	return err;
- }
-@@ -2315,6 +2346,8 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
- 	has_dre = of_property_read_bool(node, "xlnx,include-dre");
- 
- 	chan->genlock = of_property_read_bool(node, "xlnx,genlock-mode");
-+	chan->has_fstoreconfig = of_property_read_bool(node,
-+						       "xlnx,fstore-config");
- 
- 	err = of_property_read_u32(node, "xlnx,datawidth", &value);
- 	if (err) {
 -- 
-2.1.2
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
