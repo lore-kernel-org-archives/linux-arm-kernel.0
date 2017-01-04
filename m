@@ -1,100 +1,67 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Wed,  4 Jan 2017 13:32:22 +0000
-Subject: [PATCH v5 13/17] irqdomain: irq_domain_check_msi_remap
+Date: Wed,  4 Jan 2017 13:32:12 +0000
+Subject: [PATCH v5 03/17] iommu: Add a new type field in iommu_resv_region
 In-Reply-To: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
 References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1483536746-2725-14-git-send-email-eric.auger@redhat.com>
+Message-ID: <1483536746-2725-4-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This new function checks whether all platform and PCI
-MSI domains implement IRQ remapping. This is useful to
-understand whether VFIO passthrough is safe with respect
-to interrupts.
+We introduce a new field to differentiate the reserved region
+types and specialize the apply_resv_region implementation.
 
-On ARM typically an MSI controller can sit downstream
-to the IOMMU without preventing VFIO passthrough.
-As such any assigned device can write into the MSI doorbell.
-In case the MSI controller implements IRQ remapping, assigned
-devices will not be able to trigger interrupts towards the
-host. On the contrary, the assignment must be emphasized as
-unsafe with respect to interrupts.
+Legacy direct mapped regions have IOMMU_RESV_DIRECT type.
+We introduce 2 new reserved memory types:
+- IOMMU_RESV_MSI will characterize MSI regions
+- IOMMU_RESV_NOMAP characterize regions that cannot by mapped.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-
 ---
+ drivers/iommu/amd_iommu.c | 1 +
+ include/linux/iommu.h     | 7 +++++++
+ 2 files changed, 8 insertions(+)
 
-v4 -> v5:
-- Handle DOMAIN_BUS_FSL_MC_MSI domains
-- Check parents
----
- include/linux/irqdomain.h |  1 +
- kernel/irq/irqdomain.c    | 41 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 42 insertions(+)
-
-diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index ab017b2..281a40f 100644
---- a/include/linux/irqdomain.h
-+++ b/include/linux/irqdomain.h
-@@ -219,6 +219,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
- 					 void *host_data);
- extern struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
- 						   enum irq_domain_bus_token bus_token);
-+extern bool irq_domain_check_msi_remap(void);
- extern void irq_set_default_host(struct irq_domain *host);
- extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
- 				  irq_hw_number_t hwirq, int node,
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 8c0a0ae..700caea 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -278,6 +278,47 @@ struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
- EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
+diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
+index 04334eb..c6c3f1e 100644
+--- a/drivers/iommu/amd_iommu.c
++++ b/drivers/iommu/amd_iommu.c
+@@ -3186,6 +3186,7 @@ static void amd_iommu_get_resv_regions(struct device *dev,
  
+ 		region->start = entry->address_start;
+ 		region->length = entry->address_end - entry->address_start;
++		region->type = IOMMU_RESV_DIRECT;
+ 		if (entry->prot & IOMMU_PROT_IR)
+ 			region->prot |= IOMMU_READ;
+ 		if (entry->prot & IOMMU_PROT_IW)
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index bfecb8b..9128a8d 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -117,18 +117,25 @@ enum iommu_attr {
+ 	DOMAIN_ATTR_MAX,
+ };
+ 
++/* These are the possible reserved region types */
++#define IOMMU_RESV_DIRECT	(1 << 0)
++#define IOMMU_RESV_NOMAP	(1 << 1)
++#define IOMMU_RESV_MSI		(1 << 2)
++
  /**
-+ * irq_domain_is_msi_remap - Check if @domain or any parent
-+ * has MSI remapping support
-+ * @domain: domain pointer
-+ */
-+static bool irq_domain_is_msi_remap(struct irq_domain *domain)
-+{
-+	struct irq_domain *h = domain;
-+
-+	for (; h; h = h->parent) {
-+		if (h->flags & IRQ_DOMAIN_FLAG_MSI_REMAP)
-+			return true;
-+	}
-+	return false;
-+}
-+
-+/**
-+ * irq_domain_check_msi_remap() - Checks whether all MSI
-+ * irq domains implement IRQ remapping
-+ */
-+bool irq_domain_check_msi_remap(void)
-+{
-+	struct irq_domain *h;
-+	bool ret = true;
-+
-+	mutex_lock(&irq_domain_mutex);
-+	list_for_each_entry(h, &irq_domain_list, link) {
-+		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
-+		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI) ||
-+		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI)) &&
-+		     !irq_domain_is_msi_remap(h)) {
-+			ret = false;
-+			goto out;
-+		}
-+	}
-+out:
-+	mutex_unlock(&irq_domain_mutex);
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(irq_domain_check_msi_remap);
-+
-+/**
-  * irq_set_default_host() - Set a "default" irq domain
-  * @domain: default domain pointer
-  *
+  * struct iommu_resv_region - descriptor for a reserved memory region
+  * @list: Linked list pointers
+  * @start: System physical start address of the region
+  * @length: Length of the region in bytes
+  * @prot: IOMMU Protection flags (READ/WRITE/...)
++ * @type: Type of the reserved region
+  */
+ struct iommu_resv_region {
+ 	struct list_head	list;
+ 	phys_addr_t		start;
+ 	size_t			length;
+ 	int			prot;
++	int			type;
+ };
+ 
+ #ifdef CONFIG_IOMMU_API
 -- 
 1.9.1
