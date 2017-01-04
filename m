@@ -1,301 +1,195 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  4 Jan 2017 16:19:15 +0000
-Subject: [PATCH] crypto: arm64/aes - add scalar implementation
-Message-ID: <1483546755-13429-1-git-send-email-ard.biesheuvel@linaro.org>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 4 Jan 2017 16:58:39 +0100
+Subject: [PATCH v5 13/17] irqdomain: irq_domain_check_msi_remap
+In-Reply-To: <c9c4c159-60ea-8501-5dc2-17bbb24ddfab@arm.com>
+References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
+ <1483536746-2725-14-git-send-email-eric.auger@redhat.com>
+ <ecb7ddf6-074f-50e4-6402-d59ceb1edd1d@arm.com>
+ <df8e7fdb-4048-3169-c758-c2a64119a321@redhat.com>
+ <c9c4c159-60ea-8501-5dc2-17bbb24ddfab@arm.com>
+Message-ID: <817fdda2-6083-069c-40b8-e9f5c5ca576f@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a scalar implementation of AES, based on the precomputed tables
-that are exposed by the generic AES code. Since rotates are cheap on arm64,
-this implementation only uses the 4 core tables (of 1 KB each), and avoids
-the prerotated ones, reducing the D-cache footprint by 75%.
+Hi Marc,
 
-On Cortex-A57, this code manages 13.0 cycles per byte, which is ~34% faster
-than the generic C code. (Note that this is still >13x slower than the code
-that uses the optional ARMv8 Crypto Extensions, which manages <1 cycles per
-byte.)
+On 04/01/2017 16:27, Marc Zyngier wrote:
+> On 04/01/17 14:11, Auger Eric wrote:
+>> Hi Marc,
+>>
+>> On 04/01/2017 14:46, Marc Zyngier wrote:
+>>> Hi Eric,
+>>>
+>>> On 04/01/17 13:32, Eric Auger wrote:
+>>>> This new function checks whether all platform and PCI
+>>>> MSI domains implement IRQ remapping. This is useful to
+>>>> understand whether VFIO passthrough is safe with respect
+>>>> to interrupts.
+>>>>
+>>>> On ARM typically an MSI controller can sit downstream
+>>>> to the IOMMU without preventing VFIO passthrough.
+>>>> As such any assigned device can write into the MSI doorbell.
+>>>> In case the MSI controller implements IRQ remapping, assigned
+>>>> devices will not be able to trigger interrupts towards the
+>>>> host. On the contrary, the assignment must be emphasized as
+>>>> unsafe with respect to interrupts.
+>>>>
+>>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>>>
+>>>> ---
+>>>>
+>>>> v4 -> v5:
+>>>> - Handle DOMAIN_BUS_FSL_MC_MSI domains
+>>>> - Check parents
+>>>> ---
+>>>>  include/linux/irqdomain.h |  1 +
+>>>>  kernel/irq/irqdomain.c    | 41 +++++++++++++++++++++++++++++++++++++++++
+>>>>  2 files changed, 42 insertions(+)
+>>>>
+>>>> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+>>>> index ab017b2..281a40f 100644
+>>>> --- a/include/linux/irqdomain.h
+>>>> +++ b/include/linux/irqdomain.h
+>>>> @@ -219,6 +219,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
+>>>>  					 void *host_data);
+>>>>  extern struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+>>>>  						   enum irq_domain_bus_token bus_token);
+>>>> +extern bool irq_domain_check_msi_remap(void);
+>>>>  extern void irq_set_default_host(struct irq_domain *host);
+>>>>  extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
+>>>>  				  irq_hw_number_t hwirq, int node,
+>>>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+>>>> index 8c0a0ae..700caea 100644
+>>>> --- a/kernel/irq/irqdomain.c
+>>>> +++ b/kernel/irq/irqdomain.c
+>>>> @@ -278,6 +278,47 @@ struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+>>>>  EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
+>>>>  
+>>>>  /**
+>>>> + * irq_domain_is_msi_remap - Check if @domain or any parent
+>>>> + * has MSI remapping support
+>>>> + * @domain: domain pointer
+>>>> + */
+>>>> +static bool irq_domain_is_msi_remap(struct irq_domain *domain)
+>>>> +{
+>>>> +	struct irq_domain *h = domain;
+>>>> +
+>>>> +	for (; h; h = h->parent) {
+>>>> +		if (h->flags & IRQ_DOMAIN_FLAG_MSI_REMAP)
+>>>> +			return true;
+>>>> +	}
+>>>> +	return false;
+>>>> +}
+>>>> +
+>>>> +/**
+>>>> + * irq_domain_check_msi_remap() - Checks whether all MSI
+>>>> + * irq domains implement IRQ remapping
+>>>> + */
+>>>> +bool irq_domain_check_msi_remap(void)
+>>>> +{
+>>>> +	struct irq_domain *h;
+>>>> +	bool ret = true;
+>>>> +
+>>>> +	mutex_lock(&irq_domain_mutex);
+>>>> +	list_for_each_entry(h, &irq_domain_list, link) {
+>>>> +		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
+>>>> +		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI) ||
+>>>> +		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI)) &&
+>>>> +		     !irq_domain_is_msi_remap(h)) {
+>>>
+>>> (h->bus_token & DOMAIN_BUS_PCI_MSI) and co looks quite wrong. bus_token
+>>> is not a bitmap, and DOMAIN_BUS_* not a single bit value (see enum
+>>> irq_domain_bus_token). Surely this should read
+>>> (h->bus_token == DOMAIN_BUS_PCI_MSI).
+>> Oh I did not notice that. Thanks.
+>>
+>> Any other comments on the irqdomain side? Do you think the current
+>> approach consisting in looking at those bus tokens and their parents
+>> looks good?
+> 
+> To be completely honest, I don't like it much, as having to enumerate
+> all the bus types can come up with could become quite a burden in the
+> long run. I'd rather be able to identify MSI capable domains by
+> construction. I came up with the following approach (fully untested):
+> 
+> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+> index 281a40f..7779796 100644
+> --- a/include/linux/irqdomain.h
+> +++ b/include/linux/irqdomain.h
+> @@ -183,8 +183,11 @@ enum {
+>  	/* Irq domain is an IPI domain with single virq */
+>  	IRQ_DOMAIN_FLAG_IPI_SINGLE	= (1 << 3),
+>  
+> +	/* Irq domain implements MSIs */
+> +	IRQ_DOMAIN_FLAG_MSI		= (1 << 4),
+> +
+>  	/* Irq domain is MSI remapping capable */
+> -	IRQ_DOMAIN_FLAG_MSI_REMAP	= (1 << 4),
+> +	IRQ_DOMAIN_FLAG_MSI_REMAP	= (1 << 5),
+>  
+>  	/*
+>  	 * Flags starting from IRQ_DOMAIN_FLAG_NONCORE are reserved
+> @@ -450,6 +453,11 @@ static inline bool irq_domain_is_ipi_single(struct irq_domain *domain)
+>  {
+>  	return domain->flags & IRQ_DOMAIN_FLAG_IPI_SINGLE;
+>  }
+> +
+> +static inline bool irq_domain_is_msi(struct irq_domain *domain)
+> +{
+> +	return domain->flags & IRQ_DOMAIN_FLAG_MSI;
+> +}
+>  #else	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
+>  static inline void irq_domain_activate_irq(struct irq_data *data) { }
+>  static inline void irq_domain_deactivate_irq(struct irq_data *data) { }
+> @@ -481,6 +489,11 @@ static inline bool irq_domain_is_ipi_single(struct irq_domain *domain)
+>  {
+>  	return false;
+>  }
+> +
+> +static inline bool irq_domain_is_msi(struct irq_domain *domain)
+> +{
+> +	return false;
+> +}
+>  #endif	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
+>  
+>  #else /* CONFIG_IRQ_DOMAIN */
+> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> index 700caea..33b6921 100644
+> --- a/kernel/irq/irqdomain.c
+> +++ b/kernel/irq/irqdomain.c
+> @@ -304,10 +304,7 @@ bool irq_domain_check_msi_remap(void)
+>  
+>  	mutex_lock(&irq_domain_mutex);
+>  	list_for_each_entry(h, &irq_domain_list, link) {
+> -		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
+> -		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI) ||
+> -		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI)) &&
+> -		     !irq_domain_is_msi_remap(h)) {
+> +		if (irq_domain_is_msi(h) && !irq_domain_is_msi_remap(h)) {
+>  			ret = false;
+>  			goto out;
+>  		}
+> diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+> index ee23006..b637263 100644
+> --- a/kernel/irq/msi.c
+> +++ b/kernel/irq/msi.c
+> @@ -270,7 +270,7 @@ struct irq_domain *msi_create_irq_domain(struct fwnode_handle *fwnode,
+>  	if (info->flags & MSI_FLAG_USE_DEF_CHIP_OPS)
+>  		msi_domain_update_chip_ops(info);
+>  
+> -	return irq_domain_create_hierarchy(parent, 0, 0, fwnode,
+> +	return irq_domain_create_hierarchy(parent, IRQ_DOMAIN_FLAG_MSI, 0, fwnode,
+>  					   &msi_domain_ops, info);
+>  }
+>  
+> 
+> 
+> Thoughts?
+No objection from my side. I will respin and test.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
+Thanks
 
-Raw performance data after the patch, which was generated on a 2 GHz
-Cortex-A57 (AMD Seattle B1).
-
- arch/arm64/crypto/Kconfig           |   4 +
- arch/arm64/crypto/Makefile          |   3 +
- arch/arm64/crypto/aes-cipher-core.S | 126 ++++++++++++++++++++
- arch/arm64/crypto/aes-cipher-glue.c |  69 +++++++++++
- 4 files changed, 202 insertions(+)
-
-diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
-index 0bf0f531f539..0826f8e599a6 100644
---- a/arch/arm64/crypto/Kconfig
-+++ b/arch/arm64/crypto/Kconfig
-@@ -41,6 +41,10 @@ config CRYPTO_CRC32_ARM64_CE
- 	depends on KERNEL_MODE_NEON && CRC32
- 	select CRYPTO_HASH
- 
-+config CRYPTO_AES_ARM64
-+	tristate "AES core cipher using scalar instructions"
-+	select CRYPTO_AES
-+
- config CRYPTO_AES_ARM64_CE
- 	tristate "AES core cipher using ARMv8 Crypto Extensions"
- 	depends on ARM64 && KERNEL_MODE_NEON
-diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
-index 9d2826c5fccf..a893507629eb 100644
---- a/arch/arm64/crypto/Makefile
-+++ b/arch/arm64/crypto/Makefile
-@@ -44,6 +44,9 @@ sha512-arm64-y := sha512-glue.o sha512-core.o
- obj-$(CONFIG_CRYPTO_CHACHA20_NEON) += chacha20-neon.o
- chacha20-neon-y := chacha20-neon-core.o chacha20-neon-glue.o
- 
-+obj-$(CONFIG_CRYPTO_AES_ARM64) += aes-arm64.o
-+aes-arm64-y := aes-cipher-core.o aes-cipher-glue.o
-+
- AFLAGS_aes-ce.o		:= -DINTERLEAVE=4
- AFLAGS_aes-neon.o	:= -DINTERLEAVE=4
- 
-diff --git a/arch/arm64/crypto/aes-cipher-core.S b/arch/arm64/crypto/aes-cipher-core.S
-new file mode 100644
-index 000000000000..22d1bc46feba
---- /dev/null
-+++ b/arch/arm64/crypto/aes-cipher-core.S
-@@ -0,0 +1,126 @@
-+/*
-+ * Scalar AES core transform
-+ *
-+ * Copyright (C) 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+
-+	.text
-+	.align		5
-+
-+	rk		.req	x0
-+	out		.req	x1
-+	in		.req	x2
-+	rounds		.req	x3
-+	tt		.req	x4
-+	lt		.req	x2
-+
-+	.macro		__hround, out0, out1, in0, in1, in2, in3, t0, t1, enc
-+	ldp		\out0, \out1, [rk], #8
-+
-+	ubfx		w13, \in0, #0, #8
-+	ubfx		w14, \in1, #8, #8
-+	ldr		w13, [tt, w13, uxtw #2]
-+	ldr		w14, [tt, w14, uxtw #2]
-+
-+	ubfx		w15, \in2, #16, #8
-+	ubfx		w16, \in3, #24, #8
-+	ldr		w15, [tt, w15, uxtw #2]
-+	ldr		w16, [tt, w16, uxtw #2]
-+
-+	.if		\enc
-+	ubfx		w17, \in1, #0, #8
-+	ubfx		w18, \in2, #8, #8
-+	.else
-+	ubfx		w17, \in3, #0, #8
-+	ubfx		w18, \in0, #8, #8
-+	.endif
-+	ldr		w17, [tt, w17, uxtw #2]
-+	ldr		w18, [tt, w18, uxtw #2]
-+
-+	.if		\enc
-+	ubfx		\t0, \in3, #16, #8
-+	ubfx		\t1, \in0, #24, #8
-+	.else
-+	ubfx		\t0, \in1, #16, #8
-+	ubfx		\t1, \in2, #24, #8
-+	.endif
-+	ldr		\t0, [tt, \t0, uxtw #2]
-+	ldr		\t1, [tt, \t1, uxtw #2]
-+
-+	eor		\out0, \out0, w13
-+	eor		\out1, \out1, w17
-+	eor		\out0, \out0, w14, ror #24
-+	eor		\out1, \out1, w18, ror #24
-+	eor		\out0, \out0, w15, ror #16
-+	eor		\out1, \out1, \t0, ror #16
-+	eor		\out0, \out0, w16, ror #8
-+	eor		\out1, \out1, \t1, ror #8
-+	.endm
-+
-+	.macro		fround, out0, out1, out2, out3, in0, in1, in2, in3
-+	__hround	\out0, \out1, \in0, \in1, \in2, \in3, \out2, \out3, 1
-+	__hround	\out2, \out3, \in2, \in3, \in0, \in1, \in1, \in2, 1
-+	.endm
-+
-+	.macro		iround, out0, out1, out2, out3, in0, in1, in2, in3
-+	__hround	\out0, \out1, \in0, \in3, \in2, \in1, \out2, \out3, 0
-+	__hround	\out2, \out3, \in2, \in1, \in0, \in3, \in1, \in0, 0
-+	.endm
-+
-+	.macro		do_crypt, round, ttab, ltab
-+	ldp		w5, w6, [in]
-+	ldp		w7, w8, [in, #8]
-+	ldp		w9, w10, [rk], #16
-+	ldp		w11, w12, [rk, #-8]
-+
-+CPU_BE(	rev		w5, w5		)
-+CPU_BE(	rev		w6, w6		)
-+CPU_BE(	rev		w7, w7		)
-+CPU_BE(	rev		w8, w8		)
-+
-+	eor		w5, w5, w9
-+	eor		w6, w6, w10
-+	eor		w7, w7, w11
-+	eor		w8, w8, w12
-+
-+	ldr		tt, =\ttab
-+	ldr		lt, =\ltab
-+
-+	tbnz		rounds, #1, 1f
-+
-+0:	\round		w9, w10, w11, w12, w5, w6, w7, w8
-+	\round		w5, w6, w7, w8, w9, w10, w11, w12
-+
-+1:	subs		rounds, rounds, #4
-+	\round		w9, w10, w11, w12, w5, w6, w7, w8
-+	csel		tt, tt, lt, hi
-+	\round		w5, w6, w7, w8, w9, w10, w11, w12
-+	b.hi		0b
-+
-+CPU_BE(	rev		w5, w5		)
-+CPU_BE(	rev		w6, w6		)
-+CPU_BE(	rev		w7, w7		)
-+CPU_BE(	rev		w8, w8		)
-+
-+	stp		w5, w6, [out]
-+	stp		w7, w8, [out, #8]
-+	ret
-+
-+	.align		4
-+	.ltorg
-+	.endm
-+
-+ENTRY(__aes_arm64_encrypt)
-+	do_crypt	fround, crypto_ft_tab, crypto_fl_tab
-+ENDPROC(__aes_arm64_encrypt)
-+
-+ENTRY(__aes_arm64_decrypt)
-+	do_crypt	iround, crypto_it_tab, crypto_il_tab
-+ENDPROC(__aes_arm64_decrypt)
-diff --git a/arch/arm64/crypto/aes-cipher-glue.c b/arch/arm64/crypto/aes-cipher-glue.c
-new file mode 100644
-index 000000000000..7288e7cbebff
---- /dev/null
-+++ b/arch/arm64/crypto/aes-cipher-glue.c
-@@ -0,0 +1,69 @@
-+/*
-+ * Scalar AES core transform
-+ *
-+ * Copyright (C) 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <crypto/aes.h>
-+#include <linux/crypto.h>
-+#include <linux/module.h>
-+
-+asmlinkage void __aes_arm64_encrypt(u32 *rk, u8 *out, const u8 *in, int rounds);
-+EXPORT_SYMBOL(__aes_arm64_encrypt);
-+
-+asmlinkage void __aes_arm64_decrypt(u32 *rk, u8 *out, const u8 *in, int rounds);
-+EXPORT_SYMBOL(__aes_arm64_decrypt);
-+
-+static void aes_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
-+{
-+	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
-+	int rounds = 6 + ctx->key_length / 4;
-+
-+	__aes_arm64_encrypt(ctx->key_enc, out, in, rounds);
-+}
-+
-+static void aes_decrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
-+{
-+	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
-+	int rounds = 6 + ctx->key_length / 4;
-+
-+	__aes_arm64_decrypt(ctx->key_dec, out, in, rounds);
-+}
-+
-+static struct crypto_alg aes_alg = {
-+	.cra_name			= "aes",
-+	.cra_driver_name		= "aes-arm64",
-+	.cra_priority			= 200,
-+	.cra_flags			= CRYPTO_ALG_TYPE_CIPHER,
-+	.cra_blocksize			= AES_BLOCK_SIZE,
-+	.cra_ctxsize			= sizeof(struct crypto_aes_ctx),
-+	.cra_module			= THIS_MODULE,
-+
-+	.cra_cipher.cia_min_keysize	= AES_MIN_KEY_SIZE,
-+	.cra_cipher.cia_max_keysize	= AES_MAX_KEY_SIZE,
-+	.cra_cipher.cia_setkey		= crypto_aes_set_key,
-+	.cra_cipher.cia_encrypt		= aes_encrypt,
-+	.cra_cipher.cia_decrypt		= aes_decrypt
-+};
-+
-+static int __init aes_init(void)
-+{
-+	return crypto_register_alg(&aes_alg);
-+}
-+
-+static void __exit aes_fini(void)
-+{
-+	crypto_unregister_alg(&aes_alg);
-+}
-+
-+module_init(aes_init);
-+module_exit(aes_fini);
-+
-+MODULE_DESCRIPTION("Scalar AES cipher for arm64");
-+MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS_CRYPTO("aes");
--- 
-2.7.4
-
-testing speed of async ecb(aes) (ecb(aes-generic)) encryption
-test 0 (128 bit key, 16 byte blocks): 4594689 operations in 1 seconds (73515024 bytes)
-test 1 (128 bit key, 64 byte blocks): 1585137 operations in 1 seconds (101448768 bytes)
-test 2 (128 bit key, 256 byte blocks): 435173 operations in 1 seconds (111404288 bytes)
-test 3 (128 bit key, 1024 byte blocks): 111505 operations in 1 seconds (114181120 bytes)
-test 4 (128 bit key, 8192 byte blocks): 14093 operations in 1 seconds (115449856 bytes)
-test 5 (192 bit key, 16 byte blocks): 4078345 operations in 1 seconds (65253520 bytes)
-test 6 (192 bit key, 64 byte blocks): 1349425 operations in 1 seconds (86363200 bytes)
-test 7 (192 bit key, 256 byte blocks): 365631 operations in 1 seconds (93601536 bytes)
-test 8 (192 bit key, 1024 byte blocks): 93362 operations in 1 seconds (95602688 bytes)
-test 9 (192 bit key, 8192 byte blocks): 11729 operations in 1 seconds (96083968 bytes)
-test 10 (256 bit key, 16 byte blocks): 3692945 operations in 1 seconds (59087120 bytes)
-test 11 (256 bit key, 64 byte blocks): 1182522 operations in 1 seconds (75681408 bytes)
-test 12 (256 bit key, 256 byte blocks): 317285 operations in 1 seconds (81224960 bytes)
-test 13 (256 bit key, 1024 byte blocks): 80459 operations in 1 seconds (82390016 bytes)
-test 14 (256 bit key, 8192 byte blocks): 10138 operations in 1 seconds (83050496 bytes)
-
-testing speed of async ecb(aes) (ecb(aes-arm64)) encryption
-test 0 (128 bit key, 16 byte blocks): 5455304 operations in 1 seconds (87284864 bytes)
-test 1 (128 bit key, 64 byte blocks): 2000321 operations in 1 seconds (128020544 bytes)
-test 2 (128 bit key, 256 byte blocks): 574174 operations in 1 seconds (146988544 bytes)
-test 3 (128 bit key, 1024 byte blocks): 148497 operations in 1 seconds (152060928 bytes)
-test 4 (128 bit key, 8192 byte blocks): 18836 operations in 1 seconds (154304512 bytes)
-test 5 (192 bit key, 16 byte blocks): 4962478 operations in 1 seconds (79399648 bytes)
-test 6 (192 bit key, 64 byte blocks): 1740157 operations in 1 seconds (111370048 bytes)
-test 7 (192 bit key, 256 byte blocks): 490443 operations in 1 seconds (125553408 bytes)
-test 8 (192 bit key, 1024 byte blocks): 126165 operations in 1 seconds (129192960 bytes)
-test 9 (192 bit key, 8192 byte blocks): 15897 operations in 1 seconds (130228224 bytes)
-test 10 (256 bit key, 16 byte blocks): 4527784 operations in 1 seconds (72444544 bytes)
-test 11 (256 bit key, 64 byte blocks): 1527235 operations in 1 seconds (97743040 bytes)
-test 12 (256 bit key, 256 byte blocks): 425302 operations in 1 seconds (108877312 bytes)
-test 13 (256 bit key, 1024 byte blocks): 109013 operations in 1 seconds (111629312 bytes)
-test 14 (256 bit key, 8192 byte blocks): 13778 operations in 1 seconds (112869376 bytes)
+Eric
+> 
+> 	M.
+> 
