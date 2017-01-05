@@ -1,40 +1,52 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Jan 2017 23:25:08 +0000
-Subject: [PATCH net-next v4 0/4] Fix OdroidC2 Gigabit Tx link issue
-In-Reply-To: <049b1efc-3bad-92e0-45ef-0563dc5d81de@gmail.com>
-References: <1480348229-25672-1-git-send-email-jbrunet@baylibre.com>
- <049b1efc-3bad-92e0-45ef-0563dc5d81de@gmail.com>
-Message-ID: <20170105232508.GU14217@n2100.armlinux.org.uk>
+From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
+Date: Thu, 5 Jan 2017 23:33:28 +0000
+Subject: [PATCH 2/5] drivers: mmc: sunxi: limit A64 MMC2 to 8K DMA buffer
+In-Reply-To: <20170105175746.fq6crpc3krz7tzxi@lukather>
+References: <1483398226-29321-1-git-send-email-andre.przywara@arm.com>
+ <1483398226-29321-3-git-send-email-andre.przywara@arm.com>
+ <20170104140750.7qs4pvggwjdj5cma@rob-hp-laptop>
+ <20170105175746.fq6crpc3krz7tzxi@lukather>
+Message-ID: <87b26848-4f86-f2d2-3f82-db0937c572e2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2016 at 09:54:28AM -0800, Florian Fainelli wrote:
-> If we start supporting generic "enable", "disable" type of properties
-> with values that map directly to register definitions of the HW, we
-> leave too much room for these properties to be utilized to implement a
-> specific policy, and this is not acceptable.
+On 05/01/17 17:57, Maxime Ripard wrote:
+> Hi Rob,
+> 
+> On Wed, Jan 04, 2017 at 08:07:50AM -0600, Rob Herring wrote:
+>> On Mon, Jan 02, 2017 at 11:03:43PM +0000, Andre Przywara wrote:
+>>> From: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>>
+>>> Unlike the A64 user manual reports, the third MMC controller on the
+>>> A64 (and the only one capable of 8-bit HS400 eMMC transfers) has a
+>>> DMA buffer size limit of 8KB (much like the very old Allwinner SoCs).
+>>> This does not affect the other two controllers, so introduce a new
+>>> DT compatible string to let the driver use different settings for that
+>>> particular device. This will also help to enable the high-speed transfer
+>>> modes of that controller later.
+>>>
+>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt | 1 +
+>>>  drivers/mmc/host/sunxi-mmc.c                        | 7 +++++++
+>>>  2 files changed, 8 insertions(+)
+>>
+>> Acked-by: Rob Herring <robh@kernel.org>
+> 
+> Some kind of a digression on this: we have three MMC controllers on
+> this SoC. Like this patch shows, the third one is clearly different,
+> and supports both more modes, a wider bus, and specific quirks. We
+> need a new compatible for this one, everything's perfect.
+> 
+> However, the other two are mostly the same, but seems to need
+> different tuning parameters to get more performances out of the
+> controller (but this is unclear yet). How do we usually deal with
+> that?
 
-Another concern with this patch is that the existing phylib "set_eee"
-code is horribly buggy - it just translates the modes from userspace
-into the register value and writes them directly to the register with
-no validation.  So it's possible to set modes in the register that the
-hardware doesn't support, and have them advertised to the link partner.
+I guess you wanted to hear Rob's opinion ;-), but "get more performance"
+sounds like we add one (or more) properties to tune those values.
+If I get this right, it works with default values, but is sub-optimal?
 
-I have a patch which fixes that, restricting (as we do elsewhere) the
-advert according to the EEE supported capabilities retrieved from the
-PCS - maybe the problem here is that the PCS doesn't support support
-EEE in 1000baseT mode?
-
-Out of interest, which PHY is used on this platform?
-
-On the SolidRun boards, they're using AR8035, and have suffered this
-occasional link drop problem.  What has been found is that it seems to
-be to do with the timing parameters, and it seemed to only be 1000bT
-that was affected.  I don't remember off hand exactly which or what
-the change was they made to stabilise it though, but I can probabily
-find out tomorrow.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Cheers,
+Andre.
