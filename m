@@ -1,48 +1,71 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 5 Jan 2017 14:05:06 +0800
-Subject: [PATCH v6 03/14] ACPI: ARM64: IORT: add missing comment for
- iort_dev_find_its_id()
-In-Reply-To: <20170104143442.GA8604@red-moon>
-References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
- <1483363905-2806-4-git-send-email-hanjun.guo@linaro.org>
- <20170104143442.GA8604@red-moon>
-Message-ID: <4915fe90-ea61-45b5-491d-0628456abed2@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 5 Jan 2017 14:10:32 +0800
+Subject: [PATCH 15/22] mfd: axp20x: add CHRG_CTRL1 to writeable regs for
+ AXP20X/AXP22X
+In-Reply-To: <20170102163723.7939-16-quentin.schulz@free-electrons.com>
+References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
+ <20170102163723.7939-16-quentin.schulz@free-electrons.com>
+Message-ID: <CAGb2v67KmaECfFO+QBxKbtKscD0O=KNVHO1TS4FspYEdaLWUCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/1/4 22:34, Lorenzo Pieralisi wrote:
-> On Mon, Jan 02, 2017 at 09:31:34PM +0800, Hanjun Guo wrote:
->> We are missing req_id's comment for iort_dev_find_its_id(),
->> add it back.
->
-> "Add missing req_id parameter to the iort_dev_find_its_id() function
-> kernel-doc comment."
->
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Tested-by: Majun <majun258@huawei.com>
->> Tested-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
->> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Tomasz Nowicki <tn@semihalf.com>
->> ---
->>  drivers/acpi/arm64/iort.c | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
->> index 46e2d82..174e983 100644
->> --- a/drivers/acpi/arm64/iort.c
->> +++ b/drivers/acpi/arm64/iort.c
->> @@ -446,6 +446,7 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
->>  /**
->>   * iort_dev_find_its_id() - Find the ITS identifier for a device
->>   * @dev: The device.
->> + * @req_id: Device's Requster ID
->
-> s/Requster/Requester
->
-> We can send it upstream independently along with some other patches
-> in this series but I will have a look at the whole series first.
+On Tue, Jan 3, 2017 at 12:37 AM, Quentin Schulz
+<quentin.schulz@free-electrons.com> wrote:
+> The CHR_CTRL1 register is made of 7 read-write bits with one being used
+> to set the target voltage for battery charging.
 
-Do you mean go to 4.10-rcx?
+The description is incorrect.
 
-Thanks
-Hanjun
+All 8 bits are read-write:
+
+  - The highest bit enables the charger module
+  - Bits [6:5] set the target voltage
+  - Bits [4:3] set when the charge cycle ends, based on percentage
+    of charge current
+  - Bits [2:0] set the charge current
+
+Feel free to use the above in the commit message.
+
+>
+> This adds the CHRG_CTRL1 register to the list of writeable registers for
+> AXP20X and AXP22X PMICs.
+
+You might want to add up to CHRG_CTRL3 for the AXP22x and CHRG_CTRL2
+for the AXP20x. These control additional aspects of the charger.
+
+AXP20X_CHRG_BAK_CTRL controls the charger for the RTC battery. You
+could add this now, or let the person doing the RTC battery driver
+add it.
+
+Regards
+ChenYu
+
+>
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+>  drivers/mfd/axp20x.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 65c57d0..19bdba3 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -66,6 +66,7 @@ static const struct regmap_access_table axp152_volatile_table = {
+>  static const struct regmap_range axp20x_writeable_ranges[] = {
+>         regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
+>         regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
+> +       regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL1),
+>         regmap_reg_range(AXP20X_DCDC_MODE, AXP20X_FG_RES),
+>         regmap_reg_range(AXP20X_RDC_H, AXP20X_OCV(AXP20X_OCV_MAX)),
+>  };
+> @@ -94,6 +95,7 @@ static const struct regmap_access_table axp20x_volatile_table = {
+>  static const struct regmap_range axp22x_writeable_ranges[] = {
+>         regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
+>         regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
+> +       regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL1),
+>         regmap_reg_range(AXP20X_DCDC_MODE, AXP22X_BATLOW_THRES1),
+>  };
+>
+> --
+> 2.9.3
+>
