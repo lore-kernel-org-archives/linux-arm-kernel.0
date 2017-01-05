@@ -1,46 +1,35 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 5 Jan 2017 16:49:03 -0600
-Subject: [PATCH 1/2] ARM: dts: da850: Add usb device node
-In-Reply-To: <20161121165920.29809-2-ahaslam@baylibre.com>
-References: <20161121165920.29809-1-ahaslam@baylibre.com>
- <20161121165920.29809-2-ahaslam@baylibre.com>
-Message-ID: <0dd074af-a4ae-34fa-a404-1116b554135b@lechnology.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Thu,  5 Jan 2017 15:01:12 -0800
+Subject: [PATCHv2 0/2] Memblock cleanup plus memory removal fix
+Message-ID: <1483657274-11346-1-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+Hi,
 
-On 11/21/2016 10:59 AM, Axel Haslam wrote:
-> Add the usb1 device node for the da850 soc.
-> This will allow boards to use the usb1 port
-> when booting through DT.
->
-> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
-> ---
->  arch/arm/boot/dts/da850.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> index 1bb1f6d..fbd50d6 100644
-> --- a/arch/arm/boot/dts/da850.dtsi
-> +++ b/arch/arm/boot/dts/da850.dtsi
-> @@ -406,6 +406,14 @@
->  					>;
->  			status = "disabled";
->  		};
-> +		usb1: usb at 225000 {
-> +			compatible = "ti,da830-ohci";
-> +			reg = <0x225000 0x1000>;
-> +			interrupts = <59>;
-> +			phys = <&usb_phy 1>;
-> +			phy-names = "usb-phy";
-> +			status = "disabled";
-> +		};
->  		gpio: gpio at 226000 {
->  			compatible = "ti,dm6441-gpio";
->  			gpio-controller;
->
+This is v2 of the series to make sanity_check_meminfo (renamed in this series)
+more readable and less error prone and fix an existing bug. v1 failed in that it
+re-introduced a previously fixed bug. Hopefully this version does better.
+
+As a reminder, During the course of
+https://marc.info/?l=linux-arm-kernel&m=148145259511248, Grygorii Strashko
+reminded me of another issue where I proposed a patch but never followed up on
+it. The patch in
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296978.html
+did some cleanup and renaming of sanity_check_meminfo. I think this makes the
+code more readable so I'd like to resurect it and rebase my fix
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/474060.html
+on top of it.
 
 
-This patch can be pickup up now. I have just tested with next-20171015 + 
-linux-davinci/master.
+Laura Abbott (2):
+  arm: Cleanup sanity_check_meminfo
+  arm: Adjust memory boundaries after reservations
+
+ arch/arm/kernel/setup.c | 12 ++++++++--
+ arch/arm/mm/mmu.c       | 62 +++++++++++++++++--------------------------------
+ arch/arm/mm/nommu.c     |  8 +++----
+ 3 files changed, 35 insertions(+), 47 deletions(-)
+
+-- 
+2.7.4
