@@ -1,72 +1,37 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Thu, 05 Jan 2017 11:20:30 +0200
-Subject: [RFC PATCH] usb: dwc3: add support for OTG driver compilation
-In-Reply-To: <B2EF86ADE403CA4A85AF1BE1D3A22A06DB2CED@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1483536181-22356-1-git-send-email-mnarani@xilinx.com>
- <1483536181-22356-2-git-send-email-mnarani@xilinx.com>
- <87r34jvtn5.fsf@linux.intel.com>
- <B2EF86ADE403CA4A85AF1BE1D3A22A06DB2CED@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <87bmvlx3q9.fsf@linux.intel.com>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Thu, 05 Jan 2017 18:23:15 +0900
+Subject: [PATCH v2 3/4] arm64: dts: exynos: make tm2 and tm2e independent
+ from each other
+In-Reply-To: <586E0E56.6050608@samsung.com>
+References: <1483604833-29746-1-git-send-email-jcsing.lee@samsung.com>
+ <CGME20170105082716epcas1p1f2a6eea40d842e2d8f7f7f54c029bc82@epcas1p1.samsung.com>
+ <1483604833-29746-4-git-send-email-jcsing.lee@samsung.com>
+ <586E0E56.6050608@samsung.com>
+Message-ID: <20170105092315.swensammin4wbgx5@gangnam.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Chanwoo,
 
-Hi,
+> I add the some comment as following:
+> - ldo23/25/31/38 have the different value between tm2 and tm2e.
 
-Manish Narani <manish.narani@xilinx.com> writes:
-> Hi Felipe,
->
->
->> From: Felipe Balbi [mailto:balbi at kernel.org]
->> Sent: Wednesday, January 04, 2017 7:01 PM
->> Hi,
->>
->> Manish Narani <manish.narani@xilinx.com> writes:
->> > This patch adds support for OTG driver compilation and object file
->> > creation
->> >
->> > Signed-off-by: Manish Narani <mnarani@xilinx.com>
->> > ---
->> >  drivers/usb/dwc3/Makefile | 4 ++++
->> >  1 file changed, 4 insertions(+)
->> >
->> > diff --git a/drivers/usb/dwc3/Makefile b/drivers/usb/dwc3/Makefile
->> > index ffca340..2d269ad 100644
->> > --- a/drivers/usb/dwc3/Makefile
->> > +++ b/drivers/usb/dwc3/Makefile
->> > @@ -17,6 +17,10 @@ ifneq ($(filter y,$(CONFIG_USB_DWC3_GADGET)
->> $(CONFIG_USB_DWC3_DUAL_ROLE)),)
->> >     dwc3-y                          += gadget.o ep0.o
->> >  endif
->> >
->> > +ifneq ($(CONFIG_USB_DWC3_DUAL_ROLE),)
->> > +   dwc3-y                          += otg.o
->> > +endif
->>
->> you just broke compilation
->
-> Should I add new USB_DWC3_OTG macro in Kconfig?
+Thanks for pointing this out. I planned to do this already in a
+following patch as for now I think it's out from the scope of this
+particular patch.
 
-No, no. Reset your tree to this commit and try to compile it. Problem
-should be clear.
+> - The patch[1] was alread posted. I think you better to rebase this patch on patch[1].
+> [1] https://patchwork.kernel.org/patch/9491769/
+> - ("ARM64: dts: TM2: comply to the samsung pinctrl naming convention")
 
-> This email and any attachments are intended for the sole use of the
-> named recipient(s) and contain(s) confidential information that may be
-> proprietary, privileged or copyrighted under applicable law. If you
-> are not the intended recipient, do not read, copy, or forward this
-> email message or any attachments. Delete this email message and any
-> attachments immediately.
+Yes, I also thought about this, but I didn't know whether it was
+already picked by anyone. I didn't want to stop Jaechul that's
+why I was planning to rebase the other rather than this.
+But you are right, because some bits of the other patches I know
+that have been merged. Thank you!
 
-you should make sure these notes aren't sent to public mailing
-lists. I'll delete this email of yours and stop reading them until this
-is sorted out.
+Krzysztof, do you mind if I send patch 3 as a reply to this
+e-mail? The changes should not affect patch 4, anyway.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170105/2f209b19/attachment.sig>
+Thanks,
+Andi
