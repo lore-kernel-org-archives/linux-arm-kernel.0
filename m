@@ -1,42 +1,67 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu,  5 Jan 2017 12:54:16 -0600
-Subject: [PATCH v3 0/4] TI DA8xx/OMAPL13x/AM17xx/AM18xx/66AK2x UART
-Message-ID: <1483642460-6891-1-git-send-email-david@lechnology.com>
+Date: Thu,  5 Jan 2017 12:54:19 -0600
+Subject: [PATCH v3 3/4] ARM: da850: Add ti,
+ da830-uart compatible for serial ports
+In-Reply-To: <1483642460-6891-1-git-send-email-david@lechnology.com>
+References: <1483642460-6891-1-git-send-email-david@lechnology.com>
+Message-ID: <1483642460-6891-4-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds a new UART port type for TI DA8xx/OMAPL13x/AM17xx/AM18xx/66AK2x
-UART. These SoCs have a non-standard register for UART power management that
-needs special handling in the UART driver.
+TI DA8xx/OMAPL13x/AM17xx/AM18xx SoCs have extra UART registers beyond
+the standard 8250 registers, so we need a new compatible string to
+indicate this. Also, at least one of these registers uses the full 32
+bits, so we need to specify reg-io-width in addition to reg-shift.
 
-Greg, the first two patches will need to go through your tree. Sekhar and
-Santosh will pick up the 3 and 4 patches respectively.
+"ns16550a" is left in the compatible specification since it does work
+as long as the bootloader configures the SoC UART power management
+registers.
+
+Signed-off-by: David Lechner <david@lechnology.com>
+---
 
 v3 changes:
-* Shortened list of SoCs to "DA8xx/66AK2x"
+* None
 
 v2 changes:
-* Added references to C66x SoC in various places, which I assume is an OK
-  shorthand for TI Keystone processors.
-* New patch for Keystone device tree. This is untested as I don't have any
-  Keystone boards.
+* None
 
-David Lechner (4):
-  doc: DT: Add ti,da830-uart to serial/8250 bindings
-  serial: 8250: Add new port type for TI DA8xx/66AK2x
-  ARM: da850: Add ti,da830-uart compatible for serial ports
-  ARM: dts: keystone: Add "ti,da830-uart" compatible string
 
- Documentation/devicetree/bindings/serial/8250.txt |  1 +
- arch/arm/boot/dts/da850.dtsi                      |  9 ++++++---
- arch/arm/boot/dts/keystone-k2g.dtsi               |  2 +-
- arch/arm/boot/dts/keystone-k2l.dtsi               |  4 ++--
- arch/arm/boot/dts/keystone.dtsi                   |  4 ++--
- drivers/tty/serial/8250/8250_of.c                 |  1 +
- drivers/tty/serial/8250/8250_port.c               | 22 ++++++++++++++++++++++
- include/uapi/linux/serial_core.h                  |  3 ++-
- include/uapi/linux/serial_reg.h                   |  8 ++++++++
- 9 files changed, 45 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/da850.dtsi | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 104155d..f6cd212 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -266,22 +266,25 @@
+ 			interrupt-names = "edm3_tcerrint";
+ 		};
+ 		serial0: serial at 42000 {
+-			compatible = "ns16550a";
++			compatible = "ti,da830-uart", "ns16550a";
+ 			reg = <0x42000 0x100>;
++			reg-io-width = <4>;
+ 			reg-shift = <2>;
+ 			interrupts = <25>;
+ 			status = "disabled";
+ 		};
+ 		serial1: serial at 10c000 {
+-			compatible = "ns16550a";
++			compatible = "ti,da830-uart", "ns16550a";
+ 			reg = <0x10c000 0x100>;
++			reg-io-width = <4>;
+ 			reg-shift = <2>;
+ 			interrupts = <53>;
+ 			status = "disabled";
+ 		};
+ 		serial2: serial at 10d000 {
+-			compatible = "ns16550a";
++			compatible = "ti,da830-uart", "ns16550a";
+ 			reg = <0x10d000 0x100>;
++			reg-io-width = <4>;
+ 			reg-shift = <2>;
+ 			interrupts = <61>;
+ 			status = "disabled";
 -- 
 2.7.4
