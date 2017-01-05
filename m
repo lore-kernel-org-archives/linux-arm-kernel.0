@@ -1,102 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 5 Jan 2017 08:50:23 +0000
-Subject: [PATCH v3] mfd: axp20x: Fix AXP806 access errors on cold boot
-In-Reply-To: <20170105040103.10303-1-wens@csie.org>
-References: <20170105040103.10303-1-wens@csie.org>
-Message-ID: <20170105085023.GP24225@dell>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Thu, 05 Jan 2017 09:55:56 +0100
+Subject: [PATCH 08/12] ARM: dts: socfpga: Add NAND device tree for Arria10
+In-Reply-To: <1483575694-29599-9-git-send-email-dinguyen@kernel.org>
+References: <1483575694-29599-1-git-send-email-dinguyen@kernel.org>
+ <1483575694-29599-9-git-send-email-dinguyen@kernel.org>
+Message-ID: <73a8b5ga1v.fsf@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 05 Jan 2017, Chen-Yu Tsai wrote:
 
-> The AXP806 supports either master/standalone or slave mode.
-> Slave mode allows sharing the serial bus, even with multiple
-> AXP806 which all have the same hardware address.
-> 
-> This is done with extra "serial interface address extension",
-> or AXP806_BUS_ADDR_EXT, and "register address extension", or
-> AXP806_REG_ADDR_EXT, registers. The former is read-only, with
-> 1 bit customizable at the factory, and 1 bit depending on the
-> state of an external pin. The latter is writable. Only when
-> the these device addressing bits (in the upper 4 bits of the
-> registers) match, will the device respond to operations on
-> its other registers.
-> 
-> The AXP806_REG_ADDR_EXT was previously configured by Allwinner's
-> bootloader. Work on U-boot SPL support now allows us to switch
-> to mainline U-boot, which doesn't do this for us. There might
-> be other bare minimum bootloaders out there which don't to this
-> either. It's best to handle this in the kernel.
-> 
-> This patch sets AXP806_REG_ADDR_EXT to 0x10, which is what we
-> know to be the proper value for a standard AXP806 in slave mode.
-> Afterwards it will reinitialize the regmap cache, to purge any
-> invalid stale values.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Hi!
+
+Dinh Nguyen <dinguyen@kernel.org> writes:
+
+> From: Graham Moore <grmoore@opensource.altera.com>
+>
+> Add socfpga_arria10_socdk_nand.dts board file for supporting NAND.
+>
+> Signed-off-by: Graham Moore <grmoore@opensource.altera.com>
+> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
 > ---
-> Changes since v2:
-> 
->   - Dropped regcache_sync_region() and regmap_reinit_cache() calls.
->     The write immediately after getting the regmap from the caller
->     of axp20x_device_probe() is enough.
-> 
->   - Slightly rearranged a few sentences in the comment block.
-> ---
->  drivers/mfd/axp20x.c | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
+>  arch/arm/boot/dts/Makefile                       |  1 +
+>  arch/arm/boot/dts/socfpga_arria10_socdk_nand.dts | 44 ++++++++++++++++++++++++
+>  2 files changed, 45 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/socfpga_arria10_socdk_nand.dts
+>
 
-Much better.
+(...)
 
-Applied, thanks.
-
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index ed918de84238..81b9ddd10e6c 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -31,6 +31,8 @@
->  
->  #define AXP20X_OFF	0x80
->  
-> +#define AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE	BIT(4)
+> +#include "socfpga_arria10_socdk.dtsi"
 > +
->  static const char * const axp20x_model_names[] = {
->  	"AXP152",
->  	"AXP202",
-> @@ -830,6 +832,30 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
->  {
->  	int ret;
->  
-> +	/*
-> +	 * The AXP806 supports either master/standalone or slave mode.
-> +	 * Slave mode allows sharing the serial bus, even with multiple
-> +	 * AXP806 which all have the same hardware address.
-> +	 *
-> +	 * This is done with extra "serial interface address extension",
-> +	 * or AXP806_BUS_ADDR_EXT, and "register address extension", or
-> +	 * AXP806_REG_ADDR_EXT, registers. The former is read-only, with
-> +	 * 1 bit customizable at the factory, and 1 bit depending on the
-> +	 * state of an external pin. The latter is writable. The device
-> +	 * will only respond to operations to its other registers when
-> +	 * the these device addressing bits (in the upper 4 bits of the
-> +	 * registers) match.
-> +	 *
-> +	 * Since we only support an AXP806 chained to an AXP809 in slave
-> +	 * mode, and there isn't any existing hardware which uses AXP806
-> +	 * in master mode, or has 2 AXP806s in the same system, we can
-> +	 * just program the register address extension to the slave mode
-> +	 * address.
-> +	 */
-> +	if (axp20x->variant == AXP806_ID)
-> +		regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
-> +			     AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE);
+> +/ {
+> +	soc {
+> +		nand: nand at ffb90000 {
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			status = "okay";
 > +
->  	ret = regmap_add_irq_chip(axp20x->regmap, axp20x->irq,
->  				  IRQF_ONESHOT | IRQF_SHARED, -1,
->  				  axp20x->regmap_irq_chip,
+> +			compatible = "denali,denali-nand-dt", "altr,socfpga-denali-nand";
+> +			reg = <0xffb90000 0x72000>, <0xffb80000 0x10000>;
+> +			reg-names = "nand_data", "denali_reg";
+> +			interrupts = <0 99 4>;
+> +			dma-mask = <0xffffffff>;
+> +			clocks = <&nand_clk>;
+
+This belongs into the socfpga_arria10.dtsi.
+
+Regards,
+Steffen
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           | Steffen Trumtrar            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
