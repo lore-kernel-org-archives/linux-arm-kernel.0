@@ -1,52 +1,45 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 5 Jan 2017 20:32:42 +0200
-Subject: [PATCH] cpufreq: Remove CONFIG_CPU_FREQ_STAT_DETAILS config option
-In-Reply-To: <d4299228a500a889c2b4b9e305674f3d1ea9ae06.1483604760.git.viresh.kumar@linaro.org>
-References: <d4299228a500a889c2b4b9e305674f3d1ea9ae06.1483604760.git.viresh.kumar@linaro.org>
-Message-ID: <20170105183242.cwyymvr37mdqb6mj@kozik-lap>
+Date: Thu, 5 Jan 2017 20:37:59 +0200
+Subject: [PATCH v2 3/4] arm64: dts: exynos: make tm2 and tm2e independent
+ from each other
+In-Reply-To: <20170105092315.swensammin4wbgx5@gangnam.samsung>
+References: <1483604833-29746-1-git-send-email-jcsing.lee@samsung.com>
+ <CGME20170105082716epcas1p1f2a6eea40d842e2d8f7f7f54c029bc82@epcas1p1.samsung.com>
+ <1483604833-29746-4-git-send-email-jcsing.lee@samsung.com>
+ <586E0E56.6050608@samsung.com>
+ <20170105092315.swensammin4wbgx5@gangnam.samsung>
+Message-ID: <20170105183759.ohmsu5ndxt7hwkjj@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 01:57:41PM +0530, Viresh Kumar wrote:
-> This doesn't have any benefit apart from saving a small amount of memory
-> when it is disabled. The ifdef hackery in the code makes it dirty
-> unnecessarily.
+On Thu, Jan 05, 2017 at 06:23:15PM +0900, Andi Shyti wrote:
+> Hi Chanwoo,
 > 
-> Clean it up by removing the Kconfig option completely. Few defconfigs
-> are also updated and CONFIG_CPU_FREQ_STAT_DETAILS is replaced with
-> CONFIG_CPU_FREQ_STAT now in them, as users wanted stats to be enabled.
+> > I add the some comment as following:
+> > - ldo23/25/31/38 have the different value between tm2 and tm2e.
 > 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  arch/arm/configs/exynos_defconfig         |  2 +-
->  arch/arm/configs/multi_v5_defconfig       |  2 +-
->  arch/arm/configs/multi_v7_defconfig       |  2 +-
->  arch/arm/configs/mvebu_v5_defconfig       |  2 +-
->  arch/arm/configs/pxa_defconfig            |  2 +-
->  arch/arm/configs/shmobile_defconfig       |  2 +-
->  arch/mips/configs/lemote2f_defconfig      |  1 -
->  arch/powerpc/configs/ppc6xx_defconfig     |  1 -
->  arch/sh/configs/sh7785lcr_32bit_defconfig |  2 +-
->  drivers/cpufreq/Kconfig                   |  8 --------
->  drivers/cpufreq/cpufreq_stats.c           | 14 --------------
->  11 files changed, 7 insertions(+), 31 deletions(-)
+> Thanks for pointing this out. I planned to do this already in a
+> following patch as for now I think it's out from the scope of this
+> particular patch.
 > 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 79c415c33f69..809f0bf3042a 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -24,7 +24,7 @@ CONFIG_ARM_APPENDED_DTB=y
->  CONFIG_ARM_ATAG_DTB_COMPAT=y
->  CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC1,115200 init=/linuxrc mem=256M"
->  CONFIG_CPU_FREQ=y
-> -CONFIG_CPU_FREQ_STAT_DETAILS=y
-> +CONFIG_CPU_FREQ_STAT=y
->  CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
->  CONFIG_CPU_FREQ_GOV_POWERSAVE=m
->  CONFIG_CPU_FREQ_GOV_USERSPACE=m
+> > - The patch[1] was alread posted. I think you better to rebase this patch on patch[1].
+> > [1] https://patchwork.kernel.org/patch/9491769/
+> > - ("ARM64: dts: TM2: comply to the samsung pinctrl naming convention")
+> 
+> Yes, I also thought about this, but I didn't know whether it was
+> already picked by anyone. I didn't want to stop Jaechul that's
+> why I was planning to rebase the other rather than this.
+> But you are right, because some bits of the other patches I know
+> that have been merged. Thank you!
+> 
+> Krzysztof, do you mind if I send patch 3 as a reply to this
+> e-mail? The changes should not affect patch 4, anyway.
 
-For Exynos:
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+By patch 3 you mean this patch? Yes, you can send another version as a
+reply-to but please version it (2.1? etc).
+
+Anyway I need a proper rename detection. I pointed proper command last
+time. Is it working?
 
 Best regards,
 Krzysztof
