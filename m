@@ -1,90 +1,76 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  5 Jan 2017 12:01:03 +0800
-Subject: [PATCH v3] mfd: axp20x: Fix AXP806 access errors on cold boot
-Message-ID: <20170105040103.10303-1-wens@csie.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 4 Jan 2017 20:04:16 -0800
+Subject: [PATCHv2 2/5] arm: mvebu: support for SMP on 98DX3336 SoC
+In-Reply-To: <20170105033641.6212-3-chris.packham@alliedtelesis.co.nz>
+References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
+ <20170105033641.6212-3-chris.packham@alliedtelesis.co.nz>
+Message-ID: <5edb6751-d15b-6654-f4ae-adf38fafb8a4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP806 supports either master/standalone or slave mode.
-Slave mode allows sharing the serial bus, even with multiple
-AXP806 which all have the same hardware address.
+Le 01/04/17 ? 19:36, Chris Packham a ?crit :
+> Compared to the armada-xp the 98DX3336 uses different registers to set
+> the boot address for the secondary CPU so a new enable-method is needed.
+> This will only work if the machine definition doesn't define an overall
+> smp_ops because there is not currently a way of overriding this from the
+> device tree if it is set in the machine definition.
 
-This is done with extra "serial interface address extension",
-or AXP806_BUS_ADDR_EXT, and "register address extension", or
-AXP806_REG_ADDR_EXT, registers. The former is read-only, with
-1 bit customizable at the factory, and 1 bit depending on the
-state of an external pin. The latter is writable. Only when
-the these device addressing bits (in the upper 4 bits of the
-registers) match, will the device respond to operations on
-its other registers.
+Not sure I follow you here, in theory, each individual CPU could have a
+different enable-method property, and considering how you leverage
+existing DTS include files, you should be able to override the DTS with
+the appropriate enable-method, or do you have a different problem?
 
-The AXP806_REG_ADDR_EXT was previously configured by Allwinner's
-bootloader. Work on U-boot SPL support now allows us to switch
-to mainline U-boot, which doesn't do this for us. There might
-be other bare minimum bootloaders out there which don't to this
-either. It's best to handle this in the kernel.
+ mv98dx3236_resume_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
+> +{
+> +	WARN_ON(hw_cpu != 1);
+> +
+> +	writel(0, mv98dx3236_resume_base + MV98DX3236_CPU_RESUME_CTRL_OFFSET);
+> +	writel(virt_to_phys(boot_addr), mv98dx3236_resume_base +
+> +	       MV98DX3236_CPU_RESUME_ADDR_OFFSET);
 
-This patch sets AXP806_REG_ADDR_EXT to 0x10, which is what we
-know to be the proper value for a standard AXP806 in slave mode.
-Afterwards it will reinitialize the regmap cache, to purge any
-invalid stale values.
+I just submitted a patch series that switches such users to
+__pa_symbol() instead of virt_to_phys() because this is a kernel image
+symbol. For now this will work as-is, but depending on which patch
+series makes it first, it may be a good idea to keep this on someone's
+TODO list (yours or mine). I do expect having to make a second pass of
+conversions anyway.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
-Changes since v2:
+[1]: https://lkml.org/lkml/2017/1/4/1101
 
-  - Dropped regcache_sync_region() and regmap_reinit_cache() calls.
-    The write immediately after getting the regmap from the caller
-    of axp20x_device_probe() is enough.
+> +}
+> +
+> +static int __init mv98dx3236_resume_init(void)
+> +{
+> +	struct device_node *np;
+> +	struct resource res;
+> +	int ret = 0;
+> +
+> +	np = of_find_matching_node(NULL, of_mv98dx3236_resume_table);
+> +	if (!np)
+> +		return 0;
+> +
+> +	pr_info("Initializing 98DX3236 Resume\n");
 
-  - Slightly rearranged a few sentences in the comment block.
----
- drivers/mfd/axp20x.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+This can be probably be dropped, you should know fairly quickly if this
+succeeded or not.
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index ed918de84238..81b9ddd10e6c 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -31,6 +31,8 @@
- 
- #define AXP20X_OFF	0x80
- 
-+#define AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE	BIT(4)
-+
- static const char * const axp20x_model_names[] = {
- 	"AXP152",
- 	"AXP202",
-@@ -830,6 +832,30 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
- {
- 	int ret;
- 
-+	/*
-+	 * The AXP806 supports either master/standalone or slave mode.
-+	 * Slave mode allows sharing the serial bus, even with multiple
-+	 * AXP806 which all have the same hardware address.
-+	 *
-+	 * This is done with extra "serial interface address extension",
-+	 * or AXP806_BUS_ADDR_EXT, and "register address extension", or
-+	 * AXP806_REG_ADDR_EXT, registers. The former is read-only, with
-+	 * 1 bit customizable at the factory, and 1 bit depending on the
-+	 * state of an external pin. The latter is writable. The device
-+	 * will only respond to operations to its other registers when
-+	 * the these device addressing bits (in the upper 4 bits of the
-+	 * registers) match.
-+	 *
-+	 * Since we only support an AXP806 chained to an AXP809 in slave
-+	 * mode, and there isn't any existing hardware which uses AXP806
-+	 * in master mode, or has 2 AXP806s in the same system, we can
-+	 * just program the register address extension to the slave mode
-+	 * address.
-+	 */
-+	if (axp20x->variant == AXP806_ID)
-+		regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
-+			     AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE);
-+
- 	ret = regmap_add_irq_chip(axp20x->regmap, axp20x->irq,
- 				  IRQF_ONESHOT | IRQF_SHARED, -1,
- 				  axp20x->regmap_irq_chip,
+Can't this function be implemented as a smp_ops::smp_init_cpus instead
+of having this initialization done at arch_initcall time?
+
+> +
+> +	if (of_address_to_resource(np, 0, &res)) {
+> +		pr_err("unable to get resource\n");
+> +		ret = -ENOENT;
+> +		goto out;
+> +	}
+> +
+> +	if (!request_mem_region(res.start, resource_size(&res),
+> +				np->full_name)) {
+> +		pr_err("unable to request region\n");
+> +		ret = -EBUSY;
+> +		goto out;
+> +	}
+
+You should be able to use of_io_request_and_map() and here.
 -- 
-2.11.0
+Florian
