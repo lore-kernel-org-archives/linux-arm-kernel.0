@@ -1,93 +1,88 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Thu,  5 Jan 2017 19:04:35 +0000
-Subject: [PATCH v6 07/18] iommu: Implement reserved_regions iommu-group sysfs
- file
+Date: Thu,  5 Jan 2017 19:04:38 +0000
+Subject: [PATCH v6 10/18] iommu/arm-smmu: Implement reserved region get/put
+ callbacks
 In-Reply-To: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
 References: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1483643086-2883-8-git-send-email-eric.auger@redhat.com>
+Message-ID: <1483643086-2883-11-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new iommu-group sysfs attribute file is introduced. It contains
-the list of reserved regions for the iommu-group. Each reserved
-region is described on a separate line:
-- first field is the start IOVA address,
-- second is the end IOVA address,
+The get() populates the list with the MSI IOVA reserved window.
+
+At the moment an arbitray MSI IOVA window is set at 0x8000000
+of size 1MB. This will allow to report those info in iommu-group
+sysfs.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
 
 v3 -> v4:
-- add cast to long long int when printing to avoid warning on
-  i386
-- change S_IRUGO into 0444
-- remove sort. The list is natively sorted now.
+- do not handle PCI host bridge windows anymore
+- encode prot
 
-The file layout is inspired of /sys/bus/pci/devices/BDF/resource.
-I also read Documentation/filesystems/sysfs.txt so I expect this
-to be frowned upon.
+RFC v2 -> v3:
+- use existing get/put_resv_regions
+
+RFC v1 -> v2:
+- use defines for MSI IOVA base and length
 ---
- drivers/iommu/iommu.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ drivers/iommu/arm-smmu.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index a2d51b3..15756d8 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -211,8 +211,32 @@ int iommu_get_group_resv_regions(struct iommu_group *group,
- }
- EXPORT_SYMBOL_GPL(iommu_get_group_resv_regions);
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index a60cded..a354572 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -281,6 +281,9 @@ enum arm_smmu_s2cr_privcfg {
  
-+static ssize_t iommu_group_show_resv_regions(struct iommu_group *group,
-+					     char *buf)
+ #define FSYNR0_WNR			(1 << 4)
+ 
++#define MSI_IOVA_BASE			0x8000000
++#define MSI_IOVA_LENGTH			0x100000
++
+ static int force_stage;
+ module_param(force_stage, int, S_IRUGO);
+ MODULE_PARM_DESC(force_stage,
+@@ -1549,6 +1552,29 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+ 	return iommu_fwspec_add_ids(dev, &fwid, 1);
+ }
+ 
++static void arm_smmu_get_resv_regions(struct device *dev,
++				      struct list_head *head)
 +{
-+	struct iommu_resv_region *region, *next;
-+	struct list_head group_resv_regions;
-+	char *str = buf;
++	struct iommu_resv_region *region;
++	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
 +
-+	INIT_LIST_HEAD(&group_resv_regions);
-+	iommu_get_group_resv_regions(group, &group_resv_regions);
++	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
++					 prot, IOMMU_RESV_MSI);
++	if (!region)
++		return;
 +
-+	list_for_each_entry_safe(region, next, &group_resv_regions, list) {
-+		str += sprintf(str, "0x%016llx 0x%016llx\n",
-+			       (long long int)region->start,
-+			       (long long int)(region->start +
-+						region->length - 1));
-+		kfree(region);
-+	}
-+
-+	return (str - buf);
++	list_add_tail(&region->list, head);
 +}
 +
- static IOMMU_GROUP_ATTR(name, S_IRUGO, iommu_group_show_name, NULL);
- 
-+static IOMMU_GROUP_ATTR(reserved_regions, 0444,
-+			iommu_group_show_resv_regions, NULL);
++static void arm_smmu_put_resv_regions(struct device *dev,
++				      struct list_head *head)
++{
++	struct iommu_resv_region *entry, *next;
 +
- static void iommu_group_release(struct kobject *kobj)
- {
- 	struct iommu_group *group = to_iommu_group(kobj);
-@@ -227,6 +251,8 @@ static void iommu_group_release(struct kobject *kobj)
- 	if (group->default_domain)
- 		iommu_domain_free(group->default_domain);
- 
-+	iommu_group_remove_file(group, &iommu_group_attr_reserved_regions);
++	list_for_each_entry_safe(entry, next, head, list)
++		kfree(entry);
++}
 +
- 	kfree(group->name);
- 	kfree(group);
- }
-@@ -290,6 +316,11 @@ struct iommu_group *iommu_group_alloc(void)
- 	 */
- 	kobject_put(&group->kobj);
+ static struct iommu_ops arm_smmu_ops = {
+ 	.capable		= arm_smmu_capable,
+ 	.domain_alloc		= arm_smmu_domain_alloc,
+@@ -1564,6 +1590,8 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+ 	.domain_get_attr	= arm_smmu_domain_get_attr,
+ 	.domain_set_attr	= arm_smmu_domain_set_attr,
+ 	.of_xlate		= arm_smmu_of_xlate,
++	.get_resv_regions	= arm_smmu_get_resv_regions,
++	.put_resv_regions	= arm_smmu_put_resv_regions,
+ 	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
+ };
  
-+	ret = iommu_group_create_file(group,
-+				      &iommu_group_attr_reserved_regions);
-+	if (ret)
-+		return ERR_PTR(ret);
-+
- 	pr_debug("Allocated group %d\n", group->id);
- 
- 	return group;
 -- 
 1.9.1
