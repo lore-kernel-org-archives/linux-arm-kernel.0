@@ -1,43 +1,67 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 5 Jan 2017 22:19:47 +0100
-Subject: [PATCH 2/2] isdn: i4l: move active-isdn drivers to staging
-In-Reply-To: <3286019.I2UkVCJq41@wuerfel>
-References: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
- <1456945629-1793533-2-git-send-email-arnd@arndb.de>
- <20170103152436.GA26156@kroah.com> <3286019.I2UkVCJq41@wuerfel>
-Message-ID: <20170105211947.GA18143@kroah.com>
+From: webczat_200@poczta.onet.pl (=?UTF-8?Q?Micha=c5=82_Zegan?=)
+Date: Thu, 5 Jan 2017 20:04:03 +0100
+Subject: [PATCH] ARM64: dts: meson-gxbb-odroidc2: Disable SCPI DVFS
+In-Reply-To: <1483628549-29486-1-git-send-email-narmstrong@baylibre.com>
+References: <1483628549-29486-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <9f508097-f605-ebd8-20af-c3e798c6fdcc@poczta.onet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 10:19:29PM +0100, Arnd Bergmann wrote:
-> On Tuesday, January 3, 2017 4:24:36 PM CET Greg Kroah-Hartman wrote:
-> > On Wed, Mar 02, 2016 at 08:06:46PM +0100, Arnd Bergmann wrote:
-> > > The icn, act2000 and pcbit drivers are all for very old hardware,
-> > > and it is highly unlikely that anyone is actually still using them
-> > > on modern kernels, if at all.
-> > > 
-> > > All three drivers apparently are for hardware that predates PCI
-> > > being the common connector, as they are ISA-only and active
-> > > PCI ISDN cards were widely available in the 1990s.
-> > > 
-> > > Looking through the git logs, it I cannot find any indication of a
-> > > patch to any of these drivers that has been tested on real hardware,
-> > > only cleanups or global API changes.
-> > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > Acked-by: Karsten Keil <isdn@linux-pingi.de>
-> > 
-> > This patch got added in the 4.6 kernel release.  As I am now taking
-> > patches for 4.11-rc1, I figure it is time to just delete the
-> > drivers/staging/i4l/ directory now, given that no one has really done
-> > anything with it.  If people show up that wish to maintain it, I'll be
-> > glad to revert it, or if someone really screams in the next week.
-> > Otherwise it's time to just move on 
+Hello.
+
+The patch causes cpufreq module (scpi-cpufreq) not to detect cpufreq, so
+it actually works, but...
+Loading the module causes few errors because of not found frequencies or
+something, then it is all okay. However after loading scpi-cpufreq you
+cannot actually power the cpu off and on. You will power it off
+successfully, but when trying to power it on, the cpufreq driver will
+error out, and then after it happens, the cpu that was trying to go
+online will be offline again, and that is a little... unfortunate. The
+question is, and I cannot really test that: will the module actually
+autoload after this change?
+
+W dniu 05.01.2017 o 16:02, Neil Armstrong pisze:
+> The current hardware is not able to run with all cores enabled at a
+> cluster frequency superior at 1536MHz.
+> But the currently shipped u-boot for the platform still reports an OPP
+> table with possible DVFS frequency up to 2GHz, and will not change since
+> the off-tree linux tree supports limiting the OPPs with a kernel parameter.
+> A recent u-boot change reports the boot-time DVFS around 100MHz and
+> the default performance cpufreq governor sets the maximum frequency.
+> Previous version of u-boot reported to be already at the max OPP and
+> left the OPP as is.
+> Nevertheless, other governors like ondemand could setup the max frequency
+> and make the system crash.
 > 
-> Sounds good to me.
+> This patch disables the DVFS clock and disables cpufreq.
+> 
+> Fixes: 70db166a2baa ("ARM64: dts: meson-gxbb: Add SCPI with cpufreq & sensors Nodes")
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> index 238fbea..5e63e3b 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> @@ -137,6 +137,10 @@
+>  	};
+>  };
+>  
+> +&scpi_dvfs {
+> +	status = "disabled";
+> +};
+> +
+>  &uart_AO {
+>  	status = "okay";
+>  	pinctrl-0 = <&uart_ao_a_pins>;
+> 
 
-Ok, now deleted!
-
-thanks,
-
-greg k-h
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 525 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170105/9c0439b7/attachment.sig>
