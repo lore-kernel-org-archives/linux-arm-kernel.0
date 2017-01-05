@@ -1,56 +1,57 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Thu, 5 Jan 2017 09:10:35 +0100
-Subject: [PATCH 15/22] mfd: axp20x: add CHRG_CTRL1 to writeable regs for
- AXP20X/AXP22X
-In-Reply-To: <CAGb2v67KmaECfFO+QBxKbtKscD0O=KNVHO1TS4FspYEdaLWUCA@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 5 Jan 2017 16:16:07 +0800
+Subject: [PATCH 05/22] ARM: dtsi: axp209: add AXP209 ADC subnode
+In-Reply-To: <1ddf7012-3336-84c2-6392-353b01beea93@free-electrons.com>
 References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
- <20170102163723.7939-16-quentin.schulz@free-electrons.com>
- <CAGb2v67KmaECfFO+QBxKbtKscD0O=KNVHO1TS4FspYEdaLWUCA@mail.gmail.com>
-Message-ID: <304cdd9e-93a7-f554-99ce-e3e01762761d@free-electrons.com>
+ <20170102163723.7939-6-quentin.schulz@free-electrons.com>
+ <CAGb2v66dw=DECuHpLDzHnMP-O4UwZ+RkPsH0RofOGdBa7z7OHw@mail.gmail.com>
+ <1ddf7012-3336-84c2-6392-353b01beea93@free-electrons.com>
+Message-ID: <CAGb2v67zHf9maNvTVKBZWUTAZFP++PsJt+e3_Mt=Mv4FQ-6FZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/2017 07:10, Chen-Yu Tsai wrote:
-> On Tue, Jan 3, 2017 at 12:37 AM, Quentin Schulz
-> <quentin.schulz@free-electrons.com> wrote:
->> The CHR_CTRL1 register is made of 7 read-write bits with one being used
->> to set the target voltage for battery charging.
-> 
-> The description is incorrect.
-> 
-> All 8 bits are read-write:
-> 
->   - The highest bit enables the charger module
->   - Bits [6:5] set the target voltage
->   - Bits [4:3] set when the charge cycle ends, based on percentage
->     of charge current
->   - Bits [2:0] set the charge current
-> 
-> Feel free to use the above in the commit message.
-> 
-
-Thanks for the correction.
-
+On Thu, Jan 5, 2017 at 4:08 PM, Quentin Schulz
+<quentin.schulz@free-electrons.com> wrote:
+> On 05/01/2017 06:51, Chen-Yu Tsai wrote:
+>> On Tue, Jan 3, 2017 at 12:37 AM, Quentin Schulz
+>> <quentin.schulz@free-electrons.com> wrote:
+>>> X-Powers AXP209 PMIC has multiple ADCs, each one exposing data from the
+>>> different power supplies connected to the PMIC.
+>>>
+>>> This adds the ADC subnode for AXP20X PMIC.
+>>>
+>>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>>> ---
+>>>  arch/arm/boot/dts/axp209.dtsi | 5 +++++
+>>>  1 file changed, 5 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/axp209.dtsi b/arch/arm/boot/dts/axp209.dtsi
+>>> index 675bb0f..2a4e8ee 100644
+>>> --- a/arch/arm/boot/dts/axp209.dtsi
+>>> +++ b/arch/arm/boot/dts/axp209.dtsi
+>>> @@ -53,6 +53,11 @@
+>>>         interrupt-controller;
+>>>         #interrupt-cells = <1>;
+>>>
+>>> +       axp209_adc: axp209_adc {
 >>
->> This adds the CHRG_CTRL1 register to the list of writeable registers for
->> AXP20X and AXP22X PMICs.
-> 
-> You might want to add up to CHRG_CTRL3 for the AXP22x and CHRG_CTRL2
-> for the AXP20x. These control additional aspects of the charger.
-> 
+>> Node name should be generic. Please change it to "adc".
+>>
+>
+> OK, do I keep the label as is?
+>
+> axp209_adc: adc {
 
-ACK.
+Yup. The label is for dereferencing and stuff, and exists in a global scope.
+You wouldn't want 2 label names clashing.
 
-> AXP20X_CHRG_BAK_CTRL controls the charger for the RTC battery. You
-> could add this now, or let the person doing the RTC battery driver
-> add it.
+ChenYu
 
-I'll let the person adding the RTC battery driver add it.
-
-Thanks,
-Quentin
-
--- 
-Quentin Schulz, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+>
+> Thanks,
+> Quentin
+>
+> --
+> Quentin Schulz, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
