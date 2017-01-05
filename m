@@ -1,44 +1,54 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 5 Jan 2017 14:34:10 +0530
-Subject: [PATCH v2 4/4] ARM: dts: keystone: Add "ti, da830-uart" compatible
- string
-In-Reply-To: <93c4aed0-6faa-2c27-7931-454fc1f48e79@oracle.com>
-References: <1483561814-21953-1-git-send-email-david@lechnology.com>
- <1483561814-21953-5-git-send-email-david@lechnology.com>
- <93c4aed0-6faa-2c27-7931-454fc1f48e79@oracle.com>
-Message-ID: <824238e0-b710-7146-b67b-b2135c2a8bd2@ti.com>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Thu,  5 Jan 2017 10:07:21 +0100
+Subject: [PATCH v8 0/5] Add support for the STM32F4 I2C
+Message-ID: <1483607246-14771-1-git-send-email-cedric.madianga@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+This patchset adds support for the I2C controller embedded in STM32F4xx SoC.
+It enables I2C transfer in interrupt mode with Standard-mode and Fast-mode bus
+speed.
 
-On Thursday 05 January 2017 03:30 AM, Santosh Shilimkar wrote:
-> On 1/4/2017 12:30 PM, David Lechner wrote:
->> The TI Keystone SoCs have extra UART registers beyond the standard 8250
->> registers, so we need a new compatible string to indicate this. Also, at
->> least one of these registers uses the full 32 bits, so we need to specify
->> reg-io-width in addition to reg-shift.
->>
->> "ns16550a" is left in the compatible specification since it does work as
->> long as the bootloader configures the SoC UART power management
->> registers.
->>
-> NAK!!
-> We can't break the booting boards with existing boot loaders.
+Changes since v7:
+- Remove unneeded parenthesis in some macro definitions (Uwe)
+- Fix some typo (s/KhzkHZ, s/PEC/POC) (Uwe)
+- Fix alignment issues in some structures declaration (Uwe)
+- Clarify comments to argue i2c_timing values chosen (Uwe)
+- Raise an error if parent clk rate is out of scope during I2C hw config (Uwe)
+- Use dev_dbg instead of dev_err message when I2C bus is busy  (Uwe)
+- Add more comments about stuff done by stm32f4_i2c_handle_rx_btf() (Uwe)
+- Simplify stm32f4_i2c_isr_error() routine implementation by removing possible
+  status checking (Uwe)
+- Rework stm32f4_i2c_isr_error() routine by removing the loop to check which status occured  (Uwe)
+- Add open-drain property for SCL pins  (Uwe)
+- Rework unneeded mul_ccr field from i2c_timing structure
+- Remove min_ccr field from i2c_timing structure as default scl_period is chosen
+  to have a correct minimal ccr value
+- Execute hw_config once during probe
+- Remove soft_reset after an I2C error as all errors are now handled and
+  hw_config is done once during probe
+- Generate STOP by software when Acknowledge failure occurs
+- Set the max speed mode for I2C pins
+- Add bias-disable property for I2C pins
+- Use intrinsic limitation of APB bus to set I2C max input clk
 
-Sorry, but it not clear to me how this breaks booting with older
-bootloaders? If older DTB is ROM'ed, it will continue to work because of
-match with ns16550a.
+M'boumba Cedric Madianga (5):
+  dt-bindings: Document the STM32 I2C bindings
+  i2c: Add STM32F4 I2C driver
+  ARM: dts: stm32: Add I2C1 support for STM32F429 SoC
+  ARM: dts: stm32: Add I2C1 support for STM32429 eval board
+  ARM: configs: stm32: Add I2C support for STM32 defconfig
 
-I just verified boot on K2E with these patches applied and using 2016.05
-based U-Boot from a TI release.
+ .../devicetree/bindings/i2c/i2c-stm32.txt          |  33 +
+ arch/arm/boot/dts/stm32429i-eval.dts               |   6 +
+ arch/arm/boot/dts/stm32f429.dtsi                   |  23 +
+ arch/arm/configs/stm32_defconfig                   |   3 +
+ drivers/i2c/busses/Kconfig                         |  10 +
+ drivers/i2c/busses/Makefile                        |   1 +
+ drivers/i2c/busses/i2c-stm32f4.c                   | 866 +++++++++++++++++++++
+ 7 files changed, 942 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-stm32.txt
+ create mode 100644 drivers/i2c/busses/i2c-stm32f4.c
 
-http://pastebin.ubuntu.com/23744719/
-
-> I suggest you to first get the driver updated to take care of
-> the UART PM register and then enable the support for it.
-
-Isn't that what patch 2/4 is doing?
-
-Thanks,
-Sekhar
+-- 
+1.9.1
