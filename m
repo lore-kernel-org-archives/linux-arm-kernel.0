@@ -1,92 +1,49 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Thu,  5 Jan 2017 19:04:37 +0000
-Subject: [PATCH v6 09/18] iommu/amd: Declare MSI and HT regions as reserved
- IOVA regions
-In-Reply-To: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
-References: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1483643086-2883-10-git-send-email-eric.auger@redhat.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu,  5 Jan 2017 11:29:49 -0800
+Subject: [PATCH v2 0/8] ARM: dts: Switch to new DSA binding
+Message-ID: <20170105192957.14304-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch registers the MSI and HT regions as non mappable
-reserved regions. They will be exposed in the iommu-group sysfs.
+Hi all,
 
-For direct-mapped regions let's also use iommu_alloc_resv_region().
+This patch series converts the in-tree users to utilize the new (relatively)
+DSA binding that was introduced with commit 8c5ad1d6179d ("net: dsa: Document
+new binding"). The legacy binding node is kept included, but is marked
+disabled.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Changes in v2:
 
----
+- patch 1: Use an hexadecimal reg property
+- patch 2: fixed the subject
+- patch 3: s/okay/disabled/ for the legacy DSA node
+- patches 7/8: fixed a stray whitespace
 
-v5: creation
----
- drivers/iommu/amd_iommu.c | 37 ++++++++++++++++++++++++++-----------
- 1 file changed, 26 insertions(+), 11 deletions(-)
+In about 2-3 releases we may consider removing the old DSA binding entirely
+from the kernel.
 
-diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
-index c6c3f1e..24c752d 100644
---- a/drivers/iommu/amd_iommu.c
-+++ b/drivers/iommu/amd_iommu.c
-@@ -3164,6 +3164,7 @@ static bool amd_iommu_capable(enum iommu_cap cap)
- static void amd_iommu_get_resv_regions(struct device *dev,
- 				       struct list_head *head)
- {
-+	struct iommu_resv_region *region;
- 	struct unity_map_entry *entry;
- 	int devid;
- 
-@@ -3172,28 +3173,42 @@ static void amd_iommu_get_resv_regions(struct device *dev,
- 		return;
- 
- 	list_for_each_entry(entry, &amd_iommu_unity_map, list) {
--		struct iommu_resv_region *region;
-+		size_t length;
-+		int prot = 0;
- 
- 		if (devid < entry->devid_start || devid > entry->devid_end)
- 			continue;
- 
--		region = kzalloc(sizeof(*region), GFP_KERNEL);
-+		length = entry->address_end - entry->address_start;
-+		if (entry->prot & IOMMU_PROT_IR)
-+			prot |= IOMMU_READ;
-+		if (entry->prot & IOMMU_PROT_IW)
-+			prot |= IOMMU_WRITE;
-+
-+		region = iommu_alloc_resv_region(entry->address_start,
-+						 length, prot,
-+						 IOMMU_RESV_DIRECT);
- 		if (!region) {
- 			pr_err("Out of memory allocating dm-regions for %s\n",
- 				dev_name(dev));
- 			return;
- 		}
--
--		region->start = entry->address_start;
--		region->length = entry->address_end - entry->address_start;
--		region->type = IOMMU_RESV_DIRECT;
--		if (entry->prot & IOMMU_PROT_IR)
--			region->prot |= IOMMU_READ;
--		if (entry->prot & IOMMU_PROT_IW)
--			region->prot |= IOMMU_WRITE;
--
- 		list_add_tail(&region->list, head);
- 	}
-+
-+	region = iommu_alloc_resv_region(MSI_RANGE_START,
-+					 MSI_RANGE_END - MSI_RANGE_START + 1,
-+					 0, IOMMU_RESV_NOMAP);
-+	if (!region)
-+		return;
-+	list_add_tail(&region->list, head);
-+
-+	region = iommu_alloc_resv_region(HT_RANGE_START,
-+					 HT_RANGE_END - HT_RANGE_START + 1,
-+					 0, IOMMU_RESV_NOMAP);
-+	if (!region)
-+		return;
-+	list_add_tail(&region->list, head);
- }
- 
- static void amd_iommu_put_resv_regions(struct device *dev,
+Thank you!
+
+Florian Fainelli (8):
+  ARM: dts: armada-370-rd: Utilize new DSA binding
+  ARM: dts: armada-385-linksys: Utilize new DSA binding
+  ARM: dts: armada-388-clearfog: Utilize new DSA binding
+  ARM: dts: armada-xp-linksys-mamba: Utilize new DSA binding
+  ARM: dts: kirkwood-dir665: Utilize new DSA binding
+  ARM: dts: kirkwood-linksys-viper: Utilize new DSA binding
+  ARM: dts: kirkwood-mv88f6281gtw-ge: Utilize new DSA binding
+  ARM: dts: kirkwood-rd88f6281: Utilize new DSA binding
+
+ arch/arm/boot/dts/armada-370-rd.dts            | 44 +++++++++++++++++
+ arch/arm/boot/dts/armada-385-linksys.dtsi      | 52 ++++++++++++++++++++-
+ arch/arm/boot/dts/armada-388-clearfog.dts      | 65 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/armada-xp-linksys-mamba.dts  | 53 +++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-dir665.dts          | 49 +++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-linksys-viper.dts   | 49 +++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 49 +++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts    | 11 +++++
+ arch/arm/boot/dts/kirkwood-rd88f6281.dtsi      | 44 +++++++++++++++++
+ 9 files changed, 415 insertions(+), 1 deletion(-)
+
 -- 
-1.9.1
+2.9.3
