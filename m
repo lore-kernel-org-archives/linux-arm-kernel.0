@@ -1,41 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Jan 2017 17:14:38 +0000
-Subject: [PATCH 15/20] ARM/hw_breakpoint: Convert to hotplug state machine
-In-Reply-To: <CACRpkdYCG71AUe9iBdV+2t_LNFSzYO18vM=-pa=jWDTT53FnwA@mail.gmail.com>
-References: <20161117183541.8588-1-bigeasy@linutronix.de>
- <20161117183541.8588-16-bigeasy@linutronix.de>
- <CACRpkdZE+h0+3EizLCMUr-e-4pv4w9iAatSqL8k0Ovd2iUaS8Q@mail.gmail.com>
- <CACRpkda2gdjM--LSoJTL0dvqyw796w1hMSAhUQwv9X0EPzJHig@mail.gmail.com>
- <20170102150015.GJ14217@n2100.armlinux.org.uk>
- <CACRpkdaxAPSU-XPQrgVRoBecAD1ZpVVP4qPe59af-yy11WqBQw@mail.gmail.com>
- <20170103093335.GA5605@leverpostej>
- <20170104135644.GA29212@leverpostej>
- <CACRpkdYCG71AUe9iBdV+2t_LNFSzYO18vM=-pa=jWDTT53FnwA@mail.gmail.com>
-Message-ID: <20170105171438.GA3287@leverpostej>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 5 Jan 2017 18:16:01 +0100
+Subject: [PATCH] ARM: dts: sunxi: Enable spi1 and spi2 for Olimex A20 SOM
+ EVB
+In-Reply-To: <20161226175349.17712-1-manu@bidouilliste.com>
+References: <20161226175349.17712-1-manu@bidouilliste.com>
+Message-ID: <20170105171601.us4wffupptilvvqp@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 04:26:45PM +0100, Linus Walleij wrote:
-> On Wed, Jan 4, 2017 at 2:56 PM, Mark Rutland <mark.rutland@arm.com> wrote:
- 
-> > Linus, I wasn't able to get ethernet working. Do I need anything on top
-> > of v4.10-rc2 && multi_v7_defconfig?
-> 
-> I haven't tried it with multi_v7 but I should probably try that and patch
-> up the defconfigs, those are probably the root of the problem.
-> 
-> I do this on top of qcom_defconfig:
-> 
-> scripts/config --file .config \
->         --enable QCOM_EBI2 \
->         --enable ETHERNET \
->         --enable NET_VENDOR_SMSC \
->         --enable SMSC911X
-> 
-> Maybe you are missing the EBI2 config?
+Hi,
 
-That was it, yes! With QCOM_EBI2 atop of multi_v7_defconfig (along with
-a hack to the hw_breakpoint code), I can boot to an NFS filesystem.
+On Mon, Dec 26, 2016 at 06:53:49PM +0100, Emmanuel Vadot wrote:
+> Enable the spi1 and spi2 node since the pins are exposed on the UEXT
+> connectors.
+> 
+> Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> index 669a1c338c76..fa8c6f60552b 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> @@ -300,12 +300,14 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&spi1_pins_a>,
+>  		    <&spi1_cs0_pins_a>;
+> +	status = "okay";
+>  };
+>  
+>  &spi2 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&spi2_pins_a>,
+>  		    <&spi2_cs0_pins_a>;
+> +	status = "okay";
+>  };
 
-Thanks,
-Mark.
+Those nodes don't exist unfortunately. Maybe you forgot to send one
+patch?
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170105/d6854ac6/attachment.sig>
