@@ -1,66 +1,62 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 5 Jan 2017 21:40:59 +0200
-Subject: [PATCH v2] ARM: dts: Add missing CPU frequencies for
- Exynos5422/5800
-In-Reply-To: <2c85559a-dc12-610b-c842-c89d078e1c2a@osg.samsung.com>
-References: <10512254.nyUcL0zgTP@amdc3058>
- <CAD=FV=Wo273T20fe8D2v5Pn1HYR==7PHtr7WZGwzFPRspAYPzg@mail.gmail.com>
- <20161229141707.qjrtjz7dik6a7l5s@kozik-lap>
- <CAD=FV=WM_K_f0NQ0mxB55Ksbqg1gYJHs5d66ARYsa1=5hKLjXA@mail.gmail.com>
- <2c85559a-dc12-610b-c842-c89d078e1c2a@osg.samsung.com>
-Message-ID: <20170105194059.bwpotpv3zjtvg5oz@kozik-lap>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 6 Jan 2017 03:41:45 +0800
+Subject: [arm:clearfog 21/65] drivers/net/phy/micrel.c:969:2: warning:
+ initialization from incompatible pointer type
+Message-ID: <201701060343.pGxeXjPX%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 08:57:47PM -0300, Javier Martinez Canillas wrote:
-> Hello Doug,
-> 
-> On 01/04/2017 06:05 PM, Doug Anderson wrote:
-> > Hi,
-> > 
-> > On Thu, Dec 29, 2016 at 6:17 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> >> On Thu, Dec 15, 2016 at 04:54:30PM -0800, Doug Anderson wrote:
-> >>>> Index: b/arch/arm/boot/dts/exynos5800.dtsi
-> >>>> ===================================================================
-> >>>> --- a/arch/arm/boot/dts/exynos5800.dtsi 2016-12-15 12:43:54.365955950 +0100
-> >>>> +++ b/arch/arm/boot/dts/exynos5800.dtsi 2016-12-15 12:43:54.361955949 +0100
-> >>>> @@ -24,6 +24,16 @@
-> >>>>  };
-> >>>>
-> >>>>  &cluster_a15_opp_table {
-> >>>> +       opp at 2000000000 {
-> >>>> +               opp-hz = /bits/ 64 <2000000000>;
-> >>>> +               opp-microvolt = <1250000>;
-> >>>> +               clock-latency-ns = <140000>;
-> >>>> +       };
-> >>>> +       opp at 1900000000 {
-> >>>> +               opp-hz = /bits/ 64 <1900000000>;
-> >>>> +               opp-microvolt = <1250000>;
-> >>>> +               clock-latency-ns = <140000>;
-> >>>> +       };
-> >>>
-> >>> I don't think the voltages you listed are high enough for all peach pi
-> >>> boards for A15 at 1.9 GHz and 2.0 GHz, at least based on the research
-> >>> I did.  See my response to v1.
-> >>
-> >> I wanted to apply this but saw this remaining issue. Javier tested it
-> >> on Peach Pi so is this concern still valid?
-> > 
-> > I'm not sure.  It's been years since I did anything with exynos, so I
-> > won't stand in the way if everyone else agrees that this patch is
-> > good, but I will point out that testing on a single Peach Pi board is
-> > not really enough given the massive difference in voltage needed
-> > between the highest ASV group and the lowest (a whopping 112.5 mV from
-> > looking in the Chrome OS source tree).
-> > 
-> 
-> I agree. That's why answered that I wasn't able to find regressions on the
-> Peach Pi I've access to, but I couldn't provide a Reviewed-by tag since it
-> wasn't clear to me that the values were safe for any Exynos5420/5422/5800.
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git clearfog
+head:   a0b3b7ea35687eaa7b1836bcdbbe10daf034c621
+commit: adb3f9b9239ac1d683db5f1e0ac9435966d02b3d [21/65] net: phy: convert micrel to new read_mmd/write_mmd driver methods
+config: openrisc-or1ksim_defconfig (attached as .config)
+compiler: or32-linux-gcc (GCC) 4.5.1-or32-1.0rc1
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout adb3f9b9239ac1d683db5f1e0ac9435966d02b3d
+        # save the attached .config to linux build tree
+        make.cross ARCH=openrisc 
 
-The value of 1.250 V seems to be covering only half of ASV values for
-2.0 GHz so indeed it might be insufficient for some of the chips.
-Unfortunately...
+All warnings (new ones prefixed by >>):
 
-Best regards,
-Krzysztof
+>> drivers/net/phy/micrel.c:969:2: warning: initialization from incompatible pointer type
+
+vim +969 drivers/net/phy/micrel.c
+
+   953		.phy_id_mask	= 0x000ffffe,
+   954		.name		= "Micrel KSZ9021 Gigabit PHY",
+   955		.features	= (PHY_GBIT_FEATURES | SUPPORTED_Pause),
+   956		.flags		= PHY_HAS_MAGICANEG | PHY_HAS_INTERRUPT,
+   957		.driver_data	= &ksz9021_type,
+   958		.config_init	= ksz9021_config_init,
+   959		.config_aneg	= genphy_config_aneg,
+   960		.read_status	= genphy_read_status,
+   961		.ack_interrupt	= kszphy_ack_interrupt,
+   962		.config_intr	= kszphy_config_intr,
+   963		.get_sset_count = kszphy_get_sset_count,
+   964		.get_strings	= kszphy_get_strings,
+   965		.get_stats	= kszphy_get_stats,
+   966		.suspend	= genphy_suspend,
+   967		.resume		= genphy_resume,
+   968		.read_mmd	= ksz9021_rd_mmd_phyreg,
+ > 969		.write_mmd	= ksz9021_wr_mmd_phyreg,
+   970	}, {
+   971		.phy_id		= PHY_ID_KSZ9031,
+   972		.phy_id_mask	= MICREL_PHY_ID_MASK,
+   973		.name		= "Micrel KSZ9031 Gigabit PHY",
+   974		.features	= (PHY_GBIT_FEATURES | SUPPORTED_Pause),
+   975		.flags		= PHY_HAS_MAGICANEG | PHY_HAS_INTERRUPT,
+   976		.driver_data	= &ksz9021_type,
+   977		.config_init	= ksz9031_config_init,
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 7274 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170106/58dd2493/attachment.gz>
