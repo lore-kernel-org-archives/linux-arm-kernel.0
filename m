@@ -1,22 +1,33 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 5 Jan 2017 14:09:45 +0100
-Subject: [PATCHv2 0/5] Support for Marvell switches with integrated CPUs
-In-Reply-To: <185147a37cab4d7eaea5f79d86cc9451@svr-chch-ex1.atlnz.lc>
-References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
- <6c6795d3-06ab-a4f0-78ad-5ecc78c1aa2f@gmail.com>
- <185147a37cab4d7eaea5f79d86cc9451@svr-chch-ex1.atlnz.lc>
-Message-ID: <20170105130945.GA18033@lunn.ch>
+From: amelie.delaunay@st.com (Amelie Delaunay)
+Date: Thu, 5 Jan 2017 14:43:22 +0100
+Subject: [PATCHv3 1/8] ARM: dts: stm32: set HSE_RTC clock frequency to 1 MHz
+ on stm32f429
+In-Reply-To: <1483623809-29937-1-git-send-email-amelie.delaunay@st.com>
+References: <1483623809-29937-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1483623809-29937-2-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I'd love to see a switchdev driver but it's a huge task (and no I'm not 
-> committing to writing it). As it stands Marvell ship a switch SDK 
-> largely executes in userspace with a small kernel module providing some 
-> linkage to the underlying hardware.
+This patch set HSE_RTC clock frequency to 1 MHz, as the clock supplied to
+the RTC must be 1 MHz.
 
-Is there any similarity to the mv88e6xxx family?
+Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+---
+ arch/arm/boot/dts/stm32f429.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-If it was similar registers, just a different access mechanising, we
-could probably extend the mv88e6xxx to support MMIO as well as MDIO.
-
-   Andrew
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index b077f99..d195ccf 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -371,6 +371,8 @@
+ 			reg = <0x40023800 0x400>;
+ 			clocks = <&clk_hse>, <&clk_i2s_ckin>;
+ 			st,syscfg = <&pwrcfg>;
++			assigned-clocks = <&rcc 1 CLK_HSE_RTC>;
++			assigned-clock-rates = <1000000>;
+ 		};
+ 
+ 		dma1: dma-controller at 40026000 {
+-- 
+1.9.1
