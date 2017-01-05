@@ -1,183 +1,50 @@
-From: anurupvasu@gmail.com (Anurup M)
-Date: Thu, 5 Jan 2017 10:30:08 +0530
-Subject: [PATCH v3 03/10] dt-bindings: perf: hisi: Add Devicetree bindings
- for Hisilicon SoC PMU
-In-Reply-To: <20170103225914.w3drvtpvupnpfa4x@rob-hp-laptop>
-References: <1483339761-23927-1-git-send-email-anurup.m@huawei.com>
- <20170103225914.w3drvtpvupnpfa4x@rob-hp-laptop>
-Message-ID: <586DD2D8.4030600@gmail.com>
+From: manish.narani@xilinx.com (Manish Narani)
+Date: Thu, 5 Jan 2017 05:27:22 +0000
+Subject: [RFC PATCH] usb: dwc3: add support for OTG driver compilation
+In-Reply-To: <87r34jvtn5.fsf@linux.intel.com>
+References: <1483536181-22356-1-git-send-email-mnarani@xilinx.com>
+ <1483536181-22356-2-git-send-email-mnarani@xilinx.com>
+ <87r34jvtn5.fsf@linux.intel.com>
+Message-ID: <B2EF86ADE403CA4A85AF1BE1D3A22A06DB2CED@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Felipe,
 
 
-On Wednesday 04 January 2017 04:29 AM, Rob Herring wrote:
-> On Mon, Jan 02, 2017 at 01:49:21AM -0500, Anurup M wrote:
->> 1) Device tree bindings for Hisilicon SoC PMU.
->> 2) Add example for Hisilicon L3 cache and MN PMU.
->> 3) Add child nodes of L3C and MN in djtag bindings example.
->>
->> Signed-off-by: Anurup M <anurup.m@huawei.com>
->> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
->> ---
->>   .../devicetree/bindings/arm/hisilicon/djtag.txt    |  25 ++++++
->>   .../devicetree/bindings/arm/hisilicon/pmu.txt      | 100 +++++++++++++++++++++
->>   2 files changed, 125 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt b/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
->> index bbe8b45..653fdb7 100644
->> --- a/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
->> +++ b/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
->> @@ -27,6 +27,31 @@ Example 1: Djtag for CPU die
->>   		hisi-scl-id = <0x02>;
->>   
->>   		/* All connecting components will appear as child nodes */
->> +
->> +		pmul3c0 {
->> +			compatible = "hisilicon,hip05-pmu-l3c-v1";
->> +			hisi-module-id = <0x04 0x02>;
->> +		};
->> +
->> +		pmul3c1 {
->> +			compatible = "hisilicon,hip05-pmu-l3c-v1";
->> +			hisi-module-id = <0x04 0x04>;
->> +		};
->> +
->> +		pmul3c2 {
->> +			compatible = "hisilicon,hip05-pmu-l3c-v1";
->> +			hisi-module-id = <0x04 0x01>;
->> +		};
->> +
->> +		pmul3c3 {
->> +			compatible = "hisilicon,hip05-pmu-l3c-v1";
->> +			hisi-module-id = <0x04 0x08>;
->> +		};
->> +
->> +		pmumn0 {
->> +			compatible = "hisilicon,hip05-pmu-mn-v1";
->> +			hisi-module-id = <0x0b>;
->> +		};
->>   	};
->>   
->>   Example 2: Djtag for IO die
->> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt b/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
->> new file mode 100644
->> index 0000000..fceef8d
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
->> @@ -0,0 +1,100 @@
->> +Hisilicon SoC HiP05/06/07 ARMv8 PMU
->> +===================================
->> +
->> +The Hisilicon SoC chips like HiP05/06/07 etc. consist of various independent
->> +system device PMUs such as L3 cache (L3C) and Miscellaneous Nodes(MN). These
->> +PMU devices are independent and have hardware logic to gather statistics and
->> +performance information.
->> +
->> +HiSilicon SoC chip is encapsulated by multiple CPU and IO dies. The CPU die
->> +is called as Super CPU cluster (SCCL) which includes 16 cpu-cores. Every SCCL
->> +in HiP05/06/07 chips are further grouped as CPU clusters (CCL) which includes
->> +4 cpu-cores each.
->> +e.g. In the case of HiP05/06/07, each SCCL has 1 L3 cache and 1 MN PMU device.
->> +The L3 cache is further grouped as 4 L3 cache banks in a SCCL.
->> +
->> +The Hisilicon SoC PMU DT node bindings for uncore PMU devices are as below.
->> +For PMU devices like L3 cache. MN etc. which are accessed using the djtag,
->> +the parent node will be the djtag node of the corresponding CPU die (SCCL).
->> +
->> +L3 cache
->> +---------
->> +The L3 cache is dedicated for each SCCL. Each SCCL in HiP05/06/07 chips have 4
->> +L3 cache banks. Each L3 cache bank have separate DT nodes.
->> +
->> +Required properties:
->> +
->> +	- compatible : This value should be as follows
->> +		(a) "hisilicon,hip05-pmu-l3c-v1" for v1 hw in HiP05 chipset
->> +		(b) "hisilicon,hip06-pmu-l3c-v1" for v1 hw in HiP06 chipset
->> +		(c) "hisilicon,hip07-pmu-l3c-v2" for v2 hw in HiP07 chipset
->> +
->> +	- hisi-module-id : This property is a combination of two values in the below order.
-> Vendor prefix: hisilicon,module-id
+> From: Felipe Balbi [mailto:balbi at kernel.org]
+> Sent: Wednesday, January 04, 2017 7:01 PM
+> Hi,
+>
+> Manish Narani <manish.narani@xilinx.com> writes:
+> > This patch adds support for OTG driver compilation and object file
+> > creation
+> >
+> > Signed-off-by: Manish Narani <mnarani@xilinx.com>
+> > ---
+> >  drivers/usb/dwc3/Makefile | 4 ++++
+> >  1 file changed, 4 insertions(+)
+> >
+> > diff --git a/drivers/usb/dwc3/Makefile b/drivers/usb/dwc3/Makefile
+> > index ffca340..2d269ad 100644
+> > --- a/drivers/usb/dwc3/Makefile
+> > +++ b/drivers/usb/dwc3/Makefile
+> > @@ -17,6 +17,10 @@ ifneq ($(filter y,$(CONFIG_USB_DWC3_GADGET)
+> $(CONFIG_USB_DWC3_DUAL_ROLE)),)
+> >     dwc3-y                          += gadget.o ep0.o
+> >  endif
+> >
+> > +ifneq ($(CONFIG_USB_DWC3_DUAL_ROLE),)
+> > +   dwc3-y                          += otg.o
+> > +endif
+>
+> you just broke compilation
 
-Ok. I shall modify it.
+Should I add new USB_DWC3_OTG macro in Kconfig?
 
->> +		      a) Module ID: The module identifier for djtag.
->> +		      b) Instance or Bank ID: This will identify the L3 cache bank
->> +			 or instance.
->> +
->> +Optional properties:
->> +
->> +	- interrupt-parent : A phandle indicating which interrupt controller
->> +		this PMU signals interrupts to.
->> +
->> +	- interrupts : Interrupt line used by this L3 cache bank.
->> +
->> +	*The counter overflow IRQ is not supported in v1 hardware (HiP05/06).
->> +
->> +Miscellaneous Node
->> +------------------
->> +The MN is dedicated for each SCCL and hence there are separate DT nodes for MN
->> +for each SCCL.
->> +
->> +Required properties:
->> +
->> +	- compatible : This value should be as follows
->> +		(a) "hisilicon,hip05-pmu-mn-v1" for v1 hw in HiP05 chipset
->> +		(b) "hisilicon,hip06-pmu-mn-v1" for v1 hw in HiP06 chipset
->> +		(c) "hisilicon,hip07-pmu-mn-v2" for v2 hw in HiP07 chipset
->> +
->> +	- hisi-module-id : Module ID to input for djtag.
-> ditto
-
-Ok. I shall modify it.
 
 Thanks,
-Anurup
+Manish
 
->> +
->> +Optional properties:
->> +
->> +	- interrupt-parent : A phandle indicating which interrupt controller
->> +		this PMU signals interrupts to.
->> +
->> +	- interrupts : Interrupt line used by this PMU.
->> +
->> +	*The counter overflow IRQ is not supported in v1 hardware (HiP05/06).
->> +
->> +Example:
->> +
->> +	djtag0: djtag at 80010000 {
->> +		compatible = "hisilicon,hip05-djtag-v1";
->> +		reg = <0x0 0x80010000 0x0 0x10000>;
->> +		scl-id = <0x02>;
->> +
->> +		pmul3c0 {
->> +			compatible = "hisilicon,hip05-pmu-l3c-v1";
->> +			hisi-module-id = <0x04 0x02>;
->> +		};
->> +
->> +		pmul3c1 {
->> +			compatible = "hisilicon,hip05-pmu-l3c-v1";
->> +			hisi-module-id = <0x04 0x04>;
->> +		};
->> +
->> +		pmul3c2 {
->> +			compatible = "hisilicon,hip05-pmu-l3c-v1";
->> +			hisi-module-id = <0x04 0x01>;
->> +		};
->> +
->> +		pmul3c3 {
->> +			compatible = "hisilicon,hip05-pmu-l3c-v1";
->> +			hisi-module-id = <0x04 0x08>;
->> +		};
->> +
->> +		pmumn0 {
->> +			compatible = "hisilicon,hip05-pmu-mn-v1";
->> +			hisi-module-id = <0x0b>;
->> +		};
->> +	};
->> -- 
->> 2.1.4
->>
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
