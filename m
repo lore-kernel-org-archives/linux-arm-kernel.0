@@ -1,66 +1,73 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Thu, 5 Jan 2017 23:50:56 +0200
-Subject: [PATCH] MAINTAINERS: Add Aaro Koskinen as TI omap1 SoC
- co-maintainer
-In-Reply-To: <20170105214101.30286-1-tony@atomide.com>
-References: <20170105214101.30286-1-tony@atomide.com>
-Message-ID: <20170105215056.fzqogma2zgntepm7@raspberrypi-2.musicnaut.iki.fi>
+From: spjoshi@codeaurora.org (Sarangdhar Joshi)
+Date: Thu, 5 Jan 2017 13:58:42 -0800
+Subject: [PATCH v2] soc: ti: Drop wait from wkup_m3_rproc_boot_thread
+In-Reply-To: <482666d0-7915-ead2-c514-2651a4967a43@ti.com>
+References: <1483486889-3662-1-git-send-email-spjoshi@codeaurora.org>
+ <482666d0-7915-ead2-c514-2651a4967a43@ti.com>
+Message-ID: <927ed4ce-b2a6-699d-9a35-795633484b82@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01/05/2017 01:08 PM, Suman Anna wrote:
+> On 01/03/2017 05:41 PM, Sarangdhar Joshi wrote:
+>> The function wkup_m3_rproc_boot_thread waits for
+>> asynchronous firmware loading to parse the resource table
+>> before calling rproc_boot(). However, as the resource table
+>> parsing has been moved to rproc_boot(), there's no need to
+>> wait for the asynchronous firmware loading completion.
+>> So, drop this.
+>>
+>> CC: Dave Gerlach <d-gerlach@ti.com>
+>> CC: Suman Anna <s-anna@ti.com>
+>> CC: Bjorn Andersson <bjorn.andersson@linaro.org>
+>> Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
+>
+> + Tony and Santosh, not sure who is picking up the wkup_m3 related patches.
+>
+> Only one minor nit, I would prefer the patch subject to start with
+> soc: ti: wkup_m3_ipc: ....
 
-On Thu, Jan 05, 2017 at 01:41:01PM -0800, Tony Lindgren wrote:
-> Aaro has been doing a great job making sure mach-omap1 stays working
-> with the mainline kernel. So let's add Aaro as omap1 co-maintainer to
-> the MAINTAINERS file.
-> 
-> Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+Sure, will update the subject line.
 
-Acked-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+Regards,
+Sarang
 
-A.
+>
+> Tested-by: Suman Anna <s-anna@ti.com>
+>
+> regards
+> Suman
+>
+>> ---
+>>
+>> This patch seems to be doing an independent clean up now. Hence
+>> removing it from the series.
+>>
+>>  drivers/soc/ti/wkup_m3_ipc.c | 2 --
+>>  1 file changed, 2 deletions(-)
+>>
+>> diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
+>> index 8823cc8..8bfa44b 100644
+>> --- a/drivers/soc/ti/wkup_m3_ipc.c
+>> +++ b/drivers/soc/ti/wkup_m3_ipc.c
+>> @@ -370,8 +370,6 @@ static void wkup_m3_rproc_boot_thread(struct wkup_m3_ipc *m3_ipc)
+>>  	struct device *dev = m3_ipc->dev;
+>>  	int ret;
+>>
+>> -	wait_for_completion(&m3_ipc->rproc->firmware_loading_complete);
+>> -
+>>  	init_completion(&m3_ipc->sync_complete);
+>>
+>>  	ret = rproc_boot(m3_ipc->rproc);
+>>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
 
-> ---
->  MAINTAINERS | 19 ++++++++++++++++---
->  1 file changed, 16 insertions(+), 3 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -8933,7 +8933,20 @@ M:	Josh Poimboeuf <jpoimboe@redhat.com>
->  S:	Supported
->  F:	tools/objtool/
->  
-> -OMAP SUPPORT
-> +OMAP1 SUPPORT
-> +M:	Aaro Koskinen <aaro.koskinen@iki.fi>
-> +M:	Tony Lindgren <tony@atomide.com>
-> +L:	linux-omap at vger.kernel.org
-> +Q:	http://patchwork.kernel.org/project/linux-omap/list/
-> +T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
-> +S:	Maintained
-> +F:	arch/arm/mach-omap1/
-> +F:	arch/arm/plat-omap/
-> +F:	arch/arm/configs/omap1_defconfig
-> +F:	drivers/i2c/busses/i2c-omap.c
-> +F:	include/linux/i2c-omap.h
-> +
-> +OMAP2+ SUPPORT
->  M:	Tony Lindgren <tony@atomide.com>
->  L:	linux-omap at vger.kernel.org
->  W:	http://www.muru.com/linux/omap/
-> @@ -8941,8 +8954,8 @@ W:	http://linux.omap.com/
->  Q:	http://patchwork.kernel.org/project/linux-omap/list/
->  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
->  S:	Maintained
-> -F:	arch/arm/*omap*/
-> -F:	arch/arm/configs/omap1_defconfig
-> +F:	arch/arm/mach-omap2/
-> +F:	arch/arm/plat-omap/
->  F:	arch/arm/configs/omap2plus_defconfig
->  F:	drivers/i2c/busses/i2c-omap.c
->  F:	drivers/irqchip/irq-omap-intc.c
-> -- 
-> 2.11.0
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
