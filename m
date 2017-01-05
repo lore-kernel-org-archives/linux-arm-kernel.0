@@ -1,37 +1,25 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Thu, 5 Jan 2017 05:42:54 -0600
-Subject: [PATCH 08/12] ARM: dts: socfpga: Add NAND device tree for Arria10
-In-Reply-To: <73a8b5ga1v.fsf@pengutronix.de>
-References: <1483575694-29599-1-git-send-email-dinguyen@kernel.org>
- <1483575694-29599-9-git-send-email-dinguyen@kernel.org>
- <73a8b5ga1v.fsf@pengutronix.de>
-Message-ID: <7b15c95e-6d9f-bb2e-8c73-2f01dc3c8af2@kernel.org>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Thu, 5 Jan 2017 12:55:45 +0100
+Subject: [PATCH 4/4] watchdog: tangox: Use watchdog core to install
+ restart handler
+In-Reply-To: <yw1xmvf5ohx2.fsf@unicorn.mansr.com>
+References: <1483565318-25578-1-git-send-email-linux@roeck-us.net>
+ <1483565318-25578-4-git-send-email-linux@roeck-us.net>
+ <df7b5570-a44d-0c25-fedd-03a0891fdff3@sigmadesigns.com>
+ <yw1xmvf5ohx2.fsf@unicorn.mansr.com>
+Message-ID: <aaf896ca-d2f1-1a47-ef21-762db1e62a56@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/01/2017 12:38, M?ns Rullg?rd wrote:
 
-
-On 01/05/2017 02:55 AM, Steffen Trumtrar wrote:
-
->> +#include "socfpga_arria10_socdk.dtsi"
->> +
->> +/ {
->> +	soc {
->> +		nand: nand at ffb90000 {
->> +			#address-cells = <1>;
->> +			#size-cells = <1>;
->> +			status = "okay";
->> +
->> +			compatible = "denali,denali-nand-dt", "altr,socfpga-denali-nand";
->> +			reg = <0xffb90000 0x72000>, <0xffb80000 0x10000>;
->> +			reg-names = "nand_data", "denali_reg";
->> +			interrupts = <0 99 4>;
->> +			dma-mask = <0xffffffff>;
->> +			clocks = <&nand_clk>;
+> Marc Gonzalez writes:
 > 
-> This belongs into the socfpga_arria10.dtsi.
+>> Guenter, patch c7ef68c32265 states "Fixes: a3e376d26ace".
+>> Is that true? I mean, they seem quite orthogonal; then again I know
+>> nothing of this framework.
 > 
+> I don't see the relation of either of those to this patch.
 
-Ah yes, you're right. Thanks for the review.
-
-Dinh
+There is none. I just happened to git log the file because
+of this proposed patch.
