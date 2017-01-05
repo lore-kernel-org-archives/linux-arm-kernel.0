@@ -1,49 +1,44 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu,  5 Jan 2017 11:29:52 -0800
-Subject: [PATCH v2 3/8] ARM: dts: armada-388-clearfog: Utilize new DSA binding
+Date: Thu,  5 Jan 2017 11:29:50 -0800
+Subject: [PATCH v2 1/8] ARM: dts: armada-370-rd: Utilize new DSA binding
 In-Reply-To: <20170105192957.14304-1-f.fainelli@gmail.com>
 References: <20170105192957.14304-1-f.fainelli@gmail.com>
-Message-ID: <20170105192957.14304-4-f.fainelli@gmail.com>
+Message-ID: <20170105192957.14304-2-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Utilize the new DSA binding, introduced with commit 8c5ad1d6179d ("net:
-dsa: Document new binding"). The legacy binding node is kept included, but is
-marked disabled.
+Utilize the new DSA binding, introduced with commit 8c5ad1d6179d ("net: dsa:
+Document new binding"). The legacy binding node is kept included, but is marked
+disabled.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/boot/dts/armada-388-clearfog.dts | 65 +++++++++++++++++++++++++++++++
- 1 file changed, 65 insertions(+)
+ arch/arm/boot/dts/armada-370-rd.dts | 44 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-388-clearfog.dts b/arch/arm/boot/dts/armada-388-clearfog.dts
-index 71ce201c903e..40ec6d768669 100644
---- a/arch/arm/boot/dts/armada-388-clearfog.dts
-+++ b/arch/arm/boot/dts/armada-388-clearfog.dts
-@@ -351,6 +351,8 @@
+diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+index c3fd6e49212f..ade956cbd41a 100644
+--- a/arch/arm/boot/dts/armada-370-rd.dts
++++ b/arch/arm/boot/dts/armada-370-rd.dts
+@@ -173,6 +173,8 @@
  	};
  
- 	dsa at 0 {
+ 	dsa {
 +		status = "disabled";
 +
  		compatible = "marvell,dsa";
- 		dsa,ethernet = <&eth1>;
- 		dsa,mii-bus = <&mdio>;
-@@ -444,3 +446,66 @@
- 		status = "disabled";
+ 		#address-cells = <2>;
+ 		#size-cells = <0>;
+@@ -235,6 +237,48 @@
+ 	phy0: ethernet-phy at 0 {
+ 		reg = <0>;
  	};
- };
 +
-+&mdio {
-+	status = "okay";
-+
-+	switch at 4 {
++	switch: switch at 10 {
 +		compatible = "marvell,mv88e6085";
 +		#address-cells = <1>;
 +		#size-cells = <0>;
-+		reg = <4>;
-+		pinctrl-0 = <&clearfog_dsa0_clk_pins &clearfog_dsa0_pins>;
-+		pinctrl-names = "default";
++		reg = <0x10>;
 +
 +		ports {
 +			#address-cells = <1>;
@@ -51,27 +46,22 @@ index 71ce201c903e..40ec6d768669 100644
 +
 +			port at 0 {
 +				reg = <0>;
-+				label = "lan5";
++				label = "lan0";
 +			};
 +
 +			port at 1 {
-+				reg = <1>;
-+				label = "lan4";
++			       reg = <1>;
++			       label = "lan1";
 +			};
 +
 +			port at 2 {
-+				reg = <2>;
-+				label = "lan3";
++			       reg = <2>;
++			       label = "lan2";
 +			};
 +
 +			port at 3 {
-+				reg = <3>;
-+				label = "lan2";
-+			};
-+
-+			port at 4 {
-+				reg = <4>;
-+				label = "lan1";
++			       reg = <3>;
++			       label = "lan3";
 +			};
 +
 +			port at 5 {
@@ -83,18 +73,10 @@ index 71ce201c903e..40ec6d768669 100644
 +					full-duplex;
 +				};
 +			};
-+
-+			port at 6 {
-+				/* 88E1512 external phy */
-+				reg = <6>;
-+				label = "lan6";
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
 +		};
 +	};
-+};
+ };
+ 
+ 
 -- 
 2.9.3
