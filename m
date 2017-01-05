@@ -1,67 +1,217 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Jan 2017 11:24:26 +0000
-Subject: [PATCH v2 2/4] linux/const.h: move UL() macro to
- include/linux/const.h
-In-Reply-To: <1483582810-7046-3-git-send-email-yamada.masahiro@socionext.com>
-References: <1483582810-7046-1-git-send-email-yamada.masahiro@socionext.com>
- <1483582810-7046-3-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20170105112425.GT14217@n2100.armlinux.org.uk>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 5 Jan 2017 12:29:47 +0100
+Subject: [PATCH v5 13/17] irqdomain: irq_domain_check_msi_remap
+In-Reply-To: <f6096747-5943-520a-2d16-de5650292ff3@arm.com>
+References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
+ <1483536746-2725-14-git-send-email-eric.auger@redhat.com>
+ <ecb7ddf6-074f-50e4-6402-d59ceb1edd1d@arm.com>
+ <df8e7fdb-4048-3169-c758-c2a64119a321@redhat.com>
+ <c9c4c159-60ea-8501-5dc2-17bbb24ddfab@arm.com>
+ <92fcb464-3364-c432-29d8-1c2ce4a5f110@redhat.com>
+ <f6096747-5943-520a-2d16-de5650292ff3@arm.com>
+Message-ID: <1e881510-bc18-ae97-ec2f-feadcba54150@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 11:20:07AM +0900, Masahiro Yamada wrote:
-> ARM, ARM64 and UniCore32 duplicate the definition of UL():
-> 
->   #define UL(x) _AC(x, UL)
-> 
-> This is not actually arch-specific, so it will be useful to move it
-> to a common header.  Currently, we only have the uapi variant for
-> linux/const.h, so I am creating include/linux/const.h.
-> 
-> I am also adding _UL(), _ULL() and ULL() because _AC() is mostly
-> used in the form either _AC(..., UL) or _AC(..., ULL).  I expect
-> they will be replaced in later cleanups.  The underscore-prefixed
-> ones should be used for exported headers.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Acked-by: Guan Xuetao <gxt@mprc.pku.edu.cn>
-> ---
-> 
-> Changes in v2: None
-> 
->  arch/arm/include/asm/memory.h       | 6 ------
->  arch/arm64/include/asm/memory.h     | 6 ------
->  arch/unicore32/include/asm/memory.h | 6 ------
->  include/linux/const.h               | 9 +++++++++
->  include/uapi/linux/const.h          | 9 ++++++---
->  5 files changed, 15 insertions(+), 21 deletions(-)
->  create mode 100644 include/linux/const.h
-> 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 76cbd9c..7558247 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -22,12 +22,6 @@
->  #include <mach/memory.h>
->  #endif
->  
-> -/*
-> - * Allow for constants defined here to be used from assembly code
-> - * by prepending the UL suffix only with actual C code compilation.
-> - */
-> -#define UL(x) _AC(x, UL)
-> -
->  /* PAGE_OFFSET - the virtual address of the start of the kernel image */
->  #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
->  
+Hi Marc,
 
-For ARM,
+On 05/01/2017 12:25, Marc Zyngier wrote:
+> On 05/01/17 10:45, Auger Eric wrote:
+>> Hi Marc,
+>>
+>> On 04/01/2017 16:27, Marc Zyngier wrote:
+>>> On 04/01/17 14:11, Auger Eric wrote:
+>>>> Hi Marc,
+>>>>
+>>>> On 04/01/2017 14:46, Marc Zyngier wrote:
+>>>>> Hi Eric,
+>>>>>
+>>>>> On 04/01/17 13:32, Eric Auger wrote:
+>>>>>> This new function checks whether all platform and PCI
+>>>>>> MSI domains implement IRQ remapping. This is useful to
+>>>>>> understand whether VFIO passthrough is safe with respect
+>>>>>> to interrupts.
+>>>>>>
+>>>>>> On ARM typically an MSI controller can sit downstream
+>>>>>> to the IOMMU without preventing VFIO passthrough.
+>>>>>> As such any assigned device can write into the MSI doorbell.
+>>>>>> In case the MSI controller implements IRQ remapping, assigned
+>>>>>> devices will not be able to trigger interrupts towards the
+>>>>>> host. On the contrary, the assignment must be emphasized as
+>>>>>> unsafe with respect to interrupts.
+>>>>>>
+>>>>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>>>>>
+>>>>>> ---
+>>>>>>
+>>>>>> v4 -> v5:
+>>>>>> - Handle DOMAIN_BUS_FSL_MC_MSI domains
+>>>>>> - Check parents
+>>>>>> ---
+>>>>>>  include/linux/irqdomain.h |  1 +
+>>>>>>  kernel/irq/irqdomain.c    | 41 +++++++++++++++++++++++++++++++++++++++++
+>>>>>>  2 files changed, 42 insertions(+)
+>>>>>>
+>>>>>> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+>>>>>> index ab017b2..281a40f 100644
+>>>>>> --- a/include/linux/irqdomain.h
+>>>>>> +++ b/include/linux/irqdomain.h
+>>>>>> @@ -219,6 +219,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
+>>>>>>  					 void *host_data);
+>>>>>>  extern struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+>>>>>>  						   enum irq_domain_bus_token bus_token);
+>>>>>> +extern bool irq_domain_check_msi_remap(void);
+>>>>>>  extern void irq_set_default_host(struct irq_domain *host);
+>>>>>>  extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
+>>>>>>  				  irq_hw_number_t hwirq, int node,
+>>>>>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+>>>>>> index 8c0a0ae..700caea 100644
+>>>>>> --- a/kernel/irq/irqdomain.c
+>>>>>> +++ b/kernel/irq/irqdomain.c
+>>>>>> @@ -278,6 +278,47 @@ struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+>>>>>>  EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
+>>>>>>  
+>>>>>>  /**
+>>>>>> + * irq_domain_is_msi_remap - Check if @domain or any parent
+>>>>>> + * has MSI remapping support
+>>>>>> + * @domain: domain pointer
+>>>>>> + */
+>>>>>> +static bool irq_domain_is_msi_remap(struct irq_domain *domain)
+>>>>>> +{
+>>>>>> +	struct irq_domain *h = domain;
+>>>>>> +
+>>>>>> +	for (; h; h = h->parent) {
+>>>>>> +		if (h->flags & IRQ_DOMAIN_FLAG_MSI_REMAP)
+>>>>>> +			return true;
+>>>>>> +	}
+>>>>>> +	return false;
+>>>>>> +}
+>>>>>> +
+>>>>>> +/**
+>>>>>> + * irq_domain_check_msi_remap() - Checks whether all MSI
+>>>>>> + * irq domains implement IRQ remapping
+>>>>>> + */
+>>>>>> +bool irq_domain_check_msi_remap(void)
+>>>>>> +{
+>>>>>> +	struct irq_domain *h;
+>>>>>> +	bool ret = true;
+>>>>>> +
+>>>>>> +	mutex_lock(&irq_domain_mutex);
+>>>>>> +	list_for_each_entry(h, &irq_domain_list, link) {
+>>>>>> +		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
+>>>>>> +		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI) ||
+>>>>>> +		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI)) &&
+>>>>>> +		     !irq_domain_is_msi_remap(h)) {
+>>>>>
+>>>>> (h->bus_token & DOMAIN_BUS_PCI_MSI) and co looks quite wrong. bus_token
+>>>>> is not a bitmap, and DOMAIN_BUS_* not a single bit value (see enum
+>>>>> irq_domain_bus_token). Surely this should read
+>>>>> (h->bus_token == DOMAIN_BUS_PCI_MSI).
+>>>> Oh I did not notice that. Thanks.
+>>>>
+>>>> Any other comments on the irqdomain side? Do you think the current
+>>>> approach consisting in looking at those bus tokens and their parents
+>>>> looks good?
+>>>
+>>> To be completely honest, I don't like it much, as having to enumerate
+>>> all the bus types can come up with could become quite a burden in the
+>>> long run. I'd rather be able to identify MSI capable domains by
+>>> construction. I came up with the following approach (fully untested):
+>>>
+>>> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+>>> index 281a40f..7779796 100644
+>>> --- a/include/linux/irqdomain.h
+>>> +++ b/include/linux/irqdomain.h
+>>> @@ -183,8 +183,11 @@ enum {
+>>>  	/* Irq domain is an IPI domain with single virq */
+>>>  	IRQ_DOMAIN_FLAG_IPI_SINGLE	= (1 << 3),
+>>>  
+>>> +	/* Irq domain implements MSIs */
+>>> +	IRQ_DOMAIN_FLAG_MSI		= (1 << 4),
+>>> +
+>>>  	/* Irq domain is MSI remapping capable */
+>>> -	IRQ_DOMAIN_FLAG_MSI_REMAP	= (1 << 4),
+>>> +	IRQ_DOMAIN_FLAG_MSI_REMAP	= (1 << 5),
+>>>  
+>>>  	/*
+>>>  	 * Flags starting from IRQ_DOMAIN_FLAG_NONCORE are reserved
+>>> @@ -450,6 +453,11 @@ static inline bool irq_domain_is_ipi_single(struct irq_domain *domain)
+>>>  {
+>>>  	return domain->flags & IRQ_DOMAIN_FLAG_IPI_SINGLE;
+>>>  }
+>>> +
+>>> +static inline bool irq_domain_is_msi(struct irq_domain *domain)
+>>> +{
+>>> +	return domain->flags & IRQ_DOMAIN_FLAG_MSI;
+>>> +}
+>>>  #else	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
+>>>  static inline void irq_domain_activate_irq(struct irq_data *data) { }
+>>>  static inline void irq_domain_deactivate_irq(struct irq_data *data) { }
+>>> @@ -481,6 +489,11 @@ static inline bool irq_domain_is_ipi_single(struct irq_domain *domain)
+>>>  {
+>>>  	return false;
+>>>  }
+>>> +
+>>> +static inline bool irq_domain_is_msi(struct irq_domain *domain)
+>>> +{
+>>> +	return false;
+>>> +}
+>>>  #endif	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
+>>>  
+>>>  #else /* CONFIG_IRQ_DOMAIN */
+>>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+>>> index 700caea..33b6921 100644
+>>> --- a/kernel/irq/irqdomain.c
+>>> +++ b/kernel/irq/irqdomain.c
+>>> @@ -304,10 +304,7 @@ bool irq_domain_check_msi_remap(void)
+>>>  
+>>>  	mutex_lock(&irq_domain_mutex);
+>>>  	list_for_each_entry(h, &irq_domain_list, link) {
+>>> -		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
+>>> -		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI) ||
+>>> -		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI)) &&
+>>> -		     !irq_domain_is_msi_remap(h)) {
+>>> +		if (irq_domain_is_msi(h) && !irq_domain_is_msi_remap(h)) {
+>>>  			ret = false;
+>>>  			goto out;
+>>>  		}
+>>> diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+>>> index ee23006..b637263 100644
+>>> --- a/kernel/irq/msi.c
+>>> +++ b/kernel/irq/msi.c
+>>> @@ -270,7 +270,7 @@ struct irq_domain *msi_create_irq_domain(struct fwnode_handle *fwnode,
+>>>  	if (info->flags & MSI_FLAG_USE_DEF_CHIP_OPS)
+>>>  		msi_domain_update_chip_ops(info);
+>>>  
+>>> -	return irq_domain_create_hierarchy(parent, 0, 0, fwnode,
+>>> +	return irq_domain_create_hierarchy(parent, IRQ_DOMAIN_FLAG_MSI, 0, fwnode,
+>>>  					   &msi_domain_ops, info);
+>>>  }
+>>>  
+>>>
+>>>
+>>> Thoughts?
+>>
+>> Don't we need to set the IRQ_DOMAIN_FLAG_MSI flag in
+>> platform_msi_create_device_domain too (drivers/base/platform-msi.c)?
+was mentioning platform_msi_create_*device*_domain.
+it calls irq_domain_create_hierarchy and looks to be MSI irq domain
+related. But I don't have a full understanding of the whole irq domain
+hierarchy.
 
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+Thanks
 
-Thanks.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Eric
+> 
+> Well, platform_msi_create_irq_domain does call msi_create_irq_domain,
+> doesn't it? That's one of the benefits of the generic MSI
+> infrastructure: it is the only function that performs the creation of an
+> MSI domain for any bus type.
+> 
+> Or am I missing something completely obvious (which is perfectly
+> possible since I only had a couple of cups of the brown stuff...)?
+> 
+> Thanks,
+> 
+> 	M.
+> 
