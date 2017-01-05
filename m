@@ -1,39 +1,54 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 5 Jan 2017 20:49:49 +0000
-Subject: [PATCHv2 2/5] arm: mvebu: support for SMP on 98DX3336 SoC
-References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
- <20170105033641.6212-3-chris.packham@alliedtelesis.co.nz>
- <5edb6751-d15b-6654-f4ae-adf38fafb8a4@gmail.com>
- <dd384eda81d2420dafe740bf5bb4dae0@svr-chch-ex1.atlnz.lc>
-Message-ID: <b71083040acf4fbb9341be3c1e70a930@svr-chch-ex1.atlnz.lc>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 5 Jan 2017 15:08:28 -0600
+Subject: [PATCH v2] soc: ti: Drop wait from wkup_m3_rproc_boot_thread
+In-Reply-To: <1483486889-3662-1-git-send-email-spjoshi@codeaurora.org>
+References: <1483486889-3662-1-git-send-email-spjoshi@codeaurora.org>
+Message-ID: <482666d0-7915-ead2-c514-2651a4967a43@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/17 17:46, Chris Packham wrote:
-> On 05/01/17 17:04, Florian Fainelli wrote:
->> Le 01/04/17 ? 19:36, Chris Packham a ?crit :
->>> +}
->>> +
->>> +static int __init mv98dx3236_resume_init(void)
->>> +{
->>> +	struct device_node *np;
->>> +	struct resource res;
->>> +	int ret = 0;
->>> +
->>> +	np = of_find_matching_node(NULL, of_mv98dx3236_resume_table);
->>> +	if (!np)
->>> +		return 0;
->>
->> Can't this function be implemented as a smp_ops::smp_init_cpus instead
->> of having this initialization done at arch_initcall time?
->>
->
-> I'll look into it. My initial reaction is no because I still need
-> armada_xp_smp_init_cpus().
->
+On 01/03/2017 05:41 PM, Sarangdhar Joshi wrote:
+> The function wkup_m3_rproc_boot_thread waits for
+> asynchronous firmware loading to parse the resource table
+> before calling rproc_boot(). However, as the resource table
+> parsing has been moved to rproc_boot(), there's no need to
+> wait for the asynchronous firmware loading completion.
+> So, drop this.
+> 
+> CC: Dave Gerlach <d-gerlach@ti.com>
+> CC: Suman Anna <s-anna@ti.com>
+> CC: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
 
-I looked at this. I could write a mv98dx3236_smp_init_cpus() that calls 
-armada_xp_smp_init_cpus() and inits the resume controller address. My 
-original reason for this approach was to parallel mvebu_v7_pmsu_init. I 
-won't do anything just yet but is there any downside to the current 
-approach?
++ Tony and Santosh, not sure who is picking up the wkup_m3 related patches.
+
+Only one minor nit, I would prefer the patch subject to start with
+soc: ti: wkup_m3_ipc: ....
+
+Tested-by: Suman Anna <s-anna@ti.com>
+
+regards
+Suman
+
+> ---
+> 
+> This patch seems to be doing an independent clean up now. Hence
+> removing it from the series.
+> 
+>  drivers/soc/ti/wkup_m3_ipc.c | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
+> index 8823cc8..8bfa44b 100644
+> --- a/drivers/soc/ti/wkup_m3_ipc.c
+> +++ b/drivers/soc/ti/wkup_m3_ipc.c
+> @@ -370,8 +370,6 @@ static void wkup_m3_rproc_boot_thread(struct wkup_m3_ipc *m3_ipc)
+>  	struct device *dev = m3_ipc->dev;
+>  	int ret;
+>  
+> -	wait_for_completion(&m3_ipc->rproc->firmware_loading_complete);
+> -
+>  	init_completion(&m3_ipc->sync_complete);
+>  
+>  	ret = rproc_boot(m3_ipc->rproc);
+> 
