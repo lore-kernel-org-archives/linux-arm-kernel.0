@@ -1,42 +1,40 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 5 Jan 2017 15:23:24 -0800
-Subject: [PATCH] ARM: hw_breakpoint: blacklist Scorpion CPUs
-In-Reply-To: <1483637556-3974-1-git-send-email-mark.rutland@arm.com>
-References: <1483637556-3974-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170105232324.GL17126@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Jan 2017 23:25:08 +0000
+Subject: [PATCH net-next v4 0/4] Fix OdroidC2 Gigabit Tx link issue
+In-Reply-To: <049b1efc-3bad-92e0-45ef-0563dc5d81de@gmail.com>
+References: <1480348229-25672-1-git-send-email-jbrunet@baylibre.com>
+ <049b1efc-3bad-92e0-45ef-0563dc5d81de@gmail.com>
+Message-ID: <20170105232508.GU14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05, Mark Rutland wrote:
-> On APQ8060, the kernel crashes in arch_hw_breakpoint_init, taking an
-> undefined instruction trap within write_wb_reg. This is because Scorpion
-> CPUs erroneously appear to set DBGPRSR.SPD when WFI is issued, even if
-> the core is not powered down. When DBGPRSR.SPD is set, breakpoint and
-> watchpoint registers are treated as undefined.
-> 
-> It's possible to trigger similar crashes later on from userspace, by
-> requesting the kernel to install a breakpoint or watchpoint, as we can
-> go idle at any point between the reset of the debug registers and their
-> later use. This has always been the case.
-> 
-> Given that this has always been broken, no-one has complained until now,
-> and there is no clear workaround, disable hardware breakpoints and
-> watchpoints on Scorpion to avoid these issues.
+On Mon, Nov 28, 2016 at 09:54:28AM -0800, Florian Fainelli wrote:
+> If we start supporting generic "enable", "disable" type of properties
+> with values that map directly to register definitions of the HW, we
+> leave too much room for these properties to be utilized to implement a
+> specific policy, and this is not acceptable.
 
-I believe the workaround is to read DBGPRSR after exit from WFI?
-I'm fine with the blacklisting approach though.
+Another concern with this patch is that the existing phylib "set_eee"
+code is horribly buggy - it just translates the modes from userspace
+into the register value and writes them directly to the register with
+no validation.  So it's possible to set modes in the register that the
+hardware doesn't support, and have them advertised to the link partner.
 
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Reported-by: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: stable at vger.kernel.org
-> ---
+I have a patch which fixes that, restricting (as we do elsewhere) the
+advert according to the EEE supported capabilities retrieved from the
+PCS - maybe the problem here is that the PCS doesn't support support
+EEE in 1000baseT mode?
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Out of interest, which PHY is used on this platform?
+
+On the SolidRun boards, they're using AR8035, and have suffered this
+occasional link drop problem.  What has been found is that it seems to
+be to do with the timing parameters, and it seemed to only be 1000bT
+that was affected.  I don't remember off hand exactly which or what
+the change was they made to stabilise it though, but I can probabily
+find out tomorrow.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
