@@ -1,51 +1,31 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Thu,  5 Jan 2017 19:04:46 +0000
-Subject: [PATCH v6 18/18] iommu/arm-smmu: Do not advertise
- IOMMU_CAP_INTR_REMAP anymore
-In-Reply-To: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
-References: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1483643086-2883-19-git-send-email-eric.auger@redhat.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 5 Jan 2017 14:08:26 -0500
+Subject: [PATCH 1/2] soc: ti: knav_dma: fix typos in trace message
+In-Reply-To: <06b11675-e66f-2a0f-134a-29ab789f7d99@oracle.com>
+References: <1482272663-29829-1-git-send-email-m-karicheri2@ti.com>
+ <06b11675-e66f-2a0f-134a-29ab789f7d99@oracle.com>
+Message-ID: <586E99AA.7080409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IOMMU_CAP_INTR_REMAP has been advertised in arm-smmu(-v3) although
-on ARM this property is not attached to the IOMMU but rather is
-implemented in the MSI controller (GICv3 ITS).
+On 12/20/2016 08:01 PM, Santosh Shilimkar wrote:
+> On 12/20/2016 2:24 PM, Murali Karicheri wrote:
+>> This patch fixes some typos in the trace message
+>>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>> ---
+> Patch 1 and 2 looks fine. Will pick them for next
+> merge window. Thanks !!
+> 
+> Regards,
+> Santosh
+> 
+Santosh,
 
-Now vfio_iommu_type1 checks MSI remapping capability at MSI controller
-level, let's correct this.
+Could you send this to linux-next please so that I can
+cherry-pick them for our internal release?
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
----
- drivers/iommu/arm-smmu-v3.c | 2 --
- drivers/iommu/arm-smmu.c    | 2 --
- 2 files changed, 4 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 6c4111c..d9cf6cb 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1375,8 +1375,6 @@ static bool arm_smmu_capable(enum iommu_cap cap)
- 	switch (cap) {
- 	case IOMMU_CAP_CACHE_COHERENCY:
- 		return true;
--	case IOMMU_CAP_INTR_REMAP:
--		return true; /* MSIs are just memory writes */
- 	case IOMMU_CAP_NOEXEC:
- 		return true;
- 	default:
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index a354572..13d2600 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1374,8 +1374,6 @@ static bool arm_smmu_capable(enum iommu_cap cap)
- 		 * requests.
- 		 */
- 		return true;
--	case IOMMU_CAP_INTR_REMAP:
--		return true; /* MSIs are just memory writes */
- 	case IOMMU_CAP_NOEXEC:
- 		return true;
- 	default:
 -- 
-1.9.1
+Murali Karicheri
+Linux Kernel, Keystone
