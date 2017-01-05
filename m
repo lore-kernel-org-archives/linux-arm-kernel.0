@@ -1,48 +1,29 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 5 Jan 2017 11:22:55 +0900
-Subject: [PATCH 1/3] linux/const.h: move UL() macro to
- include/linux/const.h
-In-Reply-To: <CAMuHMdVyzF4xFPotburrP+cihjfyCDfHeAt4bienLG9kdG_zSg@mail.gmail.com>
-References: <1483520127-29316-1-git-send-email-yamada.masahiro@socionext.com>
- <1483520127-29316-2-git-send-email-yamada.masahiro@socionext.com>
- <CAMuHMdVyzF4xFPotburrP+cihjfyCDfHeAt4bienLG9kdG_zSg@mail.gmail.com>
-Message-ID: <CAK7LNATgkJJ4rnK7N8NQ2WR22eoCR3Hz5pCoE4VvOiRXrC0yPQ@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 4 Jan 2017 18:26:06 -0800
+Subject: [PATCH 1/2] mfd: micon: Add Buffalo Kurobox Pro, Terastation II
+ Pro/Live driver
+In-Reply-To: <20170104112227.GA27589@dell>
+References: <20161229000137.5553-1-f.fainelli@gmail.com>
+ <20161229000137.5553-2-f.fainelli@gmail.com> <20170104112227.GA27589@dell>
+Message-ID: <3e9b7bfe-8305-64fc-f175-e612576d58a7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Le 01/04/17 ? 03:22, Lee Jones a ?crit :
+> On Wed, 28 Dec 2016, Florian Fainelli wrote:
+> 
+>> This driver is currently only used to reboot the devices, but the
+>> microcontroller hanging off UART1 on the Buffalo Kurobox Pro and
+>> Terastation II Pro/Live is capable of a lot more than that, which we
+>> will support in subsequent patches. For now, just add the reboot
+>> functionality to make the kernel reboot correctly.
+> 
+> This is not an MFD driver.  You have written a UART driver.
+> 
+> Please relocate it to drivers/char/tty/serial.
 
-2017-01-04 18:27 GMT+09:00 Geert Uytterhoeven <geert@linux-m68k.org>:
-> Hi Yamada-san,
->
-> On Wed, Jan 4, 2017 at 9:55 AM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> Some architectures are duplicating the definition of UL():
->>
->>   #define UL(x) _AC(x, UL)
->>
->> This is not actually arch-specific, so it will be useful to move it
->> to a common header.  Currently, we only have the uapi variant for
->> linux/const.h, so I am creating include/linux/const.h.
->>
->> I am also adding _UL(x), _ULL(x), ULL(x) because _AC() is used for
->> UL in most places (and ULL in some places).  I expect _AC(..., UL)
->> will be replaced with _UL(...) or UL(...).  The underscore-prefixed
->> one should be used for exported headers.
->>
->> Note:
->> I renamed UL(x) in arch/m68k/mm/init.c, where it is used for a
->> different meaning.
->
-> Shouldn't that be a separate (prerequisite) patch?
-
-
-Yes, I did so in v2.
-
-Thanks!
-
-
-
+Not that simple, and as explained in the cover letter the UART attached
+micro controller can do a lot more than just reboot the machine, but
+someone else is working on the driver, so this patch series can be ignored.
 -- 
-Best Regards
-Masahiro Yamada
+Florian
