@@ -1,45 +1,75 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Jan 2017 18:06:26 +0000
-Subject: [PATCH v3 7/9] arm64: cpufeature: Track user visible fields
-In-Reply-To: <1483552147-9605-8-git-send-email-suzuki.poulose@arm.com>
-References: <1483552147-9605-1-git-send-email-suzuki.poulose@arm.com>
- <1483552147-9605-8-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20170105180626.GH29765@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 5 Jan 2017 18:11:14 +0000
+Subject: [RFC PATCH 1/7] arm64: Use physical counter for in-kernel reads
+In-Reply-To: <20161210204712.21830-2-christoffer.dall@linaro.org>
+References: <20161210204712.21830-1-christoffer.dall@linaro.org>
+ <20161210204712.21830-2-christoffer.dall@linaro.org>
+Message-ID: <5e820613-f9f3-0035-b145-0e22e9bcfeca@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 05:49:05PM +0000, Suzuki K. Poulose wrote:
-> Track the user visible fields of a CPU feature register. This will be
-> used for exposing the value to the userspace. All the user visible
-> fields of a feature register will be passed on as it is, while the
-> others would be filled with their respective safe value.
+[adding the arm64 maintainers, plus Mark as arch timer maintainer]
+
+On 10/12/16 20:47, Christoffer Dall wrote:
+> Using the physical counter allows KVM to retain the offset between the
+> virtual and physical counter as long as it is actively running a VCPU.
 > 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-
-> @@ -81,75 +82,75 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
+> As soon as a VCPU is released, another thread is scheduled or we start
+> running userspace applications, we reset the offset to 0, so that VDSO
+> operations can still read the virtual counter and get the same view of
+> time as the kernel.
+> 
+> This opens up potential improvements for KVM performance.
+> 
+> VHE kernels or kernels using the virtual timer are unaffected by this.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm64/include/asm/arch_timer.h  | 6 ++++--
+>  drivers/clocksource/arm_arch_timer.c | 2 +-
+>  2 files changed, 5 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> index eaa5bbe..cec2549 100644
+> --- a/arch/arm64/include/asm/arch_timer.h
+> +++ b/arch/arm64/include/asm/arch_timer.h
+> @@ -139,11 +139,13 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
 >  
+>  static inline u64 arch_counter_get_cntpct(void)
+>  {
+> +	u64 cval;
+>  	/*
+>  	 * AArch64 kernel and user space mandate the use of CNTVCT.
+>  	 */
+> -	BUG();
+> -	return 0;
+> +	isb();
+> +	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
+> +	return cval;
+>  }
 >  
->  static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
-> -	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
+>  static inline u64 arch_counter_get_cntvct(void)
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 73c487d..a5b0789 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -597,7 +597,7 @@ static void __init arch_counter_register(unsigned type)
+>  
+>  	/* Register the CP15 based counter if we have one */
+>  	if (type & ARCH_CP15_TIMER) {
+> -		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_uses_ppi == VIRT_PPI)
+> +		if (arch_timer_uses_ppi == VIRT_PPI || is_kernel_in_hyp_mode())
 
-BTW, as a separate patch I think we need to expose the RDM field in this
-register as well, together with a corresponding HWCAP bit.
+Why do we have this is_kernel_in_hyp_mode clause? I can't think of any
+reason for a VHE kernel to use the virtual counter at all...
 
+>  			arch_timer_read_counter = arch_counter_get_cntvct;
+>  		else
+>  			arch_timer_read_counter = arch_counter_get_cntpct;
+> 
+
+Thanks,
+
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
