@@ -1,72 +1,33 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 5 Jan 2017 12:05:24 +0800
-Subject: [PATCH 01/22] dt-bindings: iio: adc: add AXP20X/AXP22X ADC DT
- binding
-In-Reply-To: <20170103232035.wwsqmea5dxzu2r5m@rob-hp-laptop>
-References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
- <20170102163723.7939-2-quentin.schulz@free-electrons.com>
- <20170103232035.wwsqmea5dxzu2r5m@rob-hp-laptop>
-Message-ID: <CAGb2v64d4tsQHkXRG9PMFTqG0k9sgut5zBeaQRCo-kVA1W8LhQ@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 4 Jan 2017 20:06:49 -0800
+Subject: [PATCHv2 4/5] arm: mvebu: Add device tree for 98DX3236 SoCs
+In-Reply-To: <20170105033641.6212-5-chris.packham@alliedtelesis.co.nz>
+References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
+ <20170105033641.6212-5-chris.packham@alliedtelesis.co.nz>
+Message-ID: <1ee850ee-f771-1aeb-6b96-dfbe3118f2fc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 4, 2017 at 7:20 AM, Rob Herring <robh@kernel.org> wrote:
-> On Mon, Jan 02, 2017 at 05:37:01PM +0100, Quentin Schulz wrote:
->> The X-Powers AXP20X and AXP22X PMICs have multiple ADCs. They expose the
->> battery voltage, battery charge and discharge currents, AC-in and VBUS
->> voltages and currents, 2 GPIOs muxable in ADC mode and PMIC temperature.
->>
->> This adds the device tree binding documentation for the X-Powers AXP20X
->> and AXP22X PMICs ADCs.
->>
->> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->> ---
->>  .../devicetree/bindings/iio/adc/axp20x_adc.txt     | 24 ++++++++++++++++++++++
->>  1 file changed, 24 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt b/Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt
->> new file mode 100644
->> index 0000000..1b60065
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt
->> @@ -0,0 +1,24 @@
->> +X-Powers AXP20X and AXP22X PMIC Analog to Digital Converter (ADC)
->> +
->> +The X-Powers AXP20X and AXP22X PMICs have multiple ADCs. They expose the
->> +battery voltage, battery charge and discharge currents, AC-in and VBUS
->> +voltages and currents, 2 GPIOs muxable in ADC mode and PMIC temperature.
->> +
->> +The AXP22X PMICs do not have all ADCs of the AXP20X though.
->> +
->> +Required properties:
->> + - compatible, one of:
->> +                     "x-powers,axp209-adc"
->> +                     "x-powers,axp221-adc"
->> + - #io-channel-cells = <1>;
->> +
->> +This is a subnode of the AXP20X PMIC.
->> +
->> +Example:
->> +
->> +&axp209 {
->> +     axp209_adc: axp209_adc {
->
-> Use 'adc' for node name:
->
-> With that,
->
-> Acked-by: Rob Herring <robh@kernel.org>
+Le 01/04/17 ? 19:36, Chris Packham a ?crit :
+> The Marvell 98DX3236, 98DX3336, 98DX4521 and variants are switch ASICs
+> with integrated CPUs. They are similar to the Armada XP SoCs but have
+> different I/O interfaces.
+> 
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> ---
+> +
+> +		switch {
+> +			packet-processor at 0 {
+> +				compatible = "marvell,prestera-98dx4521";
+> +			};
+> +		};
 
-Same comments as Rob.
+This may be a bit premature if you are not providing a binding document
+for this sub-node, you might as well add it once you also add a
+corresponding driver (or if this will remain out of tree, at least
+submitting a separate binding document).
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-
->
->> +             compatible = "x-powers,axp209-adc";
->> +             #io-channel-cells = <1>;
->> +     };
->> +};
->> --
->> 2.9.3
->>
+Also, if this node's unit address is 0, you would expect at least a reg
+property whose address cell is 0 to be present.
+-- 
+Florian
