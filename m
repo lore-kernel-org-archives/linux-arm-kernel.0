@@ -1,61 +1,35 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 5 Jan 2017 10:03:48 +0800
-Subject: [PATCH v3] arm64: mm: Fix NOMAP page initialization
-In-Reply-To: <CAKv+Gu_SmTNguC=tSCwYOL2kx-DogLvSYRZc56eGP=JhdrUOsA@mail.gmail.com>
-References: <20161216165437.21612-1-rrichter@cavium.com>
- <CAKv+Gu_SmTNguC=tSCwYOL2kx-DogLvSYRZc56eGP=JhdrUOsA@mail.gmail.com>
-Message-ID: <c74d6ec6-16ba-dccc-3b0d-a8bedcb46dc5@linaro.org>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu,  5 Jan 2017 11:20:08 +0900
+Subject: [PATCH v2 3/4] linux/const.h: refactor _BITUL and _BITULL a bit
+In-Reply-To: <1483582810-7046-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1483582810-7046-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1483582810-7046-4-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/1/4 21:56, Ard Biesheuvel wrote:
-> On 16 December 2016 at 16:54, Robert Richter <rrichter@cavium.com> wrote:
->> On ThunderX systems with certain memory configurations we see the
->> following BUG_ON():
->>
->>  kernel BUG at mm/page_alloc.c:1848!
->>
->> This happens for some configs with 64k page size enabled. The BUG_ON()
->> checks if start and end page of a memmap range belongs to the same
->> zone.
->>
->> The BUG_ON() check fails if a memory zone contains NOMAP regions. In
->> this case the node information of those pages is not initialized. This
->> causes an inconsistency of the page links with wrong zone and node
->> information for that pages. NOMAP pages from node 1 still point to the
->> mem zone from node 0 and have the wrong nid assigned.
->>
->> The reason for the mis-configuration is a change in pfn_valid() which
->> reports pages marked NOMAP as invalid:
->>
->>  68709f45385a arm64: only consider memblocks with NOMAP cleared for linear mapping
->>
->> This causes pages marked as nomap being no longer reassigned to the
->> new zone in memmap_init_zone() by calling __init_single_pfn().
->>
->> Fixing this by implementing an arm64 specific early_pfn_valid(). This
->> causes all pages of sections with memory including NOMAP ranges to be
->> initialized by __init_single_page() and ensures consistency of page
->> links to zone, node and section.
->>
->
-> I like this solution a lot better than the first one, but I am still
-> somewhat uneasy about having the kernel reason about attributes of
-> pages it should not touch in the first place. But the fact that
-> early_pfn_valid() is only used a single time in the whole kernel does
-> give some confidence that we are not simply moving the problem
-> elsewhere.
->
-> Given that you are touching arch/arm/ as well as arch/arm64, could you
-> explain why only arm64 needs this treatment? Is it simply because we
-> don't have NUMA support there?
->
-> Considering that Hisilicon D05 suffered from the same issue, I would
-> like to get some coverage there as well. Hanjun, is this something you
-> can arrange? Thanks
+Minor cleanups available by _UL and _ULL.
 
-Sure, we will test this patch with LTP MM stress test (which triggers
-the bug on D05), and give the feedback.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Thanks
-Hanjun
+Changes in v2: None
+
+ include/uapi/linux/const.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/include/uapi/linux/const.h b/include/uapi/linux/const.h
+index 76fb0f9..13e5165 100644
+--- a/include/uapi/linux/const.h
++++ b/include/uapi/linux/const.h
+@@ -24,7 +24,7 @@
+ #define _UL(x)		(_AC(x, UL))
+ #define _ULL(x)		(_AC(x, ULL))
+ 
+-#define _BITUL(x)	(_AC(1,UL) << (x))
+-#define _BITULL(x)	(_AC(1,ULL) << (x))
++#define _BITUL(x)	(_UL(1) << (x))
++#define _BITULL(x)	(_ULL(1) << (x))
+ 
+ #endif /* _UAPI_LINUX_CONST_H */
+-- 
+2.7.4
