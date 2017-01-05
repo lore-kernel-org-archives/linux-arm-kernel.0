@@ -1,62 +1,40 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 05 Jan 2017 14:04:43 +0100
-Subject: [PATCH 1/5] ARM: dts: armada388-clearfog: add phy reset gpio-hog
-In-Reply-To: <20170105103134.GS14217@n2100.armlinux.org.uk> (Russell King's
- message of "Thu, 5 Jan 2017 10:31:35 +0000")
-References: <E1cO4UH-0008SR-GW@rmk-PC.armlinux.org.uk>
- <E1cO4Vz-00005t-8n@rmk-PC.armlinux.org.uk>
- <871swig5b3.fsf@free-electrons.com>
- <20170105101620.GR14217@n2100.armlinux.org.uk>
- <87zij5dckj.fsf@free-electrons.com>
- <20170105103134.GS14217@n2100.armlinux.org.uk>
-Message-ID: <87eg0hd5ec.fsf@free-electrons.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu,  5 Jan 2017 14:06:43 +0100
+Subject: [PATCH v2 0/5] drm/dp: Implement CRC debugfs API
+Message-ID: <20170105130648.3139-1-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell King,
- 
- On jeu., janv. 05 2017, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+Hi,
 
-> On Thu, Jan 05, 2017 at 11:29:48AM +0100, Gregory CLEMENT wrote:
->> Hi Russell King,
->>  
->>  On jeu., janv. 05 2017, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
->> 
->> > On Wed, Jan 04, 2017 at 05:26:08PM +0100, Gregory CLEMENT wrote:
->> >> Hi Russell,
->> >>  
->> >>  On lun., janv. 02 2017, Russell King <rmk+kernel@armlinux.org.uk> wrote:
->> >> 
->> >> 
->> >> It would be nice to have some word here about this patch. Especially why
->> >> we need it now. I guess it is for being less dependent on the
->> >> initialization done by the bootloader but maybe you have other reasons.
->> >
->> > I'm not sure I follow.  This is adding it to the new platform, not the
->> > old one.  I guess I should've rolled this into the patch creating the
->> > clearfog-base dts file, and this question wouldn't have come up.
->> >
->> 
->> Indeed I missed the fact that it was on the new board as all the other
->> patches were related to the common part.
->> 
->> Do you agree that I squash this patch into the "ARM: dts:
->> armada388-clearfog: add base model DTS file" patch?
->
-> Yep, thanks.
+this series builds up on the API for exposing captured CRCs through
+debugfs.
 
-It's done and it is also part of mvebu/for-next now.
+It adds new DP helpers for starting and stopping CRC capture and gets
+the Rockchip driver to use it.
 
-Gregory
+Also had to add a connector backpointer to the drm_dp_aux struct so we could
+wait for the right vblank and store the CRCs afterwards, I will be glad
+to hear about better alternatives.
 
->
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+Thanks,
+
+Tomeu
+
+
+Tomeu Vizoso (5):
+  drm/dp: add connector backpointer to drm_dp_aux
+  drm/bridge: analogix_dp: set connector to drm_dp_aux
+  drm/dp: add helpers for capture of frame CRCs
+  drm/bridge: analogix_dp: add helpers for capture of frame CRCs
+  drm/rockchip: Implement CRC debugfs API
+
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  34 ++++--
+ drivers/gpu/drm/drm_dp_helper.c                    | 120 +++++++++++++++++++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |  48 +++++++++
+ include/drm/bridge/analogix_dp.h                   |   3 +
+ include/drm/drm_dp_helper.h                        |   9 ++
+ 5 files changed, 206 insertions(+), 8 deletions(-)
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.9.3
