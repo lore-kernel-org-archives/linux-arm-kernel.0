@@ -1,111 +1,102 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Thu, 5 Jan 2017 14:04:37 +0530
-Subject: [PATCH 02/10] iommu/of: Prepare for deferred IOMMU configuration
-References: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
- <1480465344-11862-3-git-send-email-sricharan@codeaurora.org>
- <20161130161723.GA9042@red-moon>
- <c89825aa-c75f-8493-fe92-7cc97f525bc7@arm.com>
- <20161201112917.GA9680@red-moon>
-Message-ID: <003601d2672e$91744b40$b45ce1c0$@codeaurora.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 5 Jan 2017 08:50:23 +0000
+Subject: [PATCH v3] mfd: axp20x: Fix AXP806 access errors on cold boot
+In-Reply-To: <20170105040103.10303-1-wens@csie.org>
+References: <20170105040103.10303-1-wens@csie.org>
+Message-ID: <20170105085023.GP24225@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin/Lorenzo,
+On Thu, 05 Jan 2017, Chen-Yu Tsai wrote:
 
->Hi Robin,Lorenzo,
->
->>On Wed, Nov 30, 2016 at 04:42:27PM +0000, Robin Murphy wrote:
->>> On 30/11/16 16:17, Lorenzo Pieralisi wrote:
->>> > Sricharan, Robin,
->>> >
->>> > I gave this series a go on ACPI and apart from an SMMU v3 fix-up
->>> > it seems to work, more thorough testing required though.
->>> >
->>> > A key question below.
->>> >
->>> > On Wed, Nov 30, 2016 at 05:52:16AM +0530, Sricharan R wrote:
->>> >> From: Robin Murphy <robin.murphy@arm.com>
->>> >>
->>> >> IOMMU configuration represents unchanging properties of the hardware,
->>> >> and as such should only need happen once in a device's lifetime, but
->>> >> the necessary interaction with the IOMMU device and driver complicates
->>> >> exactly when that point should be.
->>> >>
->>> >> Since the only reasonable tool available for handling the inter-device
->>> >> dependency is probe deferral, we need to prepare of_iommu_configure()
->>> >> to run later than it is currently called (i.e. at driver probe rather
->>> >> than device creation), to handle being retried, and to tell whether a
->>> >> not-yet present IOMMU should be waited for or skipped (by virtue of
->>> >> having declared a built-in driver or not).
->>> >>
->>> >> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>> >> ---
->>> >>  drivers/iommu/of_iommu.c | 30 +++++++++++++++++++++++++++++-
->>> >>  1 file changed, 29 insertions(+), 1 deletion(-)
->>> >>
->>> >> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
->>> >> index ee49081..349bd1d 100644
->>> >> --- a/drivers/iommu/of_iommu.c
->>> >> +++ b/drivers/iommu/of_iommu.c
->>> >> @@ -104,12 +104,20 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
->>> >>  	int err;
->>> >>
->>> >>  	ops = iommu_get_instance(fwnode);
->>> >> -	if (!ops || !ops->of_xlate)
->>> >> +	if ((ops && !ops->of_xlate) ||
->>> >> +	    (!ops && !of_match_node(&__iommu_of_table, iommu_spec->np)))
->>> >
->>> > IIUC of_match_node() here is there to check there is a driver compiled
->>> > in for this device_node (aka compatible string in OF world), correct ?
->>>
->>> Yes - specifically, it's checking the magic table for a matching
->>> IOMMU_OF_DECLARE entry.
->>>
->>> > If that's the case (and I think that's what Sricharan was referring to
->>> > in his ACPI query) I need to cook-up something on the ACPI side to
->>> > emulate the OF linker table behaviour (or anyway to detect a driver is
->>> > actually in the kernel), it is not that difficult but it is key to know,
->>> > I will give it some thought to make it as clean as possible.
->>>
->>> I didn't think this would be a concern for ACPI, since IORT works much
->>> the same way the current of_iommu_init_fn/of_platform_device_create()
->>> bodges in drivers so for DT. If you can only discover SMMUs from IORT,
->>> then iort_init_platform_devices() will have already created every SMMU
->>> that's going to exist before discovering other devices from wherever
->>> they come from, thus you could never get into the situation of probing a
->>> device without its SMMU being ready (if it's ever going to be). Is that
->>> not right?
->>
->>It is right, my point and question is: we are probing a device and we
->>have to know whether it is worth deferring its IOMMU DMA setup. On DT,
->>through of_match_node(&__iommu_of_table, iommu_device_node) we check at
->>once that:
->>
->>1 - A device for the IOMMU exists
->>
->>AND
->>
->>2 - A driver for the IOMMU is compiled in the kernel
->>
->>Is this correct ? As you said (1) is not a concern on ACPI IORT (because
->>we create the IOMMU device before _any_ other device so either the IOMMU
->>device is there or it will never be by the time master devices are
->>probed), but for (2) I need to slightly change how the IORT linker entry
->>work to make sure we can detect a driver is actually compiled in the
->>kernel, it is easy, I was just asking if my understanding was correct
->>and I think that was what Sricharan was referring to in his query.
->>
->
->Yes right, this was what i was looking for in the ACPI case and putting this
->in the iort_iommu_xlate was needed to return EPROBE_DEFER when the
->driver is not yet been probed.
+> The AXP806 supports either master/standalone or slave mode.
+> Slave mode allows sharing the serial bus, even with multiple
+> AXP806 which all have the same hardware address.
+> 
+> This is done with extra "serial interface address extension",
+> or AXP806_BUS_ADDR_EXT, and "register address extension", or
+> AXP806_REG_ADDR_EXT, registers. The former is read-only, with
+> 1 bit customizable at the factory, and 1 bit depending on the
+> state of an external pin. The latter is writable. Only when
+> the these device addressing bits (in the upper 4 bits of the
+> registers) match, will the device respond to operations on
+> its other registers.
+> 
+> The AXP806_REG_ADDR_EXT was previously configured by Allwinner's
+> bootloader. Work on U-boot SPL support now allows us to switch
+> to mainline U-boot, which doesn't do this for us. There might
+> be other bare minimum bootloaders out there which don't to this
+> either. It's best to handle this in the kernel.
+> 
+> This patch sets AXP806_REG_ADDR_EXT to 0x10, which is what we
+> know to be the proper value for a standard AXP806 in slave mode.
+> Afterwards it will reinitialize the regmap cache, to purge any
+> invalid stale values.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> Changes since v2:
+> 
+>   - Dropped regcache_sync_region() and regmap_reinit_cache() calls.
+>     The write immediately after getting the regmap from the caller
+>     of axp20x_device_probe() is enough.
+> 
+>   - Slightly rearranged a few sentences in the comment block.
+> ---
+>  drivers/mfd/axp20x.c | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
 
-With the thinking of taking this series through, would it be fine if i cleanup
-the pci configure hanging outside and push it in to of/acpi_iommu configure
-respectively ? This time with all neeeded for ACPI added as well.
- Also on the last post of V4, Lorenzo commented that it worked for him, although
-still the of_match_node equivalent in ACPI has to be added. If i can get that,
-then i will add that as well to make this complete.
+Much better.
 
-Regards,
- Sricharan
+Applied, thanks.
+
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index ed918de84238..81b9ddd10e6c 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -31,6 +31,8 @@
+>  
+>  #define AXP20X_OFF	0x80
+>  
+> +#define AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE	BIT(4)
+> +
+>  static const char * const axp20x_model_names[] = {
+>  	"AXP152",
+>  	"AXP202",
+> @@ -830,6 +832,30 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
+>  {
+>  	int ret;
+>  
+> +	/*
+> +	 * The AXP806 supports either master/standalone or slave mode.
+> +	 * Slave mode allows sharing the serial bus, even with multiple
+> +	 * AXP806 which all have the same hardware address.
+> +	 *
+> +	 * This is done with extra "serial interface address extension",
+> +	 * or AXP806_BUS_ADDR_EXT, and "register address extension", or
+> +	 * AXP806_REG_ADDR_EXT, registers. The former is read-only, with
+> +	 * 1 bit customizable at the factory, and 1 bit depending on the
+> +	 * state of an external pin. The latter is writable. The device
+> +	 * will only respond to operations to its other registers when
+> +	 * the these device addressing bits (in the upper 4 bits of the
+> +	 * registers) match.
+> +	 *
+> +	 * Since we only support an AXP806 chained to an AXP809 in slave
+> +	 * mode, and there isn't any existing hardware which uses AXP806
+> +	 * in master mode, or has 2 AXP806s in the same system, we can
+> +	 * just program the register address extension to the slave mode
+> +	 * address.
+> +	 */
+> +	if (axp20x->variant == AXP806_ID)
+> +		regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
+> +			     AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE);
+> +
+>  	ret = regmap_add_irq_chip(axp20x->regmap, axp20x->irq,
+>  				  IRQF_ONESHOT | IRQF_SHARED, -1,
+>  				  axp20x->regmap_irq_chip,
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
