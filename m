@@ -1,95 +1,22 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu,  5 Jan 2017 14:06:48 +0100
-Subject: [PATCH v2 5/5] drm/rockchip: Implement CRC debugfs API
-In-Reply-To: <20170105130648.3139-1-tomeu.vizoso@collabora.com>
-References: <20170105130648.3139-1-tomeu.vizoso@collabora.com>
-Message-ID: <20170105130648.3139-6-tomeu.vizoso@collabora.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 5 Jan 2017 14:09:45 +0100
+Subject: [PATCHv2 0/5] Support for Marvell switches with integrated CPUs
+In-Reply-To: <185147a37cab4d7eaea5f79d86cc9451@svr-chch-ex1.atlnz.lc>
+References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
+ <6c6795d3-06ab-a4f0-78ad-5ecc78c1aa2f@gmail.com>
+ <185147a37cab4d7eaea5f79d86cc9451@svr-chch-ex1.atlnz.lc>
+Message-ID: <20170105130945.GA18033@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the .set_crc_source() callback and call the DP helpers
-accordingly to start and stop CRC capture.
+> I'd love to see a switchdev driver but it's a huge task (and no I'm not 
+> committing to writing it). As it stands Marvell ship a switch SDK 
+> largely executes in userspace with a small kernel module providing some 
+> linkage to the underlying hardware.
 
-This is only done if this CRTC is currently using the eDP connector.
+Is there any similarity to the mv88e6xxx family?
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
+If it was similar registers, just a different access mechanising, we
+could probably extend the mv88e6xxx to support MMIO as well as MDIO.
 
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 48 +++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index fb5f001f51c3..5e19bef6d5b4 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -19,6 +19,7 @@
- #include <drm/drm_crtc_helper.h>
- #include <drm/drm_flip_work.h>
- #include <drm/drm_plane_helper.h>
-+#include <drm/bridge/analogix_dp.h>
- 
- #include <linux/kernel.h>
- #include <linux/module.h>
-@@ -1105,6 +1106,52 @@ static void vop_crtc_destroy_state(struct drm_crtc *crtc,
- 	kfree(s);
- }
- 
-+static struct drm_connector *vop_get_edp_connector(struct vop *vop)
-+{
-+	struct drm_crtc *crtc = &vop->crtc;
-+	struct drm_connector *connector;
-+
-+	mutex_lock(&crtc->dev->mode_config.mutex);
-+	drm_for_each_connector(connector, crtc->dev)
-+		if (connector->connector_type == DRM_MODE_CONNECTOR_eDP) {
-+			mutex_unlock(&crtc->dev->mode_config.mutex);
-+			return connector;
-+		}
-+	mutex_unlock(&crtc->dev->mode_config.mutex);
-+
-+	return NULL;
-+}
-+
-+static int vop_crtc_set_crc_source(struct drm_crtc *crtc,
-+				   const char *source_name, size_t *values_cnt)
-+{
-+	struct vop *vop = to_vop(crtc);
-+	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc->state);
-+	struct drm_connector *connector;
-+	int ret;
-+
-+	connector = vop_get_edp_connector(vop);
-+	if (!connector)
-+		return -EINVAL;
-+
-+	*values_cnt = 3;
-+
-+	if (source_name &&
-+	    strcmp(source_name, "auto") == 0) {
-+
-+		if (s->output_type != DRM_MODE_CONNECTOR_eDP)
-+			return -EINVAL;
-+
-+		ret = analogix_dp_start_crc(connector);
-+	} else if (!source_name)
-+
-+		ret = analogix_dp_stop_crc(connector);
-+	else
-+		ret = -EINVAL;
-+
-+	return ret;
-+}
-+
- static const struct drm_crtc_funcs vop_crtc_funcs = {
- 	.set_config = drm_atomic_helper_set_config,
- 	.page_flip = drm_atomic_helper_page_flip,
-@@ -1112,6 +1159,7 @@ static const struct drm_crtc_funcs vop_crtc_funcs = {
- 	.reset = vop_crtc_reset,
- 	.atomic_duplicate_state = vop_crtc_duplicate_state,
- 	.atomic_destroy_state = vop_crtc_destroy_state,
-+	.set_crc_source = vop_crtc_set_crc_source,
- };
- 
- static void vop_fb_unref_worker(struct drm_flip_work *work, void *val)
--- 
-2.9.3
+   Andrew
