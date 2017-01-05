@@ -1,32 +1,48 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 6 Jan 2017 04:03:24 +0800
-Subject: [nomadik:lis3lv02 5/6] warning: (IIO_ST_ACCEL_3AXIS) selects
- IIO_ST_ACCEL_I2C_3AXIS which has unmet direct dependencies (IIO && ..)
-Message-ID: <201701060422.ANenCkLe%fengguang.wu@intel.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 5 Jan 2017 22:08:07 +0200
+Subject: [PATCH v2 3/4] ARM64: dts: exynos5433: use macros for pinctrl
+ configuration on Exynos5433
+In-Reply-To: <CACRpkdbX_MuLSCerq08-1VZV6VJfynjkv1QOr7ssOCGvM5aB_Q@mail.gmail.com>
+References: <CGME20161230041427epcas1p1151d6e28fac143c63efaf4f7c8ed432d@epcas1p1.samsung.com>
+ <20161230041421.24448-1-andi.shyti@samsung.com>
+ <20161230041421.24448-4-andi.shyti@samsung.com>
+ <CACRpkdaz9AyFJs1Th_SVexqKaP-=iPF0G-1YXOCoSmrQH8ZHDA@mail.gmail.com>
+ <20161230151724.5wlp4hbphasmw3rg@kozik-lap>
+ <CACRpkdbX_MuLSCerq08-1VZV6VJfynjkv1QOr7ssOCGvM5aB_Q@mail.gmail.com>
+Message-ID: <20170105200807.54j2ebve6kqd5bob@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git lis3lv02
-head:   e343deae8006a1fc109534497c943eab51a1c2a8
-commit: 0a9710dd480b06b6fefefdedc732020f2297e247 [5/6] iio: accel: st_accel: handle deprecated bindings
-config: x86_64-randconfig-x008-201701 (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        git checkout 0a9710dd480b06b6fefefdedc732020f2297e247
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+On Tue, Jan 03, 2017 at 09:24:34AM +0100, Linus Walleij wrote:
+> On Fri, Dec 30, 2016 at 4:17 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > On Fri, Dec 30, 2016 at 02:32:39PM +0100, Linus Walleij wrote:
+> >> On Fri, Dec 30, 2016 at 5:14 AM, Andi Shyti <andi.shyti@samsung.com> wrote:
+> >>
+> >> > Use the macros defined in include/dt-bindings/pinctrl/samsung.h
+> >> > instead of hardcoded values.
+> >> >
+> >> > Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> >>
+> >> These look fine, but that this and the other DTS patch through ARM SoC.
+> >>
+> >> If you also need the headerfile patch (patch 2) to go through ARM SoC
+> >> that is fine,
+> >> I can take it out of pinctrl if you want.
+> >
+> > Yes, I need the header. It would be much appreciated if you could
+> > provide a tag or stable branch with it.
+> 
+> Nah better just merge that patch into the ARM SoC tree only.
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> I'll remove it from the pinctrl tree.
 
-All warnings (new ones prefixed by >>):
+Thanks, I see it being dropped.
 
-warning: (IIO_ST_ACCEL_3AXIS) selects IIO_ST_ACCEL_I2C_3AXIS which has unmet direct dependencies (IIO && !SENSORS_LIS3_I2C && IIO_ST_ACCEL_3AXIS && IIO_ST_SENSORS_I2C)
+Andi,
+Please fix missing Signed-off-by and resend with Linus' tags for #1 and
+#2 and with other accumulated tags.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 27927 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170106/31be2ce4/attachment-0001.gz>
+Best regards,
+Krzysztof
