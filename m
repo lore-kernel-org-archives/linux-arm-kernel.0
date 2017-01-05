@@ -1,43 +1,87 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 5 Jan 2017 07:45:09 +0000
-Subject: [PATCH 1/2] mfd: micon: Add Buffalo Kurobox Pro, Terastation II
- Pro/Live driver
-In-Reply-To: <3e9b7bfe-8305-64fc-f175-e612576d58a7@gmail.com>
-References: <20161229000137.5553-1-f.fainelli@gmail.com>
- <20161229000137.5553-2-f.fainelli@gmail.com>
- <20170104112227.GA27589@dell>
- <3e9b7bfe-8305-64fc-f175-e612576d58a7@gmail.com>
-Message-ID: <20170105074509.GF24225@dell>
+Date: Thu, 5 Jan 2017 07:51:59 +0000
+Subject: [PATCH v2] mfd: mc13xxx: Set the irq type.
+In-Reply-To: <CAM=E1R59oKhT3b8=nJ3Utg4cPi0Z6oiLkj8DU7grg6T+2CoMAw@mail.gmail.com>
+References: <1483112613-18092-1-git-send-email-lilja.magnus@gmail.com>
+ <20170104110959.GZ27589@dell>
+ <CAM=E1R59oKhT3b8=nJ3Utg4cPi0Z6oiLkj8DU7grg6T+2CoMAw@mail.gmail.com>
+Message-ID: <20170105075159.GH24225@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 04 Jan 2017, Florian Fainelli wrote:
+Thomas,
 
-> Le 01/04/17 ? 03:22, Lee Jones a ?crit :
-> > On Wed, 28 Dec 2016, Florian Fainelli wrote:
-> > 
-> >> This driver is currently only used to reboot the devices, but the
-> >> microcontroller hanging off UART1 on the Buffalo Kurobox Pro and
-> >> Terastation II Pro/Live is capable of a lot more than that, which we
-> >> will support in subsequent patches. For now, just add the reboot
-> >> functionality to make the kernel reboot correctly.
-> > 
-> > This is not an MFD driver.  You have written a UART driver.
-> > 
-> > Please relocate it to drivers/char/tty/serial.
+On Wed, 04 Jan 2017, Magnus Lilja wrote:
+> On 4 January 2017 at 12:09, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Fri, 30 Dec 2016, Magnus Lilja wrote:
+> >
+> >> Commit 10f9edaeaa30 ("mfd: mc13xxx: Use regmap irq framework for
+> >> interrupts") removed the passing of the IRQF_TRIGGER_HIGH flag when
+> >> registering the interrupt.
+> >> This commit fixes that problem by setting the IRQF_TRIGGER_HIGH flag in
+> >> case no irq type is set via irqd framework (e.g. device tree). In the
+> >> latter case the irq flag from irqd is used.
+> >
+> > This looks like a hack.
+> >
+> > Why can't you set the trigger type in Device Tree instead?
 > 
-> Not that simple, and as explained in the cover letter the UART attached
-> micro controller can do a lot more than just reboot the machine, but
+> The i.MX31 PDK board has not, like many (all?) i.MX31 boards, not been
+> converted to use device tree yet. I think there is work in progress in
+> this area. However, as the IRQF_TRIGGER problem also affects several
+> stable kernel series (since 3.18.x) I thought it was worthwhile to fix
+> this.
 
-That's fine.  This is precisely why we have MFD.  But the core (MFD)
-driver should only conduct set-up of shared resources, registration of
-child devices and maybe some shared functionality required by >1 child
-device.  All child device (i.e. UART) capability should be handled by
-the child drivers.
+I would like Thomas' advice on this.
 
-> someone else is working on the driver, so this patch series can be ignored.
-
-Okay.
+> >> Tested on i.MX31 PDK hardware.
+> >>
+> >> Fixes: 10f9edaeaa30 ("mfd: mc13xxx: Use regmap irq framework for interrupts")
+> >> Cc: <stable@vger.kernel.org> # 3.18.x
+> >> Cc: Lee Jones <lee.jones@linaro.org>
+> >> Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
+> >> ---
+> >> Changes from v1 (which was part of a patch series):
+> >>   - Now uses irqd_-functions to check if irq type is defined
+> >>   - Added Fixes: and Cc: to stable kernel.
+> >>
+> >>  drivers/mfd/mc13xxx-core.c | 8 +++++++-
+> >>  1 file changed, 7 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
+> >> index d7f54e4..e1757ea 100644
+> >> --- a/drivers/mfd/mc13xxx-core.c
+> >> +++ b/drivers/mfd/mc13xxx-core.c
+> >> @@ -15,6 +15,7 @@
+> >>  #include <linux/of_device.h>
+> >>  #include <linux/platform_device.h>
+> >>  #include <linux/mfd/core.h>
+> >> +#include <linux/irq.h>
+> >>
+> >>  #include "mc13xxx.h"
+> >>
+> >> @@ -410,6 +411,7 @@ int mc13xxx_common_init(struct device *dev)
+> >>       struct mc13xxx *mc13xxx = dev_get_drvdata(dev);
+> >>       u32 revision;
+> >>       int i, ret;
+> >> +     unsigned int flags;
+> >>
+> >>       mc13xxx->dev = dev;
+> >>
+> >> @@ -440,7 +442,11 @@ int mc13xxx_common_init(struct device *dev)
+> >>       mc13xxx->irq_chip.irqs = mc13xxx->irqs;
+> >>       mc13xxx->irq_chip.num_irqs = ARRAY_SIZE(mc13xxx->irqs);
+> >>
+> >> -     ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq, IRQF_ONESHOT,
+> >> +     flags = irqd_get_trigger_type(irq_get_irq_data(mc13xxx->irq));
+> >> +     flags = (flags == IRQ_TYPE_NONE) ? IRQF_TRIGGER_HIGH : flags;
+> >> +
+> >> +     ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq,
+> >> +                               IRQF_ONESHOT | flags,
+> >>                                 0, &mc13xxx->irq_chip, &mc13xxx->irq_data);
+> >>       if (ret)
+> >>               return ret;
+> >
 
 -- 
 Lee Jones
