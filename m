@@ -1,89 +1,115 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 5 Jan 2017 12:31:51 +0100
-Subject: [RFC PATCH 09/10] drivers/perf: Add support for ARMv8.2
- Statistical Profiling Extension
-In-Reply-To: <20170104191414.GU18193@arm.com>
-References: <1483467027-14547-1-git-send-email-will.deacon@arm.com>
- <1483467027-14547-10-git-send-email-will.deacon@arm.com>
- <20170104103713.GH25813@worktop.programming.kicks-ass.net>
- <20170104191414.GU18193@arm.com>
-Message-ID: <20170105113151.GG3093@worktop>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Thu, 05 Jan 2017 11:38:49 +0000
+Subject: [PATCH 4/4] watchdog: tangox: Use watchdog core to install
+ restart handler
+In-Reply-To: <df7b5570-a44d-0c25-fedd-03a0891fdff3@sigmadesigns.com> (Marc
+ Gonzalez's message of "Thu, 5 Jan 2017 10:42:19 +0100")
+References: <1483565318-25578-1-git-send-email-linux@roeck-us.net>
+ <1483565318-25578-4-git-send-email-linux@roeck-us.net>
+ <df7b5570-a44d-0c25-fedd-03a0891fdff3@sigmadesigns.com>
+Message-ID: <yw1xmvf5ohx2.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 07:14:14PM +0000, Will Deacon wrote:
-> Hi Peter,
-> 
-> On Wed, Jan 04, 2017 at 11:37:13AM +0100, Peter Zijlstra wrote:
-> > On Tue, Jan 03, 2017 at 06:10:26PM +0000, Will Deacon wrote:
-> > > The ARMv8.2 architecture introduces the Statistical Profiling Extension
-> > > (SPE). SPE provides a way to configure and collect profiling samples
-> > > from the CPU in the form of a trace buffer, which can be mapped directly
-> > > into userspace using the perf AUX buffer infrastructure.
-> > > 
-> > > This patch adds support for SPE in the form of a new perf driver.
-> > > 
-> > 
-> > Can you give a little high level overview of what exactly SPE is?
-> 
-> Sure, I can try, although there is no public documentation yet so it's a
-> bit fiddly.
-> 
-> SPE can be used to profile a population of operations in the CPU pipeline
-> after instruction decode. These are either architected instructions (i.e.
-> a dynamic instruction trace) or CPU-specific uops and the choice is fixed
-> statically in the hardware and advertised to userspace via caps/. Sampling
-> is controlled using a sampling interval, similar to a regular PMU counter,
-> but also with an optional random perturbation to avoid falling into patterns
-> where you continuously profile the same instruction in a hot loop.
-> 
-> After each operation is decoded, the interval counter is decremented. When
-> it hits zero, an operation is chosen for profiling and tracked within the
-> pipeline until it retires. Along the way, information such as TLB lookups,
-> cache misses, time spent to issue etc is captured in the form of a sample.
-> The sample is then filtered according to certain criteria (e.g. load
-> latency) that can be specified in the event config (described under
-> format/) and, if the sample satisfies the filter, it is written out to
-> memory as a record, otherwise it is discarded. Only one operation can
-> be sampled at a time.
-> 
-> The in-memory buffer is linear and virtually addressed, raising an
-> interrupt when it fills up. The PMU driver handles these interrupts to
-> give the appearance of a ring buffer, as expected by the AUX code.
-> 
-> The in-memory trace-like format is self-describing (though not parseable
-> in reverse) and written as a series of records, with each record
-> corresponding to a sample and consisting of a sequence of packets. These
-> packets are defined by the architecture, although some have CPU-specific
-> fields for recording information specific to the microarchitecture.
-> 
-> As a simple example, a record generated for a branch instruction may
-> consist of the following packets:
-> 
->   0 (Address) : Virtual PC of the branch instruction
->   1 (Type)    : Conditional direct branch
->   2 (Counter) : Number of cycles taken from Dispatch to Issue
->   3 (Address) : Virtual branch target + condition flags
->   4 (Counter) : Number of cycles taken from Dispatch to Complete
->   5 (Events)  : Mispredicted as not-taken
->   6 (END)     : End of record
-> 
-> You can also toggle things like timestamp packets in each record.
-> 
-> Since SPE is an optional extension to the architecture, I'm sure there
-> will be big.LITTLE systems where only one of the clusters has SPE support,
-> so the driver is slightly complicated by handling that.
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-Hmm, on first reading that sounds a bit like a combination of AMD-IBS
-and Intel-PEBS. PEBS has the memory buffer, but we keep that private to
-the implementation, we rewrite the events into 'normal' perf SAMPLE
-records on interrupt and context switch. IBS otoh doesn't have the
-memory buffer but does similar things like tagging u-ops and providing
-various metrics, which are exposed as is through SAMPLE_RAW.
+> [ Adding Mans ]
+>
+> Guenter, patch c7ef68c32265 states "Fixes: a3e376d26ace".
+> Is that true? I mean, they seem quite orthogonal; then again I know
+> nothing of this framework.
 
-I have no immediate objection to using AUX for this though, its arguably
-similar to SAMPLE_RAW and makes sense since you have a memory buffer
-already.
+I don't see the relation of either of those to this patch.
 
-We also have an AUX enabled driver for Intel-BTS, which is similar to
-PEBS but records branch traces (the precursor to PT in a sense).
+> On 04/01/2017 22:28, Guenter Roeck wrote:
+>> Use the infrastructure provided by the watchdog core to install
+>> the restart handler.
+>> 
+>> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+>> ---
+>>  drivers/watchdog/tangox_wdt.c | 32 +++++++++++---------------------
+>>  1 file changed, 11 insertions(+), 21 deletions(-)
+>> 
+>> diff --git a/drivers/watchdog/tangox_wdt.c b/drivers/watchdog/tangox_wdt.c
+>> index 202c4b9cc921..49e6e805db7c 100644
+>> --- a/drivers/watchdog/tangox_wdt.c
+>> +++ b/drivers/watchdog/tangox_wdt.c
+>> @@ -15,9 +15,7 @@
+>>  #include <linux/kernel.h>
+>>  #include <linux/module.h>
+>>  #include <linux/moduleparam.h>
+>> -#include <linux/notifier.h>
+>>  #include <linux/platform_device.h>
+>> -#include <linux/reboot.h>
+>>  #include <linux/watchdog.h>
+>>  
+>>  #define DEFAULT_TIMEOUT 30
+>> @@ -47,7 +45,6 @@ struct tangox_wdt_device {
+>>  	void __iomem *base;
+>>  	unsigned long clk_rate;
+>>  	struct clk *clk;
+>> -	struct notifier_block restart;
+>>  };
+>>  
+>>  static int tangox_wdt_set_timeout(struct watchdog_device *wdt,
+>> @@ -96,24 +93,24 @@ static const struct watchdog_info tangox_wdt_info = {
+>>  	.identity = "tangox watchdog",
+>>  };
+>>  
+>> +static int tangox_wdt_restart(struct watchdog_device *wdt,
+>> +			      unsigned long action, void *data)
+>> +{
+>> +	struct tangox_wdt_device *dev = watchdog_get_drvdata(wdt);
+>> +
+>> +	writel(1, dev->base + WD_COUNTER);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>  static const struct watchdog_ops tangox_wdt_ops = {
+>>  	.start		= tangox_wdt_start,
+>>  	.stop		= tangox_wdt_stop,
+>>  	.set_timeout	= tangox_wdt_set_timeout,
+>>  	.get_timeleft	= tangox_wdt_get_timeleft,
+>> +	.restart	= tangox_wdt_restart,
+>>  };
+>>  
+>> -static int tangox_wdt_restart(struct notifier_block *nb, unsigned long action,
+>> -			      void *data)
+>> -{
+>> -	struct tangox_wdt_device *dev =
+>> -		container_of(nb, struct tangox_wdt_device, restart);
+>> -
+>> -	writel(1, dev->base + WD_COUNTER);
+>> -
+>> -	return NOTIFY_DONE;
+>> -}
+>> -
+>>  static int tangox_wdt_probe(struct platform_device *pdev)
+>>  {
+>>  	struct tangox_wdt_device *dev;
+>> @@ -180,12 +177,6 @@ static int tangox_wdt_probe(struct platform_device *pdev)
+>>  
+>>  	platform_set_drvdata(pdev, dev);
+>>  
+>> -	dev->restart.notifier_call = tangox_wdt_restart;
+>> -	dev->restart.priority = 128;
+>> -	err = register_restart_handler(&dev->restart);
+>> -	if (err)
+>> -		dev_warn(&pdev->dev, "failed to register restart handler\n");
+>> -
+>>  	dev_info(&pdev->dev, "SMP86xx/SMP87xx watchdog registered\n");
+>>  
+>>  	return 0;
+>> @@ -202,7 +193,6 @@ static int tangox_wdt_remove(struct platform_device *pdev)
+>>  	tangox_wdt_stop(&dev->wdt);
+>>  	clk_disable_unprepare(dev->clk);
+>>  
+>> -	unregister_restart_handler(&dev->restart);
+>>  	watchdog_unregister_device(&dev->wdt);
+>>  
+>>  	return 0;
+>> 
+
+-- 
+M?ns Rullg?rd
