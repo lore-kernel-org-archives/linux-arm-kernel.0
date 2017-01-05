@@ -1,35 +1,190 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Thu,  5 Jan 2017 15:01:12 -0800
-Subject: [PATCHv2 0/2] Memblock cleanup plus memory removal fix
-Message-ID: <1483657274-11346-1-git-send-email-labbott@redhat.com>
+Date: Thu,  5 Jan 2017 15:01:13 -0800
+Subject: [PATCHv2 1/2] arm: Cleanup sanity_check_meminfo
+In-Reply-To: <1483657274-11346-1-git-send-email-labbott@redhat.com>
+References: <1483657274-11346-1-git-send-email-labbott@redhat.com>
+Message-ID: <1483657274-11346-2-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-This is v2 of the series to make sanity_check_meminfo (renamed in this series)
-more readable and less error prone and fix an existing bug. v1 failed in that it
-re-introduced a previously fixed bug. Hopefully this version does better.
+The logic for sanity_check_meminfo has become difficult to
+follow. Clean up the code so it's more obvious what the code
+is actually trying to do. Additionally, meminfo is now removed
+so rename the function to better describe it's purpose.
 
-As a reminder, During the course of
-https://marc.info/?l=linux-arm-kernel&m=148145259511248, Grygorii Strashko
-reminded me of another issue where I proposed a patch but never followed up on
-it. The patch in
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296978.html
-did some cleanup and renaming of sanity_check_meminfo. I think this makes the
-code more readable so I'd like to resurect it and rebase my fix
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/474060.html
-on top of it.
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: Laura Abbott <labbott@redhat.com>
+---
+v2: Fixed code so b9a019899f61 ("ARM: 8590/1: sanity_check_meminfo():
+avoid overflow on vmalloc_limit") should stay fixed. The casting and assignment
+still seem ugly. Also corrected the size for memblock_remove with
+!CONFIG_HIGHMEM (found by inspection, memblock was handling it properly).
+---
+ arch/arm/kernel/setup.c |  4 +--
+ arch/arm/mm/mmu.c       | 65 ++++++++++++++++++-------------------------------
+ arch/arm/mm/nommu.c     |  8 +++---
+ 3 files changed, 30 insertions(+), 47 deletions(-)
 
-
-Laura Abbott (2):
-  arm: Cleanup sanity_check_meminfo
-  arm: Adjust memory boundaries after reservations
-
- arch/arm/kernel/setup.c | 12 ++++++++--
- arch/arm/mm/mmu.c       | 62 +++++++++++++++++--------------------------------
- arch/arm/mm/nommu.c     |  8 +++----
- 3 files changed, 35 insertions(+), 47 deletions(-)
-
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 34e3f3c..8a8051c 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -81,7 +81,7 @@ __setup("fpe=", fpe_setup);
+ extern void init_default_cache_policy(unsigned long);
+ extern void paging_init(const struct machine_desc *desc);
+ extern void early_paging_init(const struct machine_desc *);
+-extern void sanity_check_meminfo(void);
++extern void adjust_lowmem_bounds(void);
+ extern enum reboot_mode reboot_mode;
+ extern void setup_dma_zone(const struct machine_desc *desc);
+ 
+@@ -1093,7 +1093,7 @@ void __init setup_arch(char **cmdline_p)
+ 	setup_dma_zone(mdesc);
+ 	xen_early_init();
+ 	efi_init();
+-	sanity_check_meminfo();
++	adjust_lowmem_bounds();
+ 	arm_memblock_init(mdesc);
+ 
+ 	early_ioremap_reset();
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 4001dd1..ce5123b 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1152,13 +1152,11 @@ early_param("vmalloc", early_vmalloc);
+ 
+ phys_addr_t arm_lowmem_limit __initdata = 0;
+ 
+-void __init sanity_check_meminfo(void)
++void __init adjust_lowmem_bounds(void)
+ {
+ 	phys_addr_t memblock_limit = 0;
+-	int highmem = 0;
+ 	u64 vmalloc_limit;
+ 	struct memblock_region *reg;
+-	bool should_use_highmem = false;
+ 
+ 	/*
+ 	 * Let's use our own (unoptimized) equivalent of __pa() that is
+@@ -1172,43 +1170,19 @@ void __init sanity_check_meminfo(void)
+ 	for_each_memblock(memory, reg) {
+ 		phys_addr_t block_start = reg->base;
+ 		phys_addr_t block_end = reg->base + reg->size;
+-		phys_addr_t size_limit = reg->size;
+ 
+-		if (reg->base >= vmalloc_limit)
+-			highmem = 1;
+-		else
+-			size_limit = vmalloc_limit - reg->base;
+ 
+-
+-		if (!IS_ENABLED(CONFIG_HIGHMEM) || cache_is_vipt_aliasing()) {
+-
+-			if (highmem) {
+-				pr_notice("Ignoring RAM at %pa-%pa (!CONFIG_HIGHMEM)\n",
+-					  &block_start, &block_end);
+-				memblock_remove(reg->base, reg->size);
+-				should_use_highmem = true;
+-				continue;
+-			}
+-
+-			if (reg->size > size_limit) {
+-				phys_addr_t overlap_size = reg->size - size_limit;
+-
+-				pr_notice("Truncating RAM at %pa-%pa",
+-					  &block_start, &block_end);
+-				block_end = vmalloc_limit;
+-				pr_cont(" to -%pa", &block_end);
+-				memblock_remove(vmalloc_limit, overlap_size);
+-				should_use_highmem = true;
+-			}
+-		}
+-
+-		if (!highmem) {
+-			if (block_end > arm_lowmem_limit) {
+-				if (reg->size > size_limit)
+-					arm_lowmem_limit = vmalloc_limit;
+-				else
+-					arm_lowmem_limit = block_end;
+-			}
++		if (reg->base < vmalloc_limit) {
++			if (block_end > arm_lowmem_limit)
++				/*
++				 * Compare as u64 to ensure vmalloc_limit does
++				 * not get truncated. block_end should always
++				 * fit in phys_addr_t so there should be no
++				 * issue with assignment.
++				 */
++				arm_lowmem_limit = min_t(u64,
++							 vmalloc_limit,
++							 block_end);
+ 
+ 			/*
+ 			 * Find the first non-pmd-aligned page, and point
+@@ -1233,9 +1207,6 @@ void __init sanity_check_meminfo(void)
+ 		}
+ 	}
+ 
+-	if (should_use_highmem)
+-		pr_notice("Consider using a HIGHMEM enabled kernel.\n");
+-
+ 	high_memory = __va(arm_lowmem_limit - 1) + 1;
+ 
+ 	/*
+@@ -1248,6 +1219,18 @@ void __init sanity_check_meminfo(void)
+ 	if (!memblock_limit)
+ 		memblock_limit = arm_lowmem_limit;
+ 
++	if (!IS_ENABLED(CONFIG_HIGHMEM) || cache_is_vipt_aliasing()) {
++		if (memblock_end_of_DRAM() > arm_lowmem_limit) {
++			phys_addr_t end = memblock_end_of_DRAM();
++
++			pr_notice("Ignoring RAM at %pa-%pa\n",
++				  &memblock_limit, &end);
++			pr_notice("Consider using a HIGHMEM enabled kernel.\n");
++
++			memblock_remove(memblock_limit, end - memblock_limit);
++		}
++	}
++
+ 	memblock_set_current_limit(memblock_limit);
+ }
+ 
+diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+index 2740967..13a25d6 100644
+--- a/arch/arm/mm/nommu.c
++++ b/arch/arm/mm/nommu.c
+@@ -85,7 +85,7 @@ static unsigned long irbar_read(void)
+ }
+ 
+ /* MPU initialisation functions */
+-void __init sanity_check_meminfo_mpu(void)
++void __init adjust_lowmem_bounds_mpu(void)
+ {
+ 	phys_addr_t phys_offset = PHYS_OFFSET;
+ 	phys_addr_t aligned_region_size, specified_mem_size, rounded_mem_size;
+@@ -274,7 +274,7 @@ void __init mpu_setup(void)
+ 	}
+ }
+ #else
+-static void sanity_check_meminfo_mpu(void) {}
++static void adjust_lowmem_bounds_mpu(void) {}
+ static void __init mpu_setup(void) {}
+ #endif /* CONFIG_ARM_MPU */
+ 
+@@ -295,10 +295,10 @@ void __init arm_mm_memblock_reserve(void)
+ #endif
+ }
+ 
+-void __init sanity_check_meminfo(void)
++void __init adjust_lowmem_bounds(void)
+ {
+ 	phys_addr_t end;
+-	sanity_check_meminfo_mpu();
++	adjust_lowmem_bounds_mpu();
+ 	end = memblock_end_of_DRAM();
+ 	high_memory = __va(end - 1) + 1;
+ 	memblock_set_current_limit(end);
 -- 
 2.7.4
