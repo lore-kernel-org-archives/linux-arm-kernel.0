@@ -1,34 +1,88 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Thu, 5 Jan 2017 11:13:15 -0800
-Subject: [PATCH 1/2] soc: ti: knav_dma: fix typos in trace message
-In-Reply-To: <586E99AA.7080409@ti.com>
-References: <1482272663-29829-1-git-send-email-m-karicheri2@ti.com>
- <06b11675-e66f-2a0f-134a-29ab789f7d99@oracle.com> <586E99AA.7080409@ti.com>
-Message-ID: <9eb85103-5b62-8659-6513-27a20974ea17@oracle.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Thu, 5 Jan 2017 11:20:57 -0800
+Subject: [PATCH v2 04/19] ARM: dts: imx6-sabrelite: add OV5642 and OV5640
+ camera sensors
+In-Reply-To: <0a343705-1d38-9fe2-6419-56ab9bdfb0c2@mentor.com>
+References: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483477049-19056-5-git-send-email-steve_longerbeam@mentor.com>
+ <0a343705-1d38-9fe2-6419-56ab9bdfb0c2@mentor.com>
+Message-ID: <d9f31e15-39b7-3c31-e45f-b19c0dd1e791@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/5/2017 11:08 AM, Murali Karicheri wrote:
-> On 12/20/2016 08:01 PM, Santosh Shilimkar wrote:
->> On 12/20/2016 2:24 PM, Murali Karicheri wrote:
->>> This patch fixes some typos in the trace message
->>>
->>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
->>> ---
->> Patch 1 and 2 looks fine. Will pick them for next
->> merge window. Thanks !!
->>
->> Regards,
->> Santosh
->>
-> Santosh,
->
-> Could you send this to linux-next please so that I can
-> cherry-pick them for our internal release?
->
-Am collecting few more patches Murali. Hopefully
-I will be able to push that to linux-next next week.
+Hi Vladimir,
 
-Regards,
-Santosh
+
+On 01/04/2017 04:25 AM, Vladimir Zapolskiy wrote:
+> Hi Steve,
+>
+> On 01/03/2017 10:57 PM, Steve Longerbeam wrote:
+>> Enables the OV5642 parallel-bus sensor, and the OV5640 MIPI CSI-2 sensor.
+>> Both hang off the same i2c2 bus, so they require different (and non-
+>> default) i2c slave addresses.
+>>
+>> The OV5642 connects to the parallel-bus mux input port on ipu1_csi0_mux.
+>>
+>> The OV5640 connects to the input port on the MIPI CSI-2 receiver on
+>> mipi_csi. It is set to transmit over MIPI virtual channel 1.
+>>
+>> Note there is a pin conflict with GPIO6. This pin functions as a power
+>> input pin to the OV5642, but ENET uses it as the h/w workaround for
+>> erratum ERR006687, to wake-up the ARM cores on normal RX and TX packet
+>> done events (see 6261c4c8). So workaround 6261c4c8 is reverted here to
+>> support the OV5642, and the "fsl,err006687-workaround-present" boolean
+>> also must be removed. The result is that the CPUidle driver will no longer
+>> allow entering the deep idle states on the sabrelite.
+> For me it sounds like a candidate of its own separate change.
+
+Yes, I split out the two partial reverts into a separate commit
+("ARM: dts: imx6qdl-sabrelite: remove erratum ERR006687
+  workaround").
+
+>
+>
+>
+>> +
+>> +	mipi_camera: ov5640 at 40 {
+> Please reorder device nodes by address value,
+
+done.
+
+>   also according to ePAPR
+> node names should be generic, labels can be specific:
+>
+> 	ov5640: camera at 40 {
+> 		...
+> 	};
+>
+> 	ov5642: camera at 42 {
+> 		...
+> 	};
+
+fixed.
+
+>
+>> +		pinctrl_ipu1_csi0: ipu1grp-csi0 {
+> Please rename node name to ipu1csi0grp.
+
+done.
+
+>
+>> +
+>> +                pinctrl_ov5640: ov5640grp {
+>> +                        fsl,pins = <
+>> +				MX6QDL_PAD_NANDF_D5__GPIO2_IO05 0x000b0
+>> +				MX6QDL_PAD_NANDF_WP_B__GPIO6_IO09 0x0b0b0
+>> +                        >;
+>> +                };
+>> +
+> Indentation issues above, please use tabs instead of spaces.
+
+fixed.
+
+>
+> Also please add new pin control groups preserving the alphanimerical order.
+
+done.
+
+Steve
