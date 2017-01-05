@@ -1,32 +1,27 @@
 From: luto@amacapital.net (Andy Lutomirski)
-Date: Thu, 5 Jan 2017 09:53:54 -0800
-Subject: [RFC, PATCHv2 29/29] mm, x86: introduce RLIMIT_VADDR
-In-Reply-To: <20170104141959.GC17319@node.shutemov.name>
-References: <20161227015413.187403-1-kirill.shutemov@linux.intel.com>
- <20161227015413.187403-30-kirill.shutemov@linux.intel.com>
- <2736959.3MfCab47fD@wuerfel>
- <CALCETrV_qejd-Ozqo4vTqz=LuukMUPeQ7EVUQbfTxs_xNbO3oQ@mail.gmail.com>
- <20170103160457.GB17319@node.shutemov.name>
- <CALCETrW3=SsQeC-gWOVqwTtg022+gHei=xfUc2ei3kkX0CACpg@mail.gmail.com>
- <20170104141959.GC17319@node.shutemov.name>
-Message-ID: <CALCETrXTD97Sk-AThhN8myfY5+pL9memi2RQfhFNjv1mFoiALw@mail.gmail.com>
+Date: Thu, 5 Jan 2017 09:54:30 -0800
+Subject: [RFC 1/4] mm: remove unused TASK_SIZE_OF()
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DB0258289@AcuExch.aculab.com>
+References: <20161230155634.8692-1-dsafonov@virtuozzo.com>
+ <20161230155634.8692-2-dsafonov@virtuozzo.com>
+ <063D6719AE5E284EB5DD2968C1650D6DB0258289@AcuExch.aculab.com>
+Message-ID: <CALCETrXUB8AeEzJ-WtW3kW9c189AcOe+GBq8TE7GPE+xrvXS8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 4, 2017 at 6:19 AM, Kirill A. Shutemov <kirill@shutemov.name> wrote:
-> On Tue, Jan 03, 2017 at 10:27:22AM -0800, Andy Lutomirski wrote:
->> On Tue, Jan 3, 2017 at 8:04 AM, Kirill A. Shutemov <kirill@shutemov.name> wrote:
->> > And what about stack? I'm not sure that everybody would be happy with
->> > stack in the middle of address space.
->>
->> I would, personally.  I think that, for very large address spaces, we
->> should allocate a large block of stack and get rid of the "stack grows
->> down forever" legacy idea.  Then we would never need to worry about
->> the stack eventually hitting some other allocation.  And 2^57 bytes is
->> hilariously large for a default stack.
+On Thu, Jan 5, 2017 at 1:51 AM, David Laight <David.Laight@aculab.com> wrote:
+> From: Dmitry Safonov
+>> Sent: 30 December 2016 15:57
+>> All users of TASK_SIZE_OF(tsk) have migrated to mm->task_size or
+>> TASK_SIZE_MAX since:
+>> commit d696ca016d57 ("x86/fsgsbase/64: Use TASK_SIZE_MAX for
+>> FSBASE/GSBASE upper limits"),
+>> commit a06db751c321 ("pagemap: check permissions and capabilities at
+>> open time"),
+> ...
+>> +#define TASK_SIZE            (current->thread.task_size)
 >
-> The stack in the middle of address space can prevent creating other huuuge
-> contiguous mapping. Databases may want this.
+> I'm not sure I like he hidden 'current' argument to an
+> apparent constant.
 
-Fair enough.  OTOH, 2^47 is nowhere near the middle if we were to put
-it near the top of the legacy address space.
+Me neither.  But this patch is merely changing the implementation.
