@@ -1,70 +1,56 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Thu,  5 Jan 2017 09:09:40 +0100
-Subject: [PATCH RESEND] dmaengine: stm32-dma: Add error messages if xlate fails
-Message-ID: <1483603780-3368-1-git-send-email-cedric.madianga@gmail.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Thu, 5 Jan 2017 09:10:35 +0100
+Subject: [PATCH 15/22] mfd: axp20x: add CHRG_CTRL1 to writeable regs for
+ AXP20X/AXP22X
+In-Reply-To: <CAGb2v67KmaECfFO+QBxKbtKscD0O=KNVHO1TS4FspYEdaLWUCA@mail.gmail.com>
+References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
+ <20170102163723.7939-16-quentin.schulz@free-electrons.com>
+ <CAGb2v67KmaECfFO+QBxKbtKscD0O=KNVHO1TS4FspYEdaLWUCA@mail.gmail.com>
+Message-ID: <304cdd9e-93a7-f554-99ce-e3e01762761d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds some error messages when a slave device fails to request a
-channel.
+On 05/01/2017 07:10, Chen-Yu Tsai wrote:
+> On Tue, Jan 3, 2017 at 12:37 AM, Quentin Schulz
+> <quentin.schulz@free-electrons.com> wrote:
+>> The CHR_CTRL1 register is made of 7 read-write bits with one being used
+>> to set the target voltage for battery charging.
+> 
+> The description is incorrect.
+> 
+> All 8 bits are read-write:
+> 
+>   - The highest bit enables the charger module
+>   - Bits [6:5] set the target voltage
+>   - Bits [4:3] set when the charge cycle ends, based on percentage
+>     of charge current
+>   - Bits [2:0] set the charge current
+> 
+> Feel free to use the above in the commit message.
+> 
 
-Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-Reviewed-by: Ludovic BARRE <ludovic.barre@st.com>
----
-Resolve conflicts issue
----
- drivers/dma/stm32-dma.c | 24 +++++++++++++++---------
- 1 file changed, 15 insertions(+), 9 deletions(-)
+Thanks for the correction.
 
-diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
-index fc9738e..4eacd9d 100644
---- a/drivers/dma/stm32-dma.c
-+++ b/drivers/dma/stm32-dma.c
-@@ -987,30 +987,36 @@ static struct dma_chan *stm32_dma_of_xlate(struct of_phandle_args *dma_spec,
- 					   struct of_dma *ofdma)
- {
- 	struct stm32_dma_device *dmadev = ofdma->of_dma_data;
-+	struct device *dev = dmadev->ddev.dev;
- 	struct stm32_dma_cfg cfg;
- 	struct stm32_dma_chan *chan;
- 	struct dma_chan *c;
- 
--	if (dma_spec->args_count < 3)
-+	if (dma_spec->args_count < 4) {
-+		dev_err(dev, "Bad number of cells\n");
- 		return NULL;
-+	}
- 
- 	cfg.channel_id = dma_spec->args[0];
- 	cfg.request_line = dma_spec->args[1];
- 	cfg.stream_config = dma_spec->args[2];
--	cfg.threshold = 0;
-+	cfg.threshold = dma_spec->args[3];
- 
--	if ((cfg.channel_id >= STM32_DMA_MAX_CHANNELS) || (cfg.request_line >=
--				STM32_DMA_MAX_REQUEST_ID))
-+	if ((cfg.channel_id >= STM32_DMA_MAX_CHANNELS) ||
-+	    (cfg.request_line >= STM32_DMA_MAX_REQUEST_ID)) {
-+		dev_err(dev, "Bad channel and/or request id\n");
- 		return NULL;
--
--	if (dma_spec->args_count > 3)
--		cfg.threshold = dma_spec->args[3];
-+	}
- 
- 	chan = &dmadev->chan[cfg.channel_id];
- 
- 	c = dma_get_slave_channel(&chan->vchan.chan);
--	if (c)
--		stm32_dma_set_config(chan, &cfg);
-+	if (!c) {
-+		dev_err(dev, "No more channel avalaible\n");
-+		return NULL;
-+	}
-+
-+	stm32_dma_set_config(chan, &cfg);
- 
- 	return c;
- }
+>>
+>> This adds the CHRG_CTRL1 register to the list of writeable registers for
+>> AXP20X and AXP22X PMICs.
+> 
+> You might want to add up to CHRG_CTRL3 for the AXP22x and CHRG_CTRL2
+> for the AXP20x. These control additional aspects of the charger.
+> 
+
+ACK.
+
+> AXP20X_CHRG_BAK_CTRL controls the charger for the RTC battery. You
+> could add this now, or let the person doing the RTC battery driver
+> add it.
+
+I'll let the person adding the RTC battery driver add it.
+
+Thanks,
+Quentin
+
 -- 
-1.9.1
+Quentin Schulz, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
