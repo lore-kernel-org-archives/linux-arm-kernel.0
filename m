@@ -1,27 +1,60 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Thu, 5 Jan 2017 09:54:30 -0800
-Subject: [RFC 1/4] mm: remove unused TASK_SIZE_OF()
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DB0258289@AcuExch.aculab.com>
-References: <20161230155634.8692-1-dsafonov@virtuozzo.com>
- <20161230155634.8692-2-dsafonov@virtuozzo.com>
- <063D6719AE5E284EB5DD2968C1650D6DB0258289@AcuExch.aculab.com>
-Message-ID: <CALCETrXUB8AeEzJ-WtW3kW9c189AcOe+GBq8TE7GPE+xrvXS8g@mail.gmail.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Thu, 5 Jan 2017 09:56:20 -0800
+Subject: [PATCH 1/6] ARM: dts: am335x-phycore-som: Update NAND partition
+ table
+In-Reply-To: <20170105171845.GK4310@atomide.com>
+References: <1483627851-17996-1-git-send-email-t.remmet@phytec.de>
+ <1483627851-17996-2-git-send-email-t.remmet@phytec.de>
+ <20170105153637.GA4310@atomide.com>
+ <20170105171845.GK4310@atomide.com>
+Message-ID: <20170105175619.GA56877@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 5, 2017 at 1:51 AM, David Laight <David.Laight@aculab.com> wrote:
-> From: Dmitry Safonov
->> Sent: 30 December 2016 15:57
->> All users of TASK_SIZE_OF(tsk) have migrated to mm->task_size or
->> TASK_SIZE_MAX since:
->> commit d696ca016d57 ("x86/fsgsbase/64: Use TASK_SIZE_MAX for
->> FSBASE/GSBASE upper limits"),
->> commit a06db751c321 ("pagemap: check permissions and capabilities at
->> open time"),
-> ...
->> +#define TASK_SIZE            (current->thread.task_size)
->
-> I'm not sure I like he hidden 'current' argument to an
-> apparent constant.
+On Thu, Jan 05, 2017 at 09:18:45AM -0800, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [170105 07:37]:
+> > * Teresa Remmet <t.remmet@phytec.de> [170105 06:57]:
+> > > To improve NAND safety we updated the partition layout.
+> > > Added barebox backup partition and removed kernel and oftree
+> > > partition. They are kept in ubi now.
+> > 
+> > What about the users with earlier partition tables?
+> > 
+> > Please read about "flag day" changes, typically they are not
+> > acceptable.
+> 
+> Adding Brian and Adam to Cc. Can you guys come up with some
+> solution on this?
 
-Me neither.  But this patch is merely changing the implementation.
+I don't have much context for this thread, and no I don't plan to solve
+your problems for you. But I can provide tips!
+
+> I'm suggesting we leave the kernel nodes empty and let u-boot
+> populate them, so maybe you guys can discuss this on the related
+> lists.
+
+That's an option. I've worked with platforms that did something like
+this, and that's really one of the only ways you can handle putting
+partition information in the device tree. You're really hamstringing
+yourself when you put all the partition information in the device tree.
+And it's just dumb once that gets codified in the kernel source tree.
+
+The best solution would be to try to migrate away from static device
+tree representations of partition info entirely. UBI volumes are best
+where possible. If not, then some other kind of on-flash data structures
+(along the lines of a GPT) with a corresponding MTD partition parser is
+an OK alternative. Unfortunately, there isn't any good standard format
+for this on MTD, so it's typically all custom -- and so people use the
+easiest approach: device tree. And it's even more difficult with NAND,
+which has reliability problems, especially with static data (e.g., read
+disturb).
+
+Anyway, the parser solution is helpful only if one can properly fix the
+"flag day" first. And it requires a little bit more work to be generally
+useful; I posted some work for this over a year ago, but bikeshedding
+brought it down.
+
+> The rest of the series looks fine to me so applying it into
+> omap-for-v4.11/dt.
+
+Brian
