@@ -1,65 +1,39 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 4 Jan 2017 20:57:47 -0300
-Subject: [PATCH v2] ARM: dts: Add missing CPU frequencies for
- Exynos5422/5800
-In-Reply-To: <CAD=FV=WM_K_f0NQ0mxB55Ksbqg1gYJHs5d66ARYsa1=5hKLjXA@mail.gmail.com>
-References: <10512254.nyUcL0zgTP@amdc3058>
- <CAD=FV=Wo273T20fe8D2v5Pn1HYR==7PHtr7WZGwzFPRspAYPzg@mail.gmail.com>
- <20161229141707.qjrtjz7dik6a7l5s@kozik-lap>
- <CAD=FV=WM_K_f0NQ0mxB55Ksbqg1gYJHs5d66ARYsa1=5hKLjXA@mail.gmail.com>
-Message-ID: <2c85559a-dc12-610b-c842-c89d078e1c2a@osg.samsung.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Wed,  4 Jan 2017 18:21:25 -0600
+Subject: [PATCH 03/12] ARM: dts: socfpga: Add Rohm DH2228FV DAC
+In-Reply-To: <1483575694-29599-1-git-send-email-dinguyen@kernel.org>
+References: <1483575694-29599-1-git-send-email-dinguyen@kernel.org>
+Message-ID: <1483575694-29599-4-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug,
+Enable the SPI node and add the Rohm DH2228FV DAC.
 
-On 01/04/2017 06:05 PM, Doug Anderson wrote:
-> Hi,
-> 
-> On Thu, Dec 29, 2016 at 6:17 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> On Thu, Dec 15, 2016 at 04:54:30PM -0800, Doug Anderson wrote:
->>>> Index: b/arch/arm/boot/dts/exynos5800.dtsi
->>>> ===================================================================
->>>> --- a/arch/arm/boot/dts/exynos5800.dtsi 2016-12-15 12:43:54.365955950 +0100
->>>> +++ b/arch/arm/boot/dts/exynos5800.dtsi 2016-12-15 12:43:54.361955949 +0100
->>>> @@ -24,6 +24,16 @@
->>>>  };
->>>>
->>>>  &cluster_a15_opp_table {
->>>> +       opp at 2000000000 {
->>>> +               opp-hz = /bits/ 64 <2000000000>;
->>>> +               opp-microvolt = <1250000>;
->>>> +               clock-latency-ns = <140000>;
->>>> +       };
->>>> +       opp at 1900000000 {
->>>> +               opp-hz = /bits/ 64 <1900000000>;
->>>> +               opp-microvolt = <1250000>;
->>>> +               clock-latency-ns = <140000>;
->>>> +       };
->>>
->>> I don't think the voltages you listed are high enough for all peach pi
->>> boards for A15 at 1.9 GHz and 2.0 GHz, at least based on the research
->>> I did.  See my response to v1.
->>
->> I wanted to apply this but saw this remaining issue. Javier tested it
->> on Peach Pi so is this concern still valid?
-> 
-> I'm not sure.  It's been years since I did anything with exynos, so I
-> won't stand in the way if everyone else agrees that this patch is
-> good, but I will point out that testing on a single Peach Pi board is
-> not really enough given the massive difference in voltage needed
-> between the highest ASV group and the lowest (a whopping 112.5 mV from
-> looking in the Chrome OS source tree).
-> 
+Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+---
+ arch/arm/boot/dts/socfpga_cyclone5_socdk.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-I agree. That's why answered that I wasn't able to find regressions on the
-Peach Pi I've access to, but I couldn't provide a Reviewed-by tag since it
-wasn't clear to me that the values were safe for any Exynos5420/5422/5800.
-
-> -Doug
-
-Best regards,
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+index 24650ba..c2884c9 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+@@ -159,6 +159,16 @@
+ 	};
+ };
+ 
++&spi0 {
++	status = "okay";
++
++	spidev at 0 {
++		compatible = "rohm,dh2228fv";
++		reg = <0>;
++		spi-max-frequency = <1000000>;
++	};
++};
++
+ &usb1 {
+ 	status = "okay";
+ };
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.7.4
