@@ -1,53 +1,83 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 05 Jan 2017 19:12:29 +0900
-Subject: [PATCH] cpufreq: Remove CONFIG_CPU_FREQ_STAT_DETAILS config option
-In-Reply-To: <d4299228a500a889c2b4b9e305674f3d1ea9ae06.1483604760.git.viresh.kumar@linaro.org>
-References: <CGME20170105082939epcas4p4b494945ce55c949dc7a030ebf9dbdd4c@epcas4p4.samsung.com>
- <d4299228a500a889c2b4b9e305674f3d1ea9ae06.1483604760.git.viresh.kumar@linaro.org>
-Message-ID: <586E1C0D.20102@samsung.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Jan 2017 10:16:20 +0000
+Subject: [PATCH 1/5] ARM: dts: armada388-clearfog: add phy reset gpio-hog
+In-Reply-To: <871swig5b3.fsf@free-electrons.com>
+References: <E1cO4UH-0008SR-GW@rmk-PC.armlinux.org.uk>
+ <E1cO4Vz-00005t-8n@rmk-PC.armlinux.org.uk>
+ <871swig5b3.fsf@free-electrons.com>
+Message-ID: <20170105101620.GR14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
-
-On 2017? 01? 05? 17:27, Viresh Kumar wrote:
-> This doesn't have any benefit apart from saving a small amount of memory
-> when it is disabled. The ifdef hackery in the code makes it dirty
-> unnecessarily.
+On Wed, Jan 04, 2017 at 05:26:08PM +0100, Gregory CLEMENT wrote:
+> Hi Russell,
+>  
+>  On lun., janv. 02 2017, Russell King <rmk+kernel@armlinux.org.uk> wrote:
 > 
-> Clean it up by removing the Kconfig option completely. Few defconfigs
-> are also updated and CONFIG_CPU_FREQ_STAT_DETAILS is replaced with
-> CONFIG_CPU_FREQ_STAT now in them, as users wanted stats to be enabled.
 > 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  arch/arm/configs/exynos_defconfig         |  2 +-
->  arch/arm/configs/multi_v5_defconfig       |  2 +-
->  arch/arm/configs/multi_v7_defconfig       |  2 +-
->  arch/arm/configs/mvebu_v5_defconfig       |  2 +-
->  arch/arm/configs/pxa_defconfig            |  2 +-
->  arch/arm/configs/shmobile_defconfig       |  2 +-
->  arch/mips/configs/lemote2f_defconfig      |  1 -
->  arch/powerpc/configs/ppc6xx_defconfig     |  1 -
->  arch/sh/configs/sh7785lcr_32bit_defconfig |  2 +-
->  drivers/cpufreq/Kconfig                   |  8 --------
->  drivers/cpufreq/cpufreq_stats.c           | 14 --------------
->  11 files changed, 7 insertions(+), 31 deletions(-)
+> It would be nice to have some word here about this patch. Especially why
+> we need it now. I guess it is for being less dependent on the
+> initialization done by the bootloader but maybe you have other reasons.
 
+I'm not sure I follow.  This is adding it to the new platform, not the
+old one.  I guess I should've rolled this into the patch creating the
+clearfog-base dts file, and this question wouldn't have come up.
 
-I agree. Looks good to me.
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-
-[snip]
+> 
+> Thanks,
+> 
+> Gregory
+> 
+> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > ---
+> >  arch/arm/boot/dts/armada-388-clearfog-base.dts | 15 +++++++++++++++
+> >  1 file changed, 15 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/armada-388-clearfog-base.dts b/arch/arm/boot/dts/armada-388-clearfog-base.dts
+> > index f86e1876fb38..da788ea40717 100644
+> > --- a/arch/arm/boot/dts/armada-388-clearfog-base.dts
+> > +++ b/arch/arm/boot/dts/armada-388-clearfog-base.dts
+> > @@ -74,7 +74,17 @@
+> >  	phy = <&phy1>;
+> >  };
+> >  
+> > +&gpio0 {
+> > +	phy1_reset {
+> > +		gpio-hog;
+> > +		gpios = <19 GPIO_ACTIVE_LOW>;
+> > +		output-low;
+> > +		line-name = "phy1-reset";
+> > +	};
+> > +};
+> > +
+> >  &mdio {
+> > +	pinctrl-0 = <&mdio_pins &microsom_phy_clk_pins &clearfog_phy_pins>;
+> >  	phy1: ethernet-phy at 1 {
+> >  		/*
+> >  		 * Annoyingly, the marvell phy driver configures the LED
+> > @@ -87,6 +97,11 @@
+> >  };
+> >  
+> >  &pinctrl {
+> > +	/* phy1 reset */
+> > +	clearfog_phy_pins: clearfog-phy-pins {
+> > +		marvell,pins = "mpp19";
+> > +		marvell,function = "gpio";
+> > +	};
+> >  	rear_button_pins: rear-button-pins {
+> >  		marvell,pins = "mpp44";
+> >  		marvell,function = "gpio";
+> > -- 
+> > 2.7.4
+> >
+> 
+> -- 
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
 
 -- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: cw00_choi.vcf
-Type: text/x-vcard
-Size: 6 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170105/206bbca6/attachment.vcf>
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
