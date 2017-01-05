@@ -1,9 +1,10 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu,  5 Jan 2017 11:29:57 -0800
-Subject: [PATCH v2 8/8] ARM: dts: kirkwood-rd88f6281: Utilize new DSA binding
+Date: Thu,  5 Jan 2017 11:29:55 -0800
+Subject: [PATCH v2 6/8] ARM: dts: kirkwood-linksys-viper: Utilize new DSA
+ binding
 In-Reply-To: <20170105192957.14304-1-f.fainelli@gmail.com>
 References: <20170105192957.14304-1-f.fainelli@gmail.com>
-Message-ID: <20170105192957.14304-9-f.fainelli@gmail.com>
+Message-ID: <20170105192957.14304-7-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,34 +14,14 @@ disabled.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts | 11 ++++++++
- arch/arm/boot/dts/kirkwood-rd88f6281.dtsi   | 44 +++++++++++++++++++++++++++++
- 2 files changed, 55 insertions(+)
+ arch/arm/boot/dts/kirkwood-linksys-viper.dts | 49 ++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
-diff --git a/arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts b/arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts
-index 1a797381d3d4..6a4a65ec7944 100644
---- a/arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts
-+++ b/arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts
-@@ -33,3 +33,14 @@
- &eth1 {
-       status = "disabled";
- };
-+
-+&switch {
-+	reg = <0>;
-+
-+	ports {
-+		port at 4 {
-+			reg = <4>;
-+			label = "wan";
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/kirkwood-rd88f6281.dtsi b/arch/arm/boot/dts/kirkwood-rd88f6281.dtsi
-index d5aacf137e40..91f5da5dae5f 100644
---- a/arch/arm/boot/dts/kirkwood-rd88f6281.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-rd88f6281.dtsi
-@@ -54,6 +54,8 @@
+diff --git a/arch/arm/boot/dts/kirkwood-linksys-viper.dts b/arch/arm/boot/dts/kirkwood-linksys-viper.dts
+index 345fcac48dc7..df7851820507 100644
+--- a/arch/arm/boot/dts/kirkwood-linksys-viper.dts
++++ b/arch/arm/boot/dts/kirkwood-linksys-viper.dts
+@@ -70,6 +70,8 @@
  	};
  
  	dsa {
@@ -49,15 +30,16 @@ index d5aacf137e40..91f5da5dae5f 100644
  		compatible = "marvell,dsa";
  		#address-cells = <2>;
  		#size-cells = <0>;
-@@ -115,6 +117,48 @@
+@@ -207,6 +209,53 @@
  
  &mdio {
  	status = "okay";
 +
-+	switch: switch at 0 {
++	switch at 10 {
 +		compatible = "marvell,mv88e6085";
 +		#address-cells = <1>;
 +		#size-cells = <0>;
++		reg = <16>;
 +
 +		ports {
 +			#address-cells = <1>;
@@ -65,22 +47,27 @@ index d5aacf137e40..91f5da5dae5f 100644
 +
 +			port at 0 {
 +				reg = <0>;
-+				label = "lan1";
++				label = "ethernet1";
 +			};
 +
 +			port at 1 {
 +				reg = <1>;
-+				label = "lan2";
++				label = "ethernet2";
 +			};
 +
 +			port at 2 {
 +				reg = <2>;
-+				label = "lan3";
++				label = "ethernet3";
 +			};
 +
 +			port at 3 {
 +				reg = <3>;
-+				label = "lan4";
++				label = "ethernet4";
++			};
++
++			port at 4 {
++				reg = <4>;
++				label = "internet";
 +			};
 +
 +			port at 5 {
@@ -92,11 +79,10 @@ index d5aacf137e40..91f5da5dae5f 100644
 +					full-duplex;
 +				};
 +			};
-+
 +		};
 +	};
  };
  
- &eth0 {
+ &uart0 {
 -- 
 2.9.3
