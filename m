@@ -1,352 +1,129 @@
-From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu,  5 Jan 2017 16:36:41 +1300
-Subject: [PATCHv2 5/5] arm: mvebu: Add device tree for db-dxbc2 and
- db-xc3-24g4xg boards
-In-Reply-To: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
-References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170105033641.6212-6-chris.packham@alliedtelesis.co.nz>
+From: tanxiaojun@huawei.com (Tan Xiaojun)
+Date: Thu, 5 Jan 2017 11:43:44 +0800
+Subject: [QUESTION] Arm64: Query L3 cache info via DT
+In-Reply-To: <81784854-11f8-468a-a280-69be0a714a3b@arm.com>
+References: <58633494.9030708@huawei.com>
+ <81784854-11f8-468a-a280-69be0a714a3b@arm.com>
+Message-ID: <586DC0F0.5030006@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These boards are Marvell's evaluation boards for the 98DX4251 and
-98DX3336 SoCs.
+OK. Thank you very much. I will try it in my arm64 board.
 
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
----
-Chaqnges in v2:
-- None
+Xiaojun.
 
- arch/arm/boot/dts/db-dxbc2.dts      | 159 ++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/db-xc3-24g4xg.dts | 155 +++++++++++++++++++++++++++++++++++
- 2 files changed, 314 insertions(+)
- create mode 100644 arch/arm/boot/dts/db-dxbc2.dts
- create mode 100644 arch/arm/boot/dts/db-xc3-24g4xg.dts
-
-diff --git a/arch/arm/boot/dts/db-dxbc2.dts b/arch/arm/boot/dts/db-dxbc2.dts
-new file mode 100644
-index 000000000000..f56786cea5f8
---- /dev/null
-+++ b/arch/arm/boot/dts/db-dxbc2.dts
-@@ -0,0 +1,159 @@
-+/*
-+ * Device Tree file for DB-DXBC2 board
-+ *
-+ * Copyright (C) 2016 Allied Telesis Labs
-+ *
-+ * Based on armada-xp-db.dts
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ *
-+ * Note: this Device Tree assumes that the bootloader has remapped the
-+ * internal registers to 0xf1000000 (instead of the default
-+ * 0xd0000000). The 0xf1000000 is the default used by the recent,
-+ * DT-capable, U-Boot bootloaders provided by Marvell. Some earlier
-+ * boards were delivered with an older version of the bootloader that
-+ * left internal registers mapped at 0xd0000000. If you are in this
-+ * situation, you should either update your bootloader (preferred
-+ * solution) or the below Device Tree should be adjusted.
-+ */
-+
-+/dts-v1/;
-+#include "armada-xp-98dx4251.dtsi"
-+
-+/ {
-+	model = "Marvell Bobcat2 Evaluation Board";
-+	compatible = "marvell,db-dxbc2", "marvell,armadaxp-98dx4251", "marvell,armadaxp", "marvell,armada-370-xp";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0 0x00000000 0 0x20000000>; /* 512 MB */
-+	};
-+
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
-+			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
-+			  MBUS_ID(0x03, 0x00) 0 0 0xa8000000 0x4000000
-+			  MBUS_ID(0x08, 0x00) 0 0 0xac000000 0x100000>;
-+
-+		devbus-bootcs {
-+			status = "okay";
-+
-+			/* Device Bus parameters are required */
-+
-+			/* Read parameters */
-+			devbus,bus-width    = <16>;
-+			devbus,turn-off-ps  = <60000>;
-+			devbus,badr-skew-ps = <0>;
-+			devbus,acc-first-ps = <124000>;
-+			devbus,acc-next-ps  = <248000>;
-+			devbus,rd-setup-ps  = <0>;
-+			devbus,rd-hold-ps   = <0>;
-+
-+			/* Write parameters */
-+			devbus,sync-enable = <0>;
-+			devbus,wr-high-ps  = <60000>;
-+			devbus,wr-low-ps   = <60000>;
-+			devbus,ale-wr-ps   = <60000>;
-+		};
-+
-+		internal-regs {
-+			serial at 12000 {
-+				status = "okay";
-+			};
-+			serial at 12100 {
-+				status = "okay";
-+			};
-+
-+			i2c at 11000 {
-+				clock-frequency = <100000>;
-+				status = "okay";
-+			};
-+
-+			mvsdio at d4000 {
-+				pinctrl-0 = <&sdio_pins>;
-+				pinctrl-names = "default";
-+				status = "okay";
-+				/* No CD or WP GPIOs */
-+				broken-cd;
-+			};
-+
-+			nand at d0000 {
-+				status = "okay";
-+				num-cs = <1>;
-+				marvell,nand-keep-config;
-+				marvell,nand-enable-arbiter;
-+				nand-on-flash-bbt;
-+				nand-ecc-strength = <4>;
-+				nand-ecc-step-size = <512>;
-+			};
-+		};
-+	};
-+};
-+
-+&spi0 {
-+	status = "okay";
-+
-+	spi-flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "m25p64";
-+		reg = <0>; /* Chip select 0 */
-+		spi-max-frequency = <20000000>;
-+		m25p,fast-read;
-+
-+		partition at u-boot {
-+			reg = <0x00000000 0x00100000>;
-+			label = "u-boot";
-+		};
-+		partition at u-boot-env {
-+			reg = <0x00100000 0x00040000>;
-+			label = "u-boot-env";
-+		};
-+		partition at unused {
-+			reg = <0x00140000 0x00ec0000>;
-+			label = "unused";
-+		};
-+
-+	};
-+};
-diff --git a/arch/arm/boot/dts/db-xc3-24g4xg.dts b/arch/arm/boot/dts/db-xc3-24g4xg.dts
-new file mode 100644
-index 000000000000..5eb89ffb9a7d
---- /dev/null
-+++ b/arch/arm/boot/dts/db-xc3-24g4xg.dts
-@@ -0,0 +1,155 @@
-+/*
-+ * Device Tree file for DB-XC3-24G4XG board
-+ *
-+ * Copyright (C) 2016 Allied Telesis Labs
-+ *
-+ * Based on armada-xp-db.dts
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ *
-+ * Note: this Device Tree assumes that the bootloader has remapped the
-+ * internal registers to 0xf1000000 (instead of the default
-+ * 0xd0000000). The 0xf1000000 is the default used by the recent,
-+ * DT-capable, U-Boot bootloaders provided by Marvell. Some earlier
-+ * boards were delivered with an older version of the bootloader that
-+ * left internal registers mapped at 0xd0000000. If you are in this
-+ * situation, you should either update your bootloader (preferred
-+ * solution) or the below Device Tree should be adjusted.
-+ */
-+
-+/dts-v1/;
-+#include "armada-xp-98dx3336.dtsi"
-+
-+/ {
-+	model = "DB-XC3-24G4XG";
-+	compatible = "marvell,db-xc3-24g4xg", "marvell,armadaxp-98dx3336", "marvell,armadaxp", "marvell,armada-370-xp";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0 0x00000000 0 0x40000000>; /* 1 GB */
-+	};
-+
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
-+			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
-+			  MBUS_ID(0x03, 0x00) 0 0 0xa8000000 0x4000000
-+			  MBUS_ID(0x08, 0x00) 0 0 0xac000000 0x100000>;
-+
-+		devbus-bootcs {
-+			status = "okay";
-+
-+			/* Device Bus parameters are required */
-+
-+			/* Read parameters */
-+			devbus,bus-width    = <16>;
-+			devbus,turn-off-ps  = <60000>;
-+			devbus,badr-skew-ps = <0>;
-+			devbus,acc-first-ps = <124000>;
-+			devbus,acc-next-ps  = <248000>;
-+			devbus,rd-setup-ps  = <0>;
-+			devbus,rd-hold-ps   = <0>;
-+
-+			/* Write parameters */
-+			devbus,sync-enable = <0>;
-+			devbus,wr-high-ps  = <60000>;
-+			devbus,wr-low-ps   = <60000>;
-+			devbus,ale-wr-ps   = <60000>;
-+		};
-+
-+		internal-regs {
-+			serial at 12000 {
-+				status = "okay";
-+			};
-+			serial at 12100 {
-+				status = "okay";
-+			};
-+
-+			i2c at 11000 {
-+				clock-frequency = <100000>;
-+				status = "okay";
-+			};
-+
-+			mvsdio at d4000 {
-+				status = "disabled";
-+			};
-+
-+			nand at d0000 {
-+				status = "okay";
-+				num-cs = <1>;
-+				marvell,nand-keep-config;
-+				marvell,nand-enable-arbiter;
-+				nand-on-flash-bbt;
-+				nand-ecc-strength = <4>;
-+				nand-ecc-step-size = <512>;
-+			};
-+		};
-+	};
-+};
-+
-+&spi0 {
-+	status = "okay";
-+
-+	spi-flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "m25p64";
-+		reg = <0>; /* Chip select 0 */
-+		spi-max-frequency = <20000000>;
-+		m25p,fast-read;
-+
-+		partition at u-boot {
-+			reg = <0x00000000 0x00100000>;
-+			label = "u-boot";
-+		};
-+		partition at u-boot-env {
-+			reg = <0x00100000 0x00040000>;
-+			label = "u-boot-env";
-+		};
-+		partition at unused {
-+			reg = <0x00140000 0x00ec0000>;
-+			label = "unused";
-+		};
-+
-+	};
-+};
--- 
-2.11.0.24.ge6920cf
+On 2017/1/4 19:47, Sudeep Holla wrote:
+> 
+> Hi Tan,
+> 
+> On 28/12/16 03:42, Tan Xiaojun wrote:
+>> Hi.
+>>
+>> I saw you discussed how to achieve querying cache information and
+>> tend to implement the external ones(like L3 cache) via DT a few
+>> months ago.
+>>
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/405399.html
+>>
+>>  Are these implementations progressing? Forgive me to take the
+>> liberty to ask, we care about this thing.
+>>
+> 
+> Yes the support to override the cache properties for DT was added in v4.10
+> 
+> However, it still depends on the the sysreg to get the total levels of
+> caches supported in the system. You may need to tweak a bit around that
+> to support what you need.
+> 
+>> If you've already implemented some codes, we can help with testing
+>> (in Hisilicon D02, D03, D05) after you send it to the mail-list.
+>>
+> 
+> Sure, that would help.
+> 
+>> We can try our best to help if there is any difficulty.
+> 
+> OK, you can start trying the patch below :). It's not even compile
+> tested, so you make have to make some changes necessary. I just wanted
+> to put my thoughts here. Make sure all the L3 cacheinfo is present in DT.
+> 
+> Regards,
+> Sudeep
+> 
+> 
+> --
+> 
+> diff --git i/arch/arm64/kernel/cacheinfo.c w/arch/arm64/kernel/cacheinfo.c
+> index 9617301f76b5..88fbcd368104 100644
+> --- i/arch/arm64/kernel/cacheinfo.c
+> +++ w/arch/arm64/kernel/cacheinfo.c
+> @@ -84,7 +84,7 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
+> 
+>  static int __init_cache_level(unsigned int cpu)
+>  {
+> -	unsigned int ctype, level, leaves;
+> +	unsigned int ctype, level, leaves, of_level;
+>  	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+> 
+>  	for (level = 1, leaves = 0; level <= MAX_CACHE_LEVEL; level++) {
+> @@ -97,6 +97,17 @@ static int __init_cache_level(unsigned int cpu)
+>  		leaves += (ctype == CACHE_TYPE_SEPARATE) ? 2 : 1;
+>  	}
+> 
+> +	of_level = of_count_cache_levels(cpu);
+> +	if (level < of_level) {
+> +		/*
+> +		 * some external caches not specified in CLIDR_EL1
+> +		 * the information may be available in the device tree
+> +		 * only unified external caches are considered here
+> +		 */
+> +		level = of_level;
+> +		leaves += (of_level - level);
+> +	}
+> +
+>  	this_cpu_ci->num_levels = level;
+>  	this_cpu_ci->num_leaves = leaves;
+>  	return 0;
+> diff --git i/drivers/of/base.c w/drivers/of/base.c
+> index d4bea3c797d6..8007f3b06cb8 100644
+> --- i/drivers/of/base.c
+> +++ w/drivers/of/base.c
+> @@ -2267,6 +2267,20 @@ struct device_node *of_find_next_cache_node(const
+> struct device_node *np)
+>  	return NULL;
+>  }
+> 
+> +int of_count_cache_levels(unsigned int cpu)
+> +{
+> +	int level = 0;
+> +	struct device *cpu_dev = get_cpu_device(cpu);
+> +	struct device_node *np = cpu_dev->of_node;
+> +
+> +	while (np) {
+> +		level++;
+> +		np = of_find_next_cache_node(np);
+> +	}
+> +
+> +	return level;
+> +}
+> +
+>  /**
+>   * of_graph_parse_endpoint() - parse common endpoint node properties
+>   * @node: pointer to endpoint device_node
+> diff --git i/include/linux/of.h w/include/linux/of.h
+> index d72f01009297..c8597ae71ff3 100644
+> --- i/include/linux/of.h
+> +++ w/include/linux/of.h
+> @@ -280,6 +280,7 @@ extern struct device_node
+> *of_get_child_by_name(const struct device_node *node,
+> 
+>  /* cache lookup */
+>  extern struct device_node *of_find_next_cache_node(const struct
+> device_node *);
+> +extern int of_count_cache_levels(unsigned int cpu);
+>  extern struct device_node *of_find_node_with_property(
+>  	struct device_node *from, const char *prop_name);
+> 
+> 
+> .
+> 
