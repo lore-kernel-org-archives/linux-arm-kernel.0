@@ -1,62 +1,100 @@
 From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 5 Jan 2017 04:34:55 +0000
-Subject: [PATCHv2 4/5] arm: mvebu: Add device tree for 98DX3236 SoCs
+Date: Thu, 5 Jan 2017 04:46:32 +0000
+Subject: [PATCHv2 2/5] arm: mvebu: support for SMP on 98DX3336 SoC
 References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
- <20170105033641.6212-5-chris.packham@alliedtelesis.co.nz>
- <1ee850ee-f771-1aeb-6b96-dfbe3118f2fc@gmail.com>
-Message-ID: <ac117de5855d45ffa39cf7f7fd8cfbe8@svr-chch-ex1.atlnz.lc>
+ <20170105033641.6212-3-chris.packham@alliedtelesis.co.nz>
+ <5edb6751-d15b-6654-f4ae-adf38fafb8a4@gmail.com>
+Message-ID: <dd384eda81d2420dafe740bf5bb4dae0@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/17 17:06, Florian Fainelli wrote:
+On 05/01/17 17:04, Florian Fainelli wrote:
 > Le 01/04/17 ? 19:36, Chris Packham a ?crit :
->> The Marvell 98DX3236, 98DX3336, 98DX4521 and variants are switch ASICs
->> with integrated CPUs. They are similar to the Armada XP SoCs but have
->> different I/O interfaces.
->>
->> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->> ---
+>> Compared to the armada-xp the 98DX3336 uses different registers to set
+>> the boot address for the secondary CPU so a new enable-method is needed.
+>> This will only work if the machine definition doesn't define an overall
+>> smp_ops because there is not currently a way of overriding this from the
+>> device tree if it is set in the machine definition.
+>
+> Not sure I follow you here, in theory, each individual CPU could have a
+> different enable-method property, and considering how you leverage
+> existing DTS include files, you should be able to override the DTS with
+> the appropriate enable-method, or do you have a different problem?
+>
+
+The problem is I can't override the enable method if it's set in the 
+machine definition. It's because the devicetree is looked up first then 
+the machine definition overrides it.
+
+Heres an old thread that basically outlines the problem.
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/300371.html
+
+I posted a few attempts to work around it but there never really was any 
+consensus reached.
+
+>  mv98dx3236_resume_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
+>> +{
+>> +	WARN_ON(hw_cpu != 1);
 >> +
->> +		switch {
->> +			packet-processor at 0 {
->> +				compatible = "marvell,prestera-98dx4521";
->> +			};
->> +		};
+>> +	writel(0, mv98dx3236_resume_base + MV98DX3236_CPU_RESUME_CTRL_OFFSET);
+>> +	writel(virt_to_phys(boot_addr), mv98dx3236_resume_base +
+>> +	       MV98DX3236_CPU_RESUME_ADDR_OFFSET);
 >
-> This may be a bit premature if you are not providing a binding document
-> for this sub-node, you might as well add it once you also add a
-> corresponding driver (or if this will remain out of tree, at least
-> submitting a separate binding document).
+> I just submitted a patch series that switches such users to
+> __pa_symbol() instead of virt_to_phys() because this is a kernel image
+> symbol. For now this will work as-is, but depending on which patch
+> series makes it first, it may be a good idea to keep this on someone's
+> TODO list (yours or mine). I do expect having to make a second pass of
+> conversions anyway.
+>
+> [1]: https://lkml.org/lkml/2017/1/4/1101
 
-I also see that I made a typo 4521 should be 4251.
-
-The driver that uses this is an out of tree one so I will add a binding 
-document for it for now.
-
-It wouldn't he hard to whip up a simple uio based driver that provides 
-mmap access to the switch register space so I might look at that if I 
-get time. It would be useful for testing if nothing else.
+OK I'll keep that in mind.
 
 >
-> Also, if this node's unit address is 0, you would expect at least a reg
-> property whose address cell is 0 to be present.
+>> +}
+>> +
+>> +static int __init mv98dx3236_resume_init(void)
+>> +{
+>> +	struct device_node *np;
+>> +	struct resource res;
+>> +	int ret = 0;
+>> +
+>> +	np = of_find_matching_node(NULL, of_mv98dx3236_resume_table);
+>> +	if (!np)
+>> +		return 0;
+>> +
+>> +	pr_info("Initializing 98DX3236 Resume\n");
+>
+> This can be probably be dropped, you should know fairly quickly if this
+> succeeded or not.
+
+Will do.
+
+>
+> Can't this function be implemented as a smp_ops::smp_init_cpus instead
+> of having this initialization done at arch_initcall time?
 >
 
-The reg property is in the base 98dx3236 dsti file. The 3 devices have 
-the same IO footprint but the switching functionality is quite different 
-between them hence the different compatible strings (all of which I need 
-to add binding documentation for). I guess I could make the 3236 entry
+I'll look into it. My initial reaction is no because I still need 
+armada_xp_smp_init_cpus().
 
-   pp0: packet-processor at 0 {
-       compatible = "marvell,prestera-98dx3236";
-       reg = <0 0x4000000>;
-       ...
-   }
+>> +
+>> +	if (of_address_to_resource(np, 0, &res)) {
+>> +		pr_err("unable to get resource\n");
+>> +		ret = -ENOENT;
+>> +		goto out;
+>> +	}
+>> +
+>> +	if (!request_mem_region(res.start, resource_size(&res),
+>> +				np->full_name)) {
+>> +		pr_err("unable to request region\n");
+>> +		ret = -EBUSY;
+>> +		goto out;
+>> +	}
+>
+> You should be able to use of_io_request_and_map() and here.
+>
 
-Then the 3336 and 4251 could just override the compatible string
-
-   &pp0 {
-       compatible = "marvell,prestera-98dx4251";
-   };
-
-Would that be clearer?
+Will do.
