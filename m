@@ -1,197 +1,66 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 5 Jan 2017 23:13:04 +0100
-Subject: [PATCH 6/6] arm64: dts: sunxi: add support for the Orange Pi PC
- 2 board
-In-Reply-To: <20161226171156.11605-3-icenowy@aosc.xyz>
-References: <20161226171156.11605-1-icenowy@aosc.xyz>
- <20161226171156.11605-3-icenowy@aosc.xyz>
-Message-ID: <20170105221304.ai6bue44eu73kwoi@lukather>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 6 Jan 2017 06:19:53 +0800
+Subject: [arm:clearfog 25/65] htmldocs: drivers/net/phy/phy.c:278: warning:
+ No description found for parameter 'speed'
+Message-ID: <201701060640.wHmkUVqb%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2016 at 01:11:56AM +0800, Icenowy Zheng wrote:
-> From: Andre Przywara <andre.przywara@arm.com>
-> 
-> The Orange Pi PC 2 is a typical single board computer using the
-> Allwinner H5 SoC. Apart from the usual suspects it features three
-> separately driven USB ports and a Gigabit Ethernet port.
-> Also it has a SPI NOR flash soldered, from which the board can boot
-> from. This enables the SBC to behave like a "real computer" with
-> built-in firmware.
-> 
-> Add the board specific .dts file, which includes the H5 .dtsi and
-> enables the peripherals that we support so far.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
->  arch/arm64/boot/dts/allwinner/Makefile             |   1 +
->  .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 183 +++++++++++++++++++++
->  2 files changed, 184 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-> index 1e29a5ae8282..b26bb46b934c 100644
-> --- a/arch/arm64/boot/dts/allwinner/Makefile
-> +++ b/arch/arm64/boot/dts/allwinner/Makefile
-> @@ -1,4 +1,5 @@
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
-> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
->  
->  always		:= $(dtb-y)
->  subdir-y	:= $(dts-dirs)
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-> new file mode 100644
-> index 000000000000..a29ca6b274bb
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-> @@ -0,0 +1,183 @@
-> +/*
-> + * Copyright (C) 2016 ARM Ltd.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "sun50i-h5.dtsi"
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +#include <dt-bindings/pinctrl/sun4i-a10.h>
-> +
-> +/ {
-> +	model = "Xunlong Orange Pi PC 2";
-> +	compatible = "xunlong,orangepi-pc2", "allwinner,sun50i-h5";
-> +
-> +	reg_vcc3v3: vcc3v3 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc3v3";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&leds_opc>, <&leds_r_opc>;
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git clearfog
+head:   a0b3b7ea35687eaa7b1836bcdbbe10daf034c621
+commit: b73483caa6bece0e854d064bb931dc25f84c935e [25/65] net: phy: improve phylib correctness for non-autoneg settings
+reproduce: make htmldocs
 
-There's no need to declare the LED GPIO in pinctrl.
+All warnings (new ones prefixed by >>):
 
-> +
-> +		pwr_led {
-> +			label = "orangepi:green:pwr";
-> +			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
-> +			default-state = "on";
-> +		};
-> +
-> +		status_led {
-> +			label = "orangepi:red:status";
-> +			gpios = <&pio 0 15 GPIO_ACTIVE_HIGH>;
-> +		};
-> +	};
-> +
-> +	r_gpio_keys {
-> +		compatible = "gpio-keys";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&sw_r_opc>;
+>> drivers/net/phy/phy.c:278: warning: No description found for parameter 'speed'
+>> drivers/net/phy/phy.c:278: warning: No description found for parameter 'duplex'
+>> drivers/net/phy/phy.c:278: warning: No description found for parameter 'supported'
+>> drivers/net/phy/phy.c:278: warning: No description found for parameter 'speed'
+>> drivers/net/phy/phy.c:278: warning: No description found for parameter 'duplex'
+>> drivers/net/phy/phy.c:278: warning: No description found for parameter 'supported'
 
-Ditto
+vim +/speed +278 drivers/net/phy/phy.c
 
-> +
-> +		sw4 {
-> +			label = "sw4";
-> +			linux,code = <BTN_0>;
-> +			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
-> +		};
-> +	};
-> +};
-> +
-> +&ehci1 {
-> +	status = "okay";
-> +};
-> +
-> +&ehci2 {
-> +	status = "okay";
-> +};
-> +
-> +&ehci3 {
-> +	status = "okay";
-> +};
-> +
-> +&ir {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&ir_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&mmc0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+b73483ca Russell King  2017-01-05  262  					break;
+b73483ca Russell King  2017-01-05  263  			}
+b73483ca Russell King  2017-01-05  264  		}
+b73483ca Russell King  2017-01-05  265  	}
+00db8189 Andy Fleming  2005-07-30  266  
+b73483ca Russell King  2017-01-05  267  	if (!match && !exact)
+b73483ca Russell King  2017-01-05  268  		match = last;
+00db8189 Andy Fleming  2005-07-30  269  
+b73483ca Russell King  2017-01-05  270  	return match;
+00db8189 Andy Fleming  2005-07-30  271  }
+00db8189 Andy Fleming  2005-07-30  272  
+b3df0da8 Randy Dunlap  2007-03-06  273  /**
+b3df0da8 Randy Dunlap  2007-03-06  274   * phy_find_valid - find a PHY setting that matches the requested features mask
+00db8189 Andy Fleming  2005-07-30  275   */
+b73483ca Russell King  2017-01-05  276  static const struct phy_setting *
+b73483ca Russell King  2017-01-05  277  phy_find_valid(int speed, int duplex, u32 supported)
+00db8189 Andy Fleming  2005-07-30 @278  {
+b73483ca Russell King  2017-01-05  279  	unsigned long mask = supported;
+00db8189 Andy Fleming  2005-07-30  280  
+b73483ca Russell King  2017-01-05  281  	return phy_lookup_setting(speed, duplex, &mask, BITS_PER_LONG, false);
+00db8189 Andy Fleming  2005-07-30  282  }
+00db8189 Andy Fleming  2005-07-30  283  
+b3df0da8 Randy Dunlap  2007-03-06  284  /**
+54da5a8b Guenter Roeck 2015-02-17  285   * phy_check_valid - check if there is a valid PHY setting which matches
+54da5a8b Guenter Roeck 2015-02-17  286   *		     speed, duplex, and feature mask
 
-Ditto
+:::::: The code at line 278 was first introduced by commit
+:::::: 00db8189d984d6c51226dafbbe4a667ce9b7d5da This patch adds a PHY Abstraction Layer to the Linux Kernel, enabling ethernet drivers to remain as ignorant as is reasonable of the connected PHY's design and operation details.
 
-> +	vmmc-supply = <&reg_vcc3v3>;
-> +	bus-width = <4>;
-> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
-> +	cd-inverted;
+:::::: TO: Andy Fleming <afleming@freescale.com>
+:::::: CC: Jeff Garzik <jgarzik@pobox.com>
 
-Do you need both the GPIO flag and the cd-inverted one?
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
+Name: .config.gz
+Type: application/gzip
+Size: 6421 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170105/59c73b72/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170106/f92d6b9a/attachment-0001.gz>
