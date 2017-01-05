@@ -1,75 +1,101 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 5 Jan 2017 18:11:14 +0000
-Subject: [RFC PATCH 1/7] arm64: Use physical counter for in-kernel reads
-In-Reply-To: <20161210204712.21830-2-christoffer.dall@linaro.org>
-References: <20161210204712.21830-1-christoffer.dall@linaro.org>
- <20161210204712.21830-2-christoffer.dall@linaro.org>
-Message-ID: <5e820613-f9f3-0035-b145-0e22e9bcfeca@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 5 Jan 2017 19:11:51 +0100
+Subject: [PATCH v2] ARM: dts: sun7i: Add wifi dt node on Banana Pro
+In-Reply-To: <20170105173753.14024-1-joerg.krause@embedded.rocks>
+References: <20170105173753.14024-1-joerg.krause@embedded.rocks>
+Message-ID: <20170105181151.i3ttsu5ylrw45br7@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding the arm64 maintainers, plus Mark as arch timer maintainer]
+Hi J?rg,
 
-On 10/12/16 20:47, Christoffer Dall wrote:
-> Using the physical counter allows KVM to retain the offset between the
-> virtual and physical counter as long as it is actively running a VCPU.
+On Thu, Jan 05, 2017 at 06:37:53PM +0100, J?rg Krause wrote:
+> The Banana Pro has an AMPAK AP6181 WiFi+Bluetooth module. The WiFi part
+> is a BCM43362 IC connected to MMC3 of the A20 SoC via SDIO. The IC also
+> takes a power enable signal via GPIO.
 > 
-> As soon as a VCPU is released, another thread is scheduled or we start
-> running userspace applications, we reset the offset to 0, so that VDSO
-> operations can still read the virtual counter and get the same view of
-> time as the kernel.
+> This commit adds a device-tree node to power it up, so the mmc subsys
+> can scan it, and enables the mmc controller which is connected to it.
 > 
-> This opens up potential improvements for KVM performance.
+> As the wifi enable pin of the AP6181 module is not really a regulator,
+> switch the mmc3 node to the mmc-pwrseq framework for controlling it.
+> This more accurately reflectes how the hardware actually works.
 > 
-> VHE kernels or kernels using the virtual timer are unaffected by this.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
 > ---
->  arch/arm64/include/asm/arch_timer.h  | 6 ++++--
->  drivers/clocksource/arm_arch_timer.c | 2 +-
->  2 files changed, 5 insertions(+), 3 deletions(-)
+> Changes v2 (suggested by Maxime Ripard):
+>   - rename pwrseq node to clarify the function rather what it's
+>     connected to
+>   - use dash instead of underscore for the pwrseq node name
+>   - remove setting pull-ups for mmc3 (default since commit 37bc56128d92)
 > 
-> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index eaa5bbe..cec2549 100644
-> --- a/arch/arm64/include/asm/arch_timer.h
-> +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -139,11 +139,13 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
->  
->  static inline u64 arch_counter_get_cntpct(void)
->  {
-> +	u64 cval;
->  	/*
->  	 * AArch64 kernel and user space mandate the use of CNTVCT.
->  	 */
-> -	BUG();
-> -	return 0;
-> +	isb();
-> +	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
-> +	return cval;
->  }
->  
->  static inline u64 arch_counter_get_cntvct(void)
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 73c487d..a5b0789 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -597,7 +597,7 @@ static void __init arch_counter_register(unsigned type)
->  
->  	/* Register the CP15 based counter if we have one */
->  	if (type & ARCH_CP15_TIMER) {
-> -		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_uses_ppi == VIRT_PPI)
-> +		if (arch_timer_uses_ppi == VIRT_PPI || is_kernel_in_hyp_mode())
-
-Why do we have this is_kernel_in_hyp_mode clause? I can't think of any
-reason for a VHE kernel to use the virtual counter at all...
-
->  			arch_timer_read_counter = arch_counter_get_cntvct;
->  		else
->  			arch_timer_read_counter = arch_counter_get_cntpct;
+> ---
+>  arch/arm/boot/dts/sun7i-a20-bananapro.dts | 30 ++++++++++++++++++------------
+>  1 file changed, 18 insertions(+), 12 deletions(-)
 > 
+> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapro.dts b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+> index 19d63d4049de..77f8fb76c157 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+> @@ -76,6 +76,13 @@
+>  		};
+>  	};
+>  
+> +	wifi_pwrseq: wifi-pwrseq {
+> +		compatible = "mmc-pwrseq-simple";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&vmmc3_pin_bananapro>;
+> +		reset-gpios = <&pio 7 22 GPIO_ACTIVE_LOW>;
+> +	};
+> +
+>  	reg_gmac_3v3: gmac-3v3 {
+>  		compatible = "regulator-fixed";
+>  		pinctrl-names = "default";
+> @@ -87,17 +94,6 @@
+>  		enable-active-high;
+>  		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>;
+>  	};
+> -
+> -	reg_vmmc3: vmmc3 {
+> -		compatible = "regulator-fixed";
+> -		pinctrl-names = "default";
+> -		pinctrl-0 = <&vmmc3_pin_bananapro>;
+> -		regulator-name = "vmmc3";
+> -		regulator-min-microvolt = <3300000>;
+> -		regulator-max-microvolt = <3300000>;
+> -		enable-active-high;
+> -		gpio = <&pio 7 22 GPIO_ACTIVE_HIGH>;
+> -	};
+>  };
+>  
+>  &ahci {
+> @@ -166,10 +162,20 @@
+>  &mmc3 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&mmc3_pins_a>;
+> -	vmmc-supply = <&reg_vmmc3>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	mmc-pwrseq = <&wifi_pwrseq>;
+>  	bus-width = <4>;
+>  	non-removable;
+> +	wakeup-source;
 
-Thanks,
+Sorry for not spotting that earlier, but this is suspicious. The PIO
+is not able to be wake up the CPU, since it's connected to the GIC
+that is shut down during CPU suspend. Our only wake up source is the
+NMI controller. So either it is not able to wake up the system, or the
+interrupt line in not the right one.
 
-	M.
+Maxime
+
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170105/67bd8828/attachment.sig>
