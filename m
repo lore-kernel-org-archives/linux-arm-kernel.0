@@ -1,54 +1,48 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Thu, 5 Jan 2017 14:01:57 +0800
-Subject: [PATCH v11 6/8] ARM: dts: imx6qdl: Enable usb node children with <reg>
-In-Reply-To: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
-References: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1483596119-27508-7-git-send-email-peter.chen@nxp.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 5 Jan 2017 14:05:06 +0800
+Subject: [PATCH v6 03/14] ACPI: ARM64: IORT: add missing comment for
+ iort_dev_find_its_id()
+In-Reply-To: <20170104143442.GA8604@red-moon>
+References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
+ <1483363905-2806-4-git-send-email-hanjun.guo@linaro.org>
+ <20170104143442.GA8604@red-moon>
+Message-ID: <4915fe90-ea61-45b5-491d-0628456abed2@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joshua Clayton <stillcompiling@gmail.com>
+On 2017/1/4 22:34, Lorenzo Pieralisi wrote:
+> On Mon, Jan 02, 2017 at 09:31:34PM +0800, Hanjun Guo wrote:
+>> We are missing req_id's comment for iort_dev_find_its_id(),
+>> add it back.
+>
+> "Add missing req_id parameter to the iort_dev_find_its_id() function
+> kernel-doc comment."
+>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Tested-by: Majun <majun258@huawei.com>
+>> Tested-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Tomasz Nowicki <tn@semihalf.com>
+>> ---
+>>  drivers/acpi/arm64/iort.c | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+>> index 46e2d82..174e983 100644
+>> --- a/drivers/acpi/arm64/iort.c
+>> +++ b/drivers/acpi/arm64/iort.c
+>> @@ -446,6 +446,7 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+>>  /**
+>>   * iort_dev_find_its_id() - Find the ITS identifier for a device
+>>   * @dev: The device.
+>> + * @req_id: Device's Requster ID
+>
+> s/Requster/Requester
+>
+> We can send it upstream independently along with some other patches
+> in this series but I will have a look at the whole series first.
 
-Give usb nodes #address and #size attributes, so that a child node
-representing a permanently connected device such as an onboard hub may
-be addressed with a <reg> attribute
+Do you mean go to 4.10-rcx?
 
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
----
- arch/arm/boot/dts/imx6qdl.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 53e6e63..e6725f1 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -936,6 +936,8 @@
- 
- 			usbh1: usb at 02184200 {
- 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0x02184200 0x200>;
- 				interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
-@@ -950,6 +952,8 @@
- 
- 			usbh2: usb at 02184400 {
- 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0x02184400 0x200>;
- 				interrupts = <0 41 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
-@@ -963,6 +967,8 @@
- 
- 			usbh3: usb at 02184600 {
- 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0x02184600 0x200>;
- 				interrupts = <0 42 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
--- 
-2.7.4
+Thanks
+Hanjun
