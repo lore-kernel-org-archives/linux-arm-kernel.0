@@ -1,22 +1,18 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 5 Jan 2017 18:14:06 +0100
-Subject: [PATCH] ARM: dts: sunxi: Use axp209.dtsi for Olinuxino Lime2
-In-Reply-To: <20161227102238.20110-1-manu@bidouilliste.com>
-References: <20161227102238.20110-1-manu@bidouilliste.com>
-Message-ID: <20170105171406.s5xpbtcpe4esn6iz@lukather>
+Date: Thu, 5 Jan 2017 18:14:27 +0100
+Subject: [PATCH v3] ARM: dts: sunxi: Add num-cs for A20 spi nodes
+In-Reply-To: <20161227102807.20244-1-manu@bidouilliste.com>
+References: <20161227102807.20244-1-manu@bidouilliste.com>
+Message-ID: <20170105171427.v4vosv7mfv3zveyz@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2016 at 11:22:38AM +0100, Emmanuel Vadot wrote:
-> Use axp209.dtsi in sun7i-a20-olinuxino-lime2.dts and correct
-> some regulators.
-> 
-> DCDC2 is used for vdd-cpu so it should never be bellow 1V and above 1.4V
-> DCDC3 is used for VDD_INT so same as above.
-> LD01 is used for the RTC, and should have a typical value of 1.3V
-> LD02 is used for AVCC and should have a typical value of 3.0V
-> LD03/4 are used for Port-E/Port-G Power pin, and the schematics recommands
-> to set them to 2.8V as they can be used for CSI0/1.
+On Tue, Dec 27, 2016 at 11:28:07AM +0100, Emmanuel Vadot wrote:
+> The spi0 controller on the A20 have up to 4 CS (Chip Select) while the
+> others three only have 1.
+> Add the num-cs property to each node.
+> The current driver doesn't read this property but this is useful for
+> downstream user of DTS (FreeBSD for example).
 > 
 > Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
 
@@ -33,4 +29,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170105/3536d00f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170105/1f29aa7b/attachment.sig>
