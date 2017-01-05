@@ -1,117 +1,263 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
-Date: Thu, 05 Jan 2017 20:01:11 +0100
-Subject: [PATCH v2] ARM: dts: sun7i: Add wifi dt node on Banana Pro
-In-Reply-To: <20170105181151.i3ttsu5ylrw45br7@lukather>
-References: <20170105173753.14024-1-joerg.krause@embedded.rocks>
- <20170105181151.i3ttsu5ylrw45br7@lukather>
-Message-ID: <1483642871.27207.1.camel@embedded.rocks>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Thu,  5 Jan 2017 19:04:29 +0000
+Subject: [PATCH v6 01/18] iommu/dma: Allow MSI-only cookies
+In-Reply-To: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
+References: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1483643086-2883-2-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxim,
+IOMMU domain users such as VFIO face a similar problem to DMA API ops
+with regard to mapping MSI messages in systems where the MSI write is
+subject to IOMMU translation. With the relevant infrastructure now in
+place for managed DMA domains, it's actually really simple for other
+users to piggyback off that and reap the benefits without giving up
+their own IOVA management, and without having to reinvent their own
+wheel in the MSI layer.
 
-On Thu, 2017-01-05 at 19:11 +0100, Maxime Ripard wrote:
-> Hi J?rg,
-> 
-> On Thu, Jan 05, 2017 at 06:37:53PM +0100, J?rg Krause wrote:
-> > The Banana Pro has an AMPAK AP6181 WiFi+Bluetooth module. The WiFi
-> > part
-> > is a BCM43362 IC connected to MMC3 of the A20 SoC via SDIO. The IC
-> > also
-> > takes a power enable signal via GPIO.
-> > 
-> > This commit adds a device-tree node to power it up, so the mmc
-> > subsys
-> > can scan it, and enables the mmc controller which is connected to
-> > it.
-> > 
-> > As the wifi enable pin of the AP6181 module is not really a
-> > regulator,
-> > switch the mmc3 node to the mmc-pwrseq framework for controlling
-> > it.
-> > This more accurately reflectes how the hardware actually works.
-> > 
-> > Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
-> > ---
-> > Changes v2 (suggested by Maxime Ripard):
-> > ? - rename pwrseq node to clarify the function rather what it's
-> > ????connected to
-> > ? - use dash instead of underscore for the pwrseq node name
-> > ? - remove setting pull-ups for mmc3 (default since commit
-> > 37bc56128d92)
-> > 
-> > ---
-> > ?arch/arm/boot/dts/sun7i-a20-bananapro.dts | 30 ++++++++++++++++++-
-> > -----------
-> > ?1 file changed, 18 insertions(+), 12 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-> > b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-> > index 19d63d4049de..77f8fb76c157 100644
-> > --- a/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-> > +++ b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-> > @@ -76,6 +76,13 @@
-> > ?		};
-> > ?	};
-> > ?
-> > +	wifi_pwrseq: wifi-pwrseq {
-> > +		compatible = "mmc-pwrseq-simple";
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&vmmc3_pin_bananapro>;
-> > +		reset-gpios = <&pio 7 22 GPIO_ACTIVE_LOW>;
-> > +	};
-> > +
-> > ?	reg_gmac_3v3: gmac-3v3 {
-> > ?		compatible = "regulator-fixed";
-> > ?		pinctrl-names = "default";
-> > @@ -87,17 +94,6 @@
-> > ?		enable-active-high;
-> > ?		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>;
-> > ?	};
-> > -
-> > -	reg_vmmc3: vmmc3 {
-> > -		compatible = "regulator-fixed";
-> > -		pinctrl-names = "default";
-> > -		pinctrl-0 = <&vmmc3_pin_bananapro>;
-> > -		regulator-name = "vmmc3";
-> > -		regulator-min-microvolt = <3300000>;
-> > -		regulator-max-microvolt = <3300000>;
-> > -		enable-active-high;
-> > -		gpio = <&pio 7 22 GPIO_ACTIVE_HIGH>;
-> > -	};
-> > ?};
-> > ?
-> > ?&ahci {
-> > @@ -166,10 +162,20 @@
-> > ?&mmc3 {
-> > ?	pinctrl-names = "default";
-> > ?	pinctrl-0 = <&mmc3_pins_a>;
-> > -	vmmc-supply = <&reg_vmmc3>;
-> > +	vmmc-supply = <&reg_vcc3v3>;
-> > +	mmc-pwrseq = <&wifi_pwrseq>;
-> > ?	bus-width = <4>;
-> > ?	non-removable;
-> > +	wakeup-source;
-> 
-> Sorry for not spotting that earlier, but this is suspicious. The PIO
-> is not able to be wake up the CPU, since it's connected to the GIC
-> that is shut down during CPU suspend. Our only wake up source is the
-> NMI controller. So either it is not able to wake up the system, or
-> the
-> interrupt line in not the right one.
+Allow such users to opt into automatic MSI remapping by dedicating a
+region of their IOVA space to a managed cookie, and extend the mapping
+routine to implement a trivial linear allocator in such cases, to avoid
+the needless overhead of a full-blown IOVA domain.
 
-Sorry, but I'm not sure I understand...
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
-The "WIFI-HOST-WAKE" line connects "WL_HOST_WAKE" of the AP6210 to pin
-EINT15 of the A20 as shown in the schematic of the board [1].
+---
+[Eric] fixed 2 issues on MSI path
+---
+ drivers/iommu/dma-iommu.c | 116 +++++++++++++++++++++++++++++++++++++---------
+ include/linux/dma-iommu.h |   7 +++
+ 2 files changed, 101 insertions(+), 22 deletions(-)
 
-Note, that this is the same hardware configuration as done on the
-Banana Pi M1+ [2]. The device tree node for mmc3 of the M1+ has
-"wakeup-source" enabled, too, so I inherited it. However, I did not
-tested the wake-up feature.
-
-[1] http://mirror.lemaker.org/Banana%20Pro%20Schematic.pdf
-[2] https://drive.google.com/file/d/0B4PAo2nW2KfnNTk5WnVSV0lPejA/view?u
-sp=sharing
-
-J?rg
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 2db0d64..f2c47ad 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -37,10 +37,19 @@ struct iommu_dma_msi_page {
+ 	phys_addr_t		phys;
+ };
+ 
++enum iommu_dma_cookie_type {
++	IOMMU_DMA_IOVA_COOKIE,
++	IOMMU_DMA_MSI_COOKIE,
++};
++
+ struct iommu_dma_cookie {
+-	struct iova_domain	iovad;
+-	struct list_head	msi_page_list;
+-	spinlock_t		msi_lock;
++	union {
++		struct iova_domain	iovad;
++		dma_addr_t		msi_iova;
++	};
++	struct list_head		msi_page_list;
++	spinlock_t			msi_lock;
++	enum iommu_dma_cookie_type	type;
+ };
+ 
+ static inline struct iova_domain *cookie_iovad(struct iommu_domain *domain)
+@@ -53,6 +62,19 @@ int iommu_dma_init(void)
+ 	return iova_cache_get();
+ }
+ 
++static struct iommu_dma_cookie *__cookie_alloc(enum iommu_dma_cookie_type type)
++{
++	struct iommu_dma_cookie *cookie;
++
++	cookie = kzalloc(sizeof(*cookie), GFP_KERNEL);
++	if (cookie) {
++		spin_lock_init(&cookie->msi_lock);
++		INIT_LIST_HEAD(&cookie->msi_page_list);
++		cookie->type = type;
++	}
++	return cookie;
++}
++
+ /**
+  * iommu_get_dma_cookie - Acquire DMA-API resources for a domain
+  * @domain: IOMMU domain to prepare for DMA-API usage
+@@ -62,25 +84,53 @@ int iommu_dma_init(void)
+  */
+ int iommu_get_dma_cookie(struct iommu_domain *domain)
+ {
++	if (domain->iova_cookie)
++		return -EEXIST;
++
++	domain->iova_cookie = __cookie_alloc(IOMMU_DMA_IOVA_COOKIE);
++	if (!domain->iova_cookie)
++		return -ENOMEM;
++
++	return 0;
++}
++EXPORT_SYMBOL(iommu_get_dma_cookie);
++
++/**
++ * iommu_get_msi_cookie - Acquire just MSI remapping resources
++ * @domain: IOMMU domain to prepare
++ * @base: Start address of IOVA region for MSI mappings
++ *
++ * Users who manage their own IOVA allocation and do not want DMA API support,
++ * but would still like to take advantage of automatic MSI remapping, can use
++ * this to initialise their own domain appropriately. Users should reserve a
++ * contiguous IOVA region, starting at @base, large enough to accommodate the
++ * number of PAGE_SIZE mappings necessary to cover every MSI doorbell address
++ * used by the devices attached to @domain.
++ */
++int iommu_get_msi_cookie(struct iommu_domain *domain, dma_addr_t base)
++{
+ 	struct iommu_dma_cookie *cookie;
+ 
++	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
++		return -EINVAL;
++
+ 	if (domain->iova_cookie)
+ 		return -EEXIST;
+ 
+-	cookie = kzalloc(sizeof(*cookie), GFP_KERNEL);
++	cookie = __cookie_alloc(IOMMU_DMA_MSI_COOKIE);
+ 	if (!cookie)
+ 		return -ENOMEM;
+ 
+-	spin_lock_init(&cookie->msi_lock);
+-	INIT_LIST_HEAD(&cookie->msi_page_list);
++	cookie->msi_iova = base;
+ 	domain->iova_cookie = cookie;
+ 	return 0;
+ }
+-EXPORT_SYMBOL(iommu_get_dma_cookie);
++EXPORT_SYMBOL(iommu_get_msi_cookie);
+ 
+ /**
+  * iommu_put_dma_cookie - Release a domain's DMA mapping resources
+- * @domain: IOMMU domain previously prepared by iommu_get_dma_cookie()
++ * @domain: IOMMU domain previously prepared by iommu_get_dma_cookie() or
++ *          iommu_get_msi_cookie()
+  *
+  * IOMMU drivers should normally call this from their domain_free callback.
+  */
+@@ -92,7 +142,7 @@ void iommu_put_dma_cookie(struct iommu_domain *domain)
+ 	if (!cookie)
+ 		return;
+ 
+-	if (cookie->iovad.granule)
++	if (cookie->type == IOMMU_DMA_IOVA_COOKIE && cookie->iovad.granule)
+ 		put_iova_domain(&cookie->iovad);
+ 
+ 	list_for_each_entry_safe(msi, tmp, &cookie->msi_page_list, list) {
+@@ -137,11 +187,12 @@ static void iova_reserve_pci_windows(struct pci_dev *dev,
+ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
+ 		u64 size, struct device *dev)
+ {
+-	struct iova_domain *iovad = cookie_iovad(domain);
++	struct iommu_dma_cookie *cookie = domain->iova_cookie;
++	struct iova_domain *iovad = &cookie->iovad;
+ 	unsigned long order, base_pfn, end_pfn;
+ 
+-	if (!iovad)
+-		return -ENODEV;
++	if (!cookie || cookie->type != IOMMU_DMA_IOVA_COOKIE)
++		return -EINVAL;
+ 
+ 	/* Use the smallest supported page size for IOVA granularity */
+ 	order = __ffs(domain->pgsize_bitmap);
+@@ -662,11 +713,21 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
+ {
+ 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+ 	struct iommu_dma_msi_page *msi_page;
+-	struct iova_domain *iovad = &cookie->iovad;
++	struct iova_domain *iovad;
+ 	struct iova *iova;
+ 	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
++	size_t size;
++
++	if (cookie->type == IOMMU_DMA_IOVA_COOKIE) {
++		iovad = &cookie->iovad;
++		size = iovad->granule;
++	} else {
++		iovad = NULL;
++		size = PAGE_SIZE;
++	}
++
++	msi_addr &= ~(phys_addr_t)(size - 1);
+ 
+-	msi_addr &= ~(phys_addr_t)iova_mask(iovad);
+ 	list_for_each_entry(msi_page, &cookie->msi_page_list, list)
+ 		if (msi_page->phys == msi_addr)
+ 			return msi_page;
+@@ -675,13 +736,18 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
+ 	if (!msi_page)
+ 		return NULL;
+ 
+-	iova = __alloc_iova(domain, iovad->granule, dma_get_mask(dev));
+-	if (!iova)
+-		goto out_free_page;
+-
+ 	msi_page->phys = msi_addr;
+-	msi_page->iova = iova_dma_addr(iovad, iova);
+-	if (iommu_map(domain, msi_page->iova, msi_addr, iovad->granule, prot))
++	if (iovad) {
++		iova = __alloc_iova(domain, size, dma_get_mask(dev));
++		if (!iova)
++			goto out_free_page;
++		msi_page->iova = iova_dma_addr(iovad, iova);
++	} else {
++		msi_page->iova = cookie->msi_iova;
++		cookie->msi_iova += size;
++	}
++
++	if (iommu_map(domain, msi_page->iova, msi_addr, size, prot))
+ 		goto out_free_iova;
+ 
+ 	INIT_LIST_HEAD(&msi_page->list);
+@@ -689,7 +755,10 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
+ 	return msi_page;
+ 
+ out_free_iova:
+-	__free_iova(iovad, iova);
++	if (iovad)
++		__free_iova(iovad, iova);
++	else
++		cookie->msi_iova -= size;
+ out_free_page:
+ 	kfree(msi_page);
+ 	return NULL;
+@@ -730,7 +799,10 @@ void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
+ 		msg->data = ~0U;
+ 	} else {
+ 		msg->address_hi = upper_32_bits(msi_page->iova);
+-		msg->address_lo &= iova_mask(&cookie->iovad);
++		if (cookie->type == IOMMU_DMA_IOVA_COOKIE)
++			msg->address_lo &= iova_mask(&cookie->iovad);
++		else
++			msg->address_lo &= (PAGE_SIZE - 1);
+ 		msg->address_lo += lower_32_bits(msi_page->iova);
+ 	}
+ }
+diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+index 7f7e9a7..c843461 100644
+--- a/include/linux/dma-iommu.h
++++ b/include/linux/dma-iommu.h
+@@ -27,6 +27,7 @@
+ 
+ /* Domain management interface for IOMMU drivers */
+ int iommu_get_dma_cookie(struct iommu_domain *domain);
++int iommu_get_msi_cookie(struct iommu_domain *domain, dma_addr_t base);
+ void iommu_put_dma_cookie(struct iommu_domain *domain);
+ 
+ /* Setup call for arch DMA mapping code */
+@@ -86,6 +87,12 @@ static inline int iommu_get_dma_cookie(struct iommu_domain *domain)
+ 	return -ENODEV;
+ }
+ 
++static inline int iommu_get_msi_cookie(struct iommu_domain *domain,
++				       dma_addr_t base)
++{
++	return -ENODEV;
++}
++
+ static inline void iommu_put_dma_cookie(struct iommu_domain *domain)
+ {
+ }
+-- 
+1.9.1
