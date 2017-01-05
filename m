@@ -1,155 +1,70 @@
-From: Minghuan.Lian@nxp.com (Minghuan Lian)
-Date: Thu, 5 Jan 2017 16:10:37 +0800
-Subject: [PATCH v2,9/9] irqchip/ls-scfg-msi: add MSI affinity support
-In-Reply-To: <1483603837-4629-1-git-send-email-Minghuan.Lian@nxp.com>
-References: <1483603837-4629-1-git-send-email-Minghuan.Lian@nxp.com>
-Message-ID: <1483603837-4629-9-git-send-email-Minghuan.Lian@nxp.com>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Thu,  5 Jan 2017 09:09:40 +0100
+Subject: [PATCH RESEND] dmaengine: stm32-dma: Add error messages if xlate fails
+Message-ID: <1483603780-3368-1-git-send-email-cedric.madianga@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For LS1046a and LS1043a v1.1, the MSI controller has 4 MSIRs and 4
-CPUs. A GIC SPI interrupt of MSIR can be associated with a CPU.
-When changing MSI interrupt affinity, this MSI will be moved to the
-corresponding MSIR and MSI message data will be changed according to
-MSIR. when requesting a MSI, the bits of all 4 MSIR will be reserved.
-The parameter 'msi_affinity_flag' is provide to change this mode.
-"lsmsi=no-affinity" will disable affinity, all MSI can only be
-associated with CPU 0.
+This patch adds some error messages when a slave device fails to request a
+channel.
 
-Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+Reviewed-by: Ludovic BARRE <ludovic.barre@st.com>
 ---
-v2-v1:
-- None
+Resolve conflicts issue
+---
+ drivers/dma/stm32-dma.c | 24 +++++++++++++++---------
+ 1 file changed, 15 insertions(+), 9 deletions(-)
 
- drivers/irqchip/irq-ls-scfg-msi.c | 75 ++++++++++++++++++++++++++++++++++++---
- 1 file changed, 70 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/irqchip/irq-ls-scfg-msi.c b/drivers/irqchip/irq-ls-scfg-msi.c
-index dc19569..753fe39 100644
---- a/drivers/irqchip/irq-ls-scfg-msi.c
-+++ b/drivers/irqchip/irq-ls-scfg-msi.c
-@@ -40,6 +40,7 @@ struct ls_scfg_msir {
- 	unsigned int gic_irq;
- 	unsigned int bit_start;
- 	unsigned int bit_end;
-+	unsigned int srs; /* Shared interrupt register select */
- 	void __iomem *reg;
- };
- 
-@@ -70,6 +71,19 @@ struct ls_scfg_msi {
- 	.chip	= &ls_scfg_msi_irq_chip,
- };
- 
-+static int msi_affinity_flag = 1;
-+
-+static int __init early_parse_ls_scfg_msi(char *p)
-+{
-+	if (p && strncmp(p, "no-affinity", 11) == 0)
-+		msi_affinity_flag = 0;
-+	else
-+		msi_affinity_flag = 1;
-+
-+	return 0;
-+}
-+early_param("lsmsi", early_parse_ls_scfg_msi);
-+
- static void ls_scfg_msi_compose_msg(struct irq_data *data, struct msi_msg *msg)
+diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
+index fc9738e..4eacd9d 100644
+--- a/drivers/dma/stm32-dma.c
++++ b/drivers/dma/stm32-dma.c
+@@ -987,30 +987,36 @@ static struct dma_chan *stm32_dma_of_xlate(struct of_phandle_args *dma_spec,
+ 					   struct of_dma *ofdma)
  {
- 	struct ls_scfg_msi *msi_data = irq_data_get_irq_chip_data(data);
-@@ -77,12 +91,43 @@ static void ls_scfg_msi_compose_msg(struct irq_data *data, struct msi_msg *msg)
- 	msg->address_hi = upper_32_bits(msi_data->msiir_addr);
- 	msg->address_lo = lower_32_bits(msi_data->msiir_addr);
- 	msg->data = data->hwirq;
-+
-+	if (msi_affinity_flag) {
-+		u32 msir_index;
-+
-+		msir_index = cpumask_first(data->common->affinity);
-+		if (msir_index >= msi_data->msir_num)
-+			msir_index = 0;
-+
-+		msg->data |= msir_index;
+ 	struct stm32_dma_device *dmadev = ofdma->of_dma_data;
++	struct device *dev = dmadev->ddev.dev;
+ 	struct stm32_dma_cfg cfg;
+ 	struct stm32_dma_chan *chan;
+ 	struct dma_chan *c;
+ 
+-	if (dma_spec->args_count < 3)
++	if (dma_spec->args_count < 4) {
++		dev_err(dev, "Bad number of cells\n");
+ 		return NULL;
 +	}
+ 
+ 	cfg.channel_id = dma_spec->args[0];
+ 	cfg.request_line = dma_spec->args[1];
+ 	cfg.stream_config = dma_spec->args[2];
+-	cfg.threshold = 0;
++	cfg.threshold = dma_spec->args[3];
+ 
+-	if ((cfg.channel_id >= STM32_DMA_MAX_CHANNELS) || (cfg.request_line >=
+-				STM32_DMA_MAX_REQUEST_ID))
++	if ((cfg.channel_id >= STM32_DMA_MAX_CHANNELS) ||
++	    (cfg.request_line >= STM32_DMA_MAX_REQUEST_ID)) {
++		dev_err(dev, "Bad channel and/or request id\n");
+ 		return NULL;
+-
+-	if (dma_spec->args_count > 3)
+-		cfg.threshold = dma_spec->args[3];
++	}
+ 
+ 	chan = &dmadev->chan[cfg.channel_id];
+ 
+ 	c = dma_get_slave_channel(&chan->vchan.chan);
+-	if (c)
+-		stm32_dma_set_config(chan, &cfg);
++	if (!c) {
++		dev_err(dev, "No more channel avalaible\n");
++		return NULL;
++	}
++
++	stm32_dma_set_config(chan, &cfg);
+ 
+ 	return c;
  }
- 
- static int ls_scfg_msi_set_affinity(struct irq_data *irq_data,
- 				    const struct cpumask *mask, bool force)
- {
--	return -EINVAL;
-+	struct ls_scfg_msi *msi_data = irq_data_get_irq_chip_data(irq_data);
-+	u32 cpu;
-+
-+	if (!msi_affinity_flag)
-+		return -EINVAL;
-+
-+	if (!force)
-+		cpu = cpumask_any_and(mask, cpu_online_mask);
-+	else
-+		cpu = cpumask_first(mask);
-+
-+	if (cpu >= msi_data->msir_num)
-+		return -EINVAL;
-+
-+	if (msi_data->msir[cpu].gic_irq <= 0) {
-+		pr_warn("cannot bind the irq to cpu%d\n", cpu);
-+		return -EINVAL;
-+	}
-+
-+	cpumask_copy(irq_data->common->affinity, mask);
-+
-+	return IRQ_SET_MASK_OK;
- }
- 
- static struct irq_chip ls_scfg_msi_parent_chip = {
-@@ -158,7 +203,7 @@ static void ls_scfg_msi_irq_handler(struct irq_desc *desc)
- 
- 	for_each_set_bit_from(pos, &val, size) {
- 		hwirq = ((msir->bit_end - pos) << msi_data->cfg->ibs_shift) |
--			msir->index;
-+			msir->srs;
- 		virq = irq_find_mapping(msi_data->parent, hwirq);
- 		if (virq)
- 			generic_handle_irq(virq);
-@@ -221,10 +266,19 @@ static int ls_scfg_msi_setup_hwirq(struct ls_scfg_msi *msi_data, int index)
- 					 ls_scfg_msi_irq_handler,
- 					 msir);
- 
-+	if (msi_affinity_flag) {
-+		/* Associate MSIR interrupt to the cpu */
-+		irq_set_affinity(msir->gic_irq, get_cpu_mask(index));
-+		msir->srs = 0; /* This value is determined by the CPU */
-+	} else
-+		msir->srs = index;
-+
- 	/* Release the hwirqs corresponding to this MSIR */
--	for (i = 0; i < msi_data->cfg->msir_irqs; i++) {
--		hwirq = i << msi_data->cfg->ibs_shift | msir->index;
--		bitmap_clear(msi_data->used, hwirq, 1);
-+	if (!msi_affinity_flag || msir->index == 0) {
-+		for (i = 0; i < msi_data->cfg->msir_irqs; i++) {
-+			hwirq = i << msi_data->cfg->ibs_shift | msir->index;
-+			bitmap_clear(msi_data->used, hwirq, 1);
-+		}
- 	}
- 
- 	return 0;
-@@ -316,6 +370,17 @@ static int ls_scfg_msi_probe(struct platform_device *pdev)
- 	bitmap_set(msi_data->used, 0, msi_data->irqs_num);
- 
- 	msi_data->msir_num = of_irq_count(pdev->dev.of_node);
-+
-+	if (msi_affinity_flag) {
-+		u32 cpu_num;
-+
-+		cpu_num = num_possible_cpus();
-+		if (msi_data->msir_num >= cpu_num)
-+			msi_data->msir_num = cpu_num;
-+		else
-+			msi_affinity_flag = 0;
-+	}
-+
- 	msi_data->msir = devm_kcalloc(&pdev->dev, msi_data->msir_num,
- 				      sizeof(*msi_data->msir),
- 				      GFP_KERNEL);
 -- 
 1.9.1
