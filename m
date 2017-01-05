@@ -1,108 +1,267 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Thu, 5 Jan 2017 10:42:19 +0100
-Subject: [PATCH 4/4] watchdog: tangox: Use watchdog core to install
- restart handler
-In-Reply-To: <1483565318-25578-4-git-send-email-linux@roeck-us.net>
-References: <1483565318-25578-1-git-send-email-linux@roeck-us.net>
- <1483565318-25578-4-git-send-email-linux@roeck-us.net>
-Message-ID: <df7b5570-a44d-0c25-fedd-03a0891fdff3@sigmadesigns.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 05 Jan 2017 10:50:25 +0100
+Subject: [PATCH] cpufreq: Remove CONFIG_CPU_FREQ_STAT_DETAILS config option
+In-Reply-To: <d4299228a500a889c2b4b9e305674f3d1ea9ae06.1483604760.git.viresh.kumar@linaro.org>
+ (Viresh Kumar's message of "Thu, 5 Jan 2017 13:57:41 +0530")
+References: <d4299228a500a889c2b4b9e305674f3d1ea9ae06.1483604760.git.viresh.kumar@linaro.org>
+Message-ID: <877f69esym.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ Adding Mans ]
+Hi Viresh,
+ 
+ On jeu., janv. 05 2017, Viresh Kumar <viresh.kumar@linaro.org> wrote:
 
-Guenter, patch c7ef68c32265 states "Fixes: a3e376d26ace".
-Is that true? I mean, they seem quite orthogonal; then again I know
-nothing of this framework.
-
-Regards.
-
-On 04/01/2017 22:28, Guenter Roeck wrote:
-> Use the infrastructure provided by the watchdog core to install
-> the restart handler.
-> 
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> This doesn't have any benefit apart from saving a small amount of memory
+> when it is disabled. The ifdef hackery in the code makes it dirty
+> unnecessarily.
+>
+> Clean it up by removing the Kconfig option completely. Few defconfigs
+> are also updated and CONFIG_CPU_FREQ_STAT_DETAILS is replaced with
+> CONFIG_CPU_FREQ_STAT now in them, as users wanted stats to be enabled.
+>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
->  drivers/watchdog/tangox_wdt.c | 32 +++++++++++---------------------
->  1 file changed, 11 insertions(+), 21 deletions(-)
-> 
-> diff --git a/drivers/watchdog/tangox_wdt.c b/drivers/watchdog/tangox_wdt.c
-> index 202c4b9cc921..49e6e805db7c 100644
-> --- a/drivers/watchdog/tangox_wdt.c
-> +++ b/drivers/watchdog/tangox_wdt.c
-> @@ -15,9 +15,7 @@
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/moduleparam.h>
-> -#include <linux/notifier.h>
->  #include <linux/platform_device.h>
-> -#include <linux/reboot.h>
->  #include <linux/watchdog.h>
+>  arch/arm/configs/exynos_defconfig         |  2 +-
+>  arch/arm/configs/multi_v5_defconfig       |  2 +-
+>  arch/arm/configs/multi_v7_defconfig       |  2 +-
+
+>  arch/arm/configs/mvebu_v5_defconfig       |  2 +-
+For this file:
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Gregory
+
+
+>  arch/arm/configs/pxa_defconfig            |  2 +-
+>  arch/arm/configs/shmobile_defconfig       |  2 +-
+>  arch/mips/configs/lemote2f_defconfig      |  1 -
+>  arch/powerpc/configs/ppc6xx_defconfig     |  1 -
+>  arch/sh/configs/sh7785lcr_32bit_defconfig |  2 +-
+>  drivers/cpufreq/Kconfig                   |  8 --------
+>  drivers/cpufreq/cpufreq_stats.c           | 14 --------------
+>  11 files changed, 7 insertions(+), 31 deletions(-)
+>
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 79c415c33f69..809f0bf3042a 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -24,7 +24,7 @@ CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_ARM_ATAG_DTB_COMPAT=y
+>  CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC1,115200 init=/linuxrc mem=256M"
+>  CONFIG_CPU_FREQ=y
+> -CONFIG_CPU_FREQ_STAT_DETAILS=y
+> +CONFIG_CPU_FREQ_STAT=y
+>  CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+>  CONFIG_CPU_FREQ_GOV_POWERSAVE=m
+>  CONFIG_CPU_FREQ_GOV_USERSPACE=m
+> diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
+> index 361686a362f1..69a4bd13eea5 100644
+> --- a/arch/arm/configs/multi_v5_defconfig
+> +++ b/arch/arm/configs/multi_v5_defconfig
+> @@ -58,7 +58,7 @@ CONFIG_ZBOOT_ROM_BSS=0x0
+>  CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_ARM_ATAG_DTB_COMPAT=y
+>  CONFIG_CPU_FREQ=y
+> -CONFIG_CPU_FREQ_STAT_DETAILS=y
+> +CONFIG_CPU_FREQ_STAT=y
+>  CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+>  CONFIG_CPU_IDLE=y
+>  CONFIG_ARM_KIRKWOOD_CPUIDLE=y
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index b01a43851294..2dcac90eba01 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -132,7 +132,7 @@ CONFIG_ARM_ATAG_DTB_COMPAT=y
+>  CONFIG_KEXEC=y
+>  CONFIG_EFI=y
+>  CONFIG_CPU_FREQ=y
+> -CONFIG_CPU_FREQ_STAT_DETAILS=y
+> +CONFIG_CPU_FREQ_STAT=y
+>  CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+>  CONFIG_CPU_FREQ_GOV_POWERSAVE=m
+>  CONFIG_CPU_FREQ_GOV_USERSPACE=m
+> diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
+> index f7f6039419aa..4b598da0d086 100644
+> --- a/arch/arm/configs/mvebu_v5_defconfig
+> +++ b/arch/arm/configs/mvebu_v5_defconfig
+> @@ -44,7 +44,7 @@ CONFIG_ZBOOT_ROM_BSS=0x0
+>  CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_ARM_ATAG_DTB_COMPAT=y
+>  CONFIG_CPU_FREQ=y
+> -CONFIG_CPU_FREQ_STAT_DETAILS=y
+> +CONFIG_CPU_FREQ_STAT=y
+>  CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+>  CONFIG_CPU_IDLE=y
+>  CONFIG_ARM_KIRKWOOD_CPUIDLE=y
+> diff --git a/arch/arm/configs/pxa_defconfig b/arch/arm/configs/pxa_defconfig
+> index e4314b1227a3..271dc7e78e43 100644
+> --- a/arch/arm/configs/pxa_defconfig
+> +++ b/arch/arm/configs/pxa_defconfig
+> @@ -97,7 +97,7 @@ CONFIG_ZBOOT_ROM_BSS=0x0
+>  CONFIG_CMDLINE="root=/dev/ram0 ro"
+>  CONFIG_KEXEC=y
+>  CONFIG_CPU_FREQ=y
+> -CONFIG_CPU_FREQ_STAT_DETAILS=y
+> +CONFIG_CPU_FREQ_STAT=y
+>  CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+>  CONFIG_CPU_FREQ_GOV_POWERSAVE=m
+>  CONFIG_CPU_FREQ_GOV_USERSPACE=m
+> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+> index 1b0f8ae36fb3..adeaecd831a4 100644
+> --- a/arch/arm/configs/shmobile_defconfig
+> +++ b/arch/arm/configs/shmobile_defconfig
+> @@ -38,7 +38,7 @@ CONFIG_ZBOOT_ROM_BSS=0x0
+>  CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_KEXEC=y
+>  CONFIG_CPU_FREQ=y
+> -CONFIG_CPU_FREQ_STAT_DETAILS=y
+> +CONFIG_CPU_FREQ_STAT=y
+>  CONFIG_CPU_FREQ_GOV_POWERSAVE=y
+>  CONFIG_CPU_FREQ_GOV_USERSPACE=y
+>  CONFIG_CPU_FREQ_GOV_ONDEMAND=y
+> diff --git a/arch/mips/configs/lemote2f_defconfig b/arch/mips/configs/lemote2f_defconfig
+> index 5da76e0e120f..bed745596d86 100644
+> --- a/arch/mips/configs/lemote2f_defconfig
+> +++ b/arch/mips/configs/lemote2f_defconfig
+> @@ -40,7 +40,6 @@ CONFIG_PM_STD_PARTITION="/dev/hda3"
+>  CONFIG_CPU_FREQ=y
+>  CONFIG_CPU_FREQ_DEBUG=y
+>  CONFIG_CPU_FREQ_STAT=m
+> -CONFIG_CPU_FREQ_STAT_DETAILS=y
+>  CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+>  CONFIG_CPU_FREQ_GOV_POWERSAVE=m
+>  CONFIG_CPU_FREQ_GOV_USERSPACE=m
+> diff --git a/arch/powerpc/configs/ppc6xx_defconfig b/arch/powerpc/configs/ppc6xx_defconfig
+> index 3ce91a3df27f..1d2d69dd6409 100644
+> --- a/arch/powerpc/configs/ppc6xx_defconfig
+> +++ b/arch/powerpc/configs/ppc6xx_defconfig
+> @@ -62,7 +62,6 @@ CONFIG_MPC8610_HPCD=y
+>  CONFIG_GEF_SBC610=y
+>  CONFIG_CPU_FREQ=y
+>  CONFIG_CPU_FREQ_STAT=m
+> -CONFIG_CPU_FREQ_STAT_DETAILS=y
+>  CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE=y
+>  CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
+>  CONFIG_CPU_FREQ_GOV_POWERSAVE=m
+> diff --git a/arch/sh/configs/sh7785lcr_32bit_defconfig b/arch/sh/configs/sh7785lcr_32bit_defconfig
+> index 9bdcf72ec06a..2fce54d9c388 100644
+> --- a/arch/sh/configs/sh7785lcr_32bit_defconfig
+> +++ b/arch/sh/configs/sh7785lcr_32bit_defconfig
+> @@ -25,7 +25,7 @@ CONFIG_SH_SH7785LCR=y
+>  CONFIG_NO_HZ=y
+>  CONFIG_HIGH_RES_TIMERS=y
+>  CONFIG_CPU_FREQ=y
+> -CONFIG_CPU_FREQ_STAT_DETAILS=y
+> +CONFIG_CPU_FREQ_STAT=y
+>  CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+>  CONFIG_SH_CPU_FREQ=y
+>  CONFIG_HEARTBEAT=y
+> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+> index d8b164a7c4e5..15adef473d42 100644
+> --- a/drivers/cpufreq/Kconfig
+> +++ b/drivers/cpufreq/Kconfig
+> @@ -37,14 +37,6 @@ config CPU_FREQ_STAT
 >  
->  #define DEFAULT_TIMEOUT 30
-> @@ -47,7 +45,6 @@ struct tangox_wdt_device {
->  	void __iomem *base;
->  	unsigned long clk_rate;
->  	struct clk *clk;
-> -	struct notifier_block restart;
+>  	  If in doubt, say N.
+>  
+> -config CPU_FREQ_STAT_DETAILS
+> -	bool "CPU frequency transition statistics details"
+> -	depends on CPU_FREQ_STAT
+> -	help
+> -	  Show detailed CPU frequency transition table in sysfs.
+> -
+> -	  If in doubt, say N.
+> -
+>  choice
+>  	prompt "Default CPUFreq governor"
+>  	default CPU_FREQ_DEFAULT_GOV_USERSPACE if ARM_SA1100_CPUFREQ || ARM_SA1110_CPUFREQ
+> diff --git a/drivers/cpufreq/cpufreq_stats.c b/drivers/cpufreq/cpufreq_stats.c
+> index ac284e66839c..18abd454da43 100644
+> --- a/drivers/cpufreq/cpufreq_stats.c
+> +++ b/drivers/cpufreq/cpufreq_stats.c
+> @@ -25,9 +25,7 @@ struct cpufreq_stats {
+>  	unsigned int last_index;
+>  	u64 *time_in_state;
+>  	unsigned int *freq_table;
+> -#ifdef CONFIG_CPU_FREQ_STAT_DETAILS
+>  	unsigned int *trans_table;
+> -#endif
 >  };
 >  
->  static int tangox_wdt_set_timeout(struct watchdog_device *wdt,
-> @@ -96,24 +93,24 @@ static const struct watchdog_info tangox_wdt_info = {
->  	.identity = "tangox watchdog",
->  };
+>  static int cpufreq_stats_update(struct cpufreq_stats *stats)
+> @@ -46,9 +44,7 @@ static void cpufreq_stats_clear_table(struct cpufreq_stats *stats)
+>  	unsigned int count = stats->max_state;
 >  
-> +static int tangox_wdt_restart(struct watchdog_device *wdt,
-> +			      unsigned long action, void *data)
-> +{
-> +	struct tangox_wdt_device *dev = watchdog_get_drvdata(wdt);
-> +
-> +	writel(1, dev->base + WD_COUNTER);
-> +
-> +	return 0;
-> +}
-> +
->  static const struct watchdog_ops tangox_wdt_ops = {
->  	.start		= tangox_wdt_start,
->  	.stop		= tangox_wdt_stop,
->  	.set_timeout	= tangox_wdt_set_timeout,
->  	.get_timeleft	= tangox_wdt_get_timeleft,
-> +	.restart	= tangox_wdt_restart,
->  };
+>  	memset(stats->time_in_state, 0, count * sizeof(u64));
+> -#ifdef CONFIG_CPU_FREQ_STAT_DETAILS
+>  	memset(stats->trans_table, 0, count * count * sizeof(int));
+> -#endif
+>  	stats->last_time = get_jiffies_64();
+>  	stats->total_trans = 0;
+>  }
+> @@ -84,7 +80,6 @@ static ssize_t store_reset(struct cpufreq_policy *policy, const char *buf,
+>  	return count;
+>  }
 >  
-> -static int tangox_wdt_restart(struct notifier_block *nb, unsigned long action,
-> -			      void *data)
-> -{
-> -	struct tangox_wdt_device *dev =
-> -		container_of(nb, struct tangox_wdt_device, restart);
-> -
-> -	writel(1, dev->base + WD_COUNTER);
-> -
-> -	return NOTIFY_DONE;
-> -}
-> -
->  static int tangox_wdt_probe(struct platform_device *pdev)
+> -#ifdef CONFIG_CPU_FREQ_STAT_DETAILS
+>  static ssize_t show_trans_table(struct cpufreq_policy *policy, char *buf)
 >  {
->  	struct tangox_wdt_device *dev;
-> @@ -180,12 +177,6 @@ static int tangox_wdt_probe(struct platform_device *pdev)
+>  	struct cpufreq_stats *stats = policy->stats;
+> @@ -129,7 +124,6 @@ static ssize_t show_trans_table(struct cpufreq_policy *policy, char *buf)
+>  	return len;
+>  }
+>  cpufreq_freq_attr_ro(trans_table);
+> -#endif
 >  
->  	platform_set_drvdata(pdev, dev);
+>  cpufreq_freq_attr_ro(total_trans);
+>  cpufreq_freq_attr_ro(time_in_state);
+> @@ -139,9 +133,7 @@ static struct attribute *default_attrs[] = {
+>  	&total_trans.attr,
+>  	&time_in_state.attr,
+>  	&reset.attr,
+> -#ifdef CONFIG_CPU_FREQ_STAT_DETAILS
+>  	&trans_table.attr,
+> -#endif
+>  	NULL
+>  };
+>  static struct attribute_group stats_attr_group = {
+> @@ -200,9 +192,7 @@ void cpufreq_stats_create_table(struct cpufreq_policy *policy)
 >  
-> -	dev->restart.notifier_call = tangox_wdt_restart;
-> -	dev->restart.priority = 128;
-> -	err = register_restart_handler(&dev->restart);
-> -	if (err)
-> -		dev_warn(&pdev->dev, "failed to register restart handler\n");
-> -
->  	dev_info(&pdev->dev, "SMP86xx/SMP87xx watchdog registered\n");
+>  	alloc_size = count * sizeof(int) + count * sizeof(u64);
 >  
->  	return 0;
-> @@ -202,7 +193,6 @@ static int tangox_wdt_remove(struct platform_device *pdev)
->  	tangox_wdt_stop(&dev->wdt);
->  	clk_disable_unprepare(dev->clk);
+> -#ifdef CONFIG_CPU_FREQ_STAT_DETAILS
+>  	alloc_size += count * count * sizeof(int);
+> -#endif
 >  
-> -	unregister_restart_handler(&dev->restart);
->  	watchdog_unregister_device(&dev->wdt);
+>  	/* Allocate memory for time_in_state/freq_table/trans_table in one go */
+>  	stats->time_in_state = kzalloc(alloc_size, GFP_KERNEL);
+> @@ -211,9 +201,7 @@ void cpufreq_stats_create_table(struct cpufreq_policy *policy)
 >  
->  	return 0;
-> 
+>  	stats->freq_table = (unsigned int *)(stats->time_in_state + count);
+>  
+> -#ifdef CONFIG_CPU_FREQ_STAT_DETAILS
+>  	stats->trans_table = stats->freq_table + count;
+> -#endif
+>  
+>  	stats->max_state = count;
+>  
+> @@ -259,8 +247,6 @@ void cpufreq_stats_record_transition(struct cpufreq_policy *policy,
+>  	cpufreq_stats_update(stats);
+>  
+>  	stats->last_index = new_index;
+> -#ifdef CONFIG_CPU_FREQ_STAT_DETAILS
+>  	stats->trans_table[old_index * stats->max_state + new_index]++;
+> -#endif
+>  	stats->total_trans++;
+>  }
+> -- 
+> 2.7.1.410.g6faf27b
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
