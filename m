@@ -1,65 +1,48 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu,  5 Jan 2017 11:20:09 +0900
-Subject: [PATCH v2 4/4] linux/const.h: move BIT(_ULL) to linux/const.h for use
- in assembly
-In-Reply-To: <1483582810-7046-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1483582810-7046-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1483582810-7046-5-git-send-email-yamada.masahiro@socionext.com>
+Date: Thu, 5 Jan 2017 11:22:55 +0900
+Subject: [PATCH 1/3] linux/const.h: move UL() macro to
+ include/linux/const.h
+In-Reply-To: <CAMuHMdVyzF4xFPotburrP+cihjfyCDfHeAt4bienLG9kdG_zSg@mail.gmail.com>
+References: <1483520127-29316-1-git-send-email-yamada.masahiro@socionext.com>
+ <1483520127-29316-2-git-send-email-yamada.masahiro@socionext.com>
+ <CAMuHMdVyzF4xFPotburrP+cihjfyCDfHeAt4bienLG9kdG_zSg@mail.gmail.com>
+Message-ID: <CAK7LNATgkJJ4rnK7N8NQ2WR22eoCR3Hz5pCoE4VvOiRXrC0yPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 2fc016c5bd8a ("linux/const.h: Add _BITUL() and _BITULL()")
-introduced _BITUL() and _BITULL().  Its git-log says the difference
-from the already existing BIT() are:
+Hi Geert,
 
-  1. The namespace is such that they can be used in uapi definitions.
-  2. The type is set with the _AC() macro to allow it to be used in
-     assembly.
-  3. The type is explicitly specified to be UL or ULL.
+2017-01-04 18:27 GMT+09:00 Geert Uytterhoeven <geert@linux-m68k.org>:
+> Hi Yamada-san,
+>
+> On Wed, Jan 4, 2017 at 9:55 AM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>> Some architectures are duplicating the definition of UL():
+>>
+>>   #define UL(x) _AC(x, UL)
+>>
+>> This is not actually arch-specific, so it will be useful to move it
+>> to a common header.  Currently, we only have the uapi variant for
+>> linux/const.h, so I am creating include/linux/const.h.
+>>
+>> I am also adding _UL(x), _ULL(x), ULL(x) because _AC() is used for
+>> UL in most places (and ULL in some places).  I expect _AC(..., UL)
+>> will be replaced with _UL(...) or UL(...).  The underscore-prefixed
+>> one should be used for exported headers.
+>>
+>> Note:
+>> I renamed UL(x) in arch/m68k/mm/init.c, where it is used for a
+>> different meaning.
+>
+> Shouldn't that be a separate (prerequisite) patch?
 
-However, I found _BITUL() is often used for "2. use in assembly",
-while "1. use in uapi" is unneeded.  If we address only "2.", we can
-improve the existing BIT() for that.  It will allow us to replace
-many _BITUL() instances with BIT(), i.e. avoid needless use of
-underscore-prefixed macros, in the end, for better de-couple of
-userspace/kernel headers.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Yes, I did so in v2.
 
-Changes in v2: None
+Thanks!
 
- include/linux/bitops.h | 3 +--
- include/linux/const.h  | 3 +++
- 2 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/bitops.h b/include/linux/bitops.h
-index a83c822..5f45fa5 100644
---- a/include/linux/bitops.h
-+++ b/include/linux/bitops.h
-@@ -1,10 +1,9 @@
- #ifndef _LINUX_BITOPS_H
- #define _LINUX_BITOPS_H
-+#include <linux/const.h>
- #include <asm/types.h>
- 
- #ifdef	__KERNEL__
--#define BIT(nr)			(1UL << (nr))
--#define BIT_ULL(nr)		(1ULL << (nr))
- #define BIT_MASK(nr)		(1UL << ((nr) % BITS_PER_LONG))
- #define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
- #define BIT_ULL_MASK(nr)	(1ULL << ((nr) % BITS_PER_LONG_LONG))
-diff --git a/include/linux/const.h b/include/linux/const.h
-index 7b55a55..200892d 100644
---- a/include/linux/const.h
-+++ b/include/linux/const.h
-@@ -6,4 +6,7 @@
- #define UL(x)		(_UL(x))
- #define ULL(x)		(_ULL(x))
- 
-+#define BIT(x)		(_BITUL(x))
-+#define BIT_ULL(x)	(_BITULL(x))
-+
- #endif /* _LINUX_CONST_H */
+
 -- 
-2.7.4
+Best Regards
+Masahiro Yamada
