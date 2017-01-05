@@ -1,33 +1,44 @@
 From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Wed,  4 Jan 2017 18:21:26 -0600
-Subject: [PATCH 04/12] ARM: dts: socfpga: enable CAN on Cyclone5 devkit
+Date: Wed,  4 Jan 2017 18:21:27 -0600
+Subject: [PATCH 05/12] ARM: dts: socfpga: enable watchdog timer on Arria5 and
+ Arria10
 In-Reply-To: <1483575694-29599-1-git-send-email-dinguyen@kernel.org>
 References: <1483575694-29599-1-git-send-email-dinguyen@kernel.org>
-Message-ID: <1483575694-29599-5-git-send-email-dinguyen@kernel.org>
+Message-ID: <1483575694-29599-6-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the CAN node on the Cyclone5 devkit.
+Enable the watchdog for Arria5 and Arria10.
 
 Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
 ---
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/socfpga_arria10_socdk.dtsi | 4 ++++
+ arch/arm/boot/dts/socfpga_arria5.dtsi        | 4 ++++
+ 2 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-index c2884c9..7ea32c8 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-@@ -70,6 +70,10 @@
- 	};
+diff --git a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
+index eb00ae3..17ec17a 100644
+--- a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
+@@ -154,3 +154,7 @@
+ &usb0 {
+ 	status = "okay";
  };
- 
-+&can0 {
++
++&watchdog0 {
 +	status = "okay";
 +};
+diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
+index 1907cc6..8c03729 100644
+--- a/arch/arm/boot/dts/socfpga_arria5.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
+@@ -42,3 +42,7 @@
+ 		};
+ 	};
+ };
 +
- &gmac1 {
- 	status = "okay";
- 	phy-mode = "rgmii";
++&watchdog0 {
++	status = "okay";
++};
 -- 
 2.7.4
