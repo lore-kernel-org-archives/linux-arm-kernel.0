@@ -1,49 +1,115 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 05 Jan 2017 15:25:53 +0100
-Subject: [PATCH net-next v4 0/2] Add support for the ethernet switch on
- the ESPRESSObin
-In-Reply-To: <20161221125734.1034-1-romain.perier@free-electrons.com> (Romain
- Perier's message of "Wed, 21 Dec 2016 13:57:32 +0100")
-References: <20161221125734.1034-1-romain.perier@free-electrons.com>
-Message-ID: <87tw9dbn2m.fsf@free-electrons.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 5 Jan 2017 06:25:50 -0800
+Subject: [PATCH 4/4] watchdog: tangox: Use watchdog core to install
+ restart handler
+In-Reply-To: <df7b5570-a44d-0c25-fedd-03a0891fdff3@sigmadesigns.com>
+References: <1483565318-25578-1-git-send-email-linux@roeck-us.net>
+ <1483565318-25578-4-git-send-email-linux@roeck-us.net>
+ <df7b5570-a44d-0c25-fedd-03a0891fdff3@sigmadesigns.com>
+Message-ID: <a4200f4e-53b5-55de-1cd9-b5ae5f5f9468@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
- 
- On mer., d?c. 21 2016, Romain Perier <romain.perier@free-electrons.com> wrote:
-
-> This set of patches adds support for the Marvell ethernet switch 88E6341.
-> It also add the devicetree definition of this switch to the DT board.
-
-The forth version of this series had been sent while the net-next merge
-window was closed so I think it was missed.
-
-Do you want that we send it again on the netdev mainling list?
-
-Thanks,
-
-Gregory
-
+On 01/05/2017 01:42 AM, Marc Gonzalez wrote:
+> [ Adding Mans ]
 >
-> Romain Perier (2):
->   net: dsa: mv88e6xxx: Don't forbid MDIO I/Os for PHY addr >=
->     num_of_ports
->   net: dsa: mv88e6xxx: Add support for ethernet switch 88E6341/88E6141
+> Guenter, patch c7ef68c32265 states "Fixes: a3e376d26ace".
+> Is that true? I mean, they seem quite orthogonal; then again I know
+> nothing of this framework.
 >
->  drivers/net/dsa/mv88e6xxx/chip.c      | 48 ++++++++++++++++++++++++++++++-----
->  drivers/net/dsa/mv88e6xxx/mv88e6xxx.h |  4 ++-
->  2 files changed, 45 insertions(+), 7 deletions(-)
->
-> -- 
->
-> Note: As requested by Gregory, I have removed the patch for the DT (already merged).
->
-> 2.9.3
->
+max_hw_heartbeat_ms must be set for WDOG_HW_RUNNING to work.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Guenter
+
+> Regards.
+>
+> On 04/01/2017 22:28, Guenter Roeck wrote:
+>> Use the infrastructure provided by the watchdog core to install
+>> the restart handler.
+>>
+>> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+>> ---
+>>  drivers/watchdog/tangox_wdt.c | 32 +++++++++++---------------------
+>>  1 file changed, 11 insertions(+), 21 deletions(-)
+>>
+>> diff --git a/drivers/watchdog/tangox_wdt.c b/drivers/watchdog/tangox_wdt.c
+>> index 202c4b9cc921..49e6e805db7c 100644
+>> --- a/drivers/watchdog/tangox_wdt.c
+>> +++ b/drivers/watchdog/tangox_wdt.c
+>> @@ -15,9 +15,7 @@
+>>  #include <linux/kernel.h>
+>>  #include <linux/module.h>
+>>  #include <linux/moduleparam.h>
+>> -#include <linux/notifier.h>
+>>  #include <linux/platform_device.h>
+>> -#include <linux/reboot.h>
+>>  #include <linux/watchdog.h>
+>>
+>>  #define DEFAULT_TIMEOUT 30
+>> @@ -47,7 +45,6 @@ struct tangox_wdt_device {
+>>  	void __iomem *base;
+>>  	unsigned long clk_rate;
+>>  	struct clk *clk;
+>> -	struct notifier_block restart;
+>>  };
+>>
+>>  static int tangox_wdt_set_timeout(struct watchdog_device *wdt,
+>> @@ -96,24 +93,24 @@ static const struct watchdog_info tangox_wdt_info = {
+>>  	.identity = "tangox watchdog",
+>>  };
+>>
+>> +static int tangox_wdt_restart(struct watchdog_device *wdt,
+>> +			      unsigned long action, void *data)
+>> +{
+>> +	struct tangox_wdt_device *dev = watchdog_get_drvdata(wdt);
+>> +
+>> +	writel(1, dev->base + WD_COUNTER);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>  static const struct watchdog_ops tangox_wdt_ops = {
+>>  	.start		= tangox_wdt_start,
+>>  	.stop		= tangox_wdt_stop,
+>>  	.set_timeout	= tangox_wdt_set_timeout,
+>>  	.get_timeleft	= tangox_wdt_get_timeleft,
+>> +	.restart	= tangox_wdt_restart,
+>>  };
+>>
+>> -static int tangox_wdt_restart(struct notifier_block *nb, unsigned long action,
+>> -			      void *data)
+>> -{
+>> -	struct tangox_wdt_device *dev =
+>> -		container_of(nb, struct tangox_wdt_device, restart);
+>> -
+>> -	writel(1, dev->base + WD_COUNTER);
+>> -
+>> -	return NOTIFY_DONE;
+>> -}
+>> -
+>>  static int tangox_wdt_probe(struct platform_device *pdev)
+>>  {
+>>  	struct tangox_wdt_device *dev;
+>> @@ -180,12 +177,6 @@ static int tangox_wdt_probe(struct platform_device *pdev)
+>>
+>>  	platform_set_drvdata(pdev, dev);
+>>
+>> -	dev->restart.notifier_call = tangox_wdt_restart;
+>> -	dev->restart.priority = 128;
+>> -	err = register_restart_handler(&dev->restart);
+>> -	if (err)
+>> -		dev_warn(&pdev->dev, "failed to register restart handler\n");
+>> -
+>>  	dev_info(&pdev->dev, "SMP86xx/SMP87xx watchdog registered\n");
+>>
+>>  	return 0;
+>> @@ -202,7 +193,6 @@ static int tangox_wdt_remove(struct platform_device *pdev)
+>>  	tangox_wdt_stop(&dev->wdt);
+>>  	clk_disable_unprepare(dev->clk);
+>>
+>> -	unregister_restart_handler(&dev->restart);
+>>  	watchdog_unregister_device(&dev->wdt);
+>>
+>>  	return 0;
+>>
+>
