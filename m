@@ -1,39 +1,53 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 5 Jan 2017 11:53:39 +0200
-Subject: [PATCH 2/2] mmc: sdhci-iproc: Increase max_blk_size for bcm2835
-In-Reply-To: <1483111474-29907-3-git-send-email-stefan.wahren@i2se.com>
-References: <1483111474-29907-1-git-send-email-stefan.wahren@i2se.com>
- <1483111474-29907-3-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <f869a601-38ba-daf7-e6bb-713547041c3c@intel.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 05 Jan 2017 19:12:29 +0900
+Subject: [PATCH] cpufreq: Remove CONFIG_CPU_FREQ_STAT_DETAILS config option
+In-Reply-To: <d4299228a500a889c2b4b9e305674f3d1ea9ae06.1483604760.git.viresh.kumar@linaro.org>
+References: <CGME20170105082939epcas4p4b494945ce55c949dc7a030ebf9dbdd4c@epcas4p4.samsung.com>
+ <d4299228a500a889c2b4b9e305674f3d1ea9ae06.1483604760.git.viresh.kumar@linaro.org>
+Message-ID: <586E1C0D.20102@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/12/16 17:24, Stefan Wahren wrote:
-> According to the BCM2835 datasheet the maximum block size for the
-> eMMC module is restricted to the internal data FIFO which is 1024 byte.
-> But this is still an improvement to the default of 512 byte.
+Hi Viresh,
+
+On 2017? 01? 05? 17:27, Viresh Kumar wrote:
+> This doesn't have any benefit apart from saving a small amount of memory
+> when it is disabled. The ifdef hackery in the code makes it dirty
+> unnecessarily.
 > 
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
-
+> Clean it up by removing the Kconfig option completely. Few defconfigs
+> are also updated and CONFIG_CPU_FREQ_STAT_DETAILS is replaced with
+> CONFIG_CPU_FREQ_STAT now in them, as users wanted stats to be enabled.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
->  drivers/mmc/host/sdhci-iproc.c |    4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-iproc.c b/drivers/mmc/host/sdhci-iproc.c
-> index 30b3fdf..3275d49 100644
-> --- a/drivers/mmc/host/sdhci-iproc.c
-> +++ b/drivers/mmc/host/sdhci-iproc.c
-> @@ -218,7 +218,9 @@ static void sdhci_iproc_writeb(struct sdhci_host *host, u8 val, int reg)
->  
->  static const struct sdhci_iproc_data bcm2835_data = {
->  	.pdata = &sdhci_bcm2835_pltfm_data,
-> -	.caps = SDHCI_CAN_VDD_330 |
-> +	.caps = ((0x1 << SDHCI_MAX_BLOCK_SHIFT)
-> +			& SDHCI_MAX_BLOCK_MASK) |
-> +		SDHCI_CAN_VDD_330 |
->  		SDHCI_CAN_DO_HISPD,
->  	.caps1 = SDHCI_DRIVER_TYPE_A |
->  		 SDHCI_DRIVER_TYPE_C,
-> 
+>  arch/arm/configs/exynos_defconfig         |  2 +-
+>  arch/arm/configs/multi_v5_defconfig       |  2 +-
+>  arch/arm/configs/multi_v7_defconfig       |  2 +-
+>  arch/arm/configs/mvebu_v5_defconfig       |  2 +-
+>  arch/arm/configs/pxa_defconfig            |  2 +-
+>  arch/arm/configs/shmobile_defconfig       |  2 +-
+>  arch/mips/configs/lemote2f_defconfig      |  1 -
+>  arch/powerpc/configs/ppc6xx_defconfig     |  1 -
+>  arch/sh/configs/sh7785lcr_32bit_defconfig |  2 +-
+>  drivers/cpufreq/Kconfig                   |  8 --------
+>  drivers/cpufreq/cpufreq_stats.c           | 14 --------------
+>  11 files changed, 7 insertions(+), 31 deletions(-)
+
+
+I agree. Looks good to me.
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+
+[snip]
+
+-- 
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: cw00_choi.vcf
+Type: text/x-vcard
+Size: 6 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170105/206bbca6/attachment.vcf>
