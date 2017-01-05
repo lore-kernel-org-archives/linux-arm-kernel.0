@@ -1,61 +1,79 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 5 Jan 2017 14:02:40 +0800
-Subject: [PATCH 16/22] mfd: axp20x: add V_OFF to writeable regs for AXP20X
- and AXP22X
-In-Reply-To: <20170104115731.GF24058@dell>
-References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
- <20170102163723.7939-17-quentin.schulz@free-electrons.com>
- <20170104115731.GF24058@dell>
-Message-ID: <CAGb2v675_bbceTt0Jh++t-HeWfNqn=f4Pjf-HjbZvWvKkLtrdQ@mail.gmail.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Thu, 5 Jan 2017 14:01:59 +0800
+Subject: [PATCH v11 8/8] ARM: dts: imx6q-evi: Fix onboard hub reset line
+In-Reply-To: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
+References: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <1483596119-27508-9-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 4, 2017 at 7:57 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Mon, 02 Jan 2017, Quentin Schulz wrote:
->
->> The V_OFF register has its first 3 read-write bits for the minimal
->> voltage (Voff) of the battery before the system is automatically shut
->> down due to the power being too low.
->>
->> This adds V_OFF register to the writeable registers of AXP20X and AXP22X
->> PMICs.
->>
->> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->> ---
->>  drivers/mfd/axp20x.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> For my own reference:
->   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+From: Joshua Clayton <stillcompiling@gmail.com>
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Previously the onboard hub was made to work by treating its
+reset gpio as a regulator enable.
+Get rid of that kludge now that pwseq has added reset gpio support
+Move pin muxing the hub reset pin into the usbh1 group
 
->
->> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
->> index 19bdba3..7f0f05f 100644
->> --- a/drivers/mfd/axp20x.c
->> +++ b/drivers/mfd/axp20x.c
->> @@ -65,7 +65,7 @@ static const struct regmap_access_table axp152_volatile_table = {
->>
->>  static const struct regmap_range axp20x_writeable_ranges[] = {
->>       regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
->> -     regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
->> +     regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_V_OFF),
->>       regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL1),
->>       regmap_reg_range(AXP20X_DCDC_MODE, AXP20X_FG_RES),
->>       regmap_reg_range(AXP20X_RDC_H, AXP20X_OCV(AXP20X_OCV_MAX)),
->> @@ -94,7 +94,7 @@ static const struct regmap_access_table axp20x_volatile_table = {
->>  /* AXP22x ranges are shared with the AXP809, as they cover the same range */
->>  static const struct regmap_range axp22x_writeable_ranges[] = {
->>       regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
->> -     regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
->> +     regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_V_OFF),
->>       regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL1),
->>       regmap_reg_range(AXP20X_DCDC_MODE, AXP22X_BATLOW_THRES1),
->>  };
->
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+Signed-off-by: Peter Chen <peter.chen@nxp.com>
+---
+ arch/arm/boot/dts/imx6q-evi.dts | 25 +++++++------------------
+ 1 file changed, 7 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
+index 7c7c1a8..79a0bd5 100644
+--- a/arch/arm/boot/dts/imx6q-evi.dts
++++ b/arch/arm/boot/dts/imx6q-evi.dts
+@@ -54,18 +54,6 @@
+ 		reg = <0x10000000 0x40000000>;
+ 	};
+ 
+-	reg_usbh1_vbus: regulator-usbhubreset {
+-		compatible = "regulator-fixed";
+-		regulator-name = "usbh1_vbus";
+-		regulator-min-microvolt = <5000000>;
+-		regulator-max-microvolt = <5000000>;
+-		enable-active-high;
+-		startup-delay-us = <2>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_usbh1_hubreset>;
+-		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
+-	};
+-
+ 	reg_usb_otg_vbus: regulator-usbotgvbus {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "usb_otg_vbus";
+@@ -207,12 +195,18 @@
+ };
+ 
+ &usbh1 {
+-	vbus-supply = <&reg_usbh1_vbus>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usbh1>;
+ 	dr_mode = "host";
+ 	disable-over-current;
+ 	status = "okay";
++
++	usb2415host: hub at 1 {
++		compatible = "usb424,2513";
++		reg = <1>;
++		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
++		reset-duration-us = <3000>;
++	};
+ };
+ 
+ &usbotg {
+@@ -468,11 +462,6 @@
+ 			MX6QDL_PAD_GPIO_3__USB_H1_OC 0x1b0b0
+ 			/* usbh1_b OC */
+ 			MX6QDL_PAD_GPIO_0__GPIO1_IO00 0x1b0b0
+-		>;
+-	};
+-
+-	pinctrl_usbh1_hubreset: usbh1hubresetgrp {
+-		fsl,pins = <
+ 			MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x1b0b0
+ 		>;
+ 	};
+-- 
+2.7.4
