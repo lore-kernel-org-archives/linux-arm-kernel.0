@@ -1,44 +1,113 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  5 Jan 2017 16:02:29 +0100
-Subject: [PATCH] ARM64: dts: meson-gxbb-odroidc2: Disable SCPI DVFS
-Message-ID: <1483628549-29486-1-git-send-email-narmstrong@baylibre.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu,  5 Jan 2017 16:13:34 +0100
+Subject: [PATCH 1/3 v5] ARM: dts: rename MSM8660/APQ8060 pmicintc to pm8058
+Message-ID: <20170105151336.18667-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current hardware is not able to run with all cores enabled at a
-cluster frequency superior at 1536MHz.
-But the currently shipped u-boot for the platform still reports an OPP
-table with possible DVFS frequency up to 2GHz, and will not change since
-the off-tree linux tree supports limiting the OPPs with a kernel parameter.
-A recent u-boot change reports the boot-time DVFS around 100MHz and
-the default performance cpufreq governor sets the maximum frequency.
-Previous version of u-boot reported to be already at the max OPP and
-left the OPP as is.
-Nevertheless, other governors like ondemand could setup the max frequency
-and make the system crash.
+The name "pmicintc" is ambiguous: there is a second power
+management IC named PM8901 on these systems, and it is also
+an interrupt controller. To make things clear, just name the
+node alias "pm8058", this in unambigous and has all information
+we need.
 
-This patch disables the DVFS clock and disables cpufreq.
-
-Fixes: 70db166a2baa ("ARM64: dts: meson-gxbb: Add SCPI with cpufreq & sensors Nodes")
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ChangeLog v4->v5:
+- No changes, just rebased on v4.10-rc1
+ChangeLog v1->v4:
+- Add Bjorn's ACK.
+- Follow version numbering of the primary patch.
+---
+ arch/arm/boot/dts/qcom-apq8060-dragonboard.dts |  2 +-
+ arch/arm/boot/dts/qcom-msm8660-surf.dts        |  2 +-
+ arch/arm/boot/dts/qcom-msm8660.dtsi            | 12 ++++++------
+ 3 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-index 238fbea..5e63e3b 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-@@ -137,6 +137,10 @@
+diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+index 4b8872cc8bf9..4a532ddab53a 100644
+--- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
++++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+@@ -412,7 +412,7 @@
+ 				 * The second interrupt is the PME interrupt
+ 				 * for network wakeup, connected to the TLMM.
+ 				 */
+-				interrupts-extended = <&pmicintc 198 IRQ_TYPE_EDGE_FALLING>,
++				interrupts-extended = <&pm8058 198 IRQ_TYPE_EDGE_FALLING>,
+ 						    <&tlmm 29 IRQ_TYPE_EDGE_RISING>;
+ 				reset-gpios = <&tlmm 30 GPIO_ACTIVE_LOW>;
+ 				vdd33a-supply = <&dragon_veth>;
+diff --git a/arch/arm/boot/dts/qcom-msm8660-surf.dts b/arch/arm/boot/dts/qcom-msm8660-surf.dts
+index 23de764558ab..1adc04978a47 100644
+--- a/arch/arm/boot/dts/qcom-msm8660-surf.dts
++++ b/arch/arm/boot/dts/qcom-msm8660-surf.dts
+@@ -48,7 +48,7 @@
  	};
  };
  
-+&scpi_dvfs {
-+	status = "disabled";
-+};
-+
- &uart_AO {
- 	status = "okay";
- 	pinctrl-0 = <&uart_ao_a_pins>;
+-&pmicintc {
++&pm8058 {
+ 	keypad at 148 {
+ 		linux,keymap = <
+ 			MATRIX_KEY(0, 0, KEY_FN_F1)
+diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
+index 4d828f810746..91c9a62ae725 100644
+--- a/arch/arm/boot/dts/qcom-msm8660.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
+@@ -163,7 +163,7 @@
+ 			reg = <0x500000 0x1000>;
+ 			qcom,controller-type = "pmic-arbiter";
+ 
+-			pmicintc: pmic at 0 {
++			pm8058: pmic at 0 {
+ 				compatible = "qcom,pm8058";
+ 				interrupt-parent = <&tlmm>;
+ 				interrupts = <88 8>;
+@@ -176,7 +176,7 @@
+ 					compatible = "qcom,pm8058-gpio",
+ 						     "qcom,ssbi-gpio";
+ 					reg = <0x150>;
+-					interrupt-parent = <&pmicintc>;
++					interrupt-parent = <&pm8058>;
+ 					interrupts = <192 IRQ_TYPE_NONE>,
+ 						     <193 IRQ_TYPE_NONE>,
+ 						     <194 IRQ_TYPE_NONE>,
+@@ -232,7 +232,7 @@
+ 					reg = <0x50>;
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
+-					interrupt-parent = <&pmicintc>;
++					interrupt-parent = <&pm8058>;
+ 					interrupts =
+ 					<128 IRQ_TYPE_NONE>,
+ 					<129 IRQ_TYPE_NONE>,
+@@ -251,7 +251,7 @@
+ 				pwrkey at 1c {
+ 					compatible = "qcom,pm8058-pwrkey";
+ 					reg = <0x1c>;
+-					interrupt-parent = <&pmicintc>;
++					interrupt-parent = <&pm8058>;
+ 					interrupts = <50 1>, <51 1>;
+ 					debounce = <15625>;
+ 					pull-up;
+@@ -260,7 +260,7 @@
+ 				keypad at 148 {
+ 					compatible = "qcom,pm8058-keypad";
+ 					reg = <0x148>;
+-					interrupt-parent = <&pmicintc>;
++					interrupt-parent = <&pm8058>;
+ 					interrupts = <74 1>, <75 1>;
+ 					debounce = <15>;
+ 					scan-delay = <32>;
+@@ -270,7 +270,7 @@
+ 				rtc at 1e8 {
+ 					compatible = "qcom,pm8058-rtc";
+ 					reg = <0x1e8>;
+-					interrupt-parent = <&pmicintc>;
++					interrupt-parent = <&pm8058>;
+ 					interrupts = <39 1>;
+ 					allow-set-time;
+ 				};
 -- 
-1.9.1
+2.9.3
