@@ -1,18 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 5 Jan 2017 09:40:45 +0000
-Subject: [RESEND 2/2] arm64: dts: Add dts files for Hisilicon Hi3660 SoC
-In-Reply-To: <586DBD68.7090509@hisilicon.com>
-References: <1482744972-56622-1-git-send-email-puck.chen@hisilicon.com>
- <1482744972-56622-2-git-send-email-puck.chen@hisilicon.com>
- <586DBD68.7090509@hisilicon.com>
-Message-ID: <20170105094045.GA679@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 05 Jan 2017 10:41:16 +0100
+Subject: [PATCH 1/8] ARM: dts: armada-370-rd: Utilize new DSA binding
+In-Reply-To: <307da709-5dbd-845b-b7ec-d0c3d46ad2e6@gmail.com> (Florian
+ Fainelli's message of "Wed, 4 Jan 2017 09:30:07 -0800")
+References: <20170102022249.10657-1-f.fainelli@gmail.com>
+ <20170102022249.10657-2-f.fainelli@gmail.com>
+ <20170103163609.GE32450@lunn.ch>
+ <307da709-5dbd-845b-b7ec-d0c3d46ad2e6@gmail.com>
+Message-ID: <87bmvletdv.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 11:28:40AM +0800, Chen Feng wrote:
-> Could you help review this part?
+Hi Florian,
+ 
+ On mer., janv. 04 2017, Florian Fainelli <f.fainelli@gmail.com> wrote:
 
-It would be better if one of the devicetree maintainers reviewed it, but
-they're stretched pretty thinly so you might need to sit tight.
+> On 01/03/2017 08:36 AM, Andrew Lunn wrote:
+>>> +
+>>> +	switch: switch at 10 {
+>>> +		compatible = "marvell,mv88e6085";
+>>> +		#address-cells = <1>;
+>>> +		#size-cells = <0>;
+>>> +		reg = <16>;
+>> 
+>> Hummm, a device tree question. switch at 10, reg = <16>. Is there an
+>> implicit understanding that the 10 is hex?
+>
+> Most (if not all?) unit addresses are hexadecimal, which is why this was
+> chosen here, but I really don't mind changing that.
 
-Will
+And what about using:
+		reg = <0x10>;
+
+Gregory
+
+> -- 
+> Florian
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
