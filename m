@@ -1,297 +1,111 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 5 Jan 2017 16:27:50 +0800
-Subject: [PATCH 03/22] iio: adc: add support for X-Powers AXP20X and
- AXP22X PMICs ADCs
-In-Reply-To: <9acfe5e0-dc56-bd63-02b4-7bf34d49d62c@free-electrons.com>
-References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
- <20170102163723.7939-4-quentin.schulz@free-electrons.com>
- <CAGb2v67S==AG=jZA=mO-bB4u1F2TOwhmBXg385W1xhUa3RAFbA@mail.gmail.com>
- <9acfe5e0-dc56-bd63-02b4-7bf34d49d62c@free-electrons.com>
-Message-ID: <CAGb2v66n46KQAzQBUrDwx7sYADkRm3_XyCHf9imN+FiDkHfP1w@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Thu, 5 Jan 2017 14:04:37 +0530
+Subject: [PATCH 02/10] iommu/of: Prepare for deferred IOMMU configuration
+References: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
+ <1480465344-11862-3-git-send-email-sricharan@codeaurora.org>
+ <20161130161723.GA9042@red-moon>
+ <c89825aa-c75f-8493-fe92-7cc97f525bc7@arm.com>
+ <20161201112917.GA9680@red-moon>
+Message-ID: <003601d2672e$91744b40$b45ce1c0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 5, 2017 at 4:06 PM, Quentin Schulz
-<quentin.schulz@free-electrons.com> wrote:
-> Hi Chen-Yu,
->
-> On 05/01/2017 06:42, Chen-Yu Tsai wrote:
->> On Tue, Jan 3, 2017 at 12:37 AM, Quentin Schulz
->> <quentin.schulz@free-electrons.com> wrote:
-> [...]
->>> +
->>> +#define AXP20X_ADC_RATE_MASK                   (3 << 6)
->>> +#define AXP20X_ADC_RATE_25HZ                   (0 << 6)
->>> +#define AXP20X_ADC_RATE_50HZ                   BIT(6)
->>
->> Please be consistent with the format.
->>
->>> +#define AXP20X_ADC_RATE_100HZ                  (2 << 6)
->>> +#define AXP20X_ADC_RATE_200HZ                  (3 << 6)
->>> +
->>> +#define AXP22X_ADC_RATE_100HZ                  (0 << 6)
->>> +#define AXP22X_ADC_RATE_200HZ                  BIT(6)
->>> +#define AXP22X_ADC_RATE_400HZ                  (2 << 6)
->>> +#define AXP22X_ADC_RATE_800HZ                  (3 << 6)
->>
->> These are power-of-2 multiples of some base rate. May I suggest
->> a formula macro instead. Either way, you seem to be using only
->> one value. Will this be made configurable in the future?
->>
->
-> Yes, I could use a formula macro instead. No plan to make it
-> configurable, should I make it configurable?
+Hi Robin/Lorenzo,
 
-I don't see a use case for that atm.
+>Hi Robin,Lorenzo,
+>
+>>On Wed, Nov 30, 2016 at 04:42:27PM +0000, Robin Murphy wrote:
+>>> On 30/11/16 16:17, Lorenzo Pieralisi wrote:
+>>> > Sricharan, Robin,
+>>> >
+>>> > I gave this series a go on ACPI and apart from an SMMU v3 fix-up
+>>> > it seems to work, more thorough testing required though.
+>>> >
+>>> > A key question below.
+>>> >
+>>> > On Wed, Nov 30, 2016 at 05:52:16AM +0530, Sricharan R wrote:
+>>> >> From: Robin Murphy <robin.murphy@arm.com>
+>>> >>
+>>> >> IOMMU configuration represents unchanging properties of the hardware,
+>>> >> and as such should only need happen once in a device's lifetime, but
+>>> >> the necessary interaction with the IOMMU device and driver complicates
+>>> >> exactly when that point should be.
+>>> >>
+>>> >> Since the only reasonable tool available for handling the inter-device
+>>> >> dependency is probe deferral, we need to prepare of_iommu_configure()
+>>> >> to run later than it is currently called (i.e. at driver probe rather
+>>> >> than device creation), to handle being retried, and to tell whether a
+>>> >> not-yet present IOMMU should be waited for or skipped (by virtue of
+>>> >> having declared a built-in driver or not).
+>>> >>
+>>> >> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>>> >> ---
+>>> >>  drivers/iommu/of_iommu.c | 30 +++++++++++++++++++++++++++++-
+>>> >>  1 file changed, 29 insertions(+), 1 deletion(-)
+>>> >>
+>>> >> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>>> >> index ee49081..349bd1d 100644
+>>> >> --- a/drivers/iommu/of_iommu.c
+>>> >> +++ b/drivers/iommu/of_iommu.c
+>>> >> @@ -104,12 +104,20 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+>>> >>  	int err;
+>>> >>
+>>> >>  	ops = iommu_get_instance(fwnode);
+>>> >> -	if (!ops || !ops->of_xlate)
+>>> >> +	if ((ops && !ops->of_xlate) ||
+>>> >> +	    (!ops && !of_match_node(&__iommu_of_table, iommu_spec->np)))
+>>> >
+>>> > IIUC of_match_node() here is there to check there is a driver compiled
+>>> > in for this device_node (aka compatible string in OF world), correct ?
+>>>
+>>> Yes - specifically, it's checking the magic table for a matching
+>>> IOMMU_OF_DECLARE entry.
+>>>
+>>> > If that's the case (and I think that's what Sricharan was referring to
+>>> > in his ACPI query) I need to cook-up something on the ACPI side to
+>>> > emulate the OF linker table behaviour (or anyway to detect a driver is
+>>> > actually in the kernel), it is not that difficult but it is key to know,
+>>> > I will give it some thought to make it as clean as possible.
+>>>
+>>> I didn't think this would be a concern for ACPI, since IORT works much
+>>> the same way the current of_iommu_init_fn/of_platform_device_create()
+>>> bodges in drivers so for DT. If you can only discover SMMUs from IORT,
+>>> then iort_init_platform_devices() will have already created every SMMU
+>>> that's going to exist before discovering other devices from wherever
+>>> they come from, thus you could never get into the situation of probing a
+>>> device without its SMMU being ready (if it's ever going to be). Is that
+>>> not right?
+>>
+>>It is right, my point and question is: we are probing a device and we
+>>have to know whether it is worth deferring its IOMMU DMA setup. On DT,
+>>through of_match_node(&__iommu_of_table, iommu_device_node) we check at
+>>once that:
+>>
+>>1 - A device for the IOMMU exists
+>>
+>>AND
+>>
+>>2 - A driver for the IOMMU is compiled in the kernel
+>>
+>>Is this correct ? As you said (1) is not a concern on ACPI IORT (because
+>>we create the IOMMU device before _any_ other device so either the IOMMU
+>>device is there or it will never be by the time master devices are
+>>probed), but for (2) I need to slightly change how the IORT linker entry
+>>work to make sure we can detect a driver is actually compiled in the
+>>kernel, it is easy, I was just asking if my understanding was correct
+>>and I think that was what Sricharan was referring to in his query.
+>>
+>
+>Yes right, this was what i was looking for in the ACPI case and putting this
+>in the iort_iommu_xlate was needed to return EPROBE_DEFER when the
+>driver is not yet been probed.
 
->>> +
->>> +#define AXP20X_ADC_CHANNEL(_channel, _name, _type, _reg)       \
->>> +       {                                                       \
->>> +               .type = _type,                                  \
->>> +               .indexed = 1,                                   \
->>> +               .channel = _channel,                            \
->>> +               .address = _reg,                                \
->>> +               .info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |  \
->>> +                                     BIT(IIO_CHAN_INFO_SCALE), \
->>> +               .datasheet_name = _name,                        \
->>> +       }
->>> +
->>> +#define AXP20X_ADC_CHANNEL_OFFSET(_channel, _name, _type, _reg) \
->>> +       {                                                       \
->>> +               .type = _type,                                  \
->>> +               .indexed = 1,                                   \
->>> +               .channel = _channel,                            \
->>> +               .address = _reg,                                \
->>> +               .info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |  \
->>> +                                     BIT(IIO_CHAN_INFO_SCALE) |\
->>> +                                     BIT(IIO_CHAN_INFO_OFFSET),\
->>> +               .datasheet_name = _name,                        \
->>> +       }
->>> +
->>> +struct axp20x_adc_iio {
->>> +       struct iio_dev          *indio_dev;
->>> +       struct regmap           *regmap;
->>> +};
->>> +
->>> +enum axp20x_adc_channel {
->>> +       AXP20X_ACIN_V = 0,
->>> +       AXP20X_ACIN_I,
->>> +       AXP20X_VBUS_V,
->>> +       AXP20X_VBUS_I,
->>> +       AXP20X_TEMP_ADC,
->>
->> PMIC_TEMP would be better. And please save a slot for TS input.
->>
->
-> ACK.
->
-> Hum.. I'm wondering what should be the IIO type of the TS input channel
-> then? The TS Pin can be used in two modes: either to monitor the
-> temperature of the battery or as an external ADC, at least that's what I
-> understand from the datasheet.
+With the thinking of taking this series through, would it be fine if i cleanup
+the pci configure hanging outside and push it in to of/acpi_iommu configure
+respectively ? This time with all neeeded for ACPI added as well.
+ Also on the last post of V4, Lorenzo commented that it worked for him, although
+still the of_match_node equivalent in ACPI has to be added. If i can get that,
+then i will add that as well to make this complete.
 
-AFAIK the battery charge/discharge high/low temperature threshold
-registers take values in terms of voltage, not actual temperature.
-And the temperature readout kind of depends on the thermoresistor
-one is using. So I think "voltage" would be the proper type.
-
->
->>> +       AXP20X_GPIO0_V,
->>> +       AXP20X_GPIO1_V,
->>
->> Please skip a slot for "battery instantaneous power".
->>
->>> +       AXP20X_BATT_V,
->>> +       AXP20X_BATT_CHRG_I,
->>> +       AXP20X_BATT_DISCHRG_I,
->>> +       AXP20X_IPSOUT_V,
->>> +};
->>> +
->>> +enum axp22x_adc_channel {
->>> +       AXP22X_TEMP_ADC = 0,
->>
->> Same comments as AXP20X_TEMP_ADC.
->>
->>> +       AXP22X_BATT_V,
->>> +       AXP22X_BATT_CHRG_I,
->>> +       AXP22X_BATT_DISCHRG_I,
->>> +};
->>
->> Shouldn't these channel numbers be exported as part of the device tree
->> bindings? At the very least, they shouldn't be changed.
->>
->
-> I don't understand what you mean by that. Do you mean you want a
-> consistent numbering between the AXP20X and the AXP22X, so that
-> AXP22X_BATT_V would have the same channel number than AXP20X_BATT_V?
->
-> Could you explain a bit more your thoughts on the channel numbers being
-> exported as part of the device tree bindings?
-
-What I meant was that, since you are referencing the channels in the
-device tree, the numbering scheme would be part of the device tree
-binding, and should never be changed. So either these would be macros
-in include/dt-bindings/, or a big warning should be put before it.
-
-But see my reply on patch 7, about do we actually need to expose this
-in the device tree.
-
->> Also please add a comment saying that the channels are numbered
->> in the order of their respective registers, and not the table
->> describing the ADCs in the datasheet (9.7 Signal Capture for AXP209
->> and 9.5 E-Gauge for AXP221).
->>
->
-> Yes I can.
->
-> What about Rob wanting channel numbers to start at zero for each
-> different IIO type (i.e., today we have AXP22X_BATT_CHRG_I being
-> exported as in_current1_raw whereas he wants in_current0_raw).
-
-Hmm... I missed this. Are you talking about IIO or hwmon? IIRC
-hwmon numbers things starting at 1.
-
-> [...]
->>> +static int axp22x_adc_read_raw(struct iio_dev *indio_dev,
->>> +                              struct iio_chan_spec const *channel, int *val,
->>> +                              int *val2)
->>> +{
->>> +       struct axp20x_adc_iio *info = iio_priv(indio_dev);
->>> +       int size = 12, ret;
->>> +
->>> +       switch (channel->channel) {
->>> +       case AXP22X_BATT_DISCHRG_I:
->>> +               size = 13;
->>> +       case AXP22X_TEMP_ADC:
->>> +       case AXP22X_BATT_V:
->>> +       case AXP22X_BATT_CHRG_I:
->>
->> According to the datasheet, AXP22X_BATT_CHRG_I is also 13 bits wide.
->>
->
-> Where did you get that?
->
-> Also, the datasheet is inconsistent:
->  - 9.5 E-Gauge Fuel Gauge system => the min value is at 0x0 and the max
-> value at 0xfff for all channels, that's 12 bits.
->  - 10.1.4 ADC Data => all channels except battery discharge current are
-> on 12 bits (8 high, 4 low).
-
-My datasheets (AXP221 v1.6, AXP221s v1.2, AXP223 v1.1, all Chinese) say
-in 10.1.4:
-
-  - 7A: battery charge current high 5 bits
-  - 7B: battery charge current low 8 bits
-  - 7C: battery discharge current high 5 bits
-  - 7D: battery discharge current low 8 bits
-
->
-> [...]
->>> +static int axp22x_read_raw(struct iio_dev *indio_dev,
->>> +                          struct iio_chan_spec const *chan, int *val,
->>> +                          int *val2, long mask)
->>> +{
->>> +       switch (mask) {
->>> +       case IIO_CHAN_INFO_OFFSET:
->>> +               *val = -2667;
->>
->> Datasheet says -267.7 C, or -2677 here.
->>
->
-> The formula in the datasheet is (in milli Celsius):
->  processed = raw * 100 - 266700;
->
-> while the IIO framework asks for a scale and an offset which are then
-> applied as:
->  processed = (raw + offset) * scale;
->
-> Thus by factorizing, we get:
->  processed = (raw - 2667) * 100;
-
-What I meant was that your lower end value is off by one degree,
--266.7 in your code vs -267.7 in the datasheet.
-
->
-> [...]
->>> +static int axp20x_remove(struct platform_device *pdev)
->>> +{
->>> +       struct axp20x_adc_iio *info;
->>> +       struct iio_dev *indio_dev = platform_get_drvdata(pdev);
->>> +
->>> +       info = iio_priv(indio_dev);
->>
->> Nit: you could just reverse the 2 declarations above and join this
->> line after struct axp20x_adc_iio *info;
->>
->>> +       regmap_write(info->regmap, AXP20X_ADC_EN1, 0);
->>> +       regmap_write(info->regmap, AXP20X_ADC_EN2, 0);
->>
->> The existing VBUS power supply driver enables the VBUS ADC bits itself,
->> and does not check them later on. This means if one were to remove this
->> axp20x-adc module, the voltage/current readings in the VBUS power supply
->> would be invalid. Some sort of workaround would be needed here in this
->> driver of the VBUS driver.
->>
->
-> That would be one reason to migrate the VBUS driver to use the IIO
-> channels, wouldn't it?
-
-It is, preferably without changing the device tree.
-
-Regards
-ChenYu
-
->
-> But ACK, I'll think about something to work around this issue.
->
->>> +
->>> +       return 0;
->>> +}
->>> +
->>> +static struct platform_driver axp20x_adc_driver = {
->>> +       .driver = {
->>> +               .name = "axp20x-adc",
->>> +               .of_match_table = axp20x_adc_of_match,
->>> +       },
->>> +       .probe = axp20x_probe,
->>> +       .remove = axp20x_remove,
->>> +};
->>> +
->>> +module_platform_driver(axp20x_adc_driver);
->>> +
->>> +MODULE_DESCRIPTION("ADC driver for AXP20X and AXP22X PMICs");
->>> +MODULE_AUTHOR("Quentin Schulz <quentin.schulz@free-electrons.com>");
->>> +MODULE_LICENSE("GPL");
->>> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
->>> index a4860bc..650c6f6 100644
->>> --- a/include/linux/mfd/axp20x.h
->>> +++ b/include/linux/mfd/axp20x.h
->>> @@ -150,6 +150,10 @@ enum {
->>>  #define AXP20X_VBUS_I_ADC_L            0x5d
->>>  #define AXP20X_TEMP_ADC_H              0x5e
->>>  #define AXP20X_TEMP_ADC_L              0x5f
->>> +
->>> +#define AXP22X_TEMP_ADC_H              0x56
->>> +#define AXP22X_TEMP_ADC_L              0x57
->>> +
->>
->> This is in the wrong patch. Also we already have
->>
->> /* AXP22X specific registers */
->> #define AXP22X_PMIC_ADC_H               0x56
->> #define AXP22X_PMIC_ADC_L               0x57
->> #define AXP22X_TS_ADC_H                 0x58
->> #define AXP22X_TS_ADC_L                 0x59
->>
->> If you want, you could just rename them to be consistent.
->>
->
-> ACK.
->
-> Thanks,
-> Quentin
->
-> --
-> Quentin Schulz, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Regards,
+ Sricharan
