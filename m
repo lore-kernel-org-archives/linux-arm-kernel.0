@@ -1,40 +1,102 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 5 Jan 2017 13:51:50 +0530
-Subject: [PATCH v2 2/4] serial: 8250: Add new port type for TI
- DA8xx/OMAPL13x/AM17xx/AM18xx/C66x
-In-Reply-To: <1483561814-21953-3-git-send-email-david@lechnology.com>
-References: <1483561814-21953-1-git-send-email-david@lechnology.com>
- <1483561814-21953-3-git-send-email-david@lechnology.com>
-Message-ID: <7b175d65-7193-32e4-999b-e3cdd0005c3a@ti.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Thu, 5 Jan 2017 13:56:51 +0530
+Subject: [PATCH v3 2/2] dt-bindings: Add DT bindings info for FlexRM ring
+ manager
+In-Reply-To: <20170104143752.bl47gdfczbnfy6b3@rob-hp-laptop>
+References: <1483508082-7008-1-git-send-email-anup.patel@broadcom.com>
+ <1483508082-7008-3-git-send-email-anup.patel@broadcom.com>
+ <20170104143752.bl47gdfczbnfy6b3@rob-hp-laptop>
+Message-ID: <CAALAos-EN5-PBt35v75-HiwhR8QcMQVUje=qFWzsk4prfMw19A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 January 2017 02:00 AM, David Lechner wrote:
-> This adds a new UART port type for TI DA8xx/OMAPL13x/AM17xx/AM18xx/C66x.
+On Wed, Jan 4, 2017 at 8:07 PM, Rob Herring <robh@kernel.org> wrote:
+> On Wed, Jan 04, 2017 at 11:04:42AM +0530, Anup Patel wrote:
+>> This patch adds device tree bindings document for the FlexRM
+>> ring manager found on Broadcom iProc SoCs.
+>>
+>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>> ---
+>>  .../bindings/mailbox/brcm,iproc-flexrm-mbox.txt    | 60 ++++++++++++++++++++++
+>>  1 file changed, 60 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
+>> new file mode 100644
+>> index 0000000..ca51a39
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
+>> @@ -0,0 +1,60 @@
+>> +Broadcom FlexRM Ring Manager
+>> +============================
+>> +The Broadcom FlexRM ring manager provides a set of rings which can be
+>> +used to submit work to offload engines. An SoC may have multiple FlexRM
+>> +hardware blocks. There is one device tree entry per FlexRM block. The
+>> +FlexRM driver will create a mailbox-controller instance for given FlexRM
+>> +hardware block where each mailbox channel is a separate FlexRM ring.
+>> +
+>> +Required properties:
+>> +--------------------
+>> +- compatible:        Should be "brcm,iproc-flexrm-mbox"
+>> +- reg:               Specifies base physical address and size of the FlexRM
+>> +             ring registers
+>> +- msi-parent:        Phandles (and potential Device IDs) to MSI controllers
+>> +             The FlexRM engine will send MSIs (instead of wired
+>> +             interrupts) to CPU. There is one MSI for each FlexRM ring.
+>> +             Refer devicetree/bindings/interrupt-controller/msi.txt
+>> +- #mbox-cells:       Specifies the number of cells needed to encode a mailbox
+>> +             channel. This should be 3.
+>> +
+>> +             The 1st cell is the mailbox channel number.
+>> +
+>> +             The 2nd cell contains MSI completion threshold. This is the
+>> +             number of completion messages for which FlexRM will inject
+>> +             one MSI interrupt to CPU.
+>> +
+>> +             The 3nd cell contains MSI timer value representing time for
+>> +             which FlexRM will wait to accumulate N completion messages
+>> +             where N is the value specified by 2nd cell above. If FlexRM
+>> +             does not get required number of completion messages in time
+>> +             specified by this cell then it will inject one MSI interrupt
+>> +             to CPU provided atleast one completion message is available.
+>> +
+>> +Optional properties:
+>> +--------------------
+>> +- dma-coherent:      Present if DMA operations made by the FlexRM engine (such
+>> +             as DMA descriptor access, access to buffers pointed by DMA
+>> +             descriptors and read/write pointer updates to DDR) are
+>> +             cache coherent with the CPU.
+>> +
+>> +Example:
+>> +--------
+>> +crypto_mbox: mbox at 67000000 {
+>> +     compatible = "brcm,iproc-flexrm-mbox";
+>> +     reg = <0x67000000 0x200000>;
+>> +     msi-parent = <&gic_its 0x7f00>;
+>> +     #mbox-cells = <3>;
+>> +};
+>> +
+>> +crypto_client {
+>
+> crypto@<addr>
+>
+>> +     ...
+>> +     mboxes = <&crypto_mbox 0 0x1 0xffff>,
+>> +              <&crypto_mbox 1 0x1 0xffff>,
+>> +              <&crypto_mbox 16 0x1 0xffff>,
+>> +              <&crypto_mbox 17 0x1 0xffff>,
+>> +              <&crypto_mbox 30 0x1 0xffff>,
+>> +              <&crypto_mbox 31 0x1 0xffff>;
+>> +     };
+>> +     ...
+>
+> Please somewhat fully list the contents for node.
+>
 
-The Keystone2 processors do include the C66x DSP. But the SoCs being
-targeted with this patch are the ARM + DSP variants. Using 66AK2x is
-more appropriate.
+Sure, I will add more complete example DT node for
+mailbox client.
 
-http://www.ti.com/lsds/ti/processors/dsp/c6000_dsp-arm/66ak2x/overview.page
-
-Also, DA8xx includes DA830 which is pin-compatible with AM17x. So you
-can shorten the list of supported processors to DA8xx/66AK2x.
-
-> These SoCs have standard 8250 registers plus some extra non-standard
-> registers.
-> 
-> The UART will not function unless the non-standard Power and Emulation
-> Management Register (PWREMU_MGMT) is configured correctly. This is
-> currently handled in arch/arm/mach-davinci/serial.c for non-device-tree
-> boards. Making this part of the UART driver will allow UART to work on
-> device-tree boards as well and the mach code can eventually be removed.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
-
-Looks good to me, apart from the minor change above.
-
-Acked-by: Sekhar Nori <nsekhar@ti.com>
-
-Thanks,
-Sekhar
+Regards,
+Anup
