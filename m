@@ -1,10 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu,  5 Jan 2017 11:29:53 -0800
-Subject: [PATCH v2 4/8] ARM: dts: armada-xp-linksys-mamba: Utilize new DSA
- binding
+Date: Thu,  5 Jan 2017 11:29:54 -0800
+Subject: [PATCH v2 5/8] ARM: dts: kirkwood-dir665: Utilize new DSA binding
 In-Reply-To: <20170105192957.14304-1-f.fainelli@gmail.com>
 References: <20170105192957.14304-1-f.fainelli@gmail.com>
-Message-ID: <20170105192957.14304-5-f.fainelli@gmail.com>
+Message-ID: <20170105192957.14304-6-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,14 +13,14 @@ disabled.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/boot/dts/armada-xp-linksys-mamba.dts | 53 +++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+ arch/arm/boot/dts/kirkwood-dir665.dts | 49 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-index 83ac884c0f8a..42ea8764814c 100644
---- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-+++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-@@ -302,6 +302,8 @@
+diff --git a/arch/arm/boot/dts/kirkwood-dir665.dts b/arch/arm/boot/dts/kirkwood-dir665.dts
+index 41acbb6dd6ab..4d2b15d6244a 100644
+--- a/arch/arm/boot/dts/kirkwood-dir665.dts
++++ b/arch/arm/boot/dts/kirkwood-dir665.dts
+@@ -194,6 +194,8 @@
  	};
  
  	dsa {
@@ -30,13 +29,10 @@ index 83ac884c0f8a..42ea8764814c 100644
  		compatible = "marvell,dsa";
  		#address-cells = <2>;
  		#size-cells = <0>;
-@@ -398,3 +400,54 @@
- 		spi-max-frequency = <40000000>;
- 	};
- };
-+
-+&mdio {
-+	status = "okay";
+@@ -241,6 +243,53 @@
+ 
+ &mdio {
+ 	status = "okay";
 +
 +	switch at 0 {
 +		compatible = "marvell,mv88e6085";
@@ -54,29 +50,29 @@ index 83ac884c0f8a..42ea8764814c 100644
 +			};
 +
 +			port at 1 {
-+				reg = <1>;
-+				label = "lan3";
++			       reg = <1>;
++			       label = "lan3";
 +			};
 +
 +			port at 2 {
-+				reg = <2>;
-+				label = "lan2";
++			       reg = <2>;
++			       label = "lan2";
 +			};
 +
 +			port at 3 {
-+				reg = <3>;
-+				label = "lan1";
++			       reg = <3>;
++			       label = "lan1";
 +			};
 +
 +			port at 4 {
 +				reg = <4>;
-+				label = "internet";
++				label = "wan";
 +			};
 +
-+			port at 5 {
-+				reg = <5>;
++			port at 6 {
++				reg = <6>;
 +				label = "cpu";
-+				ethernet = <&eth0>;
++				ethernet = <&eth0port>;
 +				fixed-link {
 +					speed = <1000>;
 +					full-duplex;
@@ -84,6 +80,8 @@ index 83ac884c0f8a..42ea8764814c 100644
 +			};
 +		};
 +	};
-+};
+ };
+ 
+ /* eth0 is connected to a Marvell 88E6171 switch, without a PHY. So set
 -- 
 2.9.3
