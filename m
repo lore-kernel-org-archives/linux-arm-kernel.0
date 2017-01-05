@@ -1,48 +1,47 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu,  5 Jan 2017 11:20:06 +0900
-Subject: [PATCH v2 1/4] m68k: rename UL() to TO_UL()
-In-Reply-To: <1483582810-7046-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1483582810-7046-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1483582810-7046-2-git-send-email-yamada.masahiro@socionext.com>
+Date: Thu,  5 Jan 2017 11:20:05 +0900
+Subject: [PATCH v2 0/4] linux/const.h: cleanups of macros such as UL(),
+ _BITUL(), BIT() etc.
+Message-ID: <1483582810-7046-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM, ARM64 and UniCore32 define UL(x) like follows:
 
-  #define UL(x) _AC(x, UL)
+ARM, ARM64, UniCore32 define UL() as a shorthand of _AC(..., UL).
+In the future, more architectures may introduce it, so move
+the definition to include/linux/const.h.
 
-While, M68K defines it differently:
-  #define UL(x) ((unsigned long) (x))
+The _AC() is used for either (likely) UL or (unlikely) ULL.
+Having UL(L) in a common place can avoid direct use of _AC().
 
-I am moving the former to a common header in the next commit.
-Beforehand, this commit renames the latter to avoid name conflict.
+The _AC() is defined under the uapi directory, so it compels
+underscore-prefixed macros even for unexported headers.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
----
+I see similar situation for _BITUL().  This is available in
+both C and assembly.  However, it is defined in an uapi header,
+so direct use of the underscore macro is needed even for unexported
+headers.  The 3/3 makes BIT() available in assembly too, which will
+be more suitable for use in unexported headers.
+
 
 Changes in v2:
   - Split out as a prerequisite patch
 
- arch/m68k/mm/init.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Masahiro Yamada (4):
+  m68k: rename UL() to TO_UL()
+  linux/const.h: move UL() macro to include/linux/const.h
+  linux/const.h: refactor _BITUL and _BITULL a bit
+  linux/const.h: move BIT(_ULL) to linux/const.h for use in assembly
 
-diff --git a/arch/m68k/mm/init.c b/arch/m68k/mm/init.c
-index 9c1e656..a625144 100644
---- a/arch/m68k/mm/init.c
-+++ b/arch/m68k/mm/init.c
-@@ -121,9 +121,9 @@ void free_initmem(void)
- 
- void __init print_memmap(void)
- {
--#define UL(x) ((unsigned long) (x))
--#define MLK(b, t) UL(b), UL(t), (UL(t) - UL(b)) >> 10
--#define MLM(b, t) UL(b), UL(t), (UL(t) - UL(b)) >> 20
-+#define TO_UL(x) ((unsigned long) (x))
-+#define MLK(b, t) TO_UL(b), TO_UL(t), (TO_UL(t) - TO_UL(b)) >> 10
-+#define MLM(b, t) TO_UL(b), TO_UL(t), (TO_UL(t) - TO_UL(b)) >> 20
- #define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), 1024)
- 
- 	pr_notice("Virtual kernel memory layout:\n"
+ arch/arm/include/asm/memory.h       |  6 ------
+ arch/arm64/include/asm/memory.h     |  6 ------
+ arch/m68k/mm/init.c                 |  6 +++---
+ arch/unicore32/include/asm/memory.h |  6 ------
+ include/linux/bitops.h              |  3 +--
+ include/linux/const.h               | 12 ++++++++++++
+ include/uapi/linux/const.h          | 13 ++++++++-----
+ 7 files changed, 24 insertions(+), 28 deletions(-)
+ create mode 100644 include/linux/const.h
+
 -- 
 2.7.4
