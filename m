@@ -1,83 +1,61 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Thu, 5 Jan 2017 14:01:58 +0800
-Subject: [PATCH v11 7/8] ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB
- property
-In-Reply-To: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
-References: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1483596119-27508-8-git-send-email-peter.chen@nxp.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 5 Jan 2017 14:02:40 +0800
+Subject: [PATCH 16/22] mfd: axp20x: add V_OFF to writeable regs for AXP20X
+ and AXP22X
+In-Reply-To: <20170104115731.GF24058@dell>
+References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
+ <20170102163723.7939-17-quentin.schulz@free-electrons.com>
+ <20170104115731.GF24058@dell>
+Message-ID: <CAGb2v675_bbceTt0Jh++t-HeWfNqn=f4Pjf-HjbZvWvKkLtrdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current dts describes USB HUB's property at USB controller's
-entry, it is improper. The USB HUB should be the child node
-under USB controller, and power sequence properties are under
-it. Besides, using gpio pinctrl setting for USB2415's reset pin.
+On Wed, Jan 4, 2017 at 7:57 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Mon, 02 Jan 2017, Quentin Schulz wrote:
+>
+>> The V_OFF register has its first 3 read-write bits for the minimal
+>> voltage (Voff) of the battery before the system is automatically shut
+>> down due to the power being too low.
+>>
+>> This adds V_OFF register to the writeable registers of AXP20X and AXP22X
+>> PMICs.
+>>
+>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>> ---
+>>  drivers/mfd/axp20x.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> For my own reference:
+>   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
----
- arch/arm/boot/dts/imx6qdl-udoo.dtsi | 26 ++++++++++++--------------
- 1 file changed, 12 insertions(+), 14 deletions(-)
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-index c96c91d..a173de2 100644
---- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-@@ -9,6 +9,8 @@
-  *
-  */
- 
-+#include <dt-bindings/gpio/gpio.h>
-+
- / {
- 	aliases {
- 		backlight = &backlight;
-@@ -58,17 +60,6 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		reg_usb_h1_vbus: regulator at 0 {
--			compatible = "regulator-fixed";
--			reg = <0>;
--			regulator-name = "usb_h1_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			enable-active-high;
--			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
--			gpio = <&gpio7 12 0>;
--		};
--
- 		reg_panel: regulator at 1 {
- 			compatible = "regulator-fixed";
- 			reg = <1>;
-@@ -188,7 +179,7 @@
- 
- 		pinctrl_usbh: usbhgrp {
- 			fsl,pins = <
--				MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x80000000
-+				MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x1b0b0
- 				MX6QDL_PAD_NANDF_CS2__CCM_CLKO2 0x130b0
- 			>;
- 		};
-@@ -259,9 +250,16 @@
- &usbh1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbh>;
--	vbus-supply = <&reg_usb_h1_vbus>;
--	clocks = <&clks IMX6QDL_CLK_CKO>;
- 	status = "okay";
-+
-+	usb2415: hub at 1 {
-+		compatible = "usb424,2514";
-+		reg = <1>;
-+
-+		clocks = <&clks IMX6QDL_CLK_CKO>;
-+		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+		reset-duration-us = <3000>;
-+	};
- };
- 
- &usdhc3 {
--- 
-2.7.4
+>
+>> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+>> index 19bdba3..7f0f05f 100644
+>> --- a/drivers/mfd/axp20x.c
+>> +++ b/drivers/mfd/axp20x.c
+>> @@ -65,7 +65,7 @@ static const struct regmap_access_table axp152_volatile_table = {
+>>
+>>  static const struct regmap_range axp20x_writeable_ranges[] = {
+>>       regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
+>> -     regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
+>> +     regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_V_OFF),
+>>       regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL1),
+>>       regmap_reg_range(AXP20X_DCDC_MODE, AXP20X_FG_RES),
+>>       regmap_reg_range(AXP20X_RDC_H, AXP20X_OCV(AXP20X_OCV_MAX)),
+>> @@ -94,7 +94,7 @@ static const struct regmap_access_table axp20x_volatile_table = {
+>>  /* AXP22x ranges are shared with the AXP809, as they cover the same range */
+>>  static const struct regmap_range axp22x_writeable_ranges[] = {
+>>       regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
+>> -     regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
+>> +     regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_V_OFF),
+>>       regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL1),
+>>       regmap_reg_range(AXP20X_DCDC_MODE, AXP22X_BATLOW_THRES1),
+>>  };
+>
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
