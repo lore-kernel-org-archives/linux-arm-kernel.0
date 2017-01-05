@@ -1,83 +1,47 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 5 Jan 2017 15:35:49 +0000
-Subject: [PATCH 02/10] iommu/of: Prepare for deferred IOMMU configuration
-In-Reply-To: <7cd7bcfb-abae-2948-c3f8-230c0d9c9db6@arm.com>
-References: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
- <1480465344-11862-3-git-send-email-sricharan@codeaurora.org>
- <20161130161723.GA9042@red-moon>
- <c89825aa-c75f-8493-fe92-7cc97f525bc7@arm.com>
- <20161201112917.GA9680@red-moon>
- <003601d2672e$91744b40$b45ce1c0$@codeaurora.org>
- <20170105122714.GA30449@red-moon>
- <7cd7bcfb-abae-2948-c3f8-230c0d9c9db6@arm.com>
-Message-ID: <20170105153549.GA31090@red-moon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 5 Jan 2017 16:35:56 +0100
+Subject: [PATCH v2 9/9] ARM: sunxi: Convert pinctrl nodes to generic
+ bindings
+In-Reply-To: <58723369-50ad-1792-9be1-c277eb719044@arm.com>
+References: <cover.7edc6c25be8a5e2efdda6a82e102dbf7ece6aa64.1476200742.git-series.maxime.ripard@free-electrons.com>
+ <e32d044d2d967f24f12d83eea50e7f14f2ae1073.1476200742.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v67_4iriM2WS33hUWzNZY8R2WvGjqzntGBPGmNkr1Ryr_w@mail.gmail.com>
+ <58723369-50ad-1792-9be1-c277eb719044@arm.com>
+Message-ID: <20170105153556.pzec5jjuz7pmvsmn@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 01:52:29PM +0000, Robin Murphy wrote:
+On Wed, Jan 04, 2017 at 02:16:23AM +0000, Andr? Przywara wrote:
+> So can I ask that we start taking this seriously and stop doing things
+> which prevent Allwinner boards from being supported properly?
+> Which would first involve dropping this very patch?
 
-[...]
+The driver still supports the old binding.
 
-> > Question: I had a look into this and instead of fiddling about with the
-> > linker script entries in ACPI (ie IORT_ACPI_DECLARE - which I hope this
-> > patchset would help remove entirely), I think that the only check we
-> > need in IORT is, depending on what type of SMMU a given device is
-> > connected to, to check if the respective SMMU driver is compiled in the
-> > kernel and it will be probed, _eventually_.
-> > 
-> > As Robin said, by the time a device is probed the respective SMMU
-> > devices are already created and registered with IORT kernel code or
-> > they will never be, so to understand if we should defer probing
-> > SMMU device creation is _not_ really a problem in ACPI.
-> > 
-> > To check if a SMMU driver is enabled, do we really need a linker
-> > table ?
-> > 
-> > Would not a check based on eg:
-> > 
-> > /**
-> >  * @type: IOMMU IORT node type of the IOMMU a device is connected to
-> >  */
-> > static bool iort_iommu_driver_enabled(u8 type)
-> > {
-> > 	switch (type) {
-> > 	case ACPI_IORT_SMMU_V3:
-> > 		return IS_ENABLED(CONFIG_ARM_SMMU_V3);
-> 
-> IS_BUILTIN(...)
+> Having done breakage in the past (with "allwinner,sun7i-a20-mmc", for
+> instance) is no excuse for doing it again.
 
-Yep right, it is currently equivalent but that does not mean it
-will always be.
+I'm not sure which breakage we introduced with a new compatible: the
+old compatible is working just like it used to, and the new one is
+working like we need it to.
 
-> > 	case ACPI_IORT_SMMU:
-> > 		return IS_ENABLED(CONFIG_ARM_SMMU);
-> > 	default:
-> > 		pr_warn("Unknown IORT SMMU type\n");
-> 
-> Might displaying the actual value be helfpul for debugging a broken IORT
-> table?
+> And especially I want to avoid this habit creeping into the arm64
+> world (thinking about the H5 here, which may be impacted by this
+> very patch, for instance).
 
-Yes I will do.
+And again, if you looked at the entire serie, you would have seen that
+I took this into account.
 
-> > 		return false;
-> > 	}
-> > }
-> > 
-> > be sufficient (it is a bit gross, agreed, but it is to understand if
-> > that's all we need) ? Is there anything I am missing ?
-> > 
-> > Let me know, I will put together a patch for you I really do not
-> > want to block your series for this trivial niggle.
-> 
-> Other than that, though, I like it :) IORT has a small, strictly
-> bounded, set of supported devices, so I really don't see the need to go
-> overboard putting it on parity with DT when something this neat and
-> simple will suffice.
+Maxime
 
-Ok, patch coming, which will also allow Sricharan to get rid of the
-IORT linker script infrastructure altogether (and more than that,
-I can write the patches on top of Sricharan series that I managed
-to rebase against v4.10-rc2).
-
-Thanks,
-Lorenzo
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170105/63b51c9d/attachment.sig>
