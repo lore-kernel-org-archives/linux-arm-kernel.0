@@ -1,30 +1,21 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 5 Jan 2017 18:19:54 +0100
-Subject: [PATCH 2/2] ARM: dts: sun7i: Enable audio codec on Banana Pro
-In-Reply-To: <20170104142250.22171-2-joerg.krause@embedded.rocks>
-References: <20170104142250.22171-1-joerg.krause@embedded.rocks>
- <20170104142250.22171-2-joerg.krause@embedded.rocks>
-Message-ID: <20170105171954.o4mgfad6jednkcxj@lukather>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Jan 2017 17:26:24 +0000
+Subject: [PATCH v3 5/9] arm64: cpufeature: Define helpers for sys_reg id
+In-Reply-To: <1483552147-9605-6-git-send-email-suzuki.poulose@arm.com>
+References: <1483552147-9605-1-git-send-email-suzuki.poulose@arm.com>
+ <1483552147-9605-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20170105172624.GF29765@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 03:22:50PM +0100, J?rg Krause wrote:
-> This commit enables the on-chip audio codec present on the A20 SoC
-> on the Banana Pro board.
+On Wed, Jan 04, 2017 at 05:49:03PM +0000, Suzuki K. Poulose wrote:
+> Define helper macros to extract op0, op1, CRn, CRm & op2
+> for a given sys_reg id. While at it remove the explicit
+> masking only used for Op0.
 > 
-> Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Applied, thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170105/908d80a0/attachment.sig>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
