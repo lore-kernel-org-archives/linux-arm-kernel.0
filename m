@@ -1,27 +1,57 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Jan 2017 18:39:06 +0000
-Subject: [PATCH v3 8/9] arm64: cpufeature: Expose CPUID registers by
- emulation
-In-Reply-To: <1483552147-9605-9-git-send-email-suzuki.poulose@arm.com>
-References: <1483552147-9605-1-git-send-email-suzuki.poulose@arm.com>
- <1483552147-9605-9-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20170105183906.GI29765@e104818-lin.cambridge.arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 5 Jan 2017 20:41:40 +0200
+Subject: [PATCH v2 4/4] arm64: dts: exynos: Add tm2 touchkey node
+In-Reply-To: <1483604833-29746-5-git-send-email-jcsing.lee@samsung.com>
+References: <1483604833-29746-1-git-send-email-jcsing.lee@samsung.com>
+ <CGME20170105082716epcas1p100f48f22d5ff0bad7776f6d7b444daf3@epcas1p1.samsung.com>
+ <1483604833-29746-5-git-send-email-jcsing.lee@samsung.com>
+Message-ID: <20170105184140.tongd3evzm57qkps@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 05:49:06PM +0000, Suzuki K. Poulose wrote:
-> This patch adds the hook for emulating MRS instruction to
-> export the 'user visible' value of supported system registers.
-> We emulate only the following id space for system registers:
+On Thu, Jan 05, 2017 at 05:27:13PM +0900, Jaechul Lee wrote:
+> Add DT node support for TM2 touchkey device.
 > 
->  Op0=3, Op1=0, CRn=0, CRm=[0, 4-7]
-> 
-> The rest will fall back to SIGILL. This capability is also
-> advertised via a new HWCAP_CPUID.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
+> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
+> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Although I said the patch looks correct, it was not an explicit Review
+(and we have a quite serious "Reviewer's statement of oversight") so my
+tag should not be added.
+
+No harm was done, but I prefer clearly and explicitly given tags.
+
+Best regards,
+Krzysztof
+
+> ---
+>  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+> index aa8584a..dad6fb8 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+> @@ -17,3 +17,16 @@
+>  	model = "Samsung TM2 board";
+>  	compatible = "samsung,tm2", "samsung,exynos5433";
+>  };
+> +
+> +&hsi2c_9 {
+> +	status = "okay";
+> +
+> +	touchkey at 20 {
+> +		compatible = "samsung,tm2-touchkey";
+> +		reg = <0x20>;
+> +		interrupt-parent = <&gpa3>;
+> +		interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
+> +		vcc-supply = <&ldo32_reg>;
+> +		vdd-supply = <&ldo33_reg>;
+> +	};
+> +};
+> -- 
+> 2.7.4
+> 
