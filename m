@@ -1,55 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Jan 2017 13:58:37 +0000
-Subject: [PATCHv2 4/5] arm: mvebu: Add device tree for 98DX3236 SoCs
-In-Reply-To: <20170105033641.6212-5-chris.packham@alliedtelesis.co.nz>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Thu, 5 Jan 2017 15:07:02 +0100
+Subject: [PATCHv2 0/5] Support for Marvell switches with integrated CPUs
+In-Reply-To: <20170105130945.GA18033@lunn.ch>
 References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
- <20170105033641.6212-5-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170105135837.GC25333@leverpostej>
+ <6c6795d3-06ab-a4f0-78ad-5ecc78c1aa2f@gmail.com>
+ <185147a37cab4d7eaea5f79d86cc9451@svr-chch-ex1.atlnz.lc>
+ <20170105130945.GA18033@lunn.ch>
+Message-ID: <CAPv3WKdsiGis6gG0SmLT1mg+LYA8i5p4u9KJiYJxng8jrLsj+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 04:36:40PM +1300, Chris Packham wrote:
-> +		internal-regs {
-> +			coreclk: mvebu-sar at 18230 {
-> +				compatible = "marvell,mv98dx3236-core-clock";
-> +			};
-> +
-> +			cpuclk: clock-complex at 18700 {
-> +				compatible = "marvell,mv98dx3236-cpu-clock";
-> +			};
-> +
-> +			corediv-clock at 18740 {
-> +				compatible = "marvell,mv98dx3236-corediv-clock";
-> +				reg = <0xf8268 0xc>;
-> +				base = <&dfx>;
-> +				#clock-cells = <1>;
-> +				clocks = <&mainpll>;
-> +				clock-output-names = "nand";
-> +			};
+Hi Andrew,
 
-[...]
+2017-01-05 14:09 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
+>> I'd love to see a switchdev driver but it's a huge task (and no I'm not
+>> committing to writing it). As it stands Marvell ship a switch SDK
+>> largely executes in userspace with a small kernel module providing some
+>> linkage to the underlying hardware.
+>
+> Is there any similarity to the mv88e6xxx family?
 
-> +		};
-> +
-> +		dfx-registers {
-> +			compatible = "simple-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges = <0 MBUS_ID(0x08, 0x00) 0 0x100000>;
-> +
-> +			dfx: dfx at 0 {
-> +				compatible = "simple-bus";
-> +				reg = <0 0x100000>;
-> +			};
-> +		};
+Prestera switches (they are sold as standalone devices and with
+integrated CPU's, like ones submitted) are as far from mv88e6xxx as
+possible. There are various mix of 1/2.5/10/40G ports, depending on
+model.
 
-What is this dfx-registers, exactly? It has no children, so why is it a
-simple-bus?
+>
+> If it was similar registers, just a different access mechanising, we
+> could probably extend the mv88e6xxx to support MMIO as well as MDIO.
+>
 
->From the above, and the patch adding the corediv driver, it looks like
-the corediv-clock actually lives in this block, so I don't understand
-why the corediv-clock is sitting in internal-regs with a sideband
-reference to dfx.
+The difference is huge, nothing existing in the mainline can fit. The
+driver, that exposes resources to the userspace SDK (called CPSS, it's
+huge and complex piece of code) is existing in Marvell internal
+branches (kernel v4.4 is the latest one), but I doubt such solution
+(despite it's really small) is upstreamable. I believe it can be
+shipped to the customers along with the SDK as a kernel module. Having
+the CPU's support in the mainline is IMO sufficient.
 
-Thanks,
-Mark.
+Best regards,
+Marcin
