@@ -1,32 +1,33 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 05 Jan 2017 13:53:44 +0100
-Subject: [PATCH v5 4/4] clk: rockchip: add clock controller for rk3328
-In-Reply-To: <1482979511-6847-5-git-send-email-zhangqing@rock-chips.com>
+Date: Thu, 05 Jan 2017 13:54:53 +0100
+Subject: [PATCH v5 1/4] clk: rockchip: add dt-binding header for rk3328
+In-Reply-To: <6625105.hZYF0iglUL@phil>
 References: <1482979511-6847-1-git-send-email-zhangqing@rock-chips.com>
- <1482979511-6847-5-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <2499480.rhkWDTFgrm@phil>
+ <1482979511-6847-2-git-send-email-zhangqing@rock-chips.com>
+ <6625105.hZYF0iglUL@phil>
+Message-ID: <2865934.UftZdpvg1Y@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 29. Dezember 2016, 10:45:11 CET schrieb Elaine Zhang:
-> Add the clock tree definition for the new rk3328 SoC.
+Am Donnerstag, 5. Januar 2017, 13:39:38 CET schrieb Heiko Stuebner:
+> Am Donnerstag, 29. Dezember 2016, 10:45:08 CET schrieb Elaine Zhang:
+> > Add the dt-bindings header for the rk3328, that gets shared between
+> > the clock controller and the clock references in the dts.
+> > Add softreset ID for rk3328.
+> > 
+> > Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 > 
-> Changes in v5:
->   fix up some code style, remove grf clk init and cru dump.
-> Changes in v4:
->   adjust the pacth 3 and 4 order.
-> Changes in v3:
->   fix up the pll parent only xin24m.
-> Changes in v2:
->   fix up these *_sample error description.
+> applied, after moving the clock-ids a bit more together [0],
+> as limiting the number of empty entries in the clk-id array saves us a bit
+> of space. But please double check and shout if something looks wrong :-)
+
+forgot to add, that I also moved your mac2phy clock-ids into the regular sclk-
+area, as we want to add them via the muxgrf clktype.
+
+
+> Thanks
+> Heiko
 > 
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-
-applied for 4.11.
-
-You might also want to readd your mac2phy grf clocks via the newly
-introduced muxgrf clock-type [0] in a follow-up-patch.
-
-Heiko
-
-[0] https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?id=cb1d9f6ddaa436f2dce2710740b7a3546700949c
+> [0]
+> https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commi
+> t/?id=6cc1aef0ad0daea0c6ba5432a8a6fe1c30661e4c
