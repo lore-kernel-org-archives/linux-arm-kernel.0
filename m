@@ -1,71 +1,55 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 5 Jan 2017 20:10:34 +0000
-Subject: [PATCHv2 4/5] arm: mvebu: Add device tree for 98DX3236 SoCs
-References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
- <20170105033641.6212-5-chris.packham@alliedtelesis.co.nz>
- <20170105135837.GC25333@leverpostej>
-Message-ID: <13295ed8de3442daa373d1f39ea8b5a5@svr-chch-ex1.atlnz.lc>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 6 Jan 2017 02:10:03 +0530
+Subject: [PATCH 16/18] arm64: ptrace: handle ptrace_request differently
+ for aarch32 and ilp32
+In-Reply-To: <3703608.GKr1zzErMk@wuerfel>
+References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+ <20161206062508.GA17835@yury-N73SV>
+ <20161207165913.GD31779@e104818-lin.cambridge.arm.com>
+ <3703608.GKr1zzErMk@wuerfel>
+Message-ID: <20170105204003.GA7437@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/17 02:59, Mark Rutland wrote:
-> On Thu, Jan 05, 2017 at 04:36:40PM +1300, Chris Packham wrote:
->> +		internal-regs {
->> +			coreclk: mvebu-sar at 18230 {
->> +				compatible = "marvell,mv98dx3236-core-clock";
->> +			};
->> +
->> +			cpuclk: clock-complex at 18700 {
->> +				compatible = "marvell,mv98dx3236-cpu-clock";
->> +			};
->> +
->> +			corediv-clock at 18740 {
->> +				compatible = "marvell,mv98dx3236-corediv-clock";
->> +				reg = <0xf8268 0xc>;
->> +				base = <&dfx>;
->> +				#clock-cells = <1>;
->> +				clocks = <&mainpll>;
->> +				clock-output-names = "nand";
->> +			};
->
-> [...]
->
->> +		};
->> +
->> +		dfx-registers {
->> +			compatible = "simple-bus";
->> +			#address-cells = <1>;
->> +			#size-cells = <1>;
->> +			ranges = <0 MBUS_ID(0x08, 0x00) 0 0x100000>;
->> +
->> +			dfx: dfx at 0 {
->> +				compatible = "simple-bus";
->> +				reg = <0 0x100000>;
->> +			};
->> +		};
->
-> What is this dfx-registers, exactly?
+On Wed, Dec 07, 2016 at 09:40:13PM +0100, Arnd Bergmann wrote:
+> On Wednesday, December 7, 2016 4:59:13 PM CET Catalin Marinas wrote:
+> > On Tue, Dec 06, 2016 at 11:55:08AM +0530, Yury Norov wrote:
+> > > On Mon, Dec 05, 2016 at 04:34:23PM +0000, Catalin Marinas wrote:
+> > > > On Fri, Oct 21, 2016 at 11:33:15PM +0300, Yury Norov wrote:
+> > > > > New aarch32 ptrace syscall handler is introduced to avoid run-time
+> > > > > detection of the task type.
+> > > > 
+> > > > What's wrong with the run-time detection? If it's just to avoid a
+> > > > negligible overhead, I would rather keep the code simpler by avoiding
+> > > > duplicating the generic compat_sys_ptrace().
+> > > 
+> > > Nothing wrong. This is how Arnd asked me to do. You already asked this
+> > > question: http://lkml.iu.edu/hypermail/linux/kernel/1604.3/00930.html
+> > 
+> > Hmm, I completely forgot about this ;). There is still an advantage to
+> > doing run-time checking if we avoid touching core code (less acks to
+> > gather and less code duplication).
+> > 
+> > Let's see what Arnd says but the initial patch looked simpler.
+> 
+> I don't currently have either version of the patch in my inbox
+> (the archive is on a different machine), but in general I'd still
+> think it's best to avoid the runtime check for aarch64-ilp32
+> altogether. I'd have to look at the overall kernel source to
+> see if it's worth avoiding one or two instances though, or
+> if there are an overwhelming number of other checks that we
+> can't avoid at all.
+> 
+> Regarding ptrace, I notice that arch/tile doesn't even use
+> the compat entry point for its ilp32 user space on 64-bit
+> kernels, it just calls the regular 64-bit one. Would that
+> help here?
 
-I've been trying to get that info out of Marvell for a while I'm not 
-even sure what the "DFX" acronym stands for. The Armdada 38x also has a 
-thing called "DFX" but it seems to be quite different to this one. From 
-what I can tell it contains common elements used by both the CPU and 
-switch chip so there are things related to clocking and IO pad 
-configuration. It is necessary for both the switch and CPU to have a 
-handle to access it.
+ILP32 tasks has unique context that is not like aarch64 or aarch32,
+so we have to have unique ptrace handler. I prepared the patch for
+ptrace with runtime ABI detection, as Catalin said, see there:
+https://github.com/norov/linux/commit/1f66dc22a4450b192e83458f2c3cc0e79f53e670
 
-> It has no children, so why is it a
-> simple-bus?
->
-> From the above, and the patch adding the corediv driver, it looks like
-> the corediv-clock actually lives in this block, so I don't understand
-> why the corediv-clock is sitting in internal-regs with a sideband
-> reference to dfx.
+If it's OK, I'd like to update submission.
 
-Yeah I think the corediv-clock should be a child of this node. I'll move 
-it there.
-
->
-> Thanks,
-> Mark.
->
+Yury
