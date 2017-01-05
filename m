@@ -1,56 +1,44 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu, 05 Jan 2017 09:55:56 +0100
-Subject: [PATCH 08/12] ARM: dts: socfpga: Add NAND device tree for Arria10
-In-Reply-To: <1483575694-29599-9-git-send-email-dinguyen@kernel.org>
-References: <1483575694-29599-1-git-send-email-dinguyen@kernel.org>
- <1483575694-29599-9-git-send-email-dinguyen@kernel.org>
-Message-ID: <73a8b5ga1v.fsf@pengutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 5 Jan 2017 14:34:10 +0530
+Subject: [PATCH v2 4/4] ARM: dts: keystone: Add "ti, da830-uart" compatible
+ string
+In-Reply-To: <93c4aed0-6faa-2c27-7931-454fc1f48e79@oracle.com>
+References: <1483561814-21953-1-git-send-email-david@lechnology.com>
+ <1483561814-21953-5-git-send-email-david@lechnology.com>
+ <93c4aed0-6faa-2c27-7931-454fc1f48e79@oracle.com>
+Message-ID: <824238e0-b710-7146-b67b-b2135c2a8bd2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Santosh,
 
-Hi!
+On Thursday 05 January 2017 03:30 AM, Santosh Shilimkar wrote:
+> On 1/4/2017 12:30 PM, David Lechner wrote:
+>> The TI Keystone SoCs have extra UART registers beyond the standard 8250
+>> registers, so we need a new compatible string to indicate this. Also, at
+>> least one of these registers uses the full 32 bits, so we need to specify
+>> reg-io-width in addition to reg-shift.
+>>
+>> "ns16550a" is left in the compatible specification since it does work as
+>> long as the bootloader configures the SoC UART power management
+>> registers.
+>>
+> NAK!!
+> We can't break the booting boards with existing boot loaders.
 
-Dinh Nguyen <dinguyen@kernel.org> writes:
+Sorry, but it not clear to me how this breaks booting with older
+bootloaders? If older DTB is ROM'ed, it will continue to work because of
+match with ns16550a.
 
-> From: Graham Moore <grmoore@opensource.altera.com>
->
-> Add socfpga_arria10_socdk_nand.dts board file for supporting NAND.
->
-> Signed-off-by: Graham Moore <grmoore@opensource.altera.com>
-> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
-> ---
->  arch/arm/boot/dts/Makefile                       |  1 +
->  arch/arm/boot/dts/socfpga_arria10_socdk_nand.dts | 44 ++++++++++++++++++++++++
->  2 files changed, 45 insertions(+)
->  create mode 100644 arch/arm/boot/dts/socfpga_arria10_socdk_nand.dts
->
+I just verified boot on K2E with these patches applied and using 2016.05
+based U-Boot from a TI release.
 
-(...)
+http://pastebin.ubuntu.com/23744719/
 
-> +#include "socfpga_arria10_socdk.dtsi"
-> +
-> +/ {
-> +	soc {
-> +		nand: nand at ffb90000 {
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			status = "okay";
-> +
-> +			compatible = "denali,denali-nand-dt", "altr,socfpga-denali-nand";
-> +			reg = <0xffb90000 0x72000>, <0xffb80000 0x10000>;
-> +			reg-names = "nand_data", "denali_reg";
-> +			interrupts = <0 99 4>;
-> +			dma-mask = <0xffffffff>;
-> +			clocks = <&nand_clk>;
+> I suggest you to first get the driver updated to take care of
+> the UART PM register and then enable the support for it.
 
-This belongs into the socfpga_arria10.dtsi.
+Isn't that what patch 2/4 is doing?
 
-Regards,
-Steffen
-
--- 
-Pengutronix e.K.                           | Steffen Trumtrar            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Sekhar
