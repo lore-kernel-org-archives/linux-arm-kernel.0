@@ -1,197 +1,43 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Thu, 5 Jan 2017 14:17:54 -0700
-Subject: [PATCH V6 03/10] efi: parse ARM processor error
-In-Reply-To: <5852A3CA.807@arm.com>
-References: <1481147303-7979-1-git-send-email-tbaicar@codeaurora.org>
- <1481147303-7979-4-git-send-email-tbaicar@codeaurora.org>
- <5852A3CA.807@arm.com>
-Message-ID: <63d439c0-0e21-dcf5-72da-e84ae0cc2df8@codeaurora.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 5 Jan 2017 22:19:47 +0100
+Subject: [PATCH 2/2] isdn: i4l: move active-isdn drivers to staging
+In-Reply-To: <3286019.I2UkVCJq41@wuerfel>
+References: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
+ <1456945629-1793533-2-git-send-email-arnd@arndb.de>
+ <20170103152436.GA26156@kroah.com> <3286019.I2UkVCJq41@wuerfel>
+Message-ID: <20170105211947.GA18143@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2016 7:08 AM, James Morse wrote:
-> Hi Tyler,
->
-> On 07/12/16 21:48, Tyler Baicar wrote:
->> Add support for ARM Common Platform Error Record (CPER).
->> UEFI 2.6 specification adds support for ARM specific
->> processor error information to be reported as part of the
->> CPER records. This provides more detail on for processor error logs.
-> Looks good to me, a few minor comments below.
->
-> Reviewed-by: James Morse <james.morse@arm.com>
-Thanks!
->> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
->> index 8fa4e23..1ac2572 100644
->> --- a/drivers/firmware/efi/cper.c
->> +++ b/drivers/firmware/efi/cper.c
->> @@ -184,6 +199,110 @@ static void cper_print_proc_generic(const char *pfx,
->>   		printk("%s""IP: 0x%016llx\n", pfx, proc->ip);
->>   }
->>   
->> +static void cper_print_proc_arm(const char *pfx,
->> +				const struct cper_sec_proc_arm *proc)
->> +{
->> +	int i, len, max_ctx_type;
->> +	struct cper_arm_err_info *err_info;
->> +	struct cper_arm_ctx_info *ctx_info;
->> +	char newpfx[64];
->> +
->> +	printk("%ssection length: %d\n", pfx, proc->section_length);
-> Compared to the rest of the file, this:
->> 	printk("%s""section length: %d\n", pfx, proc->section_length);
-> would be more in keeping. I guess its done this way to avoid some spurious
-> warning about %ssection not being recognised by printk().
-Makes sense, I'll make this change next patchset.
->> +	printk("%sMIDR: 0x%016llx\n", pfx, proc->midr);
->> +
->> +	len = proc->section_length - (sizeof(*proc) +
->> +		proc->err_info_num * (sizeof(*err_info)));
->> +	if (len < 0) {
->> +		printk("%ssection length is too small\n", pfx);
-> This calculation is all based on values in the 'struct cper_sec_proc_arm', is it
-> worth making more noise about how the firmware-generated record is incorrectly
-> formatted? If we see this message its not the kernel's fault!
-I can make the print more clear saying that the firmware-generated 
-record is incorrect to make
-it clear it is not a kernel issue.
->> +		printk("%sERR_INFO_NUM is %d\n", pfx, proc->err_info_num);
->> +		return;
->> +	}
->> +
->> +	if (proc->validation_bits & CPER_ARM_VALID_MPIDR)
->> +		printk("%sMPIDR: 0x%016llx\n", pfx, proc->mpidr);
->> +	if (proc->validation_bits & CPER_ARM_VALID_AFFINITY_LEVEL)
->> +		printk("%serror affinity level: %d\n", pfx,
->> +			proc->affinity_level);
->> +	if (proc->validation_bits & CPER_ARM_VALID_RUNNING_STATE) {
->> +		printk("%srunning state: %d\n", pfx, proc->running_state);
-> This field is described as a bit field in table 260, can we print it as 0x%lx in
-> case additional bits are set?
-Yes, will do.
->> +		printk("%sPSCI state: %d\n", pfx, proc->psci_state);
->> +	}
->> +
->> +	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
->> +
->> +	err_info = (struct cper_arm_err_info *)(proc + 1);
->> +	for (i = 0; i < proc->err_info_num; i++) {
->> +		printk("%sError info structure %d:\n", pfx, i);
->> +		printk("%sversion:%d\n", newpfx, err_info->version);
->> +		printk("%slength:%d\n", newpfx, err_info->length);
->> +		if (err_info->validation_bits &
->> +		    CPER_ARM_INFO_VALID_MULTI_ERR) {
->> +			if (err_info->multiple_error == 0)
->> +				printk("%ssingle error\n", newpfx);
->> +			else if (err_info->multiple_error == 1)
->> +				printk("%smultiple errors\n", newpfx);
->> +			else
->> +				printk("%smultiple errors count:%d\n",
->> +				newpfx, err_info->multiple_error);
-> This is described as unsigned in table 261.
-Will change.
->> +		}
->> +		if (err_info->validation_bits & CPER_ARM_INFO_VALID_FLAGS) {
->> +			if (err_info->flags & CPER_ARM_INFO_FLAGS_FIRST)
->> +				printk("%sfirst error captured\n", newpfx);
->> +			if (err_info->flags & CPER_ARM_INFO_FLAGS_LAST)
->> +				printk("%slast error captured\n", newpfx);
->> +			if (err_info->flags & CPER_ARM_INFO_FLAGS_PROPAGATED)
->> +				printk("%spropagated error captured\n",
->> +				       newpfx);
-> Table 261 also has an 'overflow' bit in flags. It may be worth printing a
-> warning if this is set:
->> Note: Overflow bit indicates that firmware/hardware error
->> buffers had experience an overflow, and it is possible that
->> some error information has been lost.
-I will add that in.
->> +		}
->> +		printk("%serror_type: %d, %s\n", newpfx, err_info->type,
->> +			err_info->type < ARRAY_SIZE(proc_error_type_strs) ?
->> +			proc_error_type_strs[err_info->type] : "unknown");
->> +		if (err_info->validation_bits & CPER_ARM_INFO_VALID_ERR_INFO)
->> +			printk("%serror_info: 0x%016llx\n", newpfx,
->> +			       err_info->error_info);
->> +		if (err_info->validation_bits & CPER_ARM_INFO_VALID_VIRT_ADDR)
->> +			printk("%svirtual fault address: 0x%016llx\n",
->> +				newpfx, err_info->virt_fault_addr);
->> +		if (err_info->validation_bits &
->> +		    CPER_ARM_INFO_VALID_PHYSICAL_ADDR)
->> +			printk("%sphysical fault address: 0x%016llx\n",
->> +				newpfx, err_info->physical_fault_addr);
->> +		err_info += 1;
->> +	}
->> +	ctx_info = (struct cper_arm_ctx_info *)err_info;
->> +	max_ctx_type = (sizeof(arm_reg_ctx_strs) /
->> +			sizeof(arm_reg_ctx_strs[0]) - 1);
-> ARRAY_SIZE() - 1?
-I'll use ARRAY_SIZE in the next patchset.
->> +	for (i = 0; i < proc->context_info_num; i++) {
->> +		int size = sizeof(*ctx_info) + ctx_info->size;
->> +
->> +		printk("%sContext info structure %d:\n", pfx, i);
->> +		if (len < size) {
->> +			printk("%ssection length is too small\n", newpfx);
->> +			return;
->> +		}
->> +		if (ctx_info->type > max_ctx_type) {
->> +			printk("%sInvalid context type: %d\n",	newpfx,
->> +						ctx_info->type);
->> +			printk("%sMax context type: %d\n", newpfx,
->> +						max_ctx_type);
->> +			return;
->> +		}
->> +		printk("%sregister context type %d: %s\n", newpfx,
->> +			ctx_info->type, arm_reg_ctx_strs[ctx_info->type]);
->> +		print_hex_dump(newpfx, "", DUMP_PREFIX_OFFSET, 16, 4,
->> +				(ctx_info + 1), ctx_info->size, 0);
->> +		len -= size;
->> +		ctx_info = (struct cper_arm_ctx_info *)((long)ctx_info + size);
->> +	}
->> +
->> +	if (len > 0) {
->> +		printk("%sVendor specific error info has %d bytes:\n", pfx,
->> +		       len);
-> %u - just in case it is surprisingly large!
->
-Will do.
->> +		print_hex_dump(newpfx, "", DUMP_PREFIX_OFFSET, 16, 4, ctx_info,
->> +				len, 0);
->> +	}
->> +}
->> +
->>   static const char * const mem_err_type_strs[] = {
->>   	"unknown",
->>   	"no error",
->> @@ -458,6 +577,15 @@ static void cper_estatus_print_section(
->>   			cper_print_pcie(newpfx, pcie, gdata);
->>   		else
->>   			goto err_section_too_small;
->> +	} else if (!uuid_le_cmp(*sec_type, CPER_SEC_PROC_ARM)) {
->> +		struct cper_sec_proc_arm *arm_err;
->> +
->> +		arm_err = acpi_hest_generic_data_payload(gdata);
->> +		printk("%ssection_type: ARM processor error\n", newpfx);
->> +		if (gdata->error_data_length >= sizeof(*arm_err))
->> +			cper_print_proc_arm(newpfx, arm_err);
->> +		else
->> +			goto err_section_too_small;
->>   	} else
->>   		printk("%s""section type: unknown, %pUl\n", newpfx, sec_type);
->>   
-> This is the only processor-specific entry in this function,
-> CPER_SEC_PROC_{IA,IPF} don't appear anywhere else in the tree.
->
-> Is it worth adding an (IS_ENABLED(CONFIG_ARM64) || IS_ENABLED(CONFIG_ARM)) in
-> the if()? This would let the compiler remove cper_print_proc_arm(() on x86/ia64
-> systems which won't ever see a record of this type.
-Yes, I can add that.
+On Tue, Jan 03, 2017 at 10:19:29PM +0100, Arnd Bergmann wrote:
+> On Tuesday, January 3, 2017 4:24:36 PM CET Greg Kroah-Hartman wrote:
+> > On Wed, Mar 02, 2016 at 08:06:46PM +0100, Arnd Bergmann wrote:
+> > > The icn, act2000 and pcbit drivers are all for very old hardware,
+> > > and it is highly unlikely that anyone is actually still using them
+> > > on modern kernels, if at all.
+> > > 
+> > > All three drivers apparently are for hardware that predates PCI
+> > > being the common connector, as they are ISA-only and active
+> > > PCI ISDN cards were widely available in the 1990s.
+> > > 
+> > > Looking through the git logs, it I cannot find any indication of a
+> > > patch to any of these drivers that has been tested on real hardware,
+> > > only cleanups or global API changes.
+> > > 
+> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > Acked-by: Karsten Keil <isdn@linux-pingi.de>
+> > 
+> > This patch got added in the 4.6 kernel release.  As I am now taking
+> > patches for 4.11-rc1, I figure it is time to just delete the
+> > drivers/staging/i4l/ directory now, given that no one has really done
+> > anything with it.  If people show up that wish to maintain it, I'll be
+> > glad to revert it, or if someone really screams in the next week.
+> > Otherwise it's time to just move on 
+> 
+> Sounds good to me.
 
-Thank you for the feedback!
+Ok, now deleted!
 
--Tyler
+thanks,
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+greg k-h
