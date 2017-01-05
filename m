@@ -1,219 +1,172 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 05 Jan 2017 14:45:08 +0100
-Subject: [GIT PULL] arm-soc fixes for 4.10-rc
-Message-ID: <4837573.JAN9JzcZNZ@wuerfel>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 5 Jan 2017 13:52:29 +0000
+Subject: [PATCH 02/10] iommu/of: Prepare for deferred IOMMU configuration
+In-Reply-To: <20170105122714.GA30449@red-moon>
+References: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
+ <1480465344-11862-3-git-send-email-sricharan@codeaurora.org>
+ <20161130161723.GA9042@red-moon>
+ <c89825aa-c75f-8493-fe92-7cc97f525bc7@arm.com>
+ <20161201112917.GA9680@red-moon>
+ <003601d2672e$91744b40$b45ce1c0$@codeaurora.org>
+ <20170105122714.GA30449@red-moon>
+Message-ID: <7cd7bcfb-abae-2948-c3f8-230c0d9c9db6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
+On 05/01/17 12:27, Lorenzo Pieralisi wrote:
+> On Thu, Jan 05, 2017 at 02:04:37PM +0530, Sricharan wrote:
+>> Hi Robin/Lorenzo,
+>>
+>>> Hi Robin,Lorenzo,
+>>>
+>>>> On Wed, Nov 30, 2016 at 04:42:27PM +0000, Robin Murphy wrote:
+>>>>> On 30/11/16 16:17, Lorenzo Pieralisi wrote:
+>>>>>> Sricharan, Robin,
+>>>>>>
+>>>>>> I gave this series a go on ACPI and apart from an SMMU v3 fix-up
+>>>>>> it seems to work, more thorough testing required though.
+>>>>>>
+>>>>>> A key question below.
+>>>>>>
+>>>>>> On Wed, Nov 30, 2016 at 05:52:16AM +0530, Sricharan R wrote:
+>>>>>>> From: Robin Murphy <robin.murphy@arm.com>
+>>>>>>>
+>>>>>>> IOMMU configuration represents unchanging properties of the hardware,
+>>>>>>> and as such should only need happen once in a device's lifetime, but
+>>>>>>> the necessary interaction with the IOMMU device and driver complicates
+>>>>>>> exactly when that point should be.
+>>>>>>>
+>>>>>>> Since the only reasonable tool available for handling the inter-device
+>>>>>>> dependency is probe deferral, we need to prepare of_iommu_configure()
+>>>>>>> to run later than it is currently called (i.e. at driver probe rather
+>>>>>>> than device creation), to handle being retried, and to tell whether a
+>>>>>>> not-yet present IOMMU should be waited for or skipped (by virtue of
+>>>>>>> having declared a built-in driver or not).
+>>>>>>>
+>>>>>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>>>>>>> ---
+>>>>>>>  drivers/iommu/of_iommu.c | 30 +++++++++++++++++++++++++++++-
+>>>>>>>  1 file changed, 29 insertions(+), 1 deletion(-)
+>>>>>>>
+>>>>>>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>>>>>>> index ee49081..349bd1d 100644
+>>>>>>> --- a/drivers/iommu/of_iommu.c
+>>>>>>> +++ b/drivers/iommu/of_iommu.c
+>>>>>>> @@ -104,12 +104,20 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+>>>>>>>  	int err;
+>>>>>>>
+>>>>>>>  	ops = iommu_get_instance(fwnode);
+>>>>>>> -	if (!ops || !ops->of_xlate)
+>>>>>>> +	if ((ops && !ops->of_xlate) ||
+>>>>>>> +	    (!ops && !of_match_node(&__iommu_of_table, iommu_spec->np)))
+>>>>>>
+>>>>>> IIUC of_match_node() here is there to check there is a driver compiled
+>>>>>> in for this device_node (aka compatible string in OF world), correct ?
+>>>>>
+>>>>> Yes - specifically, it's checking the magic table for a matching
+>>>>> IOMMU_OF_DECLARE entry.
+>>>>>
+>>>>>> If that's the case (and I think that's what Sricharan was referring to
+>>>>>> in his ACPI query) I need to cook-up something on the ACPI side to
+>>>>>> emulate the OF linker table behaviour (or anyway to detect a driver is
+>>>>>> actually in the kernel), it is not that difficult but it is key to know,
+>>>>>> I will give it some thought to make it as clean as possible.
+>>>>>
+>>>>> I didn't think this would be a concern for ACPI, since IORT works much
+>>>>> the same way the current of_iommu_init_fn/of_platform_device_create()
+>>>>> bodges in drivers so for DT. If you can only discover SMMUs from IORT,
+>>>>> then iort_init_platform_devices() will have already created every SMMU
+>>>>> that's going to exist before discovering other devices from wherever
+>>>>> they come from, thus you could never get into the situation of probing a
+>>>>> device without its SMMU being ready (if it's ever going to be). Is that
+>>>>> not right?
+>>>>
+>>>> It is right, my point and question is: we are probing a device and we
+>>>> have to know whether it is worth deferring its IOMMU DMA setup. On DT,
+>>>> through of_match_node(&__iommu_of_table, iommu_device_node) we check at
+>>>> once that:
+>>>>
+>>>> 1 - A device for the IOMMU exists
+>>>>
+>>>> AND
+>>>>
+>>>> 2 - A driver for the IOMMU is compiled in the kernel
+>>>>
+>>>> Is this correct ? As you said (1) is not a concern on ACPI IORT (because
+>>>> we create the IOMMU device before _any_ other device so either the IOMMU
+>>>> device is there or it will never be by the time master devices are
+>>>> probed), but for (2) I need to slightly change how the IORT linker entry
+>>>> work to make sure we can detect a driver is actually compiled in the
+>>>> kernel, it is easy, I was just asking if my understanding was correct
+>>>> and I think that was what Sricharan was referring to in his query.
+>>>>
+>>>
+>>> Yes right, this was what i was looking for in the ACPI case and putting this
+>>> in the iort_iommu_xlate was needed to return EPROBE_DEFER when the
+>>> driver is not yet been probed.
+>>
+>> With the thinking of taking this series through, would it be fine if i
+>> cleanup the pci configure hanging outside and push it in to
+>> of/acpi_iommu configure respectively ? This time with all neeeded for
+>> ACPI added as well.  Also on the last post of V4, Lorenzo commented
+>> that it worked for him, although still the of_match_node equivalent in
+>> ACPI has to be added. If i can get that, then i will add that as well
+>> to make this complete.
+> 
+> Question: I had a look into this and instead of fiddling about with the
+> linker script entries in ACPI (ie IORT_ACPI_DECLARE - which I hope this
+> patchset would help remove entirely), I think that the only check we
+> need in IORT is, depending on what type of SMMU a given device is
+> connected to, to check if the respective SMMU driver is compiled in the
+> kernel and it will be probed, _eventually_.
+> 
+> As Robin said, by the time a device is probed the respective SMMU
+> devices are already created and registered with IORT kernel code or
+> they will never be, so to understand if we should defer probing
+> SMMU device creation is _not_ really a problem in ACPI.
+> 
+> To check if a SMMU driver is enabled, do we really need a linker
+> table ?
+> 
+> Would not a check based on eg:
+> 
+> /**
+>  * @type: IOMMU IORT node type of the IOMMU a device is connected to
+>  */
+> static bool iort_iommu_driver_enabled(u8 type)
+> {
+> 	switch (type) {
+> 	case ACPI_IORT_SMMU_V3:
+> 		return IS_ENABLED(CONFIG_ARM_SMMU_V3);
 
-  Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
+IS_BUILTIN(...)
 
-are available in the git repository at:
+> 	case ACPI_IORT_SMMU:
+> 		return IS_ENABLED(CONFIG_ARM_SMMU);
+> 	default:
+> 		pr_warn("Unknown IORT SMMU type\n");
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
+Might displaying the actual value be helfpul for debugging a broken IORT
+table?
 
-for you to fetch changes up to 1b9ec81258827001c869f003e0b8dd2ddc104717:
+> 		return false;
+> 	}
+> }
+> 
+> be sufficient (it is a bit gross, agreed, but it is to understand if
+> that's all we need) ? Is there anything I am missing ?
+> 
+> Let me know, I will put together a patch for you I really do not
+> want to block your series for this trivial niggle.
 
-  Merge tag 'davinci-fixes-for-v4.10' of git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci into fixes (2017-01-04 16:43:00 +0100)
+Other than that, though, I like it :) IORT has a small, strictly
+bounded, set of supported devices, so I really don't see the need to go
+overboard putting it on parity with DT when something this neat and
+simple will suffice.
 
-----------------------------------------------------------------
-This is a rather large set of bugfixes, as we just returned from the
-Christmas break. Most of these are relatively unimportant fixes for
-regressions introduced during the merge window, and about half of
-the changes are for mach-omap2.
+Robin.
 
-A couple of patches are just cleanups and dead code removal that I would
-not normally have considered for merging after -rc2, but I decided to
-take them along with the fixes this time.
-
-Notable fixes include:
-
-- removing the skeleton.dtsi include broke a number of machines, and we
-  have to put empty /chosen nodes back to be able to pass kernel command
-  lines as before
-
-- enabling Samsung platforms no longer hardwires CONFIG_HZ to 200,
-  as it had been for no good reason for a long time.
-
-----------------------------------------------------------------
-Adam Ford (1):
-      ARM: dts: omap3: Add DTS for Logic PD SOM-LV 37xx Dev Kit
-
-Alexandre Bailon (2):
-      ARM: davinci: Make __clk_{enable,disable} functions public
-      ARM: davinci: da8xx: Fix sleeping function called from invalid context
-
-Andreas F?rber (1):
-      ARM: dts: vf610-zii-dev-rev-b: Add missing newline
-
-Arnd Bergmann (12):
-      Merge tag 'renesas-fixes-for-v4.10' of https://git.kernel.org/.../horms/renesas into fixes
-      Merge tag 'qcom-fixes-for-4.10-rc1' of git://git.kernel.org/.../agross/linux into fixes
-      Merge tag 'samsung-soc-4.10-2' of git://git.kernel.org/.../krzk/linux into fixes
-      Merge tag 'omap-for-v4.10/fixes-rc1' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'qcom-arm-fixes-for-4.10-rc2' of git://git.kernel.org/.../agross/linux into fixes
-      Merge tag 'imx-fixes-4.10' of git://git.kernel.org/.../shawnguo/linux into fixes
-      Merge tag 'scpi-fixes-4.10' of git://git.kernel.org/.../sudeep.holla/linux into fixes
-      Merge tag 'vexpress-fixes-4.10' of git://git.kernel.org/.../sudeep.holla/linux into fixes
-      Merge tag 'juno-fixes-4.10' of git://git.kernel.org/.../sudeep.holla/linux into fixes
-      Merge tag 'psci-fixes-4.10' of git://git.kernel.org/.../lpieralisi/linux into fixes
-      Merge tag 'amlogic-fixes' of git://git.kernel.org/.../khilman/linux-amlogic into fixes
-      Merge tag 'davinci-fixes-for-v4.10' of git://git.kernel.org/.../nsekhar/linux-davinci into fixes
-
-Bartosz Golaszewski (2):
-      ARM: davinci: da850: fix infinite loop in clk_set_rate()
-      ARM: davinci: da850: don't add emac clock to lookup table twice
-
-Bjorn Andersson (1):
-      ARM: dts: qcom: apq8064: Add missing scm clock
-
-Christoffer Dall (1):
-      ARM: dts: vexpress: Support GICC_DIR operations
-
-Fabio Estevam (1):
-      ARM: dts: imx6: Disable "weim" node in the dtsi files
-
-Gary Bisson (1):
-      ARM: dts: imx6qdl-nitrogen6x: remove duplicate iomux entry
-
-Grygorii Strashko (2):
-      ARM: OMAP2+: Remove legacy gpio code
-      ARM: omap2+: am437x: rollback to use omap3_gptimer_timer_init()
-
-Javier Martinez Canillas (9):
-      ARM: dts: omap2: Add an empty chosen node to top level DTSI
-      ARM: dts: omap3: Add an empty chosen node to top level DTSI
-      ARM: dts: omap4: Add an empty chosen node to top level DTSI
-      ARM: dts: omap5: Add an empty chosen node to top level DTSI
-      ARM: dts: am33xx: Add an empty chosen node to top level DTSI
-      ARM: dts: am4372: Add an empty chosen node to top level DTSI
-      ARM: dts: dm814x: Add an empty chosen node to top level DTSI
-      ARM: dts: dm816x: Add an empty chosen node to top level DTSI
-      ARM: dts: dra7: Add an empty chosen node to top level DTSI
-
-Kevin Hilman (2):
-      ARM64: dts: meson-gxl: fix GPIO include
-      ARM64: defconfig: enable DRM_MESON as module
-
-Kishon Vijay Abraham I (1):
-      ARM: dts: am572x-idk: Add gpios property to control PCIE_RESETn
-
-Krzysztof Kozlowski (1):
-      ARM: Drop fixed 200 Hz timer requirement from Samsung platforms
-
-Lokesh Vutla (1):
-      ARM: dts: dra72-evm-tps65917: Add voltage supplies to usb_phy, mmc, dss
-
-Maninder Singh (1):
-      ARM: omap2+: fixing wrong strcat for Non-NULL terminated string
-
-Markus Elfring (1):
-      ARM: OMAP2+: PRM: Delete an error message for a failed memory allocation
-
-Martin Blumenstingl (1):
-      firmware: arm_scpi: fix reading sensor values on pre-1.0 SCPI firmwares
-
-Milo Kim (4):
-      ARM: dts: am335x: Fix the interrupt name of TPS65217
-      dt-bindings: mfd: Remove TPS65217 interrupts
-      dt-bindings: power/supply: Update TPS65217 properties
-      dt-bindings: input: Specify the interrupt number of TPS65217 power button
-
-Neil Armstrong (1):
-      ARM64: dts: meson-gx: Add Graphic Controller nodes
-
-Pali Roh?r (1):
-      ARM: dts: n900: Mark eMMC slot with no-sdio and no-sd flags
-
-Pankaj Dubey (1):
-      ARM: EXYNOS: Remove smp_init_cpus hook from platsmp.c
-
-Roger Quadros (2):
-      ARM: dts: am57xx-idk: Support VBUS detection on USB2 port
-      ARM: dts: am57xx-idk: Put USB2 port in peripheral mode
-
-Simon Horman (1):
-      arm64: dts: h3ulcb: Provide sd0_uhs node
-
-Stephen Boyd (1):
-      arm64: dts: msm8996: Add required memory carveouts
-
-Sudeep Holla (3):
-      arm64: dts: vexpress: Support GICC_DIR operations
-      drivers: psci: annotate timer on stack to silence odebug messages
-      MAINTAINERS: extend PSCI entry to cover the newly add PSCI checker code
-
-Sylwester Nawrocki (1):
-      ARM: S3C24XX: Add DMA slave maps for remaining s3c24xx SoCs
-
-Tony Lindgren (1):
-      Merge branch 'omap-for-v4.10/legacy' into omap-for-v4.10/fixes
-
-Vladimir Murzin (1):
-      ARM: i.MX: remove map_io callback
-
-Vladimir Zapolskiy (1):
-      ARM: dts: imx31: fix AVIC base address
-
- .../bindings/input/tps65218-pwrbutton.txt          |   4 +-
- .../bindings/power/supply/tps65217_charger.txt     |   7 +-
- MAINTAINERS                                        |   2 +-
- arch/arm/Kconfig                                   |   3 +-
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/am335x-bone-common.dtsi          |   8 +-
- arch/arm/boot/dts/am33xx.dtsi                      |   1 +
- arch/arm/boot/dts/am4372.dtsi                      |   1 +
- arch/arm/boot/dts/am571x-idk.dts                   |  10 +-
- arch/arm/boot/dts/am572x-idk.dts                   |  14 +-
- arch/arm/boot/dts/am57xx-idk-common.dtsi           |   9 +-
- arch/arm/boot/dts/dm814x.dtsi                      |   1 +
- arch/arm/boot/dts/dm816x.dtsi                      |   1 +
- arch/arm/boot/dts/dra7.dtsi                        |   1 +
- arch/arm/boot/dts/dra72-evm-tps65917.dtsi          |  16 +++
- arch/arm/boot/dts/imx31.dtsi                       |   4 +-
- arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi          |   1 -
- arch/arm/boot/dts/imx6qdl.dtsi                     |   1 +
- arch/arm/boot/dts/imx6sl.dtsi                      |   1 +
- arch/arm/boot/dts/imx6sx.dtsi                      |   1 +
- arch/arm/boot/dts/omap2.dtsi                       |   1 +
- arch/arm/boot/dts/omap3-n900.dts                   |   2 +
- arch/arm/boot/dts/omap3.dtsi                       |   1 +
- arch/arm/boot/dts/omap4.dtsi                       |   1 +
- arch/arm/boot/dts/omap5.dtsi                       |   1 +
- arch/arm/boot/dts/qcom-apq8064.dtsi                |   4 +
- arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts        |   2 +-
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |   2 +-
- arch/arm/boot/dts/vf610-zii-dev-rev-b.dts          |   3 +-
- arch/arm/mach-davinci/clock.c                      |  12 +-
- arch/arm/mach-davinci/clock.h                      |   2 +
- arch/arm/mach-davinci/da850.c                      |  32 ++++-
- arch/arm/mach-davinci/usb-da8xx.c                  |  34 ++---
- arch/arm/mach-exynos/platsmp.c                     |  31 ----
- arch/arm/mach-imx/mach-imx1.c                      |   1 -
- arch/arm/mach-omap2/Makefile                       |   2 +-
- arch/arm/mach-omap2/board-generic.c                |   2 +-
- arch/arm/mach-omap2/gpio.c                         | 160 ---------------------
- arch/arm/mach-omap2/omap_hwmod.c                   |   8 +-
- arch/arm/mach-omap2/omap_hwmod_common_data.h       |   4 -
- arch/arm/mach-omap2/prm_common.c                   |   4 +-
- arch/arm/mach-omap2/timer.c                        |   9 +-
- arch/arm/mach-s3c24xx/common.c                     |  76 ++++++++++
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi          |  16 +++
- .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    |  16 +++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   |  16 +++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   4 +
- .../boot/dts/amlogic/meson-gxl-nexbox-a95x.dts     |  16 +++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         |   6 +-
- .../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts |  16 +++
- arch/arm64/boot/dts/amlogic/meson-gxm.dtsi         |   4 +
- arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts         |   2 +-
- arch/arm64/boot/dts/qcom/msm8996.dtsi              |  10 ++
- arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts     |   2 +-
- arch/arm64/configs/defconfig                       |   1 +
- drivers/firmware/arm_scpi.c                        |  10 +-
- drivers/firmware/psci_checker.c                    |   4 +-
- include/dt-bindings/mfd/tps65217.h                 |  26 ----
- 58 files changed, 334 insertions(+), 296 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/gpio.c
- delete mode 100644 include/dt-bindings/mfd/tps65217.h
+> 
+> Thanks,
+> Lorenzo
+> 
