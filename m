@@ -1,42 +1,85 @@
-From: t.remmet@phytec.de (Teresa Remmet)
-Date: Thu, 5 Jan 2017 15:50:50 +0100
-Subject: [PATCH 5/6] ARM: dts: am335x-phycore-som: Update ethernet phy node
-In-Reply-To: <1483627851-17996-1-git-send-email-t.remmet@phytec.de>
-References: <1483627851-17996-1-git-send-email-t.remmet@phytec.de>
-Message-ID: <1483627851-17996-6-git-send-email-t.remmet@phytec.de>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Thu, 5 Jan 2017 20:21:53 +0530
+Subject: [PATCH 02/10] iommu/of: Prepare for deferred IOMMU configuration
+In-Reply-To: <7cd7bcfb-abae-2948-c3f8-230c0d9c9db6@arm.com>
+References: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
+ <1480465344-11862-3-git-send-email-sricharan@codeaurora.org>
+ <20161130161723.GA9042@red-moon>
+ <c89825aa-c75f-8493-fe92-7cc97f525bc7@arm.com>
+ <20161201112917.GA9680@red-moon>
+ <003601d2672e$91744b40$b45ce1c0$@codeaurora.org>
+ <20170105122714.GA30449@red-moon>
+ <7cd7bcfb-abae-2948-c3f8-230c0d9c9db6@arm.com>
+Message-ID: <005f01d26763$450f9cc0$cf2ed640$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update ethernet phy0 node to use phy-handle now.
+Hi,
 
-Signed-off-by: Teresa Remmet <t.remmet@phytec.de>
----
- arch/arm/boot/dts/am335x-phycore-som.dtsi | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+[...]
 
-diff --git a/arch/arm/boot/dts/am335x-phycore-som.dtsi b/arch/arm/boot/dts/am335x-phycore-som.dtsi
-index 08d1134..de91275 100644
---- a/arch/arm/boot/dts/am335x-phycore-som.dtsi
-+++ b/arch/arm/boot/dts/am335x-phycore-som.dtsi
-@@ -78,7 +78,7 @@
- };
- 
- &cpsw_emac0 {
--	phy_id = <&davinci_mdio>, <0>;
-+	phy-handle = <&phy0>;
- 	phy-mode = "rmii";
- 	dual_emac_res_vlan = <1>;
- };
-@@ -87,6 +87,10 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mdio_pins>;
- 	status = "okay";
-+
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
- };
- 
- &mac {
--- 
-1.9.1
+>>>
+>>> With the thinking of taking this series through, would it be fine if i
+>>> cleanup the pci configure hanging outside and push it in to
+>>> of/acpi_iommu configure respectively ? This time with all neeeded for
+>>> ACPI added as well.  Also on the last post of V4, Lorenzo commented
+>>> that it worked for him, although still the of_match_node equivalent in
+>>> ACPI has to be added. If i can get that, then i will add that as well
+>>> to make this complete.
+>>
+>> Question: I had a look into this and instead of fiddling about with the
+>> linker script entries in ACPI (ie IORT_ACPI_DECLARE - which I hope this
+>> patchset would help remove entirely), I think that the only check we
+>> need in IORT is, depending on what type of SMMU a given device is
+>> connected to, to check if the respective SMMU driver is compiled in the
+>> kernel and it will be probed, _eventually_.
+>>
+>> As Robin said, by the time a device is probed the respective SMMU
+>> devices are already created and registered with IORT kernel code or
+>> they will never be, so to understand if we should defer probing
+>> SMMU device creation is _not_ really a problem in ACPI.
+>>
+>> To check if a SMMU driver is enabled, do we really need a linker
+>> table ?
+>>
+>> Would not a check based on eg:
+>>
+>> /**
+>>  * @type: IOMMU IORT node type of the IOMMU a device is connected to
+>>  */
+>> static bool iort_iommu_driver_enabled(u8 type)
+>> {
+>> 	switch (type) {
+>> 	case ACPI_IORT_SMMU_V3:
+>> 		return IS_ENABLED(CONFIG_ARM_SMMU_V3);
+>
+>IS_BUILTIN(...)
+>
+>> 	case ACPI_IORT_SMMU:
+>> 		return IS_ENABLED(CONFIG_ARM_SMMU);
+>> 	default:
+>> 		pr_warn("Unknown IORT SMMU type\n");
+>
+>Might displaying the actual value be helfpul for debugging a broken IORT
+>table?
+>
+>> 		return false;
+>> 	}
+>> }
+>>
+>> be sufficient (it is a bit gross, agreed, but it is to understand if
+>> that's all we need) ? Is there anything I am missing ?
+>>
+>> Let me know, I will put together a patch for you I really do not
+>> want to block your series for this trivial niggle.
+>
+>Other than that, though, I like it :) IORT has a small, strictly
+>bounded, set of supported devices, so I really don't see the need to go
+>overboard putting it on parity with DT when something this neat and
+>simple will suffice.
+>
+
+Ok sure, looks correct for me as well in whole of the context here.
+
+Regards,
+ Sricharan
