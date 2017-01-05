@@ -1,38 +1,62 @@
 From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 5 Jan 2017 04:24:21 +0000
-Subject: [PATCHv2 0/5] Support for Marvell switches with integrated CPUs
+Date: Thu, 5 Jan 2017 04:34:55 +0000
+Subject: [PATCHv2 4/5] arm: mvebu: Add device tree for 98DX3236 SoCs
 References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
- <6c6795d3-06ab-a4f0-78ad-5ecc78c1aa2f@gmail.com>
-Message-ID: <185147a37cab4d7eaea5f79d86cc9451@svr-chch-ex1.atlnz.lc>
+ <20170105033641.6212-5-chris.packham@alliedtelesis.co.nz>
+ <1ee850ee-f771-1aeb-6b96-dfbe3118f2fc@gmail.com>
+Message-ID: <ac117de5855d45ffa39cf7f7fd8cfbe8@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/17 17:07, Florian Fainelli wrote:
+On 05/01/17 17:06, Florian Fainelli wrote:
 > Le 01/04/17 ? 19:36, Chris Packham a ?crit :
->> The 98DX3236, 98DX3336 and 98DX4251 are a set of switch ASICs with
->> integrated CPUs. They CPU block is common within these product lines and
->> (as far as I can tell/have been told) is based on the Armada XP. There
->> are a few differences due to the fact they have to squeeze the CPU into
->> the same package as the switch.
+>> The Marvell 98DX3236, 98DX3336, 98DX4521 and variants are switch ASICs
+>> with integrated CPUs. They are similar to the Armada XP SoCs but have
+>> different I/O interfaces.
+>>
+>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+>> ---
+>> +
+>> +		switch {
+>> +			packet-processor at 0 {
+>> +				compatible = "marvell,prestera-98dx4521";
+>> +			};
+>> +		};
 >
-> It's really great to see these changes, do you have a plan to also add
-> support for the integrated switch using a DSA/switchdev driver?
+> This may be a bit premature if you are not providing a binding document
+> for this sub-node, you might as well add it once you also add a
+> corresponding driver (or if this will remain out of tree, at least
+> submitting a separate binding document).
 
-I'd love to see a switchdev driver but it's a huge task (and no I'm not 
-committing to writing it). As it stands Marvell ship a switch SDK 
-largely executes in userspace with a small kernel module providing some 
-linkage to the underlying hardware.
+I also see that I made a typo 4521 should be 4251.
 
-We (a few of us here at Allied Telesis NZ) have discussed switchdev and 
-how we get from using Marvell's SDK in our products to using switchdev 
-proper.
+The driver that uses this is an out of tree one so I will add a binding 
+document for it for now.
 
-The first step would probably be some kind of trampoline driver which 
-communicates with a userspace helper to do the actual work. 
-Alternatively there is some support in Marvell's SDK for compilation as 
-a binary blob so a proprietary kernel module is another option. Neither 
-of these are particularly nice in a free software world.
+It wouldn't he hard to whip up a simple uio based driver that provides 
+mmap access to the switch register space so I might look at that if I 
+get time. It would be useful for testing if nothing else.
 
-A full "free" implementation would be a large undertaking. Ideally I'd 
-like to see Marvell involved with producing one but so far they've not 
-been interested whenever I've brought it up.
+>
+> Also, if this node's unit address is 0, you would expect at least a reg
+> property whose address cell is 0 to be present.
+>
+
+The reg property is in the base 98dx3236 dsti file. The 3 devices have 
+the same IO footprint but the switching functionality is quite different 
+between them hence the different compatible strings (all of which I need 
+to add binding documentation for). I guess I could make the 3236 entry
+
+   pp0: packet-processor at 0 {
+       compatible = "marvell,prestera-98dx3236";
+       reg = <0 0x4000000>;
+       ...
+   }
+
+Then the 3336 and 4251 could just override the compatible string
+
+   &pp0 {
+       compatible = "marvell,prestera-98dx4251";
+   };
+
+Would that be clearer?
