@@ -1,666 +1,82 @@
-From: mike.leach@linaro.org (Mike Leach)
-Date: Thu,  5 Jan 2017 17:34:06 +0000
-Subject: [PATCH] arm64: dts: juno: Fix CoreSight support for Juno r1/r2
- variants
-Message-ID: <1483637646-39229-1-git-send-email-mike.leach@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 5 Jan 2017 18:50:10 +0100
+Subject: [PATCH 3/5] arm64: dts: sun50i: add MMC nodes
+In-Reply-To: <1483398226-29321-4-git-send-email-andre.przywara@arm.com>
+References: <1483398226-29321-1-git-send-email-andre.przywara@arm.com>
+ <1483398226-29321-4-git-send-email-andre.przywara@arm.com>
+Message-ID: <20170105175010.j3qpqqkj3kmgrmyc@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CoreSight support added for Juno is valid for only Juno r0.
-The Juno r1 and r2 variants have additional components and alternative
-connection routes between trace source and sinks.
+On Mon, Jan 02, 2017 at 11:03:44PM +0000, Andre Przywara wrote:
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 67 +++++++++++++++++++++++++++
+>  1 file changed, 67 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> index e0dcab8..c680566 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> @@ -150,6 +150,32 @@
+>  				pins = "PB8", "PB9";
+>  				function = "uart0";
+>  			};
+> +
+> +			mmc0_pins: mmc0 at 0 {
+> +				pins = "PF0", "PF1", "PF2", "PF3", "PF4", "PF5";
+> +				function = "mmc0";
+> +				drive-strength = <30>;
+> +			};
+> +
+> +			mmc0_default_cd_pin: mmc0_cd_pin at 0 {
+> +				pins = "PF6";
+> +				function = "gpio_in";
+> +				bias-pull-up;
+> +			};
+> +
+> +			mmc1_pins: mmc1 at 0 {
+> +				pins = "PG0", "PG1", "PG2", "PG3", "PG4", "PG5";
+> +				function = "mmc1";
+> +				drive-strength = <30>;
+> +			};
+> +
+> +			mmc2_pins: mmc2 at 0 {
+> +				pins = "PC1", "PC5", "PC6", "PC8", "PC9",
+> +				       "PC10", "PC11", "PC12", "PC13", "PC14",
+> +				       "PC15", "PC16";
+> +				function = "mmc2";
+> +				drive-strength = <30>;
+> +			};
+>  		};
+>  
+>  		uart0: serial at 1c28000 {
+> @@ -240,6 +266,47 @@
+>  			#size-cells = <0>;
+>  		};
+>  
+> +		mmc0: mmc at 1c0f000 {
+> +			compatible = "allwinner,sun50i-a64-mmc",
+> +				     "allwinner,sun5i-a13-mmc";
 
-The CoreSight infrastructure external to the Cortex-Axx clusters, has
-been split into separate .dtsi include files for r0 and r1/r2 to correctly
-represent these variations.
+That's not correct. There's a bunch of features that are broken
+without A64-specific (or at least not present on the A13)
+quirks. Those features include for example the SDIO aggregation that
+are currently broken for all modes supported so far.
 
-Adds missing DT entry for the CoreSight STM component in the infrastructure
-.dtsi files.
+I was in holidays and send those patches tomorrow, but you were a bit
+too quick :)
 
-Signed-off-by: Mike Leach <mike.leach@linaro.org>
----
- arch/arm64/boot/dts/arm/juno-base.dtsi    | 135 ---------------
- arch/arm64/boot/dts/arm/juno-cs-r0.dtsi   | 166 +++++++++++++++++++
- arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 266 ++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/arm/juno-r1.dts       |   1 +
- arch/arm64/boot/dts/arm/juno-r2.dts       |   1 +
- arch/arm64/boot/dts/arm/juno.dts          |   1 +
- 6 files changed, 435 insertions(+), 135 deletions(-)
- create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r0.dtsi
- create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+Maxime
 
-diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index 7d83224..7c89000 100644
---- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -83,104 +83,6 @@
- 	 * The actual size is just 4K though 64K is reserved. Access to the
- 	 * unmapped reserved region results in a DECERR response.
- 	 */
--	etf at 20010000 {
--		compatible = "arm,coresight-tmc", "arm,primecell";
--		reg = <0 0x20010000 0 0x1000>;
--
--		clocks = <&soc_smc50mhz>;
--		clock-names = "apb_pclk";
--		power-domains = <&scpi_devpd 0>;
--		ports {
--			#address-cells = <1>;
--			#size-cells = <0>;
--
--			/* input port */
--			port at 0 {
--				reg = <0>;
--				etf_in_port: endpoint {
--					slave-mode;
--					remote-endpoint = <&main_funnel_out_port>;
--				};
--			};
--
--			/* output port */
--			port at 1 {
--				reg = <0>;
--				etf_out_port: endpoint {
--					remote-endpoint = <&replicator_in_port0>;
--				};
--			};
--		};
--	};
--
--	tpiu at 20030000 {
--		compatible = "arm,coresight-tpiu", "arm,primecell";
--		reg = <0 0x20030000 0 0x1000>;
--
--		clocks = <&soc_smc50mhz>;
--		clock-names = "apb_pclk";
--		power-domains = <&scpi_devpd 0>;
--		port {
--			tpiu_in_port: endpoint {
--				slave-mode;
--				remote-endpoint = <&replicator_out_port0>;
--			};
--		};
--	};
--
--	main-funnel at 20040000 {
--		compatible = "arm,coresight-funnel", "arm,primecell";
--		reg = <0 0x20040000 0 0x1000>;
--
--		clocks = <&soc_smc50mhz>;
--		clock-names = "apb_pclk";
--		power-domains = <&scpi_devpd 0>;
--		ports {
--			#address-cells = <1>;
--			#size-cells = <0>;
--
--			port at 0 {
--				reg = <0>;
--				main_funnel_out_port: endpoint {
--					remote-endpoint = <&etf_in_port>;
--				};
--			};
--
--			port at 1 {
--				reg = <0>;
--				main_funnel_in_port0: endpoint {
--					slave-mode;
--					remote-endpoint = <&cluster0_funnel_out_port>;
--				};
--			};
--
--			port at 2 {
--				reg = <1>;
--				main_funnel_in_port1: endpoint {
--					slave-mode;
--					remote-endpoint = <&cluster1_funnel_out_port>;
--				};
--			};
--
--		};
--	};
--
--	etr at 20070000 {
--		compatible = "arm,coresight-tmc", "arm,primecell";
--		reg = <0 0x20070000 0 0x1000>;
--		iommus = <&smmu_etr 0>;
--
--		clocks = <&soc_smc50mhz>;
--		clock-names = "apb_pclk";
--		power-domains = <&scpi_devpd 0>;
--		port {
--			etr_in_port: endpoint {
--				slave-mode;
--				remote-endpoint = <&replicator_out_port1>;
--			};
--		};
--	};
--
- 	etm0: etm at 22040000 {
- 		compatible = "arm,coresight-etm4x", "arm,primecell";
- 		reg = <0 0x22040000 0 0x1000>;
-@@ -351,43 +253,6 @@
- 		};
- 	};
- 
--	coresight-replicator {
--		/*
--		 * Non-configurable replicators don't show up on the
--		 * AMBA bus.  As such no need to add "arm,primecell".
--		 */
--		compatible = "arm,coresight-replicator";
--
--		ports {
--			#address-cells = <1>;
--			#size-cells = <0>;
--
--			/* replicator output ports */
--			port at 0 {
--				reg = <0>;
--				replicator_out_port0: endpoint {
--					remote-endpoint = <&tpiu_in_port>;
--				};
--			};
--
--			port at 1 {
--				reg = <1>;
--				replicator_out_port1: endpoint {
--					remote-endpoint = <&etr_in_port>;
--				};
--			};
--
--			/* replicator input port */
--			port at 2 {
--				reg = <0>;
--				replicator_in_port0: endpoint {
--					slave-mode;
--					remote-endpoint = <&etf_out_port>;
--				};
--			};
--		};
--	};
--
- 	sram: sram at 2e000000 {
- 		compatible = "arm,juno-sram-ns", "mmio-sram";
- 		reg = <0x0 0x2e000000 0x0 0x8000>;
-diff --git a/arch/arm64/boot/dts/arm/juno-cs-r0.dtsi b/arch/arm64/boot/dts/arm/juno-cs-r0.dtsi
-new file mode 100644
-index 0000000..4e01b0e
---- /dev/null
-+++ b/arch/arm64/boot/dts/arm/juno-cs-r0.dtsi
-@@ -0,0 +1,166 @@
-+	/*
-+	 * Juno trace infrastructure.
-+	 * Trace links and sinks and interconnections
-+	 * from clusters.
-+	 * Connections for Juno r0.
-+	 */
-+	etf at 20010000 {
-+		compatible = "arm,coresight-tmc", "arm,primecell";
-+		reg = <0 0x20010000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		power-domains = <&scpi_devpd 0>;
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* input port */
-+			port at 0 {
-+				reg = <0>;
-+				etf_in_port: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&main_funnel_out_port>;
-+				};
-+			};
-+
-+			/* output port */
-+			port at 1 {
-+				reg = <0>;
-+				etf_out_port: endpoint {
-+					remote-endpoint = <&replicator_in_port0>;
-+				};
-+			};
-+		};
-+	};
-+
-+	tpiu at 20030000 {
-+		compatible = "arm,coresight-tpiu", "arm,primecell";
-+		reg = <0 0x20030000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		power-domains = <&scpi_devpd 0>;
-+		port {
-+			tpiu_in_port: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out_port0>;
-+			};
-+		};
-+	};
-+
-+	main-funnel at 20040000 {
-+		compatible = "arm,coresight-funnel", "arm,primecell";
-+		reg = <0 0x20040000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		power-domains = <&scpi_devpd 0>;
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* output port */
-+			port at 0 {
-+				reg = <0>;
-+				main_funnel_out_port: endpoint {
-+					remote-endpoint = <&etf_in_port>;
-+				};
-+			};
-+
-+			/* input ports */
-+			port at 1 {
-+				reg = <0>;
-+				main_funnel_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&cluster0_funnel_out_port>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <1>;
-+				main_funnel_in_port1: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&cluster1_funnel_out_port>;
-+				};
-+			};
-+
-+			port at 3 {
-+				reg = <2>;
-+				main_funnel_in_port2: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&stm_out_port>;
-+				};
-+			};
-+
-+
-+		};
-+	};
-+
-+	etr at 20070000 {
-+		compatible = "arm,coresight-tmc", "arm,primecell";
-+		reg = <0 0x20070000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		power-domains = <&scpi_devpd 0>;
-+		port {
-+			etr_in_port: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out_port1>;
-+			};
-+		};
-+	};
-+
-+	coresight-replicator {
-+		/*
-+		 * Non-configurable replicators don't show up on the
-+		 * AMBA bus.  As such no need to add "arm,primecell".
-+		 */
-+		compatible = "arm,coresight-replicator";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* replicator output ports */
-+			port at 0 {
-+				reg = <0>;
-+				replicator_out_port0: endpoint {
-+					remote-endpoint = <&tpiu_in_port>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				replicator_out_port1: endpoint {
-+					remote-endpoint = <&etr_in_port>;
-+				};
-+			};
-+
-+			/* replicator input port */
-+			port at 2 {
-+				reg = <0>;
-+				replicator_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etf_out_port>;
-+				};
-+			};
-+		};
-+	};
-+
-+	stm at 20100000 {
-+		compatible = "arm,coresight-stm", "arm,primecell";
-+		reg = <0 0x20100000 0 0x1000>,
-+		      <0 0x28000000 0 0x180000>;
-+		reg-names = "stm-base", "stm-stimulus-base";
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		power-domains = <&scpi_devpd 0>;
-+		port {
-+			stm_out_port: endpoint {
-+				remote-endpoint = <&main_funnel_in_port2>;
-+			};
-+		};
-+	};
-diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
-new file mode 100644
-index 0000000..6fe8b62
---- /dev/null
-+++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
-@@ -0,0 +1,266 @@
-+	/*
-+	 * Juno trace infrastructure.
-+	 * Trace links and sinks and interconnections
-+	 * from clusters.
-+	 * Connections for Juno r1 and r2.
-+	 */
-+	etf0 at 20010000 {
-+		compatible = "arm,coresight-tmc", "arm,primecell";
-+		reg = <0 0x20010000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		power-domains = <&scpi_devpd 0>;
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* input port */
-+			port at 0 {
-+				reg = <0>;
-+				etf0_in_port: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&main_funnel_out_port>;
-+				};
-+			};
-+
-+			/* output port */
-+			port at 1 {
-+				reg = <0>;
-+				etf0_out_port: endpoint {
-+					remote-endpoint = <&csys2_funnel_in_port0>;
-+				};
-+			};
-+		};
-+	};
-+
-+	etf1 at 20140000 {
-+		compatible = "arm,coresight-tmc", "arm,primecell";
-+		reg = <0 0x20140000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		power-domains = <&scpi_devpd 0>;
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* input port */
-+			port at 0 {
-+				reg = <0>;
-+				etf1_in_port: endpoint {
-+					slave-mode;
-+					remote-endpoint =
-+						<&csys1_funnel_out_port>;
-+				};
-+			};
-+
-+			/* output port */
-+			port at 1 {
-+				reg = <0>;
-+				etf1_out_port: endpoint {
-+					remote-endpoint =
-+						<&csys2_funnel_in_port1>;
-+				};
-+			};
-+		};
-+	};
-+
-+	csys1_funnel at 20130000 {
-+		compatible = "arm,coresight-funnel", "arm,primecell";
-+		reg = <0 0x20130000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		power-domains = <&scpi_devpd 0>;
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* input port */
-+			port at 0 {
-+				reg = <0>;
-+				csys1_funnel_out_port: endpoint {
-+					remote-endpoint =
-+						<&etf1_in_port>;
-+				};
-+			};
-+
-+			/* output port */
-+			port at 1 {
-+				reg = <0>;
-+				csys1_funnel_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint =
-+						<&stm_out_port>;
-+				};
-+			};
-+
-+		};
-+	};
-+
-+	csys2_funnel at 20150000 {
-+		compatible = "arm,coresight-funnel", "arm,primecell";
-+		reg = <0 0x20150000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		power-domains = <&scpi_devpd 0>;
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* output port */
-+			port at 0 {
-+				reg = <0>;
-+				csys2_funnel_out_port: endpoint {
-+					remote-endpoint =
-+						<&replicator_in_port0>;
-+				};
-+			};
-+
-+			/* input ports */
-+			port at 1 {
-+				reg = <0>;
-+				csys2_funnel_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etf0_out_port>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <1>;
-+				csys2_funnel_in_port1: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etf1_out_port>;
-+				};
-+			};
-+
-+		};
-+	};
-+
-+	tpiu at 20030000 {
-+		compatible = "arm,coresight-tpiu", "arm,primecell";
-+		reg = <0 0x20030000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		power-domains = <&scpi_devpd 0>;
-+		port {
-+			tpiu_in_port: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out_port0>;
-+			};
-+		};
-+	};
-+
-+	/*
-+	 * This is labelled cssys0 funnel in the Juno r1/r2 TRM
-+	 * Retain the name from r0 to maintain compatibility with common
-+	 * juno-base.dtsi
-+	 */
-+	main-funnel at 20040000 {
-+		compatible = "arm,coresight-funnel", "arm,primecell";
-+		reg = <0 0x20040000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		power-domains = <&scpi_devpd 0>;
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* output port */
-+			port at 0 {
-+				reg = <0>;
-+				main_funnel_out_port: endpoint {
-+					remote-endpoint = <&etf0_in_port>;
-+				};
-+			};
-+
-+			/* input ports */
-+			port at 1 {
-+				reg = <0>;
-+				main_funnel_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&cluster0_funnel_out_port>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <1>;
-+				main_funnel_in_port1: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&cluster1_funnel_out_port>;
-+				};
-+			};
-+		};
-+	};
-+
-+	etr at 20070000 {
-+		compatible = "arm,coresight-tmc", "arm,primecell";
-+		reg = <0 0x20070000 0 0x1000>;
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		power-domains = <&scpi_devpd 0>;
-+		port {
-+			etr_in_port: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out_port1>;
-+			};
-+		};
-+	};
-+
-+	coresight-replicator {
-+		/*
-+		 * Non-configurable replicators don't show up on the
-+		 * AMBA bus.  As such no need to add "arm,primecell".
-+		 */
-+		compatible = "arm,coresight-replicator";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* replicator output ports */
-+			port at 0 {
-+				reg = <0>;
-+				replicator_out_port0: endpoint {
-+					remote-endpoint = <&tpiu_in_port>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				replicator_out_port1: endpoint {
-+					remote-endpoint = <&etr_in_port>;
-+				};
-+			};
-+
-+			/* replicator input port */
-+			port at 2 {
-+				reg = <0>;
-+				replicator_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&csys2_funnel_out_port>;
-+				};
-+			};
-+		};
-+	};
-+
-+	stm at 20100000 {
-+		compatible = "arm,coresight-stm", "arm,primecell";
-+		reg = <0 0x20100000 0 0x1000>,
-+		      <0 0x28000000 0 0x180000>;
-+		reg-names = "stm-base", "stm-stimulus-base";
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		power-domains = <&scpi_devpd 0>;
-+		port {
-+			stm_out_port: endpoint {
-+				remote-endpoint = <&csys1_funnel_in_port0>;
-+			};
-+		};
-+	};
-diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
-index eec37fe..8813395 100644
---- a/arch/arm64/boot/dts/arm/juno-r1.dts
-+++ b/arch/arm64/boot/dts/arm/juno-r1.dts
-@@ -178,6 +178,7 @@
- 	};
- 
- 	#include "juno-base.dtsi"
-+	#include "juno-cs-r1r2.dtsi"
- };
- 
- &memtimer {
-diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts b/arch/arm64/boot/dts/arm/juno-r2.dts
-index 28f40ec..fca3a17 100644
---- a/arch/arm64/boot/dts/arm/juno-r2.dts
-+++ b/arch/arm64/boot/dts/arm/juno-r2.dts
-@@ -178,6 +178,7 @@
- 	};
- 
- 	#include "juno-base.dtsi"
-+	#include "juno-cs-r1r2.dtsi"
- };
- 
- &memtimer {
-diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-index ac5ceb7..c90c37b 100644
---- a/arch/arm64/boot/dts/arm/juno.dts
-+++ b/arch/arm64/boot/dts/arm/juno.dts
-@@ -178,6 +178,7 @@
- 	};
- 
- 	#include "juno-base.dtsi"
-+	#include "juno-cs-r0.dtsi"
- };
- 
- &etm0 {
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170105/d1f8b2ae/attachment-0001.sig>
