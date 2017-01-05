@@ -1,76 +1,74 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  5 Jan 2017 17:32:36 +0000
-Subject: [PATCH] ARM: hw_breakpoint: blacklist Scorpion CPUs
-Message-ID: <1483637556-3974-1-git-send-email-mark.rutland@arm.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Thu, 5 Jan 2017 14:34:48 -0300
+Subject: [PATCH 17/22] power: supply: add battery driver for AXP20X and
+ AXP22X PMICs
+In-Reply-To: <20170102163723.7939-18-quentin.schulz@free-electrons.com>
+References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
+ <20170102163723.7939-18-quentin.schulz@free-electrons.com>
+Message-ID: <CAAEAJfBeu7Z_JeM55Tyj4a2ZOxNWhq7qoPDwFyftoO8sCumVQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On APQ8060, the kernel crashes in arch_hw_breakpoint_init, taking an
-undefined instruction trap within write_wb_reg. This is because Scorpion
-CPUs erroneously appear to set DBGPRSR.SPD when WFI is issued, even if
-the core is not powered down. When DBGPRSR.SPD is set, breakpoint and
-watchpoint registers are treated as undefined.
+On 2 January 2017 at 13:37, Quentin Schulz
+<quentin.schulz@free-electrons.com> wrote:
+[...]
+> +
+> +#define AXP20X_PWR_STATUS_BAT_CHARGING BIT(2)
+> +
+> +#define AXP20X_PWR_OP_BATT_PRESENT     BIT(5)
+> +#define AXP20X_PWR_OP_BATT_ACTIVATED   BIT(3)
+> +
+> +#define AXP209_FG_PERCENT              GENMASK(6, 0)
+> +#define AXP22X_FG_VALID                        BIT(7)
+> +
+> +#define AXP20X_CHRG_CTRL1_TGT_VOLT     GENMASK(6, 5)
+> +#define AXP20X_CHRG_CTRL1_TGT_4_1V     (0 << 5)
+> +#define AXP20X_CHRG_CTRL1_TGT_4_15V    BIT(5)
 
-It's possible to trigger similar crashes later on from userspace, by
-requesting the kernel to install a breakpoint or watchpoint, as we can
-go idle at any point between the reset of the debug registers and their
-later use. This has always been the case.
+This is just a silly nit, but I would put (1 << 5) here
+for readability.
 
-Given that this has always been broken, no-one has complained until now,
-and there is no clear workaround, disable hardware breakpoints and
-watchpoints on Scorpion to avoid these issues.
+> +#define AXP20X_CHRG_CTRL1_TGT_4_2V     (2 << 5)
+> +#define AXP20X_CHRG_CTRL1_TGT_4_36V    (3 << 5)
+> +#define AXP20X_CHRG_CTRL1_TGT_CURR     GENMASK(3, 0)
+> +
+> +#define AXP22X_CHRG_CTRL1_TGT_4_22V    BIT(5)
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reported-by: Linus Walleij <linus.walleij@linaro.org>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: stable at vger.kernel.org
----
- arch/arm/include/asm/cputype.h  |  3 +++
- arch/arm/kernel/hw_breakpoint.c | 16 ++++++++++++++++
- 2 files changed, 19 insertions(+)
+Ditto.
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index 522b5fe..b62eaeb 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -94,6 +94,9 @@
- #define ARM_CPU_XSCALE_ARCH_V2		0x4000
- #define ARM_CPU_XSCALE_ARCH_V3		0x6000
- 
-+/* Qualcomm implemented cores */
-+#define ARM_CPU_PART_SCORPION		0x510002d0
-+
- extern unsigned int processor_id;
- 
- #ifdef CONFIG_CPU_CP15
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 188180b..5d68ff9 100644
---- a/arch/arm/kernel/hw_breakpoint.c
-+++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -1063,6 +1063,22 @@ static int __init arch_hw_breakpoint_init(void)
- 		return 0;
- 	}
- 
-+	/*
-+	 * Scorpion CPUs (at least those in APQ8060) seem to set DBGPRSR.SPD
-+	 * whenever a WFI is issued, even if the core is not powered down, in
-+	 * violation of the architecture.  When DBGPRSR.SPD is set, accesses to
-+	 * breakpoint and watchpoint registers are treated as undefined, so
-+	 * this results in boot time and runtime failures when these are
-+	 * accessed and we unexpectedly take a trap.
-+	 *
-+	 * It's not clear if/how this can be worked around, so we blacklist
-+	 * Scorpion CPUs to avoid these issues.
-+	*/
-+	if (read_cpuid_part() == ARM_CPU_PART_SCORPION) {
-+		pr_info("Scorpion CPU detected. Breakpoints and watchpoints disabled\n");
-+		return 0;
-+	}
-+
- 	has_ossr = core_has_os_save_restore();
- 
- 	/* Determine how many BRPs/WRPs are available. */
+> +#define AXP22X_CHRG_CTRL1_TGT_4_24V    (3 << 5)
+> +
+> +#define AXP20X_V_OFF_MASK              GENMASK(2, 0)
+> +
+> +struct axp20x_batt_ps {
+> +       struct regmap *regmap;
+> +       struct power_supply *batt;
+> +       struct axp20x_dev *axp20x;
+> +       struct iio_channel *batt_chrg_i;
+> +       struct iio_channel *batt_dischrg_i;
+> +       struct iio_channel *batt_v;
+> +       u8 axp_id;
+> +};
+> +
+[..]
+> +static int axp20x_power_probe(struct platform_device *pdev)
+> +{
+> +       struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
+> +       struct axp20x_batt_ps *axp20x_batt;
+> +       struct power_supply_config psy_cfg = {};
+> +
+
+To be consistent with the AC power supply and USB power supply,
+you might want to call of_device_is_available() here.
+Otherwise, the device probes even if "disabled" in the DTS.
+
+> +       axp20x_batt = devm_kzalloc(&pdev->dev, sizeof(*axp20x_batt),
+> +                                  GFP_KERNEL);
+> +       if (!axp20x_batt)
+> +               return -ENOMEM;
+> +
+
+Thanks for the good work,
 -- 
-1.9.1
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
