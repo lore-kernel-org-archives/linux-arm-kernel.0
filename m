@@ -1,67 +1,33 @@
 From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Thu,  5 Jan 2017 10:07:24 +0100
-Subject: [PATCH v8 3/5] ARM: dts: stm32: Add I2C1 support for STM32F429 SoC
+Date: Thu,  5 Jan 2017 10:07:26 +0100
+Subject: [PATCH v8 5/5] ARM: configs: stm32: Add I2C support for STM32
+ defconfig
 In-Reply-To: <1483607246-14771-1-git-send-email-cedric.madianga@gmail.com>
 References: <1483607246-14771-1-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <1483607246-14771-4-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <1483607246-14771-6-git-send-email-cedric.madianga@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds I2C1 support for STM32F429 SoC
+This patch adds I2C support for STM32 default configuration
 
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
 ---
- arch/arm/boot/dts/stm32f429.dtsi | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ arch/arm/configs/stm32_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index e4dae0e..5b063e9 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -48,6 +48,7 @@
- #include "skeleton.dtsi"
- #include "armv7-m.dtsi"
- #include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
-+#include <dt-bindings/mfd/stm32f4-rcc.h>
- 
- / {
- 	clocks {
-@@ -153,6 +154,18 @@
- 			status = "disabled";
- 		};
- 
-+		i2c1: i2c at 40005400 {
-+			compatible = "st,stm32f4-i2c";
-+			reg = <0x40005400 0x400>;
-+			interrupts = <31>,
-+				     <32>;
-+			resets = <&rcc STM32F4_APB1_RESET(I2C1)>;
-+			clocks = <&rcc 0 STM32F4_APB1_CLOCK(I2C1)>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		usart7: serial at 40007800 {
- 			compatible = "st,stm32-usart", "st,stm32-uart";
- 			reg = <0x40007800 0x400>;
-@@ -355,6 +368,16 @@
- 					slew-rate = <2>;
- 				};
- 			};
-+
-+			i2c1_pins_b: i2c1 at 0 {
-+				pins {
-+					pinmux = <STM32F429_PB9_FUNC_I2C1_SDA>,
-+						 <STM32F429_PB6_FUNC_I2C1_SCL>;
-+					bias-disable;
-+					drive-open-drain;
-+					slew-rate = <3>;
-+				};
-+			};
- 		};
- 
- 		rcc: rcc at 40023810 {
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index 5a72d69..323d2a3 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -47,6 +47,9 @@ CONFIG_SERIAL_NONSTANDARD=y
+ CONFIG_SERIAL_STM32=y
+ CONFIG_SERIAL_STM32_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
++CONFIG_I2C=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_STM32F4=y
+ # CONFIG_HWMON is not set
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_NEW_LEDS=y
 -- 
 1.9.1
