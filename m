@@ -1,83 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 5 Jan 2017 17:40:58 +0000
-Subject: [RFC PATCH 4/7] KVM: arm/arm64: Check that system supports split
- eoi/deactivate
-In-Reply-To: <20161210204712.21830-5-christoffer.dall@linaro.org>
-References: <20161210204712.21830-1-christoffer.dall@linaro.org>
- <20161210204712.21830-5-christoffer.dall@linaro.org>
-Message-ID: <7e44980f-d4b9-a5d0-b0a9-5424548300d8@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 5 Jan 2017 18:47:25 +0100
+Subject: [PATCH 1/5] drivers: mmc: sunxi: fix A64 calibration routine
+In-Reply-To: <1483398226-29321-2-git-send-email-andre.przywara@arm.com>
+References: <1483398226-29321-1-git-send-email-andre.przywara@arm.com>
+ <1483398226-29321-2-git-send-email-andre.przywara@arm.com>
+Message-ID: <20170105174725.kmr25iodjnjozqjm@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/16 20:47, Christoffer Dall wrote:
-> Some systems without proper firmware and/or hardware description data
-> don't support the split EOI and deactivate operation and therefore
-> don't provide an irq_set_vcpu_affinity implementation.  On such
-> systems, we cannot leave the physical interrupt active after the timer
-> handler on the host has run, so we cannot support KVM with the timer
-> changes we about to introduce.
+Hi,
+
+On Mon, Jan 02, 2017 at 11:03:42PM +0000, Andre Przywara wrote:
+> The calibration facility in the A64 MMC block seems to have been
+> misunderstood: the result value is not the value to program into the
+> delay bits, but is the number of delay cells that result in a full clock
+> cycle delay. So this value has to be scaled by the desired phase, which
+> we still have to know and program.
+> Change the calibration routine to take a phase parameter and scale the
+> calibration value accordingly.
+> Also introduce sun50i-a64 delay parameters to store the required phase.
+> Looking at the BSP kernel the sample delay for anything below HS200 is
+> 0, so we go with that value.
+> Once the driver supports HS200 and faster modes, we can enter confirmed
+> working values in there.
 > 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/arch_timer.c | 30 ++++++++++++++++++++++++++++++
->  1 file changed, 30 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index c7c3bfd..f27a086 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -418,6 +418,31 @@ static int kvm_timer_dying_cpu(unsigned int cpu)
->  	return 0;
->  }
->  
-> +static bool has_split_eoi_deactivate_support(void)
-> +{
-> +	struct irq_desc *desc;
-> +	struct irq_data *data;
-> +	struct irq_chip *chip;
-> +
-> +	/*
-> +	 * Check if split EOI and deactivate is supported on this machine.
-> +	 */
-> +	desc = irq_to_desc(host_vtimer_irq);
-> +	if (!desc) {
-> +		kvm_err("kvm_arch_timer: no host_vtimer_irq descriptor\n");
-> +		return false;
-> +	}
-> +
-> +	data = irq_desc_get_irq_data(desc);
-> +	chip = irq_data_get_irq_chip(data);
-> +	if (!chip || !chip->irq_set_vcpu_affinity) {
-> +		kvm_err("kvm_arch_timer: no split EOI/deactivate; abort\n");
-> +		return false;
-> +	}
-> +
-> +	return true;
-> +}
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-That feels really involved. How about reporting that we don't have a
-usable VGIC altogether from the GIC driver?
+Exactly how that works hasn't been confirmed, and the only thing that
+this patch actually do is... nothing, since the delay is always 0. If
+and when we get HS400 to work and we know for a fact how the
+calibration works, then we'll be able to use it. Until then, we can
+just clear those bits.
 
-> +
->  int kvm_timer_hyp_init(void)
->  {
->  	struct arch_timer_kvm_info *info;
-> @@ -449,6 +474,11 @@ int kvm_timer_hyp_init(void)
->  		return err;
->  	}
->  
-> +	if (!has_split_eoi_deactivate_support()) {
-> +		disable_percpu_irq(host_vtimer_irq);
-> +		return -ENODEV;
-> +	}
-> +
->  	kvm_info("virtual timer IRQ%d\n", host_vtimer_irq);
->  
->  	cpuhp_setup_state(CPUHP_AP_KVM_ARM_TIMER_STARTING,
-> 
+Maxime
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170105/6994a6ab/attachment.sig>
