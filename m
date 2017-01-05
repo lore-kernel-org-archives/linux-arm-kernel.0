@@ -1,88 +1,66 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu,  5 Jan 2017 11:29:56 -0800
-Subject: [PATCH v2 7/8] ARM: dts: kirkwood-mv88f6281gtw-ge: Utilize new DSA
- binding
-In-Reply-To: <20170105192957.14304-1-f.fainelli@gmail.com>
-References: <20170105192957.14304-1-f.fainelli@gmail.com>
-Message-ID: <20170105192957.14304-8-f.fainelli@gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 5 Jan 2017 21:40:59 +0200
+Subject: [PATCH v2] ARM: dts: Add missing CPU frequencies for
+ Exynos5422/5800
+In-Reply-To: <2c85559a-dc12-610b-c842-c89d078e1c2a@osg.samsung.com>
+References: <10512254.nyUcL0zgTP@amdc3058>
+ <CAD=FV=Wo273T20fe8D2v5Pn1HYR==7PHtr7WZGwzFPRspAYPzg@mail.gmail.com>
+ <20161229141707.qjrtjz7dik6a7l5s@kozik-lap>
+ <CAD=FV=WM_K_f0NQ0mxB55Ksbqg1gYJHs5d66ARYsa1=5hKLjXA@mail.gmail.com>
+ <2c85559a-dc12-610b-c842-c89d078e1c2a@osg.samsung.com>
+Message-ID: <20170105194059.bwpotpv3zjtvg5oz@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Utilize the new DSA binding, introduced with commit 8c5ad1d6179d ("net: dsa:
-Document new binding"). The legacy binding node is kept included, but is marked
-disabled.
+On Wed, Jan 04, 2017 at 08:57:47PM -0300, Javier Martinez Canillas wrote:
+> Hello Doug,
+> 
+> On 01/04/2017 06:05 PM, Doug Anderson wrote:
+> > Hi,
+> > 
+> > On Thu, Dec 29, 2016 at 6:17 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> >> On Thu, Dec 15, 2016 at 04:54:30PM -0800, Doug Anderson wrote:
+> >>>> Index: b/arch/arm/boot/dts/exynos5800.dtsi
+> >>>> ===================================================================
+> >>>> --- a/arch/arm/boot/dts/exynos5800.dtsi 2016-12-15 12:43:54.365955950 +0100
+> >>>> +++ b/arch/arm/boot/dts/exynos5800.dtsi 2016-12-15 12:43:54.361955949 +0100
+> >>>> @@ -24,6 +24,16 @@
+> >>>>  };
+> >>>>
+> >>>>  &cluster_a15_opp_table {
+> >>>> +       opp at 2000000000 {
+> >>>> +               opp-hz = /bits/ 64 <2000000000>;
+> >>>> +               opp-microvolt = <1250000>;
+> >>>> +               clock-latency-ns = <140000>;
+> >>>> +       };
+> >>>> +       opp at 1900000000 {
+> >>>> +               opp-hz = /bits/ 64 <1900000000>;
+> >>>> +               opp-microvolt = <1250000>;
+> >>>> +               clock-latency-ns = <140000>;
+> >>>> +       };
+> >>>
+> >>> I don't think the voltages you listed are high enough for all peach pi
+> >>> boards for A15 at 1.9 GHz and 2.0 GHz, at least based on the research
+> >>> I did.  See my response to v1.
+> >>
+> >> I wanted to apply this but saw this remaining issue. Javier tested it
+> >> on Peach Pi so is this concern still valid?
+> > 
+> > I'm not sure.  It's been years since I did anything with exynos, so I
+> > won't stand in the way if everyone else agrees that this patch is
+> > good, but I will point out that testing on a single Peach Pi board is
+> > not really enough given the massive difference in voltage needed
+> > between the highest ASV group and the lowest (a whopping 112.5 mV from
+> > looking in the Chrome OS source tree).
+> > 
+> 
+> I agree. That's why answered that I wasn't able to find regressions on the
+> Peach Pi I've access to, but I couldn't provide a Reviewed-by tag since it
+> wasn't clear to me that the values were safe for any Exynos5420/5422/5800.
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 49 ++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+The value of 1.250 V seems to be covering only half of ASV values for
+2.0 GHz so indeed it might be insufficient for some of the chips.
+Unfortunately...
 
-diff --git a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-index 172a38c0b8a9..327023a477b8 100644
---- a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-+++ b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-@@ -112,6 +112,8 @@
- 	};
- 
- 	dsa {
-+		status = "disabled";
-+
- 		compatible = "marvell,dsa";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -159,6 +161,53 @@
- 
- &mdio {
- 	status = "okay";
-+
-+	switch at 0 {
-+		compatible = "marvell,mv88e6085";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				label = "lan1";
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				label = "lan2";
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				label = "lan3";
-+			};
-+
-+			port at 3 {
-+				reg = <3>;
-+				label = "lan4";
-+			};
-+
-+			port at 4 {
-+				reg = <4>;
-+				label = "wan";
-+			};
-+
-+			port at 5 {
-+				reg = <5>;
-+				label = "cpu";
-+				ethernet = <&eth0port>;
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+		};
-+	};
- };
- 
- &eth0 {
--- 
-2.9.3
+Best regards,
+Krzysztof
