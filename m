@@ -1,84 +1,45 @@
-From: manu@bidouilliste.com (Emmanuel Vadot)
-Date: Thu, 5 Jan 2017 19:04:50 +0100
-Subject: [PATCH] ARM: dts: sunxi: Enable spi1 and spi2 for Olimex A20
- SOM EVB
-In-Reply-To: <20170105180151.gooxj3zy53hgojah@lukather>
-References: <20161226175349.17712-1-manu@bidouilliste.com>
- <20170105171601.us4wffupptilvvqp@lukather>
- <20170105183734.c56cf3e0be4ad4ac21028851@bidouilliste.com>
- <20170105180151.gooxj3zy53hgojah@lukather>
-Message-ID: <20170105190450.d29f27a40978bdf0faff2e65@bidouilliste.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Jan 2017 18:06:26 +0000
+Subject: [PATCH v3 7/9] arm64: cpufeature: Track user visible fields
+In-Reply-To: <1483552147-9605-8-git-send-email-suzuki.poulose@arm.com>
+References: <1483552147-9605-1-git-send-email-suzuki.poulose@arm.com>
+ <1483552147-9605-8-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20170105180626.GH29765@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Jan 2017 19:01:51 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On Wed, Jan 04, 2017 at 05:49:05PM +0000, Suzuki K. Poulose wrote:
+> Track the user visible fields of a CPU feature register. This will be
+> used for exposing the value to the userspace. All the user visible
+> fields of a feature register will be passed on as it is, while the
+> others would be filled with their respective safe value.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-> On Thu, Jan 05, 2017 at 06:37:34PM +0100, Emmanuel Vadot wrote:
-> > 
-> >  Hi,
-> > 
-> > On Thu, 5 Jan 2017 18:16:01 +0100
-> > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> > 
-> > > Hi,
-> > > 
-> > > On Mon, Dec 26, 2016 at 06:53:49PM +0100, Emmanuel Vadot wrote:
-> > > > Enable the spi1 and spi2 node since the pins are exposed on the UEXT
-> > > > connectors.
-> > > > 
-> > > > Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
-> > > > ---
-> > > >  arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 2 ++
-> > > >  1 file changed, 2 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-> > > > index 669a1c338c76..fa8c6f60552b 100644
-> > > > --- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-> > > > +++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-> > > > @@ -300,12 +300,14 @@
-> > > >  	pinctrl-names = "default";
-> > > >  	pinctrl-0 = <&spi1_pins_a>,
-> > > >  		    <&spi1_cs0_pins_a>;
-> > > > +	status = "okay";
-> > > >  };
-> > > >  
-> > > >  &spi2 {
-> > > >  	pinctrl-names = "default";
-> > > >  	pinctrl-0 = <&spi2_pins_a>,
-> > > >  		    <&spi2_cs0_pins_a>;
-> > > > +	status = "okay";
-> > > >  };
-> > > 
-> > > Those nodes don't exist unfortunately. Maybe you forgot to send one
-> > > patch?
-> > > 
-> > > Thanks!
-> > > Maxime
-> > > 
-> > > -- 
-> > > Maxime Ripard, Free Electrons
-> > > Embedded Linux and Kernel engineering
-> > > http://free-electrons.com
-> > 
-> >  It's based on a previous sent patch :
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2016-November/469288.html
-> > 
-> >  You said you'll squash the two commits.
-> 
-> Hmmm, indeed, I might have made a mistake on this one and ended up
-> dropping it... :/
-> 
-> I reapplied both and squashed them together, thanks (and sorry again)!
-> 
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
- No problem, thank you!
+> @@ -81,75 +82,75 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
+>  
+>  
+>  static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
+> -	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
+
+BTW, as a separate patch I think we need to expose the RDM field in this
+register as well, together with a corresponding HWCAP bit.
 
 -- 
-Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
+Catalin
