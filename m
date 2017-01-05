@@ -1,25 +1,51 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Thu, 5 Jan 2017 09:51:26 +0000
-Subject: [RFC 1/4] mm: remove unused TASK_SIZE_OF()
-In-Reply-To: <20161230155634.8692-2-dsafonov@virtuozzo.com>
-References: <20161230155634.8692-1-dsafonov@virtuozzo.com>
- <20161230155634.8692-2-dsafonov@virtuozzo.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DB0258289@AcuExch.aculab.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 5 Jan 2017 09:53:26 +0000
+Subject: [PATCH v6 03/14] ACPI: ARM64: IORT: add missing comment for
+ iort_dev_find_its_id()
+In-Reply-To: <4915fe90-ea61-45b5-491d-0628456abed2@linaro.org>
+References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
+ <1483363905-2806-4-git-send-email-hanjun.guo@linaro.org>
+ <20170104143442.GA8604@red-moon>
+ <4915fe90-ea61-45b5-491d-0628456abed2@linaro.org>
+Message-ID: <20170105095326.GA8988@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dmitry Safonov
-> Sent: 30 December 2016 15:57
-> All users of TASK_SIZE_OF(tsk) have migrated to mm->task_size or
-> TASK_SIZE_MAX since:
-> commit d696ca016d57 ("x86/fsgsbase/64: Use TASK_SIZE_MAX for
-> FSBASE/GSBASE upper limits"),
-> commit a06db751c321 ("pagemap: check permissions and capabilities at
-> open time"),
-...
-> +#define TASK_SIZE	        (current->thread.task_size)
+On Thu, Jan 05, 2017 at 02:05:06PM +0800, Hanjun Guo wrote:
+> On 2017/1/4 22:34, Lorenzo Pieralisi wrote:
+> >On Mon, Jan 02, 2017 at 09:31:34PM +0800, Hanjun Guo wrote:
+> >>We are missing req_id's comment for iort_dev_find_its_id(),
+> >>add it back.
+> >
+> >"Add missing req_id parameter to the iort_dev_find_its_id() function
+> >kernel-doc comment."
+> >
+> >>Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >>Tested-by: Majun <majun258@huawei.com>
+> >>Tested-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+> >>Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >>Cc: Tomasz Nowicki <tn@semihalf.com>
+> >>---
+> >> drivers/acpi/arm64/iort.c | 1 +
+> >> 1 file changed, 1 insertion(+)
+> >>
+> >>diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> >>index 46e2d82..174e983 100644
+> >>--- a/drivers/acpi/arm64/iort.c
+> >>+++ b/drivers/acpi/arm64/iort.c
+> >>@@ -446,6 +446,7 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+> >> /**
+> >>  * iort_dev_find_its_id() - Find the ITS identifier for a device
+> >>  * @dev: The device.
+> >>+ * @req_id: Device's Requster ID
+> >
+> >s/Requster/Requester
+> >
+> >We can send it upstream independently along with some other patches
+> >in this series but I will have a look at the whole series first.
+> 
+> Do you mean go to 4.10-rcx?
 
-I'm not sure I like he hidden 'current' argument to an
-apparent constant.
+Yes, technically it is a fix, not urgent at all though.
 
-	David
+Lorenzo
