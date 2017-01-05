@@ -1,36 +1,82 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 5 Jan 2017 09:58:51 -0800
-Subject: [PATCH] mtd: nand: lpc32xx: fix invalid error handling of a
- requested irq
-In-Reply-To: <20170103114746.141d7d7d@bbrezillon>
-References: <20161205014710.2015-1-vz@mleia.com>
- <20170103101259.0ec123df@bbrezillon>
- <72ab91ec-a919-af42-8a82-f5d99b245edf@mleia.com>
- <20170103114746.141d7d7d@bbrezillon>
-Message-ID: <20170105175851.GC50438@google.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 5 Jan 2017 19:01:51 +0100
+Subject: [PATCH] ARM: dts: sunxi: Enable spi1 and spi2 for Olimex A20 SOM
+ EVB
+In-Reply-To: <20170105183734.c56cf3e0be4ad4ac21028851@bidouilliste.com>
+References: <20161226175349.17712-1-manu@bidouilliste.com>
+ <20170105171601.us4wffupptilvvqp@lukather>
+ <20170105183734.c56cf3e0be4ad4ac21028851@bidouilliste.com>
+Message-ID: <20170105180151.gooxj3zy53hgojah@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 11:47:46AM +0100, Boris Brezillon wrote:
-> On Tue, 3 Jan 2017 12:16:26 +0200
-> Vladimir Zapolskiy <vz@mleia.com> wrote:
-> > On 01/03/2017 11:12 AM, Boris Brezillon wrote:
-> > > Do you need to backport this fix to stable releases? If that's the
-> > > case, I'll add the Cc: stable tag when applying.  
-> > 
-> > that will be great if you can add
-> > 
-> > Cc: stable at kernel.org # v4.7+
-> > 
-> > Please feel free to add also the tag
-> > 
-> > Fixes: 8cb17b5ed017 ("irqchip: Add LPC32xx interrupt controller driver")
+On Thu, Jan 05, 2017 at 06:37:34PM +0100, Emmanuel Vadot wrote:
 > 
-> Applied to nand/next (this patch will appear in 4.11).
+>  Hi,
+> 
+> On Thu, 5 Jan 2017 18:16:01 +0100
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > Hi,
+> > 
+> > On Mon, Dec 26, 2016 at 06:53:49PM +0100, Emmanuel Vadot wrote:
+> > > Enable the spi1 and spi2 node since the pins are exposed on the UEXT
+> > > connectors.
+> > > 
+> > > Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
+> > > ---
+> > >  arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 2 ++
+> > >  1 file changed, 2 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> > > index 669a1c338c76..fa8c6f60552b 100644
+> > > --- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> > > +++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> > > @@ -300,12 +300,14 @@
+> > >  	pinctrl-names = "default";
+> > >  	pinctrl-0 = <&spi1_pins_a>,
+> > >  		    <&spi1_cs0_pins_a>;
+> > > +	status = "okay";
+> > >  };
+> > >  
+> > >  &spi2 {
+> > >  	pinctrl-names = "default";
+> > >  	pinctrl-0 = <&spi2_pins_a>,
+> > >  		    <&spi2_cs0_pins_a>;
+> > > +	status = "okay";
+> > >  };
+> > 
+> > Those nodes don't exist unfortunately. Maybe you forgot to send one
+> > patch?
+> > 
+> > Thanks!
+> > Maxime
+> > 
+> > -- 
+> > Maxime Ripard, Free Electrons
+> > Embedded Linux and Kernel engineering
+> > http://free-electrons.com
+> 
+>  It's based on a previous sent patch :
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-November/469288.html
+> 
+>  You said you'll squash the two commits.
 
-For next time, checkpatch noticed that you got the stable address wrong:
+Hmmm, indeed, I might have made a mistake on this one and ended up
+dropping it... :/
 
-ERROR:STABLE_ADDRESS: The 'stable' address should be 'stable at vger.kernel.org'
-#17: Cc: stable at kernel.org # v4.7+
+I reapplied both and squashed them together, thanks (and sorry again)!
 
-Brian
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170105/a970b7d1/attachment-0001.sig>
