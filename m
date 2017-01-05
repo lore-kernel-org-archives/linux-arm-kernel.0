@@ -1,37 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Jan 2017 14:03:06 -0800
-Subject: [PATCH v2] soc: ti: Drop wait from wkup_m3_rproc_boot_thread
-In-Reply-To: <d98575a9-1863-88f0-d417-ae894db2dc55@oracle.com>
-References: <1483486889-3662-1-git-send-email-spjoshi@codeaurora.org>
- <482666d0-7915-ead2-c514-2651a4967a43@ti.com>
- <d98575a9-1863-88f0-d417-ae894db2dc55@oracle.com>
-Message-ID: <20170105220305.GT4310@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 5 Jan 2017 23:04:40 +0100
+Subject: [PATCH 3/6] clk: sunxi-ng: Add H5 clocks
+In-Reply-To: <20161226162518.5367-4-icenowy@aosc.xyz>
+References: <20161226162518.5367-1-icenowy@aosc.xyz>
+ <20161226162518.5367-4-icenowy@aosc.xyz>
+Message-ID: <20170105220440.x5gfw3z7axlrxwxh@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@oracle.com> [170105 13:18]:
+On Tue, Dec 27, 2016 at 12:25:15AM +0800, Icenowy Zheng wrote:
+> Add the H5 CCU clocks set based on the H3 one.
 > 
-> 
-> On 1/5/2017 1:08 PM, Suman Anna wrote:
-> > On 01/03/2017 05:41 PM, Sarangdhar Joshi wrote:
-> > > The function wkup_m3_rproc_boot_thread waits for
-> > > asynchronous firmware loading to parse the resource table
-> > > before calling rproc_boot(). However, as the resource table
-> > > parsing has been moved to rproc_boot(), there's no need to
-> > > wait for the asynchronous firmware loading completion.
-> > > So, drop this.
-> > > 
-> > > CC: Dave Gerlach <d-gerlach@ti.com>
-> > > CC: Suman Anna <s-anna@ti.com>
-> > > CC: Bjorn Andersson <bjorn.andersson@linaro.org>
-> > > Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
-> > 
-> > + Tony and Santosh, not sure who is picking up the wkup_m3 related patches.
-> > 
-> I think Tony has queued patches for wakeup_m3 before.
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-Sure I can queue it.
+Is there any difference with H3's?
 
-Thanks,
+Maxime
 
-Tony
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170105/c4135864/attachment.sig>
