@@ -1,21 +1,52 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Thu, 5 Jan 2017 12:03:04 +0100
-Subject: [PATCH v3] arm64: mm: Fix NOMAP page initialization
-In-Reply-To: <CAKv+Gu_SmTNguC=tSCwYOL2kx-DogLvSYRZc56eGP=JhdrUOsA@mail.gmail.com>
-References: <20161216165437.21612-1-rrichter@cavium.com>
- <CAKv+Gu_SmTNguC=tSCwYOL2kx-DogLvSYRZc56eGP=JhdrUOsA@mail.gmail.com>
-Message-ID: <20170105110304.GT4930@rric.localdomain>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Thu,  5 Jan 2017 16:37:53 +0530
+Subject: [PATCH v4 0/2] Broadcom FlexRM ring manager support
+Message-ID: <1483614475-3442-1-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.01.17 13:56:39, Ard Biesheuvel wrote:
-> Given that you are touching arch/arm/ as well as arch/arm64, could you
-> explain why only arm64 needs this treatment? Is it simply because we
-> don't have NUMA support there?
+The Broadcom FlexRM ring manager provides producer-consumer style
+ring interface for offload engines on Broadcom iProc SoCs. We can
+have one or more instances of Broadcom FlexRM ring manager in a SoC.
 
-I haven't considered a solution for arch/arm yet. The fixes are
-independent. But if that fix would be an excepted solution, it could
-be implemented for arm then too. But as you said, since probably only
-NUMA is affected, we might not need it there.
+This patchset adds a mailbox driver for Broadcom FlexRM ring manager
+which can be used by offload engine drivers as mailbox clients.
 
--Robert
+The Broadcom FlexRM mailbox driver is feature complete for RAID and
+Crypto offload engines. We will have incremental patches in-future
+for ring-level statistics using debugfs and minor optimizations.
+
+This patchset is based on Linux-4.10-rc2 and it is also available
+at flexrm-v4 branch of https://github.com/Broadcom/arm64-linux.git
+
+Changes since v3:
+ - Fixed mailbox client example DT node in DT bindings document
+
+Changes since v2:
+ - Rebased patches for Linux-4.10-rc2
+
+Changes since v1:
+ - Use compatile string as brcm,iproc-flexrm-mbox
+ - Rephrase commit message and text in DT bindings patch
+
+Anup Patel (2):
+  mailbox: Add driver for Broadcom FlexRM ring manager
+  dt-bindings: Add DT bindings info for FlexRM ring manager
+
+ .../bindings/mailbox/brcm,iproc-flexrm-mbox.txt    |  59 ++
+ drivers/mailbox/Kconfig                            |  11 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/mailbox-flexrm/Makefile            |   6 +
+ drivers/mailbox/mailbox-flexrm/flexrm-desc.c       | 764 +++++++++++++++++++
+ drivers/mailbox/mailbox-flexrm/flexrm-desc.h       |  47 ++
+ drivers/mailbox/mailbox-flexrm/flexrm-main.c       | 829 +++++++++++++++++++++
+ include/linux/mailbox/brcm-message.h               |  14 +-
+ 8 files changed, 1728 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
+ create mode 100644 drivers/mailbox/mailbox-flexrm/Makefile
+ create mode 100644 drivers/mailbox/mailbox-flexrm/flexrm-desc.c
+ create mode 100644 drivers/mailbox/mailbox-flexrm/flexrm-desc.h
+ create mode 100644 drivers/mailbox/mailbox-flexrm/flexrm-main.c
+
+-- 
+2.7.4
