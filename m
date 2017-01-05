@@ -1,28 +1,72 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 05 Jan 2017 15:07:20 +0100
-Subject: [PATCH v1 0/3] soc: rockchip: power-domain: support RK3328 SoC
-In-Reply-To: <1482464872-12954-1-git-send-email-zhangqing@rock-chips.com>
-References: <1482464872-12954-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <4525049.9DCCQ7XhES@phil>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Thu, 5 Jan 2017 15:09:24 +0100
+Subject: [PATCHv2 0/5] Support for Marvell switches with integrated CPUs
+In-Reply-To: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
+References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <CAPv3WKcT8MxX+g12C1o81MmQJWRt7Rpd-hgBh8rTpLOS3vdtqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 23. Dezember 2016, 11:47:49 CET schrieb Elaine Zhang:
-> Elaine Zhang (3):
->   dt/bindings: power: add RK3328 SoCs header for idle-request
->   dt-bindings: add binding for rk3328 power domains
->   soc: rockchip: power-domain: Modify power domain driver for rk3328
-> 
->  .../bindings/soc/rockchip/power_domain.txt         |  3 ++
->  drivers/soc/rockchip/pm_domains.c                  | 63
-> +++++++++++++++++++--- include/dt-bindings/power/rk3328-power.h           |
-> 18 +++++++
->  3 files changed, 78 insertions(+), 6 deletions(-)
->  create mode 100644 include/dt-bindings/power/rk3328-power.h
+Hi Chris,
 
-I've split patch 3 into two parts (hiword support and rk3328 addition) and 
-applied all for 4.11
+Thanks a lot for your work and v2. Can you please add changelog
+between patchset versions in your cover letter?
 
+Best regards,
+Marcin
 
-Thanks
-Heiko
+2017-01-05 4:36 GMT+01:00 Chris Packham <chris.packham@alliedtelesis.co.nz>:
+> The 98DX3236, 98DX3336 and 98DX4251 are a set of switch ASICs with
+> integrated CPUs. They CPU block is common within these product lines and
+> (as far as I can tell/have been told) is based on the Armada XP. There
+> are a few differences due to the fact they have to squeeze the CPU into
+> the same package as the switch.
+>
+> Chris Packham (4):
+>   clk: mvebu: support for 98DX3236 SoC
+>   arm: mvebu: support for SMP on 98DX3336 SoC
+>   arm: mvebu: Add device tree for 98DX3236 SoCs
+>   arm: mvebu: Add device tree for db-dxbc2 and db-xc3-24g4xg boards
+>
+> Kalyan Kinthada (1):
+>   pinctrl: mvebu: pinctrl driver for 98DX3236 SoC
+>
+>  Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
+>  .../bindings/arm/marvell/98dx3236-resume-ctrl.txt  |  18 ++
+>  .../devicetree/bindings/arm/marvell/98dx3236.txt   |  23 ++
+>  .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   1 +
+>  .../pinctrl/marvell,armada-98dx3236-pinctrl.txt    |  46 ++++
+>  arch/arm/boot/dts/armada-xp-98dx3236.dtsi          | 247 +++++++++++++++++++++
+>  arch/arm/boot/dts/armada-xp-98dx3336.dtsi          |  78 +++++++
+>  arch/arm/boot/dts/armada-xp-98dx4251.dtsi          |  92 ++++++++
+>  arch/arm/boot/dts/db-dxbc2.dts                     | 159 +++++++++++++
+>  arch/arm/boot/dts/db-xc3-24g4xg.dts                | 155 +++++++++++++
+>  arch/arm/mach-mvebu/Makefile                       |   1 +
+>  arch/arm/mach-mvebu/common.h                       |   1 +
+>  arch/arm/mach-mvebu/platsmp.c                      |  43 ++++
+>  arch/arm/mach-mvebu/pmsu-98dx3236.c                |  69 ++++++
+>  drivers/clk/mvebu/Makefile                         |   2 +-
+>  drivers/clk/mvebu/armada-xp.c                      |  42 ++++
+>  drivers/clk/mvebu/clk-cpu.c                        |  33 ++-
+>  drivers/clk/mvebu/mv98dx3236-corediv.c             | 207 +++++++++++++++++
+>  drivers/pinctrl/mvebu/pinctrl-armada-xp.c          | 155 +++++++++++++
+>  19 files changed, 1369 insertions(+), 4 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/marvell/98dx3236-resume-ctrl.txt
+>  create mode 100644 Documentation/devicetree/bindings/arm/marvell/98dx3236.txt
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-98dx3236-pinctrl.txt
+>  create mode 100644 arch/arm/boot/dts/armada-xp-98dx3236.dtsi
+>  create mode 100644 arch/arm/boot/dts/armada-xp-98dx3336.dtsi
+>  create mode 100644 arch/arm/boot/dts/armada-xp-98dx4251.dtsi
+>  create mode 100644 arch/arm/boot/dts/db-dxbc2.dts
+>  create mode 100644 arch/arm/boot/dts/db-xc3-24g4xg.dts
+>  create mode 100644 arch/arm/mach-mvebu/pmsu-98dx3236.c
+>  create mode 100644 drivers/clk/mvebu/mv98dx3236-corediv.c
+>
+> --
+> 2.11.0.24.ge6920cf
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
