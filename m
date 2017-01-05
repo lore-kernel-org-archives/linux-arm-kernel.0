@@ -1,88 +1,84 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Thu, 5 Jan 2017 11:20:57 -0800
-Subject: [PATCH v2 04/19] ARM: dts: imx6-sabrelite: add OV5642 and OV5640
- camera sensors
-In-Reply-To: <0a343705-1d38-9fe2-6419-56ab9bdfb0c2@mentor.com>
-References: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
- <1483477049-19056-5-git-send-email-steve_longerbeam@mentor.com>
- <0a343705-1d38-9fe2-6419-56ab9bdfb0c2@mentor.com>
-Message-ID: <d9f31e15-39b7-3c31-e45f-b19c0dd1e791@gmail.com>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Thu,  5 Jan 2017 19:04:42 +0000
+Subject: [PATCH v6 14/18] irqdomain: irq_domain_check_msi_remap
+In-Reply-To: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
+References: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1483643086-2883-15-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+This new function checks whether all MSI irq domains
+implement IRQ remapping. This is useful to understand
+whether VFIO passthrough is safe with respect to interrupts.
 
+On ARM typically an MSI controller can sit downstream
+to the IOMMU without preventing VFIO passthrough.
+As such any assigned device can write into the MSI doorbell.
+In case the MSI controller implements IRQ remapping, assigned
+devices will not be able to trigger interrupts towards the
+host. On the contrary, the assignment must be emphasized as
+unsafe with respect to interrupts.
 
-On 01/04/2017 04:25 AM, Vladimir Zapolskiy wrote:
-> Hi Steve,
->
-> On 01/03/2017 10:57 PM, Steve Longerbeam wrote:
->> Enables the OV5642 parallel-bus sensor, and the OV5640 MIPI CSI-2 sensor.
->> Both hang off the same i2c2 bus, so they require different (and non-
->> default) i2c slave addresses.
->>
->> The OV5642 connects to the parallel-bus mux input port on ipu1_csi0_mux.
->>
->> The OV5640 connects to the input port on the MIPI CSI-2 receiver on
->> mipi_csi. It is set to transmit over MIPI virtual channel 1.
->>
->> Note there is a pin conflict with GPIO6. This pin functions as a power
->> input pin to the OV5642, but ENET uses it as the h/w workaround for
->> erratum ERR006687, to wake-up the ARM cores on normal RX and TX packet
->> done events (see 6261c4c8). So workaround 6261c4c8 is reverted here to
->> support the OV5642, and the "fsl,err006687-workaround-present" boolean
->> also must be removed. The result is that the CPUidle driver will no longer
->> allow entering the deep idle states on the sabrelite.
-> For me it sounds like a candidate of its own separate change.
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
-Yes, I split out the two partial reverts into a separate commit
-("ARM: dts: imx6qdl-sabrelite: remove erratum ERR006687
-  workaround").
+---
+v5 -> v6:
+- use irq_domain_hierarchical_is_msi_remap()
+- comment rewording
 
->
->
->
->> +
->> +	mipi_camera: ov5640 at 40 {
-> Please reorder device nodes by address value,
+v4 -> v5:
+- Handle DOMAIN_BUS_FSL_MC_MSI domains
+- Check parents
+---
+ include/linux/irqdomain.h |  1 +
+ kernel/irq/irqdomain.c    | 23 +++++++++++++++++++++++
+ 2 files changed, 24 insertions(+)
 
-done.
-
->   also according to ePAPR
-> node names should be generic, labels can be specific:
->
-> 	ov5640: camera at 40 {
-> 		...
-> 	};
->
-> 	ov5642: camera at 42 {
-> 		...
-> 	};
-
-fixed.
-
->
->> +		pinctrl_ipu1_csi0: ipu1grp-csi0 {
-> Please rename node name to ipu1csi0grp.
-
-done.
-
->
->> +
->> +                pinctrl_ov5640: ov5640grp {
->> +                        fsl,pins = <
->> +				MX6QDL_PAD_NANDF_D5__GPIO2_IO05 0x000b0
->> +				MX6QDL_PAD_NANDF_WP_B__GPIO6_IO09 0x0b0b0
->> +                        >;
->> +                };
->> +
-> Indentation issues above, please use tabs instead of spaces.
-
-fixed.
-
->
-> Also please add new pin control groups preserving the alphanimerical order.
-
-done.
-
-Steve
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index bc2f571..188eced 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -222,6 +222,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
+ 					 void *host_data);
+ extern struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+ 						   enum irq_domain_bus_token bus_token);
++extern bool irq_domain_check_msi_remap(void);
+ extern void irq_set_default_host(struct irq_domain *host);
+ extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
+ 				  irq_hw_number_t hwirq, int node,
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 6a946c4..f3fbd85d 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -278,6 +278,29 @@ struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+ EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
+ 
+ /**
++ * irq_domain_check_msi_remap - Check whether all MSI
++ * irq domains implement IRQ remapping
++ */
++bool irq_domain_check_msi_remap(void)
++{
++	struct irq_domain *h;
++	bool ret = true;
++
++	mutex_lock(&irq_domain_mutex);
++	list_for_each_entry(h, &irq_domain_list, link) {
++		if (irq_domain_is_msi(h) &&
++		    !irq_domain_hierarchical_is_msi_remap(h)) {
++			ret = false;
++			goto out;
++		}
++	}
++out:
++	mutex_unlock(&irq_domain_mutex);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(irq_domain_check_msi_remap);
++
++/**
+  * irq_set_default_host() - Set a "default" irq domain
+  * @domain: default domain pointer
+  *
+-- 
+1.9.1
