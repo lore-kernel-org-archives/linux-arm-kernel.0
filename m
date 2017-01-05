@@ -1,115 +1,37 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Thu, 05 Jan 2017 11:38:49 +0000
-Subject: [PATCH 4/4] watchdog: tangox: Use watchdog core to install
- restart handler
-In-Reply-To: <df7b5570-a44d-0c25-fedd-03a0891fdff3@sigmadesigns.com> (Marc
- Gonzalez's message of "Thu, 5 Jan 2017 10:42:19 +0100")
-References: <1483565318-25578-1-git-send-email-linux@roeck-us.net>
- <1483565318-25578-4-git-send-email-linux@roeck-us.net>
- <df7b5570-a44d-0c25-fedd-03a0891fdff3@sigmadesigns.com>
-Message-ID: <yw1xmvf5ohx2.fsf@unicorn.mansr.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Thu, 5 Jan 2017 05:42:54 -0600
+Subject: [PATCH 08/12] ARM: dts: socfpga: Add NAND device tree for Arria10
+In-Reply-To: <73a8b5ga1v.fsf@pengutronix.de>
+References: <1483575694-29599-1-git-send-email-dinguyen@kernel.org>
+ <1483575694-29599-9-git-send-email-dinguyen@kernel.org>
+ <73a8b5ga1v.fsf@pengutronix.de>
+Message-ID: <7b15c95e-6d9f-bb2e-8c73-2f01dc3c8af2@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-> [ Adding Mans ]
->
-> Guenter, patch c7ef68c32265 states "Fixes: a3e376d26ace".
-> Is that true? I mean, they seem quite orthogonal; then again I know
-> nothing of this framework.
 
-I don't see the relation of either of those to this patch.
+On 01/05/2017 02:55 AM, Steffen Trumtrar wrote:
 
-> On 04/01/2017 22:28, Guenter Roeck wrote:
->> Use the infrastructure provided by the watchdog core to install
->> the restart handler.
->> 
->> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
->> ---
->>  drivers/watchdog/tangox_wdt.c | 32 +++++++++++---------------------
->>  1 file changed, 11 insertions(+), 21 deletions(-)
->> 
->> diff --git a/drivers/watchdog/tangox_wdt.c b/drivers/watchdog/tangox_wdt.c
->> index 202c4b9cc921..49e6e805db7c 100644
->> --- a/drivers/watchdog/tangox_wdt.c
->> +++ b/drivers/watchdog/tangox_wdt.c
->> @@ -15,9 +15,7 @@
->>  #include <linux/kernel.h>
->>  #include <linux/module.h>
->>  #include <linux/moduleparam.h>
->> -#include <linux/notifier.h>
->>  #include <linux/platform_device.h>
->> -#include <linux/reboot.h>
->>  #include <linux/watchdog.h>
->>  
->>  #define DEFAULT_TIMEOUT 30
->> @@ -47,7 +45,6 @@ struct tangox_wdt_device {
->>  	void __iomem *base;
->>  	unsigned long clk_rate;
->>  	struct clk *clk;
->> -	struct notifier_block restart;
->>  };
->>  
->>  static int tangox_wdt_set_timeout(struct watchdog_device *wdt,
->> @@ -96,24 +93,24 @@ static const struct watchdog_info tangox_wdt_info = {
->>  	.identity = "tangox watchdog",
->>  };
->>  
->> +static int tangox_wdt_restart(struct watchdog_device *wdt,
->> +			      unsigned long action, void *data)
->> +{
->> +	struct tangox_wdt_device *dev = watchdog_get_drvdata(wdt);
+>> +#include "socfpga_arria10_socdk.dtsi"
 >> +
->> +	writel(1, dev->base + WD_COUNTER);
+>> +/ {
+>> +	soc {
+>> +		nand: nand at ffb90000 {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +			status = "okay";
 >> +
->> +	return 0;
->> +}
->> +
->>  static const struct watchdog_ops tangox_wdt_ops = {
->>  	.start		= tangox_wdt_start,
->>  	.stop		= tangox_wdt_stop,
->>  	.set_timeout	= tangox_wdt_set_timeout,
->>  	.get_timeleft	= tangox_wdt_get_timeleft,
->> +	.restart	= tangox_wdt_restart,
->>  };
->>  
->> -static int tangox_wdt_restart(struct notifier_block *nb, unsigned long action,
->> -			      void *data)
->> -{
->> -	struct tangox_wdt_device *dev =
->> -		container_of(nb, struct tangox_wdt_device, restart);
->> -
->> -	writel(1, dev->base + WD_COUNTER);
->> -
->> -	return NOTIFY_DONE;
->> -}
->> -
->>  static int tangox_wdt_probe(struct platform_device *pdev)
->>  {
->>  	struct tangox_wdt_device *dev;
->> @@ -180,12 +177,6 @@ static int tangox_wdt_probe(struct platform_device *pdev)
->>  
->>  	platform_set_drvdata(pdev, dev);
->>  
->> -	dev->restart.notifier_call = tangox_wdt_restart;
->> -	dev->restart.priority = 128;
->> -	err = register_restart_handler(&dev->restart);
->> -	if (err)
->> -		dev_warn(&pdev->dev, "failed to register restart handler\n");
->> -
->>  	dev_info(&pdev->dev, "SMP86xx/SMP87xx watchdog registered\n");
->>  
->>  	return 0;
->> @@ -202,7 +193,6 @@ static int tangox_wdt_remove(struct platform_device *pdev)
->>  	tangox_wdt_stop(&dev->wdt);
->>  	clk_disable_unprepare(dev->clk);
->>  
->> -	unregister_restart_handler(&dev->restart);
->>  	watchdog_unregister_device(&dev->wdt);
->>  
->>  	return 0;
->> 
+>> +			compatible = "denali,denali-nand-dt", "altr,socfpga-denali-nand";
+>> +			reg = <0xffb90000 0x72000>, <0xffb80000 0x10000>;
+>> +			reg-names = "nand_data", "denali_reg";
+>> +			interrupts = <0 99 4>;
+>> +			dma-mask = <0xffffffff>;
+>> +			clocks = <&nand_clk>;
+> 
+> This belongs into the socfpga_arria10.dtsi.
+> 
 
--- 
-M?ns Rullg?rd
+Ah yes, you're right. Thanks for the review.
+
+Dinh
