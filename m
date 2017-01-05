@@ -1,57 +1,42 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 5 Jan 2017 20:41:40 +0200
-Subject: [PATCH v2 4/4] arm64: dts: exynos: Add tm2 touchkey node
-In-Reply-To: <1483604833-29746-5-git-send-email-jcsing.lee@samsung.com>
-References: <1483604833-29746-1-git-send-email-jcsing.lee@samsung.com>
- <CGME20170105082716epcas1p100f48f22d5ff0bad7776f6d7b444daf3@epcas1p1.samsung.com>
- <1483604833-29746-5-git-send-email-jcsing.lee@samsung.com>
-Message-ID: <20170105184140.tongd3evzm57qkps@kozik-lap>
+From: david@lechnology.com (David Lechner)
+Date: Thu,  5 Jan 2017 12:54:16 -0600
+Subject: [PATCH v3 0/4] TI DA8xx/OMAPL13x/AM17xx/AM18xx/66AK2x UART
+Message-ID: <1483642460-6891-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 05:27:13PM +0900, Jaechul Lee wrote:
-> Add DT node support for TM2 touchkey device.
-> 
-> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
-> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+This series adds a new UART port type for TI DA8xx/OMAPL13x/AM17xx/AM18xx/66AK2x
+UART. These SoCs have a non-standard register for UART power management that
+needs special handling in the UART driver.
 
-Although I said the patch looks correct, it was not an explicit Review
-(and we have a quite serious "Reviewer's statement of oversight") so my
-tag should not be added.
+Greg, the first two patches will need to go through your tree. Sekhar and
+Santosh will pick up the 3 and 4 patches respectively.
 
-No harm was done, but I prefer clearly and explicitly given tags.
+v3 changes:
+* Shortened list of SoCs to "DA8xx/66AK2x"
 
-Best regards,
-Krzysztof
+v2 changes:
+* Added references to C66x SoC in various places, which I assume is an OK
+  shorthand for TI Keystone processors.
+* New patch for Keystone device tree. This is untested as I don't have any
+  Keystone boards.
 
-> ---
->  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-> index aa8584a..dad6fb8 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-> @@ -17,3 +17,16 @@
->  	model = "Samsung TM2 board";
->  	compatible = "samsung,tm2", "samsung,exynos5433";
->  };
-> +
-> +&hsi2c_9 {
-> +	status = "okay";
-> +
-> +	touchkey at 20 {
-> +		compatible = "samsung,tm2-touchkey";
-> +		reg = <0x20>;
-> +		interrupt-parent = <&gpa3>;
-> +		interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
-> +		vcc-supply = <&ldo32_reg>;
-> +		vdd-supply = <&ldo33_reg>;
-> +	};
-> +};
-> -- 
-> 2.7.4
-> 
+David Lechner (4):
+  doc: DT: Add ti,da830-uart to serial/8250 bindings
+  serial: 8250: Add new port type for TI DA8xx/66AK2x
+  ARM: da850: Add ti,da830-uart compatible for serial ports
+  ARM: dts: keystone: Add "ti,da830-uart" compatible string
+
+ Documentation/devicetree/bindings/serial/8250.txt |  1 +
+ arch/arm/boot/dts/da850.dtsi                      |  9 ++++++---
+ arch/arm/boot/dts/keystone-k2g.dtsi               |  2 +-
+ arch/arm/boot/dts/keystone-k2l.dtsi               |  4 ++--
+ arch/arm/boot/dts/keystone.dtsi                   |  4 ++--
+ drivers/tty/serial/8250/8250_of.c                 |  1 +
+ drivers/tty/serial/8250/8250_port.c               | 22 ++++++++++++++++++++++
+ include/uapi/linux/serial_core.h                  |  3 ++-
+ include/uapi/linux/serial_reg.h                   |  8 ++++++++
+ 9 files changed, 45 insertions(+), 9 deletions(-)
+
+-- 
+2.7.4
