@@ -1,9 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu,  5 Jan 2017 11:29:54 -0800
-Subject: [PATCH v2 5/8] ARM: dts: kirkwood-dir665: Utilize new DSA binding
+Date: Thu,  5 Jan 2017 11:29:57 -0800
+Subject: [PATCH v2 8/8] ARM: dts: kirkwood-rd88f6281: Utilize new DSA binding
 In-Reply-To: <20170105192957.14304-1-f.fainelli@gmail.com>
 References: <20170105192957.14304-1-f.fainelli@gmail.com>
-Message-ID: <20170105192957.14304-6-f.fainelli@gmail.com>
+Message-ID: <20170105192957.14304-9-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,14 +13,34 @@ disabled.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/boot/dts/kirkwood-dir665.dts | 49 +++++++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+ arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts | 11 ++++++++
+ arch/arm/boot/dts/kirkwood-rd88f6281.dtsi   | 44 +++++++++++++++++++++++++++++
+ 2 files changed, 55 insertions(+)
 
-diff --git a/arch/arm/boot/dts/kirkwood-dir665.dts b/arch/arm/boot/dts/kirkwood-dir665.dts
-index 41acbb6dd6ab..4d2b15d6244a 100644
---- a/arch/arm/boot/dts/kirkwood-dir665.dts
-+++ b/arch/arm/boot/dts/kirkwood-dir665.dts
-@@ -194,6 +194,8 @@
+diff --git a/arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts b/arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts
+index 1a797381d3d4..6a4a65ec7944 100644
+--- a/arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts
++++ b/arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts
+@@ -33,3 +33,14 @@
+ &eth1 {
+       status = "disabled";
+ };
++
++&switch {
++	reg = <0>;
++
++	ports {
++		port at 4 {
++			reg = <4>;
++			label = "wan";
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/kirkwood-rd88f6281.dtsi b/arch/arm/boot/dts/kirkwood-rd88f6281.dtsi
+index d5aacf137e40..91f5da5dae5f 100644
+--- a/arch/arm/boot/dts/kirkwood-rd88f6281.dtsi
++++ b/arch/arm/boot/dts/kirkwood-rd88f6281.dtsi
+@@ -54,6 +54,8 @@
  	};
  
  	dsa {
@@ -29,16 +49,15 @@ index 41acbb6dd6ab..4d2b15d6244a 100644
  		compatible = "marvell,dsa";
  		#address-cells = <2>;
  		#size-cells = <0>;
-@@ -241,6 +243,53 @@
+@@ -115,6 +117,48 @@
  
  &mdio {
  	status = "okay";
 +
-+	switch at 0 {
++	switch: switch at 0 {
 +		compatible = "marvell,mv88e6085";
 +		#address-cells = <1>;
 +		#size-cells = <0>;
-+		reg = <0>;
 +
 +		ports {
 +			#address-cells = <1>;
@@ -46,31 +65,26 @@ index 41acbb6dd6ab..4d2b15d6244a 100644
 +
 +			port at 0 {
 +				reg = <0>;
-+				label = "lan4";
++				label = "lan1";
 +			};
 +
 +			port at 1 {
-+			       reg = <1>;
-+			       label = "lan3";
++				reg = <1>;
++				label = "lan2";
 +			};
 +
 +			port at 2 {
-+			       reg = <2>;
-+			       label = "lan2";
++				reg = <2>;
++				label = "lan3";
 +			};
 +
 +			port at 3 {
-+			       reg = <3>;
-+			       label = "lan1";
++				reg = <3>;
++				label = "lan4";
 +			};
 +
-+			port at 4 {
-+				reg = <4>;
-+				label = "wan";
-+			};
-+
-+			port at 6 {
-+				reg = <6>;
++			port at 5 {
++				reg = <5>;
 +				label = "cpu";
 +				ethernet = <&eth0port>;
 +				fixed-link {
@@ -78,10 +92,11 @@ index 41acbb6dd6ab..4d2b15d6244a 100644
 +					full-duplex;
 +				};
 +			};
++
 +		};
 +	};
  };
  
- /* eth0 is connected to a Marvell 88E6171 switch, without a PHY. So set
+ &eth0 {
 -- 
 2.9.3
