@@ -1,51 +1,71 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 5 Jan 2017 14:42:15 +0800
-Subject: [PATCH v2 2/2] phy: sun4i-usb: Replace the deprecated extcon API
-In-Reply-To: <1483071089-8362-3-git-send-email-cw00.choi@samsung.com>
-References: <CGME20161230041136epcas5p4719845a9e04914e91dd6dac1a5d257ef@epcas5p4.samsung.com>
- <1483071089-8362-1-git-send-email-cw00.choi@samsung.com>
- <1483071089-8362-3-git-send-email-cw00.choi@samsung.com>
-Message-ID: <CAGb2v64BCKWFP595M0Z+ysLwsRMp05jahFzywx+-QDfhPwTjhg@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 5 Jan 2017 14:46:53 +0800
+Subject: [PATCH v6 1/5] dt-bindings: zte: documents zx2967 power domain
+ driver bindings
+In-Reply-To: <1483530494-14177-1-git-send-email-baoyou.xie@linaro.org>
+References: <1483530494-14177-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170105064651.GA4667@x250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 30, 2016 at 12:11 PM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> This patch replaces the deprecated extcon API as following:
-> - extcon_set_cable_state_() -> extcon_set_state_sync()
->
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+On Wed, Jan 04, 2017 at 07:48:10PM +0800, Baoyou Xie wrote:
+> This patch documents devicetree tree bindings for the ZTE zx2967
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+'devicetree' is good enough, and the 'tree' after it is redundant.
 
+> power domain driver.
+
+DT bindings is to describe hardware block not software, so the word like
+'driver' is not appropriate.  So please drop it from here and the patch
+subject.
+
+> 
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 > ---
->  drivers/phy/phy-sun4i-usb.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index bf28a0fdd569..eae171e18043 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -534,7 +534,7 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
->         mutex_unlock(&phy0->mutex);
->
->         if (id_notify) {
-> -               extcon_set_cable_state_(data->extcon, EXTCON_USB_HOST,
-> +               extcon_set_state_sync(data->extcon, EXTCON_USB_HOST,
->                                         !id_det);
->                 /* When leaving host mode force end the session here */
->                 if (force_session_end && id_det == 1) {
-> @@ -547,7 +547,7 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
->         }
->
->         if (vbus_notify)
-> -               extcon_set_cable_state_(data->extcon, EXTCON_USB, vbus_det);
-> +               extcon_set_state_sync(data->extcon, EXTCON_USB, vbus_det);
->
->         if (sun4i_usb_phy0_poll(data))
->                 queue_delayed_work(system_wq, &data->detect, POLL_TIME);
-> --
-> 1.9.1
->
+>  Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt b/Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt
+> new file mode 100644
+> index 0000000..1476318
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt
+> @@ -0,0 +1,17 @@
+> +* ZTE 2967 SoC Power Domains
+
+ZTE ZX2967 family.  And this is a bindings document for PCU, IMO.  And
+do we know the full name of abbreviation 'PCU'?  Power Control Unit?
+
+> +
+> +2967 processors include support for multiple power domains which are used
+
+ZX2967 family
+
+> +to gate power to one or more peripherals on the processor.
+> +
+> +Required Properties:
+> +- compatible: should be one of the following.
+> +    * zte,zx296718-pcu - for zx296718 board's power domain.
+
+Drop 'board's'.
+
+> +- reg: physical base address of the controller and length of memory mapped
+> +    region.
+> +
+> +Example:
+> +
+> +	pcu_domain: pcu at 0x00117000 {
+
+The unit-address in node name shouldn't have 0x and leading zeros.
+
+	pcu_domain: pcu at 117000 {
+
+Shawn
+
+> +		compatible = "zte,zx296718-pcu";
+> +		reg = <0x00117000 0x1000>;
+> +	};
+> -- 
+> 2.7.4
+> 
