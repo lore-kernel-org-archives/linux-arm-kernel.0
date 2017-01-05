@@ -1,48 +1,66 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Thu, 5 Jan 2017 13:22:00 +0100
-Subject: [PATCH 2/2] arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA
-In-Reply-To: <20170105120819.GH679@arm.com>
-References: <1481706707-6211-1-git-send-email-ard.biesheuvel@linaro.org>
- <1481706707-6211-3-git-send-email-ard.biesheuvel@linaro.org>
- <20170104132831.GD18193@arm.com>
- <CAKv+Gu8MdpVDCSjfum7AMtbgR6cTP5H+67svhDSu6bkaijvvyg@mail.gmail.com>
- <20170104140223.GF18193@arm.com>
- <20170105112407.GU4930@rric.localdomain>
- <20170105120819.GH679@arm.com>
-Message-ID: <20170105122200.GV4930@rric.localdomain>
+From: manish.narani@xilinx.com (Manish Narani)
+Date: Thu, 5 Jan 2017 12:24:01 +0000
+Subject: [RFC PATCH] usb: dwc3: host: add support for OTG in DWC3 host
+ driver
+In-Reply-To: <87o9znvtl3.fsf@linux.intel.com>
+References: <1483536181-22356-1-git-send-email-mnarani@xilinx.com>
+ <1483536181-22356-5-git-send-email-mnarani@xilinx.com>
+ <87o9znvtl3.fsf@linux.intel.com>
+Message-ID: <B2EF86ADE403CA4A85AF1BE1D3A22A06DB2FC0@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.01.17 12:08:20, Will Deacon wrote:
-> On Thu, Jan 05, 2017 at 12:24:07PM +0100, Robert Richter wrote:
-> > On 04.01.17 14:02:23, Will Deacon wrote:
-> > > Using early_pfn_valid feels like a bodge to me, since having pfn_valid
-> > > return false for something that early_pfn_valid says is valid (and is
-> > > therefore initialised in the memmap) makes the NOMAP semantics even more
-> > > confusing.
-> > 
-> > The concern I have had with HOLES_IN_ZONE is that it enables
-> > pfn_valid_within() for arm64. This means that each pfn of a section is
-> > checked which is done only once for the section otherwise. With up to
-> > 2^18 pages per section we traverse the memblock list by that factor
-> > more often. There could be a performance regression.
+Hi Felipe,
+
+> -----Original Message-----
+> From: Felipe Balbi [mailto:balbi at kernel.org]
+> Sent: Wednesday, January 04, 2017 7:03 PM
 > 
-> There could be, but we're trying to fix a bug here. I wouldn't have
-> thought that walking over pfns like that is done very often.
-
-The bug happens on a small number of machines depending on the memory
-layout. The fix affects all systems. And right know the impact is
-unclear.
-
-> > I haven't numbers yet, since the fix causes another kernel crash. And,
-> > this is the next problem I have. The crash doesn't happen otherwise. So,
-> > either it uncovers another bug or the fix is incomplete. Though the
-> > changes look like it should work. This needs more investigation.
+> Hi,
 > 
-> I really can't see how the fix causes a crash, and I couldn't reproduce
-> it on any of my boards, nor could any of the Linaro folk afaik. Are you
-> definitely running mainline with just these two patches from Ard?
+> Manish Narani <manish.narani@xilinx.com> writes:
+> > This patch adds support for OTG host mode initialization in DWC3 host
+> > driver. Before the host initialization sequence begins. The driver has
+> > to make sure the no OTG peripheral mode is enabled.
+> >
+> > Signed-off-by: Manish Narani <mnarani@xilinx.com>
+> > ---
+> >  drivers/usb/dwc3/host.c | 14 ++++++++++++++
+> >  1 file changed, 14 insertions(+)
+> >
+> > diff --git a/drivers/usb/dwc3/host.c b/drivers/usb/dwc3/host.c index
+> > 487f0ff..4caa3fe 100644
+> > --- a/drivers/usb/dwc3/host.c
+> > +++ b/drivers/usb/dwc3/host.c
+> > @@ -16,6 +16,8 @@
+> >   */
+> >
+> >  #include <linux/platform_device.h>
+> > +#include <linux/usb.h>
+> > +#include <linux/usb/hcd.h>
+> >
+> >  #include "core.h"
+> >
+> > @@ -111,6 +113,18 @@ int dwc3_host_init(struct dwc3 *dwc)
+> >  	phy_create_lookup(dwc->usb3_generic_phy, "usb3-phy",
+> >  			  dev_name(dwc->dev));
+> >
+> > +	if (dwc->dr_mode == USB_DR_MODE_OTG) {
+> > +		struct usb_phy *phy;
+> > +		/* Switch otg to host mode */
+> > +		phy = usb_get_phy(USB_PHY_TYPE_USB3);
+> > +		if (!IS_ERR(phy)) {
+> > +			if (phy && phy->otg)
+> > +				otg_set_host(phy->otg,
+> > +						(struct usb_bus *)(long)1);
+> > +			usb_put_phy(phy);
+> > +		}
+> > +	}
+> 
+> NAK. Don't change default mode for everybody. Default mode should actually
+> be peripheral, but let's not touch whatever HW designer has set; at least for
+> now.
 
-Yes, just both patches applied. Various other solutions were working.
+Yes, The default mode is Peripheral. The above is to initialize the host related stuff in OTG driver before sensing the OTG ID and get to the respective mode.
 
--Robert
+- Manish
