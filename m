@@ -1,71 +1,54 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 5 Jan 2017 14:46:53 +0800
-Subject: [PATCH v6 1/5] dt-bindings: zte: documents zx2967 power domain
- driver bindings
-In-Reply-To: <1483530494-14177-1-git-send-email-baoyou.xie@linaro.org>
+Date: Thu, 5 Jan 2017 14:49:43 +0800
+Subject: [PATCH v6 2/5] MAINTAINERS: add zx2967 SoC drivers to ARM ZTE
+ architecture
+In-Reply-To: <1483530494-14177-2-git-send-email-baoyou.xie@linaro.org>
 References: <1483530494-14177-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20170105064651.GA4667@x250>
+ <1483530494-14177-2-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170105064941.GB4667@x250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 07:48:10PM +0800, Baoyou Xie wrote:
-> This patch documents devicetree tree bindings for the ZTE zx2967
-
-'devicetree' is good enough, and the 'tree' after it is redundant.
-
-> power domain driver.
-
-DT bindings is to describe hardware block not software, so the word like
-'driver' is not appropriate.  So please drop it from here and the patch
-subject.
-
+On Wed, Jan 04, 2017 at 07:48:11PM +0800, Baoyou Xie wrote:
+> Add the ZTE SoC drivers as maintained by ARM ZTE
+> architecture maintainers, as they're parts of the core IP.
+> 
+> By the way, this patch adds the maintainer for ARM
+> ZTE architecture to Baoyou Xie.
 > 
 > Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 > ---
->  Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt
+>  MAINTAINERS | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt b/Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt
-> new file mode 100644
-> index 0000000..1476318
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt
-> @@ -0,0 +1,17 @@
-> +* ZTE 2967 SoC Power Domains
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index ad199da..2593296 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1975,12 +1975,17 @@ F:	arch/arm/mach-pxa/include/mach/z2.h
+>  
+>  ARM/ZTE ARCHITECTURE
+>  M:	Jun Nie <jun.nie@linaro.org>
+> +M:	Baoyou Xie <baoyou.xie@linaro.org>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+>  F:	arch/arm/mach-zx/
+>  F:	drivers/clk/zte/
+> +F:	drivers/soc/zte/
+> +F:	drivers/thermal/zx*
 
-ZTE ZX2967 family.  And this is a bindings document for PCU, IMO.  And
-do we know the full name of abbreviation 'PCU'?  Power Control Unit?
-
-> +
-> +2967 processors include support for multiple power domains which are used
-
-ZX2967 family
-
-> +to gate power to one or more peripherals on the processor.
-> +
-> +Required Properties:
-> +- compatible: should be one of the following.
-> +    * zte,zx296718-pcu - for zx296718 board's power domain.
-
-Drop 'board's'.
-
-> +- reg: physical base address of the controller and length of memory mapped
-> +    region.
-> +
-> +Example:
-> +
-> +	pcu_domain: pcu at 0x00117000 {
-
-The unit-address in node name shouldn't have 0x and leading zeros.
-
-	pcu_domain: pcu at 117000 {
+This line is about thermal support, and shouldn't be added in this
+patch series.
 
 Shawn
 
-> +		compatible = "zte,zx296718-pcu";
-> +		reg = <0x00117000 0x1000>;
-> +	};
+>  F:	Documentation/devicetree/bindings/arm/zte.txt
+>  F:	Documentation/devicetree/bindings/clock/zx296702-clk.txt
+> +F:	Documentation/devicetree/bindings/soc/zte/
+> +F:	include/dt-bindings/soc/zx*.h
+>  
+>  ARM/ZYNQ ARCHITECTURE
+>  M:	Michal Simek <michal.simek@xilinx.com>
 > -- 
 > 2.7.4
 > 
