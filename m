@@ -1,54 +1,77 @@
 From: Minghuan.Lian@nxp.com (Minghuan Lian)
-Date: Thu, 5 Jan 2017 16:10:33 +0800
-Subject: [PATCH v2,5/9] arm64: dts: ls1043a: share all MSIs
+Date: Thu, 5 Jan 2017 16:10:34 +0800
+Subject: [PATCH v2,6/9] arm64: dts: ls1046a: add MSI dts node
 In-Reply-To: <1483603837-4629-1-git-send-email-Minghuan.Lian@nxp.com>
 References: <1483603837-4629-1-git-send-email-Minghuan.Lian@nxp.com>
-Message-ID: <1483603837-4629-5-git-send-email-Minghuan.Lian@nxp.com>
+Message-ID: <1483603837-4629-6-git-send-email-Minghuan.Lian@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to maximize the use of MSI, a PCIe controller will share
-all MSI controllers. The patch changes "msi-parent" to refer to all
-MSI controller dts nodes.
+LS1046a includes 3 MSI controllers.
+Each controller supports 128 interrupts.
 
 Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+Acked-by: Rob Herring <robh@kernel.org> 
 ---
 v2-v1:
-- None
+- change whitespace number
 
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ .../interrupt-controller/fsl,ls-scfg-msi.txt       |  1 +
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     | 31 ++++++++++++++++++++++
+ 2 files changed, 32 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index 692fc35..3947220 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -625,7 +625,7 @@
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x40 0x00010000 0x0 0x00010000   /* downstream I/O */
- 				  0x82000000 0x0 0x40000000 0x40 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
--			msi-parent = <&msi1>;
-+			msi-parent = <&msi1>, <&msi2>, <&msi3>;
- 			#interrupt-cells = <1>;
- 			interrupt-map-mask = <0 0 0 7>;
- 			interrupt-map = <0000 0 0 1 &gic 0 110 0x4>,
-@@ -650,7 +650,7 @@
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x48 0x00010000 0x0 0x00010000   /* downstream I/O */
- 				  0x82000000 0x0 0x40000000 0x48 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
--			msi-parent = <&msi2>;
-+			msi-parent = <&msi1>, <&msi2>, <&msi3>;
- 			#interrupt-cells = <1>;
- 			interrupt-map-mask = <0 0 0 7>;
- 			interrupt-map = <0000 0 0 1 &gic 0 120  0x4>,
-@@ -675,7 +675,7 @@
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x50 0x00010000 0x0 0x00010000   /* downstream I/O */
- 				  0x82000000 0x0 0x40000000 0x50 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
--			msi-parent = <&msi3>;
-+			msi-parent = <&msi1>, <&msi2>, <&msi3>;
- 			#interrupt-cells = <1>;
- 			interrupt-map-mask = <0 0 0 7>;
- 			interrupt-map = <0000 0 0 1 &gic 0 154 0x4>,
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
+index 2755cd1..dde4552 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
+@@ -6,6 +6,7 @@ Required properties:
+ 	      Layerscape PCIe MSI controller block such as:
+               "fsl,ls1021a-msi"
+               "fsl,ls1043a-msi"
++              "fsl,ls1046a-msi"
+ - msi-controller: indicates that this is a PCIe MSI controller node
+ - reg: physical base address of the controller and length of memory mapped.
+ - interrupts: an interrupt to the parent interrupt controller.
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+index 38806ca..49dbafc 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+@@ -511,5 +511,36 @@
+ 			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clockgen 4 1>;
+ 		};
++
++		msi1: msi-controller at 1580000 {
++			compatible = "fsl,ls1046a-msi";
++			msi-controller;
++			reg = <0x0 0x1580000 0x0 0x10000>;
++			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
++		msi2: msi-controller at 1590000 {
++			compatible = "fsl,ls1046a-msi";
++			msi-controller;
++			reg = <0x0 0x1590000 0x0 0x10000>;
++			interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
++		msi3: msi-controller at 15a0000 {
++			compatible = "fsl,ls1046a-msi";
++			msi-controller;
++			reg = <0x0 0x15a0000 0x0 0x10000>;
++			interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
+ 	};
+ };
 -- 
 1.9.1
