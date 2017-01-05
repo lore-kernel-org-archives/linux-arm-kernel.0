@@ -1,82 +1,83 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 5 Jan 2017 14:17:35 +0800
-Subject: [PATCH 07/22] dt-bindings: power: supply: add AXP20X/AXP22X AC
- power supply
-In-Reply-To: <20170104131410.mni7opxnouzagypu@rob-hp-laptop>
-References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
- <20170102163723.7939-8-quentin.schulz@free-electrons.com>
- <20170104131410.mni7opxnouzagypu@rob-hp-laptop>
-Message-ID: <CAGb2v67V6oGEyYGsBWfp3rVVm_VWQta0szeBiNSKUQR7awm5ng@mail.gmail.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Thu, 5 Jan 2017 14:01:58 +0800
+Subject: [PATCH v11 7/8] ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB
+ property
+In-Reply-To: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
+References: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <1483596119-27508-8-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Quentin,
+The current dts describes USB HUB's property at USB controller's
+entry, it is improper. The USB HUB should be the child node
+under USB controller, and power sequence properties are under
+it. Besides, using gpio pinctrl setting for USB2415's reset pin.
 
-On Wed, Jan 4, 2017 at 9:14 PM, Rob Herring <robh@kernel.org> wrote:
-> On Mon, Jan 02, 2017 at 05:37:07PM +0100, Quentin Schulz wrote:
->> The X-Powers AXP20X and AXP22X PMICs have an AC entry to supply power to
->> the board. They have a few registers dedicated to the status of the AC
->> power supply.
->>
->> This adds the DT binding documentation for the AC power supply for
->> AXP20X and AXP22X PMICs.
->>
->> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->> ---
->>  .../bindings/power/supply/axp20x_ac_power.txt      | 28 ++++++++++++++++++++++
->>  1 file changed, 28 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
->>
->> diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
->> new file mode 100644
->> index 0000000..16d0de4
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
->> @@ -0,0 +1,28 @@
->> +AXP20X and AXP22X PMICs' AC power supply
->> +
->> +Required Properties:
->> + - compatible: One of:
->> +                     "x-powers,axp202-ac-power-supply"
->> +                     "x-powers,axp221-ac-power-supply"
->> +
->> +More Required Properties for AXP20X PMICs:
->> + - io-channels: phandles to ACIN voltage and current ADC channels
->> + - io-channel-names = "acin_v", "acin_i";
->> +
->> +This node is a subnode of the axp20x PMIC.
->> +
->> +The AXP20X can read the current current and voltage supplied by AC by
->> +reading ADC channels from the AXP20X ADC.
->> +
->> +The AXP22X is only able to tell if an AC power supply is present and
->> +usable.
->> +
->> +Example:
->> +
->> +&axp209 {
->> +     ac_power_supply: ac_power_supply {
->
-> power-supply {
->
->> +             compatible = "x-powers,axp202-ac-power-supply";
->> +             io-channels = <&axp209_adc 0>, <&axp209_adc 1>;
->
-> Is this assignment fixed? If so, then it doesn't need to be in DT.
+Signed-off-by: Peter Chen <peter.chen@nxp.com>
+Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
+---
+ arch/arm/boot/dts/imx6qdl-udoo.dtsi | 26 ++++++++++++--------------
+ 1 file changed, 12 insertions(+), 14 deletions(-)
 
-Is there any case that we actually need to use the IIO channels
-from the device tree? Seems to me its limited to the other AXP
-sub-devices.
-
-If so you could use struct iio_map to map the channels to other
-devices by name. See axp288_adc for an example.
-
-Regards
-ChenYu
-
->> +             io-channel-names = "acin_v", "acin_i";
->> +     };
->> +};
->> --
->> 2.9.3
->>
+diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+index c96c91d..a173de2 100644
+--- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+@@ -9,6 +9,8 @@
+  *
+  */
+ 
++#include <dt-bindings/gpio/gpio.h>
++
+ / {
+ 	aliases {
+ 		backlight = &backlight;
+@@ -58,17 +60,6 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		reg_usb_h1_vbus: regulator at 0 {
+-			compatible = "regulator-fixed";
+-			reg = <0>;
+-			regulator-name = "usb_h1_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			enable-active-high;
+-			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
+-			gpio = <&gpio7 12 0>;
+-		};
+-
+ 		reg_panel: regulator at 1 {
+ 			compatible = "regulator-fixed";
+ 			reg = <1>;
+@@ -188,7 +179,7 @@
+ 
+ 		pinctrl_usbh: usbhgrp {
+ 			fsl,pins = <
+-				MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x80000000
++				MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x1b0b0
+ 				MX6QDL_PAD_NANDF_CS2__CCM_CLKO2 0x130b0
+ 			>;
+ 		};
+@@ -259,9 +250,16 @@
+ &usbh1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usbh>;
+-	vbus-supply = <&reg_usb_h1_vbus>;
+-	clocks = <&clks IMX6QDL_CLK_CKO>;
+ 	status = "okay";
++
++	usb2415: hub at 1 {
++		compatible = "usb424,2514";
++		reg = <1>;
++
++		clocks = <&clks IMX6QDL_CLK_CKO>;
++		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
++		reset-duration-us = <3000>;
++	};
+ };
+ 
+ &usdhc3 {
+-- 
+2.7.4
