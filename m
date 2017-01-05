@@ -1,256 +1,254 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Thu, 5 Jan 2017 02:26:45 -0500
-Subject: [PATCH v3 2/3] drm: zte: add .atomic_disable hook to disable
- graphic layer
-In-Reply-To: <1482979048-32037-3-git-send-email-shawnguo@kernel.org>
-References: <1482979048-32037-1-git-send-email-shawnguo@kernel.org>
- <1482979048-32037-3-git-send-email-shawnguo@kernel.org>
-Message-ID: <CAOw6vbLm2u4neihhNyYENpni8ak-BmvxGuL4aKR8CcX0nwXFRw@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 5 Jan 2017 15:38:48 +0800
+Subject: [PATCH v6 5/5] soc: zte: pm_domains: Add support for zx296718
+In-Reply-To: <1483530494-14177-5-git-send-email-baoyou.xie@linaro.org>
+References: <1483530494-14177-1-git-send-email-baoyou.xie@linaro.org>
+ <1483530494-14177-5-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170105073846.GD4667@x250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 28, 2016 at 9:37 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> From: Shawn Guo <shawn.guo@linaro.org>
->
-> There are a few hardware bits for each graphic layer to control main/aux
-> channel and clock selection, as well as the layer enabling.  These bits
-> sit outside the layer block itself, but in VOU control glue block.  We
-> currently set these bits up at CRTC initialization for once, and do not
-> support disabling the layer.
->
-> This patch creates a pair of functions zx_vou_layer_enable[disable] to
-> be invoked from plane hooks .atomic_update and .atomic_disable to set up
-> and tear down the layer.  This is generic for both graphic and video
-> layers, so it will make the overlay plane support to be added later much
-> easier.
->
-
-This feels ever so slightly awkward since the plane is calling back to
-the crtc in enable/disable, but i suppose this is a byproduct of
-defining the atomic plane hooks in zx_plane. I think we just need to
-be careful not to introduce more of these cross-block/file
-dependencies, as that might signify that zx_plane should be merged
-into zx_vou. At the moment, I feel like this is fine, so,
-
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
-
-
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+On Wed, Jan 04, 2017 at 07:48:14PM +0800, Baoyou Xie wrote:
+> This patch introduces the power domain driver of zx296718
+> which belongs to zte's zx2967 family.
+> 
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> Reviewed-by: Jun Nie <jun.nie@linaro.org>
 > ---
->  drivers/gpu/drm/zte/zx_plane.c | 15 +++++++++
->  drivers/gpu/drm/zte/zx_plane.h |  1 +
->  drivers/gpu/drm/zte/zx_vou.c   | 70 ++++++++++++++++++++++++++++++------------
->  drivers/gpu/drm/zte/zx_vou.h   |  3 ++
->  4 files changed, 69 insertions(+), 20 deletions(-)
->
-> diff --git a/drivers/gpu/drm/zte/zx_plane.c b/drivers/gpu/drm/zte/zx_plane.c
-> index 78d29b1db91c..5445eebf830f 100644
-> --- a/drivers/gpu/drm/zte/zx_plane.c
-> +++ b/drivers/gpu/drm/zte/zx_plane.c
-> @@ -197,12 +197,27 @@ static void zx_gl_plane_atomic_update(struct drm_plane *plane,
->         /* Enable HBSC block */
->         zx_writel_mask(hbsc + HBSC_CTRL0, HBSC_CTRL_EN, HBSC_CTRL_EN);
->
-> +       zx_vou_layer_enable(plane);
+>  drivers/soc/zte/Makefile              |   1 +
+>  drivers/soc/zte/zx296718_pm_domains.c | 181 ++++++++++++++++++++++++++++++++++
+>  2 files changed, 182 insertions(+)
+>  create mode 100644 drivers/soc/zte/zx296718_pm_domains.c
+> 
+> diff --git a/drivers/soc/zte/Makefile b/drivers/soc/zte/Makefile
+> index 8a37f2f..96b7cd4 100644
+> --- a/drivers/soc/zte/Makefile
+> +++ b/drivers/soc/zte/Makefile
+> @@ -2,3 +2,4 @@
+>  # ZTE SOC drivers
+>  #
+>  obj-$(CONFIG_ZX2967_PM_DOMAINS) += zx2967_pm_domains.o
+> +obj-$(CONFIG_ZX2967_PM_DOMAINS) += zx296718_pm_domains.o
+> diff --git a/drivers/soc/zte/zx296718_pm_domains.c b/drivers/soc/zte/zx296718_pm_domains.c
+> new file mode 100644
+> index 0000000..52003ee
+> --- /dev/null
+> +++ b/drivers/soc/zte/zx296718_pm_domains.c
+> @@ -0,0 +1,181 @@
+> +/*
+> + * Copyright (C) 2017 ZTE Ltd.
+> + *
+> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
+> + * License terms: GNU General Public License (GPL) version 2
+> + */
+
+Please have a newline between licence declaration and headers to improve
+the readability.  Same for zx2967_pm_domains.c.
+
+> +#include <dt-bindings/soc/zte,pm_domains.h>
+> +#include "zx2967_pm_domains.h"
 > +
->         zx_gl_set_update(zplane);
->  }
->
-> +static void zx_plane_atomic_disable(struct drm_plane *plane,
-> +                                   struct drm_plane_state *old_state)
-> +{
-> +       struct zx_plane *zplane = to_zx_plane(plane);
-> +       void __iomem *hbsc = zplane->hbsc;
-> +
-> +       zx_vou_layer_disable(plane);
-> +
-> +       /* Disable HBSC block */
-> +       zx_writel_mask(hbsc + HBSC_CTRL0, HBSC_CTRL_EN, 0);
-> +}
-> +
->  static const struct drm_plane_helper_funcs zx_gl_plane_helper_funcs = {
->         .atomic_check = zx_gl_plane_atomic_check,
->         .atomic_update = zx_gl_plane_atomic_update,
-> +       .atomic_disable = zx_plane_atomic_disable,
->  };
->
->  static void zx_plane_destroy(struct drm_plane *plane)
-> diff --git a/drivers/gpu/drm/zte/zx_plane.h b/drivers/gpu/drm/zte/zx_plane.h
-> index 264a92e0b532..933611ddffd0 100644
-> --- a/drivers/gpu/drm/zte/zx_plane.h
-> +++ b/drivers/gpu/drm/zte/zx_plane.h
-> @@ -18,6 +18,7 @@ struct zx_plane {
->         void __iomem *csc;
->         void __iomem *hbsc;
->         void __iomem *rsz;
-> +       const struct vou_layer_bits *bits;
->  };
->
->  #define to_zx_plane(plane) container_of(plane, struct zx_plane, plane)
-> diff --git a/drivers/gpu/drm/zte/zx_vou.c b/drivers/gpu/drm/zte/zx_vou.c
-> index d5c801f6f97b..3fb4fc04e693 100644
-> --- a/drivers/gpu/drm/zte/zx_vou.c
-> +++ b/drivers/gpu/drm/zte/zx_vou.c
-> @@ -65,7 +65,6 @@ struct zx_crtc_bits {
->         u32 polarity_shift;
->         u32 int_frame_mask;
->         u32 tc_enable;
-> -       u32 gl_enable;
->  };
->
->  static const struct zx_crtc_bits main_crtc_bits = {
-> @@ -73,7 +72,6 @@ struct zx_crtc_bits {
->         .polarity_shift = MAIN_POL_SHIFT,
->         .int_frame_mask = TIMING_INT_MAIN_FRAME,
->         .tc_enable = MAIN_TC_EN,
-> -       .gl_enable = OSD_CTRL0_GL0_EN,
->  };
->
->  static const struct zx_crtc_bits aux_crtc_bits = {
-> @@ -81,7 +79,6 @@ struct zx_crtc_bits {
->         .polarity_shift = AUX_POL_SHIFT,
->         .int_frame_mask = TIMING_INT_AUX_FRAME,
->         .tc_enable = AUX_TC_EN,
-> -       .gl_enable = OSD_CTRL0_GL1_EN,
->  };
->
->  struct zx_crtc {
-> @@ -97,6 +94,24 @@ struct zx_crtc {
->
->  #define to_zx_crtc(x) container_of(x, struct zx_crtc, crtc)
->
-> +struct vou_layer_bits {
-> +       u32 enable;
-> +       u32 chnsel;
-> +       u32 clksel;
+> +static u16 zx296718_offsets[REG_ARRAY_SIZE] = {
+> +	[REG_CLKEN] = 0x18,
+> +	[REG_ISOEN] = 0x1c,
+> +	[REG_RSTEN] = 0x20,
+> +	[REG_PWREN] = 0x24,
+> +	[REG_ACK_SYNC] = 0x28,
 > +};
 > +
-> +static const struct vou_layer_bits zx_gl_bits[GL_NUM] = {
-> +       {
-> +               .enable = OSD_CTRL0_GL0_EN,
-> +               .chnsel = OSD_CTRL0_GL0_SEL,
-> +               .clksel = VOU_CLK_GL0_SEL,
-> +       }, {
-> +               .enable = OSD_CTRL0_GL1_EN,
-> +               .chnsel = OSD_CTRL0_GL1_SEL,
-> +               .clksel = VOU_CLK_GL1_SEL,
-> +       },
+> +enum {
+> +	PCU_DM_VOU = 0,
+> +	PCU_DM_SAPPU,
+> +	PCU_DM_VDE,
+> +	PCU_DM_VCE,
+> +	PCU_DM_HDE,
+> +	PCU_DM_VIU,
+> +	PCU_DM_USB20,
+> +	PCU_DM_USB21,
+> +	PCU_DM_USB30,
+> +	PCU_DM_HSIC,
+> +	PCU_DM_GMAC,
+> +	PCU_DM_TS,
+> +};
+
+I think we can save this enum completely by defining those
+DM_ZX296718_xxx constants in zte,pm_domains.h in the same order of this
+enum (hardware bit position order), so that DM_ZX296718_xxx can directly
+be used as .bit field of struct zx2967_pm_domain.
+
+#define DM_ZX296718_VOU 	0
+#define DM_ZX296718_SAPPU	1
+#define DM_ZX296718_VDE		2  /* g1v6 */
+#define DM_ZX296718_VCE		3  /* h1v6 */
+#define DM_ZX296718_HDE		4  /* g2v2 */
+#define DM_ZX296718_VIU		5
+#define DM_ZX296718_USB20	6
+#define DM_ZX296718_USB21	7
+#define DM_ZX296718_USB30	8
+#define DM_ZX296718_HSIC	9
+#define DM_ZX296718_GMAC	10
+#define DM_ZX296718_TS		11
+
+> +
+> +static struct zx2967_pm_domain vou_domain = {
+> +	.dm = {
+> +		.name		= "vou_domain",
+> +	},
+> +	.bit = PCU_DM_VOU,
+> +	.polarity = PWREN,
+> +	.reg_offset = zx296718_offsets,
 > +};
 > +
->  struct zx_vou_hw {
->         struct device *dev;
->         void __iomem *osd;
-> @@ -220,10 +235,6 @@ static void zx_crtc_enable(struct drm_crtc *crtc)
->         /* Enable channel */
->         zx_writel_mask(zcrtc->chnreg + CHN_CTRL0, CHN_ENABLE, CHN_ENABLE);
->
-> -       /* Enable Graphic Layer */
-> -       zx_writel_mask(vou->osd + OSD_CTRL0, bits->gl_enable,
-> -                      bits->gl_enable);
-> -
->         drm_crtc_vblank_on(crtc);
->
->         ret = clk_set_rate(zcrtc->pixclk, mode->clock * 1000);
-> @@ -247,9 +258,6 @@ static void zx_crtc_disable(struct drm_crtc *crtc)
->
->         drm_crtc_vblank_off(crtc);
->
-> -       /* Disable Graphic Layer */
-> -       zx_writel_mask(vou->osd + OSD_CTRL0, bits->gl_enable, 0);
-> -
->         /* Disable channel */
->         zx_writel_mask(zcrtc->chnreg + CHN_CTRL0, CHN_ENABLE, 0);
->
-> @@ -316,6 +324,7 @@ static int zx_crtc_init(struct drm_device *drm, struct zx_vou_hw *vou,
->                 zplane->csc = vou->osd + MAIN_CSC_OFFSET;
->                 zplane->hbsc = vou->osd + MAIN_HBSC_OFFSET;
->                 zplane->rsz = vou->otfppu + MAIN_RSZ_OFFSET;
-> +               zplane->bits = &zx_gl_bits[0];
->                 zcrtc->chnreg = vou->osd + OSD_MAIN_CHN;
->                 zcrtc->regs = &main_crtc_regs;
->                 zcrtc->bits = &main_crtc_bits;
-> @@ -324,6 +333,7 @@ static int zx_crtc_init(struct drm_device *drm, struct zx_vou_hw *vou,
->                 zplane->csc = vou->osd + AUX_CSC_OFFSET;
->                 zplane->hbsc = vou->osd + AUX_HBSC_OFFSET;
->                 zplane->rsz = vou->otfppu + AUX_RSZ_OFFSET;
-> +               zplane->bits = &zx_gl_bits[1];
->                 zcrtc->chnreg = vou->osd + OSD_AUX_CHN;
->                 zcrtc->regs = &aux_crtc_regs;
->                 zcrtc->bits = &aux_crtc_bits;
-> @@ -411,6 +421,36 @@ void zx_vou_disable_vblank(struct drm_device *drm, unsigned int pipe)
->                        zcrtc->bits->int_frame_mask, 0);
->  }
->
-> +void zx_vou_layer_enable(struct drm_plane *plane)
+> +static struct zx2967_pm_domain sappu_domain = {
+> +	.dm = {
+> +		.name		= "sappu_domain",
+> +	},
+> +	.bit = PCU_DM_SAPPU,
+> +	.polarity = PWREN,
+> +	.reg_offset = zx296718_offsets,
+> +};
+> +
+> +static struct zx2967_pm_domain vde_domain = {
+> +	.dm = {
+> +		.name		= "vde_domain",
+> +	},
+> +	.bit = PCU_DM_VDE,
+> +	.polarity = PWREN,
+> +	.reg_offset = zx296718_offsets,
+> +};
+> +
+> +static struct zx2967_pm_domain vce_domain = {
+> +	.dm = {
+> +		.name		= "vce_domain",
+> +	},
+> +	.bit = PCU_DM_VCE,
+> +	.polarity = PWREN,
+> +	.reg_offset = zx296718_offsets,
+> +};
+> +
+> +static struct zx2967_pm_domain hde_domain = {
+> +	.dm = {
+> +		.name		= "hde_domain",
+> +	},
+> +	.bit = PCU_DM_HDE,
+> +	.polarity = PWREN,
+> +	.reg_offset = zx296718_offsets,
+> +};
+> +
+> +static struct zx2967_pm_domain viu_domain = {
+> +	.dm = {
+> +		.name		= "viu_domain",
+> +	},
+> +	.bit = PCU_DM_VIU,
+> +	.polarity = PWREN,
+> +	.reg_offset = zx296718_offsets,
+> +};
+> +
+> +static struct zx2967_pm_domain usb20_domain = {
+> +	.dm = {
+> +		.name		= "usb20_domain",
+> +	},
+> +	.bit = PCU_DM_USB20,
+> +	.polarity = PWREN,
+> +	.reg_offset = zx296718_offsets,
+> +};
+> +
+> +static struct zx2967_pm_domain usb21_domain = {
+> +	.dm = {
+> +		.name		= "usb21_domain",
+> +	},
+> +	.bit = PCU_DM_USB21,
+> +	.polarity = PWREN,
+> +	.reg_offset = zx296718_offsets,
+> +};
+> +
+> +static struct zx2967_pm_domain usb30_domain = {
+> +	.dm = {
+> +		.name		= "usb30_domain",
+> +	},
+> +	.bit = PCU_DM_USB30,
+> +	.polarity = PWREN,
+> +	.reg_offset = zx296718_offsets,
+> +};
+> +
+> +static struct zx2967_pm_domain hsic_domain = {
+> +	.dm = {
+> +		.name		= "hsic_domain",
+> +	},
+> +	.bit = PCU_DM_HSIC,
+> +	.polarity = PWREN,
+> +	.reg_offset = zx296718_offsets,
+> +};
+> +
+> +static struct zx2967_pm_domain gmac_domain = {
+> +	.dm = {
+> +		.name		= "gmac_domain",
+> +	},
+> +	.bit = PCU_DM_GMAC,
+> +	.polarity = PWREN,
+> +	.reg_offset = zx296718_offsets,
+> +};
+> +
+> +static struct zx2967_pm_domain ts_domain = {
+> +	.dm = {
+> +		.name		= "ts_domain",
+> +	},
+> +	.bit = PCU_DM_TS,
+> +	.polarity = PWREN,
+> +	.reg_offset = zx296718_offsets,
+> +};
+> +
+> +static struct generic_pm_domain *zx296718_pm_domains[] = {
+> +	[DM_ZX296718_SAPPU] = &sappu_domain.dm,
+> +	[DM_ZX296718_VDE] = &vde_domain.dm,
+> +	[DM_ZX296718_VCE] = &vce_domain.dm,
+> +	[DM_ZX296718_HDE] = &hde_domain.dm,
+> +	[DM_ZX296718_VIU] = &viu_domain.dm,
+> +	[DM_ZX296718_USB20] = &usb20_domain.dm,
+> +	[DM_ZX296718_USB21] = &usb21_domain.dm,
+> +	[DM_ZX296718_USB30] = &usb30_domain.dm,
+> +	[DM_ZX296718_HSIC] = &hsic_domain.dm,
+> +	[DM_ZX296718_GMAC] = &gmac_domain.dm,
+> +	[DM_ZX296718_TS] = &ts_domain.dm,
+> +	[DM_ZX296718_VOU] = &vou_domain.dm,
+
+If you update the order of DM_ZX296718_xxx in zte,pm_domains.h, it would
+be nice to update this list accordingly as well.
+
+> +};
+> +
+> +static int zx296718_pd_probe(struct platform_device *pdev)
 > +{
-> +       struct zx_crtc *zcrtc = to_zx_crtc(plane->state->crtc);
-> +       struct zx_vou_hw *vou = zcrtc->vou;
-> +       struct zx_plane *zplane = to_zx_plane(plane);
-> +       const struct vou_layer_bits *bits = zplane->bits;
-> +
-> +       if (zcrtc->chn_type == VOU_CHN_MAIN) {
-> +               zx_writel_mask(vou->osd + OSD_CTRL0, bits->chnsel, 0);
-> +               zx_writel_mask(vou->vouctl + VOU_CLK_SEL, bits->clksel, 0);
-> +       } else {
-> +               zx_writel_mask(vou->osd + OSD_CTRL0, bits->chnsel,
-> +                              bits->chnsel);
-> +               zx_writel_mask(vou->vouctl + VOU_CLK_SEL, bits->clksel,
-> +                              bits->clksel);
-> +       }
-> +
-> +       zx_writel_mask(vou->osd + OSD_CTRL0, bits->enable, bits->enable);
+> +	return zx2967_pd_probe(pdev,
+> +			  zx296718_pm_domains,
+> +			  ARRAY_SIZE(zx296718_pm_domains));
 > +}
 > +
-> +void zx_vou_layer_disable(struct drm_plane *plane)
+> +static const struct of_device_id zx296718_pm_domain_matches[] = {
+> +	{ .compatible = "zte,zx296718-pcu", },
+> +	{ },
+> +};
+> +
+> +static struct platform_driver zx296718_pd_driver = {
+> +	.driver = {
+> +		.name = "zx-powerdomain",
+
+This is a zx296718 specific driver.  So zx296718-powerdomain should
+be a better name?
+
+Shawn
+
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = zx296718_pm_domain_matches,
+> +	},
+> +	.probe = zx296718_pd_probe,
+> +};
+> +
+> +static int __init zx296718_pd_init(void)
 > +{
-> +       struct zx_crtc *zcrtc = to_zx_crtc(plane->crtc);
-> +       struct zx_vou_hw *vou = zcrtc->vou;
-> +       struct zx_plane *zplane = to_zx_plane(plane);
-> +       const struct vou_layer_bits *bits = zplane->bits;
-> +
-> +       zx_writel_mask(vou->osd + OSD_CTRL0, bits->enable, 0);
+> +	return platform_driver_register(&zx296718_pd_driver);
 > +}
-> +
->  static irqreturn_t vou_irq_handler(int irq, void *dev_id)
->  {
->         struct zx_vou_hw *vou = dev_id;
-> @@ -469,19 +509,9 @@ static void vou_dtrc_init(struct zx_vou_hw *vou)
->
->  static void vou_hw_init(struct zx_vou_hw *vou)
->  {
-> -       /* Set GL0 to main channel and GL1 to aux channel */
-> -       zx_writel_mask(vou->osd + OSD_CTRL0, OSD_CTRL0_GL0_SEL, 0);
-> -       zx_writel_mask(vou->osd + OSD_CTRL0, OSD_CTRL0_GL1_SEL,
-> -                      OSD_CTRL0_GL1_SEL);
-> -
->         /* Release reset for all VOU modules */
->         zx_writel(vou->vouctl + VOU_SOFT_RST, ~0);
->
-> -       /* Select main clock for GL0 and aux clock for GL1 module */
-> -       zx_writel_mask(vou->vouctl + VOU_CLK_SEL, VOU_CLK_GL0_SEL, 0);
-> -       zx_writel_mask(vou->vouctl + VOU_CLK_SEL, VOU_CLK_GL1_SEL,
-> -                      VOU_CLK_GL1_SEL);
-> -
->         /* Enable clock auto-gating for all VOU modules */
->         zx_writel(vou->vouctl + VOU_CLK_REQEN, ~0);
->
-> diff --git a/drivers/gpu/drm/zte/zx_vou.h b/drivers/gpu/drm/zte/zx_vou.h
-> index 349e06cd86f4..4b4339be641b 100644
-> --- a/drivers/gpu/drm/zte/zx_vou.h
-> +++ b/drivers/gpu/drm/zte/zx_vou.h
-> @@ -43,4 +43,7 @@ struct vou_inf {
->  int zx_vou_enable_vblank(struct drm_device *drm, unsigned int pipe);
->  void zx_vou_disable_vblank(struct drm_device *drm, unsigned int pipe);
->
-> +void zx_vou_layer_enable(struct drm_plane *plane);
-> +void zx_vou_layer_disable(struct drm_plane *plane);
-> +
->  #endif /* __ZX_VOU_H__ */
-> --
-> 1.9.1
->
-
-
-
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+> +subsys_initcall(zx296718_pd_init);
+> -- 
+> 2.7.4
+> 
