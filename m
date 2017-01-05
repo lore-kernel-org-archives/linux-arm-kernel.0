@@ -1,63 +1,61 @@
-From: alison.wang@nxp.com (Alison Wang)
-Date: Thu, 5 Jan 2017 02:02:30 +0000
-Subject: [PATCH v2 2/2] mtd: nand: Update dependency of IFC for LS1021A
-In-Reply-To: <ffb2c20d-3aeb-6f5a-1880-3bed0c964821@gmail.com>
-References: <1483411266-45875-1-git-send-email-b18965@freescale.com>
- <1483411266-45875-2-git-send-email-b18965@freescale.com>
- <4e04eb5e-fb53-f71e-ee49-0872a6c11e97@gmail.com>
- <DB6PR0401MB2584606EC932BF1FAED788E1F4610@DB6PR0401MB2584.eurprd04.prod.outlook.com>
- <ffb2c20d-3aeb-6f5a-1880-3bed0c964821@gmail.com>
-Message-ID: <DB6PR0401MB2584DBE5D6496F44B7169B49F4600@DB6PR0401MB2584.eurprd04.prod.outlook.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 5 Jan 2017 10:03:48 +0800
+Subject: [PATCH v3] arm64: mm: Fix NOMAP page initialization
+In-Reply-To: <CAKv+Gu_SmTNguC=tSCwYOL2kx-DogLvSYRZc56eGP=JhdrUOsA@mail.gmail.com>
+References: <20161216165437.21612-1-rrichter@cavium.com>
+ <CAKv+Gu_SmTNguC=tSCwYOL2kx-DogLvSYRZc56eGP=JhdrUOsA@mail.gmail.com>
+Message-ID: <c74d6ec6-16ba-dccc-3b0d-a8bedcb46dc5@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 01/04/2017 02:46 AM, Alison Wang wrote:
-> >> On 01/03/2017 03:41 AM, Alison Wang wrote:
-> >>> As NAND support for Freescale/NXP IFC controller is available on
-> >>> LS1021A, the dependency for LS1021A is added.
-> >>
-> >> Does LS stand for LayerScape ? Yes it does. So why does
-> >> ARCH_LAYERSCAPE not cover LS1021 ?
-> > [Alison Wang] LS1021A is an earlier product and is not compatible
-> with later Layerscape architecture. So ARCH_LAYERSCAPE can't cover
-> LS1021A.
-> 
-> Ah ok, I see. That information would be useful in the commit message ;-)
-> 
-[Alison Wang] Ok. :)
-> >>
-> >>> Signed-off-by: Alison Wang <alison.wang@nxp.com>
-> >>> ---
-> >>> Changes in v2:
-> >>> - None
-> >>>
-> >>>  drivers/mtd/nand/Kconfig | 2 +-
-> >>>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>>
-> >>> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-> >> index
-> >>> 353a9dd..85e3860 100644
-> >>> --- a/drivers/mtd/nand/Kconfig
-> >>> +++ b/drivers/mtd/nand/Kconfig
-> >>> @@ -441,7 +441,7 @@ config MTD_NAND_FSL_ELBC
-> >>>
-> >>>  config MTD_NAND_FSL_IFC
-> >>>  	tristate "NAND support for Freescale IFC controller"
-> >>> -	depends on FSL_SOC || ARCH_LAYERSCAPE
-> >>> +	depends on FSL_SOC || ARCH_LAYERSCAPE || SOC_LS1021A
-> >>>  	select FSL_IFC
-> >>>  	select MEMORY
-> >>>  	help
-> >>>
-> >
-> > Best Regards,
-> > Alison Wang
-> >
-> 
-> 
-> --
-> Best regards,
-> Marek Vasut
+On 2017/1/4 21:56, Ard Biesheuvel wrote:
+> On 16 December 2016 at 16:54, Robert Richter <rrichter@cavium.com> wrote:
+>> On ThunderX systems with certain memory configurations we see the
+>> following BUG_ON():
+>>
+>>  kernel BUG at mm/page_alloc.c:1848!
+>>
+>> This happens for some configs with 64k page size enabled. The BUG_ON()
+>> checks if start and end page of a memmap range belongs to the same
+>> zone.
+>>
+>> The BUG_ON() check fails if a memory zone contains NOMAP regions. In
+>> this case the node information of those pages is not initialized. This
+>> causes an inconsistency of the page links with wrong zone and node
+>> information for that pages. NOMAP pages from node 1 still point to the
+>> mem zone from node 0 and have the wrong nid assigned.
+>>
+>> The reason for the mis-configuration is a change in pfn_valid() which
+>> reports pages marked NOMAP as invalid:
+>>
+>>  68709f45385a arm64: only consider memblocks with NOMAP cleared for linear mapping
+>>
+>> This causes pages marked as nomap being no longer reassigned to the
+>> new zone in memmap_init_zone() by calling __init_single_pfn().
+>>
+>> Fixing this by implementing an arm64 specific early_pfn_valid(). This
+>> causes all pages of sections with memory including NOMAP ranges to be
+>> initialized by __init_single_page() and ensures consistency of page
+>> links to zone, node and section.
+>>
+>
+> I like this solution a lot better than the first one, but I am still
+> somewhat uneasy about having the kernel reason about attributes of
+> pages it should not touch in the first place. But the fact that
+> early_pfn_valid() is only used a single time in the whole kernel does
+> give some confidence that we are not simply moving the problem
+> elsewhere.
+>
+> Given that you are touching arch/arm/ as well as arch/arm64, could you
+> explain why only arm64 needs this treatment? Is it simply because we
+> don't have NUMA support there?
+>
+> Considering that Hisilicon D05 suffered from the same issue, I would
+> like to get some coverage there as well. Hanjun, is this something you
+> can arrange? Thanks
 
-Best Regards,
-Alison Wang
+Sure, we will test this patch with LTP MM stress test (which triggers
+the bug on D05), and give the feedback.
+
+Thanks
+Hanjun
