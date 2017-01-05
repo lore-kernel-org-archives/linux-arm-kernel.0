@@ -1,79 +1,52 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Thu, 5 Jan 2017 14:01:59 +0800
-Subject: [PATCH v11 8/8] ARM: dts: imx6q-evi: Fix onboard hub reset line
-In-Reply-To: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
-References: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1483596119-27508-9-git-send-email-peter.chen@nxp.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 5 Jan 2017 14:28:50 +0800
+Subject: [PATCH v5 13/17] irqdomain: irq_domain_check_msi_remap
+In-Reply-To: <1483536746-2725-14-git-send-email-eric.auger@redhat.com>
+Message-ID: <201701051438.w4q2qX7B%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joshua Clayton <stillcompiling@gmail.com>
+Hi Eric,
 
-Previously the onboard hub was made to work by treating its
-reset gpio as a regulator enable.
-Get rid of that kludge now that pwseq has added reset gpio support
-Move pin muxing the hub reset pin into the usbh1 group
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.10-rc2 next-20170105]
+[cannot apply to iommu/next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
+url:    https://github.com/0day-ci/linux/commits/Eric-Auger/KVM-PCIe-MSI-passthrough-on-ARM-ARM64-and-IOVA-reserved-regions/20170105-132853
+config: i386-randconfig-x003-201701 (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All errors (new ones prefixed by >>):
+
+   kernel/irq/irqdomain.c: In function 'irq_domain_is_msi_remap':
+>> kernel/irq/irqdomain.c:289:17: error: 'struct irq_domain' has no member named 'parent'
+     for (; h; h = h->parent) {
+                    ^~
+
+vim +289 kernel/irq/irqdomain.c
+
+   283	 * @domain: domain pointer
+   284	 */
+   285	static bool irq_domain_is_msi_remap(struct irq_domain *domain)
+   286	{
+   287		struct irq_domain *h = domain;
+   288	
+ > 289		for (; h; h = h->parent) {
+   290			if (h->flags & IRQ_DOMAIN_FLAG_MSI_REMAP)
+   291				return true;
+   292		}
+
 ---
- arch/arm/boot/dts/imx6q-evi.dts | 25 +++++++------------------
- 1 file changed, 7 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
-index 7c7c1a8..79a0bd5 100644
---- a/arch/arm/boot/dts/imx6q-evi.dts
-+++ b/arch/arm/boot/dts/imx6q-evi.dts
-@@ -54,18 +54,6 @@
- 		reg = <0x10000000 0x40000000>;
- 	};
- 
--	reg_usbh1_vbus: regulator-usbhubreset {
--		compatible = "regulator-fixed";
--		regulator-name = "usbh1_vbus";
--		regulator-min-microvolt = <5000000>;
--		regulator-max-microvolt = <5000000>;
--		enable-active-high;
--		startup-delay-us = <2>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&pinctrl_usbh1_hubreset>;
--		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
--	};
--
- 	reg_usb_otg_vbus: regulator-usbotgvbus {
- 		compatible = "regulator-fixed";
- 		regulator-name = "usb_otg_vbus";
-@@ -207,12 +195,18 @@
- };
- 
- &usbh1 {
--	vbus-supply = <&reg_usbh1_vbus>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbh1>;
- 	dr_mode = "host";
- 	disable-over-current;
- 	status = "okay";
-+
-+	usb2415host: hub at 1 {
-+		compatible = "usb424,2513";
-+		reg = <1>;
-+		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+		reset-duration-us = <3000>;
-+	};
- };
- 
- &usbotg {
-@@ -468,11 +462,6 @@
- 			MX6QDL_PAD_GPIO_3__USB_H1_OC 0x1b0b0
- 			/* usbh1_b OC */
- 			MX6QDL_PAD_GPIO_0__GPIO1_IO00 0x1b0b0
--		>;
--	};
--
--	pinctrl_usbh1_hubreset: usbh1hubresetgrp {
--		fsl,pins = <
- 			MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x1b0b0
- 		>;
- 	};
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 25534 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170105/89886e81/attachment-0001.gz>
