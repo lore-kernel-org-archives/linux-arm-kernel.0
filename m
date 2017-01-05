@@ -1,43 +1,53 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Thu, 5 Jan 2017 14:43:25 +0100
-Subject: [PATCHv3 4/8] ARM: dts: stm32: Add RTC support for STM32F429 MCU
+Date: Thu, 5 Jan 2017 14:43:23 +0100
+Subject: [PATCHv3 2/8] dt-bindings: document the STM32 RTC bindings
 In-Reply-To: <1483623809-29937-1-git-send-email-amelie.delaunay@st.com>
 References: <1483623809-29937-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1483623809-29937-5-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1483623809-29937-3-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds STM32 RTC bindings for STM32F429.
+This patch adds documentation of device tree bindings for the STM32 RTC.
 
 Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/stm32f429.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ .../devicetree/bindings/rtc/st,stm32-rtc.txt       | 27 ++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index d195ccf..d181025 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -125,6 +125,20 @@
- 			status = "disabled";
- 		};
- 
-+		rtc: rtc at 40002800 {
-+			compatible = "st,stm32-rtc";
-+			reg = <0x40002800 0x400>;
-+			clocks = <&rcc 1 CLK_RTC>;
-+			clock-names = "ck_rtc";
-+			assigned-clocks = <&rcc 1 CLK_RTC>;
-+			assigned-clock-parents = <&rcc 1 CLK_LSE>;
-+			interrupt-parent = <&exti>;
-+			interrupts = <17 1>;
-+			interrupt-names = "alarm";
-+			st,syscfg = <&pwrcfg>;
-+			status = "disabled";
-+		};
+diff --git a/Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt b/Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt
+new file mode 100644
+index 0000000..e2837b9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt
+@@ -0,0 +1,27 @@
++STM32 Real Time Clock
 +
- 		usart2: serial at 40004400 {
- 			compatible = "st,stm32-usart", "st,stm32-uart";
- 			reg = <0x40004400 0x400>;
++Required properties:
++- compatible: "st,stm32-rtc".
++- reg: address range of rtc register set.
++- clocks: reference to the clock entry ck_rtc.
++- interrupt-parent: phandle for the interrupt controller.
++- interrupts: rtc alarm interrupt.
++- st,syscfg: phandle for pwrcfg, mandatory to disable/enable backup domain
++  (RTC registers) write protection.
++
++Optional properties (to override default ck_rtc parent clock):
++- assigned-clocks: reference to the ck_rtc clock entry.
++- assigned-clock-parents: phandle of the new parent clock of ck_rtc.
++
++Example:
++
++	rtc: rtc at 40002800 {
++		compatible = "st,stm32-rtc";
++		reg = <0x40002800 0x400>;
++		clocks = <&rcc 1 CLK_RTC>;
++		assigned-clocks = <&rcc 1 CLK_RTC>;
++		assigned-clock-parents = <&rcc 1 CLK_LSE>;
++		interrupt-parent = <&exti>;
++		interrupts = <17 1>;
++		st,syscfg = <&pwrcfg>;
++	};
 -- 
 1.9.1
