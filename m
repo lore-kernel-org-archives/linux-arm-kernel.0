@@ -1,30 +1,34 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Fri, 06 Jan 2017 22:53:57 +0900
-Subject: [PATCH v5 2/5] arm64: dts: exynos: make tm2 and tm2e independent
- from each other
-In-Reply-To: <20170106134929.mj7wqalp7lpkfm6b@kozik-lap>
-References: <20170106134350.32428-1-andi.shyti@samsung.com>
- <CGME20170106134356epcas1p19be459900aec43b2b9ea343cdaf0a2bf@epcas1p1.samsung.com>
- <20170106134350.32428-3-andi.shyti@samsung.com>
- <20170106134929.mj7wqalp7lpkfm6b@kozik-lap>
-Message-ID: <20170106135357.n4ugkcdcog4hzbhe@gangnam.samsung>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 6 Jan 2017 14:56:24 +0100
+Subject: [PATCH 1/4] phy: sun4i-usb: add support for V3s USB PHY
+In-Reply-To: <20170103152534.20118-2-icenowy@aosc.xyz>
+References: <20170103152534.20118-1-icenowy@aosc.xyz>
+ <20170103152534.20118-2-icenowy@aosc.xyz>
+Message-ID: <20170106135624.kbjdvb3wtytfj6ob@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
-
-> > -#include "exynos5433-tm2.dts"
-> > +#include "exynos5433-tm2-common.dtsi"
-> >  
-> >  / {
-> >  	model = "Samsung TM2E board";
+On Tue, Jan 03, 2017 at 11:25:31PM +0800, Icenowy Zheng wrote:
+> Allwinner V3s come with a USB PHY controller slightly different to other
+> SoCs, with only one PHY.
 > 
-> Where are the regulators?
+> Add support for it.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-No need, they were already overwriting the original property, so
-with your suggestion they didn't change in tm2e. That's why I like
-your suggestion.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Originally I added the 'regulator' label to not have empty nodes.
+Thanks,
+Maxime
 
-Andi
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170106/9e9d2195/attachment.sig>
