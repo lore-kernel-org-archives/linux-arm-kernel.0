@@ -1,73 +1,93 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 06 Jan 2017 09:01:31 -0800
-Subject: [PATCH 1/1] MMC: meson: avoid possible NULL dereference
-In-Reply-To: <20161223150108.9229-1-xypron.glpk@gmx.de> (Heinrich Schuchardt's
- message of "Fri, 23 Dec 2016 16:01:08 +0100")
-References: <20161223150108.9229-1-xypron.glpk@gmx.de>
-Message-ID: <m237gwcec4.fsf@baylibre.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 6 Jan 2017 19:08:32 +0200
+Subject: [PATCH v11 0/8] power: add power sequence library
+In-Reply-To: <20170106151841.l6ehqmpben4ilkaf@kozik-lap>
+References: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
+ <20170106151841.l6ehqmpben4ilkaf@kozik-lap>
+Message-ID: <20170106170832.jxthwq5sabpyskui@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heinrich Schuchardt <xypron.glpk@gmx.de> writes:
+On Fri, Jan 06, 2017 at 05:18:41PM +0200, Krzysztof Kozlowski wrote:
+> On Thu, Jan 05, 2017 at 02:01:51PM +0800, Peter Chen wrote:
+> > Hi all,
+> > 
+> > This is a follow-up for my last power sequence framework patch set [1].
+> > According to Rob Herring and Ulf Hansson's comments[2]. The kinds of
+> > power sequence instances will be added at postcore_initcall, the match
+> > criteria is compatible string first, if the compatible string is not
+> > matched between dts and library, it will try to use generic power sequence.
+> > 	 
+> > The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+> > if only one power sequence instance is needed, for more power sequences
+> > are used, using of_pwrseq_on_list/of_pwrseq_off_list instead (eg, USB hub driver).
+> > 
+> > In future, if there are special power sequence requirements, the special
+> > power sequence library can be created.
+> > 
+> > This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+> > two hot-plug devices to simulate this use case, the related binding
+> > change is updated at patch [1/6], The udoo board changes were tested
+> > using my last power sequence patch set.[3]
+> > 
+> > Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+> > need to power on itself before it can be found by ULPI bus.
+> > 
+> > [1] http://www.spinics.net/lists/linux-usb/msg142755.html
+> > [2] http://www.spinics.net/lists/linux-usb/msg143106.html
+> > [3] http://www.spinics.net/lists/linux-usb/msg142815.html
+> > 
+> 
+> Unfortunately I was unable to utilize this library to solve Odroid U3
+> usb3503/lan9730 power sequence (as a continuation of my old series [0][1]).
+> 
+> The main problem is that power sequence instance (pwrseq_generic.c) is
+> not a device. I don't get why it is not a device. It would be rather
+> intuitive to me to make it a device. Also it would make life easier
+> because you could use all device-like consumer APIs (of getting clocks,
+> GPIOs etc). Since it is not a device, it is not possible to use
+> regulator consumer API.
+> 
+> I need a regulator because I need to toggle the power.
+> 
+> Other encountered issue is that power sequence happens early, before the
+> unused regulators are turned off by the system. However maybe this is
+> the necessity from other point of view.
+> 
+> My case is annoyingly over-complicated so I am slowly getting sertain
+> that it is not generic. Anyway it looks like this:
+> 
+> EHCI controller
+>      |
+>      |--HSIC0--lan9730 (reset is done only through regulator)
+>      |--HSIC1--usb3504 (it has a reset GPIO... but it is toggled by
+>                         usb3504 driver)
+> 
+> Overall, I want to reset the lan9730. This can be done only through
+> power - buck8. buck8 state is an logical OR of register set by I2C and
+> GPIO. Thus to turn it off, it is not sufficient just to set register to
+> 0x0 because the GPIO is keeping it on. The best way is to switch the
+> buck8 to gpio-enable-control thus only GPIO will be toggling it... still
+> through the regulator consumer API (because it is an GPIO for the
+> regulator, not for the reset!).
+> 
+> However these two seems coupled. On invalid reset sequence, both chips
+> die. The usb3504 has its own existing reset sequence and my findings
+> show that it should happen after lan9730 reset sequence. Otherwise all
+> devices might be lost...
 
-> No actual segmentation faults were observed but the coding is
-> at least inconsistent.
->
-> irqreturn_t meson_mmc_irq():
->
-> We should not dereference host before checking it.
->
-> meson_mmc_irq_thread():
->
-> If cmd or mrq are NULL we should not dereference them after
-> writing a warning.
->
-> Fixes: 51c5d8447bd7 MMC: meson: initial support for GX platforms
-> Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+Update - it's working! I skipped entirely the regulator API and I am
+playing with its GPIO. This sounds like a hack but finally after few
+days of different tries I was able to find a working, reproducible
+solution. It turned out that the yours pwrseq is working quite good.
 
-Acked-by: Kevin Hilman <khilman@baylibre.com>
+I'll send a follow-up for my board soon.
 
-Ulf, I assume you can pick this up directly for v4.10-rc?
+Best regards,
+Krzysztof
 
-Thanks,
 
-Kevin
-
-> ---
->  drivers/mmc/host/meson-gx-mmc.c | 8 +++++---
->  1 file changed, 5 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-> index b352760c041e..09739352834c 100644
-> --- a/drivers/mmc/host/meson-gx-mmc.c
-> +++ b/drivers/mmc/host/meson-gx-mmc.c
-> @@ -578,13 +578,15 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
->  {
->  	struct meson_host *host = dev_id;
->  	struct mmc_request *mrq;
-> -	struct mmc_command *cmd = host->cmd;
-> +	struct mmc_command *cmd;
->  	u32 irq_en, status, raw_status;
->  	irqreturn_t ret = IRQ_HANDLED;
->  
->  	if (WARN_ON(!host))
->  		return IRQ_NONE;
->  
-> +	cmd = host->cmd;
-> +
->  	mrq = host->mrq;
->  
->  	if (WARN_ON(!mrq))
-> @@ -670,10 +672,10 @@ static irqreturn_t meson_mmc_irq_thread(int irq, void *dev_id)
->  	int ret = IRQ_HANDLED;
->  
->  	if (WARN_ON(!mrq))
-> -		ret = IRQ_NONE;
-> +		return IRQ_NONE;
->  
->  	if (WARN_ON(!cmd))
-> -		ret = IRQ_NONE;
-> +		return IRQ_NONE;
->  
->  	data = cmd->data;
->  	if (data) {
+> 
+> [0] http://www.spinics.net/lists/linux-mmc/msg37386.html
+> [1] https://github.com/krzk/linux/commits/for-next/odroid-u3-usb3503-lan-boot-fixes-v4
+> 
