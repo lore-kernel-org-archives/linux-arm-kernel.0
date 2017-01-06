@@ -1,46 +1,45 @@
 From: nicolas.dichtel@6wind.com (Nicolas Dichtel)
-Date: Fri,  6 Jan 2017 10:43:55 +0100
-Subject: [PATCH v2 3/7] nios2: put setup.h in uapi
-In-Reply-To: <1483695839-18660-1-git-send-email-nicolas.dichtel@6wind.com>
+Date: Fri,  6 Jan 2017 10:43:52 +0100
+Subject: [PATCH v2 0/7] uapi: export all headers under uapi directories
+In-Reply-To: <bf83da6b-01ef-bf44-b3e1-ca6fc5636818@6wind.com>
 References: <bf83da6b-01ef-bf44-b3e1-ca6fc5636818@6wind.com>
- <1483695839-18660-1-git-send-email-nicolas.dichtel@6wind.com>
-Message-ID: <1483695839-18660-4-git-send-email-nicolas.dichtel@6wind.com>
+Message-ID: <1483695839-18660-1-git-send-email-nicolas.dichtel@6wind.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This header file is exported, thus move it to uapi.
 
-Signed-off-by: Nicolas Dichtel <nicolas.dichtel@6wind.com>
----
- arch/nios2/include/asm/setup.h      | 2 +-
- arch/nios2/include/uapi/asm/setup.h | 6 ++++++
- 2 files changed, 7 insertions(+), 1 deletion(-)
- create mode 100644 arch/nios2/include/uapi/asm/setup.h
+Here is the v2 of this series. The first 5 patches are just cleanup: some
+exported headers were still under a non-uapi directory.
+The patch 6 was spotted by code review: there is no in-tree user of this
+functionality.
+The last patch remove the use of header-y. Now all files under an uapi
+directory are exported.
 
-diff --git a/arch/nios2/include/asm/setup.h b/arch/nios2/include/asm/setup.h
-index dcbf8cf1a344..d49e9e91bf55 100644
---- a/arch/nios2/include/asm/setup.h
-+++ b/arch/nios2/include/asm/setup.h
-@@ -19,7 +19,7 @@
- #ifndef _ASM_NIOS2_SETUP_H
- #define _ASM_NIOS2_SETUP_H
- 
--#include <asm-generic/setup.h>
-+#include <uapi/asm/setup.h>
- 
- #ifndef __ASSEMBLY__
- #ifdef __KERNEL__
-diff --git a/arch/nios2/include/uapi/asm/setup.h b/arch/nios2/include/uapi/asm/setup.h
-new file mode 100644
-index 000000000000..8d8285997ba8
---- /dev/null
-+++ b/arch/nios2/include/uapi/asm/setup.h
-@@ -0,0 +1,6 @@
-+#ifndef _UAPI_ASM_NIOS2_SETUP_H
-+#define _UAPI_ASM_NIOS2_SETUP_H
-+
-+#include <asm-generic/setup.h>
-+
-+#endif /* _UAPI_ASM_NIOS2_SETUP_H */
--- 
-2.8.1
+asm is a bit special, most of architectures export asm/<arch>/include/uapi/asm
+only, but there is two exceptions:
+ - cris which exports arch/cris/include/uapi/arch-v[10|32];
+ - tile which exports arch/tile/include/uapi/arch.
+Because I don't know if the output of 'make headers_install_all' can be changed,
+I introduce subdir-y in Kbuild file. The headers_install_all target copies all
+asm/<arch>/include/uapi/asm to usr/include/asm-<arch> but
+arch/cris/include/uapi/arch-v[10|32] and arch/tile/include/uapi/arch are not
+prefixed (they are put asis in usr/include/). If it's acceptable to modify the
+output of 'make headers_install_all' to export asm headers in
+usr/include/asm-<arch>/asm, then I could remove this new subdir-y and exports
+everything under arch/<arch>/include/uapi/.
+
+Note also that exported files for asm are a mix of files listed by:
+ - include/uapi/asm-generic/Kbuild.asm;
+ - arch/x86/include/uapi/asm/Kbuild;
+ - arch/x86/include/asm/Kbuild.
+This complicates a lot the processing (arch/x86/include/asm/Kbuild is also
+used by scripts/Makefile.asm-generic).
+
+This series has been tested with a 'make headers_install' on x86 and a
+'make headers_install_all'. I've checked the result of both commands.
+
+This patch is built against linus tree. I don't know if it should be
+made against antoher tree.
+
+Comments are welcomed,
+Nicolas
