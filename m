@@ -1,531 +1,338 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Thu, 5 Jan 2017 17:21:53 -0800
-Subject: [PATCH v2 10/19] media: Add i.MX media core driver
-In-Reply-To: <c04a85dc-4f62-798f-2e37-d7848657730a@mentor.com>
-References: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
- <1483477049-19056-11-git-send-email-steve_longerbeam@mentor.com>
- <c04a85dc-4f62-798f-2e37-d7848657730a@mentor.com>
-Message-ID: <21871007-5243-7fc8-5087-f2ce5185180a@gmail.com>
+From: minghuan.lian@nxp.com (M.H. Lian)
+Date: Fri, 6 Jan 2017 01:45:20 +0000
+Subject: [PATCH v2,7/9] irqchip/ls-scfg-msi: add LS1046a MSI support
+In-Reply-To: <7cd3cc33-741a-6ab1-6444-17a626991d33@arm.com>
+References: <1483603837-4629-1-git-send-email-Minghuan.Lian@nxp.com>
+ <1483603837-4629-7-git-send-email-Minghuan.Lian@nxp.com>
+ <7cd3cc33-741a-6ab1-6444-17a626991d33@arm.com>
+Message-ID: <VI1PR04MB1615D724A4E6029EE8F2B7FAE8630@VI1PR04MB1615.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marc,
 
-On 01/04/2017 05:33 AM, Vladimir Zapolskiy wrote:
-> Hi Steve,
->
-> On 01/03/2017 10:57 PM, Steve Longerbeam wrote:
->> Add the core media driver for i.MX SOC.
->>
->> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
->> ---
->>   Documentation/devicetree/bindings/media/imx.txt   | 205 +++++
-> v2 was sent before getting Rob's review comments, but still they
-> should be addressed in v3.
+Thanks for your review.
+Please see my comments inline.
 
-yes, those changes will be part of v3 as well.
+Thanks,
+Minghuan
 
->
-> Also I would suggest to separate device tree binding documentation
-> change and place it as the first patch in the series, this should
-> make the following DTS changes valid.
+> -----Original Message-----
+> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> Sent: Thursday, January 05, 2017 11:19 PM
+> To: M.H. Lian <minghuan.lian@nxp.com>; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> devicetree at vger.kernel.org
+> Cc: Rob Herring <robh@kernel.org>; Jason Cooper
+> <jason@lakedaemon.net>; Roy Zang <roy.zang@nxp.com>; Mingkai Hu
+> <mingkai.hu@nxp.com>; Stuart Yoder <stuart.yoder@nxp.com>; Leo Li
+> <leoyang.li@nxp.com>; Scott Wood <scott.wood@nxp.com>
+> Subject: Re: [PATCH v2,7/9] irqchip/ls-scfg-msi: add LS1046a MSI support
+> 
+> On 05/01/17 08:10, Minghuan Lian wrote:
+> > LS1046a includes 4 MSIRs, each MSIR is assigned a dedicate GIC SPI
+> > interrupt and provides 32 MSI interrupts. Compared to previous MSI,
+> > LS1046a's IBS(interrupt bit select) shift is changed to 2 and total
+> > MSI interrupt number is changed to 128.
+> >
+> > The patch adds structure 'ls_scfg_msir' to describe MSIR setting and
+> > 'ibs_shift' to store the different value between the SoCs.
+> >
+> > Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+> > ---
+> > v2-v1:
+> > - MSI dts node change has been merged into the patch 6/9
+> >
+> >  drivers/irqchip/irq-ls-scfg-msi.c | 161
+> > +++++++++++++++++++++++++++++---------
+> >  1 file changed, 126 insertions(+), 35 deletions(-)
+> >
+> > diff --git a/drivers/irqchip/irq-ls-scfg-msi.c
+> > b/drivers/irqchip/irq-ls-scfg-msi.c
+> > index cef67cc..67547bd 100644
+> > --- a/drivers/irqchip/irq-ls-scfg-msi.c
+> > +++ b/drivers/irqchip/irq-ls-scfg-msi.c
+> > @@ -17,13 +17,24 @@
+> >  #include <linux/irq.h>
+> >  #include <linux/irqchip/chained_irq.h>  #include <linux/irqdomain.h>
+> > +#include <linux/of_irq.h>
+> >  #include <linux/of_pci.h>
+> >  #include <linux/of_platform.h>
+> >  #include <linux/spinlock.h>
+> >
+> > -#define MSI_MAX_IRQS	32
+> > -#define MSI_IBS_SHIFT	3
+> > -#define MSIR		4
+> > +#define MSI_IRQS_PER_MSIR	32
+> > +#define MSI_MSIR_OFFSET		4
+> > +
+> > +struct ls_scfg_msi_cfg {
+> > +	u32 ibs_shift; /* Shift of interrupt bit select */ };
+> > +
+> > +struct ls_scfg_msir {
+> > +	struct ls_scfg_msi *msi_data;
+> > +	unsigned int index;
+> > +	unsigned int gic_irq;
+> > +	void __iomem *reg;
+> > +};
+> >
+> >  struct ls_scfg_msi {
+> >  	spinlock_t		lock;
+> > @@ -32,8 +43,11 @@ struct ls_scfg_msi {
+> >  	struct irq_domain	*msi_domain;
+> >  	void __iomem		*regs;
+> >  	phys_addr_t		msiir_addr;
+> > -	int			irq;
+> > -	DECLARE_BITMAP(used, MSI_MAX_IRQS);
+> > +	struct ls_scfg_msi_cfg	*cfg;
+> > +	u32			msir_num;
+> > +	struct ls_scfg_msir	*msir;
+> > +	u32			irqs_num;
+> > +	unsigned long		*used;
+> >  };
+> >
+> >  static struct irq_chip ls_scfg_msi_irq_chip = { @@ -55,7 +69,7 @@
+> > static void ls_scfg_msi_compose_msg(struct irq_data *data, struct
+> > msi_msg *msg)
+> >
+> >  	msg->address_hi = upper_32_bits(msi_data->msiir_addr);
+> >  	msg->address_lo = lower_32_bits(msi_data->msiir_addr);
+> > -	msg->data = data->hwirq << MSI_IBS_SHIFT;
+> > +	msg->data = data->hwirq;
+> >  }
+> >
+> >  static int ls_scfg_msi_set_affinity(struct irq_data *irq_data, @@
+> > -81,8 +95,8 @@ static int ls_scfg_msi_domain_irq_alloc(struct irq_domain
+> *domain,
+> >  	WARN_ON(nr_irqs != 1);
+> >
+> >  	spin_lock(&msi_data->lock);
+> > -	pos = find_first_zero_bit(msi_data->used, MSI_MAX_IRQS);
+> > -	if (pos < MSI_MAX_IRQS)
+> > +	pos = find_first_zero_bit(msi_data->used, msi_data->irqs_num);
+> > +	if (pos < msi_data->irqs_num)
+> >  		__set_bit(pos, msi_data->used);
+> >  	else
+> >  		err = -ENOSPC;
+> > @@ -106,7 +120,7 @@ static void ls_scfg_msi_domain_irq_free(struct
+> irq_domain *domain,
+> >  	int pos;
+> >
+> >  	pos = d->hwirq;
+> > -	if (pos < 0 || pos >= MSI_MAX_IRQS) {
+> > +	if (pos < 0 || pos >= msi_data->irqs_num) {
+> >  		pr_err("failed to teardown msi. Invalid hwirq %d\n", pos);
+> >  		return;
+> >  	}
+> > @@ -123,15 +137,17 @@ static void ls_scfg_msi_domain_irq_free(struct
+> > irq_domain *domain,
+> >
+> >  static void ls_scfg_msi_irq_handler(struct irq_desc *desc)  {
+> > -	struct ls_scfg_msi *msi_data = irq_desc_get_handler_data(desc);
+> > +	struct ls_scfg_msir *msir = irq_desc_get_handler_data(desc);
+> > +	struct ls_scfg_msi *msi_data = msir->msi_data;
+> >  	unsigned long val;
+> > -	int pos, virq;
+> > +	int pos, virq, hwirq;
+> >
+> >  	chained_irq_enter(irq_desc_get_chip(desc), desc);
+> >
+> > -	val = ioread32be(msi_data->regs + MSIR);
+> > -	for_each_set_bit(pos, &val, MSI_MAX_IRQS) {
+> > -		virq = irq_find_mapping(msi_data->parent, (31 - pos));
+> > +	val = ioread32be(msir->reg);
+> > +	for_each_set_bit(pos, &val, MSI_IRQS_PER_MSIR) {
+> > +		hwirq = ((31 - pos) << msi_data->cfg->ibs_shift) | msir-
+> >index;
+> > +		virq = irq_find_mapping(msi_data->parent, hwirq);
+> >  		if (virq)
+> >  			generic_handle_irq(virq);
+> >  	}
+> > @@ -143,7 +159,7 @@ static int ls_scfg_msi_domains_init(struct
+> > ls_scfg_msi *msi_data)  {
+> >  	/* Initialize MSI domain parent */
+> >  	msi_data->parent = irq_domain_add_linear(NULL,
+> > -						 MSI_MAX_IRQS,
+> > +						 msi_data->irqs_num,
+> >  						 &ls_scfg_msi_domain_ops,
+> >  						 msi_data);
+> >  	if (!msi_data->parent) {
+> > @@ -164,16 +180,83 @@ static int ls_scfg_msi_domains_init(struct
+> ls_scfg_msi *msi_data)
+> >  	return 0;
+> >  }
+> >
+> > +static int ls_scfg_msi_setup_hwirq(struct ls_scfg_msi *msi_data, int
+> > +index) {
+> > +	struct ls_scfg_msir *msir;
+> > +	int virq, i, hwirq;
+> > +
+> > +	virq = platform_get_irq(msi_data->pdev, index);
+> > +	if (virq <= 0)
+> > +		return -ENODEV;
+> > +
+> > +	msir = &msi_data->msir[index];
+> > +	msir->index = index;
+> > +	msir->msi_data = msi_data;
+> > +	msir->gic_irq = virq;
+> > +	msir->reg = msi_data->regs + MSI_MSIR_OFFSET + 4 * index;
+> > +
+> > +	irq_set_chained_handler_and_data(msir->gic_irq,
+> > +					 ls_scfg_msi_irq_handler,
+> > +					 msir);
+> > +
+> > +	/* Release the hwirqs corresponding to this MSIR */
+> > +	for (i = 0; i < MSI_IRQS_PER_MSIR; i++) {
+> > +		hwirq = i << msi_data->cfg->ibs_shift | msir->index;
+> > +		bitmap_clear(msi_data->used, hwirq, 1);
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int ls_scfg_msi_teardown_hwirq(struct ls_scfg_msir *msir) {
+> > +	struct ls_scfg_msi *msi_data = msir->msi_data;
+> > +	int i, hwirq;
+> > +
+> > +	if (msir->gic_irq > 0)
+> > +		irq_set_chained_handler_and_data(msir->gic_irq, NULL,
+> NULL);
+> > +
+> > +	for (i = 0; i < MSI_IRQS_PER_MSIR; i++) {
+> > +		hwirq = i << msi_data->cfg->ibs_shift | msir->index;
+> > +		bitmap_set(msi_data->used, hwirq, 1);
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static struct ls_scfg_msi_cfg ls1021_msi_cfg = {
+> > +	.ibs_shift = 3,
+> > +};
+> > +
+> > +static struct ls_scfg_msi_cfg ls1046_msi_cfg = {
+> > +	.ibs_shift = 2,
+> > +};
+> > +
+> > +static const struct of_device_id ls_scfg_msi_id[] = {
+> > +	{ .compatible = "fsl,ls1021a-msi", .data = &ls1021_msi_cfg },
+> > +	{ .compatible = "fsl,ls1043a-msi", .data = &ls1021_msi_cfg },
+> > +	{ .compatible = "fsl,ls1046a-msi", .data = &ls1046_msi_cfg },
+> 
+> So after 3 patches adding compatibility between the fsl,1s10 and
+> fsl,ls10 names, you discard them? How does it work again with the old DTs?
+> 
+[Minghuan Lian]  ok, I will store the old compatible.
+This typo makes me very uncomfortable  :(
 
-done.
+> > +	{},
+> > +};
+> > +MODULE_DEVICE_TABLE(of, ls_scfg_msi_id);
+> > +
+> >  static int ls_scfg_msi_probe(struct platform_device *pdev)  {
+> > +	const struct of_device_id *match;
+> >  	struct ls_scfg_msi *msi_data;
+> >  	struct resource *res;
+> > -	int ret;
+> > +	int i, ret;
+> > +
+> > +	match = of_match_device(ls_scfg_msi_id, &pdev->dev);
+> > +	if (!match)
+> > +		return -ENODEV;
+> >
+> >  	msi_data = devm_kzalloc(&pdev->dev, sizeof(*msi_data),
+> GFP_KERNEL);
+> >  	if (!msi_data)
+> >  		return -ENOMEM;
+> >
+> > +	msi_data->cfg = (struct ls_scfg_msi_cfg *) match->data;
+> > +
+> >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >  	msi_data->regs = devm_ioremap_resource(&pdev->dev, res);
+> >  	if (IS_ERR(msi_data->regs)) {
+> > @@ -182,23 +265,37 @@ static int ls_scfg_msi_probe(struct
+> platform_device *pdev)
+> >  	}
+> >  	msi_data->msiir_addr = res->start;
+> >
+> > -	msi_data->irq = platform_get_irq(pdev, 0);
+> > -	if (msi_data->irq <= 0) {
+> > -		dev_err(&pdev->dev, "failed to get MSI irq\n");
+> > -		return -ENODEV;
+> > -	}
+> > -
+> >  	msi_data->pdev = pdev;
+> >  	spin_lock_init(&msi_data->lock);
+> >
+> > +	msi_data->irqs_num = MSI_IRQS_PER_MSIR *
+> > +			     (1 << msi_data->cfg->ibs_shift);
+> > +	msi_data->used = devm_kcalloc(&pdev->dev,
+> > +				    BITS_TO_LONGS(msi_data->irqs_num),
+> > +				    sizeof(*msi_data->used),
+> > +				    GFP_KERNEL);
+> > +	if (!msi_data->used)
+> > +		return -ENOMEM;
+> > +	/*
+> > +	 * Reserve all the hwirqs
+> > +	 * The available hwirqs will be released in ls1_msi_setup_hwirq()
+> > +	 */
+> > +	bitmap_set(msi_data->used, 0, msi_data->irqs_num);
+> > +
+> > +	msi_data->msir_num = of_irq_count(pdev->dev.of_node);
+> > +	msi_data->msir = devm_kcalloc(&pdev->dev, msi_data->msir_num,
+> > +				      sizeof(*msi_data->msir),
+> > +				      GFP_KERNEL);
+> > +	if (!msi_data->msir)
+> > +		return -ENOMEM;
+> > +
+> > +	for (i = 0; i < msi_data->msir_num; i++)
+> > +		ls_scfg_msi_setup_hwirq(msi_data, i);
+> > +
+> >  	ret = ls_scfg_msi_domains_init(msi_data);
+> >  	if (ret)
+> >  		return ret;
+> >
+> > -	irq_set_chained_handler_and_data(msi_data->irq,
+> > -					 ls_scfg_msi_irq_handler,
+> > -					 msi_data);
+> > -
+> >  	platform_set_drvdata(pdev, msi_data);
+> >
+> >  	return 0;
+> > @@ -207,8 +304,10 @@ static int ls_scfg_msi_probe(struct
+> > platform_device *pdev)  static int ls_scfg_msi_remove(struct
+> > platform_device *pdev)  {
+> >  	struct ls_scfg_msi *msi_data = platform_get_drvdata(pdev);
+> > +	int i;
+> >
+> > -	irq_set_chained_handler_and_data(msi_data->irq, NULL, NULL);
+> > +	for (i = 0; i < msi_data->msir_num; i++)
+> > +		ls_scfg_msi_teardown_hwirq(&msi_data->msir[i]);
+> >
+> >  	irq_domain_remove(msi_data->msi_domain);
+> >  	irq_domain_remove(msi_data->parent);
+> > @@ -218,14 +317,6 @@ static int ls_scfg_msi_remove(struct
+> platform_device *pdev)
+> >  	return 0;
+> >  }
+> >
+> > -static const struct of_device_id ls_scfg_msi_id[] = {
+> > -	{ .compatible = "fsl,1s1021a-msi", }, /* a typo */
+> > -	{ .compatible = "fsl,1s1043a-msi", }, /* a typo */
+> ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> ^
+> these entries definitely need to be restored.
+> 
+> Also, please make sure you have a cover letter at the beginning of the series.
+> I flag series to review by flagging the cover letter, and I suspect many of us
+> are doing something similar. Not doing so is likely to leave your series
+> unreviewed...
+[Minghuan Lian]  I see. I will add cover letter for this series. And I will
+do this for all series of patches.
 
->
->>   Documentation/media/v4l-drivers/imx.rst           | 430 ++++++++++
->>   drivers/staging/media/Kconfig                     |   2 +
->>   drivers/staging/media/Makefile                    |   1 +
->>   drivers/staging/media/imx/Kconfig                 |   8 +
->>   drivers/staging/media/imx/Makefile                |   6 +
->>   drivers/staging/media/imx/TODO                    |  18 +
->>   drivers/staging/media/imx/imx-media-common.c      | 985 ++++++++++++++++++++++
->>   drivers/staging/media/imx/imx-media-dev.c         | 479 +++++++++++
->>   drivers/staging/media/imx/imx-media-fim.c         | 509 +++++++++++
->>   drivers/staging/media/imx/imx-media-internal-sd.c | 457 ++++++++++
->>   drivers/staging/media/imx/imx-media-of.c          | 291 +++++++
->>   drivers/staging/media/imx/imx-media-of.h          |  25 +
->>   drivers/staging/media/imx/imx-media.h             | 299 +++++++
->>   include/media/imx.h                               |  15 +
->>   include/uapi/Kbuild                               |   1 +
->>   include/uapi/linux/v4l2-controls.h                |   4 +
->>   include/uapi/media/Kbuild                         |   2 +
->>   include/uapi/media/imx.h                          |  30 +
-> Probably Greg should ack the UAPI changes, you may consider
-> to split them into a separate patch.
-
-I split out the one-line addition to include/uapi/Kbuild with an empty
-include/uapi/media/Kbuild into a new patch "UAPI: Add media UAPI Kbuild 
-file".
-Also added a patch "media: Add userspace header file for i.MX".
-
-
->
->
->> +
->> +struct imx_media_subdev *
->> +imx_media_find_subdev_by_sd(struct imx_media_dev *imxmd,
->> +			    struct v4l2_subdev *sd)
->> +{
->> +	struct imx_media_subdev *imxsd;
->> +	int i, ret = -ENODEV;
->> +
->> +	for (i = 0; i < imxmd->num_subdevs; i++) {
->> +		imxsd = &imxmd->subdev[i];
->> +		if (sd == imxsd->sd) {
-> This can be simplifed:
->
-> ...
->
-> 	if (sd == imxsd->sd)
-> 		return imxsd;
-> }
->
-> return ERR_PTR(-ENODEV);
-
-yep, done.
-
->
->> +struct imx_media_subdev *
->> +imx_media_find_subdev_by_id(struct imx_media_dev *imxmd, u32 grp_id)
->> +{
->> +	struct imx_media_subdev *imxsd;
->> +	int i, ret = -ENODEV;
->> +
->> +	for (i = 0; i < imxmd->num_subdevs; i++) {
->> +		imxsd = &imxmd->subdev[i];
->> +		if (imxsd->sd && imxsd->sd->grp_id == grp_id) {
->> +			ret = 0;
->> +			break;
-> This can be simplifed:
->
-> ...
->
-> 	if (imxsd->sd && imxsd->sd->grp_id == grp_i)
-> 		return imxsd;
-> }
->
-> return ERR_PTR(-ENODEV);
-
-done.
-
->
->
->> diff --git a/drivers/staging/media/imx/imx-media-dev.c b/drivers/staging/media/imx/imx-media-dev.c
->> new file mode 100644
->> index 0000000..8d22730
->> --- /dev/null
->> +++ b/drivers/staging/media/imx/imx-media-dev.c
->> @@ -0,0 +1,479 @@
->> +/*
->> + * V4L2 Media Controller Driver for Freescale i.MX5/6 SOC
->> + *
->> + * Copyright (c) 2016 Mentor Graphics Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + */
->> +#include <linux/module.h>
->> +#include <linux/delay.h>
->> +#include <linux/fs.h>
->> +#include <linux/timer.h>
->> +#include <linux/sched.h>
->> +#include <linux/slab.h>
->> +#include <linux/spinlock.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/pinctrl/consumer.h>
->> +#include <linux/of_platform.h>
->> +#include <media/v4l2-ioctl.h>
->> +#include <media/v4l2-ctrls.h>
->> +#include <media/v4l2-event.h>
->> +#include <media/v4l2-mc.h>
-> Please sort out the list of headers alphabetically.
-
-done.
-
->> +#include <video/imx-ipu-v3.h>
->> +#include <media/imx.h>
->> +#include "imx-media.h"
->> +#include "imx-media-of.h"
->> +
->> +#define DEVICE_NAME "imx-media"
-> I suppose you don't need this macro.
-
-sure why not, removed.
-
->
-> [snip]
->
->> + */
->> +static int imx_media_create_links(struct imx_media_dev *imxmd)
->> +{
->> +	struct imx_media_subdev *local_sd;
->> +	struct imx_media_subdev *remote_sd;
->> +	struct v4l2_subdev *source, *sink;
->> +	struct imx_media_link *link;
->> +	struct imx_media_pad *pad;
->> +	u16 source_pad, sink_pad;
->> +	int num_pads, i, j, k;
->> +	int ret = 0;
->> +
->> +	for (i = 0; i < imxmd->num_subdevs; i++) {
->> +		local_sd = &imxmd->subdev[i];
->> +		num_pads = local_sd->num_sink_pads + local_sd->num_src_pads;
->> +
->> +		for (j = 0; j < num_pads; j++) {
->> +			pad = &local_sd->pad[j];
->> +
->> +			for (k = 0; k < pad->num_links; k++) {
->> +				link = &pad->link[k];
->> +
->>   <snip>
-> Indentation depth is quite terrific.
-
-yes, it needs to iterate by subdev, pads in the subdev, then links
-in the pad. But I moved the code under the innermost loop into a
-function imx_media_create_link(), which creates a single media
-link. So it's not so much an eye-sore now.
-
->
->
->> +static struct platform_driver imx_media_pdrv = {
->> +	.probe		= imx_media_probe,
->> +	.remove		= imx_media_remove,
->> +	.driver		= {
->> +		.name	= DEVICE_NAME,
->> +		.owner	= THIS_MODULE,
-> Setting of .owner is not needed nowadays IIRC.
-
-a quick look at struct device_driver definition didn't mention that
-.owner member is deprecated or not needed, so for now I'll leave
-it in place. We can revisit that later.
-
->
->> +		.of_match_table	= imx_media_dt_ids,
->> +	},
->> +};
->> +
->> +module_platform_driver(imx_media_pdrv);
->> +
->> +MODULE_DESCRIPTION("i.MX5/6 v4l2 media controller driver");
->> +MODULE_AUTHOR("Steve Longerbeam <steve_longerbeam@mentor.com>");
->> +MODULE_LICENSE("GPL");
->> diff --git a/drivers/staging/media/imx/imx-media-fim.c b/drivers/staging/media/imx/imx-media-fim.c
->> new file mode 100644
->> index 0000000..52bfa8d
->> --- /dev/null
->> +++ b/drivers/staging/media/imx/imx-media-fim.c
->> @@ -0,0 +1,509 @@
->> +/*
->> + * Frame Interval Monitor.
->> + *
->> + * Copyright (c) 2016 Mentor Graphics Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + */
->> +#include <linux/module.h>
->> +#include <linux/delay.h>
->> +#include <linux/slab.h>
->> +#include <linux/platform_device.h>
->> +#ifdef CONFIG_IMX_GPT_ICAP
->> +#include <linux/mxc_icap.h>
->> +#endif
-> This looks clumsy. Include it unconditionally, if needed
-> do #ifdef's inside the header file.
-
-The i.MX input capture patch will come later. These are just
-placeholders until then, the config name could even change.
-For now I just removed the above conditional include.
-
->
->> +#include <media/v4l2-subdev.h>
->> +#include <media/v4l2-of.h>
->> +#include <media/v4l2-ctrls.h>
-> Please sort out the list alphabetically.
-
-done.
-
->> +	if (IS_ENABLED(CONFIG_IMX_GPT_ICAP)) {
->> +		ret = of_property_read_u32_array(fim_np,
->> +						 "input-capture-channel",
->> +						 icap, 2);
->> +		if (!ret) {
->> +			fim->icap_channel = icap[0];
->> +			fim->icap_flags = icap[1];
->> +		}
-> Should you return error otherwise?
-
-nope, it's an optional property.
-
->
->> diff --git a/drivers/staging/media/imx/imx-media-of.c b/drivers/staging/media/imx/imx-media-of.c
->> new file mode 100644
->> index 0000000..018d05a
->> --- /dev/null
->> +++ b/drivers/staging/media/imx/imx-media-of.c
->> @@ -0,0 +1,291 @@
->> +/*
->> + * Media driver for Freescale i.MX5/6 SOC
->> + *
->> + * Open Firmware parsing.
->> + *
->> + * Copyright (c) 2016 Mentor Graphics Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + */
->> +#include <linux/of_platform.h>
->> +#include <media/v4l2-device.h>
->> +#include <media/videobuf2-dma-contig.h>
->> +#include <media/v4l2-subdev.h>
->> +#include <media/v4l2-of.h>
->> +#include <media/v4l2-ctrls.h>
-> Please sort out the list alphabetically.
-
-done.
-
->>
->> +static int of_get_port_count(const struct device_node *np)
->> +{
->> +	struct device_node *child;
->> +	int num = 0;
->> +
->> +	/* if this node is itself a port, return 1 */
->> +	if (of_node_cmp(np->name, "port") == 0)
->> +		return 1;
->> +
->> +	for_each_child_of_node(np, child) {
->> +		if (of_node_cmp(child->name, "port") == 0)
->> +			num++;
->> +	}
-> Unneeded bracers.
-
-fixed.
-
->
->> +static struct imx_media_subdev *
->> +of_parse_subdev(struct imx_media_dev *imxmd, struct device_node *sd_np,
->> +		bool is_csi_port)
->> +{
->> +	struct imx_media_subdev *imxsd;
->> +	int i, num_pads, ret;
->> +
->> +	if (!of_device_is_available(sd_np)) {
->> +		dev_dbg(imxmd->dev, "%s: %s not enabled\n", __func__,
->> +			sd_np->name);
->> +		return NULL;
->> +	}
->> +
->> +	/* register this subdev with async notifier */
->> +	imxsd = imx_media_add_async_subdev(imxmd, sd_np, NULL);
->> +	if (!imxsd)
->> +		return NULL;
->> +	if (IS_ERR(imxsd))
->> +		return imxsd;
-> if (IS_ERR_OR_NULL(imxsd))
-> 	return imxsd;
-
-yep, done.
-
->> +
->> +	if (imxsd->num_sink_pads == 0) {
->> +		/* this might be a sensor */
->> +		of_parse_sensor(imxmd, imxsd, sd_np);
->> +	}
-> Unneeded bracers.
-
-ok removed.
-
->
->> +
->> +	for (i = 0; i < num_pads; i++) {
->> +		struct device_node *epnode = NULL, *port, *remote_np;
->> +		struct imx_media_subdev *remote_imxsd;
->> +		struct imx_media_pad *pad;
->> +		int remote_pad;
-> Too deep indentation, may be move the cycle body into a separate function?
-
-in this case I prefer not to, of_parse_subdev() is called recursively, and I
-think it's bad form to hide that fact by moving the recursive call into a
-separate function. The indentation is not that deep, only two loops deep.
-
-
->
->> +
->> +		/* init this pad */
->> +		pad = &imxsd->pad[i];
->> +		pad->pad.flags = (i < imxsd->num_sink_pads) ?
->> +			MEDIA_PAD_FL_SINK : MEDIA_PAD_FL_SOURCE;
->> +
->> +		if (is_csi_port)
->> +			port = (i < imxsd->num_sink_pads) ? sd_np : NULL;
->> +		else
->> +			port = of_graph_get_port_by_id(sd_np, i);
->> +		if (!port)
->> +			continue;
->> +
->> +		while ((epnode = of_get_next_child(port, epnode))) {
-> Please reuse for_each_child_of_node() here.
-
-done.
-
->
->> +			of_get_remote_pad(epnode, &remote_np, &remote_pad);
->> +			if (!remote_np) {
->> +				of_node_put(epnode);
-> Please remove of_node_put() here, of_get_next_child() does it.
-
-oops, good catch, fixed.
-
->
->> +				continue;
->> +			}
->> +
->> +			ret = of_add_pad_link(imxmd, pad, sd_np, remote_np,
->> +					      i, remote_pad);
->> +			if (ret) {
->> +				imxsd = ERR_PTR(ret);
->> +				break;
->> +			}
->> +
->> +			if (i < imxsd->num_sink_pads) {
->> +				/* follow sink endpoints upstream */
->> +				remote_imxsd = of_parse_subdev(imxmd,
->> +							       remote_np,
->> +							       false);
->> +				if (IS_ERR(remote_imxsd)) {
->> +					imxsd = remote_imxsd;
->> +					break;
->> +				}
->> +			}
->> +
->> +			of_node_put(remote_np);
->> +			of_node_put(epnode);
-
-also removed this put of epnode.
-
->>
->> +
->> +int imx_media_of_parse(struct imx_media_dev *imxmd,
->> +		       struct imx_media_subdev *(*csi)[4],
->> +		       struct device_node *np)
->> +{
->> +	struct device_node *csi_np;
->> +	struct imx_media_subdev *lcsi;
-> Please swap two lines above to get the reverse christmas tree ordering.
-
-done.
-
->
->> +	u32 ipu_id, csi_id;
->> +	int i, ret;
->> +
->> +	for (i = 0; ; i++) {
->> +		csi_np = of_parse_phandle(np, "ports", i);
->> +		if (!csi_np)
->> +			break;
->> +
->> +		lcsi = of_parse_subdev(imxmd, csi_np, true);
->> +		if (IS_ERR(lcsi)) {
->> +			ret = PTR_ERR(lcsi);
->> +			goto err_put;
->> +		}
->> +
->> +		of_property_read_u32(csi_np, "reg", &csi_id);
-> Not sure if it is safe enough to ignore return value and potentially
-> left csi_id uninitialized.
-
-The CSI nodes are port nodes, and the reg property is required,
-so I added a check and error return here.
-
->
->> +		ipu_id = of_alias_get_id(csi_np->parent, "ipu");
->> +
->> +		if (ipu_id > 1 || csi_id > 1) {
->> +			dev_err(imxmd->dev, "%s: invalid ipu/csi id (%u/%u)\n",
->> +				__func__, ipu_id, csi_id);
->> +			ret = -EINVAL;
->> +			goto err_put;
->> +		}
->> +
->> +		of_node_put(csi_np);
-> You can put the node right after of_alias_get_id() call, then in case
-> of error return right from the if block and remove the goto label.
-
-done.
-
->
->> +
->> +		(*csi)[ipu_id * 2 + csi_id] = lcsi;
->> +	}
->> +
->> +	return 0;
->> +err_put:
->> +	of_node_put(csi_np);
->> +	return ret;
->> +}
->> diff --git a/drivers/staging/media/imx/imx-media-of.h b/drivers/staging/media/imx/imx-media-of.h
->> new file mode 100644
->> index 0000000..0c61b05
->> --- /dev/null
->> +++ b/drivers/staging/media/imx/imx-media-of.h
->> @@ -0,0 +1,25 @@
->> +/*
->> + * V4L2 Media Controller Driver for Freescale i.MX5/6 SOC
->> + *
->> + * Open Firmware parsing.
->> + *
->> + * Copyright (c) 2016 Mentor Graphics Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + */
->> +#ifndef _IMX_MEDIA_OF_H
->> +#define _IMX_MEDIA_OF_H
->> +
-> I do believe you should include some headers or add declarations
-> of "struct imx_media_dev", "struct imx_media_subdev", "struct device_node".
-
-actually imx-media-of.h isn't really needed, I just moved those prototypes
-into imx-media.h and removed imx-media-of.h.
-
->> diff --git a/drivers/staging/media/imx/imx-media.h b/drivers/staging/media/imx/imx-media.h
->> new file mode 100644
->> index 0000000..6a018a9
->> --- /dev/null
->> +++ b/drivers/staging/media/imx/imx-media.h
->> @@ -0,0 +1,299 @@
->> +/*
->> + * V4L2 Media Controller Driver for Freescale i.MX5/6 SOC
->> + *
->> + * Copyright (c) 2016 Mentor Graphics Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + */
->> +#ifndef _IMX_MEDIA_H
->> +#define _IMX_MEDIA_H
-> Please insert here an empty line to improve readability.
-
-done.
-
->
->> +#include <media/v4l2-device.h>
->> +#include <media/v4l2-subdev.h>
->> +#include <media/v4l2-ctrls.h>
->> +#include <media/v4l2-of.h>
-> Please sort out the list alphabetically.
-
-done.
-
-Steve
+> 
+> Thanks,
+> 
+> 	M.
+> --
+> Jazz is not dead. It just smells funny...
