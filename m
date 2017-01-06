@@ -1,73 +1,50 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Fri, 6 Jan 2017 10:05:27 -0600
-Subject: [PATCH 1/6] ARM: dts: am335x-phycore-som: Update NAND partition
- table
-In-Reply-To: <20170106160222.GC2630@atomide.com>
-References: <1483627851-17996-1-git-send-email-t.remmet@phytec.de>
- <1483627851-17996-2-git-send-email-t.remmet@phytec.de>
- <20170105153637.GA4310@atomide.com>
- <20170105171845.GK4310@atomide.com> <20170105175619.GA56877@google.com>
- <1483694849.3634.6.camel@phytec.de> <20170106160222.GC2630@atomide.com>
-Message-ID: <CAHCN7xL2n0qsg61i85o7DczanMH1E=HWhNvqUtTH9UhEVBvd8g@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 6 Jan 2017 16:05:15 +0000
+Subject: [PATCH v2 4/5] arm64: Use __tlbi_dsb() macros in KVM code
+In-Reply-To: <f5020a04-5fc7-26b5-1ded-c58e159bc722@codeaurora.org>
+References: <20161229224335.13531-1-cov@codeaurora.org>
+ <20161229224335.13531-4-cov@codeaurora.org>
+ <20170103155756.GB14183@leverpostej>
+ <f5020a04-5fc7-26b5-1ded-c58e159bc722@codeaurora.org>
+Message-ID: <20170106160515.GB17642@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 6, 2017 at 10:02 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Teresa Remmet <t.remmet@phytec.de> [170106 01:28]:
->> Hello Brian,
->>
->> Am Donnerstag, den 05.01.2017, 09:56 -0800 schrieb Brian Norris:
->> > On Thu, Jan 05, 2017 at 09:18:45AM -0800, Tony Lindgren wrote:
->> > >
->> > > * Tony Lindgren <tony@atomide.com> [170105 07:37]:
->> > > >
->> > > > * Teresa Remmet <t.remmet@phytec.de> [170105 06:57]:
->> > > > >
->> > > > > To improve NAND safety we updated the partition layout.
->> > > > > Added barebox backup partition and removed kernel and oftree
->> > > > > partition. They are kept in ubi now.
->> > > > What about the users with earlier partition tables?
->> > > >
->> > > > Please read about "flag day" changes, typically they are not
->> > > > acceptable.
->> > > Adding Brian and Adam to Cc. Can you guys come up with some
->> > > solution on this?
->> > I don't have much context for this thread, and no I don't plan to
->> > solve
->> > your problems for you. But I can provide tips!
->> >
->> > >
->> > > I'm suggesting we leave the kernel nodes empty and let u-boot
->> > > populate them, so maybe you guys can discuss this on the related
->> > > lists.
->> > That's an option. I've worked with platforms that did something like
->> > this, and that's really one of the only ways you can handle putting
->> > partition information in the device tree. You're really hamstringing
->> > yourself when you put all the partition information in the device
->> > tree.
->> > And it's just dumb once that gets codified in the kernel source tree.
->> >
->>
->> In our case the bootloader does pass the partition table to the kernel.
->> So it gets overwritten anyway. This was just more for backup,
->> if someone uses a different bootloader. But I'm fine with removing the
->> nand partition table completely from the kernel device tree.
->> Same with the SPI nor partition table.
->>
->> I will send patches for this.
->
-> OK thanks! Also thank you Brian for your comments.
->
+On Fri, Jan 06, 2017 at 10:51:53AM -0500, Christopher Covington wrote:
+> On 01/03/2017 10:57 AM, Mark Rutland wrote:
+> > On Thu, Dec 29, 2016 at 05:43:34PM -0500, Christopher Covington wrote:
+> >> Refactor the KVM code to use the newly introduced __tlbi_dsb macros, which
+> >> will allow an errata workaround that repeats tlbi dsb sequences to only
+> >> change one location. This is not intended to change the generated assembly
+> >> and comparing before and after vmlinux objdump shows no functional changes.
+> 
+> @@ -32,7 +33,7 @@ void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>  	 * whole of Stage-1. Weep...
+>  	 */
+>  	ipa >>= 12;
+> -	asm volatile("tlbi ipas2e1is, %0" : : "r" (ipa));
+> +	__tlbi_dsb(ipas2e1is, ish, ipa);
+>  
+>  	/*
+>  	 * We have to ensure completion of the invalidation at Stage-2,
+> 
+> >> @@ -40,9 +41,7 @@ void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+> >>  	 * complete (S1 + S2) walk based on the old Stage-2 mapping if
+> >>  	 * the Stage-1 invalidation happened first.
+> >>  	 */
+> >> -	dsb(ish);
+> > 
+> > Looks like this got accidentally removed. AFAICT it is still necessary.
+> 
+> Not removed, just hoisted above the comment block to the previous patch hunk.
 
-Tony - I tested leaving the partition info as-is with the updates from
-the bootloader and it works.  Would you prefer that I match Brian and
-remove the partition table completely, or should I just leave my board
-alone?
+Ah, sorry. I hadn't spotted that it got folded into the __tlbi_dsb()
+above.
 
-I am good either way.
+Given the comment was previously attached to the DSB, it might make more
+sense to fold it into the prior comment block, so that it remains
+attached to the __tlbi_dsb(), which guarantees the completion that the
+comment describes.
 
-> Regards,
->
-> Tony
-
-adam
+Thanks,
+Mark.
