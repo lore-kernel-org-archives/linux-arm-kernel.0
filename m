@@ -1,117 +1,72 @@
-From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Fri,  6 Jan 2017 17:38:35 +0300
-Subject: [PATCH] arm64: do not set dma masks that device connection can't
- handle
-In-Reply-To: <9a03c05d-ad4c-0547-d1fe-01edb8b082d6@cogentembedded.com>
-References: <9a03c05d-ad4c-0547-d1fe-01edb8b082d6@cogentembedded.com>
-Message-ID: <1483713515-1945-1-git-send-email-nikita.yoush@cogentembedded.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 6 Jan 2017 14:44:56 +0000
+Subject: [PATCHv2 net-next 05/16] net: mvpp2: introduce PPv2.2 HW
+ descriptors and adapt accessors
+In-Reply-To: <20170106142901.GC14217@n2100.armlinux.org.uk>
+References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1482943592-12556-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20170106142901.GC14217@n2100.armlinux.org.uk>
+Message-ID: <113811b6-79a4-9c66-d302-add9fb0c5b1a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is possible that device is capable of 64-bit DMA addresses, and
-device driver tries to set wide DMA mask, but bridge or bus used to
-connect device to the system can't handle wide addresses.
+On 06/01/17 14:29, Russell King - ARM Linux wrote:
+> On Wed, Dec 28, 2016 at 05:46:21PM +0100, Thomas Petazzoni wrote:
+>> This commit adds the definition of the PPv2.2 HW descriptors, adjusts
+>> the mvpp2_tx_desc and mvpp2_rx_desc structures accordingly, and adapts
+>> the accessors to work on both PPv2.1 and PPv2.2.
+>>
+>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ...
+>> +		/* On PPv2.2, the situation is more complicated,
+>> +		 * because there is only 40 bits to store the virtual
+>> +		 * address, which is not sufficient. So on 64 bits
+>> +		 * systems, we use phys_to_virt() to get the virtual
+>> +		 * address from the physical address, which is fine
+>> +		 * because the kernel linear mapping includes the
+>> +		 * entire 40 bits physical address space. On 32 bits
+>> +		 * systems however, we can't use phys_to_virt(), but
+>> +		 * since virtual addresses are 32 bits only, there is
+>> +		 * enough space in the RX descriptor for the full
+>> +		 * virtual address.
+>> +		 */
+>> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+>> +		dma_addr_t dma_addr =
+>> +			rx_desc->pp22.buf_phys_addr_key_hash & DMA_BIT_MASK(40);
+>> +		phys_addr_t phys_addr =
+>> +			dma_to_phys(port->dev->dev.parent, dma_addr);
 
-With swiotlb, memory above 4G still can be used by drivers for streaming
-DMA, but *dev->mask and dev->dma_coherent_mask must still keep values
-that hardware handles physically.
+Ugh, this looks bogus. dma_to_phys(), in the arm64 case at least, is
+essentially a SWIOTLB internal helper function which has to be
+implemented in architecture code because reasons. Calling it from a
+driver is almost certainly wrong (it doesn't even exist on most
+architectures). Besides, if this is really a genuine dma_addr_t obtained
+from a DMA API call, you cannot infer it to be related to a CPU physical
+address, or convertible to one at all.
 
-This patch enforces that. Based on original version by
-Arnd Bergmann <arnd@arndb.de>, extended with coherent mask hadnling.
+>> +
+>> +		return (unsigned long)phys_to_virt(phys_addr);
+>> +#else
+>> +		return rx_desc->pp22.buf_cookie_misc & DMA_BIT_MASK(40);
+>> +#endif
+> 
+> I'm not sure that's the best way of selecting the difference.
 
-Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
-CC: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm64/Kconfig              |  3 +++
- arch/arm64/include/asm/device.h |  1 +
- arch/arm64/mm/dma-mapping.c     | 40 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 44 insertions(+)
+Given that CONFIG_ARCH_DMA_ADDR_T_64BIT could be enabled on 32-bit LPAE
+systems, indeed it definitely isn't.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 1117421..afb2c08 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -216,6 +216,9 @@ config NEED_DMA_MAP_STATE
- config NEED_SG_DMA_LENGTH
- 	def_bool y
- 
-+config ARCH_HAS_DMA_SET_COHERENT_MASK
-+	def_bool y
-+
- config SMP
- 	def_bool y
- 
-diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
-index 243ef25..a57e7bb 100644
---- a/arch/arm64/include/asm/device.h
-+++ b/arch/arm64/include/asm/device.h
-@@ -22,6 +22,7 @@ struct dev_archdata {
- 	void *iommu;			/* private IOMMU data */
- #endif
- 	bool dma_coherent;
-+	u64 parent_dma_mask;
- };
- 
- struct pdev_archdata {
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 290a84f..be3632e 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -352,6 +352,31 @@ static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
- 	return 1;
- }
- 
-+static int __swiotlb_set_dma_mask(struct device *dev, u64 mask)
-+{
-+	/* device is not DMA capable */
-+	if (!dev->dma_mask)
-+		return -EIO;
-+
-+	/* mask is below swiotlb bounce buffer, so fail */
-+	if (!swiotlb_dma_supported(dev, mask))
-+		return -EIO;
-+
-+	/*
-+	 * because of the swiotlb, we can return success for
-+	 * larger masks, but need to ensure that bounce buffers
-+	 * are used above parent_dma_mask, so set that as
-+	 * the effective mask.
-+	 */
-+	if (mask > dev->archdata.parent_dma_mask)
-+		mask = dev->archdata.parent_dma_mask;
-+
-+
-+	*dev->dma_mask = mask;
-+
-+	return 0;
-+}
-+
- static struct dma_map_ops swiotlb_dma_ops = {
- 	.alloc = __dma_alloc,
- 	.free = __dma_free,
-@@ -367,8 +392,23 @@ static struct dma_map_ops swiotlb_dma_ops = {
- 	.sync_sg_for_device = __swiotlb_sync_sg_for_device,
- 	.dma_supported = __swiotlb_dma_supported,
- 	.mapping_error = swiotlb_dma_mapping_error,
-+	.set_dma_mask = __swiotlb_set_dma_mask,
- };
- 
-+int dma_set_coherent_mask(struct device *dev, u64 mask)
-+{
-+	if (!dma_supported(dev, mask))
-+		return -EIO;
-+
-+	if (get_dma_ops(dev) == &swiotlb_dma_ops &&
-+	    mask > dev->archdata.parent_dma_mask)
-+		mask = dev->archdata.parent_dma_mask;
-+
-+	dev->coherent_dma_mask = mask;
-+	return 0;
-+}
-+EXPORT_SYMBOL(dma_set_coherent_mask);
-+
- static int __init atomic_pool_init(void)
- {
- 	pgprot_t prot = __pgprot(PROT_NORMAL_NC);
--- 
-2.1.4
+Robin.
+
+>  It seems
+> that the issue here is the size of the virtual address, so why not test
+> the size of a virtual address pointer?
+> 
+> 		if (8 * sizeof(rx_desc) > 40) {
+> 			/* do phys addr dance */
+> 		} else {
+> 			return rx_desc->pp22.buf_cookie_misc & DMA_BIT_MASK(40);
+> 		}
+> 
+> It also means that we get compile coverage over both sides of the
+> conditional.
+> 
