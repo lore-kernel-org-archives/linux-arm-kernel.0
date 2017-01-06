@@ -1,41 +1,93 @@
-From: dhowells@redhat.com (David Howells)
-Date: Fri, 06 Jan 2017 10:45:55 +0000
-Subject: [PATCH v2 2/4] linux/const.h: move UL() macro to
- include/linux/const.h
-In-Reply-To: <1483582810-7046-3-git-send-email-yamada.masahiro@socionext.com>
-References: <1483582810-7046-3-git-send-email-yamada.masahiro@socionext.com>
- <1483582810-7046-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <15496.1483699555@warthog.procyon.org.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 6 Jan 2017 11:53:01 +0100
+Subject: [RFC PATCH 1/7] arm64: Use physical counter for in-kernel reads
+In-Reply-To: <89b4c1c1-3c6a-b7a1-cbcb-93a64812ebff@arm.com>
+References: <20161210204712.21830-1-christoffer.dall@linaro.org>
+ <20161210204712.21830-2-christoffer.dall@linaro.org>
+ <5e820613-f9f3-0035-b145-0e22e9bcfeca@arm.com>
+ <20170106100049.GB21089@cbox>
+ <89b4c1c1-3c6a-b7a1-cbcb-93a64812ebff@arm.com>
+Message-ID: <20170106105301.GB27758@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
+On Fri, Jan 06, 2017 at 10:38:49AM +0000, Marc Zyngier wrote:
+> On 06/01/17 10:00, Christoffer Dall wrote:
+> > Hi Marc,
+> > 
+> > On Thu, Jan 05, 2017 at 06:11:14PM +0000, Marc Zyngier wrote:
+> >> [adding the arm64 maintainers, plus Mark as arch timer maintainer]
+> > 
+> > Right, sorry, I should have done that already.
+> > 
+> >>
+> >> On 10/12/16 20:47, Christoffer Dall wrote:
+> >>> Using the physical counter allows KVM to retain the offset between the
+> >>> virtual and physical counter as long as it is actively running a VCPU.
+> >>>
+> >>> As soon as a VCPU is released, another thread is scheduled or we start
+> >>> running userspace applications, we reset the offset to 0, so that VDSO
+> >>> operations can still read the virtual counter and get the same view of
+> >>> time as the kernel.
+> >>>
+> >>> This opens up potential improvements for KVM performance.
+> >>>
+> >>> VHE kernels or kernels using the virtual timer are unaffected by this.
+> >>>
+> >>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >>> ---
+> >>>  arch/arm64/include/asm/arch_timer.h  | 6 ++++--
+> >>>  drivers/clocksource/arm_arch_timer.c | 2 +-
+> >>>  2 files changed, 5 insertions(+), 3 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> >>> index eaa5bbe..cec2549 100644
+> >>> --- a/arch/arm64/include/asm/arch_timer.h
+> >>> +++ b/arch/arm64/include/asm/arch_timer.h
+> >>> @@ -139,11 +139,13 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
+> >>>  
+> >>>  static inline u64 arch_counter_get_cntpct(void)
+> >>>  {
+> >>> +	u64 cval;
+> >>>  	/*
+> >>>  	 * AArch64 kernel and user space mandate the use of CNTVCT.
+> >>>  	 */
+> >>> -	BUG();
+> >>> -	return 0;
+> >>> +	isb();
+> >>> +	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
+> >>> +	return cval;
+> >>>  }
+> >>>  
+> >>>  static inline u64 arch_counter_get_cntvct(void)
+> >>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> >>> index 73c487d..a5b0789 100644
+> >>> --- a/drivers/clocksource/arm_arch_timer.c
+> >>> +++ b/drivers/clocksource/arm_arch_timer.c
+> >>> @@ -597,7 +597,7 @@ static void __init arch_counter_register(unsigned type)
+> >>>  
+> >>>  	/* Register the CP15 based counter if we have one */
+> >>>  	if (type & ARCH_CP15_TIMER) {
+> >>> -		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_uses_ppi == VIRT_PPI)
+> >>> +		if (arch_timer_uses_ppi == VIRT_PPI || is_kernel_in_hyp_mode())
+> >>
+> >> Why do we have this is_kernel_in_hyp_mode clause? I can't think of any
+> >> reason for a VHE kernel to use the virtual counter at all...
+> >>
+> > 
+> > Good question.  I think I just didn't want to change behavior from the
+> > existing functionality mre than necessary.
+> > 
+> > Note that on a VHE kernel this will be the EL2 virtual counter, not the
+> > EL1 virtual counter, due to the register redirection.  Are the virtual
+> > and physical EL2 counters always equivalent on a VHE system?
+> 
+> Yes, they are. CNTVOFF_EL2 is ignored in that case, and you get an extra
+> interrupt for the new EL2 virtual timer as well.
+> 
 
-> diff --git a/include/uapi/linux/const.h b/include/uapi/linux/const.h
-> index c872bfd..76fb0f9 100644
-> --- a/include/uapi/linux/const.h
-> +++ b/include/uapi/linux/const.h
-> @@ -1,7 +1,7 @@
->  /* const.h: Macros for dealing with constants.  */
->  
-> -#ifndef _LINUX_CONST_H
-> -#define _LINUX_CONST_H
-> +#ifndef _UAPI_LINUX_CONST_H
-> +#define _UAPI_LINUX_CONST_H
+ok, in that case I suppose I can just check for arch_timer_uses_ppi ==
+VIRT_PPI and be done with it.
 
-You need to be very careful doing this.  Some userspace stuff depends on the
-guard macro names on the kernel header files.
-
->  /* Some constant macros are used in both assembler and
->   * C code.  Therefore we cannot annotate them always with
-> @@ -21,7 +21,10 @@
->  #define _AT(T,X)	((T)(X))
->  #endif
->  
-> +#define _UL(x)		(_AC(x, UL))
-> +#define _ULL(x)		(_AC(x, ULL))
-
-How likely is this to collide with existing userspace code somewhere?  It
-looks like the sort of thing that could collide with a C library.
-
-David
+Thanks,
+-Christoffer
