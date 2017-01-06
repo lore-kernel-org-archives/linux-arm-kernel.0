@@ -1,32 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 Jan 2017 08:33:35 -0800
-Subject: [PATCH] ARM: OMAP1: DMA: Correct the number of logical channels
-In-Reply-To: <20170105214750.g7d6kbaq7q4vgrug@raspberrypi-2.musicnaut.iki.fi>
-References: <20170103112234.19097-1-peter.ujfalusi@ti.com>
- <20170105214750.g7d6kbaq7q4vgrug@raspberrypi-2.musicnaut.iki.fi>
-Message-ID: <20170106163335.GE2630@atomide.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 6 Jan 2017 17:33:34 +0100
+Subject: [RESEND PATCH] ARM: dts: stm32f469-disco: Fix memory size from
+ 8MB to 16MB
+In-Reply-To: <20161118145845.30455-1-bmh@certi.org.br>
+References: <20161118145845.30455-1-bmh@certi.org.br>
+Message-ID: <a8259368-896a-64fe-4a48-71f15906dc74@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aaro Koskinen <aaro.koskinen@iki.fi> [170105 13:48]:
-> Hi,
-> 
-> On Tue, Jan 03, 2017 at 01:22:34PM +0200, Peter Ujfalusi wrote:
-> > OMAP1510, OMAP5910 and OMAP310 have only 9 logical channels.
-> > OMAP1610, OMAP5912, OMAP1710, OMAP730, and OMAP850 have 16 logical channels
-> > available.
-> > 
-> > The wired 17 for the lch_count must have been used to cover the 16 + 1
-> > dedicated LCD channel, in reality we can only use 9 or 16 channels.
-> > 
-> > The d->chan_count is not used by the omap-dma stack, so we can skip the
-> > setup. chan_count was configured to the number of logical channels and not
-> > the actual number of physical channels anyways.
-> > 
-> > Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> 
-> Acked-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+Hi Bruno,
 
-Applying into omap-for-v4.10/fixes thanks.
+On 11/18/2016 03:58 PM, Bruno Meirelles Herrera wrote:
+> From: Bruno Herrera <bruherrera@gmail.com>
+>
+> This patch fix memory size to support 16MB of external SDRAM.
+>
+> Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
+> ---
+>  arch/arm/boot/dts/stm32f469-disco.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
+> index 75f4303..fda12a4 100644
+> --- a/arch/arm/boot/dts/stm32f469-disco.dts
+> +++ b/arch/arm/boot/dts/stm32f469-disco.dts
+> @@ -58,7 +58,7 @@
+>  	};
+>
+>  	memory {
+> -		reg = <0x00000000 0x800000>;
+> +		reg = <0x00000000 0x1000000>;
+>  	};
+>
+>  	aliases {
+>
+After a little cosmetic change in commit header:
 
-Tony
+Applied on stm32-dt-for-v4.11-1
+
+Thanks!
+Alex
