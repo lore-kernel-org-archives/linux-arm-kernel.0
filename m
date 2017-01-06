@@ -1,99 +1,73 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:17:53 +0100
-Subject: [PATCH 11/16] arm64: dts: r8a7796: Use R-Car Gen 3 fallback binding
- for i2c nodes
+Date: Fri,  6 Jan 2017 12:17:49 +0100
+Subject: [PATCH 07/16] arm64: dts: r8a7795: add sound CTU support
 In-Reply-To: <cover.1483700694.git.horms+renesas@verge.net.au>
 References: <cover.1483700694.git.horms+renesas@verge.net.au>
-Message-ID: <5553e2196229501346f262a9ebdc4e4ed74ff45c.1483700694.git.horms+renesas@verge.net.au>
+Message-ID: <c9293d784d32c868e83079bb6d1e26f316c4148d.1483700694.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added R-Car Gen 3 fallback binding for i2c nodes in
-DT for r8a7796 SoC.
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This has no run-time effect for the current driver as the initialisation
-sequence is the same for the SoC-specific binding for r8a7796 and the
-fallback binding for R-Car Gen 3.
+This patch adds CTU (= Channel Transfer Unit) support which is needed
+to sound mixing.
 
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 21 ++++++++++++++-------
- 1 file changed, 14 insertions(+), 7 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |  1 +
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 13 +++++++++++++
+ 2 files changed, 14 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index a37bb5eb062c..26a0506e3013 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -269,7 +269,8 @@
- 		i2c0: i2c at e6500000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "renesas,i2c-r8a7796";
-+			compatible = "renesas,i2c-r8a7796",
-+				     "renesas,rcar-gen3-i2c";
- 			reg = <0 0xe6500000 0 0x40>;
- 			interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 931>;
-@@ -284,7 +285,8 @@
- 		i2c1: i2c at e6508000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "renesas,i2c-r8a7796";
-+			compatible = "renesas,i2c-r8a7796",
-+				     "renesas,rcar-gen3-i2c";
- 			reg = <0 0xe6508000 0 0x40>;
- 			interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 930>;
-@@ -299,7 +301,8 @@
- 		i2c2: i2c at e6510000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "renesas,i2c-r8a7796";
-+			compatible = "renesas,i2c-r8a7796",
-+				     "renesas,rcar-gen3-i2c";
- 			reg = <0 0xe6510000 0 0x40>;
- 			interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 929>;
-@@ -314,7 +317,8 @@
- 		i2c3: i2c at e66d0000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "renesas,i2c-r8a7796";
-+			compatible = "renesas,i2c-r8a7796",
-+				     "renesas,rcar-gen3-i2c";
- 			reg = <0 0xe66d0000 0 0x40>;
- 			interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 928>;
-@@ -328,7 +332,8 @@
- 		i2c4: i2c at e66d8000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "renesas,i2c-r8a7796";
-+			compatible = "renesas,i2c-r8a7796",
-+				     "renesas,rcar-gen3-i2c";
- 			reg = <0 0xe66d8000 0 0x40>;
- 			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 927>;
-@@ -342,7 +347,8 @@
- 		i2c5: i2c at e66e0000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "renesas,i2c-r8a7796";
-+			compatible = "renesas,i2c-r8a7796",
-+				     "renesas,rcar-gen3-i2c";
- 			reg = <0 0xe66e0000 0 0x40>;
- 			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 919>;
-@@ -356,7 +362,8 @@
- 		i2c6: i2c at e66e8000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "renesas,i2c-r8a7796";
-+			compatible = "renesas,i2c-r8a7796",
-+				     "renesas,rcar-gen3-i2c";
- 			reg = <0 0xe66e8000 0 0x40>;
- 			interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 918>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+index bcaf4008d32d..82a269a4f10d 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+@@ -412,6 +412,7 @@
+ 		 <&cpg CPG_MOD 1026>, <&cpg CPG_MOD 1027>,
+ 		 <&cpg CPG_MOD 1028>, <&cpg CPG_MOD 1029>,
+ 		 <&cpg CPG_MOD 1030>, <&cpg CPG_MOD 1031>,
++		 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
+ 		 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
+ 		 <&audio_clk_a>, <&cs2000>,
+ 		 <&audio_clk_c>,
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 2c076c21d7fa..e09f5b7b874a 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -919,6 +919,7 @@
+ 				 <&cpg CPG_MOD 1026>, <&cpg CPG_MOD 1027>,
+ 				 <&cpg CPG_MOD 1028>, <&cpg CPG_MOD 1029>,
+ 				 <&cpg CPG_MOD 1030>, <&cpg CPG_MOD 1031>,
++				 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
+ 				 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
+ 				 <&audio_clk_a>, <&audio_clk_b>,
+ 				 <&audio_clk_c>,
+@@ -930,6 +931,7 @@
+ 				      "src.9", "src.8", "src.7", "src.6",
+ 				      "src.5", "src.4", "src.3", "src.2",
+ 				      "src.1", "src.0",
++				      "ctu.1", "ctu.0",
+ 				      "dvc.0", "dvc.1",
+ 				      "clk_a", "clk_b", "clk_c", "clk_i";
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+@@ -946,6 +948,17 @@
+ 				};
+ 			};
+ 
++			rcar_sound,ctu {
++				ctu00: ctu-0 { };
++				ctu01: ctu-1 { };
++				ctu02: ctu-2 { };
++				ctu03: ctu-3 { };
++				ctu10: ctu-4 { };
++				ctu11: ctu-5 { };
++				ctu12: ctu-6 { };
++				ctu13: ctu-7 { };
++			};
++
+ 			rcar_sound,src {
+ 				src0: src-0 {
+ 					interrupts = <GIC_SPI 352 IRQ_TYPE_LEVEL_HIGH>;
 -- 
 2.7.0.rc3.207.g0ac5344
