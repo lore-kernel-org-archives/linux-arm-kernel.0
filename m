@@ -1,101 +1,203 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 6 Jan 2017 15:16:24 +0000
-Subject: [RFC PATCH 1/7] arm64: Use physical counter for in-kernel reads
-In-Reply-To: <20170106105301.GB27758@cbox>
-References: <20161210204712.21830-1-christoffer.dall@linaro.org>
- <20161210204712.21830-2-christoffer.dall@linaro.org>
- <5e820613-f9f3-0035-b145-0e22e9bcfeca@arm.com> <20170106100049.GB21089@cbox>
- <89b4c1c1-3c6a-b7a1-cbcb-93a64812ebff@arm.com> <20170106105301.GB27758@cbox>
-Message-ID: <00f4cdb2-83f1-5a9d-3320-7cbdac20466d@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 6 Jan 2017 17:18:41 +0200
+Subject: [PATCH v11 0/8] power: add power sequence library
+In-Reply-To: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
+References: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <20170106151841.l6ehqmpben4ilkaf@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/17 10:53, Christoffer Dall wrote:
-> On Fri, Jan 06, 2017 at 10:38:49AM +0000, Marc Zyngier wrote:
->> On 06/01/17 10:00, Christoffer Dall wrote:
->>> Hi Marc,
->>>
->>> On Thu, Jan 05, 2017 at 06:11:14PM +0000, Marc Zyngier wrote:
->>>> [adding the arm64 maintainers, plus Mark as arch timer maintainer]
->>>
->>> Right, sorry, I should have done that already.
->>>
->>>>
->>>> On 10/12/16 20:47, Christoffer Dall wrote:
->>>>> Using the physical counter allows KVM to retain the offset between the
->>>>> virtual and physical counter as long as it is actively running a VCPU.
->>>>>
->>>>> As soon as a VCPU is released, another thread is scheduled or we start
->>>>> running userspace applications, we reset the offset to 0, so that VDSO
->>>>> operations can still read the virtual counter and get the same view of
->>>>> time as the kernel.
->>>>>
->>>>> This opens up potential improvements for KVM performance.
->>>>>
->>>>> VHE kernels or kernels using the virtual timer are unaffected by this.
->>>>>
->>>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>>>> ---
->>>>>  arch/arm64/include/asm/arch_timer.h  | 6 ++++--
->>>>>  drivers/clocksource/arm_arch_timer.c | 2 +-
->>>>>  2 files changed, 5 insertions(+), 3 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
->>>>> index eaa5bbe..cec2549 100644
->>>>> --- a/arch/arm64/include/asm/arch_timer.h
->>>>> +++ b/arch/arm64/include/asm/arch_timer.h
->>>>> @@ -139,11 +139,13 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
->>>>>  
->>>>>  static inline u64 arch_counter_get_cntpct(void)
->>>>>  {
->>>>> +	u64 cval;
->>>>>  	/*
->>>>>  	 * AArch64 kernel and user space mandate the use of CNTVCT.
->>>>>  	 */
->>>>> -	BUG();
->>>>> -	return 0;
->>>>> +	isb();
->>>>> +	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
->>>>> +	return cval;
->>>>>  }
->>>>>  
->>>>>  static inline u64 arch_counter_get_cntvct(void)
->>>>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->>>>> index 73c487d..a5b0789 100644
->>>>> --- a/drivers/clocksource/arm_arch_timer.c
->>>>> +++ b/drivers/clocksource/arm_arch_timer.c
->>>>> @@ -597,7 +597,7 @@ static void __init arch_counter_register(unsigned type)
->>>>>  
->>>>>  	/* Register the CP15 based counter if we have one */
->>>>>  	if (type & ARCH_CP15_TIMER) {
->>>>> -		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_uses_ppi == VIRT_PPI)
->>>>> +		if (arch_timer_uses_ppi == VIRT_PPI || is_kernel_in_hyp_mode())
->>>>
->>>> Why do we have this is_kernel_in_hyp_mode clause? I can't think of any
->>>> reason for a VHE kernel to use the virtual counter at all...
->>>>
->>>
->>> Good question.  I think I just didn't want to change behavior from the
->>> existing functionality mre than necessary.
->>>
->>> Note that on a VHE kernel this will be the EL2 virtual counter, not the
->>> EL1 virtual counter, due to the register redirection.  Are the virtual
->>> and physical EL2 counters always equivalent on a VHE system?
->>
->> Yes, they are. CNTVOFF_EL2 is ignored in that case, and you get an extra
->> interrupt for the new EL2 virtual timer as well.
->>
+On Thu, Jan 05, 2017 at 02:01:51PM +0800, Peter Chen wrote:
+> Hi all,
 > 
-> ok, in that case I suppose I can just check for arch_timer_uses_ppi ==
-> VIRT_PPI and be done with it.
+> This is a follow-up for my last power sequence framework patch set [1].
+> According to Rob Herring and Ulf Hansson's comments[2]. The kinds of
+> power sequence instances will be added at postcore_initcall, the match
+> criteria is compatible string first, if the compatible string is not
+> matched between dts and library, it will try to use generic power sequence.
+> 	 
+> The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+> if only one power sequence instance is needed, for more power sequences
+> are used, using of_pwrseq_on_list/of_pwrseq_off_list instead (eg, USB hub driver).
+> 
+> In future, if there are special power sequence requirements, the special
+> power sequence library can be created.
+> 
+> This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+> two hot-plug devices to simulate this use case, the related binding
+> change is updated at patch [1/6], The udoo board changes were tested
+> using my last power sequence patch set.[3]
+> 
+> Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+> need to power on itself before it can be found by ULPI bus.
+> 
+> [1] http://www.spinics.net/lists/linux-usb/msg142755.html
+> [2] http://www.spinics.net/lists/linux-usb/msg143106.html
+> [3] http://www.spinics.net/lists/linux-usb/msg142815.html
+> 
 
-I wonder what we should do for get_cycles(), which is hardwired to the
-virtual counter at the moment. If we decide to use the physical counter
-on systems identified as hosts, we may have to revise this as well (I
-feel the need for an alternative... ;-).
+Unfortunately I was unable to utilize this library to solve Odroid U3
+usb3503/lan9730 power sequence (as a continuation of my old series [0][1]).
 
-Thanks,
+The main problem is that power sequence instance (pwrseq_generic.c) is
+not a device. I don't get why it is not a device. It would be rather
+intuitive to me to make it a device. Also it would make life easier
+because you could use all device-like consumer APIs (of getting clocks,
+GPIOs etc). Since it is not a device, it is not possible to use
+regulator consumer API.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I need a regulator because I need to toggle the power.
+
+Other encountered issue is that power sequence happens early, before the
+unused regulators are turned off by the system. However maybe this is
+the necessity from other point of view.
+
+My case is annoyingly over-complicated so I am slowly getting sertain
+that it is not generic. Anyway it looks like this:
+
+EHCI controller
+     |
+     |--HSIC0--lan9730 (reset is done only through regulator)
+     |--HSIC1--usb3504 (it has a reset GPIO... but it is toggled by
+                        usb3504 driver)
+
+Overall, I want to reset the lan9730. This can be done only through
+power - buck8. buck8 state is an logical OR of register set by I2C and
+GPIO. Thus to turn it off, it is not sufficient just to set register to
+0x0 because the GPIO is keeping it on. The best way is to switch the
+buck8 to gpio-enable-control thus only GPIO will be toggling it... still
+through the regulator consumer API (because it is an GPIO for the
+regulator, not for the reset!).
+
+However these two seems coupled. On invalid reset sequence, both chips
+die. The usb3504 has its own existing reset sequence and my findings
+show that it should happen after lan9730 reset sequence. Otherwise all
+devices might be lost...
+
+[0] http://www.spinics.net/lists/linux-mmc/msg37386.html
+[1] https://github.com/krzk/linux/commits/for-next/odroid-u3-usb3503-lan-boot-fixes-v4
+
+Best regards,
+Krzysztof
+
+> Changes for v11:
+> - Fix warning: (USB) selects POWER_SEQUENCE which has unmet direct dependencies (OF)
+> - Delete redundant copyright statement.
+> - Change pr_warn to pr_debug at wrseq_find_available_instance
+> - Refine kerneldoc
+> - %s/ENONET/ENOENT 
+> - Allocate pwrseq list node before than carry out power sequence on 
+> - Add mutex_lock/mutex_lock for pwrseq node browse at pwrseq_find_available_instance
+> - Add pwrseq_suspend/resume for API both single instance and list 
+> - Add .pwrseq_suspend/resume for pwrseq_generic.c
+> - Add pwrseq_suspend_list and pwrseq_resume_list for USB hub suspend
+>   and resume routine
+> 
+> Changes for v10:
+> - Improve the kernel-doc for power sequence core, including exported APIs and
+>   main structure. [Patch 2/8]
+> - Change Kconfig, and let the user choose power sequence. [Patch 2/8]
+> - Delete EXPORT_SYMBOL and change related APIs as local, these APIs do not
+>   be intended to export currently. [Patch 2/8]
+> - Selete POWER_SEQUENCE at USB core's Kconfig. [Patch 4/8]
+> 
+> Changes for v9:
+> - Add Vaibhav Hiremath's reviewed-by [Patch 4/8]
+> - Rebase to v4.9-rc1
+> 
+> Changes for v8:
+> - Allocate one extra pwrseq instance if pwrseq_get has succeed, it can avoid
+>   preallocate instances problem which the number of instance is decided at
+>   compile time, thanks for Heiko Stuebner's suggestion [Patch 2/8]
+> - Delete pwrseq_compatible_sample.c which is the demo purpose to show compatible
+>   match method. [Patch 2/8]
+> - Add Maciej S. Szmigiero's tested-by. [Patch 7/8]
+> 
+> Changes for v7:
+> - Create kinds of power sequence instance at postcore_initcall, and match
+>   the instance with node using compatible string, the beneit of this is
+>   the host driver doesn't need to consider which pwrseq instance needs
+>   to be used, and pwrseq core will match it, however, it eats some memories
+>   if less power sequence instances are used. [Patch 2/8]
+> - Add pwrseq_compatible_sample.c to test match pwrseq using device_id. [Patch 2/8]
+> - Fix the comments Vaibhav Hiremath adds for error path for clock and do not
+>   use device_node for parameters at pwrseq_on. [Patch 2/8]
+> - Simplify the caller to use power sequence, follows Alan's commnets [Patch 4/8]
+> - Tested three pwrseq instances together using both specific compatible string and
+>   generic libraries.
+> 
+> Changes for v6:
+> - Add Matthias Kaehlcke's Reviewed-by and Tested-by. (patch [2/6])
+> - Change chipidea core of_node assignment for coming user. (patch [5/6])
+> - Applies Joshua Clayton's three dts changes for two boards,
+>   the USB device's reg has only #address-cells, but without #size-cells.
+> 
+> Changes for v5:
+> - Delete pwrseq_register/pwrseq_unregister, which is useless currently
+> - Fix the linker error when the pwrseq user is compiled as module
+> 
+> Changes for v4:
+> - Create the patch on next-20160722 
+> - Fix the of_node is not NULL after chipidea driver is unbinded [Patch 5/6]
+> - Using more friendly wait method for reset gpio [Patch 2/6]
+> - Support multiple input clocks [Patch 2/6]
+> - Add Rob Herring's ack for DT changes
+> - Add Joshua Clayton's Tested-by
+> 
+> Changes for v3:
+> - Delete "power-sequence" property at binding-doc, and change related code
+>   at both library and user code.
+> - Change binding-doc example node name with Rob's comments
+> - of_get_named_gpio_flags only gets the gpio, but without setting gpio flags,
+>   add additional code request gpio with proper gpio flags
+> - Add Philipp Zabel's Ack and MAINTAINER's entry
+> 
+> Changes for v2:
+> - Delete "pwrseq" prefix and clock-names for properties at dt binding
+> - Should use structure not but its pointer for kzalloc
+> - Since chipidea core has no of_node, let core's of_node equals glue
+>   layer's at core's probe
+> 
+> Joshua Clayton (2):
+>   ARM: dts: imx6qdl: Enable usb node children with <reg>
+>   ARM: dts: imx6q-evi: Fix onboard hub reset line
+> 
+> Peter Chen (6):
+>   binding-doc: power: pwrseq-generic: add binding doc for generic power
+>     sequence library
+>   power: add power sequence library
+>   binding-doc: usb: usb-device: add optional properties for power
+>     sequence
+>   usb: core: add power sequence handling for USB devices
+>   usb: chipidea: let chipidea core device of_node equal's glue layer
+>     device of_node
+>   ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
+> 
+>  .../bindings/power/pwrseq/pwrseq-generic.txt       |  48 +++
+>  .../devicetree/bindings/usb/usb-device.txt         |  10 +-
+>  MAINTAINERS                                        |   9 +
+>  arch/arm/boot/dts/imx6q-evi.dts                    |  25 +-
+>  arch/arm/boot/dts/imx6qdl-udoo.dtsi                |  26 +-
+>  arch/arm/boot/dts/imx6qdl.dtsi                     |   6 +
+>  drivers/power/Kconfig                              |   1 +
+>  drivers/power/Makefile                             |   1 +
+>  drivers/power/pwrseq/Kconfig                       |  20 ++
+>  drivers/power/pwrseq/Makefile                      |   2 +
+>  drivers/power/pwrseq/core.c                        | 335 +++++++++++++++++++++
+>  drivers/power/pwrseq/pwrseq_generic.c              | 224 ++++++++++++++
+>  drivers/usb/Kconfig                                |   1 +
+>  drivers/usb/chipidea/core.c                        |  27 +-
+>  drivers/usb/core/hub.c                             |  48 ++-
+>  drivers/usb/core/hub.h                             |   1 +
+>  include/linux/power/pwrseq.h                       |  81 +++++
+>  17 files changed, 823 insertions(+), 42 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+>  create mode 100644 drivers/power/pwrseq/Kconfig
+>  create mode 100644 drivers/power/pwrseq/Makefile
+>  create mode 100644 drivers/power/pwrseq/core.c
+>  create mode 100644 drivers/power/pwrseq/pwrseq_generic.c
+>  create mode 100644 include/linux/power/pwrseq.h
+> 
+> -- 
+> 2.7.4
+> 
