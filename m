@@ -1,100 +1,78 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 06 Jan 2017 11:11:36 +0100
-Subject: [PATCH net-next v4 0/4] Fix OdroidC2 Gigabit Tx link issue
-In-Reply-To: <20170105232508.GU14217@n2100.armlinux.org.uk>
-References: <1480348229-25672-1-git-send-email-jbrunet@baylibre.com>
- <049b1efc-3bad-92e0-45ef-0563dc5d81de@gmail.com>
- <20170105232508.GU14217@n2100.armlinux.org.uk>
-Message-ID: <1483697496.28003.40.camel@baylibre.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 6 Jan 2017 10:24:04 +0000
+Subject: [RFC PATCH 4/7] KVM: arm/arm64: Check that system supports split
+ eoi/deactivate
+In-Reply-To: <20170106100257.GD21089@cbox>
+References: <20161210204712.21830-1-christoffer.dall@linaro.org>
+ <20161210204712.21830-5-christoffer.dall@linaro.org>
+ <7e44980f-d4b9-a5d0-b0a9-5424548300d8@arm.com> <20170106100257.GD21089@cbox>
+Message-ID: <c3f788da-4cae-76ee-d186-ad44fcf3a318@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-01-05 at 23:25 +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 28, 2016 at 09:54:28AM -0800, Florian Fainelli wrote:
-> > 
-> > If we start supporting generic "enable", "disable" type of
-> > properties
-> > with values that map directly to register definitions of the HW, we
-> > leave too much room for these properties to be utilized to
-> > implement a
-> > specific policy, and this is not acceptable.
+On 06/01/17 10:02, Christoffer Dall wrote:
+> On Thu, Jan 05, 2017 at 05:40:58PM +0000, Marc Zyngier wrote:
+>> On 10/12/16 20:47, Christoffer Dall wrote:
+>>> Some systems without proper firmware and/or hardware description data
+>>> don't support the split EOI and deactivate operation and therefore
+>>> don't provide an irq_set_vcpu_affinity implementation.  On such
+>>> systems, we cannot leave the physical interrupt active after the timer
+>>> handler on the host has run, so we cannot support KVM with the timer
+>>> changes we about to introduce.
+>>>
+>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>> ---
+>>>  virt/kvm/arm/arch_timer.c | 30 ++++++++++++++++++++++++++++++
+>>>  1 file changed, 30 insertions(+)
+>>>
+>>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+>>> index c7c3bfd..f27a086 100644
+>>> --- a/virt/kvm/arm/arch_timer.c
+>>> +++ b/virt/kvm/arm/arch_timer.c
+>>> @@ -418,6 +418,31 @@ static int kvm_timer_dying_cpu(unsigned int cpu)
+>>>  	return 0;
+>>>  }
+>>>  
+>>> +static bool has_split_eoi_deactivate_support(void)
+>>> +{
+>>> +	struct irq_desc *desc;
+>>> +	struct irq_data *data;
+>>> +	struct irq_chip *chip;
+>>> +
+>>> +	/*
+>>> +	 * Check if split EOI and deactivate is supported on this machine.
+>>> +	 */
+>>> +	desc = irq_to_desc(host_vtimer_irq);
+>>> +	if (!desc) {
+>>> +		kvm_err("kvm_arch_timer: no host_vtimer_irq descriptor\n");
+>>> +		return false;
+>>> +	}
+>>> +
+>>> +	data = irq_desc_get_irq_data(desc);
+>>> +	chip = irq_data_get_irq_chip(data);
+>>> +	if (!chip || !chip->irq_set_vcpu_affinity) {
+>>> +		kvm_err("kvm_arch_timer: no split EOI/deactivate; abort\n");
+>>> +		return false;
+>>> +	}
+>>> +
+>>> +	return true;
+>>> +}
+>>
+>> That feels really involved. How about reporting that we don't have a
+>> usable VGIC altogether from the GIC driver?
+>>
 > 
-> Another concern with this patch is that the existing phylib "set_eee"
-> code is horribly buggy - it just translates the modes from userspace
-> into the register value and writes them directly to the register with
-> no validation.??So it's possible to set modes in the register that
-> the
-> hardware doesn't support, and have them advertised to the link
-> partner.
+> You mean not booting the kernel at all, or establish some communication
+> from the GIC driver to KVM, telling KVM if it's usable for
+> virtualization or not?
 
-Hi Russell,
+We already query the vgic configuration by calling gic_get_kvm_info() at
+boot time. My suggestion is to make it return NULL if the GIC can't
+support split EOI/deactivate, and fallback to the "no-vgic" mode, if
+ever implemented.
 
-The purpose of this patch is to provide a way to mark as broken a
-particular eee mode. At first, it had nothing to do with "set_eee" but,
-as Florian rightly pointed out, users shouldn't be able to re-enable a
-broken mode.
+Thoughts?
 
-At first, I was thinking about returning -ENOSUP if a broken mode was
-requested. Then I noticed the behavior you just described: A user can
-request anything of "set_eee", he won't necessarily get what he asked
-but won't get an error either.
-
-To avoid mixing different topic in a single patch, I kept the same
-behavior, not returning an error, just silently discarding broken modes
-
-I agree with you, we should probably validate a bit more what we asked
-of the hardware in set_eee.
-
-I wonder if we should return an error though. With the current
-implementation, user space application could simply ask to activate
-everything, excepting the kernel to sort it out and return an error
-only if something horribly wrong happened. If we start returning an
-error for unsupported modes, we could break things. I guess we should
-just silently filter the requested modes.
-
-> 
-> I have a patch which fixes that, restricting (as we do elsewhere) the
-> advert according to the EEE supported capabilities retrieved from the
-> PCS
-
-Could be interesting :)
-
->  - maybe the problem here is that the PCS doesn't support support
-> EEE in 1000baseT mode?
-
-
-It does, and that's kind of the problem. EEE in ON for 100Tx and 1000T
-by default with this PHY. I have several platform with the same MAC-PHY 
-combination. Only the OdroidC2 shows this particular issue with 1000T-
-EEE
-
-As explained in other mails in this thread. The problem does not come
-from the MAC entering LPI. It actually comes from the link partner
-entering LPI on the Rx path under significant Tx transfer. For some
-reason, this completely mess up our PHY.
-
-> 
-> Out of interest, which PHY is used on this platform?
-
-The PHY is the Realtek RTL8211F
-
-> 
-> On the SolidRun boards, they're using AR8035, and have suffered this
-> occasional link drop problem.??What has been found is that it seems
-> to
-> be to do with the timing parameters, and it seemed to only be 1000bT
-> that was affected.??I don't remember off hand exactly which or what
-> the change was they made to stabilise it though, but I can probabily
-> find out tomorrow.
-> 
-
-Since the same combination of MAC-PHY works well on other designs, it
-is also my feeling that is has something to do with some timing
-parameter, maybe related to this particular PCB.
-
-While debugging this issue, we tried to play with all the parameters we
-could think of but never found anything worth mentioning.
-
-If you have any ideas, I'd be happy to try.
-
-Jerome
+	M.
+-- 
+Jazz is not dead. It just smells funny...
