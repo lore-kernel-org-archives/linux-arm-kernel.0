@@ -1,97 +1,79 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Fri,  6 Jan 2017 15:30:29 +0100
-Subject: [PATCH v3 5/5] drm/rockchip: Implement CRC debugfs API
-In-Reply-To: <20170106143029.11553-1-tomeu.vizoso@collabora.com>
-References: <20170106143029.11553-1-tomeu.vizoso@collabora.com>
-Message-ID: <20170106143029.11553-6-tomeu.vizoso@collabora.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Jan 2017 14:32:06 +0000
+Subject: [PATCHv2 net-next 06/16] net: mvpp2: adjust the allocation/free
+ of BM pools for PPv2.2
+In-Reply-To: <1482943592-12556-7-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1482943592-12556-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170106143206.GD14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the .set_crc_source() callback and call the DP helpers
-accordingly to start and stop CRC capture.
+On Wed, Dec 28, 2016 at 05:46:22PM +0100, Thomas Petazzoni wrote:
+> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+> +	if (priv->hw_version == MVPP22) {
 
-This is only done if this CRTC is currently using the eDP connector.
+Maybe
+	if (sizeof(dma_addr_t) > sizeof(u32) && priv->hw_version == MVPP22) {
 
-v3: Remove superfluous check on rockchip_crtc_state->output_type
+to get better compile coverage?
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
+> +		u32 val;
+> +		u32 paddr_highbits;
+> +
+> +		val = mvpp2_read(priv, MVPP2_BM_ADDR_HIGH_ALLOC);
+> +		paddr_highbits = (val & MVPP2_BM_ADDR_HIGH_PHYS_MASK);
+> +
+> +		*paddr |= (dma_addr_t)paddr_highbits << 32;
+> +		*vaddr = (unsigned long)phys_to_virt(dma_to_phys(dev, *paddr));
+> +	}
+> +#endif
+> +}
+> +
+>  /* Free all buffers from the pool */
+>  static void mvpp2_bm_bufs_free(struct device *dev, struct mvpp2 *priv,
+>  			       struct mvpp2_bm_pool *bm_pool)
+> @@ -3616,10 +3671,8 @@ static void mvpp2_bm_bufs_free(struct device *dev, struct mvpp2 *priv,
+>  		dma_addr_t buf_phys_addr;
+>  		unsigned long vaddr;
+>  
+> -		/* Get buffer virtual address (indirect access) */
+> -		buf_phys_addr = mvpp2_read(priv,
+> -					   MVPP2_BM_PHY_ALLOC_REG(bm_pool->id));
+> -		vaddr = mvpp2_read(priv, MVPP2_BM_VIRT_ALLOC_REG);
+> +		mvpp2_bm_bufs_get_addrs(dev, priv, bm_pool,
+> +					&buf_phys_addr, &vaddr);
+>  
+>  		dma_unmap_single(dev, buf_phys_addr,
+>  				 bm_pool->buf_size, DMA_FROM_DEVICE);
+> @@ -3651,7 +3704,7 @@ static int mvpp2_bm_pool_destroy(struct platform_device *pdev,
+>  	val |= MVPP2_BM_STOP_MASK;
+>  	mvpp2_write(priv, MVPP2_BM_POOL_CTRL_REG(bm_pool->id), val);
+>  
+> -	dma_free_coherent(&pdev->dev, sizeof(u32) * bm_pool->size,
+> +	dma_free_coherent(&pdev->dev, bm_pool->size_bytes,
+>  			  bm_pool->virt_addr,
+>  			  bm_pool->phys_addr);
+>  	return 0;
+> @@ -3787,8 +3840,19 @@ static inline void mvpp2_bm_pool_put(struct mvpp2_port *port, int pool,
+>  				     dma_addr_t buf_phys_addr,
+>  				     unsigned long buf_virt_addr)
+>  {
+> -	mvpp2_write(port->priv, MVPP2_BM_VIRT_RLS_REG, buf_virt_addr);
+> -	mvpp2_write(port->priv, MVPP2_BM_PHY_RLS_REG(pool), buf_phys_addr);
+> +#if defined(CONFIG_ARCH_DMA_ADDR_T_64BIT)
+> +	u32 val;
+> +
+> +	val = upper_32_bits(buf_phys_addr) & MVPP22_BM_ADDR_HIGH_PHYS_RLS_MASK;
+> +	val |= (upper_32_bits(buf_virt_addr) &
+> +		MVPP22_BM_ADDR_HIGH_VIRT_RLS_MASK)
+> +		<< MVPP22_BM_ADDR_HIGH_VIRT_RLS_SHIFT;
+> +	mvpp2_write(port->priv, MVPP22_BM_ADDR_HIGH_RLS_REG, val);
+> +#endif
 
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 48 +++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+Similar compile-time conditional?
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index fb5f001f51c3..5e19bef6d5b4 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -19,6 +19,7 @@
- #include <drm/drm_crtc_helper.h>
- #include <drm/drm_flip_work.h>
- #include <drm/drm_plane_helper.h>
-+#include <drm/bridge/analogix_dp.h>
- 
- #include <linux/kernel.h>
- #include <linux/module.h>
-@@ -1105,6 +1106,52 @@ static void vop_crtc_destroy_state(struct drm_crtc *crtc,
- 	kfree(s);
- }
- 
-+static struct drm_connector *vop_get_edp_connector(struct vop *vop)
-+{
-+	struct drm_crtc *crtc = &vop->crtc;
-+	struct drm_connector *connector;
-+
-+	mutex_lock(&crtc->dev->mode_config.mutex);
-+	drm_for_each_connector(connector, crtc->dev)
-+		if (connector->connector_type == DRM_MODE_CONNECTOR_eDP) {
-+			mutex_unlock(&crtc->dev->mode_config.mutex);
-+			return connector;
-+		}
-+	mutex_unlock(&crtc->dev->mode_config.mutex);
-+
-+	return NULL;
-+}
-+
-+static int vop_crtc_set_crc_source(struct drm_crtc *crtc,
-+				   const char *source_name, size_t *values_cnt)
-+{
-+	struct vop *vop = to_vop(crtc);
-+	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc->state);
-+	struct drm_connector *connector;
-+	int ret;
-+
-+	connector = vop_get_edp_connector(vop);
-+	if (!connector)
-+		return -EINVAL;
-+
-+	*values_cnt = 3;
-+
-+	if (source_name &&
-+	    strcmp(source_name, "auto") == 0) {
-+
-+		if (s->output_type != DRM_MODE_CONNECTOR_eDP)
-+			return -EINVAL;
-+
-+		ret = analogix_dp_start_crc(connector);
-+	} else if (!source_name)
-+
-+		ret = analogix_dp_stop_crc(connector);
-+	else
-+		ret = -EINVAL;
-+
-+	return ret;
-+}
-+
- static const struct drm_crtc_funcs vop_crtc_funcs = {
- 	.set_config = drm_atomic_helper_set_config,
- 	.page_flip = drm_atomic_helper_page_flip,
-@@ -1112,6 +1159,7 @@ static const struct drm_crtc_funcs vop_crtc_funcs = {
- 	.reset = vop_crtc_reset,
- 	.atomic_duplicate_state = vop_crtc_duplicate_state,
- 	.atomic_destroy_state = vop_crtc_destroy_state,
-+	.set_crc_source = vop_crtc_set_crc_source,
- };
- 
- static void vop_fb_unref_worker(struct drm_flip_work *work, void *val)
 -- 
-2.9.3
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
