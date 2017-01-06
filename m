@@ -1,78 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:17:56 +0100
-Subject: [PATCH 14/16] arm64: dts: r8a7796: salvator-x: Enable EthernetAVB
+Date: Fri,  6 Jan 2017 12:17:50 +0100
+Subject: [PATCH 08/16] arm64: dts: r8a7795: add sound MIX support
 In-Reply-To: <cover.1483700694.git.horms+renesas@verge.net.au>
 References: <cover.1483700694.git.horms+renesas@verge.net.au>
-Message-ID: <dc36965a890515753671628cdf25365ee45e6206.1483700694.git.horms+renesas@verge.net.au>
+Message-ID: <ad5805f3aa07c6eb6ef2578ee9b5f8ca9b0c28f2.1483700694.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-[geert: Add pinctrl]
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+This patch adds MIX (= Mixer) support.
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 32 ++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 1 +
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 7 +++++++
+ 2 files changed, 8 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-index 38bde9de3250..c7f40f8f3169 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-@@ -18,6 +18,7 @@
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+index 82a269a4f10d..7a8986edcdc0 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+@@ -413,6 +413,7 @@
+ 		 <&cpg CPG_MOD 1028>, <&cpg CPG_MOD 1029>,
+ 		 <&cpg CPG_MOD 1030>, <&cpg CPG_MOD 1031>,
+ 		 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
++		 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
+ 		 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
+ 		 <&audio_clk_a>, <&cs2000>,
+ 		 <&audio_clk_c>,
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index e09f5b7b874a..7e21491c6510 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -920,6 +920,7 @@
+ 				 <&cpg CPG_MOD 1028>, <&cpg CPG_MOD 1029>,
+ 				 <&cpg CPG_MOD 1030>, <&cpg CPG_MOD 1031>,
+ 				 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
++				 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
+ 				 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
+ 				 <&audio_clk_a>, <&audio_clk_b>,
+ 				 <&audio_clk_c>,
+@@ -931,6 +932,7 @@
+ 				      "src.9", "src.8", "src.7", "src.6",
+ 				      "src.5", "src.4", "src.3", "src.2",
+ 				      "src.1", "src.0",
++				      "mix.1", "mix.0",
+ 				      "ctu.1", "ctu.0",
+ 				      "dvc.0", "dvc.1",
+ 				      "clk_a", "clk_b", "clk_c", "clk_i";
+@@ -948,6 +950,11 @@
+ 				};
+ 			};
  
- 	aliases {
- 		serial0 = &scif2;
-+		ethernet0 = &avb;
- 	};
- 
- 	chosen {
-@@ -107,6 +108,11 @@
- 	pinctrl-0 = <&scif_clk_pins>;
- 	pinctrl-names = "default";
- 
-+	avb_pins: avb {
-+		groups = "avb_mdc";
-+		function = "avb";
-+	};
++			rcar_sound,mix {
++				mix0: mix-0 { };
++				mix1: mix-1 { };
++			};
 +
- 	scif2_pins: scif2 {
- 		groups = "scif2_data_a";
- 		function = "scif2";
-@@ -158,6 +164,32 @@
- 	};
- };
- 
-+&avb {
-+	pinctrl-0 = <&avb_pins>;
-+	pinctrl-names = "default";
-+	renesas,no-ether-link;
-+	phy-handle = <&phy0>;
-+	status = "okay";
-+
-+	phy0: ethernet-phy at 0 {
-+		rxc-skew-ps = <900>;
-+		rxdv-skew-ps = <0>;
-+		rxd0-skew-ps = <0>;
-+		rxd1-skew-ps = <0>;
-+		rxd2-skew-ps = <0>;
-+		rxd3-skew-ps = <0>;
-+		txc-skew-ps = <900>;
-+		txen-skew-ps = <0>;
-+		txd0-skew-ps = <0>;
-+		txd1-skew-ps = <0>;
-+		txd2-skew-ps = <0>;
-+		txd3-skew-ps = <0>;
-+		reg = <0>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
- &extal_clk {
- 	clock-frequency = <16666666>;
- };
+ 			rcar_sound,ctu {
+ 				ctu00: ctu-0 { };
+ 				ctu01: ctu-1 { };
 -- 
 2.7.0.rc3.207.g0ac5344
