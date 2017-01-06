@@ -1,44 +1,39 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:18:10 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.11
-Message-ID: <cover.1483701293.git.horms+renesas@verge.net.au>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 6 Jan 2017 11:19:51 +0000
+Subject: [PATCH] ARM: hw_breakpoint: blacklist Scorpion CPUs
+In-Reply-To: <20170105232324.GL17126@codeaurora.org>
+References: <1483637556-3974-1-git-send-email-mark.rutland@arm.com>
+ <20170105232324.GL17126@codeaurora.org>
+Message-ID: <20170106111951.GA15333@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+On Thu, Jan 05, 2017 at 03:23:24PM -0800, Stephen Boyd wrote:
+> On 01/05, Mark Rutland wrote:
+> > On APQ8060, the kernel crashes in arch_hw_breakpoint_init, taking an
+> > undefined instruction trap within write_wb_reg. This is because Scorpion
+> > CPUs erroneously appear to set DBGPRSR.SPD when WFI is issued, even if
+> > the core is not powered down. When DBGPRSR.SPD is set, breakpoint and
+> > watchpoint registers are treated as undefined.
+> > 
+> > It's possible to trigger similar crashes later on from userspace, by
+> > requesting the kernel to install a breakpoint or watchpoint, as we can
+> > go idle at any point between the reset of the debug registers and their
+> > later use. This has always been the case.
+> > 
+> > Given that this has always been broken, no-one has complained until now,
+> > and there is no clear workaround, disable hardware breakpoints and
+> > watchpoints on Scorpion to avoid these issues.
+> 
+> I believe the workaround is to read DBGPRSR after exit from WFI?
 
-Please consider these Renesas ARM based SoC defconfig updates for v4.11.
+That might be do-able via cpuidle, but it's probably better for somebody
+familiar with the SoC PM to write that patch.
 
+> I'm fine with the blacklisting approach though.
+> 
+> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+Thanks,
 
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.11
-
-for you to fetch changes up to e37278d83e348eb53029452e65892780359b6bea:
-
-  ARM: multi_v7_defconfig: Enable r8a774[35] SoCs (2017-01-03 10:44:04 +0100)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Defconfig Updates for v4.11
-
-Enable:
-* Recently added Enable r8a774[35] SoCs
-* CMA for DMA to allow use of VIN with large frame sizes
-* CONFIG_VIDEO_ADV7604 to allow use of HDMI input
-
-----------------------------------------------------------------
-Niklas S?derlund (2):
-      ARM: shmobile: defconfig: Enable CONFIG_VIDEO_ADV7604
-      ARM: shmobile: defconfig: Enable CMA for DMA
-
-Simon Horman (2):
-      ARM: shmobile: defconfig: Enable r8a774[35] SoCs
-      ARM: multi_v7_defconfig: Enable r8a774[35] SoCs
-
- arch/arm/configs/multi_v7_defconfig | 2 ++
- arch/arm/configs/shmobile_defconfig | 6 ++++++
- 2 files changed, 8 insertions(+)
+Will
