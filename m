@@ -1,125 +1,442 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Jan 2017 11:42:26 +0000
-Subject: [PATCH net-next v4 0/4] Fix OdroidC2 Gigabit Tx link issue
-In-Reply-To: <1483697496.28003.40.camel@baylibre.com>
-References: <1480348229-25672-1-git-send-email-jbrunet@baylibre.com>
- <049b1efc-3bad-92e0-45ef-0563dc5d81de@gmail.com>
- <20170105232508.GU14217@n2100.armlinux.org.uk>
- <1483697496.28003.40.camel@baylibre.com>
-Message-ID: <20170106114226.GX14217@n2100.armlinux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri,  6 Jan 2017 11:53:12 +0000
+Subject: [RFT PATCH] crypto: arm/aes - replace scalar AES cipher
+Message-ID: <1483703592-7745-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 11:11:36AM +0100, Jerome Brunet wrote:
-> The purpose of this patch is to provide a way to mark as broken a
-> particular eee mode. At first, it had nothing to do with "set_eee" but,
-> as Florian rightly pointed out, users shouldn't be able to re-enable a
-> broken mode.
+This replaces the scalar AES cipher that originates in the OpenSSL project
+with a new implementation that is ~15% (*) faster (on modern cores), and
+reuses the lookup tables and the key schedule generation routines from the
+generic C implementation (which is usually compiled in anyway due to
+networking and other subsystems depending on it).
 
-I think something else has been missed - I don't see much point to
-telling userspace that (eg) 1000baseT EEE is supported and then
-ignore attempts to advertise it.
+Note that the bit sliced NEON code for AES still depends on the scalar cipher
+that this patch replaces, so it is not removed entirely yet.
 
-If it's broken, then arguably the hardware doesn't support the mode,
-so we should really be masking those bits from the EEE supported mask
-as well.
+* On Cortex-A57, the performance increases from 17.0 to 14.9 cycles per byte
+  for 128-bit keys.
 
-> I wonder if we should return an error though. With the current
-> implementation, user space application could simply ask to activate
-> everything, excepting the kernel to sort it out and return an error
-> only if something horribly wrong happened. If we start returning an
-> error for unsupported modes, we could break things. I guess we should
-> just silently filter the requested modes.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
 
-The ethtool behaviour for advertisments is that errors are not returned
-unless the attempted advert is really wrong.
+It makes sense to test this on a variety of cores before deciding whether
+to merge it or not. Test results welcome. (insmod tcrypt.ko mode=200 sec=1)
 
-So, for example, when setting an advertisment for link modes, we accept
-the user's supplied mask, and bitwise AND it with the supported mask,
-so unsupported link modes are cleared.  Only if the result is an empty
-mask do we then return an error to userspace.
+ arch/arm/crypto/Kconfig           |  20 +--
+ arch/arm/crypto/Makefile          |   4 +-
+ arch/arm/crypto/aes-cipher-core.S | 169 ++++++++++++++++++++
+ arch/arm/crypto/aes-cipher-glue.c |  69 ++++++++
+ arch/arm/crypto/aes_glue.c        |  98 ------------
+ 5 files changed, 241 insertions(+), 119 deletions(-)
 
-It's similar for forcing the link parameters - phylib attempts to find
-the best phy setting mode which fuzzily matches the users request, but
-doesn't error out if we can't do exactly what the user requested.
-
-In the EEE case, an empty mask is acceptable (it means "EEE is supported
-in no link modes") so it isn't appropriate to return errors there.
-
-> >  - maybe the problem here is that the PCS doesn't support support
-> > EEE in 1000baseT mode?
-> 
-> 
-> It does, and that's kind of the problem. EEE in ON for 100Tx and 1000T
-> by default with this PHY. I have several platform with the same MAC-PHY 
-> combination. Only the OdroidC2 shows this particular issue with 1000T-
-> EEE
-> 
-> As explained in other mails in this thread. The problem does not come
-> from the MAC entering LPI. It actually comes from the link partner
-> entering LPI on the Rx path under significant Tx transfer. For some
-> reason, this completely mess up our PHY.
-
-For a 1000baseT link to enter low power, both ends have to enter LPI
-(see 802.3 78.1.3.3.1) - the Tx and Rx paths can't independently enter
-LPI.
-
-So, if you have a busy Tx link, the link itself can't be entering LPI.
-Your link partner may be sending a request to enter LPI due to its own
-Tx path being idle, which should then be forwarded to your MAC.
-
-It's pretty hard to see what could be messed up with that - I'd have
-expected the problems to occur when both ends were idle and the link
-had entered low power mode.
-
-> > On the SolidRun boards, they're using AR8035, and have suffered this
-> > occasional link drop problem.??What has been found is that it seems
-> > to
-> > be to do with the timing parameters, and it seemed to only be 1000bT
-> > that was affected.??I don't remember off hand exactly which or what
-> > the change was they made to stabilise it though, but I can probabily
-> > find out tomorrow.
-> > 
-> 
-> Since the same combination of MAC-PHY works well on other designs, it
-> is also my feeling that is has something to do with some timing
-> parameter, maybe related to this particular PCB.
-
-Maybe a different PHY interface?  Meson seems to use RGMII, maybe
-others use SGMII - but then I'd expect 100base-Tx to also be broken.
-So not really sure.
-
-I was talking to Florian about that last night, because the mis-named
-phy_init_eee() tests for various phy interface modes before proceeding,
-which seems to be fairly rubbish as the list of interface modes is
-gradually increasing since it was introduced (and I need to add SGMII
-to it.)  The conclusion I've come to there is that the test should
-never have been part of phylib, because if there are restrictions on
-which phy interface modes are allowable for EEE, they're likely to be
-either PHY or MAC specific.
-
-The other problem that having the test there causes is that if the
-existing users can't handle EEE over SGMII, then when I add SGMII to
-support my hardware, they end up breaking - far from desirable.
-There's no information on why the test is there, or even which PHYs
-or MACs it's applicable to, which makes this unnecessarily more
-difficult to now resolve.
-
-My feeling is that the integration of EEE into phylib is fairly poor
-at the moment, and we need to be a lot smarter about it.
-
-BTW, one of the problems (not caused by your patch) is that changing
-the EEE advertisment does not (on all PHY drivers) cause the link to
-be renegotiated - there's no call to phy_start_aneg() when the advert
-changes, and even if there was, there's no guarantee that
-phy_start_aneg() will even set the AN restart bit in the control
-register.
-
-However, given that you're hooking into the set_eee function, I'm not
-sure why you placed your EEE advertisment thing into config_aneg() -
-isn't it more an initialisation thing (so should be in config_init()?)
-
+diff --git a/arch/arm/crypto/Kconfig b/arch/arm/crypto/Kconfig
+index 2f3339f015d3..f1de658c3c8f 100644
+--- a/arch/arm/crypto/Kconfig
++++ b/arch/arm/crypto/Kconfig
+@@ -62,33 +62,15 @@ config CRYPTO_SHA512_ARM
+ 	  using optimized ARM assembler and NEON, when available.
+ 
+ config CRYPTO_AES_ARM
+-	tristate "AES cipher algorithms (ARM-asm)"
+-	depends on ARM
++	tristate "Scalar AES cipher for ARM"
+ 	select CRYPTO_ALGAPI
+ 	select CRYPTO_AES
+ 	help
+ 	  Use optimized AES assembler routines for ARM platforms.
+ 
+-	  AES cipher algorithms (FIPS-197). AES uses the Rijndael
+-	  algorithm.
+-
+-	  Rijndael appears to be consistently a very good performer in
+-	  both hardware and software across a wide range of computing
+-	  environments regardless of its use in feedback or non-feedback
+-	  modes. Its key setup time is excellent, and its key agility is
+-	  good. Rijndael's very low memory requirements make it very well
+-	  suited for restricted-space environments, in which it also
+-	  demonstrates excellent performance. Rijndael's operations are
+-	  among the easiest to defend against power and timing attacks.
+-
+-	  The AES specifies three key sizes: 128, 192 and 256 bits
+-
+-	  See <http://csrc.nist.gov/encryption/aes/> for more information.
+-
+ config CRYPTO_AES_ARM_BS
+ 	tristate "Bit sliced AES using NEON instructions"
+ 	depends on KERNEL_MODE_NEON
+-	select CRYPTO_AES_ARM
+ 	select CRYPTO_BLKCIPHER
+ 	select CRYPTO_SIMD
+ 	help
+diff --git a/arch/arm/crypto/Makefile b/arch/arm/crypto/Makefile
+index 8d74e55eacd4..8f5de2db701c 100644
+--- a/arch/arm/crypto/Makefile
++++ b/arch/arm/crypto/Makefile
+@@ -27,8 +27,8 @@ $(warning $(ce-obj-y) $(ce-obj-m))
+ endif
+ endif
+ 
+-aes-arm-y	:= aes-armv4.o aes_glue.o
+-aes-arm-bs-y	:= aesbs-core.o aesbs-glue.o
++aes-arm-y	:= aes-cipher-core.o aes-cipher-glue.o
++aes-arm-bs-y	:= aes-armv4.o aesbs-core.o aesbs-glue.o
+ sha1-arm-y	:= sha1-armv4-large.o sha1_glue.o
+ sha1-arm-neon-y	:= sha1-armv7-neon.o sha1_neon_glue.o
+ sha256-arm-neon-$(CONFIG_KERNEL_MODE_NEON) := sha256_neon_glue.o
+diff --git a/arch/arm/crypto/aes-cipher-core.S b/arch/arm/crypto/aes-cipher-core.S
+new file mode 100644
+index 000000000000..8d4a15364d43
+--- /dev/null
++++ b/arch/arm/crypto/aes-cipher-core.S
+@@ -0,0 +1,169 @@
++/*
++ * Scalar AES core transform
++ *
++ * Copyright (C) 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/linkage.h>
++
++	.text
++	.align		5
++
++	rk		.req	r0
++	rounds		.req	r1
++	in		.req	r2
++	out		.req	r3
++	tt		.req	ip
++
++	t0		.req	lr
++	t1		.req	r2
++	t2		.req	r3
++
++	.macro		__select, out, in, idx
++	.if		__LINUX_ARM_ARCH__ < 7
++	and		\out, \in, #0xff << (8 * \idx)
++	.else
++	ubfx		\out, \in, #(8 * \idx), #8
++	.endif
++	.endm
++
++	.macro		__load, out, in, idx
++	.if		__LINUX_ARM_ARCH__ < 7 && \idx > 0
++	ldr		\out, [tt, \in, lsr #(8 * \idx) - 2]
++	.else
++	ldr		\out, [tt, \in, lsl #2]
++	.endif
++	.endm
++
++	.macro		__hround, out0, out1, in0, in1, in2, in3, t3, t4, enc
++	__select	\out0, \in0, 0
++	__select	t0, \in1, 1
++	__load		\out0, \out0, 0
++	__load		t0, t0, 1
++
++	.if		\enc
++	__select	\out1, \in1, 0
++	__select	t1, \in2, 1
++	.else
++	__select	\out1, \in3, 0
++	__select	t1, \in0, 1
++	.endif
++	__load		\out1, \out1, 0
++	__select	t2, \in2, 2
++	__load		t1, t1, 1
++	__load		t2, t2, 2
++
++	eor		\out0, \out0, t0, ror #24
++
++	__select	t0, \in3, 3
++	.if		\enc
++	__select	\t3, \in3, 2
++	__select	\t4, \in0, 3
++	.else
++	__select	\t3, \in1, 2
++	__select	\t4, \in2, 3
++	.endif
++	__load		\t3, \t3, 2
++	__load		t0, t0, 3
++	__load		\t4, \t4, 3
++
++	eor		\out1, \out1, t1, ror #24
++	eor		\out0, \out0, t2, ror #16
++	ldm		rk!, {t1, t2}
++	eor		\out1, \out1, \t3, ror #16
++	eor		\out0, \out0, t0, ror #8
++	eor		\out1, \out1, \t4, ror #8
++	eor		\out0, \out0, t1
++	eor		\out1, \out1, t2
++	.endm
++
++	.macro		fround, out0, out1, out2, out3, in0, in1, in2, in3
++	__hround	\out0, \out1, \in0, \in1, \in2, \in3, \out2, \out3, 1
++	__hround	\out2, \out3, \in2, \in3, \in0, \in1, \in1, \in2, 1
++	.endm
++
++	.macro		iround, out0, out1, out2, out3, in0, in1, in2, in3
++	__hround	\out0, \out1, \in0, \in3, \in2, \in1, \out2, \out3, 0
++	__hround	\out2, \out3, \in2, \in1, \in0, \in3, \in1, \in0, 0
++	.endm
++
++	.macro		__rev, out, in
++	.if		__LINUX_ARM_ARCH__ < 7
++	lsl		t0, \in, #24
++	and		t1, \in, #0xff00
++	and		t2, \in, #0xff0000
++	orr		\out, t0, \in, lsr #24
++	orr		\out, \out, t1, lsl #8
++	orr		\out, \out, t2, lsr #8
++	.else
++	rev		\out, \in
++	.endif
++	.endm
++
++	.macro		do_crypt, round, ttab, ltab
++	push		{r3-r11, lr}
++
++	ldr		r4, [in]
++	ldr		r5, [in, #4]
++	ldr		r6, [in, #8]
++	ldr		r7, [in, #12]
++
++	ldm		rk!, {r8, r9, r10, r11}
++
++#ifdef CONFIG_CPU_BIG_ENDIAN
++	__rev		r4, r4
++	__rev		r5, r5
++	__rev		r6, r6
++	__rev		r7, r7
++#endif
++
++	eor		r4, r4, r8
++	eor		r5, r5, r9
++	eor		r6, r6, r10
++	eor		r7, r7, r11
++
++	ldr		tt, =\ttab
++
++	tst		rounds, #2
++	bne		1f
++
++0:	\round		r8, r9, r10, r11, r4, r5, r6, r7
++	\round		r4, r5, r6, r7, r8, r9, r10, r11
++
++1:	subs		rounds, rounds, #4
++	\round		r8, r9, r10, r11, r4, r5, r6, r7
++	ldrls		tt, =\ltab
++	\round		r4, r5, r6, r7, r8, r9, r10, r11
++	bhi		0b
++
++#ifdef CONFIG_CPU_BIG_ENDIAN
++	__rev		r4, r4
++	__rev		r5, r5
++	__rev		r6, r6
++	__rev		r7, r7
++#endif
++
++	ldr		out, [sp]
++
++	str		r4, [out]
++	str		r5, [out, #4]
++	str		r6, [out, #8]
++	str		r7, [out, #12]
++
++	pop		{r3-r11, pc}
++
++	.align		3
++	.ltorg
++	.endm
++
++ENTRY(__aes_arm_encrypt)
++	do_crypt	fround, crypto_ft_tab, crypto_fl_tab
++ENDPROC(__aes_arm_encrypt)
++
++ENTRY(__aes_arm_decrypt)
++	do_crypt	iround, crypto_it_tab, crypto_il_tab
++ENDPROC(__aes_arm_decrypt)
+diff --git a/arch/arm/crypto/aes-cipher-glue.c b/arch/arm/crypto/aes-cipher-glue.c
+new file mode 100644
+index 000000000000..19545237112a
+--- /dev/null
++++ b/arch/arm/crypto/aes-cipher-glue.c
+@@ -0,0 +1,69 @@
++/*
++ * Scalar AES core transform
++ *
++ * Copyright (C) 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <crypto/aes.h>
++#include <linux/crypto.h>
++#include <linux/module.h>
++
++asmlinkage void __aes_arm_encrypt(u32 *rk, int rounds, const u8 *in, u8 *out);
++EXPORT_SYMBOL(__aes_arm_encrypt);
++
++asmlinkage void __aes_arm_decrypt(u32 *rk, int rounds, const u8 *in, u8 *out);
++EXPORT_SYMBOL(__aes_arm_decrypt);
++
++static void aes_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
++{
++	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
++	int rounds = 6 + ctx->key_length / 4;
++
++	__aes_arm_encrypt(ctx->key_enc, rounds, in, out);
++}
++
++static void aes_decrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
++{
++	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
++	int rounds = 6 + ctx->key_length / 4;
++
++	__aes_arm_decrypt(ctx->key_dec, rounds, in, out);
++}
++
++static struct crypto_alg aes_alg = {
++	.cra_name			= "aes",
++	.cra_driver_name		= "aes-arm",
++	.cra_priority			= 200,
++	.cra_flags			= CRYPTO_ALG_TYPE_CIPHER,
++	.cra_blocksize			= AES_BLOCK_SIZE,
++	.cra_ctxsize			= sizeof(struct crypto_aes_ctx),
++	.cra_module			= THIS_MODULE,
++
++	.cra_cipher.cia_min_keysize	= AES_MIN_KEY_SIZE,
++	.cra_cipher.cia_max_keysize	= AES_MAX_KEY_SIZE,
++	.cra_cipher.cia_setkey		= crypto_aes_set_key,
++	.cra_cipher.cia_encrypt		= aes_encrypt,
++	.cra_cipher.cia_decrypt		= aes_decrypt
++};
++
++static int __init aes_init(void)
++{
++	return crypto_register_alg(&aes_alg);
++}
++
++static void __exit aes_fini(void)
++{
++	crypto_unregister_alg(&aes_alg);
++}
++
++module_init(aes_init);
++module_exit(aes_fini);
++
++MODULE_DESCRIPTION("Scalar AES cipher for ARM");
++MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS_CRYPTO("aes");
+diff --git a/arch/arm/crypto/aes_glue.c b/arch/arm/crypto/aes_glue.c
+deleted file mode 100644
+index 0409b8f89782..000000000000
+--- a/arch/arm/crypto/aes_glue.c
++++ /dev/null
+@@ -1,98 +0,0 @@
+-/*
+- * Glue Code for the asm optimized version of the AES Cipher Algorithm
+- */
+-
+-#include <linux/module.h>
+-#include <linux/crypto.h>
+-#include <crypto/aes.h>
+-
+-#include "aes_glue.h"
+-
+-EXPORT_SYMBOL(AES_encrypt);
+-EXPORT_SYMBOL(AES_decrypt);
+-EXPORT_SYMBOL(private_AES_set_encrypt_key);
+-EXPORT_SYMBOL(private_AES_set_decrypt_key);
+-
+-static void aes_encrypt(struct crypto_tfm *tfm, u8 *dst, const u8 *src)
+-{
+-	struct AES_CTX *ctx = crypto_tfm_ctx(tfm);
+-	AES_encrypt(src, dst, &ctx->enc_key);
+-}
+-
+-static void aes_decrypt(struct crypto_tfm *tfm, u8 *dst, const u8 *src)
+-{
+-	struct AES_CTX *ctx = crypto_tfm_ctx(tfm);
+-	AES_decrypt(src, dst, &ctx->dec_key);
+-}
+-
+-static int aes_set_key(struct crypto_tfm *tfm, const u8 *in_key,
+-		unsigned int key_len)
+-{
+-	struct AES_CTX *ctx = crypto_tfm_ctx(tfm);
+-
+-	switch (key_len) {
+-	case AES_KEYSIZE_128:
+-		key_len = 128;
+-		break;
+-	case AES_KEYSIZE_192:
+-		key_len = 192;
+-		break;
+-	case AES_KEYSIZE_256:
+-		key_len = 256;
+-		break;
+-	default:
+-		tfm->crt_flags |= CRYPTO_TFM_RES_BAD_KEY_LEN;
+-		return -EINVAL;
+-	}
+-
+-	if (private_AES_set_encrypt_key(in_key, key_len, &ctx->enc_key) == -1) {
+-		tfm->crt_flags |= CRYPTO_TFM_RES_BAD_KEY_LEN;
+-		return -EINVAL;
+-	}
+-	/* private_AES_set_decrypt_key expects an encryption key as input */
+-	ctx->dec_key = ctx->enc_key;
+-	if (private_AES_set_decrypt_key(in_key, key_len, &ctx->dec_key) == -1) {
+-		tfm->crt_flags |= CRYPTO_TFM_RES_BAD_KEY_LEN;
+-		return -EINVAL;
+-	}
+-	return 0;
+-}
+-
+-static struct crypto_alg aes_alg = {
+-	.cra_name		= "aes",
+-	.cra_driver_name	= "aes-asm",
+-	.cra_priority		= 200,
+-	.cra_flags		= CRYPTO_ALG_TYPE_CIPHER,
+-	.cra_blocksize		= AES_BLOCK_SIZE,
+-	.cra_ctxsize		= sizeof(struct AES_CTX),
+-	.cra_module		= THIS_MODULE,
+-	.cra_list		= LIST_HEAD_INIT(aes_alg.cra_list),
+-	.cra_u	= {
+-		.cipher	= {
+-			.cia_min_keysize	= AES_MIN_KEY_SIZE,
+-			.cia_max_keysize	= AES_MAX_KEY_SIZE,
+-			.cia_setkey		= aes_set_key,
+-			.cia_encrypt		= aes_encrypt,
+-			.cia_decrypt		= aes_decrypt
+-		}
+-	}
+-};
+-
+-static int __init aes_init(void)
+-{
+-	return crypto_register_alg(&aes_alg);
+-}
+-
+-static void __exit aes_fini(void)
+-{
+-	crypto_unregister_alg(&aes_alg);
+-}
+-
+-module_init(aes_init);
+-module_exit(aes_fini);
+-
+-MODULE_DESCRIPTION("Rijndael (AES) Cipher Algorithm (ASM)");
+-MODULE_LICENSE("GPL");
+-MODULE_ALIAS_CRYPTO("aes");
+-MODULE_ALIAS_CRYPTO("aes-asm");
+-MODULE_AUTHOR("David McCullough <ucdevel@gmail.com>");
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.4
