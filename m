@@ -1,81 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 Jan 2017 10:43:57 -0800
-Subject: [PATCH 1/6] ARM: dts: am335x-phycore-som: Update NAND partition
- table
-In-Reply-To: <20170106182052.GA127120@google.com>
-References: <1483627851-17996-1-git-send-email-t.remmet@phytec.de>
- <1483627851-17996-2-git-send-email-t.remmet@phytec.de>
- <20170105153637.GA4310@atomide.com>
- <20170105171845.GK4310@atomide.com>
- <20170105175619.GA56877@google.com>
- <1483694849.3634.6.camel@phytec.de>
- <20170106160222.GC2630@atomide.com>
- <CAHCN7xL2n0qsg61i85o7DczanMH1E=HWhNvqUtTH9UhEVBvd8g@mail.gmail.com>
- <20170106161421.GD2630@atomide.com>
- <20170106182052.GA127120@google.com>
-Message-ID: <20170106184356.GH2630@atomide.com>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Fri, 6 Jan 2017 10:56:16 -0800
+Subject: [PATCH 0/5] Use mmio-sram driver for Keystone MSMC RAM
+In-Reply-To: <287b7e1d-1453-2832-515d-e7e51373a3bc@oracle.com>
+References: <20160901225846.31058-1-s-anna@ti.com>
+ <d797bb0d-41b5-45a7-6faf-95baaab0215b@oracle.com>
+ <f6920801-554d-18e8-f140-44aeeb2f878e@ti.com>
+ <287b7e1d-1453-2832-515d-e7e51373a3bc@oracle.com>
+Message-ID: <3abc3c7d-2f45-f5dd-e6f5-c03008d22d56@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Brian Norris <briannorris@chromium.org> [170106 10:21]:
-> On Fri, Jan 06, 2017 at 08:14:22AM -0800, Tony Lindgren wrote:
-> > * Adam Ford <aford173@gmail.com> [170106 08:06]:
-> > > On Fri, Jan 6, 2017 at 10:02 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > > > * Teresa Remmet <t.remmet@phytec.de> [170106 01:28]:
-> > > >> Am Donnerstag, den 05.01.2017, 09:56 -0800 schrieb Brian Norris:
-> > > >> > On Thu, Jan 05, 2017 at 09:18:45AM -0800, Tony Lindgren wrote:
-> > > >> > > I'm suggesting we leave the kernel nodes empty and let u-boot
-> > > >> > > populate them, so maybe you guys can discuss this on the related
-> > > >> > > lists.
-> > > >> > That's an option. I've worked with platforms that did something like
-> > > >> > this, and that's really one of the only ways you can handle putting
-> > > >> > partition information in the device tree. You're really hamstringing
-> > > >> > yourself when you put all the partition information in the device
-> > > >> > tree.
-> > > >> > And it's just dumb once that gets codified in the kernel source tree.
-> > > >> >
-> > > >>
-> > > >> In our case the bootloader does pass the partition table to the kernel.
-> > > >> So it gets overwritten anyway. This was just more for backup,
-> > > >> if someone uses a different bootloader. But I'm fine with removing the
-> > > >> nand partition table completely from the kernel device tree.
-> > > >> Same with the SPI nor partition table.
-> 
-> Ah, well if these are essentially just a backup, then why do they need
-> changed at all? To be more precise about my "dumb" statement: it seems
-> unwise to assume that all systems using a particular board will have the
-> same partition layout. So *relying* on the in-kernel DTS(I) files to
-> have a universal partition layout would likely cause problems.
-> 
-> I don't have much problem with keeping a sample layout there as a
-> backup, if you find it useful. But it seems like it will be hard to
-> argue that you can ever change it in the future.
-> 
-> Anyway, the ofpart mechanism is there, and it's fine to use it, but it's
-> up to you to understand the implications and manage the backwards
-> compatibility problems :)
-> 
-> > > >> I will send patches for this.
-> > > >
-> > > > OK thanks! Also thank you Brian for your comments.
-> > > >
-> > > 
-> > > Tony - I tested leaving the partition info as-is with the updates from
-> > > the bootloader and it works.  Would you prefer that I match Brian and
-> > > remove the partition table completely, or should I just leave my board
-> > > alone?
-> > > 
-> > > I am good either way.
-> > 
-> > OK. How about let's remove the partitions from kernel for v4.11 as
-> > clean-up then for cases where the bootloader might change them?
-> 
-> I don't have much stake in this but...if there were any systems using
-> the backup layout (i.e., the in-kernel partition layout), wouldn't that
-> break them? Is there a problem with just leaving them alone?
+Hi Suman,
 
-Yeah I guess it depends on the device and it's bootloader versions.
+On 9/7/16 9:25 AM, Santosh Shilimkar wrote:
+> On 9/7/2016 9:22 AM, Suman Anna wrote:
+>> Hi Santosh,
+>>
+>> On 09/07/2016 11:11 AM, Santosh Shilimkar wrote:
+>>> Hi Suman,
+>>>
+>>> On 9/1/2016 3:58 PM, Suman Anna wrote:
+>>>> Hi,
+>>>>
+>>>> The Keystone 2 family of SoCs have an on-chip RAM called the
+>>>> Multicore Shared Memory (MSM) RAM. This RAM is accessible through
+>>>> the Multicore Shared Memory Controller (MSMC). This series represents
+>>>> these on-chip RAMs as sram nodes so that the memory allocations
+>>>> can be managed by the in-kernel mmio-sram driver.
+>>>>
+>>>> The first 4 patches adds the basic SRAM nodes on each of the SoCs,
+>>>> and the last patch enables the generic on-chip SRAM driver for
+>>>> keystone defconfig.
+>>>>
+>>> The series looks good in general but I would like to understand
+>>> the users of this memory in kernel. Is that going to be posted
+>>> as a follow up patch ? Is the Power controller going to make
+>>> use of this SRAM for PM code ?
+>>
+>> Yes, the users will eventually follow. Power Controller code is not
+>> gonna be using this SRAM, it has its own RAM. This memory is gonna be
+>> split between various functional features like IPC, OPTEE integration,
+>> we already have the Boot Monitor code using this. We will have the
+>> memory split by either having static child nodes or drivers requesting
+>> the memory using gen_pool API.
+>>
+> OK. Its good to add the code at least with one active user of it.
+> Since this has to anyway wait for another merge window, please post the
+> users of it so that I can pull the combined patchset.
+>
+Are you going to post new patchset or you dropped this series ?
+
+If you want me to include it for next merge window, please post
+refreshed patchset.
 
 Regards,
-
-Tony
+Santosh
