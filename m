@@ -1,79 +1,60 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Jan 2017 14:32:06 +0000
-Subject: [PATCHv2 net-next 06/16] net: mvpp2: adjust the allocation/free
- of BM pools for PPv2.2
-In-Reply-To: <1482943592-12556-7-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482943592-12556-7-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170106143206.GD14217@n2100.armlinux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 6 Jan 2017 14:36:19 +0000
+Subject: [PATCH 16/18] arm64: ptrace: handle ptrace_request differently
+ for aarch32 and ilp32
+In-Reply-To: <20170105204003.GA7437@yury-N73SV>
+References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+ <20161206062508.GA17835@yury-N73SV>
+ <20161207165913.GD31779@e104818-lin.cambridge.arm.com>
+ <3703608.GKr1zzErMk@wuerfel> <20170105204003.GA7437@yury-N73SV>
+Message-ID: <20170106143619.GC12863@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 28, 2016 at 05:46:22PM +0100, Thomas Petazzoni wrote:
-> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-> +	if (priv->hw_version == MVPP22) {
+On Fri, Jan 06, 2017 at 02:10:03AM +0530, Yury Norov wrote:
+> On Wed, Dec 07, 2016 at 09:40:13PM +0100, Arnd Bergmann wrote:
+> > On Wednesday, December 7, 2016 4:59:13 PM CET Catalin Marinas wrote:
+> > > On Tue, Dec 06, 2016 at 11:55:08AM +0530, Yury Norov wrote:
+> > > > On Mon, Dec 05, 2016 at 04:34:23PM +0000, Catalin Marinas wrote:
+> > > > > On Fri, Oct 21, 2016 at 11:33:15PM +0300, Yury Norov wrote:
+> > > > > > New aarch32 ptrace syscall handler is introduced to avoid run-time
+> > > > > > detection of the task type.
+> > > > > 
+> > > > > What's wrong with the run-time detection? If it's just to avoid a
+> > > > > negligible overhead, I would rather keep the code simpler by avoiding
+> > > > > duplicating the generic compat_sys_ptrace().
+> > > > 
+> > > > Nothing wrong. This is how Arnd asked me to do. You already asked this
+> > > > question: http://lkml.iu.edu/hypermail/linux/kernel/1604.3/00930.html
+> > > 
+> > > Hmm, I completely forgot about this ;). There is still an advantage to
+> > > doing run-time checking if we avoid touching core code (less acks to
+> > > gather and less code duplication).
+> > > 
+> > > Let's see what Arnd says but the initial patch looked simpler.
+> > 
+> > I don't currently have either version of the patch in my inbox
+> > (the archive is on a different machine), but in general I'd still
+> > think it's best to avoid the runtime check for aarch64-ilp32
+> > altogether. I'd have to look at the overall kernel source to
+> > see if it's worth avoiding one or two instances though, or
+> > if there are an overwhelming number of other checks that we
+> > can't avoid at all.
+> > 
+> > Regarding ptrace, I notice that arch/tile doesn't even use
+> > the compat entry point for its ilp32 user space on 64-bit
+> > kernels, it just calls the regular 64-bit one. Would that
+> > help here?
+> 
+> ILP32 tasks has unique context that is not like aarch64 or aarch32,
+> so we have to have unique ptrace handler. I prepared the patch for
+> ptrace with runtime ABI detection, as Catalin said, see there:
+> https://github.com/norov/linux/commit/1f66dc22a4450b192e83458f2c3cc0e79f53e670
+> 
+> If it's OK, I'd like to update submission.
 
-Maybe
-	if (sizeof(dma_addr_t) > sizeof(u32) && priv->hw_version == MVPP22) {
-
-to get better compile coverage?
-
-> +		u32 val;
-> +		u32 paddr_highbits;
-> +
-> +		val = mvpp2_read(priv, MVPP2_BM_ADDR_HIGH_ALLOC);
-> +		paddr_highbits = (val & MVPP2_BM_ADDR_HIGH_PHYS_MASK);
-> +
-> +		*paddr |= (dma_addr_t)paddr_highbits << 32;
-> +		*vaddr = (unsigned long)phys_to_virt(dma_to_phys(dev, *paddr));
-> +	}
-> +#endif
-> +}
-> +
->  /* Free all buffers from the pool */
->  static void mvpp2_bm_bufs_free(struct device *dev, struct mvpp2 *priv,
->  			       struct mvpp2_bm_pool *bm_pool)
-> @@ -3616,10 +3671,8 @@ static void mvpp2_bm_bufs_free(struct device *dev, struct mvpp2 *priv,
->  		dma_addr_t buf_phys_addr;
->  		unsigned long vaddr;
->  
-> -		/* Get buffer virtual address (indirect access) */
-> -		buf_phys_addr = mvpp2_read(priv,
-> -					   MVPP2_BM_PHY_ALLOC_REG(bm_pool->id));
-> -		vaddr = mvpp2_read(priv, MVPP2_BM_VIRT_ALLOC_REG);
-> +		mvpp2_bm_bufs_get_addrs(dev, priv, bm_pool,
-> +					&buf_phys_addr, &vaddr);
->  
->  		dma_unmap_single(dev, buf_phys_addr,
->  				 bm_pool->buf_size, DMA_FROM_DEVICE);
-> @@ -3651,7 +3704,7 @@ static int mvpp2_bm_pool_destroy(struct platform_device *pdev,
->  	val |= MVPP2_BM_STOP_MASK;
->  	mvpp2_write(priv, MVPP2_BM_POOL_CTRL_REG(bm_pool->id), val);
->  
-> -	dma_free_coherent(&pdev->dev, sizeof(u32) * bm_pool->size,
-> +	dma_free_coherent(&pdev->dev, bm_pool->size_bytes,
->  			  bm_pool->virt_addr,
->  			  bm_pool->phys_addr);
->  	return 0;
-> @@ -3787,8 +3840,19 @@ static inline void mvpp2_bm_pool_put(struct mvpp2_port *port, int pool,
->  				     dma_addr_t buf_phys_addr,
->  				     unsigned long buf_virt_addr)
->  {
-> -	mvpp2_write(port->priv, MVPP2_BM_VIRT_RLS_REG, buf_virt_addr);
-> -	mvpp2_write(port->priv, MVPP2_BM_PHY_RLS_REG(pool), buf_phys_addr);
-> +#if defined(CONFIG_ARCH_DMA_ADDR_T_64BIT)
-> +	u32 val;
-> +
-> +	val = upper_32_bits(buf_phys_addr) & MVPP22_BM_ADDR_HIGH_PHYS_RLS_MASK;
-> +	val |= (upper_32_bits(buf_virt_addr) &
-> +		MVPP22_BM_ADDR_HIGH_VIRT_RLS_MASK)
-> +		<< MVPP22_BM_ADDR_HIGH_VIRT_RLS_SHIFT;
-> +	mvpp2_write(port->priv, MVPP22_BM_ADDR_HIGH_RLS_REG, val);
-> +#endif
-
-Similar compile-time conditional?
+This looks better to me (and even better if you no longer need to touch
+the generic ptrace code).
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Catalin
