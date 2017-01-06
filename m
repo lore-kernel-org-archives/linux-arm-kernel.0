@@ -1,118 +1,34 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Jan 2017 00:41:37 +0000
-Subject: [PATCHv2 2/2] arm: Adjust memory boundaries after reservations
-In-Reply-To: <1483657274-11346-3-git-send-email-labbott@redhat.com>
-References: <1483657274-11346-1-git-send-email-labbott@redhat.com>
- <1483657274-11346-3-git-send-email-labbott@redhat.com>
-Message-ID: <20170106004137.GW14217@n2100.armlinux.org.uk>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 6 Jan 2017 08:43:46 +0800
+Subject: [nomadik:lis3lv02 5/6] warning: (IIO_ST_ACCEL_3AXIS) selects
+ IIO_ST_ACCEL_SPI_3AXIS which has unmet direct dependencies (IIO && ..)
+Message-ID: <201701060843.W5UJu28i%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only comments are to do with the comments...
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git lis3lv02
+head:   e343deae8006a1fc109534497c943eab51a1c2a8
+commit: 0a9710dd480b06b6fefefdedc732020f2297e247 [5/6] iio: accel: st_accel: handle deprecated bindings
+config: powerpc-allyesconfig (attached as .config)
+compiler: powerpc64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 0a9710dd480b06b6fefefdedc732020f2297e247
+        # save the attached .config to linux build tree
+        make.cross ARCH=powerpc 
 
-On Thu, Jan 05, 2017 at 03:01:14PM -0800, Laura Abbott wrote:
-> 
-> adjust_lowmem_bounds is responsible for setting up the boundary for
-> lowmem/hihgmme. This needs to be setup before memblock reservations can
+All warnings (new ones prefixed by >>):
 
-highmem
+warning: (IIO_ST_ACCEL_3AXIS) selects IIO_ST_ACCEL_SPI_3AXIS which has unmet direct dependencies (IIO && !SENSORS_LIS3_SPI && IIO_ST_ACCEL_3AXIS && IIO_ST_SENSORS_SPI)
 
-> occur. At the time memblock reservations can occur, memory can also be
-> removed from the system. The lowmem/highmem boundary and end of memory
-> may be affected by this but it is currently not recalculated. On some
-> systems this may be harmless, on o thers this may result in incorrect
-
-others
-
-> ranges being passed to the main memory allocator. Correct this by
-> recalculating the lowmem/highmem boundary after all reservations have
-> been made.
-> 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> v2: Rebased for changes in sanity_check_meminfo cleanup
-> ---
->  arch/arm/kernel/setup.c | 8 ++++++++
->  arch/arm/mm/mmu.c       | 9 ++++++---
->  2 files changed, 14 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 8a8051c..4625115 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -1093,8 +1093,16 @@ void __init setup_arch(char **cmdline_p)
->  	setup_dma_zone(mdesc);
->  	xen_early_init();
->  	efi_init();
-> +	/*
-> +	 * Make sure the calcualtion for lowmem/highmem is set appropriately
-
-calculation
-
-> +	 * before reserving/allocating any mmeory
-> +	 */
->  	adjust_lowmem_bounds();
->  	arm_memblock_init(mdesc);
-> +	/*
-> +	 * Memory may have been removed so recalculate the bounds.
-> +	 */
-
-Single line comments should be... /* blah */
-
-> +	adjust_lowmem_bounds();
->  
->  	early_ioremap_reset();
->  
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index ce5123b..7ca6910 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -1157,6 +1157,7 @@ void __init adjust_lowmem_bounds(void)
->  	phys_addr_t memblock_limit = 0;
->  	u64 vmalloc_limit;
->  	struct memblock_region *reg;
-> +	phys_addr_t lowmem_limit = 0;
->  
->  	/*
->  	 * Let's use our own (unoptimized) equivalent of __pa() that is
-> @@ -1173,14 +1174,14 @@ void __init adjust_lowmem_bounds(void)
->  
->  
->  		if (reg->base < vmalloc_limit) {
-> -			if (block_end > arm_lowmem_limit)
-> +			if (block_end > lowmem_limit)
->  				/*
->  				 * Compare as u64 to ensure vmalloc_limit does
->  				 * not get truncated. block_end should always
->  				 * fit in phys_addr_t so there should be no
->  				 * issue with assignment.
->  				 */
-> -				arm_lowmem_limit = min_t(u64,
-> +				lowmem_limit = min_t(u64,
->  							 vmalloc_limit,
->  							 block_end);
->  
-> @@ -1201,12 +1202,14 @@ void __init adjust_lowmem_bounds(void)
->  				if (!IS_ALIGNED(block_start, PMD_SIZE))
->  					memblock_limit = block_start;
->  				else if (!IS_ALIGNED(block_end, PMD_SIZE))
-> -					memblock_limit = arm_lowmem_limit;
-> +					memblock_limit = lowmem_limit;
->  			}
->  
->  		}
->  	}
->  
-> +	arm_lowmem_limit = lowmem_limit;
-> +
->  	high_memory = __va(arm_lowmem_limit - 1) + 1;
->  
->  	/*
-> -- 
-> 2.7.4
-> 
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 51856 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170106/9cb0f0b3/attachment-0001.gz>
