@@ -1,39 +1,37 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 6 Jan 2017 14:16:05 +0200
-Subject: [PATCH v4 4/5] input: tm2-touchkey: Add touchkey driver support
- for TM2
-In-Reply-To: <20170106114114.19321-5-andi.shyti@samsung.com>
-References: <20170106114114.19321-1-andi.shyti@samsung.com>
- <CGME20170106114120epcas5p26f09370d63026c8fbb64df049d2e2cfd@epcas5p2.samsung.com>
- <20170106114114.19321-5-andi.shyti@samsung.com>
-Message-ID: <20170106121605.dvq6kaacqouqecqe@kozik-lap>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Fri, 6 Jan 2017 21:18:15 +0900
+Subject: [PATCH v3 2/3] DT: bingdings: power: reset: add linkstation-reset
+ doc
+In-Reply-To: <20170103170952.7svgaa247ewlht7f@rob-hp-laptop>
+References: <20161216100501.18173-1-rogershimizu@gmail.com>
+ <20161227070611.14852-1-rogershimizu@gmail.com>
+ <20161227070611.14852-3-rogershimizu@gmail.com>
+ <20170103170952.7svgaa247ewlht7f@rob-hp-laptop>
+Message-ID: <CAEQ9gEkGKHXEqjcuR6nrV5XpLRvCFhaONjpPkeCx46ygD0K1UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 08:41:13PM +0900, Andi Shyti wrote:
-> From: Jaechul Lee <jcsing.lee@samsung.com>
-> 
-> This patch adds support for the TM2 touch key and led
-> functionality.
-> 
-> The driver interfaces with userspace through an input device and
-> reports KEY_PHONE and KEY_BACK event types. LED brightness can be
-> controlled by "/sys/class/leds/tm2-touchkey/brightness".
-> 
-> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
-> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> ---
->  drivers/input/keyboard/Kconfig        |  11 ++
->  drivers/input/keyboard/Makefile       |   1 +
->  drivers/input/keyboard/tm2-touchkey.c | 280 ++++++++++++++++++++++++++++++++++
->  3 files changed, 292 insertions(+)
->  create mode 100644 drivers/input/keyboard/tm2-touchkey.c
-> 
+Dear Rob,
 
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+Thanks for your comments!
 
-Best regards,
-Krzysztof
+On Wed, Jan 4, 2017 at 2:09 AM, Rob Herring <robh@kernel.org> wrote:
+>
+> This needs to model the uC connected to the UART rather than some node
+> that defines only some portion of the functionality. I'm working on
+> bindings and proper bus support for this[1], but it's not done yet.
+> Though, the binding side is pretty simple.
+>
+> Rob
+>
+> [1] https://git.kernel.org/cgit/linux/kernel/git/robh/linux.git/log/?h=serial-bus-v2
+
+Actually I have limited knowledge on DT binding.
+I think it should be OK to remove the 2/3 patch (this thread) in my
+next series, and I'll do my homework when you finish it.
+Thank you!
+
+Cheers,
+-- 
+Roger Shimizu, GMT +9 Tokyo
+PGP/GPG: 4096R/6C6ACD6417B3ACB1
