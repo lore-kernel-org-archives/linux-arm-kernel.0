@@ -1,102 +1,75 @@
-From: puck.chen@hisilicon.com (Chen Feng)
-Date: Fri, 6 Jan 2017 08:59:19 +0800
-Subject: [RESEND 2/2] arm64: dts: Add dts files for Hisilicon Hi3660 SoC
-In-Reply-To: <20170105141456.GA5710@hector.attlocal.net>
-References: <1482744972-56622-1-git-send-email-puck.chen@hisilicon.com>
- <1482744972-56622-2-git-send-email-puck.chen@hisilicon.com>
- <20170105141456.GA5710@hector.attlocal.net>
-Message-ID: <586EEBE7.4050709@hisilicon.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 6 Jan 2017 09:07:17 +0800
+Subject: [PATCH v3] arm64: mm: Fix NOMAP page initialization
+In-Reply-To: <c74d6ec6-16ba-dccc-3b0d-a8bedcb46dc5@linaro.org>
+References: <20161216165437.21612-1-rrichter@cavium.com>
+ <CAKv+Gu_SmTNguC=tSCwYOL2kx-DogLvSYRZc56eGP=JhdrUOsA@mail.gmail.com>
+ <c74d6ec6-16ba-dccc-3b0d-a8bedcb46dc5@linaro.org>
+Message-ID: <cbbf14fd-a1cc-2463-ba67-acd6d61e9db1@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2017/1/5 10:03, Hanjun Guo wrote:
+> On 2017/1/4 21:56, Ard Biesheuvel wrote:
+>> On 16 December 2016 at 16:54, Robert Richter <rrichter@cavium.com> wrote:
+>>> On ThunderX systems with certain memory configurations we see the
+>>> following BUG_ON():
+>>>
+>>>  kernel BUG at mm/page_alloc.c:1848!
+>>>
+>>> This happens for some configs with 64k page size enabled. The BUG_ON()
+>>> checks if start and end page of a memmap range belongs to the same
+>>> zone.
+>>>
+>>> The BUG_ON() check fails if a memory zone contains NOMAP regions. In
+>>> this case the node information of those pages is not initialized. This
+>>> causes an inconsistency of the page links with wrong zone and node
+>>> information for that pages. NOMAP pages from node 1 still point to the
+>>> mem zone from node 0 and have the wrong nid assigned.
+>>>
+>>> The reason for the mis-configuration is a change in pfn_valid() which
+>>> reports pages marked NOMAP as invalid:
+>>>
+>>>  68709f45385a arm64: only consider memblocks with NOMAP cleared for
+>>> linear mapping
+>>>
+>>> This causes pages marked as nomap being no longer reassigned to the
+>>> new zone in memmap_init_zone() by calling __init_single_pfn().
+>>>
+>>> Fixing this by implementing an arm64 specific early_pfn_valid(). This
+>>> causes all pages of sections with memory including NOMAP ranges to be
+>>> initialized by __init_single_page() and ensures consistency of page
+>>> links to zone, node and section.
+>>>
+>>
+>> I like this solution a lot better than the first one, but I am still
+>> somewhat uneasy about having the kernel reason about attributes of
+>> pages it should not touch in the first place. But the fact that
+>> early_pfn_valid() is only used a single time in the whole kernel does
+>> give some confidence that we are not simply moving the problem
+>> elsewhere.
+>>
+>> Given that you are touching arch/arm/ as well as arch/arm64, could you
+>> explain why only arm64 needs this treatment? Is it simply because we
+>> don't have NUMA support there?
+>>
+>> Considering that Hisilicon D05 suffered from the same issue, I would
+>> like to get some coverage there as well. Hanjun, is this something you
+>> can arrange? Thanks
+>
+> Sure, we will test this patch with LTP MM stress test (which triggers
+> the bug on D05), and give the feedback.
 
+a update here, tested on 4.9,
 
-On 2017/1/5 22:14, Andy Gross wrote:
-> On Mon, Dec 26, 2016 at 05:36:12PM +0800, Chen Feng wrote:
->> Add initial dtsi file to support Hisilicon Hi3660 SoC with
->> support of Octal core CPUs in two clusters(4 * A53 & 4 * A73).
->>
->> Also add dts file to support HiKey960 development board which
->> based on Hi3660 SoC.
->> The output console is earlycon "earlycon=pl011,0xfdf05000".
->> And the con_init uart5 with a fixed clock, which already
->> configured at bootloader.
->>
->> When clock is available, the uart5 will be modified.
->>
->> Tested on HiKey960 Board.
->>
->> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
->> ---
->>  arch/arm64/boot/dts/hisilicon/Makefile            |   1 +
->>  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  34 +++++
->>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 156 ++++++++++++++++++++++
->>  3 files changed, 191 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
->>  create mode 100644 arch/arm64/boot/dts/hisilicon/hi3660.dtsi
->>
->> diff --git a/arch/arm64/boot/dts/hisilicon/Makefile b/arch/arm64/boot/dts/hisilicon/Makefile
->> index d5f43a0..b633b5d 100644
->> --- a/arch/arm64/boot/dts/hisilicon/Makefile
->> +++ b/arch/arm64/boot/dts/hisilicon/Makefile
->> @@ -1,4 +1,5 @@
->>  dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb
->> +dtb-$(CONFIG_ARCH_HISI) += hi3660-hikey960.dtb
->>  dtb-$(CONFIG_ARCH_HISI) += hip05-d02.dtb
->>  dtb-$(CONFIG_ARCH_HISI) += hip06-d03.dtb
->>  
->> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
->> new file mode 100644
->> index 0000000..3d7aead
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
->> @@ -0,0 +1,34 @@
->> +/*
->> + * dts file for Hisilicon HiKey960 Development Board
->> + *
->> + * Copyright (C) 2016, Hisilicon Ltd.
->> + *
->> + */
->> +
->> +/dts-v1/;
->> +
->> +#include "hi3660.dtsi"
->> +
->> +/ {
->> +	model = "HiKey960";
->> +	compatible = "hisilicon,hi3660";
->> +
->> +	aliases {
->> +		serial5 = &uart5;       /* console UART */
->> +	};
->> +
->> +	chosen {
->> +		stdout-path = "serial5:115200n8";
->> +	};
->> +
->> +	memory at 0 {
->> +		device_type = "memory";
->> +		reg = <0x0 0x00400000 0x0 0xBFE00000>;
-> 
-> Use lower case letters for hex numbers.  0xbfe00000.
-> 
+  - Applied Ard's two patches only
+  - Applied Robert's patch only
 
+Both of them can work fine on D05 with NUMA enabled, which means
+boot ok and LTP MM stress test is passed.
 
-ok, thanks!
->> +	};
->> +
->> +	soc {
->> +		uart5: uart at fdf05000 {
->> +			status = "ok";
->> +		};
->> +	};
->> +};
-> 
-> <snip>
-> 
-> Regards,
-> 
-> Andy
-> 
-> .
-> 
+I'm not familiar with memory management, it's up to you guys to make
+a decision :)
+
+Thanks
+Hanjun
