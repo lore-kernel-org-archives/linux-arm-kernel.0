@@ -1,52 +1,72 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:18:58 +0100
-Subject: [PATCH 3/5] ARM: shmobile: apmu: Allow booting secondary CPU cores in
- debug mode
+Date: Fri,  6 Jan 2017 12:19:00 +0100
+Subject: [PATCH 5/5] ARM: shmobile: rcar-gen2: Remove unused
+ rcar_gen2_read_mode_pins()
 In-Reply-To: <cover.1483701101.git.horms+renesas@verge.net.au>
 References: <cover.1483701101.git.horms+renesas@verge.net.au>
-Message-ID: <d03c8f78d03af2a46127537dd1daa67164e53c09.1483701101.git.horms+renesas@verge.net.au>
+Message-ID: <70def3e53694a65c5583fb5f411491a5074bab18.1483701101.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Now debug resource reset is handled properly, allow booting secondary
-CPU cores when hardware debug mode is enabled (MD21=1) on SoCs using the
-"renesas,apmu" enable method.
+After
+  1. commit 9f5ce39ddb8f68b3 ("ARM: shmobile: rcar-gen2: Obtain extal
+     frequency from DT"),
+  2. commit 80951f04c3f92533 ("ARM: shmobile: rcar-gen2: Stop passing
+     mode pins state to clock driver"),
+  3. and handling of debug resource reset,
+there are no more users of rcar_gen2_read_mode_pins() left.
+Remove the function and its support definitions.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Hiep Cao Minh <cm-hiep@jinso.co.jp>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/platsmp-apmu.c | 14 +-------------
- 1 file changed, 1 insertion(+), 13 deletions(-)
+ arch/arm/mach-shmobile/rcar-gen2.h       |  2 --
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 18 ------------------
+ 2 files changed, 20 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
-index 7e4ca6788be5..e19266844e16 100644
---- a/arch/arm/mach-shmobile/platsmp-apmu.c
-+++ b/arch/arm/mach-shmobile/platsmp-apmu.c
-@@ -216,21 +216,9 @@ static void __init shmobile_smp_apmu_prepare_cpus_dt(unsigned int max_cpus)
- 	rcar_gen2_pm_init();
- }
+diff --git a/arch/arm/mach-shmobile/rcar-gen2.h b/arch/arm/mach-shmobile/rcar-gen2.h
+index 8a66b4aae035..6792e249cf56 100644
+--- a/arch/arm/mach-shmobile/rcar-gen2.h
++++ b/arch/arm/mach-shmobile/rcar-gen2.h
+@@ -2,8 +2,6 @@
+ #define __ASM_RCAR_GEN2_H__
  
--static int shmobile_smp_apmu_boot_secondary_md21(unsigned int cpu,
--						 struct task_struct *idle)
+ void rcar_gen2_timer_init(void);
+-#define MD(nr) BIT(nr)
+-u32 rcar_gen2_read_mode_pins(void);
+ void rcar_gen2_reserve(void);
+ void rcar_gen2_pm_init(void);
+ 
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+index ac63fa407b64..52d466b75973 100644
+--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -29,24 +29,6 @@
+ #include "common.h"
+ #include "rcar-gen2.h"
+ 
+-#define MODEMR 0xe6160060
+-
+-u32 rcar_gen2_read_mode_pins(void)
 -{
--	/* Error out when hardware debug mode is enabled */
--	if (rcar_gen2_read_mode_pins() & BIT(21)) {
--		pr_warn("Unable to boot CPU%u when MD21 is set\n", cpu);
--		return -ENOTSUPP;
+-	static u32 mode;
+-	static bool mode_valid;
+-
+-	if (!mode_valid) {
+-		void __iomem *modemr = ioremap_nocache(MODEMR, 4);
+-		BUG_ON(!modemr);
+-		mode = ioread32(modemr);
+-		iounmap(modemr);
+-		mode_valid = true;
 -	}
 -
--	return shmobile_smp_apmu_boot_secondary(cpu, idle);
+-	return mode;
 -}
 -
- static struct smp_operations apmu_smp_ops __initdata = {
- 	.smp_prepare_cpus	= shmobile_smp_apmu_prepare_cpus_dt,
--	.smp_boot_secondary	= shmobile_smp_apmu_boot_secondary_md21,
-+	.smp_boot_secondary	= shmobile_smp_apmu_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_can_disable	= shmobile_smp_cpu_can_disable,
- 	.cpu_die		= shmobile_smp_apmu_cpu_die,
+ static unsigned int __init get_extal_freq(void)
+ {
+ 	struct device_node *cpg, *extal;
 -- 
 2.7.0.rc3.207.g0ac5344
