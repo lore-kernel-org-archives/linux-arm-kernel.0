@@ -1,39 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 6 Jan 2017 11:19:51 +0000
-Subject: [PATCH] ARM: hw_breakpoint: blacklist Scorpion CPUs
-In-Reply-To: <20170105232324.GL17126@codeaurora.org>
-References: <1483637556-3974-1-git-send-email-mark.rutland@arm.com>
- <20170105232324.GL17126@codeaurora.org>
-Message-ID: <20170106111951.GA15333@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri,  6 Jan 2017 12:18:10 +0100
+Subject: [PATCH 2/4] ARM: shmobile: defconfig: Enable CMA for DMA
+In-Reply-To: <cover.1483701293.git.horms+renesas@verge.net.au>
+References: <cover.1483701293.git.horms+renesas@verge.net.au>
+Message-ID: <77af670a7698bbc4dc9fd8bbd553b33bfb16b68a.1483701293.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 03:23:24PM -0800, Stephen Boyd wrote:
-> On 01/05, Mark Rutland wrote:
-> > On APQ8060, the kernel crashes in arch_hw_breakpoint_init, taking an
-> > undefined instruction trap within write_wb_reg. This is because Scorpion
-> > CPUs erroneously appear to set DBGPRSR.SPD when WFI is issued, even if
-> > the core is not powered down. When DBGPRSR.SPD is set, breakpoint and
-> > watchpoint registers are treated as undefined.
-> > 
-> > It's possible to trigger similar crashes later on from userspace, by
-> > requesting the kernel to install a breakpoint or watchpoint, as we can
-> > go idle at any point between the reset of the debug registers and their
-> > later use. This has always been the case.
-> > 
-> > Given that this has always been broken, no-one has complained until now,
-> > and there is no clear workaround, disable hardware breakpoints and
-> > watchpoints on Scorpion to avoid these issues.
-> 
-> I believe the workaround is to read DBGPRSR after exit from WFI?
+From: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 
-That might be do-able via cpuidle, but it's probably better for somebody
-familiar with the SoC PM to write that patch.
+To be able to use VIN with larger frame sizes CMA memory are needed for
+DMA. If this is not enabled trying to capture large frames can result in
+errors such as:
 
-> I'm fine with the blacklisting approach though.
-> 
-> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+rcar-vin e6ef0000.video: dma_alloc_coherent of size 8388608 failed
 
-Thanks,
+A CMA area of 64MB are needed for v4l2-compliance to pass on all formats
+on the largest possible frame size of 2048x2048.
 
-Will
+Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/shmobile_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index 98e9ce66740d..b66e17aec058 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -33,6 +33,7 @@ CONFIG_HAVE_ARM_ARCH_TIMER=y
+ CONFIG_NR_CPUS=8
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
++CONFIG_CMA=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+@@ -58,6 +59,8 @@ CONFIG_CAN_RCAR=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_DMA_CMA=y
++CONFIG_CMA_SIZE_MBYTES=64
+ CONFIG_SIMPLE_PM_BUS=y
+ CONFIG_MTD=y
+ CONFIG_MTD_BLOCK=y
+-- 
+2.7.0.rc3.207.g0ac5344
