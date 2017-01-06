@@ -1,81 +1,70 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 6 Jan 2017 08:37:25 +0000
-Subject: [PATCH v3] arm64: mm: Fix NOMAP page initialization
-In-Reply-To: <cbbf14fd-a1cc-2463-ba67-acd6d61e9db1@linaro.org>
-References: <20161216165437.21612-1-rrichter@cavium.com>
- <CAKv+Gu_SmTNguC=tSCwYOL2kx-DogLvSYRZc56eGP=JhdrUOsA@mail.gmail.com>
- <c74d6ec6-16ba-dccc-3b0d-a8bedcb46dc5@linaro.org>
- <cbbf14fd-a1cc-2463-ba67-acd6d61e9db1@linaro.org>
-Message-ID: <CAKv+Gu8-+0LUTN0+8OGWRhd22Ls5cMQqTJcjKQK_0N=Uc-0jog@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 6 Jan 2017 10:37:29 +0200
+Subject: [PATCH v3 2/5] arm64: dts: exynos: make tm2 and tm2e independent
+ from each other
+In-Reply-To: <20170106075914.y5nuak3bz3zrvvex@gangnam.samsung>
+References: <1483675149-32598-1-git-send-email-jcsing.lee@samsung.com>
+ <CGME20170106035914epcas5p209490dfca8e8ae83c6a9b5aa1408a1ed@epcas5p2.samsung.com>
+ <1483675149-32598-3-git-send-email-jcsing.lee@samsung.com>
+ <20170106070911.sj6qjd5akyxnazsl@kozik-lap>
+ <20170106075914.y5nuak3bz3zrvvex@gangnam.samsung>
+Message-ID: <20170106083729.4odfu42knjxxudve@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 January 2017 at 01:07, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> On 2017/1/5 10:03, Hanjun Guo wrote:
->>
->> On 2017/1/4 21:56, Ard Biesheuvel wrote:
->>>
->>> On 16 December 2016 at 16:54, Robert Richter <rrichter@cavium.com> wrote:
->>>>
->>>> On ThunderX systems with certain memory configurations we see the
->>>> following BUG_ON():
->>>>
->>>>  kernel BUG at mm/page_alloc.c:1848!
->>>>
->>>> This happens for some configs with 64k page size enabled. The BUG_ON()
->>>> checks if start and end page of a memmap range belongs to the same
->>>> zone.
->>>>
->>>> The BUG_ON() check fails if a memory zone contains NOMAP regions. In
->>>> this case the node information of those pages is not initialized. This
->>>> causes an inconsistency of the page links with wrong zone and node
->>>> information for that pages. NOMAP pages from node 1 still point to the
->>>> mem zone from node 0 and have the wrong nid assigned.
->>>>
->>>> The reason for the mis-configuration is a change in pfn_valid() which
->>>> reports pages marked NOMAP as invalid:
->>>>
->>>>  68709f45385a arm64: only consider memblocks with NOMAP cleared for
->>>> linear mapping
->>>>
->>>> This causes pages marked as nomap being no longer reassigned to the
->>>> new zone in memmap_init_zone() by calling __init_single_pfn().
->>>>
->>>> Fixing this by implementing an arm64 specific early_pfn_valid(). This
->>>> causes all pages of sections with memory including NOMAP ranges to be
->>>> initialized by __init_single_page() and ensures consistency of page
->>>> links to zone, node and section.
->>>>
->>>
->>> I like this solution a lot better than the first one, but I am still
->>> somewhat uneasy about having the kernel reason about attributes of
->>> pages it should not touch in the first place. But the fact that
->>> early_pfn_valid() is only used a single time in the whole kernel does
->>> give some confidence that we are not simply moving the problem
->>> elsewhere.
->>>
->>> Given that you are touching arch/arm/ as well as arch/arm64, could you
->>> explain why only arm64 needs this treatment? Is it simply because we
->>> don't have NUMA support there?
->>>
->>> Considering that Hisilicon D05 suffered from the same issue, I would
->>> like to get some coverage there as well. Hanjun, is this something you
->>> can arrange? Thanks
->>
->>
->> Sure, we will test this patch with LTP MM stress test (which triggers
->> the bug on D05), and give the feedback.
->
->
-> a update here, tested on 4.9,
->
->  - Applied Ard's two patches only
->  - Applied Robert's patch only
->
-> Both of them can work fine on D05 with NUMA enabled, which means
-> boot ok and LTP MM stress test is passed.
->
+On Fri, Jan 06, 2017 at 04:59:14PM +0900, Andi Shyti wrote:
+> Hi, 
+> 
+> On Fri, Jan 06, 2017 at 09:09:11AM +0200, Krzysztof Kozlowski wrote:
+> > On Fri, Jan 06, 2017 at 12:59:06PM +0900, Jaechul Lee wrote:
+> > > From: Andi Shyti <andi.shyti@samsung.com>
+> > > 
+> > > Currently tm2e dts includes tm2 but there are some differences
+> > > between the two boards and tm2 has some properties that tm2e
+> > > doesn't have.
+> > > 
+> > > That's why it's important to keep the two dts files independent
+> > > and put all the commonalities in a tm2-common.dtsi file.
+> > > 
+> > > At the current status the only two differences between the two
+> > > dts files (besides the board name) are ldo31 and ldo38.
+> > > 
+> > > Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> > > Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
+> > > ---
+> > >  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 1118 +++++++++++++++++++
+> > >  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 1153 +-------------------
+> > 
+> > Like talking to a wall. Without any feedback. If my instructions were
+> > wrong (and it is not possible to detect rename) then please say it (you
+> > can add personal comments after separator ---).
+> 
+> no Krzysztof, I'm sorry, but this patch has been formatted with
+> the diff algorithm *you* asked, -B50% both version 2 (where you
+> didn't comment) and version 3. If you still don't like it, please
+> don't blame me, blame the algorithm.
 
-Thanks a lot Hanjun.
+If you wrote it in cover letter or after '---' I wouldn't complain
+because I would know that my feedback was ignored. But here it is like
+black hole - I do not know whether I was ignored or it was not working.
+> 
+> Now we can stay here at trying random diff algorithms (as they
+> give more or less the same result) or you tell me which exact
+> algorithm you want me to use. Besides, for me it's clear,
+> tm2-common is all new, while in tm2 you have on one side the '-'
+> (if it applies nothing has changed) on the bottom the '+'.
 
-Any comments on the performance impact (including boot time) ?
+Maybe that depends on the git?
+$ git --version 
+git version 2.9.3
+$ git format-patch -2 -B50%
+...
+  21  ...ynos5433-tm2.dts => exynos5433-tm2-common.dtsi} |   24 +-
+  22  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 1153 +-------------------
+  23  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |   22 +-
+  24  3 files changed, 56 insertions(+), 1143 deletions(-)
+  25  copy arch/arm64/boot/dts/exynos/{exynos5433-tm2.dts => exynos5433-tm2-common.dtsi} (98%)
+  26  rewrite arch/arm64/boot/dts/exynos/exynos5433-tm2.dts (98%)
+
+Best regards,
+Krzysztof
