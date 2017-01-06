@@ -1,76 +1,46 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:18:57 +0100
-Subject: [PATCH 2/5] ARM: shmobile: apmu: Add debug resource reset for
- secondary CPU boot
-In-Reply-To: <cover.1483701101.git.horms+renesas@verge.net.au>
-References: <cover.1483701101.git.horms+renesas@verge.net.au>
-Message-ID: <10f778a97845e8b10af8878af99c9cfe6c31baf9.1483701101.git.horms+renesas@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 06 Jan 2017 12:24:25 +0100
+Subject: [QUESTION] Early Write Acknowledge for PCIe configuration space
+In-Reply-To: <df407f39-ee05-d74d-6e5e-c5e502372032@huawei.com>
+References: <df407f39-ee05-d74d-6e5e-c5e502372032@huawei.com>
+Message-ID: <6092525.UgRCY3dpzP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Friday, January 6, 2017 11:15:22 AM CET John Garry wrote:
+> [apologies if this has been queried before]
+> 
+> Hi ARM guys,
+> 
+> I have a question about the device memory attributes we assign for PCIe 
+> config space for arm64. Currently we use ioremap to map in the config 
+> space; this uses nGnRE, which means we enable Early Write Acknowledge.
+> 
+> The ARMv8 ARM states that "ARM recommend that No Early Write Acknowledge 
+> Hint is used for PCIe configuration writes".
+> 
+> I understand a problem with using E is in that configuration write is a 
+> non-post operation, which means the RP requires to get the completion 
+> ack from the EP The problem here is if CPU writes data to ECAM by E, 
+> complete will go back to CPU directly, and maybe at this point the write 
+> has not reached the EP.
+> 
+> I believe that this may cause ordering issues in PCI read/write. In 
+> practice we use non-relaxed readl/writel to access config space, which 
+> include the synchronization barriers, which, *as I understand*, even if 
+> for full system domain, may be negated by the E attribute for PCIe.
 
-In debug mode (MD21=1), reset requests derived from power-shutoff to the
-AP-system CPU cores must be enabled before the AP-system CPU cores
-resume from power-shutoff for the first time. Else resume may fail,
-causing the system to hang during boot.
+I don't think the barriers in readl/writel are enough here, in particular
+the write barrier is *before* the access to synchronize DMAs
+on RAM with MMIO accesses, which is a bit different from what you
+have here.
 
-As setting these bits is a no-op in normal mode, there's no need to
-check the actual state of MD21 first.
+> So a question: why is the recommendation in the ARMv8 ARM ignored?
 
-Inspired by CPU-specific patches in the BSP by Hisashi Nakamura
-<hisashi.nakamura.ak@renesas.com>.
+Probably nobody thought about this properly in the Linux drivers. The
+ARMv8 ARM sounds correct here.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Hiep Cao Minh <cm-hiep@jinso.co.jp>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/platsmp-apmu.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+I/O space may have the same issue, as it also requires non-posted
+accesses.
 
-diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
-index 933f9b902405..7e4ca6788be5 100644
---- a/arch/arm/mach-shmobile/platsmp-apmu.c
-+++ b/arch/arm/mach-shmobile/platsmp-apmu.c
-@@ -35,12 +35,18 @@ static struct {
- #define PSTR_OFFS	 0x40		/* Power Status Register */
- #define CPUNCR_OFFS(n)	(0x100 + (0x10 * (n)))
- 					/* CPUn Power Status Control Register */
-+#define DBGRCR_OFFS	0x180		/* Debug Resource Reset Control Reg. */
- 
- /* Power Status Register */
- #define CPUNST(r, n)	(((r) >> (n * 4)) & 3)	/* CPUn Status Bit */
- #define CPUST_RUN	0		/* Run Mode */
- #define CPUST_STANDBY	3		/* CoreStandby Mode */
- 
-+/* Debug Resource Reset Control Register */
-+#define DBGCPUREN	BIT(24)		/* CPU Other Reset Request Enable */
-+#define DBGCPUNREN(n)	BIT((n) + 20)	/* CPUn Reset Request Enable */
-+#define DBGCPUPREN	BIT(19)		/* CPU Peripheral Reset Req. Enable */
-+
- static int __maybe_unused apmu_power_on(void __iomem *p, int bit)
- {
- 	/* request power on */
-@@ -84,6 +90,8 @@ static int __maybe_unused apmu_wrap(int cpu, int (*fn)(void __iomem *p, int cpu)
- #ifdef CONFIG_SMP
- static void apmu_init_cpu(struct resource *res, int cpu, int bit)
- {
-+	u32 x;
-+
- 	if ((cpu >= ARRAY_SIZE(apmu_cpus)) || apmu_cpus[cpu].iomem)
- 		return;
- 
-@@ -91,6 +99,11 @@ static void apmu_init_cpu(struct resource *res, int cpu, int bit)
- 	apmu_cpus[cpu].bit = bit;
- 
- 	pr_debug("apmu ioremap %d %d %pr\n", cpu, bit, res);
-+
-+	/* Setup for debug mode */
-+	x = readl(apmu_cpus[cpu].iomem + DBGRCR_OFFS);
-+	x |= DBGCPUREN | DBGCPUNREN(bit) | DBGCPUPREN;
-+	writel(x, apmu_cpus[cpu].iomem + DBGRCR_OFFS);
- }
- 
- static void apmu_parse_cfg(void (*fn)(struct resource *res, int cpu, int bit),
--- 
-2.7.0.rc3.207.g0ac5344
+	Arnd
