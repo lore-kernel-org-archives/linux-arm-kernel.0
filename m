@@ -1,42 +1,56 @@
 From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Sat, 7 Jan 2017 06:26:15 +0900
-Subject: [PATCH v5 2/5] arm64: dts: exynos: make tm2 and tm2e independent
- from each other
-In-Reply-To: <20170106134350.32428-3-andi.shyti@samsung.com>
-References: <CGME20170106134356epcas1p19be459900aec43b2b9ea343cdaf0a2bf@epcas1p1.samsung.com>
+Date: Sat, 7 Jan 2017 06:31:21 +0900
+Subject: [PATCH v5 5/5] arm64: dts: exynos: Add tm2 touchkey node
+In-Reply-To: <20170106134350.32428-6-andi.shyti@samsung.com>
+References: <CGME20170106134356epcas1p1aee9f715c58b50f6056bf0b43b849497@epcas1p1.samsung.com>
  <20170106134350.32428-1-andi.shyti@samsung.com>
- <20170106134350.32428-3-andi.shyti@samsung.com>
-Message-ID: <CAGTfZH2-NxEfPDnF987--V3HARm6ZWTeU+qPrhbM3RQ9mBSS=w@mail.gmail.com>
+ <20170106134350.32428-6-andi.shyti@samsung.com>
+Message-ID: <CAGTfZH2QYQK190kYFbOMqJMFgH32548ra-VqzYwc5LVBJwqisA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andi,
+Hi,
 
 2017-01-06 22:43 GMT+09:00 Andi Shyti <andi.shyti@samsung.com>:
-> Currently tm2e dts includes tm2 but there are some differences
-> between the two boards and tm2 has some properties that tm2e
-> doesn't have.
+> From: Jaechul Lee <jcsing.lee@samsung.com>
 >
-> That's why it's important to keep the two dts files independent
-> and put all the commonalities in a tm2-common.dtsi file.
+> Add DT node support for TM2 touchkey device.
 >
-> At the current status the only two differences between the two
-> dts files (besides the board name) are ldo31 and ldo38.
->
+> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
+> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
 > Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
 > Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 > ---
->  ...ynos5433-tm2.dts => exynos5433-tm2-common.dtsi} |   21 +-
->  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 1150 +-------------------
->  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |    2 +-
->  3 files changed, 42 insertions(+), 1131 deletions(-)
->  copy arch/arm64/boot/dts/exynos/{exynos5433-tm2.dts => exynos5433-tm2-common.dtsi} (98%)
->  rewrite arch/arm64/boot/dts/exynos/exynos5433-tm2.dts (98%)
+>  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+> index 2449266b268f..92fcc4ec8319 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+> @@ -18,6 +18,19 @@
+>         compatible = "samsung,tm2", "samsung,exynos5433";
+>  };
+>
+> +&hsi2c_9 {
+> +       status = "okay";
+> +
+> +       touchkey at 20 {
+> +               compatible = "samsung,tm2-touchkey";
+> +               reg = <0x20>;
+> +               interrupt-parent = <&gpa3>;
+> +               interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
+> +               vcc-supply = <&ldo32_reg>;
+> +               vdd-supply = <&ldo33_reg>;
+> +       };
+> +};
+> +
+>  &ldo31_reg {
+>         regulator-name = "TSP_VDD_1.85V_AP";
+>         regulator-min-microvolt = <1850000>;
 
 Looks good to me.
 Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-
-[snip]
 
 -- 
 Best Regards,
