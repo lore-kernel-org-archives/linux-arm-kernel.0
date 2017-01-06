@@ -1,51 +1,81 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 9 Jan 2017 12:03:00 +0000
-Subject: APM smmu implementation
-In-Reply-To: <d9e40de8-82e2-0f19-5b99-d756ded21e80@arm.com>
-References: <CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g@mail.gmail.com>
- <d9e40de8-82e2-0f19-5b99-d756ded21e80@arm.com>
-Message-ID: <20170109120300.GC21398@arm.com>
+Date: Fri, 6 Jan 2017 18:08:29 +0000
+Subject: [RFC PATCH] vring: Force use of DMA API for ARM-based systems
+In-Reply-To: <0b9a1f70-58fe-69c2-87db-d7773cb6a68c@arm.com>
+References: <1482246864-16399-1-git-send-email-will.deacon@arm.com>
+ <0b9a1f70-58fe-69c2-87db-d7773cb6a68c@arm.com>
+Message-ID: <20170106180829.GG22088@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 11:34:42AM +0000, Robin Murphy wrote:
-> On 06/01/17 23:21, Feng Kan wrote:
-> > The APM IOMMU implementation is mostly just the ARM SMMU 500 variant.
+Hi Jean-Philippe,
+
+On Fri, Jan 06, 2017 at 05:48:33PM +0000, Jean-Philippe Brucker wrote:
+> On 20/12/16 15:14, Will Deacon wrote:
+> > Booting Linux on an ARM fastmodel containing an SMMU emulation results
+> > in an unexpected I/O page fault from the legacy virtio-blk PCI device:
+> > 
+> > [    1.211721] arm-smmu-v3 2b400000.smmu: event 0x10 received:
+> > [    1.211800] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
+> > [    1.211880] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
+> > [    1.211959] arm-smmu-v3 2b400000.smmu:	0x00000008fa081002
+> > [    1.212075] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
+> > [    1.212155] arm-smmu-v3 2b400000.smmu: event 0x10 received:
+> > [    1.212234] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
+> > [    1.212314] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
+> > [    1.212394] arm-smmu-v3 2b400000.smmu:	0x00000008fa081000
+> > [    1.212471] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
+> > 
+> > <system hangs failing to read partition table>
+> > 
+> > This is because the virtio-blk is behind an SMMU, so we have consequently
+> > swizzled its DMA ops and configured the SMMU to translate accesses. This
+> > then requires the vring code to use the DMA API to establish translations,
+> > otherwise all transactions will result in fatal faults and termination.
+> > 
+> > Given that ARM-based systems only see an SMMU if one is really present
+> > (the topology is all described by firmware tables such as device-tree or
+> > IORT), then we can safely use the DMA API for all virtio devices.
 > 
-> "Mostly"? Have APM actually modified it (which I strongly doubt) or do
-> you mean it's simply been integrated with the upper address lines tied
-> off? MMU-500 reports a 48-bit IAS because MMU-500 has 48-bit-wide slave
-> interfaces; that's all there is to it. Whether or not you use all of
-> those bits is up to you as a system integrator.
-
-That's a good point; MMU-500 doesn't appear to let you change the IAS
-anyway. That should also mean that UBS and OAS are unchanged.
-
-> > However, our internal bus is only 42 bits wide. Our IAS field is coded
-> > as 48 bits, which cause IPA to truncated to 42 bits on the physical
-> > bus. In order for our system to work with the arm-smmu.c, there needs
-> > to be a way to force the ipa_size to 42. The current internal solution
-> > is to use the cpuid, but that is quite ugly. I was thinking of using
-> > the model
-> > as indication to right the ipa_size, but I am not too sure of the ACPI
-> > side. Would it be okay to add an APM MMU500 variant? I would also
-> > appreciated it if you guys have any alternate solutions.
+> There is a problem with the platform block device on that same model.
+> Since it's not behind the SMMU, the DMA ops fall back to swiotlb, which
+> limits the number of mappings.
 > 
-> This is something we've been axpecting to run into for a while now - the
-> appropriate solution is to use a "dma-ranges" property on the master
-> device(s) to describe that they have 42 bits of address wired up, from
-> which they will then inherit the appropriate DMA mask. The outstanding
-> issue which remains is that we're still missing some way of preventing
-> drivers simply clobbering that with a 64-bit mask later, but that's a
-> more general problem[1].
+> It used to work with 4.9, but since 9491ae4 ("mm: don't cap request size
+> based on read-ahead setting") unlocked read-ahead, we quickly run into
+> the limit of swiotlb and panic:
+> 
+> [    5.382359] virtio-mmio 1c130000.virtio_block: swiotlb buffer is full
+> (sz: 491520 bytes)
+> [    5.382452] virtio-mmio 1c130000.virtio_block: DMA: Out of SW-IOMMU
+> space for 491520 bytes
+> [    5.382531] Kernel panic - not syncing: DMA: Random memory could be
+> DMA written
+> ...
+> [    5.383148] [<ffff0000083ad754>] swiotlb_map_page+0x194/0x1a0
+> [    5.383226] [<ffff000008096bb8>] __swiotlb_map_page+0x20/0x88
+> [    5.383320] [<ffff0000084bf738>] vring_map_one_sg.isra.1+0x70/0x88
+> [    5.383417] [<ffff0000084c04fc>] virtqueue_add_sgs+0x2ec/0x4e8
+> [    5.383505] [<ffff00000856d99c>] __virtblk_add_req+0x9c/0x1a8
+> ...
+> [    5.384449] [<ffff0000081829c4>] ondemand_readahead+0xfc/0x2b8
 
-I wonder if the driver is actually using IAS, OAS and UBS incorrectly.
-We're using them to parameterise the DMA aperture, which is then used
-to size the IOVA domain, but that's wrong because the IAS, OAS and UBS
-are upper bounds and we can still end up allocating unusable/unreachable
-addresses.
+Oh, lovely!
 
-So I do think that this should be fixed on the SMMU firmware node, rather
-than restricting the range of each master device.
+> Commit 9491ae4 caps the read-ahead request to a limit set by the backing
+> device. For virtio-blk, it is infinite (as set by the call to
+> blk_queue_max_hw_sectors in virtblk_probe).
+> 
+> I'm not sure how to fix this. Setting an arbitrary sector limit in the
+> virtio-blk driver seems unfair to other users. Maybe we should check if
+> the device is behind a hardware IOMMU before using the DMA API?
+
+Couldn't the same issue potentially occur with a hardware IOMMU, where
+we run out of IOVA space due to unlimited readahead? I think it might be
+best to enforce a finite limit for virtio devices when the DMA API is in
+use.
+
+Do any drivers for physical (i.e. non-virtual) hardware make use of
+unlimited readahead?
 
 Will
