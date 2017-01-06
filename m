@@ -1,43 +1,70 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Fri, 6 Jan 2017 23:34:24 +0200
-Subject: [PATCH] i2c: i2c-cadence: Don't register the adapter until it's
- ready
-In-Reply-To: <1483613240-32501-1-git-send-email-mike.looijmans@topic.nl>
-References: <1483613240-32501-1-git-send-email-mike.looijmans@topic.nl>
-Message-ID: <428e8fc8-8b23-8e2c-763e-d977aaa98691@mleia.com>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Sat, 7 Jan 2017 06:34:36 +0900
+Subject: [PATCH v5 3/5] input: Add support for the tm2 touchkey device
+ driver
+In-Reply-To: <20170106134350.32428-4-andi.shyti@samsung.com>
+References: <CGME20170106134356epcas1p1758fadaa2b12ad29d90e2da525456a28@epcas1p1.samsung.com>
+ <20170106134350.32428-1-andi.shyti@samsung.com>
+ <20170106134350.32428-4-andi.shyti@samsung.com>
+Message-ID: <CAGTfZH0mkTQ4=_Xs47z95xu5=GEOuj3NW=8EBP8-jnfR0drJHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mike,
+Hi,
 
-On 01/05/2017 12:47 PM, Mike Looijmans wrote:
-> The driver calls i2c_add_adapter before writing to config registers,
-> resulting in dmesg output like this, where devices fail to initialize:
-> 
-> cdns-i2c ff030000.i2c: timeout waiting on completion
-> pca953x 1-0041: failed reading register
-> pca953x: probe of 1-0041 failed with error -110
-> at24 1-0050: 512 byte 24c04 EEPROM, writable, 1 bytes/write
-> cdns-i2c ff030000.i2c: 100 kHz mmio ff030000 irq 197
-> 
-> The adapter is being used before it completed the "probe". To fix
-> this, make "i2c_add_adapter" the last thing it calls in probe.
-> It also makes sense to show the adapter initialization before
-> the devices on the bus.
+2017-01-06 22:43 GMT+09:00 Andi Shyti <andi.shyti@samsung.com>:
+> From: Jaechul Lee <jcsing.lee@samsung.com>
+>
+> This patch adds the binding description of the tm2 touchkey
+> device driver.
+>
+> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> ---
+>  .../bindings/input/samsung,tm2-touchkey.txt        | 27 ++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/input/samsung,tm2-touchkey.txt
+>
+> diff --git a/Documentation/devicetree/bindings/input/samsung,tm2-touchkey.txt b/Documentation/devicetree/bindings/input/samsung,tm2-touchkey.txt
+> new file mode 100644
+> index 000000000000..4de1af0f0a37
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/samsung,tm2-touchkey.txt
+> @@ -0,0 +1,27 @@
+> +Samsung tm2-touchkey
+> +
+> +Required properties:
+> +- compatible: must be "samsung,tm2-touchkey"
+> +- reg: I2C address of the chip.
+> +- interrupt-parent: a phandle for the interrupt controller (see interrupt
+> +       binding[0]).
+> +- interrupts: interrupt to which the chip is connected (see interrupt
+> +       binding[0]).
+> +- vcc-supply : internal regulator output. 1.8V
+> +- vdd-supply : power supply for IC 3.3V
+> +
+> +[0]: Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+> +
+> +Example:
+> +       &i2c0 {
+> +               /* ... */
+> +
+> +               touchkey at 20 {
+> +                       compatible = "samsung,tm2-touchkey";
+> +                       reg = <0x20>;
+> +                       interrupt-parent = <&gpa3>;
+> +                       interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
+> +                       vcc-supply=<&ldo32_reg>;
+> +                       vdd-supply=<&ldo33_reg>;
+> +               };
+> +       };
 
-commonly "it also" in a commit message means a change, which should be done
-separately, and this is the case here as well.
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-Because the adapter registration i2c_add_adapter() can fail, information
-about the adapter initialization would be expected only in case of
-successful registration.
-
-The information sent to the kernel log buffer here is quite trivial,
-probably dev_info() can be just removed, but in any case it should be
-a separate change.
-
-> Signed-off-by: Mike Looijmans <mike.looijmans@topic.nl>
-
---
-With best wishes,
-Vladimir
+-- 
+Best Regards,
+Chanwoo Choi
