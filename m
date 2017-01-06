@@ -1,83 +1,48 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:18:27 +0100
-Subject: [PATCH 18/25] ARM: dts: r8a7794: Use R-Car Gen 2 fallback binding for
- i2c nodes
-In-Reply-To: <cover.1483700969.git.horms+renesas@verge.net.au>
-References: <cover.1483700969.git.horms+renesas@verge.net.au>
-Message-ID: <5e6173897c03f13366edefca98dd4712d3ddb0d4.1483700969.git.horms+renesas@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 06 Jan 2017 12:32:52 +0100
+Subject: [PATCH v3] i2c: designware: add reset interface
+In-Reply-To: <1483544119.9552.223.camel@linux.intel.com>
+References: <1482500451-30137-1-git-send-email-zhangfei.gao@linaro.org>
+ <2921529.fKUMSWjgsl@wuerfel> <1483544119.9552.223.camel@linux.intel.com>
+Message-ID: <3024749.v77eulNknP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added R-Car Gen 2 fallback binding for i2c nodes in
-DT for r8a7794 SoC.
+On Wednesday, January 4, 2017 5:35:19 PM CET Andy Shevchenko wrote:
 
-This has no run-time effect for the current driver as the initialisation
-sequence is the same for the SoC-specific binding for r8a7794 and the
-fallback binding for R-Car Gen 2.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r8a7794.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+> > > @@ -270,10 +280,18 @@ static int dw_i2c_plat_probe(struct
+> > > platform_device *pdev)
+> > >         }
+> > >  
+> > >         r = i2c_dw_probe(dev);
+> > > -       if (r && !dev->pm_runtime_disabled)
+> > > -               pm_runtime_disable(&pdev->dev);
+> > > +       if (r)
+> > > +               goto exit_probe;
+> > >  
+> > >         return r;
+> > > +
+> > > +exit_probe:
+> > > +       if (!dev->pm_runtime_disabled)
+> > > +               pm_runtime_disable(&pdev->dev);
+> > > +exit_reset:
+> > > +       if (!IS_ERR_OR_NULL(dev->rst))
+> > > +               reset_control_assert(dev->rst);
+> > > +       return r;
+> > > 
+> > 
+> > try to avoid the IS_ERR_OR_NULL() check, it usually indicates either
+> > a bad interface, or that the interface is used wrong.
+> 
+> Please, fix reset framework first than.
+> 
+> For my understanding:
+> It should return NULL for optional reset control.
+> It should not fail on NULL argument.
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 9692bfd82b1d..89f8f98cb115 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -611,7 +611,7 @@
- 
- 	/* The memory map in the User's Manual maps the cores to bus numbers */
- 	i2c0: i2c at e6508000 {
--		compatible = "renesas,i2c-r8a7794";
-+		compatible = "renesas,i2c-r8a7794", "renesas,rcar-gen2-i2c";
- 		reg = <0 0xe6508000 0 0x40>;
- 		interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7794_CLK_I2C0>;
-@@ -623,7 +623,7 @@
- 	};
- 
- 	i2c1: i2c at e6518000 {
--		compatible = "renesas,i2c-r8a7794";
-+		compatible = "renesas,i2c-r8a7794", "renesas,rcar-gen2-i2c";
- 		reg = <0 0xe6518000 0 0x40>;
- 		interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7794_CLK_I2C1>;
-@@ -635,7 +635,7 @@
- 	};
- 
- 	i2c2: i2c at e6530000 {
--		compatible = "renesas,i2c-r8a7794";
-+		compatible = "renesas,i2c-r8a7794", "renesas,rcar-gen2-i2c";
- 		reg = <0 0xe6530000 0 0x40>;
- 		interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7794_CLK_I2C2>;
-@@ -647,7 +647,7 @@
- 	};
- 
- 	i2c3: i2c at e6540000 {
--		compatible = "renesas,i2c-r8a7794";
-+		compatible = "renesas,i2c-r8a7794", "renesas,rcar-gen2-i2c";
- 		reg = <0 0xe6540000 0 0x40>;
- 		interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7794_CLK_I2C3>;
-@@ -659,7 +659,7 @@
- 	};
- 
- 	i2c4: i2c at e6520000 {
--		compatible = "renesas,i2c-r8a7794";
-+		compatible = "renesas,i2c-r8a7794", "renesas,rcar-gen2-i2c";
- 		reg = <0 0xe6520000 0 0x40>;
- 		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7794_CLK_I2C4>;
-@@ -671,7 +671,7 @@
- 	};
- 
- 	i2c5: i2c at e6528000 {
--		compatible = "renesas,i2c-r8a7794";
-+		compatible = "renesas,i2c-r8a7794", "renesas,rcar-gen2-i2c";
- 		reg = <0 0xe6528000 0 0x40>;
- 		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7794_CLK_I2C5>;
--- 
-2.7.0.rc3.207.g0ac5344
+I think we discussed that a few times. Your suggestion makes sense
+to me, but I don't know why we don't already do that, maybe there
+is a good reason.
+
+	Arnd
