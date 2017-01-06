@@ -1,42 +1,45 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 6 Jan 2017 12:06:27 +0100
-Subject: [PATCH V8 1/9] iommu: add IOMMU_PRIV attribute
-In-Reply-To: <1483362764-11990-2-git-send-email-sricharan@codeaurora.org>
-References: <1483362764-11990-1-git-send-email-sricharan@codeaurora.org>
- <1483362764-11990-2-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20170106110627.GO17255@8bytes.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 06 Jan 2017 12:10:33 +0100
+Subject: [PATCH 1/2] arm64: dma_mapping: allow PCI host driver to limit
+ DMA mask
+In-Reply-To: <9d5e32d3-000c-2f95-7ea8-c64d53ab6b56@cogentembedded.com>
+References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
+ <3158203.Yc9Qgx82xo@wuerfel>
+ <9d5e32d3-000c-2f95-7ea8-c64d53ab6b56@cogentembedded.com>
+Message-ID: <2723285.JORgusvJv4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 02, 2017 at 06:42:36PM +0530, Sricharan R wrote:
-> From: Mitchel Humpherys <mitchelh@codeaurora.org>
-> 
-> Add the IOMMU_PRIV attribute, which is used to indicate privileged
-> mappings.
-> 
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> Tested-by: Robin Murphy <robin.murphy@arm.com>
-> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> ---
->  include/linux/iommu.h | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index 0ff5111..8c15ada 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -31,6 +31,7 @@
->  #define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
->  #define IOMMU_NOEXEC	(1 << 3)
->  #define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
-> +#define IOMMU_PRIV	(1 << 5) /* privileged */
+On Wednesday, January 4, 2017 6:29:39 PM CET Nikita Yushchenko wrote:
 
-Since this is a new generic global flag, can you please add a more
-verbose comment telling what a 'privileged' mapping is about in the
-iommu-case? We should have a clear defined semantic for this flag or we
-might end up with different meanings for it with different
-iommu-hardware.
+> > Just a guess, but if the inbound translation windows in the host
+> > bridge are wider than 32-bit, the reason for setting up a single
+> > 32-bit window is probably because that is what the parent bus supports.
+> 
+> Well anyway applying patch similar to your's will fix pcie-rcar + nvme
+> case - thus I don't object :)   But it can break other cases ...
+> 
+> But why do you hook at set_dma_mask() and overwrite mask inside, instead
+> of hooking at dma_supported() and rejecting unsupported mask?
+> 
+> I think later is better, because it lets drivers to handle unsupported
+> high-dma case, like documented in DMA-API_HOWTO.
 
+I think the behavior I put in there is required for swiotlb to make
+sense, otherwise you would rely on the driver to handle dma_set_mask()
+failure gracefully with its own bounce buffers (as network and
+scsi drivers do but others don't).
 
-	Joerg
+Having swiotlb or iommu enabled should result in dma_set_mask() always
+succeeding unless the mask is too small to cover the swiotlb
+bounce buffer area or the iommu virtual address space. This behavior
+is particularly important in case the bus address space is narrower
+than 32-bit, as we have to guarantee that the fallback to 32-bit
+DMA always succeeds. There are also a lot of drivers that try to
+set a 64-bit mask but don't implement bounce buffers for streaming
+mappings if that fails, and swiotlb is what we use to make those
+drivers work.
+
+And yes, the API is a horrible mess.
+
+	Arnd
