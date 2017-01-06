@@ -1,353 +1,283 @@
-From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Fri,  6 Jan 2017 17:15:02 +1300
-Subject: [PATCHv3 5/5] arm: mvebu: Add device tree for db-dxbc2 and
- db-xc3-24g4xg boards
-In-Reply-To: <20170106041517.9589-1-chris.packham@alliedtelesis.co.nz>
-References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
- <20170106041517.9589-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170106041517.9589-6-chris.packham@alliedtelesis.co.nz>
+From: bharat.bhushan@nxp.com (Bharat Bhushan)
+Date: Fri, 6 Jan 2017 04:27:03 +0000
+Subject: [PATCH v5 13/17] irqdomain: irq_domain_check_msi_remap
+In-Reply-To: <a574e969-b46d-94fb-e4c2-646a37b17122@redhat.com>
+References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
+ <1483536746-2725-14-git-send-email-eric.auger@redhat.com>
+ <ecb7ddf6-074f-50e4-6402-d59ceb1edd1d@arm.com>
+ <df8e7fdb-4048-3169-c758-c2a64119a321@redhat.com>
+ <c9c4c159-60ea-8501-5dc2-17bbb24ddfab@arm.com>
+ <92fcb464-3364-c432-29d8-1c2ce4a5f110@redhat.com>
+ <f6096747-5943-520a-2d16-de5650292ff3@arm.com>
+ <1e881510-bc18-ae97-ec2f-feadcba54150@redhat.com>
+ <eca92fdb-9d90-4d4b-baa5-2f4109ee1961@arm.com>
+ <a574e969-b46d-94fb-e4c2-646a37b17122@redhat.com>
+Message-ID: <AM5PR0401MB2545B4A50ABE17B27C50B3099A630@AM5PR0401MB2545.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These boards are Marvell's evaluation boards for the 98DX4251 and
-98DX3336 SoCs.
+Hi Mark,
 
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
----
-    Change in v2/v3:
-    - None
+> -----Original Message-----
+> From: Auger Eric [mailto:eric.auger at redhat.com]
+> Sent: Thursday, January 05, 2017 5:39 PM
+> To: Marc Zyngier <marc.zyngier@arm.com>; eric.auger.pro at gmail.com;
+> christoffer.dall at linaro.org; robin.murphy at arm.com;
+> alex.williamson at redhat.com; will.deacon at arm.com; joro at 8bytes.org;
+> tglx at linutronix.de; jason at lakedaemon.net; linux-arm-
+> kernel at lists.infradead.org
+> Cc: drjones at redhat.com; kvm at vger.kernel.org; punit.agrawal at arm.com;
+> linux-kernel at vger.kernel.org; geethasowjanya.akula at gmail.com; Diana
+> Madalina Craciun <diana.craciun@nxp.com>; iommu at lists.linux-
+> foundation.org; pranav.sawargaonkar at gmail.com; Bharat Bhushan
+> <bharat.bhushan@nxp.com>; shankerd at codeaurora.org;
+> gpkulkarni at gmail.com
+> Subject: Re: [PATCH v5 13/17] irqdomain: irq_domain_check_msi_remap
+> 
+> Hi Marc,
+> 
+> On 05/01/2017 12:57, Marc Zyngier wrote:
+> > On 05/01/17 11:29, Auger Eric wrote:
+> >> Hi Marc,
+> >>
+> >> On 05/01/2017 12:25, Marc Zyngier wrote:
+> >>> On 05/01/17 10:45, Auger Eric wrote:
+> >>>> Hi Marc,
+> >>>>
+> >>>> On 04/01/2017 16:27, Marc Zyngier wrote:
+> >>>>> On 04/01/17 14:11, Auger Eric wrote:
+> >>>>>> Hi Marc,
+> >>>>>>
+> >>>>>> On 04/01/2017 14:46, Marc Zyngier wrote:
+> >>>>>>> Hi Eric,
+> >>>>>>>
+> >>>>>>> On 04/01/17 13:32, Eric Auger wrote:
+> >>>>>>>> This new function checks whether all platform and PCI MSI
+> >>>>>>>> domains implement IRQ remapping. This is useful to understand
+> >>>>>>>> whether VFIO passthrough is safe with respect to interrupts.
+> >>>>>>>>
+> >>>>>>>> On ARM typically an MSI controller can sit downstream to the
+> >>>>>>>> IOMMU without preventing VFIO passthrough.
+> >>>>>>>> As such any assigned device can write into the MSI doorbell.
+> >>>>>>>> In case the MSI controller implements IRQ remapping, assigned
+> >>>>>>>> devices will not be able to trigger interrupts towards the
+> >>>>>>>> host. On the contrary, the assignment must be emphasized as
+> >>>>>>>> unsafe with respect to interrupts.
+> >>>>>>>>
+> >>>>>>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> >>>>>>>>
+> >>>>>>>> ---
+> >>>>>>>>
+> >>>>>>>> v4 -> v5:
+> >>>>>>>> - Handle DOMAIN_BUS_FSL_MC_MSI domains
+> >>>>>>>> - Check parents
+> >>>>>>>> ---
+> >>>>>>>>  include/linux/irqdomain.h |  1 +
+> >>>>>>>>  kernel/irq/irqdomain.c    | 41
+> +++++++++++++++++++++++++++++++++++++++++
+> >>>>>>>>  2 files changed, 42 insertions(+)
+> >>>>>>>>
+> >>>>>>>> diff --git a/include/linux/irqdomain.h
+> >>>>>>>> b/include/linux/irqdomain.h index ab017b2..281a40f 100644
+> >>>>>>>> --- a/include/linux/irqdomain.h
+> >>>>>>>> +++ b/include/linux/irqdomain.h
+> >>>>>>>> @@ -219,6 +219,7 @@ struct irq_domain
+> *irq_domain_add_legacy(struct device_node *of_node,
+> >>>>>>>>  					 void *host_data);
+> >>>>>>>>  extern struct irq_domain *irq_find_matching_fwspec(struct
+> irq_fwspec *fwspec,
+> >>>>>>>>  						   enum
+> irq_domain_bus_token bus_token);
+> >>>>>>>> +extern bool irq_domain_check_msi_remap(void);
+> >>>>>>>>  extern void irq_set_default_host(struct irq_domain *host);
+> >>>>>>>> extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
+> >>>>>>>>  				  irq_hw_number_t hwirq, int node,
+> diff --git
+> >>>>>>>> a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c index
+> >>>>>>>> 8c0a0ae..700caea 100644
+> >>>>>>>> --- a/kernel/irq/irqdomain.c
+> >>>>>>>> +++ b/kernel/irq/irqdomain.c
+> >>>>>>>> @@ -278,6 +278,47 @@ struct irq_domain
+> >>>>>>>> *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+> >>>>>>>> EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
+> >>>>>>>>
+> >>>>>>>>  /**
+> >>>>>>>> + * irq_domain_is_msi_remap - Check if @domain or any parent
+> >>>>>>>> + * has MSI remapping support
+> >>>>>>>> + * @domain: domain pointer
+> >>>>>>>> + */
+> >>>>>>>> +static bool irq_domain_is_msi_remap(struct irq_domain
+> *domain)
+> >>>>>>>> +{
+> >>>>>>>> +	struct irq_domain *h = domain;
+> >>>>>>>> +
+> >>>>>>>> +	for (; h; h = h->parent) {
+> >>>>>>>> +		if (h->flags & IRQ_DOMAIN_FLAG_MSI_REMAP)
+> >>>>>>>> +			return true;
+> >>>>>>>> +	}
+> >>>>>>>> +	return false;
+> >>>>>>>> +}
+> >>>>>>>> +
+> >>>>>>>> +/**
+> >>>>>>>> + * irq_domain_check_msi_remap() - Checks whether all MSI
+> >>>>>>>> + * irq domains implement IRQ remapping  */ bool
+> >>>>>>>> +irq_domain_check_msi_remap(void) {
+> >>>>>>>> +	struct irq_domain *h;
+> >>>>>>>> +	bool ret = true;
+> >>>>>>>> +
+> >>>>>>>> +	mutex_lock(&irq_domain_mutex);
+> >>>>>>>> +	list_for_each_entry(h, &irq_domain_list, link) {
+> >>>>>>>> +		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
+> >>>>>>>> +		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI)
+> ||
+> >>>>>>>> +		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI))
+> &&
+> >>>>>>>> +		     !irq_domain_is_msi_remap(h)) {
+> >>>>>>>
+> >>>>>>> (h->bus_token & DOMAIN_BUS_PCI_MSI) and co looks quite
+> wrong.
+> >>>>>>> bus_token is not a bitmap, and DOMAIN_BUS_* not a single bit
+> >>>>>>> value (see enum irq_domain_bus_token). Surely this should read
+> >>>>>>> (h->bus_token == DOMAIN_BUS_PCI_MSI).
+> >>>>>> Oh I did not notice that. Thanks.
+> >>>>>>
+> >>>>>> Any other comments on the irqdomain side? Do you think the
+> >>>>>> current approach consisting in looking at those bus tokens and
+> >>>>>> their parents looks good?
+> >>>>>
+> >>>>> To be completely honest, I don't like it much, as having to
+> >>>>> enumerate all the bus types can come up with could become quite a
+> >>>>> burden in the long run. I'd rather be able to identify MSI capable
+> >>>>> domains by construction. I came up with the following approach (fully
+> untested):
+> >>>>>
+> >>>>> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+> >>>>> index 281a40f..7779796 100644
+> >>>>> --- a/include/linux/irqdomain.h
+> >>>>> +++ b/include/linux/irqdomain.h
+> >>>>> @@ -183,8 +183,11 @@ enum {
+> >>>>>  	/* Irq domain is an IPI domain with single virq */
+> >>>>>  	IRQ_DOMAIN_FLAG_IPI_SINGLE	= (1 << 3),
+> >>>>>
+> >>>>> +	/* Irq domain implements MSIs */
+> >>>>> +	IRQ_DOMAIN_FLAG_MSI		= (1 << 4),
+> >>>>> +
+> >>>>>  	/* Irq domain is MSI remapping capable */
+> >>>>> -	IRQ_DOMAIN_FLAG_MSI_REMAP	= (1 << 4),
+> >>>>> +	IRQ_DOMAIN_FLAG_MSI_REMAP	= (1 << 5),
+> >>>>>
+> >>>>>  	/*
+> >>>>>  	 * Flags starting from IRQ_DOMAIN_FLAG_NONCORE are reserved
+> @@
+> >>>>> -450,6 +453,11 @@ static inline bool
+> >>>>> irq_domain_is_ipi_single(struct irq_domain *domain)  {
+> >>>>>  	return domain->flags & IRQ_DOMAIN_FLAG_IPI_SINGLE;  }
+> >>>>> +
+> >>>>> +static inline bool irq_domain_is_msi(struct irq_domain *domain) {
+> >>>>> +	return domain->flags & IRQ_DOMAIN_FLAG_MSI; }
+> >>>>>  #else	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
+> >>>>>  static inline void irq_domain_activate_irq(struct irq_data *data)
+> >>>>> { }  static inline void irq_domain_deactivate_irq(struct irq_data
+> >>>>> *data) { } @@ -481,6 +489,11 @@ static inline bool
+> >>>>> irq_domain_is_ipi_single(struct irq_domain *domain)  {
+> >>>>>  	return false;
+> >>>>>  }
+> >>>>> +
+> >>>>> +static inline bool irq_domain_is_msi(struct irq_domain *domain) {
+> >>>>> +	return false;
+> >>>>> +}
+> >>>>>  #endif	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
+> >>>>>
+> >>>>>  #else /* CONFIG_IRQ_DOMAIN */
+> >>>>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c index
+> >>>>> 700caea..33b6921 100644
+> >>>>> --- a/kernel/irq/irqdomain.c
+> >>>>> +++ b/kernel/irq/irqdomain.c
+> >>>>> @@ -304,10 +304,7 @@ bool irq_domain_check_msi_remap(void)
+> >>>>>
+> >>>>>  	mutex_lock(&irq_domain_mutex);
+> >>>>>  	list_for_each_entry(h, &irq_domain_list, link) {
+> >>>>> -		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
+> >>>>> -		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI)
+> ||
+> >>>>> -		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI))
+> &&
+> >>>>> -		     !irq_domain_is_msi_remap(h)) {
+> >>>>> +		if (irq_domain_is_msi(h) &&
+> !irq_domain_is_msi_remap(h)) {
+> >>>>>  			ret = false;
+> >>>>>  			goto out;
+> >>>>>  		}
+> >>>>> diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c index
+> >>>>> ee23006..b637263 100644
+> >>>>> --- a/kernel/irq/msi.c
+> >>>>> +++ b/kernel/irq/msi.c
+> >>>>> @@ -270,7 +270,7 @@ struct irq_domain
+> *msi_create_irq_domain(struct fwnode_handle *fwnode,
+> >>>>>  	if (info->flags & MSI_FLAG_USE_DEF_CHIP_OPS)
+> >>>>>  		msi_domain_update_chip_ops(info);
+> >>>>>
+> >>>>> -	return irq_domain_create_hierarchy(parent, 0, 0, fwnode,
+> >>>>> +	return irq_domain_create_hierarchy(parent,
+> IRQ_DOMAIN_FLAG_MSI,
+> >>>>> +0, fwnode,
+> >>>>>  					   &msi_domain_ops, info);
+> >>>>>  }
+> >>>>>
+> >>>>>
+> >>>>>
+> >>>>> Thoughts?
+> >>>>
+> >>>> Don't we need to set the IRQ_DOMAIN_FLAG_MSI flag in
+> >>>> platform_msi_create_device_domain too (drivers/base/platform-
+> msi.c)?
+> >> was mentioning platform_msi_create_*device*_domain.
+> >> it calls irq_domain_create_hierarchy and looks to be MSI irq domain
+> >> related. But I don't have a full understanding of the whole irq
+> >> domain hierarchy.
+> >
+> > Ah, sorry - I blame the ARM coffee.
+> >
+> > This function builds a domain for a single device on top of the MSI
+> > domain that has been already created (see the dev->msi_domain passed
+> > to irq_domain_create_hierarchy). The structure looks like this:
+> >
+> > device-domain -> platform MSI domain -> HW MSI domain -> whatever
+> >
+> > So what we're *really* interested in is the platform MSI domain, which
+> > is going to carry the IRQ_DOMAIN_FLAG_MSI flag. The device-domain only
+> > describes a portion of it, and can safely be ignored.
+> >
+> > In the end, what matters for this patch is that we can prove that from
+> > any domain carrying the IRQ_DOMAIN_FLAG_MSI flag, we can find a
+> domain
+> > carrying the IRQ_DOMAIN_FLAG_MSI_REMAP flag. If that property holds,
+> > we're safe. Otherwise, we disable the Guest MSI feature.
+> >
+> > Does it make sense?
+> Yes it makes sense. Thank you for the explanation!
 
- arch/arm/boot/dts/db-dxbc2.dts      | 159 ++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/db-xc3-24g4xg.dts | 155 +++++++++++++++++++++++++++++++++++
- 2 files changed, 314 insertions(+)
- create mode 100644 arch/arm/boot/dts/db-dxbc2.dts
- create mode 100644 arch/arm/boot/dts/db-xc3-24g4xg.dts
+If I understood correctly then the domain hierarchy is 
 
-diff --git a/arch/arm/boot/dts/db-dxbc2.dts b/arch/arm/boot/dts/db-dxbc2.dts
-new file mode 100644
-index 000000000000..f56786cea5f8
---- /dev/null
-+++ b/arch/arm/boot/dts/db-dxbc2.dts
-@@ -0,0 +1,159 @@
-+/*
-+ * Device Tree file for DB-DXBC2 board
-+ *
-+ * Copyright (C) 2016 Allied Telesis Labs
-+ *
-+ * Based on armada-xp-db.dts
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ *
-+ * Note: this Device Tree assumes that the bootloader has remapped the
-+ * internal registers to 0xf1000000 (instead of the default
-+ * 0xd0000000). The 0xf1000000 is the default used by the recent,
-+ * DT-capable, U-Boot bootloaders provided by Marvell. Some earlier
-+ * boards were delivered with an older version of the bootloader that
-+ * left internal registers mapped at 0xd0000000. If you are in this
-+ * situation, you should either update your bootloader (preferred
-+ * solution) or the below Device Tree should be adjusted.
-+ */
-+
-+/dts-v1/;
-+#include "armada-xp-98dx4251.dtsi"
-+
-+/ {
-+	model = "Marvell Bobcat2 Evaluation Board";
-+	compatible = "marvell,db-dxbc2", "marvell,armadaxp-98dx4251", "marvell,armadaxp", "marvell,armada-370-xp";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0 0x00000000 0 0x20000000>; /* 512 MB */
-+	};
-+
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
-+			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
-+			  MBUS_ID(0x03, 0x00) 0 0 0xa8000000 0x4000000
-+			  MBUS_ID(0x08, 0x00) 0 0 0xac000000 0x100000>;
-+
-+		devbus-bootcs {
-+			status = "okay";
-+
-+			/* Device Bus parameters are required */
-+
-+			/* Read parameters */
-+			devbus,bus-width    = <16>;
-+			devbus,turn-off-ps  = <60000>;
-+			devbus,badr-skew-ps = <0>;
-+			devbus,acc-first-ps = <124000>;
-+			devbus,acc-next-ps  = <248000>;
-+			devbus,rd-setup-ps  = <0>;
-+			devbus,rd-hold-ps   = <0>;
-+
-+			/* Write parameters */
-+			devbus,sync-enable = <0>;
-+			devbus,wr-high-ps  = <60000>;
-+			devbus,wr-low-ps   = <60000>;
-+			devbus,ale-wr-ps   = <60000>;
-+		};
-+
-+		internal-regs {
-+			serial at 12000 {
-+				status = "okay";
-+			};
-+			serial at 12100 {
-+				status = "okay";
-+			};
-+
-+			i2c at 11000 {
-+				clock-frequency = <100000>;
-+				status = "okay";
-+			};
-+
-+			mvsdio at d4000 {
-+				pinctrl-0 = <&sdio_pins>;
-+				pinctrl-names = "default";
-+				status = "okay";
-+				/* No CD or WP GPIOs */
-+				broken-cd;
-+			};
-+
-+			nand at d0000 {
-+				status = "okay";
-+				num-cs = <1>;
-+				marvell,nand-keep-config;
-+				marvell,nand-enable-arbiter;
-+				nand-on-flash-bbt;
-+				nand-ecc-strength = <4>;
-+				nand-ecc-step-size = <512>;
-+			};
-+		};
-+	};
-+};
-+
-+&spi0 {
-+	status = "okay";
-+
-+	spi-flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "m25p64";
-+		reg = <0>; /* Chip select 0 */
-+		spi-max-frequency = <20000000>;
-+		m25p,fast-read;
-+
-+		partition at u-boot {
-+			reg = <0x00000000 0x00100000>;
-+			label = "u-boot";
-+		};
-+		partition at u-boot-env {
-+			reg = <0x00100000 0x00040000>;
-+			label = "u-boot-env";
-+		};
-+		partition at unused {
-+			reg = <0x00140000 0x00ec0000>;
-+			label = "unused";
-+		};
-+
-+	};
-+};
-diff --git a/arch/arm/boot/dts/db-xc3-24g4xg.dts b/arch/arm/boot/dts/db-xc3-24g4xg.dts
-new file mode 100644
-index 000000000000..5eb89ffb9a7d
---- /dev/null
-+++ b/arch/arm/boot/dts/db-xc3-24g4xg.dts
-@@ -0,0 +1,155 @@
-+/*
-+ * Device Tree file for DB-XC3-24G4XG board
-+ *
-+ * Copyright (C) 2016 Allied Telesis Labs
-+ *
-+ * Based on armada-xp-db.dts
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ *
-+ * Note: this Device Tree assumes that the bootloader has remapped the
-+ * internal registers to 0xf1000000 (instead of the default
-+ * 0xd0000000). The 0xf1000000 is the default used by the recent,
-+ * DT-capable, U-Boot bootloaders provided by Marvell. Some earlier
-+ * boards were delivered with an older version of the bootloader that
-+ * left internal registers mapped at 0xd0000000. If you are in this
-+ * situation, you should either update your bootloader (preferred
-+ * solution) or the below Device Tree should be adjusted.
-+ */
-+
-+/dts-v1/;
-+#include "armada-xp-98dx3336.dtsi"
-+
-+/ {
-+	model = "DB-XC3-24G4XG";
-+	compatible = "marvell,db-xc3-24g4xg", "marvell,armadaxp-98dx3336", "marvell,armadaxp", "marvell,armada-370-xp";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0 0x00000000 0 0x40000000>; /* 1 GB */
-+	};
-+
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
-+			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
-+			  MBUS_ID(0x03, 0x00) 0 0 0xa8000000 0x4000000
-+			  MBUS_ID(0x08, 0x00) 0 0 0xac000000 0x100000>;
-+
-+		devbus-bootcs {
-+			status = "okay";
-+
-+			/* Device Bus parameters are required */
-+
-+			/* Read parameters */
-+			devbus,bus-width    = <16>;
-+			devbus,turn-off-ps  = <60000>;
-+			devbus,badr-skew-ps = <0>;
-+			devbus,acc-first-ps = <124000>;
-+			devbus,acc-next-ps  = <248000>;
-+			devbus,rd-setup-ps  = <0>;
-+			devbus,rd-hold-ps   = <0>;
-+
-+			/* Write parameters */
-+			devbus,sync-enable = <0>;
-+			devbus,wr-high-ps  = <60000>;
-+			devbus,wr-low-ps   = <60000>;
-+			devbus,ale-wr-ps   = <60000>;
-+		};
-+
-+		internal-regs {
-+			serial at 12000 {
-+				status = "okay";
-+			};
-+			serial at 12100 {
-+				status = "okay";
-+			};
-+
-+			i2c at 11000 {
-+				clock-frequency = <100000>;
-+				status = "okay";
-+			};
-+
-+			mvsdio at d4000 {
-+				status = "disabled";
-+			};
-+
-+			nand at d0000 {
-+				status = "okay";
-+				num-cs = <1>;
-+				marvell,nand-keep-config;
-+				marvell,nand-enable-arbiter;
-+				nand-on-flash-bbt;
-+				nand-ecc-strength = <4>;
-+				nand-ecc-step-size = <512>;
-+			};
-+		};
-+	};
-+};
-+
-+&spi0 {
-+	status = "okay";
-+
-+	spi-flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "m25p64";
-+		reg = <0>; /* Chip select 0 */
-+		spi-max-frequency = <20000000>;
-+		m25p,fast-read;
-+
-+		partition at u-boot {
-+			reg = <0x00000000 0x00100000>;
-+			label = "u-boot";
-+		};
-+		partition at u-boot-env {
-+			reg = <0x00100000 0x00040000>;
-+			label = "u-boot-env";
-+		};
-+		partition at unused {
-+			reg = <0x00140000 0x00ec0000>;
-+			label = "unused";
-+		};
-+
-+	};
-+};
--- 
-2.11.0.24.ge6920cf
+ -> "gic-irq-domain"
+	 -> "gic-its-irq-domain"
+		-> "platform-msi-domain"
+		-> "pci-msi-domain"
+		->  "fsl-mc-msi-domain"
+
+"gic-its-irq-domain" carries IRQ_DOMAIN_FLAG_MSI_REMAP
+
+So we need to look for the IRQ_DOMAIN_FLAG_MSI_REMAP flag in "gic-its-irq-domain" when doing safety check for "platform/pci/fsl-mc"-msi-irqdomain,  is this what you mentioned?
+
+Can we can pass this flags from "gic-its-irq-domain" to "platform/pci/fsl-mc"-msi-irqdomain during domain creation?
+
+Thanks
+-Bharat
+
+> 
+> Eric
+> >
+> > Thanks,
+> >
+> > 	M.
+> >
