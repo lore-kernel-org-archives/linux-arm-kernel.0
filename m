@@ -1,34 +1,87 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Fri, 06 Jan 2017 12:43:46 +0900
-Subject: [PATCH 2/2] media: rc: add driver for IR remote receiver on MT7623
- SoC
-In-Reply-To: <1483632384-8107-3-git-send-email-sean.wang@mediatek.com>
-References: <1483632384-8107-1-git-send-email-sean.wang@mediatek.com>
- <CGME20170105160810epcas3p1b7a85197c15fbbe87e08c736259935d6@epcas3p1.samsung.com>
- <1483632384-8107-3-git-send-email-sean.wang@mediatek.com>
-Message-ID: <20170106034346.7njhyhtsc4yado5c@gangnam.samsung>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Fri, 6 Jan 2017 11:41:28 +0800
+Subject: [PATCH v6 0/4] arm64: arch_timer: Add workaround for
+ hisilicon-161601 erratum
+In-Reply-To: <1483594317-10732-1-git-send-email-dingtianhong@huawei.com>
+References: <1483594317-10732-1-git-send-email-dingtianhong@huawei.com>
+Message-ID: <e518ab78-4093-0bc9-fe68-e7da25fd5644@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+Hi Marc, Will:
 
-> +	ir->rc = rc_allocate_device();
+Please help reviewing the new version, I think it is nearly close to the final solution and it is very important to our chip or something else chip has similar erratum.
+If there is any dissatisfaction, please inform me and I will fix it. :)
+Thanks a lot.
 
-Yes, you should use devm_rc_allocate_device(...)
+Ding
 
-Besides, standing to this patch which is not in yet:
-
-https://lkml.org/lkml/2016/12/18/39
-
-rc_allocate_device should provide the driver type during
-allocation, so it should be:
-
-	ir->rc = rc_allocate_device(RC_DRIVER_IR_RAW);
-
-and this line can be removed:
-
-> +	ir->rc->driver_type = RC_DRIVER_IR_RAW;
-
-I don't know when Mauro will take the patch above.
-
-Andi
+On 2017/1/5 13:31, Ding Tianhong wrote:
+> Erratum Hisilicon-161601 says that the ARM generic timer counter "has the
+> potential to contain an erroneous value when the timer value changes".
+> Accesses to TVAL (both read and write) are also affected due to the implicit counter
+> read.  Accesses to CVAL are not affected.
+> 
+> The workaround is to reread the system count registers until the value of the second
+> read is larger than the first one by less than 32, the system counter can be guaranteed
+> not to return wrong value twice by back-to-back read and the error value is always larger
+> than the correct one by 32. Writes to TVAL are replaced with an equivalent write to CVAL.
+> 
+> v2: Introducing a new generic erratum handling mechanism for fsl,a008585 and hisilicon,161601.
+>     Significant rework based on feedback, including seperate the fsl erratum a008585
+>     to another patch, update the erratum name and remove unwanted code.
+> 
+> v3: Introducing the erratum_workaround_set_sne generic function for fsl erratum a008585
+>     and make the #define __fsl_a008585_read_reg to be private to the .c file instead of
+>     being globally visible. After discussion with Marc and Will, a consensus decision was
+>     made to remove the commandline parameter for enabling fsl,erratum-a008585 erratum,
+>     and make some generic name more specific, export timer_unstable_counter_workaround
+>     for module access.
+>     
+>     Significant rework based on feedback, including fix some alignment problem, make the
+>     #define __hisi_161601_read_reg to be private to the .c file instead of being globally
+>     visible, add more accurate annotation and modify a bit of logical format to enable
+>     arch_timer_read_ool_enabled, remove the kernel commandline parameter
+>     clocksource.arm_arch_timer.hisilicon-161601.
+> 
+>     Introduce a generic aquick framework for erratum in ACPI mode.
+> 
+> v4: rename the quirk handler parameter to make it more generic, and
+>     avoid break loop when handling the quirk becasue it need to
+>     support multi quirks handler.
+> 
+>     update some data structures for acpi mode. 
+> 
+> v5: Adapt the new kernel-parameters.txt for latest kernel version.
+>     Set the retries of reread system counter to 50, because it is possible 
+>     that some interrupts may lead to more than twice read errors and break the loop,
+>     it will trigger the warning, so we set the number of retries far beyond the number of
+>     iterations the loop has been observed to take.
+> 
+> v6: The last 2 patches in the previous version about the ACPI mode will conflict witch Fuwei's
+>     GTDT patches, so remove the ACPI part and only support the DT base code for this patch set.
+> 
+>     We have trigger a bug when select the CONFIG_FUNCTION_GRAPH_TRACER and enable function_graph
+>     to /sys/kernel/debug/tracing/current_tracer, the system will stall into an endless loop, it looks
+>     like that the ftrace_graph_caller will be related to xxx.read_cntvct_el0 and read the system counter
+>     again, so mark the xxx.read_cntvct_el0 with notrace to fix the problem.
+> 
+> Ding Tianhong (4):
+>   arm64: arch_timer: Add device tree binding for hisilicon-161601
+>     erratum
+>   arm64: arch_timer: Introduce a generic erratum handing mechanism for
+>     fsl-a008585
+>   arm64: arch_timer: Work around Erratum Hisilicon-161601
+>   arm64: arch timer: Add timer erratum property for Hip05-d02 and
+>     Hip06-d03
+> 
+>  Documentation/admin-guide/kernel-parameters.txt    |   9 --
+>  Documentation/arm64/silicon-errata.txt             |   1 +
+>  .../devicetree/bindings/arm/arch_timer.txt         |   8 ++
+>  arch/arm64/boot/dts/hisilicon/hip05.dtsi           |   1 +
+>  arch/arm64/boot/dts/hisilicon/hip06.dtsi           |   1 +
+>  arch/arm64/include/asm/arch_timer.h                |  38 ++----
+>  drivers/clocksource/Kconfig                        |   9 ++
+>  drivers/clocksource/arm_arch_timer.c               | 146 ++++++++++++++++-----
+>  8 files changed, 143 insertions(+), 70 deletions(-)
+> 
