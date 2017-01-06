@@ -1,42 +1,41 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Fri, 6 Jan 2017 15:57:27 -0600
-Subject: [PATCH v2 3/9] ARM: dts: keystone-k2e: Add MSM RAM node
+Date: Fri, 6 Jan 2017 15:57:31 -0600
+Subject: [PATCH v2 7/9] ARM: dts: keystone-k2l: Reserve MSM RAM for boot
+ monitor
 In-Reply-To: <20170106215733.41637-1-s-anna@ti.com>
 References: <20170106215733.41637-1-s-anna@ti.com>
-Message-ID: <20170106215733.41637-4-s-anna@ti.com>
+Message-ID: <20170106215733.41637-8-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the RAM managed by the Multicire Shared Memory Controller (MSMC)
-as a mmio-sram node. The 66AK2E SoCs have 2 MB of such memory. Any
-specific MSM memory range needed by a software module ought to be
-reserved using an appropriate child node.
+The Keystone 2 boot monitor uses 32 KB of the MSM RAM @ 0x0c1f8000
+on 66AK2L SoCs, so add a reserved child node for the same.
+
+This address is aligned to the values used within the latest boot
+monitor firmware [1] as of commit cf8b431e8b3b ("soc: Move load
+address to end of MSMC").
+
+[1] git://git.ti.com/processor-firmware/ks2-boot-monitor.git
 
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
-v2: No code changes, SoC name in commit message corrected to use 66AK2E
+ arch/arm/boot/dts/keystone-k2l.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
- arch/arm/boot/dts/keystone-k2e.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/keystone-k2e.dtsi b/arch/arm/boot/dts/keystone-k2e.dtsi
-index 497c417db5b6..256dcc87f36a 100644
---- a/arch/arm/boot/dts/keystone-k2e.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2e.dtsi
-@@ -82,6 +82,14 @@
- 			};
+diff --git a/arch/arm/boot/dts/keystone-k2l.dtsi b/arch/arm/boot/dts/keystone-k2l.dtsi
+index edc08de4e196..b58015737a35 100644
+--- a/arch/arm/boot/dts/keystone-k2l.dtsi
++++ b/arch/arm/boot/dts/keystone-k2l.dtsi
+@@ -210,6 +210,10 @@
+ 			ranges = <0x0 0x0c000000 0x200000>;
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
++
++			sram-bm at 1f8000 {
++				reg = <0x001f8000 0x8000>;
++			};
  		};
  
-+		msm_ram: msmram at 0c000000 {
-+			compatible = "mmio-sram";
-+			reg = <0x0c000000 0x200000>;
-+			ranges = <0x0 0x0c000000 0x200000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+		};
-+
  		dspgpio0: keystone_dsp_gpio at 02620240 {
- 			compatible = "ti,keystone-dsp-gpio";
- 			gpio-controller;
 -- 
 2.10.2
