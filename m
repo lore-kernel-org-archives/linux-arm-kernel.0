@@ -1,136 +1,62 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Fri, 6 Jan 2017 10:58:26 -0800
-Subject: [PATCH v2 15/19] media: imx: Add MIPI CSI-2 Receiver subdev driver
-In-Reply-To: <ecfcd8e5-01bd-b9a4-8653-7bbbdece4231@mentor.com>
-References: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
- <1483477049-19056-16-git-send-email-steve_longerbeam@mentor.com>
- <ecfcd8e5-01bd-b9a4-8653-7bbbdece4231@mentor.com>
-Message-ID: <e326764e-629e-3d1d-8671-0d902a54b9bf@gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 6 Jan 2017 13:10:41 -0600
+Subject: [PATCH 0/5] Use mmio-sram driver for Keystone MSMC RAM
+In-Reply-To: <3abc3c7d-2f45-f5dd-e6f5-c03008d22d56@oracle.com>
+References: <20160901225846.31058-1-s-anna@ti.com>
+ <d797bb0d-41b5-45a7-6faf-95baaab0215b@oracle.com>
+ <f6920801-554d-18e8-f140-44aeeb2f878e@ti.com>
+ <287b7e1d-1453-2832-515d-e7e51373a3bc@oracle.com>
+ <3abc3c7d-2f45-f5dd-e6f5-c03008d22d56@oracle.com>
+Message-ID: <b49bfb08-292f-ee26-b385-fdba304571b0@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Santosh,
 
-
-On 01/04/2017 07:05 AM, Vladimir Zapolskiy wrote:
-> On 01/03/2017 10:57 PM, Steve Longerbeam wrote:
->> Adds MIPI CSI-2 Receiver subdev driver. This subdev is required
->> for sensors with a MIPI CSI2 interface.
+> 
+> On 9/7/16 9:25 AM, Santosh Shilimkar wrote:
+>> On 9/7/2016 9:22 AM, Suman Anna wrote:
+>>> Hi Santosh,
+>>>
+>>> On 09/07/2016 11:11 AM, Santosh Shilimkar wrote:
+>>>> Hi Suman,
+>>>>
+>>>> On 9/1/2016 3:58 PM, Suman Anna wrote:
+>>>>> Hi,
+>>>>>
+>>>>> The Keystone 2 family of SoCs have an on-chip RAM called the
+>>>>> Multicore Shared Memory (MSM) RAM. This RAM is accessible through
+>>>>> the Multicore Shared Memory Controller (MSMC). This series represents
+>>>>> these on-chip RAMs as sram nodes so that the memory allocations
+>>>>> can be managed by the in-kernel mmio-sram driver.
+>>>>>
+>>>>> The first 4 patches adds the basic SRAM nodes on each of the SoCs,
+>>>>> and the last patch enables the generic on-chip SRAM driver for
+>>>>> keystone defconfig.
+>>>>>
+>>>> The series looks good in general but I would like to understand
+>>>> the users of this memory in kernel. Is that going to be posted
+>>>> as a follow up patch ? Is the Power controller going to make
+>>>> use of this SRAM for PM code ?
+>>>
+>>> Yes, the users will eventually follow. Power Controller code is not
+>>> gonna be using this SRAM, it has its own RAM. This memory is gonna be
+>>> split between various functional features like IPC, OPTEE integration,
+>>> we already have the Boot Monitor code using this. We will have the
+>>> memory split by either having static child nodes or drivers requesting
+>>> the memory using gen_pool API.
+>>>
+>> OK. Its good to add the code at least with one active user of it.
+>> Since this has to anyway wait for another merge window, please post the
+>> users of it so that I can pull the combined patchset.
 >>
->> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
->> ---
->>   drivers/staging/media/imx/Makefile        |   1 +
->>   drivers/staging/media/imx/imx-mipi-csi2.c | 509 ++++++++++++++++++++++++++++++
->>   2 files changed, 510 insertions(+)
->>   create mode 100644 drivers/staging/media/imx/imx-mipi-csi2.c
->>
->> diff --git a/drivers/staging/media/imx/Makefile b/drivers/staging/media/imx/Makefile
->> index fe9e992..0decef7 100644
->> --- a/drivers/staging/media/imx/Makefile
->> +++ b/drivers/staging/media/imx/Makefile
->> @@ -9,3 +9,4 @@ obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-ic.o
->>   obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-csi.o
->>   obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-smfc.o
->>   obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-camif.o
->> +obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-mipi-csi2.o
->> diff --git a/drivers/staging/media/imx/imx-mipi-csi2.c b/drivers/staging/media/imx/imx-mipi-csi2.c
->> new file mode 100644
->> index 0000000..84df16e
->> --- /dev/null
->> +++ b/drivers/staging/media/imx/imx-mipi-csi2.c
->> @@ -0,0 +1,509 @@
->> +/*
->> + * MIPI CSI-2 Receiver Subdev for Freescale i.MX5/6 SOC.
->> + *
->> + * Copyright (c) 2012-2014 Mentor Graphics Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + */
->> +#include <linux/module.h>
->> +#include <linux/export.h>
->> +#include <linux/types.h>
->> +#include <linux/init.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/err.h>
->> +#include <linux/delay.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/io.h>
->> +#include <linux/clk.h>
->> +#include <linux/list.h>
->> +#include <linux/irq.h>
->> +#include <linux/of_device.h>
->> +#include <media/v4l2-device.h>
->> +#include <media/v4l2-of.h>
->> +#include <media/v4l2-subdev.h>
->> +#include <media/v4l2-async.h>
-> Please sort the list of headers alphabetically.
+> Are you going to post new patchset or you dropped this series ?
+> 
+> If you want me to include it for next merge window, please post
+> refreshed patchset.
 
-done.
+No, haven't dropped the series, will post it today. You prefer the
+series on -rc1 or -rc2, not that it makes a difference.
 
->
->> +#include <asm/mach/irq.h>
-> Why do you need to include this header?
-
-good question. In fact this include list was in need of a lot of pruning,
-so I paired it down to the essentials.
-
->> +static int imxcsi2_s_stream(struct v4l2_subdev *sd, int enable)
->> +{
->> +	struct imxcsi2_dev *csi2 = sd_to_dev(sd);
->> +	int i, ret = 0;
->> +
->> +	if (!csi2->src_sd)
->> +		return -EPIPE;
->> +	for (i = 0; i < CSI2_NUM_SRC_PADS; i++) {
->> +		if (csi2->sink_sd[i])
->> +			break;
->> +	}
->> +	if (i >= CSI2_NUM_SRC_PADS)
->> +		return -EPIPE;
->> +
->> +	v4l2_info(sd, "stream %s\n", enable ? "ON" : "OFF");
->> +
->> +	if (enable && !csi2->stream_on) {
->> +		clk_prepare_enable(csi2->pix_clk);
-> It can complicate the design for you, but in general clk_prepare_enable()
-> can return an error.
-
-I added an error check and reorganized a little.
-
->> +
->> +static int imxcsi2_parse_endpoints(struct imxcsi2_dev *csi2)
->> +{
->> +	struct device_node *node = csi2->dev->of_node;
->> +	struct device_node *epnode;
->> +	struct v4l2_of_endpoint ep;
->> +	int ret = 0;
->> +
->> +	epnode = of_graph_get_next_endpoint(node, NULL);
->> +	if (!epnode) {
->> +		v4l2_err(&csi2->sd, "failed to get endpoint node\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	v4l2_of_parse_endpoint(epnode, &ep);
-> Do of_node_put(epnode) here and remove 'out' goto label.
-
-done.
-
->> +static const struct of_device_id imxcsi2_dt_ids[] = {
->> +	{ .compatible = "fsl,imx-mipi-csi2", },
->> +	{ /* sentinel */ }
->> +};
->> +MODULE_DEVICE_TABLE(of, imxcsi2_dt_ids);
->> +
->> +static struct platform_driver imxcsi2_driver = {
->> +	.driver = {
->> +		.name = DEVICE_NAME,
->> +		.owner = THIS_MODULE,
-> Please drop .owner assignment.
-
-done.
-
-
-Steve
+regards
+Suman
