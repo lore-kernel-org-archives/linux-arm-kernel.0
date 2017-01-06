@@ -1,33 +1,24 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 6 Jan 2017 14:15:37 +0200
-Subject: [PATCH v4 3/5] input: Add support for the tm2 touchkey device
- driver
-In-Reply-To: <20170106114114.19321-4-andi.shyti@samsung.com>
-References: <20170106114114.19321-1-andi.shyti@samsung.com>
- <CGME20170106114120epcas5p299b63311b3c55738537a40486f1462d8@epcas5p2.samsung.com>
- <20170106114114.19321-4-andi.shyti@samsung.com>
-Message-ID: <20170106121537.4nwcntxogeg4y3ii@kozik-lap>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 6 Jan 2017 13:14:46 +0100
+Subject: [PATCH v2 4/7] x86: put msr-index.h in uapi
+In-Reply-To: <1483695839-18660-5-git-send-email-nicolas.dichtel@6wind.com>
+References: <bf83da6b-01ef-bf44-b3e1-ca6fc5636818@6wind.com>
+ <1483695839-18660-1-git-send-email-nicolas.dichtel@6wind.com>
+ <1483695839-18660-5-git-send-email-nicolas.dichtel@6wind.com>
+Message-ID: <20170106121446.aizmoxons5gpecnc@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 08:41:12PM +0900, Andi Shyti wrote:
-> From: Jaechul Lee <jcsing.lee@samsung.com>
-> 
-> This patch adds the binding description of the tm2 touchkey
-> device driver.
-> 
-> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> ---
->  .../bindings/input/samsung,tm2-touchkey.txt        | 27 ++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/input/samsung,tm2-touchkey.txt
+On Fri, Jan 06, 2017 at 10:43:56AM +0100, Nicolas Dichtel wrote:
+> This header file is exported, thus move it to uapi.
 
+It should rather not be exported - please remove it from
+arch/x86/include/uapi/asm/Kbuild instead.
 
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+Thanks.
 
-Best regards,
-Krzysztof
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
