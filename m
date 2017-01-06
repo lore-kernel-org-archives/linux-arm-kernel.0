@@ -1,40 +1,33 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 6 Jan 2017 16:13:22 +0200
-Subject: [PATCH] ARM, ARM64: dts: drop "arm,amba-bus" in favor of
- "simple-bus" part 3
-In-Reply-To: <1482853886-7932-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1482853886-7932-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20170106141322.pejnlr6vbsq6bo6l@kozik-lap>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 6 Jan 2017 15:19:11 +0100
+Subject: [PATCH 3/4] ARM: dts: sunxi: add usb_otg and usbphy node for V3s
+ SoC
+In-Reply-To: <20170103152534.20118-4-icenowy@aosc.xyz>
+References: <20170103152534.20118-1-icenowy@aosc.xyz>
+ <20170103152534.20118-4-icenowy@aosc.xyz>
+Message-ID: <20170106141911.r4ehba64y4atys74@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 28, 2016 at 12:51:26AM +0900, Masahiro Yamada wrote:
-> Tree-wide replacement was done by commit 2ef7d5f342c1 ("ARM, ARM64:
-> dts: drop "arm,amba-bus" in favor of "simple-bus"), then the 2nd
-> round by commit 15b7cc78f095 ("arm64: dts: drop "arm,amba-bus" in
-> favor of "simple-bus" part 2").
+On Tue, Jan 03, 2017 at 11:25:33PM +0800, Icenowy Zheng wrote:
+> V3s SoC features a USB PHY controller and a MUSB OTG controller.
 > 
-> Here, some new users have appeared for Linux v4.10-rc1.  Eliminate
-> them now.
+> Add device nodes for them.
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
-> Hi Arnd, Olof,
-> 
-> Can you pick this up for v4.10 fixes?
-> 
-> If we carry arm,amba-bus until the release, we will need to
-> take more time to deprecate it.
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-What is the status of this?
+This can be merged in your other DTSI patch.
 
-Masahiro, if you would split this, I could take Exynos part through my
-tree. Anyway I am fine with taking this directly into arm-soc. I do not
-expect conflicts around these lines, so:
+Maxime
 
-For Exynos:
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-
-Best regards,
-Krzysztof
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170106/c1123176/attachment.sig>
