@@ -1,46 +1,46 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri,  6 Jan 2017 10:42:07 +0100
-Subject: [PATCH 3/3] mtd: nand: sunxi: Improve sunxi_nfc_cmd_ctrl()
-In-Reply-To: <1483695727-17415-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1483695727-17415-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1483695727-17415-4-git-send-email-boris.brezillon@free-electrons.com>
+From: nicolas.dichtel@6wind.com (Nicolas Dichtel)
+Date: Fri,  6 Jan 2017 10:43:55 +0100
+Subject: [PATCH v2 3/7] nios2: put setup.h in uapi
+In-Reply-To: <1483695839-18660-1-git-send-email-nicolas.dichtel@6wind.com>
+References: <bf83da6b-01ef-bf44-b3e1-ca6fc5636818@6wind.com>
+ <1483695839-18660-1-git-send-email-nicolas.dichtel@6wind.com>
+Message-ID: <1483695839-18660-4-git-send-email-nicolas.dichtel@6wind.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We only need to call sunxi_nfc_wait_cmd_fifo_empty() if we want to send
-a new command. Move the sunxi_nfc_wait_cmd_fifo_empty() call to right
-place to avoid extra register reads.
+This header file is exported, thus move it to uapi.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Nicolas Dichtel <nicolas.dichtel@6wind.com>
 ---
- drivers/mtd/nand/sunxi_nand.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/nios2/include/asm/setup.h      | 2 +-
+ arch/nios2/include/uapi/asm/setup.h | 6 ++++++
+ 2 files changed, 7 insertions(+), 1 deletion(-)
+ create mode 100644 arch/nios2/include/uapi/asm/setup.h
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index 76449f79d4c5..0eeeb8b889ea 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -604,10 +604,6 @@ static void sunxi_nfc_cmd_ctrl(struct mtd_info *mtd, int dat,
- 	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
- 	int ret;
+diff --git a/arch/nios2/include/asm/setup.h b/arch/nios2/include/asm/setup.h
+index dcbf8cf1a344..d49e9e91bf55 100644
+--- a/arch/nios2/include/asm/setup.h
++++ b/arch/nios2/include/asm/setup.h
+@@ -19,7 +19,7 @@
+ #ifndef _ASM_NIOS2_SETUP_H
+ #define _ASM_NIOS2_SETUP_H
  
--	ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
--	if (ret)
--		return;
--
- 	if (dat == NAND_CMD_NONE && (ctrl & NAND_NCE) &&
- 	    !(ctrl & (NAND_CLE | NAND_ALE))) {
- 		u32 cmd = 0;
-@@ -637,6 +633,10 @@ static void sunxi_nfc_cmd_ctrl(struct mtd_info *mtd, int dat,
- 			writel(sunxi_nand->addr[1],
- 			       nfc->regs + NFC_REG_ADDR_HIGH);
+-#include <asm-generic/setup.h>
++#include <uapi/asm/setup.h>
  
-+		ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
-+		if (ret)
-+			return;
+ #ifndef __ASSEMBLY__
+ #ifdef __KERNEL__
+diff --git a/arch/nios2/include/uapi/asm/setup.h b/arch/nios2/include/uapi/asm/setup.h
+new file mode 100644
+index 000000000000..8d8285997ba8
+--- /dev/null
++++ b/arch/nios2/include/uapi/asm/setup.h
+@@ -0,0 +1,6 @@
++#ifndef _UAPI_ASM_NIOS2_SETUP_H
++#define _UAPI_ASM_NIOS2_SETUP_H
 +
- 		writel(cmd, nfc->regs + NFC_REG_CMD);
- 		sunxi_nand->addr[0] = 0;
- 		sunxi_nand->addr[1] = 0;
++#include <asm-generic/setup.h>
++
++#endif /* _UAPI_ASM_NIOS2_SETUP_H */
 -- 
-2.7.4
+2.8.1
