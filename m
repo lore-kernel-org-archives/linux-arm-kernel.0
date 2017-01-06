@@ -1,28 +1,62 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Fri, 6 Jan 2017 10:05:54 -0800
-Subject: [PATCH v2 11/19] media: imx: Add CSI subdev driver
-In-Reply-To: <21b54a7b-1254-a14f-767c-c92feed7433d@mentor.com>
+Date: Fri, 6 Jan 2017 10:11:54 -0800
+Subject: [PATCH v2 12/19] media: imx: Add SMFC subdev driver
+In-Reply-To: <13ff9579-ce8e-9272-ee44-9b597631f6b5@mentor.com>
 References: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
- <1483477049-19056-12-git-send-email-steve_longerbeam@mentor.com>
- <21b54a7b-1254-a14f-767c-c92feed7433d@mentor.com>
-Message-ID: <4800b65e-1168-9a10-df5e-4e9eaa0d99d3@gmail.com>
+ <1483477049-19056-13-git-send-email-steve_longerbeam@mentor.com>
+ <13ff9579-ce8e-9272-ee44-9b597631f6b5@mentor.com>
+Message-ID: <7814d422-0782-9e5a-bcd9-29e747ba2858@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 01/04/2017 05:44 AM, Vladimir Zapolskiy wrote:
+On 01/04/2017 06:23 AM, Vladimir Zapolskiy wrote:
+> On 01/03/2017 10:57 PM, Steve Longerbeam wrote:
+>> This is a media entity subdevice driver for the i.MX Sensor Multi-FIFO
+>> Controller module. Video frames are received from the CSI and can
+>> be routed to various sinks including the i.MX Image Converter for
+>> scaling, color-space conversion, motion compensated deinterlacing,
+>> and image rotation.
+>>
+>> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+>> ---
+>>   drivers/staging/media/imx/Makefile   |   1 +
+>>   drivers/staging/media/imx/imx-smfc.c | 739 +++++++++++++++++++++++++++++++++++
+>>   2 files changed, 740 insertions(+)
+>>   create mode 100644 drivers/staging/media/imx/imx-smfc.c
+>>
+>> diff --git a/drivers/staging/media/imx/Makefile b/drivers/staging/media/imx/Makefile
+>> index 133672a..3559d7b 100644
+>> --- a/drivers/staging/media/imx/Makefile
+>> +++ b/drivers/staging/media/imx/Makefile
+>> @@ -5,4 +5,5 @@ obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media.o
+>>   obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-common.o
+>>   
+>>   obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-csi.o
+>> +obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-smfc.o
+> May be
 >
->> diff --git a/drivers/staging/media/imx/imx-csi.c b/drivers/staging/media/imx/imx-csi.c
+> obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-csi.o imx-smfc.o
+
+I'd prefer to keep them on separate lines, to indicate they
+are all built as separate modules.
+
+>
+>>   
+>> diff --git a/drivers/staging/media/imx/imx-smfc.c b/drivers/staging/media/imx/imx-smfc.c
 >> new file mode 100644
->> index 0000000..975eafb
+>> index 0000000..565048c
 >> --- /dev/null
->> +++ b/drivers/staging/media/imx/imx-csi.c
->> @@ -0,0 +1,638 @@
+>> +++ b/drivers/staging/media/imx/imx-smfc.c
+>> @@ -0,0 +1,739 @@
 >> +/*
->> + * V4L2 Capture CSI Subdev for Freescale i.MX5/6 SOC
+>> + * V4L2 Capture SMFC Subdev for Freescale i.MX5/6 SOC
 >> + *
->> + * Copyright (c) 2014-2016 Mentor Graphics Inc.
+>> + * This subdevice handles capture of raw/unconverted video frames
+>> + * from the CSI, directly to memory via the Sensor Multi-FIFO Controller.
+>> + *
+>> + * Copyright (c) 2012-2016 Mentor Graphics Inc.
 >> + *
 >> + * This program is free software; you can redistribute it and/or modify
 >> + * it under the terms of the GNU General Public License as published by
@@ -30,117 +64,55 @@ On 01/04/2017 05:44 AM, Vladimir Zapolskiy wrote:
 >> + * (at your option) any later version.
 >> + */
 >> +#include <linux/module.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/fs.h>
+>> +#include <linux/timer.h>
+>> +#include <linux/sched.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/spinlock.h>
 >> +#include <linux/platform_device.h>
+>> +#include <linux/pinctrl/consumer.h>
 >> +#include <media/v4l2-device.h>
->> +#include <media/v4l2-subdev.h>
+>> +#include <media/v4l2-ioctl.h>
 >> +#include <media/videobuf2-dma-contig.h>
+>> +#include <media/v4l2-subdev.h>
 >> +#include <media/v4l2-of.h>
 >> +#include <media/v4l2-ctrls.h>
-> Please add the headers alphabetically ordered.
+> Please sort the list of headers alphabetically.
 
 done.
 
->> +
->> +static int csi_start(struct csi_priv *priv)
+>
+>> +static irqreturn_t imx_smfc_eof_interrupt(int irq, void *dev_id)
 >> +{
->> +	int ret;
+>> +	struct imx_smfc_priv *priv = dev_id;
+>> +	struct imx_media_dma_buf *done, *next;
+>> +	unsigned long flags;
 >> +
->> +	if (!priv->sensor) {
->> +		v4l2_err(&priv->sd, "no sensor attached\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	ret = csi_setup(priv);
->> +	if (ret)
->> +		return ret;
->> +
->> +	/* start the frame interval monitor */
->> +	ret = imx_media_fim_set_stream(priv->fim, priv->sensor, true);
->> +	if (ret)
->> +		return ret;
->> +
->> +	ret = ipu_csi_enable(priv->csi);
->> +	if (ret) {
->> +		v4l2_err(&priv->sd, "CSI enable error: %d\n", ret);
->> +		return ret;
->> +	}
->> +
->> +	return 0;
-> if (ret)
-> 	v4l2_err(&priv->sd, "CSI enable error: %d\n", ret);
->
-> return ret;
+>> +	spin_lock_irqsave(&priv->irqlock, flags);
+> spin_lock(&priv->irqlock) should be sufficient.
 
-I failed to cleanup in this path, so it is now:
-
-     ret = ipu_csi_enable(priv->csi);
-     if (ret) {
-         v4l2_err(&priv->sd, "CSI enable error: %d\n", ret);
-         goto fim_off;
-     }
-
-     return 0;
-fim_off:
-     if (priv->fim)
-         imx_media_fim_set_stream(priv->fim, priv->sensor, false);
-     return ret;
-
->> +
->> +static int csi_link_setup(struct media_entity *entity,
->> +			  const struct media_pad *local,
->> +			  const struct media_pad *remote, u32 flags)
->> +{
->> +	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(entity);
->> +	struct csi_priv *priv = v4l2_get_subdevdata(sd);
->> +	struct v4l2_subdev *remote_sd;
->> +
->> +	dev_dbg(priv->dev, "link setup %s -> %s", remote->entity->name,
->> +		local->entity->name);
->> +
->> +	remote_sd = media_entity_to_v4l2_subdev(remote->entity);
->> +
->> +	if (local->flags & MEDIA_PAD_FL_SINK) {
->> +		if (flags & MEDIA_LNK_FL_ENABLED) {
->> +			if (priv->src_sd)
->> +				return -EBUSY;
->> +			priv->src_sd = remote_sd;
->> +		} else {
->> +			priv->src_sd = NULL;
->> +			return 0;
-> You can remove the return above.
-
-right, fixed.
+yes thanks.
 
 >
 >> +
->> +	ret = v4l2_async_register_subdev(&priv->sd);
->> +	if (ret)
->> +		goto free_ctrls;
+>> +static const struct platform_device_id imx_smfc_ids[] = {
+>> +	{ .name = "imx-ipuv3-smfc" },
+>> +	{ },
+>> +};
+>> +MODULE_DEVICE_TABLE(platform, imx_smfc_ids);
 >> +
->> +	return 0;
->> +free_ctrls:
->> +	v4l2_ctrl_handler_free(&priv->ctrl_hdlr);
->> +	return ret;
-> This is a functionally equal and simplified version:
->
-> if (ret)
-> 	v4l2_ctrl_handler_free(&priv->ctrl_hdlr);
->
-> return ret;
-
-thanks, done.
-
->> +
->> +static struct platform_driver imx_csi_driver = {
->> +	.probe = imx_csi_probe,
->> +	.remove = imx_csi_remove,
->> +	.id_table = imx_csi_ids,
+>> +static struct platform_driver imx_smfc_driver = {
+>> +	.probe = imx_smfc_probe,
+>> +	.remove = imx_smfc_remove,
+>> +	.id_table = imx_smfc_ids,
 >> +	.driver = {
->> +		.name = "imx-ipuv3-csi",
+>> +		.name = "imx-ipuv3-smfc",
 >> +		.owner = THIS_MODULE,
-> Please drop .owner.
+> You can drop owner assignment.
 
-ok, I tested this and there are no regressions, done
-for all modules.
+done.
+
 
 Steve
