@@ -1,74 +1,78 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:17:55 +0100
-Subject: [PATCH 13/16] arm64: dts: renesas: r8a7796: Add EthernetAVB instance
+Date: Fri,  6 Jan 2017 12:17:56 +0100
+Subject: [PATCH 14/16] arm64: dts: r8a7796: salvator-x: Enable EthernetAVB
 In-Reply-To: <cover.1483700694.git.horms+renesas@verge.net.au>
 References: <cover.1483700694.git.horms+renesas@verge.net.au>
-Message-ID: <8e8b9eaef8fb05d9707087ea82c1c928317ac9f8.1483700694.git.horms+renesas@verge.net.au>
+Message-ID: <dc36965a890515753671628cdf25365ee45e6206.1483700694.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+[geert: Add pinctrl]
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 43 ++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 32 ++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 26a0506e3013..d4beb15b076a 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -428,6 +428,49 @@
- 			};
- 		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+index 38bde9de3250..c7f40f8f3169 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+@@ -18,6 +18,7 @@
  
-+		avb: ethernet at e6800000 {
-+			compatible = "renesas,etheravb-r8a7796",
-+				     "renesas,etheravb-rcar-gen3";
-+			reg = <0 0xe6800000 0 0x800>, <0 0xe6a00000 0 0x10000>;
-+			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "ch0", "ch1", "ch2", "ch3",
-+					  "ch4", "ch5", "ch6", "ch7",
-+					  "ch8", "ch9", "ch10", "ch11",
-+					  "ch12", "ch13", "ch14", "ch15",
-+					  "ch16", "ch17", "ch18", "ch19",
-+					  "ch20", "ch21", "ch22", "ch23",
-+					  "ch24";
-+			clocks = <&cpg CPG_MOD 812>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			phy-mode = "rgmii-id";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
+ 	aliases {
+ 		serial0 = &scif2;
++		ethernet0 = &avb;
+ 	};
+ 
+ 	chosen {
+@@ -107,6 +108,11 @@
+ 	pinctrl-0 = <&scif_clk_pins>;
+ 	pinctrl-names = "default";
+ 
++	avb_pins: avb {
++		groups = "avb_mdc";
++		function = "avb";
++	};
 +
- 		scif2: serial at e6e88000 {
- 			compatible = "renesas,scif-r8a7796",
- 				     "renesas,rcar-gen3-scif", "renesas,scif";
+ 	scif2_pins: scif2 {
+ 		groups = "scif2_data_a";
+ 		function = "scif2";
+@@ -158,6 +164,32 @@
+ 	};
+ };
+ 
++&avb {
++	pinctrl-0 = <&avb_pins>;
++	pinctrl-names = "default";
++	renesas,no-ether-link;
++	phy-handle = <&phy0>;
++	status = "okay";
++
++	phy0: ethernet-phy at 0 {
++		rxc-skew-ps = <900>;
++		rxdv-skew-ps = <0>;
++		rxd0-skew-ps = <0>;
++		rxd1-skew-ps = <0>;
++		rxd2-skew-ps = <0>;
++		rxd3-skew-ps = <0>;
++		txc-skew-ps = <900>;
++		txen-skew-ps = <0>;
++		txd0-skew-ps = <0>;
++		txd1-skew-ps = <0>;
++		txd2-skew-ps = <0>;
++		txd3-skew-ps = <0>;
++		reg = <0>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
++
+ &extal_clk {
+ 	clock-frequency = <16666666>;
+ };
 -- 
 2.7.0.rc3.207.g0ac5344
