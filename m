@@ -1,56 +1,118 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu, 5 Jan 2017 07:42:02 -0800
-Subject: [PATCH] arm64: dts: msm8996: Add required memory carveouts
-In-Reply-To: <1482357822-20823-1-git-send-email-andy.gross@linaro.org>
-References: <1482357822-20823-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <20170105154202.GA8599@builder>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Jan 2017 00:19:38 +0000
+Subject: [PATCH v2 3/8] ARM: dts: armada-388-clearfog: Utilize new DSA
+ binding
+In-Reply-To: <20170105192957.14304-4-f.fainelli@gmail.com>
+References: <20170105192957.14304-1-f.fainelli@gmail.com>
+ <20170105192957.14304-4-f.fainelli@gmail.com>
+Message-ID: <20170106001938.GV14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 21 Dec 14:03 PST 2016, Andy Gross wrote:
-
-> From: Stephen Boyd <sboyd@codeaurora.org>
+On Thu, Jan 05, 2017 at 11:29:52AM -0800, Florian Fainelli wrote:
+> Utilize the new DSA binding, introduced with commit 8c5ad1d6179d ("net:
+> dsa: Document new binding"). The legacy binding node is kept included, but is
+> marked disabled.
 > 
-> This patch adds required memory carveouts so that the kernel does not
-> access memory that is in use or has been reserved for use by other remote
-> processors.
-> 
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Booted here on clearfog, and tested traffic passes between two lan
+ports, and a lan port and the cpu port... and generally still seems
+to work as a switch.  All seems well on the face of it.
 
-Regards,
-Bjorn
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+
+Thanks.
 
 > ---
->  arch/arm64/boot/dts/qcom/msm8996.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+>  arch/arm/boot/dts/armada-388-clearfog.dts | 65 +++++++++++++++++++++++++++++++
+>  1 file changed, 65 insertions(+)
 > 
-> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> index cde4114..25e11dc 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> @@ -64,6 +64,16 @@
->  			reg = <0x0 0x86000000 0x0 0x200000>;
->  			no-map;
->  		};
-> +
-> +		memory at 85800000 {
-> +			reg = <0x0 0x85800000 0x0 0x800000>;
-> +			no-map;
-> +		};
-> +
-> +		memory at 86200000 {
-> +			reg = <0x0 0x86200000 0x0 0x2600000>;
-> +			no-map;
-> +		};
+> diff --git a/arch/arm/boot/dts/armada-388-clearfog.dts b/arch/arm/boot/dts/armada-388-clearfog.dts
+> index 71ce201c903e..40ec6d768669 100644
+> --- a/arch/arm/boot/dts/armada-388-clearfog.dts
+> +++ b/arch/arm/boot/dts/armada-388-clearfog.dts
+> @@ -351,6 +351,8 @@
 >  	};
 >  
->  	cpus {
+>  	dsa at 0 {
+> +		status = "disabled";
+> +
+>  		compatible = "marvell,dsa";
+>  		dsa,ethernet = <&eth1>;
+>  		dsa,mii-bus = <&mdio>;
+> @@ -444,3 +446,66 @@
+>  		status = "disabled";
+>  	};
+>  };
+> +
+> +&mdio {
+> +	status = "okay";
+> +
+> +	switch at 4 {
+> +		compatible = "marvell,mv88e6085";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		reg = <4>;
+> +		pinctrl-0 = <&clearfog_dsa0_clk_pins &clearfog_dsa0_pins>;
+> +		pinctrl-names = "default";
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port at 0 {
+> +				reg = <0>;
+> +				label = "lan5";
+> +			};
+> +
+> +			port at 1 {
+> +				reg = <1>;
+> +				label = "lan4";
+> +			};
+> +
+> +			port at 2 {
+> +				reg = <2>;
+> +				label = "lan3";
+> +			};
+> +
+> +			port at 3 {
+> +				reg = <3>;
+> +				label = "lan2";
+> +			};
+> +
+> +			port at 4 {
+> +				reg = <4>;
+> +				label = "lan1";
+> +			};
+> +
+> +			port at 5 {
+> +				reg = <5>;
+> +				label = "cpu";
+> +				ethernet = <&eth1>;
+> +				fixed-link {
+> +					speed = <1000>;
+> +					full-duplex;
+> +				};
+> +			};
+> +
+> +			port at 6 {
+> +				/* 88E1512 external phy */
+> +				reg = <6>;
+> +				label = "lan6";
+> +				fixed-link {
+> +					speed = <1000>;
+> +					full-duplex;
+> +				};
+> +			};
+> +		};
+> +	};
+> +};
 > -- 
-> 1.9.1
+> 2.9.3
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
