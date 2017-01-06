@@ -1,42 +1,48 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Fri, 6 Jan 2017 15:57:25 -0600
-Subject: [PATCH v2 1/9] ARM: dts: keystone-k2hk: Add MSM RAM node
-In-Reply-To: <20170106215733.41637-1-s-anna@ti.com>
-References: <20170106215733.41637-1-s-anna@ti.com>
-Message-ID: <20170106215733.41637-2-s-anna@ti.com>
+Date: Fri, 6 Jan 2017 15:57:24 -0600
+Subject: [PATCH v2 0/9] Use mmio-sram driver for Keystone MSMC RAM
+Message-ID: <20170106215733.41637-1-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the RAM managed by the Multicore Shared Memory Controller (MSMC)
-as a mmio-sram node. The 66AK2H SoCs have 6 MB of such memory. Any
-specific MSM memory range needed by a software module ought to be
-reserved using an appropriate child node.
+Hi,
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
-v2: No code changes, SoC name in commit message corrected to use 66AK2H
+The Keystone 2 family of SoCs have an on-chip RAM called the
+Multicore Shared Memory (MSM) RAM. This RAM is accessible through
+the Multicore Shared Memory Controller (MSMC). This series represents
+these on-chip RAMs as sram nodes so that the memory allocations
+can be managed by the in-kernel mmio-sram driver.
 
- arch/arm/boot/dts/keystone-k2hk.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+This is v2 of the previous series [1], and now includes 4 additional
+patches that reserve the portions of the MSMC RAM used by the
+Keystone Boot Monitor. The first 5 patches are essentially the same
+as in v1, with minor commit description updates for using the proper
+SoC names, but no code changes.
 
-diff --git a/arch/arm/boot/dts/keystone-k2hk.dtsi b/arch/arm/boot/dts/keystone-k2hk.dtsi
-index 8f67fa8df936..39e88d815235 100644
---- a/arch/arm/boot/dts/keystone-k2hk.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2hk.dtsi
-@@ -46,6 +46,14 @@
- 	soc {
- 		/include/ "keystone-k2hk-clocks.dtsi"
- 
-+		msm_ram: msmram at 0c000000 {
-+			compatible = "mmio-sram";
-+			reg = <0x0c000000 0x600000>;
-+			ranges = <0x0 0x0c000000 0x600000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+		};
-+
- 		dspgpio0: keystone_dsp_gpio at 02620240 {
- 			compatible = "ti,keystone-dsp-gpio";
- 			gpio-controller;
+Patches baselined on 4.10-rc1.
+
+regards
+Suman
+
+[1] http://marc.info/?l=linux-arm-kernel&m=147277092730387&w=2
+
+Suman Anna (9):
+  ARM: dts: keystone-k2hk: Add MSM RAM node
+  ARM: dts: keystone-k2l: Add MSM RAM node
+  ARM: dts: keystone-k2e: Add MSM RAM node
+  ARM: dts: keystone-k2g: Add MSM RAM node
+  ARM: configs: keystone: Enable Generic on-chip SRAM driver
+  ARM: dts: keystone-k2hk: Reserve MSM RAM for boot monitor
+  ARM: dts: keystone-k2l: Reserve MSM RAM for boot monitor
+  ARM: dts: keystone-k2e: Reserve MSM RAM for boot monitor
+  ARM: dts: keystone-k2g: Reserve MSM RAM for boot monitor
+
+ arch/arm/boot/dts/keystone-k2e.dtsi  | 12 ++++++++++++
+ arch/arm/boot/dts/keystone-k2g.dtsi  | 12 ++++++++++++
+ arch/arm/boot/dts/keystone-k2hk.dtsi | 12 ++++++++++++
+ arch/arm/boot/dts/keystone-k2l.dtsi  | 12 ++++++++++++
+ arch/arm/configs/keystone_defconfig  |  1 +
+ 5 files changed, 49 insertions(+)
+
 -- 
 2.10.2
