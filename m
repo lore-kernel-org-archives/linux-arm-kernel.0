@@ -1,49 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:18:31 +0100
-Subject: [PATCH 22/25] ARM: dts: r8a7794: Use R-Car Gen 2 fallback binding for
- iic nodes
-In-Reply-To: <cover.1483700969.git.horms+renesas@verge.net.au>
-References: <cover.1483700969.git.horms+renesas@verge.net.au>
-Message-ID: <40a99dbb99b1a50c11b95578d7300e5756e7662f.1483700969.git.horms+renesas@verge.net.au>
+Date: Fri,  6 Jan 2017 12:18:59 +0100
+Subject: [PATCH 4/5] ARM: shmobile: r8a7791: Allow booting secondary CPU cores
+ in debug mode
+In-Reply-To: <cover.1483701101.git.horms+renesas@verge.net.au>
+References: <cover.1483701101.git.horms+renesas@verge.net.au>
+Message-ID: <367ed998fa3e04d8bde42f431e880cd3e5922095.1483701101.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added R-Car Gen 2 fallback binding for iic nodes in
-DT for r8a7794 SoC.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-This has no run-time effect for the current driver as the initialisation
-sequence is the same for the SoC-specific binding for r8a7794 and the
-fallback binding for R-Car Gen 2.
+Now debug resource reset is handled properly, allow booting secondary
+CPU cores when hardware debug mode is enabled (MD21=1, SW8-4=OFF on
+koelsch) on legacy r8a7791.
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/smp-r8a7791.c | 14 +-------------
+ 1 file changed, 1 insertion(+), 13 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 89f8f98cb115..86042e64972a 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -683,7 +683,8 @@
- 	};
+diff --git a/arch/arm/mach-shmobile/smp-r8a7791.c b/arch/arm/mach-shmobile/smp-r8a7791.c
+index 2d6417af73b5..2948c22cfc53 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7791.c
++++ b/arch/arm/mach-shmobile/smp-r8a7791.c
+@@ -42,21 +42,9 @@ static void __init r8a7791_smp_prepare_cpus(unsigned int max_cpus)
+ 	rcar_gen2_pm_init();
+ }
  
- 	i2c6: i2c at e6500000 {
--		compatible = "renesas,iic-r8a7794", "renesas,rmobile-iic";
-+		compatible = "renesas,iic-r8a7794", "renesas,rcar-gen2-iic",
-+			     "renesas,rmobile-iic";
- 		reg = <0 0xe6500000 0 0x425>;
- 		interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7794_CLK_IIC0>;
-@@ -697,7 +698,8 @@
- 	};
- 
- 	i2c7: i2c at e6510000 {
--		compatible = "renesas,iic-r8a7794", "renesas,rmobile-iic";
-+		compatible = "renesas,iic-r8a7794", "renesas,rcar-gen2-iic",
-+			     "renesas,rmobile-iic";
- 		reg = <0 0xe6510000 0 0x425>;
- 		interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7794_CLK_IIC1>;
+-static int r8a7791_smp_boot_secondary(unsigned int cpu,
+-				      struct task_struct *idle)
+-{
+-	/* Error out when hardware debug mode is enabled */
+-	if (rcar_gen2_read_mode_pins() & BIT(21)) {
+-		pr_warn("Unable to boot CPU%u when MD21 is set\n", cpu);
+-		return -ENOTSUPP;
+-	}
+-
+-	return shmobile_smp_apmu_boot_secondary(cpu, idle);
+-}
+-
+ const struct smp_operations r8a7791_smp_ops __initconst = {
+ 	.smp_prepare_cpus	= r8a7791_smp_prepare_cpus,
+-	.smp_boot_secondary	= r8a7791_smp_boot_secondary,
++	.smp_boot_secondary	= shmobile_smp_apmu_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_can_disable	= shmobile_smp_cpu_can_disable,
+ 	.cpu_die		= shmobile_smp_apmu_cpu_die,
 -- 
 2.7.0.rc3.207.g0ac5344
