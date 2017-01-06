@@ -1,75 +1,85 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 6 Jan 2017 09:07:17 +0800
-Subject: [PATCH v3] arm64: mm: Fix NOMAP page initialization
-In-Reply-To: <c74d6ec6-16ba-dccc-3b0d-a8bedcb46dc5@linaro.org>
-References: <20161216165437.21612-1-rrichter@cavium.com>
- <CAKv+Gu_SmTNguC=tSCwYOL2kx-DogLvSYRZc56eGP=JhdrUOsA@mail.gmail.com>
- <c74d6ec6-16ba-dccc-3b0d-a8bedcb46dc5@linaro.org>
-Message-ID: <cbbf14fd-a1cc-2463-ba67-acd6d61e9db1@linaro.org>
+From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
+Date: Fri, 6 Jan 2017 01:17:21 +0000
+Subject: [PATCH v2 9/9] ARM: sunxi: Convert pinctrl nodes to generic
+ bindings
+In-Reply-To: <20170105153556.pzec5jjuz7pmvsmn@lukather>
+References: <cover.7edc6c25be8a5e2efdda6a82e102dbf7ece6aa64.1476200742.git-series.maxime.ripard@free-electrons.com>
+ <e32d044d2d967f24f12d83eea50e7f14f2ae1073.1476200742.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v67_4iriM2WS33hUWzNZY8R2WvGjqzntGBPGmNkr1Ryr_w@mail.gmail.com>
+ <58723369-50ad-1792-9be1-c277eb719044@arm.com>
+ <20170105153556.pzec5jjuz7pmvsmn@lukather>
+Message-ID: <dfd7242d-6b16-6091-979f-0bff85a20806@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/1/5 10:03, Hanjun Guo wrote:
-> On 2017/1/4 21:56, Ard Biesheuvel wrote:
->> On 16 December 2016 at 16:54, Robert Richter <rrichter@cavium.com> wrote:
->>> On ThunderX systems with certain memory configurations we see the
->>> following BUG_ON():
->>>
->>>  kernel BUG at mm/page_alloc.c:1848!
->>>
->>> This happens for some configs with 64k page size enabled. The BUG_ON()
->>> checks if start and end page of a memmap range belongs to the same
->>> zone.
->>>
->>> The BUG_ON() check fails if a memory zone contains NOMAP regions. In
->>> this case the node information of those pages is not initialized. This
->>> causes an inconsistency of the page links with wrong zone and node
->>> information for that pages. NOMAP pages from node 1 still point to the
->>> mem zone from node 0 and have the wrong nid assigned.
->>>
->>> The reason for the mis-configuration is a change in pfn_valid() which
->>> reports pages marked NOMAP as invalid:
->>>
->>>  68709f45385a arm64: only consider memblocks with NOMAP cleared for
->>> linear mapping
->>>
->>> This causes pages marked as nomap being no longer reassigned to the
->>> new zone in memmap_init_zone() by calling __init_single_pfn().
->>>
->>> Fixing this by implementing an arm64 specific early_pfn_valid(). This
->>> causes all pages of sections with memory including NOMAP ranges to be
->>> initialized by __init_single_page() and ensures consistency of page
->>> links to zone, node and section.
->>>
->>
->> I like this solution a lot better than the first one, but I am still
->> somewhat uneasy about having the kernel reason about attributes of
->> pages it should not touch in the first place. But the fact that
->> early_pfn_valid() is only used a single time in the whole kernel does
->> give some confidence that we are not simply moving the problem
->> elsewhere.
->>
->> Given that you are touching arch/arm/ as well as arch/arm64, could you
->> explain why only arm64 needs this treatment? Is it simply because we
->> don't have NUMA support there?
->>
->> Considering that Hisilicon D05 suffered from the same issue, I would
->> like to get some coverage there as well. Hanjun, is this something you
->> can arrange? Thanks
->
-> Sure, we will test this patch with LTP MM stress test (which triggers
-> the bug on D05), and give the feedback.
+On 05/01/17 15:35, Maxime Ripard wrote:
 
-a update here, tested on 4.9,
+Hi Maxime,
 
-  - Applied Ard's two patches only
-  - Applied Robert's patch only
+> On Wed, Jan 04, 2017 at 02:16:23AM +0000, Andr? Przywara wrote:
+>> So can I ask that we start taking this seriously and stop doing things
+>> which prevent Allwinner boards from being supported properly?
+>> Which would first involve dropping this very patch?
+> 
+> The driver still supports the old binding.
 
-Both of them can work fine on D05 with NUMA enabled, which means
-boot ok and LTP MM stress test is passed.
+Yes, a _current_ version of the driver supports both bindings, but older
+versions *require* the older binding and bail out if various
+allwinner,xxx properties are missing - as in those proposed new DTs:
 
-I'm not familiar with memory management, it's up to you guys to make
-a decision :)
+4.9 kernel with sunxi/for-next .dtb:
+sun8i-h3-pinctrl 1c20800.pinctrl: missing allwinner,function property in
+node uart0
+sun8i-h3-pinctrl 1c20800.pinctrl: missing allwinner,function property in
+node mmc0
+sunxi-mmc: probe of 1c0f000.mmc failed with error -22
 
-Thanks
-Hanjun
+>> Having done breakage in the past (with "allwinner,sun7i-a20-mmc", for
+>> instance) is no excuse for doing it again.
+> 
+> I'm not sure which breakage we introduced with a new compatible: the
+> old compatible is working just like it used to, and the new one is
+> working like we need it to.
+
+But the new compatible is not recognized with older kernels, preventing
+people from using the newest DT with older kernels as well.
+I proposed to simply work around this by using the old compatible as a
+fallback: compatible="sun7i-a20-mmc", "sun5i-a13-mmc";
+Unfortunately this suggestion was not followed.
+So now we can't boot a 4.8 (or earlier) kernel with a .dtb from a 4.9 or
+later tree. Adding the extra string would fix this.
+
+Actually the recommended approach to avoid this situation in the first
+place is to always use compatible strings with the SoC-specific name as
+the first string, followed by the compatible string the driver works
+with. And this should be done upon introducing a new DT to the tree -
+even if at this point the driver doesn't deal with the new string.
+Unknown strings will just be skipped.
+So for instance the H5 DT should read: "sun50i-h5-mmc",
+"sun50i-a64-mmc", "sun5i-a13-mmc"; (with the last string possibly being
+optional). The current kernel driver will not match the h5 string, so it
+falls back to the a64 string and works. If we learn about a neat eMMC
+5.1 feature (or any quirk the H5 can benefit from) somewhere in the
+future, we can add the code together with this h5 string to the driver
+and don't need to change the DT at all.
+
+>> And especially I want to avoid this habit creeping into the arm64
+>> world (thinking about the H5 here, which may be impacted by this
+>> very patch, for instance).
+> 
+> And again, if you looked at the entire serie, you would have seen that
+> I took this into account.
+
+I saw that and I appreciate that very much, but that post was not about
+keeping compatibility with older DTs, but allowing older kernels to run
+with the latest DT as well.
+Newer DTs from your -next branch do not work with older kernels - that
+is what my whole post was about. _Why_ we should care is explained there.
+
+And please don't get me wrong: I am not asking for rewriting and bending
+the whole kernel source to make this possible, it's just that we drop
+this patch here, for instance, or simply not _change_ compatible names,
+but instead add new strings.
+
+Cheers,
+Andre.
