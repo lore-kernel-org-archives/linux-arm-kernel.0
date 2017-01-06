@@ -1,46 +1,43 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 6 Jan 2017 19:22:32 -0200
-Subject: imx: RS-485 problems during TX, maybe DMA related
-In-Reply-To: <20170104160024.GA13442@archie.localdomain>
-References: <20170104160024.GA13442@archie.localdomain>
-Message-ID: <CAOMZO5C3enuThR1DpcwNnqFdxd8tGoBwd76O62Gnviz8x1_a9w@mail.gmail.com>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Sat, 7 Jan 2017 06:26:15 +0900
+Subject: [PATCH v5 2/5] arm64: dts: exynos: make tm2 and tm2e independent
+ from each other
+In-Reply-To: <20170106134350.32428-3-andi.shyti@samsung.com>
+References: <CGME20170106134356epcas1p19be459900aec43b2b9ea343cdaf0a2bf@epcas1p1.samsung.com>
+ <20170106134350.32428-1-andi.shyti@samsung.com>
+ <20170106134350.32428-3-andi.shyti@samsung.com>
+Message-ID: <CAGTfZH2-NxEfPDnF987--V3HARm6ZWTeU+qPrhbM3RQ9mBSS=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Clemens,
+Hi Andi,
 
-On Wed, Jan 4, 2017 at 2:00 PM, Clemens Gruber
-<clemens.gruber@pqgruber.com> wrote:
-> Hi,
+2017-01-06 22:43 GMT+09:00 Andi Shyti <andi.shyti@samsung.com>:
+> Currently tm2e dts includes tm2 but there are some differences
+> between the two boards and tm2 has some properties that tm2e
+> doesn't have.
 >
-> I observed odd behavior of the current tty/serial/imx.c driver in RS-485
-> mode.
+> That's why it's important to keep the two dts files independent
+> and put all the commonalities in a tm2-common.dtsi file.
 >
-> RX works fine, but TX does not: When sending data, it arrives multiple
+> At the current status the only two differences between the two
+> dts files (besides the board name) are ldo31 and ldo38.
+>
+> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> ---
+>  ...ynos5433-tm2.dts => exynos5433-tm2-common.dtsi} |   21 +-
+>  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 1150 +-------------------
+>  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |    2 +-
+>  3 files changed, 42 insertions(+), 1131 deletions(-)
+>  copy arch/arm64/boot/dts/exynos/{exynos5433-tm2.dts => exynos5433-tm2-common.dtsi} (98%)
+>  rewrite arch/arm64/boot/dts/exynos/exynos5433-tm2.dts (98%)
 
-I am also trying to get rs485 in half-duplex mode to work on mx6dl
-with kernel 4.9.
+Looks good to me.
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-RX also works for me, but TX does not.
+[snip]
 
-On my board it is the MX6QDL_PAD_CSI0_DAT16__UART4_RTS_B pin that
-controls the rs485 transceiver flow, but I do not
-see RTS to toggle to 1 during transmit. It stays always at 0.
-
-I see you use CTS pin instead, but I thought RTS pin should be used.
-
-On my userspace application I have:
-
-/* enable RS485 mode: */
-rs485conf.flags |= SER_RS485_ENABLED;
-
-/* set logical level for RTS pin equal to 1 when sending: */
-rs485conf.flags |= SER_RS485_RTS_ON_SEND;
-
-/* set logical level for RTS pin equal to 0 after sending: */
-rs485conf.flags &= ~(SER_RS485_RTS_AFTER_SEND);
-
-Any ideas as to how to make RTS go to one so that the data can go
-through the rs485 transceiver?
-
-Thanks
+-- 
+Best Regards,
+Chanwoo Choi
