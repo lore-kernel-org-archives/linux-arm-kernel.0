@@ -1,65 +1,58 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:18:23 +0100
-Subject: [PATCH 14/25] ARM: dts: r8a7790: Use R-Car Gen 2 fallback binding for
- i2c nodes
+Date: Fri,  6 Jan 2017 12:18:17 +0100
+Subject: [PATCH 08/25] ARM: dts: gose: Add da9063 PMIC device node for system
+ restart
 In-Reply-To: <cover.1483700969.git.horms+renesas@verge.net.au>
 References: <cover.1483700969.git.horms+renesas@verge.net.au>
-Message-ID: <82f8bfbef9864f6165b7741e251bf74827079604.1483700969.git.horms+renesas@verge.net.au>
+Message-ID: <c20839a36132462496f939b0d13afee009c9a547.1483700969.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added R-Car Gen 2 fallback binding for i2c nodes in
-DT for r8a7790 SoC.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-This has no run-time effect for the current driver as the initialisation
-sequence is the same for the SoC-specific binding for r8a7790 and the
-fallback binding for R-Car Gen 2.
+Enable i2c6, and add a device node for the da9063 PMIC, with subnodes
+for rtc and wdt.  Regulator support is not yet included.
 
+This allows the system to be restarted when the watchdog timer times
+out, or when a system restart is requested.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/r8a7793-gose.dts | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index b7ed7466308b..823ab536175d 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -480,7 +480,7 @@
- 	i2c0: i2c at e6508000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7790";
-+		compatible = "renesas,i2c-r8a7790", "renesas,rcar-gen2-i2c";
- 		reg = <0 0xe6508000 0 0x40>;
- 		interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7790_CLK_I2C0>;
-@@ -492,7 +492,7 @@
- 	i2c1: i2c at e6518000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7790";
-+		compatible = "renesas,i2c-r8a7790", "renesas,rcar-gen2-i2c";
- 		reg = <0 0xe6518000 0 0x40>;
- 		interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7790_CLK_I2C1>;
-@@ -504,7 +504,7 @@
- 	i2c2: i2c at e6530000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7790";
-+		compatible = "renesas,i2c-r8a7790", "renesas,rcar-gen2-i2c";
- 		reg = <0 0xe6530000 0 0x40>;
- 		interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7790_CLK_I2C2>;
-@@ -516,7 +516,7 @@
- 	i2c3: i2c at e6540000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7790";
-+		compatible = "renesas,i2c-r8a7790", "renesas,rcar-gen2-i2c";
- 		reg = <0 0xe6540000 0 0x40>;
- 		interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7790_CLK_I2C3>;
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index dc311eba4444..92fff07c5e2b 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -538,6 +538,27 @@
+ 	};
+ };
+ 
++&i2c6 {
++	status = "okay";
++	clock-frequency = <100000>;
++
++	pmic at 58 {
++		compatible = "dlg,da9063";
++		reg = <0x58>;
++		interrupt-parent = <&irqc0>;
++		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-controller;
++
++		rtc {
++			compatible = "dlg,da9063-rtc";
++		};
++
++		wdt {
++			compatible = "dlg,da9063-watchdog";
++		};
++	};
++};
++
+ &rcar_sound {
+ 	pinctrl-0 = <&sound_pins &sound_clk_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.7.0.rc3.207.g0ac5344
