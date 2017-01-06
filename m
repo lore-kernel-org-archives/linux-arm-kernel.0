@@ -1,97 +1,44 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 6 Jan 2017 16:24:00 +0000
-Subject: [PATCH 02/10] iommu/of: Prepare for deferred IOMMU configuration
-In-Reply-To: <005f01d26763$450f9cc0$cf2ed640$@codeaurora.org>
-References: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
- <1480465344-11862-3-git-send-email-sricharan@codeaurora.org>
- <20161130161723.GA9042@red-moon>
- <c89825aa-c75f-8493-fe92-7cc97f525bc7@arm.com>
- <20161201112917.GA9680@red-moon>
- <003601d2672e$91744b40$b45ce1c0$@codeaurora.org>
- <20170105122714.GA30449@red-moon>
- <7cd7bcfb-abae-2948-c3f8-230c0d9c9db6@arm.com>
- <005f01d26763$450f9cc0$cf2ed640$@codeaurora.org>
-Message-ID: <20170106162400.GA8109@red-moon>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 6 Jan 2017 10:29:43 -0600
+Subject: [PATCH 1/2] ARM: mm: fix set_memory_*() bounds checks
+In-Reply-To: <20161129175920.GZ14217@n2100.armlinux.org.uk>
+References: <E1c8r91-0007wL-Fl@rmk-PC.armlinux.org.uk>
+ <24932a5a-4cbf-dd84-2e87-de29b07da5b3@ti.com>
+ <20161129175920.GZ14217@n2100.armlinux.org.uk>
+Message-ID: <b7d5fa1e-9301-2b3a-f773-67cfd2c4136f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 08:21:53PM +0530, Sricharan wrote:
-> Hi,
-> 
-> [...]
-> 
-> >>>
-> >>> With the thinking of taking this series through, would it be fine if i
-> >>> cleanup the pci configure hanging outside and push it in to
-> >>> of/acpi_iommu configure respectively ? This time with all neeeded for
-> >>> ACPI added as well.  Also on the last post of V4, Lorenzo commented
-> >>> that it worked for him, although still the of_match_node equivalent in
-> >>> ACPI has to be added. If i can get that, then i will add that as well
-> >>> to make this complete.
-> >>
-> >> Question: I had a look into this and instead of fiddling about with the
-> >> linker script entries in ACPI (ie IORT_ACPI_DECLARE - which I hope this
-> >> patchset would help remove entirely), I think that the only check we
-> >> need in IORT is, depending on what type of SMMU a given device is
-> >> connected to, to check if the respective SMMU driver is compiled in the
-> >> kernel and it will be probed, _eventually_.
-> >>
-> >> As Robin said, by the time a device is probed the respective SMMU
-> >> devices are already created and registered with IORT kernel code or
-> >> they will never be, so to understand if we should defer probing
-> >> SMMU device creation is _not_ really a problem in ACPI.
-> >>
-> >> To check if a SMMU driver is enabled, do we really need a linker
-> >> table ?
-> >>
-> >> Would not a check based on eg:
-> >>
-> >> /**
-> >>  * @type: IOMMU IORT node type of the IOMMU a device is connected to
-> >>  */
-> >> static bool iort_iommu_driver_enabled(u8 type)
-> >> {
-> >> 	switch (type) {
-> >> 	case ACPI_IORT_SMMU_V3:
-> >> 		return IS_ENABLED(CONFIG_ARM_SMMU_V3);
-> >
-> >IS_BUILTIN(...)
-> >
-> >> 	case ACPI_IORT_SMMU:
-> >> 		return IS_ENABLED(CONFIG_ARM_SMMU);
-> >> 	default:
-> >> 		pr_warn("Unknown IORT SMMU type\n");
-> >
-> >Might displaying the actual value be helfpul for debugging a broken IORT
-> >table?
-> >
-> >> 		return false;
-> >> 	}
-> >> }
-> >>
-> >> be sufficient (it is a bit gross, agreed, but it is to understand if
-> >> that's all we need) ? Is there anything I am missing ?
-> >>
-> >> Let me know, I will put together a patch for you I really do not
-> >> want to block your series for this trivial niggle.
-> >
-> >Other than that, though, I like it :) IORT has a small, strictly
-> >bounded, set of supported devices, so I really don't see the need to go
-> >overboard putting it on parity with DT when something this neat and
-> >simple will suffice.
-> >
-> 
-> Ok sure, looks correct for me as well in whole of the context here.
+Russell,
+On 11/29/2016 11:59 AM, Russell King - ARM Linux wrote:
+> On Tue, Nov 29, 2016 at 09:25:19AM -0600, Dave Gerlach wrote:
+>> Hi,
+>> On 11/21/2016 10:08 AM, Russell King wrote:
+>>> +static bool in_range(unsigned long start, unsigned long size,
+>>> +	unsigned long range_start, unsigned long range_end)
+>>> +{
+>>> +	return start >= range_start && start < range_end &&
+>>> +		size <= range_end - start;
+>>> +}
+>>> +
+>>> static int change_memory_common(unsigned long addr, int numpages,
+>>> 				pgprot_t set_mask, pgprot_t clear_mask)
+>>> {
+>>> -	unsigned long start = addr;
+>>> -	unsigned long size = PAGE_SIZE*numpages;
+>>> -	unsigned long end = start + size;
+>>> +	unsigned long start = addr & PAGE_SIZE;
+>>
+>> This doesn't work as is, I believe 'start' should be set to
+>> PAGE_ALIGN(addr), addr & PAGE_SIZE as it is doesn't make sense. If I make
+>> this change this code works ok.
+>
+> You're right, but we want to round 'addr' _down_, not up as PAGE_ALIGN()
+> will do.  So that should've been PAGE_MASK.
+>
 
-Ok, I put together a branch where you can find your original series
-plus some ACPI patches for you to test and use:
+Do you plan to send an updated version of this patch? I'd be happy to 
+update it and resend.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git iommu/probe-deferral
-
-Feel free to post the additional patches I added along with your series
-(that from what I gather you have reworked already) and please both have a
-look if the deferral mechanism I put in place in ACPI makes sense to you.
-
-Please CC linux-acpi upon posting, if you need help shout.
-
-Lorenzo
+Regards,
+Dave
