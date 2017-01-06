@@ -1,65 +1,59 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 6 Jan 2017 14:05:15 +0100
-Subject: [PATCH v6 01/18] iommu/dma: Allow MSI-only cookies
-In-Reply-To: <ae222579-6939-b89a-80c2-9ee8f147299e@arm.com>
-References: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
- <1483643086-2883-2-git-send-email-eric.auger@redhat.com>
- <20170106105945.GK17255@8bytes.org>
- <b058a7f9-84bf-1d5c-1c24-24da251cc964@redhat.com>
- <ae222579-6939-b89a-80c2-9ee8f147299e@arm.com>
-Message-ID: <814f9798-dbd9-8e41-8e87-20a517c28c71@redhat.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Jan 2017 13:07:27 +0000
+Subject: [PATCHv2 net-next 09/11] net: mvpp2: simplify MVPP2_PRS_RI_*
+ definitions
+In-Reply-To: <1482943567-12483-10-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1482943567-12483-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1482943567-12483-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170106130727.GB14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-On 06/01/2017 13:12, Robin Murphy wrote:
-> On 06/01/17 11:46, Auger Eric wrote:
->>
->>
->> On 06/01/2017 11:59, Joerg Roedel wrote:
->>> On Thu, Jan 05, 2017 at 07:04:29PM +0000, Eric Auger wrote:
->>>>  struct iommu_dma_cookie {
->>>> -	struct iova_domain	iovad;
->>>> -	struct list_head	msi_page_list;
->>>> -	spinlock_t		msi_lock;
->>>> +	union {
->>>> +		struct iova_domain	iovad;
->>>> +		dma_addr_t		msi_iova;
->>>> +	};
->>>> +	struct list_head		msi_page_list;
->>>> +	spinlock_t			msi_lock;
->>>> +	enum iommu_dma_cookie_type	type;
->>>
->>> Please move the type to the beginning of the struct and add a comment
->>> how the type relates to the union.
->>
->> Sure
->>
->> Thank you for the review.
+On Wed, Dec 28, 2016 at 05:46:05PM +0100, Thomas Petazzoni wrote:
+> Some of the MVPP2_PRS_RI_* definitions use the ~(value) syntax, which
+> doesn't compile nicely on 64-bit. Moreover, those definitions are in
+> fact unneeded, since they are always used in combination with a bit
+> mask that ensures only the appropriate bits are modified.
 > 
-> FWIW I already had a cleaned up version of this patch, I just hadn't
-> mentioned it. I've pushed out an update with that change added too[1].
+> Therefore, such definitions should just be set to 0x0. For example:
 > 
-> Robin.
+>  #define MVPP2_PRS_RI_L2_CAST_MASK              0x600
+>  #define MVPP2_PRS_RI_L2_UCAST                  ~(BIT(9) | BIT(10))
+>  #define MVPP2_PRS_RI_L2_MCAST                  BIT(9)
+>  #define MVPP2_PRS_RI_L2_BCAST                  BIT(10)
 > 
-> [1]:http://linux-arm.org/git?p=linux-rm.git;a=shortlog;h=refs/heads/iommu/misc
+> becomes
+> 
+>  #define MVPP2_PRS_RI_L2_CAST_MASK              0x600
+>  #define MVPP2_PRS_RI_L2_UCAST                  0x0
+>  #define MVPP2_PRS_RI_L2_MCAST                  BIT(9)
+>  #define MVPP2_PRS_RI_L2_BCAST                  BIT(10)
 
-Great, thanks!
+So this is a two-bit field in a register with three defined states - I'm
+not sure that using BIT() here is really a good idea.  BIT() is fine for
+single-bit controls, but I think it adds an additional level of confusion
+for multi-bit controls.
 
-Eric
-> 
->>
->> Best regards
->>
->> Eric
->>>
->>>
->>>
->>> 	Joerg
->>>
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Also, the combination of the mask being defined as hex and the controls
+using BIT() is particularly not nice.  I think either use one style or
+the other, don't mix them.  So either:
+
+  #define MVPP2_PRS_RI_L2_CAST_MASK              0x600
+  #define MVPP2_PRS_RI_L2_UCAST                  0x000
+  #define MVPP2_PRS_RI_L2_MCAST                  0x200
+  #define MVPP2_PRS_RI_L2_BCAST                  0x400
+
+or:
+
+  #define MVPP2_PRS_RI_L2_CAST_MASK              (BIT(10) | BIT(9))
+  #define MVPP2_PRS_RI_L2_UCAST                  0
+  #define MVPP2_PRS_RI_L2_MCAST                  BIT(9)
+  #define MVPP2_PRS_RI_L2_BCAST                  BIT(10)
+
+It then becomes obvious that the mask and the settings are changing the
+same bits.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
