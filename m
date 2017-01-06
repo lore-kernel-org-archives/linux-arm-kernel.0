@@ -1,69 +1,97 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:17:57 +0100
-Subject: [PATCH 15/16] arm64: dts: r8a7796: Use R-Car Gen 3 fallback binding
- for msiof nodes
+Date: Fri,  6 Jan 2017 12:17:58 +0100
+Subject: [PATCH 16/16] arm64: dts: r8a7795: Add PWM support
 In-Reply-To: <cover.1483700694.git.horms+renesas@verge.net.au>
 References: <cover.1483700694.git.horms+renesas@verge.net.au>
-Message-ID: <8b51f97138ca22b6ae728a434215a05b7e5bbc63.1483700694.git.horms+renesas@verge.net.au>
+Message-ID: <b2b9443beee5017ebdb3f2be9ef472c73d260481.1483700694.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added R-Car Gen 3 fallback binding for msiof nodes in
-DT for r8a7796 SoC.
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-This has no run-time effect for the current driver as the initialisation
-sequence is the same for the SoC-specific binding for r8a7796 and the
-fallback binding for R-Car Gen 3.
+Add the 7 PWM channels to the r8a7795 device tree, in the disabled
+state.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 63 ++++++++++++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index d4beb15b076a..eb446d966621 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -485,7 +485,8 @@
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 3fe7e0af5989..972e379c0596 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -894,6 +894,69 @@
+ 			status = "disabled";
  		};
  
- 		msiof0: spi at e6e90000 {
--			compatible = "renesas,msiof-r8a7796";
-+			compatible = "renesas,msiof-r8a7796",
-+				     "renesas,rcar-gen3-msiof";
- 			reg = <0 0xe6e90000 0 0x0064>;
- 			interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 211>;
-@@ -499,7 +500,8 @@
- 		};
- 
- 		msiof1: spi at e6ea0000 {
--			compatible = "renesas,msiof-r8a7796";
-+			compatible = "renesas,msiof-r8a7796",
-+				     "renesas,rcar-gen3-msiof";
- 			reg = <0 0xe6ea0000 0 0x0064>;
- 			interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 210>;
-@@ -513,7 +515,8 @@
- 		};
- 
- 		msiof2: spi at e6c00000 {
--			compatible = "renesas,msiof-r8a7796";
-+			compatible = "renesas,msiof-r8a7796",
-+				     "renesas,rcar-gen3-msiof";
- 			reg = <0 0xe6c00000 0 0x0064>;
- 			interrupts = <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 209>;
-@@ -526,7 +529,8 @@
- 		};
- 
- 		msiof3: spi at e6c10000 {
--			compatible = "renesas,msiof-r8a7796";
-+			compatible = "renesas,msiof-r8a7796",
-+				     "renesas,rcar-gen3-msiof";
- 			reg = <0 0xe6c10000 0 0x0064>;
- 			interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 208>;
++		pwm0: pwm at e6e30000 {
++			compatible = "renesas,pwm-r8a7795", "renesas,pwm-rcar";
++			reg = <0 0xe6e30000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
++		pwm1: pwm at e6e31000 {
++			compatible = "renesas,pwm-r8a7795", "renesas,pwm-rcar";
++			reg = <0 0xe6e31000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
++		pwm2: pwm at e6e32000 {
++			compatible = "renesas,pwm-r8a7795", "renesas,pwm-rcar";
++			reg = <0 0xe6e32000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
++		pwm3: pwm at e6e33000 {
++			compatible = "renesas,pwm-r8a7795", "renesas,pwm-rcar";
++			reg = <0 0xe6e33000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
++		pwm4: pwm at e6e34000 {
++			compatible = "renesas,pwm-r8a7795", "renesas,pwm-rcar";
++			reg = <0 0xe6e34000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
++		pwm5: pwm at e6e35000 {
++			compatible = "renesas,pwm-r8a7795", "renesas,pwm-rcar";
++			reg = <0 0xe6e35000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
++		pwm6: pwm at e6e36000 {
++			compatible = "renesas,pwm-r8a7795", "renesas,pwm-rcar";
++			reg = <0 0xe6e36000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
+ 		rcar_sound: sound at ec500000 {
+ 			/*
+ 			 * #sound-dai-cells is required
 -- 
 2.7.0.rc3.207.g0ac5344
