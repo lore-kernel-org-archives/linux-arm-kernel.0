@@ -1,87 +1,31 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 6 Jan 2017 11:02:57 +0100
-Subject: [RFC PATCH 4/7] KVM: arm/arm64: Check that system supports split
- eoi/deactivate
-In-Reply-To: <7e44980f-d4b9-a5d0-b0a9-5424548300d8@arm.com>
-References: <20161210204712.21830-1-christoffer.dall@linaro.org>
- <20161210204712.21830-5-christoffer.dall@linaro.org>
- <7e44980f-d4b9-a5d0-b0a9-5424548300d8@arm.com>
-Message-ID: <20170106100257.GD21089@cbox>
+From: Raghavan.Anurag@in.bosch.com (Anurag Raghavan (RBEI/ETW11))
+Date: Fri, 6 Jan 2017 10:07:29 +0000
+Subject: ubi_io_read: error -74 (ECC error) 
+Message-ID: <38f0cfac3dbe4ea89da84c7fbf667833@SGPMBX1023.APAC.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 05:40:58PM +0000, Marc Zyngier wrote:
-> On 10/12/16 20:47, Christoffer Dall wrote:
-> > Some systems without proper firmware and/or hardware description data
-> > don't support the split EOI and deactivate operation and therefore
-> > don't provide an irq_set_vcpu_affinity implementation.  On such
-> > systems, we cannot leave the physical interrupt active after the timer
-> > handler on the host has run, so we cannot support KVM with the timer
-> > changes we about to introduce.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> >  virt/kvm/arm/arch_timer.c | 30 ++++++++++++++++++++++++++++++
-> >  1 file changed, 30 insertions(+)
-> > 
-> > diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> > index c7c3bfd..f27a086 100644
-> > --- a/virt/kvm/arm/arch_timer.c
-> > +++ b/virt/kvm/arm/arch_timer.c
-> > @@ -418,6 +418,31 @@ static int kvm_timer_dying_cpu(unsigned int cpu)
-> >  	return 0;
-> >  }
-> >  
-> > +static bool has_split_eoi_deactivate_support(void)
-> > +{
-> > +	struct irq_desc *desc;
-> > +	struct irq_data *data;
-> > +	struct irq_chip *chip;
-> > +
-> > +	/*
-> > +	 * Check if split EOI and deactivate is supported on this machine.
-> > +	 */
-> > +	desc = irq_to_desc(host_vtimer_irq);
-> > +	if (!desc) {
-> > +		kvm_err("kvm_arch_timer: no host_vtimer_irq descriptor\n");
-> > +		return false;
-> > +	}
-> > +
-> > +	data = irq_desc_get_irq_data(desc);
-> > +	chip = irq_data_get_irq_chip(data);
-> > +	if (!chip || !chip->irq_set_vcpu_affinity) {
-> > +		kvm_err("kvm_arch_timer: no split EOI/deactivate; abort\n");
-> > +		return false;
-> > +	}
-> > +
-> > +	return true;
-> > +}
-> 
-> That feels really involved. How about reporting that we don't have a
-> usable VGIC altogether from the GIC driver?
-> 
+Hi All,
 
-You mean not booting the kernel at all, or establish some communication
-from the GIC driver to KVM, telling KVM if it's usable for
-virtualization or not?
+My appdata partition could not be mounted or where the partition was not able to be used. Anyone can help me to find out the root cause of this. What are the possibilities of this ubifs corruption. Any patched are available to fix this issue.
 
-> > +
-> >  int kvm_timer_hyp_init(void)
-> >  {
-> >  	struct arch_timer_kvm_info *info;
-> > @@ -449,6 +474,11 @@ int kvm_timer_hyp_init(void)
-> >  		return err;
-> >  	}
-> >  
-> > +	if (!has_split_eoi_deactivate_support()) {
-> > +		disable_percpu_irq(host_vtimer_irq);
-> > +		return -ENODEV;
-> > +	}
-> > +
-> >  	kvm_info("virtual timer IRQ%d\n", host_vtimer_irq);
-> >  
-> >  	cpuhp_setup_state(CPUHP_AP_KVM_ARM_TIMER_STARTING,
-> > 
-> 
-Thanks,
--Christoffer
+I am using the kernel version-30.3.5
+Any kernel patches are available to solve this issue...??
+
+Error logs:
+
+[    1.797141] UBI error: ubi_io_read: error -74 (ECC error) while reading 253952 bytes from PEB 445:8192, read 253952 bytes
+[    1.808274] UBIFS error (pid 491): ubifs_scan: corrupt empty space at LEB 489:233760
+[    1.816037] UBIFS error (pid 491): ubifs_scanned_corruption: corruption at LEB 489:233760
+[    1.828660] UBIFS error (pid 491): ubifs_scan: LEB 489 scanning failed
+[    1.835215] UBIFS warning (pid 491): ubifs_ro_mode: switched to read-only mode, error -117
+[    1.843502] UBIFS error (pid 491): make_reservation: cannot reserve 58 bytes in jhead 2, error -117
+[    1.852569] UBIFS error (pid 491): do_writepage: cannot write page 0 of inode 76584, error -117
+dpkg: error: unable to sync new file '/var/lib/dpkg/arch-new': Structure needs cleaning
+
+Best regards
+
+Raghavan Anurag
+RBEI/ETW1  
+
+Tel. +91(422)667-4001 | Mobil 9986968950
