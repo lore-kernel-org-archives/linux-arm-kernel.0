@@ -1,61 +1,70 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Fri, 06 Jan 2017 22:43:48 +0900
-Subject: [PATCH v5 3/5] input: Add support for the tm2 touchkey device driver
-In-Reply-To: <20170106134350.32428-1-andi.shyti@samsung.com>
-References: <20170106134350.32428-1-andi.shyti@samsung.com>
- <CGME20170106134356epcas1p1758fadaa2b12ad29d90e2da525456a28@epcas1p1.samsung.com>
-Message-ID: <20170106134350.32428-4-andi.shyti@samsung.com>
+From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
+Date: Fri, 6 Jan 2017 16:47:59 +0300
+Subject: [PATCH 1/2] arm64: dma_mapping: allow PCI host driver to limit
+ DMA mask
+In-Reply-To: <2723285.JORgusvJv4@wuerfel>
+References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
+ <3158203.Yc9Qgx82xo@wuerfel>
+ <9d5e32d3-000c-2f95-7ea8-c64d53ab6b56@cogentembedded.com>
+ <2723285.JORgusvJv4@wuerfel>
+Message-ID: <9a03c05d-ad4c-0547-d1fe-01edb8b082d6@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jaechul Lee <jcsing.lee@samsung.com>
+>>> Just a guess, but if the inbound translation windows in the host
+>>> bridge are wider than 32-bit, the reason for setting up a single
+>>> 32-bit window is probably because that is what the parent bus supports.
 
-This patch adds the binding description of the tm2 touchkey
-device driver.
+I've re-checked rcar-pcie hardware documentation.
 
-Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
----
- .../bindings/input/samsung,tm2-touchkey.txt        | 27 ++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/input/samsung,tm2-touchkey.txt
+It indeed mentions that AXI bus it sits on is 32-bit.
 
-diff --git a/Documentation/devicetree/bindings/input/samsung,tm2-touchkey.txt b/Documentation/devicetree/bindings/input/samsung,tm2-touchkey.txt
-new file mode 100644
-index 000000000000..4de1af0f0a37
---- /dev/null
-+++ b/Documentation/devicetree/bindings/input/samsung,tm2-touchkey.txt
-@@ -0,0 +1,27 @@
-+Samsung tm2-touchkey
-+
-+Required properties:
-+- compatible: must be "samsung,tm2-touchkey"
-+- reg: I2C address of the chip.
-+- interrupt-parent: a phandle for the interrupt controller (see interrupt
-+	binding[0]).
-+- interrupts: interrupt to which the chip is connected (see interrupt
-+	binding[0]).
-+- vcc-supply : internal regulator output. 1.8V
-+- vdd-supply : power supply for IC 3.3V
-+
-+[0]: Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
-+
-+Example:
-+	&i2c0 {
-+		/* ... */
-+
-+		touchkey at 20 {
-+			compatible = "samsung,tm2-touchkey";
-+			reg = <0x20>;
-+			interrupt-parent = <&gpa3>;
-+			interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
-+			vcc-supply=<&ldo32_reg>;
-+			vdd-supply=<&ldo33_reg>;
-+		};
-+	};
--- 
-2.11.0
+
+>> Well anyway applying patch similar to your's will fix pcie-rcar + nvme
+>> case - thus I don't object :)   But it can break other cases ...
+>>
+>> But why do you hook at set_dma_mask() and overwrite mask inside, instead
+>> of hooking at dma_supported() and rejecting unsupported mask?
+>>
+>> I think later is better, because it lets drivers to handle unsupported
+>> high-dma case, like documented in DMA-API_HOWTO.
+> 
+> I think the behavior I put in there is required for swiotlb to make
+> sense, otherwise you would rely on the driver to handle dma_set_mask()
+> failure gracefully with its own bounce buffers (as network and
+> scsi drivers do but others don't).
+> 
+> Having swiotlb or iommu enabled should result in dma_set_mask() always
+> succeeding unless the mask is too small to cover the swiotlb
+> bounce buffer area or the iommu virtual address space. This behavior
+> is particularly important in case the bus address space is narrower
+> than 32-bit, as we have to guarantee that the fallback to 32-bit
+> DMA always succeeds. There are also a lot of drivers that try to
+> set a 64-bit mask but don't implement bounce buffers for streaming
+> mappings if that fails, and swiotlb is what we use to make those
+> drivers work.
+> 
+> And yes, the API is a horrible mess.
+
+With my patch applied and thus 32bit dma_mask set for NVMe device, I do
+see high addresses passed to dma_map_*() routines and handled by
+swiotlb. Thus your statement that behavior "succeed 64bit dma_set_mask()
+operation but silently replace mask behind the scene" is required for
+swiotlb to be used, does not match reality.
+
+It can be interpreted as a breakage elsewhere, but it's hard to point
+particular "root cause". The entire infrastructure to allocate and use
+DMA memory is messy.
+
+Still current code does not work, thus fix is needed.
+
+Perhaps need to introduce some generic API to "allocate memory best
+suited for DMA to particular device", and fix allocation points (in
+drivers, filesystems, etc) to use it. Such an API could try to allocate
+area that can be DMAed by hardware, and fallback to other memory that
+can be used via swiotlb or other bounce buffer implementation.
+
+But for now, have to stay with dma masks. Will follow-up with a patch
+based on your but with coherent mask handling added.
+
+Nikita
