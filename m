@@ -1,483 +1,122 @@
-From: agustinv@codeaurora.org (Agustin Vega-Frias)
-Date: Fri, 06 Jan 2017 08:17:09 -0500
-Subject: [PATCH V9 3/3] irqchip: qcom: Add IRQ combiner driver
-In-Reply-To: <ded278ef-a0a2-811a-f362-70555f74d6fc@arm.com>
-References: <1481753438-3905-1-git-send-email-agustinv@codeaurora.org>
- <1481753438-3905-4-git-send-email-agustinv@codeaurora.org>
- <ded278ef-a0a2-811a-f362-70555f74d6fc@arm.com>
-Message-ID: <a1d3e5706ea8c97a4712a8fb33db71ca@codeaurora.org>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Fri,  6 Jan 2017 18:58:07 +0530
+Subject: [PATCH V9 0/9] Add support for privileged mappings
+Message-ID: <1483709296-32761-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Marc,
+This series is a resend of the V5 that Mitch sent sometime back [2]
+All the patches are the same and i have just rebased. Redid patch [3],
+as it does not apply in this code base. Added a couple of more patches
+[4], [5] from Robin for adding the privileged attributes to armv7s format
+and arm-smmuv3 revert. Added a patch for passing in the privileged
+attributes from arm32 dma-mapping apis as well.
 
-On 2017-01-05 11:48, Marc Zyngier wrote:
-> Hi Agustin,
-> 
-> On 14/12/16 22:10, Agustin Vega-Frias wrote:
->> Driver for interrupt combiners in the Top-level Control and Status
->> Registers (TCSR) hardware block in Qualcomm Technologies chips.
->> 
->> An interrupt combiner in this block combines a set of interrupts by
->> OR'ing the individual interrupt signals into a summary interrupt
->> signal routed to a parent interrupt controller, and provides read-
->> only, 32-bit registers to query the status of individual interrupts.
->> The status bit for IRQ n is bit (n % 32) within register (n / 32)
->> of the given combiner. Thus, each combiner can be described as a set
->> of register offsets and the number of IRQs managed.
->> 
->> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
->> ---
->>  drivers/irqchip/Kconfig             |   9 +
->>  drivers/irqchip/Makefile            |   1 +
->>  drivers/irqchip/qcom-irq-combiner.c | 322 
->> ++++++++++++++++++++++++++++++++++++
->>  3 files changed, 332 insertions(+)
->>  create mode 100644 drivers/irqchip/qcom-irq-combiner.c
->> 
->> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
->> index bc0af33..3e3430c 100644
->> --- a/drivers/irqchip/Kconfig
->> +++ b/drivers/irqchip/Kconfig
->> @@ -279,3 +279,12 @@ config EZNPS_GIC
->>  config STM32_EXTI
->>  	bool
->>  	select IRQ_DOMAIN
->> +
->> +config QCOM_IRQ_COMBINER
->> +	bool "QCOM IRQ combiner support"
->> +	depends on ARCH_QCOM && ACPI
->> +	select IRQ_DOMAIN
->> +	select IRQ_DOMAIN_HIERARCHY
->> +	help
->> +	  Say yes here to add support for the IRQ combiner devices embedded
->> +	  in Qualcomm Technologies chips.
->> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
->> index e4dbfc8..1818a0b 100644
->> --- a/drivers/irqchip/Makefile
->> +++ b/drivers/irqchip/Makefile
->> @@ -74,3 +74,4 @@ obj-$(CONFIG_LS_SCFG_MSI)		+= irq-ls-scfg-msi.o
->>  obj-$(CONFIG_EZNPS_GIC)			+= irq-eznps.o
->>  obj-$(CONFIG_ARCH_ASPEED)		+= irq-aspeed-vic.o
->>  obj-$(CONFIG_STM32_EXTI) 		+= irq-stm32-exti.o
->> +obj-$(CONFIG_QCOM_IRQ_COMBINER)		+= qcom-irq-combiner.o
->> diff --git a/drivers/irqchip/qcom-irq-combiner.c 
->> b/drivers/irqchip/qcom-irq-combiner.c
->> new file mode 100644
->> index 0000000..0055e08
->> --- /dev/null
->> +++ b/drivers/irqchip/qcom-irq-combiner.c
->> @@ -0,0 +1,322 @@
->> +/* Copyright (c) 2015-2016, The Linux Foundation. All rights 
->> reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or 
->> modify
->> + * it under the terms of the GNU General Public License version 2 and
->> + * only version 2 as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +/*
->> + * Driver for interrupt combiners in the Top-level Control and Status
->> + * Registers (TCSR) hardware block in Qualcomm Technologies chips.
->> + * An interrupt combiner in this block combines a set of interrupts 
->> by
->> + * OR'ing the individual interrupt signals into a summary interrupt
->> + * signal routed to a parent interrupt controller, and provides read-
->> + * only, 32-bit registers to query the status of individual 
->> interrupts.
->> + * The status bit for IRQ n is bit (n % 32) within register (n / 32)
->> + * of the given combiner. Thus, each combiner can be described as a 
->> set
->> + * of register offsets and the number of IRQs managed.
->> + */
->> +
->> +#include <linux/acpi.h>
->> +#include <linux/irqchip/chained_irq.h>
->> +#include <linux/irqdomain.h>
->> +#include <linux/platform_device.h>
->> +
->> +#define REG_SIZE 32
->> +
->> +struct combiner_reg {
->> +	void __iomem *addr;
->> +	unsigned long mask;
->> +};
->> +
->> +struct combiner {
->> +	struct irq_domain   *domain;
->> +	int                 parent_irq;
->> +	u32                 nirqs;
->> +	u32                 nregs;
->> +	struct combiner_reg regs[0];
->> +};
->> +
->> +static inline u32 irq_register(int irq)
->> +{
->> +	return irq / REG_SIZE;
->> +}
->> +
->> +static inline u32 irq_bit(int irq)
->> +{
->> +	return irq % REG_SIZE;
->> +
->> +}
->> +
->> +static inline int irq_nr(u32 reg, u32 bit)
->> +{
->> +	return reg * REG_SIZE + bit;
->> +}
->> +
->> +/*
->> + * Handler for the cascaded IRQ.
->> + */
->> +static void combiner_handle_irq(struct irq_desc *desc)
->> +{
->> +	struct combiner *combiner = irq_desc_get_handler_data(desc);
->> +	struct irq_chip *chip = irq_desc_get_chip(desc);
->> +	u32 reg;
->> +
->> +	chained_irq_enter(chip, desc);
->> +
->> +	for (reg = 0; reg < combiner->nregs; reg++) {
->> +		int virq;
->> +		int hwirq;
->> +		u32 bit;
->> +		u32 status;
->> +
->> +		if (combiner->regs[reg].mask == 0)
->> +			continue;
-> 
-> I'm a bit worried by this. If I understand it well, this is a pure
-> software construct (controlled from combiner_irq_chip_{un,}mask_irq) 
-> and
-> there is nothing that actually masks the interrupt at the HW level.
-> 
-> So if a device asserts its interrupt line, what mechanism do we have to
-> make sure that we don't end-up with the CPU pegged in interrupt 
-> context?
-> 
+The following patch to the ARM SMMU driver:
 
-Yes, unfortunately this is a dumb hardware combiner; however, the real 
-use
-of mask here is to optimize IRQ handling if the combiner instance has 
-its
-IRQ statuses across more than one register. Currently all active 
-instances
-only use one register, but we are getting close to 32 in one case, so I
-wanted to accommodate a general case where an instance can combine more
-than 32 IRQs.
+    commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
+    Author: Robin Murphy <robin.murphy@arm.com>
+    Date:   Tue Jan 26 18:06:34 2016 +0000
+    
+        iommu/arm-smmu: Treat all device transactions as unprivileged
 
-Having said that, what I'm inclined to do is to remove the use of mask
-on the status read form the register on the next two lines, and then let
-irq_find_mapping fail if we are getting an unexpected IRQ, then call
-handle_bad_irq(desc).
+started forcing all SMMU transactions to come through as "unprivileged".
+The rationale given was that:
 
-Do you have any other suggestions to handle the scenario? E.g., can we
-safely disable the parent IRQ from this context if we see too many
-spurious interrupts?
+  (1) There is no way in the IOMMU API to even request privileged
+      mappings.
 
->> +
->> +		status = readl_relaxed(combiner->regs[reg].addr);
->> +		status &= combiner->regs[reg].mask;
->> +
->> +		while (status) {
->> +			bit = __ffs(status);
->> +			status &= ~(1 << bit);
->> +			hwirq = irq_nr(reg, bit);
->> +			virq = irq_find_mapping(combiner->domain, hwirq);
->> +			if (virq >= 0)
-> 
-> Small bug: virq == 0 shouldn't happen, since this would be an 
-> indication
-> that the hwirq doesn't have a mapping.
-> 
+  (2) It's difficult to implement a DMA mapper that correctly models the
+      ARM VMSAv8 behavior of unprivileged-writeable =>
+      privileged-execute-never.
 
-Will fix this on V10.
+This series rectifies (1) by introducing an IOMMU API for privileged
+mappings and implements it in io-pgtable-arm.
 
->> +				generic_handle_irq(virq);
->> +
->> +		}
->> +	}
->> +
->> +	chained_irq_exit(chip, desc);
->> +}
->> +
->> +/*
->> + * irqchip callbacks
->> + */
->> +
->> +static void combiner_irq_chip_mask_irq(struct irq_data *data)
->> +{
->> +	struct combiner *combiner = irq_data_get_irq_chip_data(data);
->> +	struct combiner_reg *reg = combiner->regs + 
->> irq_register(data->hwirq);
->> +
->> +	clear_bit(irq_bit(data->hwirq), &reg->mask);
->> +}
->> +
->> +static void combiner_irq_chip_unmask_irq(struct irq_data *data)
->> +{
->> +	struct combiner *combiner = irq_data_get_irq_chip_data(data);
->> +	struct combiner_reg *reg = combiner->regs + 
->> irq_register(data->hwirq);
->> +
->> +	set_bit(irq_bit(data->hwirq), &reg->mask);
->> +}
->> +
->> +static struct irq_chip irq_chip = {
->> +	.irq_mask = combiner_irq_chip_mask_irq,
->> +	.irq_unmask = combiner_irq_chip_unmask_irq,
->> +	.name = "qcom-irq-combiner"
->> +};
->> +
->> +/*
->> + * irq_domain_ops callbacks
->> + */
->> +
->> +static int combiner_irq_map(struct irq_domain *domain, unsigned int 
->> irq,
->> +				   irq_hw_number_t hwirq)
->> +{
->> +	struct combiner *combiner = domain->host_data;
->> +
->> +	if (hwirq >= combiner->nirqs)
->> +		return -EINVAL;
-> 
-> Given that this should have come from the translate function, can we
-> move the check there instead, so that we validate everything early?
-> 
+This series rectifies (2) by introducing a new dma attribute
+(DMA_ATTR_PRIVILEGED) for users of the DMA API that need privileged
+mappings which are inaccessible to lesser-privileged execution levels, and
+implements it in the arm64 IOMMU DMA mapper.  The one known user (pl330.c)
+is converted over to the new attribute.
 
-Will fix this on V10.
+Jordan and Jeremy can provide more info on the use case if needed, but the
+high level is that it's a security feature to prevent attacks such as [1].
 
->> +
->> +	irq_set_chip_and_handler(irq, &irq_chip, handle_level_irq);
->> +	irq_set_chip_data(irq, combiner);
->> +	irq_set_noprobe(irq);
->> +	return 0;
->> +}
->> +
->> +static void combiner_irq_unmap(struct irq_domain *domain, unsigned 
->> int irq)
->> +{
->> +	struct irq_data *data = irq_get_irq_data(irq);
->> +
->> +	if (WARN_ON(!data))
->> +		return;
-> 
-> Can this happen?
-> 
+Note that, i tested this on arm64 with arm-smmuv2, short descriptor changes,
+tested this on arm32 platform as well and do not have an platform to test
+this with arm-smmuv3.
 
-I will remove this check on V10 given that irq_domain_disassociate 
-already
-has a check for a NULL irq_data.
+[1] https://github.com/robclark/kilroy
+[2] https://lkml.org/lkml/2016/7/27/590
+[3] https://patchwork.kernel.org/patch/9250493/
+[4] http://www.linux-arm.org/git?p=linux-rm.git;a=commit;h=1291bd74f05d31da1dab3df02987cba5bd25849b
+[5] http://www.linux-arm.org/git?p=linux-rm.git;a=commit;h=a79c1c6333f26849dba418cd92de26b60f5954f3
 
->> +	irq_domain_reset_irq_data(data);
->> +}
->> +
->> +static int combiner_irq_translate(struct irq_domain *d, struct 
->> irq_fwspec *fws,
->> +				  unsigned long *hwirq, unsigned int *type)
->> +{
->> +	if (is_acpi_node(fws->fwnode)) {
->> +		if (WARN_ON((fws->param_count != 2) ||
->> +			    (fws->param[1] & IORESOURCE_IRQ_LOWEDGE) ||
->> +			    (fws->param[1] & IORESOURCE_IRQ_HIGHEDGE)))
->> +			return -EINVAL;
->> +
->> +		*hwirq = fws->param[0];
->> +		*type = fws->param[1];
->> +		return 0;
->> +	}
->> +
->> +	return -EINVAL;
->> +}
->> +
->> +static const struct irq_domain_ops domain_ops = {
->> +	.map = combiner_irq_map,
->> +	.unmap = combiner_irq_unmap,
->> +	.translate = combiner_irq_translate
->> +};
->> +
->> +/*
->> + * Device probing
->> + */
->> +
->> +static acpi_status count_registers_cb(struct acpi_resource *ares, 
->> void *context)
->> +{
->> +	int *count = context;
->> +
->> +	if (ares->type == ACPI_RESOURCE_TYPE_GENERIC_REGISTER)
->> +		++(*count);
->> +	return AE_OK;
->> +}
->> +
->> +static int count_registers(struct platform_device *pdev)
->> +{
->> +	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
->> +	acpi_status status;
->> +	int count = 0;
->> +
->> +	if (!acpi_has_method(adev->handle, METHOD_NAME__CRS))
->> +		return -EINVAL;
->> +
->> +	status = acpi_walk_resources(adev->handle, METHOD_NAME__CRS,
->> +				     count_registers_cb, &count);
->> +	if (ACPI_FAILURE(status))
->> +		return -EINVAL;
->> +	return count;
->> +}
->> +
->> +struct get_registers_context {
->> +	struct device *dev;
->> +	struct combiner *combiner;
->> +	int err;
->> +};
->> +
->> +static acpi_status get_registers_cb(struct acpi_resource *ares, void 
->> *context)
->> +{
->> +	struct get_registers_context *ctx = context;
->> +	struct acpi_resource_generic_register *reg;
->> +	phys_addr_t paddr;
->> +	void __iomem *vaddr;
->> +
->> +	if (ares->type != ACPI_RESOURCE_TYPE_GENERIC_REGISTER)
->> +		return AE_OK;
->> +
->> +	reg = &ares->data.generic_reg;
->> +	paddr = reg->address;
->> +	if ((reg->space_id != ACPI_SPACE_MEM) ||
->> +	    (reg->bit_offset != 0) ||
->> +	    (reg->bit_width > REG_SIZE)) {
->> +		dev_err(ctx->dev, "Bad register resource @%pa\n", &paddr);
->> +		ctx->err = -EINVAL;
->> +		return AE_ERROR;
->> +	}
->> +
->> +	vaddr = devm_ioremap(ctx->dev, reg->address, REG_SIZE);
->> +	if (IS_ERR(vaddr)) {
->> +		dev_err(ctx->dev, "Can't map register @%pa\n", &paddr);
->> +		ctx->err = PTR_ERR(vaddr);
->> +		return AE_ERROR;
->> +	}
->> +
->> +	ctx->combiner->regs[ctx->combiner->nregs].addr = vaddr;
->> +	ctx->combiner->nirqs += reg->bit_width;
->> +	ctx->combiner->nregs++;
->> +	return AE_OK;
->> +}
->> +
->> +static int get_registers(struct platform_device *pdev, struct 
->> combiner *comb)
->> +{
->> +	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
->> +	acpi_status status;
->> +	struct get_registers_context ctx;
->> +
->> +	if (!acpi_has_method(adev->handle, METHOD_NAME__CRS))
->> +		return -EINVAL;
->> +
->> +	ctx.dev = &pdev->dev;
->> +	ctx.combiner = comb;
->> +	ctx.err = 0;
->> +
->> +	status = acpi_walk_resources(adev->handle, METHOD_NAME__CRS,
->> +				     get_registers_cb, &ctx);
->> +	if (ACPI_FAILURE(status))
->> +		return ctx.err;
->> +	return 0;
->> +}
->> +
->> +static int __init combiner_probe(struct platform_device *pdev)
->> +{
->> +	struct combiner *combiner;
->> +	size_t alloc_sz;
->> +	u32 nregs;
->> +	int err;
->> +
->> +	nregs = count_registers(pdev);
->> +	if (nregs <= 0) {
->> +		dev_err(&pdev->dev, "Error reading register resources\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	alloc_sz = sizeof(*combiner) + sizeof(struct combiner_reg) * nregs;
->> +	combiner = devm_kzalloc(&pdev->dev, alloc_sz, GFP_KERNEL);
->> +	if (!combiner)
->> +		return -ENOMEM;
->> +
->> +	err = get_registers(pdev, combiner);
->> +	if (err < 0)
->> +		return err;
->> +
->> +	combiner->parent_irq = platform_get_irq(pdev, 0);
->> +	if (combiner->parent_irq <= 0) {
->> +		dev_err(&pdev->dev, "Error getting IRQ resource\n");
->> +		return -EPROBE_DEFER;
->> +	}
->> +
->> +	combiner->domain = irq_domain_create_linear(pdev->dev.fwnode, 
->> combiner->nirqs,
->> +						    &domain_ops, combiner);
->> +	if (!combiner->domain)
->> +		/* Errors printed by irq_domain_create_linear */
->> +		return -ENODEV;
->> +
->> +	irq_set_chained_handler_and_data(combiner->parent_irq,
->> +					 combiner_handle_irq, combiner);
->> +
->> +	dev_info(&pdev->dev, "Initialized with [p=%d,n=%d,r=%p]\n",
->> +		 combiner->parent_irq, combiner->nirqs, combiner->regs[0].addr);
->> +	return 0;
->> +}
->> +
->> +static const struct acpi_device_id qcom_irq_combiner_acpi_match[] = {
->> +	{ "QCOM80B1", },
->> +	{ }
->> +};
->> +
->> +static struct platform_driver qcom_irq_combiner_probe = {
->> +	.driver = {
->> +		.name = "qcom-irq-combiner",
->> +		.owner = THIS_MODULE,
->> +		.acpi_match_table = ACPI_PTR(qcom_irq_combiner_acpi_match),
->> +	},
->> +	.probe = combiner_probe,
->> +};
->> +
->> +static int __init register_qcom_irq_combiner(void)
->> +{
->> +	return platform_driver_register(&qcom_irq_combiner_probe);
->> +}
->> +device_initcall(register_qcom_irq_combiner);
->> 
-> 
-> Other than the questions I have above, this now looks in a much better
-> shape. Hopefully Rafael will soon come back will his conclusions on the
-> first two patches, as I'd like to see this code to get some -next for a
-> while.
+Changelog:
+ v8..v9
+    - Added additional comment in patch 1 and added tag for patch 6.
 
-Yes, hopefully we can get to that in the following weeks.
+ v7..v8
+    - Added a patch for passing in the privileged attributes from arm32
+      dma-mapping apis as well.
 
-Thanks,
-Agustin
+ v6..v7
+    - Added couple of more patches, picked up acks, updated commit log
 
-> 
-> Thanks,
-> 
-> 	M.
-> --
-> Jazz is not dead. It just smells funny...
+ v5..v6
+    - Rebased all the patches and redid 6/6 as it does not apply in
+      this code base. 
+
+ v4..v5
+    - Simplified patch 4/6 (suggested by Robin Murphy).
+
+ v3..v4
+    - Rebased and reworked on linux next due to the dma attrs rework going
+      on over there.  Patches changed: 3/6, 4/6, and 5/6.
+
+ v2..v3
+    - Incorporated feedback from Robin:
+      * Various comments and re-wordings.
+      * Use existing bit definitions for IOMMU_PRIV implementation
+        in io-pgtable-arm.
+      * Renamed and redocumented dma_direction_to_prot.
+      * Don't worry about executability in new DMA attr.
+
+ v1..v2
+    - Added a new DMA attribute to make executable privileged mappings
+      work, and use that in the pl330 driver (suggested by Will).
+
+Jeremy Gebben (1):
+  iommu/io-pgtable-arm: add support for the IOMMU_PRIV flag
+
+Mitchel Humpherys (4):
+  iommu: add IOMMU_PRIV attribute
+  common: DMA-mapping: add DMA_ATTR_PRIVILEGED attribute
+  arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED
+  dmaengine: pl330: Make sure microcode is privileged
+
+Robin Murphy (2):
+  iommu/io-pgtable-arm-v7s: Add support for the IOMMU_PRIV flag
+  Revert "iommu/arm-smmu: Set PRIVCFG in stage 1 STEs"
+
+Sricharan R (2):
+  arm/dma-mapping: Implement DMA_ATTR_PRIVILEGED
+  iommu/arm-smmu: Set privileged attribute to 'default' instead of
+    'unprivileged'
+
+ Documentation/DMA-attributes.txt   | 10 +++++++
+ arch/arm/mm/dma-mapping.c          | 60 +++++++++++++++++++-------------------
+ arch/arm64/mm/dma-mapping.c        |  6 ++--
+ drivers/dma/pl330.c                |  5 ++--
+ drivers/iommu/arm-smmu-v3.c        |  7 +----
+ drivers/iommu/arm-smmu.c           |  2 +-
+ drivers/iommu/dma-iommu.c          | 12 ++++++--
+ drivers/iommu/io-pgtable-arm-v7s.c |  6 +++-
+ drivers/iommu/io-pgtable-arm.c     |  5 +++-
+ include/linux/dma-iommu.h          |  3 +-
+ include/linux/dma-mapping.h        |  7 +++++
+ include/linux/iommu.h              |  7 +++++
+ 12 files changed, 82 insertions(+), 48 deletions(-)
 
 -- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
-Linux Foundation Collaborative Project.
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
