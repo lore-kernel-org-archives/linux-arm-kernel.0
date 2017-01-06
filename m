@@ -1,419 +1,378 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Fri, 6 Jan 2017 14:59:23 +0100
-Subject: [PATCH 2/4] clk: stm32f7: Introduce stm32f7 clocks for STM32F746
- boards
+Date: Fri, 6 Jan 2017 14:59:25 +0100
+Subject: [PATCH 4/4] dt-bindings: mfd: Add STM32F7 RCC numeric constants into
+ DT include file
 In-Reply-To: <1483711165-17149-1-git-send-email-gabriel.fernandez@st.com>
 References: <1483711165-17149-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1483711165-17149-3-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1483711165-17149-5-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-This patch enables clocks for STM32F746 boards.
+This patch lists STM32F7's RCC numeric constants.
+It will be used by clock and reset drivers, and DT bindings.
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- drivers/clk/clk-stm32f4.c | 277 +++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 271 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/stm32f746.dtsi      |  51 ++++++++--------
+ include/dt-bindings/mfd/stm32f7-rcc.h | 112 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 138 insertions(+), 25 deletions(-)
+ create mode 100644 include/dt-bindings/mfd/stm32f7-rcc.h
 
-diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-index 42f8534..344a411 100644
---- a/drivers/clk/clk-stm32f4.c
-+++ b/drivers/clk/clk-stm32f4.c
-@@ -48,6 +48,7 @@
- #define STM32F4_RCC_PLLI2SCFGR		0x84
- #define STM32F4_RCC_PLLSAICFGR		0x88
- #define STM32F4_RCC_DCKCFGR		0x8c
-+#define STM32F7_RCC_DCKCFGR2		0x90
+diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
+index e05e131..09d6649 100644
+--- a/arch/arm/boot/dts/stm32f746.dtsi
++++ b/arch/arm/boot/dts/stm32f746.dtsi
+@@ -44,6 +44,7 @@
+ #include "armv7-m.dtsi"
+ #include <dt-bindings/pinctrl/stm32f746-pinfunc.h>
+ #include <dt-bindings/clock/stm32fx-clock.h>
++#include <dt-bindings/mfd/stm32f7-rcc.h>
  
- #define NONE -1
- #define NO_IDX  NONE
-@@ -224,6 +225,80 @@ struct stm32f4_gate_data {
- 	{ STM32F4_RCC_APB2ENR, 26,	"ltdc",		"apb2_div" },
- };
+ / {
+ 	clocks {
+@@ -77,7 +78,7 @@
+ 			compatible = "st,stm32-timer";
+ 			reg = <0x40000000 0x400>;
+ 			interrupts = <28>;
+-			clocks = <&rcc 0 128>;
++			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM2)>;
+ 			status = "disabled";
+ 		};
  
-+static const struct stm32f4_gate_data stm32f746_gates[] __initconst = {
-+	{ STM32F4_RCC_AHB1ENR,  0,	"gpioa",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR,  1,	"gpiob",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR,  2,	"gpioc",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR,  3,	"gpiod",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR,  4,	"gpioe",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR,  5,	"gpiof",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR,  6,	"gpiog",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR,  7,	"gpioh",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR,  8,	"gpioi",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR,  9,	"gpioj",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR, 10,	"gpiok",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR, 12,	"crc",		"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR, 18,	"bkpsra",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR, 20,	"dtcmram",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR, 21,	"dma1",		"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR, 22,	"dma2",		"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR, 23,	"dma2d",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR, 25,	"ethmac",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR, 26,	"ethmactx",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR, 27,	"ethmacrx",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR, 28,	"ethmacptp",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR, 29,	"otghs",	"ahb_div" },
-+	{ STM32F4_RCC_AHB1ENR, 30,	"otghsulpi",	"ahb_div" },
-+
-+	{ STM32F4_RCC_AHB2ENR,  0,	"dcmi",		"ahb_div" },
-+	{ STM32F4_RCC_AHB2ENR,  4,	"cryp",		"ahb_div" },
-+	{ STM32F4_RCC_AHB2ENR,  5,	"hash",		"ahb_div" },
-+	{ STM32F4_RCC_AHB2ENR,  6,	"rng",		"pll48"   },
-+	{ STM32F4_RCC_AHB2ENR,  7,	"otgfs",	"pll48"   },
-+
-+	{ STM32F4_RCC_AHB3ENR,  0,	"fmc",		"ahb_div",
-+		CLK_IGNORE_UNUSED },
-+	{ STM32F4_RCC_AHB3ENR,  1,	"qspi",		"ahb_div",
-+		CLK_IGNORE_UNUSED },
-+
-+	{ STM32F4_RCC_APB1ENR,  0,	"tim2",		"apb1_mul" },
-+	{ STM32F4_RCC_APB1ENR,  1,	"tim3",		"apb1_mul" },
-+	{ STM32F4_RCC_APB1ENR,  2,	"tim4",		"apb1_mul" },
-+	{ STM32F4_RCC_APB1ENR,  3,	"tim5",		"apb1_mul" },
-+	{ STM32F4_RCC_APB1ENR,  4,	"tim6",		"apb1_mul" },
-+	{ STM32F4_RCC_APB1ENR,  5,	"tim7",		"apb1_mul" },
-+	{ STM32F4_RCC_APB1ENR,  6,	"tim12",	"apb1_mul" },
-+	{ STM32F4_RCC_APB1ENR,  7,	"tim13",	"apb1_mul" },
-+	{ STM32F4_RCC_APB1ENR,  8,	"tim14",	"apb1_mul" },
-+	{ STM32F4_RCC_APB1ENR, 11,	"wwdg",		"apb1_div" },
-+	{ STM32F4_RCC_APB1ENR, 14,	"spi2",		"apb1_div" },
-+	{ STM32F4_RCC_APB1ENR, 15,	"spi3",		"apb1_div" },
-+	{ STM32F4_RCC_APB1ENR, 16,	"spdifrx",	"apb1_div" },
-+	{ STM32F4_RCC_APB1ENR, 25,	"can1",		"apb1_div" },
-+	{ STM32F4_RCC_APB1ENR, 26,	"can2",		"apb1_div" },
-+	{ STM32F4_RCC_APB1ENR, 27,	"cec",		"apb1_div" },
-+	{ STM32F4_RCC_APB1ENR, 28,	"pwr",		"apb1_div" },
-+	{ STM32F4_RCC_APB1ENR, 29,	"dac",		"apb1_div" },
-+
-+	{ STM32F4_RCC_APB2ENR,  0,	"tim1",		"apb2_mul" },
-+	{ STM32F4_RCC_APB2ENR,  1,	"tim8",		"apb2_mul" },
-+	{ STM32F4_RCC_APB2ENR,  8,	"adc1",		"apb2_div" },
-+	{ STM32F4_RCC_APB2ENR,  9,	"adc2",		"apb2_div" },
-+	{ STM32F4_RCC_APB2ENR, 10,	"adc3",		"apb2_div" },
-+	{ STM32F4_RCC_APB2ENR, 11,	"sdmmc",	"sdmux"    },
-+	{ STM32F4_RCC_APB2ENR, 12,	"spi1",		"apb2_div" },
-+	{ STM32F4_RCC_APB2ENR, 13,	"spi4",		"apb2_div" },
-+	{ STM32F4_RCC_APB2ENR, 14,	"syscfg",	"apb2_div" },
-+	{ STM32F4_RCC_APB2ENR, 16,	"tim9",		"apb2_mul" },
-+	{ STM32F4_RCC_APB2ENR, 17,	"tim10",	"apb2_mul" },
-+	{ STM32F4_RCC_APB2ENR, 18,	"tim11",	"apb2_mul" },
-+	{ STM32F4_RCC_APB2ENR, 20,	"spi5",		"apb2_div" },
-+	{ STM32F4_RCC_APB2ENR, 21,	"spi6",		"apb2_div" },
-+	{ STM32F4_RCC_APB2ENR, 22,	"sai1",		"apb2_div" },
-+	{ STM32F4_RCC_APB2ENR, 23,	"sai2",		"apb2_div" },
-+	{ STM32F4_RCC_APB2ENR, 26,	"ltdc",		"apb2_div" },
-+};
-+
- /*
-  * This bitmask tells us which bit offsets (0..192) on STM32F4[23]xxx
-  * have gate bits associated with them. Its combined hweight is 71.
-@@ -238,6 +313,10 @@ struct stm32f4_gate_data {
- 						       0x0000000000000003ull,
- 						       0x0c777f33f6fec9ffull };
+@@ -85,7 +86,7 @@
+ 			compatible = "st,stm32-timer";
+ 			reg = <0x40000400 0x400>;
+ 			interrupts = <29>;
+-			clocks = <&rcc 0 129>;
++			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM3)>;
+ 			status = "disabled";
+ 		};
  
-+static const u64 stm32f746_gate_map[MAX_GATE_MAP] = { 0x000000f17ef417ffull,
-+						      0x0000000000000003ull,
-+						      0x04f77f033e01c9ffull };
+@@ -93,7 +94,7 @@
+ 			compatible = "st,stm32-timer";
+ 			reg = <0x40000800 0x400>;
+ 			interrupts = <30>;
+-			clocks = <&rcc 0 130>;
++			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM4)>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -101,14 +102,14 @@
+ 			compatible = "st,stm32-timer";
+ 			reg = <0x40000c00 0x400>;
+ 			interrupts = <50>;
+-			clocks = <&rcc 0 131>;
++			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM5)>;
+ 		};
+ 
+ 		timer6: timer at 40001000 {
+ 			compatible = "st,stm32-timer";
+ 			reg = <0x40001000 0x400>;
+ 			interrupts = <54>;
+-			clocks = <&rcc 0 132>;
++			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM6)>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -116,7 +117,7 @@
+ 			compatible = "st,stm32-timer";
+ 			reg = <0x40001400 0x400>;
+ 			interrupts = <55>;
+-			clocks = <&rcc 0 133>;
++			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM7)>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -124,7 +125,7 @@
+ 			compatible = "st,stm32f7-usart", "st,stm32f7-uart";
+ 			reg = <0x40004400 0x400>;
+ 			interrupts = <38>;
+-			clocks =  <&rcc 0 145>;
++			clocks = <&rcc 1 CLK_USART2>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -132,7 +133,7 @@
+ 			compatible = "st,stm32f7-usart", "st,stm32f7-uart";
+ 			reg = <0x40004800 0x400>;
+ 			interrupts = <39>;
+-			clocks = <&rcc 0 146>;
++			clocks = <&rcc 1 CLK_USART3>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -140,7 +141,7 @@
+ 			compatible = "st,stm32f7-uart";
+ 			reg = <0x40004c00 0x400>;
+ 			interrupts = <52>;
+-			clocks = <&rcc 0 147>;
++			clocks = <&rcc 1 CLK_UART4>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -148,7 +149,7 @@
+ 			compatible = "st,stm32f7-uart";
+ 			reg = <0x40005000 0x400>;
+ 			interrupts = <53>;
+-			clocks = <&rcc 0 148>;
++			clocks = <&rcc 1 CLK_UART5>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -156,7 +157,7 @@
+ 			compatible = "st,stm32f7-usart", "st,stm32f7-uart";
+ 			reg = <0x40007800 0x400>;
+ 			interrupts = <82>;
+-			clocks = <&rcc 0 158>;
++			clocks = <&rcc 1 CLK_UART7>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -164,7 +165,7 @@
+ 			compatible = "st,stm32f7-usart", "st,stm32f7-uart";
+ 			reg = <0x40007c00 0x400>;
+ 			interrupts = <83>;
+-			clocks = <&rcc 0 159>;
++			clocks = <&rcc 1 CLK_UART8>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -172,7 +173,7 @@
+ 			compatible = "st,stm32f7-usart", "st,stm32f7-uart";
+ 			reg = <0x40011000 0x400>;
+ 			interrupts = <37>;
+-			clocks = <&rcc 0 164>;
++			clocks = <&rcc 1 CLK_USART1>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -180,7 +181,7 @@
+ 			compatible = "st,stm32f7-usart", "st,stm32f7-uart";
+ 			reg = <0x40011400 0x400>;
+ 			interrupts = <71>;
+-			clocks = <&rcc 0 165>;
++			clocks = <&rcc 1 CLK_USART6>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -215,7 +216,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				reg = <0x0 0x400>;
+-				clocks = <&rcc 0 256>;
++				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOA)>;
+ 				st,bank-name = "GPIOA";
+ 			};
+ 
+@@ -223,7 +224,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				reg = <0x400 0x400>;
+-				clocks = <&rcc 0 257>;
++				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOB)>;
+ 				st,bank-name = "GPIOB";
+ 			};
+ 
+@@ -231,7 +232,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				reg = <0x800 0x400>;
+-				clocks = <&rcc 0 258>;
++				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOC)>;
+ 				st,bank-name = "GPIOC";
+ 			};
+ 
+@@ -239,7 +240,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				reg = <0xc00 0x400>;
+-				clocks = <&rcc 0 259>;
++				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOD)>;
+ 				st,bank-name = "GPIOD";
+ 			};
+ 
+@@ -247,7 +248,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				reg = <0x1000 0x400>;
+-				clocks = <&rcc 0 260>;
++				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOE)>;
+ 				st,bank-name = "GPIOE";
+ 			};
+ 
+@@ -255,7 +256,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				reg = <0x1400 0x400>;
+-				clocks = <&rcc 0 261>;
++				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOF)>;
+ 				st,bank-name = "GPIOF";
+ 			};
+ 
+@@ -263,7 +264,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				reg = <0x1800 0x400>;
+-				clocks = <&rcc 0 262>;
++				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOG)>;
+ 				st,bank-name = "GPIOG";
+ 			};
+ 
+@@ -271,7 +272,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				reg = <0x1c00 0x400>;
+-				clocks = <&rcc 0 263>;
++				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOH)>;
+ 				st,bank-name = "GPIOH";
+ 			};
+ 
+@@ -279,7 +280,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				reg = <0x2000 0x400>;
+-				clocks = <&rcc 0 264>;
++				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOI)>;
+ 				st,bank-name = "GPIOI";
+ 			};
+ 
+@@ -287,7 +288,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				reg = <0x2400 0x400>;
+-				clocks = <&rcc 0 265>;
++				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOJ)>;
+ 				st,bank-name = "GPIOJ";
+ 			};
+ 
+@@ -295,7 +296,7 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				reg = <0x2800 0x400>;
+-				clocks = <&rcc 0 266>;
++				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOK)>;
+ 				st,bank-name = "GPIOK";
+ 			};
+ 
+diff --git a/include/dt-bindings/mfd/stm32f7-rcc.h b/include/dt-bindings/mfd/stm32f7-rcc.h
+new file mode 100644
+index 0000000..e36cc69
+--- /dev/null
++++ b/include/dt-bindings/mfd/stm32f7-rcc.h
+@@ -0,0 +1,112 @@
++/*
++ * This header provides constants for the STM32F7 RCC IP
++ */
 +
- static const u64 *stm32f4_gate_map;
- 
- static struct clk_hw **clks;
-@@ -247,6 +326,8 @@ struct stm32f4_gate_data {
- 
- static struct regmap *pdrm;
- 
-+static int stm32fx_end_primary_clk;
++#ifndef _DT_BINDINGS_MFD_STM32F7_RCC_H
++#define _DT_BINDINGS_MFD_STM32F7_RCC_H
 +
- /*
-  * "Multiplier" device for APBx clocks.
-  *
-@@ -685,7 +766,7 @@ static int stm32f4_rcc_lookup_clk_idx(u8 primary, u8 secondary)
- 	u64 table[MAX_GATE_MAP];
- 
- 	if (primary == 1) {
--		if (WARN_ON(secondary >= END_PRIMARY_CLK))
-+		if (WARN_ON(secondary >= stm32fx_end_primary_clk))
- 			return -EINVAL;
- 		return secondary;
- 	}
-@@ -702,7 +783,7 @@ static int stm32f4_rcc_lookup_clk_idx(u8 primary, u8 secondary)
- 	table[BIT_ULL_WORD(secondary)] &=
- 	    GENMASK_ULL(secondary % BITS_PER_LONG_LONG, 0);
- 
--	return END_PRIMARY_CLK - 1 + hweight64(table[0]) +
-+	return stm32fx_end_primary_clk - 1 + hweight64(table[0]) +
- 	       (BIT_ULL_WORD(secondary) >= 1 ? hweight64(table[1]) : 0) +
- 	       (BIT_ULL_WORD(secondary) >= 2 ? hweight64(table[2]) : 0);
- }
-@@ -955,6 +1036,17 @@ static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
- 
- static const char *sdmux_parents[2] = { "pll48", "sys" };
- 
-+static const char *hdmi_parents[2] = { "lse", "hsi_div488" };
++/* AHB1 */
++#define STM32F7_RCC_AHB1_GPIOA		0
++#define STM32F7_RCC_AHB1_GPIOB		1
++#define STM32F7_RCC_AHB1_GPIOC		2
++#define STM32F7_RCC_AHB1_GPIOD		3
++#define STM32F7_RCC_AHB1_GPIOE		4
++#define STM32F7_RCC_AHB1_GPIOF		5
++#define STM32F7_RCC_AHB1_GPIOG		6
++#define STM32F7_RCC_AHB1_GPIOH		7
++#define STM32F7_RCC_AHB1_GPIOI		8
++#define STM32F7_RCC_AHB1_GPIOJ		9
++#define STM32F7_RCC_AHB1_GPIOK		10
++#define STM32F7_RCC_AHB1_CRC		12
++#define STM32F7_RCC_AHB1_BKPSRAM	18
++#define STM32F7_RCC_AHB1_DTCMRAM	20
++#define STM32F7_RCC_AHB1_DMA1		21
++#define STM32F7_RCC_AHB1_DMA2		22
++#define STM32F7_RCC_AHB1_DMA2D		23
++#define STM32F7_RCC_AHB1_ETHMAC		25
++#define STM32F7_RCC_AHB1_ETHMACTX	26
++#define STM32F7_RCC_AHB1_ETHMACRX	27
++#define STM32FF_RCC_AHB1_ETHMACPTP	28
++#define STM32F7_RCC_AHB1_OTGHS		29
++#define STM32F7_RCC_AHB1_OTGHSULPI	30
 +
-+static const char *spdif_parent[1] = { "plli2s-p" };
++#define STM32F7_AHB1_RESET(bit) (STM32F7_RCC_AHB1_##bit + (0x10 * 8))
++#define STM32F7_AHB1_CLOCK(bit) (STM32F7_RCC_AHB1_##bit)
 +
-+static const char *lptim_parent[4] = { "apb1_mul", "lsi", "hsi", "lse" };
 +
-+static const char *uart_parents1[4] = { "apb2_div", "sys", "hsi", "lse" };
-+static const char *uart_parents2[4] = { "apb1_div", "sys", "hsi", "lse" };
++/* AHB2 */
++#define STM32F7_RCC_AHB2_DCMI		0
++#define STM32F7_RCC_AHB2_CRYP		4
++#define STM32F7_RCC_AHB2_HASH		5
++#define STM32F7_RCC_AHB2_RNG		6
++#define STM32F7_RCC_AHB2_OTGFS		7
 +
-+static const char *i2c_parents[4] = { "apb1_div", "sys", "hsi", "no-clock" };
++#define STM32F7_AHB2_RESET(bit)	(STM32F7_RCC_AHB2_##bit + (0x14 * 8))
++#define STM32F7_AHB2_CLOCK(bit)	(STM32F7_RCC_AHB2_##bit + 0x20)
 +
- struct stm32_aux_clk {
- 	int idx;
- 	const char *name;
-@@ -975,6 +1067,7 @@ struct stm32f4_clk_data {
- 	const struct stm32f4_pll_data *pll_data;
- 	const struct stm32_aux_clk *aux_clk;
- 	int aux_clk_num;
-+	int end_primary;
- };
- 
- static const struct stm32_aux_clk stm32f429_aux_clk[] = {
-@@ -1043,7 +1136,154 @@ struct stm32f4_clk_data {
- 	},
- };
- 
-+static const struct stm32_aux_clk stm32f746_aux_clk[] = {
-+	{
-+		CLK_LCD, "lcd-tft", lcd_parent, ARRAY_SIZE(lcd_parent),
-+		NO_MUX, 0, 0,
-+		STM32F4_RCC_APB2ENR, 26,
-+		CLK_SET_RATE_PARENT
-+	},
-+	{
-+		CLK_I2S, "i2s", i2s_parents, ARRAY_SIZE(i2s_parents),
-+		STM32F4_RCC_CFGR, 23, 1,
-+		NO_GATE, 0,
-+		CLK_SET_RATE_PARENT
-+	},
-+	{
-+		CLK_SAI1, "sai1_clk", sai_parents, ARRAY_SIZE(sai_parents),
-+		STM32F4_RCC_DCKCFGR, 20, 3,
-+		STM32F4_RCC_APB2ENR, 22,
-+		CLK_SET_RATE_PARENT
-+	},
-+	{
-+		CLK_SAI2, "sai2_clk", sai_parents, ARRAY_SIZE(sai_parents),
-+		STM32F4_RCC_DCKCFGR, 22, 3,
-+		STM32F4_RCC_APB2ENR, 23,
-+		CLK_SET_RATE_PARENT
-+	},
-+	{
-+		NO_IDX, "pll48", pll48_parents, ARRAY_SIZE(pll48_parents),
-+		STM32F7_RCC_DCKCFGR2, 27, 1,
-+		NO_GATE, 0,
-+		0
-+	},
-+	{
-+		NO_IDX, "sdmux", sdmux_parents, ARRAY_SIZE(sdmux_parents),
-+		STM32F7_RCC_DCKCFGR2, 28, 1,
-+		NO_GATE, 0,
-+		0
-+	},
-+	{
-+		CLK_HDMI_CEC, "hdmi-cec",
-+		hdmi_parents, ARRAY_SIZE(hdmi_parents),
-+		STM32F7_RCC_DCKCFGR2, 26, 1,
-+		NO_GATE, 0,
-+		0
-+	},
-+	{
-+		CLK_SPDIF, "spdif-rx",
-+		spdif_parent, ARRAY_SIZE(spdif_parent),
-+		STM32F7_RCC_DCKCFGR2, 22, 3,
-+		STM32F4_RCC_APB2ENR, 23,
-+		CLK_SET_RATE_PARENT
-+	},
-+	{
-+		CLK_USART1, "usart1",
-+		uart_parents1, ARRAY_SIZE(uart_parents1),
-+		STM32F7_RCC_DCKCFGR2, 0, 3,
-+		STM32F4_RCC_APB2ENR, 4,
-+		CLK_SET_RATE_PARENT,
-+	},
-+	{
-+		CLK_USART2, "usart2",
-+		uart_parents2, ARRAY_SIZE(uart_parents1),
-+		STM32F7_RCC_DCKCFGR2, 2, 3,
-+		STM32F4_RCC_APB1ENR, 17,
-+		CLK_SET_RATE_PARENT,
-+	},
-+	{
-+		CLK_USART3, "usart3",
-+		uart_parents2, ARRAY_SIZE(uart_parents1),
-+		STM32F7_RCC_DCKCFGR2, 4, 3,
-+		STM32F4_RCC_APB1ENR, 18,
-+		CLK_SET_RATE_PARENT,
-+	},
-+	{
-+		CLK_UART4, "uart4",
-+		uart_parents2, ARRAY_SIZE(uart_parents1),
-+		STM32F7_RCC_DCKCFGR2, 6, 3,
-+		STM32F4_RCC_APB1ENR, 19,
-+		CLK_SET_RATE_PARENT,
-+	},
-+	{
-+		CLK_UART5, "uart5",
-+		uart_parents2, ARRAY_SIZE(uart_parents1),
-+		STM32F7_RCC_DCKCFGR2, 8, 3,
-+		STM32F4_RCC_APB1ENR, 20,
-+		CLK_SET_RATE_PARENT,
-+	},
-+	{
-+		CLK_USART6, "usart6",
-+		uart_parents1, ARRAY_SIZE(uart_parents1),
-+		STM32F7_RCC_DCKCFGR2, 10, 3,
-+		STM32F4_RCC_APB2ENR, 5,
-+		CLK_SET_RATE_PARENT,
-+	},
++/* AHB3 */
++#define STM32F7_RCC_AHB3_FMC		0
++#define STM32F7_RCC_AHB3_QSPI		1
 +
-+	{
-+		CLK_UART7, "uart7",
-+		uart_parents2, ARRAY_SIZE(uart_parents1),
-+		STM32F7_RCC_DCKCFGR2, 12, 3,
-+		STM32F4_RCC_APB1ENR, 30,
-+		CLK_SET_RATE_PARENT,
-+	},
-+	{
-+		CLK_UART8, "uart8",
-+		uart_parents2, ARRAY_SIZE(uart_parents1),
-+		STM32F7_RCC_DCKCFGR2, 14, 3,
-+		STM32F4_RCC_APB1ENR, 31,
-+		CLK_SET_RATE_PARENT,
-+	},
-+	{
-+		CLK_I2C1, "i2c1",
-+		i2c_parents, ARRAY_SIZE(i2c_parents),
-+		STM32F7_RCC_DCKCFGR2, 16, 3,
-+		STM32F4_RCC_APB1ENR, 21,
-+		CLK_SET_RATE_PARENT,
-+	},
-+	{
-+		CLK_I2C2, "i2c2",
-+		i2c_parents, ARRAY_SIZE(i2c_parents),
-+		STM32F7_RCC_DCKCFGR2, 18, 3,
-+		STM32F4_RCC_APB1ENR, 22,
-+		CLK_SET_RATE_PARENT,
-+	},
-+	{
-+		CLK_I2C3, "i2c3",
-+		i2c_parents, ARRAY_SIZE(i2c_parents),
-+		STM32F7_RCC_DCKCFGR2, 20, 3,
-+		STM32F4_RCC_APB1ENR, 23,
-+		CLK_SET_RATE_PARENT,
-+	},
-+	{
-+		CLK_I2C4, "i2c4",
-+		i2c_parents, ARRAY_SIZE(i2c_parents),
-+		STM32F7_RCC_DCKCFGR2, 22, 3,
-+		STM32F4_RCC_APB1ENR, 24,
-+		CLK_SET_RATE_PARENT,
-+	},
++#define STM32F7_AHB3_RESET(bit)	(STM32F7_RCC_AHB3_##bit + (0x18 * 8))
++#define STM32F7_AHB3_CLOCK(bit)	(STM32F7_RCC_AHB3_##bit + 0x40)
 +
-+	{
-+		CLK_LPTIMER, "lptim1",
-+		lptim_parent, ARRAY_SIZE(lptim_parent),
-+		STM32F7_RCC_DCKCFGR2, 24, 3,
-+		STM32F4_RCC_APB1ENR, 9,
-+		CLK_SET_RATE_PARENT
-+	},
-+};
++/* APB1 */
++#define STM32F7_RCC_APB1_TIM2		0
++#define STM32F7_RCC_APB1_TIM3		1
++#define STM32F7_RCC_APB1_TIM4		2
++#define STM32F7_RCC_APB1_TIM5		3
++#define STM32F7_RCC_APB1_TIM6		4
++#define STM32F7_RCC_APB1_TIM7		5
++#define STM32F7_RCC_APB1_TIM12		6
++#define STM32F7_RCC_APB1_TIM13		7
++#define STM32F7_RCC_APB1_TIM14		8
++#define STM32F7_RCC_APB1_LPTIM1		9
++#define STM32F7_RCC_APB1_WWDG		11
++#define STM32F7_RCC_APB1_SPI2		14
++#define STM32F7_RCC_APB1_SPI3		15
++#define STM32F7_RCC_APB1_SPDIFRX	16
++#define STM32F7_RCC_APB1_UART2		17
++#define STM32F7_RCC_APB1_UART3		18
++#define STM32F7_RCC_APB1_UART4		19
++#define STM32F7_RCC_APB1_UART5		20
++#define STM32F7_RCC_APB1_I2C1		21
++#define STM32F7_RCC_APB1_I2C2		22
++#define STM32F7_RCC_APB1_I2C3		23
++#define STM32F7_RCC_APB1_I2C4		24
++#define STM32F7_RCC_APB1_CAN1		25
++#define STM32F7_RCC_APB1_CAN2		26
++#define STM32F7_RCC_APB1_CEC		27
++#define STM32F7_RCC_APB1_PWR		28
++#define STM32F7_RCC_APB1_DAC		29
++#define STM32F7_RCC_APB1_UART7		30
++#define STM32F7_RCC_APB1_UART8		31
 +
- static const struct stm32f4_clk_data stm32f429_clk_data = {
-+	.end_primary	= END_PRIMARY_CLK,
- 	.gates_data	= stm32f429_gates,
- 	.gates_map	= stm32f42xx_gate_map,
- 	.gates_num	= ARRAY_SIZE(stm32f429_gates),
-@@ -1053,6 +1293,7 @@ struct stm32f4_clk_data {
- };
- 
- static const struct stm32f4_clk_data stm32f469_clk_data = {
-+	.end_primary	= END_PRIMARY_CLK,
- 	.gates_data	= stm32f469_gates,
- 	.gates_map	= stm32f46xx_gate_map,
- 	.gates_num	= ARRAY_SIZE(stm32f469_gates),
-@@ -1061,6 +1302,16 @@ struct stm32f4_clk_data {
- 	.aux_clk_num	= ARRAY_SIZE(stm32f469_aux_clk),
- };
- 
-+static const struct stm32f4_clk_data stm32f746_clk_data = {
-+	.end_primary	= END_PRIMARY_CLK_F7,
-+	.gates_data	= stm32f746_gates,
-+	.gates_map	= stm32f746_gate_map,
-+	.gates_num	= ARRAY_SIZE(stm32f746_gates),
-+	.pll_data	= stm32f469_pll,
-+	.aux_clk	= stm32f746_aux_clk,
-+	.aux_clk_num	= ARRAY_SIZE(stm32f746_aux_clk),
-+};
++#define STM32F7_APB1_RESET(bit)	(STM32F7_RCC_APB1_##bit + (0x20 * 8))
++#define STM32F7_APB1_CLOCK(bit)	(STM32F7_RCC_APB1_##bit + 0x80)
 +
- static const struct of_device_id stm32f4_of_match[] = {
- 	{
- 		.compatible = "st,stm32f42xx-rcc",
-@@ -1070,6 +1321,10 @@ struct stm32f4_clk_data {
- 		.compatible = "st,stm32f469-rcc",
- 		.data = &stm32f469_clk_data
- 	},
-+	{
-+		.compatible = "st,stm32f746-rcc",
-+		.data = &stm32f746_clk_data
-+	},
- 	{}
- };
- 
-@@ -1161,7 +1416,9 @@ static void __init stm32f4_rcc_init(struct device_node *np)
- 
- 	data = match->data;
- 
--	clks = kmalloc_array(data->gates_num + END_PRIMARY_CLK,
-+	stm32fx_end_primary_clk = data->end_primary;
++/* APB2 */
++#define STM32F7_RCC_APB2_TIM1		0
++#define STM32F7_RCC_APB2_TIM8		1
++#define STM32F7_RCC_APB2_USART1		4
++#define STM32F7_RCC_APB2_USART6		5
++#define STM32F7_RCC_APB2_ADC1		8
++#define STM32F7_RCC_APB2_ADC2		9
++#define STM32F7_RCC_APB2_ADC3		10
++#define STM32F7_RCC_APB2_SDMMC1		11
++#define STM32F7_RCC_APB2_SPI1		12
++#define STM32F7_RCC_APB2_SPI4		13
++#define STM32F7_RCC_APB2_SYSCFG		14
++#define STM32F7_RCC_APB2_TIM9		16
++#define STM32F7_RCC_APB2_TIM10		17
++#define STM32F7_RCC_APB2_TIM11		18
++#define STM32F7_RCC_APB2_SPI5		20
++#define STM32F7_RCC_APB2_SPI6		21
++#define STM32F7_RCC_APB2_SAI1		22
++#define STM32F7_RCC_APB2_SAI2		23
++#define STM32F7_RCC_APB2_LTDC		26
 +
-+	clks = kmalloc_array(data->gates_num + stm32fx_end_primary_clk,
- 			sizeof(*clks), GFP_KERNEL);
- 	if (!clks)
- 		goto fail;
-@@ -1175,8 +1432,9 @@ static void __init stm32f4_rcc_init(struct device_node *np)
- 	i2s_parents[1] = i2s_in_clk;
- 	sai_parents[2] = i2s_in_clk;
- 
--	clk_register_fixed_rate_with_accuracy(NULL, "hsi", NULL, 0,
--			16000000, 160000);
-+	clks[CLK_HSI] = clk_hw_register_fixed_rate_with_accuracy(NULL, "hsi",
-+			NULL, 0, 16000000, 160000);
++#define STM32F7_APB2_RESET(bit)	(STM32F7_RCC_APB2_##bit + (0x24 * 8))
++#define STM32F7_APB2_CLOCK(bit)	(STM32F7_RCC_APB2_##bit + 0xA0)
 +
- 	pllcfgr = readl(base + STM32F4_RCC_PLLCFGR);
- 	pllsrc = pllcfgr & BIT(22) ? hse_clk : "hsi";
- 	pllm = pllcfgr & 0x3f;
-@@ -1215,7 +1473,8 @@ static void __init stm32f4_rcc_init(struct device_node *np)
- 	}
- 
- 	sys_parents[1] = hse_clk;
--	clk_register_mux_table(
-+
-+	clks[CLK_SYSCLK] = clk_hw_register_mux_table(
- 	    NULL, "sys", sys_parents, ARRAY_SIZE(sys_parents), 0,
- 	    base + STM32F4_RCC_CFGR, 0, 3, 0, NULL, &stm32f4_clk_lock);
- 
-@@ -1319,6 +1578,11 @@ static void __init stm32f4_rcc_init(struct device_node *np)
- 			clks[aux_clk->idx] = hw;
- 	}
- 
-+	if (of_device_is_compatible(np, "st,stm32f746-rcc"))
-+
-+		clk_hw_register_fixed_factor(NULL, "hsi_div488", "hsi", 0,
-+				1, 488);
-+
- 	of_clk_add_hw_provider(np, stm32f4_rcc_lookup_clk, NULL);
- 	return;
- fail:
-@@ -1327,3 +1591,4 @@ static void __init stm32f4_rcc_init(struct device_node *np)
- }
- CLK_OF_DECLARE_DRIVER(stm32f42xx_rcc, "st,stm32f42xx-rcc", stm32f4_rcc_init);
- CLK_OF_DECLARE_DRIVER(stm32f46xx_rcc, "st,stm32f469-rcc", stm32f4_rcc_init);
-+CLK_OF_DECLARE_DRIVER(stm32f746_rcc, "st,stm32f746-rcc", stm32f4_rcc_init);
++#endif /* _DT_BINDINGS_MFD_STM32F7_RCC_H */
 -- 
 1.9.1
