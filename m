@@ -1,54 +1,44 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 6 Jan 2017 11:12:44 +0200
-Subject: [PATCH v3 1/5] arm64: dts: exynos5433: TM2/E: Fix wrong
- information of ldo23 and ldo25
-In-Reply-To: <73639ec8-028a-56a2-0b47-3465974ec3f3@samsung.com>
-References: <1483675149-32598-1-git-send-email-jcsing.lee@samsung.com>
- <CGME20170106035913epcas5p20336406863f1029ccf614520f366ddcf@epcas5p2.samsung.com>
- <1483675149-32598-2-git-send-email-jcsing.lee@samsung.com>
- <20170106070539.wd3kfhi77pa5ekcy@kozik-lap>
- <586F4554.6020206@samsung.com>
- <20170106085026.5pfwyxt2qipzbjpy@kozik-lap>
- <73639ec8-028a-56a2-0b47-3465974ec3f3@samsung.com>
-Message-ID: <20170106091244.3vgpw7lceqfyb446@kozik-lap>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Fri,  6 Jan 2017 17:16:00 +0800
+Subject: [PATCH v7 1/5] dt-bindings: zte: add bindings document for zx2967
+ power domain controller
+Message-ID: <1483694164-7668-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 06:06:43PM +0900, Chanwoo Choi wrote:
-> On 2017? 01? 06? 17:50, Krzysztof Kozlowski wrote:
-> > On Fri, Jan 06, 2017 at 04:20:52PM +0900, Chanwoo Choi wrote:
-> >> On 2017? 01? 06? 16:05, Krzysztof Kozlowski wrote:
-> >>> On Fri, Jan 06, 2017 at 12:59:05PM +0900, Jaechul Lee wrote:
-> >>>> From: Chanwoo Choi <cw00.choi@samsung.com>
-> >>>>
-> >>>> This patch fixes the wrong information of ldo23 and ldo25 on both TM2 and TM2E.
-> >>>
-> >>> Please describe what is exactly wrong and how it affects the
-> >>> system/user. This is going to the fixes so it needs a good explanation.
-> >>
-> >> When I posted the patch[1], I refer to the old schematic document of both TM2 and TM2E.
-> >> [1] 01e5d2352152 ("arm64: dts: exynos: Add dts file for Exynos5433-based TM2 board")
-> >>
-> >> After checking the highest version of schematic document of both TM2 and TM2E,
-> >> there is no difference of ldo23/ldo25 on both TM2 and TM2E.
-> >> - ldo23 is used on TM2/TM2E, but the name/max-microvolt are wrong. 
-> >> - ldo25 isn't used on TM2/TM2E. (not connected)
-> >>
-> >> Because ldo23 and lod25 are not used on other device in Exynos5433 and TM2 board.
-> >> this patch does not affect the operation to system/user.
-> > 
-> > If it does not affect anyone (including TM2/TM2E) then this do not have
-> > to be a fix. Am I right?
-> 
-> This patch does not affect the TM2/TM2E's operation
-> because ldo23/25 are not used on TM2/TM2E. Just fix the wrong information.
+This patch adds device tree bindings document for ZTE zx2967
+family power domain controller.
 
-Ah, okay, thanks for explanation. Please just rebase on current
-next/dt64 (or for-next or just my
-https://patchwork.kernel.org/patch/9500153/) so the always-off property
-won't be copied.
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+---
+ .../devicetree/bindings/soc/zte/pd-2967xx.txt         | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt
 
-I'll take it then for v4.11.
-
-Best regards,
-Krzysztof
+diff --git a/Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt b/Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt
+new file mode 100644
+index 0000000..7629de1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt
+@@ -0,0 +1,19 @@
++* ZTE zx2967 family Power Domains
++
++zx2967 family includes support for multiple power domains which are used
++to gate power to one or more peripherals on the processor.
++
++Required Properties:
++  - compatible: should be one of the following.
++      * zte,zx296718-pcu - for zx296718 power domain.
++  - reg: physical base address of the controller and length of memory mapped
++      region.
++  - #power-domain-cells: Must be 1.
++
++Example:
++
++	pcu_domain: pcu at 117000 {
++		compatible = "zte,zx296718-pcu";
++		reg = <0x00117000 0x1000>;
++		#power-domain-cells = <1>;
++	};
+-- 
+2.7.4
