@@ -1,127 +1,47 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Jan 2017 12:59:24 +0000
-Subject: [PATCHv2 net-next 02/11] net: mvpp2: handle too large value in
- mvpp2_rx_time_coal_set()
-In-Reply-To: <1482943567-12483-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1482943567-12483-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482943567-12483-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170106125923.GA14217@n2100.armlinux.org.uk>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Fri, 6 Jan 2017 14:03:26 +0100
+Subject: [PATCH v6 08/18] iommu/vt-d: Implement reserved region get/put
+ callbacks
+In-Reply-To: <20170106124631.GP17255@8bytes.org>
+References: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
+ <1483643086-2883-9-git-send-email-eric.auger@redhat.com>
+ <20170106110131.GM17255@8bytes.org>
+ <36bac0a9-89a6-ff7b-1870-a795a4f57700@redhat.com>
+ <20170106124631.GP17255@8bytes.org>
+Message-ID: <bbad2117-a4ac-056c-9c3a-a7e11e4b5630@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 28, 2016 at 05:45:58PM +0100, Thomas Petazzoni wrote:
-> When configuring the MVPP2_ISR_RX_THRESHOLD_REG with the RX coalescing
-> time threshold, we do not check for the maximum allowed value supported
-> by the driver, which means we might overflow and use a bogus value. This
-> commit adds a check for this situation, and if a value higher than what
-> is supported by the hardware is provided, then we use the maximum value
-> supported by the hardware.
+Hi Joerg,
+
+On 06/01/2017 13:46, Joerg Roedel wrote:
+> On Fri, Jan 06, 2017 at 12:45:54PM +0100, Auger Eric wrote:
+>> On 06/01/2017 12:01, Joerg Roedel wrote:
+>>> On Thu, Jan 05, 2017 at 07:04:36PM +0000, Eric Auger wrote:
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/net/ethernet/marvell/mvpp2.c | 7 +++++++
->  1 file changed, 7 insertions(+)
+>>> That is different from what AMD does, can you also report the RMRR
+>>> regions for the device here (as direct-map regions)?
+>>
+>> if I return RMRR regions as direct mapped regions,
+>> iommu_group_create_direct_mappings will perform the 1-1 mapping.
 > 
-> diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-> index 02d91e4..a1ba89f 100644
-> --- a/drivers/net/ethernet/marvell/mvpp2.c
-> +++ b/drivers/net/ethernet/marvell/mvpp2.c
-> @@ -154,6 +154,7 @@
->  
->  /* Interrupt Cause and Mask registers */
->  #define MVPP2_ISR_RX_THRESHOLD_REG(rxq)		(0x5200 + 4 * (rxq))
-> +#define     MVPP2_MAX_ISR_RX_THRESHOLD		0xfffff0
->  #define MVPP2_ISR_RXQ_GROUP_REG(rxq)		(0x5400 + 4 * (rxq))
->  #define MVPP2_ISR_ENABLE_REG(port)		(0x5420 + 4 * (port))
->  #define     MVPP2_ISR_ENABLE_INTERRUPT(mask)	((mask) & 0xffff)
-> @@ -4397,6 +4398,12 @@ static void mvpp2_rx_time_coal_set(struct mvpp2_port *port,
->  	u32 val;
->  
->  	val = (port->priv->tclk / USEC_PER_SEC) * usec;
-> +
-> +	if (val > MVPP2_MAX_ISR_RX_THRESHOLD) {
-> +		val = MVPP2_MAX_ISR_RX_THRESHOLD;
-> +		usec = (val * USEC_PER_SEC) / port->priv->tclk;
-> +	}
-> +
+> No, this will not happen until the Intel IOMMU driver returns valid
+> IOMMU_DOMAIN_DMA type domains.
+Hum OK thanks!
 
-Beware of rounding and overflow errors.  usec and val are u32's.
+Best Regards
 
-	MVPP2_MAX_ISR_RX_THRESHOLD = 16777200
-	USEC_PER_SEC = 1000000
+Eric
 
-This equates to 0xF423F0BDC00 for the multiplication, which is a little
-larger than 32-bit.  Assuming tclk is 166.666666MHz (as it was on Dove
-- I don't know what it would be here) and 64-bit arithmetic, the maximum
-value gives 100663us.
-
-Passing that back into the function gives... 16710058, so the second time
-around, we end up with a different setting (even though a change wasn't
-requested.)
-
-However, 100664 won't trigger your check, neither will values all the way
-up to 101067 - the reason being that you're losing so much precision by
-dividling the clock by USEC_PER_SEC first.  Only if it's a whole number
-of MHz will you get away with that.
-
-So, I'd suggest you switch to using 64 bit math here - it's not a fast
-path.  Using bc to evaluate val = port->priv->tclk * usec / USEC_PER_SEC
-gives:
-
-	(166666666 * 100663 / 1000000)
-	16777166
-
-which is as close as you can come to the limit.
-
-So, I'd suggest (these variants round down, which is acceptable for
-this implementation):
-
-static u32 usec_to_cycles(u32 usec, unsigned long clock_rate_hz)
-{
-	u64 tmp = clock_rate_hz * usec;
-
-	do_div(tmp, USEC_PER_SEC);
-
-	return tmp > 0xffffffff ? 0xffffffff : tmp;
-}
-
-static u32 cycles_to_usec(u32 cycles, unsigned long clock_rate_hz)
-{
-	u64 tmp = cycles * USEC_PER_SEC;
-
-	do_div(tmp, clock_rate_hz);
-
-	return tmp > 0xffffffff ? 0xffffffff : tmp;
-}
-
-and:
-	u32 val = usec_to_cycles(usec, port->priv->tclk);
-
-	if (val > MVPP2_MAX_ISR_RX_THRESHOLD) {
-		usec = cycles_to_usec(MVPP2_MAX_ISR_RX_THRESHOLD,
-				      port->priv->tclk);
-
-		/* re-evaluate to get actual register value for usec */
-		val = usec_to_cycles(usec, port->priv->tclk);
-	}
-
->  	mvpp2_write(port->priv, MVPP2_ISR_RX_THRESHOLD_REG(rxq->id), val);
->  
->  	rxq->time_coal = usec;
-
-This function appears to be called from two places:
-
-mvpp2_rxq_init():
-        mvpp2_rx_time_coal_set(port, rxq, rxq->time_coal);
-
-mvpp2_ethtool_set_coalesce():
-                rxq->time_coal = c->rx_coalesce_usecs;
-                mvpp2_rx_time_coal_set(port, rxq, rxq->time_coal);
-
-It seems rather pointless to pass in rxq->time_coal when you're also
-passing in rxq.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> 
+>> I am not familiar with the intel-iommu code but I guess this job
+>> currently is done in the intel driver:
+>> iommu_prepare_rmrr_dev -> iommu_prepare_identity_map
+>> ->domain_prepare_identity_map -> iommu_domain_identity_map?
+> 
+> Right, this is done in the Intel driver atm.
+> 
+> 
+> 
+> 	Joerg
+> 
