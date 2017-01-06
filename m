@@ -1,42 +1,65 @@
 From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 6 Jan 2017 14:04:02 +0100
-Subject: [PATCH v6 07/18] iommu: Implement reserved_regions iommu-group
- sysfs file
-In-Reply-To: <20170106124816.GQ17255@8bytes.org>
+Date: Fri, 6 Jan 2017 14:05:15 +0100
+Subject: [PATCH v6 01/18] iommu/dma: Allow MSI-only cookies
+In-Reply-To: <ae222579-6939-b89a-80c2-9ee8f147299e@arm.com>
 References: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
- <1483643086-2883-8-git-send-email-eric.auger@redhat.com>
- <20170106110039.GL17255@8bytes.org>
- <888d3750-817c-77d1-8154-e77cf8c3ad4b@redhat.com>
- <20170106124816.GQ17255@8bytes.org>
-Message-ID: <e73ae95f-2d54-836e-d19c-81ebd3bf409e@redhat.com>
+ <1483643086-2883-2-git-send-email-eric.auger@redhat.com>
+ <20170106105945.GK17255@8bytes.org>
+ <b058a7f9-84bf-1d5c-1c24-24da251cc964@redhat.com>
+ <ae222579-6939-b89a-80c2-9ee8f147299e@arm.com>
+Message-ID: <814f9798-dbd9-8e41-8e87-20a517c28c71@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 06/01/2017 13:48, Joerg Roedel wrote:
-> On Fri, Jan 06, 2017 at 12:46:05PM +0100, Auger Eric wrote:
->> On 06/01/2017 12:00, Joerg Roedel wrote:
-> 
->>> I think it also makes sense to report the type of the reserved region.
+Hi Robin,
+On 06/01/2017 13:12, Robin Murphy wrote:
+> On 06/01/17 11:46, Auger Eric wrote:
 >>
->> What is the best practice in that case? Shall we put the type enum
->> values as strings such as:
->> - direct
->> - nomap
->> - msi
 >>
->> and document that in Documentation/ABI/testing/sysfs-kernel-iommu_groups
+>> On 06/01/2017 11:59, Joerg Roedel wrote:
+>>> On Thu, Jan 05, 2017 at 07:04:29PM +0000, Eric Auger wrote:
+>>>>  struct iommu_dma_cookie {
+>>>> -	struct iova_domain	iovad;
+>>>> -	struct list_head	msi_page_list;
+>>>> -	spinlock_t		msi_lock;
+>>>> +	union {
+>>>> +		struct iova_domain	iovad;
+>>>> +		dma_addr_t		msi_iova;
+>>>> +	};
+>>>> +	struct list_head		msi_page_list;
+>>>> +	spinlock_t			msi_lock;
+>>>> +	enum iommu_dma_cookie_type	type;
+>>>
+>>> Please move the type to the beginning of the struct and add a comment
+>>> how the type relates to the union.
+>>
+>> Sure
+>>
+>> Thank you for the review.
 > 
-> Yes, a string would be good. An probably 'reserved' is a better name
-> than nomap?
+> FWIW I already had a cleaned up version of this patch, I just hadn't
+> mentioned it. I've pushed out an update with that change added too[1].
+> 
+> Robin.
+> 
+> [1]:http://linux-arm.org/git?p=linux-rm.git;a=shortlog;h=refs/heads/iommu/misc
 
-OK that's equal to me.
-
-Thanks
+Great, thanks!
 
 Eric
 > 
+>>
+>> Best regards
+>>
+>> Eric
+>>>
+>>>
+>>>
+>>> 	Joerg
+>>>
 > 
-> 	Joerg
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
