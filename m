@@ -1,78 +1,97 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 Jan 2017 08:14:22 -0800
-Subject: [PATCH 1/6] ARM: dts: am335x-phycore-som: Update NAND partition
- table
-In-Reply-To: <CAHCN7xL2n0qsg61i85o7DczanMH1E=HWhNvqUtTH9UhEVBvd8g@mail.gmail.com>
-References: <1483627851-17996-1-git-send-email-t.remmet@phytec.de>
- <1483627851-17996-2-git-send-email-t.remmet@phytec.de>
- <20170105153637.GA4310@atomide.com>
- <20170105171845.GK4310@atomide.com>
- <20170105175619.GA56877@google.com>
- <1483694849.3634.6.camel@phytec.de>
- <20170106160222.GC2630@atomide.com>
- <CAHCN7xL2n0qsg61i85o7DczanMH1E=HWhNvqUtTH9UhEVBvd8g@mail.gmail.com>
-Message-ID: <20170106161421.GD2630@atomide.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 6 Jan 2017 16:24:00 +0000
+Subject: [PATCH 02/10] iommu/of: Prepare for deferred IOMMU configuration
+In-Reply-To: <005f01d26763$450f9cc0$cf2ed640$@codeaurora.org>
+References: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
+ <1480465344-11862-3-git-send-email-sricharan@codeaurora.org>
+ <20161130161723.GA9042@red-moon>
+ <c89825aa-c75f-8493-fe92-7cc97f525bc7@arm.com>
+ <20161201112917.GA9680@red-moon>
+ <003601d2672e$91744b40$b45ce1c0$@codeaurora.org>
+ <20170105122714.GA30449@red-moon>
+ <7cd7bcfb-abae-2948-c3f8-230c0d9c9db6@arm.com>
+ <005f01d26763$450f9cc0$cf2ed640$@codeaurora.org>
+Message-ID: <20170106162400.GA8109@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Adam Ford <aford173@gmail.com> [170106 08:06]:
-> On Fri, Jan 6, 2017 at 10:02 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Teresa Remmet <t.remmet@phytec.de> [170106 01:28]:
-> >> Hello Brian,
+On Thu, Jan 05, 2017 at 08:21:53PM +0530, Sricharan wrote:
+> Hi,
+> 
+> [...]
+> 
+> >>>
+> >>> With the thinking of taking this series through, would it be fine if i
+> >>> cleanup the pci configure hanging outside and push it in to
+> >>> of/acpi_iommu configure respectively ? This time with all neeeded for
+> >>> ACPI added as well.  Also on the last post of V4, Lorenzo commented
+> >>> that it worked for him, although still the of_match_node equivalent in
+> >>> ACPI has to be added. If i can get that, then i will add that as well
+> >>> to make this complete.
 > >>
-> >> Am Donnerstag, den 05.01.2017, 09:56 -0800 schrieb Brian Norris:
-> >> > On Thu, Jan 05, 2017 at 09:18:45AM -0800, Tony Lindgren wrote:
-> >> > >
-> >> > > * Tony Lindgren <tony@atomide.com> [170105 07:37]:
-> >> > > >
-> >> > > > * Teresa Remmet <t.remmet@phytec.de> [170105 06:57]:
-> >> > > > >
-> >> > > > > To improve NAND safety we updated the partition layout.
-> >> > > > > Added barebox backup partition and removed kernel and oftree
-> >> > > > > partition. They are kept in ubi now.
-> >> > > > What about the users with earlier partition tables?
-> >> > > >
-> >> > > > Please read about "flag day" changes, typically they are not
-> >> > > > acceptable.
-> >> > > Adding Brian and Adam to Cc. Can you guys come up with some
-> >> > > solution on this?
-> >> > I don't have much context for this thread, and no I don't plan to
-> >> > solve
-> >> > your problems for you. But I can provide tips!
-> >> >
-> >> > >
-> >> > > I'm suggesting we leave the kernel nodes empty and let u-boot
-> >> > > populate them, so maybe you guys can discuss this on the related
-> >> > > lists.
-> >> > That's an option. I've worked with platforms that did something like
-> >> > this, and that's really one of the only ways you can handle putting
-> >> > partition information in the device tree. You're really hamstringing
-> >> > yourself when you put all the partition information in the device
-> >> > tree.
-> >> > And it's just dumb once that gets codified in the kernel source tree.
-> >> >
+> >> Question: I had a look into this and instead of fiddling about with the
+> >> linker script entries in ACPI (ie IORT_ACPI_DECLARE - which I hope this
+> >> patchset would help remove entirely), I think that the only check we
+> >> need in IORT is, depending on what type of SMMU a given device is
+> >> connected to, to check if the respective SMMU driver is compiled in the
+> >> kernel and it will be probed, _eventually_.
 > >>
-> >> In our case the bootloader does pass the partition table to the kernel.
-> >> So it gets overwritten anyway. This was just more for backup,
-> >> if someone uses a different bootloader. But I'm fine with removing the
-> >> nand partition table completely from the kernel device tree.
-> >> Same with the SPI nor partition table.
+> >> As Robin said, by the time a device is probed the respective SMMU
+> >> devices are already created and registered with IORT kernel code or
+> >> they will never be, so to understand if we should defer probing
+> >> SMMU device creation is _not_ really a problem in ACPI.
 > >>
-> >> I will send patches for this.
+> >> To check if a SMMU driver is enabled, do we really need a linker
+> >> table ?
+> >>
+> >> Would not a check based on eg:
+> >>
+> >> /**
+> >>  * @type: IOMMU IORT node type of the IOMMU a device is connected to
+> >>  */
+> >> static bool iort_iommu_driver_enabled(u8 type)
+> >> {
+> >> 	switch (type) {
+> >> 	case ACPI_IORT_SMMU_V3:
+> >> 		return IS_ENABLED(CONFIG_ARM_SMMU_V3);
 > >
-> > OK thanks! Also thank you Brian for your comments.
+> >IS_BUILTIN(...)
+> >
+> >> 	case ACPI_IORT_SMMU:
+> >> 		return IS_ENABLED(CONFIG_ARM_SMMU);
+> >> 	default:
+> >> 		pr_warn("Unknown IORT SMMU type\n");
+> >
+> >Might displaying the actual value be helfpul for debugging a broken IORT
+> >table?
+> >
+> >> 		return false;
+> >> 	}
+> >> }
+> >>
+> >> be sufficient (it is a bit gross, agreed, but it is to understand if
+> >> that's all we need) ? Is there anything I am missing ?
+> >>
+> >> Let me know, I will put together a patch for you I really do not
+> >> want to block your series for this trivial niggle.
+> >
+> >Other than that, though, I like it :) IORT has a small, strictly
+> >bounded, set of supported devices, so I really don't see the need to go
+> >overboard putting it on parity with DT when something this neat and
+> >simple will suffice.
 > >
 > 
-> Tony - I tested leaving the partition info as-is with the updates from
-> the bootloader and it works.  Would you prefer that I match Brian and
-> remove the partition table completely, or should I just leave my board
-> alone?
-> 
-> I am good either way.
+> Ok sure, looks correct for me as well in whole of the context here.
 
-OK. How about let's remove the partitions from kernel for v4.11 as
-clean-up then for cases where the bootloader might change them?
+Ok, I put together a branch where you can find your original series
+plus some ACPI patches for you to test and use:
 
-Regards,
+git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git iommu/probe-deferral
 
-Tony
+Feel free to post the additional patches I added along with your series
+(that from what I gather you have reworked already) and please both have a
+look if the deferral mechanism I put in place in ACPI makes sense to you.
+
+Please CC linux-acpi upon posting, if you need help shout.
+
+Lorenzo
