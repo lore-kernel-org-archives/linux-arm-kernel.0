@@ -1,150 +1,51 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Fri, 6 Jan 2017 08:58:46 +0100
-Subject: [PATCH v7 0/8] Add PWM and IIO timer drivers for STM32
-In-Reply-To: <20170105144953.GT24225@dell>
-References: <1483608344-9012-1-git-send-email-benjamin.gaignard@st.com>
- <20170105144953.GT24225@dell>
-Message-ID: <CA+M3ks43GYEQo6Sev9oB5RfSF3fYNLixESSceXpu2CtKPnpB1Q@mail.gmail.com>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Fri, 06 Jan 2017 16:59:14 +0900
+Subject: [PATCH v3 2/5] arm64: dts: exynos: make tm2 and tm2e independent
+ from each other
+In-Reply-To: <20170106070911.sj6qjd5akyxnazsl@kozik-lap>
+References: <1483675149-32598-1-git-send-email-jcsing.lee@samsung.com>
+ <CGME20170106035914epcas5p209490dfca8e8ae83c6a9b5aa1408a1ed@epcas5p2.samsung.com>
+ <1483675149-32598-3-git-send-email-jcsing.lee@samsung.com>
+ <20170106070911.sj6qjd5akyxnazsl@kozik-lap>
+Message-ID: <20170106075914.y5nuak3bz3zrvvex@gangnam.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-01-05 15:49 GMT+01:00 Lee Jones <lee.jones@linaro.org>:
-> On Thu, 05 Jan 2017, Benjamin Gaignard wrote:
->
->> version 7:
->> - rebase on v4.10-rc2
->> - remove iio_device code from driver and keep only the trigger part
->>
->> version 6:
->> - rename stm32-gptimer in stm32-timers.
->> - change "st,stm32-gptimer" compatible to "st,stm32-timers".
->> - modify "st,breakinput" parameter in pwm part.
->> - split DT patch in 2
->>
->> version 5:
->> - fix comments done on version 4
->> - rebased on kernel 4.9-rc8
->> - change nodes names and re-order then by addresses
->>
->> version 4:
->> - fix comments done on version 3
->> - don't use interrupts anymore in IIO timer
->> - detect hardware capabilities at probe time to simplify binding
->>
->> version 3:
->> - no change on mfd and pwm divers patches
->> - add cross reference between bindings
->> - change compatible to "st,stm32-timer-trigger"
->> - fix attributes access rights
->> - use string instead of int for master_mode and slave_mode
->> - document device attributes in sysfs-bus-iio-timer-stm32
->> - update DT with the new compatible
->>
->> version 2:
->> - keep only one compatible per driver
->> - use DT parameters to describe hardware block configuration:
->>   - pwm channels, complementary output, counter size, break input
->>   - triggers accepted and create by IIO timers
->> - change DT to limite use of reference to the node
->> - interrupt is now in IIO timer driver
->> - rename stm32-mfd-timer to stm32-timers (for general purpose timer)
->>
->> The following patches enable PWM and IIO Timer features for STM32 platforms.
->>
->> Those two features are mixed into the registers of the same hardware block
->> (named general purpose timer) which lead to introduce a multifunctions driver
->> on the top of them to be able to share the registers.
->>
->> In STM32f4 14 instances of timer hardware block exist, even if they all have
->> the same register mapping they could have a different number of pwm channels
->> and/or different triggers capabilities. We use various parameters in DT to
->> describe the differences between hardware blocks
->>
->> The MFD (stm32-timers.c) takes care of clock and register mapping
->> by using regmap. stm32_timers structure is provided to its sub-node to
->> share those information.
->>
->> PWM driver is implemented into pwm-stm32.c. Depending of the instance we may
->> have up to 4 channels, sometime with complementary outputs or 32 bits counter
->> instead of 16 bits. Some hardware blocks may also have a break input function
->> which allows to stop pwm depending of a level, defined in devicetree, on an
->> external pin.
->>
->> IIO timer driver (stm32-timer-trigger.c and stm32-timer-trigger.h) define a list
->> of hardware triggers usable by hardware blocks like ADC, DAC or other timers.
->>
->> The matrix of possible connections between blocks is quite complex so we use
->> trigger names and is_stm32_iio_timer_trigger() function to be sure that
->> triggers are valid and configure the IPs.
->>
->> At run time IIO timer hardware blocks can configure (through "master_mode"
->> IIO device attribute) which internal signal (counter enable, reset,
->> comparison block, etc...) is used to generate the trigger.
->>
->> Benjamin Gaignard (8):
->>   MFD: add bindings for STM32 Timers driver
->>   MFD: add STM32 Timers driver
->>   PWM: add pwm-stm32 DT bindings
->>   PWM: add PWM driver for STM32 plaftorm
->>   IIO: add bindings for STM32 timer trigger driver
->>   IIO: add STM32 timer trigger driver
->>   ARM: dts: stm32: add Timers driver for stm32f429 MCU
->>   ARM: dts: stm32: Enable pwm1 and pwm3 for stm32f469-disco
->
-> Any reason why you've dropped all your Acks?
->
-> I don't really want to review it again if little is different.
->
-> How much MFD related code has changed since the last review?
+Hi, 
 
-All my apologies I forgot to add your Acks for MFD parts.
+On Fri, Jan 06, 2017 at 09:09:11AM +0200, Krzysztof Kozlowski wrote:
+> On Fri, Jan 06, 2017 at 12:59:06PM +0900, Jaechul Lee wrote:
+> > From: Andi Shyti <andi.shyti@samsung.com>
+> > 
+> > Currently tm2e dts includes tm2 but there are some differences
+> > between the two boards and tm2 has some properties that tm2e
+> > doesn't have.
+> > 
+> > That's why it's important to keep the two dts files independent
+> > and put all the commonalities in a tm2-common.dtsi file.
+> > 
+> > At the current status the only two differences between the two
+> > dts files (besides the board name) are ldo31 and ldo38.
+> > 
+> > Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> > Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
+> > ---
+> >  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 1118 +++++++++++++++++++
+> >  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 1153 +-------------------
+> 
+> Like talking to a wall. Without any feedback. If my instructions were
+> wrong (and it is not possible to detect rename) then please say it (you
+> can add personal comments after separator ---).
 
-Sorry for that
+no Krzysztof, I'm sorry, but this patch has been formatted with
+the diff algorithm *you* asked, -B50% both version 2 (where you
+didn't comment) and version 3. If you still don't like it, please
+don't blame me, blame the algorithm.
 
->
->>  .../ABI/testing/sysfs-bus-iio-timer-stm32          |  29 ++
->>  .../bindings/iio/timer/stm32-timer-trigger.txt     |  23 ++
->>  .../devicetree/bindings/mfd/stm32-timers.txt       |  46 +++
->>  .../devicetree/bindings/pwm/pwm-stm32.txt          |  33 ++
->>  arch/arm/boot/dts/stm32f429.dtsi                   | 275 +++++++++++++
->>  arch/arm/boot/dts/stm32f469-disco.dts              |  28 ++
->>  drivers/iio/Kconfig                                |   1 -
->>  drivers/iio/trigger/Kconfig                        |  10 +
->>  drivers/iio/trigger/Makefile                       |   1 +
->>  drivers/iio/trigger/stm32-timer-trigger.c          | 340 ++++++++++++++++
->>  drivers/mfd/Kconfig                                |  11 +
->>  drivers/mfd/Makefile                               |   2 +
->>  drivers/mfd/stm32-timers.c                         |  80 ++++
->>  drivers/pwm/Kconfig                                |   9 +
->>  drivers/pwm/Makefile                               |   1 +
->>  drivers/pwm/pwm-stm32.c                            | 434 +++++++++++++++++++++
->>  include/linux/iio/timer/stm32-timer-trigger.h      |  62 +++
->>  include/linux/mfd/stm32-timers.h                   |  71 ++++
->>  18 files changed, 1455 insertions(+), 1 deletion(-)
->>  create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-timer-stm32
->>  create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
->>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-timers.txt
->>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
->>  create mode 100644 drivers/iio/trigger/stm32-timer-trigger.c
->>  create mode 100644 drivers/mfd/stm32-timers.c
->>  create mode 100644 drivers/pwm/pwm-stm32.c
->>  create mode 100644 include/linux/iio/timer/stm32-timer-trigger.h
->>  create mode 100644 include/linux/mfd/stm32-timers.h
->>
->
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+Now we can stay here at trying random diff algorithms (as they
+give more or less the same result) or you tell me which exact
+algorithm you want me to use. Besides, for me it's clear,
+tm2-common is all new, while in tm2 you have on one side the '-'
+(if it applies nothing has changed) on the bottom the '+'.
 
-
-
--- 
-Benjamin Gaignard
-
-Graphic Study Group
-
-Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro: Facebook | Twitter | Blog
+Andi
