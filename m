@@ -1,67 +1,86 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:17:45 +0100
-Subject: [PATCH 03/16] arm64: dts: r8a7796: Add CAN support
+Date: Fri,  6 Jan 2017 12:17:43 +0100
+Subject: [PATCH 01/16] arm64: dts: r8a7796: Add all MSIOF nodes
 In-Reply-To: <cover.1483700694.git.horms+renesas@verge.net.au>
 References: <cover.1483700694.git.horms+renesas@verge.net.au>
-Message-ID: <909c1625241515aa2a5027a24e17d77b54e8ce4b.1483700694.git.horms+renesas@verge.net.au>
+Message-ID: <80fab06e258da76232356d8a0b390d4bc25e6917.1483700694.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Paterson <chris.paterson2@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Adds CAN controller nodes for r8a7796.
+Add the device nodes for all MSIOF SPI controllers.
 
-Based on a patch for r8a7795 by Ramesh Shanmugasundaram.
-
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 54 ++++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index c0f9ced8df7e..a97ef2e7202c 100644
+index 28ba59a00cd8..4bf8e14956fe 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -367,6 +367,36 @@
+@@ -373,6 +373,60 @@
  			status = "disabled";
  		};
  
-+		can0: can at e6c30000 {
-+			compatible = "renesas,can-r8a7796",
-+				     "renesas,rcar-gen3-can";
-+			reg = <0 0xe6c30000 0 0x1000>;
-+			interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 916>,
-+			       <&cpg CPG_CORE R8A7796_CLK_CANFD>,
-+			       <&can_clk>;
-+			clock-names = "clkp1", "clkp2", "can_clk";
-+			assigned-clocks = <&cpg CPG_CORE R8A7796_CLK_CANFD>;
-+			assigned-clock-rates = <40000000>;
++		msiof0: spi at e6e90000 {
++			compatible = "renesas,msiof-r8a7796";
++			reg = <0 0xe6e90000 0 0x0064>;
++			interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 211>;
++			dmas = <&dmac1 0x41>, <&dmac1 0x40>,
++			       <&dmac2 0x41>, <&dmac2 0x40>;
++			dma-names = "tx", "rx";
 +			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			#address-cells = <1>;
++			#size-cells = <0>;
 +			status = "disabled";
 +		};
 +
-+		can1: can at e6c38000 {
-+			compatible = "renesas,can-r8a7796",
-+				     "renesas,rcar-gen3-can";
-+			reg = <0 0xe6c38000 0 0x1000>;
-+			interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 915>,
-+			       <&cpg CPG_CORE R8A7796_CLK_CANFD>,
-+			       <&can_clk>;
-+			clock-names = "clkp1", "clkp2", "can_clk";
-+			assigned-clocks = <&cpg CPG_CORE R8A7796_CLK_CANFD>;
-+			assigned-clock-rates = <40000000>;
++		msiof1: spi at e6ea0000 {
++			compatible = "renesas,msiof-r8a7796";
++			reg = <0 0xe6ea0000 0 0x0064>;
++			interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 210>;
++			dmas = <&dmac1 0x43>, <&dmac1 0x42>,
++			       <&dmac2 0x43>, <&dmac2 0x42>;
++			dma-names = "tx", "rx";
 +			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			#address-cells = <1>;
++			#size-cells = <0>;
 +			status = "disabled";
 +		};
 +
- 		scif2: serial at e6e88000 {
- 			compatible = "renesas,scif-r8a7796",
- 				     "renesas,rcar-gen3-scif", "renesas,scif";
++		msiof2: spi at e6c00000 {
++			compatible = "renesas,msiof-r8a7796";
++			reg = <0 0xe6c00000 0 0x0064>;
++			interrupts = <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 209>;
++			dmas = <&dmac0 0x45>, <&dmac0 0x44>;
++			dma-names = "tx", "rx";
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		msiof3: spi at e6c10000 {
++			compatible = "renesas,msiof-r8a7796";
++			reg = <0 0xe6c10000 0 0x0064>;
++			interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 208>;
++			dmas = <&dmac0 0x47>, <&dmac0 0x46>;
++			dma-names = "tx", "rx";
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
+ 		dmac0: dma-controller at e6700000 {
+ 			compatible = "renesas,dmac-r8a7796",
+ 				     "renesas,rcar-dmac";
 -- 
 2.7.0.rc3.207.g0ac5344
