@@ -1,51 +1,83 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Fri, 06 Jan 2017 16:59:14 +0900
-Subject: [PATCH v3 2/5] arm64: dts: exynos: make tm2 and tm2e independent
- from each other
-In-Reply-To: <20170106070911.sj6qjd5akyxnazsl@kozik-lap>
-References: <1483675149-32598-1-git-send-email-jcsing.lee@samsung.com>
- <CGME20170106035914epcas5p209490dfca8e8ae83c6a9b5aa1408a1ed@epcas5p2.samsung.com>
- <1483675149-32598-3-git-send-email-jcsing.lee@samsung.com>
- <20170106070911.sj6qjd5akyxnazsl@kozik-lap>
-Message-ID: <20170106075914.y5nuak3bz3zrvvex@gangnam.samsung>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 6 Jan 2017 09:04:17 +0100
+Subject: [PATCH] ARM64: dts: meson-gxbb-odroidc2: Disable SCPI DVFS
+In-Reply-To: <9f508097-f605-ebd8-20af-c3e798c6fdcc@poczta.onet.pl>
+References: <1483628549-29486-1-git-send-email-narmstrong@baylibre.com>
+ <9f508097-f605-ebd8-20af-c3e798c6fdcc@poczta.onet.pl>
+Message-ID: <cd6bbd24-f014-7342-34e6-ead7eec429f4@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
-
-On Fri, Jan 06, 2017 at 09:09:11AM +0200, Krzysztof Kozlowski wrote:
-> On Fri, Jan 06, 2017 at 12:59:06PM +0900, Jaechul Lee wrote:
-> > From: Andi Shyti <andi.shyti@samsung.com>
-> > 
-> > Currently tm2e dts includes tm2 but there are some differences
-> > between the two boards and tm2 has some properties that tm2e
-> > doesn't have.
-> > 
-> > That's why it's important to keep the two dts files independent
-> > and put all the commonalities in a tm2-common.dtsi file.
-> > 
-> > At the current status the only two differences between the two
-> > dts files (besides the board name) are ldo31 and ldo38.
-> > 
-> > Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> > Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
-> > ---
-> >  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 1118 +++++++++++++++++++
-> >  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 1153 +-------------------
+On 01/05/2017 08:04 PM, Micha? Zegan wrote:
+> Hello.
 > 
-> Like talking to a wall. Without any feedback. If my instructions were
-> wrong (and it is not possible to detect rename) then please say it (you
-> can add personal comments after separator ---).
+> The patch causes cpufreq module (scpi-cpufreq) not to detect cpufreq, so
+> it actually works, but...
+> Loading the module causes few errors because of not found frequencies or
+> something, then it is all okay. However after loading scpi-cpufreq you
+> cannot actually power the cpu off and on. You will power it off
+> successfully, but when trying to power it on, the cpufreq driver will
+> error out, and then after it happens, the cpu that was trying to go
+> online will be offline again, and that is a little... unfortunate. The
+> question is, and I cannot really test that: will the module actually
+> autoload after this change?
 
-no Krzysztof, I'm sorry, but this patch has been formatted with
-the diff algorithm *you* asked, -B50% both version 2 (where you
-didn't comment) and version 3. If you still don't like it, please
-don't blame me, blame the algorithm.
+Hi Michal,
 
-Now we can stay here at trying random diff algorithms (as they
-give more or less the same result) or you tell me which exact
-algorithm you want me to use. Besides, for me it's clear,
-tm2-common is all new, while in tm2 you have on one side the '-'
-(if it applies nothing has changed) on the bottom the '+'.
+You are right, it breaks cpufreq and the cpu hotplug feature, I will send a v2 completely disabling cpufreq instead.
 
-Andi
+For the module autoloading, the arm_scpi.ko must be loaded before the other scpi modules.
+
+Please ask Sudeep Holla <sudeep.holla@arm.com> if module autoloading for scpi is meant to work.
+
+Neil
+
+
+> 
+> W dniu 05.01.2017 o 16:02, Neil Armstrong pisze:
+>> The current hardware is not able to run with all cores enabled at a
+>> cluster frequency superior at 1536MHz.
+>> But the currently shipped u-boot for the platform still reports an OPP
+>> table with possible DVFS frequency up to 2GHz, and will not change since
+>> the off-tree linux tree supports limiting the OPPs with a kernel parameter.
+>> A recent u-boot change reports the boot-time DVFS around 100MHz and
+>> the default performance cpufreq governor sets the maximum frequency.
+>> Previous version of u-boot reported to be already at the max OPP and
+>> left the OPP as is.
+>> Nevertheless, other governors like ondemand could setup the max frequency
+>> and make the system crash.
+>>
+>> This patch disables the DVFS clock and disables cpufreq.
+>>
+>> Fixes: 70db166a2baa ("ARM64: dts: meson-gxbb: Add SCPI with cpufreq & sensors Nodes")
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+>> index 238fbea..5e63e3b 100644
+>> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+>> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+>> @@ -137,6 +137,10 @@
+>>  	};
+>>  };
+>>  
+>> +&scpi_dvfs {
+>> +	status = "disabled";
+>> +};
+>> +
+>>  &uart_AO {
+>>  	status = "okay";
+>>  	pinctrl-0 = <&uart_ao_a_pins>;
+>>
+> 
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170106/f360c5ac/attachment-0001.sig>
