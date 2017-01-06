@@ -1,54 +1,99 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 6 Jan 2017 11:18:39 +0000
-Subject: [PATCH v3 7/9] arm64: cpufeature: Track user visible fields
-In-Reply-To: <20170105180626.GH29765@e104818-lin.cambridge.arm.com>
-References: <1483552147-9605-1-git-send-email-suzuki.poulose@arm.com>
- <1483552147-9605-8-git-send-email-suzuki.poulose@arm.com>
- <20170105180626.GH29765@e104818-lin.cambridge.arm.com>
-Message-ID: <f4413bf1-56af-9912-7494-5cb633db835c@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri,  6 Jan 2017 12:17:53 +0100
+Subject: [PATCH 11/16] arm64: dts: r8a7796: Use R-Car Gen 3 fallback binding
+ for i2c nodes
+In-Reply-To: <cover.1483700694.git.horms+renesas@verge.net.au>
+References: <cover.1483700694.git.horms+renesas@verge.net.au>
+Message-ID: <5553e2196229501346f262a9ebdc4e4ed74ff45c.1483700694.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/17 18:06, Catalin Marinas wrote:
-> On Wed, Jan 04, 2017 at 05:49:05PM +0000, Suzuki K. Poulose wrote:
->> Track the user visible fields of a CPU feature register. This will be
->> used for exposing the value to the userspace. All the user visible
->> fields of a feature register will be passed on as it is, while the
->> others would be filled with their respective safe value.
->>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->
->> @@ -81,75 +82,75 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
->>
->>
->>  static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
->> -	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
->> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
->> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
->> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
->> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
->> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
->> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
+Use recently added R-Car Gen 3 fallback binding for i2c nodes in
+DT for r8a7796 SoC.
 
-On a second look, I think we should make the RDM field visible to the user space as it
-is something useful for the user.
+This has no run-time effect for the current driver as the initialisation
+sequence is the same for the SoC-specific binding for r8a7796 and the
+fallback binding for R-Car Gen 3.
 
->> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
->> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
->> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
->> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
->> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
->
-> BTW, as a separate patch I think we need to expose the RDM field in this
-> register as well, together with a corresponding HWCAP bit.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 21 ++++++++++++++-------
+ 1 file changed, 14 insertions(+), 7 deletions(-)
 
-OK, I will send a separate patch for this.
-
-Thanks for the review.
-
-Suzuki
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index a37bb5eb062c..26a0506e3013 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -269,7 +269,8 @@
+ 		i2c0: i2c at e6500000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			compatible = "renesas,i2c-r8a7796";
++			compatible = "renesas,i2c-r8a7796",
++				     "renesas,rcar-gen3-i2c";
+ 			reg = <0 0xe6500000 0 0x40>;
+ 			interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 931>;
+@@ -284,7 +285,8 @@
+ 		i2c1: i2c at e6508000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			compatible = "renesas,i2c-r8a7796";
++			compatible = "renesas,i2c-r8a7796",
++				     "renesas,rcar-gen3-i2c";
+ 			reg = <0 0xe6508000 0 0x40>;
+ 			interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 930>;
+@@ -299,7 +301,8 @@
+ 		i2c2: i2c at e6510000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			compatible = "renesas,i2c-r8a7796";
++			compatible = "renesas,i2c-r8a7796",
++				     "renesas,rcar-gen3-i2c";
+ 			reg = <0 0xe6510000 0 0x40>;
+ 			interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 929>;
+@@ -314,7 +317,8 @@
+ 		i2c3: i2c at e66d0000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			compatible = "renesas,i2c-r8a7796";
++			compatible = "renesas,i2c-r8a7796",
++				     "renesas,rcar-gen3-i2c";
+ 			reg = <0 0xe66d0000 0 0x40>;
+ 			interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 928>;
+@@ -328,7 +332,8 @@
+ 		i2c4: i2c at e66d8000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			compatible = "renesas,i2c-r8a7796";
++			compatible = "renesas,i2c-r8a7796",
++				     "renesas,rcar-gen3-i2c";
+ 			reg = <0 0xe66d8000 0 0x40>;
+ 			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 927>;
+@@ -342,7 +347,8 @@
+ 		i2c5: i2c at e66e0000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			compatible = "renesas,i2c-r8a7796";
++			compatible = "renesas,i2c-r8a7796",
++				     "renesas,rcar-gen3-i2c";
+ 			reg = <0 0xe66e0000 0 0x40>;
+ 			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 919>;
+@@ -356,7 +362,8 @@
+ 		i2c6: i2c at e66e8000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			compatible = "renesas,i2c-r8a7796";
++			compatible = "renesas,i2c-r8a7796",
++				     "renesas,rcar-gen3-i2c";
+ 			reg = <0 0xe66e8000 0 0x40>;
+ 			interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 918>;
+-- 
+2.7.0.rc3.207.g0ac5344
