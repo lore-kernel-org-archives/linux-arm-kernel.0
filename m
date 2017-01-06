@@ -1,59 +1,50 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Jan 2017 13:07:27 +0000
-Subject: [PATCHv2 net-next 09/11] net: mvpp2: simplify MVPP2_PRS_RI_*
- definitions
-In-Reply-To: <1482943567-12483-10-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1482943567-12483-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482943567-12483-10-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170106130727.GB14217@n2100.armlinux.org.uk>
+From: webczat_200@poczta.onet.pl (=?UTF-8?Q?Micha=c5=82_Zegan?=)
+Date: Fri, 6 Jan 2017 14:12:21 +0100
+Subject: [PATCH] ARM64: dts: meson-gxbb-odroidc2: Disable SCPI DVFS
+In-Reply-To: <83fd9b61-dbff-68e0-82e5-8e01058d04a9@arm.com>
+References: <1483628549-29486-1-git-send-email-narmstrong@baylibre.com>
+ <9f508097-f605-ebd8-20af-c3e798c6fdcc@poczta.onet.pl>
+ <83fd9b61-dbff-68e0-82e5-8e01058d04a9@arm.com>
+Message-ID: <70c0537a-0e16-ed69-ab90-c8e69e44b5f3@poczta.onet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 28, 2016 at 05:46:05PM +0100, Thomas Petazzoni wrote:
-> Some of the MVPP2_PRS_RI_* definitions use the ~(value) syntax, which
-> doesn't compile nicely on 64-bit. Moreover, those definitions are in
-> fact unneeded, since they are always used in combination with a bit
-> mask that ensures only the appropriate bits are modified.
+Yes, I meant what you think I meant. :) thanks
+
+W dniu 06.01.2017 o 12:54, Sudeep Holla pisze:
+> Hi Micha?,
 > 
-> Therefore, such definitions should just be set to 0x0. For example:
+> On 05/01/17 19:04, Micha? Zegan wrote:
+>> Hello.
+>>
+>> The patch causes cpufreq module (scpi-cpufreq) not to detect cpufreq, so
+>> it actually works, but...
+>> Loading the module causes few errors because of not found frequencies or
+>> something, then it is all okay. However after loading scpi-cpufreq you
+>> cannot actually power the cpu off and on. You will power it off
+>> successfully, but when trying to power it on, the cpufreq driver will
+>> error out, 
 > 
->  #define MVPP2_PRS_RI_L2_CAST_MASK              0x600
->  #define MVPP2_PRS_RI_L2_UCAST                  ~(BIT(9) | BIT(10))
->  #define MVPP2_PRS_RI_L2_MCAST                  BIT(9)
->  #define MVPP2_PRS_RI_L2_BCAST                  BIT(10)
+> Yes I had noticed this in past, this needs to be fixed. I had a patch
+> and seems like it slipped through the cracks. I will fins and post it.
 > 
-> becomes
+>> and then after it happens, the cpu that was trying to go
+>> online will be offline again, and that is a little... unfortunate. The
 > 
->  #define MVPP2_PRS_RI_L2_CAST_MASK              0x600
->  #define MVPP2_PRS_RI_L2_UCAST                  0x0
->  #define MVPP2_PRS_RI_L2_MCAST                  BIT(9)
->  #define MVPP2_PRS_RI_L2_BCAST                  BIT(10)
+> IIUC, you mean the cpufreq drive spits error on every hotplug event ?
+> If so yes, otherwise I think I didn't understand you concern above.
+> 
+>> question is, and I cannot really test that: will the module actually
+>> autoload after this change?
+>>
+> 
+> It should work, I had tested this in past.
+> 
 
-So this is a two-bit field in a register with three defined states - I'm
-not sure that using BIT() here is really a good idea.  BIT() is fine for
-single-bit controls, but I think it adds an additional level of confusion
-for multi-bit controls.
-
-Also, the combination of the mask being defined as hex and the controls
-using BIT() is particularly not nice.  I think either use one style or
-the other, don't mix them.  So either:
-
-  #define MVPP2_PRS_RI_L2_CAST_MASK              0x600
-  #define MVPP2_PRS_RI_L2_UCAST                  0x000
-  #define MVPP2_PRS_RI_L2_MCAST                  0x200
-  #define MVPP2_PRS_RI_L2_BCAST                  0x400
-
-or:
-
-  #define MVPP2_PRS_RI_L2_CAST_MASK              (BIT(10) | BIT(9))
-  #define MVPP2_PRS_RI_L2_UCAST                  0
-  #define MVPP2_PRS_RI_L2_MCAST                  BIT(9)
-  #define MVPP2_PRS_RI_L2_BCAST                  BIT(10)
-
-It then becomes obvious that the mask and the settings are changing the
-same bits.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 525 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170106/37f9d743/attachment.sig>
