@@ -1,38 +1,66 @@
 From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 6 Jan 2017 17:33:34 +0100
-Subject: [RESEND PATCH] ARM: dts: stm32f469-disco: Fix memory size from
- 8MB to 16MB
-In-Reply-To: <20161118145845.30455-1-bmh@certi.org.br>
-References: <20161118145845.30455-1-bmh@certi.org.br>
-Message-ID: <a8259368-896a-64fe-4a48-71f15906dc74@st.com>
+Date: Fri, 6 Jan 2017 17:34:29 +0100
+Subject: [RESEND PATCH v1] ARM: dts: stm32f429: Add missing USART3 pin
+ config to STM32F469I-DISCO board
+In-Reply-To: <20161118151033.30592-1-bmh@certi.org.br>
+References: <20161118151033.30592-1-bmh@certi.org.br>
+Message-ID: <97600913-7d3e-8096-3bfa-431c70a949dc@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Bruno,
 
-On 11/18/2016 03:58 PM, Bruno Meirelles Herrera wrote:
-> From: Bruno Herrera <bruherrera@gmail.com>
+On 11/18/2016 04:10 PM, Bruno Meirelles Herrera wrote:
+> Including new STM32 maintainer. Rebased at stm32-dt-for-v4.10-1 and
+> stm32-dt-for-v4.10-2 branches. It fix the port/pin initialization in
+> case boot-loader does not configure/initialize the pins.
+> Fixing line wrapping from last patch
 >
-> This patch fix memory size to support 16MB of external SDRAM.
+> This patch adds USART3 pin configuration on PB10/PA11 pins
+> for STM32F469I-DISCO board.
 >
 > Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
 > ---
->  arch/arm/boot/dts/stm32f469-disco.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/boot/dts/stm32f429.dtsi      | 13 +++++++++++++
+>  arch/arm/boot/dts/stm32f469-disco.dts |  2 ++
+>  2 files changed, 15 insertions(+)
 >
+> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+> index e4dae0e..1b8b105 100644
+> --- a/arch/arm/boot/dts/stm32f429.dtsi
+> +++ b/arch/arm/boot/dts/stm32f429.dtsi
+> @@ -316,6 +316,19 @@
+>  				};
+>  			};
+>
+> +			usart3_pins_a: usart3 at 0 {
+> +				pins1 {
+> +					pinmux = <STM32F429_PB10_FUNC_USART3_TX>;
+> +					bias-disable;
+> +					drive-push-pull;
+> +					slew-rate = <0>;
+> +				};
+> +				pins2 {
+> +					pinmux = <STM32F429_PB11_FUNC_USART3_RX>;
+> +					bias-disable;
+> +				};
+> +			};
+> +
+>  			usbotg_hs_pins_a: usbotg_hs at 0 {
+>  				pins {
+>  					pinmux = <STM32F429_PH4_FUNC_OTG_HS_ULPI_NXT>,
 > diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
-> index 75f4303..fda12a4 100644
+> index 8877c00..75f4303 100644
 > --- a/arch/arm/boot/dts/stm32f469-disco.dts
 > +++ b/arch/arm/boot/dts/stm32f469-disco.dts
-> @@ -58,7 +58,7 @@
->  	};
+> @@ -79,5 +79,7 @@
+>  };
 >
->  	memory {
-> -		reg = <0x00000000 0x800000>;
-> +		reg = <0x00000000 0x1000000>;
->  	};
->
->  	aliases {
+>  &usart3 {
+> +	pinctrl-0 = <&usart3_pins_a>;
+> +	pinctrl-names = "default";
+>  	status = "okay";
+>  };
 >
 After a little cosmetic change in commit header:
 
