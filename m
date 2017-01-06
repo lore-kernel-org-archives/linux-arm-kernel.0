@@ -1,1267 +1,213 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 6 Jan 2017 15:49:29 +0200
-Subject: [PATCH v5 2/5] arm64: dts: exynos: make tm2 and tm2e independent
- from each other
-In-Reply-To: <20170106134350.32428-3-andi.shyti@samsung.com>
-References: <20170106134350.32428-1-andi.shyti@samsung.com>
- <CGME20170106134356epcas1p19be459900aec43b2b9ea343cdaf0a2bf@epcas1p1.samsung.com>
- <20170106134350.32428-3-andi.shyti@samsung.com>
-Message-ID: <20170106134929.mj7wqalp7lpkfm6b@kozik-lap>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Fri, 06 Jan 2017 14:50:21 +0100
+Subject: [PATCH net-next v4 0/4] Fix OdroidC2 Gigabit Tx link issue
+In-Reply-To: <20170106114226.GX14217@n2100.armlinux.org.uk>
+References: <1480348229-25672-1-git-send-email-jbrunet@baylibre.com>
+ <049b1efc-3bad-92e0-45ef-0563dc5d81de@gmail.com>
+ <20170105232508.GU14217@n2100.armlinux.org.uk>
+ <1483697496.28003.40.camel@baylibre.com>
+ <20170106114226.GX14217@n2100.armlinux.org.uk>
+Message-ID: <1483710621.28003.74.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 10:43:47PM +0900, Andi Shyti wrote:
-> Currently tm2e dts includes tm2 but there are some differences
-> between the two boards and tm2 has some properties that tm2e
-> doesn't have.
+On Fri, 2017-01-06 at 11:42 +0000, Russell King - ARM Linux wrote:
+> On Fri, Jan 06, 2017 at 11:11:36AM +0100, Jerome Brunet wrote:
+> > 
+> > The purpose of this patch is to provide a way to mark as broken a
+> > particular eee mode. At first, it had nothing to do with "set_eee"
+> > but,
+> > as Florian rightly pointed out, users shouldn't be able to re-
+> > enable a
+> > broken mode.
 > 
-> That's why it's important to keep the two dts files independent
-> and put all the commonalities in a tm2-common.dtsi file.
+> I think something else has been missed - I don't see much point to
+> telling userspace that (eg) 1000baseT EEE is supported and then
+> ignore attempts to advertise it.
 > 
-> At the current status the only two differences between the two
-> dts files (besides the board name) are ldo31 and ldo38.
-> 
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
->  ...ynos5433-tm2.dts => exynos5433-tm2-common.dtsi} |   21 +-
->  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 1150 +-------------------
->  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |    2 +-
->  3 files changed, 42 insertions(+), 1131 deletions(-)
->  copy arch/arm64/boot/dts/exynos/{exynos5433-tm2.dts => exynos5433-tm2-common.dtsi} (98%)
->  rewrite arch/arm64/boot/dts/exynos/exynos5433-tm2.dts (98%)
-> 
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-> similarity index 98%
-> copy from arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-> copy to arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-> index 640e4b9910ae..cc6701b3bce4 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-> @@ -3,8 +3,8 @@
->   *
->   * Copyright (c) 2016 Samsung Electronics Co., Ltd.
->   *
-> - * Device tree source file for Samsung's TM2 board which is based on
-> - * Samsung Exynos5433 SoC.
-> + * Common device tree source file for Samsung's TM2 and TM2E boards
-> + * which are based on Samsung Exynos5433 SoC.
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 as
-> @@ -19,9 +19,6 @@
->  #include <dt-bindings/interrupt-controller/irq.h>
->  
->  / {
-> -	model = "Samsung TM2 board";
-> -	compatible = "samsung,tm2", "samsung,exynos5433";
-> -
->  	aliases {
->  		gsc0 = &gsc_0;
->  		gsc1 = &gsc_1;
-> @@ -552,9 +549,10 @@
->  			};
->  
->  			ldo31_reg: LDO31 {
-> -				regulator-name = "TSP_VDD_1.85V_AP";
-> -				regulator-min-microvolt = <1850000>;
-> -				regulator-max-microvolt = <1850000>;
-> +				/*
-> +				 * LDO31 differs from target to target,
-> +				 * its definition is in the .dts
-> +				 */
->  			};
->  
->  			ldo32_reg: LDO32 {
-> @@ -595,9 +593,10 @@
->  			};
->  
->  			ldo38_reg: LDO38 {
-> -				regulator-name = "VCC_3.0V_MOTOR_AP";
-> -				regulator-min-microvolt = <3000000>;
-> -				regulator-max-microvolt = <3000000>;
-> +				/*
-> +				 * LDO38 differs from target to target,
-> +				 * its definition is in the .dts
-> +				 */
->  			};
->  
->  			ldo39_reg: LDO39 {
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-> dissimilarity index 98%
-> index 640e4b9910ae..2449266b268f 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-> @@ -1,1119 +1,31 @@
-> -/*
-> - * SAMSUNG Exynos5433 TM2 board device tree source
-> - *
-> - * Copyright (c) 2016 Samsung Electronics Co., Ltd.
-> - *
-> - * Device tree source file for Samsung's TM2 board which is based on
-> - * Samsung Exynos5433 SoC.
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - */
-> -
-> -/dts-v1/;
-> -#include "exynos5433.dtsi"
-> -#include <dt-bindings/clock/samsung,s2mps11.h>
-> -#include <dt-bindings/gpio/gpio.h>
-> -#include <dt-bindings/input/input.h>
-> -#include <dt-bindings/interrupt-controller/irq.h>
-> -
-> -/ {
-> -	model = "Samsung TM2 board";
-> -	compatible = "samsung,tm2", "samsung,exynos5433";
-> -
-> -	aliases {
-> -		gsc0 = &gsc_0;
-> -		gsc1 = &gsc_1;
-> -		gsc2 = &gsc_2;
-> -		pinctrl0 = &pinctrl_alive;
-> -		pinctrl1 = &pinctrl_aud;
-> -		pinctrl2 = &pinctrl_cpif;
-> -		pinctrl3 = &pinctrl_ese;
-> -		pinctrl4 = &pinctrl_finger;
-> -		pinctrl5 = &pinctrl_fsys;
-> -		pinctrl6 = &pinctrl_imem;
-> -		pinctrl7 = &pinctrl_nfc;
-> -		pinctrl8 = &pinctrl_peric;
-> -		pinctrl9 = &pinctrl_touch;
-> -		serial0 = &serial_0;
-> -		serial1 = &serial_1;
-> -		serial2 = &serial_2;
-> -		serial3 = &serial_3;
-> -		spi0 = &spi_0;
-> -		spi1 = &spi_1;
-> -		spi2 = &spi_2;
-> -		spi3 = &spi_3;
-> -		spi4 = &spi_4;
-> -		mshc0 = &mshc_0;
-> -		mshc2 = &mshc_2;
-> -	};
-> -
-> -	chosen {
-> -		stdout-path = &serial_1;
-> -	};
-> -
-> -	memory at 20000000 {
-> -		device_type = "memory";
-> -		reg = <0x0 0x20000000 0x0 0xc0000000>;
-> -	};
-> -
-> -	gpio-keys {
-> -		compatible = "gpio-keys";
-> -
-> -		power-key {
-> -			gpios = <&gpa2 7 GPIO_ACTIVE_LOW>;
-> -			linux,code = <KEY_POWER>;
-> -			label = "power key";
-> -			debounce-interval = <10>;
-> -		};
-> -
-> -		volume-up-key {
-> -			gpios = <&gpa2 0 GPIO_ACTIVE_LOW>;
-> -			linux,code = <KEY_VOLUMEUP>;
-> -			label = "volume-up key";
-> -			debounce-interval = <10>;
-> -		};
-> -
-> -		volume-down-key {
-> -			gpios = <&gpa2 1 GPIO_ACTIVE_LOW>;
-> -			linux,code = <KEY_VOLUMEDOWN>;
-> -			label = "volume-down key";
-> -			debounce-interval = <10>;
-> -		};
-> -
-> -		homepage-key {
-> -			gpios = <&gpa0 3 GPIO_ACTIVE_LOW>;
-> -			linux,code = <KEY_MENU>;
-> -			label = "homepage key";
-> -			debounce-interval = <10>;
-> -		};
-> -	};
-> -
-> -	i2c_max98504: i2c-gpio-0 {
-> -		compatible = "i2c-gpio";
-> -		gpios = <&gpd0 1 GPIO_ACTIVE_HIGH /* SPK_AMP_SDA */
-> -			 &gpd0 0 GPIO_ACTIVE_HIGH /* SPK_AMP_SCL */ >;
-> -		i2c-gpio,delay-us = <2>;
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
-> -		status = "okay";
-> -
-> -		max98504: max98504 at 31 {
-> -			compatible = "maxim,max98504";
-> -			reg = <0x31>;
-> -			maxim,rx-path = <1>;
-> -			maxim,tx-path = <1>;
-> -			maxim,tx-channel-mask = <3>;
-> -			maxim,tx-channel-source = <2>;
-> -		};
-> -	};
-> -
-> -	sound {
-> -		compatible = "samsung,tm2-audio";
-> -		audio-codec = <&wm5110>;
-> -		i2s-controller = <&i2s0>;
-> -		audio-amplifier = <&max98504>;
-> -		mic-bias-gpios = <&gpr3 2 GPIO_ACTIVE_HIGH>;
-> -		model = "wm5110";
-> -		samsung,audio-routing =
-> -			/* Headphone */
-> -			"HP", "HPOUT1L",
-> -			"HP", "HPOUT1R",
-> -
-> -			/* Speaker */
-> -			"SPK", "SPKOUT",
-> -			"SPKOUT", "HPOUT2L",
-> -			"SPKOUT", "HPOUT2R",
-> -
-> -			/* Receiver */
-> -			"RCV", "HPOUT3L",
-> -			"RCV", "HPOUT3R";
-> -		status = "okay";
-> -	};
-> -};
-> -
-> -&adc {
-> -	vdd-supply = <&ldo3_reg>;
-> -	status = "okay";
-> -
-> -	thermistor-ap {
-> -		compatible = "murata,ncp03wf104";
-> -		pullup-uv = <1800000>;
-> -		pullup-ohm = <100000>;
-> -		pulldown-ohm = <0>;
-> -		io-channels = <&adc 0>;
-> -	};
-> -
-> -	thermistor-battery {
-> -		compatible = "murata,ncp03wf104";
-> -		pullup-uv = <1800000>;
-> -		pullup-ohm = <100000>;
-> -		pulldown-ohm = <0>;
-> -		io-channels = <&adc 1>;
-> -		#thermal-sensor-cells = <0>;
-> -	};
-> -
-> -	thermistor-charger {
-> -		compatible = "murata,ncp03wf104";
-> -		pullup-uv = <1800000>;
-> -		pullup-ohm = <100000>;
-> -		pulldown-ohm = <0>;
-> -		io-channels = <&adc 2>;
-> -	};
-> -};
-> -
-> -&bus_g2d_400 {
-> -	devfreq-events = <&ppmu_event0_d0_general>, <&ppmu_event0_d1_general>;
-> -	vdd-supply = <&buck4_reg>;
-> -	exynos,saturation-ratio = <10>;
-> -	status = "okay";
-> -};
-> -
-> -&bus_g2d_266 {
-> -	devfreq = <&bus_g2d_400>;
-> -	status = "okay";
-> -};
-> -
-> -&bus_gscl {
-> -	devfreq = <&bus_g2d_400>;
-> -	status = "okay";
-> -};
-> -
-> -&bus_hevc {
-> -	devfreq = <&bus_g2d_400>;
-> -	status = "okay";
-> -};
-> -
-> -&bus_jpeg {
-> -	devfreq = <&bus_g2d_400>;
-> -	status = "okay";
-> -};
-> -
-> -&bus_mfc {
-> -	devfreq = <&bus_g2d_400>;
-> -	status = "okay";
-> -};
-> -
-> -&bus_mscl {
-> -	devfreq = <&bus_g2d_400>;
-> -	status = "okay";
-> -};
-> -
-> -&bus_noc0 {
-> -	devfreq = <&bus_g2d_400>;
-> -	status = "okay";
-> -};
-> -
-> -&bus_noc1 {
-> -	devfreq = <&bus_g2d_400>;
-> -	status = "okay";
-> -};
-> -
-> -&bus_noc2 {
-> -	devfreq = <&bus_g2d_400>;
-> -	status = "okay";
-> -};
-> -
-> -&cmu_aud {
-> -	assigned-clocks = <&cmu_aud CLK_MOUT_AUD_PLL_USER>;
-> -	assigned-clock-parents = <&cmu_top CLK_FOUT_AUD_PLL>;
-> -};
-> -
-> -&cmu_fsys {
-> -	assigned-clocks = <&cmu_top CLK_MOUT_SCLK_USBDRD30>,
-> -		<&cmu_top CLK_MOUT_SCLK_USBHOST30>,
-> -		<&cmu_fsys CLK_MOUT_SCLK_USBDRD30_USER>,
-> -		<&cmu_fsys CLK_MOUT_SCLK_USBHOST30_USER>,
-> -		<&cmu_fsys CLK_MOUT_PHYCLK_USBDRD30_UDRD30_PIPE_PCLK_USER>,
-> -		<&cmu_fsys CLK_MOUT_PHYCLK_USBHOST30_UHOST30_PIPE_PCLK_USER>,
-> -		<&cmu_fsys CLK_MOUT_PHYCLK_USBDRD30_UDRD30_PHYCLOCK_USER>,
-> -		<&cmu_fsys CLK_MOUT_PHYCLK_USBHOST30_UHOST30_PHYCLOCK_USER>,
-> -		<&cmu_top CLK_DIV_SCLK_USBDRD30>,
-> -		<&cmu_top CLK_DIV_SCLK_USBHOST30>;
-> -	assigned-clock-parents = <&cmu_top CLK_MOUT_BUS_PLL_USER>,
-> -		<&cmu_top CLK_MOUT_BUS_PLL_USER>,
-> -		<&cmu_top CLK_SCLK_USBDRD30_FSYS>,
-> -		<&cmu_top CLK_SCLK_USBHOST30_FSYS>,
-> -		<&cmu_fsys CLK_PHYCLK_USBDRD30_UDRD30_PIPE_PCLK_PHY>,
-> -		<&cmu_fsys CLK_PHYCLK_USBHOST30_UHOST30_PIPE_PCLK_PHY>,
-> -		<&cmu_fsys CLK_PHYCLK_USBDRD30_UDRD30_PHYCLOCK_PHY>,
-> -		<&cmu_fsys CLK_PHYCLK_USBHOST30_UHOST30_PHYCLOCK_PHY>;
-> -	assigned-clock-rates = <0>, <0>, <0>, <0>, <0>, <0>, <0>, <0>,
-> -			       <66700000>, <66700000>;
-> -};
-> -
-> -&cmu_gscl {
-> -	assigned-clocks = <&cmu_gscl CLK_MOUT_ACLK_GSCL_111_USER>,
-> -			  <&cmu_gscl CLK_MOUT_ACLK_GSCL_333_USER>;
-> -	assigned-clock-parents = <&cmu_top CLK_ACLK_GSCL_111>,
-> -				 <&cmu_top CLK_ACLK_GSCL_333>;
-> -};
-> -
-> -&cmu_mfc {
-> -	assigned-clocks = <&cmu_mfc CLK_MOUT_ACLK_MFC_400_USER>;
-> -	assigned-clock-parents = <&cmu_top CLK_ACLK_MFC_400>;
-> -};
-> -
-> -&cmu_mscl {
-> -	assigned-clocks = <&cmu_mscl CLK_MOUT_ACLK_MSCL_400_USER>,
-> -			  <&cmu_mscl CLK_MOUT_SCLK_JPEG_USER>,
-> -			  <&cmu_mscl CLK_MOUT_SCLK_JPEG>,
-> -			  <&cmu_top CLK_MOUT_SCLK_JPEG_A>;
-> -	assigned-clock-parents = <&cmu_top CLK_ACLK_MSCL_400>,
-> -				 <&cmu_top CLK_SCLK_JPEG_MSCL>,
-> -				 <&cmu_mscl CLK_MOUT_SCLK_JPEG_USER>,
-> -				 <&cmu_top CLK_MOUT_BUS_PLL_USER>;
-> -};
-> -
-> -&cpu0 {
-> -	cpu-supply = <&buck3_reg>;
-> -};
-> -
-> -&cpu4 {
-> -	cpu-supply = <&buck2_reg>;
-> -};
-> -
-> -&decon {
-> -	status = "okay";
-> -
-> -	i80-if-timings {
-> -	};
-> -};
-> -
-> -&dsi {
-> -	status = "okay";
-> -	vddcore-supply = <&ldo6_reg>;
-> -	vddio-supply = <&ldo7_reg>;
-> -	samsung,pll-clock-frequency = <24000000>;
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&te_irq>;
-> -
-> -	ports {
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
-> -
-> -		port at 1 {
-> -			reg = <1>;
-> -
-> -			dsi_out: endpoint {
-> -				samsung,burst-clock-frequency = <512000000>;
-> -				samsung,esc-clock-frequency = <16000000>;
-> -			};
-> -		};
-> -	};
-> -};
-> -
-> -&hsi2c_0 {
-> -	status = "okay";
-> -	clock-frequency = <2500000>;
-> -
-> -	s2mps13-pmic at 66 {
-> -		compatible = "samsung,s2mps13-pmic";
-> -		interrupt-parent = <&gpa0>;
-> -		interrupts = <7 IRQ_TYPE_NONE>;
-> -		reg = <0x66>;
-> -		samsung,s2mps11-wrstbi-ground;
-> -
-> -		s2mps13_osc: clocks {
-> -			compatible = "samsung,s2mps13-clk";
-> -			#clock-cells = <1>;
-> -			clock-output-names = "s2mps13_ap", "s2mps13_cp",
-> -				"s2mps13_bt";
-> -		};
-> -
-> -		regulators {
-> -			ldo1_reg: LDO1 {
-> -				regulator-name = "VDD_ALIVE_0.9V_AP";
-> -				regulator-min-microvolt = <900000>;
-> -				regulator-max-microvolt = <900000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			ldo2_reg: LDO2 {
-> -				regulator-name = "VDDQ_MMC2_2.8V_AP";
-> -				regulator-min-microvolt = <2800000>;
-> -				regulator-max-microvolt = <2800000>;
-> -				regulator-always-on;
-> -				regulator-state-mem {
-> -					regulator-off-in-suspend;
-> -				};
-> -			};
-> -
-> -			ldo3_reg: LDO3 {
-> -				regulator-name = "VDD1_E_1.8V_AP";
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <1800000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			ldo4_reg: LDO4 {
-> -				regulator-name = "VDD10_MIF_PLL_1.0V_AP";
-> -				regulator-min-microvolt = <1300000>;
-> -				regulator-max-microvolt = <1300000>;
-> -				regulator-always-on;
-> -				regulator-state-mem {
-> -					regulator-off-in-suspend;
-> -				};
-> -			};
-> -
-> -			ldo5_reg: LDO5 {
-> -				regulator-name = "VDD10_DPLL_1.0V_AP";
-> -				regulator-min-microvolt = <1000000>;
-> -				regulator-max-microvolt = <1000000>;
-> -				regulator-always-on;
-> -				regulator-state-mem {
-> -					regulator-off-in-suspend;
-> -				};
-> -			};
-> -
-> -			ldo6_reg: LDO6 {
-> -				regulator-name = "VDD10_MIPI2L_1.0V_AP";
-> -				regulator-min-microvolt = <1000000>;
-> -				regulator-max-microvolt = <1000000>;
-> -				regulator-state-mem {
-> -					regulator-off-in-suspend;
-> -				};
-> -			};
-> -
-> -			ldo7_reg: LDO7 {
-> -				regulator-name = "VDD18_MIPI2L_1.8V_AP";
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <1800000>;
-> -			};
-> -
-> -			ldo8_reg: LDO8 {
-> -				regulator-name = "VDD18_LLI_1.8V_AP";
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <1800000>;
-> -				regulator-always-on;
-> -				regulator-state-mem {
-> -					regulator-off-in-suspend;
-> -				};
-> -			};
-> -
-> -			ldo9_reg: LDO9 {
-> -				regulator-name = "VDD18_ABB_ETC_1.8V_AP";
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <1800000>;
-> -				regulator-always-on;
-> -				regulator-state-mem {
-> -					regulator-off-in-suspend;
-> -				};
-> -			};
-> -
-> -			ldo10_reg: LDO10 {
-> -				regulator-name = "VDD33_USB30_3.0V_AP";
-> -				regulator-min-microvolt = <3000000>;
-> -				regulator-max-microvolt = <3000000>;
-> -				regulator-state-mem {
-> -					regulator-off-in-suspend;
-> -				};
-> -			};
-> -
-> -			ldo11_reg: LDO11 {
-> -				regulator-name = "VDD_INT_M_1.0V_AP";
-> -				regulator-min-microvolt = <1000000>;
-> -				regulator-max-microvolt = <1000000>;
-> -				regulator-always-on;
-> -				regulator-state-mem {
-> -					regulator-off-in-suspend;
-> -				};
-> -			};
-> -
-> -			ldo12_reg: LDO12 {
-> -				regulator-name = "VDD_KFC_M_1.1V_AP";
-> -				regulator-min-microvolt = <800000>;
-> -				regulator-max-microvolt = <1350000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			ldo13_reg: LDO13 {
-> -				regulator-name = "VDD_G3D_M_0.95V_AP";
-> -				regulator-min-microvolt = <950000>;
-> -				regulator-max-microvolt = <950000>;
-> -				regulator-always-on;
-> -				regulator-state-mem {
-> -					regulator-off-in-suspend;
-> -				};
-> -			};
-> -
-> -			ldo14_reg: LDO14 {
-> -				regulator-name = "VDDQ_M1_LDO_1.2V_AP";
-> -				regulator-min-microvolt = <1200000>;
-> -				regulator-max-microvolt = <1200000>;
-> -				regulator-always-on;
-> -				regulator-state-mem {
-> -					regulator-off-in-suspend;
-> -				};
-> -			};
-> -
-> -			ldo15_reg: LDO15 {
-> -				regulator-name = "VDDQ_M2_LDO_1.2V_AP";
-> -				regulator-min-microvolt = <1200000>;
-> -				regulator-max-microvolt = <1200000>;
-> -				regulator-always-on;
-> -				regulator-state-mem {
-> -					regulator-off-in-suspend;
-> -				};
-> -			};
-> -
-> -			ldo16_reg: LDO16 {
-> -				regulator-name = "VDDQ_EFUSE";
-> -				regulator-min-microvolt = <1400000>;
-> -				regulator-max-microvolt = <3400000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			ldo17_reg: LDO17 {
-> -				regulator-name = "V_TFLASH_2.8V_AP";
-> -				regulator-min-microvolt = <2800000>;
-> -				regulator-max-microvolt = <2800000>;
-> -			};
-> -
-> -			ldo18_reg: LDO18 {
-> -				regulator-name = "V_CODEC_1.8V_AP";
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <1800000>;
-> -			};
-> -
-> -			ldo19_reg: LDO19 {
-> -				regulator-name = "VDDA_1.8V_COMP";
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <1800000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			ldo20_reg: LDO20 {
-> -				regulator-name = "VCC_2.8V_AP";
-> -				regulator-min-microvolt = <2800000>;
-> -				regulator-max-microvolt = <2800000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			ldo21_reg: LDO21 {
-> -				regulator-name = "VT_CAM_1.8V";
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <1800000>;
-> -			};
-> -
-> -			ldo22_reg: LDO22 {
-> -				regulator-name = "CAM_IO_1.8V_AP";
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <1800000>;
-> -			};
-> -
-> -			ldo23_reg: LDO23 {
-> -				regulator-name = "CAM_SEN_CORE_1.05V_AP";
-> -				regulator-min-microvolt = <1050000>;
-> -				regulator-max-microvolt = <1050000>;
-> -			};
-> -
-> -			ldo24_reg: LDO24 {
-> -				regulator-name = "VT_CAM_1.2V";
-> -				regulator-min-microvolt = <1200000>;
-> -				regulator-max-microvolt = <1200000>;
-> -			};
-> -
-> -			ldo25_reg: LDO25 {
-> -				regulator-name = "UNUSED_LDO25";
-> -				regulator-min-microvolt = <2800000>;
-> -				regulator-max-microvolt = <2800000>;
-> -			};
-> -
-> -			ldo26_reg: LDO26 {
-> -				regulator-name = "CAM_AF_2.8V_AP";
-> -				regulator-min-microvolt = <2800000>;
-> -				regulator-max-microvolt = <2800000>;
-> -			};
-> -
-> -			ldo27_reg: LDO27 {
-> -				regulator-name = "VCC_3.0V_LCD_AP";
-> -				regulator-min-microvolt = <3000000>;
-> -				regulator-max-microvolt = <3000000>;
-> -			};
-> -
-> -			ldo28_reg: LDO28 {
-> -				regulator-name = "VCC_1.8V_LCD_AP";
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <1800000>;
-> -			};
-> -
-> -			ldo29_reg: LDO29 {
-> -				regulator-name = "VT_CAM_2.8V";
-> -				regulator-min-microvolt = <3000000>;
-> -				regulator-max-microvolt = <3000000>;
-> -			};
-> -
-> -			ldo30_reg: LDO30 {
-> -				regulator-name = "TSP_AVDD_3.3V_AP";
-> -				regulator-min-microvolt = <3300000>;
-> -				regulator-max-microvolt = <3300000>;
-> -			};
-> -
-> -			ldo31_reg: LDO31 {
-> -				regulator-name = "TSP_VDD_1.85V_AP";
-> -				regulator-min-microvolt = <1850000>;
-> -				regulator-max-microvolt = <1850000>;
-> -			};
-> -
-> -			ldo32_reg: LDO32 {
-> -				regulator-name = "VTOUCH_1.8V_AP";
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <1800000>;
-> -			};
-> -
-> -			ldo33_reg: LDO33 {
-> -				regulator-name = "VTOUCH_LED_3.3V";
-> -				regulator-min-microvolt = <2500000>;
-> -				regulator-max-microvolt = <3300000>;
-> -				regulator-ramp-delay = <12500>;
-> -			};
-> -
-> -			ldo34_reg: LDO34 {
-> -				regulator-name = "VCC_1.8V_MHL_AP";
-> -				regulator-min-microvolt = <1000000>;
-> -				regulator-max-microvolt = <2100000>;
-> -			};
-> -
-> -			ldo35_reg: LDO35 {
-> -				regulator-name = "OIS_VM_2.8V";
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <2800000>;
-> -			};
-> -
-> -			ldo36_reg: LDO36 {
-> -				regulator-name = "VSIL_1.0V";
-> -				regulator-min-microvolt = <1000000>;
-> -				regulator-max-microvolt = <1000000>;
-> -			};
-> -
-> -			ldo37_reg: LDO37 {
-> -				regulator-name = "VF_1.8V";
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <1800000>;
-> -			};
-> -
-> -			ldo38_reg: LDO38 {
-> -				regulator-name = "VCC_3.0V_MOTOR_AP";
-> -				regulator-min-microvolt = <3000000>;
-> -				regulator-max-microvolt = <3000000>;
-> -			};
-> -
-> -			ldo39_reg: LDO39 {
-> -				regulator-name = "V_HRM_1.8V";
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <1800000>;
-> -			};
-> -
-> -			ldo40_reg: LDO40 {
-> -				regulator-name = "V_HRM_3.3V";
-> -				regulator-min-microvolt = <3300000>;
-> -				regulator-max-microvolt = <3300000>;
-> -			};
-> -
-> -			buck1_reg: BUCK1 {
-> -				regulator-name = "VDD_MIF_0.9V_AP";
-> -				regulator-min-microvolt = <600000>;
-> -				regulator-max-microvolt = <1500000>;
-> -				regulator-always-on;
-> -				regulator-state-mem {
-> -					regulator-off-in-suspend;
-> -				};
-> -			};
-> -
-> -			buck2_reg: BUCK2 {
-> -				regulator-name = "VDD_EGL_1.0V_AP";
-> -				regulator-min-microvolt = <900000>;
-> -				regulator-max-microvolt = <1300000>;
-> -				regulator-always-on;
-> -				regulator-state-mem {
-> -					regulator-off-in-suspend;
-> -				};
-> -			};
-> -
-> -			buck3_reg: BUCK3 {
-> -				regulator-name = "VDD_KFC_1.0V_AP";
-> -				regulator-min-microvolt = <800000>;
-> -				regulator-max-microvolt = <1200000>;
-> -				regulator-always-on;
-> -				regulator-state-mem {
-> -					regulator-off-in-suspend;
-> -				};
-> -			};
-> -
-> -			buck4_reg: BUCK4 {
-> -				regulator-name = "VDD_INT_0.95V_AP";
-> -				regulator-min-microvolt = <600000>;
-> -				regulator-max-microvolt = <1500000>;
-> -				regulator-always-on;
-> -				regulator-state-mem {
-> -					regulator-off-in-suspend;
-> -				};
-> -			};
-> -
-> -			buck5_reg: BUCK5 {
-> -				regulator-name = "VDD_DISP_CAM0_0.9V_AP";
-> -				regulator-min-microvolt = <600000>;
-> -				regulator-max-microvolt = <1500000>;
-> -				regulator-always-on;
-> -				regulator-state-mem {
-> -					regulator-off-in-suspend;
-> -				};
-> -			};
-> -
-> -			buck6_reg: BUCK6 {
-> -				regulator-name = "VDD_G3D_0.9V_AP";
-> -				regulator-min-microvolt = <600000>;
-> -				regulator-max-microvolt = <1500000>;
-> -				regulator-always-on;
-> -				regulator-state-mem {
-> -					regulator-off-in-suspend;
-> -				};
-> -			};
-> -
-> -			buck7_reg: BUCK7 {
-> -				regulator-name = "VDD_MEM1_1.2V_AP";
-> -				regulator-min-microvolt = <1200000>;
-> -				regulator-max-microvolt = <1200000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			buck8_reg: BUCK8 {
-> -				regulator-name = "VDD_LLDO_1.35V_AP";
-> -				regulator-min-microvolt = <1350000>;
-> -				regulator-max-microvolt = <3300000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			buck9_reg: BUCK9 {
-> -				regulator-name = "VDD_MLDO_2.0V_AP";
-> -				regulator-min-microvolt = <1350000>;
-> -				regulator-max-microvolt = <3300000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			buck10_reg: BUCK10 {
-> -				regulator-name = "vdd_mem2";
-> -				regulator-min-microvolt = <550000>;
-> -				regulator-max-microvolt = <1500000>;
-> -				regulator-always-on;
-> -			};
-> -		};
-> -	};
-> -};
-> -
-> -&hsi2c_8 {
-> -	status = "okay";
-> -
-> -	max77843 at 66 {
-> -		compatible = "maxim,max77843";
-> -		interrupt-parent = <&gpa1>;
-> -		interrupts = <5 IRQ_TYPE_EDGE_FALLING>;
-> -		reg = <0x66>;
-> -
-> -		muic: max77843-muic {
-> -			compatible = "maxim,max77843-muic";
-> -		};
-> -
-> -		regulators {
-> -			compatible = "maxim,max77843-regulator";
-> -			safeout1_reg: SAFEOUT1 {
-> -				regulator-name = "SAFEOUT1";
-> -				regulator-min-microvolt = <3300000>;
-> -				regulator-max-microvolt = <4950000>;
-> -			};
-> -
-> -			safeout2_reg: SAFEOUT2 {
-> -				regulator-name = "SAFEOUT2";
-> -				regulator-min-microvolt = <3300000>;
-> -				regulator-max-microvolt = <4950000>;
-> -			};
-> -
-> -			charger_reg: CHARGER {
-> -				regulator-name = "CHARGER";
-> -				regulator-min-microamp = <100000>;
-> -				regulator-max-microamp = <3150000>;
-> -			};
-> -		};
-> -
-> -		haptic: max77843-haptic {
-> -			compatible = "maxim,max77843-haptic";
-> -			haptic-supply = <&ldo38_reg>;
-> -			pwms = <&pwm 0 33670 0>;
-> -			pwm-names = "haptic";
-> -		};
-> -	};
-> -};
-> -
-> -&i2s0 {
-> -	status = "okay";
-> -};
-> -
-> -&mshc_0 {
-> -	status = "okay";
-> -	num-slots = <1>;
-> -	mmc-hs200-1_8v;
-> -	mmc-hs400-1_8v;
-> -	cap-mmc-highspeed;
-> -	non-removable;
-> -	card-detect-delay = <200>;
-> -	samsung,dw-mshc-ciu-div = <3>;
-> -	samsung,dw-mshc-sdr-timing = <0 4>;
-> -	samsung,dw-mshc-ddr-timing = <0 2>;
-> -	samsung,dw-mshc-hs400-timing = <0 3>;
-> -	samsung,read-strobe-delay = <90>;
-> -	fifo-depth = <0x80>;
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_qrdy &sd0_bus1 &sd0_bus4
-> -			&sd0_bus8 &sd0_rdqs>;
-> -	bus-width = <8>;
-> -	assigned-clocks = <&cmu_top CLK_SCLK_MMC0_FSYS>;
-> -	assigned-clock-rates = <800000000>;
-> -};
-> -
-> -&mshc_2 {
-> -	status = "okay";
-> -	num-slots = <1>;
-> -	cap-sd-highspeed;
-> -	disable-wp;
-> -	cd-gpios = <&gpa2 4 GPIO_ACTIVE_HIGH>;
-> -	cd-inverted;
-> -	card-detect-delay = <200>;
-> -	samsung,dw-mshc-ciu-div = <3>;
-> -	samsung,dw-mshc-sdr-timing = <0 4>;
-> -	samsung,dw-mshc-ddr-timing = <0 2>;
-> -	fifo-depth = <0x80>;
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus1 &sd2_bus4>;
-> -	bus-width = <4>;
-> -};
-> -
-> -&ppmu_d0_general {
-> -	status = "okay";
-> -	events {
-> -		ppmu_event0_d0_general: ppmu-event0-d0-general {
-> -			event-name = "ppmu-event0-d0-general";
-> -		};
-> -	};
-> -};
-> -
-> -&ppmu_d1_general {
-> -	status = "okay";
-> -	events {
-> -		ppmu_event0_d1_general: ppmu-event0-d1-general {
-> -		       event-name = "ppmu-event0-d1-general";
-> -	       };
-> -       };
-> -};
-> -
-> -&pinctrl_alive {
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&initial_alive>;
-> -
-> -	initial_alive: initial-state {
-> -		PIN(INPUT, gpa0-0, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpa0-1, NONE, FAST_SR1);
-> -		PIN(INPUT, gpa0-2, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpa0-3, NONE, FAST_SR1);
-> -		PIN(INPUT, gpa0-4, NONE, FAST_SR1);
-> -		PIN(INPUT, gpa0-5, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpa0-6, NONE, FAST_SR1);
-> -		PIN(INPUT, gpa0-7, NONE, FAST_SR1);
-> -
-> -		PIN(INPUT, gpa1-0, UP, FAST_SR1);
-> -		PIN(INPUT, gpa1-1, NONE, FAST_SR1);
-> -		PIN(INPUT, gpa1-2, NONE, FAST_SR1);
-> -		PIN(INPUT, gpa1-3, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpa1-4, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpa1-5, NONE, FAST_SR1);
-> -		PIN(INPUT, gpa1-6, NONE, FAST_SR1);
-> -		PIN(INPUT, gpa1-7, NONE, FAST_SR1);
-> -
-> -		PIN(INPUT, gpa2-0, NONE, FAST_SR1);
-> -		PIN(INPUT, gpa2-1, NONE, FAST_SR1);
-> -		PIN(INPUT, gpa2-2, NONE, FAST_SR1);
-> -		PIN(INPUT, gpa2-3, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpa2-4, NONE, FAST_SR1);
-> -		PIN(INPUT, gpa2-5, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpa2-6, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpa2-7, NONE, FAST_SR1);
-> -
-> -		PIN(INPUT, gpa3-0, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpa3-1, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpa3-2, NONE, FAST_SR1);
-> -		PIN(INPUT, gpa3-3, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpa3-4, NONE, FAST_SR1);
-> -		PIN(INPUT, gpa3-5, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpa3-6, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpa3-7, DOWN, FAST_SR1);
-> -
-> -		PIN(INPUT, gpf1-0, NONE, FAST_SR1);
-> -		PIN(INPUT, gpf1-1, NONE, FAST_SR1);
-> -		PIN(INPUT, gpf1-2, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf1-4, UP, FAST_SR1);
-> -		PIN(OUTPUT, gpf1-5, NONE, FAST_SR1);
-> -		PIN(INPUT, gpf1-6, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf1-7, DOWN, FAST_SR1);
-> -
-> -		PIN(INPUT, gpf2-0, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf2-1, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf2-2, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf2-3, DOWN, FAST_SR1);
-> -
-> -		PIN(INPUT, gpf3-0, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf3-1, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf3-2, NONE, FAST_SR1);
-> -		PIN(INPUT, gpf3-3, DOWN, FAST_SR1);
-> -
-> -		PIN(INPUT, gpf4-0, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf4-1, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf4-2, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf4-3, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf4-4, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf4-5, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf4-6, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf4-7, DOWN, FAST_SR1);
-> -
-> -		PIN(INPUT, gpf5-0, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf5-1, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf5-2, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf5-3, DOWN, FAST_SR1);
-> -		PIN(OUTPUT, gpf5-4, NONE, FAST_SR1);
-> -		PIN(INPUT, gpf5-5, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf5-6, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf5-7, DOWN, FAST_SR1);
-> -	};
-> -
-> -	te_irq: te_irq {
-> -		samsung,pins = "gpf1-3";
-> -		samsung,pin-function = <0xf>;
-> -	};
-> -};
-> -
-> -&pinctrl_cpif {
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&initial_cpif>;
-> -
-> -	initial_cpif: initial-state {
-> -		PIN(INPUT, gpv6-0, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpv6-1, DOWN, FAST_SR1);
-> -	};
-> -};
-> -
-> -&pinctrl_ese {
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&initial_ese>;
-> -
-> -	initial_ese: initial-state {
-> -		PIN(INPUT, gpj2-0, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpj2-1, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpj2-2, DOWN, FAST_SR1);
-> -	};
-> -};
-> -
-> -&pinctrl_fsys {
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&initial_fsys>;
-> -
-> -	initial_fsys: initial-state {
-> -		PIN(INPUT, gpr3-0, NONE, FAST_SR1);
-> -		PIN(INPUT, gpr3-1, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpr3-2, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpr3-3, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpr3-7, NONE, FAST_SR1);
-> -	};
-> -};
-> -
-> -&pinctrl_imem {
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&initial_imem>;
-> -
-> -	initial_imem: initial-state {
-> -		PIN(INPUT, gpf0-0, UP, FAST_SR1);
-> -		PIN(INPUT, gpf0-1, UP, FAST_SR1);
-> -		PIN(INPUT, gpf0-2, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf0-3, UP, FAST_SR1);
-> -		PIN(INPUT, gpf0-4, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf0-5, NONE, FAST_SR1);
-> -		PIN(INPUT, gpf0-6, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpf0-7, UP, FAST_SR1);
-> -	};
-> -};
-> -
-> -&pinctrl_nfc {
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&initial_nfc>;
-> -
-> -	initial_nfc: initial-state {
-> -		PIN(INPUT, gpj0-2, DOWN, FAST_SR1);
-> -	};
-> -};
-> -
-> -&pinctrl_peric {
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&initial_peric>;
-> -
-> -	initial_peric: initial-state {
-> -		PIN(INPUT, gpv7-0, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpv7-1, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpv7-2, NONE, FAST_SR1);
-> -		PIN(INPUT, gpv7-3, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpv7-4, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpv7-5, DOWN, FAST_SR1);
-> -
-> -		PIN(INPUT, gpb0-4, DOWN, FAST_SR1);
-> -
-> -		PIN(INPUT, gpc0-2, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpc0-5, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpc0-7, DOWN, FAST_SR1);
-> -
-> -		PIN(INPUT, gpc1-1, DOWN, FAST_SR1);
-> -
-> -		PIN(INPUT, gpc3-4, NONE, FAST_SR1);
-> -		PIN(INPUT, gpc3-5, NONE, FAST_SR1);
-> -		PIN(INPUT, gpc3-6, NONE, FAST_SR1);
-> -		PIN(INPUT, gpc3-7, NONE, FAST_SR1);
-> -
-> -		PIN(OUTPUT, gpg0-0, NONE, FAST_SR1);
-> -		PIN(2, gpg0-1, DOWN, FAST_SR1);
-> -
-> -		PIN(INPUT, gpd2-5, DOWN, FAST_SR1);
-> -
-> -		PIN(INPUT, gpd4-0, NONE, FAST_SR1);
-> -		PIN(INPUT, gpd4-1, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpd4-2, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpd4-3, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpd4-4, DOWN, FAST_SR1);
-> -
-> -		PIN(INPUT, gpd6-3, DOWN, FAST_SR1);
-> -
-> -		PIN(INPUT, gpd8-1, UP, FAST_SR1);
-> -
-> -		PIN(INPUT, gpg1-0, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpg1-1, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpg1-2, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpg1-3, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpg1-4, DOWN, FAST_SR1);
-> -
-> -		PIN(INPUT, gpg2-0, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpg2-1, DOWN, FAST_SR1);
-> -
-> -		PIN(INPUT, gpg3-0, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpg3-1, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpg3-5, DOWN, FAST_SR1);
-> -		PIN(INPUT, gpg3-7, DOWN, FAST_SR1);
-> -	};
-> -};
-> -
-> -&pinctrl_touch {
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&initial_touch>;
-> -
-> -	initial_touch: initial-state {
-> -		PIN(INPUT, gpj1-2, DOWN, FAST_SR1);
-> -	};
-> -};
-> -
-> -&pwm {
-> -	pinctrl-0 = <&pwm0_out>;
-> -	pinctrl-names = "default";
-> -	status = "okay";
-> -};
-> -
-> -&mic {
-> -	status = "okay";
-> -
-> -	i80-if-timings {
-> -	};
-> -};
-> -
-> -&pmu_system_controller {
-> -	assigned-clocks = <&pmu_system_controller 0>;
-> -	assigned-clock-parents = <&xxti>;
-> -};
-> -
-> -&serial_1 {
-> -	status = "okay";
-> -};
-> -
-> -&spi_1 {
-> -	cs-gpios = <&gpd6 3 GPIO_ACTIVE_HIGH>;
-> -	status = "okay";
-> -
-> -	wm5110: wm5110-codec at 0 {
-> -		compatible = "wlf,wm5110";
-> -		reg = <0x0>;
-> -		spi-max-frequency = <20000000>;
-> -		interrupt-parent = <&gpa0>;
-> -		interrupts = <4 IRQ_TYPE_NONE>;
-> -		clocks = <&pmu_system_controller 0>,
-> -			<&s2mps13_osc S2MPS11_CLK_BT>;
-> -		clock-names = "mclk1", "mclk2";
-> -
-> -		gpio-controller;
-> -		#gpio-cells = <2>;
-> -
-> -		wlf,micd-detect-debounce = <300>;
-> -		wlf,micd-bias-start-time = <0x1>;
-> -		wlf,micd-rate = <0x7>;
-> -		wlf,micd-dbtime = <0x1>;
-> -		wlf,micd-force-micbias;
-> -		wlf,micd-configs = <0x0 1 0>;
-> -		wlf,hpdet-channel = <1>;
-> -		wlf,gpsw = <0x1>;
-> -		wlf,inmode = <2 0 2 0>;
-> -
-> -		wlf,reset = <&gpc0 7 GPIO_ACTIVE_HIGH>;
-> -		wlf,ldoena = <&gpf0 0 GPIO_ACTIVE_HIGH>;
-> -
-> -		/* core supplies */
-> -		AVDD-supply = <&ldo18_reg>;
-> -		DBVDD1-supply = <&ldo18_reg>;
-> -		CPVDD-supply = <&ldo18_reg>;
-> -		DBVDD2-supply = <&ldo18_reg>;
-> -		DBVDD3-supply = <&ldo18_reg>;
-> -
-> -		controller-data {
-> -			samsung,spi-feedback-delay = <0>;
-> -		};
-> -	};
-> -};
-> -
-> -&timer {
-> -	clock-frequency = <24000000>;
-> -};
-> -
-> -&tmu_atlas0 {
-> -	vtmu-supply = <&ldo3_reg>;
-> -	status = "okay";
-> -};
-> -
-> -&tmu_apollo {
-> -	vtmu-supply = <&ldo3_reg>;
-> -	status = "okay";
-> -};
-> -
-> -&tmu_g3d {
-> -	vtmu-supply = <&ldo3_reg>;
-> -	status = "okay";
-> -};
-> -
-> -&usbdrd30 {
-> -	vdd33-supply = <&ldo10_reg>;
-> -	vdd10-supply = <&ldo6_reg>;
-> -	status = "okay";
-> -};
-> -
-> -&usbdrd_dwc3_0 {
-> -	dr_mode = "otg";
-> -};
-> -
-> -&usbdrd30_phy {
-> -	vbus-supply = <&safeout1_reg>;
-> -	status = "okay";
-> -};
-> -
-> -&xxti {
-> -	clock-frequency = <24000000>;
-> -};
-> +/*
-> + * SAMSUNG Exynos5433 TM2 board device tree source
-> + *
-> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
-> + *
-> + * Device tree source file for Samsung's TM2 board which is based on
-> + * Samsung Exynos5433 SoC.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include "exynos5433-tm2-common.dtsi"
-> +
-> +/ {
-> +	model = "Samsung TM2 board";
-> +	compatible = "samsung,tm2", "samsung,exynos5433";
-> +};
-> +
-> +&ldo31_reg {
-> +	regulator-name = "TSP_VDD_1.85V_AP";
-> +	regulator-min-microvolt = <1850000>;
-> +	regulator-max-microvolt = <1850000>;
-> +};
-> +
-> +&ldo38_reg {
-> +	regulator-name = "VCC_3.0V_MOTOR_AP";
-> +	regulator-min-microvolt = <3000000>;
-> +	regulator-max-microvolt = <3000000>;
-> +};
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
-> index 854c583092d5..2fbf3a860316 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
-> @@ -11,7 +11,7 @@
->   * published by the Free Software Foundation.
->   */
->  
-> -#include "exynos5433-tm2.dts"
-> +#include "exynos5433-tm2-common.dtsi"
->  
->  / {
->  	model = "Samsung TM2E board";
+> If it's broken, then arguably the hardware doesn't support the mode,
+> so we should really be masking those bits from the EEE supported mask
+> as well.
 
-Where are the regulators?
+indeed.
 
-Beside that it is starting to look good. I didn't find anything else but
-maybe Javier's eagle eye will catch something.
+> 
+> > 
+[...]
+> 
+> > 
+> > > 
+> > > ?- maybe the problem here is that the PCS doesn't support support
+> > > EEE in 1000baseT mode?
+> > 
+> > 
+> > It does, and that's kind of the problem. EEE in ON for 100Tx and
+> > 1000T
+> > by default with this PHY. I have several platform with the same
+> > MAC-PHY?
+> > combination. Only the OdroidC2 shows this particular issue with
+> > 1000T-
+> > EEE
+> > 
+> > As explained in other mails in this thread. The problem does not
+> > come
+> > from the MAC entering LPI. It actually comes from the link partner
+> > entering LPI on the Rx path under significant Tx transfer. For some
+> > reason, this completely mess up our PHY.
+> 
+> For a 1000baseT link to enter low power, both ends have to enter LPI
+> (see 802.3 78.1.3.3.1) - the Tx and Rx paths can't independently
+> enter
+> LPI.
+> 
+> So, if you have a busy Tx link, the link itself can't be entering
+> LPI.
+> Your link partner may be sending a request to enter LPI due to its
+> own
+> Tx path being idle, which should then be forwarded to your MAC.
+> 
+> It's pretty hard to see what could be messed up with that - I'd have
+> expected the problems to occur when both ends were idle and the link
+> had entered low power mode.
+
+Well, maybe I'm not explaining the issue very well. Here the test done
+which led me to this conclusion:
+
+The?test?are?done?using?iperf. Receiving data works well, with the
+expected performance. Sending data is the problem, and only under high
+load:
+
+Here are the lpi stats before starting the test:
+? ? ?irq_tx_path_in_lpi_mode_n: 6
+?????irq_tx_path_exit_lpi_mode_n: 5
+?????irq_rx_path_in_lpi_mode_n: 76
+?????irq_rx_path_exit_lpi_mode_n: 75
+?????phy_eee_wakeup_error_n: 0
+
+Sending data with iperf usually works for little while (between 0 and
+10s)
+
+# iperf3 -c 192.168.1.170 -p12345
+Connecting to host 192.168.1.170, port 12345
+local 192.168.1.30 port 54450 connected to 192.168.1.170 port 12345
+Interval???????????Transfer?????Bandwidth???????Retr??Cwnd
+0.00-1.00???sec???112 MBytes???938 Mbits/sec????0????409 KBytes???????
+1.00-2.00???sec???112 MBytes???940 Mbits/sec????0????426 KBytes???????
+2.00-3.00???sec???112 MBytes???939 Mbits/sec????0????426 KBytes???????
+3.00-4.00???sec???112 MBytes???940 Mbits/sec????0????426 KBytes???????
+4.00-5.00???sec???112 MBytes???940 Mbits/sec????0????426 KBytes???????
+5.00-6.00???sec???112 MBytes???939 Mbits/sec????0????426 KBytes???????
+6.00-7.00???sec??9.26 MBytes??77.6 Mbits/sec????2???1.41 KBytes <=Issue
+? ?
+7.00-8.00???sec??0.00 Bytes??0.00 bits/sec????1???1.41 KBytes???????
+8.00-9.00???sec??0.00 Bytes??0.00 bits/sec????0???1.41 KBytes???????
+^C10.00-13.58??sec??0.00 Bytes??0.00 bits/sec????1???1.41 KBytes???????
+- - - - - - - - - - - - - - - - - - - - - - - - -
+Interval???????????Transfer?????Bandwidth???????Retr
+0.00-13.58??sec???681 MBytes???421 Mbits/sec????4?????????????sender
+0.00-13.58??sec??0.00 Bytes??0.00 bits/sec??????????????????receiver
+iperf3: interrupt - the client has terminated
+
+iperf3 does not exit ant the link seems completely broken. We cannot
+send or receive until the interface is brought down then up again.
+
+Here are the LPI related stats after the test:
+?????irq_tx_path_in_lpi_mode_n: 48
+?????irq_tx_path_exit_lpi_mode_n: 48
+?????irq_rx_path_in_lpi_mode_n: 325
+?????irq_rx_path_exit_lpi_mode_n: 325
+?????phy_eee_wakeup_error_n: 0
 
 
-Best regards,
-Krzysztof
+This happens with :
+1) Default configuration: EEE enabled on the MAC, PHY with reset
+settings (EEE advertised)
+2) EEE disabled on the MAC, PHY still with reset settings (EEE
+advertised). In such case there is no irq_tx_path_*_lpi_mode interrupts
+at all but still a lot of irq_rx_path_*_lpi_mode interrupts. So even if
+the mac does not drive anything EEE related, there is still something
+happening between the PHY and the link partner regarding EEE.
+
+3) Disabling EEE advertisement for 1000t: no irq_*_lpi_mode@all. The
+feature is not negotiated and the Tx works well.
+
+By the way, EEE work well for the 100tx on the same HW.
+
+> 
+> > 
+> > > 
+> > > On the SolidRun boards, they're using AR8035, and have suffered
+> > > this
+> > > occasional link drop problem.??What has been found is that it
+> > > seems
+> > > to
+> > > be to do with the timing parameters, and it seemed to only be
+> > > 1000bT
+> > > that was affected.??I don't remember off hand exactly which or
+> > > what
+> > > the change was they made to stabilise it though, but I can
+> > > probabily
+> > > find out tomorrow.
+> > > 
+> > 
+> > Since the same combination of MAC-PHY works well on other designs,
+> > it
+> > is also my feeling that is has something to do with some timing
+> > parameter, maybe related to this particular PCB.
+> 
+> Maybe a different PHY interface???Meson seems to use RGMII, maybe
+> others use SGMII - but then I'd expect 100base-Tx to also be broken.
+> So not really sure.
+
+Nope, same interface (RGMII), same SoC. Only the PCB layout and
+external components might be different.
+
+> 
+> I was talking to Florian about that last night, because the mis-named
+> phy_init_eee() tests for various phy interface modes before
+> proceeding,
+> which seems to be fairly rubbish as the list of interface modes is
+> gradually increasing since it was introduced (and I need to add SGMII
+> to it.)??The conclusion I've come to there is that the test should
+> never have been part of phylib, because if there are restrictions on
+> which phy interface modes are allowable for EEE, they're likely to be
+> either PHY or MAC specific.
+> 
+> The other problem that having the test there causes is that if the
+> existing users can't handle EEE over SGMII, then when I add SGMII to
+> support my hardware, they end up breaking - far from desirable.
+> There's no information on why the test is there, or even which PHYs
+> or MACs it's applicable to, which makes this unnecessarily more
+> difficult to now resolve.
+> 
+> My feeling is that the integration of EEE into phylib is fairly poor
+> at the moment, and we need to be a lot smarter about it.
+
+You know a lot more than I do on this topic obviously. I'm just trying
+to make GbE work (as cleanly as possible) on that board to be honest.
+
+So I'm not sure I understand, are you against EEE integration in phylib
+entirely, or specifically against the test I added in set_eee to filter
+out broken modes ?
+
+Since set_eee directly set the register, I don't see where else I could
+have put this test to prevent EEE broken modes from being re-enabled.
+
+> 
+> BTW, one of the problems (not caused by your patch) is that changing
+> the EEE advertisment does not (on all PHY drivers) cause the link to
+> be renegotiated - there's no call to phy_start_aneg() when the advert
+> changes, and even if there was, there's no guarantee that
+> phy_start_aneg() will even set the AN restart bit in the control
+> register.
+> 
+> However, given that you're hooking into the set_eee function, I'm not
+> sure why you placed your EEE advertisment thing into config_aneg() -
+> isn't it more an initialisation thing (so should be in
+> config_init()?)
+
+What I change is what the PHY advertise, so it seems logical to do it
+where "genphy_config_advert" was called. Just taking the existing code
+as an example
+
+> 
