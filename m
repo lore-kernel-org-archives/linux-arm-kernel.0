@@ -1,64 +1,27 @@
 From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 6 Jan 2017 10:39:45 -0500
+Date: Fri, 6 Jan 2017 10:44:31 -0500
 Subject: [PATCH v2 2/5] arm64: Work around Falkor erratum 1003
-In-Reply-To: <1dfdc578-e0f8-1320-d223-c9c55e70ca93@codeaurora.org>
+In-Reply-To: <ac275374-2aa6-43ec-25c9-6a3fec4ceedc@codeaurora.org>
 References: <20161229224335.13531-1-cov@codeaurora.org>
  <20161229224335.13531-2-cov@codeaurora.org>
- <1dfdc578-e0f8-1320-d223-c9c55e70ca93@codeaurora.org>
-Message-ID: <fd82e2bf-5259-2fda-c931-1996387d779f@codeaurora.org>
+ <ac275374-2aa6-43ec-25c9-6a3fec4ceedc@codeaurora.org>
+Message-ID: <54ceb523-47ea-f137-293f-0da0166bb14b@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/29/2016 06:02 PM, Timur Tabi wrote:
+On 12/29/2016 06:08 PM, Timur Tabi wrote:
 > On 12/29/2016 04:43 PM, Christopher Covington wrote:
->> -| Implementor    | Component       | Erratum ID      | Kconfig                 |
->> -+----------------+-----------------+-----------------+-------------------------+
->> -| ARM            | Cortex-A53      | #826319         | ARM64_ERRATUM_826319    |
->> -| ARM            | Cortex-A53      | #827319         | ARM64_ERRATUM_827319    |
->> -| ARM            | Cortex-A53      | #824069         | ARM64_ERRATUM_824069    |
->> -| ARM            | Cortex-A53      | #819472         | ARM64_ERRATUM_819472    |
->> -| ARM            | Cortex-A53      | #845719         | ARM64_ERRATUM_845719    |
->> -| ARM            | Cortex-A53      | #843419         | ARM64_ERRATUM_843419    |
->> -| ARM            | Cortex-A57      | #832075         | ARM64_ERRATUM_832075    |
->> -| ARM            | Cortex-A57      | #852523         | N/A                     |
->> -| ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220    |
->> -| ARM            | Cortex-A72      | #853709         | N/A                     |
->> -| ARM            | MMU-500         | #841119,#826419 | N/A                     |
->> -|                |                 |                 |                         |
->> -| Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375    |
->> -| Cavium         | ThunderX ITS    | #23144          | CAVIUM_ERRATUM_23144    |
->> -| Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154    |
->> -| Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456    |
->> -| Cavium         | ThunderX SMMUv2 | #27704          | N/A               |
->> -|                |                 |                 |                         |
->> -| Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585     |
->> +| Implementor   | Component       | Erratum ID      | Kconfig                  |
->> ++---------------+-----------------+-----------------+--------------------------+
->> +| ARM           | Cortex-A53      | #826319         | ARM64_ERRATUM_826319     |
->> +| ARM           | Cortex-A53      | #827319         | ARM64_ERRATUM_827319     |
->> +| ARM           | Cortex-A53      | #824069         | ARM64_ERRATUM_824069     |
->> +| ARM           | Cortex-A53      | #819472         | ARM64_ERRATUM_819472     |
->> +| ARM           | Cortex-A53      | #845719         | ARM64_ERRATUM_845719     |
->> +| ARM           | Cortex-A53      | #843419         | ARM64_ERRATUM_843419     |
->> +| ARM           | Cortex-A57      | #832075         | ARM64_ERRATUM_832075     |
->> +| ARM           | Cortex-A57      | #852523         | N/A                      |
->> +| ARM           | Cortex-A57      | #834220         | ARM64_ERRATUM_834220     |
->> +| ARM           | Cortex-A72      | #853709         | N/A                      |
->> +| ARM           | MMU-500         | #841119,#826419 | N/A                      |
->> +|               |                 |                 |                          |
->> +| Cavium        | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375     |
->> +| Cavium        | ThunderX ITS    | #23144          | CAVIUM_ERRATUM_23144     |
->> +| Cavium        | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154     |
->> +| Cavium        | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456     |
->> +| Cavium        | ThunderX SMMUv2 | #27704          | N/A                      |
->> +|               |                 |                 |                          |
->> +| Freescale/NXP | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585      |
->> +| Qualcomm      | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003 |
+>> +config QCOM_FALKOR_E1003_RESERVED_ASID
+>> +    int
+>> +    default 1
+>> +    depends on QCOM_FALKOR_ERRATUM_1003
 > 
-> Looks like you've made an unrelated whitespace change that affected the entire table,
-> not just the line you're adding.
+> Also, since this can't be changed via the menu, why bother putting it in?
 
-I'm making space for "QCOM_FALKOR_ERRATUM_1003".
+I put it in in response to review comments asking for the magic number to
+be clarified by a #define or variable. I could not find a suitably shared
+header between the files in question, so I used the Kconfig machinery to
+generate the #define.
 
 Cov
 
