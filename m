@@ -1,42 +1,34 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Fri, 6 Jan 2017 14:46:04 +0800
-Subject: [PATCH] iommu: Drop the of_iommu_{set/get}_ops() interface
-In-Reply-To: <c61db43c-82b1-b4c9-63cb-a8c78878cb39@arm.com>
-References: <20170103173456.18154-1-lorenzo.pieralisi@arm.com>
- <c61db43c-82b1-b4c9-63cb-a8c78878cb39@arm.com>
-Message-ID: <1483685164.3334.3.camel@mhfsdcap03>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 6 Jan 2017 08:48:14 +0200
+Subject: [PATCH v2 2/4] pinctrl: dt-bindings: samsung: add drive strength
+ macros for Exynos5433
+In-Reply-To: <CACRpkdaE0-4MN+D1THxo7nqQ5qMNZOi7b+cpqE+6-x8RFPuUfA@mail.gmail.com>
+References: <CGME20161230041427epcas1p1e4d0dd5e7f9928664c664b7850dbd87a@epcas1p1.samsung.com>
+ <20161230041421.24448-1-andi.shyti@samsung.com>
+ <20161230041421.24448-3-andi.shyti@samsung.com>
+ <CACRpkdaE0-4MN+D1THxo7nqQ5qMNZOi7b+cpqE+6-x8RFPuUfA@mail.gmail.com>
+Message-ID: <20170106064814.khwru5rdulh6jbkl@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-01-04 at 15:11 +0000, Robin Murphy wrote:
-> [+Yong Wu for mtk_iommu]
+On Fri, Dec 30, 2016 at 02:30:47PM +0100, Linus Walleij wrote:
+> On Fri, Dec 30, 2016 at 5:14 AM, Andi Shyti <andi.shyti@samsung.com> wrote:
 > 
-> On 03/01/17 17:34, Lorenzo Pieralisi wrote:
-> > With the introduction of the new iommu_{register/get}_instance()
-> > interface in commit e4f10ffe4c9b ("iommu: Make of_iommu_set/get_ops() DT
-> > agnostic") (based on struct fwnode_handle as look-up token, so firmware
-> > agnostic) to register IOMMU instances with the core IOMMU layer there is
-> > no reason to keep the old OF based interface around any longer.
-> > 
-> > Convert all the IOMMU drivers (and OF IOMMU core code) that rely on the
-> > of_iommu_{set/get}_ops() to the new kernel interface to register/retrieve
-> > IOMMU instances and remove the of_iommu_{set/get}_ops() remaining glue
-> > code in order to complete the interface rework.
+> > Commit 5db7e3bb87df ("pinctrl: dt-bindings: samsung: Add header with
+> > values used for configuration") has added a header file for defining the
+> > pinctrl values in order to avoid hardcoded settings in the Exynos
+> > DTS related files.
+> >
+> > Extend samsung.h to the Exynos5433 for drive strength values
+> > which are strictly related to the particular SoC and may defer
+> > from others.
+> >
+> > Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
 > 
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> 
-> Looking at before-and-after disassemblies, of_iommu.o is binary
-> identical, and exynos-iommu.o differs only in the use of dev->fwnode
-> rather than &dev->of_node->fwnode (and is binary identical if I hack it
-> back to the latter). I'm not sure why the (GCC 6.2) codegen for
-> mtk_iommu.o changes quite so much when merely replacing a callsite with
-> the contents of its static inline callee, but it does :/
-> 
-> Robin.
-> 
+> Patch applied with Chanwoo's review tag.
 
-For MTK IOMMU,
+As agreed, applied with your ack to samsung-soc. I put it on separate
+branch so I can provide a tag if needed.
 
-Tested-by: Yong Wu <yong.wu@mediatek.com>
-
-Thanks.
+Best regards,
+Krzysztof
