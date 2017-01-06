@@ -1,90 +1,139 @@
-From: t.remmet@phytec.de (Teresa Remmet)
-Date: Fri, 06 Jan 2017 10:27:29 +0100
-Subject: [PATCH 1/6] ARM: dts: am335x-phycore-som: Update NAND partition
- table
-In-Reply-To: <20170105175619.GA56877@google.com>
-References: <1483627851-17996-1-git-send-email-t.remmet@phytec.de>
- <1483627851-17996-2-git-send-email-t.remmet@phytec.de>
- <20170105153637.GA4310@atomide.com> <20170105171845.GK4310@atomide.com>
- <20170105175619.GA56877@google.com>
-Message-ID: <1483694849.3634.6.camel@phytec.de>
+From: bharat.bhushan@nxp.com (Bharat Bhushan)
+Date: Fri, 6 Jan 2017 09:31:03 +0000
+Subject: [PATCH v6 17/18] vfio/type1: Check MSI remapping at irq domain
+ level
+In-Reply-To: <845d7167-6734-03c9-4df6-2f82f1627dbc@arm.com>
+References: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
+ <1483643086-2883-18-git-send-email-eric.auger@redhat.com>
+ <AM5PR0401MB25454B0C8F6E610A50B299D19A630@AM5PR0401MB2545.eurprd04.prod.outlook.com>
+ <af612e18-ca0b-b855-e198-d4c706f2febc@redhat.com>
+ <845d7167-6734-03c9-4df6-2f82f1627dbc@arm.com>
+Message-ID: <AM5PR0401MB2545F1BFDFD57FC8D48E45C59A630@AM5PR0401MB2545.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Brian,
 
-Am Donnerstag, den 05.01.2017, 09:56 -0800 schrieb Brian Norris:
-> On Thu, Jan 05, 2017 at 09:18:45AM -0800, Tony Lindgren wrote:
-> > 
-> > * Tony Lindgren <tony@atomide.com> [170105 07:37]:
-> > > 
-> > > * Teresa Remmet <t.remmet@phytec.de> [170105 06:57]:
-> > > > 
-> > > > To improve NAND safety we updated the partition layout.
-> > > > Added barebox backup partition and removed kernel and oftree
-> > > > partition. They are kept in ubi now.
-> > > What about the users with earlier partition tables?
-> > > 
-> > > Please read about "flag day" changes, typically they are not
-> > > acceptable.
-> > Adding Brian and Adam to Cc. Can you guys come up with some
-> > solution on this?
-> I don't have much context for this thread, and no I don't plan to
-> solve
-> your problems for you. But I can provide tips!
-> 
-> > 
-> > I'm suggesting we leave the kernel nodes empty and let u-boot
-> > populate them, so maybe you guys can discuss this on the related
-> > lists.
-> That's an option. I've worked with platforms that did something like
-> this, and that's really one of the only ways you can handle putting
-> partition information in the device tree. You're really hamstringing
-> yourself when you put all the partition information in the device
-> tree.
-> And it's just dumb once that gets codified in the kernel source tree.
-> 
 
-In our case the bootloader does pass the partition table to the kernel.
-So it gets overwritten anyway. This was just more for backup,?
-if someone uses a different bootloader. But I'm fine with removing the
-nand partition table completely from the kernel device tree.
-Same with the SPI nor partition table.
-
-I will send patches for this.
-
-Regards,
-Teresa
-
-> The best solution would be to try to migrate away from static device
-> tree representations of partition info entirely. UBI volumes are best
-> where possible. If not, then some other kind of on-flash data
-> structures
-> (along the lines of a GPT) with a corresponding MTD partition parser
-> is
-> an OK alternative. Unfortunately, there isn't any good standard
-> format
-> for this on MTD, so it's typically all custom -- and so people use
-> the
-> easiest approach: device tree. And it's even more difficult with
-> NAND,
-> which has reliability problems, especially with static data (e.g.,
-> read
-> disturb).
+> -----Original Message-----
+> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> Sent: Friday, January 06, 2017 2:50 PM
+> To: Auger Eric <eric.auger@redhat.com>; Bharat Bhushan
+> <bharat.bhushan@nxp.com>; eric.auger.pro at gmail.com;
+> christoffer.dall at linaro.org; robin.murphy at arm.com;
+> alex.williamson at redhat.com; will.deacon at arm.com; joro at 8bytes.org;
+> tglx at linutronix.de; jason at lakedaemon.net; linux-arm-
+> kernel at lists.infradead.org
+> Cc: kvm at vger.kernel.org; drjones at redhat.com; linux-
+> kernel at vger.kernel.org; pranav.sawargaonkar at gmail.com;
+> iommu at lists.linux-foundation.org; punit.agrawal at arm.com; Diana Madalina
+> Craciun <diana.craciun@nxp.com>; gpkulkarni at gmail.com;
+> shankerd at codeaurora.org; geethasowjanya.akula at gmail.com
+> Subject: Re: [PATCH v6 17/18] vfio/type1: Check MSI remapping at irq
+> domain level
 > 
-> Anyway, the parser solution is helpful only if one can properly fix
-> the
-> "flag day" first. And it requires a little bit more work to be
-> generally
-> useful; I posted some work for this over a year ago, but bikeshedding
-> brought it down.
+> On 06/01/17 09:08, Auger Eric wrote:
+> > Hi Bharat
+> >
+> > On 06/01/2017 09:50, Bharat Bhushan wrote:
+> >> Hi Eric,
+> >>
+> >>> -----Original Message-----
+> >>> From: Eric Auger [mailto:eric.auger at redhat.com]
+> >>> Sent: Friday, January 06, 2017 12:35 AM
+> >>> To: eric.auger at redhat.com; eric.auger.pro at gmail.com;
+> >>> christoffer.dall at linaro.org; marc.zyngier at arm.com;
+> >>> robin.murphy at arm.com; alex.williamson at redhat.com;
+> >>> will.deacon at arm.com; joro at 8bytes.org; tglx at linutronix.de;
+> >>> jason at lakedaemon.net; linux-arm-kernel at lists.infradead.org
+> >>> Cc: kvm at vger.kernel.org; drjones at redhat.com; linux-
+> >>> kernel at vger.kernel.org; pranav.sawargaonkar at gmail.com;
+> >>> iommu at lists.linux-foundation.org; punit.agrawal at arm.com; Diana
+> >>> Madalina Craciun <diana.craciun@nxp.com>; gpkulkarni at gmail.com;
+> >>> shankerd at codeaurora.org; Bharat Bhushan
+> <bharat.bhushan@nxp.com>;
+> >>> geethasowjanya.akula at gmail.com
+> >>> Subject: [PATCH v6 17/18] vfio/type1: Check MSI remapping at irq
+> >>> domain level
+> >>>
+> >>> In case the IOMMU translates MSI transactions (typical case on ARM),
+> >>> we check MSI remapping capability at IRQ domain level. Otherwise it
+> >>> is checked at IOMMU level.
+> >>>
+> >>> At this stage the arm-smmu-(v3) still advertise the
+> >>> IOMMU_CAP_INTR_REMAP capability at IOMMU level. This will be
+> removed
+> >>> in subsequent patches.
+> >>>
+> >>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> >>>
+> >>> ---
+> >>>
+> >>> v6: rewrite test
+> >>> ---
+> >>>  drivers/vfio/vfio_iommu_type1.c | 9 ++++++---
+> >>>  1 file changed, 6 insertions(+), 3 deletions(-)
+> >>>
+> >>> diff --git a/drivers/vfio/vfio_iommu_type1.c
+> >>> b/drivers/vfio/vfio_iommu_type1.c index b473ef80..fa0b5c4 100644
+> >>> --- a/drivers/vfio/vfio_iommu_type1.c
+> >>> +++ b/drivers/vfio/vfio_iommu_type1.c
+> >>> @@ -40,6 +40,7 @@
+> >>>  #include <linux/mdev.h>
+> >>>  #include <linux/notifier.h>
+> >>>  #include <linux/dma-iommu.h>
+> >>> +#include <linux/irqdomain.h>
+> >>>
+> >>>  #define DRIVER_VERSION  "0.2"
+> >>>  #define DRIVER_AUTHOR   "Alex Williamson
+> >>> <alex.williamson@redhat.com>"
+> >>> @@ -1208,7 +1209,7 @@ static int
+> vfio_iommu_type1_attach_group(void
+> >>> *iommu_data,
+> >>>  	struct vfio_domain *domain, *d;
+> >>>  	struct bus_type *bus = NULL, *mdev_bus;
+> >>>  	int ret;
+> >>> -	bool resv_msi;
+> >>> +	bool resv_msi, msi_remap;
+> >>>  	phys_addr_t resv_msi_base;
+> >>>
+> >>>  	mutex_lock(&iommu->lock);
+> >>> @@ -1284,8 +1285,10 @@ static int
+> vfio_iommu_type1_attach_group(void
+> >>> *iommu_data,
+> >>>  	INIT_LIST_HEAD(&domain->group_list);
+> >>>  	list_add(&group->next, &domain->group_list);
+> >>>
+> >>> -	if (!allow_unsafe_interrupts &&
+> >>> -	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
+> >>> +	msi_remap = resv_msi ? irq_domain_check_msi_remap() :
+> >>
+> >> There can be multiple interrupt-controller, at-least theoretically it is
+> possible and not sure practically it exists and supported, where not all may
+> support IRQ_REMAP. If that is the case be then should we check for IRQ-
+> REMAP for that device-bus irq-domain?
+> >>
+> > I mentioned in the cover letter that the approach was defensive and
+> > rough today. As soon as we detect an MSI controller in the platform
+> > that has no support for MSI remapping we flag the assignment as
+> > unsafe. I think this approach was agreed on the ML. Such rough
+> > assessment was used in the past on x86.
+> >
+> > I am reluctant to add more complexity at that stage. This can be
+> > improved latter I think when such platforms show up.
 > 
-> > 
-> > The rest of the series looks fine to me so applying it into
-> > omap-for-v4.11/dt.
-> Brian
+> I don't think this is worth it. If the system is so broken that the designer
+> cannot make up their mind about device isolation, too bad.
+> People will either disable the non-isolating MSI controller altogether, or force
+> the unsafe flag.
+
+Understand, just want to be sure that this is a known limitation. It will be good if we have some comment around this function.
+
+Thanks
+-Bharat
+
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Thanks,
+> 
+> 	M.
+> --
+> Jazz is not dead. It just smells funny...
