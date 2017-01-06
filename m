@@ -1,50 +1,483 @@
-From: webczat_200@poczta.onet.pl (=?UTF-8?Q?Micha=c5=82_Zegan?=)
-Date: Fri, 6 Jan 2017 14:12:21 +0100
-Subject: [PATCH] ARM64: dts: meson-gxbb-odroidc2: Disable SCPI DVFS
-In-Reply-To: <83fd9b61-dbff-68e0-82e5-8e01058d04a9@arm.com>
-References: <1483628549-29486-1-git-send-email-narmstrong@baylibre.com>
- <9f508097-f605-ebd8-20af-c3e798c6fdcc@poczta.onet.pl>
- <83fd9b61-dbff-68e0-82e5-8e01058d04a9@arm.com>
-Message-ID: <70c0537a-0e16-ed69-ab90-c8e69e44b5f3@poczta.onet.pl>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Fri, 06 Jan 2017 08:17:09 -0500
+Subject: [PATCH V9 3/3] irqchip: qcom: Add IRQ combiner driver
+In-Reply-To: <ded278ef-a0a2-811a-f362-70555f74d6fc@arm.com>
+References: <1481753438-3905-1-git-send-email-agustinv@codeaurora.org>
+ <1481753438-3905-4-git-send-email-agustinv@codeaurora.org>
+ <ded278ef-a0a2-811a-f362-70555f74d6fc@arm.com>
+Message-ID: <a1d3e5706ea8c97a4712a8fb33db71ca@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yes, I meant what you think I meant. :) thanks
+Hey Marc,
 
-W dniu 06.01.2017 o 12:54, Sudeep Holla pisze:
-> Hi Micha?,
+On 2017-01-05 11:48, Marc Zyngier wrote:
+> Hi Agustin,
 > 
-> On 05/01/17 19:04, Micha? Zegan wrote:
->> Hello.
->>
->> The patch causes cpufreq module (scpi-cpufreq) not to detect cpufreq, so
->> it actually works, but...
->> Loading the module causes few errors because of not found frequencies or
->> something, then it is all okay. However after loading scpi-cpufreq you
->> cannot actually power the cpu off and on. You will power it off
->> successfully, but when trying to power it on, the cpufreq driver will
->> error out, 
+> On 14/12/16 22:10, Agustin Vega-Frias wrote:
+>> Driver for interrupt combiners in the Top-level Control and Status
+>> Registers (TCSR) hardware block in Qualcomm Technologies chips.
+>> 
+>> An interrupt combiner in this block combines a set of interrupts by
+>> OR'ing the individual interrupt signals into a summary interrupt
+>> signal routed to a parent interrupt controller, and provides read-
+>> only, 32-bit registers to query the status of individual interrupts.
+>> The status bit for IRQ n is bit (n % 32) within register (n / 32)
+>> of the given combiner. Thus, each combiner can be described as a set
+>> of register offsets and the number of IRQs managed.
+>> 
+>> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
+>> ---
+>>  drivers/irqchip/Kconfig             |   9 +
+>>  drivers/irqchip/Makefile            |   1 +
+>>  drivers/irqchip/qcom-irq-combiner.c | 322 
+>> ++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 332 insertions(+)
+>>  create mode 100644 drivers/irqchip/qcom-irq-combiner.c
+>> 
+>> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+>> index bc0af33..3e3430c 100644
+>> --- a/drivers/irqchip/Kconfig
+>> +++ b/drivers/irqchip/Kconfig
+>> @@ -279,3 +279,12 @@ config EZNPS_GIC
+>>  config STM32_EXTI
+>>  	bool
+>>  	select IRQ_DOMAIN
+>> +
+>> +config QCOM_IRQ_COMBINER
+>> +	bool "QCOM IRQ combiner support"
+>> +	depends on ARCH_QCOM && ACPI
+>> +	select IRQ_DOMAIN
+>> +	select IRQ_DOMAIN_HIERARCHY
+>> +	help
+>> +	  Say yes here to add support for the IRQ combiner devices embedded
+>> +	  in Qualcomm Technologies chips.
+>> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+>> index e4dbfc8..1818a0b 100644
+>> --- a/drivers/irqchip/Makefile
+>> +++ b/drivers/irqchip/Makefile
+>> @@ -74,3 +74,4 @@ obj-$(CONFIG_LS_SCFG_MSI)		+= irq-ls-scfg-msi.o
+>>  obj-$(CONFIG_EZNPS_GIC)			+= irq-eznps.o
+>>  obj-$(CONFIG_ARCH_ASPEED)		+= irq-aspeed-vic.o
+>>  obj-$(CONFIG_STM32_EXTI) 		+= irq-stm32-exti.o
+>> +obj-$(CONFIG_QCOM_IRQ_COMBINER)		+= qcom-irq-combiner.o
+>> diff --git a/drivers/irqchip/qcom-irq-combiner.c 
+>> b/drivers/irqchip/qcom-irq-combiner.c
+>> new file mode 100644
+>> index 0000000..0055e08
+>> --- /dev/null
+>> +++ b/drivers/irqchip/qcom-irq-combiner.c
+>> @@ -0,0 +1,322 @@
+>> +/* Copyright (c) 2015-2016, The Linux Foundation. All rights 
+>> reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or 
+>> modify
+>> + * it under the terms of the GNU General Public License version 2 and
+>> + * only version 2 as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +/*
+>> + * Driver for interrupt combiners in the Top-level Control and Status
+>> + * Registers (TCSR) hardware block in Qualcomm Technologies chips.
+>> + * An interrupt combiner in this block combines a set of interrupts 
+>> by
+>> + * OR'ing the individual interrupt signals into a summary interrupt
+>> + * signal routed to a parent interrupt controller, and provides read-
+>> + * only, 32-bit registers to query the status of individual 
+>> interrupts.
+>> + * The status bit for IRQ n is bit (n % 32) within register (n / 32)
+>> + * of the given combiner. Thus, each combiner can be described as a 
+>> set
+>> + * of register offsets and the number of IRQs managed.
+>> + */
+>> +
+>> +#include <linux/acpi.h>
+>> +#include <linux/irqchip/chained_irq.h>
+>> +#include <linux/irqdomain.h>
+>> +#include <linux/platform_device.h>
+>> +
+>> +#define REG_SIZE 32
+>> +
+>> +struct combiner_reg {
+>> +	void __iomem *addr;
+>> +	unsigned long mask;
+>> +};
+>> +
+>> +struct combiner {
+>> +	struct irq_domain   *domain;
+>> +	int                 parent_irq;
+>> +	u32                 nirqs;
+>> +	u32                 nregs;
+>> +	struct combiner_reg regs[0];
+>> +};
+>> +
+>> +static inline u32 irq_register(int irq)
+>> +{
+>> +	return irq / REG_SIZE;
+>> +}
+>> +
+>> +static inline u32 irq_bit(int irq)
+>> +{
+>> +	return irq % REG_SIZE;
+>> +
+>> +}
+>> +
+>> +static inline int irq_nr(u32 reg, u32 bit)
+>> +{
+>> +	return reg * REG_SIZE + bit;
+>> +}
+>> +
+>> +/*
+>> + * Handler for the cascaded IRQ.
+>> + */
+>> +static void combiner_handle_irq(struct irq_desc *desc)
+>> +{
+>> +	struct combiner *combiner = irq_desc_get_handler_data(desc);
+>> +	struct irq_chip *chip = irq_desc_get_chip(desc);
+>> +	u32 reg;
+>> +
+>> +	chained_irq_enter(chip, desc);
+>> +
+>> +	for (reg = 0; reg < combiner->nregs; reg++) {
+>> +		int virq;
+>> +		int hwirq;
+>> +		u32 bit;
+>> +		u32 status;
+>> +
+>> +		if (combiner->regs[reg].mask == 0)
+>> +			continue;
 > 
-> Yes I had noticed this in past, this needs to be fixed. I had a patch
-> and seems like it slipped through the cracks. I will fins and post it.
+> I'm a bit worried by this. If I understand it well, this is a pure
+> software construct (controlled from combiner_irq_chip_{un,}mask_irq) 
+> and
+> there is nothing that actually masks the interrupt at the HW level.
 > 
->> and then after it happens, the cpu that was trying to go
->> online will be offline again, and that is a little... unfortunate. The
-> 
-> IIUC, you mean the cpufreq drive spits error on every hotplug event ?
-> If so yes, otherwise I think I didn't understand you concern above.
-> 
->> question is, and I cannot really test that: will the module actually
->> autoload after this change?
->>
-> 
-> It should work, I had tested this in past.
+> So if a device asserts its interrupt line, what mechanism do we have to
+> make sure that we don't end-up with the CPU pegged in interrupt 
+> context?
 > 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 525 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170106/37f9d743/attachment.sig>
+Yes, unfortunately this is a dumb hardware combiner; however, the real 
+use
+of mask here is to optimize IRQ handling if the combiner instance has 
+its
+IRQ statuses across more than one register. Currently all active 
+instances
+only use one register, but we are getting close to 32 in one case, so I
+wanted to accommodate a general case where an instance can combine more
+than 32 IRQs.
+
+Having said that, what I'm inclined to do is to remove the use of mask
+on the status read form the register on the next two lines, and then let
+irq_find_mapping fail if we are getting an unexpected IRQ, then call
+handle_bad_irq(desc).
+
+Do you have any other suggestions to handle the scenario? E.g., can we
+safely disable the parent IRQ from this context if we see too many
+spurious interrupts?
+
+>> +
+>> +		status = readl_relaxed(combiner->regs[reg].addr);
+>> +		status &= combiner->regs[reg].mask;
+>> +
+>> +		while (status) {
+>> +			bit = __ffs(status);
+>> +			status &= ~(1 << bit);
+>> +			hwirq = irq_nr(reg, bit);
+>> +			virq = irq_find_mapping(combiner->domain, hwirq);
+>> +			if (virq >= 0)
+> 
+> Small bug: virq == 0 shouldn't happen, since this would be an 
+> indication
+> that the hwirq doesn't have a mapping.
+> 
+
+Will fix this on V10.
+
+>> +				generic_handle_irq(virq);
+>> +
+>> +		}
+>> +	}
+>> +
+>> +	chained_irq_exit(chip, desc);
+>> +}
+>> +
+>> +/*
+>> + * irqchip callbacks
+>> + */
+>> +
+>> +static void combiner_irq_chip_mask_irq(struct irq_data *data)
+>> +{
+>> +	struct combiner *combiner = irq_data_get_irq_chip_data(data);
+>> +	struct combiner_reg *reg = combiner->regs + 
+>> irq_register(data->hwirq);
+>> +
+>> +	clear_bit(irq_bit(data->hwirq), &reg->mask);
+>> +}
+>> +
+>> +static void combiner_irq_chip_unmask_irq(struct irq_data *data)
+>> +{
+>> +	struct combiner *combiner = irq_data_get_irq_chip_data(data);
+>> +	struct combiner_reg *reg = combiner->regs + 
+>> irq_register(data->hwirq);
+>> +
+>> +	set_bit(irq_bit(data->hwirq), &reg->mask);
+>> +}
+>> +
+>> +static struct irq_chip irq_chip = {
+>> +	.irq_mask = combiner_irq_chip_mask_irq,
+>> +	.irq_unmask = combiner_irq_chip_unmask_irq,
+>> +	.name = "qcom-irq-combiner"
+>> +};
+>> +
+>> +/*
+>> + * irq_domain_ops callbacks
+>> + */
+>> +
+>> +static int combiner_irq_map(struct irq_domain *domain, unsigned int 
+>> irq,
+>> +				   irq_hw_number_t hwirq)
+>> +{
+>> +	struct combiner *combiner = domain->host_data;
+>> +
+>> +	if (hwirq >= combiner->nirqs)
+>> +		return -EINVAL;
+> 
+> Given that this should have come from the translate function, can we
+> move the check there instead, so that we validate everything early?
+> 
+
+Will fix this on V10.
+
+>> +
+>> +	irq_set_chip_and_handler(irq, &irq_chip, handle_level_irq);
+>> +	irq_set_chip_data(irq, combiner);
+>> +	irq_set_noprobe(irq);
+>> +	return 0;
+>> +}
+>> +
+>> +static void combiner_irq_unmap(struct irq_domain *domain, unsigned 
+>> int irq)
+>> +{
+>> +	struct irq_data *data = irq_get_irq_data(irq);
+>> +
+>> +	if (WARN_ON(!data))
+>> +		return;
+> 
+> Can this happen?
+> 
+
+I will remove this check on V10 given that irq_domain_disassociate 
+already
+has a check for a NULL irq_data.
+
+>> +	irq_domain_reset_irq_data(data);
+>> +}
+>> +
+>> +static int combiner_irq_translate(struct irq_domain *d, struct 
+>> irq_fwspec *fws,
+>> +				  unsigned long *hwirq, unsigned int *type)
+>> +{
+>> +	if (is_acpi_node(fws->fwnode)) {
+>> +		if (WARN_ON((fws->param_count != 2) ||
+>> +			    (fws->param[1] & IORESOURCE_IRQ_LOWEDGE) ||
+>> +			    (fws->param[1] & IORESOURCE_IRQ_HIGHEDGE)))
+>> +			return -EINVAL;
+>> +
+>> +		*hwirq = fws->param[0];
+>> +		*type = fws->param[1];
+>> +		return 0;
+>> +	}
+>> +
+>> +	return -EINVAL;
+>> +}
+>> +
+>> +static const struct irq_domain_ops domain_ops = {
+>> +	.map = combiner_irq_map,
+>> +	.unmap = combiner_irq_unmap,
+>> +	.translate = combiner_irq_translate
+>> +};
+>> +
+>> +/*
+>> + * Device probing
+>> + */
+>> +
+>> +static acpi_status count_registers_cb(struct acpi_resource *ares, 
+>> void *context)
+>> +{
+>> +	int *count = context;
+>> +
+>> +	if (ares->type == ACPI_RESOURCE_TYPE_GENERIC_REGISTER)
+>> +		++(*count);
+>> +	return AE_OK;
+>> +}
+>> +
+>> +static int count_registers(struct platform_device *pdev)
+>> +{
+>> +	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
+>> +	acpi_status status;
+>> +	int count = 0;
+>> +
+>> +	if (!acpi_has_method(adev->handle, METHOD_NAME__CRS))
+>> +		return -EINVAL;
+>> +
+>> +	status = acpi_walk_resources(adev->handle, METHOD_NAME__CRS,
+>> +				     count_registers_cb, &count);
+>> +	if (ACPI_FAILURE(status))
+>> +		return -EINVAL;
+>> +	return count;
+>> +}
+>> +
+>> +struct get_registers_context {
+>> +	struct device *dev;
+>> +	struct combiner *combiner;
+>> +	int err;
+>> +};
+>> +
+>> +static acpi_status get_registers_cb(struct acpi_resource *ares, void 
+>> *context)
+>> +{
+>> +	struct get_registers_context *ctx = context;
+>> +	struct acpi_resource_generic_register *reg;
+>> +	phys_addr_t paddr;
+>> +	void __iomem *vaddr;
+>> +
+>> +	if (ares->type != ACPI_RESOURCE_TYPE_GENERIC_REGISTER)
+>> +		return AE_OK;
+>> +
+>> +	reg = &ares->data.generic_reg;
+>> +	paddr = reg->address;
+>> +	if ((reg->space_id != ACPI_SPACE_MEM) ||
+>> +	    (reg->bit_offset != 0) ||
+>> +	    (reg->bit_width > REG_SIZE)) {
+>> +		dev_err(ctx->dev, "Bad register resource @%pa\n", &paddr);
+>> +		ctx->err = -EINVAL;
+>> +		return AE_ERROR;
+>> +	}
+>> +
+>> +	vaddr = devm_ioremap(ctx->dev, reg->address, REG_SIZE);
+>> +	if (IS_ERR(vaddr)) {
+>> +		dev_err(ctx->dev, "Can't map register @%pa\n", &paddr);
+>> +		ctx->err = PTR_ERR(vaddr);
+>> +		return AE_ERROR;
+>> +	}
+>> +
+>> +	ctx->combiner->regs[ctx->combiner->nregs].addr = vaddr;
+>> +	ctx->combiner->nirqs += reg->bit_width;
+>> +	ctx->combiner->nregs++;
+>> +	return AE_OK;
+>> +}
+>> +
+>> +static int get_registers(struct platform_device *pdev, struct 
+>> combiner *comb)
+>> +{
+>> +	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
+>> +	acpi_status status;
+>> +	struct get_registers_context ctx;
+>> +
+>> +	if (!acpi_has_method(adev->handle, METHOD_NAME__CRS))
+>> +		return -EINVAL;
+>> +
+>> +	ctx.dev = &pdev->dev;
+>> +	ctx.combiner = comb;
+>> +	ctx.err = 0;
+>> +
+>> +	status = acpi_walk_resources(adev->handle, METHOD_NAME__CRS,
+>> +				     get_registers_cb, &ctx);
+>> +	if (ACPI_FAILURE(status))
+>> +		return ctx.err;
+>> +	return 0;
+>> +}
+>> +
+>> +static int __init combiner_probe(struct platform_device *pdev)
+>> +{
+>> +	struct combiner *combiner;
+>> +	size_t alloc_sz;
+>> +	u32 nregs;
+>> +	int err;
+>> +
+>> +	nregs = count_registers(pdev);
+>> +	if (nregs <= 0) {
+>> +		dev_err(&pdev->dev, "Error reading register resources\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	alloc_sz = sizeof(*combiner) + sizeof(struct combiner_reg) * nregs;
+>> +	combiner = devm_kzalloc(&pdev->dev, alloc_sz, GFP_KERNEL);
+>> +	if (!combiner)
+>> +		return -ENOMEM;
+>> +
+>> +	err = get_registers(pdev, combiner);
+>> +	if (err < 0)
+>> +		return err;
+>> +
+>> +	combiner->parent_irq = platform_get_irq(pdev, 0);
+>> +	if (combiner->parent_irq <= 0) {
+>> +		dev_err(&pdev->dev, "Error getting IRQ resource\n");
+>> +		return -EPROBE_DEFER;
+>> +	}
+>> +
+>> +	combiner->domain = irq_domain_create_linear(pdev->dev.fwnode, 
+>> combiner->nirqs,
+>> +						    &domain_ops, combiner);
+>> +	if (!combiner->domain)
+>> +		/* Errors printed by irq_domain_create_linear */
+>> +		return -ENODEV;
+>> +
+>> +	irq_set_chained_handler_and_data(combiner->parent_irq,
+>> +					 combiner_handle_irq, combiner);
+>> +
+>> +	dev_info(&pdev->dev, "Initialized with [p=%d,n=%d,r=%p]\n",
+>> +		 combiner->parent_irq, combiner->nirqs, combiner->regs[0].addr);
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct acpi_device_id qcom_irq_combiner_acpi_match[] = {
+>> +	{ "QCOM80B1", },
+>> +	{ }
+>> +};
+>> +
+>> +static struct platform_driver qcom_irq_combiner_probe = {
+>> +	.driver = {
+>> +		.name = "qcom-irq-combiner",
+>> +		.owner = THIS_MODULE,
+>> +		.acpi_match_table = ACPI_PTR(qcom_irq_combiner_acpi_match),
+>> +	},
+>> +	.probe = combiner_probe,
+>> +};
+>> +
+>> +static int __init register_qcom_irq_combiner(void)
+>> +{
+>> +	return platform_driver_register(&qcom_irq_combiner_probe);
+>> +}
+>> +device_initcall(register_qcom_irq_combiner);
+>> 
+> 
+> Other than the questions I have above, this now looks in a much better
+> shape. Hopefully Rafael will soon come back will his conclusions on the
+> first two patches, as I'd like to see this code to get some -next for a
+> while.
+
+Yes, hopefully we can get to that in the following weeks.
+
+Thanks,
+Agustin
+
+> 
+> Thanks,
+> 
+> 	M.
+> --
+> Jazz is not dead. It just smells funny...
+
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux Foundation Collaborative Project.
