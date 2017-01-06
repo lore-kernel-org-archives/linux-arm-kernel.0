@@ -1,72 +1,83 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:19:00 +0100
-Subject: [PATCH 5/5] ARM: shmobile: rcar-gen2: Remove unused
- rcar_gen2_read_mode_pins()
-In-Reply-To: <cover.1483701101.git.horms+renesas@verge.net.au>
-References: <cover.1483701101.git.horms+renesas@verge.net.au>
-Message-ID: <70def3e53694a65c5583fb5f411491a5074bab18.1483701101.git.horms+renesas@verge.net.au>
+Date: Fri,  6 Jan 2017 12:18:24 +0100
+Subject: [PATCH 15/25] ARM: dts: r8a7791: Use R-Car Gen 2 fallback binding for
+ i2c nodes
+In-Reply-To: <cover.1483700969.git.horms+renesas@verge.net.au>
+References: <cover.1483700969.git.horms+renesas@verge.net.au>
+Message-ID: <c7407ca7ef61ff91cfa3c130de59061171102cf3.1483700969.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Use recently added R-Car Gen 2 fallback binding for i2c nodes in
+DT for r8a7791 SoC.
 
-After
-  1. commit 9f5ce39ddb8f68b3 ("ARM: shmobile: rcar-gen2: Obtain extal
-     frequency from DT"),
-  2. commit 80951f04c3f92533 ("ARM: shmobile: rcar-gen2: Stop passing
-     mode pins state to clock driver"),
-  3. and handling of debug resource reset,
-there are no more users of rcar_gen2_read_mode_pins() left.
-Remove the function and its support definitions.
+This has no run-time effect for the current driver as the initialisation
+sequence is the same for the SoC-specific binding for r8a7791 and the
+fallback binding for R-Car Gen 2.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/rcar-gen2.h       |  2 --
- arch/arm/mach-shmobile/setup-rcar-gen2.c | 18 ------------------
- 2 files changed, 20 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/rcar-gen2.h b/arch/arm/mach-shmobile/rcar-gen2.h
-index 8a66b4aae035..6792e249cf56 100644
---- a/arch/arm/mach-shmobile/rcar-gen2.h
-+++ b/arch/arm/mach-shmobile/rcar-gen2.h
-@@ -2,8 +2,6 @@
- #define __ASM_RCAR_GEN2_H__
- 
- void rcar_gen2_timer_init(void);
--#define MD(nr) BIT(nr)
--u32 rcar_gen2_read_mode_pins(void);
- void rcar_gen2_reserve(void);
- void rcar_gen2_pm_init(void);
- 
-diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-index ac63fa407b64..52d466b75973 100644
---- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-@@ -29,24 +29,6 @@
- #include "common.h"
- #include "rcar-gen2.h"
- 
--#define MODEMR 0xe6160060
--
--u32 rcar_gen2_read_mode_pins(void)
--{
--	static u32 mode;
--	static bool mode_valid;
--
--	if (!mode_valid) {
--		void __iomem *modemr = ioremap_nocache(MODEMR, 4);
--		BUG_ON(!modemr);
--		mode = ioread32(modemr);
--		iounmap(modemr);
--		mode_valid = true;
--	}
--
--	return mode;
--}
--
- static unsigned int __init get_extal_freq(void)
- {
- 	struct device_node *cpg, *extal;
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index a5c596a15120..b61700aa862e 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -444,7 +444,7 @@
+ 	i2c0: i2c at e6508000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,i2c-r8a7791";
++		compatible = "renesas,i2c-r8a7791", "renesas,rcar-gen2-i2c";
+ 		reg = <0 0xe6508000 0 0x40>;
+ 		interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7791_CLK_I2C0>;
+@@ -456,7 +456,7 @@
+ 	i2c1: i2c at e6518000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,i2c-r8a7791";
++		compatible = "renesas,i2c-r8a7791", "renesas,rcar-gen2-i2c";
+ 		reg = <0 0xe6518000 0 0x40>;
+ 		interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7791_CLK_I2C1>;
+@@ -468,7 +468,7 @@
+ 	i2c2: i2c at e6530000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,i2c-r8a7791";
++		compatible = "renesas,i2c-r8a7791", "renesas,rcar-gen2-i2c";
+ 		reg = <0 0xe6530000 0 0x40>;
+ 		interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7791_CLK_I2C2>;
+@@ -480,7 +480,7 @@
+ 	i2c3: i2c at e6540000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,i2c-r8a7791";
++		compatible = "renesas,i2c-r8a7791", "renesas,rcar-gen2-i2c";
+ 		reg = <0 0xe6540000 0 0x40>;
+ 		interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7791_CLK_I2C3>;
+@@ -492,7 +492,7 @@
+ 	i2c4: i2c at e6520000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,i2c-r8a7791";
++		compatible = "renesas,i2c-r8a7791", "renesas,rcar-gen2-i2c";
+ 		reg = <0 0xe6520000 0 0x40>;
+ 		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7791_CLK_I2C4>;
+@@ -505,7 +505,7 @@
+ 		/* doesn't need pinmux */
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,i2c-r8a7791";
++		compatible = "renesas,i2c-r8a7791", "renesas,rcar-gen2-i2c";
+ 		reg = <0 0xe6528000 0 0x40>;
+ 		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7791_CLK_I2C5>;
 -- 
 2.7.0.rc3.207.g0ac5344
