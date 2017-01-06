@@ -1,106 +1,64 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 6 Jan 2017 09:20:29 +0000
-Subject: [PATCH v6 17/18] vfio/type1: Check MSI remapping at irq domain
- level
-In-Reply-To: <af612e18-ca0b-b855-e198-d4c706f2febc@redhat.com>
-References: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
- <1483643086-2883-18-git-send-email-eric.auger@redhat.com>
- <AM5PR0401MB25454B0C8F6E610A50B299D19A630@AM5PR0401MB2545.eurprd04.prod.outlook.com>
- <af612e18-ca0b-b855-e198-d4c706f2febc@redhat.com>
-Message-ID: <845d7167-6734-03c9-4df6-2f82f1627dbc@arm.com>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Fri, 06 Jan 2017 18:25:41 +0900
+Subject: [PATCH v3 2/5] arm64: dts: exynos: make tm2 and tm2e independent
+ from each other
+In-Reply-To: <20170106083729.4odfu42knjxxudve@kozik-lap>
+References: <1483675149-32598-1-git-send-email-jcsing.lee@samsung.com>
+ <CGME20170106035914epcas5p209490dfca8e8ae83c6a9b5aa1408a1ed@epcas5p2.samsung.com>
+ <1483675149-32598-3-git-send-email-jcsing.lee@samsung.com>
+ <20170106070911.sj6qjd5akyxnazsl@kozik-lap>
+ <20170106075914.y5nuak3bz3zrvvex@gangnam.samsung>
+ <20170106083729.4odfu42knjxxudve@kozik-lap>
+Message-ID: <20170106092541.zpdnuesdjo5vctlz@gangnam.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/17 09:08, Auger Eric wrote:
-> Hi Bharat
+Hi Krzysztof,
+
+> > > >  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 1118 +++++++++++++++++++
+> > > >  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 1153 +-------------------
+> > > 
+> > > Like talking to a wall. Without any feedback. If my instructions were
+> > > wrong (and it is not possible to detect rename) then please say it (you
+> > > can add personal comments after separator ---).
+> > 
+> > no Krzysztof, I'm sorry, but this patch has been formatted with
+> > the diff algorithm *you* asked, -B50% both version 2 (where you
+> > didn't comment) and version 3. If you still don't like it, please
+> > don't blame me, blame the algorithm.
 > 
-> On 06/01/2017 09:50, Bharat Bhushan wrote:
->> Hi Eric,
->>
->>> -----Original Message-----
->>> From: Eric Auger [mailto:eric.auger at redhat.com]
->>> Sent: Friday, January 06, 2017 12:35 AM
->>> To: eric.auger at redhat.com; eric.auger.pro at gmail.com;
->>> christoffer.dall at linaro.org; marc.zyngier at arm.com;
->>> robin.murphy at arm.com; alex.williamson at redhat.com;
->>> will.deacon at arm.com; joro at 8bytes.org; tglx at linutronix.de;
->>> jason at lakedaemon.net; linux-arm-kernel at lists.infradead.org
->>> Cc: kvm at vger.kernel.org; drjones at redhat.com; linux-
->>> kernel at vger.kernel.org; pranav.sawargaonkar at gmail.com;
->>> iommu at lists.linux-foundation.org; punit.agrawal at arm.com; Diana Madalina
->>> Craciun <diana.craciun@nxp.com>; gpkulkarni at gmail.com;
->>> shankerd at codeaurora.org; Bharat Bhushan <bharat.bhushan@nxp.com>;
->>> geethasowjanya.akula at gmail.com
->>> Subject: [PATCH v6 17/18] vfio/type1: Check MSI remapping at irq domain
->>> level
->>>
->>> In case the IOMMU translates MSI transactions (typical case on ARM), we
->>> check MSI remapping capability at IRQ domain level. Otherwise it is checked
->>> at IOMMU level.
->>>
->>> At this stage the arm-smmu-(v3) still advertise the
->>> IOMMU_CAP_INTR_REMAP capability at IOMMU level. This will be removed
->>> in subsequent patches.
->>>
->>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>>
->>> ---
->>>
->>> v6: rewrite test
->>> ---
->>>  drivers/vfio/vfio_iommu_type1.c | 9 ++++++---
->>>  1 file changed, 6 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/vfio/vfio_iommu_type1.c
->>> b/drivers/vfio/vfio_iommu_type1.c index b473ef80..fa0b5c4 100644
->>> --- a/drivers/vfio/vfio_iommu_type1.c
->>> +++ b/drivers/vfio/vfio_iommu_type1.c
->>> @@ -40,6 +40,7 @@
->>>  #include <linux/mdev.h>
->>>  #include <linux/notifier.h>
->>>  #include <linux/dma-iommu.h>
->>> +#include <linux/irqdomain.h>
->>>
->>>  #define DRIVER_VERSION  "0.2"
->>>  #define DRIVER_AUTHOR   "Alex Williamson
->>> <alex.williamson@redhat.com>"
->>> @@ -1208,7 +1209,7 @@ static int vfio_iommu_type1_attach_group(void
->>> *iommu_data,
->>>  	struct vfio_domain *domain, *d;
->>>  	struct bus_type *bus = NULL, *mdev_bus;
->>>  	int ret;
->>> -	bool resv_msi;
->>> +	bool resv_msi, msi_remap;
->>>  	phys_addr_t resv_msi_base;
->>>
->>>  	mutex_lock(&iommu->lock);
->>> @@ -1284,8 +1285,10 @@ static int vfio_iommu_type1_attach_group(void
->>> *iommu_data,
->>>  	INIT_LIST_HEAD(&domain->group_list);
->>>  	list_add(&group->next, &domain->group_list);
->>>
->>> -	if (!allow_unsafe_interrupts &&
->>> -	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
->>> +	msi_remap = resv_msi ? irq_domain_check_msi_remap() :
->>
->> There can be multiple interrupt-controller, at-least theoretically it is possible and not sure practically it exists and supported, where not all may support IRQ_REMAP. If that is the case be then should we check for IRQ-REMAP for that device-bus irq-domain?
->>
-> I mentioned in the cover letter that the approach was defensive and
-> rough today. As soon as we detect an MSI controller in the platform that
-> has no support for MSI remapping we flag the assignment as unsafe. I
-> think this approach was agreed on the ML. Such rough assessment was used
-> in the past on x86.
+> If you wrote it in cover letter or after '---' I wouldn't complain
+> because I would know that my feedback was ignored. But here it is like
+> black hole - I do not know whether I was ignored or it was not working.
+
+In the cover letter is written:
+
+ "- patch 3 diff has been generated with -B50%"
+
+in "Changes in v2:". In v3 patch 3 has become patch 2.
+
+> > Now we can stay here at trying random diff algorithms (as they
+> > give more or less the same result) or you tell me which exact
+> > algorithm you want me to use. Besides, for me it's clear,
+> > tm2-common is all new, while in tm2 you have on one side the '-'
+> > (if it applies nothing has changed) on the bottom the '+'.
 > 
-> I am reluctant to add more complexity at that stage. This can be
-> improved latter I think when such platforms show up.
+> Maybe that depends on the git?
+> $ git --version 
+> git version 2.9.3
+> $ git format-patch -2 -B50%
+> ...
+>   21  ...ynos5433-tm2.dts => exynos5433-tm2-common.dtsi} |   24 +-
+>   22  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 1153 +-------------------
+>   23  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |   22 +-
+>   24  3 files changed, 56 insertions(+), 1143 deletions(-)
+>   25  copy arch/arm64/boot/dts/exynos/{exynos5433-tm2.dts => exynos5433-tm2-common.dtsi} (98%)
+>   26  rewrite arch/arm64/boot/dts/exynos/exynos5433-tm2.dts (98%)
 
-I don't think this is worth it. If the system is so broken that the
-designer cannot make up their mind about device isolation, too bad.
-People will either disable the non-isolating MSI controller altogether,
-or force the unsafe flag.
+I guess you're right, this has been generated from Jaechul's PC
+who perhaps has a different version. I have version 2.11.0 and I
+have same output as you.
 
-Thanks,
+I will send the patch generated from my PC as reply to your mail.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Andi
