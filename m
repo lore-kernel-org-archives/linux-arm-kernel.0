@@ -1,50 +1,72 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 6 Jan 2017 10:51:53 -0500
-Subject: [PATCH v2 4/5] arm64: Use __tlbi_dsb() macros in KVM code
-In-Reply-To: <20170103155756.GB14183@leverpostej>
-References: <20161229224335.13531-1-cov@codeaurora.org>
- <20161229224335.13531-4-cov@codeaurora.org>
- <20170103155756.GB14183@leverpostej>
-Message-ID: <f5020a04-5fc7-26b5-1ded-c58e159bc722@codeaurora.org>
+From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
+Date: Fri, 6 Jan 2017 16:52:12 +0100
+Subject: [PATCH 1/3] dt-bindings: mfd: stm32f4: Fix STM32F4_XXXX_CLOCK() macro
+In-Reply-To: <1483717934-21415-1-git-send-email-gabriel.fernandez@st.com>
+References: <1483717934-21415-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1483717934-21415-2-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2017 10:57 AM, Mark Rutland wrote:
-> On Thu, Dec 29, 2016 at 05:43:34PM -0500, Christopher Covington wrote:
->> Refactor the KVM code to use the newly introduced __tlbi_dsb macros, which
->> will allow an errata workaround that repeats tlbi dsb sequences to only
->> change one location. This is not intended to change the generated assembly
->> and comparing before and after vmlinux objdump shows no functional changes.
+From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-@@ -32,7 +33,7 @@ void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- 	 * whole of Stage-1. Weep...
- 	 */
- 	ipa >>= 12;
--	asm volatile("tlbi ipas2e1is, %0" : : "r" (ipa));
-+	__tlbi_dsb(ipas2e1is, ish, ipa);
+Macro to select a clock was not correct.
+
+Offset of enable register starts at 0x30, then calculation to select
+a bit is:
+
+(@enable_reg - 0x30) / 4 * 32 + bit_to_select
+
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+Tested-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+---
+ include/dt-bindings/mfd/stm32f4-rcc.h | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/include/dt-bindings/mfd/stm32f4-rcc.h b/include/dt-bindings/mfd/stm32f4-rcc.h
+index e98942d..f662b19 100644
+--- a/include/dt-bindings/mfd/stm32f4-rcc.h
++++ b/include/dt-bindings/mfd/stm32f4-rcc.h
+@@ -25,7 +25,7 @@
+ #define STM32F4_RCC_AHB1_OTGHS	29
  
- 	/*
- 	 * We have to ensure completion of the invalidation at Stage-2,
-
->> @@ -40,9 +41,7 @@ void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
->>  	 * complete (S1 + S2) walk based on the old Stage-2 mapping if
->>  	 * the Stage-1 invalidation happened first.
->>  	 */
->> -	dsb(ish);
-> 
-> Looks like this got accidentally removed. AFAICT it is still necessary.
-
-Not removed, just hoisted above the comment block to the previous patch hunk.
-
->> -	asm volatile("tlbi vmalle1is" : : );
->> -	dsb(ish);
->> +	__tlbi_dsb(vmalle1is, ish);
->>  	isb();
-
-Thanks,
-Cov
-
+ #define STM32F4_AHB1_RESET(bit) (STM32F4_RCC_AHB1_##bit + (0x10 * 8))
+-#define STM32F4_AHB1_CLOCK(bit) (STM32F4_RCC_AHB1_##bit + (0x30 * 8))
++#define STM32F4_AHB1_CLOCK(bit) (STM32F4_RCC_AHB1_##bit)
+ 
+ 
+ /* AHB2 */
+@@ -36,13 +36,13 @@
+ #define STM32F4_RCC_AHB2_OTGFS	7
+ 
+ #define STM32F4_AHB2_RESET(bit)	(STM32F4_RCC_AHB2_##bit + (0x14 * 8))
+-#define STM32F4_AHB2_CLOCK(bit)	(STM32F4_RCC_AHB2_##bit + (0x34 * 8))
++#define STM32F4_AHB2_CLOCK(bit)	(STM32F4_RCC_AHB2_##bit + 0x20)
+ 
+ /* AHB3 */
+ #define STM32F4_RCC_AHB3_FMC	0
+ 
+ #define STM32F4_AHB3_RESET(bit)	(STM32F4_RCC_AHB3_##bit + (0x18 * 8))
+-#define STM32F4_AHB3_CLOCK(bit)	(STM32F4_RCC_AHB3_##bit + (0x38 * 8))
++#define STM32F4_AHB3_CLOCK(bit)	(STM32F4_RCC_AHB3_##bit + 0x40)
+ 
+ /* APB1 */
+ #define STM32F4_RCC_APB1_TIM2	0
+@@ -72,7 +72,7 @@
+ #define STM32F4_RCC_APB1_UART8	31
+ 
+ #define STM32F4_APB1_RESET(bit)	(STM32F4_RCC_APB1_##bit + (0x20 * 8))
+-#define STM32F4_APB1_CLOCK(bit)	(STM32F4_RCC_APB1_##bit + (0x40 * 8))
++#define STM32F4_APB1_CLOCK(bit)	(STM32F4_RCC_APB1_##bit + 0x80)
+ 
+ /* APB2 */
+ #define STM32F4_RCC_APB2_TIM1	0
+@@ -93,6 +93,6 @@
+ #define STM32F4_RCC_APB2_LTDC	26
+ 
+ #define STM32F4_APB2_RESET(bit)	(STM32F4_RCC_APB2_##bit + (0x24 * 8))
+-#define STM32F4_APB2_CLOCK(bit)	(STM32F4_RCC_APB2_##bit + (0x44 * 8))
++#define STM32F4_APB2_CLOCK(bit)	(STM32F4_RCC_APB2_##bit + 0xA0)
+ 
+ #endif /* _DT_BINDINGS_MFD_STM32F4_RCC_H */
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
-Aurora Forum, a Linux Foundation Collaborative Project.
+1.9.1
