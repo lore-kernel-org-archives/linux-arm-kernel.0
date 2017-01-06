@@ -1,32 +1,20 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 6 Jan 2017 12:26:41 +0000
-Subject: [PATCH] ARM: hw_breakpoint: blacklist Scorpion CPUs
-In-Reply-To: <20170106112125.GB15333@arm.com>
-References: <1483637556-3974-1-git-send-email-mark.rutland@arm.com>
- <20170106112125.GB15333@arm.com>
-Message-ID: <20170106122312.GA17642@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 6 Jan 2017 12:27:39 +0000
+Subject: [PATCH v6 0/4] arm64: arch_timer: Add workaround for
+ hisilicon-161601 erratum
+In-Reply-To: <e518ab78-4093-0bc9-fe68-e7da25fd5644@huawei.com>
+References: <1483594317-10732-1-git-send-email-dingtianhong@huawei.com>
+ <e518ab78-4093-0bc9-fe68-e7da25fd5644@huawei.com>
+Message-ID: <20170106122739.GA20796@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 11:21:25AM +0000, Will Deacon wrote:
-> On Thu, Jan 05, 2017 at 05:32:36PM +0000, Mark Rutland wrote:
-> > +	if (read_cpuid_part() == ARM_CPU_PART_SCORPION) {
-> > +		pr_info("Scorpion CPU detected. Breakpoints and watchpoints disabled\n");
-> 
-> nit: we're disabling *hardware* breakpoints and watchpoints, so it's worth
-> mentioning that in the print.
+On Fri, Jan 06, 2017 at 11:41:28AM +0800, Ding Tianhong wrote:
+> Please help reviewing the new version, I think it is nearly close to the
+> final solution and it is very important to our chip or something else chip
+> has similar erratum.  If there is any dissatisfaction, please inform me
+> and I will fix it. :)
 
-True. I've fixed up the message.
+It looks fine to me, but I don't maintain the arch timer driver!
 
-> With that:
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Please put this into Russell's patch system.
-
-Cheers.
-
-I've dropped this in the patch system as 8634/1.
-
-Thanks,
-Mark.
+Will
