@@ -1,48 +1,24 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 6 Jan 2017 10:49:36 -0500
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 6 Jan 2017 09:51:20 -0600
 Subject: [PATCH v2 2/5] arm64: Work around Falkor erratum 1003
-In-Reply-To: <20170103155502.GA14183@leverpostej>
+In-Reply-To: <fd82e2bf-5259-2fda-c931-1996387d779f@codeaurora.org>
 References: <20161229224335.13531-1-cov@codeaurora.org>
  <20161229224335.13531-2-cov@codeaurora.org>
- <20170103155502.GA14183@leverpostej>
-Message-ID: <ae59aa20-5518-0e33-6b64-7622010fc541@codeaurora.org>
+ <1dfdc578-e0f8-1320-d223-c9c55e70ca93@codeaurora.org>
+ <fd82e2bf-5259-2fda-c931-1996387d779f@codeaurora.org>
+Message-ID: <4bf67a17-bb2f-cc1f-97c5-2d7c50604f60@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2017 10:55 AM, Mark Rutland wrote:
-> Hi,
-> 
-> On Thu, Dec 29, 2016 at 05:43:32PM -0500, Christopher Covington wrote:
->> +config QCOM_FALKOR_E1003_RESERVED_ASID
->> +	int
->> +	default 1
->> +	depends on QCOM_FALKOR_ERRATUM_1003
->> +
-> 
-> I don't think this needs to be configurable, so let's drop this into a
-> header, e.g. drop:
-> 
-> #define FALKOR_RESERVED_ASID	1
-> 
-> ... in <asm/mmu_context.h>, protecting the rest with an ifndef
-> __ASSEMBLY__ guard.
+Christopher Covington wrote:
+>> > Looks like you've made an unrelated whitespace change that affected the entire table,
+>> > not just the line you're adding.
+> I'm making space for "QCOM_FALKOR_ERRATUM_1003".
 
-Will do, thanks for the concrete suggestion.
-
-> [...]
-> 
->> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
->> +alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
->> +	mrs     x2, ttbr0_el1                   // get cuurent TTBR0_EL1
->> +	mov     x3, #CONFIG_QCOM_FALKOR_ERRATUM_1003	// reserved ASID
-> 
-> Wrong macro? That's not the ASID.
-
-Oops, thanks for spotting.
-
-Cov
+Ok, but you're also shrinking the other columns.  I think a better 
+solution is to make the macro shorter. QCOM_ERRATUM_FLK1003?
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
-Aurora Forum, a Linux Foundation Collaborative Project.
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
