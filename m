@@ -1,41 +1,67 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 6 Jan 2017 11:54:48 +0000
-Subject: [PATCH] ARM64: dts: meson-gxbb-odroidc2: Disable SCPI DVFS
-In-Reply-To: <9f508097-f605-ebd8-20af-c3e798c6fdcc@poczta.onet.pl>
-References: <1483628549-29486-1-git-send-email-narmstrong@baylibre.com>
- <9f508097-f605-ebd8-20af-c3e798c6fdcc@poczta.onet.pl>
-Message-ID: <83fd9b61-dbff-68e0-82e5-8e01058d04a9@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Jan 2017 11:58:21 +0000
+Subject: [PATCH net-next v4 0/4] Fix OdroidC2 Gigabit Tx link issue
+In-Reply-To: <CAGm1_kvZ4dQrJ89qYU5wLGU1NR=j9xyWUm2mgYtq3F1+bo1OCg@mail.gmail.com>
+References: <1480348229-25672-1-git-send-email-jbrunet@baylibre.com>
+ <049b1efc-3bad-92e0-45ef-0563dc5d81de@gmail.com>
+ <20170105232508.GU14217@n2100.armlinux.org.uk>
+ <CAGm1_kvZ4dQrJ89qYU5wLGU1NR=j9xyWUm2mgYtq3F1+bo1OCg@mail.gmail.com>
+Message-ID: <20170106115821.GY14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Micha?,
-
-On 05/01/17 19:04, Micha? Zegan wrote:
-> Hello.
+On Fri, Jan 06, 2017 at 06:42:24AM +0100, Yegor Yefremov wrote:
+> On Fri, Jan 6, 2017 at 12:25 AM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > Another concern with this patch is that the existing phylib "set_eee"
+> > code is horribly buggy - it just translates the modes from userspace
+> > into the register value and writes them directly to the register with
+> > no validation.  So it's possible to set modes in the register that the
+> > hardware doesn't support, and have them advertised to the link partner.
+> >
+> > I have a patch which fixes that, restricting (as we do elsewhere) the
+> > advert according to the EEE supported capabilities retrieved from the
+> > PCS - maybe the problem here is that the PCS doesn't support support
+> > EEE in 1000baseT mode?
+> >
+> > Out of interest, which PHY is used on this platform?
+> >
+> > On the SolidRun boards, they're using AR8035, and have suffered this
+> > occasional link drop problem.  What has been found is that it seems to
+> > be to do with the timing parameters, and it seemed to only be 1000bT
+> > that was affected.  I don't remember off hand exactly which or what
+> > the change was they made to stabilise it though, but I can probabily
+> > find out tomorrow.
 > 
-> The patch causes cpufreq module (scpi-cpufreq) not to detect cpufreq, so
-> it actually works, but...
-> Loading the module causes few errors because of not found frequencies or
-> something, then it is all okay. However after loading scpi-cpufreq you
-> cannot actually power the cpu off and on. You will power it off
-> successfully, but when trying to power it on, the cpufreq driver will
-> error out, 
+> I have different boards with am335x and AR8035 and we had occasional
+> link drop with both 100 and 1000 speeds.
 
-Yes I had noticed this in past, this needs to be fixed. I had a patch
-and seems like it slipped through the cracks. I will fins and post it.
+AR8035 has "Smart EEE", which is a PHY specific thing... it's not
+entirely 802.3 compliant as it doesn't involve the MAC.
 
-> and then after it happens, the cpu that was trying to go
-> online will be offline again, and that is a little... unfortunate. The
+The Smart EEE control registers are in the PCS MMD - some of this
+is from people's memories:
 
-IIUC, you mean the cpufreq drive spits error on every hotplug event ?
-If so yes, otherwise I think I didn't understand you concern above.
+- 0x805b is the TX wakeup timer.  Lower 8 bits for 100base-Tx and
+  upper 8 bits for 1000base-T.
 
-> question is, and I cannot really test that: will the module actually
-> autoload after this change?
->
+- 0x805c and 0x805d.
+  The LPI timer is 24 bit, with the lower 16 bits in 0x805c and the
+  upper 8 in 0x805d.  0x805d bit 8 appears to be the Smart EEE enable bit.
 
-It should work, I had tested this in past.
+What was found was setting the 1000base-T wakeup timer to the same as
+the 100base-Tx avoided the problems we were seeing, which was only
+with 1000base-T.  (Whether that's because 100base-Tx hasn't been as well
+tested, I don't know.)  SR ended up with 0x1717 in 0x805b.
+
+I'd suggest playing around with that register to see if extending the
+wakeup time has any beneficial effect.
+
+Also, I suspect Smart EEE shouldn't be enabled if you have an EEE
+capable MAC (in which case 0x805d bit 8 should be clear.)  I think,
+however, it defaults to enabled.
 
 -- 
-Regards,
-Sudeep
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
