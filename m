@@ -1,61 +1,33 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:17:46 +0100
-Subject: [PATCH 04/16] arm64: dts: r8a7796: Add CAN FD support
+Date: Fri,  6 Jan 2017 12:17:47 +0100
+Subject: [PATCH 05/16] arm64: renesas: r8a7796/salvator-x: Add board part
+ number to DT bindings
 In-Reply-To: <cover.1483700694.git.horms+renesas@verge.net.au>
 References: <cover.1483700694.git.horms+renesas@verge.net.au>
-Message-ID: <f4176d7c7c03ed23d8335465f309b44519fb6ad5.1483700694.git.horms+renesas@verge.net.au>
+Message-ID: <6be91f865660d56081fe67e969a4adf71c24cada.1483700694.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Paterson <chris.paterson2@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Adds CAN FD controller node for r8a7796.
-
-Based on a patch for r8a7795 by Ramesh Shanmugasundaram.
-
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ Documentation/devicetree/bindings/arm/shmobile.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index a97ef2e7202c..a37bb5eb062c 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -397,6 +397,30 @@
- 			status = "disabled";
- 		};
- 
-+		canfd: can at e66c0000 {
-+			compatible = "renesas,r8a7796-canfd",
-+				     "renesas,rcar-gen3-canfd";
-+			reg = <0 0xe66c0000 0 0x8000>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>,
-+				   <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 914>,
-+			       <&cpg CPG_CORE R8A7796_CLK_CANFD>,
-+			       <&can_clk>;
-+			clock-names = "fck", "canfd", "can_clk";
-+			assigned-clocks = <&cpg CPG_CORE R8A7796_CLK_CANFD>;
-+			assigned-clock-rates = <40000000>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			status = "disabled";
-+
-+			channel0 {
-+				status = "disabled";
-+			};
-+
-+			channel1 {
-+				status = "disabled";
-+			};
-+		};
-+
- 		scif2: serial at e6e88000 {
- 			compatible = "renesas,scif-r8a7796",
- 				     "renesas,rcar-gen3-scif", "renesas,scif";
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index 253bf9b86690..c9502634316d 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -75,7 +75,7 @@ Boards:
+     compatible = "renesas,rskrza1", "renesas,r7s72100"
+   - Salvator-X (RTP0RC7795SIPB0010S)
+     compatible = "renesas,salvator-x", "renesas,r8a7795";
+-  - Salvator-X
++  - Salvator-X (RTP0RC7796SIPB0011S)
+     compatible = "renesas,salvator-x", "renesas,r8a7796";
+   - SILK (RTP0RC7794LCB00011S)
+     compatible = "renesas,silk", "renesas,r8a7794"
 -- 
 2.7.0.rc3.207.g0ac5344
