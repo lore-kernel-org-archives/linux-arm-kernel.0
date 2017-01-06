@@ -1,42 +1,52 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:18:48 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.11
-Message-ID: <cover.1483701101.git.horms+renesas@verge.net.au>
+Date: Fri,  6 Jan 2017 12:18:56 +0100
+Subject: [PATCH 1/5] ARM: shmobile: apmu: Add more register documentation
+In-Reply-To: <cover.1483701101.git.horms+renesas@verge.net.au>
+References: <cover.1483701101.git.horms+renesas@verge.net.au>
+Message-ID: <460d4117a4714f3e9ae600974df03632139728ec.1483701101.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC updates for v4.11.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Hiep Cao Minh <cm-hiep@jinso.co.jp>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/platsmp-apmu.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
-
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
-
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v4.11
-
-for you to fetch changes up to 70def3e53694a65c5583fb5f411491a5074bab18:
-
-  ARM: shmobile: rcar-gen2: Remove unused rcar_gen2_read_mode_pins() (2017-01-03 10:50:45 +0100)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Updates for v4.11
-
-* Allow booting secondary CPU cores in debug mode
-
-----------------------------------------------------------------
-Geert Uytterhoeven (5):
-      ARM: shmobile: apmu: Add more register documentation
-      ARM: shmobile: apmu: Add debug resource reset for secondary CPU boot
-      ARM: shmobile: apmu: Allow booting secondary CPU cores in debug mode
-      ARM: shmobile: r8a7791: Allow booting secondary CPU cores in debug mode
-      ARM: shmobile: rcar-gen2: Remove unused rcar_gen2_read_mode_pins()
-
- arch/arm/mach-shmobile/platsmp-apmu.c    | 41 +++++++++++++++++++-------------
- arch/arm/mach-shmobile/rcar-gen2.h       |  2 --
- arch/arm/mach-shmobile/setup-rcar-gen2.c | 18 --------------
- arch/arm/mach-shmobile/smp-r8a7791.c     | 14 +----------
- 4 files changed, 25 insertions(+), 50 deletions(-)
+diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
+index 0c6bb458b7a4..933f9b902405 100644
+--- a/arch/arm/mach-shmobile/platsmp-apmu.c
++++ b/arch/arm/mach-shmobile/platsmp-apmu.c
+@@ -31,9 +31,15 @@ static struct {
+ 	int bit;
+ } apmu_cpus[NR_CPUS];
+ 
+-#define WUPCR_OFFS 0x10
+-#define PSTR_OFFS 0x40
+-#define CPUNCR_OFFS(n) (0x100 + (0x10 * (n)))
++#define WUPCR_OFFS	 0x10		/* Wake Up Control Register */
++#define PSTR_OFFS	 0x40		/* Power Status Register */
++#define CPUNCR_OFFS(n)	(0x100 + (0x10 * (n)))
++					/* CPUn Power Status Control Register */
++
++/* Power Status Register */
++#define CPUNST(r, n)	(((r) >> (n * 4)) & 3)	/* CPUn Status Bit */
++#define CPUST_RUN	0		/* Run Mode */
++#define CPUST_STANDBY	3		/* CoreStandby Mode */
+ 
+ static int __maybe_unused apmu_power_on(void __iomem *p, int bit)
+ {
+@@ -59,7 +65,7 @@ static int __maybe_unused apmu_power_off_poll(void __iomem *p, int bit)
+ 	int k;
+ 
+ 	for (k = 0; k < 1000; k++) {
+-		if (((readl_relaxed(p + PSTR_OFFS) >> (bit * 4)) & 0x03) == 3)
++		if (CPUNST(readl_relaxed(p + PSTR_OFFS), bit) == CPUST_STANDBY)
+ 			return 1;
+ 
+ 		mdelay(1);
+-- 
+2.7.0.rc3.207.g0ac5344
