@@ -1,65 +1,101 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Jan 2017 15:05:35 +0000
-Subject: [PATCH net-next v4 0/4] Fix OdroidC2 Gigabit Tx link issue
-In-Reply-To: <1483710621.28003.74.camel@baylibre.com>
-References: <1480348229-25672-1-git-send-email-jbrunet@baylibre.com>
- <049b1efc-3bad-92e0-45ef-0563dc5d81de@gmail.com>
- <20170105232508.GU14217@n2100.armlinux.org.uk>
- <1483697496.28003.40.camel@baylibre.com>
- <20170106114226.GX14217@n2100.armlinux.org.uk>
- <1483710621.28003.74.camel@baylibre.com>
-Message-ID: <20170106150534.GF14217@n2100.armlinux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 6 Jan 2017 15:16:24 +0000
+Subject: [RFC PATCH 1/7] arm64: Use physical counter for in-kernel reads
+In-Reply-To: <20170106105301.GB27758@cbox>
+References: <20161210204712.21830-1-christoffer.dall@linaro.org>
+ <20161210204712.21830-2-christoffer.dall@linaro.org>
+ <5e820613-f9f3-0035-b145-0e22e9bcfeca@arm.com> <20170106100049.GB21089@cbox>
+ <89b4c1c1-3c6a-b7a1-cbcb-93a64812ebff@arm.com> <20170106105301.GB27758@cbox>
+Message-ID: <00f4cdb2-83f1-5a9d-3320-7cbdac20466d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(quick reply...)
-
-On Fri, Jan 06, 2017 at 02:50:21PM +0100, Jerome Brunet wrote:
-> So I'm not sure I understand, are you against EEE integration in phylib
-> entirely, or specifically against the test I added in set_eee to filter
-> out broken modes ?
-
-I'm happy to see EEE integrated into phylib, but I think the current
-implementation is very buggy and needs a rewrite.
-
-> > BTW, one of the problems (not caused by your patch) is that changing
-> > the EEE advertisment does not (on all PHY drivers) cause the link to
-> > be renegotiated - there's no call to phy_start_aneg() when the advert
-> > changes, and even if there was, there's no guarantee that
-> > phy_start_aneg() will even set the AN restart bit in the control
-> > register.
-> > 
-> > However, given that you're hooking into the set_eee function, I'm not
-> > sure why you placed your EEE advertisment thing into config_aneg() -
-> > isn't it more an initialisation thing (so should be in
-> > config_init()?)
+On 06/01/17 10:53, Christoffer Dall wrote:
+> On Fri, Jan 06, 2017 at 10:38:49AM +0000, Marc Zyngier wrote:
+>> On 06/01/17 10:00, Christoffer Dall wrote:
+>>> Hi Marc,
+>>>
+>>> On Thu, Jan 05, 2017 at 06:11:14PM +0000, Marc Zyngier wrote:
+>>>> [adding the arm64 maintainers, plus Mark as arch timer maintainer]
+>>>
+>>> Right, sorry, I should have done that already.
+>>>
+>>>>
+>>>> On 10/12/16 20:47, Christoffer Dall wrote:
+>>>>> Using the physical counter allows KVM to retain the offset between the
+>>>>> virtual and physical counter as long as it is actively running a VCPU.
+>>>>>
+>>>>> As soon as a VCPU is released, another thread is scheduled or we start
+>>>>> running userspace applications, we reset the offset to 0, so that VDSO
+>>>>> operations can still read the virtual counter and get the same view of
+>>>>> time as the kernel.
+>>>>>
+>>>>> This opens up potential improvements for KVM performance.
+>>>>>
+>>>>> VHE kernels or kernels using the virtual timer are unaffected by this.
+>>>>>
+>>>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>>>> ---
+>>>>>  arch/arm64/include/asm/arch_timer.h  | 6 ++++--
+>>>>>  drivers/clocksource/arm_arch_timer.c | 2 +-
+>>>>>  2 files changed, 5 insertions(+), 3 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+>>>>> index eaa5bbe..cec2549 100644
+>>>>> --- a/arch/arm64/include/asm/arch_timer.h
+>>>>> +++ b/arch/arm64/include/asm/arch_timer.h
+>>>>> @@ -139,11 +139,13 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
+>>>>>  
+>>>>>  static inline u64 arch_counter_get_cntpct(void)
+>>>>>  {
+>>>>> +	u64 cval;
+>>>>>  	/*
+>>>>>  	 * AArch64 kernel and user space mandate the use of CNTVCT.
+>>>>>  	 */
+>>>>> -	BUG();
+>>>>> -	return 0;
+>>>>> +	isb();
+>>>>> +	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
+>>>>> +	return cval;
+>>>>>  }
+>>>>>  
+>>>>>  static inline u64 arch_counter_get_cntvct(void)
+>>>>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>>>>> index 73c487d..a5b0789 100644
+>>>>> --- a/drivers/clocksource/arm_arch_timer.c
+>>>>> +++ b/drivers/clocksource/arm_arch_timer.c
+>>>>> @@ -597,7 +597,7 @@ static void __init arch_counter_register(unsigned type)
+>>>>>  
+>>>>>  	/* Register the CP15 based counter if we have one */
+>>>>>  	if (type & ARCH_CP15_TIMER) {
+>>>>> -		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_uses_ppi == VIRT_PPI)
+>>>>> +		if (arch_timer_uses_ppi == VIRT_PPI || is_kernel_in_hyp_mode())
+>>>>
+>>>> Why do we have this is_kernel_in_hyp_mode clause? I can't think of any
+>>>> reason for a VHE kernel to use the virtual counter at all...
+>>>>
+>>>
+>>> Good question.  I think I just didn't want to change behavior from the
+>>> existing functionality mre than necessary.
+>>>
+>>> Note that on a VHE kernel this will be the EL2 virtual counter, not the
+>>> EL1 virtual counter, due to the register redirection.  Are the virtual
+>>> and physical EL2 counters always equivalent on a VHE system?
+>>
+>> Yes, they are. CNTVOFF_EL2 is ignored in that case, and you get an extra
+>> interrupt for the new EL2 virtual timer as well.
+>>
 > 
-> What I change is what the PHY advertise, so it seems logical to do it
-> where "genphy_config_advert" was called. Just taking the existing code
-> as an example
+> ok, in that case I suppose I can just check for arch_timer_uses_ppi ==
+> VIRT_PPI and be done with it.
 
-You need to adjust the adverisment in two places:
+I wonder what we should do for get_cycles(), which is hardwired to the
+virtual counter at the moment. If we decide to use the physical counter
+on systems identified as hosts, we may have to revise this as well (I
+feel the need for an alternative... ;-).
 
-1. On initialisation, when you need to change the default value.
-2. Whenever the user requests a different EEE advertisment.
+Thanks,
 
-You don't need to do it each time config_aneg() is called - nothing's
-going to change the EEE advertisment in that path.  Hence, to check
-it each and every time seems like a waste of CPU cycles.
-
-However, there's another path that needs to be considered, which the
-current EEE code fails to do, and that is the resume path.  Nothing
-at present saves and restores the EEE settings, they are completely
-lost if the PHY is powered down.  This is just another symptom of the
-current poor quality EEE implementation in phylib, and another reason
-why I say above that the EEE code is in need of a rewrite... which is
-something I will be looking at.
-
-If the EEE settings are properly saved and restored over suspend/
-resume, then the previously programmed EEE advertisment would also
-be restored.
-
+	M.
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Jazz is not dead. It just smells funny...
