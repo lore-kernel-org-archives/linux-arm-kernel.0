@@ -1,38 +1,38 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 7 Jan 2017 02:04:46 +0800
-Subject: [PATCH v2 5/5] ARM: dts: Add LEGO MINDSTORMS EV3 dts
-In-Reply-To: <1483677228-2325-6-git-send-email-david@lechnology.com>
-Message-ID: <201701070216.EVasnzUW%fengguang.wu@intel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 6 Jan 2017 18:05:22 +0000
+Subject: [GIT PULL] arm64 fixes for 4.10-rc3
+Message-ID: <20170106180519.GA4700@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi Linus,
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.10-rc2 next-20170106]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Please pull the arm64 fixes below. Thanks.
 
-url:    https://github.com/0day-ci/linux/commits/David-Lechner/Support-for-LEGO-MINDSTORMS-EV3/20170107-002649
-config: arm-at91_dt_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
 
-All errors (new ones prefixed by >>):
+  Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
 
->> Error: arch/arm/boot/dts/da850-lego-ev3.dts:378.1-6 Label or path usb1 not found
-   FATAL ERROR: Syntax error parsing input tree
+are available in the git repository at:
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 22125 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170107/22479587/attachment-0001.gz>
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+
+for you to fetch changes up to 9d84fb27fa135c99c9fe3de33628774a336a70a8:
+
+  arm64: restore get_current() optimisation (2017-01-04 16:26:18 +0000)
+
+----------------------------------------------------------------
+- Re-introduce the arm64 get_current() optimisation
+- KERN_CONT fallout fix in show_pte()
+
+----------------------------------------------------------------
+Mark Rutland (2):
+      arm64: mm: fix show_pte KERN_CONT fallout
+      arm64: restore get_current() optimisation
+
+ arch/arm64/include/asm/current.h | 10 +++++++++-
+ arch/arm64/mm/fault.c            |  8 ++++----
+ 2 files changed, 13 insertions(+), 5 deletions(-)
+
+-- 
+Catalin
