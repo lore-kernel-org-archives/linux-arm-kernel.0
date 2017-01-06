@@ -1,65 +1,82 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:18:21 +0100
-Subject: [PATCH 12/25] ARM: dts: r8a7779: Use R-Car Gen 1 fallback binding for
- i2c nodes
-In-Reply-To: <cover.1483700969.git.horms+renesas@verge.net.au>
-References: <cover.1483700969.git.horms+renesas@verge.net.au>
-Message-ID: <137d27f10f638781d5487b44302c2a2ee5d12655.1483700969.git.horms+renesas@verge.net.au>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 6 Jan 2017 11:21:25 +0000
+Subject: [PATCH] ARM: hw_breakpoint: blacklist Scorpion CPUs
+In-Reply-To: <1483637556-3974-1-git-send-email-mark.rutland@arm.com>
+References: <1483637556-3974-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170106112125.GB15333@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added R-Car Gen 1 fallback binding for i2c nodes in
-DT for r8a7779 SoC.
+On Thu, Jan 05, 2017 at 05:32:36PM +0000, Mark Rutland wrote:
+> On APQ8060, the kernel crashes in arch_hw_breakpoint_init, taking an
+> undefined instruction trap within write_wb_reg. This is because Scorpion
+> CPUs erroneously appear to set DBGPRSR.SPD when WFI is issued, even if
+> the core is not powered down. When DBGPRSR.SPD is set, breakpoint and
+> watchpoint registers are treated as undefined.
+> 
+> It's possible to trigger similar crashes later on from userspace, by
+> requesting the kernel to install a breakpoint or watchpoint, as we can
+> go idle at any point between the reset of the debug registers and their
+> later use. This has always been the case.
+> 
+> Given that this has always been broken, no-one has complained until now,
+> and there is no clear workaround, disable hardware breakpoints and
+> watchpoints on Scorpion to avoid these issues.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Reported-by: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: stable at vger.kernel.org
+> ---
+>  arch/arm/include/asm/cputype.h  |  3 +++
+>  arch/arm/kernel/hw_breakpoint.c | 16 ++++++++++++++++
+>  2 files changed, 19 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+> index 522b5fe..b62eaeb 100644
+> --- a/arch/arm/include/asm/cputype.h
+> +++ b/arch/arm/include/asm/cputype.h
+> @@ -94,6 +94,9 @@
+>  #define ARM_CPU_XSCALE_ARCH_V2		0x4000
+>  #define ARM_CPU_XSCALE_ARCH_V3		0x6000
+>  
+> +/* Qualcomm implemented cores */
+> +#define ARM_CPU_PART_SCORPION		0x510002d0
+> +
+>  extern unsigned int processor_id;
+>  
+>  #ifdef CONFIG_CPU_CP15
+> diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+> index 188180b..5d68ff9 100644
+> --- a/arch/arm/kernel/hw_breakpoint.c
+> +++ b/arch/arm/kernel/hw_breakpoint.c
+> @@ -1063,6 +1063,22 @@ static int __init arch_hw_breakpoint_init(void)
+>  		return 0;
+>  	}
+>  
+> +	/*
+> +	 * Scorpion CPUs (at least those in APQ8060) seem to set DBGPRSR.SPD
+> +	 * whenever a WFI is issued, even if the core is not powered down, in
+> +	 * violation of the architecture.  When DBGPRSR.SPD is set, accesses to
+> +	 * breakpoint and watchpoint registers are treated as undefined, so
+> +	 * this results in boot time and runtime failures when these are
+> +	 * accessed and we unexpectedly take a trap.
+> +	 *
+> +	 * It's not clear if/how this can be worked around, so we blacklist
+> +	 * Scorpion CPUs to avoid these issues.
+> +	*/
+> +	if (read_cpuid_part() == ARM_CPU_PART_SCORPION) {
+> +		pr_info("Scorpion CPU detected. Breakpoints and watchpoints disabled\n");
 
-This has no run-time effect for the current driver as the initialisation
-sequence is the same for the SoC-specific binding for r8a7779 and the
-fallback binding for R-Car Gen 1.
+nit: we're disabling *hardware* breakpoints and watchpoints, so it's worth
+mentioning that in the print.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r8a7779.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+With that:
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index 55a7c1e37c57..f47a0edc26d4 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -173,7 +173,7 @@
- 	i2c0: i2c at ffc70000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7779";
-+		compatible = "renesas,i2c-r8a7779", "renesas,rcar-gen1-i2c";
- 		reg = <0xffc70000 0x1000>;
- 		interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7779_CLK_I2C0>;
-@@ -184,7 +184,7 @@
- 	i2c1: i2c at ffc71000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7779";
-+		compatible = "renesas,i2c-r8a7779", "renesas,rcar-gen1-i2c";
- 		reg = <0xffc71000 0x1000>;
- 		interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7779_CLK_I2C1>;
-@@ -195,7 +195,7 @@
- 	i2c2: i2c at ffc72000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7779";
-+		compatible = "renesas,i2c-r8a7779", "renesas,rcar-gen1-i2c";
- 		reg = <0xffc72000 0x1000>;
- 		interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7779_CLK_I2C2>;
-@@ -206,7 +206,7 @@
- 	i2c3: i2c at ffc73000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7779";
-+		compatible = "renesas,i2c-r8a7779", "renesas,rcar-gen1-i2c";
- 		reg = <0xffc73000 0x1000>;
- 		interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7779_CLK_I2C3>;
--- 
-2.7.0.rc3.207.g0ac5344
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Please put this into Russell's patch system.
+
+Will
