@@ -1,294 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 6 Jan 2017 09:42:12 +0000
-Subject: [PATCH v5 13/17] irqdomain: irq_domain_check_msi_remap
-In-Reply-To: <AM5PR0401MB2545B4A50ABE17B27C50B3099A630@AM5PR0401MB2545.eurprd04.prod.outlook.com>
-References: <1483536746-2725-1-git-send-email-eric.auger@redhat.com>
- <1483536746-2725-14-git-send-email-eric.auger@redhat.com>
- <ecb7ddf6-074f-50e4-6402-d59ceb1edd1d@arm.com>
- <df8e7fdb-4048-3169-c758-c2a64119a321@redhat.com>
- <c9c4c159-60ea-8501-5dc2-17bbb24ddfab@arm.com>
- <92fcb464-3364-c432-29d8-1c2ce4a5f110@redhat.com>
- <f6096747-5943-520a-2d16-de5650292ff3@arm.com>
- <1e881510-bc18-ae97-ec2f-feadcba54150@redhat.com>
- <eca92fdb-9d90-4d4b-baa5-2f4109ee1961@arm.com>
- <a574e969-b46d-94fb-e4c2-646a37b17122@redhat.com>
- <AM5PR0401MB2545B4A50ABE17B27C50B3099A630@AM5PR0401MB2545.eurprd04.prod.outlook.com>
-Message-ID: <cd246966-7b24-3b78-0660-3a63ea9b9fa2@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri,  6 Jan 2017 10:42:07 +0100
+Subject: [PATCH 3/3] mtd: nand: sunxi: Improve sunxi_nfc_cmd_ctrl()
+In-Reply-To: <1483695727-17415-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1483695727-17415-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1483695727-17415-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/17 04:27, Bharat Bhushan wrote:
-> Hi Mark,
-> 
->> -----Original Message-----
->> From: Auger Eric [mailto:eric.auger at redhat.com]
->> Sent: Thursday, January 05, 2017 5:39 PM
->> To: Marc Zyngier <marc.zyngier@arm.com>; eric.auger.pro at gmail.com;
->> christoffer.dall at linaro.org; robin.murphy at arm.com;
->> alex.williamson at redhat.com; will.deacon at arm.com; joro at 8bytes.org;
->> tglx at linutronix.de; jason at lakedaemon.net; linux-arm-
->> kernel at lists.infradead.org
->> Cc: drjones at redhat.com; kvm at vger.kernel.org; punit.agrawal at arm.com;
->> linux-kernel at vger.kernel.org; geethasowjanya.akula at gmail.com; Diana
->> Madalina Craciun <diana.craciun@nxp.com>; iommu at lists.linux-
->> foundation.org; pranav.sawargaonkar at gmail.com; Bharat Bhushan
->> <bharat.bhushan@nxp.com>; shankerd at codeaurora.org;
->> gpkulkarni at gmail.com
->> Subject: Re: [PATCH v5 13/17] irqdomain: irq_domain_check_msi_remap
->>
->> Hi Marc,
->>
->> On 05/01/2017 12:57, Marc Zyngier wrote:
->>> On 05/01/17 11:29, Auger Eric wrote:
->>>> Hi Marc,
->>>>
->>>> On 05/01/2017 12:25, Marc Zyngier wrote:
->>>>> On 05/01/17 10:45, Auger Eric wrote:
->>>>>> Hi Marc,
->>>>>>
->>>>>> On 04/01/2017 16:27, Marc Zyngier wrote:
->>>>>>> On 04/01/17 14:11, Auger Eric wrote:
->>>>>>>> Hi Marc,
->>>>>>>>
->>>>>>>> On 04/01/2017 14:46, Marc Zyngier wrote:
->>>>>>>>> Hi Eric,
->>>>>>>>>
->>>>>>>>> On 04/01/17 13:32, Eric Auger wrote:
->>>>>>>>>> This new function checks whether all platform and PCI MSI
->>>>>>>>>> domains implement IRQ remapping. This is useful to understand
->>>>>>>>>> whether VFIO passthrough is safe with respect to interrupts.
->>>>>>>>>>
->>>>>>>>>> On ARM typically an MSI controller can sit downstream to the
->>>>>>>>>> IOMMU without preventing VFIO passthrough.
->>>>>>>>>> As such any assigned device can write into the MSI doorbell.
->>>>>>>>>> In case the MSI controller implements IRQ remapping, assigned
->>>>>>>>>> devices will not be able to trigger interrupts towards the
->>>>>>>>>> host. On the contrary, the assignment must be emphasized as
->>>>>>>>>> unsafe with respect to interrupts.
->>>>>>>>>>
->>>>>>>>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>>>>>>>>>
->>>>>>>>>> ---
->>>>>>>>>>
->>>>>>>>>> v4 -> v5:
->>>>>>>>>> - Handle DOMAIN_BUS_FSL_MC_MSI domains
->>>>>>>>>> - Check parents
->>>>>>>>>> ---
->>>>>>>>>>  include/linux/irqdomain.h |  1 +
->>>>>>>>>>  kernel/irq/irqdomain.c    | 41
->> +++++++++++++++++++++++++++++++++++++++++
->>>>>>>>>>  2 files changed, 42 insertions(+)
->>>>>>>>>>
->>>>>>>>>> diff --git a/include/linux/irqdomain.h
->>>>>>>>>> b/include/linux/irqdomain.h index ab017b2..281a40f 100644
->>>>>>>>>> --- a/include/linux/irqdomain.h
->>>>>>>>>> +++ b/include/linux/irqdomain.h
->>>>>>>>>> @@ -219,6 +219,7 @@ struct irq_domain
->> *irq_domain_add_legacy(struct device_node *of_node,
->>>>>>>>>>  					 void *host_data);
->>>>>>>>>>  extern struct irq_domain *irq_find_matching_fwspec(struct
->> irq_fwspec *fwspec,
->>>>>>>>>>  						   enum
->> irq_domain_bus_token bus_token);
->>>>>>>>>> +extern bool irq_domain_check_msi_remap(void);
->>>>>>>>>>  extern void irq_set_default_host(struct irq_domain *host);
->>>>>>>>>> extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
->>>>>>>>>>  				  irq_hw_number_t hwirq, int node,
->> diff --git
->>>>>>>>>> a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c index
->>>>>>>>>> 8c0a0ae..700caea 100644
->>>>>>>>>> --- a/kernel/irq/irqdomain.c
->>>>>>>>>> +++ b/kernel/irq/irqdomain.c
->>>>>>>>>> @@ -278,6 +278,47 @@ struct irq_domain
->>>>>>>>>> *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
->>>>>>>>>> EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
->>>>>>>>>>
->>>>>>>>>>  /**
->>>>>>>>>> + * irq_domain_is_msi_remap - Check if @domain or any parent
->>>>>>>>>> + * has MSI remapping support
->>>>>>>>>> + * @domain: domain pointer
->>>>>>>>>> + */
->>>>>>>>>> +static bool irq_domain_is_msi_remap(struct irq_domain
->> *domain)
->>>>>>>>>> +{
->>>>>>>>>> +	struct irq_domain *h = domain;
->>>>>>>>>> +
->>>>>>>>>> +	for (; h; h = h->parent) {
->>>>>>>>>> +		if (h->flags & IRQ_DOMAIN_FLAG_MSI_REMAP)
->>>>>>>>>> +			return true;
->>>>>>>>>> +	}
->>>>>>>>>> +	return false;
->>>>>>>>>> +}
->>>>>>>>>> +
->>>>>>>>>> +/**
->>>>>>>>>> + * irq_domain_check_msi_remap() - Checks whether all MSI
->>>>>>>>>> + * irq domains implement IRQ remapping  */ bool
->>>>>>>>>> +irq_domain_check_msi_remap(void) {
->>>>>>>>>> +	struct irq_domain *h;
->>>>>>>>>> +	bool ret = true;
->>>>>>>>>> +
->>>>>>>>>> +	mutex_lock(&irq_domain_mutex);
->>>>>>>>>> +	list_for_each_entry(h, &irq_domain_list, link) {
->>>>>>>>>> +		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
->>>>>>>>>> +		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI)
->> ||
->>>>>>>>>> +		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI))
->> &&
->>>>>>>>>> +		     !irq_domain_is_msi_remap(h)) {
->>>>>>>>>
->>>>>>>>> (h->bus_token & DOMAIN_BUS_PCI_MSI) and co looks quite
->> wrong.
->>>>>>>>> bus_token is not a bitmap, and DOMAIN_BUS_* not a single bit
->>>>>>>>> value (see enum irq_domain_bus_token). Surely this should read
->>>>>>>>> (h->bus_token == DOMAIN_BUS_PCI_MSI).
->>>>>>>> Oh I did not notice that. Thanks.
->>>>>>>>
->>>>>>>> Any other comments on the irqdomain side? Do you think the
->>>>>>>> current approach consisting in looking at those bus tokens and
->>>>>>>> their parents looks good?
->>>>>>>
->>>>>>> To be completely honest, I don't like it much, as having to
->>>>>>> enumerate all the bus types can come up with could become quite a
->>>>>>> burden in the long run. I'd rather be able to identify MSI capable
->>>>>>> domains by construction. I came up with the following approach (fully
->> untested):
->>>>>>>
->>>>>>> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
->>>>>>> index 281a40f..7779796 100644
->>>>>>> --- a/include/linux/irqdomain.h
->>>>>>> +++ b/include/linux/irqdomain.h
->>>>>>> @@ -183,8 +183,11 @@ enum {
->>>>>>>  	/* Irq domain is an IPI domain with single virq */
->>>>>>>  	IRQ_DOMAIN_FLAG_IPI_SINGLE	= (1 << 3),
->>>>>>>
->>>>>>> +	/* Irq domain implements MSIs */
->>>>>>> +	IRQ_DOMAIN_FLAG_MSI		= (1 << 4),
->>>>>>> +
->>>>>>>  	/* Irq domain is MSI remapping capable */
->>>>>>> -	IRQ_DOMAIN_FLAG_MSI_REMAP	= (1 << 4),
->>>>>>> +	IRQ_DOMAIN_FLAG_MSI_REMAP	= (1 << 5),
->>>>>>>
->>>>>>>  	/*
->>>>>>>  	 * Flags starting from IRQ_DOMAIN_FLAG_NONCORE are reserved
->> @@
->>>>>>> -450,6 +453,11 @@ static inline bool
->>>>>>> irq_domain_is_ipi_single(struct irq_domain *domain)  {
->>>>>>>  	return domain->flags & IRQ_DOMAIN_FLAG_IPI_SINGLE;  }
->>>>>>> +
->>>>>>> +static inline bool irq_domain_is_msi(struct irq_domain *domain) {
->>>>>>> +	return domain->flags & IRQ_DOMAIN_FLAG_MSI; }
->>>>>>>  #else	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
->>>>>>>  static inline void irq_domain_activate_irq(struct irq_data *data)
->>>>>>> { }  static inline void irq_domain_deactivate_irq(struct irq_data
->>>>>>> *data) { } @@ -481,6 +489,11 @@ static inline bool
->>>>>>> irq_domain_is_ipi_single(struct irq_domain *domain)  {
->>>>>>>  	return false;
->>>>>>>  }
->>>>>>> +
->>>>>>> +static inline bool irq_domain_is_msi(struct irq_domain *domain) {
->>>>>>> +	return false;
->>>>>>> +}
->>>>>>>  #endif	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
->>>>>>>
->>>>>>>  #else /* CONFIG_IRQ_DOMAIN */
->>>>>>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c index
->>>>>>> 700caea..33b6921 100644
->>>>>>> --- a/kernel/irq/irqdomain.c
->>>>>>> +++ b/kernel/irq/irqdomain.c
->>>>>>> @@ -304,10 +304,7 @@ bool irq_domain_check_msi_remap(void)
->>>>>>>
->>>>>>>  	mutex_lock(&irq_domain_mutex);
->>>>>>>  	list_for_each_entry(h, &irq_domain_list, link) {
->>>>>>> -		if (((h->bus_token & DOMAIN_BUS_PCI_MSI) ||
->>>>>>> -		     (h->bus_token & DOMAIN_BUS_PLATFORM_MSI)
->> ||
->>>>>>> -		     (h->bus_token & DOMAIN_BUS_FSL_MC_MSI))
->> &&
->>>>>>> -		     !irq_domain_is_msi_remap(h)) {
->>>>>>> +		if (irq_domain_is_msi(h) &&
->> !irq_domain_is_msi_remap(h)) {
->>>>>>>  			ret = false;
->>>>>>>  			goto out;
->>>>>>>  		}
->>>>>>> diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c index
->>>>>>> ee23006..b637263 100644
->>>>>>> --- a/kernel/irq/msi.c
->>>>>>> +++ b/kernel/irq/msi.c
->>>>>>> @@ -270,7 +270,7 @@ struct irq_domain
->> *msi_create_irq_domain(struct fwnode_handle *fwnode,
->>>>>>>  	if (info->flags & MSI_FLAG_USE_DEF_CHIP_OPS)
->>>>>>>  		msi_domain_update_chip_ops(info);
->>>>>>>
->>>>>>> -	return irq_domain_create_hierarchy(parent, 0, 0, fwnode,
->>>>>>> +	return irq_domain_create_hierarchy(parent,
->> IRQ_DOMAIN_FLAG_MSI,
->>>>>>> +0, fwnode,
->>>>>>>  					   &msi_domain_ops, info);
->>>>>>>  }
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> Thoughts?
->>>>>>
->>>>>> Don't we need to set the IRQ_DOMAIN_FLAG_MSI flag in
->>>>>> platform_msi_create_device_domain too (drivers/base/platform-
->> msi.c)?
->>>> was mentioning platform_msi_create_*device*_domain.
->>>> it calls irq_domain_create_hierarchy and looks to be MSI irq domain
->>>> related. But I don't have a full understanding of the whole irq
->>>> domain hierarchy.
->>>
->>> Ah, sorry - I blame the ARM coffee.
->>>
->>> This function builds a domain for a single device on top of the MSI
->>> domain that has been already created (see the dev->msi_domain passed
->>> to irq_domain_create_hierarchy). The structure looks like this:
->>>
->>> device-domain -> platform MSI domain -> HW MSI domain -> whatever
->>>
->>> So what we're *really* interested in is the platform MSI domain, which
->>> is going to carry the IRQ_DOMAIN_FLAG_MSI flag. The device-domain only
->>> describes a portion of it, and can safely be ignored.
->>>
->>> In the end, what matters for this patch is that we can prove that from
->>> any domain carrying the IRQ_DOMAIN_FLAG_MSI flag, we can find a
->> domain
->>> carrying the IRQ_DOMAIN_FLAG_MSI_REMAP flag. If that property holds,
->>> we're safe. Otherwise, we disable the Guest MSI feature.
->>>
->>> Does it make sense?
->> Yes it makes sense. Thank you for the explanation!
-> 
-> If I understood correctly then the domain hierarchy is 
-> 
->  -> "gic-irq-domain"
-> 	 -> "gic-its-irq-domain"
-> 		-> "platform-msi-domain"
-> 		-> "pci-msi-domain"
-> 		->  "fsl-mc-msi-domain"
-> 
-> "gic-its-irq-domain" carries IRQ_DOMAIN_FLAG_MSI_REMAP
-> 
-> So we need to look for the IRQ_DOMAIN_FLAG_MSI_REMAP flag in
-> "gic-its-irq-domain" when doing safety check for
-> "platform/pci/fsl-mc"-msi-irqdomain,  is this what you mentioned?
-> 
-> Can we can pass this flags from "gic-its-irq-domain" to
-> "platform/pci/fsl-mc"-msi-irqdomain during domain creation?
+We only need to call sunxi_nfc_wait_cmd_fifo_empty() if we want to send
+a new command. Move the sunxi_nfc_wait_cmd_fifo_empty() call to right
+place to avoid extra register reads.
 
-No, that's a very bad idea. It is not that domain that provides the
-isolation, as it merely provides a software abstraction for a bus. On
-the other hand, the underlying domain represents the HW that does
-provide such isolation. Only that domain can claim that isolation will
-be enforced.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/mtd/nand/sunxi_nand.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-So we only set the REMAP flag on the ITS domain, and place the MSI flag
-on the top level MSI domains. And if we can prove that *all* MSI domains
-have a parent implementing remapping, we're safe. Any other
-configuration is unsafe.
-
-Thanks,
-
-	M.
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index 76449f79d4c5..0eeeb8b889ea 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -604,10 +604,6 @@ static void sunxi_nfc_cmd_ctrl(struct mtd_info *mtd, int dat,
+ 	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
+ 	int ret;
+ 
+-	ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
+-	if (ret)
+-		return;
+-
+ 	if (dat == NAND_CMD_NONE && (ctrl & NAND_NCE) &&
+ 	    !(ctrl & (NAND_CLE | NAND_ALE))) {
+ 		u32 cmd = 0;
+@@ -637,6 +633,10 @@ static void sunxi_nfc_cmd_ctrl(struct mtd_info *mtd, int dat,
+ 			writel(sunxi_nand->addr[1],
+ 			       nfc->regs + NFC_REG_ADDR_HIGH);
+ 
++		ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
++		if (ret)
++			return;
++
+ 		writel(cmd, nfc->regs + NFC_REG_CMD);
+ 		sunxi_nand->addr[0] = 0;
+ 		sunxi_nand->addr[1] = 0;
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
