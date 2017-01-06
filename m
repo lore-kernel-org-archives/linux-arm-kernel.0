@@ -1,34 +1,32 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:18:09 +0100
-Subject: [PATCH 1/4] ARM: shmobile: defconfig: Enable CONFIG_VIDEO_ADV7604
+Date: Fri,  6 Jan 2017 12:18:11 +0100
+Subject: [PATCH 3/4] ARM: shmobile: defconfig: Enable r8a774[35] SoCs
 In-Reply-To: <cover.1483701293.git.horms+renesas@verge.net.au>
 References: <cover.1483701293.git.horms+renesas@verge.net.au>
-Message-ID: <1682a9c5694d228041dc7ff59f49427c83920675.1483701293.git.horms+renesas@verge.net.au>
+Message-ID: <d234e29dae04b224a63e39bc29938fa77819b3f1.1483701293.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Enable recently added r8a7743 (RZ/G1M) and r8a7745 (RZ/G1E) SoCs.
 
-The adv7612 is used on Gen2 boards (Lager, Koelsch and Gose) for HDMI
-input. Enable support for this chip in shmobile_defconfig.
-
-Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/shmobile_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 1b0f8ae36fb3..98e9ce66740d 100644
+index b66e17aec058..760688aa5c79 100644
 --- a/arch/arm/configs/shmobile_defconfig
 +++ b/arch/arm/configs/shmobile_defconfig
-@@ -145,6 +145,7 @@ CONFIG_VIDEO_RENESAS_JPU=y
- CONFIG_VIDEO_RENESAS_VSP1=y
- # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
- CONFIG_VIDEO_ADV7180=y
-+CONFIG_VIDEO_ADV7604=y
- CONFIG_VIDEO_ML86V7667=y
- CONFIG_DRM=y
- CONFIG_DRM_I2C_ADV7511=y
+@@ -14,6 +14,8 @@ CONFIG_ARCH_EMEV2=y
+ CONFIG_ARCH_R7S72100=y
+ CONFIG_ARCH_R8A73A4=y
+ CONFIG_ARCH_R8A7740=y
++CONFIG_ARCH_R8A7743=y
++CONFIG_ARCH_R8A7745=y
+ CONFIG_ARCH_R8A7778=y
+ CONFIG_ARCH_R8A7779=y
+ CONFIG_ARCH_R8A7790=y
 -- 
 2.7.0.rc3.207.g0ac5344
