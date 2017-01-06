@@ -1,60 +1,117 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 6 Jan 2017 14:36:19 +0000
-Subject: [PATCH 16/18] arm64: ptrace: handle ptrace_request differently
- for aarch32 and ilp32
-In-Reply-To: <20170105204003.GA7437@yury-N73SV>
-References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
- <20161206062508.GA17835@yury-N73SV>
- <20161207165913.GD31779@e104818-lin.cambridge.arm.com>
- <3703608.GKr1zzErMk@wuerfel> <20170105204003.GA7437@yury-N73SV>
-Message-ID: <20170106143619.GC12863@e104818-lin.cambridge.arm.com>
+From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
+Date: Fri,  6 Jan 2017 17:38:35 +0300
+Subject: [PATCH] arm64: do not set dma masks that device connection can't
+ handle
+In-Reply-To: <9a03c05d-ad4c-0547-d1fe-01edb8b082d6@cogentembedded.com>
+References: <9a03c05d-ad4c-0547-d1fe-01edb8b082d6@cogentembedded.com>
+Message-ID: <1483713515-1945-1-git-send-email-nikita.yoush@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 02:10:03AM +0530, Yury Norov wrote:
-> On Wed, Dec 07, 2016 at 09:40:13PM +0100, Arnd Bergmann wrote:
-> > On Wednesday, December 7, 2016 4:59:13 PM CET Catalin Marinas wrote:
-> > > On Tue, Dec 06, 2016 at 11:55:08AM +0530, Yury Norov wrote:
-> > > > On Mon, Dec 05, 2016 at 04:34:23PM +0000, Catalin Marinas wrote:
-> > > > > On Fri, Oct 21, 2016 at 11:33:15PM +0300, Yury Norov wrote:
-> > > > > > New aarch32 ptrace syscall handler is introduced to avoid run-time
-> > > > > > detection of the task type.
-> > > > > 
-> > > > > What's wrong with the run-time detection? If it's just to avoid a
-> > > > > negligible overhead, I would rather keep the code simpler by avoiding
-> > > > > duplicating the generic compat_sys_ptrace().
-> > > > 
-> > > > Nothing wrong. This is how Arnd asked me to do. You already asked this
-> > > > question: http://lkml.iu.edu/hypermail/linux/kernel/1604.3/00930.html
-> > > 
-> > > Hmm, I completely forgot about this ;). There is still an advantage to
-> > > doing run-time checking if we avoid touching core code (less acks to
-> > > gather and less code duplication).
-> > > 
-> > > Let's see what Arnd says but the initial patch looked simpler.
-> > 
-> > I don't currently have either version of the patch in my inbox
-> > (the archive is on a different machine), but in general I'd still
-> > think it's best to avoid the runtime check for aarch64-ilp32
-> > altogether. I'd have to look at the overall kernel source to
-> > see if it's worth avoiding one or two instances though, or
-> > if there are an overwhelming number of other checks that we
-> > can't avoid at all.
-> > 
-> > Regarding ptrace, I notice that arch/tile doesn't even use
-> > the compat entry point for its ilp32 user space on 64-bit
-> > kernels, it just calls the regular 64-bit one. Would that
-> > help here?
-> 
-> ILP32 tasks has unique context that is not like aarch64 or aarch32,
-> so we have to have unique ptrace handler. I prepared the patch for
-> ptrace with runtime ABI detection, as Catalin said, see there:
-> https://github.com/norov/linux/commit/1f66dc22a4450b192e83458f2c3cc0e79f53e670
-> 
-> If it's OK, I'd like to update submission.
+It is possible that device is capable of 64-bit DMA addresses, and
+device driver tries to set wide DMA mask, but bridge or bus used to
+connect device to the system can't handle wide addresses.
 
-This looks better to me (and even better if you no longer need to touch
-the generic ptrace code).
+With swiotlb, memory above 4G still can be used by drivers for streaming
+DMA, but *dev->mask and dev->dma_coherent_mask must still keep values
+that hardware handles physically.
 
+This patch enforces that. Based on original version by
+Arnd Bergmann <arnd@arndb.de>, extended with coherent mask hadnling.
+
+Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm64/Kconfig              |  3 +++
+ arch/arm64/include/asm/device.h |  1 +
+ arch/arm64/mm/dma-mapping.c     | 40 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 44 insertions(+)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1117421..afb2c08 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -216,6 +216,9 @@ config NEED_DMA_MAP_STATE
+ config NEED_SG_DMA_LENGTH
+ 	def_bool y
+ 
++config ARCH_HAS_DMA_SET_COHERENT_MASK
++	def_bool y
++
+ config SMP
+ 	def_bool y
+ 
+diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
+index 243ef25..a57e7bb 100644
+--- a/arch/arm64/include/asm/device.h
++++ b/arch/arm64/include/asm/device.h
+@@ -22,6 +22,7 @@ struct dev_archdata {
+ 	void *iommu;			/* private IOMMU data */
+ #endif
+ 	bool dma_coherent;
++	u64 parent_dma_mask;
+ };
+ 
+ struct pdev_archdata {
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 290a84f..be3632e 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -352,6 +352,31 @@ static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
+ 	return 1;
+ }
+ 
++static int __swiotlb_set_dma_mask(struct device *dev, u64 mask)
++{
++	/* device is not DMA capable */
++	if (!dev->dma_mask)
++		return -EIO;
++
++	/* mask is below swiotlb bounce buffer, so fail */
++	if (!swiotlb_dma_supported(dev, mask))
++		return -EIO;
++
++	/*
++	 * because of the swiotlb, we can return success for
++	 * larger masks, but need to ensure that bounce buffers
++	 * are used above parent_dma_mask, so set that as
++	 * the effective mask.
++	 */
++	if (mask > dev->archdata.parent_dma_mask)
++		mask = dev->archdata.parent_dma_mask;
++
++
++	*dev->dma_mask = mask;
++
++	return 0;
++}
++
+ static struct dma_map_ops swiotlb_dma_ops = {
+ 	.alloc = __dma_alloc,
+ 	.free = __dma_free,
+@@ -367,8 +392,23 @@ static struct dma_map_ops swiotlb_dma_ops = {
+ 	.sync_sg_for_device = __swiotlb_sync_sg_for_device,
+ 	.dma_supported = __swiotlb_dma_supported,
+ 	.mapping_error = swiotlb_dma_mapping_error,
++	.set_dma_mask = __swiotlb_set_dma_mask,
+ };
+ 
++int dma_set_coherent_mask(struct device *dev, u64 mask)
++{
++	if (!dma_supported(dev, mask))
++		return -EIO;
++
++	if (get_dma_ops(dev) == &swiotlb_dma_ops &&
++	    mask > dev->archdata.parent_dma_mask)
++		mask = dev->archdata.parent_dma_mask;
++
++	dev->coherent_dma_mask = mask;
++	return 0;
++}
++EXPORT_SYMBOL(dma_set_coherent_mask);
++
+ static int __init atomic_pool_init(void)
+ {
+ 	pgprot_t prot = __pgprot(PROT_NORMAL_NC);
 -- 
-Catalin
+2.1.4
