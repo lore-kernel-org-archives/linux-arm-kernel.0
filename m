@@ -1,59 +1,46 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 6 Jan 2017 10:05:17 +0100
-Subject: [PATCH 1/3] ARM: at91: flush the L2 cache before entering cpu idle
-In-Reply-To: <20170106065947.30631-2-wenyou.yang@atmel.com>
-References: <20170106065947.30631-1-wenyou.yang@atmel.com>
- <20170106065947.30631-2-wenyou.yang@atmel.com>
-Message-ID: <20170106090517.txcoukisnx43cfqq@piout.net>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 06 Jan 2017 18:06:43 +0900
+Subject: [PATCH v3 1/5] arm64: dts: exynos5433: TM2/E: Fix wrong
+ information of ldo23 and ldo25
+In-Reply-To: <20170106085026.5pfwyxt2qipzbjpy@kozik-lap>
+References: <1483675149-32598-1-git-send-email-jcsing.lee@samsung.com>
+ <CGME20170106035913epcas5p20336406863f1029ccf614520f366ddcf@epcas5p2.samsung.com>
+ <1483675149-32598-2-git-send-email-jcsing.lee@samsung.com>
+ <20170106070539.wd3kfhi77pa5ekcy@kozik-lap> <586F4554.6020206@samsung.com>
+ <20170106085026.5pfwyxt2qipzbjpy@kozik-lap>
+Message-ID: <73639ec8-028a-56a2-0b47-3465974ec3f3@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 06/01/2017 at 14:59:45 +0800, Wenyou Yang wrote :
-> For the SoCs such as SAMA5D2 and SAMA5D4 which have L2 cache,
-> flush the L2 cache first before entering the cpu idle.
+On 2017? 01? 06? 17:50, Krzysztof Kozlowski wrote:
+> On Fri, Jan 06, 2017 at 04:20:52PM +0900, Chanwoo Choi wrote:
+>> On 2017? 01? 06? 16:05, Krzysztof Kozlowski wrote:
+>>> On Fri, Jan 06, 2017 at 12:59:05PM +0900, Jaechul Lee wrote:
+>>>> From: Chanwoo Choi <cw00.choi@samsung.com>
+>>>>
+>>>> This patch fixes the wrong information of ldo23 and ldo25 on both TM2 and TM2E.
+>>>
+>>> Please describe what is exactly wrong and how it affects the
+>>> system/user. This is going to the fixes so it needs a good explanation.
+>>
+>> When I posted the patch[1], I refer to the old schematic document of both TM2 and TM2E.
+>> [1] 01e5d2352152 ("arm64: dts: exynos: Add dts file for Exynos5433-based TM2 board")
+>>
+>> After checking the highest version of schematic document of both TM2 and TM2E,
+>> there is no difference of ldo23/ldo25 on both TM2 and TM2E.
+>> - ldo23 is used on TM2/TM2E, but the name/max-microvolt are wrong. 
+>> - ldo25 isn't used on TM2/TM2E. (not connected)
+>>
+>> Because ldo23 and lod25 are not used on other device in Exynos5433 and TM2 board.
+>> this patch does not affect the operation to system/user.
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
-> 
->  arch/arm/mach-at91/pm.c       | 19 +++++++++++++++++++
->  drivers/memory/atmel-sdramc.c |  1 +
->  2 files changed, 20 insertions(+)
-> 
-> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-> index b4332b727e9c..1a60dede1a01 100644
-> --- a/arch/arm/mach-at91/pm.c
-> +++ b/arch/arm/mach-at91/pm.c
-> @@ -289,6 +289,24 @@ static void at91_ddr_standby(void)
->  		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
->  }
->  
-> +static void at91_ddr_cache_standby(void)
-> +{
-> +	u32 saved_lpr;
-> +
-> +	flush_cache_all();
-> +	outer_disable();
-> +
-> +	saved_lpr = at91_ramc_read(0, AT91_DDRSDRC_LPR);
-> +	at91_ramc_write(0, AT91_DDRSDRC_LPR, (saved_lpr &
-> +			(~AT91_DDRSDRC_LPCB)) | AT91_DDRSDRC_LPCB_SELF_REFRESH);
-> +
-> +	cpu_do_idle();
-> +
-> +	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr);
-> +
-> +	outer_resume();
-> +}
-> +
+> If it does not affect anyone (including TM2/TM2E) then this do not have
+> to be a fix. Am I right?
 
-Seems good to me. Did you measure the added latency on sama5d3 if you
-add the cache operations in at91_ddr_standby instead of having a new
-function?
-
+This patch does not affect the TM2/TM2E's operation
+because ldo23/25 are not used on TM2/TM2E. Just fix the wrong information.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Best Regards,
+Chanwoo Choi
+S/W Center, Samsung Electronics
