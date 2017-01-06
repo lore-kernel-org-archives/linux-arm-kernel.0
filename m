@@ -1,110 +1,245 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 6 Jan 2017 18:32:58 +0000
-Subject: [RFC PATCH] vring: Force use of DMA API for ARM-based systems
-In-Reply-To: <0b9a1f70-58fe-69c2-87db-d7773cb6a68c@arm.com>
-References: <1482246864-16399-1-git-send-email-will.deacon@arm.com>
- <0b9a1f70-58fe-69c2-87db-d7773cb6a68c@arm.com>
-Message-ID: <cb98e455-bdee-19ab-8896-9123c6d12a26@arm.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Fri, 6 Jan 2017 10:34:56 -0800
+Subject: [PATCH v2 13/19] media: imx: Add IC subdev drivers
+In-Reply-To: <96684048-c5ad-3e64-0fbc-61dcaf184519@mentor.com>
+References: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483477049-19056-14-git-send-email-steve_longerbeam@mentor.com>
+ <96684048-c5ad-3e64-0fbc-61dcaf184519@mentor.com>
+Message-ID: <b5bd5807-2db4-8677-0891-11ad74c1de7f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/17 17:48, Jean-Philippe Brucker wrote:
-> Hi Will,
-> 
-> On 20/12/16 15:14, Will Deacon wrote:
->> Booting Linux on an ARM fastmodel containing an SMMU emulation results
->> in an unexpected I/O page fault from the legacy virtio-blk PCI device:
->>
->> [    1.211721] arm-smmu-v3 2b400000.smmu: event 0x10 received:
->> [    1.211800] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
->> [    1.211880] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
->> [    1.211959] arm-smmu-v3 2b400000.smmu:	0x00000008fa081002
->> [    1.212075] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
->> [    1.212155] arm-smmu-v3 2b400000.smmu: event 0x10 received:
->> [    1.212234] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
->> [    1.212314] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
->> [    1.212394] arm-smmu-v3 2b400000.smmu:	0x00000008fa081000
->> [    1.212471] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
->>
->> <system hangs failing to read partition table>
->>
->> This is because the virtio-blk is behind an SMMU, so we have consequently
->> swizzled its DMA ops and configured the SMMU to translate accesses. This
->> then requires the vring code to use the DMA API to establish translations,
->> otherwise all transactions will result in fatal faults and termination.
->>
->> Given that ARM-based systems only see an SMMU if one is really present
->> (the topology is all described by firmware tables such as device-tree or
->> IORT), then we can safely use the DMA API for all virtio devices.
-> 
-> There is a problem with the platform block device on that same model.
-> Since it's not behind the SMMU, the DMA ops fall back to swiotlb, which
-> limits the number of mappings.
-> 
-> It used to work with 4.9, but since 9491ae4 ("mm: don't cap request size
-> based on read-ahead setting") unlocked read-ahead, we quickly run into
-> the limit of swiotlb and panic:
-> 
-> [    5.382359] virtio-mmio 1c130000.virtio_block: swiotlb buffer is full
-> (sz: 491520 bytes)
-> [    5.382452] virtio-mmio 1c130000.virtio_block: DMA: Out of SW-IOMMU
-> space for 491520 bytes
-> [    5.382531] Kernel panic - not syncing: DMA: Random memory could be
-> DMA written
-> ...
-> [    5.383148] [<ffff0000083ad754>] swiotlb_map_page+0x194/0x1a0
-> [    5.383226] [<ffff000008096bb8>] __swiotlb_map_page+0x20/0x88
-> [    5.383320] [<ffff0000084bf738>] vring_map_one_sg.isra.1+0x70/0x88
-> [    5.383417] [<ffff0000084c04fc>] virtqueue_add_sgs+0x2ec/0x4e8
-> [    5.383505] [<ffff00000856d99c>] __virtblk_add_req+0x9c/0x1a8
-> ...
-> [    5.384449] [<ffff0000081829c4>] ondemand_readahead+0xfc/0x2b8
-> 
-> Commit 9491ae4 caps the read-ahead request to a limit set by the backing
-> device. For virtio-blk, it is infinite (as set by the call to
-> blk_queue_max_hw_sectors in virtblk_probe).
-> 
-> I'm not sure how to fix this. Setting an arbitrary sector limit in the
-> virtio-blk driver seems unfair to other users. Maybe we should check if
-> the device is behind a hardware IOMMU before using the DMA API?
 
-Hmm, this looks more like the virtio_block device simply has the wrong
-DMA mask to begin with. For virtio-pci we set the streaming DMA mask to
-64 bits - should a platform device not be similarly capable?
 
-Robin.
-
-> 
-> Thanks,
-> Jean-Philippe
-> 
->> Cc: Andy Lutomirski <luto@kernel.org>
->> Cc: Michael S. Tsirkin <mst@redhat.com>
->> Signed-off-by: Will Deacon <will.deacon@arm.com>
->> ---
->>  drivers/virtio/virtio_ring.c | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/drivers/virtio/virtio_ring.c b/drivers/virtio/virtio_ring.c
->> index ed9c9eeedfe5..06b91e29d1b7 100644
->> --- a/drivers/virtio/virtio_ring.c
->> +++ b/drivers/virtio/virtio_ring.c
->> @@ -159,6 +159,10 @@ static bool vring_use_dma_api(struct virtio_device *vdev)
->>  	if (xen_domain())
->>  		return true;
->>  
->> +	/* On ARM-based machines, the DMA ops will do the right thing */
->> +	if (IS_ENABLED(CONFIG_ARM) || IS_ENABLED(CONFIG_ARM64))
->> +		return true;
+On 01/04/2017 06:48 AM, Vladimir Zapolskiy wrote:
+> On 01/03/2017 10:57 PM, Steve Longerbeam wrote:
+>
 >> +
->>  	return false;
->>  }
->>  
+>> +	ret = ic_ops[priv->task_id]->init(priv);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	ret = v4l2_async_register_subdev(&priv->sd);
+>> +	if (ret)
+>> +		goto remove;
+>> +
+>> +	return 0;
+>> +remove:
+>> +	ic_ops[priv->task_id]->remove(priv);
+>> +	return ret;
+> if (ret)
+> 	ic_ops[priv->task_id]->remove(priv);
+>
+> return ret;
+>
+> as an alternative.
+
+done.
+
+>
+>
+> +
+> +static struct platform_driver imx_ic_driver = {
+> +	.probe = imx_ic_probe,
+> +	.remove = imx_ic_remove,
+> +	.id_table = imx_ic_ids,
+> +	.driver = {
+> +		.name = "imx-ipuv3-ic",
+> +		.owner = THIS_MODULE,
+> Please drop .owner assignment.
+
+done.
+
+>> diff --git a/drivers/staging/media/imx/imx-ic-pp.c b/drivers/staging/media/imx/imx-ic-pp.c
+>> new file mode 100644
+>> index 0000000..5ef0581
+>> --- /dev/null
+>> +++ b/drivers/staging/media/imx/imx-ic-pp.c
+>> @@ -0,0 +1,636 @@
+>> +/*
+>> + * V4L2 IC Post-Processor Subdev for Freescale i.MX5/6 SOC
+>> + *
+>> + * Copyright (c) 2014-2016 Mentor Graphics Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + */
+>> +#include <linux/module.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/fs.h>
+>> +#include <linux/timer.h>
+>> +#include <linux/sched.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/pinctrl/consumer.h>
+>> +#include <media/v4l2-device.h>
+>> +#include <media/v4l2-ioctl.h>
+>> +#include <media/videobuf2-dma-contig.h>
+>> +#include <media/v4l2-subdev.h>
+>> +#include <media/v4l2-of.h>
+>> +#include <media/v4l2-ctrls.h>
+> Please sort the list of headers alphabetically.
+
+done.
+
+>
 >>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+>> +
+>> +	priv->out_run = kzalloc(IMX_MEDIA_MAX_RING_BUFS *
+>> +				sizeof(*priv->out_run), GFP_KERNEL);
+>> +	if (!priv->out_run) {
+>> +		v4l2_err(&ic_priv->sd, "failed to alloc src ring runs\n");
+> In OOM situation the core will report it, probably you can drop the message.
+
+with a backtrace? I can't remember, if not I'd like to keep this.
+
+>> diff --git a/drivers/staging/media/imx/imx-ic-prpenc.c b/drivers/staging/media/imx/imx-ic-prpenc.c
+>> new file mode 100644
+>> index 0000000..e17216b
+>> --- /dev/null
+>> +++ b/drivers/staging/media/imx/imx-ic-prpenc.c
+>> @@ -0,0 +1,1037 @@
+>> +/*
+>> + * V4L2 Capture IC Encoder Subdev for Freescale i.MX5/6 SOC
+>> + *
+>> + * This subdevice handles capture of video frames from the CSI, which
+>> + * are routed directly to the Image Converter preprocess encode task,
+>> + * for resizing, colorspace conversion, and rotation.
+>> + *
+>> + * Copyright (c) 2012-2016 Mentor Graphics Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + */
+>> +#include <linux/module.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/fs.h>
+>> +#include <linux/timer.h>
+>> +#include <linux/sched.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/spinlock.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/pinctrl/consumer.h>
+>> +#include <media/v4l2-device.h>
+>> +#include <media/v4l2-ioctl.h>
+>> +#include <media/videobuf2-dma-contig.h>
+>> +#include <media/v4l2-subdev.h>
+>> +#include <media/v4l2-of.h>
+>> +#include <media/v4l2-ctrls.h>
+> Please sort the list of headers alphabetically.
+
+done.
+
+>
+>> +static irqreturn_t prpenc_eof_interrupt(int irq, void *dev_id)
+>> +{
+>> +	struct prpenc_priv *priv = dev_id;
+>> +	struct imx_media_dma_buf *done, *next;
+>> +	struct ipuv3_channel *channel;
+>> +	unsigned long flags;
+>> +
+>> +	spin_lock_irqsave(&priv->irqlock, flags);
+> Here spin_lock(&priv->irqlock) should be sufficient.
+
+done.
+
+>> +
+>> +	ret = media_entity_pads_init(&sd->entity, PRPENC_NUM_PADS, priv->pad);
+>> +	if (ret)
+>> +		goto free_ctrls;
+>> +
+>> +	return 0;
+>> +free_ctrls:
+>> +	v4l2_ctrl_handler_free(&priv->ctrl_hdlr);
+>> +	return ret;
+> if (ret)
+> 	v4l2_ctrl_handler_free(&priv->ctrl_hdlr);
+>
+> return ret;
+>
+> version is shorter.
+
+done.
+
+>
+> diff --git a/drivers/staging/media/imx/imx-ic-prpvf.c 
+> b/drivers/staging/media/imx/imx-ic-prpvf.c
+>> new file mode 100644
+>> index 0000000..53ce006
+>> --- /dev/null
+>> +++ b/drivers/staging/media/imx/imx-ic-prpvf.c
+>> @@ -0,0 +1,1180 @@
+>> +/*
+>> + * V4L2 IC Deinterlacer Subdev for Freescale i.MX5/6 SOC
+>> + *
+>> + * Copyright (c) 2014-2016 Mentor Graphics Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + */
+>> +#include <linux/module.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/fs.h>
+>> +#include <linux/timer.h>
+>> +#include <linux/sched.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/pinctrl/consumer.h>
+>> +#include <media/v4l2-device.h>
+>> +#include <media/v4l2-ioctl.h>
+>> +#include <media/videobuf2-dma-contig.h>
+>> +#include <media/v4l2-subdev.h>
+>> +#include <media/v4l2-of.h>
+>> +#include <media/v4l2-ctrls.h>
+> Please sort the list of headers alphabetically.
+
+done.
+
+>
+>> +/* prpvf_out_ch EOF interrupt (progressive frame ready) */
+>> +static irqreturn_t prpvf_out_eof_interrupt(int irq, void *dev_id)
+>> +{
+>> +	struct prpvf_priv *priv = dev_id;
+>> +	struct imx_media_dma_buf *done;
+>> +	unsigned long flags;
+>> +
+>> +	spin_lock_irqsave(&priv->irqlock, flags);
+>
+> Here spin_lock(&priv->irqlock) should be sufficient.
+
+done.
+
+>
+>> diff --git a/drivers/staging/media/imx/imx-ic.h b/drivers/staging/media/imx/imx-ic.h
+>> new file mode 100644
+>> index 0000000..9aed5f5
+>> --- /dev/null
+>> +++ b/drivers/staging/media/imx/imx-ic.h
+>> @@ -0,0 +1,36 @@
+>> +/*
+>> + * V4L2 Image Converter Subdev for Freescale i.MX5/6 SOC
+>> + *
+>> + * Copyright (c) 2016 Mentor Graphics Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + */
+>> +#ifndef _IMX_IC_H
+>> +#define _IMX_IC_H
+>> +
+> Please add header files or declarations of all used structs.
+
+done (it only needs v4l2-subdev.h).
+
+Steve
