@@ -1,33 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:17:47 +0100
-Subject: [PATCH 05/16] arm64: renesas: r8a7796/salvator-x: Add board part
- number to DT bindings
+Date: Fri,  6 Jan 2017 12:17:48 +0100
+Subject: [PATCH 06/16] arm64: dts: r8a7795: Use renesas,
+ rcar-gen3-usb2-phy fallback binding
 In-Reply-To: <cover.1483700694.git.horms+renesas@verge.net.au>
 References: <cover.1483700694.git.horms+renesas@verge.net.au>
-Message-ID: <6be91f865660d56081fe67e969a4adf71c24cada.1483700694.git.horms+renesas@verge.net.au>
+Message-ID: <6695092b34a3edd69b617e86bf34236ee8f2dbad.1483700694.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+A fallback binding for the Renesas R-Car Gen3 for USB2.0 PHY driver was
+added by commit cde7bc367f09 ("phy: rcar-gen3-usb2: add fallback binding").
+This patch makes use of this binding in the DT for the r8a7795 SoC.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- Documentation/devicetree/bindings/arm/shmobile.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 253bf9b86690..c9502634316d 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -75,7 +75,7 @@ Boards:
-     compatible = "renesas,rskrza1", "renesas,r7s72100"
-   - Salvator-X (RTP0RC7795SIPB0010S)
-     compatible = "renesas,salvator-x", "renesas,r8a7795";
--  - Salvator-X
-+  - Salvator-X (RTP0RC7796SIPB0011S)
-     compatible = "renesas,salvator-x", "renesas,r8a7796";
-   - SILK (RTP0RC7794LCB00011S)
-     compatible = "renesas,silk", "renesas,r8a7794"
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index bbf594bce930..2c076c21d7fa 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -1146,7 +1146,8 @@
+ 		};
+ 
+ 		usb2_phy0: usb-phy at ee080200 {
+-			compatible = "renesas,usb2-phy-r8a7795";
++			compatible = "renesas,usb2-phy-r8a7795",
++				     "renesas,rcar-gen3-usb2-phy";
+ 			reg = <0 0xee080200 0 0x700>;
+ 			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 703>;
+@@ -1156,7 +1157,8 @@
+ 		};
+ 
+ 		usb2_phy1: usb-phy at ee0a0200 {
+-			compatible = "renesas,usb2-phy-r8a7795";
++			compatible = "renesas,usb2-phy-r8a7795",
++				     "renesas,rcar-gen3-usb2-phy";
+ 			reg = <0 0xee0a0200 0 0x700>;
+ 			clocks = <&cpg CPG_MOD 702>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+@@ -1165,7 +1167,8 @@
+ 		};
+ 
+ 		usb2_phy2: usb-phy at ee0c0200 {
+-			compatible = "renesas,usb2-phy-r8a7795";
++			compatible = "renesas,usb2-phy-r8a7795",
++				     "renesas,rcar-gen3-usb2-phy";
+ 			reg = <0 0xee0c0200 0 0x700>;
+ 			clocks = <&cpg CPG_MOD 701>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
 -- 
 2.7.0.rc3.207.g0ac5344
