@@ -1,32 +1,47 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Fri, 6 Jan 2017 14:59:46 +0800
-Subject: [PATCH 2/3] doc: binding: add new compatible for SDRAM/DDR Controller
+Date: Fri, 6 Jan 2017 14:59:47 +0800
+Subject: [PATCH 3/3] ARM: dts: at91: use "atmel,sama5d4-ddramc" for ramc
 In-Reply-To: <20170106065947.30631-1-wenyou.yang@atmel.com>
 References: <20170106065947.30631-1-wenyou.yang@atmel.com>
-Message-ID: <20170106065947.30631-3-wenyou.yang@atmel.com>
+Message-ID: <20170106065947.30631-4-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the new compatible "atmel,sama5d4-ddramc" for the SDRAM/DDR
-Controller.
+Use the new compatible "atmel,sama5d4-ddramc" for the ramc of
+SAMA5D2 and SAMA5D4.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
 
- Documentation/devicetree/bindings/arm/atmel-at91.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/sama5d2.dtsi | 2 +-
+ arch/arm/boot/dts/sama5d4.dtsi | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-index 29737b9b616e..9b5de6397666 100644
---- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-@@ -111,6 +111,7 @@ RAMC SDRAM/DDR Controller required properties:
- 			"atmel,at91sam9260-sdramc",
- 			"atmel,at91sam9g45-ddramc",
- 			"atmel,sama5d3-ddramc",
-+			"atmel,sama5d4-ddramc",
- - reg: Should contain registers location and length
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index ceb9783ff7e1..b5259d85737d 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -380,7 +380,7 @@
+ 			};
  
- Examples:
+ 			ramc0: ramc at f000c000 {
+-				compatible = "atmel,sama5d3-ddramc";
++				compatible = "atmel,sama5d4-ddramc";
+ 				reg = <0xf000c000 0x200>;
+ 				clocks = <&ddrck>, <&mpddr_clk>;
+ 				clock-names = "ddrck", "mpddr";
+diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+index 4f60c1b7b137..603ba986858c 100644
+--- a/arch/arm/boot/dts/sama5d4.dtsi
++++ b/arch/arm/boot/dts/sama5d4.dtsi
+@@ -370,7 +370,7 @@
+ 			};
+ 
+ 			ramc0: ramc at f0010000 {
+-				compatible = "atmel,sama5d3-ddramc";
++				compatible = "atmel,sama5d4-ddramc";
+ 				reg = <0xf0010000 0x200>;
+ 				clocks = <&ddrck>, <&mpddr_clk>;
+ 				clock-names = "ddrck", "mpddr";
 -- 
 2.11.0
