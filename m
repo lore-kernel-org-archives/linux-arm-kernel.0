@@ -1,99 +1,47 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:17:52 +0100
-Subject: [PATCH 10/16] arm64: dts: r8a7795: Use R-Car Gen 3 fallback binding
- for i2c nodes
+Date: Fri,  6 Jan 2017 12:17:54 +0100
+Subject: [PATCH 12/16] arm64: dts: r8a7796: salvator-x: Update memory node to
+ 4 GiB map
 In-Reply-To: <cover.1483700694.git.horms+renesas@verge.net.au>
 References: <cover.1483700694.git.horms+renesas@verge.net.au>
-Message-ID: <d8ebefc9ace7c9810fd433e6ff18559e7c2f228a.1483700694.git.horms+renesas@verge.net.au>
+Message-ID: <d78fcc47e6814605eb90cd4ab1d79f9609ff32a4.1483700694.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added R-Car Gen 3 fallback binding for i2c nodes in
-DT for r8a7795 SoC.
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-This has no run-time effect for the current driver as the initialisation
-sequence is the same for the SoC-specific binding for r8a7795 and the
-fallback binding for R-Car Gen 3.
+This patch updates memory region:
 
+  - After changes, the new map of the Salvator-X board on R8A7796 SoC
+    Bank0: 2GiB RAM : 0x000048000000 -> 0x000bfffffff
+    Bank1: 2GiB RAM : 0x000600000000 -> 0x0067fffffff
+
+  - Before changes, the old map looked like this:
+    Bank0: 2GiB RAM : 0x000048000000 -> 0x000bfffffff
+
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+[geert: Correct size of old map]
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 21 ++++++++++++++-------
- 1 file changed, 14 insertions(+), 7 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 91a797b18c11..3fe7e0af5989 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -792,7 +792,8 @@
- 		i2c0: i2c at e6500000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "renesas,i2c-r8a7795";
-+			compatible = "renesas,i2c-r8a7795",
-+				     "renesas,rcar-gen3-i2c";
- 			reg = <0 0xe6500000 0 0x40>;
- 			interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 931>;
-@@ -806,7 +807,8 @@
- 		i2c1: i2c at e6508000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "renesas,i2c-r8a7795";
-+			compatible = "renesas,i2c-r8a7795",
-+				     "renesas,rcar-gen3-i2c";
- 			reg = <0 0xe6508000 0 0x40>;
- 			interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 930>;
-@@ -820,7 +822,8 @@
- 		i2c2: i2c at e6510000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "renesas,i2c-r8a7795";
-+			compatible = "renesas,i2c-r8a7795",
-+				     "renesas,rcar-gen3-i2c";
- 			reg = <0 0xe6510000 0 0x40>;
- 			interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 929>;
-@@ -834,7 +837,8 @@
- 		i2c3: i2c at e66d0000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "renesas,i2c-r8a7795";
-+			compatible = "renesas,i2c-r8a7795",
-+				     "renesas,rcar-gen3-i2c";
- 			reg = <0 0xe66d0000 0 0x40>;
- 			interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 928>;
-@@ -848,7 +852,8 @@
- 		i2c4: i2c at e66d8000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "renesas,i2c-r8a7795";
-+			compatible = "renesas,i2c-r8a7795",
-+				     "renesas,rcar-gen3-i2c";
- 			reg = <0 0xe66d8000 0 0x40>;
- 			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 927>;
-@@ -862,7 +867,8 @@
- 		i2c5: i2c at e66e0000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "renesas,i2c-r8a7795";
-+			compatible = "renesas,i2c-r8a7795",
-+				     "renesas,rcar-gen3-i2c";
- 			reg = <0 0xe66e0000 0 0x40>;
- 			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 919>;
-@@ -876,7 +882,8 @@
- 		i2c6: i2c at e66e8000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "renesas,i2c-r8a7795";
-+			compatible = "renesas,i2c-r8a7795",
-+				     "renesas,rcar-gen3-i2c";
- 			reg = <0 0xe66e8000 0 0x40>;
- 			interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 918>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+index f35e96ca7d60..38bde9de3250 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+@@ -31,6 +31,11 @@
+ 		reg = <0x0 0x48000000 0x0 0x78000000>;
+ 	};
+ 
++	memory at 600000000 {
++		device_type = "memory";
++		reg = <0x6 0x00000000 0x0 0x80000000>;
++	};
++
+ 	reg_1p8v: regulator0 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "fixed-1.8V";
 -- 
 2.7.0.rc3.207.g0ac5344
