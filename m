@@ -1,38 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:18:13 +0100
-Subject: [PATCH 04/25] ARM: dts: r8a7745: Add device node for PRR
+Date: Fri,  6 Jan 2017 12:18:14 +0100
+Subject: [PATCH 05/25] ARM: dts: r8a73a4: Use SoC-specific compat string for
+ mmcif
 In-Reply-To: <cover.1483700969.git.horms+renesas@verge.net.au>
 References: <cover.1483700969.git.horms+renesas@verge.net.au>
-Message-ID: <8916c7b58319fa27eae25c0c9b9a4cd68b9b30bd.1483700969.git.horms+renesas@verge.net.au>
+Message-ID: <5b0161743e194ab558143fdeea03243e35a5297f.1483700969.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Use the SoC-specific compat string for mmcif in DT for the r8a73a4 SoC.
+This is in keeping with the use of compat strings for mmcif for other
+Renesas ARM based SoCs.
 
-Add a device node for the Product Register, which provides SoC product
-and revision information.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7745.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/r8a73a4.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index 0a5d7872ce28..2f60c3cb9117 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -102,6 +102,11 @@
- 			#power-domain-cells = <0>;
- 		};
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 53183ffe04c1..b138584b8800 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -440,7 +440,7 @@
+ 	};
  
-+		prr: chipid at ff000044 {
-+			compatible = "renesas,prr";
-+			reg = <0 0xff000044 0 4>;
-+		};
-+
- 		rst: reset-controller at e6160000 {
- 			compatible = "renesas,r8a7745-rst";
- 			reg = <0 0xe6160000 0 0x100>;
+ 	mmcif0: mmc at ee200000 {
+-		compatible = "renesas,sh-mmcif";
++		compatible = "renesas,mmcif-r8a73a4", "renesas,sh-mmcif";
+ 		reg = <0 0xee200000 0 0x80>;
+ 		interrupts = <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A73A4_CLK_MMCIF0>;
+@@ -450,7 +450,7 @@
+ 	};
+ 
+ 	mmcif1: mmc at ee220000 {
+-		compatible = "renesas,sh-mmcif";
++		compatible = "renesas,mmcif-r8a73a4", "renesas,sh-mmcif";
+ 		reg = <0 0xee220000 0 0x80>;
+ 		interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A73A4_CLK_MMCIF1>;
 -- 
 2.7.0.rc3.207.g0ac5344
