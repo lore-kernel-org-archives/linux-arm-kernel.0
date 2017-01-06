@@ -1,117 +1,54 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 6 Jan 2017 10:08:54 +0100
-Subject: [PATCH v6 17/18] vfio/type1: Check MSI remapping at irq domain
- level
-In-Reply-To: <AM5PR0401MB25454B0C8F6E610A50B299D19A630@AM5PR0401MB2545.eurprd04.prod.outlook.com>
-References: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
- <1483643086-2883-18-git-send-email-eric.auger@redhat.com>
- <AM5PR0401MB25454B0C8F6E610A50B299D19A630@AM5PR0401MB2545.eurprd04.prod.outlook.com>
-Message-ID: <af612e18-ca0b-b855-e198-d4c706f2febc@redhat.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 6 Jan 2017 11:12:44 +0200
+Subject: [PATCH v3 1/5] arm64: dts: exynos5433: TM2/E: Fix wrong
+ information of ldo23 and ldo25
+In-Reply-To: <73639ec8-028a-56a2-0b47-3465974ec3f3@samsung.com>
+References: <1483675149-32598-1-git-send-email-jcsing.lee@samsung.com>
+ <CGME20170106035913epcas5p20336406863f1029ccf614520f366ddcf@epcas5p2.samsung.com>
+ <1483675149-32598-2-git-send-email-jcsing.lee@samsung.com>
+ <20170106070539.wd3kfhi77pa5ekcy@kozik-lap>
+ <586F4554.6020206@samsung.com>
+ <20170106085026.5pfwyxt2qipzbjpy@kozik-lap>
+ <73639ec8-028a-56a2-0b47-3465974ec3f3@samsung.com>
+Message-ID: <20170106091244.3vgpw7lceqfyb446@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bharat
+On Fri, Jan 06, 2017 at 06:06:43PM +0900, Chanwoo Choi wrote:
+> On 2017? 01? 06? 17:50, Krzysztof Kozlowski wrote:
+> > On Fri, Jan 06, 2017 at 04:20:52PM +0900, Chanwoo Choi wrote:
+> >> On 2017? 01? 06? 16:05, Krzysztof Kozlowski wrote:
+> >>> On Fri, Jan 06, 2017 at 12:59:05PM +0900, Jaechul Lee wrote:
+> >>>> From: Chanwoo Choi <cw00.choi@samsung.com>
+> >>>>
+> >>>> This patch fixes the wrong information of ldo23 and ldo25 on both TM2 and TM2E.
+> >>>
+> >>> Please describe what is exactly wrong and how it affects the
+> >>> system/user. This is going to the fixes so it needs a good explanation.
+> >>
+> >> When I posted the patch[1], I refer to the old schematic document of both TM2 and TM2E.
+> >> [1] 01e5d2352152 ("arm64: dts: exynos: Add dts file for Exynos5433-based TM2 board")
+> >>
+> >> After checking the highest version of schematic document of both TM2 and TM2E,
+> >> there is no difference of ldo23/ldo25 on both TM2 and TM2E.
+> >> - ldo23 is used on TM2/TM2E, but the name/max-microvolt are wrong. 
+> >> - ldo25 isn't used on TM2/TM2E. (not connected)
+> >>
+> >> Because ldo23 and lod25 are not used on other device in Exynos5433 and TM2 board.
+> >> this patch does not affect the operation to system/user.
+> > 
+> > If it does not affect anyone (including TM2/TM2E) then this do not have
+> > to be a fix. Am I right?
+> 
+> This patch does not affect the TM2/TM2E's operation
+> because ldo23/25 are not used on TM2/TM2E. Just fix the wrong information.
 
-On 06/01/2017 09:50, Bharat Bhushan wrote:
-> Hi Eric,
-> 
->> -----Original Message-----
->> From: Eric Auger [mailto:eric.auger at redhat.com]
->> Sent: Friday, January 06, 2017 12:35 AM
->> To: eric.auger at redhat.com; eric.auger.pro at gmail.com;
->> christoffer.dall at linaro.org; marc.zyngier at arm.com;
->> robin.murphy at arm.com; alex.williamson at redhat.com;
->> will.deacon at arm.com; joro at 8bytes.org; tglx at linutronix.de;
->> jason at lakedaemon.net; linux-arm-kernel at lists.infradead.org
->> Cc: kvm at vger.kernel.org; drjones at redhat.com; linux-
->> kernel at vger.kernel.org; pranav.sawargaonkar at gmail.com;
->> iommu at lists.linux-foundation.org; punit.agrawal at arm.com; Diana Madalina
->> Craciun <diana.craciun@nxp.com>; gpkulkarni at gmail.com;
->> shankerd at codeaurora.org; Bharat Bhushan <bharat.bhushan@nxp.com>;
->> geethasowjanya.akula at gmail.com
->> Subject: [PATCH v6 17/18] vfio/type1: Check MSI remapping at irq domain
->> level
->>
->> In case the IOMMU translates MSI transactions (typical case on ARM), we
->> check MSI remapping capability at IRQ domain level. Otherwise it is checked
->> at IOMMU level.
->>
->> At this stage the arm-smmu-(v3) still advertise the
->> IOMMU_CAP_INTR_REMAP capability at IOMMU level. This will be removed
->> in subsequent patches.
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->>
->> v6: rewrite test
->> ---
->>  drivers/vfio/vfio_iommu_type1.c | 9 ++++++---
->>  1 file changed, 6 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/vfio/vfio_iommu_type1.c
->> b/drivers/vfio/vfio_iommu_type1.c index b473ef80..fa0b5c4 100644
->> --- a/drivers/vfio/vfio_iommu_type1.c
->> +++ b/drivers/vfio/vfio_iommu_type1.c
->> @@ -40,6 +40,7 @@
->>  #include <linux/mdev.h>
->>  #include <linux/notifier.h>
->>  #include <linux/dma-iommu.h>
->> +#include <linux/irqdomain.h>
->>
->>  #define DRIVER_VERSION  "0.2"
->>  #define DRIVER_AUTHOR   "Alex Williamson
->> <alex.williamson@redhat.com>"
->> @@ -1208,7 +1209,7 @@ static int vfio_iommu_type1_attach_group(void
->> *iommu_data,
->>  	struct vfio_domain *domain, *d;
->>  	struct bus_type *bus = NULL, *mdev_bus;
->>  	int ret;
->> -	bool resv_msi;
->> +	bool resv_msi, msi_remap;
->>  	phys_addr_t resv_msi_base;
->>
->>  	mutex_lock(&iommu->lock);
->> @@ -1284,8 +1285,10 @@ static int vfio_iommu_type1_attach_group(void
->> *iommu_data,
->>  	INIT_LIST_HEAD(&domain->group_list);
->>  	list_add(&group->next, &domain->group_list);
->>
->> -	if (!allow_unsafe_interrupts &&
->> -	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
->> +	msi_remap = resv_msi ? irq_domain_check_msi_remap() :
-> 
-> There can be multiple interrupt-controller, at-least theoretically it is possible and not sure practically it exists and supported, where not all may support IRQ_REMAP. If that is the case be then should we check for IRQ-REMAP for that device-bus irq-domain?
-> 
-I mentioned in the cover letter that the approach was defensive and
-rough today. As soon as we detect an MSI controller in the platform that
-has no support for MSI remapping we flag the assignment as unsafe. I
-think this approach was agreed on the ML. Such rough assessment was used
-in the past on x86.
+Ah, okay, thanks for explanation. Please just rebase on current
+next/dt64 (or for-next or just my
+https://patchwork.kernel.org/patch/9500153/) so the always-off property
+won't be copied.
 
-I am reluctant to add more complexity at that stage. This can be
-improved latter I think when such platforms show up.
+I'll take it then for v4.11.
 
-Best Regards
-
-Eric
-> Thanks
-> -Bharat
-> 
->> +				iommu_capable(bus,
->> IOMMU_CAP_INTR_REMAP);
->> +
->> +	if (!allow_unsafe_interrupts && !msi_remap) {
->>  		pr_warn("%s: No interrupt remapping support.  Use the
->> module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support
->> on this platform\n",
->>  		       __func__);
->>  		ret = -EPERM;
->> --
->> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Best regards,
+Krzysztof
