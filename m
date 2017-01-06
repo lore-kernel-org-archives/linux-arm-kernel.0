@@ -1,31 +1,73 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu,  5 Jan 2017 22:33:45 -0600
-Subject: [PATCH v2 2/5] ARM: davinci_all_defconfig: Enable PWM modules
-In-Reply-To: <1483677228-2325-1-git-send-email-david@lechnology.com>
-References: <1483677228-2325-1-git-send-email-david@lechnology.com>
-Message-ID: <1483677228-2325-3-git-send-email-david@lechnology.com>
+From: bjsprakash.linux@gmail.com (Prakash B)
+Date: Fri, 6 Jan 2017 10:52:39 +0530
+Subject: [PATCH v3] arm64: mm: Fix NOMAP page initialization
+In-Reply-To: <cbbf14fd-a1cc-2463-ba67-acd6d61e9db1@linaro.org>
+References: <20161216165437.21612-1-rrichter@cavium.com>
+ <CAKv+Gu_SmTNguC=tSCwYOL2kx-DogLvSYRZc56eGP=JhdrUOsA@mail.gmail.com>
+ <c74d6ec6-16ba-dccc-3b0d-a8bedcb46dc5@linaro.org>
+ <cbbf14fd-a1cc-2463-ba67-acd6d61e9db1@linaro.org>
+Message-ID: <CACJhumfqWkXXpbJomjJ1jM5B3kG+1Jk9EvGWR50_u-AO1ySXfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables PWM and the TI ECAP and EHRWPM modules. These are used on LEGO
-MINDSTORMS EV3.
----
- arch/arm/configs/davinci_all_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+Hi Hanjun,
 
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index a12e4c2..2b1967a 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -200,6 +200,9 @@ CONFIG_TI_EDMA=y
- CONFIG_MEMORY=y
- CONFIG_TI_AEMIF=m
- CONFIG_DA8XX_DDRCTL=y
-+CONFIG_PWM=y
-+CONFIG_PWM_TIECAP=m
-+CONFIG_PWM_TIEHRPWM=m
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT4_FS_POSIX_ACL=y
--- 
-2.7.4
+
+> a update here, tested on 4.9,
+>
+>  - Applied Ard's two patches only
+>  - Applied Robert's patch only
+>
+> Both of them can work fine on D05 with NUMA enabled, which means
+> boot ok and LTP MM stress test is passed.
+
+It is  not related to this patch set.
+LTP "cpuset01" test  crashes with latest 4.9,  4.10-rc1 and 4.10-rc2 kernels on
+Thunderx 2S .  Do you see any such behaviour on D05.
+
+Any idea what might be causing this issue.
+
+
+  227.627546] cpuset01: page allocation stalls for 10096ms, order:0,
+mode:0x24200ca(GFP_HIGHUSER_MOVABLE)
+[  227.627586] CPU: 53 PID: 11017 Comm: cpuset01 Not tainted 4.9.04kNUMA+ #2
+[  227.627591] Hardware name: www.cavium.com ThunderX Unknown/ThunderX
+Unknown, BIOS 0.3 Aug 24 2016
+[  227.627599] Call trace:
+[  227.627623] [<ffff000008089f10>] dump_backtrace+0x0/0x238
+[  227.627640] [<ffff00000808a16c>] show_stack+0x24/0x30
+[  227.627656] [<ffff00000846fb50>] dump_stack+0x94/0xb4
+[  227.627679] [<ffff0000081eb4f8>] warn_alloc+0x138/0x150
+[  227.627686] [<ffff0000081ec0a4>] __alloc_pages_nodemask+0xb04/0xcf0
+[  227.627697] [<ffff000008245988>] alloc_pages_vma+0xc8/0x270
+[  227.627715] [<ffff00000821f604>] handle_mm_fault+0xc8c/0xfd8
+[  227.627732] [<ffff00000809a488>] do_page_fault+0x2c0/0x368
+[  227.627744] [<ffff0000080812ec>] do_mem_abort+0x6c/0xe0
+[  227.627752] Exception stack(0xffff801f55823e00 to 0xffff801f55823f30)
+[  227.627763] 3e00: 0000000000000000 0000ffff92682000
+ffffffffffffffff 0000ffff9252b3e8
+[  227.627774] 3e20: 0000000020000000 0000000000000000
+000000000000a000 0000000000000003
+[  227.627785] 3e40: 0000000000000022 ffffffffffffffff
+0000000000000123 00000000000000de
+[  227.627793] 3e60: ffff000008972000 0000000000000015
+ffff801f55823e90 0000000000040900
+[  227.627800] 3e80: 0000000000000000 ffff0000080836f0
+0000000000000000 0000ffff92682000
+[  227.627809] 3ea0: ffffffffffffffff 0000ffff92575d8c
+0000000000000000 0000000000040900
+[  227.627819] 3ec0: 0000ffff92682000 00000000000000f7
+0000000000004fc0 0000000000000022
+[  227.627828] 3ee0: 0000000000000000 0000000000000000
+0000ffff925f5508 f7f7f7f7f7f7f7f7
+[  227.627838] 3f00: 0000ffff92686ff0 0000000000002ab8
+0101010101010101 0000000000000020
+[  227.627847] 3f20: 0000000000000000 0000000000000000
+[  227.627858] [<ffff000008083324>] el0_da+0x18/0x1c
+[  227.627865] Mem-Info:
+[  227.627899] active_anon:38613 inactive_anon:8174 isolated_anon:0
+                active_file:25148 inactive_file:64173 isolated_file:0
+                unevictable:742 dirty:0 writeback:0 unstable:0
+                slab_reclaimable:29066 slab_unreclaimable:67304
+                mapped:22876 shmem:2597 pagetables:1240 bounce:0
+                free:65582521 free_pcp:1834 free_cma:0
