@@ -1,73 +1,45 @@
-From: bjsprakash.linux@gmail.com (Prakash B)
-Date: Fri, 6 Jan 2017 10:52:39 +0530
-Subject: [PATCH v3] arm64: mm: Fix NOMAP page initialization
-In-Reply-To: <cbbf14fd-a1cc-2463-ba67-acd6d61e9db1@linaro.org>
-References: <20161216165437.21612-1-rrichter@cavium.com>
- <CAKv+Gu_SmTNguC=tSCwYOL2kx-DogLvSYRZc56eGP=JhdrUOsA@mail.gmail.com>
- <c74d6ec6-16ba-dccc-3b0d-a8bedcb46dc5@linaro.org>
- <cbbf14fd-a1cc-2463-ba67-acd6d61e9db1@linaro.org>
-Message-ID: <CACJhumfqWkXXpbJomjJ1jM5B3kG+1Jk9EvGWR50_u-AO1ySXfg@mail.gmail.com>
+From: yegorslists@googlemail.com (Yegor Yefremov)
+Date: Fri, 6 Jan 2017 06:42:24 +0100
+Subject: [PATCH net-next v4 0/4] Fix OdroidC2 Gigabit Tx link issue
+In-Reply-To: <20170105232508.GU14217@n2100.armlinux.org.uk>
+References: <1480348229-25672-1-git-send-email-jbrunet@baylibre.com>
+ <049b1efc-3bad-92e0-45ef-0563dc5d81de@gmail.com>
+ <20170105232508.GU14217@n2100.armlinux.org.uk>
+Message-ID: <CAGm1_kvZ4dQrJ89qYU5wLGU1NR=j9xyWUm2mgYtq3F1+bo1OCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
+Hi Russel,
 
-
-> a update here, tested on 4.9,
+On Fri, Jan 6, 2017 at 12:25 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Mon, Nov 28, 2016 at 09:54:28AM -0800, Florian Fainelli wrote:
+>> If we start supporting generic "enable", "disable" type of properties
+>> with values that map directly to register definitions of the HW, we
+>> leave too much room for these properties to be utilized to implement a
+>> specific policy, and this is not acceptable.
 >
->  - Applied Ard's two patches only
->  - Applied Robert's patch only
+> Another concern with this patch is that the existing phylib "set_eee"
+> code is horribly buggy - it just translates the modes from userspace
+> into the register value and writes them directly to the register with
+> no validation.  So it's possible to set modes in the register that the
+> hardware doesn't support, and have them advertised to the link partner.
 >
-> Both of them can work fine on D05 with NUMA enabled, which means
-> boot ok and LTP MM stress test is passed.
+> I have a patch which fixes that, restricting (as we do elsewhere) the
+> advert according to the EEE supported capabilities retrieved from the
+> PCS - maybe the problem here is that the PCS doesn't support support
+> EEE in 1000baseT mode?
+>
+> Out of interest, which PHY is used on this platform?
+>
+> On the SolidRun boards, they're using AR8035, and have suffered this
+> occasional link drop problem.  What has been found is that it seems to
+> be to do with the timing parameters, and it seemed to only be 1000bT
+> that was affected.  I don't remember off hand exactly which or what
+> the change was they made to stabilise it though, but I can probabily
+> find out tomorrow.
 
-It is  not related to this patch set.
-LTP "cpuset01" test  crashes with latest 4.9,  4.10-rc1 and 4.10-rc2 kernels on
-Thunderx 2S .  Do you see any such behaviour on D05.
+I have different boards with am335x and AR8035 and we had occasional
+link drop with both 100 and 1000 speeds.
 
-Any idea what might be causing this issue.
-
-
-  227.627546] cpuset01: page allocation stalls for 10096ms, order:0,
-mode:0x24200ca(GFP_HIGHUSER_MOVABLE)
-[  227.627586] CPU: 53 PID: 11017 Comm: cpuset01 Not tainted 4.9.04kNUMA+ #2
-[  227.627591] Hardware name: www.cavium.com ThunderX Unknown/ThunderX
-Unknown, BIOS 0.3 Aug 24 2016
-[  227.627599] Call trace:
-[  227.627623] [<ffff000008089f10>] dump_backtrace+0x0/0x238
-[  227.627640] [<ffff00000808a16c>] show_stack+0x24/0x30
-[  227.627656] [<ffff00000846fb50>] dump_stack+0x94/0xb4
-[  227.627679] [<ffff0000081eb4f8>] warn_alloc+0x138/0x150
-[  227.627686] [<ffff0000081ec0a4>] __alloc_pages_nodemask+0xb04/0xcf0
-[  227.627697] [<ffff000008245988>] alloc_pages_vma+0xc8/0x270
-[  227.627715] [<ffff00000821f604>] handle_mm_fault+0xc8c/0xfd8
-[  227.627732] [<ffff00000809a488>] do_page_fault+0x2c0/0x368
-[  227.627744] [<ffff0000080812ec>] do_mem_abort+0x6c/0xe0
-[  227.627752] Exception stack(0xffff801f55823e00 to 0xffff801f55823f30)
-[  227.627763] 3e00: 0000000000000000 0000ffff92682000
-ffffffffffffffff 0000ffff9252b3e8
-[  227.627774] 3e20: 0000000020000000 0000000000000000
-000000000000a000 0000000000000003
-[  227.627785] 3e40: 0000000000000022 ffffffffffffffff
-0000000000000123 00000000000000de
-[  227.627793] 3e60: ffff000008972000 0000000000000015
-ffff801f55823e90 0000000000040900
-[  227.627800] 3e80: 0000000000000000 ffff0000080836f0
-0000000000000000 0000ffff92682000
-[  227.627809] 3ea0: ffffffffffffffff 0000ffff92575d8c
-0000000000000000 0000000000040900
-[  227.627819] 3ec0: 0000ffff92682000 00000000000000f7
-0000000000004fc0 0000000000000022
-[  227.627828] 3ee0: 0000000000000000 0000000000000000
-0000ffff925f5508 f7f7f7f7f7f7f7f7
-[  227.627838] 3f00: 0000ffff92686ff0 0000000000002ab8
-0101010101010101 0000000000000020
-[  227.627847] 3f20: 0000000000000000 0000000000000000
-[  227.627858] [<ffff000008083324>] el0_da+0x18/0x1c
-[  227.627865] Mem-Info:
-[  227.627899] active_anon:38613 inactive_anon:8174 isolated_anon:0
-                active_file:25148 inactive_file:64173 isolated_file:0
-                unevictable:742 dirty:0 writeback:0 unstable:0
-                slab_reclaimable:29066 slab_unreclaimable:67304
-                mapped:22876 shmem:2597 pagetables:1240 bounce:0
-                free:65582521 free_pcp:1834 free_cma:0
+Yegor
