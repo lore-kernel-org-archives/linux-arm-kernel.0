@@ -1,115 +1,115 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Jan 2017 00:19:38 +0000
-Subject: [PATCH v2 3/8] ARM: dts: armada-388-clearfog: Utilize new DSA
- binding
-In-Reply-To: <20170105192957.14304-4-f.fainelli@gmail.com>
-References: <20170105192957.14304-1-f.fainelli@gmail.com>
- <20170105192957.14304-4-f.fainelli@gmail.com>
-Message-ID: <20170106001938.GV14217@n2100.armlinux.org.uk>
+Date: Fri, 6 Jan 2017 00:41:37 +0000
+Subject: [PATCHv2 2/2] arm: Adjust memory boundaries after reservations
+In-Reply-To: <1483657274-11346-3-git-send-email-labbott@redhat.com>
+References: <1483657274-11346-1-git-send-email-labbott@redhat.com>
+ <1483657274-11346-3-git-send-email-labbott@redhat.com>
+Message-ID: <20170106004137.GW14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 11:29:52AM -0800, Florian Fainelli wrote:
-> Utilize the new DSA binding, introduced with commit 8c5ad1d6179d ("net:
-> dsa: Document new binding"). The legacy binding node is kept included, but is
-> marked disabled.
+Only comments are to do with the comments...
+
+On Thu, Jan 05, 2017 at 03:01:14PM -0800, Laura Abbott wrote:
 > 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> adjust_lowmem_bounds is responsible for setting up the boundary for
+> lowmem/hihgmme. This needs to be setup before memblock reservations can
 
-Booted here on clearfog, and tested traffic passes between two lan
-ports, and a lan port and the cpu port... and generally still seems
-to work as a switch.  All seems well on the face of it.
+highmem
 
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+> occur. At the time memblock reservations can occur, memory can also be
+> removed from the system. The lowmem/highmem boundary and end of memory
+> may be affected by this but it is currently not recalculated. On some
+> systems this may be harmless, on o thers this may result in incorrect
 
-Thanks.
+others
 
+> ranges being passed to the main memory allocator. Correct this by
+> recalculating the lowmem/highmem boundary after all reservations have
+> been made.
+> 
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
 > ---
->  arch/arm/boot/dts/armada-388-clearfog.dts | 65 +++++++++++++++++++++++++++++++
->  1 file changed, 65 insertions(+)
+> v2: Rebased for changes in sanity_check_meminfo cleanup
+> ---
+>  arch/arm/kernel/setup.c | 8 ++++++++
+>  arch/arm/mm/mmu.c       | 9 ++++++---
+>  2 files changed, 14 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/armada-388-clearfog.dts b/arch/arm/boot/dts/armada-388-clearfog.dts
-> index 71ce201c903e..40ec6d768669 100644
-> --- a/arch/arm/boot/dts/armada-388-clearfog.dts
-> +++ b/arch/arm/boot/dts/armada-388-clearfog.dts
-> @@ -351,6 +351,8 @@
->  	};
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 8a8051c..4625115 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -1093,8 +1093,16 @@ void __init setup_arch(char **cmdline_p)
+>  	setup_dma_zone(mdesc);
+>  	xen_early_init();
+>  	efi_init();
+> +	/*
+> +	 * Make sure the calcualtion for lowmem/highmem is set appropriately
+
+calculation
+
+> +	 * before reserving/allocating any mmeory
+> +	 */
+>  	adjust_lowmem_bounds();
+>  	arm_memblock_init(mdesc);
+> +	/*
+> +	 * Memory may have been removed so recalculate the bounds.
+> +	 */
+
+Single line comments should be... /* blah */
+
+> +	adjust_lowmem_bounds();
 >  
->  	dsa at 0 {
-> +		status = "disabled";
+>  	early_ioremap_reset();
+>  
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index ce5123b..7ca6910 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -1157,6 +1157,7 @@ void __init adjust_lowmem_bounds(void)
+>  	phys_addr_t memblock_limit = 0;
+>  	u64 vmalloc_limit;
+>  	struct memblock_region *reg;
+> +	phys_addr_t lowmem_limit = 0;
+>  
+>  	/*
+>  	 * Let's use our own (unoptimized) equivalent of __pa() that is
+> @@ -1173,14 +1174,14 @@ void __init adjust_lowmem_bounds(void)
+>  
+>  
+>  		if (reg->base < vmalloc_limit) {
+> -			if (block_end > arm_lowmem_limit)
+> +			if (block_end > lowmem_limit)
+>  				/*
+>  				 * Compare as u64 to ensure vmalloc_limit does
+>  				 * not get truncated. block_end should always
+>  				 * fit in phys_addr_t so there should be no
+>  				 * issue with assignment.
+>  				 */
+> -				arm_lowmem_limit = min_t(u64,
+> +				lowmem_limit = min_t(u64,
+>  							 vmalloc_limit,
+>  							 block_end);
+>  
+> @@ -1201,12 +1202,14 @@ void __init adjust_lowmem_bounds(void)
+>  				if (!IS_ALIGNED(block_start, PMD_SIZE))
+>  					memblock_limit = block_start;
+>  				else if (!IS_ALIGNED(block_end, PMD_SIZE))
+> -					memblock_limit = arm_lowmem_limit;
+> +					memblock_limit = lowmem_limit;
+>  			}
+>  
+>  		}
+>  	}
+>  
+> +	arm_lowmem_limit = lowmem_limit;
 > +
->  		compatible = "marvell,dsa";
->  		dsa,ethernet = <&eth1>;
->  		dsa,mii-bus = <&mdio>;
-> @@ -444,3 +446,66 @@
->  		status = "disabled";
->  	};
->  };
-> +
-> +&mdio {
-> +	status = "okay";
-> +
-> +	switch at 4 {
-> +		compatible = "marvell,mv88e6085";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		reg = <4>;
-> +		pinctrl-0 = <&clearfog_dsa0_clk_pins &clearfog_dsa0_pins>;
-> +		pinctrl-names = "default";
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			port at 0 {
-> +				reg = <0>;
-> +				label = "lan5";
-> +			};
-> +
-> +			port at 1 {
-> +				reg = <1>;
-> +				label = "lan4";
-> +			};
-> +
-> +			port at 2 {
-> +				reg = <2>;
-> +				label = "lan3";
-> +			};
-> +
-> +			port at 3 {
-> +				reg = <3>;
-> +				label = "lan2";
-> +			};
-> +
-> +			port at 4 {
-> +				reg = <4>;
-> +				label = "lan1";
-> +			};
-> +
-> +			port at 5 {
-> +				reg = <5>;
-> +				label = "cpu";
-> +				ethernet = <&eth1>;
-> +				fixed-link {
-> +					speed = <1000>;
-> +					full-duplex;
-> +				};
-> +			};
-> +
-> +			port at 6 {
-> +				/* 88E1512 external phy */
-> +				reg = <6>;
-> +				label = "lan6";
-> +				fixed-link {
-> +					speed = <1000>;
-> +					full-duplex;
-> +				};
-> +			};
-> +		};
-> +	};
-> +};
+>  	high_memory = __va(arm_lowmem_limit - 1) + 1;
+>  
+>  	/*
 > -- 
-> 2.9.3
+> 2.7.4
 > 
 
 -- 
