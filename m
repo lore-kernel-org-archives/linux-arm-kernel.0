@@ -1,45 +1,65 @@
-From: yegorslists@googlemail.com (Yegor Yefremov)
-Date: Fri, 6 Jan 2017 06:42:24 +0100
-Subject: [PATCH net-next v4 0/4] Fix OdroidC2 Gigabit Tx link issue
-In-Reply-To: <20170105232508.GU14217@n2100.armlinux.org.uk>
-References: <1480348229-25672-1-git-send-email-jbrunet@baylibre.com>
- <049b1efc-3bad-92e0-45ef-0563dc5d81de@gmail.com>
- <20170105232508.GU14217@n2100.armlinux.org.uk>
-Message-ID: <CAGm1_kvZ4dQrJ89qYU5wLGU1NR=j9xyWUm2mgYtq3F1+bo1OCg@mail.gmail.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Fri, 6 Jan 2017 06:01:17 +0000
+Subject: [PATCH v4 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
+ stores scenario in vdma
+In-Reply-To: <CAL_JsqKFF2g7_y6kS_A33wDQE3Sw5mJdoUj8wGaX5ZbQ6pK_zQ@mail.gmail.com>
+References: <1483536954-27203-1-git-send-email-appanad@xilinx.com>
+ <1483536954-27203-3-git-send-email-appanad@xilinx.com>
+ <20170104152613.hhdptwsyg73ev3dz@rob-hp-laptop>
+ <C246CAC1457055469EF09E3A7AC4E11A4A660958@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <CAL_JsqKFF2g7_y6kS_A33wDQE3Sw5mJdoUj8wGaX5ZbQ6pK_zQ@mail.gmail.com>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A66111B@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
+Hi Rob,
 
-On Fri, Jan 6, 2017 at 12:25 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Mon, Nov 28, 2016 at 09:54:28AM -0800, Florian Fainelli wrote:
->> If we start supporting generic "enable", "disable" type of properties
->> with values that map directly to register definitions of the HW, we
->> leave too much room for these properties to be utilized to implement a
->> specific policy, and this is not acceptable.
->
-> Another concern with this patch is that the existing phylib "set_eee"
-> code is horribly buggy - it just translates the modes from userspace
-> into the register value and writes them directly to the register with
-> no validation.  So it's possible to set modes in the register that the
-> hardware doesn't support, and have them advertised to the link partner.
->
-> I have a patch which fixes that, restricting (as we do elsewhere) the
-> advert according to the EEE supported capabilities retrieved from the
-> PCS - maybe the problem here is that the PCS doesn't support support
-> EEE in 1000baseT mode?
->
-> Out of interest, which PHY is used on this platform?
->
-> On the SolidRun boards, they're using AR8035, and have suffered this
-> occasional link drop problem.  What has been found is that it seems to
-> be to do with the timing parameters, and it seemed to only be 1000bT
-> that was affected.  I don't remember off hand exactly which or what
-> the change was they made to stabilise it though, but I can probabily
-> find out tomorrow.
+	Thanks for the review...
 
-I have different boards with am335x and AR8035 and we had occasional
-link drop with both 100 and 1000 speeds.
+ [Snip]
+> > -- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> >> > +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> >> > @@ -66,6 +66,8 @@ Optional child node properties:
+> >> >  Optional child node properties for VDMA:
+> >> >  - xlnx,genlock-mode: Tells Genlock synchronization is
+> >> >     enabled/disabled in hardware.
+> >> > +- xlnx,fstore-config: Tells Whether Frame Store Configuration is
+> >> > +   enabled/disabled in hardware.
+> >>
+> >> What's the default (when not present)? That should be the most common
+> case.
+> >> Looks like the code treats this as bool, but that's not clear here.
+> >> The name is not clear what it is doing. Enabling or disabling the feature?
+> >
+> > Default value is zero...
+> > When this property is present it tells hardware is configured for frame store
+> configuration.
+> 
+> So most people will not want "frame store configuration"?
 
-Yegor
+Since the driver is for SoftIP (I mean fpga ip) default h/w configuration of this IP is frame store
+Configuration disabled that's in the driver making default value of this configuration as zero.
+
+If users are trying a use case where this configuration should be enabled but in the h/w it is disabled.
+In this case driver will warn users to enable this frame store configuration in the h/w.
+So that users can enable it in their h/w.
+
+Please let me know if the above expiation is not clear will explain in detail...
+
+> 
+> > Will fix the explanation part in the next version like below.
+> >  xlnx,fstore-config: Tells hardware is configured for frame store configuration.
+> > Is the above explanation clear???
+> 
+> No, I mean make it obvious from the name of the property:
+> xlnx,fstore-config-enable or xlnx,fstore-enable
+> 
+> And the description needs to say it is boolean.
+
+Sure will fix in the next version...
+
+Regards,
+Kedar.
+
+> 
+> Rob
