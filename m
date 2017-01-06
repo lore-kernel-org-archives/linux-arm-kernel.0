@@ -1,219 +1,106 @@
-From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Fri,  6 Jan 2017 17:16:04 +0800
-Subject: [PATCH v7 5/5] soc: zte: pm_domains: Add support for zx296718
-In-Reply-To: <1483694164-7668-1-git-send-email-baoyou.xie@linaro.org>
-References: <1483694164-7668-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <1483694164-7668-5-git-send-email-baoyou.xie@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 6 Jan 2017 09:20:29 +0000
+Subject: [PATCH v6 17/18] vfio/type1: Check MSI remapping at irq domain
+ level
+In-Reply-To: <af612e18-ca0b-b855-e198-d4c706f2febc@redhat.com>
+References: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
+ <1483643086-2883-18-git-send-email-eric.auger@redhat.com>
+ <AM5PR0401MB25454B0C8F6E610A50B299D19A630@AM5PR0401MB2545.eurprd04.prod.outlook.com>
+ <af612e18-ca0b-b855-e198-d4c706f2febc@redhat.com>
+Message-ID: <845d7167-6734-03c9-4df6-2f82f1627dbc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces the power domain driver of zx296718
-which belongs to zte's zx2967 family.
+On 06/01/17 09:08, Auger Eric wrote:
+> Hi Bharat
+> 
+> On 06/01/2017 09:50, Bharat Bhushan wrote:
+>> Hi Eric,
+>>
+>>> -----Original Message-----
+>>> From: Eric Auger [mailto:eric.auger at redhat.com]
+>>> Sent: Friday, January 06, 2017 12:35 AM
+>>> To: eric.auger at redhat.com; eric.auger.pro at gmail.com;
+>>> christoffer.dall at linaro.org; marc.zyngier at arm.com;
+>>> robin.murphy at arm.com; alex.williamson at redhat.com;
+>>> will.deacon at arm.com; joro at 8bytes.org; tglx at linutronix.de;
+>>> jason at lakedaemon.net; linux-arm-kernel at lists.infradead.org
+>>> Cc: kvm at vger.kernel.org; drjones at redhat.com; linux-
+>>> kernel at vger.kernel.org; pranav.sawargaonkar at gmail.com;
+>>> iommu at lists.linux-foundation.org; punit.agrawal at arm.com; Diana Madalina
+>>> Craciun <diana.craciun@nxp.com>; gpkulkarni at gmail.com;
+>>> shankerd at codeaurora.org; Bharat Bhushan <bharat.bhushan@nxp.com>;
+>>> geethasowjanya.akula at gmail.com
+>>> Subject: [PATCH v6 17/18] vfio/type1: Check MSI remapping at irq domain
+>>> level
+>>>
+>>> In case the IOMMU translates MSI transactions (typical case on ARM), we
+>>> check MSI remapping capability at IRQ domain level. Otherwise it is checked
+>>> at IOMMU level.
+>>>
+>>> At this stage the arm-smmu-(v3) still advertise the
+>>> IOMMU_CAP_INTR_REMAP capability at IOMMU level. This will be removed
+>>> in subsequent patches.
+>>>
+>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>>
+>>> ---
+>>>
+>>> v6: rewrite test
+>>> ---
+>>>  drivers/vfio/vfio_iommu_type1.c | 9 ++++++---
+>>>  1 file changed, 6 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/vfio/vfio_iommu_type1.c
+>>> b/drivers/vfio/vfio_iommu_type1.c index b473ef80..fa0b5c4 100644
+>>> --- a/drivers/vfio/vfio_iommu_type1.c
+>>> +++ b/drivers/vfio/vfio_iommu_type1.c
+>>> @@ -40,6 +40,7 @@
+>>>  #include <linux/mdev.h>
+>>>  #include <linux/notifier.h>
+>>>  #include <linux/dma-iommu.h>
+>>> +#include <linux/irqdomain.h>
+>>>
+>>>  #define DRIVER_VERSION  "0.2"
+>>>  #define DRIVER_AUTHOR   "Alex Williamson
+>>> <alex.williamson@redhat.com>"
+>>> @@ -1208,7 +1209,7 @@ static int vfio_iommu_type1_attach_group(void
+>>> *iommu_data,
+>>>  	struct vfio_domain *domain, *d;
+>>>  	struct bus_type *bus = NULL, *mdev_bus;
+>>>  	int ret;
+>>> -	bool resv_msi;
+>>> +	bool resv_msi, msi_remap;
+>>>  	phys_addr_t resv_msi_base;
+>>>
+>>>  	mutex_lock(&iommu->lock);
+>>> @@ -1284,8 +1285,10 @@ static int vfio_iommu_type1_attach_group(void
+>>> *iommu_data,
+>>>  	INIT_LIST_HEAD(&domain->group_list);
+>>>  	list_add(&group->next, &domain->group_list);
+>>>
+>>> -	if (!allow_unsafe_interrupts &&
+>>> -	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
+>>> +	msi_remap = resv_msi ? irq_domain_check_msi_remap() :
+>>
+>> There can be multiple interrupt-controller, at-least theoretically it is possible and not sure practically it exists and supported, where not all may support IRQ_REMAP. If that is the case be then should we check for IRQ-REMAP for that device-bus irq-domain?
+>>
+> I mentioned in the cover letter that the approach was defensive and
+> rough today. As soon as we detect an MSI controller in the platform that
+> has no support for MSI remapping we flag the assignment as unsafe. I
+> think this approach was agreed on the ML. Such rough assessment was used
+> in the past on x86.
+> 
+> I am reluctant to add more complexity at that stage. This can be
+> improved latter I think when such platforms show up.
 
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-Reviewed-by: Jun Nie <jun.nie@linaro.org>
----
- drivers/soc/zte/Makefile              |   1 +
- drivers/soc/zte/zx296718_pm_domains.c | 182 ++++++++++++++++++++++++++++++++++
- 2 files changed, 183 insertions(+)
- create mode 100644 drivers/soc/zte/zx296718_pm_domains.c
+I don't think this is worth it. If the system is so broken that the
+designer cannot make up their mind about device isolation, too bad.
+People will either disable the non-isolating MSI controller altogether,
+or force the unsafe flag.
 
-diff --git a/drivers/soc/zte/Makefile b/drivers/soc/zte/Makefile
-index 8a37f2f..96b7cd4 100644
---- a/drivers/soc/zte/Makefile
-+++ b/drivers/soc/zte/Makefile
-@@ -2,3 +2,4 @@
- # ZTE SOC drivers
- #
- obj-$(CONFIG_ZX2967_PM_DOMAINS) += zx2967_pm_domains.o
-+obj-$(CONFIG_ZX2967_PM_DOMAINS) += zx296718_pm_domains.o
-diff --git a/drivers/soc/zte/zx296718_pm_domains.c b/drivers/soc/zte/zx296718_pm_domains.c
-new file mode 100644
-index 0000000..5ed924f
---- /dev/null
-+++ b/drivers/soc/zte/zx296718_pm_domains.c
-@@ -0,0 +1,182 @@
-+/*
-+ * Copyright (C) 2017 ZTE Ltd.
-+ *
-+ * Author: Baoyou Xie <baoyou.xie@linaro.org>
-+ * License terms: GNU General Public License (GPL) version 2
-+ */
-+
-+#include <dt-bindings/soc/zte,pm_domains.h>
-+#include "zx2967_pm_domains.h"
-+
-+static u16 zx296718_offsets[REG_ARRAY_SIZE] = {
-+	[REG_CLKEN] = 0x18,
-+	[REG_ISOEN] = 0x1c,
-+	[REG_RSTEN] = 0x20,
-+	[REG_PWREN] = 0x24,
-+	[REG_ACK_SYNC] = 0x28,
-+};
-+
-+enum {
-+	PCU_DM_VOU = 0,
-+	PCU_DM_SAPPU,
-+	PCU_DM_VDE,
-+	PCU_DM_VCE,
-+	PCU_DM_HDE,
-+	PCU_DM_VIU,
-+	PCU_DM_USB20,
-+	PCU_DM_USB21,
-+	PCU_DM_USB30,
-+	PCU_DM_HSIC,
-+	PCU_DM_GMAC,
-+	PCU_DM_TS,
-+};
-+
-+static struct zx2967_pm_domain vou_domain = {
-+	.dm = {
-+		.name		= "vou_domain",
-+	},
-+	.bit = PCU_DM_VOU,
-+	.polarity = PWREN,
-+	.reg_offset = zx296718_offsets,
-+};
-+
-+static struct zx2967_pm_domain sappu_domain = {
-+	.dm = {
-+		.name		= "sappu_domain",
-+	},
-+	.bit = PCU_DM_SAPPU,
-+	.polarity = PWREN,
-+	.reg_offset = zx296718_offsets,
-+};
-+
-+static struct zx2967_pm_domain vde_domain = {
-+	.dm = {
-+		.name		= "vde_domain",
-+	},
-+	.bit = PCU_DM_VDE,
-+	.polarity = PWREN,
-+	.reg_offset = zx296718_offsets,
-+};
-+
-+static struct zx2967_pm_domain vce_domain = {
-+	.dm = {
-+		.name		= "vce_domain",
-+	},
-+	.bit = PCU_DM_VCE,
-+	.polarity = PWREN,
-+	.reg_offset = zx296718_offsets,
-+};
-+
-+static struct zx2967_pm_domain hde_domain = {
-+	.dm = {
-+		.name		= "hde_domain",
-+	},
-+	.bit = PCU_DM_HDE,
-+	.polarity = PWREN,
-+	.reg_offset = zx296718_offsets,
-+};
-+
-+static struct zx2967_pm_domain viu_domain = {
-+	.dm = {
-+		.name		= "viu_domain",
-+	},
-+	.bit = PCU_DM_VIU,
-+	.polarity = PWREN,
-+	.reg_offset = zx296718_offsets,
-+};
-+
-+static struct zx2967_pm_domain usb20_domain = {
-+	.dm = {
-+		.name		= "usb20_domain",
-+	},
-+	.bit = PCU_DM_USB20,
-+	.polarity = PWREN,
-+	.reg_offset = zx296718_offsets,
-+};
-+
-+static struct zx2967_pm_domain usb21_domain = {
-+	.dm = {
-+		.name		= "usb21_domain",
-+	},
-+	.bit = PCU_DM_USB21,
-+	.polarity = PWREN,
-+	.reg_offset = zx296718_offsets,
-+};
-+
-+static struct zx2967_pm_domain usb30_domain = {
-+	.dm = {
-+		.name		= "usb30_domain",
-+	},
-+	.bit = PCU_DM_USB30,
-+	.polarity = PWREN,
-+	.reg_offset = zx296718_offsets,
-+};
-+
-+static struct zx2967_pm_domain hsic_domain = {
-+	.dm = {
-+		.name		= "hsic_domain",
-+	},
-+	.bit = PCU_DM_HSIC,
-+	.polarity = PWREN,
-+	.reg_offset = zx296718_offsets,
-+};
-+
-+static struct zx2967_pm_domain gmac_domain = {
-+	.dm = {
-+		.name		= "gmac_domain",
-+	},
-+	.bit = PCU_DM_GMAC,
-+	.polarity = PWREN,
-+	.reg_offset = zx296718_offsets,
-+};
-+
-+static struct zx2967_pm_domain ts_domain = {
-+	.dm = {
-+		.name		= "ts_domain",
-+	},
-+	.bit = PCU_DM_TS,
-+	.polarity = PWREN,
-+	.reg_offset = zx296718_offsets,
-+};
-+
-+static struct generic_pm_domain *zx296718_pm_domains[] = {
-+	[DM_ZX296718_VOU] = &vou_domain.dm,
-+	[DM_ZX296718_SAPPU] = &sappu_domain.dm,
-+	[DM_ZX296718_VDE] = &vde_domain.dm,
-+	[DM_ZX296718_VCE] = &vce_domain.dm,
-+	[DM_ZX296718_HDE] = &hde_domain.dm,
-+	[DM_ZX296718_VIU] = &viu_domain.dm,
-+	[DM_ZX296718_USB20] = &usb20_domain.dm,
-+	[DM_ZX296718_USB21] = &usb21_domain.dm,
-+	[DM_ZX296718_USB30] = &usb30_domain.dm,
-+	[DM_ZX296718_HSIC] = &hsic_domain.dm,
-+	[DM_ZX296718_GMAC] = &gmac_domain.dm,
-+	[DM_ZX296718_TS] = &ts_domain.dm,
-+};
-+
-+static int zx296718_pd_probe(struct platform_device *pdev)
-+{
-+	return zx2967_pd_probe(pdev,
-+			  zx296718_pm_domains,
-+			  ARRAY_SIZE(zx296718_pm_domains));
-+}
-+
-+static const struct of_device_id zx296718_pm_domain_matches[] = {
-+	{ .compatible = "zte,zx296718-pcu", },
-+	{ },
-+};
-+
-+static struct platform_driver zx296718_pd_driver = {
-+	.driver = {
-+		.name = "zx296718-powerdomain",
-+		.owner = THIS_MODULE,
-+		.of_match_table = zx296718_pm_domain_matches,
-+	},
-+	.probe = zx296718_pd_probe,
-+};
-+
-+static int __init zx296718_pd_init(void)
-+{
-+	return platform_driver_register(&zx296718_pd_driver);
-+}
-+subsys_initcall(zx296718_pd_init);
+Thanks,
+
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
