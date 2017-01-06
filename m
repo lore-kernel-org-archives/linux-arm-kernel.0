@@ -1,93 +1,58 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 6 Jan 2017 19:08:32 +0200
-Subject: [PATCH v11 0/8] power: add power sequence library
-In-Reply-To: <20170106151841.l6ehqmpben4ilkaf@kozik-lap>
-References: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
- <20170106151841.l6ehqmpben4ilkaf@kozik-lap>
-Message-ID: <20170106170832.jxthwq5sabpyskui@kozik-lap>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Fri, 6 Jan 2017 18:18:33 +0100
+Subject: [PATCH v6 07/18] iommu: Implement reserved_regions iommu-group
+ sysfs file
+In-Reply-To: <20170106124816.GQ17255@8bytes.org>
+References: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
+ <1483643086-2883-8-git-send-email-eric.auger@redhat.com>
+ <20170106110039.GL17255@8bytes.org>
+ <888d3750-817c-77d1-8154-e77cf8c3ad4b@redhat.com>
+ <20170106124816.GQ17255@8bytes.org>
+Message-ID: <0858b719-2888-0645-66d2-56fe698f4e2f@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 05:18:41PM +0200, Krzysztof Kozlowski wrote:
-> On Thu, Jan 05, 2017 at 02:01:51PM +0800, Peter Chen wrote:
-> > Hi all,
-> > 
-> > This is a follow-up for my last power sequence framework patch set [1].
-> > According to Rob Herring and Ulf Hansson's comments[2]. The kinds of
-> > power sequence instances will be added at postcore_initcall, the match
-> > criteria is compatible string first, if the compatible string is not
-> > matched between dts and library, it will try to use generic power sequence.
-> > 	 
-> > The host driver just needs to call of_pwrseq_on/of_pwrseq_off
-> > if only one power sequence instance is needed, for more power sequences
-> > are used, using of_pwrseq_on_list/of_pwrseq_off_list instead (eg, USB hub driver).
-> > 
-> > In future, if there are special power sequence requirements, the special
-> > power sequence library can be created.
-> > 
-> > This patch set is tested on i.mx6 sabresx evk using a dts change, I use
-> > two hot-plug devices to simulate this use case, the related binding
-> > change is updated at patch [1/6], The udoo board changes were tested
-> > using my last power sequence patch set.[3]
-> > 
-> > Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
-> > need to power on itself before it can be found by ULPI bus.
-> > 
-> > [1] http://www.spinics.net/lists/linux-usb/msg142755.html
-> > [2] http://www.spinics.net/lists/linux-usb/msg143106.html
-> > [3] http://www.spinics.net/lists/linux-usb/msg142815.html
-> > 
-> 
-> Unfortunately I was unable to utilize this library to solve Odroid U3
-> usb3503/lan9730 power sequence (as a continuation of my old series [0][1]).
-> 
-> The main problem is that power sequence instance (pwrseq_generic.c) is
-> not a device. I don't get why it is not a device. It would be rather
-> intuitive to me to make it a device. Also it would make life easier
-> because you could use all device-like consumer APIs (of getting clocks,
-> GPIOs etc). Since it is not a device, it is not possible to use
-> regulator consumer API.
-> 
-> I need a regulator because I need to toggle the power.
-> 
-> Other encountered issue is that power sequence happens early, before the
-> unused regulators are turned off by the system. However maybe this is
-> the necessity from other point of view.
-> 
-> My case is annoyingly over-complicated so I am slowly getting sertain
-> that it is not generic. Anyway it looks like this:
-> 
-> EHCI controller
->      |
->      |--HSIC0--lan9730 (reset is done only through regulator)
->      |--HSIC1--usb3504 (it has a reset GPIO... but it is toggled by
->                         usb3504 driver)
-> 
-> Overall, I want to reset the lan9730. This can be done only through
-> power - buck8. buck8 state is an logical OR of register set by I2C and
-> GPIO. Thus to turn it off, it is not sufficient just to set register to
-> 0x0 because the GPIO is keeping it on. The best way is to switch the
-> buck8 to gpio-enable-control thus only GPIO will be toggling it... still
-> through the regulator consumer API (because it is an GPIO for the
-> regulator, not for the reset!).
-> 
-> However these two seems coupled. On invalid reset sequence, both chips
-> die. The usb3504 has its own existing reset sequence and my findings
-> show that it should happen after lan9730 reset sequence. Otherwise all
-> devices might be lost...
+Hi Joerg, Robin,
 
-Update - it's working! I skipped entirely the regulator API and I am
-playing with its GPIO. This sounds like a hack but finally after few
-days of different tries I was able to find a working, reproducible
-solution. It turned out that the yours pwrseq is working quite good.
-
-I'll send a follow-up for my board soon.
-
-Best regards,
-Krzysztof
-
-
+On 06/01/2017 13:48, Joerg Roedel wrote:
+> On Fri, Jan 06, 2017 at 12:46:05PM +0100, Auger Eric wrote:
+>> On 06/01/2017 12:00, Joerg Roedel wrote:
 > 
-> [0] http://www.spinics.net/lists/linux-mmc/msg37386.html
-> [1] https://github.com/krzk/linux/commits/for-next/odroid-u3-usb3503-lan-boot-fixes-v4
+>>> I think it also makes sense to report the type of the reserved region.
+>>
+>> What is the best practice in that case? Shall we put the type enum
+>> values as strings such as:
+>> - direct
+>> - nomap
+>> - msi
+>>
+>> and document that in Documentation/ABI/testing/sysfs-kernel-iommu_groups
+> 
+> Yes, a string would be good. An probably 'reserved' is a better name
+> than nomap?
+the iommu_insert_resv_region() function that builds the group reserved
+region list sorts all regions and handles the case where there is an
+overlap between regions. Current code does not care about the type of
+regions. So in case a NOMAP region overlaps with a direct-mapped region,
+what is reported to the user space is the superset and the type depends
+on the overlap. This was suggested by Robin at some point to handle
+overlaps.
+
+I guess I should merge regions only in case the types equal?
+
+I remember that Alex thought that user-space should not care so much
+about the type of the regions so I tought it was better for the
+user-space to have a minimal view of the regions.
+
+On the other hand, this issue of merging regions of different types
+should not happen often but I prefer to highlight the potential issue.
+
+What is your guidance?
+
+Thanks
+
+Eric
+> 
+> 
+> 	Joerg
 > 
