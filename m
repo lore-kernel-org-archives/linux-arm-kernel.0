@@ -1,97 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:17:58 +0100
-Subject: [PATCH 16/16] arm64: dts: r8a7795: Add PWM support
-In-Reply-To: <cover.1483700694.git.horms+renesas@verge.net.au>
-References: <cover.1483700694.git.horms+renesas@verge.net.au>
-Message-ID: <b2b9443beee5017ebdb3f2be9ef472c73d260481.1483700694.git.horms+renesas@verge.net.au>
+Date: Fri,  6 Jan 2017 12:18:10 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.11
+Message-ID: <cover.1483701293.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Add the 7 PWM channels to the r8a7795 device tree, in the disabled
-state.
+Please consider these Renesas ARM based SoC defconfig updates for v4.11.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 63 ++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 3fe7e0af5989..972e379c0596 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -894,6 +894,69 @@
- 			status = "disabled";
- 		};
- 
-+		pwm0: pwm at e6e30000 {
-+			compatible = "renesas,pwm-r8a7795", "renesas,pwm-rcar";
-+			reg = <0 0xe6e30000 0 0x8>;
-+			clocks = <&cpg CPG_MOD 523>;
-+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-+			#pwm-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		pwm1: pwm at e6e31000 {
-+			compatible = "renesas,pwm-r8a7795", "renesas,pwm-rcar";
-+			reg = <0 0xe6e31000 0 0x8>;
-+			clocks = <&cpg CPG_MOD 523>;
-+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-+			#pwm-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		pwm2: pwm at e6e32000 {
-+			compatible = "renesas,pwm-r8a7795", "renesas,pwm-rcar";
-+			reg = <0 0xe6e32000 0 0x8>;
-+			clocks = <&cpg CPG_MOD 523>;
-+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-+			#pwm-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		pwm3: pwm at e6e33000 {
-+			compatible = "renesas,pwm-r8a7795", "renesas,pwm-rcar";
-+			reg = <0 0xe6e33000 0 0x8>;
-+			clocks = <&cpg CPG_MOD 523>;
-+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-+			#pwm-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		pwm4: pwm at e6e34000 {
-+			compatible = "renesas,pwm-r8a7795", "renesas,pwm-rcar";
-+			reg = <0 0xe6e34000 0 0x8>;
-+			clocks = <&cpg CPG_MOD 523>;
-+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-+			#pwm-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		pwm5: pwm at e6e35000 {
-+			compatible = "renesas,pwm-r8a7795", "renesas,pwm-rcar";
-+			reg = <0 0xe6e35000 0 0x8>;
-+			clocks = <&cpg CPG_MOD 523>;
-+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-+			#pwm-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		pwm6: pwm at e6e36000 {
-+			compatible = "renesas,pwm-r8a7795", "renesas,pwm-rcar";
-+			reg = <0 0xe6e36000 0 0x8>;
-+			clocks = <&cpg CPG_MOD 523>;
-+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-+			#pwm-cells = <2>;
-+			status = "disabled";
-+		};
-+
- 		rcar_sound: sound at ec500000 {
- 			/*
- 			 * #sound-dai-cells is required
--- 
-2.7.0.rc3.207.g0ac5344
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+
+  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.11
+
+for you to fetch changes up to e37278d83e348eb53029452e65892780359b6bea:
+
+  ARM: multi_v7_defconfig: Enable r8a774[35] SoCs (2017-01-03 10:44:04 +0100)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Defconfig Updates for v4.11
+
+Enable:
+* Recently added Enable r8a774[35] SoCs
+* CMA for DMA to allow use of VIN with large frame sizes
+* CONFIG_VIDEO_ADV7604 to allow use of HDMI input
+
+----------------------------------------------------------------
+Niklas S?derlund (2):
+      ARM: shmobile: defconfig: Enable CONFIG_VIDEO_ADV7604
+      ARM: shmobile: defconfig: Enable CMA for DMA
+
+Simon Horman (2):
+      ARM: shmobile: defconfig: Enable r8a774[35] SoCs
+      ARM: multi_v7_defconfig: Enable r8a774[35] SoCs
+
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ arch/arm/configs/shmobile_defconfig | 6 ++++++
+ 2 files changed, 8 insertions(+)
