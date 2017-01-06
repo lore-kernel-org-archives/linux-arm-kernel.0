@@ -1,70 +1,20 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 6 Jan 2017 17:34:29 +0100
-Subject: [RESEND PATCH v1] ARM: dts: stm32f429: Add missing USART3 pin
- config to STM32F469I-DISCO board
-In-Reply-To: <20161118151033.30592-1-bmh@certi.org.br>
-References: <20161118151033.30592-1-bmh@certi.org.br>
-Message-ID: <97600913-7d3e-8096-3bfa-431c70a949dc@st.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 6 Jan 2017 08:38:39 -0800
+Subject: [PATCH v3] soc: ti: wkup_m3_ipc: Drop wait from
+ wkup_m3_rproc_boot_thread
+In-Reply-To: <1483653615-24378-1-git-send-email-spjoshi@codeaurora.org>
+References: <1483653615-24378-1-git-send-email-spjoshi@codeaurora.org>
+Message-ID: <20170106163839.GF2630@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bruno,
+* Sarangdhar Joshi <spjoshi@codeaurora.org> [170105 14:01]:
+> The function wkup_m3_rproc_boot_thread waits for asynchronous
+> firmware loading to parse the resource table before calling
+> rproc_boot(). However, as the resource table parsing has been
+> moved to rproc_boot(), there's no need to wait for the
+> asynchronous firmware loading completion.  So, drop this.
 
-On 11/18/2016 04:10 PM, Bruno Meirelles Herrera wrote:
-> Including new STM32 maintainer. Rebased at stm32-dt-for-v4.10-1 and
-> stm32-dt-for-v4.10-2 branches. It fix the port/pin initialization in
-> case boot-loader does not configure/initialize the pins.
-> Fixing line wrapping from last patch
->
-> This patch adds USART3 pin configuration on PB10/PA11 pins
-> for STM32F469I-DISCO board.
->
-> Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
-> ---
->  arch/arm/boot/dts/stm32f429.dtsi      | 13 +++++++++++++
->  arch/arm/boot/dts/stm32f469-disco.dts |  2 ++
->  2 files changed, 15 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-> index e4dae0e..1b8b105 100644
-> --- a/arch/arm/boot/dts/stm32f429.dtsi
-> +++ b/arch/arm/boot/dts/stm32f429.dtsi
-> @@ -316,6 +316,19 @@
->  				};
->  			};
->
-> +			usart3_pins_a: usart3 at 0 {
-> +				pins1 {
-> +					pinmux = <STM32F429_PB10_FUNC_USART3_TX>;
-> +					bias-disable;
-> +					drive-push-pull;
-> +					slew-rate = <0>;
-> +				};
-> +				pins2 {
-> +					pinmux = <STM32F429_PB11_FUNC_USART3_RX>;
-> +					bias-disable;
-> +				};
-> +			};
-> +
->  			usbotg_hs_pins_a: usbotg_hs at 0 {
->  				pins {
->  					pinmux = <STM32F429_PH4_FUNC_OTG_HS_ULPI_NXT>,
-> diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
-> index 8877c00..75f4303 100644
-> --- a/arch/arm/boot/dts/stm32f469-disco.dts
-> +++ b/arch/arm/boot/dts/stm32f469-disco.dts
-> @@ -79,5 +79,7 @@
->  };
->
->  &usart3 {
-> +	pinctrl-0 = <&usart3_pins_a>;
-> +	pinctrl-names = "default";
->  	status = "okay";
->  };
->
-After a little cosmetic change in commit header:
+Applying into omap-for-v4.11/drivers thanks.
 
-Applied on stm32-dt-for-v4.11-1
-
-Thanks!
-Alex
+Tony
