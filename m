@@ -1,63 +1,139 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Jan 2017 14:46:48 +0000
-Subject: [PATCHv2 net-next 10/16] net: mvpp2: handle register mapping and
- access for PPv2.2
-In-Reply-To: <1482943592-12556-11-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482943592-12556-11-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170106144648.GE14217@n2100.armlinux.org.uk>
+From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
+Date: Fri,  6 Jan 2017 17:45:11 +0300
+Subject: [PATCH] arm64: do not set dma masks that device connection can't
+ handle
+In-Reply-To: <9a03c05d-ad4c-0547-d1fe-01edb8b082d6@cogentembedded.com>
+References: <9a03c05d-ad4c-0547-d1fe-01edb8b082d6@cogentembedded.com>
+Message-ID: <1483713911-2079-1-git-send-email-nikita.yoush@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 28, 2016 at 05:46:26PM +0100, Thomas Petazzoni wrote:
-> This commit adjusts the mvpp2 driver register mapping and access logic
-> to support PPv2.2, to handle a number of differences.
-> 
-> Due to how the registers are laid out in memory, the Device Tree binding
-> for the "reg" property is different:
-> 
->  - On PPv2.1, we had a first area for the common registers, and then one
->    area per port.
-> 
->  - On PPv2.2, we have a first area for the common registers, and a
->    second area for all the per-ports registers.
-> 
-> In addition, on PPv2.2, the area for the common registers is split into
-> so-called "address spaces" of 64 KB each. They allow to access the same
-> registers, but from different CPUs. Hence the introduction of cpu_base[]
-> in 'struct mvpp2', and the modification of the mvpp2_write() and
-> mvpp2_read() register accessors. For PPv2.1, the compatibility is
-> preserved by using an "address space" size of 0.
+It is possible that device is capable of 64-bit DMA addresses, and
+device driver tries to set wide DMA mask, but bridge or bus used to
+connect device to the system can't handle wide addresses.
 
-I'm not entirely sure this is the best solution - every register access
-will be wrapped with a preempt_disable() and preempt_enable().  At
-every site, when preempt is enabled, we will end up with code to:
+With swiotlb, memory above 4G still can be used by drivers for streaming
+DMA, but *dev->mask and dev->dma_coherent_mask must still keep values
+that hardware handles physically.
 
-- get the thread info
-- increment the preempt count
-- access the register
-- decrement the preempt count
-- test resulting preempt count and branch to __preempt_schedule()
+This patch enforces that. Based on original version by
+Arnd Bergmann <arnd@arndb.de>, extended with coherent mask hadnling.
 
-If tracing is enabled, it gets much worse, because the increment and
-decrement happen out of line, and are even more expensive.
+Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+---
 
-If a function is going to make several register accesses, it's going
-to be much more efficient to do:
+... now with initially missed change in arch_setup_dma_ops() ...
 
-	void __iomem *base = priv->cpu_base[get_cpu()];
+ arch/arm64/Kconfig              |  3 +++
+ arch/arm64/include/asm/device.h |  1 +
+ arch/arm64/mm/dma-mapping.c     | 52 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 56 insertions(+)
 
-	...
-
-	put_cpu();
-
-which means we don't end up with multiple instances of the preempt code
-consecutive accesses.
-
-I think this is an example where having driver-private accessors for
-readl()/writel() is far from a good idea.
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1117421..afb2c08 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -216,6 +216,9 @@ config NEED_DMA_MAP_STATE
+ config NEED_SG_DMA_LENGTH
+ 	def_bool y
+ 
++config ARCH_HAS_DMA_SET_COHERENT_MASK
++	def_bool y
++
+ config SMP
+ 	def_bool y
+ 
+diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
+index 243ef25..a57e7bb 100644
+--- a/arch/arm64/include/asm/device.h
++++ b/arch/arm64/include/asm/device.h
+@@ -22,6 +22,7 @@ struct dev_archdata {
+ 	void *iommu;			/* private IOMMU data */
+ #endif
+ 	bool dma_coherent;
++	u64 parent_dma_mask;
+ };
+ 
+ struct pdev_archdata {
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 290a84f..09c7900 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -352,6 +352,31 @@ static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
+ 	return 1;
+ }
+ 
++static int __swiotlb_set_dma_mask(struct device *dev, u64 mask)
++{
++	/* device is not DMA capable */
++	if (!dev->dma_mask)
++		return -EIO;
++
++	/* mask is below swiotlb bounce buffer, so fail */
++	if (!swiotlb_dma_supported(dev, mask))
++		return -EIO;
++
++	/*
++	 * because of the swiotlb, we can return success for
++	 * larger masks, but need to ensure that bounce buffers
++	 * are used above parent_dma_mask, so set that as
++	 * the effective mask.
++	 */
++	if (mask > dev->archdata.parent_dma_mask)
++		mask = dev->archdata.parent_dma_mask;
++
++
++	*dev->dma_mask = mask;
++
++	return 0;
++}
++
+ static struct dma_map_ops swiotlb_dma_ops = {
+ 	.alloc = __dma_alloc,
+ 	.free = __dma_free,
+@@ -367,8 +392,23 @@ static struct dma_map_ops swiotlb_dma_ops = {
+ 	.sync_sg_for_device = __swiotlb_sync_sg_for_device,
+ 	.dma_supported = __swiotlb_dma_supported,
+ 	.mapping_error = swiotlb_dma_mapping_error,
++	.set_dma_mask = __swiotlb_set_dma_mask,
+ };
+ 
++int dma_set_coherent_mask(struct device *dev, u64 mask)
++{
++	if (!dma_supported(dev, mask))
++		return -EIO;
++
++	if (get_dma_ops(dev) == &swiotlb_dma_ops &&
++	    mask > dev->archdata.parent_dma_mask)
++		mask = dev->archdata.parent_dma_mask;
++
++	dev->coherent_dma_mask = mask;
++	return 0;
++}
++EXPORT_SYMBOL(dma_set_coherent_mask);
++
+ static int __init atomic_pool_init(void)
+ {
+ 	pgprot_t prot = __pgprot(PROT_NORMAL_NC);
+@@ -957,6 +997,18 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 	if (!dev->archdata.dma_ops)
+ 		dev->archdata.dma_ops = &swiotlb_dma_ops;
+ 
++	/*
++	 * we don't yet support buses that have a non-zero mapping.
++	 *  Let's hope we won't need it
++	 */
++	WARN_ON(dma_base != 0);
++
++	/*
++	 * Whatever the parent bus can set. A device must not set
++	 * a DMA mask larger than this.
++	 */
++	dev->archdata.parent_dma_mask = size;
++
+ 	dev->archdata.dma_coherent = coherent;
+ 	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
+ }
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
