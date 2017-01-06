@@ -1,72 +1,68 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 6 Jan 2017 15:27:20 +0000
-Subject: [PATCH] arm64: dts: juno: Fix CoreSight support for Juno r1/r2
- variants
-In-Reply-To: <1483637646-39229-1-git-send-email-mike.leach@linaro.org>
-References: <1483637646-39229-1-git-send-email-mike.leach@linaro.org>
-Message-ID: <3082bef8-edf6-2575-85d0-1b06ea7b1f77@arm.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Fri, 6 Jan 2017 10:39:45 -0500
+Subject: [PATCH v2 2/5] arm64: Work around Falkor erratum 1003
+In-Reply-To: <1dfdc578-e0f8-1320-d223-c9c55e70ca93@codeaurora.org>
+References: <20161229224335.13531-1-cov@codeaurora.org>
+ <20161229224335.13531-2-cov@codeaurora.org>
+ <1dfdc578-e0f8-1320-d223-c9c55e70ca93@codeaurora.org>
+Message-ID: <fd82e2bf-5259-2fda-c931-1996387d779f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Suzuki
-
-Hi Mike,
-
-Thanks for fixing the R1/2 CS support. Suzuki was also looking at fixing it.
-
-On 05/01/17 17:34, Mike Leach wrote:
-> The CoreSight support added for Juno is valid for only Juno r0.
-> The Juno r1 and r2 variants have additional components and alternative
-> connection routes between trace source and sinks.
+On 12/29/2016 06:02 PM, Timur Tabi wrote:
+> On 12/29/2016 04:43 PM, Christopher Covington wrote:
+>> -| Implementor    | Component       | Erratum ID      | Kconfig                 |
+>> -+----------------+-----------------+-----------------+-------------------------+
+>> -| ARM            | Cortex-A53      | #826319         | ARM64_ERRATUM_826319    |
+>> -| ARM            | Cortex-A53      | #827319         | ARM64_ERRATUM_827319    |
+>> -| ARM            | Cortex-A53      | #824069         | ARM64_ERRATUM_824069    |
+>> -| ARM            | Cortex-A53      | #819472         | ARM64_ERRATUM_819472    |
+>> -| ARM            | Cortex-A53      | #845719         | ARM64_ERRATUM_845719    |
+>> -| ARM            | Cortex-A53      | #843419         | ARM64_ERRATUM_843419    |
+>> -| ARM            | Cortex-A57      | #832075         | ARM64_ERRATUM_832075    |
+>> -| ARM            | Cortex-A57      | #852523         | N/A                     |
+>> -| ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220    |
+>> -| ARM            | Cortex-A72      | #853709         | N/A                     |
+>> -| ARM            | MMU-500         | #841119,#826419 | N/A                     |
+>> -|                |                 |                 |                         |
+>> -| Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375    |
+>> -| Cavium         | ThunderX ITS    | #23144          | CAVIUM_ERRATUM_23144    |
+>> -| Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154    |
+>> -| Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456    |
+>> -| Cavium         | ThunderX SMMUv2 | #27704          | N/A               |
+>> -|                |                 |                 |                         |
+>> -| Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585     |
+>> +| Implementor   | Component       | Erratum ID      | Kconfig                  |
+>> ++---------------+-----------------+-----------------+--------------------------+
+>> +| ARM           | Cortex-A53      | #826319         | ARM64_ERRATUM_826319     |
+>> +| ARM           | Cortex-A53      | #827319         | ARM64_ERRATUM_827319     |
+>> +| ARM           | Cortex-A53      | #824069         | ARM64_ERRATUM_824069     |
+>> +| ARM           | Cortex-A53      | #819472         | ARM64_ERRATUM_819472     |
+>> +| ARM           | Cortex-A53      | #845719         | ARM64_ERRATUM_845719     |
+>> +| ARM           | Cortex-A53      | #843419         | ARM64_ERRATUM_843419     |
+>> +| ARM           | Cortex-A57      | #832075         | ARM64_ERRATUM_832075     |
+>> +| ARM           | Cortex-A57      | #852523         | N/A                      |
+>> +| ARM           | Cortex-A57      | #834220         | ARM64_ERRATUM_834220     |
+>> +| ARM           | Cortex-A72      | #853709         | N/A                      |
+>> +| ARM           | MMU-500         | #841119,#826419 | N/A                      |
+>> +|               |                 |                 |                          |
+>> +| Cavium        | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375     |
+>> +| Cavium        | ThunderX ITS    | #23144          | CAVIUM_ERRATUM_23144     |
+>> +| Cavium        | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154     |
+>> +| Cavium        | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456     |
+>> +| Cavium        | ThunderX SMMUv2 | #27704          | N/A                      |
+>> +|               |                 |                 |                          |
+>> +| Freescale/NXP | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585      |
+>> +| Qualcomm      | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003 |
 > 
-> The CoreSight infrastructure external to the Cortex-Axx clusters, has
-> been split into separate .dtsi include files for r0 and r1/r2 to correctly
-> represent these variations.
-> 
-> Adds missing DT entry for the CoreSight STM component in the infrastructure
-> .dtsi files.
-> 
+> Looks like you've made an unrelated whitespace change that affected the entire table,
+> not just the line you're adding.
 
-STM support can be a separate patch as it's a new feature added.
+I'm making space for "QCOM_FALKOR_ERRATUM_1003".
 
-> Signed-off-by: Mike Leach <mike.leach@linaro.org>
-> ---
->  arch/arm64/boot/dts/arm/juno-base.dtsi    | 135 ---------------
->  arch/arm64/boot/dts/arm/juno-cs-r0.dtsi   | 166 +++++++++++++++++++
->  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 266 ++++++++++++++++++++++++++++++
->  arch/arm64/boot/dts/arm/juno-r1.dts       |   1 +
->  arch/arm64/boot/dts/arm/juno-r2.dts       |   1 +
->  arch/arm64/boot/dts/arm/juno.dts          |   1 +
->  6 files changed, 435 insertions(+), 135 deletions(-)
->  create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r0.dtsi
->  create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> index 7d83224..7c89000 100644
-> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-
-[...]
-
-> +
-> +	stm at 20100000 {
-> +		compatible = "arm,coresight-stm", "arm,primecell";
-> +		reg = <0 0x20100000 0 0x1000>,
-> +		      <0 0x28000000 0 0x180000>;
-> +		reg-names = "stm-base", "stm-stimulus-base";
-> +
-> +		clocks = <&soc_smc50mhz>;
-> +		clock-names = "apb_pclk";
-> +		power-domains = <&scpi_devpd 0>;
-> +		port {
-> +			stm_out_port: endpoint {
-> +				remote-endpoint = <&main_funnel_in_port2>;
-> +			};
-> +		};
-> +	};
-
-As mentioned above move this to a different patch.
+Cov
 
 -- 
-Regards,
-Sudeep
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
+Aurora Forum, a Linux Foundation Collaborative Project.
