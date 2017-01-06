@@ -1,49 +1,30 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 6 Jan 2017 11:02:20 -0300
-Subject: [PATCH v5 2/5] arm64: dts: exynos: make tm2 and tm2e independent
- from each other
-In-Reply-To: <20170106134929.mj7wqalp7lpkfm6b@kozik-lap>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 6 Jan 2017 16:03:33 +0200
+Subject: [PATCH v5 5/5] arm64: dts: exynos: Add tm2 touchkey node
+In-Reply-To: <20170106134350.32428-6-andi.shyti@samsung.com>
 References: <20170106134350.32428-1-andi.shyti@samsung.com>
- <CGME20170106134356epcas1p19be459900aec43b2b9ea343cdaf0a2bf@epcas1p1.samsung.com>
- <20170106134350.32428-3-andi.shyti@samsung.com>
- <20170106134929.mj7wqalp7lpkfm6b@kozik-lap>
-Message-ID: <9e4fe0ee-0c33-9a5f-a954-b13d35b0113f@osg.samsung.com>
+ <CGME20170106134356epcas1p1aee9f715c58b50f6056bf0b43b849497@epcas1p1.samsung.com>
+ <20170106134350.32428-6-andi.shyti@samsung.com>
+Message-ID: <20170106140333.v47qqspgvmkd24zg@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On 01/06/2017 10:49 AM, Krzysztof Kozlowski wrote:
-> On Fri, Jan 06, 2017 at 10:43:47PM +0900, Andi Shyti wrote:
->> Currently tm2e dts includes tm2 but there are some differences
->> between the two boards and tm2 has some properties that tm2e
->> doesn't have.
->>
->> That's why it's important to keep the two dts files independent
->> and put all the commonalities in a tm2-common.dtsi file.
->>
->> At the current status the only two differences between the two
->> dts files (besides the board name) are ldo31 and ldo38.
->>
->> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
->> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
->> ---
-
-[snip]
-
- > Beside that it is starting to look good. I didn't find anything else but
-> maybe Javier's eagle eye will catch something.
->
-
-I didn't find anything else, the patch looks good to me now.
- 
+On Fri, Jan 06, 2017 at 10:43:50PM +0900, Andi Shyti wrote:
+> From: Jaechul Lee <jcsing.lee@samsung.com>
 > 
-> Best regards,
-> Krzysztof
+> Add DT node support for TM2 touchkey device.
 > 
+> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
+> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
+> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> ---
+>  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+
+Looks good, but I will wait with this one till the bindings and driver
+got accepted.
 
 Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Krzysztof
