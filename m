@@ -1,78 +1,43 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Fri, 6 Jan 2017 01:39:25 -0600
-Subject: [PATCH 10/12] ARM: dts: socfpga: add base fpga region and fpga
- bridges
-In-Reply-To: <CANk1AXRsrW1YHRPn4Rcv7Pu8jBUEcOmREOFYvvMV8D9eKLU-6g@mail.gmail.com>
-References: <1483575694-29599-1-git-send-email-dinguyen@kernel.org>
- <1483575694-29599-11-git-send-email-dinguyen@kernel.org>
- <CANk1AXSbqohp73xHpp7e9-37d61ZB-dRAPAFc2eQGRYUnvB+0w@mail.gmail.com>
- <CANk1AXRsrW1YHRPn4Rcv7Pu8jBUEcOmREOFYvvMV8D9eKLU-6g@mail.gmail.com>
-Message-ID: <c1f0db0e-18ae-660f-2ff0-4489419fe838@kernel.org>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Fri, 6 Jan 2017 15:41:30 +0800
+Subject: [PATCH 2/2] media: rc: add driver for IR remote receiver on
+ MT7623 SoC
+In-Reply-To: <20170106034346.7njhyhtsc4yado5c@gangnam.samsung>
+References: <1483632384-8107-1-git-send-email-sean.wang@mediatek.com>
+ <CGME20170105160810epcas3p1b7a85197c15fbbe87e08c736259935d6@epcas3p1.samsung.com>
+ <1483632384-8107-3-git-send-email-sean.wang@mediatek.com>
+ <20170106034346.7njhyhtsc4yado5c@gangnam.samsung>
+Message-ID: <1483688490.16976.26.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Andi,
 
+Thank for your reminder. I will refine the code based on your work.
+to have elegant code and easy error handling.
 
-On 01/05/2017 10:34 AM, Alan Tull wrote:
-> On Thu, Jan 5, 2017 at 10:28 AM, Alan Tull <atull@kernel.org> wrote:
->> On Wed, Jan 4, 2017 at 6:21 PM, Dinh Nguyen <dinguyen@kernel.org> wrote:
->>> From: Alan Tull <atull@opensource.altera.com>
->>>
->>> Add h2f and lwh2f bridges.
->>> Add base FPGA Region to support DT overlays for FPGA programming.
->>> Add l3regs.
->>>
->>> Signed-off-by: Alan Tull <atull@opensource.altera.com>
->>> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
->>> ---
->>>  arch/arm/boot/dts/socfpga.dtsi | 31 +++++++++++++++++++++++++++++++
->>>  1 file changed, 31 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
->>> index de29172..dccc281 100644
->>> --- a/arch/arm/boot/dts/socfpga.dtsi
->>> +++ b/arch/arm/boot/dts/socfpga.dtsi
->>> @@ -93,6 +93,16 @@
->>>                         };
->>>                 };
->>>
->>> +               base_fpga_region {
->>> +                       compatible = "fpga-region";
->>> +                       fpga-mgr = <&fpgamgr0>;
->>> +                       fpga-bridges = <&fpga_bridge0>, <&fpga_bridge1>;
->>
->> Hi Dinh,
->>
->> We want to get rid of the 'fpga-bridges' line.
->>
->>> +
->>> +                       #address-cells = <0x1>;
->>> +                       #size-cells = <0x1>;
->>> +                       ranges = <0 0xff200000 0x100000>;
->>
->> Should get rid of the ranges line here too.  The 'fpga-bridges' and
->> 'ranges' line can be added in the overlay.
->>
->> Alan
->>
->>> +               };
->>> +
->>>                 can0: can at ffc00000 {
->>>                         compatible = "bosch,d_can";
->>>                         reg = <0xffc00000 0x1000>;
->>> @@ -513,6 +523,22 @@
->>>                                 };
->>>                 };
->>>
->>> +               fpga_bridge0: fpga_bridge at ff400000 {
->>> +                       compatible = "altr,socfpga-lwhps2fpga-bridge";
->>> +                       reg = <0xff400000 0x100000>;
->>> +                       resets = <&rst LWHPS2FPGA_RESET>;
->>> +                       reset-names = "lwhps2fpga";
+Sean
+
+On Fri, 2017-01-06 at 12:43 +0900, Andi Shyti wrote:
+> Hi Sean,
 > 
-> The driver doesn't need 'reset-names' here or below for fpga_bridge1.
+> > +	ir->rc = rc_allocate_device();
 > 
-
-Ok, thanks for the review.
-
-Dinh
+> Yes, you should use devm_rc_allocate_device(...)
+> 
+> Besides, standing to this patch which is not in yet:
+> 
+> https://lkml.org/lkml/2016/12/18/39
+> 
+> rc_allocate_device should provide the driver type during
+> allocation, so it should be:
+> 
+> 	ir->rc = rc_allocate_device(RC_DRIVER_IR_RAW);
+> 
+> and this line can be removed:
+> 
+> > +	ir->rc->driver_type = RC_DRIVER_IR_RAW;
+> 
+> I don't know when Mauro will take the patch above.
+> 
+> Andi
