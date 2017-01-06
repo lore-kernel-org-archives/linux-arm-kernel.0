@@ -1,27 +1,89 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri,  6 Jan 2017 10:42:04 +0100
-Subject: [PATCH 0/3] mtd: nand: sunxi: Perfs improvements
-Message-ID: <1483695727-17415-1-git-send-email-boris.brezillon@free-electrons.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 6 Jan 2017 11:00:49 +0100
+Subject: [RFC PATCH 1/7] arm64: Use physical counter for in-kernel reads
+In-Reply-To: <5e820613-f9f3-0035-b145-0e22e9bcfeca@arm.com>
+References: <20161210204712.21830-1-christoffer.dall@linaro.org>
+ <20161210204712.21830-2-christoffer.dall@linaro.org>
+ <5e820613-f9f3-0035-b145-0e22e9bcfeca@arm.com>
+Message-ID: <20170106100049.GB21089@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Marc,
 
-These 3 patches aims at improving the sunxi NAND driver perfs and
-avoiding busy waits on long operations to improve system reactivity.
+On Thu, Jan 05, 2017 at 06:11:14PM +0000, Marc Zyngier wrote:
+> [adding the arm64 maintainers, plus Mark as arch timer maintainer]
 
-Regards,
+Right, sorry, I should have done that already.
 
-Boris
+> 
+> On 10/12/16 20:47, Christoffer Dall wrote:
+> > Using the physical counter allows KVM to retain the offset between the
+> > virtual and physical counter as long as it is actively running a VCPU.
+> > 
+> > As soon as a VCPU is released, another thread is scheduled or we start
+> > running userspace applications, we reset the offset to 0, so that VDSO
+> > operations can still read the virtual counter and get the same view of
+> > time as the kernel.
+> > 
+> > This opens up potential improvements for KVM performance.
+> > 
+> > VHE kernels or kernels using the virtual timer are unaffected by this.
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  arch/arm64/include/asm/arch_timer.h  | 6 ++++--
+> >  drivers/clocksource/arm_arch_timer.c | 2 +-
+> >  2 files changed, 5 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> > index eaa5bbe..cec2549 100644
+> > --- a/arch/arm64/include/asm/arch_timer.h
+> > +++ b/arch/arm64/include/asm/arch_timer.h
+> > @@ -139,11 +139,13 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
+> >  
+> >  static inline u64 arch_counter_get_cntpct(void)
+> >  {
+> > +	u64 cval;
+> >  	/*
+> >  	 * AArch64 kernel and user space mandate the use of CNTVCT.
+> >  	 */
+> > -	BUG();
+> > -	return 0;
+> > +	isb();
+> > +	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
+> > +	return cval;
+> >  }
+> >  
+> >  static inline u64 arch_counter_get_cntvct(void)
+> > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> > index 73c487d..a5b0789 100644
+> > --- a/drivers/clocksource/arm_arch_timer.c
+> > +++ b/drivers/clocksource/arm_arch_timer.c
+> > @@ -597,7 +597,7 @@ static void __init arch_counter_register(unsigned type)
+> >  
+> >  	/* Register the CP15 based counter if we have one */
+> >  	if (type & ARCH_CP15_TIMER) {
+> > -		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_uses_ppi == VIRT_PPI)
+> > +		if (arch_timer_uses_ppi == VIRT_PPI || is_kernel_in_hyp_mode())
+> 
+> Why do we have this is_kernel_in_hyp_mode clause? I can't think of any
+> reason for a VHE kernel to use the virtual counter at all...
+> 
 
-Boris Brezillon (3):
-  mtd: nand: sunxi: Fix the non-polling case in sunxi_nfc_wait_events()
-  mtd: nand: sunxi: Stop using polling mode when waiting for long
-    operations
-  mtd: nand: sunxi: Improve sunxi_nfc_cmd_ctrl()
+Good question.  I think I just didn't want to change behavior from the
+existing functionality mre than necessary.
 
- drivers/mtd/nand/sunxi_nand.c | 36 ++++++++++++++++++++++++++----------
- 1 file changed, 26 insertions(+), 10 deletions(-)
+Note that on a VHE kernel this will be the EL2 virtual counter, not the
+EL1 virtual counter, due to the register redirection.  Are the virtual
+and physical EL2 counters always equivalent on a VHE system?
 
--- 
-2.7.4
+
+> >  			arch_timer_read_counter = arch_counter_get_cntvct;
+> >  		else
+> >  			arch_timer_read_counter = arch_counter_get_cntpct;
+> > 
+> 
+
+Thanks,
+-Christoffer
