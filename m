@@ -1,46 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 06 Jan 2017 12:24:25 +0100
-Subject: [QUESTION] Early Write Acknowledge for PCIe configuration space
-In-Reply-To: <df407f39-ee05-d74d-6e5e-c5e502372032@huawei.com>
-References: <df407f39-ee05-d74d-6e5e-c5e502372032@huawei.com>
-Message-ID: <6092525.UgRCY3dpzP@wuerfel>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri,  6 Jan 2017 12:18:27 +0100
+Subject: [PATCH 18/25] ARM: dts: r8a7794: Use R-Car Gen 2 fallback binding for
+ i2c nodes
+In-Reply-To: <cover.1483700969.git.horms+renesas@verge.net.au>
+References: <cover.1483700969.git.horms+renesas@verge.net.au>
+Message-ID: <5e6173897c03f13366edefca98dd4712d3ddb0d4.1483700969.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 6, 2017 11:15:22 AM CET John Garry wrote:
-> [apologies if this has been queried before]
-> 
-> Hi ARM guys,
-> 
-> I have a question about the device memory attributes we assign for PCIe 
-> config space for arm64. Currently we use ioremap to map in the config 
-> space; this uses nGnRE, which means we enable Early Write Acknowledge.
-> 
-> The ARMv8 ARM states that "ARM recommend that No Early Write Acknowledge 
-> Hint is used for PCIe configuration writes".
-> 
-> I understand a problem with using E is in that configuration write is a 
-> non-post operation, which means the RP requires to get the completion 
-> ack from the EP The problem here is if CPU writes data to ECAM by E, 
-> complete will go back to CPU directly, and maybe at this point the write 
-> has not reached the EP.
-> 
-> I believe that this may cause ordering issues in PCI read/write. In 
-> practice we use non-relaxed readl/writel to access config space, which 
-> include the synchronization barriers, which, *as I understand*, even if 
-> for full system domain, may be negated by the E attribute for PCIe.
+Use recently added R-Car Gen 2 fallback binding for i2c nodes in
+DT for r8a7794 SoC.
 
-I don't think the barriers in readl/writel are enough here, in particular
-the write barrier is *before* the access to synchronize DMAs
-on RAM with MMIO accesses, which is a bit different from what you
-have here.
+This has no run-time effect for the current driver as the initialisation
+sequence is the same for the SoC-specific binding for r8a7794 and the
+fallback binding for R-Car Gen 2.
 
-> So a question: why is the recommendation in the ARMv8 ARM ignored?
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/boot/dts/r8a7794.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-Probably nobody thought about this properly in the Linux drivers. The
-ARMv8 ARM sounds correct here.
-
-I/O space may have the same issue, as it also requires non-posted
-accesses.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 9692bfd82b1d..89f8f98cb115 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -611,7 +611,7 @@
+ 
+ 	/* The memory map in the User's Manual maps the cores to bus numbers */
+ 	i2c0: i2c at e6508000 {
+-		compatible = "renesas,i2c-r8a7794";
++		compatible = "renesas,i2c-r8a7794", "renesas,rcar-gen2-i2c";
+ 		reg = <0 0xe6508000 0 0x40>;
+ 		interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7794_CLK_I2C0>;
+@@ -623,7 +623,7 @@
+ 	};
+ 
+ 	i2c1: i2c at e6518000 {
+-		compatible = "renesas,i2c-r8a7794";
++		compatible = "renesas,i2c-r8a7794", "renesas,rcar-gen2-i2c";
+ 		reg = <0 0xe6518000 0 0x40>;
+ 		interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7794_CLK_I2C1>;
+@@ -635,7 +635,7 @@
+ 	};
+ 
+ 	i2c2: i2c at e6530000 {
+-		compatible = "renesas,i2c-r8a7794";
++		compatible = "renesas,i2c-r8a7794", "renesas,rcar-gen2-i2c";
+ 		reg = <0 0xe6530000 0 0x40>;
+ 		interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7794_CLK_I2C2>;
+@@ -647,7 +647,7 @@
+ 	};
+ 
+ 	i2c3: i2c at e6540000 {
+-		compatible = "renesas,i2c-r8a7794";
++		compatible = "renesas,i2c-r8a7794", "renesas,rcar-gen2-i2c";
+ 		reg = <0 0xe6540000 0 0x40>;
+ 		interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7794_CLK_I2C3>;
+@@ -659,7 +659,7 @@
+ 	};
+ 
+ 	i2c4: i2c at e6520000 {
+-		compatible = "renesas,i2c-r8a7794";
++		compatible = "renesas,i2c-r8a7794", "renesas,rcar-gen2-i2c";
+ 		reg = <0 0xe6520000 0 0x40>;
+ 		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7794_CLK_I2C4>;
+@@ -671,7 +671,7 @@
+ 	};
+ 
+ 	i2c5: i2c at e6528000 {
+-		compatible = "renesas,i2c-r8a7794";
++		compatible = "renesas,i2c-r8a7794", "renesas,rcar-gen2-i2c";
+ 		reg = <0 0xe6528000 0 0x40>;
+ 		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7794_CLK_I2C5>;
+-- 
+2.7.0.rc3.207.g0ac5344
