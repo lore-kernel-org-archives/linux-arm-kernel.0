@@ -1,37 +1,38 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Fri, 6 Jan 2017 03:46:58 +0100
-Subject: [PATCH 17/22] power: supply: add battery driver for AXP20X and
- AXP22X PMICs
-In-Reply-To: <CAAEAJfBeu7Z_JeM55Tyj4a2ZOxNWhq7qoPDwFyftoO8sCumVQw@mail.gmail.com>
-References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
- <20170102163723.7939-18-quentin.schulz@free-electrons.com>
- <CAAEAJfBeu7Z_JeM55Tyj4a2ZOxNWhq7qoPDwFyftoO8sCumVQw@mail.gmail.com>
-Message-ID: <20170106024657.y72pxkh6xeexwpp4@earth>
+From: panand@redhat.com (Pratyush Anand)
+Date: Fri, 6 Jan 2017 08:56:30 +0530
+Subject: [PATCH v29 0/9] arm64: add kdump support
+In-Reply-To: <20161228043347.27358-1-takahiro.akashi@linaro.org>
+References: <20161228043347.27358-1-takahiro.akashi@linaro.org>
+Message-ID: <610620b2-d77d-0684-144f-0f76d0cdbb5e@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Thu, Jan 05, 2017 at 02:34:48PM -0300, Ezequiel Garcia wrote:
-> > +static int axp20x_power_probe(struct platform_device *pdev)
-> > +{
-> > +       struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
-> > +       struct axp20x_batt_ps *axp20x_batt;
-> > +       struct power_supply_config psy_cfg = {};
-> > +
-> 
-> To be consistent with the AC power supply and USB power supply,
-> you might want to call of_device_is_available() here.
-> Otherwise, the device probes even if "disabled" in the DTS.
 
-I would expect that check in the mfd code. Probe should not be
-called at all if the sub-device is disabled.
+On Wednesday 28 December 2016 10:03 AM, AKASHI Takahiro wrote:
+> This patch series adds kdump support on arm64.
+>
+> To load a crash-dump kernel to the systems, a series of patches to
+> kexec-tools[1] are also needed. Please use the latest one, v4 [2].
+> For your convinience, you can pick them up from:
+>    https://git.linaro.org/people/takahiro.akashi/linux-aarch64.git arm64/kdump
+>    https://git.linaro.org/people/takahiro.akashi/kexec-tools.git arm64/kdump
+>
+> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
+>   - crash utility (v7.1.7 or later) [3]
+>     (As of today, the very latest tree cannot handle a core image correctly
+>      due to the commit 7fd8329ba502 ("taint/module: Clean up global and module
+>      taint flags handling")
+>
+>
+> The previous version, v27, was also:
+> Tested-by: Pratyush Anand <panand@redhat.com> (mustang and seattle)
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170106/306245c1/attachment.sig>
+You have my "Tested-by" for this version as well :-). Patches works 
+great after applying them over v4.10-rc2.
+
+I used crash-utility from below where there are few patches queued for 
+crash-7.1.8
+https://github.com/crash-utility/crash
+
+~Pratyush
