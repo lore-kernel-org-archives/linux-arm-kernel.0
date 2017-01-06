@@ -1,45 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 06 Jan 2017 12:10:33 +0100
-Subject: [PATCH 1/2] arm64: dma_mapping: allow PCI host driver to limit
- DMA mask
-In-Reply-To: <9d5e32d3-000c-2f95-7ea8-c64d53ab6b56@cogentembedded.com>
-References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
- <3158203.Yc9Qgx82xo@wuerfel>
- <9d5e32d3-000c-2f95-7ea8-c64d53ab6b56@cogentembedded.com>
-Message-ID: <2723285.JORgusvJv4@wuerfel>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri,  6 Jan 2017 12:17:56 +0100
+Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.11
+Message-ID: <cover.1483700694.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, January 4, 2017 6:29:39 PM CET Nikita Yushchenko wrote:
+Hi Olof, Hi Kevin, Hi Arnd,
 
-> > Just a guess, but if the inbound translation windows in the host
-> > bridge are wider than 32-bit, the reason for setting up a single
-> > 32-bit window is probably because that is what the parent bus supports.
-> 
-> Well anyway applying patch similar to your's will fix pcie-rcar + nvme
-> case - thus I don't object :)   But it can break other cases ...
-> 
-> But why do you hook at set_dma_mask() and overwrite mask inside, instead
-> of hooking at dma_supported() and rejecting unsupported mask?
-> 
-> I think later is better, because it lets drivers to handle unsupported
-> high-dma case, like documented in DMA-API_HOWTO.
+Please consider these Renesas ARM64 based SoC DT updates for v4.11.
 
-I think the behavior I put in there is required for swiotlb to make
-sense, otherwise you would rely on the driver to handle dma_set_mask()
-failure gracefully with its own bounce buffers (as network and
-scsi drivers do but others don't).
+This is based on v4.10-rc2 as v4.10-rc1 does not compile using
+the defconfig.
 
-Having swiotlb or iommu enabled should result in dma_set_mask() always
-succeeding unless the mask is too small to cover the swiotlb
-bounce buffer area or the iommu virtual address space. This behavior
-is particularly important in case the bus address space is narrower
-than 32-bit, as we have to guarantee that the fallback to 32-bit
-DMA always succeeds. There are also a lot of drivers that try to
-set a 64-bit mask but don't implement bounce buffers for streaming
-mappings if that fails, and swiotlb is what we use to make those
-drivers work.
 
-And yes, the API is a horrible mess.
+The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
 
-	Arnd
+  Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.11
+
+for you to fetch changes up to b2b9443beee5017ebdb3f2be9ef472c73d260481:
+
+  arm64: dts: r8a7795: Add PWM support (2017-01-04 10:00:44 +0100)
+
+----------------------------------------------------------------
+Renesas ARM64 Based SoC DT Updates for v4.11
+
+* Add PWM, and sound MIX and CTU support to r8a7795 SoC
+* Add CAN, CAN FD and all MSIOF nodes to r8a7796 SoC
+* Use Gen 3 fallback binding for i2c, msiof, PCIE and USB2 phy
+* Enable Ethernet and 4 GiB memory on r8a7796/salvator-x board
+* Add r8a7796/salvator-x board part number to bindings
+
+----------------------------------------------------------------
+Chris Paterson (3):
+      arm64: dts: r8a7796: Add CAN external clock support
+      arm64: dts: r8a7796: Add CAN support
+      arm64: dts: r8a7796: Add CAN FD support
+
+Geert Uytterhoeven (2):
+      arm64: dts: r8a7796: Add all MSIOF nodes
+      arm64: renesas: r8a7796/salvator-x: Add board part number to DT bindings
+
+Kuninori Morimoto (2):
+      arm64: dts: r8a7795: add sound CTU support
+      arm64: dts: r8a7795: add sound MIX support
+
+Laurent Pinchart (3):
+      arm64: dts: renesas: r8a7796: Add EthernetAVB instance
+      arm64: dts: r8a7796: salvator-x: Enable EthernetAVB
+      arm64: dts: r8a7795: Add PWM support
+
+Simon Horman (5):
+      arm64: dts: r8a7795: Use renesas,rcar-gen3-usb2-phy fallback binding
+      arm64: dts: r8a7795: Use Gen 3 fallback compat string for PCIE
+      arm64: dts: r8a7795: Use R-Car Gen 3 fallback binding for i2c nodes
+      arm64: dts: r8a7796: Use R-Car Gen 3 fallback binding for i2c nodes
+      arm64: dts: r8a7796: Use R-Car Gen 3 fallback binding for msiof nodes
+
+Takeshi Kihara (1):
+      arm64: dts: r8a7796: salvator-x: Update memory node to 4 GiB map
+
+ Documentation/devicetree/bindings/arm/shmobile.txt |   2 +-
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |   2 +
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 119 ++++++++++++--
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts |  37 +++++
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 183 ++++++++++++++++++++-
+ 5 files changed, 323 insertions(+), 20 deletions(-)
