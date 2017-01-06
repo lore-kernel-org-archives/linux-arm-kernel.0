@@ -1,56 +1,54 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  6 Jan 2017 12:17:48 +0100
-Subject: [PATCH 06/16] arm64: dts: r8a7795: Use renesas,
- rcar-gen3-usb2-phy fallback binding
-In-Reply-To: <cover.1483700694.git.horms+renesas@verge.net.au>
-References: <cover.1483700694.git.horms+renesas@verge.net.au>
-Message-ID: <6695092b34a3edd69b617e86bf34236ee8f2dbad.1483700694.git.horms+renesas@verge.net.au>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 6 Jan 2017 11:18:39 +0000
+Subject: [PATCH v3 7/9] arm64: cpufeature: Track user visible fields
+In-Reply-To: <20170105180626.GH29765@e104818-lin.cambridge.arm.com>
+References: <1483552147-9605-1-git-send-email-suzuki.poulose@arm.com>
+ <1483552147-9605-8-git-send-email-suzuki.poulose@arm.com>
+ <20170105180626.GH29765@e104818-lin.cambridge.arm.com>
+Message-ID: <f4413bf1-56af-9912-7494-5cb633db835c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A fallback binding for the Renesas R-Car Gen3 for USB2.0 PHY driver was
-added by commit cde7bc367f09 ("phy: rcar-gen3-usb2: add fallback binding").
-This patch makes use of this binding in the DT for the r8a7795 SoC.
+On 05/01/17 18:06, Catalin Marinas wrote:
+> On Wed, Jan 04, 2017 at 05:49:05PM +0000, Suzuki K. Poulose wrote:
+>> Track the user visible fields of a CPU feature register. This will be
+>> used for exposing the value to the userspace. All the user visible
+>> fields of a feature register will be passed on as it is, while the
+>> others would be filled with their respective safe value.
+>>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+>
+>> @@ -81,75 +82,75 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
+>>
+>>
+>>  static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
+>> -	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
+>> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
+>> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
+>> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
+>> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
+>> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
+>> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+On a second look, I think we should make the RDM field visible to the user space as it
+is something useful for the user.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index bbf594bce930..2c076c21d7fa 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -1146,7 +1146,8 @@
- 		};
- 
- 		usb2_phy0: usb-phy at ee080200 {
--			compatible = "renesas,usb2-phy-r8a7795";
-+			compatible = "renesas,usb2-phy-r8a7795",
-+				     "renesas,rcar-gen3-usb2-phy";
- 			reg = <0 0xee080200 0 0x700>;
- 			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 703>;
-@@ -1156,7 +1157,8 @@
- 		};
- 
- 		usb2_phy1: usb-phy at ee0a0200 {
--			compatible = "renesas,usb2-phy-r8a7795";
-+			compatible = "renesas,usb2-phy-r8a7795",
-+				     "renesas,rcar-gen3-usb2-phy";
- 			reg = <0 0xee0a0200 0 0x700>;
- 			clocks = <&cpg CPG_MOD 702>;
- 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-@@ -1165,7 +1167,8 @@
- 		};
- 
- 		usb2_phy2: usb-phy at ee0c0200 {
--			compatible = "renesas,usb2-phy-r8a7795";
-+			compatible = "renesas,usb2-phy-r8a7795",
-+				     "renesas,rcar-gen3-usb2-phy";
- 			reg = <0 0xee0c0200 0 0x700>;
- 			clocks = <&cpg CPG_MOD 701>;
- 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
--- 
-2.7.0.rc3.207.g0ac5344
+>> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
+>> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
+>> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
+>> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
+>> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
+>
+> BTW, as a separate patch I think we need to expose the RDM field in this
+> register as well, together with a corresponding HWCAP bit.
+
+OK, I will send a separate patch for this.
+
+Thanks for the review.
+
+Suzuki
