@@ -1,58 +1,43 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Jan 2017 14:29:02 +0000
-Subject: [PATCHv2 net-next 05/16] net: mvpp2: introduce PPv2.2 HW
- descriptors and adapt accessors
-In-Reply-To: <1482943592-12556-6-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482943592-12556-6-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170106142901.GC14217@n2100.armlinux.org.uk>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Fri,  6 Jan 2017 15:30:24 +0100
+Subject: [PATCH v3 0/5] drm/dp: Implement CRC debugfs API
+Message-ID: <20170106143029.11553-1-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 28, 2016 at 05:46:21PM +0100, Thomas Petazzoni wrote:
-> This commit adds the definition of the PPv2.2 HW descriptors, adjusts
-> the mvpp2_tx_desc and mvpp2_rx_desc structures accordingly, and adapts
-> the accessors to work on both PPv2.1 and PPv2.2.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-...
-> +		/* On PPv2.2, the situation is more complicated,
-> +		 * because there is only 40 bits to store the virtual
-> +		 * address, which is not sufficient. So on 64 bits
-> +		 * systems, we use phys_to_virt() to get the virtual
-> +		 * address from the physical address, which is fine
-> +		 * because the kernel linear mapping includes the
-> +		 * entire 40 bits physical address space. On 32 bits
-> +		 * systems however, we can't use phys_to_virt(), but
-> +		 * since virtual addresses are 32 bits only, there is
-> +		 * enough space in the RX descriptor for the full
-> +		 * virtual address.
-> +		 */
-> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-> +		dma_addr_t dma_addr =
-> +			rx_desc->pp22.buf_phys_addr_key_hash & DMA_BIT_MASK(40);
-> +		phys_addr_t phys_addr =
-> +			dma_to_phys(port->dev->dev.parent, dma_addr);
-> +
-> +		return (unsigned long)phys_to_virt(phys_addr);
-> +#else
-> +		return rx_desc->pp22.buf_cookie_misc & DMA_BIT_MASK(40);
-> +#endif
+Hi,
 
-I'm not sure that's the best way of selecting the difference.  It seems
-that the issue here is the size of the virtual address, so why not test
-the size of a virtual address pointer?
+this series builds up on the API for exposing captured CRCs through
+debugfs.
 
-		if (8 * sizeof(rx_desc) > 40) {
-			/* do phys addr dance */
-		} else {
-			return rx_desc->pp22.buf_cookie_misc & DMA_BIT_MASK(40);
-		}
+It adds new DP helpers for starting and stopping CRC capture and gets
+the Rockchip driver to use it.
 
-It also means that we get compile coverage over both sides of the
-conditional.
+Also had to add a connector backpointer to the drm_dp_aux struct so we could
+wait for the right vblank and store the CRCs afterwards, I will be glad
+to hear about better alternatives.
+
+With these patches, tests in IGT such as kms_pipe_crc_basic and
+kms_plane do pass on RK3288.
+
+Thanks,
+
+Tomeu
+
+
+Tomeu Vizoso (5):
+  drm/dp: add connector backpointer to drm_dp_aux
+  drm/bridge: analogix_dp: set connector to drm_dp_aux
+  drm/dp: add helpers for capture of frame CRCs
+  drm/bridge: analogix_dp: add helpers for capture of frame CRCs
+  drm/rockchip: Implement CRC debugfs API
+
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  34 ++++--
+ drivers/gpu/drm/drm_dp_helper.c                    | 118 +++++++++++++++++++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |  48 +++++++++
+ include/drm/bridge/analogix_dp.h                   |   3 +
+ include/drm/drm_dp_helper.h                        |   9 ++
+ 5 files changed, 204 insertions(+), 8 deletions(-)
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.9.3
