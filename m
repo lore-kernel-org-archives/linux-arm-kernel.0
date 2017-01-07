@@ -1,47 +1,66 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 7 Jan 2017 12:57:10 -0200
-Subject: imx: RS-485 problems during TX, maybe DMA related
-In-Reply-To: <20170107134557.GA12299@archie.localdomain>
-References: <20170104160024.GA13442@archie.localdomain>
- <CAOMZO5C3enuThR1DpcwNnqFdxd8tGoBwd76O62Gnviz8x1_a9w@mail.gmail.com>
- <20170106225026.GA3804@archie.localdomain>
- <CAOMZO5CywajwZEL8K2ATfS80WzqY69YVX+3S7hq9_HmNdNAwaw@mail.gmail.com>
- <20170107134557.GA12299@archie.localdomain>
-Message-ID: <CAOMZO5ALSQj3C6Yn-avMZdzTvtWCZPQ5+pNdzYi03G-GZB_t+w@mail.gmail.com>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Sun,  8 Jan 2017 00:04:49 +0900
+Subject: [PATCH v4 0/2] make kurobox-pro be able to shutdown after device-tree
+ migration
+In-Reply-To: <20161227070611.14852-1-rogershimizu@gmail.com>
+References: <20161227070611.14852-1-rogershimizu@gmail.com>
+Message-ID: <20170107150451.17912-1-rogershimizu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Clemens,
+Dear Kernel Maintainers,
 
-On Sat, Jan 7, 2017 at 11:45 AM, Clemens Gruber
-<clemens.gruber@pqgruber.com> wrote:
+Kurobox-Pro (and variants) need more commands sending to UART1 to shutdown.
+So here I make this patch series to let current qnap-poweroff implementation
+be able to handle such case.
 
-> It should work like this, I don't think using an extra GPIO is
-> necessary.
+Here I give 3 patches, for 3 different kernel subsystems respectivelay:
+  - Patch 1/3: System reset/shutdown driver
+  - Patch 2/3: Open firmware and flattened device tree bindings
+  - Patch 3/3: ARM/Marvell Dove/MV78xx0/Orion SOC support
 
-The MX6QDL_PAD_CSI0_DAT16__UART4_CTS_B option is only valid in dte mode.
+Ryan Tandy, the issue reporter, and I have already tested those changes on
+Linkstation/KuroBoxPro devices, and confirmed it's working well.
 
-If I pass 'fsl,dte-mode' then I can see this pin toggling. (rx, tx
-would not work as expected).
+Merry Xmax and look forward to your feedback!
 
-In the default dce mode I can see UART4_CTS_B pin toggling when I
-monitor CSI0_DAT17 pin and configure it as:
+Changes:
+  v0 => v1:
+  - Update 0003 to split kuroboxpro related code into kuroboxpro-common.c
+  v1 => v2:
+  - Split off linkstation/kuroboxpro related code to linkstation-reset.c
+    Because linkstation before kuroboxpro also need this driver to power
+    off properly. It's more proper to call it linkstation driver.
+  v2 => v3:
+  - Split off devicetree bindings doc into a separate patch.
+  - Add device-tree patch to make Linkstation LS-GL and KuroBox Pro to
+    use the newly created linkstation-reset driver.
+  - Remove the unused one-byte command sending case in linkstation-reset
+    driver.
+  v3 => v4:
+  - Reduce the global singleton variables by moving to structure, which makes
+    the driver easy to support reboot function in the future.  Thanks to
+    Florian Fainelli.
+  - Simplify the power_off function registration. Thanks to Florian Fainelli.
+  - Drop DT binding doc.
 
-MX6QDL_PAD_CSI0_DAT17__UART4_CTS_B
+Cheers,
+Roger Shimizu, GMT +9 Tokyo
+PGP/GPG: 4096R/6C6ACD6417B3ACB1
 
-,but unfortunately this pin does not go to the TXEN pin of the RS485
-transceiver.
+Roger Shimizu (2):
+  power: reset: add linkstation-reset driver
+  ARM: DT: add power-off support to linkstation lsgl and kuroboxpro
 
-So this means that with the hardware I have access to my only
-alternative is to set MX6QDL_PAD_CSI0_DAT16__GPIO6_IO02.
+ arch/arm/boot/dts/orion5x-kuroboxpro.dts         |   8 +
+ arch/arm/boot/dts/orion5x-linkstation-lsgl.dts   |  10 +
+ arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts |   4 +
+ arch/arm/boot/dts/orion5x-linkstation.dtsi       |   4 -
+ drivers/power/reset/Kconfig                      |  10 +
+ drivers/power/reset/Makefile                     |   1 +
+ drivers/power/reset/linkstation-reset.c          | 270 +++++++++++++++++++++++
+ 7 files changed, 303 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/power/reset/linkstation-reset.c
 
->> So I was never able to observe the DE pin toggling correctly.
->
-> But did you set SER_RS485_RX_DURING_TX in your flags? This is counter
-> intuitive, but I observed that it would not work otherwise.
-
-Yes, I have also tried when I read your email, but did not help on my case.
-
-Thanks,
-
-Fabio Estevam
+-- 
+2.11.0
