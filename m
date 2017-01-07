@@ -1,22 +1,60 @@
-From: fkan@apm.com (Feng Kan)
-Date: Fri, 6 Jan 2017 15:21:34 -0800
-Subject: APM smmu implementation
-Message-ID: <CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g@mail.gmail.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Fri, 6 Jan 2017 16:25:14 -0800
+Subject: [PATCH v2 05/19] ARM: dts: imx6-sabresd: add OV5642 and OV5640
+ camera sensors
+In-Reply-To: <CAOMZO5CibSU45Cw1d8ZipiGSVfhCQ4uP4XiNuWTGLa5eHmC6Qg@mail.gmail.com>
+References: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483477049-19056-6-git-send-email-steve_longerbeam@mentor.com>
+ <CAOMZO5CibSU45Cw1d8ZipiGSVfhCQ4uP4XiNuWTGLa5eHmC6Qg@mail.gmail.com>
+Message-ID: <e8f3329a-ff01-ae6d-a52d-32cb9bb10b2c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will/Robin:
 
-The APM IOMMU implementation is mostly just the ARM SMMU 500 variant.
-However, our internal bus is only 42 bits wide. Our IAS field is coded
-as 48 bits, which cause IPA to truncated to 42 bits on the physical
-bus. In order for our system to work with the arm-smmu.c, there needs
-to be a way to force the ipa_size to 42. The current internal solution
-is to use the cpuid, but that is quite ugly. I was thinking of using
-the model
-as indication to right the ipa_size, but I am not too sure of the ACPI
-side. Would it be okay to add an APM MMU500 variant? I would also
-appreciated it if you guys have any alternate solutions.
 
-Thanks
-Feng Kan
+On 01/04/2017 07:26 AM, Fabio Estevam wrote:
+> On Tue, Jan 3, 2017 at 6:57 PM, Steve Longerbeam <slongerbeam@gmail.com> wrote:
+>
+>> +       camera: ov5642 at 3c {
+>> +               compatible = "ovti,ov5642";
+>> +               pinctrl-names = "default";
+>> +               pinctrl-0 = <&pinctrl_ov5642>;
+>> +               clocks = <&clks IMX6QDL_CLK_CKO>;
+>> +               clock-names = "xclk";
+>> +               reg = <0x3c>;
+>> +               xclk = <24000000>;
+>> +               DOVDD-supply = <&vgen4_reg>; /* 1.8v */
+>> +               AVDD-supply = <&vgen5_reg>;  /* 2.8v, rev C board is VGEN3
+>> +                                               rev B board is VGEN5 */
+> Please use vgen3 so that by default we have the valid AVDD-supply for
+> revC boards which is more recent and more the users have access to.
+
+done.
+
+>
+>> +       mipi_camera: ov5640 at 3c {
+>> +               compatible = "ovti,ov5640_mipi";
+>> +               pinctrl-names = "default";
+>> +               pinctrl-0 = <&pinctrl_ov5640>;
+>> +               reg = <0x3c>;
+>> +               clocks = <&clks IMX6QDL_CLK_CKO>;
+>> +               clock-names = "xclk";
+>> +               xclk = <24000000>;
+>> +               DOVDD-supply = <&vgen4_reg>; /* 1.8v */
+>> +               AVDD-supply = <&vgen5_reg>;  /* 2.8v, rev C board is VGEN3
+>> +                                               rev B board is VGEN5 */
+> Same here.
+
+done.
+
+>
+>> +               pinctrl_ov5640: ov5640grp {
+>> +                       fsl,pins = <
+>> +                               MX6QDL_PAD_SD1_DAT2__GPIO1_IO19 0x80000000
+>> +                               MX6QDL_PAD_SD1_CLK__GPIO1_IO20  0x80000000
+> Please avoid all the 0x80000000 IOMUX settings and replace them by
+> their real values.
+
+yeah, finally got around to this, done!
+
+Steve
