@@ -1,37 +1,40 @@
-From: lukma@denx.de (Lukasz Majewski)
-Date: Sat, 7 Jan 2017 22:24:06 +0100
-Subject: [PATCH v3 2/2] ARM: dts: imx6q: Add mccmon6 board support
-In-Reply-To: <1483440381-24268-2-git-send-email-lukma@denx.de>
-References: <1483440381-24268-1-git-send-email-lukma@denx.de>
- <1483440381-24268-2-git-send-email-lukma@denx.de>
-Message-ID: <20170107222406.04428dfc@jawa>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 7 Jan 2017 19:43:48 -0200
+Subject: imx: RS-485 problems during TX, maybe DMA related
+In-Reply-To: <20170107205930.GA12367@archie.localdomain>
+References: <20170104160024.GA13442@archie.localdomain>
+ <CAOMZO5C3enuThR1DpcwNnqFdxd8tGoBwd76O62Gnviz8x1_a9w@mail.gmail.com>
+ <20170106225026.GA3804@archie.localdomain>
+ <CAOMZO5CywajwZEL8K2ATfS80WzqY69YVX+3S7hq9_HmNdNAwaw@mail.gmail.com>
+ <20170107134557.GA12299@archie.localdomain>
+ <CAOMZO5ALSQj3C6Yn-avMZdzTvtWCZPQ5+pNdzYi03G-GZB_t+w@mail.gmail.com>
+ <20170107153434.GA13307@archie.localdomain>
+ <CAOMZO5CY3ys6moE133LwSKcS4egv56JdmhPMRG0TmAnfD+ZBAw@mail.gmail.com>
+ <20170107205930.GA12367@archie.localdomain>
+Message-ID: <CAOMZO5D00YFLS=pddAqPo_FUoP6MF-juAef2H71-Wx_NQArdpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear All,
+Hi Clemens,
 
-> From: Lukasz Majewski <l.majewski@majess.pl>
-> 
-> This patch provides support for Liebherr's Monitor 6 board
-> (abverrated as mccmon6) to Linux kernel.
-> 
-> Signed-off-by: Lukasz Majewski <lukma@denx.de>
-> ---
-> Changes for v3:
-> - Reorganize the dts file according to Shawn Guo's comments
-> 
-> Changes for v2:
-> - Reorganize the dts file according to Valdimir Zapolskiy's comments
+On Sat, Jan 7, 2017 at 6:59 PM, Clemens Gruber
+<clemens.gruber@pqgruber.com> wrote:
 
-Do you have any more comments for this DTS file?
+> Great!
+>
+> Did you observe the same effect I described, with the doubling of
+> characters in the front and the leftovers from previous transmissions at
+> the end?
 
+No, I don't observe these errors when I use 'rts-gpios' in the device tree.
 
-Best regards,
+Maybe you could try to use 'rts-gpios' for a quick test by applying
+the patches I have just sent.
 
-Lukasz Majewski
+If you run this test, please remove 'uart-has-rtscts' from your dts.
+According to Documentation/devicetree/bindings/serial/serial.txt they
+are mutually-exclusive.
 
---
+Regards,
 
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+Fabio Estevam
