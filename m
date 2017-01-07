@@ -1,41 +1,43 @@
-From: andi@etezian.org (Andi Shyti)
-Date: Sat, 7 Jan 2017 21:40:26 +0900
-Subject: [PATCH v5 5/5] arm64: dts: exynos: Add tm2 touchkey node
-In-Reply-To: <CAGTfZH1QtbieMxQzoPvxsP_3tSYBSuXe+wtq0uUs03mhcLFdXg@mail.gmail.com>
-References: <CGME20170106134356epcas1p1aee9f715c58b50f6056bf0b43b849497@epcas1p1.samsung.com>
- <20170106134350.32428-1-andi.shyti@samsung.com>
- <20170106134350.32428-6-andi.shyti@samsung.com>
- <CAGTfZH2QYQK190kYFbOMqJMFgH32548ra-VqzYwc5LVBJwqisA@mail.gmail.com>
- <CAGTfZH347ZRve20cdGLwtuf6arRAJ4Ry+HQrTubDj-RGR=K9cA@mail.gmail.com>
- <CAGTfZH1QtbieMxQzoPvxsP_3tSYBSuXe+wtq0uUs03mhcLFdXg@mail.gmail.com>
-Message-ID: <20170107124026.gl447hl5bucdflyk@jack.zhora.eu>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Sat,  7 Jan 2017 21:05:13 +0800
+Subject: [PATCH] arm64: dts: rockchip: add "rockchip,
+ grf" property for RK3399 PMUCRU/CRU
+Message-ID: <1483794313-18195-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+The structure rockchip_clk_provider needs to refer the GRF regmap
+in somewhere, if the CRU node has not "rockchip,grf" property,
+calling syscon_regmap_lookup_by_phandle will return an invaild GRF
+regmap, and the MUXGRF type clock will be not supported.
 
-> >>> +       touchkey at 20 {
-> >>> +               compatible = "samsung,tm2-touchkey";
-> >>> +               reg = <0x20>;
-> >>> +               interrupt-parent = <&gpa3>;
-> >>> +               interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
-> >>> +               vcc-supply = <&ldo32_reg>;
-> >>> +               vdd-supply = <&ldo33_reg>;
-> >>> +       };
-> >>> +};
-> >>> +
-> >>>  &ldo31_reg {
-> >>>         regulator-name = "TSP_VDD_1.85V_AP";
-> >>>         regulator-min-microvolt = <1850000>;
-> 
-> I repiled the touchkey driver against compatible name.
-> Usually, when developing the device driver, we use the specific h/w name
-> but in this patch, the touckey dt node uses the h/w board name instead of
-> original touckhey name.
+Therefore, we need to add them.
 
-this should be a device specifically done for the tm2 and we are
-not sure who is the manufacturer of the device. In order to not
-assign the device to the wrong manufacturer, we preferred calling
-it Samsung as it is in a Samsung device.
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+---
 
-Andi
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 92b731f..7790634 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -1090,6 +1090,7 @@
+ 	pmucru: pmu-clock-controller at ff750000 {
+ 		compatible = "rockchip,rk3399-pmucru";
+ 		reg = <0x0 0xff750000 0x0 0x1000>;
++		rockchip,grf = <&grf>;
+ 		#clock-cells = <1>;
+ 		#reset-cells = <1>;
+ 		assigned-clocks = <&pmucru PLL_PPLL>;
+@@ -1099,6 +1100,7 @@
+ 	cru: clock-controller at ff760000 {
+ 		compatible = "rockchip,rk3399-cru";
+ 		reg = <0x0 0xff760000 0x0 0x1000>;
++		rockchip,grf = <&grf>;
+ 		#clock-cells = <1>;
+ 		#reset-cells = <1>;
+ 		assigned-clocks =
+-- 
+2.7.4
