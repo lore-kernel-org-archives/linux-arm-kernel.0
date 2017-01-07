@@ -1,45 +1,82 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat,  7 Jan 2017 10:51:59 +0200
-Subject: [PATCH 0/4] ARM: exynos: Fix Odroid U3 USB/LAN when TFTP booting
- (power sequence)
-Message-ID: <20170107085203.4431-1-krzk@kernel.org>
+Date: Sat,  7 Jan 2017 10:52:01 +0200
+Subject: [PATCH 2/4] ARM: dts: exynos: Fix LAN9730 on Odroid U3 after tftpboot
+In-Reply-To: <20170107085203.4431-1-krzk@kernel.org>
+References: <20170107085203.4431-1-krzk@kernel.org>
+Message-ID: <20170107085203.4431-3-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The ethernet adapter LAN9730, after enabling in bootloader (e.g. for
+tftpboot) requires reset during boot.  Otherwise it won't come up.
 
-Thanks to Markus Reichl, I got an Odroid U3 to work with. Thanks to Peter
-Chen, we got a power sequence generic library which solves my long
-standing Odroid U3 problem - no LAN9730 if it was enabled by bootloader.
+The schematics of Odroid U3 are detailed enough but after grabbing
+knowledge also from other sources (like U-Boot) the overall design looks
+like:
+1. LAN9730 is connected to HSIC0 and USB3503 to HSIC1 of EHCI controller.
+2. USB3503 comes with its own reset pin: gpx3-5.
+3. Reset pin of LAN9730 is pulled up to 3.3 V so it cannot be used.
+4. The supply of 3.3 V for LAN9730 is delivered from buck8.
+5. Buck8 state is a logical OR of registry value (through I2C command)
+   and ENB8 pin.  The ENB8, not described in schematics, is in fact
+   gpa1-1.
+6. Missing or wrongly timed reset of LAN9730 might result in missing of
+   two devices: LAN9730 and USB3503. Without reset, LAN9730 will not
+   come up, if it was enabled by bootloader.
 
-My previous attempts for this can be found here [0].
+To fix the issue use the generic power sequence driver and toggle the
+ENB8 (buck8) pin.  Reset duration of 500 us was chosen by experiments
+(shortest working time was 400 us).  This is an easiest way to fix the
+long standing LAN9730 reset issue.
 
-This patchset is based on Peter's v11 of power sequence [1].
-Patchset is available also on my Github [2].
-
-More detailed analysis is described in patch 2/4 ("ARM: dts: exynos: Fix
-LAN9730 on Odroid U3 after tftpboot").
-
-
-Best regards,
-Krzysztof
-
-
-[0] http://www.spinics.net/lists/linux-mmc/msg37386.html
-[1] https://lwn.net/Articles/710736/
-[2] https://github.com/krzk/linux/commits/for-next/odroid-u3-usb3503-pwrseq
-
-Krzysztof Kozlowski (4):
-  ARM: dts: exynos: Fix indentation of EHCI and OHCI ports
-  ARM: dts: exynos: Fix LAN9730 on Odroid U3 after tftpboot
-  ARM: exynos_defconfig: Enable power sequence for Odroid U3
-  ARM: multi_v7_defconfig: Enable power sequence for Odroid U3
-
- arch/arm/boot/dts/exynos4.dtsi            | 24 ++++++++++++------------
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
  arch/arm/boot/dts/exynos4412-odroidu3.dts | 21 +++++++++++++++++++++
- arch/arm/configs/exynos_defconfig         |  2 ++
- arch/arm/configs/multi_v7_defconfig       |  1 +
- 4 files changed, 36 insertions(+), 12 deletions(-)
+ 1 file changed, 21 insertions(+)
 
+diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+index 99634c54dca9..aef49007cba0 100644
+--- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
++++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+@@ -84,10 +84,23 @@
+ 	regulator-max-microvolt = <2800000>;
+ };
+ 
++&max77686 {
++	pinctrl-0 = <&max77686_irq &max77686_enb8>;
++};
++
+ &mshc_0 {
+ 	vqmmc-supply = <&ldo22_reg>;
+ };
+ 
++&pinctrl_0 {
++	max77686_enb8: max77686-enb8 {
++		samsung,pins = "gpa1-1";
++		samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
++		samsung,pin-pud = <EXYNOS_PIN_PULL_DOWN>;
++		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
++	};
++};
++
+ &pwm {
+ 	pinctrl-0 = <&pwm0_out>;
+ 	pinctrl-names = "default";
+@@ -103,7 +116,15 @@
+ 
+ &ehci {
+ 	port at 1 {
++		/* HSIC for LAN9730 */
+ 		status = "okay";
++		/* buck8 enable pin, use it for power sequence */
++		reset-gpios = <&gpa1 1 GPIO_ACTIVE_LOW>;
++		/*
++		 * Reset duration of 500 us was chosen experimentally.
++		 * Minimal working value was 400 us. Add some safe margin.
++		 */
++		reset-duration-us = <500>;
+ 	};
+ 	port at 2 {
+ 		status = "okay";
 -- 
 2.9.3
