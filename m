@@ -1,41 +1,46 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 7 Jan 2017 10:56:16 +0200
-Subject: [PATCH v11 4/8] usb: core: add power sequence handling for USB
- devices
-In-Reply-To: <1483596119-27508-5-git-send-email-peter.chen@nxp.com>
-References: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
- <1483596119-27508-5-git-send-email-peter.chen@nxp.com>
-Message-ID: <20170107085616.jvercrfl3huzubkr@kozik-lap>
+Date: Sat,  7 Jan 2017 11:16:51 +0200
+Subject: [PATCH v1.1] ARM: multi_v7_defconfig: Enable power sequence for
+ Odroid U3
+In-Reply-To: <20170107085203.4431-5-krzk@kernel.org>
+References: <20170107085203.4431-5-krzk@kernel.org>
+Message-ID: <20170107091651.10560-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 02:01:55PM +0800, Peter Chen wrote:
-> Some hard-wired USB devices need to do power sequence to let the
-> device work normally, the typical power sequence like: enable USB
-> PHY clock, toggle reset pin, etc. But current Linux USB driver
-> lacks of such code to do it, it may cause some hard-wired USB devices
-> works abnormal or can't be recognized by controller at all.
-> 
-> In this patch, it calls power sequence library APIs to finish
-> the power sequence events. It will do power on sequence at hub's
-> probe for all devices under this hub (includes root hub).
-> At hub_disconnect, it will do power off sequence which is at powered
-> on list.
-> 
-> Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> Tested-by Joshua Clayton <stillcompiling@gmail.com>
-> Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
-> Reviewed-by: Vaibhav Hiremath <hvaibhav.linux@gmail.com>
-> ---
->  drivers/usb/Kconfig    |  1 +
->  drivers/usb/core/hub.c | 48 ++++++++++++++++++++++++++++++++++++++++++++----
->  drivers/usb/core/hub.h |  1 +
->  3 files changed, 46 insertions(+), 4 deletions(-)
-> 
+Odroid U3 needs a power sequence for lan9730, if it was enabled by
+bootloader.  Also enable the USB3503 HSCI to USB2.0 driver (device
+is present on Odroid U3).
 
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-Tested on Odroid U3 (reset sequence for LAN9730):
-Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Best regards,
-Krzysztof
+---
+
+Changes since v1 (v1 -> v1.1):
+1. Enable also usb3503 driver.
+---
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index b01a43851294..8cc73e084b25 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -443,6 +443,7 @@ CONFIG_POWER_RESET_RMOBILE=y
+ CONFIG_POWER_RESET_ST=y
+ CONFIG_POWER_AVS=y
+ CONFIG_ROCKCHIP_IODOMAIN=y
++CONFIG_PWRSEQ_GENERIC=y
+ CONFIG_SENSORS_IIO_HWMON=y
+ CONFIG_SENSORS_LM90=y
+ CONFIG_SENSORS_LM95245=y
+@@ -686,6 +687,7 @@ CONFIG_USB_DWC2=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_UDC=y
+ CONFIG_USB_CHIPIDEA_HOST=y
++CONFIG_USB_HSIC_USB3503=m
+ CONFIG_AB8500_USB=y
+ CONFIG_KEYSTONE_USB_PHY=y
+ CONFIG_OMAP_USB3=y
+-- 
+2.9.3
