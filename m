@@ -1,60 +1,66 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Fri, 6 Jan 2017 16:25:14 -0800
-Subject: [PATCH v2 05/19] ARM: dts: imx6-sabresd: add OV5642 and OV5640
- camera sensors
-In-Reply-To: <CAOMZO5CibSU45Cw1d8ZipiGSVfhCQ4uP4XiNuWTGLa5eHmC6Qg@mail.gmail.com>
-References: <1483477049-19056-1-git-send-email-steve_longerbeam@mentor.com>
- <1483477049-19056-6-git-send-email-steve_longerbeam@mentor.com>
- <CAOMZO5CibSU45Cw1d8ZipiGSVfhCQ4uP4XiNuWTGLa5eHmC6Qg@mail.gmail.com>
-Message-ID: <e8f3329a-ff01-ae6d-a52d-32cb9bb10b2c@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 6 Jan 2017 22:31:16 -0200
+Subject: imx: RS-485 problems during TX, maybe DMA related
+In-Reply-To: <20170106225026.GA3804@archie.localdomain>
+References: <20170104160024.GA13442@archie.localdomain>
+ <CAOMZO5C3enuThR1DpcwNnqFdxd8tGoBwd76O62Gnviz8x1_a9w@mail.gmail.com>
+ <20170106225026.GA3804@archie.localdomain>
+Message-ID: <CAOMZO5CywajwZEL8K2ATfS80WzqY69YVX+3S7hq9_HmNdNAwaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Clemens,
 
+On Fri, Jan 6, 2017 at 8:50 PM, Clemens Gruber
+<clemens.gruber@pqgruber.com> wrote:
 
-On 01/04/2017 07:26 AM, Fabio Estevam wrote:
-> On Tue, Jan 3, 2017 at 6:57 PM, Steve Longerbeam <slongerbeam@gmail.com> wrote:
->
->> +       camera: ov5642 at 3c {
->> +               compatible = "ovti,ov5642";
->> +               pinctrl-names = "default";
->> +               pinctrl-0 = <&pinctrl_ov5642>;
->> +               clocks = <&clks IMX6QDL_CLK_CKO>;
->> +               clock-names = "xclk";
->> +               reg = <0x3c>;
->> +               xclk = <24000000>;
->> +               DOVDD-supply = <&vgen4_reg>; /* 1.8v */
->> +               AVDD-supply = <&vgen5_reg>;  /* 2.8v, rev C board is VGEN3
->> +                                               rev B board is VGEN5 */
-> Please use vgen3 so that by default we have the valid AVDD-supply for
-> revC boards which is more recent and more the users have access to.
+> But according to the i.MX Pins tool, they can be muxed vice-versa too.
+> So if you connected the transceiver-enable to ball L4 (CSI0_DAT16), you
+> could mux MX6QDL_PAD_CSI0_DAT16__UART4_CTS_B and
+> MX6QDL_PAD_CSI0_DAT17__UART4_RTS_B instead?
 
-done.
+Yes, I have tried like this:
 
->
->> +       mipi_camera: ov5640 at 3c {
->> +               compatible = "ovti,ov5640_mipi";
->> +               pinctrl-names = "default";
->> +               pinctrl-0 = <&pinctrl_ov5640>;
->> +               reg = <0x3c>;
->> +               clocks = <&clks IMX6QDL_CLK_CKO>;
->> +               clock-names = "xclk";
->> +               xclk = <24000000>;
->> +               DOVDD-supply = <&vgen4_reg>; /* 1.8v */
->> +               AVDD-supply = <&vgen5_reg>;  /* 2.8v, rev C board is VGEN3
->> +                                               rev B board is VGEN5 */
-> Same here.
+&uart4 {
+    pinctrl-names = "default";
+    pinctrl-0 = <&pinctrl_uart4>;
+    uart-has-rtscts;
+    status = "okay";
+};
 
-done.
+pinctrl_uart4: uart4grp {
+fsl,pins = <
+    MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA 0x1b0b1
+    MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA 0x1b0b1
+   MX6QDL_PAD_CSI0_DAT16__UART4_CTS_B 0x1b0b1
+>;
+};
 
->
->> +               pinctrl_ov5640: ov5640grp {
->> +                       fsl,pins = <
->> +                               MX6QDL_PAD_SD1_DAT2__GPIO1_IO19 0x80000000
->> +                               MX6QDL_PAD_SD1_CLK__GPIO1_IO20  0x80000000
-> Please avoid all the 0x80000000 IOMUX settings and replace them by
-> their real values.
+In this case the DE pin of the rs485 transceiver is always at 0 then
+RX works and TX does not.
 
-yeah, finally got around to this, done!
+Then I tried to use a gpio for controling the rts line:
 
-Steve
+&uart4 {
+    pinctrl-names = "default";
+    pinctrl-0 = <&pinctrl_uart4>;
+    rts-gpios = <&gpio6 2 GPIO_ACTIVE_HIGH>;
+    status = "okay";
+};
+
+pinctrl_uart4: uart4grp {
+fsl,pins = <
+    MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA 0x1b0b1
+    MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA 0x1b0b1
+    MX6QDL_PAD_CSI0_DAT16__GPIO6_IO02 0x1b0b1
+>;
+}
+
+In this case the DE pin of the rs485 transceiver is always at 1, then
+TX works and RX does not.
+
+So I was never able to observe the DE pin toggling correctly.
+
+Maybe you could share your userspace application with me offline?
+
+Thanks
