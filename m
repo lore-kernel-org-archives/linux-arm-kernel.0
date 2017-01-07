@@ -1,43 +1,57 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Sat,  7 Jan 2017 21:05:13 +0800
-Subject: [PATCH] arm64: dts: rockchip: add "rockchip,
- grf" property for RK3399 PMUCRU/CRU
-Message-ID: <1483794313-18195-1-git-send-email-zhengxing@rock-chips.com>
+From: clemens.gruber@pqgruber.com (Clemens Gruber)
+Date: Sat, 7 Jan 2017 14:45:57 +0100
+Subject: imx: RS-485 problems during TX, maybe DMA related
+In-Reply-To: <CAOMZO5CywajwZEL8K2ATfS80WzqY69YVX+3S7hq9_HmNdNAwaw@mail.gmail.com>
+References: <20170104160024.GA13442@archie.localdomain>
+ <CAOMZO5C3enuThR1DpcwNnqFdxd8tGoBwd76O62Gnviz8x1_a9w@mail.gmail.com>
+ <20170106225026.GA3804@archie.localdomain>
+ <CAOMZO5CywajwZEL8K2ATfS80WzqY69YVX+3S7hq9_HmNdNAwaw@mail.gmail.com>
+Message-ID: <20170107134557.GA12299@archie.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The structure rockchip_clk_provider needs to refer the GRF regmap
-in somewhere, if the CRU node has not "rockchip,grf" property,
-calling syscon_regmap_lookup_by_phandle will return an invaild GRF
-regmap, and the MUXGRF type clock will be not supported.
+Hi Fabio,
 
-Therefore, we need to add them.
+On Fri, Jan 06, 2017 at 10:31:16PM -0200, Fabio Estevam wrote:
+> Yes, I have tried like this:
+> 
+> &uart4 {
+>     pinctrl-names = "default";
+>     pinctrl-0 = <&pinctrl_uart4>;
+>     uart-has-rtscts;
+>     status = "okay";
+> };
+> 
+> pinctrl_uart4: uart4grp {
+> fsl,pins = <
+>     MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA 0x1b0b1
+>     MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA 0x1b0b1
+>    MX6QDL_PAD_CSI0_DAT16__UART4_CTS_B 0x1b0b1
+> >;
+> };
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
----
+I also mux RTS_B even though it is unused, not sure if it this makes a
+difference to also add MX6QDL_PAD_CSI0_DAT17_UART4_RTS_B in your case?
 
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+It should work like this, I don't think using an extra GPIO is
+necessary.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 92b731f..7790634 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1090,6 +1090,7 @@
- 	pmucru: pmu-clock-controller at ff750000 {
- 		compatible = "rockchip,rk3399-pmucru";
- 		reg = <0x0 0xff750000 0x0 0x1000>;
-+		rockchip,grf = <&grf>;
- 		#clock-cells = <1>;
- 		#reset-cells = <1>;
- 		assigned-clocks = <&pmucru PLL_PPLL>;
-@@ -1099,6 +1100,7 @@
- 	cru: clock-controller at ff760000 {
- 		compatible = "rockchip,rk3399-cru";
- 		reg = <0x0 0xff760000 0x0 0x1000>;
-+		rockchip,grf = <&grf>;
- 		#clock-cells = <1>;
- 		#reset-cells = <1>;
- 		assigned-clocks =
--- 
-2.7.4
+> 
+> So I was never able to observe the DE pin toggling correctly.
+
+But did you set SER_RS485_RX_DURING_TX in your flags? This is counter
+intuitive, but I observed that it would not work otherwise.
+
+> Maybe you could share your userspace application with me offline?
+
+I am using a patched version of the busybox stty utility, I posted the
+patch here, feel free to use it:
+https://gist.github.com/clemensg/29bd68b3cfd719bd01002a2acde9662c
+
+I use stty -F /dev/ttymxc4 clocal cread -hupcl -ixon -opost rs485
+-rs485rtsonsend rs485rtsaftersend rs485rxduringtx
+
+But for you it is probably rs485rtsonsend and -rs485rtsaftersend?
+
+Regards,
+Clemens
