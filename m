@@ -1,39 +1,33 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Sat, 07 Jan 2017 11:28:36 +0000
-Subject: [PATCH RFC 4/4] net: mvmdio: disable interrupt if resource size is
- too small
+Date: Sat, 07 Jan 2017 11:28:20 +0000
+Subject: [PATCH RFC 1/4] net: mvmdio: disable interrupts in driver failure path
 In-Reply-To: <20170107112656.GL14217@n2100.armlinux.org.uk>
 References: <20170107112656.GL14217@n2100.armlinux.org.uk>
-Message-ID: <E1cPpAq-0005uQ-1T@rmk-PC.armlinux.org.uk>
+Message-ID: <E1cPpAa-0005u5-LW@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Disable the MDIO interrupt, falling back to polled mode, if the resource
-size does not allow us to access the interrupt registers.  All current
-DT bindings use a size of 0x84, which allows access, but verifying it is
-good practice.
+When the mvmdio driver has an interrupt, it enables the "done" interrupt
+after requesting its interrupt handler.  However, probe failure results
+in the interrupt being left enabled.  Disable it on the failure path.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/net/ethernet/marvell/mvmdio.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/net/ethernet/marvell/mvmdio.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index 6ea5caddca62..614dfde657fe 100644
+index a0d1b084ecec..7aea0beca56e 100644
 --- a/drivers/net/ethernet/marvell/mvmdio.c
 +++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -221,6 +221,12 @@ static int orion_mdio_probe(struct platform_device *pdev)
- 		clk_prepare_enable(dev->clk);
+@@ -251,6 +251,8 @@ static int orion_mdio_probe(struct platform_device *pdev)
+ 	return 0;
  
- 	dev->err_interrupt = platform_get_irq(pdev, 0);
-+	if (dev->err_interrupt > 0 &&
-+	    resource_size(r) < MVMDIO_ERR_INT_MASK + 4) {
-+		dev_err(&pdev->dev,
-+			"disabling interrupt, resource size is too small\n");
-+		dev->err_interrupt = 0;
-+	}
- 	if (dev->err_interrupt > 0) {
- 		ret = devm_request_irq(&pdev->dev, dev->err_interrupt,
- 					orion_mdio_err_irq,
+ out_mdio:
++	if (dev->err_interrupt > 0)
++		writel(0, dev->regs + MVMDIO_ERR_INT_MASK);
+ 	if (!IS_ERR(dev->clk))
+ 		clk_disable_unprepare(dev->clk);
+ 	return ret;
 -- 
 2.7.4
