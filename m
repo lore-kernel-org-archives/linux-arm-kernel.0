@@ -1,61 +1,25 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 7 Jan 2017 10:54:56 +0200
-Subject: [PATCH v11 2/8] power: add power sequence library
-In-Reply-To: <1483596119-27508-3-git-send-email-peter.chen@nxp.com>
+Date: Sat, 7 Jan 2017 10:55:36 +0200
+Subject: [PATCH v11 3/8] binding-doc: usb: usb-device: add optional
+ properties for power sequence
+In-Reply-To: <1483596119-27508-4-git-send-email-peter.chen@nxp.com>
 References: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
- <1483596119-27508-3-git-send-email-peter.chen@nxp.com>
-Message-ID: <20170107085456.w5dhm7qadqa6tc7v@kozik-lap>
+ <1483596119-27508-4-git-send-email-peter.chen@nxp.com>
+Message-ID: <20170107085536.53scuagjrijdltrq@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 02:01:53PM +0800, Peter Chen wrote:
-> We have an well-known problem that the device needs to do some power
-> sequence before it can be recognized by related host, the typical
-> example like hard-wired mmc devices and usb devices.
-> 
-> This power sequence is hard to be described at device tree and handled by
-> related host driver, so we have created a common power sequence
-> library to cover this requirement. The core code has supplied
-> some common helpers for host driver, and individual power sequence
-> libraries handle kinds of power sequence for devices. The pwrseq
-> librares always need to allocate extra instance for compatible
-> string match.
-> 
-> pwrseq_generic is intended for general purpose of power sequence, which
-> handles gpios and clocks currently, and can cover other controls in
-> future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
-> if only one power sequence is needed, else call of_pwrseq_on_list
-> /of_pwrseq_off_list instead (eg, USB hub driver).
-> 
-> For new power sequence library, it can add its compatible string
-> to pwrseq_of_match_table, then the pwrseq core will match it with
-> DT's, and choose this library at runtime.
+On Thu, Jan 05, 2017 at 02:01:54PM +0800, Peter Chen wrote:
+> Add optional properties for power sequence.
 > 
 > Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
-> Tested-by Joshua Clayton <stillcompiling@gmail.com>
-> Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
-> Tested-by: Matthias Kaehlcke <mka@chromium.org>
+> Acked-by: Rob Herring <robh@kernel.org>
 > ---
->  MAINTAINERS                           |   9 +
->  drivers/power/Kconfig                 |   1 +
->  drivers/power/Makefile                |   1 +
->  drivers/power/pwrseq/Kconfig          |  20 ++
->  drivers/power/pwrseq/Makefile         |   2 +
->  drivers/power/pwrseq/core.c           | 335 ++++++++++++++++++++++++++++++++++
->  drivers/power/pwrseq/pwrseq_generic.c | 224 +++++++++++++++++++++++
->  include/linux/power/pwrseq.h          |  81 ++++++++
->  8 files changed, 673 insertions(+)
->  create mode 100644 drivers/power/pwrseq/Kconfig
->  create mode 100644 drivers/power/pwrseq/Makefile
->  create mode 100644 drivers/power/pwrseq/core.c
->  create mode 100644 drivers/power/pwrseq/pwrseq_generic.c
->  create mode 100644 include/linux/power/pwrseq.h
+>  Documentation/devicetree/bindings/usb/usb-device.txt | 10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
 > 
 
 Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-Tested on Odroid U3 (reset sequence for LAN9730):
-Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
 
 Best regards,
 Krzysztof
