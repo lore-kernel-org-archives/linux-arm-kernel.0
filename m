@@ -1,66 +1,66 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 6 Jan 2017 22:31:16 -0200
-Subject: imx: RS-485 problems during TX, maybe DMA related
-In-Reply-To: <20170106225026.GA3804@archie.localdomain>
-References: <20170104160024.GA13442@archie.localdomain>
- <CAOMZO5C3enuThR1DpcwNnqFdxd8tGoBwd76O62Gnviz8x1_a9w@mail.gmail.com>
- <20170106225026.GA3804@archie.localdomain>
-Message-ID: <CAOMZO5CywajwZEL8K2ATfS80WzqY69YVX+3S7hq9_HmNdNAwaw@mail.gmail.com>
+From: webczat_200@poczta.onet.pl (=?UTF-8?Q?Micha=c5=82_Zegan?=)
+Date: Sat, 7 Jan 2017 01:44:08 +0100
+Subject: [PATCH] clk: scpi: don't add cpufreq device if the scpi dvfs node
+ is disabled
+In-Reply-To: <1483706070-12357-1-git-send-email-sudeep.holla@arm.com>
+References: <1483706070-12357-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <d51628d1-c930-ec13-990c-97cc47d80472@poczta.onet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Clemens,
+seems the patch works as intended.
 
-On Fri, Jan 6, 2017 at 8:50 PM, Clemens Gruber
-<clemens.gruber@pqgruber.com> wrote:
+W dniu 06.01.2017 o 13:34, Sudeep Holla pisze:
+> Currently we add the virtual cpufreq device unconditionally even when
+> the SCPI DVFS clock provider node is disabled. This will cause cpufreq
+> driver to throw errors when it gets initailised on boot/modprobe and
+> also when the CPUs are hot-plugged back in.
+> 
+> This patch fixes the issue by adding the virtual cpufreq device only if
+> the SCPI DVFS clock provider is available and registered.
+> 
+> Fixes: 9490f01e2471 ("clk: scpi: add support for cpufreq virtual device")
+> Reported-by: Micha? Zegan <webczat_200@poczta.onet.pl>
+> Cc: Neil Armstrong <narmstrong@baylibre.com>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/clk/clk-scpi.c | 14 ++++++++------
+>  1 file changed, 8 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/clk/clk-scpi.c b/drivers/clk/clk-scpi.c
+> index 2a3e9d8e88b0..96d37175d0ad 100644
+> --- a/drivers/clk/clk-scpi.c
+> +++ b/drivers/clk/clk-scpi.c
+> @@ -290,13 +290,15 @@ static int scpi_clocks_probe(struct platform_device *pdev)
+>  			of_node_put(child);
+>  			return ret;
+>  		}
+> -	}
+> -	/* Add the virtual cpufreq device */
+> -	cpufreq_dev = platform_device_register_simple("scpi-cpufreq",
+> -						      -1, NULL, 0);
+> -	if (IS_ERR(cpufreq_dev))
+> -		pr_warn("unable to register cpufreq device");
+>  
+> +		if (match->data != &scpi_dvfs_ops)
+> +			continue;
+> +		/* Add the virtual cpufreq device if it's DVFS clock provider */
+> +		cpufreq_dev = platform_device_register_simple("scpi-cpufreq",
+> +							      -1, NULL, 0);
+> +		if (IS_ERR(cpufreq_dev))
+> +			pr_warn("unable to register cpufreq device");
+> +	}
+>  	return 0;
+>  }
+>  
+> 
 
-> But according to the i.MX Pins tool, they can be muxed vice-versa too.
-> So if you connected the transceiver-enable to ball L4 (CSI0_DAT16), you
-> could mux MX6QDL_PAD_CSI0_DAT16__UART4_CTS_B and
-> MX6QDL_PAD_CSI0_DAT17__UART4_RTS_B instead?
-
-Yes, I have tried like this:
-
-&uart4 {
-    pinctrl-names = "default";
-    pinctrl-0 = <&pinctrl_uart4>;
-    uart-has-rtscts;
-    status = "okay";
-};
-
-pinctrl_uart4: uart4grp {
-fsl,pins = <
-    MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA 0x1b0b1
-    MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA 0x1b0b1
-   MX6QDL_PAD_CSI0_DAT16__UART4_CTS_B 0x1b0b1
->;
-};
-
-In this case the DE pin of the rs485 transceiver is always at 0 then
-RX works and TX does not.
-
-Then I tried to use a gpio for controling the rts line:
-
-&uart4 {
-    pinctrl-names = "default";
-    pinctrl-0 = <&pinctrl_uart4>;
-    rts-gpios = <&gpio6 2 GPIO_ACTIVE_HIGH>;
-    status = "okay";
-};
-
-pinctrl_uart4: uart4grp {
-fsl,pins = <
-    MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA 0x1b0b1
-    MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA 0x1b0b1
-    MX6QDL_PAD_CSI0_DAT16__GPIO6_IO02 0x1b0b1
->;
-}
-
-In this case the DE pin of the rs485 transceiver is always at 1, then
-TX works and RX does not.
-
-So I was never able to observe the DE pin toggling correctly.
-
-Maybe you could share your userspace application with me offline?
-
-Thanks
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 525 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170107/0969a2b2/attachment.sig>
