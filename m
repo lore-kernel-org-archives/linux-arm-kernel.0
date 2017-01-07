@@ -1,111 +1,83 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Fri,  6 Jan 2017 18:11:29 -0800
-Subject: [PATCH v3 11/24] ARM: dts: imx6-sabreauto: add the ADV7180 video
- decoder
+Date: Fri,  6 Jan 2017 18:11:19 -0800
+Subject: [PATCH v3 01/24] [media] dt-bindings: Add bindings for i.MX media
+ driver
 In-Reply-To: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1483755102-24785-12-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1483755102-24785-2-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enables the ADV7180 decoder sensor. The ADV7180 connects to the
-parallel-bus mux input on ipu1_csi0_mux.
-
-On the sabreauto, two analog video inputs are routed to the ADV7180,
-composite on Ain1, and composite on Ain3. Those inputs are defined
-via inputs and input-names under the ADV7180 node. The ADV7180 power
-pin is via max7310_b port expander.
+Add bindings documentation for the i.MX media driver.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 61 ++++++++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
+ Documentation/devicetree/bindings/media/imx.txt | 57 +++++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/imx.txt
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index 495709f..7999857 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -124,6 +124,24 @@
- 			#size-cells = <0>;
- 			reg = <1>;
- 
-+			adv7180: camera at 21 {
-+				compatible = "adi,adv7180";
-+				reg = <0x21>;
-+				powerdown-gpios = <&max7310_b 2 GPIO_ACTIVE_LOW>;
-+				interrupt-parent = <&gpio1>;
-+				interrupts = <27 0x8>;
-+				inputs = <0x00 0x02>;
-+				input-names = "ADV7180 Composite on Ain1",
-+						"ADV7180 Composite on Ain3";
+diff --git a/Documentation/devicetree/bindings/media/imx.txt b/Documentation/devicetree/bindings/media/imx.txt
+new file mode 100644
+index 0000000..254b64a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/imx.txt
+@@ -0,0 +1,57 @@
++Freescale i.MX Media Video Devices
 +
-+				port {
-+					adv7180_to_ipu1_csi0_mux: endpoint {
-+						remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
-+						bus-width = <8>;
-+					};
-+				};
-+			};
++Video Media Controller node
++---------------------------
 +
- 			max7310_a: gpio at 30 {
- 				compatible = "maxim,max7310";
- 				reg = <0x30>;
-@@ -151,6 +169,25 @@
- 	};
- };
- 
-+&ipu1_csi0_from_ipu1_csi0_mux {
-+	bus-width = <8>;
-+};
++This is the parent media controller node for video capture support.
 +
-+&ipu1_csi0_mux_from_parallel_sensor {
-+	remote-endpoint = <&adv7180_to_ipu1_csi0_mux>;
-+	bus-width = <8>;
-+};
++Required properties:
++- compatible : "fsl,imx-media";
++- ports      : Should contain a list of phandles pointing to camera
++  	       sensor interface ports of IPU devices
 +
-+&ipu1_csi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ipu1_csi0>;
 +
-+	/* enable frame interval monitor on this port */
-+	fim {
-+		status = "okay";
-+	};
-+};
++fim child node
++--------------
 +
- &clks {
- 	assigned-clocks = <&clks IMX6QDL_PLL4_BYPASS_SRC>,
- 			  <&clks IMX6QDL_PLL4_BYPASS>,
-@@ -445,6 +482,30 @@
- 			>;
- 		};
- 
-+		pinctrl_ipu1_csi0: ipu1csi0grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_CSI0_DAT4__IPU1_CSI0_DATA04   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT5__IPU1_CSI0_DATA05   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT6__IPU1_CSI0_DATA06   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT7__IPU1_CSI0_DATA07   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT8__IPU1_CSI0_DATA08   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT9__IPU1_CSI0_DATA09   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT10__IPU1_CSI0_DATA10  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT11__IPU1_CSI0_DATA11  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19  0x1b0b0
-+				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK 0x1b0b0
-+				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC    0x1b0b0
-+				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC   0x1b0b0
-+			>;
-+		};
++This is an optional child node of the ipu_csi port nodes. If present and
++available, it enables the Frame Interval Monitor. Its properties can be
++used to modify the method in which the FIM measures frame intervals.
++Refer to Documentation/media/v4l-drivers/imx.rst for more info on the
++Frame Interval Monitor.
 +
- 		pinctrl_max7310: max7310grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD2_DAT0__GPIO1_IO15 0x1b0b0
++Optional properties:
++- fsl,input-capture-channel: an input capture channel and channel flags,
++			     specified as <chan flags>. The channel number
++			     must be 0 or 1. The flags can be
++			     IRQ_TYPE_EDGE_RISING, IRQ_TYPE_EDGE_FALLING, or
++			     IRQ_TYPE_EDGE_BOTH, and specify which input
++			     capture signal edge will trigger the input
++			     capture event. If an input capture channel is
++			     specified, the FIM will use this method to
++			     measure frame intervals instead of via the EOF
++			     interrupt. The input capture method is much
++			     preferred over EOF as it is not subject to
++			     interrupt latency errors. However it requires
++			     routing the VSYNC or FIELD output signals of
++			     the camera sensor to one of the i.MX input
++			     capture pads (SD1_DAT0, SD1_DAT1), which also
++			     gives up support for SD1.
++
++
++mipi_csi2 node
++--------------
++
++This is the device node for the MIPI CSI-2 Receiver, required for MIPI
++CSI-2 sensors.
++
++Required properties:
++- compatible	: "fsl,imx6-mipi-csi2";
++- reg           : physical base address and length of the register set;
++- clocks	: the MIPI CSI-2 receiver requires three clocks: hsi_tx
++                  (the DPHY clock), video_27m, and eim_sel;
++- clock-names	: must contain "dphy", "cfg", "pix";
++
++Optional properties:
++- interrupts	: must contain two level-triggered interrupts,
++                  in order: 100 and 101;
 -- 
 2.7.4
