@@ -1,69 +1,42 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Fri,  6 Jan 2017 18:11:30 -0800
-Subject: [PATCH v3 12/24] add mux and video interface bridge entity functions
+Date: Fri,  6 Jan 2017 18:11:28 -0800
+Subject: [PATCH v3 10/24] ARM: dts: imx6-sabreauto: add pinctrl for gpt input
+ capture
 In-Reply-To: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1483755102-24785-13-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1483755102-24785-11-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Zabel <p.zabel@pengutronix.de>
+Add pinctrl groups for both GPT input capture channels.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- Documentation/media/uapi/mediactl/media-types.rst | 22 ++++++++++++++++++++++
- include/uapi/linux/media.h                        |  6 ++++++
- 2 files changed, 28 insertions(+)
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/Documentation/media/uapi/mediactl/media-types.rst b/Documentation/media/uapi/mediactl/media-types.rst
-index 3e03dc2..023be29 100644
---- a/Documentation/media/uapi/mediactl/media-types.rst
-+++ b/Documentation/media/uapi/mediactl/media-types.rst
-@@ -298,6 +298,28 @@ Types and flags used to represent the media graph elements
- 	  received on its sink pad and outputs the statistics data on
- 	  its source pad.
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index 967c3b8..495709f 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -457,6 +457,18 @@
+ 			>;
+ 		};
  
-+    -  ..  row 29
++		pinctrl_gpt_input_capture0: gptinputcapture0grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_DAT0__GPT_CAPTURE1	0x1b0b0
++			>;
++		};
 +
-+       ..  _MEDIA-ENT-F-MUX:
++		pinctrl_gpt_input_capture1: gptinputcapture1grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_DAT1__GPT_CAPTURE2	0x1b0b0
++			>;
++		};
 +
-+       -  ``MEDIA_ENT_F_MUX``
-+
-+       - Video multiplexer. An entity capable of multiplexing must have at
-+         least two sink pads and one source pad, and must pass the video
-+         frame(s) received from the active sink pad to the source pad. Video
-+         frame(s) from the inactive sink pads are discarded.
-+
-+    -  ..  row 30
-+
-+       ..  _MEDIA-ENT-F-VID-IF-BRIDGE:
-+
-+       -  ``MEDIA_ENT_F_VID_IF_BRIDGE``
-+
-+       - Video interface bridge. A video interface bridge entity must have at
-+         least one sink pad and one source pad. It receives video frame(s) on
-+         its sink pad in one bus format (HDMI, eDP, MIPI CSI-2, ...) and
-+         converts them and outputs them on its source pad in another bus format
-+         (eDP, MIPI CSI-2, parallel, ...).
- 
- ..  tabularcolumns:: |p{5.5cm}|p{12.0cm}|
- 
-diff --git a/include/uapi/linux/media.h b/include/uapi/linux/media.h
-index 4890787..08a8bfa 100644
---- a/include/uapi/linux/media.h
-+++ b/include/uapi/linux/media.h
-@@ -105,6 +105,12 @@ struct media_device_info {
- #define MEDIA_ENT_F_PROC_VIDEO_STATISTICS	(MEDIA_ENT_F_BASE + 0x4006)
- 
- /*
-+ * Switch and bridge entitites
-+ */
-+#define MEDIA_ENT_F_MUX				(MEDIA_ENT_F_BASE + 0x5001)
-+#define MEDIA_ENT_F_VID_IF_BRIDGE		(MEDIA_ENT_F_BASE + 0x5002)
-+
-+/*
-  * Connectors
-  */
- /* It is a responsibility of the entity drivers to add connectors and links */
+ 		pinctrl_spdif: spdifgrp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_KEY_COL3__SPDIF_IN 0x1b0b0
 -- 
 2.7.4
