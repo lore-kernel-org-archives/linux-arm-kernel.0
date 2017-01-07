@@ -1,68 +1,58 @@
-From: clemens.gruber@pqgruber.com (Clemens Gruber)
-Date: Sun, 8 Jan 2017 00:06:24 +0100
-Subject: imx: RS-485 problems during TX, maybe DMA related
-In-Reply-To: <CAOMZO5D00YFLS=pddAqPo_FUoP6MF-juAef2H71-Wx_NQArdpw@mail.gmail.com>
-References: <20170104160024.GA13442@archie.localdomain>
- <CAOMZO5C3enuThR1DpcwNnqFdxd8tGoBwd76O62Gnviz8x1_a9w@mail.gmail.com>
- <20170106225026.GA3804@archie.localdomain>
- <CAOMZO5CywajwZEL8K2ATfS80WzqY69YVX+3S7hq9_HmNdNAwaw@mail.gmail.com>
- <20170107134557.GA12299@archie.localdomain>
- <CAOMZO5ALSQj3C6Yn-avMZdzTvtWCZPQ5+pNdzYi03G-GZB_t+w@mail.gmail.com>
- <20170107153434.GA13307@archie.localdomain>
- <CAOMZO5CY3ys6moE133LwSKcS4egv56JdmhPMRG0TmAnfD+ZBAw@mail.gmail.com>
- <20170107205930.GA12367@archie.localdomain>
- <CAOMZO5D00YFLS=pddAqPo_FUoP6MF-juAef2H71-Wx_NQArdpw@mail.gmail.com>
-Message-ID: <20170107230624.GA21729@archie.localdomain>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Sun, 8 Jan 2017 01:32:00 +0200
+Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
+ enable panel
+In-Reply-To: <20170102142228.GI14217@n2100.armlinux.org.uk>
+References: <20161221032717.13154-1-vz@mleia.com>
+ <CACRpkdZE6VgJA27+Wh=Gxd7yOXpLMyT7yCB2PYA36y0gvosHFQ@mail.gmail.com>
+ <20170102142228.GI14217@n2100.armlinux.org.uk>
+Message-ID: <252ad888-fa9d-695a-58ed-46806e4374fd@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-On Sat, Jan 07, 2017 at 07:43:48PM -0200, Fabio Estevam wrote:
-> Hi Clemens,
+On 01/02/2017 04:22 PM, Russell King - ARM Linux wrote:
+> On Fri, Dec 30, 2016 at 09:23:59AM +0100, Linus Walleij wrote:
+>> On Wed, Dec 21, 2016 at 4:27 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
+>>
+>>> The changeset contains a number of cleanups, changed semantics of
+>>> init_panel() callback, which allows to simplify getting of panel
+>>> properties from panel device tree node, and a handling of optional
+>>> "enable-gpios" panel property, the latter is described in
+>>> display/panel/panel-dpi.txt device tree binding documentation, but
+>>> it has been unsupported by the ARM CLCD driver.
+>>>
+>>> Vladimir Zapolskiy (4):
+>>>   video: ARM CLCD: sort included headers out alphabetically
+>>>   video: ARM CLCD: use panel device node for panel initialization
+>>>   video: ARM CLCD: use panel device node for getting backlight and mode
+>>>   video: ARM CLCD: add support of an optional GPIO to enable panel
+>>
+>> As you may have seen Tomi has stepped down as FBDEV maintainer and
+>> this subsystem is now orphaned.
+>>
+>> I guess Andrew Morton merges patches for it in this case, he usually does.
+>>
+>> But what we should actually do is create a new DRM driver for CLCD
+>> in drivers/gpu/drm/arm/clcd*
+>>
+>> It's maybe not a small undertaking :(
+>>
+>> But in case you're interested in the job, I will pitch in and test the result
+>> on all ARM reference designs plus Nomadik.
 > 
-> On Sat, Jan 7, 2017 at 6:59 PM, Clemens Gruber
-> <clemens.gruber@pqgruber.com> wrote:
+> A DRM driver for it would probably be a good idea, but dealing with all
+> the weird and wonderful connection arrangements may not be that easy...
 > 
-> > Great!
-> >
-> > Did you observe the same effect I described, with the doubling of
-> > characters in the front and the leftovers from previous transmissions at
-> > the end?
-> 
-> No, I don't observe these errors when I use 'rts-gpios' in the device tree.
-> 
-> Maybe you could try to use 'rts-gpios' for a quick test by applying
-> the patches I have just sent.
-> 
-> If you run this test, please remove 'uart-has-rtscts' from your dts.
-> According to Documentation/devicetree/bindings/serial/serial.txt they
-> are mutually-exclusive.
 
-Just remuxed GPIO signals to these pads, applied your two patches and
-used rts-gpios in the DT but I still see the same problem :/
+Linus, Russell,
 
-When transmit something, I get doubled characters, then zeros and at the
-end garbled data of previous transmissions, same as described in my
-first post (Logic analyzer: https://pqgruber.com/rs485_results.png)
-The data is always 4096 bytes long, this explains why the echo command
-is blocking for about 4 seconds (<- 4096 bytes@a baudrate of 9600).
-The TE line is also high until all 4096 bytes are sent.
+I've immediately encountered a problem while porting the driver to DRM,
+because LPC18xx/LPC43xx SoCs are powered by Cortex-M3/M4 cores and DRM
+framework has build and runtime dependencies on MMU.
 
-I think this comes from the UART_XMIT_SIZE which is defined to the page
-size.
-Maybe there is something wrong in imx_transmit_buffer and leads to the
-whole circular buffer being sent out all the time, not stopping..
+That said, in short term I would expect a continuation of support for
+the legacy CLCD framebuffer driver, which works fine on MMU-less SoCs.
 
-Do these debug logs tell you anything?
-https://gist.github.com/clemensg/1ac5ee8a8ea32acc9145c5aa8407aea5
-
-I am analyzing the signals coming directly from the i.MX6Q, so this must
-be a software problem, but I don't understand why it works for you, if
-we use the same software.
-
-Do you use any other patches on top of mainline and do you use the SDMA
-scripts from the ROM?
-
-Thanks,
-Clemens
+--
+With best wishes,
+Vladimir
