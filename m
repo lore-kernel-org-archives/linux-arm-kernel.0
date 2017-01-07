@@ -1,91 +1,327 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 7 Jan 2017 14:26:47 -0500
-Subject: [PATCH 07/22] dt-bindings: power: supply: add AXP20X/AXP22X AC
- power supply
-In-Reply-To: <CAGb2v67V6oGEyYGsBWfp3rVVm_VWQta0szeBiNSKUQR7awm5ng@mail.gmail.com>
+Date: Sat, 7 Jan 2017 14:31:57 -0500
+Subject: [PATCH 08/22] power: supply: add AC power supply driver for
+ AXP20X and AXP22X PMICs
+In-Reply-To: <20170102163723.7939-9-quentin.schulz@free-electrons.com>
 References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
- <20170102163723.7939-8-quentin.schulz@free-electrons.com>
- <20170104131410.mni7opxnouzagypu@rob-hp-laptop>
- <CAGb2v67V6oGEyYGsBWfp3rVVm_VWQta0szeBiNSKUQR7awm5ng@mail.gmail.com>
-Message-ID: <eb5972af-93c1-0818-7640-58f32e97629b@kernel.org>
+ <20170102163723.7939-9-quentin.schulz@free-electrons.com>
+Message-ID: <d6661ff6-442c-5535-aec2-35066577f119@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/17 01:17, Chen-Yu Tsai wrote:
-> Hi Quentin,
+On 02/01/17 11:37, Quentin Schulz wrote:
+> The X-Powers AXP20X and AXP22X PMICs expose the status of AC power
+> supply.
 > 
-> On Wed, Jan 4, 2017 at 9:14 PM, Rob Herring <robh@kernel.org> wrote:
->> On Mon, Jan 02, 2017 at 05:37:07PM +0100, Quentin Schulz wrote:
->>> The X-Powers AXP20X and AXP22X PMICs have an AC entry to supply power to
->>> the board. They have a few registers dedicated to the status of the AC
->>> power supply.
->>>
->>> This adds the DT binding documentation for the AC power supply for
->>> AXP20X and AXP22X PMICs.
->>>
->>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->>> ---
->>>  .../bindings/power/supply/axp20x_ac_power.txt      | 28 ++++++++++++++++++++++
->>>  1 file changed, 28 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
->>> new file mode 100644
->>> index 0000000..16d0de4
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
->>> @@ -0,0 +1,28 @@
->>> +AXP20X and AXP22X PMICs' AC power supply
->>> +
->>> +Required Properties:
->>> + - compatible: One of:
->>> +                     "x-powers,axp202-ac-power-supply"
->>> +                     "x-powers,axp221-ac-power-supply"
->>> +
->>> +More Required Properties for AXP20X PMICs:
->>> + - io-channels: phandles to ACIN voltage and current ADC channels
->>> + - io-channel-names = "acin_v", "acin_i";
->>> +
->>> +This node is a subnode of the axp20x PMIC.
->>> +
->>> +The AXP20X can read the current current and voltage supplied by AC by
->>> +reading ADC channels from the AXP20X ADC.
->>> +
->>> +The AXP22X is only able to tell if an AC power supply is present and
->>> +usable.
->>> +
->>> +Example:
->>> +
->>> +&axp209 {
->>> +     ac_power_supply: ac_power_supply {
->>
->> power-supply {
->>
->>> +             compatible = "x-powers,axp202-ac-power-supply";
->>> +             io-channels = <&axp209_adc 0>, <&axp209_adc 1>;
->>
->> Is this assignment fixed? If so, then it doesn't need to be in DT.
+> Moreover, the AXP20X can also expose the current current and voltage
+> values of the AC power supply.
 > 
-> Is there any case that we actually need to use the IIO channels
-> from the device tree? Seems to me its limited to the other AXP
-> sub-devices.
+> This adds the driver which exposes the status of the AC power supply of
+> the AXP20X and AXP22X PMICs.
 > 
-> If so you could use struct iio_map to map the channels to other
-> devices by name. See axp288_adc for an example.
-Agreed. When we are within a device (so it's not flexible) that
-is the way to go.
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+For the IIO bits
+Acked-by: Jonathan Cameron <jic23@kernel.org>
+
+Trivial comment inline.
+> ---
+>  drivers/power/supply/Kconfig           |  12 ++
+>  drivers/power/supply/Makefile          |   1 +
+>  drivers/power/supply/axp20x_ac_power.c | 251 +++++++++++++++++++++++++++++++++
+>  3 files changed, 264 insertions(+)
+>  create mode 100644 drivers/power/supply/axp20x_ac_power.c
 > 
-> Regards
-> ChenYu
-> 
->>> +             io-channel-names = "acin_v", "acin_i";
->>> +     };
->>> +};
->>> --
->>> 2.9.3
->>>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> diff --git a/drivers/power/supply/Kconfig b/drivers/power/supply/Kconfig
+> index 76806a0..c552b4b 100644
+> --- a/drivers/power/supply/Kconfig
+> +++ b/drivers/power/supply/Kconfig
+> @@ -214,6 +214,18 @@ config BATTERY_DA9150
+>  	  This driver can also be built as a module. If so, the module will be
+>  	  called da9150-fg.
+>  
+> +config CHARGER_AXP20X
+> +	tristate "X-Powers AXP20X and AXP22X AC power supply driver"
+> +	depends on MFD_AXP20X
+> +	depends on AXP20X_ADC
+> +	depends on IIO
+> +	help
+> +	  Say Y here to enable support for X-Powers AXP20X and AXP22X PMICs' AC
+> +	  power supply.
+> +
+> +	  This driver can also be built as a module. If so, the module will be
+> +	  called axp20x_ac_power.
+> +
+>  config AXP288_CHARGER
+>  	tristate "X-Powers AXP288 Charger"
+>  	depends on MFD_AXP20X && EXTCON_AXP288
+> diff --git a/drivers/power/supply/Makefile b/drivers/power/supply/Makefile
+> index 36c599d..7d22417 100644
+> --- a/drivers/power/supply/Makefile
+> +++ b/drivers/power/supply/Makefile
+> @@ -18,6 +18,7 @@ obj-$(CONFIG_TEST_POWER)	+= test_power.o
+>  
+>  obj-$(CONFIG_BATTERY_88PM860X)	+= 88pm860x_battery.o
+>  obj-$(CONFIG_BATTERY_ACT8945A)	+= act8945a_charger.o
+> +obj-$(CONFIG_CHARGER_AXP20X)	+= axp20x_ac_power.o
+>  obj-$(CONFIG_BATTERY_DS2760)	+= ds2760_battery.o
+>  obj-$(CONFIG_BATTERY_DS2780)	+= ds2780_battery.o
+>  obj-$(CONFIG_BATTERY_DS2781)	+= ds2781_battery.o
+> diff --git a/drivers/power/supply/axp20x_ac_power.c b/drivers/power/supply/axp20x_ac_power.c
+> new file mode 100644
+> index 0000000..d7bc25c
+> --- /dev/null
+> +++ b/drivers/power/supply/axp20x_ac_power.c
+> @@ -0,0 +1,251 @@
+> +/*
+> + * AXP20X and AXP22X PMICs' ACIN power supply driver
+> + *
+> + * Copyright (C) 2016 Free Electrons
+> + *	Quentin Schulz <quentin.schulz@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under  the terms of the GNU General  Public License as published by the
+> + * Free Software Foundation;  either version 2 of the License, or (at your
+> + * option) any later version.
+> + */
+> +
+> +#include <linux/device.h>
+> +#include <linux/init.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mfd/axp20x.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/power_supply.h>
+> +#include <linux/regmap.h>
+> +#include <linux/slab.h>
+> +#include <linux/iio/consumer.h>
+> +
+> +#define AXP20X_PWR_STATUS_ACIN_PRESENT	BIT(7)
+> +#define AXP20X_PWR_STATUS_ACIN_AVAIL	BIT(6)
+> +
+> +#define DRVNAME "axp20x-ac-power-supply"
+> +
+> +struct axp20x_ac_power {
+> +	struct device_node *np;
+> +	struct regmap *regmap;
+> +	struct power_supply *supply;
+> +	int axp20x_id;
+> +	struct iio_channel *acin_v;
+> +	struct iio_channel *acin_i;
+> +};
+> +
+> +static irqreturn_t axp20x_ac_power_irq(int irq, void *devid)
+> +{
+> +	struct axp20x_ac_power *power = devid;
+> +
+> +	power_supply_changed(power->supply);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int axp20x_ac_power_get_property(struct power_supply *psy,
+> +					enum power_supply_property psp,
+> +					union power_supply_propval *val)
+> +{
+> +	struct axp20x_ac_power *power = power_supply_get_drvdata(psy);
+> +	int ret, reg;
+> +
+> +	switch (psp) {
+> +	case POWER_SUPPLY_PROP_HEALTH:
+> +		ret = regmap_read(power->regmap, AXP20X_PWR_INPUT_STATUS, &reg);
+> +		if (ret)
+> +			return ret;
+> +
+> +		if (reg & AXP20X_PWR_STATUS_ACIN_PRESENT) {
+> +			val->intval = POWER_SUPPLY_HEALTH_GOOD;
+> +			return 0;
+> +		}
+> +
+> +		val->intval = POWER_SUPPLY_HEALTH_UNKNOWN;
+> +		return 0;
+> +
+> +	case POWER_SUPPLY_PROP_PRESENT:
+> +		ret = regmap_read(power->regmap, AXP20X_PWR_INPUT_STATUS, &reg);
+> +		if (ret)
+> +			return ret;
+> +
+> +		val->intval = !!(reg & AXP20X_PWR_STATUS_ACIN_PRESENT);
+> +		return 0;
+> +
+> +	case POWER_SUPPLY_PROP_ONLINE:
+> +		ret = regmap_read(power->regmap, AXP20X_PWR_INPUT_STATUS, &reg);
+> +		if (ret)
+> +			return ret;
+> +
+> +		val->intval = !!(reg & AXP20X_PWR_STATUS_ACIN_AVAIL);
+> +		return 0;
+> +
+> +	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+> +		ret = iio_read_channel_processed(power->acin_v, &val->intval);
+> +		if (ret)
+> +			return ret;
+> +
+> +		/*
+> +		 * IIO framework gives mV but Power Supply framework gives ?V.
+> +		 */
+single line comment syntax throughout or we'll have to face a patch 'fixing' it.
+> +		val->intval *= 1000;
+> +
+> +		return 0;
+> +
+> +	case POWER_SUPPLY_PROP_CURRENT_NOW:
+> +		ret = iio_read_channel_processed(power->acin_i, &val->intval);
+> +		if (ret)
+> +			return ret;
+> +
+> +		/*
+> +		 * IIO framework gives mV but Power Supply framework gives ?V.
+> +		 */
+> +		val->intval *= 1000;
+> +
+> +		return 0;
+> +
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +
+> +static enum power_supply_property axp20x_ac_power_properties[] = {
+> +	POWER_SUPPLY_PROP_HEALTH,
+> +	POWER_SUPPLY_PROP_PRESENT,
+> +	POWER_SUPPLY_PROP_ONLINE,
+> +	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+> +	POWER_SUPPLY_PROP_CURRENT_NOW,
+> +};
+> +
+> +static enum power_supply_property axp22x_ac_power_properties[] = {
+> +	POWER_SUPPLY_PROP_HEALTH,
+> +	POWER_SUPPLY_PROP_PRESENT,
+> +	POWER_SUPPLY_PROP_ONLINE,
+> +};
+> +
+> +static const struct power_supply_desc axp20x_ac_power_desc = {
+> +	.name = "axp20x-ac",
+> +	.type = POWER_SUPPLY_TYPE_MAINS,
+> +	.properties = axp20x_ac_power_properties,
+> +	.num_properties = ARRAY_SIZE(axp20x_ac_power_properties),
+> +	.get_property = axp20x_ac_power_get_property,
+> +};
+> +
+> +static const struct power_supply_desc axp22x_ac_power_desc = {
+> +	.name = "axp22x-ac",
+> +	.type = POWER_SUPPLY_TYPE_MAINS,
+> +	.properties = axp22x_ac_power_properties,
+> +	.num_properties = ARRAY_SIZE(axp22x_ac_power_properties),
+> +	.get_property = axp20x_ac_power_get_property,
+> +};
+> +
+> +static int axp20x_ac_power_probe(struct platform_device *pdev)
+> +{
+> +	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
+> +	struct power_supply_config psy_cfg = {};
+> +	struct axp20x_ac_power *power;
+> +	static const char * const axp20x_irq_names[] = { "ACIN_PLUGIN",
+> +		"ACIN_REMOVAL", NULL };
+> +	static const char * const *irq_names;
+> +	const struct power_supply_desc *ac_power_desc;
+> +	int i, irq, ret;
+> +
+> +	if (!of_device_is_available(pdev->dev.of_node))
+> +		return -ENODEV;
+> +
+> +	if (!axp20x) {
+> +		dev_err(&pdev->dev, "Parent drvdata not set\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	power = devm_kzalloc(&pdev->dev, sizeof(*power), GFP_KERNEL);
+> +	if (!power)
+> +		return -ENOMEM;
+> +
+> +	power->axp20x_id = (int)of_device_get_match_data(&pdev->dev);
+> +
+> +	irq_names = axp20x_irq_names;
+> +
+> +	if (power->axp20x_id == AXP202_ID) {
+> +		ac_power_desc = &axp20x_ac_power_desc;
+> +
+> +		power->acin_v = devm_iio_channel_get(&pdev->dev, "acin_v");
+> +		if (IS_ERR(power->acin_v)) {
+> +			if (PTR_ERR(power->acin_v) == -ENODEV)
+> +				return -EPROBE_DEFER;
+> +			return PTR_ERR(power->acin_v);
+> +		}
+> +
+> +		power->acin_i = devm_iio_channel_get(&pdev->dev, "acin_i");
+> +		if (IS_ERR(power->acin_i)) {
+> +			if (PTR_ERR(power->acin_i) == -ENODEV)
+> +				return -EPROBE_DEFER;
+> +			return PTR_ERR(power->acin_i);
+> +		}
+> +	} else {
+> +		ac_power_desc = &axp22x_ac_power_desc;
+> +	}
+> +
+> +	power->np = pdev->dev.of_node;
+> +	power->regmap = axp20x->regmap;
+> +
+> +	platform_set_drvdata(pdev, power);
+> +
+> +	psy_cfg.of_node = pdev->dev.of_node;
+> +	psy_cfg.drv_data = power;
+> +
+> +	power->supply = devm_power_supply_register(&pdev->dev, ac_power_desc,
+> +						   &psy_cfg);
+> +	if (IS_ERR(power->supply))
+> +		return PTR_ERR(power->supply);
+> +
+> +	/* Request irqs after registering, as irqs may trigger immediately */
+> +	for (i = 0; irq_names[i]; i++) {
+> +		irq = platform_get_irq_byname(pdev, irq_names[i]);
+> +		if (irq < 0) {
+> +			dev_warn(&pdev->dev, "No IRQ for %s: %d\n",
+> +				 irq_names[i], irq);
+> +			continue;
+> +		}
+> +		irq = regmap_irq_get_virq(axp20x->regmap_irqc, irq);
+> +		ret = devm_request_any_context_irq(&pdev->dev, irq,
+> +						   axp20x_ac_power_irq, 0,
+> +						   DRVNAME, power);
+> +		if (ret < 0)
+> +			dev_warn(&pdev->dev, "Error requesting %s IRQ: %d\n",
+> +				 irq_names[i], ret);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id axp20x_ac_power_match[] = {
+> +	{
+> +		.compatible = "x-powers,axp202-ac-power-supply",
+> +		.data = (void *)AXP202_ID,
+> +	}, {
+> +		.compatible = "x-powers,axp221-ac-power-supply",
+> +		.data = (void *)AXP221_ID,
+> +	}, { /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, axp20x_ac_power_match);
+> +
+> +static struct platform_driver axp20x_ac_power_driver = {
+> +	.probe = axp20x_ac_power_probe,
+> +	.driver = {
+> +		.name = DRVNAME,
+> +		.of_match_table = axp20x_ac_power_match,
+> +	},
+> +};
+> +
+> +module_platform_driver(axp20x_ac_power_driver);
+> +
+> +MODULE_AUTHOR("Quentin Schulz <quentin.schulz@free-electrons.com>");
+> +MODULE_DESCRIPTION("AXP20X and AXP22X PMICs' AC power supply driver");
+> +MODULE_LICENSE("GPL");
 > 
