@@ -1,46 +1,49 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Fri,  6 Jan 2017 18:11:36 -0800
-Subject: [PATCH v3 18/24] media: imx: Add SMFC subdev driver
+Date: Fri,  6 Jan 2017 18:11:38 -0800
+Subject: [PATCH v3 20/24] media: imx: Add Camera Interface subdev driver
 In-Reply-To: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1483755102-24785-19-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1483755102-24785-21-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a media entity subdevice driver for the i.MX Sensor Multi-FIFO
-Controller module. Video frames are received from the CSI and can
-be routed to various sinks including the i.MX Image Converter for
-scaling, color-space conversion, motion compensated deinterlacing,
-and image rotation.
+This is the camera interface driver that provides the v4l2
+user interface. Frames can be received from various sources:
+
+- directly from SMFC for capturing unconverted images directly from
+  camera sensors.
+
+- from the IC pre-process encode task.
+
+- from the IC pre-process viewfinder task.
+
+- from the IC post-process task.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- drivers/staging/media/imx/Makefile   |   1 +
- drivers/staging/media/imx/imx-smfc.c | 737 +++++++++++++++++++++++++++++++++++
- 2 files changed, 738 insertions(+)
- create mode 100644 drivers/staging/media/imx/imx-smfc.c
+ drivers/staging/media/imx/Makefile    |    2 +-
+ drivers/staging/media/imx/imx-camif.c | 1000 +++++++++++++++++++++++++++++++++
+ 2 files changed, 1001 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/staging/media/imx/imx-camif.c
 
 diff --git a/drivers/staging/media/imx/Makefile b/drivers/staging/media/imx/Makefile
-index 133672a..3559d7b 100644
+index d2a962c..fe9e992 100644
 --- a/drivers/staging/media/imx/Makefile
 +++ b/drivers/staging/media/imx/Makefile
-@@ -5,4 +5,5 @@ obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media.o
- obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-common.o
+@@ -8,4 +8,4 @@ obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-ic.o
  
  obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-csi.o
-+obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-smfc.o
- 
-diff --git a/drivers/staging/media/imx/imx-smfc.c b/drivers/staging/media/imx/imx-smfc.c
+ obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-smfc.o
+-
++obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-camif.o
+diff --git a/drivers/staging/media/imx/imx-camif.c b/drivers/staging/media/imx/imx-camif.c
 new file mode 100644
-index 0000000..614a4381
+index 0000000..404f724
 --- /dev/null
-+++ b/drivers/staging/media/imx/imx-smfc.c
-@@ -0,0 +1,737 @@
++++ b/drivers/staging/media/imx/imx-camif.c
+@@ -0,0 +1,1000 @@
 +/*
-+ * V4L2 Capture SMFC Subdev for Freescale i.MX5/6 SOC
-+ *
-+ * This subdevice handles capture of raw/unconverted video frames
-+ * from the CSI, directly to memory via the Sensor Multi-FIFO Controller.
++ * Video Camera Capture Subdev for Freescale i.MX5/6 SOC
 + *
 + * Copyright (c) 2012-2016 Mentor Graphics Inc.
 + *
@@ -51,8 +54,8 @@ index 0000000..614a4381
 + */
 +#include <linux/delay.h>
 +#include <linux/fs.h>
-+#include <linux/interrupt.h>
 +#include <linux/module.h>
++#include <linux/of_platform.h>
 +#include <linux/pinctrl/consumer.h>
 +#include <linux/platform_device.h>
 +#include <linux/sched.h>
@@ -61,434 +64,695 @@ index 0000000..614a4381
 +#include <linux/timer.h>
 +#include <media/v4l2-ctrls.h>
 +#include <media/v4l2-device.h>
++#include <media/v4l2-event.h>
 +#include <media/v4l2-ioctl.h>
 +#include <media/v4l2-of.h>
 +#include <media/v4l2-subdev.h>
 +#include <media/videobuf2-dma-contig.h>
++#include <video/imx-ipu-v3.h>
 +#include <media/imx.h>
 +#include "imx-media.h"
 +
-+/*
-+ * Min/Max supported width and heights.
-+ *
-+ * We allow planar output from the SMFC, so we have to align
-+ * output width by 16 pixels to meet IDMAC alignment requirements,
-+ * which also means input width must have the same alignment.
-+ */
-+#define MIN_W       176
-+#define MIN_H       144
-+#define MAX_W      8192
-+#define MAX_H      4096
-+#define W_ALIGN    4 /* multiple of 16 pixels */
-+#define H_ALIGN    1 /* multiple of 2 lines */
-+#define S_ALIGN    1 /* multiple of 2 */
++#define CAMIF_NUM_PADS 2
 +
-+#define SMFC_NUM_PADS 2
-+
-+struct imx_smfc_priv {
-+	struct device        *dev;
-+	struct ipu_soc       *ipu;
-+	struct imx_media_dev *md;
-+	struct v4l2_subdev   sd;
-+	struct media_pad pad[SMFC_NUM_PADS];
-+	int ipu_id;
-+	int smfc_id;
++struct camif_priv {
++	struct device         *dev;
++	struct video_device    vfd;
++	struct media_pipeline  mp;
++	struct imx_media_dev  *md;
++	struct v4l2_subdev     sd;
++	struct media_pad       pad[CAMIF_NUM_PADS];
++	struct media_pad       vd_pad;
++	int id;
 +	int input_pad;
 +	int output_pad;
 +
-+	struct ipuv3_channel *smfc_ch;
-+	struct ipu_smfc *smfc;
++	struct v4l2_mbus_framefmt format_mbus[CAMIF_NUM_PADS];
++	const struct imx_media_pixfmt *cc[CAMIF_NUM_PADS];
 +
-+	struct v4l2_mbus_framefmt format_mbus[SMFC_NUM_PADS];
-+	const struct imx_media_pixfmt *cc[SMFC_NUM_PADS];
++	/* dma buffer ring */
++	struct imx_media_dma_buf_ring *in_ring;
++	struct v4l2_subdev     *src_sd;
 +
-+	struct v4l2_mbus_config sensor_mbus_cfg;
++	struct mutex           mutex;       /* capture device mutex */
++	spinlock_t             q_lock;      /* protect ready_q */
 +
-+	/* the dma buffer ring to send to sink */
-+	struct imx_media_dma_buf_ring *out_ring;
-+	struct imx_media_dma_buf *next;
++	/* buffer queue used in videobuf2 */
++	struct vb2_queue       buffer_queue;
 +
-+	int ipu_buf_num;  /* ipu double buffer index: 0-1 */
++	/* streaming buffer queue */
++	struct list_head       ready_q;
 +
-+	/* the sink that will receive the dma buffers */
-+	struct v4l2_subdev *sink_sd;
-+	struct v4l2_subdev *src_sd;
++	/* controls inherited from subdevs */
++	struct v4l2_ctrl_handler ctrl_hdlr;
 +
-+	/*
-+	 * the CSI id and mipi virtual channel number at
-+	 * link validate
-+	 */
-+	int csi_id;
-+	int vc_num;
-+
-+	/* the attached sensor at stream on */
-+	struct imx_media_subdev *sensor;
-+
-+	spinlock_t irqlock;
-+	struct timer_list eof_timeout_timer;
-+	int eof_irq;
-+	int nfb4eof_irq;
-+
-+	bool stream_on; /* streaming is on */
-+	bool last_eof;  /* waiting for last EOF at stream off */
-+	struct completion last_eof_comp;
++	/* misc status */
++	int                    current_input; /* the current input */
++	v4l2_std_id            current_std;   /* current standard */
++	bool                   stop;          /* streaming is stopping */
 +};
 +
-+static void imx_smfc_put_ipu_resources(struct imx_smfc_priv *priv)
-+{
-+	if (!IS_ERR_OR_NULL(priv->smfc_ch))
-+		ipu_idmac_put(priv->smfc_ch);
-+	priv->smfc_ch = NULL;
++/* In bytes, per queue */
++#define VID_MEM_LIMIT	SZ_64M
 +
-+	if (!IS_ERR_OR_NULL(priv->smfc))
-+		ipu_smfc_put(priv->smfc);
-+	priv->smfc = NULL;
++static struct vb2_ops camif_qops;
++
++/*
++ * Video ioctls follow
++ */
++
++static int vidioc_querycap(struct file *file, void *fh,
++			   struct v4l2_capability *cap)
++{
++	strncpy(cap->driver, "imx-media-camif", sizeof(cap->driver) - 1);
++	strncpy(cap->card, "imx-media-camif", sizeof(cap->card) - 1);
++	cap->bus_info[0] = 0;
++	cap->device_caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_STREAMING;
++	cap->capabilities = cap->device_caps | V4L2_CAP_DEVICE_CAPS;
++
++	return 0;
 +}
 +
-+static int imx_smfc_get_ipu_resources(struct imx_smfc_priv *priv)
++static int camif_enum_fmt_vid_cap(struct file *file, void *fh,
++				  struct v4l2_fmtdesc *f)
 +{
-+	int ch_num, ret;
++	const struct imx_media_pixfmt *cc;
++	u32 code;
++	int ret;
 +
-+	priv->ipu = priv->md->ipu[priv->ipu_id];
++	ret = imx_media_enum_format(&code, f->index, true, true);
++	if (ret)
++		return ret;
++	cc = imx_media_find_format(0, code, true, true);
++	if (!cc)
++		return -EINVAL;
 +
-+	ch_num = IPUV3_CHANNEL_CSI0 + priv->smfc_id;
++	f->pixelformat = cc->fourcc;
 +
-+	priv->smfc = ipu_smfc_get(priv->ipu, ch_num);
-+	if (IS_ERR(priv->smfc)) {
-+		v4l2_err(&priv->sd, "failed to get SMFC\n");
-+		ret = PTR_ERR(priv->smfc);
-+		goto out;
++	return 0;
++}
++
++static int camif_g_fmt_vid_cap(struct file *file, void *fh,
++			       struct v4l2_format *f)
++{
++	struct camif_priv *priv = video_drvdata(file);
++	struct v4l2_mbus_framefmt *outfmt;
++
++	/* user format is the same as the format from output pad */
++	outfmt = &priv->format_mbus[priv->output_pad];
++	return imx_media_mbus_fmt_to_pix_fmt(&f->fmt.pix, outfmt);
++}
++
++static int camif_try_fmt_vid_cap(struct file *file, void *fh,
++				 struct v4l2_format *f)
++{
++	return camif_g_fmt_vid_cap(file, fh, f);
++}
++
++static int camif_s_fmt_vid_cap(struct file *file, void *fh,
++			       struct v4l2_format *f)
++{
++	struct camif_priv *priv = video_drvdata(file);
++
++	if (vb2_is_busy(&priv->buffer_queue)) {
++		v4l2_err(&priv->sd, "%s queue busy\n", __func__);
++		return -EBUSY;
 +	}
 +
-+	priv->smfc_ch = ipu_idmac_get(priv->ipu, ch_num);
-+	if (IS_ERR(priv->smfc_ch)) {
-+		v4l2_err(&priv->sd, "could not get IDMAC channel %u\n", ch_num);
-+		ret = PTR_ERR(priv->smfc_ch);
-+		goto out;
++	return camif_try_fmt_vid_cap(file, priv, f);
++}
++
++static int camif_querystd(struct file *file, void *fh, v4l2_std_id *std)
++{
++	struct camif_priv *priv = video_drvdata(file);
++	struct imx_media_subdev *sensor;
++
++	sensor = imx_media_find_sensor(priv->md, &priv->sd.entity);
++	if (IS_ERR(sensor)) {
++		v4l2_err(&priv->sd, "no sensor attached\n");
++		return PTR_ERR(sensor);
++	}
++
++	return v4l2_subdev_call(sensor->sd, video, querystd, std);
++}
++
++static int camif_g_std(struct file *file, void *fh, v4l2_std_id *std)
++{
++	struct camif_priv *priv = video_drvdata(file);
++
++	*std = priv->current_std;
++	return 0;
++}
++
++static int camif_s_std(struct file *file, void *fh, v4l2_std_id std)
++{
++	struct camif_priv *priv = video_drvdata(file);
++	struct imx_media_subdev *sensor;
++	int ret;
++
++	sensor = imx_media_find_sensor(priv->md, &priv->sd.entity);
++	if (IS_ERR(sensor)) {
++		v4l2_err(&priv->sd, "no sensor attached\n");
++		return PTR_ERR(sensor);
++	}
++
++	if (vb2_is_busy(&priv->buffer_queue))
++		return -EBUSY;
++
++	ret = v4l2_subdev_call(sensor->sd, video, s_std, std);
++	if (ret < 0)
++		return ret;
++
++	priv->current_std = std;
++	return 0;
++}
++
++static int camif_enum_input(struct file *file, void *fh,
++			    struct v4l2_input *input)
++{
++	struct camif_priv *priv = video_drvdata(file);
++	struct imx_media_subdev *sensor;
++	int index = input->index;
++
++	sensor = imx_media_find_sensor(priv->md, &priv->sd.entity);
++	if (IS_ERR(sensor)) {
++		v4l2_err(&priv->sd, "no sensor attached\n");
++		return PTR_ERR(sensor);
++	}
++
++	if (index >= sensor->input.num)
++		return -EINVAL;
++
++	input->type = V4L2_INPUT_TYPE_CAMERA;
++	strncpy(input->name, sensor->input.name[index], sizeof(input->name));
++
++	if (index == priv->current_input) {
++		v4l2_subdev_call(sensor->sd, video, g_input_status,
++				 &input->status);
++		v4l2_subdev_call(sensor->sd, video, querystd, &input->std);
++	} else {
++		input->status = V4L2_IN_ST_NO_SIGNAL;
++		input->std = V4L2_STD_UNKNOWN;
 +	}
 +
 +	return 0;
-+out:
-+	imx_smfc_put_ipu_resources(priv);
++}
++
++static int camif_g_input(struct file *file, void *fh, unsigned int *index)
++{
++	struct camif_priv *priv = video_drvdata(file);
++
++	*index = priv->current_input;
++	return 0;
++}
++
++static int camif_s_input(struct file *file, void *fh, unsigned int index)
++{
++	struct camif_priv *priv = video_drvdata(file);
++	struct imx_media_subdev *sensor;
++	int ret;
++
++	sensor = imx_media_find_sensor(priv->md, &priv->sd.entity);
++	if (IS_ERR(sensor)) {
++		v4l2_err(&priv->sd, "no sensor attached\n");
++		return PTR_ERR(sensor);
++	}
++
++	if (index >= sensor->input.num)
++		return -EINVAL;
++
++	if (index == priv->current_input)
++		return 0;
++
++	/* select the sensor's input */
++	ret = v4l2_subdev_call(sensor->sd, video, s_routing,
++			       sensor->input.value[index], 0, 0);
++	if (!ret)
++		priv->current_input = index;
++
 +	return ret;
 +}
 +
-+static irqreturn_t imx_smfc_eof_interrupt(int irq, void *dev_id)
++static int camif_g_parm(struct file *file, void *fh,
++			struct v4l2_streamparm *a)
 +{
-+	struct imx_smfc_priv *priv = dev_id;
-+	struct imx_media_dma_buf *done, *next;
++	struct camif_priv *priv = video_drvdata(file);
++	struct imx_media_subdev *sensor;
 +
-+	spin_lock(&priv->irqlock);
-+
-+	if (priv->last_eof) {
-+		complete(&priv->last_eof_comp);
-+		priv->last_eof = false;
-+		goto unlock;
++	sensor = imx_media_find_sensor(priv->md, &priv->sd.entity);
++	if (IS_ERR(sensor)) {
++		v4l2_err(&priv->sd, "no sensor attached\n");
++		return PTR_ERR(sensor);
 +	}
 +
-+	/* inform CSI of this EOF so it can monitor frame intervals */
-+	v4l2_subdev_call(priv->src_sd, core, interrupt_service_routine,
-+			 0, NULL);
++	if (a->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
++		return -EINVAL;
 +
-+	done = imx_media_dma_buf_get_active(priv->out_ring);
-+	/* give the completed buffer to the sink  */
-+	if (!WARN_ON(!done))
-+		imx_media_dma_buf_done(done, IMX_MEDIA_BUF_STATUS_DONE);
-+
-+	/* priv->next buffer is now the active one */
-+	imx_media_dma_buf_set_active(priv->next);
-+
-+	/* bump the EOF timeout timer */
-+	mod_timer(&priv->eof_timeout_timer,
-+		  jiffies + msecs_to_jiffies(IMX_MEDIA_EOF_TIMEOUT));
-+
-+	if (ipu_idmac_buffer_is_ready(priv->smfc_ch, priv->ipu_buf_num))
-+		ipu_idmac_clear_buffer(priv->smfc_ch, priv->ipu_buf_num);
-+
-+	/* get next queued buffer */
-+	next = imx_media_dma_buf_get_next_queued(priv->out_ring);
-+
-+	ipu_cpmem_set_buffer(priv->smfc_ch, priv->ipu_buf_num, next->phys);
-+	ipu_idmac_select_buffer(priv->smfc_ch, priv->ipu_buf_num);
-+
-+	/* toggle IPU double-buffer index */
-+	priv->ipu_buf_num ^= 1;
-+	priv->next = next;
-+
-+unlock:
-+	spin_unlock(&priv->irqlock);
-+	return IRQ_HANDLED;
++	return v4l2_subdev_call(sensor->sd, video, g_parm, a);
 +}
 +
-+static irqreturn_t imx_smfc_nfb4eof_interrupt(int irq, void *dev_id)
++static int camif_s_parm(struct file *file, void *fh,
++			struct v4l2_streamparm *a)
 +{
-+	struct imx_smfc_priv *priv = dev_id;
-+	static const struct v4l2_event ev = {
-+		.type = V4L2_EVENT_IMX_NFB4EOF,
-+	};
++	struct camif_priv *priv = video_drvdata(file);
++	struct imx_media_subdev *sensor;
 +
-+	v4l2_err(&priv->sd, "NFB4EOF\n");
++	sensor = imx_media_find_sensor(priv->md, &priv->sd.entity);
++	if (IS_ERR(sensor)) {
++		v4l2_err(&priv->sd, "no sensor attached\n");
++		return PTR_ERR(sensor);
++	}
 +
-+	v4l2_subdev_notify_event(&priv->sd, &ev);
++	if (a->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
++		return -EINVAL;
 +
-+	return IRQ_HANDLED;
++	return v4l2_subdev_call(sensor->sd, video, s_parm, a);
 +}
++
++static const struct v4l2_ioctl_ops camif_ioctl_ops = {
++	.vidioc_querycap	= vidioc_querycap,
++
++	.vidioc_enum_fmt_vid_cap        = camif_enum_fmt_vid_cap,
++	.vidioc_g_fmt_vid_cap           = camif_g_fmt_vid_cap,
++	.vidioc_try_fmt_vid_cap         = camif_try_fmt_vid_cap,
++	.vidioc_s_fmt_vid_cap           = camif_s_fmt_vid_cap,
++
++	.vidioc_querystd        = camif_querystd,
++	.vidioc_g_std           = camif_g_std,
++	.vidioc_s_std           = camif_s_std,
++
++	.vidioc_enum_input      = camif_enum_input,
++	.vidioc_g_input         = camif_g_input,
++	.vidioc_s_input         = camif_s_input,
++
++	.vidioc_g_parm          = camif_g_parm,
++	.vidioc_s_parm          = camif_s_parm,
++
++	.vidioc_reqbufs		= vb2_ioctl_reqbufs,
++	.vidioc_create_bufs     = vb2_ioctl_create_bufs,
++	.vidioc_prepare_buf     = vb2_ioctl_prepare_buf,
++	.vidioc_querybuf	= vb2_ioctl_querybuf,
++	.vidioc_qbuf		= vb2_ioctl_qbuf,
++	.vidioc_dqbuf		= vb2_ioctl_dqbuf,
++	.vidioc_expbuf		= vb2_ioctl_expbuf,
++	.vidioc_streamon	= vb2_ioctl_streamon,
++	.vidioc_streamoff	= vb2_ioctl_streamoff,
++};
 +
 +/*
-+ * EOF timeout timer function.
++ * Queue operations
 + */
-+static void imx_smfc_eof_timeout(unsigned long data)
++
++static u32 camif_get_sizeimage(struct camif_priv *priv)
 +{
-+	struct imx_smfc_priv *priv = (struct imx_smfc_priv *)data;
-+	static const struct v4l2_event ev = {
-+		.type = V4L2_EVENT_IMX_EOF_TIMEOUT,
-+	};
++	struct v4l2_mbus_framefmt *outfmt;
++	const struct imx_media_pixfmt *outcc;
 +
-+	v4l2_err(&priv->sd, "EOF timeout\n");
-+
-+	v4l2_subdev_notify_event(&priv->sd, &ev);
-+}
-+
-+/* init the SMFC IDMAC channel */
-+static void imx_smfc_setup_channel(struct imx_smfc_priv *priv)
-+{
-+	struct v4l2_mbus_framefmt *infmt, *outfmt;
-+	struct imx_media_dma_buf *buf0, *buf1;
-+	unsigned int burst_size;
-+	struct ipu_image image;
-+	bool passthrough;
-+
-+	infmt = &priv->format_mbus[priv->input_pad];
 +	outfmt = &priv->format_mbus[priv->output_pad];
-+
-+	ipu_cpmem_zero(priv->smfc_ch);
-+
-+	imx_media_mbus_fmt_to_ipu_image(&image, outfmt);
-+
-+	buf0 = imx_media_dma_buf_get_next_queued(priv->out_ring);
-+	imx_media_dma_buf_set_active(buf0);
-+	buf1 = imx_media_dma_buf_get_next_queued(priv->out_ring);
-+	priv->next = buf1;
-+
-+	image.phys0 = buf0->phys;
-+	image.phys1 = buf1->phys;
-+	ipu_cpmem_set_image(priv->smfc_ch, &image);
-+
-+	burst_size = (outfmt->width & 0xf) ? 8 : 16;
-+
-+	ipu_cpmem_set_burstsize(priv->smfc_ch, burst_size);
-+
-+	/*
-+	 * If the sensor uses 16-bit parallel CSI bus, we must handle
-+	 * the data internally in the IPU as 16-bit generic, aka
-+	 * passthrough mode.
-+	 */
-+	passthrough = (priv->sensor_mbus_cfg.type != V4L2_MBUS_CSI2 &&
-+		       priv->sensor->sensor_ep.bus.parallel.bus_width >= 16);
-+
-+	if (passthrough)
-+		ipu_cpmem_set_format_passthrough(priv->smfc_ch, 16);
-+
-+	/*
-+	 * Set the channel for the direct CSI-->memory via SMFC
-+	 * use-case to very high priority, by enabling the watermark
-+	 * signal in the SMFC, enabling WM in the channel, and setting
-+	 * the channel priority to high.
-+	 *
-+	 * Refer to the i.mx6 rev. D TRM Table 36-8: Calculated priority
-+	 * value.
-+	 *
-+	 * The WM's are set very low by intention here to ensure that
-+	 * the SMFC FIFOs do not overflow.
-+	 */
-+	ipu_smfc_set_watermark(priv->smfc, 0x02, 0x01);
-+	ipu_cpmem_set_high_priority(priv->smfc_ch);
-+	ipu_idmac_enable_watermark(priv->smfc_ch, true);
-+	ipu_cpmem_set_axi_id(priv->smfc_ch, 0);
-+	ipu_idmac_lock_enable(priv->smfc_ch, 8);
-+
-+	burst_size = ipu_cpmem_get_burstsize(priv->smfc_ch);
-+	burst_size = passthrough ?
-+		(burst_size >> 3) - 1 : (burst_size >> 2) - 1;
-+
-+	ipu_smfc_set_burstsize(priv->smfc, burst_size);
-+
-+	if (outfmt->field == V4L2_FIELD_NONE &&
-+	    (V4L2_FIELD_HAS_BOTH(infmt->field) ||
-+	     infmt->field == V4L2_FIELD_ALTERNATE))
-+		ipu_cpmem_interlaced_scan(priv->smfc_ch,
-+					  image.pix.bytesperline);
-+
-+	ipu_idmac_set_double_buffer(priv->smfc_ch, true);
++	outcc = priv->cc[priv->output_pad];
++	return (outfmt->width * outfmt->height * outcc->bpp) >> 3;
 +}
 +
-+static void imx_smfc_unsetup(struct imx_smfc_priv *priv)
++static int camif_queue_setup(struct vb2_queue *vq,
++			     unsigned int *nbuffers, unsigned int *nplanes,
++			     unsigned int sizes[], struct device *alloc_devs[])
 +{
-+	ipu_idmac_disable_channel(priv->smfc_ch);
-+	ipu_smfc_disable(priv->smfc);
++	struct camif_priv *priv = vb2_get_drv_priv(vq);
++	unsigned int count = *nbuffers;
++	u32 sizeimage;
++
++	if (!priv->src_sd)
++		return -EPIPE;
++
++	if (vq->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
++		return -EINVAL;
++
++	sizeimage = camif_get_sizeimage(priv);
++
++	count = min_t(unsigned int, count, IMX_MEDIA_MAX_RING_BUFS);
++	count = max_t(unsigned int, count, IMX_MEDIA_MIN_RING_BUFS);
++
++	while (sizeimage * count > VID_MEM_LIMIT)
++		count--;
++
++	if (count < IMX_MEDIA_MIN_RING_BUFS)
++		return -EINVAL;
++
++	*nplanes = 1;
++	*nbuffers = count;
++	sizes[0] = sizeimage;
++
++	return 0;
 +}
 +
-+static void imx_smfc_setup(struct imx_smfc_priv *priv)
++static int camif_buf_init(struct vb2_buffer *vb)
 +{
-+	imx_smfc_setup_channel(priv);
++	struct vb2_queue *vq = vb->vb2_queue;
++	struct camif_priv *priv = vb2_get_drv_priv(vq);
++	struct imx_media_buffer *buf = to_imx_media_vb(vb);
 +
-+	ipu_cpmem_dump(priv->smfc_ch);
-+	ipu_dump(priv->ipu);
++	if (!priv->src_sd)
++		return -EPIPE;
 +
-+	ipu_smfc_enable(priv->smfc);
++	INIT_LIST_HEAD(&buf->list);
 +
-+	/* set buffers ready */
-+	ipu_idmac_select_buffer(priv->smfc_ch, 0);
-+	ipu_idmac_select_buffer(priv->smfc_ch, 1);
-+
-+	/* enable the channels */
-+	ipu_idmac_enable_channel(priv->smfc_ch);
++	return 0;
 +}
 +
-+static int imx_smfc_start(struct imx_smfc_priv *priv)
++static int camif_buf_prepare(struct vb2_buffer *vb)
 +{
++	struct vb2_queue *vq = vb->vb2_queue;
++	struct camif_priv *priv = vb2_get_drv_priv(vq);
++	u32 sizeimage = camif_get_sizeimage(priv);
 +	int ret;
 +
-+	if (!priv->sensor) {
-+		v4l2_err(&priv->sd, "no sensor attached\n");
++	if (!priv->src_sd)
++		return -EPIPE;
++
++	if (vb2_plane_size(vb, 0) < sizeimage) {
++		v4l2_err(&priv->sd,
++			 "data will not fit into plane (%lu < %lu)\n",
++			 vb2_plane_size(vb, 0), (long)sizeimage);
 +		return -EINVAL;
 +	}
 +
-+	ret = imx_smfc_get_ipu_resources(priv);
-+	if (ret)
-+		return ret;
++	vb2_set_plane_payload(vb, 0, sizeimage);
 +
-+	ipu_smfc_map_channel(priv->smfc, priv->csi_id, priv->vc_num);
-+
-+	/* ask the sink for the buffer ring */
-+	ret = v4l2_subdev_call(priv->sink_sd, core, ioctl,
-+			       IMX_MEDIA_REQ_DMA_BUF_SINK_RING,
-+			       &priv->out_ring);
-+	if (ret)
-+		goto out_put_ipu;
-+
-+	priv->ipu_buf_num = 0;
-+
-+	/* init EOF completion waitq */
-+	init_completion(&priv->last_eof_comp);
-+	priv->last_eof = false;
-+
-+	imx_smfc_setup(priv);
-+
-+	priv->nfb4eof_irq = ipu_idmac_channel_irq(priv->ipu,
-+						 priv->smfc_ch,
-+						 IPU_IRQ_NFB4EOF);
-+	ret = devm_request_irq(priv->dev, priv->nfb4eof_irq,
-+			       imx_smfc_nfb4eof_interrupt, 0,
-+			       "imx-smfc-nfb4eof", priv);
-+	if (ret) {
-+		v4l2_err(&priv->sd,
-+			 "Error registering NFB4EOF irq: %d\n", ret);
-+		goto out_unsetup;
++	if (!priv->in_ring) {
++		priv->in_ring = imx_media_alloc_dma_buf_ring(
++			priv->md, &priv->src_sd->entity, &priv->sd.entity,
++			sizeimage, vq->num_buffers, false);
++		if (IS_ERR(priv->in_ring)) {
++			v4l2_err(&priv->sd, "failed to alloc dma-buf ring\n");
++			ret = PTR_ERR(priv->in_ring);
++			priv->in_ring = NULL;
++			return ret;
++		}
 +	}
 +
-+	priv->eof_irq = ipu_idmac_channel_irq(priv->ipu, priv->smfc_ch,
-+					      IPU_IRQ_EOF);
-+
-+	ret = devm_request_irq(priv->dev, priv->eof_irq,
-+			       imx_smfc_eof_interrupt, 0,
-+			       "imx-smfc-eof", priv);
-+	if (ret) {
-+		v4l2_err(&priv->sd,
-+			 "Error registering eof irq: %d\n", ret);
-+		goto out_free_nfb4eof_irq;
-+	}
-+
-+	/* start the EOF timeout timer */
-+	mod_timer(&priv->eof_timeout_timer,
-+		  jiffies + msecs_to_jiffies(IMX_MEDIA_EOF_TIMEOUT));
++	ret = imx_media_dma_buf_queue_from_vb(priv->in_ring, vb);
++	if (ret)
++		goto free_ring;
 +
 +	return 0;
 +
-+out_free_nfb4eof_irq:
-+	devm_free_irq(priv->dev, priv->nfb4eof_irq, priv);
-+out_unsetup:
-+	imx_smfc_unsetup(priv);
-+out_put_ipu:
-+	imx_smfc_put_ipu_resources(priv);
++free_ring:
++	imx_media_free_dma_buf_ring(priv->in_ring);
++	priv->in_ring = NULL;
 +	return ret;
 +}
 +
-+static void imx_smfc_stop(struct imx_smfc_priv *priv)
++static void camif_buf_queue(struct vb2_buffer *vb)
 +{
++	struct camif_priv *priv = vb2_get_drv_priv(vb->vb2_queue);
++	struct imx_media_buffer *buf = to_imx_media_vb(vb);
++	unsigned long flags;
++
++	spin_lock_irqsave(&priv->q_lock, flags);
++
++	list_add_tail(&buf->list, &priv->ready_q);
++
++	spin_unlock_irqrestore(&priv->q_lock, flags);
++}
++
++static int camif_start_streaming(struct vb2_queue *vq, unsigned int count)
++{
++	struct camif_priv *priv = vb2_get_drv_priv(vq);
++	u32 sizeimage = camif_get_sizeimage(priv);
++	struct imx_media_buffer *buf, *tmp;
 +	unsigned long flags;
 +	int ret;
 +
-+	/* mark next EOF interrupt as the last before stream off */
-+	spin_lock_irqsave(&priv->irqlock, flags);
-+	priv->last_eof = true;
-+	spin_unlock_irqrestore(&priv->irqlock, flags);
++	if (vb2_is_streaming(vq))
++		return 0;
 +
-+	/*
-+	 * and then wait for interrupt handler to mark completion.
-+	 */
-+	ret = wait_for_completion_timeout(
-+		&priv->last_eof_comp, msecs_to_jiffies(IMX_MEDIA_EOF_TIMEOUT));
-+	if (ret == 0)
-+		v4l2_warn(&priv->sd, "wait last EOF timeout\n");
-+
-+	devm_free_irq(priv->dev, priv->eof_irq, priv);
-+	devm_free_irq(priv->dev, priv->nfb4eof_irq, priv);
-+
-+	imx_smfc_unsetup(priv);
-+
-+	/* cancel the EOF timeout timer */
-+	del_timer_sync(&priv->eof_timeout_timer);
-+
-+	priv->out_ring = NULL;
-+
-+	/* inform sink that the buffer ring can now be freed */
-+	v4l2_subdev_call(priv->sink_sd, core, ioctl,
-+			 IMX_MEDIA_REL_DMA_BUF_SINK_RING, 0);
-+
-+	imx_smfc_put_ipu_resources(priv);
-+}
-+
-+static int imx_smfc_s_stream(struct v4l2_subdev *sd, int enable)
-+{
-+	struct imx_smfc_priv *priv = v4l2_get_subdevdata(sd);
-+	int ret = 0;
-+
-+	if (!priv->src_sd || !priv->sink_sd)
++	if (!priv->src_sd)
 +		return -EPIPE;
 +
-+	v4l2_info(sd, "stream %s\n", enable ? "ON" : "OFF");
++	if (!priv->in_ring) {
++		priv->in_ring = imx_media_alloc_dma_buf_ring(
++			priv->md, &priv->src_sd->entity, &priv->sd.entity,
++			sizeimage, vq->num_buffers, false);
++		if (IS_ERR(priv->in_ring)) {
++			v4l2_err(&priv->sd, "failed to alloc dma-buf ring\n");
++			ret = PTR_ERR(priv->in_ring);
++			priv->in_ring = NULL;
++			goto return_bufs;
++		}
++	}
 +
-+	if (enable && !priv->stream_on)
-+		ret = imx_smfc_start(priv);
-+	else if (!enable && priv->stream_on)
-+		imx_smfc_stop(priv);
++	ret = imx_media_pipeline_set_stream(priv->md, &priv->sd.entity,
++					    &priv->mp, true);
++	if (ret) {
++		v4l2_err(&priv->sd, "pipeline_set_stream failed with %d\n",
++			 ret);
++		goto free_ring;
++	}
 +
-+	if (!ret)
-+		priv->stream_on = enable;
++	priv->stop = false;
++
++	return 0;
++
++free_ring:
++	imx_media_free_dma_buf_ring(priv->in_ring);
++	priv->in_ring = NULL;
++return_bufs:
++	spin_lock_irqsave(&priv->q_lock, flags);
++	list_for_each_entry_safe(buf, tmp, &priv->ready_q, list) {
++		list_del(&buf->list);
++		vb2_buffer_done(&buf->vbuf.vb2_buf, VB2_BUF_STATE_QUEUED);
++	}
++	spin_unlock_irqrestore(&priv->q_lock, flags);
 +	return ret;
 +}
 +
-+static int imx_smfc_enum_mbus_code(struct v4l2_subdev *sd,
-+				   struct v4l2_subdev_pad_config *cfg,
-+				   struct v4l2_subdev_mbus_code_enum *code)
++static void camif_stop_streaming(struct vb2_queue *vq)
 +{
-+	struct imx_smfc_priv *priv = v4l2_get_subdevdata(sd);
++	struct camif_priv *priv = vb2_get_drv_priv(vq);
++	struct imx_media_buffer *frame;
++	unsigned long flags;
++	int ret;
 +
-+	if (code->pad >= SMFC_NUM_PADS)
-+		return -EINVAL;
++	if (!vb2_is_streaming(vq))
++		return;
 +
-+	return imx_media_enum_format(&code->code, code->index,
-+				     true, code->pad == priv->output_pad);
++	spin_lock_irqsave(&priv->q_lock, flags);
++	priv->stop = true;
++	spin_unlock_irqrestore(&priv->q_lock, flags);
++
++	ret = imx_media_pipeline_set_stream(priv->md, &priv->sd.entity,
++					    &priv->mp, false);
++	if (ret)
++		v4l2_warn(&priv->sd, "pipeline_set_stream failed with %d\n",
++			  ret);
++
++	if (priv->in_ring) {
++		v4l2_warn(&priv->sd, "%s: in_ring was not freed\n",
++			  __func__);
++		imx_media_free_dma_buf_ring(priv->in_ring);
++		priv->in_ring = NULL;
++	}
++
++	/* release all active buffers */
++	spin_lock_irqsave(&priv->q_lock, flags);
++	while (!list_empty(&priv->ready_q)) {
++		frame = list_entry(priv->ready_q.next,
++				   struct imx_media_buffer, list);
++		list_del(&frame->list);
++		vb2_buffer_done(&frame->vbuf.vb2_buf, VB2_BUF_STATE_ERROR);
++	}
++	spin_unlock_irqrestore(&priv->q_lock, flags);
 +}
 +
-+static int imx_smfc_get_fmt(struct v4l2_subdev *sd,
-+			    struct v4l2_subdev_pad_config *cfg,
-+			    struct v4l2_subdev_format *sdformat)
-+{
-+	struct imx_smfc_priv *priv = v4l2_get_subdevdata(sd);
++static struct vb2_ops camif_qops = {
++	.queue_setup	 = camif_queue_setup,
++	.buf_init        = camif_buf_init,
++	.buf_prepare	 = camif_buf_prepare,
++	.buf_queue	 = camif_buf_queue,
++	.wait_prepare	 = vb2_ops_wait_prepare,
++	.wait_finish	 = vb2_ops_wait_finish,
++	.start_streaming = camif_start_streaming,
++	.stop_streaming  = camif_stop_streaming,
++};
 +
-+	if (sdformat->pad >= SMFC_NUM_PADS)
++/*
++ * File operations
++ */
++static int camif_open(struct file *file)
++{
++	struct camif_priv *priv = video_drvdata(file);
++	int ret;
++
++	if (mutex_lock_interruptible(&priv->mutex))
++		return -ERESTARTSYS;
++
++	ret = v4l2_fh_open(file);
++	if (ret)
++		v4l2_err(&priv->sd, "v4l2_fh_open failed\n");
++
++	mutex_unlock(&priv->mutex);
++	return ret;
++}
++
++static int camif_release(struct file *file)
++{
++	struct camif_priv *priv = video_drvdata(file);
++	struct vb2_queue *vq = &priv->buffer_queue;
++	int ret = 0;
++
++	mutex_lock(&priv->mutex);
++
++	if (file->private_data == vq->owner) {
++		vb2_queue_release(vq);
++		vq->owner = NULL;
++	}
++
++	v4l2_fh_release(file);
++	mutex_unlock(&priv->mutex);
++	return ret;
++}
++
++static const struct v4l2_file_operations camif_fops = {
++	.owner		= THIS_MODULE,
++	.open		= camif_open,
++	.release	= camif_release,
++	.poll		= vb2_fop_poll,
++	.unlocked_ioctl	= video_ioctl2,
++	.mmap		= vb2_fop_mmap,
++};
++
++static struct video_device camif_videodev = {
++	.fops		= &camif_fops,
++	.ioctl_ops	= &camif_ioctl_ops,
++	.minor		= -1,
++	.release	= video_device_release,
++	.vfl_dir	= VFL_DIR_RX,
++	.tvnorms	= V4L2_STD_NTSC | V4L2_STD_PAL | V4L2_STD_SECAM,
++};
++
++/*
++ * Subdev and media entity operations
++ */
++
++static void camif_new_dma_buf(struct camif_priv *priv)
++{
++	struct imx_media_dma_buf *dmabuf;
++	struct imx_media_buffer *buf;
++	enum vb2_buffer_state state;
++	struct vb2_buffer *vb;
++	unsigned long flags;
++
++	spin_lock_irqsave(&priv->q_lock, flags);
++
++	if (priv->stop || list_empty(&priv->ready_q))
++		goto unlock;
++
++	dmabuf = imx_media_dma_buf_dequeue(priv->in_ring);
++	if (!dmabuf)
++		goto unlock;
++
++	vb = dmabuf->vb;
++	buf = to_imx_media_vb(vb);
++	if (list_empty(&buf->list)) {
++		dev_dbg(priv->dev, "%s: buf%d not queued\n", __func__,
++			vb->index);
++		goto unlock;
++	}
++
++	dev_dbg(priv->dev, "%s: new buf%d\n", __func__, vb->index);
++	vb->timestamp = ktime_get_ns();
++	list_del_init(&buf->list);
++	state = dmabuf->status == IMX_MEDIA_BUF_STATUS_DONE ?
++		VB2_BUF_STATE_DONE : VB2_BUF_STATE_ERROR;
++	vb2_buffer_done(vb, state);
++unlock:
++	spin_unlock_irqrestore(&priv->q_lock, flags);
++}
++
++static long camif_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
++{
++	struct camif_priv *priv = v4l2_get_subdevdata(sd);
++	struct imx_media_dma_buf_ring **ring;
++
++	switch (cmd) {
++	case IMX_MEDIA_REQ_DMA_BUF_SINK_RING:
++		if (!priv->in_ring)
++			return -EINVAL;
++		ring = (struct imx_media_dma_buf_ring **)arg;
++		*ring = priv->in_ring;
++		break;
++	case IMX_MEDIA_NEW_DMA_BUF:
++		camif_new_dma_buf(priv);
++		break;
++	case IMX_MEDIA_REL_DMA_BUF_SINK_RING:
++		/* src indicates sink buffer ring can be freed */
++		if (!priv->in_ring)
++			return 0;
++		v4l2_info(sd, "%s: freeing sink ring\n", __func__);
++		imx_media_free_dma_buf_ring(priv->in_ring);
++		priv->in_ring = NULL;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int camif_link_setup(struct media_entity *entity,
++			    const struct media_pad *local,
++			    const struct media_pad *remote, u32 flags)
++{
++	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(entity);
++	struct camif_priv *priv = v4l2_get_subdevdata(sd);
++	struct video_device *vfd = &priv->vfd;
++	struct v4l2_subdev *remote_sd;
++	int ret = 0;
++
++	dev_dbg(priv->dev, "link setup %s -> %s", remote->entity->name,
++		local->entity->name);
++
++	if (is_media_entity_v4l2_video_device(remote->entity))
++		return 0;
++
++	WARN_ON(local->flags & MEDIA_PAD_FL_SOURCE);
++
++	remote_sd = media_entity_to_v4l2_subdev(remote->entity);
++
++	/* reset controls to refresh with inherited from subdevs */
++	v4l2_ctrl_handler_free(vfd->ctrl_handler);
++	v4l2_ctrl_handler_init(vfd->ctrl_handler, 0);
++
++	if (flags & MEDIA_LNK_FL_ENABLED) {
++		if (priv->src_sd)
++			return -EBUSY;
++		priv->src_sd = remote_sd;
++		ret = imx_media_inherit_controls(priv->md, vfd,
++						 &priv->src_sd->entity);
++	} else {
++		priv->src_sd = NULL;
++	}
++
++	return ret;
++}
++
++static int camif_enum_mbus_code(struct v4l2_subdev *sd,
++				struct v4l2_subdev_pad_config *cfg,
++				struct v4l2_subdev_mbus_code_enum *code)
++{
++	if (code->pad >= CAMIF_NUM_PADS)
++		return -EINVAL;
++
++	return imx_media_enum_format(&code->code, code->index, true, true);
++}
++
++static int camif_get_fmt(struct v4l2_subdev *sd,
++			 struct v4l2_subdev_pad_config *cfg,
++			 struct v4l2_subdev_format *sdformat)
++{
++	struct camif_priv *priv = v4l2_get_subdevdata(sd);
++
++	if (sdformat->pad >= CAMIF_NUM_PADS)
 +		return -EINVAL;
 +
 +	sdformat->format = priv->format_mbus[sdformat->pad];
@@ -496,50 +760,32 @@ index 0000000..614a4381
 +	return 0;
 +}
 +
-+static int imx_smfc_set_fmt(struct v4l2_subdev *sd,
-+			    struct v4l2_subdev_pad_config *cfg,
-+			    struct v4l2_subdev_format *sdformat)
++static int camif_set_fmt(struct v4l2_subdev *sd,
++			 struct v4l2_subdev_pad_config *cfg,
++			 struct v4l2_subdev_format *sdformat)
 +{
-+	struct imx_smfc_priv *priv = v4l2_get_subdevdata(sd);
-+	struct v4l2_mbus_framefmt *infmt, *outfmt;
-+	const struct imx_media_pixfmt *cc, *incc;
-+	bool allow_planar;
++	struct camif_priv *priv = v4l2_get_subdevdata(sd);
++	const struct imx_media_pixfmt *cc;
 +	u32 code;
 +
-+	if (sdformat->pad >= SMFC_NUM_PADS)
++	if (sdformat->pad >= CAMIF_NUM_PADS)
 +		return -EINVAL;
 +
-+	if (priv->stream_on)
++	if (vb2_is_busy(&priv->buffer_queue)) {
++		v4l2_err(&priv->sd, "%s queue busy\n", __func__);
 +		return -EBUSY;
++	}
 +
-+	infmt = &priv->format_mbus[priv->input_pad];
-+	outfmt = &priv->format_mbus[priv->output_pad];
-+	allow_planar = (sdformat->pad == priv->output_pad);
-+
-+	cc = imx_media_find_format(0, sdformat->format.code,
-+				   true, allow_planar);
++	cc = imx_media_find_format(0, sdformat->format.code, true, true);
 +	if (!cc) {
-+		imx_media_enum_format(&code, 0, true, false);
-+		cc = imx_media_find_format(0, code, true, false);
++		imx_media_enum_format(&code, 0, true, true);
++		cc = imx_media_find_format(0, code, true, true);
 +		sdformat->format.code = cc->codes[0];
 +	}
 +
-+	v4l_bound_align_image(&sdformat->format.width, MIN_W, MAX_W,
-+			      W_ALIGN, &sdformat->format.height,
-+			      MIN_H, MAX_H, H_ALIGN, S_ALIGN);
-+
-+	if (sdformat->pad == priv->output_pad) {
-+		incc = priv->cc[priv->input_pad];
-+		sdformat->format.width = infmt->width;
-+		sdformat->format.height = infmt->height;
-+		if (sdformat->format.field != V4L2_FIELD_NONE)
-+			sdformat->format.field = infmt->field;
-+		if (cc->cs != incc->cs) {
-+			sdformat->format.code = infmt->code;
-+			cc = imx_media_find_format(0, sdformat->format.code,
-+						   true, false);
-+		}
-+	}
++	/* Output pad mirrors input pad, no limitations on input pads */
++	if (sdformat->pad == priv->output_pad)
++		sdformat->format = priv->format_mbus[priv->input_pad];
 +
 +	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
 +		cfg->try_fmt = sdformat->format;
@@ -551,118 +797,31 @@ index 0000000..614a4381
 +	return 0;
 +}
 +
-+static int imx_smfc_link_setup(struct media_entity *entity,
-+			       const struct media_pad *local,
-+			       const struct media_pad *remote, u32 flags)
++static int camif_init_pads(struct camif_priv *priv)
 +{
-+	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(entity);
-+	struct imx_smfc_priv *priv = v4l2_get_subdevdata(sd);
-+	struct v4l2_subdev *remote_sd;
-+
-+	dev_dbg(priv->dev, "link setup %s -> %s", remote->entity->name,
-+		local->entity->name);
-+
-+	remote_sd = media_entity_to_v4l2_subdev(remote->entity);
-+
-+	if (local->flags & MEDIA_PAD_FL_SOURCE) {
-+		if (flags & MEDIA_LNK_FL_ENABLED) {
-+			if (priv->sink_sd)
-+				return -EBUSY;
-+			priv->sink_sd = remote_sd;
-+		} else {
-+			priv->sink_sd = NULL;
-+		}
-+
-+		return 0;
-+	}
-+
-+	if (flags & MEDIA_LNK_FL_ENABLED) {
-+		if (priv->src_sd)
-+			return -EBUSY;
-+		priv->src_sd = remote_sd;
-+	} else {
-+		priv->src_sd = NULL;
-+		return 0;
-+	}
-+
-+	/* must attach to CSI source */
-+	if (!(priv->src_sd->grp_id & IMX_MEDIA_GRP_ID_CSI))
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+static int imx_smfc_link_validate(struct v4l2_subdev *sd,
-+				  struct media_link *link,
-+				  struct v4l2_subdev_format *source_fmt,
-+				  struct v4l2_subdev_format *sink_fmt)
-+{
-+	struct imx_smfc_priv *priv = v4l2_get_subdevdata(sd);
-+	int ret;
-+
-+	ret = v4l2_subdev_link_validate_default(sd, link, source_fmt, sink_fmt);
-+	if (ret)
-+		return ret;
-+
-+	switch (priv->src_sd->grp_id) {
-+	case IMX_MEDIA_GRP_ID_CSI0:
-+		priv->csi_id = 0;
-+		break;
-+	case IMX_MEDIA_GRP_ID_CSI1:
-+		priv->csi_id = 1;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	priv->sensor = __imx_media_find_sensor(priv->md, &priv->sd.entity);
-+	if (IS_ERR(priv->sensor)) {
-+		v4l2_err(&priv->sd, "no sensor attached\n");
-+		ret = PTR_ERR(priv->sensor);
-+		priv->sensor = NULL;
-+		return ret;
-+	}
-+
-+	ret = v4l2_subdev_call(priv->sensor->sd, video, g_mbus_config,
-+			       &priv->sensor_mbus_cfg);
-+	if (ret)
-+		return ret;
-+
-+	priv->vc_num = 0;
-+	if (priv->sensor_mbus_cfg.type == V4L2_MBUS_CSI2) {
-+		/* see NOTE in imx-csi.c */
-+#if 0
-+		priv->vc_num = imx_media_find_mipi_csi2_channel(
-+			priv->md, &priv->sd.entity);
-+		if (priv->vc_num < 0)
-+			return vc_num;
-+#endif
-+	}
-+
-+	return 0;
-+}
-+
-+/*
-+ * retrieve our pads parsed from the OF graph by the media device
-+ */
-+static int imx_smfc_registered(struct v4l2_subdev *sd)
-+{
-+	struct imx_smfc_priv *priv = v4l2_get_subdevdata(sd);
++	struct video_device *vfd = &priv->vfd;
 +	struct imx_media_subdev *imxsd;
 +	struct imx_media_pad *pad;
-+	int i;
++	int i, ret;
 +
-+	/* get media device */
-+	priv->md = dev_get_drvdata(sd->v4l2_dev->dev);
-+
-+	imxsd = imx_media_find_subdev_by_sd(priv->md, sd);
++	imxsd = imx_media_find_subdev_by_sd(priv->md, &priv->sd);
 +	if (IS_ERR(imxsd))
 +		return PTR_ERR(imxsd);
 +
-+	if (imxsd->num_sink_pads != 1 || imxsd->num_src_pads != 1)
++	if (imxsd->num_sink_pads != 1 || imxsd->num_src_pads != 1) {
++		v4l2_err(&priv->sd, "invalid num pads %d/%d\n",
++			 imxsd->num_sink_pads, imxsd->num_src_pads);
 +		return -EINVAL;
++	}
 +
-+	for (i = 0; i < SMFC_NUM_PADS; i++) {
++	priv->vd_pad.flags = MEDIA_PAD_FL_SINK;
++	ret = media_entity_pads_init(&vfd->entity, 1, &priv->vd_pad);
++	if (ret) {
++		v4l2_err(&priv->sd, "failed to init device node pad\n");
++		return ret;
++	}
++
++	for (i = 0; i < CAMIF_NUM_PADS; i++) {
 +		pad = &imxsd->pad[i];
 +		priv->pad[i] = pad->pad;
 +		if (priv->pad[i].flags & MEDIA_PAD_FL_SINK)
@@ -671,107 +830,217 @@ index 0000000..614a4381
 +			priv->output_pad = i;
 +
 +		/* set a default mbus format  */
-+		imx_media_init_mbus_fmt(&priv->format_mbus[i],
-+					640, 480, 0, V4L2_FIELD_NONE,
-+					&priv->cc[i]);
++		ret = imx_media_init_mbus_fmt(&priv->format_mbus[i],
++					      640, 480, 0, V4L2_FIELD_NONE,
++					      &priv->cc[i]);
++		if (ret)
++			return ret;
 +	}
 +
-+	return media_entity_pads_init(&sd->entity, SMFC_NUM_PADS, priv->pad);
++	return media_entity_pads_init(&priv->sd.entity, CAMIF_NUM_PADS,
++				      priv->pad);
 +}
 +
-+static struct media_entity_operations imx_smfc_entity_ops = {
-+	.link_setup = imx_smfc_link_setup,
++static int camif_registered(struct v4l2_subdev *sd)
++{
++	struct camif_priv *priv = v4l2_get_subdevdata(sd);
++	struct vb2_queue *vq = &priv->buffer_queue;
++	struct video_device *vfd = &priv->vfd;
++	struct v4l2_mbus_framefmt *infmt, *outfmt;
++	int ret;
++
++	/* get media device */
++	priv->md = dev_get_drvdata(sd->v4l2_dev->dev);
++
++	vfd->v4l2_dev = sd->v4l2_dev;
++
++	ret = video_register_device(vfd, VFL_TYPE_GRABBER, 0);
++	if (ret) {
++		v4l2_err(sd, "Failed to register video device\n");
++		return ret;
++	}
++
++	vq->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
++	vq->io_modes = VB2_MMAP | VB2_DMABUF;
++	vq->drv_priv = priv;
++	vq->buf_struct_size = sizeof(struct imx_media_buffer);
++	vq->ops = &camif_qops;
++	vq->mem_ops = &vb2_dma_contig_memops;
++	vq->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
++	vq->lock = &priv->mutex;
++	vq->min_buffers_needed = 2;
++	vq->dev = priv->dev;
++
++	ret = vb2_queue_init(vq);
++	if (ret) {
++		v4l2_err(sd, "vb2_queue_init failed\n");
++		goto unreg;
++	}
++
++	INIT_LIST_HEAD(&priv->ready_q);
++
++	ret = camif_init_pads(priv);
++	if (ret) {
++		v4l2_err(sd, "camif_init_pads failed\n");
++		goto unreg;
++	}
++
++	/* create the link to our device node */
++	ret = media_create_pad_link(&sd->entity, priv->output_pad,
++				    &vfd->entity, 0,
++				    MEDIA_LNK_FL_IMMUTABLE |
++				    MEDIA_LNK_FL_ENABLED);
++	if (ret) {
++		v4l2_err(sd, "failed to create link to device node\n");
++		goto unreg;
++	}
++
++	/* setup default pad formats */
++	infmt = &priv->format_mbus[priv->input_pad];
++	outfmt = &priv->format_mbus[priv->output_pad];
++	ret = imx_media_init_mbus_fmt(outfmt, 640, 480, 0, V4L2_FIELD_NONE,
++				      &priv->cc[priv->output_pad]);
++	if (ret)
++		goto unreg;
++
++	*infmt = *outfmt;
++	priv->cc[priv->input_pad] = priv->cc[priv->output_pad];
++
++	priv->current_std = V4L2_STD_UNKNOWN;
++
++	v4l2_info(sd, "Registered %s as /dev/%s\n", vfd->name,
++		  video_device_node_name(vfd));
++
++	vfd->ctrl_handler = &priv->ctrl_hdlr;
++
++	return 0;
++unreg:
++	video_unregister_device(vfd);
++	return ret;
++}
++
++static void camif_unregistered(struct v4l2_subdev *sd)
++{
++	struct camif_priv *priv = v4l2_get_subdevdata(sd);
++	struct video_device *vfd = &priv->vfd;
++
++	mutex_lock(&priv->mutex);
++
++	if (video_is_registered(vfd)) {
++		video_unregister_device(vfd);
++		media_entity_cleanup(&vfd->entity);
++	}
++
++	mutex_unlock(&priv->mutex);
++}
++
++static const struct v4l2_subdev_internal_ops camif_internal_ops = {
++	.registered = camif_registered,
++	.unregistered = camif_unregistered,
++};
++
++static struct v4l2_subdev_core_ops camif_core_ops = {
++	.ioctl = camif_ioctl,
++};
++
++static struct media_entity_operations camif_entity_ops = {
++	.link_setup = camif_link_setup,
 +	.link_validate = v4l2_subdev_link_validate,
 +};
 +
-+static struct v4l2_subdev_video_ops imx_smfc_video_ops = {
-+	.s_stream = imx_smfc_s_stream,
++static struct v4l2_subdev_pad_ops camif_pad_ops = {
++	.enum_mbus_code = camif_enum_mbus_code,
++	.get_fmt = camif_get_fmt,
++	.set_fmt = camif_set_fmt,
 +};
 +
-+static struct v4l2_subdev_pad_ops imx_smfc_pad_ops = {
-+	.enum_mbus_code = imx_smfc_enum_mbus_code,
-+	.get_fmt = imx_smfc_get_fmt,
-+	.set_fmt = imx_smfc_set_fmt,
-+	.link_validate = imx_smfc_link_validate,
++static struct v4l2_subdev_ops camif_subdev_ops = {
++	.pad = &camif_pad_ops,
++	.core = &camif_core_ops,
 +};
 +
-+static struct v4l2_subdev_ops imx_smfc_subdev_ops = {
-+	.video = &imx_smfc_video_ops,
-+	.pad = &imx_smfc_pad_ops,
-+};
-+
-+static struct v4l2_subdev_internal_ops imx_smfc_internal_ops = {
-+	.registered = imx_smfc_registered,
-+};
-+
-+static int imx_smfc_probe(struct platform_device *pdev)
++static int camif_probe(struct platform_device *pdev)
 +{
 +	struct imx_media_internal_sd_platformdata *pdata;
-+	struct imx_smfc_priv *priv;
++	struct camif_priv *priv;
++	struct video_device *vfd;
++	int ret;
 +
 +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
 +	if (!priv)
 +		return -ENOMEM;
 +
-+	platform_set_drvdata(pdev, &priv->sd);
++	platform_set_drvdata(pdev, priv);
 +	priv->dev = &pdev->dev;
 +
 +	pdata = priv->dev->platform_data;
-+	priv->ipu_id = pdata->ipu_id;
 +
-+	init_timer(&priv->eof_timeout_timer);
-+	priv->eof_timeout_timer.data = (unsigned long)priv;
-+	priv->eof_timeout_timer.function = imx_smfc_eof_timeout;
-+	spin_lock_init(&priv->irqlock);
++	mutex_init(&priv->mutex);
++	spin_lock_init(&priv->q_lock);
 +
-+	v4l2_subdev_init(&priv->sd, &imx_smfc_subdev_ops);
++	v4l2_subdev_init(&priv->sd, &camif_subdev_ops);
 +	v4l2_set_subdevdata(&priv->sd, priv);
-+	priv->sd.internal_ops = &imx_smfc_internal_ops;
-+	priv->sd.entity.ops = &imx_smfc_entity_ops;
-+	/* FIXME: this the right function? */
++	priv->sd.internal_ops = &camif_internal_ops;
++	priv->sd.entity.ops = &camif_entity_ops;
 +	priv->sd.entity.function = MEDIA_ENT_F_PROC_VIDEO_PIXEL_FORMATTER;
 +	priv->sd.dev = &pdev->dev;
 +	priv->sd.owner = THIS_MODULE;
-+	priv->sd.flags = V4L2_SUBDEV_FL_HAS_DEVNODE | V4L2_SUBDEV_FL_HAS_EVENTS;
-+	/* get our group id and SMFC id */
++	/* get our group id and camif id */
 +	priv->sd.grp_id = pdata->grp_id;
-+	priv->smfc_id = (pdata->grp_id >> IMX_MEDIA_GRP_ID_SMFC_BIT) - 1;
++	priv->id = (pdata->grp_id >> IMX_MEDIA_GRP_ID_CAMIF_BIT) - 1;
 +	strncpy(priv->sd.name, pdata->sd_name, sizeof(priv->sd.name));
++	snprintf(camif_videodev.name, sizeof(camif_videodev.name),
++		 "%s devnode", pdata->sd_name);
 +
-+	return v4l2_async_register_subdev(&priv->sd);
++	priv->sd.flags = V4L2_SUBDEV_FL_HAS_DEVNODE | V4L2_SUBDEV_FL_HAS_EVENTS;
++
++	vfd = &priv->vfd;
++	*vfd = camif_videodev;
++	vfd->lock = &priv->mutex;
++	vfd->queue = &priv->buffer_queue;
++
++	video_set_drvdata(vfd, priv);
++
++	v4l2_ctrl_handler_init(&priv->ctrl_hdlr, 0);
++
++	ret = v4l2_async_register_subdev(&priv->sd);
++	if (ret)
++		v4l2_ctrl_handler_free(&priv->ctrl_hdlr);
++
++	return ret;
 +}
 +
-+static int imx_smfc_remove(struct platform_device *pdev)
++static int camif_remove(struct platform_device *pdev)
 +{
-+	struct v4l2_subdev *sd = platform_get_drvdata(pdev);
-+	struct imx_smfc_priv *priv = container_of(sd, struct imx_smfc_priv, sd);
++	struct camif_priv *priv =
++		(struct camif_priv *)platform_get_drvdata(pdev);
 +
++	v4l2_ctrl_handler_free(&priv->ctrl_hdlr);
 +	v4l2_async_unregister_subdev(&priv->sd);
 +	media_entity_cleanup(&priv->sd.entity);
-+	v4l2_device_unregister_subdev(sd);
++	v4l2_device_unregister_subdev(&priv->sd);
 +
 +	return 0;
 +}
 +
-+static const struct platform_device_id imx_smfc_ids[] = {
-+	{ .name = "imx-ipuv3-smfc" },
++static const struct platform_device_id camif_ids[] = {
++	{ .name = "imx-media-camif" },
 +	{ },
 +};
-+MODULE_DEVICE_TABLE(platform, imx_smfc_ids);
++MODULE_DEVICE_TABLE(platform, camif_ids);
 +
-+static struct platform_driver imx_smfc_driver = {
-+	.probe = imx_smfc_probe,
-+	.remove = imx_smfc_remove,
-+	.id_table = imx_smfc_ids,
-+	.driver = {
-+		.name = "imx-ipuv3-smfc",
++static struct platform_driver imx_camif_driver = {
++	.probe		= camif_probe,
++	.remove		= camif_remove,
++	.driver		= {
++		.name	= "imx-media-camif",
 +	},
 +};
-+module_platform_driver(imx_smfc_driver);
 +
-+MODULE_DESCRIPTION("i.MX SMFC subdev driver");
++module_platform_driver(imx_camif_driver);
++
++MODULE_DESCRIPTION("i.MX camera interface subdev driver");
 +MODULE_AUTHOR("Steve Longerbeam <steve_longerbeam@mentor.com>");
 +MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:imx-ipuv3-smfc");
 -- 
 2.7.4
