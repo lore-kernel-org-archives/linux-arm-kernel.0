@@ -1,75 +1,58 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 8 Jan 2017 03:16:22 +0800
-Subject: [linux-sunxi][PATCH 3/3] ARM: dts: sun6i: Add SPDIF to the Mele I7
-In-Reply-To: <20161220104038.22532-4-codekipper@gmail.com>
-References: <20161220104038.22532-1-codekipper@gmail.com>
- <20161220104038.22532-4-codekipper@gmail.com>
-Message-ID: <CAGb2v66atehFNDu-G94_WoFXzCPfZev4xsGD8ghr7+_gx-PZJg@mail.gmail.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Sat,  7 Jan 2017 12:06:53 -0800
+Subject: [PATCH v5 1/2] ARM: dts: vf610-zii-dev-rev-b: Remove leftover PWM
+ pingroup
+Message-ID: <20170107200654.26056-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 20, 2016 at 6:40 PM,  <codekipper@gmail.com> wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
->
-> Enable the S/PDIF transmitter that is present on the Mele I7.
->
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+Remove pwm0grp since it is:
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+	a) Not referenced anywhere in the DTS file (unlike Tower board it
+	is based on, this board does not use/expose FTM0)
 
-This patch should be ready to be merged. The associated clk
-and dtsi changes are already in Maxime's tree.
+	b) Configures PTB2 and PTB3 in a way that contradicts
+	pinctrl-mdio-mux
 
-> ---
->  arch/arm/boot/dts/sun6i-a31-i7.dts | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun6i-a31-i7.dts b/arch/arm/boot/dts/sun6i-a31-i7.dts
-> index a2193309a199..2bc57d2dcd80 100644
-> --- a/arch/arm/boot/dts/sun6i-a31-i7.dts
-> +++ b/arch/arm/boot/dts/sun6i-a31-i7.dts
-> @@ -69,6 +69,23 @@
->                         gpios = <&pio 7 13 GPIO_ACTIVE_HIGH>;
->                 };
->         };
-> +
-> +       sound {
-> +               compatible = "simple-audio-card";
-> +               simple-audio-card,name = "On-board SPDIF";
-> +               simple-audio-card,cpu {
-> +                       sound-dai = <&spdif>;
-> +               };
-> +
-> +               simple-audio-card,codec {
-> +                       sound-dai = <&spdif_out>;
-> +               };
-> +       };
-> +
-> +       spdif_out: spdif-out {
-> +               #sound-dai-cells = <0>;
-> +               compatible = "linux,spdif-dit";
-> +       };
->  };
->
->  &codec {
-> @@ -138,6 +155,13 @@
->         status = "okay";
->  };
->
-> +&spdif {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&spdif_pins_a>;
-> +       spdif-out = "okay";
-> +       status = "okay";
-> +};
-> +
->  &uart0 {
->         pinctrl-names = "default";
->         pinctrl-0 = <&uart0_pins_a>;
-> --
-> 2.11.0
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Stefan Agner <stefan@agner.ch>
+Cc: devicetree at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: andrew at lunn.ch
+Cc: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+Cc: cphealy at gmail.com
+Tested-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
+
+No changes since v4
+
+ arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 9 ---------
+ 1 file changed, 9 deletions(-)
+
+diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+index fa19cfd..2210811 100644
+--- a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
++++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+@@ -677,15 +677,6 @@
+ 		>;
+ 	};
+ 
+-	pinctrl_pwm0: pwm0grp {
+-		fsl,pins = <
+-			VF610_PAD_PTB0__FTM0_CH0	0x1582
+-			VF610_PAD_PTB1__FTM0_CH1	0x1582
+-			VF610_PAD_PTB2__FTM0_CH2	0x1582
+-			VF610_PAD_PTB3__FTM0_CH3	0x1582
+-		>;
+-	};
+-
+ 	pinctrl_qspi0: qspi0grp {
+ 		fsl,pins = <
+ 			VF610_PAD_PTD7__QSPI0_B_QSCK	0x31c3
+-- 
+2.9.3
