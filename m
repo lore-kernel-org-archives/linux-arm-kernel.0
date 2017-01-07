@@ -1,35 +1,49 @@
 From: afzal.mohd.ma@gmail.com (afzal mohammed)
-Date: Sat,  7 Jan 2017 22:51:30 +0530
-Subject: [PATCH WIP 2/4] ARM: nommu: remove Hivecs configuration is asm
+Date: Sat,  7 Jan 2017 22:52:00 +0530
+Subject: [PATCH WIP 3/4] ARM: mm: nommu: display dynamic exception base
 In-Reply-To: <20170107171339.GA5044@afzalpc>
 References: <20170107171339.GA5044@afzalpc>
-Message-ID: <20170107172130.6343-1-afzal.mohd.ma@gmail.com>
+Message-ID: <20170107172200.6397-1-afzal.mohd.ma@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that exception based address is handled dynamically for
-processors with CP15, remove Hivecs configuration in assembly.
+Display dynamically estimated nommu exception base.
+
+TODO: Dynamically update MMU case too.
 
 Signed-off-by: afzal mohammed <afzal.mohd.ma@gmail.com>
 ---
- arch/arm/kernel/head-nommu.S | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/mm/init.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index 2ab026ffc270..e0565d73e49e 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -162,11 +162,6 @@ ENDPROC(secondary_startup_arm)
- #ifdef CONFIG_CPU_ICACHE_DISABLE
- 	bic	r0, r0, #CR_I
- #endif
--#ifdef CONFIG_CPU_HIGH_VECTOR
--	orr	r0, r0, #CR_V
--#else
--	bic	r0, r0, #CR_V
--#endif
- 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
- #elif defined (CONFIG_CPU_V7M)
- 	/* For V7M systems we want to modify the CCR similarly to the SCTLR */
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 370581aeb871..1777ee23a6a2 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -39,6 +39,10 @@
+ 
+ #include "mm.h"
+ 
++#ifndef CONFIG_MMU
++extern unsigned long vectors_base;
++#endif
++
+ #ifdef CONFIG_CPU_CP15_MMU
+ unsigned long __init __clear_cr(unsigned long mask)
+ {
+@@ -521,8 +525,13 @@ void __init mem_init(void)
+ 			"      .data : 0x%p" " - 0x%p" "   (%4td kB)\n"
+ 			"       .bss : 0x%p" " - 0x%p" "   (%4td kB)\n",
+ 
++#ifdef CONFIG_MMU
+ 			MLK(UL(CONFIG_VECTORS_BASE), UL(CONFIG_VECTORS_BASE) +
+ 				(PAGE_SIZE)),
++#else
++			MLK_ROUNDUP(vectors_base, vectors_base + PAGE_SIZE),
++#endif
++
+ #ifdef CONFIG_HAVE_TCM
+ 			MLK(DTCM_OFFSET, (unsigned long) dtcm_end),
+ 			MLK(ITCM_OFFSET, (unsigned long) itcm_end),
 -- 
 2.11.0
