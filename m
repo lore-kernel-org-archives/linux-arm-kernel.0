@@ -1,77 +1,123 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Sat, 7 Jan 2017 22:43:39 +0530
-Subject: [PATCH RFC 2/2] ARM: nommu: remap exception base address to RAM
-In-Reply-To: <20161213100226.GW14217@n2100.armlinux.org.uk>
-References: <20161211131028.3019-1-afzal.mohd.ma@gmail.com>
- <20161211131255.3221-1-afzal.mohd.ma@gmail.com>
- <20161213100226.GW14217@n2100.armlinux.org.uk>
-Message-ID: <20170107171339.GA5044@afzalpc>
+From: afzal.mohd.ma@gmail.com (afzal mohammed)
+Date: Sat,  7 Jan 2017 22:50:42 +0530
+Subject: [PATCH WIP 1/4] ARM: nommu: dynamic exception base address setting
+In-Reply-To: <20170107171339.GA5044@afzalpc>
+References: <20170107171339.GA5044@afzalpc>
+Message-ID: <20170107172042.6288-1-afzal.mohd.ma@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+No-MMU dynamic exception base address configuration on processors
+with CP15.
 
-On Tue, Dec 13, 2016 at 10:02:26AM +0000, Russell King - ARM Linux wrote:
+TODO: Handle MMU case as well as ARM_MPU scenario dynamically
 
-> Is there really any need to do this in head.S ?  I believe it's
-> entirely possible to do it later - arch/arm/mm/nommu.c:paging_init().
+Signed-off-by: afzal mohammed <afzal.mohd.ma@gmail.com>
+---
+ arch/arm/mm/nommu.c | 62 +++++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 60 insertions(+), 2 deletions(-)
 
-As memblock_reserve() for exception address was done before
-paging_init(), seems it has to be done by arm_mm_memblock_reserve() in
-arch/arm/mm/nommu.c, WIP patch follows, but not that happy -
-conditional compilation's make it not so readable, still better to
-see in C.
-
-> Also, if the region setup for the vectors was moved as well, it would
-> then be possible to check the ID registers to determine whether this
-> is supported, and make the decision where to locate the vectors base
-> more dynamically.
-
-This would affect Cortex-R's, which is a bit concerning due to lack of
-those platforms with me, let me try to get it right. Seems
-translating __setup_mpu() altogether to C & installing at a later, but
-suitable place might be better.
-
-And feeling something strange about Cortex-R support in mainline,
-don't know whether it boots out of the box, there are no Cortex-R cpu
-compatibles in dts(i), but devicetree documentation documents it.
-Still wrecking Cortex-R's could get counted as a regression as dts is
-not considered Kernel. Looks like there is a Cortex-R mafia around
-mainline ;)
-
-> That leaves one pr_notice() call using the CONFIG_VECTORS_BASE
-> constant...
-
-Seems you want to completely kick out CONFIG_VECTORS_BASE.
-
-Saw 2 interesting MMU cases,
-1. in devicemaps_init(), if Hivecs is not set, it is being mapped to
-virtual address zero, was wondering how MMU Kernel can handle
-exceptions with zero address base (& still prints 0xffff0000 as vector
-base)
-2. One of the platform does a ioremap of CONFIG_VECTORS_BASE
-
-Once i take care of the above, the ugly conditional compilation in
-3/4th patch (@arch/arm/mm/init.c) of WIP patch series that follows
-will be removed.
-
-Please let know if you have any comments on the above.
-
-
-Also !MMU Kernel could boot on 3 ARM v7-A platforms - AM335x Beagle
-Bone (A8), AM437x IDK (A9) & Vybrid VF610 (on A5 core, note that it
-has M4 core too) with same Kernel image*.
-
-Vybrid did not need any platform specific tweaks, just 1/2th patch
-(put in patch system as 8635/1) & WIP series over Vladimir's one,
-while TI Sitara AMx3's needed one w.r.t remap.
-
-Please bear my delay - to fill the stomach, work not on Linux and then
-the vacations.
-
-Regards
-afzal
-
-* Since initramfs was used, tty port had to be changed in initramfs
-build for Vybrid, but Kernel except for above initramfs change, was
-identical.
+diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+index 681cec879caf..e82056df0635 100644
+--- a/arch/arm/mm/nommu.c
++++ b/arch/arm/mm/nommu.c
+@@ -11,6 +11,7 @@
+ #include <linux/kernel.h>
+ 
+ #include <asm/cacheflush.h>
++#include <asm/cp15.h>
+ #include <asm/sections.h>
+ #include <asm/page.h>
+ #include <asm/setup.h>
+@@ -23,6 +24,8 @@
+ 
+ #include "mm.h"
+ 
++unsigned long vectors_base;
++
+ #ifdef CONFIG_ARM_MPU
+ struct mpu_rgn_info mpu_rgn_info;
+ 
+@@ -279,15 +282,70 @@ static void sanity_check_meminfo_mpu(void) {}
+ static void __init mpu_setup(void) {}
+ #endif /* CONFIG_ARM_MPU */
+ 
++#ifdef CONFIG_CPU_CP15
++/*
++ * ID_PRF1 bits (CP#15 ID_PFR1)
++ */
++#define ID_PFR1_SE (0x3 << 4)	/* Security extension enable bits */
++
++#ifndef CONFIG_CPU_HIGH_VECTOR
++static inline unsigned long get_id_pfr1(void)
++{
++	unsigned long val;
++	asm("mrc p15, 0, %0, c0, c1, 1" : "=r" (val) : : "cc");
++	return val;
++}
++
++static inline void set_vbar(unsigned long val)
++{
++	asm("mcr p15, 0, %0, c12, c0, 0" : : "r" (val) : "cc");
++}
++
++static bool __init security_extensions_enabled(void)
++{
++	return !!(get_id_pfr1() & ID_PFR1_SE);
++}
++#endif
++
++static unsigned long __init setup_vector_base(void)
++{
++	unsigned long reg, base;
++
++	reg = get_cr();
++
++#ifdef CONFIG_CPU_HIGH_VECTOR
++	set_cr(reg | CR_V);
++	base = 0xFFFF0000;
++#else
++	set_cr(reg & ~CR_V);
++	base = 0;
++	if (security_extensions_enabled()) {
++#ifdef CONFIG_REMAP_VECTORS_TO_RAM
++		base = CONFIG_DRAM_BASE;
++#endif
++		set_vbar(base);
++	}
++#endif /* CONFIG_CPU_HIGH_VECTOR */
++
++	return base;
++}
++#endif /* CONFIG_CPU_CP15 */
++
+ void __init arm_mm_memblock_reserve(void)
+ {
+ #ifndef CONFIG_CPU_V7M
++
++#ifdef CONFIG_CPU_CP15
++	vectors_base = setup_vector_base();
++#else
++	vectors_base = CONFIG_VECTORS_BASE;
++#endif
+ 	/*
+ 	 * Register the exception vector page.
+ 	 * some architectures which the DRAM is the exception vector to trap,
+ 	 * alloc_page breaks with error, although it is not NULL, but "0."
+ 	 */
+-	memblock_reserve(CONFIG_VECTORS_BASE, 2 * PAGE_SIZE);
++	memblock_reserve(vectors_base, 2 * PAGE_SIZE);
+ #else /* ifndef CONFIG_CPU_V7M */
+ 	/*
+ 	 * There is no dedicated vector page on V7-M. So nothing needs to be
+@@ -311,7 +369,7 @@ void __init sanity_check_meminfo(void)
+  */
+ void __init paging_init(const struct machine_desc *mdesc)
+ {
+-	early_trap_init((void *)CONFIG_VECTORS_BASE);
++	early_trap_init((void *)vectors_base);
+ 	mpu_setup();
+ 	bootmem_init();
+ }
+-- 
+2.11.0
