@@ -1,85 +1,17 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 7 Jan 2017 13:50:20 +0000
-Subject: [PATCHv2 net-next 11/16] net: mvpp2: handle misc PPv2.1/PPv2.2
- differences
-In-Reply-To: <CAPv3WKeQ=fj2cKPyJ2NqCaAv55cOyWodujKwj3-v5iCrDYNcmA@mail.gmail.com>
-References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482943592-12556-12-git-send-email-thomas.petazzoni@free-electrons.com>
- <20170107110351.GK14217@n2100.armlinux.org.uk>
- <CAPv3WKeQ=fj2cKPyJ2NqCaAv55cOyWodujKwj3-v5iCrDYNcmA@mail.gmail.com>
-Message-ID: <20170107135019.GM14217@n2100.armlinux.org.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sat, 7 Jan 2017 19:46:14 +0530
+Subject: [PATCH v2 0/2] ARM: davinvi: da850 add ohci DT nodes
+In-Reply-To: <20170106094054.27767-1-ahaslam@baylibre.com>
+References: <20170106094054.27767-1-ahaslam@baylibre.com>
+Message-ID: <8f662b2f-a7b7-28af-aa6c-1226ea2b0e58@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 07, 2017 at 01:12:35PM +0100, Marcin Wojtas wrote:
-> In fact there is common SMI bus, but each port has its own register
-> set to control it (it's true at least for Neta and PP2). There is also
-> an option to use HW polling - every 1s hardware checks PHY over SMI
-> and updates MAC registers of each port independently. I was able to
-> use those successfully in other implementations.
-> 
-> However we are supposed to use libphy in Linux and I'm afraid we have
-> to use single instance that controls single SMI bus - I think current
-> implementation is a compromise between HW and libphy demands.
+On Friday 06 January 2017 03:10 PM, Axel Haslam wrote:
+> This adds the DT node for the ohci controller and
+> enables it for the omapl138-lckd platform.
 
-One of the "DT rules" is that DT only describes the hardware in an
-implementation independent way.  It should not describe a particular
-implementation's view of the hardware.
+Applied to v4.11/dt
 
-"libphy demands" sounds very much like an implementation dictating
-the DT description, which sounds to me very wrong and against the
-goals and purposes of DT.
-
-Anyway, I don't think it's too bad - a possible solution here would
-be to have the existing MDIO driver as a library, which can be
-instantiated by the Neta and PP2 drivers.  This could be done in
-DT (taking dove as an example) as:
-
-                        eth: ethernet-ctrl at 72000 {
-                                compatible = "marvell,orion-eth";
-				reg = <0x72000 0x4000>;
-				ranges = <0 0x72000 0 0x4000>;
-				...
-				mdio: mdio at 4 {
-					compatible = "marvell,orion-mdio";
-					reg = <4>;
-					...
-					... phys ...
-				};
-			};
-
-I don't think that would require that big a change - and it could be
-done in a way that compatibility with the existing DT descriptions is
-maintained very cheaply.
-
-Now, I'm not suggesting that mdio at 4 should be created by a platform
-device via marking ethernet-ctrl at 72000 with "simple-bus", but it's
-something that should be created by the ethernet driver if present.
-The compatible string is there so we can identify that this is a
-mdio node, and which type of mdio it is (the Armada 8k has this type
-and a separate clause-45 xmdio implementation, and we need to
-distinguish those.)
-
-What that means is that we no longer have to worry about clocks and
-overlapping register regions and the like, and can deal with the
-ethernet driver wanting to access the SMI registers as well.
-
-We would need the ethernet driver to be capable of instantiation even
-with no ports enabled, so cases where the MDIO interface is used with
-other ethernet controllers continues to be supportable (eg, the
-Armada 8040 case where the slave CP110 ethernet controller is used
-with PHYs connected to the master CP110 ethernet controller's MDIO
-buses - which afaik aren't shared between the two CP110 dies.)
-
-However, I'd like to see libphy become more flexible and support
-hardware polled mode of operation, since libphy provides a nice
-library of functions for accessing various phy features (like setting
-the advertisment, EEE modes, flow control, etc.)  Even with hardware
-polling, we should still describe the PHY in DT, because PHY is part
-of the hardware description, and we need to know where it is in order
-to program these phy features.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Sekhar
