@@ -1,82 +1,40 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat,  7 Jan 2017 10:52:01 +0200
-Subject: [PATCH 2/4] ARM: dts: exynos: Fix LAN9730 on Odroid U3 after tftpboot
+Date: Sat,  7 Jan 2017 10:52:02 +0200
+Subject: [PATCH 3/4] ARM: exynos_defconfig: Enable power sequence for Odroid U3
 In-Reply-To: <20170107085203.4431-1-krzk@kernel.org>
 References: <20170107085203.4431-1-krzk@kernel.org>
-Message-ID: <20170107085203.4431-3-krzk@kernel.org>
+Message-ID: <20170107085203.4431-4-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ethernet adapter LAN9730, after enabling in bootloader (e.g. for
-tftpboot) requires reset during boot.  Otherwise it won't come up.
-
-The schematics of Odroid U3 are detailed enough but after grabbing
-knowledge also from other sources (like U-Boot) the overall design looks
-like:
-1. LAN9730 is connected to HSIC0 and USB3503 to HSIC1 of EHCI controller.
-2. USB3503 comes with its own reset pin: gpx3-5.
-3. Reset pin of LAN9730 is pulled up to 3.3 V so it cannot be used.
-4. The supply of 3.3 V for LAN9730 is delivered from buck8.
-5. Buck8 state is a logical OR of registry value (through I2C command)
-   and ENB8 pin.  The ENB8, not described in schematics, is in fact
-   gpa1-1.
-6. Missing or wrongly timed reset of LAN9730 might result in missing of
-   two devices: LAN9730 and USB3503. Without reset, LAN9730 will not
-   come up, if it was enabled by bootloader.
-
-To fix the issue use the generic power sequence driver and toggle the
-ENB8 (buck8) pin.  Reset duration of 500 us was chosen by experiments
-(shortest working time was 400 us).  This is an easiest way to fix the
-long standing LAN9730 reset issue.
+Odroid U3 needs a power sequence for lan9730, if it was enabled by
+bootloader.  Enable also GPIO_SYSFS which is useful for playing with
+GPIO during debug process.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm/boot/dts/exynos4412-odroidu3.dts | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/configs/exynos_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-index 99634c54dca9..aef49007cba0 100644
---- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
-+++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-@@ -84,10 +84,23 @@
- 	regulator-max-microvolt = <2800000>;
- };
- 
-+&max77686 {
-+	pinctrl-0 = <&max77686_irq &max77686_enb8>;
-+};
-+
- &mshc_0 {
- 	vqmmc-supply = <&ldo22_reg>;
- };
- 
-+&pinctrl_0 {
-+	max77686_enb8: max77686-enb8 {
-+		samsung,pins = "gpa1-1";
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
-+		samsung,pin-pud = <EXYNOS_PIN_PULL_DOWN>;
-+		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
-+	};
-+};
-+
- &pwm {
- 	pinctrl-0 = <&pwm0_out>;
- 	pinctrl-names = "default";
-@@ -103,7 +116,15 @@
- 
- &ehci {
- 	port at 1 {
-+		/* HSIC for LAN9730 */
- 		status = "okay";
-+		/* buck8 enable pin, use it for power sequence */
-+		reset-gpios = <&gpa1 1 GPIO_ACTIVE_LOW>;
-+		/*
-+		 * Reset duration of 500 us was chosen experimentally.
-+		 * Minimal working value was 400 us. Add some safe margin.
-+		 */
-+		reset-duration-us = <500>;
- 	};
- 	port at 2 {
- 		status = "okay";
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 79c415c33f69..ad1a509c296a 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -99,6 +99,7 @@ CONFIG_SPI=y
+ CONFIG_SPI_GPIO=y
+ CONFIG_SPI_S3C64XX=y
+ CONFIG_DEBUG_GPIO=y
++CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_WM8994=y
+ CONFIG_POWER_SUPPLY=y
+ CONFIG_BATTERY_SBS=y
+@@ -108,6 +109,7 @@ CONFIG_CHARGER_MAX14577=y
+ CONFIG_CHARGER_MAX77693=y
+ CONFIG_CHARGER_MAX8997=y
+ CONFIG_CHARGER_TPS65090=y
++CONFIG_PWRSEQ_GENERIC=y
+ CONFIG_SENSORS_LM90=y
+ CONFIG_SENSORS_NTC_THERMISTOR=y
+ CONFIG_SENSORS_PWM_FAN=y
 -- 
 2.9.3
