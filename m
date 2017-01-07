@@ -1,66 +1,24 @@
-From: webczat_200@poczta.onet.pl (=?UTF-8?Q?Micha=c5=82_Zegan?=)
-Date: Sat, 7 Jan 2017 01:44:08 +0100
-Subject: [PATCH] clk: scpi: don't add cpufreq device if the scpi dvfs node
- is disabled
-In-Reply-To: <1483706070-12357-1-git-send-email-sudeep.holla@arm.com>
-References: <1483706070-12357-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <d51628d1-c930-ec13-990c-97cc47d80472@poczta.onet.pl>
+From: john.stultz@linaro.org (John Stultz)
+Date: Fri, 6 Jan 2017 17:07:26 -0800
+Subject: [PATCH 2/5] ARM: dts: qcom: apq8064: Add riva-pil node
+In-Reply-To: <20161221114939.19973-2-bjorn.andersson@linaro.org>
+References: <20161221114939.19973-1-bjorn.andersson@linaro.org>
+ <20161221114939.19973-2-bjorn.andersson@linaro.org>
+Message-ID: <CALAqxLXHh8Yjt_uS8TrPLPo_DgWtkgB-zhDrsTUBn3VgXwPYaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-seems the patch works as intended.
+On Wed, Dec 21, 2016 at 3:49 AM, Bjorn Andersson
+<bjorn.andersson@linaro.org> wrote:
+> Add nodes for the Riva PIL, IRIS RF module, BT and WiFI services exposed
+> by the Riva firmware and the related memory reserve.
+>
+> Also provides pinctrl nodes for devices enabling the riva-pil.
+>
+> Cc: John Stultz <john.stultz@linaro.org>
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-W dniu 06.01.2017 o 13:34, Sudeep Holla pisze:
-> Currently we add the virtual cpufreq device unconditionally even when
-> the SCPI DVFS clock provider node is disabled. This will cause cpufreq
-> driver to throw errors when it gets initailised on boot/modprobe and
-> also when the CPUs are hot-plugged back in.
-> 
-> This patch fixes the issue by adding the virtual cpufreq device only if
-> the SCPI DVFS clock provider is available and registered.
-> 
-> Fixes: 9490f01e2471 ("clk: scpi: add support for cpufreq virtual device")
-> Reported-by: Micha? Zegan <webczat_200@poczta.onet.pl>
-> Cc: Neil Armstrong <narmstrong@baylibre.com>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  drivers/clk/clk-scpi.c | 14 ++++++++------
->  1 file changed, 8 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-scpi.c b/drivers/clk/clk-scpi.c
-> index 2a3e9d8e88b0..96d37175d0ad 100644
-> --- a/drivers/clk/clk-scpi.c
-> +++ b/drivers/clk/clk-scpi.c
-> @@ -290,13 +290,15 @@ static int scpi_clocks_probe(struct platform_device *pdev)
->  			of_node_put(child);
->  			return ret;
->  		}
-> -	}
-> -	/* Add the virtual cpufreq device */
-> -	cpufreq_dev = platform_device_register_simple("scpi-cpufreq",
-> -						      -1, NULL, 0);
-> -	if (IS_ERR(cpufreq_dev))
-> -		pr_warn("unable to register cpufreq device");
->  
-> +		if (match->data != &scpi_dvfs_ops)
-> +			continue;
-> +		/* Add the virtual cpufreq device if it's DVFS clock provider */
-> +		cpufreq_dev = platform_device_register_simple("scpi-cpufreq",
-> +							      -1, NULL, 0);
-> +		if (IS_ERR(cpufreq_dev))
-> +			pr_warn("unable to register cpufreq device");
-> +	}
->  	return 0;
->  }
->  
-> 
+Tested-by: John Stultz <john.stultz@linaro.org>
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 525 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170107/0969a2b2/attachment.sig>
+thanks
+-john
