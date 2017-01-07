@@ -1,42 +1,37 @@
-From: clemens.gruber@pqgruber.com (Clemens Gruber)
-Date: Sat, 7 Jan 2017 21:59:30 +0100
-Subject: imx: RS-485 problems during TX, maybe DMA related
-In-Reply-To: <CAOMZO5CY3ys6moE133LwSKcS4egv56JdmhPMRG0TmAnfD+ZBAw@mail.gmail.com>
-References: <20170104160024.GA13442@archie.localdomain>
- <CAOMZO5C3enuThR1DpcwNnqFdxd8tGoBwd76O62Gnviz8x1_a9w@mail.gmail.com>
- <20170106225026.GA3804@archie.localdomain>
- <CAOMZO5CywajwZEL8K2ATfS80WzqY69YVX+3S7hq9_HmNdNAwaw@mail.gmail.com>
- <20170107134557.GA12299@archie.localdomain>
- <CAOMZO5ALSQj3C6Yn-avMZdzTvtWCZPQ5+pNdzYi03G-GZB_t+w@mail.gmail.com>
- <20170107153434.GA13307@archie.localdomain>
- <CAOMZO5CY3ys6moE133LwSKcS4egv56JdmhPMRG0TmAnfD+ZBAw@mail.gmail.com>
-Message-ID: <20170107205930.GA12367@archie.localdomain>
+From: lukma@denx.de (Lukasz Majewski)
+Date: Sat, 7 Jan 2017 22:24:06 +0100
+Subject: [PATCH v3 2/2] ARM: dts: imx6q: Add mccmon6 board support
+In-Reply-To: <1483440381-24268-2-git-send-email-lukma@denx.de>
+References: <1483440381-24268-1-git-send-email-lukma@denx.de>
+ <1483440381-24268-2-git-send-email-lukma@denx.de>
+Message-ID: <20170107222406.04428dfc@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 07, 2017 at 02:48:03PM -0200, Fabio Estevam wrote:
-> On Sat, Jan 7, 2017 at 1:34 PM, Clemens Gruber
-> <clemens.gruber@pqgruber.com> wrote:
-> > Hi Fabio,
-> >
-> > On Sat, Jan 07, 2017 at 12:57:10PM -0200, Fabio Estevam wrote:
-> >> The MX6QDL_PAD_CSI0_DAT16__UART4_CTS_B option is only valid in dte mode.
-> >
-> > Ah, the input select is limited in that way, I see.
-> >
-> > You wrote that you tried rts-gpios.
-> > What about setting cts-gpios to gpio6 2 in the DT?
-> >
-> > Or can you remux RX and TX to be switched to work in dte mode?
+Dear All,
+
+> From: Lukasz Majewski <l.majewski@majess.pl>
 > 
-> I managed to get RS485 in half-duplex working with rts-gios. Will send
-> a patch shortly.
+> This patch provides support for Liebherr's Monitor 6 board
+> (abverrated as mccmon6) to Linux kernel.
+> 
+> Signed-off-by: Lukasz Majewski <lukma@denx.de>
+> ---
+> Changes for v3:
+> - Reorganize the dts file according to Shawn Guo's comments
+> 
+> Changes for v2:
+> - Reorganize the dts file according to Valdimir Zapolskiy's comments
 
-Great!
+Do you have any more comments for this DTS file?
 
-Did you observe the same effect I described, with the doubling of
-characters in the front and the leftovers from previous transmissions at
-the end?
 
-Thanks,
-Clemens
+Best regards,
+
+Lukasz Majewski
+
+--
+
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
