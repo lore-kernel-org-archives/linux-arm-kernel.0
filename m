@@ -1,81 +1,171 @@
-From: peter.senna@collabora.co.uk (Peter Senna Tschudin)
-Date: Sat, 07 Jan 2017 01:29:52 +0000
-Subject: =?utf-8?q?Re=3A?==?utf-8?q?_=5BPATCH?= V7 =?utf-8?q?1=2F4=5D?=
- =?utf-8?q?_Documentation=2Fdevicetree=2Fbindings=3A?=
- =?utf-8?q?_b850v3=5Flvds=5Fdp?=
-In-Reply-To: <CAL_JsqJk=QZ20VmV5uE1ta2T0TEO3rvWFbiGsJpH1e3-ojnBfA@mail.gmail.com>
-Message-ID: <74f0-58704480-5-27259840@173563636>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Fri,  6 Jan 2017 18:11:18 -0800
+Subject: [PATCH v3 00/24] i.MX Media Driver
+Message-ID: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-On 04 January, 2017 21:39 CET, Rob Herring <robh@kernel.org> wrote: 
- 
-> On Tue, Jan 3, 2017 at 5:34 PM, Peter Senna Tschudin
-> <peter.senna@collabora.co.uk> wrote:
-> >  Hi Rob,
-> >
-> > Thank you for the review.
-> >
-> > On 03 January, 2017 23:51 CET, Rob Herring <robh@kernel.org> wrote:
-> >
-> >> On Sun, Jan 01, 2017 at 09:24:29PM +0100, Peter Senna Tschudin wrote:
-> >> > Devicetree bindings documentation for the GE B850v3 LVDS/DP++
-> >> > display bridge.
-> >> >
-> >> > Cc: Martyn Welch <martyn.welch@collabora.co.uk>
-> >> > Cc: Martin Donnelly <martin.donnelly@ge.com>
-> >> > Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> >> > Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> >> > Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> >> > Cc: Rob Herring <robh@kernel.org>
-> >> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> >> > Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+In version 3:
 
-> >> > ---
-> >> > There was an Acked-by from Rob Herring <robh@kernel.org> for V6, but I changed
-> >> > the bindings to use i2c_new_secondary_device() so I removed it from the commit
-> >> > message.
-> >> >
-> >> >  .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 39 ++++++++++++++++++++++
-> >>
-> >> Generally, bindings are not organized by vendor. Put in
-> >> bindings/display/bridge/... instead.
-> >
-> > Will change that.
-> >
-> >>
-> >> >  1 file changed, 39 insertions(+)
-> >> >  create mode 100644 Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
-> >> >
-> >> > diff --git a/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
-> >> > new file mode 100644
-> >> > index 0000000..1bc6ebf
-> >> > --- /dev/null
-> >> > +++ b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
-> >> > @@ -0,0 +1,39 @@
-> >> > +Driver for GE B850v3 LVDS/DP++ display bridge
-> >> > +
-> >> > +Required properties:
-> >> > +  - compatible : should be "ge,b850v3-lvds-dp".
-> >>
-> >> Isn't '-lvds-dp' redundant? The part# should be enough.
-> >
-> > b850v3 is the name of the product, this is why the proposed name. What about, b850v3-dp2 dp2 indicating the second DP output?
-> 
-> Humm, b850v3 is the board name? This node should be the name of the bridge chip.
+Changes suggested by Rob Herring <robh@kernel.org>:
 
->From the cover letter:
+  - prepended FIM node properties with vendor prefix "fsl,".
 
--- // --
-There are two physical bridges on the video signal pipeline: a STDP4028(LVDS to
-DP) and a STDP2690(DP to DP++).  The hardware and firmware made it complicated
-for this binding to comprise two device tree nodes, as the design goal is to
-configure both bridges based on the LVDS signal, which leave the driver
-powerless to control the video processing pipeline. The two bridges behaves as
-a single bridge, and the driver is only needed for telling the host about EDID /
-HPD, and for giving the host powers to ack interrupts. The video signal
-pipeline is as follows:
+  - make mipi csi-2 receiver compatible string SoC specific:
+    "fsl,imx6-mipi-csi2" instead of "fsl,imx-mipi-csi2".
 
-  Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
--- // --
+  - redundant "_clk" removed from mipi csi-2 receiver clock-names property.
+
+  - removed board-specific info from the media driver binding doc. These
+    were all related to sensor bindings, which already are (adv7180)
+    or will be (ov564x) covered in separate binding docs. All reference
+    board info not related to DT bindings has been moved to
+    Documentation/media/v4l-drivers/imx.rst.
+
+  - removed "_mipi" from the OV5640 compatible string.
+
+Changes suggested by Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>:
+
+  Mostly cosmetic/non-functional changes which I won't list here, except
+  for the following:
+
+  - spin_lock_irqsave() changed to spin_lock() in a couple interrupt handlers.
+
+  - fixed some unnecessary of_node_put()'s in for_each_child_of_node() loops.
+
+  - check/handle return code from required reg property of CSI port nodes.
+
+  - check/handle return code from clk_prepare_enable().
+
+Changes suggested by Fabio Estevam <festevam@gmail.com>:
+
+  - switch to VGEN3 Analog Vdd supply assuming rev. C SabreSD boards.
+
+  - finally got around to passing valid IOMUX pin config values to the
+    pin groups.
+
+Other changes:
+
+  - removed the FIM properties that overrided the v4l2 FIM control defaults
+    values. This was left-over from a requirement of a customer and is not
+    necessary here.
+
+  - The FIM must be explicitly enabled in the fim child node under the CSI
+    port nodes, using the status property. If not enabled, FIM v4l2 controls
+    will not appear in the video capture driver.
+
+  - brought in additional media types patch from Philipp Zabel. Use new
+    MEDIA_ENT_F_VID_IF_BRIDGE in mipi csi-2 receiver subdev.
+
+  - brought in latest platform generic video multiplexer subdevice driver
+    from Philipp Zabel (squashed with patch that uses new MEDIA_ENT_F_MUX).
+
+  - removed imx-media-of.h, moved those prototypes into imx-media.h.
+
+
+Philipp Zabel (3):
+  ARM: dts: imx6qdl: Add mipi_ipu1/2 multiplexers, mipi_csi, and their
+    connections
+  add mux and video interface bridge entity functions
+  platform: add video-multiplexer subdevice driver
+
+Steve Longerbeam (21):
+  [media] dt-bindings: Add bindings for i.MX media driver
+  ARM: dts: imx6qdl: Add compatible, clocks, irqs to MIPI CSI-2 node
+  ARM: dts: imx6qdl: add media device
+  ARM: dts: imx6qdl-sabrelite: remove erratum ERR006687 workaround
+  ARM: dts: imx6-sabrelite: add OV5642 and OV5640 camera sensors
+  ARM: dts: imx6-sabresd: add OV5642 and OV5640 camera sensors
+  ARM: dts: imx6-sabreauto: create i2cmux for i2c3
+  ARM: dts: imx6-sabreauto: add reset-gpios property for max7310_b
+  ARM: dts: imx6-sabreauto: add pinctrl for gpt input capture
+  ARM: dts: imx6-sabreauto: add the ADV7180 video decoder
+  UAPI: Add media UAPI Kbuild file
+  media: Add userspace header file for i.MX
+  media: Add i.MX media core driver
+  media: imx: Add CSI subdev driver
+  media: imx: Add SMFC subdev driver
+  media: imx: Add IC subdev drivers
+  media: imx: Add Camera Interface subdev driver
+  media: imx: Add MIPI CSI-2 Receiver subdev driver
+  media: imx: Add MIPI CSI-2 OV5640 sensor subdev driver
+  media: imx: Add Parallel OV5642 sensor subdev driver
+  ARM: imx_v6_v7_defconfig: Enable staging video4linux drivers
+
+ Documentation/devicetree/bindings/media/imx.txt    |   57 +
+ .../bindings/media/video-multiplexer.txt           |   59 +
+ Documentation/media/uapi/mediactl/media-types.rst  |   22 +
+ Documentation/media/v4l-drivers/imx.rst            |  443 ++
+ arch/arm/boot/dts/imx6dl-sabrelite.dts             |    5 +
+ arch/arm/boot/dts/imx6dl-sabresd.dts               |    5 +
+ arch/arm/boot/dts/imx6dl.dtsi                      |  187 +
+ arch/arm/boot/dts/imx6q-sabrelite.dts              |    6 +
+ arch/arm/boot/dts/imx6q-sabresd.dts                |    5 +
+ arch/arm/boot/dts/imx6q.dtsi                       |  127 +
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           |  147 +-
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi           |  122 +-
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |  114 +-
+ arch/arm/boot/dts/imx6qdl.dtsi                     |   25 +-
+ arch/arm/configs/imx_v6_v7_defconfig               |   12 +-
+ drivers/media/platform/Kconfig                     |    8 +
+ drivers/media/platform/Makefile                    |    2 +
+ drivers/media/platform/video-multiplexer.c         |  472 +++
+ drivers/staging/media/Kconfig                      |    2 +
+ drivers/staging/media/Makefile                     |    1 +
+ drivers/staging/media/imx/Kconfig                  |   36 +
+ drivers/staging/media/imx/Makefile                 |   15 +
+ drivers/staging/media/imx/TODO                     |   22 +
+ drivers/staging/media/imx/imx-camif.c              | 1000 +++++
+ drivers/staging/media/imx/imx-csi.c                |  644 +++
+ drivers/staging/media/imx/imx-ic-common.c          |  109 +
+ drivers/staging/media/imx/imx-ic-pp.c              |  636 +++
+ drivers/staging/media/imx/imx-ic-prpenc.c          | 1033 +++++
+ drivers/staging/media/imx/imx-ic-prpvf.c           | 1179 ++++++
+ drivers/staging/media/imx/imx-ic.h                 |   38 +
+ drivers/staging/media/imx/imx-media-common.c       |  981 +++++
+ drivers/staging/media/imx/imx-media-dev.c          |  486 +++
+ drivers/staging/media/imx/imx-media-fim.c          |  471 +++
+ drivers/staging/media/imx/imx-media-internal-sd.c  |  457 ++
+ drivers/staging/media/imx/imx-media-of.c           |  289 ++
+ drivers/staging/media/imx/imx-media.h              |  310 ++
+ drivers/staging/media/imx/imx-mipi-csi2.c          |  501 +++
+ drivers/staging/media/imx/imx-smfc.c               |  737 ++++
+ drivers/staging/media/imx/ov5640-mipi.c            | 2348 +++++++++++
+ drivers/staging/media/imx/ov5642.c                 | 4363 ++++++++++++++++++++
+ include/media/imx.h                                |   15 +
+ include/uapi/Kbuild                                |    1 +
+ include/uapi/linux/media.h                         |    6 +
+ include/uapi/linux/v4l2-controls.h                 |    4 +
+ include/uapi/media/Kbuild                          |    2 +
+ include/uapi/media/imx.h                           |   30 +
+ 46 files changed, 17505 insertions(+), 29 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/imx.txt
+ create mode 100644 Documentation/devicetree/bindings/media/video-multiplexer.txt
+ create mode 100644 Documentation/media/v4l-drivers/imx.rst
+ create mode 100644 drivers/media/platform/video-multiplexer.c
+ create mode 100644 drivers/staging/media/imx/Kconfig
+ create mode 100644 drivers/staging/media/imx/Makefile
+ create mode 100644 drivers/staging/media/imx/TODO
+ create mode 100644 drivers/staging/media/imx/imx-camif.c
+ create mode 100644 drivers/staging/media/imx/imx-csi.c
+ create mode 100644 drivers/staging/media/imx/imx-ic-common.c
+ create mode 100644 drivers/staging/media/imx/imx-ic-pp.c
+ create mode 100644 drivers/staging/media/imx/imx-ic-prpenc.c
+ create mode 100644 drivers/staging/media/imx/imx-ic-prpvf.c
+ create mode 100644 drivers/staging/media/imx/imx-ic.h
+ create mode 100644 drivers/staging/media/imx/imx-media-common.c
+ create mode 100644 drivers/staging/media/imx/imx-media-dev.c
+ create mode 100644 drivers/staging/media/imx/imx-media-fim.c
+ create mode 100644 drivers/staging/media/imx/imx-media-internal-sd.c
+ create mode 100644 drivers/staging/media/imx/imx-media-of.c
+ create mode 100644 drivers/staging/media/imx/imx-media.h
+ create mode 100644 drivers/staging/media/imx/imx-mipi-csi2.c
+ create mode 100644 drivers/staging/media/imx/imx-smfc.c
+ create mode 100644 drivers/staging/media/imx/ov5640-mipi.c
+ create mode 100644 drivers/staging/media/imx/ov5642.c
+ create mode 100644 include/media/imx.h
+ create mode 100644 include/uapi/media/Kbuild
+ create mode 100644 include/uapi/media/imx.h
+
+-- 
+2.7.4
