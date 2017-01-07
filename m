@@ -1,7 +1,7 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 7 Jan 2017 19:43:48 -0200
+From: clemens.gruber@pqgruber.com (Clemens Gruber)
+Date: Sun, 8 Jan 2017 00:06:24 +0100
 Subject: imx: RS-485 problems during TX, maybe DMA related
-In-Reply-To: <20170107205930.GA12367@archie.localdomain>
+In-Reply-To: <CAOMZO5D00YFLS=pddAqPo_FUoP6MF-juAef2H71-Wx_NQArdpw@mail.gmail.com>
 References: <20170104160024.GA13442@archie.localdomain>
  <CAOMZO5C3enuThR1DpcwNnqFdxd8tGoBwd76O62Gnviz8x1_a9w@mail.gmail.com>
  <20170106225026.GA3804@archie.localdomain>
@@ -11,30 +11,58 @@ References: <20170104160024.GA13442@archie.localdomain>
  <20170107153434.GA13307@archie.localdomain>
  <CAOMZO5CY3ys6moE133LwSKcS4egv56JdmhPMRG0TmAnfD+ZBAw@mail.gmail.com>
  <20170107205930.GA12367@archie.localdomain>
-Message-ID: <CAOMZO5D00YFLS=pddAqPo_FUoP6MF-juAef2H71-Wx_NQArdpw@mail.gmail.com>
+ <CAOMZO5D00YFLS=pddAqPo_FUoP6MF-juAef2H71-Wx_NQArdpw@mail.gmail.com>
+Message-ID: <20170107230624.GA21729@archie.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Clemens,
+Hi Fabio,
 
-On Sat, Jan 7, 2017 at 6:59 PM, Clemens Gruber
-<clemens.gruber@pqgruber.com> wrote:
+On Sat, Jan 07, 2017 at 07:43:48PM -0200, Fabio Estevam wrote:
+> Hi Clemens,
+> 
+> On Sat, Jan 7, 2017 at 6:59 PM, Clemens Gruber
+> <clemens.gruber@pqgruber.com> wrote:
+> 
+> > Great!
+> >
+> > Did you observe the same effect I described, with the doubling of
+> > characters in the front and the leftovers from previous transmissions at
+> > the end?
+> 
+> No, I don't observe these errors when I use 'rts-gpios' in the device tree.
+> 
+> Maybe you could try to use 'rts-gpios' for a quick test by applying
+> the patches I have just sent.
+> 
+> If you run this test, please remove 'uart-has-rtscts' from your dts.
+> According to Documentation/devicetree/bindings/serial/serial.txt they
+> are mutually-exclusive.
 
-> Great!
->
-> Did you observe the same effect I described, with the doubling of
-> characters in the front and the leftovers from previous transmissions at
-> the end?
+Just remuxed GPIO signals to these pads, applied your two patches and
+used rts-gpios in the DT but I still see the same problem :/
 
-No, I don't observe these errors when I use 'rts-gpios' in the device tree.
+When transmit something, I get doubled characters, then zeros and at the
+end garbled data of previous transmissions, same as described in my
+first post (Logic analyzer: https://pqgruber.com/rs485_results.png)
+The data is always 4096 bytes long, this explains why the echo command
+is blocking for about 4 seconds (<- 4096 bytes@a baudrate of 9600).
+The TE line is also high until all 4096 bytes are sent.
 
-Maybe you could try to use 'rts-gpios' for a quick test by applying
-the patches I have just sent.
+I think this comes from the UART_XMIT_SIZE which is defined to the page
+size.
+Maybe there is something wrong in imx_transmit_buffer and leads to the
+whole circular buffer being sent out all the time, not stopping..
 
-If you run this test, please remove 'uart-has-rtscts' from your dts.
-According to Documentation/devicetree/bindings/serial/serial.txt they
-are mutually-exclusive.
+Do these debug logs tell you anything?
+https://gist.github.com/clemensg/1ac5ee8a8ea32acc9145c5aa8407aea5
 
-Regards,
+I am analyzing the signals coming directly from the i.MX6Q, so this must
+be a software problem, but I don't understand why it works for you, if
+we use the same software.
 
-Fabio Estevam
+Do you use any other patches on top of mainline and do you use the SDMA
+scripts from the ROM?
+
+Thanks,
+Clemens
