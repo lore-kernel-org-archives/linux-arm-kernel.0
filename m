@@ -1,24 +1,42 @@
 From: john.stultz@linaro.org (John Stultz)
-Date: Fri, 6 Jan 2017 17:07:26 -0800
-Subject: [PATCH 2/5] ARM: dts: qcom: apq8064: Add riva-pil node
-In-Reply-To: <20161221114939.19973-2-bjorn.andersson@linaro.org>
+Date: Fri, 6 Jan 2017 17:10:44 -0800
+Subject: [PATCH 1/5] ARM: dts: qcom: apq8064: Add missing scm clock
+In-Reply-To: <20161221114939.19973-1-bjorn.andersson@linaro.org>
 References: <20161221114939.19973-1-bjorn.andersson@linaro.org>
- <20161221114939.19973-2-bjorn.andersson@linaro.org>
-Message-ID: <CALAqxLXHh8Yjt_uS8TrPLPo_DgWtkgB-zhDrsTUBn3VgXwPYaw@mail.gmail.com>
+Message-ID: <CALAqxLVGMzPmRBM5SPO=pQjuasf0f_aRJ+94FUHtidYYU7yhpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Dec 21, 2016 at 3:49 AM, Bjorn Andersson
 <bjorn.andersson@linaro.org> wrote:
-> Add nodes for the Riva PIL, IRIS RF module, BT and WiFI services exposed
-> by the Riva firmware and the related memory reserve.
->
-> Also provides pinctrl nodes for devices enabling the riva-pil.
+> As per the device tree binding the apq8064 scm node requires the core
+> clock to be specified, so add this.
 >
 > Cc: John Stultz <john.stultz@linaro.org>
 > Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> ---
+>  arch/arm/boot/dts/qcom-apq8064.dtsi | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> index 268bd470c865..78bf155a52f3 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
+> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> @@ -303,6 +303,9 @@
+>         firmware {
+>                 scm {
+>                         compatible = "qcom,scm-apq8064";
+> +
+> +                       clocks = <&gcc CE3_CORE_CLK>;
+> +                       clock-names = "core";
+
 
 Tested-by: John Stultz <john.stultz@linaro.org>
+
+I know Bjorn has a new version of this patch that uses the
+RPM_DAYTONA_FABRIC_CLK value, but that one results in problems with
+usb gadget functionality on my Nexus7.  This one seems to work ok
+though.
 
 thanks
 -john
