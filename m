@@ -1,8 +1,10 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat,  7 Jan 2017 10:41:40 +0200
-Subject: [PATCH 1/2] usb: host: ehci-exynos: Decrese node refcount on
+Date: Sat,  7 Jan 2017 10:41:41 +0200
+Subject: [PATCH 2/2] usb: host: ohci-exynos: Decrese node refcount on
  exynos_ehci_get_phy() error paths
-Message-ID: <20170107084141.3731-1-krzk@kernel.org>
+In-Reply-To: <20170107084141.3731-1-krzk@kernel.org>
+References: <20170107084141.3731-1-krzk@kernel.org>
+Message-ID: <20170107084141.3731-2-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,14 +15,14 @@ deferred probe, the refcount of phy node was left increased.
 Fixes: 6d40500ac9b6 ("usb: ehci/ohci-exynos: Fix of_node_put() for child when getting PHYs")
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- drivers/usb/host/ehci-exynos.c | 2 ++
+ drivers/usb/host/ohci-exynos.c | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
-index 42e5b66353ef..7a603f66a9bc 100644
---- a/drivers/usb/host/ehci-exynos.c
-+++ b/drivers/usb/host/ehci-exynos.c
-@@ -77,10 +77,12 @@ static int exynos_ehci_get_phy(struct device *dev,
+diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
+index 2cd105be7319..6865b919403f 100644
+--- a/drivers/usb/host/ohci-exynos.c
++++ b/drivers/usb/host/ohci-exynos.c
+@@ -66,10 +66,12 @@ static int exynos_ohci_get_phy(struct device *dev,
  		if (IS_ERR(phy)) {
  			ret = PTR_ERR(phy);
  			if (ret == -EPROBE_DEFER) {
