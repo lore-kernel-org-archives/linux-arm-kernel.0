@@ -1,68 +1,58 @@
-From: andi@smida.it (Andi Shyti)
-Date: Sun, 8 Jan 2017 15:13:31 +0900
-Subject: [PATCH v5 5/5] arm64: dts: exynos: Add tm2 touchkey node
-In-Reply-To: <CAGTfZH1CuMxhaqPJCzxgF8p39OAu+o0GDJEsh5DVGtU-hqfxvQ@mail.gmail.com>
-References: <CGME20170106134356epcas1p1aee9f715c58b50f6056bf0b43b849497@epcas1p1.samsung.com>
- <20170106134350.32428-1-andi.shyti@samsung.com>
- <20170106134350.32428-6-andi.shyti@samsung.com>
- <CAGTfZH2QYQK190kYFbOMqJMFgH32548ra-VqzYwc5LVBJwqisA@mail.gmail.com>
- <CAGTfZH347ZRve20cdGLwtuf6arRAJ4Ry+HQrTubDj-RGR=K9cA@mail.gmail.com>
- <CAGTfZH1QtbieMxQzoPvxsP_3tSYBSuXe+wtq0uUs03mhcLFdXg@mail.gmail.com>
- <20170107124026.gl447hl5bucdflyk@jack.zhora.eu>
- <CAGTfZH35sx5v-XcxkDG7TVRmW8cLirAXRxA=kGZQDBnpw3vYhg@mail.gmail.com>
- <20170108054504.fssqicmeovufar2r@jack.zhora.eu>
- <CAGTfZH1CuMxhaqPJCzxgF8p39OAu+o0GDJEsh5DVGtU-hqfxvQ@mail.gmail.com>
-Message-ID: <20170108061331.uzpig4gzrlyhndhc@jack.zhora.eu>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 8 Jan 2017 15:27:40 +0900
+Subject: [PATCH v2 2/4] linux/const.h: move UL() macro to
+ include/linux/const.h
+In-Reply-To: <15496.1483699555@warthog.procyon.org.uk>
+References: <1483582810-7046-1-git-send-email-yamada.masahiro@socionext.com>
+ <1483582810-7046-3-git-send-email-yamada.masahiro@socionext.com>
+ <15496.1483699555@warthog.procyon.org.uk>
+Message-ID: <CAK7LNARMJVpd47L-3VRafZxdaBT09tA4Bq+V2yFAi_X+cCJsGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+Hi.
 
-> >> >> >>> +       touchkey at 20 {
-> >> >> >>> +               compatible = "samsung,tm2-touchkey";
-> >> >> >>> +               reg = <0x20>;
-> >> >> >>> +               interrupt-parent = <&gpa3>;
-> >> >> >>> +               interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
-> >> >> >>> +               vcc-supply = <&ldo32_reg>;
-> >> >> >>> +               vdd-supply = <&ldo33_reg>;
-> >> >> >>> +       };
-> >> >> >>> +};
-> >> >> >>> +
-> >> >> >>>  &ldo31_reg {
-> >> >> >>>         regulator-name = "TSP_VDD_1.85V_AP";
-> >> >> >>>         regulator-min-microvolt = <1850000>;
-> >> >>
-> >> >> I repiled the touchkey driver against compatible name.
-> >> >> Usually, when developing the device driver, we use the specific h/w name
-> >> >> but in this patch, the touckey dt node uses the h/w board name instead of
-> >> >> original touckhey name.
-> >> >
-> >> > this should be a device specifically done for the tm2 and we are
-> >> > not sure who is the manufacturer of the device. In order to not
-> >>
-> >> As I knew, this touchkey was made by Cypress semiconductor.
-> >> But, for more correct information, you may try to find it.
-> >
-> > The Android Kernel says that this is the cy8cmbr3xxx. I
-> > downloaded the datasheets, but it doesn't have any similarity
-> > with the device. Which means that on tm2 we don't the
-> > cy8cmbr3xxx bot something else that I even doubt comes from
-> > cypress, but I strongly believe it's a dedicated hardware.
-> 
-> Although this device is a dedicated h/w, you should keep the principal.
-> Did you check the schematic document of TM2? The schematic document
-> might include the specific device name.
-> 
-> Sometimes, the downloaded datasheet does not include the
-> all of information of device because of confidential information.
-> But, I?m not sure. Just it is guess as my experience.
-> 
-> I want to check the manufacturer and name of device with you
-> on next Monday.
+2017-01-06 19:45 GMT+09:00 David Howells <dhowells@redhat.com>:
+> Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
+>
+>> diff --git a/include/uapi/linux/const.h b/include/uapi/linux/const.h
+>> index c872bfd..76fb0f9 100644
+>> --- a/include/uapi/linux/const.h
+>> +++ b/include/uapi/linux/const.h
+>> @@ -1,7 +1,7 @@
+>>  /* const.h: Macros for dealing with constants.  */
+>>
+>> -#ifndef _LINUX_CONST_H
+>> -#define _LINUX_CONST_H
+>> +#ifndef _UAPI_LINUX_CONST_H
+>> +#define _UAPI_LINUX_CONST_H
+>
+> You need to be very careful doing this.  Some userspace stuff depends on the
+> guard macro names on the kernel header files.
 
-Yes, I checked everything, but didn't find the exact device name.
+Oh...
 
-Anyway, let's take this discussion offline and find the correct
-way.
+>>  /* Some constant macros are used in both assembler and
+>>   * C code.  Therefore we cannot annotate them always with
+>> @@ -21,7 +21,10 @@
+>>  #define _AT(T,X)     ((T)(X))
+>>  #endif
+>>
+>> +#define _UL(x)               (_AC(x, UL))
+>> +#define _ULL(x)              (_AC(x, ULL))
+>
+> How likely is this to collide with existing userspace code somewhere?  It
+> looks like the sort of thing that could collide with a C library.
 
-Andi
+Sorry, I do not have enough insight to answer your questions.
+
+
+Andrew,
+If this seems dangerous, please feel free to drop the entire series
+because it is not adding any value except some cleanups.
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
