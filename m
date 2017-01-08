@@ -1,74 +1,63 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 7 Jan 2017 14:33:47 -0500
-Subject: [PATCH 14/22] dt-bindings: power: supply: add AXP20X/AXP22X
- battery DT binding
-In-Reply-To: <20170104132107.tciklylgqvhftb6f@rob-hp-laptop>
-References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
- <20170102163723.7939-15-quentin.schulz@free-electrons.com>
- <20170104132107.tciklylgqvhftb6f@rob-hp-laptop>
-Message-ID: <3155ba16-b51a-9306-6be4-0bdf4482a679@kernel.org>
+From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
+Date: Sun, 8 Jan 2017 15:28:28 +0530
+Subject: [PATCH WIP 4/4] ARM: remove compile time vector base for CP15 case
+In-Reply-To: <20170107182415.GO14217@n2100.armlinux.org.uk>
+References: <20170107171339.GA5044@afzalpc>
+ <20170107172228.6451-1-afzal.mohd.ma@gmail.com>
+ <20170107173832.GN14217@n2100.armlinux.org.uk>
+ <20170107180227.GA8130@afzalpc>
+ <20170107182415.GO14217@n2100.armlinux.org.uk>
+Message-ID: <20170108095828.GA3025@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/17 08:21, Rob Herring wrote:
-> On Mon, Jan 02, 2017 at 05:37:14PM +0100, Quentin Schulz wrote:
->> The X-Powers AXP20X and AXP22X PMICs can have a battery as power supply.
->>
->> This patch adds the DT binding documentation for the battery power
->> supply which gets various data from the PMIC, such as the battery status
->> (charging, discharging, full, dead), current max limit, current current,
->> battery capacity (in percentage), voltage max and min limits, current
->> voltage and battery capacity (in Ah).
->>
->> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->> ---
->>  .../bindings/power/supply/axp20x_battery.txt       | 27 ++++++++++++++++++++++
->>  1 file changed, 27 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
->>
->> diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt b/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
->> new file mode 100644
->> index 0000000..5489d0d
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
->> @@ -0,0 +1,27 @@
->> +AXP20x and AXP22x battery power supply
->> +
->> +Required Properties:
->> + - compatible, one of:
->> +			"x-powers,axp209-battery-power-supply"
->> +			"x-powers,axp221-battery-power-supply"
->> + - io-channels: phandles to battery voltage, charge and discharge
->> + currents ADC channels
->> + - io-channel-names = "batt_v", "batt_chrg_i", "batt_dischrg_i";
->> +
->> +This node is a subnode of the axp20x/axp22x PMIC.
->> +
->> +The AXP20X and AXP22X can read the battery voltage, charge and discharge
->> +currents of the battery by reading ADC channels from the AXP20X/AXP22X
->> +ADC.
->> +
->> +Example:
->> +
->> +&axp209 {
->> +	battery_power_supply: battery_power_supply {
+Hi,
+
+On Sat, Jan 07, 2017 at 06:24:15PM +0000, Russell King - ARM Linux wrote:
+
+> As I've said, CONFIG_VECTORS_BASE is _always_ 0xffff0000 on MMU, so
+> this always displays 0xffff0000 - 0xffff1000 here.
+
+> Older ARM CPUs without the V bit (ARMv3 and early ARMv4) expect the
+> vectors to be at virtual address zero.
 > 
-> Humm, I guess you power-supply is not sufficient, so 
-> 'battery-power-supply' and similar for ac.
+> Most of these systems place ROM at physical address 0, so when the CPU
+> starts from reset (with the MMU off) it starts executing from ROM.  Once
+> the MMU is initialised, RAM can be placed there and the ROM vectors
+> replaced.  The side effect of this is that NULL pointer dereferences
+> are not always caught... of course, it makes sense that the page at
+> address 0 is write protected even from the kernel, so a NULL pointer
+> write dereference doesn't corrupt the vectors.
 > 
->> +		compatible = "x-powers,axp209-battery-power-supply";
->> +		io-channels = <&axp209_adc 7>, <&axp209_adc 8>,
->> +			<&axp209_adc 9>;
->> +		io-channel-names = "batt_v", "batt_chrg_i",
->> +			"batt_dischrg_i";
-Is this stuff fixed for the device?
->> +	}
->> +};
->> -- 
->> 2.9.3
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> How we handle it in Linux is that we always map the page for the vectors
+> at 0xffff0000, and then only map that same page at 0x00000000 if we have
+> a CPU that needs it there.
+
+Thanks for the information, i was not aware, seems that simplifies MMU
+case handling.
+
+arch/arm/mm/mmu.c:
+
+	if (!vectors_high()) {
+		map.virtual = 0;
+		map.length = PAGE_SIZE * 2;
+		map.type = MT_LOW_VECTORS;
+		create_mapping(&map);
+	}
+
+
+
+arch/arm/include/asm/cp15.h:
+
+#if __LINUX_ARM_ARCH__ >= 4
+#define vectors_high()	(get_cr() & CR_V)
+#else
+#define vectors_high()	(0)
+#endif
+
+Deducing from your reply & above code snippets that for
+__LINUX_ARM_ARCH__ >= 4, in all practical cases, vector_high() returns
+true
+
+Regards
+afzal
