@@ -1,40 +1,24 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 8 Jan 2017 14:51:37 +0000
-Subject: [PATCH] ARM: imx6: add support for SolidRun Hummingboard2
-In-Reply-To: <20170108135830.22595-1-dev@lynxeye.de>
-References: <20170108135830.22595-1-dev@lynxeye.de>
-Message-ID: <20170108145137.GR14217@n2100.armlinux.org.uk>
+Date: Sun, 8 Jan 2017 15:02:01 +0000
+Subject: [PATCH RFC 0/4] SolidRun Hummingboard 2 support
+Message-ID: <20170108150201.GS14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 08, 2017 at 02:58:30PM +0100, Lucas Stach wrote:
-> Aka: Hummingboard Edge and Hummingboard Gate
-> 
-> This currently only supports the pieces I was able to test:
-> - RTC
-> - SD card with UHS modes
-> - eMMC
-> - SGTL5000 sound
-> - All standard host USB ports
-> - mini PCIe
-> - IR receiver
-> - HDMI output
-> 
-> Functions routed out to the pin headers are not enabled and have
-> not been tested.
+These patches add support for SolidRun's Hummingboard 2 to mainline.
+The first is the official SolidRun DTS file supplied by Jon, the
+remainder are cleanups to it for mainline.
 
-It would be nice if you talked to me or at least Jon, as I'm SolidRun's
-"official" path to getting support for their boards merged - and rather
-than having a Lucas special independently created DT file merged, we
-can have one which closer resembles the one in the SolidRun tree.
+These can be found in my HB2 branch.
 
-I know working with manufacters isn't seen to be a good thing to do
-in Open Source, but it would really help if people did at least try.
-
-I've been holding off on the HB2 DT patches because there's changes I
-needed which I need to talk to Jon about before I send them upstream.
-
-You can find the changes in my "hb2" branch.
+ arch/arm/boot/dts/Makefile                   |   2 +
+ arch/arm/boot/dts/imx6dl-hummingboard2.dts   |  52 +++
+ arch/arm/boot/dts/imx6q-hummingboard2.dts    |  60 +++
+ arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 562 +++++++++++++++++++++++++++
+ 4 files changed, 676 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-hummingboard2.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-hummingboard2.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
