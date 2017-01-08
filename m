@@ -1,33 +1,71 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 8 Jan 2017 15:20:50 +0000
-Subject: [PATCH 1/4] ARM: dts: imx6qdl: add HummingBoard2 boards
-In-Reply-To: <CAOMZO5AcyweJ8xgGyGKD4CVPiuxaEE+JKs=ASNUU5BcL+3fASQ@mail.gmail.com>
-References: <20170108150201.GS14217@n2100.armlinux.org.uk>
- <E1cQF03-0003N1-HY@rmk-PC.armlinux.org.uk>
- <CAOMZO5AcyweJ8xgGyGKD4CVPiuxaEE+JKs=ASNUU5BcL+3fASQ@mail.gmail.com>
-Message-ID: <20170108152050.GU14217@n2100.armlinux.org.uk>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Sun, 8 Jan 2017 17:26:53 +0100
+Subject: [PATCH v6 07/18] iommu: Implement reserved_regions iommu-group
+ sysfs file
+In-Reply-To: <0858b719-2888-0645-66d2-56fe698f4e2f@redhat.com>
+References: <1483643086-2883-1-git-send-email-eric.auger@redhat.com>
+ <1483643086-2883-8-git-send-email-eric.auger@redhat.com>
+ <20170106110039.GL17255@8bytes.org>
+ <888d3750-817c-77d1-8154-e77cf8c3ad4b@redhat.com>
+ <20170106124816.GQ17255@8bytes.org>
+ <0858b719-2888-0645-66d2-56fe698f4e2f@redhat.com>
+Message-ID: <24abe958-6a79-5766-653b-b355a85f2be4@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 08, 2017 at 01:07:42PM -0200, Fabio Estevam wrote:
-> On Sun, Jan 8, 2017 at 1:03 PM, Russell King <rmk+kernel@armlinux.org.uk> wrote:
-> > From: Jon Nettleton <jon.nettleton@gmail.com>
-> >
-> > This adds support for the Hummingboard Gate and Edge devices from
-> > SolidRun.
-> >
-> > Signed-off-by: Rabeeh Khoury <rabeeh@solid-run.com>
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Hi,
+
+On 06/01/2017 18:18, Auger Eric wrote:
+> Hi Joerg, Robin,
 > 
-> This one misses a Signed-off-by tag from Jon.
+> On 06/01/2017 13:48, Joerg Roedel wrote:
+>> On Fri, Jan 06, 2017 at 12:46:05PM +0100, Auger Eric wrote:
+>>> On 06/01/2017 12:00, Joerg Roedel wrote:
+>>
+>>>> I think it also makes sense to report the type of the reserved region.
+>>>
+>>> What is the best practice in that case? Shall we put the type enum
+>>> values as strings such as:
+>>> - direct
+>>> - nomap
+>>> - msi
+>>>
+>>> and document that in Documentation/ABI/testing/sysfs-kernel-iommu_groups
+>>
+>> Yes, a string would be good. An probably 'reserved' is a better name
+>> than nomap?
+> the iommu_insert_resv_region() function that builds the group reserved
+> region list sorts all regions and handles the case where there is an
+> overlap between regions. Current code does not care about the type of
+> regions. So in case a NOMAP region overlaps with a direct-mapped region,
+> what is reported to the user space is the superset and the type depends
+> on the overlap. This was suggested by Robin at some point to handle
+> overlaps.
+> 
+> I guess I should merge regions only in case the types equal?
+> 
+> I remember that Alex thought that user-space should not care so much
+> about the type of the regions so I tought it was better for the
+> user-space to have a minimal view of the regions.
+> 
+> On the other hand, this issue of merging regions of different types
+> should not happen often but I prefer to highlight the potential issue.
 
-That depends whether Jon is the author or not... Jon needs to comment
-on that.
+> 
+> What is your guidance?
 
-As I said in the cover, this is rather "not ready" but is being posted
-because Lucas is forcing our hands.
+Please forget the question. From an API point of view It does not make
+sense that iommu_insert_resv_region() merges regions of a different
+types since the type field becomes unreliable. I will fix this.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks
+
+Eric
+> 
+> Thanks
+> 
+> Eric
+>>
+>>
+>> 	Joerg
+>>
