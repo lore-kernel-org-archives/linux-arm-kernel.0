@@ -1,63 +1,114 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Sun, 8 Jan 2017 15:28:28 +0530
-Subject: [PATCH WIP 4/4] ARM: remove compile time vector base for CP15 case
-In-Reply-To: <20170107182415.GO14217@n2100.armlinux.org.uk>
-References: <20170107171339.GA5044@afzalpc>
- <20170107172228.6451-1-afzal.mohd.ma@gmail.com>
- <20170107173832.GN14217@n2100.armlinux.org.uk>
- <20170107180227.GA8130@afzalpc>
- <20170107182415.GO14217@n2100.armlinux.org.uk>
-Message-ID: <20170108095828.GA3025@afzalpc>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Sun,  8 Jan 2017 16:05:56 +0530
+Subject: [PATCH] drivers: phy: constify phy_ops structures
+Message-ID: <1483871756-19008-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Declare phy_ops structures as const as they are only passed as an
+argument to the function devm_phy_create. This argument is of type const
+struct phy_ops *, so phy_ops structures having this property can be
+declared as const.
+Done using Coccinelle:
 
-On Sat, Jan 07, 2017 at 06:24:15PM +0000, Russell King - ARM Linux wrote:
+@r1 disable optional_qualifier @
+identifier i;
+position p;
+@@
+static struct phy_ops i at p = {...};
 
-> As I've said, CONFIG_VECTORS_BASE is _always_ 0xffff0000 on MMU, so
-> this always displays 0xffff0000 - 0xffff1000 here.
+@ok1@
+identifier r1.i;
+position p;
+@@
+devm_phy_create(...,&i at p)
 
-> Older ARM CPUs without the V bit (ARMv3 and early ARMv4) expect the
-> vectors to be at virtual address zero.
-> 
-> Most of these systems place ROM at physical address 0, so when the CPU
-> starts from reset (with the MMU off) it starts executing from ROM.  Once
-> the MMU is initialised, RAM can be placed there and the ROM vectors
-> replaced.  The side effect of this is that NULL pointer dereferences
-> are not always caught... of course, it makes sense that the page at
-> address 0 is write protected even from the kernel, so a NULL pointer
-> write dereference doesn't corrupt the vectors.
-> 
-> How we handle it in Linux is that we always map the page for the vectors
-> at 0xffff0000, and then only map that same page at 0x00000000 if we have
-> a CPU that needs it there.
+@bad@
+position p!={r1.p,ok1.p};
+identifier r1.i;
+@@
+i at p
 
-Thanks for the information, i was not aware, seems that simplifies MMU
-case handling.
+@depends on !bad disable optional_qualifier@
+identifier r1.i;
+@@
++const
+struct phy_ops i;
 
-arch/arm/mm/mmu.c:
+File size details:
 
-	if (!vectors_high()) {
-		map.virtual = 0;
-		map.length = PAGE_SIZE * 2;
-		map.type = MT_LOW_VECTORS;
-		create_mapping(&map);
-	}
+   text	   data	    bss	    dec	    hex	filename
+   1504	    264	      0	   1768	    6e8	phy/phy-bcm-cygnus-pcie.o
+   1576	    192	      0	   1768	    6e8	phy/phy-bcm-cygnus-pcie.o
 
+   1083	    264	      0	   1347	    543	phy/phy-hi6220-usb.o
+   1155	    192	      0	   1347	    543	phy/phy-hi6220-usb.o
 
+   2767	    264	      0	   3031	    bd7	phy/phy-mt65xx-usb3.o
+   2829	    192	      0	   3021	    bcd	phy/phy-mt65xx-usb3.o
 
-arch/arm/include/asm/cp15.h:
+   2710	    304	      0	   3014	    bc6	phy/phy-rcar-gen3-usb2.o
+   2766	    240	      0	   3006	    bbe	phy/phy-rcar-gen3-usb2.o
 
-#if __LINUX_ARM_ARCH__ >= 4
-#define vectors_high()	(get_cr() & CR_V)
-#else
-#define vectors_high()	(0)
-#endif
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+---
+ drivers/phy/phy-bcm-cygnus-pcie.c | 2 +-
+ drivers/phy/phy-hi6220-usb.c      | 2 +-
+ drivers/phy/phy-mt65xx-usb3.c     | 2 +-
+ drivers/phy/phy-rcar-gen3-usb2.c  | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-Deducing from your reply & above code snippets that for
-__LINUX_ARM_ARCH__ >= 4, in all practical cases, vector_high() returns
-true
-
-Regards
-afzal
+diff --git a/drivers/phy/phy-bcm-cygnus-pcie.c b/drivers/phy/phy-bcm-cygnus-pcie.c
+index 082c03f..0f4ac5d 100644
+--- a/drivers/phy/phy-bcm-cygnus-pcie.c
++++ b/drivers/phy/phy-bcm-cygnus-pcie.c
+@@ -114,7 +114,7 @@ static int cygnus_pcie_phy_power_off(struct phy *p)
+ 	return cygnus_pcie_power_config(phy, false);
+ }
+ 
+-static struct phy_ops cygnus_pcie_phy_ops = {
++static const struct phy_ops cygnus_pcie_phy_ops = {
+ 	.power_on = cygnus_pcie_phy_power_on,
+ 	.power_off = cygnus_pcie_phy_power_off,
+ 	.owner = THIS_MODULE,
+diff --git a/drivers/phy/phy-hi6220-usb.c b/drivers/phy/phy-hi6220-usb.c
+index b2141cb..398c102 100644
+--- a/drivers/phy/phy-hi6220-usb.c
++++ b/drivers/phy/phy-hi6220-usb.c
+@@ -112,7 +112,7 @@ static int hi6220_phy_exit(struct phy *phy)
+ 	return hi6220_phy_setup(priv, false);
+ }
+ 
+-static struct phy_ops hi6220_phy_ops = {
++static const struct phy_ops hi6220_phy_ops = {
+ 	.init		= hi6220_phy_start,
+ 	.exit		= hi6220_phy_exit,
+ 	.owner		= THIS_MODULE,
+diff --git a/drivers/phy/phy-mt65xx-usb3.c b/drivers/phy/phy-mt65xx-usb3.c
+index 4d85e73..d972067 100644
+--- a/drivers/phy/phy-mt65xx-usb3.c
++++ b/drivers/phy/phy-mt65xx-usb3.c
+@@ -506,7 +506,7 @@ static struct phy *mt65xx_phy_xlate(struct device *dev,
+ 	return instance->phy;
+ }
+ 
+-static struct phy_ops mt65xx_u3phy_ops = {
++static const struct phy_ops mt65xx_u3phy_ops = {
+ 	.init		= mt65xx_phy_init,
+ 	.exit		= mt65xx_phy_exit,
+ 	.power_on	= mt65xx_phy_power_on,
+diff --git a/drivers/phy/phy-rcar-gen3-usb2.c b/drivers/phy/phy-rcar-gen3-usb2.c
+index c63da1b..17be045 100644
+--- a/drivers/phy/phy-rcar-gen3-usb2.c
++++ b/drivers/phy/phy-rcar-gen3-usb2.c
+@@ -350,7 +350,7 @@ static int rcar_gen3_phy_usb2_power_off(struct phy *p)
+ 	return ret;
+ }
+ 
+-static struct phy_ops rcar_gen3_phy_usb2_ops = {
++static const struct phy_ops rcar_gen3_phy_usb2_ops = {
+ 	.init		= rcar_gen3_phy_usb2_init,
+ 	.exit		= rcar_gen3_phy_usb2_exit,
+ 	.power_on	= rcar_gen3_phy_usb2_power_on,
+-- 
+1.9.1
