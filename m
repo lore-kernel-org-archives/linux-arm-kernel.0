@@ -1,58 +1,93 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 8 Jan 2017 15:27:40 +0900
-Subject: [PATCH v2 2/4] linux/const.h: move UL() macro to
- include/linux/const.h
-In-Reply-To: <15496.1483699555@warthog.procyon.org.uk>
-References: <1483582810-7046-1-git-send-email-yamada.masahiro@socionext.com>
- <1483582810-7046-3-git-send-email-yamada.masahiro@socionext.com>
- <15496.1483699555@warthog.procyon.org.uk>
-Message-ID: <CAK7LNARMJVpd47L-3VRafZxdaBT09tA4Bq+V2yFAi_X+cCJsGg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 8 Jan 2017 10:09:46 +0300
+Subject: [PATCH] arm64: do not set dma masks that device connection can't
+ handle
+In-Reply-To: <1483713911-2079-1-git-send-email-nikita.yoush@cogentembedded.com>
+References: <9a03c05d-ad4c-0547-d1fe-01edb8b082d6@cogentembedded.com>
+ <1483713911-2079-1-git-send-email-nikita.yoush@cogentembedded.com>
+Message-ID: <d60c54cd-ca62-4c56-7545-17e15f80b797@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
+Hello!
 
-2017-01-06 19:45 GMT+09:00 David Howells <dhowells@redhat.com>:
-> Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
+On 1/6/2017 5:45 PM, Nikita Yushchenko wrote:
+
+> It is possible that device is capable of 64-bit DMA addresses, and
+> device driver tries to set wide DMA mask, but bridge or bus used to
+> connect device to the system can't handle wide addresses.
 >
->> diff --git a/include/uapi/linux/const.h b/include/uapi/linux/const.h
->> index c872bfd..76fb0f9 100644
->> --- a/include/uapi/linux/const.h
->> +++ b/include/uapi/linux/const.h
->> @@ -1,7 +1,7 @@
->>  /* const.h: Macros for dealing with constants.  */
->>
->> -#ifndef _LINUX_CONST_H
->> -#define _LINUX_CONST_H
->> +#ifndef _UAPI_LINUX_CONST_H
->> +#define _UAPI_LINUX_CONST_H
+> With swiotlb, memory above 4G still can be used by drivers for streaming
+> DMA, but *dev->mask and dev->dma_coherent_mask must still keep values
+> that hardware handles physically.
 >
-> You need to be very careful doing this.  Some userspace stuff depends on the
-> guard macro names on the kernel header files.
-
-Oh...
-
->>  /* Some constant macros are used in both assembler and
->>   * C code.  Therefore we cannot annotate them always with
->> @@ -21,7 +21,10 @@
->>  #define _AT(T,X)     ((T)(X))
->>  #endif
->>
->> +#define _UL(x)               (_AC(x, UL))
->> +#define _ULL(x)              (_AC(x, ULL))
+> This patch enforces that. Based on original version by
+> Arnd Bergmann <arnd@arndb.de>, extended with coherent mask hadnling.
 >
-> How likely is this to collide with existing userspace code somewhere?  It
-> looks like the sort of thing that could collide with a C library.
+> Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
+> CC: Arnd Bergmann <arnd@arndb.de>
+[...]
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 290a84f..09c7900 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -352,6 +352,31 @@ static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
+>  	return 1;
+>  }
+>
+> +static int __swiotlb_set_dma_mask(struct device *dev, u64 mask)
+> +{
+> +	/* device is not DMA capable */
+> +	if (!dev->dma_mask)
+> +		return -EIO;
+> +
+> +	/* mask is below swiotlb bounce buffer, so fail */
+> +	if (!swiotlb_dma_supported(dev, mask))
+> +		return -EIO;
+> +
+> +	/*
+> +	 * because of the swiotlb, we can return success for
+> +	 * larger masks, but need to ensure that bounce buffers
+> +	 * are used above parent_dma_mask, so set that as
+> +	 * the effective mask.
+> +	 */
+> +	if (mask > dev->archdata.parent_dma_mask)
+> +		mask = dev->archdata.parent_dma_mask;
+> +
+> +
 
-Sorry, I do not have enough insight to answer your questions.
+    One empty line is enough...
 
+> +	*dev->dma_mask = mask;
+> +
+> +	return 0;
+> +}
+> +
+>  static struct dma_map_ops swiotlb_dma_ops = {
+>  	.alloc = __dma_alloc,
+>  	.free = __dma_free,
+[...]
+> @@ -957,6 +997,18 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>  	if (!dev->archdata.dma_ops)
+>  		dev->archdata.dma_ops = &swiotlb_dma_ops;
+>
+> +	/*
+> +	 * we don't yet support buses that have a non-zero mapping.
+> +	 *  Let's hope we won't need it
+> +	 */
+> +	WARN_ON(dma_base != 0);
+> +
+> +	/*
+> +	 * Whatever the parent bus can set. A device must not set
+> +	 * a DMA mask larger than this.
+> +	 */
+> +	dev->archdata.parent_dma_mask = size;
 
-Andrew,
-If this seems dangerous, please feel free to drop the entire series
-because it is not adding any value except some cleanups.
+    Not 'size - 1'?
 
+> +
+>  	dev->archdata.dma_coherent = coherent;
+>  	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
+>  }
 
-
--- 
-Best Regards
-Masahiro Yamada
+MBR, Sergei
