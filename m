@@ -1,37 +1,31 @@
 From: scott@matheina.com (Scott Matheina)
-Date: Sun,  8 Jan 2017 17:00:38 -0600
-Subject: [PATCH 1/2] staging:media:s5p-cec:exynos_hdmi_cecctrl.c Fixed
- Alignment should match open parenthesis
-Message-ID: <1483916446-6418-1-git-send-email-scott@matheina.com>
+Date: Sun,  8 Jan 2017 17:00:39 -0600
+Subject: [PATCH 2/2] staging/media/s5p-cec/exynos_hdmi_cecctrl.c Fixed blank
+ line before closing brace '}'
+In-Reply-To: <1483916446-6418-1-git-send-email-scott@matheina.com>
+References: <1483916446-6418-1-git-send-email-scott@matheina.com>
+Message-ID: <1483916446-6418-2-git-send-email-scott@matheina.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixed Checkpatch check "Alignment should match open parenthesis"
+Fixed checkpatch check blank line before closing brace '}'
 
 Signed-off-by: Scott Matheina <scott@matheina.com>
 ---
- drivers/staging/media/s5p-cec/exynos_hdmi_cecctrl.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/staging/media/s5p-cec/exynos_hdmi_cecctrl.c | 1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/drivers/staging/media/s5p-cec/exynos_hdmi_cecctrl.c b/drivers/staging/media/s5p-cec/exynos_hdmi_cecctrl.c
-index ce95e0f..f2b24a4 100644
+index f2b24a4..1edf667 100644
 --- a/drivers/staging/media/s5p-cec/exynos_hdmi_cecctrl.c
 +++ b/drivers/staging/media/s5p-cec/exynos_hdmi_cecctrl.c
-@@ -186,13 +186,13 @@ u32 s5p_cec_get_status(struct s5p_cec_dev *cec)
- void s5p_clr_pending_tx(struct s5p_cec_dev *cec)
- {
- 	writeb(S5P_CEC_IRQ_TX_DONE | S5P_CEC_IRQ_TX_ERROR,
--					cec->reg + S5P_CEC_IRQ_CLEAR);
-+	       cec->reg + S5P_CEC_IRQ_CLEAR);
+@@ -87,7 +87,6 @@ void s5p_cec_mask_tx_interrupts(struct s5p_cec_dev *cec)
+ 	reg |= S5P_CEC_IRQ_TX_DONE;
+ 	reg |= S5P_CEC_IRQ_TX_ERROR;
+ 	writeb(reg, cec->reg + S5P_CEC_IRQ_MASK);
+-
  }
  
- void s5p_clr_pending_rx(struct s5p_cec_dev *cec)
- {
- 	writeb(S5P_CEC_IRQ_RX_DONE | S5P_CEC_IRQ_RX_ERROR,
--					cec->reg + S5P_CEC_IRQ_CLEAR);
-+	       cec->reg + S5P_CEC_IRQ_CLEAR);
- }
- 
- void s5p_cec_get_rx_buf(struct s5p_cec_dev *cec, u32 size, u8 *buffer)
+ void s5p_cec_unmask_tx_interrupts(struct s5p_cec_dev *cec)
 -- 
 2.7.4
