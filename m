@@ -1,108 +1,57 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 8 Jan 2017 00:30:24 -0200
-Subject: imx: RS-485 problems during TX, maybe DMA related
-In-Reply-To: <20170107230624.GA21729@archie.localdomain>
-References: <20170104160024.GA13442@archie.localdomain>
- <CAOMZO5C3enuThR1DpcwNnqFdxd8tGoBwd76O62Gnviz8x1_a9w@mail.gmail.com>
- <20170106225026.GA3804@archie.localdomain>
- <CAOMZO5CywajwZEL8K2ATfS80WzqY69YVX+3S7hq9_HmNdNAwaw@mail.gmail.com>
- <20170107134557.GA12299@archie.localdomain>
- <CAOMZO5ALSQj3C6Yn-avMZdzTvtWCZPQ5+pNdzYi03G-GZB_t+w@mail.gmail.com>
- <20170107153434.GA13307@archie.localdomain>
- <CAOMZO5CY3ys6moE133LwSKcS4egv56JdmhPMRG0TmAnfD+ZBAw@mail.gmail.com>
- <20170107205930.GA12367@archie.localdomain>
- <CAOMZO5D00YFLS=pddAqPo_FUoP6MF-juAef2H71-Wx_NQArdpw@mail.gmail.com>
- <20170107230624.GA21729@archie.localdomain>
-Message-ID: <CAOMZO5DedNURGV_k5Y=nt1O98SojsvrOd69PEPEzi8F7N3dJuw@mail.gmail.com>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Sun, 8 Jan 2017 14:14:20 +0900
+Subject: [PATCH v5 5/5] arm64: dts: exynos: Add tm2 touchkey node
+In-Reply-To: <20170107124026.gl447hl5bucdflyk@jack.zhora.eu>
+References: <CGME20170106134356epcas1p1aee9f715c58b50f6056bf0b43b849497@epcas1p1.samsung.com>
+ <20170106134350.32428-1-andi.shyti@samsung.com>
+ <20170106134350.32428-6-andi.shyti@samsung.com>
+ <CAGTfZH2QYQK190kYFbOMqJMFgH32548ra-VqzYwc5LVBJwqisA@mail.gmail.com>
+ <CAGTfZH347ZRve20cdGLwtuf6arRAJ4Ry+HQrTubDj-RGR=K9cA@mail.gmail.com>
+ <CAGTfZH1QtbieMxQzoPvxsP_3tSYBSuXe+wtq0uUs03mhcLFdXg@mail.gmail.com>
+ <20170107124026.gl447hl5bucdflyk@jack.zhora.eu>
+Message-ID: <CAGTfZH35sx5v-XcxkDG7TVRmW8cLirAXRxA=kGZQDBnpw3vYhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Clemens,
+Hi Andi,
 
-On Sat, Jan 7, 2017 at 9:06 PM, Clemens Gruber
-<clemens.gruber@pqgruber.com> wrote:
-
-> Just remuxed GPIO signals to these pads, applied your two patches and
-> used rts-gpios in the DT but I still see the same problem :/
+2017-01-07 21:40 GMT+09:00 Andi Shyti <andi@etezian.org>:
+> Hi Chanwoo,
 >
-> When transmit something, I get doubled characters, then zeros and at the
-> end garbled data of previous transmissions, same as described in my
-> first post (Logic analyzer: https://pqgruber.com/rs485_results.png)
-> The data is always 4096 bytes long, this explains why the echo command
-> is blocking for about 4 seconds (<- 4096 bytes@a baudrate of 9600).
-> The TE line is also high until all 4096 bytes are sent.
+>> >>> +       touchkey at 20 {
+>> >>> +               compatible = "samsung,tm2-touchkey";
+>> >>> +               reg = <0x20>;
+>> >>> +               interrupt-parent = <&gpa3>;
+>> >>> +               interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
+>> >>> +               vcc-supply = <&ldo32_reg>;
+>> >>> +               vdd-supply = <&ldo33_reg>;
+>> >>> +       };
+>> >>> +};
+>> >>> +
+>> >>>  &ldo31_reg {
+>> >>>         regulator-name = "TSP_VDD_1.85V_AP";
+>> >>>         regulator-min-microvolt = <1850000>;
+>>
+>> I repiled the touchkey driver against compatible name.
+>> Usually, when developing the device driver, we use the specific h/w name
+>> but in this patch, the touckey dt node uses the h/w board name instead of
+>> original touckhey name.
 >
-> I think this comes from the UART_XMIT_SIZE which is defined to the page
-> size.
-> Maybe there is something wrong in imx_transmit_buffer and leads to the
-> whole circular buffer being sent out all the time, not stopping..
->
-> Do these debug logs tell you anything?
-> https://gist.github.com/clemensg/1ac5ee8a8ea32acc9145c5aa8407aea5
->
-> I am analyzing the signals coming directly from the i.MX6Q, so this must
-> be a software problem, but I don't understand why it works for you, if
-> we use the same software.
->
-> Do you use any other patches on top of mainline and do you use the SDMA
-> scripts from the ROM?
+> this should be a device specifically done for the tm2 and we are
+> not sure who is the manufacturer of the device. In order to not
 
-No, I use the original 4.9 + the two patches I sent. Yes, I do use the
-SDMA scripts from ROM.
+As I knew, this touchkey was made by Cypress semiconductor.
+But, for more correct information, you may try to find it.
 
-Here is the procedure I did to try to reproduce the issue you reported:
+> assign the device to the wrong manufacturer, we preferred calling
+> it Samsung as it is in a Samsung device.
 
-(The rs485conf is available at:
-https://github.com/mniestroj/rs485conf/blob/master/main.c )
+As you mentioned, Samsung made not this touchkey device. It is
+certainly wrong manufacturer. I have not seen to use the h/w board
+name as the peripheral device name.
 
-First of all I enable rs485 for ttymxc3 using the rs485conf application:
+I don't prefer to use the inaccurate manufacturer and device name.
 
-root at imx6qsabresd:/home# ./rs485conf  /dev/ttymxc3 -e 1
-[   27.106517] random: crng init done
-= Current configuration:
-RS485 enabled:                false
-RTS on send:                  high
-RTS after send:               low
-RTS delay before send:        0
-RTS delay after send:         0
-Receive during sending data:  true
-
-= New configuration:
-RS485 enabled:                true
-RTS on send:                  high
-RTS after send:               low
-RTS delay before send:        0
-RTS delay after send:         0
-Receive during sending data:  true
-
-= Saved configuration:
-RS485 enabled:                true
-RTS on send:                  high
-RTS after send:               low
-RTS delay before send:        0
-RTS delay after send:         0
-Receive during sending data:  true
-root at imx6qsabresd:/ho
-
-Then
-
-root at imx6qsabresd:/home# echo A > /dev/ttymxc3
-
-(wait 10 seconds)
-
-root at imx6qsabresd:/home# echo B > /dev/ttymxc3
-
-(wait 10 seconds)
-
-root at imx6qsabresd:/home# echo C > /dev/ttymxc3
-
-On the serial console at 9600bps only the:
-A
-B
-C
-
-are seen, so not duplicated characters, nor noise is seen on the console.
-
-Regards,
-
-Fabio Estevam
+-- 
+Best Regards,
+Chanwoo Choi
