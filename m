@@ -1,20 +1,31 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 8 Jan 2017 13:07:42 -0200
-Subject: [PATCH 1/4] ARM: dts: imx6qdl: add HummingBoard2 boards
-In-Reply-To: <E1cQF03-0003N1-HY@rmk-PC.armlinux.org.uk>
-References: <20170108150201.GS14217@n2100.armlinux.org.uk>
- <E1cQF03-0003N1-HY@rmk-PC.armlinux.org.uk>
-Message-ID: <CAOMZO5AcyweJ8xgGyGKD4CVPiuxaEE+JKs=ASNUU5BcL+3fASQ@mail.gmail.com>
+Date: Sun, 8 Jan 2017 13:12:13 -0200
+Subject: imx: RS-485 problems during TX, maybe DMA related
+In-Reply-To: <20170107230624.GA21729@archie.localdomain>
+References: <20170104160024.GA13442@archie.localdomain>
+ <CAOMZO5C3enuThR1DpcwNnqFdxd8tGoBwd76O62Gnviz8x1_a9w@mail.gmail.com>
+ <20170106225026.GA3804@archie.localdomain>
+ <CAOMZO5CywajwZEL8K2ATfS80WzqY69YVX+3S7hq9_HmNdNAwaw@mail.gmail.com>
+ <20170107134557.GA12299@archie.localdomain>
+ <CAOMZO5ALSQj3C6Yn-avMZdzTvtWCZPQ5+pNdzYi03G-GZB_t+w@mail.gmail.com>
+ <20170107153434.GA13307@archie.localdomain>
+ <CAOMZO5CY3ys6moE133LwSKcS4egv56JdmhPMRG0TmAnfD+ZBAw@mail.gmail.com>
+ <20170107205930.GA12367@archie.localdomain>
+ <CAOMZO5D00YFLS=pddAqPo_FUoP6MF-juAef2H71-Wx_NQArdpw@mail.gmail.com>
+ <20170107230624.GA21729@archie.localdomain>
+Message-ID: <CAOMZO5Cdaob_r3YjhFYGLsmbdKGJiA8uC+5_tndcf+O0VHvH3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 8, 2017 at 1:03 PM, Russell King <rmk+kernel@armlinux.org.uk> wrote:
-> From: Jon Nettleton <jon.nettleton@gmail.com>
->
-> This adds support for the Hummingboard Gate and Edge devices from
-> SolidRun.
->
-> Signed-off-by: Rabeeh Khoury <rabeeh@solid-run.com>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Hi Clemens,
 
-This one misses a Signed-off-by tag from Jon.
+On Sat, Jan 7, 2017 at 9:06 PM, Clemens Gruber
+<clemens.gruber@pqgruber.com> wrote:
+
+> Just remuxed GPIO signals to these pads, applied your two patches and
+> used rts-gpios in the DT but I still see the same problem :/
+
+As you have tested my 'rts-gpios' patches, would it be possible to
+reply with your Tested-by tag?
+
+Thanks
