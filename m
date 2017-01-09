@@ -1,62 +1,56 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 9 Jan 2017 12:32:14 -0600
-Subject: [PATCH 1/2] Documentation: devicetree: Add document bindings for
- mtk-cir
-In-Reply-To: <1483632384-8107-2-git-send-email-sean.wang@mediatek.com>
-References: <1483632384-8107-1-git-send-email-sean.wang@mediatek.com>
- <1483632384-8107-2-git-send-email-sean.wang@mediatek.com>
-Message-ID: <20170109183214.xonv52sn3fo4exqp@rob-hp-laptop>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 9 Jan 2017 20:35:22 +0200
+Subject: [PATCH 0/4] ARM: exynos: Fix Odroid U3 USB/LAN when TFTP booting
+ (power sequence)
+In-Reply-To: <CANAwSgR7=cELNK9of5ngFTdhcxWn2KXL=R8tMsTKD7gecBcMYw@mail.gmail.com>
+References: <20170107085203.4431-1-krzk@kernel.org>
+ <CANAwSgSEZvxHje65Kk13fvD9NZGB+iHCJtoGJdQrUdS42ei_WA@mail.gmail.com>
+ <20170109181703.436gv7bq76xuv35q@kozik-lap>
+ <CANAwSgR7=cELNK9of5ngFTdhcxWn2KXL=R8tMsTKD7gecBcMYw@mail.gmail.com>
+Message-ID: <20170109183522.wrha6twqlxiaxjed@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 12:06:23AM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+On Mon, Jan 09, 2017 at 11:56:41PM +0530, Anand Moon wrote:
+> Hi Krzysztof,
 > 
-> This patch adds documentation for devicetree bindings for
-> Mediatek IR controller.
+> On 9 January 2017 at 23:47, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > On Mon, Jan 09, 2017 at 11:34:48PM +0530, Anand Moon wrote:
+> >> Hi Krzysztof,
+> >>
+> >> On 7 January 2017 at 14:21, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> >> > Hi,
+> >> >
+> >> > Thanks to Markus Reichl, I got an Odroid U3 to work with. Thanks to Peter
+> >> > Chen, we got a power sequence generic library which solves my long
+> >> > standing Odroid U3 problem - no LAN9730 if it was enabled by bootloader.
+> >> >
+> >> > My previous attempts for this can be found here [0].
+> >> >
+> >> > This patchset is based on Peter's v11 of power sequence [1].
+> >> > Patchset is available also on my Github [2].
+> >> >
+> >> > More detailed analysis is described in patch 2/4 ("ARM: dts: exynos: Fix
+> >> > LAN9730 on Odroid U3 after tftpboot").
+> >> >
+> >> >
+> >>
+> >> [snip]
+> >>
+> >> On which u-boot should this be tested.
+> >>
+> >> On HK u-boot tftp boot is not supported.
+> >
+> > ... so you gave an answer: you cannot test it on HK. How many other
+> > U-Boot flavors you know? :)
+> >
 > 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
->  .../devicetree/bindings/media/mtk-cir.txt          | 23 ++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
->  create mode 100644 linux-4.8.rc1_p0/Documentation/devicetree/bindings/media/mtk-cir.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/media/mtk-cir.txt b/Documentation/devicetree/bindings/media/mtk-cir.txt
-> new file mode 100644
-> index 0000000..bbedd71
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/mtk-cir.txt
-> @@ -0,0 +1,23 @@
-> +Device-Tree bindings for Mediatek IR controller found in Mediatek SoC family
-> +
-> +Required properties:
-> +- compatible	    : "mediatek,mt7623-ir"
-> +- clocks	    : list of clock specifiers, corresponding to
-> +		      entries in clock-names property;
-> +- clock-names	    : should contain "clk" entries;
-> +- interrupts	    : should contain IR IRQ number;
-> +- reg		    : should contain IO map address for IR.
-> +
-> +Optional properties:
-> +- linux,rc-map-name : Remote control map name.
+> u-boot mainline have tftp support enable, so I will try to test on this u-boot.
 
-Would 'label' be appropriate here instead? If not, this needs to be 
-documented in a common location and explained better.
+Yes, please try it. Some time ago I was using v2016.03-rc3 and now
+recent (~40 commits after v2017.01-rc2). Both are working fine however
+the configuration (partitions, default env settings etc) differs from HK
+so migration was not straightforward.
 
-> +
-> +Example:
-> +
-> +cir: cir at 0x10013000 {
-
-Drop the '0x'.
-
-> +	compatible = "mediatek,mt7623-ir";
-> +	reg = <0 0x10013000 0 0x1000>;
-> +	interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_LOW>;
-> +	clocks = <&infracfg CLK_INFRA_IRRX>;
-> +	clock-names = "clk";
-> +	linux,rc-map-name = "rc-rc6-mce";
-> +};
-> -- 
-> 1.9.1
-> 
+Best regards,
+Krzysztof
