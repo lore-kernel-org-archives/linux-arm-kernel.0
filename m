@@ -1,70 +1,36 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 9 Jan 2017 18:37:31 +0100
-Subject: [PATCH net-next v4 2/2] net: stmmac: dwmac-meson8b: make the
- RGMII TX delay configurable
-In-Reply-To: <CAFBinCDZ_mqt8q2rG6zDy8ke5sX6L+4sVYOOhWUdO3apwFiRYw@mail.gmail.com>
-References: <20161202233238.17561-1-martin.blumenstingl@googlemail.com>
- <20161217182119.4037-1-martin.blumenstingl@googlemail.com>
- <20161217182119.4037-3-martin.blumenstingl@googlemail.com>
- <20161218.104950.1013829528388480468.davem@davemloft.net>
- <CAFBinCDZ_mqt8q2rG6zDy8ke5sX6L+4sVYOOhWUdO3apwFiRYw@mail.gmail.com>
-Message-ID: <CAFBinCBDyBLtDZyawGGSNT2u71k9ALoSKcTAUm+PRKC+2yawzg@mail.gmail.com>
+From: fkan@apm.com (Feng Kan)
+Date: Mon, 9 Jan 2017 09:37:55 -0800
+Subject: APM smmu implementation
+In-Reply-To: <20170109105421.GA21398@arm.com>
+References: <CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g@mail.gmail.com>
+ <20170109105421.GA21398@arm.com>
+Message-ID: <CAL85gmA-14azx0RUX7jNNZbWDtkumGyYYBYEM6yHXUfSui1GAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
-
-On Sun, Dec 18, 2016 at 5:13 PM, Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
-> On Sun, Dec 18, 2016 at 4:49 PM, David Miller <davem@davemloft.net> wrote:
->> From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->> Date: Sat, 17 Dec 2016 19:21:19 +0100
->>
->>> Prior to this patch we were using a hardcoded RGMII TX clock delay of
->>> 2ns (= 1/4 cycle of the 125MHz RGMII TX clock). This value works for
->>> many boards, but unfortunately not for all (due to the way the actual
->>> circuit is designed, sometimes because the TX delay is enabled in the
->>> PHY, etc.). Making the TX delay on the MAC side configurable allows us
->>> to support all possible hardware combinations.
->>>
->>> This allows fixing a compatibility issue on some boards, where the
->>> RTL8211F PHY is configured to generate the TX delay. We can now turn
->>> off the TX delay in the MAC, because otherwise we would be applying the
->>> delay twice (which results in non-working TX traffic).
->>>
->>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->>> Tested-by: Neil Armstrong <narmstrong@baylibre.com>
->>
->> Is this really the safest thing to do?
->>
->> If you say the existing hard-coded setting of 1/4 cycle works on most
->> boards, and what you're trying to do is override it with an OF
->> property value for boards where the existing setting does not work,
->> then you _must_ use a default value that corresponds to what the
->> existing code does not when you don't see this new OF property.
-> it's a bit more complicated in reality: 1/4 cycle works when the TX
-> delay of the RTL8211F PHY is turned off (until recently it was always
-> enabled for phy-mode RGMII).
+On Mon, Jan 9, 2017 at 2:54 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Jan 06, 2017 at 03:21:34PM -0800, Feng Kan wrote:
+>> The APM IOMMU implementation is mostly just the ARM SMMU 500 variant.
+>> However, our internal bus is only 42 bits wide. Our IAS field is coded
+>> as 48 bits, which cause IPA to truncated to 42 bits on the physical
+>> bus. In order for our system to work with the arm-smmu.c, there needs
+>> to be a way to force the ipa_size to 42. The current internal solution
+>> is to use the cpuid, but that is quite ugly. I was thinking of using
+>> the model
 >
->> So please retain the current behavior of the 1/4 cycle TX delay
->> setting when you don't see the amlogic,tx-delay-ns property.
->>
->> I really think you risk breaking existing boards by not doing so,
->> unless you can have this patch tested on every such board that exists
->> and I don't think you really can feasibly and rigorously do that.
-> there's a patch in my follow-up series which adds the 2ns to the .dts
-> for all RGMII based boards: [0] (and I would keep these even if we had
-> a default value, just to make it explicit and thus easier to
-> understand for other people).
-> however, we can add the 2ns default back (I can do this if you want -
-> Rob Herring was unhappy with the missing documentation of this default
-> value [1] - so note to myself: take care of that as well). but then we
-> have to decide when to apply this default value: only when we're in
-> RGMII mode or also in any of the RGMII_*ID modes?
+> Just so I understand, what are the UBS and OAS values on your part?
+
+UBS/OAS/IAS are all default to 5.
 >
-> please let me know how we should proceed
-gentle ping - what is your opinion on this?
-
-
-Regards,
-Martin
+>> as indication to right the ipa_size, but I am not too sure of the ACPI
+>> side. Would it be okay to add an APM MMU500 variant? I would also
+>> appreciated it if you guys have any alternate solutions.
+>
+> For this sort of implementation erratum, I think using the model field
+> is the right thing to do. However, you'll need to get your model registered
+> with IORT, so I've added Charles to cc since he maintains that document.
+>
+> Also, please add a device-tree property to override the IAS once you
+> start writing patches.
+>
+> Will
