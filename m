@@ -1,81 +1,79 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:14 -0500
-Subject: [RFC 18/55] KVM: arm64: Forward traps due to HCR_EL2.NV1 bit to the
- guest hypervisor
+Date: Mon,  9 Jan 2017 01:24:19 -0500
+Subject: [RFC 23/55] KVM: arm64: Forward WFX to the guest hypervisor
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-19-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-24-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forward ELR_EL1, SPSR_EL1 and VBAR_EL1 traps to the guest hypervisor if
-it has set the NV1 bit to the virtual HCR_EL2. The guest hypervisor
-would set this NV1 bit to run a hypervisor in its VM (i.e. another level
-of nested hypervisor).
+Forward exceptions due to WFI or WFE to the guest hypervisor if the
+guest hypervisor has set corresponding virtual HCR_EL2.TWX bits.
 
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm64/include/asm/kvm_arm.h |  1 +
- arch/arm64/kvm/sys_regs.c        | 17 +++++++++++++++++
- 2 files changed, 18 insertions(+)
+ arch/arm64/include/asm/kvm_nested.h |  1 +
+ arch/arm64/kvm/handle_exit.c        | 11 ++++++++++-
+ arch/arm64/kvm/handle_exit_nested.c | 18 ++++++++++++++++++
+ 3 files changed, 29 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 2a2752b..feded61 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -23,6 +23,7 @@
- #include <asm/types.h>
+diff --git a/arch/arm64/include/asm/kvm_nested.h b/arch/arm64/include/asm/kvm_nested.h
+index 620b4d3..8d36935 100644
+--- a/arch/arm64/include/asm/kvm_nested.h
++++ b/arch/arm64/include/asm/kvm_nested.h
+@@ -2,4 +2,5 @@
+ #define __ARM64_KVM_NESTED_H__
  
- /* Hyp Configuration Register (HCR) bits */
-+#define HCR_NV1		(UL(1) << 43)
- #define HCR_E2H		(UL(1) << 34)
- #define HCR_ID		(UL(1) << 33)
- #define HCR_CD		(UL(1) << 32)
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 19d6a6e..59f9cc6 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -906,10 +906,21 @@ static inline void access_rw(struct sys_reg_params *p, u64 *sysreg)
- 		*sysreg = p->regval;
+ int handle_hvc_nested(struct kvm_vcpu *vcpu);
++int handle_wfx_nested(struct kvm_vcpu *vcpu, bool is_wfe);
+ #endif
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index ce6d2ef..046fdf8 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -101,7 +101,16 @@ static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+  */
+ static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+-	if (kvm_vcpu_get_hsr(vcpu) & ESR_ELx_WFx_ISS_WFE) {
++	bool is_wfe = !!(kvm_vcpu_get_hsr(vcpu) & ESR_ELx_WFx_ISS_WFE);
++#ifdef CONFIG_KVM_ARM_NESTED_HYP
++	int ret = handle_wfx_nested(vcpu, is_wfe);
++
++	if (ret < 0 && ret != -EINVAL)
++		return ret;
++	else if (ret >= 0)
++		return ret;
++#endif
++	if (is_wfe) {
+ 		trace_kvm_wfx_arm64(*vcpu_pc(vcpu), true);
+ 		vcpu->stat.wfe_exit_stat++;
+ 		kvm_vcpu_on_spin(vcpu);
+diff --git a/arch/arm64/kvm/handle_exit_nested.c b/arch/arm64/kvm/handle_exit_nested.c
+index a6ce23b..871ecfc 100644
+--- a/arch/arm64/kvm/handle_exit_nested.c
++++ b/arch/arm64/kvm/handle_exit_nested.c
+@@ -25,3 +25,21 @@ int handle_hvc_nested(struct kvm_vcpu *vcpu)
+ {
+ 	return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
  }
- 
-+static bool forward_nv1_traps(struct kvm_vcpu *vcpu, struct sys_reg_params *p)
++
++/*
++ * Inject wfx to the nested hypervisor if this is from the nested VM and
++ * the virtual HCR_EL2.TWX is set. Otherwise, let the host hypervisor
++ * handle this.
++ */
++int handle_wfx_nested(struct kvm_vcpu *vcpu, bool is_wfe)
 +{
-+	if (!vcpu_mode_el2(vcpu) && (vcpu_el2_reg(vcpu, HCR_EL2) & HCR_NV1))
-+		return true;
++	u64 hcr_el2 = vcpu_el2_reg(vcpu, HCR_EL2);
 +
-+	return false;
++	if (vcpu_mode_el2(vcpu))
++		return -EINVAL;
++
++	if ((is_wfe && (hcr_el2 & HCR_TWE)) || (!is_wfe && (hcr_el2 & HCR_TWI)))
++		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
++
++	return -EINVAL;
 +}
-+
- static bool access_elr(struct kvm_vcpu *vcpu,
- 		struct sys_reg_params *p,
- 		const struct sys_reg_desc *r)
- {
-+	if (forward_nv1_traps(vcpu, p))
-+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
-+
- 	access_rw(p, &vcpu->arch.ctxt.gp_regs.elr_el1);
- 	return true;
- }
-@@ -918,6 +929,9 @@ static bool access_spsr(struct kvm_vcpu *vcpu,
- 		struct sys_reg_params *p,
- 		const struct sys_reg_desc *r)
- {
-+	if (forward_nv1_traps(vcpu, p))
-+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
-+
- 	access_rw(p, &vcpu->arch.ctxt.gp_regs.spsr[KVM_SPSR_EL1]);
- 	return true;
- }
-@@ -926,6 +940,9 @@ static bool access_vbar(struct kvm_vcpu *vcpu,
- 		struct sys_reg_params *p,
- 		const struct sys_reg_desc *r)
- {
-+	if (forward_nv1_traps(vcpu, p))
-+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
-+
- 	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
- 	return true;
- }
 -- 
 1.9.1
