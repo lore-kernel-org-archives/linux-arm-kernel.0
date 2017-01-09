@@ -1,93 +1,52 @@
-From: joerg.krause@embedded.rocks (=?UTF-8?q?J=C3=B6rg=20Krause?=)
-Date: Mon,  9 Jan 2017 21:36:38 +0100
-Subject: [PATCH v3] ARM: dts: sun7i: Add wifi dt node on Banana Pro
-Message-ID: <20170109203638.29546-1-joerg.krause@embedded.rocks>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Mon, 9 Jan 2017 15:40:04 -0500
+Subject: [PATCH 04/10] arm: migrate exception table users off module.h and
+ onto extable.h
+In-Reply-To: <20170109204010.5047-1-paul.gortmaker@windriver.com>
+References: <20170109204010.5047-1-paul.gortmaker@windriver.com>
+Message-ID: <20170109204010.5047-5-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Banana Pro has an AMPAK AP6181 WiFi+Bluetooth module. The WiFi part
-is a BCM43362 IC connected to MMC3 of the A20 SoC via SDIO. The IC also
-takes a power enable signal via GPIO.
+These files were only including module.h for exception table
+related functions.  We've now separated that content out into its
+own file "extable.h" so now move over to that and avoid all the
+extra header content in module.h that we don't really need to compile
+these files.
 
-This commit adds a device-tree node to power it up, so the mmc subsys
-can scan it, and enables the mmc controller which is connected to it.
-
-As the wifi enable pin of the AP6181 module is not really a regulator,
-switch the mmc3 node to the mmc-pwrseq framework for controlling it.
-This more accurately reflectes how the hardware actually works.
-
-Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 ---
-Changes v3 suggested by Maxime Ripard):
-  - do not set the wakeup-source property for the mmc3 node as it is
-    suspicious and propably does not work
+ arch/arm/mm/extable.c | 2 +-
+ arch/arm/mm/fault.c   | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Changes v2 (suggested by Maxime Ripard):
-  - rename pwrseq node to clarify the function rather what it's
-    connected to
-  - use dash instead of underscore for the pwrseq node name
-  - remove setting pull-ups for mmc3 (default since commit 37bc56128d92)
-
----
- arch/arm/boot/dts/sun7i-a20-bananapro.dts | 29 +++++++++++++++++------------
- 1 file changed, 17 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sun7i-a20-bananapro.dts b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-index f1a33560710f..c17e6407fee0 100644
---- a/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-@@ -76,6 +76,13 @@
- 		};
- 	};
+diff --git a/arch/arm/mm/extable.c b/arch/arm/mm/extable.c
+index 312e15e6d00b..f436f7439e46 100644
+--- a/arch/arm/mm/extable.c
++++ b/arch/arm/mm/extable.c
+@@ -1,7 +1,7 @@
+ /*
+  *  linux/arch/arm/mm/extable.c
+  */
+-#include <linux/module.h>
++#include <linux/extable.h>
+ #include <linux/uaccess.h>
  
-+	wifi_pwrseq: wifi-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&vmmc3_pin_bananapro>;
-+		reset-gpios = <&pio 7 22 GPIO_ACTIVE_LOW>;
-+	};
-+
- 	reg_gmac_3v3: gmac-3v3 {
- 		compatible = "regulator-fixed";
- 		pinctrl-names = "default";
-@@ -87,17 +94,6 @@
- 		enable-active-high;
- 		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>;
- 	};
--
--	reg_vmmc3: vmmc3 {
--		compatible = "regulator-fixed";
--		pinctrl-names = "default";
--		pinctrl-0 = <&vmmc3_pin_bananapro>;
--		regulator-name = "vmmc3";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--		enable-active-high;
--		gpio = <&pio 7 22 GPIO_ACTIVE_HIGH>;
--	};
- };
- 
- &ahci {
-@@ -170,10 +166,19 @@
- &mmc3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc3_pins_a>;
--	vmmc-supply = <&reg_vmmc3>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
- 	bus-width = <4>;
- 	non-removable;
- 	status = "okay";
-+
-+	brcmf: bcrmf at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+		interrupt-parent = <&pio>;
-+		interrupts = <7 15 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-names = "host-wake";
-+	};
- };
- 
- &ohci0 {
+ int fixup_exception(struct pt_regs *regs)
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index 3a2e678b8d30..94de590db99e 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -8,7 +8,7 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-#include <linux/module.h>
++#include <linux/extable.h>
+ #include <linux/signal.h>
+ #include <linux/mm.h>
+ #include <linux/hardirq.h>
 -- 
 2.11.0
