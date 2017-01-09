@@ -1,95 +1,125 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 Jan 2017 13:20:26 +0000
-Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
-In-Reply-To: <e16d9b76-49ce-ae22-60f9-f2000d1862af@arm.com>
-References: <20161213113044.GC19985@leverpostej>
- <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
- <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
- <20170109125431.GY14217@n2100.armlinux.org.uk>
- <e16d9b76-49ce-ae22-60f9-f2000d1862af@arm.com>
-Message-ID: <20170109132026.GZ14217@n2100.armlinux.org.uk>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Mon, 9 Jan 2017 14:25:42 +0100
+Subject: [PATCH v3 5/5] drm/rockchip: Implement CRC debugfs API
+In-Reply-To: <CAOw6vbLAwzrwfHdny=-RYrUE7wBksqwkOxatJ1=_HMojQLPm4w@mail.gmail.com>
+References: <20170106143029.11553-1-tomeu.vizoso@collabora.com>
+ <20170106143029.11553-6-tomeu.vizoso@collabora.com>
+ <CAOw6vbLAwzrwfHdny=-RYrUE7wBksqwkOxatJ1=_HMojQLPm4w@mail.gmail.com>
+Message-ID: <CAAObsKCCFic7ReS=Jxsiko2G_o2gTXVV6cyfG_B+ra9oOQaq-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 01:14:31PM +0000, Marc Zyngier wrote:
-> On 09/01/17 12:54, Russell King - ARM Linux wrote:
-> > I don't think this is sufficient - the kdump case for ARM will still be
-> > broken after these patches.
-> > 
-> > The new soft-restart ABI introduced by my patch 2 passes in:
-> > 
-> > r0 = HVC_SOFT_RESTART
-> > r1 = non-zero
-> > r2 = undefined
-> > r3 = function pointer
-> > 
-> > and the assumption is that r3 will be preserved if the HVC call does
-> > nothing - which probably isn't a safe assumption.
-> > 
-> > With these arguments passed to the KVM stub (which may be in place at
-> > the point of a kdump), we end up executing this code:
-> > 
-> >         push    {lr}
-> > 
-> >         mov     lr, r0
-> >         mov     r0, r1
-> >         mov     r1, r2
-> >         mov     r2, r3
-> > 
-> > THUMB(  orr     lr, #1)
-> >         blx     lr                      @ Call the HYP function
-> > 
-> > This will result in an attempt to branch to address 2 or 3, which isn't
-> > sane - a panic in the host kernel (eg due to a NULL pointer deref with
-> > panic_on_oops enabled) will then cause kdump to try to execute code from
-> > a stupid address.
-> > 
-> > So, we need KVM's stub to be (a) better documented so this stuff is
-> > obvious, and (b) updated so that kdump stands a chance of working even
-> > if the KVM stub is still in place at the point the host kernel panics.
-> > 
-> > Another reason why documentation is important here is that we need to
-> > make it clear to alternative hypervisors that the host kernel may issue
-> > a HVC call at any moment due to a crash with particular arguments, and
-> > that the host kernel expects a certain behaviour in that case, and that
-> > the hypervisor does not crash.
-> > 
-> > For example, how will Xen behave - is introducing these changes going
-> > to cause a regression with Xen?  Does anyone even know the answer to
-> > that?  From what I can see, it seems we'll end up calling Xen's
-> > hypervisor with a random r12 value (which it uses as a reason code)
-> > but without the 0xea1 immediate constant in the HVC instruction.
-> > Beyond that, I've no idea.
-> 
-> I fail to see why you would issue a hyp stub hypercall if you're booted
-> under *any* hypervisor. The only way you can have a valid hyp stub is
-> because the kernel was booted at EL2/HYP. If you're running under Xen,
-> KVM or whatever other hypervisor, you're booted at EL1/SVC, you only
-> have the hypercall API exposed by that hypervisor, and nothing else. You
-> can't even install the stub the first place.
-> 
-> So any code path that tries to tear down KVM would better check that the
-> kernel was entered at HYP. If it doesn't, it is broken.
+On 6 January 2017 at 16:56, Sean Paul <seanpaul@chromium.org> wrote:
+> On Fri, Jan 6, 2017 at 9:30 AM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+>> Implement the .set_crc_source() callback and call the DP helpers
+>> accordingly to start and stop CRC capture.
+>>
+>> This is only done if this CRTC is currently using the eDP connector.
+>>
+>> v3: Remove superfluous check on rockchip_crtc_state->output_type
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> ---
+>>
+>>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 48 +++++++++++++++++++++++++++++
+>>  1 file changed, 48 insertions(+)
+>>
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> index fb5f001f51c3..5e19bef6d5b4 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> @@ -19,6 +19,7 @@
+>>  #include <drm/drm_crtc_helper.h>
+>>  #include <drm/drm_flip_work.h>
+>>  #include <drm/drm_plane_helper.h>
+>> +#include <drm/bridge/analogix_dp.h>
+>>
+>>  #include <linux/kernel.h>
+>>  #include <linux/module.h>
+>> @@ -1105,6 +1106,52 @@ static void vop_crtc_destroy_state(struct drm_crtc *crtc,
+>>         kfree(s);
+>>  }
+>>
+>> +static struct drm_connector *vop_get_edp_connector(struct vop *vop)
+>> +{
+>> +       struct drm_crtc *crtc = &vop->crtc;
+>> +       struct drm_connector *connector;
+>> +
+>> +       mutex_lock(&crtc->dev->mode_config.mutex);
+>> +       drm_for_each_connector(connector, crtc->dev)
+>> +               if (connector->connector_type == DRM_MODE_CONNECTOR_eDP) {
+>> +                       mutex_unlock(&crtc->dev->mode_config.mutex);
+>> +                       return connector;
+>> +               }
+>> +       mutex_unlock(&crtc->dev->mode_config.mutex);
+>> +
+>> +       return NULL;
+>> +}
+>> +
+>> +static int vop_crtc_set_crc_source(struct drm_crtc *crtc,
+>> +                                  const char *source_name, size_t *values_cnt)
+>> +{
+>> +       struct vop *vop = to_vop(crtc);
+>> +       struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc->state);
+>> +       struct drm_connector *connector;
+>> +       int ret;
+>> +
+>> +       connector = vop_get_edp_connector(vop);
+>> +       if (!connector)
+>> +               return -EINVAL;
+>> +
+>> +       *values_cnt = 3;
+>> +
+>> +       if (source_name &&
+>> +           strcmp(source_name, "auto") == 0) {
+>> +
+>> +               if (s->output_type != DRM_MODE_CONNECTOR_eDP)
+>> +                       return -EINVAL;
+>> +
+>> +               ret = analogix_dp_start_crc(connector);
+>
+> To pick up my thoughts from 1/5, you could do the following instead:
+>
+> analogix_dp_start_crc(drm_crtc_index(crtc));
 
-Let me refresh your memory.  This thread is about kexec/kdump on 32-bit
-ARM of the _host_ kernel, which will be entered in HYP mode.
+Well, I still need the dpaux to access the dpcd, so that would have to be:
 
-I've never used Xen, so I've no idea about it.  I'm merely pointing out
-the possibilities as I see them.
+analogix_dp_start_crc(connector, drm_crtc_index(crtc));
 
-Let me repeat the on-going theme here.  Documentation.  Documentation.
-Documentation.  Documentation.  Documentation.  Documentation.
-Documentation.  Documentation.  Documentation.  Documentation.
-Documentation.  Documentation.  Documentation.  Documentation.
-Documentation.  Documentation.  Documentation.  Documentation.
-Documentation.  Documentation.  Documentation.  Documentation.
-Documentation.  Documentation.  Documentation.  Documentation.
+Regards,
 
-Is the message getting through yet?  Can you see the waste of time
-the lack of documentation is having yet - not only my time, but your
-time replying to these emails.
+Tomeu
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>> +       } else if (!source_name)
+>> +
+>> +               ret = analogix_dp_stop_crc(connector);
+>> +       else
+>> +               ret = -EINVAL;
+>> +
+>> +       return ret;
+>> +}
+>> +
+>>  static const struct drm_crtc_funcs vop_crtc_funcs = {
+>>         .set_config = drm_atomic_helper_set_config,
+>>         .page_flip = drm_atomic_helper_page_flip,
+>> @@ -1112,6 +1159,7 @@ static const struct drm_crtc_funcs vop_crtc_funcs = {
+>>         .reset = vop_crtc_reset,
+>>         .atomic_duplicate_state = vop_crtc_duplicate_state,
+>>         .atomic_destroy_state = vop_crtc_destroy_state,
+>> +       .set_crc_source = vop_crtc_set_crc_source,
+>>  };
+>>
+>>  static void vop_fb_unref_worker(struct drm_flip_work *work, void *val)
+>> --
+>> 2.9.3
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+>
+> --
+> Sean Paul, Software Engineer, Google / Chromium OS
