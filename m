@@ -1,57 +1,32 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Mon, 9 Jan 2017 14:23:49 +0530
-Subject: [PATCH 2/6] arm64: dts: apq8016-sbc: add support to hdmi audio
- via adv7533
-In-Reply-To: <1483536902-21450-3-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1483536902-21450-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1483536902-21450-3-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <5888fad6-edfd-1b9a-f9d7-da0e6ed68afc@codeaurora.org>
+From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
+Date: Mon, 9 Jan 2017 10:07:10 +0100
+Subject: [PATCH v2 0/3] STM32F4 Clock binding fix & update
+Message-ID: <1483952833-14704-1-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
+v2:
+- Only rename commit subject of first patch to avoid the error:
+ Remote Server returned '<vger.kernel.org #5.7.1 SMTP;
+ 550 5.7.1 Content-Policy reject msg: The capital Triple-X in subject
+ is way too often associated with junk email,
 
-On 01/04/2017 07:04 PM, Srinivas Kandagatla wrote:
-> This patch adds support to hdmi audio via adv7533.
+This patch-set includes:
+ - a fix to STM32F4_X_CLOCK() macro
+ - an update of missing binding definition
+ - a patch to use STM32F4_X_CLOCK() macro
 
-Tested-by: Archit Taneja <architt@codeaurora.org>
+Gabriel Fernandez (3):
+  dt-bindings: mfd: stm32f4: Fix STM32F4_X_CLOCK() macro
+  dt-bindings: mfd: stm32f4: Add missing binding definition
+  ARM: dts: stm32: Use clock DT binding definition on stm32f429 family
 
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> index 08bd5eb..5ab277f 100644
-> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> @@ -85,6 +85,7 @@
->  				pinctrl-names = "default","sleep";
->  				pinctrl-0 = <&adv7533_int_active &adv7533_switch_active>;
->  				pinctrl-1 = <&adv7533_int_suspend &adv7533_switch_suspend>;
-> +				#sound-dai-cells = <1>;
->
->  				ports {
->  					#address-cells = <1>;
-> @@ -285,6 +286,15 @@
->                          qcom,audio-routing =
->                                  "AMIC2", "MIC BIAS Internal2",
->                                  "AMIC3", "MIC BIAS External1";
-> +			external-dai-link at 0 {
-> +				link-name = "ADV7533";
-> +				cpu { /* QUAT */
-> +					sound-dai = <&lpass MI2S_QUATERNARY>;
-> +				};
-> +				codec {
-> +					sound-dai = <&adv_bridge 0>;
-> +				};
-> +			};
->
->                          internal-codec-playback-dai-link at 0 {            /* I2S - Internal codec */
->                                  link-name = "WCD";
->
+ arch/arm/boot/dts/stm32429i-eval.dts  |  2 +-
+ arch/arm/boot/dts/stm32f429.dtsi      | 66 +++++++++++++++++++----------------
+ include/dt-bindings/mfd/stm32f4-rcc.h | 24 +++++++++----
+ 3 files changed, 53 insertions(+), 39 deletions(-)
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
