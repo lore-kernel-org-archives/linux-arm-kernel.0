@@ -1,75 +1,64 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:23:59 -0500
-Subject: [RFC 03/55] KVM: arm64: Add KVM nesting feature
+Date: Mon,  9 Jan 2017 01:24:01 -0500
+Subject: [RFC 05/55] KVM: arm64: Add vcpu_mode_el2 primitive to support nesting
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-4-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-6-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Set the initial exception level of the guest to EL2 if nested
-virtualization feature is enabled.
+When running a nested hypervisor we occasionally have to figure out if
+the mode we are switching into is the virtual EL2 mode or a regular
+EL0/1 mode.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm64/include/asm/kvm_host.h | 2 +-
- arch/arm64/include/uapi/asm/kvm.h | 1 +
- arch/arm64/kvm/reset.c            | 8 ++++++++
- 3 files changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/kvm_emulate.h   |  6 ++++++
+ arch/arm64/include/asm/kvm_emulate.h | 12 ++++++++++++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index e505038..c0c8b02 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -41,7 +41,7 @@
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index 9a8a45a..399cd75e 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -77,6 +77,12 @@ static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
+ 	return 1;
+ }
  
- #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
- 
--#define KVM_VCPU_MAX_FEATURES 4
-+#define KVM_VCPU_MAX_FEATURES 5
- 
- #define KVM_REQ_VCPU_EXIT	8
- 
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 3051f86..78117bf 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -97,6 +97,7 @@ struct kvm_regs {
- #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
- #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
- #define KVM_ARM_VCPU_PMU_V3		3 /* Support guest PMUv3 */
-+#define KVM_ARM_VCPU_NESTED_VIRT	4 /* Support nested virtual EL2 */
- 
- struct kvm_vcpu_init {
- 	__u32 target;
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 74322c2..e6b0b20 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -41,6 +41,11 @@
- 			PSR_F_BIT | PSR_D_BIT),
- };
- 
-+static const struct kvm_regs default_regs_reset_el2 = {
-+	.regs.pstate = (PSR_MODE_EL2h | PSR_A_BIT | PSR_I_BIT |
-+			PSR_F_BIT | PSR_D_BIT),
-+};
++/* We don't support nesting on arm */
++static inline bool vcpu_mode_el2(const struct kvm_vcpu *vcpu)
++{
++	return false;
++}
 +
- static const struct kvm_regs default_regs_reset32 = {
- 	.regs.pstate = (COMPAT_PSR_MODE_SVC | COMPAT_PSR_A_BIT |
- 			COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
-@@ -124,6 +129,9 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 			if (!cpu_has_32bit_el1())
- 				return -EINVAL;
- 			cpu_reset = &default_regs_reset32;
-+		} else if (test_bit(KVM_ARM_VCPU_NESTED_VIRT,
-+				    vcpu->arch.features)) {
-+			cpu_reset = &default_regs_reset_el2;
- 		} else {
- 			cpu_reset = &default_regs_reset;
- 		}
+ static inline unsigned long *vcpu_pc(struct kvm_vcpu *vcpu)
+ {
+ 	return &vcpu->arch.ctxt.gp_regs.usr_regs.ARM_pc;
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index f5ea0ba..830be2e 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -143,6 +143,18 @@ static inline bool vcpu_mode_priv(const struct kvm_vcpu *vcpu)
+ 	return mode != PSR_MODE_EL0t;
+ }
+ 
++static inline bool vcpu_mode_el2(const struct kvm_vcpu *vcpu)
++{
++	u32 mode;
++
++	if (vcpu_mode_is_32bit(vcpu))
++		return false;
++
++	mode = *vcpu_cpsr(vcpu) & PSR_MODE_MASK;
++
++	return mode == PSR_MODE_EL2h || mode == PSR_MODE_EL2t;
++}
++
+ static inline u32 kvm_vcpu_get_hsr(const struct kvm_vcpu *vcpu)
+ {
+ 	return vcpu->arch.fault.esr_el2;
 -- 
 1.9.1
