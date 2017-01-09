@@ -1,59 +1,88 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 9 Jan 2017 10:43:07 +0000
-Subject: [PATCH v3 4/9] arm64: cpufeature: Document the rules of safe
- value for features
-In-Reply-To: <20170106123011.GB12863@e104818-lin.cambridge.arm.com>
-References: <1483552147-9605-1-git-send-email-suzuki.poulose@arm.com>
- <1483552147-9605-5-git-send-email-suzuki.poulose@arm.com>
- <20170106123011.GB12863@e104818-lin.cambridge.arm.com>
-Message-ID: <2338875a-6a5b-ba9e-59fe-d681091c2923@arm.com>
+From: alexgershgorin@gmail.com (Alex Gershgorin)
+Date: Mon, 9 Jan 2017 12:44:42 +0200
+Subject: mmc: sdhci-of-at91: Internal clock never stabilised
+In-Reply-To: <20170109071900.fz2en246i7uqmavw@rfolt0960.corp.atmel.com>
+References: <1DC01DCD0F70AE4284AE3A5E8C726E225D20EDF1@Ex2010.q-core.co.il>
+ <CAJP5LRNRSpMjdTFyL4R4ZN1tZAG0A=TKR5LRareg+TEJmnkd2Q@mail.gmail.com>
+ <20170108125344.3iyfoodszupzgukk@piout.net>
+ <20170109071900.fz2en246i7uqmavw@rfolt0960.corp.atmel.com>
+Message-ID: <CAJP5LRMjVGWpHE5K8xZOb=m2wxy8qRxx5_BbLFEHuA13Rh_WoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/17 12:30, Catalin Marinas wrote:
-> On Wed, Jan 04, 2017 at 05:49:02PM +0000, Suzuki K. Poulose wrote:
->> --- a/arch/arm64/include/asm/cpufeature.h
->> +++ b/arch/arm64/include/asm/cpufeature.h
->> @@ -29,7 +29,21 @@
->>  #include <linux/jump_label.h>
->>  #include <linux/kernel.h>
->>
->> -/* CPU feature register tracking */
->> +/*
->> + * CPU feature register tracking
->> + *
->> + * The safe value of a CPUID feature field is dependent on the implications
->> + * of the values assigned to it by the architecture. Based on the relationship
->> + * between the values, the features are classified into 3 types.
->> + *
->> + * a) LOWER_SAFE - The value 'n+1' indicates, value 'n' and some
->> + *    additional features. (where n >= 0). The smaller value (n) is
->> + *    considered safer in this case.
->> + * b) HIGHER_SAFE - The value 'n+1' is safer than 'n' (for n>= 0).
->> + * c) EXACT - If the values of the feature don't have any relationship,
->> + *    a predefined safe value is used.
->> + */
+Hi Ludovic,
+As we read the chip ID from CHIPID_CIDR register we get 0x8a5c08c0 (we
+use ATSAMA5D27A-CU).
+
+
+Thanks,
+Alex
+
+On Mon, Jan 9, 2017 at 9:19 AM, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
+> Hi Alex,
 >
-> I don't think this text fully describes what is actually compared. You
-> could say something that the lowest value of all the CPUs is chosen for
-> LOWER_SAFE, highest for HIGHER_SAFE and it is expected that all CPUs
-> have the same value for a field when EXACT is specified.
-
-Ok. I have changed it as below :
-
-/*
-  * CPU feature register tracking
-  *
-  * The safe value of a CPUID feature field is dependent on the implications
-  * of the values assigned to it by the architecture. Based on the relationship
-  * between the values, the features are classified into 3 types - LOWER_SAFE,
-  * HIGHER_SAFE and EXACT.
-  *
-  * The lowest value of all the CPUs is chosen for LOWER_SAFE and highest
-  * for HIGHER_SAFE. It is expected that all CPUs have the same value for
-  * a field when EXACT is specified, failing which, the safe value specified
-  * in the table is chosen.
-  */
-
-
-Suzuki
+> Which revision of SoC are you using?
+>
+> Regards
+>
+> Ludovic
+>
+> On Sun, Jan 08, 2017 at 01:53:44PM +0100, Alexandre Belloni wrote:
+>> Hi,
+>>
+>> I think Cyrille worked on that a few month ago, maybe he has a comment.
+>>
+>> On 08/01/2017 at 14:07:53 +0200, Alex Gershgorin wrote :
+>> > Hi All,
+>> > We have two different HW platforms based on SAMA5D2 SoC (SAMA5D2 Xplained
+>> > Board and our own HW).
+>> > On both of them we are facing stabilization of the internal
+>> > clock problem, it does not happen all the time but quite often.
+>> > Please see below my Kernel boot messages:
+>> >
+>> > sdhci: Copyright(c) Pierre Ossman
+>> > sdhci-pltfm: SDHCI platform and OF driver helper
+>> > sdhci-at91 a0000000.sdio-host: update clk mul to 39 as gck rate is
+>> > 480000000 Hz
+>> > mmc0: Internal clock never stabilised.
+>> > mmc0: Internal clock never stabilised.
+>> > mmc0: SDHCI controller on a0000000.sdio-host [a0000000.sdio-host] using ADMA
+>> >
+>> > snip
+>> >
+>> > snip
+>> >
+>> > Waiting for root device /dev/mmcblk0p2...
+>> > mmc0: Internal clock never stabilised.
+>> > mmc0: Timeout waiting for hardware cmd interrupt.
+>> > sdhci: =========== REGISTER DUMP (mmc0)===========
+>> > sdhci: Sys addr: 0x00000000 | Version:  0x00001502
+>> > sdhci: Blk size: 0x00000000 | Blk cnt:  0x00000000
+>> > sdhci: Argument: 0x00000000 | Trn mode: 0x00000000
+>> > sdhci: Present: 0x01ff0001 | Host ctl: 0x00000001
+>> > sdhci: Power: 0x0000000f | Blk gap:  0x00000000
+>> > sdhci: Wake-up: 0x00000000 | Clock:    0x0000ffe1
+>> > sdhci: Timeout: 0x00000000 | Int stat: 0x00000000
+>> > sdhci: Int enab: 0x00ff0003 | Sig enab: 0x00ff0003
+>> > sdhci: AC12 err: 0x00000000 | Slot int: 0x00000000
+>> > sdhci: Caps: 0x27ec0c8c | Caps_1: 0x00270f77
+>> > sdhci: Cmd: 0x00000000 | Max curr: 0x00000000
+>> > sdhci: Host ctl2: 0x00000000
+>> > sdhci: ADMA Err: 0x00000000 | ADMA Ptr: 0x00000000
+>> > sdhci: ===========================================
+>> >
+>> > Any direction to solve this problem?
+>> >
+>> > Thanks,
+>> > Alex Gershgorin
+>>
+>> --
+>> Alexandre Belloni, Free Electrons
+>> Embedded Linux and Kernel engineering
+>> http://free-electrons.com
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
