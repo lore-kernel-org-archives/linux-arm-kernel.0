@@ -1,91 +1,95 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon,  9 Jan 2017 14:32:37 +0100
-Subject: [PATCH v4 5/5] drm/rockchip: Implement CRC debugfs API
-In-Reply-To: <20170109133237.17413-1-tomeu.vizoso@collabora.com>
-References: <20170109133237.17413-1-tomeu.vizoso@collabora.com>
-Message-ID: <20170109133237.17413-6-tomeu.vizoso@collabora.com>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Mon,  9 Jan 2017 13:45:52 +0000
+Subject: [PATCH v7 01/19] iommu/dma: Implement PCI allocation optimisation
+In-Reply-To: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
+References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1483969570-3154-2-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the .set_crc_source() callback and call the DP helpers
-accordingly to start and stop CRC capture.
+From: Robin Murphy <robin.murphy@arm.com>
 
-This is only done if this CRTC is currently using the eDP connector.
+Whilst PCI devices may have 64-bit DMA masks, they still benefit from
+using 32-bit addresses wherever possible in order to avoid DAC (PCI) or
+longer address packets (PCIe), which may incur a performance overhead.
+Implement the same optimisation as other allocators by trying to get a
+32-bit address first, only falling back to the full mask if that fails.
 
-v3: Remove superfluous check on rockchip_crtc_state->output_type
-
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
+ drivers/iommu/dma-iommu.c | 21 +++++++++++++++------
+ 1 file changed, 15 insertions(+), 6 deletions(-)
 
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 42 +++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index fb5f001f51c3..6e5eb1aa182a 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -19,6 +19,7 @@
- #include <drm/drm_crtc_helper.h>
- #include <drm/drm_flip_work.h>
- #include <drm/drm_plane_helper.h>
-+#include <drm/bridge/analogix_dp.h>
- 
- #include <linux/kernel.h>
- #include <linux/module.h>
-@@ -1105,6 +1106,46 @@ static void vop_crtc_destroy_state(struct drm_crtc *crtc,
- 	kfree(s);
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 2db0d64..a59ca47 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -204,19 +204,28 @@ int dma_direction_to_prot(enum dma_data_direction dir, bool coherent)
  }
  
-+static struct drm_connector *vop_get_edp_connector(struct vop *vop)
-+{
-+	struct drm_crtc *crtc = &vop->crtc;
-+	struct drm_connector *connector;
-+
-+	mutex_lock(&crtc->dev->mode_config.mutex);
-+	drm_for_each_connector(connector, crtc->dev)
-+		if (connector->connector_type == DRM_MODE_CONNECTOR_eDP) {
-+			mutex_unlock(&crtc->dev->mode_config.mutex);
-+			return connector;
-+		}
-+	mutex_unlock(&crtc->dev->mode_config.mutex);
-+
-+	return NULL;
-+}
-+
-+static int vop_crtc_set_crc_source(struct drm_crtc *crtc,
-+				   const char *source_name, size_t *values_cnt)
-+{
-+	struct vop *vop = to_vop(crtc);
-+	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc->state);
-+	struct drm_connector *connector;
-+	int ret;
-+
-+	connector = vop_get_edp_connector(vop);
-+	if (!connector)
-+		return -EINVAL;
-+
-+	*values_cnt = 3;
-+
-+	if (source_name && strcmp(source_name, "auto") == 0)
-+		ret = analogix_dp_start_crc(connector);
-+	else if (!source_name)
-+		ret = analogix_dp_stop_crc(connector);
-+	else
-+		ret = -EINVAL;
-+
-+	return ret;
-+}
-+
- static const struct drm_crtc_funcs vop_crtc_funcs = {
- 	.set_config = drm_atomic_helper_set_config,
- 	.page_flip = drm_atomic_helper_page_flip,
-@@ -1112,6 +1153,7 @@ static const struct drm_crtc_funcs vop_crtc_funcs = {
- 	.reset = vop_crtc_reset,
- 	.atomic_duplicate_state = vop_crtc_duplicate_state,
- 	.atomic_destroy_state = vop_crtc_destroy_state,
-+	.set_crc_source = vop_crtc_set_crc_source,
- };
+ static struct iova *__alloc_iova(struct iommu_domain *domain, size_t size,
+-		dma_addr_t dma_limit)
++		dma_addr_t dma_limit, struct device *dev)
+ {
+ 	struct iova_domain *iovad = cookie_iovad(domain);
+ 	unsigned long shift = iova_shift(iovad);
+ 	unsigned long length = iova_align(iovad, size) >> shift;
++	struct iova *iova = NULL;
  
- static void vop_fb_unref_worker(struct drm_flip_work *work, void *val)
+ 	if (domain->geometry.force_aperture)
+ 		dma_limit = min(dma_limit, domain->geometry.aperture_end);
++
++	/* Try to get PCI devices a SAC address */
++	if (dma_limit > DMA_BIT_MASK(32) && dev_is_pci(dev))
++		iova = alloc_iova(iovad, length, DMA_BIT_MASK(32) >> shift,
++				  true);
+ 	/*
+ 	 * Enforce size-alignment to be safe - there could perhaps be an
+ 	 * attribute to control this per-device, or at least per-domain...
+ 	 */
+-	return alloc_iova(iovad, length, dma_limit >> shift, true);
++	if (!iova)
++		iova = alloc_iova(iovad, length, dma_limit >> shift, true);
++
++	return iova;
+ }
+ 
+ /* The IOVA allocator knows what we mapped, so just unmap whatever that was */
+@@ -369,7 +378,7 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
+ 	if (!pages)
+ 		return NULL;
+ 
+-	iova = __alloc_iova(domain, size, dev->coherent_dma_mask);
++	iova = __alloc_iova(domain, size, dev->coherent_dma_mask, dev);
+ 	if (!iova)
+ 		goto out_free_pages;
+ 
+@@ -440,7 +449,7 @@ static dma_addr_t __iommu_dma_map(struct device *dev, phys_addr_t phys,
+ 	struct iova_domain *iovad = cookie_iovad(domain);
+ 	size_t iova_off = iova_offset(iovad, phys);
+ 	size_t len = iova_align(iovad, size + iova_off);
+-	struct iova *iova = __alloc_iova(domain, len, dma_get_mask(dev));
++	struct iova *iova = __alloc_iova(domain, len, dma_get_mask(dev), dev);
+ 
+ 	if (!iova)
+ 		return DMA_ERROR_CODE;
+@@ -598,7 +607,7 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
+ 		prev = s;
+ 	}
+ 
+-	iova = __alloc_iova(domain, iova_len, dma_get_mask(dev));
++	iova = __alloc_iova(domain, iova_len, dma_get_mask(dev), dev);
+ 	if (!iova)
+ 		goto out_restore_sg;
+ 
+@@ -675,7 +684,7 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
+ 	if (!msi_page)
+ 		return NULL;
+ 
+-	iova = __alloc_iova(domain, iovad->granule, dma_get_mask(dev));
++	iova = __alloc_iova(domain, iovad->granule, dma_get_mask(dev), dev);
+ 	if (!iova)
+ 		goto out_free_page;
+ 
 -- 
-2.9.3
+1.9.1
