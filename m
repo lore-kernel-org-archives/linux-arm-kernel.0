@@ -1,142 +1,53 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:43 -0500
-Subject: [RFC 47/55] KVM: arm/arm64: Forward the guest hypervisor's stage 2
- permission faults
+Date: Mon,  9 Jan 2017 01:24:42 -0500
+Subject: [RFC 46/55] KVM: arm64: Add more info to the S2 translation result
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-48-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-47-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-When faulting on a shadow stage 2 page table we have to check if the
-fault was a permission fault and if so, if that fault needs to be
-handled by the guest hypervisor before us, in case the guest hypervisor
-has created a less permissive S2 entry than the operation required.
-
-Check if this is the case, and inject a fault if it is.
+When translating an L2 IPA to an L1 IPA, we some times need to know at
+which level this translation occurred and what the resulting permissions
+was, so populate the translation result structure with these additional
+fields.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm/include/asm/kvm_mmu.h   |  7 +++++++
- arch/arm/kvm/mmu.c               |  5 +++++
- arch/arm64/include/asm/kvm_mmu.h |  9 +++++++++
- arch/arm64/kvm/mmu-nested.c      | 33 +++++++++++++++++++++++++++++++++
- 4 files changed, 54 insertions(+)
+ arch/arm64/include/asm/kvm_mmu.h | 3 +++
+ arch/arm64/kvm/mmu-nested.c      | 3 +++
+ 2 files changed, 6 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index ab41a10..0d106ae 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -241,6 +241,13 @@ static inline int kvm_walk_nested_s2(struct kvm_vcpu *vcpu, phys_addr_t gipa,
- 	return 0;
- }
- 
-+static inline int kvm_s2_handle_perm_fault(struct kvm_vcpu *vcpu,
-+					   phys_addr_t fault_ipa,
-+					   struct kvm_s2_trans *trans)
-+{
-+	return 0;
-+}
-+
- static inline void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu) { }
- static inline int kvm_nested_s2_init(struct kvm_vcpu *vcpu) { return 0; }
- static inline void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu) { }
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index abdf345..68fc8e8 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1542,6 +1542,11 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		ret = kvm_walk_nested_s2(vcpu, fault_ipa, &nested_trans);
- 		if (ret)
- 			goto out_unlock;
-+
-+		ret = kvm_s2_handle_perm_fault(vcpu, fault_ipa, &nested_trans);
-+		if (ret)
-+			goto out_unlock;
-+
- 		ipa = nested_trans.output;
- 	}
- 
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 2ac603d..2086296 100644
+index bf94f0c..2ac603d 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -338,6 +338,8 @@ struct kvm_s2_trans {
- bool handle_vttbr_update(struct kvm_vcpu *vcpu, u64 vttbr);
- int kvm_walk_nested_s2(struct kvm_vcpu *vcpu, phys_addr_t gipa,
- 		       struct kvm_s2_trans *result);
-+int kvm_s2_handle_perm_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-+			     struct kvm_s2_trans *trans);
- void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu);
- int kvm_nested_s2_init(struct kvm_vcpu *vcpu);
- void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu);
-@@ -366,6 +368,13 @@ static inline int kvm_walk_nested_s2(struct kvm_vcpu *vcpu, phys_addr_t gipa,
+@@ -327,6 +327,9 @@ static inline unsigned int kvm_get_vmid_bits(void)
+ struct kvm_s2_trans {
+ 	phys_addr_t output;
+ 	phys_addr_t block_size;
++	bool writable;
++	bool readable;
++	int level;
+ };
+ 
+ #ifdef CONFIG_KVM_ARM_NESTED_HYP
+diff --git a/arch/arm64/kvm/mmu-nested.c b/arch/arm64/kvm/mmu-nested.c
+index b161b55..b579d23 100644
+--- a/arch/arm64/kvm/mmu-nested.c
++++ b/arch/arm64/kvm/mmu-nested.c
+@@ -236,6 +236,9 @@ static int walk_nested_s2_pgd(struct kvm_vcpu *vcpu, phys_addr_t ipa,
+ 		(ipa & GENMASK_ULL(addr_bottom - 1, 0));
+ 	out->output = paddr;
+ 	out->block_size = 1UL << ((3 - level) * stride + wi->pgshift);
++	out->readable = desc & (0b01 << 6);
++	out->writable = desc & (0b10 << 6);
++	out->level = level;
  	return 0;
  }
  
-+static inline int kvm_s2_handle_perm_fault(struct kvm_vcpu *vcpu,
-+					   phys_addr_t fault_ipa,
-+					   struct kvm_s2_trans *trans)
-+{
-+	return 0;
-+}
-+
- static inline void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu) { }
- static inline int kvm_nested_s2_init(struct kvm_vcpu *vcpu) { return 0; }
- static inline void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu) { }
-diff --git a/arch/arm64/kvm/mmu-nested.c b/arch/arm64/kvm/mmu-nested.c
-index b579d23..65ad0da 100644
---- a/arch/arm64/kvm/mmu-nested.c
-+++ b/arch/arm64/kvm/mmu-nested.c
-@@ -52,6 +52,19 @@ static unsigned int pa_max(void)
- 	return ps_to_output_size(parange);
- }
- 
-+static int vcpu_inject_s2_perm_fault(struct kvm_vcpu *vcpu, gpa_t ipa,
-+				     int level)
-+{
-+	u32 esr;
-+
-+	vcpu->arch.ctxt.el2_regs[FAR_EL2] = vcpu->arch.fault.far_el2;
-+	vcpu->arch.ctxt.el2_regs[HPFAR_EL2] = vcpu->arch.fault.hpfar_el2;
-+	esr = kvm_vcpu_get_hsr(vcpu) & ~ESR_ELx_FSC;
-+	esr |= ESR_ELx_FSC_PERM;
-+	esr |= level & 0x3;
-+	return kvm_inject_nested_sync(vcpu, esr);
-+}
-+
- static int vcpu_inject_s2_trans_fault(struct kvm_vcpu *vcpu, gpa_t ipa,
- 				      int level)
- {
-@@ -268,6 +281,26 @@ int kvm_walk_nested_s2(struct kvm_vcpu *vcpu, phys_addr_t gipa,
- 	return walk_nested_s2_pgd(vcpu, gipa, &wi, result);
- }
- 
-+/*
-+ * Returns non-zero if permission fault is handled by injecting it to the next
-+ * level hypervisor.
-+ */
-+int kvm_s2_handle_perm_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-+			     struct kvm_s2_trans *trans)
-+{
-+	unsigned long fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
-+	bool write_fault = kvm_is_write_fault(vcpu);
-+
-+	if (fault_status != FSC_PERM)
-+		return 0;
-+
-+	if ((write_fault && !trans->writable) ||
-+	    (!write_fault && !trans->readable))
-+		return vcpu_inject_s2_perm_fault(vcpu, fault_ipa, trans->level);
-+
-+	return 0;
-+}
-+
- /* expects kvm->mmu_lock to be held */
- void kvm_nested_s2_all_vcpus_wp(struct kvm *kvm)
- {
 -- 
 1.9.1
