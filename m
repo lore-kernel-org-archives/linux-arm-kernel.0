@@ -1,21 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 9 Jan 2017 20:39:28 +0100
-Subject: [PATCH 3/4] watchdog: coh901327_wdt: Use devm_ioremap_resource to
- map resources
-In-Reply-To: <1483500343-27113-3-git-send-email-linux@roeck-us.net>
-References: <1483500343-27113-1-git-send-email-linux@roeck-us.net>
- <1483500343-27113-3-git-send-email-linux@roeck-us.net>
-Message-ID: <CACRpkda1aTWaj1gN_y2L_yD8T9rFX4K7aL3+BukTjq1MRD7E6Q@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 9 Jan 2017 11:39:51 -0800
+Subject: [PATCH 2/6] arm64: dts: apq8016-sbc: add support to hdmi audio
+ via adv7533
+In-Reply-To: <1483536902-21450-3-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1483536902-21450-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1483536902-21450-3-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20170109193951.GO17126@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 4, 2017 at 4:25 AM, Guenter Roeck <linux@roeck-us.net> wrote:
+On 01/04, Srinivas Kandagatla wrote:
+> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> index 08bd5eb..5ab277f 100644
+> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> @@ -85,6 +85,7 @@
+>  				pinctrl-names = "default","sleep";
+>  				pinctrl-0 = <&adv7533_int_active &adv7533_switch_active>;
+>  				pinctrl-1 = <&adv7533_int_suspend &adv7533_switch_suspend>;
+> +				#sound-dai-cells = <1>;
+>  
+>  				ports {
+>  					#address-cells = <1>;
+> @@ -285,6 +286,15 @@
+>                          qcom,audio-routing =
+>                                  "AMIC2", "MIC BIAS Internal2",
+>                                  "AMIC3", "MIC BIAS External1";
+> +			external-dai-link at 0 {
+> +				link-name = "ADV7533";
+> +				cpu { /* QUAT */
+> +					sound-dai = <&lpass MI2S_QUATERNARY>;
+> +				};
+> +				codec {
+> +					sound-dai = <&adv_bridge 0>;
+> +				};
+> +			};
+>  
+>                          internal-codec-playback-dai-link at 0 {            /* I2S - Internal codec */
+>                                  link-name = "WCD";
 
-> Map resources using devm_ioremap_resource() to simplify error handling.
->
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+The spacing is weird here. Did the internal-codec get added
+without tabs before?
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Yours,
-Linus Walleij
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
