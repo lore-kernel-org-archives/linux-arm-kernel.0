@@ -1,125 +1,89 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon, 9 Jan 2017 14:25:42 +0100
-Subject: [PATCH v3 5/5] drm/rockchip: Implement CRC debugfs API
-In-Reply-To: <CAOw6vbLAwzrwfHdny=-RYrUE7wBksqwkOxatJ1=_HMojQLPm4w@mail.gmail.com>
-References: <20170106143029.11553-1-tomeu.vizoso@collabora.com>
- <20170106143029.11553-6-tomeu.vizoso@collabora.com>
- <CAOw6vbLAwzrwfHdny=-RYrUE7wBksqwkOxatJ1=_HMojQLPm4w@mail.gmail.com>
-Message-ID: <CAAObsKCCFic7ReS=Jxsiko2G_o2gTXVV6cyfG_B+ra9oOQaq-g@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 9 Jan 2017 14:26:36 +0100
+Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
+In-Reply-To: <20170109122639.GX14217@n2100.armlinux.org.uk>
+References: <20161213113044.GC19985@leverpostej>
+ <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
+ <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
+ <20161215113539.GK14217@n2100.armlinux.org.uk>
+ <06fca797-da5d-f7f2-eecb-9b1b33b7e83f@arm.com>
+ <20161215151548.GL14217@n2100.armlinux.org.uk>
+ <c21d6514-44a2-ba88-0fe5-d14d5897cc48@arm.com>
+ <20161215185717.GM14217@n2100.armlinux.org.uk>
+ <20170103095149.GA14242@cbox>
+ <20170109122639.GX14217@n2100.armlinux.org.uk>
+Message-ID: <20170109132636.GH4348@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 January 2017 at 16:56, Sean Paul <seanpaul@chromium.org> wrote:
-> On Fri, Jan 6, 2017 at 9:30 AM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
->> Implement the .set_crc_source() callback and call the DP helpers
->> accordingly to start and stop CRC capture.
->>
->> This is only done if this CRTC is currently using the eDP connector.
->>
->> v3: Remove superfluous check on rockchip_crtc_state->output_type
->>
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->> ---
->>
->>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 48 +++++++++++++++++++++++++++++
->>  1 file changed, 48 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> index fb5f001f51c3..5e19bef6d5b4 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> @@ -19,6 +19,7 @@
->>  #include <drm/drm_crtc_helper.h>
->>  #include <drm/drm_flip_work.h>
->>  #include <drm/drm_plane_helper.h>
->> +#include <drm/bridge/analogix_dp.h>
->>
->>  #include <linux/kernel.h>
->>  #include <linux/module.h>
->> @@ -1105,6 +1106,52 @@ static void vop_crtc_destroy_state(struct drm_crtc *crtc,
->>         kfree(s);
->>  }
->>
->> +static struct drm_connector *vop_get_edp_connector(struct vop *vop)
->> +{
->> +       struct drm_crtc *crtc = &vop->crtc;
->> +       struct drm_connector *connector;
->> +
->> +       mutex_lock(&crtc->dev->mode_config.mutex);
->> +       drm_for_each_connector(connector, crtc->dev)
->> +               if (connector->connector_type == DRM_MODE_CONNECTOR_eDP) {
->> +                       mutex_unlock(&crtc->dev->mode_config.mutex);
->> +                       return connector;
->> +               }
->> +       mutex_unlock(&crtc->dev->mode_config.mutex);
->> +
->> +       return NULL;
->> +}
->> +
->> +static int vop_crtc_set_crc_source(struct drm_crtc *crtc,
->> +                                  const char *source_name, size_t *values_cnt)
->> +{
->> +       struct vop *vop = to_vop(crtc);
->> +       struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc->state);
->> +       struct drm_connector *connector;
->> +       int ret;
->> +
->> +       connector = vop_get_edp_connector(vop);
->> +       if (!connector)
->> +               return -EINVAL;
->> +
->> +       *values_cnt = 3;
->> +
->> +       if (source_name &&
->> +           strcmp(source_name, "auto") == 0) {
->> +
->> +               if (s->output_type != DRM_MODE_CONNECTOR_eDP)
->> +                       return -EINVAL;
->> +
->> +               ret = analogix_dp_start_crc(connector);
->
-> To pick up my thoughts from 1/5, you could do the following instead:
->
-> analogix_dp_start_crc(drm_crtc_index(crtc));
+On Mon, Jan 09, 2017 at 12:26:39PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 03, 2017 at 10:51:49AM +0100, Christoffer Dall wrote:
+> > Hi Russell,
+> > 
+> > On Thu, Dec 15, 2016 at 06:57:18PM +0000, Russell King - ARM Linux wrote:
+> > > What's also coming clear is that there's very few people who understand
+> > > all the interactions here, and the whole thing seems to be an undocumented
+> > > mess.  
+> > 
+> > I think the hyp stub has just served a very limited purpose so far, and
+> > therefore is a somewhat immature implementation.  Now we've discovered a
+> > need to clean it up, and we're all for that.  Again, I don't think the
+> > problem is any larger than that, we just need to fix it, and it seems to
+> > me everyone is willing to work on that.
+> 
+> What I want to see is some documentation of the hyp-stub, so that there
+> can be some element of confidence that changes there are properly
+> coordinated.  As I said in a follow up email:
+> 
+> | Either we need more people to have an understanding (so if one of them
+> | gets run over by a bus, we're not left floundering around) or we need
+> | it to be documented - even if it's just a simple comment "the ABI in
+> | this file is shared with XYZ, if you change the ABI here, also update
+> | XYZ too."
+> 
+> > Marc even offered to work on your suggestion to support the general
+> > hyp ABI commands in KVM.
+> 
+> ... which is pointless, because it's a duplication of the effort I've
+> already put in.  My patches already do the:
+> 
+> #define HVC_GET_VECTORS 0
+> #define HVC_SET_VECTORS 1
+> #define HVC_SOFT_RESTART 2
+> 
+> thing which ARM64 does, passing the arguments in via the appropriate
+> registers.  However, such a change is a major revision of hyp-stub's
+> ABI, which completely changes the way it works.
 
-Well, I still need the dpaux to access the dpcd, so that would have to be:
+Sorry, I'm afraid I might have been unclear.  What I meant with "general
+hyp ABI commands in KVM" was, that if there's a need for KVM to support
+the operations (using a unified and documented ABI) that the hyp stub
+supports, then we could add that in KVM as well.  I thought your patches
+added the functionality for the hyp stub, and Marc would add whichever
+remaining pieces in the KVM side.
 
-analogix_dp_start_crc(connector, drm_crtc_index(crtc));
 
-Regards,
+[...]
 
-Tomeu
+> 
+> Longer term, I'd like to see the existing hypervisor documentation in
+> Documentation/virtual/kvm/hypercalls.txt updated with the ARM details.
+> According to that document, KVM effectively only exists on PPC and x86
+> at the present time...
+> 
 
->> +       } else if (!source_name)
->> +
->> +               ret = analogix_dp_stop_crc(connector);
->> +       else
->> +               ret = -EINVAL;
->> +
->> +       return ret;
->> +}
->> +
->>  static const struct drm_crtc_funcs vop_crtc_funcs = {
->>         .set_config = drm_atomic_helper_set_config,
->>         .page_flip = drm_atomic_helper_page_flip,
->> @@ -1112,6 +1159,7 @@ static const struct drm_crtc_funcs vop_crtc_funcs = {
->>         .reset = vop_crtc_reset,
->>         .atomic_duplicate_state = vop_crtc_duplicate_state,
->>         .atomic_destroy_state = vop_crtc_destroy_state,
->> +       .set_crc_source = vop_crtc_set_crc_source,
->>  };
->>
->>  static void vop_fb_unref_worker(struct drm_flip_work *work, void *val)
->> --
->> 2.9.3
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
->
-> --
-> Sean Paul, Software Engineer, Google / Chromium OS
+I'm afraid I don't think this is right place to document this behavior.
+
+There's a difference between an internal ABI between code running in two
+CPU modes but both part of the same kernel, and a hypervisor running
+a guest OS on top.
+
+I believe that Documentation/virtual/kvm/hypercalls.txt documents the
+latter case (i.e. guest hypercalls supported by the KVM host
+hypervisor), not the former case, and these things should not be
+combined.
+
+I would suggest adding something like
+Documentation/virtual/kvm/arm/hyp-abi.txt instead.
+
+-Christoffer
