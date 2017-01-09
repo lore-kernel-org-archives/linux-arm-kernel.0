@@ -1,85 +1,67 @@
-From: ping.bai@nxp.com (Jacky Bai)
-Date: Mon, 9 Jan 2017 02:32:36 +0000
-Subject: [PATCH v2 05/12] Document: dt: binding: imx: update pinctrl doc
- for imx6sll
-In-Reply-To: <CACRpkdYUME8K+JusA0ORRKqxyBuhDdyei8eg7UZbHidKw9=bQw@mail.gmail.com>
-References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
- <1482832070-22668-6-git-send-email-ping.bai@nxp.com>
- <CACRpkdYUME8K+JusA0ORRKqxyBuhDdyei8eg7UZbHidKw9=bQw@mail.gmail.com>
-Message-ID: <AM3PR04MB5304992095753B761E66A9A87640@AM3PR04MB530.eurprd04.prod.outlook.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 9 Jan 2017 10:41:37 +0800
+Subject: [PATCH v1 1/3] dt: bindings: add thermal device driver for zx2967
+In-Reply-To: <1483767488-19778-1-git-send-email-baoyou.xie@linaro.org>
+References: <1483767488-19778-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170109024136.GJ20956@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCH v2 05/12] Document: dt: binding: imx: update pinctrl doc
-> for imx6sll
+On Sat, Jan 07, 2017 at 01:38:06PM +0800, Baoyou Xie wrote:
+> This patch adds dt-binding documentation for zx2967 family thermal sensor.
 > 
-> On Tue, Dec 27, 2016 at 10:47 AM, Bai Ping <ping.bai@nxp.com> wrote:
-> 
-> > Add pinctrl binding doc update for imx6sll.
-> >
-> > Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> 
-> I have to push back on this a bit.
-> 
-> > +Please refer to fsl,imx-pinctrl.txt in this directory for common
-> > +binding part and usage.
-> 
-> I understand that it is building on top of the old i.MX bindings and that it has
-> some kind of "tradition" coming with it.
-> 
-> At the same time, the i.MX bindings came about before we had the generic pin
-> control bindings defined.
-> 
-> > +CONFIG bits definition:
-> > +PAD_CTL_LVE                    (1 << 22)
-> > +PAD_CTL_HYS                     (1 << 16)
-> > +PAD_CTL_PUS_100K_DOWN           (0 << 14)
-> > +PAD_CTL_PUS_47K_UP              (1 << 14)
-> > +PAD_CTL_PUS_100K_UP             (2 << 14)
-> > +PAD_CTL_PUS_22K_UP              (3 << 14)
-> > +PAD_CTL_PUE                     (1 << 13)
-> > +PAD_CTL_PKE                     (1 << 12)
-> > +PAD_CTL_ODE                     (1 << 11)
-> > +PAD_CTL_SPEED_LOW               (0 << 6)
-> > +PAD_CTL_SPEED_MED               (1 << 6)
-> > +PAD_CTL_SPEED_HIGH              (3 << 6)
-> > +PAD_CTL_DSE_DISABLE             (0 << 3)
-> > +PAD_CTL_DSE_260ohm              (1 << 3)
-> > +PAD_CTL_DSE_130ohm              (2 << 3)
-> > +PAD_CTL_DSE_87ohm               (3 << 3)
-> > +PAD_CTL_DSE_65ohm               (4 << 3)
-> > +PAD_CTL_DSE_52ohm               (5 << 3)
-> > +PAD_CTL_DSE_43ohm               (6 << 3)
-> > +PAD_CTL_DSE_37ohm               (7 << 3)
-> > +PAD_CTL_SRE_FAST                (1 << 0)
-> > +PAD_CTL_SRE_SLOW                (0 << 0)
-> 
-> A whole slew of these if not all correspond to the generic bindings.
-> 
-> I would consider augmenting the code in the driver to handle the generic
-> bindings *in addition* to the old legacy bindings, and use those over these
-> random custom bits.
-> 
-> Read drivers using CONFIG_GENERIC_PINCONF as an inspiration.
-> 
-> For example see commit
-> cefbf1a1b29531a970bc2908a50a75d6474fcc38
-> "pinctrl: sunxi: Support generic binding"
-> from Maxime Ripard, where he does a similar thing for sunxi.
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 
-I have look into the above commit on using generic binding. But I think the generic pinconf
-is not very easy to add in imx pinctrl Driver. imx pinctrl use a different way to parse the pin configure.
- 
-Each fsl,pin entry  looks like <PIN_FUNC_ID  CONFIG> in dts, the CONFIG is the pad setting value like
-pull-up, open-drain, drive strength etc. The above config bit definition is specific to each SOC in the PAD CTL register.
+The patch subject is inappropriate.  The patch adds a bindings not
+device driver.
 
-If we want set the pin config to enable hysteresis, 47KOhm Pull Up, 50Mhz speed, 80Ohm driver strength
-and Fast Slew Rate, then the CONFIG value should be 0x17059( ORs corresponding bit definition). This value will be set in
-PAD CTL register to config the corresponding pin.
-
-BR
-Jacky Bai
-
+> ---
+>  .../devicetree/bindings/thermal/zx2967-thermal.txt | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
 > 
-> Yours,
-> Linus Walleij
+> diff --git a/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt b/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
+> new file mode 100644
+> index 0000000..2633964
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
+> @@ -0,0 +1,22 @@
+> +* ZTE zx2967 family Thermal
+> +
+> +Required Properties:
+> +- compatible: should be one of the following.
+> +    * zte,zx2967-thermal
+> +    * zte,zx296718-thermal
+
+We usually use specific SoC name in compatible string to specify the
+programming model for the hardware.  That said, I do not think we need
+"zte,zx2967-thermal".
+
+> +- reg: physical base address of the controller and length of memory mapped
+> +    region.
+> +- clocks : Pairs of phandle and specifier referencing the controller's clocks.
+> +- clock-names: "tempsensor_gate" for the topcrm clock.
+> +	       "tempsensor_pclk" for the apb clock.
+
+In the context of tempsensor device, the "tempsensor_" in the clock
+names are not really necessary.
+
+> +- #thermal-sensor-cells: must be 0.
+> +
+> +Example:
+> +
+> +	tempsensor: tempsensor at 148a000 {
+> +		compatible = "zte,zx2967-thermal";
+
+"zte,zx296718-thermal"
+
+Shawn
+
+> +		reg = <0x0148a000 0x20>;
+> +		clocks = <&topcrm TEMPSENSOR_GATE>, <&audiocrm AUDIO_TS_PCLK>;
+> +		clock-names = "tempsensor_gate", "tempsensor_pclk";
+> +		#thermal-sensor-cells = <0>;
+> +	};
+> -- 
+> 2.7.4
+> 
