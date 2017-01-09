@@ -1,111 +1,70 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 9 Jan 2017 14:58:55 +0100
-Subject: mmc: sdhci-of-at91: Internal clock never stabilised
-In-Reply-To: <CAJP5LRMjVGWpHE5K8xZOb=m2wxy8qRxx5_BbLFEHuA13Rh_WoQ@mail.gmail.com>
-References: <1DC01DCD0F70AE4284AE3A5E8C726E225D20EDF1@Ex2010.q-core.co.il>
- <CAJP5LRNRSpMjdTFyL4R4ZN1tZAG0A=TKR5LRareg+TEJmnkd2Q@mail.gmail.com>
- <20170108125344.3iyfoodszupzgukk@piout.net>
- <20170109071900.fz2en246i7uqmavw@rfolt0960.corp.atmel.com>
- <CAJP5LRMjVGWpHE5K8xZOb=m2wxy8qRxx5_BbLFEHuA13Rh_WoQ@mail.gmail.com>
-Message-ID: <20170109135855.dquiysi5wnilujgp@rfolt0960.corp.atmel.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 9 Jan 2017 14:00:36 +0000
+Subject: Tegra baseline test results for v4.10-rc3
+Message-ID: <d19d0674-cc1d-6f76-47cb-c04b892b362a@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 12:44:42PM +0200, Alex Gershgorin wrote:
-> Hi Ludovic,
-> As we read the chip ID from CHIPID_CIDR register we get 0x8a5c08c0 (we
-> use ATSAMA5D27A-CU).
-> 
+Here are some basic Tegra test results for Linux v4.10-rc3.
+Logs and other details at:
 
-It seems the device you have is a rev A device, this issue should be fixed in
-the revision B.
+    https://nvtb.github.io//linux/test_v4.10-rc3/20170108150103/
 
-I say should, because the bug was identified and I provided a workaround with
-the use of our own set_clock function has been done. Unfortunately, even
-if it happens less frequently, it seems the bug is still here.
 
-The hardware part has been reworked on the revision B. I don't recall facing
-this issue again but I can't guarantee that it won't happen anymore
-since the root cause was not properly identified on rev A.
+Test summary
+------------
 
-Regards
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-Ludovic
+Build: Image:
+    Pass: ( 1/ 1): defconfig
 
-> 
-> Thanks,
-> Alex
-> 
-> On Mon, Jan 9, 2017 at 9:19 AM, Ludovic Desroches
-> <ludovic.desroches@atmel.com> wrote:
-> > Hi Alex,
-> >
-> > Which revision of SoC are you using?
-> >
-> > Regards
-> >
-> > Ludovic
-> >
-> > On Sun, Jan 08, 2017 at 01:53:44PM +0100, Alexandre Belloni wrote:
-> >> Hi,
-> >>
-> >> I think Cyrille worked on that a few month ago, maybe he has a comment.
-> >>
-> >> On 08/01/2017 at 14:07:53 +0200, Alex Gershgorin wrote :
-> >> > Hi All,
-> >> > We have two different HW platforms based on SAMA5D2 SoC (SAMA5D2 Xplained
-> >> > Board and our own HW).
-> >> > On both of them we are facing stabilization of the internal
-> >> > clock problem, it does not happen all the time but quite often.
-> >> > Please see below my Kernel boot messages:
-> >> >
-> >> > sdhci: Copyright(c) Pierre Ossman
-> >> > sdhci-pltfm: SDHCI platform and OF driver helper
-> >> > sdhci-at91 a0000000.sdio-host: update clk mul to 39 as gck rate is
-> >> > 480000000 Hz
-> >> > mmc0: Internal clock never stabilised.
-> >> > mmc0: Internal clock never stabilised.
-> >> > mmc0: SDHCI controller on a0000000.sdio-host [a0000000.sdio-host] using ADMA
-> >> >
-> >> > snip
-> >> >
-> >> > snip
-> >> >
-> >> > Waiting for root device /dev/mmcblk0p2...
-> >> > mmc0: Internal clock never stabilised.
-> >> > mmc0: Timeout waiting for hardware cmd interrupt.
-> >> > sdhci: =========== REGISTER DUMP (mmc0)===========
-> >> > sdhci: Sys addr: 0x00000000 | Version:  0x00001502
-> >> > sdhci: Blk size: 0x00000000 | Blk cnt:  0x00000000
-> >> > sdhci: Argument: 0x00000000 | Trn mode: 0x00000000
-> >> > sdhci: Present: 0x01ff0001 | Host ctl: 0x00000001
-> >> > sdhci: Power: 0x0000000f | Blk gap:  0x00000000
-> >> > sdhci: Wake-up: 0x00000000 | Clock:    0x0000ffe1
-> >> > sdhci: Timeout: 0x00000000 | Int stat: 0x00000000
-> >> > sdhci: Int enab: 0x00ff0003 | Sig enab: 0x00ff0003
-> >> > sdhci: AC12 err: 0x00000000 | Slot int: 0x00000000
-> >> > sdhci: Caps: 0x27ec0c8c | Caps_1: 0x00270f77
-> >> > sdhci: Cmd: 0x00000000 | Max curr: 0x00000000
-> >> > sdhci: Host ctl2: 0x00000000
-> >> > sdhci: ADMA Err: 0x00000000 | ADMA Ptr: 0x00000000
-> >> > sdhci: ===========================================
-> >> >
-> >> > Any direction to solve this problem?
-> >> >
-> >> > Thanks,
-> >> > Alex Gershgorin
-> >>
-> >> --
-> >> Alexandre Belloni, Free Electrons
-> >> Embedded Linux and Kernel engineering
-> >> http://free-electrons.com
-> >>
-> >> _______________________________________________
-> >> linux-arm-kernel mailing list
-> >> linux-arm-kernel at lists.infradead.org
-> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.10-rc2 (0c744ea4f77d72b3dcebb7a8f2684633ec79be88)):
+   text     data      bss    total  kernel
+  -8260     +664        0    -7596  defconfig
+   -396     -256        0     -652  multi_v7_defconfig
+   +632     +256        0     +888  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.10-rc2 (0c744ea4f77d72b3dcebb7a8f2684633ec79be88))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+	
+--
+nvpublic
