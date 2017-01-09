@@ -1,17 +1,17 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Mon, 9 Jan 2017 11:00:38 +0800
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 9 Jan 2017 11:00:25 +0800
 Subject: [PATCH v1 3/3] thermal: zx2967: add thermal driver for ZTE's
  zx2967 family
 In-Reply-To: <1483767488-19778-3-git-send-email-baoyou.xie@linaro.org>
 References: <1483767488-19778-1-git-send-email-baoyou.xie@linaro.org>
  <1483767488-19778-3-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <843c634a-c624-e7db-99f6-8efdc19d7243@linaro.org>
+Message-ID: <20170109030023.GK20956@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?01?07? 13:38, Baoyou Xie wrote:
+On Sat, Jan 07, 2017 at 01:38:08PM +0800, Baoyou Xie wrote:
 > This patch adds thermal driver for ZTE's zx2967 family.
->
+> 
 > Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 > ---
 >  drivers/thermal/Kconfig          |   6 +
@@ -19,14 +19,14 @@ On 2017?01?07? 13:38, Baoyou Xie wrote:
 >  drivers/thermal/zx2967_thermal.c | 241 +++++++++++++++++++++++++++++++++++++++
 >  3 files changed, 248 insertions(+)
 >  create mode 100644 drivers/thermal/zx2967_thermal.c
->
+> 
 > diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
 > index 18f2de6..0dd597e 100644
 > --- a/drivers/thermal/Kconfig
 > +++ b/drivers/thermal/Kconfig
 > @@ -445,3 +445,9 @@ config BCM2835_THERMAL
 >  	  Support for thermal sensors on Broadcom bcm2835 SoCs.
->
+>  
 >  endif
 > +
 > +config ZX2967_THERMAL
@@ -60,7 +60,6 @@ On 2017?01?07? 13:38, Baoyou Xie wrote:
 > + */
 > +
 > +#include <linux/module.h>
-Please follow alphabet sequence.
 > +#include <linux/device.h>
 > +#include <linux/io.h>
 > +#include <linux/err.h>
@@ -90,15 +89,19 @@ Please follow alphabet sequence.
 > +
 > +struct zx2967_thermal_priv {
 > +	struct zx2967_thermal_sensor	sensors[NUM_SENSORS];
+
+What's the point of defining an array with only one element?
+
 > +	struct mutex			lock;
 > +	struct clk			*clk_gate;
 > +	struct clk			*pclk;
 > +	void __iomem			*regs;
+
 > +	struct pinctrl			*pinmux_dvi0_d3;
 > +	struct pinctrl			*pinmux_dvi0_d4;
 > +	struct pinctrl			*pinmux_dvi0_d5;
 
-I do not see usage of pinmux_div0_d*, please remove it.
+These three pointers are not used.
 
 > +};
 > +
@@ -113,6 +116,9 @@ I do not see usage of pinmux_div0_d*, please remove it.
 > +	if (priv && priv->clk_gate)
 > +		clk_disable_unprepare(priv->clk_gate);
 > +	dev_info(dev, "suspended\n");
+
+Noisy message.
+
 > +
 > +	return 0;
 > +}
@@ -125,13 +131,15 @@ I do not see usage of pinmux_div0_d*, please remove it.
 > +
 > +	error = clk_prepare_enable(priv->clk_gate);
 > +	if (error)
-Use IS_ERR(ret) to check error.
 > +		return error;
 > +
 > +	error = clk_prepare_enable(priv->pclk);
 > +	if (error)
-Ditto.
 > +		return error;
+
+clk_disable_unprepare() should be called for priv->clk_gate before
+returning here.
+
 > +
 > +	dev_info(dev, "resumed\n");
 > +
@@ -150,16 +158,15 @@ Ditto.
 > +	mutex_lock(&priv->lock);
 > +
 > +	writel_relaxed(0, regs);
+
+I suggest we have a macro for register at offset 0 as well to improve
+the readability.
+
 > +	writel_relaxed(2, regs + ZX2967_THERMAL_DCF);
 > +
 > +	val = readl_relaxed(regs + ZX2967_THERMAL_SEL);
 > +	val &= ~ZX2967_THERMAL_ID_MASK;
 > +	sel_id = sensor->id ? 8 : 0x10;
-
-You can define a macro for 8 and 0x10. BTW: NUM_SENSORS is 1 currently, 
-you can change it to 2 if hardware support it. Or you can add TODO mark 
-for later work.
-
 > +	val |= sel_id;
 > +	writel_relaxed(val, regs + ZX2967_THERMAL_SEL);
 > +
@@ -168,16 +175,19 @@ for later work.
 > +		if (time_after(jiffies, timeout)) {
 > +			pr_err("*** Thermal sensor %d data timeout\n",
 > +			      sensor->id);
+
+dev_err?  And drop "*** ".
+
 > +			mutex_unlock(&priv->lock);
 > +			return -EIO;
+
+-ETIMEDOUT?
+
 > +		}
 > +	}
 > +
 > +	writel_relaxed(3, regs + ZX2967_THERMAL_DCF);
 > +	val = readl_relaxed(regs + ZX2967_THERMAL_CTRL) & 0xfff;
-
-Define 0xfff as a macro.
-
 > +	writel_relaxed(1, regs);
 > +
 > +	/** Calculate temperature */
@@ -216,8 +226,6 @@ Define 0xfff as a macro.
 > +
 > +	ret = clk_prepare_enable(priv->clk_gate);
 > +	if (ret) {
-Use IS_ERR(ret) to check error.
-
 > +		dev_err(&pdev->dev, "failed to enable converter clock: %d\n",
 > +			ret);
 > +		return ret;
@@ -232,11 +240,13 @@ Use IS_ERR(ret) to check error.
 > +
 > +	ret = clk_prepare_enable(priv->pclk);
 > +	if (ret) {
-Ditto.
-
 > +		dev_err(&pdev->dev, "failed to enable converter clock: %d\n",
 > +			ret);
 > +		return ret;
+
+The use count of enable and prepare on priv->clk_gate will be
+unbalanced.
+
 > +	}
 > +
 > +	mutex_init(&priv->lock);
@@ -248,8 +258,6 @@ Ditto.
 > +		sensor->tzd = thermal_zone_of_sensor_register(&pdev->dev,
 > +					i,
 > +					sensor,
-No need to create new line.
-
 > +					&zx2967_of_thermal_ops);
 > +		if (IS_ERR(sensor->tzd)) {
 > +			ret = PTR_ERR(sensor->tzd);
@@ -268,6 +276,11 @@ No need to create new line.
 > +						  priv->sensors[i].tzd);
 > +
 > +	return ret;
+
+Unbalanced clk_prepare_enable(priv->pclk).
+
+Shawn
+
 > +}
 > +
 > +static int zx2967_thermal_exit(struct platform_device *pdev)
@@ -289,11 +302,6 @@ No need to create new line.
 > +static const struct of_device_id zx2967_thermal_id_table[] = {
 > +	{ .compatible = "zte,zx2967-thermal" },
 > +	{ .compatible = "zte,zx296718-thermal" },
-
-Does the sensors that maps to the two compatibles have any difference? 
-If yes, we can add the difference with data member. If not, we can use 
-the same compatible string.
-
 > +	{}
 > +};
 > +MODULE_DEVICE_TABLE(of, zx2967_thermal_id_table);
@@ -315,4 +323,6 @@ the same compatible string.
 > +MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
 > +MODULE_DESCRIPTION("ZTE zx2967 thermal driver");
 > +MODULE_LICENSE("GPL");
->
+> -- 
+> 2.7.4
+> 
