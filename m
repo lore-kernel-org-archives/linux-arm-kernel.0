@@ -1,78 +1,163 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:29 -0500
-Subject: [RFC 33/55] KVM: arm/arm64: Remove unused params in mmu functions
+Date: Mon,  9 Jan 2017 01:24:28 -0500
+Subject: [RFC 32/55] KVM: arm/arm64: register GICH iodev for the guest
+ hypervisor
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-34-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-33-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+Register a device for the virtual interface control block(GICH) access
+from the guest hypervisor.
 
-stage2_flush_xxx functions take a pointer to the kvm struct as the first
-parameter but they are never used. Clean this up before modifying mmu
-code for nested virtualization support.
+TODO: Get GICH address from DT, which is hardcoded now.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm/kvm/mmu.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ arch/arm64/include/uapi/asm/kvm.h  |  6 ++++++
+ include/kvm/arm_vgic.h             |  5 ++++-
+ virt/kvm/arm/vgic/vgic-mmio.c      |  6 ++++++
+ virt/kvm/arm/vgic/vgic-v2-nested.c | 24 ++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-v2.c        |  7 +++++++
+ virt/kvm/arm/vgic/vgic.h           |  6 ++++++
+ 6 files changed, 53 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index a5265ed..57cb671 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -300,7 +300,7 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
- 	} while (pgd++, addr = next, addr != end);
- }
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 78117bf..3995d3d 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -99,6 +99,12 @@ struct kvm_regs {
+ #define KVM_ARM_VCPU_PMU_V3		3 /* Support guest PMUv3 */
+ #define KVM_ARM_VCPU_NESTED_VIRT	4 /* Support nested virtual EL2 */
  
--static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
-+static void stage2_flush_ptes(pmd_t *pmd,
- 			      phys_addr_t addr, phys_addr_t end)
++/* FIXME: This should come from DT */
++#ifdef CONFIG_KVM_ARM_NESTED_HYP
++#define KVM_VGIC_V2_GICH_BASE          0x08030000
++#define KVM_VGIC_V2_GICH_SIZE          0x2000
++#endif
++
+ struct kvm_vcpu_init {
+ 	__u32 target;
+ 	__u32 features[7];
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index fc882d6..5bda20c 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -125,7 +125,8 @@ enum iodev_type {
+ 	IODEV_CPUIF,
+ 	IODEV_DIST,
+ 	IODEV_REDIST,
+-	IODEV_ITS
++	IODEV_ITS,
++	IODEV_GICH,
+ };
+ 
+ struct vgic_io_device {
+@@ -198,6 +199,8 @@ struct vgic_dist {
+ 
+ 	struct vgic_io_device	dist_iodev;
+ 
++	struct vgic_io_device	hyp_iodev;
++
+ 	bool			has_its;
+ 
+ 	/*
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index 049c570..2e4097d 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -512,6 +512,9 @@ static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+ 	case IODEV_ITS:
+ 		data = region->its_read(vcpu->kvm, iodev->its, addr, len);
+ 		break;
++	case IODEV_GICH:
++		data = region->read(vcpu, addr, len);
++		break;
+ 	}
+ 
+ 	vgic_data_host_to_mmio_bus(val, len, data);
+@@ -543,6 +546,9 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+ 	case IODEV_ITS:
+ 		region->its_write(vcpu->kvm, iodev->its, addr, len, data);
+ 		break;
++	case IODEV_GICH:
++		region->write(vcpu, addr, len, data);
++		break;
+ 	}
+ 
+ 	return 0;
+diff --git a/virt/kvm/arm/vgic/vgic-v2-nested.c b/virt/kvm/arm/vgic/vgic-v2-nested.c
+index 85f646b..cb55324 100644
+--- a/virt/kvm/arm/vgic/vgic-v2-nested.c
++++ b/virt/kvm/arm/vgic/vgic-v2-nested.c
+@@ -206,6 +206,30 @@ static void vgic_mmio_write_v2_gich(struct kvm_vcpu *vcpu,
+ 		4 * VGIC_V2_MAX_LRS, VGIC_ACCESS_32bit),
+ };
+ 
++int vgic_register_gich_iodev(struct kvm *kvm, struct vgic_dist *dist)
++{
++	struct vgic_io_device *io_device = &kvm->arch.vgic.hyp_iodev;
++	int ret = 0;
++	unsigned int len;
++
++	len = KVM_VGIC_V2_GICH_SIZE;
++
++	io_device->regions = vgic_v2_gich_registers;
++	io_device->nr_regions = ARRAY_SIZE(vgic_v2_gich_registers);
++	kvm_iodevice_init(&io_device->dev, &kvm_io_gic_ops);
++
++	io_device->base_addr = KVM_VGIC_V2_GICH_BASE;
++	io_device->iodev_type = IODEV_GICH;
++	io_device->redist_vcpu = NULL;
++
++	mutex_lock(&kvm->slots_lock);
++	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, KVM_VGIC_V2_GICH_BASE,
++			len, &io_device->dev);
++	mutex_unlock(&kvm->slots_lock);
++
++	return ret;
++}
++
+ /*
+  * For LRs which have HW bit set such as timer interrupts, we modify them to
+  * have the host hardware interrupt number instead of the virtual one programmed
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index 9bab867..b8b73fd 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -280,6 +280,13 @@ int vgic_v2_map_resources(struct kvm *kvm)
+ 		goto out;
+ 	}
+ 
++	/* Register virtual GICH interface to kvm io bus */
++	ret = vgic_register_gich_iodev(kvm, dist);
++	if (ret) {
++		kvm_err("Unable to register VGIC GICH regions\n");
++		goto out;
++	}
++
+ 	if (!static_branch_unlikely(&vgic_v2_cpuif_trap)) {
+ 		ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
+ 					    kvm_vgic_global_state.vcpu_base,
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 2aef680..11d61a7 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -121,8 +121,14 @@ static inline int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
+ int vgic_init(struct kvm *kvm);
+ 
+ #ifdef CONFIG_KVM_ARM_NESTED_HYP
++int vgic_register_gich_iodev(struct kvm *kvm, struct vgic_dist *dist);
+ void vgic_init_nested(struct kvm_vcpu *vcpu);
+ #else
++static inline int vgic_register_gich_iodev(struct kvm *kvm,
++		struct vgic_dist *dist)
++{
++	return 0;
++}
+ static inline void vgic_init_nested(struct kvm_vcpu *vcpu)
  {
- 	pte_t *pte;
-@@ -312,7 +312,7 @@ static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
- }
- 
--static void stage2_flush_pmds(struct kvm *kvm, pud_t *pud,
-+static void stage2_flush_pmds(pud_t *pud,
- 			      phys_addr_t addr, phys_addr_t end)
- {
- 	pmd_t *pmd;
-@@ -325,12 +325,12 @@ static void stage2_flush_pmds(struct kvm *kvm, pud_t *pud,
- 			if (pmd_thp_or_huge(*pmd))
- 				kvm_flush_dcache_pmd(*pmd);
- 			else
--				stage2_flush_ptes(kvm, pmd, addr, next);
-+				stage2_flush_ptes(pmd, addr, next);
- 		}
- 	} while (pmd++, addr = next, addr != end);
- }
- 
--static void stage2_flush_puds(struct kvm *kvm, pgd_t *pgd,
-+static void stage2_flush_puds(pgd_t *pgd,
- 			      phys_addr_t addr, phys_addr_t end)
- {
- 	pud_t *pud;
-@@ -343,7 +343,7 @@ static void stage2_flush_puds(struct kvm *kvm, pgd_t *pgd,
- 			if (stage2_pud_huge(*pud))
- 				kvm_flush_dcache_pud(*pud);
- 			else
--				stage2_flush_pmds(kvm, pud, addr, next);
-+				stage2_flush_pmds(pud, addr, next);
- 		}
- 	} while (pud++, addr = next, addr != end);
- }
-@@ -359,7 +359,7 @@ static void stage2_flush_memslot(struct kvm *kvm,
- 	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
- 	do {
- 		next = stage2_pgd_addr_end(addr, end);
--		stage2_flush_puds(kvm, pgd, addr, next);
-+		stage2_flush_puds(pgd, addr, next);
- 	} while (pgd++, addr = next, addr != end);
- }
- 
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
 -- 
 1.9.1
