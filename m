@@ -1,72 +1,32 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 09 Jan 2017 20:01:18 +0000
-Subject: Applied "ASoC: sun4i-codec: Add "Right Mixer" to "Line Out Mono
- Diff." route" to the asoc tree
-In-Reply-To: <20161107100703.5586-4-wens@csie.org>
-Message-ID: <E1cQg86-0006pr-TO@debutante>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 9 Jan 2017 21:06:29 +0100
+Subject: [PATCH 0/3] watchdog: imx2: handle WMCR only being available on
+ i.MX35 and later
+In-Reply-To: <20170109171959.GA7274@roeck-us.net>
+References: <20170109095039.11979-1-u.kleine-koenig@pengutronix.de>
+ <20170109171959.GA7274@roeck-us.net>
+Message-ID: <20170109200629.jwknq6lauknlzsqi@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Mon, Jan 09, 2017 at 09:19:59AM -0800, Guenter Roeck wrote:
+> On Mon, Jan 09, 2017 at 10:50:36AM +0100, Uwe Kleine-K?nig wrote:
+> > this is my approach to fix the issue reported by Vladimir Zapolskiy.
+> > 
+> So ...
+> 
+> Unfortunately, I don't see any convergence on this issue. My take is that,
+> given the lack of convergence, it can't be that severe since no one feels
+> that it is important enough to get it fixed one way or the other to budge
+> from your positions.
 
-   ASoC: sun4i-codec: Add "Right Mixer" to "Line Out Mono Diff." route
+I didn't get any critic for my patch set yet apart from being a second
+one to address the same problem. So until proven differently I assume
+that mine is fine.
 
-has been applied to the asoc tree at
+Best regards
+Uwe
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 19426bdedb72b965db0ebf2106e95e9eeb3b5935 Mon Sep 17 00:00:00 2001
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Sun, 8 Jan 2017 02:57:06 +0800
-Subject: [PATCH] ASoC: sun4i-codec: Add "Right Mixer" to "Line Out Mono Diff."
- route
-
-The mono differential output for "Line Out" downmixes the stereo audio
-from the mixer, instead of just taking the left channel.
-
-Add a route from the "Right Mixer" to "Line Out Source Playback Route"
-through the "Mono Differential" path, so DAPM doesn't shut down
-everything if the left channel is muted.
-
-Fixes: 0f909f98d7cb ("ASoC: sun4i-codec: Add support for A31 Line Out
-		      playback")
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/sunxi/sun4i-codec.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 848af01692a0..c3aab10fa085 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -1058,6 +1058,7 @@ static const struct snd_soc_dapm_route sun6i_codec_codec_dapm_routes[] = {
- 	{ "Line Out Source Playback Route", "Stereo", "Left Mixer" },
- 	{ "Line Out Source Playback Route", "Stereo", "Right Mixer" },
- 	{ "Line Out Source Playback Route", "Mono Differential", "Left Mixer" },
-+	{ "Line Out Source Playback Route", "Mono Differential", "Right Mixer" },
- 	{ "LINEOUT", NULL, "Line Out Source Playback Route" },
- 
- 	/* ADC Routes */
 -- 
-2.11.0
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
