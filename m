@@ -1,83 +1,244 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:27 -0500
-Subject: [RFC 31/55] KVM: arm/arm64: Inject maintenance interrupts to the
- guest hypervisor
+Date: Mon,  9 Jan 2017 01:24:23 -0500
+Subject: [RFC 27/55] KVM: arm/arm64: Emulate GICH interface on GICv2
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-32-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-28-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+Emulate GICH interface accesses from the guest hypervisor.
 
-If we exit a nested VM with a pending maintenance interrupt from the
-GIC, then we need to forward this to the guest hypervisor so that it can
-re-sync the appropriate LRs and sample level triggered interrupts again.
-
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+Signed-off-by: Shih-Wei Li <shihwei@cs.columbia.edu>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/context.c           |  3 +++
- include/kvm/arm_vgic.h             |  2 ++
- virt/kvm/arm/vgic/vgic-v2-nested.c | 16 ++++++++++++++++
- 3 files changed, 21 insertions(+)
+ arch/arm64/kvm/Makefile            |   1 +
+ virt/kvm/arm/vgic/vgic-v2-nested.c | 207 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 208 insertions(+)
+ create mode 100644 virt/kvm/arm/vgic/vgic-v2-nested.c
 
-diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
-index 7a94c9d..a93ffe4 100644
---- a/arch/arm64/kvm/context.c
-+++ b/arch/arm64/kvm/context.c
-@@ -140,6 +140,9 @@ static void sync_shadow_el1_state(struct kvm_vcpu *vcpu, bool setup)
- void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
- {
- 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
-+
-+	vgic_handle_nested_maint_irq(vcpu);
-+
- 	if (unlikely(vcpu_mode_el2(vcpu))) {
- 		ctxt->hw_pstate = *vcpu_cpsr(vcpu) & ~PSR_MODE_MASK;
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index 9c35e9a..8573faf 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -37,3 +37,4 @@ kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
  
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 484f6b1..fc882d6 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -315,9 +315,11 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- #ifdef CONFIG_KVM_ARM_NESTED_HYP
- void vgic_v2_setup_shadow_state(struct kvm_vcpu *vcpu);
- void vgic_v2_restore_shadow_state(struct kvm_vcpu *vcpu);
-+void vgic_handle_nested_maint_irq(struct kvm_vcpu *vcpu);
- #else
- static inline void vgic_v2_setup_shadow_state(struct kvm_vcpu *vcpu) { }
- static inline void vgic_v2_restore_shadow_state(struct kvm_vcpu *vcpu) { }
-+static inline void vgic_handle_nested_maint_irq(struct kvm_vcpu *vcpu) { }
- #endif
- 
- #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+ kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += handle_exit_nested.o
+ kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += emulate-nested.o
++kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += $(KVM)/arm/vgic/vgic-v2-nested.o
 diff --git a/virt/kvm/arm/vgic/vgic-v2-nested.c b/virt/kvm/arm/vgic/vgic-v2-nested.c
-index a992da5..85f646b 100644
---- a/virt/kvm/arm/vgic/vgic-v2-nested.c
+new file mode 100644
+index 0000000..b13128e
+--- /dev/null
 +++ b/virt/kvm/arm/vgic/vgic-v2-nested.c
-@@ -300,6 +300,22 @@ void vgic_v2_restore_shadow_state(struct kvm_vcpu *vcpu)
- 	vgic_cpu->nested_vgic_v2 = vgic_cpu->shadow_vgic_v2;
- }
- 
-+void vgic_handle_nested_maint_irq(struct kvm_vcpu *vcpu)
+@@ -0,0 +1,207 @@
++#include <linux/cpu.h>
++#include <linux/kvm.h>
++#include <linux/kvm_host.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/uaccess.h>
++
++#include <linux/irqchip/arm-gic.h>
++
++#include <asm/kvm_emulate.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_mmu.h>
++#include <kvm/arm_vgic.h>
++
++#include "vgic.h"
++#include "vgic-mmio.h"
++
++static inline struct vgic_v2_cpu_if *vcpu_nested_if(struct kvm_vcpu *vcpu)
++{
++	return &vcpu->arch.vgic_cpu.nested_vgic_v2;
++}
++
++static inline struct vgic_v2_cpu_if *vcpu_shadow_if(struct kvm_vcpu *vcpu)
++{
++	return &vcpu->arch.vgic_cpu.shadow_vgic_v2;
++}
++
++static unsigned long vgic_mmio_read_v2_vtr(struct kvm_vcpu *vcpu,
++					   gpa_t addr, unsigned int len)
++{
++	u32 reg;
++
++	reg = kvm_vgic_global_state.nr_lr - 1;
++	reg |= 0b100 << 26;
++	reg |= 0b100 << 29;
++
++	return reg;
++}
++
++static inline bool lr_triggers_eoi(u32 lr)
++{
++	return !(lr & (GICH_LR_STATE | GICH_LR_HW)) && (lr & GICH_LR_EOI);
++}
++
++static unsigned long get_eisr(struct kvm_vcpu *vcpu, bool upper_reg)
++{
++	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
++	int max_lr = upper_reg ? 64 : 32;
++	int min_lr = upper_reg ? 32 : 0;
++	int nr_lr = min(kvm_vgic_global_state.nr_lr, max_lr);
++	int i;
++	u32 reg = 0;
++
++	for (i = min_lr; i < nr_lr; i++) {
++		if (lr_triggers_eoi(cpu_if->vgic_lr[i]))
++			reg |= BIT(i - min_lr);
++	}
++
++	return reg;
++}
++
++static unsigned long vgic_mmio_read_v2_eisr0(struct kvm_vcpu *vcpu,
++					     gpa_t addr, unsigned int len)
++{
++	return get_eisr(vcpu, false);
++}
++
++static unsigned long vgic_mmio_read_v2_eisr1(struct kvm_vcpu *vcpu,
++					     gpa_t addr, unsigned int len)
++{
++	return get_eisr(vcpu, true);
++}
++
++static u32 get_elrsr(struct kvm_vcpu *vcpu, bool upper_reg)
++{
++	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
++	int max_lr = upper_reg ? 64 : 32;
++	int min_lr = upper_reg ? 32 : 0;
++	int nr_lr = min(kvm_vgic_global_state.nr_lr, max_lr);
++	u32 reg = 0;
++	int i;
++
++	for (i = min_lr; i < nr_lr; i++) {
++		if (!(cpu_if->vgic_lr[i] & GICH_LR_STATE))
++			reg |= BIT(i - min_lr);
++	}
++
++	return reg;
++}
++
++static unsigned long vgic_mmio_read_v2_elrsr0(struct kvm_vcpu *vcpu,
++					      gpa_t addr, unsigned int len)
++{
++	return get_elrsr(vcpu, false);
++}
++
++static unsigned long vgic_mmio_read_v2_elrsr1(struct kvm_vcpu *vcpu,
++					      gpa_t addr, unsigned int len)
++{
++	return get_elrsr(vcpu, true);
++}
++
++static unsigned long vgic_mmio_read_v2_misr(struct kvm_vcpu *vcpu,
++					    gpa_t addr, unsigned int len)
++{
++	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
++	int nr_lr = kvm_vgic_global_state.nr_lr;
++	u32 reg = 0;
++
++	if (vgic_mmio_read_v2_eisr0(vcpu, addr, len) ||
++			vgic_mmio_read_v2_eisr1(vcpu, addr, len))
++		reg |= GICH_MISR_EOI;
++
++	if (cpu_if->vgic_hcr & GICH_HCR_UIE) {
++		u32 elrsr0 = vgic_mmio_read_v2_elrsr0(vcpu, addr, len);
++		u32 elrsr1 = vgic_mmio_read_v2_elrsr1(vcpu, addr, len);
++		int used_lrs;
++
++		used_lrs = nr_lr - (hweight32(elrsr0) + hweight32(elrsr1));
++		if (used_lrs <= 1)
++			reg |= GICH_MISR_U;
++	}
++
++	/* TODO: Support remaining bits in this register */
++	return reg;
++}
++
++static unsigned long vgic_mmio_read_v2_gich(struct kvm_vcpu *vcpu,
++					    gpa_t addr, unsigned int len)
++{
++	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
++	u32 value;
++
++	switch (addr & 0xfff) {
++	case GICH_HCR:
++		value = cpu_if->vgic_hcr;
++		break;
++	case GICH_VMCR:
++		value = cpu_if->vgic_vmcr;
++		break;
++	case GICH_APR:
++		value = cpu_if->vgic_apr;
++		break;
++	case GICH_LR0 ... (GICH_LR0 + 4 * (VGIC_V2_MAX_LRS - 1)):
++		value = cpu_if->vgic_lr[(addr & 0xff) >> 2];
++		break;
++	default:
++		return 0;
++	}
++
++	return value;
++}
++
++static void vgic_mmio_write_v2_gich(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len,
++				    unsigned long val)
 +{
 +	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
 +
-+	/*
-+	 * If we exit a nested VM with a pending maintenance interrupt from the
-+	 * GIC, then we need to forward this to the guest hypervisor so that it
-+	 * can re-sync the appropriate LRs and sample level triggered interrupts
-+	 * again.
-+	 */
-+	if (vcpu_el2_imo_is_set(vcpu) && !vcpu_mode_el2(vcpu) &&
-+	    (cpu_if->vgic_hcr & GICH_HCR_EN) &&
-+	    vgic_mmio_read_v2_misr(vcpu, 0, 0))
-+		kvm_inject_nested_irq(vcpu);
++	switch (addr & 0xfff) {
++	case GICH_HCR:
++		cpu_if->vgic_hcr = val;
++		break;
++	case GICH_VMCR:
++		cpu_if->vgic_vmcr = val;
++		break;
++	case GICH_APR:
++		cpu_if->vgic_apr = val;
++		break;
++	case GICH_LR0 ... (GICH_LR0 + 4 * (VGIC_V2_MAX_LRS - 1)):
++		cpu_if->vgic_lr[(addr & 0xff) >> 2] = val;
++		break;
++	}
 +}
 +
- void vgic_init_nested(struct kvm_vcpu *vcpu)
- {
- 	vgic_v2_setup_shadow_state(vcpu);
++static const struct vgic_register_region vgic_v2_gich_registers[] = {
++	REGISTER_DESC_WITH_LENGTH(GICH_HCR,
++		vgic_mmio_read_v2_gich, vgic_mmio_write_v2_gich, 4,
++		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GICH_VTR,
++		vgic_mmio_read_v2_vtr, vgic_mmio_write_wi, 4,
++		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GICH_VMCR,
++		vgic_mmio_read_v2_gich, vgic_mmio_write_v2_gich, 4,
++		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GICH_MISR,
++		vgic_mmio_read_v2_misr, vgic_mmio_write_wi, 4,
++		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GICH_EISR0,
++		vgic_mmio_read_v2_eisr0, vgic_mmio_write_wi, 4,
++		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GICH_EISR1,
++		vgic_mmio_read_v2_eisr1, vgic_mmio_write_wi, 4,
++		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GICH_ELRSR0,
++		vgic_mmio_read_v2_elrsr0, vgic_mmio_write_wi, 4,
++		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GICH_ELRSR1,
++		vgic_mmio_read_v2_elrsr1, vgic_mmio_write_wi, 4,
++		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GICH_APR,
++		vgic_mmio_read_v2_gich, vgic_mmio_write_v2_gich, 4,
++		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GICH_LR0,
++		vgic_mmio_read_v2_gich, vgic_mmio_write_v2_gich,
++		4 * VGIC_V2_MAX_LRS, VGIC_ACCESS_32bit),
++};
 -- 
 1.9.1
