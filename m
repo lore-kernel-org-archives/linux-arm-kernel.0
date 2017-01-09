@@ -1,39 +1,36 @@
-From: bjsprakash.linux@gmail.com (Prakash B)
-Date: Mon, 9 Jan 2017 11:45:28 +0530
-Subject: [PATCH v3] arm64: mm: Fix NOMAP page initialization
-In-Reply-To: <4fbd559b-b4f2-2c89-3024-5d1137ff170d@linaro.org>
-References: <20161216165437.21612-1-rrichter@cavium.com>
- <CAKv+Gu_SmTNguC=tSCwYOL2kx-DogLvSYRZc56eGP=JhdrUOsA@mail.gmail.com>
- <c74d6ec6-16ba-dccc-3b0d-a8bedcb46dc5@linaro.org>
- <cbbf14fd-a1cc-2463-ba67-acd6d61e9db1@linaro.org>
- <CACJhumfqWkXXpbJomjJ1jM5B3kG+1Jk9EvGWR50_u-AO1ySXfg@mail.gmail.com>
- <4fbd559b-b4f2-2c89-3024-5d1137ff170d@linaro.org>
-Message-ID: <CACJhumf4Ej4m5oPeVp1uKiYgk8LO-1W2L+ExhH6hti+yJXXnqA@mail.gmail.com>
+From: jintack@cs.columbia.edu (Jintack Lim)
+Date: Mon,  9 Jan 2017 01:24:00 -0500
+Subject: [RFC 04/55] KVM: arm64: Allow userspace to set PSR_MODE_EL2x
+In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-5-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Hanjun ,
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
+We were not allowing userspace to set a more privileged mode for the VCPU
+than EL1, but now that we support nesting with a virtual EL2 mode, do
+allow this!
 
-On Mon, Jan 9, 2017 at 10:39 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> Hi Prakash,
-> I didn't test "cpuset01" on D05 but according to the test in
-> Linaro, LTP full test is passed on D05 with Ard's 2 patches.
->
->>
->> Any idea what might be causing this issue.
->
->
-> Since it's not happening on D05, maybe it's related to
-> the firmware? (just a wild guess...)
->
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+---
+ arch/arm64/kvm/guest.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
- Used same firmware b/w 4.4 kernel and 4.9 (and   above kernels) .
-Test passed wtih 4.4 kernel and didn't generated  any crashes or
-dumps.
-
-If there is more observation I will  send a  mail  or I will start a
-separate mail thread.
-
-Thanks,
-Prakash B
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 3f9e157..6b9f38a 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -117,6 +117,8 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 		case PSR_MODE_EL0t:
+ 		case PSR_MODE_EL1t:
+ 		case PSR_MODE_EL1h:
++		case PSR_MODE_EL2h:
++		case PSR_MODE_EL2t:
+ 			break;
+ 		default:
+ 			err = -EINVAL;
+-- 
+1.9.1
