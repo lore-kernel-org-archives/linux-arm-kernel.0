@@ -1,38 +1,39 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 9 Jan 2017 12:39:32 -0600
-Subject: [PATCHv3 1/5] clk: mvebu: support for 98DX3236 SoC
-In-Reply-To: <20170106041517.9589-2-chris.packham@alliedtelesis.co.nz>
+Date: Mon, 9 Jan 2017 12:40:38 -0600
+Subject: [PATCHv3 2/5] arm: mvebu: support for SMP on 98DX3336 SoC
+In-Reply-To: <20170106041517.9589-3-chris.packham@alliedtelesis.co.nz>
 References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
  <20170106041517.9589-1-chris.packham@alliedtelesis.co.nz>
- <20170106041517.9589-2-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170109183932.hyuwkhyrewxiaxuq@rob-hp-laptop>
+ <20170106041517.9589-3-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20170109184038.bz3oqyvtbua562pl@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 05:14:58PM +1300, Chris Packham wrote:
-> The 98DX3236, 98DX3336, 98DX4521 and variants have a different TCLK from
-> the Armada XP (200MHz vs 250MHz). The CPU core clock is fixed at 800MHz.
-> 
-> The clock gating options are a subset of those on the Armada XP.
-> 
-> The core clock divider is different to the Armada XP also.
+On Fri, Jan 06, 2017 at 05:14:59PM +1300, Chris Packham wrote:
+> Compared to the armada-xp the 98DX3336 uses different registers to set
+> the boot address for the secondary CPU so a new enable-method is needed.
+> This will only work if the machine definition doesn't define an overall
+> smp_ops because there is not currently a way of overriding this from the
+> device tree if it is set in the machine definition.
 > 
 > Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 > ---
 >     Changes in v2:
->     - Update devicetree binding documentation for new compatible string
+>     - Document new enable-method value
+>     - Correct some references from 98DX4521 to 98DX3236
 >     
 >     Changes in v3:
->     - Add 98dx3236 support to mvebu/clk-corediv.c rather than creating a new
->       driver.
->     - Document mv98dx3236-corediv-clock binding
+>     - Simplify mv98dx3236_resume_init by using of_io_request_and_map()
 > 
->  .../bindings/clock/mvebu-corediv-clock.txt         |  1 +
->  .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |  1 +
+>  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
+>  .../bindings/arm/marvell/98dx3236-resume-ctrl.txt  | 18 ++++++++
 
 Acked-by: Rob Herring <robh@kernel.org>
 
->  drivers/clk/mvebu/armada-xp.c                      | 42 ++++++++++++++++++++++
->  drivers/clk/mvebu/clk-corediv.c                    | 23 ++++++++++++
->  drivers/clk/mvebu/clk-cpu.c                        | 31 ++++++++++++++--
->  5 files changed, 96 insertions(+), 2 deletions(-)
+>  arch/arm/mach-mvebu/Makefile                       |  1 +
+>  arch/arm/mach-mvebu/common.h                       |  1 +
+>  arch/arm/mach-mvebu/platsmp.c                      | 43 ++++++++++++++++++
+>  arch/arm/mach-mvebu/pmsu-98dx3236.c                | 52 ++++++++++++++++++++++
+>  6 files changed, 116 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/marvell/98dx3236-resume-ctrl.txt
+>  create mode 100644 arch/arm/mach-mvebu/pmsu-98dx3236.c
