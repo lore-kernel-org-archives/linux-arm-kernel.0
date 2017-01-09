@@ -1,36 +1,43 @@
-From: fkan@apm.com (Feng Kan)
-Date: Mon, 9 Jan 2017 09:37:55 -0800
-Subject: APM smmu implementation
-In-Reply-To: <20170109105421.GA21398@arm.com>
-References: <CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g@mail.gmail.com>
- <20170109105421.GA21398@arm.com>
-Message-ID: <CAL85gmA-14azx0RUX7jNNZbWDtkumGyYYBYEM6yHXUfSui1GAA@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 9 Jan 2017 19:38:03 +0200
+Subject: [PATCH v1.1] ARM: multi_v7_defconfig: Enable power sequence for
+ Odroid U3
+In-Reply-To: <d8ee24b1-9d6b-e76f-b5ef-71706efbf9e5@osg.samsung.com>
+References: <20170107085203.4431-5-krzk@kernel.org>
+ <20170107091651.10560-1-krzk@kernel.org>
+ <d8ee24b1-9d6b-e76f-b5ef-71706efbf9e5@osg.samsung.com>
+Message-ID: <CAJKOXPdODg2gCXP-BCRhDZAc2+o1J7Ek9iLaYF7hn_R2mNiK3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 9, 2017 at 2:54 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Jan 06, 2017 at 03:21:34PM -0800, Feng Kan wrote:
->> The APM IOMMU implementation is mostly just the ARM SMMU 500 variant.
->> However, our internal bus is only 42 bits wide. Our IAS field is coded
->> as 48 bits, which cause IPA to truncated to 42 bits on the physical
->> bus. In order for our system to work with the arm-smmu.c, there needs
->> to be a way to force the ipa_size to 42. The current internal solution
->> is to use the cpuid, but that is quite ugly. I was thinking of using
->> the model
+On Mon, Jan 9, 2017 at 6:24 PM, Javier Martinez Canillas
+<javier@osg.samsung.com> wrote:
+> Hello Krzysztof,
 >
-> Just so I understand, what are the UBS and OAS values on your part?
+> I think it would had been clearer if the subject prefix was "[PATCH v1.1 4/4]" :)
 
-UBS/OAS/IAS are all default to 5.
+Ah, yes.
+
 >
->> as indication to right the ipa_size, but I am not too sure of the ACPI
->> side. Would it be okay to add an APM MMU500 variant? I would also
->> appreciated it if you guys have any alternate solutions.
+> On 01/07/2017 06:16 AM, Krzysztof Kozlowski wrote:
+>> Odroid U3 needs a power sequence for lan9730, if it was enabled by
+>> bootloader.  Also enable the USB3503 HSCI to USB2.0 driver (device
+>> is present on Odroid U3).
+>>
+>> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+>>
+>> ---
+>>
 >
-> For this sort of implementation erratum, I think using the model field
-> is the right thing to do. However, you'll need to get your model registered
-> with IORT, so I've added Charles to cc since he maintains that document.
->
-> Also, please add a device-tree property to override the IAS once you
-> start writing patches.
->
-> Will
+> Do you think that makes sense to also enable GPIO_SYS for debugging
+> purposes as you do in patch 3/4?
+
+I like the GPIO_SYSFS interface because it is easy to use. However
+now, after your question, I found this:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-November/470154.html
+ARM/ARM64: defconfig: drop GPIO_SYSFS on multiplatforms
+
+... so instead I will drop it from exynos_defconfig.
+
+Best regards,
+Krzysztof
