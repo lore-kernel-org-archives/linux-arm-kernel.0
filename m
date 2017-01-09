@@ -1,252 +1,273 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:34 -0500
-Subject: [RFC 38/55] KVM: arm/arm64: Make mmu functions non-static
+Date: Mon,  9 Jan 2017 01:24:39 -0500
+Subject: [RFC 43/55] KVM: arm/arm64: Handle shadow stage 2 page faults
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-39-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-44-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Make mmu functions non-static so that we can reuse those functions
-to support mmu for the nested VMs.
+If we are faulting on a shadow stage 2 translation, we have to take
+extra care in faulting in a page, because we have to collapse the two
+levels of stage 2 paging by walking the L2-to-L1 stage 2 page tables in
+software.
+
+This approach tries to integrate as much as possible with the existing
+code.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm/kvm/mmu.c               | 90 +++++++++++++++++++++++-----------------
- arch/arm64/include/asm/kvm_mmu.h |  9 ++++
- 2 files changed, 61 insertions(+), 38 deletions(-)
+ arch/arm/include/asm/kvm_emulate.h   |  7 ++++
+ arch/arm/kvm/mmio.c                  | 12 +++---
+ arch/arm/kvm/mmu.c                   | 75 ++++++++++++++++++++++++++++--------
+ arch/arm64/include/asm/kvm_emulate.h |  9 +++++
+ 4 files changed, 82 insertions(+), 21 deletions(-)
 
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index 6285f4f..dfc53ce 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -309,4 +309,11 @@ static inline struct kvm_s2_vmid *vcpu_get_active_vmid(struct kvm_vcpu *vcpu)
+ {
+ 	return &vcpu->kvm->arch.mmu.vmid;
+ }
++
++/* arm architecture doesn't support the nesting */
++static inline bool kvm_is_shadow_s2_fault(struct kvm_vcpu *vcpu)
++{
++	return false;
++}
++
+ #endif /* __ARM_KVM_EMULATE_H__ */
+diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+index b6e715f..a1009c2 100644
+--- a/arch/arm/kvm/mmio.c
++++ b/arch/arm/kvm/mmio.c
+@@ -153,7 +153,7 @@ static int decode_hsr(struct kvm_vcpu *vcpu, bool *is_write, int *len)
+ }
+ 
+ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+-		 phys_addr_t fault_ipa)
++		 phys_addr_t ipa)
+ {
+ 	unsigned long data;
+ 	unsigned long rt;
+@@ -182,22 +182,22 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		data = vcpu_data_guest_to_host(vcpu, vcpu_get_reg(vcpu, rt),
+ 					       len);
+ 
+-		trace_kvm_mmio(KVM_TRACE_MMIO_WRITE, len, fault_ipa, data);
++		trace_kvm_mmio(KVM_TRACE_MMIO_WRITE, len, ipa, data);
+ 		kvm_mmio_write_buf(data_buf, len, data);
+ 
+-		ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, fault_ipa, len,
++		ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, ipa, len,
+ 				       data_buf);
+ 	} else {
+ 		trace_kvm_mmio(KVM_TRACE_MMIO_READ_UNSATISFIED, len,
+-			       fault_ipa, 0);
++			       ipa, 0);
+ 
+-		ret = kvm_io_bus_read(vcpu, KVM_MMIO_BUS, fault_ipa, len,
++		ret = kvm_io_bus_read(vcpu, KVM_MMIO_BUS, ipa, len,
+ 				      data_buf);
+ 	}
+ 
+ 	/* Now prepare kvm_run for the potential return to userland. */
+ 	run->mmio.is_write	= is_write;
+-	run->mmio.phys_addr	= fault_ipa;
++	run->mmio.phys_addr	= ipa;
+ 	run->mmio.len		= len;
+ 
+ 	if (!ret) {
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 56358fa..98b42e8 100644
+index 1677a87..710ae60 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -301,7 +301,7 @@ static void unmap_stage2_puds(struct kvm_s2_mmu *mmu, pgd_t *pgd,
+@@ -1072,10 +1072,10 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+ 	return ret;
  }
  
- /**
-- * unmap_stage2_range -- Clear stage2 page table entries to unmap a range
-+ * kvm_unmap_stage2_range -- Clear stage2 page table entries to unmap a range
-  * @kvm:   The VM pointer
-  * @start: The intermediate physical base address of the range to unmap
-  * @size:  The size of the area to unmap
-@@ -311,8 +311,7 @@ static void unmap_stage2_puds(struct kvm_s2_mmu *mmu, pgd_t *pgd,
-  * destroying the VM), otherwise another faulting VCPU may come in and mess
-  * with things behind our backs.
-  */
--static void unmap_stage2_range(struct kvm_s2_mmu *mmu,
--			       phys_addr_t start, u64 size)
-+void kvm_unmap_stage2_range(struct kvm_s2_mmu *mmu, phys_addr_t start, u64 size)
+-static bool transparent_hugepage_adjust(kvm_pfn_t *pfnp, phys_addr_t *ipap)
++static bool transparent_hugepage_adjust(kvm_pfn_t *pfnp, gfn_t gfn,
++					phys_addr_t *ipap)
  {
- 	pgd_t *pgd;
- 	phys_addr_t addr = start, end = start + size;
-@@ -374,11 +373,10 @@ static void stage2_flush_puds(pgd_t *pgd,
- 	} while (pud++, addr = next, addr != end);
+ 	kvm_pfn_t pfn = *pfnp;
+-	gfn_t gfn = *ipap >> PAGE_SHIFT;
+ 
+ 	if (PageTransCompoundMap(pfn_to_page(pfn))) {
+ 		unsigned long mask;
+@@ -1291,13 +1291,15 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
  }
  
--static void stage2_flush_memslot(struct kvm_s2_mmu *mmu,
--				 struct kvm_memory_slot *memslot)
-+void kvm_stage2_flush_range(struct kvm_s2_mmu *mmu,
-+			    phys_addr_t start, phys_addr_t end)
+ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+-			  struct kvm_memory_slot *memslot, unsigned long hva,
+-			  unsigned long fault_status)
++			  struct kvm_s2_trans *nested,
++			  struct kvm_memory_slot *memslot,
++			  unsigned long hva, unsigned long fault_status)
  {
--	phys_addr_t addr = memslot->base_gfn << PAGE_SHIFT;
--	phys_addr_t end = addr + PAGE_SIZE * memslot->npages;
-+	phys_addr_t addr = start;
- 	phys_addr_t next;
- 	pgd_t *pgd;
+ 	int ret;
+ 	bool write_fault, writable, hugetlb = false, force_pte = false;
+ 	unsigned long mmu_seq;
+-	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
++	phys_addr_t ipa = fault_ipa;
++	gfn_t gfn;
+ 	struct kvm *kvm = vcpu->kvm;
+ 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
+ 	struct vm_area_struct *vma;
+@@ -1323,9 +1325,23 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		return -EFAULT;
+ 	}
  
-@@ -389,6 +387,15 @@ static void stage2_flush_memslot(struct kvm_s2_mmu *mmu,
- 	} while (pgd++, addr = next, addr != end);
- }
- 
-+static void stage2_flush_memslot(struct kvm_s2_mmu *mmu,
-+				 struct kvm_memory_slot *memslot)
-+{
-+	phys_addr_t start = memslot->base_gfn << PAGE_SHIFT;
-+	phys_addr_t end = start + PAGE_SIZE * memslot->npages;
+-	if (is_vm_hugetlb_page(vma) && !logging_active) {
++	if (kvm_is_shadow_s2_fault(vcpu)) {
++		ipa = nested->output;
 +
-+	kvm_stage2_flush_range(mmu, start, end);
++		/*
++		 * If we're about to create a shadow stage 2 entry, then we
++		 * can only create huge mapings if the guest hypervior also
++		 * uses a huge mapping.
++		 */
++		if (nested->block_size != PMD_SIZE)
++			force_pte = true;
++	}
++	gfn = ipa >> PAGE_SHIFT;
++
++
++	if (!force_pte && is_vm_hugetlb_page(vma) && !logging_active) {
+ 		hugetlb = true;
+-		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
++		gfn = (ipa & PMD_MASK) >> PAGE_SHIFT;
+ 	} else {
+ 		/*
+ 		 * Pages belonging to memslots that don't have the same
+@@ -1389,7 +1405,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		goto out_unlock;
+ 
+ 	if (!hugetlb && !force_pte)
+-		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
++		hugetlb = transparent_hugepage_adjust(&pfn, gfn, &fault_ipa);
+ 
+ 	fault_ipa_uncached = memslot->flags & KVM_MEMSLOT_INCOHERENT;
+ 
+@@ -1435,6 +1451,12 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
+ 	kvm_pfn_t pfn;
+ 	bool pfn_valid = false;
+ 
++	/*
++	 * TODO: Lookup nested S2 pgtable entry and if the access flag is set,
++	 * then inject an access fault to the guest and invalidate the shadow
++	 * entry.
++	 */
++
+ 	trace_kvm_access_fault(fault_ipa);
+ 
+ 	spin_lock(&vcpu->kvm->mmu_lock);
+@@ -1478,8 +1500,10 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
+ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+ 	unsigned long fault_status;
+-	phys_addr_t fault_ipa;
++	phys_addr_t fault_ipa; /* The address we faulted on */
++	phys_addr_t ipa; /* Always the IPA in the L1 guest phys space */
+ 	struct kvm_memory_slot *memslot;
++	struct kvm_s2_trans nested_trans;
+ 	unsigned long hva;
+ 	bool is_iabt, write_fault, writable;
+ 	gfn_t gfn;
+@@ -1491,7 +1515,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		return 1;
+ 	}
+ 
+-	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
++	ipa = fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
+ 
+ 	trace_kvm_guest_fault(*vcpu_pc(vcpu), kvm_vcpu_get_hsr(vcpu),
+ 			      kvm_vcpu_get_hfar(vcpu), fault_ipa);
+@@ -1500,6 +1524,10 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+ 	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+ 	    fault_status != FSC_ACCESS) {
++		/*
++		 * TODO: Report address size faults from an L2 IPA which
++		 * exceeds KVM_PHYS_SIZE to the L1 hypervisor.
++		 */
+ 		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+ 			kvm_vcpu_trap_get_class(vcpu),
+ 			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+@@ -1509,7 +1537,23 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ 	idx = srcu_read_lock(&vcpu->kvm->srcu);
+ 
+-	gfn = fault_ipa >> PAGE_SHIFT;
++	/*
++	 * We may have faulted on a shadow stage 2 page table if we are
++	 * running a nested guest.  In this case, we have to resovle the L2
++	 * IPA to the L1 IPA first, before knowing what kind of memory should
++	 * back the L1 IPA.
++	 *
++	 * If the shadow stage 2 page table walk faults, then we simply inject
++	 * this to the guest and carry on.
++	 */
++	if (kvm_is_shadow_s2_fault(vcpu)) {
++		ret = kvm_walk_nested_s2(vcpu, fault_ipa, &nested_trans);
++		if (ret)
++			goto out_unlock;
++		ipa = nested_trans.output;
++	}
++
++	gfn = ipa >> PAGE_SHIFT;
+ 	memslot = gfn_to_memslot(vcpu->kvm, gfn);
+ 	hva = gfn_to_hva_memslot_prot(memslot, gfn, &writable);
+ 	write_fault = kvm_is_write_fault(vcpu);
+@@ -1543,13 +1587,13 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 * faulting VA. This is always 12 bits, irrespective
+ 		 * of the page size.
+ 		 */
+-		fault_ipa |= kvm_vcpu_get_hfar(vcpu) & ((1 << 12) - 1);
+-		ret = io_mem_abort(vcpu, run, fault_ipa);
++		ipa |= kvm_vcpu_get_hfar(vcpu) & ((1 << 12) - 1);
++		ret = io_mem_abort(vcpu, run, ipa);
+ 		goto out_unlock;
+ 	}
+ 
+ 	/* Userspace should not be able to register out-of-bounds IPAs */
+-	VM_BUG_ON(fault_ipa >= KVM_PHYS_SIZE);
++	VM_BUG_ON(ipa >= KVM_PHYS_SIZE);
+ 
+ 	if (fault_status == FSC_ACCESS) {
+ 		handle_access_fault(vcpu, fault_ipa);
+@@ -1557,7 +1601,8 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		goto out_unlock;
+ 	}
+ 
+-	ret = user_mem_abort(vcpu, fault_ipa, memslot, hva, fault_status);
++	ret = user_mem_abort(vcpu, fault_ipa, &nested_trans,
++			     memslot, hva, fault_status);
+ 	if (ret == 0)
+ 		ret = 1;
+ out_unlock:
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index abad676..2994410 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -368,4 +368,13 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+ 	return data;		/* Leave LE untouched */
+ }
+ 
++static inline bool kvm_is_shadow_s2_fault(struct kvm_vcpu *vcpu)
++{
++#ifdef CONFIG_KVM_ARM_NESTED_HYP
++	return (!vcpu_mode_el2(vcpu)) && vcpu_nested_stage2_enabled(vcpu);
++#else
++	return false;
++#endif
 +}
 +
- /**
-  * stage2_flush_vm - Invalidate cache for pages mapped in stage 2
-  * @kvm: The struct kvm pointer
-@@ -745,21 +752,9 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
- 				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
- }
- 
--/**
-- * kvm_alloc_stage2_pgd - allocate level-1 table for stage-2 translation.
-- * @kvm:	The KVM struct pointer for the VM.
-- *
-- * Allocates only the stage-2 HW PGD level table(s) (can support either full
-- * 40-bit input addresses or limited to 32-bit input addresses). Clears the
-- * allocated pages.
-- *
-- * Note we don't need locking here as this is only called when the VM is
-- * created, which can only be done once.
-- */
--int kvm_alloc_stage2_pgd(struct kvm *kvm)
-+int __kvm_alloc_stage2_pgd(struct kvm_s2_mmu *mmu)
- {
- 	pgd_t *pgd;
--	struct kvm_s2_mmu *mmu = &kvm->arch.mmu;
- 
- 	if (mmu->pgd != NULL) {
- 		kvm_err("kvm_arch already initialized?\n");
-@@ -776,6 +771,22 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
- 	return 0;
- }
- 
-+/**
-+ * kvm_alloc_stage2_pgd - allocate level-1 table for stage-2 translation.
-+ * @kvm:	The KVM struct pointer for the VM.
-+ *
-+ * Allocates only the stage-2 HW PGD level table(s) (can support either full
-+ * 40-bit input addresses or limited to 32-bit input addresses). Clears the
-+ * allocated pages.
-+ *
-+ * Note we don't need locking here as this is only called when the VM is
-+ * created, which can only be done once.
-+ */
-+int kvm_alloc_stage2_pgd(struct kvm *kvm)
-+{
-+	return __kvm_alloc_stage2_pgd(&kvm->arch.mmu);
-+}
-+
- static void stage2_unmap_memslot(struct kvm_s2_mmu *mmu,
- 				 struct kvm_memory_slot *memslot)
- {
-@@ -811,7 +822,7 @@ static void stage2_unmap_memslot(struct kvm_s2_mmu *mmu,
- 
- 		if (!(vma->vm_flags & VM_PFNMAP)) {
- 			gpa_t gpa = addr + (vm_start - memslot->userspace_addr);
--			unmap_stage2_range(mmu, gpa, vm_end - vm_start);
-+			kvm_unmap_stage2_range(mmu, gpa, vm_end - vm_start);
- 		}
- 		hva = vm_end;
- 	} while (hva < reg_end);
-@@ -841,6 +852,17 @@ void stage2_unmap_vm(struct kvm *kvm)
- 	srcu_read_unlock(&kvm->srcu, idx);
- }
- 
-+void __kvm_free_stage2_pgd(struct kvm_s2_mmu *mmu)
-+{
-+	if (mmu->pgd == NULL)
-+		return;
-+
-+	kvm_unmap_stage2_range(mmu, 0, KVM_PHYS_SIZE);
-+	/* Free the HW pgd, one page at a time */
-+	free_pages_exact(mmu->pgd, S2_PGD_SIZE);
-+	mmu->pgd = NULL;
-+}
-+
- /**
-  * kvm_free_stage2_pgd - free all stage-2 tables
-  * @kvm:	The KVM struct pointer for the VM.
-@@ -854,15 +876,7 @@ void stage2_unmap_vm(struct kvm *kvm)
-  */
- void kvm_free_stage2_pgd(struct kvm *kvm)
- {
--	struct kvm_s2_mmu *mmu = &kvm->arch.mmu;
--
--	if (mmu->pgd == NULL)
--		return;
--
--	unmap_stage2_range(mmu, 0, KVM_PHYS_SIZE);
--	/* Free the HW pgd, one page at a time */
--	free_pages_exact(mmu->pgd, S2_PGD_SIZE);
--	mmu->pgd = NULL;
-+	__kvm_free_stage2_pgd(&kvm->arch.mmu);
- }
- 
- static pud_t *stage2_get_pud(struct kvm_s2_mmu *mmu,
-@@ -1175,13 +1189,13 @@ static void  stage2_wp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
- }
- 
- /**
-- * stage2_wp_range() - write protect stage2 memory region range
-+ * kvm_stage2_wp_range() - write protect stage2 memory region range
-  * @kvm:	The KVM pointer
-  * @addr:	Start address of range
-  * @end:	End address of range
-  */
--static void stage2_wp_range(struct kvm *kvm, struct kvm_s2_mmu *mmu,
--			    phys_addr_t addr, phys_addr_t end)
-+void kvm_stage2_wp_range(struct kvm *kvm, struct kvm_s2_mmu *mmu,
-+			 phys_addr_t addr, phys_addr_t end)
- {
- 	pgd_t *pgd;
- 	phys_addr_t next;
-@@ -1225,7 +1239,7 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot)
- 	phys_addr_t end = (memslot->base_gfn + memslot->npages) << PAGE_SHIFT;
- 
- 	spin_lock(&kvm->mmu_lock);
--	stage2_wp_range(kvm, &kvm->arch.mmu, start, end);
-+	kvm_stage2_wp_range(kvm, &kvm->arch.mmu, start, end);
- 	spin_unlock(&kvm->mmu_lock);
- 	kvm_flush_remote_tlbs(kvm);
- }
-@@ -1249,7 +1263,7 @@ static void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
- 	phys_addr_t start = (base_gfn +  __ffs(mask)) << PAGE_SHIFT;
- 	phys_addr_t end = (base_gfn + __fls(mask) + 1) << PAGE_SHIFT;
- 
--	stage2_wp_range(kvm, &kvm->arch.mmu, start, end);
-+	kvm_stage2_wp_range(kvm, &kvm->arch.mmu, start, end);
- }
- 
- /*
-@@ -1589,7 +1603,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
- 
- static int kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
- {
--	unmap_stage2_range(&kvm->arch.mmu, gpa, PAGE_SIZE);
-+	kvm_unmap_stage2_range(&kvm->arch.mmu, gpa, PAGE_SIZE);
- 	return 0;
- }
- 
-@@ -1900,7 +1914,7 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
- 
- 	spin_lock(&kvm->mmu_lock);
- 	if (ret)
--		unmap_stage2_range(&kvm->arch.mmu, mem->guest_phys_addr,
-+		kvm_unmap_stage2_range(&kvm->arch.mmu, mem->guest_phys_addr,
- 				   mem->memory_size);
- 	else
- 		stage2_flush_memslot(&kvm->arch.mmu, memslot);
-@@ -1944,7 +1958,7 @@ void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
- 	phys_addr_t size = slot->npages << PAGE_SHIFT;
- 
- 	spin_lock(&kvm->mmu_lock);
--	unmap_stage2_range(&kvm->arch.mmu, gpa, size);
-+	kvm_unmap_stage2_range(&kvm->arch.mmu, gpa, size);
- 	spin_unlock(&kvm->mmu_lock);
- }
- 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index e3455c4..a504162 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -145,9 +145,18 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
- 
- void stage2_unmap_vm(struct kvm *kvm);
- int kvm_alloc_stage2_pgd(struct kvm *kvm);
-+int __kvm_alloc_stage2_pgd(struct kvm_s2_mmu *mmu);
- void kvm_free_stage2_pgd(struct kvm *kvm);
-+void __kvm_free_stage2_pgd(struct kvm_s2_mmu *mmu);
- int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
- 			  phys_addr_t pa, unsigned long size, bool writable);
-+void kvm_unmap_stage2_range(struct kvm_s2_mmu *mmu, phys_addr_t start,
-+			    u64 size);
-+void kvm_stage2_wp_range(struct kvm *kvm, struct kvm_s2_mmu *mmu,
-+			 phys_addr_t addr, phys_addr_t end);
-+void kvm_stage2_flush_range(struct kvm_s2_mmu *mmu,
-+			    phys_addr_t start, phys_addr_t end);
-+
- 
- int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run);
- 
+ #endif /* __ARM64_KVM_EMULATE_H__ */
 -- 
 1.9.1
