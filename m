@@ -1,50 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  9 Jan 2017 14:31:55 +0000
-Subject: [PATCH] arm64: head.S: fix up stale comments
-Message-ID: <1483972315-12782-1-git-send-email-mark.rutland@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon,  9 Jan 2017 22:35:41 +0800
+Subject: [PATCH v4 0/3] Add overlay plane support for ZTE drm driver
+Message-ID: <1483972544-12731-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit 23c8a500c24d02dd ("arm64: kernel: use ordinary return/argument
-register for el2_setup()"), we stopped using w20 as a global stash of
-the boot mode flag, and instead pass this around in w0 as a function
-parameter.
+From: Shawn Guo <shawn.guo@linaro.org>
 
-Unfortunately, we missed a couple of comments, which still refer to the
-old convention of using w20/x20.
+Changes for v4:
+ - Instead of using val, return value directly for zx_vl_get_fmt() and
+   zx_vl_rsz_get_fmt().
+ - Fix typo of 'heigth'
+ - Add 'enabled' in struct zx_plane to track layer enabling state, and
+   check the state in zx_plane_set_update(), so that we can call
+   zx_plane_set_update() unconditionally in the vou irq handler.
 
-This patch fixes up the comments to describe the code as it currently
-works.
+Changes for v3:
+ - Let zx_plane be accessible from zx_vou driver, and so we can easily
+   access all the data encoded in zx_plane with a drm_plane pointer.
+   Thus, function zx_overlay_find_vl_idx() can be saved completely.
+ - Refine the existing zx_plane driver a bit to support disable graphic
+   layer, and make the support of overlay plane a bit easier, by sharing
+   VOU layer setup and teardown functions between graphic and video
+   layers.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/head.S | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Changes for v2:
+ - Use clipped coordinates for overlay position calculation
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 4b1abac..9b0857a 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -483,7 +483,7 @@ ENTRY(kimage_vaddr)
-  * If we're fortunate enough to boot at EL2, ensure that the world is
-  * sane before dropping to EL1.
-  *
-- * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 in x20 if
-+ * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 in w0 if
-  * booted in EL1 or EL2 respectively.
-  */
- ENTRY(el2_setup)
-@@ -628,7 +628,7 @@ ENDPROC(el2_setup)
- 
- /*
-  * Sets the __boot_cpu_mode flag depending on the CPU boot mode passed
-- * in x20. See arch/arm64/include/asm/virt.h for more info.
-+ * in w0. See arch/arm64/include/asm/virt.h for more info.
-  */
- set_cpu_boot_mode_flag:
- 	adr_l	x1, __boot_cpu_mode
+Shawn Guo (3):
+  drm: zte: make zx_plane accessible from zx_vou driver
+  drm: zte: add .atomic_disable hook to disable graphic layer
+  drm: zte: add overlay plane support
+
+ drivers/gpu/drm/zte/zx_plane.c      | 328 +++++++++++++++++++++++++++++++-----
+ drivers/gpu/drm/zte/zx_plane.h      |  13 +-
+ drivers/gpu/drm/zte/zx_plane_regs.h |  51 ++++++
+ drivers/gpu/drm/zte/zx_vou.c        | 185 +++++++++++++++-----
+ drivers/gpu/drm/zte/zx_vou.h        |   3 +
+ drivers/gpu/drm/zte/zx_vou_regs.h   |  18 ++
+ 6 files changed, 516 insertions(+), 82 deletions(-)
+
 -- 
 1.9.1
