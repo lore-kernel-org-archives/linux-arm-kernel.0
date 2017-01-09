@@ -1,93 +1,28 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 9 Jan 2017 15:46:55 +0100
-Subject: [PATCH 2/3] ARM: dts: stm32: Add ADC support to stm32f429
-In-Reply-To: <1480687022-12851-3-git-send-email-fabrice.gasnier@st.com>
-References: <1480687022-12851-1-git-send-email-fabrice.gasnier@st.com>
- <1480687022-12851-3-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <cdfb7781-196a-ad78-45e0-53c47fe7b532@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Jan 2017 15:47:35 +0100
+Subject: [PATCH 1/6] drivers: pinctrl: add driver for Allwinner H5 SoC
+In-Reply-To: <20170105220823.5ai4yvcblmzmaey2@lukather>
+References: <20161226162518.5367-1-icenowy@aosc.xyz>
+ <20161226162518.5367-2-icenowy@aosc.xyz>
+ <20170105220823.5ai4yvcblmzmaey2@lukather>
+Message-ID: <CACRpkdbZkJcPDquhspVcp6R01h-oJ13_YiShiQC7i=d2bZBfSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabrice
+On Thu, Jan 5, 2017 at 11:08 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Dec 27, 2016 at 12:25:13AM +0800, Icenowy Zheng wrote:
 
-On 12/02/2016 02:57 PM, Fabrice GASNIER wrote:
-> Add ADC support & pinctrl analog phandle (adc3_in8) to stm32f429.
+>> +builtin_platform_driver(sun50i_h5_pinctrl_driver);
 >
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
->  arch/arm/boot/dts/stm32f429.dtsi | 49 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 49 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-> index 3dd47eb..be1d970 100644
-> --- a/arch/arm/boot/dts/stm32f429.dtsi
-> +++ b/arch/arm/boot/dts/stm32f429.dtsi
-> @@ -172,6 +172,49 @@
->  			status = "disabled";
->  		};
->
-> +		adc: adc at 40012000 {
-> +			compatible = "st,stm32f4-adc-core";
-> +			reg = <0x40012000 0x400>;
-> +			interrupts = <18>;
-> +			clocks = <&rcc 0 168>;
-> +			clock-names = "adc";
-> +			interrupt-controller;
-> +			#interrupt-cells = <1>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +
-> +			adc1: adc at 0 {
-> +				compatible = "st,stm32f4-adc";
-> +				#io-channel-cells = <1>;
-> +				reg = <0x0>;
-> +				clocks = <&rcc 0 168>;
-> +				interrupt-parent = <&adc>;
-> +				interrupts = <0>;
-> +				status = "disabled";
-> +			};
-> +
-> +			adc2: adc at 100 {
-> +				compatible = "st,stm32f4-adc";
-> +				#io-channel-cells = <1>;
-> +				reg = <0x100>;
-> +				clocks = <&rcc 0 169>;
-> +				interrupt-parent = <&adc>;
-> +				interrupts = <1>;
-> +				status = "disabled";
-> +			};
-> +
-> +			adc3: adc at 200 {
-> +				compatible = "st,stm32f4-adc";
-> +				#io-channel-cells = <1>;
-> +				reg = <0x200>;
-> +				clocks = <&rcc 0 170>;
-> +				interrupt-parent = <&adc>;
-> +				interrupts = <2>;
-> +				status = "disabled";
-> +			};
-> +		};
-> +
->  		syscfg: system-config at 40013800 {
->  			compatible = "syscon";
->  			reg = <0x40013800 0x400>;
-> @@ -334,6 +377,12 @@
->  					slew-rate = <2>;
->  				};
->  			};
-> +
-> +			adc3_in8_pin: adc at 200 {
-> +				pins {
-> +					pinmux = <STM32F429_PF10_FUNC_ANALOG>;
-> +				};
-> +			};
->  		};
->
->  		rcc: rcc at 40023810 {
->
+> This also looks very much like the H3. I'll post a patchset during the
+> weekend to avoid duplicating those drivers. This was initially done
+> for the sun5i, but it very much applies here.
 
-Applied on stm32-dt-for-v4.11
+I have applied Maxime's patch set from today.
 
-Thanks
-Alex
+Icenowy, please investigate the direction taken by Maxime
+here for future revisions if needed.
+
+Yours,
+Linus Walleij
