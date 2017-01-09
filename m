@@ -1,67 +1,58 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 9 Jan 2017 12:04:20 +0100
-Subject: [PATCH 0/3] watchdog: imx2: handle WMCR only being available on
- i.MX35 and later
-In-Reply-To: <19492fdf-a0f7-8525-f955-8c9136575659@mleia.com>
-References: <20170109095039.11979-1-u.kleine-koenig@pengutronix.de>
- <19492fdf-a0f7-8525-f955-8c9136575659@mleia.com>
-Message-ID: <20170109110420.atgdqwin77iheb5g@pengutronix.de>
+From: john.garry@huawei.com (John Garry)
+Date: Mon, 9 Jan 2017 10:59:47 +0000
+Subject: [QUESTION] Early Write Acknowledge for PCIe configuration space
+In-Reply-To: <6092525.UgRCY3dpzP@wuerfel>
+References: <df407f39-ee05-d74d-6e5e-c5e502372032@huawei.com>
+ <6092525.UgRCY3dpzP@wuerfel>
+Message-ID: <e085504e-74fd-e8be-8287-4baef88551c9@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vladimir,
+On 06/01/2017 11:24, Arnd Bergmann wrote:
+> On Friday, January 6, 2017 11:15:22 AM CET John Garry wrote:
+>> [apologies if this has been queried before]
+>>
+>> Hi ARM guys,
+>>
+>> I have a question about the device memory attributes we assign for PCIe
+>> config space for arm64. Currently we use ioremap to map in the config
+>> space; this uses nGnRE, which means we enable Early Write Acknowledge.
+>>
+>> The ARMv8 ARM states that "ARM recommend that No Early Write Acknowledge
+>> Hint is used for PCIe configuration writes".
+>>
+>> I understand a problem with using E is in that configuration write is a
+>> non-post operation, which means the RP requires to get the completion
+>> ack from the EP The problem here is if CPU writes data to ECAM by E,
+>> complete will go back to CPU directly, and maybe at this point the write
+>> has not reached the EP.
+>>
+>> I believe that this may cause ordering issues in PCI read/write. In
+>> practice we use non-relaxed readl/writel to access config space, which
+>> include the synchronization barriers, which, *as I understand*, even if
+>> for full system domain, may be negated by the E attribute for PCIe.
+>
+> I don't think the barriers in readl/writel are enough here, in particular
+> the write barrier is *before* the access to synchronize DMAs
+> on RAM with MMIO accesses, which is a bit different from what you
+> have here.
+>
+>> So a question: why is the recommendation in the ARMv8 ARM ignored?
+>
+> Probably nobody thought about this properly in the Linux drivers. The
+> ARMv8 ARM sounds correct here.
+>
+> I/O space may have the same issue, as it also requires non-posted
+> accesses.
 
-On Mon, Jan 09, 2017 at 12:55:28PM +0200, Vladimir Zapolskiy wrote:
-> On 01/09/2017 11:50 AM, Uwe Kleine-K?nig wrote:
-> > Hello,
-> > 
-> > this is my approach to fix the issue reported by Vladimir Zapolskiy.
-> > 
-> > IMHO we don't need the third commit because I'm convinced most machines
-> > just don't do anything when the WDOG signal becomes active. An affected
-> > machine powers off 16 seconds after startup. This would be noticed
-> > during development of the bootloader and so I assume all affected
-> > machines having bootloaders that make the compat code unimportant.
-> > 
-> > If you want to know if your machine is affected, do:
-> > 
-> > 	mw -w $(watchdog_base_addr) 0x10
-> 
-> is it a command in barebox shell?
+Right, so our HW team's recommendation - from ARM's memory model and 
+also PCIe order model - is that not only config space but also PCIe 
+memory mapped IO has the same attribute (nE).
 
-barebox cannot do $(watchdog_base_addr), but (on i.MX25) I can do:
+John
 
-	mw -w 0x53fdc000 0x10
-
-. I think the corresponding U-Boot command is:
-
-	mw.w 0x53fdc000 0x10
-
-> > The machines I tested this on (among a few customer boards a
-> > Phycore i.MX35 and a Freescale i.MX53 Quick Start Board) don't power off.
-> > 
-> > I don't have manuals handy for ls1021a, ls1043a and ls1046a but assume
-> > they use the i.MX35 type, too. This needs to be fixed before this series
-> > is applied.
-> > 
-> > Compared to Vladimir's patch machines still using board files are fixed,
-> > too.
-> > 
-> 
-> This addition can be done on top of my changes, in my version the driver
-> ignores WMCR on all machines with board files.
-> 
-> So now we have two competing series unfortunately...
-
-With mine being the better one, right? :-) 
-
-You didn't update your series for my concerns, so I did it myself
-instead of retrying to iterate about the changes I'd like to see on your
-version. Feel free to criticise my variant.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>
+> 	Arnd
+>
+> .
+>
