@@ -1,83 +1,112 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 Jan 2017 14:10:59 +0000
-Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
-In-Reply-To: <20170109140500.GA14217@n2100.armlinux.org.uk>
-References: <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
- <20161215113539.GK14217@n2100.armlinux.org.uk>
- <06fca797-da5d-f7f2-eecb-9b1b33b7e83f@arm.com>
- <20161215151548.GL14217@n2100.armlinux.org.uk>
- <c21d6514-44a2-ba88-0fe5-d14d5897cc48@arm.com>
- <20161215185717.GM14217@n2100.armlinux.org.uk>
- <20170103095149.GA14242@cbox>
- <20170109122639.GX14217@n2100.armlinux.org.uk>
- <20170109132636.GH4348@cbox>
- <20170109140500.GA14217@n2100.armlinux.org.uk>
-Message-ID: <20170109141059.GB14217@n2100.armlinux.org.uk>
+From: arnd@linaro.org (Arnd Bergmann)
+Date: Mon, 09 Jan 2017 15:05:38 +0100
+Subject: [PATCH 1/2] arm64: dma_mapping: allow PCI host driver to limit
+ DMA mask
+In-Reply-To: <9a03c05d-ad4c-0547-d1fe-01edb8b082d6@cogentembedded.com>
+References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
+ <2723285.JORgusvJv4@wuerfel>
+ <9a03c05d-ad4c-0547-d1fe-01edb8b082d6@cogentembedded.com>
+Message-ID: <6374144.HVL0QxNJiT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 02:05:00PM +0000, Russell King - ARM Linux wrote:
-> So, although Marc produced a patch which updates the KVM hypervisor for
-> the GET_VECTORS change, through reading the code today, it's become clear
-> that much more is needed, so I'm yet again banging on about documentation.
-> It's only become clear to me today that the KVM stub calling convention
-> for the host kernel is:
+On Friday, January 6, 2017 4:47:59 PM CET Nikita Yushchenko wrote:
+> >>> Just a guess, but if the inbound translation windows in the host
+> >>> bridge are wider than 32-bit, the reason for setting up a single
+> >>> 32-bit window is probably because that is what the parent bus supports.
 > 
-> entry:
-> 	r0 = function pointer
-> 	r1 = 32-bit function argument 0
-> 	r2 = 32-bit function argument 1
-> 	r3 = 32-bit function argument 2
-> 	no further arguments are supported
-> 	--- or ---
-> 	r0 = -1 (or 0 post Marc's patch) for get_vectors
-> exit:
-> 	r0 = vectors (if get_vectors call was made)
-> 	otherwise, who knows...
+> I've re-checked rcar-pcie hardware documentation.
 > 
-> I specify "32-bit" there because they're shifted by one register, which,
-> if a 64-bit argument is passed with EABI, the arguments will no longer be
-> appropriately aligned... so it's an important detail to be aware of with
-> the current KVM hypervisor interface.
+> It indeed mentions that AXI bus it sits on is 32-bit.
 > 
-> What I want to do here is to fix this kexec issue completely, not in a
-> piecemeal fashion - I'm not interested in fixing one small problem, then
-> coming back to it in a few months time to fix another problem.  That's a
-> waste of time (well, unless you're into job creation.)  I've always been
-> for "if you're going to do the job, damn well do the job properly".  So
-> I'm not going to accept anything short of fixing _both_ kexec and kdump
-> together.
 > 
-> So, given that the hyp-stub has this ABI after my patches:
+> >> Well anyway applying patch similar to your's will fix pcie-rcar + nvme
+> >> case - thus I don't object :)   But it can break other cases ...
+> >>
+> >> But why do you hook at set_dma_mask() and overwrite mask inside, instead
+> >> of hooking at dma_supported() and rejecting unsupported mask?
+> >>
+> >> I think later is better, because it lets drivers to handle unsupported
+> >> high-dma case, like documented in DMA-API_HOWTO.
+> > 
+> > I think the behavior I put in there is required for swiotlb to make
+> > sense, otherwise you would rely on the driver to handle dma_set_mask()
+> > failure gracefully with its own bounce buffers (as network and
+> > scsi drivers do but others don't).
+> > 
+> > Having swiotlb or iommu enabled should result in dma_set_mask() always
+> > succeeding unless the mask is too small to cover the swiotlb
+> > bounce buffer area or the iommu virtual address space. This behavior
+> > is particularly important in case the bus address space is narrower
+> > than 32-bit, as we have to guarantee that the fallback to 32-bit
+> > DMA always succeeds. There are also a lot of drivers that try to
+> > set a 64-bit mask but don't implement bounce buffers for streaming
+> > mappings if that fails, and swiotlb is what we use to make those
+> > drivers work.
+> > 
+> > And yes, the API is a horrible mess.
 > 
-> entry:
-> 	r0 = argument (0 = get vectors, 1 = set vectors, 2 = call function)
-> 	r1 = vectors for r0 = 1
-> 	r3 = function pointer (with bit 0 already set for thumb functions)
-> 	     for r0 = 2
-> exit:
-> 	r0 = -1 for invalid calls
-> 	r0 = current vectors address (for r0 = 0 on entry)
-> 	is not expected to return for r0 = 2 on entry
-> 	otherwise registers preserved preserved
-> 
-> which is clearly incompatible with the current KVM stub, can we come up
-> with a common ABI that is satisfactory to both.
-> 
-> The above are probably the very first time anyone has written out the
-> ABI of these things, and as can be seen, it's still something of a mess.
+> With my patch applied and thus 32bit dma_mask set for NVMe device, I do
+> see high addresses passed to dma_map_*() routines and handled by
+> swiotlb. Thus your statement that behavior "succeed 64bit dma_set_mask()
+> operation but silently replace mask behind the scene" is required for
+> swiotlb to be used, does not match reality.
 
-For completeness, this is the existing hyp-stub ABI:
+See my point about drivers that don't implement bounce buffering.
+Apparently NVMe is one of them, unlike the SATA/SCSI/MMC storage
+drivers that do their own thing.
 
-entry:
-	r0 = -1 => get_vectors
-	r0 != -1 => set_vectors (to the value in r0)
-exit:
-	r0 = current vector address
+The problem again is the inconsistency of the API.
 
-And that's it.
+> It can be interpreted as a breakage elsewhere, but it's hard to point
+> particular "root cause". The entire infrastructure to allocate and use
+> DMA memory is messy.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Absolutely.
+
+What I think happened here in chronological order is:
+
+- In the old days, 64-bit architectures tended to use an IOMMU 
+  all the time to work around 32-bit limitations on DMA masters
+- Some architectures had no IOMMU that fully solved this and the
+  dma-mapping API required drivers to set the right mask and check
+  the return code. If this failed, the driver needed to use its
+  own bounce buffers as network and scsi do. See also the
+  grossly misnamed "PCI_DMA_BUS_IS_PHYS" macro.
+- As we never had support for bounce buffers in all drivers, and
+  early 64-bit Intel machines had no IOMMU, the swiotlb code was
+  introduced as a workaround, so we can use the IOMMU case without
+  driver specific bounce buffers everywhere
+- As most of the important 64-bit architectures (x86, arm64, powerpc)
+  now always have either IOMMU or swiotlb enabled, drivers like
+  NVMe started relying on it, and no longer handle a dma_set_mask
+  failure properly.
+
+We may need to audit how drivers typically handle dma_set_mask()
+failure. The NVMe driver in its current state will probably cause
+silent data corruption when used on a 64-bit architecture that has
+a 32-bit bus but neither swiotlb nor iommu enabled at runtime.
+
+I would argue that the driver should be fixed to either refuse
+working in that configuration to avoid data corruption, or that
+it should implement bounce buffering like SCSI does. If we make it
+simply not work, then your suggestion of making dma_set_mask()
+fail will break your system in a different way.
+
+> Still current code does not work, thus fix is needed.
+> 
+> Perhaps need to introduce some generic API to "allocate memory best
+> suited for DMA to particular device", and fix allocation points (in
+> drivers, filesystems, etc) to use it. Such an API could try to allocate
+> area that can be DMAed by hardware, and fallback to other memory that
+> can be used via swiotlb or other bounce buffer implementation.
+
+The DMA mapping API is meant to do this, but we can definitely improve
+it or clarify some of the rules.
+ 
+> But for now, have to stay with dma masks. Will follow-up with a patch
+> based on your but with coherent mask handling added.
+
+Ok.
+
+	Arnd
