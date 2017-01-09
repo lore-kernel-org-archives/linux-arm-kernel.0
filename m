@@ -1,105 +1,38 @@
-From: smueller@chronox.de (Stephan =?ISO-8859-1?Q?M=FCller?=)
-Date: Mon, 09 Jan 2017 19:34:36 +0100
-Subject: [PATCH v2 11/12] crypto: atmel-authenc: add support to
- authenc(hmac(shaX), Y(aes)) modes
-In-Reply-To: <6301d79c-f1c5-d86c-823c-dfdbb5100e74@atmel.com>
-References: <cover.1482424395.git.cyrille.pitchen@atmel.com>
- <1548507.knvAQkH9bK@tauon.atsec.com>
- <6301d79c-f1c5-d86c-823c-dfdbb5100e74@atmel.com>
-Message-ID: <1593848.VVZBeNLOu9@tauon.atsec.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 9 Jan 2017 12:39:32 -0600
+Subject: [PATCHv3 1/5] clk: mvebu: support for 98DX3236 SoC
+In-Reply-To: <20170106041517.9589-2-chris.packham@alliedtelesis.co.nz>
+References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
+ <20170106041517.9589-1-chris.packham@alliedtelesis.co.nz>
+ <20170106041517.9589-2-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20170109183932.hyuwkhyrewxiaxuq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 9. Januar 2017, 19:24:12 CET schrieb Cyrille Pitchen:
-
-Hi Cyrille,
-
-> >> +static int atmel_aes_authenc_copy_assoc(struct aead_request *req)
-> >> +{
-> >> +	size_t buflen, assoclen = req->assoclen;
-> >> +	off_t skip = 0;
-> >> +	u8 buf[256];
-> >> +
-> >> +	while (assoclen) {
-> >> +		buflen = min_t(size_t, assoclen, sizeof(buf));
-> >> +
-> >> +		if (sg_pcopy_to_buffer(req->src, sg_nents(req->src),
-> >> +				       buf, buflen, skip) != buflen)
-> >> +			return -EINVAL;
-> >> +
-> >> +		if (sg_pcopy_from_buffer(req->dst, sg_nents(req->dst),
-> >> +					 buf, buflen, skip) != buflen)
-> >> +			return -EINVAL;
-> >> +
-> >> +		skip += buflen;
-> >> +		assoclen -= buflen;
-> >> +	}
-> > 
-> > This seems to be a very expansive operation. Wouldn't it be easier, leaner
-> > and with one less memcpy to use the approach of
-> > crypto_authenc_copy_assoc?
-> > 
-> > Instead of copying crypto_authenc_copy_assoc, what about carving the logic
-> > in crypto/authenc.c out into a generic aead helper code as we need to add
-> > that to other AEAD implementations?
+On Fri, Jan 06, 2017 at 05:14:58PM +1300, Chris Packham wrote:
+> The 98DX3236, 98DX3336, 98DX4521 and variants have a different TCLK from
+> the Armada XP (200MHz vs 250MHz). The CPU core clock is fixed at 800MHz.
 > 
-> Before writing this function, I checked how the crypto/authenc.c driver
-> handles the copy of the associated data, hence crypto_authenc_copy_assoc().
+> The clock gating options are a subset of those on the Armada XP.
 > 
-> I have to admit I didn't perform any benchmark to compare the two
-> implementation but I just tried to understand how
-> crypto_authenc_copy_assoc() works. At the first look, this function seems
-> very simple but I guess all the black magic is hidden by the call of
-> crypto_skcipher_encrypt() on the default null transform, which is
-> implemented using the ecb(cipher_null) algorithm.
-
-The magic in the null cipher is that it not only performs a memcpy, but 
-iterates through the SGL and performs a memcpy on each part of the source/
-destination SGL.
-
-I will release a patch set later today -- the coding is completed, but testing 
-is yet under way. That patch now allows you to make only one function call 
-without special init/deinit code.
+> The core clock divider is different to the Armada XP also.
 > 
-> When I wrote my function I thought that this ecb(cipher_null) algorithm was
-> implemented by combining crypto_ecb_crypt() from crypto/ecb.c with
-> null_crypt() from crypto/crypto_null.c. Hence I thought there would be much
-> function call overhead to copy only few bytes but now checking again I
-> realize that the ecb(cipher_null) algorithm is directly implemented by
-> skcipher_null_crypt() still from crypto/crypto_null.c. So yes, maybe you're
-> right: it could be better to reuse what was done in
-> crypto_authenc_copy_assoc() from crypto/authenc.c.
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> ---
+>     Changes in v2:
+>     - Update devicetree binding documentation for new compatible string
+>     
+>     Changes in v3:
+>     - Add 98dx3236 support to mvebu/clk-corediv.c rather than creating a new
+>       driver.
+>     - Document mv98dx3236-corediv-clock binding
 > 
-> This way we could need twice less memcpy() hence I agree with you.
+>  .../bindings/clock/mvebu-corediv-clock.txt         |  1 +
+>  .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |  1 +
 
-In addition to the additional memcpy, the patch I want to air shortly (and 
-which I hope is going to be accepted) should reduce the complexity of your 
-code in this corner.
+Acked-by: Rob Herring <robh@kernel.org>
 
-...
-
-> >> +static int atmel_aes_authenc_crypt(struct aead_request *req,
-> >> +				   unsigned long mode)
-> >> +{
-> >> +	struct atmel_aes_authenc_reqctx *rctx = aead_request_ctx(req);
-> >> +	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
-> >> +	struct atmel_aes_base_ctx *ctx = crypto_aead_ctx(tfm);
-> >> +	u32 authsize = crypto_aead_authsize(tfm);
-> >> +	bool enc = (mode & AES_FLAGS_ENCRYPT);
-> >> +	struct atmel_aes_dev *dd;
-> >> +
-> >> +	/* Compute text length. */
-> >> +	rctx->textlen = req->cryptlen - (enc ? 0 : authsize);
-> > 
-> > Is there somewhere a check that authsize is always < req->cryptlen (at
-> > least it escaped me)? Note, this logic will be exposed to user space
-> > which may do funky things.
-> 
-> I thought those 2 sizes were always set by the kernel only but I admit I
-> didn't check my assumption. If you tell me they could be set directly from
-> the userspace, yes I agree with you, I need to add a test.
-
-Then I would like to ask you adding that check -- as this check is cheap, it 
-should not affect performance.
-Ciao
-Stephan
+>  drivers/clk/mvebu/armada-xp.c                      | 42 ++++++++++++++++++++++
+>  drivers/clk/mvebu/clk-corediv.c                    | 23 ++++++++++++
+>  drivers/clk/mvebu/clk-cpu.c                        | 31 ++++++++++++++--
+>  5 files changed, 96 insertions(+), 2 deletions(-)
