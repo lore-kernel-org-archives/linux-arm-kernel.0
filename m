@@ -1,336 +1,165 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon,  9 Jan 2017 13:47:47 +0000
-Subject: [RFC PATCH v3 3/5] ARM: NOMMU: Introduce dma operations for noMMU
+Date: Mon,  9 Jan 2017 13:47:46 +0000
+Subject: [RFC PATCH v3 2/5] drivers: dma-coherent: Introduce default DMA pool
 In-Reply-To: <1483969669-4636-1-git-send-email-vladimir.murzin@arm.com>
 References: <1483969669-4636-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1483969669-4636-4-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1483969669-4636-3-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R/M classes of cpus can have memory covered by MPU which in turn might
-configure RAM as Normal i.e. bufferable and cacheable. It breaks
-dma_alloc_coherent() and friends, since data can stuck in caches now
-or be buffered.
+This patch introduces default coherent DMA pool similar to default CMA
+area concept. To keep other users safe code kept under CONFIG_ARM.
 
-This patch factors out DMA support for NOMMU configuration into
-separate entity which provides dedicated dma_ops. We have to handle
-there several cases:
-- configurations with MMU/MPU setup
-- configurations without MMU/MPU setup
-- special case for M-class, since caches and MPU there are optional
-
-In general we rely on default DMA area for coherent allocations or/and
-per-device memory reserves suitable for coherent DMA, so if such
-regions are set coherent allocations go from there.
-
-In case MPU/MPU was not setup we fallback to normal page allocator for
-DMA memory allocation.
-
-In case we run M-class cpus, for configuration without cache support
-(like Cortex-M3/M4) dma operations are forced to be coherent and wired
-with dma-noop (such decision is made based on cacheid global
-variable); however, if caches are detected there and no DMA coherent
-region is given (either default or per-device), dma is disallowed even
-MPU is not set - it is because M-class implement system memory map
-which defines part of address space as Normal memory.
-
-Reported-by: Alexandre Torgue <alexandre.torgue@st.com>
-Reported-by: Andras Szemzo <sza@esh.hu>
+Suggested-by: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/include/asm/dma-mapping.h |   3 +-
- arch/arm/mm/Makefile               |   5 +-
- arch/arm/mm/dma-mapping-nommu.c    | 252 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 256 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/mm/dma-mapping-nommu.c
+ .../bindings/reserved-memory/reserved-memory.txt   |  3 ++
+ drivers/base/dma-coherent.c                        | 59 +++++++++++++++++++---
+ 2 files changed, 55 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index bf02dbd..559faad 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -20,7 +20,8 @@ static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
- {
- 	if (dev && dev->archdata.dma_ops)
- 		return dev->archdata.dma_ops;
--	return &arm_dma_ops;
+diff --git a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+index 3da0ebd..16291f2 100644
+--- a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
++++ b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+@@ -68,6 +68,9 @@ Linux implementation note:
+ - If a "linux,cma-default" property is present, then Linux will use the
+   region for the default pool of the contiguous memory allocator.
+ 
++- If a "linux,dma-default" property is present, then Linux will use the
++  region for the default pool of the consistent DMA allocator.
 +
-+	return IS_ENABLED(CONFIG_MMU) ? &arm_dma_ops : &dma_noop_ops;
+ Device node references to reserved memory
+ -----------------------------------------
+ Regions in the /reserved-memory node may be referenced by other device
+diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+index 640a7e6..b52ba27 100644
+--- a/drivers/base/dma-coherent.c
++++ b/drivers/base/dma-coherent.c
+@@ -18,6 +18,15 @@ struct dma_coherent_mem {
+ 	spinlock_t	spinlock;
+ };
+ 
++static struct dma_coherent_mem *dma_coherent_default_memory __ro_after_init;
++
++static inline struct dma_coherent_mem *dev_get_coherent_memory(struct device *dev)
++{
++	if (dev && dev->dma_mem)
++		return dev->dma_mem;
++	return dma_coherent_default_memory;
++}
++
+ static bool dma_init_coherent_memory(
+ 	phys_addr_t phys_addr, dma_addr_t device_addr, size_t size, int flags,
+ 	struct dma_coherent_mem **mem)
+@@ -83,6 +92,9 @@ static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
+ static int dma_assign_coherent_memory(struct device *dev,
+ 				      struct dma_coherent_mem *mem)
+ {
++	if (!dev)
++		return -ENODEV;
++
+ 	if (dev->dma_mem)
+ 		return -EBUSY;
+ 
+@@ -161,15 +173,12 @@ EXPORT_SYMBOL(dma_mark_declared_memory_occupied);
+ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+ 				       dma_addr_t *dma_handle, void **ret)
+ {
+-	struct dma_coherent_mem *mem;
++	struct dma_coherent_mem *mem = dev_get_coherent_memory(dev);
+ 	int order = get_order(size);
+ 	unsigned long flags;
+ 	int pageno;
+ 	int dma_memory_map;
+ 
+-	if (!dev)
+-		return 0;
+-	mem = dev->dma_mem;
+ 	if (!mem)
+ 		return 0;
+ 
+@@ -223,7 +232,7 @@ EXPORT_SYMBOL(dma_alloc_from_coherent);
+  */
+ int dma_release_from_coherent(struct device *dev, int order, void *vaddr)
+ {
+-	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
++	struct dma_coherent_mem *mem = dev_get_coherent_memory(dev);
+ 
+ 	if (mem && vaddr >= mem->virt_base && vaddr <
+ 		   (mem->virt_base + (mem->size << PAGE_SHIFT))) {
+@@ -257,7 +266,7 @@ EXPORT_SYMBOL(dma_release_from_coherent);
+ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
+ 			   void *vaddr, size_t size, int *ret)
+ {
+-	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
++	struct dma_coherent_mem *mem = dev_get_coherent_memory(dev);
+ 
+ 	if (mem && vaddr >= mem->virt_base && vaddr + size <=
+ 		   (mem->virt_base + (mem->size << PAGE_SHIFT))) {
+@@ -287,6 +296,8 @@ EXPORT_SYMBOL(dma_mmap_from_coherent);
+ #include <linux/of_fdt.h>
+ #include <linux/of_reserved_mem.h>
+ 
++static struct reserved_mem *dma_reserved_default_memory __initdata;
++
+ static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
+ {
+ 	struct dma_coherent_mem *mem = rmem->priv;
+@@ -307,7 +318,8 @@ static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
+ static void rmem_dma_device_release(struct reserved_mem *rmem,
+ 				    struct device *dev)
+ {
+-	dev->dma_mem = NULL;
++	if (dev)
++		dev->dma_mem = NULL;
  }
  
- static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-index 2ac7988..5796357 100644
---- a/arch/arm/mm/Makefile
-+++ b/arch/arm/mm/Makefile
-@@ -2,9 +2,8 @@
- # Makefile for the linux arm-specific parts of the memory manager.
- #
+ static const struct reserved_mem_ops rmem_dma_ops = {
+@@ -327,6 +339,12 @@ static int __init rmem_dma_setup(struct reserved_mem *rmem)
+ 		pr_err("Reserved memory: regions without no-map are not yet supported\n");
+ 		return -EINVAL;
+ 	}
++
++	if (of_get_flat_dt_prop(node, "linux,dma-default", NULL)) {
++		WARN(dma_reserved_default_memory,
++		     "Reserved memory: region for default DMA coherent area is redefined\n");
++		dma_reserved_default_memory = rmem;
++	}
+ #endif
  
--obj-y				:= dma-mapping.o extable.o fault.o init.o \
--				   iomap.o
--
-+obj-y				:= extable.o fault.o init.o iomap.o
-+obj-y				+= dma-mapping$(MMUEXT).o
- obj-$(CONFIG_MMU)		+= fault-armv.o flush.o idmap.o ioremap.o \
- 				   mmap.o pgd.o mmu.o pageattr.o
- 
-diff --git a/arch/arm/mm/dma-mapping-nommu.c b/arch/arm/mm/dma-mapping-nommu.c
-new file mode 100644
-index 0000000..a5c50fb
---- /dev/null
-+++ b/arch/arm/mm/dma-mapping-nommu.c
-@@ -0,0 +1,252 @@
-+/*
-+ *  Based on linux/arch/arm/mm/dma-mapping.c
-+ *
-+ *  Copyright (C) 2000-2004 Russell King
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
+ 	rmem->ops = &rmem_dma_ops;
+@@ -334,5 +352,32 @@ static int __init rmem_dma_setup(struct reserved_mem *rmem)
+ 		&rmem->base, (unsigned long)rmem->size / SZ_1M);
+ 	return 0;
+ }
 +
-+#include <linux/export.h>
-+#include <linux/mm.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/scatterlist.h>
-+
-+#include <asm/cachetype.h>
-+#include <asm/cacheflush.h>
-+#include <asm/outercache.h>
-+#include <asm/cp15.h>
-+
-+#include "dma.h"
-+
-+/*
-+ *  dma_noop_ops is used if
-+ *   - MMU/MPU is off
-+ *   - cpu is v7m w/o cache support
-+ *   - device is coherent
-+ *  otherwise arm_nommu_dma_ops is used.
-+ *
-+ *  arm_nommu_dma_ops rely on consistent DMA memory (please, refer to
-+ *  [1] on how to declare such memory).
-+ *
-+ *  [1] Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-+ */
-+
-+static void *arm_nommu_dma_alloc(struct device *dev, size_t size,
-+				 dma_addr_t *dma_handle, gfp_t gfp,
-+				 unsigned long attrs)
-+
++static int __init dma_init_reserved_memory(void)
 +{
-+	struct dma_map_ops *ops = &dma_noop_ops;
-+
-+	/*
-+	 * We are here because:
-+	 * - no consistent DMA region has been defined, so we can't
-+	 *   continue.
-+	 * - there is no space left in consistent DMA region, so we
-+	 *   only can fallback to generic allocator if we are
-+	 *   advertised that consistency is not required.
-+	 */
-+
-+	if (attrs & DMA_ATTR_NON_CONSISTENT)
-+		return ops->alloc(dev, size, dma_handle, gfp, attrs);
-+
-+	WARN_ON_ONCE(1);
-+	return NULL;
-+}
-+
-+static void arm_nommu_dma_free(struct device *dev, size_t size,
-+			       void *cpu_addr, dma_addr_t dma_addr,
-+			       unsigned long attrs)
-+{
-+	struct dma_map_ops *ops = &dma_noop_ops;
-+
-+	if (attrs & DMA_ATTR_NON_CONSISTENT)
-+		ops->free(dev, size, cpu_addr, dma_addr, attrs);
-+
-+	WARN_ON_ONCE(1);
-+	return;
-+}
-+
-+static int arm_nommu_dma_mmap(struct device *dev, struct vm_area_struct *vma,
-+			      void *cpu_addr, dma_addr_t dma_addr, size_t size,
-+			      unsigned long attrs)
-+{
-+	struct dma_map_ops *ops = &dma_noop_ops;
++	const struct reserved_mem_ops *ops;
 +	int ret;
 +
-+	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
-+		return ret;
++	if (!dma_reserved_default_memory)
++		return -ENOMEM;
 +
-+	if (attrs & DMA_ATTR_NON_CONSISTENT)
-+		return ops->mmap(dev, vma, cpu_addr, dma_addr, size, attrs);
++	ops = dma_reserved_default_memory->ops;
 +
-+	WARN_ON_ONCE(1);
-+	return -ENXIO;
-+}
++	/*
++	 * We rely on rmem_dma_device_init() does not propagate error of
++	 * dma_assign_coherent_memory() for "NULL" device.
++	 */
++	ret = ops->device_init(dma_reserved_default_memory, NULL);
 +
-+static void __dma_page_cpu_to_dev(dma_addr_t handle, size_t size,
-+				  enum dma_data_direction dir)
-+{
-+	dmac_unmap_area(__va(handle), size, dir);
-+
-+	if (dir == DMA_FROM_DEVICE)
-+		outer_inv_range(handle, handle + size);
-+	else
-+		outer_clean_range(handle, handle + size);
-+}
-+
-+static void __dma_page_dev_to_cpu(dma_addr_t handle, size_t size,
-+				  enum dma_data_direction dir)
-+{
-+	if (dir != DMA_TO_DEVICE) {
-+		outer_inv_range(handle, handle + size);
-+		dmac_unmap_area(__va(handle), size, dir);
-+	}
-+}
-+
-+static dma_addr_t arm_nommu_dma_map_page(struct device *dev, struct page *page,
-+					 unsigned long offset, size_t size,
-+					 enum dma_data_direction dir,
-+					 unsigned long attrs)
-+{
-+	dma_addr_t handle = page_to_phys(page) + offset;
-+
-+	__dma_page_cpu_to_dev(handle, size, dir);
-+
-+	return handle;
-+}
-+
-+static void arm_nommu_dma_unmap_page(struct device *dev, dma_addr_t handle,
-+				     size_t size, enum dma_data_direction dir,
-+				     unsigned long attrs)
-+{
-+	__dma_page_dev_to_cpu(handle, size, dir);
-+}
-+
-+
-+static int arm_nommu_dma_map_sg(struct device *dev, struct scatterlist *sgl,
-+				int nents, enum dma_data_direction dir,
-+				unsigned long attrs)
-+{
-+	int i;
-+	struct scatterlist *sg;
-+
-+	for_each_sg(sgl, sg, nents, i) {
-+		sg_dma_address(sg) = sg_phys(sg);
-+		sg_dma_len(sg) = sg->length;
-+		__dma_page_cpu_to_dev(sg_dma_address(sg), sg_dma_len(sg), dir);
++	if (!ret) {
++		dma_coherent_default_memory = dma_reserved_default_memory->priv;
++		pr_info("DMA: default coherent area is set\n");
 +	}
 +
-+	return nents;
++	return ret;
 +}
 +
-+static void arm_nommu_dma_unmap_sg(struct device *dev, struct scatterlist *sgl,
-+				   int nents, enum dma_data_direction dir,
-+				   unsigned long attrs)
-+{
-+	struct scatterlist *sg;
-+	int i;
++core_initcall(dma_init_reserved_memory);
 +
-+	for_each_sg(sgl, sg, nents, i)
-+		__dma_page_dev_to_cpu(sg_dma_address(sg), sg_dma_len(sg), dir);
-+}
-+
-+static void arm_nommu_dma_sync_single_for_device(struct device *dev,
-+		dma_addr_t handle, size_t size, enum dma_data_direction dir)
-+{
-+	__dma_page_cpu_to_dev(handle, size, dir);
-+}
-+
-+static void arm_nommu_dma_sync_single_for_cpu(struct device *dev,
-+		dma_addr_t handle, size_t size, enum dma_data_direction dir)
-+{
-+	__dma_page_cpu_to_dev(handle, size, dir);
-+}
-+
-+static void arm_nommu_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sgl,
-+					     int nents, enum dma_data_direction dir)
-+{
-+	struct scatterlist *sg;
-+	int i;
-+
-+	for_each_sg(sgl, sg, nents, i)
-+		__dma_page_cpu_to_dev(sg_dma_address(sg), sg_dma_len(sg), dir);
-+}
-+
-+static void arm_nommu_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sgl,
-+					  int nents, enum dma_data_direction dir)
-+{
-+	struct scatterlist *sg;
-+	int i;
-+
-+	for_each_sg(sgl, sg, nents, i)
-+		__dma_page_dev_to_cpu(sg_dma_address(sg), sg_dma_len(sg), dir);
-+}
-+
-+struct dma_map_ops arm_nommu_dma_ops = {
-+	.alloc			= arm_nommu_dma_alloc,
-+	.free			= arm_nommu_dma_free,
-+	.mmap			= arm_nommu_dma_mmap,
-+	.map_page		= arm_nommu_dma_map_page,
-+	.unmap_page		= arm_nommu_dma_unmap_page,
-+	.map_sg			= arm_nommu_dma_map_sg,
-+	.unmap_sg		= arm_nommu_dma_unmap_sg,
-+	.sync_single_for_device	= arm_nommu_dma_sync_single_for_device,
-+	.sync_single_for_cpu	= arm_nommu_dma_sync_single_for_cpu,
-+	.sync_sg_for_device	= arm_nommu_dma_sync_sg_for_device,
-+	.sync_sg_for_cpu	= arm_nommu_dma_sync_sg_for_cpu,
-+};
-+EXPORT_SYMBOL(arm_nommu_dma_ops);
-+
-+static struct dma_map_ops *arm_nommu_get_dma_map_ops(bool coherent)
-+{
-+	return coherent ? &dma_noop_ops : &arm_nommu_dma_ops;
-+}
-+
-+void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-+			const struct iommu_ops *iommu, bool coherent)
-+{
-+	struct dma_map_ops *dma_ops;
-+
-+	if (IS_ENABLED(CONFIG_CPU_V7M)) {
-+		/*
-+		 * Cache support for v7m is optional, so can be treated as
-+		 * coherent if no cache has been detected. Note that it is not
-+		 * enough to check if MPU is in use or not since in absense of
-+		 * MPU system memory map is used.
-+		 */
-+		dev->archdata.dma_coherent = (cacheid) ? coherent : true;
-+	} else {
-+		/*
-+		 * Assume coherent DMA in case MMU/MPU has not been set up.
-+		 */
-+		dev->archdata.dma_coherent = (get_cr() & CR_M) ? coherent : true;
-+	}
-+
-+	dma_ops = arm_nommu_get_dma_map_ops(dev->archdata.dma_coherent);
-+
-+	set_dma_ops(dev, dma_ops);
-+}
-+
-+void arch_teardown_dma_ops(struct device *dev)
-+{
-+}
-+
-+int dma_supported(struct device *dev, u64 mask)
-+{
-+	return 1;
-+}
-+
-+EXPORT_SYMBOL(dma_supported);
-+
-+#define PREALLOC_DMA_DEBUG_ENTRIES	4096
-+
-+static int __init dma_debug_do_init(void)
-+{
-+	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
-+	return 0;
-+}
-+core_initcall(dma_debug_do_init);
+ RESERVEDMEM_OF_DECLARE(dma, "shared-dma-pool", rmem_dma_setup);
+ #endif
 -- 
 2.0.0
