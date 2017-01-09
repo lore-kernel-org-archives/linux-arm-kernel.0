@@ -1,46 +1,37 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:21 -0500
-Subject: [RFC 25/55] KVM: arm/arm64: Let vcpu thread modify its own active
- state
+Date: Mon,  9 Jan 2017 01:24:49 -0500
+Subject: [RFC 53/55] KVM: arm64: Reflect shadow VMPIDR_EL2 value to MPIDR_EL1
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-26-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-54-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, if a vcpu thread tries to change its own active state when
-the irq is already in AP list, it'll loop forever. Since the VCPU thread
-has already synced back LR state to the struct vgic_irq, let it modify
-its own state safely.
+A non-secure EL0 or EL1 read of MPIDR_EL1 should return the value of
+VMPIDR_EL2. We emulate this by copying the virtual VMPIDR_EL2 value to
+MPIDR_EL1 when entering VM's EL0 or EL1.
 
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- virt/kvm/arm/vgic/vgic-mmio.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm64/kvm/context.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index ebe1b9f..049c570 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -192,9 +192,9 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
- 	 * If this virtual IRQ was written into a list register, we
- 	 * have to make sure the CPU that runs the VCPU thread has
- 	 * synced back LR state to the struct vgic_irq.  We can only
--	 * know this for sure, when either this irq is not assigned to
-+	 * know this for sure, when this irq is not assigned to
- 	 * anyone's AP list anymore, or the VCPU thread is not
--	 * running on any CPUs.
-+	 * running on any CPUs, or current thread is the VCPU thread.
- 	 *
- 	 * In the opposite case, we know the VCPU thread may be on its
- 	 * way back from the guest and still has to sync back this
-@@ -202,6 +202,7 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
- 	 * other thread sync back the IRQ.
- 	 */
- 	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
-+	       irq->vcpu != vcpu && /* Current thread is not the VCPU thread */
- 	       irq->vcpu->cpu != -1) /* VCPU thread is running */
- 		cond_resched_lock(&irq->irq_lock);
+diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
+index 9ebc38f..dd79b0e 100644
+--- a/arch/arm64/kvm/context.c
++++ b/arch/arm64/kvm/context.c
+@@ -173,6 +173,12 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
+ 		ctxt->hw_pstate = *vcpu_cpsr(vcpu);
+ 		ctxt->hw_sys_regs = ctxt->sys_regs;
+ 		ctxt->hw_sp_el1 = ctxt->gp_regs.sp_el1;
++
++		/*
++		 * A non-secure EL0 or EL1 read of MPIDR_EL1 returns
++		 * the value of VMPIDR_EL2.
++		 */
++		ctxt->hw_sys_regs[MPIDR_EL1] = ctxt->el2_regs[VMPIDR_EL2];
+ 	}
  
+ 	vgic_v2_setup_shadow_state(vcpu);
 -- 
 1.9.1
