@@ -1,61 +1,41 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 9 Jan 2017 13:43:57 -0600
-Subject: [PATCH 4/5] ARM: dts: keystone-k2l: Add PSC reset controller node
-In-Reply-To: <20170109194358.27271-1-s-anna@ti.com>
-References: <20170109194358.27271-1-s-anna@ti.com>
-Message-ID: <20170109194358.27271-5-s-anna@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 9 Jan 2017 19:48:11 +0000
+Subject: [RESEND] spi: davinci: Allow device tree devices to use DMA
+In-Reply-To: <1483673177-31516-1-git-send-email-david@lechnology.com>
+References: <1483673177-31516-1-git-send-email-david@lechnology.com>
+Message-ID: <20170109194811.p3if5pzvjjaez2g3@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Power Sleep Controller (PSC) module contains specific
-memory-mapped registers that can be used to perform reset
-management using specific bits for the DSPs available on the
-SoC. The PSC is defined using a syscon node, and the reset
-functionality is defined using a child syscon reset controller
-node.
+On Thu, Jan 05, 2017 at 09:26:17PM -0600, David Lechner wrote:
 
-Add this syscon reset controller node as well as the reset
-control data for the resets it supports for the 66AK2L SoCs.
+> This allows SPI devices specified in a device tree to use DMA when the
+> master controller.
 
-Signed-off-by: Andrew F. Davis <afd@ti.com>
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/boot/dts/keystone-k2l.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+> Since device tree is supposed to only describe the hardware, adding such
+> a configuration option to device tree would not be acceptable. So, this
+> is the best we can do for now to get SPI devices working with DMA.
 
-diff --git a/arch/arm/boot/dts/keystone-k2l.dtsi b/arch/arm/boot/dts/keystone-k2l.dtsi
-index b58015737a35..4fa368f9ba52 100644
---- a/arch/arm/boot/dts/keystone-k2l.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2l.dtsi
-@@ -8,6 +8,8 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <dt-bindings/reset/ti-syscon.h>
-+
- / {
- 	compatible = "ti,k2l", "ti,keystone";
- 	model = "Texas Instruments Keystone 2 Lamarr SoC";
-@@ -216,6 +218,20 @@
- 			};
- 		};
- 
-+		psc: power-sleep-controller at 02350000 {
-+			pscrst: psc-reset-controller {
-+				compatible = "ti,k2l-pscrst", "ti,syscon-reset";
-+				#reset-cells = <1>;
-+
-+				ti,reset-bits = <
-+					0xa3c 8 0xa3c 8 0x83c 8 (ASSERT_CLEAR | DEASSERT_SET | STATUS_CLEAR) /* 0: dsp0 */
-+					0xa40 8 0xa40 8 0x840 8 (ASSERT_CLEAR | DEASSERT_SET | STATUS_CLEAR) /* 1: dsp1 */
-+					0xa44 8 0xa44 8 0x844 8 (ASSERT_CLEAR | DEASSERT_SET | STATUS_CLEAR) /* 2: dsp2 */
-+					0xa48 8 0xa48 8 0x848 8 (ASSERT_CLEAR | DEASSERT_SET | STATUS_CLEAR) /* 3: dsp3 */
-+				>;
-+			};
-+		};
-+
- 		dspgpio0: keystone_dsp_gpio at 02620240 {
- 			compatible = "ti,keystone-dsp-gpio";
- 			gpio-controller;
--- 
-2.10.2
+> Unfortunately, this excludes the possibility of using one SPI device with
+> DMA and one without on the same master.
+
+Why would you ever want to do that?  What would ever make sense about
+not using DMA if it's available and the transfer is suitably large, or
+conversely why would one want to force DMA even if PIO would be more
+performant?
+
+> When I originally submitted this patch, there was some discussion as to whether
+> dspi->dma_rx should be changed to return an error rather than being null.
+
+> However, I prefer it the way it is and don't see a compelling reason to change
+> it.
+
+I don't know what the above comment means, sorry (and don't recall
+having seen any earlier versions of this).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170109/ce442c16/attachment.sig>
