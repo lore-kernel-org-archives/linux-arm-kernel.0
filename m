@@ -1,30 +1,62 @@
-From: bvantiel@gmail.com (Bas van Tiel)
-Date: Mon, 9 Jan 2017 19:06:19 +0100
-Subject: Unhandled level 2 translation fault (11) at 0x000000b8, esr
- 0x92000046, rpi3 (aarch64)
-In-Reply-To: <20170109151354.GC7593@e104818-lin.cambridge.arm.com>
-References: <CAGDbNAD7-TM6+x0A3FebTOPYmqQqbm1w29ZwH+9qePaAvhxTKw@mail.gmail.com>
- <20161230151323.583b7ac5@xhacker>
- <CAGDbNAAGqFqt7X+=XYRLAp=L_fTv9dAAe=wu4T_W-FCGqnYHHg@mail.gmail.com>
- <20170109151354.GC7593@e104818-lin.cambridge.arm.com>
-Message-ID: <CAGDbNAC-8w1xytLuzWTMnWLi8=j1ShkwE3CLXQ5q75m_RibCMA@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 9 Jan 2017 20:08:21 +0200
+Subject: [PATCH v2 3/4] dmaengine: pl330: Store pointer to slave device
+In-Reply-To: <1483970598-6191-4-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20170109140326eucas1p29d3e54da58845589e2adf70db854d996@eucas1p2.samsung.com>
+ <1483970598-6191-1-git-send-email-m.szyprowski@samsung.com>
+ <1483970598-6191-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAJKOXPeFMpt1nKHD=zqEiFb45Hoxv-=+SHav=8C=KVbYJ0DAbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I defined STACKSIZE to the kernel's SIGSTKSZ (16384) and it seems to run
-> fine, though I'll leave it longer/overnight (on a Juno board). With the
-> 4K signal stack it was crashing shortly after start.
+On Mon, Jan 9, 2017 at 4:03 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Store the pointer to slave device, which requested our channel. It will be
+> later used to implement runtime PM of PL330 DMA controller. Although
+> DMA channels might be requested many times, each DMA peripheral channel is
+> physically dedicated only for specific hardware, so there should be only
+> one slave device for each channel.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/dma/pl330.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+>
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 3c80e71271a2..9c72f535739c 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -450,6 +450,7 @@ struct dma_pl330_chan {
+>
+>         /* for runtime pm tracking */
+>         bool active;
+> +       struct device *slave;
+>  };
+>
+>  struct pl330_dmac {
+> @@ -2113,6 +2114,14 @@ static struct dma_chan *of_dma_pl330_xlate(struct of_phandle_args *dma_spec,
+>         if (chan_id >= pl330->num_peripherals)
+>                 return NULL;
+>
+> +       if (!pl330->peripherals[chan_id].slave)
+> +               pl330->peripherals[chan_id].slave = slave;
 
-I tried the STACKSIZE of 16384 for both the RPI3 and the PINEA64 board
-and still see the same behaviour of crashing. Sometimes the process
-is also blocked for a long time before it crashes.
+Following coding style, this should be inside {} because the other
+branch has them. Beside that:
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Setting the interval to 200 usec [5 Khz] will help to crash it faster.
+Best regards,
+Krzysztof
 
-To further isolate the issue I will create a kernel module (based on a
-hrtimer) that will sent a periodic signal to the registered process
-and execute the same sighandler logic to check if the problem is still
-there.
-
-regards
-Bas
+> +       else if (pl330->peripherals[chan_id].slave != slave) {
+> +               dev_err(pl330->ddma.dev,
+> +                       "Can't use same channel with multiple slave devices!\n");
+> +               return NULL;
+> +       }
+> +
+>         return dma_get_slave_channel(&pl330->peripherals[chan_id].chan);
+>  }
+>
+> --
+> 1.9.1
+>
