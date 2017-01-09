@@ -1,66 +1,44 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 09 Jan 2017 11:32:35 -0800
-Subject: [PATCH v2.1 1/4] ARM: dts: davinci: da850: VPIF: add node and
- muxing
-In-Reply-To: <f3cdadf0-b0e9-9956-145a-9cc22024f6f9@ti.com> (Sekhar Nori's
- message of "Tue, 3 Jan 2017 11:05:00 +0530")
-References: <20161207193137.27947-2-khilman@baylibre.com>
- <20161208001418.4469-1-khilman@baylibre.com>
- <f3cdadf0-b0e9-9956-145a-9cc22024f6f9@ti.com>
-Message-ID: <m21swc81ws.fsf@baylibre.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 9 Jan 2017 11:33:12 -0800
+Subject: [PATCH v4 1/9] clk: stm32f4: Update DT bindings documentation
+In-Reply-To: <ccd14adb-9d10-ae9e-de6d-565418421968@st.com>
+References: <1481638820-29324-1-git-send-email-gabriel.fernandez@st.com>
+ <1481638820-29324-2-git-send-email-gabriel.fernandez@st.com>
+ <20161222001051.GP8288@codeaurora.org>
+ <ccd14adb-9d10-ae9e-de6d-565418421968@st.com>
+Message-ID: <20170109193312.GN17126@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar Nori <nsekhar@ti.com> writes:
+On 01/09, Alexandre Torgue wrote:
+> Hi Stephen,
+> 
+> On 12/22/2016 01:10 AM, Stephen Boyd wrote:
+> >On 12/13, gabriel.fernandez at st.com wrote:
+> >>From: Gabriel Fernandez <gabriel.fernandez@st.com>
+> >>
+> >>Creation of dt include file for specific stm32f4 clocks.
+> >>These specific clocks are not derived from system clock (SYSCLOCK)
+> >>We should use index 1 to use these clocks in DT.
+> >>e.g. <&rcc 1 CLK_LSI>
+> >>
+> >>Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> >>Acked-by: Rob Herring <robh@kernel.org>
+> >>---
+> >
+> >Applied to clk-stm32f4 and merged into clk-next.
+> >
+> 
+> I'm preparing pull request branch for STM32 DT part. This patch is
+> also requested to build correctly DT patches. Do you know how could
+> we synchronize our pull request ?
+> 
 
-> Hi Kevin,
->
-> On Thursday 08 December 2016 05:44 AM, Kevin Hilman wrote:
->> Add VPIF node an pins to da850 and enable on boards.  VPIF has two input
->> channels described using the standard DT ports and enpoints.
->> 
->> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
->> ---
->> v2 -> v2.1: moved ports from SoC .dtsi to board .dts files.
->> 
->>  arch/arm/boot/dts/da850-evm.dts  | 20 ++++++++++++++++++++
->>  arch/arm/boot/dts/da850-lcdk.dts | 13 +++++++++++++
->>  arch/arm/boot/dts/da850.dtsi     | 27 ++++++++++++++++++++++++++-
->>  3 files changed, 59 insertions(+), 1 deletion(-)
->
-> Can you split this patch to keep the SoC addition separate from board
-> updates. Separating support addition for EVM and LCDK will be good also.
+clk-stm32f4 is stable and not going to be rebased, so you're good
+to base patches on it and send it off to arm-soc if the arm-soc
+maintainers agree to it. You can also base off an earlier part of
+the branch if you only need this first patch for example.
 
-I don't understand why that matters, but OK.
-
->> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
->> index f79e1b91c680..5f0b40510b2b 100644
->> --- a/arch/arm/boot/dts/da850.dtsi
->> +++ b/arch/arm/boot/dts/da850.dtsi
->
->> @@ -399,7 +410,21 @@
->>  				<&edma0 0 1>;
->>  			dma-names = "tx", "rx";
->>  		};
->> +
->> +		vpif: video at 217000 {
->> +			compatible = "ti,da850-vpif";
->> +			reg = <0x217000 0x1000>;
->> +			interrupts = <92>;
->> +			status = "disabled";
->> +
->> +			/* VPIF capture port */
->> +			port {
->> +				#address-cells = <1>;
->> +				#size-cells = <0>;
->> +			};
->> +		};
->
-> Can you add this node just above mmc1? I am trying to keep the nodes
-> sorted in the order of unit address instead of new ones getting added at
-> the end. Unfortunately, it was not strictly enforced and we have many
-> breakages. But lets add the new ones where they will eventually end up.
-
-OK.
-
-Kevin
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
