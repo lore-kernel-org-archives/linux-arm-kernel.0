@@ -1,89 +1,99 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 9 Jan 2017 14:26:36 +0100
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 9 Jan 2017 13:31:50 +0000
 Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
-In-Reply-To: <20170109122639.GX14217@n2100.armlinux.org.uk>
+In-Reply-To: <20170109132026.GZ14217@n2100.armlinux.org.uk>
 References: <20161213113044.GC19985@leverpostej>
  <E1cH74w-0003ke-Qp@rmk-PC.armlinux.org.uk>
  <72f93940-cf87-fd91-90f2-760b7ff050fb@arm.com>
- <20161215113539.GK14217@n2100.armlinux.org.uk>
- <06fca797-da5d-f7f2-eecb-9b1b33b7e83f@arm.com>
- <20161215151548.GL14217@n2100.armlinux.org.uk>
- <c21d6514-44a2-ba88-0fe5-d14d5897cc48@arm.com>
- <20161215185717.GM14217@n2100.armlinux.org.uk>
- <20170103095149.GA14242@cbox>
- <20170109122639.GX14217@n2100.armlinux.org.uk>
-Message-ID: <20170109132636.GH4348@cbox>
+ <20170109125431.GY14217@n2100.armlinux.org.uk>
+ <e16d9b76-49ce-ae22-60f9-f2000d1862af@arm.com>
+ <20170109132026.GZ14217@n2100.armlinux.org.uk>
+Message-ID: <9466dbfd-8887-5e13-205e-5023173bdd30@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 12:26:39PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Jan 03, 2017 at 10:51:49AM +0100, Christoffer Dall wrote:
-> > Hi Russell,
-> > 
-> > On Thu, Dec 15, 2016 at 06:57:18PM +0000, Russell King - ARM Linux wrote:
-> > > What's also coming clear is that there's very few people who understand
-> > > all the interactions here, and the whole thing seems to be an undocumented
-> > > mess.  
-> > 
-> > I think the hyp stub has just served a very limited purpose so far, and
-> > therefore is a somewhat immature implementation.  Now we've discovered a
-> > need to clean it up, and we're all for that.  Again, I don't think the
-> > problem is any larger than that, we just need to fix it, and it seems to
-> > me everyone is willing to work on that.
+On 09/01/17 13:20, Russell King - ARM Linux wrote:
+> On Mon, Jan 09, 2017 at 01:14:31PM +0000, Marc Zyngier wrote:
+>> On 09/01/17 12:54, Russell King - ARM Linux wrote:
+>>> I don't think this is sufficient - the kdump case for ARM will still be
+>>> broken after these patches.
+>>>
+>>> The new soft-restart ABI introduced by my patch 2 passes in:
+>>>
+>>> r0 = HVC_SOFT_RESTART
+>>> r1 = non-zero
+>>> r2 = undefined
+>>> r3 = function pointer
+>>>
+>>> and the assumption is that r3 will be preserved if the HVC call does
+>>> nothing - which probably isn't a safe assumption.
+>>>
+>>> With these arguments passed to the KVM stub (which may be in place at
+>>> the point of a kdump), we end up executing this code:
+>>>
+>>>         push    {lr}
+>>>
+>>>         mov     lr, r0
+>>>         mov     r0, r1
+>>>         mov     r1, r2
+>>>         mov     r2, r3
+>>>
+>>> THUMB(  orr     lr, #1)
+>>>         blx     lr                      @ Call the HYP function
+>>>
+>>> This will result in an attempt to branch to address 2 or 3, which isn't
+>>> sane - a panic in the host kernel (eg due to a NULL pointer deref with
+>>> panic_on_oops enabled) will then cause kdump to try to execute code from
+>>> a stupid address.
+>>>
+>>> So, we need KVM's stub to be (a) better documented so this stuff is
+>>> obvious, and (b) updated so that kdump stands a chance of working even
+>>> if the KVM stub is still in place at the point the host kernel panics.
+>>>
+>>> Another reason why documentation is important here is that we need to
+>>> make it clear to alternative hypervisors that the host kernel may issue
+>>> a HVC call at any moment due to a crash with particular arguments, and
+>>> that the host kernel expects a certain behaviour in that case, and that
+>>> the hypervisor does not crash.
+>>>
+>>> For example, how will Xen behave - is introducing these changes going
+>>> to cause a regression with Xen?  Does anyone even know the answer to
+>>> that?  From what I can see, it seems we'll end up calling Xen's
+>>> hypervisor with a random r12 value (which it uses as a reason code)
+>>> but without the 0xea1 immediate constant in the HVC instruction.
+>>> Beyond that, I've no idea.
+>>
+>> I fail to see why you would issue a hyp stub hypercall if you're booted
+>> under *any* hypervisor. The only way you can have a valid hyp stub is
+>> because the kernel was booted at EL2/HYP. If you're running under Xen,
+>> KVM or whatever other hypervisor, you're booted at EL1/SVC, you only
+>> have the hypercall API exposed by that hypervisor, and nothing else. You
+>> can't even install the stub the first place.
+>>
+>> So any code path that tries to tear down KVM would better check that the
+>> kernel was entered at HYP. If it doesn't, it is broken.
 > 
-> What I want to see is some documentation of the hyp-stub, so that there
-> can be some element of confidence that changes there are properly
-> coordinated.  As I said in a follow up email:
+> Let me refresh your memory.  This thread is about kexec/kdump on 32-bit
+> ARM of the _host_ kernel, which will be entered in HYP mode.
+>
+> I've never used Xen, so I've no idea about it.  I'm merely pointing out
+> the possibilities as I see them.
 > 
-> | Either we need more people to have an understanding (so if one of them
-> | gets run over by a bus, we're not left floundering around) or we need
-> | it to be documented - even if it's just a simple comment "the ABI in
-> | this file is shared with XYZ, if you change the ABI here, also update
-> | XYZ too."
+> Let me repeat the on-going theme here.  Documentation.  Documentation.
+> Documentation.  Documentation.  Documentation.  Documentation.
+> Documentation.  Documentation.  Documentation.  Documentation.
+> Documentation.  Documentation.  Documentation.  Documentation.
+> Documentation.  Documentation.  Documentation.  Documentation.
+> Documentation.  Documentation.  Documentation.  Documentation.
+> Documentation.  Documentation.  Documentation.  Documentation.
 > 
-> > Marc even offered to work on your suggestion to support the general
-> > hyp ABI commands in KVM.
-> 
-> ... which is pointless, because it's a duplication of the effort I've
-> already put in.  My patches already do the:
-> 
-> #define HVC_GET_VECTORS 0
-> #define HVC_SET_VECTORS 1
-> #define HVC_SOFT_RESTART 2
-> 
-> thing which ARM64 does, passing the arguments in via the appropriate
-> registers.  However, such a change is a major revision of hyp-stub's
-> ABI, which completely changes the way it works.
+> Is the message getting through yet?  Can you see the waste of time
+> the lack of documentation is having yet - not only my time, but your
+> time replying to these emails.
 
-Sorry, I'm afraid I might have been unclear.  What I meant with "general
-hyp ABI commands in KVM" was, that if there's a need for KVM to support
-the operations (using a unified and documented ABI) that the hyp stub
-supports, then we could add that in KVM as well.  I thought your patches
-added the functionality for the hyp stub, and Marc would add whichever
-remaining pieces in the KVM side.
+I'm all for more documentation. Once we agree on what the API is going
+to be (as you're about to change it), I'll be happy to write something up.
 
-
-[...]
-
-> 
-> Longer term, I'd like to see the existing hypervisor documentation in
-> Documentation/virtual/kvm/hypercalls.txt updated with the ARM details.
-> According to that document, KVM effectively only exists on PPC and x86
-> at the present time...
-> 
-
-I'm afraid I don't think this is right place to document this behavior.
-
-There's a difference between an internal ABI between code running in two
-CPU modes but both part of the same kernel, and a hypervisor running
-a guest OS on top.
-
-I believe that Documentation/virtual/kvm/hypercalls.txt documents the
-latter case (i.e. guest hypercalls supported by the KVM host
-hypervisor), not the former case, and these things should not be
-combined.
-
-I would suggest adding something like
-Documentation/virtual/kvm/arm/hyp-abi.txt instead.
-
--Christoffer
+	M.
+-- 
+Jazz is not dead. It just smells funny...
