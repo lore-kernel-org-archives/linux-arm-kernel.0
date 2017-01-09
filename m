@@ -1,57 +1,60 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 9 Jan 2017 14:44:54 -0300
-Subject: [PATCH v1.1] ARM: multi_v7_defconfig: Enable power sequence for
- Odroid U3
-In-Reply-To: <CAJKOXPdODg2gCXP-BCRhDZAc2+o1J7Ek9iLaYF7hn_R2mNiK3A@mail.gmail.com>
-References: <20170107085203.4431-5-krzk@kernel.org>
- <20170107091651.10560-1-krzk@kernel.org>
- <d8ee24b1-9d6b-e76f-b5ef-71706efbf9e5@osg.samsung.com>
- <CAJKOXPdODg2gCXP-BCRhDZAc2+o1J7Ek9iLaYF7hn_R2mNiK3A@mail.gmail.com>
-Message-ID: <953e4035-114d-6aa0-df88-8263b56be18b@osg.samsung.com>
+From: fkan@apm.com (Feng Kan)
+Date: Mon, 9 Jan 2017 09:49:51 -0800
+Subject: APM smmu implementation
+In-Reply-To: <20170109120300.GC21398@arm.com>
+References: <CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g@mail.gmail.com>
+ <d9e40de8-82e2-0f19-5b99-d756ded21e80@arm.com>
+ <20170109120300.GC21398@arm.com>
+Message-ID: <CAL85gmCFRLSyO-TVcC67J3PW1C3s6h8Dx7KBzEjHkHxGANE9oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On 01/09/2017 02:38 PM, Krzysztof Kozlowski wrote:
-> On Mon, Jan 9, 2017 at 6:24 PM, Javier Martinez Canillas
-> <javier@osg.samsung.com> wrote:
->> Hello Krzysztof,
+On Mon, Jan 9, 2017 at 4:03 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Jan 09, 2017 at 11:34:42AM +0000, Robin Murphy wrote:
+>> On 06/01/17 23:21, Feng Kan wrote:
+>> > The APM IOMMU implementation is mostly just the ARM SMMU 500 variant.
 >>
->> I think it would had been clearer if the subject prefix was "[PATCH v1.1 4/4]" :)
-> 
-> Ah, yes.
-> 
+>> "Mostly"? Have APM actually modified it (which I strongly doubt) or do
+>> you mean it's simply been integrated with the upper address lines tied
+>> off?
+Yes, and that we only do stage 2 translation.
+
+ MMU-500 reports a 48-bit IAS because MMU-500 has 48-bit-wide slave
+>> interfaces; that's all there is to it. Whether or not you use all of
+>> those bits is up to you as a system integrator.
+>
+> That's a good point; MMU-500 doesn't appear to let you change the IAS
+> anyway. That should also mean that UBS and OAS are unchanged.
+>
+>> > However, our internal bus is only 42 bits wide. Our IAS field is coded
+>> > as 48 bits, which cause IPA to truncated to 42 bits on the physical
+>> > bus. In order for our system to work with the arm-smmu.c, there needs
+>> > to be a way to force the ipa_size to 42. The current internal solution
+>> > is to use the cpuid, but that is quite ugly. I was thinking of using
+>> > the model
+>> > as indication to right the ipa_size, but I am not too sure of the ACPI
+>> > side. Would it be okay to add an APM MMU500 variant? I would also
+>> > appreciated it if you guys have any alternate solutions.
 >>
->> On 01/07/2017 06:16 AM, Krzysztof Kozlowski wrote:
->>> Odroid U3 needs a power sequence for lan9730, if it was enabled by
->>> bootloader.  Also enable the USB3503 HSCI to USB2.0 driver (device
->>> is present on Odroid U3).
->>>
->>> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->>>
->>> ---
->>>
->>
->> Do you think that makes sense to also enable GPIO_SYS for debugging
->> purposes as you do in patch 3/4?
-> 
-> I like the GPIO_SYSFS interface because it is easy to use. However
-> now, after your question, I found this:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-November/470154.html
-> ARM/ARM64: defconfig: drop GPIO_SYSFS on multiplatforms
-> 
-> ... so instead I will drop it from exynos_defconfig.
-> 
-
-Right, I forgot that using the GPIO sysfs interface is discouraged now and the
-new chardev/ioctl based should be used instead. So it makes sense to drop it.
-
-> Best regards,
-> Krzysztof
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+>> This is something we've been axpecting to run into for a while now - the
+>> appropriate solution is to use a "dma-ranges" property on the master
+>> device(s) to describe that they have 42 bits of address wired up, from
+>> which they will then inherit the appropriate DMA mask. The outstanding
+>> issue which remains is that we're still missing some way of preventing
+>> drivers simply clobbering that with a 64-bit mask later, but that's a
+>> more general problem[1].
+Thanks, I have thought about this as well. As you have stated, it
+simply does not work for all at this point.
+>
+> I wonder if the driver is actually using IAS, OAS and UBS incorrectly.
+> We're using them to parameterise the DMA aperture, which is then used
+> to size the IOVA domain, but that's wrong because the IAS, OAS and UBS
+> are upper bounds and we can still end up allocating unusable/unreachable
+> addresses.
+>
+> So I do think that this should be fixed on the SMMU firmware node, rather
+> than restricting the range of each master device.
+I am more partial to the Will's idea, adding an override
+attribute would be the simplest at this point.
+>
+> Will
