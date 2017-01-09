@@ -1,45 +1,45 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:47 -0500
-Subject: [RFC 51/55] KVM: arm64: Expose physical address of vcpu interface
+Date: Mon,  9 Jan 2017 01:24:51 -0500
+Subject: [RFC 55/55] KVM: arm64: Enable nested virtualization
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-52-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-56-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Expose physical address of vgic virtual cpu interface.
+Now that everything is ready, we enable nested virtualization by setting
+the HCR NV and NV1 bit.
 
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- include/kvm/arm_vgic.h      | 1 +
- virt/kvm/arm/vgic/vgic-v2.c | 6 ++++++
- 2 files changed, 7 insertions(+)
+ arch/arm64/include/asm/kvm_arm.h | 1 +
+ arch/arm64/kvm/hyp/switch.c      | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 5bda20c..05c7811 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -331,6 +331,7 @@ static inline void vgic_handle_nested_maint_irq(struct kvm_vcpu *vcpu) { }
- #define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
- 			((i) < (k)->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS))
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index f9addf3..ab8b93b 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -24,6 +24,7 @@
  
-+phys_addr_t vgic_vcpu_base(void);
- bool kvm_vcpu_has_pending_irqs(struct kvm_vcpu *vcpu);
- void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
- void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index b8b73fd..5d85041 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -386,3 +386,9 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
- 
- 	return ret;
- }
-+
-+/* Return physical address of vgic virtual cpu interface */
-+phys_addr_t vgic_vcpu_base(void)
-+{
-+	return kvm_vgic_global_state.vcpu_base;
-+}
+ /* Hyp Configuration Register (HCR) bits */
+ #define HCR_NV1		(UL(1) << 43)
++#define HCR_NV		(UL(1) << 42)
+ #define HCR_E2H		(UL(1) << 34)
+ #define HCR_ID		(UL(1) << 33)
+ #define HCR_CD		(UL(1) << 32)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index c80b2ae..df7b88d 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -87,7 +87,7 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ 		isb();
+ 	}
+ 	if (vcpu_mode_el2(vcpu))
+-		val |= HCR_TVM | HCR_TRVM;
++		val |= HCR_TVM | HCR_TRVM | HCR_NV | HCR_NV1;
+ 	write_sysreg(val, hcr_el2);
+ 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+ 	write_sysreg(1 << 15, hstr_el2);
 -- 
 1.9.1
