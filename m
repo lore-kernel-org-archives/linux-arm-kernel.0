@@ -1,89 +1,107 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:13 -0500
-Subject: [RFC 17/55] KVM: arm64: Trap SPSR_EL1,
- ELR_EL1 and VBAR_EL1 in virtual EL2
+Date: Mon,  9 Jan 2017 01:24:17 -0500
+Subject: [RFC 21/55] KVM: arm64: Forward HVC instruction to the guest
+ hypervisor
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-18-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-22-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the same reason we trap virtual memory register accesses in virtual
-EL2, we need to trap SPSR_EL1, ELR_EL1 and VBAR_EL1 accesses. ARM v8.3
-introduces the HCR_EL2.NV1 bit to be able to trap on those register
-accesses in EL1. Do not set this bit until the whole nesting support is
-complete.
+Forward exceptions due to hvc instruction to the guest hypervisor.
 
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm64/kvm/sys_regs.c | 41 ++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 40 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/kvm_nested.h |  5 +++++
+ arch/arm64/kvm/Makefile             |  1 +
+ arch/arm64/kvm/handle_exit.c        | 11 +++++++++++
+ arch/arm64/kvm/handle_exit_nested.c | 27 +++++++++++++++++++++++++++
+ 4 files changed, 44 insertions(+)
+ create mode 100644 arch/arm64/include/asm/kvm_nested.h
+ create mode 100644 arch/arm64/kvm/handle_exit_nested.c
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 0f5d21b..19d6a6e 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -898,6 +898,38 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
- 	return true;
- }
+diff --git a/arch/arm64/include/asm/kvm_nested.h b/arch/arm64/include/asm/kvm_nested.h
+new file mode 100644
+index 0000000..620b4d3
+--- /dev/null
++++ b/arch/arm64/include/asm/kvm_nested.h
+@@ -0,0 +1,5 @@
++#ifndef __ARM64_KVM_NESTED_H__
++#define __ARM64_KVM_NESTED_H__
++
++int handle_hvc_nested(struct kvm_vcpu *vcpu);
++#endif
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index b342bdd..9c35e9a 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -35,4 +35,5 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/irqchip.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
+ kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
  
-+static inline void access_rw(struct sys_reg_params *p, u64 *sysreg)
-+{
-+	if (!p->is_write)
-+		p->regval = *sysreg;
-+	else
-+		*sysreg = p->regval;
-+}
-+
-+static bool access_elr(struct kvm_vcpu *vcpu,
-+		struct sys_reg_params *p,
-+		const struct sys_reg_desc *r)
-+{
-+	access_rw(p, &vcpu->arch.ctxt.gp_regs.elr_el1);
-+	return true;
-+}
-+
-+static bool access_spsr(struct kvm_vcpu *vcpu,
-+		struct sys_reg_params *p,
-+		const struct sys_reg_desc *r)
-+{
-+	access_rw(p, &vcpu->arch.ctxt.gp_regs.spsr[KVM_SPSR_EL1]);
-+	return true;
-+}
-+
-+static bool access_vbar(struct kvm_vcpu *vcpu,
-+		struct sys_reg_params *p,
-+		const struct sys_reg_desc *r)
-+{
-+	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
-+	return true;
-+}
-+
- static bool trap_el2_reg(struct kvm_vcpu *vcpu,
- 			 struct sys_reg_params *p,
- 			 const struct sys_reg_desc *r)
-@@ -1013,6 +1045,13 @@ static bool trap_el2_reg(struct kvm_vcpu *vcpu,
- 	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b010),
- 	  access_vm_reg, reset_val, TCR_EL1, 0 },
++kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += handle_exit_nested.o
+ kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += emulate-nested.o
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index a891684..208be16 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -29,6 +29,10 @@
+ #include <asm/kvm_mmu.h>
+ #include <asm/kvm_psci.h>
  
-+	/* SPSR_EL1 */
-+	{ Op0(0b11), Op1(0b000), CRn(0b0100), CRm(0b0000), Op2(0b000),
-+	  access_spsr},
-+	/* ELR_EL1 */
-+	{ Op0(0b11), Op1(0b000), CRn(0b0100), CRm(0b0000), Op2(0b001),
-+	  access_elr},
++#ifdef CONFIG_KVM_ARM_NESTED_HYP
++#include <asm/kvm_nested.h>
++#endif
 +
- 	/* AFSR0_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0001), Op2(0b000),
- 	  access_vm_reg, reset_unknown, AFSR0_EL1 },
-@@ -1045,7 +1084,7 @@ static bool trap_el2_reg(struct kvm_vcpu *vcpu,
+ #define CREATE_TRACE_POINTS
+ #include "trace.h"
  
- 	/* VBAR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
--	  NULL, reset_val, VBAR_EL1, 0 },
-+	  access_vbar, reset_val, VBAR_EL1, 0 },
+@@ -42,6 +46,13 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 			    kvm_vcpu_hvc_get_imm(vcpu));
+ 	vcpu->stat.hvc_exit_stat++;
  
- 	/* ICC_SGI1R_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1011), Op2(0b101),
++#ifdef CONFIG_KVM_ARM_NESTED_HYP
++	ret = handle_hvc_nested(vcpu);
++	if (ret < 0 && ret != -EINVAL)
++		return ret;
++	else if (ret >= 0)
++		return ret;
++#endif
+ 	ret = kvm_psci_call(vcpu);
+ 	if (ret < 0) {
+ 		kvm_inject_undefined(vcpu);
+diff --git a/arch/arm64/kvm/handle_exit_nested.c b/arch/arm64/kvm/handle_exit_nested.c
+new file mode 100644
+index 0000000..a6ce23b
+--- /dev/null
++++ b/arch/arm64/kvm/handle_exit_nested.c
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (C) 2016 - Columbia University
++ * Author: Jintack Lim <jintack@cs.columbia.edu>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/kvm.h>
++#include <linux/kvm_host.h>
++
++#include <asm/kvm_emulate.h>
++
++/* We forward all hvc instruction to the guest hypervisor. */
++int handle_hvc_nested(struct kvm_vcpu *vcpu)
++{
++	return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
++}
 -- 
 1.9.1
