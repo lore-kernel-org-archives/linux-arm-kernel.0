@@ -1,58 +1,120 @@
-From: john.garry@huawei.com (John Garry)
-Date: Mon, 9 Jan 2017 10:59:47 +0000
-Subject: [QUESTION] Early Write Acknowledge for PCIe configuration space
-In-Reply-To: <6092525.UgRCY3dpzP@wuerfel>
-References: <df407f39-ee05-d74d-6e5e-c5e502372032@huawei.com>
- <6092525.UgRCY3dpzP@wuerfel>
-Message-ID: <e085504e-74fd-e8be-8287-4baef88551c9@huawei.com>
+From: bharat.bhushan@nxp.com (Bharat Bhushan)
+Date: Mon, 9 Jan 2017 11:14:48 +0000
+Subject: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
+In-Reply-To: <DB6PR0402MB2694957C2D7C648CC342627FE69F0@DB6PR0402MB2694.eurprd04.prod.outlook.com>
+References: <ad6b6a4937b1fe183e6d48ccbaf4cb46db92fed4.1481893907.git.robin.murphy@arm.com>
+ <DB6PR0402MB2694957C2D7C648CC342627FE69F0@DB6PR0402MB2694.eurprd04.prod.outlook.com>
+Message-ID: <AM5PR0401MB25451FAB56E697889FDA30309A640@AM5PR0401MB2545.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2017 11:24, Arnd Bergmann wrote:
-> On Friday, January 6, 2017 11:15:22 AM CET John Garry wrote:
->> [apologies if this has been queried before]
->>
->> Hi ARM guys,
->>
->> I have a question about the device memory attributes we assign for PCIe
->> config space for arm64. Currently we use ioremap to map in the config
->> space; this uses nGnRE, which means we enable Early Write Acknowledge.
->>
->> The ARMv8 ARM states that "ARM recommend that No Early Write Acknowledge
->> Hint is used for PCIe configuration writes".
->>
->> I understand a problem with using E is in that configuration write is a
->> non-post operation, which means the RP requires to get the completion
->> ack from the EP The problem here is if CPU writes data to ECAM by E,
->> complete will go back to CPU directly, and maybe at this point the write
->> has not reached the EP.
->>
->> I believe that this may cause ordering issues in PCI read/write. In
->> practice we use non-relaxed readl/writel to access config space, which
->> include the synchronization barriers, which, *as I understand*, even if
->> for full system domain, may be negated by the E attribute for PCIe.
->
-> I don't think the barriers in readl/writel are enough here, in particular
-> the write barrier is *before* the access to synchronize DMAs
-> on RAM with MMIO accesses, which is a bit different from what you
-> have here.
->
->> So a question: why is the recommendation in the ARMv8 ARM ignored?
->
-> Probably nobody thought about this properly in the Linux drivers. The
-> ARMv8 ARM sounds correct here.
->
-> I/O space may have the same issue, as it also requires non-posted
-> accesses.
+Hi Robin,
 
-Right, so our HW team's recommendation - from ARM's memory model and 
-also PCIe order model - is that not only config space but also PCIe 
-memory mapped IO has the same attribute (nE).
+> -----Original Message-----
+> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+> bounces at lists.linux-foundation.org] On Behalf Of Nipun Gupta
+> Sent: Sunday, December 18, 2016 2:37 AM
+> To: Robin Murphy <robin.murphy@arm.com>; iommu at lists.linux-
+> foundation.org; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Cc: mark.rutland at arm.com; will.deacon at arm.com; Stuart Yoder
+> <stuart.yoder@nxp.com>
+> Subject: RE: [RFC PATCH] iommu/arm-smmu: Add global SMR masking
+> property
+> 
+> 
+> 
+> > -----Original Message-----
+> > From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+> > bounces at lists.linux-foundation.org] On Behalf Of Robin Murphy
+> > Sent: Friday, December 16, 2016 18:49
+> > To: iommu at lists.linux-foundation.org; devicetree at vger.kernel.org;
+> > linux-arm- kernel at lists.infradead.org
+> > Cc: mark.rutland at arm.com; will.deacon at arm.com; Stuart Yoder
+> > <stuart.yoder@nxp.com>
+> > Subject: [RFC PATCH] iommu/arm-smmu: Add global SMR masking
+> property
+> >
+> > The current SMR masking support using a 2-cell iommu-specifier is
+> > primarily intended to handle individual masters with large and/or
+> > complex Stream ID assignments; it quickly gets a bit clunky in other
+> > SMR use-cases where we just want to consistently mask out the same
+> > part of every Stream ID (e.g. for MMU-500 configurations where the
+> > appended TBU number gets in the way unnecessarily). Let's add a new
+> > property to allow a single global mask value to better fit the latter situation.
+> >
+> > CC: Stuart Yoder <stuart.yoder@nxp.com>
+> 
+> Tested-by: Nipun Gupta <nipun.gupta@nxp.com>
 
-John
+We have verified this patches with PCI and FSL-MC bus devices.
 
->
-> 	Arnd
->
-> .
->
+I do not see any comment on this patch, I know there were holidays around, can we assume this as accepted and we can develop u-boot patches.
+
+Thanks
+-Bharat
+
+> 
+> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> > ---
+> >
+> > Compile-tested only...
+> >
+> >  Documentation/devicetree/bindings/iommu/arm,smmu.txt | 8 ++++++++
+> >  drivers/iommu/arm-smmu.c                             | 4 +++-
+> >  2 files changed, 11 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> > b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> > index e862d1485205..98f5cbe5fdb4 100644
+> > --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> > +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> > @@ -60,6 +60,14 @@ conditions.
+> >                    aliases of secure registers have to be used during
+> >                    SMMU configuration.
+> >
+> > +- stream-match-mask : Specifies a fixed SMR mask value to combine with
+> > +                  the Stream ID value from every iommu-specifier. This
+> > +                  may be used instead of an "#iommu-cells" value of 2
+> > +                  when there is no need for per-master SMR masks, but
+> > +                  it is still desired to mask some portion of every
+> > +                  Stream ID (e.g. for certain MMU-500 configurations
+> > +                  given globally unique external IDs).
+> > +
+> >  ** Deprecated properties:
+> >
+> >  - mmu-masters (deprecated in favour of the generic "iommus" binding) :
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index
+> > 8f7281444551..f1abcb7dde36 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -1534,13 +1534,15 @@ static int arm_smmu_domain_set_attr(struct
+> > iommu_domain *domain,
+> >
+> >  static int arm_smmu_of_xlate(struct device *dev, struct
+> > of_phandle_args *args)  {
+> > -	u32 fwid = 0;
+> > +	u32 mask, fwid = 0;
+> >
+> >  	if (args->args_count > 0)
+> >  		fwid |= (u16)args->args[0];
+> >
+> >  	if (args->args_count > 1)
+> >  		fwid |= (u16)args->args[1] << SMR_MASK_SHIFT;
+> > +	else if (!of_property_read_u32(args->np, "stream-match-mask",
+> > &mask))
+> > +		fwid |= (u16)mask << SMR_MASK_SHIFT;
+> >
+> >  	return iommu_fwspec_add_ids(dev, &fwid, 1);  }
+> > --
+> > 2.10.2.dirty
+> >
+> > _______________________________________________
+> > iommu mailing list
+> > iommu at lists.linux-foundation.org
+> > https://lists.linuxfoundation.org/mailman/listinfo/iommu
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
