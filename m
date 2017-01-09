@@ -1,34 +1,61 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Mon, 9 Jan 2017 13:43:54 -0600
-Subject: [PATCH 1/5] ARM: Keystone: Enable ARCH_HAS_RESET_CONTROLLER
+Date: Mon, 9 Jan 2017 13:43:57 -0600
+Subject: [PATCH 4/5] ARM: dts: keystone-k2l: Add PSC reset controller node
 In-Reply-To: <20170109194358.27271-1-s-anna@ti.com>
 References: <20170109194358.27271-1-s-anna@ti.com>
-Message-ID: <20170109194358.27271-2-s-anna@ti.com>
+Message-ID: <20170109194358.27271-5-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Keystone 2 family of SoCs will use various Reset Controller
-drivers for managing the resets of remote processor devices like
-DSPs on the SoC, so select the ARCH_HAS_RESET_CONTROLLER option
-by default to enable the Reset framework.
+The Power Sleep Controller (PSC) module contains specific
+memory-mapped registers that can be used to perform reset
+management using specific bits for the DSPs available on the
+SoC. The PSC is defined using a syscon node, and the reset
+functionality is defined using a child syscon reset controller
+node.
 
+Add this syscon reset controller node as well as the reset
+control data for the resets it supports for the 66AK2L SoCs.
+
+Signed-off-by: Andrew F. Davis <afd@ti.com>
 Signed-off-by: Suman Anna <s-anna@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-keystone/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/keystone-k2l.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-index 24bd64dabdfc..554357035f30 100644
---- a/arch/arm/mach-keystone/Kconfig
-+++ b/arch/arm/mach-keystone/Kconfig
-@@ -4,6 +4,7 @@ config ARCH_KEYSTONE
- 	select ARM_GIC
- 	select HAVE_ARM_ARCH_TIMER
- 	select KEYSTONE_TIMER
-+	select ARCH_HAS_RESET_CONTROLLER
- 	select ARM_ERRATA_798181 if SMP
- 	select COMMON_CLK_KEYSTONE
- 	select ARCH_SUPPORTS_BIG_ENDIAN
+diff --git a/arch/arm/boot/dts/keystone-k2l.dtsi b/arch/arm/boot/dts/keystone-k2l.dtsi
+index b58015737a35..4fa368f9ba52 100644
+--- a/arch/arm/boot/dts/keystone-k2l.dtsi
++++ b/arch/arm/boot/dts/keystone-k2l.dtsi
+@@ -8,6 +8,8 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <dt-bindings/reset/ti-syscon.h>
++
+ / {
+ 	compatible = "ti,k2l", "ti,keystone";
+ 	model = "Texas Instruments Keystone 2 Lamarr SoC";
+@@ -216,6 +218,20 @@
+ 			};
+ 		};
+ 
++		psc: power-sleep-controller at 02350000 {
++			pscrst: psc-reset-controller {
++				compatible = "ti,k2l-pscrst", "ti,syscon-reset";
++				#reset-cells = <1>;
++
++				ti,reset-bits = <
++					0xa3c 8 0xa3c 8 0x83c 8 (ASSERT_CLEAR | DEASSERT_SET | STATUS_CLEAR) /* 0: dsp0 */
++					0xa40 8 0xa40 8 0x840 8 (ASSERT_CLEAR | DEASSERT_SET | STATUS_CLEAR) /* 1: dsp1 */
++					0xa44 8 0xa44 8 0x844 8 (ASSERT_CLEAR | DEASSERT_SET | STATUS_CLEAR) /* 2: dsp2 */
++					0xa48 8 0xa48 8 0x848 8 (ASSERT_CLEAR | DEASSERT_SET | STATUS_CLEAR) /* 3: dsp3 */
++				>;
++			};
++		};
++
+ 		dspgpio0: keystone_dsp_gpio at 02620240 {
+ 			compatible = "ti,keystone-dsp-gpio";
+ 			gpio-controller;
 -- 
 2.10.2
