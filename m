@@ -1,45 +1,47 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon,  9 Jan 2017 12:55:25 -0800
-Subject: [PATCH v2 0/6] ARM: davinci: da850: add/enable video capture
-Message-ID: <20170109205531.3435-1-khilman@baylibre.com>
+Date: Mon,  9 Jan 2017 12:55:27 -0800
+Subject: [PATCH v2 2/6] ARM: dts: davinci: da850-evm: enable VPIF
+In-Reply-To: <20170109205531.3435-1-khilman@baylibre.com>
+References: <20170109205531.3435-1-khilman@baylibre.com>
+Message-ID: <20170109205531.3435-3-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for VPIF video capture using DT (partially.)
+Enable VPIF node for video capture, and configure ports.  EVM board
+uses channel 0 for composite input and channel 1 S-Video input.
 
-The main VPIF device, and its pin muxing are using DT, but legacy
-platform_data is still required for the vpif_capture driver.  Passing
-legacy platform_data is required until the V4L2 framework, and
-subdevice drivers (such as the tvp514x) grow a way of selecting input
-and output routing (c.f. V4L2 s_routing API)
+Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+---
+ arch/arm/boot/dts/da850-evm.dts | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-Dependencies:
-- VPIF driver changes:
-  [PATCH v6 0/5] davinci: VPIF: add DT support
-  https://marc.info/?l=linux-arm-kernel&m=148113556200610
-
-Changes since v1:
-- split DT patches into separate SoC and board patches
-- split pdata-quirks into base/skeleton driver and da8xx
-
-Kevin Hilman (6):
-  ARM: dts: davinci: da850: VPIF: add node and muxing
-  ARM: dts: davinci: da850-evm: enable VPIF
-  ARM: dts: davinci: da850-lcdk: enable VPIF
-  ARM: davinci: add skeleton for pdata-quirks
-  ARM: davinci: da8xx: add pdata-quirks, use for VPIF capture
-  ARM: davinci: board-da850-evm: add I2C ID for VPIF
-
- arch/arm/boot/dts/da850-evm.dts             |  20 ++++
- arch/arm/boot/dts/da850-lcdk.dts            |  13 +++
- arch/arm/boot/dts/da850.dtsi                |  26 ++++-
- arch/arm/mach-davinci/Makefile              |   2 +-
- arch/arm/mach-davinci/board-da850-evm.c     |   1 +
- arch/arm/mach-davinci/da8xx-dt.c            |   2 +
- arch/arm/mach-davinci/include/mach/common.h |   2 +
- arch/arm/mach-davinci/pdata-quirks.c        | 154 ++++++++++++++++++++++++++++
- 8 files changed, 218 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-davinci/pdata-quirks.c
-
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index 41de15fe15a2..cea36ee6fd07 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -289,3 +289,23 @@
+ 		};
+ 	};
+ };
++
++&vpif {
++	pinctrl-names = "default";
++	pinctrl-0 = <&vpif_capture_pins>;
++	status = "okay";
++
++	/* VPIF capture port */
++	port {
++		vpif_ch0: endpoint at 0 {
++			  reg = <0>;
++			  bus-width = <8>;
++		};
++
++		vpif_ch1: endpoint at 1 {
++			  reg = <1>;
++			  bus-width = <8>;
++			  data-shift = <8>;
++		};
++	};
++};
 -- 
 2.9.3
