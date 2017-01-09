@@ -1,79 +1,76 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:19 -0500
-Subject: [RFC 23/55] KVM: arm64: Forward WFX to the guest hypervisor
+Date: Mon,  9 Jan 2017 01:24:25 -0500
+Subject: [RFC 29/55] KVM: arm/arm64: Set up the prepared vgic state
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-24-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-30-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forward exceptions due to WFI or WFE to the guest hypervisor if the
-guest hypervisor has set corresponding virtual HCR_EL2.TWX bits.
+Since vgic state is properly prepared and is pointed by hw_v2_cpu_if,
+let's use it to manipulate vgic.
 
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm64/include/asm/kvm_nested.h |  1 +
- arch/arm64/kvm/handle_exit.c        | 11 ++++++++++-
- arch/arm64/kvm/handle_exit_nested.c | 18 ++++++++++++++++++
- 3 files changed, 29 insertions(+), 1 deletion(-)
+ virt/kvm/arm/hyp/vgic-v2-sr.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_nested.h b/arch/arm64/include/asm/kvm_nested.h
-index 620b4d3..8d36935 100644
---- a/arch/arm64/include/asm/kvm_nested.h
-+++ b/arch/arm64/include/asm/kvm_nested.h
-@@ -2,4 +2,5 @@
- #define __ARM64_KVM_NESTED_H__
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+index c8aeb7b..5d4898f 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+@@ -22,10 +22,15 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
  
- int handle_hvc_nested(struct kvm_vcpu *vcpu);
-+int handle_wfx_nested(struct kvm_vcpu *vcpu, bool is_wfe);
- #endif
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index ce6d2ef..046fdf8 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -101,7 +101,16 @@ static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
-  */
- static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
--	if (kvm_vcpu_get_hsr(vcpu) & ESR_ELx_WFx_ISS_WFE) {
-+	bool is_wfe = !!(kvm_vcpu_get_hsr(vcpu) & ESR_ELx_WFx_ISS_WFE);
-+#ifdef CONFIG_KVM_ARM_NESTED_HYP
-+	int ret = handle_wfx_nested(vcpu, is_wfe);
-+
-+	if (ret < 0 && ret != -EINVAL)
-+		return ret;
-+	else if (ret >= 0)
-+		return ret;
-+#endif
-+	if (is_wfe) {
- 		trace_kvm_wfx_arm64(*vcpu_pc(vcpu), true);
- 		vcpu->stat.wfe_exit_stat++;
- 		kvm_vcpu_on_spin(vcpu);
-diff --git a/arch/arm64/kvm/handle_exit_nested.c b/arch/arm64/kvm/handle_exit_nested.c
-index a6ce23b..871ecfc 100644
---- a/arch/arm64/kvm/handle_exit_nested.c
-+++ b/arch/arm64/kvm/handle_exit_nested.c
-@@ -25,3 +25,21 @@ int handle_hvc_nested(struct kvm_vcpu *vcpu)
- {
- 	return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
- }
-+
-+/*
-+ * Inject wfx to the nested hypervisor if this is from the nested VM and
-+ * the virtual HCR_EL2.TWX is set. Otherwise, let the host hypervisor
-+ * handle this.
-+ */
-+int handle_wfx_nested(struct kvm_vcpu *vcpu, bool is_wfe)
++static __hyp_text struct vgic_v2_cpu_if *__hyp_get_cpu_if(struct kvm_vcpu *vcpu)
 +{
-+	u64 hcr_el2 = vcpu_el2_reg(vcpu, HCR_EL2);
-+
-+	if (vcpu_mode_el2(vcpu))
-+		return -EINVAL;
-+
-+	if ((is_wfe && (hcr_el2 & HCR_TWE)) || (!is_wfe && (hcr_el2 & HCR_TWI)))
-+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
-+
-+	return -EINVAL;
++	return kern_hyp_va(vcpu->arch.vgic_cpu.hw_v2_cpu_if);
 +}
++
+ static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
+ 					    void __iomem *base)
+ {
+-	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
++	struct vgic_v2_cpu_if *cpu_if = __hyp_get_cpu_if(vcpu);
+ 	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
+ 	u32 eisr0, eisr1;
+ 	int i;
+@@ -67,7 +72,7 @@ static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
+ 
+ static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
+ {
+-	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
++	struct vgic_v2_cpu_if *cpu_if = __hyp_get_cpu_if(vcpu);
+ 	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
+ 	u32 elrsr0, elrsr1;
+ 
+@@ -86,7 +91,7 @@ static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
+ 
+ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
+ {
+-	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
++	struct vgic_v2_cpu_if *cpu_if = __hyp_get_cpu_if(vcpu);
+ 	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
+ 	int i;
+ 
+@@ -107,7 +112,7 @@ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
+ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+-	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
++	struct vgic_v2_cpu_if *cpu_if = __hyp_get_cpu_if(vcpu);
+ 	struct vgic_dist *vgic = &kvm->arch.vgic;
+ 	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
+ 
+@@ -138,7 +143,7 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+-	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
++	struct vgic_v2_cpu_if *cpu_if = __hyp_get_cpu_if(vcpu);
+ 	struct vgic_dist *vgic = &kvm->arch.vgic;
+ 	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
+ 	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
 -- 
 1.9.1
