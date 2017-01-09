@@ -1,48 +1,53 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Mon, 9 Jan 2017 12:55:28 +0200
-Subject: [PATCH 0/3] watchdog: imx2: handle WMCR only being available on
- i.MX35 and later
-In-Reply-To: <20170109095039.11979-1-u.kleine-koenig@pengutronix.de>
-References: <20170109095039.11979-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <19492fdf-a0f7-8525-f955-8c9136575659@mleia.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 9 Jan 2017 10:59:23 +0000
+Subject: [PATCH v3 9/9] arm64: Documentation - Expose CPU feature registers
+In-Reply-To: <20170106121612.GA12863@e104818-lin.cambridge.arm.com>
+References: <1483552147-9605-1-git-send-email-suzuki.poulose@arm.com>
+ <1483552147-9605-10-git-send-email-suzuki.poulose@arm.com>
+ <20170106121612.GA12863@e104818-lin.cambridge.arm.com>
+Message-ID: <0701afb7-c337-4f82-3dd1-728bca160a44@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Uwe,
+On 06/01/17 12:16, Catalin Marinas wrote:
+> On Wed, Jan 04, 2017 at 05:49:07PM +0000, Suzuki K. Poulose wrote:
+>> +The following rules are applied to the value returned by the
+>> +infrastructure:
+>> +
+>> + a) The value of an 'IMPLEMENTATION DEFINED' field is set to 0.
+>> + b) The value of a reserved field is populated with the reserved
+>> +    value as defined by the architecture.
+>> + c) The value of a field marked as not 'visible', is set to indicate
+>> +    the feature is missing (as defined by the architecture).
+>> + d) The value of a 'visible' field holds the system wide safe value
+>> +    for the particular feature(except for MIDR_EL1, see section 4).
+>> +    See Appendix I for more information on safe value.
+>> +
+>> +There are only a few registers visible to the userspace. See Section 4,
+>> +for the list of 'visible' registers.
+>> +
+>> +All others are emulated as having 'invisible' features.
+>
+> BTW, we don't have any statement about whether a visible field may
+> become invisible but I guess this wouldn't be a problem as long as the
+> feature is reported as missing. I'm thinking about currently RES0 fields
+> that are listed as visible but they may report something in the future
+> that we don't want exposed to user. At that point, we'll change the
+> field to "invisible" while reporting RES0 to user. I don't see an issue
+> with this, just I thought worth flagging.
 
-On 01/09/2017 11:50 AM, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> this is my approach to fix the issue reported by Vladimir Zapolskiy.
-> 
-> IMHO we don't need the third commit because I'm convinced most machines
-> just don't do anything when the WDOG signal becomes active. An affected
-> machine powers off 16 seconds after startup. This would be noticed
-> during development of the bootloader and so I assume all affected
-> machines having bootloaders that make the compat code unimportant.
-> 
-> If you want to know if your machine is affected, do:
-> 
-> 	mw -w $(watchdog_base_addr) 0x10
+Thanks for raising that. In fact, we treat all the RES0 fields as invisible
+and strict for the moment. So, I think it is worth reflecting that in the
+documentation. As you mentioned, we could switch them as required based on
+the feature without any issues. I will fix this.
 
-is it a command in barebox shell?
+>
+> Anyway:
+>
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+>
 
-> The machines I tested this on (among a few customer boards a
-> Phycore i.MX35 and a Freescale i.MX53 Quick Start Board) don't power off.
-> 
-> I don't have manuals handy for ls1021a, ls1043a and ls1046a but assume
-> they use the i.MX35 type, too. This needs to be fixed before this series
-> is applied.
-> 
-> Compared to Vladimir's patch machines still using board files are fixed,
-> too.
-> 
+Thanks for reviewing the entire series. I will resend the series with the tags
+and updates to this documentation and a couple of other patches.
 
-This addition can be done on top of my changes, in my version the driver
-ignores WMCR on all machines with board files.
-
-So now we have two competing series unfortunately...
-
---
-With best wishes,
-Vladimir
+Suzuki
