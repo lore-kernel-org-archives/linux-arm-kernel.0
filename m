@@ -1,120 +1,62 @@
-From: alexgershgorin@gmail.com (Alex Gershgorin)
-Date: Mon, 9 Jan 2017 17:10:34 +0200
-Subject: mmc: sdhci-of-at91: Internal clock never stabilised
-In-Reply-To: <20170109135855.dquiysi5wnilujgp@rfolt0960.corp.atmel.com>
-References: <1DC01DCD0F70AE4284AE3A5E8C726E225D20EDF1@Ex2010.q-core.co.il>
- <CAJP5LRNRSpMjdTFyL4R4ZN1tZAG0A=TKR5LRareg+TEJmnkd2Q@mail.gmail.com>
- <20170108125344.3iyfoodszupzgukk@piout.net>
- <20170109071900.fz2en246i7uqmavw@rfolt0960.corp.atmel.com>
- <CAJP5LRMjVGWpHE5K8xZOb=m2wxy8qRxx5_BbLFEHuA13Rh_WoQ@mail.gmail.com>
- <20170109135855.dquiysi5wnilujgp@rfolt0960.corp.atmel.com>
-Message-ID: <CAJP5LROuAg1xc1q8LpJ7QjynKBfYrvpjX8Jn54LmkCFMENo1uQ@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 9 Jan 2017 23:11:10 +0800
+Subject: [PATCH v2 2/4] dmaengine: Forward slave device pointer to
+ of_xlate callback
+In-Reply-To: <1483970598-6191-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <201701092339.Or2Yo06w%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for your help, I will replace the chip with Rev B so I can
-indeed start working on my board normally J
+Hi Marek,
 
-Regards,
-Alex
+[auto build test ERROR on next-20170106]
+[also build test ERROR on v4.10-rc3]
+[cannot apply to linus/master linux/master xlnx/master v4.9-rc8 v4.9-rc7 v4.9-rc6]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-On Mon, Jan 9, 2017 at 3:58 PM, Ludovic Desroches
-<ludovic.desroches@atmel.com> wrote:
-> On Mon, Jan 09, 2017 at 12:44:42PM +0200, Alex Gershgorin wrote:
->> Hi Ludovic,
->> As we read the chip ID from CHIPID_CIDR register we get 0x8a5c08c0 (we
->> use ATSAMA5D27A-CU).
->>
->
-> It seems the device you have is a rev A device, this issue should be fixed in
-> the revision B.
->
-> I say should, because the bug was identified and I provided a workaround with
-> the use of our own set_clock function has been done. Unfortunately, even
-> if it happens less frequently, it seems the bug is still here.
->
-> The hardware part has been reworked on the revision B. I don't recall facing
-> this issue again but I can't guarantee that it won't happen anymore
-> since the root cause was not properly identified on rev A.
->
-> Regards
->
-> Ludovic
->
->>
->> Thanks,
->> Alex
->>
->> On Mon, Jan 9, 2017 at 9:19 AM, Ludovic Desroches
->> <ludovic.desroches@atmel.com> wrote:
->> > Hi Alex,
->> >
->> > Which revision of SoC are you using?
->> >
->> > Regards
->> >
->> > Ludovic
->> >
->> > On Sun, Jan 08, 2017 at 01:53:44PM +0100, Alexandre Belloni wrote:
->> >> Hi,
->> >>
->> >> I think Cyrille worked on that a few month ago, maybe he has a comment.
->> >>
->> >> On 08/01/2017 at 14:07:53 +0200, Alex Gershgorin wrote :
->> >> > Hi All,
->> >> > We have two different HW platforms based on SAMA5D2 SoC (SAMA5D2 Xplained
->> >> > Board and our own HW).
->> >> > On both of them we are facing stabilization of the internal
->> >> > clock problem, it does not happen all the time but quite often.
->> >> > Please see below my Kernel boot messages:
->> >> >
->> >> > sdhci: Copyright(c) Pierre Ossman
->> >> > sdhci-pltfm: SDHCI platform and OF driver helper
->> >> > sdhci-at91 a0000000.sdio-host: update clk mul to 39 as gck rate is
->> >> > 480000000 Hz
->> >> > mmc0: Internal clock never stabilised.
->> >> > mmc0: Internal clock never stabilised.
->> >> > mmc0: SDHCI controller on a0000000.sdio-host [a0000000.sdio-host] using ADMA
->> >> >
->> >> > snip
->> >> >
->> >> > snip
->> >> >
->> >> > Waiting for root device /dev/mmcblk0p2...
->> >> > mmc0: Internal clock never stabilised.
->> >> > mmc0: Timeout waiting for hardware cmd interrupt.
->> >> > sdhci: =========== REGISTER DUMP (mmc0)===========
->> >> > sdhci: Sys addr: 0x00000000 | Version:  0x00001502
->> >> > sdhci: Blk size: 0x00000000 | Blk cnt:  0x00000000
->> >> > sdhci: Argument: 0x00000000 | Trn mode: 0x00000000
->> >> > sdhci: Present: 0x01ff0001 | Host ctl: 0x00000001
->> >> > sdhci: Power: 0x0000000f | Blk gap:  0x00000000
->> >> > sdhci: Wake-up: 0x00000000 | Clock:    0x0000ffe1
->> >> > sdhci: Timeout: 0x00000000 | Int stat: 0x00000000
->> >> > sdhci: Int enab: 0x00ff0003 | Sig enab: 0x00ff0003
->> >> > sdhci: AC12 err: 0x00000000 | Slot int: 0x00000000
->> >> > sdhci: Caps: 0x27ec0c8c | Caps_1: 0x00270f77
->> >> > sdhci: Cmd: 0x00000000 | Max curr: 0x00000000
->> >> > sdhci: Host ctl2: 0x00000000
->> >> > sdhci: ADMA Err: 0x00000000 | ADMA Ptr: 0x00000000
->> >> > sdhci: ===========================================
->> >> >
->> >> > Any direction to solve this problem?
->> >> >
->> >> > Thanks,
->> >> > Alex Gershgorin
->> >>
->> >> --
->> >> Alexandre Belloni, Free Electrons
->> >> Embedded Linux and Kernel engineering
->> >> http://free-electrons.com
->> >>
->> >> _______________________________________________
->> >> linux-arm-kernel mailing list
->> >> linux-arm-kernel at lists.infradead.org
->> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+url:    https://github.com/0day-ci/linux/commits/Marek-Szyprowski/dmaengine-pl330-remove-pdata-based-initialization/20170109-224452
+config: i386-randconfig-x001-201702 (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All errors (new ones prefixed by >>):
+
+   drivers/dma/dw/platform.c: In function 'dw_dma_of_xlate':
+>> drivers/dma/dw/platform.c:35:22: error: 'slave' redeclared as different kind of symbol
+     struct dw_dma_slave slave = {
+                         ^~~~~
+   drivers/dma/dw/platform.c:32:47: note: previous definition of 'slave' was here
+             struct of_dma *ofdma, struct device *slave)
+                                                  ^~~~~
+
+vim +/slave +35 drivers/dma/dw/platform.c
+
+a104a45ba7 Andy Shevchenko  2015-03-09  29  #define DRV_NAME	"dw_dmac"
+a104a45ba7 Andy Shevchenko  2015-03-09  30  
+9cade1a46c Andy Shevchenko  2013-06-05  31  static struct dma_chan *dw_dma_of_xlate(struct of_phandle_args *dma_spec,
+7b7c0c79d7 Marek Szyprowski 2017-01-09  32  				     struct of_dma *ofdma, struct device *slave)
+9cade1a46c Andy Shevchenko  2013-06-05  33  {
+9cade1a46c Andy Shevchenko  2013-06-05  34  	struct dw_dma *dw = ofdma->of_dma_data;
+4d130de20c Andy Shevchenko  2014-08-19 @35  	struct dw_dma_slave slave = {
+4d130de20c Andy Shevchenko  2014-08-19  36  		.dma_dev = dw->dma.dev,
+9cade1a46c Andy Shevchenko  2013-06-05  37  	};
+9cade1a46c Andy Shevchenko  2013-06-05  38  	dma_cap_mask_t cap;
+
+:::::: The code at line 35 was first introduced by commit
+:::::: 4d130de20c3f39fc1a1aecd3969b50d49ff2e358 dmaengine: dw: introduce generic filter function
+
+:::::: TO: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+:::::: CC: Vinod Koul <vinod.koul@intel.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 28695 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170109/ddcca592/attachment-0001.gz>
