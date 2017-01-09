@@ -1,138 +1,145 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 9 Jan 2017 16:59:48 +0530
-Subject: [PATCH 11/20] arm64: introduce binfmt_elf32.c
-In-Reply-To: <1483961397-8599-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1483961397-8599-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1483961397-8599-12-git-send-email-ynorov@caviumnetworks.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 9 Jan 2017 12:59:26 +0100
+Subject: [RFC 2/8] KVM: arm/arm64: Decouple kvm timer functions from
+ virtual timer
+In-Reply-To: <1482772326-29110-3-git-send-email-jintack@cs.columbia.edu>
+References: <1482772326-29110-1-git-send-email-jintack@cs.columbia.edu>
+ <1482772326-29110-3-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <20170109115926.GC4348@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we support more than one compat formats, it looks more reasonable
-to not use fs/compat_binfmt.c. Custom binfmt_elf32.c allows to move aarch32
-specific definitions there and make code more maintainable and readable.
+On Mon, Dec 26, 2016 at 12:12:00PM -0500, Jintack Lim wrote:
+> Now that we have a separate structure for timer context, make functions
+> general so that they can work on any timer context, not just the virtual
+> timer context.  This does not change the virtual timer functionality.
+> 
+> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+> ---
+>  arch/arm/kvm/arm.c           |  2 +-
+>  include/kvm/arm_arch_timer.h |  3 +-
+>  virt/kvm/arm/arch_timer.c    | 65 +++++++++++++++++++++++++-------------------
+>  3 files changed, 40 insertions(+), 30 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 19b5f5c..37d1623 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -295,7 +295,7 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
+>  
+>  int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
+>  {
+> -	return kvm_timer_should_fire(vcpu);
+> +	return kvm_timer_should_fire(vcpu, vcpu_vtimer(vcpu));
+>  }
+>  
+>  void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
+> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+> index 7dabe56..cf84145 100644
+> --- a/include/kvm/arm_arch_timer.h
+> +++ b/include/kvm/arm_arch_timer.h
+> @@ -69,7 +69,8 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+>  u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+>  int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
+>  
+> -bool kvm_timer_should_fire(struct kvm_vcpu *vcpu);
+> +bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
+> +			   struct arch_timer_context *timer_ctx);
+>  void kvm_timer_schedule(struct kvm_vcpu *vcpu);
+>  void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
+>  
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 30a64df..3bd6063 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -91,7 +91,7 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
+>  	vcpu = container_of(work, struct kvm_vcpu, arch.timer_cpu.expired);
+>  	vcpu->arch.timer_cpu.armed = false;
+>  
+> -	WARN_ON(!kvm_timer_should_fire(vcpu));
+> +	WARN_ON(!kvm_timer_should_fire(vcpu, vcpu_vtimer(vcpu)));
+>  
+>  	/*
+>  	 * If the vcpu is blocked we want to wake it up so that it will see
+> @@ -100,12 +100,22 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
+>  	kvm_vcpu_kick(vcpu);
+>  }
+>  
+> -static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
+> +static u64 kvm_timer_cntvoff(struct kvm_vcpu *vcpu,
+> +			     struct arch_timer_context *timer_ctx)
+> +{
+> +	if (timer_ctx == vcpu_vtimer(vcpu))
+> +		return vcpu->kvm->arch.timer.cntvoff;
+> +
+> +	return 0;
+> +}
+> +
+> +static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu,
+> +				   struct arch_timer_context *timer_ctx)
+>  {
+>  	cycle_t cval, now;
+>  
+> -	cval = vcpu_vtimer(vcpu)->cnt_cval;
+> -	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
+> +	cval = timer_ctx->cnt_cval;
+> +	now = kvm_phys_timer_read() - kvm_timer_cntvoff(vcpu, timer_ctx);
+>  
+>  	if (now < cval) {
+>  		u64 ns;
+> @@ -134,7 +144,7 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+>  	 * PoV (NTP on the host may have forced it to expire
+>  	 * early). If we should have slept longer, restart it.
+>  	 */
+> -	ns = kvm_timer_compute_delta(vcpu);
+> +	ns = kvm_timer_compute_delta(vcpu, vcpu_vtimer(vcpu));
+>  	if (unlikely(ns)) {
+>  		hrtimer_forward_now(hrt, ns_to_ktime(ns));
+>  		return HRTIMER_RESTART;
+> @@ -144,42 +154,40 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+>  	return HRTIMER_NORESTART;
+>  }
+>  
+> -static bool kvm_timer_irq_can_fire(struct kvm_vcpu *vcpu)
+> +static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx)
+>  {
+> -	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+> -
+> -	return !(vtimer->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
+> -		(vtimer->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
+> +	return !(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
+> +		(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
+>  }
+>  
+> -bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
+> +bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
+> +			   struct arch_timer_context *timer_ctx)
+>  {
+> -	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+>  	cycle_t cval, now;
+>  
+> -	if (!kvm_timer_irq_can_fire(vcpu))
+> +	if (!kvm_timer_irq_can_fire(timer_ctx))
+>  		return false;
+>  
+> -	cval = vtimer->cnt_cval;
+> -	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
+> +	cval = timer_ctx->cnt_cval;
+> +	now = kvm_phys_timer_read() - kvm_timer_cntvoff(vcpu, timer_ctx);
+>  
 
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
----
- arch/arm64/Kconfig               |  1 -
- arch/arm64/include/asm/elf.h     | 22 ++--------------------
- arch/arm64/include/asm/hwcap.h   |  2 --
- arch/arm64/kernel/Makefile       |  2 +-
- arch/arm64/kernel/binfmt_elf32.c | 32 ++++++++++++++++++++++++++++++++
- 5 files changed, 35 insertions(+), 24 deletions(-)
- create mode 100644 arch/arm64/kernel/binfmt_elf32.c
+I'm wondering if we should move the cntvoff field to the
+arch_timer_context struct so that all these functions can just take
+the timer_ctx pointer without a vcpu pointer?
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index bcb11dd..e668ace 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1016,7 +1016,6 @@ config AARCH32_EL0
- 	def_bool y
- 	depends on ARM64_4K_PAGES || EXPERT
- 	select COMPAT
--	select COMPAT_BINFMT_ELF
- 	select HAVE_UID16
- 	select OLD_SIGSUSPEND3
- 	select COMPAT_OLD_SIGACTION
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index a0188e2..453e0da 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -176,30 +176,12 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
- 
- #define COMPAT_ELF_ET_DYN_BASE		(2 * TASK_SIZE_32 / 3)
- 
-+#ifdef CONFIG_AARCH32_EL0
- /* AArch32 registers. */
- #define COMPAT_ELF_NGREG		18
- typedef unsigned int			compat_elf_greg_t;
- typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
--
--/* AArch32 EABI. */
--#define EF_ARM_EABI_MASK		0xff000000
--#define compat_elf_check_arch(x)	(system_supports_32bit_el0() && \
--					 ((x)->e_machine == EM_ARM) && \
--					 ((x)->e_flags & EF_ARM_EABI_MASK))
--
--#define compat_start_thread		compat_start_thread
--#define COMPAT_SET_PERSONALITY(ex)					\
--({									\
--	set_bit(TIF_32BIT, &current->mm->context.flags);		\
--	clear_thread_flag(TIF_32BIT_AARCH64);				\
--	set_thread_flag(TIF_32BIT);					\
-- })
--#define COMPAT_ARCH_DLINFO
--extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
--				      int uses_interp);
--#define compat_arch_setup_additional_pages \
--					aarch32_setup_vectors_page
--
-+#endif /* CONFIG_AARCH32_EL0 */
- #endif /* CONFIG_COMPAT */
- 
- #endif /* !__ASSEMBLY__ */
-diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
-index 2c7fc5d..99dfd92 100644
---- a/arch/arm64/include/asm/hwcap.h
-+++ b/arch/arm64/include/asm/hwcap.h
-@@ -47,8 +47,6 @@
- #define ELF_HWCAP		(elf_hwcap)
- 
- #ifdef CONFIG_AARCH32_EL0
--#define COMPAT_ELF_HWCAP	(compat_elf_hwcap)
--#define COMPAT_ELF_HWCAP2	(compat_elf_hwcap2)
- extern unsigned int compat_elf_hwcap, compat_elf_hwcap2;
- #endif
- 
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 8a19fda..abe5040 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -28,7 +28,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
- 	$(call if_changed,objcopy)
- 
- arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
--					   sys_compat.o entry32.o
-+					   sys_compat.o entry32.o binfmt_elf32.o
- arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
- arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
-diff --git a/arch/arm64/kernel/binfmt_elf32.c b/arch/arm64/kernel/binfmt_elf32.c
-new file mode 100644
-index 0000000..7c38a22
---- /dev/null
-+++ b/arch/arm64/kernel/binfmt_elf32.c
-@@ -0,0 +1,32 @@
-+/*
-+ * Support for AArch32 Linux ELF binaries.
-+ */
-+
-+/* AArch32 EABI. */
-+#define EF_ARM_EABI_MASK		0xff000000
-+
-+#define compat_start_thread		compat_start_thread
-+#define COMPAT_SET_PERSONALITY(ex)					\
-+({									\
-+	set_bit(TIF_32BIT, &current->mm->context.flags);		\
-+	clear_thread_flag(TIF_32BIT_AARCH64);				\
-+	set_thread_flag(TIF_32BIT);					\
-+ })
-+
-+#define COMPAT_ARCH_DLINFO
-+#define COMPAT_ELF_HWCAP		(compat_elf_hwcap)
-+#define COMPAT_ELF_HWCAP2		(compat_elf_hwcap2)
-+
-+#define compat_arch_setup_additional_pages \
-+					aarch32_setup_vectors_page
-+struct linux_binprm;
-+extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
-+				      int uses_interp);
-+
-+/* AArch32 EABI. */
-+#define compat_elf_check_arch(x)	(system_supports_32bit_el0() && \
-+					 ((x)->e_machine == EM_ARM) && \
-+					 ((x)->e_flags & EF_ARM_EABI_MASK))
-+
-+
-+#include "../../../fs/compat_binfmt_elf.c"
--- 
-2.7.4
+(That would pave the way for ever doing adjustments of the cntvoff on a
+per-CPU basis if that should ever make sense, which it maybe won't but
+still...)
+
+The challenge would be to ensure that the cntvoff stays in sync between
+all the contexts when being modified from userspace and during init.
+
+Thoughts?
+
+Thanks,
+-Christoffer
