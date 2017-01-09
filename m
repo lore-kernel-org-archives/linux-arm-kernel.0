@@ -1,112 +1,154 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:20 -0500
-Subject: [RFC 24/55] KVM: arm64: Forward FP exceptions to the guest hypervisor
+Date: Mon,  9 Jan 2017 01:24:10 -0500
+Subject: [RFC 14/55] KVM: arm64: Take account of system instruction traps
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-25-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-15-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forward exceptions due to floating-point register accesses to the guest
-hypervisor if it has set CPTR_EL2.TFP bit.
+When HCR.NV bit is set, execution of the EL2 translation regime Address
+Translation instructions and TLB maintenance instructions are trapped to
+EL2. In addition, execution of the EL1 translation regime Address
+Translation instructions and TLB maintenance instructions that are only
+accessible from EL2 and above are trapped to EL2. In these cases,
+ESR_EL2.EC will be set to 0x18.
+
+Take account of this and handle system instructions as well as MRS/MSR
+instructions in the handler. Change the handler name to reflect this.
+
+Emulation of those system instructions is to be done.
 
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm64/include/asm/kvm_nested.h |  1 +
- arch/arm64/kernel/asm-offsets.c     |  1 +
- arch/arm64/kvm/handle_exit.c        |  3 +++
- arch/arm64/kvm/handle_exit_nested.c |  6 ++++++
- arch/arm64/kvm/hyp/entry.S          | 14 ++++++++++++++
- arch/arm64/kvm/hyp/hyp-entry.S      |  2 +-
- 6 files changed, 26 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/kvm_coproc.h |  2 +-
+ arch/arm64/kvm/handle_exit.c        |  2 +-
+ arch/arm64/kvm/sys_regs.c           | 49 ++++++++++++++++++++++++++++++++-----
+ arch/arm64/kvm/trace.h              |  2 +-
+ 4 files changed, 46 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_nested.h b/arch/arm64/include/asm/kvm_nested.h
-index 8d36935..54c5ce5 100644
---- a/arch/arm64/include/asm/kvm_nested.h
-+++ b/arch/arm64/include/asm/kvm_nested.h
-@@ -3,4 +3,5 @@
+diff --git a/arch/arm64/include/asm/kvm_coproc.h b/arch/arm64/include/asm/kvm_coproc.h
+index 0b52377..1b3d21b 100644
+--- a/arch/arm64/include/asm/kvm_coproc.h
++++ b/arch/arm64/include/asm/kvm_coproc.h
+@@ -43,7 +43,7 @@ void kvm_register_target_sys_reg_table(unsigned int target,
+ int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
+-int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run);
++int kvm_handle_sys(struct kvm_vcpu *vcpu, struct kvm_run *run);
  
- int handle_hvc_nested(struct kvm_vcpu *vcpu);
- int handle_wfx_nested(struct kvm_vcpu *vcpu, bool is_wfe);
-+int kvm_handle_fp_asimd(struct kvm_vcpu *vcpu, struct kvm_run *run);
- #endif
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 4a2f0f0..b635f1a 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -131,6 +131,7 @@ int main(void)
-   DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
-   DEFINE(VCPU_FPEXC32_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.sys_regs[FPEXC32_EL2]));
-   DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
-+  DEFINE(VIRTUAL_CPTR_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.el2_regs[CPTR_EL2]));
- #endif
- #ifdef CONFIG_CPU_PM
-   DEFINE(CPU_SUSPEND_SZ,	sizeof(struct cpu_suspend_ctx));
+ #define kvm_coproc_table_init kvm_sys_reg_table_init
+ void kvm_sys_reg_table_init(void);
 diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 046fdf8..308f5c5 100644
+index 4e4a915..a891684 100644
 --- a/arch/arm64/kvm/handle_exit.c
 +++ b/arch/arm64/kvm/handle_exit.c
-@@ -195,6 +195,9 @@ static int kvm_handle_eret(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	[ESR_ELx_EC_BREAKPT_LOW]= kvm_handle_guest_debug,
- 	[ESR_ELx_EC_BKPT32]	= kvm_handle_guest_debug,
- 	[ESR_ELx_EC_BRK64]	= kvm_handle_guest_debug,
-+#ifdef CONFIG_KVM_ARM_NESTED_HYP
-+	[ESR_ELx_EC_FP_ASIMD]	= kvm_handle_fp_asimd,
-+#endif
- };
- 
- static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
-diff --git a/arch/arm64/kvm/handle_exit_nested.c b/arch/arm64/kvm/handle_exit_nested.c
-index 871ecfc..7544c6d 100644
---- a/arch/arm64/kvm/handle_exit_nested.c
-+++ b/arch/arm64/kvm/handle_exit_nested.c
-@@ -43,3 +43,9 @@ int handle_wfx_nested(struct kvm_vcpu *vcpu, bool is_wfe)
- 
- 	return -EINVAL;
+@@ -147,7 +147,7 @@ static int kvm_handle_eret(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	[ESR_ELx_EC_SMC32]	= handle_smc,
+ 	[ESR_ELx_EC_HVC64]	= handle_hvc,
+ 	[ESR_ELx_EC_SMC64]	= handle_smc,
+-	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
++	[ESR_ELx_EC_SYS64]	= kvm_handle_sys,
+ 	[ESR_ELx_EC_ERET]	= kvm_handle_eret,
+ 	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
+ 	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 4158f2f..202f64d 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -1903,6 +1903,36 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
+ 	return 1;
  }
-+
-+/* This is only called when virtual CPTR_EL2.TFP bit is set. */
-+int kvm_handle_fp_asimd(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
++static int emulate_tlbi(struct kvm_vcpu *vcpu,
++			     struct sys_reg_params *params)
 +{
-+	return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
++	/* TODO: support tlbi instruction emulation*/
++	kvm_inject_undefined(vcpu);
++	return 1;
 +}
-diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-index 12ee62d..a76f102 100644
---- a/arch/arm64/kvm/hyp/entry.S
-+++ b/arch/arm64/kvm/hyp/entry.S
-@@ -158,6 +158,20 @@ abort_guest_exit_end:
- 1:	ret
- ENDPROC(__guest_exit)
- 
-+ENTRY(__fpsimd_guest_trap)
-+#ifdef CONFIG_KVM_ARM_NESTED_HYP
-+// If virtual CPTR_EL2.TFP is set, then foward it to the nested hyp.
-+	mrs	x1, tpidr_el2
-+	ldr	x0, [x1, #VIRTUAL_CPTR_EL2]
-+	and 	x0, x0, #CPTR_EL2_TFP
-+	cbnz	x0, 1f
-+#endif
-+	b	__fpsimd_guest_restore
-+1:
-+	mov	x0, #ARM_EXCEPTION_TRAP
-+	b	__guest_exit
-+ENDPROC(__fpsimd_guest_trap)
 +
- ENTRY(__fpsimd_guest_restore)
- 	stp	x2, x3, [sp, #-16]!
- 	stp	x4, lr, [sp, #-16]!
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index 4e92399..d83494b 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -108,7 +108,7 @@ el1_trap:
++static int emulate_at(struct kvm_vcpu *vcpu,
++			     struct sys_reg_params *params)
++{
++	/* TODO: support address translation instruction emulation */
++	kvm_inject_undefined(vcpu);
++	return 1;
++}
++
++static int emulate_sys_instr(struct kvm_vcpu *vcpu,
++			     struct sys_reg_params *params)
++{
++	int ret;
++
++	/* TLB maintenance instructions*/
++	if (params->CRn == 0b1000)
++		ret = emulate_tlbi(vcpu, params);
++	/* Address Translation instructions */
++	else if (params->CRn == 0b0111 && params->CRm == 0b1000)
++		ret = emulate_at(vcpu, params);
++	return ret;
++}
++
+ static void reset_sys_reg_descs(struct kvm_vcpu *vcpu,
+ 			      const struct sys_reg_desc *table, size_t num)
+ {
+@@ -1914,18 +1944,19 @@ static void reset_sys_reg_descs(struct kvm_vcpu *vcpu,
+ }
  
- 	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
- 	cmp	x0, #ESR_ELx_EC_FP_ASIMD
--	b.eq	__fpsimd_guest_restore
-+	b.eq	__fpsimd_guest_trap
+ /**
+- * kvm_handle_sys_reg -- handles a mrs/msr trap on a guest sys_reg access
++ * kvm_handle_sys-- handles a system instruction or mrs/msr instruction trap
++		    on a guest execution
+  * @vcpu: The VCPU pointer
+  * @run:  The kvm_run struct
+  */
+-int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run)
++int kvm_handle_sys(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+ 	struct sys_reg_params params;
+ 	unsigned long esr = kvm_vcpu_get_hsr(vcpu);
+ 	int Rt = (esr >> 5) & 0x1f;
+ 	int ret;
  
- 	mrs	x1, tpidr_el2
- 	mov	x0, #ARM_EXCEPTION_TRAP
+-	trace_kvm_handle_sys_reg(esr);
++	trace_kvm_handle_sys(esr);
+ 
+ 	params.is_aarch32 = false;
+ 	params.is_32bit = false;
+@@ -1937,10 +1968,16 @@ int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	params.regval = vcpu_get_reg(vcpu, Rt);
+ 	params.is_write = !(esr & 1);
+ 
+-	ret = emulate_sys_reg(vcpu, &params);
++	if (params.Op0 == 1) {
++		/* System instructions */
++		ret = emulate_sys_instr(vcpu, &params);
++	} else {
++		/* MRS/MSR instructions */
++		ret = emulate_sys_reg(vcpu, &params);
++		if (!params.is_write)
++			vcpu_set_reg(vcpu, Rt, params.regval);
++	}
+ 
+-	if (!params.is_write)
+-		vcpu_set_reg(vcpu, Rt, params.regval);
+ 	return ret;
+ }
+ 
+diff --git a/arch/arm64/kvm/trace.h b/arch/arm64/kvm/trace.h
+index 5f40987..192708e 100644
+--- a/arch/arm64/kvm/trace.h
++++ b/arch/arm64/kvm/trace.h
+@@ -134,7 +134,7 @@
+ 	TP_printk("%s %s reg %d (0x%08llx)", __entry->fn,  __entry->is_write?"write to":"read from", __entry->reg, __entry->write_value)
+ );
+ 
+-TRACE_EVENT(kvm_handle_sys_reg,
++TRACE_EVENT(kvm_handle_sys,
+ 	TP_PROTO(unsigned long hsr),
+ 	TP_ARGS(hsr),
+ 
 -- 
 1.9.1
