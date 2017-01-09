@@ -1,76 +1,83 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:25 -0500
-Subject: [RFC 29/55] KVM: arm/arm64: Set up the prepared vgic state
+Date: Mon,  9 Jan 2017 01:24:27 -0500
+Subject: [RFC 31/55] KVM: arm/arm64: Inject maintenance interrupts to the
+ guest hypervisor
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-30-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-32-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since vgic state is properly prepared and is pointed by hw_v2_cpu_if,
-let's use it to manipulate vgic.
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
+If we exit a nested VM with a pending maintenance interrupt from the
+GIC, then we need to forward this to the guest hypervisor so that it can
+re-sync the appropriate LRs and sample level triggered interrupts again.
+
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- virt/kvm/arm/hyp/vgic-v2-sr.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+ arch/arm64/kvm/context.c           |  3 +++
+ include/kvm/arm_vgic.h             |  2 ++
+ virt/kvm/arm/vgic/vgic-v2-nested.c | 16 ++++++++++++++++
+ 3 files changed, 21 insertions(+)
 
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index c8aeb7b..5d4898f 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -22,10 +22,15 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_hyp.h>
+diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
+index 7a94c9d..a93ffe4 100644
+--- a/arch/arm64/kvm/context.c
++++ b/arch/arm64/kvm/context.c
+@@ -140,6 +140,9 @@ static void sync_shadow_el1_state(struct kvm_vcpu *vcpu, bool setup)
+ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
++
++	vgic_handle_nested_maint_irq(vcpu);
++
+ 	if (unlikely(vcpu_mode_el2(vcpu))) {
+ 		ctxt->hw_pstate = *vcpu_cpsr(vcpu) & ~PSR_MODE_MASK;
  
-+static __hyp_text struct vgic_v2_cpu_if *__hyp_get_cpu_if(struct kvm_vcpu *vcpu)
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 484f6b1..fc882d6 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -315,9 +315,11 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ #ifdef CONFIG_KVM_ARM_NESTED_HYP
+ void vgic_v2_setup_shadow_state(struct kvm_vcpu *vcpu);
+ void vgic_v2_restore_shadow_state(struct kvm_vcpu *vcpu);
++void vgic_handle_nested_maint_irq(struct kvm_vcpu *vcpu);
+ #else
+ static inline void vgic_v2_setup_shadow_state(struct kvm_vcpu *vcpu) { }
+ static inline void vgic_v2_restore_shadow_state(struct kvm_vcpu *vcpu) { }
++static inline void vgic_handle_nested_maint_irq(struct kvm_vcpu *vcpu) { }
+ #endif
+ 
+ #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+diff --git a/virt/kvm/arm/vgic/vgic-v2-nested.c b/virt/kvm/arm/vgic/vgic-v2-nested.c
+index a992da5..85f646b 100644
+--- a/virt/kvm/arm/vgic/vgic-v2-nested.c
++++ b/virt/kvm/arm/vgic/vgic-v2-nested.c
+@@ -300,6 +300,22 @@ void vgic_v2_restore_shadow_state(struct kvm_vcpu *vcpu)
+ 	vgic_cpu->nested_vgic_v2 = vgic_cpu->shadow_vgic_v2;
+ }
+ 
++void vgic_handle_nested_maint_irq(struct kvm_vcpu *vcpu)
 +{
-+	return kern_hyp_va(vcpu->arch.vgic_cpu.hw_v2_cpu_if);
++	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
++
++	/*
++	 * If we exit a nested VM with a pending maintenance interrupt from the
++	 * GIC, then we need to forward this to the guest hypervisor so that it
++	 * can re-sync the appropriate LRs and sample level triggered interrupts
++	 * again.
++	 */
++	if (vcpu_el2_imo_is_set(vcpu) && !vcpu_mode_el2(vcpu) &&
++	    (cpu_if->vgic_hcr & GICH_HCR_EN) &&
++	    vgic_mmio_read_v2_misr(vcpu, 0, 0))
++		kvm_inject_nested_irq(vcpu);
 +}
 +
- static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
- 					    void __iomem *base)
+ void vgic_init_nested(struct kvm_vcpu *vcpu)
  {
--	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	struct vgic_v2_cpu_if *cpu_if = __hyp_get_cpu_if(vcpu);
- 	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
- 	u32 eisr0, eisr1;
- 	int i;
-@@ -67,7 +72,7 @@ static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
- 
- static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
- {
--	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	struct vgic_v2_cpu_if *cpu_if = __hyp_get_cpu_if(vcpu);
- 	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
- 	u32 elrsr0, elrsr1;
- 
-@@ -86,7 +91,7 @@ static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
- 
- static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
- {
--	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	struct vgic_v2_cpu_if *cpu_if = __hyp_get_cpu_if(vcpu);
- 	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
- 	int i;
- 
-@@ -107,7 +112,7 @@ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
- void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
- {
- 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
--	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	struct vgic_v2_cpu_if *cpu_if = __hyp_get_cpu_if(vcpu);
- 	struct vgic_dist *vgic = &kvm->arch.vgic;
- 	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
- 
-@@ -138,7 +143,7 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
- void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
- {
- 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
--	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	struct vgic_v2_cpu_if *cpu_if = __hyp_get_cpu_if(vcpu);
- 	struct vgic_dist *vgic = &kvm->arch.vgic;
- 	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
- 	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
+ 	vgic_v2_setup_shadow_state(vcpu);
 -- 
 1.9.1
