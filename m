@@ -1,26 +1,39 @@
-From: ryan@nardis.ca (Ryan Tandy)
-Date: Sun, 8 Jan 2017 21:43:15 -0800
-Subject: [PATCH v4 1/2] power: reset: add linkstation-reset driver
-In-Reply-To: <CAEQ9gEkvj++e7ch40cFqBy3KXg-a=pYnH7cwErMe2RDd2qzQJg@mail.gmail.com>
-References: <20161227070611.14852-1-rogershimizu@gmail.com>
- <20170107150451.17912-1-rogershimizu@gmail.com>
- <20170107150451.17912-2-rogershimizu@gmail.com>
- <20170108170209.GD573@kiwi.nardis.ca>
- <CAEQ9gEkvj++e7ch40cFqBy3KXg-a=pYnH7cwErMe2RDd2qzQJg@mail.gmail.com>
-Message-ID: <20170109054315.GB580@kiwi.nardis.ca>
+From: bjsprakash.linux@gmail.com (Prakash B)
+Date: Mon, 9 Jan 2017 11:45:28 +0530
+Subject: [PATCH v3] arm64: mm: Fix NOMAP page initialization
+In-Reply-To: <4fbd559b-b4f2-2c89-3024-5d1137ff170d@linaro.org>
+References: <20161216165437.21612-1-rrichter@cavium.com>
+ <CAKv+Gu_SmTNguC=tSCwYOL2kx-DogLvSYRZc56eGP=JhdrUOsA@mail.gmail.com>
+ <c74d6ec6-16ba-dccc-3b0d-a8bedcb46dc5@linaro.org>
+ <cbbf14fd-a1cc-2463-ba67-acd6d61e9db1@linaro.org>
+ <CACJhumfqWkXXpbJomjJ1jM5B3kG+1Jk9EvGWR50_u-AO1ySXfg@mail.gmail.com>
+ <4fbd559b-b4f2-2c89-3024-5d1137ff170d@linaro.org>
+Message-ID: <CACJhumf4Ej4m5oPeVp1uKiYgk8LO-1W2L+ExhH6hti+yJXXnqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 12:31:44PM +0900, Roger Shimizu wrote:
->This driver, linkstation-reset, can also handle PPC Linkstation after
->it's converted to DT.
->I already considered this and mentioned in previous reply [0].
+Thanks Hanjun ,
 
-OK. I was thinking of Sebastian's earlier comment:
 
-On Wed, Dec 21, 2016 at 04:59:29PM +0100, Sebastian Reichel wrote:
->These models can just be added to qnap-poweroff, which handles
->exactly this special case as far as I can see.
+On Mon, Jan 9, 2017 at 10:39 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> Hi Prakash,
+> I didn't test "cpuset01" on D05 but according to the test in
+> Linaro, LTP full test is passed on D05 with Ard's 2 patches.
+>
+>>
+>> Any idea what might be causing this issue.
+>
+>
+> Since it's not happening on D05, maybe it's related to
+> the firmware? (just a wild guess...)
+>
 
-and forgot that you planned to handle it in this driver. Sorry for the 
-noise.
+ Used same firmware b/w 4.4 kernel and 4.9 (and   above kernels) .
+Test passed wtih 4.4 kernel and didn't generated  any crashes or
+dumps.
+
+If there is more observation I will  send a  mail  or I will start a
+separate mail thread.
+
+Thanks,
+Prakash B
