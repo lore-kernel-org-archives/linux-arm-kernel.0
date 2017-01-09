@@ -1,204 +1,238 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon,  9 Jan 2017 22:35:42 +0800
-Subject: [PATCH v4 1/3] drm: zte: make zx_plane accessible from zx_vou driver
+Date: Mon,  9 Jan 2017 22:35:43 +0800
+Subject: [PATCH v4 2/3] drm: zte: add .atomic_disable hook to disable graphic
+ layer
 In-Reply-To: <1483972544-12731-1-git-send-email-shawnguo@kernel.org>
 References: <1483972544-12731-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1483972544-12731-2-git-send-email-shawnguo@kernel.org>
+Message-ID: <1483972544-12731-3-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shawn Guo <shawn.guo@linaro.org>
 
-Move struct zx_plane from zx_plane.c to zx_plane.h, so that it can be
-accessed from zx_vou driver, and we can save the use of struct
-zx_layer_data completely.  More importantly, those additional data used
-by VOU controller to enable/disable graphic and video layers can later
-be added and accessed much more easily from zx_vou driver.
+There are a few hardware bits for each graphic layer to control main/aux
+channel and clock selection, as well as the layer enabling.  These bits
+sit outside the layer block itself, but in VOU control glue block.  We
+currently set these bits up at CRTC initialization for once, and do not
+support disabling the layer.
 
-While at it, we make two changes to zx_plane_init() interface:
-
- - Encode struct device pointer in zx_plane, so that we do not need to
-   pass it as a parameter.
- - Change return of zx_plane_init() from struct drm_plane pointer to
-   error code, since we can get the pointer from zx_plane in zx_vou
-   driver now.
+This patch creates a pair of functions zx_vou_layer_enable[disable] to
+be invoked from plane hooks .atomic_update and .atomic_disable to set up
+and tear down the layer.  This is generic for both graphic and video
+layers, so it will make the overlay plane support to be added later much
+easier.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 Reviewed-by: Sean Paul <seanpaul@chromium.org>
 ---
- drivers/gpu/drm/zte/zx_plane.c | 36 +++++++-----------------------------
- drivers/gpu/drm/zte/zx_plane.h | 11 +++++++----
- drivers/gpu/drm/zte/zx_vou.c   | 31 +++++++++++++++++++------------
- 3 files changed, 33 insertions(+), 45 deletions(-)
+ drivers/gpu/drm/zte/zx_plane.c | 15 +++++++++
+ drivers/gpu/drm/zte/zx_plane.h |  1 +
+ drivers/gpu/drm/zte/zx_vou.c   | 70 ++++++++++++++++++++++++++++++------------
+ drivers/gpu/drm/zte/zx_vou.h   |  3 ++
+ 4 files changed, 69 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/gpu/drm/zte/zx_plane.c b/drivers/gpu/drm/zte/zx_plane.c
-index 546eb92a94e8..78d29b1db91c 100644
+index 78d29b1db91c..5445eebf830f 100644
 --- a/drivers/gpu/drm/zte/zx_plane.c
 +++ b/drivers/gpu/drm/zte/zx_plane.c
-@@ -21,16 +21,6 @@
- #include "zx_plane_regs.h"
- #include "zx_vou.h"
+@@ -197,12 +197,27 @@ static void zx_gl_plane_atomic_update(struct drm_plane *plane,
+ 	/* Enable HBSC block */
+ 	zx_writel_mask(hbsc + HBSC_CTRL0, HBSC_CTRL_EN, HBSC_CTRL_EN);
  
--struct zx_plane {
--	struct drm_plane plane;
--	void __iomem *layer;
--	void __iomem *csc;
--	void __iomem *hbsc;
--	void __iomem *rsz;
--};
--
--#define to_zx_plane(plane)	container_of(plane, struct zx_plane, plane)
--
- static const uint32_t gl_formats[] = {
- 	DRM_FORMAT_ARGB8888,
- 	DRM_FORMAT_XRGB8888,
-@@ -248,28 +238,16 @@ static void zx_plane_hbsc_init(struct zx_plane *zplane)
- 	zx_writel(hbsc + HBSC_THRESHOLD_COL3, (0x3c0 << 16) | 0x40);
++	zx_vou_layer_enable(plane);
++
+ 	zx_gl_set_update(zplane);
  }
  
--struct drm_plane *zx_plane_init(struct drm_device *drm, struct device *dev,
--				struct zx_layer_data *data,
--				enum drm_plane_type type)
-+int zx_plane_init(struct drm_device *drm, struct zx_plane *zplane,
-+		  enum drm_plane_type type)
- {
- 	const struct drm_plane_helper_funcs *helper;
--	struct zx_plane *zplane;
--	struct drm_plane *plane;
-+	struct drm_plane *plane = &zplane->plane;
-+	struct device *dev = zplane->dev;
- 	const uint32_t *formats;
- 	unsigned int format_count;
- 	int ret;
++static void zx_plane_atomic_disable(struct drm_plane *plane,
++				    struct drm_plane_state *old_state)
++{
++	struct zx_plane *zplane = to_zx_plane(plane);
++	void __iomem *hbsc = zplane->hbsc;
++
++	zx_vou_layer_disable(plane);
++
++	/* Disable HBSC block */
++	zx_writel_mask(hbsc + HBSC_CTRL0, HBSC_CTRL_EN, 0);
++}
++
+ static const struct drm_plane_helper_funcs zx_gl_plane_helper_funcs = {
+ 	.atomic_check = zx_gl_plane_atomic_check,
+ 	.atomic_update = zx_gl_plane_atomic_update,
++	.atomic_disable = zx_plane_atomic_disable,
+ };
  
--	zplane = devm_kzalloc(dev, sizeof(*zplane), GFP_KERNEL);
--	if (!zplane)
--		return ERR_PTR(-ENOMEM);
--
--	plane = &zplane->plane;
--
--	zplane->layer = data->layer;
--	zplane->hbsc = data->hbsc;
--	zplane->csc = data->csc;
--	zplane->rsz = data->rsz;
--
- 	zx_plane_hbsc_init(zplane);
- 
- 	switch (type) {
-@@ -282,7 +260,7 @@ struct drm_plane *zx_plane_init(struct drm_device *drm, struct device *dev,
- 		/* TODO: add video layer (vl) support */
- 		break;
- 	default:
--		return ERR_PTR(-ENODEV);
-+		return -ENODEV;
- 	}
- 
- 	ret = drm_universal_plane_init(drm, plane, VOU_CRTC_MASK,
-@@ -290,10 +268,10 @@ struct drm_plane *zx_plane_init(struct drm_device *drm, struct device *dev,
- 				       type, NULL);
- 	if (ret) {
- 		DRM_DEV_ERROR(dev, "failed to init universal plane: %d\n", ret);
--		return ERR_PTR(ret);
-+		return ret;
- 	}
- 
- 	drm_plane_helper_add(plane, helper);
- 
--	return plane;
-+	return 0;
- }
+ static void zx_plane_destroy(struct drm_plane *plane)
 diff --git a/drivers/gpu/drm/zte/zx_plane.h b/drivers/gpu/drm/zte/zx_plane.h
-index 2b82cd558d9d..264a92e0b532 100644
+index 264a92e0b532..933611ddffd0 100644
 --- a/drivers/gpu/drm/zte/zx_plane.h
 +++ b/drivers/gpu/drm/zte/zx_plane.h
-@@ -11,16 +11,19 @@
- #ifndef __ZX_PLANE_H__
- #define __ZX_PLANE_H__
- 
--struct zx_layer_data {
-+struct zx_plane {
-+	struct drm_plane plane;
-+	struct device *dev;
- 	void __iomem *layer;
+@@ -18,6 +18,7 @@ struct zx_plane {
  	void __iomem *csc;
  	void __iomem *hbsc;
  	void __iomem *rsz;
++	const struct vou_layer_bits *bits;
  };
  
--struct drm_plane *zx_plane_init(struct drm_device *drm, struct device *dev,
--				struct zx_layer_data *data,
--				enum drm_plane_type type);
-+#define to_zx_plane(plane) container_of(plane, struct zx_plane, plane)
-+
-+int zx_plane_init(struct drm_device *drm, struct zx_plane *zplane,
-+		  enum drm_plane_type type);
- void zx_plane_set_update(struct drm_plane *plane);
- 
- #endif /* __ZX_PLANE_H__ */
+ #define to_zx_plane(plane) container_of(plane, struct zx_plane, plane)
 diff --git a/drivers/gpu/drm/zte/zx_vou.c b/drivers/gpu/drm/zte/zx_vou.c
-index 73fe15c17c32..d5c801f6f97b 100644
+index d5c801f6f97b..3fb4fc04e693 100644
 --- a/drivers/gpu/drm/zte/zx_vou.c
 +++ b/drivers/gpu/drm/zte/zx_vou.c
-@@ -294,7 +294,7 @@ static int zx_crtc_init(struct drm_device *drm, struct zx_vou_hw *vou,
- 			enum vou_chn_type chn_type)
- {
- 	struct device *dev = vou->dev;
--	struct zx_layer_data data;
-+	struct zx_plane *zplane;
- 	struct zx_crtc *zcrtc;
- 	int ret;
+@@ -65,7 +65,6 @@ struct zx_crtc_bits {
+ 	u32 polarity_shift;
+ 	u32 int_frame_mask;
+ 	u32 tc_enable;
+-	u32 gl_enable;
+ };
  
-@@ -305,19 +305,25 @@ static int zx_crtc_init(struct drm_device *drm, struct zx_vou_hw *vou,
- 	zcrtc->vou = vou;
- 	zcrtc->chn_type = chn_type;
+ static const struct zx_crtc_bits main_crtc_bits = {
+@@ -73,7 +72,6 @@ struct zx_crtc_bits {
+ 	.polarity_shift = MAIN_POL_SHIFT,
+ 	.int_frame_mask = TIMING_INT_MAIN_FRAME,
+ 	.tc_enable = MAIN_TC_EN,
+-	.gl_enable = OSD_CTRL0_GL0_EN,
+ };
  
-+	zplane = devm_kzalloc(dev, sizeof(*zplane), GFP_KERNEL);
-+	if (!zplane)
-+		return -ENOMEM;
+ static const struct zx_crtc_bits aux_crtc_bits = {
+@@ -81,7 +79,6 @@ struct zx_crtc_bits {
+ 	.polarity_shift = AUX_POL_SHIFT,
+ 	.int_frame_mask = TIMING_INT_AUX_FRAME,
+ 	.tc_enable = AUX_TC_EN,
+-	.gl_enable = OSD_CTRL0_GL1_EN,
+ };
+ 
+ struct zx_crtc {
+@@ -97,6 +94,24 @@ struct zx_crtc {
+ 
+ #define to_zx_crtc(x) container_of(x, struct zx_crtc, crtc)
+ 
++struct vou_layer_bits {
++	u32 enable;
++	u32 chnsel;
++	u32 clksel;
++};
 +
-+	zplane->dev = dev;
++static const struct vou_layer_bits zx_gl_bits[GL_NUM] = {
++	{
++		.enable = OSD_CTRL0_GL0_EN,
++		.chnsel = OSD_CTRL0_GL0_SEL,
++		.clksel = VOU_CLK_GL0_SEL,
++	}, {
++		.enable = OSD_CTRL0_GL1_EN,
++		.chnsel = OSD_CTRL0_GL1_SEL,
++		.clksel = VOU_CLK_GL1_SEL,
++	},
++};
 +
- 	if (chn_type == VOU_CHN_MAIN) {
--		data.layer = vou->osd + MAIN_GL_OFFSET;
--		data.csc = vou->osd + MAIN_CSC_OFFSET;
--		data.hbsc = vou->osd + MAIN_HBSC_OFFSET;
--		data.rsz = vou->otfppu + MAIN_RSZ_OFFSET;
-+		zplane->layer = vou->osd + MAIN_GL_OFFSET;
-+		zplane->csc = vou->osd + MAIN_CSC_OFFSET;
-+		zplane->hbsc = vou->osd + MAIN_HBSC_OFFSET;
-+		zplane->rsz = vou->otfppu + MAIN_RSZ_OFFSET;
+ struct zx_vou_hw {
+ 	struct device *dev;
+ 	void __iomem *osd;
+@@ -220,10 +235,6 @@ static void zx_crtc_enable(struct drm_crtc *crtc)
+ 	/* Enable channel */
+ 	zx_writel_mask(zcrtc->chnreg + CHN_CTRL0, CHN_ENABLE, CHN_ENABLE);
+ 
+-	/* Enable Graphic Layer */
+-	zx_writel_mask(vou->osd + OSD_CTRL0, bits->gl_enable,
+-		       bits->gl_enable);
+-
+ 	drm_crtc_vblank_on(crtc);
+ 
+ 	ret = clk_set_rate(zcrtc->pixclk, mode->clock * 1000);
+@@ -247,9 +258,6 @@ static void zx_crtc_disable(struct drm_crtc *crtc)
+ 
+ 	drm_crtc_vblank_off(crtc);
+ 
+-	/* Disable Graphic Layer */
+-	zx_writel_mask(vou->osd + OSD_CTRL0, bits->gl_enable, 0);
+-
+ 	/* Disable channel */
+ 	zx_writel_mask(zcrtc->chnreg + CHN_CTRL0, CHN_ENABLE, 0);
+ 
+@@ -316,6 +324,7 @@ static int zx_crtc_init(struct drm_device *drm, struct zx_vou_hw *vou,
+ 		zplane->csc = vou->osd + MAIN_CSC_OFFSET;
+ 		zplane->hbsc = vou->osd + MAIN_HBSC_OFFSET;
+ 		zplane->rsz = vou->otfppu + MAIN_RSZ_OFFSET;
++		zplane->bits = &zx_gl_bits[0];
  		zcrtc->chnreg = vou->osd + OSD_MAIN_CHN;
  		zcrtc->regs = &main_crtc_regs;
  		zcrtc->bits = &main_crtc_bits;
- 	} else {
--		data.layer = vou->osd + AUX_GL_OFFSET;
--		data.csc = vou->osd + AUX_CSC_OFFSET;
--		data.hbsc = vou->osd + AUX_HBSC_OFFSET;
--		data.rsz = vou->otfppu + AUX_RSZ_OFFSET;
-+		zplane->layer = vou->osd + AUX_GL_OFFSET;
-+		zplane->csc = vou->osd + AUX_CSC_OFFSET;
-+		zplane->hbsc = vou->osd + AUX_HBSC_OFFSET;
-+		zplane->rsz = vou->otfppu + AUX_RSZ_OFFSET;
+@@ -324,6 +333,7 @@ static int zx_crtc_init(struct drm_device *drm, struct zx_vou_hw *vou,
+ 		zplane->csc = vou->osd + AUX_CSC_OFFSET;
+ 		zplane->hbsc = vou->osd + AUX_HBSC_OFFSET;
+ 		zplane->rsz = vou->otfppu + AUX_RSZ_OFFSET;
++		zplane->bits = &zx_gl_bits[1];
  		zcrtc->chnreg = vou->osd + OSD_AUX_CHN;
  		zcrtc->regs = &aux_crtc_regs;
  		zcrtc->bits = &aux_crtc_bits;
-@@ -331,13 +337,14 @@ static int zx_crtc_init(struct drm_device *drm, struct zx_vou_hw *vou,
- 		return ret;
- 	}
+@@ -411,6 +421,36 @@ void zx_vou_disable_vblank(struct drm_device *drm, unsigned int pipe)
+ 		       zcrtc->bits->int_frame_mask, 0);
+ }
  
--	zcrtc->primary = zx_plane_init(drm, dev, &data, DRM_PLANE_TYPE_PRIMARY);
--	if (IS_ERR(zcrtc->primary)) {
--		ret = PTR_ERR(zcrtc->primary);
-+	ret = zx_plane_init(drm, zplane, DRM_PLANE_TYPE_PRIMARY);
-+	if (ret) {
- 		DRM_DEV_ERROR(dev, "failed to init primary plane: %d\n", ret);
- 		return ret;
- 	}
- 
-+	zcrtc->primary = &zplane->plane;
++void zx_vou_layer_enable(struct drm_plane *plane)
++{
++	struct zx_crtc *zcrtc = to_zx_crtc(plane->state->crtc);
++	struct zx_vou_hw *vou = zcrtc->vou;
++	struct zx_plane *zplane = to_zx_plane(plane);
++	const struct vou_layer_bits *bits = zplane->bits;
 +
- 	ret = drm_crtc_init_with_planes(drm, &zcrtc->crtc, zcrtc->primary, NULL,
- 					&zx_crtc_funcs, NULL);
- 	if (ret) {
++	if (zcrtc->chn_type == VOU_CHN_MAIN) {
++		zx_writel_mask(vou->osd + OSD_CTRL0, bits->chnsel, 0);
++		zx_writel_mask(vou->vouctl + VOU_CLK_SEL, bits->clksel, 0);
++	} else {
++		zx_writel_mask(vou->osd + OSD_CTRL0, bits->chnsel,
++			       bits->chnsel);
++		zx_writel_mask(vou->vouctl + VOU_CLK_SEL, bits->clksel,
++			       bits->clksel);
++	}
++
++	zx_writel_mask(vou->osd + OSD_CTRL0, bits->enable, bits->enable);
++}
++
++void zx_vou_layer_disable(struct drm_plane *plane)
++{
++	struct zx_crtc *zcrtc = to_zx_crtc(plane->crtc);
++	struct zx_vou_hw *vou = zcrtc->vou;
++	struct zx_plane *zplane = to_zx_plane(plane);
++	const struct vou_layer_bits *bits = zplane->bits;
++
++	zx_writel_mask(vou->osd + OSD_CTRL0, bits->enable, 0);
++}
++
+ static irqreturn_t vou_irq_handler(int irq, void *dev_id)
+ {
+ 	struct zx_vou_hw *vou = dev_id;
+@@ -469,19 +509,9 @@ static void vou_dtrc_init(struct zx_vou_hw *vou)
+ 
+ static void vou_hw_init(struct zx_vou_hw *vou)
+ {
+-	/* Set GL0 to main channel and GL1 to aux channel */
+-	zx_writel_mask(vou->osd + OSD_CTRL0, OSD_CTRL0_GL0_SEL, 0);
+-	zx_writel_mask(vou->osd + OSD_CTRL0, OSD_CTRL0_GL1_SEL,
+-		       OSD_CTRL0_GL1_SEL);
+-
+ 	/* Release reset for all VOU modules */
+ 	zx_writel(vou->vouctl + VOU_SOFT_RST, ~0);
+ 
+-	/* Select main clock for GL0 and aux clock for GL1 module */
+-	zx_writel_mask(vou->vouctl + VOU_CLK_SEL, VOU_CLK_GL0_SEL, 0);
+-	zx_writel_mask(vou->vouctl + VOU_CLK_SEL, VOU_CLK_GL1_SEL,
+-		       VOU_CLK_GL1_SEL);
+-
+ 	/* Enable clock auto-gating for all VOU modules */
+ 	zx_writel(vou->vouctl + VOU_CLK_REQEN, ~0);
+ 
+diff --git a/drivers/gpu/drm/zte/zx_vou.h b/drivers/gpu/drm/zte/zx_vou.h
+index 349e06cd86f4..4b4339be641b 100644
+--- a/drivers/gpu/drm/zte/zx_vou.h
++++ b/drivers/gpu/drm/zte/zx_vou.h
+@@ -43,4 +43,7 @@ struct vou_inf {
+ int zx_vou_enable_vblank(struct drm_device *drm, unsigned int pipe);
+ void zx_vou_disable_vblank(struct drm_device *drm, unsigned int pipe);
+ 
++void zx_vou_layer_enable(struct drm_plane *plane);
++void zx_vou_layer_disable(struct drm_plane *plane);
++
+ #endif /* __ZX_VOU_H__ */
 -- 
 1.9.1
