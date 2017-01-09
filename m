@@ -1,41 +1,28 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 9 Jan 2017 19:48:11 +0000
-Subject: [RESEND] spi: davinci: Allow device tree devices to use DMA
-In-Reply-To: <1483673177-31516-1-git-send-email-david@lechnology.com>
-References: <1483673177-31516-1-git-send-email-david@lechnology.com>
-Message-ID: <20170109194811.p3if5pzvjjaez2g3@sirena.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon,  9 Jan 2017 19:57:27 +0000
+Subject: [RFC PATCH 0/2] ARM: kernel mode NEON in softirq context
+Message-ID: <1483991849-32448-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 09:26:17PM -0600, David Lechner wrote:
+Patch #1 in this series adds support for using the NEON in kernel mode
+while executing in softirq context. By allowing this, subsystems that
+perform non-trivial crypto in softirq context (such as CCMP in the
+mac80211 layer) can use algorithms such as the AES-CCM driver in
+patch #2, which is 13x faster than the generic CCM driver.
 
-> This allows SPI devices specified in a device tree to use DMA when the
-> master controller.
+Ard Biesheuvel (2):
+  ARM: vfp - allow kernel mode NEON in softirq context
+  crypto: arm/aes - add CCM driver using ARMv8 Crypto Extensions
 
-> Since device tree is supposed to only describe the hardware, adding such
-> a configuration option to device tree would not be acceptable. So, this
-> is the best we can do for now to get SPI devices working with DMA.
+ arch/arm/crypto/Kconfig           |   8 +
+ arch/arm/crypto/Makefile          |   2 +
+ arch/arm/crypto/aes-ce-ccm-core.S | 234 +++++++++++++
+ arch/arm/crypto/aes-ce-ccm-glue.c | 360 ++++++++++++++++++++
+ arch/arm/vfp/vfpmodule.c          |  22 +-
+ 5 files changed, 620 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/crypto/aes-ce-ccm-core.S
+ create mode 100644 arch/arm/crypto/aes-ce-ccm-glue.c
 
-> Unfortunately, this excludes the possibility of using one SPI device with
-> DMA and one without on the same master.
-
-Why would you ever want to do that?  What would ever make sense about
-not using DMA if it's available and the transfer is suitably large, or
-conversely why would one want to force DMA even if PIO would be more
-performant?
-
-> When I originally submitted this patch, there was some discussion as to whether
-> dspi->dma_rx should be changed to return an error rather than being null.
-
-> However, I prefer it the way it is and don't see a compelling reason to change
-> it.
-
-I don't know what the above comment means, sorry (and don't recall
-having seen any earlier versions of this).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170109/ce442c16/attachment.sig>
+-- 
+2.7.4
