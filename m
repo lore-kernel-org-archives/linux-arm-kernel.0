@@ -1,70 +1,117 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 9 Jan 2017 14:00:36 +0000
-Subject: Tegra baseline test results for v4.10-rc3
-Message-ID: <d19d0674-cc1d-6f76-47cb-c04b892b362a@nvidia.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 09 Jan 2017 15:03:14 +0100
+Subject: [PATCH v2 0/4] DMA Engine: switch PL330 driver to non-irq-safe runtime
+ PM
+References: <CGME20170109140324eucas1p2c2b981ae2222c6a4e3dcb3e5ce3c607d@eucas1p2.samsung.com>
+Message-ID: <1483970598-6191-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.10-rc3.
-Logs and other details at:
+Hello,
 
-    https://nvtb.github.io//linux/test_v4.10-rc3/20170108150103/
+This patchset changes the way the runtime PM is implemented in the PL330 DMA
+engine driver. The main goal of such change is to add support for the audio
+power domain to Exynos5 SoCs (5250, 542x, 5433, probably others) and let
+it to be properly turned off, when no audio is being used. Switching to
+non-irq-safe runtime PM is required to properly let power domain to be
+turned off (irq-safe runtime PM keeps power domain turned on all the time)
+and to integrate with clock controller's runtime PM (this cannot be
+workarounded any other way, PL330 uses clocks from the controller, which
+belongs to the same power domain).
 
+For more details of the proposed change to the PL330 driver see patch #4.
 
-Test summary
-------------
+Audio power domain on Exynos5 SoCs contains following hardware modules:
+1. clock controller
+2. pin controller
+3. PL330 DMA controller
+4. I2S audio controller
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+Patches for adding or fixing runtime PM for each of the above devices is
+handled separately.
 
-Build: Image:
-    Pass: ( 1/ 1): defconfig
+Runtime PM patches for clock controllers is possible and has been proposed
+in the following thread (pending review): "[PATCH v4 0/4] Add runtime PM
+support for clocks (on Exynos SoC example)",
+http://www.spinics.net/lists/arm-kernel/msg550747.html
 
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
+Runtime PM support for Exynos pin controller has been posted in the
+following thread: "[PATCH 0/9] Runtime PM for Exynos pin controller driver",
+http://www.spinics.net/lists/arm-kernel/msg550161.html
 
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+Exynos I2S driver supports runtime PM, but some fixes were needed for it
+and they are already queued to linux-next.
 
-Boot to userspace: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+This patchset is based on linux-next from 9th January 2017.
 
-PM: System suspend: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.10-rc2 (0c744ea4f77d72b3dcebb7a8f2684633ec79be88)):
-   text     data      bss    total  kernel
-  -8260     +664        0    -7596  defconfig
-   -396     -256        0     -652  multi_v7_defconfig
-   +632     +256        0     +888  tegra_defconfig
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
 
 
-Boot-time memory difference
-(delta in bytes from test_v4.10-rc2 (0c744ea4f77d72b3dcebb7a8f2684633ec79be88))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
-	
---
-nvpublic
+Changelog:
+
+v2:
+- rebased onto linux next-20170109
+- improved patch description
+- separated patch #3 from #4 (storing a pointer to slave device for each
+  DMA channel) as requested by Krzysztof Kozlowski
+
+v1: https://www.spinics.net/lists/arm-kernel/msg550008.html
+- initial version
+
+
+Patch summary:
+
+Marek Szyprowski (4):
+  dmaengine: pl330: remove pdata based initialization
+  dmaengine: Forward slave device pointer to of_xlate callback
+  dmaengine: pl330: Store pointer to slave device
+  dmaengine: pl330: Don't require irq-safe runtime PM
+
+ drivers/dma/amba-pl08x.c        |   2 +-
+ drivers/dma/at_hdmac.c          |   4 +-
+ drivers/dma/at_xdmac.c          |   2 +-
+ drivers/dma/bcm2835-dma.c       |   2 +-
+ drivers/dma/coh901318.c         |   2 +-
+ drivers/dma/cppi41.c            |   2 +-
+ drivers/dma/dma-jz4780.c        |   2 +-
+ drivers/dma/dmaengine.c         |   2 +-
+ drivers/dma/dw/platform.c       |   2 +-
+ drivers/dma/edma.c              |   4 +-
+ drivers/dma/fsl-edma.c          |   2 +-
+ drivers/dma/img-mdc-dma.c       |   2 +-
+ drivers/dma/imx-dma.c           |   2 +-
+ drivers/dma/imx-sdma.c          |   2 +-
+ drivers/dma/k3dma.c             |   2 +-
+ drivers/dma/lpc18xx-dmamux.c    |   2 +-
+ drivers/dma/mmp_pdma.c          |   2 +-
+ drivers/dma/mmp_tdma.c          |   2 +-
+ drivers/dma/moxart-dma.c        |   2 +-
+ drivers/dma/mxs-dma.c           |   2 +-
+ drivers/dma/nbpfaxi.c           |   2 +-
+ drivers/dma/of-dma.c            |  20 +++--
+ drivers/dma/pl330.c             | 166 +++++++++++++++++++---------------------
+ drivers/dma/pxa_dma.c           |   2 +-
+ drivers/dma/qcom/bam_dma.c      |   2 +-
+ drivers/dma/sh/rcar-dmac.c      |   2 +-
+ drivers/dma/sh/shdma-of.c       |   2 +-
+ drivers/dma/sh/usb-dmac.c       |   2 +-
+ drivers/dma/sirf-dma.c          |   2 +-
+ drivers/dma/st_fdma.c           |   2 +-
+ drivers/dma/ste_dma40.c         |   2 +-
+ drivers/dma/stm32-dma.c         |   2 +-
+ drivers/dma/sun4i-dma.c         |   2 +-
+ drivers/dma/sun6i-dma.c         |   2 +-
+ drivers/dma/tegra20-apb-dma.c   |   2 +-
+ drivers/dma/tegra210-adma.c     |   2 +-
+ drivers/dma/xilinx/xilinx_dma.c |   2 +-
+ drivers/dma/xilinx/zynqmp_dma.c |   2 +-
+ drivers/dma/zx_dma.c            |   2 +-
+ include/linux/amba/pl330.h      |  35 ---------
+ include/linux/of_dma.h          |  17 ++--
+ 41 files changed, 140 insertions(+), 176 deletions(-)
+ delete mode 100644 include/linux/amba/pl330.h
+
+-- 
+1.9.1
