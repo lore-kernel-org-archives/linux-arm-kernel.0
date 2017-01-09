@@ -1,10 +1,11 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 9 Jan 2017 12:39:22 -0300
-Subject: [PATCH 1/2] usb: host: ehci-exynos: Decrese node refcount on
+Date: Mon, 9 Jan 2017 12:40:14 -0300
+Subject: [PATCH 2/2] usb: host: ohci-exynos: Decrese node refcount on
  exynos_ehci_get_phy() error paths
-In-Reply-To: <20170107084141.3731-1-krzk@kernel.org>
+In-Reply-To: <20170107084141.3731-2-krzk@kernel.org>
 References: <20170107084141.3731-1-krzk@kernel.org>
-Message-ID: <8a9d9fe4-5f24-e162-0adc-866c8eefd387@osg.samsung.com>
+ <20170107084141.3731-2-krzk@kernel.org>
+Message-ID: <3b7bb120-1963-04ec-0cf5-87c580d25c0d@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
