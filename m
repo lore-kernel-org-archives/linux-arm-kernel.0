@@ -1,140 +1,137 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
-Date: Mon, 09 Jan 2017 08:33:11 +0100
-Subject: [PATCH v2] ARM: dts: sun7i: Add wifi dt node on Banana Pro
-In-Reply-To: <20170109071050.d533vekwrfwslxdw@lukather>
-References: <20170105173753.14024-1-joerg.krause@embedded.rocks>
- <20170105181151.i3ttsu5ylrw45br7@lukather>
- <1483642871.27207.1.camel@embedded.rocks>
- <20170109071050.d533vekwrfwslxdw@lukather>
-Message-ID: <1483947191.4334.1.camel@embedded.rocks>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 09 Jan 2017 09:11:28 +0100
+Subject: [PATCH] iommu: Drop the of_iommu_{set/get}_ops() interface
+In-Reply-To: <20170103173456.18154-1-lorenzo.pieralisi@arm.com>
+References: <CGME20170103173514epcas4p42d343054cc7117c7299ca7bfad0015af@epcas4p4.samsung.com>
+ <20170103173456.18154-1-lorenzo.pieralisi@arm.com>
+Message-ID: <e9d847ad-a986-965f-0432-374e1c55bab3@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi Lorenzo,
 
-On Mon, 2017-01-09 at 08:10 +0100, Maxime Ripard wrote:
-> Hi,
-> 
-> On Thu, Jan 05, 2017 at 08:01:11PM +0100, J?rg Krause wrote:
-> > Hi Maxim,
-> > 
-> > On Thu, 2017-01-05 at 19:11 +0100, Maxime Ripard wrote:
-> > > Hi J?rg,
-> > > 
-> > > On Thu, Jan 05, 2017 at 06:37:53PM +0100, J?rg Krause wrote:
-> > > > The Banana Pro has an AMPAK AP6181 WiFi+Bluetooth module. The
-> > > > WiFi
-> > > > part
-> > > > is a BCM43362 IC connected to MMC3 of the A20 SoC via SDIO. The
-> > > > IC
-> > > > also
-> > > > takes a power enable signal via GPIO.
-> > > > 
-> > > > This commit adds a device-tree node to power it up, so the mmc
-> > > > subsys
-> > > > can scan it, and enables the mmc controller which is connected
-> > > > to
-> > > > it.
-> > > > 
-> > > > As the wifi enable pin of the AP6181 module is not really a
-> > > > regulator,
-> > > > switch the mmc3 node to the mmc-pwrseq framework for
-> > > > controlling
-> > > > it.
-> > > > This more accurately reflectes how the hardware actually works.
-> > > > 
-> > > > Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
-> > > > ---
-> > > > Changes v2 (suggested by Maxime Ripard):
-> > > > ? - rename pwrseq node to clarify the function rather what it's
-> > > > ????connected to
-> > > > ? - use dash instead of underscore for the pwrseq node name
-> > > > ? - remove setting pull-ups for mmc3 (default since commit
-> > > > 37bc56128d92)
-> > > > 
-> > > > ---
-> > > > ?arch/arm/boot/dts/sun7i-a20-bananapro.dts | 30
-> > > > ++++++++++++++++++-
-> > > > -----------
-> > > > ?1 file changed, 18 insertions(+), 12 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-> > > > b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-> > > > index 19d63d4049de..77f8fb76c157 100644
-> > > > --- a/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-> > > > +++ b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-> > > > @@ -76,6 +76,13 @@
-> > > > ?		};
-> > > > ?	};
-> > > > ?
-> > > > +	wifi_pwrseq: wifi-pwrseq {
-> > > > +		compatible = "mmc-pwrseq-simple";
-> > > > +		pinctrl-names = "default";
-> > > > +		pinctrl-0 = <&vmmc3_pin_bananapro>;
-> > > > +		reset-gpios = <&pio 7 22 GPIO_ACTIVE_LOW>;
-> > > > +	};
-> > > > +
-> > > > ?	reg_gmac_3v3: gmac-3v3 {
-> > > > ?		compatible = "regulator-fixed";
-> > > > ?		pinctrl-names = "default";
-> > > > @@ -87,17 +94,6 @@
-> > > > ?		enable-active-high;
-> > > > ?		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>;
-> > > > ?	};
-> > > > -
-> > > > -	reg_vmmc3: vmmc3 {
-> > > > -		compatible = "regulator-fixed";
-> > > > -		pinctrl-names = "default";
-> > > > -		pinctrl-0 = <&vmmc3_pin_bananapro>;
-> > > > -		regulator-name = "vmmc3";
-> > > > -		regulator-min-microvolt = <3300000>;
-> > > > -		regulator-max-microvolt = <3300000>;
-> > > > -		enable-active-high;
-> > > > -		gpio = <&pio 7 22 GPIO_ACTIVE_HIGH>;
-> > > > -	};
-> > > > ?};
-> > > > ?
-> > > > ?&ahci {
-> > > > @@ -166,10 +162,20 @@
-> > > > ?&mmc3 {
-> > > > ?	pinctrl-names = "default";
-> > > > ?	pinctrl-0 = <&mmc3_pins_a>;
-> > > > -	vmmc-supply = <&reg_vmmc3>;
-> > > > +	vmmc-supply = <&reg_vcc3v3>;
-> > > > +	mmc-pwrseq = <&wifi_pwrseq>;
-> > > > ?	bus-width = <4>;
-> > > > ?	non-removable;
-> > > > +	wakeup-source;
-> > > 
-> > > Sorry for not spotting that earlier, but this is suspicious. The
-> > > PIO
-> > > is not able to be wake up the CPU, since it's connected to the
-> > > GIC
-> > > that is shut down during CPU suspend. Our only wake up source is
-> > > the
-> > > NMI controller. So either it is not able to wake up the system,
-> > > or
-> > > the
-> > > interrupt line in not the right one.
-> > 
-> > Sorry, but I'm not sure I understand...
-> > 
-> > The "WIFI-HOST-WAKE" line connects "WL_HOST_WAKE" of the AP6210 to
-> > pin
-> > EINT15 of the A20 as shown in the schematic of the board [1].
-> > 
-> > Note, that this is the same hardware configuration as done on the
-> > Banana Pi M1+ [2]. The device tree node for mmc3 of the M1+ has
-> > "wakeup-source" enabled, too, so I inherited it. However, I did not
-> > tested the wake-up feature.
-> 
-> This is exactly the wakeup-source property that is suspicious, and
-> probably doesn't work on the BPi either. Either way, we don't have
-> suspend support at all on both of these boards, so you can just
-> remove
-> it and we will figure it out later.
+On 2017-01-03 18:34, Lorenzo Pieralisi wrote:
+> With the introduction of the new iommu_{register/get}_instance()
+> interface in commit e4f10ffe4c9b ("iommu: Make of_iommu_set/get_ops() DT
+> agnostic") (based on struct fwnode_handle as look-up token, so firmware
+> agnostic) to register IOMMU instances with the core IOMMU layer there is
+> no reason to keep the old OF based interface around any longer.
+>
+> Convert all the IOMMU drivers (and OF IOMMU core code) that rely on the
+> of_iommu_{set/get}_ops() to the new kernel interface to register/retrieve
+> IOMMU instances and remove the of_iommu_{set/get}_ops() remaining glue
+> code in order to complete the interface rework.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+> Exynos, msm and mtk code compile tested only owing to lack of
+> test platforms, I would appreciate some help in testing this
+> patch on those platforms before merging it even if it is just
+> a simple interface conversion.
 
-I see! I'll remove this property and send an updated version. Many
-thanks for the review!
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-J?rg
+>
+> Thanks,
+> Lorenzo
+>
+>   drivers/iommu/exynos-iommu.c |  2 +-
+>   drivers/iommu/msm_iommu.c    |  2 +-
+>   drivers/iommu/mtk_iommu.c    |  2 +-
+>   drivers/iommu/of_iommu.c     |  4 ++--
+>   include/linux/of_iommu.h     | 11 -----------
+>   5 files changed, 5 insertions(+), 16 deletions(-)
+>
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index 57ba0d3..b79e4c4 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -628,7 +628,7 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+>   
+>   	pm_runtime_enable(dev);
+>   
+> -	of_iommu_set_ops(dev->of_node, &exynos_iommu_ops);
+> +	iommu_register_instance(dev->fwnode, &exynos_iommu_ops);
+>   
+>   	return 0;
+>   }
+> diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
+> index b09692b..9cd3cee 100644
+> --- a/drivers/iommu/msm_iommu.c
+> +++ b/drivers/iommu/msm_iommu.c
+> @@ -737,7 +737,7 @@ static int msm_iommu_probe(struct platform_device *pdev)
+>   	}
+>   
+>   	list_add(&iommu->dev_node, &qcom_iommu_devices);
+> -	of_iommu_set_ops(pdev->dev.of_node, &msm_iommu_ops);
+> +	iommu_register_instance(pdev->dev.fwnode, &msm_iommu_ops);
+>   
+>   	pr_info("device mapped at %p, irq %d with %d ctx banks\n",
+>   		iommu->base, iommu->irq, iommu->ncb);
+> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+> index 1479c76..0596ab2 100644
+> --- a/drivers/iommu/mtk_iommu.c
+> +++ b/drivers/iommu/mtk_iommu.c
+> @@ -655,7 +655,7 @@ static int mtk_iommu_init_fn(struct device_node *np)
+>   		return ret;
+>   	}
+>   
+> -	of_iommu_set_ops(np, &mtk_iommu_ops);
+> +	iommu_register_instance(&np->fwnode, &mtk_iommu_ops);
+>   	return 0;
+>   }
+>   
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index 0f57ddc..d7f480a 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -127,7 +127,7 @@ static const struct iommu_ops
+>   			   "iommu-map-mask", &iommu_spec.np, iommu_spec.args))
+>   		return NULL;
+>   
+> -	ops = of_iommu_get_ops(iommu_spec.np);
+> +	ops = iommu_get_instance(&iommu_spec.np->fwnode);
+>   	if (!ops || !ops->of_xlate ||
+>   	    iommu_fwspec_init(&pdev->dev, &iommu_spec.np->fwnode, ops) ||
+>   	    ops->of_xlate(&pdev->dev, &iommu_spec))
+> @@ -157,7 +157,7 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
+>   					   "#iommu-cells", idx,
+>   					   &iommu_spec)) {
+>   		np = iommu_spec.np;
+> -		ops = of_iommu_get_ops(np);
+> +		ops = iommu_get_instance(&np->fwnode);
+>   
+>   		if (!ops || !ops->of_xlate ||
+>   		    iommu_fwspec_init(dev, &np->fwnode, ops) ||
+> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+> index 6a7fc50..13394ac 100644
+> --- a/include/linux/of_iommu.h
+> +++ b/include/linux/of_iommu.h
+> @@ -31,17 +31,6 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
+>   
+>   #endif	/* CONFIG_OF_IOMMU */
+>   
+> -static inline void of_iommu_set_ops(struct device_node *np,
+> -				    const struct iommu_ops *ops)
+> -{
+> -	iommu_register_instance(&np->fwnode, ops);
+> -}
+> -
+> -static inline const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+> -{
+> -	return iommu_get_instance(&np->fwnode);
+> -}
+> -
+>   extern struct of_device_id __iommu_of_table;
+>   
+>   typedef int (*of_iommu_init_fn)(struct device_node *);
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
