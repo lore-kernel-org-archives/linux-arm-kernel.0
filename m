@@ -1,95 +1,75 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 9 Jan 2017 11:50:12 -0600
-Subject: [PATCH v3 2/4] dt-bindings: Add TI SCI PM Domains
-In-Reply-To: <20170104205536.15963-3-d-gerlach@ti.com>
-References: <20170104205536.15963-1-d-gerlach@ti.com>
- <20170104205536.15963-3-d-gerlach@ti.com>
-Message-ID: <20170109175012.sg7eze7llqq7qevd@rob-hp-laptop>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 9 Jan 2017 17:55:26 +0000
+Subject: APM smmu implementation
+In-Reply-To: <20170109120300.GC21398@arm.com>
+References: <CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g@mail.gmail.com>
+ <d9e40de8-82e2-0f19-5b99-d756ded21e80@arm.com>
+ <20170109120300.GC21398@arm.com>
+Message-ID: <9d083b5e-0fe4-b649-c4f4-e1005feb9ec1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 02:55:34PM -0600, Dave Gerlach wrote:
-> Add a generic power domain implementation, TI SCI PM Domains, that
-> will hook into the genpd framework and allow the TI SCI protocol to
-> control device power states.
+On 09/01/17 12:03, Will Deacon wrote:
+> On Mon, Jan 09, 2017 at 11:34:42AM +0000, Robin Murphy wrote:
+>> On 06/01/17 23:21, Feng Kan wrote:
+>>> The APM IOMMU implementation is mostly just the ARM SMMU 500 variant.
+>>
+>> "Mostly"? Have APM actually modified it (which I strongly doubt) or do
+>> you mean it's simply been integrated with the upper address lines tied
+>> off? MMU-500 reports a 48-bit IAS because MMU-500 has 48-bit-wide slave
+>> interfaces; that's all there is to it. Whether or not you use all of
+>> those bits is up to you as a system integrator.
 > 
-> Also, provide macros representing each device index as understood
-> by TI SCI to be used in the device node power-domain references.
-> These are identifiers for the K2G devices managed by the PMMC.
+> That's a good point; MMU-500 doesn't appear to let you change the IAS
+> anyway. That should also mean that UBS and OAS are unchanged.
 > 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
-> v2->v3:
-> 	Update k2g_pds node docs to show it should be a child of pmmc node.
-> 	In early versions a phandle was used to point to pmmc and docs still
-> 	incorrectly showed this.
+>>> However, our internal bus is only 42 bits wide. Our IAS field is coded
+>>> as 48 bits, which cause IPA to truncated to 42 bits on the physical
+>>> bus. In order for our system to work with the arm-smmu.c, there needs
+>>> to be a way to force the ipa_size to 42. The current internal solution
+>>> is to use the cpuid, but that is quite ugly. I was thinking of using
+>>> the model
+>>> as indication to right the ipa_size, but I am not too sure of the ACPI
+>>> side. Would it be okay to add an APM MMU500 variant? I would also
+>>> appreciated it if you guys have any alternate solutions.
+>>
+>> This is something we've been axpecting to run into for a while now - the
+>> appropriate solution is to use a "dma-ranges" property on the master
+>> device(s) to describe that they have 42 bits of address wired up, from
+>> which they will then inherit the appropriate DMA mask. The outstanding
+>> issue which remains is that we're still missing some way of preventing
+>> drivers simply clobbering that with a 64-bit mask later, but that's a
+>> more general problem[1].
 > 
->  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   | 59 ++++++++++++++
->  MAINTAINERS                                        |  2 +
->  include/dt-bindings/genpd/k2g.h                    | 90 ++++++++++++++++++++++
->  3 files changed, 151 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->  create mode 100644 include/dt-bindings/genpd/k2g.h
-> 
-> diff --git a/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
-> new file mode 100644
-> index 000000000000..4c9064e512cb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
-> @@ -0,0 +1,59 @@
-> +Texas Instruments TI-SCI Generic Power Domain
-> +---------------------------------------------
-> +
-> +Some TI SoCs contain a system controller (like the PMMC, etc...) that is
-> +responsible for controlling the state of the IPs that are present.
-> +Communication between the host processor running an OS and the system
-> +controller happens through a protocol known as TI-SCI [1]. This pm domain
-> +implementation plugs into the generic pm domain framework and makes use of
-> +the TI SCI protocol power on and off each device when needed.
-> +
-> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-> +
-> +PM Domain Node
-> +==============
-> +The PM domain node represents the global PM domain managed by the PMMC,
-> +which in this case is the single implementation as documented by the generic
-> +PM domain bindings in Documentation/devicetree/bindings/power/power_domain.txt.
-> +Because this relies on the TI SCI protocol to communicate with the PMMC it
-> +must be a child of the pmmc node.
-> +
-> +Required Properties:
-> +--------------------
-> +- compatible: should be "ti,sci-pm-domain"
-> +- #power-domain-cells: Must be 0.
-> +
-> +Example (K2G):
-> +-------------
-> +	pmmc: pmmc {
-> +		compatible = "ti,k2g-sci";
-> +		...
-> +
-> +		k2g_pds: k2g_pds {
-> +			compatible = "ti,sci-pm-domain";
-> +			#power-domain-cells = <0>;
-> +		};
-> +	};
-> +
-> +PM Domain Consumers
-> +===================
-> +Hardware blocks that require SCI control over their state must provide
-> +a reference to the sci-pm-domain they are part of and a unique device
-> +specific ID that identifies the device.
-> +
-> +Required Properties:
-> +--------------------
-> +- power-domains: phandle pointing to the corresponding PM domain node.
-> +- ti,sci-id: index representing the device id to be passed oevr SCI to
-> +	     be used for device control.
+> I wonder if the driver is actually using IAS, OAS and UBS incorrectly.
+> We're using them to parameterise the DMA aperture, which is then used
+> to size the IOVA domain, but that's wrong because the IAS, OAS and UBS
+> are upper bounds and we can still end up allocating unusable/unreachable
+> addresses.
 
-As I've already stated before, this goes in power-domain cells. When you 
-have a single thing (i.e. node) that controls multiple things, then you 
-you need to specify the ID for each of them in phandle args. This is how 
-irqs, gpio, clocks, *everything* in DT works.
+It's not incorrect, it's simply all we know at that point. From inside
+the SMMU, we can't tell how many of the bits we have are actually wired
+up externally, which is why we always take the intersection of the DMA
+aperture and the given device's DMA mask at the point of IOVA allocation.
 
-Rob
+You can reproduce much the same thing on your Juno if you fancy - just
+make the HDLCD or PL330 driver set a DMA mask larger than the default 32
+bits and the top 8 bits of the MMU-401's 40-bit input being tied off to
+0 will become apparent (the only difference being there's not actually
+anything at the master end they could be wired to either).
+
+> So I do think that this should be fixed on the SMMU firmware node, rather
+> than restricting the range of each master device.
+
+In general, it's a per-master thing which "dma-ranges" is exactly the
+correct tool to describe - a property on the SMMU would just be a weird
+nonstandard shorthand for a very particular case (it breaks as soon as
+you have some *more* limited, e.g. 32-bit, device in the same system).
+The fact that every master in this case apparently has the same
+capability is just happenstance.
+
+Robin.
+
+> 
+> Will
+> 
