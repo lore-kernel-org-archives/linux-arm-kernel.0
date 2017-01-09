@@ -1,124 +1,195 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 9 Jan 2017 12:29:49 +0100
-Subject: [RFC PATCH 1/7] arm64: Use physical counter for in-kernel reads
-In-Reply-To: <00f4cdb2-83f1-5a9d-3320-7cbdac20466d@arm.com>
-References: <20161210204712.21830-1-christoffer.dall@linaro.org>
- <20161210204712.21830-2-christoffer.dall@linaro.org>
- <5e820613-f9f3-0035-b145-0e22e9bcfeca@arm.com>
- <20170106100049.GB21089@cbox>
- <89b4c1c1-3c6a-b7a1-cbcb-93a64812ebff@arm.com>
- <20170106105301.GB27758@cbox>
- <00f4cdb2-83f1-5a9d-3320-7cbdac20466d@arm.com>
-Message-ID: <20170109112949.GB4348@cbox>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Mon, 9 Jan 2017 16:59:37 +0530
+Subject: [PATCH v7 00/20] ILP32 for ARM64
+Message-ID: <1483961397-8599-1-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 03:16:24PM +0000, Marc Zyngier wrote:
-> On 06/01/17 10:53, Christoffer Dall wrote:
-> > On Fri, Jan 06, 2017 at 10:38:49AM +0000, Marc Zyngier wrote:
-> >> On 06/01/17 10:00, Christoffer Dall wrote:
-> >>> Hi Marc,
-> >>>
-> >>> On Thu, Jan 05, 2017 at 06:11:14PM +0000, Marc Zyngier wrote:
-> >>>> [adding the arm64 maintainers, plus Mark as arch timer maintainer]
-> >>>
-> >>> Right, sorry, I should have done that already.
-> >>>
-> >>>>
-> >>>> On 10/12/16 20:47, Christoffer Dall wrote:
-> >>>>> Using the physical counter allows KVM to retain the offset between the
-> >>>>> virtual and physical counter as long as it is actively running a VCPU.
-> >>>>>
-> >>>>> As soon as a VCPU is released, another thread is scheduled or we start
-> >>>>> running userspace applications, we reset the offset to 0, so that VDSO
-> >>>>> operations can still read the virtual counter and get the same view of
-> >>>>> time as the kernel.
-> >>>>>
-> >>>>> This opens up potential improvements for KVM performance.
-> >>>>>
-> >>>>> VHE kernels or kernels using the virtual timer are unaffected by this.
-> >>>>>
-> >>>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >>>>> ---
-> >>>>>  arch/arm64/include/asm/arch_timer.h  | 6 ++++--
-> >>>>>  drivers/clocksource/arm_arch_timer.c | 2 +-
-> >>>>>  2 files changed, 5 insertions(+), 3 deletions(-)
-> >>>>>
-> >>>>> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> >>>>> index eaa5bbe..cec2549 100644
-> >>>>> --- a/arch/arm64/include/asm/arch_timer.h
-> >>>>> +++ b/arch/arm64/include/asm/arch_timer.h
-> >>>>> @@ -139,11 +139,13 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
-> >>>>>  
-> >>>>>  static inline u64 arch_counter_get_cntpct(void)
-> >>>>>  {
-> >>>>> +	u64 cval;
-> >>>>>  	/*
-> >>>>>  	 * AArch64 kernel and user space mandate the use of CNTVCT.
-> >>>>>  	 */
-> >>>>> -	BUG();
-> >>>>> -	return 0;
-> >>>>> +	isb();
-> >>>>> +	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
-> >>>>> +	return cval;
-> >>>>>  }
-> >>>>>  
-> >>>>>  static inline u64 arch_counter_get_cntvct(void)
-> >>>>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> >>>>> index 73c487d..a5b0789 100644
-> >>>>> --- a/drivers/clocksource/arm_arch_timer.c
-> >>>>> +++ b/drivers/clocksource/arm_arch_timer.c
-> >>>>> @@ -597,7 +597,7 @@ static void __init arch_counter_register(unsigned type)
-> >>>>>  
-> >>>>>  	/* Register the CP15 based counter if we have one */
-> >>>>>  	if (type & ARCH_CP15_TIMER) {
-> >>>>> -		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_uses_ppi == VIRT_PPI)
-> >>>>> +		if (arch_timer_uses_ppi == VIRT_PPI || is_kernel_in_hyp_mode())
-> >>>>
-> >>>> Why do we have this is_kernel_in_hyp_mode clause? I can't think of any
-> >>>> reason for a VHE kernel to use the virtual counter at all...
-> >>>>
-> >>>
-> >>> Good question.  I think I just didn't want to change behavior from the
-> >>> existing functionality mre than necessary.
-> >>>
-> >>> Note that on a VHE kernel this will be the EL2 virtual counter, not the
-> >>> EL1 virtual counter, due to the register redirection.  Are the virtual
-> >>> and physical EL2 counters always equivalent on a VHE system?
-> >>
-> >> Yes, they are. CNTVOFF_EL2 is ignored in that case, and you get an extra
-> >> interrupt for the new EL2 virtual timer as well.
-> >>
-> > 
-> > ok, in that case I suppose I can just check for arch_timer_uses_ppi ==
-> > VIRT_PPI and be done with it.
-> 
-> I wonder what we should do for get_cycles(), which is hardwired to the
-> virtual counter at the moment. If we decide to use the physical counter
-> on systems identified as hosts, we may have to revise this as well (I
-> feel the need for an alternative... ;-).
-> 
+This series enables aarch64 with ilp32 mode.
 
-The physical counter is always available right?  So why not just use the
-physical counter?
+As supporting work, it introduces ARCH_32BIT_OFF_T configuration
+option that is enabled for existing 32-bit architectures but disabled
+for new arches (so 64-bit off_t is is used by new userspace). Also it
+deprecates getrlimit and setrlimit syscalls prior to prlimit64.
 
-I guess that comes down to two questions:
+This version is based on linux-next from 2017-01-09. It works with
+glibc-2.25, and tested with LTP, glibc testsuite, trinity, lmbench,
+CPUSpec.
 
-First, can get_cycles() be called from whereever in any context etc.?
-In other words, is it ever called between vcpu_load() and vcpu_put(),
-because if not, it doesn't matter which one we use, but that may be a
-slightly brittle solution.
+This is not RFC anymore. I believe that all ABI and implementation
+issues are resolved now. The way that kernel clears registers top
+halves is probably the last question, and because there's no objection
+for current approach for more that 6 month, I think, community agrees
+with it.
 
-Second, what should the semantics of get_cycles be?  Is it important
-it's synchronized with the counter backing the timer being used, or
-should it rather represents a wall-clock cycle measure, or should it
-indeed represent virtual cycles spent if we ever decide to start
-tweaking the offset depending on stolen cycles?
+Patches 1, 2, 3 and 8 are general, and may be applied separately.
 
-Perhaps I'm getting ahead of myself and we should just make sure it's
-aligned with the timer in use, in which case we only have to decide if
-we should implement that by (a) setting a function pointer, (b) using an
-alternative, or (c) using a static key :)
+Current version does not introduce ABI changes comparing to RFC3.
+Kernel and GLIBC trees:
+https://github.com/norov/linux/tree/ilp32-2017-01-09
+https://github.com/norov/glibc/tree/dev9
 
-Thanks,
--Christoffer
+(GLIBC patches are managed by Steve Ellsey, so my tree is only for
+reference.)
+
+Changes:
+v3: https://lkml.org/lkml/2014/9/3/704
+v4: https://lkml.org/lkml/2015/4/13/691
+v5: https://lkml.org/lkml/2015/9/29/911
+v6: https://lkml.org/lkml/2016/5/23/661
+v7: RFC nowrap:  https://lkml.org/lkml/2016/6/17/990
+v7: RFC2 nowrap: https://lkml.org/lkml/2016/8/17/245
+v7: RFC3 nowrap: https://lkml.org/lkml/2016/10/21/883
+v7: - 32-bit off_t deprecation is splitted for compat
+      and native 32-bit arches, as it was initially
+      done (patches 1, 2);
+    - getrlimit() and setrlimit() syscalls deprecated for
+      aarch64/ilp32 and all new architectures;
+    - documentation is cleaned up (patch 4);
+    - compat-related definitions moved from
+      aarch64/include/elf.h to binfmt_elf32.c (patch 11)
+    - for ptrace, execution mode detection is performed
+      at runtime, as it was in v4 (patch 18)
+
+Andrew Pinski (6):
+  arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+  arm64: ensure the kernel is compiled for LP64
+  arm64:uapi: set __BITS_PER_LONG correctly for ILP32 and LP64
+  arm64: ilp32: add sys_ilp32.c and a separate table (in entry.S) to use
+    it
+  arm64: ilp32: introduce ilp32-specific handlers for sigframe and
+    ucontext
+  arm64:ilp32: add ARM64_ILP32 to Kconfig
+
+Philipp Tomsich (1):
+  arm64:ilp32: add vdso-ilp32 and use for signal return
+
+Yury Norov (13):
+  compat ABI: use non-compat openat and open_by_handle_at variants
+  32-bit ABI: introduce ARCH_32BIT_OFF_T config option
+  asm-generic: Drop getrlimit and setrlimit syscalls from default list
+  arm64: ilp32: add documentation on the ILP32 ABI for ARM64
+  thread: move thread bits accessors to separated file
+  arm64: introduce is_a32_task and is_a32_thread (for AArch32 compat)
+  arm64: ilp32: add is_ilp32_compat_{task,thread} and TIF_32BIT_AARCH64
+  arm64: introduce binfmt_elf32.c
+  arm64: ilp32: introduce binfmt_ilp32.c
+  arm64: ilp32: share aarch32 syscall handlers
+  arm64: signal: share lp64 signal routines to ilp32
+  arm64: signal32: move ilp32 and aarch32 common code to separated file
+  arm64: ptrace: handle ptrace_request differently for aarch32 and ilp32
+
+ Documentation/arm64/ilp32.txt                 |  45 +++++++
+ arch/Kconfig                                  |   4 +
+ arch/arc/Kconfig                              |   1 +
+ arch/arc/include/uapi/asm/unistd.h            |   1 +
+ arch/arm/Kconfig                              |   1 +
+ arch/arm64/Kconfig                            |  19 ++-
+ arch/arm64/Makefile                           |   5 +
+ arch/arm64/include/asm/compat.h               |  19 +--
+ arch/arm64/include/asm/elf.h                  |  32 ++---
+ arch/arm64/include/asm/fpsimd.h               |   2 +-
+ arch/arm64/include/asm/ftrace.h               |   2 +-
+ arch/arm64/include/asm/hwcap.h                |   6 +-
+ arch/arm64/include/asm/is_compat.h            |  90 ++++++++++++++
+ arch/arm64/include/asm/memory.h               |   5 +-
+ arch/arm64/include/asm/processor.h            |  11 +-
+ arch/arm64/include/asm/ptrace.h               |   2 +-
+ arch/arm64/include/asm/seccomp.h              |   2 +-
+ arch/arm64/include/asm/signal32.h             |   9 +-
+ arch/arm64/include/asm/signal32_common.h      |  27 ++++
+ arch/arm64/include/asm/signal_common.h        |  33 +++++
+ arch/arm64/include/asm/signal_ilp32.h         |  38 ++++++
+ arch/arm64/include/asm/syscall.h              |   2 +-
+ arch/arm64/include/asm/thread_info.h          |   4 +-
+ arch/arm64/include/asm/unistd.h               |   8 +-
+ arch/arm64/include/asm/vdso.h                 |   6 +
+ arch/arm64/include/uapi/asm/bitsperlong.h     |   9 +-
+ arch/arm64/include/uapi/asm/unistd.h          |  13 ++
+ arch/arm64/kernel/Makefile                    |  18 ++-
+ arch/arm64/kernel/asm-offsets.c               |   9 +-
+ arch/arm64/kernel/binfmt_elf32.c              |  32 +++++
+ arch/arm64/kernel/binfmt_ilp32.c              |  98 +++++++++++++++
+ arch/arm64/kernel/cpufeature.c                |   8 +-
+ arch/arm64/kernel/cpuinfo.c                   |  20 +--
+ arch/arm64/kernel/entry.S                     |  34 +++++-
+ arch/arm64/kernel/entry32.S                   |  80 ------------
+ arch/arm64/kernel/entry32_common.S            | 107 ++++++++++++++++
+ arch/arm64/kernel/entry_ilp32.S               |  22 ++++
+ arch/arm64/kernel/head.S                      |   2 +-
+ arch/arm64/kernel/hw_breakpoint.c             |   8 +-
+ arch/arm64/kernel/perf_regs.c                 |   2 +-
+ arch/arm64/kernel/process.c                   |   7 +-
+ arch/arm64/kernel/ptrace.c                    |  80 ++++++++++--
+ arch/arm64/kernel/signal.c                    | 102 ++++++++++------
+ arch/arm64/kernel/signal32.c                  | 107 ----------------
+ arch/arm64/kernel/signal32_common.c           | 135 ++++++++++++++++++++
+ arch/arm64/kernel/signal_ilp32.c              | 170 ++++++++++++++++++++++++++
+ arch/arm64/kernel/sys_ilp32.c                 | 100 +++++++++++++++
+ arch/arm64/kernel/traps.c                     |   5 +-
+ arch/arm64/kernel/vdso-ilp32/.gitignore       |   2 +
+ arch/arm64/kernel/vdso-ilp32/Makefile         |  74 +++++++++++
+ arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S     |  33 +++++
+ arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S |  95 ++++++++++++++
+ arch/arm64/kernel/vdso.c                      |  70 +++++++++--
+ arch/arm64/kernel/vdso/gettimeofday.S         |  20 ++-
+ arch/arm64/kernel/vdso/vdso.S                 |   6 +-
+ arch/blackfin/Kconfig                         |   1 +
+ arch/c6x/include/uapi/asm/unistd.h            |   1 +
+ arch/cris/Kconfig                             |   1 +
+ arch/frv/Kconfig                              |   1 +
+ arch/h8300/Kconfig                            |   1 +
+ arch/h8300/include/uapi/asm/unistd.h          |   1 +
+ arch/hexagon/Kconfig                          |   1 +
+ arch/hexagon/include/uapi/asm/unistd.h        |   1 +
+ arch/m32r/Kconfig                             |   1 +
+ arch/m68k/Kconfig                             |   1 +
+ arch/metag/Kconfig                            |   1 +
+ arch/metag/include/uapi/asm/unistd.h          |   1 +
+ arch/microblaze/Kconfig                       |   1 +
+ arch/mips/Kconfig                             |   1 +
+ arch/mn10300/Kconfig                          |   1 +
+ arch/nios2/Kconfig                            |   1 +
+ arch/nios2/include/uapi/asm/unistd.h          |   1 +
+ arch/openrisc/Kconfig                         |   1 +
+ arch/openrisc/include/uapi/asm/unistd.h       |   1 +
+ arch/parisc/Kconfig                           |   1 +
+ arch/powerpc/Kconfig                          |   1 +
+ arch/score/Kconfig                            |   1 +
+ arch/score/include/uapi/asm/unistd.h          |   1 +
+ arch/sh/Kconfig                               |   1 +
+ arch/sparc/Kconfig                            |   1 +
+ arch/tile/Kconfig                             |   1 +
+ arch/tile/include/uapi/asm/unistd.h           |   1 +
+ arch/tile/kernel/compat.c                     |   3 +
+ arch/unicore32/Kconfig                        |   1 +
+ arch/unicore32/include/uapi/asm/unistd.h      |   1 +
+ arch/x86/Kconfig                              |   1 +
+ arch/x86/um/Kconfig                           |   1 +
+ arch/xtensa/Kconfig                           |   1 +
+ drivers/clocksource/arm_arch_timer.c          |   2 +-
+ include/linux/fcntl.h                         |   2 +-
+ include/linux/thread_bits.h                   |  63 ++++++++++
+ include/linux/thread_info.h                   |  54 +-------
+ include/uapi/asm-generic/unistd.h             |  10 +-
+ 93 files changed, 1600 insertions(+), 408 deletions(-)
+ create mode 100644 Documentation/arm64/ilp32.txt
+ create mode 100644 arch/arm64/include/asm/is_compat.h
+ create mode 100644 arch/arm64/include/asm/signal32_common.h
+ create mode 100644 arch/arm64/include/asm/signal_common.h
+ create mode 100644 arch/arm64/include/asm/signal_ilp32.h
+ create mode 100644 arch/arm64/kernel/binfmt_elf32.c
+ create mode 100644 arch/arm64/kernel/binfmt_ilp32.c
+ create mode 100644 arch/arm64/kernel/entry32_common.S
+ create mode 100644 arch/arm64/kernel/entry_ilp32.S
+ create mode 100644 arch/arm64/kernel/signal32_common.c
+ create mode 100644 arch/arm64/kernel/signal_ilp32.c
+ create mode 100644 arch/arm64/kernel/sys_ilp32.c
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/.gitignore
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/Makefile
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+ create mode 100644 include/linux/thread_bits.h
+
+-- 
+2.7.4
