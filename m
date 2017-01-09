@@ -1,97 +1,62 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon, 9 Jan 2017 23:56:41 +0530
-Subject: [PATCH 0/4] ARM: exynos: Fix Odroid U3 USB/LAN when TFTP booting
- (power sequence)
-In-Reply-To: <20170109181703.436gv7bq76xuv35q@kozik-lap>
-References: <20170107085203.4431-1-krzk@kernel.org>
- <CANAwSgSEZvxHje65Kk13fvD9NZGB+iHCJtoGJdQrUdS42ei_WA@mail.gmail.com>
- <20170109181703.436gv7bq76xuv35q@kozik-lap>
-Message-ID: <CANAwSgR7=cELNK9of5ngFTdhcxWn2KXL=R8tMsTKD7gecBcMYw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 9 Jan 2017 12:32:14 -0600
+Subject: [PATCH 1/2] Documentation: devicetree: Add document bindings for
+ mtk-cir
+In-Reply-To: <1483632384-8107-2-git-send-email-sean.wang@mediatek.com>
+References: <1483632384-8107-1-git-send-email-sean.wang@mediatek.com>
+ <1483632384-8107-2-git-send-email-sean.wang@mediatek.com>
+Message-ID: <20170109183214.xonv52sn3fo4exqp@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Fri, Jan 06, 2017 at 12:06:23AM +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> This patch adds documentation for devicetree bindings for
+> Mediatek IR controller.
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>  .../devicetree/bindings/media/mtk-cir.txt          | 23 ++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>  create mode 100644 linux-4.8.rc1_p0/Documentation/devicetree/bindings/media/mtk-cir.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/mtk-cir.txt b/Documentation/devicetree/bindings/media/mtk-cir.txt
+> new file mode 100644
+> index 0000000..bbedd71
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/mtk-cir.txt
+> @@ -0,0 +1,23 @@
+> +Device-Tree bindings for Mediatek IR controller found in Mediatek SoC family
+> +
+> +Required properties:
+> +- compatible	    : "mediatek,mt7623-ir"
+> +- clocks	    : list of clock specifiers, corresponding to
+> +		      entries in clock-names property;
+> +- clock-names	    : should contain "clk" entries;
+> +- interrupts	    : should contain IR IRQ number;
+> +- reg		    : should contain IO map address for IR.
+> +
+> +Optional properties:
+> +- linux,rc-map-name : Remote control map name.
 
-On 9 January 2017 at 23:47, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On Mon, Jan 09, 2017 at 11:34:48PM +0530, Anand Moon wrote:
->> Hi Krzysztof,
->>
->> On 7 January 2017 at 14:21, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> > Hi,
->> >
->> > Thanks to Markus Reichl, I got an Odroid U3 to work with. Thanks to Peter
->> > Chen, we got a power sequence generic library which solves my long
->> > standing Odroid U3 problem - no LAN9730 if it was enabled by bootloader.
->> >
->> > My previous attempts for this can be found here [0].
->> >
->> > This patchset is based on Peter's v11 of power sequence [1].
->> > Patchset is available also on my Github [2].
->> >
->> > More detailed analysis is described in patch 2/4 ("ARM: dts: exynos: Fix
->> > LAN9730 on Odroid U3 after tftpboot").
->> >
->> >
->>
->> [snip]
->>
->> On which u-boot should this be tested.
->>
->> On HK u-boot tftp boot is not supported.
->
-> ... so you gave an answer: you cannot test it on HK. How many other
-> U-Boot flavors you know? :)
->
+Would 'label' be appropriate here instead? If not, this needs to be 
+documented in a common location and explained better.
 
-u-boot mainline have tftp support enable, so I will try to test on this u-boot.
+> +
+> +Example:
+> +
+> +cir: cir at 0x10013000 {
 
-Best Regards
--Anand
+Drop the '0x'.
 
-> Best regards,
-> Krzysztof
->
->
->> ----------------------------------------------------------
->> U-Boot 2010.12-00000-g9777ca6-dirty (Nov 26 2015 - 10:10:11) for Exynox4412
->>
->>
->> CPU: S5PC220 [Samsung SOC on SMP Platform Base on ARM CortexA9]
->> APLL = 1000MHz, MPLL = 800MHz
->> DRAM:  2 GiB
->>
->> PMIC VERSION : 0x00, CHIP REV : 2
->> TrustZone Enabled BSP
->> BL1 version: 20121128
->>
->>
->> Checking Boot Mode ... SDMMC
->> MMC Device 0: 14804 MB
->> MMC Device 1 not found
->> *** Warning - using default environment
->>
->> USB3503 NINT = OUTPUT LOW!
->> ModeKey Check... run normal_boot
->> No ethernet found.
->> Hit any key to stop autoboot:  0
->> Exynos4412 #
->> Exynos4412 #
->> Exynos4412 #
->> Exynos4412 # usb start
->> (Re)start USB...
->> USB0:   Exynos4412-ehci: init hccr 12580000 and hcor 12580010 hc_length 16
->> usb: usb_refclk_enable is active low: NO
->> ProTIP: If usb doesn't work - try playing with 'usb_invert_clken' environment
->> USB EHCI 1.00
->> scanning bus 0 for devices... EHCI timed out on TD - token=0x80008c80
->> EHCI fail timeout STS_ASS set
->>
->>       USB device not accepting new address (error=80000000)
->> EHCI fail timeout STS_ASS set
->> 1 USB Device(s) found
->>        scanning usb for storage devices... 0 Storage Device(s) found
->>        scanning usb for ethernet devices... 0 Ethernet Device(s) found
->> Exynos4412 #
->>
->> Best Regards
->> -Anand
+> +	compatible = "mediatek,mt7623-ir";
+> +	reg = <0 0x10013000 0 0x1000>;
+> +	interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_LOW>;
+> +	clocks = <&infracfg CLK_INFRA_IRRX>;
+> +	clock-names = "clk";
+> +	linux,rc-map-name = "rc-rc6-mce";
+> +};
+> -- 
+> 1.9.1
+> 
