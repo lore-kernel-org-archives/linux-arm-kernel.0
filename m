@@ -1,77 +1,57 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon,  9 Jan 2017 17:28:29 +0000
-Subject: [PATCH v4 6/9] arm64: Add helper to decode register from instruction
+Date: Mon,  9 Jan 2017 17:28:28 +0000
+Subject: [PATCH v4 5/9] arm64: cpufeature: Define helpers for sys_reg id
 In-Reply-To: <1483982912-27215-1-git-send-email-suzuki.poulose@arm.com>
 References: <1483982912-27215-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1483982912-27215-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1483982912-27215-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a helper to extract the register field from a given
-instruction.
+Define helper macros to extract op0, op1, CRn, CRm & op2
+for a given sys_reg id. While at it remove the explicit
+masking only used for Op0.
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/insn.h |  2 ++
- arch/arm64/kernel/insn.c      | 29 +++++++++++++++++++++++++++++
- 2 files changed, 31 insertions(+)
+ arch/arm64/include/asm/sysreg.h | 21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index bc85366..aecc07e 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -332,6 +332,8 @@ bool aarch64_insn_is_branch(u32 insn);
- u64 aarch64_insn_decode_immediate(enum aarch64_insn_imm_type type, u32 insn);
- u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
- 				  u32 insn, u64 imm);
-+u32 aarch64_insn_decode_register(enum aarch64_insn_register_type type,
-+					 u32 insn);
- u32 aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
- 				enum aarch64_insn_branch_type type);
- u32 aarch64_insn_gen_comp_branch_imm(unsigned long pc, unsigned long addr,
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 94b62c1..1f44cf8 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -417,6 +417,35 @@ u32 __kprobes aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
- 	return insn;
- }
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 98ae03f..cf43064 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -32,8 +32,27 @@
+  *	[11-8]  : CRm
+  *	[7-5]   : Op2
+  */
++#define Op0_shift	19
++#define Op0_mask	0x3
++#define Op1_shift	16
++#define Op1_mask	0x7
++#define CRn_shift	12
++#define CRn_mask	0xf
++#define CRm_shift	8
++#define CRm_mask	0xf
++#define Op2_shift	5
++#define Op2_mask	0x7
++
+ #define sys_reg(op0, op1, crn, crm, op2) \
+-	((((op0)&3)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
++	(((op0) << Op0_shift) | ((op1) << Op1_shift) | \
++	 ((crn) << CRn_shift) | ((crm) << CRm_shift) | \
++	 ((op2) << Op2_shift))
++
++#define sys_reg_Op0(id)	(((id) >> Op0_shift) & Op0_mask)
++#define sys_reg_Op1(id)	(((id) >> Op1_shift) & Op1_mask)
++#define sys_reg_CRn(id)	(((id) >> CRn_shift) & CRn_mask)
++#define sys_reg_CRm(id)	(((id) >> CRm_shift) & CRm_mask)
++#define sys_reg_Op2(id)	(((id) >> Op2_shift) & Op2_mask)
  
-+u32 aarch64_insn_decode_register(enum aarch64_insn_register_type type,
-+					u32 insn)
-+{
-+	int shift;
-+
-+	switch (type) {
-+	case AARCH64_INSN_REGTYPE_RT:
-+	case AARCH64_INSN_REGTYPE_RD:
-+		shift = 0;
-+		break;
-+	case AARCH64_INSN_REGTYPE_RN:
-+		shift = 5;
-+		break;
-+	case AARCH64_INSN_REGTYPE_RT2:
-+	case AARCH64_INSN_REGTYPE_RA:
-+		shift = 10;
-+		break;
-+	case AARCH64_INSN_REGTYPE_RM:
-+		shift = 16;
-+		break;
-+	default:
-+		pr_err("%s: unknown register type encoding %d\n", __func__,
-+		       type);
-+		return 0;
-+	}
-+
-+	return (insn >> shift) & GENMASK(4, 0);
-+}
-+
- static u32 aarch64_insn_encode_register(enum aarch64_insn_register_type type,
- 					u32 insn,
- 					enum aarch64_insn_register reg)
+ #ifndef CONFIG_BROKEN_GAS_INST
+ 
 -- 
 2.7.4
