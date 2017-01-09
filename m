@@ -1,34 +1,24 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Mon, 9 Jan 2017 12:08:01 -0800
-Subject: [PATCH 0/5] Reset Controller Nodes for TI Keystone platforms
-In-Reply-To: <20170109194358.27271-1-s-anna@ti.com>
-References: <20170109194358.27271-1-s-anna@ti.com>
-Message-ID: <efd6ca8e-8c5d-0e24-1cb9-ba412cec1fce@oracle.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 9 Jan 2017 12:17:13 -0800
+Subject: [PATCH 1/4] watchdog: coh901327_wdt: Simplify error handling in
+ probe function
+In-Reply-To: <CACRpkdbb9O=zRNox9RO9bNkAJ0grZ7vHy+8=9udJj0_Gw+k5hA@mail.gmail.com>
+References: <1483500343-27113-1-git-send-email-linux@roeck-us.net>
+ <CACRpkdbb9O=zRNox9RO9bNkAJ0grZ7vHy+8=9udJj0_Gw+k5hA@mail.gmail.com>
+Message-ID: <20170109201713.GB8668@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/9/2017 11:43 AM, Suman Anna wrote:
-> Hi Santosh,
->
-> This patch adds the reset controller nodes and the corresponding
-> reset data for TI Keystone 66AK2H, 66AK2L and 66AK2E SoCs. These
-> resets are for the DSPs on these SoCs, and are the last dependencies
-> before the keystone remoteproc driver can be added.
->
-> All these SoCs will use the ti-syscon-reset driver which is already
-> part of mainline kernel. The bindings for the same can be found in
-> Documentation/devicetree/bindings/reset/ti-syscon-reset.txt file.
-> Note that the other Keystone 66AK2G SoC will use a different TI-SCI
-> based reset driver, so will be submitted separately once the TI-SCI
-> dependencies make it into mainline.
->
-> Patches are based on top of 4.10-rc1 plus the MSM-RAM DT node series
-> that you have already picked up. Patch 1 enable the Reset Framework
-> for Keystone platforms, and remaining patches add the required DT
-> nodes.
->
-Ok. I will let this series be on list for a week or so for any
-comments. After that will pick this up and push it out to next.
+On Mon, Jan 09, 2017 at 08:38:03PM +0100, Linus Walleij wrote:
+> On Wed, Jan 4, 2017 at 4:25 AM, Guenter Roeck <linux@roeck-us.net> wrote:
+> 
+> > Checking if there is no error followed by a goto if there is one is
+> > confusing. Reverse the logic.
+> >
+> > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> 
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+Thanks!
 
-Regards,
-Santosh
+Guenter
