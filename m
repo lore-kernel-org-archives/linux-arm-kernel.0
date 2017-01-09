@@ -1,65 +1,52 @@
 From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Sun, 8 Jan 2017 23:56:49 +0000
-Subject: [PATCH 1/5] drivers: mmc: sunxi: fix A64 calibration routine
-In-Reply-To: <20170105174725.kmr25iodjnjozqjm@lukather>
-References: <1483398226-29321-1-git-send-email-andre.przywara@arm.com>
- <1483398226-29321-2-git-send-email-andre.przywara@arm.com>
- <20170105174725.kmr25iodjnjozqjm@lukather>
-Message-ID: <95b2e25c-da97-4136-3c49-ff8ecf011c14@arm.com>
+Date: Mon, 9 Jan 2017 00:16:00 +0000
+Subject: [linux-sunxi] [PATCH 1/2] drivers: pinctrl: add driver for
+ Allwinner H5 SoC
+In-Reply-To: <20170105224210.wfinfucbpkkd44om@lukather>
+References: <20161223125001.1176-1-icenowy@aosc.xyz>
+ <1280f095-ab03-93f8-14d2-99d13ba1ce55@arm.com>
+ <CACRpkdYQhfid3VRcaj=7as_+Zg=pX3Svp9FJ_W_Ft8nVuoZqKQ@mail.gmail.com>
+ <20170105224210.wfinfucbpkkd44om@lukather>
+Message-ID: <38fe3491-457a-f0c5-54fb-9defdcd45045@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/17 17:47, Maxime Ripard wrote:
-
-Hi,
-
-> On Mon, Jan 02, 2017 at 11:03:42PM +0000, Andre Przywara wrote:
->> The calibration facility in the A64 MMC block seems to have been
->> misunderstood: the result value is not the value to program into the
->> delay bits, but is the number of delay cells that result in a full clock
->> cycle delay. So this value has to be scaled by the desired phase, which
->> we still have to know and program.
->> Change the calibration routine to take a phase parameter and scale the
->> calibration value accordingly.
->> Also introduce sun50i-a64 delay parameters to store the required phase.
->> Looking at the BSP kernel the sample delay for anything below HS200 is
->> 0, so we go with that value.
->> Once the driver supports HS200 and faster modes, we can enter confirmed
->> working values in there.
+On 05/01/17 22:42, Maxime Ripard wrote:
+> On Fri, Dec 30, 2016 at 01:55:44PM +0100, Linus Walleij wrote:
+>> On Mon, Dec 26, 2016 at 3:33 PM, Andr? Przywara <andre.przywara@arm.com> wrote:
 >>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>> So while this patch technically looks correct, I was wondering if we
+>>> should really explore the possibility of making the whole of sunxi
+>>> pinctrl DT controlled.
+>>> I brought this up a while ago, but people weren't overly enthusiastic
+>>> about it, though their argument weren't really convincing to me[1].
+>>>
+>>> So:
+>>> As this "driver" here is basically a table linking GPIO bit settings
+>>> (the actual mux value) to names and every pin we care about needs to be
+>>> enumerated in the DT anyway, why not just add something like:
+>>> allwinner,pinmux = <4>;
+>>> to each pin(group) in the DT and get rid of this "driver" file here
+>>> entirely?
+>>
+>> I'm open to that if you can use pinctrl-single which is in the kernel
+>> for this purpose only, and is used with both OMAPs and HiSilicon.
 > 
-> Exactly how that works hasn't been confirmed, and the only thing that
-> this patch actually do is... nothing, since the delay is always 0. If
-> and when we get HS400 to work and we know for a fact how the
-> calibration works, then we'll be able to use it. Until then, we can
-> just clear those bits.
+> I'm not open to that, and I'm getting tired of discussing it over and
+> over again. Andre, if you want to be convinced again, please read the
+> last discussion we had on this topic.
 
-Fair enough, though I am a bit puzzled as what to do here now:
+As I said: It didn't convince me back then. And frankly we didn't really
+discuss it back then, I just refrained from entering a discussion
+against _two_ maintainers at this time, since my capacity on this kind
+of email threads is really very limited - especially for something that
+is a hobby to me.
 
-Dropping this patch here entirely causes the wrong calibration settings
-to degrade the BananaPi eMMC performance by up to 50% (20 MB/s vs.
-40MB/s in hdparm, and 25% longer execution time for a "find / -type f |
-xargs md5sum > /dev/null" run). So this is not an option.
-
-1) Shall I simply revert Icenowy's original patch that introduced the
-calibration function? That should leave the values at their reset value
-of 0.  But do we want to make sure that these values are set to 0 by
-explicitly zeroing the bits?
-Also I guess your HS-400 support will need to write some values in
-there, so we will need some code later again?
-
-2) Changing the calibration function to don't do any calibration really
-and just write 0 into the delay bits seems like an option, but looks a
-bit weird. Also I guess your faster transfer modes support will need to
-write _something_, though I don't know what those values are and where
-they will come from.
-
-So I am leaning towards 1) for now, unless you send your MMC patches and
-we at least merge the patch dealing with the calibration part for the
-next release.
-
-Any recommendations? I would love to see the MMC support go into 4.11.
+It isn't the highest priority on my list, but I am still planning on
+sketching something, so that we can discuss about actual code.
+As it seems like your new patches bring some relief to the immediate
+copy&paste pain (though the actual DT aspect still remains), I will shut
+up - for now ;-)
 
 Cheers,
 Andre.
