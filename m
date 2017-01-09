@@ -1,137 +1,57 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 09 Jan 2017 09:11:28 +0100
-Subject: [PATCH] iommu: Drop the of_iommu_{set/get}_ops() interface
-In-Reply-To: <20170103173456.18154-1-lorenzo.pieralisi@arm.com>
-References: <CGME20170103173514epcas4p42d343054cc7117c7299ca7bfad0015af@epcas4p4.samsung.com>
- <20170103173456.18154-1-lorenzo.pieralisi@arm.com>
-Message-ID: <e9d847ad-a986-965f-0432-374e1c55bab3@samsung.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Mon, 9 Jan 2017 14:00:07 +0530
+Subject: [RFC3 nowrap: PATCH v7 00/18] ILP32 for ARM64
+In-Reply-To: <20170106144704.GD12863@e104818-lin.cambridge.arm.com>
+References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+ <20161218070823.GA1153@yury-N73SV>
+ <20170106144704.GD12863@e104818-lin.cambridge.arm.com>
+Message-ID: <20170109083007.GA6850@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Fri, Jan 06, 2017 at 02:47:04PM +0000, Catalin Marinas wrote:
+> On Sun, Dec 18, 2016 at 12:38:23PM +0530, Yury Norov wrote:
+> > On Fri, Oct 21, 2016 at 11:32:59PM +0300, Yury Norov wrote:
+> > > This series enables aarch64 with ilp32 mode, and as supporting work,
+> > > introduces ARCH_32BIT_OFF_T configuration option that is enabled for
+> > > existing 32-bit architectures but disabled for new arches (so 64-bit
+> > > off_t is is used by new userspace).
+> > > 
+> > > This version is based on kernel v4.9-rc1.  It works with glibc-2.24,
+> > > and tested with LTP.
+> >  
+> > Hi Arnd, Catalin
+> > 
+> > For last few days I'm trying to rebase this series on current master,
+> > and I see significant conflicts and regressions. In fact, every time
+> > I rebase on next rc1, I feel like I play a roulette.
+> > 
+> > This is not a significant problem now because it's almost for sure
+> > that this series will not get into 4.10, for reasons not related to
+> > kernel code. And I have time to deal with regressions. But in general,
+> > I'd like to try my patches on top of other candidates for next merge
+> > window. I cannot read all emails in LKML, but I can easily detect
+> > problems and join to the discussion at early stage if I see any problem.
+> > 
+> > This is probably a noob question, and there are well-known branches,
+> > like Andrew Morton's one. But at this stage it's very important to
+> > have this series prepared for merge, and I'd prefer to ask about it.
+> 
+> I'm not entirely sure what the question is. For development, you could
+> base your series on a final release, e.g. 4.9. For reviews and
+> especially if you are targeting a certain merging window, it's useful to
+> rebase your patches on a fairly recent -rc, e.g. 4.10-rc3. I would
+> entirely skip any non-tagged kernel states (like middle of the merging
+> window) or out of tree branches. There may be a case to rebase on some
+> other developer's branch but only if there is a dependency that can't be
+> avoided and usually with prior agreement from both the respective
+> developer (as not to rebase the branch) and the involved maintainers.
 
-On 2017-01-03 18:34, Lorenzo Pieralisi wrote:
-> With the introduction of the new iommu_{register/get}_instance()
-> interface in commit e4f10ffe4c9b ("iommu: Make of_iommu_set/get_ops() DT
-> agnostic") (based on struct fwnode_handle as look-up token, so firmware
-> agnostic) to register IOMMU instances with the core IOMMU layer there is
-> no reason to keep the old OF based interface around any longer.
->
-> Convert all the IOMMU drivers (and OF IOMMU core code) that rely on the
-> of_iommu_{set/get}_ops() to the new kernel interface to register/retrieve
-> IOMMU instances and remove the of_iommu_{set/get}_ops() remaining glue
-> code in order to complete the interface rework.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
-> Exynos, msm and mtk code compile tested only owing to lack of
-> test platforms, I would appreciate some help in testing this
-> patch on those platforms before merging it even if it is just
-> a simple interface conversion.
+Hi Catalin, 4.10-rcX is good enough but I also need to be sure that
+when merge window will be opened I will not find my series broken due
+to conflicts, because merge window is only 2 weeks, and there's no
+much time to investigate and fix all bugs properly.
 
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Anyway, linux-next is what I need, as Chris mentioned.
 
->
-> Thanks,
-> Lorenzo
->
->   drivers/iommu/exynos-iommu.c |  2 +-
->   drivers/iommu/msm_iommu.c    |  2 +-
->   drivers/iommu/mtk_iommu.c    |  2 +-
->   drivers/iommu/of_iommu.c     |  4 ++--
->   include/linux/of_iommu.h     | 11 -----------
->   5 files changed, 5 insertions(+), 16 deletions(-)
->
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index 57ba0d3..b79e4c4 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -628,7 +628,7 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
->   
->   	pm_runtime_enable(dev);
->   
-> -	of_iommu_set_ops(dev->of_node, &exynos_iommu_ops);
-> +	iommu_register_instance(dev->fwnode, &exynos_iommu_ops);
->   
->   	return 0;
->   }
-> diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
-> index b09692b..9cd3cee 100644
-> --- a/drivers/iommu/msm_iommu.c
-> +++ b/drivers/iommu/msm_iommu.c
-> @@ -737,7 +737,7 @@ static int msm_iommu_probe(struct platform_device *pdev)
->   	}
->   
->   	list_add(&iommu->dev_node, &qcom_iommu_devices);
-> -	of_iommu_set_ops(pdev->dev.of_node, &msm_iommu_ops);
-> +	iommu_register_instance(pdev->dev.fwnode, &msm_iommu_ops);
->   
->   	pr_info("device mapped at %p, irq %d with %d ctx banks\n",
->   		iommu->base, iommu->irq, iommu->ncb);
-> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-> index 1479c76..0596ab2 100644
-> --- a/drivers/iommu/mtk_iommu.c
-> +++ b/drivers/iommu/mtk_iommu.c
-> @@ -655,7 +655,7 @@ static int mtk_iommu_init_fn(struct device_node *np)
->   		return ret;
->   	}
->   
-> -	of_iommu_set_ops(np, &mtk_iommu_ops);
-> +	iommu_register_instance(&np->fwnode, &mtk_iommu_ops);
->   	return 0;
->   }
->   
-> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> index 0f57ddc..d7f480a 100644
-> --- a/drivers/iommu/of_iommu.c
-> +++ b/drivers/iommu/of_iommu.c
-> @@ -127,7 +127,7 @@ static const struct iommu_ops
->   			   "iommu-map-mask", &iommu_spec.np, iommu_spec.args))
->   		return NULL;
->   
-> -	ops = of_iommu_get_ops(iommu_spec.np);
-> +	ops = iommu_get_instance(&iommu_spec.np->fwnode);
->   	if (!ops || !ops->of_xlate ||
->   	    iommu_fwspec_init(&pdev->dev, &iommu_spec.np->fwnode, ops) ||
->   	    ops->of_xlate(&pdev->dev, &iommu_spec))
-> @@ -157,7 +157,7 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
->   					   "#iommu-cells", idx,
->   					   &iommu_spec)) {
->   		np = iommu_spec.np;
-> -		ops = of_iommu_get_ops(np);
-> +		ops = iommu_get_instance(&np->fwnode);
->   
->   		if (!ops || !ops->of_xlate ||
->   		    iommu_fwspec_init(dev, &np->fwnode, ops) ||
-> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-> index 6a7fc50..13394ac 100644
-> --- a/include/linux/of_iommu.h
-> +++ b/include/linux/of_iommu.h
-> @@ -31,17 +31,6 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
->   
->   #endif	/* CONFIG_OF_IOMMU */
->   
-> -static inline void of_iommu_set_ops(struct device_node *np,
-> -				    const struct iommu_ops *ops)
-> -{
-> -	iommu_register_instance(&np->fwnode, ops);
-> -}
-> -
-> -static inline const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
-> -{
-> -	return iommu_get_instance(&np->fwnode);
-> -}
-> -
->   extern struct of_device_id __iommu_of_table;
->   
->   typedef int (*of_iommu_init_fn)(struct device_node *);
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Yury
