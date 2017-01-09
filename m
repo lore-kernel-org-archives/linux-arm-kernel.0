@@ -1,328 +1,298 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:38 -0500
-Subject: [RFC 42/55] KVM: arm64: Implement nested Stage-2 page table walk logic
+Date: Mon,  9 Jan 2017 01:24:37 -0500
+Subject: [RFC 41/55] KVM: arm/arm64: Unmap/flush shadow stage 2 page tables
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-43-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-42-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Based on the pseudo-code in the ARM ARM, implement a stage 2 software
-page table walker.
+Unmap/flush shadow stage 2 page tables for the nested VMs as well as the
+stage 2 page table for the guest hypervisor.
+
+Note: A bunch of the code in mmu.c relating to MMU notifiers is
+currently dealt with in an extremely abrupt way, for example by clearing
+out an entire shadow stage-2 table.  Probably we can do smarter with
+some sort of rmap structure.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm/include/asm/kvm_mmu.h   |  11 ++
- arch/arm64/include/asm/kvm_arm.h |   1 +
- arch/arm64/include/asm/kvm_mmu.h |  13 +++
- arch/arm64/kvm/mmu-nested.c      | 223 +++++++++++++++++++++++++++++++++++++++
- 4 files changed, 248 insertions(+)
+ arch/arm/include/asm/kvm_mmu.h   |  7 ++++
+ arch/arm/kvm/arm.c               |  6 ++-
+ arch/arm/kvm/mmu.c               | 11 +++++
+ arch/arm64/include/asm/kvm_mmu.h | 13 ++++++
+ arch/arm64/kvm/mmu-nested.c      | 90 ++++++++++++++++++++++++++++++++++++----
+ 5 files changed, 117 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index ae3aa39..ab41a10 100644
+index 1b3309c..ae3aa39 100644
 --- a/arch/arm/include/asm/kvm_mmu.h
 +++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -230,6 +230,17 @@ static inline unsigned int kvm_get_vmid_bits(void)
+@@ -230,6 +230,13 @@ static inline unsigned int kvm_get_vmid_bits(void)
  	return 8;
  }
  
-+struct kvm_s2_trans {
-+	phys_addr_t output;
-+	phys_addr_t block_size;
-+};
++static inline void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu) { }
++static inline int kvm_nested_s2_init(struct kvm_vcpu *vcpu) { return 0; }
++static inline void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu) { }
++static inline void kvm_nested_s2_all_vcpus_wp(struct kvm *kvm) { }
++static inline void kvm_nested_s2_all_vcpus_unmap(struct kvm *kvm) { }
++static inline void kvm_nested_s2_all_vcpus_flush(struct kvm *kvm) { }
 +
-+static inline int kvm_walk_nested_s2(struct kvm_vcpu *vcpu, phys_addr_t gipa,
-+				     struct kvm_s2_trans *result)
-+{
-+	return 0;
-+}
+ static inline u64 kvm_get_vttbr(struct kvm_s2_vmid *vmid,
+ 				struct kvm_s2_mmu *mmu)
+ {
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 6fa5754..dc2795f 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -191,6 +191,7 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
+ 
+ 	for (i = 0; i < KVM_MAX_VCPUS; ++i) {
+ 		if (kvm->vcpus[i]) {
++			kvm_nested_s2_teardown(kvm->vcpus[i]);
+ 			kvm_arch_vcpu_free(kvm->vcpus[i]);
+ 			kvm->vcpus[i] = NULL;
+ 		}
+@@ -333,6 +334,7 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+ 
+ 	vcpu->arch.hw_mmu = mmu;
+ 	vcpu->arch.hw_vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
++	kvm_nested_s2_init(vcpu);
+ 
+ 	return 0;
+ }
+@@ -871,8 +873,10 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
+ 	 * Ensure a rebooted VM will fault in RAM pages and detect if the
+ 	 * guest MMU is turned off and flush the caches as needed.
+ 	 */
+-	if (vcpu->arch.has_run_once)
++	if (vcpu->arch.has_run_once) {
+ 		stage2_unmap_vm(vcpu->kvm);
++		kvm_nested_s2_unmap(vcpu);
++	}
+ 
+ 	vcpu_reset_hcr(vcpu);
+ 
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 98b42e8..1677a87 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -416,6 +416,8 @@ static void stage2_flush_vm(struct kvm *kvm)
+ 	kvm_for_each_memslot(memslot, slots)
+ 		stage2_flush_memslot(&kvm->arch.mmu, memslot);
+ 
++	kvm_nested_s2_all_vcpus_flush(kvm);
 +
- static inline void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu) { }
- static inline int kvm_nested_s2_init(struct kvm_vcpu *vcpu) { return 0; }
- static inline void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu) { }
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index feded61..f9addf3 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -103,6 +103,7 @@
- #define VTCR_EL2_RES1		(1 << 31)
- #define VTCR_EL2_HD		(1 << 22)
- #define VTCR_EL2_HA		(1 << 21)
-+#define VTCR_EL2_PS_SHIFT	TCR_EL2_PS_SHIFT
- #define VTCR_EL2_PS_MASK	TCR_EL2_PS_MASK
- #define VTCR_EL2_TG0_MASK	TCR_TG0_MASK
- #define VTCR_EL2_TG0_4K		TCR_TG0_4K
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index e4d5d54..bf94f0c 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -324,10 +324,17 @@ static inline unsigned int kvm_get_vmid_bits(void)
- 	return (cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
+ 	spin_unlock(&kvm->mmu_lock);
+ 	srcu_read_unlock(&kvm->srcu, idx);
+ }
+@@ -1240,6 +1242,7 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot)
+ 
+ 	spin_lock(&kvm->mmu_lock);
+ 	kvm_stage2_wp_range(kvm, &kvm->arch.mmu, start, end);
++	kvm_nested_s2_all_vcpus_wp(kvm);
+ 	spin_unlock(&kvm->mmu_lock);
+ 	kvm_flush_remote_tlbs(kvm);
+ }
+@@ -1278,6 +1281,7 @@ void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
+ 		gfn_t gfn_offset, unsigned long mask)
+ {
+ 	kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, mask);
++	kvm_nested_s2_all_vcpus_wp(kvm);
  }
  
-+struct kvm_s2_trans {
-+	phys_addr_t output;
-+	phys_addr_t block_size;
-+};
+ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+@@ -1604,6 +1608,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
+ static int kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
+ {
+ 	kvm_unmap_stage2_range(&kvm->arch.mmu, gpa, PAGE_SIZE);
++	kvm_nested_s2_all_vcpus_unmap(kvm);
+ 	return 0;
+ }
+ 
+@@ -1642,6 +1647,7 @@ static int kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
+ 	 * through this calling path.
+ 	 */
+ 	stage2_set_pte(&kvm->arch.mmu, NULL, gpa, pte, 0);
++	kvm_nested_s2_all_vcpus_unmap(kvm);
+ 	return 0;
+ }
+ 
+@@ -1675,6 +1681,8 @@ static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
+ 	if (pte_none(*pte))
+ 		return 0;
+ 
++	/* TODO: Handle nested_mmu structures here as well */
 +
- #ifdef CONFIG_KVM_ARM_NESTED_HYP
+ 	return stage2_ptep_test_and_clear_young(pte);
+ }
+ 
+@@ -1694,6 +1702,8 @@ static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
+ 	if (!pte_none(*pte))		/* Just a page... */
+ 		return pte_young(*pte);
+ 
++	/* TODO: Handle nested_mmu structures here as well */
++
+ 	return 0;
+ }
+ 
+@@ -1959,6 +1969,7 @@ void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
+ 
+ 	spin_lock(&kvm->mmu_lock);
+ 	kvm_unmap_stage2_range(&kvm->arch.mmu, gpa, size);
++	kvm_nested_s2_all_vcpus_unmap(kvm);
+ 	spin_unlock(&kvm->mmu_lock);
+ }
+ 
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index fdc9327..e4d5d54 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -328,6 +328,12 @@ static inline unsigned int kvm_get_vmid_bits(void)
  struct kvm_nested_s2_mmu *get_nested_mmu(struct kvm_vcpu *vcpu, u64 vttbr);
  struct kvm_s2_mmu *vcpu_get_active_s2_mmu(struct kvm_vcpu *vcpu);
  bool handle_vttbr_update(struct kvm_vcpu *vcpu, u64 vttbr);
-+int kvm_walk_nested_s2(struct kvm_vcpu *vcpu, phys_addr_t gipa,
-+		       struct kvm_s2_trans *result);
- void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu);
- int kvm_nested_s2_init(struct kvm_vcpu *vcpu);
- void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu);
-@@ -350,6 +357,12 @@ static inline bool handle_vttbr_update(struct kvm_vcpu *vcpu, u64 vttbr)
++void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu);
++int kvm_nested_s2_init(struct kvm_vcpu *vcpu);
++void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu);
++void kvm_nested_s2_all_vcpus_wp(struct kvm *kvm);
++void kvm_nested_s2_all_vcpus_unmap(struct kvm *kvm);
++void kvm_nested_s2_all_vcpus_flush(struct kvm *kvm);
+ #else
+ static inline struct kvm_nested_s2_mmu *get_nested_mmu(struct kvm_vcpu *vcpu,
+ 						       u64 vttbr)
+@@ -343,6 +349,13 @@ static inline bool handle_vttbr_update(struct kvm_vcpu *vcpu, u64 vttbr)
+ {
  	return false;
  }
- 
-+static inline int kvm_walk_nested_s2(struct kvm_vcpu *vcpu, phys_addr_t gipa,
-+				     struct kvm_s2_trans *result)
-+{
-+	return 0;
-+}
 +
- static inline void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu) { }
- static inline int kvm_nested_s2_init(struct kvm_vcpu *vcpu) { return 0; }
- static inline void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu) { }
++static inline void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu) { }
++static inline int kvm_nested_s2_init(struct kvm_vcpu *vcpu) { return 0; }
++static inline void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu) { }
++static inline void kvm_nested_s2_all_vcpus_wp(struct kvm *kvm) { }
++static inline void kvm_nested_s2_all_vcpus_unmap(struct kvm *kvm) { }
++static inline void kvm_nested_s2_all_vcpus_flush(struct kvm *kvm) { }
+ #endif
+ 
+ static inline u64 kvm_get_vttbr(struct kvm_s2_vmid *vmid,
 diff --git a/arch/arm64/kvm/mmu-nested.c b/arch/arm64/kvm/mmu-nested.c
-index b22b78c..a2fab41 100644
+index 0811d94..b22b78c 100644
 --- a/arch/arm64/kvm/mmu-nested.c
 +++ b/arch/arm64/kvm/mmu-nested.c
-@@ -23,6 +23,229 @@
+@@ -1,6 +1,7 @@
+ /*
+  * Copyright (C) 2016 - Columbia University
+  * Author: Jintack Lim <jintack@cs.columbia.edu>
++ * Author: Christoffer Dall <cdall@cs.columbia.edu>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -22,6 +23,86 @@
  #include <asm/kvm_mmu.h>
  #include <asm/kvm_nested.h>
  
-+struct s2_walk_info {
-+	unsigned int pgshift;
-+	unsigned int pgsize;
-+	unsigned int ps;
-+	unsigned int sl;
-+	unsigned int t0sz;
-+};
 +
-+static unsigned int ps_to_output_size(unsigned int ps)
++/* expects kvm->mmu_lock to be held */
++void kvm_nested_s2_all_vcpus_wp(struct kvm *kvm)
 +{
-+	switch (ps) {
-+	case 0: return 32;
-+	case 1: return 36;
-+	case 2: return 40;
-+	case 3: return 42;
-+	case 4: return 44;
-+	case 5:
-+	default:
-+		return 48;
++	int i;
++	struct kvm_vcpu *vcpu;
++	struct kvm_nested_s2_mmu *nested_mmu;
++	struct list_head *nested_mmu_list;
++
++	kvm_for_each_vcpu(i, vcpu, kvm) {
++		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
++			cond_resched_lock(&kvm->mmu_lock);
++
++		nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
++		list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
++			kvm_stage2_wp_range(kvm, &nested_mmu->mmu,
++				    0, KVM_PHYS_SIZE);
 +	}
 +}
 +
-+static unsigned int pa_max(void)
++/* expects kvm->mmu_lock to be held */
++void kvm_nested_s2_all_vcpus_unmap(struct kvm *kvm)
 +{
-+	u64 parange = read_sysreg(id_aa64mmfr0_el1) & 7;
++	int i;
++	struct kvm_vcpu *vcpu;
++	struct kvm_nested_s2_mmu *nested_mmu;
++	struct list_head *nested_mmu_list;
 +
-+	return ps_to_output_size(parange);
-+}
++	kvm_for_each_vcpu(i, vcpu, kvm) {
++		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
++			cond_resched_lock(&kvm->mmu_lock);
 +
-+static int vcpu_inject_s2_trans_fault(struct kvm_vcpu *vcpu, gpa_t ipa,
-+				      int level)
-+{
-+	/* TODO: Implement */
-+	return -EFAULT;
-+}
-+
-+static int vcpu_inject_s2_addr_sz_fault(struct kvm_vcpu *vcpu, gpa_t ipa,
-+					int level)
-+{
-+	/* TODO: Implement */
-+	return -EFAULT;
-+}
-+
-+static int vcpu_inject_s2_access_flag_fault(struct kvm_vcpu *vcpu, gpa_t ipa,
-+					    int level)
-+{
-+	/* TODO: Implement */
-+	return -EFAULT;
-+}
-+
-+static int check_base_s2_limits(struct kvm_vcpu *vcpu, struct s2_walk_info *wi,
-+				int level, int input_size, int stride)
-+{
-+	int start_size;
-+
-+	/* Check translation limits */
-+	switch (wi->pgsize) {
-+	case SZ_64K:
-+		if (level == 0 || (level == 1 && pa_max() <= 42))
-+			return -EFAULT;
-+		break;
-+	case SZ_16K:
-+		if (level == 0 || (level == 1 && pa_max() <= 40))
-+			return -EFAULT;
-+		break;
-+	case SZ_4K:
-+		if (level < 0 || (level == 0 && pa_max() <= 42))
-+			return -EFAULT;
-+		break;
++		nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
++		list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
++			kvm_unmap_stage2_range(&nested_mmu->mmu,
++				       0, KVM_PHYS_SIZE);
 +	}
++}
 +
-+	/* Check input size limits */
-+	if (input_size > pa_max() &&
-+	    (!vcpu_mode_is_32bit(vcpu) || input_size > 40))
-+		return -EFAULT;
++void kvm_nested_s2_all_vcpus_flush(struct kvm *kvm)
++{
++	int i;
++	struct kvm_vcpu *vcpu;
++	struct kvm_nested_s2_mmu *nested_mmu;
++	struct list_head *nested_mmu_list;
 +
-+	/* Check number of entries in starting level table */
-+	start_size = input_size - ((3 - level) * stride + wi->pgshift);
-+	if (start_size < 1 || start_size > stride + 4)
-+		return -EFAULT;
++	kvm_for_each_vcpu(i, vcpu, kvm) {
++		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
++			cond_resched_lock(&kvm->mmu_lock);
 +
++		nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
++		list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
++			kvm_stage2_flush_range(&nested_mmu->mmu,
++				       0, KVM_PHYS_SIZE);
++	}
++}
++
++void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu)
++{
++	struct kvm_nested_s2_mmu *nested_mmu;
++	struct list_head *nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
++
++	list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
++		kvm_unmap_stage2_range(&nested_mmu->mmu, 0, KVM_PHYS_SIZE);
++}
++
++int kvm_nested_s2_init(struct kvm_vcpu *vcpu)
++{
 +	return 0;
 +}
 +
-+/* Check if output is within boundaries */
-+static int check_output_size(struct kvm_vcpu *vcpu, struct s2_walk_info *wi,
-+			     phys_addr_t output)
++void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu)
 +{
-+	unsigned int output_size = ps_to_output_size(wi->ps);
++	struct kvm_nested_s2_mmu *nested_mmu;
++	struct list_head *nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
 +
-+	if (output_size > pa_max())
-+		output_size = pa_max();
-+
-+	if (output_size != 48 && (output & GENMASK_ULL(47, output_size)))
-+		return -1;
-+
-+	return 0;
++	list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
++		__kvm_free_stage2_pgd(&nested_mmu->mmu);
 +}
 +
-+/*
-+ * This is essentially a C-version of the pseudo code from the ARM ARM
-+ * AArch64.TranslationTableWalk  function.  I strongly recommend looking at
-+ * that pseudocode in trying to understand this.
-+ *
-+ * Must be called with the kvm->srcy read lock held
-+ */
-+static int walk_nested_s2_pgd(struct kvm_vcpu *vcpu, phys_addr_t ipa,
-+			      struct s2_walk_info *wi, struct kvm_s2_trans *out)
-+{
-+	u64 vttbr = vcpu->arch.ctxt.el2_regs[VTTBR_EL2];
-+	int first_block_level, level, stride, input_size, base_lower_bound;
-+	phys_addr_t base_addr;
-+	unsigned int addr_top, addr_bottom;
-+	u64 desc;  /* page table entry */
-+	int ret;
-+	phys_addr_t paddr;
-+
-+	switch (wi->pgsize) {
-+	case SZ_64K:
-+	case SZ_16K:
-+		level = 3 - wi->sl;
-+		first_block_level = 2;
-+		break;
-+	case SZ_4K:
-+		level = 2 - wi->sl;
-+		first_block_level = 1;
-+		break;
-+	default:
-+		/* GCC is braindead */
-+		WARN(1, "Page size is none of 4K, 16K or 64K");
-+	}
-+
-+	stride = wi->pgshift - 3;
-+	input_size = 64 - wi->t0sz;
-+	if (input_size > 48 || input_size < 25)
-+		return -EFAULT;
-+
-+	ret = check_base_s2_limits(vcpu, wi, level, input_size, stride);
-+	if (WARN_ON(ret))
-+		return ret;
-+
-+	if (check_output_size(vcpu, wi, vttbr))
-+		return vcpu_inject_s2_addr_sz_fault(vcpu, ipa, level);
-+
-+	base_lower_bound = 3 + input_size - ((3 - level) * stride +
-+			   wi->pgshift);
-+	base_addr = vttbr & GENMASK_ULL(47, base_lower_bound);
-+
-+	addr_top = input_size - 1;
-+
-+	while (1) {
-+		phys_addr_t index;
-+
-+		addr_bottom = (3 - level) * stride + wi->pgshift;
-+		index = (ipa & GENMASK_ULL(addr_top, addr_bottom))
-+			>> (addr_bottom - 3);
-+
-+		paddr = base_addr | index;
-+		ret = kvm_read_guest(vcpu->kvm, paddr, &desc, sizeof(desc));
-+		if (ret < 0)
-+			return ret;
-+
-+		/* Check for valid descriptor at this point */
-+		if (!(desc & 1) || ((desc & 3) == 1 && level == 3))
-+			return vcpu_inject_s2_trans_fault(vcpu, ipa, level);
-+
-+		/* We're@the final level or block translation level */
-+		if ((desc & 3) == 1 || level == 3)
-+			break;
-+
-+		if (check_output_size(vcpu, wi, desc))
-+			return vcpu_inject_s2_addr_sz_fault(vcpu, ipa, level);
-+
-+		base_addr = desc & GENMASK_ULL(47, wi->pgshift);
-+
-+		level += 1;
-+		addr_top = addr_bottom - 1;
-+	}
-+
-+	if (level < first_block_level)
-+		return vcpu_inject_s2_trans_fault(vcpu, ipa, level);
-+
-+	/* TODO: Consider checking contiguous bit setting */
-+
-+	if (check_output_size(vcpu, wi, desc))
-+		return vcpu_inject_s2_addr_sz_fault(vcpu, ipa, level);
-+
-+	if (!(desc & BIT(10)))
-+		return vcpu_inject_s2_access_flag_fault(vcpu, ipa, level);
-+
-+	/* Calculate and return the result */
-+	paddr = (desc & GENMASK_ULL(47, addr_bottom)) |
-+		(ipa & GENMASK_ULL(addr_bottom - 1, 0));
-+	out->output = paddr;
-+	out->block_size = 1UL << ((3 - level) * stride + wi->pgshift);
-+	return 0;
-+}
-+
-+int kvm_walk_nested_s2(struct kvm_vcpu *vcpu, phys_addr_t gipa,
-+		       struct kvm_s2_trans *result)
-+{
-+	u64 vtcr = vcpu->arch.ctxt.el2_regs[VTCR_EL2];
-+	struct s2_walk_info wi;
-+
-+	wi.t0sz = vtcr & TCR_EL2_T0SZ_MASK;
-+
-+	switch (vtcr & VTCR_EL2_TG0_MASK) {
-+	case VTCR_EL2_TG0_4K:
-+		wi.pgshift = 12;	 break;
-+	case VTCR_EL2_TG0_16K:
-+		wi.pgshift = 14;	 break;
-+	case VTCR_EL2_TG0_64K:
-+	default:
-+		wi.pgshift = 16;	 break;
-+	}
-+	wi.pgsize = 1UL << wi.pgshift;
-+	wi.ps = (vtcr & VTCR_EL2_PS_MASK) >> VTCR_EL2_PS_SHIFT;
-+	wi.sl = (vtcr & VTCR_EL2_SL0_MASK) >> VTCR_EL2_SL0_SHIFT;
-+
-+	/* TODO: Reversedescriptor if SCTLR_EL2.EE == 1 */
-+
-+	return walk_nested_s2_pgd(vcpu, gipa, &wi, result);
-+}
+ struct kvm_nested_s2_mmu *get_nested_mmu(struct kvm_vcpu *vcpu, u64 vttbr)
+ {
+ 	struct kvm_nested_s2_mmu *mmu;
+@@ -89,15 +170,6 @@ static struct kvm_nested_s2_mmu *create_nested_mmu(struct kvm_vcpu *vcpu,
+ 	return nested_mmu;
+ }
  
- /* expects kvm->mmu_lock to be held */
- void kvm_nested_s2_all_vcpus_wp(struct kvm *kvm)
+-static void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu)
+-{
+-	struct kvm_nested_s2_mmu *nested_mmu;
+-	struct list_head *nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
+-
+-	list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
+-		kvm_unmap_stage2_range(&nested_mmu->mmu, 0, KVM_PHYS_SIZE);
+-}
+-
+ bool handle_vttbr_update(struct kvm_vcpu *vcpu, u64 vttbr)
+ {
+ 	struct kvm_nested_s2_mmu *nested_mmu;
 -- 
 1.9.1
