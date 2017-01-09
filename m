@@ -1,57 +1,93 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 9 Jan 2017 14:00:07 +0530
-Subject: [RFC3 nowrap: PATCH v7 00/18] ILP32 for ARM64
-In-Reply-To: <20170106144704.GD12863@e104818-lin.cambridge.arm.com>
-References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
- <20161218070823.GA1153@yury-N73SV>
- <20170106144704.GD12863@e104818-lin.cambridge.arm.com>
-Message-ID: <20170109083007.GA6850@yury-N73SV>
+From: t.remmet@phytec.de (Teresa Remmet)
+Date: Mon, 9 Jan 2017 09:37:30 +0100
+Subject: [PATCH] ARM: dts: am335x-phycore-som: Remove partition tables
+Message-ID: <1483951050-46588-1-git-send-email-t.remmet@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 02:47:04PM +0000, Catalin Marinas wrote:
-> On Sun, Dec 18, 2016 at 12:38:23PM +0530, Yury Norov wrote:
-> > On Fri, Oct 21, 2016 at 11:32:59PM +0300, Yury Norov wrote:
-> > > This series enables aarch64 with ilp32 mode, and as supporting work,
-> > > introduces ARCH_32BIT_OFF_T configuration option that is enabled for
-> > > existing 32-bit architectures but disabled for new arches (so 64-bit
-> > > off_t is is used by new userspace).
-> > > 
-> > > This version is based on kernel v4.9-rc1.  It works with glibc-2.24,
-> > > and tested with LTP.
-> >  
-> > Hi Arnd, Catalin
-> > 
-> > For last few days I'm trying to rebase this series on current master,
-> > and I see significant conflicts and regressions. In fact, every time
-> > I rebase on next rc1, I feel like I play a roulette.
-> > 
-> > This is not a significant problem now because it's almost for sure
-> > that this series will not get into 4.10, for reasons not related to
-> > kernel code. And I have time to deal with regressions. But in general,
-> > I'd like to try my patches on top of other candidates for next merge
-> > window. I cannot read all emails in LKML, but I can easily detect
-> > problems and join to the discussion at early stage if I see any problem.
-> > 
-> > This is probably a noob question, and there are well-known branches,
-> > like Andrew Morton's one. But at this stage it's very important to
-> > have this series prepared for merge, and I'd prefer to ask about it.
-> 
-> I'm not entirely sure what the question is. For development, you could
-> base your series on a final release, e.g. 4.9. For reviews and
-> especially if you are targeting a certain merging window, it's useful to
-> rebase your patches on a fairly recent -rc, e.g. 4.10-rc3. I would
-> entirely skip any non-tagged kernel states (like middle of the merging
-> window) or out of tree branches. There may be a case to rebase on some
-> other developer's branch but only if there is a dependency that can't be
-> avoided and usually with prior agreement from both the respective
-> developer (as not to rebase the branch) and the involved maintainers.
+As the bootloader passes the NAND and the SPI flash partition tables
+there is no need to keep them in the kernel device tree.
+Removed them.
 
-Hi Catalin, 4.10-rcX is good enough but I also need to be sure that
-when merge window will be opened I will not find my series broken due
-to conflicts, because merge window is only 2 weeks, and there's no
-much time to investigate and fix all bugs properly.
+Signed-off-by: Teresa Remmet <t.remmet@phytec.de>
+---
+ arch/arm/boot/dts/am335x-phycore-som.dtsi | 58 -------------------------------
+ 1 file changed, 58 deletions(-)
 
-Anyway, linux-next is what I need, as Chris mentioned.
-
-Yury
+diff --git a/arch/arm/boot/dts/am335x-phycore-som.dtsi b/arch/arm/boot/dts/am335x-phycore-som.dtsi
+index 25f5449..14533ff 100644
+--- a/arch/arm/boot/dts/am335x-phycore-som.dtsi
++++ b/arch/arm/boot/dts/am335x-phycore-som.dtsi
+@@ -211,43 +211,6 @@
+ 
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-
+-		partition at 0 {
+-			label = "xload";
+-			reg = <0x0 0x20000>;
+-		};
+-		partition at 1 {
+-			label = "xload_backup1";
+-			reg = <0x20000 0x20000>;
+-		};
+-		partition at 2 {
+-			label = "xload_backup2";
+-			reg = <0x40000 0x20000>;
+-		};
+-		partition at 3 {
+-			label = "xload_backup3";
+-			reg = <0x60000 0x20000>;
+-		};
+-		partition at 4 {
+-			label = "barebox";
+-			reg = <0x80000 0x80000>;
+-		};
+-		partition at 5 {
+-			label = "bareboxenv";
+-			reg = <0x100000 0x40000>;
+-		};
+-		partition at 6 {
+-			label = "oftree";
+-			reg = <0x140000 0x40000>;
+-		};
+-		partition at 7 {
+-			label = "kernel";
+-			reg = <0x180000 0x800000>;
+-		};
+-		partition at 8 {
+-			label = "root";
+-			reg = <0x980000 0x0>;
+-		};
+ 	};
+ };
+ 
+@@ -358,26 +321,5 @@
+ 		status = "disabled";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-
+-		partition at 0 {
+-			label = "xload";
+-			reg = <0x0 0x20000>;
+-		};
+-		partition at 1 {
+-			label = "barebox";
+-			reg = <0x20000 0x80000>;
+-		};
+-		partition at 2 {
+-			label = "bareboxenv";
+-			reg = <0xa0000 0x20000>;
+-		};
+-		partition at 3 {
+-			label = "oftree";
+-			reg = <0xc0000 0x20000>;
+-		};
+-		partition at 4 {
+-			label = "kernel";
+-			reg = <0xe0000 0x0>;
+-		};
+ 	};
+ };
+-- 
+1.9.1
