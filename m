@@ -1,91 +1,112 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:15 -0500
-Subject: [RFC 19/55] KVM: arm64: Trap CPACR_EL1 access in virtual EL2
+Date: Mon,  9 Jan 2017 01:24:20 -0500
+Subject: [RFC 24/55] KVM: arm64: Forward FP exceptions to the guest hypervisor
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-20-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-25-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the same reason we trap virtual memory register accesses in virtual
-EL2, we trap CPACR_EL1 access too. Basically, we don't want the guest
-hypervisor to access the real CPACR_EL1, which is used to emulate
-virtual EL2. Instead, we want it to access virtual CPACR_EL1 which is
-used to run software in EL0/EL1 from the guest hypervisor's perspective.
+Forward exceptions due to floating-point register accesses to the guest
+hypervisor if it has set CPTR_EL2.TFP bit.
 
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm64/kvm/hyp/switch.c | 10 +++++++---
- arch/arm64/kvm/sys_regs.c   | 10 +++++++++-
- 2 files changed, 16 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/kvm_nested.h |  1 +
+ arch/arm64/kernel/asm-offsets.c     |  1 +
+ arch/arm64/kvm/handle_exit.c        |  3 +++
+ arch/arm64/kvm/handle_exit_nested.c |  6 ++++++
+ arch/arm64/kvm/hyp/entry.S          | 14 ++++++++++++++
+ arch/arm64/kvm/hyp/hyp-entry.S      |  2 +-
+ 6 files changed, 26 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index c05c48f..b7c8c30 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -41,7 +41,8 @@ bool __hyp_text __fpsimd_enabled(void)
- 	return __fpsimd_is_enabled()();
- }
+diff --git a/arch/arm64/include/asm/kvm_nested.h b/arch/arm64/include/asm/kvm_nested.h
+index 8d36935..54c5ce5 100644
+--- a/arch/arm64/include/asm/kvm_nested.h
++++ b/arch/arm64/include/asm/kvm_nested.h
+@@ -3,4 +3,5 @@
  
--static void __hyp_text __activate_traps_vhe(void)
-+static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
+ int handle_hvc_nested(struct kvm_vcpu *vcpu);
+ int handle_wfx_nested(struct kvm_vcpu *vcpu, bool is_wfe);
++int kvm_handle_fp_asimd(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ #endif
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 4a2f0f0..b635f1a 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -131,6 +131,7 @@ int main(void)
+   DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
+   DEFINE(VCPU_FPEXC32_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.sys_regs[FPEXC32_EL2]));
+   DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
++  DEFINE(VIRTUAL_CPTR_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.el2_regs[CPTR_EL2]));
+ #endif
+ #ifdef CONFIG_CPU_PM
+   DEFINE(CPU_SUSPEND_SZ,	sizeof(struct cpu_suspend_ctx));
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 046fdf8..308f5c5 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -195,6 +195,9 @@ static int kvm_handle_eret(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	[ESR_ELx_EC_BREAKPT_LOW]= kvm_handle_guest_debug,
+ 	[ESR_ELx_EC_BKPT32]	= kvm_handle_guest_debug,
+ 	[ESR_ELx_EC_BRK64]	= kvm_handle_guest_debug,
++#ifdef CONFIG_KVM_ARM_NESTED_HYP
++	[ESR_ELx_EC_FP_ASIMD]	= kvm_handle_fp_asimd,
++#endif
+ };
+ 
+ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/kvm/handle_exit_nested.c b/arch/arm64/kvm/handle_exit_nested.c
+index 871ecfc..7544c6d 100644
+--- a/arch/arm64/kvm/handle_exit_nested.c
++++ b/arch/arm64/kvm/handle_exit_nested.c
+@@ -43,3 +43,9 @@ int handle_wfx_nested(struct kvm_vcpu *vcpu, bool is_wfe)
+ 
+ 	return -EINVAL;
+ }
 +
- {
- 	u64 val;
- 
-@@ -53,12 +54,15 @@ static void __hyp_text __activate_traps_vhe(void)
- 	write_sysreg(__kvm_hyp_vector, vbar_el1);
- }
- 
--static void __hyp_text __activate_traps_nvhe(void)
-+static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
-+
- {
- 	u64 val;
- 
- 	val = CPTR_EL2_DEFAULT;
- 	val |= CPTR_EL2_TTA | CPTR_EL2_TFP;
-+	if (vcpu_mode_el2(vcpu))
-+		val |= CPTR_EL2_TCPAC;
- 	write_sysreg(val, cptr_el2);
- }
- 
-@@ -90,7 +94,7 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
- 	/* Make sure we trap PMU access from EL0 to EL2 */
- 	write_sysreg(ARMV8_PMU_USERENR_MASK, pmuserenr_el0);
- 	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
--	__activate_traps_arch()();
-+	__activate_traps_arch()(vcpu);
- }
- 
- static void __hyp_text __deactivate_traps_vhe(void)
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 59f9cc6..321ecbc 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -947,6 +947,14 @@ static bool access_vbar(struct kvm_vcpu *vcpu,
- 	return true;
- }
- 
-+static bool access_cpacr(struct kvm_vcpu *vcpu,
-+		struct sys_reg_params *p,
-+		const struct sys_reg_desc *r)
++/* This is only called when virtual CPTR_EL2.TFP bit is set. */
++int kvm_handle_fp_asimd(struct kvm_vcpu *vcpu, struct kvm_run *run)
 +{
-+	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
-+	return true;
++	return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
 +}
+diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+index 12ee62d..a76f102 100644
+--- a/arch/arm64/kvm/hyp/entry.S
++++ b/arch/arm64/kvm/hyp/entry.S
+@@ -158,6 +158,20 @@ abort_guest_exit_end:
+ 1:	ret
+ ENDPROC(__guest_exit)
+ 
++ENTRY(__fpsimd_guest_trap)
++#ifdef CONFIG_KVM_ARM_NESTED_HYP
++// If virtual CPTR_EL2.TFP is set, then foward it to the nested hyp.
++	mrs	x1, tpidr_el2
++	ldr	x0, [x1, #VIRTUAL_CPTR_EL2]
++	and 	x0, x0, #CPTR_EL2_TFP
++	cbnz	x0, 1f
++#endif
++	b	__fpsimd_guest_restore
++1:
++	mov	x0, #ARM_EXCEPTION_TRAP
++	b	__guest_exit
++ENDPROC(__fpsimd_guest_trap)
 +
- static bool trap_el2_reg(struct kvm_vcpu *vcpu,
- 			 struct sys_reg_params *p,
- 			 const struct sys_reg_desc *r)
-@@ -1051,7 +1059,7 @@ static bool trap_el2_reg(struct kvm_vcpu *vcpu,
- 	  access_vm_reg, reset_val, SCTLR_EL1, 0x00C50078 },
- 	/* CPACR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b010),
--	  NULL, reset_val, CPACR_EL1, 0 },
-+	  access_cpacr, reset_val, CPACR_EL1, 0 },
- 	/* TTBR0_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b000),
- 	  access_vm_reg, reset_unknown, TTBR0_EL1 },
+ ENTRY(__fpsimd_guest_restore)
+ 	stp	x2, x3, [sp, #-16]!
+ 	stp	x4, lr, [sp, #-16]!
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index 4e92399..d83494b 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -108,7 +108,7 @@ el1_trap:
+ 
+ 	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
+ 	cmp	x0, #ESR_ELx_EC_FP_ASIMD
+-	b.eq	__fpsimd_guest_restore
++	b.eq	__fpsimd_guest_trap
+ 
+ 	mrs	x1, tpidr_el2
+ 	mov	x0, #ARM_EXCEPTION_TRAP
 -- 
 1.9.1
