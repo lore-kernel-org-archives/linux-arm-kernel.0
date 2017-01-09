@@ -1,63 +1,26 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 9 Jan 2017 12:00:51 -0600
-Subject: [PATCH v7 2/8] MFD: add STM32 Timers driver
-In-Reply-To: <1483608344-9012-3-git-send-email-benjamin.gaignard@st.com>
+Date: Mon, 9 Jan 2017 12:01:55 -0600
+Subject: [PATCH v7 3/8] PWM: add pwm-stm32 DT bindings
+In-Reply-To: <1483608344-9012-4-git-send-email-benjamin.gaignard@st.com>
 References: <1483608344-9012-1-git-send-email-benjamin.gaignard@st.com>
- <1483608344-9012-3-git-send-email-benjamin.gaignard@st.com>
-Message-ID: <20170109180051.uwd4su3maj5gkf5l@rob-hp-laptop>
+ <1483608344-9012-4-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <20170109180155.3invte4tko4lipcs@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 10:25:38AM +0100, Benjamin Gaignard wrote:
-> This hardware block could at used at same time for PWM generation
-> and IIO timers.
-> PWM and IIO timer configuration are mixed in the same registers
-> so we need a multi fonction driver to be able to share those registers.
-> 
-> version 7:
-> - rebase on v4.10-rc2
+On Thu, Jan 05, 2017 at 10:25:39AM +0100, Benjamin Gaignard wrote:
+> Define bindings for pwm-stm32
 > 
 > version 6:
-> - rename files to stm32-timers
-> - rename functions to stm32_timers_xxx
-> 
-> version 5:
-> - fix Lee comments about detect function
-> - add missing dependency on REGMAP_MMIO
-> 
-> version 4:
-> - add a function to detect Auto Reload Register (ARR) size
-> - rename the structure shared with other drivers
+> - change st,breakinput parameter format to make it usuable on stm32f7 too.
 > 
 > version 2:
-> - rename driver "stm32-gptimer" to be align with SoC documentation
-> - only keep one compatible
-> - use of_platform_populate() instead of devm_mfd_add_devices()
+> - use parameters instead of compatible of handle the hardware configuration
 > 
 > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 > ---
->  .../devicetree/bindings/mfd/stm32-timers.txt       |  2 +-
->  drivers/mfd/Kconfig                                | 11 +++
->  drivers/mfd/Makefile                               |  2 +
->  drivers/mfd/stm32-timers.c                         | 80 ++++++++++++++++++++++
->  include/linux/mfd/stm32-timers.h                   | 71 +++++++++++++++++++
->  5 files changed, 165 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/mfd/stm32-timers.c
->  create mode 100644 include/linux/mfd/stm32-timers.h
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/stm32-timers.txt b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
-> index a73301d..897e7c2 100644
-> --- a/Documentation/devicetree/bindings/mfd/stm32-timers.txt
-> +++ b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
-> @@ -12,7 +12,7 @@ Required parameters:
->  
->  - reg:			Physical base address and length of the controller's
->  			registers.
-> -- clock-names: 		Set to "int".
-> +- clock-names:		Set to "int".
+>  .../devicetree/bindings/pwm/pwm-stm32.txt          | 33 ++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
 
-This hunk should be dropped or moved to previous patch.
-
->  - clocks: 		Phandle to the clock used by the timer module.
->  			For Clk properties, please refer to ../clock/clock-bindings.txt
->  
+Acked-by: Rob Herring <robh@kernel.org>
