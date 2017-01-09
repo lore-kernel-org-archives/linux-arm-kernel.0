@@ -1,215 +1,114 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:23:56 -0500
-Subject: [RFC 00/55] Nested Virtualization on KVM/ARM
-Message-ID: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+Date: Mon,  9 Jan 2017 01:24:05 -0500
+Subject: [RFC 09/55] KVM: arm64: Set shadow EL1 registers for virtual EL2
+ execution
+In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-10-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nested virtualization is the ability to run a virtual machine inside another
-virtual machine. In other words, it???s about running a hypervisor (the guest
-hypervisor) on top of another hypervisor (the host hypervisor).
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-This series supports nested virtualization on arm64. ARM recently announced an
-extension (ARMv8.3) which has support for nested virtualization[1]. This series
-is based on the ARMv8.3 specification.
+When entering virtual EL2, we need to reflect virtual EL2 register
+states to corresponding shadow EL1 registers. We can simply copy them if
+their formats are identical.  Otherwise, we need to convert EL2 register
+state to EL1 register state.
 
-Supporting nested virtualization means that the hypervisor provides not only
-EL0/EL1 execution environment with VMs as it usually does, but also the
-virtualization extensions including EL2 execution environment with the VMs.
-Once the host hypervisor provides those execution environment with the VMs,
-then the guest hypervisor can run its own VMs (nested VMs) naturally.
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+---
+ arch/arm64/kvm/context.c | 71 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
 
-To support nested virtualization on ARM the hypervisor must emulate a virtual
-execution environment consisting of EL2, EL1, and EL0, as the guest hypervisor
-will run in a virtual EL2 mode.  Normally KVM/ARM only emulated a VM supporting
-EL1/0 running in their respective native CPU modes, but with nested
-virtualization we deprivilege the guest hypervisor and emulate a virtual EL2
-execution mode in EL1 using the hardware features provided by ARMv8.3 to trap
-EL2 operations to EL1. To do that the host hypervisor needs to manage EL2
-register state for the guest hypervisor, and shadow EL1 register state that
-reflects the EL2 register state to run the guest hypervisor in EL1. See patch 6
-through 10 for this.
-
-For memory virtualization, the biggest issue is that we now have more than two
-stages of translation when running nested VMs. We choose to merge two stage-2
-page tables (one from the guest hypervisor and the other from the host
-hypervisor) and create shadow stage-2 page tables, which have mappings from the
-nested VM???s physical addresses to the machine physical addresses. Stage-1
-translation is done by the hardware as is done for the normal VMs.
-
-To provide VGIC support to the guest hypervisor, we emulate the GIC
-virtualization extensions using trap-and-emulate to a virtual GIC Hypervisor
-Control Interface.  Furthermore, we can still use the GIC VE hardware features
-to deliver virtual interrupts to the nested VM, by directly mapping the GIC
-VCPU interface to the nested VM and switching the content of the GIC Hypervisor
-Control interface when alternating between a nested VM and a normal VM.  See
-patches 25 through 32, and 50 through 52 for more information.
-
-For timer virtualization, the guest hypervisor expects to have access to the
-EL2 physical timer, the EL1 physical timer and the virtual timer. So, the host
-hypervisor needs to provide all of them. The virtual timer is always available
-to VMs. The physical timer is available to VMs via my previous patch series[3].
-The EL2 physical timer is not supported yet in this RFC. We plan to support
-this as it is required to run other guest hypervisors such as Xen.
-
-Even though this work is not complete (see limitations below), I'd appreciate
-early feedback on this RFC. Specifically, I'm interested in:
-- Is it better to have a kernel config or to make it configurable at runtime?
-- I wonder if the data structure for memory management makes sense.
-- What architecture version do we support for the guest hypervisor, and how?
-  For example, do we always support all architecture versions or the same
-  architecture as the underlying hardware platform? Or is it better
-  to make it configurable from the userspace?
-- Initial comments on the overall design?
-
-This patch series is based on kvm-arm-for-4.9-rc7 with the patch series to provide
-VMs with the EL1 physical timer[2].
-
-Git: https://github.com/columbia/nesting-pub/tree/rfc-v1
-
-Testing:
-We have tested this on ARMv8.0 (Applied Micro X-Gene)[3] since ARMv8.3 hardware
-is not available yet. We have paravirtualized the guest hypervisor to trap to
-EL2 as specified in ARMv8.3 specification using hvc instruction. We plan to
-test this on ARMv8.3 model, and will post the result and v2 if necessary.
-
-Limitations:
-- This patch series only supports arm64, not arm. All the patches compile on
-  arm, but I haven't try to boot normal VMs on it.
-- The guest hypervisor with VHE (ARMv8.1) is not supported in this RFC. I have
-  patches for that, but they need to be cleaned up.
-- Recursive nesting (i.e. emulating ARMv8.3 in the VM) is not tested yet.
-- Other hypervisors (such as Xen) on KVM are not tested.
-
-TODO:
-- Test to boot normal VMs on arm architecture
-- Test this on ARMv8.3 model
-- Support the guest hypervisor with VHE
-- Provide the guest hypervisor with the EL2 physical timer
-- Run other hypervisors such as Xen on KVM
-
-[1] https://www.community.arm.com/processors/b/blog/posts/armv8-a-architecture-2016-additions
-[2] https://lists.cs.columbia.edu/pipermail/kvmarm/2016-December/022825.html
-[3] https://www.cloudlab.us/hardware.php#utah
-
-Christoffer Dall (27):
-  arm64: Add missing TCR hw defines
-  KVM: arm64: Add nesting config option
-  KVM: arm64: Add KVM nesting feature
-  KVM: arm64: Allow userspace to set PSR_MODE_EL2x
-  KVM: arm64: Add vcpu_mode_el2 primitive to support nesting
-  KVM: arm/arm64: Add virtual EL2 state emulation framework
-  KVM: arm64: Set virtual EL2 context depending on the guest exception
-    level
-  KVM: arm64: Set shadow EL1 registers for virtual EL2 execution
-  KVM: arm64: Synchronize EL1 system registers on virtual EL2 entry and
-    exit
-  KVM: arm64: Trap EL1 VM register accesses in virtual EL2
-  KVM: arm/arm64: Add VGIC data structures for the nesting
-  KVM: arm/arm64: Inject maintenance interrupts to the guest hypervisor
-  KVM: arm/arm64: Remove unused params in mmu functions
-  KVM: arm/arm64: Abstract stage-2 MMU state into a separate structure
-  KVM: arm/arm64: Support mmu for the virtual EL2 execution
-  KVM: arm64: Invalidate virtual EL2 TLB entries when needed
-  KVM: arm64: Setup vttbr_el2 on each VM entry
-  KVM: arm/arm64: Make mmu functions non-static
-  KVM: arm/arm64: Unmap/flush shadow stage 2 page tables
-  KVM: arm64: Implement nested Stage-2 page table walk logic
-  KVM: arm/arm64: Handle shadow stage 2 page faults
-  KVM: arm/arm64: Move kvm_is_write_fault to header file
-  KVM: arm64: KVM: Inject stage-2 page faults
-  KVM: arm64: Add more info to the S2 translation result
-  KVM: arm/arm64: Forward the guest hypervisor's stage 2 permission
-    faults
-  KVM: arm64: Emulate TLBI instruction
-  KVM: arm64: Fixes to toggle_cache for nesting
-
-Jintack Lim (28):
-  KVM: arm64: Add EL2 execution context for nesting
-  KVM: arm64: Emulate taking an exception to the guest hypervisor
-  KVM: arm64: Handle EL2 register access traps
-  KVM: arm64: Handle eret instruction traps
-  KVM: arm64: Take account of system instruction traps
-  KVM: arm64: Forward VM reg traps to the guest hypervisor
-  KVM: arm64: Trap SPSR_EL1, ELR_EL1 and VBAR_EL1 in virtual EL2
-  KVM: arm64: Forward traps due to HCR_EL2.NV1 bit to the guest
-    hypervisor
-  KVM: arm64: Trap CPACR_EL1 access in virtual EL2
-  KVM: arm64: Forward CPACR_EL1 traps to the guest hypervisor
-  KVM: arm64: Forward HVC instruction to the guest hypervisor
-  KVM: arm64: Handle PSCI call from the guest
-  KVM: arm64: Forward WFX to the guest hypervisor
-  KVM: arm64: Forward FP exceptions to the guest hypervisor
-  KVM: arm/arm64: Let vcpu thread modify its own active state
-  KVM: arm/arm64: Emulate GICH interface on GICv2
-  KVM: arm/arm64: Prepare vgic state for the nested VM
-  KVM: arm/arm64: Set up the prepared vgic state
-  KVM: arm/arm64: Inject irqs to the guest hypervisor
-  KVM: arm/arm64: register GICH iodev for the guest hypervisor
-  KVM: arm/arm64: Add mmu context for the nesting
-  KVM: arm/arm64: Handle vttbr_el2 write operation from the guest
-    hypervisor
-  KVM: arm/arm64: Abstract kvm_phys_addr_ioremap() function
-  KVM: arm64: Expose physical address of vcpu interface
-  KVM: arm/arm64: Create a vcpu mapping for the nested VM
-  KVM: arm64: Reflect shadow VMPIDR_EL2 value to MPIDR_EL1
-  KVM: arm/arm64: Adjust virtual offset considering nesting
-  KVM: arm64: Enable nested virtualization
-
- arch/arm/include/asm/kvm_asm.h         |   7 +-
- arch/arm/include/asm/kvm_emulate.h     |  54 ++++
- arch/arm/include/asm/kvm_host.h        |  34 ++-
- arch/arm/include/asm/kvm_mmu.h         |  39 +++
- arch/arm/kvm/arm.c                     |  79 ++++--
- arch/arm/kvm/hyp/switch.c              |   3 +-
- arch/arm/kvm/hyp/tlb.c                 |  15 +-
- arch/arm/kvm/mmio.c                    |  12 +-
- arch/arm/kvm/mmu.c                     | 386 +++++++++++++++++--------
- arch/arm64/include/asm/esr.h           |   2 +
- arch/arm64/include/asm/kvm_arm.h       |   3 +
- arch/arm64/include/asm/kvm_asm.h       |   7 +-
- arch/arm64/include/asm/kvm_coproc.h    |   2 +-
- arch/arm64/include/asm/kvm_emulate.h   |  68 +++++
- arch/arm64/include/asm/kvm_host.h      |  96 ++++++-
- arch/arm64/include/asm/kvm_mmu.h       | 110 +++++++-
- arch/arm64/include/asm/kvm_nested.h    |   7 +
- arch/arm64/include/asm/pgtable-hwdef.h |   6 +
- arch/arm64/include/uapi/asm/kvm.h      |   7 +
- arch/arm64/kernel/asm-offsets.c        |   1 +
- arch/arm64/kvm/Kconfig                 |   6 +
- arch/arm64/kvm/Makefile                |   7 +-
- arch/arm64/kvm/context.c               | 212 ++++++++++++++
- arch/arm64/kvm/emulate-nested.c        |  66 +++++
- arch/arm64/kvm/guest.c                 |   2 +
- arch/arm64/kvm/handle_exit.c           |  62 +++-
- arch/arm64/kvm/handle_exit_nested.c    |  51 ++++
- arch/arm64/kvm/hyp/entry.S             |  14 +
- arch/arm64/kvm/hyp/hyp-entry.S         |   2 +-
- arch/arm64/kvm/hyp/switch.c            |  15 +-
- arch/arm64/kvm/hyp/sysreg-sr.c         | 109 +++----
- arch/arm64/kvm/hyp/tlb.c               |  16 +-
- arch/arm64/kvm/mmu-nested.c            | 501 +++++++++++++++++++++++++++++++++
- arch/arm64/kvm/reset.c                 |   8 +
- arch/arm64/kvm/sys_regs.c              | 287 ++++++++++++++++++-
- arch/arm64/kvm/sys_regs.h              |   7 +
- arch/arm64/kvm/trace.h                 |  43 ++-
- include/kvm/arm_vgic.h                 |  36 ++-
- virt/kvm/arm/arch_timer.c              |   3 +-
- virt/kvm/arm/hyp/timer-sr.c            |   5 +-
- virt/kvm/arm/hyp/vgic-v2-sr.c          |  15 +-
- virt/kvm/arm/vgic/vgic-init.c          |   3 +
- virt/kvm/arm/vgic/vgic-mmio.c          |  11 +-
- virt/kvm/arm/vgic/vgic-v2-nested.c     | 346 +++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-v2.c            |  13 +
- virt/kvm/arm/vgic/vgic.c               |  23 ++
- virt/kvm/arm/vgic/vgic.h               |  17 ++
- 47 files changed, 2542 insertions(+), 276 deletions(-)
- create mode 100644 arch/arm64/include/asm/kvm_nested.h
- create mode 100644 arch/arm64/kvm/context.c
- create mode 100644 arch/arm64/kvm/emulate-nested.c
- create mode 100644 arch/arm64/kvm/handle_exit_nested.c
- create mode 100644 arch/arm64/kvm/mmu-nested.c
- create mode 100644 virt/kvm/arm/vgic/vgic-v2-nested.c
-
+diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
+index acb4b1e..2e9e386 100644
+--- a/arch/arm64/kvm/context.c
++++ b/arch/arm64/kvm/context.c
+@@ -17,6 +17,76 @@
+ 
+ #include <linux/kvm_host.h>
+ #include <asm/kvm_emulate.h>
++#include <asm/esr.h>
++
++struct el1_el2_map {
++	enum vcpu_sysreg	el1;
++	enum el2_regs		el2;
++};
++
++/*
++ * List of EL2 registers which can be directly applied to EL1 registers to
++ * emulate running EL2 in EL1.  The EL1 registers here must either be trapped
++ * or paravirtualized in EL1.
++ */
++static const struct el1_el2_map el1_el2_map[] = {
++	{ AMAIR_EL1, AMAIR_EL2 },
++	{ MAIR_EL1, MAIR_EL2 },
++	{ TTBR0_EL1, TTBR0_EL2 },
++	{ ACTLR_EL1, ACTLR_EL2 },
++	{ AFSR0_EL1, AFSR0_EL2 },
++	{ AFSR1_EL1, AFSR1_EL2 },
++	{ SCTLR_EL1, SCTLR_EL2 },
++	{ VBAR_EL1, VBAR_EL2 },
++};
++
++static inline u64 tcr_el2_ips_to_tcr_el1_ps(u64 tcr_el2)
++{
++	return ((tcr_el2 & TCR_EL2_PS_MASK) >> TCR_EL2_PS_SHIFT)
++		<< TCR_IPS_SHIFT;
++}
++
++static inline u64 cptr_el2_to_cpacr_el1(u64 cptr_el2)
++{
++	u64 cpacr_el1 = 0;
++
++	if (!(cptr_el2 & CPTR_EL2_TFP))
++		cpacr_el1 |= CPACR_EL1_FPEN;
++	if (cptr_el2 & CPTR_EL2_TTA)
++		cpacr_el1 |= CPACR_EL1_TTA;
++
++	return cpacr_el1;
++}
++
++static void create_shadow_el1_sysregs(struct kvm_vcpu *vcpu)
++{
++	u64 *s_sys_regs = vcpu->arch.ctxt.shadow_sys_regs;
++	u64 *el2_regs = vcpu->arch.ctxt.el2_regs;
++	u64 tcr_el2;
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(el1_el2_map); i++) {
++		const struct el1_el2_map *map = &el1_el2_map[i];
++
++		s_sys_regs[map->el1] = el2_regs[map->el2];
++	}
++
++	tcr_el2 = el2_regs[TCR_EL2];
++	s_sys_regs[TCR_EL1] =
++		TCR_EPD1 |	/* disable TTBR1_EL1 */
++		((tcr_el2 & TCR_EL2_TBI) ? TCR_TBI0 : 0) |
++		tcr_el2_ips_to_tcr_el1_ps(tcr_el2) |
++		(tcr_el2 & TCR_EL2_TG0_MASK) |
++		(tcr_el2 & TCR_EL2_ORGN0_MASK) |
++		(tcr_el2 & TCR_EL2_IRGN0_MASK) |
++		(tcr_el2 & TCR_EL2_T0SZ_MASK);
++
++	/* Rely on separate VMID for VA context, always use ASID 0 */
++	s_sys_regs[TTBR0_EL1] &= ~GENMASK_ULL(63, 48);
++	s_sys_regs[TTBR1_EL1] = 0;
++
++	s_sys_regs[CPACR_EL1] = cptr_el2_to_cpacr_el1(el2_regs[CPTR_EL2]);
++}
+ 
+ /**
+  * kvm_arm_setup_shadow_state -- prepare shadow state based on emulated mode
+@@ -37,6 +107,7 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
+ 		else
+ 			ctxt->hw_pstate |= PSR_MODE_EL1t;
+ 
++		create_shadow_el1_sysregs(vcpu);
+ 		ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
+ 		ctxt->hw_sp_el1 = ctxt->el2_regs[SP_EL2];
+ 	} else {
 -- 
 1.9.1
