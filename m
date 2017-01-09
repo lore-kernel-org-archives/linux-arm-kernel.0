@@ -1,295 +1,402 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon,  9 Jan 2017 17:28:32 +0000
-Subject: [PATCH v4 9/9] arm64: Documentation - Expose CPU feature registers
+Date: Mon,  9 Jan 2017 17:28:30 +0000
+Subject: [PATCH v4 7/9] arm64: cpufeature: Track user visible fields
 In-Reply-To: <1483982912-27215-1-git-send-email-suzuki.poulose@arm.com>
 References: <1483982912-27215-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1483982912-27215-10-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1483982912-27215-8-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Documentation for the infrastructure to expose CPU feature
-register by emulating MRS.
+Track the user visible fields of a CPU feature register. This will be
+used for exposing the value to the userspace. All the user visible
+fields of a feature register will be passed on as it is, while the
+others would be filled with their respective safe value.
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Dave Martin <dave.martin@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
 Changes since V3:
- - Mark RES0 fields as hidden and remove the RAZ registers from the
-   exposed list, as RES0 fields are hidden.
- - Removed obsolete references
-
+ - Mark ID_AA64ISAR0_EL1:RDM visible
 Changes since V2:
- - Include the sample program in the documentation
+ - Mark DCZID_EL0 fields visible, as the register is already accessible
+   to EL0.
 ---
- Documentation/arm64/cpu-feature-registers.txt | 240 ++++++++++++++++++++++++++
- arch/arm64/kernel/cpufeature.c                |   4 +
- 2 files changed, 244 insertions(+)
- create mode 100644 Documentation/arm64/cpu-feature-registers.txt
+ arch/arm64/include/asm/cpufeature.h |  11 +++
+ arch/arm64/kernel/cpufeature.c      | 189 +++++++++++++++++++-----------------
+ arch/arm64/kernel/traps.c           |   2 +-
+ 3 files changed, 111 insertions(+), 91 deletions(-)
 
-diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
-new file mode 100644
-index 0000000..61ca21e
---- /dev/null
-+++ b/Documentation/arm64/cpu-feature-registers.txt
-@@ -0,0 +1,240 @@
-+		ARM64 CPU Feature Registers
-+		===========================
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 10d5624..4ce82ed 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -55,8 +55,12 @@ enum ftr_type {
+ #define FTR_SIGNED	true	/* Value should be treated as signed */
+ #define FTR_UNSIGNED	false	/* Value should be treated as unsigned */
+ 
++#define FTR_VISIBLE	true	/* Feature visible to the user space */
++#define FTR_HIDDEN	false	/* Feature is hidden from the user */
 +
-+Author: Suzuki K Poulose <suzuki.poulose@arm.com>
-+
-+
-+This file describes the ABI for exporting the AArch64 CPU ID/feature
-+registers to userspace. The availability of this ABI is advertised
-+via the HWCAP_CPUID in HWCAPs.
-+
-+1. Motivation
-+---------------
-+
-+The ARM architecture defines a set of feature registers, which describe
-+the capabilities of the CPU/system. Access to these system registers is
-+restricted from EL0 and there is no reliable way for an application to
-+extract this information to make better decisions at runtime. There is
-+limited information available to the application via HWCAPs, however
-+there are some issues with their usage.
-+
-+ a) Any change to the HWCAPs requires an update to userspace (e.g libc)
-+    to detect the new changes, which can take a long time to appear in
-+    distributions. Exposing the registers allows applications to get the
-+    information without requiring updates to the toolchains.
-+
-+ b) Access to HWCAPs is sometimes limited (e.g prior to libc, or
-+    when ld is initialised at startup time).
-+
-+ c) HWCAPs cannot represent non-boolean information effectively. The
-+    architecture defines a canonical format for representing features
-+    in the ID registers; this is well defined and is capable of
-+    representing all valid architecture variations.
-+
-+
-+2. Requirements
-+-----------------
-+
-+ a) Safety :
-+    Applications should be able to use the information provided by the
-+    infrastructure to run safely across the system. This has greater
-+    implications on a system with heterogeneous CPUs.
-+    The infrastructure exports a value that is safe across all the
-+    available CPU on the system.
-+
-+    e.g, If at least one CPU doesn't implement CRC32 instructions, while
-+    others do, we should report that the CRC32 is not implemented.
-+    Otherwise an application could crash when scheduled on the CPU
-+    which doesn't support CRC32.
-+
-+ b) Security :
-+    Applications should only be able to receive information that is
-+    relevant to the normal operation in userspace. Hence, some of the
-+    fields are masked out(i.e, made invisible) and their values are set to
-+    indicate the feature is 'not supported'. See Section 4 for the list
-+    of visible features. Also, the kernel may manipulate the fields
-+    based on what it supports. e.g, If FP is not supported by the
-+    kernel, the values could indicate that the FP is not available
-+    (even when the CPU provides it).
-+
-+ c) Implementation Defined Features
-+    The infrastructure doesn't expose any register which is
-+    IMPLEMENTATION DEFINED as per ARMv8-A Architecture.
-+
-+ d) CPU Identification :
-+    MIDR_EL1 is exposed to help identify the processor. On a
-+    heterogeneous system, this could be racy (just like getcpu()). The
-+    process could be migrated to another CPU by the time it uses the
-+    register value, unless the CPU affinity is set. Hence, there is no
-+    guarantee that the value reflects the processor that it is
-+    currently executing on. The REVIDR is not exposed due to this
-+    constraint, as REVIDR makes sense only in conjunction with the
-+    MIDR. Alternately, MIDR_EL1 and REVIDR_EL1 are exposed via sysfs
-+    at:
-+
-+	/sys/devices/system/cpu/cpu$ID/regs/identification/
-+	                                              \- midr
-+	                                              \- revidr
-+
-+3. Implementation
-+--------------------
-+
-+The infrastructure is built on the emulation of the 'MRS' instruction.
-+Accessing a restricted system register from an application generates an
-+exception and ends up in SIGILL being delivered to the process.
-+The infrastructure hooks into the exception handler and emulates the
-+operation if the source belongs to the supported system register space.
-+
-+The infrastructure emulates only the following system register space:
-+	Op0=3, Op1=0, CRn=0, CRm=0,4,5,6,7
-+
-+(See Table C5-6 'System instruction encodings for non-Debug System
-+register accesses' in ARMv8 ARM DDI 0487A.h, for the list of
-+registers).
-+
-+The following rules are applied to the value returned by the
-+infrastructure:
-+
-+ a) The value of an 'IMPLEMENTATION DEFINED' field is set to 0.
-+ b) The value of a reserved field is populated with the reserved
-+    value as defined by the architecture.
-+ c) The value of a 'visible' field holds the system wide safe value
-+    for the particular feature (except for MIDR_EL1, see section 4).
-+ d) All other fields (i.e, invisible fields) are set to indicate
-+    the feature is missing (as defined by the architecture).
-+
-+4. List of registers with visible features
-+-------------------------------------------
-+
-+  1) ID_AA64ISAR0_EL1 - Instruction Set Attribute Register 0
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | RES0                         | [63-32] |    n    |
-+     |--------------------------------------------------|
-+     | RDM                          | [31-28] |    y    |
-+     |--------------------------------------------------|
-+     | ATOMICS                      | [23-20] |    y    |
-+     |--------------------------------------------------|
-+     | CRC32                        | [19-16] |    y    |
-+     |--------------------------------------------------|
-+     | SHA2                         | [15-12] |    y    |
-+     |--------------------------------------------------|
-+     | SHA1                         | [11-8]  |    y    |
-+     |--------------------------------------------------|
-+     | AES                          | [7-4]   |    y    |
-+     |--------------------------------------------------|
-+     | RES0                         | [3-0]   |    n    |
-+     x--------------------------------------------------x
-+
-+
-+  2) ID_AA64PFR0_EL1 - Processor Feature Register 0
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | RES0                         | [63-28] |    n    |
-+     |--------------------------------------------------|
-+     | GIC                          | [27-24] |    n    |
-+     |--------------------------------------------------|
-+     | AdvSIMD                      | [23-20] |    y    |
-+     |--------------------------------------------------|
-+     | FP                           | [19-16] |    y    |
-+     |--------------------------------------------------|
-+     | EL3                          | [15-12] |    n    |
-+     |--------------------------------------------------|
-+     | EL2                          | [11-8]  |    n    |
-+     |--------------------------------------------------|
-+     | EL1                          | [7-4]   |    n    |
-+     |--------------------------------------------------|
-+     | EL0                          | [3-0]   |    n    |
-+     x--------------------------------------------------x
-+
-+
-+  3) MIDR_EL1 - Main ID Register
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | Implementer                  | [31-24] |    y    |
-+     |--------------------------------------------------|
-+     | Variant                      | [23-20] |    y    |
-+     |--------------------------------------------------|
-+     | Architecture                 | [19-16] |    y    |
-+     |--------------------------------------------------|
-+     | PartNum                      | [15-4]  |    y    |
-+     |--------------------------------------------------|
-+     | Revision                     | [3-0]   |    y    |
-+     x--------------------------------------------------x
-+
-+   NOTE: The 'visible' fields of MIDR_EL1 will contain the value
-+   as available on the CPU where it is fetched and is not a system
-+   wide safe value.
-+
-+Appendix I: Example
-+---------------------------
-+
-+/*
-+ * Sample program to demonstrate the MRS emulation ABI.
-+ *
-+ * Copyright (C) 2015-2016, ARM Ltd
-+ *
-+ * Author: Suzuki K Poulose <suzuki.poulose@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <asm/hwcap.h>
-+#include <stdio.h>
-+#include <sys/auxv.h>
-+
-+#define get_cpu_ftr(id) ({					\
-+		unsigned long __val;				\
-+		asm("mrs %0, "#id : "=r" (__val));		\
-+		printf("%-20s: 0x%016lx\n", #id, __val);	\
-+	})
-+
-+int main(void)
+ struct arm64_ftr_bits {
+ 	bool		sign;	/* Value is signed ? */
++	bool		visible;
+ 	bool		strict;	/* CPU Sanity check: strict matching required ? */
+ 	enum ftr_type	type;
+ 	u8		shift;
+@@ -72,7 +76,9 @@ struct arm64_ftr_bits {
+ struct arm64_ftr_reg {
+ 	const char			*name;
+ 	u64				strict_mask;
++	u64				user_mask;
+ 	u64				sys_val;
++	u64				user_val;
+ 	const struct arm64_ftr_bits	*ftr_bits;
+ };
+ 
+@@ -172,6 +178,11 @@ static inline u64 arm64_ftr_mask(const struct arm64_ftr_bits *ftrp)
+ 	return (u64)GENMASK(ftrp->shift + ftrp->width - 1, ftrp->shift);
+ }
+ 
++static inline u64 arm64_ftr_reg_user_value(const struct arm64_ftr_reg *reg)
 +{
-+
-+	if (!(getauxval(AT_HWCAP) & HWCAP_CPUID)) {
-+		fputs("CPUID registers unavailable\n", stderr);
-+		return 1;
-+	}
-+
-+	get_cpu_ftr(ID_AA64ISAR0_EL1);
-+	get_cpu_ftr(ID_AA64ISAR1_EL1);
-+	get_cpu_ftr(ID_AA64MMFR0_EL1);
-+	get_cpu_ftr(ID_AA64MMFR1_EL1);
-+	get_cpu_ftr(ID_AA64PFR0_EL1);
-+	get_cpu_ftr(ID_AA64PFR1_EL1);
-+	get_cpu_ftr(ID_AA64DFR0_EL1);
-+	get_cpu_ftr(ID_AA64DFR1_EL1);
-+
-+	get_cpu_ftr(MIDR_EL1);
-+	get_cpu_ftr(MPIDR_EL1);
-+	get_cpu_ftr(REVIDR_EL1);
-+
-+#if 0
-+	/* Unexposed register access causes SIGILL */
-+	get_cpu_ftr(ID_MMFR0_EL1);
-+#endif
-+
-+	return 0;
++	return (reg->user_val | (reg->sys_val & reg->user_mask));
 +}
 +
-+
-+
+ static inline int __attribute_const__
+ cpuid_feature_extract_field(u64 features, int field, bool sign)
+ {
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 6494f9b..fa707e3 100644
+index fb519e1..346faec 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -82,6 +82,10 @@ static bool __maybe_unused
- cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused);
+@@ -52,9 +52,10 @@ EXPORT_SYMBOL(cpu_hwcaps);
+ DEFINE_STATIC_KEY_ARRAY_FALSE(cpu_hwcap_keys, ARM64_NCAPS);
+ EXPORT_SYMBOL(cpu_hwcap_keys);
+ 
+-#define __ARM64_FTR_BITS(SIGNED, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
++#define __ARM64_FTR_BITS(SIGNED, VISIBLE, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
+ 	{						\
+ 		.sign = SIGNED,				\
++		.visible = VISIBLE,			\
+ 		.strict = STRICT,			\
+ 		.type = TYPE,				\
+ 		.shift = SHIFT,				\
+@@ -63,12 +64,12 @@ EXPORT_SYMBOL(cpu_hwcap_keys);
+ 	}
+ 
+ /* Define a feature with unsigned values */
+-#define ARM64_FTR_BITS(STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
+-	__ARM64_FTR_BITS(FTR_UNSIGNED, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL)
++#define ARM64_FTR_BITS(VISIBLE, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
++	__ARM64_FTR_BITS(FTR_UNSIGNED, VISIBLE, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL)
+ 
+ /* Define a feature with a signed value */
+-#define S_ARM64_FTR_BITS(STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
+-	__ARM64_FTR_BITS(FTR_SIGNED, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL)
++#define S_ARM64_FTR_BITS(VISIBLE, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
++	__ARM64_FTR_BITS(FTR_SIGNED, VISIBLE, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL)
+ 
+ #define ARM64_FTR_END					\
+ 	{						\
+@@ -81,75 +82,75 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
  
  
-+/*
-+ * NOTE: Any changes to the visibility of features should be kept in
-+ * sync with the documentation of the CPU feature register ABI.
-+ */
  static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+-	S_ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
+-	S_ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_GIC_SHIFT, 4, 0),
++	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
++	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
+ 	/* Linux doesn't care about the EL3 */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, ID_AA64PFR0_EL3_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL2_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL1_SHIFT, 4, ID_AA64PFR0_EL1_64BIT_ONLY),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL0_SHIFT, 4, ID_AA64PFR0_EL0_64BIT_ONLY),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, ID_AA64PFR0_EL3_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL2_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL1_SHIFT, 4, ID_AA64PFR0_EL1_64BIT_ONLY),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL0_SHIFT, 4, ID_AA64PFR0_EL0_64BIT_ONLY),
+ 	ARM64_FTR_END,
+ };
+ 
+ static const struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
+-	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN4_SHIFT, 4, ID_AA64MMFR0_TGRAN4_NI),
+-	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN64_SHIFT, 4, ID_AA64MMFR0_TGRAN64_NI),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN16_SHIFT, 4, ID_AA64MMFR0_TGRAN16_NI),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_BIGENDEL0_SHIFT, 4, 0),
++	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN4_SHIFT, 4, ID_AA64MMFR0_TGRAN4_NI),
++	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN64_SHIFT, 4, ID_AA64MMFR0_TGRAN64_NI),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN16_SHIFT, 4, ID_AA64MMFR0_TGRAN16_NI),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_BIGENDEL0_SHIFT, 4, 0),
+ 	/* Linux shouldn't care about secure memory */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, ID_AA64MMFR0_SNSMEM_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_BIGENDEL_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_ASID_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, ID_AA64MMFR0_SNSMEM_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_BIGENDEL_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_ASID_SHIFT, 4, 0),
+ 	/*
+ 	 * Differing PARange is fine as long as all peripherals and memory are mapped
+ 	 * within the minimum PARange of all CPUs
+ 	 */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_PARANGE_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_PARANGE_SHIFT, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static const struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_PAN_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_LOR_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_HPD_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_VMIDBITS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_HADBS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_PAN_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_LOR_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_HPD_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_VMIDBITS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_HADBS_SHIFT, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static const struct arm64_ftr_bits ftr_id_aa64mmfr2[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_LVA_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_IESB_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_LSM_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_UAO_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_CNP_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_LVA_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_IESB_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_LSM_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_UAO_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_CNP_SHIFT, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static const struct arm64_ftr_bits ftr_ctr[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 31, 1, 1),	/* RAO */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_HIGHER_SAFE, 24, 4, 0),	/* CWG */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* ERG */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, 31, 1, 1),	/* RAO */
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, 24, 4, 0),	/* CWG */
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* ERG */
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
+ 	/*
+ 	 * Linux can handle differing I-cache policies. Userspace JITs will
+ 	 * make use of *minLine.
+ 	 * If we have differing I-cache policies, report it as the weakest - AIVIVT.
+ 	 */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, 14, 2, ICACHE_POLICY_AIVIVT),	/* L1Ip */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* IminLine */
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_EXACT, 14, 2, ICACHE_POLICY_AIVIVT),	/* L1Ip */
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* IminLine */
+ 	ARM64_FTR_END,
+ };
+ 
+@@ -159,73 +160,73 @@ struct arm64_ftr_reg arm64_ftr_reg_ctrel0 = {
+ };
+ 
+ static const struct arm64_ftr_bits ftr_id_mmfr0[] = {
+-	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 28, 4, 0xf),	/* InnerShr */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 24, 4, 0),	/* FCSE */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* AuxReg */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 16, 4, 0),	/* TCM */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 12, 4, 0),	/* ShareLvl */
+-	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 8, 4, 0xf),	/* OuterShr */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 4, 0),	/* PMSA */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),	/* VMSA */
++	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 28, 4, 0xf),	/* InnerShr */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 24, 4, 0),	/* FCSE */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* AuxReg */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 16, 4, 0),	/* TCM */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 12, 4, 0),	/* ShareLvl */
++	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 8, 4, 0xf),	/* OuterShr */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 4, 4, 0),	/* PMSA */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 4, 0),	/* VMSA */
+ 	ARM64_FTR_END,
+ };
+ 
+ static const struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
+-	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 32, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
++	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
+ 	ARM64_FTR_END,
+ };
+ 
+ static const struct arm64_ftr_bits ftr_mvfr2[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 4, 0),		/* FPMisc */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),		/* SIMDMisc */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 4, 4, 0),		/* FPMisc */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 4, 0),		/* SIMDMisc */
+ 	ARM64_FTR_END,
+ };
+ 
+ static const struct arm64_ftr_bits ftr_dczid[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 1, 1),		/* DZP */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* BS */
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, 4, 1, 1),		/* DZP */
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* BS */
+ 	ARM64_FTR_END,
+ };
+ 
+ 
+ static const struct arm64_ftr_bits ftr_id_isar5[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_RDM_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_CRC32_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_SHA2_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_SHA1_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_AES_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_SEVL_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_RDM_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_CRC32_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_SHA2_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_SHA1_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_AES_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_SEVL_SHIFT, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static const struct arm64_ftr_bits ftr_id_mmfr4[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 4, 0),		/* ac2 */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 4, 4, 0),		/* ac2 */
+ 	ARM64_FTR_END,
+ };
+ 
+ static const struct arm64_ftr_bits ftr_id_pfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 12, 4, 0),	/* State3 */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 8, 4, 0),		/* State2 */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 4, 0),		/* State1 */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),		/* State0 */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 12, 4, 0),	/* State3 */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 8, 4, 0),		/* State2 */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 4, 4, 0),		/* State1 */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 4, 0),		/* State0 */
+ 	ARM64_FTR_END,
+ };
+ 
+ static const struct arm64_ftr_bits ftr_id_dfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 28, 4, 0),
+-	S_ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 24, 4, 0xf),	/* PerfMon */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 12, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 8, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 4, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 28, 4, 0),
++	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 24, 4, 0xf),	/* PerfMon */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 12, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 8, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 4, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+@@ -236,20 +237,20 @@ static const struct arm64_ftr_bits ftr_id_dfr0[] = {
+  * id_isar[0-4], id_mmfr[1-3], id_pfr1, mvfr[0-1]
+  */
+ static const struct arm64_ftr_bits ftr_generic_32bits[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 28, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 24, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 12, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 8, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 4, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 28, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 24, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 12, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 8, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 4, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ /* Table for a single 32bit feature value */
+ static const struct arm64_ftr_bits ftr_single32[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 32, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+@@ -397,6 +398,7 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
+ {
+ 	u64 val = 0;
+ 	u64 strict_mask = ~0x0ULL;
++	u64 user_mask = 0;
+ 	u64 valid_mask = 0;
+ 
+ 	const struct arm64_ftr_bits *ftrp;
+@@ -413,12 +415,19 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
+ 		valid_mask |= ftr_mask;
+ 		if (!ftrp->strict)
+ 			strict_mask &= ~ftr_mask;
++		if (ftrp->visible)
++			user_mask |= ftr_mask;
++		else
++			reg->user_val = arm64_ftr_set_value(ftrp,
++							    reg->user_val,
++							    ftrp->safe_val);
+ 	}
+ 
+ 	val &= valid_mask;
+ 
+ 	reg->sys_val = val;
+ 	reg->strict_mask = strict_mask;
++	reg->user_mask = user_mask;
+ }
+ 
+ void __init init_cpu_features(struct cpuinfo_arm64 *info)
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 5b830be..8187229 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -496,7 +496,7 @@ static void ctr_read_handler(unsigned int esr, struct pt_regs *regs)
+ {
+ 	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
+ 
+-	regs->regs[rt] = arm64_ftr_reg_ctrel0.sys_val;
++	regs->regs[rt] = arm64_ftr_reg_user_value(&arm64_ftr_reg_ctrel0);
+ 	regs->pc += 4;
+ }
+ 
 -- 
 2.7.4
