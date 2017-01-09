@@ -1,116 +1,67 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Mon, 9 Jan 2017 16:42:20 +0100
-Subject: [PATCHv9 6/6] dmaengine: rcar-dmac: add iommu support for slave
- transfers
-In-Reply-To: <26490346.qhNpbOL6eO@avalon>
-References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
- <20160810112219.17964-7-niklas.soderlund+renesas@ragnatech.se>
- <6358234.jyTvyVnNF0@avalon> <26490346.qhNpbOL6eO@avalon>
-Message-ID: <20170109154220.GH29854@bigcity.dyn.berto.se>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Jan 2017 15:43:02 +0000
+Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
+In-Reply-To: <20170109150138.GJ4348@cbox>
+References: <20161215113539.GK14217@n2100.armlinux.org.uk>
+ <06fca797-da5d-f7f2-eecb-9b1b33b7e83f@arm.com>
+ <20161215151548.GL14217@n2100.armlinux.org.uk>
+ <c21d6514-44a2-ba88-0fe5-d14d5897cc48@arm.com>
+ <20161215185717.GM14217@n2100.armlinux.org.uk>
+ <20170103095149.GA14242@cbox>
+ <20170109122639.GX14217@n2100.armlinux.org.uk>
+ <20170109132636.GH4348@cbox>
+ <20170109140500.GA14217@n2100.armlinux.org.uk>
+ <20170109150138.GJ4348@cbox>
+Message-ID: <20170109154302.GF14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Mon, Jan 09, 2017 at 04:01:38PM +0100, Christoffer Dall wrote:
+> Nobody is arguing with the need for documentation, and I think I
+> understan the reason for needing to support a common ABI with a common
+> set of functions regardless of the logic in place in Hyp mode.
+> 
+> We just have to agree on a sane ABI and I'll be happy to help
+> write/review the API docs and clean things up.
 
-On 2017-01-02 01:08:04 +0200, Laurent Pinchart wrote:
-> Hi Niklas,
-> 
-> On Monday 05 Sep 2016 12:52:44 Laurent Pinchart wrote:
-> > On Wednesday 10 Aug 2016 13:22:19 Niklas S?derlund wrote:
-> > > Enable slave transfers to a device behind a IPMMU by mapping the slave
-> > > addresses using the dma-mapping API.
-> > > 
-> > > Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-> > > ---
-> > > drivers/dma/sh/rcar-dmac.c | 82 ++++++++++++++++++++++++++++++++++++-----
-> > > 1 file changed, 74 insertions(+), 8 deletions(-)
-> > > 
-> > > diff --git a/drivers/dma/sh/rcar-dmac.c b/drivers/dma/sh/rcar-dmac.c
-> > > index cf983a9..22a5e40 100644
-> > > --- a/drivers/dma/sh/rcar-dmac.c
-> > > +++ b/drivers/dma/sh/rcar-dmac.c
-> 
-> [snip]
-> 
-> > > +static int rcar_dmac_map_slave_addr(struct dma_chan *chan,
-> > > +				    enum dma_transfer_direction dir)
-> > > +{
-> > > +	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
-> > > +	struct rcar_dmac_chan_map *map = &rchan->map;
-> > > +	phys_addr_t dev_addr;
-> > > +	size_t dev_size;
-> > > +	enum dma_data_direction dev_dir;
-> > > +
-> > > +	if (dir == DMA_DEV_TO_MEM) {
-> > > +		dev_addr = rchan->src.slave_addr;
-> > > +		dev_size = rchan->src.xfer_size;
-> > > +		dev_dir = DMA_TO_DEVICE;
-> > 
-> > Shouldn't this be DMA_FROM_DEVICE, and DMA_TO_DEVICE below ?
-> 
-> This comment can be ignored (thank you Robin for the explanation), but ...
-> 
-> > > +	} else {
-> > > +		dev_addr = rchan->dst.slave_addr;
-> > > +		dev_size = rchan->dst.xfer_size;
-> > > +		dev_dir = DMA_FROM_DEVICE;
-> > > +	}
-> > > +
-> > > +	/* Reuse current map if possible. */
-> > > +	if (dev_addr == map->slave.slave_addr &&
-> > > +	    dev_size == map->slave.xfer_size &&
-> > > +	    dev_dir == map->dir)
-> > > +		return 0;
-> > > +
-> > > +	/* Remove old mapping if present. */
-> > > +	if (map->slave.xfer_size)
-> > > +		dma_unmap_resource(chan->device->dev, map->addr,
-> > > +				   map->slave.xfer_size, map->dir, 0);
-> > 
-> > Unless I'm mistaken the resource will not be unmapped when freeing channel
-> > resources, will it ?
-> 
-> I believe this one still needs to be addressed.
+Let me make this crystal clear - this is where I am with this problem.
 
-I believe you are correct, I will look in to it and hopefully submit a 
-patch to address it. Thanks for brining it up.
+I've identified many issues with the ABI, and that there are several
+differnet chunks of code which are a problem.
 
-> 
-> > > +	map->slave.xfer_size = 0;
-> > > +
-> > > +	/* Create new slave address map. */
-> > > +	map->addr = dma_map_resource(chan->device->dev, dev_addr, dev_size,
-> > > +				     dev_dir, 0);
-> > > +
-> > > +	if (dma_mapping_error(chan->device->dev, map->addr)) {
-> > > +		dev_err(chan->device->dev,
-> > > +			"chan%u: failed to map %zx@%pap", rchan->index,
-> > > +			dev_size, &dev_addr);
-> > > +		return -EIO;
-> > > +	}
-> > > +
-> > > +	dev_dbg(chan->device->dev, "chan%u: map %zx@%pap to %pad dir: %s\n",
-> > > +		rchan->index, dev_size, &dev_addr, &map->addr,
-> > 
-> > > +		dev_dir == DMA_TO_DEVICE ? "DMA_TO_DEVICE" :
-> > "DMA_FROM_DEVICE");
-> > 
-> > > +
-> > > +	map->slave.slave_addr = dev_addr;
-> > > +	map->slave.xfer_size = dev_size;
-> > > +	map->dir = dev_dir;
-> > > +
-> > > +	return 0;
-> > > +}
-> 
-> [snip]
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
+Although I've proposed a change to the hyp-stub ABI, which has since
+been found to be insufficient, right now I have no better suggestions
+to make.  I'm operating in an information vaccuum here, and it is not
+yet clear to me what changes to the hyp-stub and KVM ABI would be
+acceptable.  I don't know what environment the KVM hypervisor operates
+in yet, eg whether it can see the kernel, whether it can see the IDMAP
+region, etc.
+
+Why would the IDMAP region be important?  The hyp-stub doesn't setup
+any page tables, so it seems to operate without any MMU translation.
+That rather rules out passing virtual address pointers through a
+common hyp-mode interface.
+
+However, it seems that the KVM hypervisor does setup MMU translations,
+making virtual addresses acceptable but physical/IDMAP addresses not.
+
+So, right now I've no idea what a replacement ABI would look like.
+
+Hence, the lack of _current_ documentation is hampering the situation.
+
+Now, you've said to me privately that you think my demands for
+documentation are unwarranted.  I've been trying to gain enough
+understanding that I can move forward, with my requests for
+documentation being treated as "we'll do that later."  Well, given
+that, it leads me to only one possible outcome.
+
+Enough is enough.  Since there's no movement on the documentation
+front, and because you're now saying that my demands for documentation
+are unreasonable, I've reached the end of the road.  There's nothing
+more that I'm willing to do on this problem - at least not until there's
+a change of heart wrt documentation.
 
 -- 
-Regards,
-Niklas S?derlund
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
