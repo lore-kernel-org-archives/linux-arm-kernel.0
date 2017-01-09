@@ -1,77 +1,78 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 9 Jan 2017 08:19:00 +0100
-Subject: mmc: sdhci-of-at91: Internal clock never stabilised
-In-Reply-To: <20170108125344.3iyfoodszupzgukk@piout.net>
-References: <1DC01DCD0F70AE4284AE3A5E8C726E225D20EDF1@Ex2010.q-core.co.il>
- <CAJP5LRNRSpMjdTFyL4R4ZN1tZAG0A=TKR5LRareg+TEJmnkd2Q@mail.gmail.com>
- <20170108125344.3iyfoodszupzgukk@piout.net>
-Message-ID: <20170109071900.fz2en246i7uqmavw@rfolt0960.corp.atmel.com>
+From: jcsing.lee@samsung.com (Jaechul Lee)
+Date: Mon, 09 Jan 2017 16:22:12 +0900
+Subject: [PATCH v6 0/3] Add touch key driver support for TM2
+References: <CGME20170109072218epcas1p38d937ae34dcd7ece7b9f092b1527a691@epcas1p3.samsung.com>
+Message-ID: <1483946535-4703-1-git-send-email-jcsing.lee@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+Hi,
 
-Which revision of SoC are you using?
+This patch is last three patch from https://lkml.org/lkml/2017/1/6/277.
+because 1 and 2 patches have already been merged by Krzysztof.
 
-Regards
+This patchset adds support for the tm2 touchkey device.
 
-Ludovic
+The driver has been ported from Tizen Kernel, originally written
+by Beomho. I ported it to the latest mainline Kernel.
 
-On Sun, Jan 08, 2017 at 01:53:44PM +0100, Alexandre Belloni wrote:
-> Hi,
-> 
-> I think Cyrille worked on that a few month ago, maybe he has a comment.
-> 
-> On 08/01/2017 at 14:07:53 +0200, Alex Gershgorin wrote :
-> > Hi All,
-> > We have two different HW platforms based on SAMA5D2 SoC (SAMA5D2 Xplained
-> > Board and our own HW).
-> > On both of them we are facing stabilization of the internal
-> > clock problem, it does not happen all the time but quite often.
-> > Please see below my Kernel boot messages:
-> > 
-> > sdhci: Copyright(c) Pierre Ossman
-> > sdhci-pltfm: SDHCI platform and OF driver helper
-> > sdhci-at91 a0000000.sdio-host: update clk mul to 39 as gck rate is
-> > 480000000 Hz
-> > mmc0: Internal clock never stabilised.
-> > mmc0: Internal clock never stabilised.
-> > mmc0: SDHCI controller on a0000000.sdio-host [a0000000.sdio-host] using ADMA
-> > 
-> > snip
-> > 
-> > snip
-> > 
-> > Waiting for root device /dev/mmcblk0p2...
-> > mmc0: Internal clock never stabilised.
-> > mmc0: Timeout waiting for hardware cmd interrupt.
-> > sdhci: =========== REGISTER DUMP (mmc0)===========
-> > sdhci: Sys addr: 0x00000000 | Version:  0x00001502
-> > sdhci: Blk size: 0x00000000 | Blk cnt:  0x00000000
-> > sdhci: Argument: 0x00000000 | Trn mode: 0x00000000
-> > sdhci: Present: 0x01ff0001 | Host ctl: 0x00000001
-> > sdhci: Power: 0x0000000f | Blk gap:  0x00000000
-> > sdhci: Wake-up: 0x00000000 | Clock:    0x0000ffe1
-> > sdhci: Timeout: 0x00000000 | Int stat: 0x00000000
-> > sdhci: Int enab: 0x00ff0003 | Sig enab: 0x00ff0003
-> > sdhci: AC12 err: 0x00000000 | Slot int: 0x00000000
-> > sdhci: Caps: 0x27ec0c8c | Caps_1: 0x00270f77
-> > sdhci: Cmd: 0x00000000 | Max curr: 0x00000000
-> > sdhci: Host ctl2: 0x00000000
-> > sdhci: ADMA Err: 0x00000000 | ADMA Ptr: 0x00000000
-> > sdhci: ===========================================
-> > 
-> > Any direction to solve this problem?
-> > 
-> > Thanks,
-> > Alex Gershgorin
-> 
-> -- 
-> Alexandre Belloni, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Best Regard,
+Jaechul
+
+Changes in v6:
+ - changed compatible name from samsaung to cypress. 
+ - updated commit tags.
+ - removed first two patches from the original patchset.
+ 
+Changes in v5:
+ - patch 1: removed a spurious regulator-always-off inherited from
+   a different patch. Thanks Krzysztof.
+ - patch 2: fixed a slip on  the model, thanks Javier (this patch
+   confuses me quite a lot, this was all right some patches ago
+   and re appeared on this one).
+ - patch 2: removed 'regulator' label and used the original ldo3x
+   labels. Krzysztof: it looks better indeed.
+ - added Javier's reviews and Krzysztof's acks on the related
+   patches.
+
+Changes in v4:
+ - patch 1 has been rebased on top of 7c294e002641 (arm64: dts:
+   exynos: Remove unsupported regulator-always-off property from
+   TM2E)
+ - patch 2 has been generated with -B50% diff option using git
+   2.11
+
+Changes in v3:
+ - Changed the commit ordering, the tm2-touchkey related patches
+   are the last 3.
+ - Added Chanwoo's patch which fixes the wrong voltage of ldo23
+   and ldo25.
+ - Andi (patch 3) moves the ldo31 and ldo38 in the tm2 and tm2e
+   files as they have different values.
+
+Changes in v2:
+ - fixed reviews from Javier, Dmitry
+ - refactored power enable/disable functions.
+ - reordered signed-offs in patch 2, while patch 4 is left as it
+   was as Andi copy pasted the node to the new tm2.dts file
+ - added Jarvier's (patch 1,2,4) and Krzysztof's (patch 4)
+   reviews
+   and Rob's Ack
+ - patch 3 diff has been generated with -B50%
+
+Jaechul Lee (3):
+  input: Add support for the tm2 touchkey device driver
+  input: tm2-touchkey: Add touchkey driver support for TM2
+  arm64: dts: exynos: Add tm2 touchkey node
+
+ .../bindings/input/cypress,tm2-touchkey.txt        |  27 ++
+ arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      |  13 +
+ drivers/input/keyboard/Kconfig                     |  11 +
+ drivers/input/keyboard/Makefile                    |   1 +
+ drivers/input/keyboard/tm2-touchkey.c              | 287 +++++++++++++++++++++
+ 5 files changed, 339 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/cypress,tm2-touchkey.txt
+ create mode 100644 drivers/input/keyboard/tm2-touchkey.c
+
+-- 
+2.7.4
