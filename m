@@ -1,132 +1,94 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Mon,  9 Jan 2017 13:45:59 +0000
-Subject: [PATCH v7 08/19] iommu: Implement reserved_regions iommu-group sysfs
- file
+Date: Mon,  9 Jan 2017 13:46:01 +0000
+Subject: [PATCH v7 10/19] iommu/amd: Declare MSI and HT regions as reserved
+ IOVA regions
 In-Reply-To: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
 References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1483969570-3154-9-git-send-email-eric.auger@redhat.com>
+Message-ID: <1483969570-3154-11-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new iommu-group sysfs attribute file is introduced. It contains
-the list of reserved regions for the iommu-group. Each reserved
-region is described on a separate line:
-- first field is the start IOVA address,
-- second is the end IOVA address,
-- third is the type.
+This patch registers the MSI and HT regions as non mappable
+reserved regions. They will be exposed in the iommu-group sysfs.
+
+For direct-mapped regions let's also use iommu_alloc_resv_region().
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
 v6 -> v7:
-- also report the type of the reserved region as a string
-- updated ABI documentation
+- use IOMMU_RESV_RESERVED
 
-v3 -> v4:
-- add cast to long long int when printing to avoid warning on
-  i386
-- change S_IRUGO into 0444
-- remove sort. The list is natively sorted now.
-
-The file layout is inspired of /sys/bus/pci/devices/BDF/resource.
-I also read Documentation/filesystems/sysfs.txt so I expect this
-to be frowned upon.
+v5: creation
 ---
- .../ABI/testing/sysfs-kernel-iommu_groups          | 12 +++++++
- drivers/iommu/iommu.c                              | 38 ++++++++++++++++++++++
- 2 files changed, 50 insertions(+)
+ drivers/iommu/amd_iommu.c | 37 ++++++++++++++++++++++++++-----------
+ 1 file changed, 26 insertions(+), 11 deletions(-)
 
-diff --git a/Documentation/ABI/testing/sysfs-kernel-iommu_groups b/Documentation/ABI/testing/sysfs-kernel-iommu_groups
-index 9b31556..35c64e0 100644
---- a/Documentation/ABI/testing/sysfs-kernel-iommu_groups
-+++ b/Documentation/ABI/testing/sysfs-kernel-iommu_groups
-@@ -12,3 +12,15 @@ Description:	/sys/kernel/iommu_groups/ contains a number of sub-
- 		file if the IOMMU driver has chosen to register a more
- 		common name for the group.
- Users:
-+
-+What:		/sys/kernel/iommu_groups/reserved_regions
-+Date: 		January 2017
-+KernelVersion:  v4.11
-+Contact: 	Eric Auger <eric.auger@redhat.com>
-+Description:    /sys/kernel/iommu_groups/reserved_regions list IOVA
-+		regions that are reserved. Not necessarily all
-+		reserved regions are listed. This is typically used to
-+		output direct-mapped, MSI, non mappable regions. Each
-+		region is described on a single line: the 1st field is
-+		the base IOVA, the second is the end IOVA and the third
-+		field describes the type of the region.
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 640056b..0123daa 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -68,6 +68,12 @@ struct iommu_group_attribute {
- 			 const char *buf, size_t count);
- };
- 
-+static const char * const iommu_group_resv_type_string[] = {
-+	[IOMMU_RESV_DIRECT]	= "direct",
-+	[IOMMU_RESV_RESERVED]	= "reserved",
-+	[IOMMU_RESV_MSI]	= "msi",
-+};
-+
- #define IOMMU_GROUP_ATTR(_name, _mode, _show, _store)		\
- struct iommu_group_attribute iommu_group_attr_##_name =		\
- 	__ATTR(_name, _mode, _show, _store)
-@@ -231,8 +237,33 @@ int iommu_get_group_resv_regions(struct iommu_group *group,
- }
- EXPORT_SYMBOL_GPL(iommu_get_group_resv_regions);
- 
-+static ssize_t iommu_group_show_resv_regions(struct iommu_group *group,
-+					     char *buf)
-+{
-+	struct iommu_resv_region *region, *next;
-+	struct list_head group_resv_regions;
-+	char *str = buf;
-+
-+	INIT_LIST_HEAD(&group_resv_regions);
-+	iommu_get_group_resv_regions(group, &group_resv_regions);
-+
-+	list_for_each_entry_safe(region, next, &group_resv_regions, list) {
-+		str += sprintf(str, "0x%016llx 0x%016llx %s\n",
-+			       (long long int)region->start,
-+			       (long long int)(region->start +
-+						region->length - 1),
-+			       iommu_group_resv_type_string[region->type]);
-+		kfree(region);
-+	}
-+
-+	return (str - buf);
-+}
-+
- static IOMMU_GROUP_ATTR(name, S_IRUGO, iommu_group_show_name, NULL);
- 
-+static IOMMU_GROUP_ATTR(reserved_regions, 0444,
-+			iommu_group_show_resv_regions, NULL);
-+
- static void iommu_group_release(struct kobject *kobj)
+diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
+index 5f7ea4f..d109e41 100644
+--- a/drivers/iommu/amd_iommu.c
++++ b/drivers/iommu/amd_iommu.c
+@@ -3164,6 +3164,7 @@ static bool amd_iommu_capable(enum iommu_cap cap)
+ static void amd_iommu_get_resv_regions(struct device *dev,
+ 				       struct list_head *head)
  {
- 	struct iommu_group *group = to_iommu_group(kobj);
-@@ -247,6 +278,8 @@ static void iommu_group_release(struct kobject *kobj)
- 	if (group->default_domain)
- 		iommu_domain_free(group->default_domain);
++	struct iommu_resv_region *region;
+ 	struct unity_map_entry *entry;
+ 	int devid;
  
-+	iommu_group_remove_file(group, &iommu_group_attr_reserved_regions);
+@@ -3172,28 +3173,42 @@ static void amd_iommu_get_resv_regions(struct device *dev,
+ 		return;
+ 
+ 	list_for_each_entry(entry, &amd_iommu_unity_map, list) {
+-		struct iommu_resv_region *region;
++		size_t length;
++		int prot = 0;
+ 
+ 		if (devid < entry->devid_start || devid > entry->devid_end)
+ 			continue;
+ 
+-		region = kzalloc(sizeof(*region), GFP_KERNEL);
++		length = entry->address_end - entry->address_start;
++		if (entry->prot & IOMMU_PROT_IR)
++			prot |= IOMMU_READ;
++		if (entry->prot & IOMMU_PROT_IW)
++			prot |= IOMMU_WRITE;
 +
- 	kfree(group->name);
- 	kfree(group);
++		region = iommu_alloc_resv_region(entry->address_start,
++						 length, prot,
++						 IOMMU_RESV_DIRECT);
+ 		if (!region) {
+ 			pr_err("Out of memory allocating dm-regions for %s\n",
+ 				dev_name(dev));
+ 			return;
+ 		}
+-
+-		region->start = entry->address_start;
+-		region->length = entry->address_end - entry->address_start;
+-		region->type = IOMMU_RESV_DIRECT;
+-		if (entry->prot & IOMMU_PROT_IR)
+-			region->prot |= IOMMU_READ;
+-		if (entry->prot & IOMMU_PROT_IW)
+-			region->prot |= IOMMU_WRITE;
+-
+ 		list_add_tail(&region->list, head);
+ 	}
++
++	region = iommu_alloc_resv_region(MSI_RANGE_START,
++					 MSI_RANGE_END - MSI_RANGE_START + 1,
++					 0, IOMMU_RESV_RESERVED);
++	if (!region)
++		return;
++	list_add_tail(&region->list, head);
++
++	region = iommu_alloc_resv_region(HT_RANGE_START,
++					 HT_RANGE_END - HT_RANGE_START + 1,
++					 0, IOMMU_RESV_RESERVED);
++	if (!region)
++		return;
++	list_add_tail(&region->list, head);
  }
-@@ -310,6 +343,11 @@ struct iommu_group *iommu_group_alloc(void)
- 	 */
- 	kobject_put(&group->kobj);
  
-+	ret = iommu_group_create_file(group,
-+				      &iommu_group_attr_reserved_regions);
-+	if (ret)
-+		return ERR_PTR(ret);
-+
- 	pr_debug("Allocated group %d\n", group->id);
- 
- 	return group;
+ static void amd_iommu_put_resv_regions(struct device *dev,
 -- 
 1.9.1
