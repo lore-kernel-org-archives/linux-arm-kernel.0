@@ -1,67 +1,100 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 9 Jan 2017 14:56:30 +0000
-Subject: [PATCH] arm64: head.S: fix up stale comments
-In-Reply-To: <CAKv+Gu_t7n8PUAeAYe2kkFpPciC0eJ+Qg7sHu_tTfux=3LwyTg@mail.gmail.com>
-References: <1483972315-12782-1-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu_t7n8PUAeAYe2kkFpPciC0eJ+Qg7sHu_tTfux=3LwyTg@mail.gmail.com>
-Message-ID: <20170109145630.GA13104@leverpostej>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 9 Jan 2017 15:57:49 +0100
+Subject: [PATCH 1/2] ARM: hyp-stub: improve ABI
+In-Reply-To: <20170109144235.GC14217@n2100.armlinux.org.uk>
+References: <20161215113539.GK14217@n2100.armlinux.org.uk>
+ <06fca797-da5d-f7f2-eecb-9b1b33b7e83f@arm.com>
+ <20161215151548.GL14217@n2100.armlinux.org.uk>
+ <c21d6514-44a2-ba88-0fe5-d14d5897cc48@arm.com>
+ <20161215185717.GM14217@n2100.armlinux.org.uk>
+ <20170103095149.GA14242@cbox>
+ <20170109122639.GX14217@n2100.armlinux.org.uk>
+ <20170109132636.GH4348@cbox>
+ <20170109140500.GA14217@n2100.armlinux.org.uk>
+ <20170109144235.GC14217@n2100.armlinux.org.uk>
+Message-ID: <20170109145749.GI4348@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 02:55:51PM +0000, Ard Biesheuvel wrote:
-> On 9 January 2017 at 14:31, Mark Rutland <mark.rutland@arm.com> wrote:
-> > In commit 23c8a500c24d02dd ("arm64: kernel: use ordinary return/argument
-> > register for el2_setup()"), we stopped using w20 as a global stash of
-> > the boot mode flag, and instead pass this around in w0 as a function
-> > parameter.
-> >
-> > Unfortunately, we missed a couple of comments, which still refer to the
-> > old convention of using w20/x20.
-> >
-> > This patch fixes up the comments to describe the code as it currently
-> > works.
-> >
+On Mon, Jan 09, 2017 at 02:42:35PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 09, 2017 at 02:05:00PM +0000, Russell King - ARM Linux wrote:
+> > So, although Marc produced a patch which updates the KVM hypervisor for
+> > the GET_VECTORS change, through reading the code today, it's become clear
+> > that much more is needed, so I'm yet again banging on about documentation.
+> > It's only become clear to me today that the KVM stub calling convention
+> > for the host kernel is:
+> > 
+> > entry:
+> > 	r0 = function pointer
+> > 	r1 = 32-bit function argument 0
+> > 	r2 = 32-bit function argument 1
+> > 	r3 = 32-bit function argument 2
+> > 	no further arguments are supported
+> > 	--- or ---
+> > 	r0 = -1 (or 0 post Marc's patch) for get_vectors
+> > exit:
+> > 	r0 = vectors (if get_vectors call was made)
+> > 	otherwise, who knows...
 > 
-> Ah yes, apologies for the sloppiness
+> Hang on, even this is nowhere near the full picture.
+> 
+> static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+>                                        unsigned long hyp_stack_ptr,
+>                                        unsigned long vector_ptr)
+> {
+>         /*
+>          * Call initialization code, and switch to the full blown HYP
+>          * code. The init code doesn't need to preserve these
+>          * registers as r0-r3 are already callee saved according to
+>          * the AAPCS.
+>          * Note that we slightly misuse the prototype by casting the
+>          * stack pointer to a void *.
+> 
+>          * The PGDs are always passed as the third argument, in order
+>          * to be passed into r2-r3 to the init code (yes, this is
+>          * compliant with the PCS!).
+>          */
+> 
+>         kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+> }
+> 
+> This results in a completely different calling convention -
+> 
+> 	r0 = hyp_stack_ptr
+> 	r1 = vector_ptr
+> 	r2,r3 = pgd_ptr
+> 
+> Which clearly doesn't fit the KVM hypervisor's calling requirements...
+> and, looking deeper at this:
+> 
+>         /* Switch from the HYP stub to our own HYP init vector */
+>         __hyp_set_vectors(kvm_get_idmap_vector());
+> 
+>         pgd_ptr = kvm_mmu_get_httbr();
+>         stack_page = __this_cpu_read(kvm_arm_hyp_stack_page);
+>         hyp_stack_ptr = stack_page + PAGE_SIZE;
+>         vector_ptr = (unsigned long)kvm_ksym_ref(__kvm_hyp_vector);
+> 
+>         __cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
+> 
+> So we actually have _another_ hypervisor stub to care about - should
+> anything go wrong between __hyp_set_vectors() and __cpu_init_hyp_mode(),
+> we will be hitting the __do_hyp_init assembly code with maybe a get
+> vectors or soft reboot call, which, reading the code, would be bad
+> news.
+> 
+> Since this code is run at several different times - CPU hotplug (when
+> the system will be quiescent) and also cpuidle PM (when the system is
+> not quiescent).  With kdump/kexec, I think this could be racy.
+> Certainly if anything were to go wrong between the two with a kdump
+> kernel in place, we'd be making HVC calls to the KVM init stub and
+> expecting them to work.
+> 
+Indeed it looks like interrupts are enabled during cpu_init_hyp_mode,
+and if it's possible to be preempted there or if kdump can be initiated
+from interrupt context, this could go wrong, so you're probably right
+that we need to support a common hyp-ABI for the kernel hyp stub, the
+KVM stub (a.k.a. the trampoline code), and KVM's hyp layer itself.
 
-No worries; I missed this in review, too...
-
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Cheers!
-
-Mark.
-
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/kernel/head.S | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> > index 4b1abac..9b0857a 100644
-> > --- a/arch/arm64/kernel/head.S
-> > +++ b/arch/arm64/kernel/head.S
-> > @@ -483,7 +483,7 @@ ENTRY(kimage_vaddr)
-> >   * If we're fortunate enough to boot at EL2, ensure that the world is
-> >   * sane before dropping to EL1.
-> >   *
-> > - * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 in x20 if
-> > + * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 in w0 if
-> >   * booted in EL1 or EL2 respectively.
-> >   */
-> >  ENTRY(el2_setup)
-> > @@ -628,7 +628,7 @@ ENDPROC(el2_setup)
-> >
-> >  /*
-> >   * Sets the __boot_cpu_mode flag depending on the CPU boot mode passed
-> > - * in x20. See arch/arm64/include/asm/virt.h for more info.
-> > + * in w0. See arch/arm64/include/asm/virt.h for more info.
-> >   */
-> >  set_cpu_boot_mode_flag:
-> >         adr_l   x1, __boot_cpu_mode
-> > --
-> > 1.9.1
-> >
+Thanks,
+-Christoffer
