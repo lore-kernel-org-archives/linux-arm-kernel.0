@@ -1,50 +1,70 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 9 Jan 2017 14:40:50 -0600
-Subject: [RESEND] spi: davinci: Allow device tree devices to use DMA
-In-Reply-To: <20170109194811.p3if5pzvjjaez2g3@sirena.org.uk>
-References: <1483673177-31516-1-git-send-email-david@lechnology.com>
- <20170109194811.p3if5pzvjjaez2g3@sirena.org.uk>
-Message-ID: <dc47ecd2-fb94-ef7c-af15-590b2233e79f@lechnology.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon,  9 Jan 2017 12:55:26 -0800
+Subject: [PATCH v2 1/6] ARM: dts: davinci: da850: VPIF: add node and muxing
+In-Reply-To: <20170109205531.3435-1-khilman@baylibre.com>
+References: <20170109205531.3435-1-khilman@baylibre.com>
+Message-ID: <20170109205531.3435-2-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2017 01:48 PM, Mark Brown wrote:
-> On Thu, Jan 05, 2017 at 09:26:17PM -0600, David Lechner wrote:
->
->> This allows SPI devices specified in a device tree to use DMA when the
->> master controller.
->
->> Since device tree is supposed to only describe the hardware, adding such
->> a configuration option to device tree would not be acceptable. So, this
->> is the best we can do for now to get SPI devices working with DMA.
->
->> Unfortunately, this excludes the possibility of using one SPI device with
->> DMA and one without on the same master.
->
-> Why would you ever want to do that?  What would ever make sense about
-> not using DMA if it's available and the transfer is suitably large, or
-> conversely why would one want to force DMA even if PIO would be more
-> performant?
+Add VPIF node an pins to da850 SoC.  VPIF has two input channels which
+can be described using the standard DT ports and enpoints.
 
-I don't particularly want to do that, but that is the way the 
-spi-davinci driver currently works. The choice between DMA or PIO is 
-specified in the platform data on a per-device basis.
+Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+---
+ arch/arm/boot/dts/da850.dtsi | 26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
 
-What I get from your remarks is that this is wrong and it needs to be 
-fixed. If that is so, could someone please point out a driver that does 
-it the right way and I will try to fix it.
-
-
->
->> When I originally submitted this patch, there was some discussion as to whether
->> dspi->dma_rx should be changed to return an error rather than being null.
->
->> However, I prefer it the way it is and don't see a compelling reason to change
->> it.
->
-> I don't know what the above comment means, sorry (and don't recall
-> having seen any earlier versions of this).
->
-
-FWIW, you can find the previous conversation at 
-https://patchwork.kernel.org/patch/9437901/
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 104155d12c2f..edab8bb92ec5 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -208,7 +208,18 @@
+ 					0x4c 0x02000022 0x0f0000ff
+ 				>;
+ 			};
+-
++			vpif_capture_pins: vpif_capture_pins {
++				pinctrl-single,bits = <
++					/* VP_DIN[2..7], VP_CLKIN1, VP_CLKIN0 */
++					0x38 0x11111111 0xffffffff
++					/* VP_DIN[10..15,0..1] */
++					0x3c 0x11111111 0xffffffff
++					/* VP_DIN[8..9] */
++					0x40 0x00000011 0x000000ff
++					/* VP_CLKIN3, VP_CLKIN2 */
++					0x4c 0x00010100 0x000f0f00
++				>;
++			};
+ 		};
+ 		prictrl: priority-controller at 14110 {
+ 			compatible = "ti,da850-mstpri";
+@@ -324,6 +335,18 @@
+ 			dma-names = "rx", "tx";
+ 			status = "disabled";
+ 		};
++		vpif: video at 217000 {
++			compatible = "ti,da850-vpif";
++			reg = <0x217000 0x1000>;
++			interrupts = <92>;
++			status = "disabled";
++
++			/* VPIF capture port */
++			port {
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
++		};
+ 		mmc1: mmc at 21b000 {
+ 			compatible = "ti,da830-mmc";
+ 			reg = <0x21b000 0x1000>;
+@@ -465,6 +488,7 @@
+ 			status = "disabled";
+ 		};
+ 	};
++
+ 	aemif: aemif at 68000000 {
+ 		compatible = "ti,da850-aemif";
+ 		#address-cells = <2>;
+-- 
+2.9.3
