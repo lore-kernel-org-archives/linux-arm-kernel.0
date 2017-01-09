@@ -1,39 +1,84 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Mon,  9 Jan 2017 13:46:05 +0000
-Subject: [PATCH v7 14/19] genirq/msi: Set IRQ_DOMAIN_FLAG_MSI on MSI domain
- creation
+Date: Mon,  9 Jan 2017 13:46:06 +0000
+Subject: [PATCH v7 15/19] irqdomain: irq_domain_check_msi_remap
 In-Reply-To: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
 References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1483969570-3154-15-git-send-email-eric.auger@redhat.com>
+Message-ID: <1483969570-3154-16-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we have a flag value indicating an IRQ domain implements MSI,
-let's set it on msi_create_irq_domain().
+This new function checks whether all MSI irq domains
+implement IRQ remapping. This is useful to understand
+whether VFIO passthrough is safe with respect to interrupts.
+
+On ARM typically an MSI controller can sit downstream
+to the IOMMU without preventing VFIO passthrough.
+As such any assigned device can write into the MSI doorbell.
+In case the MSI controller implements IRQ remapping, assigned
+devices will not be able to trigger interrupts towards the
+host. On the contrary, the assignment must be emphasized as
+unsafe with respect to interrupts.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
+v5 -> v6:
+- use irq_domain_hierarchical_is_msi_remap()
+- comment rewording
 
-v6: new
+v4 -> v5:
+- Handle DOMAIN_BUS_FSL_MC_MSI domains
+- Check parents
 ---
- kernel/irq/msi.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ include/linux/irqdomain.h |  1 +
+ kernel/irq/irqdomain.c    | 23 +++++++++++++++++++++++
+ 2 files changed, 24 insertions(+)
 
-diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-index ee23006..ddc2f54 100644
---- a/kernel/irq/msi.c
-+++ b/kernel/irq/msi.c
-@@ -270,8 +270,8 @@ struct irq_domain *msi_create_irq_domain(struct fwnode_handle *fwnode,
- 	if (info->flags & MSI_FLAG_USE_DEF_CHIP_OPS)
- 		msi_domain_update_chip_ops(info);
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index bc2f571..188eced 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -222,6 +222,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
+ 					 void *host_data);
+ extern struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+ 						   enum irq_domain_bus_token bus_token);
++extern bool irq_domain_check_msi_remap(void);
+ extern void irq_set_default_host(struct irq_domain *host);
+ extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
+ 				  irq_hw_number_t hwirq, int node,
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 101ee8f..fff30cb 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -278,6 +278,29 @@ struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+ EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
  
--	return irq_domain_create_hierarchy(parent, 0, 0, fwnode,
--					   &msi_domain_ops, info);
-+	return irq_domain_create_hierarchy(parent, IRQ_DOMAIN_FLAG_MSI, 0,
-+					   fwnode, &msi_domain_ops, info);
- }
- 
- int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
+ /**
++ * irq_domain_check_msi_remap - Check whether all MSI
++ * irq domains implement IRQ remapping
++ */
++bool irq_domain_check_msi_remap(void)
++{
++	struct irq_domain *h;
++	bool ret = true;
++
++	mutex_lock(&irq_domain_mutex);
++	list_for_each_entry(h, &irq_domain_list, link) {
++		if (irq_domain_is_msi(h) &&
++		    !irq_domain_hierarchical_is_msi_remap(h)) {
++			ret = false;
++			goto out;
++		}
++	}
++out:
++	mutex_unlock(&irq_domain_mutex);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(irq_domain_check_msi_remap);
++
++/**
+  * irq_set_default_host() - Set a "default" irq domain
+  * @domain: default domain pointer
+  *
 -- 
 1.9.1
