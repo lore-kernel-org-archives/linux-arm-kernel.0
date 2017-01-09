@@ -1,62 +1,46 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:33 -0500
-Subject: [RFC 37/55] KVM: arm64: Setup vttbr_el2 on each VM entry
+Date: Mon,  9 Jan 2017 01:24:21 -0500
+Subject: [RFC 25/55] KVM: arm/arm64: Let vcpu thread modify its own active
+ state
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-38-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-26-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+Currently, if a vcpu thread tries to change its own active state when
+the irq is already in AP list, it'll loop forever. Since the VCPU thread
+has already synced back LR state to the struct vgic_irq, let it modify
+its own state safely.
 
-Now that the vttbr value will be different depending on the VM's
-exception level, we set it on each VM entry.
-
-We only have one mmu instance at this point, but there will be
-multiple of them when we run nested VMs.
-
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm64/kvm/context.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ virt/kvm/arm/vgic/vgic-mmio.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
-index a93ffe4..b2c0220 100644
---- a/arch/arm64/kvm/context.c
-+++ b/arch/arm64/kvm/context.c
-@@ -18,6 +18,7 @@
- #include <linux/kvm_host.h>
- #include <asm/kvm_emulate.h>
- #include <asm/esr.h>
-+#include <asm/kvm_mmu.h>
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index ebe1b9f..049c570 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -192,9 +192,9 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+ 	 * If this virtual IRQ was written into a list register, we
+ 	 * have to make sure the CPU that runs the VCPU thread has
+ 	 * synced back LR state to the struct vgic_irq.  We can only
+-	 * know this for sure, when either this irq is not assigned to
++	 * know this for sure, when this irq is not assigned to
+ 	 * anyone's AP list anymore, or the VCPU thread is not
+-	 * running on any CPUs.
++	 * running on any CPUs, or current thread is the VCPU thread.
+ 	 *
+ 	 * In the opposite case, we know the VCPU thread may be on its
+ 	 * way back from the guest and still has to sync back this
+@@ -202,6 +202,7 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+ 	 * other thread sync back the IRQ.
+ 	 */
+ 	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
++	       irq->vcpu != vcpu && /* Current thread is not the VCPU thread */
+ 	       irq->vcpu->cpu != -1) /* VCPU thread is running */
+ 		cond_resched_lock(&irq->irq_lock);
  
- struct el1_el2_map {
- 	enum vcpu_sysreg	el1;
-@@ -88,6 +89,15 @@ static void create_shadow_el1_sysregs(struct kvm_vcpu *vcpu)
- 	s_sys_regs[CPACR_EL1] = cptr_el2_to_cpacr_el1(el2_regs[CPTR_EL2]);
- }
- 
-+static void setup_s2_mmu(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm_s2_mmu *mmu = &vcpu->kvm->arch.mmu;
-+	struct kvm_s2_vmid *vmid = vcpu_get_active_vmid(vcpu);
-+
-+	vcpu->arch.hw_vttbr = kvm_get_vttbr(vmid, mmu);
-+	vcpu->arch.hw_mmu = mmu;
-+}
-+
- /*
-  * List of EL1 registers which we allow the virtual EL2 mode to access
-  * directly without trapping and which haven't been paravirtualized.
-@@ -166,6 +176,8 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
- 	}
- 
- 	vgic_v2_setup_shadow_state(vcpu);
-+
-+	setup_s2_mmu(vcpu);
- }
- 
- /**
 -- 
 1.9.1
