@@ -1,57 +1,74 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:12 -0500
-Subject: [RFC 16/55] KVM: arm64: Forward VM reg traps to the guest hypervisor
+Date: Mon,  9 Jan 2017 01:24:04 -0500
+Subject: [RFC 08/55] KVM: arm64: Set virtual EL2 context depending on the
+ guest exception level
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-17-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-9-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forward virtual memory register traps to the guest hypervisor
-if it has set corresponding bits to the virtual HCR_EL2.
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
+Set up virutal EL2 context to hardware if the guest exception level is
+EL2.
+
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm64/kvm/sys_regs.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm64/kvm/context.c | 32 ++++++++++++++++++++++++++------
+ 1 file changed, 26 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index b8e993a..0f5d21b 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -90,6 +90,23 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
- 	return true;
+diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
+index 320afc6..acb4b1e 100644
+--- a/arch/arm64/kvm/context.c
++++ b/arch/arm64/kvm/context.c
+@@ -25,10 +25,25 @@
+ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
++	if (unlikely(vcpu_mode_el2(vcpu))) {
++		ctxt->hw_pstate = *vcpu_cpsr(vcpu) & ~PSR_MODE_MASK;
+ 
+-	ctxt->hw_pstate = *vcpu_cpsr(vcpu);
+-	ctxt->hw_sys_regs = ctxt->sys_regs;
+-	ctxt->hw_sp_el1 = ctxt->gp_regs.sp_el1;
++		/*
++		 * We emulate virtual EL2 mode in hardware EL1 mode using the
++		 * same stack pointer mode as the guest expects.
++		 */
++		if ((*vcpu_cpsr(vcpu) & PSR_MODE_MASK) == PSR_MODE_EL2h)
++			ctxt->hw_pstate |= PSR_MODE_EL1h;
++		else
++			ctxt->hw_pstate |= PSR_MODE_EL1t;
++
++		ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
++		ctxt->hw_sp_el1 = ctxt->el2_regs[SP_EL2];
++	} else {
++		ctxt->hw_pstate = *vcpu_cpsr(vcpu);
++		ctxt->hw_sys_regs = ctxt->sys_regs;
++		ctxt->hw_sp_el1 = ctxt->gp_regs.sp_el1;
++	}
  }
  
-+static bool forward_vm_traps(struct kvm_vcpu *vcpu, struct sys_reg_params *p)
-+{
-+	u64 hcr_el2 = vcpu_el2_reg(vcpu, HCR_EL2);
-+
-+	/* If this is a trap from the virtual EL2, the host handles */
-+	if (vcpu_mode_el2(vcpu))
-+		return false;
-+
-+	/* If the guest wants to trap on R/W operation, forward this trap */
-+	if ((hcr_el2 & HCR_TVM) && p->is_write)
-+		return true;
-+	else if ((hcr_el2 & HCR_TRVM) && !p->is_write)
-+		return true;
-+
-+	return false;
-+}
-+
- /*
-  * Generic accessor for VM registers. Only called as long as HCR_TVM
-  * is set. If the guest enables the MMU, we stop trapping the VM
-@@ -101,6 +118,9 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
+ /**
+@@ -38,9 +53,14 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
+ void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
  {
- 	bool was_enabled = vcpu_has_cache_enabled(vcpu);
+ 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
+-
+-	*vcpu_cpsr(vcpu) = ctxt->hw_pstate;
+-	ctxt->gp_regs.sp_el1 = ctxt->hw_sp_el1;
++	if (unlikely(vcpu_mode_el2(vcpu))) {
++		*vcpu_cpsr(vcpu) &= PSR_MODE_MASK;
++		*vcpu_cpsr(vcpu) |= ctxt->hw_pstate & ~PSR_MODE_MASK;
++		ctxt->el2_regs[SP_EL2] = ctxt->hw_sp_el1;
++	} else {
++		*vcpu_cpsr(vcpu) = ctxt->hw_pstate;
++		ctxt->gp_regs.sp_el1 = ctxt->hw_sp_el1;
++	}
+ }
  
-+	if (forward_vm_traps(vcpu, p))
-+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
-+
- 	BUG_ON(!vcpu_mode_el2(vcpu) && !p->is_write);
- 
- 	if (!p->is_write) {
+ void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt)
 -- 
 1.9.1
