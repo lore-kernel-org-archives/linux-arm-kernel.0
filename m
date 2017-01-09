@@ -1,41 +1,37 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 9 Jan 2017 11:05:20 -0500 (EST)
-Subject: [PATCH 1/2] usb: host: ehci-exynos: Decrese node refcount on
- exynos_ehci_get_phy() error paths
-In-Reply-To: <20170107084141.3731-1-krzk@kernel.org>
-Message-ID: <Pine.LNX.4.44L0.1701091104540.1954-100000@iolanthe.rowland.org>
+From: david@lechnology.com (David Lechner)
+Date: Mon,  9 Jan 2017 10:11:40 -0600
+Subject: [RESEND 3/3] ARM: davinci_all_defconfig: enable iio and ADS7950
+In-Reply-To: <1483978300-403-1-git-send-email-david@lechnology.com>
+References: <1483978300-403-1-git-send-email-david@lechnology.com>
+Message-ID: <1483978300-403-4-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 7 Jan 2017, Krzysztof Kozlowski wrote:
+This enables the iio subsystem and the TI ADS7950 driver. This is used by
+LEGO MINDSTORMS EV3, which has an ADS7957 chip.
 
-> Returning from for_each_available_child_of_node() loop requires cleaning
-> up node refcount.  Error paths lacked it so for example in case of
-> deferred probe, the refcount of phy node was left increased.
-> 
-> Fixes: 6d40500ac9b6 ("usb: ehci/ohci-exynos: Fix of_node_put() for child when getting PHYs")
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  drivers/usb/host/ehci-exynos.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
-> index 42e5b66353ef..7a603f66a9bc 100644
-> --- a/drivers/usb/host/ehci-exynos.c
-> +++ b/drivers/usb/host/ehci-exynos.c
-> @@ -77,10 +77,12 @@ static int exynos_ehci_get_phy(struct device *dev,
->  		if (IS_ERR(phy)) {
->  			ret = PTR_ERR(phy);
->  			if (ret == -EPROBE_DEFER) {
-> +				of_node_put(child);
->  				return ret;
->  			} else if (ret != -ENOSYS && ret != -ENODEV) {
->  				dev_err(dev,
->  					"Error retrieving usb2 phy: %d\n", ret);
-> +				of_node_put(child);
->  				return ret;
->  			}
->  		}
-> 
+Signed-off-by: David Lechner <david@lechnology.com>
+---
+ arch/arm/configs/davinci_all_defconfig | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+index 2b1967a..a899876 100644
+--- a/arch/arm/configs/davinci_all_defconfig
++++ b/arch/arm/configs/davinci_all_defconfig
+@@ -200,6 +200,13 @@ CONFIG_TI_EDMA=y
+ CONFIG_MEMORY=y
+ CONFIG_TI_AEMIF=m
+ CONFIG_DA8XX_DDRCTL=y
++CONFIG_IIO=m
++CONFIG_IIO_BUFFER_CB=m
++CONFIG_IIO_SW_DEVICE=m
++CONFIG_IIO_SW_TRIGGER=m
++CONFIG_TI_ADS7950=m
++CONFIG_IIO_HRTIMER_TRIGGER=m
++CONFIG_IIO_SYSFS_TRIGGER=m
+ CONFIG_PWM=y
+ CONFIG_PWM_TIECAP=m
+ CONFIG_PWM_TIEHRPWM=m
+-- 
+2.7.4
