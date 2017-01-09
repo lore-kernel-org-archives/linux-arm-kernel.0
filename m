@@ -1,38 +1,72 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 9 Jan 2017 11:30:04 +0100
-Subject: [PATCH v2 02/12] driver: clocksource: add gpt timer for imx6sll
-In-Reply-To: <1482832070-22668-3-git-send-email-ping.bai@nxp.com>
-References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
- <1482832070-22668-3-git-send-email-ping.bai@nxp.com>
-Message-ID: <20170109103004.GA30688@mai>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 9 Jan 2017 10:31:56 +0000
+Subject: [PATCH RFC 3/4] dt-bindings: correct marvell orion MDIO binding
+ document
+In-Reply-To: <E1cPpAk-0005uJ-TM@rmk-PC.armlinux.org.uk>
+References: <20170107112656.GL14217@n2100.armlinux.org.uk>
+ <E1cPpAk-0005uJ-TM@rmk-PC.armlinux.org.uk>
+Message-ID: <20170109103156.GA2147@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2016 at 05:47:40PM +0800, Bai Ping wrote:
-> Add gpt timer support for i.MX6SLL.
+On Sat, Jan 07, 2017 at 11:28:30AM +0000, Russell King wrote:
+> Correct the Marvell Orion MDIO binding document to properly reflect the
+> cases where an interrupt is present.  Augment the examples to show this.
 > 
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+
+This looks fine to me.
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
 > ---
->  drivers/clocksource/timer-imx-gpt.c | 1 +
->  1 file changed, 1 insertion(+)
+>  .../devicetree/bindings/net/marvell-orion-mdio.txt      | 17 +++++++++++++++--
+>  1 file changed, 15 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/clocksource/timer-imx-gpt.c b/drivers/clocksource/timer-imx-gpt.c
-> index f595460..f71822d 100644
-> --- a/drivers/clocksource/timer-imx-gpt.c
-> +++ b/drivers/clocksource/timer-imx-gpt.c
-> @@ -556,4 +556,5 @@ static int __init imx6dl_timer_init_dt(struct device_node *np)
->  CLOCKSOURCE_OF_DECLARE(imx6q_timer, "fsl,imx6q-gpt", imx31_timer_init_dt);
->  CLOCKSOURCE_OF_DECLARE(imx6dl_timer, "fsl,imx6dl-gpt", imx6dl_timer_init_dt);
->  CLOCKSOURCE_OF_DECLARE(imx6sl_timer, "fsl,imx6sl-gpt", imx6dl_timer_init_dt);
-> +CLOCKSOURCE_OF_DECLARE(imx6sll_timer, "fsl,imx6sll-gpt", imx6dl_timer_init_dt);
->  CLOCKSOURCE_OF_DECLARE(imx6sx_timer, "fsl,imx6sx-gpt", imx6dl_timer_init_dt);
-
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-
--- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> diff --git a/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt b/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
+> index 9417e54c26c0..ca733ff68ab9 100644
+> --- a/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
+> +++ b/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
+> @@ -7,7 +7,10 @@ interface.
+>  
+>  Required properties:
+>  - compatible: "marvell,orion-mdio"
+> -- reg: address and length of the SMI register
+> +- reg: address and length of the MDIO registers.  When an interrupt is
+> +  not present, the length is the size of the SMI register (4 bytes)
+> +  otherwise it must be 0x84 bytes to cover the interrupt control
+> +  registers.
+>  
+>  Optional properties:
+>  - interrupts: interrupt line number for the SMI error/done interrupt
+> @@ -17,7 +20,7 @@ The child nodes of the MDIO driver are the individual PHY devices
+>  connected to this MDIO bus. They must have a "reg" property given the
+>  PHY address on the MDIO bus.
+>  
+> -Example at the SoC level:
+> +Example at the SoC level without an interrupt property:
+>  
+>  mdio {
+>  	#address-cells = <1>;
+> @@ -26,6 +29,16 @@ mdio {
+>  	reg = <0xd0072004 0x4>;
+>  };
+>  
+> +Example with an interrupt property:
+> +
+> +mdio {
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	compatible = "marvell,orion-mdio";
+> +	reg = <0xd0072004 0x84>;
+> +	interrupts = <30>;
+> +};
+> +
+>  And at the board level:
+>  
+>  mdio {
+> -- 
+> 2.7.4
+> 
