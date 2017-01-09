@@ -1,107 +1,81 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:17 -0500
-Subject: [RFC 21/55] KVM: arm64: Forward HVC instruction to the guest
- hypervisor
+Date: Mon,  9 Jan 2017 01:24:14 -0500
+Subject: [RFC 18/55] KVM: arm64: Forward traps due to HCR_EL2.NV1 bit to the
+ guest hypervisor
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-22-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-19-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forward exceptions due to hvc instruction to the guest hypervisor.
+Forward ELR_EL1, SPSR_EL1 and VBAR_EL1 traps to the guest hypervisor if
+it has set the NV1 bit to the virtual HCR_EL2. The guest hypervisor
+would set this NV1 bit to run a hypervisor in its VM (i.e. another level
+of nested hypervisor).
 
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm64/include/asm/kvm_nested.h |  5 +++++
- arch/arm64/kvm/Makefile             |  1 +
- arch/arm64/kvm/handle_exit.c        | 11 +++++++++++
- arch/arm64/kvm/handle_exit_nested.c | 27 +++++++++++++++++++++++++++
- 4 files changed, 44 insertions(+)
- create mode 100644 arch/arm64/include/asm/kvm_nested.h
- create mode 100644 arch/arm64/kvm/handle_exit_nested.c
+ arch/arm64/include/asm/kvm_arm.h |  1 +
+ arch/arm64/kvm/sys_regs.c        | 17 +++++++++++++++++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_nested.h b/arch/arm64/include/asm/kvm_nested.h
-new file mode 100644
-index 0000000..620b4d3
---- /dev/null
-+++ b/arch/arm64/include/asm/kvm_nested.h
-@@ -0,0 +1,5 @@
-+#ifndef __ARM64_KVM_NESTED_H__
-+#define __ARM64_KVM_NESTED_H__
-+
-+int handle_hvc_nested(struct kvm_vcpu *vcpu);
-+#endif
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index b342bdd..9c35e9a 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -35,4 +35,5 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/irqchip.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
- kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 2a2752b..feded61 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -23,6 +23,7 @@
+ #include <asm/types.h>
  
-+kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += handle_exit_nested.o
- kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += emulate-nested.o
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index a891684..208be16 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -29,6 +29,10 @@
- #include <asm/kvm_mmu.h>
- #include <asm/kvm_psci.h>
+ /* Hyp Configuration Register (HCR) bits */
++#define HCR_NV1		(UL(1) << 43)
+ #define HCR_E2H		(UL(1) << 34)
+ #define HCR_ID		(UL(1) << 33)
+ #define HCR_CD		(UL(1) << 32)
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 19d6a6e..59f9cc6 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -906,10 +906,21 @@ static inline void access_rw(struct sys_reg_params *p, u64 *sysreg)
+ 		*sysreg = p->regval;
+ }
  
-+#ifdef CONFIG_KVM_ARM_NESTED_HYP
-+#include <asm/kvm_nested.h>
-+#endif
-+
- #define CREATE_TRACE_POINTS
- #include "trace.h"
- 
-@@ -42,6 +46,13 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 			    kvm_vcpu_hvc_get_imm(vcpu));
- 	vcpu->stat.hvc_exit_stat++;
- 
-+#ifdef CONFIG_KVM_ARM_NESTED_HYP
-+	ret = handle_hvc_nested(vcpu);
-+	if (ret < 0 && ret != -EINVAL)
-+		return ret;
-+	else if (ret >= 0)
-+		return ret;
-+#endif
- 	ret = kvm_psci_call(vcpu);
- 	if (ret < 0) {
- 		kvm_inject_undefined(vcpu);
-diff --git a/arch/arm64/kvm/handle_exit_nested.c b/arch/arm64/kvm/handle_exit_nested.c
-new file mode 100644
-index 0000000..a6ce23b
---- /dev/null
-+++ b/arch/arm64/kvm/handle_exit_nested.c
-@@ -0,0 +1,27 @@
-+/*
-+ * Copyright (C) 2016 - Columbia University
-+ * Author: Jintack Lim <jintack@cs.columbia.edu>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/kvm.h>
-+#include <linux/kvm_host.h>
-+
-+#include <asm/kvm_emulate.h>
-+
-+/* We forward all hvc instruction to the guest hypervisor. */
-+int handle_hvc_nested(struct kvm_vcpu *vcpu)
++static bool forward_nv1_traps(struct kvm_vcpu *vcpu, struct sys_reg_params *p)
 +{
-+	return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
++	if (!vcpu_mode_el2(vcpu) && (vcpu_el2_reg(vcpu, HCR_EL2) & HCR_NV1))
++		return true;
++
++	return false;
 +}
++
+ static bool access_elr(struct kvm_vcpu *vcpu,
+ 		struct sys_reg_params *p,
+ 		const struct sys_reg_desc *r)
+ {
++	if (forward_nv1_traps(vcpu, p))
++		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
++
+ 	access_rw(p, &vcpu->arch.ctxt.gp_regs.elr_el1);
+ 	return true;
+ }
+@@ -918,6 +929,9 @@ static bool access_spsr(struct kvm_vcpu *vcpu,
+ 		struct sys_reg_params *p,
+ 		const struct sys_reg_desc *r)
+ {
++	if (forward_nv1_traps(vcpu, p))
++		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
++
+ 	access_rw(p, &vcpu->arch.ctxt.gp_regs.spsr[KVM_SPSR_EL1]);
+ 	return true;
+ }
+@@ -926,6 +940,9 @@ static bool access_vbar(struct kvm_vcpu *vcpu,
+ 		struct sys_reg_params *p,
+ 		const struct sys_reg_desc *r)
+ {
++	if (forward_nv1_traps(vcpu, p))
++		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
++
+ 	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
+ 	return true;
+ }
 -- 
 1.9.1
