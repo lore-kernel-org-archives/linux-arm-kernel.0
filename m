@@ -1,82 +1,62 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Mon,  9 Jan 2017 13:46:03 +0000
-Subject: [PATCH v7 12/19] iommu/arm-smmu-v3: Implement reserved region get/put
- callbacks
+Date: Mon,  9 Jan 2017 13:46:09 +0000
+Subject: [PATCH v7 18/19] vfio/type1: Check MSI remapping at irq domain level
 In-Reply-To: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
 References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1483969570-3154-13-git-send-email-eric.auger@redhat.com>
+Message-ID: <1483969570-3154-19-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iommu/arm-smmu: Implement reserved region get/put callbacks
+In case the IOMMU translates MSI transactions (typical case
+on ARM), we check MSI remapping capability at IRQ domain
+level. Otherwise it is checked at IOMMU level.
 
-The get() populates the list with the MSI IOVA reserved window.
-
-At the moment an arbitray MSI IOVA window is set at 0x8000000
-of size 1MB. This will allow to report those info in iommu-group
-sysfs.
+At this stage the arm-smmu-(v3) still advertise the
+IOMMU_CAP_INTR_REMAP capability at IOMMU level. This will be
+removed in subsequent patches.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
 
-v4: creation
+v6: rewrite test
 ---
- drivers/iommu/arm-smmu-v3.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ drivers/vfio/vfio_iommu_type1.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 4d6ec44..6c4111c 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -412,6 +412,9 @@
- /* High-level queue structures */
- #define ARM_SMMU_POLL_TIMEOUT_US	100
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index 5651faf..ec903a0 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -40,6 +40,7 @@
+ #include <linux/mdev.h>
+ #include <linux/notifier.h>
+ #include <linux/dma-iommu.h>
++#include <linux/irqdomain.h>
  
-+#define MSI_IOVA_BASE			0x8000000
-+#define MSI_IOVA_LENGTH			0x100000
-+
- static bool disable_bypass;
- module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
- MODULE_PARM_DESC(disable_bypass,
-@@ -1883,6 +1886,29 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
- 	return iommu_fwspec_add_ids(dev, args->args, 1);
- }
+ #define DRIVER_VERSION  "0.2"
+ #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+@@ -1212,7 +1213,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 	struct vfio_domain *domain, *d;
+ 	struct bus_type *bus = NULL, *mdev_bus;
+ 	int ret;
+-	bool resv_msi;
++	bool resv_msi, msi_remap;
+ 	phys_addr_t resv_msi_base;
  
-+static void arm_smmu_get_resv_regions(struct device *dev,
-+				      struct list_head *head)
-+{
-+	struct iommu_resv_region *region;
-+	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-+
-+	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
-+					 prot, IOMMU_RESV_MSI);
-+	if (!region)
-+		return;
-+
-+	list_add_tail(&region->list, head);
-+}
-+
-+static void arm_smmu_put_resv_regions(struct device *dev,
-+				      struct list_head *head)
-+{
-+	struct iommu_resv_region *entry, *next;
-+
-+	list_for_each_entry_safe(entry, next, head, list)
-+		kfree(entry);
-+}
-+
- static struct iommu_ops arm_smmu_ops = {
- 	.capable		= arm_smmu_capable,
- 	.domain_alloc		= arm_smmu_domain_alloc,
-@@ -1898,6 +1924,8 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
- 	.domain_get_attr	= arm_smmu_domain_get_attr,
- 	.domain_set_attr	= arm_smmu_domain_set_attr,
- 	.of_xlate		= arm_smmu_of_xlate,
-+	.get_resv_regions	= arm_smmu_get_resv_regions,
-+	.put_resv_regions	= arm_smmu_put_resv_regions,
- 	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
- };
+ 	mutex_lock(&iommu->lock);
+@@ -1288,8 +1289,10 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 	INIT_LIST_HEAD(&domain->group_list);
+ 	list_add(&group->next, &domain->group_list);
  
+-	if (!allow_unsafe_interrupts &&
+-	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
++	msi_remap = resv_msi ? irq_domain_check_msi_remap() :
++				iommu_capable(bus, IOMMU_CAP_INTR_REMAP);
++
++	if (!allow_unsafe_interrupts && !msi_remap) {
+ 		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
+ 		       __func__);
+ 		ret = -EPERM;
 -- 
 1.9.1
