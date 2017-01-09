@@ -1,120 +1,46 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 9 Jan 2017 16:59:55 +0530
-Subject: [PATCH 18/20] arm64: ptrace: handle ptrace_request differently for
- aarch32 and ilp32
-In-Reply-To: <1483961397-8599-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1483961397-8599-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1483961397-8599-19-git-send-email-ynorov@caviumnetworks.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 9 Jan 2017 11:34:42 +0000
+Subject: APM smmu implementation
+In-Reply-To: <CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g@mail.gmail.com>
+References: <CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g@mail.gmail.com>
+Message-ID: <d9e40de8-82e2-0f19-5b99-d756ded21e80@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ILP32 has context-related structures different from both aarch32 and
-aarch64/lp64. In this patch compat_arch_ptrace() renamed to
-compat_a32_ptrace(), and compat_arch_ptrace() only makes choice between
-compat_a32_ptrace() and new compat_ilp32_ptrace() handler.
+On 06/01/17 23:21, Feng Kan wrote:
+> Hi Will/Robin:
+> 
+> The APM IOMMU implementation is mostly just the ARM SMMU 500 variant.
 
-compat_ilp32_ptrace() calls generic compat_ptrace_request() for all
-requests except PTRACE_GETSIGMASK and PTRACE_SETSIGMASK, which need
-special handling.
+"Mostly"? Have APM actually modified it (which I strongly doubt) or do
+you mean it's simply been integrated with the upper address lines tied
+off? MMU-500 reports a 48-bit IAS because MMU-500 has 48-bit-wide slave
+interfaces; that's all there is to it. Whether or not you use all of
+those bits is up to you as a system integrator.
 
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
----
- arch/arm64/kernel/ptrace.c | 65 ++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 63 insertions(+), 2 deletions(-)
+> However, our internal bus is only 42 bits wide. Our IAS field is coded
+> as 48 bits, which cause IPA to truncated to 42 bits on the physical
+> bus. In order for our system to work with the arm-smmu.c, there needs
+> to be a way to force the ipa_size to 42. The current internal solution
+> is to use the cpuid, but that is quite ugly. I was thinking of using
+> the model
+> as indication to right the ipa_size, but I am not too sure of the ACPI
+> side. Would it be okay to add an APM MMU500 variant? I would also
+> appreciated it if you guys have any alternate solutions.
 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index ab7937c..d936048 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -758,9 +758,11 @@ static const struct user_regset_view user_aarch64_view = {
- 	.regsets = aarch64_regsets, .n = ARRAY_SIZE(aarch64_regsets)
- };
- 
--#ifdef CONFIG_AARCH32_EL0
-+#ifdef CONFIG_COMPAT
- #include <linux/compat.h>
-+#endif
- 
-+#ifdef CONFIG_AARCH32_EL0
- enum compat_regset {
- 	REGSET_COMPAT_GPR,
- 	REGSET_COMPAT_VFP,
-@@ -1216,7 +1218,7 @@ static int compat_ptrace_sethbpregs(struct task_struct *tsk, compat_long_t num,
- }
- #endif	/* CONFIG_HAVE_HW_BREAKPOINT */
- 
--long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
-+static long compat_a32_ptrace(struct task_struct *child, compat_long_t request,
- 			compat_ulong_t caddr, compat_ulong_t cdata)
- {
- 	unsigned long addr = caddr;
-@@ -1293,8 +1295,67 @@ long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
- 
- 	return ret;
- }
-+
-+#else
-+#define  compat_a32_ptrace(child, request, caddr, cdata)	(0)
- #endif /* CONFIG_AARCH32_EL0 */
- 
-+#ifdef CONFIG_ARM64_ILP32
-+#include <asm/signal32_common.h>
-+
-+static long compat_ilp32_ptrace(struct task_struct *child, compat_long_t request,
-+			compat_ulong_t caddr, compat_ulong_t cdata)
-+{
-+	sigset_t new_set;
-+
-+	switch (request) {
-+	case PTRACE_GETSIGMASK:
-+		if (caddr != sizeof(compat_sigset_t))
-+			return -EINVAL;
-+
-+		return put_sigset_t((compat_sigset_t __user *) (u64) cdata,
-+					&child->blocked);
-+
-+	case PTRACE_SETSIGMASK:
-+		if (caddr != sizeof(compat_sigset_t))
-+			return -EINVAL;
-+
-+		if (get_sigset_t(&new_set, (compat_sigset_t __user *) (u64) cdata))
-+			return -EFAULT;
-+
-+		sigdelsetmask(&new_set, sigmask(SIGKILL)|sigmask(SIGSTOP));
-+
-+		/*
-+		 * Every thread does recalc_sigpending() after resume, so
-+		 * retarget_shared_pending() and recalc_sigpending() are not
-+		 * called here.
-+		 */
-+		spin_lock_irq(&child->sighand->siglock);
-+		child->blocked = new_set;
-+		spin_unlock_irq(&child->sighand->siglock);
-+
-+		return 0;
-+
-+	default:
-+		return compat_ptrace_request(child, request, caddr, cdata);
-+	}
-+}
-+
-+#else
-+#define compat_ilp32_ptrace(child, request, caddr, cdata)	(0)
-+#endif
-+
-+#ifdef CONFIG_COMPAT
-+long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
-+			compat_ulong_t caddr, compat_ulong_t cdata)
-+{
-+	if (is_a32_compat_task())
-+		return compat_a32_ptrace(child, request, caddr, cdata);
-+
-+	return compat_ilp32_ptrace(child, request, caddr, cdata);
-+}
-+#endif
-+
- const struct user_regset_view *task_user_regset_view(struct task_struct *task)
- {
- #ifdef CONFIG_AARCH32_EL0
--- 
-2.7.4
+This is something we've been axpecting to run into for a while now - the
+appropriate solution is to use a "dma-ranges" property on the master
+device(s) to describe that they have 42 bits of address wired up, from
+which they will then inherit the appropriate DMA mask. The outstanding
+issue which remains is that we're still missing some way of preventing
+drivers simply clobbering that with a 64-bit mask later, but that's a
+more general problem[1].
+
+Robin.
+
+[1]:https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg10209.html
+
+> 
+> Thanks
+> Feng Kan
+> 
