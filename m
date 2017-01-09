@@ -1,28 +1,69 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 9 Jan 2017 15:47:35 +0100
-Subject: [PATCH 1/6] drivers: pinctrl: add driver for Allwinner H5 SoC
-In-Reply-To: <20170105220823.5ai4yvcblmzmaey2@lukather>
-References: <20161226162518.5367-1-icenowy@aosc.xyz>
- <20161226162518.5367-2-icenowy@aosc.xyz>
- <20170105220823.5ai4yvcblmzmaey2@lukather>
-Message-ID: <CACRpkdbZkJcPDquhspVcp6R01h-oJ13_YiShiQC7i=d2bZBfSA@mail.gmail.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 9 Jan 2017 15:48:42 +0100
+Subject: [PATCH 3/3] ARM: dts: stm32: enable ADC on stm32f429i-eval board
+In-Reply-To: <1480687022-12851-4-git-send-email-fabrice.gasnier@st.com>
+References: <1480687022-12851-1-git-send-email-fabrice.gasnier@st.com>
+ <1480687022-12851-4-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <56abb501-7920-9b8a-2a82-35d43f40dc12@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 5, 2017 at 11:08 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Dec 27, 2016 at 12:25:13AM +0800, Icenowy Zheng wrote:
+Hi Fabrice
 
->> +builtin_platform_driver(sun50i_h5_pinctrl_driver);
+On 12/02/2016 02:57 PM, Fabrice GASNIER wrote:
+> Enable analog to digital converter on stm32f429i-eval board.
+> It has on-board potentimeter wired to ADC3 in8 analog pin and
+> uses fixed regulator to provide reference voltage.
 >
-> This also looks very much like the H3. I'll post a patchset during the
-> weekend to avoid duplicating those drivers. This was initially done
-> for the sun5i, but it very much applies here.
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+>  arch/arm/boot/dts/stm32429i-eval.dts | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
+> index 13c7cd2..6be0a24 100644
+> --- a/arch/arm/boot/dts/stm32429i-eval.dts
+> +++ b/arch/arm/boot/dts/stm32429i-eval.dts
+> @@ -65,6 +65,20 @@
+>  		serial0 = &usart1;
+>  	};
+>
+> +	regulators {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		reg_vref: regulator at 0 {
+> +			compatible = "regulator-fixed";
+> +			reg = <0>;
+> +			regulator-name = "vref";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +		};
+> +	};
+> +
+>  	leds {
+>  		compatible = "gpio-leds";
+>  		green {
+> @@ -123,3 +137,14 @@
+>  	pinctrl-names = "default";
+>  	status = "okay";
+>  };
+> +
+> +&adc {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&adc3_in8_pin>;
+> +	vref-supply = <&reg_vref>;
+> +	status = "okay";
+> +	adc3: adc at 200 {
+> +		st,adc-channels = <8>;
+> +		status = "okay";
+> +	};
+> +};
+>
+After node reordering:
 
-I have applied Maxime's patch set from today.
+Applied on stm32-dt-for-v4.11
 
-Icenowy, please investigate the direction taken by Maxime
-here for future revisions if needed.
-
-Yours,
-Linus Walleij
+Thanks
+Alex
