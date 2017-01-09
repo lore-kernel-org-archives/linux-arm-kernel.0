@@ -1,134 +1,77 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 9 Jan 2017 08:10:50 +0100
-Subject: [PATCH v2] ARM: dts: sun7i: Add wifi dt node on Banana Pro
-In-Reply-To: <1483642871.27207.1.camel@embedded.rocks>
-References: <20170105173753.14024-1-joerg.krause@embedded.rocks>
- <20170105181151.i3ttsu5ylrw45br7@lukather>
- <1483642871.27207.1.camel@embedded.rocks>
-Message-ID: <20170109071050.d533vekwrfwslxdw@lukather>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 9 Jan 2017 08:19:00 +0100
+Subject: mmc: sdhci-of-at91: Internal clock never stabilised
+In-Reply-To: <20170108125344.3iyfoodszupzgukk@piout.net>
+References: <1DC01DCD0F70AE4284AE3A5E8C726E225D20EDF1@Ex2010.q-core.co.il>
+ <CAJP5LRNRSpMjdTFyL4R4ZN1tZAG0A=TKR5LRareg+TEJmnkd2Q@mail.gmail.com>
+ <20170108125344.3iyfoodszupzgukk@piout.net>
+Message-ID: <20170109071900.fz2en246i7uqmavw@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Alex,
 
-On Thu, Jan 05, 2017 at 08:01:11PM +0100, J?rg Krause wrote:
-> Hi Maxim,
+Which revision of SoC are you using?
+
+Regards
+
+Ludovic
+
+On Sun, Jan 08, 2017 at 01:53:44PM +0100, Alexandre Belloni wrote:
+> Hi,
 > 
-> On Thu, 2017-01-05 at 19:11 +0100, Maxime Ripard wrote:
-> > Hi J?rg,
+> I think Cyrille worked on that a few month ago, maybe he has a comment.
+> 
+> On 08/01/2017 at 14:07:53 +0200, Alex Gershgorin wrote :
+> > Hi All,
+> > We have two different HW platforms based on SAMA5D2 SoC (SAMA5D2 Xplained
+> > Board and our own HW).
+> > On both of them we are facing stabilization of the internal
+> > clock problem, it does not happen all the time but quite often.
+> > Please see below my Kernel boot messages:
 > > 
-> > On Thu, Jan 05, 2017 at 06:37:53PM +0100, J?rg Krause wrote:
-> > > The Banana Pro has an AMPAK AP6181 WiFi+Bluetooth module. The WiFi
-> > > part
-> > > is a BCM43362 IC connected to MMC3 of the A20 SoC via SDIO. The IC
-> > > also
-> > > takes a power enable signal via GPIO.
-> > > 
-> > > This commit adds a device-tree node to power it up, so the mmc
-> > > subsys
-> > > can scan it, and enables the mmc controller which is connected to
-> > > it.
-> > > 
-> > > As the wifi enable pin of the AP6181 module is not really a
-> > > regulator,
-> > > switch the mmc3 node to the mmc-pwrseq framework for controlling
-> > > it.
-> > > This more accurately reflectes how the hardware actually works.
-> > > 
-> > > Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
-> > > ---
-> > > Changes v2 (suggested by Maxime Ripard):
-> > > ? - rename pwrseq node to clarify the function rather what it's
-> > > ????connected to
-> > > ? - use dash instead of underscore for the pwrseq node name
-> > > ? - remove setting pull-ups for mmc3 (default since commit
-> > > 37bc56128d92)
-> > > 
-> > > ---
-> > > ?arch/arm/boot/dts/sun7i-a20-bananapro.dts | 30 ++++++++++++++++++-
-> > > -----------
-> > > ?1 file changed, 18 insertions(+), 12 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-> > > b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-> > > index 19d63d4049de..77f8fb76c157 100644
-> > > --- a/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-> > > +++ b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-> > > @@ -76,6 +76,13 @@
-> > > ?		};
-> > > ?	};
-> > > ?
-> > > +	wifi_pwrseq: wifi-pwrseq {
-> > > +		compatible = "mmc-pwrseq-simple";
-> > > +		pinctrl-names = "default";
-> > > +		pinctrl-0 = <&vmmc3_pin_bananapro>;
-> > > +		reset-gpios = <&pio 7 22 GPIO_ACTIVE_LOW>;
-> > > +	};
-> > > +
-> > > ?	reg_gmac_3v3: gmac-3v3 {
-> > > ?		compatible = "regulator-fixed";
-> > > ?		pinctrl-names = "default";
-> > > @@ -87,17 +94,6 @@
-> > > ?		enable-active-high;
-> > > ?		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>;
-> > > ?	};
-> > > -
-> > > -	reg_vmmc3: vmmc3 {
-> > > -		compatible = "regulator-fixed";
-> > > -		pinctrl-names = "default";
-> > > -		pinctrl-0 = <&vmmc3_pin_bananapro>;
-> > > -		regulator-name = "vmmc3";
-> > > -		regulator-min-microvolt = <3300000>;
-> > > -		regulator-max-microvolt = <3300000>;
-> > > -		enable-active-high;
-> > > -		gpio = <&pio 7 22 GPIO_ACTIVE_HIGH>;
-> > > -	};
-> > > ?};
-> > > ?
-> > > ?&ahci {
-> > > @@ -166,10 +162,20 @@
-> > > ?&mmc3 {
-> > > ?	pinctrl-names = "default";
-> > > ?	pinctrl-0 = <&mmc3_pins_a>;
-> > > -	vmmc-supply = <&reg_vmmc3>;
-> > > +	vmmc-supply = <&reg_vcc3v3>;
-> > > +	mmc-pwrseq = <&wifi_pwrseq>;
-> > > ?	bus-width = <4>;
-> > > ?	non-removable;
-> > > +	wakeup-source;
+> > sdhci: Copyright(c) Pierre Ossman
+> > sdhci-pltfm: SDHCI platform and OF driver helper
+> > sdhci-at91 a0000000.sdio-host: update clk mul to 39 as gck rate is
+> > 480000000 Hz
+> > mmc0: Internal clock never stabilised.
+> > mmc0: Internal clock never stabilised.
+> > mmc0: SDHCI controller on a0000000.sdio-host [a0000000.sdio-host] using ADMA
 > > 
-> > Sorry for not spotting that earlier, but this is suspicious. The PIO
-> > is not able to be wake up the CPU, since it's connected to the GIC
-> > that is shut down during CPU suspend. Our only wake up source is the
-> > NMI controller. So either it is not able to wake up the system, or
-> > the
-> > interrupt line in not the right one.
+> > snip
+> > 
+> > snip
+> > 
+> > Waiting for root device /dev/mmcblk0p2...
+> > mmc0: Internal clock never stabilised.
+> > mmc0: Timeout waiting for hardware cmd interrupt.
+> > sdhci: =========== REGISTER DUMP (mmc0)===========
+> > sdhci: Sys addr: 0x00000000 | Version:  0x00001502
+> > sdhci: Blk size: 0x00000000 | Blk cnt:  0x00000000
+> > sdhci: Argument: 0x00000000 | Trn mode: 0x00000000
+> > sdhci: Present: 0x01ff0001 | Host ctl: 0x00000001
+> > sdhci: Power: 0x0000000f | Blk gap:  0x00000000
+> > sdhci: Wake-up: 0x00000000 | Clock:    0x0000ffe1
+> > sdhci: Timeout: 0x00000000 | Int stat: 0x00000000
+> > sdhci: Int enab: 0x00ff0003 | Sig enab: 0x00ff0003
+> > sdhci: AC12 err: 0x00000000 | Slot int: 0x00000000
+> > sdhci: Caps: 0x27ec0c8c | Caps_1: 0x00270f77
+> > sdhci: Cmd: 0x00000000 | Max curr: 0x00000000
+> > sdhci: Host ctl2: 0x00000000
+> > sdhci: ADMA Err: 0x00000000 | ADMA Ptr: 0x00000000
+> > sdhci: ===========================================
+> > 
+> > Any direction to solve this problem?
+> > 
+> > Thanks,
+> > Alex Gershgorin
 > 
-> Sorry, but I'm not sure I understand...
+> -- 
+> Alexandre Belloni, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
 > 
-> The "WIFI-HOST-WAKE" line connects "WL_HOST_WAKE" of the AP6210 to pin
-> EINT15 of the A20 as shown in the schematic of the board [1].
-> 
-> Note, that this is the same hardware configuration as done on the
-> Banana Pi M1+ [2]. The device tree node for mmc3 of the M1+ has
-> "wakeup-source" enabled, too, so I inherited it. However, I did not
-> tested the wake-up feature.
-
-This is exactly the wakeup-source property that is suspicious, and
-probably doesn't work on the BPi either. Either way, we don't have
-suspend support at all on both of these boards, so you can just remove
-it and we will figure it out later.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170109/109713f1/attachment.sig>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
