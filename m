@@ -1,22 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 9 Jan 2017 20:39:58 +0100
-Subject: [PATCH 4/4] watchdog: coh901327_wdt: Use dev variable instead of
- pdev->dev
-In-Reply-To: <1483500343-27113-4-git-send-email-linux@roeck-us.net>
-References: <1483500343-27113-1-git-send-email-linux@roeck-us.net>
- <1483500343-27113-4-git-send-email-linux@roeck-us.net>
-Message-ID: <CACRpkdbsZB-yKCY-fzLw-OK6YmXycTKF5Hep094W8HbQxj+ptg@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 9 Jan 2017 13:43:55 -0600
+Subject: [PATCH 2/5] ARM: dts: keystone: Add PSC node
+In-Reply-To: <20170109194358.27271-1-s-anna@ti.com>
+References: <20170109194358.27271-1-s-anna@ti.com>
+Message-ID: <20170109194358.27271-3-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 4, 2017 at 4:25 AM, Guenter Roeck <linux@roeck-us.net> wrote:
+The Power Sleep Controller (PSC) module is responsible
+for the power and clock management for each of the peripherals
+present on the SoC. Represent this as a syscon node so that
+multiple users can leverage it for various functionalities.
 
-> Use a local dev variable instead of dereferencing pdev->dev several
-> times in the probe function to make the code easier to read.
->
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+Signed-off-by: Suman Anna <s-anna@ti.com>
+[afd at ti.com: add simple-mfd compatible]
+Signed-off-by: Andrew F. Davis <afd@ti.com>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/boot/dts/keystone.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+index 02708ba2d4f4..ec203d0a673d 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -83,6 +83,11 @@
+ 			reg = <0x02310000 0x200>;
+ 		};
+ 
++		psc: power-sleep-controller at 02350000 {
++			compatible = "syscon", "simple-mfd";
++			reg = <0x02350000 0x1000>;
++		};
++
+ 		devctrl: device-state-control at 02620000 {
+ 			compatible = "ti,keystone-devctrl", "syscon";
+ 			reg = <0x02620000 0x1000>;
+-- 
+2.10.2
