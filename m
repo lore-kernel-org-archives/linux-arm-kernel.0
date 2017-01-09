@@ -1,57 +1,295 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon,  9 Jan 2017 17:28:28 +0000
-Subject: [PATCH v4 5/9] arm64: cpufeature: Define helpers for sys_reg id
+Date: Mon,  9 Jan 2017 17:28:32 +0000
+Subject: [PATCH v4 9/9] arm64: Documentation - Expose CPU feature registers
 In-Reply-To: <1483982912-27215-1-git-send-email-suzuki.poulose@arm.com>
 References: <1483982912-27215-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1483982912-27215-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1483982912-27215-10-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define helper macros to extract op0, op1, CRn, CRm & op2
-for a given sys_reg id. While at it remove the explicit
-masking only used for Op0.
+Documentation for the infrastructure to expose CPU feature
+register by emulating MRS.
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Dave Martin <dave.martin@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/sysreg.h | 21 ++++++++++++++++++++-
- 1 file changed, 20 insertions(+), 1 deletion(-)
+Changes since V3:
+ - Mark RES0 fields as hidden and remove the RAZ registers from the
+   exposed list, as RES0 fields are hidden.
+ - Removed obsolete references
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 98ae03f..cf43064 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -32,8 +32,27 @@
-  *	[11-8]  : CRm
-  *	[7-5]   : Op2
-  */
-+#define Op0_shift	19
-+#define Op0_mask	0x3
-+#define Op1_shift	16
-+#define Op1_mask	0x7
-+#define CRn_shift	12
-+#define CRn_mask	0xf
-+#define CRm_shift	8
-+#define CRm_mask	0xf
-+#define Op2_shift	5
-+#define Op2_mask	0x7
+Changes since V2:
+ - Include the sample program in the documentation
+---
+ Documentation/arm64/cpu-feature-registers.txt | 240 ++++++++++++++++++++++++++
+ arch/arm64/kernel/cpufeature.c                |   4 +
+ 2 files changed, 244 insertions(+)
+ create mode 100644 Documentation/arm64/cpu-feature-registers.txt
+
+diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
+new file mode 100644
+index 0000000..61ca21e
+--- /dev/null
++++ b/Documentation/arm64/cpu-feature-registers.txt
+@@ -0,0 +1,240 @@
++		ARM64 CPU Feature Registers
++		===========================
 +
- #define sys_reg(op0, op1, crn, crm, op2) \
--	((((op0)&3)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
-+	(((op0) << Op0_shift) | ((op1) << Op1_shift) | \
-+	 ((crn) << CRn_shift) | ((crm) << CRm_shift) | \
-+	 ((op2) << Op2_shift))
++Author: Suzuki K Poulose <suzuki.poulose@arm.com>
 +
-+#define sys_reg_Op0(id)	(((id) >> Op0_shift) & Op0_mask)
-+#define sys_reg_Op1(id)	(((id) >> Op1_shift) & Op1_mask)
-+#define sys_reg_CRn(id)	(((id) >> CRn_shift) & CRn_mask)
-+#define sys_reg_CRm(id)	(((id) >> CRm_shift) & CRm_mask)
-+#define sys_reg_Op2(id)	(((id) >> Op2_shift) & Op2_mask)
++
++This file describes the ABI for exporting the AArch64 CPU ID/feature
++registers to userspace. The availability of this ABI is advertised
++via the HWCAP_CPUID in HWCAPs.
++
++1. Motivation
++---------------
++
++The ARM architecture defines a set of feature registers, which describe
++the capabilities of the CPU/system. Access to these system registers is
++restricted from EL0 and there is no reliable way for an application to
++extract this information to make better decisions at runtime. There is
++limited information available to the application via HWCAPs, however
++there are some issues with their usage.
++
++ a) Any change to the HWCAPs requires an update to userspace (e.g libc)
++    to detect the new changes, which can take a long time to appear in
++    distributions. Exposing the registers allows applications to get the
++    information without requiring updates to the toolchains.
++
++ b) Access to HWCAPs is sometimes limited (e.g prior to libc, or
++    when ld is initialised at startup time).
++
++ c) HWCAPs cannot represent non-boolean information effectively. The
++    architecture defines a canonical format for representing features
++    in the ID registers; this is well defined and is capable of
++    representing all valid architecture variations.
++
++
++2. Requirements
++-----------------
++
++ a) Safety :
++    Applications should be able to use the information provided by the
++    infrastructure to run safely across the system. This has greater
++    implications on a system with heterogeneous CPUs.
++    The infrastructure exports a value that is safe across all the
++    available CPU on the system.
++
++    e.g, If at least one CPU doesn't implement CRC32 instructions, while
++    others do, we should report that the CRC32 is not implemented.
++    Otherwise an application could crash when scheduled on the CPU
++    which doesn't support CRC32.
++
++ b) Security :
++    Applications should only be able to receive information that is
++    relevant to the normal operation in userspace. Hence, some of the
++    fields are masked out(i.e, made invisible) and their values are set to
++    indicate the feature is 'not supported'. See Section 4 for the list
++    of visible features. Also, the kernel may manipulate the fields
++    based on what it supports. e.g, If FP is not supported by the
++    kernel, the values could indicate that the FP is not available
++    (even when the CPU provides it).
++
++ c) Implementation Defined Features
++    The infrastructure doesn't expose any register which is
++    IMPLEMENTATION DEFINED as per ARMv8-A Architecture.
++
++ d) CPU Identification :
++    MIDR_EL1 is exposed to help identify the processor. On a
++    heterogeneous system, this could be racy (just like getcpu()). The
++    process could be migrated to another CPU by the time it uses the
++    register value, unless the CPU affinity is set. Hence, there is no
++    guarantee that the value reflects the processor that it is
++    currently executing on. The REVIDR is not exposed due to this
++    constraint, as REVIDR makes sense only in conjunction with the
++    MIDR. Alternately, MIDR_EL1 and REVIDR_EL1 are exposed via sysfs
++    at:
++
++	/sys/devices/system/cpu/cpu$ID/regs/identification/
++	                                              \- midr
++	                                              \- revidr
++
++3. Implementation
++--------------------
++
++The infrastructure is built on the emulation of the 'MRS' instruction.
++Accessing a restricted system register from an application generates an
++exception and ends up in SIGILL being delivered to the process.
++The infrastructure hooks into the exception handler and emulates the
++operation if the source belongs to the supported system register space.
++
++The infrastructure emulates only the following system register space:
++	Op0=3, Op1=0, CRn=0, CRm=0,4,5,6,7
++
++(See Table C5-6 'System instruction encodings for non-Debug System
++register accesses' in ARMv8 ARM DDI 0487A.h, for the list of
++registers).
++
++The following rules are applied to the value returned by the
++infrastructure:
++
++ a) The value of an 'IMPLEMENTATION DEFINED' field is set to 0.
++ b) The value of a reserved field is populated with the reserved
++    value as defined by the architecture.
++ c) The value of a 'visible' field holds the system wide safe value
++    for the particular feature (except for MIDR_EL1, see section 4).
++ d) All other fields (i.e, invisible fields) are set to indicate
++    the feature is missing (as defined by the architecture).
++
++4. List of registers with visible features
++-------------------------------------------
++
++  1) ID_AA64ISAR0_EL1 - Instruction Set Attribute Register 0
++     x--------------------------------------------------x
++     | Name                         |  bits   | visible |
++     |--------------------------------------------------|
++     | RES0                         | [63-32] |    n    |
++     |--------------------------------------------------|
++     | RDM                          | [31-28] |    y    |
++     |--------------------------------------------------|
++     | ATOMICS                      | [23-20] |    y    |
++     |--------------------------------------------------|
++     | CRC32                        | [19-16] |    y    |
++     |--------------------------------------------------|
++     | SHA2                         | [15-12] |    y    |
++     |--------------------------------------------------|
++     | SHA1                         | [11-8]  |    y    |
++     |--------------------------------------------------|
++     | AES                          | [7-4]   |    y    |
++     |--------------------------------------------------|
++     | RES0                         | [3-0]   |    n    |
++     x--------------------------------------------------x
++
++
++  2) ID_AA64PFR0_EL1 - Processor Feature Register 0
++     x--------------------------------------------------x
++     | Name                         |  bits   | visible |
++     |--------------------------------------------------|
++     | RES0                         | [63-28] |    n    |
++     |--------------------------------------------------|
++     | GIC                          | [27-24] |    n    |
++     |--------------------------------------------------|
++     | AdvSIMD                      | [23-20] |    y    |
++     |--------------------------------------------------|
++     | FP                           | [19-16] |    y    |
++     |--------------------------------------------------|
++     | EL3                          | [15-12] |    n    |
++     |--------------------------------------------------|
++     | EL2                          | [11-8]  |    n    |
++     |--------------------------------------------------|
++     | EL1                          | [7-4]   |    n    |
++     |--------------------------------------------------|
++     | EL0                          | [3-0]   |    n    |
++     x--------------------------------------------------x
++
++
++  3) MIDR_EL1 - Main ID Register
++     x--------------------------------------------------x
++     | Name                         |  bits   | visible |
++     |--------------------------------------------------|
++     | Implementer                  | [31-24] |    y    |
++     |--------------------------------------------------|
++     | Variant                      | [23-20] |    y    |
++     |--------------------------------------------------|
++     | Architecture                 | [19-16] |    y    |
++     |--------------------------------------------------|
++     | PartNum                      | [15-4]  |    y    |
++     |--------------------------------------------------|
++     | Revision                     | [3-0]   |    y    |
++     x--------------------------------------------------x
++
++   NOTE: The 'visible' fields of MIDR_EL1 will contain the value
++   as available on the CPU where it is fetched and is not a system
++   wide safe value.
++
++Appendix I: Example
++---------------------------
++
++/*
++ * Sample program to demonstrate the MRS emulation ABI.
++ *
++ * Copyright (C) 2015-2016, ARM Ltd
++ *
++ * Author: Suzuki K Poulose <suzuki.poulose@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <asm/hwcap.h>
++#include <stdio.h>
++#include <sys/auxv.h>
++
++#define get_cpu_ftr(id) ({					\
++		unsigned long __val;				\
++		asm("mrs %0, "#id : "=r" (__val));		\
++		printf("%-20s: 0x%016lx\n", #id, __val);	\
++	})
++
++int main(void)
++{
++
++	if (!(getauxval(AT_HWCAP) & HWCAP_CPUID)) {
++		fputs("CPUID registers unavailable\n", stderr);
++		return 1;
++	}
++
++	get_cpu_ftr(ID_AA64ISAR0_EL1);
++	get_cpu_ftr(ID_AA64ISAR1_EL1);
++	get_cpu_ftr(ID_AA64MMFR0_EL1);
++	get_cpu_ftr(ID_AA64MMFR1_EL1);
++	get_cpu_ftr(ID_AA64PFR0_EL1);
++	get_cpu_ftr(ID_AA64PFR1_EL1);
++	get_cpu_ftr(ID_AA64DFR0_EL1);
++	get_cpu_ftr(ID_AA64DFR1_EL1);
++
++	get_cpu_ftr(MIDR_EL1);
++	get_cpu_ftr(MPIDR_EL1);
++	get_cpu_ftr(REVIDR_EL1);
++
++#if 0
++	/* Unexposed register access causes SIGILL */
++	get_cpu_ftr(ID_MMFR0_EL1);
++#endif
++
++	return 0;
++}
++
++
++
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 6494f9b..fa707e3 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -82,6 +82,10 @@ static bool __maybe_unused
+ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused);
  
- #ifndef CONFIG_BROKEN_GAS_INST
  
++/*
++ * NOTE: Any changes to the visibility of features should be kept in
++ * sync with the documentation of the CPU feature register ABI.
++ */
+ static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
 -- 
 2.7.4
