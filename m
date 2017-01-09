@@ -1,77 +1,30 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon, 9 Jan 2017 23:34:48 +0530
-Subject: [PATCH 0/4] ARM: exynos: Fix Odroid U3 USB/LAN when TFTP booting
- (power sequence)
-In-Reply-To: <20170107085203.4431-1-krzk@kernel.org>
-References: <20170107085203.4431-1-krzk@kernel.org>
-Message-ID: <CANAwSgSEZvxHje65Kk13fvD9NZGB+iHCJtoGJdQrUdS42ei_WA@mail.gmail.com>
+From: bvantiel@gmail.com (Bas van Tiel)
+Date: Mon, 9 Jan 2017 19:06:19 +0100
+Subject: Unhandled level 2 translation fault (11) at 0x000000b8, esr
+ 0x92000046, rpi3 (aarch64)
+In-Reply-To: <20170109151354.GC7593@e104818-lin.cambridge.arm.com>
+References: <CAGDbNAD7-TM6+x0A3FebTOPYmqQqbm1w29ZwH+9qePaAvhxTKw@mail.gmail.com>
+ <20161230151323.583b7ac5@xhacker>
+ <CAGDbNAAGqFqt7X+=XYRLAp=L_fTv9dAAe=wu4T_W-FCGqnYHHg@mail.gmail.com>
+ <20170109151354.GC7593@e104818-lin.cambridge.arm.com>
+Message-ID: <CAGDbNAC-8w1xytLuzWTMnWLi8=j1ShkwE3CLXQ5q75m_RibCMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+> I defined STACKSIZE to the kernel's SIGSTKSZ (16384) and it seems to run
+> fine, though I'll leave it longer/overnight (on a Juno board). With the
+> 4K signal stack it was crashing shortly after start.
 
-On 7 January 2017 at 14:21, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> Hi,
->
-> Thanks to Markus Reichl, I got an Odroid U3 to work with. Thanks to Peter
-> Chen, we got a power sequence generic library which solves my long
-> standing Odroid U3 problem - no LAN9730 if it was enabled by bootloader.
->
-> My previous attempts for this can be found here [0].
->
-> This patchset is based on Peter's v11 of power sequence [1].
-> Patchset is available also on my Github [2].
->
-> More detailed analysis is described in patch 2/4 ("ARM: dts: exynos: Fix
-> LAN9730 on Odroid U3 after tftpboot").
->
->
+I tried the STACKSIZE of 16384 for both the RPI3 and the PINEA64 board
+and still see the same behaviour of crashing. Sometimes the process
+is also blocked for a long time before it crashes.
 
-[snip]
+Setting the interval to 200 usec [5 Khz] will help to crash it faster.
 
-On which u-boot should this be tested.
+To further isolate the issue I will create a kernel module (based on a
+hrtimer) that will sent a periodic signal to the registered process
+and execute the same sighandler logic to check if the problem is still
+there.
 
-On HK u-boot tftp boot is not supported.
-----------------------------------------------------------
-U-Boot 2010.12-00000-g9777ca6-dirty (Nov 26 2015 - 10:10:11) for Exynox4412
-
-
-CPU: S5PC220 [Samsung SOC on SMP Platform Base on ARM CortexA9]
-APLL = 1000MHz, MPLL = 800MHz
-DRAM:  2 GiB
-
-PMIC VERSION : 0x00, CHIP REV : 2
-TrustZone Enabled BSP
-BL1 version: 20121128
-
-
-Checking Boot Mode ... SDMMC
-MMC Device 0: 14804 MB
-MMC Device 1 not found
-*** Warning - using default environment
-
-USB3503 NINT = OUTPUT LOW!
-ModeKey Check... run normal_boot
-No ethernet found.
-Hit any key to stop autoboot:  0
-Exynos4412 #
-Exynos4412 #
-Exynos4412 #
-Exynos4412 # usb start
-(Re)start USB...
-USB0:   Exynos4412-ehci: init hccr 12580000 and hcor 12580010 hc_length 16
-usb: usb_refclk_enable is active low: NO
-ProTIP: If usb doesn't work - try playing with 'usb_invert_clken' environment
-USB EHCI 1.00
-scanning bus 0 for devices... EHCI timed out on TD - token=0x80008c80
-EHCI fail timeout STS_ASS set
-
-      USB device not accepting new address (error=80000000)
-EHCI fail timeout STS_ASS set
-1 USB Device(s) found
-       scanning usb for storage devices... 0 Storage Device(s) found
-       scanning usb for ethernet devices... 0 Ethernet Device(s) found
-Exynos4412 #
-
-Best Regards
--Anand
+regards
+Bas
