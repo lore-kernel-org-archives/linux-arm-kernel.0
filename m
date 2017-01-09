@@ -1,71 +1,63 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:22 -0500
-Subject: [RFC 26/55] KVM: arm/arm64: Add VGIC data structures for the nesting
+Date: Mon,  9 Jan 2017 01:24:26 -0500
+Subject: [RFC 30/55] KVM: arm/arm64: Inject irqs to the guest hypervisor
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-27-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-31-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+If we have a pending IRQ for the guest and the guest expects IRQs
+to be handled in its virtual EL2 mode (the virtual IMO bit is set)
+and it is not already running in virtual EL2 mode, then we have to
+emulate an IRQ exception.
 
-This adds a couple of extra data structures:
-
-The nested_vgic_vX structures contain the data manipulated by the guest
-hypervisor when it faults/traps on accesses to the GICH_ interface.
-
-The shadow_vgic_vX arrays contain the shadow copies of the LRs.  That
-is, it is a modified version of the nested_vgic_vX->vgic_lr.  The reason
-why we need a modified version is that for interrupts with the HW bit
-set (those for the timer) the interrupt number must be that of the host
-hardware number, and not the virtual one programmed by the guest
-hypervisor.
-
-The hw_vX_cpu_if pointers point to the registers that the lowvisor (EL2)
-code actually copied into hardware when switching to the guest, so at
-init time we set:
-
-vgic_cpu->hw_v2_cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-
-And we should change the vgic-sr function to read the LRs from the
-hw_v2_lr pointer.
-
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/kvm/arm_vgic.h | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ virt/kvm/arm/vgic/vgic.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 002f092..9a9cb27 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -246,6 +246,26 @@ struct vgic_cpu {
- 	unsigned int used_lrs;
- 	struct vgic_irq private_irqs[VGIC_NR_PRIVATE_IRQS];
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 6440b56..4a98654 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -17,6 +17,7 @@
+ #include <linux/kvm.h>
+ #include <linux/kvm_host.h>
+ #include <linux/list_sort.h>
++#include <asm/kvm_emulate.h>
  
-+	/* CPU vif control registers for the virtual GICH interface */
-+	union {
-+		struct vgic_v2_cpu_if	nested_vgic_v2;
-+		struct vgic_v3_cpu_if	nested_vgic_v3;
-+	};
+ #include "vgic.h"
+ 
+@@ -652,6 +653,28 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+ 	/* Nuke remaining LRs */
+ 	for ( ; count < kvm_vgic_global_state.nr_lr; count++)
+ 		vgic_clear_lr(vcpu, count);
 +
 +	/*
-+	 * The shadow vif control register loaded to the hardware when
-+	 * running a sted L2 guest with the virtual IMO bit set.
++	 * If we have any pending IRQ for the guest and the guest expects IRQs
++	 * to be handled in its virtual EL2 mode (the virtual IMO bit is set)
++	 * and it is not already running in virtual EL2 mode, then we have to
++	 * emulate an IRQ exception to virtual IRQ. Note that a pending IRQ
++	 * means an irq of which state is pending but not active.
 +	 */
-+	union {
-+		struct vgic_v2_cpu_if	shadow_vgic_v2;
-+		struct vgic_v3_cpu_if	shadow_vgic_v3;
-+	};
++	if (vcpu_el2_imo_is_set(vcpu) && !vcpu_mode_el2(vcpu)) {
++		bool pending = false;
 +
-+	union {
-+		struct vgic_v2_cpu_if	*hw_v2_cpu_if;
-+		struct vgic_v3_cpu_if	*hw_v3_cpu_if;
-+	};
++		list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
++			spin_lock(&irq->irq_lock);
++			pending = irq->pending && irq->enabled && !irq->active;
++			spin_unlock(&irq->irq_lock);
 +
- 	spinlock_t ap_list_lock;	/* Protects the ap_list */
++			if (pending) {
++				kvm_inject_nested_irq(vcpu);
++				break;
++			}
++		}
++	}
+ }
  
- 	/*
+ /* Sync back the hardware VGIC state into our emulation after a guest's run. */
 -- 
 1.9.1
