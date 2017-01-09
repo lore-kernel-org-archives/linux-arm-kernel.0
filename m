@@ -1,43 +1,55 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  9 Jan 2017 17:46:49 +0100
-Subject: [PATCH v2 0/6] arm64: allwinner: a64: Enable MMC support
-Message-ID: <cover.493dc67855a5f1837e875d37307319a03d14d1d0.1483980339.git-series.maxime.ripard@free-electrons.com>
+Date: Mon,  9 Jan 2017 17:46:51 +0100
+Subject: [PATCH v2 2/6] mmc: sunxi: Enable the new timings for the A64 MMC
+ controllers
+In-Reply-To: <cover.493dc67855a5f1837e875d37307319a03d14d1d0.1483980339.git-series.maxime.ripard@free-electrons.com>
+References: <cover.493dc67855a5f1837e875d37307319a03d14d1d0.1483980339.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <1c00451acbaa345533cd5b19544d2d492a0decca.1483980339.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The A64 MMC controllers need to set a "new timings" bit when a new rate is
+set.
 
-Here is a second attempt at getting the MMC controllers running, the first
-having been done by Andre.
+The actual meaning of that bit is not clear yet, but not setting it leads
+to some corner-case issues, like the CMD53 failing, which is used to
+implement SDIO packet aggregation.
 
-This has been tested on a board with one SDIO device (a Marvell WiFi chip)
-and a Kingston eMMC with 1.8V IOs.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/mmc/host/sunxi-mmc.c | 6 ++++++
+ 1 file changed, 6 insertions(+), 0 deletions(-)
 
-For SDIO, the HS DDR mode works just fine. There's a little bit of work to
-get to SDR104, but that will come eventually.
-
-For the eMMC, HS200 with the voltage switch works. HS400 doesn't at the
-moment, but since it's significantly more complex, and at the same time
-Allwinner recommends to limit its frequency to 100MHz, this doesn't have
-any benefits. If there's any at some point, this can be added later.
-
-Let me know what you think,
-Maxime
-
-Andre Przywara (1):
-  arm64: allwinner: a64: Add MMC nodes
-
-Maxime Ripard (5):
-  mmc: sunxi: Always set signal delay to 0 for A64
-  mmc: sunxi: Enable the new timings for the A64 MMC controllers
-  mmc: sunxi: Add EMMC (MMC2) controller compatible
-  arm64: allwinner: a64: Add MMC pinctrl nodes
-  arm64: allwinner: a64: Increase the MMC max frequency
-
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 67 ++++++++++++++++++++-
- drivers/mmc/host/sunxi-mmc.c                  | 63 +++++++++----------
- 2 files changed, 97 insertions(+), 33 deletions(-)
-
-base-commit: f9ca9b952ee139fbb9cd4d354a33f440bc1049cd
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index ea9552a0d820..9a860bcac154 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -253,6 +253,8 @@ struct sunxi_mmc_cfg {
+ 
+ 	/* does the IP block support autocalibration? */
+ 	bool can_calibrate;
++
++	bool needs_new_timings;
+ };
+ 
+ struct sunxi_mmc_host {
+@@ -776,6 +778,9 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 	}
+ 	mmc_writel(host, REG_CLKCR, rval);
+ 
++	if (host->cfg->needs_new_timings)
++		mmc_writel(host, REG_SD_NTSR, SDXC_2X_TIMING_MODE);
++
+ 	ret = sunxi_mmc_clk_set_phase(host, ios, rate);
+ 	if (ret)
+ 		return ret;
+@@ -1073,6 +1078,7 @@ static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
+ 	.idma_des_size_bits = 16,
+ 	.clk_delays = NULL,
+ 	.can_calibrate = true,
++	.needs_new_timings = true,
+ };
+ 
+ static const struct of_device_id sunxi_mmc_of_match[] = {
 -- 
 git-series 0.8.11
