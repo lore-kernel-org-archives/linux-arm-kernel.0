@@ -1,34 +1,39 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon,  9 Jan 2017 13:47:48 +0000
-Subject: [RFC PATCH v3 4/5] ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class
- cpus
-In-Reply-To: <1483969669-4636-1-git-send-email-vladimir.murzin@arm.com>
-References: <1483969669-4636-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1483969669-4636-5-git-send-email-vladimir.murzin@arm.com>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Mon,  9 Jan 2017 13:46:05 +0000
+Subject: [PATCH v7 14/19] genirq/msi: Set IRQ_DOMAIN_FLAG_MSI on MSI domain
+ creation
+In-Reply-To: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
+References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1483969570-3154-15-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now, we have dedicated non-cacheable region for consistent DMA
-operations. However, that region can still be marked as bufferable by
-MPU, so it'd be safer to have barriers by default.
+Now we have a flag value indicating an IRQ domain implements MSI,
+let's set it on msi_create_irq_domain().
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+
 ---
- arch/arm/mm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 0b79f12..64a1465c 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -1029,7 +1029,7 @@ config ARM_L1_CACHE_SHIFT
+v6: new
+---
+ kernel/irq/msi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+index ee23006..ddc2f54 100644
+--- a/kernel/irq/msi.c
++++ b/kernel/irq/msi.c
+@@ -270,8 +270,8 @@ struct irq_domain *msi_create_irq_domain(struct fwnode_handle *fwnode,
+ 	if (info->flags & MSI_FLAG_USE_DEF_CHIP_OPS)
+ 		msi_domain_update_chip_ops(info);
  
- config ARM_DMA_MEM_BUFFERABLE
- 	bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K) && !CPU_V7
--	default y if CPU_V6 || CPU_V6K || CPU_V7
-+	default y if CPU_V6 || CPU_V6K || CPU_V7 || CPU_V7M
- 	help
- 	  Historically, the kernel has used strongly ordered mappings to
- 	  provide DMA coherent memory.  With the advent of ARMv7, mapping
+-	return irq_domain_create_hierarchy(parent, 0, 0, fwnode,
+-					   &msi_domain_ops, info);
++	return irq_domain_create_hierarchy(parent, IRQ_DOMAIN_FLAG_MSI, 0,
++					   fwnode, &msi_domain_ops, info);
+ }
+ 
+ int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
 -- 
-2.0.0
+1.9.1
