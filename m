@@ -1,86 +1,107 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:46 -0500
-Subject: [RFC 50/55] KVM: arm/arm64: Abstract kvm_phys_addr_ioremap() function
+Date: Mon,  9 Jan 2017 01:24:50 -0500
+Subject: [RFC 54/55] KVM: arm/arm64: Adjust virtual offset considering nesting
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-51-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-55-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original kvm_phys_addr_ioremap function only uses mmu pointing to
-the VM's mmu context. However, it would be very useful to reuse this
-function for the nested mmu context. Therefore, create a function named
-__kvm_phys_addr_ioremapp which takes mmu as an argument, and let
-kvm_phys_addr_ioremap calls this function with the VM's mmu context.
+The guest hypervisor sets cntvoff_el2 for its VM (i.e. nested VM).  Note
+that physical/virtual counter value in the guest hypervisor's point of
+view is already offsetted by the virtual offset set by the host
+hypervisor.  Therefore, the correct offset we need to write to the
+cntvoff_el2 is the sum of offset the host hypervisor initially has for
+the VM and virtual offset the guest hypervisor sets for the nested VM.
 
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm/kvm/mmu.c               | 18 +++++++++++++-----
- arch/arm64/include/asm/kvm_mmu.h |  3 +++
- 2 files changed, 16 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/kvm_emulate.h   | 6 ++++++
+ arch/arm64/include/asm/kvm_emulate.h | 6 ++++++
+ virt/kvm/arm/arch_timer.c            | 3 ++-
+ virt/kvm/arm/hyp/timer-sr.c          | 5 ++++-
+ 4 files changed, 18 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 344bc01..2cd6a19 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1058,15 +1058,16 @@ static int stage2_pmdp_test_and_clear_young(pmd_t *pmd)
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index dde5335..c7a690f 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -324,4 +324,10 @@ static inline bool kvm_is_shadow_s2_fault(struct kvm_vcpu *vcpu)
+ 	return false;
  }
  
- /**
-- * kvm_phys_addr_ioremap - map a device range to guest IPA
-+ * __kvm_phys_addr_ioremap - map a device range to guest IPA
-  *
-  * @kvm:	The KVM pointer
-  * @guest_ipa:	The IPA at which to insert the mapping
-  * @pa:		The physical address of the device
-  * @size:	The size of the mapping
-  */
--int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
--			  phys_addr_t pa, unsigned long size, bool writable)
-+int __kvm_phys_addr_ioremap(struct kvm *kvm, struct kvm_s2_mmu *mmu,
-+			    phys_addr_t guest_ipa, phys_addr_t pa,
-+			    unsigned long size, bool writable)
- {
- 	phys_addr_t addr, end;
- 	int ret = 0;
-@@ -1087,8 +1088,8 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
- 		if (ret)
- 			goto out;
- 		spin_lock(&kvm->mmu_lock);
--		ret = stage2_set_pte(&kvm->arch.mmu, &cache, addr, &pte,
--						KVM_S2PTE_FLAG_IS_IOMAP);
-+		ret = stage2_set_pte(mmu, &cache, addr, &pte,
-+				     KVM_S2PTE_FLAG_IS_IOMAP);
- 		spin_unlock(&kvm->mmu_lock);
- 		if (ret)
- 			goto out;
-@@ -1101,6 +1102,13 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
- 	return ret;
- }
- 
-+int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
-+			  phys_addr_t pa, unsigned long size, bool writable)
++/* Return the guest hypervisor's cntvoff value */
++static inline u64 kvm_get_vcntvoff(struct kvm_vcpu *vcpu)
 +{
-+	return __kvm_phys_addr_ioremap(kvm, &kvm->arch.mmu, guest_ipa, pa,
-+				       size, writable);
++	return 0;
 +}
 +
- static bool transparent_hugepage_adjust(kvm_pfn_t *pfnp, gfn_t gfn,
- 					phys_addr_t *ipap)
+ #endif /* __ARM_KVM_EMULATE_H__ */
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 17f4855..0aaa4ca 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -385,4 +385,10 @@ static inline bool kvm_is_shadow_s2_fault(struct kvm_vcpu *vcpu)
+ #endif
+ }
+ 
++/* Return the guest hypervisor's cntvoff value */
++static inline u64 kvm_get_vcntvoff(struct kvm_vcpu *vcpu)
++{
++	return vcpu_el2_reg(vcpu, CNTVOFF_EL2);
++}
++
+ #endif /* __ARM64_KVM_EMULATE_H__ */
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 7a161f8..e393939 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -24,6 +24,7 @@
+ 
+ #include <clocksource/arm_arch_timer.h>
+ #include <asm/arch_timer.h>
++#include <asm/kvm_emulate.h>
+ 
+ #include <kvm/arm_vgic.h>
+ #include <kvm/arm_arch_timer.h>
+@@ -102,7 +103,7 @@ static u64 kvm_timer_cntvoff(struct kvm_vcpu *vcpu,
+ 			     struct arch_timer_context *timer_ctx)
  {
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 7754f3e..ec9e5e9 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -149,6 +149,9 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
- int __kvm_alloc_stage2_pgd(struct kvm_s2_mmu *mmu);
- void kvm_free_stage2_pgd(struct kvm *kvm);
- void __kvm_free_stage2_pgd(struct kvm_s2_mmu *mmu);
-+int __kvm_phys_addr_ioremap(struct kvm *kvm, struct kvm_s2_mmu *mmu,
-+			    phys_addr_t guest_ipa, phys_addr_t pa,
-+			    unsigned long size, bool writable);
- int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
- 			  phys_addr_t pa, unsigned long size, bool writable);
- void kvm_unmap_stage2_range(struct kvm_s2_mmu *mmu, phys_addr_t start,
+ 	if (timer_ctx == vcpu_vtimer(vcpu))
+-		return vcpu->kvm->arch.timer.cntvoff;
++		return vcpu->kvm->arch.timer.cntvoff + kvm_get_vcntvoff(vcpu);
+ 
+ 	return 0;
+ }
+diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
+index 4bbd36c..66dab01 100644
+--- a/virt/kvm/arm/hyp/timer-sr.c
++++ b/virt/kvm/arm/hyp/timer-sr.c
+@@ -20,6 +20,7 @@
+ #include <linux/kvm_host.h>
+ 
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_emulate.h>
+ 
+ /* vcpu is already in the HYP VA space */
+ void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
+@@ -49,6 +50,7 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
+ 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 	u64 val;
++	u64 cntvoff;
+ 
+ 	/*
+ 	 * Disallow physical timer access for the guest
+@@ -60,7 +62,8 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
+ 	write_sysreg(val, cnthctl_el2);
+ 
+ 	if (vtimer->enabled) {
+-		write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
++		cntvoff = kvm->arch.timer.cntvoff + kvm_get_vcntvoff(vcpu);
++		write_sysreg(cntvoff, cntvoff_el2);
+ 		write_sysreg_el0(vtimer->cnt_cval, cntv_cval);
+ 		isb();
+ 		write_sysreg_el0(vtimer->cnt_ctl, cntv_ctl);
 -- 
 1.9.1
