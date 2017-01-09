@@ -1,39 +1,74 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 9 Jan 2017 09:58:37 +0000
-Subject: [PATCH] clk: scpi: don't add cpufreq device if the scpi dvfs node
- is disabled
-In-Reply-To: <d51628d1-c930-ec13-990c-97cc47d80472@poczta.onet.pl>
-References: <1483706070-12357-1-git-send-email-sudeep.holla@arm.com>
- <d51628d1-c930-ec13-990c-97cc47d80472@poczta.onet.pl>
-Message-ID: <d1cccb6b-e938-6522-c45f-5b613567cb4e@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 9 Jan 2017 10:59:46 +0100
+Subject: [linux-sunxi] [PATCH] clk: sunxi-ng: fix PLL_CPUX adjusting on H3
+In-Reply-To: <0985b1ec-ba95-1505-cc59-adec4b88238f@megous.com>
+References: <20161125002852.18097-1-megous@megous.com>
+ <0985b1ec-ba95-1505-cc59-adec4b88238f@megous.com>
+Message-ID: <20170109095946.6esbfx6pafega5cd@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 07/01/17 00:44, Micha? Zegan wrote:
-> seems the patch works as intended.
+On Sat, Jan 07, 2017 at 04:49:18PM +0100, Ond?ej Jirman wrote:
+> Maxime,
 > 
+> Dne 25.11.2016 v 01:28 megous at megous.com napsal(a):
+> > From: Ondrej Jirman <megous@megous.com>
+> > 
+> > When adjusting PLL_CPUX on H3, the PLL is temporarily driven
+> > too high, and the system becomes unstable (oopses or hangs).
+> > 
+> > Add a notifier to avoid this situation by temporarily switching
+> > to a known stable 24 MHz oscillator.
+> 
+> I have done more thorough testing on H3 and this approach with switching
+> to 24MHz oscillator does not work. Motivation being that my Orange Pi
+> One still gets lockups even with this patch under certain circumstances.
+> 
+> So I have created a small test program for CPUS (additional OpenRISC CPU
+> on the SoC) which randomly changes PLL_CPUX settings while main CPU is
+> running a loop that sends messages to CPUS via msgbox.
+> 
+> Assumption being that while CPUS is successfully receiving messages via
+> msgbox, the main CPU didn't lock up, yet.
+> 
+> With this I am able to quickly and thoroughly test various PLL_CPUX
+> change and factor selection algorithms.
+> 
+> Results are that bypassing CPUX clock by switching to 24 MHz oscillator
+> does not work at all. Main CPU locks up in about 1 second into the test.
+> Don't ask me why.
 
-So, can we take this as
-Tested-by: Micha? Zegan <webczat_200@poczta.onet.pl> ?
+You mean that you are changing the frequency behind Linux' back? That
+won't work. There's more to cpufreq than just changing the frequency,
+but also adusting the number of loops per jiffy for the new frequency
+for example. I don't really expect that setup to work even on a
+perfectly stable system. CPUFreq *has* to be involved, otherwise, that
+alone might introduce bugs, and you cannot draw any conclusions
+anymore.
 
-> W dniu 06.01.2017 o 13:34, Sudeep Holla pisze:
->> Currently we add the virtual cpufreq device unconditionally even when
->> the SCPI DVFS clock provider node is disabled. This will cause cpufreq
->> driver to throw errors when it gets initailised on boot/modprobe and
->> also when the CPUs are hot-plugged back in.
->>
->> This patch fixes the issue by adding the virtual cpufreq device only if
->> the SCPI DVFS clock provider is available and registered.
->>
->> Fixes: 9490f01e2471 ("clk: scpi: add support for cpufreq virtual device")
->> Reported-by: Micha? Zegan <webczat_200@poczta.onet.pl>
->> Cc: Neil Armstrong <narmstrong@baylibre.com>
->> Cc: Michael Turquette <mturquette@baylibre.com>
->> Cc: Stephen Boyd <sboyd@codeaurora.org>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> What works is selecting NKMP factors so that M is always 1 and P is
+> anything other than /1 only for frequencies under 288MHz. As mandated by
+> the H3 datasheet. Mainline ccu_nkmp_find_best doesn't respect these
+> conditions. With that I can change CPUX frequencies randomly 20x a
+> second so far indefinitely without the main CPU ever locking up.
+> 
+> Please drop or revert this patch. It is not a correct approach to the
+> problem. I'd suggest dropping the entire clock notifier mechanism, too,
+> unless it can be proven to work reliably.
+
+It has been proven to work reliably on a number of other SoCs.
+
+Thanks!
+Maxime
 
 -- 
-Regards,
-Sudeep
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170109/e1fe005b/attachment.sig>
