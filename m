@@ -1,37 +1,31 @@
 From: david@lechnology.com (David Lechner)
-Date: Mon,  9 Jan 2017 10:11:40 -0600
-Subject: [RESEND 3/3] ARM: davinci_all_defconfig: enable iio and ADS7950
+Date: Mon,  9 Jan 2017 10:11:38 -0600
+Subject: [RESEND 1/3] ARM: davinci_all_defconfig: enable DA8xx pinconf
 In-Reply-To: <1483978300-403-1-git-send-email-david@lechnology.com>
 References: <1483978300-403-1-git-send-email-david@lechnology.com>
-Message-ID: <1483978300-403-4-git-send-email-david@lechnology.com>
+Message-ID: <1483978300-403-2-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the iio subsystem and the TI ADS7950 driver. This is used by
-LEGO MINDSTORMS EV3, which has an ADS7957 chip.
+This enables the DA8xx pinconf driver by default. It is needed by LEGO
+MINDSTORMS EV3.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
- arch/arm/configs/davinci_all_defconfig | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/configs/davinci_all_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index 2b1967a..a899876 100644
+index ddb586a..a12e4c2 100644
 --- a/arch/arm/configs/davinci_all_defconfig
 +++ b/arch/arm/configs/davinci_all_defconfig
-@@ -200,6 +200,13 @@ CONFIG_TI_EDMA=y
- CONFIG_MEMORY=y
- CONFIG_TI_AEMIF=m
- CONFIG_DA8XX_DDRCTL=y
-+CONFIG_IIO=m
-+CONFIG_IIO_BUFFER_CB=m
-+CONFIG_IIO_SW_DEVICE=m
-+CONFIG_IIO_SW_TRIGGER=m
-+CONFIG_TI_ADS7950=m
-+CONFIG_IIO_HRTIMER_TRIGGER=m
-+CONFIG_IIO_SYSFS_TRIGGER=m
- CONFIG_PWM=y
- CONFIG_PWM_TIECAP=m
- CONFIG_PWM_TIEHRPWM=m
+@@ -114,6 +114,7 @@ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_DAVINCI=y
+ CONFIG_SPI=y
+ CONFIG_SPI_DAVINCI=m
++CONFIG_PINCTRL_DA850_PUPD=m
+ CONFIG_PINCTRL_SINGLE=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_PCA953X=y
 -- 
 2.7.4
