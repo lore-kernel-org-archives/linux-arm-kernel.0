@@ -1,63 +1,79 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:26 -0500
-Subject: [RFC 30/55] KVM: arm/arm64: Inject irqs to the guest hypervisor
+Date: Mon,  9 Jan 2017 01:24:32 -0500
+Subject: [RFC 36/55] KVM: arm64: Invalidate virtual EL2 TLB entries when needed
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-31-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-37-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we have a pending IRQ for the guest and the guest expects IRQs
-to be handled in its virtual EL2 mode (the virtual IMO bit is set)
-and it is not already running in virtual EL2 mode, then we have to
-emulate an IRQ exception.
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+Sometimes when we are invalidating the TLB for a certain S2 MMU
+context, this context can also have EL2 context associated with it and
+we have to invalidate this too.
+
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- virt/kvm/arm/vgic/vgic.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ arch/arm/kvm/arm.c |  6 ++++++
+ arch/arm/kvm/mmu.c | 16 ++++++++++++++++
+ 2 files changed, 22 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 6440b56..4a98654 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -17,6 +17,7 @@
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
- #include <linux/list_sort.h>
-+#include <asm/kvm_emulate.h>
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index aa8771d..371b38e7 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -350,6 +350,12 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+ 		u64 vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
  
- #include "vgic.h"
- 
-@@ -652,6 +653,28 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
- 	/* Nuke remaining LRs */
- 	for ( ; count < kvm_vgic_global_state.nr_lr; count++)
- 		vgic_clear_lr(vcpu, count);
-+
-+	/*
-+	 * If we have any pending IRQ for the guest and the guest expects IRQs
-+	 * to be handled in its virtual EL2 mode (the virtual IMO bit is set)
-+	 * and it is not already running in virtual EL2 mode, then we have to
-+	 * emulate an IRQ exception to virtual IRQ. Note that a pending IRQ
-+	 * means an irq of which state is pending but not active.
-+	 */
-+	if (vcpu_el2_imo_is_set(vcpu) && !vcpu_mode_el2(vcpu)) {
-+		bool pending = false;
-+
-+		list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
-+			spin_lock(&irq->irq_lock);
-+			pending = irq->pending && irq->enabled && !irq->active;
-+			spin_unlock(&irq->irq_lock);
-+
-+			if (pending) {
-+				kvm_inject_nested_irq(vcpu);
-+				break;
-+			}
+ 		kvm_call_hyp(__kvm_tlb_flush_local_vmid, vttbr);
++#ifndef CONFIG_KVM_ARM_NESTED_HYP
++		if (mmu->el2_vmid.vmid) {
++			vttbr = kvm_get_vttbr(&mmu->el2_vmid, mmu);
++			kvm_call_hyp(__kvm_tlb_flush_local_vmid, vttbr);
 +		}
-+	}
++#endif
+ 		*last_ran = vcpu->vcpu_id;
+ 	}
+ 
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 5ca3a04..56358fa 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -60,10 +60,20 @@ static bool memslot_is_logging(struct kvm_memory_slot *memslot)
+  */
+ void kvm_flush_remote_tlbs(struct kvm *kvm)
+ {
++#ifndef CONFIG_KVM_ARM_NESTED_HYP
+ 	struct kvm_s2_mmu *mmu = &kvm->arch.mmu;
+ 	u64 vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
+ 
+ 	kvm_call_hyp(__kvm_tlb_flush_vmid, vttbr);
++#else
++	/*
++	 * When supporting nested virtualization, we can have multiple VMIDs
++	 * in play for each VCPU in the VM, so it's really not worth it to try
++	 * to quiesce the system and flush all the VMIDs that may be in use,
++	 * instead just nuke the whole thing.
++	 */
++	kvm_call_hyp(__kvm_flush_vm_context);
++#endif
  }
  
- /* Sync back the hardware VGIC state into our emulation after a guest's run. */
+ static void kvm_tlb_flush_vmid_ipa(struct kvm_s2_mmu *mmu, phys_addr_t ipa)
+@@ -71,6 +81,12 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm_s2_mmu *mmu, phys_addr_t ipa)
+ 	u64 vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
+ 
+ 	kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, vttbr, ipa);
++#ifdef CONFIG_KVM_ARM_NESTED_HYP
++	if (!mmu->el2_vmid.vmid)
++		return; /* only if this mmu has el2 context */
++	vttbr = kvm_get_vttbr(&mmu->el2_vmid, mmu);
++	kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, vttbr, ipa);
++#endif
+ }
+ 
+ /*
 -- 
 1.9.1
