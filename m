@@ -1,37 +1,45 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:49 -0500
-Subject: [RFC 53/55] KVM: arm64: Reflect shadow VMPIDR_EL2 value to MPIDR_EL1
+Date: Mon,  9 Jan 2017 01:24:47 -0500
+Subject: [RFC 51/55] KVM: arm64: Expose physical address of vcpu interface
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-54-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-52-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A non-secure EL0 or EL1 read of MPIDR_EL1 should return the value of
-VMPIDR_EL2. We emulate this by copying the virtual VMPIDR_EL2 value to
-MPIDR_EL1 when entering VM's EL0 or EL1.
+Expose physical address of vgic virtual cpu interface.
 
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm64/kvm/context.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ include/kvm/arm_vgic.h      | 1 +
+ virt/kvm/arm/vgic/vgic-v2.c | 6 ++++++
+ 2 files changed, 7 insertions(+)
 
-diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
-index 9ebc38f..dd79b0e 100644
---- a/arch/arm64/kvm/context.c
-+++ b/arch/arm64/kvm/context.c
-@@ -173,6 +173,12 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
- 		ctxt->hw_pstate = *vcpu_cpsr(vcpu);
- 		ctxt->hw_sys_regs = ctxt->sys_regs;
- 		ctxt->hw_sp_el1 = ctxt->gp_regs.sp_el1;
-+
-+		/*
-+		 * A non-secure EL0 or EL1 read of MPIDR_EL1 returns
-+		 * the value of VMPIDR_EL2.
-+		 */
-+		ctxt->hw_sys_regs[MPIDR_EL1] = ctxt->el2_regs[VMPIDR_EL2];
- 	}
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 5bda20c..05c7811 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -331,6 +331,7 @@ static inline void vgic_handle_nested_maint_irq(struct kvm_vcpu *vcpu) { }
+ #define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
+ 			((i) < (k)->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS))
  
- 	vgic_v2_setup_shadow_state(vcpu);
++phys_addr_t vgic_vcpu_base(void);
+ bool kvm_vcpu_has_pending_irqs(struct kvm_vcpu *vcpu);
+ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index b8b73fd..5d85041 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -386,3 +386,9 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+ 
+ 	return ret;
+ }
++
++/* Return physical address of vgic virtual cpu interface */
++phys_addr_t vgic_vcpu_base(void)
++{
++	return kvm_vgic_global_state.vcpu_base;
++}
 -- 
 1.9.1
