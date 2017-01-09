@@ -1,31 +1,78 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 9 Jan 2017 09:21:26 +0000
-Subject: [PATCH 0/6] crypto: ARM/arm64 - AES and ChaCha20 updates for v4.11
-In-Reply-To: <CAKv+Gu8wWW-c6dYcsRtD8LK4nrP=6pQwb63OkJTyGTYhK3Ryyw@mail.gmail.com>
-References: <1483381268-12987-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu8wWW-c6dYcsRtD8LK4nrP=6pQwb63OkJTyGTYhK3Ryyw@mail.gmail.com>
-Message-ID: <CAKv+Gu8=FjE7Gy8enNqAZ2NqaWXmcjf7bu77UcArgbZf8-Giig@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon,  9 Jan 2017 10:50:39 +0100
+Subject: [PATCH 3/3] watchdog: imx2: add compatibility for new i.MX35 type
+ watchdog
+In-Reply-To: <20170109095039.11979-1-u.kleine-koenig@pengutronix.de>
+References: <20170109095039.11979-1-u.kleine-koenig@pengutronix.de>
+Message-ID: <20170109095039.11979-4-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 January 2017 at 20:01, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 2 January 2017 at 18:21, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> This series adds SIMD implementations for arm64 and ARM of ChaCha20 (*),
->> and a port of the ARM bit-sliced AES algorithm to arm64, and
->>
->> Patch #1 is a prerequisite for the AES-XTS implementation in #6, which needs
->> a secondary AES transform to generate the initial tweak.
->>
->
-> Herbert,
->
-> I actually have a scalar AES implementation for arm64 which I could
-> use instead, making this patch unnecessary.
->
-> I could respin the entire series, or you could simply disregard #1 and
-> #6 for now, whichever you prefer.
->
+When the watchdog driver learned about the i.MX35 type watchdog a new
+compatibility string was introduced. Older dtb continue to use the
+old fsl,imx21-wdt string and so stop writing the WMCR register which is
+critical iff the machine powers off when WDOG becomes active and the
+bootloader doesn't stop the power down counter.
 
-I ended up doing some more work on the scalar and bit sliced AES
-implementations for both ARM and arm64, so everything in this series
-except the chacha20 patches (#3, #4) is now superseded.
+It's unknown which boards are affected and I guess most of them are not.
+Also note this is only an issue if a new kernel is operated with an old
+dtb as the SoC dtsi files are fixed accordingly.
+
+XXX: the XXX introduced needs to be changed to HEAD~2 when got a stable commit id.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ drivers/watchdog/imx2_wdt.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
+
+diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+index 509b2fedb112..f5616e2c2c58 100644
+--- a/drivers/watchdog/imx2_wdt.c
++++ b/drivers/watchdog/imx2_wdt.c
+@@ -454,6 +454,44 @@ static const struct of_device_id imx2_wdt_dt_ids[] = {
+ 	}, {
+ 		.compatible = "fsl,imx35-wdt",
+ 		.data = &imx2_wdt_type_imx35,
++	},
++	/*
++	 * The following ids are only there to make commit XXX compatible with
++	 * older device trees. The result is that iff the machine makes use of
++	 * the WDG signal (most don't, only WDG_RST is used) and the bootloader
++	 * doesn't stop the power down counter it powers off the board after 16
++	 * seconds.
++	 */
++	{
++		.compatible = "fsl,imx25-wdt",
++		.data = &imx2_wdt_type_imx35,
++	}, {
++		.compatible = "fsl,imx50-wdt",
++		.data = &imx2_wdt_type_imx35,
++	}, {
++		.compatible = "fsl,imx51-wdt",
++		.data = &imx2_wdt_type_imx35,
++	}, {
++		.compatible = "fsl,imx53-wdt",
++		.data = &imx2_wdt_type_imx35,
++	}, {
++		.compatible = "fsl,imx6q-wdt",
++		.data = &imx2_wdt_type_imx35,
++	}, {
++		.compatible = "fsl,imx6sl-wdt",
++		.data = &imx2_wdt_type_imx35,
++	}, {
++		.compatible = "fsl,imx6sx-wdt",
++		.data = &imx2_wdt_type_imx35,
++	}, {
++		.compatible = "fsl,imx6ul-wdt",
++		.data = &imx2_wdt_type_imx35,
++	}, {
++		.compatible = "fsl,imx7d-wdt",
++		.data = &imx2_wdt_type_imx35,
++	}, {
++		.compatible = "fsl,vf610-wdt",
++		.data = &imx2_wdt_type_imx35,
+ 	}, {
+ 		/* sentinel */
+ 	}
+-- 
+2.11.0
