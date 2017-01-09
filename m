@@ -1,190 +1,94 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:07 -0500
-Subject: [RFC 11/55] KVM: arm64: Emulate taking an exception to the guest
- hypervisor
+Date: Mon,  9 Jan 2017 01:24:09 -0500
+Subject: [RFC 13/55] KVM: arm64: Handle eret instruction traps
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-12-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-14-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Emulate taking an exception to the guest hypervisor running in the
-virtual EL2 as described in ARM ARM AArch64.TakeException().
+When HCR.NV bit is set, eret instruction execution in the guest
+hypervisor will trap with EC code 0x1A. Let ELR_EL2 and SPSR_EL2 state
+from the guest's perspective be restored to the hardware on the next
+guest entry.
 
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm/include/asm/kvm_emulate.h   | 14 ++++++++
- arch/arm64/include/asm/kvm_emulate.h | 19 +++++++++++
- arch/arm64/kvm/Makefile              |  2 ++
- arch/arm64/kvm/emulate-nested.c      | 66 ++++++++++++++++++++++++++++++++++++
- arch/arm64/kvm/trace.h               | 20 +++++++++++
- 5 files changed, 121 insertions(+)
- create mode 100644 arch/arm64/kvm/emulate-nested.c
+ arch/arm64/include/asm/esr.h |  1 +
+ arch/arm64/kvm/handle_exit.c | 12 ++++++++++++
+ arch/arm64/kvm/trace.h       | 21 +++++++++++++++++++++
+ 3 files changed, 34 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index 0a03b7d..0fa2f5a 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -47,6 +47,20 @@ static inline void vcpu_set_reg(struct kvm_vcpu *vcpu, u8 reg_num,
- void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
- void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index d14c478..f32e3a7 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -42,6 +42,7 @@
+ #define ESR_ELx_EC_HVC64	(0x16)
+ #define ESR_ELx_EC_SMC64	(0x17)
+ #define ESR_ELx_EC_SYS64	(0x18)
++#define ESR_ELx_EC_ERET		(0x1A)
+ /* Unallocated EC: 0x19 - 0x1E */
+ #define ESR_ELx_EC_IMP_DEF	(0x1f)
+ #define ESR_ELx_EC_IABT_LOW	(0x20)
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index a204adf..4e4a915 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -125,6 +125,17 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	return ret;
+ }
  
-+static inline int kvm_inject_nested_sync(struct kvm_vcpu *vcpu, u64 esr_el2)
++static int kvm_handle_eret(struct kvm_vcpu *vcpu, struct kvm_run *run)
 +{
-+	kvm_err("Unexpected call to %s for the non-nesting configuration\n",
-+		 __func__);
-+	return -EINVAL;
++	trace_kvm_nested_eret(vcpu, vcpu_el2_reg(vcpu, ELR_EL2),
++			      vcpu_el2_reg(vcpu, SPSR_EL2));
++
++	*vcpu_pc(vcpu) = vcpu_el2_reg(vcpu, ELR_EL2);
++	*vcpu_cpsr(vcpu) = vcpu_el2_reg(vcpu, SPSR_EL2);
++
++	return 1;
 +}
 +
-+static inline int kvm_inject_nested_irq(struct kvm_vcpu *vcpu)
-+{
-+	kvm_err("Unexpected call to %s for the non-nesting configuration\n",
-+		 __func__);
-+	return -EINVAL;
-+}
-+
- static inline void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu) { };
- static inline void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu) { };
- static inline void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt) { };
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 8892c82..0987ee4 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -42,6 +42,25 @@
- void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
- void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
- 
-+#ifdef CONFIG_KVM_ARM_NESTED_HYP
-+int kvm_inject_nested_sync(struct kvm_vcpu *vcpu, u64 esr_el2);
-+int kvm_inject_nested_irq(struct kvm_vcpu *vcpu);
-+#else
-+static inline int kvm_inject_nested_sync(struct kvm_vcpu *vcpu, u64 esr_el2)
-+{
-+	kvm_err("Unexpected call to %s for the non-nesting configuration\n",
-+		 __func__);
-+	return -EINVAL;
-+}
-+
-+static inline int kvm_inject_nested_irq(struct kvm_vcpu *vcpu)
-+{
-+	kvm_err("Unexpected call to %s for the non-nesting configuration\n",
-+		 __func__);
-+	return -EINVAL;
-+}
-+#endif
-+
- void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu);
- void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu);
- void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt);
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 7811d27..b342bdd 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -34,3 +34,5 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-its.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/irqchip.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
- kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
-+
-+kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += emulate-nested.o
-diff --git a/arch/arm64/kvm/emulate-nested.c b/arch/arm64/kvm/emulate-nested.c
-new file mode 100644
-index 0000000..59d147f
---- /dev/null
-+++ b/arch/arm64/kvm/emulate-nested.c
-@@ -0,0 +1,66 @@
-+/*
-+ * Copyright (C) 2016 - Columbia University
-+ * Author: Jintack Lim <jintack@cs.columbia.edu>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/kvm.h>
-+#include <linux/kvm_host.h>
-+
-+#include <asm/kvm_emulate.h>
-+
-+#include "trace.h"
-+
-+#define	EL2_EXCEPT_SYNC_OFFSET	0x400
-+#define	EL2_EXCEPT_ASYNC_OFFSET	0x480
-+
-+
-+/*
-+ *  Emulate taking an exception. See ARM ARM J8.1.2 AArch64.TakeException()
-+ */
-+static int kvm_inject_nested(struct kvm_vcpu *vcpu, u64 esr_el2,
-+			     int exception_offset)
-+{
-+	int ret = 1;
-+	kvm_cpu_context_t *ctxt = &vcpu->arch.ctxt;
-+
-+	/* We don't inject an exception recursively to virtual EL2 */
-+	if (vcpu_mode_el2(vcpu))
-+		BUG();
-+
-+	ctxt->el2_regs[SPSR_EL2] = *vcpu_cpsr(vcpu);
-+	ctxt->el2_regs[ELR_EL2] = *vcpu_pc(vcpu);
-+	ctxt->el2_regs[ESR_EL2] = esr_el2;
-+
-+	/* On an exception, PSTATE.SP = 1 */
-+	*vcpu_cpsr(vcpu) = PSR_MODE_EL2h;
-+	*vcpu_cpsr(vcpu) |=  (PSR_A_BIT | PSR_F_BIT | PSR_I_BIT | PSR_D_BIT);
-+	*vcpu_pc(vcpu) = ctxt->el2_regs[VBAR_EL2] + exception_offset;
-+
-+	trace_kvm_inject_nested_exception(vcpu, esr_el2, *vcpu_pc(vcpu));
-+
-+	return ret;
-+}
-+
-+int kvm_inject_nested_sync(struct kvm_vcpu *vcpu, u64 esr_el2)
-+{
-+	return kvm_inject_nested(vcpu, esr_el2, EL2_EXCEPT_SYNC_OFFSET);
-+}
-+
-+int kvm_inject_nested_irq(struct kvm_vcpu *vcpu)
-+{
-+	u64 esr_el2 = kvm_vcpu_get_hsr(vcpu);
-+	/* We supports only IRQ and FIQ, so the esr_el2 is not updated. */
-+	return kvm_inject_nested(vcpu, esr_el2, EL2_EXCEPT_ASYNC_OFFSET);
-+}
+ static exit_handle_fn arm_exit_handlers[] = {
+ 	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
+ 	[ESR_ELx_EC_CP15_32]	= kvm_handle_cp15_32,
+@@ -137,6 +148,7 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	[ESR_ELx_EC_HVC64]	= handle_hvc,
+ 	[ESR_ELx_EC_SMC64]	= handle_smc,
+ 	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
++	[ESR_ELx_EC_ERET]	= kvm_handle_eret,
+ 	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
+ 	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
+ 	[ESR_ELx_EC_SOFTSTP_LOW]= kvm_handle_guest_debug,
 diff --git a/arch/arm64/kvm/trace.h b/arch/arm64/kvm/trace.h
-index 7fb0008..7c86cfb 100644
+index 7c86cfb..5f40987 100644
 --- a/arch/arm64/kvm/trace.h
 +++ b/arch/arm64/kvm/trace.h
-@@ -167,6 +167,26 @@
+@@ -187,6 +187,27 @@
+ 	TP_printk("vcpu: %p, inject exception to vEL2: ESR_EL2 0x%lx, vector: 0x%016lx",
+ 		  __entry->vcpu, __entry->esr_el2, __entry->pc)
  );
- 
- 
-+TRACE_EVENT(kvm_inject_nested_exception,
-+	TP_PROTO(struct kvm_vcpu *vcpu, unsigned long esr_el2,
-+		 unsigned long pc),
-+	TP_ARGS(vcpu, esr_el2, pc),
++
++TRACE_EVENT(kvm_nested_eret,
++	TP_PROTO(struct kvm_vcpu *vcpu, unsigned long elr_el2,
++		 unsigned long spsr_el2),
++	TP_ARGS(vcpu, elr_el2, spsr_el2),
 +
 +	TP_STRUCT__entry(
 +		__field(struct kvm_vcpu *,	vcpu)
-+		__field(unsigned long,		esr_el2)
-+		__field(unsigned long,		pc)
++		__field(unsigned long,		elr_el2)
++		__field(unsigned long,		spsr_el2)
 +	),
 +
 +	TP_fast_assign(
 +		__entry->vcpu = vcpu;
-+		__entry->esr_el2 = esr_el2;
-+		__entry->pc = pc;
++		__entry->elr_el2 = elr_el2;
++		__entry->spsr_el2 = spsr_el2;
 +	),
 +
-+	TP_printk("vcpu: %p, inject exception to vEL2: ESR_EL2 0x%lx, vector: 0x%016lx",
-+		  __entry->vcpu, __entry->esr_el2, __entry->pc)
++	TP_printk("vcpu: %p, eret to elr_el2: 0x%016lx, with spsr_el2: 0x%08lx",
++		  __entry->vcpu, __entry->elr_el2, __entry->spsr_el2)
 +);
  #endif /* _TRACE_ARM64_KVM_H */
  
