@@ -1,22 +1,59 @@
-From: dhowells@redhat.com (David Howells)
-Date: Mon, 09 Jan 2017 10:40:09 +0000
-Subject: [GIT PULL] efi: Pass secure boot mode to kernel
-In-Reply-To: <20170109101547.GE16838@codeblueprint.co.uk>
-References: <20170109101547.GE16838@codeblueprint.co.uk>
- <20161208115652.GE5462@codeblueprint.co.uk>
- <4561.1481197517@warthog.procyon.org.uk>
- <31936.1483627269@warthog.procyon.org.uk>
-Message-ID: <2696.1483958409@warthog.procyon.org.uk>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 9 Jan 2017 10:43:07 +0000
+Subject: [PATCH v3 4/9] arm64: cpufeature: Document the rules of safe
+ value for features
+In-Reply-To: <20170106123011.GB12863@e104818-lin.cambridge.arm.com>
+References: <1483552147-9605-1-git-send-email-suzuki.poulose@arm.com>
+ <1483552147-9605-5-git-send-email-suzuki.poulose@arm.com>
+ <20170106123011.GB12863@e104818-lin.cambridge.arm.com>
+Message-ID: <2338875a-6a5b-ba9e-59fe-d681091c2923@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matt Fleming <matt@codeblueprint.co.uk> wrote:
+On 06/01/17 12:30, Catalin Marinas wrote:
+> On Wed, Jan 04, 2017 at 05:49:02PM +0000, Suzuki K. Poulose wrote:
+>> --- a/arch/arm64/include/asm/cpufeature.h
+>> +++ b/arch/arm64/include/asm/cpufeature.h
+>> @@ -29,7 +29,21 @@
+>>  #include <linux/jump_label.h>
+>>  #include <linux/kernel.h>
+>>
+>> -/* CPU feature register tracking */
+>> +/*
+>> + * CPU feature register tracking
+>> + *
+>> + * The safe value of a CPUID feature field is dependent on the implications
+>> + * of the values assigned to it by the architecture. Based on the relationship
+>> + * between the values, the features are classified into 3 types.
+>> + *
+>> + * a) LOWER_SAFE - The value 'n+1' indicates, value 'n' and some
+>> + *    additional features. (where n >= 0). The smaller value (n) is
+>> + *    considered safer in this case.
+>> + * b) HIGHER_SAFE - The value 'n+1' is safer than 'n' (for n>= 0).
+>> + * c) EXACT - If the values of the feature don't have any relationship,
+>> + *    a predefined safe value is used.
+>> + */
+>
+> I don't think this text fully describes what is actually compared. You
+> could say something that the lowest value of all the CPUs is chosen for
+> LOWER_SAFE, highest for HIGHER_SAFE and it is expected that all CPUs
+> have the same value for a field when EXACT is specified.
 
-> > Can I request that it be pulled now?  Are you going to update efi/core?
-> 
-> Sorry for the delay David. I've just returned from annual leave and
-> I'll take a look at this series this week.
+Ok. I have changed it as below :
 
-That's okay, thanks!
+/*
+  * CPU feature register tracking
+  *
+  * The safe value of a CPUID feature field is dependent on the implications
+  * of the values assigned to it by the architecture. Based on the relationship
+  * between the values, the features are classified into 3 types - LOWER_SAFE,
+  * HIGHER_SAFE and EXACT.
+  *
+  * The lowest value of all the CPUs is chosen for LOWER_SAFE and highest
+  * for HIGHER_SAFE. It is expected that all CPUs have the same value for
+  * a field when EXACT is specified, failing which, the safe value specified
+  * in the table is chosen.
+  */
 
-David
+
+Suzuki
