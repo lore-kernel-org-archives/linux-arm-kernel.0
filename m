@@ -1,56 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 9 Jan 2017 11:23:41 +0000
-Subject: [QUESTION] Early Write Acknowledge for PCIe configuration space
-In-Reply-To: <e085504e-74fd-e8be-8287-4baef88551c9@huawei.com>
-References: <df407f39-ee05-d74d-6e5e-c5e502372032@huawei.com>
- <6092525.UgRCY3dpzP@wuerfel>
- <e085504e-74fd-e8be-8287-4baef88551c9@huawei.com>
-Message-ID: <20170109112340.GB21398@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon,  9 Jan 2017 17:28:23 +0000
+Subject: [PATCH v4 0/9] arm64: Expose CPUID registers via emulation
+Message-ID: <1483982912-27215-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 10:59:47AM +0000, John Garry wrote:
-> On 06/01/2017 11:24, Arnd Bergmann wrote:
-> >On Friday, January 6, 2017 11:15:22 AM CET John Garry wrote:
-> >>[apologies if this has been queried before]
-> >>
-> >>Hi ARM guys,
-> >>
-> >>I have a question about the device memory attributes we assign for PCIe
-> >>config space for arm64. Currently we use ioremap to map in the config
-> >>space; this uses nGnRE, which means we enable Early Write Acknowledge.
-> >>
-> >>The ARMv8 ARM states that "ARM recommend that No Early Write Acknowledge
-> >>Hint is used for PCIe configuration writes".
-> >>
-> >>I understand a problem with using E is in that configuration write is a
-> >>non-post operation, which means the RP requires to get the completion
-> >>ack from the EP The problem here is if CPU writes data to ECAM by E,
-> >>complete will go back to CPU directly, and maybe at this point the write
-> >>has not reached the EP.
-> >>
-> >>I believe that this may cause ordering issues in PCI read/write. In
-> >>practice we use non-relaxed readl/writel to access config space, which
-> >>include the synchronization barriers, which, *as I understand*, even if
-> >>for full system domain, may be negated by the E attribute for PCIe.
-> >
-> >I don't think the barriers in readl/writel are enough here, in particular
-> >the write barrier is *before* the access to synchronize DMAs
-> >on RAM with MMIO accesses, which is a bit different from what you
-> >have here.
-> >
-> >>So a question: why is the recommendation in the ARMv8 ARM ignored?
-> >
-> >Probably nobody thought about this properly in the Linux drivers. The
-> >ARMv8 ARM sounds correct here.
-> >
-> >I/O space may have the same issue, as it also requires non-posted
-> >accesses.
-> 
-> Right, so our HW team's recommendation - from ARM's memory model and also
-> PCIe order model - is that not only config space but also PCIe memory mapped
-> IO has the same attribute (nE).
+This series adds a new ABI to expose the CPU feature registers
+to the user space via emulation of MRS instruction. The system exposes
+only a limited set of feature values (See the documentation patch)
+from the cpufeature infrastructure. The feature bits that are not
+exposed are set to the 'safe value' which implies 'not supported'.
 
-What's the rationale behind that recommendation?
+Apart from the selected feature registers, we expose MIDR_EL1 (Main
+ID Register). The user should be aware that, reading MIDR_EL1 can be
+tricky on a heterogeneous system (just like getcpu()). We export the
+value of the current CPU where 'MRS' is executed.
 
-Will
+Applies on v4.10-rc3.
+
+Changes since V3:
+ - Mark ID_AA64ISAR0_EL1:RDM visible.
+ - Improve commentary of the type of feature for safe value computation
+ - Fix Documentation for the RES0 fields and minor cleanups
+ - Added Reviewed-by tags from the previous version.
+
+Changes since V2:
+ - Mark DCZID_EL0 fields visible, as the register is already accessible
+   to EL0.
+ - Included the sample program to demonstrate the use of the new ABI in
+   documentation.
+ - Fixed minor coding style issues.
+
+Changes since V1:
+  - Drop mask for Op0 in sys_reg()
+  - Fix documentation
+  - Change safe value of MPIDR to drop MT support
+  - Do not emulate AArch32 ID registers
+
+
+Mark Rutland (2):
+  arm64: cpufeature: treat unknown fields as RES0
+  arm64: cpufeature: remove explicit RAZ fields
+
+Suzuki K Poulose (7):
+  arm64: cpufeature: Cleanup feature bit tables
+  arm64: cpufeature: Document the rules of safe value for features
+  arm64: cpufeature: Define helpers for sys_reg id
+  arm64: Add helper to decode register from instruction
+  arm64: cpufeature: Track user visible fields
+  arm64: cpufeature: Expose CPUID registers by emulation
+  arm64: Documentation - Expose CPU feature registers
+
+ Documentation/arm64/cpu-feature-registers.txt | 240 ++++++++++++++++++
+ arch/arm64/include/asm/cpufeature.h           |  26 +-
+ arch/arm64/include/asm/insn.h                 |   2 +
+ arch/arm64/include/asm/sysreg.h               |  25 +-
+ arch/arm64/include/uapi/asm/hwcap.h           |   1 +
+ arch/arm64/kernel/cpufeature.c                | 340 +++++++++++++++++---------
+ arch/arm64/kernel/cpuinfo.c                   |   1 +
+ arch/arm64/kernel/insn.c                      |  29 +++
+ arch/arm64/kernel/traps.c                     |   2 +-
+ 9 files changed, 545 insertions(+), 121 deletions(-)
+ create mode 100644 Documentation/arm64/cpu-feature-registers.txt
+
+-- 
+2.7.4
