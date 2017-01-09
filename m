@@ -1,65 +1,92 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon,  9 Jan 2017 12:18:56 +0100
-Subject: [PATCH v2] KVM: arm/arm64: Fix occasional warning from the timer work
- function
-Message-ID: <20170109111856.8439-1-christoffer.dall@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 9 Jan 2017 11:24:04 +0000
+Subject: [RFC PATCH] vring: Force use of DMA API for ARM-based systems
+In-Reply-To: <CALCETrXMFHPxAx=ZTYLe9iKPNGfTPEEdis3mn3pphHYpD2h9+A@mail.gmail.com>
+References: <1482246864-16399-1-git-send-email-will.deacon@arm.com>
+ <0b9a1f70-58fe-69c2-87db-d7773cb6a68c@arm.com>
+ <cb98e455-bdee-19ab-8896-9123c6d12a26@arm.com>
+ <CALCETrXMFHPxAx=ZTYLe9iKPNGfTPEEdis3mn3pphHYpD2h9+A@mail.gmail.com>
+Message-ID: <fbf1a09a-bdb2-504a-f4a7-56fa54b6292b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a VCPU blocks (WFI) and has programmed the vtimer, we program a
-soft timer to expire in the future to wake up the vcpu thread when
-appropriate.  Because such as wake up involves a vcpu kick, and the
-timer expire function can get called from interrupt context, and the
-kick may sleep, we have to schedule the kick in the work function.
+On 06/01/17 21:51, Andy Lutomirski wrote:
+> On Fri, Jan 6, 2017 at 10:32 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+>> On 06/01/17 17:48, Jean-Philippe Brucker wrote:
+>>> Hi Will,
+>>>
+>>> On 20/12/16 15:14, Will Deacon wrote:
+>>>> Booting Linux on an ARM fastmodel containing an SMMU emulation results
+>>>> in an unexpected I/O page fault from the legacy virtio-blk PCI device:
+>>>>
+>>>> [    1.211721] arm-smmu-v3 2b400000.smmu: event 0x10 received:
+>>>> [    1.211800] arm-smmu-v3 2b400000.smmu:    0x00000000fffff010
+>>>> [    1.211880] arm-smmu-v3 2b400000.smmu:    0x0000020800000000
+>>>> [    1.211959] arm-smmu-v3 2b400000.smmu:    0x00000008fa081002
+>>>> [    1.212075] arm-smmu-v3 2b400000.smmu:    0x0000000000000000
+>>>> [    1.212155] arm-smmu-v3 2b400000.smmu: event 0x10 received:
+>>>> [    1.212234] arm-smmu-v3 2b400000.smmu:    0x00000000fffff010
+>>>> [    1.212314] arm-smmu-v3 2b400000.smmu:    0x0000020800000000
+>>>> [    1.212394] arm-smmu-v3 2b400000.smmu:    0x00000008fa081000
+>>>> [    1.212471] arm-smmu-v3 2b400000.smmu:    0x0000000000000000
+>>>>
+>>>> <system hangs failing to read partition table>
+>>>>
+>>>> This is because the virtio-blk is behind an SMMU, so we have consequently
+>>>> swizzled its DMA ops and configured the SMMU to translate accesses. This
+>>>> then requires the vring code to use the DMA API to establish translations,
+>>>> otherwise all transactions will result in fatal faults and termination.
+>>>>
+>>>> Given that ARM-based systems only see an SMMU if one is really present
+>>>> (the topology is all described by firmware tables such as device-tree or
+>>>> IORT), then we can safely use the DMA API for all virtio devices.
+>>>
+>>> There is a problem with the platform block device on that same model.
+>>> Since it's not behind the SMMU, the DMA ops fall back to swiotlb, which
+>>> limits the number of mappings.
+>>>
+>>> It used to work with 4.9, but since 9491ae4 ("mm: don't cap request size
+>>> based on read-ahead setting") unlocked read-ahead, we quickly run into
+>>> the limit of swiotlb and panic:
+>>>
+>>> [    5.382359] virtio-mmio 1c130000.virtio_block: swiotlb buffer is full
+>>> (sz: 491520 bytes)
+>>> [    5.382452] virtio-mmio 1c130000.virtio_block: DMA: Out of SW-IOMMU
+>>> space for 491520 bytes
+>>> [    5.382531] Kernel panic - not syncing: DMA: Random memory could be
+>>> DMA written
+>>> ...
+>>> [    5.383148] [<ffff0000083ad754>] swiotlb_map_page+0x194/0x1a0
+>>> [    5.383226] [<ffff000008096bb8>] __swiotlb_map_page+0x20/0x88
+>>> [    5.383320] [<ffff0000084bf738>] vring_map_one_sg.isra.1+0x70/0x88
+>>> [    5.383417] [<ffff0000084c04fc>] virtqueue_add_sgs+0x2ec/0x4e8
+>>> [    5.383505] [<ffff00000856d99c>] __virtblk_add_req+0x9c/0x1a8
+>>> ...
+>>> [    5.384449] [<ffff0000081829c4>] ondemand_readahead+0xfc/0x2b8
+>>>
+>>> Commit 9491ae4 caps the read-ahead request to a limit set by the backing
+>>> device. For virtio-blk, it is infinite (as set by the call to
+>>> blk_queue_max_hw_sectors in virtblk_probe).
+>>>
+>>> I'm not sure how to fix this. Setting an arbitrary sector limit in the
+>>> virtio-blk driver seems unfair to other users. Maybe we should check if
+>>> the device is behind a hardware IOMMU before using the DMA API?
+>>
+>> Hmm, this looks more like the virtio_block device simply has the wrong
+>> DMA mask to begin with. For virtio-pci we set the streaming DMA mask to
+>> 64 bits - should a platform device not be similarly capable?
+> 
+> If it's not, then turning off DMA API will cause random corruption.
+> ISTM one way or another the bug is in either the DMA ops or in the
+> driver initialization.
 
-The work function currently has a warning that gets raised if it turns
-out that the timer shouldn't fire when it's run, which was added because
-the idea was that in that case the work should never have been cancelled.
+OK, having looked a little deeper, I reckon virtio_mmio_probe() is
+indeed missing a dma_set_mask() call compared to its PCI friends. The
+only question then is where does virtio-mmio stand with respect to
+legacy/modern/44-bit/64-bit etc.?
 
-However, it turns out that this whole thing is racy and we can get
-spurious warnings.  The problem is that we clear the armed flag in the
-work function, which may run in parallel with the
-kvm_timer_unschedule->timer_disarm() call.  This results in a possible
-situation where the timer_disarm() call does not call
-cancel_work_sync(), which effectively synchronizes the completion of the
-work function with running the VCPU.  As a result, the VCPU thread
-proceeds before the work function completees, causing changes to the
-timer state such that kvm_timer_should_fire(vcpu) returns false in the
-work function.
+Robin.
 
-All we do in the work function is to kick the VCPU, and an occasional
-rare extra kick never harmed anyone.  Since the race above is extremely
-rare, we don't bother checking if the race happens but simply remove the
-check and the clearing of the armed flag from the work function.
-
-Reported-by: Matthias Brugger <mbrugger@suse.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
-Changes since v1:
- - Don't add a second call to cancel_work_sync, but avoid clearing
-   the armed flag to let the timer_disarm() function call
-   cancel_work_sync on every unschedule call.
- - Note that I chose to remove the warning, despite it shouldn't really
-   happen anymore, because I don't see the value in the warning and
-   it does a bit of potentially unnecessary checking in a potentially
-   hot path.
-
- virt/kvm/arm/arch_timer.c | 3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index a2dbbcc..a7fe606 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -89,9 +89,6 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
- 	struct kvm_vcpu *vcpu;
- 
- 	vcpu = container_of(work, struct kvm_vcpu, arch.timer_cpu.expired);
--	vcpu->arch.timer_cpu.armed = false;
--
--	WARN_ON(!kvm_timer_should_fire(vcpu));
- 
- 	/*
- 	 * If the vcpu is blocked we want to wake it up so that it will see
--- 
-2.9.0
+> 
+> --Andy
+> 
