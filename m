@@ -1,114 +1,194 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon,  9 Jan 2017 01:24:05 -0500
-Subject: [RFC 09/55] KVM: arm64: Set shadow EL1 registers for virtual EL2
- execution
+Date: Mon,  9 Jan 2017 01:24:08 -0500
+Subject: [RFC 12/55] KVM: arm64: Handle EL2 register access traps
 In-Reply-To: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1483943091-1364-10-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1483943091-1364-13-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+ARM v8.3 introduces a new bit in the HCR_EL2, which is the NV bit. When
+this bit is set, accessing EL2 registers in EL1 traps to EL2. In
+addition, executing following instructions in EL1 will trap to EL2 -
+tlbi and at instructions which are undefined when exectued in EL1, eret
+instruction, msr/mrs instructions to access SP_EL1.
 
-When entering virtual EL2, we need to reflect virtual EL2 register
-states to corresponding shadow EL1 registers. We can simply copy them if
-their formats are identical.  Otherwise, we need to convert EL2 register
-state to EL1 register state.
+This patch handles traps due to accessing EL2 registers in EL1.  The
+host hypervisor keeps EL2 register values in memory, and will use them
+to emulate the behavior that the guest hypervisor expects from the
+hardware.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Subsequent patches will handle other kinds of traps.
+
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm64/kvm/context.c | 71 ++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 71 insertions(+)
+ arch/arm64/kvm/sys_regs.c | 119 ++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kvm/sys_regs.h |   7 +++
+ 2 files changed, 126 insertions(+)
 
-diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
-index acb4b1e..2e9e386 100644
---- a/arch/arm64/kvm/context.c
-+++ b/arch/arm64/kvm/context.c
-@@ -17,6 +17,76 @@
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 7cef94f..4158f2f 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -873,6 +873,18 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
+ 	return true;
+ }
  
- #include <linux/kvm_host.h>
- #include <asm/kvm_emulate.h>
-+#include <asm/esr.h>
-+
-+struct el1_el2_map {
-+	enum vcpu_sysreg	el1;
-+	enum el2_regs		el2;
-+};
-+
-+/*
-+ * List of EL2 registers which can be directly applied to EL1 registers to
-+ * emulate running EL2 in EL1.  The EL1 registers here must either be trapped
-+ * or paravirtualized in EL1.
-+ */
-+static const struct el1_el2_map el1_el2_map[] = {
-+	{ AMAIR_EL1, AMAIR_EL2 },
-+	{ MAIR_EL1, MAIR_EL2 },
-+	{ TTBR0_EL1, TTBR0_EL2 },
-+	{ ACTLR_EL1, ACTLR_EL2 },
-+	{ AFSR0_EL1, AFSR0_EL2 },
-+	{ AFSR1_EL1, AFSR1_EL2 },
-+	{ SCTLR_EL1, SCTLR_EL2 },
-+	{ VBAR_EL1, VBAR_EL2 },
-+};
-+
-+static inline u64 tcr_el2_ips_to_tcr_el1_ps(u64 tcr_el2)
++static bool trap_el2_reg(struct kvm_vcpu *vcpu,
++			 struct sys_reg_params *p,
++			 const struct sys_reg_desc *r)
 +{
-+	return ((tcr_el2 & TCR_EL2_PS_MASK) >> TCR_EL2_PS_SHIFT)
-+		<< TCR_IPS_SHIFT;
++	if (!p->is_write)
++		p->regval = vcpu_el2_reg(vcpu, r->reg);
++	else
++		vcpu_el2_reg(vcpu, r->reg) = p->regval;
++
++	return true;
 +}
 +
-+static inline u64 cptr_el2_to_cpacr_el1(u64 cptr_el2)
+ /*
+  * Architected system registers.
+  * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
+@@ -1163,15 +1175,122 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b1111), Op2(0b111),
+ 	  access_pmu_evtyper, reset_val, PMCCFILTR_EL0, 0 },
+ 
++	/* VPIDR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0000), CRm(0b0000), Op2(0b000),
++	  trap_el2_reg, reset_el2_val, VPIDR_EL2, 0 },
++	/* VMPIDR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0000), CRm(0b0000), Op2(0b101),
++	  trap_el2_reg, reset_el2_val, VMPIDR_EL2, 0 },
++
++	/* SCTLR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0001), CRm(0b0000), Op2(0b000),
++	  trap_el2_reg, reset_el2_val, SCTLR_EL2, 0 },
++	/* ACTLR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0001), CRm(0b0000), Op2(0b001),
++	  trap_el2_reg, reset_el2_val, ACTLR_EL2, 0 },
++	/* HCR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0001), CRm(0b0001), Op2(0b000),
++	  trap_el2_reg, reset_el2_val, HCR_EL2, 0 },
++	/* MDCR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0001), CRm(0b0001), Op2(0b001),
++	  trap_el2_reg, reset_el2_val, MDCR_EL2, 0 },
++	/* CPTR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0001), CRm(0b0001), Op2(0b010),
++	  trap_el2_reg, reset_el2_val, CPTR_EL2, 0 },
++	/* HSTR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0001), CRm(0b0001), Op2(0b011),
++	  trap_el2_reg, reset_el2_val, HSTR_EL2, 0 },
++	/* HACR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0001), CRm(0b0001), Op2(0b111),
++	  trap_el2_reg, reset_el2_val, HACR_EL2, 0 },
++
++	/* TTBR0_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0010), CRm(0b0000), Op2(0b000),
++	  trap_el2_reg, reset_el2_val, TTBR0_EL2, 0 },
++	/* TCR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0010), CRm(0b0000), Op2(0b010),
++	  trap_el2_reg, reset_el2_val, TCR_EL2, 0 },
++	/* VTTBR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0010), CRm(0b0001), Op2(0b000),
++	  trap_el2_reg, reset_el2_val, VTTBR_EL2, 0 },
++	/* VTCR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0010), CRm(0b0001), Op2(0b010),
++	  trap_el2_reg, reset_el2_val, VTCR_EL2, 0 },
++
+ 	/* DACR32_EL2 */
+ 	{ Op0(0b11), Op1(0b100), CRn(0b0011), CRm(0b0000), Op2(0b000),
+ 	  NULL, reset_unknown, DACR32_EL2 },
++
++	/* SPSR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0100), CRm(0b0000), Op2(0b000),
++	  trap_el2_reg, reset_el2_val, SPSR_EL2, 0 },
++	/* ELR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0100), CRm(0b0000), Op2(0b001),
++	  trap_el2_reg, reset_el2_val, ELR_EL2, 0 },
++	/* SP_EL1 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0100), CRm(0b0001), Op2(0b000),
++	  trap_el2_reg },
++
+ 	/* IFSR32_EL2 */
+ 	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0000), Op2(0b001),
+ 	  NULL, reset_unknown, IFSR32_EL2 },
++	/* AFSR0_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0001), Op2(0b000),
++	  trap_el2_reg, reset_el2_val, AFSR0_EL2, 0 },
++	/* AFSR1_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0001), Op2(0b001),
++	  trap_el2_reg, reset_el2_val, AFSR1_EL2, 0 },
++	/* ESR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0010), Op2(0b000),
++	  trap_el2_reg, reset_el2_val, ESR_EL2, 0 },
+ 	/* FPEXC32_EL2 */
+ 	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0011), Op2(0b000),
+ 	  NULL, reset_val, FPEXC32_EL2, 0x70 },
++
++	/* FAR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0110), CRm(0b0000), Op2(0b000),
++	  trap_el2_reg, reset_el2_val, FAR_EL2, 0 },
++	/* HPFAR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0110), CRm(0b0000), Op2(0b100),
++	  trap_el2_reg, reset_el2_val, HPFAR_EL2, 0 },
++
++	/* MAIR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b1010), CRm(0b0010), Op2(0b000),
++	  trap_el2_reg, reset_el2_val, MAIR_EL2, 0 },
++	/* AMAIR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b1010), CRm(0b0011), Op2(0b000),
++	  trap_el2_reg, reset_el2_val, AMAIR_EL2, 0 },
++
++	/* VBAR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b1100), CRm(0b0000), Op2(0b000),
++	  trap_el2_reg, reset_el2_val, VBAR_EL2, 0 },
++	/* RVBAR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b1100), CRm(0b0000), Op2(0b001),
++	  trap_el2_reg, reset_el2_val, RVBAR_EL2, 0 },
++	/* RMR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b1100), CRm(0b0000), Op2(0b010),
++	  trap_el2_reg, reset_el2_val, RMR_EL2, 0 },
++
++	/* TPIDR_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b1101), CRm(0b0000), Op2(0b010),
++	  trap_el2_reg, reset_el2_val, TPIDR_EL2, 0 },
++
++	/* CNTVOFF_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b1110), CRm(0b0000), Op2(0b011),
++	  trap_el2_reg, reset_el2_val, CNTVOFF_EL2, 0 },
++	/* CNTHCTL_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b1110), CRm(0b0001), Op2(0b000),
++	  trap_el2_reg, reset_el2_val, CNTHCTL_EL2, 0 },
++	/* CNTHP_TVAL_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b1110), CRm(0b0010), Op2(0b000),
++	  trap_el2_reg, reset_el2_val, CNTHP_TVAL_EL2, 0 },
++	/* CNTHP_CTL_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b1110), CRm(0b0010), Op2(0b001),
++	  trap_el2_reg, reset_el2_val, CNTHP_CTL_EL2, 0 },
++	/* CNTHP_CVAL_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b1110), CRm(0b0010), Op2(0b010),
++	  trap_el2_reg, reset_el2_val, CNTHP_CVAL_EL2, 0 },
++
+ };
+ 
+ static bool trap_dbgidr(struct kvm_vcpu *vcpu,
+diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+index dbbb01c..181290f 100644
+--- a/arch/arm64/kvm/sys_regs.h
++++ b/arch/arm64/kvm/sys_regs.h
+@@ -117,6 +117,13 @@ static inline void reset_val(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r
+ 	vcpu_sys_reg(vcpu, r->reg) = r->val;
+ }
+ 
++static inline void reset_el2_val(struct kvm_vcpu *vcpu,
++				 const struct sys_reg_desc *r)
 +{
-+	u64 cpacr_el1 = 0;
-+
-+	if (!(cptr_el2 & CPTR_EL2_TFP))
-+		cpacr_el1 |= CPACR_EL1_FPEN;
-+	if (cptr_el2 & CPTR_EL2_TTA)
-+		cpacr_el1 |= CPACR_EL1_TTA;
-+
-+	return cpacr_el1;
++	BUG_ON(r->reg >= NR_EL2_REGS);
++	vcpu_el2_reg(vcpu, r->reg) = r->val;
 +}
 +
-+static void create_shadow_el1_sysregs(struct kvm_vcpu *vcpu)
-+{
-+	u64 *s_sys_regs = vcpu->arch.ctxt.shadow_sys_regs;
-+	u64 *el2_regs = vcpu->arch.ctxt.el2_regs;
-+	u64 tcr_el2;
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(el1_el2_map); i++) {
-+		const struct el1_el2_map *map = &el1_el2_map[i];
-+
-+		s_sys_regs[map->el1] = el2_regs[map->el2];
-+	}
-+
-+	tcr_el2 = el2_regs[TCR_EL2];
-+	s_sys_regs[TCR_EL1] =
-+		TCR_EPD1 |	/* disable TTBR1_EL1 */
-+		((tcr_el2 & TCR_EL2_TBI) ? TCR_TBI0 : 0) |
-+		tcr_el2_ips_to_tcr_el1_ps(tcr_el2) |
-+		(tcr_el2 & TCR_EL2_TG0_MASK) |
-+		(tcr_el2 & TCR_EL2_ORGN0_MASK) |
-+		(tcr_el2 & TCR_EL2_IRGN0_MASK) |
-+		(tcr_el2 & TCR_EL2_T0SZ_MASK);
-+
-+	/* Rely on separate VMID for VA context, always use ASID 0 */
-+	s_sys_regs[TTBR0_EL1] &= ~GENMASK_ULL(63, 48);
-+	s_sys_regs[TTBR1_EL1] = 0;
-+
-+	s_sys_regs[CPACR_EL1] = cptr_el2_to_cpacr_el1(el2_regs[CPTR_EL2]);
-+}
- 
- /**
-  * kvm_arm_setup_shadow_state -- prepare shadow state based on emulated mode
-@@ -37,6 +107,7 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
- 		else
- 			ctxt->hw_pstate |= PSR_MODE_EL1t;
- 
-+		create_shadow_el1_sysregs(vcpu);
- 		ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
- 		ctxt->hw_sp_el1 = ctxt->el2_regs[SP_EL2];
- 	} else {
+ static inline int cmp_sys_reg(const struct sys_reg_desc *i1,
+ 			      const struct sys_reg_desc *i2)
+ {
 -- 
 1.9.1
