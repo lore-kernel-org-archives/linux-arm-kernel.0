@@ -1,60 +1,70 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 10 Jan 2017 09:43:58 -0600
-Subject: [PATCH v2 3/5] ARM: davinci_all_defconfig: enable iio and ADS7950
-In-Reply-To: <cb9455bc-2658-9826-823b-2aa845237fed@ti.com>
-References: <1483677228-2325-1-git-send-email-david@lechnology.com>
- <1483677228-2325-4-git-send-email-david@lechnology.com>
- <cb9455bc-2658-9826-823b-2aa845237fed@ti.com>
-Message-ID: <01ec2c94-46e0-3534-94e8-bd92f78b70ec@lechnology.com>
+From: pmladek@suse.com (Petr Mladek)
+Date: Tue, 10 Jan 2017 16:51:12 +0100
+Subject: [PATCH] arm: ftrace: Adds support for
+ CONFIG_DYNAMIC_FTRACE_WITH_REGS
+In-Reply-To: <20161208224655.GA6319@gce>
+References: <1481233595-22112-1-git-send-email-abelvesa@linux.com>
+ <20161208224655.GA6319@gce>
+Message-ID: <20170110155112.GB14894@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2017 06:29 AM, Sekhar Nori wrote:
-> On Friday 06 January 2017 10:03 AM, David Lechner wrote:
->> This enables the iio subsystem and the TI ADS7950 driver. This is used by
->> LEGO MINDSTORMS EV3, which has an ADS7957 chip.
->
-> Can you add your sign-off?
->
->> ---
->>
->> The CONFIG_TI_ADS7950 driver is currently in iio/testing, so some coordination
->> may be needed before picking up this patch.
->>
->>  arch/arm/configs/davinci_all_defconfig | 7 +++++++
->>  1 file changed, 7 insertions(+)
->>
->> diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
->> index 2b1967a..a899876 100644
->> --- a/arch/arm/configs/davinci_all_defconfig
->> +++ b/arch/arm/configs/davinci_all_defconfig
->> @@ -200,6 +200,13 @@ CONFIG_TI_EDMA=y
->>  CONFIG_MEMORY=y
->>  CONFIG_TI_AEMIF=m
->>  CONFIG_DA8XX_DDRCTL=y
->> +CONFIG_IIO=m
->> +CONFIG_IIO_BUFFER_CB=m
->> +CONFIG_IIO_SW_DEVICE=m
->> +CONFIG_IIO_SW_TRIGGER=m
->
->> +CONFIG_TI_ADS7950=m
->
-> Can you separate this from rest of the patch. I would like to enable
-> this option only after I can find the symbol in linux-next.
+On Thu 2016-12-08 22:46:55, Abel Vesa wrote:
+> On Thu, Dec 08, 2016 at 09:46:35PM +0000, Abel Vesa wrote:
+> > From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> > 
+> > From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> 
+> >From statement twice in the commit message. Will resend.
+> > 
+> > The DYNAMIC_FTRACE_WITH_REGS configuration makes it possible for a ftrace
+> > operation to specify if registers need to saved/restored by the ftrace handler.
+> > This is needed by kgraft and possibly other ftrace-based tools, and the ARM
+> > architecture is currently lacking this feature. It would also be the first step
+> > to support the "Kprobes-on-ftrace" optimization on ARM.
+> > 
+> > This patch introduces a new ftrace handler that stores the registers on the
+> > stack before calling the next stage. The registers are restored from the stack
+> > before going back to the instrumented function.
+> > 
+> > A side-effect of this patch is to activate the support for ftrace_modify_call()
+> > as it defines ARCH_SUPPORTS_FTRACE_OPS for the ARM architecture
+> > 
+> > Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> > Signed-off-by: Abel Vesa <abelvesa@linux.com>
+> > ---
+> >  arch/arm/Kconfig               |  2 ++
+> >  arch/arm/include/asm/ftrace.h  |  4 +++
+> >  arch/arm/kernel/entry-ftrace.S | 78 ++++++++++++++++++++++++++++++++++++++++++
+> >  arch/arm/kernel/ftrace.c       | 33 ++++++++++++++++++
+> >  4 files changed, 117 insertions(+)
+> > 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index b5d529f..87f1a9f 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -50,6 +50,7 @@ config ARM
+> >  	select HAVE_DMA_API_DEBUG
+> >  	select HAVE_DMA_CONTIGUOUS if MMU
+> >  	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
+> > +	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
+> >  	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
+> >  	select HAVE_EXIT_THREAD
+> >  	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+> > @@ -90,6 +91,7 @@ config ARM
+> >  	select PERF_USE_VMALLOC
+> >  	select RTC_LIB
+> >  	select SYS_SUPPORTS_APM_EMULATION
+> > +	select FRAME_POINTER if DYNAMIC_FTRACE_WITH_REGS && FUNCTION_GRAPH_TRACER
 
-Will resend without CONFIG_TI_ADS7950
+FRAME_POINTER is not for free. It takes space on the stack. Also there
+is a performance penalty. Do we really need to depend on it? If so,
+it might be worth a note in the commit message.
 
->
->> +CONFIG_IIO_HRTIMER_TRIGGER=m
->> +CONFIG_IIO_SYSFS_TRIGGER=m
->
-> Need CONFIG_IIO_TRIGGER=y also for these two options to take effect.
+I made only a quick look at the patch. It looks reasonable. But I do
+not have enough knowledge about the arm architecture, assembly, and
+ftrace-specifics. Also I cannot test it easily. So issues might
+be hidden to my eyes.
 
-CONFIG_IIO_TRIGGER is selected by IIO_TRIGGERED_BUFFER [=m] && IIO [=m] 
-&& IIO_BUFFER [=y], so save_defconfig does not pick it up.
-
-
->
-> Thanks,
-> Sekhar
->
+Best Regards,
+Petr
