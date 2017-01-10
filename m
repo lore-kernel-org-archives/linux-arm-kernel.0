@@ -1,122 +1,78 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 9 Jan 2017 16:37:53 -0800
-Subject: [PATCH v2 04/12] driver: clk: imx: Add clock driver for imx6sll
-In-Reply-To: <1482832070-22668-5-git-send-email-ping.bai@nxp.com>
-References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
- <1482832070-22668-5-git-send-email-ping.bai@nxp.com>
-Message-ID: <20170110003753.GM17126@codeaurora.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 10 Jan 2017 01:38:54 +0100
+Subject: [PATCH v3] rtc: armada38x: Follow the new recommendation for
+ errata implementation
+In-Reply-To: <20161221102816.6939-1-gregory.clement@free-electrons.com>
+References: <20161221102816.6939-1-gregory.clement@free-electrons.com>
+Message-ID: <20170110003854.67n6x2chjkwazfvs@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/27, Bai Ping wrote:
-> diff --git a/drivers/clk/imx/clk-imx6sll.c b/drivers/clk/imx/clk-imx6sll.c
-> new file mode 100644
-> index 0000000..73758fe1
-> --- /dev/null
-> +++ b/drivers/clk/imx/clk-imx6sll.c
-> @@ -0,0 +1,369 @@
-> +/*
-> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <dt-bindings/clock/imx6sll-clock.h>
-> +#include <linux/clk.h>
-> +#include <linux/clkdev.h>
-
-Is this used?
-
-> +#include <linux/err.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-
-Is this used?
-
-> +#include <linux/types.h>
-> +
-> +#include "clk.h"
-> +
-> +#define CCM_ANALOG_PLL_BYPASS		(0x1 << 16)
-> +#define BM_CCM_CCDR_MMDC_CH0_MASK	(0x2 << 16)
-> +#define CCDR	0x4
-> +#define xPLL_CLR(offset)		 (offset + 0x8)
-> +
-> +static const char *pll_bypass_src_sels[] = { "osc", "dummy", };
-
-All these should be const char * const unless something is wrong.
-
-> +static const char *pll1_bypass_sels[] = { "pll1", "pll1_bypass_src", };
-> +static const char *pll2_bypass_sels[] = { "pll2", "pll2_bypass_src", };
-> +static const char *pll3_bypass_sels[] = { "pll3", "pll3_bypass_src", };
-> +static const char *pll4_bypass_sels[] = { "pll4", "pll4_bypass_src", };
-> +static const char *pll5_bypass_sels[] = { "pll5", "pll5_bypass_src", };
-> +static const char *pll6_bypass_sels[] = { "pll6", "pll6_bypass_src", };
-[...]
-> +	clks[IMX6SLL_CLK_USDHC3]	= imx_clk_gate2("usdhc3",	"usdhc3_podf",	 base + 0x80,	6);
-> +
-> +	/* mask handshake of mmdc */
-> +	writel_relaxed(BM_CCM_CCDR_MMDC_CH0_MASK, base + CCDR);
-> +
-> +	for (i = 0; i < ARRAY_SIZE(clks); i++)
-> +		if (IS_ERR(clks[i]))
-> +			pr_err("i.MX6SLL clk %d: register failed with %ld\n", i, PTR_ERR(clks[i]));
-> +
-> +	clk_data.clks = clks;
-> +	clk_data.clk_num = ARRAY_SIZE(clks);
-> +	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-> +
-> +	/* set perclk to from OSC */
-> +	clk_set_parent(clks[IMX6SLL_CLK_PERCLK_SEL], clks[IMX6SLL_CLK_OSC]);
-
-Can this be done with assigned-clocks in DT?
-
-> +
-> +	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
-> +		clk_prepare_enable(clks[clks_init_on[i]]);
-
-Critical clocks?
-
-> +
-> +	if (IS_ENABLED(CONFIG_USB_MXS_PHY)) {
-> +		clk_prepare_enable(clks[IMX6SLL_CLK_USBPHY1_GATE]);
-> +		clk_prepare_enable(clks[IMX6SLL_CLK_USBPHY2_GATE]);
-
-The phy driver can't enable these?
-
-> +	}
-> +
-> +	/* Lower the AHB clock rate before changing the clock source. */
-> +	clk_set_rate(clks[IMX6SLL_CLK_AHB], 99000000);
-> +
-> +	/* Change periph_pre clock to pll2_bus to adjust AXI rate to 264MHz */
-> +	clk_set_parent(clks[IMX6SLL_CLK_PERIPH_CLK2_SEL], clks[IMX6SLL_CLK_PLL3_USB_OTG]);
-> +	clk_set_parent(clks[IMX6SLL_CLK_PERIPH], clks[IMX6SLL_CLK_PERIPH_CLK2]);
-> +	clk_set_parent(clks[IMX6SLL_CLK_PERIPH_PRE], clks[IMX6SLL_CLK_PLL2_BUS]);
-> +	clk_set_parent(clks[IMX6SLL_CLK_PERIPH], clks[IMX6SLL_CLK_PERIPH_PRE]);
-> +
-> +	clk_set_rate(clks[IMX6SLL_CLK_AHB], 132000000);
-
-assigned-clocks for rates now? Or perhaps we shouldn't be
-exposing these as clks if they have some sort of complicated rate
-sequence switch that we can't guarantee with the clk_ops we have
-today.
-
-> +}
-> +
-> +CLK_OF_DECLARE(imx6sll, "fsl,imx6sll-ccm", imx6sll_clocks_init);
-> +
-
-Please drop this extra newline.
+On 21/12/2016 at 11:28:16 +0100, Gregory CLEMENT wrote :
+> According to RES-3124064:
+> 
+> The device supports CPU write and read access to the RTC time register.
+> However, due to this restriction, read and write from/to internal RTC
+> register may fail.
+> 
+> Workaround:
+> General setup:
+> 1. Configure the RTC Mbus Bridge Timing Control register (offset 0x184A0)
+>    to value 0xFD4D4FFF
+>    Write RTC WRCLK Period to its maximum value (0x3FF)
+>    Write RTC WRCLK setup to 0x29
+>    Write RTC WRCLK High Time to 0x53 (default value)
+>    Write RTC Read Output Delay to its maximum value (0x1F)
+>    Mbus - Read All Byte Enable to 0x1 (default value)
+> 2. Configure the RTC Test Configuration Register (offset 0xA381C) bit3
+>    to '1' (Reserved, Marvell internal)
+> 
+> For any RTC register read operation:
+> 1. Read the requested register 100 times.
+> 2. Find the result that appears most frequently and use this result
+>    as the correct value.
+> 
+> For any RTC register write operation:
+> 1. Issue two dummy writes of 0x0 to the RTC Status register (offset
+>    0xA3800).
+> 2. Write the time to the RTC Time register (offset 0xA380C).
+> 
+> This patch is based on the work of Shaker Daibes
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+> Hi,
+> 
+> this patch followed the patch series sent here:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/473232.html
+> 
+> For now I kept the patch 2 converting to time64_t apart after Russell
+> King feedback.
+> 
+> Changelog:
+> 
+> v2 -> v3:
+> - Removed unrelated change
+> - Remove Unnecessary blank line
+> - Used u32 instead of uint32_t
+> - use the new errata name: RES-3124064 instead of FE-3124064
+> 
+> v1 -> v2:
+> - merged the patch 1 and 3
+> - substantially modified the 1st patch with I think a better
+> implementation:
+>   - First I do not put anymore more a big array onto the stack as
+>     suggested by Andrew Lunn.
+>   - Then I optimize the way to find the correct value.
+> 
+> Gregory
+> 
+>  drivers/rtc/rtc-armada38x.c | 118 +++++++++++++++++++++++++++++++++++---------
+>  1 file changed, 95 insertions(+), 23 deletions(-)
+> 
+Applied, thanks.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
