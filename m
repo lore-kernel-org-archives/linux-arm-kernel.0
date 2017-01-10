@@ -1,72 +1,46 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Tue, 10 Jan 2017 15:29:08 +0000
-Subject: [kvm-unit-tests PATCH v7 04/11] libcflat: add PRI(dux)32 format
- types
-In-Reply-To: <87r34b2b3a.fsf@linaro.org>
-References: <20161124161033.11456-1-alex.bennee@linaro.org>
- <20161124161033.11456-5-alex.bennee@linaro.org> <87r34b2b3a.fsf@linaro.org>
-Message-ID: <87pojv2at7.fsf@linaro.org>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 10 Jan 2017 09:32:09 -0600
+Subject: [RESEND 3/3] ARM: davinci_all_defconfig: enable iio and ADS7950
+In-Reply-To: <03501962-eb4a-6936-15dd-ed59c73f9cd9@ti.com>
+References: <1483978300-403-1-git-send-email-david@lechnology.com>
+ <1483978300-403-4-git-send-email-david@lechnology.com>
+ <03501962-eb4a-6936-15dd-ed59c73f9cd9@ti.com>
+Message-ID: <366c8cd2-e313-2ea2-211d-7e9a425b62e6@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Alex Benn?e <alex.bennee@linaro.org> writes:
-
-> Alex Benn?e <alex.bennee@linaro.org> writes:
->
->> So we can have portable formatting of uint32_t types.
+On 01/10/2017 03:27 AM, Sekhar Nori wrote:
+> On Monday 09 January 2017 09:41 PM, David Lechner wrote:
+>> This enables the iio subsystem and the TI ADS7950 driver. This is used by
+>> LEGO MINDSTORMS EV3, which has an ADS7957 chip.
 >>
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> Signed-off-by: David Lechner <david@lechnology.com>
 >> ---
->>  lib/libcflat.h | 5 +++++
->>  1 file changed, 5 insertions(+)
+>>  arch/arm/configs/davinci_all_defconfig | 7 +++++++
+>>  1 file changed, 7 insertions(+)
 >>
->> diff --git a/lib/libcflat.h b/lib/libcflat.h
->> index bdcc561..6dab5be 100644
->> --- a/lib/libcflat.h
->> +++ b/lib/libcflat.h
->> @@ -55,12 +55,17 @@ typedef _Bool		bool;
->>  #define true  1
->>
->>  #if __SIZEOF_LONG__ == 8
->> +#  define __PRI32_PREFIX
->>  #  define __PRI64_PREFIX	"l"
->>  #  define __PRIPTR_PREFIX	"l"
->>  #else
->> +#  define __PRI32_PREFIX        "l"
+>> diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+>> index 2b1967a..a899876 100644
+>> --- a/arch/arm/configs/davinci_all_defconfig
+>> +++ b/arch/arm/configs/davinci_all_defconfig
+>> @@ -200,6 +200,13 @@ CONFIG_TI_EDMA=y
+>>  CONFIG_MEMORY=y
+>>  CONFIG_TI_AEMIF=m
+>>  CONFIG_DA8XX_DDRCTL=y
+>> +CONFIG_IIO=m
+>> +CONFIG_IIO_BUFFER_CB=m
+>> +CONFIG_IIO_SW_DEVICE=m
+>> +CONFIG_IIO_SW_TRIGGER=m
+>> +CONFIG_TI_ADS7950=m
+>> +CONFIG_IIO_HRTIMER_TRIGGER=m
+>> +CONFIG_IIO_SYSFS_TRIGGER=m
 >
-> OK this is bogus, but the failure is because of where we get uint32_t
-> from (hint using arm32 compiler on a arm64 system) so I got:
+> Hmm, there are some other comments I gave on the previous version I
+> don't see addressed. Can you please fix those or respond to those comments?
+
+Oops, I missed the other comments. I will fix it.
+
 >
->   lib/pci.c:71:9: error: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'uint32_t {aka long unsigned int}' [-Werro\
-> r=format=]
+> Thanks,
+> Sekhar
 >
-> Which makes me think we should be more careful about including system
-> headers in kvm-unit-tests (done in 75e777a0).
-
-Hmm it turns out my compiler is d.r.t as far as it is concerned:
-
-  # 34 "/usr/lib/gcc/arm-none-eabi/5.4.1/include/stdint-gcc.h" 3 4
-  typedef signed char int8_t;
-
-
-  typedef short int int16_t;
-
-
-  typedef long int int32_t;
-
-
-  typedef long long int int64_t;
-
-
-  typedef unsigned char uint8_t;
-
-
-  typedef short unsigned int uint16_t;
-
-
-  typedef long unsigned int uint32_t;
-
-
---
-Alex Benn?e
