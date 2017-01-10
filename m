@@ -1,17 +1,22 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 9 Jan 2017 19:18:32 -0800
-Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.11
-In-Reply-To: <cover.1483701101.git.horms+renesas@verge.net.au>
-References: <cover.1483701101.git.horms+renesas@verge.net.au>
-Message-ID: <20170110031832.GH22261@localhost>
+Date: Mon, 9 Jan 2017 19:21:20 -0800
+Subject: [GIT PULL] Allwinner conversion to generic pin properties
+In-Reply-To: <20161226074214.sd53ozm6hvzkdb26@lukather>
+References: <20161226074214.sd53ozm6hvzkdb26@lukather>
+Message-ID: <20170110032120.GJ22261@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 12:18:48PM +0100, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+Hi,
+
+On Mon, Dec 26, 2016 at 08:42:14AM +0100, Maxime Ripard wrote:
+> Hi Arnd, Olof,
 > 
-> Please consider these Renesas ARM based SoC updates for v4.11.
+> Like we discussed it last time, here is a pull request with the
+> convertion patches to the generic pin properties for 4.10.
 > 
+> Thanks,
+> Maxime
 > 
 > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 > 
@@ -19,18 +24,27 @@ On Fri, Jan 06, 2017 at 12:18:48PM +0100, Simon Horman wrote:
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v4.11
+>   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-generic-pinconf-for-4.10
 > 
-> for you to fetch changes up to 70def3e53694a65c5583fb5f411491a5074bab18:
+> for you to fetch changes up to 1edcd36fcb48fe841bcc62eda36c105037d9583c:
 > 
->   ARM: shmobile: rcar-gen2: Remove unused rcar_gen2_read_mode_pins() (2017-01-03 10:50:45 +0100)
+>   ARM: sunxi: Convert pinctrl nodes to generic bindings (2016-12-26 08:27:11 +0100)
 > 
 > ----------------------------------------------------------------
-> Renesas ARM Based SoC Updates for v4.11
+> Allwinner conversion to generic pin muxing properties
 > 
-> * Allow booting secondary CPU cores in debug mode
+> Here is a list of patches that converts the current DT to the generic pin
+> control and muxing properties, now that the pinctrl driver supports it.
 
-Merged, thanks.
+I dropped the ball on this over the holidays for a few reasons, none of them
+good. Unfortunately we're at -rc3+ now, so I've queued this up in next/dt for
+v4.11 at this point. Hope that's alright.
 
+You might want to use your branch as a base for new DT contents for
+v4.11 in case it ends up being conflict-heavy, which would work fine at our
+end.
+
+
+Regards,
 
 -Olof
