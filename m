@@ -1,64 +1,68 @@
-From: nwatters@codeaurora.org (Nate Watterson)
-Date: Tue, 10 Jan 2017 14:47:13 -0500
-Subject: [PATCH] iommu/arm-smmu-v3: limit use of 2-level stream tables
-In-Reply-To: <20161220102209.GC10132@arm.com>
-References: <20161220102209.GC10132@arm.com>
-Message-ID: <1484077633-18376-1-git-send-email-nwatters@codeaurora.org>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 10 Jan 2017 16:55:52 -0300
+Subject: [PATCH v2 1/3] arm64: dts: exynos: Add missing unit name to
+ Exynos7 SoC node
+In-Reply-To: <20170110184728.2nff4r634ics4wb3@kozik-lap>
+References: <1484069912-6534-1-git-send-email-javier@osg.samsung.com>
+ <1484069912-6534-2-git-send-email-javier@osg.samsung.com>
+ <20170110184728.2nff4r634ics4wb3@kozik-lap>
+Message-ID: <e60bf634-d60d-7316-76a9-3b2f2f1480e8@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the current arm-smmu-v3 driver, all smmus that support 2-level
-stream tables are being forced to use them. This is suboptimal for
-smmus that support fewer stream id bits than would fill in a single
-second level table. This patch limits the use of 2-level tables to
-smmus that both support the feature and whose first level table can
-possibly contain more than a single entry.
+Hello Krzysztof,
 
-Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
----
- drivers/iommu/arm-smmu-v3.c | 21 ++++++++++-----------
- 1 file changed, 10 insertions(+), 11 deletions(-)
+On 01/10/2017 03:47 PM, Krzysztof Kozlowski wrote:
+> On Tue, Jan 10, 2017 at 02:38:30PM -0300, Javier Martinez Canillas wrote:
+>> This patch fixes the following DTC warning about a mismatch
+>> between a device node reg property and its unit name:
+>>
+>> Node /soc has a reg or ranges property, but no unit name
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>> ---
+>>
+>>  arch/arm64/boot/dts/exynos/exynos7.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+>> index 80aa60e38237..0d2fedc6ac2f 100644
+>> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
+>> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+>> @@ -69,7 +69,7 @@
+>>  		method = "smc";
+>>  	};
+>>  
+>> -	soc: soc {
+>> +	soc: soc at 0 {
+> 
+> This looks unnatural, like a fix just to silence the DTC. Mostly de do
+> not enumerate soc node, although there are few exceptions.
+>
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 4d6ec44..7d1a7e5 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1983,17 +1983,9 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
- 	u32 size, l1size;
- 	struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
+Yes, but OTOH arm32 Exynos SoCs just have an empty "ranges" property in their
+soc device node (parent and child address space is the same, no translation)
+so DTC doesn't complain about the unit address in those.
+
+But others SoCs DTSI with a non-empty ranges property have an unit name in
+their soc nodes, i.e for arm64 and arm32:
+
+arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+
+arch/arm/boot/dts/da850.dtsi
  
--	/*
--	 * If we can resolve everything with a single L2 table, then we
--	 * just need a single L1 descriptor. Otherwise, calculate the L1
--	 * size, capped to the SIDSIZE.
--	 */
--	if (smmu->sid_bits < STRTAB_SPLIT) {
--		size = 0;
--	} else {
--		size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
--		size = min(size, smmu->sid_bits - STRTAB_SPLIT);
--	}
-+	/* Calculate the L1 size, capped to the SIDSIZE. */
-+	size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
-+	size = min(size, smmu->sid_bits - STRTAB_SPLIT);
- 	cfg->num_l1_ents = 1 << size;
- 
- 	size += STRTAB_SPLIT;
-@@ -2504,6 +2496,13 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- 	smmu->ssid_bits = reg >> IDR1_SSID_SHIFT & IDR1_SSID_MASK;
- 	smmu->sid_bits = reg >> IDR1_SID_SHIFT & IDR1_SID_MASK;
- 
-+	/*
-+	 * If the SMMU supports fewer bits than would fill a single L2 stream
-+	 * table, use a linear table instead.
-+	 */
-+	if (smmu->sid_bits <= STRTAB_SPLIT)
-+		smmu->features &= ~ARM_SMMU_FEAT_2_LVL_STRTAB;
-+
- 	/* IDR5 */
- 	reg = readl_relaxed(smmu->base + ARM_SMMU_IDR5);
- 
+> I would prefer ignore the warning... however I am happy to hear other opinions.
+>
+
+If is wrong/unnatural to have addresses for soc nodes then I think DTC should
+be patched to ignore these (like it will be the case for the OPP nodes AFAIU).
+
+> Best regards,
+> Krzysztof
+> 
+
+Best regards,
 -- 
-Qualcomm Datacenter Technologies, Inc. on behalf of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux
-Foundation Collaborative Project.
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
