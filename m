@@ -1,41 +1,39 @@
 From: arnd@linaro.org (Arnd Bergmann)
-Date: Tue, 10 Jan 2017 16:00:47 +0100
-Subject: [PATCH 1/2] arm64: dma_mapping: allow PCI host driver to limit
- DMA mask
-In-Reply-To: <20170110144453.GA27156@lst.de>
+Date: Tue, 10 Jan 2017 16:02:28 +0100
+Subject: NVMe vs DMA addressing limitations
+In-Reply-To: <20170110144839.GB27156@lst.de>
 References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
- <1988852.3nyUoruEjG@wuerfel> <20170110144453.GA27156@lst.de>
-Message-ID: <7276604.Zo5Nlf9pQ3@wuerfel>
+ <4137257.d2v87kqLLv@wuerfel> <20170110144839.GB27156@lst.de>
+Message-ID: <9020459.Ga31IGQ4TP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 10, 2017 3:44:53 PM CET Christoph Hellwig wrote:
-> On Tue, Jan 10, 2017 at 11:47:42AM +0100, Arnd Bergmann wrote:
-> > I see that we have CONFIG_ARCH_PHYS_ADDR_T_64BIT on a couple of
-> > 32-bit architectures without swiotlb (arc, arm, some mips32), and
-> > there are several 64-bit architectures that do not have swiotlb
-> > (alpha, parisc, s390, sparc). I believe that alpha, s390 and sparc
-> > always use some form of IOMMU, but the other four apparently don't,
-> > so we would need to add swiotlb support there to remove all the
-> > bounce buffering in network and block layers.
+On Tuesday, January 10, 2017 3:48:39 PM CET Christoph Hellwig wrote:
+> On Tue, Jan 10, 2017 at 12:01:05PM +0100, Arnd Bergmann wrote:
+> > Another workaround me might need is to limit amount of concurrent DMA
+> > in the NVMe driver based on some platform quirk. The way that NVMe works,
+> > it can have very large amounts of data that is concurrently mapped into
+> > the device.
 > 
-> mips has lots of weird swiotlb wire-up in it's board code (the swiotlb
-> arch glue really needs some major cleanup..),
+> That's not really just NVMe - other storage and network controllers also
+> can DMA map giant amounts of memory.  There are a couple aspects to it:
+> 
+>  - dma coherent memoery - right now NVMe doesn't use too much of it,
+>    but upcoming low-end NVMe controllers will soon start to require
+>    fairl large amounts of it for the host memory buffer feature that
+>    allows for DRAM-less controller designs.  As an interesting quirk
+>    that is memory only used by the PCIe devices, and never accessed
+>    by the Linux host at all.
 
-My reading of the MIPS code was that only the 64-bit platforms use it,
-but there are a number of 32-bit platforms that have 64-bit physical
-addresses and don't.
+Right, that is going to become interesting, as some platforms are
+very limited with their coherent allocations.
 
-> as does arm.  Not sure about the others.
+>  - size vs number of the dynamic mapping.  We probably want the dma_ops
+>    specify a maximum mapping size for a given device.  As long as we
+>    can make progress with a few mappings swiotlb / the iommu can just
+>    fail mapping and the driver will propagate that to the block layer
+>    that throttles I/O.
 
-32-bit ARM doesn't actually use SWIOTLB at all, despite selecting it
-in Kconfig. I think Xen uses it for its own purposes, but nothing
-else does.
-
-Most ARM platforms can't actually have RAM beyond 4GB, and the ones
-that do have it tend to also come with an IOMMU, but I remember
-at least BCM53xx actually needing swiotlb on some chip revisions
-that are widely used and that cannot DMA to the second memory bank
-from PCI (!).
+Good idea.
 
 	Arnd
