@@ -1,43 +1,61 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 10 Jan 2017 22:21:17 +0100
-Subject: [PATCH net-next 6/8] net: dsa: Add support for platform data
-In-Reply-To: <1530c7f6-f8ba-ab32-75aa-288549f25db9@gmail.com>
-References: <20170110201235.21771-1-f.fainelli@gmail.com>
- <20170110201235.21771-7-f.fainelli@gmail.com>
- <20170110204124.GL22820@lunn.ch>
- <1530c7f6-f8ba-ab32-75aa-288549f25db9@gmail.com>
-Message-ID: <20170110212117.GO22820@lunn.ch>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 10 Jan 2017 22:21:28 +0100
+Subject: [PATCH v7 08/19] iommu: Implement reserved_regions iommu-group
+ sysfs file
+In-Reply-To: <20170110171444.GU17255@8bytes.org>
+References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
+ <1483969570-3154-9-git-send-email-eric.auger@redhat.com>
+ <9ee5aa6b-6e63-c153-0727-729e0e9592c6@redhat.com>
+ <20170110171444.GU17255@8bytes.org>
+Message-ID: <1d2137bf-8d0d-d786-6cd6-9090fb76f05c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Last time we discussed this, I had a super complex dsa2_platform_data
-> that allowed you to do exactly the same thing we currently do with
-> Device Tree, except that this was with platform_data. It took a lot of
-> effort to get there, but I essentially had the ZII vf160 board example
-> re-implemented and verified with a mockup driver (still have it in a
-> branch that's not too far from net-next/master).
+Hi Joerg,
+On 10/01/2017 18:14, Joerg Roedel wrote:
+> On Tue, Jan 10, 2017 at 05:20:34PM +0100, Auger Eric wrote:
+>> The /sys/kernel/iommu_groups/n directory seems to be removed before this
+>> gets called and this may produce a WARNING when devices get removed from
+>> the group. I intend to remove the call since I have the feeling
+>> everything gets cleaned up properly.
+> 
+> A feeling is not enough, please check that in the code.
 
-One thing different this time is you have associated the platform data
-to an MDIO device. So the platform data represents one switch, not the
-whole complex. This is going to make the platform data much simpler,
-and allow the core to do the work of assembling the multiple platform
-datas into one switch complex. So basically, the platform data is
-dsa_chip_data.
+So my understanding is on group's kobject_release we have:
+kobject_release
+|_ kobject_cleanup
+	|_ kobject_del
+		|_ sysfs_remove_dir
+			|_ kernfs_remove
+				|_ _kernfs_remove
+	../..
+	|_ ktype release (iommu_group_release)
 
-To handle multi-CPUs, we need to move the master ethernet device and
-put it next to the cpu port. So add a
+_kernfs_remove() calls kernfs_put() on all descendant nodes, leading to
+the whole directory cleanup.
 
-struct device   *netdev[DSA_MAX_PORTS];
+In iommu_group_release I called sysfs_remove_file on the
+reserved_regions attribute file. My understanding is its job is
+identifical as what was done previously and the node was already
+destroyed hence the warning.
 
-to dsa_chip_data. It then becomes easy to represent multiple CPU
-ports.
+sysfs_remove_file
+|_ sysfs_remove_file_ns
+	|_ kernfs_remove_by_name_ns
+		|_kernfs_remove
 
-> I would very much like to see the patches and then make a decision based
-> on the submission rather than project a decision on code that has not
-> been submitted yet.
+So my understanding is it is safe to remove it.
 
-The first version was posted a week ago. I requested a lot of
-changes. So lets see what John says about when the next version will
-be ready.
+Thanks
 
-   Andrew
+Eric
+> 
+> 
+> 	Joerg
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
