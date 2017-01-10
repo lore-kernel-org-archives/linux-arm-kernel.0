@@ -1,70 +1,95 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Tue, 10 Jan 2017 16:51:12 +0100
-Subject: [PATCH] arm: ftrace: Adds support for
- CONFIG_DYNAMIC_FTRACE_WITH_REGS
-In-Reply-To: <20161208224655.GA6319@gce>
-References: <1481233595-22112-1-git-send-email-abelvesa@linux.com>
- <20161208224655.GA6319@gce>
-Message-ID: <20170110155112.GB14894@pathway.suse.cz>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 10 Jan 2017 15:55:31 +0000
+Subject: [PATCH] virtio_mmio: Set DMA masks appropriately
+In-Reply-To: <20170110165221-mutt-send-email-mst@kernel.org>
+References: <50defbbe87d75db85a9d22f914258975d661208a.1484051089.git.robin.murphy@arm.com>
+ <20170110165221-mutt-send-email-mst@kernel.org>
+Message-ID: <b60d0de1-a79b-50c0-f773-5a509b0e94d5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2016-12-08 22:46:55, Abel Vesa wrote:
-> On Thu, Dec 08, 2016 at 09:46:35PM +0000, Abel Vesa wrote:
-> > From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-> > 
-> > From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+On 10/01/17 14:54, Michael S. Tsirkin wrote:
+> On Tue, Jan 10, 2017 at 12:26:01PM +0000, Robin Murphy wrote:
+>> Once DMA API usage is enabled, it becomes apparent that virtio-mmio is
+>> inadvertently relying on the default 32-bit DMA mask, which leads to
+>> problems like rapidly exhausting SWIOTLB bounce buffers.
+>>
+>> Ensure that we set the appropriate 64-bit DMA mask whenever possible,
+>> with the coherent mask suitably limited for the legacy vring as per
+>> a0be1db4304f ("virtio_pci: Limit DMA mask to 44 bits for legacy virtio
+>> devices").
+>>
+>> Reported-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+>> Fixes: b42111382f0e ("virtio_mmio: Use the DMA API if enabled")
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>  drivers/virtio/virtio_mmio.c | 10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>
+>> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+>> index 48bfea91dbca..b5c5d49ca598 100644
+>> --- a/drivers/virtio/virtio_mmio.c
+>> +++ b/drivers/virtio/virtio_mmio.c
+>> @@ -59,6 +59,7 @@
+>>  #define pr_fmt(fmt) "virtio-mmio: " fmt
+>>  
+>>  #include <linux/acpi.h>
+>> +#include <linux/dma-mapping.h>
+>>  #include <linux/highmem.h>
+>>  #include <linux/interrupt.h>
+>>  #include <linux/io.h>
+>> @@ -497,6 +498,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
+>>  	struct virtio_mmio_device *vm_dev;
+>>  	struct resource *mem;
+>>  	unsigned long magic;
+>> +	int rc;
+>>  
+>>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>  	if (!mem)
+>> @@ -548,6 +550,14 @@ static int virtio_mmio_probe(struct platform_device *pdev)
+>>  	if (vm_dev->version == 1)
+>>  		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
+>>  
+>> +	rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+>> +	if (rc)
+>> +		rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+>> +	else if (vm_dev->version == 1)
+>> +		dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32 + PAGE_SHIFT));
 > 
-> >From statement twice in the commit message. Will resend.
-> > 
-> > The DYNAMIC_FTRACE_WITH_REGS configuration makes it possible for a ftrace
-> > operation to specify if registers need to saved/restored by the ftrace handler.
-> > This is needed by kgraft and possibly other ftrace-based tools, and the ARM
-> > architecture is currently lacking this feature. It would also be the first step
-> > to support the "Kprobes-on-ftrace" optimization on ARM.
-> > 
-> > This patch introduces a new ftrace handler that stores the registers on the
-> > stack before calling the next stage. The registers are restored from the stack
-> > before going back to the instrumented function.
-> > 
-> > A side-effect of this patch is to activate the support for ftrace_modify_call()
-> > as it defines ARCH_SUPPORTS_FTRACE_OPS for the ARM architecture
-> > 
-> > Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-> > Signed-off-by: Abel Vesa <abelvesa@linux.com>
-> > ---
-> >  arch/arm/Kconfig               |  2 ++
-> >  arch/arm/include/asm/ftrace.h  |  4 +++
-> >  arch/arm/kernel/entry-ftrace.S | 78 ++++++++++++++++++++++++++++++++++++++++++
-> >  arch/arm/kernel/ftrace.c       | 33 ++++++++++++++++++
-> >  4 files changed, 117 insertions(+)
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index b5d529f..87f1a9f 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -50,6 +50,7 @@ config ARM
-> >  	select HAVE_DMA_API_DEBUG
-> >  	select HAVE_DMA_CONTIGUOUS if MMU
-> >  	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
-> > +	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
-> >  	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
-> >  	select HAVE_EXIT_THREAD
-> >  	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
-> > @@ -90,6 +91,7 @@ config ARM
-> >  	select PERF_USE_VMALLOC
-> >  	select RTC_LIB
-> >  	select SYS_SUPPORTS_APM_EMULATION
-> > +	select FRAME_POINTER if DYNAMIC_FTRACE_WITH_REGS && FUNCTION_GRAPH_TRACER
+> That's a very convoluted way to do this, for version 1 you
+> set coherent mask to 64 then override it.
+> why not
+> 
+> if (vm_dev->version == 1) {
+> 	dma_set_mask
+> 	dma_set_coherent_mask
+> } else {
+> 	dma_set_mask_and_coherent
+> }
+> 
+> if (rc)
+> 	dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
 
-FRAME_POINTER is not for free. It takes space on the stack. Also there
-is a performance penalty. Do we really need to depend on it? If so,
-it might be worth a note in the commit message.
+Purely because it's fewer lines of code - if you'd prefer separate
+legacy vs. modern flows for clarity that's fine by me.
 
-I made only a quick look at the patch. It looks reasonable. But I do
-not have enough knowledge about the arm architecture, assembly, and
-ftrace-specifics. Also I cannot test it easily. So issues might
-be hidden to my eyes.
+>> +	if (rc)
+>> +		dev_warn(&pdev->dev, "Failed to enable 64-bit or 32-bit DMA.  Trying to continue, but this might not work.\n");
+>> +
+> 
+> is there a chance it actually still might work?
 
-Best Regards,
-Petr
+If we're not actually using the DMA API, we may still get away with it,
+otherwise it's a fairly sure bet that the subsequent dma_map/dma_alloc
+calls will fail and we'll get nowhere. If I change this to be a probe
+failure condition (and correspondingly in the PCI drivers too), would
+you rather that be predicated on vring_use_dma_api(), or always (given
+the TODO in virtio_ring.c)?
+
+Robin.
+
+>>  	platform_set_drvdata(pdev, vm_dev);
+>>  
+>>  	return register_virtio_device(&vm_dev->vdev);
+>> -- 
+>> 2.10.2.dirty
