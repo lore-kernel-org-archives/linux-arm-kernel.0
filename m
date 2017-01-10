@@ -1,61 +1,57 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 10 Jan 2017 22:21:28 +0100
-Subject: [PATCH v7 08/19] iommu: Implement reserved_regions iommu-group
- sysfs file
-In-Reply-To: <20170110171444.GU17255@8bytes.org>
-References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
- <1483969570-3154-9-git-send-email-eric.auger@redhat.com>
- <9ee5aa6b-6e63-c153-0727-729e0e9592c6@redhat.com>
- <20170110171444.GU17255@8bytes.org>
-Message-ID: <1d2137bf-8d0d-d786-6cd6-9090fb76f05c@redhat.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue, 10 Jan 2017 13:35:40 -0800
+Subject: [PATCHv7 01/11] lib/Kconfig.debug: Add ARCH_HAS_DEBUG_VIRTUAL
+In-Reply-To: <1484084150-1523-1-git-send-email-labbott@redhat.com>
+References: <1484084150-1523-1-git-send-email-labbott@redhat.com>
+Message-ID: <1484084150-1523-2-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
-On 10/01/2017 18:14, Joerg Roedel wrote:
-> On Tue, Jan 10, 2017 at 05:20:34PM +0100, Auger Eric wrote:
->> The /sys/kernel/iommu_groups/n directory seems to be removed before this
->> gets called and this may produce a WARNING when devices get removed from
->> the group. I intend to remove the call since I have the feeling
->> everything gets cleaned up properly.
-> 
-> A feeling is not enough, please check that in the code.
 
-So my understanding is on group's kobject_release we have:
-kobject_release
-|_ kobject_cleanup
-	|_ kobject_del
-		|_ sysfs_remove_dir
-			|_ kernfs_remove
-				|_ _kernfs_remove
-	../..
-	|_ ktype release (iommu_group_release)
+DEBUG_VIRTUAL currently depends on DEBUG_KERNEL && X86. arm64 is getting
+the same support. Rather than add a list of architectures, switch this
+to ARCH_HAS_DEBUG_VIRTUAL and let architectures select it as
+appropriate.
 
-_kernfs_remove() calls kernfs_put() on all descendant nodes, leading to
-the whole directory cleanup.
+Acked-by: Ingo Molnar <mingo@kernel.org>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+Suggested-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Laura Abbott <labbott@redhat.com>
+---
+ arch/x86/Kconfig  | 1 +
+ lib/Kconfig.debug | 5 ++++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-In iommu_group_release I called sysfs_remove_file on the
-reserved_regions attribute file. My understanding is its job is
-identifical as what was done previously and the node was already
-destroyed hence the warning.
-
-sysfs_remove_file
-|_ sysfs_remove_file_ns
-	|_ kernfs_remove_by_name_ns
-		|_kernfs_remove
-
-So my understanding is it is safe to remove it.
-
-Thanks
-
-Eric
-> 
-> 
-> 	Joerg
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index e487493..f1d4e8f 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -46,6 +46,7 @@ config X86
+ 	select ARCH_CLOCKSOURCE_DATA
+ 	select ARCH_DISCARD_MEMBLOCK
+ 	select ARCH_HAS_ACPI_TABLE_UPGRADE	if ACPI
++	select ARCH_HAS_DEBUG_VIRTUAL
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+ 	select ARCH_HAS_ELF_RANDOMIZE
+ 	select ARCH_HAS_FAST_MULTIPLIER
+diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+index b06848a..2aed316 100644
+--- a/lib/Kconfig.debug
++++ b/lib/Kconfig.debug
+@@ -622,9 +622,12 @@ config DEBUG_VM_PGFLAGS
+ 
+ 	  If unsure, say N.
+ 
++config ARCH_HAS_DEBUG_VIRTUAL
++	bool
++
+ config DEBUG_VIRTUAL
+ 	bool "Debug VM translations"
+-	depends on DEBUG_KERNEL && X86
++	depends on DEBUG_KERNEL && ARCH_HAS_DEBUG_VIRTUAL
+ 	help
+ 	  Enable some costly sanity checks in virtual to page code. This can
+ 	  catch mistakes with virt_to_page() and friends.
+-- 
+2.7.4
