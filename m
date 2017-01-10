@@ -1,84 +1,70 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 10 Jan 2017 09:55:26 +0100
-Subject: [PATCH v7 5/8] IIO: add bindings for STM32 timer trigger driver
-In-Reply-To: <20170109180448.f3pcpuarhcddo76b@rob-hp-laptop>
+Date: Tue, 10 Jan 2017 09:56:08 +0100
+Subject: [PATCH v7 2/8] MFD: add STM32 Timers driver
+In-Reply-To: <20170109180051.uwd4su3maj5gkf5l@rob-hp-laptop>
 References: <1483608344-9012-1-git-send-email-benjamin.gaignard@st.com>
- <1483608344-9012-6-git-send-email-benjamin.gaignard@st.com>
- <20170109180448.f3pcpuarhcddo76b@rob-hp-laptop>
-Message-ID: <CA+M3ks713cwuaeBwrPett+KrbQC5-w0oyq7aSTrdHReWYVQRoQ@mail.gmail.com>
+ <1483608344-9012-3-git-send-email-benjamin.gaignard@st.com>
+ <20170109180051.uwd4su3maj5gkf5l@rob-hp-laptop>
+Message-ID: <CA+M3ks5r71FAuy5tKeHSRtSVvDvZ21pXecYFnZEF2VrxdT81xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-01-09 19:04 GMT+01:00 Rob Herring <robh@kernel.org>:
-> On Thu, Jan 05, 2017 at 10:25:41AM +0100, Benjamin Gaignard wrote:
->> Define bindings for STM32 timer trigger
+2017-01-09 19:00 GMT+01:00 Rob Herring <robh@kernel.org>:
+> On Thu, Jan 05, 2017 at 10:25:38AM +0100, Benjamin Gaignard wrote:
+>> This hardware block could at used at same time for PWM generation
+>> and IIO timers.
+>> PWM and IIO timer configuration are mixed in the same registers
+>> so we need a multi fonction driver to be able to share those registers.
+>>
+>> version 7:
+>> - rebase on v4.10-rc2
+>>
+>> version 6:
+>> - rename files to stm32-timers
+>> - rename functions to stm32_timers_xxx
+>>
+>> version 5:
+>> - fix Lee comments about detect function
+>> - add missing dependency on REGMAP_MMIO
 >>
 >> version 4:
->> - remove triggers enumeration from DT
->> - add reg parameter
->>
->> version 3:
->> - change file name
->> - add cross reference with mfd bindings
+>> - add a function to detect Auto Reload Register (ARR) size
+>> - rename the structure shared with other drivers
 >>
 >> version 2:
+>> - rename driver "stm32-gptimer" to be align with SoC documentation
 >> - only keep one compatible
->> - add DT parameters to set lists of the triggers:
->>   one list describe the triggers created by the device
->>   another one give the triggers accepted by the device
+>> - use of_platform_populate() instead of devm_mfd_add_devices()
 >>
 >> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 >> ---
->>  .../bindings/iio/timer/stm32-timer-trigger.txt     | 23 ++++++++++++++++++++++
->>  1 file changed, 23 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+>>  .../devicetree/bindings/mfd/stm32-timers.txt       |  2 +-
+>>  drivers/mfd/Kconfig                                | 11 +++
+>>  drivers/mfd/Makefile                               |  2 +
+>>  drivers/mfd/stm32-timers.c                         | 80 ++++++++++++++++++++++
+>>  include/linux/mfd/stm32-timers.h                   | 71 +++++++++++++++++++
+>>  5 files changed, 165 insertions(+), 1 deletion(-)
+>>  create mode 100644 drivers/mfd/stm32-timers.c
+>>  create mode 100644 include/linux/mfd/stm32-timers.h
 >>
->> diff --git a/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
->> new file mode 100644
->> index 0000000..36a6c4a
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
->> @@ -0,0 +1,23 @@
->> +STMicroelectronics STM32 Timers IIO timer bindings
->> +
->> +Must be a sub-node of an STM32 Timers device tree node.
->> +See ../mfd/stm32-timers.txt for details about the parent node.
->> +
->> +Required parameters:
->> +- compatible:        Must be "st,stm32-timer-trigger".
->> +- reg:               Define triggers configuration of the hardware IP.
+>> diff --git a/Documentation/devicetree/bindings/mfd/stm32-timers.txt b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+>> index a73301d..897e7c2 100644
+>> --- a/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+>> +++ b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+>> @@ -12,7 +12,7 @@ Required parameters:
+>>
+>>  - reg:                       Physical base address and length of the controller's
+>>                       registers.
+>> -- clock-names:               Set to "int".
+>> +- clock-names:               Set to "int".
 >
-> Valid values? Not sure this makes sense for use of reg. reg should be
-> how you address or id a device.
+> This hunk should be dropped or moved to previous patch.
 
-I use reg like an id to distinguish device and get the right
-configuration inside
-the driver.
+I will move it in the previous patch
 
 >
->> +
->> +Example:
->> +     timers at 40010000 {
->> +             #address-cells = <1>;
->> +             #size-cells = <0>;
->> +             compatible = "st,stm32-timers";
->> +             reg = <0x40010000 0x400>;
->> +             clocks = <&rcc 0 160>;
->> +             clock-names = "clk_int";
->> +
->> +             timer {
->
-> This would also need an unit address.
-
-Ok I will fix that
-
->
->> +                     compatible = "st,stm32-timer-trigger";
->> +                     reg = <0>;
->> +             };
->> +     };
->> --
->> 1.9.1
+>>  - clocks:            Phandle to the clock used by the timer module.
+>>                       For Clk properties, please refer to ../clock/clock-bindings.txt
 >>
 
 
