@@ -1,81 +1,120 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 10 Jan 2017 17:20:38 +0900
-Subject: [PATCH v2] usb: musb: sunxi: Uses the resource-managed extcon API
- when registering extcon notifier
-In-Reply-To: <1483071550-8683-1-git-send-email-cw00.choi@samsung.com>
-References: <CGME20161230041914epcas5p24826e70fd5de710818687e55579757ba@epcas5p2.samsung.com>
- <1483071550-8683-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <58749956.1030800@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 10 Jan 2017 09:33:55 +0100
+Subject: [RFC PATCH 1/5] regulator: Extend the power-management APIs
+In-Reply-To: <20170109191758.7zzxeh45pvwiw3jo@sirena.org.uk>
+References: <1480687036-5037-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1480687036-5037-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20170109191758.7zzxeh45pvwiw3jo@sirena.org.uk>
+Message-ID: <20170110093355.700f8225@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+Hi Mark,
 
-This patch got the acked-by from Bin Liu and.
-Could you please apply this patch?
+On Mon, 9 Jan 2017 19:17:58 +0000
+Mark Brown <broonie@kernel.org> wrote:
 
-On 2016? 12? 30? 13:19, Chanwoo Choi wrote:
-> This patch just uses the resource-managed extcon API when registering
-> the extcon notifier.
+> On Fri, Dec 02, 2016 at 02:57:12PM +0100, Boris Brezillon wrote:
 > 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Bin Liu <b-liu@ti.com>
-> ---
-> Changes from v1:
-> - Rebase this patch based on v4.10-rc1.
-> - Add acked-by tag from Maxime Ripard and Bin Lin.
-> - Drop the phy/power-supply/chipidea patches.
+> > The idea to solve #2 is to allow runtime changes. Since this kind of
+> > change is likely to have an impact on the whole system, we require the
+> > board to explicitly state that runtime changes are allowed (using a DT
+> > property).  
 > 
->  drivers/usb/musb/sunxi.c | 12 +++---------
->  1 file changed, 3 insertions(+), 9 deletions(-)
+> > Allowing runtime changes, may also be a problem if devices are not
+> > suspended in the correct order: a device using a regulator should be
+> > suspended before the regulator itself, otherwise we may change the
+> > regulator state while it's still being used.
+> > Hopefully, this problem will be solved with the work done on device
+> > dependency description.  
 > 
-> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-> index d0be0eadd0d9..2332294dee0f 100644
-> --- a/drivers/usb/musb/sunxi.c
-> +++ b/drivers/usb/musb/sunxi.c
-> @@ -251,14 +251,14 @@ static int sunxi_musb_init(struct musb *musb)
->  	writeb(SUNXI_MUSB_VEND0_PIO_MODE, musb->mregs + SUNXI_MUSB_VEND0);
->  
->  	/* Register notifier before calling phy_init() */
-> -	ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
-> -				       &glue->host_nb);
-> +	ret = devm_extcon_register_notifier(glue->dev, glue->extcon,
-> +					EXTCON_USB_HOST, &glue->host_nb);
->  	if (ret)
->  		goto error_reset_assert;
->  
->  	ret = phy_init(glue->phy);
->  	if (ret)
-> -		goto error_unregister_notifier;
-> +		goto error_reset_assert;
->  
->  	musb->isr = sunxi_musb_interrupt;
->  
-> @@ -267,9 +267,6 @@ static int sunxi_musb_init(struct musb *musb)
->  
->  	return 0;
->  
-> -error_unregister_notifier:
-> -	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
-> -				   &glue->host_nb);
->  error_reset_assert:
->  	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
->  		reset_control_assert(glue->rst);
-> @@ -293,9 +290,6 @@ static int sunxi_musb_exit(struct musb *musb)
->  
->  	phy_exit(glue->phy);
->  
-> -	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
-> -				   &glue->host_nb);
-> -
->  	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
->  		reset_control_assert(glue->rst);
->  
-> 
+> I'm not sure that adding an extra property is going to help with the
+> problems here - the system already has to provide explicit support for
+> setting the suspend configuration so that should be enough.
 
+I'm not a big fan of this DT property either, but after our discussion
+on IRC I had the feeling you wanted it to be as safe as possible, and
+since changing the regulator config at runtime is far more dangerous
+than asking the regulator to enter a specific state after everything has
+been suspended, I thought you would prefer to have an extra property
+stating that entering suspend state at runtime is authorized (meaning
+it's safe to do it). 
 
--- 
-Best Regards,
-Chanwoo Choi
-S/W Center, Samsung Electronics
+> However it
+> *is* a bit more than just making sure that the device suspend ordering
+> is good (though that's definitely part of it), there will be things
+> kicked off by hardware signalling without software knowing about it.
+
+Do you have an example, so that I can understand the use case?
+
+> 
+> Anything that doesn't affect a hardware supported runtime state probably
+> needs to be split off and handled separately as that's the much more
+> risky bit
+
+Just to be sure, you mean regulator devices that do not support the
+->set_suspend_xx() hooks, right?
+
+>, moving changing of suspend mode earlier isn't going to cause
+> too much grief, that patch should just be split out and can probably
+> just go straight in.
+
+Yes, I just thought it would be clearer to have everything implemented
+in the same function. Since calling ->set_suspend_xx() does not have
+any impact on the runtime state, it can be called whenever we want
+(assuming we can still communicate with the regulator device to
+configure this suspend state).
+But if you prefer to have it split out in 2 different function, with the
+'set suspend mode' bits called from the regulator_suspend_begin(), I'm
+fine with that.
+
+> 
+> > + * This function should be called from the regulator driver ->suspend() hook
+> > + * and after the platform has called regulator_suspend_begin() to properly set
+> > + * the rdev->suspend.target field.  
+> 
+> Requring these functions to be called from every single driver seems
+> like we're doing something wrong - if we're going to do this we should
+> find some way to loop over all regulators and apply any unapplied
+> changes.
+
+I agree. Actually, I forgot that we had PM ops at the device class
+level. Maybe we could just move these generic ->suspend()/->resume()
+implementation here.
+
+> Batching things up at the end of suspend would also mean that
+> we'd be able to minimise the chances that we get the ordering wrong.
+
+Unfortunately that's not possible, for the exact same reason calling
+regulator_suspend_prepare() from the platform ->prepare() hook did not
+work for me: at that point, all devices have been suspended, and this
+includes the i2c controller which we're using to communicate with the
+PMIC exposing those regulators.
+This leaves 2 solutions:
+
+1/ Apply the suspend state earlier (before the devices ->suspend()
+   hooks have been called)
+2/ Rely on the device model dependency graph, and enter the suspend
+   state when the regulator device is being suspended (this is the
+   solution I'm proposing in this patch).
+
+Solution #1 is acceptable if we omit the case where one regulator
+consumer (another device) is depending on the regulator to be setup
+properly until the device has been suspended. But this still leaves the
+'apply suspend state as late as possible' problem, and in this regards,
+solution #1 is clearly not the best option.
+
+Solution #2 might not be perfect right now, but it should benefit from
+all the work done by Rafael on 'device dependency tracking' and
+'suspend/resume ordering'.
+
+> 
+> For the target bit...  we should be able to find some way to figure out
+> what kind of suspend we're doing without the platform being involved, a
+> callback from the PM core would be helpful here.
+
+Yep, I agree. Rafael, what's your opinion?
+
+Thanks for your comments.
+
+Boris
