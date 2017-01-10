@@ -1,43 +1,81 @@
-From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Tue, 10 Jan 2017 19:59:20 +0800
-Subject: [PATCH 4/4] clk: rockchip: add rk3288 cif_out clock
-In-Reply-To: <1484049560-14820-1-git-send-email-jacob-chen@iotwrt.com>
-References: <1484049560-14820-1-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <1484049560-14820-4-git-send-email-jacob-chen@iotwrt.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 10 Jan 2017 12:00:16 +0000
+Subject: [PATCH 1/2][UPDATE] of: base: add support to get the number of cache
+ levels
+In-Reply-To: <1484048479-19767-1-git-send-email-sudeep.holla@arm.com>
+References: <1484048479-19767-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1484049616-22388-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the clocks for the cif block of the rk3288
+It is useful to have helper function just to get the number of cache
+levels for a given logical cpu. This patch adds the support for the
+same.
 
-Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+It will be used on ARM64 platform where the device tree provides the
+information for the additional non-architected/transparent/external
+last level caches that are not integrated with the processors.
+
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/clk/rockchip/clk-rk3288.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/of/base.c  | 23 +++++++++++++++++++++++
+ include/linux/of.h |  1 +
+ 2 files changed, 24 insertions(+)
 
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 8047cea..f071c24 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -192,6 +192,7 @@ PNAME(mux_uart1_p)	= { "uart1_src", "uart1_frac", "xin24m" };
- PNAME(mux_uart2_p)	= { "uart2_src", "uart2_frac", "xin24m" };
- PNAME(mux_uart3_p)	= { "uart3_src", "uart3_frac", "xin24m" };
- PNAME(mux_uart4_p)	= { "uart4_src", "uart4_frac", "xin24m" };
-+PNAME(mux_cif_out_p)	= { "cif_src", "xin24m" };
- PNAME(mux_vip_out_p)	= { "vip_src", "xin24m" };
- PNAME(mux_mac_p)	= { "mac_pll_src", "ext_gmac" };
- PNAME(mux_hsadcout_p)	= { "hsadc_src", "ext_hsadc" };
-@@ -448,6 +449,12 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- 			RK3288_CLKSEL_CON(6), 14, 2, MFLAGS, 8, 6, DFLAGS,
- 			RK3288_CLKGATE_CON(3), 15, GFLAGS),
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index d4bea3c797d6..80e557eca858 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -25,6 +25,7 @@
+ #include <linux/cpu.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/of_graph.h>
+ #include <linux/spinlock.h>
+ #include <linux/slab.h>
+@@ -2268,6 +2269,28 @@ struct device_node *of_find_next_cache_node(const struct device_node *np)
+ }
  
-+	COMPOSITE_NOGATE(0, "cif_src", mux_pll_src_cpll_gpll_p, 0,
-+			RK3288_CLKSEL_CON(26), 8, 1, MFLAGS, 9, 5, DFLAGS),
-+	COMPOSITE_NODIV(SCLK_CIF_OUT, "sclk_cif_out", mux_cif_out_p, 0,
-+			RK3288_CLKSEL_CON(26), 15, 1, MFLAGS,
-+			RK3288_CLKGATE_CON(3), 7, GFLAGS),
+ /**
++ * of_count_cache_levels - Find the total number of cache levels for the
++ *			   given logical cpu
++ *
++ * @cpu: cpu number(logical index) for which cache levels is being counted
++ *
++ * Returns the total number of cache levels for the given logical cpu
++ */
++int of_count_cache_levels(unsigned int cpu)
++{
++	int level = 0;
++	struct device_node *np = of_cpu_device_node_get(cpu);
 +
- 	GATE(SCLK_HDMI_HDCP, "sclk_hdmi_hdcp", "xin24m", 0,
- 			RK3288_CLKGATE_CON(5), 12, GFLAGS),
- 	GATE(SCLK_HDMI_CEC, "sclk_hdmi_cec", "xin32k", 0,
++	while (np) {
++		level++;
++		of_node_put(np);
++		np = of_find_next_cache_node(np);
++	}
++
++	return level;
++}
++
++/**
+  * of_graph_parse_endpoint() - parse common endpoint node properties
+  * @node: pointer to endpoint device_node
+  * @endpoint: pointer to the OF endpoint data structure
+diff --git a/include/linux/of.h b/include/linux/of.h
+index d72f01009297..c8597ae71ff3 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -280,6 +280,7 @@ extern struct device_node *of_get_child_by_name(const struct device_node *node,
+ 
+ /* cache lookup */
+ extern struct device_node *of_find_next_cache_node(const struct device_node *);
++extern int of_count_cache_levels(unsigned int cpu);
+ extern struct device_node *of_find_node_with_property(
+ 	struct device_node *from, const char *prop_name);
+ 
 -- 
 2.7.4
