@@ -1,42 +1,55 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 10 Jan 2017 12:38:29 +0000
-Subject: [PATCH] arm64: Remove useless UAO IPI and describe how this gets
- enabled
-In-Reply-To: <20170109181402.12883-1-james.morse@arm.com>
-References: <20170109181402.12883-1-james.morse@arm.com>
-Message-ID: <20170110123828.GG21598@arm.com>
+Date: Tue, 10 Jan 2017 12:41:05 +0000
+Subject: [PATCHv6 00/11] CONFIG_DEBUG_VIRTUAL for arm64
+In-Reply-To: <e13dc77e-6709-8122-9856-35aee876b836@gmail.com>
+References: <1483464113-1587-1-git-send-email-labbott@redhat.com>
+ <edc8eaa2-5414-506c-1dad-f2404ef19c81@gmail.com>
+ <b3de65da-8a74-2510-268e-34516cc2de77@redhat.com>
+ <20170104114449.GA18193@arm.com>
+ <e13dc77e-6709-8122-9856-35aee876b836@gmail.com>
+Message-ID: <20170110124105.GH21598@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 06:14:02PM +0000, James Morse wrote:
-> Since its introduction, the UAO enable call was broken, and useless.
-> commit 2a6dcb2b5f3e ("arm64: cpufeature: Schedule enable() calls instead
-> of calling them via IPI"), fixed the framework so that these calls
-> are scheduled, so that they can modify PSTATE.
+On Wed, Jan 04, 2017 at 02:30:50PM -0800, Florian Fainelli wrote:
+> On 01/04/2017 03:44 AM, Will Deacon wrote:
+> > On Tue, Jan 03, 2017 at 03:25:53PM -0800, Laura Abbott wrote:
+> >> On 01/03/2017 02:56 PM, Florian Fainelli wrote:
+> >>> On 01/03/2017 09:21 AM, Laura Abbott wrote:
+> >>>> Happy New Year!
+> >>>>
+> >>>> This is a very minor rebase from v5. It only moves a few headers around.
+> >>>> I think this series should be ready to be queued up for 4.11.
+> >>>
+> >>> FWIW:
+> >>>
+> >>> Tested-by: Florian Fainelli <f.fainelli@gmail.com>
+> >>>
+> >>
+> >> Thanks!
+> >>
+> >>> How do we get this series included? I would like to get the ARM 32-bit
+> >>> counterpart included as well (will resubmit rebased shortly), but I have
+> >>> no clue which tree this should be going through.
+> >>>
+> >>
+> >> I was assuming this would go through the arm64 tree unless Catalin/Will
+> >> have an objection to that.
+> > 
+> > Yup, I was planning to pick it up for 4.11.
+> > 
+> > Florian -- does your series depend on this? If so, then I'll need to
+> > co-ordinate with Russell (probably via a shared branch that we both pull)
+> > if you're aiming for 4.11 too.
 > 
-> Now it is just useless. Remove it. UAO is enabled by the code patching
-> which causes get_user() and friends to use the 'ldtr' family of
-> instructions. This relies on the PSTATE.UAO bit being set to match
-> addr_limit, which we do in uao_thread_switch() called via __switch_to().
-> 
-> All that is needed to enable UAO is patch the code, and call schedule().
-> __apply_alternatives_multi_stop() calls stop_machine() when it modifies
-> the kernel text to enable the alternatives, (including the UAO code in
-> uao_thread_switch()). Once stop_machine() has finished __switch_to() is
-> called to reschedule the original task, this causes PSTATE.UAO to be set
-> appropriately. An explicit enable() call is not needed.
-> 
-> Reported-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> Signed-off-by: James Morse <james.morse@arm.com>
-> 
-> ==
-> Sorry, I forgot about this cleanup after the last round of PAN fixes.
-> ---
->  arch/arm64/include/asm/processor.h |  1 -
->  arch/arm64/kernel/cpufeature.c     |  5 ++++-
->  arch/arm64/mm/fault.c              | 14 --------------
->  3 files changed, 4 insertions(+), 16 deletions(-)
+> Yes, pretty much everything in Laura's patch series is relevant, except
+> the arm64 bits.
 
-Applied for 4.11.
+Ok, then. Laura -- could you please reorder your patches so that the
+non-arm64 bits come first? That way, I can put those on a separate branch
+and have it pulled by both arm64 and rmk, so that the prequisities are
+shared between the architectures.
+
+Thanks,
 
 Will
