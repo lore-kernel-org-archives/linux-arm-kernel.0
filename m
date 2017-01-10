@@ -1,40 +1,94 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 10 Jan 2017 11:09:31 +0100
-Subject: [PATCH] ARM: defconfig: include QCOM_EBI2 in multi_v7
-Message-ID: <20170110100931.15791-1-linus.walleij@linaro.org>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 10 Jan 2017 11:14:30 +0100
+Subject: [PATCH 3/4] ARM: dts: stm32: stm32f7: Enable clocks for STM32F746
+ boards
+In-Reply-To: <1483711165-17149-4-git-send-email-gabriel.fernandez@st.com>
+References: <1483711165-17149-1-git-send-email-gabriel.fernandez@st.com>
+ <1483711165-17149-4-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <2c699f28-f554-e48a-34a0-e356f0bf7e2c@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the Qualcomm External Bus Interface 2 to the multi_v7
-defconfig: it is hard for users to realize that this is a
-required driver for getting things like ethernet, and a necessary
-prerequisite to get the external bus discoverable on the
-MSM8660/APQ8060 machines.
+Hi Gabriel
 
-As regular users will likely want to have some ethernet and
-other functionality up quickly, it makes sense to add this to
-the multi_v7 defconfig.
+On 01/06/2017 02:59 PM, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>
+> This patch enables clocks for STM32F746 boards.
+>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> ---
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: please just apply this wherever ARM multi_v7
-defconfigs go if you're OK with it.
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+In commit header, "stm32f7" is not usefull.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index b01a43851294..267d0703caae 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -192,6 +192,7 @@ CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_DMA_CMA=y
- CONFIG_CMA_SIZE_MBYTES=64
- CONFIG_OMAP_OCP2SCP=y
-+CONFIG_QCOM_EBI2=y
- CONFIG_SIMPLE_PM_BUS=y
- CONFIG_SUNXI_RSB=m
- CONFIG_MTD=y
--- 
-2.9.3
+
+>  arch/arm/boot/dts/stm32f746.dtsi | 29 +++++++++++++++++++++++++++--
+>  1 file changed, 27 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
+> index f321ffe..e05e131 100644
+> --- a/arch/arm/boot/dts/stm32f746.dtsi
+> +++ b/arch/arm/boot/dts/stm32f746.dtsi
+> @@ -43,6 +43,7 @@
+>  #include "skeleton.dtsi"
+>  #include "armv7-m.dtsi"
+>  #include <dt-bindings/pinctrl/stm32f746-pinfunc.h>
+> +#include <dt-bindings/clock/stm32fx-clock.h>
+
+This patch depends on another series not yet merged (maybe "[PATCH-next 
+... is a better header ?
+
+>
+>  / {
+>  	clocks {
+> @@ -51,6 +52,24 @@
+>  			compatible = "fixed-clock";
+>  			clock-frequency = <0>;
+>  		};
+> +
+> +		clk-lse {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <32768>;
+> +		};
+> +
+> +		clk-lsi {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <32000>;
+> +		};
+> +
+> +		clk_i2s_ckin: clk-i2s-ckin {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <48000000>;
+> +		};
+>  	};
+>
+>  	soc {
+> @@ -178,6 +197,11 @@
+>  			interrupts = <1>, <2>, <3>, <6>, <7>, <8>, <9>, <10>, <23>, <40>, <41>, <42>, <62>, <76>;
+>  		};
+>
+> +		pwrcfg: power-config at 40007000 {
+> +			compatible = "syscon";
+> +			reg = <0x40007000 0x400>;
+> +		};
+> +
+>  		pin-controller {
+>  			#address-cells = <1>;
+>  			#size-cells = <1>;
+> @@ -291,9 +315,10 @@
+>
+>  		rcc: rcc at 40023800 {
+>  			#clock-cells = <2>;
+> -			compatible = "st,stm32f42xx-rcc", "st,stm32-rcc";
+> +			compatible = "st,stm32f746-rcc", "st,stm32-rcc";
+>  			reg = <0x40023800 0x400>;
+> -			clocks = <&clk_hse>;
+> +			clocks = <&clk_hse>, <&clk_i2s_ckin>;
+> +			st,syscfg = <&pwrcfg>;
+>  		};
+>  	};
+>  };
+>
