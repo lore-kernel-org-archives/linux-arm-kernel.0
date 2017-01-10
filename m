@@ -1,104 +1,38 @@
-From: breno.lima@nxp.com (Breno Lima)
-Date: Tue, 10 Jan 2017 16:59:38 -0200
-Subject: [PATCH] ARM: dts: udoo_neo: Add UDOO Neo USB OTG1 and OTG2 support
-Message-ID: <1484074778-2112-1-git-send-email-breno.lima@nxp.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 10 Jan 2017 20:59:43 +0200
+Subject: [PATCH] usb: dwc3-exynos fix unspecified suspend clk error
+ handling
+In-Reply-To: <23cf318d-b83f-55e6-e980-13133f0ceb8b@osg.samsung.com>
+References: <20170110022131.31042-1-shuahkh@osg.samsung.com>
+ <CANAwSgQ4Nxyq5itu62qdz18d4xvTu-e3P3ZXK2acLWtzexaaCA@mail.gmail.com>
+ <2265318.ybtxfiNn3d@amdc3058>
+ <CGME20170110182345epcas1p3112f94aad300625ff1f75860c55a2b7e@epcas1p3.samsung.com>
+ <1659345.4CcVdVckN5@amdc3058>
+ <23cf318d-b83f-55e6-e980-13133f0ceb8b@osg.samsung.com>
+Message-ID: <20170110185943.qxwnzjg6zzy4zbki@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for micro USB (OTG1) and USB Host (OTG2) for UDOO Neo board.
+On Tue, Jan 10, 2017 at 11:37:24AM -0700, Shuah Khan wrote:
+> On 01/10/2017 11:23 AM, Bartlomiej Zolnierkiewicz wrote:
+> > I also think that regardless of what is decided on making susp_clk
+> > non-optional for some Exynos SoCs we should probably remove the debug
+> > message as it doesn't bring useful information and may be confusing.
+> > 
+> > Shuah, can you take care of this?
+> 
+> Yes. This message as it reads now is not only confusing, but also can
+> lead users to think something is wrong.
+> 
+> I can get rid of it or I could change it from info to debug and change
+> it to read:
+> 
+> "Optional Suspend clock isn't found. Diver operation isn't impacted"
 
-Tested on a UDOO Neo Full board by mounting a mass storage device
-on both ports.
+It is even more confusing. If the clock is required (by binding, by
+hardware) - make it an error. If it is completely not important - do not
+print anything. If it is optional but helpful (enabling clock gives
+someything) then print something... but it is not that case.
 
-Signed-off-by: Breno Lima <breno.lima@nxp.com>
----
- arch/arm/boot/dts/imx6sx-udoo-neo.dtsi | 60 ++++++++++++++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-index 2b65d26..827ace1 100644
---- a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-+++ b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-@@ -75,6 +75,28 @@
- 		regulator-max-microvolt = <3300000>;
- 		regulator-boot-on;
- 	};
-+
-+	reg_usb_otg1_vbus: usb-otg1-vbus {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_otg1_reg>;
-+		regulator-name = "usb_otg1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	reg_usb_otg2_vbus: usb-otg2-vbus {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_otg2_reg>;
-+		regulator-name = "usb_otg2_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio4 12 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
- };
- 
- &cpu0 {
-@@ -241,6 +263,28 @@
- 			<MX6SX_PAD_CSI_DATA07__UART6_CTS_B	0x1b0b1>;
- 	};
- 
-+	pinctrl_otg1_reg: otg1grp {
-+		fsl,pins =
-+			<MX6SX_PAD_GPIO1_IO09__GPIO1_IO_9        0x10b0>;
-+	};
-+
-+
-+	pinctrl_otg2_reg: otg2grp {
-+		fsl,pins =
-+			<MX6SX_PAD_NAND_RE_B__GPIO4_IO_12        0x10b0>;
-+	};
-+
-+	pinctrl_usb_otg1: usbotg1grp {
-+		fsl,pins =
-+			<MX6SX_PAD_GPIO1_IO10__ANATOP_OTG1_ID    0x17059>,
-+			<MX6SX_PAD_GPIO1_IO08__USB_OTG1_OC       0x10b0>;
-+	};
-+
-+	pinctrl_usb_otg2: usbot2ggrp {
-+		fsl,pins =
-+			<MX6SX_PAD_QSPI1A_DATA0__USB_OTG2_OC     0x10b0>;
-+	};
-+
- 	pinctrl_usdhc2: usdhc2grp {
- 		fsl,pins =
- 			<MX6SX_PAD_SD2_CMD__USDHC2_CMD		0x17059>,
-@@ -280,6 +324,22 @@
- 	status = "disabled";
- };
- 
-+&usbotg1 { /* J2 micro USB port */
-+	vbus-supply = <&reg_usb_otg1_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usb_otg1>;
-+	imx6-usb-charger-detection;
-+	status = "okay";
-+};
-+
-+&usbotg2 { /* J3 host USB port */
-+	vbus-supply = <&reg_usb_otg2_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usb_otg2>;
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
- &usdhc2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc2>;
--- 
-2.7.4
+Best regards,
+Krzysztof
