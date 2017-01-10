@@ -1,22 +1,26 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 10 Jan 2017 18:14:44 +0100
-Subject: [PATCH v7 08/19] iommu: Implement reserved_regions iommu-group
- sysfs file
-In-Reply-To: <9ee5aa6b-6e63-c153-0727-729e0e9592c6@redhat.com>
-References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
- <1483969570-3154-9-git-send-email-eric.auger@redhat.com>
- <9ee5aa6b-6e63-c153-0727-729e0e9592c6@redhat.com>
-Message-ID: <20170110171444.GU17255@8bytes.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 10 Jan 2017 17:15:00 +0000
+Subject: [PATCH v4 0/9] arm64: Expose CPUID registers via emulation
+In-Reply-To: <1483982912-27215-1-git-send-email-suzuki.poulose@arm.com>
+References: <1483982912-27215-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20170110171459.GH527@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 05:20:34PM +0100, Auger Eric wrote:
-> The /sys/kernel/iommu_groups/n directory seems to be removed before this
-> gets called and this may produce a WARNING when devices get removed from
-> the group. I intend to remove the call since I have the feeling
-> everything gets cleaned up properly.
+On Mon, Jan 09, 2017 at 05:28:23PM +0000, Suzuki K Poulose wrote:
+> This series adds a new ABI to expose the CPU feature registers
+> to the user space via emulation of MRS instruction. The system exposes
+> only a limited set of feature values (See the documentation patch)
+> from the cpufeature infrastructure. The feature bits that are not
+> exposed are set to the 'safe value' which implies 'not supported'.
+> 
+> Apart from the selected feature registers, we expose MIDR_EL1 (Main
+> ID Register). The user should be aware that, reading MIDR_EL1 can be
+> tricky on a heterogeneous system (just like getcpu()). We export the
+> value of the current CPU where 'MRS' is executed.
+> 
+> Applies on v4.10-rc3.
 
-A feeling is not enough, please check that in the code.
+Thanks, I'll queue this for 4.11.
 
-
-	Joerg
+Will
