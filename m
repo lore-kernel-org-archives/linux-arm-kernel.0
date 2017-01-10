@@ -1,56 +1,38 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 10 Jan 2017 13:35:41 -0800
-Subject: [PATCHv7 02/11] mm/cma: Cleanup highmem check
+Date: Tue, 10 Jan 2017 13:35:42 -0800
+Subject: [PATCHv7 03/11] mm: Introduce lm_alias
 In-Reply-To: <1484084150-1523-1-git-send-email-labbott@redhat.com>
 References: <1484084150-1523-1-git-send-email-labbott@redhat.com>
-Message-ID: <1484084150-1523-3-git-send-email-labbott@redhat.com>
+Message-ID: <1484084150-1523-4-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-6b101e2a3ce4 ("mm/CMA: fix boot regression due to physical address of
-high_memory") added checks to use __pa_nodebug on x86 since
-CONFIG_DEBUG_VIRTUAL complains about high_memory not being linearlly
-mapped. arm64 is now getting support for CONFIG_DEBUG_VIRTUAL as well.
-Rather than add an explosion of arches to the #ifdef, switch to an
-alternate method to calculate the physical start of highmem using
-the page before highmem starts. This avoids the need for the #ifdef and
-extra __pa_nodebug calls.
+Certain architectures may have the kernel image mapped separately to
+alias the linear map. Introduce a macro lm_alias to translate a kernel
+image symbol into its linear alias. This is used in part with work to
+add CONFIG_DEBUG_VIRTUAL support for arm64.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
- mm/cma.c | 15 +++++----------
- 1 file changed, 5 insertions(+), 10 deletions(-)
+ include/linux/mm.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/mm/cma.c b/mm/cma.c
-index c960459..94b3460 100644
---- a/mm/cma.c
-+++ b/mm/cma.c
-@@ -235,18 +235,13 @@ int __init cma_declare_contiguous(phys_addr_t base,
- 	phys_addr_t highmem_start;
- 	int ret = 0;
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index fe6b403..5dc9c46 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -76,6 +76,10 @@ extern int mmap_rnd_compat_bits __read_mostly;
+ #define page_to_virt(x)	__va(PFN_PHYS(page_to_pfn(x)))
+ #endif
  
--#ifdef CONFIG_X86
- 	/*
--	 * high_memory isn't direct mapped memory so retrieving its physical
--	 * address isn't appropriate.  But it would be useful to check the
--	 * physical address of the highmem boundary so it's justifiable to get
--	 * the physical address from it.  On x86 there is a validation check for
--	 * this case, so the following workaround is needed to avoid it.
-+	 * We can't use __pa(high_memory) directly, since high_memory
-+	 * isn't a valid direct map VA, and DEBUG_VIRTUAL will (validly)
-+	 * complain. Find the boundary by adding one to the last valid
-+	 * address.
- 	 */
--	highmem_start = __pa_nodebug(high_memory);
--#else
--	highmem_start = __pa(high_memory);
--#endif
-+	highmem_start = __pa(high_memory - 1) + 1;
- 	pr_debug("%s(size %pa, base %pa, limit %pa alignment %pa)\n",
- 		__func__, &size, &base, &limit, &alignment);
- 
++#ifndef lm_alias
++#define lm_alias(x)	__va(__pa_symbol(x))
++#endif
++
+ /*
+  * To prevent common memory management code establishing
+  * a zero page mapping on a read fault.
 -- 
 2.7.4
