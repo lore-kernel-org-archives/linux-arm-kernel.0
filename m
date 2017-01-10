@@ -1,40 +1,136 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 10 Jan 2017 14:57:19 +0530
-Subject: [RESEND 3/3] ARM: davinci_all_defconfig: enable iio and ADS7950
-In-Reply-To: <1483978300-403-4-git-send-email-david@lechnology.com>
-References: <1483978300-403-1-git-send-email-david@lechnology.com>
- <1483978300-403-4-git-send-email-david@lechnology.com>
-Message-ID: <03501962-eb4a-6936-15dd-ed59c73f9cd9@ti.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 10 Jan 2017 10:29:28 +0100
+Subject: [PATCH v5 1/2] ARM: dts: at91: add devicetree for the Axentia
+ TSE-850
+In-Reply-To: <1484035732-31635-2-git-send-email-peda@axentia.se>
+References: <1484035732-31635-1-git-send-email-peda@axentia.se>
+ <1484035732-31635-2-git-send-email-peda@axentia.se>
+Message-ID: <20170110092928.hwd4l4k3eyagepco@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 January 2017 09:41 PM, David Lechner wrote:
-> This enables the iio subsystem and the TI ADS7950 driver. This is used by
-> LEGO MINDSTORMS EV3, which has an ADS7957 chip.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
+Hi,
+
+This needs a commit message, please add one.
+
+On 10/01/2017 at 09:08:51 +0100, Peter Rosin wrote :
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Peter Rosin <peda@axentia.se>
 > ---
->  arch/arm/configs/davinci_all_defconfig | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  Documentation/devicetree/bindings/arm/axentia.txt |  19 ++
+>  MAINTAINERS                                       |   8 +
+>  arch/arm/boot/dts/Makefile                        |   1 +
+>  arch/arm/boot/dts/at91-linea.dtsi                 |  53 +++++
+>  arch/arm/boot/dts/at91-tse850-3.dts               | 274 ++++++++++++++++++++++
+>  5 files changed, 355 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/axentia.txt
+>  create mode 100644 arch/arm/boot/dts/at91-linea.dtsi
+>  create mode 100644 arch/arm/boot/dts/at91-tse850-3.dts
 > 
-> diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-> index 2b1967a..a899876 100644
-> --- a/arch/arm/configs/davinci_all_defconfig
-> +++ b/arch/arm/configs/davinci_all_defconfig
-> @@ -200,6 +200,13 @@ CONFIG_TI_EDMA=y
->  CONFIG_MEMORY=y
->  CONFIG_TI_AEMIF=m
->  CONFIG_DA8XX_DDRCTL=y
-> +CONFIG_IIO=m
-> +CONFIG_IIO_BUFFER_CB=m
-> +CONFIG_IIO_SW_DEVICE=m
-> +CONFIG_IIO_SW_TRIGGER=m
-> +CONFIG_TI_ADS7950=m
-> +CONFIG_IIO_HRTIMER_TRIGGER=m
-> +CONFIG_IIO_SYSFS_TRIGGER=m
+> diff --git a/Documentation/devicetree/bindings/arm/axentia.txt b/Documentation/devicetree/bindings/arm/axentia.txt
+> new file mode 100644
+> index 000000000000..ea3fb96ae465
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/axentia.txt
+> @@ -0,0 +1,19 @@
+> +Device tree bindings for Axentia ARM devices
+> +============================================
+> +
+> +Linea CPU module
+> +----------------
+> +
+> +Required root node properties:
+> +compatible = "axentia,linea",
+> +	     "atmel,sama5d31", "atmel,sama5d3", "atmel,sama5";
+> +and following the rules from atmel-at91.txt for a sama5d31 SoC.
+> +
+> +
+> +TSE-850 v3 board
+> +----------------
+> +
+> +Required root node properties:
+> +compatible = "axentia,tse850v3", "axentia,linea",
+> +	     "atmel,sama5d31", "atmel,sama5d3", "atmel,sama5";
+> +and following the rules from above for the axentia,linea CPU module.
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 97b78cc5aa51..5c2ea6e9cd7f 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -2346,6 +2346,14 @@ S:	Maintained
+>  F:	Documentation/devicetree/bindings/sound/axentia,*
+>  F:	sound/soc/atmel/tse850-pcm5142.c
+>  
+> +AXENTIA ARM DEVICES
+> +M:	Peter Rosin <peda@axentia.se>
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:	Maintained
+> +F:	Documentation/devicetree/bindings/arm/axentia.txt
+> +F:	arch/arm/boot/dts/at91-linea.dtsi
+> +F:	arch/arm/boot/dts/at91-tse850-3.dts
+> +
 
-Hmm, there are some other comments I gave on the previous version I
-don't see addressed. Can you please fix those or respond to those comments?
+I don't think you need to add yourself to MAINTAINERS for two DTs if
+that is just to keep checkpatch happy, don't bother.
 
-Thanks,
-Sekhar
+>  AZ6007 DVB DRIVERV
+>  M:	Mauro Carvalho Chehab <mchehab@s-opensource.com>
+>  M:	Mauro Carvalho Chehab <mchehab@kernel.org>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 9a7375c388a8..7632849866de 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -48,6 +48,7 @@ dtb-$(CONFIG_SOC_SAM_V7) += \
+>  	at91-kizbox2.dtb \
+>  	at91-sama5d2_xplained.dtb \
+>  	at91-sama5d3_xplained.dtb \
+> +	at91-tse850-3.dtb \
+>  	sama5d31ek.dtb \
+>  	sama5d33ek.dtb \
+>  	sama5d34ek.dtb \
+> diff --git a/arch/arm/boot/dts/at91-linea.dtsi b/arch/arm/boot/dts/at91-linea.dtsi
+> new file mode 100644
+> index 000000000000..646feb0daa81
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91-linea.dtsi
+> @@ -0,0 +1,53 @@
+> +/*
+> + * at91-linea.dtsi - Device Tree Include file for the Axentia Linea Module.
+> + *
+> + * Copyright (C) 2017 Axentia Technologies AB
+> + *
+> + * Author: Peter Rosin <peda@axentia.se>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +
+> +#include "sama5d31.dtsi"
+> +
+> +/ {
+> +	compatible = "axentia,linea",
+> +		     "atmel,sama5d31", "atmel,sama5d3", "atmel,sama5";
+> +
+> +	memory {
+> +		reg = <0x20000000 0x4000000>;
+> +	};
+> +};
+> +
+> +&slow_xtal {
+> +	clock-frequency = <32768>;
+> +};
+> +
+> +&main_xtal {
+> +	clock-frequency = <12000000>;
+> +};
+> +
+> +&main {
+> +	clock-frequency = <12000000>;
+> +};
+> +
+
+I don't think this is needed
+
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
