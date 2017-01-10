@@ -1,51 +1,39 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 10 Jan 2017 14:15:06 -0800
-Subject: [PATCH net-next 6/8] net: dsa: Add support for platform data
-In-Reply-To: <20170110212117.GO22820@lunn.ch>
-References: <20170110201235.21771-1-f.fainelli@gmail.com>
- <20170110201235.21771-7-f.fainelli@gmail.com>
- <20170110204124.GL22820@lunn.ch>
- <1530c7f6-f8ba-ab32-75aa-288549f25db9@gmail.com>
- <20170110212117.GO22820@lunn.ch>
-Message-ID: <f48f61c6-e87c-c3bd-65e4-87e2093248d0@gmail.com>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Wed, 11 Jan 2017 07:45:43 +0900
+Subject: [PATCH v2 2/2] media: rc: add driver for IR remote receiver on
+ MT7623 SoC
+In-Reply-To: <201701102015.fSM15CvI%fengguang.wu@intel.com>
+References: <CGME20170110120828epcas4p42482b7920c7a7dabd4c7794959f6d264@epcas4p4.samsung.com>
+ <201701102015.fSM15CvI%fengguang.wu@intel.com>
+Message-ID: <20170110224543.uuoa7ofkvolz6inp@gangnam.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2017 01:21 PM, Andrew Lunn wrote:
->> Last time we discussed this, I had a super complex dsa2_platform_data
->> that allowed you to do exactly the same thing we currently do with
->> Device Tree, except that this was with platform_data. It took a lot of
->> effort to get there, but I essentially had the ZII vf160 board example
->> re-implemented and verified with a mockup driver (still have it in a
->> branch that's not too far from net-next/master).
-> 
-> One thing different this time is you have associated the platform data
-> to an MDIO device. So the platform data represents one switch, not the
-> whole complex. This is going to make the platform data much simpler,
-> and allow the core to do the work of assembling the multiple platform
-> datas into one switch complex. So basically, the platform data is
-> dsa_chip_data.
-> 
-> To handle multi-CPUs, we need to move the master ethernet device and
-> put it next to the cpu port. So add a
-> 
-> struct device   *netdev[DSA_MAX_PORTS];
-> 
-> to dsa_chip_data. It then becomes easy to represent multiple CPU
-> ports.
+Hi Sean,
 
-Alright, let me get that prepared then, thanks!
-
+>    include/linux/compiler.h:253:8: sparse: attribute 'no_sanitize_address': unknown attribute
+> >> drivers/media/rc/mtk-cir.c:215:41: sparse: too many arguments for function devm_rc_allocate_device
+>    drivers/media/rc/mtk-cir.c: In function 'mtk_ir_probe':
+>    drivers/media/rc/mtk-cir.c:215:11: error: too many arguments to function 'devm_rc_allocate_device'
+>      ir->rc = devm_rc_allocate_device(dev, RC_DRIVER_IR_RAW);
+>               ^~~~~~~~~~~~~~~~~~~~~~~
+>    In file included from drivers/media/rc/mtk-cir.c:22:0:
+>    include/media/rc-core.h:213:16: note: declared here
+>     struct rc_dev *devm_rc_allocate_device(struct device *dev);
+>                    ^~~~~~~~~~~~~~~~~~~~~~~
 > 
->> I would very much like to see the patches and then make a decision based
->> on the submission rather than project a decision on code that has not
->> been submitted yet.
+> vim +/devm_rc_allocate_device +215 drivers/media/rc/mtk-cir.c
 > 
-> The first version was posted a week ago. I requested a lot of
-> changes. So lets see what John says about when the next version will
-> be ready.
+>    209		ir->base = devm_ioremap_resource(dev, res);
+>    210		if (IS_ERR(ir->base)) {
+>    211			dev_err(dev, "failed to map registers\n");
+>    212			return PTR_ERR(ir->base);
+>    213		}
+>    214	
+>  > 215		ir->rc = devm_rc_allocate_device(dev, RC_DRIVER_IR_RAW);
 
-Oh that series, okay, somehow I thought you were referring to something
-else.
--- 
-Florian
+this error comes because the patches I pointed out have not been
+applied yet. I guess you can ignore them as long as you tested
+yours on top those patches.
+
+Andi
