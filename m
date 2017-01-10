@@ -1,179 +1,157 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 10 Jan 2017 18:09:40 +0100
-Subject: [PATCH] usb: dwc3-exynos fix unspecified suspend clk error
- handling
-In-Reply-To: <28815306-e220-4847-99ce-b058baae0d07@osg.samsung.com>
-References: <20170110022131.31042-1-shuahkh@osg.samsung.com>
- <8784459.rxWqZlDLVg@amdc3058>
- <28815306-e220-4847-99ce-b058baae0d07@osg.samsung.com>
- <CGME20170110170942epcas1p3decee28366d7d42b70e7b0669b97326f@epcas1p3.samsung.com>
-Message-ID: <5156028.4V9iLD3Qkj@amdc3058>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 10 Jan 2017 17:14:46 +0000
+Subject: [PATCH] arm64: avoid increasing DMA masks above what hardware
+ supports
+In-Reply-To: <1484056844-9567-1-git-send-email-nikita.yoush@cogentembedded.com>
+References: <11daacde-5399-039f-80a3-01d7bd13e9e8@arm.com>
+ <1484056844-9567-1-git-send-email-nikita.yoush@cogentembedded.com>
+Message-ID: <dca35acf-1adf-aa85-7a0b-d0c6ec702fa1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Tuesday, January 10, 2017 09:28:52 AM Shuah Khan wrote:
-> On 01/10/2017 09:05 AM, Bartlomiej Zolnierkiewicz wrote:
-> > 
-> > Hi,
-> > 
-> > On Tuesday, January 10, 2017 07:36:35 AM Shuah Khan wrote:
-> >> On 01/10/2017 07:16 AM, Shuah Khan wrote:
-> >>> On 01/10/2017 05:05 AM, Bartlomiej Zolnierkiewicz wrote:
-> >>>>
-> >>>> Hi,
-> >>>>
-> >>>> On Monday, January 09, 2017 07:21:31 PM Shuah Khan wrote:
-> >>>>> Fix dwc3_exynos_probe() to call clk_prepare_enable() only when suspend
-> >>>>> clock is specified. Call clk_disable_unprepare() from remove and probe
-> >>>>> error path only when susp_clk has been set from remove and probe error
-> >>>>> paths.
-> >>>>
-> >>>> It is legal to call clk_prepare_enable() and clk_disable_unprepare()
-> >>>> for NULL clock.  Also your patch changes susp_clk handling while
-> >>>> leaves axius_clk handling (which also can be NULL) untouched.
-> >>>>
-> >>>> Do you actually see some runtime problem with the current code?
-> >>>>
-> >>>> If not then the patch should probably be dropped.
-> >>>>
-> >>>> Best regards,
-> >>>> --
-> >>>> Bartlomiej Zolnierkiewicz
-> >>>> Samsung R&D Institute Poland
-> >>>> Samsung Electronics
-> >>>
-> >>> Hi Bartlomiej,
-> >>>
-> >>> I am seeing the "no suspend clk specified" message in dmesg.
-> >>> After that it sets the exynos->susp_clk = NULL and starts
-> >>> calling clk_prepare_enable(exynos->susp_clk);
-> >>>
-> >>> That can't be good. If you see the logic right above this
-> >>> one for exynos->clk, it returns error and fails the probe.
-> >>> This this case it doesn't, but tries to use null susp_clk.
-> > 
-> > exynos->susp_clk is optional, exynos->clk is not.
+On 10/01/17 14:00, Nikita Yushchenko wrote:
+> There are cases when device supports wide DMA addresses wider than
+> device's connection supports.
 > 
-> Right. That is clear since we don't fail the probe.
+> In this case driver sets DMA mask based on knowledge of device
+> capabilities. That must succeed to allow drivers to initialize.
 > 
-> > 
-> >>> I believe this patch is necessary.
-> >>
-> >> Let me clarify this a bit further. Since we already know
-> >> susp_clk is null, with this patch we can avoid extra calls
-> >> to clk_prepare_enable() and clk_disable_unprepare().
-> >>
-> >> One can say, it also adds extra checks, hence I will let you
-> >> decide one way or the other. :)
-> > 
-> > I would prefer to leave the things as they are currently.
-> > 
-> > The code in question is not performance sensitive so extra
-> > calls are not a problem.  No extra checks means less code.
-> > 
-> > Also the current code seems to be more in line with the rest
-> > of the kernel.
+> However, swiotlb or iommu still need knowledge about actual device
+> capabilities. To avoid breakage, actual mask must not be set wider than
+> device connection allows.
 > 
-> What functionality is missing without the suspend clock? Would
-> it make sense to change the info. message to include what it
-> means. At the moment it doesn't anything more than "no suspend
-> clock" which is a very cryptic user visible message. It would be
-> helpful for it to also include what functionality is impacted.
-
-Well, all I know is what the original commit descriptions says and
-that the commit itself comes from patchset adding Exynos7 USB 3.0
-support [1]:
-
-commit 72d996fc7a01c2e4d581a15db7d001e2799ffb29
-Author: Vivek Gautam <gautam.vivek@samsung.com>
-Date:   Fri Nov 21 19:05:46 2014 +0530
-
-    usb: dwc3: exynos: Add provision for suspend clock
-    
-    DWC3 controller on Exynos SoC series have separate control for
-    suspend clock which replaces pipe3_rx_pclk as clock source to
-    a small part of DWC3 core that operates when SS PHY is in its
-    lowest power state (P3) in states SS.disabled and U3.
-    
-    Suggested-by: Anton Tikhomirov <av.tikhomirov@samsung.com>
-    Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-    Signed-off-by: Felipe Balbi <balbi@ti.com>
-
-Anton's & Vivek's Samsung email addresses are no longer valid but
-I added current Vivek's email address to Cc:.
-
-BTW What is interesting is that the Exynos7 dts patch [2] has never
-made it into upstream for some reason.  In the meantime however
-Exynos5433 (similar to Exynos7 to some degree) became the user of
-susp_clk.
-
-[1] https://lkml.org/lkml/2014/11/21/247
-[2] https://patchwork.kernel.org/patch/5355161/
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> thanks,
-> -- Shuah
+> Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> CC: Robin Murphy <robin.murphy@arm.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/Kconfig                   |  3 +++
+>  arch/arm64/include/asm/device.h      |  1 +
+>  arch/arm64/include/asm/dma-mapping.h |  3 +++
+>  arch/arm64/mm/dma-mapping.c          | 43 ++++++++++++++++++++++++++++++++++++
+>  4 files changed, 50 insertions(+)
 > 
-> > 
-> > Best regards,
-> > --
-> > Bartlomiej Zolnierkiewicz
-> > Samsung R&D Institute Poland
-> > Samsung Electronics
-> > 
-> >> thanks,
-> >> -- Shuah
-> >>
-> >>>
-> >>> thanks,
-> >>> -- Shuah
-> >>>
-> >>>>
-> >>>>> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> >>>>> ---
-> >>>>>  drivers/usb/dwc3/dwc3-exynos.c | 10 ++++++----
-> >>>>>  1 file changed, 6 insertions(+), 4 deletions(-)
-> >>>>>
-> >>>>> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
-> >>>>> index e27899b..f97a3d7 100644
-> >>>>> --- a/drivers/usb/dwc3/dwc3-exynos.c
-> >>>>> +++ b/drivers/usb/dwc3/dwc3-exynos.c
-> >>>>> @@ -131,8 +131,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
-> >>>>>  	if (IS_ERR(exynos->susp_clk)) {
-> >>>>>  		dev_info(dev, "no suspend clk specified\n");
-> >>>>>  		exynos->susp_clk = NULL;
-> >>>>> -	}
-> >>>>> -	clk_prepare_enable(exynos->susp_clk);
-> >>>>> +	} else
-> >>>>> +		clk_prepare_enable(exynos->susp_clk);
-> >>>>>  
-> >>>>>  	if (of_device_is_compatible(node, "samsung,exynos7-dwusb3")) {
-> >>>>>  		exynos->axius_clk = devm_clk_get(dev, "usbdrd30_axius_clk");
-> >>>>> @@ -196,7 +196,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
-> >>>>>  	regulator_disable(exynos->vdd33);
-> >>>>>  err2:
-> >>>>>  	clk_disable_unprepare(exynos->axius_clk);
-> >>>>> -	clk_disable_unprepare(exynos->susp_clk);
-> >>>>> +	if (exynos->susp_clk)
-> >>>>> +		clk_disable_unprepare(exynos->susp_clk);
-> >>>>>  	clk_disable_unprepare(exynos->clk);
-> >>>>>  	return ret;
-> >>>>>  }
-> >>>>> @@ -210,7 +211,8 @@ static int dwc3_exynos_remove(struct platform_device *pdev)
-> >>>>>  	platform_device_unregister(exynos->usb3_phy);
-> >>>>>  
-> >>>>>  	clk_disable_unprepare(exynos->axius_clk);
-> >>>>> -	clk_disable_unprepare(exynos->susp_clk);
-> >>>>> +	if (exynos->susp_clk)
-> >>>>> +		clk_disable_unprepare(exynos->susp_clk);
-> >>>>>  	clk_disable_unprepare(exynos->clk);
-> >>>>>  
-> >>>>>  	regulator_disable(exynos->vdd33);
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 1117421..afb2c08 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -216,6 +216,9 @@ config NEED_DMA_MAP_STATE
+>  config NEED_SG_DMA_LENGTH
+>  	def_bool y
+>  
+> +config ARCH_HAS_DMA_SET_COHERENT_MASK
+> +	def_bool y
+> +
+>  config SMP
+>  	def_bool y
+>  
+> diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
+> index 243ef25..a57e7bb 100644
+> --- a/arch/arm64/include/asm/device.h
+> +++ b/arch/arm64/include/asm/device.h
+> @@ -22,6 +22,7 @@ struct dev_archdata {
+>  	void *iommu;			/* private IOMMU data */
+>  #endif
+>  	bool dma_coherent;
+> +	u64 parent_dma_mask;
+>  };
+>  
+>  struct pdev_archdata {
+> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+> index ccea82c..eab36d2 100644
+> --- a/arch/arm64/include/asm/dma-mapping.h
+> +++ b/arch/arm64/include/asm/dma-mapping.h
+> @@ -51,6 +51,9 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>  			const struct iommu_ops *iommu, bool coherent);
+>  #define arch_setup_dma_ops	arch_setup_dma_ops
+>  
+> +#define HAVE_ARCH_DMA_SET_MASK 1
+> +extern int dma_set_mask(struct device *dev, u64 dma_mask);
+> +
+>  #ifdef CONFIG_IOMMU_DMA
+>  void arch_teardown_dma_ops(struct device *dev);
+>  #define arch_teardown_dma_ops	arch_teardown_dma_ops
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index e040827..7b1bb87 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -203,6 +203,37 @@ static void __dma_free(struct device *dev, size_t size,
+>  	__dma_free_coherent(dev, size, swiotlb_addr, dma_handle, attrs);
+>  }
+>  
+> +int dma_set_mask(struct device *dev, u64 dma_mask)
+> +{
+> +	const struct dma_map_ops *ops = get_dma_ops(dev);
+> +
+> +	if (mask > dev->archdata.parent_dma_mask)
+> +		mask = dev->archdata.parent_dma_mask;
+> +
+> +	if (ops->set_dma_mask)
+> +		return ops->set_dma_mask(dev, mask);
+> +
+> +	if (!dev->dma_mask || !dma_supported(dev, mask))
+> +		return -EIO;
+> +
+> +	*dev->dma_mask = mask;
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(dma_set_mask);
+> +
+> +int dma_set_coherent_mask(struct device *dev, u64 mask)
+> +{
+> +	if (mask > dev->archdata.parent_dma_mask)
+> +		mask = dev->archdata.parent_dma_mask;
+> +
+> +	if (!dma_supported(dev, mask))
+> +		return -EIO;
+> +
+> +	dev->coherent_dma_mask = mask;
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(dma_set_coherent_mask);
+> +
+>  static dma_addr_t __swiotlb_map_page(struct device *dev, struct page *page,
+>  				     unsigned long offset, size_t size,
+>  				     enum dma_data_direction dir,
+> @@ -958,6 +989,18 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>  	if (!dev->archdata.dma_ops)
+>  		dev->archdata.dma_ops = &swiotlb_dma_ops;
+>  
+> +	/*
+> +	 * we don't yet support buses that have a non-zero mapping.
+> +	 *  Let's hope we won't need it
+> +	 */
+> +	WARN_ON(dma_base != 0);
+
+I believe we now accomodate the bus remap bits on BCM2837 as a DMA
+offset, so unfortunately I think this is no longer true.
+
+> +	/*
+> +	 * Whatever the parent bus can set. A device must not set
+> +	 * a DMA mask larger than this.
+> +	 */
+> +	dev->archdata.parent_dma_mask = size - 1;
+
+This will effectively constrain *all* DMA masks to be 32-bit, since for
+99% of devices we're going to see a size derived from the default mask
+passed in here. I worry that that's liable to lead to performance and
+stability regressions (now that the block layer can apparently generate
+sufficient readahead to ovflow a typical SWIOTLB bounce buffer[1]).
+Whilst DT users would be able to mitigate that by putting explicit
+"dma-ranges" properties on every device node, it's less clear what we'd
+do for ACPI.
+
+I reckon the easiest way forward would be to pass in some flag to
+arch_setup_dma_ops to indicate whether it's an explicitly-configured
+range or not - then simply initialising parent_dma_mask to ~0 for the
+default case *should* keep things working as before.
+
+Robin.
+
+[1]:https://www.mail-archive.com/virtualization at lists.linux-foundation.org/msg26532.html
+
+> +
+>  	dev->archdata.dma_coherent = coherent;
+>  	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
+>  }
+> 
