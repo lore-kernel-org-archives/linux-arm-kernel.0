@@ -1,70 +1,147 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 10 Jan 2017 18:34:55 +0100
-Subject: [GIT PULL] Allwinner conversion to generic pin properties
-In-Reply-To: <20170110032120.GJ22261@localhost>
-References: <20161226074214.sd53ozm6hvzkdb26@lukather>
- <20170110032120.GJ22261@localhost>
-Message-ID: <20170110173455.5vlzp7s3vquerpkm@lukather>
+From: jintack@cs.columbia.edu (Jintack Lim)
+Date: Tue, 10 Jan 2017 12:36:36 -0500
+Subject: [RFC 8/8] KVM: arm/arm64: Emulate the EL1 phys timer register
+ access
+In-Reply-To: <20170109121612.GG4348@cbox>
+References: <1482772326-29110-1-git-send-email-jintack@cs.columbia.edu>
+ <1482772326-29110-9-git-send-email-jintack@cs.columbia.edu>
+ <20170109121612.GG4348@cbox>
+Message-ID: <CAHyh4xhNUTuzaf=JJKidHj1fnOgoe_8aTZamnnGsc6C+iKL1BA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Mon, Jan 9, 2017 at 7:16 AM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Mon, Dec 26, 2016 at 12:12:06PM -0500, Jintack Lim wrote:
+>> Emulate read and write operations to CNTP_TVAL, CNTP_CVAL and CNTP_CTL.
+>> Now the VM is able to use the EL1 physical timer.
+>>
+>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+>> ---
+>>  arch/arm64/kvm/sys_regs.c    | 35 ++++++++++++++++++++++++++++++++---
+>>  include/kvm/arm_arch_timer.h |  3 +++
+>>  virt/kvm/arm/arch_timer.c    |  4 ++--
+>>  3 files changed, 37 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>> index fd9e747..7cef94f 100644
+>> --- a/arch/arm64/kvm/sys_regs.c
+>> +++ b/arch/arm64/kvm/sys_regs.c
+>> @@ -824,7 +824,15 @@ static bool access_cntp_tval(struct kvm_vcpu *vcpu,
+>>               struct sys_reg_params *p,
+>>               const struct sys_reg_desc *r)
+>>  {
+>> -     kvm_inject_undefined(vcpu);
+>> +     struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+>> +     cycle_t now = kvm_phys_timer_read();
+>> +
+>> +     if (p->is_write) {
+>> +             ptimer->cnt_cval = p->regval + now;
+>> +             kvm_timer_emulate(vcpu, ptimer);
+>
+> Hmm, do we really need those calls here?
+>
+> I guess I'm a little confused about exactly what the kvm_timer_emulate()
+> function is supposed to do, and it feels to me like these handlers
+> should just record what the guest is asking the kernel to do and the
+> logic of handling the additional timer should be moved into the run path
+> as much as possible.
 
-On Mon, Jan 09, 2017 at 07:21:20PM -0800, Olof Johansson wrote:
-> Hi,
-> 
-> On Mon, Dec 26, 2016 at 08:42:14AM +0100, Maxime Ripard wrote:
-> > Hi Arnd, Olof,
-> > 
-> > Like we discussed it last time, here is a pull request with the
-> > convertion patches to the generic pin properties for 4.10.
-> > 
-> > Thanks,
-> > Maxime
-> > 
-> > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
-> > 
-> >   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-generic-pinconf-for-4.10
-> > 
-> > for you to fetch changes up to 1edcd36fcb48fe841bcc62eda36c105037d9583c:
-> > 
-> >   ARM: sunxi: Convert pinctrl nodes to generic bindings (2016-12-26 08:27:11 +0100)
-> > 
-> > ----------------------------------------------------------------
-> > Allwinner conversion to generic pin muxing properties
-> > 
-> > Here is a list of patches that converts the current DT to the generic pin
-> > control and muxing properties, now that the pinctrl driver supports it.
-> 
-> I dropped the ball on this over the holidays for a few reasons, none of them
-> good. Unfortunately we're at -rc3+ now, so I've queued this up in next/dt for
-> v4.11 at this point. Hope that's alright.
+I think it's a design decision. As you suggested, it's simple to do
+set up the background timer on entry to the VM, cancel it on exit, but
+since that's on the critical path it may have some impact on the
+performance, especially the world switch cost. To avoid
+canceling/setting up timer every world switch, I choose to schedule
+the physical timer here. I haven't compared the cost of the two
+alternatives, though.
 
-It is, there's no rush.
-
-> You might want to use your branch as a base for new DT contents for
-> v4.11 in case it ends up being conflict-heavy, which would work fine at our
-> end.
-
-There might be one minor (and trivial) conflict with one of the fix
-I'll send your way, but that pretty much it. All the other patches
-were based on this one already.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170110/4ffabc83/attachment.sig>
+>
+> Thanks,
+> -Christoffer
+>
+>> +     } else
+>> +             p->regval = ptimer->cnt_cval - now;
+>> +
+>>       return true;
+>>  }
+>>
+>> @@ -832,7 +840,21 @@ static bool access_cntp_ctl(struct kvm_vcpu *vcpu,
+>>               struct sys_reg_params *p,
+>>               const struct sys_reg_desc *r)
+>>  {
+>> -     kvm_inject_undefined(vcpu);
+>> +     struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+>> +
+>> +     if (p->is_write) {
+>> +             /* ISTATUS bit is read-only */
+>> +             ptimer->cnt_ctl = p->regval & ~ARCH_TIMER_CTRL_IT_STAT;
+>> +             kvm_timer_emulate(vcpu, ptimer);
+>> +     } else {
+>> +             cycle_t now = kvm_phys_timer_read();
+>> +
+>> +             p->regval = ptimer->cnt_ctl;
+>> +             /* Set ISTATUS bit if it's expired */
+>> +             if (ptimer->cnt_cval <= now)
+>> +                     p->regval |= ARCH_TIMER_CTRL_IT_STAT;
+>> +     }
+>> +
+>>       return true;
+>>  }
+>>
+>> @@ -840,7 +862,14 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
+>>               struct sys_reg_params *p,
+>>               const struct sys_reg_desc *r)
+>>  {
+>> -     kvm_inject_undefined(vcpu);
+>> +     struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+>> +
+>> +     if (p->is_write) {
+>> +             ptimer->cnt_cval = p->regval;
+>> +             kvm_timer_emulate(vcpu, ptimer);
+>> +     } else
+>> +             p->regval = ptimer->cnt_cval;
+>> +
+>>       return true;
+>>  }
+>>
+>> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+>> index 04ed9c1..776579b 100644
+>> --- a/include/kvm/arm_arch_timer.h
+>> +++ b/include/kvm/arm_arch_timer.h
+>> @@ -75,6 +75,9 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
+>>                          struct arch_timer_context *timer_ctx);
+>>  void kvm_timer_schedule(struct kvm_vcpu *vcpu);
+>>  void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
+>> +void kvm_timer_emulate(struct kvm_vcpu *vcpu, struct arch_timer_context *timer);
+>> +
+>> +cycle_t kvm_phys_timer_read(void);
+>>
+>>  void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
+>>
+>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+>> index be8d953..7a161f8 100644
+>> --- a/virt/kvm/arm/arch_timer.c
+>> +++ b/virt/kvm/arm/arch_timer.c
+>> @@ -39,7 +39,7 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
+>>       vcpu_vtimer(vcpu)->active_cleared_last = false;
+>>  }
+>>
+>> -static cycle_t kvm_phys_timer_read(void)
+>> +cycle_t kvm_phys_timer_read(void)
+>>  {
+>>       return timecounter->cc->read(timecounter->cc);
+>>  }
+>> @@ -258,7 +258,7 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+>>   * Schedule the background timer for the emulated timer. The background timer
+>>   * runs whenever vcpu is runnable and the timer is not expired.
+>>   */
+>> -static void kvm_timer_emulate(struct kvm_vcpu *vcpu,
+>> +void kvm_timer_emulate(struct kvm_vcpu *vcpu,
+>>                      struct arch_timer_context *timer_ctx)
+>>  {
+>>       struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>> --
+>> 1.9.1
+>>
+>>
+>
