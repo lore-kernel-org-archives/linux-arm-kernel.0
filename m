@@ -1,95 +1,50 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 10 Jan 2017 15:55:31 +0000
-Subject: [PATCH] virtio_mmio: Set DMA masks appropriately
-In-Reply-To: <20170110165221-mutt-send-email-mst@kernel.org>
-References: <50defbbe87d75db85a9d22f914258975d661208a.1484051089.git.robin.murphy@arm.com>
- <20170110165221-mutt-send-email-mst@kernel.org>
-Message-ID: <b60d0de1-a79b-50c0-f773-5a509b0e94d5@arm.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 10 Jan 2017 16:58:12 +0100
+Subject: [PATCH v7 00/19] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
+ reserved regions
+In-Reply-To: <20170110140924.GC1318@8bytes.org>
+References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
+ <20170110140924.GC1318@8bytes.org>
+Message-ID: <6fb2ec1e-a8e1-44fa-a146-0b92335de711@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/17 14:54, Michael S. Tsirkin wrote:
-> On Tue, Jan 10, 2017 at 12:26:01PM +0000, Robin Murphy wrote:
->> Once DMA API usage is enabled, it becomes apparent that virtio-mmio is
->> inadvertently relying on the default 32-bit DMA mask, which leads to
->> problems like rapidly exhausting SWIOTLB bounce buffers.
->>
->> Ensure that we set the appropriate 64-bit DMA mask whenever possible,
->> with the coherent mask suitably limited for the legacy vring as per
->> a0be1db4304f ("virtio_pci: Limit DMA mask to 44 bits for legacy virtio
->> devices").
->>
->> Reported-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
->> Fixes: b42111382f0e ("virtio_mmio: Use the DMA API if enabled")
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>  drivers/virtio/virtio_mmio.c | 10 ++++++++++
->>  1 file changed, 10 insertions(+)
->>
->> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
->> index 48bfea91dbca..b5c5d49ca598 100644
->> --- a/drivers/virtio/virtio_mmio.c
->> +++ b/drivers/virtio/virtio_mmio.c
->> @@ -59,6 +59,7 @@
->>  #define pr_fmt(fmt) "virtio-mmio: " fmt
->>  
->>  #include <linux/acpi.h>
->> +#include <linux/dma-mapping.h>
->>  #include <linux/highmem.h>
->>  #include <linux/interrupt.h>
->>  #include <linux/io.h>
->> @@ -497,6 +498,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
->>  	struct virtio_mmio_device *vm_dev;
->>  	struct resource *mem;
->>  	unsigned long magic;
->> +	int rc;
->>  
->>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>  	if (!mem)
->> @@ -548,6 +550,14 @@ static int virtio_mmio_probe(struct platform_device *pdev)
->>  	if (vm_dev->version == 1)
->>  		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
->>  
->> +	rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
->> +	if (rc)
->> +		rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
->> +	else if (vm_dev->version == 1)
->> +		dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32 + PAGE_SHIFT));
+Hi all,
+
+On 10/01/2017 15:09, Joerg Roedel wrote:
+> On Mon, Jan 09, 2017 at 01:45:51PM +0000, Eric Auger wrote:
+>> Eric Auger (17):
+>>   iommu: Rename iommu_dm_regions into iommu_resv_regions
+>>   iommu: Add a new type field in iommu_resv_region
+>>   iommu: iommu_alloc_resv_region
+>>   iommu: Only map direct mapped regions
+>>   iommu: iommu_get_group_resv_regions
+>>   iommu: Implement reserved_regions iommu-group sysfs file
+>>   iommu/vt-d: Implement reserved region get/put callbacks
+>>   iommu/amd: Declare MSI and HT regions as reserved IOVA regions
+>>   iommu/arm-smmu: Implement reserved region get/put callbacks
+>>   iommu/arm-smmu-v3: Implement reserved region get/put callbacks
 > 
-> That's a very convoluted way to do this, for version 1 you
-> set coherent mask to 64 then override it.
-> why not
+> IOMMU patches look good, what is the plan to merge this? I'd like to
+> take the IOMMU patches and can provide a branch for someone else to base
+> the rest on.
+
+I will respin asap taking into account Marc's nits, Robin's update. Also
+I would like to do one change in
+
+[PATCH v7 08/19] iommu: Implement reserved_regions iommu-group sysfs file
+
+I will send a separate email.
+
+Thanks
+
+Eric
+
 > 
-> if (vm_dev->version == 1) {
-> 	dma_set_mask
-> 	dma_set_coherent_mask
-> } else {
-> 	dma_set_mask_and_coherent
-> }
 > 
-> if (rc)
-> 	dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-
-Purely because it's fewer lines of code - if you'd prefer separate
-legacy vs. modern flows for clarity that's fine by me.
-
->> +	if (rc)
->> +		dev_warn(&pdev->dev, "Failed to enable 64-bit or 32-bit DMA.  Trying to continue, but this might not work.\n");
->> +
+> 	Joerg
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> is there a chance it actually still might work?
-
-If we're not actually using the DMA API, we may still get away with it,
-otherwise it's a fairly sure bet that the subsequent dma_map/dma_alloc
-calls will fail and we'll get nowhere. If I change this to be a probe
-failure condition (and correspondingly in the PCI drivers too), would
-you rather that be predicated on vring_use_dma_api(), or always (given
-the TODO in virtio_ring.c)?
-
-Robin.
-
->>  	platform_set_drvdata(pdev, vm_dev);
->>  
->>  	return register_virtio_device(&vm_dev->vdev);
->> -- 
->> 2.10.2.dirty
