@@ -1,125 +1,102 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 10 Jan 2017 17:05:30 +0100
-Subject: [PATCH] usb: dwc3-exynos fix unspecified suspend clk error
- handling
-In-Reply-To: <3a113696-d0cd-8944-4acd-c87646fbee15@osg.samsung.com>
-References: <20170110022131.31042-1-shuahkh@osg.samsung.com>
- <2e4a5e53-6603-13b8-0302-dc8093978013@osg.samsung.com>
- <3a113696-d0cd-8944-4acd-c87646fbee15@osg.samsung.com>
- <CGME20170110160532epcas1p198cef8317dcbc8740366d06b38e7465f@epcas1p1.samsung.com>
-Message-ID: <8784459.rxWqZlDLVg@amdc3058>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Tue, 10 Jan 2017 18:07:50 +0200
+Subject: [PATCH] virtio_mmio: Set DMA masks appropriately
+In-Reply-To: <b60d0de1-a79b-50c0-f773-5a509b0e94d5@arm.com>
+References: <50defbbe87d75db85a9d22f914258975d661208a.1484051089.git.robin.murphy@arm.com>
+ <20170110165221-mutt-send-email-mst@kernel.org>
+ <b60d0de1-a79b-50c0-f773-5a509b0e94d5@arm.com>
+Message-ID: <20170110180656-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Tuesday, January 10, 2017 07:36:35 AM Shuah Khan wrote:
-> On 01/10/2017 07:16 AM, Shuah Khan wrote:
-> > On 01/10/2017 05:05 AM, Bartlomiej Zolnierkiewicz wrote:
+On Tue, Jan 10, 2017 at 03:55:31PM +0000, Robin Murphy wrote:
+> On 10/01/17 14:54, Michael S. Tsirkin wrote:
+> > On Tue, Jan 10, 2017 at 12:26:01PM +0000, Robin Murphy wrote:
+> >> Once DMA API usage is enabled, it becomes apparent that virtio-mmio is
+> >> inadvertently relying on the default 32-bit DMA mask, which leads to
+> >> problems like rapidly exhausting SWIOTLB bounce buffers.
 > >>
-> >> Hi,
+> >> Ensure that we set the appropriate 64-bit DMA mask whenever possible,
+> >> with the coherent mask suitably limited for the legacy vring as per
+> >> a0be1db4304f ("virtio_pci: Limit DMA mask to 44 bits for legacy virtio
+> >> devices").
 > >>
-> >> On Monday, January 09, 2017 07:21:31 PM Shuah Khan wrote:
-> >>> Fix dwc3_exynos_probe() to call clk_prepare_enable() only when suspend
-> >>> clock is specified. Call clk_disable_unprepare() from remove and probe
-> >>> error path only when susp_clk has been set from remove and probe error
-> >>> paths.
+> >> Reported-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> >> Fixes: b42111382f0e ("virtio_mmio: Use the DMA API if enabled")
+> >> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> >> ---
+> >>  drivers/virtio/virtio_mmio.c | 10 ++++++++++
+> >>  1 file changed, 10 insertions(+)
 > >>
-> >> It is legal to call clk_prepare_enable() and clk_disable_unprepare()
-> >> for NULL clock.  Also your patch changes susp_clk handling while
-> >> leaves axius_clk handling (which also can be NULL) untouched.
-> >>
-> >> Do you actually see some runtime problem with the current code?
-> >>
-> >> If not then the patch should probably be dropped.
-> >>
-> >> Best regards,
-> >> --
-> >> Bartlomiej Zolnierkiewicz
-> >> Samsung R&D Institute Poland
-> >> Samsung Electronics
+> >> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+> >> index 48bfea91dbca..b5c5d49ca598 100644
+> >> --- a/drivers/virtio/virtio_mmio.c
+> >> +++ b/drivers/virtio/virtio_mmio.c
+> >> @@ -59,6 +59,7 @@
+> >>  #define pr_fmt(fmt) "virtio-mmio: " fmt
+> >>  
+> >>  #include <linux/acpi.h>
+> >> +#include <linux/dma-mapping.h>
+> >>  #include <linux/highmem.h>
+> >>  #include <linux/interrupt.h>
+> >>  #include <linux/io.h>
+> >> @@ -497,6 +498,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
+> >>  	struct virtio_mmio_device *vm_dev;
+> >>  	struct resource *mem;
+> >>  	unsigned long magic;
+> >> +	int rc;
+> >>  
+> >>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >>  	if (!mem)
+> >> @@ -548,6 +550,14 @@ static int virtio_mmio_probe(struct platform_device *pdev)
+> >>  	if (vm_dev->version == 1)
+> >>  		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
+> >>  
+> >> +	rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+> >> +	if (rc)
+> >> +		rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+> >> +	else if (vm_dev->version == 1)
+> >> +		dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32 + PAGE_SHIFT));
 > > 
-> > Hi Bartlomiej,
+> > That's a very convoluted way to do this, for version 1 you
+> > set coherent mask to 64 then override it.
+> > why not
 > > 
-> > I am seeing the "no suspend clk specified" message in dmesg.
-> > After that it sets the exynos->susp_clk = NULL and starts
-> > calling clk_prepare_enable(exynos->susp_clk);
+> > if (vm_dev->version == 1) {
+> > 	dma_set_mask
+> > 	dma_set_coherent_mask
+> > } else {
+> > 	dma_set_mask_and_coherent
+> > }
 > > 
-> > That can't be good. If you see the logic right above this
-> > one for exynos->clk, it returns error and fails the probe.
-> > This this case it doesn't, but tries to use null susp_clk.
-
-exynos->susp_clk is optional, exynos->clk is not.
-
-> > I believe this patch is necessary.
+> > if (rc)
+> > 	dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
 > 
-> Let me clarify this a bit further. Since we already know
-> susp_clk is null, with this patch we can avoid extra calls
-> to clk_prepare_enable() and clk_disable_unprepare().
-> 
-> One can say, it also adds extra checks, hence I will let you
-> decide one way or the other. :)
+> Purely because it's fewer lines of code - if you'd prefer separate
+> legacy vs. modern flows for clarity that's fine by me.
 
-I would prefer to leave the things as they are currently.
+Yes please. It's less legacy vs modern and more that I don't like
+line 2 undoig what line 1 did.
 
-The code in question is not performance sensitive so extra
-calls are not a problem.  No extra checks means less code.
-
-Also the current code seems to be more in line with the rest
-of the kernel.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> thanks,
-> -- Shuah
-> 
+> >> +	if (rc)
+> >> +		dev_warn(&pdev->dev, "Failed to enable 64-bit or 32-bit DMA.  Trying to continue, but this might not work.\n");
+> >> +
 > > 
-> > thanks,
-> > -- Shuah
-> > 
-> >>
-> >>> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> >>> ---
-> >>>  drivers/usb/dwc3/dwc3-exynos.c | 10 ++++++----
-> >>>  1 file changed, 6 insertions(+), 4 deletions(-)
-> >>>
-> >>> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
-> >>> index e27899b..f97a3d7 100644
-> >>> --- a/drivers/usb/dwc3/dwc3-exynos.c
-> >>> +++ b/drivers/usb/dwc3/dwc3-exynos.c
-> >>> @@ -131,8 +131,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
-> >>>  	if (IS_ERR(exynos->susp_clk)) {
-> >>>  		dev_info(dev, "no suspend clk specified\n");
-> >>>  		exynos->susp_clk = NULL;
-> >>> -	}
-> >>> -	clk_prepare_enable(exynos->susp_clk);
-> >>> +	} else
-> >>> +		clk_prepare_enable(exynos->susp_clk);
-> >>>  
-> >>>  	if (of_device_is_compatible(node, "samsung,exynos7-dwusb3")) {
-> >>>  		exynos->axius_clk = devm_clk_get(dev, "usbdrd30_axius_clk");
-> >>> @@ -196,7 +196,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
-> >>>  	regulator_disable(exynos->vdd33);
-> >>>  err2:
-> >>>  	clk_disable_unprepare(exynos->axius_clk);
-> >>> -	clk_disable_unprepare(exynos->susp_clk);
-> >>> +	if (exynos->susp_clk)
-> >>> +		clk_disable_unprepare(exynos->susp_clk);
-> >>>  	clk_disable_unprepare(exynos->clk);
-> >>>  	return ret;
-> >>>  }
-> >>> @@ -210,7 +211,8 @@ static int dwc3_exynos_remove(struct platform_device *pdev)
-> >>>  	platform_device_unregister(exynos->usb3_phy);
-> >>>  
-> >>>  	clk_disable_unprepare(exynos->axius_clk);
-> >>> -	clk_disable_unprepare(exynos->susp_clk);
-> >>> +	if (exynos->susp_clk)
-> >>> +		clk_disable_unprepare(exynos->susp_clk);
-> >>>  	clk_disable_unprepare(exynos->clk);
-> >>>  
-> >>>  	regulator_disable(exynos->vdd33);
+> > is there a chance it actually still might work?
+> 
+> If we're not actually using the DMA API, we may still get away with it,
+> otherwise it's a fairly sure bet that the subsequent dma_map/dma_alloc
+> calls will fail and we'll get nowhere. If I change this to be a probe
+> failure condition (and correspondingly in the PCI drivers too), would
+> you rather that be predicated on vring_use_dma_api(), or always (given
+> the TODO in virtio_ring.c)?
+> 
+> Robin.
+
+Oh I see you are just mirroring what pci does. I think it's fine.
+
+> >>  	platform_set_drvdata(pdev, vm_dev);
+> >>  
+> >>  	return register_virtio_device(&vm_dev->vdev);
+> >> -- 
+> >> 2.10.2.dirty
