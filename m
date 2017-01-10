@@ -1,28 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Jan 2017 14:15:57 +0100
-Subject: [PATCH] virtio_mmio: Set DMA masks appropriately
-In-Reply-To: <50defbbe87d75db85a9d22f914258975d661208a.1484051089.git.robin.murphy@arm.com>
-References: <50defbbe87d75db85a9d22f914258975d661208a.1484051089.git.robin.murphy@arm.com>
-Message-ID: <2220292.9CN9cxzsPe@wuerfel>
+From: peda@axentia.se (Peter Rosin)
+Date: Tue, 10 Jan 2017 14:18:32 +0100
+Subject: [PATCH v6 0/2] Support for Axentia TSE-850
+Message-ID: <1484054314-6244-1-git-send-email-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 10, 2017 12:26:01 PM CET Robin Murphy wrote:
-> @@ -548,6 +550,14 @@ static int virtio_mmio_probe(struct platform_device *pdev)
->         if (vm_dev->version == 1)
->                 writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
->  
-> +       rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
-> +       if (rc)
-> +               rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+Hi!
 
-You don't seem to do anything different when 64-bit DMA is unsupported.
-How do you prevent the use of kernel buffers that are above the first 4G
-here?
+changes v5 -> v6
+- drop the &main clock-frequency
+- add some text to the commit messages
+- make config additions modules
 
-> +       else if (vm_dev->version == 1)
-> +               dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32 + PAGE_SHIFT));
+changes v4 -> v5
+- comment from Rob about the memory node made me look closer and
+  the memory size is actually updated by the bootloader, and that
+  hid the fact that the entry was always faulty. This version
+  specifies the correct memory size from the start, which is 64MB.
+- ack from Rob
 
-Why is this limitation only for the coherent mask?
+changes v3 -> v4
+- rename files arch/arm/boot/dts/axentia-* to .../at91-*
+- remove bootargs from at91-tse850-3.dts
+- depend on the atmel ssc to register as a sound dai by itself
+- bump copyright years
 
-	Arnd
+changes v2 -> v3
+- document the new compatible strings prefixed with "axentia,".
+
+changes v1 -> v2
+- squash the fixup into the correct patch, sorry for the noise.
+
+After finally having all essintial drivers upstreamed I would
+like to have the dts and the defconfig also upstreamed.
+
+The atmel-ssc/sound-dai change depends on a change that has been
+sitting in the ASoC tree since mid-december, and I have been waiting
+for it to hit linux-next before sending this, but it seems to take
+longer than I anticipated. So, since I do not want this to in
+turn miss the next merge window because of that wait I therefore
+request that this is taken now even though it doesn't really work
+w/o the ASoC "topic/atmel" branch as of 2016-12-15 [1]. It of course
+builds cleanly even w/o those ASoC changes. That effectively means
+that noone besides me should notice the inconsistency (I currently
+have all affected devices under my control).
+
+Cheers,
+peda
+
+[1] http://git.kernel.org/cgit/linux/kernel/git/broonie/sound.git/log/?h=topic/atmel
+
+Peter Rosin (2):
+  ARM: dts: at91: add devicetree for the Axentia TSE-850
+  ARM: sama5_defconfig: add support for the Axentia TSE-850 board
+
+ Documentation/devicetree/bindings/arm/axentia.txt |  19 ++
+ MAINTAINERS                                       |   8 +
+ arch/arm/boot/dts/Makefile                        |   1 +
+ arch/arm/boot/dts/at91-linea.dtsi                 |  49 ++++
+ arch/arm/boot/dts/at91-tse850-3.dts               | 274 ++++++++++++++++++++++
+ arch/arm/configs/sama5_defconfig                  |   7 +-
+ 6 files changed, 357 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/axentia.txt
+ create mode 100644 arch/arm/boot/dts/at91-linea.dtsi
+ create mode 100644 arch/arm/boot/dts/at91-tse850-3.dts
+
+-- 
+2.1.4
