@@ -1,55 +1,48 @@
-From: dianders@google.com (Doug Anderson)
-Date: Tue, 10 Jan 2017 10:45:48 -0800
-Subject: [PATCH v4 1/2] arm64: dts: rockchip: add "rockchip, grf" property
- for RK3399 PMUCRU/CRU
-In-Reply-To: <1484028930-20305-2-git-send-email-zhengxing@rock-chips.com>
-References: <1484028930-20305-1-git-send-email-zhengxing@rock-chips.com>
- <1484028930-20305-2-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <CAD=FV=Wwu3q_LqwYUWcJQRvp5neVOS9szgsYFONWTRJ0X8hRTA@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 10 Jan 2017 20:47:28 +0200
+Subject: [PATCH v2 1/3] arm64: dts: exynos: Add missing unit name to
+ Exynos7 SoC node
+In-Reply-To: <1484069912-6534-2-git-send-email-javier@osg.samsung.com>
+References: <1484069912-6534-1-git-send-email-javier@osg.samsung.com>
+ <1484069912-6534-2-git-send-email-javier@osg.samsung.com>
+Message-ID: <20170110184728.2nff4r634ics4wb3@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jan 9, 2017 at 10:15 PM, Xing Zheng <zhengxing@rock-chips.com> wrote:
-> The structure rockchip_clk_provider needs to refer the GRF regmap
-> in somewhere, if the CRU node has not "rockchip,grf" property,
-> calling syscon_regmap_lookup_by_phandle will return an invalid GRF
-> regmap, and the MUXGRF type clock will be not supported.
->
-> Therefore, we need to add them.
->
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+On Tue, Jan 10, 2017 at 02:38:30PM -0300, Javier Martinez Canillas wrote:
+> This patch fixes the following DTC warning about a mismatch
+> between a device node reg property and its unit name:
+> 
+> Node /soc has a reg or ranges property, but no unit name
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 > ---
->
-> Changes in v4:
-> - separte the binding patch
->
-> Changes in v3:
-> - add optional roperty rockchip,grf in rockchip,rk3399-cru.txt
->
-> Changes in v2:
-> - referring pmugrf for PMUGRU
-> - fix the typo "invaild" in COMMIT message
->
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
+> 
+>  arch/arm64/boot/dts/exynos/exynos7.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+> index 80aa60e38237..0d2fedc6ac2f 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
+> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+> @@ -69,7 +69,7 @@
+>  		method = "smc";
+>  	};
+>  
+> -	soc: soc {
+> +	soc: soc at 0 {
 
-This seems fine to me, so:
+This looks unnatural, like a fix just to silence the DTC. Mostly de do
+not enumerate soc node, although there are few exceptions.
 
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+I would prefer ignore the warning... however I am happy to hear other opinions.
 
-...but I will say that before you actually add any real "MUXGRF"
-clocks on rk3399 you _might_ need to rework the code to make things
-truly "optional".  If it turns out that any existing clocks that
-already exist today already go through one of these muxes in the GRF
-and we've always been assuming one setting of the mux, we'll need to
-make sure we keep assuming that setting of the mux even if the "grf"
-isn't specified.
+Best regards,
+Krzysztof
 
-As I understand it, your motivation for this patch is to eventually be
-able to model the EDP reference clock which can either be xin24 or
-"edp osc".  Presumably the eDP "reference clock" isn't related to any
-of the pre-existing eDP clocks so that one should be safe.
-
--Doug
+>  		compatible = "simple-bus";
+>  		#address-cells = <1>;
+>  		#size-cells = <1>;
+> -- 
+> 2.7.4
+> 
