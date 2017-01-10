@@ -1,38 +1,50 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 10 Jan 2017 20:10:02 +0100
-Subject: [linux-sunxi] Re: [PATCH 3/6] clk: sunxi-ng: Add H5 clocks
-In-Reply-To: <20170109161500.Ep9GCmIb@smtp2p.mail.yandex.net>
-References: <20170109161500.Ep9GCmIb@smtp2p.mail.yandex.net>
-Message-ID: <20170110191002.tpdzjlf2eeck4fv6@lukather>
+Date: Tue, 10 Jan 2017 20:15:14 +0100
+Subject: [PATCH v2 6/6] arm64: allwinner: a64: Increase the MMC max
+ frequency
+In-Reply-To: <CAGb2v67JoOAtHjMJboNUdCDX=+=Hf+zOWr234rT7GEiUmPb=nQ@mail.gmail.com>
+References: <cover.493dc67855a5f1837e875d37307319a03d14d1d0.1483980339.git-series.maxime.ripard@free-electrons.com>
+ <3689701f93c8426bfa476e9a5f31c3642a8a898e.1483980339.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v67JoOAtHjMJboNUdCDX=+=Hf+zOWr234rT7GEiUmPb=nQ@mail.gmail.com>
+Message-ID: <20170110191514.kgbesffn3xqltnol@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 09:13:12PM +0800, Icenowy Zheng wrote:
-> 
-> 2017?1?9? ??7:01? Maxime Ripard <maxime.ripard@free-electrons.com>???
-> >
-> > On Fri, Jan 06, 2017 at 06:48:31AM +0800, Icenowy Zheng wrote: 
-> > > 
-> > > 2017?1?6? 06:04? Maxime Ripard <maxime.ripard@free-electrons.com>??? 
-> > > > 
-> > > > On Tue, Dec 27, 2016 at 12:25:15AM +0800, Icenowy Zheng wrote: 
-> > > > > Add the H5 CCU clocks set based on the H3 one. 
-> > > > > 
-> > > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz> 
-> > > > 
-> > > > Is there any difference with H3's? 
-> > > 
-> > > One more Transport Stream controller, so one more bus gate and bus 
-> > > reset for it. 
-> >
-> > There's no need to duplicate more than 1000 lines of code just for 
-> > that then. Just add a new compatible and reuse the clocks already 
-> > defined. 
-> 
-> How can I do this? Add them in ccu-sun8i-h3.c ?
+Hi,
 
-Yes, you can have a look at how I did it for sun5i for example if you
-want.
+On Tue, Jan 10, 2017 at 01:01:20AM +0800, Chen-Yu Tsai wrote:
+> On Tue, Jan 10, 2017 at 12:46 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > All the controllers can have a maximum frequency of 200MHz.
+> >
+> > Since older SoCs cannot go that high, we cannot change the default maximum
+> > frequency, but fortunately for us we have a property for that in the DT.
+> >
+> > This also has the side effect of allowing to use the MMC HS200 mode for the
+> > boards that support it (with either 1.2v or 1.8v IOs).
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 3 +++
+> >  1 file changed, 3 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> > index 8e149498e096..f46ae965cf5b 100644
+> > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> > @@ -332,6 +332,7 @@
+> >                         resets = <&ccu RST_BUS_MMC0>;
+> >                         reset-names = "ahb";
+> >                         interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+> > +                       max-frequency = <200000000>;
+> 
+> You also have to set one of MMC_CAP2_HS200* in the driver,
+> or mmc-hs200-1_8v or mmc-hs200-1_2v in the device tree to
+> actually use HS200, right?
+
+Yes, but that requires a board with 1.8V IOs to work properly, which
+not all board use, so it's probably best to enable it in the board
+DTS.
 
 Thanks!
 Maxime
@@ -47,4 +59,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170110/47a0649c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170110/de9c272e/attachment.sig>
