@@ -1,62 +1,54 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 9 Jan 2017 17:07:53 -0800
-Subject: [PATCHv2 1/2] arm: Cleanup sanity_check_meminfo
-In-Reply-To: <alpine.LFD.2.20.1701052308020.21662@knanqh.ubzr>
-References: <1483657274-11346-1-git-send-email-labbott@redhat.com>
- <1483657274-11346-2-git-send-email-labbott@redhat.com>
- <alpine.LFD.2.20.1701052308020.21662@knanqh.ubzr>
-Message-ID: <7d93f84e-c533-4295-7361-bd4455592584@redhat.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 10 Jan 2017 09:17:56 +0800
+Subject: [PATCH v4 3/3] drm: zte: add overlay plane support
+In-Reply-To: <CAOw6vbLrHuEa_L9uW6X-_ZMkfXyGjaFACFoedVYN1epeMW+9=w@mail.gmail.com>
+References: <1483972544-12731-1-git-send-email-shawnguo@kernel.org>
+ <1483972544-12731-4-git-send-email-shawnguo@kernel.org>
+ <CAOw6vbLrHuEa_L9uW6X-_ZMkfXyGjaFACFoedVYN1epeMW+9=w@mail.gmail.com>
+Message-ID: <20170110011754.GO20956@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2017 08:17 PM, Nicolas Pitre wrote:
-> On Thu, 5 Jan 2017, Laura Abbott wrote:
-> 
->>
->> The logic for sanity_check_meminfo has become difficult to
->> follow. Clean up the code so it's more obvious what the code
->> is actually trying to do. Additionally, meminfo is now removed
->> so rename the function to better describe it's purpose.
-> 
-> s/it's/its/
-> 
->> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
->> Signed-off-by: Laura Abbott <labbott@redhat.com>
->> ---
->> v2: Fixed code so b9a019899f61 ("ARM: 8590/1: sanity_check_meminfo():
->> avoid overflow on vmalloc_limit") should stay fixed. The casting and assignment
->> still seem ugly.
-> 
-> Are you referring to the initial vmalloc_limit assignment?
-> 
+Hi Sean,
 
-I was referring to the min_t with u64 that gets assigned to phys_addr_t.
-for lowmem_limit
+On Mon, Jan 09, 2017 at 11:27:44AM -0500, Sean Paul wrote:
+> > +static inline void zx_osd_int_update(struct zx_crtc *zcrtc)
+> > +{
+> > +       struct zx_vou_hw *vou = zcrtc->vou;
+> > +       int i;
+> > +
+> > +       vou_chn_set_update(zcrtc);
+> > +       zx_plane_set_update(zcrtc->primary);
+> > +
+> > +       for (i = 0; i < VL_NUM; i++) {
+> > +               struct drm_plane *overlay = vou->overlays[i];
+> > +
+> > +               if (overlay)
+> > +                       zx_plane_set_update(overlay);
+> > +       }
+> 
+> Hi Shawn,
+> Thanks so much for revving this patch, it's looking really good. I
+> just have one (1.5, really) suggestion.
+> 
+> I don't think we need to keep vou->overlays around. You should be able
+> to loop through all the planes registered with drm core and use
+> crtc->state->plane_mask to determine which are active for a given crtc
+> (this would also encapsulate the zcrtc->primary update above).
+> 
+> I think you can also use if (plane->state->crtc) as your
+> enable/disable check in zx_plane_set_update() and eliminate the new
+> enabled flag.
 
->> @@ -1172,43 +1170,19 @@ void __init sanity_check_meminfo(void)
->>  	for_each_memblock(memory, reg) {
->>  		phys_addr_t block_start = reg->base;
->>  		phys_addr_t block_end = reg->base + reg->size;
->> -		phys_addr_t size_limit = reg->size;
->>  
->> -		if (reg->base >= vmalloc_limit)
->> -			highmem = 1;
->> -		else
->> -			size_limit = vmalloc_limit - reg->base;
->>  
->> -
-> [...]
-> 
-> This leaves a spurious empty line. One was already there before your 
-> patch but this would be a good opportunity to remove it.
-> 
-> Other than that...
-> 
-> Reviewed-by: Nicolas Pitre <nico@linaro.org>
-> 
-> 
-> Nicolas
-> 
+Great.  Since I'm still quite new to DRM subsystem, such core
+infrastructural usage guide are really helpful for me.  I tested the
+changes as you suggested, and they worked just fine.  So happy to see my
+code gets cleaned up further.
 
-Thanks,
-Laura
+> I fully realize this was my suggestion, and I apologize
+> for the churn. I'll try not to do reviews past midnight again :-)
+
+I'm so grateful to you for helping review my code, especially in
+midnight time :)
+
+Shawn
