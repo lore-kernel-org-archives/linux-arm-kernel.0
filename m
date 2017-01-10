@@ -1,22 +1,37 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 10 Jan 2017 14:11:54 +0000
-Subject: [PATCH V2 0/2] kexec-tools: arm64: Enable D-cache in purgatory
-In-Reply-To: <e44d0ede-a116-f0cf-15db-07bf75856f07@redhat.com>
-References: <cover.1482129830.git.panand@redhat.com>
- <e44d0ede-a116-f0cf-15db-07bf75856f07@redhat.com>
-Message-ID: <5874EBAA.2040202@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 10 Jan 2017 14:15:32 +0000
+Subject: [PATCH v7 00/19] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
+ reserved regions
+In-Reply-To: <20170110140924.GC1318@8bytes.org>
+References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
+ <20170110140924.GC1318@8bytes.org>
+Message-ID: <20170110141532.GA27365@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pratyush,
+On Tue, Jan 10, 2017 at 03:09:24PM +0100, Joerg Roedel wrote:
+> On Mon, Jan 09, 2017 at 01:45:51PM +0000, Eric Auger wrote:
+> > Eric Auger (17):
+> >   iommu: Rename iommu_dm_regions into iommu_resv_regions
+> >   iommu: Add a new type field in iommu_resv_region
+> >   iommu: iommu_alloc_resv_region
+> >   iommu: Only map direct mapped regions
+> >   iommu: iommu_get_group_resv_regions
+> >   iommu: Implement reserved_regions iommu-group sysfs file
+> >   iommu/vt-d: Implement reserved region get/put callbacks
+> >   iommu/amd: Declare MSI and HT regions as reserved IOVA regions
+> >   iommu/arm-smmu: Implement reserved region get/put callbacks
+> >   iommu/arm-smmu-v3: Implement reserved region get/put callbacks
+> 
+> IOMMU patches look good, what is the plan to merge this? I'd like to
+> take the IOMMU patches and can provide a branch for someone else to base
+> the rest on.
 
-On 06/01/17 03:31, Pratyush Anand wrote:
-> Any feedback/review comment on it?
+I'm perfectly happy with this going through you. In fact, I suspect you
+could take the whole series once Marc is happy with the few remaining
+irq domain niggles (which are really minor at this point).
 
-I started going through this last week, I hope to get back to it later this
-week. (I also need to learn/remember how some of the kexec-tools stuff works).
+That just leaves the VFIO bits -- Alex, are you happy with those now?
+If not, we can hold off on the last three patches for the time being.
 
-
-Thanks,
-
-James
+Will
