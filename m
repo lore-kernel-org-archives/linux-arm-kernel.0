@@ -1,122 +1,781 @@
-From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Tue, 10 Jan 2017 10:31:47 +0300
-Subject: NVMe vs DMA addressing limitations
-In-Reply-To: <20170110070719.GA17208@lst.de>
-References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
- <2723285.JORgusvJv4@wuerfel>
- <9a03c05d-ad4c-0547-d1fe-01edb8b082d6@cogentembedded.com>
- <6374144.HVL0QxNJiT@wuerfel>
- <b50e25af-3936-d22d-2e9b-5bf6be19c800@cogentembedded.com>
- <20170109205746.GA6274@lst.de>
- <e084dbad-29ab-25bd-5e17-da0fcd92f7ac@cogentembedded.com>
- <20170110070719.GA17208@lst.de>
-Message-ID: <c4fd007c-3f07-fc2a-8cbb-7152f578609d@cogentembedded.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 10 Jan 2017 15:31:21 +0800
+Subject: [PATCH 1/4] ARM: dts: imx6qdl: add HummingBoard2 boards
+In-Reply-To: <E1cQF03-0003N1-HY@rmk-PC.armlinux.org.uk>
+References: <20170108150201.GS14217@n2100.armlinux.org.uk>
+ <E1cQF03-0003N1-HY@rmk-PC.armlinux.org.uk>
+Message-ID: <20170110073119.GC20956@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christoph, thanks for clear input.
+On Sun, Jan 08, 2017 at 03:03:11PM +0000, Russell King wrote:
+> From: Jon Nettleton <jon.nettleton@gmail.com>
+> 
+> This adds support for the Hummingboard Gate and Edge devices from
+> SolidRun.
+> 
+> Signed-off-by: Rabeeh Khoury <rabeeh@solid-run.com>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/boot/dts/Makefile                   |   2 +
+>  arch/arm/boot/dts/imx6dl-hummingboard2.dts   |  52 +++
+>  arch/arm/boot/dts/imx6q-hummingboard2.dts    |  60 +++
+>  arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 550 +++++++++++++++++++++++++++
+>  4 files changed, 664 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6dl-hummingboard2.dts
+>  create mode 100644 arch/arm/boot/dts/imx6q-hummingboard2.dts
+>  create mode 100644 arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index c558ba75cbcc..ea53640652f9 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -340,6 +340,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+>  	imx6dl-gw552x.dtb \
+>  	imx6dl-gw553x.dtb \
+>  	imx6dl-hummingboard.dtb \
+> +	imx6dl-hummingboard2.dtb \
+>  	imx6dl-nit6xlite.dtb \
+>  	imx6dl-nitrogen6x.dtb \
+>  	imx6dl-phytec-pbab01.dtb \
+> @@ -381,6 +382,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+>  	imx6q-gw553x.dtb \
+>  	imx6q-h100.dtb \
+>  	imx6q-hummingboard.dtb \
+> +	imx6q-hummingboard2.dtb \
+>  	imx6q-icore-rqs.dtb \
+>  	imx6q-marsboard.dtb \
+>  	imx6q-nitrogen6x.dtb \
+> diff --git a/arch/arm/boot/dts/imx6dl-hummingboard2.dts b/arch/arm/boot/dts/imx6dl-hummingboard2.dts
+> new file mode 100644
+> index 000000000000..990b5050de5b
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6dl-hummingboard2.dts
+> @@ -0,0 +1,52 @@
+> +/*
+> + * Device Tree file for SolidRun HummingBoard2
+> + * Copyright (C) 2015 Rabeeh Khoury <rabeeh@solid-run.com>
+> + * Based on work by Russell King
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
 
-Arnd, I think that given this discussion, best short-term solution is
-indeed the patch I've submitted yesterday. That is, your version +
-coherent mask support.  With that, set_dma_mask(DMA_BIT_MASK(64)) will
-succeed and hardware with work with swiotlb.
+The copyright text needs to be corrected as below.
 
-Possible next step is to teach swiotlb to dynamically allocate bounce
-buffers within entire arm64's ZONE_DMA.
+https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/dt&id=13283626c889fd5c03b485d54c924b795aca1c1e
 
-Also there is some hope that R-Car *can* iommu-translate addresses that
-PCIe module issues to system bus.  Although previous attempts to make
-that working failed. Additional research is needed here.
+> +/dts-v1/;
+> +
+> +#include "imx6dl.dtsi"
+> +#include "imx6qdl-hummingboard2.dtsi"
+> +
+> +/ {
+> +	model = "SolidRun HummingBoard2 Solo/DualLite";
+> +	compatible = "solidrun,hummingboard2/dl", "fsl,imx6dl";
+> +};
+> diff --git a/arch/arm/boot/dts/imx6q-hummingboard2.dts b/arch/arm/boot/dts/imx6q-hummingboard2.dts
+> new file mode 100644
+> index 000000000000..f5eec9163bb8
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6q-hummingboard2.dts
+> @@ -0,0 +1,60 @@
+> +/*
+> + * Device Tree file for SolidRun HummingBoard2
+> + * Copyright (C) 2015 Rabeeh Khoury <rabeeh@solid-run.com>
+> + * Based on work by Russell King
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +/dts-v1/;
+> +
+> +#include "imx6q.dtsi"
+> +#include "imx6qdl-hummingboard2.dtsi"
+> +
+> +/ {
+> +	model = "SolidRun HummingBoard2 Dual/Quad";
+> +	compatible = "solidrun,hummingboard2/q", "fsl,imx6q";
+> +};
+> +
+> +&sata {
+> +	status = "okay";
+> +	fsl,transmit-level-mV = <1104>;
+> +	fsl,transmit-boost-mdB = <0>;
+> +	fsl,transmit-atten-16ths = <9>;
+> +	fsl,no-spread-spectrum;
+> +};
+> diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
+> new file mode 100644
+> index 000000000000..4512ed4fe011
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
+> @@ -0,0 +1,550 @@
+> +/*
+> + * Device Tree file for SolidRun HummingBoard2
+> + * Copyright (C) 2015 Rabeeh Khoury <rabeeh@solid-run.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +#include "imx6qdl-microsom.dtsi"
+> +#include "imx6qdl-microsom-ar8035.dtsi"
+> +
+> +/ {
+> +	chosen {
+> +		stdout-path = &uart1;
+> +	};
+> +
+> +	ir_recv: ir-receiver {
+> +		compatible = "gpio-ir-receiver";
+> +		gpios = <&gpio7 9 1>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_hummingboard2_gpio7_9>;
+> +		linux,rc-map-name = "rc-rc6-mce";
+> +	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
 
-Nikita
+DT folks do not like this fake bus container node, and we were asked to
+put fixed regulators directly under root for new board support.  And we
+use the following naming scheme for them.
 
-> On Tue, Jan 10, 2017 at 09:47:21AM +0300, Nikita Yushchenko wrote:
->> I'm now working with HW that:
->> - is now way "low end" or "obsolete", it has 4G of RAM and 8 CPU cores,
->> and is being manufactured and developed,
->> - has 75% of it's RAM located beyond first 4G of address space,
->> - can't physically handle incoming PCIe transactions addressed to memory
->> beyond 4G.
-> 
-> It might not be low end or obselete, but it's absolutely braindead.
-> Your I/O performance will suffer badly for the life of the platform
-> because someone tries to save 2 cents, and there is not much we can do
-> about it.
-> 
->> (1) it constantly runs of swiotlb space, logs are full of warnings
->> despite of rate limiting,
-> 
->> Per my current understanding, blk-level bounce buffering will at least
->> help with (1) - if done properly it will allocate bounce buffers within
->> entire memory below 4G, not within dedicated swiotlb space (that is
->> small and enlarging it makes memory permanently unavailable for other
->> use).  This looks simple and safe (in sense of not anyhow breaking
->> unrelated use cases).
-> 
-> Yes.  Although there is absolutely no reason why swiotlb could not
-> do the same.
-> 
->> (2) it runs far suboptimal due to bounce-buffering almost all i/o,
->> despite of lots of free memory in area where direct DMA is possible.
-> 
->> Addressing (2) looks much more difficult because different memory
->> allocation policy is required for that.
-> 
-> It's basically not possible.  Every piece of memory in a Linux
-> kernel is a possible source of I/O, and depending on the workload
-> type it might even be a the prime source of I/O.
-> 
->>> NVMe should never bounce, the fact that it currently possibly does
->>> for highmem pages is a bug.
->>
->> The entire topic is absolutely not related to highmem (i.e. memory not
->> directly addressable by 32-bit kernel).
-> 
-> I did not say this affects you, but thanks to your mail I noticed that
-> NVMe has a suboptimal setting there.  Also note that highmem does not
-> have to imply a 32-bit kernel, just physical memory that is not in the
-> kernel mapping.
-> 
->> What we are discussing is hw-originated restriction on where DMA is
->> possible.
-> 
-> Yes, where hw means the SOC, and not the actual I/O device, which is an
-> important distinction.
-> 
->>> Or even better remove the call to dma_set_mask_and_coherent with
->>> DMA_BIT_MASK(32).  NVMe is designed around having proper 64-bit DMA
->>> addressing, there is not point in trying to pretent it works without that
->>
->> Are you claiming that NVMe driver in mainline is intentionally designed
->> to not work on HW that can't do DMA to entire 64-bit space?
-> 
-> It is not intenteded to handle the case where the SOC / chipset
-> can't handle DMA to all physical memoery, yes.
-> 
->> Such setups do exist and there is interest to make them working.
-> 
-> Sure, but it's not the job of the NVMe driver to work around such a broken
-> system.  It's something your architecture code needs to do, maybe with
-> a bit of core kernel support.
-> 
->> Quite a few pages used for block I/O are allocated by filemap code - and
->> at allocation point it is known what inode page is being allocated for.
->> If this inode is from filesystem located on a known device with known
->> DMA limitations, this knowledge can be used to allocate page that can be
->> DMAed directly.
-> 
-> But in other cases we might never DMA to it.  Or we rarely DMA to it, say
-> for a machine running databses or qemu and using lots of direct I/O. Or
-> a storage target using it's local alloc_pages buffers.
-> 
->> Sure there are lots of cases when at allocation time there is no idea
->> what device will run DMA on page being allocated, or perhaps page is
->> going to be shared, or whatever. Such cases unavoidably require bounce
->> buffers if page ends to be used with device with DMA limitations. But
->> still there are cases when better allocation can remove need for bounce
->> buffers - without any hurt for other cases.
-> 
-> It takes your max 1GB DMA addressable memoery away from other uses,
-> and introduce the crazy highmem VM tuning issues we had with big
-> 32-bit x86 systems in the past.
+	reg_xxx: regulator-xxx {
+		...
+	};
+
+> +
+> +		reg_3p3v: 3p3v {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "3P3V";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		reg_1p8v: 1p8v {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "1P8V";
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <1800000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		reg_usbh1_vbus: usb-h1-vbus {
+> +			compatible = "regulator-fixed";
+> +			enable-active-high;
+> +			gpio = <&gpio1 0 0>;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_hummingboard2_usbh1_vbus>;
+> +			regulator-name = "usb_h1_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +		};
+> +
+> +		reg_usbotg_vbus: usb-otg-vbus {
+> +			compatible = "regulator-fixed";
+> +			enable-active-high;
+> +			gpio = <&gpio3 22 0>;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_hummingboard2_usbotg_vbus>;
+> +			regulator-name = "usb_otg_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +		};
+> +
+> +		reg_usbh2_vbus: usb-h2-vbus {
+> +			compatible = "regulator-gpio";
+> +			enable-active-high;
+> +			enable-gpio = <&gpio2 13 0>;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_hummingboard2_usbh2_vbus>;
+> +			regulator-name = "usb_h2_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			regulator-boot-on;
+> +		};
+> +
+> +		reg_usbh3_vbus: usb-h3-vbus {
+> +			compatible = "regulator-gpio";
+> +			enable-active-high;
+> +			enable-gpio = <&gpio7 10 0>;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_hummingboard2_usbh3_vbus>;
+> +			regulator-name = "usb_h3_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			regulator-boot-on;
+> +		};
+> +	};
+> +
+> +	usdhc2_pwrseq: usdhc2_pwrseq {
+
+usdhc2_pwrseq: usdhc2-pwrseq
+
+Hyphen instead of underscore should generally used in node name.
+
+> +		compatible = "mmc-pwrseq-simple";
+> +		reset-gpios = <&gpio4 30 GPIO_ACTIVE_HIGH>;
+> +	};
+> +
+> +	sound-sgtl5000 {
+> +		audio-codec = <&sgtl5000>;
+> +		audio-routing =
+> +			"MIC_IN", "Mic Jack",
+> +			"Mic Jack", "Mic Bias",
+> +			"Headphone Jack", "HP_OUT";
+> +		compatible = "fsl,imx-audio-sgtl5000";
+> +		model = "On-board Codec";
+> +		mux-ext-port = <5>;
+> +		mux-int-port = <1>;
+> +		ssi-controller = <&ssi1>;
+> +	};
+> +};
+> +
+> +&audmux {
+> +	status = "okay";
+> +};
+> +
+> +&ecspi2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hummingboard2_ecspi2>;
+> +	fsl,spi-num-chipselects = <1>;
+
+This property is obsolete, and can be dropped.
+
+> +	cs-gpios = <&gpio2 26 0>;
+> +	status = "okay";
+> +};
+> +
+> +&hdmi {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hummingboard2_hdmi>;
+> +	ddc-i2c-bus = <&i2c2>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hummingboard2_i2c1>;
+> +	status = "okay";
+> +
+> +	rtc: pcf8523 at 68 {
+
+Node name should be generic, while label can be specific.  That said,
+pcf8523: rtc at 68 would be more appropriate.
+
+> +		compatible = "nxp,pcf8523";
+
+Undocumented bindings.
+
+> +		reg = <0x68>;
+> +		nxp,12p5_pf;
+> +	};
+> +
+> +	sgtl5000: sgtl5000 at 0a {
+
+sgtl5000: codec at a {
+
+> +		clocks = <&clks IMX6QDL_CLK_CKO>;
+> +		compatible = "fsl,sgtl5000";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_hummingboard2_sgtl5000>;
+> +		reg = <0x0a>;
+> +		VDDA-supply = <&reg_3p3v>;
+> +		VDDIO-supply = <&reg_3p3v>;
+> +	};
+> +};
+> +
+> +&i2c2 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hummingboard2_i2c2>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c3 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hummingboard2_i2c3>;
+> +	status = "okay";
+> +};
+> +
+> +&iomuxc {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hog>;
+
+Have a newline between properties and child node.
+
+> +	hummingboard2 {
+> +		pinctrl_hog: hoggrp {
+> +		fsl,pins = <
+> +				/*
+> +				 * 36 pin headers GPIO description. The pins
+> +				 * numbering as following -
+> +				 *
+> +				 * 	3.2v	5v	74	75
+> +				 *	73	72	71	70
+> +				 *	69	68	67	66
+> +				 *
+> +				 *	77	78	79	76
+> +				 *	65	64	61	60
+> +				 *	53	52	51	50
+> +				 *	49	48	166	132
+> +				 *	95	94	90	91
+> +				 *	GND	54	24	204
+> +				 *
+> +				 * The GPIO numbers can be extracted using
+> +				 * signal name from below.
+> +				 * Example -
+> +				 * MX6QDL_PAD_EIM_DA10__GPIO3_IO10 is
+> +				 * GPIO(3,10) which is (3-1)*32+10 = gpio 74
+> +				 *
+> +				 * i.e. The mapping of GPIO(X,Y) to Linux gpio
+> +				 * number is : gpio number = (X-1) * 32 + Y
+> +				 */
+> +				/* DI1_PIN15 */
+> +				MX6QDL_PAD_EIM_DA10__GPIO3_IO10 0x400130b1
+> +				/* DI1_PIN02 */
+> +				MX6QDL_PAD_EIM_DA11__GPIO3_IO11 0x400130b1
+> +				/* DISP1_DATA00 */
+> +				MX6QDL_PAD_EIM_DA9__GPIO3_IO09 0x400130b1
+> +				/* DISP1_DATA01 */
+> +				MX6QDL_PAD_EIM_DA8__GPIO3_IO08 0x400130b1
+> +				/* DISP1_DATA02 */
+> +				MX6QDL_PAD_EIM_DA7__GPIO3_IO07 0x400130b1
+> +				/* DISP1_DATA03 */
+> +				MX6QDL_PAD_EIM_DA6__GPIO3_IO06 0x400130b1
+> +				/* DISP1_DATA04 */
+> +				MX6QDL_PAD_EIM_DA5__GPIO3_IO05 0x400130b1
+> +				/* DISP1_DATA05 */
+> +				MX6QDL_PAD_EIM_DA4__GPIO3_IO04 0x400130b1
+> +				/* DISP1_DATA06 */
+> +				MX6QDL_PAD_EIM_DA3__GPIO3_IO03 0x400130b1
+> +				/* DISP1_DATA07 */
+> +				MX6QDL_PAD_EIM_DA2__GPIO3_IO02 0x400130b1
+> +				/* DI1_D0_CS */
+> +				MX6QDL_PAD_EIM_DA13__GPIO3_IO13 0x400130b1
+> +				/* DI1_D1_CS */
+> +				MX6QDL_PAD_EIM_DA14__GPIO3_IO14 0x400130b1
+> +				/* DI1_PIN01 */
+> +				MX6QDL_PAD_EIM_DA15__GPIO3_IO15 0x400130b1
+> +				/* DI1_PIN03 */
+> +				MX6QDL_PAD_EIM_DA12__GPIO3_IO12 0x400130b1
+> +				/* DISP1_DATA08 */
+> +				MX6QDL_PAD_EIM_DA1__GPIO3_IO01 0x400130b1
+> +				/* DISP1_DATA09 */
+> +				MX6QDL_PAD_EIM_DA0__GPIO3_IO00 0x400130b1
+> +				/* DISP1_DATA10 */
+> +				MX6QDL_PAD_EIM_EB1__GPIO2_IO29 0x400130b1
+> +				/* DISP1_DATA11 */
+> +				MX6QDL_PAD_EIM_EB0__GPIO2_IO28 0x400130b1
+> +				/* DISP1_DATA12 */
+> +				MX6QDL_PAD_EIM_A17__GPIO2_IO21 0x400130b1
+> +				/* DISP1_DATA13 */
+> +				MX6QDL_PAD_EIM_A18__GPIO2_IO20 0x400130b1
+> +				/* DISP1_DATA14 */
+> +				MX6QDL_PAD_EIM_A19__GPIO2_IO19 0x400130b1
+> +				/* DISP1_DATA15 */
+> +				MX6QDL_PAD_EIM_A20__GPIO2_IO18 0x400130b1
+> +				/* DISP1_DATA16 */
+> +				MX6QDL_PAD_EIM_A21__GPIO2_IO17 0x400130b1
+> +				/* DISP1_DATA17 */
+> +				MX6QDL_PAD_EIM_A22__GPIO2_IO16 0x400130b1
+> +				/* DISP1_DATA18 */
+> +				MX6QDL_PAD_EIM_A23__GPIO6_IO06 0x400130b1
+> +				/* DISP1_DATA19 */
+> +				MX6QDL_PAD_EIM_A24__GPIO5_IO04 0x400130b1
+> +				/* DISP1_DATA20 */
+> +				MX6QDL_PAD_EIM_D31__GPIO3_IO31 0x400130b1
+> +				/* DISP1_DATA21 */
+> +				MX6QDL_PAD_EIM_D30__GPIO3_IO30 0x400130b1
+> +				/* DISP1_DATA22 */
+> +				MX6QDL_PAD_EIM_D26__GPIO3_IO26 0x400130b1
+> +				/* DISP1_DATA23 */
+> +				MX6QDL_PAD_EIM_D27__GPIO3_IO27 0x400130b1
+> +				/* DI1_DISP_CLK */
+> +				MX6QDL_PAD_EIM_A16__GPIO2_IO22 0x400130b1
+> +				/* SPDIF_IN */
+> +				MX6QDL_PAD_ENET_RX_ER__GPIO1_IO24 0x400130b1
+> +				/* SPDIF_OUT */
+> +				MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x400130b1
+> +
+> +				/* MikroBUS GPIO pin number 10 */
+> +				MX6QDL_PAD_EIM_LBA__GPIO2_IO27 0x400130b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_gpio7_9: hummingboard2-gpio7_9 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD4_CMD__GPIO7_IO09 0x80000000
+> +			>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_hdmi: hummingboard2-hdmi {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
+> +			>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_i2c1: hummingboard2-i2c1 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
+> +				MX6QDL_PAD_EIM_D28__I2C1_SDA 0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_i2c2: hummingboard2-i2c2 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
+> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_i2c3: hummingboard2-i2c3 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D17__I2C3_SCL 0x4001b8b1
+> +				MX6QDL_PAD_EIM_D18__I2C3_SDA 0x4001b8b1
+> +			>;
+> +		};
+> +
+> +                pinctrl_hummingboard2_mipi: hummingboard2_mipi {
+> +                        fsl,pins = <
+> +                                MX6QDL_PAD_SD4_DAT2__GPIO2_IO10 0x4001b8b1
+> +                                MX6QDL_PAD_KEY_COL4__GPIO4_IO14 0x4001b8b1
+> +                                MX6QDL_PAD_NANDF_CS2__CCM_CLKO2 0x130b0
+> +                        >;
+> +                };
+
+Use tabs instead of spaces for indentation.
+
+> +
+> +		pinctrl_hummingboard2_pcie_reset: hummingboard2-pcie-reset {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD4_DAT3__GPIO2_IO11 0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_pwm1: pwm1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_DISP0_DAT8__PWM1_OUT 0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_sgtl5000: hummingboard2-sgtl5000 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_DISP0_DAT19__AUD5_RXD 0x130b0
+> +				MX6QDL_PAD_KEY_COL0__AUD5_TXC 0x130b0
+> +				MX6QDL_PAD_KEY_ROW0__AUD5_TXD 0x110b0
+> +				MX6QDL_PAD_KEY_COL1__AUD5_TXFS 0x130b0
+> +				MX6QDL_PAD_GPIO_5__CCM_CLKO1 0x130b0
+> +			>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_usbh1_vbus: hummingboard2-usbh1-vbus {
+> +			fsl,pins = <MX6QDL_PAD_GPIO_0__GPIO1_IO00 0x1b0b0>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_usbh2_vbus: hummingboard2-usbh2-vbus {
+> +			fsl,pins = <MX6QDL_PAD_SD4_DAT5__GPIO2_IO13 0x1b0b0>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_usbh3_vbus: hummingboard2-usbh3-vbus {
+> +			fsl,pins = <MX6QDL_PAD_SD4_CLK__GPIO7_IO10 0x1b0b0>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_usbotg_id: hummingboard2-usbotg-id {
+> +			/*
+> +			 * Similar to pinctrl_usbotg_2, but we want it
+> +			 * pulled down for a fixed host connection.
+> +			 */
+> +			fsl,pins = <MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x13059>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_usbotg_vbus: hummingboard2-usbotg-vbus {
+> +			fsl,pins = <MX6QDL_PAD_EIM_D22__GPIO3_IO22 0x1b0b0>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_usdhc2_aux: hummingboard2-usdhc2-aux {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_4__GPIO1_IO04    0x13071
+> +				MX6QDL_PAD_KEY_ROW1__SD2_VSELECT 0x1b071
+> +				MX6QDL_PAD_DISP0_DAT9__GPIO4_IO30 0x1b0b0
+> +			>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_usdhc2: hummingboard2-usdhc2 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD2_CMD__SD2_CMD    0x17059
+> +				MX6QDL_PAD_SD2_CLK__SD2_CLK    0x10059
+> +				MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x17059
+> +				MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x17059
+> +				MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x17059
+> +				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x13059
+> +			>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_usdhc2_100mhz: hummingboard2-usdhc2-100mhz {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD2_CMD__SD2_CMD    0x170b9
+> +				MX6QDL_PAD_SD2_CLK__SD2_CLK    0x100b9
+> +				MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x170b9
+> +				MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x170b9
+> +				MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x170b9
+> +				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x130b9
+> +			>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_usdhc2_200mhz: hummingboard2-usdhc2-200mhz {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD2_CMD__SD2_CMD    0x170f9
+> +				MX6QDL_PAD_SD2_CLK__SD2_CLK    0x100f9
+> +				MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x170f9
+> +				MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x170f9
+> +				MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x170f9
+> +				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x130f9
+> +			>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_usdhc3: hummingboard2-usdhc3 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17059
+> +				MX6QDL_PAD_SD3_CLK__SD3_CLK    0x10059
+> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x17059
+> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x17059
+> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x17059
+> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x17059
+> +				MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x17059
+> +				MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x17059
+> +				MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x17059
+> +				MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x17059
+> +				MX6QDL_PAD_SD3_RST__SD3_RESET  0x17059
+> +			>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_uart3: hummingboard2-uart3 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D25__UART3_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_EIM_D24__UART3_RX_DATA	0x40013000
+> +			>;
+> +		};
+> +
+> +		pinctrl_hummingboard2_ecspi2: hummingboard2-ecspi2grp {
+
+This one is not sorted.
+
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_OE__ECSPI2_MISO	0x100b1
+> +				MX6QDL_PAD_EIM_CS1__ECSPI2_MOSI	0x100b1
+> +				MX6QDL_PAD_EIM_CS0__ECSPI2_SCLK	0x100b1
+> +				MX6QDL_PAD_EIM_RW__GPIO2_IO26	0x000b1 /* CS */
+> +			>;
+> +		};
+> +	};
+> +};
+> +
+> +&ldb {
+> +	status = "disabled";
+> +
+> +	lvds-channel at 0 {
+> +		fsl,data-mapping = "spwg";
+> +		fsl,data-width = <18>;
+> +	};
+> +};
+> +
+> +&pcie {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <
+> +		&pinctrl_hummingboard2_pcie_reset
+> +	>;
+
+pinctrl-0 = <&pinctrl_hummingboard2_pcie_reset>;
+
+> +	reset-gpio = <&gpio2 11 0>;
+> +	status = "okay";
+> +};
+> +
+> +&pwm1 {
+> +        pinctrl-names = "default";
+> +        pinctrl-0 = <&pinctrl_hummingboard2_pwm1>;
+> +        status = "okay";
+> +};
+> +
+> +&pwm3 {
+> +	status = "disabled";
+> +};
+> +
+> +&pwm4 {
+> +	status = "disabled";
+> +};
+> +
+> +&ssi1 {
+> +	fsl,mode = "i2s-slave";
+
+Please check commit b93427b1c057 ("ASoC: fsl ssi doc: Remove unused
+properties").
+
+Shawn
+
+> +	status = "okay";
+> +};
+> +
+> +&usbh1 {
+> +	disable-over-current;
+> +	vbus-supply = <&reg_usbh1_vbus>;
+> +	status = "okay";
+> +};
+> +
+> +&usbotg {
+> +	disable-over-current;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hummingboard2_usbotg_id>;
+> +	vbus-supply = <&reg_usbotg_vbus>;
+> +	status = "okay";
+> +};
+> +
+> +&usdhc2 {
+> +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+> +	pinctrl-0 = <
+> +		&pinctrl_hummingboard2_usdhc2_aux
+> +		&pinctrl_hummingboard2_usdhc2
+> +	>;
+> +	pinctrl-1 = <
+> +		&pinctrl_hummingboard2_usdhc2_aux
+> +		&pinctrl_hummingboard2_usdhc2_100mhz
+> +	>;
+> +	pinctrl-2 = <
+> +		&pinctrl_hummingboard2_usdhc2_aux
+> +		&pinctrl_hummingboard2_usdhc2_200mhz
+> +	>;
+> +	mmc-pwrseq = <&usdhc2_pwrseq>;
+> +	cd-gpios = <&gpio1 4 0>;
+> +	status = "okay";
+> +};
+> +
+> +&usdhc3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <
+> +		&pinctrl_hummingboard2_usdhc3
+> +	>;
+> +	vmmc-supply = <&reg_3p3v>;
+> +	vqmmc-supply = <&reg_3p3v>;
+> +	bus-width = <8>;
+> +	non-removable;
+> +	status = "okay";
+> +};
+> +
+> +&uart3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hummingboard2_uart3>;
+> +	status = "okay";
+> +};
+> -- 
+> 2.7.4
 > 
