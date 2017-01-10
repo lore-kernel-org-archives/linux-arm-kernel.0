@@ -1,100 +1,122 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Tue, 10 Jan 2017 00:30:41 +0000
-Subject: [PATCH v2 1/6] mmc: sunxi: Always set signal delay to 0 for A64
-In-Reply-To: <5eff19eec2b110bb643a38e7fef221208f585589.1483980339.git-series.maxime.ripard@free-electrons.com>
-References: <cover.493dc67855a5f1837e875d37307319a03d14d1d0.1483980339.git-series.maxime.ripard@free-electrons.com>
- <5eff19eec2b110bb643a38e7fef221208f585589.1483980339.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <96ba5fd8-d551-5993-f347-202c47efec8c@arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 9 Jan 2017 16:37:53 -0800
+Subject: [PATCH v2 04/12] driver: clk: imx: Add clock driver for imx6sll
+In-Reply-To: <1482832070-22668-5-git-send-email-ping.bai@nxp.com>
+References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
+ <1482832070-22668-5-git-send-email-ping.bai@nxp.com>
+Message-ID: <20170110003753.GM17126@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/17 16:46, Maxime Ripard wrote:
-> Experience have shown that the using the  autocalibration could severely
-> degrade the performances of the MMC bus.
-> 
-> Allwinner is using in its BSP a delay set to 0 for all the modes but HS400.
-> Remove the calibration code for now, and add comments to document our
-> findings.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 50 ++++++++++++-------------------------
->  1 file changed, 17 insertions(+), 33 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index b1d1303389a7..ea9552a0d820 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -683,41 +683,19 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
->  
->  static int sunxi_mmc_calibrate(struct sunxi_mmc_host *host, int reg_off)
->  {
-> -	u32 reg = readl(host->reg_base + reg_off);
-> -	u32 delay;
-> -	unsigned long timeout;
-> -
->  	if (!host->cfg->can_calibrate)
->  		return 0;
->  
-> -	reg &= ~(SDXC_CAL_DL_MASK << SDXC_CAL_DL_SW_SHIFT);
-> -	reg &= ~SDXC_CAL_DL_SW_EN;
-> -
-> -	writel(reg | SDXC_CAL_START, host->reg_base + reg_off);
-> -
-> -	dev_dbg(mmc_dev(host->mmc), "calibration started\n");
-> -
-> -	timeout = jiffies + HZ * SDXC_CAL_TIMEOUT;
-> -
-> -	while (!((reg = readl(host->reg_base + reg_off)) & SDXC_CAL_DONE)) {
-> -		if (time_before(jiffies, timeout))
-> -			cpu_relax();
-> -		else {
-> -			reg &= ~SDXC_CAL_START;
-> -			writel(reg, host->reg_base + reg_off);
-> -
-> -			return -ETIMEDOUT;
-> -		}
-> -	}
-> -
-> -	delay = (reg >> SDXC_CAL_DL_SHIFT) & SDXC_CAL_DL_MASK;
-> -
-> -	reg &= ~SDXC_CAL_START;
-> -	reg |= (delay << SDXC_CAL_DL_SW_SHIFT) | SDXC_CAL_DL_SW_EN;
-> -
-> -	writel(reg, host->reg_base + reg_off);
-> -
-> -	dev_dbg(mmc_dev(host->mmc), "calibration ended, reg is 0x%x\n", reg);
-> +	/*
-> +	 * FIXME:
-> +	 * This is not clear how the calibration is supposed to work
-> +	 * yet. The best rate have been obtained by simply setting the
-> +	 * delay to 0, as Allwinner does in its BSP.
-> +	 *
-> +	 * The only mode that doesn't have such a delay is HS400, that
-> +	 * is in itself a TODO.
-> +	 */
-> +	writel(SDXC_CAL_DL_SW_EN, host->reg_base + reg_off);
->  
->  	return 0;
->  }
-> @@ -806,7 +784,13 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->  	if (ret)
->  		return ret;
->  
-> -	/* TODO: enable calibrate on sdc2 SDXC_REG_DS_DL_REG of A64 */
-> +	/*
-> +	 * FIXME:
-> +	 *
-> +	 * In HS400 we'll also need to calibrate the data strobe
-> +	 * signal. This should only happen on the MMC2 controller (at
-> +	 * least on the A64 and older SoCs).
+On 12/27, Bai Ping wrote:
+> diff --git a/drivers/clk/imx/clk-imx6sll.c b/drivers/clk/imx/clk-imx6sll.c
+> new file mode 100644
+> index 0000000..73758fe1
+> --- /dev/null
+> +++ b/drivers/clk/imx/clk-imx6sll.c
+> @@ -0,0 +1,369 @@
+> +/*
+> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include <dt-bindings/clock/imx6sll-clock.h>
+> +#include <linux/clk.h>
+> +#include <linux/clkdev.h>
 
-Which older SoCs have this calibration register and a DS signal?
-Is that supposed to mean "other" SoCs?
+Is this used?
 
-Other than that:
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
 
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Is this used?
 
-Cheers,
-Andre.
+> +#include <linux/types.h>
+> +
+> +#include "clk.h"
+> +
+> +#define CCM_ANALOG_PLL_BYPASS		(0x1 << 16)
+> +#define BM_CCM_CCDR_MMDC_CH0_MASK	(0x2 << 16)
+> +#define CCDR	0x4
+> +#define xPLL_CLR(offset)		 (offset + 0x8)
+> +
+> +static const char *pll_bypass_src_sels[] = { "osc", "dummy", };
+
+All these should be const char * const unless something is wrong.
+
+> +static const char *pll1_bypass_sels[] = { "pll1", "pll1_bypass_src", };
+> +static const char *pll2_bypass_sels[] = { "pll2", "pll2_bypass_src", };
+> +static const char *pll3_bypass_sels[] = { "pll3", "pll3_bypass_src", };
+> +static const char *pll4_bypass_sels[] = { "pll4", "pll4_bypass_src", };
+> +static const char *pll5_bypass_sels[] = { "pll5", "pll5_bypass_src", };
+> +static const char *pll6_bypass_sels[] = { "pll6", "pll6_bypass_src", };
+[...]
+> +	clks[IMX6SLL_CLK_USDHC3]	= imx_clk_gate2("usdhc3",	"usdhc3_podf",	 base + 0x80,	6);
+> +
+> +	/* mask handshake of mmdc */
+> +	writel_relaxed(BM_CCM_CCDR_MMDC_CH0_MASK, base + CCDR);
+> +
+> +	for (i = 0; i < ARRAY_SIZE(clks); i++)
+> +		if (IS_ERR(clks[i]))
+> +			pr_err("i.MX6SLL clk %d: register failed with %ld\n", i, PTR_ERR(clks[i]));
+> +
+> +	clk_data.clks = clks;
+> +	clk_data.clk_num = ARRAY_SIZE(clks);
+> +	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+> +
+> +	/* set perclk to from OSC */
+> +	clk_set_parent(clks[IMX6SLL_CLK_PERCLK_SEL], clks[IMX6SLL_CLK_OSC]);
+
+Can this be done with assigned-clocks in DT?
+
+> +
+> +	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+> +		clk_prepare_enable(clks[clks_init_on[i]]);
+
+Critical clocks?
+
+> +
+> +	if (IS_ENABLED(CONFIG_USB_MXS_PHY)) {
+> +		clk_prepare_enable(clks[IMX6SLL_CLK_USBPHY1_GATE]);
+> +		clk_prepare_enable(clks[IMX6SLL_CLK_USBPHY2_GATE]);
+
+The phy driver can't enable these?
+
+> +	}
+> +
+> +	/* Lower the AHB clock rate before changing the clock source. */
+> +	clk_set_rate(clks[IMX6SLL_CLK_AHB], 99000000);
+> +
+> +	/* Change periph_pre clock to pll2_bus to adjust AXI rate to 264MHz */
+> +	clk_set_parent(clks[IMX6SLL_CLK_PERIPH_CLK2_SEL], clks[IMX6SLL_CLK_PLL3_USB_OTG]);
+> +	clk_set_parent(clks[IMX6SLL_CLK_PERIPH], clks[IMX6SLL_CLK_PERIPH_CLK2]);
+> +	clk_set_parent(clks[IMX6SLL_CLK_PERIPH_PRE], clks[IMX6SLL_CLK_PLL2_BUS]);
+> +	clk_set_parent(clks[IMX6SLL_CLK_PERIPH], clks[IMX6SLL_CLK_PERIPH_PRE]);
+> +
+> +	clk_set_rate(clks[IMX6SLL_CLK_AHB], 132000000);
+
+assigned-clocks for rates now? Or perhaps we shouldn't be
+exposing these as clks if they have some sort of complicated rate
+sequence switch that we can't guarantee with the clk_ops we have
+today.
+
+> +}
+> +
+> +CLK_OF_DECLARE(imx6sll, "fsl,imx6sll-ccm", imx6sll_clocks_init);
+> +
+
+Please drop this extra newline.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
