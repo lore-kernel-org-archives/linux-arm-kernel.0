@@ -1,63 +1,54 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 10 Jan 2017 11:41:19 +0000
-Subject: [PATCH 2/2] arm64: cacheinfo: add support to override cache levels
- via device tree
-In-Reply-To: <1484048479-19767-1-git-send-email-sudeep.holla@arm.com>
-References: <1484048479-19767-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1484048479-19767-2-git-send-email-sudeep.holla@arm.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 10 Jan 2017 11:38:55 +0000
+Subject: [PATCH v3 8/9] arm: KVM: Enable support for host pmu
+In-Reply-To: <20170110113856.7183-1-punit.agrawal@arm.com>
+References: <20170110113856.7183-1-punit.agrawal@arm.com>
+Message-ID: <20170110113856.7183-9-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cache hierarchy can be identified through Cache Level ID(CLIDR)
-architected system register. However in some cases it will provide
-only the number of cache levels that are integrated into the processor
-itself. In other words, it can't provide any information about the
-caches that are external and/or transparent.
+Add the Kconfig option and Makefile updates to enable the recently added
+support for host pmu.
 
-Some platforms require to export the information about all such external
-caches to the userspace applications via the sysfs interface.
-
-This patch adds support to override the cache levels using device tree
-to take such external non-architected caches into account.
-
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
 ---
- arch/arm64/kernel/cacheinfo.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+ arch/arm/kvm/Kconfig  | 4 ++++
+ arch/arm/kvm/Makefile | 1 +
+ 2 files changed, 5 insertions(+)
 
-diff --git a/arch/arm64/kernel/cacheinfo.c b/arch/arm64/kernel/cacheinfo.c
-index 9617301f76b5..fe7738a8c5b1 100644
---- a/arch/arm64/kernel/cacheinfo.c
-+++ b/arch/arm64/kernel/cacheinfo.c
-@@ -84,7 +84,7 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+index 90d0176fb30d..198d16c36220 100644
+--- a/arch/arm/kvm/Kconfig
++++ b/arch/arm/kvm/Kconfig
+@@ -16,6 +16,9 @@ menuconfig VIRTUALIZATION
  
- static int __init_cache_level(unsigned int cpu)
- {
--	unsigned int ctype, level, leaves;
-+	unsigned int ctype, level, leaves, of_level;
- 	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+ if VIRTUALIZATION
  
- 	for (level = 1, leaves = 0; level <= MAX_CACHE_LEVEL; level++) {
-@@ -97,6 +97,17 @@ static int __init_cache_level(unsigned int cpu)
- 		leaves += (ctype == CACHE_TYPE_SEPARATE) ? 2 : 1;
- 	}
- 
-+	of_level = of_count_cache_levels(cpu);
-+	if (level < of_level) {
-+		/*
-+		 * some external caches not specified in CLIDR_EL1
-+		 * the information may be available in the device tree
-+		 * only unified external caches are considered here
-+		 */
-+		leaves += (of_level - level);
-+		level = of_level;
-+	}
++config KVM_HOST_PMU
++	bool
 +
- 	this_cpu_ci->num_levels = level;
- 	this_cpu_ci->num_leaves = leaves;
- 	return 0;
+ config KVM
+ 	bool "Kernel-based Virtual Machine (KVM) support"
+ 	depends on MMU && OF
+@@ -30,6 +33,7 @@ config KVM
+ 	select SRCU
+ 	select MMU_NOTIFIER
+ 	select KVM_VFIO
++	select KVM_HOST_PMU if PERF_EVENTS
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
+ 	select HAVE_KVM_IRQCHIP
+diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+index d571243ab4d1..09d358499ce1 100644
+--- a/arch/arm/kvm/Makefile
++++ b/arch/arm/kvm/Makefile
+@@ -35,3 +35,4 @@ obj-y += $(KVM)/arm/vgic/vgic-kvm-device.o
+ obj-y += $(KVM)/arm/vgic/vgic-its.o
+ obj-y += $(KVM)/irqchip.o
+ obj-y += $(KVM)/arm/arch_timer.o
++obj-$(CONFIG_KVM_HOST_PMU) += $(KVM)/arm/host_pmu.o
 -- 
-2.7.4
+2.11.0
