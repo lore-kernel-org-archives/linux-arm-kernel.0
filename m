@@ -1,72 +1,89 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 10 Jan 2017 13:06:07 -0800
-Subject: [PATCH net-next 6/8] net: dsa: Add support for platform data
-In-Reply-To: <20170110204124.GL22820@lunn.ch>
-References: <20170110201235.21771-1-f.fainelli@gmail.com>
- <20170110201235.21771-7-f.fainelli@gmail.com>
- <20170110204124.GL22820@lunn.ch>
-Message-ID: <1530c7f6-f8ba-ab32-75aa-288549f25db9@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 10 Jan 2017 23:06:22 +0200
+Subject: [PATCH V7 1/4] Documentation/devicetree/bindings: b850v3_lvds_dp
+In-Reply-To: <21ea1b0795bdaa30ca475d6ce675b620b2b644ed.1483301745.git.peter.senna@collabora.com>
+References: <cover.1483301745.git.peter.senna@collabora.com>
+ <21ea1b0795bdaa30ca475d6ce675b620b2b644ed.1483301745.git.peter.senna@collabora.com>
+Message-ID: <6121545.d1oTkZXUdh@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2017 12:41 PM, Andrew Lunn wrote:
->> @@ -452,11 +455,14 @@ static int dsa_cpu_parse(struct dsa_port *port, u32 index,
->>  	struct net_device *ethernet_dev;
->>  	struct device_node *ethernet;
->>  
->> -	ethernet = of_parse_phandle(port->dn, "ethernet", 0);
->> -	if (!ethernet)
->> -		return -EINVAL;
->> +	if (port->dn) {
->> +		ethernet = of_parse_phandle(port->dn, "ethernet", 0);
->> +		if (!ethernet)
->> +			return -EINVAL;
->> +		ethernet_dev = of_find_net_device_by_node(ethernet);
->> +	} else
->> +		ethernet_dev = dev_to_net_device(dst->pd->netdev);
+Hi Peter,
 
-Bonjour Andrew,
+Thank you for the patch.
 
+On Sunday 01 Jan 2017 21:24:29 Peter Senna Tschudin wrote:
+> Devicetree bindings documentation for the GE B850v3 LVDS/DP++
+> display bridge.
 > 
-> Hi Florian
+> Cc: Martyn Welch <martyn.welch@collabora.co.uk>
+> Cc: Martin Donnelly <martin.donnelly@ge.com>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+> ---
+> There was an Acked-by from Rob Herring <robh@kernel.org> for V6, but I
+> changed the bindings to use i2c_new_secondary_device() so I removed it from
+> the commit message.
 > 
-> This is not going to work with John's rework of my multi CPU ports
-> code. I think you are going to have to modify the platform_data
-> structure to support multi-CPU ports.
-
-Last time we discussed this, I had a super complex dsa2_platform_data
-that allowed you to do exactly the same thing we currently do with
-Device Tree, except that this was with platform_data. It took a lot of
-effort to get there, but I essentially had the ZII vf160 board example
-re-implemented and verified with a mockup driver (still have it in a
-branch that's not too far from net-next/master).
-
-Your reply then AFAIR was that we should aim for something simpler and
-here is the result, we end-up re-using the existing dsa_platform_data
-with its limitations.
-
-If we have legacy platforms with complex setups, I really don't think we
-have those in tree, we should use dsa2_platform_data (still have the
-patches somewhere for that) although I was hoping to not have to use it
-since it is way more intrusive into net/dsa/dsa2.c.
-
-All platforms that I know that will benefit from this patch series: x86
-SCU from ZII (out of tree), BCM47xx, BCM63xx, Orion5x have the same
-properties: single switch attached to a SPI/MDIO/MMAP with built-in
-PHYs. If we have more complex setups than that, we should try to collect
-the requirements.
-
+>  .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 39 +++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
 > 
-> I put higher priority on cleanly integrating multi-CPU ports using
-> device tree, than supporting legacy platforms. I'm O.K. with
-> preparatory patches, but i think we should wait for actually platform
-> data changes until after Johns code has landed and we can design the
-> platform_data to work with it.
+> diff --git a/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+> b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt new file mode
+> 100644
+> index 0000000..1bc6ebf
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+> @@ -0,0 +1,39 @@
+> +Driver for GE B850v3 LVDS/DP++ display bridge
+> +
+> +Required properties:
+> +  - compatible : should be "ge,b850v3-lvds-dp".
+> +  - reg : should contain the main address which is used to ack the
+> +    interrupts and address for edid.
+> +  - reg-names : comma separeted list of register names. Valid values
+> +    are "main", and "edid".
+> +  - interrupt-parent : phandle of the interrupt controller that services
+> +    interrupts to the device
+> +  - interrupts : one interrupt should be described here, as in
+> +    <0 IRQ_TYPE_LEVEL_HIGH>.
+> +  - port : should describe the video signal connection between the host
+> +    and the bridge.
 
-I would very much like to see the patches and then make a decision based
-on the submission rather than project a decision on code that has not
-been submitted yet.
+A bridge has, by definition, (at least) one input and (at least) one output. 
+You should thus have (at least) two ports.
 
-Do we agree that patches 1 through 5 and 7 could go in then?
+> +Example:
+> +
+> +&mux2_i2c2 {
+> +	status = "okay";
+> +	clock-frequency = <100000>;
+> +
+> +	b850v3-lvds-dp-bridge at 73  {
+> +		compatible = "ge,b850v3-lvds-dp";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		reg = <0x73 0x72>;
+> +		reg-names = "main", "edid";
+> +
+> +		interrupt-parent = <&gpio2>;
+> +		interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
+> +
+> +		port {
+> +			b850v3_dp_bridge_in: endpoint {
+> +				remote-endpoint = <&lvds0_out>;
+> +			};
+> +		};
+> +	};
+> +};
+
 -- 
-Florian
+Regards,
+
+Laurent Pinchart
