@@ -1,73 +1,104 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 10 Jan 2017 18:56:14 +0000
-Subject: System/uncore PMUs and unit aggregation
-In-Reply-To: <582EB89B.5050708@gmail.com>
-References: <20161117181708.GT22855@arm.com>
- <582EB89B.5050708@gmail.com>
-Message-ID: <20170110185614.GC12728@arm.com>
+From: breno.lima@nxp.com (Breno Lima)
+Date: Tue, 10 Jan 2017 16:59:38 -0200
+Subject: [PATCH] ARM: dts: udoo_neo: Add UDOO Neo USB OTG1 and OTG2 support
+Message-ID: <1484074778-2112-1-git-send-email-breno.lima@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 01:45:23PM +0530, Anurup M wrote:
-> On Thursday 17 November 2016 11:47 PM, Will Deacon wrote:
-> >We currently have support for three arm64 system PMUs in flight:
-> >
-> >  [Cavium ThunderX] http://lkml.kernel.org/r/cover.1477741719.git.jglauber at cavium.com
-> >  [Hisilicon Hip0x] http://lkml.kernel.org/r/1478151727-20250-1-git-send-email-anurup.m at huawei.com
-> >  [Qualcomm L2] http://lkml.kernel.org/r/1477687813-11412-1-git-send-email-nleeder at codeaurora.org
-> >
-> >Each of which have to deal with multiple underlying hardware units in one
-> >way or another. Mark and I recently expressed a desire to expose these
-> >units to userspace as individual PMU instances, since this can allow:
-> >
-> >   * Fine-grained control of events from userspace, when you want to see
-> >     individual numbers as opposed to a summed total
-> >
-> >   * Potentially ease migration to new SoC revisions, where the units
-> >     are laid out slightly differently
-> >
-> >   * Easier handling of cases where the units aren't quite identical
-> >
-> >however, this received pushback from all of the patch authors, so there's
-> >clearly a problem with this approach. I'm hoping we can try to resolve
-> >this here.
-> >
-> >Speaking to Mark earlier today, we came up with the following rough rules
-> >for drivers that present multiple hardware units as a single PMU:
-> >
-> >   1. If the units share some part of the programming interface (e.g. control
-> >      registers or interrupts), then they must be handled by the same PMU.
-> >      Otherwise, they should be treated independently as separate PMU
-> >      instances.
-> The Hisilicon Hip0x chip has units like L3 cache, Miscellaneous nodes, DDR
-> controller etc.
-> There are such units in multiple CPU die's in the chip.
-> 
-> The L3 cache is further divided as banks which have separate set of
-> interface (control registers, interrupts etc..).
-> As per the suggestion, each L3 cache banks will be exposed as a individual
-> PMU instance.
-> So for e.g. in a board using Hip0x chip with 2 sockets and each socket
-> consists of 2 CPU die,
-> There will be a total of 16 L3 cache PMU's which will be exposed.
-> 
-> My doubt here is
-> Each L3 cache PMU has total 22 statistics events. So if registered as a
-> separate PMU, will it not
-> create multiple entries (with same event names) in event listing for
-> multiple L3 cache PMU's.
-> Is there a way to avoid this? or this is acceptable?
-> 
-> Just a thought, If we can group them as single PMU and add a config
-> parameter in the event listing to
-> identify the L3 cache bank(sub unit). e.g:  event name will appear as
-> "hisi_l3c2/read_allocate,bank=?/".
-> And user can choose count from bank 0x01 as -e
-> "hisi_l3c2/read_allocate,bank=0x01/".
-> And for aggregate count, bank=0xff.
-> Does it over complicate? Please share your comments.
+Add support for micro USB (OTG1) and USB Host (OTG2) for UDOO Neo board.
 
-Adding a bank field to the config looks fine to me. I'm assuming the banks
-aren't CPU affine?
+Tested on a UDOO Neo Full board by mounting a mass storage device
+on both ports.
 
-Will
+Signed-off-by: Breno Lima <breno.lima@nxp.com>
+---
+ arch/arm/boot/dts/imx6sx-udoo-neo.dtsi | 60 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+index 2b65d26..827ace1 100644
+--- a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
++++ b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+@@ -75,6 +75,28 @@
+ 		regulator-max-microvolt = <3300000>;
+ 		regulator-boot-on;
+ 	};
++
++	reg_usb_otg1_vbus: usb-otg1-vbus {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_otg1_reg>;
++		regulator-name = "usb_otg1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	reg_usb_otg2_vbus: usb-otg2-vbus {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_otg2_reg>;
++		regulator-name = "usb_otg2_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio4 12 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
+ };
+ 
+ &cpu0 {
+@@ -241,6 +263,28 @@
+ 			<MX6SX_PAD_CSI_DATA07__UART6_CTS_B	0x1b0b1>;
+ 	};
+ 
++	pinctrl_otg1_reg: otg1grp {
++		fsl,pins =
++			<MX6SX_PAD_GPIO1_IO09__GPIO1_IO_9        0x10b0>;
++	};
++
++
++	pinctrl_otg2_reg: otg2grp {
++		fsl,pins =
++			<MX6SX_PAD_NAND_RE_B__GPIO4_IO_12        0x10b0>;
++	};
++
++	pinctrl_usb_otg1: usbotg1grp {
++		fsl,pins =
++			<MX6SX_PAD_GPIO1_IO10__ANATOP_OTG1_ID    0x17059>,
++			<MX6SX_PAD_GPIO1_IO08__USB_OTG1_OC       0x10b0>;
++	};
++
++	pinctrl_usb_otg2: usbot2ggrp {
++		fsl,pins =
++			<MX6SX_PAD_QSPI1A_DATA0__USB_OTG2_OC     0x10b0>;
++	};
++
+ 	pinctrl_usdhc2: usdhc2grp {
+ 		fsl,pins =
+ 			<MX6SX_PAD_SD2_CMD__USDHC2_CMD		0x17059>,
+@@ -280,6 +324,22 @@
+ 	status = "disabled";
+ };
+ 
++&usbotg1 { /* J2 micro USB port */
++	vbus-supply = <&reg_usb_otg1_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usb_otg1>;
++	imx6-usb-charger-detection;
++	status = "okay";
++};
++
++&usbotg2 { /* J3 host USB port */
++	vbus-supply = <&reg_usb_otg2_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usb_otg2>;
++	dr_mode = "host";
++	status = "okay";
++};
++
+ &usdhc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usdhc2>;
+-- 
+2.7.4
