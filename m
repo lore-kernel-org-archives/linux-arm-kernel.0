@@ -1,32 +1,81 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Tue, 10 Jan 2017 08:53:48 -0600
-Subject: [PATCH] ARM: defconfig: qcom: add APQ8060 DragonBoard devices
-In-Reply-To: <20170110095521.14146-1-linus.walleij@linaro.org>
-References: <20170110095521.14146-1-linus.walleij@linaro.org>
-Message-ID: <20170110145348.GD5710@hector.attlocal.net>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Tue, 10 Jan 2017 16:54:49 +0200
+Subject: [PATCH] virtio_mmio: Set DMA masks appropriately
+In-Reply-To: <50defbbe87d75db85a9d22f914258975d661208a.1484051089.git.robin.murphy@arm.com>
+References: <50defbbe87d75db85a9d22f914258975d661208a.1484051089.git.robin.murphy@arm.com>
+Message-ID: <20170110165221-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 10:55:21AM +0100, Linus Walleij wrote:
-> This default-enables the devices found on the APQ8060 DragonBoard
-> in the qcom_defconfig:
+On Tue, Jan 10, 2017 at 12:26:01PM +0000, Robin Murphy wrote:
+> Once DMA API usage is enabled, it becomes apparent that virtio-mmio is
+> inadvertently relying on the default 32-bit DMA mask, which leads to
+> problems like rapidly exhausting SWIOTLB bounce buffers.
 > 
-> - EBI2 bus
-> - SMSC911x ethernet
-> - LEDs class and PM8058 LEDs driver, trigger and heartbeat
->   trigger (so we get heartbeat on the board by default)
-> - IIO framework, including the HRTimer trigger, KXSD9
->   accelerometer, MPU3050 gyroscope, AK8975 magnetometer and
->   BMP085 pressure sensor
+> Ensure that we set the appropriate 64-bit DMA mask whenever possible,
+> with the coherent mask suitably limited for the legacy vring as per
+> a0be1db4304f ("virtio_pci: Limit DMA mask to 44 bits for legacy virtio
+> devices").
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Reported-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> Fixes: b42111382f0e ("virtio_mmio: Use the DMA API if enabled")
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/virtio/virtio_mmio.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+> index 48bfea91dbca..b5c5d49ca598 100644
+> --- a/drivers/virtio/virtio_mmio.c
+> +++ b/drivers/virtio/virtio_mmio.c
+> @@ -59,6 +59,7 @@
+>  #define pr_fmt(fmt) "virtio-mmio: " fmt
+>  
+>  #include <linux/acpi.h>
+> +#include <linux/dma-mapping.h>
+>  #include <linux/highmem.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/io.h>
+> @@ -497,6 +498,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
+>  	struct virtio_mmio_device *vm_dev;
+>  	struct resource *mem;
+>  	unsigned long magic;
+> +	int rc;
+>  
+>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	if (!mem)
+> @@ -548,6 +550,14 @@ static int virtio_mmio_probe(struct platform_device *pdev)
+>  	if (vm_dev->version == 1)
+>  		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
+>  
+> +	rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+> +	if (rc)
+> +		rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+> +	else if (vm_dev->version == 1)
+> +		dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32 + PAGE_SHIFT));
 
-This brings up a point of discussion.  Do we even need the qcom_defconfig any
-more?  Is everyone comfortable with using the multi_v7_defconfig?
+That's a very convoluted way to do this, for version 1 you
+set coherent mask to 64 then override it.
+why not
 
-Aside from size of the image, i can't think of any other reason to keep around
-the separate qcom file.
+if (vm_dev->version == 1) {
+	dma_set_mask
+	dma_set_coherent_mask
+} else {
+	dma_set_mask_and_coherent
+}
 
+if (rc)
+	dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
 
-Regards,
-Andy
+> +	if (rc)
+> +		dev_warn(&pdev->dev, "Failed to enable 64-bit or 32-bit DMA.  Trying to continue, but this might not work.\n");
+> +
+
+is there a chance it actually still might work?
+
+>  	platform_set_drvdata(pdev, vm_dev);
+>  
+>  	return register_virtio_device(&vm_dev->vdev);
+> -- 
+> 2.10.2.dirty
