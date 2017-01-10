@@ -1,58 +1,28 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 10 Jan 2017 14:38:32 -0300
-Subject: [PATCH v2 3/3] arm64: dts: exynos: Remove unneeded unit names in
- Exynos5433 nodes
-In-Reply-To: <1484069912-6534-1-git-send-email-javier@osg.samsung.com>
-References: <1484069912-6534-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1484069912-6534-4-git-send-email-javier@osg.samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 10 Jan 2017 17:43:11 +0000
+Subject: [PATCH v3 00/10] perf: arm64: Support for Hisilicon SoC Hardware
+ event counters
+In-Reply-To: <1483339672-23778-1-git-send-email-anurup.m@huawei.com>
+References: <1483339672-23778-1-git-send-email-anurup.m@huawei.com>
+Message-ID: <20170110174311.GB24036@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "samsung,exynos5433-mipi-video-phy" and "samsung,exynos5250-dwusb3"
-DT bindings don't specify a reg property for these nodes, so having a
-unit name leads to the following DTC warnings:
+Hi,
 
-Node /soc/video-phy at 105c0710 has a unit name, but no reg property
-Node /soc/usb at 15400000 has a unit name, but no reg property
-Node /soc/usb at 15a00000 has a unit name, but no reg property
+On Mon, Jan 02, 2017 at 01:47:52AM -0500, Anurup M wrote:
+> ToDo:
+> 1) The counter overflow handling is currently unsupported in this
+>    patch series.
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>From a quick scan of the patches, I see mention of an interrupt in a
+comment the driver, but there's noething in the DT binding.
 
----
+Is there an overflow interrupt at all?
 
- arch/arm64/boot/dts/exynos/exynos5433.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Or do you need to implement polling to avoid overflow?
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-index 3695ddaf2e04..17e5dafd392c 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-@@ -706,7 +706,7 @@
- 			interrupts = <GIC_PPI 9 0xf04>;
- 		};
- 
--		mipi_phy: video-phy at 105c0710 {
-+		mipi_phy: video-phy {
- 			compatible = "samsung,exynos5433-mipi-video-phy";
- 			#phy-cells = <1>;
- 			samsung,pmu-syscon = <&pmu_system_controller>;
-@@ -1285,7 +1285,7 @@
- 			status = "disabled";
- 		};
- 
--		usbdrd30: usb at 15400000  {
-+		usbdrd30: usb-0  {
- 			compatible = "samsung,exynos5250-dwusb3";
- 			clocks = <&cmu_fsys CLK_ACLK_USBDRD30>,
- 				<&cmu_fsys CLK_SCLK_USBDRD30>;
-@@ -1332,7 +1332,7 @@
- 			status = "disabled";
- 		};
- 
--		usbhost30: usb at 15a00000 {
-+		usbhost30: usb-1 {
- 			compatible = "samsung,exynos5250-dwusb3";
- 			clocks = <&cmu_fsys CLK_ACLK_USBHOST30>,
- 				<&cmu_fsys CLK_SCLK_USBHOST30>;
--- 
-2.7.4
+This is a prerequisite for merging the driver.
+
+Thanks,
+Mark.
