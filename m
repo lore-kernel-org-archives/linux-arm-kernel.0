@@ -1,73 +1,64 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 10 Jan 2017 11:49:03 -0800
-Subject: [PATCH] of: alloc anywhere from memblock if range not specified
-In-Reply-To: <717b117d-9b8b-d4e9-6135-3c52afd635c8@gmail.com>
-References: <1456148744-7583-1-git-send-email-vinmenon@codeaurora.org>
- <717b117d-9b8b-d4e9-6135-3c52afd635c8@gmail.com>
-Message-ID: <ec66df44-3997-cfae-8f44-a46b16da896b@redhat.com>
+From: nwatters@codeaurora.org (Nate Watterson)
+Date: Tue, 10 Jan 2017 14:47:13 -0500
+Subject: [PATCH] iommu/arm-smmu-v3: limit use of 2-level stream tables
+In-Reply-To: <20161220102209.GC10132@arm.com>
+References: <20161220102209.GC10132@arm.com>
+Message-ID: <1484077633-18376-1-git-send-email-nwatters@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2017 08:16 AM, Leonard Crestez wrote:
-> Hello,
-> 
-> I have some trouble with this patch.
-> 
-> It seems the intention is to allow CMA to be placed in highmem. If the CMA area is
-> larger than highmem and no alloc-ranges is specified (just a size) it is possible
-> to end up allocating a area that spans from multiple zones. This later breaks
-> checks in cma_activate_area and makes most dma allocations fail.
-> 
-> Am I missing something or this a bug?
-> 
+In the current arm-smmu-v3 driver, all smmus that support 2-level
+stream tables are being forced to use them. This is suboptimal for
+smmus that support fewer stream id bits than would fill in a single
+second level table. This patch limits the use of 2-level tables to
+smmus that both support the feature and whose first level table can
+possibly contain more than a single entry.
 
-This has been discussed in previous threads
+Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
+---
+ drivers/iommu/arm-smmu-v3.c | 21 ++++++++++-----------
+ 1 file changed, 10 insertions(+), 11 deletions(-)
 
-https://marc.info/?l=linux-kernel&m=147990760506179&w=2
-https://marc.info/?l=linux-kernel&m=147928325113103&w=2
-
-I haven't seen any follow up since then though.
-
-> On Mon, Feb 22, 2016 at 3:45 PM, Vinayak Menon <vinmenon@codeaurora.org> wrote:
->>
->> early_init_dt_alloc_reserved_memory_arch passes end as 0 to
->> __memblock_alloc_base, when limits are not specified. But
->> __memblock_alloc_base takes end value of 0 as MEMBLOCK_ALLOC_ACCESSIBLE
->> and limits the end to memblock.current_limit. This results in regions
->> never being placed in HIGHMEM area, for e.g. CMA.
->> Let __memblock_alloc_base allocate from anywhere in memory if limits are
->> not specified.
->>
->> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> Signed-off-by: Vinayak Menon <vinmenon@codeaurora.org>
->> ---
->>  drivers/of/of_reserved_mem.c | 4 +++-
->>  1 file changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
->> index 1a3556a..ed01c01 100644
->> --- a/drivers/of/of_reserved_mem.c
->> +++ b/drivers/of/of_reserved_mem.c
->> @@ -32,11 +32,13 @@ int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
->>         phys_addr_t align, phys_addr_t start, phys_addr_t end, bool nomap,
->>         phys_addr_t *res_base)
->>  {
->> +       phys_addr_t base;
->>         /*
->>          * We use __memblock_alloc_base() because memblock_alloc_base()
->>          * panic()s on allocation failure.
->>          */
->> -       phys_addr_t base = __memblock_alloc_base(size, align, end);
->> +       end = !end ? MEMBLOCK_ALLOC_ANYWHERE : end;
->> +       base = __memblock_alloc_base(size, align, end);
->>         if (!base)
->>                 return -ENOMEM;
->>
->> -- 
->> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a
->> member of the Code Aurora Forum, hosted by The Linux Foundation
->>
-> -- 
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 4d6ec44..7d1a7e5 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1983,17 +1983,9 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
+ 	u32 size, l1size;
+ 	struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
+ 
+-	/*
+-	 * If we can resolve everything with a single L2 table, then we
+-	 * just need a single L1 descriptor. Otherwise, calculate the L1
+-	 * size, capped to the SIDSIZE.
+-	 */
+-	if (smmu->sid_bits < STRTAB_SPLIT) {
+-		size = 0;
+-	} else {
+-		size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
+-		size = min(size, smmu->sid_bits - STRTAB_SPLIT);
+-	}
++	/* Calculate the L1 size, capped to the SIDSIZE. */
++	size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
++	size = min(size, smmu->sid_bits - STRTAB_SPLIT);
+ 	cfg->num_l1_ents = 1 << size;
+ 
+ 	size += STRTAB_SPLIT;
+@@ -2504,6 +2496,13 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
+ 	smmu->ssid_bits = reg >> IDR1_SSID_SHIFT & IDR1_SSID_MASK;
+ 	smmu->sid_bits = reg >> IDR1_SID_SHIFT & IDR1_SID_MASK;
+ 
++	/*
++	 * If the SMMU supports fewer bits than would fill a single L2 stream
++	 * table, use a linear table instead.
++	 */
++	if (smmu->sid_bits <= STRTAB_SPLIT)
++		smmu->features &= ~ARM_SMMU_FEAT_2_LVL_STRTAB;
++
+ 	/* IDR5 */
+ 	reg = readl_relaxed(smmu->base + ARM_SMMU_IDR5);
+ 
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux
+Foundation Collaborative Project.
