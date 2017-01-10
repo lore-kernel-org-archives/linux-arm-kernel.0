@@ -1,58 +1,56 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 10 Jan 2017 13:35:39 -0800
-Subject: [PATCHv7 00/11] CONFIG_DEBUG_VIRTUAL for arm64
-Message-ID: <1484084150-1523-1-git-send-email-labbott@redhat.com>
+Date: Tue, 10 Jan 2017 13:35:41 -0800
+Subject: [PATCHv7 02/11] mm/cma: Cleanup highmem check
+In-Reply-To: <1484084150-1523-1-git-send-email-labbott@redhat.com>
+References: <1484084150-1523-1-git-send-email-labbott@redhat.com>
+Message-ID: <1484084150-1523-3-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-This is v7 of the patches to add CONFIG_DEBUG_VIRTUAL for arm64. This is
-a simple reordering of patches from v6 per request of Will Deacon for ease
-of merging support for arm which depends on this series.
+6b101e2a3ce4 ("mm/CMA: fix boot regression due to physical address of
+high_memory") added checks to use __pa_nodebug on x86 since
+CONFIG_DEBUG_VIRTUAL complains about high_memory not being linearlly
+mapped. arm64 is now getting support for CONFIG_DEBUG_VIRTUAL as well.
+Rather than add an explosion of arches to the #ifdef, switch to an
+alternate method to calculate the physical start of highmem using
+the page before highmem starts. This avoids the need for the #ifdef and
+extra __pa_nodebug calls.
 
-Laura Abbott (11):
-  lib/Kconfig.debug: Add ARCH_HAS_DEBUG_VIRTUAL
-  mm/cma: Cleanup highmem check
-  mm: Introduce lm_alias
-  kexec: Switch to __pa_symbol
-  mm/kasan: Switch to using __pa_symbol and lm_alias
-  mm/usercopy: Switch to using lm_alias
-  drivers: firmware: psci: Use __pa_symbol for kernel symbol
-  arm64: Move some macros under #ifndef __ASSEMBLY__
-  arm64: Add cast for virt_to_pfn
-  arm64: Use __pa_symbol for kernel symbols
-  arm64: Add support for CONFIG_DEBUG_VIRTUAL
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Laura Abbott <labbott@redhat.com>
+---
+ mm/cma.c | 15 +++++----------
+ 1 file changed, 5 insertions(+), 10 deletions(-)
 
- arch/arm64/Kconfig                        |  1 +
- arch/arm64/include/asm/kvm_mmu.h          |  4 +-
- arch/arm64/include/asm/memory.h           | 66 +++++++++++++++++++++----------
- arch/arm64/include/asm/mmu_context.h      |  6 +--
- arch/arm64/include/asm/pgtable.h          |  2 +-
- arch/arm64/kernel/acpi_parking_protocol.c |  3 +-
- arch/arm64/kernel/cpu-reset.h             |  2 +-
- arch/arm64/kernel/cpufeature.c            |  3 +-
- arch/arm64/kernel/hibernate.c             | 20 +++-------
- arch/arm64/kernel/insn.c                  |  2 +-
- arch/arm64/kernel/psci.c                  |  3 +-
- arch/arm64/kernel/setup.c                 |  9 +++--
- arch/arm64/kernel/smp_spin_table.c        |  3 +-
- arch/arm64/kernel/vdso.c                  |  8 +++-
- arch/arm64/mm/Makefile                    |  2 +
- arch/arm64/mm/init.c                      | 12 +++---
- arch/arm64/mm/kasan_init.c                | 22 +++++++----
- arch/arm64/mm/mmu.c                       | 33 ++++++++++------
- arch/arm64/mm/physaddr.c                  | 30 ++++++++++++++
- arch/x86/Kconfig                          |  1 +
- drivers/firmware/psci.c                   |  2 +-
- include/linux/mm.h                        |  4 ++
- kernel/kexec_core.c                       |  2 +-
- lib/Kconfig.debug                         |  5 ++-
- mm/cma.c                                  | 15 +++----
- mm/kasan/kasan_init.c                     | 15 +++----
- mm/usercopy.c                             |  4 +-
- 27 files changed, 180 insertions(+), 99 deletions(-)
- create mode 100644 arch/arm64/mm/physaddr.c
-
+diff --git a/mm/cma.c b/mm/cma.c
+index c960459..94b3460 100644
+--- a/mm/cma.c
++++ b/mm/cma.c
+@@ -235,18 +235,13 @@ int __init cma_declare_contiguous(phys_addr_t base,
+ 	phys_addr_t highmem_start;
+ 	int ret = 0;
+ 
+-#ifdef CONFIG_X86
+ 	/*
+-	 * high_memory isn't direct mapped memory so retrieving its physical
+-	 * address isn't appropriate.  But it would be useful to check the
+-	 * physical address of the highmem boundary so it's justifiable to get
+-	 * the physical address from it.  On x86 there is a validation check for
+-	 * this case, so the following workaround is needed to avoid it.
++	 * We can't use __pa(high_memory) directly, since high_memory
++	 * isn't a valid direct map VA, and DEBUG_VIRTUAL will (validly)
++	 * complain. Find the boundary by adding one to the last valid
++	 * address.
+ 	 */
+-	highmem_start = __pa_nodebug(high_memory);
+-#else
+-	highmem_start = __pa(high_memory);
+-#endif
++	highmem_start = __pa(high_memory - 1) + 1;
+ 	pr_debug("%s(size %pa, base %pa, limit %pa alignment %pa)\n",
+ 		__func__, &size, &base, &limit, &alignment);
+ 
 -- 
 2.7.4
