@@ -1,125 +1,388 @@
-From: john@phrozen.org (John Crispin)
-Date: Tue, 10 Jan 2017 11:18:51 +0100
-Subject: [PATCH 0/4] ARM: dts: mt7623: Add initial Geek Force support
-In-Reply-To: <d6bd3783-d124-9871-d3b4-93e366517895@suse.de>
-References: <20170108133100.10428-1-afaerber@suse.de>
- <91f5ec74-1aa1-f2ad-24e9-14267cbe8498@phrozen.org>
- <d6bd3783-d124-9871-d3b4-93e366517895@suse.de>
-Message-ID: <3fecb422-8185-7ee0-c203-2bfdc4fd1393@phrozen.org>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 10 Jan 2017 11:21:25 +0100
+Subject: [PATCH 4/4] dt-bindings: mfd: Add STM32F7 RCC numeric constants
+ into DT include file
+In-Reply-To: <1483711165-17149-5-git-send-email-gabriel.fernandez@st.com>
+References: <1483711165-17149-1-git-send-email-gabriel.fernandez@st.com>
+ <1483711165-17149-5-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <59ec2422-b892-3f36-196f-1ec2ee11b3cc@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(resend, hit the wrong reply button)
+Hi Gabriel
 
-On 10/01/2017 10:48, Andreas F?rber wrote:
-> Hi,
+On 01/06/2017 02:59 PM, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
 >
-> Am 10.01.2017 um 08:00 schrieb John Crispin:
->> On 08/01/2017 14:30, Andreas F?rber wrote:
->>>
->>> Andreas F?rber (4):
->>>   Documentation: devicetree: Add vendor prefix for AsiaRF
->>>   Documentation: devicetree: arm: mediatek: Add Geek Force board
->>>   ARM: dts: mt7623: Add Geek Force config
->>>   MAINTAINERS: Extend ARM/Mediatek SoC support section
->>>
->>
->> Hi,
->>
->> i need to NAK this series. the asiarf board is nothing more than the
->> official MTK EVB with AsiaRF written on it. this board is already
->> supported by linux (arch/arm/boot/dts/mt7623-evb.dts) please extend the
->> EVB dts file nstead of adding a duplicate and letting the original
-bitrot.
+> This patch lists STM32F7's RCC numeric constants.
+> It will be used by clock and reset drivers, and DT bindings.
 >
-> Well, I disagree.
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-reading the rest of the email you seem to be quite agro about this.
+can you please split this commit ? (one part for binding and another for DT)
 
+Thanks in advance
+Alex
+
+
+> ---
+>  arch/arm/boot/dts/stm32f746.dtsi      |  51 ++++++++--------
+>  include/dt-bindings/mfd/stm32f7-rcc.h | 112 ++++++++++++++++++++++++++++++++++
+>  2 files changed, 138 insertions(+), 25 deletions(-)
+>  create mode 100644 include/dt-bindings/mfd/stm32f7-rcc.h
 >
-> First of all I'm not letting "the original" bitrot, because I have
-> nothing to do with that .dts! If anyone is to blame for letting it
-> bitrot since February 2016, pick your own nose:
+> diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
+> index e05e131..09d6649 100644
+> --- a/arch/arm/boot/dts/stm32f746.dtsi
+> +++ b/arch/arm/boot/dts/stm32f746.dtsi
+> @@ -44,6 +44,7 @@
+>  #include "armv7-m.dtsi"
+>  #include <dt-bindings/pinctrl/stm32f746-pinfunc.h>
+>  #include <dt-bindings/clock/stm32fx-clock.h>
+> +#include <dt-bindings/mfd/stm32f7-rcc.h>
 >
+>  / {
+>  	clocks {
+> @@ -77,7 +78,7 @@
+>  			compatible = "st,stm32-timer";
+>  			reg = <0x40000000 0x400>;
+>  			interrupts = <28>;
+> -			clocks = <&rcc 0 128>;
+> +			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM2)>;
+>  			status = "disabled";
+>  		};
 >
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/log/arch/arm/boot/dts/mt7623-evb.dts
-
-what should i pick my nose about ? i made mt7623 work, then waited for
-4.10-rc1 to be out for clk-mt2701 so that i can continue adding the
-missing support
-
-
-> Second, I have no Mediatek documentation or even picture to identify any
-> similarities between my board and that Mediatek EVB, so no, I can't hack
-> on the -evb.dts file. I wrote my .dts from scratch, not even having
-> access to /proc/device-tree on its 3.10 kernel for comparison.
-
-ok, that info is most likely under NDA
-
+> @@ -85,7 +86,7 @@
+>  			compatible = "st,stm32-timer";
+>  			reg = <0x40000400 0x400>;
+>  			interrupts = <29>;
+> -			clocks = <&rcc 0 129>;
+> +			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM3)>;
+>  			status = "disabled";
+>  		};
 >
-> Third, by your argumentation we shouldn't be adding, e.g., Odroid .dts
-> files either because they were based on a Samsung SMDK, or .dts files
-> for Amlogic TV boxes because they're almost identical to reference
-> designs, etc.
-> Users need to know which .dts file to choose, so having a sane .dts
-> filename is warranted. Depending on how similar they are, one could
-> either #include the -evb.dts or factor out a shared .dtsi, but that
-> takes us back to the previous point of hardly anyone having access to
-> EVB information to identify such a subset. Therefore duplicating trivial
-> nodes is the method of choice for all practical purposes - mt7623.dtsi
-> is getting reused just fine.
+> @@ -93,7 +94,7 @@
+>  			compatible = "st,stm32-timer";
+>  			reg = <0x40000800 0x400>;
+>  			interrupts = <30>;
+> -			clocks = <&rcc 0 130>;
+> +			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM4)>;
+>  			status = "disabled";
+>  		};
 >
-
-in that case add a dtsi file for the EVB and include it in your geek
-board.dts and only update the compat string.
-
-> Comparing our two .dts files, mine has two more UART nodes enabled, the
-> U-Boot bootloader's baudrate set to actually get serial output, a
-> different board compatible string for identification, and I chose the
-> new dual-licensing header that is being requested for new DT files.
-
-1) at the time we adde this the uart support was not ready
-2) the bootloader i am using is a custom built one hence the random baudrate
-3) you can just updae the license if you want to, no problem
-
-> For lack of schematics I figured out UART1 by testing - continuity tests
-> for GND, console=ttySx,115200n8 and trial-and-error for RX/TX. Obviously
-> I can't do that for a board I don't have access to.
-> UART2 and UART0 pins were clear, but only UART2 was obvious from ttyMT2.
-
-you do have the EVB directly in front of you
-
-> Do you actually have access to a Geek Force board yourself, or what are
-> you basing your claims on? Mine looks different from the Indiegogo
-> picture and thus has different identification from that on
-> https://wikidevi.com/wiki/AsiaRF_WS2977 (WS3301, MT7623N RFB_V10).
-
-i dont need the geek board as i have the EVB and they are identical
-according to MTK
-
-> If you confirm the EVB's baudrate I can happily send that part your way.
-> I've seen 921600 on the Helio X20 96board for instance.
-
-see above
-
-> Also, none of what you've said justifies NAK'ing patch 4/4, which
-> applies to any mt7* and arm64 .dts, including yours.
-
-agreed, i never even mentioned 4/4
-
-> While we're at it, I noticed that mainline has a "mediatek,mt7623-eth"
-> network driver but no corresponding .dtsi node. Talk about bitrot...
-
-the idea is that we work together to make thins optimal. this is not a
-you or is right. this is about the FOSS peer review process. please dont
-be so agro.
-
-to me it seems suboptimal to support 2 dts files for the same board.
-
-	John
-
-
+> @@ -101,14 +102,14 @@
+>  			compatible = "st,stm32-timer";
+>  			reg = <0x40000c00 0x400>;
+>  			interrupts = <50>;
+> -			clocks = <&rcc 0 131>;
+> +			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM5)>;
+>  		};
 >
-> Regards,
-> Andreas
+>  		timer6: timer at 40001000 {
+>  			compatible = "st,stm32-timer";
+>  			reg = <0x40001000 0x400>;
+>  			interrupts = <54>;
+> -			clocks = <&rcc 0 132>;
+> +			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM6)>;
+>  			status = "disabled";
+>  		};
+>
+> @@ -116,7 +117,7 @@
+>  			compatible = "st,stm32-timer";
+>  			reg = <0x40001400 0x400>;
+>  			interrupts = <55>;
+> -			clocks = <&rcc 0 133>;
+> +			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM7)>;
+>  			status = "disabled";
+>  		};
+>
+> @@ -124,7 +125,7 @@
+>  			compatible = "st,stm32f7-usart", "st,stm32f7-uart";
+>  			reg = <0x40004400 0x400>;
+>  			interrupts = <38>;
+> -			clocks =  <&rcc 0 145>;
+> +			clocks = <&rcc 1 CLK_USART2>;
+>  			status = "disabled";
+>  		};
+>
+> @@ -132,7 +133,7 @@
+>  			compatible = "st,stm32f7-usart", "st,stm32f7-uart";
+>  			reg = <0x40004800 0x400>;
+>  			interrupts = <39>;
+> -			clocks = <&rcc 0 146>;
+> +			clocks = <&rcc 1 CLK_USART3>;
+>  			status = "disabled";
+>  		};
+>
+> @@ -140,7 +141,7 @@
+>  			compatible = "st,stm32f7-uart";
+>  			reg = <0x40004c00 0x400>;
+>  			interrupts = <52>;
+> -			clocks = <&rcc 0 147>;
+> +			clocks = <&rcc 1 CLK_UART4>;
+>  			status = "disabled";
+>  		};
+>
+> @@ -148,7 +149,7 @@
+>  			compatible = "st,stm32f7-uart";
+>  			reg = <0x40005000 0x400>;
+>  			interrupts = <53>;
+> -			clocks = <&rcc 0 148>;
+> +			clocks = <&rcc 1 CLK_UART5>;
+>  			status = "disabled";
+>  		};
+>
+> @@ -156,7 +157,7 @@
+>  			compatible = "st,stm32f7-usart", "st,stm32f7-uart";
+>  			reg = <0x40007800 0x400>;
+>  			interrupts = <82>;
+> -			clocks = <&rcc 0 158>;
+> +			clocks = <&rcc 1 CLK_UART7>;
+>  			status = "disabled";
+>  		};
+>
+> @@ -164,7 +165,7 @@
+>  			compatible = "st,stm32f7-usart", "st,stm32f7-uart";
+>  			reg = <0x40007c00 0x400>;
+>  			interrupts = <83>;
+> -			clocks = <&rcc 0 159>;
+> +			clocks = <&rcc 1 CLK_UART8>;
+>  			status = "disabled";
+>  		};
+>
+> @@ -172,7 +173,7 @@
+>  			compatible = "st,stm32f7-usart", "st,stm32f7-uart";
+>  			reg = <0x40011000 0x400>;
+>  			interrupts = <37>;
+> -			clocks = <&rcc 0 164>;
+> +			clocks = <&rcc 1 CLK_USART1>;
+>  			status = "disabled";
+>  		};
+>
+> @@ -180,7 +181,7 @@
+>  			compatible = "st,stm32f7-usart", "st,stm32f7-uart";
+>  			reg = <0x40011400 0x400>;
+>  			interrupts = <71>;
+> -			clocks = <&rcc 0 165>;
+> +			clocks = <&rcc 1 CLK_USART6>;
+>  			status = "disabled";
+>  		};
+>
+> @@ -215,7 +216,7 @@
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+>  				reg = <0x0 0x400>;
+> -				clocks = <&rcc 0 256>;
+> +				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOA)>;
+>  				st,bank-name = "GPIOA";
+>  			};
+>
+> @@ -223,7 +224,7 @@
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+>  				reg = <0x400 0x400>;
+> -				clocks = <&rcc 0 257>;
+> +				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOB)>;
+>  				st,bank-name = "GPIOB";
+>  			};
+>
+> @@ -231,7 +232,7 @@
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+>  				reg = <0x800 0x400>;
+> -				clocks = <&rcc 0 258>;
+> +				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOC)>;
+>  				st,bank-name = "GPIOC";
+>  			};
+>
+> @@ -239,7 +240,7 @@
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+>  				reg = <0xc00 0x400>;
+> -				clocks = <&rcc 0 259>;
+> +				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOD)>;
+>  				st,bank-name = "GPIOD";
+>  			};
+>
+> @@ -247,7 +248,7 @@
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+>  				reg = <0x1000 0x400>;
+> -				clocks = <&rcc 0 260>;
+> +				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOE)>;
+>  				st,bank-name = "GPIOE";
+>  			};
+>
+> @@ -255,7 +256,7 @@
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+>  				reg = <0x1400 0x400>;
+> -				clocks = <&rcc 0 261>;
+> +				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOF)>;
+>  				st,bank-name = "GPIOF";
+>  			};
+>
+> @@ -263,7 +264,7 @@
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+>  				reg = <0x1800 0x400>;
+> -				clocks = <&rcc 0 262>;
+> +				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOG)>;
+>  				st,bank-name = "GPIOG";
+>  			};
+>
+> @@ -271,7 +272,7 @@
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+>  				reg = <0x1c00 0x400>;
+> -				clocks = <&rcc 0 263>;
+> +				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOH)>;
+>  				st,bank-name = "GPIOH";
+>  			};
+>
+> @@ -279,7 +280,7 @@
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+>  				reg = <0x2000 0x400>;
+> -				clocks = <&rcc 0 264>;
+> +				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOI)>;
+>  				st,bank-name = "GPIOI";
+>  			};
+>
+> @@ -287,7 +288,7 @@
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+>  				reg = <0x2400 0x400>;
+> -				clocks = <&rcc 0 265>;
+> +				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOJ)>;
+>  				st,bank-name = "GPIOJ";
+>  			};
+>
+> @@ -295,7 +296,7 @@
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+>  				reg = <0x2800 0x400>;
+> -				clocks = <&rcc 0 266>;
+> +				clocks = <&rcc 0 STM32F7_AHB1_CLOCK(GPIOK)>;
+>  				st,bank-name = "GPIOK";
+>  			};
+>
+> diff --git a/include/dt-bindings/mfd/stm32f7-rcc.h b/include/dt-bindings/mfd/stm32f7-rcc.h
+> new file mode 100644
+> index 0000000..e36cc69
+> --- /dev/null
+> +++ b/include/dt-bindings/mfd/stm32f7-rcc.h
+> @@ -0,0 +1,112 @@
+> +/*
+> + * This header provides constants for the STM32F7 RCC IP
+> + */
+> +
+> +#ifndef _DT_BINDINGS_MFD_STM32F7_RCC_H
+> +#define _DT_BINDINGS_MFD_STM32F7_RCC_H
+> +
+> +/* AHB1 */
+> +#define STM32F7_RCC_AHB1_GPIOA		0
+> +#define STM32F7_RCC_AHB1_GPIOB		1
+> +#define STM32F7_RCC_AHB1_GPIOC		2
+> +#define STM32F7_RCC_AHB1_GPIOD		3
+> +#define STM32F7_RCC_AHB1_GPIOE		4
+> +#define STM32F7_RCC_AHB1_GPIOF		5
+> +#define STM32F7_RCC_AHB1_GPIOG		6
+> +#define STM32F7_RCC_AHB1_GPIOH		7
+> +#define STM32F7_RCC_AHB1_GPIOI		8
+> +#define STM32F7_RCC_AHB1_GPIOJ		9
+> +#define STM32F7_RCC_AHB1_GPIOK		10
+> +#define STM32F7_RCC_AHB1_CRC		12
+> +#define STM32F7_RCC_AHB1_BKPSRAM	18
+> +#define STM32F7_RCC_AHB1_DTCMRAM	20
+> +#define STM32F7_RCC_AHB1_DMA1		21
+> +#define STM32F7_RCC_AHB1_DMA2		22
+> +#define STM32F7_RCC_AHB1_DMA2D		23
+> +#define STM32F7_RCC_AHB1_ETHMAC		25
+> +#define STM32F7_RCC_AHB1_ETHMACTX	26
+> +#define STM32F7_RCC_AHB1_ETHMACRX	27
+> +#define STM32FF_RCC_AHB1_ETHMACPTP	28
+> +#define STM32F7_RCC_AHB1_OTGHS		29
+> +#define STM32F7_RCC_AHB1_OTGHSULPI	30
+> +
+> +#define STM32F7_AHB1_RESET(bit) (STM32F7_RCC_AHB1_##bit + (0x10 * 8))
+> +#define STM32F7_AHB1_CLOCK(bit) (STM32F7_RCC_AHB1_##bit)
+> +
+> +
+> +/* AHB2 */
+> +#define STM32F7_RCC_AHB2_DCMI		0
+> +#define STM32F7_RCC_AHB2_CRYP		4
+> +#define STM32F7_RCC_AHB2_HASH		5
+> +#define STM32F7_RCC_AHB2_RNG		6
+> +#define STM32F7_RCC_AHB2_OTGFS		7
+> +
+> +#define STM32F7_AHB2_RESET(bit)	(STM32F7_RCC_AHB2_##bit + (0x14 * 8))
+> +#define STM32F7_AHB2_CLOCK(bit)	(STM32F7_RCC_AHB2_##bit + 0x20)
+> +
+> +/* AHB3 */
+> +#define STM32F7_RCC_AHB3_FMC		0
+> +#define STM32F7_RCC_AHB3_QSPI		1
+> +
+> +#define STM32F7_AHB3_RESET(bit)	(STM32F7_RCC_AHB3_##bit + (0x18 * 8))
+> +#define STM32F7_AHB3_CLOCK(bit)	(STM32F7_RCC_AHB3_##bit + 0x40)
+> +
+> +/* APB1 */
+> +#define STM32F7_RCC_APB1_TIM2		0
+> +#define STM32F7_RCC_APB1_TIM3		1
+> +#define STM32F7_RCC_APB1_TIM4		2
+> +#define STM32F7_RCC_APB1_TIM5		3
+> +#define STM32F7_RCC_APB1_TIM6		4
+> +#define STM32F7_RCC_APB1_TIM7		5
+> +#define STM32F7_RCC_APB1_TIM12		6
+> +#define STM32F7_RCC_APB1_TIM13		7
+> +#define STM32F7_RCC_APB1_TIM14		8
+> +#define STM32F7_RCC_APB1_LPTIM1		9
+> +#define STM32F7_RCC_APB1_WWDG		11
+> +#define STM32F7_RCC_APB1_SPI2		14
+> +#define STM32F7_RCC_APB1_SPI3		15
+> +#define STM32F7_RCC_APB1_SPDIFRX	16
+> +#define STM32F7_RCC_APB1_UART2		17
+> +#define STM32F7_RCC_APB1_UART3		18
+> +#define STM32F7_RCC_APB1_UART4		19
+> +#define STM32F7_RCC_APB1_UART5		20
+> +#define STM32F7_RCC_APB1_I2C1		21
+> +#define STM32F7_RCC_APB1_I2C2		22
+> +#define STM32F7_RCC_APB1_I2C3		23
+> +#define STM32F7_RCC_APB1_I2C4		24
+> +#define STM32F7_RCC_APB1_CAN1		25
+> +#define STM32F7_RCC_APB1_CAN2		26
+> +#define STM32F7_RCC_APB1_CEC		27
+> +#define STM32F7_RCC_APB1_PWR		28
+> +#define STM32F7_RCC_APB1_DAC		29
+> +#define STM32F7_RCC_APB1_UART7		30
+> +#define STM32F7_RCC_APB1_UART8		31
+> +
+> +#define STM32F7_APB1_RESET(bit)	(STM32F7_RCC_APB1_##bit + (0x20 * 8))
+> +#define STM32F7_APB1_CLOCK(bit)	(STM32F7_RCC_APB1_##bit + 0x80)
+> +
+> +/* APB2 */
+> +#define STM32F7_RCC_APB2_TIM1		0
+> +#define STM32F7_RCC_APB2_TIM8		1
+> +#define STM32F7_RCC_APB2_USART1		4
+> +#define STM32F7_RCC_APB2_USART6		5
+> +#define STM32F7_RCC_APB2_ADC1		8
+> +#define STM32F7_RCC_APB2_ADC2		9
+> +#define STM32F7_RCC_APB2_ADC3		10
+> +#define STM32F7_RCC_APB2_SDMMC1		11
+> +#define STM32F7_RCC_APB2_SPI1		12
+> +#define STM32F7_RCC_APB2_SPI4		13
+> +#define STM32F7_RCC_APB2_SYSCFG		14
+> +#define STM32F7_RCC_APB2_TIM9		16
+> +#define STM32F7_RCC_APB2_TIM10		17
+> +#define STM32F7_RCC_APB2_TIM11		18
+> +#define STM32F7_RCC_APB2_SPI5		20
+> +#define STM32F7_RCC_APB2_SPI6		21
+> +#define STM32F7_RCC_APB2_SAI1		22
+> +#define STM32F7_RCC_APB2_SAI2		23
+> +#define STM32F7_RCC_APB2_LTDC		26
+> +
+> +#define STM32F7_APB2_RESET(bit)	(STM32F7_RCC_APB2_##bit + (0x24 * 8))
+> +#define STM32F7_APB2_CLOCK(bit)	(STM32F7_RCC_APB2_##bit + 0xA0)
+> +
+> +#endif /* _DT_BINDINGS_MFD_STM32F7_RCC_H */
 >
