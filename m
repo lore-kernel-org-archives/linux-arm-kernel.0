@@ -1,104 +1,123 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Tue, 10 Jan 2017 08:07:20 +0100
-Subject: NVMe vs DMA addressing limitations
-In-Reply-To: <e084dbad-29ab-25bd-5e17-da0fcd92f7ac@cogentembedded.com>
-References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
- <2723285.JORgusvJv4@wuerfel>
- <9a03c05d-ad4c-0547-d1fe-01edb8b082d6@cogentembedded.com>
- <6374144.HVL0QxNJiT@wuerfel>
- <b50e25af-3936-d22d-2e9b-5bf6be19c800@cogentembedded.com>
- <20170109205746.GA6274@lst.de>
- <e084dbad-29ab-25bd-5e17-da0fcd92f7ac@cogentembedded.com>
-Message-ID: <20170110070719.GA17208@lst.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 10 Jan 2017 08:12:35 +0100
+Subject: [PATCH v3 0/4] DMA Engine: switch PL330 driver to non-irq-safe runtime
+ PM
+References: <CGME20170110071342eucas1p1fe5a031bb1e32b7a3b5081f2938f3465@eucas1p1.samsung.com>
+Message-ID: <1484032359-8311-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 09:47:21AM +0300, Nikita Yushchenko wrote:
-> I'm now working with HW that:
-> - is now way "low end" or "obsolete", it has 4G of RAM and 8 CPU cores,
-> and is being manufactured and developed,
-> - has 75% of it's RAM located beyond first 4G of address space,
-> - can't physically handle incoming PCIe transactions addressed to memory
-> beyond 4G.
+Hello,
 
-It might not be low end or obselete, but it's absolutely braindead.
-Your I/O performance will suffer badly for the life of the platform
-because someone tries to save 2 cents, and there is not much we can do
-about it.
+This patchset changes the way the runtime PM is implemented in the PL330 DMA
+engine driver. The main goal of such change is to add support for the audio
+power domain to Exynos5 SoCs (5250, 542x, 5433, probably others) and let
+it to be properly turned off, when no audio is being used. Switching to
+non-irq-safe runtime PM is required to properly let power domain to be
+turned off (irq-safe runtime PM keeps power domain turned on all the time)
+and to integrate with clock controller's runtime PM (this cannot be
+workarounded any other way, PL330 uses clocks from the controller, which
+belongs to the same power domain).
 
-> (1) it constantly runs of swiotlb space, logs are full of warnings
-> despite of rate limiting,
+For more details of the proposed change to the PL330 driver see patch #4.
 
-> Per my current understanding, blk-level bounce buffering will at least
-> help with (1) - if done properly it will allocate bounce buffers within
-> entire memory below 4G, not within dedicated swiotlb space (that is
-> small and enlarging it makes memory permanently unavailable for other
-> use).  This looks simple and safe (in sense of not anyhow breaking
-> unrelated use cases).
+Audio power domain on Exynos5 SoCs contains following hardware modules:
+1. clock controller
+2. pin controller
+3. PL330 DMA controller
+4. I2S audio controller
 
-Yes.  Although there is absolutely no reason why swiotlb could not
-do the same.
+Patches for adding or fixing runtime PM for each of the above devices is
+handled separately.
 
-> (2) it runs far suboptimal due to bounce-buffering almost all i/o,
-> despite of lots of free memory in area where direct DMA is possible.
+Runtime PM patches for clock controllers is possible and has been proposed
+in the following thread (pending review): "[PATCH v4 0/4] Add runtime PM
+support for clocks (on Exynos SoC example)",
+http://www.spinics.net/lists/arm-kernel/msg550747.html
 
-> Addressing (2) looks much more difficult because different memory
-> allocation policy is required for that.
+Runtime PM support for Exynos pin controller has been posted in the
+following thread: "[PATCH 0/9] Runtime PM for Exynos pin controller driver",
+http://www.spinics.net/lists/arm-kernel/msg550161.html
 
-It's basically not possible.  Every piece of memory in a Linux
-kernel is a possible source of I/O, and depending on the workload
-type it might even be a the prime source of I/O.
+Exynos I2S driver supports runtime PM, but some fixes were needed for it
+and they are already queued to linux-next.
 
-> > NVMe should never bounce, the fact that it currently possibly does
-> > for highmem pages is a bug.
-> 
-> The entire topic is absolutely not related to highmem (i.e. memory not
-> directly addressable by 32-bit kernel).
+This patchset is based on linux-next from 9th January 2017.
 
-I did not say this affects you, but thanks to your mail I noticed that
-NVMe has a suboptimal setting there.  Also note that highmem does not
-have to imply a 32-bit kernel, just physical memory that is not in the
-kernel mapping.
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
 
-> What we are discussing is hw-originated restriction on where DMA is
-> possible.
 
-Yes, where hw means the SOC, and not the actual I/O device, which is an
-important distinction.
+Changelog:
 
-> > Or even better remove the call to dma_set_mask_and_coherent with
-> > DMA_BIT_MASK(32).  NVMe is designed around having proper 64-bit DMA
-> > addressing, there is not point in trying to pretent it works without that
-> 
-> Are you claiming that NVMe driver in mainline is intentionally designed
-> to not work on HW that can't do DMA to entire 64-bit space?
+v3:
+- removed pl330_filter function as suggested by Arnd Bergmann
+- removed pl330.h from arch/arm/plat-samsung/devs.c
+- fixes some minor style issues pointed by Krzysztof Kozlowski
 
-It is not intenteded to handle the case where the SOC / chipset
-can't handle DMA to all physical memoery, yes.
+v2: https://www.spinics.net/lists/arm-kernel/msg552772.html
+- rebased onto linux next-20170109
+- improved patch description
+- separated patch #3 from #4 (storing a pointer to slave device for each
+  DMA channel) as requested by Krzysztof Kozlowski
 
-> Such setups do exist and there is interest to make them working.
+v1: https://www.spinics.net/lists/arm-kernel/msg550008.html
+- initial version
 
-Sure, but it's not the job of the NVMe driver to work around such a broken
-system.  It's something your architecture code needs to do, maybe with
-a bit of core kernel support.
 
-> Quite a few pages used for block I/O are allocated by filemap code - and
-> at allocation point it is known what inode page is being allocated for.
-> If this inode is from filesystem located on a known device with known
-> DMA limitations, this knowledge can be used to allocate page that can be
-> DMAed directly.
+Patch summary:
 
-But in other cases we might never DMA to it.  Or we rarely DMA to it, say
-for a machine running databses or qemu and using lots of direct I/O. Or
-a storage target using it's local alloc_pages buffers.
+Marek Szyprowski (4):
+  dmaengine: pl330: remove pdata based initialization
+  dmaengine: Forward slave device pointer to of_xlate callback
+  dmaengine: pl330: Store pointer to slave device
+  dmaengine: pl330: Don't require irq-safe runtime PM
 
-> Sure there are lots of cases when at allocation time there is no idea
-> what device will run DMA on page being allocated, or perhaps page is
-> going to be shared, or whatever. Such cases unavoidably require bounce
-> buffers if page ends to be used with device with DMA limitations. But
-> still there are cases when better allocation can remove need for bounce
-> buffers - without any hurt for other cases.
+ arch/arm/plat-samsung/devs.c    |   1 -
+ drivers/dma/amba-pl08x.c        |   2 +-
+ drivers/dma/at_hdmac.c          |   4 +-
+ drivers/dma/at_xdmac.c          |   2 +-
+ drivers/dma/bcm2835-dma.c       |   2 +-
+ drivers/dma/coh901318.c         |   2 +-
+ drivers/dma/cppi41.c            |   2 +-
+ drivers/dma/dma-jz4780.c        |   2 +-
+ drivers/dma/dmaengine.c         |   2 +-
+ drivers/dma/dw/platform.c       |   2 +-
+ drivers/dma/edma.c              |   4 +-
+ drivers/dma/fsl-edma.c          |   2 +-
+ drivers/dma/img-mdc-dma.c       |   2 +-
+ drivers/dma/imx-dma.c           |   2 +-
+ drivers/dma/imx-sdma.c          |   2 +-
+ drivers/dma/k3dma.c             |   2 +-
+ drivers/dma/lpc18xx-dmamux.c    |   2 +-
+ drivers/dma/mmp_pdma.c          |   2 +-
+ drivers/dma/mmp_tdma.c          |   2 +-
+ drivers/dma/moxart-dma.c        |   2 +-
+ drivers/dma/mxs-dma.c           |   2 +-
+ drivers/dma/nbpfaxi.c           |   2 +-
+ drivers/dma/of-dma.c            |  20 +++--
+ drivers/dma/pl330.c             | 178 ++++++++++++++++++----------------------
+ drivers/dma/pxa_dma.c           |   2 +-
+ drivers/dma/qcom/bam_dma.c      |   2 +-
+ drivers/dma/sh/rcar-dmac.c      |   2 +-
+ drivers/dma/sh/shdma-of.c       |   2 +-
+ drivers/dma/sh/usb-dmac.c       |   2 +-
+ drivers/dma/sirf-dma.c          |   2 +-
+ drivers/dma/st_fdma.c           |   2 +-
+ drivers/dma/ste_dma40.c         |   2 +-
+ drivers/dma/stm32-dma.c         |   2 +-
+ drivers/dma/sun4i-dma.c         |   2 +-
+ drivers/dma/sun6i-dma.c         |   2 +-
+ drivers/dma/tegra20-apb-dma.c   |   2 +-
+ drivers/dma/tegra210-adma.c     |   2 +-
+ drivers/dma/xilinx/xilinx_dma.c |   2 +-
+ drivers/dma/xilinx/zynqmp_dma.c |   2 +-
+ drivers/dma/zx_dma.c            |   2 +-
+ include/linux/amba/pl330.h      |  35 --------
+ include/linux/of_dma.h          |  17 ++--
+ 42 files changed, 140 insertions(+), 189 deletions(-)
+ delete mode 100644 include/linux/amba/pl330.h
 
-It takes your max 1GB DMA addressable memoery away from other uses,
-and introduce the crazy highmem VM tuning issues we had with big
-32-bit x86 systems in the past.
+-- 
+1.9.1
