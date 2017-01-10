@@ -1,70 +1,120 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Wed, 11 Jan 2017 01:33:31 +0200
-Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
-In-Reply-To: <4833e705fb6841fbfdbee3b1a21a7bc917292410.1484070340.git.robin.murphy@arm.com>
-References: <85015f1653eb7e36f992708362b75d1f4391b783.1484070340.git.robin.murphy@arm.com>
- <4833e705fb6841fbfdbee3b1a21a7bc917292410.1484070340.git.robin.murphy@arm.com>
-Message-ID: <20170111013046-mutt-send-email-mst@kernel.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 10 Jan 2017 15:34:22 -0800
+Subject: [PATCH 05/62] watchdog: bcm2835_wdt: Convert to use device managed
+ functions and other improvements
+In-Reply-To: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+Message-ID: <1484091325-9199-6-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 05:51:18PM +0000, Robin Murphy wrote:
-> From: Will Deacon <will.deacon@arm.com>
-> 
-> Booting Linux on an ARM fastmodel containing an SMMU emulation results
-> in an unexpected I/O page fault from the legacy virtio-blk PCI device:
-> 
-> [    1.211721] arm-smmu-v3 2b400000.smmu: event 0x10 received:
-> [    1.211800] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
-> [    1.211880] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
-> [    1.211959] arm-smmu-v3 2b400000.smmu:	0x00000008fa081002
-> [    1.212075] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
-> [    1.212155] arm-smmu-v3 2b400000.smmu: event 0x10 received:
-> [    1.212234] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
-> [    1.212314] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
-> [    1.212394] arm-smmu-v3 2b400000.smmu:	0x00000008fa081000
-> [    1.212471] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
-> 
-> <system hangs failing to read partition table>
-> 
-> This is because the virtio-blk is behind an SMMU, so we have consequently
-> swizzled its DMA ops and configured the SMMU to translate accesses. This
-> then requires the vring code to use the DMA API to establish translations,
-> otherwise all transactions will result in fatal faults and termination.
-> 
-> Given that ARM-based systems only see an SMMU if one is really present
-> (the topology is all described by firmware tables such as device-tree or
-> IORT), then we can safely use the DMA API for all virtio devices.
-> 
-> Cc: Andy Lutomirski <luto@kernel.org>
-> Cc: Michael S. Tsirkin <mst@redhat.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Use device managed functions to simplify error handling, reduce
+source code size, improve readability, and reduce the likelyhood of bugs.
+Other improvements as listed below.
 
-I'd like to better understand then need for this one.
-Can't the device in question just set VIRTIO_F_IOMMU_PLATFORM ?
+The conversion was done automatically with coccinelle using the
+following semantic patches. The semantic patches and the scripts used
+to generate this commit log are available at
+https://github.com/groeck/coccinelle-patches
 
-I'd rather we avoided need for more hacks and just
-have everyone switch to that.
+- Drop assignments to otherwise unused variables
+- Replace of_iomap() with platform_get_resource() followed by
+  devm_ioremap_resource()
+- Replace &pdev->dev with dev if 'struct device *dev' is a declared
+  variable
+- Use devm_watchdog_register_driver() to register watchdog device
+- Replace shutdown function with call to watchdog_stop_on_reboot()
 
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Lee Jones <lee@kernel.org>
+Cc: Eric Anholt <eric@anholt.net>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Ray Jui <rjui@broadcom.com>
+Cc: Scott Branden <sbranden@broadcom.com>
+Cc: bcm-kernel-feedback-list at broadcom.com
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+ drivers/watchdog/bcm2835_wdt.c | 27 ++++++++-------------------
+ 1 file changed, 8 insertions(+), 19 deletions(-)
 
-> ---
->  drivers/virtio/virtio_ring.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/virtio/virtio_ring.c b/drivers/virtio/virtio_ring.c
-> index 409aeaa49246..447245f2c813 100644
-> --- a/drivers/virtio/virtio_ring.c
-> +++ b/drivers/virtio/virtio_ring.c
-> @@ -159,6 +159,10 @@ static bool vring_use_dma_api(struct virtio_device *vdev)
->  	if (xen_domain())
->  		return true;
->  
-> +	/* On ARM-based machines, the DMA ops will do the right thing */
-> +	if (IS_ENABLED(CONFIG_ARM) || IS_ENABLED(CONFIG_ARM64))
-> +		return true;
-> +
->  	return false;
->  }
->  
-> -- 
-> 2.10.2.dirty
+diff --git a/drivers/watchdog/bcm2835_wdt.c b/drivers/watchdog/bcm2835_wdt.c
+index 4e0adb6c88f0..496f6c106bb1 100644
+--- a/drivers/watchdog/bcm2835_wdt.c
++++ b/drivers/watchdog/bcm2835_wdt.c
+@@ -172,8 +172,8 @@ static void bcm2835_power_off(void)
+ 
+ static int bcm2835_wdt_probe(struct platform_device *pdev)
+ {
++	struct resource *res;
+ 	struct device *dev = &pdev->dev;
+-	struct device_node *np = dev->of_node;
+ 	struct bcm2835_wdt *wdt;
+ 	int err;
+ 
+@@ -184,16 +184,15 @@ static int bcm2835_wdt_probe(struct platform_device *pdev)
+ 
+ 	spin_lock_init(&wdt->lock);
+ 
+-	wdt->base = of_iomap(np, 0);
+-	if (!wdt->base) {
+-		dev_err(dev, "Failed to remap watchdog regs");
+-		return -ENODEV;
+-	}
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	wdt->base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(wdt->base))
++		return PTR_ERR(wdt->base);
+ 
+ 	watchdog_set_drvdata(&bcm2835_wdt_wdd, wdt);
+ 	watchdog_init_timeout(&bcm2835_wdt_wdd, heartbeat, dev);
+ 	watchdog_set_nowayout(&bcm2835_wdt_wdd, nowayout);
+-	bcm2835_wdt_wdd.parent = &pdev->dev;
++	bcm2835_wdt_wdd.parent = dev;
+ 	if (bcm2835_wdt_is_running(wdt)) {
+ 		/*
+ 		 * The currently active timeout value (set by the
+@@ -208,10 +207,10 @@ static int bcm2835_wdt_probe(struct platform_device *pdev)
+ 
+ 	watchdog_set_restart_priority(&bcm2835_wdt_wdd, 128);
+ 
+-	err = watchdog_register_device(&bcm2835_wdt_wdd);
++	watchdog_stop_on_reboot(&bcm2835_wdt_wdd);
++	err = devm_watchdog_register_device(dev, &bcm2835_wdt_wdd);
+ 	if (err) {
+ 		dev_err(dev, "Failed to register watchdog device");
+-		iounmap(wdt->base);
+ 		return err;
+ 	}
+ 
+@@ -224,21 +223,12 @@ static int bcm2835_wdt_probe(struct platform_device *pdev)
+ 
+ static int bcm2835_wdt_remove(struct platform_device *pdev)
+ {
+-	struct bcm2835_wdt *wdt = platform_get_drvdata(pdev);
+-
+ 	if (pm_power_off == bcm2835_power_off)
+ 		pm_power_off = NULL;
+-	watchdog_unregister_device(&bcm2835_wdt_wdd);
+-	iounmap(wdt->base);
+ 
+ 	return 0;
+ }
+ 
+-static void bcm2835_wdt_shutdown(struct platform_device *pdev)
+-{
+-	bcm2835_wdt_stop(&bcm2835_wdt_wdd);
+-}
+-
+ static const struct of_device_id bcm2835_wdt_of_match[] = {
+ 	{ .compatible = "brcm,bcm2835-pm-wdt", },
+ 	{},
+@@ -248,7 +238,6 @@ MODULE_DEVICE_TABLE(of, bcm2835_wdt_of_match);
+ static struct platform_driver bcm2835_wdt_driver = {
+ 	.probe		= bcm2835_wdt_probe,
+ 	.remove		= bcm2835_wdt_remove,
+-	.shutdown	= bcm2835_wdt_shutdown,
+ 	.driver = {
+ 		.name =		"bcm2835-wdt",
+ 		.of_match_table = bcm2835_wdt_of_match,
+-- 
+2.7.4
