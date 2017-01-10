@@ -1,45 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 Jan 2017 11:57:17 +0000
-Subject: [PATCH v7 16/19] irqchip/gicv3-its: Sets IRQ_DOMAIN_FLAG_MSI_REMAP
-In-Reply-To: <1483969570-3154-17-git-send-email-eric.auger@redhat.com>
-References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
- <1483969570-3154-17-git-send-email-eric.auger@redhat.com>
-Message-ID: <7eb4fde8-93fd-3046-a261-06c62a14c8da@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 10 Jan 2017 12:14:23 +0000
+Subject: Unhandled level 2 translation fault (11) at 0x000000b8, esr
+ 0x92000046, rpi3 (aarch64)
+In-Reply-To: <CAGDbNAC-8w1xytLuzWTMnWLi8=j1ShkwE3CLXQ5q75m_RibCMA@mail.gmail.com>
+References: <CAGDbNAD7-TM6+x0A3FebTOPYmqQqbm1w29ZwH+9qePaAvhxTKw@mail.gmail.com>
+ <20161230151323.583b7ac5@xhacker>
+ <CAGDbNAAGqFqt7X+=XYRLAp=L_fTv9dAAe=wu4T_W-FCGqnYHHg@mail.gmail.com>
+ <20170109151354.GC7593@e104818-lin.cambridge.arm.com>
+ <CAGDbNAC-8w1xytLuzWTMnWLi8=j1ShkwE3CLXQ5q75m_RibCMA@mail.gmail.com>
+Message-ID: <20170110121423.GF19960@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-On 09/01/17 13:46, Eric Auger wrote:
-> The GICv3 ITS is MSI remapping capable. Let's advertise
-> this property so that VFIO passthrough can assess IRQ safety.
+On Mon, Jan 09, 2017 at 07:06:19PM +0100, Bas van Tiel wrote:
+> > I defined STACKSIZE to the kernel's SIGSTKSZ (16384) and it seems to run
+> > fine, though I'll leave it longer/overnight (on a Juno board). With the
+> > 4K signal stack it was crashing shortly after start.
 > 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 1 +
->  1 file changed, 1 insertion(+)
+> I tried the STACKSIZE of 16384 for both the RPI3 and the PINEA64 board
+> and still see the same behaviour of crashing. Sometimes the process
+> is also blocked for a long time before it crashes.
 > 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 69b040f..9d4fefc 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1642,6 +1642,7 @@ static int its_init_domain(struct fwnode_handle *handle, struct its_node *its)
->  
->  	inner_domain->parent = its_parent;
->  	inner_domain->bus_token = DOMAIN_BUS_NEXUS;
-> +	inner_domain->flags |= IRQ_DOMAIN_FLAG_MSI_REMAP;
->  	info->ops = &its_msi_domain_ops;
->  	info->data = its;
->  	inner_domain->host_data = info;
+> Setting the interval to 200 usec [5 Khz] will help to crash it faster.
 > 
+> To further isolate the issue I will create a kernel module (based on a
+> hrtimer) that will sent a periodic signal to the registered process
+> and execute the same sighandler logic to check if the problem is still
+> there.
 
-For patches 13 to 16, and provided that you address the couple of nits I
-mentioned in reply to patches 13 and 15:
+I lowered the interval to 100us (it was 100ms in the original file) and
+I can indeed trigger segfault easily on Juno. But it doesn't fail in the
+same way every time, I sometimes get permission fault, other times bad
+frame.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
