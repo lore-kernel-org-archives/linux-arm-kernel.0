@@ -1,38 +1,93 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 10 Jan 2017 14:16:52 +0000
-Subject: [PATCH v7 11/19] iommu/arm-smmu: Implement reserved region
- get/put callbacks
-In-Reply-To: <1483969570-3154-12-git-send-email-eric.auger@redhat.com>
-References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
- <1483969570-3154-12-git-send-email-eric.auger@redhat.com>
-Message-ID: <20170110141651.GB27365@arm.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Tue, 10 Jan 2017 07:16:21 -0700
+Subject: [PATCH] usb: dwc3-exynos fix unspecified suspend clk error
+ handling
+In-Reply-To: <1641038.u0riMiuGF5@amdc3058>
+References: <20170110022131.31042-1-shuahkh@osg.samsung.com>
+ <CGME20170110120605epcas1p1c26f7f90fca4765ab9cc339c51d11347@epcas1p1.samsung.com>
+ <1641038.u0riMiuGF5@amdc3058>
+Message-ID: <2e4a5e53-6603-13b8-0302-dc8093978013@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 01:46:02PM +0000, Eric Auger wrote:
-> The get() populates the list with the MSI IOVA reserved window.
+On 01/10/2017 05:05 AM, Bartlomiej Zolnierkiewicz wrote:
 > 
-> At the moment an arbitray MSI IOVA window is set at 0x8000000
-> of size 1MB. This will allow to report those info in iommu-group
-> sysfs.
+> Hi,
 > 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> On Monday, January 09, 2017 07:21:31 PM Shuah Khan wrote:
+>> Fix dwc3_exynos_probe() to call clk_prepare_enable() only when suspend
+>> clock is specified. Call clk_disable_unprepare() from remove and probe
+>> error path only when susp_clk has been set from remove and probe error
+>> paths.
 > 
-> ---
+> It is legal to call clk_prepare_enable() and clk_disable_unprepare()
+> for NULL clock.  Also your patch changes susp_clk handling while
+> leaves axius_clk handling (which also can be NULL) untouched.
 > 
-> v3 -> v4:
-> - do not handle PCI host bridge windows anymore
-> - encode prot
+> Do you actually see some runtime problem with the current code?
 > 
-> RFC v2 -> v3:
-> - use existing get/put_resv_regions
+> If not then the patch should probably be dropped.
 > 
-> RFC v1 -> v2:
-> - use defines for MSI IOVA base and length
-> ---
->  drivers/iommu/arm-smmu.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Hi Bartlomiej,
 
-Will
+I am seeing the "no suspend clk specified" message in dmesg.
+After that it sets the exynos->susp_clk = NULL and starts
+calling clk_prepare_enable(exynos->susp_clk);
+
+That can't be good. If you see the logic right above this
+one for exynos->clk, it returns error and fails the probe.
+This this case it doesn't, but tries to use null susp_clk.
+
+I believe this patch is necessary.
+
+thanks,
+-- Shuah
+
+> 
+>> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+>> ---
+>>  drivers/usb/dwc3/dwc3-exynos.c | 10 ++++++----
+>>  1 file changed, 6 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
+>> index e27899b..f97a3d7 100644
+>> --- a/drivers/usb/dwc3/dwc3-exynos.c
+>> +++ b/drivers/usb/dwc3/dwc3-exynos.c
+>> @@ -131,8 +131,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+>>  	if (IS_ERR(exynos->susp_clk)) {
+>>  		dev_info(dev, "no suspend clk specified\n");
+>>  		exynos->susp_clk = NULL;
+>> -	}
+>> -	clk_prepare_enable(exynos->susp_clk);
+>> +	} else
+>> +		clk_prepare_enable(exynos->susp_clk);
+>>  
+>>  	if (of_device_is_compatible(node, "samsung,exynos7-dwusb3")) {
+>>  		exynos->axius_clk = devm_clk_get(dev, "usbdrd30_axius_clk");
+>> @@ -196,7 +196,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+>>  	regulator_disable(exynos->vdd33);
+>>  err2:
+>>  	clk_disable_unprepare(exynos->axius_clk);
+>> -	clk_disable_unprepare(exynos->susp_clk);
+>> +	if (exynos->susp_clk)
+>> +		clk_disable_unprepare(exynos->susp_clk);
+>>  	clk_disable_unprepare(exynos->clk);
+>>  	return ret;
+>>  }
+>> @@ -210,7 +211,8 @@ static int dwc3_exynos_remove(struct platform_device *pdev)
+>>  	platform_device_unregister(exynos->usb3_phy);
+>>  
+>>  	clk_disable_unprepare(exynos->axius_clk);
+>> -	clk_disable_unprepare(exynos->susp_clk);
+>> +	if (exynos->susp_clk)
+>> +		clk_disable_unprepare(exynos->susp_clk);
+>>  	clk_disable_unprepare(exynos->clk);
+>>  
+>>  	regulator_disable(exynos->vdd33);
+> 
