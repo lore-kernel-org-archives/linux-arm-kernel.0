@@ -1,31 +1,167 @@
-From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Tue, 10 Jan 2017 11:18:21 -0500
-Subject: [RFC 00/55] Nested Virtualization on KVM/ARM
-In-Reply-To: <7991b5fa-cbd3-a3b3-3f1c-8b8655ebdcfd@redhat.com>
-References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
- <7991b5fa-cbd3-a3b3-3f1c-8b8655ebdcfd@redhat.com>
-Message-ID: <CAHyh4xg23zgqzJa9yUgXdjZN5v45fBLjDFJok_DPSWUo9UaewQ@mail.gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 10 Jan 2017 17:20:34 +0100
+Subject: [PATCH v7 08/19] iommu: Implement reserved_regions iommu-group
+ sysfs file
+In-Reply-To: <1483969570-3154-9-git-send-email-eric.auger@redhat.com>
+References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
+ <1483969570-3154-9-git-send-email-eric.auger@redhat.com>
+Message-ID: <9ee5aa6b-6e63-c153-0727-729e0e9592c6@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 9, 2017 at 10:05 AM, David Hildenbrand <david@redhat.com> wrote:
->
->> Even though this work is not complete (see limitations below), I'd
->> appreciate
->> early feedback on this RFC. Specifically, I'm interested in:
->> - Is it better to have a kernel config or to make it configurable at
->> runtime?
->
->
-> x86 and s390x have a kernel module parameter (nested) that can only be
-> changed when loading the module and should default to false. So the
-> admin explicitly has to enable it. Maybe going the same path makes
-> sense.
+Hi Joerg,
 
-I think that makes sense. Thanks!
+On 09/01/2017 14:45, Eric Auger wrote:
+> A new iommu-group sysfs attribute file is introduced. It contains
+> the list of reserved regions for the iommu-group. Each reserved
+> region is described on a separate line:
+> - first field is the start IOVA address,
+> - second is the end IOVA address,
+> - third is the type.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> 
+> ---
+> v6 -> v7:
+> - also report the type of the reserved region as a string
+> - updated ABI documentation
+> 
+> v3 -> v4:
+> - add cast to long long int when printing to avoid warning on
+>   i386
+> - change S_IRUGO into 0444
+> - remove sort. The list is natively sorted now.
+> 
+> The file layout is inspired of /sys/bus/pci/devices/BDF/resource.
+> I also read Documentation/filesystems/sysfs.txt so I expect this
+> to be frowned upon.
+> ---
+>  .../ABI/testing/sysfs-kernel-iommu_groups          | 12 +++++++
+>  drivers/iommu/iommu.c                              | 38 ++++++++++++++++++++++
+>  2 files changed, 50 insertions(+)
+> 
+> diff --git a/Documentation/ABI/testing/sysfs-kernel-iommu_groups b/Documentation/ABI/testing/sysfs-kernel-iommu_groups
+> index 9b31556..35c64e0 100644
+> --- a/Documentation/ABI/testing/sysfs-kernel-iommu_groups
+> +++ b/Documentation/ABI/testing/sysfs-kernel-iommu_groups
+> @@ -12,3 +12,15 @@ Description:	/sys/kernel/iommu_groups/ contains a number of sub-
+>  		file if the IOMMU driver has chosen to register a more
+>  		common name for the group.
+>  Users:
+> +
+> +What:		/sys/kernel/iommu_groups/reserved_regions
+> +Date: 		January 2017
+> +KernelVersion:  v4.11
+> +Contact: 	Eric Auger <eric.auger@redhat.com>
+> +Description:    /sys/kernel/iommu_groups/reserved_regions list IOVA
+> +		regions that are reserved. Not necessarily all
+> +		reserved regions are listed. This is typically used to
+> +		output direct-mapped, MSI, non mappable regions. Each
+> +		region is described on a single line: the 1st field is
+> +		the base IOVA, the second is the end IOVA and the third
+> +		field describes the type of the region.
+> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+> index 640056b..0123daa 100644
+> --- a/drivers/iommu/iommu.c
+> +++ b/drivers/iommu/iommu.c
+> @@ -68,6 +68,12 @@ struct iommu_group_attribute {
+>  			 const char *buf, size_t count);
+>  };
+>  
+> +static const char * const iommu_group_resv_type_string[] = {
+> +	[IOMMU_RESV_DIRECT]	= "direct",
+> +	[IOMMU_RESV_RESERVED]	= "reserved",
+> +	[IOMMU_RESV_MSI]	= "msi",
+> +};
+> +
+>  #define IOMMU_GROUP_ATTR(_name, _mode, _show, _store)		\
+>  struct iommu_group_attribute iommu_group_attr_##_name =		\
+>  	__ATTR(_name, _mode, _show, _store)
+> @@ -231,8 +237,33 @@ int iommu_get_group_resv_regions(struct iommu_group *group,
+>  }
+>  EXPORT_SYMBOL_GPL(iommu_get_group_resv_regions);
+>  
+> +static ssize_t iommu_group_show_resv_regions(struct iommu_group *group,
+> +					     char *buf)
+> +{
+> +	struct iommu_resv_region *region, *next;
+> +	struct list_head group_resv_regions;
+> +	char *str = buf;
+> +
+> +	INIT_LIST_HEAD(&group_resv_regions);
+> +	iommu_get_group_resv_regions(group, &group_resv_regions);
+> +
+> +	list_for_each_entry_safe(region, next, &group_resv_regions, list) {
+> +		str += sprintf(str, "0x%016llx 0x%016llx %s\n",
+> +			       (long long int)region->start,
+> +			       (long long int)(region->start +
+> +						region->length - 1),
+> +			       iommu_group_resv_type_string[region->type]);
+> +		kfree(region);
+> +	}
+> +
+> +	return (str - buf);
+> +}
+> +
+>  static IOMMU_GROUP_ATTR(name, S_IRUGO, iommu_group_show_name, NULL);
+>  
+> +static IOMMU_GROUP_ATTR(reserved_regions, 0444,
+> +			iommu_group_show_resv_regions, NULL);
+> +
+>  static void iommu_group_release(struct kobject *kobj)
+>  {
+>  	struct iommu_group *group = to_iommu_group(kobj);
+> @@ -247,6 +278,8 @@ static void iommu_group_release(struct kobject *kobj)
+>  	if (group->default_domain)
+>  		iommu_domain_free(group->default_domain);
+>  
+> +	iommu_group_remove_file(group, &iommu_group_attr_reserved_regions);
 
->
-> --
->
-> David
->
+The /sys/kernel/iommu_groups/n directory seems to be removed before this
+gets called and this may produce a WARNING when devices get removed from
+the group. I intend to remove the call since I have the feeling
+everything gets cleaned up properly.
+
+Do you see any issue?
+
+Thanks
+
+Eric
+
+[  350.753618] iommu: Removing device 0000:01:10.0 from group 7
+[  350.759331] kernfs: can not remove 'reserved_regions', no directory
+[  350.765603] ------------[ cut here ]------------
+[  350.770216] WARNING: CPU: 3 PID: 2617 at fs/kernfs/dir.c:1406
+kernfs_remove_by_name_ns+0x8c/0x98
+../..
+[  351.028154] [<ffff00000828819c>] kernfs_remove_by_name_ns+0x8c/0x98
+[  351.034414] [<ffff000008289bf8>] sysfs_remove_file_ns+0x14/0x1c
+[  351.040325] [<ffff00000856d918>] iommu_group_release+0x68/0x9c
+[  351.046150] [<ffff0000083d152c>] kobject_cleanup+0x8c/0x194
+[  351.051715] [<ffff0000083d13c8>] kobject_put+0x44/0x6c
+[  351.056844] [<ffff0000083d1490>] kobject_del+0x40/0x50
+[  351.061974] [<ffff0000083d1508>] kobject_cleanup+0x68/0x194
+[  351.067538] [<ffff0000083d13c8>] kobject_put+0x44/0x6c
+[  351.072668] [<ffff00000856df30>] iommu_group_remove_device+0x128/0x1d4
+[  351.079187] [<ffff000008575eb0>] arm_smmu_remove_device+0x12c/0x158
+
+
+
+
+> +
+>  	kfree(group->name);
+>  	kfree(group);
+>  }
+> @@ -310,6 +343,11 @@ struct iommu_group *iommu_group_alloc(void)
+>  	 */
+>  	kobject_put(&group->kobj);
+>  
+> +	ret = iommu_group_create_file(group,
+> +				      &iommu_group_attr_reserved_regions);
+> +	if (ret)
+> +		return ERR_PTR(ret);
+> +
+>  	pr_debug("Allocated group %d\n", group->id);
+>  
+>  	return group;
+> 
