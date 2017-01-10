@@ -1,40 +1,43 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Tue, 10 Jan 2017 14:20:59 -0700
-Subject: [PATCH] usb: dwc3-exynos remove suspend clock unspecified debug
- message
-Message-ID: <20170110212059.21995-1-shuahkh@osg.samsung.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 10 Jan 2017 22:21:17 +0100
+Subject: [PATCH net-next 6/8] net: dsa: Add support for platform data
+In-Reply-To: <1530c7f6-f8ba-ab32-75aa-288549f25db9@gmail.com>
+References: <20170110201235.21771-1-f.fainelli@gmail.com>
+ <20170110201235.21771-7-f.fainelli@gmail.com>
+ <20170110204124.GL22820@lunn.ch>
+ <1530c7f6-f8ba-ab32-75aa-288549f25db9@gmail.com>
+Message-ID: <20170110212117.GO22820@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dwc3-exynos prints debug message when suspend clock is not specified.
-The suspend clock is optional and driver can work without it.
+> Last time we discussed this, I had a super complex dsa2_platform_data
+> that allowed you to do exactly the same thing we currently do with
+> Device Tree, except that this was with platform_data. It took a lot of
+> effort to get there, but I essentially had the ZII vf160 board example
+> re-implemented and verified with a mockup driver (still have it in a
+> branch that's not too far from net-next/master).
 
-This debug message doesn't add any value and leads to confusion and
-concern. Remove it.
+One thing different this time is you have associated the platform data
+to an MDIO device. So the platform data represents one switch, not the
+whole complex. This is going to make the platform data much simpler,
+and allow the core to do the work of assembling the multiple platform
+datas into one switch complex. So basically, the platform data is
+dsa_chip_data.
 
-Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
----
-This patch is a result of the disussion on the following patch.
-https://lkml.org/lkml/2017/1/9/891
+To handle multi-CPUs, we need to move the master ethernet device and
+put it next to the cpu port. So add a
 
-drivers/usb/dwc3/dwc3-exynos.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+struct device   *netdev[DSA_MAX_PORTS];
 
-diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
-index e27899b..3e8407a 100644
---- a/drivers/usb/dwc3/dwc3-exynos.c
-+++ b/drivers/usb/dwc3/dwc3-exynos.c
-@@ -128,10 +128,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
- 	clk_prepare_enable(exynos->clk);
- 
- 	exynos->susp_clk = devm_clk_get(dev, "usbdrd30_susp_clk");
--	if (IS_ERR(exynos->susp_clk)) {
--		dev_info(dev, "no suspend clk specified\n");
-+	if (IS_ERR(exynos->susp_clk))
- 		exynos->susp_clk = NULL;
--	}
- 	clk_prepare_enable(exynos->susp_clk);
- 
- 	if (of_device_is_compatible(node, "samsung,exynos7-dwusb3")) {
--- 
-2.7.4
+to dsa_chip_data. It then becomes easy to represent multiple CPU
+ports.
+
+> I would very much like to see the patches and then make a decision based
+> on the submission rather than project a decision on code that has not
+> been submitted yet.
+
+The first version was posted a week ago. I requested a lot of
+changes. So lets see what John says about when the next version will
+be ready.
+
+   Andrew
