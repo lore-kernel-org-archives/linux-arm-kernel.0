@@ -1,68 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 10 Jan 2017 10:10:34 +0100
-Subject: [PATCH v5 2/2] ARM: sama5_defconfig: add support for the Axentia
- TSE-850 board
-In-Reply-To: <1484035732-31635-3-git-send-email-peda@axentia.se>
-References: <1484035732-31635-1-git-send-email-peda@axentia.se>
- <1484035732-31635-3-git-send-email-peda@axentia.se>
-Message-ID: <10e75ffd-d68b-97f2-2618-c5e92713f5b3@atmel.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Tue, 10 Jan 2017 17:13:49 +0800
+Subject: [PATCH v2 0/2] media: rc: add support for IR receiver on MT7623 SoC
+Message-ID: <1484039631-25120-1-git-send-email-sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 10/01/2017 ? 09:08, Peter Rosin a ?crit :
-> Signed-off-by: Peter Rosin <peda@axentia.se>
+From: Sean Wang <sean.wang@mediatek.com>
 
-I know that most of the entries in this configuration file are direct
-additions to the kernel but what about moving some of your additions to
-modules?
+This patchset introduces consumer IR (CIR) support on MT7623 SoC 
+that also works on other similar SoCs and implements raw mode for
+more compatibility with different protocols. The driver simply
+reports the duration of pulses and spaces to rc-core logic to
+decode.
 
-Regards,
+Changes since v1:
+- change compatible string from "mediatek,mt7623-ir" into 
+"mediatek,mt7623-cir"
+- use KBUILD_MODNAME to provide consistent device name used in driver.
+- remove unused fields in struct mtk_ir.
+- use synchronize_irq to give protection between IRQ handler and 
+remove handler.
+- use devm_rc_allocate_device based on Andi Shyti's work.
+- simplify error handling patch with devm_rc_register_device and devm_rc_allocate_device.
+- remove unused spinlock.
+- add comments about hardware limitation and related workarounds.
+- enhance the caculation of sampling period for easiler assigned specific 
+value.
+- refine git description.
+- fix IR message handling between IR hardware and rc-core.
 
-> ---
->  arch/arm/configs/sama5_defconfig | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-> index aca8625b6fc9..bf5b3a73e38c 100644
-> --- a/arch/arm/configs/sama5_defconfig
-> +++ b/arch/arm/configs/sama5_defconfig
-> @@ -131,7 +131,7 @@ CONFIG_GPIO_SYSFS=y
->  CONFIG_POWER_SUPPLY=y
->  CONFIG_BATTERY_ACT8945A=y
->  CONFIG_POWER_RESET=y
-> -# CONFIG_HWMON is not set
-> +CONFIG_SENSORS_JC42=y
->  CONFIG_WATCHDOG=y
->  CONFIG_AT91SAM9X_WATCHDOG=y
->  CONFIG_SAMA5D4_WATCHDOG=y
-> @@ -142,6 +142,7 @@ CONFIG_REGULATOR=y
->  CONFIG_REGULATOR_FIXED_VOLTAGE=y
->  CONFIG_REGULATOR_ACT8865=y
->  CONFIG_REGULATOR_ACT8945A=y
-> +CONFIG_REGULATOR_PWM=y
->  CONFIG_MEDIA_SUPPORT=y
->  CONFIG_MEDIA_CAMERA_SUPPORT=y
->  CONFIG_V4L_PLATFORM_DRIVERS=y
-> @@ -164,6 +165,7 @@ CONFIG_SND_ATMEL_SOC=y
->  CONFIG_SND_ATMEL_SOC_WM8904=y
->  # CONFIG_HID_GENERIC is not set
->  CONFIG_SND_ATMEL_SOC_PDMIC=y
-> +CONFIG_SND_ATMEL_SOC_TSE850_PCM5142=y
->  CONFIG_USB=y
->  CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
->  CONFIG_USB_EHCI_HCD=y
-> @@ -199,6 +201,9 @@ CONFIG_AT_XDMAC=y
->  CONFIG_IIO=y
->  CONFIG_AT91_ADC=y
->  CONFIG_AT91_SAMA5D2_ADC=y
-> +CONFIG_ENVELOPE_DETECTOR=y
-> +CONFIG_DPOT_DAC=y
-> +CONFIG_MCP4531=y
->  CONFIG_PWM=y
->  CONFIG_PWM_ATMEL=y
->  CONFIG_PWM_ATMEL_HLCDC_PWM=y
-> 
+Sean Wang (2):
+  Documentation: devicetree: Add document bindings for mtk-cir
+  media: rc: add driver for IR remote receiver on MT7623 SoC
 
+ .../devicetree/bindings/media/mtk-cir.txt          |  24 ++
+ drivers/media/rc/Kconfig                           |  11 +
+ drivers/media/rc/Makefile                          |   1 +
+ drivers/media/rc/mtk-cir.c                         | 326 +++++++++++++++++++++
+ 4 files changed, 362 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/mtk-cir.txt
+ create mode 100644 drivers/media/rc/mtk-cir.c
 
 -- 
-Nicolas Ferre
+2.7.4
