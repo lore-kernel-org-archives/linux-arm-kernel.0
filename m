@@ -1,37 +1,52 @@
-From: john@phrozen.org (John Crispin)
-Date: Tue, 10 Jan 2017 08:00:16 +0100
-Subject: [PATCH 0/4] ARM: dts: mt7623: Add initial Geek Force support
-In-Reply-To: <20170108133100.10428-1-afaerber@suse.de>
-References: <20170108133100.10428-1-afaerber@suse.de>
-Message-ID: <91f5ec74-1aa1-f2ad-24e9-14267cbe8498@phrozen.org>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Tue, 10 Jan 2017 15:02:41 +0800
+Subject: [PATCH v11 2/8] power: add power sequence library
+In-Reply-To: <20170107085456.w5dhm7qadqa6tc7v@kozik-lap>
+References: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
+ <1483596119-27508-3-git-send-email-peter.chen@nxp.com>
+ <20170107085456.w5dhm7qadqa6tc7v@kozik-lap>
+Message-ID: <20170110070240.GA29454@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 08/01/2017 14:30, Andreas F?rber wrote:
+On Sat, Jan 07, 2017 at 10:54:56AM +0200, Krzysztof Kozlowski wrote:
+> On Thu, Jan 05, 2017 at 02:01:53PM +0800, Peter Chen wrote:
+> > We have an well-known problem that the device needs to do some power
+> > sequence before it can be recognized by related host, the typical
+> > example like hard-wired mmc devices and usb devices.
+> > 
+> > This power sequence is hard to be described at device tree and handled by
+> > related host driver, so we have created a common power sequence
+> > library to cover this requirement. The core code has supplied
+> > some common helpers for host driver, and individual power sequence
+> > libraries handle kinds of power sequence for devices. The pwrseq
+> > librares always need to allocate extra instance for compatible
+> > string match.
+> > 
+> > pwrseq_generic is intended for general purpose of power sequence, which
+> > handles gpios and clocks currently, and can cover other controls in
+> > future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+> > if only one power sequence is needed, else call of_pwrseq_on_list
+> > /of_pwrseq_off_list instead (eg, USB hub driver).
+> > 
+> > For new power sequence library, it can add its compatible string
+> > to pwrseq_of_match_table, then the pwrseq core will match it with
+> > DT's, and choose this library at runtime.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> > Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
+> > Tested-by Joshua Clayton <stillcompiling@gmail.com>
+> > Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
+> > Tested-by: Matthias Kaehlcke <mka@chromium.org>
 > 
-> Andreas F?rber (4):
->   Documentation: devicetree: Add vendor prefix for AsiaRF
->   Documentation: devicetree: arm: mediatek: Add Geek Force board
->   ARM: dts: mt7623: Add Geek Force config
->   MAINTAINERS: Extend ARM/Mediatek SoC support section
+> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Tested on Odroid U3 (reset sequence for LAN9730):
+> Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
 > 
 
-Hi,
+A nice ping...
 
-i need to NAK this series. the asiarf board is nothing more than the
-official MTK EVB with AsiaRF written on it. this board is already
-supported by linux (arch/arm/boot/dts/mt7623-evb.dts) please extend the
-EVB dts file nstead of adding a duplicate and letting the original bitrot.
+-- 
 
-	John
-
->  Documentation/devicetree/bindings/arm/mediatek.txt |  3 +
->  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->  MAINTAINERS                                        |  2 +
->  arch/arm/boot/dts/Makefile                         |  1 +
->  arch/arm/boot/dts/mt7623-geekforce.dts             | 77 ++++++++++++++++++++++
->  5 files changed, 84 insertions(+)
->  create mode 100644 arch/arm/boot/dts/mt7623-geekforce.dts
-> 
+Best Regards,
+Peter Chen
