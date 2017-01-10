@@ -1,81 +1,63 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 10 Jan 2017 16:38:30 +0100
-Subject: [PATCH 1/1] MMC: meson: avoid possible NULL dereference
-In-Reply-To: <m237gwcec4.fsf@baylibre.com>
-References: <20161223150108.9229-1-xypron.glpk@gmx.de>
- <m237gwcec4.fsf@baylibre.com>
-Message-ID: <CAPDyKFoxtnkoLo71xDdv3_e1jEjSqOHbBdAzQFPMvFxqHnzgsQ@mail.gmail.com>
+Date: Tue, 10 Jan 2017 16:38:56 +0100
+Subject: [PATCH 0/2] mmc: sdhci-iproc: Improve bcm2835 performance
+In-Reply-To: <1483111474-29907-1-git-send-email-stefan.wahren@i2se.com>
+References: <1483111474-29907-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <CAPDyKFpWw_MppWqqmVSYCE6AcECq_BLV8GT419o77_8qysagjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 January 2017 at 18:01, Kevin Hilman <khilman@baylibre.com> wrote:
-> Heinrich Schuchardt <xypron.glpk@gmx.de> writes:
+On 30 December 2016 at 16:24, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> The sdhci-iproc waste a lot performance potential on bcm2835 because of
+> missing capabilities in the platform data. This patch series tries to fix
+> this.
 >
->> No actual segmentation faults were observed but the coding is
->> at least inconsistent.
->>
->> irqreturn_t meson_mmc_irq():
->>
->> We should not dereference host before checking it.
->>
->> meson_mmc_irq_thread():
->>
->> If cmd or mrq are NULL we should not dereference them after
->> writing a warning.
->>
->> Fixes: 51c5d8447bd7 MMC: meson: initial support for GX platforms
->> Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+> Raspberry Pi Zero with a class 10 sdhc card
 >
-> Acked-by: Kevin Hilman <khilman@baylibre.com>
+> Before:
+> dd if=/dev/zero conv=fdatasync of=test bs=8k count=10000
+> 81920000 Bytes (82 MB), 11,0044 s, 7,4 MB/s
 >
-> Ulf, I assume you can pick this up directly for v4.10-rc?
+> sudo dd if=/dev/mmcblk0p1 of=/dev/null
+> 62914560 Bytes (63 MB), 5,83784 s, 10,8 MB/s
+>
+> After:
+> dd if=/dev/zero conv=fdatasync of=test bs=8k count=10000
+> 81920000 Bytes (82 MB), 9,76938 s, 8,4 MB/s
+>
+> sudo dd if=/dev/mmcblk0p1 of=/dev/null
+> 62914560 Bytes (63 MB), 4,73651 s, 13,3 MB/s
+>
+> Raspberry Pi Compute Module
+>
+> Before:
+> dd if=/dev/zero conv=fdatasync of=test bs=8k count=10000
+> 81920000 Bytes (82 MB), 27,4257 s, 3,0 MB/s
+>
+> sudo dd if=/dev/mmcblk0p1 of=/dev/null
+> 66060288 Bytes (66 MB), 21,4365 s, 3,1 MB/s
+>
+> After:
+> dd if=/dev/zero conv=fdatasync of=test bs=8k count=10000
+> 81920000 Bytes (82 MB), 7,19661 s, 11,4 MB/s
+>
+> sudo dd if=/dev/mmcblk0p1 of=/dev/null
+> 66060288 Bytes (66 MB), 4,76453 s, 13,9 MB/s
+>
+> Any tests with a Raspberry Pi 3 (SD and Wifi over SDIO) are welcome.
+>
+> Stefan Wahren (2):
+>   mmc: sdhci-iproc: Apply caps from bcm2835-mmc driver
+>   mmc: sdhci-iproc: Increase max_blk_size for bcm2835
+>
+>  drivers/mmc/host/sdhci-iproc.c |   11 ++++++++---
+>  1 file changed, 8 insertions(+), 3 deletions(-)
+>
+> --
+> 1.7.9.5
+>
 
-Thanks, applied for fixes!
+Thanks, applied for next!
 
 Kind regards
 Uffe
-
-
->
-> Thanks,
->
-> Kevin
->
->> ---
->>  drivers/mmc/host/meson-gx-mmc.c | 8 +++++---
->>  1 file changed, 5 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
->> index b352760c041e..09739352834c 100644
->> --- a/drivers/mmc/host/meson-gx-mmc.c
->> +++ b/drivers/mmc/host/meson-gx-mmc.c
->> @@ -578,13 +578,15 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
->>  {
->>       struct meson_host *host = dev_id;
->>       struct mmc_request *mrq;
->> -     struct mmc_command *cmd = host->cmd;
->> +     struct mmc_command *cmd;
->>       u32 irq_en, status, raw_status;
->>       irqreturn_t ret = IRQ_HANDLED;
->>
->>       if (WARN_ON(!host))
->>               return IRQ_NONE;
->>
->> +     cmd = host->cmd;
->> +
->>       mrq = host->mrq;
->>
->>       if (WARN_ON(!mrq))
->> @@ -670,10 +672,10 @@ static irqreturn_t meson_mmc_irq_thread(int irq, void *dev_id)
->>       int ret = IRQ_HANDLED;
->>
->>       if (WARN_ON(!mrq))
->> -             ret = IRQ_NONE;
->> +             return IRQ_NONE;
->>
->>       if (WARN_ON(!cmd))
->> -             ret = IRQ_NONE;
->> +             return IRQ_NONE;
->>
->>       data = cmd->data;
->>       if (data) {
