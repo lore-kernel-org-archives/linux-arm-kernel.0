@@ -1,18 +1,21 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 10 Jan 2017 10:51:23 +0530
-Subject: [PATCH RESEND] dmaengine: stm32-dma: Add error messages if xlate
- fails
-In-Reply-To: <1483603780-3368-1-git-send-email-cedric.madianga@gmail.com>
-References: <1483603780-3368-1-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <20170110052123.GV3573@localhost>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 9 Jan 2017 23:35:14 -0600
+Subject: [PATCH v7 1/5] dt-bindings: zte: add bindings document for
+ zx2967 power domain controller
+In-Reply-To: <1483694164-7668-1-git-send-email-baoyou.xie@linaro.org>
+References: <1483694164-7668-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170110053514.jpgvjnlijx3tj3ye@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 09:09:40AM +0100, M'boumba Cedric Madianga wrote:
-> This patch adds some error messages when a slave device fails to request a
-> channel.
+On Fri, Jan 06, 2017 at 05:16:00PM +0800, Baoyou Xie wrote:
+> This patch adds device tree bindings document for ZTE zx2967
+> family power domain controller.
+> 
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> ---
+>  .../devicetree/bindings/soc/zte/pd-2967xx.txt         | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt
 
-Applied now
-
--- 
-~Vinod
+Acked-by: Rob Herring <robh@kernel.org>
