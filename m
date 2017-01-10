@@ -1,55 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 10 Jan 2017 12:41:05 +0000
-Subject: [PATCHv6 00/11] CONFIG_DEBUG_VIRTUAL for arm64
-In-Reply-To: <e13dc77e-6709-8122-9856-35aee876b836@gmail.com>
-References: <1483464113-1587-1-git-send-email-labbott@redhat.com>
- <edc8eaa2-5414-506c-1dad-f2404ef19c81@gmail.com>
- <b3de65da-8a74-2510-268e-34516cc2de77@redhat.com>
- <20170104114449.GA18193@arm.com>
- <e13dc77e-6709-8122-9856-35aee876b836@gmail.com>
-Message-ID: <20170110124105.GH21598@arm.com>
+From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
+Date: Tue, 10 Jan 2017 15:47:25 +0300
+Subject: [PATCH v2] arm64: do not set dma masks that device connection
+ can't handle
+In-Reply-To: <20170110115132.GD21598@arm.com>
+References: <1483947002-16410-1-git-send-email-nikita.yoush@cogentembedded.com>
+ <20170110115132.GD21598@arm.com>
+Message-ID: <07253eaa-5729-0f15-42b6-e8403f1f0412@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 02:30:50PM -0800, Florian Fainelli wrote:
-> On 01/04/2017 03:44 AM, Will Deacon wrote:
-> > On Tue, Jan 03, 2017 at 03:25:53PM -0800, Laura Abbott wrote:
-> >> On 01/03/2017 02:56 PM, Florian Fainelli wrote:
-> >>> On 01/03/2017 09:21 AM, Laura Abbott wrote:
-> >>>> Happy New Year!
-> >>>>
-> >>>> This is a very minor rebase from v5. It only moves a few headers around.
-> >>>> I think this series should be ready to be queued up for 4.11.
-> >>>
-> >>> FWIW:
-> >>>
-> >>> Tested-by: Florian Fainelli <f.fainelli@gmail.com>
-> >>>
-> >>
-> >> Thanks!
-> >>
-> >>> How do we get this series included? I would like to get the ARM 32-bit
-> >>> counterpart included as well (will resubmit rebased shortly), but I have
-> >>> no clue which tree this should be going through.
-> >>>
-> >>
-> >> I was assuming this would go through the arm64 tree unless Catalin/Will
-> >> have an objection to that.
-> > 
-> > Yup, I was planning to pick it up for 4.11.
-> > 
-> > Florian -- does your series depend on this? If so, then I'll need to
-> > co-ordinate with Russell (probably via a shared branch that we both pull)
-> > if you're aiming for 4.11 too.
-> 
-> Yes, pretty much everything in Laura's patch series is relevant, except
-> the arm64 bits.
+Hi
 
-Ok, then. Laura -- could you please reorder your patches so that the
-non-arm64 bits come first? That way, I can put those on a separate branch
-and have it pulled by both arm64 and rmk, so that the prequisities are
-shared between the architectures.
+> The point here is that an IOMMU doesn't solve your issue, and the
+> IOMMU-backed DMA ops need the same treatment. In light of that, it really
+> feels to me like the DMA masks should be restricted in of_dma_configure
+> so that the parent mask is taken into account there, rather than hook
+> into each set of DMA ops to intercept set_dma_mask. We'd still need to
+> do something to stop dma_set_mask widening the mask if it was restricted
+> by of_dma_configure, but I think Robin (cc'd) was playing with that.
 
-Thanks,
+What issue "IOMMU doesn't solve"?
 
-Will
+Issue I'm trying to address is - inconsistency within swiotlb
+dma_map_ops, where (1) any wide mask is silently accepted, but (2) then
+mask is used to decide if bounce buffers are needed or not. This
+inconsistency causes NVMe+R-Car cobmo not working (and breaking memory
+instead).
+
+I just can't think out what similar issue iommu can have.
+Do you mean that in iommu case, mask also must not be set to whatever
+wider than initial value? Why? What is the use of mask in iommu case? Is
+there any real case when iommu can't address all memory existing in the
+system?
+
+NVMe maintainer has just stated that they expect
+set_dma_mask(DMA_BIT_MASK(64)) to always succeed, and are going to error
+out driver probe if that call fails.  They claim that architecture must
+always be able to dma_map() whatever memory existing in the system - via
+iommu or swiotlb or whatever. Their direction is to remove bounce
+buffers from block and other layers.
+
+With this direction, semantics of dma mask becomes even more
+questionable. I'd say dma_mask is candidate for removal (or to move to
+swiotlb's or iommu's local area)
+
+Nikita
