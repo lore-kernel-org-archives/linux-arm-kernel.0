@@ -1,167 +1,141 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 10 Jan 2017 17:20:34 +0100
-Subject: [PATCH v7 08/19] iommu: Implement reserved_regions iommu-group
- sysfs file
-In-Reply-To: <1483969570-3154-9-git-send-email-eric.auger@redhat.com>
-References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
- <1483969570-3154-9-git-send-email-eric.auger@redhat.com>
-Message-ID: <9ee5aa6b-6e63-c153-0727-729e0e9592c6@redhat.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Tue, 10 Jan 2017 09:28:52 -0700
+Subject: [PATCH] usb: dwc3-exynos fix unspecified suspend clk error
+ handling
+In-Reply-To: <8784459.rxWqZlDLVg@amdc3058>
+References: <20170110022131.31042-1-shuahkh@osg.samsung.com>
+ <2e4a5e53-6603-13b8-0302-dc8093978013@osg.samsung.com>
+ <3a113696-d0cd-8944-4acd-c87646fbee15@osg.samsung.com>
+ <CGME20170110160532epcas1p198cef8317dcbc8740366d06b38e7465f@epcas1p1.samsung.com>
+ <8784459.rxWqZlDLVg@amdc3058>
+Message-ID: <28815306-e220-4847-99ce-b058baae0d07@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
-
-On 09/01/2017 14:45, Eric Auger wrote:
-> A new iommu-group sysfs attribute file is introduced. It contains
-> the list of reserved regions for the iommu-group. Each reserved
-> region is described on a separate line:
-> - first field is the start IOVA address,
-> - second is the end IOVA address,
-> - third is the type.
+On 01/10/2017 09:05 AM, Bartlomiej Zolnierkiewicz wrote:
 > 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> Hi,
 > 
-> ---
-> v6 -> v7:
-> - also report the type of the reserved region as a string
-> - updated ABI documentation
+> On Tuesday, January 10, 2017 07:36:35 AM Shuah Khan wrote:
+>> On 01/10/2017 07:16 AM, Shuah Khan wrote:
+>>> On 01/10/2017 05:05 AM, Bartlomiej Zolnierkiewicz wrote:
+>>>>
+>>>> Hi,
+>>>>
+>>>> On Monday, January 09, 2017 07:21:31 PM Shuah Khan wrote:
+>>>>> Fix dwc3_exynos_probe() to call clk_prepare_enable() only when suspend
+>>>>> clock is specified. Call clk_disable_unprepare() from remove and probe
+>>>>> error path only when susp_clk has been set from remove and probe error
+>>>>> paths.
+>>>>
+>>>> It is legal to call clk_prepare_enable() and clk_disable_unprepare()
+>>>> for NULL clock.  Also your patch changes susp_clk handling while
+>>>> leaves axius_clk handling (which also can be NULL) untouched.
+>>>>
+>>>> Do you actually see some runtime problem with the current code?
+>>>>
+>>>> If not then the patch should probably be dropped.
+>>>>
+>>>> Best regards,
+>>>> --
+>>>> Bartlomiej Zolnierkiewicz
+>>>> Samsung R&D Institute Poland
+>>>> Samsung Electronics
+>>>
+>>> Hi Bartlomiej,
+>>>
+>>> I am seeing the "no suspend clk specified" message in dmesg.
+>>> After that it sets the exynos->susp_clk = NULL and starts
+>>> calling clk_prepare_enable(exynos->susp_clk);
+>>>
+>>> That can't be good. If you see the logic right above this
+>>> one for exynos->clk, it returns error and fails the probe.
+>>> This this case it doesn't, but tries to use null susp_clk.
 > 
-> v3 -> v4:
-> - add cast to long long int when printing to avoid warning on
->   i386
-> - change S_IRUGO into 0444
-> - remove sort. The list is natively sorted now.
+> exynos->susp_clk is optional, exynos->clk is not.
+
+Right. That is clear since we don't fail the probe.
+
 > 
-> The file layout is inspired of /sys/bus/pci/devices/BDF/resource.
-> I also read Documentation/filesystems/sysfs.txt so I expect this
-> to be frowned upon.
-> ---
->  .../ABI/testing/sysfs-kernel-iommu_groups          | 12 +++++++
->  drivers/iommu/iommu.c                              | 38 ++++++++++++++++++++++
->  2 files changed, 50 insertions(+)
+>>> I believe this patch is necessary.
+>>
+>> Let me clarify this a bit further. Since we already know
+>> susp_clk is null, with this patch we can avoid extra calls
+>> to clk_prepare_enable() and clk_disable_unprepare().
+>>
+>> One can say, it also adds extra checks, hence I will let you
+>> decide one way or the other. :)
 > 
-> diff --git a/Documentation/ABI/testing/sysfs-kernel-iommu_groups b/Documentation/ABI/testing/sysfs-kernel-iommu_groups
-> index 9b31556..35c64e0 100644
-> --- a/Documentation/ABI/testing/sysfs-kernel-iommu_groups
-> +++ b/Documentation/ABI/testing/sysfs-kernel-iommu_groups
-> @@ -12,3 +12,15 @@ Description:	/sys/kernel/iommu_groups/ contains a number of sub-
->  		file if the IOMMU driver has chosen to register a more
->  		common name for the group.
->  Users:
-> +
-> +What:		/sys/kernel/iommu_groups/reserved_regions
-> +Date: 		January 2017
-> +KernelVersion:  v4.11
-> +Contact: 	Eric Auger <eric.auger@redhat.com>
-> +Description:    /sys/kernel/iommu_groups/reserved_regions list IOVA
-> +		regions that are reserved. Not necessarily all
-> +		reserved regions are listed. This is typically used to
-> +		output direct-mapped, MSI, non mappable regions. Each
-> +		region is described on a single line: the 1st field is
-> +		the base IOVA, the second is the end IOVA and the third
-> +		field describes the type of the region.
-> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> index 640056b..0123daa 100644
-> --- a/drivers/iommu/iommu.c
-> +++ b/drivers/iommu/iommu.c
-> @@ -68,6 +68,12 @@ struct iommu_group_attribute {
->  			 const char *buf, size_t count);
->  };
->  
-> +static const char * const iommu_group_resv_type_string[] = {
-> +	[IOMMU_RESV_DIRECT]	= "direct",
-> +	[IOMMU_RESV_RESERVED]	= "reserved",
-> +	[IOMMU_RESV_MSI]	= "msi",
-> +};
-> +
->  #define IOMMU_GROUP_ATTR(_name, _mode, _show, _store)		\
->  struct iommu_group_attribute iommu_group_attr_##_name =		\
->  	__ATTR(_name, _mode, _show, _store)
-> @@ -231,8 +237,33 @@ int iommu_get_group_resv_regions(struct iommu_group *group,
->  }
->  EXPORT_SYMBOL_GPL(iommu_get_group_resv_regions);
->  
-> +static ssize_t iommu_group_show_resv_regions(struct iommu_group *group,
-> +					     char *buf)
-> +{
-> +	struct iommu_resv_region *region, *next;
-> +	struct list_head group_resv_regions;
-> +	char *str = buf;
-> +
-> +	INIT_LIST_HEAD(&group_resv_regions);
-> +	iommu_get_group_resv_regions(group, &group_resv_regions);
-> +
-> +	list_for_each_entry_safe(region, next, &group_resv_regions, list) {
-> +		str += sprintf(str, "0x%016llx 0x%016llx %s\n",
-> +			       (long long int)region->start,
-> +			       (long long int)(region->start +
-> +						region->length - 1),
-> +			       iommu_group_resv_type_string[region->type]);
-> +		kfree(region);
-> +	}
-> +
-> +	return (str - buf);
-> +}
-> +
->  static IOMMU_GROUP_ATTR(name, S_IRUGO, iommu_group_show_name, NULL);
->  
-> +static IOMMU_GROUP_ATTR(reserved_regions, 0444,
-> +			iommu_group_show_resv_regions, NULL);
-> +
->  static void iommu_group_release(struct kobject *kobj)
->  {
->  	struct iommu_group *group = to_iommu_group(kobj);
-> @@ -247,6 +278,8 @@ static void iommu_group_release(struct kobject *kobj)
->  	if (group->default_domain)
->  		iommu_domain_free(group->default_domain);
->  
-> +	iommu_group_remove_file(group, &iommu_group_attr_reserved_regions);
+> I would prefer to leave the things as they are currently.
+> 
+> The code in question is not performance sensitive so extra
+> calls are not a problem.  No extra checks means less code.
+> 
+> Also the current code seems to be more in line with the rest
+> of the kernel.
 
-The /sys/kernel/iommu_groups/n directory seems to be removed before this
-gets called and this may produce a WARNING when devices get removed from
-the group. I intend to remove the call since I have the feeling
-everything gets cleaned up properly.
+What functionality is missing without the suspend clock? Would
+it make sense to change the info. message to include what it
+means. At the moment it doesn't anything more than "no suspend
+clock" which is a very cryptic user visible message. It would be
+helpful for it to also include what functionality is impacted.
 
-Do you see any issue?
+thanks,
+-- Shuah
 
-Thanks
-
-Eric
-
-[  350.753618] iommu: Removing device 0000:01:10.0 from group 7
-[  350.759331] kernfs: can not remove 'reserved_regions', no directory
-[  350.765603] ------------[ cut here ]------------
-[  350.770216] WARNING: CPU: 3 PID: 2617 at fs/kernfs/dir.c:1406
-kernfs_remove_by_name_ns+0x8c/0x98
-../..
-[  351.028154] [<ffff00000828819c>] kernfs_remove_by_name_ns+0x8c/0x98
-[  351.034414] [<ffff000008289bf8>] sysfs_remove_file_ns+0x14/0x1c
-[  351.040325] [<ffff00000856d918>] iommu_group_release+0x68/0x9c
-[  351.046150] [<ffff0000083d152c>] kobject_cleanup+0x8c/0x194
-[  351.051715] [<ffff0000083d13c8>] kobject_put+0x44/0x6c
-[  351.056844] [<ffff0000083d1490>] kobject_del+0x40/0x50
-[  351.061974] [<ffff0000083d1508>] kobject_cleanup+0x68/0x194
-[  351.067538] [<ffff0000083d13c8>] kobject_put+0x44/0x6c
-[  351.072668] [<ffff00000856df30>] iommu_group_remove_device+0x128/0x1d4
-[  351.079187] [<ffff000008575eb0>] arm_smmu_remove_device+0x12c/0x158
-
-
-
-
-> +
->  	kfree(group->name);
->  	kfree(group);
->  }
-> @@ -310,6 +343,11 @@ struct iommu_group *iommu_group_alloc(void)
->  	 */
->  	kobject_put(&group->kobj);
->  
-> +	ret = iommu_group_create_file(group,
-> +				      &iommu_group_attr_reserved_regions);
-> +	if (ret)
-> +		return ERR_PTR(ret);
-> +
->  	pr_debug("Allocated group %d\n", group->id);
->  
->  	return group;
+> 
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
+> 
+>> thanks,
+>> -- Shuah
+>>
+>>>
+>>> thanks,
+>>> -- Shuah
+>>>
+>>>>
+>>>>> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+>>>>> ---
+>>>>>  drivers/usb/dwc3/dwc3-exynos.c | 10 ++++++----
+>>>>>  1 file changed, 6 insertions(+), 4 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
+>>>>> index e27899b..f97a3d7 100644
+>>>>> --- a/drivers/usb/dwc3/dwc3-exynos.c
+>>>>> +++ b/drivers/usb/dwc3/dwc3-exynos.c
+>>>>> @@ -131,8 +131,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+>>>>>  	if (IS_ERR(exynos->susp_clk)) {
+>>>>>  		dev_info(dev, "no suspend clk specified\n");
+>>>>>  		exynos->susp_clk = NULL;
+>>>>> -	}
+>>>>> -	clk_prepare_enable(exynos->susp_clk);
+>>>>> +	} else
+>>>>> +		clk_prepare_enable(exynos->susp_clk);
+>>>>>  
+>>>>>  	if (of_device_is_compatible(node, "samsung,exynos7-dwusb3")) {
+>>>>>  		exynos->axius_clk = devm_clk_get(dev, "usbdrd30_axius_clk");
+>>>>> @@ -196,7 +196,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+>>>>>  	regulator_disable(exynos->vdd33);
+>>>>>  err2:
+>>>>>  	clk_disable_unprepare(exynos->axius_clk);
+>>>>> -	clk_disable_unprepare(exynos->susp_clk);
+>>>>> +	if (exynos->susp_clk)
+>>>>> +		clk_disable_unprepare(exynos->susp_clk);
+>>>>>  	clk_disable_unprepare(exynos->clk);
+>>>>>  	return ret;
+>>>>>  }
+>>>>> @@ -210,7 +211,8 @@ static int dwc3_exynos_remove(struct platform_device *pdev)
+>>>>>  	platform_device_unregister(exynos->usb3_phy);
+>>>>>  
+>>>>>  	clk_disable_unprepare(exynos->axius_clk);
+>>>>> -	clk_disable_unprepare(exynos->susp_clk);
+>>>>> +	if (exynos->susp_clk)
+>>>>> +		clk_disable_unprepare(exynos->susp_clk);
+>>>>>  	clk_disable_unprepare(exynos->clk);
+>>>>>  
+>>>>>  	regulator_disable(exynos->vdd33);
 > 
