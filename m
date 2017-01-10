@@ -1,62 +1,137 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
-Date: Tue, 10 Jan 2017 17:17:34 +0100
-Subject: noise issues when recording sound on i.MX28
-In-Reply-To: <20160217085502.39e4cb24@ipc1.ka-ro>
-References: <20160127105613.GC13664@pengutronix.de>
- <CAOMZO5BpLen517q2heramSta-R6pdESkjM6w=7FRMZebY6ue-Q@mail.gmail.com>
- <20160127144340.GD13664@pengutronix.de>
- <CAOMZO5AE6HwBYz7kOFORt0HTojJLSb0MYUbkb_HCshDHy=d27g@mail.gmail.com>
- <20160210150315.GC13664@pengutronix.de>
- <CAOMZO5D5H4F90nse9kyW9KvsJStN-sCGktup4FDPw_zTeNfS2g@mail.gmail.com>
- <20160211084029.GE13664@pengutronix.de>
- <CAOMZO5BDjkWi+cQK1-J7ag8Z48tY1Uwofi4EkovN-drSC4_reA@mail.gmail.com>
- <20160217085502.39e4cb24@ipc1.ka-ro>
-Message-ID: <1484065054.28705.1.camel@embedded.rocks>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 10 Jan 2017 17:18:21 +0100
+Subject: [PATCH 1/3] ARM: at91: flush the L2 cache before entering cpu idle
+In-Reply-To: <20170106065947.30631-2-wenyou.yang@atmel.com>
+References: <20170106065947.30631-1-wenyou.yang@atmel.com>
+ <20170106065947.30631-2-wenyou.yang@atmel.com>
+Message-ID: <20170110161821.vp673jyfqx6s76pg@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+I though a bit more about it, and I don't really like the new compatible
+string. I don't feel this should be necessary.
 
-On Wed, 2016-02-17 at 08:55 +0100, Lothar Wa?mann wrote:
-> Hi,
+What about the following:
+
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index b4332b727e9c..0333aca63e44 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -53,6 +53,7 @@ extern void at91_pinctrl_gpio_resume(void);
+ static struct {
+ 	unsigned long uhp_udp_mask;
+ 	int memctrl;
++	bool has_l2_cache;
+ } at91_pm_data;
+ 
+ void __iomem *at91_ramc_base[2];
+@@ -267,6 +268,11 @@ static void at91_ddr_standby(void)
+ 	u32 lpr0, lpr1 = 0;
+ 	u32 saved_lpr0, saved_lpr1 = 0;
+ 
++	if (at91_pm_data.has_l2_cache) {
++		flush_cache_all();
++		outer_disable();
++	}
++
+ 	if (at91_ramc_base[1]) {
+ 		saved_lpr1 = at91_ramc_read(1, AT91_DDRSDRC_LPR);
+ 		lpr1 = saved_lpr1 & ~AT91_DDRSDRC_LPCB;
+@@ -287,6 +293,9 @@ static void at91_ddr_standby(void)
+ 	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0);
+ 	if (at91_ramc_base[1])
+ 		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
++
++	if (at91_pm_data.has_l2_cache)
++		outer_resume();
+ }
+ 
+ /* We manage both DDRAM/SDRAM controllers, we need more than one value
+ * to
+@@ -353,6 +362,11 @@ static __init void at91_dt_ramc(void)
+ 		return;
+ 	}
+ 
++	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
++	if (np)
++		at91_pm_data.has_l2_cache = true;
++	of_node_put(np);
++
+ 	at91_pm_set_standby(standby);
+ }
+
+
+This has the following benefits:
+ - everybody will have the fix, regardless of whether the dtb is updated
+ - has_l2_cache can be used later in at91_pm_suspend instead of calling
+   it unconditionnaly (I'll send a patch)
+
+
+On 06/01/2017 at 14:59:45 +0800, Wenyou Yang wrote :
+> For the SoCs such as SAMA5D2 and SAMA5D4 which have L2 cache,
+> flush the L2 cache first before entering the cpu idle.
 > 
-> On Tue, 16 Feb 2016 13:01:19 -0200 Fabio Estevam wrote:
-> > On Thu, Feb 11, 2016 at 6:40 AM, Uwe Kleine-K?nig
-> > <u.kleine-koenig@pengutronix.de> wrote:
-> > 
-> > > root at hostname:/sys/kernel/debug/clk find -name saif?_sel
-> > > ./ref_xtal/pll0/saif0_sel
-> > > ./ref_xtal/pll0/saif1_sel
-> > > 
-> > > root at hostname:/sys/kernel/debug/clk cat
-> > > ./ref_xtal/pll0/saif?_sel/clk_rate
-> > > 480000000
-> > > 480000000
-> > 
-> > Ok, what about the SAIF0 and SAIF1 sampling rates: are they always
-> > the same?
-> > 
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> ---
 > 
-> Yes, of course. The driver wouldn't allow using both interfaces with
-> different sample rates any way.
+>  arch/arm/mach-at91/pm.c       | 19 +++++++++++++++++++
+>  drivers/memory/atmel-sdramc.c |  1 +
+>  2 files changed, 20 insertions(+)
+> 
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index b4332b727e9c..1a60dede1a01 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -289,6 +289,24 @@ static void at91_ddr_standby(void)
+>  		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
+>  }
+>  
+> +static void at91_ddr_cache_standby(void)
+> +{
+> +	u32 saved_lpr;
+> +
+> +	flush_cache_all();
+> +	outer_disable();
+> +
+> +	saved_lpr = at91_ramc_read(0, AT91_DDRSDRC_LPR);
+> +	at91_ramc_write(0, AT91_DDRSDRC_LPR, (saved_lpr &
+> +			(~AT91_DDRSDRC_LPCB)) | AT91_DDRSDRC_LPCB_SELF_REFRESH);
+> +
+> +	cpu_do_idle();
+> +
+> +	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr);
+> +
+> +	outer_resume();
+> +}
+> +
+>  /* We manage both DDRAM/SDRAM controllers, we need more than one value to
+>   * remember.
+>   */
+> @@ -324,6 +342,7 @@ static const struct of_device_id const ramc_ids[] __initconst = {
+>  	{ .compatible = "atmel,at91sam9260-sdramc", .data = at91sam9_sdram_standby },
+>  	{ .compatible = "atmel,at91sam9g45-ddramc", .data = at91_ddr_standby },
+>  	{ .compatible = "atmel,sama5d3-ddramc", .data = at91_ddr_standby },
+> +	{ .compatible = "atmel,sama5d4-ddramc", .data = at91_ddr_cache_standby },
+>  	{ /*sentinel*/ }
+>  };
+>  
+> diff --git a/drivers/memory/atmel-sdramc.c b/drivers/memory/atmel-sdramc.c
+> index b418b39af180..7e5c5c6c1348 100644
+> --- a/drivers/memory/atmel-sdramc.c
+> +++ b/drivers/memory/atmel-sdramc.c
+> @@ -48,6 +48,7 @@ static const struct of_device_id atmel_ramc_of_match[] = {
+>  	{ .compatible = "atmel,at91sam9260-sdramc", .data = &at91rm9200_caps, },
+>  	{ .compatible = "atmel,at91sam9g45-ddramc", .data = &at91sam9g45_caps, },
+>  	{ .compatible = "atmel,sama5d3-ddramc", .data = &sama5d3_caps, },
+> +	{ .compatible = "atmel,sama5d4-ddramc", .data = &sama5d3_caps, },
+>  	{},
+>  };
+>  
+> -- 
+> 2.11.0
+> 
 
-Are there any updates about this issue?
-
-I am facing the same problem when using SAIF1 for capture and SAIF0 for
-playback. SAIF1 uses SAIF0 as the master and I do set
-MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0 when bringing up the board. However,
-whenever I record with
-
-$ arecord -D hw:0,1 -t wav -c 2 -r 48000 -f S16_LE -d 5 /tmp/out.wav
-
-and playback afterwards:
-
-$ aplay -D hw:0,0 /tmp/out.wav
-
-I only get noise.
-
-Note, that I am using the Audio Codec Board from Mikroelectronika, but
-replaced the on-board 12.288MHz quarz with the MCLK line from SAIF0.
-
-Best regards,
-J?rg Krause
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
