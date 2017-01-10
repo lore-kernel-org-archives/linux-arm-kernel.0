@@ -1,60 +1,74 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 10 Jan 2017 18:51:24 +0100
-Subject: [GIT PULL] Allwinner fixes for 4.10
-Message-ID: <20170110175124.oqlucb6a2qut2ten@lukather>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 10 Jan 2017 17:51:17 +0000
+Subject: [PATCH v2 1/2] virtio_mmio: Set DMA masks appropriately
+Message-ID: <85015f1653eb7e36f992708362b75d1f4391b783.1484070340.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Once DMA API usage is enabled, it becomes apparent that virtio-mmio is
+inadvertently relying on the default 32-bit DMA mask, which leads to
+problems like rapidly exhausting SWIOTLB bounce buffers.
 
-Please pull the following changes for 4.10.
+Ensure that we set the appropriate 64-bit DMA mask whenever possible,
+with the coherent mask suitably limited for the legacy vring as per
+a0be1db4304f ("virtio_pci: Limit DMA mask to 44 bits for legacy virtio
+devices").
 
-Thanks!
-Maxime
+Cc: Andy Lutomirski <luto@kernel.org>
+Cc: Michael S. Tsirkin <mst@redhat.com>
+Reported-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+Fixes: b42111382f0e ("virtio_mmio: Use the DMA API if enabled")
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/virtio/virtio_mmio.c | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
-
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-fixes-for-4.10
-
-for you to fetch changes up to 3116d37651d77125bf50f81f859b1278e02ccce6:
-
-  ARM: dts: sunxi: Change node name for pwrseq pin on Olinuxino-lime2-emmc (2017-01-10 18:33:16 +0100)
-
-----------------------------------------------------------------
-Allwinner fixes for 4.10
-
-A few fixes here and there to enable the build of some DT leftover, prevent
-display issues or setup a proper muxing.
-
-----------------------------------------------------------------
-Chen-Yu Tsai (2):
-      ARM: dts: sun6i: Disable display pipeline by default
-      ARM: dts: sun6i: hummingbird: Enable display engine again
-
-Emmanuel Vadot (1):
-      ARM: dts: sunxi: Change node name for pwrseq pin on Olinuxino-lime2-emmc
-
-Milo Kim (1):
-      ARM: dts: sun8i: Support DTB build for NanoPi M1
-
- arch/arm/boot/dts/Makefile                           | 1 +
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts          | 4 ++++
- arch/arm/boot/dts/sun6i-a31.dtsi                     | 1 +
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts | 2 +-
- 4 files changed, 7 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+index d47a2fcef818..c71fde5fe835 100644
+--- a/drivers/virtio/virtio_mmio.c
++++ b/drivers/virtio/virtio_mmio.c
+@@ -59,6 +59,7 @@
+ #define pr_fmt(fmt) "virtio-mmio: " fmt
+ 
+ #include <linux/acpi.h>
++#include <linux/dma-mapping.h>
+ #include <linux/highmem.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+@@ -498,6 +499,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
+ 	struct virtio_mmio_device *vm_dev;
+ 	struct resource *mem;
+ 	unsigned long magic;
++	int rc;
+ 
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!mem)
+@@ -547,9 +549,25 @@ static int virtio_mmio_probe(struct platform_device *pdev)
+ 	}
+ 	vm_dev->vdev.id.vendor = readl(vm_dev->base + VIRTIO_MMIO_VENDOR_ID);
+ 
+-	if (vm_dev->version == 1)
++	if (vm_dev->version == 1) {
+ 		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
+ 
++		rc = dma_set_mask(&pdev->dev, DMA_BIT_MASK(64));
++		/*
++		 * In the legacy case, ensure our coherently-allocated virtio
++		 * ring will be at an address expressable as a 32-bit PFN.
++		 */
++		if (!rc)
++			dma_set_coherent_mask(&pdev->dev,
++					      DMA_BIT_MASK(32 + PAGE_SHIFT));
++	} else {
++		rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
++	}
++	if (rc)
++		rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
++	if (rc)
++		dev_warn(&pdev->dev, "Failed to enable 64-bit or 32-bit DMA.  Trying to continue, but this might not work.\n");
++
+ 	platform_set_drvdata(pdev, vm_dev);
+ 
+ 	return register_virtio_device(&vm_dev->vdev);
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170110/5ec32ec7/attachment.sig>
+2.10.2.dirty
