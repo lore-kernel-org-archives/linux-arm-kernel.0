@@ -1,26 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 10 Jan 2017 17:15:00 +0000
-Subject: [PATCH v4 0/9] arm64: Expose CPUID registers via emulation
-In-Reply-To: <1483982912-27215-1-git-send-email-suzuki.poulose@arm.com>
-References: <1483982912-27215-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20170110171459.GH527@arm.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Tue, 10 Jan 2017 11:17:46 -0600
+Subject: [PATCH v12 1/7] arm64: Rename the common MADT parse routine
+In-Reply-To: <1484068672-15852-1-git-send-email-jeremy.linton@arm.com>
+References: <1484068672-15852-1-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1484068672-15852-2-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 05:28:23PM +0000, Suzuki K Poulose wrote:
-> This series adds a new ABI to expose the CPU feature registers
-> to the user space via emulation of MRS instruction. The system exposes
-> only a limited set of feature values (See the documentation patch)
-> from the cpufeature infrastructure. The feature bits that are not
-> exposed are set to the 'safe value' which implies 'not supported'.
-> 
-> Apart from the selected feature registers, we expose MIDR_EL1 (Main
-> ID Register). The user should be aware that, reading MIDR_EL1 can be
-> tricky on a heterogeneous system (just like getcpu()). We export the
-> value of the current CPU where 'MRS' is executed.
-> 
-> Applies on v4.10-rc3.
+The MADT parser in smp.c is now being used to parse
+out NUMA, PMU and ACPI parking protocol information as
+well as the GIC information for which it was originally
+created. Rename it to avoid a misleading name.
 
-Thanks, I'll queue this for 4.11.
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ arch/arm64/kernel/smp.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-Will
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index cb87234..8ea244c 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -517,13 +517,14 @@ static unsigned int cpu_count = 1;
+ 
+ #ifdef CONFIG_ACPI
+ /*
+- * acpi_map_gic_cpu_interface - parse processor MADT entry
++ * acpi_verify_and_map_madt - parse processor MADT entry
+  *
+  * Carry out sanity checks on MADT processor entry and initialize
+- * cpu_logical_map on success
++ * cpu_logical_map, the ACPI parking protocol, NUMA mapping
++ * and the PMU interrupts on success
+  */
+ static void __init
+-acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
++acpi_verify_and_map_madt(struct acpi_madt_generic_interrupt *processor)
+ {
+ 	u64 hwid = processor->arm_mpidr;
+ 
+@@ -577,7 +578,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+ }
+ 
+ static int __init
+-acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
++acpi_parse_madt_common(struct acpi_subtable_header *header,
+ 			     const unsigned long end)
+ {
+ 	struct acpi_madt_generic_interrupt *processor;
+@@ -588,7 +589,7 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+ 
+ 	acpi_table_print_madt_entry(header);
+ 
+-	acpi_map_gic_cpu_interface(processor);
++	acpi_verify_and_map_madt(processor);
+ 
+ 	return 0;
+ }
+@@ -672,7 +673,7 @@ void __init smp_init_cpus(void)
+ 		 * we need for SMP init
+ 		 */
+ 		acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+-				      acpi_parse_gic_cpu_interface, 0);
++				      acpi_parse_madt_common, 0);
+ 
+ 	if (cpu_count > nr_cpu_ids)
+ 		pr_warn("Number of cores (%d) exceeds configured maximum of %d - clipping\n",
+-- 
+2.5.5
