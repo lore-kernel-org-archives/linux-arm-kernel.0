@@ -1,79 +1,54 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 10 Jan 2017 14:57:41 +0000
-Subject: [PATCH v6 05/14] ACPI: platform-msi: retrieve dev id from IORT
-In-Reply-To: <237ca4dc-07ce-0104-27f2-5437b7c7718e@linaro.org>
-References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
- <1483363905-2806-6-git-send-email-hanjun.guo@linaro.org>
- <20170104191805.GE8604@red-moon>
- <eb1a8149-7c46-39bc-f655-58ca6345f40a@linaro.org>
- <20170105151530.GA30852@red-moon>
- <237ca4dc-07ce-0104-27f2-5437b7c7718e@linaro.org>
-Message-ID: <20170110145741.GA17967@red-moon>
+From: hch@lst.de (Christoph Hellwig)
+Date: Tue, 10 Jan 2017 15:57:16 +0100
+Subject: [PATCH v2] arm64: do not set dma masks that device connection
+ can't handle
+In-Reply-To: <11daacde-5399-039f-80a3-01d7bd13e9e8@arm.com>
+References: <1483947002-16410-1-git-send-email-nikita.yoush@cogentembedded.com>
+ <20170110115132.GD21598@arm.com>
+ <07253eaa-5729-0f15-42b6-e8403f1f0412@cogentembedded.com>
+ <11daacde-5399-039f-80a3-01d7bd13e9e8@arm.com>
+Message-ID: <20170110145716.GD27156@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 09:39:39PM +0800, Hanjun Guo wrote:
+On Tue, Jan 10, 2017 at 01:25:12PM +0000, Robin Murphy wrote:
+> We still need a way for drivers to communicate a device's probed
+> addressing capability to SWIOTLB, so there's always going to have to be
+> *some* sort of public interface. Personally, the change in semantics I'd
+> like to see is to make dma_set_mask() only fail if DMA is entirely
+> disallowed - in the normal case it would always succeed, but the DMA API
+> implementation would be permitted to set a smaller mask than requested
+> (this is effectively what the x86 IOMMU ops do already).
 
-[...]
+Yes, this sounds reasonable.
 
-> >What you can do is create a wrapper, say iort_node_map_platform_id()
-> >(whose signature is equivalent to iort_node_map_rid() minus rid_in)
-> >that carries out the two steps outlined above.
-> >
-> >To do that I suggest the following:
-> >
-> >(1) I send a patch to "fix" iort_node_get_id() (ie index issue you
-> >    reported)
+> The significant
+> work that would require, though, is changing all the drivers currently
+> using this sort of pattern:
 > 
-> I prepared two simple patches, one is for fix the indentation and
-> the other is adding the missing kernel-doc comment, how about
-> sending the out for 4.10-rcx?
+> 	if (!dma_set_mask(dev, DMA_BIT_MASK(64))
+> 		/* put device into 64-bit mode */
+> 	else if (!dma_set_mask(dev, DMA_BIT_MASK(32))
+> 		/* put device into 32-bit mode */
+> 	else
+> 		/* error */
 
-For me it is fine depending on how Rafael wants to handle them,
-ie if he can batch those with the eg iort_node_get_id() fix I have
-just sent:
+While we have this pattern in a lot of places it's already rather
+pointless on most architectures as the first dma_set_mask call
+won't ever fail for the most common dma_ops implementations.
 
-https://patchwork.kernel.org/patch/9507041/
-
-> >(2) We remove type_mask handling from iort_node_get_id()
+> to something like this:
 > 
-> iort_node_get_id() for now only supports id single mappings,
-> Do we need to extend it for multi id mappings? seems Sinan's
-> platform have such cases.
-
-I am not really sure I understand what you mean here.
-
-> >(3) We create iort_node_map_platform_id() that (pseudo-code, I can
-> >    write the patch if it is clearer):
-> >
-> >struct acpi_iort_node *iort_node_map_platform_id(u8 type_mask, int index,
-> >						 ...)
-> >{
-> >	u32 id, id_out;
-> >	struct acpi_iort_node *parent = iort_node_get_id(&id, index);
-> >
-> >	if (!parent)
-> >		return NULL;
-> >
-> >	/* we should probably rename iort_node_map_rid() too */
-> >	if (!(IORT_TYPE_MASK(parent->type) & type_mask)
-> >		parent = iort_node_map_rid(parent, id, &id_out, type_mask);
-> >
-> >	return parent;
-> >}
-> >
-> >(4) we update current iort_node_get_id() users and move them over
-> >    to iort_node_map_platform_id()
+> 	if (!dma_set_mask(dev, DMA_BIT_MASK(64))
+> 		/* error */
+> 	if (dma_get_mask(dev) > DMA_BIT_MASK(32))
+> 		/* put device into 64-bit mode */
+> 	else
+> 		/* put device into 32-bit mode */
 > 
-> I think we need to prepare one patch for the above steps, or it
-> have functional changes for iort_node_get_id(), for example we
-> removed the type_mask handling from iort_node_get_id() and it
-> will break the case for SMMU if we only have requester id entries.
+> Which would be a pretty major job.
 
-If the question is "should we apply this change as a single logical
-patch" the answer is yes, it looks a simple one to me (basically
-it implies writing the function above and update the iort_node_get_id()
-existing callers with it). Does this answer your question ?
-
-Thanks !
-Lorenzo
+I don't think it's too bad.  Also for many modern devices there is no
+need to put the device into a specific mode.  It's mostly a historic
+issue from the PCI/PCI-X days with the less efficient DAC addressing
+scheme.
