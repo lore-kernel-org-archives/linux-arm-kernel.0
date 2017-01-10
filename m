@@ -1,81 +1,79 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Tue, 10 Jan 2017 16:54:49 +0200
-Subject: [PATCH] virtio_mmio: Set DMA masks appropriately
-In-Reply-To: <50defbbe87d75db85a9d22f914258975d661208a.1484051089.git.robin.murphy@arm.com>
-References: <50defbbe87d75db85a9d22f914258975d661208a.1484051089.git.robin.murphy@arm.com>
-Message-ID: <20170110165221-mutt-send-email-mst@kernel.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 10 Jan 2017 14:57:41 +0000
+Subject: [PATCH v6 05/14] ACPI: platform-msi: retrieve dev id from IORT
+In-Reply-To: <237ca4dc-07ce-0104-27f2-5437b7c7718e@linaro.org>
+References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
+ <1483363905-2806-6-git-send-email-hanjun.guo@linaro.org>
+ <20170104191805.GE8604@red-moon>
+ <eb1a8149-7c46-39bc-f655-58ca6345f40a@linaro.org>
+ <20170105151530.GA30852@red-moon>
+ <237ca4dc-07ce-0104-27f2-5437b7c7718e@linaro.org>
+Message-ID: <20170110145741.GA17967@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 12:26:01PM +0000, Robin Murphy wrote:
-> Once DMA API usage is enabled, it becomes apparent that virtio-mmio is
-> inadvertently relying on the default 32-bit DMA mask, which leads to
-> problems like rapidly exhausting SWIOTLB bounce buffers.
+On Tue, Jan 10, 2017 at 09:39:39PM +0800, Hanjun Guo wrote:
+
+[...]
+
+> >What you can do is create a wrapper, say iort_node_map_platform_id()
+> >(whose signature is equivalent to iort_node_map_rid() minus rid_in)
+> >that carries out the two steps outlined above.
+> >
+> >To do that I suggest the following:
+> >
+> >(1) I send a patch to "fix" iort_node_get_id() (ie index issue you
+> >    reported)
 > 
-> Ensure that we set the appropriate 64-bit DMA mask whenever possible,
-> with the coherent mask suitably limited for the legacy vring as per
-> a0be1db4304f ("virtio_pci: Limit DMA mask to 44 bits for legacy virtio
-> devices").
+> I prepared two simple patches, one is for fix the indentation and
+> the other is adding the missing kernel-doc comment, how about
+> sending the out for 4.10-rcx?
+
+For me it is fine depending on how Rafael wants to handle them,
+ie if he can batch those with the eg iort_node_get_id() fix I have
+just sent:
+
+https://patchwork.kernel.org/patch/9507041/
+
+> >(2) We remove type_mask handling from iort_node_get_id()
 > 
-> Reported-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> Fixes: b42111382f0e ("virtio_mmio: Use the DMA API if enabled")
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/virtio/virtio_mmio.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+> iort_node_get_id() for now only supports id single mappings,
+> Do we need to extend it for multi id mappings? seems Sinan's
+> platform have such cases.
+
+I am not really sure I understand what you mean here.
+
+> >(3) We create iort_node_map_platform_id() that (pseudo-code, I can
+> >    write the patch if it is clearer):
+> >
+> >struct acpi_iort_node *iort_node_map_platform_id(u8 type_mask, int index,
+> >						 ...)
+> >{
+> >	u32 id, id_out;
+> >	struct acpi_iort_node *parent = iort_node_get_id(&id, index);
+> >
+> >	if (!parent)
+> >		return NULL;
+> >
+> >	/* we should probably rename iort_node_map_rid() too */
+> >	if (!(IORT_TYPE_MASK(parent->type) & type_mask)
+> >		parent = iort_node_map_rid(parent, id, &id_out, type_mask);
+> >
+> >	return parent;
+> >}
+> >
+> >(4) we update current iort_node_get_id() users and move them over
+> >    to iort_node_map_platform_id()
 > 
-> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
-> index 48bfea91dbca..b5c5d49ca598 100644
-> --- a/drivers/virtio/virtio_mmio.c
-> +++ b/drivers/virtio/virtio_mmio.c
-> @@ -59,6 +59,7 @@
->  #define pr_fmt(fmt) "virtio-mmio: " fmt
->  
->  #include <linux/acpi.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/highmem.h>
->  #include <linux/interrupt.h>
->  #include <linux/io.h>
-> @@ -497,6 +498,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
->  	struct virtio_mmio_device *vm_dev;
->  	struct resource *mem;
->  	unsigned long magic;
-> +	int rc;
->  
->  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	if (!mem)
-> @@ -548,6 +550,14 @@ static int virtio_mmio_probe(struct platform_device *pdev)
->  	if (vm_dev->version == 1)
->  		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
->  
-> +	rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
-> +	if (rc)
-> +		rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-> +	else if (vm_dev->version == 1)
-> +		dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32 + PAGE_SHIFT));
+> I think we need to prepare one patch for the above steps, or it
+> have functional changes for iort_node_get_id(), for example we
+> removed the type_mask handling from iort_node_get_id() and it
+> will break the case for SMMU if we only have requester id entries.
 
-That's a very convoluted way to do this, for version 1 you
-set coherent mask to 64 then override it.
-why not
+If the question is "should we apply this change as a single logical
+patch" the answer is yes, it looks a simple one to me (basically
+it implies writing the function above and update the iort_node_get_id()
+existing callers with it). Does this answer your question ?
 
-if (vm_dev->version == 1) {
-	dma_set_mask
-	dma_set_coherent_mask
-} else {
-	dma_set_mask_and_coherent
-}
-
-if (rc)
-	dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-
-> +	if (rc)
-> +		dev_warn(&pdev->dev, "Failed to enable 64-bit or 32-bit DMA.  Trying to continue, but this might not work.\n");
-> +
-
-is there a chance it actually still might work?
-
->  	platform_set_drvdata(pdev, vm_dev);
->  
->  	return register_virtio_device(&vm_dev->vdev);
-> -- 
-> 2.10.2.dirty
+Thanks !
+Lorenzo
