@@ -1,31 +1,39 @@
-From: arnd@linaro.org (Arnd Bergmann)
-Date: Tue, 10 Jan 2017 11:54:26 +0100
-Subject: NVMe vs DMA addressing limitations
-In-Reply-To: <20170110070719.GA17208@lst.de>
-References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
- <e084dbad-29ab-25bd-5e17-da0fcd92f7ac@cogentembedded.com>
- <20170110070719.GA17208@lst.de>
-Message-ID: <1967203.EWsxCL11oI@wuerfel>
+From: tanxiaojun@huawei.com (Tan Xiaojun)
+Date: Tue, 10 Jan 2017 18:54:36 +0800
+Subject: [QUESTION] Arm64: Query L3 cache info via DT
+In-Reply-To: <536f64cc-357c-40a1-b2a0-1db0c4280fc0@arm.com>
+References: <58633494.9030708@huawei.com>
+ <81784854-11f8-468a-a280-69be0a714a3b@arm.com> <5874A03A.9000901@huawei.com>
+ <536f64cc-357c-40a1-b2a0-1db0c4280fc0@arm.com>
+Message-ID: <5874BD6C.7060008@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 10, 2017 8:07:20 AM CET Christoph Hellwig wrote:
-> On Tue, Jan 10, 2017 at 09:47:21AM +0300, Nikita Yushchenko wrote:
-> > I'm now working with HW that:
-> > - is now way "low end" or "obsolete", it has 4G of RAM and 8 CPU cores,
-> > and is being manufactured and developed,
-> > - has 75% of it's RAM located beyond first 4G of address space,
-> > - can't physically handle incoming PCIe transactions addressed to memory
-> > beyond 4G.
+On 2017/1/10 18:01, Sudeep Holla wrote:
 > 
-> It might not be low end or obselete, but it's absolutely braindead.
-> Your I/O performance will suffer badly for the life of the platform
-> because someone tries to save 2 cents, and there is not much we can do
-> about it.
+> 
+> On 10/01/17 08:50, Tan Xiaojun wrote:
+>> I add this patch, and test in Hisilicon D02/D03. It can work well.
+>>
+>> I'm sorry to reply so late. I took some time to debug, because I am not familiar with the code.
+>>
+>>> +	if (level < of_level) {
+>>> +		/*
+>>> +		 * some external caches not specified in CLIDR_EL1
+>>> +		 * the information may be available in the device tree
+>>> +		 * only unified external caches are considered here
+>>> +		 */
+>>> +		level = of_level;
+>>> +		leaves += (of_level - level);
+>>
+>> The above two lines need to exchange the location.
+>>
+> 
+> Ah crap, sorry for such a silly mistake.
+> I will post proper patch(es) soon.
+> 
 
-Unfortunately it is a common problem for arm64 chips that were designed
-by taking a 32-bit SoC and replacing the CPU core. The swiotlb is the
-right workaround for this, and I think we all agree that we should
-just make it work correctly.
+OK. Wait for your new patch. ^_^
 
-	Arnd
+Thanks.
+Xiaojun.
