@@ -1,34 +1,30 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 10 Jan 2017 19:10:06 +0100
-Subject: [PATCH 2/5] clk: sunxi-ng: add support for V3s CCU
-In-Reply-To: <20170103151629.19447-3-icenowy@aosc.xyz>
-References: <20170103151629.19447-1-icenowy@aosc.xyz>
- <20170103151629.19447-3-icenowy@aosc.xyz>
-Message-ID: <20170110181006.yrd6moy2mctzoc4c@lukather>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 10 Jan 2017 18:16:07 +0000
+Subject: next-20170110 build: 1 failures 4 warnings (next-20170110)
+In-Reply-To: <E1cQqkO-0005XB-2K@optimist>
+References: <E1cQqkO-0005XB-2K@optimist>
+Message-ID: <20170110181607.dp6giaxyeczykmv4@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 11:16:26PM +0800, Icenowy Zheng wrote:
-> V3s has a similar but cut-down CCU to H3.
-> 
-> Add support for it.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+On Tue, Jan 10, 2017 at 07:21:32AM +0000, Build bot for Mark Brown wrote:
 
-It looks like there's nothing different but the clocks that you
-register with the H3, please just use the H3 driver.
+Today's -next fails to build an arm allmodconfig due to:
 
-Thanks!
-Maxime
+> 	arm-allmodconfig
+> ../drivers/net/ethernet/ti/netcp_core.c:1951:28: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+caused by 6a8162e99ef344 (net: netcp: store network statistics in 64
+bits).  It's assigning the function
+
+  static struct rtnl_link_stats64 *
+  netcp_get_stats(struct net_device *ndev, struct rtnl_link_stats64 *stats)
+
+to ndo_get_stats64 which expects a function returning void.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 801 bytes
+Size: 488 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170110/8a227678/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170110/7194228e/attachment.sig>
