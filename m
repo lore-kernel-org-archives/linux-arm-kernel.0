@@ -1,95 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 10 Jan 2017 12:10:26 +0000
-Subject: [RFC PATCH 1/5] regulator: Extend the power-management APIs
-In-Reply-To: <20170110093355.700f8225@bbrezillon>
-References: <1480687036-5037-1-git-send-email-boris.brezillon@free-electrons.com>
- <1480687036-5037-2-git-send-email-boris.brezillon@free-electrons.com>
- <20170109191758.7zzxeh45pvwiw3jo@sirena.org.uk>
- <20170110093355.700f8225@bbrezillon>
-Message-ID: <20170110121026.zstf7a6cflzk366l@sirena.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 10 Jan 2017 11:57:17 +0000
+Subject: [PATCH v7 16/19] irqchip/gicv3-its: Sets IRQ_DOMAIN_FLAG_MSI_REMAP
+In-Reply-To: <1483969570-3154-17-git-send-email-eric.auger@redhat.com>
+References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
+ <1483969570-3154-17-git-send-email-eric.auger@redhat.com>
+Message-ID: <7eb4fde8-93fd-3046-a261-06c62a14c8da@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 09:33:55AM +0100, Boris Brezillon wrote:
-> Mark Brown <broonie@kernel.org> wrote:
+Hi Eric,
 
-> > However it
-> > *is* a bit more than just making sure that the device suspend ordering
-> > is good (though that's definitely part of it), there will be things
-> > kicked off by hardware signalling without software knowing about it.
+On 09/01/17 13:46, Eric Auger wrote:
+> The GICv3 ITS is MSI remapping capable. Let's advertise
+> this property so that VFIO passthrough can assess IRQ safety.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 69b040f..9d4fefc 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1642,6 +1642,7 @@ static int its_init_domain(struct fwnode_handle *handle, struct its_node *its)
+>  
+>  	inner_domain->parent = its_parent;
+>  	inner_domain->bus_token = DOMAIN_BUS_NEXUS;
+> +	inner_domain->flags |= IRQ_DOMAIN_FLAG_MSI_REMAP;
+>  	info->ops = &its_msi_domain_ops;
+>  	info->data = its;
+>  	inner_domain->host_data = info;
+> 
 
-> Do you have an example, so that I can understand the use case?
+For patches 13 to 16, and provided that you address the couple of nits I
+mentioned in reply to patches 13 and 15:
 
-Think about how a CPU suspends and signals the PMIC to go into suspend
-mode - things signalled by hardware state changes that the hardware does
-autonomously.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> > Anything that doesn't affect a hardware supported runtime state probably
-> > needs to be split off and handled separately as that's the much more
-> > risky bit
+Thanks,
 
-> Just to be sure, you mean regulator devices that do not support the
-> ->set_suspend_xx() hooks, right?
-
-Yes.
-
-> >, moving changing of suspend mode earlier isn't going to cause
-> > too much grief, that patch should just be split out and can probably
-> > just go straight in.
-
-> Yes, I just thought it would be clearer to have everything implemented
-> in the same function. Since calling ->set_suspend_xx() does not have
-> any impact on the runtime state, it can be called whenever we want
-> (assuming we can still communicate with the regulator device to
-> configure this suspend state).
-> But if you prefer to have it split out in 2 different function, with the
-> 'set suspend mode' bits called from the regulator_suspend_begin(), I'm
-> fine with that.
-
-No, I'm mainly saying that these things should be done in two separate
-patches rather than talking about how the end code looks.  To a large
-extent it does't matter when we apply the hardware supported suspend
-modes, they won't take effect while software is running anyway.
-
-> > Requring these functions to be called from every single driver seems
-> > like we're doing something wrong - if we're going to do this we should
-> > find some way to loop over all regulators and apply any unapplied
-> > changes.
-
-> I agree. Actually, I forgot that we had PM ops at the device class
-> level. Maybe we could just move these generic ->suspend()/->resume()
-> implementation here.
-
-Yeah, I need to check if those class level operations always get run.
-
-> > Batching things up at the end of suspend would also mean that
-> > we'd be able to minimise the chances that we get the ordering wrong.
-
-> Unfortunately that's not possible, for the exact same reason calling
-> regulator_suspend_prepare() from the platform ->prepare() hook did not
-> work for me: at that point, all devices have been suspended, and this
-> includes the i2c controller which we're using to communicate with the
-> PMIC exposing those regulators.
-
-Do those devices actually get meaningfully suspended on your system, and
-even on systems where we do if we are going to use the dependency graphs
-we should be able to arrange to do something with that to reorder both
-them and the regulators to as near the end of the queue as we can get
-tehm - that way we minimise the chances of being bitten by any
-unexpressed depdencies (which I expect we have a lot of given how
-resistant people are to writing proper DTs).
-
-> 2/ Rely on the device model dependency graph, and enter the suspend
->    state when the regulator device is being suspended (this is the
->    solution I'm proposing in this patch).
-
-That's future work though (which is happening but still), right now we
-know the graph doesn't work properly.  It also leaves us more open to
-unexpressed dependencies which are
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170110/d6f8b633/attachment.sig>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
