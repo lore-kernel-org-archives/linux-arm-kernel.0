@@ -1,387 +1,221 @@
-From: sean@mess.org (Sean Young)
-Date: Tue, 10 Jan 2017 17:23:56 +0000
-Subject: [PATCH v2 2/2] media: rc: add driver for IR remote receiver on
- MT7623 SoC
-In-Reply-To: <1484056789.4057.17.camel@mtkswgap22>
-References: <1484039631-25120-1-git-send-email-sean.wang@mediatek.com>
- <1484039631-25120-3-git-send-email-sean.wang@mediatek.com>
- <20170110110943.GA24889@gofer.mess.org>
- <1484056789.4057.17.camel@mtkswgap22>
-Message-ID: <20170110172355.GA27008@gofer.mess.org>
+From: jintack@cs.columbia.edu (Jintack Lim)
+Date: Tue, 10 Jan 2017 12:27:19 -0500
+Subject: [RFC 6/8] KVM: arm/arm64: Update the physical timer interrupt
+ level
+In-Reply-To: <20170109121445.GF4348@cbox>
+References: <1482772326-29110-1-git-send-email-jintack@cs.columbia.edu>
+ <1482772326-29110-7-git-send-email-jintack@cs.columbia.edu>
+ <20170109121445.GF4348@cbox>
+Message-ID: <CAHyh4xge=A7z9B+aoZXYHB4M2_a6tRZVSiMk+QWXwV72mN4tpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+On Mon, Jan 9, 2017 at 7:14 AM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Mon, Dec 26, 2016 at 12:12:04PM -0500, Jintack Lim wrote:
+>> Now that we maintain the EL1 physical timer register states of the VM,
+>> update the physical timer interrupt level along with the virtual one.
+>>
+>> Note that the emulated EL1 physical timer is not mapped to any hardware
+>> timer, so we let vgic know that.
+>>
+>> With this commit, VMs are able to get the physical timer interrupts
+>> while they are runnable. But they won't get interrupts once vcpus go to
+>> sleep since we don't have code to wake vcpus up on the emulated physical
+>> timer expiration yet.
+>
+> I'm not sure I understand.  It looks to me like it's the other way
+> around and that this code supports waking up a sleeping VCPU sooner if
+> it has a physical timer scheduled, but doesn't yet support causing an
+> early exit from running the VPCU base on programing the physical timer?
+>
 
-The driver is looking very good, we are looking at minor details now.
+Ah, you are right. This was really two commits: one that checks the
+physical timer expiration on entry to the VM AND another one that sets
+up the background timer when the VM goes to sleep.
 
-On Tue, Jan 10, 2017 at 09:59:49PM +0800, Sean Wang wrote:
-> On Tue, 2017-01-10 at 11:09 +0000, Sean Young wrote:
-> 
-> > > +#include <linux/clk.h>
-> > > +#include <linux/interrupt.h>
-> > > +#include <linux/module.h>
-> > > +#include <linux/of_platform.h>
-> > > +#include <linux/reset.h>
-> > > +#include <media/rc-core.h>
-> > > +
-> > > +#define MTK_IR_DEV KBUILD_MODNAME
-> > 
-> > You could remove this #define and just use KBUILD_MODNAME
-> 
-> I preferred to use MTK_IR_DEV internally that helps
-> renaming in the future if necessary.
+I'll split this into two and put the correct commit messages.
 
-ok.
+Thanks,
+Jintack
 
-> >  
-> > > +
-> > > +/* Register to enable PWM and IR */
-> > > +#define MTK_CONFIG_HIGH_REG       0x0c
-> > > +/* Enable IR pulse width detection */
-> > > +#define MTK_PWM_EN		  BIT(13)
-> > > +/* Enable IR hardware function */
-> > > +#define MTK_IR_EN		  BIT(0)
-> > > +
-> > > +/* Register to setting sample period */
-> > > +#define MTK_CONFIG_LOW_REG        0x10
-> > > +/* Field to set sample period */
-> > > +#define CHK_PERIOD		  DIV_ROUND_CLOSEST(MTK_IR_SAMPLE,  \
-> > > +						    MTK_IR_CLK_PERIOD)
-> > > +#define MTK_CHK_PERIOD            (((CHK_PERIOD) << 8) & (GENMASK(20, 8)))
-> > > +#define MTK_CHK_PERIOD_MASK	  (GENMASK(20, 8))
-> > > +
-> > > +/* Register to clear state of state machine */
-> > > +#define MTK_IRCLR_REG             0x20
-> > > +/* Bit to restart IR receiving */
-> > > +#define MTK_IRCLR		  BIT(0)
-> > > +
-> > > +/* Register containing pulse width data */
-> > > +#define MTK_CHKDATA_REG(i)        (0x88 + 4 * (i))
-> > > +#define MTK_WIDTH_MASK		  (GENMASK(7, 0))
-> > > +
-> > > +/* Register to enable IR interrupt */
-> > > +#define MTK_IRINT_EN_REG          0xcc
-> > > +/* Bit to enable interrupt */
-> > > +#define MTK_IRINT_EN		  BIT(0)
-> > > +
-> > > +/* Register to ack IR interrupt */
-> > > +#define MTK_IRINT_CLR_REG         0xd0
-> > > +/* Bit to clear interrupt status */
-> > > +#define MTK_IRINT_CLR		  BIT(0)
-> > > +
-> > > +/* Maximum count of samples */
-> > > +#define MTK_MAX_SAMPLES		  0xff
-> > > +/* Indicate the end of IR message */
-> > > +#define MTK_IR_END(v, p)	  ((v) == MTK_MAX_SAMPLES && (p) == 0)
-> > > +/* Number of registers to record the pulse width */
-> > > +#define MTK_CHKDATA_SZ		  17
-> > > +/* Source clock frequency */
-> > > +#define MTK_IR_BASE_CLK		  273000000
-> > > +/* Frequency after IR internal divider */
-> > > +#define MTK_IR_CLK_FREQ		  (MTK_IR_BASE_CLK / 4)
-> 
-> > > +static irqreturn_t mtk_ir_irq(int irqno, void *dev_id)
-> > > +{
-> > > +	struct mtk_ir *ir = dev_id;
-> > > +	u8  wid = 0;
-> > > +	u32 i, j, val;
-> > > +	DEFINE_IR_RAW_EVENT(rawir);
-> > > +
-> > > +	mtk_irq_disable(ir, MTK_IRINT_EN);
-> > 
-> > The kernel guarantees that calls to the interrupt handler are serialised,
-> > no need to disable the interrupt in the handler.
-> 
-> agreed. I will save the mtk irq disable/enable and retest again.
-> 
-> 
-> > > +
-> > > +	/* Reset decoder state machine */
-> > > +	ir_raw_event_reset(ir->rc);
-> > 
-> > Not needed.
-> 
-> 
-> two reasons I added the line here
-> 
-> 1) 
-> I thought it is possible the decoder goes to the
-> middle state when getting the data not belonged
-> to the protocol. If so, that would cause the decoding
-> fails in the next time receiving the valid protocol data.
-
-The last IR event submitted will always be a long space, that's enough
-to reset the decoders. Adding a ir_raw_event_reset() will do this
-more explicitly, rather than their state machines resetting themselves
-through the trailing space.
-
-> 2) 
-> the mtk hardware register always contains the start of 
-> IR message. So force to sync the state between 
-> HW and ir-core.
-> 
-> 
-> 
-> > > +
-> > > +	/* First message must be pulse */
-> > > +	rawir.pulse = false;
-> > 
-> > pulse = true?
-> 
-> becasue of rawir.pulse = !rawir.pulse does as below
-> so the initial value is set as false.
-
-Ah, sorry, of course. :)
-
-> > > +
-> > > +	/* Handle all pulse and space IR controller captures */
-> > > +	for (i = 0 ; i < MTK_CHKDATA_SZ ; i++) {
-> > > +		val = mtk_r32(ir, MTK_CHKDATA_REG(i));
-> > > +		dev_dbg(ir->dev, "@reg%d=0x%08x\n", i, val);
-> > > +
-> > > +		for (j = 0 ; j < 4 ; j++) {
-> > > +			wid = (val & (MTK_WIDTH_MASK << j * 8)) >> j * 8;
-> > > +			rawir.pulse = !rawir.pulse;
-> > > +			rawir.duration = wid * (MTK_IR_SAMPLE + 1);
-> > > +			ir_raw_event_store_with_filter(ir->rc, &rawir);
-> > > +		}
-> > 
-> > In v1 you would break out of the loop if the ir message was shorter, but
-> > now you are always passing on 68 pulses and spaces. Is that right?
-> 
-> as I asked in the previous mail list as below i copied from it, so i
-> made some changes ...
-> 
-> """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-> > I had another question. I found multiple and same IR messages being
-> > received when using SONY remote controller. Should driver needs to
-> > report each message or only one of these to the upper layer ?
-> 
-> In general the driver shouldn't try to change any IR message, this
-> should be done in rc-core if necessary.
-> 
-> rc-core should handle this correctly. If the same key is received twice
-> within IR_KEYPRESS_TIMEOUT (250ms) then it not reported to the input
-> layer.
-> """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-> 
-> for example:
-> the 68 pulse/spaces might contains 2.x IR messages when I
-> pressed one key on SONY remote control. 
-> 
-> the v1 proposed is passing only one IR message into ir-core ; 
-> the v2 done is passing all IR messages even including the last
-> incomplete message into ir-core. 
-
-Yes, agreed. Sorry if I wasn't clear. I just wanted to make sure you've
-thought about what happens when the IR message is short (e.g. rc-5 with
-23 pulse-spaces). Are the remaining registers 0 or do we get stale data
-from a previous transmit?
-
-> But I was still afraid the state machine can't  go back to initial state
-> after receiving these incomplete data. 
-> 
-> So the ir_raw_event_reset() call in the beginning of ISR seems becoming
-> more important.
-> 
-> > > +	}
-> > > +
-> > > +	/* The maximum number of edges the IR controller can
-> > > +	 * hold is MTK_CHKDATA_SZ * 4. So if received IR messages
-> > > +	 * is over the limit, the last incomplete IR message would
-> > > +	 * be appended trailing space and still would be sent into
-> > > +	 * ir-rc-raw to decode. That helps it is possible that it
-> > > +	 * has enough information to decode a scancode even if the
-> > > +	 * trailing end of the message is missing.
-> > > +	 */
-> > > +	if (!MTK_IR_END(wid, rawir.pulse)) {
-> > > +		rawir.pulse = false;
-> > > +		rawir.duration = MTK_MAX_SAMPLES * (MTK_IR_SAMPLE + 1);
-> > > +		ir_raw_event_store_with_filter(ir->rc, &rawir);
-> > > +	}
-
-See here you add a long space if one was not added already.
-
-> > > +
-> > > +	ir_raw_event_handle(ir->rc);
-> > > +
-> > > +	/* Restart controller for the next receive */
-> > > +	mtk_w32_mask(ir, 0x1, MTK_IRCLR, MTK_IRCLR_REG);
-> > > +
-> > > +	/* Clear interrupt status */
-> > > +	mtk_w32_mask(ir, 0x1, MTK_IRINT_CLR, MTK_IRINT_CLR_REG);
-> > > +
-> > > +	/* Enable interrupt */
-> > > +	mtk_irq_enable(ir, MTK_IRINT_EN);
-> > > +
-> > > +	return IRQ_HANDLED;
-> > > +}
-> > > +
-> > > +static int mtk_ir_probe(struct platform_device *pdev)
-> > > +{
-> > > +	struct device *dev = &pdev->dev;
-> > > +	struct device_node *dn = dev->of_node;
-> > > +	struct resource *res;
-> > > +	struct mtk_ir *ir;
-> > > +	u32 val;
-> > > +	int ret = 0;
-> > > +	const char *map_name;
-> > > +
-> > > +	ir = devm_kzalloc(dev, sizeof(struct mtk_ir), GFP_KERNEL);
-> > > +	if (!ir)
-> > > +		return -ENOMEM;
-> > > +
-> > > +	ir->dev = dev;
-> > > +
-> > > +	if (!of_device_is_compatible(dn, "mediatek,mt7623-cir"))
-> > > +		return -ENODEV;
-> > > +
-> > > +	ir->clk = devm_clk_get(dev, "clk");
-> > > +	if (IS_ERR(ir->clk)) {
-> > > +		dev_err(dev, "failed to get a ir clock.\n");
-> > > +		return PTR_ERR(ir->clk);
-> > > +	}
-> > > +
-> > > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > > +	ir->base = devm_ioremap_resource(dev, res);
-> > > +	if (IS_ERR(ir->base)) {
-> > > +		dev_err(dev, "failed to map registers\n");
-> > > +		return PTR_ERR(ir->base);
-> > > +	}
-> > > +
-> > > +	ir->rc = devm_rc_allocate_device(dev, RC_DRIVER_IR_RAW);
-> > > +	if (!ir->rc) {
-> > > +		dev_err(dev, "failed to allocate device\n");
-> > > +		return -ENOMEM;
-> > > +	}
-> > > +
-> > > +	ir->rc->priv = ir;
-> > > +	ir->rc->input_name = MTK_IR_DEV;
-> > > +	ir->rc->input_phys = MTK_IR_DEV "/input0";
-> > > +	ir->rc->input_id.bustype = BUS_HOST;
-> > > +	ir->rc->input_id.vendor = 0x0001;
-> > > +	ir->rc->input_id.product = 0x0001;
-> > > +	ir->rc->input_id.version = 0x0001;
-> > > +	map_name = of_get_property(dn, "linux,rc-map-name", NULL);
-> > > +	ir->rc->map_name = map_name ?: RC_MAP_EMPTY;
-> > > +	ir->rc->dev.parent = dev;
-> > > +	ir->rc->driver_name = MTK_IR_DEV;
-> > > +	ir->rc->allowed_protocols = RC_BIT_ALL;
-> > > +	ir->rc->rx_resolution = MTK_IR_SAMPLE;
-> > > +	ir->rc->timeout = MTK_MAX_SAMPLES * (MTK_IR_SAMPLE + 1);
-> > > +
-> > > +	ret = devm_rc_register_device(dev, ir->rc);
-> > 
-> > Here you do devm_rc_register_device()
-> 
-> does it have problem ?
-
-Sorry, no. I just wanted to highlight wrt a comment below.
-> 
-> 
-> > > +	if (ret) {
-> > > +		dev_err(dev, "failed to register rc device\n");
-> > > +		return ret;
-> > > +	}
-> > > +
-> > > +	platform_set_drvdata(pdev, ir);
-> > > +
-> > > +	ir->irq = platform_get_irq(pdev, 0);
-> > > +	if (ir->irq < 0) {
-> > > +		dev_err(dev, "no irq resource\n");
-> > > +		return -ENODEV;
-> > > +	}
-> > > +
-> > > +	/* Enable interrupt after proper hardware
-> > > +	 * setup and IRQ handler registration
-> > > +	 */
-> > > +	if (clk_prepare_enable(ir->clk)) {
-> > > +		dev_err(dev, "try to enable ir_clk failed\n");
-> > > +		ret = -EINVAL;
-> > > +		goto exit_clkdisable_clk;
-> > > +	}
-> > > +
-> > > +	mtk_irq_disable(ir, MTK_IRINT_EN);
-> > > +
-> > > +	ret = devm_request_irq(dev, ir->irq, mtk_ir_irq, 0, MTK_IR_DEV, ir);
-> > > +	if (ret) {
-> > > +		dev_err(dev, "failed request irq\n");
-> > > +		goto exit_clkdisable_clk;
-> > > +	}
-> > > +
-> > > +	/* Enable IR and PWM */
-> > > +	val = mtk_r32(ir, MTK_CONFIG_HIGH_REG);
-> > > +	val |= MTK_PWM_EN | MTK_IR_EN;
-> > > +	mtk_w32(ir, val, MTK_CONFIG_HIGH_REG);
-> > > +
-> > > +	/* Setting sample period */
-> > > +	mtk_w32_mask(ir, MTK_CHK_PERIOD, MTK_CHK_PERIOD_MASK,
-> > > +		     MTK_CONFIG_LOW_REG);
-> > > +
-> > > +	mtk_irq_enable(ir, MTK_IRINT_EN);
-> > > +
-> > > +	dev_info(dev, "Initialized MT7623 IR driver, sample period = %luus\n",
-> > > +		 DIV_ROUND_CLOSEST(MTK_IR_SAMPLE, 1000));
-> > > +
-> > > +	return 0;
-> > > +
-> > > +exit_clkdisable_clk:
-> > > +	clk_disable_unprepare(ir->clk);
-> > > +
-> > > +	return ret;
-> > > +}
-> > > +
-> > > +static int mtk_ir_remove(struct platform_device *pdev)
-> > > +{
-> > > +	struct mtk_ir *ir = platform_get_drvdata(pdev);
-> > > +
-> > > +	/* Avoid contention between remove handler and
-> > > +	 * IRQ handler so that disabling IR interrupt and
-> > > +	 * waiting for pending IRQ handler to complete
-> > > +	 */
-> > > +	mtk_irq_disable(ir, MTK_IRINT_EN);
-> > > +	synchronize_irq(ir->irq);
-> > > +
-> > > +	clk_disable_unprepare(ir->clk);
-> > > +
-> > > +	rc_unregister_device(ir->rc);
-> > 
-> > Yet here you explicitly call rc_unregister_device(). Since it was registered
-> > with the devm call, this call is not needed and will lead to double frees etc
-> 
-> bug :( .  I will fix it ..
-> 
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +
-> > > +static const struct of_device_id mtk_ir_match[] = {
-> > > +	{ .compatible = "mediatek,mt7623-cir" },
-> > > +	{},
-> > > +};
-> > > +MODULE_DEVICE_TABLE(of, mtk_ir_match);
-> > > +
-> > > +static struct platform_driver mtk_ir_driver = {
-> > > +	.probe          = mtk_ir_probe,
-> > > +	.remove         = mtk_ir_remove,
-> > > +	.driver = {
-> > > +		.name = MTK_IR_DEV,
-> > > +		.of_match_table = mtk_ir_match,
-> > > +	},
-> > > +};
-> > > +
-> > > +module_platform_driver(mtk_ir_driver);
-> > > +
-> > > +MODULE_DESCRIPTION("Mediatek IR Receiver Controller Driver");
-> > > +MODULE_AUTHOR("Sean Wang <sean.wang@mediatek.com>");
-> > > +MODULE_LICENSE("GPL");
-> > > -- 
-> > > 2.7.4
-> > > 
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> Thanks,
+> -Christoffer
+>
+>>
+>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+>> ---
+>>  arch/arm/kvm/arm.c        |  3 +-
+>>  virt/kvm/arm/arch_timer.c | 76 ++++++++++++++++++++++++++++++++++++++---------
+>>  2 files changed, 64 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index 37d1623..d2dfa32 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -295,7 +295,8 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
+>>
+>>  int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
+>>  {
+>> -     return kvm_timer_should_fire(vcpu, vcpu_vtimer(vcpu));
+>> +     return kvm_timer_should_fire(vcpu, vcpu_vtimer(vcpu)) ||
+>> +             kvm_timer_should_fire(vcpu, vcpu_ptimer(vcpu));
+>>  }
+>>
+>>  void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
+>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+>> index ed80864..aa7e243 100644
+>> --- a/virt/kvm/arm/arch_timer.c
+>> +++ b/virt/kvm/arm/arch_timer.c
+>> @@ -91,7 +91,8 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
+>>       vcpu = container_of(work, struct kvm_vcpu, arch.timer_cpu.expired);
+>>       vcpu->arch.timer_cpu.armed = false;
+>>
+>> -     WARN_ON(!kvm_timer_should_fire(vcpu, vcpu_vtimer(vcpu)));
+>> +     WARN_ON(!kvm_timer_should_fire(vcpu, vcpu_vtimer(vcpu)) &&
+>> +             !kvm_timer_should_fire(vcpu, vcpu_ptimer(vcpu)));
+>>
+>>       /*
+>>        * If the vcpu is blocked we want to wake it up so that it will see
+>> @@ -130,6 +131,33 @@ static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu,
+>>       return 0;
+>>  }
+>>
+>> +static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx)
+>> +{
+>> +     return !(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
+>> +             (timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
+>> +}
+>> +
+>> +/*
+>> + * Returns minimal timer expiration time in ns among guest timers.
+>> + * Note that it will return inf time if none of timers can fire.
+>> + */
+>> +static u64 kvm_timer_min_block(struct kvm_vcpu *vcpu)
+>> +{
+>> +     u64 min_virt = ULLONG_MAX, min_phys = ULLONG_MAX;
+>> +     struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+>> +     struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+>> +
+>> +     if (kvm_timer_irq_can_fire(vtimer))
+>> +             min_virt = kvm_timer_compute_delta(vcpu, vtimer);
+>> +
+>> +     if (kvm_timer_irq_can_fire(ptimer))
+>> +             min_phys = kvm_timer_compute_delta(vcpu, ptimer);
+>> +
+>> +     WARN_ON((min_virt == ULLONG_MAX) && (min_phys == ULLONG_MAX));
+>> +
+>> +     return min(min_virt, min_phys);
+>> +}
+>> +
+>>  static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+>>  {
+>>       struct arch_timer_cpu *timer;
+>> @@ -144,7 +172,7 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+>>        * PoV (NTP on the host may have forced it to expire
+>>        * early). If we should have slept longer, restart it.
+>>        */
+>> -     ns = kvm_timer_compute_delta(vcpu, vcpu_vtimer(vcpu));
+>> +     ns = kvm_timer_min_block(vcpu);
+>>       if (unlikely(ns)) {
+>>               hrtimer_forward_now(hrt, ns_to_ktime(ns));
+>>               return HRTIMER_RESTART;
+>> @@ -154,12 +182,6 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+>>       return HRTIMER_NORESTART;
+>>  }
+>>
+>> -static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx)
+>> -{
+>> -     return !(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
+>> -             (timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
+>> -}
+>> -
+>>  bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
+>>                          struct arch_timer_context *timer_ctx)
+>>  {
+>> @@ -191,6 +213,21 @@ static void kvm_timer_update_mapped_irq(struct kvm_vcpu *vcpu, bool new_level,
+>>       WARN_ON(ret);
+>>  }
+>>
+>> +static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
+>> +                              struct arch_timer_context *timer)
+>> +{
+>> +     int ret;
+>> +
+>> +     BUG_ON(!vgic_initialized(vcpu->kvm));
+>> +
+>> +     timer->irq.level = new_level;
+>> +     trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
+>> +                                timer->irq.level);
+>> +     ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id, timer->irq.irq,
+>> +                               timer->irq.level);
+>> +     WARN_ON(ret);
+>> +}
+>> +
+>>  /*
+>>   * Check if there was a change in the timer state (should we raise or lower
+>>   * the line level to the GIC).
+>> @@ -198,6 +235,7 @@ static void kvm_timer_update_mapped_irq(struct kvm_vcpu *vcpu, bool new_level,
+>>  static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+>>  {
+>>       struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+>> +     struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+>>
+>>       /*
+>>        * If userspace modified the timer registers via SET_ONE_REG before
+>> @@ -211,6 +249,10 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+>>       if (kvm_timer_should_fire(vcpu, vtimer) != vtimer->irq.level)
+>>               kvm_timer_update_mapped_irq(vcpu, !vtimer->irq.level, vtimer);
+>>
+>> +     /* The emulated EL1 physical timer irq is not mapped to hardware */
+>> +     if (kvm_timer_should_fire(vcpu, ptimer) != ptimer->irq.level)
+>> +             kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
+>> +
+>>       return 0;
+>>  }
+>>
+>> @@ -223,26 +265,32 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+>>  {
+>>       struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>>       struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+>> +     struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+>>
+>>       BUG_ON(timer_is_armed(timer));
+>>
+>>       /*
+>> -      * No need to schedule a background timer if the guest timer has
+>> +      * No need to schedule a background timer if any guest timer has
+>>        * already expired, because kvm_vcpu_block will return before putting
+>>        * the thread to sleep.
+>>        */
+>> -     if (kvm_timer_should_fire(vcpu, vtimer))
+>> +     if (kvm_timer_should_fire(vcpu, vtimer) ||
+>> +         kvm_timer_should_fire(vcpu, ptimer))
+>>               return;
+>>
+>>       /*
+>> -      * If the timer is not capable of raising interrupts (disabled or
+>> +      * If both timers are not capable of raising interrupts (disabled or
+>>        * masked), then there's no more work for us to do.
+>>        */
+>> -     if (!kvm_timer_irq_can_fire(vtimer))
+>> +     if (!kvm_timer_irq_can_fire(vtimer) &&
+>> +         !kvm_timer_irq_can_fire(ptimer))
+>>               return;
+>>
+>> -     /*  The timer has not yet expired, schedule a background timer */
+>> -     timer_arm(timer, kvm_timer_compute_delta(vcpu, vtimer));
+>> +     /*
+>> +      * The guest timers have not yet expired, schedule a background timer.
+>> +      * Pick smaller expiration time between phys and virt timer.
+>> +      */
+>> +     timer_arm(timer, kvm_timer_min_block(vcpu));
+>>  }
+>>
+>>  void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
+>> --
+>> 1.9.1
+>>
+>>
+>
