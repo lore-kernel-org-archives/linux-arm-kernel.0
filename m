@@ -1,86 +1,72 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 10 Jan 2017 23:04:58 +0200
-Subject: [PATCH V7 1/4] Documentation/devicetree/bindings: b850v3_lvds_dp
-In-Reply-To: <74f0-58704480-5-27259840@173563636>
-References: <74f0-58704480-5-27259840@173563636>
-Message-ID: <6276161.johxDync2u@avalon>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 10 Jan 2017 13:06:07 -0800
+Subject: [PATCH net-next 6/8] net: dsa: Add support for platform data
+In-Reply-To: <20170110204124.GL22820@lunn.ch>
+References: <20170110201235.21771-1-f.fainelli@gmail.com>
+ <20170110201235.21771-7-f.fainelli@gmail.com>
+ <20170110204124.GL22820@lunn.ch>
+Message-ID: <1530c7f6-f8ba-ab32-75aa-288549f25db9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On 01/10/2017 12:41 PM, Andrew Lunn wrote:
+>> @@ -452,11 +455,14 @@ static int dsa_cpu_parse(struct dsa_port *port, u32 index,
+>>  	struct net_device *ethernet_dev;
+>>  	struct device_node *ethernet;
+>>  
+>> -	ethernet = of_parse_phandle(port->dn, "ethernet", 0);
+>> -	if (!ethernet)
+>> -		return -EINVAL;
+>> +	if (port->dn) {
+>> +		ethernet = of_parse_phandle(port->dn, "ethernet", 0);
+>> +		if (!ethernet)
+>> +			return -EINVAL;
+>> +		ethernet_dev = of_find_net_device_by_node(ethernet);
+>> +	} else
+>> +		ethernet_dev = dev_to_net_device(dst->pd->netdev);
 
-On Saturday 07 Jan 2017 01:29:52 Peter Senna Tschudin wrote:
-> On 04 January, 2017 21:39 CET, Rob Herring wrote:
-> > On Tue, Jan 3, 2017 at 5:34 PM, Peter Senna Tschudin wrote:
-> >> On 03 January, 2017 23:51 CET, Rob Herring <robh@kernel.org> wrote:
-> >>> On Sun, Jan 01, 2017 at 09:24:29PM +0100, Peter Senna Tschudin wrote:
-> >>>> Devicetree bindings documentation for the GE B850v3 LVDS/DP++
-> >>>> display bridge.
-> >>>> 
-> >>>> Cc: Martyn Welch <martyn.welch@collabora.co.uk>
-> >>>> Cc: Martin Donnelly <martin.donnelly@ge.com>
-> >>>> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> >>>> Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> >>>> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> >>>> Cc: Rob Herring <robh@kernel.org>
-> >>>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> >>>> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
-> >>>> ---
-> >>>> There was an Acked-by from Rob Herring <robh@kernel.org> for V6, but
-> >>>> I changed the bindings to use i2c_new_secondary_device() so I
-> >>>> removed it from the commit message.
-> >>>> 
-> >>>>  .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 39 ++++++++++++++
-> >>> Generally, bindings are not organized by vendor. Put in
-> >>> bindings/display/bridge/... instead.
-> >> 
-> >> Will change that.
-> >> 
-> >>>>  1 file changed, 39 insertions(+)
-> >>>>  create mode 100644
-> >>>>  Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
-> >>>> 
-> >>>> diff --git a/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
-> >>>> b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt new file
-> >>>> mode 100644
-> >>>> index 0000000..1bc6ebf
-> >>>> --- /dev/null
-> >>>> +++ b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
-> >>>> @@ -0,0 +1,39 @@
-> >>>> +Driver for GE B850v3 LVDS/DP++ display bridge
-> >>>> +
-> >>>> +Required properties:
-> >>>> +  - compatible : should be "ge,b850v3-lvds-dp".
-> >>> 
-> >>> Isn't '-lvds-dp' redundant? The part# should be enough.
-> >> 
-> >> b850v3 is the name of the product, this is why the proposed name. What
-> >> about, b850v3-dp2 dp2 indicating the second DP output?
-> >
-> > Humm, b850v3 is the board name? This node should be the name of the bridge
-> > chip.
->
-> From the cover letter:
+Bonjour Andrew,
+
 > 
-> -- // --
-> There are two physical bridges on the video signal pipeline: a STDP4028(LVDS
-> to DP) and a STDP2690(DP to DP++).  The hardware and firmware made it
-> complicated for this binding to comprise two device tree nodes, as the
-> design goal is to configure both bridges based on the LVDS signal, which
-> leave the driver powerless to control the video processing pipeline. The
-> two bridges behaves as a single bridge, and the driver is only needed for
-> telling the host about EDID / HPD, and for giving the host powers to ack
-> interrupts. The video signal pipeline is as follows:
+> Hi Florian
 > 
->   Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
-> -- // --
+> This is not going to work with John's rework of my multi CPU ports
+> code. I think you are going to have to modify the platform_data
+> structure to support multi-CPU ports.
 
-You forgot to prefix your patch series with [HACK] ;-)
+Last time we discussed this, I had a super complex dsa2_platform_data
+that allowed you to do exactly the same thing we currently do with
+Device Tree, except that this was with platform_data. It took a lot of
+effort to get there, but I essentially had the ZII vf160 board example
+re-implemented and verified with a mockup driver (still have it in a
+branch that's not too far from net-next/master).
 
-How about fixing the issues that make the two DT nodes solution difficult ? 
-What are they ?
+Your reply then AFAIR was that we should aim for something simpler and
+here is the result, we end-up re-using the existing dsa_platform_data
+with its limitations.
 
+If we have legacy platforms with complex setups, I really don't think we
+have those in tree, we should use dsa2_platform_data (still have the
+patches somewhere for that) although I was hoping to not have to use it
+since it is way more intrusive into net/dsa/dsa2.c.
+
+All platforms that I know that will benefit from this patch series: x86
+SCU from ZII (out of tree), BCM47xx, BCM63xx, Orion5x have the same
+properties: single switch attached to a SPI/MDIO/MMAP with built-in
+PHYs. If we have more complex setups than that, we should try to collect
+the requirements.
+
+> 
+> I put higher priority on cleanly integrating multi-CPU ports using
+> device tree, than supporting legacy platforms. I'm O.K. with
+> preparatory patches, but i think we should wait for actually platform
+> data changes until after Johns code has landed and we can design the
+> platform_data to work with it.
+
+I would very much like to see the patches and then make a decision based
+on the submission rather than project a decision on code that has not
+been submitted yet.
+
+Do we agree that patches 1 through 5 and 7 could go in then?
 -- 
-Regards,
-
-Laurent Pinchart
+Florian
