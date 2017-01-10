@@ -1,43 +1,93 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 10 Jan 2017 09:54:01 +0100
-Subject: [PATCH 2/3 v2] iio: adc: break out common code from SPMI VADC
-In-Reply-To: <717ea1c4-33af-f0ca-e018-5d7ac87506e1@kernel.org>
-References: <1481842105-14047-1-git-send-email-linus.walleij@linaro.org>
- <717ea1c4-33af-f0ca-e018-5d7ac87506e1@kernel.org>
-Message-ID: <CACRpkdZUk6UUN2ACXp0S1RW7k2M5t5X5N_0mJQeo_UTEa4H=9w@mail.gmail.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue, 10 Jan 2017 09:55:26 +0100
+Subject: [PATCH v7 5/8] IIO: add bindings for STM32 timer trigger driver
+In-Reply-To: <20170109180448.f3pcpuarhcddo76b@rob-hp-laptop>
+References: <1483608344-9012-1-git-send-email-benjamin.gaignard@st.com>
+ <1483608344-9012-6-git-send-email-benjamin.gaignard@st.com>
+ <20170109180448.f3pcpuarhcddo76b@rob-hp-laptop>
+Message-ID: <CA+M3ks713cwuaeBwrPett+KrbQC5-w0oyq7aSTrdHReWYVQRoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 30, 2016 at 8:01 PM, Jonathan Cameron <jic23@kernel.org> wrote:
-> On 15/12/16 22:48, Linus Walleij wrote:
->> The SPMI VADC and the earlier XOADC share a subset of
->> common code, so to be able to use the same code in both
->> drivers, we break out a separate file with the common code,
->> prefix exported functions that are no longer static with
->> qcom_* and bake an object qcom-vadc.o that contains both
->> files: qcom-vadc-common.o and qcom-spmi-vadc.o.
+2017-01-09 19:04 GMT+01:00 Rob Herring <robh@kernel.org>:
+> On Thu, Jan 05, 2017 at 10:25:41AM +0100, Benjamin Gaignard wrote:
+>> Define bindings for STM32 timer trigger
 >>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-arm-msm at vger.kernel.org
->> Cc: Ivan T. Ivanov <iivanov.xz@gmail.com>
->> Cc: Andy Gross <andy.gross@linaro.org>
->> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
->> Cc: Stephen Boyd <sboyd@codeaurora.org>
->> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> version 4:
+>> - remove triggers enumeration from DT
+>> - add reg parameter
+>>
+>> version 3:
+>> - change file name
+>> - add cross reference with mfd bindings
+>>
+>> version 2:
+>> - only keep one compatible
+>> - add DT parameters to set lists of the triggers:
+>>   one list describe the triggers created by the device
+>>   another one give the triggers accepted by the device
+>>
+>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>> ---
+>>  .../bindings/iio/timer/stm32-timer-trigger.txt     | 23 ++++++++++++++++++++++
+>>  1 file changed, 23 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+>> new file mode 100644
+>> index 0000000..36a6c4a
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+>> @@ -0,0 +1,23 @@
+>> +STMicroelectronics STM32 Timers IIO timer bindings
+>> +
+>> +Must be a sub-node of an STM32 Timers device tree node.
+>> +See ../mfd/stm32-timers.txt for details about the parent node.
+>> +
+>> +Required parameters:
+>> +- compatible:        Must be "st,stm32-timer-trigger".
+>> +- reg:               Define triggers configuration of the hardware IP.
 >
-> Looks superficially fine, but I'm guessing will need a respin
-> as we have a fair bit of new stuff (and a couple of fixes) going
-> through this driver at the moment.
+> Valid values? Not sure this makes sense for use of reg. reg should be
+> how you address or id a device.
+
+I use reg like an id to distinguish device and get the right
+configuration inside
+the driver.
+
 >
-> All but the two fixes I posted a few mins ago are in my testing
-> branch and should go to Greg once I have confirmed testing on
-> those two fixes.
+>> +
+>> +Example:
+>> +     timers at 40010000 {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +             compatible = "st,stm32-timers";
+>> +             reg = <0x40010000 0x400>;
+>> +             clocks = <&rcc 0 160>;
+>> +             clock-names = "clk_int";
+>> +
+>> +             timer {
+>
+> This would also need an unit address.
 
-I looked at the git and "testing"
-contains a top commit named "guessing" fixing some 64bit
-artithmetic (which looks correct) in the driver, shall I simply
-rebase on top of that and hope for the best? :)
+Ok I will fix that
 
-Yours,
-Linus Walleij
+>
+>> +                     compatible = "st,stm32-timer-trigger";
+>> +                     reg = <0>;
+>> +             };
+>> +     };
+>> --
+>> 1.9.1
+>>
+
+
+
+-- 
+Benjamin Gaignard
+
+Graphic Study Group
+
+Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro: Facebook | Twitter | Blog
