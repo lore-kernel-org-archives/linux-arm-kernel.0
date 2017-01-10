@@ -1,70 +1,64 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Tue, 10 Jan 2017 11:17:46 -0600
-Subject: [PATCH v12 1/7] arm64: Rename the common MADT parse routine
+Date: Tue, 10 Jan 2017 11:17:47 -0600
+Subject: [PATCH v12 2/7] arm: arm64: Add routine to determine cpuid of other
+ cpus
 In-Reply-To: <1484068672-15852-1-git-send-email-jeremy.linton@arm.com>
 References: <1484068672-15852-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1484068672-15852-2-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1484068672-15852-3-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MADT parser in smp.c is now being used to parse
-out NUMA, PMU and ACPI parking protocol information as
-well as the GIC information for which it was originally
-created. Rename it to avoid a misleading name.
+It is helpful if we can read the cpuid/midr of other CPUs
+in the system independent of arm/arm64.
 
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm64/kernel/smp.c | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/cputype.h   | 4 ++++
+ arch/arm/kernel/setup.c          | 2 +-
+ arch/arm64/include/asm/cputype.h | 3 +++
+ 3 files changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index cb87234..8ea244c 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -517,13 +517,14 @@ static unsigned int cpu_count = 1;
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index 522b5fe..1e87d06 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -235,6 +235,10 @@ static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
+ #define cpu_is_sa1100() (read_cpuid_part() == ARM_CPU_PART_SA1100)
+ #define cpu_is_sa1110() (read_cpuid_part() == ARM_CPU_PART_SA1110)
  
- #ifdef CONFIG_ACPI
++#define read_specific_cpuid(cpu_num) (is_smp() ? \
++				      per_cpu_ptr(&cpu_data, cpu_num)->cpuid \
++				      : read_cpuid_id())
++
  /*
-- * acpi_map_gic_cpu_interface - parse processor MADT entry
-+ * acpi_verify_and_map_madt - parse processor MADT entry
-  *
-  * Carry out sanity checks on MADT processor entry and initialize
-- * cpu_logical_map on success
-+ * cpu_logical_map, the ACPI parking protocol, NUMA mapping
-+ * and the PMU interrupts on success
-  */
- static void __init
--acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
-+acpi_verify_and_map_madt(struct acpi_madt_generic_interrupt *processor)
- {
- 	u64 hwid = processor->arm_mpidr;
- 
-@@ -577,7 +578,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
- }
- 
- static int __init
--acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
-+acpi_parse_madt_common(struct acpi_subtable_header *header,
- 			     const unsigned long end)
- {
- 	struct acpi_madt_generic_interrupt *processor;
-@@ -588,7 +589,7 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
- 
- 	acpi_table_print_madt_entry(header);
- 
--	acpi_map_gic_cpu_interface(processor);
-+	acpi_verify_and_map_madt(processor);
- 
- 	return 0;
- }
-@@ -672,7 +673,7 @@ void __init smp_init_cpus(void)
- 		 * we need for SMP init
+  * Intel's XScale3 core supports some v6 features (supersections, L2)
+  * but advertises itself as v5 as it does not support the v6 ISA.  For
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 34e3f3c..d443c97 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -1217,7 +1217,7 @@ static int c_show(struct seq_file *m, void *v)
+ 		 * "processor".  Give glibc what it expects.
  		 */
- 		acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
--				      acpi_parse_gic_cpu_interface, 0);
-+				      acpi_parse_madt_common, 0);
+ 		seq_printf(m, "processor\t: %d\n", i);
+-		cpuid = is_smp() ? per_cpu(cpu_data, i).cpuid : read_cpuid_id();
++		cpuid = read_specific_cpuid(i);
+ 		seq_printf(m, "model name\t: %s rev %d (%s)\n",
+ 			   cpu_name, cpuid & 15, elf_platform);
  
- 	if (cpu_count > nr_cpu_ids)
- 		pr_warn("Number of cores (%d) exceeds configured maximum of %d - clipping\n",
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 26a68dd..a6d26e1 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -124,6 +124,9 @@ static inline u32 __attribute_const__ read_cpuid_cachetype(void)
+ {
+ 	return read_cpuid(CTR_EL0);
+ }
++
++#define read_specific_cpuid(cpu_num) per_cpu_ptr(&cpu_data, cpu_num)->reg_midr
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif
 -- 
 2.5.5
