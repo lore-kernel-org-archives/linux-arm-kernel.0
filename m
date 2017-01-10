@@ -1,48 +1,40 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 10 Jan 2017 11:08:55 +0100
-Subject: [PATCH v4 1/9] clk: stm32f4: Update DT bindings documentation
-In-Reply-To: <20170109193312.GN17126@codeaurora.org>
-References: <1481638820-29324-1-git-send-email-gabriel.fernandez@st.com>
- <1481638820-29324-2-git-send-email-gabriel.fernandez@st.com>
- <20161222001051.GP8288@codeaurora.org>
- <ccd14adb-9d10-ae9e-de6d-565418421968@st.com>
- <20170109193312.GN17126@codeaurora.org>
-Message-ID: <0031c2ec-5fc8-4abf-29ef-5039b0508931@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 10 Jan 2017 11:09:31 +0100
+Subject: [PATCH] ARM: defconfig: include QCOM_EBI2 in multi_v7
+Message-ID: <20170110100931.15791-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This adds the Qualcomm External Bus Interface 2 to the multi_v7
+defconfig: it is hard for users to realize that this is a
+required driver for getting things like ethernet, and a necessary
+prerequisite to get the external bus discoverable on the
+MSM8660/APQ8060 machines.
 
+As regular users will likely want to have some ethernet and
+other functionality up quickly, it makes sense to add this to
+the multi_v7 defconfig.
 
-On 01/09/2017 08:33 PM, Stephen Boyd wrote:
-> On 01/09, Alexandre Torgue wrote:
->> Hi Stephen,
->>
->> On 12/22/2016 01:10 AM, Stephen Boyd wrote:
->>> On 12/13, gabriel.fernandez at st.com wrote:
->>>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
->>>>
->>>> Creation of dt include file for specific stm32f4 clocks.
->>>> These specific clocks are not derived from system clock (SYSCLOCK)
->>>> We should use index 1 to use these clocks in DT.
->>>> e.g. <&rcc 1 CLK_LSI>
->>>>
->>>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
->>>> Acked-by: Rob Herring <robh@kernel.org>
->>>> ---
->>>
->>> Applied to clk-stm32f4 and merged into clk-next.
->>>
->>
->> I'm preparing pull request branch for STM32 DT part. This patch is
->> also requested to build correctly DT patches. Do you know how could
->> we synchronize our pull request ?
->>
->
-> clk-stm32f4 is stable and not going to be rebased, so you're good
-> to base patches on it and send it off to arm-soc if the arm-soc
-> maintainers agree to it. You can also base off an earlier part of
-> the branch if you only need this first patch for example.
->
-I will base my DT branch from 4.10-rc1 + this commit (seen with Arnd)
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: please just apply this wherever ARM multi_v7
+defconfigs go if you're OK with it.
+---
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index b01a43851294..267d0703caae 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -192,6 +192,7 @@ CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_DMA_CMA=y
+ CONFIG_CMA_SIZE_MBYTES=64
+ CONFIG_OMAP_OCP2SCP=y
++CONFIG_QCOM_EBI2=y
+ CONFIG_SIMPLE_PM_BUS=y
+ CONFIG_SUNXI_RSB=m
+ CONFIG_MTD=y
+-- 
+2.9.3
