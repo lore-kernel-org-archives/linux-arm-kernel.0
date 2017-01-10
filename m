@@ -1,61 +1,62 @@
-From: cdleonard@gmail.com (Leonard Crestez)
-Date: Tue, 10 Jan 2017 18:16:46 +0200
-Subject: [PATCH] of: alloc anywhere from memblock if range not specified
-In-Reply-To: <1456148744-7583-1-git-send-email-vinmenon@codeaurora.org>
-References: <1456148744-7583-1-git-send-email-vinmenon@codeaurora.org>
-Message-ID: <717b117d-9b8b-d4e9-6135-3c52afd635c8@gmail.com>
+From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
+Date: Tue, 10 Jan 2017 17:17:34 +0100
+Subject: noise issues when recording sound on i.MX28
+In-Reply-To: <20160217085502.39e4cb24@ipc1.ka-ro>
+References: <20160127105613.GC13664@pengutronix.de>
+ <CAOMZO5BpLen517q2heramSta-R6pdESkjM6w=7FRMZebY6ue-Q@mail.gmail.com>
+ <20160127144340.GD13664@pengutronix.de>
+ <CAOMZO5AE6HwBYz7kOFORt0HTojJLSb0MYUbkb_HCshDHy=d27g@mail.gmail.com>
+ <20160210150315.GC13664@pengutronix.de>
+ <CAOMZO5D5H4F90nse9kyW9KvsJStN-sCGktup4FDPw_zTeNfS2g@mail.gmail.com>
+ <20160211084029.GE13664@pengutronix.de>
+ <CAOMZO5BDjkWi+cQK1-J7ag8Z48tY1Uwofi4EkovN-drSC4_reA@mail.gmail.com>
+ <20160217085502.39e4cb24@ipc1.ka-ro>
+Message-ID: <1484065054.28705.1.camel@embedded.rocks>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi all,
 
-I have some trouble with this patch.
+On Wed, 2016-02-17 at 08:55 +0100, Lothar Wa?mann wrote:
+> Hi,
+> 
+> On Tue, 16 Feb 2016 13:01:19 -0200 Fabio Estevam wrote:
+> > On Thu, Feb 11, 2016 at 6:40 AM, Uwe Kleine-K?nig
+> > <u.kleine-koenig@pengutronix.de> wrote:
+> > 
+> > > root at hostname:/sys/kernel/debug/clk find -name saif?_sel
+> > > ./ref_xtal/pll0/saif0_sel
+> > > ./ref_xtal/pll0/saif1_sel
+> > > 
+> > > root at hostname:/sys/kernel/debug/clk cat
+> > > ./ref_xtal/pll0/saif?_sel/clk_rate
+> > > 480000000
+> > > 480000000
+> > 
+> > Ok, what about the SAIF0 and SAIF1 sampling rates: are they always
+> > the same?
+> > 
+> 
+> Yes, of course. The driver wouldn't allow using both interfaces with
+> different sample rates any way.
 
-It seems the intention is to allow CMA to be placed in highmem. If the 
-CMA area is larger than highmem and no alloc-ranges is specified (just a 
-size) it is possible to end up allocating a area that spans from 
-multiple zones. This later breaks checks in cma_activate_area and makes 
-most dma allocations fail.
+Are there any updates about this issue?
 
-Am I missing something or this a bug?
+I am facing the same problem when using SAIF1 for capture and SAIF0 for
+playback. SAIF1 uses SAIF0 as the master and I do set
+MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0 when bringing up the board. However,
+whenever I record with
 
-On Mon, Feb 22, 2016 at 3:45 PM, Vinayak Menon <vinmenon@codeaurora.org> 
-wrote:
->
-> early_init_dt_alloc_reserved_memory_arch passes end as 0 to
-> __memblock_alloc_base, when limits are not specified. But
-> __memblock_alloc_base takes end value of 0 as MEMBLOCK_ALLOC_ACCESSIBLE
-> and limits the end to memblock.current_limit. This results in regions
-> never being placed in HIGHMEM area, for e.g. CMA.
-> Let __memblock_alloc_base allocate from anywhere in memory if limits are
-> not specified.
->
-> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Vinayak Menon <vinmenon@codeaurora.org>
-> ---
->  drivers/of/of_reserved_mem.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-> index 1a3556a..ed01c01 100644
-> --- a/drivers/of/of_reserved_mem.c
-> +++ b/drivers/of/of_reserved_mem.c
-> @@ -32,11 +32,13 @@ int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
->         phys_addr_t align, phys_addr_t start, phys_addr_t end, bool nomap,
->         phys_addr_t *res_base)
->  {
-> +       phys_addr_t base;
->         /*
->          * We use __memblock_alloc_base() because memblock_alloc_base()
->          * panic()s on allocation failure.
->          */
-> -       phys_addr_t base = __memblock_alloc_base(size, align, end);
-> +       end = !end ? MEMBLOCK_ALLOC_ANYWHERE : end;
-> +       base = __memblock_alloc_base(size, align, end);
->         if (!base)
->                 return -ENOMEM;
->
-> --
-> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a
-> member of the Code Aurora Forum, hosted by The Linux Foundation
->
+$ arecord -D hw:0,1 -t wav -c 2 -r 48000 -f S16_LE -d 5 /tmp/out.wav
+
+and playback afterwards:
+
+$ aplay -D hw:0,0 /tmp/out.wav
+
+I only get noise.
+
+Note, that I am using the Audio Codec Board from Mikroelectronika, but
+replaced the on-board 12.288MHz quarz with the MCLK line from SAIF0.
+
+Best regards,
+J?rg Krause
