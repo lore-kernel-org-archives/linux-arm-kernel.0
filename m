@@ -1,102 +1,61 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Tue, 10 Jan 2017 18:07:50 +0200
-Subject: [PATCH] virtio_mmio: Set DMA masks appropriately
-In-Reply-To: <b60d0de1-a79b-50c0-f773-5a509b0e94d5@arm.com>
-References: <50defbbe87d75db85a9d22f914258975d661208a.1484051089.git.robin.murphy@arm.com>
- <20170110165221-mutt-send-email-mst@kernel.org>
- <b60d0de1-a79b-50c0-f773-5a509b0e94d5@arm.com>
-Message-ID: <20170110180656-mutt-send-email-mst@kernel.org>
+From: cdleonard@gmail.com (Leonard Crestez)
+Date: Tue, 10 Jan 2017 18:16:46 +0200
+Subject: [PATCH] of: alloc anywhere from memblock if range not specified
+In-Reply-To: <1456148744-7583-1-git-send-email-vinmenon@codeaurora.org>
+References: <1456148744-7583-1-git-send-email-vinmenon@codeaurora.org>
+Message-ID: <717b117d-9b8b-d4e9-6135-3c52afd635c8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 03:55:31PM +0000, Robin Murphy wrote:
-> On 10/01/17 14:54, Michael S. Tsirkin wrote:
-> > On Tue, Jan 10, 2017 at 12:26:01PM +0000, Robin Murphy wrote:
-> >> Once DMA API usage is enabled, it becomes apparent that virtio-mmio is
-> >> inadvertently relying on the default 32-bit DMA mask, which leads to
-> >> problems like rapidly exhausting SWIOTLB bounce buffers.
-> >>
-> >> Ensure that we set the appropriate 64-bit DMA mask whenever possible,
-> >> with the coherent mask suitably limited for the legacy vring as per
-> >> a0be1db4304f ("virtio_pci: Limit DMA mask to 44 bits for legacy virtio
-> >> devices").
-> >>
-> >> Reported-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> >> Fixes: b42111382f0e ("virtio_mmio: Use the DMA API if enabled")
-> >> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> >> ---
-> >>  drivers/virtio/virtio_mmio.c | 10 ++++++++++
-> >>  1 file changed, 10 insertions(+)
-> >>
-> >> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
-> >> index 48bfea91dbca..b5c5d49ca598 100644
-> >> --- a/drivers/virtio/virtio_mmio.c
-> >> +++ b/drivers/virtio/virtio_mmio.c
-> >> @@ -59,6 +59,7 @@
-> >>  #define pr_fmt(fmt) "virtio-mmio: " fmt
-> >>  
-> >>  #include <linux/acpi.h>
-> >> +#include <linux/dma-mapping.h>
-> >>  #include <linux/highmem.h>
-> >>  #include <linux/interrupt.h>
-> >>  #include <linux/io.h>
-> >> @@ -497,6 +498,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
-> >>  	struct virtio_mmio_device *vm_dev;
-> >>  	struct resource *mem;
-> >>  	unsigned long magic;
-> >> +	int rc;
-> >>  
-> >>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >>  	if (!mem)
-> >> @@ -548,6 +550,14 @@ static int virtio_mmio_probe(struct platform_device *pdev)
-> >>  	if (vm_dev->version == 1)
-> >>  		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
-> >>  
-> >> +	rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
-> >> +	if (rc)
-> >> +		rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-> >> +	else if (vm_dev->version == 1)
-> >> +		dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32 + PAGE_SHIFT));
-> > 
-> > That's a very convoluted way to do this, for version 1 you
-> > set coherent mask to 64 then override it.
-> > why not
-> > 
-> > if (vm_dev->version == 1) {
-> > 	dma_set_mask
-> > 	dma_set_coherent_mask
-> > } else {
-> > 	dma_set_mask_and_coherent
-> > }
-> > 
-> > if (rc)
-> > 	dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-> 
-> Purely because it's fewer lines of code - if you'd prefer separate
-> legacy vs. modern flows for clarity that's fine by me.
+Hello,
 
-Yes please. It's less legacy vs modern and more that I don't like
-line 2 undoig what line 1 did.
+I have some trouble with this patch.
 
-> >> +	if (rc)
-> >> +		dev_warn(&pdev->dev, "Failed to enable 64-bit or 32-bit DMA.  Trying to continue, but this might not work.\n");
-> >> +
-> > 
-> > is there a chance it actually still might work?
-> 
-> If we're not actually using the DMA API, we may still get away with it,
-> otherwise it's a fairly sure bet that the subsequent dma_map/dma_alloc
-> calls will fail and we'll get nowhere. If I change this to be a probe
-> failure condition (and correspondingly in the PCI drivers too), would
-> you rather that be predicated on vring_use_dma_api(), or always (given
-> the TODO in virtio_ring.c)?
-> 
-> Robin.
+It seems the intention is to allow CMA to be placed in highmem. If the 
+CMA area is larger than highmem and no alloc-ranges is specified (just a 
+size) it is possible to end up allocating a area that spans from 
+multiple zones. This later breaks checks in cma_activate_area and makes 
+most dma allocations fail.
 
-Oh I see you are just mirroring what pci does. I think it's fine.
+Am I missing something or this a bug?
 
-> >>  	platform_set_drvdata(pdev, vm_dev);
-> >>  
-> >>  	return register_virtio_device(&vm_dev->vdev);
-> >> -- 
-> >> 2.10.2.dirty
+On Mon, Feb 22, 2016 at 3:45 PM, Vinayak Menon <vinmenon@codeaurora.org> 
+wrote:
+>
+> early_init_dt_alloc_reserved_memory_arch passes end as 0 to
+> __memblock_alloc_base, when limits are not specified. But
+> __memblock_alloc_base takes end value of 0 as MEMBLOCK_ALLOC_ACCESSIBLE
+> and limits the end to memblock.current_limit. This results in regions
+> never being placed in HIGHMEM area, for e.g. CMA.
+> Let __memblock_alloc_base allocate from anywhere in memory if limits are
+> not specified.
+>
+> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Vinayak Menon <vinmenon@codeaurora.org>
+> ---
+>  drivers/of/of_reserved_mem.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+> index 1a3556a..ed01c01 100644
+> --- a/drivers/of/of_reserved_mem.c
+> +++ b/drivers/of/of_reserved_mem.c
+> @@ -32,11 +32,13 @@ int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
+>         phys_addr_t align, phys_addr_t start, phys_addr_t end, bool nomap,
+>         phys_addr_t *res_base)
+>  {
+> +       phys_addr_t base;
+>         /*
+>          * We use __memblock_alloc_base() because memblock_alloc_base()
+>          * panic()s on allocation failure.
+>          */
+> -       phys_addr_t base = __memblock_alloc_base(size, align, end);
+> +       end = !end ? MEMBLOCK_ALLOC_ANYWHERE : end;
+> +       base = __memblock_alloc_base(size, align, end);
+>         if (!base)
+>                 return -ENOMEM;
+>
+> --
+> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a
+> member of the Code Aurora Forum, hosted by The Linux Foundation
+>
