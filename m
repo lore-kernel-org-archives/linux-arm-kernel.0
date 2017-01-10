@@ -1,48 +1,199 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 10 Jan 2017 20:47:28 +0200
-Subject: [PATCH v2 1/3] arm64: dts: exynos: Add missing unit name to
- Exynos7 SoC node
-In-Reply-To: <1484069912-6534-2-git-send-email-javier@osg.samsung.com>
-References: <1484069912-6534-1-git-send-email-javier@osg.samsung.com>
- <1484069912-6534-2-git-send-email-javier@osg.samsung.com>
-Message-ID: <20170110184728.2nff4r634ics4wb3@kozik-lap>
+From: jintack@cs.columbia.edu (Jintack Lim)
+Date: Tue, 10 Jan 2017 13:47:49 -0500
+Subject: [RFC 7/8] KVM: arm/arm64: Set up a background timer for the
+ physical timer emulation
+In-Reply-To: <20170109121326.GE4348@cbox>
+References: <1482772326-29110-1-git-send-email-jintack@cs.columbia.edu>
+ <1482772326-29110-8-git-send-email-jintack@cs.columbia.edu>
+ <20170109121326.GE4348@cbox>
+Message-ID: <CAHyh4xhvjR2k5H4kTM3t_rXyzih-h2aHQTN9VPqrzJbJ=Zuq0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 02:38:30PM -0300, Javier Martinez Canillas wrote:
-> This patch fixes the following DTC warning about a mismatch
-> between a device node reg property and its unit name:
-> 
-> Node /soc has a reg or ranges property, but no unit name
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
-> 
->  arch/arm64/boot/dts/exynos/exynos7.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> index 80aa60e38237..0d2fedc6ac2f 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> @@ -69,7 +69,7 @@
->  		method = "smc";
->  	};
->  
-> -	soc: soc {
-> +	soc: soc at 0 {
+Hi Christoffer,
 
-This looks unnatural, like a fix just to silence the DTC. Mostly de do
-not enumerate soc node, although there are few exceptions.
+thanks for the review!
 
-I would prefer ignore the warning... however I am happy to hear other opinions.
+On Mon, Jan 9, 2017 at 7:13 AM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Mon, Dec 26, 2016 at 12:12:05PM -0500, Jintack Lim wrote:
+>> Set a background timer for the EL1 physical timer emulation while VMs are
+>> running, so that VMs get interrupts for the physical timer in a timely
+>> manner.
+>>
+>> We still use just one background timer. When a VM is runnable, we use
+>> the background timer for the physical timer emulation.  When the VM is
+>> about to be blocked, we use the background timer to wake up the vcpu at
+>> the earliest timer expiration among timers the VM is using.
+>>
+>> As a result, the assumption that the background timer is not armed while
+>> VMs are running does not hold any more. So, remove BUG_ON()s and
+>> WARN_ON()s accordingly.
+>>
+>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+>> ---
+>>  virt/kvm/arm/arch_timer.c | 42 +++++++++++++++++++++++++++++++-----------
+>>  1 file changed, 31 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+>> index aa7e243..be8d953 100644
+>> --- a/virt/kvm/arm/arch_timer.c
+>> +++ b/virt/kvm/arm/arch_timer.c
+>> @@ -91,9 +91,6 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
+>>       vcpu = container_of(work, struct kvm_vcpu, arch.timer_cpu.expired);
+>>       vcpu->arch.timer_cpu.armed = false;
+>>
+>> -     WARN_ON(!kvm_timer_should_fire(vcpu, vcpu_vtimer(vcpu)) &&
+>> -             !kvm_timer_should_fire(vcpu, vcpu_ptimer(vcpu)));
+>> -
+>
+> This seems misplaced and has been addressed here:
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2017-January/022933.html
+>
+> When you respin you can benefit from basing on that (assuming it gets
+> acked and goes int).
 
-Best regards,
-Krzysztof
+Ok, I got it.
 
->  		compatible = "simple-bus";
->  		#address-cells = <1>;
->  		#size-cells = <1>;
-> -- 
-> 2.7.4
-> 
+>
+>>       /*
+>>        * If the vcpu is blocked we want to wake it up so that it will see
+>>        * the timer has expired when entering the guest.
+>> @@ -139,7 +136,6 @@ static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx)
+>>
+>>  /*
+>>   * Returns minimal timer expiration time in ns among guest timers.
+>> - * Note that it will return inf time if none of timers can fire.
+>>   */
+>>  static u64 kvm_timer_min_block(struct kvm_vcpu *vcpu)
+>>  {
+>> @@ -153,7 +149,9 @@ static u64 kvm_timer_min_block(struct kvm_vcpu *vcpu)
+>>       if (kvm_timer_irq_can_fire(ptimer))
+>>               min_phys = kvm_timer_compute_delta(vcpu, ptimer);
+>>
+>> -     WARN_ON((min_virt == ULLONG_MAX) && (min_phys == ULLONG_MAX));
+>> +     /* If none of timers can fire, then return 0 */
+>> +     if ((min_virt == ULLONG_MAX) && (min_phys == ULLONG_MAX))
+>> +             return 0;
+>
+> Why didn't you have this semantics in the previous patch?
+
+I should have put this in the previous patch, and I'll do that.
+
+Just let you know, WARN_ON() in the previous patch was there because I
+thought that the caller of this function is sure that one of the
+timers are able to fire. But I think that's beyond the scope of this
+function.
+
+>
+>>
+>>       return min(min_virt, min_phys);
+>>  }
+>> @@ -257,6 +255,26 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+>>  }
+>>
+>>  /*
+>> + * Schedule the background timer for the emulated timer. The background timer
+>> + * runs whenever vcpu is runnable and the timer is not expired.
+>> + */
+>> +static void kvm_timer_emulate(struct kvm_vcpu *vcpu,
+>> +                    struct arch_timer_context *timer_ctx)
+>> +{
+>> +     struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>> +
+>> +     if (kvm_timer_should_fire(vcpu, timer_ctx))
+>> +             return;
+>> +
+>> +     if (!kvm_timer_irq_can_fire(timer_ctx))
+>> +             return;
+>> +
+>> +     /*  The timer has not yet expired, schedule a background timer */
+>> +     timer_disarm(timer);
+>> +     timer_arm(timer, kvm_timer_compute_delta(vcpu, timer_ctx));
+>
+> I'm wondering what the effect of this thing really is.  Isn't the soft
+> timer programmed in timer_arm() based on Linux's own timekeeping
+> schedule, such that the physical timer will be programmed to the next
+> tick, regardless of what you program here, so all you have to do is
+> check if you need to inject the phys timer on entry to the VM?
+>
+> On the other hand, if this can cause Linux to program the phys timer to
+> expire sooner, then I guess it makes sense.  Thinking about it, would
+> that be the case on a tickless system?
+
+I don't have a good answer for this, so I'll get back to you!
+
+>
+>> +}
+>> +
+>> +/*
+>>   * Schedule the background timer before calling kvm_vcpu_block, so that this
+>>   * thread is removed from its waitqueue and made runnable when there's a timer
+>>   * interrupt to handle.
+>> @@ -267,8 +285,6 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+>>       struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+>>       struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+>>
+>> -     BUG_ON(timer_is_armed(timer));
+>> -
+>>       /*
+>>        * No need to schedule a background timer if any guest timer has
+>>        * already expired, because kvm_vcpu_block will return before putting
+>> @@ -290,13 +306,21 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+>>        * The guest timers have not yet expired, schedule a background timer.
+>>        * Pick smaller expiration time between phys and virt timer.
+>>        */
+>> +     timer_disarm(timer);
+>>       timer_arm(timer, kvm_timer_min_block(vcpu));
+>>  }
+>>
+>>  void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
+>>  {
+>>       struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>> +
+>>       timer_disarm(timer);
+>> +
+>> +     /*
+>> +      * Now we return from the blocking. If we have any timer to emulate,
+>> +      * and it's not expired, set the background timer for it.
+>> +      */
+>> +     kvm_timer_emulate(vcpu, vcpu_ptimer(vcpu));
+>
+> hmm, this is only called when returning from the kvm_vcpu_block() path.
+> What about when you do vcpu_load/put, don't you need to schedule/cancel
+> it there too?
+
+We can do that, but I think that's not necessary. Firing the physical
+timer while a vcpu is unloaded doesn't affect the task scheduling. Or
+is it awkward to do so?
+
+>
+> Maybe it's simpler to just program the soft timer during flush_hwstate
+> and cancel the timer during sync_hwstate.  Does that work?
+
+As far as I remember, it worked. I agree that it's simpler.
+But as I mentioned in the patch [8/8] reply this *may* cause more overhead.
+
+>
+>>  }
+>>
+>>  /**
+>> @@ -375,10 +399,6 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+>>   */
+>>  void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+>>  {
+>> -     struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>> -
+>> -     BUG_ON(timer_is_armed(timer));
+>> -
+>>       /*
+>>        * The guest could have modified the timer registers or the timer
+>>        * could have expired, update the timer state.
+>> --
+>> 1.9.1
+>>
+>>
+>
+> Thanks,
+> -Christoffer
+>
