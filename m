@@ -1,64 +1,25 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Tue, 10 Jan 2017 00:54:57 +0000
-Subject: [PATCH v2 5/6] arm64: allwinner: a64: Add MMC pinctrl nodes
-In-Reply-To: <f7a004f7905badbd8e6fea7fd8591a498b396b9d.1483980339.git-series.maxime.ripard@free-electrons.com>
-References: <cover.493dc67855a5f1837e875d37307319a03d14d1d0.1483980339.git-series.maxime.ripard@free-electrons.com>
- <f7a004f7905badbd8e6fea7fd8591a498b396b9d.1483980339.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <0427ccd8-0aa5-2d98-938d-784321a3ec48@arm.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Tue, 10 Jan 2017 08:57:31 +0800
+Subject: [PATCH v2] arm64: dts: rockchip: add "rockchip, grf" property for
+ RK3399 PMUCRU/CRU
+In-Reply-To: <CAD=FV=WjzU_2QSLET3Y9_5A5khXjqMYNzB2ifextKhekmvCsjw@mail.gmail.com>
+References: <1483945344-3125-1-git-send-email-zhengxing@rock-chips.com>
+ <CAD=FV=WjzU_2QSLET3Y9_5A5khXjqMYNzB2ifextKhekmvCsjw@mail.gmail.com>
+Message-ID: <c7f199ed-de69-5642-e344-67eee92b1573@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/17 16:46, Maxime Ripard wrote:
-> The A64 only has a single set of pins for each MMC controller. Since we
-> already have boards that require all of them, let's add them to the DTSI.
+Hi Doug,
 
-This matches my reworked version from the previous series, so:
+? 2017?01?10? 02:52, Doug Anderson ??:
+> This looks sane to me, but before you land it you need to first send
+> up a (separate) patch that adjusts:
+>
+> Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt
+>
+> ...it would also be sorta nice if you included an a patch in your
+> series that actually uses this new functionality.
+Sorry to miss it. Thanks for your reminding me.
 
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-
-Cheers,
-Andre.
-
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 25 ++++++++++++++++++++-
->  1 file changed, 25 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index 143e9706438f..8e149498e096 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -205,6 +205,31 @@
->  				function = "i2c1";
->  			};
->  
-> +			mmc0_pins: mmc0-pins {
-> +				pins = "PF0", "PF1", "PF2", "PF3",
-> +				       "PF4", "PF5";
-> +				function = "mmc0";
-> +				drive-strength = <30>;
-> +				bias-pull-up;
-> +			};
-> +
-> +			mmc1_pins: mmc1-pins {
-> +				pins = "PG0", "PG1", "PG2", "PG3",
-> +				       "PG4", "PG5";
-> +				function = "mmc1";
-> +				drive-strength = <30>;
-> +				bias-pull-up;
-> +			};
-> +
-> +			mmc2_pins: mmc2-pins {
-> +				pins = "PC1", "PC5", "PC6", "PC8", "PC9",
-> +				       "PC10","PC11", "PC12", "PC13",
-> +				       "PC14", "PC15", "PC16";
-> +				function = "mmc2";
-> +				drive-strength = <30>;
-> +				bias-pull-up;
-> +			};
-> +
->  			uart0_pins_a: uart0 at 0 {
->  				pins = "PB8", "PB9";
->  				function = "uart0";
-> 
+-- 
+- Xing Zheng
