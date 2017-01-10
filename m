@@ -1,135 +1,212 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 10 Jan 2017 14:25:17 +0800
-Subject: [PATCH 2/3][v3] arm64: freescale: ls2080a: Split devicetree for
- code resuability
-In-Reply-To: <1483938896-2221-3-git-send-email-abhimanyu.saini@nxp.com>
-References: <1483938896-2221-1-git-send-email-abhimanyu.saini@nxp.com>
- <1483938896-2221-3-git-send-email-abhimanyu.saini@nxp.com>
-Message-ID: <20170110062516.GZ20956@dragon>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 10 Jan 2017 11:56:20 +0530
+Subject: [PATCH v5 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
+ stores scenario in vdma
+In-Reply-To: <1483771530-8545-3-git-send-email-appanad@xilinx.com>
+References: <1483771530-8545-1-git-send-email-appanad@xilinx.com>
+ <1483771530-8545-3-git-send-email-appanad@xilinx.com>
+Message-ID: <20170110062620.GZ3573@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 10:44:55AM +0530, Abhimanyu Saini wrote:
-> LS2088A and LS2080A are similar SoCs with a few differences like
-> ARM cores etc.
-> 
-> Reorganize the LS2080A device tree to move the common nodes to:
->         - fsl-ls208xa.dtsi
->         - fsl-ls208xa-rdb.dtsi
->         - fsl-ls208xa-qds.dtsi
+On Sat, Jan 07, 2017 at 12:15:29PM +0530, Kedareswara rao Appana wrote:
+> When VDMA is configured for more than one frame in the h/w
+> for example h/w is configured for n number of frames and user
+> Submits n number of frames and triggered the DMA using issue_pending API.
 
-These 3 new files are missing.
+title case in middle if sentence, no commas, can you make it easier to read
+please..
+
+> In the current driver flow we are submitting one frame at a time
+> but we should submit all the n number of frames at one time as the h/w
+> Is configured for n number of frames.
+
+s/Is/is
 
 > 
-> Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
-> Signed-off-by: Ashish Kumar <ashish.kumar@nxp.com>
-> Signed-off-by: Abhimanyu Saini <abhimanyu.saini@nxp.com>
+> This patch fixes this issue.
+> 
+> Reviewed-by: Jose Abreu <joabreu@synopsys.com>
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 > ---
+> Changes for v5:
+> ---> Updated xlnx,fstore-config property to xlnx,fstore-enable
+>      and updated description as suggested by Rob.
+> Changes for v4:
+> ---> Add Check for framestore configuration on Transmit case as well
+>      as suggested by Jose Abreu.
+> ---> Modified the dev_dbg checks to dev_warn checks as suggested
+>      by Jose Abreu.
 > Changes for v3:
->         - rename dts/dtsi files
+> ---> Added Checks for frame store configuration. If frame store
+>      Configuration is not present at the h/w level and user
+>      Submits less frames added debug prints in the driver as relevant.
+> Changes for v2:
+> ---> Fixed race conditions in the driver as suggested by Jose Abreu
+> ---> Fixed unnecessray if else checks in the vdma_start_transfer
+>      as suggested by Laurent Pinchart.
 > 
->  arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts | 154 +----
->  arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts | 106 +---
->  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi    | 715 +---------------------
->  3 files changed, 26 insertions(+), 949 deletions(-)
+>  .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |  2 +
+>  drivers/dma/xilinx/xilinx_dma.c                    | 78 +++++++++++++++-------
+>  2 files changed, 57 insertions(+), 23 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
-> index 8bc1f8f..3cf4a5c 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
-> @@ -1,8 +1,9 @@
->  /*
->   * Device Tree file for Freescale LS2080a QDS Board.
->   *
-> - * Copyright (C) 2015, Freescale Semiconductor
-> + * Copyright (C) 2015-17, Freescale Semiconductor
->   *
-> + * Abhimanyu Saini <abhimanyu.saini@nxp.com>
->   * Bhupesh Sharma <bhupesh.sharma@freescale.com>
->   *
->   * This file is dual-licensed: you can use it either under the terms
-
-<snip>
-
-> -&sata0 {
-> -	status = "okay";
-> -};
-> -
-> -&sata1 {
-> -	status = "okay";
-> -};
-> -
-> -&usb0 {
-> -	status = "okay";
-> -};
-> -
-> -&usb1 {
-> -	status = "okay";
-> -};
-> +#include "fsl-ls208xa-qds.dtsi"
-
-Can we put such includes just at the beginning of the file (after
-licence section)?
-
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
-> index 2ff46ca..d5224fb 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
-> @@ -62,108 +62,4 @@
->  	};
->  };
+> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> index a2b8bfa..e951c09 100644
+> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> @@ -66,6 +66,8 @@ Optional child node properties:
+>  Optional child node properties for VDMA:
+>  - xlnx,genlock-mode: Tells Genlock synchronization is
+>  	enabled/disabled in hardware.
+> +- xlnx,fstore-enable: boolean; if defined, it indicates that controller
+> +	supports frame store configuration.
+>  Optional child node properties for AXI DMA:
+>  -dma-channels: Number of dma channels in child node.
 >  
-
-<snip>
-
-> -&usb0 {
-> -	status = "okay";
-> -};
-> -
-> -&usb1 {
-> -	status = "okay";
-> -};
-> +#include "fsl-ls208xa-rdb.dtsi"
-
-Ditto
-
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> index e5935f2..35801f3 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> @@ -1,8 +1,9 @@
->  /*
->   * Device Tree Include file for Freescale Layerscape-2080A family SoC.
->   *
-> - * Copyright (C) 2014-2015, Freescale Semiconductor
-> + * Copyright (C) 2014-2017, Freescale Semiconductor
->   *
-> + * Abhimanyu Saini <abhimanyu.saini@nxp.com>
->   * Bhupesh Sharma <bhupesh.sharma@freescale.com>
->   *
->   * This file is dual-licensed: you can use it either under the terms
-> @@ -149,697 +150,25 @@
->  		};
->  	};
+> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+> index be7eb41..0e9c02e 100644
+> --- a/drivers/dma/xilinx/xilinx_dma.c
+> +++ b/drivers/dma/xilinx/xilinx_dma.c
+> @@ -322,6 +322,7 @@ struct xilinx_dma_tx_descriptor {
+>   * @genlock: Support genlock mode
+>   * @err: Channel has errors
+>   * @idle: Check for channel idle
+> + * @has_fstoreen: Check for frame store configuration
+>   * @tasklet: Cleanup work after irq
+>   * @config: Device configuration info
+>   * @flush_on_fsync: Flush on Frame sync
+> @@ -353,6 +354,7 @@ struct xilinx_dma_chan {
+>  	bool genlock;
+>  	bool err;
+>  	bool idle;
+> +	bool has_fstoreen;
+>  	struct tasklet_struct tasklet;
+>  	struct xilinx_vdma_config config;
+>  	bool flush_on_fsync;
+> @@ -990,6 +992,27 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
+>  	if (list_empty(&chan->pending_list))
+>  		return;
 >  
-> -	memory at 80000000 {
-> -		device_type = "memory";
-> -		reg = <0x00000000 0x80000000 0 0x80000000>;
-> -		      /* DRAM space - 1, size : 2 GB DRAM */
-> -	};
+> +	/*
+> +	 * Note: When VDMA is built with default h/w configuration
+> +	 * User should submit frames upto H/W configured.
+> +	 * If users submits less than h/w configured
+> +	 * VDMA engine tries to write to a invalid location
+> +	 * Results undefined behaviour/memory corruption.
+> +	 *
+> +	 * If user would like to submit frames less than h/w capable
+> +	 * On S2MM side please enable debug info 13 at the h/w level
+> +	 * On MM2S side please enable debug info 6 at the h/w level
+> +	 * It will allows the frame buffers numbers to be modified at runtime.
+> +	 */
+> +	if (!chan->has_fstoreen &&
+> +	     chan->desc_pendingcount < chan->num_frms) {
+> +		dev_warn(chan->dev, "Frame Store Configuration is not enabled at the\n");
+> +		dev_warn(chan->dev, "H/w level enable Debug info 13 or 6 at the h/w level\n");
+> +		dev_warn(chan->dev, "OR Submit the frames upto h/w Capable\n\r");
+> +
+> +		return;
+> +	}
+> +
+>  	desc = list_first_entry(&chan->pending_list,
+>  				struct xilinx_dma_tx_descriptor, node);
+>  	tail_desc = list_last_entry(&chan->pending_list,
+> @@ -1052,25 +1075,38 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
+>  	if (chan->has_sg) {
+>  		dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
+>  				tail_segment->phys);
+> +		list_splice_tail_init(&chan->pending_list, &chan->active_list);
+> +		chan->desc_pendingcount = 0;
+>  	} else {
+>  		struct xilinx_vdma_tx_segment *segment, *last = NULL;
+> -		int i = 0;
+> +		int i = 0, j = 0;
+>  
+>  		if (chan->desc_submitcount < chan->num_frms)
+>  			i = chan->desc_submitcount;
+>  
+> -		list_for_each_entry(segment, &desc->segments, node) {
+> -			if (chan->ext_addr)
+> -				vdma_desc_write_64(chan,
+> -					XILINX_VDMA_REG_START_ADDRESS_64(i++),
+> -					segment->hw.buf_addr,
+> -					segment->hw.buf_addr_msb);
+> -			else
+> -				vdma_desc_write(chan,
+> -					XILINX_VDMA_REG_START_ADDRESS(i++),
+> -					segment->hw.buf_addr);
+> -
+> -			last = segment;
+> +		for (j = 0; j < chan->num_frms; ) {
+> +			list_for_each_entry(segment, &desc->segments, node) {
+> +				if (chan->ext_addr)
+> +					vdma_desc_write_64(chan,
+> +					  XILINX_VDMA_REG_START_ADDRESS_64(i++),
+> +					  segment->hw.buf_addr,
+> +					  segment->hw.buf_addr_msb);
+> +				else
+> +					vdma_desc_write(chan,
+> +					    XILINX_VDMA_REG_START_ADDRESS(i++),
+> +					    segment->hw.buf_addr);
+> +
+> +				last = segment;
+> +			}
+> +			list_del(&desc->node);
+> +			list_add_tail(&desc->node, &chan->active_list);
+> +			j++;
+> +			if (list_empty(&chan->pending_list) ||
+> +			    (i == chan->num_frms))
+> +				break;
+> +			desc = list_first_entry(&chan->pending_list,
+> +						struct xilinx_dma_tx_descriptor,
+> +						node);
+>  		}
+>  
+>  		if (!last)
+> @@ -1081,20 +1117,14 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
+>  		vdma_desc_write(chan, XILINX_DMA_REG_FRMDLY_STRIDE,
+>  				last->hw.stride);
+>  		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last->hw.vsize);
+> -	}
+>  
+> -	chan->idle = false;
+> -	if (!chan->has_sg) {
+> -		list_del(&desc->node);
+> -		list_add_tail(&desc->node, &chan->active_list);
+> -		chan->desc_submitcount++;
+> -		chan->desc_pendingcount--;
+> +		chan->desc_submitcount += j;
+> +		chan->desc_pendingcount -= j;
+>  		if (chan->desc_submitcount == chan->num_frms)
+>  			chan->desc_submitcount = 0;
+> -	} else {
+> -		list_splice_tail_init(&chan->pending_list, &chan->active_list);
+> -		chan->desc_pendingcount = 0;
+>  	}
+> +
+> +	chan->idle = false;
+>  }
+>  
+>  /**
+> @@ -1342,6 +1372,7 @@ static int xilinx_dma_reset(struct xilinx_dma_chan *chan)
+>  
+>  	chan->err = false;
+>  	chan->idle = true;
+> +	chan->desc_submitcount = 0;
+>  
+>  	return err;
+>  }
+> @@ -2315,6 +2346,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
+>  	has_dre = of_property_read_bool(node, "xlnx,include-dre");
+>  
+>  	chan->genlock = of_property_read_bool(node, "xlnx,genlock-mode");
+> +	chan->has_fstoreen = of_property_read_bool(node, "xlnx,fstore-enable");
+>  
+>  	err = of_property_read_u32(node, "xlnx,datawidth", &value);
+>  	if (err) {
+> -- 
+> 2.1.2
+> 
 
-<snip>
-
-> -	ddr1: memory-controller at 1080000 {
-> -		compatible = "fsl,qoriq-memory-controller";
-> -		reg = <0x0 0x1080000 0x0 0x1000>;
-> -		interrupts = <0 17 0x4>;
-> -		little-endian;
-> -	};
-> +	#include "fsl-ls208xa.dtsi"
-
-Ditto
-
-Shawn
-
-> +};
+-- 
+~Vinod
