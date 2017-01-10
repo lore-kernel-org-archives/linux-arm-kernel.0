@@ -1,74 +1,72 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 10 Jan 2017 13:05:58 +0100
-Subject: [PATCH] usb: dwc3-exynos fix unspecified suspend clk error
- handling
-In-Reply-To: <20170110022131.31042-1-shuahkh@osg.samsung.com>
-References: <20170110022131.31042-1-shuahkh@osg.samsung.com>
- <CGME20170110120605epcas1p1c26f7f90fca4765ab9cc339c51d11347@epcas1p1.samsung.com>
-Message-ID: <1641038.u0riMiuGF5@amdc3058>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 10 Jan 2017 20:07:37 +0800
+Subject: [PATCH v2 2/2] media: rc: add driver for IR remote receiver on
+ MT7623 SoC
+In-Reply-To: <1484039631-25120-3-git-send-email-sean.wang@mediatek.com>
+Message-ID: <201701102015.fSM15CvI%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sean,
 
-Hi,
+[auto build test ERROR on linuxtv-media/master]
+[also build test ERROR on v4.10-rc3 next-20170110]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-On Monday, January 09, 2017 07:21:31 PM Shuah Khan wrote:
-> Fix dwc3_exynos_probe() to call clk_prepare_enable() only when suspend
-> clock is specified. Call clk_disable_unprepare() from remove and probe
-> error path only when susp_clk has been set from remove and probe error
-> paths.
+url:    https://github.com/0day-ci/linux/commits/sean-wang-mediatek-com/Documentation-devicetree-Add-document-bindings-for-mtk-cir/20170110-193357
+base:   git://linuxtv.org/media_tree.git master
+config: x86_64-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-It is legal to call clk_prepare_enable() and clk_disable_unprepare()
-for NULL clock.  Also your patch changes susp_clk handling while
-leaves axius_clk handling (which also can be NULL) untouched.
+All errors (new ones prefixed by >>):
 
-Do you actually see some runtime problem with the current code?
+   include/linux/compiler.h:253:8: sparse: attribute 'no_sanitize_address': unknown attribute
+   drivers/media/rc/mtk-cir.c:215:41: sparse: too many arguments for function devm_rc_allocate_device
+   drivers/media/rc/mtk-cir.c: In function 'mtk_ir_probe':
+>> drivers/media/rc/mtk-cir.c:215:11: error: too many arguments to function 'devm_rc_allocate_device'
+     ir->rc = devm_rc_allocate_device(dev, RC_DRIVER_IR_RAW);
+              ^~~~~~~~~~~~~~~~~~~~~~~
+   In file included from drivers/media/rc/mtk-cir.c:22:0:
+   include/media/rc-core.h:213:16: note: declared here
+    struct rc_dev *devm_rc_allocate_device(struct device *dev);
+                   ^~~~~~~~~~~~~~~~~~~~~~~
 
-If not then the patch should probably be dropped.
+sparse warnings: (new ones prefixed by >>)
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+   include/linux/compiler.h:253:8: sparse: attribute 'no_sanitize_address': unknown attribute
+>> drivers/media/rc/mtk-cir.c:215:41: sparse: too many arguments for function devm_rc_allocate_device
+   drivers/media/rc/mtk-cir.c: In function 'mtk_ir_probe':
+   drivers/media/rc/mtk-cir.c:215:11: error: too many arguments to function 'devm_rc_allocate_device'
+     ir->rc = devm_rc_allocate_device(dev, RC_DRIVER_IR_RAW);
+              ^~~~~~~~~~~~~~~~~~~~~~~
+   In file included from drivers/media/rc/mtk-cir.c:22:0:
+   include/media/rc-core.h:213:16: note: declared here
+    struct rc_dev *devm_rc_allocate_device(struct device *dev);
+                   ^~~~~~~~~~~~~~~~~~~~~~~
 
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> ---
->  drivers/usb/dwc3/dwc3-exynos.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
-> index e27899b..f97a3d7 100644
-> --- a/drivers/usb/dwc3/dwc3-exynos.c
-> +++ b/drivers/usb/dwc3/dwc3-exynos.c
-> @@ -131,8 +131,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
->  	if (IS_ERR(exynos->susp_clk)) {
->  		dev_info(dev, "no suspend clk specified\n");
->  		exynos->susp_clk = NULL;
-> -	}
-> -	clk_prepare_enable(exynos->susp_clk);
-> +	} else
-> +		clk_prepare_enable(exynos->susp_clk);
->  
->  	if (of_device_is_compatible(node, "samsung,exynos7-dwusb3")) {
->  		exynos->axius_clk = devm_clk_get(dev, "usbdrd30_axius_clk");
-> @@ -196,7 +196,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
->  	regulator_disable(exynos->vdd33);
->  err2:
->  	clk_disable_unprepare(exynos->axius_clk);
-> -	clk_disable_unprepare(exynos->susp_clk);
-> +	if (exynos->susp_clk)
-> +		clk_disable_unprepare(exynos->susp_clk);
->  	clk_disable_unprepare(exynos->clk);
->  	return ret;
->  }
-> @@ -210,7 +211,8 @@ static int dwc3_exynos_remove(struct platform_device *pdev)
->  	platform_device_unregister(exynos->usb3_phy);
->  
->  	clk_disable_unprepare(exynos->axius_clk);
-> -	clk_disable_unprepare(exynos->susp_clk);
-> +	if (exynos->susp_clk)
-> +		clk_disable_unprepare(exynos->susp_clk);
->  	clk_disable_unprepare(exynos->clk);
->  
->  	regulator_disable(exynos->vdd33);
+vim +/devm_rc_allocate_device +215 drivers/media/rc/mtk-cir.c
+
+   209		ir->base = devm_ioremap_resource(dev, res);
+   210		if (IS_ERR(ir->base)) {
+   211			dev_err(dev, "failed to map registers\n");
+   212			return PTR_ERR(ir->base);
+   213		}
+   214	
+ > 215		ir->rc = devm_rc_allocate_device(dev, RC_DRIVER_IR_RAW);
+   216		if (!ir->rc) {
+   217			dev_err(dev, "failed to allocate device\n");
+   218			return -ENOMEM;
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 57747 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170110/f8a4befc/attachment-0001.gz>
