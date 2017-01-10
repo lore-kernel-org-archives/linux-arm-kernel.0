@@ -1,373 +1,53 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 10 Jan 2017 11:38:53 +0000
-Subject: [PATCH v3 6/9] kvm: arm/arm64: Add host pmu to support VM
- introspection
+Date: Tue, 10 Jan 2017 11:38:56 +0000
+Subject: [PATCH v3 9/9] arm64: KVM: Enable support for the host pmu
 In-Reply-To: <20170110113856.7183-1-punit.agrawal@arm.com>
 References: <20170110113856.7183-1-punit.agrawal@arm.com>
-Message-ID: <20170110113856.7183-7-punit.agrawal@arm.com>
+Message-ID: <20170110113856.7183-10-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both AArch32 and AArch64 mode of the ARMv8 architecture support trapping
-certain VM operations, e.g, TLB and cache maintenance
-operations. Selective trapping of these operations for specific VMs can
-be used to track the frequency with which these occur during execution.
-
-Add a software PMU on the host that can support tracking VM
-operations (in the form of PMU events). Supporting new events requires
-providing callbacks to configure the VM to enable/disable the trapping
-and read a count of the frequency.
-
-The host PMU events can be controlled by tools like perf that use
-standard kernel perf interfaces.
+Add the Kconfig option and Makefile update the enable the recently added
+host pmu.
 
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 Cc: Christoffer Dall <christoffer.dall@linaro.org>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h   |   8 ++
- arch/arm/kvm/arm.c                |   2 +
- arch/arm64/include/asm/kvm_host.h |   8 ++
- virt/kvm/arm/host_pmu.c           | 272 ++++++++++++++++++++++++++++++++++++++
- 4 files changed, 290 insertions(+)
- create mode 100644 virt/kvm/arm/host_pmu.c
+ arch/arm64/kvm/Kconfig  | 4 ++++
+ arch/arm64/kvm/Makefile | 1 +
+ 2 files changed, 5 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 26f0c8a0b790..b988f8801b86 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -289,6 +289,14 @@ static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
- int kvm_perf_init(void);
- int kvm_perf_teardown(void);
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index 52cb7ad9b2fd..c147a3077dab 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -16,6 +16,9 @@ menuconfig VIRTUALIZATION
  
-+#if !defined(CONFIG_KVM_HOST_PMU)
-+static inline int kvm_host_pmu_init(void) { return 0; }
-+static inline void kvm_host_pmu_teardown(void) { }
-+#else
-+int kvm_host_pmu_init(void);
-+void kvm_host_pmu_teardown(void);
-+#endif
-+
- void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+ if VIRTUALIZATION
  
- struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 11676787ad49..058626b65b8d 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1263,6 +1263,7 @@ static int init_subsystems(void)
- 		goto out;
- 
- 	kvm_perf_init();
-+	kvm_host_pmu_init();
- 	kvm_coproc_table_init();
- 
- out:
-@@ -1453,6 +1454,7 @@ int kvm_arch_init(void *opaque)
- void kvm_arch_exit(void)
- {
- 	kvm_perf_teardown();
-+	kvm_host_pmu_teardown();
- }
- 
- static int arm_init(void)
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 1e83b707f14c..018f887e8964 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -349,6 +349,14 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- int kvm_perf_init(void);
- int kvm_perf_teardown(void);
- 
-+#if !defined(CONFIG_KVM_HOST_PMU)
-+static inline int kvm_host_pmu_init(void) { return 0; }
-+static inline void kvm_host_pmu_teardown(void) { }
-+#else
-+int kvm_host_pmu_init(void);
-+void kvm_host_pmu_teardown(void);
-+#endif
++config KVM_HOST_PMU
++        bool
 +
- struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
- 
- static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
-diff --git a/virt/kvm/arm/host_pmu.c b/virt/kvm/arm/host_pmu.c
-new file mode 100644
-index 000000000000..fc610ccc169a
---- /dev/null
-+++ b/virt/kvm/arm/host_pmu.c
-@@ -0,0 +1,272 @@
-+#include <linux/cpumask.h>
-+#include <linux/device.h>
-+#include <linux/kernel.h>
-+#include <linux/kvm_host.h>
-+#include <linux/list.h>
-+#include <linux/perf_event.h>
-+#include <linux/pid.h>
-+#include <linux/sched.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock_types.h>
-+#include <linux/sysfs.h>
-+
-+#include <asm/kvm_emulate.h>
-+
-+enum host_pmu_events {
-+	KVM_HOST_MAX_EVENTS,
-+};
-+
-+struct host_pmu {
-+	struct pmu pmu;
-+	spinlock_t event_list_lock;
-+	struct list_head event_list_head;
-+} host_pmu;
-+#define to_host_pmu(p) (container_of(p, struct host_pmu, pmu))
-+
-+typedef void (*configure_event_fn)(struct kvm *kvm, bool enable);
-+typedef u64 (*get_event_count_fn)(struct kvm *kvm);
-+
-+struct kvm_event_cb {
-+	enum host_pmu_events event;
-+	get_event_count_fn get_event_count;
-+	configure_event_fn configure_event;
-+};
-+
-+struct event_data {
-+	bool enable;
-+	struct kvm *kvm;
-+	struct kvm_event_cb *cb;
-+	struct work_struct work;
-+	struct list_head event_list;
-+};
-+
-+static struct kvm_event_cb event_callbacks[] = {
-+};
-+
-+static struct attribute *event_attrs[] = {
-+	NULL,
-+};
-+
-+static struct attribute_group events_attr_group = {
-+	.name	= "events",
-+	.attrs	= event_attrs,
-+};
-+
-+
-+#define VM_MASK	GENMASK_ULL(31, 0)
-+#define EVENT_MASK	GENMASK_ULL(32, 39)
-+#define EVENT_SHIFT	(32)
-+
-+#define to_pid(cfg)	((cfg) & VM_MASK)
-+#define to_event(cfg)	(((cfg) & EVENT_MASK) >> EVENT_SHIFT)
-+
-+PMU_FORMAT_ATTR(vm, "config:0-31");
-+PMU_FORMAT_ATTR(event, "config:32-39");
-+
-+static struct attribute *format_attrs[] = {
-+	&format_attr_vm.attr,
-+	&format_attr_event.attr,
-+	NULL,
-+};
-+
-+static struct attribute_group format_attr_group = {
-+	.name	= "format",
-+	.attrs	= format_attrs,
-+};
-+
-+static const struct attribute_group *attr_groups[] = {
-+	&events_attr_group,
-+	&format_attr_group,
-+	NULL,
-+};
-+
-+static void host_event_destroy(struct perf_event *event)
-+{
-+	struct host_pmu *host_pmu = to_host_pmu(event->pmu);
-+	struct event_data *e_data = event->pmu_private;
-+
-+	/*
-+	 * Ensure outstanding work items related to this event are
-+	 * completed before freeing resources.
-+	 */
-+	flush_work(&e_data->work);
-+
-+	kvm_put_kvm(e_data->kvm);
-+
-+	spin_lock(&host_pmu->event_list_lock);
-+	list_del(&e_data->event_list);
-+	spin_unlock(&host_pmu->event_list_lock);
-+	kfree(e_data);
-+}
-+
-+void host_event_work(struct work_struct *work)
-+{
-+	struct event_data *e_data = container_of(work, struct event_data, work);
-+	struct kvm *kvm = e_data->kvm;
-+
-+	e_data->cb->configure_event(kvm, e_data->enable);
-+}
-+
-+static int host_event_init(struct perf_event *event)
-+{
-+	struct host_pmu *host_pmu = to_host_pmu(event->pmu);
-+	int event_id = to_event(event->attr.config);
-+	pid_t task_pid = to_pid(event->attr.config);
-+	struct event_data *e_data, *pos;
-+	bool found = false;
-+	struct pid *pid;
-+	struct kvm *kvm;
-+	int ret = 0;
-+
-+	if (event->attr.type != event->pmu->type)
-+		return -ENOENT;
-+
-+	if (has_branch_stack(event)	||
-+	    is_sampling_event(event)	||
-+	    event->attr.exclude_user	||
-+	    event->attr.exclude_kernel	||
-+	    event->attr.exclude_hv	||
-+	    event->attr.exclude_idle	||
-+	    event->attr.exclude_guest) {
-+		return -EINVAL;
-+	}
-+
-+	if (event->attach_state == PERF_ATTACH_TASK)
-+		return -EOPNOTSUPP;
-+
-+	if (event->cpu < 0)
-+		return -EINVAL;
-+
-+	if (event_id >= KVM_HOST_MAX_EVENTS)
-+		return -EINVAL;
-+
-+	pid = find_get_pid(task_pid);
-+	spin_lock(&kvm_lock);
-+	list_for_each_entry(kvm, &vm_list, vm_list) {
-+		if (kvm->pid == pid) {
-+			kvm_get_kvm(kvm);
-+			found = true;
-+			break;
-+		}
-+	}
-+	spin_unlock(&kvm_lock);
-+	put_pid(pid);
-+
-+	if (!found)
-+		return -EINVAL;
-+
-+	spin_lock(&host_pmu->event_list_lock);
-+	/* Make sure we don't already have the (event_id, kvm) pair */
-+	list_for_each_entry(pos, &host_pmu->event_list_head, event_list) {
-+		if (pos->cb->event == event_id &&
-+		    pos->kvm->pid == pid) {
-+			kvm_put_kvm(kvm);
-+			ret = -EOPNOTSUPP;
-+			goto unlock;
-+		}
-+	}
-+
-+	e_data = kzalloc(sizeof(*e_data), GFP_KERNEL);
-+	e_data->kvm = kvm;
-+	e_data->cb = &event_callbacks[event_id];
-+	INIT_WORK(&e_data->work, host_event_work);
-+	event->pmu_private = e_data;
-+	event->cpu = cpumask_first(cpu_online_mask);
-+	event->destroy = host_event_destroy;
-+
-+	list_add_tail(&e_data->event_list, &host_pmu->event_list_head);
-+
-+unlock:
-+	spin_unlock(&host_pmu->event_list_lock);
-+
-+	return ret;
-+}
-+
-+static void host_event_update(struct perf_event *event)
-+{
-+	struct event_data *e_data = event->pmu_private;
-+	struct kvm_event_cb *cb = e_data->cb;
-+	struct kvm *kvm = e_data->kvm;
-+	struct hw_perf_event *hw = &event->hw;
-+	u64 prev_count, new_count;
-+
-+	do {
-+		prev_count = local64_read(&hw->prev_count);
-+		new_count = cb->get_event_count(kvm);
-+	} while (local64_xchg(&hw->prev_count, new_count) != prev_count);
-+
-+	local64_add(new_count - prev_count, &event->count);
-+}
-+
-+static void host_event_start(struct perf_event *event, int flags)
-+{
-+	struct event_data *e_data = event->pmu_private;
-+	struct kvm_event_cb *cb = e_data->cb;
-+	struct kvm *kvm = e_data->kvm;
-+	u64 val;
-+
-+	val = cb->get_event_count(kvm);
-+	local64_set(&event->hw.prev_count, val);
-+
-+	e_data->enable = true;
-+	schedule_work(&e_data->work);
-+}
-+
-+static void host_event_stop(struct perf_event *event, int flags)
-+{
-+	struct event_data *e_data = event->pmu_private;
-+
-+	e_data->enable = false;
-+	schedule_work(&e_data->work);
-+
-+	if (flags & PERF_EF_UPDATE)
-+		host_event_update(event);
-+}
-+
-+static int host_event_add(struct perf_event *event, int flags)
-+{
-+	if (flags & PERF_EF_START)
-+		host_event_start(event, flags);
-+
-+	return 0;
-+}
-+
-+static void host_event_del(struct perf_event *event, int flags)
-+{
-+	host_event_stop(event, PERF_EF_UPDATE);
-+}
-+
-+static void host_event_read(struct perf_event *event)
-+{
-+	host_event_update(event);
-+}
-+
-+static void init_host_pmu(struct host_pmu *host_pmu)
-+{
-+	host_pmu->pmu = (struct pmu) {
-+		.task_ctx_nr	= perf_sw_context,
-+		.attr_groups	= attr_groups,
-+		.event_init	= host_event_init,
-+		.add		= host_event_add,
-+		.del		= host_event_del,
-+		.start		= host_event_start,
-+		.stop		= host_event_stop,
-+		.read		= host_event_read,
-+		.capabilities	= PERF_PMU_CAP_NO_INTERRUPT,
-+	};
-+
-+	INIT_LIST_HEAD(&host_pmu->event_list_head);
-+	spin_lock_init(&host_pmu->event_list_lock);
-+}
-+
-+int kvm_host_pmu_init(void)
-+{
-+	init_host_pmu(&host_pmu);
-+
-+	return perf_pmu_register(&host_pmu.pmu, "kvm", -1);
-+}
-+
-+void kvm_host_pmu_teardown(void)
-+{
-+	perf_pmu_unregister(&host_pmu.pmu);
-+}
+ config KVM
+ 	bool "Kernel-based Virtual Machine (KVM) support"
+ 	depends on OF
+@@ -31,6 +34,7 @@ config KVM
+ 	select KVM_VFIO
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
++	select KVM_HOST_PMU if PERF_EVENTS
+ 	select KVM_ARM_PMU if HW_PERF_EVENTS
+ 	select HAVE_KVM_MSI
+ 	select HAVE_KVM_IRQCHIP
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index d50a82a16ff6..3bdac93784e2 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -34,3 +34,4 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-its.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/irqchip.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
+ kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
++kvm-$(CONFIG_KVM_HOST_PMU) += $(KVM)/arm/host_pmu.o
 -- 
 2.11.0
