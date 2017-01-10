@@ -1,27 +1,60 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 10 Jan 2017 11:27:38 +0800
-Subject: [PATCH resend v4 2/3] ARM: dts: imx6: Support Savageboard dual
-In-Reply-To: <20170104070436.3425-1-woogyom.kim@gmail.com>
-References: <20170104070436.3425-1-woogyom.kim@gmail.com>
-Message-ID: <20170110032736.GX20956@dragon>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Tue, 10 Jan 2017 11:31:02 +0800
+Subject: [PATCH v3] arm64: dts: rockchip: add "rockchip, grf" property for
+ RK3399 PMUCRU/CRU
+In-Reply-To: <CAD=FV=UsMR=HD5799N7ny_Ce8XXCkcd3R3tpX34AEC6UmGkXtA@mail.gmail.com>
+References: <1484011661-13474-1-git-send-email-zhengxing@rock-chips.com>
+ <CAD=FV=UsMR=HD5799N7ny_Ce8XXCkcd3R3tpX34AEC6UmGkXtA@mail.gmail.com>
+Message-ID: <58745576.4010105@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 04, 2017 at 04:04:36PM +0900, Milo Kim wrote:
-> Common savageboard DT file is used for board support.
-> Add the vendor name and specify the dtb file for i.MX6Q build.
-> 
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
-> ---
->  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+Hi, Doug
 
-The bindings change should be ideally a separate patch.  But since Rob
-seems to be fine with it this time, I just applied the whole series.
+On 2017?01?10? 11:06, Doug Anderson wrote:
+> Hi,
+>
+> On Mon, Jan 9, 2017 at 5:27 PM, Xing Zheng <zhengxing@rock-chips.com> wrote:
+>> The structure rockchip_clk_provider needs to refer the GRF regmap
+>> in somewhere, if the CRU node has not "rockchip,grf" property,
+>> calling syscon_regmap_lookup_by_phandle will return an invalid GRF
+>> regmap, and the MUXGRF type clock will be not supported.
+>>
+>> Therefore, we need to add them.
+>>
+>> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+>> ---
+>>
+>> Changes in v3:
+>> - add optional roperty rockchip,grf in rockchip,rk3399-cru.txt
+>>
+>> Changes in v2:
+>> - referring pmugrf for PMUGRU
+>> - fix the typo "invaild" in COMMIT message
+>>
+>>   Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt | 5 +++++
+>>   arch/arm64/boot/dts/rockchip/rk3399.dtsi                        | 2 ++
+> "dts" and bindings shouldn't change in the same patch since they go
+> through different trees.  This is why I said:
+>
+>> This looks sane to me, but before you land it you need to first send
+>> up a (separate) patch that adjusts:
+>>        --------
+> AKA: you need a two patch series here.
+>
+> Sometimes it's OK to include bindings together with code changes
+> (depends on the maintainer), but never with dts changes.
+>
+> -Doug
+For little lazy, I did refer other SoC platform to using "dts" and 
+bindings in the same patch...
 
-Shawn
+OK, I will use a two patch series.
 
->  arch/arm/boot/dts/Makefile                         |  1 +
->  arch/arm/boot/dts/imx6dl-savageboard.dts           | 51 ++++++++++++++++++++++
->  3 files changed, 53 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6dl-savageboard.dts
+Thanks
+
+>
+>
+
+-- 
+- Xing Zheng
