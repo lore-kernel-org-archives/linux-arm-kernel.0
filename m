@@ -1,74 +1,148 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Jan 2017 14:12:18 +0100
-Subject: [PATCH v2] arm64: do not set dma masks that device connection
- can't handle
-In-Reply-To: <07253eaa-5729-0f15-42b6-e8403f1f0412@cogentembedded.com>
-References: <1483947002-16410-1-git-send-email-nikita.yoush@cogentembedded.com>
- <20170110115132.GD21598@arm.com>
- <07253eaa-5729-0f15-42b6-e8403f1f0412@cogentembedded.com>
-Message-ID: <2642601.V6IY0ZAJpg@wuerfel>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue, 10 Jan 2017 14:13:33 +0100
+Subject: [RFC PATCH v3 0/5] ARM: Fix dma_alloc_coherent() and friends for
+ NOMMU
+In-Reply-To: <1483969669-4636-1-git-send-email-vladimir.murzin@arm.com>
+References: <1483969669-4636-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <CA+M3ks5+e=gJsC+XGT7SDXZ=DROAs4Yk4jyKpOwT02PUCoLq_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 10, 2017 3:47:25 PM CET Nikita Yushchenko wrote:
-> 
-> > The point here is that an IOMMU doesn't solve your issue, and the
-> > IOMMU-backed DMA ops need the same treatment. In light of that, it really
-> > feels to me like the DMA masks should be restricted in of_dma_configure
-> > so that the parent mask is taken into account there, rather than hook
-> > into each set of DMA ops to intercept set_dma_mask.
+2017-01-09 14:47 GMT+01:00 Vladimir Murzin <vladimir.murzin@arm.com>:
+> Hi,
+>
+> It seem that addition of cache support for M-class cpus uncovered
+> latent bug in DMA usage. NOMMU memory model has been treated as being
+> always consistent; however, for R/M classes of cpu memory can be
+> covered by MPU which in turn might configure RAM as Normal
+> i.e. bufferable and cacheable. It breaks dma_alloc_coherent() and
+> friends, since data can stuck in caches now or be buffered.
+>
+> This patch set is trying to address the issue by providing region of
+> memory suitable for consistent DMA operations. It is supposed that
+> such region is marked by MPU as non-cacheable. Robin suggested to
+> advertise such memory as reserved shared-dma-pool, rather then using
+> homebrew command line option, and extend dma-coherent to provide
+> default DMA area in the similar way as it is done for CMA (PATCH
+> 2/5). It allows us to offload all bookkeeping on generic coherent DMA
+> framework, and it is seems that it might be reused by other
+> architectures like c6x and blackfin.
+>
+> Dedicated DMA region is required for cases other than:
+>  - MMU/MPU is off
+>  - cpu is v7m w/o cache support
+>  - device is coherent
+>
+> In case one of the above conditions is true dma operations are forced
+> to be coherent and wired with dma_noop_ops.
+>
+> To make life easier NOMMU dma operations are kept in separate
+> compilation unit.
+>
+> Since the issue was reported in the same time as Benjamin sent his
+> patch [1] to allow mmap for NOMMU, his case is also addressed in this
+> series (PATCH 1/5 and PATCH 3/5).
+>
+> @Benjamin I've tested that mmap is working with amba-clcd and following
+> hack on top:
+>
+> diff --git a/drivers/video/fbdev/core/fbmem.c b/drivers/video/fbdev/core/fbmem.c
+> index 76c1ad9..64465c9 100644
+> --- a/drivers/video/fbdev/core/fbmem.c
+> +++ b/drivers/video/fbdev/core/fbmem.c
+> @@ -1492,6 +1492,24 @@ __releases(&info->lock)
+>         return 0;
+>  }
+>
+> +static unsigned fb_capabilities(struct file *file)
+> +{
+> +       return NOMMU_MAP_DIRECT | NOMMU_MAP_READ | NOMMU_MAP_WRITE;
+> +}
+> +
+> +static unsigned long get_fb_unmapped_area(struct file *filp,
+> +                                  unsigned long addr, unsigned long len,
+> +                                  unsigned long pgoff, unsigned long flags)
+> +{
+> +       struct fb_info * const info = filp->private_data;
+> +       unsigned long fb_size = PAGE_ALIGN(info->fix.smem_len);
+> +
+> +       if (pgoff > fb_size || len > fb_size - pgoff)
+> +               return -EINVAL;
+> +
+> +       return (unsigned long)info->screen_base + pgoff;
+> +}
+> +
+>  static const struct file_operations fb_fops = {
+>         .owner =        THIS_MODULE,
+>         .read =         fb_read,
+> @@ -1503,13 +1521,12 @@ static const struct file_operations fb_fops = {
+>         .mmap =         fb_mmap,
+>         .open =         fb_open,
+>         .release =      fb_release,
+> -#ifdef HAVE_ARCH_FB_UNMAPPED_AREA
+>         .get_unmapped_area = get_fb_unmapped_area,
+> -#endif
+>  #ifdef CONFIG_FB_DEFERRED_IO
+>         .fsync =        fb_deferred_io_fsync,
+>  #endif
+>         .llseek =       default_llseek,
+> +       .mmap_capabilities = fb_capabilities,
+>  };
+>
+>  struct class *fb_class;
+>
+> I can see that fb-test-app updates display and addresses returnend with
+> dma_alloc_cohernet() and mmap() are the same.
 
-of_dma_configure() sets up a 32-bit mask, which is assumed to always work
-in the kernel. We can't change it to a larger mask because that would
-break drivers that have to restrict devices to 32-bit.
+I have push get_fb_unmapped_area() function in fbmem last week:
+https://cgit.freedesktop.org/drm/drm-misc/commit/?id=82f42e4cc164ed486c9e2b1b74e65b176830d947
+and to the same in drm/kms part:
+https://cgit.freedesktop.org/drm/drm-misc/commit/?id=62a0d98a188cc4ebd8ea54b37d274ec20465e464
+all this work without need to change mmap_capabilities.
 
-If the bus addressing is narrower than 32 bits however, the initial mask
-should probably be limited to whatever the bus supports, but that is not
-the problem we are trying to solve here.
+Other noMMU architectures don't need to change mmap_capabilities
+function to make fbmem works.
+I would like to understand how they do before push for this new function.
+It sound like it is an ARM Cortex M specific needs with your new implementation.
 
-> > We'd still need to
-> > do something to stop dma_set_mask widening the mask if it was restricted
-> > by of_dma_configure, but I think Robin (cc'd) was playing with that.
-> 
-> What issue "IOMMU doesn't solve"?
-> 
-> Issue I'm trying to address is - inconsistency within swiotlb
-> dma_map_ops, where (1) any wide mask is silently accepted, but (2) then
-> mask is used to decide if bounce buffers are needed or not. This
-> inconsistency causes NVMe+R-Car cobmo not working (and breaking memory
-> instead).
+If we can't avoid using mmap_capabilities we will have to put it (at
+least) in fbmem, drm/kms and v4l2.
 
-It's not just an inconsistency, it's a known bug that we really
-need to fix.
+Benjamin
 
-> I just can't think out what similar issue iommu can have.
-> Do you mean that in iommu case, mask also must not be set to whatever
-> wider than initial value? Why? What is the use of mask in iommu case? Is
-> there any real case when iommu can't address all memory existing in the
-> system?
+> Thanks!
+>
+> [1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8633/1
+>
+> Vladimir Murzin (5):
+>   dma: Add simple dma_noop_mmap
+>   drivers: dma-coherent: Introduce default DMA pool
+>   ARM: NOMMU: Introduce dma operations for noMMU
+>   ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class cpus
+>   ARM: dma-mapping: Remove traces of NOMMU code
+>
+>  .../bindings/reserved-memory/reserved-memory.txt   |   3 +
+>  arch/arm/include/asm/dma-mapping.h                 |   3 +-
+>  arch/arm/mm/Kconfig                                |   2 +-
+>  arch/arm/mm/Makefile                               |   5 +-
+>  arch/arm/mm/dma-mapping-nommu.c                    | 252 +++++++++++++++++++++
+>  arch/arm/mm/dma-mapping.c                          |  26 +--
+>  drivers/base/dma-coherent.c                        |  59 ++++-
+>  lib/dma-noop.c                                     |  21 ++
+>  8 files changed, 335 insertions(+), 36 deletions(-)
+>  create mode 100644 arch/arm/mm/dma-mapping-nommu.c
+>
+> --
+> 2.0.0
+>
 
-I think the problem that Will is referring to is when the IOMMU has
-a virtual address space that is wider than the DMA mask of the device:
-In this case, dma_map_single() might return a dma_addr_t that is not
-reachable by the device.
 
-I'd consider that a separate bug that needs to be worked around in
-the IOMMU code.
 
-> NVMe maintainer has just stated that they expect
-> set_dma_mask(DMA_BIT_MASK(64)) to always succeed, and are going to error
-> out driver probe if that call fails.  They claim that architecture must
-> always be able to dma_map() whatever memory existing in the system - via
-> iommu or swiotlb or whatever. Their direction is to remove bounce
-> buffers from block and other layers.
-> 
-> With this direction, semantics of dma mask becomes even more
-> questionable. I'd say dma_mask is candidate for removal (or to move to
-> swiotlb's or iommu's local area)
+-- 
+Benjamin Gaignard
 
-Removing dma_mask is not realistic any time soon, there are too many things
-in the kernel that use it for one thing or another, so any changes here
-have to be done really carefully. We definitely need the mask to support
-architectures without swiotlb.
+Graphic Study Group
 
-	Arnd
+Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro: Facebook | Twitter | Blog
