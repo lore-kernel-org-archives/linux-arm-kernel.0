@@ -1,24 +1,41 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Tue, 10 Jan 2017 15:59:14 +0100
-Subject: [PATCH v2] arm64: do not set dma masks that device connection
- can't handle
-In-Reply-To: <6116278.nQQUSuo3l4@wuerfel>
-References: <1483947002-16410-1-git-send-email-nikita.yoush@cogentembedded.com>
- <07253eaa-5729-0f15-42b6-e8403f1f0412@cogentembedded.com>
- <11daacde-5399-039f-80a3-01d7bd13e9e8@arm.com> <6116278.nQQUSuo3l4@wuerfel>
-Message-ID: <20170110145914.GE27156@lst.de>
+From: arnd@linaro.org (Arnd Bergmann)
+Date: Tue, 10 Jan 2017 16:00:47 +0100
+Subject: [PATCH 1/2] arm64: dma_mapping: allow PCI host driver to limit
+ DMA mask
+In-Reply-To: <20170110144453.GA27156@lst.de>
+References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
+ <1988852.3nyUoruEjG@wuerfel> <20170110144453.GA27156@lst.de>
+Message-ID: <7276604.Zo5Nlf9pQ3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 02:42:23PM +0100, Arnd Bergmann wrote:
-> It's a much rarer problem for the IOMMU case though, because it only
-> impacts devices that are restricted to addressing of less than 32-bits.
+On Tuesday, January 10, 2017 3:44:53 PM CET Christoph Hellwig wrote:
+> On Tue, Jan 10, 2017 at 11:47:42AM +0100, Arnd Bergmann wrote:
+> > I see that we have CONFIG_ARCH_PHYS_ADDR_T_64BIT on a couple of
+> > 32-bit architectures without swiotlb (arc, arm, some mips32), and
+> > there are several 64-bit architectures that do not have swiotlb
+> > (alpha, parisc, s390, sparc). I believe that alpha, s390 and sparc
+> > always use some form of IOMMU, but the other four apparently don't,
+> > so we would need to add swiotlb support there to remove all the
+> > bounce buffering in network and block layers.
 > 
-> If you have an IOMMU enabled, the dma-mapping interface does not care
-> if the device can do wider than 32 bit addressing, as it will never
-> hand out IOVAs above 0xffffffff.
+> mips has lots of weird swiotlb wire-up in it's board code (the swiotlb
+> arch glue really needs some major cleanup..),
 
-That's absolutely not the case.  IOMMUs can and do generate addresses
-larger than 32-bit.  Also various platforms have modes where an IOMMU
-can be used when <= 32-bit addresses are used and bypassed if full 64-bit
-addressing is supported and I/O isolation is not explicitly requested.
+My reading of the MIPS code was that only the 64-bit platforms use it,
+but there are a number of 32-bit platforms that have 64-bit physical
+addresses and don't.
+
+> as does arm.  Not sure about the others.
+
+32-bit ARM doesn't actually use SWIOTLB at all, despite selecting it
+in Kconfig. I think Xen uses it for its own purposes, but nothing
+else does.
+
+Most ARM platforms can't actually have RAM beyond 4GB, and the ones
+that do have it tend to also come with an IOMMU, but I remember
+at least BCM53xx actually needing swiotlb on some chip revisions
+that are widely used and that cannot DMA to the second memory bank
+from PCI (!).
+
+	Arnd
