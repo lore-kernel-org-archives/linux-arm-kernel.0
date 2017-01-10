@@ -1,37 +1,60 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 10 Jan 2017 12:14:23 +0000
-Subject: Unhandled level 2 translation fault (11) at 0x000000b8, esr
- 0x92000046, rpi3 (aarch64)
-In-Reply-To: <CAGDbNAC-8w1xytLuzWTMnWLi8=j1ShkwE3CLXQ5q75m_RibCMA@mail.gmail.com>
-References: <CAGDbNAD7-TM6+x0A3FebTOPYmqQqbm1w29ZwH+9qePaAvhxTKw@mail.gmail.com>
- <20161230151323.583b7ac5@xhacker>
- <CAGDbNAAGqFqt7X+=XYRLAp=L_fTv9dAAe=wu4T_W-FCGqnYHHg@mail.gmail.com>
- <20170109151354.GC7593@e104818-lin.cambridge.arm.com>
- <CAGDbNAC-8w1xytLuzWTMnWLi8=j1ShkwE3CLXQ5q75m_RibCMA@mail.gmail.com>
-Message-ID: <20170110121423.GF19960@e104818-lin.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 10 Jan 2017 12:26:01 +0000
+Subject: [PATCH] virtio_mmio: Set DMA masks appropriately
+Message-ID: <50defbbe87d75db85a9d22f914258975d661208a.1484051089.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 07:06:19PM +0100, Bas van Tiel wrote:
-> > I defined STACKSIZE to the kernel's SIGSTKSZ (16384) and it seems to run
-> > fine, though I'll leave it longer/overnight (on a Juno board). With the
-> > 4K signal stack it was crashing shortly after start.
-> 
-> I tried the STACKSIZE of 16384 for both the RPI3 and the PINEA64 board
-> and still see the same behaviour of crashing. Sometimes the process
-> is also blocked for a long time before it crashes.
-> 
-> Setting the interval to 200 usec [5 Khz] will help to crash it faster.
-> 
-> To further isolate the issue I will create a kernel module (based on a
-> hrtimer) that will sent a periodic signal to the registered process
-> and execute the same sighandler logic to check if the problem is still
-> there.
+Once DMA API usage is enabled, it becomes apparent that virtio-mmio is
+inadvertently relying on the default 32-bit DMA mask, which leads to
+problems like rapidly exhausting SWIOTLB bounce buffers.
 
-I lowered the interval to 100us (it was 100ms in the original file) and
-I can indeed trigger segfault easily on Juno. But it doesn't fail in the
-same way every time, I sometimes get permission fault, other times bad
-frame.
+Ensure that we set the appropriate 64-bit DMA mask whenever possible,
+with the coherent mask suitably limited for the legacy vring as per
+a0be1db4304f ("virtio_pci: Limit DMA mask to 44 bits for legacy virtio
+devices").
 
+Reported-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+Fixes: b42111382f0e ("virtio_mmio: Use the DMA API if enabled")
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/virtio/virtio_mmio.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+index 48bfea91dbca..b5c5d49ca598 100644
+--- a/drivers/virtio/virtio_mmio.c
++++ b/drivers/virtio/virtio_mmio.c
+@@ -59,6 +59,7 @@
+ #define pr_fmt(fmt) "virtio-mmio: " fmt
+ 
+ #include <linux/acpi.h>
++#include <linux/dma-mapping.h>
+ #include <linux/highmem.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+@@ -497,6 +498,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
+ 	struct virtio_mmio_device *vm_dev;
+ 	struct resource *mem;
+ 	unsigned long magic;
++	int rc;
+ 
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!mem)
+@@ -548,6 +550,14 @@ static int virtio_mmio_probe(struct platform_device *pdev)
+ 	if (vm_dev->version == 1)
+ 		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
+ 
++	rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
++	if (rc)
++		rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
++	else if (vm_dev->version == 1)
++		dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32 + PAGE_SHIFT));
++	if (rc)
++		dev_warn(&pdev->dev, "Failed to enable 64-bit or 32-bit DMA.  Trying to continue, but this might not work.\n");
++
+ 	platform_set_drvdata(pdev, vm_dev);
+ 
+ 	return register_virtio_device(&vm_dev->vdev);
 -- 
-Catalin
+2.10.2.dirty
