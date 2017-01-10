@@ -1,65 +1,58 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 10 Jan 2017 14:18:40 +0000
-Subject: [RFC PATCH v4 0/5] ARM: Fix dma_alloc_coherent() and friends for NOMMU
-Message-ID: <1484057925-23586-1-git-send-email-vladimir.murzin@arm.com>
+Date: Tue, 10 Jan 2017 14:18:41 +0000
+Subject: [RFC PATCH v4 1/5] dma: Add simple dma_noop_mmap
+In-Reply-To: <1484057925-23586-1-git-send-email-vladimir.murzin@arm.com>
+References: <1484057925-23586-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1484057925-23586-2-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds a simple implementation of mmap to dma_noop_ops.
 
-It seem that addition of cache support for M-class cpus uncovered
-latent bug in DMA usage. NOMMU memory model has been treated as being
-always consistent; however, for R/M classes of cpu memory can be
-covered by MPU which in turn might configure RAM as Normal
-i.e. bufferable and cacheable. It breaks dma_alloc_coherent() and
-friends, since data can stuck in caches now or be buffered.
+Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ lib/dma-noop.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-This patch set is trying to address the issue by providing region of
-memory suitable for consistent DMA operations. It is supposed that
-such region is marked by MPU as non-cacheable. Robin suggested to
-advertise such memory as reserved shared-dma-pool, rather then using
-homebrew command line option, and extend dma-coherent to provide
-default DMA area in the similar way as it is done for CMA (PATCH
-2/5). It allows us to offload all bookkeeping on generic coherent DMA
-framework, and it is seems that it might be reused by other
-architectures like c6x and blackfin.
-
-Dedicated DMA region is required for cases other than:
- - MMU/MPU is off
- - cpu is v7m w/o cache support
- - device is coherent
-
-In case one of the above conditions is true dma operations are forced
-to be coherent and wired with dma_noop_ops.
-
-To make life easier NOMMU dma operations are kept in separate
-compilation unit.
-
-Since the issue was reported in the same time as Benjamin sent his
-patch [1] to allow mmap for NOMMU, his case is also addressed in this
-series (PATCH 1/5 and PATCH 3/5).
-
-Thanks!
-
-[1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8633/1
-
-Vladimir Murzin (5):
-  dma: Add simple dma_noop_mmap
-  drivers: dma-coherent: Introduce default DMA pool
-  ARM: NOMMU: Introduce dma operations for noMMU
-  ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class cpus
-  ARM: dma-mapping: Remove traces of NOMMU code
-
- .../bindings/reserved-memory/reserved-memory.txt   |   3 +
- arch/arm/include/asm/dma-mapping.h                 |   3 +-
- arch/arm/mm/Kconfig                                |   2 +-
- arch/arm/mm/Makefile                               |   5 +-
- arch/arm/mm/dma-mapping-nommu.c                    | 252 +++++++++++++++++++++
- arch/arm/mm/dma-mapping.c                          |  26 +--
- drivers/base/dma-coherent.c                        |  59 ++++-
- lib/dma-noop.c                                     |  21 ++
- 8 files changed, 335 insertions(+), 36 deletions(-)
- create mode 100644 arch/arm/mm/dma-mapping-nommu.c
-
+diff --git a/lib/dma-noop.c b/lib/dma-noop.c
+index 3d766e7..96638a1 100644
+--- a/lib/dma-noop.c
++++ b/lib/dma-noop.c
+@@ -64,6 +64,26 @@ static int dma_noop_supported(struct device *dev, u64 mask)
+ 	return 1;
+ }
+ 
++static int dma_noop_mmap(struct device *dev, struct vm_area_struct *vma,
++			 void *cpu_addr, dma_addr_t dma_addr, size_t size,
++			 unsigned long attrs)
++{
++	unsigned long user_count = vma_pages(vma);
++	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
++	unsigned long pfn = page_to_pfn(virt_to_page(cpu_addr));
++	unsigned long off = vma->vm_pgoff;
++	int ret = -ENXIO;
++
++	if (off < count && user_count <= (count - off)) {
++		ret = remap_pfn_range(vma, vma->vm_start,
++				      pfn + off,
++				      user_count << PAGE_SHIFT,
++				      vma->vm_page_prot);
++	}
++
++	return ret;
++}
++
+ struct dma_map_ops dma_noop_ops = {
+ 	.alloc			= dma_noop_alloc,
+ 	.free			= dma_noop_free,
+@@ -71,6 +91,7 @@ struct dma_map_ops dma_noop_ops = {
+ 	.map_sg			= dma_noop_map_sg,
+ 	.mapping_error		= dma_noop_mapping_error,
+ 	.dma_supported		= dma_noop_supported,
++	.mmap			= dma_noop_mmap,
+ };
+ 
+ EXPORT_SYMBOL(dma_noop_ops);
 -- 
 2.0.0
