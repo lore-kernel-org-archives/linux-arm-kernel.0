@@ -1,41 +1,68 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 10 Jan 2017 01:22:32 +0000
-Subject: [PATCH 2/3] arm64: dts: sun50i: add UART1 pin nodes
+Date: Tue, 10 Jan 2017 01:22:31 +0000
+Subject: [PATCH 1/3] arm64: dts: Pine64: add MMC support
 In-Reply-To: <1484011353-21480-1-git-send-email-andre.przywara@arm.com>
 References: <1484011353-21480-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1484011353-21480-3-git-send-email-andre.przywara@arm.com>
+Message-ID: <1484011353-21480-2-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On many boards UART1 connects to a Bluetooth chip, so add the pinctrl
-nodes for the only pins providing access to that UART. That includes
-those pins for hardware flow control (RTS/CTS).
+All Pine64 boards connect an micro-SD card slot to the first MMC
+controller.
+Enable the respective DT node and specify the (always-on) regulator
+and card-detect pin.
+As a micro-SD slot does not feature a write-protect switch, we disable
+this feature.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index f46ae96..419b0b1 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -234,6 +234,16 @@
- 				pins = "PB8", "PB9";
- 				function = "uart0";
- 			};
-+
-+			uart1_pins: uart1_pins {
-+				pins = "PG6", "PG7";
-+				function = "uart1";
-+			};
-+
-+			uart1_rts_cts_pins: uart1_rts_cts_pins {
-+				pins = "PG8", "PG9";
-+				function = "uart1";
-+			};
- 		};
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+index cf91051..c680ed3 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+@@ -44,6 +44,8 @@
  
- 		uart0: serial at 1c28000 {
+ #include "sun50i-a64.dtsi"
+ 
++#include <dt-bindings/gpio/gpio.h>
++
+ / {
+ 	model = "Pine64";
+ 	compatible = "pine64,pine64", "allwinner,sun50i-a64";
+@@ -55,6 +57,13 @@
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+ 	};
++
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
+ };
+ 
+ &ehci1 {
+@@ -71,6 +80,17 @@
+ 	bias-pull-up;
+ };
+ 
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
++	disable-wp;
++	bus-width = <4>;
++	status = "okay";
++};
++
+ &ohci1 {
+ 	status = "okay";
+ };
 -- 
 2.8.2
