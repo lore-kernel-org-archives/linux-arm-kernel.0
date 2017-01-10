@@ -1,50 +1,126 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 10 Jan 2017 19:09:26 +0100
-Subject: [PATCH 1/5] arm: sunxi: add support for V3s SoC
-In-Reply-To: <20170103151629.19447-2-icenowy@aosc.xyz>
-References: <20170103151629.19447-1-icenowy@aosc.xyz>
- <20170103151629.19447-2-icenowy@aosc.xyz>
-Message-ID: <20170110180926.ilqtygttpfgbetvu@lukather>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Tue, 10 Jan 2017 23:42:06 +0530
+Subject: [PATCH] pwm: constify pwm_ops structures
+Message-ID: <1484071926-21582-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 11:16:25PM +0800, Icenowy Zheng wrote:
-> Allwinner V3s is a low-end single-core Cortex-A7 SoC, with 64MB
-> integrated DRAM, and several peripherals.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
->  Documentation/arm/sunxi/README | 4 ++++
->  arch/arm/mach-sunxi/sunxi.c    | 1 +
->  2 files changed, 5 insertions(+)
-> 
-> diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
-> index cd0243302bc1..91ec8f2055be 100644
-> --- a/Documentation/arm/sunxi/README
-> +++ b/Documentation/arm/sunxi/README
-> @@ -67,6 +67,10 @@ SunXi family
->          + Datasheet
->            http://dl.linux-sunxi.org/H3/Allwinner_H3_Datasheet_V1.0.pdf
->  
-> +      - Allwinner V3s (sun8i)
-> +        + Datasheet
-> +          https://www.goprawn.com/forum/allwinner-cams/783-allwinner-v3s-soc-datasheet
-> +
+Declare pwm_ops structures as const as they are only stored in the ops
+field of a pwm_chip structure. This field is of type const struct pwm_ops
+*, so pwm_ops structures having this property can be declared as const.
+Done using Coccinelle:
 
-Please don't put random links in there, but at least something that we
-know will be there in a couple of weeks/monthes/years
+@r1 disable optional_qualifier@
+identifier i;
+position p;
+@@
+static struct pwm_ops i at p={...};
 
-Thanks,
-Maxime
+@ok1@
+identifier r1.i;
+position p;
+struct pxa_pwm_chip pwm;
+struct bfin_pwm_chip bwm;
+struct vt8500_chip vp;
+struct imx_chip icp;
+@@
+(
+pwm.chip.ops=&i at p
+|
+bwm.chip.ops=&i at p
+|
+vp.chip.ops=&i at p
+|
+icp.chip.ops=&i at p
+)
 
+@bad@
+position p!={r1.p,ok1.p};
+identifier r1.i;
+@@
+i at p
+
+@depends on !bad disable optional_qualifier@
+identifier r1.i;
+@@
++const
+struct pwm_ops i;
+
+File size details:
+
+   text	   data	    bss	    dec	    hex	filename
+   1646	    328	      0	   1974	    7b6	drivers/pwm/pwm-imx.o
+   1742	    224	      0	   1966	    7ae	drivers/pwm/pwm-imx.o
+
+   1941	    296	      0	   2237	    8bd	drivers/pwm/pwm-pxa.o
+   2037	    192	      0	   2229	    8b5	drivers/pwm/pwm-pxa.o
+
+   1946	    296	      0	   2242	    8c2	drivers/pwm/pwm-vt8500.o
+   2050	    192	      0	   2242	    8c2	drivers/pwm/pwm-vt8500.o
+
+The drivers/pwm/pwm-bfin.o file did not compile.
+
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+---
+File: drivers/pwm/pwm-bfin.c is not tested
+
+ drivers/pwm/pwm-bfin.c   | 2 +-
+ drivers/pwm/pwm-imx.c    | 2 +-
+ drivers/pwm/pwm-pxa.c    | 2 +-
+ drivers/pwm/pwm-vt8500.c | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/pwm/pwm-bfin.c b/drivers/pwm/pwm-bfin.c
+index 7631ef1..d2ed0a2 100644
+--- a/drivers/pwm/pwm-bfin.c
++++ b/drivers/pwm/pwm-bfin.c
+@@ -103,7 +103,7 @@ static void bfin_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	disable_gptimer(priv->pin);
+ }
+ 
+-static struct pwm_ops bfin_pwm_ops = {
++static const struct pwm_ops bfin_pwm_ops = {
+ 	.request = bfin_pwm_request,
+ 	.free = bfin_pwm_free,
+ 	.config = bfin_pwm_config,
+diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+index d600fd5..177fb81 100644
+--- a/drivers/pwm/pwm-imx.c
++++ b/drivers/pwm/pwm-imx.c
+@@ -240,7 +240,7 @@ static void imx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	clk_disable_unprepare(imx->clk_per);
+ }
+ 
+-static struct pwm_ops imx_pwm_ops = {
++static const struct pwm_ops imx_pwm_ops = {
+ 	.enable = imx_pwm_enable,
+ 	.disable = imx_pwm_disable,
+ 	.config = imx_pwm_config,
+diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
+index 58b709f..4143a46 100644
+--- a/drivers/pwm/pwm-pxa.c
++++ b/drivers/pwm/pwm-pxa.c
+@@ -118,7 +118,7 @@ static void pxa_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	clk_disable_unprepare(pc->clk);
+ }
+ 
+-static struct pwm_ops pxa_pwm_ops = {
++static const struct pwm_ops pxa_pwm_ops = {
+ 	.config = pxa_pwm_config,
+ 	.enable = pxa_pwm_enable,
+ 	.disable = pxa_pwm_disable,
+diff --git a/drivers/pwm/pwm-vt8500.c b/drivers/pwm/pwm-vt8500.c
+index cdb58fd..8141a49 100644
+--- a/drivers/pwm/pwm-vt8500.c
++++ b/drivers/pwm/pwm-vt8500.c
+@@ -184,7 +184,7 @@ static int vt8500_pwm_set_polarity(struct pwm_chip *chip,
+ 	return 0;
+ }
+ 
+-static struct pwm_ops vt8500_pwm_ops = {
++static const struct pwm_ops vt8500_pwm_ops = {
+ 	.enable = vt8500_pwm_enable,
+ 	.disable = vt8500_pwm_disable,
+ 	.config = vt8500_pwm_config,
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170110/74d107b3/attachment.sig>
+1.9.1
