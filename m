@@ -1,191 +1,179 @@
-From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Tue, 10 Jan 2017 12:03:00 -0500
-Subject: [RFC 4/8] KVM: arm/arm64: Initialize the emulated EL1 physical
- timer
-In-Reply-To: <20170109120235.GD4348@cbox>
-References: <1482772326-29110-1-git-send-email-jintack@cs.columbia.edu>
- <1482772326-29110-5-git-send-email-jintack@cs.columbia.edu>
- <20170109120235.GD4348@cbox>
-Message-ID: <CAHyh4xgq_me42Jv+=6P=NhcyxpjJ4R6zgWGY2HibEc6e09Af2g@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 10 Jan 2017 18:09:40 +0100
+Subject: [PATCH] usb: dwc3-exynos fix unspecified suspend clk error
+ handling
+In-Reply-To: <28815306-e220-4847-99ce-b058baae0d07@osg.samsung.com>
+References: <20170110022131.31042-1-shuahkh@osg.samsung.com>
+ <8784459.rxWqZlDLVg@amdc3058>
+ <28815306-e220-4847-99ce-b058baae0d07@osg.samsung.com>
+ <CGME20170110170942epcas1p3decee28366d7d42b70e7b0669b97326f@epcas1p3.samsung.com>
+Message-ID: <5156028.4V9iLD3Qkj@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 9, 2017 at 7:02 AM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Mon, Dec 26, 2016 at 12:12:02PM -0500, Jintack Lim wrote:
->> Initialize the emulated EL1 physical timer with the default irq number.
->>
->> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
->> ---
->>  arch/arm/kvm/reset.c         |  9 ++++++++-
->>  arch/arm64/kvm/reset.c       |  9 ++++++++-
->>  include/kvm/arm_arch_timer.h |  3 ++-
->>  virt/kvm/arm/arch_timer.c    | 12 ++++++++++--
->>  4 files changed, 28 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
->> index 4b5e802..1da8b2d 100644
->> --- a/arch/arm/kvm/reset.c
->> +++ b/arch/arm/kvm/reset.c
->> @@ -37,6 +37,11 @@
->>       .usr_regs.ARM_cpsr = SVC_MODE | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
->>  };
->>
->> +static const struct kvm_irq_level cortexa_ptimer_irq = {
->> +     { .irq = 30 },
->> +     .level = 1,
->> +};
->> +
->>  static const struct kvm_irq_level cortexa_vtimer_irq = {
->>       { .irq = 27 },
->>       .level = 1,
->> @@ -58,6 +63,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
->>  {
->>       struct kvm_regs *reset_regs;
->>       const struct kvm_irq_level *cpu_vtimer_irq;
->> +     const struct kvm_irq_level *cpu_ptimer_irq;
->>
->>       switch (vcpu->arch.target) {
->>       case KVM_ARM_TARGET_CORTEX_A7:
->> @@ -65,6 +71,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
->>               reset_regs = &cortexa_regs_reset;
->>               vcpu->arch.midr = read_cpuid_id();
->>               cpu_vtimer_irq = &cortexa_vtimer_irq;
->> +             cpu_ptimer_irq = &cortexa_ptimer_irq;
->>               break;
->>       default:
->>               return -ENODEV;
->> @@ -77,5 +84,5 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
->>       kvm_reset_coprocs(vcpu);
->>
->>       /* Reset arch_timer context */
->> -     return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
->> +     return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq, cpu_ptimer_irq);
->>  }
->> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
->> index 5bc4608..74322c2 100644
->> --- a/arch/arm64/kvm/reset.c
->> +++ b/arch/arm64/kvm/reset.c
->> @@ -46,6 +46,11 @@
->>                       COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
->>  };
->>
->> +static const struct kvm_irq_level default_ptimer_irq = {
->> +     .irq    = 30,
->> +     .level  = 1,
->> +};
->> +
->>  static const struct kvm_irq_level default_vtimer_irq = {
->>       .irq    = 27,
->>       .level  = 1,
->> @@ -110,6 +115,7 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
->>  int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
->>  {
->>       const struct kvm_irq_level *cpu_vtimer_irq;
->> +     const struct kvm_irq_level *cpu_ptimer_irq;
->>       const struct kvm_regs *cpu_reset;
->>
->>       switch (vcpu->arch.target) {
->> @@ -123,6 +129,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
->>               }
->>
->>               cpu_vtimer_irq = &default_vtimer_irq;
->> +             cpu_ptimer_irq = &default_ptimer_irq;
->>               break;
->>       }
->>
->> @@ -136,5 +143,5 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
->>       kvm_pmu_vcpu_reset(vcpu);
->>
->>       /* Reset timer */
->> -     return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
->> +     return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq, cpu_ptimer_irq);
->>  }
->> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
->> index d21652a..04ed9c1 100644
->> --- a/include/kvm/arm_arch_timer.h
->> +++ b/include/kvm/arm_arch_timer.h
->> @@ -61,7 +61,8 @@ struct arch_timer_cpu {
->>  int kvm_timer_enable(struct kvm_vcpu *vcpu);
->>  void kvm_timer_init(struct kvm *kvm);
->>  int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
->> -                      const struct kvm_irq_level *irq);
->> +                      const struct kvm_irq_level *virt_irq,
->> +                      const struct kvm_irq_level *phys_irq);
->>  void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
->>  void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
->>  void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
->> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->> index 3bd6063..ed80864 100644
->> --- a/virt/kvm/arm/arch_timer.c
->> +++ b/virt/kvm/arm/arch_timer.c
->> @@ -339,9 +339,11 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
->>  }
->>
->>  int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
->> -                      const struct kvm_irq_level *irq)
->> +                      const struct kvm_irq_level *virt_irq,
->> +                      const struct kvm_irq_level *phys_irq)
->>  {
->>       struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
->> +     struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
->>
->>       /*
->>        * The vcpu timer irq number cannot be determined in
->> @@ -349,7 +351,8 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
->>        * kvm_vcpu_set_target(). To handle this, we determine
->>        * vcpu timer irq number when the vcpu is reset.
->>        */
->> -     vtimer->irq.irq = irq->irq;
->> +     vtimer->irq.irq = virt_irq->irq;
->> +     ptimer->irq.irq = phys_irq->irq;
->>
->>       /*
->>        * The bits in CNTV_CTL are architecturally reset to UNKNOWN for ARMv8
->> @@ -358,6 +361,7 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
->>        * the ARMv7 architecture.
->>        */
->>       vtimer->cnt_ctl = 0;
->> +     ptimer->cnt_ctl = 0;
->>       kvm_timer_update_state(vcpu);
->>
->>       return 0;
->> @@ -477,11 +481,15 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
->>  int kvm_timer_enable(struct kvm_vcpu *vcpu)
->>  {
->>       struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
->> +     struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
->>       struct irq_desc *desc;
->>       struct irq_data *data;
->>       int phys_irq;
->>       int ret;
->>
->> +     /* Always enable emulated the EL1 physical timer */
->
-> Dubious comment the way it stands.
->
-> Does the rest of the code really support one timer being enabled while
-> another one not so?
 
-No. The code never check if the physical timer is enabled. I think
-it's not necessary to set enable bit for this emulated physical timer.
-We, however, may need to set/check this enable bit later if we decide
-to give the EL1 physical timer to the guest instead of emulating it.
+Hi,
 
->
-> In any case, the comment should explain the rationale as opposed to
-> reiterate what the following code line does, or just not be there.
->
->> +     ptimer->enabled = 1;
->> +
->>       if (vtimer->enabled)
->>               return 0;
->>
->> --
->> 1.9.1
->>
->>
->
-> Thanks,
-> -Christoffer
->
+On Tuesday, January 10, 2017 09:28:52 AM Shuah Khan wrote:
+> On 01/10/2017 09:05 AM, Bartlomiej Zolnierkiewicz wrote:
+> > 
+> > Hi,
+> > 
+> > On Tuesday, January 10, 2017 07:36:35 AM Shuah Khan wrote:
+> >> On 01/10/2017 07:16 AM, Shuah Khan wrote:
+> >>> On 01/10/2017 05:05 AM, Bartlomiej Zolnierkiewicz wrote:
+> >>>>
+> >>>> Hi,
+> >>>>
+> >>>> On Monday, January 09, 2017 07:21:31 PM Shuah Khan wrote:
+> >>>>> Fix dwc3_exynos_probe() to call clk_prepare_enable() only when suspend
+> >>>>> clock is specified. Call clk_disable_unprepare() from remove and probe
+> >>>>> error path only when susp_clk has been set from remove and probe error
+> >>>>> paths.
+> >>>>
+> >>>> It is legal to call clk_prepare_enable() and clk_disable_unprepare()
+> >>>> for NULL clock.  Also your patch changes susp_clk handling while
+> >>>> leaves axius_clk handling (which also can be NULL) untouched.
+> >>>>
+> >>>> Do you actually see some runtime problem with the current code?
+> >>>>
+> >>>> If not then the patch should probably be dropped.
+> >>>>
+> >>>> Best regards,
+> >>>> --
+> >>>> Bartlomiej Zolnierkiewicz
+> >>>> Samsung R&D Institute Poland
+> >>>> Samsung Electronics
+> >>>
+> >>> Hi Bartlomiej,
+> >>>
+> >>> I am seeing the "no suspend clk specified" message in dmesg.
+> >>> After that it sets the exynos->susp_clk = NULL and starts
+> >>> calling clk_prepare_enable(exynos->susp_clk);
+> >>>
+> >>> That can't be good. If you see the logic right above this
+> >>> one for exynos->clk, it returns error and fails the probe.
+> >>> This this case it doesn't, but tries to use null susp_clk.
+> > 
+> > exynos->susp_clk is optional, exynos->clk is not.
+> 
+> Right. That is clear since we don't fail the probe.
+> 
+> > 
+> >>> I believe this patch is necessary.
+> >>
+> >> Let me clarify this a bit further. Since we already know
+> >> susp_clk is null, with this patch we can avoid extra calls
+> >> to clk_prepare_enable() and clk_disable_unprepare().
+> >>
+> >> One can say, it also adds extra checks, hence I will let you
+> >> decide one way or the other. :)
+> > 
+> > I would prefer to leave the things as they are currently.
+> > 
+> > The code in question is not performance sensitive so extra
+> > calls are not a problem.  No extra checks means less code.
+> > 
+> > Also the current code seems to be more in line with the rest
+> > of the kernel.
+> 
+> What functionality is missing without the suspend clock? Would
+> it make sense to change the info. message to include what it
+> means. At the moment it doesn't anything more than "no suspend
+> clock" which is a very cryptic user visible message. It would be
+> helpful for it to also include what functionality is impacted.
+
+Well, all I know is what the original commit descriptions says and
+that the commit itself comes from patchset adding Exynos7 USB 3.0
+support [1]:
+
+commit 72d996fc7a01c2e4d581a15db7d001e2799ffb29
+Author: Vivek Gautam <gautam.vivek@samsung.com>
+Date:   Fri Nov 21 19:05:46 2014 +0530
+
+    usb: dwc3: exynos: Add provision for suspend clock
+    
+    DWC3 controller on Exynos SoC series have separate control for
+    suspend clock which replaces pipe3_rx_pclk as clock source to
+    a small part of DWC3 core that operates when SS PHY is in its
+    lowest power state (P3) in states SS.disabled and U3.
+    
+    Suggested-by: Anton Tikhomirov <av.tikhomirov@samsung.com>
+    Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+    Signed-off-by: Felipe Balbi <balbi@ti.com>
+
+Anton's & Vivek's Samsung email addresses are no longer valid but
+I added current Vivek's email address to Cc:.
+
+BTW What is interesting is that the Exynos7 dts patch [2] has never
+made it into upstream for some reason.  In the meantime however
+Exynos5433 (similar to Exynos7 to some degree) became the user of
+susp_clk.
+
+[1] https://lkml.org/lkml/2014/11/21/247
+[2] https://patchwork.kernel.org/patch/5355161/
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+> thanks,
+> -- Shuah
+> 
+> > 
+> > Best regards,
+> > --
+> > Bartlomiej Zolnierkiewicz
+> > Samsung R&D Institute Poland
+> > Samsung Electronics
+> > 
+> >> thanks,
+> >> -- Shuah
+> >>
+> >>>
+> >>> thanks,
+> >>> -- Shuah
+> >>>
+> >>>>
+> >>>>> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> >>>>> ---
+> >>>>>  drivers/usb/dwc3/dwc3-exynos.c | 10 ++++++----
+> >>>>>  1 file changed, 6 insertions(+), 4 deletions(-)
+> >>>>>
+> >>>>> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
+> >>>>> index e27899b..f97a3d7 100644
+> >>>>> --- a/drivers/usb/dwc3/dwc3-exynos.c
+> >>>>> +++ b/drivers/usb/dwc3/dwc3-exynos.c
+> >>>>> @@ -131,8 +131,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+> >>>>>  	if (IS_ERR(exynos->susp_clk)) {
+> >>>>>  		dev_info(dev, "no suspend clk specified\n");
+> >>>>>  		exynos->susp_clk = NULL;
+> >>>>> -	}
+> >>>>> -	clk_prepare_enable(exynos->susp_clk);
+> >>>>> +	} else
+> >>>>> +		clk_prepare_enable(exynos->susp_clk);
+> >>>>>  
+> >>>>>  	if (of_device_is_compatible(node, "samsung,exynos7-dwusb3")) {
+> >>>>>  		exynos->axius_clk = devm_clk_get(dev, "usbdrd30_axius_clk");
+> >>>>> @@ -196,7 +196,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+> >>>>>  	regulator_disable(exynos->vdd33);
+> >>>>>  err2:
+> >>>>>  	clk_disable_unprepare(exynos->axius_clk);
+> >>>>> -	clk_disable_unprepare(exynos->susp_clk);
+> >>>>> +	if (exynos->susp_clk)
+> >>>>> +		clk_disable_unprepare(exynos->susp_clk);
+> >>>>>  	clk_disable_unprepare(exynos->clk);
+> >>>>>  	return ret;
+> >>>>>  }
+> >>>>> @@ -210,7 +211,8 @@ static int dwc3_exynos_remove(struct platform_device *pdev)
+> >>>>>  	platform_device_unregister(exynos->usb3_phy);
+> >>>>>  
+> >>>>>  	clk_disable_unprepare(exynos->axius_clk);
+> >>>>> -	clk_disable_unprepare(exynos->susp_clk);
+> >>>>> +	if (exynos->susp_clk)
+> >>>>> +		clk_disable_unprepare(exynos->susp_clk);
+> >>>>>  	clk_disable_unprepare(exynos->clk);
+> >>>>>  
+> >>>>>  	regulator_disable(exynos->vdd33);
