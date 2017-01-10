@@ -1,41 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 10 Jan 2017 10:36:26 +0100
-Subject: [PATCH] ARM: hw_breakpoint: blacklist Scorpion CPUs
-In-Reply-To: <1483637556-3974-1-git-send-email-mark.rutland@arm.com>
-References: <1483637556-3974-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <CACRpkdbXE54V49HtU11SAxJQfzspKiNE4Fv88hMUEcHNbyP00Q@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 10 Jan 2017 15:05:49 +0530
+Subject: [PATCH v2 1/6] ARM: dts: davinci: da850: VPIF: add node and muxing
+In-Reply-To: <20170109205531.3435-2-khilman@baylibre.com>
+References: <20170109205531.3435-1-khilman@baylibre.com>
+ <20170109205531.3435-2-khilman@baylibre.com>
+Message-ID: <3f8ce316-6d14-4105-5f33-df32d8730128@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 5, 2017 at 6:32 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+On Tuesday 10 January 2017 02:25 AM, Kevin Hilman wrote:
+> Add VPIF node an pins to da850 SoC.  VPIF has two input channels which
 
-> On APQ8060, the kernel crashes in arch_hw_breakpoint_init, taking an
-> undefined instruction trap within write_wb_reg. This is because Scorpion
-> CPUs erroneously appear to set DBGPRSR.SPD when WFI is issued, even if
-> the core is not powered down. When DBGPRSR.SPD is set, breakpoint and
-> watchpoint registers are treated as undefined.
->
-> It's possible to trigger similar crashes later on from userspace, by
-> requesting the kernel to install a breakpoint or watchpoint, as we can
-> go idle at any point between the reset of the debug registers and their
-> later use. This has always been the case.
->
-> Given that this has always been broken, no-one has complained until now,
-> and there is no clear workaround, disable hardware breakpoints and
-> watchpoints on Scorpion to avoid these issues.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Reported-by: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: stable at vger.kernel.org
+s/an/and
 
-Dammit git send-email does not add people on Reported-by to the
-CC list so I missed this.
+> can be described using the standard DT ports and enpoints.
 
-It works like a charm however, thanks for looking into this:
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
+s/enpoints/endpoints
 
-Yours,
-Linus Walleij
+> 
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+
+> @@ -465,6 +488,7 @@
+>  			status = "disabled";
+>  		};
+>  	};
+> +
+
+This seems like a stray newline addition. I dropped it while applying to
+v4.11/dt
+
+Thanks,
+Sekhar
+
+>  	aemif: aemif at 68000000 {
+>  		compatible = "ti,da850-aemif";
+>  		#address-cells = <2>;
+> 
