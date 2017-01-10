@@ -1,81 +1,74 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 10 Jan 2017 12:00:16 +0000
-Subject: [PATCH 1/2][UPDATE] of: base: add support to get the number of cache
- levels
-In-Reply-To: <1484048479-19767-1-git-send-email-sudeep.holla@arm.com>
-References: <1484048479-19767-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1484049616-22388-1-git-send-email-sudeep.holla@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 10 Jan 2017 13:05:58 +0100
+Subject: [PATCH] usb: dwc3-exynos fix unspecified suspend clk error
+ handling
+In-Reply-To: <20170110022131.31042-1-shuahkh@osg.samsung.com>
+References: <20170110022131.31042-1-shuahkh@osg.samsung.com>
+ <CGME20170110120605epcas1p1c26f7f90fca4765ab9cc339c51d11347@epcas1p1.samsung.com>
+Message-ID: <1641038.u0riMiuGF5@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is useful to have helper function just to get the number of cache
-levels for a given logical cpu. This patch adds the support for the
-same.
 
-It will be used on ARM64 platform where the device tree provides the
-information for the additional non-architected/transparent/external
-last level caches that are not integrated with the processors.
+Hi,
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/of/base.c  | 23 +++++++++++++++++++++++
- include/linux/of.h |  1 +
- 2 files changed, 24 insertions(+)
+On Monday, January 09, 2017 07:21:31 PM Shuah Khan wrote:
+> Fix dwc3_exynos_probe() to call clk_prepare_enable() only when suspend
+> clock is specified. Call clk_disable_unprepare() from remove and probe
+> error path only when susp_clk has been set from remove and probe error
+> paths.
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index d4bea3c797d6..80e557eca858 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -25,6 +25,7 @@
- #include <linux/cpu.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_device.h>
- #include <linux/of_graph.h>
- #include <linux/spinlock.h>
- #include <linux/slab.h>
-@@ -2268,6 +2269,28 @@ struct device_node *of_find_next_cache_node(const struct device_node *np)
- }
- 
- /**
-+ * of_count_cache_levels - Find the total number of cache levels for the
-+ *			   given logical cpu
-+ *
-+ * @cpu: cpu number(logical index) for which cache levels is being counted
-+ *
-+ * Returns the total number of cache levels for the given logical cpu
-+ */
-+int of_count_cache_levels(unsigned int cpu)
-+{
-+	int level = 0;
-+	struct device_node *np = of_cpu_device_node_get(cpu);
-+
-+	while (np) {
-+		level++;
-+		of_node_put(np);
-+		np = of_find_next_cache_node(np);
-+	}
-+
-+	return level;
-+}
-+
-+/**
-  * of_graph_parse_endpoint() - parse common endpoint node properties
-  * @node: pointer to endpoint device_node
-  * @endpoint: pointer to the OF endpoint data structure
-diff --git a/include/linux/of.h b/include/linux/of.h
-index d72f01009297..c8597ae71ff3 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -280,6 +280,7 @@ extern struct device_node *of_get_child_by_name(const struct device_node *node,
- 
- /* cache lookup */
- extern struct device_node *of_find_next_cache_node(const struct device_node *);
-+extern int of_count_cache_levels(unsigned int cpu);
- extern struct device_node *of_find_node_with_property(
- 	struct device_node *from, const char *prop_name);
- 
--- 
-2.7.4
+It is legal to call clk_prepare_enable() and clk_disable_unprepare()
+for NULL clock.  Also your patch changes susp_clk handling while
+leaves axius_clk handling (which also can be NULL) untouched.
+
+Do you actually see some runtime problem with the current code?
+
+If not then the patch should probably be dropped.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> ---
+>  drivers/usb/dwc3/dwc3-exynos.c | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
+> index e27899b..f97a3d7 100644
+> --- a/drivers/usb/dwc3/dwc3-exynos.c
+> +++ b/drivers/usb/dwc3/dwc3-exynos.c
+> @@ -131,8 +131,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+>  	if (IS_ERR(exynos->susp_clk)) {
+>  		dev_info(dev, "no suspend clk specified\n");
+>  		exynos->susp_clk = NULL;
+> -	}
+> -	clk_prepare_enable(exynos->susp_clk);
+> +	} else
+> +		clk_prepare_enable(exynos->susp_clk);
+>  
+>  	if (of_device_is_compatible(node, "samsung,exynos7-dwusb3")) {
+>  		exynos->axius_clk = devm_clk_get(dev, "usbdrd30_axius_clk");
+> @@ -196,7 +196,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+>  	regulator_disable(exynos->vdd33);
+>  err2:
+>  	clk_disable_unprepare(exynos->axius_clk);
+> -	clk_disable_unprepare(exynos->susp_clk);
+> +	if (exynos->susp_clk)
+> +		clk_disable_unprepare(exynos->susp_clk);
+>  	clk_disable_unprepare(exynos->clk);
+>  	return ret;
+>  }
+> @@ -210,7 +211,8 @@ static int dwc3_exynos_remove(struct platform_device *pdev)
+>  	platform_device_unregister(exynos->usb3_phy);
+>  
+>  	clk_disable_unprepare(exynos->axius_clk);
+> -	clk_disable_unprepare(exynos->susp_clk);
+> +	if (exynos->susp_clk)
+> +		clk_disable_unprepare(exynos->susp_clk);
+>  	clk_disable_unprepare(exynos->clk);
+>  
+>  	regulator_disable(exynos->vdd33);
