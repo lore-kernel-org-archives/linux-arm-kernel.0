@@ -1,73 +1,76 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Tue, 10 Jan 2017 10:50:55 +0000
-Subject: [RFC PATCH] vring: Force use of DMA API for ARM-based systems
-In-Reply-To: <20170109145437.GF21398@arm.com>
-References: <1482246864-16399-1-git-send-email-will.deacon@arm.com>
- <0b9a1f70-58fe-69c2-87db-d7773cb6a68c@arm.com>
- <cb98e455-bdee-19ab-8896-9123c6d12a26@arm.com>
- <CALCETrXMFHPxAx=ZTYLe9iKPNGfTPEEdis3mn3pphHYpD2h9+A@mail.gmail.com>
- <fbf1a09a-bdb2-504a-f4a7-56fa54b6292b@arm.com>
- <20170109145437.GF21398@arm.com>
-Message-ID: <8cb155ba-243d-80f6-4298-1c43266b3a5c@arm.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Tue, 10 Jan 2017 10:47:49 +0000
+Subject: [QUESTION] Early Write Acknowledge for PCIe configuration space
+In-Reply-To: <3295d30c-0b71-d73b-fd53-c75a9e0b2bae@huawei.com>
+References: <df407f39-ee05-d74d-6e5e-c5e502372032@huawei.com>
+ <6092525.UgRCY3dpzP@wuerfel>
+ <e085504e-74fd-e8be-8287-4baef88551c9@huawei.com>
+ <1882721.jqIYnAaWfQ@wuerfel>
+ <3295d30c-0b71-d73b-fd53-c75a9e0b2bae@huawei.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F9C0263@lhreml507-mbx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/17 14:54, Will Deacon wrote:
-> On Mon, Jan 09, 2017 at 11:24:04AM +0000, Robin Murphy wrote:
->> On 06/01/17 21:51, Andy Lutomirski wrote:
->>> On Fri, Jan 6, 2017 at 10:32 AM, Robin Murphy <robin.murphy@arm.com> wrote:
->>>> On 06/01/17 17:48, Jean-Philippe Brucker wrote:
->>>>> It used to work with 4.9, but since 9491ae4 ("mm: don't cap request size
->>>>> based on read-ahead setting") unlocked read-ahead, we quickly run into
->>>>> the limit of swiotlb and panic:
->>>>>
->>>>> [    5.382359] virtio-mmio 1c130000.virtio_block: swiotlb buffer is full
->>>>> (sz: 491520 bytes)
->>>>> [    5.382452] virtio-mmio 1c130000.virtio_block: DMA: Out of SW-IOMMU
->>>>> space for 491520 bytes
->>>>> [    5.382531] Kernel panic - not syncing: DMA: Random memory could be
->>>>> DMA written
->>>>> ...
->>>>> [    5.383148] [<ffff0000083ad754>] swiotlb_map_page+0x194/0x1a0
->>>>> [    5.383226] [<ffff000008096bb8>] __swiotlb_map_page+0x20/0x88
->>>>> [    5.383320] [<ffff0000084bf738>] vring_map_one_sg.isra.1+0x70/0x88
->>>>> [    5.383417] [<ffff0000084c04fc>] virtqueue_add_sgs+0x2ec/0x4e8
->>>>> [    5.383505] [<ffff00000856d99c>] __virtblk_add_req+0x9c/0x1a8
->>>>> ...
->>>>> [    5.384449] [<ffff0000081829c4>] ondemand_readahead+0xfc/0x2b8
->>>>>
->>>>> Commit 9491ae4 caps the read-ahead request to a limit set by the backing
->>>>> device. For virtio-blk, it is infinite (as set by the call to
->>>>> blk_queue_max_hw_sectors in virtblk_probe).
->>>>>
->>>>> I'm not sure how to fix this. Setting an arbitrary sector limit in the
->>>>> virtio-blk driver seems unfair to other users. Maybe we should check if
->>>>> the device is behind a hardware IOMMU before using the DMA API?
->>>>
->>>> Hmm, this looks more like the virtio_block device simply has the wrong
->>>> DMA mask to begin with. For virtio-pci we set the streaming DMA mask to
->>>> 64 bits - should a platform device not be similarly capable?
->>>
->>> If it's not, then turning off DMA API will cause random corruption.
->>> ISTM one way or another the bug is in either the DMA ops or in the
->>> driver initialization.
->>
->> OK, having looked a little deeper, I reckon virtio_mmio_probe() is
->> indeed missing a dma_set_mask() call compared to its PCI friends. The
->> only question then is where does virtio-mmio stand with respect to
->> legacy/modern/44-bit/64-bit etc.?
-> 
-> Legacy virtio-mmio has a variable page granule (GuestPageSize), so the
-> 44-bit limitation shouldn't apply. The legacy spec doesn't actually
-> initialise GuestPageSize in the example initialisation sequence, but
-> Linux does. Non-legacy uses absolute, 64-bit addresses regardless of
-> transport, so yes, it might be as simple as adding:
-> 
-> 	dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
-> 
-> to virtio_mmio_probe. Jean-Philippe -- does that fix things for you?
 
-Yes, setting the DMA mask to 64 bits seems to fix my issue.
 
-Thank,
-Jean-Philippe
+> -----Original Message-----
+> From: John Garry
+> Sent: 10 January 2017 10:23
+> To: Arnd Bergmann
+> Cc: linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com; Will
+> Deacon; Lorenzo Pieralisi; Gabriele Paoloni; Linuxarm; xuwei (O);
+> Wangzhou (B); Shameerali Kolothum Thodi; Guohanjun (Hanjun Guo)
+> Subject: Re: [QUESTION] Early Write Acknowledge for PCIe configuration
+> space
+> 
+> On 09/01/2017 11:52, Arnd Bergmann wrote:
+> > On Monday, January 9, 2017 10:59:47 AM CET John Garry wrote:
+> >> On 06/01/2017 11:24, Arnd Bergmann wrote:
+> >>> On Friday, January 6, 2017 11:15:22 AM CET John Garry wrote:
+> >>>
+> >>> Probably nobody thought about this properly in the Linux drivers.
+> The
+> >>> ARMv8 ARM sounds correct here.
+> >>>
+> >>> I/O space may have the same issue, as it also requires non-posted
+> >>> accesses.
+> >>
+> >> Right, so our HW team's recommendation - from ARM's memory model and
+> >> also PCIe order model - is that not only config space but also PCIe
+> >> memory mapped IO has the same attribute (nE).
+> >
+> > Just to be sure we are talking about the same thing: "PCIe memory
+> > mapped IO" could refer to either PCI I/O space or PCI memory space.
+> >
+> > As far as I can tell, PCI memory space should *not* be using the nE
+> > attribute, while PCI I/O space and PCI config space should.
+> > Does this match what your HW team recomments?
+> >
+> 
+> Yes, right, the config and IO space recommendation is nE and memory
+> space is E.
+> 
+> In response to Will:
+>  > What's the rationale behind that recommendation?
+> 
+> As Arnd said, the reasoning is that one access type is non-posted
+> (config and IO) and the other (memory) is posted writes.
+
+I think that the problem here is that if the CPU writes data to ECAM
+or IO space mapped using the E attribute, the ack will come back to the
+CPU before the data has actually been written to the EP. So effectively
+doing so I think that we break the PCIe specs... 
+
+Cheers
+
+Gab
+
+> 
+> Thanks,
+> John
+> 
+> > 	Arnd
+> >
+> > .
+> >
+> 
