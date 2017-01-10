@@ -1,60 +1,157 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 10 Jan 2017 17:51:18 +0000
-Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
-In-Reply-To: <85015f1653eb7e36f992708362b75d1f4391b783.1484070340.git.robin.murphy@arm.com>
-References: <85015f1653eb7e36f992708362b75d1f4391b783.1484070340.git.robin.murphy@arm.com>
-Message-ID: <4833e705fb6841fbfdbee3b1a21a7bc917292410.1484070340.git.robin.murphy@arm.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Tue, 10 Jan 2017 23:23:38 +0530
+Subject: [PATCH] usb: dwc3-exynos fix unspecified suspend clk error
+ handling
+In-Reply-To: <28815306-e220-4847-99ce-b058baae0d07@osg.samsung.com>
+References: <20170110022131.31042-1-shuahkh@osg.samsung.com>
+ <2e4a5e53-6603-13b8-0302-dc8093978013@osg.samsung.com>
+ <3a113696-d0cd-8944-4acd-c87646fbee15@osg.samsung.com>
+ <CGME20170110160532epcas1p198cef8317dcbc8740366d06b38e7465f@epcas1p1.samsung.com>
+ <8784459.rxWqZlDLVg@amdc3058>
+ <28815306-e220-4847-99ce-b058baae0d07@osg.samsung.com>
+Message-ID: <CANAwSgQ4Nxyq5itu62qdz18d4xvTu-e3P3ZXK2acLWtzexaaCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+Hi Shuah,
 
-Booting Linux on an ARM fastmodel containing an SMMU emulation results
-in an unexpected I/O page fault from the legacy virtio-blk PCI device:
+On 10 January 2017 at 21:58, Shuah Khan <shuahkh@osg.samsung.com> wrote:
+> On 01/10/2017 09:05 AM, Bartlomiej Zolnierkiewicz wrote:
+>>
+>> Hi,
+>>
+>> On Tuesday, January 10, 2017 07:36:35 AM Shuah Khan wrote:
+>>> On 01/10/2017 07:16 AM, Shuah Khan wrote:
+>>>> On 01/10/2017 05:05 AM, Bartlomiej Zolnierkiewicz wrote:
+>>>>>
+>>>>> Hi,
+>>>>>
+>>>>> On Monday, January 09, 2017 07:21:31 PM Shuah Khan wrote:
+>>>>>> Fix dwc3_exynos_probe() to call clk_prepare_enable() only when suspend
+>>>>>> clock is specified. Call clk_disable_unprepare() from remove and probe
+>>>>>> error path only when susp_clk has been set from remove and probe error
+>>>>>> paths.
+>>>>>
+>>>>> It is legal to call clk_prepare_enable() and clk_disable_unprepare()
+>>>>> for NULL clock.  Also your patch changes susp_clk handling while
+>>>>> leaves axius_clk handling (which also can be NULL) untouched.
+>>>>>
+>>>>> Do you actually see some runtime problem with the current code?
+>>>>>
+>>>>> If not then the patch should probably be dropped.
+>>>>>
+>>>>> Best regards,
+>>>>> --
+>>>>> Bartlomiej Zolnierkiewicz
+>>>>> Samsung R&D Institute Poland
+>>>>> Samsung Electronics
+>>>>
+>>>> Hi Bartlomiej,
+>>>>
+>>>> I am seeing the "no suspend clk specified" message in dmesg.
+>>>> After that it sets the exynos->susp_clk = NULL and starts
+>>>> calling clk_prepare_enable(exynos->susp_clk);
+>>>>
+>>>> That can't be good. If you see the logic right above this
+>>>> one for exynos->clk, it returns error and fails the probe.
+>>>> This this case it doesn't, but tries to use null susp_clk.
+>>
+>> exynos->susp_clk is optional, exynos->clk is not.
+>
+> Right. That is clear since we don't fail the probe.
+>
+>>
+>>>> I believe this patch is necessary.
+>>>
+>>> Let me clarify this a bit further. Since we already know
+>>> susp_clk is null, with this patch we can avoid extra calls
+>>> to clk_prepare_enable() and clk_disable_unprepare().
+>>>
+>>> One can say, it also adds extra checks, hence I will let you
+>>> decide one way or the other. :)
+>>
+>> I would prefer to leave the things as they are currently.
+>>
+>> The code in question is not performance sensitive so extra
+>> calls are not a problem.  No extra checks means less code.
+>>
+>> Also the current code seems to be more in line with the rest
+>> of the kernel.
+>
+> What functionality is missing without the suspend clock? Would
+> it make sense to change the info. message to include what it
+> means. At the moment it doesn't anything more than "no suspend
+> clock" which is a very cryptic user visible message. It would be
+> helpful for it to also include what functionality is impacted.
+>
 
-[    1.211721] arm-smmu-v3 2b400000.smmu: event 0x10 received:
-[    1.211800] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
-[    1.211880] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
-[    1.211959] arm-smmu-v3 2b400000.smmu:	0x00000008fa081002
-[    1.212075] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
-[    1.212155] arm-smmu-v3 2b400000.smmu: event 0x10 received:
-[    1.212234] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
-[    1.212314] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
-[    1.212394] arm-smmu-v3 2b400000.smmu:	0x00000008fa081000
-[    1.212471] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
+Both usbdrd30_susp_clk and usbdrd30_axius_clk are used by exynos5433 platform
+so moving the clk under compatible string "samsung,exynos7-dwusb3" make sense.
 
-<system hangs failing to read partition table>
+Best Regards
+-Anand
 
-This is because the virtio-blk is behind an SMMU, so we have consequently
-swizzled its DMA ops and configured the SMMU to translate accesses. This
-then requires the vring code to use the DMA API to establish translations,
-otherwise all transactions will result in fatal faults and termination.
-
-Given that ARM-based systems only see an SMMU if one is really present
-(the topology is all described by firmware tables such as device-tree or
-IORT), then we can safely use the DMA API for all virtio devices.
-
-Cc: Andy Lutomirski <luto@kernel.org>
-Cc: Michael S. Tsirkin <mst@redhat.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- drivers/virtio/virtio_ring.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/virtio/virtio_ring.c b/drivers/virtio/virtio_ring.c
-index 409aeaa49246..447245f2c813 100644
---- a/drivers/virtio/virtio_ring.c
-+++ b/drivers/virtio/virtio_ring.c
-@@ -159,6 +159,10 @@ static bool vring_use_dma_api(struct virtio_device *vdev)
- 	if (xen_domain())
- 		return true;
- 
-+	/* On ARM-based machines, the DMA ops will do the right thing */
-+	if (IS_ENABLED(CONFIG_ARM) || IS_ENABLED(CONFIG_ARM64))
-+		return true;
-+
- 	return false;
- }
- 
--- 
-2.10.2.dirty
+> thanks,
+> -- Shuah
+>
+>>
+>> Best regards,
+>> --
+>> Bartlomiej Zolnierkiewicz
+>> Samsung R&D Institute Poland
+>> Samsung Electronics
+>>
+>>> thanks,
+>>> -- Shuah
+>>>
+>>>>
+>>>> thanks,
+>>>> -- Shuah
+>>>>
+>>>>>
+>>>>>> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+>>>>>> ---
+>>>>>>  drivers/usb/dwc3/dwc3-exynos.c | 10 ++++++----
+>>>>>>  1 file changed, 6 insertions(+), 4 deletions(-)
+>>>>>>
+>>>>>> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
+>>>>>> index e27899b..f97a3d7 100644
+>>>>>> --- a/drivers/usb/dwc3/dwc3-exynos.c
+>>>>>> +++ b/drivers/usb/dwc3/dwc3-exynos.c
+>>>>>> @@ -131,8 +131,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+>>>>>>   if (IS_ERR(exynos->susp_clk)) {
+>>>>>>           dev_info(dev, "no suspend clk specified\n");
+>>>>>>           exynos->susp_clk = NULL;
+>>>>>> - }
+>>>>>> - clk_prepare_enable(exynos->susp_clk);
+>>>>>> + } else
+>>>>>> +         clk_prepare_enable(exynos->susp_clk);
+>>>>>>
+>>>>>>   if (of_device_is_compatible(node, "samsung,exynos7-dwusb3")) {
+>>>>>>           exynos->axius_clk = devm_clk_get(dev, "usbdrd30_axius_clk");
+>>>>>> @@ -196,7 +196,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+>>>>>>   regulator_disable(exynos->vdd33);
+>>>>>>  err2:
+>>>>>>   clk_disable_unprepare(exynos->axius_clk);
+>>>>>> - clk_disable_unprepare(exynos->susp_clk);
+>>>>>> + if (exynos->susp_clk)
+>>>>>> +         clk_disable_unprepare(exynos->susp_clk);
+>>>>>>   clk_disable_unprepare(exynos->clk);
+>>>>>>   return ret;
+>>>>>>  }
+>>>>>> @@ -210,7 +211,8 @@ static int dwc3_exynos_remove(struct platform_device *pdev)
+>>>>>>   platform_device_unregister(exynos->usb3_phy);
+>>>>>>
+>>>>>>   clk_disable_unprepare(exynos->axius_clk);
+>>>>>> - clk_disable_unprepare(exynos->susp_clk);
+>>>>>> + if (exynos->susp_clk)
+>>>>>> +         clk_disable_unprepare(exynos->susp_clk);
+>>>>>>   clk_disable_unprepare(exynos->clk);
+>>>>>>
+>>>>>>   regulator_disable(exynos->vdd33);
+>>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
