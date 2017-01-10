@@ -1,38 +1,89 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 10 Jan 2017 21:41:24 +0100
-Subject: [PATCH net-next 6/8] net: dsa: Add support for platform data
-In-Reply-To: <20170110201235.21771-7-f.fainelli@gmail.com>
-References: <20170110201235.21771-1-f.fainelli@gmail.com>
- <20170110201235.21771-7-f.fainelli@gmail.com>
-Message-ID: <20170110204124.GL22820@lunn.ch>
+From: b-liu@ti.com (Bin Liu)
+Date: Tue, 10 Jan 2017 14:47:23 -0600
+Subject: [PATCH v2] usb: musb: sunxi: Uses the resource-managed extcon
+ API when registering extcon notifier
+In-Reply-To: <58749956.1030800@samsung.com>
+References: <CGME20161230041914epcas5p24826e70fd5de710818687e55579757ba@epcas5p2.samsung.com>
+ <1483071550-8683-1-git-send-email-cw00.choi@samsung.com>
+ <58749956.1030800@samsung.com>
+Message-ID: <20170110204653.GD2479@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> @@ -452,11 +455,14 @@ static int dsa_cpu_parse(struct dsa_port *port, u32 index,
->  	struct net_device *ethernet_dev;
->  	struct device_node *ethernet;
->  
-> -	ethernet = of_parse_phandle(port->dn, "ethernet", 0);
-> -	if (!ethernet)
-> -		return -EINVAL;
-> +	if (port->dn) {
-> +		ethernet = of_parse_phandle(port->dn, "ethernet", 0);
-> +		if (!ethernet)
-> +			return -EINVAL;
-> +		ethernet_dev = of_find_net_device_by_node(ethernet);
-> +	} else
-> +		ethernet_dev = dev_to_net_device(dst->pd->netdev);
+On Tue, Jan 10, 2017 at 05:20:38PM +0900, Chanwoo Choi wrote:
+> Hi Felipe,
+> 
+> This patch got the acked-by from Bin Liu and.
+> Could you please apply this patch?
 
-Hi Florian
+I have picked this one.
 
-This is not going to work with John's rework of my multi CPU ports
-code. I think you are going to have to modify the platform_data
-structure to support multi-CPU ports.
+Regards,
+-Bin.
 
-I put higher priority on cleanly integrating multi-CPU ports using
-device tree, than supporting legacy platforms. I'm O.K. with
-preparatory patches, but i think we should wait for actually platform
-data changes until after Johns code has landed and we can design the
-platform_data to work with it.
-
-	      Andrew
+> 
+> On 2016? 12? 30? 13:19, Chanwoo Choi wrote:
+> > This patch just uses the resource-managed extcon API when registering
+> > the extcon notifier.
+> > 
+> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Acked-by: Bin Liu <b-liu@ti.com>
+> > ---
+> > Changes from v1:
+> > - Rebase this patch based on v4.10-rc1.
+> > - Add acked-by tag from Maxime Ripard and Bin Lin.
+> > - Drop the phy/power-supply/chipidea patches.
+> > 
+> >  drivers/usb/musb/sunxi.c | 12 +++---------
+> >  1 file changed, 3 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+> > index d0be0eadd0d9..2332294dee0f 100644
+> > --- a/drivers/usb/musb/sunxi.c
+> > +++ b/drivers/usb/musb/sunxi.c
+> > @@ -251,14 +251,14 @@ static int sunxi_musb_init(struct musb *musb)
+> >  	writeb(SUNXI_MUSB_VEND0_PIO_MODE, musb->mregs + SUNXI_MUSB_VEND0);
+> >  
+> >  	/* Register notifier before calling phy_init() */
+> > -	ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
+> > -				       &glue->host_nb);
+> > +	ret = devm_extcon_register_notifier(glue->dev, glue->extcon,
+> > +					EXTCON_USB_HOST, &glue->host_nb);
+> >  	if (ret)
+> >  		goto error_reset_assert;
+> >  
+> >  	ret = phy_init(glue->phy);
+> >  	if (ret)
+> > -		goto error_unregister_notifier;
+> > +		goto error_reset_assert;
+> >  
+> >  	musb->isr = sunxi_musb_interrupt;
+> >  
+> > @@ -267,9 +267,6 @@ static int sunxi_musb_init(struct musb *musb)
+> >  
+> >  	return 0;
+> >  
+> > -error_unregister_notifier:
+> > -	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
+> > -				   &glue->host_nb);
+> >  error_reset_assert:
+> >  	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
+> >  		reset_control_assert(glue->rst);
+> > @@ -293,9 +290,6 @@ static int sunxi_musb_exit(struct musb *musb)
+> >  
+> >  	phy_exit(glue->phy);
+> >  
+> > -	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
+> > -				   &glue->host_nb);
+> > -
+> >  	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
+> >  		reset_control_assert(glue->rst);
+> >  
+> > 
+> 
+> 
+> -- 
+> Best Regards,
+> Chanwoo Choi
+> S/W Center, Samsung Electronics
