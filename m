@@ -1,45 +1,50 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 10 Jan 2017 16:03:53 -0300
-Subject: [PATCH v2 3/3] arm64: dts: exynos: Remove unneeded unit names in
- Exynos5433 nodes
-In-Reply-To: <20170110185109.n3x25yxbaarzikcd@kozik-lap>
-References: <1484069912-6534-1-git-send-email-javier@osg.samsung.com>
- <1484069912-6534-4-git-send-email-javier@osg.samsung.com>
- <20170110185109.n3x25yxbaarzikcd@kozik-lap>
-Message-ID: <9ee4d297-51fd-fd37-e4e4-1a939a644201@osg.samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 10 Jan 2017 20:10:02 +0100
+Subject: [linux-sunxi] Re: [PATCH 3/6] clk: sunxi-ng: Add H5 clocks
+In-Reply-To: <20170109161500.Ep9GCmIb@smtp2p.mail.yandex.net>
+References: <20170109161500.Ep9GCmIb@smtp2p.mail.yandex.net>
+Message-ID: <20170110191002.tpdzjlf2eeck4fv6@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On 01/10/2017 03:51 PM, Krzysztof Kozlowski wrote:
-
-[snip]
-
->>  
->> -		usbdrd30: usb at 15400000  {
->> +		usbdrd30: usb-0  {
+On Mon, Jan 09, 2017 at 09:13:12PM +0800, Icenowy Zheng wrote:
 > 
-> How about "usbdrd" instead of "usb-0"? It would be still quite a generic
-> description of a class.
+> 2017?1?9? ??7:01? Maxime Ripard <maxime.ripard@free-electrons.com>???
+> >
+> > On Fri, Jan 06, 2017 at 06:48:31AM +0800, Icenowy Zheng wrote: 
+> > > 
+> > > 2017?1?6? 06:04? Maxime Ripard <maxime.ripard@free-electrons.com>??? 
+> > > > 
+> > > > On Tue, Dec 27, 2016 at 12:25:15AM +0800, Icenowy Zheng wrote: 
+> > > > > Add the H5 CCU clocks set based on the H3 one. 
+> > > > > 
+> > > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz> 
+> > > > 
+> > > > Is there any difference with H3's? 
+> > > 
+> > > One more Transport Stream controller, so one more bus gate and bus 
+> > > reset for it. 
+> >
+> > There's no need to duplicate more than 1000 lines of code just for 
+> > that then. Just add a new compatible and reuse the clocks already 
+> > defined. 
 > 
->>  			compatible = "samsung,exynos5250-dwusb3";
->>  			clocks = <&cmu_fsys CLK_ACLK_USBDRD30>,
->>  				<&cmu_fsys CLK_SCLK_USBDRD30>;
->> @@ -1332,7 +1332,7 @@
->>  			status = "disabled";
->>  		};
->>  
->> -		usbhost30: usb at 15a00000 {
->> +		usbhost30: usb-1 {
-> 
-> usbhost?
-> 
+> How can I do this? Add them in ccu-sun8i-h3.c ?
 
-Indeed, these sounds better so I'll change for them.
+Yes, you can have a look at how I did it for sun5i for example if you
+want.
 
-Best regards,
+Thanks!
+Maxime
+
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170110/47a0649c/attachment.sig>
