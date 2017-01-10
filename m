@@ -1,51 +1,30 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Tue, 10 Jan 2017 07:38:44 -0700
-Subject: [PATCH] usb: dwc3-exynos fix unspecified suspend clk error
- handling
-In-Reply-To: <82fb5295-6640-7e9e-a42a-4067aa88e5b4@cogentembedded.com>
-References: <20170110022131.31042-1-shuahkh@osg.samsung.com>
- <82fb5295-6640-7e9e-a42a-4067aa88e5b4@cogentembedded.com>
-Message-ID: <0d750439-b625-2c5f-c716-f587670e2786@osg.samsung.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Tue, 10 Jan 2017 15:44:53 +0100
+Subject: [PATCH 1/2] arm64: dma_mapping: allow PCI host driver to limit
+ DMA mask
+In-Reply-To: <1988852.3nyUoruEjG@wuerfel>
+References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
+ <b50e25af-3936-d22d-2e9b-5bf6be19c800@cogentembedded.com>
+ <20170109205746.GA6274@lst.de> <1988852.3nyUoruEjG@wuerfel>
+Message-ID: <20170110144453.GA27156@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2017 04:20 AM, Sergei Shtylyov wrote:
-> Hello!
-> 
-> On 01/10/2017 05:21 AM, Shuah Khan wrote:
-> 
->> Fix dwc3_exynos_probe() to call clk_prepare_enable() only when suspend
->> clock is specified. Call clk_disable_unprepare() from remove and probe
->> error path only when susp_clk has been set from remove and probe error
->> paths.
->>
->> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
->> ---
->>  drivers/usb/dwc3/dwc3-exynos.c | 10 ++++++----
->>  1 file changed, 6 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
->> index e27899b..f97a3d7 100644
->> --- a/drivers/usb/dwc3/dwc3-exynos.c
->> +++ b/drivers/usb/dwc3/dwc3-exynos.c
->> @@ -131,8 +131,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
->>      if (IS_ERR(exynos->susp_clk)) {
->>          dev_info(dev, "no suspend clk specified\n");
->>          exynos->susp_clk = NULL;
->> -    }
->> -    clk_prepare_enable(exynos->susp_clk);
->> +    } else
->> +        clk_prepare_enable(exynos->susp_clk);
-> 
->    CodingStyle: need {} here as well since another branch has them.
-> 
-> [...]
-> 
-> MBR, Sergei
-> 
+On Tue, Jan 10, 2017 at 11:47:42AM +0100, Arnd Bergmann wrote:
+> I see that we have CONFIG_ARCH_PHYS_ADDR_T_64BIT on a couple of
+> 32-bit architectures without swiotlb (arc, arm, some mips32), and
+> there are several 64-bit architectures that do not have swiotlb
+> (alpha, parisc, s390, sparc). I believe that alpha, s390 and sparc
+> always use some form of IOMMU, but the other four apparently don't,
+> so we would need to add swiotlb support there to remove all the
+> bounce buffering in network and block layers.
 
-Thanks. There is some concerns whether or not this patch is needed.
-If we decide to include the patch, I will send v2 with your comment.
+mips has lots of weird swiotlb wire-up in it's board code (the swiotlb
+arch glue really needs some major cleanup..), as does arm.  Not
+sure about the others.
 
-thanks,
--- Shuah
+Getting rid of highmem bouncing in the block layer will take some time
+as various PIO-only drivers rely on it at the moment.  These should
+all be convertable to kmap that data, but it needs a careful audit
+first.  For 4.11 I'll plan to switch away from bouncing highmem by
+default at least, though and maybe also convert a few PIO drivers.
