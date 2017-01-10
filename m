@@ -1,71 +1,68 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 10 Jan 2017 20:51:09 +0200
-Subject: [PATCH v2 3/3] arm64: dts: exynos: Remove unneeded unit names in
- Exynos5433 nodes
-In-Reply-To: <1484069912-6534-4-git-send-email-javier@osg.samsung.com>
-References: <1484069912-6534-1-git-send-email-javier@osg.samsung.com>
- <1484069912-6534-4-git-send-email-javier@osg.samsung.com>
-Message-ID: <20170110185109.n3x25yxbaarzikcd@kozik-lap>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 10 Jan 2017 18:54:59 +0000
+Subject: System/uncore PMUs and unit aggregation
+In-Reply-To: <2cb0eb12-979c-7eff-7c51-ce9e06b3740c@codeaurora.org>
+References: <20161117181708.GT22855@arm.com>
+ <2cb0eb12-979c-7eff-7c51-ce9e06b3740c@codeaurora.org>
+Message-ID: <20170110185459.GB12728@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 02:38:32PM -0300, Javier Martinez Canillas wrote:
-> The "samsung,exynos5433-mipi-video-phy" and "samsung,exynos5250-dwusb3"
-> DT bindings don't specify a reg property for these nodes, so having a
-> unit name leads to the following DTC warnings:
-> 
-> Node /soc/video-phy at 105c0710 has a unit name, but no reg property
-> Node /soc/usb at 15400000 has a unit name, but no reg property
-> Node /soc/usb at 15a00000 has a unit name, but no reg property
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> ---
-> 
->  arch/arm64/boot/dts/exynos/exynos5433.dtsi | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> index 3695ddaf2e04..17e5dafd392c 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> @@ -706,7 +706,7 @@
->  			interrupts = <GIC_PPI 9 0xf04>;
->  		};
->  
-> -		mipi_phy: video-phy at 105c0710 {
-> +		mipi_phy: video-phy {
->  			compatible = "samsung,exynos5433-mipi-video-phy";
->  			#phy-cells = <1>;
->  			samsung,pmu-syscon = <&pmu_system_controller>;
-> @@ -1285,7 +1285,7 @@
->  			status = "disabled";
->  		};
->  
-> -		usbdrd30: usb at 15400000  {
-> +		usbdrd30: usb-0  {
+Hi Neil, Anurup, Jan,
 
-How about "usbdrd" instead of "usb-0"? It would be still quite a generic
-description of a class.
-
->  			compatible = "samsung,exynos5250-dwusb3";
->  			clocks = <&cmu_fsys CLK_ACLK_USBDRD30>,
->  				<&cmu_fsys CLK_SCLK_USBDRD30>;
-> @@ -1332,7 +1332,7 @@
->  			status = "disabled";
->  		};
->  
-> -		usbhost30: usb at 15a00000 {
-> +		usbhost30: usb-1 {
-
-usbhost?
-
-Best regards,
-Krzysztof
-
->  			compatible = "samsung,exynos5250-dwusb3";
->  			clocks = <&cmu_fsys CLK_ACLK_USBHOST30>,
->  				<&cmu_fsys CLK_SCLK_USBHOST30>;
-> -- 
-> 2.7.4
+On Thu, Nov 17, 2016 at 10:16:46PM -0500, Leeder, Neil wrote:
+> Thanks for opening up the discussion on this Will.
 > 
+> For the Qualcomm L2 driver, one objection I had to exposing each unit is
+> that there are so many of them - the minimum starting point is a dozen, so
+> trying to start 9 counters on each means a perf command line specifying 100+
+> events. Future chips are only likely to increase that.
+> 
+> There is a single CPU node so from an end-user perspective it would seems to
+> make sense to also have a single L2 node. perf already has the ability to
+> create events on multiple units using cpumask, aggregate the results, and
+> split them out per unit with perf stat -a -A, so the user can get that
+> granularity. Exposing separate units would make userspace duplicate a lot of
+> that functionality. This may rely on each uncore unit being associated with
+> a CPU, which is the case with L2.
+> 
+> I agree with your comments regarding groups and I can see that a standard
+> way of representing topology could be useful - in this case, which CPUs are
+> within the same L2 cluster. Perhaps a list of cpumasks, one per L2 unit.
+
+Mark and I had a chat about this earlier today and I think we largely agree
+with you. That is, for composite PMUs with a notion of CPU affinity for
+their component units, it makes sense to use the event affinity as a means
+to address these units, rather than e.g. create separate PMU instances.
+
+However, for PMUs that don't have this notion of affinity, the units should
+either be exposed individually or, in the case that there is something like
+shared control logic, they should be addressed through the config fields
+(e.g. the hisilicon cache with the bank=NN option).
+
+I think this fits with your driver, so please post an updated version
+addressing Mark's unrelated review comments.
+
+> On 11/17/2016 1:17 PM, Will Deacon wrote:
+> [...]
+> >  3. Summing the counters across units is only permitted if the units
+> >     can all be started and stopped atomically. Otherwise, the counters
+> >     should be exposed individually. It's up to the driver author to
+> >     decide what makes sense to sum.
+> 
+> If I understand your your point 3 correctly, I'm not sure about the need to
+> start and stop them all atomically. That seems to be a tighter requirement
+> than we require for CPU PMUs. For them, perf stat -a creates events/groups
+> on each CPU, then starts and stops them sequentially and sums the results.
+> If that model is acceptable for the CPU to collect and aggregate counts,
+> that should be the same bar that uncore PMUs need to reach. In the L2 case,
+> the driver isn't summing the results, it's still perf doing it, so I may be
+> misinterpreting your comment about where the summation is permitted.
+
+My concern with summation is more that I don't want to expose high-level
+"meta" events from the driver which in fact end up being a bunch of
+different events in a bunch of different counters that can't be read
+atomically. Userspace is free to do that, but the driver shouldn't claim
+that it can support the event, if you see what I mean?
+
+Will
