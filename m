@@ -1,50 +1,66 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 9 Jan 2017 19:21:20 -0800
-Subject: [GIT PULL] Allwinner conversion to generic pin properties
-In-Reply-To: <20161226074214.sd53ozm6hvzkdb26@lukather>
-References: <20161226074214.sd53ozm6hvzkdb26@lukather>
-Message-ID: <20170110032120.GJ22261@localhost>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Tue, 10 Jan 2017 06:06:48 +0200
+Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
+ enable panel
+In-Reply-To: <252ad888-fa9d-695a-58ed-46806e4374fd@mleia.com>
+References: <20161221032717.13154-1-vz@mleia.com>
+ <CACRpkdZE6VgJA27+Wh=Gxd7yOXpLMyT7yCB2PYA36y0gvosHFQ@mail.gmail.com>
+ <20170102142228.GI14217@n2100.armlinux.org.uk>
+ <252ad888-fa9d-695a-58ed-46806e4374fd@mleia.com>
+Message-ID: <e6e7c575-d200-bd1f-890e-824fcf0e8c01@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01/08/2017 01:32 AM, Vladimir Zapolskiy wrote:
+> On 01/02/2017 04:22 PM, Russell King - ARM Linux wrote:
+>> On Fri, Dec 30, 2016 at 09:23:59AM +0100, Linus Walleij wrote:
+>>> On Wed, Dec 21, 2016 at 4:27 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
+>>>
+>>>> The changeset contains a number of cleanups, changed semantics of
+>>>> init_panel() callback, which allows to simplify getting of panel
+>>>> properties from panel device tree node, and a handling of optional
+>>>> "enable-gpios" panel property, the latter is described in
+>>>> display/panel/panel-dpi.txt device tree binding documentation, but
+>>>> it has been unsupported by the ARM CLCD driver.
+>>>>
+>>>> Vladimir Zapolskiy (4):
+>>>>   video: ARM CLCD: sort included headers out alphabetically
+>>>>   video: ARM CLCD: use panel device node for panel initialization
+>>>>   video: ARM CLCD: use panel device node for getting backlight and mode
+>>>>   video: ARM CLCD: add support of an optional GPIO to enable panel
+>>>
+>>> As you may have seen Tomi has stepped down as FBDEV maintainer and
+>>> this subsystem is now orphaned.
+>>>
+>>> I guess Andrew Morton merges patches for it in this case, he usually does.
+>>>
+>>> But what we should actually do is create a new DRM driver for CLCD
+>>> in drivers/gpu/drm/arm/clcd*
+>>>
+>>> It's maybe not a small undertaking :(
+>>>
+>>> But in case you're interested in the job, I will pitch in and test the result
+>>> on all ARM reference designs plus Nomadik.
+>>
+>> A DRM driver for it would probably be a good idea, but dealing with all
+>> the weird and wonderful connection arrangements may not be that easy...
+>>
+> 
+> Linus, Russell,
+> 
+> I've immediately encountered a problem while porting the driver to DRM,
+> because LPC18xx/LPC43xx SoCs are powered by Cortex-M3/M4 cores and DRM
+> framework has build and runtime dependencies on MMU.
+> 
+> That said, in short term I would expect a continuation of support for
+> the legacy CLCD framebuffer driver, which works fine on MMU-less SoCs.
+> 
 
-On Mon, Dec 26, 2016 at 08:42:14AM +0100, Maxime Ripard wrote:
-> Hi Arnd, Olof,
-> 
-> Like we discussed it last time, here is a pull request with the
-> convertion patches to the generic pin properties for 4.10.
-> 
-> Thanks,
-> Maxime
-> 
-> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
-> 
->   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-generic-pinconf-for-4.10
-> 
-> for you to fetch changes up to 1edcd36fcb48fe841bcc62eda36c105037d9583c:
-> 
->   ARM: sunxi: Convert pinctrl nodes to generic bindings (2016-12-26 08:27:11 +0100)
-> 
-> ----------------------------------------------------------------
-> Allwinner conversion to generic pin muxing properties
-> 
-> Here is a list of patches that converts the current DT to the generic pin
-> control and muxing properties, now that the pinctrl driver supports it.
+Linus, Russell,
 
-I dropped the ball on this over the holidays for a few reasons, none of them
-good. Unfortunately we're at -rc3+ now, so I've queued this up in next/dt for
-v4.11 at this point. Hope that's alright.
+please let me ask you to review/ack the changes, then I'll resend them
+to Andrew for inclusion as suggested by Linus.
 
-You might want to use your branch as a base for new DT contents for
-v4.11 in case it ends up being conflict-heavy, which would work fine at our
-end.
-
-
-Regards,
-
--Olof
+--
+With best wishes,
+Vladimir
