@@ -1,57 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 9 Jan 2017 19:15:32 -0800
-Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.11
-In-Reply-To: <cover.1483700694.git.horms+renesas@verge.net.au>
-References: <cover.1483700694.git.horms+renesas@verge.net.au>
-Message-ID: <20170110031532.GF22261@localhost>
+Date: Mon, 9 Jan 2017 19:13:20 -0800
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.11
+In-Reply-To: <cover.1483701293.git.horms+renesas@verge.net.au>
+References: <cover.1483701293.git.horms+renesas@verge.net.au>
+Message-ID: <20170110031320.GE22261@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 12:17:56PM +0100, Simon Horman wrote:
+On Fri, Jan 06, 2017 at 12:18:10PM +0100, Simon Horman wrote:
 > Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Please consider these Renesas ARM64 based SoC DT updates for v4.11.
-> 
-> This is based on v4.10-rc2 as v4.10-rc1 does not compile using
-> the defconfig.
+> Please consider these Renesas ARM based SoC defconfig updates for v4.11.
 > 
 > 
-> The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
+> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 > 
->   Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
+>   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.11
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.11
 > 
-> for you to fetch changes up to b2b9443beee5017ebdb3f2be9ef472c73d260481:
+> for you to fetch changes up to e37278d83e348eb53029452e65892780359b6bea:
 > 
->   arm64: dts: r8a7795: Add PWM support (2017-01-04 10:00:44 +0100)
+>   ARM: multi_v7_defconfig: Enable r8a774[35] SoCs (2017-01-03 10:44:04 +0100)
 > 
 > ----------------------------------------------------------------
-> Renesas ARM64 Based SoC DT Updates for v4.11
+> Renesas ARM Based SoC Defconfig Updates for v4.11
 > 
-> * Add PWM, and sound MIX and CTU support to r8a7795 SoC
-> * Add CAN, CAN FD and all MSIOF nodes to r8a7796 SoC
-> * Use Gen 3 fallback binding for i2c, msiof, PCIE and USB2 phy
-> * Enable Ethernet and 4 GiB memory on r8a7796/salvator-x board
-> * Add r8a7796/salvator-x board part number to bindings
+> Enable:
+> * Recently added Enable r8a774[35] SoCs
+> * CMA for DMA to allow use of VIN with large frame sizes
+> * CONFIG_VIDEO_ADV7604 to allow use of HDMI input
 
-Merged, thanks.
-
-
-> ----------------------------------------------------------------
-> Chris Paterson (3):
->       arm64: dts: r8a7796: Add CAN external clock support
->       arm64: dts: r8a7796: Add CAN support
->       arm64: dts: r8a7796: Add CAN FD support
-> 
-> Geert Uytterhoeven (2):
->       arm64: dts: r8a7796: Add all MSIOF nodes
->       arm64: renesas: r8a7796/salvator-x: Add board part number to DT bindings
-
-Nit: When you look at the shortlog, these with different/random format
-stand out. Feel free to fix them before sending next time.
+Merged into next/defconfig. Thanks.
 
 
 -Olof
