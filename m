@@ -1,135 +1,74 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 10 Jan 2017 14:05:56 +0100
-Subject: [RFC PATCH 1/5] regulator: Extend the power-management APIs
-In-Reply-To: <20170110121026.zstf7a6cflzk366l@sirena.org.uk>
-References: <1480687036-5037-1-git-send-email-boris.brezillon@free-electrons.com>
- <1480687036-5037-2-git-send-email-boris.brezillon@free-electrons.com>
- <20170109191758.7zzxeh45pvwiw3jo@sirena.org.uk>
- <20170110093355.700f8225@bbrezillon>
- <20170110121026.zstf7a6cflzk366l@sirena.org.uk>
-Message-ID: <20170110140556.172b3ec0@bbrezillon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Jan 2017 14:12:18 +0100
+Subject: [PATCH v2] arm64: do not set dma masks that device connection
+ can't handle
+In-Reply-To: <07253eaa-5729-0f15-42b6-e8403f1f0412@cogentembedded.com>
+References: <1483947002-16410-1-git-send-email-nikita.yoush@cogentembedded.com>
+ <20170110115132.GD21598@arm.com>
+ <07253eaa-5729-0f15-42b6-e8403f1f0412@cogentembedded.com>
+Message-ID: <2642601.V6IY0ZAJpg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Jan 2017 12:10:26 +0000
-Mark Brown <broonie@kernel.org> wrote:
+On Tuesday, January 10, 2017 3:47:25 PM CET Nikita Yushchenko wrote:
+> 
+> > The point here is that an IOMMU doesn't solve your issue, and the
+> > IOMMU-backed DMA ops need the same treatment. In light of that, it really
+> > feels to me like the DMA masks should be restricted in of_dma_configure
+> > so that the parent mask is taken into account there, rather than hook
+> > into each set of DMA ops to intercept set_dma_mask.
 
-> On Tue, Jan 10, 2017 at 09:33:55AM +0100, Boris Brezillon wrote:
-> > Mark Brown <broonie@kernel.org> wrote:  
-> 
-> > > However it
-> > > *is* a bit more than just making sure that the device suspend ordering
-> > > is good (though that's definitely part of it), there will be things
-> > > kicked off by hardware signalling without software knowing about it.  
-> 
-> > Do you have an example, so that I can understand the use case?  
-> 
-> Think about how a CPU suspends and signals the PMIC to go into suspend
-> mode - things signalled by hardware state changes that the hardware does
-> autonomously.
+of_dma_configure() sets up a 32-bit mask, which is assumed to always work
+in the kernel. We can't change it to a larger mask because that would
+break drivers that have to restrict devices to 32-bit.
 
-Got it.
+If the bus addressing is narrower than 32 bits however, the initial mask
+should probably be limited to whatever the bus supports, but that is not
+the problem we are trying to solve here.
 
+> > We'd still need to
+> > do something to stop dma_set_mask widening the mask if it was restricted
+> > by of_dma_configure, but I think Robin (cc'd) was playing with that.
 > 
-> > > Anything that doesn't affect a hardware supported runtime state probably
-> > > needs to be split off and handled separately as that's the much more
-> > > risky bit  
+> What issue "IOMMU doesn't solve"?
 > 
-> > Just to be sure, you mean regulator devices that do not support the  
-> > ->set_suspend_xx() hooks, right?  
-> 
-> Yes.
-> 
-> > >, moving changing of suspend mode earlier isn't going to cause
-> > > too much grief, that patch should just be split out and can probably
-> > > just go straight in.  
-> 
-> > Yes, I just thought it would be clearer to have everything implemented
-> > in the same function. Since calling ->set_suspend_xx() does not have
-> > any impact on the runtime state, it can be called whenever we want
-> > (assuming we can still communicate with the regulator device to
-> > configure this suspend state).
-> > But if you prefer to have it split out in 2 different function, with the
-> > 'set suspend mode' bits called from the regulator_suspend_begin(), I'm
-> > fine with that.  
-> 
-> No, I'm mainly saying that these things should be done in two separate
-> patches rather than talking about how the end code looks.  To a large
-> extent it does't matter when we apply the hardware supported suspend
-> modes, they won't take effect while software is running anyway.
+> Issue I'm trying to address is - inconsistency within swiotlb
+> dma_map_ops, where (1) any wide mask is silently accepted, but (2) then
+> mask is used to decide if bounce buffers are needed or not. This
+> inconsistency causes NVMe+R-Car cobmo not working (and breaking memory
+> instead).
 
-Okay, that shouldn't be a problem then.
+It's not just an inconsistency, it's a known bug that we really
+need to fix.
 
+> I just can't think out what similar issue iommu can have.
+> Do you mean that in iommu case, mask also must not be set to whatever
+> wider than initial value? Why? What is the use of mask in iommu case? Is
+> there any real case when iommu can't address all memory existing in the
+> system?
+
+I think the problem that Will is referring to is when the IOMMU has
+a virtual address space that is wider than the DMA mask of the device:
+In this case, dma_map_single() might return a dma_addr_t that is not
+reachable by the device.
+
+I'd consider that a separate bug that needs to be worked around in
+the IOMMU code.
+
+> NVMe maintainer has just stated that they expect
+> set_dma_mask(DMA_BIT_MASK(64)) to always succeed, and are going to error
+> out driver probe if that call fails.  They claim that architecture must
+> always be able to dma_map() whatever memory existing in the system - via
+> iommu or swiotlb or whatever. Their direction is to remove bounce
+> buffers from block and other layers.
 > 
-> > > Requring these functions to be called from every single driver seems
-> > > like we're doing something wrong - if we're going to do this we should
-> > > find some way to loop over all regulators and apply any unapplied
-> > > changes.  
-> 
-> > I agree. Actually, I forgot that we had PM ops at the device class
-> > level. Maybe we could just move these generic ->suspend()/->resume()
-> > implementation here.  
-> 
-> Yeah, I need to check if those class level operations always get run.
-> 
-> > > Batching things up at the end of suspend would also mean that
-> > > we'd be able to minimise the chances that we get the ordering wrong.  
-> 
-> > Unfortunately that's not possible, for the exact same reason calling
-> > regulator_suspend_prepare() from the platform ->prepare() hook did not
-> > work for me: at that point, all devices have been suspended, and this
-> > includes the i2c controller which we're using to communicate with the
-> > PMIC exposing those regulators.  
-> 
-> Do those devices actually get meaningfully suspended on your system,
+> With this direction, semantics of dma mask becomes even more
+> questionable. I'd say dma_mask is candidate for removal (or to move to
+> swiotlb's or iommu's local area)
 
-I think so.
+Removing dma_mask is not realistic any time soon, there are too many things
+in the kernel that use it for one thing or another, so any changes here
+have to be done really carefully. We definitely need the mask to support
+architectures without swiotlb.
 
-> and
-> even on systems where we do if we are going to use the dependency graphs
-> we should be able to arrange to do something with that to reorder both
-> them and the regulators to as near the end of the queue as we can get
-> tehm - that way we minimise the chances of being bitten by any
-> unexpressed depdencies (which I expect we have a lot of given how
-> resistant people are to writing proper DTs).
-
-Yes, maybe we'll need a mechanism to mark some devices for
-late-suspend. I currently don't need it because the runtime changes I'm
-applying are not preventing the system from running correctly:
-increasing the voltage output and moving into low-power mode (the
-reason behind voltage change is probably related to the poor precision
-of the low-power mode, which forces us to take an higher margin to
-prevent voltage from crossing the min constraint of the DDR memory).
-
-Of course, we should not only take my specific case into account, but
-I'd except people to properly define the dependencies if they really
-need to.
-
-> 
-> > 2/ Rely on the device model dependency graph, and enter the suspend
-> >    state when the regulator device is being suspended (this is the
-> >    solution I'm proposing in this patch).  
-> 
-> That's future work though (which is happening but still), right now we
-> know the graph doesn't work properly.  It also leaves us more open to
-> unexpressed dependencies which are
-
-I miss the end of the story :-).
-
-One last comment: between solution #1 and solution #2, #2 will always
-suspend the regulator later than #1. Now, if we add
-
-3/ Make sure the i2c controller driving the bus the PMIC is connected
-to is kept enabled, and enter regulators suspend state after all
-devices have been suspended.
-
-of course #3 will suspend things later than #2, but at the expense of
-driver/DT specialization, and we're not guaranteed to not face another
-weird dependency constraint like "suspend dev X" -> "suspend reg Y" ->
-"suspend dev Z" in the future.
-
-Also note that the 'suspend dev connected on a bus before the bus
-controller' dependencies are already well supported thanks to the
-device model dev->parent relationship. Actually, this is what I'm
-relying on for my "suspend PMIC's regulators before the i2c controller"
-constraint.
+	Arnd
