@@ -1,75 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Jan 2017 16:06:29 +0100
-Subject: [PATCH v2] arm64: do not set dma masks that device connection
- can't handle
-In-Reply-To: <5c5cd4fd-4854-a2dd-10b6-9cc98e63a85c@arm.com>
-References: <1483947002-16410-1-git-send-email-nikita.yoush@cogentembedded.com>
- <6116278.nQQUSuo3l4@wuerfel> <5c5cd4fd-4854-a2dd-10b6-9cc98e63a85c@arm.com>
-Message-ID: <1900630.ldF24KWUdV@wuerfel>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 10 Jan 2017 16:17:29 +0100
+Subject: [PATCH v6 0/2] Support for Axentia TSE-850
+In-Reply-To: <1484054314-6244-1-git-send-email-peda@axentia.se>
+References: <1484054314-6244-1-git-send-email-peda@axentia.se>
+Message-ID: <20170110151729.acper3qneohlfe4z@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 10, 2017 2:16:57 PM CET Robin Murphy wrote:
-> On 10/01/17 13:42, Arnd Bergmann wrote:
-> > On Tuesday, January 10, 2017 1:25:12 PM CET Robin Murphy wrote:
-> >> On 10/01/17 12:47, Nikita Yushchenko wrote:
-> >>>> The point here is that an IOMMU doesn't solve your issue, and the
-> >>>> IOMMU-backed DMA ops need the same treatment. In light of that, it really
-> >>>> feels to me like the DMA masks should be restricted in of_dma_configure
-> >>>> so that the parent mask is taken into account there, rather than hook
-> >>>> into each set of DMA ops to intercept set_dma_mask. We'd still need to
-> >>>> do something to stop dma_set_mask widening the mask if it was restricted
-> >>>> by of_dma_configure, but I think Robin (cc'd) was playing with that.
-> >>>
-> >>> What issue "IOMMU doesn't solve"?
-> >>>
-> >>> Issue I'm trying to address is - inconsistency within swiotlb
-> >>> dma_map_ops, where (1) any wide mask is silently accepted, but (2) then
-> >>> mask is used to decide if bounce buffers are needed or not. This
-> >>> inconsistency causes NVMe+R-Car cobmo not working (and breaking memory
-> >>> instead).
-> >>
-> >> The fundamental underlying problem is the "any wide mask is silently
-> >> accepted" part, and that applies equally to IOMMU ops as well.
-> > 
-> > It's a much rarer problem for the IOMMU case though, because it only
-> > impacts devices that are restricted to addressing of less than 32-bits.
-> > 
-> > If you have an IOMMU enabled, the dma-mapping interface does not care
-> > if the device can do wider than 32 bit addressing, as it will never
-> > hand out IOVAs above 0xffffffff.
+On 10/01/2017 at 14:18:32 +0100, Peter Rosin wrote :
+> Hi!
 > 
-> I can assure you that it will - we constrain allocations to the
-> intersection of the IOMMU domain aperture (normally the IOMMU's physical
-> input address width) and the given device's DMA mask. If both of those
-> are >32 bits then >32-bit IOVAs will fall out. For the arm64/common
-> implementation I have prototyped a copy of the x86 optimisation which
-> always first tries to get 32-bit IOVAs for PCI devices, but even then it
-> can start returning higher addresses if the 32-bit space fills up.
+> changes v5 -> v6
+> - drop the &main clock-frequency
+> - add some text to the commit messages
+> - make config additions modules
+> 
+> changes v4 -> v5
+> - comment from Rob about the memory node made me look closer and
+>   the memory size is actually updated by the bootloader, and that
+>   hid the fact that the entry was always faulty. This version
+>   specifies the correct memory size from the start, which is 64MB.
+> - ack from Rob
+> 
+> changes v3 -> v4
+> - rename files arch/arm/boot/dts/axentia-* to .../at91-*
+> - remove bootargs from at91-tse850-3.dts
+> - depend on the atmel ssc to register as a sound dai by itself
+> - bump copyright years
+> 
+> changes v2 -> v3
+> - document the new compatible strings prefixed with "axentia,".
+> 
+> changes v1 -> v2
+> - squash the fixup into the correct patch, sorry for the noise.
+> 
+> After finally having all essintial drivers upstreamed I would
+> like to have the dts and the defconfig also upstreamed.
+> 
+> The atmel-ssc/sound-dai change depends on a change that has been
+> sitting in the ASoC tree since mid-december, and I have been waiting
+> for it to hit linux-next before sending this, but it seems to take
+> longer than I anticipated. So, since I do not want this to in
+> turn miss the next merge window because of that wait I therefore
+> request that this is taken now even though it doesn't really work
+> w/o the ASoC "topic/atmel" branch as of 2016-12-15 [1]. It of course
+> builds cleanly even w/o those ASoC changes. That effectively means
+> that noone besides me should notice the inconsistency (I currently
+> have all affected devices under my control).
+> 
+> Cheers,
+> peda
+> 
+> [1] http://git.kernel.org/cgit/linux/kernel/git/broonie/sound.git/log/?h=topic/atmel
+> 
+> Peter Rosin (2):
+>   ARM: dts: at91: add devicetree for the Axentia TSE-850
+>   ARM: sama5_defconfig: add support for the Axentia TSE-850 board
+> 
+>  Documentation/devicetree/bindings/arm/axentia.txt |  19 ++
+>  MAINTAINERS                                       |   8 +
+>  arch/arm/boot/dts/Makefile                        |   1 +
+>  arch/arm/boot/dts/at91-linea.dtsi                 |  49 ++++
+>  arch/arm/boot/dts/at91-tse850-3.dts               | 274 ++++++++++++++++++++++
+>  arch/arm/configs/sama5_defconfig                  |   7 +-
+>  6 files changed, 357 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/axentia.txt
+>  create mode 100644 arch/arm/boot/dts/at91-linea.dtsi
+>  create mode 100644 arch/arm/boot/dts/at91-tse850-3.dts
+> 
 
-Ok, got it. I have to admit that most of my knowledge about the internals
-of IOMMUs is from PowerPC of a few years ago, which couldn't do this at
-all. I agree that we need to do the same thing on swiotlb and iommu then.
+Both applied, thanks!
 
-> >> The thread Will linked to describes that equivalent version of your
-> >> problem - the IOMMU gives the device 48-bit addresses which get
-> >> erroneously truncated because it doesn't know that only 42 bits are
-> >> actually wired up. That situation still requires the device's DMA mask
-> >> to correctly describe its addressing capability just as yours does.
-> > 
-> > That problem should only impact virtual machines which have a guest
-> > bus address space covering more than 42 bits of physical RAM, whereas
-> > the problem we have with swiotlb is for the dma-mapping interface.
-> > 
-> I actually have a third variation of this problem involving a PCI root
-> complex which *could* drive full-width (40-bit) addresses, but won't,
-> due to the way its PCI<->AXI interface is programmed. That would require
-> even more complicated dma-ranges handling to describe the windows of
-> valid physical addresses which it *will* pass, so I'm not pressing the
-> issue - let's just get the basic DMA mask case fixed first.
-
-Can you describe this a little more? We should at least try to not
-make it harder to solve the next problem while solving this one,
-so I'd like to understand the exact limitation you are hitting there.
-
-	Arnd
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
