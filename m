@@ -1,127 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 10 Jan 2017 11:16:18 +0000
-Subject: [PATCH v29 1/9] memblock: add memblock_cap_memory_range()
-In-Reply-To: <20161228043525.27420-1-takahiro.akashi@linaro.org>
-References: <20161228043347.27358-1-takahiro.akashi@linaro.org>
- <20161228043525.27420-1-takahiro.akashi@linaro.org>
-Message-ID: <20170110111617.GB21598@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 10 Jan 2017 14:20:09 +0300
+Subject: [PATCH] usb: dwc3-exynos fix unspecified suspend clk error
+ handling
+In-Reply-To: <20170110022131.31042-1-shuahkh@osg.samsung.com>
+References: <20170110022131.31042-1-shuahkh@osg.samsung.com>
+Message-ID: <82fb5295-6640-7e9e-a42a-4067aa88e5b4@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding some more folks to cc]
+Hello!
 
-On Wed, Dec 28, 2016 at 01:35:25PM +0900, AKASHI Takahiro wrote:
-> Add memblock_cap_memory_range() which will remove all the memblock regions
-> except the memory range specified in the arguments. In addition, rework is
-> done on memblock_mem_limit_remove_map() to re-implement it using
-> memblock_cap_memory_range().
-> 
-> This function, like memblock_mem_limit_remove_map(), will not remove
-> memblocks with MEMMAP_NOMAP attribute as they may be mapped and accessed
-> later as "device memory."
-> See the commit a571d4eb55d8 ("mm/memblock.c: add new infrastructure to
-> address the mem limit issue").
-> 
-> This function is used, in a succeeding patch in the series of arm64 kdump
-> suuport, to limit the range of usable memory, or System RAM, on crash dump
-> kernel.
-> (Please note that "mem=" parameter is of little use for this purpose.)
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Reviewed-by: Will Deacon <will.deacon@arm.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: linux-mm at kvack.org
-> Cc: Andrew Morton <akpm@linux-foundation.org>
+On 01/10/2017 05:21 AM, Shuah Khan wrote:
+
+> Fix dwc3_exynos_probe() to call clk_prepare_enable() only when suspend
+> clock is specified. Call clk_disable_unprepare() from remove and probe
+> error path only when susp_clk has been set from remove and probe error
+> paths.
+>
+> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
 > ---
->  include/linux/memblock.h |  1 +
->  mm/memblock.c            | 44 +++++++++++++++++++++++++++++---------------
->  2 files changed, 30 insertions(+), 15 deletions(-)
-
-Whilst this patch looks fine to me, it would be nice if Dennis (author of
-memblock_mem_limit_remove_map) or one of the mm chaps could provide an ack
-before I merge it via arm64.
-
-Thanks,
-
-Will
-
-> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-> index 5b759c9acf97..fbfcacc50c29 100644
-> --- a/include/linux/memblock.h
-> +++ b/include/linux/memblock.h
-> @@ -333,6 +333,7 @@ phys_addr_t memblock_mem_size(unsigned long limit_pfn);
->  phys_addr_t memblock_start_of_DRAM(void);
->  phys_addr_t memblock_end_of_DRAM(void);
->  void memblock_enforce_memory_limit(phys_addr_t memory_limit);
-> +void memblock_cap_memory_range(phys_addr_t base, phys_addr_t size);
->  void memblock_mem_limit_remove_map(phys_addr_t limit);
->  bool memblock_is_memory(phys_addr_t addr);
->  int memblock_is_map_memory(phys_addr_t addr);
-> diff --git a/mm/memblock.c b/mm/memblock.c
-> index 7608bc305936..fea1688fef60 100644
-> --- a/mm/memblock.c
-> +++ b/mm/memblock.c
-> @@ -1514,11 +1514,37 @@ void __init memblock_enforce_memory_limit(phys_addr_t limit)
->  			      (phys_addr_t)ULLONG_MAX);
->  }
->  
-> +void __init memblock_cap_memory_range(phys_addr_t base, phys_addr_t size)
-> +{
-> +	int start_rgn, end_rgn;
-> +	int i, ret;
-> +
-> +	if (!size)
-> +		return;
-> +
-> +	ret = memblock_isolate_range(&memblock.memory, base, size,
-> +						&start_rgn, &end_rgn);
-> +	if (ret)
-> +		return;
-> +
-> +	/* remove all the MAP regions */
-> +	for (i = memblock.memory.cnt - 1; i >= end_rgn; i--)
-> +		if (!memblock_is_nomap(&memblock.memory.regions[i]))
-> +			memblock_remove_region(&memblock.memory, i);
-> +
-> +	for (i = start_rgn - 1; i >= 0; i--)
-> +		if (!memblock_is_nomap(&memblock.memory.regions[i]))
-> +			memblock_remove_region(&memblock.memory, i);
-> +
-> +	/* truncate the reserved regions */
-> +	memblock_remove_range(&memblock.reserved, 0, base);
-> +	memblock_remove_range(&memblock.reserved,
-> +			base + size, (phys_addr_t)ULLONG_MAX);
-> +}
-> +
->  void __init memblock_mem_limit_remove_map(phys_addr_t limit)
->  {
-> -	struct memblock_type *type = &memblock.memory;
->  	phys_addr_t max_addr;
-> -	int i, ret, start_rgn, end_rgn;
->  
->  	if (!limit)
->  		return;
-> @@ -1529,19 +1555,7 @@ void __init memblock_mem_limit_remove_map(phys_addr_t limit)
->  	if (max_addr == (phys_addr_t)ULLONG_MAX)
->  		return;
->  
-> -	ret = memblock_isolate_range(type, max_addr, (phys_addr_t)ULLONG_MAX,
-> -				&start_rgn, &end_rgn);
-> -	if (ret)
-> -		return;
-> -
-> -	/* remove all the MAP regions above the limit */
-> -	for (i = end_rgn - 1; i >= start_rgn; i--) {
-> -		if (!memblock_is_nomap(&type->regions[i]))
-> -			memblock_remove_region(type, i);
+>  drivers/usb/dwc3/dwc3-exynos.c | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
+> index e27899b..f97a3d7 100644
+> --- a/drivers/usb/dwc3/dwc3-exynos.c
+> +++ b/drivers/usb/dwc3/dwc3-exynos.c
+> @@ -131,8 +131,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+>  	if (IS_ERR(exynos->susp_clk)) {
+>  		dev_info(dev, "no suspend clk specified\n");
+>  		exynos->susp_clk = NULL;
 > -	}
-> -	/* truncate the reserved regions */
-> -	memblock_remove_range(&memblock.reserved, max_addr,
-> -			      (phys_addr_t)ULLONG_MAX);
-> +	memblock_cap_memory_range(0, max_addr);
->  }
->  
->  static int __init_memblock memblock_search(struct memblock_type *type, phys_addr_t addr)
-> -- 
-> 2.11.0
-> 
+> -	clk_prepare_enable(exynos->susp_clk);
+> +	} else
+> +		clk_prepare_enable(exynos->susp_clk);
+
+    CodingStyle: need {} here as well since another branch has them.
+
+[...]
+
+MBR, Sergei
