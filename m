@@ -1,67 +1,76 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 10 Jan 2017 20:40:40 +0100
-Subject: [RFC 8/8] KVM: arm/arm64: Emulate the EL1 phys timer register
- access
-In-Reply-To: <CAHyh4xhNUTuzaf=JJKidHj1fnOgoe_8aTZamnnGsc6C+iKL1BA@mail.gmail.com>
-References: <1482772326-29110-1-git-send-email-jintack@cs.columbia.edu>
- <1482772326-29110-9-git-send-email-jintack@cs.columbia.edu>
- <20170109121612.GG4348@cbox>
- <CAHyh4xhNUTuzaf=JJKidHj1fnOgoe_8aTZamnnGsc6C+iKL1BA@mail.gmail.com>
-Message-ID: <20170110194040.GP4348@cbox>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 10 Jan 2017 20:46:12 +0100
+Subject: [PATCH v4 1/2] arm64: dts: rockchip: add "rockchip,
+ grf" property for RK3399 PMUCRU/CRU
+In-Reply-To: <CAD=FV=Wwu3q_LqwYUWcJQRvp5neVOS9szgsYFONWTRJ0X8hRTA@mail.gmail.com>
+References: <1484028930-20305-1-git-send-email-zhengxing@rock-chips.com>
+ <1484028930-20305-2-git-send-email-zhengxing@rock-chips.com>
+ <CAD=FV=Wwu3q_LqwYUWcJQRvp5neVOS9szgsYFONWTRJ0X8hRTA@mail.gmail.com>
+Message-ID: <8683375.pL9J7LxuT0@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 12:36:36PM -0500, Jintack Lim wrote:
-> On Mon, Jan 9, 2017 at 7:16 AM, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
-> > On Mon, Dec 26, 2016 at 12:12:06PM -0500, Jintack Lim wrote:
-> >> Emulate read and write operations to CNTP_TVAL, CNTP_CVAL and CNTP_CTL.
-> >> Now the VM is able to use the EL1 physical timer.
-> >>
-> >> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-> >> ---
-> >>  arch/arm64/kvm/sys_regs.c    | 35 ++++++++++++++++++++++++++++++++---
-> >>  include/kvm/arm_arch_timer.h |  3 +++
-> >>  virt/kvm/arm/arch_timer.c    |  4 ++--
-> >>  3 files changed, 37 insertions(+), 5 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> >> index fd9e747..7cef94f 100644
-> >> --- a/arch/arm64/kvm/sys_regs.c
-> >> +++ b/arch/arm64/kvm/sys_regs.c
-> >> @@ -824,7 +824,15 @@ static bool access_cntp_tval(struct kvm_vcpu *vcpu,
-> >>               struct sys_reg_params *p,
-> >>               const struct sys_reg_desc *r)
-> >>  {
-> >> -     kvm_inject_undefined(vcpu);
-> >> +     struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-> >> +     cycle_t now = kvm_phys_timer_read();
-> >> +
-> >> +     if (p->is_write) {
-> >> +             ptimer->cnt_cval = p->regval + now;
-> >> +             kvm_timer_emulate(vcpu, ptimer);
-> >
-> > Hmm, do we really need those calls here?
-> >
-> > I guess I'm a little confused about exactly what the kvm_timer_emulate()
-> > function is supposed to do, and it feels to me like these handlers
-> > should just record what the guest is asking the kernel to do and the
-> > logic of handling the additional timer should be moved into the run path
-> > as much as possible.
+Am Dienstag, 10. Januar 2017, 10:45:48 schrieb Doug Anderson:
+> Hi,
 > 
-> I think it's a design decision. As you suggested, it's simple to do
-> set up the background timer on entry to the VM, cancel it on exit, but
-> since that's on the critical path it may have some impact on the
-> performance, especially the world switch cost. To avoid
-> canceling/setting up timer every world switch, I choose to schedule
-> the physical timer here. I haven't compared the cost of the two
-> alternatives, though.
+> On Mon, Jan 9, 2017 at 10:15 PM, Xing Zheng <zhengxing@rock-chips.com> 
+wrote:
+> > The structure rockchip_clk_provider needs to refer the GRF regmap
+> > in somewhere, if the CRU node has not "rockchip,grf" property,
+> > calling syscon_regmap_lookup_by_phandle will return an invalid GRF
+> > regmap, and the MUXGRF type clock will be not supported.
+> > 
+> > Therefore, we need to add them.
+> > 
+> > Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+> > ---
+> > 
+> > Changes in v4:
+> > - separte the binding patch
+> > 
+> > Changes in v3:
+> > - add optional roperty rockchip,grf in rockchip,rk3399-cru.txt
+> > 
+> > Changes in v2:
+> > - referring pmugrf for PMUGRU
+> > - fix the typo "invaild" in COMMIT message
+> > 
+> >  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 ++
+> >  1 file changed, 2 insertions(+)
 > 
+> This seems fine to me, so:
+> 
+> Reviewed-by: Douglas Anderson <dianders@chromium.org>
+> 
+> ...but I will say that before you actually add any real "MUXGRF"
+> clocks on rk3399 you _might_ need to rework the code to make things
+> truly "optional".  If it turns out that any existing clocks that
+> already exist today already go through one of these muxes in the GRF
+> and we've always been assuming one setting of the mux, we'll need to
+> make sure we keep assuming that setting of the mux even if the "grf"
+> isn't specified.
 
-I'd definitely like to avoid us scheduling soft timers on the host if
-that's not even necessary in the first place, so I'd like to get that
-clear first, and as I said on the previous patch I think it's better to
-get a working solution that we understand firt, and then optimize on
-that later based on real results.
+I guess I see that a bit more relaxed :-) .
 
--Christoffer
+I.e. the GRF being optional is a remnant of syscons not being available when 
+the clocks get set up- so were coming in later or not at all. For the rk3288 I 
+converted, there we never really had the case of the GRF missing.
+
+And the GRF mux for the vcodec now present is not being used by anything yet 
+(neither driver nor binding), so no old devicetree can break.
+
+
+> As I understand it, your motivation for this patch is to eventually be
+> able to model the EDP reference clock which can either be xin24 or
+> "edp osc".  Presumably the eDP "reference clock" isn't related to any
+> of the pre-existing eDP clocks so that one should be safe.
+
+Same here, so far we don't even have edp or even any other graphical output on 
+the rk3399, so again there is no old devicetree that could break when the grf 
+is not specified.
+
+
+So, for me that looks good.
+
+
+Heiko
