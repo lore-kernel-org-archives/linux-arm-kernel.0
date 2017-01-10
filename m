@@ -1,51 +1,35 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Jan 2017 13:25:43 +0000
-Subject: [PATCH] virtio_mmio: Set DMA masks appropriately
-In-Reply-To: <2220292.9CN9cxzsPe@wuerfel>
-References: <50defbbe87d75db85a9d22f914258975d661208a.1484051089.git.robin.murphy@arm.com>
- <2220292.9CN9cxzsPe@wuerfel>
-Message-ID: <20170110132543.GI14217@n2100.armlinux.org.uk>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 10 Jan 2017 10:27:44 -0300
+Subject: [PATCH 1/3] arm64: dts: Add missing unit name to Exynos7 SoC node
+In-Reply-To: <1484054866-3988-1-git-send-email-javier@osg.samsung.com>
+References: <1484054866-3988-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1484054866-3988-2-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 02:15:57PM +0100, Arnd Bergmann wrote:
-> On Tuesday, January 10, 2017 12:26:01 PM CET Robin Murphy wrote:
-> > @@ -548,6 +550,14 @@ static int virtio_mmio_probe(struct platform_device *pdev)
-> >         if (vm_dev->version == 1)
-> >                 writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
-> >  
-> > +       rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
-> > +       if (rc)
-> > +               rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-> 
-> You don't seem to do anything different when 64-bit DMA is unsupported.
-> How do you prevent the use of kernel buffers that are above the first 4G
-> here?
-> 
-> > +       else if (vm_dev->version == 1)
-> > +               dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32 + PAGE_SHIFT));
-> 
-> Why is this limitation only for the coherent mask?
+This patch fixes the following DTC warning about a mismatch
+between a device node reg property and its unit name:
 
-It looks wrong for two reasons:
+Node /soc has a reg or ranges property, but no unit name
 
-1. It is calling dma_set_coherent_mask(), so only the coherent mask
-   is being updated.  What about streaming DMA?
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
-   Maybe include the comment from the commit you refer to (a0be1db4304f)
-   which explains this, which would help reviewers understand why you're
-   only changing the coherent mask.
+ arch/arm64/boot/dts/exynos/exynos7.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-2. It fails to check whether the coherent mask was accepted... which
-   I guess is okay, as the coherent allocation mask won't be updated
-   so you should get coherent memory below 4GB.  Nevertheless, drivers
-   are expected to try setting a 32-bit coherent mask if setting a
-   larger mask fails.  See examples in Documentation/DMA-API-HOWTO.txt.
-
-Of course, if setting a 32-bit coherent mask fails, then the driver
-should probably fail to initialise.
-
+diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+index 80aa60e38237..0d2fedc6ac2f 100644
+--- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+@@ -69,7 +69,7 @@
+ 		method = "smc";
+ 	};
+ 
+-	soc: soc {
++	soc: soc at 0 {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.4
