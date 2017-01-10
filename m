@@ -1,62 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 10 Jan 2017 20:15:14 +0100
-Subject: [PATCH v2 6/6] arm64: allwinner: a64: Increase the MMC max
- frequency
-In-Reply-To: <CAGb2v67JoOAtHjMJboNUdCDX=+=Hf+zOWr234rT7GEiUmPb=nQ@mail.gmail.com>
-References: <cover.493dc67855a5f1837e875d37307319a03d14d1d0.1483980339.git-series.maxime.ripard@free-electrons.com>
- <3689701f93c8426bfa476e9a5f31c3642a8a898e.1483980339.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v67JoOAtHjMJboNUdCDX=+=Hf+zOWr234rT7GEiUmPb=nQ@mail.gmail.com>
-Message-ID: <20170110191514.kgbesffn3xqltnol@lukather>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Tue, 10 Jan 2017 12:20:35 -0700
+Subject: [PATCH] usb: dwc3-exynos fix unspecified suspend clk error
+ handling
+In-Reply-To: <20170110185943.qxwnzjg6zzy4zbki@kozik-lap>
+References: <20170110022131.31042-1-shuahkh@osg.samsung.com>
+ <CANAwSgQ4Nxyq5itu62qdz18d4xvTu-e3P3ZXK2acLWtzexaaCA@mail.gmail.com>
+ <2265318.ybtxfiNn3d@amdc3058>
+ <CGME20170110182345epcas1p3112f94aad300625ff1f75860c55a2b7e@epcas1p3.samsung.com>
+ <1659345.4CcVdVckN5@amdc3058>
+ <23cf318d-b83f-55e6-e980-13133f0ceb8b@osg.samsung.com>
+ <20170110185943.qxwnzjg6zzy4zbki@kozik-lap>
+Message-ID: <e8241820-b710-9735-8b61-fc38ca636bd9@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jan 10, 2017 at 01:01:20AM +0800, Chen-Yu Tsai wrote:
-> On Tue, Jan 10, 2017 at 12:46 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > All the controllers can have a maximum frequency of 200MHz.
-> >
-> > Since older SoCs cannot go that high, we cannot change the default maximum
-> > frequency, but fortunately for us we have a property for that in the DT.
-> >
-> > This also has the side effect of allowing to use the MMC HS200 mode for the
-> > boards that support it (with either 1.2v or 1.8v IOs).
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 3 +++
-> >  1 file changed, 3 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > index 8e149498e096..f46ae965cf5b 100644
-> > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > @@ -332,6 +332,7 @@
-> >                         resets = <&ccu RST_BUS_MMC0>;
-> >                         reset-names = "ahb";
-> >                         interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
-> > +                       max-frequency = <200000000>;
+On 01/10/2017 11:59 AM, Krzysztof Kozlowski wrote:
+> On Tue, Jan 10, 2017 at 11:37:24AM -0700, Shuah Khan wrote:
+>> On 01/10/2017 11:23 AM, Bartlomiej Zolnierkiewicz wrote:
+>>> I also think that regardless of what is decided on making susp_clk
+>>> non-optional for some Exynos SoCs we should probably remove the debug
+>>> message as it doesn't bring useful information and may be confusing.
+>>>
+>>> Shuah, can you take care of this?
+>>
+>> Yes. This message as it reads now is not only confusing, but also can
+>> lead users to think something is wrong.
+>>
+>> I can get rid of it or I could change it from info to debug and change
+>> it to read:
+>>
+>> "Optional Suspend clock isn't found. Diver operation isn't impacted"
 > 
-> You also have to set one of MMC_CAP2_HS200* in the driver,
-> or mmc-hs200-1_8v or mmc-hs200-1_2v in the device tree to
-> actually use HS200, right?
+> It is even more confusing. If the clock is required (by binding, by
+> hardware) - make it an error. If it is completely not important - do not
+> print anything. If it is optional but helpful (enabling clock gives
+> someything) then print something... but it is not that case.
+> 
+> Best regards,
+> Krzysztof
+> 
 
-Yes, but that requires a board with 1.8V IOs to work properly, which
-not all board use, so it's probably best to enable it in the board
-DTS.
+Sounds fair. I will send a patch to remove the message.
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170110/de9c272e/attachment.sig>
+-- Shuah
