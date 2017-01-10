@@ -1,33 +1,34 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 10 Jan 2017 15:49:51 +0800
-Subject: [GIT PULL] i.MX fixes for 4.10, 2nd round
-Message-ID: <20170110074949.GD20956@dragon>
+Date: Tue, 10 Jan 2017 15:52:22 +0800
+Subject: [PATCH v6 1/2] ARM: dts: vf610-zii-dev-rev-b: Remove leftover
+ PWM pingroup
+In-Reply-To: <20170110073555.12178-1-andrew.smirnov@gmail.com>
+References: <20170110073555.12178-1-andrew.smirnov@gmail.com>
+Message-ID: <20170110075221.GE20956@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 116dad7d4339d0965169df8a864fc829f684794d:
+On Mon, Jan 09, 2017 at 11:35:54PM -0800, Andrey Smirnov wrote:
+> Remove pwm0grp since it is:
+> 
+> 	a) Not referenced anywhere in the DTS file (unlike Tower board it
+> 	is based on, this board does not use/expose FTM0)
+> 
+> 	b) Configures PTB2 and PTB3 in a way that contradicts
+> 	pinctrl-mdio-mux
+> 
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: andrew at lunn.ch
+> Cc: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+> Cc: cphealy at gmail.com
+> Tested-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-  ARM: dts: imx6: Disable "weim" node in the dtsi files (2017-01-03 10:59:07 +0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.10-2
-
-for you to fetch changes up to 37530e74609a28ae3a3b51e7685fe54a00b1e2f2:
-
-  ARM: dts: imx6qdl-nitrogen6_som2: fix sgtl5000 pinctrl init (2017-01-10 10:51:14 +0800)
-
-----------------------------------------------------------------
-i.MX fixes for 4.10, 2nd round:
- - A couple of Nitrogen6 device tree fixes for audio codec probe
-   failure, which is caused by that pinctrl setting for codec clock
-   was not in the correct device node.
-
-----------------------------------------------------------------
-Gary Bisson (2):
-      ARM: dts: imx6qdl-nitrogen6_max: fix sgtl5000 pinctrl init
-      ARM: dts: imx6qdl-nitrogen6_som2: fix sgtl5000 pinctrl init
-
- arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi  | 4 ++--
- arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+Applied both, thanks.
