@@ -1,50 +1,38 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Tue, 10 Jan 2017 14:24:43 -0600
-Subject: [PATCH 4/4] ARM: dts: sun8i: add OTG function to Lichee Pi Zero
-In-Reply-To: <20170103152534.20118-5-icenowy@aosc.xyz>
-References: <20170103152534.20118-1-icenowy@aosc.xyz>
- <20170103152534.20118-5-icenowy@aosc.xyz>
-Message-ID: <20170110202443.GC2479@uda0271908>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 10 Jan 2017 21:41:24 +0100
+Subject: [PATCH net-next 6/8] net: dsa: Add support for platform data
+In-Reply-To: <20170110201235.21771-7-f.fainelli@gmail.com>
+References: <20170110201235.21771-1-f.fainelli@gmail.com>
+ <20170110201235.21771-7-f.fainelli@gmail.com>
+Message-ID: <20170110204124.GL22820@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 03, 2017 at 11:25:34PM +0800, Icenowy Zheng wrote:
-> Lichee Pi Zero features a USB OTG port.
-> 
-> Add support for it.
-> 
-> Note: in order to use the Host mode, the board must be powered via the
-> +5V and GND pins.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
->  arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-> index 0099affc6ce3..3d9168cbaeca 100644
-> --- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-> +++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-> @@ -71,3 +71,13 @@
->  	pinctrl-names = "default";
->  	status = "okay";
->  };
-> +
-> +&usb_otg {
-> +	dr_mode = "otg";
+> @@ -452,11 +455,14 @@ static int dsa_cpu_parse(struct dsa_port *port, u32 index,
+>  	struct net_device *ethernet_dev;
+>  	struct device_node *ethernet;
+>  
+> -	ethernet = of_parse_phandle(port->dn, "ethernet", 0);
+> -	if (!ethernet)
+> -		return -EINVAL;
+> +	if (port->dn) {
+> +		ethernet = of_parse_phandle(port->dn, "ethernet", 0);
+> +		if (!ethernet)
+> +			return -EINVAL;
+> +		ethernet_dev = of_find_net_device_by_node(ethernet);
+> +	} else
+> +		ethernet_dev = dev_to_net_device(dst->pd->netdev);
 
-Why not set this default mode in dtsi instead?
+Hi Florian
 
-Regards,
--Bin.
+This is not going to work with John's rework of my multi CPU ports
+code. I think you are going to have to modify the platform_data
+structure to support multi-CPU ports.
 
-> +	status = "okay";
-> +};
-> +
-> +&usbphy {
-> +	usb0_id_det-gpio = <&pio 5 6 GPIO_ACTIVE_HIGH>;
-> +	status = "okay";
-> +};
-> -- 
-> 2.11.0
-> 
+I put higher priority on cleanly integrating multi-CPU ports using
+device tree, than supporting legacy platforms. I'm O.K. with
+preparatory patches, but i think we should wait for actually platform
+data changes until after Johns code has landed and we can design the
+platform_data to work with it.
+
+	      Andrew
