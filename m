@@ -1,40 +1,57 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 9 Jan 2017 19:16:42 -0800
-Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.11
-In-Reply-To: <cover.1483700969.git.horms+renesas@verge.net.au>
-References: <cover.1483700969.git.horms+renesas@verge.net.au>
-Message-ID: <20170110031642.GG22261@localhost>
+Date: Mon, 9 Jan 2017 19:15:32 -0800
+Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.11
+In-Reply-To: <cover.1483700694.git.horms+renesas@verge.net.au>
+References: <cover.1483700694.git.horms+renesas@verge.net.au>
+Message-ID: <20170110031532.GF22261@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 12:18:31PM +0100, Simon Horman wrote:
+On Fri, Jan 06, 2017 at 12:17:56PM +0100, Simon Horman wrote:
 > Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Please consider these Renesas ARM based SoC DT updates for v4.11.
+> Please consider these Renesas ARM64 based SoC DT updates for v4.11.
+> 
+> This is based on v4.10-rc2 as v4.10-rc1 does not compile using
+> the defconfig.
 > 
 > 
-> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+> The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
 > 
->   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+>   Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v4.11
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.11
 > 
-> for you to fetch changes up to 654450baf2afba86cf328e1849ccac61ec4630af:
+> for you to fetch changes up to b2b9443beee5017ebdb3f2be9ef472c73d260481:
 > 
->   ARM: dts: r8a7790: Use R-Car Gen 2 fallback binding for msiof nodes (2017-01-03 10:47:05 +0100)
+>   arm64: dts: r8a7795: Add PWM support (2017-01-04 10:00:44 +0100)
 > 
 > ----------------------------------------------------------------
-> Renesas ARM Based SoC DT Updates for v4.11
+> Renesas ARM64 Based SoC DT Updates for v4.11
 > 
-> * Add da9063 PMIC device node for system restart to gose board
-> * Add device node for PRR to SoCs where it was missing
-> * Move RST node before SYSC node where it was incorrectly placed
-> * Use Gen 2 fallback bindings for I2C, IIC, MSIOf and USB2 phy
-> * Use SoC-specific compat string for MMCIF where it was missing
+> * Add PWM, and sound MIX and CTU support to r8a7795 SoC
+> * Add CAN, CAN FD and all MSIOF nodes to r8a7796 SoC
+> * Use Gen 3 fallback binding for i2c, msiof, PCIE and USB2 phy
+> * Enable Ethernet and 4 GiB memory on r8a7796/salvator-x board
+> * Add r8a7796/salvator-x board part number to bindings
 
 Merged, thanks.
+
+
+> ----------------------------------------------------------------
+> Chris Paterson (3):
+>       arm64: dts: r8a7796: Add CAN external clock support
+>       arm64: dts: r8a7796: Add CAN support
+>       arm64: dts: r8a7796: Add CAN FD support
+> 
+> Geert Uytterhoeven (2):
+>       arm64: dts: r8a7796: Add all MSIOF nodes
+>       arm64: renesas: r8a7796/salvator-x: Add board part number to DT bindings
+
+Nit: When you look at the shortlog, these with different/random format
+stand out. Feel free to fix them before sending next time.
 
 
 -Olof
