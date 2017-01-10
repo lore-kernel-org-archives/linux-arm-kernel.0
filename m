@@ -1,113 +1,36 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 10 Jan 2017 19:23:43 +0100
-Subject: [PATCH] usb: dwc3-exynos fix unspecified suspend clk error
- handling
-In-Reply-To: <2265318.ybtxfiNn3d@amdc3058>
-References: <20170110022131.31042-1-shuahkh@osg.samsung.com>
- <CANAwSgQ4Nxyq5itu62qdz18d4xvTu-e3P3ZXK2acLWtzexaaCA@mail.gmail.com>
- <2265318.ybtxfiNn3d@amdc3058>
- <CGME20170110182345epcas1p3112f94aad300625ff1f75860c55a2b7e@epcas1p3.samsung.com>
-Message-ID: <1659345.4CcVdVckN5@amdc3058>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Tue, 10 Jan 2017 10:24:18 -0800
+Subject: [PATCH 1/2] ARM: dts: imx6: Specify 'anatop-enable-bit' where
+ appropriate
+In-Reply-To: <CAOMZO5CnwrPcney0qzQgex_aFXCrksmEocZ28nf54Kvcm2dq-w@mail.gmail.com>
+References: <20170110163015.22444-1-andrew.smirnov@gmail.com>
+ <CAOMZO5CnwrPcney0qzQgex_aFXCrksmEocZ28nf54Kvcm2dq-w@mail.gmail.com>
+Message-ID: <CAHQ1cqHhiCO8nMmYd_6r0Zx-oycVGf_0wo7x17rxbuJujxftww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 10, 2017 07:03:57 PM Bartlomiej Zolnierkiewicz wrote:
-> 
-> Hi,
-> 
-> On Tuesday, January 10, 2017 11:23:38 PM Anand Moon wrote:
-> > Hi Shuah,
-> > 
-> > On 10 January 2017 at 21:58, Shuah Khan <shuahkh@osg.samsung.com> wrote:
-> > > On 01/10/2017 09:05 AM, Bartlomiej Zolnierkiewicz wrote:
-> > >>
-> > >> Hi,
-> > >>
-> > >> On Tuesday, January 10, 2017 07:36:35 AM Shuah Khan wrote:
-> > >>> On 01/10/2017 07:16 AM, Shuah Khan wrote:
-> > >>>> On 01/10/2017 05:05 AM, Bartlomiej Zolnierkiewicz wrote:
-> > >>>>>
-> > >>>>> Hi,
-> > >>>>>
-> > >>>>> On Monday, January 09, 2017 07:21:31 PM Shuah Khan wrote:
-> > >>>>>> Fix dwc3_exynos_probe() to call clk_prepare_enable() only when suspend
-> > >>>>>> clock is specified. Call clk_disable_unprepare() from remove and probe
-> > >>>>>> error path only when susp_clk has been set from remove and probe error
-> > >>>>>> paths.
-> > >>>>>
-> > >>>>> It is legal to call clk_prepare_enable() and clk_disable_unprepare()
-> > >>>>> for NULL clock.  Also your patch changes susp_clk handling while
-> > >>>>> leaves axius_clk handling (which also can be NULL) untouched.
-> > >>>>>
-> > >>>>> Do you actually see some runtime problem with the current code?
-> > >>>>>
-> > >>>>> If not then the patch should probably be dropped.
-> > >>>>>
-> > >>>>> Best regards,
-> > >>>>> --
-> > >>>>> Bartlomiej Zolnierkiewicz
-> > >>>>> Samsung R&D Institute Poland
-> > >>>>> Samsung Electronics
-> > >>>>
-> > >>>> Hi Bartlomiej,
-> > >>>>
-> > >>>> I am seeing the "no suspend clk specified" message in dmesg.
-> > >>>> After that it sets the exynos->susp_clk = NULL and starts
-> > >>>> calling clk_prepare_enable(exynos->susp_clk);
-> > >>>>
-> > >>>> That can't be good. If you see the logic right above this
-> > >>>> one for exynos->clk, it returns error and fails the probe.
-> > >>>> This this case it doesn't, but tries to use null susp_clk.
-> > >>
-> > >> exynos->susp_clk is optional, exynos->clk is not.
-> > >
-> > > Right. That is clear since we don't fail the probe.
-> > >
-> > >>
-> > >>>> I believe this patch is necessary.
-> > >>>
-> > >>> Let me clarify this a bit further. Since we already know
-> > >>> susp_clk is null, with this patch we can avoid extra calls
-> > >>> to clk_prepare_enable() and clk_disable_unprepare().
-> > >>>
-> > >>> One can say, it also adds extra checks, hence I will let you
-> > >>> decide one way or the other. :)
-> > >>
-> > >> I would prefer to leave the things as they are currently.
-> > >>
-> > >> The code in question is not performance sensitive so extra
-> > >> calls are not a problem.  No extra checks means less code.
-> > >>
-> > >> Also the current code seems to be more in line with the rest
-> > >> of the kernel.
-> > >
-> > > What functionality is missing without the suspend clock? Would
-> > > it make sense to change the info. message to include what it
-> > > means. At the moment it doesn't anything more than "no suspend
-> > > clock" which is a very cryptic user visible message. It would be
-> > > helpful for it to also include what functionality is impacted.
-> > >
-> > 
-> > Both usbdrd30_susp_clk and usbdrd30_axius_clk are used by exynos5433 platform
-> 
-> Can you point me to the use of usbdrd30_axius_clk?
-> 
-> I cannot find in the upstream code.
-> 
-> > so moving the clk under compatible string "samsung,exynos7-dwusb3" make sense.
-> 
-> This is not so simple and we would probably need a new compatible for
-> Exynos5433 (it is currently using "samsung,exynos5250-dwusb3" one and
-> is not using axius_clk).
+On Tue, Jan 10, 2017 at 9:28 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Tue, Jan 10, 2017 at 2:30 PM, Andrey Smirnov
+> <andrew.smirnov@gmail.com> wrote:
+>> ENABLE_LINREG bit is implemented by 3P0, 1P1 and 2P5 regulators on
+>> i.MX6. This property is present in similar code in Fresscale BSP and
+>> made its way upstream in imx6ul.dtsi, so this patch adds this property
+>> to the rest of i.MX6 family for completness.
+>
+> Please see:
+> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/patch/arch/arm/boot/dts/imx6ul.dtsi?id=27958ccdf29e9971732e02494b48be54b0691269
 
-I also think that regardless of what is decided on making susp_clk
-non-optional for some Exynos SoCs we should probably remove the debug
-message as it doesn't bring useful information and may be confusing.
+Fabio:
 
-Shuah, can you take care of this?
+I submitted a patch implementing this property to LKML as well, see
+https://www.spinics.net/lists/kernel/msg2418471.html
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+All of these patches are a part of a broader attempt to add PCIe
+support for i.MX7, and on that platform this is a part of a 1P0D
+regulator which supplies PCIe PHY.
+
+I can rebase this patch set to take your commit into account, or else
+let's discuss the best way to allow setting ENABLE_LINREG.
+
+Thanks,
+Andrey Smirnov
