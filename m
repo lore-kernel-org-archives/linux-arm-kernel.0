@@ -1,66 +1,40 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Tue, 10 Jan 2017 21:14:02 +0000
-Subject: [PATCH 2/3 v2] iio: adc: break out common code from SPMI VADC
-In-Reply-To: <b6c65ca47a69bc83fce28ec8bb44dfa1@jic23.retrosnub.co.uk>
-References: <1481842105-14047-1-git-send-email-linus.walleij@linaro.org>
- <717ea1c4-33af-f0ca-e018-5d7ac87506e1@kernel.org>
- <CACRpkdZUk6UUN2ACXp0S1RW7k2M5t5X5N_0mJQeo_UTEa4H=9w@mail.gmail.com>
- <b6c65ca47a69bc83fce28ec8bb44dfa1@jic23.retrosnub.co.uk>
-Message-ID: <5935eb9c-a1e8-adb9-8a56-bed2236028ee@kernel.org>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Tue, 10 Jan 2017 14:20:59 -0700
+Subject: [PATCH] usb: dwc3-exynos remove suspend clock unspecified debug
+ message
+Message-ID: <20170110212059.21995-1-shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/17 14:21, jic23 at kernel.org wrote:
-> On 10.01.2017 08:54, Linus Walleij wrote:
->> On Fri, Dec 30, 2016 at 8:01 PM, Jonathan Cameron <jic23@kernel.org> wrote:
->>> On 15/12/16 22:48, Linus Walleij wrote:
->>>> The SPMI VADC and the earlier XOADC share a subset of
->>>> common code, so to be able to use the same code in both
->>>> drivers, we break out a separate file with the common code,
->>>> prefix exported functions that are no longer static with
->>>> qcom_* and bake an object qcom-vadc.o that contains both
->>>> files: qcom-vadc-common.o and qcom-spmi-vadc.o.
->>>>
->>>> Cc: linux-arm-kernel at lists.infradead.org
->>>> Cc: linux-arm-msm at vger.kernel.org
->>>> Cc: Ivan T. Ivanov <iivanov.xz@gmail.com>
->>>> Cc: Andy Gross <andy.gross@linaro.org>
->>>> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
->>>> Cc: Stephen Boyd <sboyd@codeaurora.org>
->>>> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->>>
->>> Looks superficially fine, but I'm guessing will need a respin
->>> as we have a fair bit of new stuff (and a couple of fixes) going
->>> through this driver at the moment.
->>>
->>> All but the two fixes I posted a few mins ago are in my testing
->>> branch and should go to Greg once I have confirmed testing on
->>> those two fixes.
->>
->> I looked at the git and "testing"
->> contains a top commit named "guessing" fixing some 64bit
->> artithmetic (which looks correct) in the driver, shall I simply
->> rebase on top of that and hope for the best? :)
-> I'm an idiot and pushed out the wrong branch.  Will fix up when
-> I get home and push one with a sensible patch title!
-> (It'll be the same content though - feel free to Ack that if
-> you like ;)
-> 
-> Not my best half asleep patch writing ;)
-Fixed... It's called testing for a reason ;)
+dwc3-exynos prints debug message when suspend clock is not specified.
+The suspend clock is optional and driver can work without it.
 
-Jonathan
-> 
-> Jonathan
->>
->> Yours,
->> Linus Walleij
->> -- 
->> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> -- 
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+This debug message doesn't add any value and leads to confusion and
+concern. Remove it.
+
+Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+---
+This patch is a result of the disussion on the following patch.
+https://lkml.org/lkml/2017/1/9/891
+
+drivers/usb/dwc3/dwc3-exynos.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
+index e27899b..3e8407a 100644
+--- a/drivers/usb/dwc3/dwc3-exynos.c
++++ b/drivers/usb/dwc3/dwc3-exynos.c
+@@ -128,10 +128,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+ 	clk_prepare_enable(exynos->clk);
+ 
+ 	exynos->susp_clk = devm_clk_get(dev, "usbdrd30_susp_clk");
+-	if (IS_ERR(exynos->susp_clk)) {
+-		dev_info(dev, "no suspend clk specified\n");
++	if (IS_ERR(exynos->susp_clk))
+ 		exynos->susp_clk = NULL;
+-	}
+ 	clk_prepare_enable(exynos->susp_clk);
+ 
+ 	if (of_device_is_compatible(node, "samsung,exynos7-dwusb3")) {
+-- 
+2.7.4
