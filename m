@@ -1,35 +1,40 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 9 Jan 2017 19:11:53 -0800
-Subject: [PATCH] ARM, ARM64: dts: drop "arm,amba-bus" in favor of
- "simple-bus" part 3
-In-Reply-To: <1482853886-7932-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1482853886-7932-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20170110031153.GD22261@localhost>
+Date: Mon, 9 Jan 2017 19:16:42 -0800
+Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.11
+In-Reply-To: <cover.1483700969.git.horms+renesas@verge.net.au>
+References: <cover.1483700969.git.horms+renesas@verge.net.au>
+Message-ID: <20170110031642.GG22261@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 28, 2016 at 12:51:26AM +0900, Masahiro Yamada wrote:
-> Tree-wide replacement was done by commit 2ef7d5f342c1 ("ARM, ARM64:
-> dts: drop "arm,amba-bus" in favor of "simple-bus"), then the 2nd
-> round by commit 15b7cc78f095 ("arm64: dts: drop "arm,amba-bus" in
-> favor of "simple-bus" part 2").
+On Fri, Jan 06, 2017 at 12:18:31PM +0100, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Here, some new users have appeared for Linux v4.10-rc1.  Eliminate
-> them now.
+> Please consider these Renesas ARM based SoC DT updates for v4.11.
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
 > 
-> Hi Arnd, Olof,
+> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 > 
-> Can you pick this up for v4.10 fixes?
+>   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 > 
-> If we carry arm,amba-bus until the release, we will need to
-> take more time to deprecate it.
+> are available in the git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v4.11
+> 
+> for you to fetch changes up to 654450baf2afba86cf328e1849ccac61ec4630af:
+> 
+>   ARM: dts: r8a7790: Use R-Car Gen 2 fallback binding for msiof nodes (2017-01-03 10:47:05 +0100)
+> 
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC DT Updates for v4.11
+> 
+> * Add da9063 PMIC device node for system restart to gose board
+> * Add device node for PRR to SoCs where it was missing
+> * Move RST node before SYSC node where it was incorrectly placed
+> * Use Gen 2 fallback bindings for I2C, IIC, MSIOf and USB2 phy
+> * Use SoC-specific compat string for MMCIF where it was missing
 
-Applied to fixes for 4.10.
+Merged, thanks.
 
-
-Thanks,
 
 -Olof
