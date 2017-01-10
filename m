@@ -1,66 +1,27 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Tue, 10 Jan 2017 06:06:48 +0200
-Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
- enable panel
-In-Reply-To: <252ad888-fa9d-695a-58ed-46806e4374fd@mleia.com>
-References: <20161221032717.13154-1-vz@mleia.com>
- <CACRpkdZE6VgJA27+Wh=Gxd7yOXpLMyT7yCB2PYA36y0gvosHFQ@mail.gmail.com>
- <20170102142228.GI14217@n2100.armlinux.org.uk>
- <252ad888-fa9d-695a-58ed-46806e4374fd@mleia.com>
-Message-ID: <e6e7c575-d200-bd1f-890e-824fcf0e8c01@mleia.com>
+From: woogyom.kim@gmail.com (Milo Kim)
+Date: Tue, 10 Jan 2017 13:31:38 +0900
+Subject: [PATCH resend v4 2/3] ARM: dts: imx6: Support Savageboard dual
+In-Reply-To: <20170110032736.GX20956@dragon>
+References: <20170104070436.3425-1-woogyom.kim@gmail.com>
+ <20170110032736.GX20956@dragon>
+Message-ID: <02b61197-c906-c072-1ee9-d6324a55f01d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2017 01:32 AM, Vladimir Zapolskiy wrote:
-> On 01/02/2017 04:22 PM, Russell King - ARM Linux wrote:
->> On Fri, Dec 30, 2016 at 09:23:59AM +0100, Linus Walleij wrote:
->>> On Wed, Dec 21, 2016 at 4:27 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
->>>
->>>> The changeset contains a number of cleanups, changed semantics of
->>>> init_panel() callback, which allows to simplify getting of panel
->>>> properties from panel device tree node, and a handling of optional
->>>> "enable-gpios" panel property, the latter is described in
->>>> display/panel/panel-dpi.txt device tree binding documentation, but
->>>> it has been unsupported by the ARM CLCD driver.
->>>>
->>>> Vladimir Zapolskiy (4):
->>>>   video: ARM CLCD: sort included headers out alphabetically
->>>>   video: ARM CLCD: use panel device node for panel initialization
->>>>   video: ARM CLCD: use panel device node for getting backlight and mode
->>>>   video: ARM CLCD: add support of an optional GPIO to enable panel
->>>
->>> As you may have seen Tomi has stepped down as FBDEV maintainer and
->>> this subsystem is now orphaned.
->>>
->>> I guess Andrew Morton merges patches for it in this case, he usually does.
->>>
->>> But what we should actually do is create a new DRM driver for CLCD
->>> in drivers/gpu/drm/arm/clcd*
->>>
->>> It's maybe not a small undertaking :(
->>>
->>> But in case you're interested in the job, I will pitch in and test the result
->>> on all ARM reference designs plus Nomadik.
+
+On 01/10/2017 12:27 PM, Shawn Guo wrote:
+> On Wed, Jan 04, 2017 at 04:04:36PM +0900, Milo Kim wrote:
+>> Common savageboard DT file is used for board support.
+>> Add the vendor name and specify the dtb file for i.MX6Q build.
 >>
->> A DRM driver for it would probably be a good idea, but dealing with all
->> the weird and wonderful connection arrangements may not be that easy...
->>
-> 
-> Linus, Russell,
-> 
-> I've immediately encountered a problem while porting the driver to DRM,
-> because LPC18xx/LPC43xx SoCs are powered by Cortex-M3/M4 cores and DRM
-> framework has build and runtime dependencies on MMU.
-> 
-> That said, in short term I would expect a continuation of support for
-> the legacy CLCD framebuffer driver, which works fine on MMU-less SoCs.
-> 
+>> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+>> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+>> ---
+>>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+> The bindings change should be ideally a separate patch.  But since Rob
+> seems to be fine with it this time, I just applied the whole series.
 
-Linus, Russell,
+Got it. Thanks for taking this.
 
-please let me ask you to review/ack the changes, then I'll resend them
-to Andrew for inclusion as suggested by Linus.
-
---
-With best wishes,
-Vladimir
+Best regards,
+Milo
