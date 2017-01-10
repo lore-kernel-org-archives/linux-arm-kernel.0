@@ -1,39 +1,47 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Wed, 11 Jan 2017 07:45:43 +0900
-Subject: [PATCH v2 2/2] media: rc: add driver for IR remote receiver on
- MT7623 SoC
-In-Reply-To: <201701102015.fSM15CvI%fengguang.wu@intel.com>
-References: <CGME20170110120828epcas4p42482b7920c7a7dabd4c7794959f6d264@epcas4p4.samsung.com>
- <201701102015.fSM15CvI%fengguang.wu@intel.com>
-Message-ID: <20170110224543.uuoa7ofkvolz6inp@gangnam.samsung>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Tue, 10 Jan 2017 22:53:28 +0000
+Subject: [PATCH] gpio: mvebu: fix warning when building on 64-bit
+Message-ID: <E1cR5IG-0008Gw-HV@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+Casting a pointer to an int is not portable, and provokes a compiler
+warning.  Cast to unsigned long instead to avoid the warning.
 
->    include/linux/compiler.h:253:8: sparse: attribute 'no_sanitize_address': unknown attribute
-> >> drivers/media/rc/mtk-cir.c:215:41: sparse: too many arguments for function devm_rc_allocate_device
->    drivers/media/rc/mtk-cir.c: In function 'mtk_ir_probe':
->    drivers/media/rc/mtk-cir.c:215:11: error: too many arguments to function 'devm_rc_allocate_device'
->      ir->rc = devm_rc_allocate_device(dev, RC_DRIVER_IR_RAW);
->               ^~~~~~~~~~~~~~~~~~~~~~~
->    In file included from drivers/media/rc/mtk-cir.c:22:0:
->    include/media/rc-core.h:213:16: note: declared here
->     struct rc_dev *devm_rc_allocate_device(struct device *dev);
->                    ^~~~~~~~~~~~~~~~~~~~~~~
-> 
-> vim +/devm_rc_allocate_device +215 drivers/media/rc/mtk-cir.c
-> 
->    209		ir->base = devm_ioremap_resource(dev, res);
->    210		if (IS_ERR(ir->base)) {
->    211			dev_err(dev, "failed to map registers\n");
->    212			return PTR_ERR(ir->base);
->    213		}
->    214	
->  > 215		ir->rc = devm_rc_allocate_device(dev, RC_DRIVER_IR_RAW);
+drivers/gpio/gpio-mvebu.c: In function 'mvebu_gpio_probe':
+drivers/gpio/gpio-mvebu.c:662:17: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+   soc_variant = (int) match->data;
+                 ^
 
-this error comes because the patches I pointed out have not been
-applied yet. I guess you can ignore them as long as you tested
-yours on top those patches.
+This will be needed when building gpio-mvebu for Armada 7k/8k ARM64
+SoCs.
 
-Andi
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+Linus,
+
+I don't think this is necessary to push into -rc, as its not yet used
+on ARM64 - GPIO support is not yet present in the DTS files, and the
+Kconfig doesn't allow the driver to be built on ARM64.  Hence, please
+queue for the next merge window as a low priority fix.
+
+Thanks.
+
+ drivers/gpio/gpio-mvebu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+index 1ed6132b993c..a649556ac3ca 100644
+--- a/drivers/gpio/gpio-mvebu.c
++++ b/drivers/gpio/gpio-mvebu.c
+@@ -659,7 +659,7 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
+ 
+ 	match = of_match_device(mvebu_gpio_of_match, &pdev->dev);
+ 	if (match)
+-		soc_variant = (int) match->data;
++		soc_variant = (unsigned long) match->data;
+ 	else
+ 		soc_variant = MVEBU_GPIO_SOC_VARIANT_ORION;
+ 
+-- 
+2.7.4
