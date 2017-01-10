@@ -1,54 +1,77 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Mon,  9 Jan 2017 19:21:31 -0700
-Subject: [PATCH] usb: dwc3-exynos fix unspecified suspend clk error handling
-Message-ID: <20170110022131.31042-1-shuahkh@osg.samsung.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Tue, 10 Jan 2017 10:35:54 +0800
+Subject: [PATCH 1/2] Documentation: devicetree: Add document bindings
+ for mtk-cir
+In-Reply-To: <20170109183214.xonv52sn3fo4exqp@rob-hp-laptop>
+References: <1483632384-8107-1-git-send-email-sean.wang@mediatek.com>
+ <1483632384-8107-2-git-send-email-sean.wang@mediatek.com>
+ <20170109183214.xonv52sn3fo4exqp@rob-hp-laptop>
+Message-ID: <1484015754.4057.4.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix dwc3_exynos_probe() to call clk_prepare_enable() only when suspend
-clock is specified. Call clk_disable_unprepare() from remove and probe
-error path only when susp_clk has been set from remove and probe error
-paths.
+Hi Rob,
 
-Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
----
- drivers/usb/dwc3/dwc3-exynos.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+thanks for your effort for reviewing. I added comments inline.
 
-diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
-index e27899b..f97a3d7 100644
---- a/drivers/usb/dwc3/dwc3-exynos.c
-+++ b/drivers/usb/dwc3/dwc3-exynos.c
-@@ -131,8 +131,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
- 	if (IS_ERR(exynos->susp_clk)) {
- 		dev_info(dev, "no suspend clk specified\n");
- 		exynos->susp_clk = NULL;
--	}
--	clk_prepare_enable(exynos->susp_clk);
-+	} else
-+		clk_prepare_enable(exynos->susp_clk);
- 
- 	if (of_device_is_compatible(node, "samsung,exynos7-dwusb3")) {
- 		exynos->axius_clk = devm_clk_get(dev, "usbdrd30_axius_clk");
-@@ -196,7 +196,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
- 	regulator_disable(exynos->vdd33);
- err2:
- 	clk_disable_unprepare(exynos->axius_clk);
--	clk_disable_unprepare(exynos->susp_clk);
-+	if (exynos->susp_clk)
-+		clk_disable_unprepare(exynos->susp_clk);
- 	clk_disable_unprepare(exynos->clk);
- 	return ret;
- }
-@@ -210,7 +211,8 @@ static int dwc3_exynos_remove(struct platform_device *pdev)
- 	platform_device_unregister(exynos->usb3_phy);
- 
- 	clk_disable_unprepare(exynos->axius_clk);
--	clk_disable_unprepare(exynos->susp_clk);
-+	if (exynos->susp_clk)
-+		clk_disable_unprepare(exynos->susp_clk);
- 	clk_disable_unprepare(exynos->clk);
- 
- 	regulator_disable(exynos->vdd33);
--- 
-2.7.4
+On Mon, 2017-01-09 at 12:32 -0600, Rob Herring wrote:
+> On Fri, Jan 06, 2017 at 12:06:23AM +0800, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
+> > 
+> > This patch adds documentation for devicetree bindings for
+> > Mediatek IR controller.
+> > 
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/media/mtk-cir.txt          | 23 ++++++++++++++++++++++
+> >  1 file changed, 23 insertions(+)
+> >  create mode 100644 linux-4.8.rc1_p0/Documentation/devicetree/bindings/media/mtk-cir.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/media/mtk-cir.txt b/Documentation/devicetree/bindings/media/mtk-cir.txt
+> > new file mode 100644
+> > index 0000000..bbedd71
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/media/mtk-cir.txt
+> > @@ -0,0 +1,23 @@
+> > +Device-Tree bindings for Mediatek IR controller found in Mediatek SoC family
+> > +
+> > +Required properties:
+> > +- compatible	    : "mediatek,mt7623-ir"
+> > +- clocks	    : list of clock specifiers, corresponding to
+> > +		      entries in clock-names property;
+> > +- clock-names	    : should contain "clk" entries;
+> > +- interrupts	    : should contain IR IRQ number;
+> > +- reg		    : should contain IO map address for IR.
+> > +
+> > +Optional properties:
+> > +- linux,rc-map-name : Remote control map name.
+> 
+> Would 'label' be appropriate here instead? If not, this needs to be 
+> documented in a common location and explained better.
+> 
+I checked with how the way applied in other IR drivers is and found that
+most IR driver also use the same label to identify the scan/key table
+they prefer to use such as gpio-ir-recv, ir-hix5hd2, meson-ir and
+sunxi-cir or use hard coding inside the driver. So I thought it should
+be appropriate here currently.
+
+> > +
+> > +Example:
+> > +
+> > +cir: cir at 0x10013000 {
+> 
+> Drop the '0x'.
+> 
+
+okay, I will.
+
+> > +	compatible = "mediatek,mt7623-ir";
+> > +	reg = <0 0x10013000 0 0x1000>;
+> > +	interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_LOW>;
+> > +	clocks = <&infracfg CLK_INFRA_IRRX>;
+> > +	clock-names = "clk";
+> > +	linux,rc-map-name = "rc-rc6-mce";
+> > +};
+> > -- 
+> > 1.9.1
+> > 
