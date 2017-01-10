@@ -1,95 +1,63 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 Jan 2017 11:54:12 +0000
-Subject: [PATCH v7 15/19] irqdomain: irq_domain_check_msi_remap
-In-Reply-To: <1483969570-3154-16-git-send-email-eric.auger@redhat.com>
-References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
- <1483969570-3154-16-git-send-email-eric.auger@redhat.com>
-Message-ID: <810b8c1d-ec2a-bef0-c771-e93d59d6c5be@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 10 Jan 2017 11:41:19 +0000
+Subject: [PATCH 2/2] arm64: cacheinfo: add support to override cache levels
+ via device tree
+In-Reply-To: <1484048479-19767-1-git-send-email-sudeep.holla@arm.com>
+References: <1484048479-19767-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1484048479-19767-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/17 13:46, Eric Auger wrote:
-> This new function checks whether all MSI irq domains
-> implement IRQ remapping. This is useful to understand
-> whether VFIO passthrough is safe with respect to interrupts.
-> 
-> On ARM typically an MSI controller can sit downstream
-> to the IOMMU without preventing VFIO passthrough.
-> As such any assigned device can write into the MSI doorbell.
-> In case the MSI controller implements IRQ remapping, assigned
-> devices will not be able to trigger interrupts towards the
-> host. On the contrary, the assignment must be emphasized as
-> unsafe with respect to interrupts.
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
-> ---
-> v5 -> v6:
-> - use irq_domain_hierarchical_is_msi_remap()
-> - comment rewording
-> 
-> v4 -> v5:
-> - Handle DOMAIN_BUS_FSL_MC_MSI domains
-> - Check parents
-> ---
->  include/linux/irqdomain.h |  1 +
->  kernel/irq/irqdomain.c    | 23 +++++++++++++++++++++++
->  2 files changed, 24 insertions(+)
-> 
-> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-> index bc2f571..188eced 100644
-> --- a/include/linux/irqdomain.h
-> +++ b/include/linux/irqdomain.h
-> @@ -222,6 +222,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
->  					 void *host_data);
->  extern struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
->  						   enum irq_domain_bus_token bus_token);
-> +extern bool irq_domain_check_msi_remap(void);
->  extern void irq_set_default_host(struct irq_domain *host);
->  extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
->  				  irq_hw_number_t hwirq, int node,
-> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-> index 101ee8f..fff30cb 100644
-> --- a/kernel/irq/irqdomain.c
-> +++ b/kernel/irq/irqdomain.c
-> @@ -278,6 +278,29 @@ struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
->  EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
->  
->  /**
-> + * irq_domain_check_msi_remap - Check whether all MSI
-> + * irq domains implement IRQ remapping
-> + */
-> +bool irq_domain_check_msi_remap(void)
-> +{
-> +	struct irq_domain *h;
-> +	bool ret = true;
-> +
-> +	mutex_lock(&irq_domain_mutex);
-> +	list_for_each_entry(h, &irq_domain_list, link) {
-> +		if (irq_domain_is_msi(h) &&
-> +		    !irq_domain_hierarchical_is_msi_remap(h)) {
-> +			ret = false;
-> +			goto out;
+The cache hierarchy can be identified through Cache Level ID(CLIDR)
+architected system register. However in some cases it will provide
+only the number of cache levels that are integrated into the processor
+itself. In other words, it can't provide any information about the
+caches that are external and/or transparent.
 
-Let's avoid gotos if we can. a break statement will have the same effect
-here, and we can drop the label.
+Some platforms require to export the information about all such external
+caches to the userspace applications via the sysfs interface.
 
-> +		}
-> +	}
-> +out:
-> +	mutex_unlock(&irq_domain_mutex);
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(irq_domain_check_msi_remap);
-> +
-> +/**
->   * irq_set_default_host() - Set a "default" irq domain
->   * @domain: default domain pointer
->   *
-> 
+This patch adds support to override the cache levels using device tree
+to take such external non-architected caches into account.
 
-Thanks,
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ arch/arm64/kernel/cacheinfo.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-	M.
+diff --git a/arch/arm64/kernel/cacheinfo.c b/arch/arm64/kernel/cacheinfo.c
+index 9617301f76b5..fe7738a8c5b1 100644
+--- a/arch/arm64/kernel/cacheinfo.c
++++ b/arch/arm64/kernel/cacheinfo.c
+@@ -84,7 +84,7 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
+ 
+ static int __init_cache_level(unsigned int cpu)
+ {
+-	unsigned int ctype, level, leaves;
++	unsigned int ctype, level, leaves, of_level;
+ 	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+ 
+ 	for (level = 1, leaves = 0; level <= MAX_CACHE_LEVEL; level++) {
+@@ -97,6 +97,17 @@ static int __init_cache_level(unsigned int cpu)
+ 		leaves += (ctype == CACHE_TYPE_SEPARATE) ? 2 : 1;
+ 	}
+ 
++	of_level = of_count_cache_levels(cpu);
++	if (level < of_level) {
++		/*
++		 * some external caches not specified in CLIDR_EL1
++		 * the information may be available in the device tree
++		 * only unified external caches are considered here
++		 */
++		leaves += (of_level - level);
++		level = of_level;
++	}
++
+ 	this_cpu_ci->num_levels = level;
+ 	this_cpu_ci->num_leaves = leaves;
+ 	return 0;
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
