@@ -1,48 +1,78 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 10 Jan 2017 13:44:37 +0000
-Subject: [PATCH] virtio_mmio: Set DMA masks appropriately
-In-Reply-To: <2220292.9CN9cxzsPe@wuerfel>
-References: <50defbbe87d75db85a9d22f914258975d661208a.1484051089.git.robin.murphy@arm.com>
- <2220292.9CN9cxzsPe@wuerfel>
-Message-ID: <c62753e7-2530-6e23-5a6c-77cf8bc92860@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 10 Jan 2017 13:47:01 +0000
+Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
+ enable panel
+In-Reply-To: <252ad888-fa9d-695a-58ed-46806e4374fd@mleia.com>
+References: <20161221032717.13154-1-vz@mleia.com>
+ <CACRpkdZE6VgJA27+Wh=Gxd7yOXpLMyT7yCB2PYA36y0gvosHFQ@mail.gmail.com>
+ <20170102142228.GI14217@n2100.armlinux.org.uk>
+ <252ad888-fa9d-695a-58ed-46806e4374fd@mleia.com>
+Message-ID: <50499352-fa14-64c4-1a74-db4827757a2d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/17 13:15, Arnd Bergmann wrote:
-> On Tuesday, January 10, 2017 12:26:01 PM CET Robin Murphy wrote:
->> @@ -548,6 +550,14 @@ static int virtio_mmio_probe(struct platform_device *pdev)
->>         if (vm_dev->version == 1)
->>                 writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
->>  
->> +       rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
->> +       if (rc)
->> +               rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+Hi Vladimir,
+
+On 07/01/17 23:32, Vladimir Zapolskiy wrote:
+> On 01/02/2017 04:22 PM, Russell King - ARM Linux wrote:
+>> On Fri, Dec 30, 2016 at 09:23:59AM +0100, Linus Walleij wrote:
+>>> On Wed, Dec 21, 2016 at 4:27 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
+>>>
+>>>> The changeset contains a number of cleanups, changed semantics of
+>>>> init_panel() callback, which allows to simplify getting of panel
+>>>> properties from panel device tree node, and a handling of optional
+>>>> "enable-gpios" panel property, the latter is described in
+>>>> display/panel/panel-dpi.txt device tree binding documentation, but
+>>>> it has been unsupported by the ARM CLCD driver.
+>>>>
+>>>> Vladimir Zapolskiy (4):
+>>>>   video: ARM CLCD: sort included headers out alphabetically
+>>>>   video: ARM CLCD: use panel device node for panel initialization
+>>>>   video: ARM CLCD: use panel device node for getting backlight and mode
+>>>>   video: ARM CLCD: add support of an optional GPIO to enable panel
+>>>
+>>> As you may have seen Tomi has stepped down as FBDEV maintainer and
+>>> this subsystem is now orphaned.
+>>>
+>>> I guess Andrew Morton merges patches for it in this case, he usually does.
+>>>
+>>> But what we should actually do is create a new DRM driver for CLCD
+>>> in drivers/gpu/drm/arm/clcd*
+>>>
+>>> It's maybe not a small undertaking :(
+>>>
+>>> But in case you're interested in the job, I will pitch in and test the result
+>>> on all ARM reference designs plus Nomadik.
+>>
+>> A DRM driver for it would probably be a good idea, but dealing with all
+>> the weird and wonderful connection arrangements may not be that easy...
+>>
 > 
-> You don't seem to do anything different when 64-bit DMA is unsupported.
-> How do you prevent the use of kernel buffers that are above the first 4G
-> here?
-
-That's the token "give up and rely on SWIOTLB/IOMMU" point, which as we
-already know won't necessarily work very well (because it's already the
-situation without this patch), but is still arguably better than
-nothing. As I've just replied elsewhere, I personally hate this idiom,
-but it's the done thing given the current DMA mask API.
-
->> +       else if (vm_dev->version == 1)
->> +               dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32 + PAGE_SHIFT));
+> Linus, Russell,
 > 
-> Why is this limitation only for the coherent mask?
+> I've immediately encountered a problem while porting the driver to DRM,
+> because LPC18xx/LPC43xx SoCs are powered by Cortex-M3/M4 cores and DRM
+> framework has build and runtime dependencies on MMU.
 
-AIUI, the "32-bit pointers to pages" limitation of legacy virtio only
-applies to the location of the vring itself, which is allocated via
-dma_alloc_coherent - the descriptors themselves hold full 64-bit
-addresses pointing at the actual data, which is mapped using streaming
-DMA. It relies on the API guarantee that if we've managed to set a
-64-bit streaming mask, then setting a smaller coherent mask cannot fail
-(DMA-API-HOWTO.txt:257)
++Benjamin
 
-This is merely an amalgamation of the logic already in place for
-virtio-pci, I just skimped on duplicating all the rationale (I know
-there's a mail thread somewhere I could probably dig up).
+In another thread Benjamin pointed at patch [1] in drm/kms part for noMMU.
 
-Robin.
+[1] https://cgit.freedesktop.org/drm/drm-misc/commit/?id=62a0d98a188cc4ebd8ea54b37d274ec20465e464
+
+Cheers
+Vladimir
+
+> 
+> That said, in short term I would expect a continuation of support for
+> the legacy CLCD framebuffer driver, which works fine on MMU-less SoCs.
+> 
+> --
+> With best wishes,
+> Vladimir
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
