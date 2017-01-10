@@ -1,245 +1,64 @@
-From: puck.chen@hisilicon.com (Chen Feng)
-Date: Tue, 10 Jan 2017 15:55:15 +0800
-Subject: [V2 2/2] arm64: dts: Add dts files for Hisilicon Hi3660 SoC
-In-Reply-To: <1484034915-48879-1-git-send-email-puck.chen@hisilicon.com>
-References: <1484034915-48879-1-git-send-email-puck.chen@hisilicon.com>
-Message-ID: <1484034915-48879-2-git-send-email-puck.chen@hisilicon.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Tue, 10 Jan 2017 09:08:50 +0100
+Subject: [PATCH v5 0/2] Support for Axentia TSE-850
+Message-ID: <1484035732-31635-1-git-send-email-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial dtsi file to support Hisilicon Hi3660 SoC with
-support of Octal core CPUs in two clusters(4 * A53 & 4 * A73).
+Hi!
 
-Also add dts file to support HiKey960 development board which
-based on Hi3660 SoC.
-The output console is earlycon "earlycon=pl011,0xfdf05000".
-And the con_init uart5 with a fixed clock, which already
-configured at bootloader.
+changes v4 -> v5
+- comment from Rob about the memory node made me look closer and
+  the memory size is actually updated by the bootloader, and that
+  hid the fact that the entry was always faulty. This version
+  specifies the correct memory size from the start, which is 64MB.
+- ack from Rob
 
-When clock is available, the uart5 will be modified.
+changes v3 -> v4
+- rename files arch/arm/boot/dts/axentia-* to .../at91-*
+- remove bootargs from at91-tse850-3.dts
+- depend on the atmel ssc to register as a sound dai by itself
+- bump copyright years
 
-Tested on HiKey960 Board.
+changes v2 -> v3
+- document the new compatible strings prefixed with "axentia,".
 
-Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
----
- arch/arm64/boot/dts/hisilicon/Makefile            |   1 +
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  34 +++++
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 156 ++++++++++++++++++++++
- 3 files changed, 191 insertions(+)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+changes v1 -> v2
+- squash the fixup into the correct patch, sorry for the noise.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/Makefile b/arch/arm64/boot/dts/hisilicon/Makefile
-index c8b8f80..7aee1f3 100644
---- a/arch/arm64/boot/dts/hisilicon/Makefile
-+++ b/arch/arm64/boot/dts/hisilicon/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb
-+dtb-$(CONFIG_ARCH_HISI) += hi3660-hikey960.dtb
- dtb-$(CONFIG_ARCH_HISI) += hip05-d02.dtb
- dtb-$(CONFIG_ARCH_HISI) += hip06-d03.dtb
- dtb-$(CONFIG_ARCH_HISI) += hip07-d05.dtb
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-new file mode 100644
-index 0000000..bc5399d
---- /dev/null
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-@@ -0,0 +1,34 @@
-+/*
-+ * dts file for Hisilicon HiKey960 Development Board
-+ *
-+ * Copyright (C) 2016, Hisilicon Ltd.
-+ *
-+ */
-+
-+/dts-v1/;
-+
-+#include "hi3660.dtsi"
-+
-+/ {
-+	model = "HiKey960";
-+	compatible = "hisilicon,hi3660";
-+
-+	aliases {
-+		serial5 = &uart5;       /* console UART */
-+	};
-+
-+	chosen {
-+		stdout-path = "serial5:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x00400000 0x0 0xbfe00000>;
-+	};
-+
-+	soc {
-+		uart5: uart at fdf05000 {
-+			status = "ok";
-+		};
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-new file mode 100644
-index 0000000..7f9805c
---- /dev/null
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -0,0 +1,156 @@
-+/*
-+ * dts file for Hisilicon Hi3660 SoC
-+ *
-+ * Copyright (C) 2016, Hisilicon Ltd.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "hisilicon,hi3660";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu-map {
-+			cluster0 {
-+				core0 {
-+					cpu = <&cpu0>;
-+				};
-+				core1 {
-+					cpu = <&cpu1>;
-+				};
-+				core2 {
-+					cpu = <&cpu2>;
-+				};
-+				core3 {
-+					cpu = <&cpu3>;
-+				};
-+			};
-+			cluster1 {
-+				core0 {
-+					cpu = <&cpu4>;
-+				};
-+				core1 {
-+					cpu = <&cpu5>;
-+				};
-+				core2 {
-+					cpu = <&cpu6>;
-+				};
-+				core3 {
-+					cpu = <&cpu7>;
-+				};
-+			};
-+		};
-+
-+		cpu0: cpu at 0 {
-+			compatible = "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x0>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu1: cpu at 1 {
-+			compatible = "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x1>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu2: cpu at 2 {
-+			compatible = "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x2>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu3: cpu at 3 {
-+			compatible = "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x3>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu4: cpu at 100 {
-+			compatible = "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x100>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu5: cpu at 101 {
-+			compatible = "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x101>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu6: cpu at 102 {
-+			compatible = "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x102>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu7: cpu at 103 {
-+			compatible = "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x103>;
-+			enable-method = "psci";
-+		};
-+	};
-+
-+	gic: interrupt-controller at e82b0000 {
-+		compatible = "arm,gic-400";
-+		reg = <0x0 0xe82b1000 0 0x1000>, /* GICD */
-+		      <0x0 0xe82b2000 0 0x2000>, /* GICC */
-+		      <0x0 0xe82b4000 0 0x2000>, /* GICH */
-+		      <0x0 0xe82b6000 0 0x2000>; /* GICV */
-+		#address-cells = <0>;
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
-+		clock-frequency = <1920000>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		fixed_uart5: fixed_19_2M {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <19200000>;
-+			clock-output-names = "fixed:uart5";
-+		};
-+
-+		uart5: uart at fdf05000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x0 0xfdf05000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&fixed_uart5 &fixed_uart5>;
-+			clock-names = "uartclk", "apb_pclk";
-+			status = "ok";
-+		};
-+	};
-+};
+After finally having all essintial drivers upstreamed I would
+like to have the dts and the defconfig also upstreamed.
+
+The atmel-ssc/sound-dai change depends on a change that has been
+sitting in the ASoC tree since mid-december, and I have been waiting
+for it to hit linux-next before sending this, but it seems to take
+longer than I anticipated. So, since I do not want this to in
+turn miss the next merge window because of that wait I therefore
+request that this is taken now even though it doesn't really work
+w/o the ASoC "topic/atmel" branch as of 2016-12-15 [1]. It of course
+builds cleanly even w/o those ASoC changes. That effectively means
+that noone besides me should notice the inconsistency (I currently
+have all affected devices under my control).
+
+Cheers,
+peda
+
+[1] http://git.kernel.org/cgit/linux/kernel/git/broonie/sound.git/log/?h=topic/atmel
+
+Peter Rosin (2):
+  ARM: dts: at91: add devicetree for the Axentia TSE-850
+  ARM: sama5_defconfig: add support for the Axentia TSE-850 board
+
+ Documentation/devicetree/bindings/arm/axentia.txt |  19 ++
+ MAINTAINERS                                       |   8 +
+ arch/arm/boot/dts/Makefile                        |   1 +
+ arch/arm/boot/dts/at91-linea.dtsi                 |  53 +++++
+ arch/arm/boot/dts/at91-tse850-3.dts               | 274 ++++++++++++++++++++++
+ arch/arm/configs/sama5_defconfig                  |   7 +-
+ 6 files changed, 361 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/axentia.txt
+ create mode 100644 arch/arm/boot/dts/at91-linea.dtsi
+ create mode 100644 arch/arm/boot/dts/at91-tse850-3.dts
+
 -- 
-1.9.1
+2.1.4
