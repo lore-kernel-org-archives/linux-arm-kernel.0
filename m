@@ -1,81 +1,43 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 10 Jan 2017 13:35:44 -0800
-Subject: [PATCHv7 05/11] mm/kasan: Switch to using __pa_symbol and lm_alias
+Date: Tue, 10 Jan 2017 13:35:45 -0800
+Subject: [PATCHv7 06/11] mm/usercopy: Switch to using lm_alias
 In-Reply-To: <1484084150-1523-1-git-send-email-labbott@redhat.com>
 References: <1484084150-1523-1-git-send-email-labbott@redhat.com>
-Message-ID: <1484084150-1523-6-git-send-email-labbott@redhat.com>
+Message-ID: <1484084150-1523-7-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-__pa_symbol is the correct API to find the physical address of symbols.
-Switch to it to allow for debugging APIs to work correctly. Other
-functions such as p*d_populate may call __pa internally. Ensure that the
-address passed is in the linear region by calling lm_alias.
+The usercopy checking code currently calls __va(__pa(...)) to check for
+aliases on symbols. Switch to using lm_alias instead.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Kees Cook <keescook@chromium.org>
 Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
- mm/kasan/kasan_init.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ mm/usercopy.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/mm/kasan/kasan_init.c b/mm/kasan/kasan_init.c
-index 3f9a41c..31238da 100644
---- a/mm/kasan/kasan_init.c
-+++ b/mm/kasan/kasan_init.c
-@@ -15,6 +15,7 @@
- #include <linux/kasan.h>
- #include <linux/kernel.h>
- #include <linux/memblock.h>
-+#include <linux/mm.h>
- #include <linux/pfn.h>
+diff --git a/mm/usercopy.c b/mm/usercopy.c
+index 3c8da0a..8345299 100644
+--- a/mm/usercopy.c
++++ b/mm/usercopy.c
+@@ -108,13 +108,13 @@ static inline const char *check_kernel_text_object(const void *ptr,
+ 	 * __pa() is not just the reverse of __va(). This can be detected
+ 	 * and checked:
+ 	 */
+-	textlow_linear = (unsigned long)__va(__pa(textlow));
++	textlow_linear = (unsigned long)lm_alias(textlow);
+ 	/* No different mapping: we're done. */
+ 	if (textlow_linear == textlow)
+ 		return NULL;
  
- #include <asm/page.h>
-@@ -49,7 +50,7 @@ static void __init zero_pte_populate(pmd_t *pmd, unsigned long addr,
- 	pte_t *pte = pte_offset_kernel(pmd, addr);
- 	pte_t zero_pte;
- 
--	zero_pte = pfn_pte(PFN_DOWN(__pa(kasan_zero_page)), PAGE_KERNEL);
-+	zero_pte = pfn_pte(PFN_DOWN(__pa_symbol(kasan_zero_page)), PAGE_KERNEL);
- 	zero_pte = pte_wrprotect(zero_pte);
- 
- 	while (addr + PAGE_SIZE <= end) {
-@@ -69,7 +70,7 @@ static void __init zero_pmd_populate(pud_t *pud, unsigned long addr,
- 		next = pmd_addr_end(addr, end);
- 
- 		if (IS_ALIGNED(addr, PMD_SIZE) && end - addr >= PMD_SIZE) {
--			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-+			pmd_populate_kernel(&init_mm, pmd, lm_alias(kasan_zero_pte));
- 			continue;
- 		}
- 
-@@ -92,9 +93,9 @@ static void __init zero_pud_populate(pgd_t *pgd, unsigned long addr,
- 		if (IS_ALIGNED(addr, PUD_SIZE) && end - addr >= PUD_SIZE) {
- 			pmd_t *pmd;
- 
--			pud_populate(&init_mm, pud, kasan_zero_pmd);
-+			pud_populate(&init_mm, pud, lm_alias(kasan_zero_pmd));
- 			pmd = pmd_offset(pud, addr);
--			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-+			pmd_populate_kernel(&init_mm, pmd, lm_alias(kasan_zero_pte));
- 			continue;
- 		}
- 
-@@ -135,11 +136,11 @@ void __init kasan_populate_zero_shadow(const void *shadow_start,
- 			 * puds,pmds, so pgd_populate(), pud_populate()
- 			 * is noops.
- 			 */
--			pgd_populate(&init_mm, pgd, kasan_zero_pud);
-+			pgd_populate(&init_mm, pgd, lm_alias(kasan_zero_pud));
- 			pud = pud_offset(pgd, addr);
--			pud_populate(&init_mm, pud, kasan_zero_pmd);
-+			pud_populate(&init_mm, pud, lm_alias(kasan_zero_pmd));
- 			pmd = pmd_offset(pud, addr);
--			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-+			pmd_populate_kernel(&init_mm, pmd, lm_alias(kasan_zero_pte));
- 			continue;
- 		}
+ 	/* Check the secondary mapping... */
+-	texthigh_linear = (unsigned long)__va(__pa(texthigh));
++	texthigh_linear = (unsigned long)lm_alias(texthigh);
+ 	if (overlaps(ptr, n, textlow_linear, texthigh_linear))
+ 		return "<linear kernel text>";
  
 -- 
 2.7.4
