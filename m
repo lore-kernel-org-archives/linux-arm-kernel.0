@@ -1,141 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 Jan 2017 11:50:14 +0000
-Subject: [PATCH v7 13/19] irqdomain: Add irq domain MSI and MSI_REMAP flags
-In-Reply-To: <1483969570-3154-14-git-send-email-eric.auger@redhat.com>
-References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
- <1483969570-3154-14-git-send-email-eric.auger@redhat.com>
-Message-ID: <fc33abb4-21a3-c94d-9417-4022e33217f8@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 10 Jan 2017 11:50:36 +0000
+Subject: [QUESTION] Arm64: Query L3 cache info via DT
+In-Reply-To: <5874BD6C.7060008@huawei.com>
+References: <58633494.9030708@huawei.com>
+ <81784854-11f8-468a-a280-69be0a714a3b@arm.com> <5874A03A.9000901@huawei.com>
+ <536f64cc-357c-40a1-b2a0-1db0c4280fc0@arm.com> <5874BD6C.7060008@huawei.com>
+Message-ID: <913e50ac-5040-8a91-539b-136ed7cde1e3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
 
-On 09/01/17 13:46, Eric Auger wrote:
-> We introduce two new enum values for the irq domain flag:
-> - IRQ_DOMAIN_FLAG_MSI indicates the irq domain corresponds to
->   an MSI domain
-> - IRQ_DOMAIN_FLAG_MSI_REMAP indicates the irq domain has MSI
->   remapping capabilities.
-> 
-> Those values will be useful to check all MSI irq domains have
-> MSI remapping support when assessing the safety of IRQ assignment
-> to a guest.
-> 
-> irq_domain_hierarchical_is_msi_remap() allows to check if an
-> irq domain or any parent implements MSI remapping.
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
-> ---
-> 
-> v6:
-> - add IRQ_DOMAIN_FLAG_MSI as suggested by Marc
-> - add irq_domain_is_msi, irq_domain_is_msi_remap and
->   irq_domain_hierarchical_is_msi_remap
-> ---
->  include/linux/irqdomain.h | 35 +++++++++++++++++++++++++++++++++++
->  kernel/irq/irqdomain.c    | 16 ++++++++++++++++
->  2 files changed, 51 insertions(+)
-> 
-> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-> index ffb8460..bc2f571 100644
-> --- a/include/linux/irqdomain.h
-> +++ b/include/linux/irqdomain.h
-> @@ -183,6 +183,12 @@ enum {
->  	/* Irq domain is an IPI domain with single virq */
->  	IRQ_DOMAIN_FLAG_IPI_SINGLE	= (1 << 3),
->  
-> +	/* Irq domain implements MSIs */
-> +	IRQ_DOMAIN_FLAG_MSI		= (1 << 4),
-> +
-> +	/* Irq domain implements MSI remapping */
-> +	IRQ_DOMAIN_FLAG_MSI_REMAP	= (1 << 5),
-> +
->  	/*
->  	 * Flags starting from IRQ_DOMAIN_FLAG_NONCORE are reserved
->  	 * for implementation specific purposes and ignored by the
-> @@ -446,6 +452,19 @@ static inline bool irq_domain_is_ipi_single(struct irq_domain *domain)
->  {
->  	return domain->flags & IRQ_DOMAIN_FLAG_IPI_SINGLE;
->  }
-> +
-> +static inline bool irq_domain_is_msi(struct irq_domain *domain)
-> +{
-> +	return domain->flags & IRQ_DOMAIN_FLAG_MSI;
-> +}
-> +
-> +static inline bool irq_domain_is_msi_remap(struct irq_domain *domain)
-> +{
-> +	return domain->flags & IRQ_DOMAIN_FLAG_MSI_REMAP;
-> +}
-> +
-> +extern bool irq_domain_hierarchical_is_msi_remap(struct irq_domain *domain);
-> +
->  #else	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
->  static inline void irq_domain_activate_irq(struct irq_data *data) { }
->  static inline void irq_domain_deactivate_irq(struct irq_data *data) { }
-> @@ -477,6 +496,22 @@ static inline bool irq_domain_is_ipi_single(struct irq_domain *domain)
->  {
->  	return false;
->  }
-> +
-> +static inline bool irq_domain_is_msi(struct irq_domain *domain)
-> +{
-> +	return false;
-> +}
-> +
-> +static inline bool irq_domain_is_msi_remap(struct irq_domain *domain)
-> +{
-> +	return false;
-> +}
-> +
-> +static inline bool
-> +irq_domain_hierarchical_is_msi_remap(struct irq_domain *domain)
-> +{
-> +	return false;
-> +}
->  #endif	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
->  
->  #else /* CONFIG_IRQ_DOMAIN */
-> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-> index 8c0a0ae..101ee8f 100644
-> --- a/kernel/irq/irqdomain.c
-> +++ b/kernel/irq/irqdomain.c
-> @@ -1392,6 +1392,22 @@ static void irq_domain_check_hierarchy(struct irq_domain *domain)
->  	if (domain->ops->alloc)
->  		domain->flags |= IRQ_DOMAIN_FLAG_HIERARCHY;
->  }
-> +
-> +/**
-> + * irq_domain_hierarchical_is_msi_remap - Check if the domain or any
-> + * parent has MSI remapping support
-> + * @domain: domain pointer
-> + */
-> +bool irq_domain_hierarchical_is_msi_remap(struct irq_domain *domain)
-> +{
-> +	struct irq_domain *h = domain;
-> +
-> +	for (; h; h = h->parent) {
-> +		if (irq_domain_is_msi_remap(h))
 
-nit: Why do you need to go via this extra 'h' variable?
-
-	for (; domain; domain = domain->parent) {
-		if (irq_domain_is_msi_remap(domain))
-
-should work just as well.
-
-> +			return true;
-> +	}
-> +	return false;
-> +}
->  #else	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
->  /**
->   * irq_domain_get_irq_data - Get irq_data associated with @virq and @domain
+On 10/01/17 10:54, Tan Xiaojun wrote:
+> On 2017/1/10 18:01, Sudeep Holla wrote:
+>>
+>>
+>> On 10/01/17 08:50, Tan Xiaojun wrote:
+>>> I add this patch, and test in Hisilicon D02/D03. It can work well.
+>>>
+>>> I'm sorry to reply so late. I took some time to debug, because I am not familiar with the code.
+>>>
+>>>> +	if (level < of_level) {
+>>>> +		/*
+>>>> +		 * some external caches not specified in CLIDR_EL1
+>>>> +		 * the information may be available in the device tree
+>>>> +		 * only unified external caches are considered here
+>>>> +		 */
+>>>> +		level = of_level;
+>>>> +		leaves += (of_level - level);
+>>>
+>>> The above two lines need to exchange the location.
+>>>
+>>
+>> Ah crap, sorry for such a silly mistake.
+>> I will post proper patch(es) soon.
+>>
+> 
+> OK. Wait for your new patch. ^_^
 > 
 
-Thanks,
+Thanks, I have posted the patches[1] and Cc-ed you on them. It would be
+good to get Tested-by once you check.
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Sudeep
+
+[1]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/478261.html
