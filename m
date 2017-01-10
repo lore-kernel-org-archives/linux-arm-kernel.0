@@ -1,74 +1,73 @@
-From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Tue, 10 Jan 2017 15:10:36 -0500
-Subject: [RFC 8/8] KVM: arm/arm64: Emulate the EL1 phys timer register
- access
-In-Reply-To: <20170110194040.GP4348@cbox>
-References: <1482772326-29110-1-git-send-email-jintack@cs.columbia.edu>
- <1482772326-29110-9-git-send-email-jintack@cs.columbia.edu>
- <20170109121612.GG4348@cbox>
- <CAHyh4xhNUTuzaf=JJKidHj1fnOgoe_8aTZamnnGsc6C+iKL1BA@mail.gmail.com>
- <20170110194040.GP4348@cbox>
-Message-ID: <CAHyh4xhxLr9ngh2YeERUSjzyv2S0bk6MqcNjP555vRGLEZDieA@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 10 Jan 2017 12:12:27 -0800
+Subject: [PATCH net-next 0/8] net: dsa: Support for pdata in dsa2
+Message-ID: <20170110201235.21771-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 2:40 PM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Tue, Jan 10, 2017 at 12:36:36PM -0500, Jintack Lim wrote:
->> On Mon, Jan 9, 2017 at 7:16 AM, Christoffer Dall
->> <christoffer.dall@linaro.org> wrote:
->> > On Mon, Dec 26, 2016 at 12:12:06PM -0500, Jintack Lim wrote:
->> >> Emulate read and write operations to CNTP_TVAL, CNTP_CVAL and CNTP_CTL.
->> >> Now the VM is able to use the EL1 physical timer.
->> >>
->> >> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
->> >> ---
->> >>  arch/arm64/kvm/sys_regs.c    | 35 ++++++++++++++++++++++++++++++++---
->> >>  include/kvm/arm_arch_timer.h |  3 +++
->> >>  virt/kvm/arm/arch_timer.c    |  4 ++--
->> >>  3 files changed, 37 insertions(+), 5 deletions(-)
->> >>
->> >> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->> >> index fd9e747..7cef94f 100644
->> >> --- a/arch/arm64/kvm/sys_regs.c
->> >> +++ b/arch/arm64/kvm/sys_regs.c
->> >> @@ -824,7 +824,15 @@ static bool access_cntp_tval(struct kvm_vcpu *vcpu,
->> >>               struct sys_reg_params *p,
->> >>               const struct sys_reg_desc *r)
->> >>  {
->> >> -     kvm_inject_undefined(vcpu);
->> >> +     struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
->> >> +     cycle_t now = kvm_phys_timer_read();
->> >> +
->> >> +     if (p->is_write) {
->> >> +             ptimer->cnt_cval = p->regval + now;
->> >> +             kvm_timer_emulate(vcpu, ptimer);
->> >
->> > Hmm, do we really need those calls here?
->> >
->> > I guess I'm a little confused about exactly what the kvm_timer_emulate()
->> > function is supposed to do, and it feels to me like these handlers
->> > should just record what the guest is asking the kernel to do and the
->> > logic of handling the additional timer should be moved into the run path
->> > as much as possible.
->>
->> I think it's a design decision. As you suggested, it's simple to do
->> set up the background timer on entry to the VM, cancel it on exit, but
->> since that's on the critical path it may have some impact on the
->> performance, especially the world switch cost. To avoid
->> canceling/setting up timer every world switch, I choose to schedule
->> the physical timer here. I haven't compared the cost of the two
->> alternatives, though.
->>
->
-> I'd definitely like to avoid us scheduling soft timers on the host if
-> that's not even necessary in the first place, so I'd like to get that
-> clear first, and as I said on the previous patch I think it's better to
-> get a working solution that we understand firt, and then optimize on
-> that later based on real results.
+Hi all,
 
-Ok, it makes sense. I'll respin!
+This is not exactly new, and was sent before, although back then, I did not
+have an user of the pre-declared MDIO board information, but now we do. Note
+that I have additional changes queued up to have b53 register platform data for
+MIPS bcm47xx and bcm63xx.
 
->
-> -Christoffer
->
+Yes I know that we should have the Orion platforms eventually be converted to
+Device Tree, but until that happens, I don't want any remaining users of the
+old "dsa" platform device (hence the previous DTS submissions for ARM/mvebu)
+and, there will be platforms out there that most likely won't never see DT
+coming their way (BCM47xx is almost 100% sure, BCM63xx maybe not in a distant
+future).
+
+We would probably want the whole series to be merged via David Miller's tree
+to simplify things.
+
+Thanks!
+
+Changes from last submission (few months back):
+
+- rebased against latest net-next
+
+- do not introduce dsa2_platform_data which was overkill and was meant to
+  allow us to do exaclty the same things with platform data and Device Tree
+  we use the existing dsa_platform_data instead
+
+- properly register MDIO devices when the MDIO bus is registered and associate
+  platform_data with them
+
+- add a change to the Orion platform code to demonstrate how this can be used
+
+Thank you
+
+Florian Fainelli (8):
+  net: dsa: Pass device pointer to dsa_register_switch
+  net: dsa: Make most functions take a dsa_port argument
+  net: dsa: Suffix function manipulating device_node with _dn
+  net: dsa: Move ports assignment closer to error checking
+  net: dsa: Export dev_to_net_device()
+  net: dsa: Add support for platform data
+  net: phy: Allow pre-declaration of MDIO devices
+  ARM: orion: Register DSA switch as a MDIO device
+
+ arch/arm/plat-orion/common.c     |  19 ++++-
+ drivers/net/dsa/b53/b53_common.c |   2 +-
+ drivers/net/dsa/mv88e6xxx/chip.c |   8 +-
+ drivers/net/dsa/qca8k.c          |   2 +-
+ drivers/net/phy/Makefile         |   3 +-
+ drivers/net/phy/mdio-boardinfo.c |  86 ++++++++++++++++++++
+ drivers/net/phy/mdio-boardinfo.h |  19 +++++
+ drivers/net/phy/mdio_bus.c       |   5 ++
+ drivers/net/phy/mdio_device.c    |  11 +++
+ include/linux/mdio.h             |   3 +
+ include/linux/mod_devicetable.h  |   1 +
+ include/linux/phy.h              |  19 +++++
+ include/net/dsa.h                |   4 +-
+ net/dsa/dsa.c                    |  18 +++--
+ net/dsa/dsa2.c                   | 169 +++++++++++++++++++++++++++------------
+ net/dsa/dsa_priv.h               |   4 +-
+ 16 files changed, 301 insertions(+), 72 deletions(-)
+ create mode 100644 drivers/net/phy/mdio-boardinfo.c
+ create mode 100644 drivers/net/phy/mdio-boardinfo.h
+
+-- 
+2.9.3
