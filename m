@@ -1,54 +1,95 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 10 Jan 2017 11:51:33 +0000
-Subject: [PATCH v2] arm64: do not set dma masks that device connection
- can't handle
-In-Reply-To: <1483947002-16410-1-git-send-email-nikita.yoush@cogentembedded.com>
-References: <1483947002-16410-1-git-send-email-nikita.yoush@cogentembedded.com>
-Message-ID: <20170110115132.GD21598@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 10 Jan 2017 11:54:12 +0000
+Subject: [PATCH v7 15/19] irqdomain: irq_domain_check_msi_remap
+In-Reply-To: <1483969570-3154-16-git-send-email-eric.auger@redhat.com>
+References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
+ <1483969570-3154-16-git-send-email-eric.auger@redhat.com>
+Message-ID: <810b8c1d-ec2a-bef0-c771-e93d59d6c5be@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 10:30:02AM +0300, Nikita Yushchenko wrote:
-> It is possible that device is capable of 64-bit DMA addresses, and
-> device driver tries to set wide DMA mask, but bridge or bus used to
-> connect device to the system can't handle wide addresses.
+On 09/01/17 13:46, Eric Auger wrote:
+> This new function checks whether all MSI irq domains
+> implement IRQ remapping. This is useful to understand
+> whether VFIO passthrough is safe with respect to interrupts.
 > 
-> With swiotlb, memory above 4G still can be used by drivers for streaming
-> DMA, but *dev->mask and dev->dma_coherent_mask must still keep values
-> that hardware handles physically.
+> On ARM typically an MSI controller can sit downstream
+> to the IOMMU without preventing VFIO passthrough.
+> As such any assigned device can write into the MSI doorbell.
+> In case the MSI controller implements IRQ remapping, assigned
+> devices will not be able to trigger interrupts towards the
+> host. On the contrary, the assignment must be emphasized as
+> unsafe with respect to interrupts.
 > 
-> This patch enforces that. Based on original version by
-> Arnd Bergmann <arnd@arndb.de>, extended with coherent mask hadnling.
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
 > 
-> Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
-> CC: Arnd Bergmann <arnd@arndb.de>
 > ---
-> Changes since v1:
-> - fixed issues noted by Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->   - save mask, not size
->   - remove doube empty line
+> v5 -> v6:
+> - use irq_domain_hierarchical_is_msi_remap()
+> - comment rewording
 > 
->  arch/arm64/Kconfig              |  3 +++
->  arch/arm64/include/asm/device.h |  1 +
->  arch/arm64/mm/dma-mapping.c     | 51 +++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 55 insertions(+)
+> v4 -> v5:
+> - Handle DOMAIN_BUS_FSL_MC_MSI domains
+> - Check parents
+> ---
+>  include/linux/irqdomain.h |  1 +
+>  kernel/irq/irqdomain.c    | 23 +++++++++++++++++++++++
+>  2 files changed, 24 insertions(+)
+> 
+> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+> index bc2f571..188eced 100644
+> --- a/include/linux/irqdomain.h
+> +++ b/include/linux/irqdomain.h
+> @@ -222,6 +222,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
+>  					 void *host_data);
+>  extern struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+>  						   enum irq_domain_bus_token bus_token);
+> +extern bool irq_domain_check_msi_remap(void);
+>  extern void irq_set_default_host(struct irq_domain *host);
+>  extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
+>  				  irq_hw_number_t hwirq, int node,
+> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> index 101ee8f..fff30cb 100644
+> --- a/kernel/irq/irqdomain.c
+> +++ b/kernel/irq/irqdomain.c
+> @@ -278,6 +278,29 @@ struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+>  EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
+>  
+>  /**
+> + * irq_domain_check_msi_remap - Check whether all MSI
+> + * irq domains implement IRQ remapping
+> + */
+> +bool irq_domain_check_msi_remap(void)
+> +{
+> +	struct irq_domain *h;
+> +	bool ret = true;
+> +
+> +	mutex_lock(&irq_domain_mutex);
+> +	list_for_each_entry(h, &irq_domain_list, link) {
+> +		if (irq_domain_is_msi(h) &&
+> +		    !irq_domain_hierarchical_is_msi_remap(h)) {
+> +			ret = false;
+> +			goto out;
 
-I still don't think this patch is general enough. The problem you're seeing
-with swiotlb seems to be exactly the same problem reported by Feng Kan over
-at:
+Let's avoid gotos if we can. a break statement will have the same effect
+here, and we can drop the label.
 
-  http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
+> +		}
+> +	}
+> +out:
+> +	mutex_unlock(&irq_domain_mutex);
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(irq_domain_check_msi_remap);
+> +
+> +/**
+>   * irq_set_default_host() - Set a "default" irq domain
+>   * @domain: default domain pointer
+>   *
+> 
 
-[read on; it was initially thought to be a hardware erratum, but it's
- actually the inability to restrict the DMA mask of the endpoint that's
- the problem]
+Thanks,
 
-The point here is that an IOMMU doesn't solve your issue, and the
-IOMMU-backed DMA ops need the same treatment. In light of that, it really
-feels to me like the DMA masks should be restricted in of_dma_configure
-so that the parent mask is taken into account there, rather than hook
-into each set of DMA ops to intercept set_dma_mask. We'd still need to
-do something to stop dma_set_mask widening the mask if it was restricted
-by of_dma_configure, but I think Robin (cc'd) was playing with that.
-
-Will
+	M.
+-- 
+Jazz is not dead. It just smells funny...
