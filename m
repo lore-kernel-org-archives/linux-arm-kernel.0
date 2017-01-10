@@ -1,331 +1,202 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 10 Jan 2017 14:19:18 +0530
-Subject: [PATCH v5 3/3] dmaengine: xilinx_dma: Fix race condition in the
- driver for multiple descriptor scenario
-In-Reply-To: <1483771530-8545-4-git-send-email-appanad@xilinx.com>
-References: <1483771530-8545-1-git-send-email-appanad@xilinx.com>
- <1483771530-8545-4-git-send-email-appanad@xilinx.com>
-Message-ID: <20170110084917.GA3573@localhost>
+From: tanxiaojun@huawei.com (Tan Xiaojun)
+Date: Tue, 10 Jan 2017 16:50:02 +0800
+Subject: [QUESTION] Arm64: Query L3 cache info via DT
+In-Reply-To: <81784854-11f8-468a-a280-69be0a714a3b@arm.com>
+References: <58633494.9030708@huawei.com>
+ <81784854-11f8-468a-a280-69be0a714a3b@arm.com>
+Message-ID: <5874A03A.9000901@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 07, 2017 at 12:15:30PM +0530, Kedareswara rao Appana wrote:
-> When driver is handling AXI DMA SoftIP
-> When user submits multiple descriptors back to back on the S2MM(recv)
-> side with the current driver flow the last buffer descriptor next bd
-> points to a invalid location resulting the invalid data or errors in the
-> DMA engine.
+I add this patch, and test in Hisilicon D02/D03. It can work well.
 
-Can you rephrase this, it a bit hard to understand.
+I'm sorry to reply so late. I took some time to debug, because I am not familiar with the code.
 
-> 
-> This patch fixes this issue by creating a BD Chain during
+> +	if (level < of_level) {
+> +		/*
+> +		 * some external caches not specified in CLIDR_EL1
+> +		 * the information may be available in the device tree
+> +		 * only unified external caches are considered here
+> +		 */
+> +		level = of_level;
+> +		leaves += (of_level - level);
 
-whats a BD?
+The above two lines need to exchange the location.
 
-> channel allocation itself and use those BD's.
-> 
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> ---
-> Changes for v5:
-> ---> None.
-> Changes for v4:
-> ---> None.
-> Changes for v3:
-> ---> None.
-> Changes for v2:
-> ---> None.
-> 
->  drivers/dma/xilinx/xilinx_dma.c | 133 +++++++++++++++++++++++++---------------
->  1 file changed, 83 insertions(+), 50 deletions(-)
-> 
-> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-> index 0e9c02e..af2159d 100644
-> --- a/drivers/dma/xilinx/xilinx_dma.c
-> +++ b/drivers/dma/xilinx/xilinx_dma.c
-> @@ -163,6 +163,7 @@
->  #define XILINX_DMA_BD_SOP		BIT(27)
->  #define XILINX_DMA_BD_EOP		BIT(26)
->  #define XILINX_DMA_COALESCE_MAX		255
-> +#define XILINX_DMA_NUM_DESCS		255
-
-why 255?
-
->  #define XILINX_DMA_NUM_APP_WORDS	5
->  
->  /* Multi-Channel DMA Descriptor offsets*/
-> @@ -310,6 +311,7 @@ struct xilinx_dma_tx_descriptor {
->   * @pending_list: Descriptors waiting
->   * @active_list: Descriptors ready to submit
->   * @done_list: Complete descriptors
-> + * @free_seg_list: Free descriptors
->   * @common: DMA common channel
->   * @desc_pool: Descriptors pool
->   * @dev: The dma device
-> @@ -331,7 +333,9 @@ struct xilinx_dma_tx_descriptor {
->   * @desc_submitcount: Descriptor h/w submitted count
->   * @residue: Residue for AXI DMA
->   * @seg_v: Statically allocated segments base
-> + * @seg_p: Physical allocated segments base
->   * @cyclic_seg_v: Statically allocated segment base for cyclic transfers
-> + * @cyclic_seg_p: Physical allocated segments base for cyclic dma
->   * @start_transfer: Differentiate b/w DMA IP's transfer
->   */
->  struct xilinx_dma_chan {
-> @@ -342,6 +346,7 @@ struct xilinx_dma_chan {
->  	struct list_head pending_list;
->  	struct list_head active_list;
->  	struct list_head done_list;
-> +	struct list_head free_seg_list;
->  	struct dma_chan common;
->  	struct dma_pool *desc_pool;
->  	struct device *dev;
-> @@ -363,7 +368,9 @@ struct xilinx_dma_chan {
->  	u32 desc_submitcount;
->  	u32 residue;
->  	struct xilinx_axidma_tx_segment *seg_v;
-> +	dma_addr_t seg_p;
->  	struct xilinx_axidma_tx_segment *cyclic_seg_v;
-> +	dma_addr_t cyclic_seg_p;
->  	void (*start_transfer)(struct xilinx_dma_chan *chan);
->  	u16 tdest;
->  };
-> @@ -569,17 +576,31 @@ static struct xilinx_axidma_tx_segment *
->  xilinx_axidma_alloc_tx_segment(struct xilinx_dma_chan *chan)
->  {
->  	struct xilinx_axidma_tx_segment *segment;
-> -	dma_addr_t phys;
-> -
-> -	segment = dma_pool_zalloc(chan->desc_pool, GFP_ATOMIC, &phys);
-> -	if (!segment)
-> -		return NULL;
-> +	unsigned long flags;
->  
-> -	segment->phys = phys;
-> +	spin_lock_irqsave(&chan->lock, flags);
-> +	if (!list_empty(&chan->free_seg_list)) {
-> +		segment = list_first_entry(&chan->free_seg_list,
-> +					   struct xilinx_axidma_tx_segment,
-> +					   node);
-> +		list_del(&segment->node);
 > +	}
-> +	spin_unlock_irqrestore(&chan->lock, flags);
->  
->  	return segment;
+
+
+PS: I will test the other scenes, the next step.
+
+Thanks.
+Xiaojun.
+
+----------------------------------------------------------------------------
+D02:
+root at genericarmv8:~# cat /sys/devices/system/cpu/cpu0/cache/index3/size
+16384K
+root at genericarmv8:~# cat /sys/devices/system/cpu/cpu0/cache/index3/number_of_sets
+4096
+root at genericarmv8:~# cat /sys/devices/system/cpu/cpu0/cache/index3/coherency_line_size
+64
+root at genericarmv8:~# cat /sys/devices/system/cpu/cpu0/cache/index3/level
+3
+root at genericarmv8:~# cat /sys/devices/system/cpu/cpu0/cache/index3/shared_cpu_list
+0-15
+root at genericarmv8:~# cat /sys/devices/system/cpu/cpu0/cache/index3/shared_cpu_map
+ffff
+
+----------------------------------------------------------------------------
+D02 (some data may be not accurate):
+diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+index 4b472a3..aac18c2 100644
+--- a/arch/arm64/boot/dts/hisilicon/hip05.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+@@ -215,18 +215,30 @@
+
+                cluster0_l2: l2-cache0 {
+                        compatible = "cache";
++                       next-level-cache = <&die0_l3c>;
+                };
+
+                cluster1_l2: l2-cache1 {
+                        compatible = "cache";
++                       next-level-cache = <&die0_l3c>;
+                };
+
+                cluster2_l2: l2-cache2 {
+                        compatible = "cache";
++                       next-level-cache = <&die0_l3c>;
+                };
+
+                cluster3_l2: l2-cache3 {
+                        compatible = "cache";
++                       next-level-cache = <&die0_l3c>;
++               };
++
++               die0_l3c: l3-cache {
++                       compatible = "cache";
++                       cache-size = <16777216>;
++                       cache-line-size = <64>;
++                       cache-block-size = <16>;
++                       cache-sets = <4096>;
+                };
+        };
+
+
+
+On 2017/1/4 19:47, Sudeep Holla wrote:
+> 
+> Hi Tan,
+> 
+> On 28/12/16 03:42, Tan Xiaojun wrote:
+>> Hi.
+>>
+>> I saw you discussed how to achieve querying cache information and
+>> tend to implement the external ones(like L3 cache) via DT a few
+>> months ago.
+>>
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/405399.html
+>>
+>>  Are these implementations progressing? Forgive me to take the
+>> liberty to ask, we care about this thing.
+>>
+> 
+> Yes the support to override the cache properties for DT was added in v4.10
+> 
+> However, it still depends on the the sysreg to get the total levels of
+> caches supported in the system. You may need to tweak a bit around that
+> to support what you need.
+> 
+>> If you've already implemented some codes, we can help with testing
+>> (in Hisilicon D02, D03, D05) after you send it to the mail-list.
+>>
+> 
+> Sure, that would help.
+> 
+>> We can try our best to help if there is any difficulty.
+> 
+> OK, you can start trying the patch below :). It's not even compile
+> tested, so you make have to make some changes necessary. I just wanted
+> to put my thoughts here. Make sure all the L3 cacheinfo is present in DT.
+> 
+> Regards,
+> Sudeep
+> 
+> 
+> --
+> 
+> diff --git i/arch/arm64/kernel/cacheinfo.c w/arch/arm64/kernel/cacheinfo.c
+> index 9617301f76b5..88fbcd368104 100644
+> --- i/arch/arm64/kernel/cacheinfo.c
+> +++ w/arch/arm64/kernel/cacheinfo.c
+> @@ -84,7 +84,7 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
+> 
+>  static int __init_cache_level(unsigned int cpu)
+>  {
+> -	unsigned int ctype, level, leaves;
+> +	unsigned int ctype, level, leaves, of_level;
+>  	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+> 
+>  	for (level = 1, leaves = 0; level <= MAX_CACHE_LEVEL; level++) {
+> @@ -97,6 +97,17 @@ static int __init_cache_level(unsigned int cpu)
+>  		leaves += (ctype == CACHE_TYPE_SEPARATE) ? 2 : 1;
+>  	}
+> 
+> +	of_level = of_count_cache_levels(cpu);
+> +	if (level < of_level) {
+> +		/*
+> +		 * some external caches not specified in CLIDR_EL1
+> +		 * the information may be available in the device tree
+> +		 * only unified external caches are considered here
+> +		 */
+> +		level = of_level;
+> +		leaves += (of_level - level);
+> +	}
+> +
+>  	this_cpu_ci->num_levels = level;
+>  	this_cpu_ci->num_leaves = leaves;
+>  	return 0;
+> diff --git i/drivers/of/base.c w/drivers/of/base.c
+> index d4bea3c797d6..8007f3b06cb8 100644
+> --- i/drivers/of/base.c
+> +++ w/drivers/of/base.c
+> @@ -2267,6 +2267,20 @@ struct device_node *of_find_next_cache_node(const
+> struct device_node *np)
+>  	return NULL;
 >  }
->  
-> +static void xilinx_dma_clean_hw_desc(struct xilinx_axidma_desc_hw *hw)
+> 
+> +int of_count_cache_levels(unsigned int cpu)
 > +{
-> +	u32 next_desc = hw->next_desc;
-> +	u32 next_desc_msb = hw->next_desc_msb;
+> +	int level = 0;
+> +	struct device *cpu_dev = get_cpu_device(cpu);
+> +	struct device_node *np = cpu_dev->of_node;
 > +
-> +	memset(hw, 0, sizeof(struct xilinx_axidma_desc_hw));
+> +	while (np) {
+> +		level++;
+> +		np = of_find_next_cache_node(np);
+> +	}
 > +
-> +	hw->next_desc = next_desc;
-> +	hw->next_desc_msb = next_desc_msb;
+> +	return level;
 > +}
 > +
 >  /**
->   * xilinx_dma_free_tx_segment - Free transaction segment
->   * @chan: Driver specific DMA channel
-> @@ -588,7 +609,9 @@ xilinx_axidma_alloc_tx_segment(struct xilinx_dma_chan *chan)
->  static void xilinx_dma_free_tx_segment(struct xilinx_dma_chan *chan,
->  				struct xilinx_axidma_tx_segment *segment)
->  {
-> -	dma_pool_free(chan->desc_pool, segment, segment->phys);
-> +	xilinx_dma_clean_hw_desc(&segment->hw);
-> +
-> +	list_add_tail(&segment->node, &chan->free_seg_list);
->  }
->  
->  /**
-> @@ -713,16 +736,26 @@ static void xilinx_dma_free_descriptors(struct xilinx_dma_chan *chan)
->  static void xilinx_dma_free_chan_resources(struct dma_chan *dchan)
->  {
->  	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
-> +	unsigned long flags;
->  
->  	dev_dbg(chan->dev, "Free all channel resources.\n");
->  
->  	xilinx_dma_free_descriptors(chan);
-> +
->  	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
-> -		xilinx_dma_free_tx_segment(chan, chan->cyclic_seg_v);
-> -		xilinx_dma_free_tx_segment(chan, chan->seg_v);
-> +		spin_lock_irqsave(&chan->lock, flags);
-> +		INIT_LIST_HEAD(&chan->free_seg_list);
-> +		spin_unlock_irqrestore(&chan->lock, flags);
-> +
-> +		/* Free Memory that is allocated for cyclic DMA Mode */
-> +		dma_free_coherent(chan->dev, sizeof(*chan->cyclic_seg_v),
-> +				  chan->cyclic_seg_v, chan->cyclic_seg_p);
-> +	}
-> +
-> +	if (chan->xdev->dma_config->dmatype != XDMA_TYPE_AXIDMA) {
-> +		dma_pool_destroy(chan->desc_pool);
-> +		chan->desc_pool = NULL;
->  	}
-> -	dma_pool_destroy(chan->desc_pool);
-> -	chan->desc_pool = NULL;
->  }
->  
->  /**
-> @@ -805,6 +838,7 @@ static void xilinx_dma_do_tasklet(unsigned long data)
->  static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
->  {
->  	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
-> +	int i;
->  
->  	/* Has this channel already been allocated? */
->  	if (chan->desc_pool)
-> @@ -815,11 +849,30 @@ static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
->  	 * for meeting Xilinx VDMA specification requirement.
->  	 */
->  	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
-> -		chan->desc_pool = dma_pool_create("xilinx_dma_desc_pool",
-> -				   chan->dev,
-> -				   sizeof(struct xilinx_axidma_tx_segment),
-> -				   __alignof__(struct xilinx_axidma_tx_segment),
-> -				   0);
-> +		/* Allocate the buffer descriptors. */
-> +		chan->seg_v = dma_zalloc_coherent(chan->dev,
-> +						  sizeof(*chan->seg_v) *
-> +						  XILINX_DMA_NUM_DESCS,
-> +						  &chan->seg_p, GFP_KERNEL);
-> +		if (!chan->seg_v) {
-> +			dev_err(chan->dev,
-> +				"unable to allocate channel %d descriptors\n",
-> +				chan->id);
-> +			return -ENOMEM;
-> +		}
-> +
-> +		for (i = 0; i < XILINX_DMA_NUM_DESCS; i++) {
-> +			chan->seg_v[i].hw.next_desc =
-> +			lower_32_bits(chan->seg_p + sizeof(*chan->seg_v) *
-> +				((i + 1) % XILINX_DMA_NUM_DESCS));
-> +			chan->seg_v[i].hw.next_desc_msb =
-> +			upper_32_bits(chan->seg_p + sizeof(*chan->seg_v) *
-> +				((i + 1) % XILINX_DMA_NUM_DESCS));
-> +			chan->seg_v[i].phys = chan->seg_p +
-> +				sizeof(*chan->seg_v) * i;
-> +			list_add_tail(&chan->seg_v[i].node,
-> +				      &chan->free_seg_list);
-> +		}
->  	} else if (chan->xdev->dma_config->dmatype == XDMA_TYPE_CDMA) {
->  		chan->desc_pool = dma_pool_create("xilinx_cdma_desc_pool",
->  				   chan->dev,
-> @@ -834,7 +887,8 @@ static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
->  				     0);
->  	}
->  
-> -	if (!chan->desc_pool) {
-> +	if (!chan->desc_pool &&
-> +	    (chan->xdev->dma_config->dmatype != XDMA_TYPE_AXIDMA)) {
->  		dev_err(chan->dev,
->  			"unable to allocate channel %d descriptor pool\n",
->  			chan->id);
-> @@ -843,22 +897,20 @@ static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
->  
->  	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
->  		/*
-> -		 * For AXI DMA case after submitting a pending_list, keep
-> -		 * an extra segment allocated so that the "next descriptor"
-> -		 * pointer on the tail descriptor always points to a
-> -		 * valid descriptor, even when paused after reaching taildesc.
-> -		 * This way, it is possible to issue additional
-> -		 * transfers without halting and restarting the channel.
-> -		 */
-> -		chan->seg_v = xilinx_axidma_alloc_tx_segment(chan);
-> -
-> -		/*
->  		 * For cyclic DMA mode we need to program the tail Descriptor
->  		 * register with a value which is not a part of the BD chain
->  		 * so allocating a desc segment during channel allocation for
->  		 * programming tail descriptor.
->  		 */
-> -		chan->cyclic_seg_v = xilinx_axidma_alloc_tx_segment(chan);
-> +		chan->cyclic_seg_v = dma_zalloc_coherent(chan->dev,
-> +					sizeof(*chan->cyclic_seg_v),
-> +					&chan->cyclic_seg_p, GFP_KERNEL);
-> +		if (!chan->cyclic_seg_v) {
-> +			dev_err(chan->dev,
-> +				"unable to allocate desc segment for cyclic DMA\n");
-> +			return -ENOMEM;
-> +		}
-> +		chan->cyclic_seg_v->phys = chan->cyclic_seg_p;
->  	}
->  
->  	dma_cookie_init(dchan);
-> @@ -1198,7 +1250,7 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
->  static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
->  {
->  	struct xilinx_dma_tx_descriptor *head_desc, *tail_desc;
-> -	struct xilinx_axidma_tx_segment *tail_segment, *old_head, *new_head;
-> +	struct xilinx_axidma_tx_segment *tail_segment;
->  	u32 reg;
->  
->  	if (chan->err)
-> @@ -1217,21 +1269,6 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
->  	tail_segment = list_last_entry(&tail_desc->segments,
->  				       struct xilinx_axidma_tx_segment, node);
->  
-> -	if (chan->has_sg && !chan->xdev->mcdma) {
-> -		old_head = list_first_entry(&head_desc->segments,
-> -					struct xilinx_axidma_tx_segment, node);
-> -		new_head = chan->seg_v;
-> -		/* Copy Buffer Descriptor fields. */
-> -		new_head->hw = old_head->hw;
-> -
-> -		/* Swap and save new reserve */
-> -		list_replace_init(&old_head->node, &new_head->node);
-> -		chan->seg_v = old_head;
-> -
-> -		tail_segment->hw.next_desc = chan->seg_v->phys;
-> -		head_desc->async_tx.phys = new_head->phys;
-> -	}
-> -
->  	reg = dma_ctrl_read(chan, XILINX_DMA_REG_DMACR);
->  
->  	if (chan->desc_pendingcount <= XILINX_DMA_COALESCE_MAX) {
-> @@ -1729,7 +1766,7 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
->  {
->  	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
->  	struct xilinx_dma_tx_descriptor *desc;
-> -	struct xilinx_axidma_tx_segment *segment = NULL, *prev = NULL;
-> +	struct xilinx_axidma_tx_segment *segment = NULL;
->  	u32 *app_w = (u32 *)context;
->  	struct scatterlist *sg;
->  	size_t copy;
-> @@ -1780,10 +1817,6 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
->  					       XILINX_DMA_NUM_APP_WORDS);
->  			}
->  
-> -			if (prev)
-> -				prev->hw.next_desc = segment->phys;
-> -
-> -			prev = segment;
->  			sg_used += copy;
->  
->  			/*
-> @@ -1797,7 +1830,6 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
->  	segment = list_first_entry(&desc->segments,
->  				   struct xilinx_axidma_tx_segment, node);
->  	desc->async_tx.phys = segment->phys;
-> -	prev->hw.next_desc = segment->phys;
->  
->  	/* For the last DMA_MEM_TO_DEV transfer, set EOP */
->  	if (chan->direction == DMA_MEM_TO_DEV) {
-> @@ -2341,6 +2373,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
->  	INIT_LIST_HEAD(&chan->pending_list);
->  	INIT_LIST_HEAD(&chan->done_list);
->  	INIT_LIST_HEAD(&chan->active_list);
-> +	INIT_LIST_HEAD(&chan->free_seg_list);
->  
->  	/* Retrieve the channel properties from the device tree */
->  	has_dre = of_property_read_bool(node, "xlnx,include-dre");
-> -- 
-> 2.1.2
+>   * of_graph_parse_endpoint() - parse common endpoint node properties
+>   * @node: pointer to endpoint device_node
+> diff --git i/include/linux/of.h w/include/linux/of.h
+> index d72f01009297..c8597ae71ff3 100644
+> --- i/include/linux/of.h
+> +++ w/include/linux/of.h
+> @@ -280,6 +280,7 @@ extern struct device_node
+> *of_get_child_by_name(const struct device_node *node,
 > 
-
--- 
-~Vinod
+>  /* cache lookup */
+>  extern struct device_node *of_find_next_cache_node(const struct
+> device_node *);
+> +extern int of_count_cache_levels(unsigned int cpu);
+>  extern struct device_node *of_find_node_with_property(
+>  	struct device_node *from, const char *prop_name);
+> 
+> 
+> .
+> 
