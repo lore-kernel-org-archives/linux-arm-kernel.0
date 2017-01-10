@@ -1,120 +1,331 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 10 Jan 2017 09:33:55 +0100
-Subject: [RFC PATCH 1/5] regulator: Extend the power-management APIs
-In-Reply-To: <20170109191758.7zzxeh45pvwiw3jo@sirena.org.uk>
-References: <1480687036-5037-1-git-send-email-boris.brezillon@free-electrons.com>
- <1480687036-5037-2-git-send-email-boris.brezillon@free-electrons.com>
- <20170109191758.7zzxeh45pvwiw3jo@sirena.org.uk>
-Message-ID: <20170110093355.700f8225@bbrezillon>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 10 Jan 2017 14:19:18 +0530
+Subject: [PATCH v5 3/3] dmaengine: xilinx_dma: Fix race condition in the
+ driver for multiple descriptor scenario
+In-Reply-To: <1483771530-8545-4-git-send-email-appanad@xilinx.com>
+References: <1483771530-8545-1-git-send-email-appanad@xilinx.com>
+ <1483771530-8545-4-git-send-email-appanad@xilinx.com>
+Message-ID: <20170110084917.GA3573@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Sat, Jan 07, 2017 at 12:15:30PM +0530, Kedareswara rao Appana wrote:
+> When driver is handling AXI DMA SoftIP
+> When user submits multiple descriptors back to back on the S2MM(recv)
+> side with the current driver flow the last buffer descriptor next bd
+> points to a invalid location resulting the invalid data or errors in the
+> DMA engine.
 
-On Mon, 9 Jan 2017 19:17:58 +0000
-Mark Brown <broonie@kernel.org> wrote:
-
-> On Fri, Dec 02, 2016 at 02:57:12PM +0100, Boris Brezillon wrote:
-> 
-> > The idea to solve #2 is to allow runtime changes. Since this kind of
-> > change is likely to have an impact on the whole system, we require the
-> > board to explicitly state that runtime changes are allowed (using a DT
-> > property).  
-> 
-> > Allowing runtime changes, may also be a problem if devices are not
-> > suspended in the correct order: a device using a regulator should be
-> > suspended before the regulator itself, otherwise we may change the
-> > regulator state while it's still being used.
-> > Hopefully, this problem will be solved with the work done on device
-> > dependency description.  
-> 
-> I'm not sure that adding an extra property is going to help with the
-> problems here - the system already has to provide explicit support for
-> setting the suspend configuration so that should be enough.
-
-I'm not a big fan of this DT property either, but after our discussion
-on IRC I had the feeling you wanted it to be as safe as possible, and
-since changing the regulator config at runtime is far more dangerous
-than asking the regulator to enter a specific state after everything has
-been suspended, I thought you would prefer to have an extra property
-stating that entering suspend state at runtime is authorized (meaning
-it's safe to do it). 
-
-> However it
-> *is* a bit more than just making sure that the device suspend ordering
-> is good (though that's definitely part of it), there will be things
-> kicked off by hardware signalling without software knowing about it.
-
-Do you have an example, so that I can understand the use case?
+Can you rephrase this, it a bit hard to understand.
 
 > 
-> Anything that doesn't affect a hardware supported runtime state probably
-> needs to be split off and handled separately as that's the much more
-> risky bit
+> This patch fixes this issue by creating a BD Chain during
 
-Just to be sure, you mean regulator devices that do not support the
-->set_suspend_xx() hooks, right?
+whats a BD?
 
->, moving changing of suspend mode earlier isn't going to cause
-> too much grief, that patch should just be split out and can probably
-> just go straight in.
-
-Yes, I just thought it would be clearer to have everything implemented
-in the same function. Since calling ->set_suspend_xx() does not have
-any impact on the runtime state, it can be called whenever we want
-(assuming we can still communicate with the regulator device to
-configure this suspend state).
-But if you prefer to have it split out in 2 different function, with the
-'set suspend mode' bits called from the regulator_suspend_begin(), I'm
-fine with that.
-
+> channel allocation itself and use those BD's.
 > 
-> > + * This function should be called from the regulator driver ->suspend() hook
-> > + * and after the platform has called regulator_suspend_begin() to properly set
-> > + * the rdev->suspend.target field.  
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+> Changes for v5:
+> ---> None.
+> Changes for v4:
+> ---> None.
+> Changes for v3:
+> ---> None.
+> Changes for v2:
+> ---> None.
 > 
-> Requring these functions to be called from every single driver seems
-> like we're doing something wrong - if we're going to do this we should
-> find some way to loop over all regulators and apply any unapplied
-> changes.
-
-I agree. Actually, I forgot that we had PM ops at the device class
-level. Maybe we could just move these generic ->suspend()/->resume()
-implementation here.
-
-> Batching things up at the end of suspend would also mean that
-> we'd be able to minimise the chances that we get the ordering wrong.
-
-Unfortunately that's not possible, for the exact same reason calling
-regulator_suspend_prepare() from the platform ->prepare() hook did not
-work for me: at that point, all devices have been suspended, and this
-includes the i2c controller which we're using to communicate with the
-PMIC exposing those regulators.
-This leaves 2 solutions:
-
-1/ Apply the suspend state earlier (before the devices ->suspend()
-   hooks have been called)
-2/ Rely on the device model dependency graph, and enter the suspend
-   state when the regulator device is being suspended (this is the
-   solution I'm proposing in this patch).
-
-Solution #1 is acceptable if we omit the case where one regulator
-consumer (another device) is depending on the regulator to be setup
-properly until the device has been suspended. But this still leaves the
-'apply suspend state as late as possible' problem, and in this regards,
-solution #1 is clearly not the best option.
-
-Solution #2 might not be perfect right now, but it should benefit from
-all the work done by Rafael on 'device dependency tracking' and
-'suspend/resume ordering'.
-
+>  drivers/dma/xilinx/xilinx_dma.c | 133 +++++++++++++++++++++++++---------------
+>  1 file changed, 83 insertions(+), 50 deletions(-)
 > 
-> For the target bit...  we should be able to find some way to figure out
-> what kind of suspend we're doing without the platform being involved, a
-> callback from the PM core would be helpful here.
+> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+> index 0e9c02e..af2159d 100644
+> --- a/drivers/dma/xilinx/xilinx_dma.c
+> +++ b/drivers/dma/xilinx/xilinx_dma.c
+> @@ -163,6 +163,7 @@
+>  #define XILINX_DMA_BD_SOP		BIT(27)
+>  #define XILINX_DMA_BD_EOP		BIT(26)
+>  #define XILINX_DMA_COALESCE_MAX		255
+> +#define XILINX_DMA_NUM_DESCS		255
 
-Yep, I agree. Rafael, what's your opinion?
+why 255?
 
-Thanks for your comments.
+>  #define XILINX_DMA_NUM_APP_WORDS	5
+>  
+>  /* Multi-Channel DMA Descriptor offsets*/
+> @@ -310,6 +311,7 @@ struct xilinx_dma_tx_descriptor {
+>   * @pending_list: Descriptors waiting
+>   * @active_list: Descriptors ready to submit
+>   * @done_list: Complete descriptors
+> + * @free_seg_list: Free descriptors
+>   * @common: DMA common channel
+>   * @desc_pool: Descriptors pool
+>   * @dev: The dma device
+> @@ -331,7 +333,9 @@ struct xilinx_dma_tx_descriptor {
+>   * @desc_submitcount: Descriptor h/w submitted count
+>   * @residue: Residue for AXI DMA
+>   * @seg_v: Statically allocated segments base
+> + * @seg_p: Physical allocated segments base
+>   * @cyclic_seg_v: Statically allocated segment base for cyclic transfers
+> + * @cyclic_seg_p: Physical allocated segments base for cyclic dma
+>   * @start_transfer: Differentiate b/w DMA IP's transfer
+>   */
+>  struct xilinx_dma_chan {
+> @@ -342,6 +346,7 @@ struct xilinx_dma_chan {
+>  	struct list_head pending_list;
+>  	struct list_head active_list;
+>  	struct list_head done_list;
+> +	struct list_head free_seg_list;
+>  	struct dma_chan common;
+>  	struct dma_pool *desc_pool;
+>  	struct device *dev;
+> @@ -363,7 +368,9 @@ struct xilinx_dma_chan {
+>  	u32 desc_submitcount;
+>  	u32 residue;
+>  	struct xilinx_axidma_tx_segment *seg_v;
+> +	dma_addr_t seg_p;
+>  	struct xilinx_axidma_tx_segment *cyclic_seg_v;
+> +	dma_addr_t cyclic_seg_p;
+>  	void (*start_transfer)(struct xilinx_dma_chan *chan);
+>  	u16 tdest;
+>  };
+> @@ -569,17 +576,31 @@ static struct xilinx_axidma_tx_segment *
+>  xilinx_axidma_alloc_tx_segment(struct xilinx_dma_chan *chan)
+>  {
+>  	struct xilinx_axidma_tx_segment *segment;
+> -	dma_addr_t phys;
+> -
+> -	segment = dma_pool_zalloc(chan->desc_pool, GFP_ATOMIC, &phys);
+> -	if (!segment)
+> -		return NULL;
+> +	unsigned long flags;
+>  
+> -	segment->phys = phys;
+> +	spin_lock_irqsave(&chan->lock, flags);
+> +	if (!list_empty(&chan->free_seg_list)) {
+> +		segment = list_first_entry(&chan->free_seg_list,
+> +					   struct xilinx_axidma_tx_segment,
+> +					   node);
+> +		list_del(&segment->node);
+> +	}
+> +	spin_unlock_irqrestore(&chan->lock, flags);
+>  
+>  	return segment;
+>  }
+>  
+> +static void xilinx_dma_clean_hw_desc(struct xilinx_axidma_desc_hw *hw)
+> +{
+> +	u32 next_desc = hw->next_desc;
+> +	u32 next_desc_msb = hw->next_desc_msb;
+> +
+> +	memset(hw, 0, sizeof(struct xilinx_axidma_desc_hw));
+> +
+> +	hw->next_desc = next_desc;
+> +	hw->next_desc_msb = next_desc_msb;
+> +}
+> +
+>  /**
+>   * xilinx_dma_free_tx_segment - Free transaction segment
+>   * @chan: Driver specific DMA channel
+> @@ -588,7 +609,9 @@ xilinx_axidma_alloc_tx_segment(struct xilinx_dma_chan *chan)
+>  static void xilinx_dma_free_tx_segment(struct xilinx_dma_chan *chan,
+>  				struct xilinx_axidma_tx_segment *segment)
+>  {
+> -	dma_pool_free(chan->desc_pool, segment, segment->phys);
+> +	xilinx_dma_clean_hw_desc(&segment->hw);
+> +
+> +	list_add_tail(&segment->node, &chan->free_seg_list);
+>  }
+>  
+>  /**
+> @@ -713,16 +736,26 @@ static void xilinx_dma_free_descriptors(struct xilinx_dma_chan *chan)
+>  static void xilinx_dma_free_chan_resources(struct dma_chan *dchan)
+>  {
+>  	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
+> +	unsigned long flags;
+>  
+>  	dev_dbg(chan->dev, "Free all channel resources.\n");
+>  
+>  	xilinx_dma_free_descriptors(chan);
+> +
+>  	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
+> -		xilinx_dma_free_tx_segment(chan, chan->cyclic_seg_v);
+> -		xilinx_dma_free_tx_segment(chan, chan->seg_v);
+> +		spin_lock_irqsave(&chan->lock, flags);
+> +		INIT_LIST_HEAD(&chan->free_seg_list);
+> +		spin_unlock_irqrestore(&chan->lock, flags);
+> +
+> +		/* Free Memory that is allocated for cyclic DMA Mode */
+> +		dma_free_coherent(chan->dev, sizeof(*chan->cyclic_seg_v),
+> +				  chan->cyclic_seg_v, chan->cyclic_seg_p);
+> +	}
+> +
+> +	if (chan->xdev->dma_config->dmatype != XDMA_TYPE_AXIDMA) {
+> +		dma_pool_destroy(chan->desc_pool);
+> +		chan->desc_pool = NULL;
+>  	}
+> -	dma_pool_destroy(chan->desc_pool);
+> -	chan->desc_pool = NULL;
+>  }
+>  
+>  /**
+> @@ -805,6 +838,7 @@ static void xilinx_dma_do_tasklet(unsigned long data)
+>  static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
+>  {
+>  	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
+> +	int i;
+>  
+>  	/* Has this channel already been allocated? */
+>  	if (chan->desc_pool)
+> @@ -815,11 +849,30 @@ static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
+>  	 * for meeting Xilinx VDMA specification requirement.
+>  	 */
+>  	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
+> -		chan->desc_pool = dma_pool_create("xilinx_dma_desc_pool",
+> -				   chan->dev,
+> -				   sizeof(struct xilinx_axidma_tx_segment),
+> -				   __alignof__(struct xilinx_axidma_tx_segment),
+> -				   0);
+> +		/* Allocate the buffer descriptors. */
+> +		chan->seg_v = dma_zalloc_coherent(chan->dev,
+> +						  sizeof(*chan->seg_v) *
+> +						  XILINX_DMA_NUM_DESCS,
+> +						  &chan->seg_p, GFP_KERNEL);
+> +		if (!chan->seg_v) {
+> +			dev_err(chan->dev,
+> +				"unable to allocate channel %d descriptors\n",
+> +				chan->id);
+> +			return -ENOMEM;
+> +		}
+> +
+> +		for (i = 0; i < XILINX_DMA_NUM_DESCS; i++) {
+> +			chan->seg_v[i].hw.next_desc =
+> +			lower_32_bits(chan->seg_p + sizeof(*chan->seg_v) *
+> +				((i + 1) % XILINX_DMA_NUM_DESCS));
+> +			chan->seg_v[i].hw.next_desc_msb =
+> +			upper_32_bits(chan->seg_p + sizeof(*chan->seg_v) *
+> +				((i + 1) % XILINX_DMA_NUM_DESCS));
+> +			chan->seg_v[i].phys = chan->seg_p +
+> +				sizeof(*chan->seg_v) * i;
+> +			list_add_tail(&chan->seg_v[i].node,
+> +				      &chan->free_seg_list);
+> +		}
+>  	} else if (chan->xdev->dma_config->dmatype == XDMA_TYPE_CDMA) {
+>  		chan->desc_pool = dma_pool_create("xilinx_cdma_desc_pool",
+>  				   chan->dev,
+> @@ -834,7 +887,8 @@ static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
+>  				     0);
+>  	}
+>  
+> -	if (!chan->desc_pool) {
+> +	if (!chan->desc_pool &&
+> +	    (chan->xdev->dma_config->dmatype != XDMA_TYPE_AXIDMA)) {
+>  		dev_err(chan->dev,
+>  			"unable to allocate channel %d descriptor pool\n",
+>  			chan->id);
+> @@ -843,22 +897,20 @@ static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
+>  
+>  	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
+>  		/*
+> -		 * For AXI DMA case after submitting a pending_list, keep
+> -		 * an extra segment allocated so that the "next descriptor"
+> -		 * pointer on the tail descriptor always points to a
+> -		 * valid descriptor, even when paused after reaching taildesc.
+> -		 * This way, it is possible to issue additional
+> -		 * transfers without halting and restarting the channel.
+> -		 */
+> -		chan->seg_v = xilinx_axidma_alloc_tx_segment(chan);
+> -
+> -		/*
+>  		 * For cyclic DMA mode we need to program the tail Descriptor
+>  		 * register with a value which is not a part of the BD chain
+>  		 * so allocating a desc segment during channel allocation for
+>  		 * programming tail descriptor.
+>  		 */
+> -		chan->cyclic_seg_v = xilinx_axidma_alloc_tx_segment(chan);
+> +		chan->cyclic_seg_v = dma_zalloc_coherent(chan->dev,
+> +					sizeof(*chan->cyclic_seg_v),
+> +					&chan->cyclic_seg_p, GFP_KERNEL);
+> +		if (!chan->cyclic_seg_v) {
+> +			dev_err(chan->dev,
+> +				"unable to allocate desc segment for cyclic DMA\n");
+> +			return -ENOMEM;
+> +		}
+> +		chan->cyclic_seg_v->phys = chan->cyclic_seg_p;
+>  	}
+>  
+>  	dma_cookie_init(dchan);
+> @@ -1198,7 +1250,7 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
+>  static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
+>  {
+>  	struct xilinx_dma_tx_descriptor *head_desc, *tail_desc;
+> -	struct xilinx_axidma_tx_segment *tail_segment, *old_head, *new_head;
+> +	struct xilinx_axidma_tx_segment *tail_segment;
+>  	u32 reg;
+>  
+>  	if (chan->err)
+> @@ -1217,21 +1269,6 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
+>  	tail_segment = list_last_entry(&tail_desc->segments,
+>  				       struct xilinx_axidma_tx_segment, node);
+>  
+> -	if (chan->has_sg && !chan->xdev->mcdma) {
+> -		old_head = list_first_entry(&head_desc->segments,
+> -					struct xilinx_axidma_tx_segment, node);
+> -		new_head = chan->seg_v;
+> -		/* Copy Buffer Descriptor fields. */
+> -		new_head->hw = old_head->hw;
+> -
+> -		/* Swap and save new reserve */
+> -		list_replace_init(&old_head->node, &new_head->node);
+> -		chan->seg_v = old_head;
+> -
+> -		tail_segment->hw.next_desc = chan->seg_v->phys;
+> -		head_desc->async_tx.phys = new_head->phys;
+> -	}
+> -
+>  	reg = dma_ctrl_read(chan, XILINX_DMA_REG_DMACR);
+>  
+>  	if (chan->desc_pendingcount <= XILINX_DMA_COALESCE_MAX) {
+> @@ -1729,7 +1766,7 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
+>  {
+>  	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
+>  	struct xilinx_dma_tx_descriptor *desc;
+> -	struct xilinx_axidma_tx_segment *segment = NULL, *prev = NULL;
+> +	struct xilinx_axidma_tx_segment *segment = NULL;
+>  	u32 *app_w = (u32 *)context;
+>  	struct scatterlist *sg;
+>  	size_t copy;
+> @@ -1780,10 +1817,6 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
+>  					       XILINX_DMA_NUM_APP_WORDS);
+>  			}
+>  
+> -			if (prev)
+> -				prev->hw.next_desc = segment->phys;
+> -
+> -			prev = segment;
+>  			sg_used += copy;
+>  
+>  			/*
+> @@ -1797,7 +1830,6 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
+>  	segment = list_first_entry(&desc->segments,
+>  				   struct xilinx_axidma_tx_segment, node);
+>  	desc->async_tx.phys = segment->phys;
+> -	prev->hw.next_desc = segment->phys;
+>  
+>  	/* For the last DMA_MEM_TO_DEV transfer, set EOP */
+>  	if (chan->direction == DMA_MEM_TO_DEV) {
+> @@ -2341,6 +2373,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
+>  	INIT_LIST_HEAD(&chan->pending_list);
+>  	INIT_LIST_HEAD(&chan->done_list);
+>  	INIT_LIST_HEAD(&chan->active_list);
+> +	INIT_LIST_HEAD(&chan->free_seg_list);
+>  
+>  	/* Retrieve the channel properties from the device tree */
+>  	has_dre = of_property_read_bool(node, "xlnx,include-dre");
+> -- 
+> 2.1.2
+> 
 
-Boris
+-- 
+~Vinod
