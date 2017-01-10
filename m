@@ -1,89 +1,86 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Tue, 10 Jan 2017 14:47:23 -0600
-Subject: [PATCH v2] usb: musb: sunxi: Uses the resource-managed extcon
- API when registering extcon notifier
-In-Reply-To: <58749956.1030800@samsung.com>
-References: <CGME20161230041914epcas5p24826e70fd5de710818687e55579757ba@epcas5p2.samsung.com>
- <1483071550-8683-1-git-send-email-cw00.choi@samsung.com>
- <58749956.1030800@samsung.com>
-Message-ID: <20170110204653.GD2479@uda0271908>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 10 Jan 2017 23:04:58 +0200
+Subject: [PATCH V7 1/4] Documentation/devicetree/bindings: b850v3_lvds_dp
+In-Reply-To: <74f0-58704480-5-27259840@173563636>
+References: <74f0-58704480-5-27259840@173563636>
+Message-ID: <6276161.johxDync2u@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 05:20:38PM +0900, Chanwoo Choi wrote:
-> Hi Felipe,
+Hi Peter,
+
+On Saturday 07 Jan 2017 01:29:52 Peter Senna Tschudin wrote:
+> On 04 January, 2017 21:39 CET, Rob Herring wrote:
+> > On Tue, Jan 3, 2017 at 5:34 PM, Peter Senna Tschudin wrote:
+> >> On 03 January, 2017 23:51 CET, Rob Herring <robh@kernel.org> wrote:
+> >>> On Sun, Jan 01, 2017 at 09:24:29PM +0100, Peter Senna Tschudin wrote:
+> >>>> Devicetree bindings documentation for the GE B850v3 LVDS/DP++
+> >>>> display bridge.
+> >>>> 
+> >>>> Cc: Martyn Welch <martyn.welch@collabora.co.uk>
+> >>>> Cc: Martin Donnelly <martin.donnelly@ge.com>
+> >>>> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> >>>> Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> >>>> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> >>>> Cc: Rob Herring <robh@kernel.org>
+> >>>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> >>>> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+> >>>> ---
+> >>>> There was an Acked-by from Rob Herring <robh@kernel.org> for V6, but
+> >>>> I changed the bindings to use i2c_new_secondary_device() so I
+> >>>> removed it from the commit message.
+> >>>> 
+> >>>>  .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 39 ++++++++++++++
+> >>> Generally, bindings are not organized by vendor. Put in
+> >>> bindings/display/bridge/... instead.
+> >> 
+> >> Will change that.
+> >> 
+> >>>>  1 file changed, 39 insertions(+)
+> >>>>  create mode 100644
+> >>>>  Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+> >>>> 
+> >>>> diff --git a/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+> >>>> b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt new file
+> >>>> mode 100644
+> >>>> index 0000000..1bc6ebf
+> >>>> --- /dev/null
+> >>>> +++ b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+> >>>> @@ -0,0 +1,39 @@
+> >>>> +Driver for GE B850v3 LVDS/DP++ display bridge
+> >>>> +
+> >>>> +Required properties:
+> >>>> +  - compatible : should be "ge,b850v3-lvds-dp".
+> >>> 
+> >>> Isn't '-lvds-dp' redundant? The part# should be enough.
+> >> 
+> >> b850v3 is the name of the product, this is why the proposed name. What
+> >> about, b850v3-dp2 dp2 indicating the second DP output?
+> >
+> > Humm, b850v3 is the board name? This node should be the name of the bridge
+> > chip.
+>
+> From the cover letter:
 > 
-> This patch got the acked-by from Bin Liu and.
-> Could you please apply this patch?
+> -- // --
+> There are two physical bridges on the video signal pipeline: a STDP4028(LVDS
+> to DP) and a STDP2690(DP to DP++).  The hardware and firmware made it
+> complicated for this binding to comprise two device tree nodes, as the
+> design goal is to configure both bridges based on the LVDS signal, which
+> leave the driver powerless to control the video processing pipeline. The
+> two bridges behaves as a single bridge, and the driver is only needed for
+> telling the host about EDID / HPD, and for giving the host powers to ack
+> interrupts. The video signal pipeline is as follows:
+> 
+>   Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
+> -- // --
 
-I have picked this one.
+You forgot to prefix your patch series with [HACK] ;-)
 
+How about fixing the issues that make the two DT nodes solution difficult ? 
+What are they ?
+
+-- 
 Regards,
--Bin.
 
-> 
-> On 2016? 12? 30? 13:19, Chanwoo Choi wrote:
-> > This patch just uses the resource-managed extcon API when registering
-> > the extcon notifier.
-> > 
-> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Acked-by: Bin Liu <b-liu@ti.com>
-> > ---
-> > Changes from v1:
-> > - Rebase this patch based on v4.10-rc1.
-> > - Add acked-by tag from Maxime Ripard and Bin Lin.
-> > - Drop the phy/power-supply/chipidea patches.
-> > 
-> >  drivers/usb/musb/sunxi.c | 12 +++---------
-> >  1 file changed, 3 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-> > index d0be0eadd0d9..2332294dee0f 100644
-> > --- a/drivers/usb/musb/sunxi.c
-> > +++ b/drivers/usb/musb/sunxi.c
-> > @@ -251,14 +251,14 @@ static int sunxi_musb_init(struct musb *musb)
-> >  	writeb(SUNXI_MUSB_VEND0_PIO_MODE, musb->mregs + SUNXI_MUSB_VEND0);
-> >  
-> >  	/* Register notifier before calling phy_init() */
-> > -	ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
-> > -				       &glue->host_nb);
-> > +	ret = devm_extcon_register_notifier(glue->dev, glue->extcon,
-> > +					EXTCON_USB_HOST, &glue->host_nb);
-> >  	if (ret)
-> >  		goto error_reset_assert;
-> >  
-> >  	ret = phy_init(glue->phy);
-> >  	if (ret)
-> > -		goto error_unregister_notifier;
-> > +		goto error_reset_assert;
-> >  
-> >  	musb->isr = sunxi_musb_interrupt;
-> >  
-> > @@ -267,9 +267,6 @@ static int sunxi_musb_init(struct musb *musb)
-> >  
-> >  	return 0;
-> >  
-> > -error_unregister_notifier:
-> > -	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
-> > -				   &glue->host_nb);
-> >  error_reset_assert:
-> >  	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
-> >  		reset_control_assert(glue->rst);
-> > @@ -293,9 +290,6 @@ static int sunxi_musb_exit(struct musb *musb)
-> >  
-> >  	phy_exit(glue->phy);
-> >  
-> > -	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
-> > -				   &glue->host_nb);
-> > -
-> >  	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
-> >  		reset_control_assert(glue->rst);
-> >  
-> > 
-> 
-> 
-> -- 
-> Best Regards,
-> Chanwoo Choi
-> S/W Center, Samsung Electronics
+Laurent Pinchart
