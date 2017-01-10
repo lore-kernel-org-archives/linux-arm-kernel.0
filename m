@@ -1,70 +1,141 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 10 Jan 2017 11:41:18 +0000
-Subject: [PATCH 1/2] of: base: add support to get the number of cache levels
-Message-ID: <1484048479-19767-1-git-send-email-sudeep.holla@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 10 Jan 2017 11:50:14 +0000
+Subject: [PATCH v7 13/19] irqdomain: Add irq domain MSI and MSI_REMAP flags
+In-Reply-To: <1483969570-3154-14-git-send-email-eric.auger@redhat.com>
+References: <1483969570-3154-1-git-send-email-eric.auger@redhat.com>
+ <1483969570-3154-14-git-send-email-eric.auger@redhat.com>
+Message-ID: <fc33abb4-21a3-c94d-9417-4022e33217f8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is useful to have helper function just to get the number of cache
-levels for a given logical cpu. This patch adds the support for the
-same.
+Hi Eric,
 
-It will be used on ARM64 platform where the device tree provides the
-information for the additional non-architected/transparent/external
-last level caches that are not integrated with the processors.
+On 09/01/17 13:46, Eric Auger wrote:
+> We introduce two new enum values for the irq domain flag:
+> - IRQ_DOMAIN_FLAG_MSI indicates the irq domain corresponds to
+>   an MSI domain
+> - IRQ_DOMAIN_FLAG_MSI_REMAP indicates the irq domain has MSI
+>   remapping capabilities.
+> 
+> Those values will be useful to check all MSI irq domains have
+> MSI remapping support when assessing the safety of IRQ assignment
+> to a guest.
+> 
+> irq_domain_hierarchical_is_msi_remap() allows to check if an
+> irq domain or any parent implements MSI remapping.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> 
+> ---
+> 
+> v6:
+> - add IRQ_DOMAIN_FLAG_MSI as suggested by Marc
+> - add irq_domain_is_msi, irq_domain_is_msi_remap and
+>   irq_domain_hierarchical_is_msi_remap
+> ---
+>  include/linux/irqdomain.h | 35 +++++++++++++++++++++++++++++++++++
+>  kernel/irq/irqdomain.c    | 16 ++++++++++++++++
+>  2 files changed, 51 insertions(+)
+> 
+> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+> index ffb8460..bc2f571 100644
+> --- a/include/linux/irqdomain.h
+> +++ b/include/linux/irqdomain.h
+> @@ -183,6 +183,12 @@ enum {
+>  	/* Irq domain is an IPI domain with single virq */
+>  	IRQ_DOMAIN_FLAG_IPI_SINGLE	= (1 << 3),
+>  
+> +	/* Irq domain implements MSIs */
+> +	IRQ_DOMAIN_FLAG_MSI		= (1 << 4),
+> +
+> +	/* Irq domain implements MSI remapping */
+> +	IRQ_DOMAIN_FLAG_MSI_REMAP	= (1 << 5),
+> +
+>  	/*
+>  	 * Flags starting from IRQ_DOMAIN_FLAG_NONCORE are reserved
+>  	 * for implementation specific purposes and ignored by the
+> @@ -446,6 +452,19 @@ static inline bool irq_domain_is_ipi_single(struct irq_domain *domain)
+>  {
+>  	return domain->flags & IRQ_DOMAIN_FLAG_IPI_SINGLE;
+>  }
+> +
+> +static inline bool irq_domain_is_msi(struct irq_domain *domain)
+> +{
+> +	return domain->flags & IRQ_DOMAIN_FLAG_MSI;
+> +}
+> +
+> +static inline bool irq_domain_is_msi_remap(struct irq_domain *domain)
+> +{
+> +	return domain->flags & IRQ_DOMAIN_FLAG_MSI_REMAP;
+> +}
+> +
+> +extern bool irq_domain_hierarchical_is_msi_remap(struct irq_domain *domain);
+> +
+>  #else	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
+>  static inline void irq_domain_activate_irq(struct irq_data *data) { }
+>  static inline void irq_domain_deactivate_irq(struct irq_data *data) { }
+> @@ -477,6 +496,22 @@ static inline bool irq_domain_is_ipi_single(struct irq_domain *domain)
+>  {
+>  	return false;
+>  }
+> +
+> +static inline bool irq_domain_is_msi(struct irq_domain *domain)
+> +{
+> +	return false;
+> +}
+> +
+> +static inline bool irq_domain_is_msi_remap(struct irq_domain *domain)
+> +{
+> +	return false;
+> +}
+> +
+> +static inline bool
+> +irq_domain_hierarchical_is_msi_remap(struct irq_domain *domain)
+> +{
+> +	return false;
+> +}
+>  #endif	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
+>  
+>  #else /* CONFIG_IRQ_DOMAIN */
+> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> index 8c0a0ae..101ee8f 100644
+> --- a/kernel/irq/irqdomain.c
+> +++ b/kernel/irq/irqdomain.c
+> @@ -1392,6 +1392,22 @@ static void irq_domain_check_hierarchy(struct irq_domain *domain)
+>  	if (domain->ops->alloc)
+>  		domain->flags |= IRQ_DOMAIN_FLAG_HIERARCHY;
+>  }
+> +
+> +/**
+> + * irq_domain_hierarchical_is_msi_remap - Check if the domain or any
+> + * parent has MSI remapping support
+> + * @domain: domain pointer
+> + */
+> +bool irq_domain_hierarchical_is_msi_remap(struct irq_domain *domain)
+> +{
+> +	struct irq_domain *h = domain;
+> +
+> +	for (; h; h = h->parent) {
+> +		if (irq_domain_is_msi_remap(h))
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/of/base.c  | 22 ++++++++++++++++++++++
- include/linux/of.h |  1 +
- 2 files changed, 23 insertions(+)
+nit: Why do you need to go via this extra 'h' variable?
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index d4bea3c797d6..f7a2b47b3c77 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -2268,6 +2268,28 @@ struct device_node *of_find_next_cache_node(const struct device_node *np)
- }
- 
- /**
-+ * of_count_cache_levels - Find the total number of cache levels for the
-+ *			   given logical cpu
-+ *
-+ * @cpu: cpu number(logical index) for which cache levels is being counted
-+ *
-+ * Returns the total number of cache levels for the given logical cpu
-+ */
-+int of_count_cache_levels(unsigned int cpu)
-+{
-+	int level = 0;
-+	struct device_node *np = of_cpu_device_node_get(cpu);
-+
-+	while (np) {
-+		level++;
-+		of_node_put(np);
-+		np = of_find_next_cache_node(np);
-+	}
-+
-+	return level;
-+}
-+
-+/**
-  * of_graph_parse_endpoint() - parse common endpoint node properties
-  * @node: pointer to endpoint device_node
-  * @endpoint: pointer to the OF endpoint data structure
-diff --git a/include/linux/of.h b/include/linux/of.h
-index d72f01009297..c8597ae71ff3 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -280,6 +280,7 @@ extern struct device_node *of_get_child_by_name(const struct device_node *node,
- 
- /* cache lookup */
- extern struct device_node *of_find_next_cache_node(const struct device_node *);
-+extern int of_count_cache_levels(unsigned int cpu);
- extern struct device_node *of_find_node_with_property(
- 	struct device_node *from, const char *prop_name);
- 
+	for (; domain; domain = domain->parent) {
+		if (irq_domain_is_msi_remap(domain))
+
+should work just as well.
+
+> +			return true;
+> +	}
+> +	return false;
+> +}
+>  #else	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
+>  /**
+>   * irq_domain_get_irq_data - Get irq_data associated with @virq and @domain
+> 
+
+Thanks,
+
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
