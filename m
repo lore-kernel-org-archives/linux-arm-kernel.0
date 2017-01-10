@@ -1,15 +1,16 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 10 Jan 2017 15:34:27 -0800
-Subject: [PATCH 10/62] watchdog: coh901327_wdt: Convert to use device managed
- functions
+Date: Tue, 10 Jan 2017 15:34:44 -0800
+Subject: [PATCH 27/62] watchdog: lpc18xx_wdt: Convert to use device managed
+ functions and other improvements
 In-Reply-To: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
 References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1484091325-9199-11-git-send-email-linux@roeck-us.net>
+Message-ID: <1484091325-9199-28-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use device managed functions to simplify error handling, reduce
 source code size, improve readability, and reduce the likelyhood of bugs.
+Other improvements as listed below.
 
 The conversion was done automatically with coccinelle using the
 following semantic patches. The semantic patches and the scripts used
@@ -17,98 +18,120 @@ to generate this commit log are available at
 https://github.com/groeck/coccinelle-patches
 
 - Use devm_add_action_or_reset() for calls to clk_disable_unprepare
-- Use devm_clk_get() if the device parameter is not NULL
 - Replace 'goto l; ... l: return e;' with 'return e;'
 - Replace 'val = e; return val;' with 'return e;'
-- Replace 'if (e) { return expr; }' with 'if (e) return expr;'
-- Replace request_irq, request_threaded_irq, and request_any_context_irq
-  with their device managed equivalent
+- Replace 'if (e) return e; return 0;' with 'return e;'
+- Drop assignments to otherwise unused variables
+- Drop remove function
+- Drop platform_set_drvdata()
 - Replace &pdev->dev with dev if 'struct device *dev' is a declared
   variable
+- Call del_timer() using devm_add_action()
 - Use devm_watchdog_register_driver() to register watchdog device
+- Replace shutdown function with call to watchdog_stop_on_reboot()
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Joachim Eastwood <manabian@gmail.com>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- drivers/watchdog/coh901327_wdt.c | 33 ++++++++++++---------------------
- 1 file changed, 12 insertions(+), 21 deletions(-)
+ drivers/watchdog/lpc18xx_wdt.c | 58 ++++++++++++++----------------------------
+ 1 file changed, 19 insertions(+), 39 deletions(-)
 
-diff --git a/drivers/watchdog/coh901327_wdt.c b/drivers/watchdog/coh901327_wdt.c
-index 38dd60f0cfcc..8b6f7f35c479 100644
---- a/drivers/watchdog/coh901327_wdt.c
-+++ b/drivers/watchdog/coh901327_wdt.c
-@@ -241,11 +241,7 @@ static struct watchdog_device coh901327_wdt = {
+diff --git a/drivers/watchdog/lpc18xx_wdt.c b/drivers/watchdog/lpc18xx_wdt.c
+index 3b8bb59adf02..554030628caa 100644
+--- a/drivers/watchdog/lpc18xx_wdt.c
++++ b/drivers/watchdog/lpc18xx_wdt.c
+@@ -231,19 +231,28 @@ static int lpc18xx_wdt_probe(struct platform_device *pdev)
+ 		dev_err(dev, "could not prepare or enable sys clock\n");
+ 		return ret;
+ 	}
++	ret = devm_add_action_or_reset(dev,
++				       (void(*)(void *))clk_disable_unprepare,
++				       lpc18xx_wdt->reg_clk);
++	if (ret)
++		return ret;
  
- static int __exit coh901327_remove(struct platform_device *pdev)
- {
--	watchdog_unregister_device(&coh901327_wdt);
- 	coh901327_disable();
--	free_irq(irq, pdev);
--	clk_disable_unprepare(clk);
--	clk_put(clk);
- 	return 0;
- }
- 
-@@ -263,7 +259,7 @@ static int __init coh901327_probe(struct platform_device *pdev)
- 	if (IS_ERR(virtbase))
- 		return PTR_ERR(virtbase);
- 
--	clk = clk_get(dev, NULL);
-+	clk = devm_clk_get(dev, NULL);
- 	if (IS_ERR(clk)) {
- 		ret = PTR_ERR(clk);
- 		dev_err(dev, "could not get clock\n");
-@@ -272,8 +268,13 @@ static int __init coh901327_probe(struct platform_device *pdev)
- 	ret = clk_prepare_enable(clk);
+ 	ret = clk_prepare_enable(lpc18xx_wdt->wdt_clk);
  	if (ret) {
- 		dev_err(dev, "could not prepare and enable clock\n");
--		goto out_no_clk_enable;
+ 		dev_err(dev, "could not prepare or enable wdt clock\n");
+-		goto disable_reg_clk;
 +		return ret;
  	}
 +	ret = devm_add_action_or_reset(dev,
 +				       (void(*)(void *))clk_disable_unprepare,
-+				       clk);
++				       lpc18xx_wdt->wdt_clk);
 +	if (ret)
 +		return ret;
  
- 	val = readw(virtbase + U300_WDOG_SR);
- 	switch (val) {
-@@ -309,31 +310,21 @@ static int __init coh901327_probe(struct platform_device *pdev)
- 	writew(U300_WDOG_SR_RESET_STATUS_RESET, virtbase + U300_WDOG_SR);
+ 	/* We use the clock rate to calculate timeouts */
+ 	lpc18xx_wdt->clk_rate = clk_get_rate(lpc18xx_wdt->wdt_clk);
+ 	if (lpc18xx_wdt->clk_rate == 0) {
+ 		dev_err(dev, "failed to get clock rate\n");
+-		ret = -EINVAL;
+-		goto disable_wdt_clk;
++		return -EINVAL;
+ 	}
  
- 	irq = platform_get_irq(pdev, 0);
--	if (request_irq(irq, coh901327_interrupt, 0,
--			DRV_NAME " Bark", pdev)) {
--		ret = -EIO;
--		goto out_no_irq;
--	}
-+	if (devm_request_irq(dev, irq, coh901327_interrupt, 0,
-+			     DRV_NAME " Bark", pdev))
-+		return -EIO;
+ 	lpc18xx_wdt->wdt_dev.info = &lpc18xx_wdt_info;
+@@ -269,44 +278,17 @@ static int lpc18xx_wdt_probe(struct platform_device *pdev)
  
- 	ret = watchdog_init_timeout(&coh901327_wdt, margin, dev);
- 	if (ret < 0)
- 		coh901327_wdt.timeout = 60;
- 
- 	coh901327_wdt.parent = dev;
--	ret = watchdog_register_device(&coh901327_wdt);
-+	ret = devm_watchdog_register_device(dev, &coh901327_wdt);
- 	if (ret)
--		goto out_no_wdog;
+ 	setup_timer(&lpc18xx_wdt->timer, lpc18xx_wdt_timer_feed,
+ 		    (unsigned long)&lpc18xx_wdt->wdt_dev);
++	ret = devm_add_action(dev, (void(*)(void *))del_timer,
++			       &lpc18xx_wdt->timer);
++	if (ret)
 +		return ret;
  
- 	dev_info(dev, "initialized. timer margin=%d sec\n", margin);
- 	return 0;
+ 	watchdog_set_nowayout(&lpc18xx_wdt->wdt_dev, nowayout);
+ 	watchdog_set_restart_priority(&lpc18xx_wdt->wdt_dev, 128);
+ 
+-	platform_set_drvdata(pdev, lpc18xx_wdt);
 -
--out_no_wdog:
--	free_irq(irq, pdev);
--out_no_irq:
--	clk_disable_unprepare(clk);
--out_no_clk_enable:
--	clk_put(clk);
+-	ret = watchdog_register_device(&lpc18xx_wdt->wdt_dev);
+-	if (ret)
+-		goto disable_wdt_clk;
+-
+-	return 0;
+-
+-disable_wdt_clk:
+-	clk_disable_unprepare(lpc18xx_wdt->wdt_clk);
+-disable_reg_clk:
+-	clk_disable_unprepare(lpc18xx_wdt->reg_clk);
 -	return ret;
+-}
+-
+-static void lpc18xx_wdt_shutdown(struct platform_device *pdev)
+-{
+-	struct lpc18xx_wdt_dev *lpc18xx_wdt = platform_get_drvdata(pdev);
+-
+-	lpc18xx_wdt_stop(&lpc18xx_wdt->wdt_dev);
+-}
+-
+-static int lpc18xx_wdt_remove(struct platform_device *pdev)
+-{
+-	struct lpc18xx_wdt_dev *lpc18xx_wdt = platform_get_drvdata(pdev);
+-
+-	dev_warn(&pdev->dev, "I quit now, hardware will probably reboot!\n");
+-	del_timer(&lpc18xx_wdt->timer);
+-
+-	watchdog_unregister_device(&lpc18xx_wdt->wdt_dev);
+-	clk_disable_unprepare(lpc18xx_wdt->wdt_clk);
+-	clk_disable_unprepare(lpc18xx_wdt->reg_clk);
+-
+-	return 0;
++	watchdog_stop_on_reboot(&lpc18xx_wdt->wdt_dev);
++	return devm_watchdog_register_device(dev,
++					     &lpc18xx_wdt->wdt_dev);
  }
  
- #ifdef CONFIG_PM
+ static const struct of_device_id lpc18xx_wdt_match[] = {
+@@ -321,8 +303,6 @@ static struct platform_driver lpc18xx_wdt_driver = {
+ 		.of_match_table	= lpc18xx_wdt_match,
+ 	},
+ 	.probe = lpc18xx_wdt_probe,
+-	.remove = lpc18xx_wdt_remove,
+-	.shutdown = lpc18xx_wdt_shutdown,
+ };
+ module_platform_driver(lpc18xx_wdt_driver);
+ 
 -- 
 2.7.4
