@@ -1,46 +1,81 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 10 Jan 2017 09:32:09 -0600
-Subject: [RESEND 3/3] ARM: davinci_all_defconfig: enable iio and ADS7950
-In-Reply-To: <03501962-eb4a-6936-15dd-ed59c73f9cd9@ti.com>
-References: <1483978300-403-1-git-send-email-david@lechnology.com>
- <1483978300-403-4-git-send-email-david@lechnology.com>
- <03501962-eb4a-6936-15dd-ed59c73f9cd9@ti.com>
-Message-ID: <366c8cd2-e313-2ea2-211d-7e9a425b62e6@lechnology.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 10 Jan 2017 16:38:30 +0100
+Subject: [PATCH 1/1] MMC: meson: avoid possible NULL dereference
+In-Reply-To: <m237gwcec4.fsf@baylibre.com>
+References: <20161223150108.9229-1-xypron.glpk@gmx.de>
+ <m237gwcec4.fsf@baylibre.com>
+Message-ID: <CAPDyKFoxtnkoLo71xDdv3_e1jEjSqOHbBdAzQFPMvFxqHnzgsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2017 03:27 AM, Sekhar Nori wrote:
-> On Monday 09 January 2017 09:41 PM, David Lechner wrote:
->> This enables the iio subsystem and the TI ADS7950 driver. This is used by
->> LEGO MINDSTORMS EV3, which has an ADS7957 chip.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> ---
->>  arch/arm/configs/davinci_all_defconfig | 7 +++++++
->>  1 file changed, 7 insertions(+)
->>
->> diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
->> index 2b1967a..a899876 100644
->> --- a/arch/arm/configs/davinci_all_defconfig
->> +++ b/arch/arm/configs/davinci_all_defconfig
->> @@ -200,6 +200,13 @@ CONFIG_TI_EDMA=y
->>  CONFIG_MEMORY=y
->>  CONFIG_TI_AEMIF=m
->>  CONFIG_DA8XX_DDRCTL=y
->> +CONFIG_IIO=m
->> +CONFIG_IIO_BUFFER_CB=m
->> +CONFIG_IIO_SW_DEVICE=m
->> +CONFIG_IIO_SW_TRIGGER=m
->> +CONFIG_TI_ADS7950=m
->> +CONFIG_IIO_HRTIMER_TRIGGER=m
->> +CONFIG_IIO_SYSFS_TRIGGER=m
+On 6 January 2017 at 18:01, Kevin Hilman <khilman@baylibre.com> wrote:
+> Heinrich Schuchardt <xypron.glpk@gmx.de> writes:
 >
-> Hmm, there are some other comments I gave on the previous version I
-> don't see addressed. Can you please fix those or respond to those comments?
+>> No actual segmentation faults were observed but the coding is
+>> at least inconsistent.
+>>
+>> irqreturn_t meson_mmc_irq():
+>>
+>> We should not dereference host before checking it.
+>>
+>> meson_mmc_irq_thread():
+>>
+>> If cmd or mrq are NULL we should not dereference them after
+>> writing a warning.
+>>
+>> Fixes: 51c5d8447bd7 MMC: meson: initial support for GX platforms
+>> Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+>
+> Acked-by: Kevin Hilman <khilman@baylibre.com>
+>
+> Ulf, I assume you can pick this up directly for v4.10-rc?
 
-Oops, I missed the other comments. I will fix it.
+Thanks, applied for fixes!
+
+Kind regards
+Uffe
+
 
 >
 > Thanks,
-> Sekhar
 >
+> Kevin
+>
+>> ---
+>>  drivers/mmc/host/meson-gx-mmc.c | 8 +++++---
+>>  1 file changed, 5 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
+>> index b352760c041e..09739352834c 100644
+>> --- a/drivers/mmc/host/meson-gx-mmc.c
+>> +++ b/drivers/mmc/host/meson-gx-mmc.c
+>> @@ -578,13 +578,15 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
+>>  {
+>>       struct meson_host *host = dev_id;
+>>       struct mmc_request *mrq;
+>> -     struct mmc_command *cmd = host->cmd;
+>> +     struct mmc_command *cmd;
+>>       u32 irq_en, status, raw_status;
+>>       irqreturn_t ret = IRQ_HANDLED;
+>>
+>>       if (WARN_ON(!host))
+>>               return IRQ_NONE;
+>>
+>> +     cmd = host->cmd;
+>> +
+>>       mrq = host->mrq;
+>>
+>>       if (WARN_ON(!mrq))
+>> @@ -670,10 +672,10 @@ static irqreturn_t meson_mmc_irq_thread(int irq, void *dev_id)
+>>       int ret = IRQ_HANDLED;
+>>
+>>       if (WARN_ON(!mrq))
+>> -             ret = IRQ_NONE;
+>> +             return IRQ_NONE;
+>>
+>>       if (WARN_ON(!cmd))
+>> -             ret = IRQ_NONE;
+>> +             return IRQ_NONE;
+>>
+>>       data = cmd->data;
+>>       if (data) {
