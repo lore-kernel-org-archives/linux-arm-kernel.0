@@ -1,78 +1,355 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 10 Jan 2017 13:47:01 +0000
-Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
- enable panel
-In-Reply-To: <252ad888-fa9d-695a-58ed-46806e4374fd@mleia.com>
-References: <20161221032717.13154-1-vz@mleia.com>
- <CACRpkdZE6VgJA27+Wh=Gxd7yOXpLMyT7yCB2PYA36y0gvosHFQ@mail.gmail.com>
- <20170102142228.GI14217@n2100.armlinux.org.uk>
- <252ad888-fa9d-695a-58ed-46806e4374fd@mleia.com>
-Message-ID: <50499352-fa14-64c4-1a74-db4827757a2d@arm.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Tue, 10 Jan 2017 21:59:49 +0800
+Subject: [PATCH v2 2/2] media: rc: add driver for IR remote receiver on
+ MT7623 SoC
+In-Reply-To: <20170110110943.GA24889@gofer.mess.org>
+References: <1484039631-25120-1-git-send-email-sean.wang@mediatek.com>
+ <1484039631-25120-3-git-send-email-sean.wang@mediatek.com>
+ <20170110110943.GA24889@gofer.mess.org>
+Message-ID: <1484056789.4057.17.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+On Tue, 2017-01-10 at 11:09 +0000, Sean Young wrote:
 
-On 07/01/17 23:32, Vladimir Zapolskiy wrote:
-> On 01/02/2017 04:22 PM, Russell King - ARM Linux wrote:
->> On Fri, Dec 30, 2016 at 09:23:59AM +0100, Linus Walleij wrote:
->>> On Wed, Dec 21, 2016 at 4:27 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
->>>
->>>> The changeset contains a number of cleanups, changed semantics of
->>>> init_panel() callback, which allows to simplify getting of panel
->>>> properties from panel device tree node, and a handling of optional
->>>> "enable-gpios" panel property, the latter is described in
->>>> display/panel/panel-dpi.txt device tree binding documentation, but
->>>> it has been unsupported by the ARM CLCD driver.
->>>>
->>>> Vladimir Zapolskiy (4):
->>>>   video: ARM CLCD: sort included headers out alphabetically
->>>>   video: ARM CLCD: use panel device node for panel initialization
->>>>   video: ARM CLCD: use panel device node for getting backlight and mode
->>>>   video: ARM CLCD: add support of an optional GPIO to enable panel
->>>
->>> As you may have seen Tomi has stepped down as FBDEV maintainer and
->>> this subsystem is now orphaned.
->>>
->>> I guess Andrew Morton merges patches for it in this case, he usually does.
->>>
->>> But what we should actually do is create a new DRM driver for CLCD
->>> in drivers/gpu/drm/arm/clcd*
->>>
->>> It's maybe not a small undertaking :(
->>>
->>> But in case you're interested in the job, I will pitch in and test the result
->>> on all ARM reference designs plus Nomadik.
->>
->> A DRM driver for it would probably be a good idea, but dealing with all
->> the weird and wonderful connection arrangements may not be that easy...
->>
+> > +#include <linux/clk.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of_platform.h>
+> > +#include <linux/reset.h>
+> > +#include <media/rc-core.h>
+> > +
+> > +#define MTK_IR_DEV KBUILD_MODNAME
 > 
-> Linus, Russell,
-> 
-> I've immediately encountered a problem while porting the driver to DRM,
-> because LPC18xx/LPC43xx SoCs are powered by Cortex-M3/M4 cores and DRM
-> framework has build and runtime dependencies on MMU.
+> You could remove this #define and just use KBUILD_MODNAME
 
-+Benjamin
+I preferred to use MTK_IR_DEV internally that helps
+renaming in the future if necessary.
+>  
+> > +
+> > +/* Register to enable PWM and IR */
+> > +#define MTK_CONFIG_HIGH_REG       0x0c
+> > +/* Enable IR pulse width detection */
+> > +#define MTK_PWM_EN		  BIT(13)
+> > +/* Enable IR hardware function */
+> > +#define MTK_IR_EN		  BIT(0)
+> > +
+> > +/* Register to setting sample period */
+> > +#define MTK_CONFIG_LOW_REG        0x10
+> > +/* Field to set sample period */
+> > +#define CHK_PERIOD		  DIV_ROUND_CLOSEST(MTK_IR_SAMPLE,  \
+> > +						    MTK_IR_CLK_PERIOD)
+> > +#define MTK_CHK_PERIOD            (((CHK_PERIOD) << 8) & (GENMASK(20, 8)))
+> > +#define MTK_CHK_PERIOD_MASK	  (GENMASK(20, 8))
+> > +
+> > +/* Register to clear state of state machine */
+> > +#define MTK_IRCLR_REG             0x20
+> > +/* Bit to restart IR receiving */
+> > +#define MTK_IRCLR		  BIT(0)
+> > +
+> > +/* Register containing pulse width data */
+> > +#define MTK_CHKDATA_REG(i)        (0x88 + 4 * (i))
+> > +#define MTK_WIDTH_MASK		  (GENMASK(7, 0))
+> > +
+> > +/* Register to enable IR interrupt */
+> > +#define MTK_IRINT_EN_REG          0xcc
+> > +/* Bit to enable interrupt */
+> > +#define MTK_IRINT_EN		  BIT(0)
+> > +
+> > +/* Register to ack IR interrupt */
+> > +#define MTK_IRINT_CLR_REG         0xd0
+> > +/* Bit to clear interrupt status */
+> > +#define MTK_IRINT_CLR		  BIT(0)
+> > +
+> > +/* Maximum count of samples */
+> > +#define MTK_MAX_SAMPLES		  0xff
+> > +/* Indicate the end of IR message */
+> > +#define MTK_IR_END(v, p)	  ((v) == MTK_MAX_SAMPLES && (p) == 0)
+> > +/* Number of registers to record the pulse width */
+> > +#define MTK_CHKDATA_SZ		  17
+> > +/* Source clock frequency */
+> > +#define MTK_IR_BASE_CLK		  273000000
+> > +/* Frequency after IR internal divider */
+> > +#define MTK_IR_CLK_FREQ		  (MTK_IR_BASE_CLK / 4)
 
-In another thread Benjamin pointed at patch [1] in drm/kms part for noMMU.
+> > +static irqreturn_t mtk_ir_irq(int irqno, void *dev_id)
+> > +{
+> > +	struct mtk_ir *ir = dev_id;
+> > +	u8  wid = 0;
+> > +	u32 i, j, val;
+> > +	DEFINE_IR_RAW_EVENT(rawir);
+> > +
+> > +	mtk_irq_disable(ir, MTK_IRINT_EN);
+> 
+> The kernel guarantees that calls to the interrupt handler are serialised,
+> no need to disable the interrupt in the handler.
 
-[1] https://cgit.freedesktop.org/drm/drm-misc/commit/?id=62a0d98a188cc4ebd8ea54b37d274ec20465e464
+agreed. I will save the mtk irq disable/enable and retest again.
 
-Cheers
-Vladimir
 
+> > +
+> > +	/* Reset decoder state machine */
+> > +	ir_raw_event_reset(ir->rc);
 > 
-> That said, in short term I would expect a continuation of support for
-> the legacy CLCD framebuffer driver, which works fine on MMU-less SoCs.
+> Not needed.
+
+
+two reasons I added the line here
+
+1) 
+I thought it is possible the decoder goes to the
+middle state when getting the data not belonged
+to the protocol. If so, that would cause the decoding
+fails in the next time receiving the valid protocol data.
+
+2) 
+the mtk hardware register always contains the start of 
+IR message. So force to sync the state between 
+HW and ir-core.
+
+
+
+> > +
+> > +	/* First message must be pulse */
+> > +	rawir.pulse = false;
 > 
-> --
-> With best wishes,
-> Vladimir
+> pulse = true?
+
+becasue of rawir.pulse = !rawir.pulse does as below
+so the initial value is set as false.
+
+> > +
+> > +	/* Handle all pulse and space IR controller captures */
+> > +	for (i = 0 ; i < MTK_CHKDATA_SZ ; i++) {
+> > +		val = mtk_r32(ir, MTK_CHKDATA_REG(i));
+> > +		dev_dbg(ir->dev, "@reg%d=0x%08x\n", i, val);
+> > +
+> > +		for (j = 0 ; j < 4 ; j++) {
+> > +			wid = (val & (MTK_WIDTH_MASK << j * 8)) >> j * 8;
+> > +			rawir.pulse = !rawir.pulse;
+> > +			rawir.duration = wid * (MTK_IR_SAMPLE + 1);
+> > +			ir_raw_event_store_with_filter(ir->rc, &rawir);
+> > +		}
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> In v1 you would break out of the loop if the ir message was shorter, but
+> now you are always passing on 68 pulses and spaces. Is that right?
+
+as I asked in the previous mail list as below i copied from it, so i
+made some changes ...
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+> I had another question. I found multiple and same IR messages being
+> received when using SONY remote controller. Should driver needs to
+> report each message or only one of these to the upper layer ?
+
+In general the driver shouldn't try to change any IR message, this
+should be done in rc-core if necessary.
+
+rc-core should handle this correctly. If the same key is received twice
+within IR_KEYPRESS_TIMEOUT (250ms) then it not reported to the input
+layer.
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+for example:
+the 68 pulse/spaces might contains 2.x IR messages when I
+pressed one key on SONY remote control. 
+
+the v1 proposed is passing only one IR message into ir-core ; 
+the v2 done is passing all IR messages even including the last
+incomplete message into ir-core. 
+
+But I was still afraid the state machine can't  go back to initial state
+after receiving these incomplete data. 
+
+So the ir_raw_event_reset() call in the beginning of ISR seems becoming
+more important.
+
+> > +	}
+> > +
+> > +	/* The maximum number of edges the IR controller can
+> > +	 * hold is MTK_CHKDATA_SZ * 4. So if received IR messages
+> > +	 * is over the limit, the last incomplete IR message would
+> > +	 * be appended trailing space and still would be sent into
+> > +	 * ir-rc-raw to decode. That helps it is possible that it
+> > +	 * has enough information to decode a scancode even if the
+> > +	 * trailing end of the message is missing.
+> > +	 */
+> > +	if (!MTK_IR_END(wid, rawir.pulse)) {
+> > +		rawir.pulse = false;
+> > +		rawir.duration = MTK_MAX_SAMPLES * (MTK_IR_SAMPLE + 1);
+> > +		ir_raw_event_store_with_filter(ir->rc, &rawir);
+> > +	}
+> > +
+> > +	ir_raw_event_handle(ir->rc);
+> > +
+> > +	/* Restart controller for the next receive */
+> > +	mtk_w32_mask(ir, 0x1, MTK_IRCLR, MTK_IRCLR_REG);
+> > +
+> > +	/* Clear interrupt status */
+> > +	mtk_w32_mask(ir, 0x1, MTK_IRINT_CLR, MTK_IRINT_CLR_REG);
+> > +
+> > +	/* Enable interrupt */
+> > +	mtk_irq_enable(ir, MTK_IRINT_EN);
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +static int mtk_ir_probe(struct platform_device *pdev)
+> > +{
+> > +	struct device *dev = &pdev->dev;
+> > +	struct device_node *dn = dev->of_node;
+> > +	struct resource *res;
+> > +	struct mtk_ir *ir;
+> > +	u32 val;
+> > +	int ret = 0;
+> > +	const char *map_name;
+> > +
+> > +	ir = devm_kzalloc(dev, sizeof(struct mtk_ir), GFP_KERNEL);
+> > +	if (!ir)
+> > +		return -ENOMEM;
+> > +
+> > +	ir->dev = dev;
+> > +
+> > +	if (!of_device_is_compatible(dn, "mediatek,mt7623-cir"))
+> > +		return -ENODEV;
+> > +
+> > +	ir->clk = devm_clk_get(dev, "clk");
+> > +	if (IS_ERR(ir->clk)) {
+> > +		dev_err(dev, "failed to get a ir clock.\n");
+> > +		return PTR_ERR(ir->clk);
+> > +	}
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	ir->base = devm_ioremap_resource(dev, res);
+> > +	if (IS_ERR(ir->base)) {
+> > +		dev_err(dev, "failed to map registers\n");
+> > +		return PTR_ERR(ir->base);
+> > +	}
+> > +
+> > +	ir->rc = devm_rc_allocate_device(dev, RC_DRIVER_IR_RAW);
+> > +	if (!ir->rc) {
+> > +		dev_err(dev, "failed to allocate device\n");
+> > +		return -ENOMEM;
+> > +	}
+> > +
+> > +	ir->rc->priv = ir;
+> > +	ir->rc->input_name = MTK_IR_DEV;
+> > +	ir->rc->input_phys = MTK_IR_DEV "/input0";
+> > +	ir->rc->input_id.bustype = BUS_HOST;
+> > +	ir->rc->input_id.vendor = 0x0001;
+> > +	ir->rc->input_id.product = 0x0001;
+> > +	ir->rc->input_id.version = 0x0001;
+> > +	map_name = of_get_property(dn, "linux,rc-map-name", NULL);
+> > +	ir->rc->map_name = map_name ?: RC_MAP_EMPTY;
+> > +	ir->rc->dev.parent = dev;
+> > +	ir->rc->driver_name = MTK_IR_DEV;
+> > +	ir->rc->allowed_protocols = RC_BIT_ALL;
+> > +	ir->rc->rx_resolution = MTK_IR_SAMPLE;
+> > +	ir->rc->timeout = MTK_MAX_SAMPLES * (MTK_IR_SAMPLE + 1);
+> > +
+> > +	ret = devm_rc_register_device(dev, ir->rc);
 > 
+> Here you do devm_rc_register_device()
+
+does it have problem ?
+
+
+> > +	if (ret) {
+> > +		dev_err(dev, "failed to register rc device\n");
+> > +		return ret;
+> > +	}
+> > +
+> > +	platform_set_drvdata(pdev, ir);
+> > +
+> > +	ir->irq = platform_get_irq(pdev, 0);
+> > +	if (ir->irq < 0) {
+> > +		dev_err(dev, "no irq resource\n");
+> > +		return -ENODEV;
+> > +	}
+> > +
+> > +	/* Enable interrupt after proper hardware
+> > +	 * setup and IRQ handler registration
+> > +	 */
+> > +	if (clk_prepare_enable(ir->clk)) {
+> > +		dev_err(dev, "try to enable ir_clk failed\n");
+> > +		ret = -EINVAL;
+> > +		goto exit_clkdisable_clk;
+> > +	}
+> > +
+> > +	mtk_irq_disable(ir, MTK_IRINT_EN);
+> > +
+> > +	ret = devm_request_irq(dev, ir->irq, mtk_ir_irq, 0, MTK_IR_DEV, ir);
+> > +	if (ret) {
+> > +		dev_err(dev, "failed request irq\n");
+> > +		goto exit_clkdisable_clk;
+> > +	}
+> > +
+> > +	/* Enable IR and PWM */
+> > +	val = mtk_r32(ir, MTK_CONFIG_HIGH_REG);
+> > +	val |= MTK_PWM_EN | MTK_IR_EN;
+> > +	mtk_w32(ir, val, MTK_CONFIG_HIGH_REG);
+> > +
+> > +	/* Setting sample period */
+> > +	mtk_w32_mask(ir, MTK_CHK_PERIOD, MTK_CHK_PERIOD_MASK,
+> > +		     MTK_CONFIG_LOW_REG);
+> > +
+> > +	mtk_irq_enable(ir, MTK_IRINT_EN);
+> > +
+> > +	dev_info(dev, "Initialized MT7623 IR driver, sample period = %luus\n",
+> > +		 DIV_ROUND_CLOSEST(MTK_IR_SAMPLE, 1000));
+> > +
+> > +	return 0;
+> > +
+> > +exit_clkdisable_clk:
+> > +	clk_disable_unprepare(ir->clk);
+> > +
+> > +	return ret;
+> > +}
+> > +
+> > +static int mtk_ir_remove(struct platform_device *pdev)
+> > +{
+> > +	struct mtk_ir *ir = platform_get_drvdata(pdev);
+> > +
+> > +	/* Avoid contention between remove handler and
+> > +	 * IRQ handler so that disabling IR interrupt and
+> > +	 * waiting for pending IRQ handler to complete
+> > +	 */
+> > +	mtk_irq_disable(ir, MTK_IRINT_EN);
+> > +	synchronize_irq(ir->irq);
+> > +
+> > +	clk_disable_unprepare(ir->clk);
+> > +
+> > +	rc_unregister_device(ir->rc);
+> 
+> Yet here you explicitly call rc_unregister_device(). Since it was registered
+> with the devm call, this call is not needed and will lead to double frees etc
+
+bug :( .  I will fix it ..
+
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct of_device_id mtk_ir_match[] = {
+> > +	{ .compatible = "mediatek,mt7623-cir" },
+> > +	{},
+> > +};
+> > +MODULE_DEVICE_TABLE(of, mtk_ir_match);
+> > +
+> > +static struct platform_driver mtk_ir_driver = {
+> > +	.probe          = mtk_ir_probe,
+> > +	.remove         = mtk_ir_remove,
+> > +	.driver = {
+> > +		.name = MTK_IR_DEV,
+> > +		.of_match_table = mtk_ir_match,
+> > +	},
+> > +};
+> > +
+> > +module_platform_driver(mtk_ir_driver);
+> > +
+> > +MODULE_DESCRIPTION("Mediatek IR Receiver Controller Driver");
+> > +MODULE_AUTHOR("Sean Wang <sean.wang@mediatek.com>");
+> > +MODULE_LICENSE("GPL");
+> > -- 
+> > 2.7.4
+> > 
