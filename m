@@ -1,55 +1,36 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Tue, 10 Jan 2017 14:15:29 +0800
-Subject: [PATCH v4 1/2] arm64: dts: rockchip: add "rockchip,
- grf" property for RK3399 PMUCRU/CRU
-In-Reply-To: <1484028930-20305-1-git-send-email-zhengxing@rock-chips.com>
-References: <1484028930-20305-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1484028930-20305-2-git-send-email-zhengxing@rock-chips.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 10 Jan 2017 14:18:20 +0800
+Subject: [PATCH v5 2/2] ARM: dts: vf610-zii-dev: Add .dts file for rev. C
+In-Reply-To: <20170107200654.26056-2-andrew.smirnov@gmail.com>
+References: <20170107200654.26056-1-andrew.smirnov@gmail.com>
+ <20170107200654.26056-2-andrew.smirnov@gmail.com>
+Message-ID: <20170110061818.GY20956@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The structure rockchip_clk_provider needs to refer the GRF regmap
-in somewhere, if the CRU node has not "rockchip,grf" property,
-calling syscon_regmap_lookup_by_phandle will return an invalid GRF
-regmap, and the MUXGRF type clock will be not supported.
+On Sat, Jan 07, 2017 at 12:06:54PM -0800, Andrey Smirnov wrote:
+> Add .dts file for rev. C of the board by factoring out commonalities
+> into a shared include file (vf610-zii-dev-rev-b-c.dtsi) and deriving
+> revision specific file from it (vf610-zii-dev-rev-b.dts and
+> vf610-zii-dev-reb-c.dts).
+> 
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: andrew at lunn.ch
+> Cc: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+> Cc: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
+> Cc: cphealy at gmail.com
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-Therefore, we need to add them.
+This patch doesn't apply to my imx/dt branch.  Please rebase.  Also
+please ensure the copyright text is the correct one [1].
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
----
+Shawn
 
-Changes in v4:
-- separte the binding patch
-
-Changes in v3:
-- add optional roperty rockchip,grf in rockchip,rk3399-cru.txt
-
-Changes in v2:
-- referring pmugrf for PMUGRU
-- fix the typo "invaild" in COMMIT message
-
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index c928015..081621b 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1077,6 +1077,7 @@
- 	pmucru: pmu-clock-controller at ff750000 {
- 		compatible = "rockchip,rk3399-pmucru";
- 		reg = <0x0 0xff750000 0x0 0x1000>;
-+		rockchip,grf = <&pmugrf>;
- 		#clock-cells = <1>;
- 		#reset-cells = <1>;
- 		assigned-clocks = <&pmucru PLL_PPLL>;
-@@ -1086,6 +1087,7 @@
- 	cru: clock-controller at ff760000 {
- 		compatible = "rockchip,rk3399-cru";
- 		reg = <0x0 0xff760000 0x0 0x1000>;
-+		rockchip,grf = <&grf>;
- 		#clock-cells = <1>;
- 		#reset-cells = <1>;
- 		assigned-clocks =
--- 
-2.7.4
+[1] https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/diff/?h=imx/dt&id=13283626c889fd5c03b485d54c924b795aca1c1e
