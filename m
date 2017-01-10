@@ -1,54 +1,36 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 10 Jan 2017 11:38:55 +0000
-Subject: [PATCH v3 8/9] arm: KVM: Enable support for host pmu
-In-Reply-To: <20170110113856.7183-1-punit.agrawal@arm.com>
-References: <20170110113856.7183-1-punit.agrawal@arm.com>
-Message-ID: <20170110113856.7183-9-punit.agrawal@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 10 Jan 2017 11:56:54 +0000
+Subject: [PATCH 1/2] of: base: add support to get the number of cache
+ levels
+In-Reply-To: <1484048479-19767-1-git-send-email-sudeep.holla@arm.com>
+References: <1484048479-19767-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <bd0ced47-8d29-b6f6-f818-4e6d191ce383@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the Kconfig option and Makefile updates to enable the recently added
-support for host pmu.
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
----
- arch/arm/kvm/Kconfig  | 4 ++++
- arch/arm/kvm/Makefile | 1 +
- 2 files changed, 5 insertions(+)
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 90d0176fb30d..198d16c36220 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -16,6 +16,9 @@ menuconfig VIRTUALIZATION
- 
- if VIRTUALIZATION
- 
-+config KVM_HOST_PMU
-+	bool
-+
- config KVM
- 	bool "Kernel-based Virtual Machine (KVM) support"
- 	depends on MMU && OF
-@@ -30,6 +33,7 @@ config KVM
- 	select SRCU
- 	select MMU_NOTIFIER
- 	select KVM_VFIO
-+	select KVM_HOST_PMU if PERF_EVENTS
- 	select HAVE_KVM_EVENTFD
- 	select HAVE_KVM_IRQFD
- 	select HAVE_KVM_IRQCHIP
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index d571243ab4d1..09d358499ce1 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -35,3 +35,4 @@ obj-y += $(KVM)/arm/vgic/vgic-kvm-device.o
- obj-y += $(KVM)/arm/vgic/vgic-its.o
- obj-y += $(KVM)/irqchip.o
- obj-y += $(KVM)/arm/arch_timer.o
-+obj-$(CONFIG_KVM_HOST_PMU) += $(KVM)/arm/host_pmu.o
+On 10/01/17 11:41, Sudeep Holla wrote:
+> It is useful to have helper function just to get the number of cache
+> levels for a given logical cpu. This patch adds the support for the
+> same.
+> 
+> It will be used on ARM64 platform where the device tree provides the
+> information for the additional non-architected/transparent/external
+> last level caches that are not integrated with the processors.
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/of/base.c  | 22 ++++++++++++++++++++++
+>  include/linux/of.h |  1 +
+>  2 files changed, 23 insertions(+)
+> 
+
+I seem to have missed to generate patch after I fixed the build error.
+I will send updated version of this patch.
+
 -- 
-2.11.0
+Regards,
+Sudeep
