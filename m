@@ -1,50 +1,54 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 10 Jan 2017 11:50:36 +0000
-Subject: [QUESTION] Arm64: Query L3 cache info via DT
-In-Reply-To: <5874BD6C.7060008@huawei.com>
-References: <58633494.9030708@huawei.com>
- <81784854-11f8-468a-a280-69be0a714a3b@arm.com> <5874A03A.9000901@huawei.com>
- <536f64cc-357c-40a1-b2a0-1db0c4280fc0@arm.com> <5874BD6C.7060008@huawei.com>
-Message-ID: <913e50ac-5040-8a91-539b-136ed7cde1e3@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 10 Jan 2017 11:51:33 +0000
+Subject: [PATCH v2] arm64: do not set dma masks that device connection
+ can't handle
+In-Reply-To: <1483947002-16410-1-git-send-email-nikita.yoush@cogentembedded.com>
+References: <1483947002-16410-1-git-send-email-nikita.yoush@cogentembedded.com>
+Message-ID: <20170110115132.GD21598@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/01/17 10:54, Tan Xiaojun wrote:
-> On 2017/1/10 18:01, Sudeep Holla wrote:
->>
->>
->> On 10/01/17 08:50, Tan Xiaojun wrote:
->>> I add this patch, and test in Hisilicon D02/D03. It can work well.
->>>
->>> I'm sorry to reply so late. I took some time to debug, because I am not familiar with the code.
->>>
->>>> +	if (level < of_level) {
->>>> +		/*
->>>> +		 * some external caches not specified in CLIDR_EL1
->>>> +		 * the information may be available in the device tree
->>>> +		 * only unified external caches are considered here
->>>> +		 */
->>>> +		level = of_level;
->>>> +		leaves += (of_level - level);
->>>
->>> The above two lines need to exchange the location.
->>>
->>
->> Ah crap, sorry for such a silly mistake.
->> I will post proper patch(es) soon.
->>
+On Mon, Jan 09, 2017 at 10:30:02AM +0300, Nikita Yushchenko wrote:
+> It is possible that device is capable of 64-bit DMA addresses, and
+> device driver tries to set wide DMA mask, but bridge or bus used to
+> connect device to the system can't handle wide addresses.
 > 
-> OK. Wait for your new patch. ^_^
+> With swiotlb, memory above 4G still can be used by drivers for streaming
+> DMA, but *dev->mask and dev->dma_coherent_mask must still keep values
+> that hardware handles physically.
 > 
+> This patch enforces that. Based on original version by
+> Arnd Bergmann <arnd@arndb.de>, extended with coherent mask hadnling.
+> 
+> Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> ---
+> Changes since v1:
+> - fixed issues noted by Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>   - save mask, not size
+>   - remove doube empty line
+> 
+>  arch/arm64/Kconfig              |  3 +++
+>  arch/arm64/include/asm/device.h |  1 +
+>  arch/arm64/mm/dma-mapping.c     | 51 +++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 55 insertions(+)
 
-Thanks, I have posted the patches[1] and Cc-ed you on them. It would be
-good to get Tested-by once you check.
+I still don't think this patch is general enough. The problem you're seeing
+with swiotlb seems to be exactly the same problem reported by Feng Kan over
+at:
 
--- 
-Regards,
-Sudeep
+  http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
 
-[1]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/478261.html
+[read on; it was initially thought to be a hardware erratum, but it's
+ actually the inability to restrict the DMA mask of the endpoint that's
+ the problem]
+
+The point here is that an IOMMU doesn't solve your issue, and the
+IOMMU-backed DMA ops need the same treatment. In light of that, it really
+feels to me like the DMA masks should be restricted in of_dma_configure
+so that the parent mask is taken into account there, rather than hook
+into each set of DMA ops to intercept set_dma_mask. We'd still need to
+do something to stop dma_set_mask widening the mask if it was restricted
+by of_dma_configure, but I think Robin (cc'd) was playing with that.
+
+Will
