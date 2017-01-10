@@ -1,76 +1,73 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 10 Jan 2017 20:46:12 +0100
-Subject: [PATCH v4 1/2] arm64: dts: rockchip: add "rockchip,
- grf" property for RK3399 PMUCRU/CRU
-In-Reply-To: <CAD=FV=Wwu3q_LqwYUWcJQRvp5neVOS9szgsYFONWTRJ0X8hRTA@mail.gmail.com>
-References: <1484028930-20305-1-git-send-email-zhengxing@rock-chips.com>
- <1484028930-20305-2-git-send-email-zhengxing@rock-chips.com>
- <CAD=FV=Wwu3q_LqwYUWcJQRvp5neVOS9szgsYFONWTRJ0X8hRTA@mail.gmail.com>
-Message-ID: <8683375.pL9J7LxuT0@diego>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue, 10 Jan 2017 11:49:03 -0800
+Subject: [PATCH] of: alloc anywhere from memblock if range not specified
+In-Reply-To: <717b117d-9b8b-d4e9-6135-3c52afd635c8@gmail.com>
+References: <1456148744-7583-1-git-send-email-vinmenon@codeaurora.org>
+ <717b117d-9b8b-d4e9-6135-3c52afd635c8@gmail.com>
+Message-ID: <ec66df44-3997-cfae-8f44-a46b16da896b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 10. Januar 2017, 10:45:48 schrieb Doug Anderson:
-> Hi,
+On 01/10/2017 08:16 AM, Leonard Crestez wrote:
+> Hello,
 > 
-> On Mon, Jan 9, 2017 at 10:15 PM, Xing Zheng <zhengxing@rock-chips.com> 
-wrote:
-> > The structure rockchip_clk_provider needs to refer the GRF regmap
-> > in somewhere, if the CRU node has not "rockchip,grf" property,
-> > calling syscon_regmap_lookup_by_phandle will return an invalid GRF
-> > regmap, and the MUXGRF type clock will be not supported.
-> > 
-> > Therefore, we need to add them.
-> > 
-> > Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> > ---
-> > 
-> > Changes in v4:
-> > - separte the binding patch
-> > 
-> > Changes in v3:
-> > - add optional roperty rockchip,grf in rockchip,rk3399-cru.txt
-> > 
-> > Changes in v2:
-> > - referring pmugrf for PMUGRU
-> > - fix the typo "invaild" in COMMIT message
-> > 
-> >  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 ++
-> >  1 file changed, 2 insertions(+)
+> I have some trouble with this patch.
 > 
-> This seems fine to me, so:
+> It seems the intention is to allow CMA to be placed in highmem. If the CMA area is
+> larger than highmem and no alloc-ranges is specified (just a size) it is possible
+> to end up allocating a area that spans from multiple zones. This later breaks
+> checks in cma_activate_area and makes most dma allocations fail.
 > 
-> Reviewed-by: Douglas Anderson <dianders@chromium.org>
+> Am I missing something or this a bug?
 > 
-> ...but I will say that before you actually add any real "MUXGRF"
-> clocks on rk3399 you _might_ need to rework the code to make things
-> truly "optional".  If it turns out that any existing clocks that
-> already exist today already go through one of these muxes in the GRF
-> and we've always been assuming one setting of the mux, we'll need to
-> make sure we keep assuming that setting of the mux even if the "grf"
-> isn't specified.
 
-I guess I see that a bit more relaxed :-) .
+This has been discussed in previous threads
 
-I.e. the GRF being optional is a remnant of syscons not being available when 
-the clocks get set up- so were coming in later or not at all. For the rk3288 I 
-converted, there we never really had the case of the GRF missing.
+https://marc.info/?l=linux-kernel&m=147990760506179&w=2
+https://marc.info/?l=linux-kernel&m=147928325113103&w=2
 
-And the GRF mux for the vcodec now present is not being used by anything yet 
-(neither driver nor binding), so no old devicetree can break.
+I haven't seen any follow up since then though.
 
-
-> As I understand it, your motivation for this patch is to eventually be
-> able to model the EDP reference clock which can either be xin24 or
-> "edp osc".  Presumably the eDP "reference clock" isn't related to any
-> of the pre-existing eDP clocks so that one should be safe.
-
-Same here, so far we don't even have edp or even any other graphical output on 
-the rk3399, so again there is no old devicetree that could break when the grf 
-is not specified.
-
-
-So, for me that looks good.
-
-
-Heiko
+> On Mon, Feb 22, 2016 at 3:45 PM, Vinayak Menon <vinmenon@codeaurora.org> wrote:
+>>
+>> early_init_dt_alloc_reserved_memory_arch passes end as 0 to
+>> __memblock_alloc_base, when limits are not specified. But
+>> __memblock_alloc_base takes end value of 0 as MEMBLOCK_ALLOC_ACCESSIBLE
+>> and limits the end to memblock.current_limit. This results in regions
+>> never being placed in HIGHMEM area, for e.g. CMA.
+>> Let __memblock_alloc_base allocate from anywhere in memory if limits are
+>> not specified.
+>>
+>> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> Signed-off-by: Vinayak Menon <vinmenon@codeaurora.org>
+>> ---
+>>  drivers/of/of_reserved_mem.c | 4 +++-
+>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+>> index 1a3556a..ed01c01 100644
+>> --- a/drivers/of/of_reserved_mem.c
+>> +++ b/drivers/of/of_reserved_mem.c
+>> @@ -32,11 +32,13 @@ int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
+>>         phys_addr_t align, phys_addr_t start, phys_addr_t end, bool nomap,
+>>         phys_addr_t *res_base)
+>>  {
+>> +       phys_addr_t base;
+>>         /*
+>>          * We use __memblock_alloc_base() because memblock_alloc_base()
+>>          * panic()s on allocation failure.
+>>          */
+>> -       phys_addr_t base = __memblock_alloc_base(size, align, end);
+>> +       end = !end ? MEMBLOCK_ALLOC_ANYWHERE : end;
+>> +       base = __memblock_alloc_base(size, align, end);
+>>         if (!base)
+>>                 return -ENOMEM;
+>>
+>> -- 
+>> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a
+>> member of the Code Aurora Forum, hosted by The Linux Foundation
+>>
+> -- 
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
