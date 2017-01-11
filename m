@@ -1,45 +1,35 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu, 12 Jan 2017 03:44:53 +0800
-Subject: [PATCH 2/5] clk: sunxi-ng: add support for V3s CCU
-In-Reply-To: <2705031484163593@web1g.yandex.ru>
-References: <20170103151629.19447-1-icenowy@aosc.xyz>
- <20170103151629.19447-3-icenowy@aosc.xyz>
- <20170110181006.yrd6moy2mctzoc4c@lukather> <2705031484163593@web1g.yandex.ru>
-Message-ID: <2714901484163893@web1g.yandex.ru>
+From: uwe@kleine-koenig.org (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 11 Jan 2017 20:49:46 +0100
+Subject: CONFIG_PCIEASPM breaks PCIe on Marvell Armada 385 machine
+Message-ID: <20170111194942.q5rdma2es6hkmxfe@perseus.defre.kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
+on an Marvell Armada 385 based machine (Turris Omnia) with 4.9 the
+ath10k driver fails to bind to the matching hardware if CONFIG_PCIEASPM
+is enabled:
 
-12.01.2017, 03:40, "Icenowy Zheng" <icenowy@aosc.xyz>:
-> 11.01.2017, 02:10, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
->> ?On Tue, Jan 03, 2017 at 11:16:26PM +0800, Icenowy Zheng wrote:
->>> ??V3s has a similar but cut-down CCU to H3.
->>>
->>> ??Add support for it.
->>>
->>> ??Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->>
->> ?It looks like there's nothing different but the clocks that you
->> ?register with the H3, please just use the H3 driver.
->
-> Nope.
->
-> It has a different PLL (PLL_ISP) at different address, and some
-> different muxes.
+# dmesg | grep ath
+[    7.207770] ath10k_pci 0000:02:00.0: Refused to change power state, currently in D3
+[    7.237955] ath10k_pci 0000:02:00.0: failed to wake up device : -110
+[    7.238146] ath10k_pci: probe of 0000:02:00.0 failed with error -110
 
-Forgot to mention the missing of PLL_DE and related misses.
+if however PCIEASPM is off, the driver probes correctly and the ath10k
+adapter works fine.
 
->
->> ?Thanks!
->> ?Maxime
->>
->> ?--
->> ?Maxime Ripard, Free Electrons
->> ?Embedded Linux and Kernel engineering
->> ?http://free-electrons.com
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I wonder if someone has an idea what needs to be done to fix this
+problem. (OK, I could disable PCIEASPM, but I'd like to have a solution
+for a distribution kernel where I think PCIEASPM=y is sensible in
+general.)
+
+Best regards
+Uwe
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170111/91e57d62/attachment.sig>
