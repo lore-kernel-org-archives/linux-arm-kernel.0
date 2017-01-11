@@ -1,55 +1,74 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 11 Jan 2017 12:51:47 +0100
-Subject: [PATCH 1/1] iommu/arm-smmu: Fix for ThunderX erratum #27704
-Message-ID: <1484135507-24872-1-git-send-email-tn@semihalf.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 11 Jan 2017 11:54:37 +0000
+Subject: [PATCH] arm64: avoid increasing DMA masks above what hardware
+ supports
+In-Reply-To: <67314806-361d-e0ac-9292-37542160ead5@cogentembedded.com>
+References: <11daacde-5399-039f-80a3-01d7bd13e9e8@arm.com>
+ <1484056844-9567-1-git-send-email-nikita.yoush@cogentembedded.com>
+ <dca35acf-1adf-aa85-7a0b-d0c6ec702fa1@arm.com>
+ <67314806-361d-e0ac-9292-37542160ead5@cogentembedded.com>
+Message-ID: <57459a4a-2c57-e081-8f27-cb83f23b5815@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The goal of erratum #27704 workaround was to make sure that ASIDs and VMIDs
-are unique across all SMMU instances on affected Cavium systems.
+On 11/01/17 07:59, Nikita Yushchenko wrote:
+>>> +	/*
+>>> +	 * we don't yet support buses that have a non-zero mapping.
+>>> +	 *  Let's hope we won't need it
+>>> +	 */
+>>> +	WARN_ON(dma_base != 0);
+>>
+>> I believe we now accomodate the bus remap bits on BCM2837 as a DMA
+>> offset, so unfortunately I think this is no longer true.
+> 
+> Arnd, this check is from you. Any updates? Perhaps this check can be
+> just dropped?
+> 
+> In swiotlb code, dma address (i.e. with offset already applied) is
+> checked against mask.  Not sure what 'dma_base' means in iommu case.
+> 
+>>> +	/*
+>>> +	 * Whatever the parent bus can set. A device must not set
+>>> +	 * a DMA mask larger than this.
+>>> +	 */
+>>> +	dev->archdata.parent_dma_mask = size - 1;
+>>
+>> This will effectively constrain *all* DMA masks to be 32-bit, since for
+>> 99% of devices we're going to see a size derived from the default mask
+>> passed in here. I worry that that's liable to lead to performance and
+>> stability regressions
+> 
+> That was exactly my concern when I first tried to address this issue. My
+> first attempt was to alter very locally exact configuration where
+> problem shows, while ensuring that everything else stays as is. See
+> https://lkml.org/lkml/2016/12/29/218
+> 
+> But looks like people want a generic solution.
+> 
+>> I reckon the easiest way forward would be to pass in some flag to
+>> arch_setup_dma_ops to indicate whether it's an explicitly-configured
+>> range or not - then simply initialising parent_dma_mask to ~0 for the
+>> default case *should* keep things working as before.
+> 
+> Currently only arm, arm64 and mips define arch_setup_dma_ops().
+> Mips version only checks 'coherent' argument, 'size' is used only by arm
+> and arm64.
+> 
+> Maybe move setting the default from caller to callee?
+> I.e. pass size=0 if no explicit information exists, and let architecture
+> handle that?
 
-Currently, the workaround code partitions ASIDs and VMIDs by increasing
-global cavium_smmu_context_count which in turn becomes the base ASID and VMID
-value for the given SMMU instance upon the context bank initialization.
+Yes, I think that ought to work, although the __iommu_setup_dma_ops()
+call will still want a real size reflecting the default mask, so
+something like:
 
-For systems with multiple SMMU instances this approach implies the risk
-of crossing 8-bit ASID, like for CN88xx capable of 4 SMMUv2, 128 context bank each:
-SMMU_0 (0-127 ASID RANGE)
-SMMU_1 (127-255 ASID RANGE)
-SMMU_2 (256-383 ASID RANGE) <--- crossing 8-bit ASID
-SMMU_3 (384-511 ASID RANGE) <--- crossing 8-bit ASID
+if (size == 0) {
+	dev->archdata.parent_dma_mask = ~0;
+	size = 1ULL << 32;
+} else {
+	dev->archdata.parent_dma_mask = size - 1;
+}
 
-Since we use 8-bit ASID now we effectively misconfigure ASID[15:8] bits for
-SMMU_CBn_TTBRm register. Also, we still use non-zero ASID[15:8] bits
-upon context invalidation. This patch adds 16-bit ASID support for stage-1
-AArch64 contexts for Cavium SMMUv2 model so that we use ASIDs consistently.
+should probably do the trick.
 
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
----
- drivers/iommu/arm-smmu.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index a60cded..ae8f059 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -260,6 +260,7 @@ enum arm_smmu_s2cr_privcfg {
- 
- #define TTBCR2_SEP_SHIFT		15
- #define TTBCR2_SEP_UPSTREAM		(0x7 << TTBCR2_SEP_SHIFT)
-+#define TTBCR2_AS			(1 << 4)
- 
- #define TTBRn_ASID_SHIFT		48
- 
-@@ -778,6 +779,9 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 			reg = pgtbl_cfg->arm_lpae_s1_cfg.tcr;
- 			reg2 = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
- 			reg2 |= TTBCR2_SEP_UPSTREAM;
-+			if (smmu->model == CAVIUM_SMMUV2 &&
-+			    cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
-+				reg2 |= TTBCR2_AS;
- 		}
- 		if (smmu->version > ARM_SMMU_V1)
- 			writel_relaxed(reg2, cb_base + ARM_SMMU_CB_TTBCR2);
--- 
-2.7.4
+Robin.
