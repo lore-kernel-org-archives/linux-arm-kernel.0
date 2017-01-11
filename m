@@ -1,105 +1,73 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 11 Jan 2017 09:41:18 -0500
-Subject: [PATCH v3 5/5] arm64: Work around Falkor erratum 1009
-In-Reply-To: <20170111144118.17062-1-cov@codeaurora.org>
-References: <20170111144118.17062-1-cov@codeaurora.org>
-Message-ID: <20170111144118.17062-5-cov@codeaurora.org>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Wed, 11 Jan 2017 14:43:27 +0000
+Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device managed
+ functions
+In-Reply-To: <a61eb838-4167-3032-bde8-3a8845b780f8@roeck-us.net> (Guenter
+ Roeck's message of "Wed, 11 Jan 2017 06:25:35 -0800")
+References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-5-git-send-email-linux@roeck-us.net>
+ <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
+ <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
+ <a45ed205-7c1b-a298-50c0-fc8b80a846c5@sigmadesigns.com>
+ <a61eb838-4167-3032-bde8-3a8845b780f8@roeck-us.net>
+Message-ID: <yw1x60llmzcg.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During a TLB invalidate sequence targeting the inner shareable
-domain, Falkor may prematurely complete the DSB before all loads
-and stores using the old translation are observed; instruction
-fetches are not subject to the conditions of this erratum.
+Guenter Roeck <linux@roeck-us.net> writes:
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
----
- Documentation/arm64/silicon-errata.txt |  1 +
- arch/arm64/Kconfig                     | 10 ++++++++++
- arch/arm64/include/asm/cpucaps.h       |  3 ++-
- arch/arm64/include/asm/tlbflush.h      |  5 ++++-
- arch/arm64/kernel/cpu_errata.c         |  7 +++++++
- 5 files changed, 24 insertions(+), 2 deletions(-)
+> On 01/11/2017 04:31 AM, Marc Gonzalez wrote:
+>> On 11/01/2017 11:52, Guenter Roeck wrote:
+>>
+>>> On 01/11/2017 01:07 AM, Marc Gonzalez wrote:
+>>>
+>>>>> @@ -134,12 +134,15 @@ static int tangox_wdt_probe(struct platform_device *pdev)
+>>>>>  	err = clk_prepare_enable(dev->clk);
+>>>>>  	if (err)
+>>>>>  		return err;
+>>>>> +	err = devm_add_action_or_reset(&pdev->dev,
+>>>>> +				       (void(*)(void *))clk_disable_unprepare,
+>>>>> +				       dev->clk);
+>>>>> +	if (err)
+>>>>> +		return err;
+>>>>
+>>>> Hello Guenter,
+>>>>
+>>>> I would rather avoid the function pointer cast.
+>>>> How about defining an auxiliary function for the cleanup action?
+>>>>
+>>>> clk_disable_unprepare() is static inline, so gcc will have to
+>>>> define an auxiliary function either way. What do you think?
+>>>
+>>> Not really. It would just make it more complicated to replace the
+>>> call with devm_clk_prepare_enable(), should it ever find its way
+>>> into the light of day.
+>>
+>> More complicated, because the cleanup function will have to be deleted later?
+>> The compiler will warn if someone forgets to do that.
+>>
+>> In my opinion, it's not a good idea to rely on the fact that casting
+>> void(*)(struct clk *clk) to void(*)(void *) is likely to work as expected
+>> on most platforms. (It has undefined behavior, strictly speaking.)
+>>
+> I do hear that you object to this code.
+>
+> However, I must admit that you completely lost me here. It is a cast from
+> one function pointer to another, passed as argument to another function,
+> with a secondary cast of its argument from a typed pointer to a void pointer.
+> I don't think C permits for "undefined behavior, strictly speaking".
+> Besides, that same mechanism is already used elsewhere, which is how I
+> got the idea. Are you claiming that there are situations where it won't
+> work ?
 
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index 7151aed..98bef2a 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -64,3 +64,4 @@ stable kernels.
- |               |                 |                 |                          |
- | Freescale/NXP | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585      |
- | Qualcomm      | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003 |
-+| Qualcomm      | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009 |
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 2a80ac9..d13e903 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -490,6 +490,16 @@ config QCOM_FALKOR_ERRATUM_1003
- 
- 	  If unsure, say Y.
- 
-+config QCOM_FALKOR_ERRATUM_1009
-+	bool "Falkor E1009: Prematurely complete a DSB after a TLBI"
-+	default y
-+	help
-+	  Falkor CPU may prematurely complete a DSB following a TLBI xxIS
-+	  invalidate maintenance operations. Repeat the TLBI operation one
-+	  more time to fix the issue.
-+
-+	  If unsure, say Y.
-+
- endmenu
- 
- 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index 5aaf7ee..55bcd02 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -36,7 +36,8 @@
- #define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
- #define ARM64_HAS_NO_FPSIMD			16
- #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	17
-+#define ARM64_WORKAROUND_REPEAT_TLBI		18
- 
--#define ARM64_NCAPS				18
-+#define ARM64_NCAPS				19
- 
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-index f28813c..7313cd3 100644
---- a/arch/arm64/include/asm/tlbflush.h
-+++ b/arch/arm64/include/asm/tlbflush.h
-@@ -85,7 +85,10 @@
- 			asm (__TLBI_INSTR(op, ##__VA_ARGS__)		       \
- 			__TLBI_IO(op, ##__VA_ARGS__));			       \
- 		asm volatile (	     as			"\ndsb " #attr "\n"    \
--		: : : "memory"); } while (0)
-+			ALTERNATIVE("nop"		"\nnop"	       "\n",   \
-+			__TLBI_INSTR(op, ##__VA_ARGS__)	"\ndsb " #attr "\n",   \
-+			ARM64_WORKAROUND_REPEAT_TLBI)			       \
-+		__TLBI_IO(op, ##__VA_ARGS__) : "memory"); } while (0)
- 
- #define __tlbi_dsb(...)	__tlbi_asm_dsb("", ##__VA_ARGS__)
- 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 787b542..e644364 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -137,6 +137,13 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		MIDR_RANGE(MIDR_QCOM_FALKOR_V1, 0x00, 0x00),
- 	},
- #endif
-+#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1009
-+	{
-+		.desc = "Qualcomm Falkor erratum 1009",
-+		.capability = ARM64_WORKAROUND_REPEAT_TLBI,
-+		MIDR_RANGE(MIDR_QCOM_FALKOR_V1, 0x00, 0x00),
-+	},
-+#endif
- 	{
- 	}
- };
+A pointer to void is interchangeable with any other pointer type.  That
+doesn't necessarily imply that pointers to functions taking arguments of
+different pointer types (as we have here) are always compatible.  I'd
+have to read the C standard carefully to see if there's any such
+promise, and I have other things to do right now.  I am, however, not
+aware of any ABI (certainly none used by Linux) where it would pose a
+problem.
+
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora
-Forum, a Linux Foundation Collaborative Project.
+M?ns Rullg?rd
