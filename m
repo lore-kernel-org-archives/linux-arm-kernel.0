@@ -1,79 +1,34 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 11 Jan 2017 02:12:58 +0100
-Subject: [PATCH v4 1/2] arm64: dts: rockchip: add "rockchip,
- grf" property for RK3399 PMUCRU/CRU
-In-Reply-To: <58758498.40309@rock-chips.com>
-References: <1484028930-20305-1-git-send-email-zhengxing@rock-chips.com>
- <CAD=FV=Wwu3q_LqwYUWcJQRvp5neVOS9szgsYFONWTRJ0X8hRTA@mail.gmail.com>
- <58758498.40309@rock-chips.com>
-Message-ID: <1799437.apf7OqdtKq@phil>
+From: jacob-chen@iotwrt.com (Jacob Chen)
+Date: Wed, 11 Jan 2017 09:26:32 +0800
+Subject: [PATCH] clk: rockchip: rk3288: make aclk_vio1_niu a critical clock
+Message-ID: <1484097992-9118-1-git-send-email-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 11. Januar 2017, 09:04:24 CET schrieb Xing Zheng:
-> Hi Doug,
-> 
-> On 2017?01?11? 02:45, Doug Anderson wrote:
-> > Hi,
-> > 
-> > On Mon, Jan 9, 2017 at 10:15 PM, Xing Zheng <zhengxing@rock-chips.com> 
-wrote:
-> >> The structure rockchip_clk_provider needs to refer the GRF regmap
-> >> in somewhere, if the CRU node has not "rockchip,grf" property,
-> >> calling syscon_regmap_lookup_by_phandle will return an invalid GRF
-> >> regmap, and the MUXGRF type clock will be not supported.
-> >> 
-> >> Therefore, we need to add them.
-> >> 
-> >> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> >> ---
-> >> 
-> >> Changes in v4:
-> >> - separte the binding patch
-> >> 
-> >> Changes in v3:
-> >> - add optional roperty rockchip,grf in rockchip,rk3399-cru.txt
-> >> 
-> >> Changes in v2:
-> >> - referring pmugrf for PMUGRU
-> >> - fix the typo "invaild" in COMMIT message
-> >> 
-> >>   arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 ++
-> >>   1 file changed, 2 insertions(+)
-> > 
-> > This seems fine to me, so:
-> > 
-> > Reviewed-by: Douglas Anderson <dianders@chromium.org>
-> > 
-> > ...but I will say that before you actually add any real "MUXGRF"
-> > clocks on rk3399 you _might_ need to rework the code to make things
-> > truly "optional".  If it turns out that any existing clocks that
-> > already exist today already go through one of these muxes in the GRF
-> > and we've always been assuming one setting of the mux, we'll need to
-> > make sure we keep assuming that setting of the mux even if the "grf"
-> > isn't specified.
-> > 
-> > As I understand it, your motivation for this patch is to eventually be
-> > able to model the EDP reference clock which can either be xin24 or
-> > "edp osc".  Presumably the eDP "reference clock" isn't related to any
-> > of the pre-existing eDP clocks so that one should be safe.
-> 
-> Hmm... I had intended to use this patch for EDP reference clock, but we
-> don't need to change the parent
-> clock (see the BUG: 61664).
+According to the pd blocks, VIO1_NIU is required by RGA,ISP and VOP1.
+Then at least one VIO_NIU should be turned on to supply eDP, HDMI, MIPI.
 
-Yep that sounds ok. As I said in my replies, we don't support the edp in the 
-mainline kernel yet, so nothing old can break here :-)
+If eDP,HDMI,MIPI is inited early than VOP or RGA is inited early than VOP1,
+system will hang.
 
+So make aclk_vio1_niu a critical clock and turn it on at all times.
 
-> I just woud like to add this patch to avoid getting some unavailable
-> MUXGRF clock and need to debug it again,
-> if we support it one day in future.
+Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+---
+ drivers/clk/rockchip/clk-rk3288.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-could you just check, if we have any other grf-based muxes that we may need in 
-the future. Right now I only see pclkin_isp1_wrapper describing such a mux, 
-but it would be cool if you could check again.
-
-
-Thanks
-Heiko
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index f071c24..59ee244 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -815,6 +815,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ static const char *const rk3288_critical_clocks[] __initconst = {
+ 	"aclk_cpu",
+ 	"aclk_peri",
++	"aclk_vio1_niu",
+ 	"hclk_peri",
+ 	"pclk_pd_pmu",
+ };
+-- 
+2.7.4
