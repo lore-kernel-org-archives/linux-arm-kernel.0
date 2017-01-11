@@ -1,40 +1,55 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 11 Jan 2017 09:51:29 -0200
-Subject: imx: RS-485 problems during TX, maybe DMA related
-In-Reply-To: <20170111003319.GA25265@archie.localdomain>
-References: <20170107134557.GA12299@archie.localdomain>
- <CAOMZO5ALSQj3C6Yn-avMZdzTvtWCZPQ5+pNdzYi03G-GZB_t+w@mail.gmail.com>
- <20170107153434.GA13307@archie.localdomain>
- <CAOMZO5CY3ys6moE133LwSKcS4egv56JdmhPMRG0TmAnfD+ZBAw@mail.gmail.com>
- <20170107205930.GA12367@archie.localdomain>
- <CAOMZO5D00YFLS=pddAqPo_FUoP6MF-juAef2H71-Wx_NQArdpw@mail.gmail.com>
- <20170107230624.GA21729@archie.localdomain>
- <CAOMZO5DedNURGV_k5Y=nt1O98SojsvrOd69PEPEzi8F7N3dJuw@mail.gmail.com>
- <20170108180609.GB24155@archie.localdomain>
- <CAOMZO5AYha+SwS4761XxOnUtT1DYhHH69UpXmQzcmEdfC++JKQ@mail.gmail.com>
- <20170111003319.GA25265@archie.localdomain>
-Message-ID: <CAOMZO5CGoq6FKSE6n9CyQycdtuJ6dAjSL7vJU4ZtXjAPWvdAug@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 11 Jan 2017 12:51:47 +0100
+Subject: [PATCH 1/1] iommu/arm-smmu: Fix for ThunderX erratum #27704
+Message-ID: <1484135507-24872-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Clemens,
+The goal of erratum #27704 workaround was to make sure that ASIDs and VMIDs
+are unique across all SMMU instances on affected Cavium systems.
 
-On Tue, Jan 10, 2017 at 10:33 PM, Clemens Gruber
-<clemens.gruber@pqgruber.com> wrote:
-> Hi Fabio,
->
-> On Sun, Jan 08, 2017 at 07:46:29PM -0200, Fabio Estevam wrote:
->> > What's the revision of the i.MX6Q on your board? Mine is 1.5 (TO 1.3)
->>
->> Mine is a mx6solo rev1.1.
->
-> Could it be dependent upon SMP? Do you have an i.MX6Q board around to
-> try?
+Currently, the workaround code partitions ASIDs and VMIDs by increasing
+global cavium_smmu_context_count which in turn becomes the base ASID and VMID
+value for the given SMMU instance upon the context bank initialization.
 
-Unfortunately the only hardware I can test RS485 is based on mx6solo.
+For systems with multiple SMMU instances this approach implies the risk
+of crossing 8-bit ASID, like for CN88xx capable of 4 SMMUv2, 128 context bank each:
+SMMU_0 (0-127 ASID RANGE)
+SMMU_1 (127-255 ASID RANGE)
+SMMU_2 (256-383 ASID RANGE) <--- crossing 8-bit ASID
+SMMU_3 (384-511 ASID RANGE) <--- crossing 8-bit ASID
 
-Adding Tim Harvey, who could probably test RS485 on MX6Q.
+Since we use 8-bit ASID now we effectively misconfigure ASID[15:8] bits for
+SMMU_CBn_TTBRm register. Also, we still use non-zero ASID[15:8] bits
+upon context invalidation. This patch adds 16-bit ASID support for stage-1
+AArch64 contexts for Cavium SMMUv2 model so that we use ASIDs consistently.
 
-Regards,
+Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+---
+ drivers/iommu/arm-smmu.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Fabio Estevam
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index a60cded..ae8f059 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -260,6 +260,7 @@ enum arm_smmu_s2cr_privcfg {
+ 
+ #define TTBCR2_SEP_SHIFT		15
+ #define TTBCR2_SEP_UPSTREAM		(0x7 << TTBCR2_SEP_SHIFT)
++#define TTBCR2_AS			(1 << 4)
+ 
+ #define TTBRn_ASID_SHIFT		48
+ 
+@@ -778,6 +779,9 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+ 			reg = pgtbl_cfg->arm_lpae_s1_cfg.tcr;
+ 			reg2 = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
+ 			reg2 |= TTBCR2_SEP_UPSTREAM;
++			if (smmu->model == CAVIUM_SMMUV2 &&
++			    cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
++				reg2 |= TTBCR2_AS;
+ 		}
+ 		if (smmu->version > ARM_SMMU_V1)
+ 			writel_relaxed(reg2, cb_base + ARM_SMMU_CB_TTBCR2);
+-- 
+2.7.4
