@@ -1,55 +1,135 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 11 Jan 2017 14:44:00 +0800
-Subject: [PATCH v2 6/6] arm64: allwinner: a64: Increase the MMC max
- frequency
-In-Reply-To: <20170110191514.kgbesffn3xqltnol@lukather>
-References: <cover.493dc67855a5f1837e875d37307319a03d14d1d0.1483980339.git-series.maxime.ripard@free-electrons.com>
- <3689701f93c8426bfa476e9a5f31c3642a8a898e.1483980339.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v67JoOAtHjMJboNUdCDX=+=Hf+zOWr234rT7GEiUmPb=nQ@mail.gmail.com>
- <20170110191514.kgbesffn3xqltnol@lukather>
-Message-ID: <CAGb2v64vU5soFybaurCKu1HE9FNo=-NGiy33ZVeoR6E7m4kk6w@mail.gmail.com>
+From: yt.shen@mediatek.com (YT Shen)
+Date: Wed, 11 Jan 2017 14:51:01 +0800
+Subject: [PATCH v11 00/12] MT2701 DRM support
+Message-ID: <1484117473-46644-1-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 3:15 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Tue, Jan 10, 2017 at 01:01:20AM +0800, Chen-Yu Tsai wrote:
->> On Tue, Jan 10, 2017 at 12:46 AM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > All the controllers can have a maximum frequency of 200MHz.
->> >
->> > Since older SoCs cannot go that high, we cannot change the default maximum
->> > frequency, but fortunately for us we have a property for that in the DT.
->> >
->> > This also has the side effect of allowing to use the MMC HS200 mode for the
->> > boards that support it (with either 1.2v or 1.8v IOs).
->> >
->> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> > ---
->> >  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 3 +++
->> >  1 file changed, 3 insertions(+), 0 deletions(-)
->> >
->> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->> > index 8e149498e096..f46ae965cf5b 100644
->> > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->> > @@ -332,6 +332,7 @@
->> >                         resets = <&ccu RST_BUS_MMC0>;
->> >                         reset-names = "ahb";
->> >                         interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
->> > +                       max-frequency = <200000000>;
->>
->> You also have to set one of MMC_CAP2_HS200* in the driver,
->> or mmc-hs200-1_8v or mmc-hs200-1_2v in the device tree to
->> actually use HS200, right?
->
-> Yes, but that requires a board with 1.8V IOs to work properly, which
-> not all board use, so it's probably best to enable it in the board
-> DTS.
+This is MT2701 DRM support PATCH v10, based on 4.10-rc1.
+We add DSI interrupt control, transfer function for MIPI DSI panel support.
+Most codes are the same, except some register changed.
 
-It's limited by the vqmmc regulator. Either way the host controller
-supports it right?
+For example:
+ - DISP_OVL address offset changed, color format definition changed.
+ - DISP_RDMA fifo size changed.
+ - DISP_COLOR offset changed.
+ - MIPI_TX setting changed.
 
-ChenYu
+We add a new component DDP_COMPONENT_BLS, and the connections are updated.
+OVL -> RDMA -> COLOR -> BLS -> DSI
+RDMA -> DPI
+And we have shadow register support in MT2701.
+
+Changes since v10:
+- Add binding descriptions for newly added bindings
+- Remove color data pointer from generic mtk_ddp_comp
+- Remove "drm/mediatek: add mipi_tx data rate check" from the patch series
+- Remove "drm/mediatek: add dsi ulp mode control" from the patch series
+- Update descriptions for "drm/mediatek: add non-continuous clock mode and EOT packet control"
+- Fix DSI disable flow
+
+Changes since v9:
+- Split DSI patches into smaller parts
+- Use a real linux errno for return value
+- Add error handling in mtk_output_dsi_enable()
+- Remove unused changes and redundant delays
+- Add helpers and macros for configuration
+- Combine "drm/mediatek: rename macros, add chip prefix" and "drm/mediatek: add *driver_data for different hardware setting"
+
+Changes since v8:
+- enable 3 DSI interrupts only
+- move mtk_dsi_wait_for_irq_done() to the patch of irq control
+- use the name BLS in DRM driver part
+- move BLS declaration to a separate patch
+- update mtk_dsi_switch_to_cmd_mode()
+- update mtk_output_dsi_enable() and mtk_output_dsi_disable()
+
+Changes since v7:
+- Remove redundant codes
+- Move the definition of DDP_COMPONENT_BLS to patch of "drm/mediatek: update display module connections"
+- Move _dsi_irq_wait_queue into platform driver data
+- Move mtk_dsi_irq_data_clear() to patch of "drm/mediatek: add dsi interrupt control"
+- Add more descriptions in the commit messages
+
+Changes since v6:
+- Change data type of irq_data to u32
+- Rewrite mtk_dsi_host_transfer() for simplify
+- Move some MIPI_TX config to patch of "drm/mediatek: add *driver_data for different hardware settings".
+- Remove device tree from this patch series
+
+Changes since v5:
+- Remove DPI device tree and compatible string
+- Use one wait queue to handle interrupt status
+- Update the interrupt check flow and DSI_INT_ALL_BITS
+- Use same function for host read/write command
+- various fixes
+
+Changes since v4:
+- Add messages when timeout in mtk_disp_mutex_acquire()
+- Add descriptions for DISP_REG_MUTEX registers
+- Move connection settings for display modules to a separate patch
+- Remove 'mt2701-disp-wdma' because it is unused
+- Move cleaning up and renaming to a separate patch
+- Use wait_event_interruptible_timeout() to replace polling
+- Remove irq_num from mtk_dsi structure
+- Remove redundant and debug codes
+
+Changes since v3:
+- Add DSI support for MIPI DSI panels
+- Update BLS binding to PWM nodes
+- Remove ufoe device nodes
+- Remove redundant parentheses
+- Remove global variable initialization
+
+Changes since v2:
+- Rename mtk_ddp_mux_sel to mtk_ddp_sout_sel
+- Update mt2701_mtk_ddp_ext components
+- Changed to prefix naming
+- Reorder the patch series
+- Use of_device_get_match_data() to get driver private data
+- Use iopoll macros to implement mtk_disp_mutex_acquire()
+- Removed empty device tree nodes
+
+Changes since v1:
+- Removed BLS bindings and codes, which belong to pwm driver
+- Moved mtk_disp_mutex_acquire() just before mtk_crtc_ddp_config()
+- Split patch into smaller parts
+- Added const keyword to constant structure
+- Removed codes for special memory align
+
+Thanks,
+yt.shen
+
+YT Shen (10):
+  dt-bindings: display: mediatek: update supported chips
+  drm/mediatek: add helpers for coverting from the generic components
+  drm/mediatek: add *driver_data for different hardware settings
+  drm/mediatek: add shadow register support
+  drm/mediatek: add BLS component
+  drm/mediatek: update display module connections
+  drm/mediatek: cleaning up and refine
+  drm/mediatek: add non-continuous clock mode and EOT packet control
+  drm/mediatek: update DSI sub driver flow for sending commands to panel
+  drm/mediatek: add support for Mediatek SoC MT2701
+
+shaoming chen (2):
+  drm/mediatek: add dsi interrupt control
+  drm/mediatek: add dsi transfer function
+
+ .../bindings/display/mediatek/mediatek,disp.txt    |   2 +
+ .../bindings/display/mediatek/mediatek,dsi.txt     |   2 +
+ drivers/gpu/drm/mediatek/mtk_disp_ovl.c            |  64 +++-
+ drivers/gpu/drm/mediatek/mtk_disp_rdma.c           |  39 +-
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.c            |  75 ++--
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c             | 138 +++++--
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.h             |   2 +
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c        |  69 +++-
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h        |   2 +
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c             |  54 ++-
+ drivers/gpu/drm/mediatek/mtk_drm_drv.h             |   9 +
+ drivers/gpu/drm/mediatek/mtk_dsi.c                 | 414 ++++++++++++++++++---
+ drivers/gpu/drm/mediatek/mtk_mipi_tx.c             |  38 +-
+ 13 files changed, 750 insertions(+), 158 deletions(-)
+
+-- 
+1.9.1
