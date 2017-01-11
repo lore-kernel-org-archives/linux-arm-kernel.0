@@ -1,172 +1,183 @@
 From: yt.shen@mediatek.com (YT Shen)
-Date: Wed, 11 Jan 2017 14:51:09 +0800
-Subject: [PATCH v11 08/12] drm/mediatek: add dsi interrupt control
+Date: Wed, 11 Jan 2017 14:51:12 +0800
+Subject: [PATCH v11 11/12] drm/mediatek: update DSI sub driver flow for
+ sending commands to panel
 In-Reply-To: <1484117473-46644-1-git-send-email-yt.shen@mediatek.com>
 References: <1484117473-46644-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1484117473-46644-9-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1484117473-46644-12-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: shaoming chen <shaoming.chen@mediatek.com>
-
-add dsi interrupt control
+This patch update enable/disable flow of DSI module.
+Original flow works on there is a bridge chip: DSI -> bridge -> panel.
+In this case: DSI -> panel, the DSI sub driver flow should be updated.
+We need to initialize DSI first so that we can send commands to panel.
 
 Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
+Signed-off-by: YT Shen <yt.shen@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_dsi.c | 92 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 92 insertions(+)
+ drivers/gpu/drm/mediatek/mtk_dsi.c | 89 +++++++++++++++++++++++++++++++-------
+ 1 file changed, 74 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-index 6f4b3bb..474861a 100644
+index 85f22d2..21392c4 100644
 --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
 +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-@@ -18,6 +18,7 @@
- #include <drm/drm_panel.h>
- #include <linux/clk.h>
- #include <linux/component.h>
-+#include <linux/irq.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
- #include <linux/of_graph.h>
-@@ -29,6 +30,16 @@
+@@ -126,6 +126,10 @@
+ #define CLK_HS_POST			(0xff << 8)
+ #define CLK_HS_EXIT			(0xff << 16)
  
- #define DSI_START		0x00
- 
-+#define DSI_INTEN		0x08
++#define DSI_VM_CMD_CON		0x130
++#define VM_CMD_EN			BIT(0)
++#define TS_VFP_EN			BIT(5)
 +
-+#define DSI_INTSTA		0x0c
-+#define LPRX_RD_RDY_INT_FLAG		BIT(0)
-+#define CMD_DONE_INT_FLAG		BIT(1)
-+#define TE_RDY_INT_FLAG			BIT(2)
-+#define VM_DONE_INT_FLAG		BIT(3)
-+#define EXT_TE_RDY_INT_FLAG		BIT(4)
-+#define DSI_BUSY			BIT(31)
+ #define DSI_CMDQ0		0x180
+ #define CONFIG				(0xff << 0)
+ #define SHORT_PACKET			0
+@@ -365,16 +369,23 @@ static void mtk_dsi_set_mode(struct mtk_dsi *dsi)
+ 	u32 vid_mode = CMD_MODE;
+ 
+ 	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO) {
+-		vid_mode = SYNC_PULSE_MODE;
+-
+-		if ((dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) &&
+-		    !(dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE))
++		if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
+ 			vid_mode = BURST_MODE;
++		else if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)
++			vid_mode = SYNC_PULSE_MODE;
++		else
++			vid_mode = SYNC_EVENT_MODE;
+ 	}
+ 
+ 	writel(vid_mode, dsi->regs + DSI_MODE_CTRL);
+ }
+ 
++static void mtk_dsi_set_vm_cmd(struct mtk_dsi *dsi)
++{
++	mtk_dsi_mask(dsi, DSI_VM_CMD_CON, VM_CMD_EN, VM_CMD_EN);
++	mtk_dsi_mask(dsi, DSI_VM_CMD_CON, TS_VFP_EN, TS_VFP_EN);
++}
 +
- #define DSI_CON_CTRL		0x10
- #define DSI_RESET			BIT(0)
- #define DSI_EN				BIT(1)
-@@ -71,6 +82,9 @@
- 
- #define DSI_HSTX_CKL_WC		0x64
- 
-+#define DSI_RACK		0x84
-+#define RACK				BIT(0)
-+
- #define DSI_PHY_LCCON		0x104
- #define LC_HS_TX_EN			BIT(0)
- #define LC_ULPM_EN			BIT(1)
-@@ -137,6 +151,8 @@ struct mtk_dsi {
- 	struct videomode vm;
- 	int refcount;
- 	bool enabled;
-+	u32 irq_data;
-+	wait_queue_head_t irq_wait_queue;
- };
- 
- static inline struct mtk_dsi *encoder_to_dsi(struct drm_encoder *e)
-@@ -469,6 +485,64 @@ static void mtk_dsi_start(struct mtk_dsi *dsi)
+ static void mtk_dsi_ps_control_vact(struct mtk_dsi *dsi)
+ {
+ 	struct videomode *vm = &dsi->vm;
+@@ -512,6 +523,16 @@ static void mtk_dsi_start(struct mtk_dsi *dsi)
  	writel(1, dsi->regs + DSI_START);
  }
  
-+static void mtk_dsi_set_interrupt_enable(struct mtk_dsi *dsi)
++static void mtk_dsi_stop(struct mtk_dsi *dsi)
 +{
-+	u32 inten = LPRX_RD_RDY_INT_FLAG | CMD_DONE_INT_FLAG | VM_DONE_INT_FLAG;
-+
-+	writel(inten, dsi->regs + DSI_INTEN);
++	writel(0, dsi->regs + DSI_START);
 +}
 +
-+static void mtk_dsi_irq_data_set(struct mtk_dsi *dsi, u32 irq_bit)
++static void mtk_dsi_set_cmd_mode(struct mtk_dsi *dsi)
 +{
-+	dsi->irq_data |= irq_bit;
++	writel(CMD_MODE, dsi->regs + DSI_MODE_CTRL);
 +}
 +
-+static __maybe_unused void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi, u32 irq_bit)
+ static void mtk_dsi_set_interrupt_enable(struct mtk_dsi *dsi)
+ {
+ 	u32 inten = LPRX_RD_RDY_INT_FLAG | CMD_DONE_INT_FLAG | VM_DONE_INT_FLAG;
+@@ -570,6 +591,19 @@ static irqreturn_t mtk_dsi_irq(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
++static s32 mtk_dsi_switch_to_cmd_mode(struct mtk_dsi *dsi, u8 irq_flag, u32 t)
 +{
-+	dsi->irq_data &= ~irq_bit;
-+}
++	mtk_dsi_irq_data_clear(dsi, irq_flag);
++	mtk_dsi_set_cmd_mode(dsi);
 +
-+static __maybe_unused s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
-+				     unsigned int timeout)
-+{
-+	s32 ret = 0;
-+	unsigned long jiffies = msecs_to_jiffies(timeout);
-+
-+	ret = wait_event_interruptible_timeout(dsi->irq_wait_queue,
-+					       dsi->irq_data & irq_flag,
-+					       jiffies);
-+	if (ret == 0) {
-+		DRM_WARN("Wait DSI IRQ(0x%08x) Timeout\n", irq_flag);
-+
-+		mtk_dsi_enable(dsi);
-+		mtk_dsi_reset_engine(dsi);
++	if (!mtk_dsi_wait_for_irq_done(dsi, irq_flag, t)) {
++		DRM_ERROR("failed to switch cmd mode\n");
++		return -ETIME;
++	} else {
++		return 0;
 +	}
-+
-+	return ret;
-+}
-+
-+static irqreturn_t mtk_dsi_irq(int irq, void *dev_id)
-+{
-+	struct mtk_dsi *dsi = dev_id;
-+	u32 status, tmp;
-+	u32 flag = LPRX_RD_RDY_INT_FLAG | CMD_DONE_INT_FLAG | VM_DONE_INT_FLAG;
-+
-+	status = readl(dsi->regs + DSI_INTSTA) & flag;
-+
-+	if (status) {
-+		do {
-+			mtk_dsi_mask(dsi, DSI_RACK, RACK, RACK);
-+			tmp = readl(dsi->regs + DSI_INTSTA);
-+		} while (tmp & DSI_BUSY);
-+
-+		mtk_dsi_mask(dsi, DSI_INTSTA, status, 0);
-+		mtk_dsi_irq_data_set(dsi, status);
-+		wake_up_interruptible(&dsi->irq_wait_queue);
-+	}
-+
-+	return IRQ_HANDLED;
 +}
 +
  static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
  {
  	if (WARN_ON(dsi->refcount == 0))
-@@ -517,6 +591,7 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
+@@ -578,6 +612,17 @@ static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
+ 	if (--dsi->refcount != 0)
+ 		return;
  
- 	mtk_dsi_ps_control_vact(dsi);
- 	mtk_dsi_config_vdo_timing(dsi);
++	mtk_dsi_stop(dsi);
++	if (!mtk_dsi_switch_to_cmd_mode(dsi, VM_DONE_INT_FLAG, 500)) {
++		if (dsi->panel) {
++			if (drm_panel_unprepare(dsi->panel)) {
++				DRM_ERROR("failed to unprepare the panel\n");
++				return;
++			}
++		}
++	}
++
++	mtk_dsi_reset_engine(dsi);
+ 	mtk_dsi_lane0_ulp_mode_enter(dsi);
+ 	mtk_dsi_clk_ulp_mode_enter(dsi);
+ 
+@@ -596,13 +641,6 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
+ 	if (dsi->enabled)
+ 		return;
+ 
+-	if (dsi->panel) {
+-		if (drm_panel_prepare(dsi->panel)) {
+-			DRM_ERROR("failed to setup the panel\n");
+-			return;
+-		}
+-	}
+-
+ 	ret = mtk_dsi_poweron(dsi);
+ 	if (ret < 0) {
+ 		DRM_ERROR("failed to power on dsi\n");
+@@ -610,22 +648,43 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
+ 	}
+ 
+ 	mtk_dsi_rxtx_control(dsi);
++	mtk_dsi_ps_control_vact(dsi);
++	mtk_dsi_set_vm_cmd(dsi);
++	mtk_dsi_config_vdo_timing(dsi);
 +	mtk_dsi_set_interrupt_enable(dsi);
+ 
+ 	mtk_dsi_clk_ulp_mode_leave(dsi);
+ 	mtk_dsi_lane0_ulp_mode_leave(dsi);
+ 	mtk_dsi_clk_hs_mode(dsi, 0);
+-	mtk_dsi_set_mode(dsi);
+ 
+-	mtk_dsi_ps_control_vact(dsi);
+-	mtk_dsi_config_vdo_timing(dsi);
+-	mtk_dsi_set_interrupt_enable(dsi);
++	if (dsi->panel) {
++		if (drm_panel_prepare(dsi->panel)) {
++			DRM_ERROR("failed to prepare the panel\n");
++			goto err_dsi_power_off;
++		}
++	}
  
  	mtk_dsi_set_mode(dsi);
  	mtk_dsi_clk_hs_mode(dsi, 1);
-@@ -818,6 +893,7 @@ static int mtk_dsi_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct device_node *remote_node, *endpoint;
- 	struct resource *regs;
-+	int irq_num;
- 	int comp_id;
- 	int ret;
  
-@@ -894,6 +970,22 @@ static int mtk_dsi_probe(struct platform_device *pdev)
- 		return ret;
- 	}
+ 	mtk_dsi_start(dsi);
  
-+	irq_num = platform_get_irq(pdev, 0);
-+	if (irq_num < 0) {
-+		dev_err(&pdev->dev, "failed to request dsi irq resource\n");
-+		return -EPROBE_DEFER;
++	if (dsi->panel) {
++		if (drm_panel_enable(dsi->panel)) {
++			DRM_ERROR("failed to enable the panel\n");
++			goto err_panel_disable;
++		}
 +	}
 +
-+	irq_set_status_flags(irq_num, IRQ_TYPE_LEVEL_LOW);
-+	ret = devm_request_irq(&pdev->dev, irq_num, mtk_dsi_irq,
-+			       IRQF_TRIGGER_LOW, dev_name(&pdev->dev), dsi);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to request mediatek dsi irq\n");
-+		return -EPROBE_DEFER;
-+	}
+ 	dsi->enabled = true;
 +
-+	init_waitqueue_head(&dsi->irq_wait_queue);
-+
- 	platform_set_drvdata(pdev, dsi);
++	return;
++err_panel_disable:
++	mtk_dsi_stop(dsi);
++	if (dsi->panel)
++		drm_panel_unprepare(dsi->panel);
++err_dsi_power_off:
++	mtk_dsi_poweroff(dsi);
+ }
  
- 	return component_add(&pdev->dev, &mtk_dsi_component_ops);
+ static void mtk_output_dsi_disable(struct mtk_dsi *dsi)
 -- 
 1.9.1
