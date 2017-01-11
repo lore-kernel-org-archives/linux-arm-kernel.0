@@ -1,59 +1,41 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 11 Jan 2017 18:40:52 +0000
-Subject: [PATCH v3 2/5] arm64: Work around Falkor erratum 1003
-In-Reply-To: <278a45c0-bd49-b8a2-63ae-80ad851bab9b@arm.com>
-References: <20170111144118.17062-1-cov@codeaurora.org>
- <20170111144118.17062-2-cov@codeaurora.org>
- <20170111180627.GG20288@e104818-lin.cambridge.arm.com>
- <278a45c0-bd49-b8a2-63ae-80ad851bab9b@arm.com>
-Message-ID: <20170111184052.GE29247@leverpostej>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 11 Jan 2017 10:44:45 -0800
+Subject: [PATCH 32/62] watchdog: meson_gxbb_wdt: Convert to use device
+ managed functions and other improvements
+In-Reply-To: <1484095516-12720-2-git-send-email-linux@roeck-us.net> (Guenter
+ Roeck's message of "Tue, 10 Jan 2017 16:44:41 -0800")
+References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+ <1484095516-12720-1-git-send-email-linux@roeck-us.net>
+ <1484095516-12720-2-git-send-email-linux@roeck-us.net>
+Message-ID: <m2o9zd77xe.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 06:22:08PM +0000, Marc Zyngier wrote:
-> On 11/01/17 18:06, Catalin Marinas wrote:
-> > On Wed, Jan 11, 2017 at 09:41:15AM -0500, Christopher Covington wrote:
-> >> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> >> index 32682be..9ee46df 100644
-> >> --- a/arch/arm64/mm/proc.S
-> >> +++ b/arch/arm64/mm/proc.S
-> >> @@ -23,6 +23,7 @@
-> >>  #include <asm/assembler.h>
-> >>  #include <asm/asm-offsets.h>
-> >>  #include <asm/hwcap.h>
-> >> +#include <asm/mmu_context.h>
-> >>  #include <asm/pgtable.h>
-> >>  #include <asm/pgtable-hwdef.h>
-> >>  #include <asm/cpufeature.h>
-> >> @@ -140,6 +141,18 @@ ENDPROC(cpu_do_resume)
-> >>  ENTRY(cpu_do_switch_mm)
-> >>  	mmid	x1, x1				// get mm->context.id
-> >>  	bfi	x0, x1, #48, #16		// set the ASID
-> >> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
-> >> +alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
-> >> +	mrs     x2, ttbr0_el1
-> >> +	mov     x3, #FALKOR_RESERVED_ASID
-> >> +	bfi     x2, x3, #48, #16                // reserved ASID + old BADDR
-> >> +	msr     ttbr0_el1, x2
-> >> +	isb
-> >> +	bfi     x2, x0, #0, #48                 // reserved ASID + new BADDR
-> >> +	msr     ttbr0_el1, x2
-> >> +	isb
-> >> +alternative_else_nop_endif
-> >> +#endif
-> >>  	msr	ttbr0_el1, x0			// set TTBR0
-> >>  	isb
-> >>  	post_ttbr0_update_workaround
-> > 
-> > Please move the above hunk to a pre_ttbr0_update_workaround macro for
-> > consistency with post_ttbr0_update_workaround.
-> 
-> In which case (and also for consistency), should we add that pre_ttbr0
-> macro to entry.S, just before __uaccess_ttbr0_enable? It may not be
-> needed in the SW pan case, but it is probably worth entertaining the
-> idea that there may be something to do there...
+Guenter Roeck <linux@roeck-us.net> writes:
 
-Likewise, I beleive we may need to modify cpu_set_reserved_ttbr0().
+> Use device managed functions to simplify error handling, reduce
+> source code size, improve readability, and reduce the likelyhood of bugs.
+> Other improvements as listed below.
+>
+> The conversion was done automatically with coccinelle using the
+> following semantic patches. The semantic patches and the scripts used
+> to generate this commit log are available at
+> https://github.com/groeck/coccinelle-patches
+>
+> - Use devm_add_action_or_reset() for calls to clk_disable_unprepare
+> - Check return value from clk_prepare_enable()
+> - Replace 'val = e; return val;' with 'return e;'
+> - Replace 'if (e) return e; return 0;' with 'return e;'
+> - Drop assignments to otherwise unused variables
+> - Replace 'if (e) { return expr; }' with 'if (e) return expr;'
+> - Drop remove function
+> - Use devm_watchdog_register_driver() to register watchdog device
+> - Replace shutdown function with call to watchdog_stop_on_reboot()
+>
+> Cc: Carlo Caione <carlo@caione.org>
+> Cc: Kevin Hilman <khilman@baylibre.com>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 
-Thanks,
-Mark.
+Nice, thanks for the cleanup!
+
+Acked-by: Kevin Hilman <khilman@baylibre.com>
