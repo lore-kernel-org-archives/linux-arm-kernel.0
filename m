@@ -1,266 +1,63 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 11 Jan 2017 16:41:52 +0000
-Subject: [PATCH v2 4/7] crypto: arm64/aes - add scalar implementation
-In-Reply-To: <1484152915-26517-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1484152915-26517-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1484152915-26517-5-git-send-email-ard.biesheuvel@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 11 Jan 2017 16:44:18 +0000
+Subject: [PATCH] arm64: assembler: make adr_l work in modules under KASLR
+In-Reply-To: <CAKv+Gu-FMCdkxpFCheCoRrCYFUdZPpViH4-G613sXyQVEH3chA@mail.gmail.com>
+References: <1484146493-18460-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170111151822.GC26344@leverpostej>
+ <CAKv+Gu9DxMzSTVRPdeSaJQNqe5RGjS_qzVzBU1SpGs5EZvCE1Q@mail.gmail.com>
+ <20170111153447.GD26344@leverpostej>
+ <CAKv+Gu-FMCdkxpFCheCoRrCYFUdZPpViH4-G613sXyQVEH3chA@mail.gmail.com>
+Message-ID: <20170111164418.GC28883@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a scalar implementation of AES, based on the precomputed tables
-that are exposed by the generic AES code. Since rotates are cheap on arm64,
-this implementation only uses the 4 core tables (of 1 KB each), and avoids
-the prerotated ones, reducing the D-cache footprint by 75%.
+On Wed, Jan 11, 2017 at 04:08:30PM +0000, Ard Biesheuvel wrote:
+> On 11 January 2017 at 15:34, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Wed, Jan 11, 2017 at 03:25:09PM +0000, Ard Biesheuvel wrote:
+> >> On 11 January 2017 at 15:18, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> > On Wed, Jan 11, 2017 at 02:54:53PM +0000, Ard Biesheuvel wrote:
 
-On Cortex-A57, this code manages 13.0 cycles per byte, which is ~34% faster
-than the generic C code. (Note that this is still >13x slower than the code
-that uses the optional ARMv8 Crypto Extensions, which manages <1 cycles per
-byte.)
+> >> But in general, if the macro is available to modules, I would like to
+> >> make sure that it does not result in code that builds fine but may
+> >> fail in some cases only at runtime, especially given the fact that
+> >> there is also a Cortex-A53 erratum regarding adrp instructions, for
+> >> which reason we build modules with -mcmodel=large (which amounts to
+> >> the same thing as the patch above)
+> >>
+> >> > It seems somewhat surprising to me to have adr_l expand to something
+> >> > that doesn't use adr/adrp, but that's not necessarily a problem.
+> >>
+> >> I did realise that, but I don't think it is a problem tbh.
+> >
+> > In this case it should be fine, certainly.
+> >
+> > There are cases like the early boot code and hyp code where it's
+> > critical that we use adr. It's also possible that we might build
+> > (modular) drivers which want some idmapped code, where we want adr, so
+> > it seems unfortunate that this depends on howthe code is built.
+> 
+> How would /that/ work? Modules are vmalloc'ed, and not covered by the
+> ID map to begin with, so it is impossible to execute those adr
+> instructions in a way that would make them return anything other than
+> the virtual address of the symbol they refer to.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/crypto/Kconfig           |   4 +
- arch/arm64/crypto/Makefile          |   3 +
- arch/arm64/crypto/aes-cipher-core.S | 127 ++++++++++++++++++++
- arch/arm64/crypto/aes-cipher-glue.c |  69 +++++++++++
- 4 files changed, 203 insertions(+)
+That's a fair point.
 
-diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
-index 0bf0f531f539..0826f8e599a6 100644
---- a/arch/arm64/crypto/Kconfig
-+++ b/arch/arm64/crypto/Kconfig
-@@ -41,6 +41,10 @@ config CRYPTO_CRC32_ARM64_CE
- 	depends on KERNEL_MODE_NEON && CRC32
- 	select CRYPTO_HASH
- 
-+config CRYPTO_AES_ARM64
-+	tristate "AES core cipher using scalar instructions"
-+	select CRYPTO_AES
-+
- config CRYPTO_AES_ARM64_CE
- 	tristate "AES core cipher using ARMv8 Crypto Extensions"
- 	depends on ARM64 && KERNEL_MODE_NEON
-diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
-index 9d2826c5fccf..a893507629eb 100644
---- a/arch/arm64/crypto/Makefile
-+++ b/arch/arm64/crypto/Makefile
-@@ -44,6 +44,9 @@ sha512-arm64-y := sha512-glue.o sha512-core.o
- obj-$(CONFIG_CRYPTO_CHACHA20_NEON) += chacha20-neon.o
- chacha20-neon-y := chacha20-neon-core.o chacha20-neon-glue.o
- 
-+obj-$(CONFIG_CRYPTO_AES_ARM64) += aes-arm64.o
-+aes-arm64-y := aes-cipher-core.o aes-cipher-glue.o
-+
- AFLAGS_aes-ce.o		:= -DINTERLEAVE=4
- AFLAGS_aes-neon.o	:= -DINTERLEAVE=4
- 
-diff --git a/arch/arm64/crypto/aes-cipher-core.S b/arch/arm64/crypto/aes-cipher-core.S
-new file mode 100644
-index 000000000000..37590ab8121a
---- /dev/null
-+++ b/arch/arm64/crypto/aes-cipher-core.S
-@@ -0,0 +1,127 @@
-+/*
-+ * Scalar AES core transform
-+ *
-+ * Copyright (C) 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+
-+	.text
-+
-+	rk		.req	x0
-+	out		.req	x1
-+	in		.req	x2
-+	rounds		.req	x3
-+	tt		.req	x4
-+	lt		.req	x2
-+
-+	.macro		__hround, out0, out1, in0, in1, in2, in3, t0, t1, enc
-+	ldp		\out0, \out1, [rk], #8
-+
-+	ubfx		w13, \in0, #0, #8
-+	ubfx		w14, \in1, #8, #8
-+	ldr		w13, [tt, w13, uxtw #2]
-+	ldr		w14, [tt, w14, uxtw #2]
-+
-+	.if		\enc
-+	ubfx		w17, \in1, #0, #8
-+	ubfx		w18, \in2, #8, #8
-+	.else
-+	ubfx		w17, \in3, #0, #8
-+	ubfx		w18, \in0, #8, #8
-+	.endif
-+	ldr		w17, [tt, w17, uxtw #2]
-+	ldr		w18, [tt, w18, uxtw #2]
-+
-+	ubfx		w15, \in2, #16, #8
-+	ubfx		w16, \in3, #24, #8
-+	ldr		w15, [tt, w15, uxtw #2]
-+	ldr		w16, [tt, w16, uxtw #2]
-+
-+	.if		\enc
-+	ubfx		\t0, \in3, #16, #8
-+	ubfx		\t1, \in0, #24, #8
-+	.else
-+	ubfx		\t0, \in1, #16, #8
-+	ubfx		\t1, \in2, #24, #8
-+	.endif
-+	ldr		\t0, [tt, \t0, uxtw #2]
-+	ldr		\t1, [tt, \t1, uxtw #2]
-+
-+	eor		\out0, \out0, w13
-+	eor		\out1, \out1, w17
-+	eor		\out0, \out0, w14, ror #24
-+	eor		\out1, \out1, w18, ror #24
-+	eor		\out0, \out0, w15, ror #16
-+	eor		\out1, \out1, \t0, ror #16
-+	eor		\out0, \out0, w16, ror #8
-+	eor		\out1, \out1, \t1, ror #8
-+	.endm
-+
-+	.macro		fround, out0, out1, out2, out3, in0, in1, in2, in3
-+	__hround	\out0, \out1, \in0, \in1, \in2, \in3, \out2, \out3, 1
-+	__hround	\out2, \out3, \in2, \in3, \in0, \in1, \in1, \in2, 1
-+	.endm
-+
-+	.macro		iround, out0, out1, out2, out3, in0, in1, in2, in3
-+	__hround	\out0, \out1, \in0, \in3, \in2, \in1, \out2, \out3, 0
-+	__hround	\out2, \out3, \in2, \in1, \in0, \in3, \in1, \in0, 0
-+	.endm
-+
-+	.macro		do_crypt, round, ttab, ltab
-+	ldp		w5, w6, [in]
-+	ldp		w7, w8, [in, #8]
-+	ldp		w9, w10, [rk], #16
-+	ldp		w11, w12, [rk, #-8]
-+
-+CPU_BE(	rev		w5, w5		)
-+CPU_BE(	rev		w6, w6		)
-+CPU_BE(	rev		w7, w7		)
-+CPU_BE(	rev		w8, w8		)
-+
-+	eor		w5, w5, w9
-+	eor		w6, w6, w10
-+	eor		w7, w7, w11
-+	eor		w8, w8, w12
-+
-+	ldr		tt, =\ttab
-+	ldr		lt, =\ltab
-+
-+	tbnz		rounds, #1, 1f
-+
-+0:	\round		w9, w10, w11, w12, w5, w6, w7, w8
-+	\round		w5, w6, w7, w8, w9, w10, w11, w12
-+
-+1:	subs		rounds, rounds, #4
-+	\round		w9, w10, w11, w12, w5, w6, w7, w8
-+	csel		tt, tt, lt, hi
-+	\round		w5, w6, w7, w8, w9, w10, w11, w12
-+	b.hi		0b
-+
-+CPU_BE(	rev		w5, w5		)
-+CPU_BE(	rev		w6, w6		)
-+CPU_BE(	rev		w7, w7		)
-+CPU_BE(	rev		w8, w8		)
-+
-+	stp		w5, w6, [out]
-+	stp		w7, w8, [out, #8]
-+	ret
-+
-+	.align		4
-+	.ltorg
-+	.endm
-+
-+	.align		5
-+ENTRY(__aes_arm64_encrypt)
-+	do_crypt	fround, crypto_ft_tab, crypto_fl_tab
-+ENDPROC(__aes_arm64_encrypt)
-+
-+	.align		5
-+ENTRY(__aes_arm64_decrypt)
-+	do_crypt	iround, crypto_it_tab, crypto_il_tab
-+ENDPROC(__aes_arm64_decrypt)
-diff --git a/arch/arm64/crypto/aes-cipher-glue.c b/arch/arm64/crypto/aes-cipher-glue.c
-new file mode 100644
-index 000000000000..7288e7cbebff
---- /dev/null
-+++ b/arch/arm64/crypto/aes-cipher-glue.c
-@@ -0,0 +1,69 @@
-+/*
-+ * Scalar AES core transform
-+ *
-+ * Copyright (C) 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <crypto/aes.h>
-+#include <linux/crypto.h>
-+#include <linux/module.h>
-+
-+asmlinkage void __aes_arm64_encrypt(u32 *rk, u8 *out, const u8 *in, int rounds);
-+EXPORT_SYMBOL(__aes_arm64_encrypt);
-+
-+asmlinkage void __aes_arm64_decrypt(u32 *rk, u8 *out, const u8 *in, int rounds);
-+EXPORT_SYMBOL(__aes_arm64_decrypt);
-+
-+static void aes_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
-+{
-+	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
-+	int rounds = 6 + ctx->key_length / 4;
-+
-+	__aes_arm64_encrypt(ctx->key_enc, out, in, rounds);
-+}
-+
-+static void aes_decrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
-+{
-+	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
-+	int rounds = 6 + ctx->key_length / 4;
-+
-+	__aes_arm64_decrypt(ctx->key_dec, out, in, rounds);
-+}
-+
-+static struct crypto_alg aes_alg = {
-+	.cra_name			= "aes",
-+	.cra_driver_name		= "aes-arm64",
-+	.cra_priority			= 200,
-+	.cra_flags			= CRYPTO_ALG_TYPE_CIPHER,
-+	.cra_blocksize			= AES_BLOCK_SIZE,
-+	.cra_ctxsize			= sizeof(struct crypto_aes_ctx),
-+	.cra_module			= THIS_MODULE,
-+
-+	.cra_cipher.cia_min_keysize	= AES_MIN_KEY_SIZE,
-+	.cra_cipher.cia_max_keysize	= AES_MAX_KEY_SIZE,
-+	.cra_cipher.cia_setkey		= crypto_aes_set_key,
-+	.cra_cipher.cia_encrypt		= aes_encrypt,
-+	.cra_cipher.cia_decrypt		= aes_decrypt
-+};
-+
-+static int __init aes_init(void)
-+{
-+	return crypto_register_alg(&aes_alg);
-+}
-+
-+static void __exit aes_fini(void)
-+{
-+	crypto_unregister_alg(&aes_alg);
-+}
-+
-+module_init(aes_init);
-+module_exit(aes_fini);
-+
-+MODULE_DESCRIPTION("Scalar AES cipher for arm64");
-+MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS_CRYPTO("aes");
--- 
-2.7.4
+> > So, maybe it's better to have a mov_sym helper for this case, to be
+> > explicit about what we want? That can use either adr* or mov*, or the
+> > latter consistently.
+> 
+> Well, the point is that adr_l should not be used for modules so adding
+> something that may be used is fine, but that still leaves the risk
+> that someone may end up using it in a module.
+
+Sure.
+
+Given you have a concrete use case, and all I have are some vague
+concerns for code that doesn't exist at present, I have no real
+objection to the patch as it stands. FWIW:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
