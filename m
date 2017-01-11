@@ -1,148 +1,57 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 11 Jan 2017 15:34:41 -0600
-Subject: [PATCH v3 2/4] dt-bindings: Add TI SCI PM Domains
-In-Reply-To: <7bd282d9-df6f-f4c6-1f7f-c8ed81c78af3@ti.com>
-References: <20170104205536.15963-1-d-gerlach@ti.com>
- <20170104205536.15963-3-d-gerlach@ti.com>
- <20170109175012.sg7eze7llqq7qevd@rob-hp-laptop>
- <7bd282d9-df6f-f4c6-1f7f-c8ed81c78af3@ti.com>
-Message-ID: <CAL_JsqKxU4c=KSn0=xX9kmbk498fhqpiXMeGjcoe8Ah48FAzUg@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 11 Jan 2017 15:49:28 -0600
+Subject: [PATCH] Documentation: dt: reset: Revise typos in TI syscon reset
+ example
+In-Reply-To: <20170111211520.w3sy5pkvjydiwvcs@rob-hp-laptop>
+References: <20170109192814.26811-1-s-anna@ti.com>
+ <20170111211520.w3sy5pkvjydiwvcs@rob-hp-laptop>
+Message-ID: <5fa2bd27-5356-1f2f-8f92-3d0d3dcaa2b4@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 9, 2017 at 11:57 AM, Dave Gerlach <d-gerlach@ti.com> wrote:
-> Rob,
->
-> On 01/09/2017 11:50 AM, Rob Herring wrote:
+On 01/11/2017 03:15 PM, Rob Herring wrote:
+> On Mon, Jan 09, 2017 at 01:28:14PM -0600, Suman Anna wrote:
+>> Fix couple of typos in the example given in the TI syscon reset
+>> binding. The ti,reset-bits used for DSP0 are corrected to match
+>> the values that will be used in the actual DT node.
 >>
->> On Wed, Jan 04, 2017 at 02:55:34PM -0600, Dave Gerlach wrote:
->>>
->>> Add a generic power domain implementation, TI SCI PM Domains, that
->>> will hook into the genpd framework and allow the TI SCI protocol to
->>> control device power states.
->>>
->>> Also, provide macros representing each device index as understood
->>> by TI SCI to be used in the device node power-domain references.
->>> These are identifiers for the K2G devices managed by the PMMC.
->>>
->>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->>> ---
->>> v2->v3:
->>>         Update k2g_pds node docs to show it should be a child of pmmc
->>> node.
->>>         In early versions a phandle was used to point to pmmc and docs
->>> still
->>>         incorrectly showed this.
->>>
->>>  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   | 59 ++++++++++++++
->>>  MAINTAINERS                                        |  2 +
->>>  include/dt-bindings/genpd/k2g.h                    | 90
->>> ++++++++++++++++++++++
->>>  3 files changed, 151 insertions(+)
->>>  create mode 100644
->>> Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>>  create mode 100644 include/dt-bindings/genpd/k2g.h
->>>
->>> diff --git a/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>> b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>> new file mode 100644
->>> index 000000000000..4c9064e512cb
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>> @@ -0,0 +1,59 @@
->>> +Texas Instruments TI-SCI Generic Power Domain
->>> +---------------------------------------------
->>> +
->>> +Some TI SoCs contain a system controller (like the PMMC, etc...) that is
->>> +responsible for controlling the state of the IPs that are present.
->>> +Communication between the host processor running an OS and the system
->>> +controller happens through a protocol known as TI-SCI [1]. This pm
->>> domain
->>> +implementation plugs into the generic pm domain framework and makes use
->>> of
->>> +the TI SCI protocol power on and off each device when needed.
->>> +
->>> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
->>> +
->>> +PM Domain Node
->>> +==============
->>> +The PM domain node represents the global PM domain managed by the PMMC,
->>> +which in this case is the single implementation as documented by the
->>> generic
->>> +PM domain bindings in
->>> Documentation/devicetree/bindings/power/power_domain.txt.
->>> +Because this relies on the TI SCI protocol to communicate with the PMMC
->>> it
->>> +must be a child of the pmmc node.
->>> +
->>> +Required Properties:
->>> +--------------------
->>> +- compatible: should be "ti,sci-pm-domain"
->>> +- #power-domain-cells: Must be 0.
->>> +
->>> +Example (K2G):
->>> +-------------
->>> +       pmmc: pmmc {
->>> +               compatible = "ti,k2g-sci";
->>> +               ...
->>> +
->>> +               k2g_pds: k2g_pds {
->>> +                       compatible = "ti,sci-pm-domain";
->>> +                       #power-domain-cells = <0>;
->>> +               };
->>> +       };
->>> +
->>> +PM Domain Consumers
->>> +===================
->>> +Hardware blocks that require SCI control over their state must provide
->>> +a reference to the sci-pm-domain they are part of and a unique device
->>> +specific ID that identifies the device.
->>> +
->>> +Required Properties:
->>> +--------------------
->>> +- power-domains: phandle pointing to the corresponding PM domain node.
->>> +- ti,sci-id: index representing the device id to be passed oevr SCI to
->>> +            be used for device control.
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>> ---
+>> Hi Philipp,
 >>
+>> This is the Documentation part fix that goes along with
+>> the ti-syscon-reset fix that you have on your next branch.
+>> I will be submitting the DT nodes very soon
 >>
->> As I've already stated before, this goes in power-domain cells. When you
->> have a single thing (i.e. node) that controls multiple things, then you
->> you need to specify the ID for each of them in phandle args. This is how
->> irqs, gpio, clocks, *everything* in DT works.
->
->
-> You think the reasoning for doing it this way provided by both Ulf and
-> myself on v2 [1] is not valid then?
->
-> From Ulf:
->
-> To me, the TI SCI ID, is similar to a "conid" for any another "device
-> resource" (like clock, pinctrl, regulator etc) which we can describe
-> in DT and assign to a device node. The only difference here, is that
-> we don't have common API to fetch the resource (like clk_get(),
-> regulator_get()), but instead we fetches the device's resource from
-> SoC specific code, via genpd's device ->attach() callback.
+>> regards
+>> Suman
+>>
+>>  Documentation/devicetree/bindings/reset/ti-syscon-reset.txt | 8 ++++----
+>>  1 file changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt b/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
+>> index 164c7f34c451..21ba739b162e 100644
+>> --- a/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
+>> +++ b/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
+>> @@ -63,7 +63,7 @@ Example:
+>>  --------
+>>  The following example demonstrates a syscon node, the reset controller node
+>>  using the syscon node, and a consumer (a DSP device) on the TI Keystone 2
+>> -Edison SoC.
+>> +66AK2E SoC.
+>>  
+>>  / {
+>>  	soc {
+>> @@ -71,13 +71,13 @@ Edison SoC.
+>>  			compatible = "syscon", "simple-mfd";
+>>  			reg = <0x02350000 0x1000>;
+>>  
+>> -			pscrst: psc-reset {
+>> +			pscrst: psc-reset-controller {
+> 
+> Really, this should be just 'reset-controller'.
 
-Sorry, but that sounds like a kernel problem to me and has nothing to
-do with DT bindings.
+Thanks Rob, I will fix this patch and the DTS patches as well.
 
-> From me:
->
-> Yes, you've pretty much hit it on the head. It is not an index into a list
-> of genpds but rather identifies the device *within* a single genpd. It is a
-> property specific to each device that resides in a ti-sci-genpd, not a
-> mapping describing which genpd the device belongs to. The generic power
-> domain binding is concerned with mapping the device to a specific genpd,
-> which is does fine for us, but we have a sub mapping for devices that exist
-> inside a genpd which, we must describe as well, hence the ti,sci-id.
->
->
-> So to summarize, the genpd framework does interpret the phandle arg as an
-> index into multiple genpds, just as you've said other frameworks do, but
-> this is not what I am trying to do, we have multiple devices within this
-> *single* genpd, hence the need for the ti,sci-id property.
-
-Fix the genpd framework rather than work around it in DT.
-
-Rob
+regards
+Suman
