@@ -1,94 +1,203 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Wed, 11 Jan 2017 09:41:45 +0000
-Subject: [PATCH v8 09/18] iommu/amd: Declare MSI and HT regions as reserved
- IOVA regions
-In-Reply-To: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
-References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1484127714-3263-10-git-send-email-eric.auger@redhat.com>
+From: jjhiblot@gmail.com (Jean-Jacques Hiblot)
+Date: Wed, 11 Jan 2017 12:05:05 +0100
+Subject: [PATCH 1/3] ARM: at91: flush the L2 cache before entering cpu idle
+In-Reply-To: <F9F4555C4E01D7469D37975B62D0EFBB496BE4@CHN-SV-EXMX07.mchp-main.com>
+References: <20170106065947.30631-1-wenyou.yang@atmel.com>
+ <20170106065947.30631-2-wenyou.yang@atmel.com>
+ <20170110161821.vp673jyfqx6s76pg@piout.net>
+ <CACh+v5NX9Da__zXtnVGgbO9wYAzEJy-8rjVPHdQx_F6QDk+xZg@mail.gmail.com>
+ <F9F4555C4E01D7469D37975B62D0EFBB496BE4@CHN-SV-EXMX07.mchp-main.com>
+Message-ID: <CACh+v5M3tU4WHMqAX0zm2H=zzwc0+XChyG1tnH2aHxaacm6C=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch registers the MSI and HT regions as non mappable
-reserved regions. They will be exposed in the iommu-group sysfs.
+2017-01-11 9:15 GMT+01:00  <Wenyou.Yang@microchip.com>:
+> Hi Jean-Jacques,
+>
+>> -----Original Message-----
+>> From: Jean-Jacques Hiblot [mailto:jjhiblot at gmail.com]
+>> Sent: 2017?1?11? 0:51
+>> To: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>> Cc: Wenyou Yang - A41535 <Wenyou.Yang@microchip.com>; Mark Rutland
+>> <mark.rutland@arm.com>; devicetree <devicetree@vger.kernel.org>; Russell
+>> King <linux@arm.linux.org.uk>; Wenyou Yang - A41535
+>> <Wenyou.Yang@microchip.com>; Nicolas Ferre <nicolas.ferre@atmel.com>;
+>> Linux Kernel Mailing List <linux-kernel@vger.kernel.org>; Rob Herring
+>> <robh+dt@kernel.org>; linux-arm-kernel at lists.infradead.org
+>> Subject: Re: [PATCH 1/3] ARM: at91: flush the L2 cache before entering cpu idle
+>>
+>> 2017-01-10 17:18 GMT+01:00 Alexandre Belloni
+>> <alexandre.belloni@free-electrons.com>:
+>> > I though a bit more about it, and I don't really like the new
+>> > compatible string. I don't feel this should be necessary.
+>> >
+>> > What about the following:
+>> >
+>> > diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c index
+>> > b4332b727e9c..0333aca63e44 100644
+>> > --- a/arch/arm/mach-at91/pm.c
+>> > +++ b/arch/arm/mach-at91/pm.c
+>> > @@ -53,6 +53,7 @@ extern void at91_pinctrl_gpio_resume(void);  static
+>> > struct {
+>> >         unsigned long uhp_udp_mask;
+>> >         int memctrl;
+>> > +       bool has_l2_cache;
+>> >  } at91_pm_data;
+>> >
+>> >  void __iomem *at91_ramc_base[2];
+>> > @@ -267,6 +268,11 @@ static void at91_ddr_standby(void)
+>> >         u32 lpr0, lpr1 = 0;
+>> >         u32 saved_lpr0, saved_lpr1 = 0;
+>> >
+>>
+>> > +       if (at91_pm_data.has_l2_cache) {
+>> > +               flush_cache_all();
+>> what is the point of calling flush_cache_all() here ? Do we really care that dirty
+>> data in L1 is written to DDR ? I may be missing something but to me it's just extra
+>> latency.
+>
+> Are you mean use outer_flush_all() to flush all cache lines in the outer cache only?
 
-For direct-mapped regions let's also use iommu_alloc_resv_region().
+Yes that's what I meant. You see, you don't flush the cache for
+sama5d3 so it shouldn't be required either for sam5d4. You should be
+able to test it quickly and see if L1 flush is indeed required by
+replacing  flush_cache_all() with outer_flush_all(). BTW is highly
+probable that L2 cache flush is done in outer_disable() so calling
+outer_flush_all() is probably no required.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
+However the more I think on it, the more I wonder about the reason why
+L2 flushing is required or to put it differently: is flusing the L2
+cache the correct thing to do or just a workaround ?
+Could it be that L2 is doing some maintenance operation when DDR
+enters self refresh? In that case maybe a simple cache sync could be
+used.
 
----
-v6 -> v7:
-- use IOMMU_RESV_RESERVED
-
-v5: creation
----
- drivers/iommu/amd_iommu.c | 37 ++++++++++++++++++++++++++-----------
- 1 file changed, 26 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
-index 5f7ea4f..d109e41 100644
---- a/drivers/iommu/amd_iommu.c
-+++ b/drivers/iommu/amd_iommu.c
-@@ -3164,6 +3164,7 @@ static bool amd_iommu_capable(enum iommu_cap cap)
- static void amd_iommu_get_resv_regions(struct device *dev,
- 				       struct list_head *head)
- {
-+	struct iommu_resv_region *region;
- 	struct unity_map_entry *entry;
- 	int devid;
- 
-@@ -3172,28 +3173,42 @@ static void amd_iommu_get_resv_regions(struct device *dev,
- 		return;
- 
- 	list_for_each_entry(entry, &amd_iommu_unity_map, list) {
--		struct iommu_resv_region *region;
-+		size_t length;
-+		int prot = 0;
- 
- 		if (devid < entry->devid_start || devid > entry->devid_end)
- 			continue;
- 
--		region = kzalloc(sizeof(*region), GFP_KERNEL);
-+		length = entry->address_end - entry->address_start;
-+		if (entry->prot & IOMMU_PROT_IR)
-+			prot |= IOMMU_READ;
-+		if (entry->prot & IOMMU_PROT_IW)
-+			prot |= IOMMU_WRITE;
-+
-+		region = iommu_alloc_resv_region(entry->address_start,
-+						 length, prot,
-+						 IOMMU_RESV_DIRECT);
- 		if (!region) {
- 			pr_err("Out of memory allocating dm-regions for %s\n",
- 				dev_name(dev));
- 			return;
- 		}
--
--		region->start = entry->address_start;
--		region->length = entry->address_end - entry->address_start;
--		region->type = IOMMU_RESV_DIRECT;
--		if (entry->prot & IOMMU_PROT_IR)
--			region->prot |= IOMMU_READ;
--		if (entry->prot & IOMMU_PROT_IW)
--			region->prot |= IOMMU_WRITE;
--
- 		list_add_tail(&region->list, head);
- 	}
-+
-+	region = iommu_alloc_resv_region(MSI_RANGE_START,
-+					 MSI_RANGE_END - MSI_RANGE_START + 1,
-+					 0, IOMMU_RESV_RESERVED);
-+	if (!region)
-+		return;
-+	list_add_tail(&region->list, head);
-+
-+	region = iommu_alloc_resv_region(HT_RANGE_START,
-+					 HT_RANGE_END - HT_RANGE_START + 1,
-+					 0, IOMMU_RESV_RESERVED);
-+	if (!region)
-+		return;
-+	list_add_tail(&region->list, head);
- }
- 
- static void amd_iommu_put_resv_regions(struct device *dev,
--- 
-1.9.1
+>
+>> > +               outer_disable();
+>> It seems to me that if there's no L2 cache, then outer_disable()  is a no-op. It
+>> could be called unconditionally.
+>> > +       }
+>> > +
+>> >         if (at91_ramc_base[1]) {
+>> >                 saved_lpr1 = at91_ramc_read(1, AT91_DDRSDRC_LPR);
+>> >                 lpr1 = saved_lpr1 & ~AT91_DDRSDRC_LPCB; @@ -287,6
+>> > +293,9 @@ static void at91_ddr_standby(void)
+>> >         at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0);
+>> >         if (at91_ramc_base[1])
+>> >                 at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
+>> > +
+>> > +       if (at91_pm_data.has_l2_cache)
+>> > +               outer_resume();
+>>
+>> same remark as for outer_disable()
+>>
+>> Jean-Jacques
+>>
+>> >  }
+>> >
+>> >  /* We manage both DDRAM/SDRAM controllers, we need more than one
+>> > value
+>> >  * to
+>> > @@ -353,6 +362,11 @@ static __init void at91_dt_ramc(void)
+>> >                 return;
+>> >         }
+>> >
+>> > +       np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
+>> > +       if (np)
+>> > +               at91_pm_data.has_l2_cache = true;
+>> > +       of_node_put(np);
+>> > +
+>> >         at91_pm_set_standby(standby);
+>> >  }
+>> >
+>> >
+>> > This has the following benefits:
+>> >  - everybody will have the fix, regardless of whether the dtb is
+>> > updated
+>> >  - has_l2_cache can be used later in at91_pm_suspend instead of calling
+>> >    it unconditionnaly (I'll send a patch)
+>> >
+>> >
+>> > On 06/01/2017 at 14:59:45 +0800, Wenyou Yang wrote :
+>> >> For the SoCs such as SAMA5D2 and SAMA5D4 which have L2 cache, flush
+>> >> the L2 cache first before entering the cpu idle.
+>> >>
+>> >> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+>> >> ---
+>> >>
+>> >>  arch/arm/mach-at91/pm.c       | 19 +++++++++++++++++++
+>> >>  drivers/memory/atmel-sdramc.c |  1 +
+>> >>  2 files changed, 20 insertions(+)
+>> >>
+>> >> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c index
+>> >> b4332b727e9c..1a60dede1a01 100644
+>> >> --- a/arch/arm/mach-at91/pm.c
+>> >> +++ b/arch/arm/mach-at91/pm.c
+>> >> @@ -289,6 +289,24 @@ static void at91_ddr_standby(void)
+>> >>               at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);  }
+>> >>
+>> >> +static void at91_ddr_cache_standby(void) {
+>> >> +     u32 saved_lpr;
+>> >> +
+>> >> +     flush_cache_all();
+>> >> +     outer_disable();
+>> >> +
+>> >> +     saved_lpr = at91_ramc_read(0, AT91_DDRSDRC_LPR);
+>> >> +     at91_ramc_write(0, AT91_DDRSDRC_LPR, (saved_lpr &
+>> >> +                     (~AT91_DDRSDRC_LPCB)) |
+>> >> + AT91_DDRSDRC_LPCB_SELF_REFRESH);
+>> >> +
+>> >> +     cpu_do_idle();
+>> >> +
+>> >> +     at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr);
+>> >> +
+>> >> +     outer_resume();
+>> >> +}
+>> >> +
+>> >>  /* We manage both DDRAM/SDRAM controllers, we need more than one
+>> value to
+>> >>   * remember.
+>> >>   */
+>> >> @@ -324,6 +342,7 @@ static const struct of_device_id const ramc_ids[]
+>> __initconst = {
+>> >>       { .compatible = "atmel,at91sam9260-sdramc", .data =
+>> at91sam9_sdram_standby },
+>> >>       { .compatible = "atmel,at91sam9g45-ddramc", .data = at91_ddr_standby },
+>> >>       { .compatible = "atmel,sama5d3-ddramc", .data =
+>> >> at91_ddr_standby },
+>> >> +     { .compatible = "atmel,sama5d4-ddramc", .data =
+>> >> + at91_ddr_cache_standby },
+>> >>       { /*sentinel*/ }
+>> >>  };
+>> >>
+>> >> diff --git a/drivers/memory/atmel-sdramc.c
+>> >> b/drivers/memory/atmel-sdramc.c index b418b39af180..7e5c5c6c1348
+>> >> 100644
+>> >> --- a/drivers/memory/atmel-sdramc.c
+>> >> +++ b/drivers/memory/atmel-sdramc.c
+>> >> @@ -48,6 +48,7 @@ static const struct of_device_id atmel_ramc_of_match[]
+>> = {
+>> >>       { .compatible = "atmel,at91sam9260-sdramc", .data =
+>> &at91rm9200_caps, },
+>> >>       { .compatible = "atmel,at91sam9g45-ddramc", .data =
+>> &at91sam9g45_caps, },
+>> >>       { .compatible = "atmel,sama5d3-ddramc", .data = &sama5d3_caps,
+>> >> },
+>> >> +     { .compatible = "atmel,sama5d4-ddramc", .data = &sama5d3_caps,
+>> >> + },
+>> >>       {},
+>> >>  };
+>> >>
+>> >> --
+>> >> 2.11.0
+>> >>
+>> >
+>> > --
+>> > Alexandre Belloni, Free Electrons
+>> > Embedded Linux and Kernel engineering
+>> > http://free-electrons.com
+>> >
+>> > _______________________________________________
+>> > linux-arm-kernel mailing list
+>> > linux-arm-kernel at lists.infradead.org
+>> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
