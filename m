@@ -1,53 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Jan 2017 15:33:12 +0100
-Subject: [PATCH v2 05/12] Document: dt: binding: imx: update pinctrl doc
- for imx6sll
-In-Reply-To: <AM3PR04MB5304992095753B761E66A9A87640@AM3PR04MB530.eurprd04.prod.outlook.com>
-References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
- <1482832070-22668-6-git-send-email-ping.bai@nxp.com>
- <CACRpkdYUME8K+JusA0ORRKqxyBuhDdyei8eg7UZbHidKw9=bQw@mail.gmail.com>
- <AM3PR04MB5304992095753B761E66A9A87640@AM3PR04MB530.eurprd04.prod.outlook.com>
-Message-ID: <CACRpkdYTpEHyzBY-mA4YUsj=xt46Pibka3-4VHwUXosfgbgp1Q@mail.gmail.com>
+From: Andrei.Pistirica@microchip.com (Andrei.Pistirica at microchip.com)
+Date: Wed, 11 Jan 2017 14:34:13 +0000
+Subject: [RFC PATCH net-next v4 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <20170103111447.GA26488@localhost.localdomain>
+References: <1481720175-12703-1-git-send-email-andrei.pistirica@microchip.com>
+ <BN3PR07MB2516815EDE69ACDCE27F81A3C96F0@BN3PR07MB2516.namprd07.prod.outlook.com>
+ <20170102113155.GA16373@localhost.localdomain>
+ <0717c63b-2e29-9ad1-7f01-39817980933f@atmel.com>
+ <20170102161359.GD3609@localhost.localdomain>
+ <CAFcVECK1vt7Hu4tgSZ2+kKpMxoT-wpikMDq65HaxRv-EMgobHA@mail.gmail.com>
+ <BN3PR07MB25168573DD82F1681CDC8437C96E0@BN3PR07MB2516.namprd07.prod.outlook.com>
+ <20170103111447.GA26488@localhost.localdomain>
+Message-ID: <07C910AB6AC6C345A093D5A08F5AF568CB77996E@CHN-SV-EXMX03.mchp-main.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 9, 2017 at 3:32 AM, Jacky Bai <ping.bai@nxp.com> wrote:
+ 
+> On Tue, Jan 03, 2017 at 10:47:56AM +0000, Rafal Ozieblo wrote:
+> > We could use only descriptor approach but there are many Atmel's cores
+> on the market which support only event registers.
+> 
+> As I said in my other reply in this thread, the Atmel cores cannot possibly be
+> made to work correctly.
+> 
+> Sad, but true.
 
-> I have look into the above commit on using generic binding. But I think the generic pinconf
-> is not very easy to add in imx pinctrl Driver. imx pinctrl use a different way to parse the pin configure.
+In conscience, I will make a patch containing only the common code (just to benefit from this effort) and then Rafal can add the driver for the GXL version on top of it.
+Everybody agrees with this?
 
-OK atleast I need an indication from one of the i.MX maintainers how they
-want to proceed.
+Best regards,
+Andrei
 
-> Each fsl,pin entry  looks like <PIN_FUNC_ID  CONFIG> in dts, the CONFIG is the pad setting value like
-> pull-up, open-drain, drive strength etc. The above config bit definition is specific to each SOC in the PAD CTL register.
->
-> If we want set the pin config to enable hysteresis, 47KOhm Pull Up, 50Mhz speed, 80Ohm driver strength
-> and Fast Slew Rate, then the CONFIG value should be 0x17059( ORs corresponding bit definition).
-
-Hysteresis is an input property and does not make sense on something
-that need drive
-strength and slew rate configuration which are output properties.
-(I guess you mean 80mA drive strength.)
-
-Actually such oxymoronic settings is a good reason to migrate to
-generic bindings
-because when you describe stuff with generic strings you see better
-what is going
-on, and we can add sanity checks to cases like this in the generic code where it
-would indeed be valid to ask why this combination of settings is being made.
-
-> This value will be set in
-> PAD CTL register to config the corresponding pin.
-
-Yes? That is common. It looks like that in DT:
-
-{
-   input-schmitt-enable;
-   bias-pull-up = <47000>;
-   slew-rate = <50000000>;
-   drive-strength = <80000>;
-};
-
-Yours,
-Linus Walleij
+> 
+> Thanks,
+> Richard
