@@ -1,51 +1,92 @@
-From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Wed, 11 Jan 2017 19:03:27 +0300
-Subject: [PATCH] arm64: avoid increasing DMA masks above what hardware
- supports
-In-Reply-To: <c5bada32-fbaf-3631-268b-db49dffe3eb9@arm.com>
-References: <11daacde-5399-039f-80a3-01d7bd13e9e8@arm.com>
- <1484056844-9567-1-git-send-email-nikita.yoush@cogentembedded.com>
- <dca35acf-1adf-aa85-7a0b-d0c6ec702fa1@arm.com>
- <67314806-361d-e0ac-9292-37542160ead5@cogentembedded.com>
- <57459a4a-2c57-e081-8f27-cb83f23b5815@arm.com>
- <09cac197-9e57-5d3e-e742-f29c00051813@cogentembedded.com>
- <c5bada32-fbaf-3631-268b-db49dffe3eb9@arm.com>
-Message-ID: <105b0b38-8c48-3355-4951-435c5dca18a4@cogentembedded.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Wed, 11 Jan 2017 10:03:40 -0600
+Subject: [PATCH] ARM: defconfig: qcom: add APQ8060 DragonBoard devices
+In-Reply-To: <0cd4197f-0055-bd8b-5d8f-dc16e008c46d@baylibre.com>
+References: <20170110095521.14146-1-linus.walleij@linaro.org>
+ <20170110145348.GD5710@hector.attlocal.net>
+ <CACRpkdb+bH1bj14d-2rBMadJQLCdVgdeuc07ESkuQpWt9UQ6rg@mail.gmail.com>
+ <7762461.Mcpxx0AiPM@wuerfel>
+ <0cd4197f-0055-bd8b-5d8f-dc16e008c46d@baylibre.com>
+Message-ID: <20170111160340.GF5710@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-11.01.2017 17:50, Robin Murphy ?????:
-> On 11/01/17 13:41, Nikita Yushchenko wrote:
->>> Yes, I think that ought to work, although the __iommu_setup_dma_ops()
->>> call will still want a real size reflecting the default mask
->>
->> I see iommu_dma_ops do not define set_dma_mask.
->>
->> So what if setup was done for size reflecting one mask and then driver
->> changes mask?  Will things still operate correctly?
+On Wed, Jan 11, 2017 at 03:11:01PM +0100, Neil Armstrong wrote:
+> On 01/11/2017 03:08 PM, Arnd Bergmann wrote:
+> > On Wednesday, January 11, 2017 2:19:55 PM CET Linus Walleij wrote:
+> >> On Tue, Jan 10, 2017 at 3:53 PM, Andy Gross <andy.gross@linaro.org> wrote:
+> >>> On Tue, Jan 10, 2017 at 10:55:21AM +0100, Linus Walleij wrote:
+> >>>> This default-enables the devices found on the APQ8060 DragonBoard
+> >>>> in the qcom_defconfig:
+> >>>>
+> >>>> - EBI2 bus
+> >>>> - SMSC911x ethernet
+> >>>> - LEDs class and PM8058 LEDs driver, trigger and heartbeat
+> >>>>   trigger (so we get heartbeat on the board by default)
+> >>>> - IIO framework, including the HRTimer trigger, KXSD9
+> >>>>   accelerometer, MPU3050 gyroscope, AK8975 magnetometer and
+> >>>>   BMP085 pressure sensor
+> >>>>
+> >>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> >>>
+> >>> This brings up a point of discussion.  Do we even need the qcom_defconfig any
+> >>> more?  Is everyone comfortable with using the multi_v7_defconfig?
+> > 
+> > I think having one specialized defconfig for the platform is helpful for
+> > the build/boot testing, e.g. it can show whether a boot failure with
+> > multi_v7_defconfig is the result of a qcom-specific change, or a side-effect
+> > of something that was done on another platform.
+> > 
+> >>> Aside from size of the image, i can't think of any other reason to keep around
+> >>> the separate qcom file.
+> >>
+> >> Actually a bit of Arnd/Olof question.
+> >>
+> >> Bystander opinion below:
+> >>
+> >> That is pretty much up to the maintainer (you) I guess.
+> >> Reasons would be:
+> >>
+> >> - Lower footprint (because you may not need all stuff selected
+> >>   as 'y' compiled-in in multi_v7) on some platforms this is even
+> >>   necessary to get a bootable image or one that will load in
+> >>   reasonable time.
+> >>
+> >> - Enable a few things by default (both compiled-in and modules)
+> >>   that multi_v7 would consider to be littering
+> >>
+> >> - For "my" systems I usually like them because these defconfigs
+> >>   have vastly shorter compile time (because so much stuff that
+> >>   idon't concern me is left out).
+> >>
+> >> On the other hand: some ARMv7 system maintainers have x86
+> >> ambitions: compile once, run everywhere, and certainly that is
+> >> the ambition with multi_v7, and if that overshadows all the above,
+> >> just kill off qcom_defconfig and be happy :)
+> > 
+> > We recently killed of the Broadcom defconfig file that actually
+> > contained some very different platforms that had not much in common
+> > besides the company name.
+> > 
+> > I think my preference is to keep it, but if Andy wants it removed
+> > and nobody complains, that's fine too.
+> > 
+> > 	Arnd
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
 > 
-> We've overridden dma_set_mask() at the function level, so it should
-> always apply regardless. Besides, none of the arm64 ops implement
-> .set_dma_mask anyway, so we could possibly drop the references to it
-> altogether.
+> Hi all,
 > 
-> Conversely, I suppose we could just implement said callback for
-> swiotlb_dma_ops and iommu_dma_ops with the parent_dma_mask-checking
-> function and drop the HAVE_ARCH_DMA_SET_MASK override instead. I'm not
-> sure which approach is preferable - the latter seems arguably cleaner in
-> isolation, but would also be less consistent with how the coherent mask
-> has to be handled. Ho hum.
+> In fact, as far as I remember the multi_v7 did not fit on the MDM9615
+> due to it's limited memory available to Linux.
 
-I mean, before patch is applied.
+This was mainly a user poll.  We'll keep it in as there is at least one user who
+cannot use the multiv7 due to size.  That alone is enough to keep it around.
 
-In the current mainline codebase, arm64 iommu does setup dependent on
-[default] dma_mask, but does not anyhow react on dma mask change.
+Linus, I'll add this to my pull list.
 
-I don't know much details about arm64 iommu, but from distant view this
-combination looks incorrect:
-- if behavior of this hardware should depend on dma_mask of device, then
-it should handle mask change,
-- if behavior of this hardware should not depend on dma_mask of device,
-then what for to pass size to it's setup?
+Andy
