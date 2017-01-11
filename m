@@ -1,118 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 Jan 2017 22:17:58 +0100
-Subject: [PATCH v2 1/6] mmc: sunxi: Always set signal delay to 0 for A64
-In-Reply-To: <96ba5fd8-d551-5993-f347-202c47efec8c@arm.com>
-References: <cover.493dc67855a5f1837e875d37307319a03d14d1d0.1483980339.git-series.maxime.ripard@free-electrons.com>
- <5eff19eec2b110bb643a38e7fef221208f585589.1483980339.git-series.maxime.ripard@free-electrons.com>
- <96ba5fd8-d551-5993-f347-202c47efec8c@arm.com>
-Message-ID: <20170111211758.wt24lx5b63rgujia@lukather>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Thu, 12 Jan 2017 06:22:42 +0900
+Subject: [PATCH] arm64: dts: exynos: Replace small letter of base
+ address/offset on Exynos5433
+In-Reply-To: <20170111162613.lxkc7k75f6q3fsz2@kozik-lap>
+References: <CGME20170111005552epcas1p4a1f6ed88022b46544dec4b3801583267@epcas1p4.samsung.com>
+ <1484096148-17120-1-git-send-email-cw00.choi@samsung.com>
+ <20170111162613.lxkc7k75f6q3fsz2@kozik-lap>
+Message-ID: <CAGTfZH0H_kA9cRPG4Vqh3iLZncfXqfKDFiSYEXV1zp+9yFP25Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 12:30:41AM +0000, Andr? Przywara wrote:
-> On 09/01/17 16:46, Maxime Ripard wrote:
-> > Experience have shown that the using the  autocalibration could severely
-> > degrade the performances of the MMC bus.
-> > 
-> > Allwinner is using in its BSP a delay set to 0 for all the modes but HS400.
-> > Remove the calibration code for now, and add comments to document our
-> > findings.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/mmc/host/sunxi-mmc.c | 50 ++++++++++++-------------------------
-> >  1 file changed, 17 insertions(+), 33 deletions(-)
-> > 
-> > diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> > index b1d1303389a7..ea9552a0d820 100644
-> > --- a/drivers/mmc/host/sunxi-mmc.c
-> > +++ b/drivers/mmc/host/sunxi-mmc.c
-> > @@ -683,41 +683,19 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
-> >  
-> >  static int sunxi_mmc_calibrate(struct sunxi_mmc_host *host, int reg_off)
-> >  {
-> > -	u32 reg = readl(host->reg_base + reg_off);
-> > -	u32 delay;
-> > -	unsigned long timeout;
-> > -
-> >  	if (!host->cfg->can_calibrate)
-> >  		return 0;
-> >  
-> > -	reg &= ~(SDXC_CAL_DL_MASK << SDXC_CAL_DL_SW_SHIFT);
-> > -	reg &= ~SDXC_CAL_DL_SW_EN;
-> > -
-> > -	writel(reg | SDXC_CAL_START, host->reg_base + reg_off);
-> > -
-> > -	dev_dbg(mmc_dev(host->mmc), "calibration started\n");
-> > -
-> > -	timeout = jiffies + HZ * SDXC_CAL_TIMEOUT;
-> > -
-> > -	while (!((reg = readl(host->reg_base + reg_off)) & SDXC_CAL_DONE)) {
-> > -		if (time_before(jiffies, timeout))
-> > -			cpu_relax();
-> > -		else {
-> > -			reg &= ~SDXC_CAL_START;
-> > -			writel(reg, host->reg_base + reg_off);
-> > -
-> > -			return -ETIMEDOUT;
-> > -		}
-> > -	}
-> > -
-> > -	delay = (reg >> SDXC_CAL_DL_SHIFT) & SDXC_CAL_DL_MASK;
-> > -
-> > -	reg &= ~SDXC_CAL_START;
-> > -	reg |= (delay << SDXC_CAL_DL_SW_SHIFT) | SDXC_CAL_DL_SW_EN;
-> > -
-> > -	writel(reg, host->reg_base + reg_off);
-> > -
-> > -	dev_dbg(mmc_dev(host->mmc), "calibration ended, reg is 0x%x\n", reg);
-> > +	/*
-> > +	 * FIXME:
-> > +	 * This is not clear how the calibration is supposed to work
-> > +	 * yet. The best rate have been obtained by simply setting the
-> > +	 * delay to 0, as Allwinner does in its BSP.
-> > +	 *
-> > +	 * The only mode that doesn't have such a delay is HS400, that
-> > +	 * is in itself a TODO.
-> > +	 */
-> > +	writel(SDXC_CAL_DL_SW_EN, host->reg_base + reg_off);
-> >  
-> >  	return 0;
-> >  }
-> > @@ -806,7 +784,13 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
-> >  	if (ret)
-> >  		return ret;
-> >  
-> > -	/* TODO: enable calibrate on sdc2 SDXC_REG_DS_DL_REG of A64 */
-> > +	/*
-> > +	 * FIXME:
-> > +	 *
-> > +	 * In HS400 we'll also need to calibrate the data strobe
-> > +	 * signal. This should only happen on the MMC2 controller (at
-> > +	 * least on the A64 and older SoCs).
-> 
-> Which older SoCs have this calibration register and a DS signal?
-> Is that supposed to mean "other" SoCs?
+2017-01-12 1:26 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
+> On Wed, Jan 11, 2017 at 09:55:48AM +0900, Chanwoo Choi wrote:
+>> This patch replaces the small letter of base address, offset and hex value
+>> with the capital letter to keep the consistency on Exynos5433.
+>>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> ---
+>>  arch/arm64/boot/dts/exynos/exynos5433.dtsi | 14 +++++++-------
+>>  1 file changed, 7 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+>> index abaf6b4d599d..d7ed1a68b6fd 100644
+>> --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+>> +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+>> @@ -231,7 +231,7 @@
+>>               compatible = "arm,psci";
+>>               method = "smc";
+>>               cpu_off = <0x84000002>;
+>> -             cpu_on = <0xC4000003>;
+>> +             cpu_on = <0xc4000003>;
+>
+> There is no point of such "improvements". This is just unnecessary
+> churn.
+>
+> Sometimes such things are accepted as part of some bigger work (vide
+> recent Andrzej's sysmmu for HDMI/TV). But on its own? No sense at all.
 
-That was supposed to mean that newer (than A64) SoCs might have that
-calibration on other controllers than MMC2. But you're right that it
-actually applies only to A64 anyway, I'll remove the and older part.
+Do you mean that this patch is not reasonable? or
+The modification of cpu_on property is only not reasonable?
 
-> Other than that:
-> 
-> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-
-Thanks!
-Maxime
+It is simple for the consistency to use the hex value in dts file.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170111/1c8767ce/attachment.sig>
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
