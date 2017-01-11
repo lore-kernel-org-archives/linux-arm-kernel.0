@@ -1,76 +1,50 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 11 Jan 2017 12:19:43 +0000
-Subject: [PATCH 1/1] iommu/arm-smmu: Fix for ThunderX erratum #27704
-In-Reply-To: <1484135507-24872-1-git-send-email-tn@semihalf.com>
-References: <1484135507-24872-1-git-send-email-tn@semihalf.com>
-Message-ID: <2c048126-a4d6-16af-987a-3174401a3960@arm.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Wed, 11 Jan 2017 13:31:47 +0100
+Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device managed
+ functions
+In-Reply-To: <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
+References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-5-git-send-email-linux@roeck-us.net>
+ <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
+ <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
+Message-ID: <a45ed205-7c1b-a298-50c0-fc8b80a846c5@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/17 11:51, Tomasz Nowicki wrote:
-> The goal of erratum #27704 workaround was to make sure that ASIDs and VMIDs
-> are unique across all SMMU instances on affected Cavium systems.
+On 11/01/2017 11:52, Guenter Roeck wrote:
+
+> On 01/11/2017 01:07 AM, Marc Gonzalez wrote:
 > 
-> Currently, the workaround code partitions ASIDs and VMIDs by increasing
-> global cavium_smmu_context_count which in turn becomes the base ASID and VMID
-> value for the given SMMU instance upon the context bank initialization.
+>>> @@ -134,12 +134,15 @@ static int tangox_wdt_probe(struct platform_device *pdev)
+>>>  	err = clk_prepare_enable(dev->clk);
+>>>  	if (err)
+>>>  		return err;
+>>> +	err = devm_add_action_or_reset(&pdev->dev,
+>>> +				       (void(*)(void *))clk_disable_unprepare,
+>>> +				       dev->clk);
+>>> +	if (err)
+>>> +		return err;
+>>
+>> Hello Guenter,
+>>
+>> I would rather avoid the function pointer cast.
+>> How about defining an auxiliary function for the cleanup action?
+>>
+>> clk_disable_unprepare() is static inline, so gcc will have to
+>> define an auxiliary function either way. What do you think?
 > 
-> For systems with multiple SMMU instances this approach implies the risk
-> of crossing 8-bit ASID, like for CN88xx capable of 4 SMMUv2, 128 context bank each:
-> SMMU_0 (0-127 ASID RANGE)
-> SMMU_1 (127-255 ASID RANGE)
-> SMMU_2 (256-383 ASID RANGE) <--- crossing 8-bit ASID
-> SMMU_3 (384-511 ASID RANGE) <--- crossing 8-bit ASID
+> Not really. It would just make it more complicated to replace the
+> call with devm_clk_prepare_enable(), should it ever find its way
+> into the light of day.
 
-I could swear that@some point in the original discussion it was said
-that the TLBs were only shared between pairs of SMMUs, so in fact 0/1
-and 2/3 are independent of each other - out of interest, have you
-managed to hit an actual problem in practice or is this patch just by
-inspection?
+More complicated, because the cleanup function will have to be deleted later?
+The compiler will warn if someone forgets to do that.
 
-Of course, depending on the SMMUs to probe in the right order isn't
-particularly robust, so it's still probably a worthwhile change.
+In my opinion, it's not a good idea to rely on the fact that casting
+void(*)(struct clk *clk) to void(*)(void *) is likely to work as expected
+on most platforms. (It has undefined behavior, strictly speaking.)
 
-> Since we use 8-bit ASID now we effectively misconfigure ASID[15:8] bits for
-> SMMU_CBn_TTBRm register. Also, we still use non-zero ASID[15:8] bits
-> upon context invalidation. This patch adds 16-bit ASID support for stage-1
-> AArch64 contexts for Cavium SMMUv2 model so that we use ASIDs consistently.
-> 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  drivers/iommu/arm-smmu.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index a60cded..ae8f059 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -260,6 +260,7 @@ enum arm_smmu_s2cr_privcfg {
->  
->  #define TTBCR2_SEP_SHIFT		15
->  #define TTBCR2_SEP_UPSTREAM		(0x7 << TTBCR2_SEP_SHIFT)
-> +#define TTBCR2_AS			(1 << 4)
->  
->  #define TTBRn_ASID_SHIFT		48
->  
-> @@ -778,6 +779,9 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
->  			reg = pgtbl_cfg->arm_lpae_s1_cfg.tcr;
->  			reg2 = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
->  			reg2 |= TTBCR2_SEP_UPSTREAM;
-> +			if (smmu->model == CAVIUM_SMMUV2 &&
+Do you really dislike the portable solution I suggested? :-(
 
-I'd be inclined to say "smmu->version == ARM_SMMU_V2" there, rather than
-make it Cavium-specific - we enable 16-bit VMID unconditionally where
-supported, so I don't see any reason not to handle 16-bit ASIDs in the
-same manner.
-
-> +			    cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
-> +				reg2 |= TTBCR2_AS;
->  		}
->  		if (smmu->version > ARM_SMMU_V1)
->  			writel_relaxed(reg2, cb_base + ARM_SMMU_CB_TTBCR2);
-> 
-
-Either way:
-
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Regards.
