@@ -1,89 +1,51 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Wed, 11 Jan 2017 10:16:58 +0000
-Subject: [PATCH] rtc: armada38x: make struct rtc_class_ops const
-Message-ID: <E1cRFxi-00083n-FY@rmk-PC.armlinux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 11 Jan 2017 10:19:25 +0000
+Subject: [PATCH] arm64: hugetlb: fix the wrong return value for
+ huge_ptep_set_access_flags
+In-Reply-To: <20170111060044.GA6112@sha-win-210.asiapac.arm.com>
+References: <1484114308-6068-1-git-send-email-shijie.huang@arm.com>
+ <20170111060044.GA6112@sha-win-210.asiapac.arm.com>
+Message-ID: <20170111101924.GA18044@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Armada38x wants to modify its rtc_class_ops to remove the interrupt
-handling when there is no usable interrupt, but this means we leave
-function pointers in writable memory.
+On Wed, Jan 11, 2017 at 02:00:46PM +0800, Huang Shijie wrote:
+> On Wed, Jan 11, 2017 at 01:58:28PM +0800, Huang Shijie wrote:
+> > In current code, the @changed always returns the last one's
+> > status for the huge page with the contiguous bit set.
+> > This is really not what we want. Even one of the PTEs is changed,
+> > we should tell it to the caller.
+> > 
+> > This patch fixes this issue.
+> > 
+> > Fixes: 66b3923a1a0f ("arm64: hugetlb: add support for PTE contiguous bit")
+> > Cc: stable at vger.kernel.org
+> > Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+> > ---
+> >  arch/arm64/mm/hugetlbpage.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+> > index 964b7549af5c..e25584d72396 100644
+> > --- a/arch/arm64/mm/hugetlbpage.c
+> > +++ b/arch/arm64/mm/hugetlbpage.c
+> > @@ -239,7 +239,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+> >  		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
+> >  					  *cpte, &pgsize);
+> >  		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize) {
+> > -			changed = ptep_set_access_flags(vma, addr, cpte,
+> > +			changed |= ptep_set_access_flags(vma, addr, cpte,
+> >  							pfn_pte(pfn,
+> >  								hugeprot),
+> >  							dirty);
+> > -- 
+> > 2.5.5
+> > 
+> sorry, I missed to remove the disclaimer.
 
-Since rtc_class_ops is small, arrange to have two instances, one for
-when we have interrupts, and one for when we have none, both marked
-const.  This allows the compiler to place them in read-only memory,
-which is better than placing them in __ro_after_init.
+The disclaimer is not the main issue. The patch that ended up on the
+list seems to have been corrupted probably by the SMTP server (all tabs
+converted to spaces).
 
-Thanks to Bhumika Goyal <bhumirks@gmail.com> for pointing out that
-the structure was writable and submitting a patch to add
-__ro_after_init.
-
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
-As the thread has gone quiet, I'm submitting the patch I sent within that
-thread.  No one appears to have raised an objection to it (other than what
-appears to be a misunderstanding.)
-
- drivers/rtc/rtc-armada38x.c | 24 +++++++++++++++++-------
- 1 file changed, 17 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
-index 9a3f2a6f512e..a4166ccfce36 100644
---- a/drivers/rtc/rtc-armada38x.c
-+++ b/drivers/rtc/rtc-armada38x.c
-@@ -202,7 +202,7 @@ static irqreturn_t armada38x_rtc_alarm_irq(int irq, void *data)
- 	return IRQ_HANDLED;
- }
- 
--static struct rtc_class_ops armada38x_rtc_ops = {
-+static const struct rtc_class_ops armada38x_rtc_ops = {
- 	.read_time = armada38x_rtc_read_time,
- 	.set_time = armada38x_rtc_set_time,
- 	.read_alarm = armada38x_rtc_read_alarm,
-@@ -210,8 +210,15 @@ static struct rtc_class_ops armada38x_rtc_ops = {
- 	.alarm_irq_enable = armada38x_rtc_alarm_irq_enable,
- };
- 
-+static const struct rtc_class_ops armada38x_rtc_ops_noirq = {
-+	.read_time = armada38x_rtc_read_time,
-+	.set_time = armada38x_rtc_set_time,
-+	.read_alarm = armada38x_rtc_read_alarm,
-+};
-+
- static __init int armada38x_rtc_probe(struct platform_device *pdev)
- {
-+	const struct rtc_class_ops *ops;
- 	struct resource *res;
- 	struct armada38x_rtc *rtc;
- 	int ret;
-@@ -242,19 +249,22 @@ static __init int armada38x_rtc_probe(struct platform_device *pdev)
- 				0, pdev->name, rtc) < 0) {
- 		dev_warn(&pdev->dev, "Interrupt not available.\n");
- 		rtc->irq = -1;
-+	}
-+	platform_set_drvdata(pdev, rtc);
-+
-+	if (rtc->irq != -1) {
-+		device_init_wakeup(&pdev->dev, 1);
-+		ops = &armada38x_rtc_ops;
-+	} else {
- 		/*
- 		 * If there is no interrupt available then we can't
- 		 * use the alarm
- 		 */
--		armada38x_rtc_ops.set_alarm = NULL;
--		armada38x_rtc_ops.alarm_irq_enable = NULL;
-+		ops = &armada38x_rtc_ops_noirq;
- 	}
--	platform_set_drvdata(pdev, rtc);
--	if (rtc->irq != -1)
--		device_init_wakeup(&pdev->dev, 1);
- 
- 	rtc->rtc_dev = devm_rtc_device_register(&pdev->dev, pdev->name,
--					&armada38x_rtc_ops, THIS_MODULE);
-+						ops, THIS_MODULE);
- 	if (IS_ERR(rtc->rtc_dev)) {
- 		ret = PTR_ERR(rtc->rtc_dev);
- 		dev_err(&pdev->dev, "Failed to register RTC device: %d\n", ret);
 -- 
-2.7.4
+Catalin
