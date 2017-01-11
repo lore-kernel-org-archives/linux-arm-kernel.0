@@ -1,185 +1,62 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Wed, 11 Jan 2017 09:41:44 +0000
-Subject: [PATCH v8 08/18] iommu/vt-d: Implement reserved region get/put
- callbacks
+Date: Wed, 11 Jan 2017 09:41:53 +0000
+Subject: [PATCH v8 17/18] vfio/type1: Check MSI remapping at irq domain level
 In-Reply-To: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
 References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1484127714-3263-9-git-send-email-eric.auger@redhat.com>
+Message-ID: <1484127714-3263-18-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch registers the [FEE0_0000h - FEF0_000h] 1MB MSI
-range as a reserved region and RMRR regions as direct regions.
+In case the IOMMU translates MSI transactions (typical case
+on ARM), we check MSI remapping capability at IRQ domain
+level. Otherwise it is checked at IOMMU level.
 
-This will allow to report those reserved regions in the
-iommu-group sysfs.
+At this stage the arm-smmu-(v3) still advertise the
+IOMMU_CAP_INTR_REMAP capability at IOMMU level. This will be
+removed in subsequent patches.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
-v6 -> v7:
-- report RMRR regions as direct regions
-- Due to the usage of rcu_read_lock, the rmrr reserved region
-  allocation is done on rmrr allocation.
-- use IOMMU_RESV_RESERVED
 
-RFCv2 -> RFCv3:
-- use get/put_resv_region callbacks.
-
-RFC v1 -> RFC v2:
-- fix intel_iommu_add_reserved_regions name
-- use IOAPIC_RANGE_START and IOAPIC_RANGE_END defines
-- return if the MSI region is already registered;
+v6: rewrite test
 ---
- drivers/iommu/intel-iommu.c | 92 ++++++++++++++++++++++++++++++++++++---------
- 1 file changed, 74 insertions(+), 18 deletions(-)
+ drivers/vfio/vfio_iommu_type1.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
-index 8a18525..bce59a5 100644
---- a/drivers/iommu/intel-iommu.c
-+++ b/drivers/iommu/intel-iommu.c
-@@ -440,6 +440,7 @@ struct dmar_rmrr_unit {
- 	u64	end_address;		/* reserved end address */
- 	struct dmar_dev_scope *devices;	/* target devices */
- 	int	devices_cnt;		/* target device count */
-+	struct iommu_resv_region *resv; /* reserved region handle */
- };
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index 5651faf..ec903a0 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -40,6 +40,7 @@
+ #include <linux/mdev.h>
+ #include <linux/notifier.h>
+ #include <linux/dma-iommu.h>
++#include <linux/irqdomain.h>
  
- struct dmar_atsr_unit {
-@@ -4246,27 +4247,40 @@ static inline void init_iommu_pm_ops(void) {}
- int __init dmar_parse_one_rmrr(struct acpi_dmar_header *header, void *arg)
- {
- 	struct acpi_dmar_reserved_memory *rmrr;
-+	int prot = DMA_PTE_READ|DMA_PTE_WRITE;
- 	struct dmar_rmrr_unit *rmrru;
-+	size_t length;
+ #define DRIVER_VERSION  "0.2"
+ #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+@@ -1212,7 +1213,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 	struct vfio_domain *domain, *d;
+ 	struct bus_type *bus = NULL, *mdev_bus;
+ 	int ret;
+-	bool resv_msi;
++	bool resv_msi, msi_remap;
+ 	phys_addr_t resv_msi_base;
  
- 	rmrru = kzalloc(sizeof(*rmrru), GFP_KERNEL);
- 	if (!rmrru)
--		return -ENOMEM;
-+		goto out;
+ 	mutex_lock(&iommu->lock);
+@@ -1288,8 +1289,10 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 	INIT_LIST_HEAD(&domain->group_list);
+ 	list_add(&group->next, &domain->group_list);
  
- 	rmrru->hdr = header;
- 	rmrr = (struct acpi_dmar_reserved_memory *)header;
- 	rmrru->base_address = rmrr->base_address;
- 	rmrru->end_address = rmrr->end_address;
+-	if (!allow_unsafe_interrupts &&
+-	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
++	msi_remap = resv_msi ? irq_domain_check_msi_remap() :
++				iommu_capable(bus, IOMMU_CAP_INTR_REMAP);
 +
-+	length = rmrr->end_address - rmrr->base_address + 1;
-+	rmrru->resv = iommu_alloc_resv_region(rmrr->base_address, length, prot,
-+					      IOMMU_RESV_DIRECT);
-+	if (!rmrru->resv)
-+		goto free_rmrru;
-+
- 	rmrru->devices = dmar_alloc_dev_scope((void *)(rmrr + 1),
- 				((void *)rmrr) + rmrr->header.length,
- 				&rmrru->devices_cnt);
--	if (rmrru->devices_cnt && rmrru->devices == NULL) {
--		kfree(rmrru);
--		return -ENOMEM;
--	}
-+	if (rmrru->devices_cnt && rmrru->devices == NULL)
-+		goto free_all;
- 
- 	list_add(&rmrru->list, &dmar_rmrr_units);
- 
- 	return 0;
-+free_all:
-+	kfree(rmrru->resv);
-+free_rmrru:
-+	kfree(rmrru);
-+out:
-+	return -ENOMEM;
- }
- 
- static struct dmar_atsr_unit *dmar_find_atsr(struct acpi_dmar_atsr *atsr)
-@@ -4480,6 +4494,7 @@ static void intel_iommu_free_dmars(void)
- 	list_for_each_entry_safe(rmrru, rmrr_n, &dmar_rmrr_units, list) {
- 		list_del(&rmrru->list);
- 		dmar_free_dev_scope(&rmrru->devices, &rmrru->devices_cnt);
-+		kfree(rmrru->resv);
- 		kfree(rmrru);
- 	}
- 
-@@ -5203,6 +5218,45 @@ static void intel_iommu_remove_device(struct device *dev)
- 	iommu_device_unlink(iommu->iommu_dev, dev);
- }
- 
-+static void intel_iommu_get_resv_regions(struct device *device,
-+					 struct list_head *head)
-+{
-+	struct iommu_resv_region *reg;
-+	struct dmar_rmrr_unit *rmrr;
-+	struct device *i_dev;
-+	int i;
-+
-+	rcu_read_lock();
-+	for_each_rmrr_units(rmrr) {
-+		for_each_active_dev_scope(rmrr->devices, rmrr->devices_cnt,
-+					  i, i_dev) {
-+			if (i_dev != device)
-+				continue;
-+
-+			list_add_tail(&rmrr->resv->list, head);
-+		}
-+	}
-+	rcu_read_unlock();
-+
-+	reg = iommu_alloc_resv_region(IOAPIC_RANGE_START,
-+				      IOAPIC_RANGE_END - IOAPIC_RANGE_START + 1,
-+				      0, IOMMU_RESV_RESERVED);
-+	if (!reg)
-+		return;
-+	list_add_tail(&reg->list, head);
-+}
-+
-+static void intel_iommu_put_resv_regions(struct device *dev,
-+					 struct list_head *head)
-+{
-+	struct iommu_resv_region *entry, *next;
-+
-+	list_for_each_entry_safe(entry, next, head, list) {
-+		if (entry->type == IOMMU_RESV_RESERVED)
-+			kfree(entry);
-+	}
-+}
-+
- #ifdef CONFIG_INTEL_IOMMU_SVM
- #define MAX_NR_PASID_BITS (20)
- static inline unsigned long intel_iommu_get_pts(struct intel_iommu *iommu)
-@@ -5333,19 +5387,21 @@ struct intel_iommu *intel_svm_device_to_iommu(struct device *dev)
- #endif /* CONFIG_INTEL_IOMMU_SVM */
- 
- static const struct iommu_ops intel_iommu_ops = {
--	.capable	= intel_iommu_capable,
--	.domain_alloc	= intel_iommu_domain_alloc,
--	.domain_free	= intel_iommu_domain_free,
--	.attach_dev	= intel_iommu_attach_device,
--	.detach_dev	= intel_iommu_detach_device,
--	.map		= intel_iommu_map,
--	.unmap		= intel_iommu_unmap,
--	.map_sg		= default_iommu_map_sg,
--	.iova_to_phys	= intel_iommu_iova_to_phys,
--	.add_device	= intel_iommu_add_device,
--	.remove_device	= intel_iommu_remove_device,
--	.device_group   = pci_device_group,
--	.pgsize_bitmap	= INTEL_IOMMU_PGSIZES,
-+	.capable		= intel_iommu_capable,
-+	.domain_alloc		= intel_iommu_domain_alloc,
-+	.domain_free		= intel_iommu_domain_free,
-+	.attach_dev		= intel_iommu_attach_device,
-+	.detach_dev		= intel_iommu_detach_device,
-+	.map			= intel_iommu_map,
-+	.unmap			= intel_iommu_unmap,
-+	.map_sg			= default_iommu_map_sg,
-+	.iova_to_phys		= intel_iommu_iova_to_phys,
-+	.add_device		= intel_iommu_add_device,
-+	.remove_device		= intel_iommu_remove_device,
-+	.get_resv_regions	= intel_iommu_get_resv_regions,
-+	.put_resv_regions	= intel_iommu_put_resv_regions,
-+	.device_group		= pci_device_group,
-+	.pgsize_bitmap		= INTEL_IOMMU_PGSIZES,
- };
- 
- static void quirk_iommu_g4x_gfx(struct pci_dev *dev)
++	if (!allow_unsafe_interrupts && !msi_remap) {
+ 		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
+ 		       __func__);
+ 		ret = -EPERM;
 -- 
 1.9.1
