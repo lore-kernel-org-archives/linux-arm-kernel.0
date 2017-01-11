@@ -1,28 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Jan 2017 16:16:31 +0100
-Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
- enable panel
-In-Reply-To: <50499352-fa14-64c4-1a74-db4827757a2d@arm.com>
-References: <20161221032717.13154-1-vz@mleia.com>
- <CACRpkdZE6VgJA27+Wh=Gxd7yOXpLMyT7yCB2PYA36y0gvosHFQ@mail.gmail.com>
- <20170102142228.GI14217@n2100.armlinux.org.uk>
- <252ad888-fa9d-695a-58ed-46806e4374fd@mleia.com>
- <50499352-fa14-64c4-1a74-db4827757a2d@arm.com>
-Message-ID: <CACRpkdYv87Tmp6i-vccVmtVD5NDk2y1=62sgP7VQgWctC+t3Tg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 11 Jan 2017 15:18:23 +0000
+Subject: [PATCH] arm64: assembler: make adr_l work in modules under KASLR
+In-Reply-To: <1484146493-18460-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1484146493-18460-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170111151822.GC26344@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 2:47 PM, Vladimir Murzin
-<vladimir.murzin@arm.com> wrote:
+Hi Ard,
 
-> In another thread Benjamin pointed at patch [1] in drm/kms part for noMMU.
->
-> [1] https://cgit.freedesktop.org/drm/drm-misc/commit/?id=62a0d98a188cc4ebd8ea54b37d274ec20465e464
+On Wed, Jan 11, 2017 at 02:54:53PM +0000, Ard Biesheuvel wrote:
+> When CONFIG_RANDOMIZE_MODULE_REGION_FULL=y, the offset between loaded
+> modules and the core kernel may exceed 4 GB, putting symbols exported
+> by the core kernel out of the reach of the ordinary adrp/add instruction
+> pairs used to generate relative symbol references. So make the adr_l
+> macro emit a movz/movk sequence instead when executing in module context.
 
-Problem solved?
+AFAICT, we only use adr_l in a few assembly files that shouldn't matter
+to modules:
 
-Vladimir: I do not require in any way that you create a CLCD driver for DRM,
-I just think it would be very very nice...
+* arch/arm64/kernel/head.S
+* arch/arm64/kernel/sleep.S
+* arch/arm64/kvm/hyp-init.S
+* arch/arm64/kvm/hyp/hyp-entry.S
 
-Yours,
-Linus Walleij
+... so I don't follow why we need this.
+
+Have I missed something? Or do you intend to use this in module code in
+future?
+
+It seems somewhat surprising to me to have adr_l expand to something
+that doesn't use adr/adrp, but that's not necessarily a problem.
+
+Thanks,
+Mark.
