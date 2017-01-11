@@ -1,65 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Jan 2017 14:55:20 +0100
-Subject: [PATCH 2/2] crypto: mediatek - fix format string for 64-bit builds
-In-Reply-To: <20170111135104.3961730-1-arnd@arndb.de>
-References: <20170111135104.3961730-1-arnd@arndb.de>
-Message-ID: <20170111135601.4047225-1-arnd@arndb.de>
+From: david.engraf@sysgo.com (David Engraf)
+Date: Wed, 11 Jan 2017 14:50:59 +0100
+Subject: [PATCH] tcb_clksrc: Use 32 bit tcb as sched_clock
+Message-ID: <20170111135059.21318-1-david.engraf@sysgo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After I enabled COMPILE_TEST for non-ARM targets, I ran into these
-warnings:
+On newer boards the TC can be read as single 32 bit value without locking.
+Thus the clock can be used as reference for sched_clock which is much more
+accurate than the jiffies implementation.
 
-crypto/mediatek/mtk-aes.c: In function 'mtk_aes_info_map':
-crypto/mediatek/mtk-aes.c:224:28: error: format '%d' expects argument of type 'int', but argument 3 has type 'long unsigned int' [-Werror=format=]
-   dev_err(cryp->dev, "dma %d bytes error\n", sizeof(*info));
-crypto/mediatek/mtk-sha.c:344:28: error: format '%d' expects argument of type 'int', but argument 3 has type 'long unsigned int' [-Werror=format=]
-crypto/mediatek/mtk-sha.c:550:21: error: format '%u' expects argument of type 'unsigned int', but argument 4 has type 'size_t {aka long unsigned int}' [-Werror=format=]
+Tested on a Atmel SAMA5D2 board.
 
-The correct format for size_t is %zu, so use that in all three
-cases.
-
-Fixes: 785e5c616c84 ("crypto: mediatek - Add crypto driver support for some MediaTek chips")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: David Engraf <david.engraf@sysgo.com>
 ---
- drivers/crypto/mediatek/mtk-aes.c | 2 +-
- drivers/crypto/mediatek/mtk-sha.c | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/clocksource/tcb_clksrc.c | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/crypto/mediatek/mtk-aes.c b/drivers/crypto/mediatek/mtk-aes.c
-index 3271471060d9..1370cabeeb5b 100644
---- a/drivers/crypto/mediatek/mtk-aes.c
-+++ b/drivers/crypto/mediatek/mtk-aes.c
-@@ -221,7 +221,7 @@ static int mtk_aes_info_map(struct mtk_cryp *cryp,
- 	aes->ct_dma = dma_map_single(cryp->dev, info, sizeof(*info),
- 					DMA_TO_DEVICE);
- 	if (unlikely(dma_mapping_error(cryp->dev, aes->ct_dma))) {
--		dev_err(cryp->dev, "dma %d bytes error\n", sizeof(*info));
-+		dev_err(cryp->dev, "dma %zu bytes error\n", sizeof(*info));
- 		return -EINVAL;
- 	}
- 	aes->tfm_dma = aes->ct_dma + sizeof(*ct);
-diff --git a/drivers/crypto/mediatek/mtk-sha.c b/drivers/crypto/mediatek/mtk-sha.c
-index 89513632c8ed..98b3d74ae23d 100644
---- a/drivers/crypto/mediatek/mtk-sha.c
-+++ b/drivers/crypto/mediatek/mtk-sha.c
-@@ -341,7 +341,7 @@ static int mtk_sha_info_map(struct mtk_cryp *cryp,
- 	sha->ct_dma = dma_map_single(cryp->dev, info, sizeof(*info),
- 				      DMA_BIDIRECTIONAL);
- 	if (unlikely(dma_mapping_error(cryp->dev, sha->ct_dma))) {
--		dev_err(cryp->dev, "dma %d bytes error\n", sizeof(*info));
-+		dev_err(cryp->dev, "dma %zu bytes error\n", sizeof(*info));
- 		return -EINVAL;
- 	}
- 	sha->tfm_dma = sha->ct_dma + sizeof(*ct);
-@@ -547,7 +547,7 @@ static int mtk_sha_update_slow(struct mtk_cryp *cryp,
+diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+index d4ca996..745844e 100644
+--- a/drivers/clocksource/tcb_clksrc.c
++++ b/drivers/clocksource/tcb_clksrc.c
+@@ -10,6 +10,7 @@
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
+ #include <linux/atmel_tc.h>
++#include <linux/sched_clock.h>
  
- 	final = (ctx->flags & SHA_FLAGS_FINUP) && !ctx->total;
  
--	dev_dbg(cryp->dev, "slow: bufcnt: %u\n", ctx->bufcnt);
-+	dev_dbg(cryp->dev, "slow: bufcnt: %zu\n", ctx->bufcnt);
+ /*
+@@ -56,11 +57,16 @@ static u64 tc_get_cycles(struct clocksource *cs)
+ 	return (upper << 16) | lower;
+ }
  
- 	if (final) {
- 		sha->flags |= SHA_FLAGS_FINAL;
+-static u64 tc_get_cycles32(struct clocksource *cs)
++static u32 tc_get_cv32(void)
+ {
+ 	return __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
+ }
+ 
++static u64 tc_get_cycles32(struct clocksource *cs)
++{
++	return tc_get_cv32();
++}
++
+ static struct clocksource clksrc = {
+ 	.name           = "tcb_clksrc",
+ 	.rating         = 200,
+@@ -69,6 +75,11 @@ static struct clocksource clksrc = {
+ 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
+ 
++static u64 notrace tc_read_sched_clock(void)
++{
++	return tc_get_cv32();
++}
++
+ #ifdef CONFIG_GENERIC_CLOCKEVENTS
+ 
+ struct tc_clkevt_device {
+@@ -339,6 +350,9 @@ static int __init tcb_clksrc_init(void)
+ 		clksrc.read = tc_get_cycles32;
+ 		/* setup ony channel 0 */
+ 		tcb_setup_single_chan(tc, best_divisor_idx);
++
++		/* register sched_clock on chips with single 32 bit counter */
++		sched_clock_register(tc_read_sched_clock, 32, divided_rate);
+ 	} else {
+ 		/* tclib will give us three clocks no matter what the
+ 		 * underlying platform supports.
 -- 
-2.9.0
+2.9.3
