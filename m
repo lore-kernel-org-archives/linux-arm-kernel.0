@@ -1,89 +1,31 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 10 Jan 2017 18:09:10 -0800
-Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device managed
- functions
-In-Reply-To: <1484100561-17638-1-git-send-email-linux@roeck-us.net>
-References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
- <1484100561-17638-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1484100561-17638-5-git-send-email-linux@roeck-us.net>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 10 Jan 2017 21:24:57 -0500 (EST)
+Subject: [PATCH net-next 5/8] net: dsa: Export dev_to_net_device()
+In-Reply-To: <20170110201235.21771-6-f.fainelli@gmail.com>
+References: <20170110201235.21771-1-f.fainelli@gmail.com>
+ <20170110201235.21771-6-f.fainelli@gmail.com>
+Message-ID: <20170110.212457.38085718141908018.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use device managed functions to simplify error handling, reduce
-source code size, improve readability, and reduce the likelyhood of bugs.
+From: Florian Fainelli <f.fainelli@gmail.com>
+Date: Tue, 10 Jan 2017 12:12:32 -0800
 
-The conversion was done automatically with coccinelle using the
-following semantic patches. The semantic patches and the scripts used
-to generate this commit log are available at
-https://github.com/groeck/coccinelle-patches
+> @@ -491,7 +491,7 @@ struct mii_bus *dsa_host_dev_to_mii_bus(struct device *dev)
+>  }
+>  EXPORT_SYMBOL_GPL(dsa_host_dev_to_mii_bus);
+>  
+> -static struct net_device *dev_to_net_device(struct device *dev)
+> +struct net_device *dev_to_net_device(struct device *dev)
+>  {
+>  	struct device *d;
+>  
+> @@ -508,6 +508,7 @@ static struct net_device *dev_to_net_device(struct device *dev)
+>  
+>  	return NULL;
+>  }
+> +EXPORT_SYMBOL_GPL(dev_to_net_device);
 
-- Use devm_add_action_or_reset() for calls to clk_disable_unprepare
-- Replace 'goto l; ... l: return e;' with 'return e;'
-- Replace 'val = e; return val;' with 'return e;'
-- Replace 'if (e) { return expr; }' with 'if (e) return expr;'
-- Use devm_watchdog_register_driver() to register watchdog device
-
-Cc: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
- drivers/watchdog/tangox_wdt.c | 22 +++++++++-------------
- 1 file changed, 9 insertions(+), 13 deletions(-)
-
-diff --git a/drivers/watchdog/tangox_wdt.c b/drivers/watchdog/tangox_wdt.c
-index d5fcce062920..7688e1b35867 100644
---- a/drivers/watchdog/tangox_wdt.c
-+++ b/drivers/watchdog/tangox_wdt.c
-@@ -134,12 +134,15 @@ static int tangox_wdt_probe(struct platform_device *pdev)
- 	err = clk_prepare_enable(dev->clk);
- 	if (err)
- 		return err;
-+	err = devm_add_action_or_reset(&pdev->dev,
-+				       (void(*)(void *))clk_disable_unprepare,
-+				       dev->clk);
-+	if (err)
-+		return err;
- 
- 	dev->clk_rate = clk_get_rate(dev->clk);
--	if (!dev->clk_rate) {
--		err = -EINVAL;
--		goto err;
--	}
-+	if (!dev->clk_rate)
-+		return -EINVAL;
- 
- 	dev->wdt.parent = &pdev->dev;
- 	dev->wdt.info = &tangox_wdt_info;
-@@ -173,19 +176,15 @@ static int tangox_wdt_probe(struct platform_device *pdev)
- 
- 	watchdog_set_restart_priority(&dev->wdt, 128);
- 
--	err = watchdog_register_device(&dev->wdt);
-+	err = devm_watchdog_register_device(&pdev->dev, &dev->wdt);
- 	if (err)
--		goto err;
-+		return err;
- 
- 	platform_set_drvdata(pdev, dev);
- 
- 	dev_info(&pdev->dev, "SMP86xx/SMP87xx watchdog registered\n");
- 
- 	return 0;
--
-- err:
--	clk_disable_unprepare(dev->clk);
--	return err;
- }
- 
- static int tangox_wdt_remove(struct platform_device *pdev)
-@@ -193,9 +192,6 @@ static int tangox_wdt_remove(struct platform_device *pdev)
- 	struct tangox_wdt_device *dev = platform_get_drvdata(pdev);
- 
- 	tangox_wdt_stop(&dev->wdt);
--	clk_disable_unprepare(dev->clk);
--
--	watchdog_unregister_device(&dev->wdt);
- 
- 	return 0;
- }
--- 
-2.7.4
+Something like this, a public interface with a very high level generic name,
+doesn't belong in the DSA layer.  It belongs in net/core/dev.c or something
+like that.
