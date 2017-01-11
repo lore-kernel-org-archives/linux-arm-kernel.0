@@ -1,57 +1,43 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Wed, 11 Jan 2017 09:41:54 +0000
-Subject: [PATCH v8 18/18] iommu/arm-smmu: Do not advertise
- IOMMU_CAP_INTR_REMAP anymore
+Date: Wed, 11 Jan 2017 09:41:49 +0000
+Subject: [PATCH v8 13/18] genirq/msi: Set IRQ_DOMAIN_FLAG_MSI on MSI domain
+ creation
 In-Reply-To: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
 References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1484127714-3263-19-git-send-email-eric.auger@redhat.com>
+Message-ID: <1484127714-3263-14-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IOMMU_CAP_INTR_REMAP has been advertised in arm-smmu(-v3) although
-on ARM this property is not attached to the IOMMU but rather is
-implemented in the MSI controller (GICv3 ITS).
-
-Now vfio_iommu_type1 checks MSI remapping capability at MSI controller
-level, let's correct this.
+Now we have a flag value indicating an IRQ domain implements MSI,
+let's set it on msi_create_irq_domain().
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
 ---
 
-v7 -> v8:
-- added Will's A-b
----
- drivers/iommu/arm-smmu-v3.c | 2 --
- drivers/iommu/arm-smmu.c    | 2 --
- 2 files changed, 4 deletions(-)
+v7 -> v8
+- Added Marc's R-b
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 6c4111c..d9cf6cb 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1375,8 +1375,6 @@ static bool arm_smmu_capable(enum iommu_cap cap)
- 	switch (cap) {
- 	case IOMMU_CAP_CACHE_COHERENCY:
- 		return true;
--	case IOMMU_CAP_INTR_REMAP:
--		return true; /* MSIs are just memory writes */
- 	case IOMMU_CAP_NOEXEC:
- 		return true;
- 	default:
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index a354572..13d2600 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1374,8 +1374,6 @@ static bool arm_smmu_capable(enum iommu_cap cap)
- 		 * requests.
- 		 */
- 		return true;
--	case IOMMU_CAP_INTR_REMAP:
--		return true; /* MSIs are just memory writes */
- 	case IOMMU_CAP_NOEXEC:
- 		return true;
- 	default:
+v6: new
+---
+ kernel/irq/msi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+index ee23006..ddc2f54 100644
+--- a/kernel/irq/msi.c
++++ b/kernel/irq/msi.c
+@@ -270,8 +270,8 @@ struct irq_domain *msi_create_irq_domain(struct fwnode_handle *fwnode,
+ 	if (info->flags & MSI_FLAG_USE_DEF_CHIP_OPS)
+ 		msi_domain_update_chip_ops(info);
+ 
+-	return irq_domain_create_hierarchy(parent, 0, 0, fwnode,
+-					   &msi_domain_ops, info);
++	return irq_domain_create_hierarchy(parent, IRQ_DOMAIN_FLAG_MSI, 0,
++					   fwnode, &msi_domain_ops, info);
+ }
+ 
+ int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
 -- 
 1.9.1
