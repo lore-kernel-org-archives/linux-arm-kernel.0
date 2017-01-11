@@ -1,49 +1,47 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 11 Jan 2017 17:01:58 +0000
-Subject: [PATCH v2 5/5] crypto: arm/sha2-ce - enable module autoloading based
- on CPU feature bits
-In-Reply-To: <1484154118-22139-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1484154118-22139-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1484154118-22139-6-git-send-email-ard.biesheuvel@linaro.org>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 11 Jan 2017 14:06:01 -0300
+Subject: [PATCH] usb: dwc3 dwc3_exynos_probe() change goto labels to
+ meaningful names
+In-Reply-To: <20170111164537.2981-1-shuahkh@osg.samsung.com>
+References: <20170111164537.2981-1-shuahkh@osg.samsung.com>
+Message-ID: <d32213e3-98c8-6c8c-231c-53aaba6468ff@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the module autoloadable by tying it to the CPU feature bit that
-describes whether the optional instructions it relies on are implemented
-by the current CPU.
+Hello Shuah,
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/crypto/sha2-ce-glue.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+On 01/11/2017 01:45 PM, Shuah Khan wrote:
+> Change goto labels to meaningful names from a series of errNs.
+> 
+> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> ---
+>  drivers/usb/dwc3/dwc3-exynos.c | 22 +++++++++++-----------
+>  1 file changed, 11 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
+> index f7421c2..ea50f74 100644
+> --- a/drivers/usb/dwc3/dwc3-exynos.c
+> +++ b/drivers/usb/dwc3/dwc3-exynos.c
+> @@ -147,53 +147,53 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+>  	exynos->vdd33 = devm_regulator_get(dev, "vdd33");
+>  	if (IS_ERR(exynos->vdd33)) {
+>  		ret = PTR_ERR(exynos->vdd33);
+> -		goto err2;
+> +		goto vdd33_err;
+>  	}
 
-diff --git a/arch/arm/crypto/sha2-ce-glue.c b/arch/arm/crypto/sha2-ce-glue.c
-index 0755b2d657f3..df4dcef054ae 100644
---- a/arch/arm/crypto/sha2-ce-glue.c
-+++ b/arch/arm/crypto/sha2-ce-glue.c
-@@ -11,6 +11,7 @@
- #include <crypto/internal/hash.h>
- #include <crypto/sha.h>
- #include <crypto/sha256_base.h>
-+#include <linux/cpufeature.h>
- #include <linux/crypto.h>
- #include <linux/module.h>
- 
-@@ -100,8 +101,6 @@ static struct shash_alg algs[] = { {
- 
- static int __init sha2_ce_mod_init(void)
- {
--	if (!(elf_hwcap2 & HWCAP2_SHA2))
--		return -ENODEV;
- 	return crypto_register_shashes(algs, ARRAY_SIZE(algs));
- }
- 
-@@ -110,5 +109,5 @@ static void __exit sha2_ce_mod_fini(void)
- 	crypto_unregister_shashes(algs, ARRAY_SIZE(algs));
- }
- 
--module_init(sha2_ce_mod_init);
-+module_cpu_feature_match(SHA2, sha2_ce_mod_init);
- module_exit(sha2_ce_mod_fini);
+I think it's better to use as labels what will be done in the error path
+rather than what failed. IOW, "disable_axius_clk" or "disable_clks" are
+more clear than vdd33_err for me, since can give you an idea of what will
+happen in the error path.
+
+But I don't have a strong opinion and your naming is an improvement over
+the current one, so:
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
 -- 
-2.7.4
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
