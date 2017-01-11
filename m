@@ -1,60 +1,103 @@
 From: yt.shen@mediatek.com (YT Shen)
-Date: Wed, 11 Jan 2017 14:51:02 +0800
-Subject: [PATCH v11 01/12] dt-bindings: display: mediatek: update supported
- chips
+Date: Wed, 11 Jan 2017 14:51:03 +0800
+Subject: [PATCH v11 02/12] drm/mediatek: add helpers for coverting from the
+ generic components
 In-Reply-To: <1484117473-46644-1-git-send-email-yt.shen@mediatek.com>
 References: <1484117473-46644-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1484117473-46644-2-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1484117473-46644-3-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add decriptions about supported chips, including MT2701 & MT8173
+define helpers for converting from 'mtk_ddp_comp' to 'mtk_disp_ovl'
+define helpers for converting from 'mtk_ddp_comp' to 'mtk_disp_rdma'
 
 Signed-off-by: YT Shen <yt.shen@mediatek.com>
 ---
- Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt | 2 ++
- Documentation/devicetree/bindings/display/mediatek/mediatek,dsi.txt  | 2 ++
- 2 files changed, 4 insertions(+)
+ drivers/gpu/drm/mediatek/mtk_disp_ovl.c  | 15 +++++++++------
+ drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 15 +++++++++------
+ 2 files changed, 18 insertions(+), 12 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-index db6e77e..acf61f1 100644
---- a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-+++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-@@ -40,6 +40,7 @@ Required properties (all function blocks):
- 	"mediatek,<chip>-dpi"        - DPI controller, see mediatek,dpi.txt
- 	"mediatek,<chip>-disp-mutex" - display mutex
- 	"mediatek,<chip>-disp-od"    - overdrive
-+  the supported chips are mt2701 and mt8173.
- - reg: Physical base address and length of the function block register space
- - interrupts: The interrupt signal from the function block (required, except for
-   merge and split function blocks).
-@@ -54,6 +55,7 @@ Required properties (DMA function blocks):
- 	"mediatek,<chip>-disp-ovl"
- 	"mediatek,<chip>-disp-rdma"
- 	"mediatek,<chip>-disp-wdma"
-+  the supported chips are mt2701 and mt8173.
- - larb: Should contain a phandle pointing to the local arbiter device as defined
-   in Documentation/devicetree/bindings/soc/mediatek/mediatek,smi-larb.txt
- - iommus: Should point to the respective IOMMU block with master port as
-diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,dsi.txt b/Documentation/devicetree/bindings/display/mediatek/mediatek,dsi.txt
-index 2b1585a..fadf327 100644
---- a/Documentation/devicetree/bindings/display/mediatek/mediatek,dsi.txt
-+++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,dsi.txt
-@@ -7,6 +7,7 @@ channel output.
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+index c703102..ce2759f 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+@@ -57,6 +57,11 @@ struct mtk_disp_ovl {
+ 	struct drm_crtc			*crtc;
+ };
  
- Required properties:
- - compatible: "mediatek,<chip>-dsi"
-+  the supported chips are mt2701 and mt8173.
- - reg: Physical base address and length of the controller's registers
- - interrupts: The interrupt signal from the function block.
- - clocks: device clocks
-@@ -25,6 +26,7 @@ The MIPI TX configuration module controls the MIPI D-PHY.
++static inline struct mtk_disp_ovl *comp_to_ovl(struct mtk_ddp_comp *comp)
++{
++	return container_of(comp, struct mtk_disp_ovl, ddp_comp);
++}
++
+ static irqreturn_t mtk_disp_ovl_irq_handler(int irq, void *dev_id)
+ {
+ 	struct mtk_disp_ovl *priv = dev_id;
+@@ -76,20 +81,18 @@ static irqreturn_t mtk_disp_ovl_irq_handler(int irq, void *dev_id)
+ static void mtk_ovl_enable_vblank(struct mtk_ddp_comp *comp,
+ 				  struct drm_crtc *crtc)
+ {
+-	struct mtk_disp_ovl *priv = container_of(comp, struct mtk_disp_ovl,
+-						 ddp_comp);
++	struct mtk_disp_ovl *ovl = comp_to_ovl(comp);
  
- Required properties:
- - compatible: "mediatek,<chip>-mipi-tx"
-+  the supported chips are mt2701 and mt8173.
- - reg: Physical base address and length of the controller's registers
- - clocks: PLL reference clock
- - clock-output-names: name of the output clock line to the DSI encoder
+-	priv->crtc = crtc;
++	ovl->crtc = crtc;
+ 	writel(0x0, comp->regs + DISP_REG_OVL_INTSTA);
+ 	writel_relaxed(OVL_FME_CPL_INT, comp->regs + DISP_REG_OVL_INTEN);
+ }
+ 
+ static void mtk_ovl_disable_vblank(struct mtk_ddp_comp *comp)
+ {
+-	struct mtk_disp_ovl *priv = container_of(comp, struct mtk_disp_ovl,
+-						 ddp_comp);
++	struct mtk_disp_ovl *ovl = comp_to_ovl(comp);
+ 
+-	priv->crtc = NULL;
++	ovl->crtc = NULL;
+ 	writel_relaxed(0x0, comp->regs + DISP_REG_OVL_INTEN);
+ }
+ 
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+index 0df05f9..21eff6f 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+@@ -49,6 +49,11 @@ struct mtk_disp_rdma {
+ 	struct drm_crtc			*crtc;
+ };
+ 
++static inline struct mtk_disp_rdma *comp_to_rdma(struct mtk_ddp_comp *comp)
++{
++	return container_of(comp, struct mtk_disp_rdma, ddp_comp);
++}
++
+ static irqreturn_t mtk_disp_rdma_irq_handler(int irq, void *dev_id)
+ {
+ 	struct mtk_disp_rdma *priv = dev_id;
+@@ -77,20 +82,18 @@ static void rdma_update_bits(struct mtk_ddp_comp *comp, unsigned int reg,
+ static void mtk_rdma_enable_vblank(struct mtk_ddp_comp *comp,
+ 				   struct drm_crtc *crtc)
+ {
+-	struct mtk_disp_rdma *priv = container_of(comp, struct mtk_disp_rdma,
+-						  ddp_comp);
++	struct mtk_disp_rdma *rdma = comp_to_rdma(comp);
+ 
+-	priv->crtc = crtc;
++	rdma->crtc = crtc;
+ 	rdma_update_bits(comp, DISP_REG_RDMA_INT_ENABLE, RDMA_FRAME_END_INT,
+ 			 RDMA_FRAME_END_INT);
+ }
+ 
+ static void mtk_rdma_disable_vblank(struct mtk_ddp_comp *comp)
+ {
+-	struct mtk_disp_rdma *priv = container_of(comp, struct mtk_disp_rdma,
+-						  ddp_comp);
++	struct mtk_disp_rdma *rdma = comp_to_rdma(comp);
+ 
+-	priv->crtc = NULL;
++	rdma->crtc = NULL;
+ 	rdma_update_bits(comp, DISP_REG_RDMA_INT_ENABLE, RDMA_FRAME_END_INT, 0);
+ }
+ 
 -- 
 1.9.1
