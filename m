@@ -1,50 +1,40 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 11 Jan 2017 15:25:09 +0000
-Subject: [PATCH] arm64: assembler: make adr_l work in modules under KASLR
-In-Reply-To: <20170111151822.GC26344@leverpostej>
-References: <1484146493-18460-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170111151822.GC26344@leverpostej>
-Message-ID: <CAKv+Gu9DxMzSTVRPdeSaJQNqe5RGjS_qzVzBU1SpGs5EZvCE1Q@mail.gmail.com>
+From: dhowells@redhat.com (David Howells)
+Date: Wed, 11 Jan 2017 15:27:23 +0000
+Subject: [PATCH 5/8] efi: Get the secure boot status [ver #6]
+In-Reply-To: <20170111143304.GA29649@codeblueprint.co.uk>
+References: <20170111143304.GA29649@codeblueprint.co.uk>
+ <148120020832.5854.5448601415491330495.stgit@warthog.procyon.org.uk>
+ <148120024570.5854.10638278395097394138.stgit@warthog.procyon.org.uk>
+Message-ID: <7948.1484148443@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 January 2017 at 15:18, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi Ard,
->
-> On Wed, Jan 11, 2017 at 02:54:53PM +0000, Ard Biesheuvel wrote:
->> When CONFIG_RANDOMIZE_MODULE_REGION_FULL=y, the offset between loaded
->> modules and the core kernel may exceed 4 GB, putting symbols exported
->> by the core kernel out of the reach of the ordinary adrp/add instruction
->> pairs used to generate relative symbol references. So make the adr_l
->> macro emit a movz/movk sequence instead when executing in module context.
->
-> AFAICT, we only use adr_l in a few assembly files that shouldn't matter
-> to modules:
->
-> * arch/arm64/kernel/head.S
-> * arch/arm64/kernel/sleep.S
-> * arch/arm64/kvm/hyp-init.S
-> * arch/arm64/kvm/hyp/hyp-entry.S
->
-> ... so I don't follow why we need this.
->
-> Have I missed something? Or do you intend to use this in module code in
-> future?
->
+Matt Fleming <matt@codeblueprint.co.uk> wrote:
 
-Yes. E.g., the scalar AES cipher that I am proposing for v4.11 reuses
-the lookup tables from crypto/aes_generic.c, which may be built into
-the core kernel, while the code itself may be built as a module.
+> > +	movb	$0, BP_secure_boot(%rsi)
+> >  #ifdef CONFIG_EFI_STUB
+> >  	/*
+> >  	 * The entry point for the PE/COFF executable is efi_pe_entry, so
+> 
+> Is clearing ::secure_boot really necessary? Any code path that goes
+> via efi_main() will set it correctly and all other code paths should
+> get it cleared in sanitize_boot_params(), no?
 
-But in general, if the macro is available to modules, I would like to
-make sure that it does not result in code that builds fine but may
-fail in some cases only at runtime, especially given the fact that
-there is also a Cortex-A53 erratum regarding adrp instructions, for
-which reason we build modules with -mcmodel=large (which amounts to
-the same thing as the patch above)
+No.
 
-> It seems somewhat surprising to me to have adr_l expand to something
-> that doesn't use adr/adrp, but that's not necessarily a problem.
->
+The boot_params->secure_boot parameter exists whether or not efi_main() is
+traversed (ie. if EFI isn't enabled or CONFIG_EFI_STUB=n) and, if not cleared,
+is of uncertain value.
 
-I did realise that, but I don't think it is a problem tbh.
+Further, sanitize_boot_params() has to be modified by this patch so as not to
+clobber the secure_boot flag.
+
+> What's the distinction between the unset and unknown enums?
+
+unset -> The flag was cleared by head.S and efi_get_secureboot() was never
+called.
+
+unknown -> efi_get_secureboot() tried and failed to access the EFI variables
+that should give the state.
+
+David
