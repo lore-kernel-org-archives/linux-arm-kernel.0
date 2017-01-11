@@ -1,32 +1,38 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 Jan 2017 18:30:59 +0000
-Subject: [RFC PATCH 1/2] ARM: vfp - allow kernel mode NEON in softirq
- context
-In-Reply-To: <CAKv+Gu9S66y0QuOcJdwrT-WoQOCJged-MzfXqdm20RYVGg9w8w@mail.gmail.com>
-References: <1483991849-32448-1-git-send-email-ard.biesheuvel@linaro.org>
- <1483991849-32448-2-git-send-email-ard.biesheuvel@linaro.org>
- <20170111175649.GK14217@n2100.armlinux.org.uk>
- <CAKv+Gu9S66y0QuOcJdwrT-WoQOCJged-MzfXqdm20RYVGg9w8w@mail.gmail.com>
-Message-ID: <20170111183059.GL14217@n2100.armlinux.org.uk>
+From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
+Date: Wed, 11 Jan 2017 21:31:50 +0300
+Subject: [PATCH 0/2] arm64: fix handling of DMA masks wider than bus supports
+In-Reply-To: <dca35acf-1adf-aa85-7a0b-d0c6ec702fa1@arm.com>
+References: <dca35acf-1adf-aa85-7a0b-d0c6ec702fa1@arm.com>
+Message-ID: <1484159512-28515-1-git-send-email-nikita.yoush@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 06:23:10PM +0000, Ard Biesheuvel wrote:
-> Re latency, I thought about adding a kernel_neon_yield(), which does a
-> kernel_neon_end()/do_softirq()/kernel_neon_begin() sequence if any
-> softirqs are pending, to be invoked by kernel mode NEON users at times
-> when there are no live NEON registers. But in-kernel users of the
-> crypto API are naturally quantised into disk sectors, pages or network
-> packets, so I would not expect any noticeable starvation to occur. But
-> that does mean such algorithms should not be exposed to userland
-> (which sounds like a bad idea in any case, given that userland can
-> simply execute the same instructions)
+> I reckon the easiest way forward would be to pass in some flag to
+> arch_setup_dma_ops to indicate whether it's an explicitly-configured
+> range or not - then simply initialising parent_dma_mask to ~0 for the
+> default case *should* keep things working as before.
 
-I was actually thinking about the impact of adding softirq disabling
-over much of the VFP code necessary to make this safe, rather than the
-softirq disable coming from the kernel mode neon itself.
+Tried to do that.
+
+---
+
+Nikita Yushchenko (2):
+  dma-mapping: let arch know origin of dma range passed to arch_setup_dma_ops()
+  arm64: avoid increasing DMA masks above what hardware supports
+
+ arch/arm/include/asm/dma-mapping.h             |  1 +
+ arch/arm/mm/dma-mapping.c                      |  3 +-
+ arch/arm64/Kconfig                             |  3 ++
+ arch/arm64/include/asm/device.h                |  1 +
+ arch/arm64/include/asm/dma-mapping.h           |  6 +++-
+ arch/arm64/mm/dma-mapping.c                    | 43 +++++++++++++++++++++++++-
+ arch/mips/include/asm/dma-mapping.h            |  3 +-
+ drivers/acpi/scan.c                            |  2 +-
+ drivers/iommu/rockchip-iommu.c                 |  2 +-
+ drivers/net/ethernet/freescale/dpaa/dpaa_eth.c |  2 +-
+ drivers/of/device.c                            |  5 ++-
+ drivers/staging/fsl-mc/bus/fsl-mc-bus.c        |  2 +-
+ 12 files changed, 64 insertions(+), 9 deletions(-)
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
