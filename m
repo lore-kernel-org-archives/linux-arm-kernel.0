@@ -1,84 +1,55 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 11 Jan 2017 15:36:28 +0900
-Subject: [PATCH v29 4/9] arm64: kdump: implement machine_crash_shutdown()
-In-Reply-To: <20170110113248.GC21598@arm.com>
-References: <20161228043347.27358-1-takahiro.akashi@linaro.org>
- <20161228043605.27470-3-takahiro.akashi@linaro.org>
- <20170110113248.GC21598@arm.com>
-Message-ID: <20170111063626.GE20972@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 11 Jan 2017 14:44:00 +0800
+Subject: [PATCH v2 6/6] arm64: allwinner: a64: Increase the MMC max
+ frequency
+In-Reply-To: <20170110191514.kgbesffn3xqltnol@lukather>
+References: <cover.493dc67855a5f1837e875d37307319a03d14d1d0.1483980339.git-series.maxime.ripard@free-electrons.com>
+ <3689701f93c8426bfa476e9a5f31c3642a8a898e.1483980339.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v67JoOAtHjMJboNUdCDX=+=Hf+zOWr234rT7GEiUmPb=nQ@mail.gmail.com>
+ <20170110191514.kgbesffn3xqltnol@lukather>
+Message-ID: <CAGb2v64vU5soFybaurCKu1HE9FNo=-NGiy33ZVeoR6E7m4kk6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Wed, Jan 11, 2017 at 3:15 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Tue, Jan 10, 2017 at 01:01:20AM +0800, Chen-Yu Tsai wrote:
+>> On Tue, Jan 10, 2017 at 12:46 AM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > All the controllers can have a maximum frequency of 200MHz.
+>> >
+>> > Since older SoCs cannot go that high, we cannot change the default maximum
+>> > frequency, but fortunately for us we have a property for that in the DT.
+>> >
+>> > This also has the side effect of allowing to use the MMC HS200 mode for the
+>> > boards that support it (with either 1.2v or 1.8v IOs).
+>> >
+>> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> > ---
+>> >  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 3 +++
+>> >  1 file changed, 3 insertions(+), 0 deletions(-)
+>> >
+>> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> > index 8e149498e096..f46ae965cf5b 100644
+>> > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> > @@ -332,6 +332,7 @@
+>> >                         resets = <&ccu RST_BUS_MMC0>;
+>> >                         reset-names = "ahb";
+>> >                         interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+>> > +                       max-frequency = <200000000>;
+>>
+>> You also have to set one of MMC_CAP2_HS200* in the driver,
+>> or mmc-hs200-1_8v or mmc-hs200-1_2v in the device tree to
+>> actually use HS200, right?
+>
+> Yes, but that requires a board with 1.8V IOs to work properly, which
+> not all board use, so it's probably best to enable it in the board
+> DTS.
 
-On Tue, Jan 10, 2017 at 11:32:48AM +0000, Will Deacon wrote:
-> On Wed, Dec 28, 2016 at 01:36:01PM +0900, AKASHI Takahiro wrote:
-> > Primary kernel calls machine_crash_shutdown() to shut down non-boot cpus
-> > and save registers' status in per-cpu ELF notes before starting crash
-> > dump kernel. See kernel_kexec().
-> > Even if not all secondary cpus have shut down, we do kdump anyway.
-> > 
-> > As we don't have to make non-boot(crashed) cpus offline (to preserve
-> > correct status of cpus at crash dump) before shutting down, this patch
-> > also adds a variant of smp_send_stop().
-> > 
-> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > Reviewed-by: James Morse <james.morse@arm.com>
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > ---
-> >  arch/arm64/include/asm/hardirq.h  |  2 +-
-> >  arch/arm64/include/asm/kexec.h    | 42 +++++++++++++++++++++++++-
-> >  arch/arm64/include/asm/smp.h      |  2 ++
-> >  arch/arm64/kernel/machine_kexec.c | 56 ++++++++++++++++++++++++++++++++--
-> >  arch/arm64/kernel/smp.c           | 63 +++++++++++++++++++++++++++++++++++++++
-> >  5 files changed, 160 insertions(+), 5 deletions(-)
-> 
-> [...]
-> 
-> > diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-> > index d050d720a1b4..cea009f2657d 100644
-> > --- a/arch/arm64/include/asm/smp.h
-> > +++ b/arch/arm64/include/asm/smp.h
-> > @@ -148,6 +148,8 @@ static inline void cpu_panic_kernel(void)
-> >   */
-> >  bool cpus_are_stuck_in_kernel(void);
-> >  
-> > +extern void smp_send_crash_stop(void);
-> > +
-> >  #endif /* ifndef __ASSEMBLY__ */
-> >  
-> >  #endif /* ifndef __ASM_SMP_H */
-> > diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> > index bc96c8a7fc79..c60346d33bb1 100644
-> > --- a/arch/arm64/kernel/machine_kexec.c
-> > +++ b/arch/arm64/kernel/machine_kexec.c
-> > @@ -9,6 +9,9 @@
-> >   * published by the Free Software Foundation.
-> >   */
-> >  
-> > +#include <linux/interrupt.h>
-> > +#include <linux/irq.h>
-> > +#include <linux/kernel.h>
-> >  #include <linux/kexec.h>
-> >  #include <linux/smp.h>
-> >  
-> > @@ -22,6 +25,7 @@
-> >  extern const unsigned char arm64_relocate_new_kernel[];
-> >  extern const unsigned long arm64_relocate_new_kernel_size;
-> >  
-> > +static bool in_crash_kexec;
-> 
-> Do you actually need this bool? Why not call kexec_crash_loaded() instead?
+It's limited by the vqmmc regulator. Either way the host controller
+supports it right?
 
-The two have different meanings:
-"in_crash_kexec" indicates that kdump is taking place, while
-kexec_crash_loaded() tells us only whether crash dump kernel has been
-loaded or not.
-
-It is crucial to distinguish them especially for machine_kexec()
-which can be called on normal kexec even if kdump has been set up.
-
-Thanks,
--Takahiro AKASHI
-
-> Will
+ChenYu
