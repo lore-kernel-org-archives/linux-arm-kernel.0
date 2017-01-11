@@ -1,203 +1,104 @@
 From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 11 Jan 2017 09:41:16 -0500
-Subject: [PATCH v3 3/5] arm64: Create and use __tlbi_dsb() macros
+Date: Wed, 11 Jan 2017 09:41:18 -0500
+Subject: [PATCH v3 5/5] arm64: Work around Falkor erratum 1009
 In-Reply-To: <20170111144118.17062-1-cov@codeaurora.org>
 References: <20170111144118.17062-1-cov@codeaurora.org>
-Message-ID: <20170111144118.17062-3-cov@codeaurora.org>
+Message-ID: <20170111144118.17062-5-cov@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This refactoring will allow an errata workaround that repeats tlbi dsb
-sequences to only change one location. This is not intended to change the
-generated assembly and comparison of before and after preprocessor output
-of arch/arm64/mm/mmu.c and vmlinux objdump shows no functional changes.
+During a TLB invalidate sequence targeting the inner shareable
+domain, Falkor may prematurely complete the DSB before all loads
+and stores using the old translation are observed; instruction
+fetches are not subject to the conditions of this erratum.
 
 Signed-off-by: Christopher Covington <cov@codeaurora.org>
 ---
- arch/arm64/include/asm/tlbflush.h | 104 +++++++++++++++++++++++++-------------
- 1 file changed, 69 insertions(+), 35 deletions(-)
+ Documentation/arm64/silicon-errata.txt |  1 +
+ arch/arm64/Kconfig                     | 10 ++++++++++
+ arch/arm64/include/asm/cpucaps.h       |  3 ++-
+ arch/arm64/include/asm/tlbflush.h      |  5 ++++-
+ arch/arm64/kernel/cpu_errata.c         |  7 +++++++
+ 5 files changed, 24 insertions(+), 2 deletions(-)
 
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+index 7151aed..98bef2a 100644
+--- a/Documentation/arm64/silicon-errata.txt
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -64,3 +64,4 @@ stable kernels.
+ |               |                 |                 |                          |
+ | Freescale/NXP | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585      |
+ | Qualcomm      | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003 |
++| Qualcomm      | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009 |
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 2a80ac9..d13e903 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -490,6 +490,16 @@ config QCOM_FALKOR_ERRATUM_1003
+ 
+ 	  If unsure, say Y.
+ 
++config QCOM_FALKOR_ERRATUM_1009
++	bool "Falkor E1009: Prematurely complete a DSB after a TLBI"
++	default y
++	help
++	  Falkor CPU may prematurely complete a DSB following a TLBI xxIS
++	  invalidate maintenance operations. Repeat the TLBI operation one
++	  more time to fix the issue.
++
++	  If unsure, say Y.
++
+ endmenu
+ 
+ 
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index 5aaf7ee..55bcd02 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -36,7 +36,8 @@
+ #define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
+ #define ARM64_HAS_NO_FPSIMD			16
+ #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	17
++#define ARM64_WORKAROUND_REPEAT_TLBI		18
+ 
+-#define ARM64_NCAPS				18
++#define ARM64_NCAPS				19
+ 
+ #endif /* __ASM_CPUCAPS_H */
 diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-index deab523..f28813c 100644
+index f28813c..7313cd3 100644
 --- a/arch/arm64/include/asm/tlbflush.h
 +++ b/arch/arm64/include/asm/tlbflush.h
-@@ -25,22 +25,69 @@
- #include <asm/cputype.h>
+@@ -85,7 +85,10 @@
+ 			asm (__TLBI_INSTR(op, ##__VA_ARGS__)		       \
+ 			__TLBI_IO(op, ##__VA_ARGS__));			       \
+ 		asm volatile (	     as			"\ndsb " #attr "\n"    \
+-		: : : "memory"); } while (0)
++			ALTERNATIVE("nop"		"\nnop"	       "\n",   \
++			__TLBI_INSTR(op, ##__VA_ARGS__)	"\ndsb " #attr "\n",   \
++			ARM64_WORKAROUND_REPEAT_TLBI)			       \
++		__TLBI_IO(op, ##__VA_ARGS__) : "memory"); } while (0)
  
- /*
-- * Raw TLBI operations.
-+ * Raw TLBI, DSB operations
-  *
-- * Where necessary, use the __tlbi() macro to avoid asm()
-- * boilerplate. Drivers and most kernel code should use the TLB
-- * management routines in preference to the macro below.
-+ * Where necessary, use __tlbi_*dsb() macros to avoid asm() boilerplate.
-+ * Drivers and most kernel code should use the TLB management routines in
-+ * preference to the macros below.
-  *
-- * The macro can be used as __tlbi(op) or __tlbi(op, arg), depending
-- * on whether a particular TLBI operation takes an argument or
-- * not. The macros handles invoking the asm with or without the
-- * register argument as appropriate.
-+ * The __tlbi_dsb() macro handles invoking the asm without any register
-+ * argument, with a single register argument, and with start (included)
-+ * and end (excluded) range of register arguments. For example:
-+ *
-+ * __tlbi_dsb(op, attr)
-+ *
-+ * 	tlbi op
-+ *	dsb attr
-+ *
-+ * __tlbi_dsb(op, attr, addr)
-+ *
-+ *	mov %[addr], =addr
-+ *	tlbi op, %[addr]
-+ *	dsb attr
-+ *
-+ * __tlbi_range_dsb(op, attr, start, end)
-+ *
-+ * 	mov %[arg], =start
-+ *	mov %[end], =end
-+ * for:
-+ * 	tlbi op, %[addr]
-+ * 	add %[addr], %[addr], #(1 << (PAGE_SHIFT - 12))
-+ * 	cmp %[addr], %[end]
-+ * 	b.ne for
-+ * 	dsb attr
-  */
--#define __TLBI_0(op, arg)		asm ("tlbi " #op)
--#define __TLBI_1(op, arg)		asm ("tlbi " #op ", %0" : : "r" (arg))
--#define __TLBI_N(op, arg, n, ...)	__TLBI_##n(op, arg)
+ #define __tlbi_dsb(...)	__tlbi_asm_dsb("", ##__VA_ARGS__)
  
--#define __tlbi(op, ...)		__TLBI_N(op, ##__VA_ARGS__, 1, 0)
-+#define __TLBI_FOR_0(ig0, ig1, ig2)
-+#define __TLBI_INSTR_0(op, ig1, ig2)	"tlbi " #op
-+#define __TLBI_IO_0(ig0, ig1, ig2)	: :
-+
-+#define __TLBI_FOR_1(ig0, ig1, ig2)
-+#define __TLBI_INSTR_1(op, ig0, ig1)	"tlbi " #op ", %0"
-+#define __TLBI_IO_1(ig0, arg, ig1)	: : "r" (arg)
-+
-+#define __TLBI_FOR_2(ig0, start, ig1)	unsigned long addr;		       \
-+					for (addr = start; addr < end;	       \
-+						addr += 1 << (PAGE_SHIFT - 12))
-+#define __TLBI_INSTR_2(op, ig0, ig1)	"tlbi " #op ", %0"
-+#define __TLBI_IO_2(ig0, ig1, ig2)	: : "r" (addr)
-+
-+#define __TLBI_FOR_N(op, a1, a2, n, ...)	__TLBI_FOR_##n(op, a1, a2)
-+#define __TLBI_INSTR_N(op, a1, a2, n, ...)	__TLBI_INSTR_##n(op, a1, a2)
-+#define __TLBI_IO_N(op, a1, a2, n, ...)	__TLBI_IO_##n(op, a1, a2)
-+
-+#define __TLBI_FOR(op, ...)		__TLBI_FOR_N(op, ##__VA_ARGS__, 2, 1, 0)
-+#define __TLBI_INSTR(op, ...)		__TLBI_INSTR_N(op, ##__VA_ARGS__, 2, 1, 0)
-+#define __TLBI_IO(op, ...)		__TLBI_IO_N(op, ##__VA_ARGS__, 2, 1, 0)
-+
-+#define __tlbi_asm_dsb(as, op, attr, ...) do {				       \
-+		__TLBI_FOR(op, ##__VA_ARGS__)				       \
-+			asm (__TLBI_INSTR(op, ##__VA_ARGS__)		       \
-+			__TLBI_IO(op, ##__VA_ARGS__));			       \
-+		asm volatile (	     as			"\ndsb " #attr "\n"    \
-+		: : : "memory"); } while (0)
-+
-+#define __tlbi_dsb(...)	__tlbi_asm_dsb("", ##__VA_ARGS__)
- 
- /*
-  *	TLB Management
-@@ -84,16 +131,14 @@
- static inline void local_flush_tlb_all(void)
- {
- 	dsb(nshst);
--	__tlbi(vmalle1);
--	dsb(nsh);
-+	__tlbi_dsb(vmalle1, nsh);
- 	isb();
- }
- 
- static inline void flush_tlb_all(void)
- {
- 	dsb(ishst);
--	__tlbi(vmalle1is);
--	dsb(ish);
-+	__tlbi_dsb(vmalle1is, ish);
- 	isb();
- }
- 
-@@ -102,8 +147,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
- 	unsigned long asid = ASID(mm) << 48;
- 
- 	dsb(ishst);
--	__tlbi(aside1is, asid);
--	dsb(ish);
-+	__tlbi_dsb(aside1is, ish, asid);
- }
- 
- static inline void flush_tlb_page(struct vm_area_struct *vma,
-@@ -112,8 +156,7 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
- 	unsigned long addr = uaddr >> 12 | (ASID(vma->vm_mm) << 48);
- 
- 	dsb(ishst);
--	__tlbi(vale1is, addr);
--	dsb(ish);
-+	__tlbi_dsb(vale1is, ish, addr);
- }
- 
- /*
-@@ -127,7 +170,6 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
- 				     bool last_level)
- {
- 	unsigned long asid = ASID(vma->vm_mm) << 48;
--	unsigned long addr;
- 
- 	if ((end - start) > MAX_TLB_RANGE) {
- 		flush_tlb_mm(vma->vm_mm);
-@@ -138,13 +180,10 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
- 	end = asid | (end >> 12);
- 
- 	dsb(ishst);
--	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12)) {
--		if (last_level)
--			__tlbi(vale1is, addr);
--		else
--			__tlbi(vae1is, addr);
--	}
--	dsb(ish);
-+	if (last_level)
-+		__tlbi_dsb(vale1is, ish, start, end);
-+	else
-+		__tlbi_dsb(vae1is, ish, start, end);
- }
- 
- static inline void flush_tlb_range(struct vm_area_struct *vma,
-@@ -155,8 +194,6 @@ static inline void flush_tlb_range(struct vm_area_struct *vma,
- 
- static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end)
- {
--	unsigned long addr;
--
- 	if ((end - start) > MAX_TLB_RANGE) {
- 		flush_tlb_all();
- 		return;
-@@ -166,9 +203,7 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
- 	end >>= 12;
- 
- 	dsb(ishst);
--	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
--		__tlbi(vaae1is, addr);
--	dsb(ish);
-+	__tlbi_dsb(vaae1is, ish, start, end);
- 	isb();
- }
- 
-@@ -181,8 +216,7 @@ static inline void __flush_tlb_pgtable(struct mm_struct *mm,
- {
- 	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
- 
--	__tlbi(vae1is, addr);
--	dsb(ish);
-+	__tlbi_dsb(vae1is, ish, addr);
- }
- 
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 787b542..e644364 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -137,6 +137,13 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 		MIDR_RANGE(MIDR_QCOM_FALKOR_V1, 0x00, 0x00),
+ 	},
  #endif
++#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1009
++	{
++		.desc = "Qualcomm Falkor erratum 1009",
++		.capability = ARM64_WORKAROUND_REPEAT_TLBI,
++		MIDR_RANGE(MIDR_QCOM_FALKOR_V1, 0x00, 0x00),
++	},
++#endif
+ 	{
+ 	}
+ };
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
 Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora
