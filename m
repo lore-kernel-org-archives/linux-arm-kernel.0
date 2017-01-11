@@ -1,39 +1,26 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 Jan 2017 10:26:47 +0000
-Subject: [PATCH] PCI/MSI: pci-xgene-msi: Fix CPU hotplug registration handling
-Message-ID: <1484130407-24707-1-git-send-email-marc.zyngier@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 11 Jan 2017 10:27:31 +0000
+Subject: [PATCH v2] arm64: hugetlb: fix the wrong return value for
+ huge_ptep_set_access_flags
+In-Reply-To: <1484114520-6168-1-git-send-email-shijie.huang@arm.com>
+References: <1484114520-6168-1-git-send-email-shijie.huang@arm.com>
+Message-ID: <20170111102731.GB18044@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The conversion to the new hotplug state machine introduced a regression
-where a successful hotplug registration would be treated as an error,
-effectively disabling the MSI driver forever.
+On Wed, Jan 11, 2017 at 02:02:00PM +0800, Huang Shijie wrote:
+> In current code, the @changed always returns the last one's
+> status for the huge page with the contiguous bit set.
+> This is really not what we want. Even one of the PTEs is changed,
+> we should tell it to the caller.
+> 
+> This patch fixes this issue.
+> 
+> Fixes: 66b3923a1a0f ("arm64: hugetlb: add support for PTE contiguous bit")
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Huang Shijie <shijie.huang@arm.com>
 
-Fix it by doing the proper check on the return value.
+Applied for 4.10. Thanks.
 
-Fixes: 9c248f8896e6 ("PCI/xgene-msi: Convert to hotplug state machine")
-Cc: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-Cc: Duc Dang <dhdang@apm.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: stable at vger.kernel.org
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/pci/host/pci-xgene-msi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
-index 1f38d08..f1b633b 100644
---- a/drivers/pci/host/pci-xgene-msi.c
-+++ b/drivers/pci/host/pci-xgene-msi.c
-@@ -517,7 +517,7 @@ static int xgene_msi_probe(struct platform_device *pdev)
- 
- 	rc = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "pci/xgene:online",
- 			       xgene_msi_hwirq_alloc, NULL);
--	if (rc)
-+	if (rc < 0)
- 		goto err_cpuhp;
- 	pci_xgene_online = rc;
- 	rc = cpuhp_setup_state(CPUHP_PCI_XGENE_DEAD, "pci/xgene:dead", NULL,
 -- 
-2.1.4
+Catalin
