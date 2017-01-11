@@ -1,36 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 11 Jan 2017 15:18:23 +0000
-Subject: [PATCH] arm64: assembler: make adr_l work in modules under KASLR
-In-Reply-To: <1484146493-18460-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1484146493-18460-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170111151822.GC26344@leverpostej>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 11 Jan 2017 16:22:18 +0100
+Subject: [PATCH] ARM: defconfig: include QCOM_EBI2 in multi_v7
+In-Reply-To: <CAOesGMh-5oyzjsby=R9c=euAngsq9=cNwJFDhEEKWtzxoqzLKA@mail.gmail.com>
+References: <20170110100931.15791-1-linus.walleij@linaro.org>
+ <CAOesGMh-5oyzjsby=R9c=euAngsq9=cNwJFDhEEKWtzxoqzLKA@mail.gmail.com>
+Message-ID: <CACRpkdacU0X1NH5HRwTvt1Wtn=9iqEs0MYQ_vt4UsGV67S4kBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Tue, Jan 10, 2017 at 7:02 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Jan 10, 2017 at 2:09 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> This adds the Qualcomm External Bus Interface 2 to the multi_v7
+>> defconfig: it is hard for users to realize that this is a
+>> required driver for getting things like ethernet, and a necessary
+>> prerequisite to get the external bus discoverable on the
+>> MSM8660/APQ8060 machines.
+>
+> Is it the kind of option that should really be selected through
+> Kconfig instead for those platforms?
 
-On Wed, Jan 11, 2017 at 02:54:53PM +0000, Ard Biesheuvel wrote:
-> When CONFIG_RANDOMIZE_MODULE_REGION_FULL=y, the offset between loaded
-> modules and the core kernel may exceed 4 GB, putting symbols exported
-> by the core kernel out of the reach of the ordinary adrp/add instruction
-> pairs used to generate relative symbol references. So make the adr_l
-> macro emit a movz/movk sequence instead when executing in module context.
+Stephen Boyd question.
 
-AFAICT, we only use adr_l in a few assembly files that shouldn't matter
-to modules:
+AFAIK the ambition is to go with the platform to have zero
+stuff in mach-qcom/* and thus it all becomes a defconfig
+thing.
 
-* arch/arm64/kernel/head.S
-* arch/arm64/kernel/sleep.S
-* arch/arm64/kvm/hyp-init.S
-* arch/arm64/kvm/hyp/hyp-entry.S
+> I.e. is it ever really likely that we'll want it off?
 
-... so I don't follow why we need this.
+Not really, if this chip should be supported in the resulting
+image.
 
-Have I missed something? Or do you intend to use this in module code in
-future?
-
-It seems somewhat surprising to me to have adr_l expand to something
-that doesn't use adr/adrp, but that's not necessarily a problem.
-
-Thanks,
-Mark.
+Yours,
+Linus Walleij
