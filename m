@@ -1,74 +1,85 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 Jan 2017 22:06:38 +0100
-Subject: [PATCH 4/4] ARM: dts: sun8i: add OTG function to Lichee Pi Zero
-In-Reply-To: <20170111200811.GA16865@uda0271908>
-References: <20170103152534.20118-1-icenowy@aosc.xyz>
- <20170103152534.20118-5-icenowy@aosc.xyz>
- <20170110202443.GC2479@uda0271908>
- <2733831484164533@web1g.yandex.ru>
- <20170111200811.GA16865@uda0271908>
-Message-ID: <20170111210638.ppdnpzdd2l6x4lyo@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Jan 2017 22:08:56 +0100
+Subject: [PATCH 1/2] dma-mapping: let arch know origin of dma range passed
+ to arch_setup_dma_ops()
+In-Reply-To: <1484159512-28515-2-git-send-email-nikita.yoush@cogentembedded.com>
+References: <dca35acf-1adf-aa85-7a0b-d0c6ec702fa1@arm.com>
+ <1484159512-28515-1-git-send-email-nikita.yoush@cogentembedded.com>
+ <1484159512-28515-2-git-send-email-nikita.yoush@cogentembedded.com>
+Message-ID: <30025121.yS4lyZEDrk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 02:08:11PM -0600, Bin Liu wrote:
-> On Thu, Jan 12, 2017 at 03:55:33AM +0800, Icenowy Zheng wrote:
-> > 
-> > 
-> > 11.01.2017, 04:24, "Bin Liu" <b-liu@ti.com>:
-> > > On Tue, Jan 03, 2017 at 11:25:34PM +0800, Icenowy Zheng wrote:
-> > >> ?Lichee Pi Zero features a USB OTG port.
-> > >>
-> > >> ?Add support for it.
-> > >>
-> > >> ?Note: in order to use the Host mode, the board must be powered via the
-> > >> ?+5V and GND pins.
-> > >>
-> > >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> > >> ?---
-> > >> ??arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 10 ++++++++++
-> > >> ??1 file changed, 10 insertions(+)
-> > >>
-> > >> ?diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-> > >> ?index 0099affc6ce3..3d9168cbaeca 100644
-> > >> ?--- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-> > >> ?+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-> > >> ?@@ -71,3 +71,13 @@
-> > >> ??????????pinctrl-names = "default";
-> > >> ??????????status = "okay";
-> > >> ??};
-> > >> ?+
-> > >> ?+&usb_otg {
-> > >> ?+ dr_mode = "otg";
-> > >
-> > > Why not set this default mode in dtsi instead?
-> > >
-> > > Regards,
-> > > -Bin.
-> > 
-> > There's possibly boards which do not have OTG functions.
-> 
-> That is board specific.
+On Wednesday, January 11, 2017 9:31:51 PM CET Nikita Yushchenko wrote:
 
-Exactly, and this is why it should be done in the board DT.
+> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+> index 9afcbf7..0995ab3 100644
+> --- a/drivers/iommu/rockchip-iommu.c
+> +++ b/drivers/iommu/rockchip-iommu.c
+> @@ -1096,7 +1096,7 @@ static int rk_iommu_domain_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  
+>  	/* Set dma_ops for dev, otherwise it would be dummy_dma_ops */
+> -	arch_setup_dma_ops(dev, 0, DMA_BIT_MASK(32), NULL, false);
+> +	arch_setup_dma_ops(dev, 0, DMA_BIT_MASK(32), false, NULL, false);
+>  
+>  	dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
+>  	dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(32));
+> diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
+> index c9b7ad6..19f70d8 100644
+> --- a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
+> +++ b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
+> @@ -2533,7 +2533,7 @@ static int dpaa_eth_probe(struct platform_device *pdev)
+>  	priv->buf_layout[TX].priv_data_size = DPAA_TX_PRIV_DATA_SIZE; /* Tx */
+>  
+>  	/* device used for DMA mapping */
+> -	arch_setup_dma_ops(dev, 0, 0, NULL, false);
+> +	arch_setup_dma_ops(dev, 0, 0, false, NULL, false);
+>  	err = dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(40));
+>  	if (err) {
+>  		dev_err(dev, "dma_coerce_mask_and_coherent() failed\n");
+> diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
+> index 5ac373c..480b644 100644
+> --- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
+> +++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
+> @@ -540,7 +540,7 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
+>  
+>  	/* Objects are coherent, unless 'no shareability' flag set. */
+>  	if (!(obj_desc->flags & DPRC_OBJ_FLAG_NO_MEM_SHAREABILITY))
+> -		arch_setup_dma_ops(&mc_dev->dev, 0, 0, NULL, true);
+> +		arch_setup_dma_ops(&mc_dev->dev, 0, 0, false, NULL, true);
+>  
+>  	/*
+>  	 * The device-specific probe callback will get invoked by device_add()
 
-The controller in the Allwinner SoCs do not handle directly the ID pin
-and VBUS, but rather rely on a GPIO to do so.
+Why are these actually calling arch_setup_dma_ops() here in the first
+place? Are these all devices that are DMA masters without an OF node?
 
-So boards with OTG will need setup anyway, at least to tell which
-GPIOs are used. There's no point in enforcing a default if it doesn't
-work by default.
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index fd5cfad..1cc2115 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -89,6 +89,7 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>  	bool coherent;
+>  	unsigned long offset;
+>  	const struct iommu_ops *iommu;
+> +	bool enforce_range = false;
+>  
+>  	/*
+>  	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
+> @@ -126,6 +127,8 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>  			return;
+>  		}
+>  		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+> +
+> +		enforce_range = true;
+>  	}
+>  
+>  	dev->dma_pfn_offset = offset;
 
-Maxime
+Hmm, I think when the dma-ranges are missing, we should either enforce
+a 32-bit mask, or disallow DMA completely. It's probably too late for
+the latter, I wish we had done this earlier in order to force everyone
+on ARM64 to have a valid dma-ranges property for any DMA master.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170111/2d54e75b/attachment.sig>
+	Arnd
