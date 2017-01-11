@@ -1,57 +1,47 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 11 Jan 2017 15:49:28 -0600
-Subject: [PATCH] Documentation: dt: reset: Revise typos in TI syscon reset
- example
-In-Reply-To: <20170111211520.w3sy5pkvjydiwvcs@rob-hp-laptop>
-References: <20170109192814.26811-1-s-anna@ti.com>
- <20170111211520.w3sy5pkvjydiwvcs@rob-hp-laptop>
-Message-ID: <5fa2bd27-5356-1f2f-8f92-3d0d3dcaa2b4@ti.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 11 Jan 2017 16:02:35 -0600
+Subject: CONFIG_PCIEASPM breaks PCIe on Marvell Armada 385 machine
+In-Reply-To: <20170111194942.q5rdma2es6hkmxfe@perseus.defre.kleine-koenig.org>
+References: <20170111194942.q5rdma2es6hkmxfe@perseus.defre.kleine-koenig.org>
+Message-ID: <20170111220235.GP14532@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2017 03:15 PM, Rob Herring wrote:
-> On Mon, Jan 09, 2017 at 01:28:14PM -0600, Suman Anna wrote:
->> Fix couple of typos in the example given in the TI syscon reset
->> binding. The ti,reset-bits used for DSP0 are corrected to match
->> the values that will be used in the actual DT node.
->>
->> Signed-off-by: Suman Anna <s-anna@ti.com>
->> ---
->> Hi Philipp,
->>
->> This is the Documentation part fix that goes along with
->> the ti-syscon-reset fix that you have on your next branch.
->> I will be submitting the DT nodes very soon
->>
->> regards
->> Suman
->>
->>  Documentation/devicetree/bindings/reset/ti-syscon-reset.txt | 8 ++++----
->>  1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt b/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
->> index 164c7f34c451..21ba739b162e 100644
->> --- a/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
->> +++ b/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
->> @@ -63,7 +63,7 @@ Example:
->>  --------
->>  The following example demonstrates a syscon node, the reset controller node
->>  using the syscon node, and a consumer (a DSP device) on the TI Keystone 2
->> -Edison SoC.
->> +66AK2E SoC.
->>  
->>  / {
->>  	soc {
->> @@ -71,13 +71,13 @@ Edison SoC.
->>  			compatible = "syscon", "simple-mfd";
->>  			reg = <0x02350000 0x1000>;
->>  
->> -			pscrst: psc-reset {
->> +			pscrst: psc-reset-controller {
+Hi Uwe,
+
+On Wed, Jan 11, 2017 at 08:49:46PM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> Really, this should be just 'reset-controller'.
+> on an Marvell Armada 385 based machine (Turris Omnia) with 4.9 the
+> ath10k driver fails to bind to the matching hardware if CONFIG_PCIEASPM
+> is enabled:
+> 
+> # dmesg | grep ath
+> [    7.207770] ath10k_pci 0000:02:00.0: Refused to change power state, currently in D3
+> [    7.237955] ath10k_pci 0000:02:00.0: failed to wake up device : -110
+> [    7.238146] ath10k_pci: probe of 0000:02:00.0 failed with error -110
+> 
+> if however PCIEASPM is off, the driver probes correctly and the ath10k
+> adapter works fine.
+> 
+> I wonder if someone has an idea what needs to be done to fix this
+> problem. (OK, I could disable PCIEASPM, but I'd like to have a solution
+> for a distribution kernel where I think PCIEASPM=y is sensible in
+> general.)
 
-Thanks Rob, I will fix this patch and the DTS patches as well.
+PCIEASPM=y is definitely sensible and disabling ASPM is OK for a
+workaround but is not a fix.
 
-regards
-Suman
+We have several open issues related to ASPM:
+
+  https://bugzilla.kernel.org/show_bug.cgi?id=102311 ASPM: ASMEDA asm1062 not working
+  https://bugzilla.kernel.org/show_bug.cgi?id=187731 Null pointer dereference in ASPM
+  https://bugzilla.kernel.org/show_bug.cgi?id=189951 Enabling ASPM causes NIC performance issue
+  https://bugzilla.kernel.org/show_bug.cgi?id=60111 NULL pointer deref in ASPM alloc_pcie_link_state()
+
+I don't recognize yours as being one of these.  Can you open a new
+issue and attach the complete dmesg log and "lspci -vv" output?
+
+Is this a regression?
+
+Bjorn
