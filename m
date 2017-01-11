@@ -1,46 +1,38 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Wed, 11 Jan 2017 16:50:57 +0200
-Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device managed
- functions
-In-Reply-To: <20170111143917.hedhyfu6m5dopag7@pengutronix.de>
-References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
- <1484100561-17638-1-git-send-email-linux@roeck-us.net>
- <1484100561-17638-5-git-send-email-linux@roeck-us.net>
- <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
- <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
- <a45ed205-7c1b-a298-50c0-fc8b80a846c5@sigmadesigns.com>
- <20170111143917.hedhyfu6m5dopag7@pengutronix.de>
-Message-ID: <3d6670d5-bc35-62cf-81b9-9d41a2f4e803@mentor.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Jan 2017 15:50:31 +0100
+Subject: [PATCH] rtc: armada38x: hide maybe-uninitialized warning
+Message-ID: <20170111145112.722743-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Uwe,
+The function is too complicated for gcc to realize that this variable
+does eventually get initialized, causing a harmless warning:
 
-On 01/11/2017 04:39 PM, Uwe Kleine-K?nig wrote:
-> On Wed, Jan 11, 2017 at 01:31:47PM +0100, Marc Gonzalez wrote:
->> On 11/01/2017 11:52, Guenter Roeck wrote:
->>
->>> On 01/11/2017 01:07 AM, Marc Gonzalez wrote:
->>>
->>>>> @@ -134,12 +134,15 @@ static int tangox_wdt_probe(struct platform_device *pdev)
->>>>>  	err = clk_prepare_enable(dev->clk);
->>>>>  	if (err)
->>>>>  		return err;
->>>>> +	err = devm_add_action_or_reset(&pdev->dev,
->>>>> +				       (void(*)(void *))clk_disable_unprepare,
->>>>> +				       dev->clk);
->>>>> +	if (err)
->>>>> +		return err;
-> 
-> This looks wrong. There is no clk_unprepare_disable when
-> devm_add_action_or_reset fails.
+drivers/rtc/rtc-armada38x.c: In function 'read_rtc_register_wa':
+drivers/rtc/rtc-armada38x.c:131:25: warning: 'index_max' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
-actually there is a call to clk_disable_unprepare() on error path, you may
-take a look at devm_add_action_or_reset() implementation.
+This adds an explicit initializion at the start of the function.
+I generally try to avoid that, but it seems appropriate here,
+as we start out with max=0 as well.
 
-Your comment is valid for devm_add_action() function though, but it's not
-the case here.
+Fixes: 61cffa2438e3 ("rtc: armada38x: Follow the new recommendation for errata implementation")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/rtc/rtc-armada38x.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
---
-With best wishes,
-Vladimir
+diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
+index 6c9a2cbdc1a9..65e16965af7e 100644
+--- a/drivers/rtc/rtc-armada38x.c
++++ b/drivers/rtc/rtc-armada38x.c
+@@ -90,7 +90,7 @@ static void rtc_update_mbus_timing_params(struct armada38x_rtc *rtc)
+ 
+ static u32 read_rtc_register_wa(struct armada38x_rtc *rtc, u8 rtc_reg)
+ {
+-	int i, index_max, max = 0;
++	int i, index_max = 0, max = 0;
+ 
+ 	for (i = 0; i < SAMPLE_NR; i++) {
+ 		rtc->val_to_freq[i].value = readl(rtc->regs + rtc_reg);
+-- 
+2.9.0
