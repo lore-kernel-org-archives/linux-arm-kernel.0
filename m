@@ -1,66 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Jan 2017 10:01:39 +0000
-Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
-In-Reply-To: <20170111013046-mutt-send-email-mst@kernel.org>
-References: <85015f1653eb7e36f992708362b75d1f4391b783.1484070340.git.robin.murphy@arm.com>
- <4833e705fb6841fbfdbee3b1a21a7bc917292410.1484070340.git.robin.murphy@arm.com>
- <20170111013046-mutt-send-email-mst@kernel.org>
-Message-ID: <20170111100139.GC12388@arm.com>
+From: amelie.delaunay@st.com (Amelie DELAUNAY)
+Date: Wed, 11 Jan 2017 11:07:16 +0100
+Subject: [PATCHv3 3/8] rtc: add STM32 RTC driver
+In-Reply-To: <20170111000803.mlie6kizcsj2o7lh@piout.net>
+References: <1483623809-29937-1-git-send-email-amelie.delaunay@st.com>
+ <1483623809-29937-4-git-send-email-amelie.delaunay@st.com>
+ <20170111000803.mlie6kizcsj2o7lh@piout.net>
+Message-ID: <1feb3a23-7450-2b5c-9c1c-c7ecacd7fa17@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 01:33:31AM +0200, Michael S. Tsirkin wrote:
-> On Tue, Jan 10, 2017 at 05:51:18PM +0000, Robin Murphy wrote:
-> > From: Will Deacon <will.deacon@arm.com>
-> > 
-> > Booting Linux on an ARM fastmodel containing an SMMU emulation results
-> > in an unexpected I/O page fault from the legacy virtio-blk PCI device:
-> > 
-> > [    1.211721] arm-smmu-v3 2b400000.smmu: event 0x10 received:
-> > [    1.211800] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
-> > [    1.211880] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
-> > [    1.211959] arm-smmu-v3 2b400000.smmu:	0x00000008fa081002
-> > [    1.212075] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
-> > [    1.212155] arm-smmu-v3 2b400000.smmu: event 0x10 received:
-> > [    1.212234] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
-> > [    1.212314] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
-> > [    1.212394] arm-smmu-v3 2b400000.smmu:	0x00000008fa081000
-> > [    1.212471] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
-> > 
-> > <system hangs failing to read partition table>
-> > 
-> > This is because the virtio-blk is behind an SMMU, so we have consequently
-> > swizzled its DMA ops and configured the SMMU to translate accesses. This
-> > then requires the vring code to use the DMA API to establish translations,
-> > otherwise all transactions will result in fatal faults and termination.
-> > 
-> > Given that ARM-based systems only see an SMMU if one is really present
-> > (the topology is all described by firmware tables such as device-tree or
-> > IORT), then we can safely use the DMA API for all virtio devices.
-> > 
-> > Cc: Andy Lutomirski <luto@kernel.org>
-> > Cc: Michael S. Tsirkin <mst@redhat.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> I'd like to better understand then need for this one.
-> Can't the device in question just set VIRTIO_F_IOMMU_PLATFORM ?
-> 
-> I'd rather we avoided need for more hacks and just
-> have everyone switch to that.
+Hi Alexandre,
 
-There are a couple of problems with VIRTIO_F_IOMMU_PLATFORM:
-
-1. It doesn't exist for legacy devices, which are all we have on the
-   platform in question.
-
-2. It's not documented in the virtio sp^H^HSTOP PRESS. I see you applied
-   my patch ;). Thanks.
-
-In which case, for non-legacy devices we should definitely be using
-VIRTIO_F_IOMMU_PLATFORM, but since this platform hasn't yet moved to the
-world of flying cars, could we unconditionally set the DMA ops on ARM
-for legacy devices? The alternative is disabling the SMMU altogether,
-but that's less than ideal because there are non-virtio devices on the
-same PCI bus.
-
-Will
+On 01/11/2017 01:08 AM, Alexandre Belloni wrote:
+> Looks good to me, however...
+>
+>
+> On 05/01/2017 at 14:43:24 +0100, Amelie Delaunay wrote :
+>> +struct stm32_rtc {
+>> +	struct rtc_device *rtc_dev;
+>> +	void __iomem *base;
+>> +	struct clk *ck_rtc;
+>> +	spinlock_t lock; /* Protects registers accesses */
+>
+> This spinlock seems to be useless, the rtc ops_lock is already
+> protecting everywhere it is taken.
+>
+After having a deeper look on ops_lock, it seems this one is sufficient, 
+so I'll remove all spinlock uses in this driver.
+>> +	int irq_alarm;
+>> +};
+>> +
+>
+> [...]
+>
+>> +static int stm32_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
+>> +{
+>> +	struct stm32_rtc *rtc = dev_get_drvdata(dev);
+>> +	struct rtc_time *tm = &alrm->time;
+>> +	unsigned long irqflags;
+>> +	unsigned int cr, isr, alrmar;
+>> +	int ret = 0;
+>> +
+>> +	if (rtc_valid_tm(tm)) {
+>> +		dev_err(dev, "Alarm time not valid.\n");
+>> +		return -EINVAL;
+>
+> This will never happen, tm is already checked multiple times (up to
+> three) in the core before this function can be called.
+>
+You're right. I'll remove all rtc_valid_tm calls.
+>> +	}
+>> +
+>
+> You don't need to resend the whole series, just this patch. I'll take
+> 2/8 and 3/8, the other ones can go through the stm32 tree.
+>
+Thanks for reviewing. I send a v4 for this patch right now.
