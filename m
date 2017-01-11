@@ -1,36 +1,39 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Jan 2017 16:47:46 +0100
-Subject: [PATCH] gpio: mvebu: fix warning when building on 64-bit
-In-Reply-To: <E1cR5IG-0008Gw-HV@rmk-PC.armlinux.org.uk>
-References: <E1cR5IG-0008Gw-HV@rmk-PC.armlinux.org.uk>
-Message-ID: <CACRpkdZ_LciV5a5Sj+YfGtfws2hvdSjscx0tu4=1RNYTXWU4gw@mail.gmail.com>
+Date: Wed, 11 Jan 2017 16:48:25 +0100
+Subject: [PATCH 10/62] watchdog: coh901327_wdt: Convert to use device
+ managed functions
+In-Reply-To: <1484091325-9199-11-git-send-email-linux@roeck-us.net>
+References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+ <1484091325-9199-11-git-send-email-linux@roeck-us.net>
+Message-ID: <CACRpkdakLhH1Te85deJ3Gmwo0VNSrTspcFjBA75N_vgYwESc+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 11:53 PM, Russell King
-<rmk+kernel@armlinux.org.uk> wrote:
+On Wed, Jan 11, 2017 at 12:34 AM, Guenter Roeck <linux@roeck-us.net> wrote:
 
-> Casting a pointer to an int is not portable, and provokes a compiler
-> warning.  Cast to unsigned long instead to avoid the warning.
+> Use device managed functions to simplify error handling, reduce
+> source code size, improve readability, and reduce the likelyhood of bugs.
 >
-> drivers/gpio/gpio-mvebu.c: In function 'mvebu_gpio_probe':
-> drivers/gpio/gpio-mvebu.c:662:17: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
->    soc_variant = (int) match->data;
->                  ^
+> The conversion was done automatically with coccinelle using the
+> following semantic patches. The semantic patches and the scripts used
+> to generate this commit log are available at
+> https://github.com/groeck/coccinelle-patches
 >
-> This will be needed when building gpio-mvebu for Armada 7k/8k ARM64
-> SoCs.
+> - Use devm_add_action_or_reset() for calls to clk_disable_unprepare
+> - Use devm_clk_get() if the device parameter is not NULL
+> - Replace 'goto l; ... l: return e;' with 'return e;'
+> - Replace 'val = e; return val;' with 'return e;'
+> - Replace 'if (e) { return expr; }' with 'if (e) return expr;'
+> - Replace request_irq, request_threaded_irq, and request_any_context_irq
+>   with their device managed equivalent
+> - Replace &pdev->dev with dev if 'struct device *dev' is a declared
+>   variable
+> - Use devm_watchdog_register_driver() to register watchdog device
 >
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
-> Linus,
->
-> I don't think this is necessary to push into -rc, as its not yet used
-> on ARM64 - GPIO support is not yet present in the DTS files, and the
-> Kconfig doesn't allow the driver to be built on ARM64.  Hence, please
-> queue for the next merge window as a low priority fix.
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 
-Fair enough, queued for next. Thanks!
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
