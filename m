@@ -1,39 +1,89 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Wed, 11 Jan 2017 16:28:35 +0000
-Subject: [kvm-unit-tests PATCH 0/6] Documentation misc fixes
-Message-ID: <20170111162841.15569-1-alex.bennee@linaro.org>
+Date: Wed, 11 Jan 2017 16:28:36 +0000
+Subject: [kvm-unit-tests PATCH 1/6] libcflat: add PRI(dux)32 format types
+In-Reply-To: <20170111162841.15569-1-alex.bennee@linaro.org>
+References: <20170111162841.15569-1-alex.bennee@linaro.org>
+Message-ID: <20170111162841.15569-2-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+So we can have portable formatting of uint32_t types. However there is
+a catch. Different compilers can use legally subtly different types
+though so we need to probe the compiler defined intdef.h first.
 
-I broke these out of my earlier MTTCG test series as they are not
-strictly related. The libcflat/pci fixes are a result of trying to
-cross-compile arm32 binaries on my arm64 box with a arm-none-abi
-compiler. I've also tidied up some documentation (along with a
-controversial move to Markdown ;-). And finally the run_script now
-follows the convention of passing arguments after -- to the child
-process.
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+---
+ Makefile       |  1 +
+ configure      | 13 +++++++++++++
+ lib/libcflat.h |  9 +++++++++
+ 3 files changed, 23 insertions(+)
 
-Alex Benn?e (6):
-  libcflat: add PRI(dux)32 format types
-  lib/pci: fix BAR format strings
-  docs: move README to README.md and symlink
-  docs: mention checkpatch in the README
-  docs: mention modifying env vars in README
-  run_tests: allow passing of options to QEMU
-
- Makefile               |  1 +
- README                 | 69 +-----------------------------------
- README.md              | 96 ++++++++++++++++++++++++++++++++++++++++++++++++++
- configure              | 13 +++++++
- lib/libcflat.h         |  9 +++++
- lib/pci.c              |  4 +--
- run_tests.sh           | 13 +++++--
- scripts/functions.bash |  7 ++--
- 8 files changed, 137 insertions(+), 75 deletions(-)
- mode change 100644 => 120000 README
- create mode 100644 README.md
-
+diff --git a/Makefile b/Makefile
+index a32333b..9822d9a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -55,6 +55,7 @@ CFLAGS += $(fomit_frame_pointer)
+ CFLAGS += $(fno_stack_protector)
+ CFLAGS += $(fno_stack_protector_all)
+ CFLAGS += $(wno_frame_address)
++CFLAGS += $(if $(U32_LONG_FMT),-D__U32_LONG_FMT__,)
+ 
+ CXXFLAGS += $(CFLAGS)
+ 
+diff --git a/configure b/configure
+index 995c8fa..127868c 100755
+--- a/configure
++++ b/configure
+@@ -109,6 +109,18 @@ if [ -f $testdir/run ]; then
+     ln -fs $testdir/run $testdir-run
+ fi
+ 
++# check if uint32_t needs a long format modifier
++cat << EOF > lib_test.c
++#include <inttypes.h>
++EOF
++
++$cross_prefix$cc lib_test.c -E | grep "typedef" | grep "long" | grep "uint32_t" &> /dev/null
++exit=$?
++if [ $exit -eq 0 ]; then
++    u32_long=true
++fi
++rm -f lib_test.c
++
+ # check for dependent 32 bit libraries
+ if [ "$arch" != "arm" ]; then
+ cat << EOF > lib_test.c
+@@ -155,4 +167,5 @@ TEST_DIR=$testdir
+ FIRMWARE=$firmware
+ ENDIAN=$endian
+ PRETTY_PRINT_STACKS=$pretty_print_stacks
++U32_LONG_FMT=$u32_long
+ EOF
+diff --git a/lib/libcflat.h b/lib/libcflat.h
+index 380395f..e80fc50 100644
+--- a/lib/libcflat.h
++++ b/lib/libcflat.h
+@@ -58,12 +58,21 @@ typedef _Bool		bool;
+ #define true  1
+ 
+ #if __SIZEOF_LONG__ == 8
++#  define __PRI32_PREFIX
+ #  define __PRI64_PREFIX	"l"
+ #  define __PRIPTR_PREFIX	"l"
+ #else
++#if defined(__U32_LONG_FMT__)
++#  define __PRI32_PREFIX        "l"
++#else
++#  define __PRI32_PREFIX
++#endif
+ #  define __PRI64_PREFIX	"ll"
+ #  define __PRIPTR_PREFIX
+ #endif
++#define PRId32  __PRI32_PREFIX	"d"
++#define PRIu32  __PRI32_PREFIX	"u"
++#define PRIx32  __PRI32_PREFIX	"x"
+ #define PRId64  __PRI64_PREFIX	"d"
+ #define PRIu64  __PRI64_PREFIX	"u"
+ #define PRIx64  __PRI64_PREFIX	"x"
 -- 
 2.11.0
