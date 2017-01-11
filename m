@@ -1,70 +1,71 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 10 Jan 2017 18:09:06 -0800
-Subject: [PATCH 52/62] watchdog: sirfsoc_wdt: Convert to use device managed
- functions and other improvements
-In-Reply-To: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+Date: Tue, 10 Jan 2017 18:09:07 -0800
+Subject: [PATCH 53/62] watchdog: st_lpc_wdt: Convert to use device managed
+ functions
+In-Reply-To: <1484100561-17638-1-git-send-email-linux@roeck-us.net>
 References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1484100561-17638-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-1-git-send-email-linux@roeck-us.net>
+Message-ID: <1484100561-17638-2-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use device managed functions to simplify error handling, reduce
 source code size, improve readability, and reduce the likelyhood of bugs.
-Other improvements as listed below.
 
 The conversion was done automatically with coccinelle using the
 following semantic patches. The semantic patches and the scripts used
 to generate this commit log are available at
 https://github.com/groeck/coccinelle-patches
 
+- Use devm_add_action_or_reset() for calls to clk_disable_unprepare
 - Use devm_watchdog_register_driver() to register watchdog device
-- Replace shutdown function with call to watchdog_stop_on_reboot()
 
-Cc: Barry Song <baohua@kernel.org>
+Cc: Patrice Chotard <patrice.chotard@st.com>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- drivers/watchdog/sirfsoc_wdt.c | 13 +++----------
- 1 file changed, 3 insertions(+), 10 deletions(-)
+ drivers/watchdog/st_lpc_wdt.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/watchdog/sirfsoc_wdt.c b/drivers/watchdog/sirfsoc_wdt.c
-index 3050a0031479..fb88e04d18ae 100644
---- a/drivers/watchdog/sirfsoc_wdt.c
-+++ b/drivers/watchdog/sirfsoc_wdt.c
-@@ -161,7 +161,8 @@ static int sirfsoc_wdt_probe(struct platform_device *pdev)
- 	watchdog_set_nowayout(&sirfsoc_wdd, nowayout);
- 	sirfsoc_wdd.parent = &pdev->dev;
- 
--	ret = watchdog_register_device(&sirfsoc_wdd);
-+	watchdog_stop_on_reboot(&sirfsoc_wdd);
-+	ret = devm_watchdog_register_device(&pdev->dev, &sirfsoc_wdd);
- 	if (ret)
+diff --git a/drivers/watchdog/st_lpc_wdt.c b/drivers/watchdog/st_lpc_wdt.c
+index e6100e447dd8..d561fbf1df85 100644
+--- a/drivers/watchdog/st_lpc_wdt.c
++++ b/drivers/watchdog/st_lpc_wdt.c
+@@ -215,6 +215,11 @@ static int st_wdog_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "Unable to enable clock\n");
  		return ret;
+ 	}
++	ret = devm_add_action_or_reset(&pdev->dev,
++				       (void(*)(void *))clk_disable_unprepare,
++				       clk);
++	if (ret)
++		return ret;
  
-@@ -170,16 +171,9 @@ static int sirfsoc_wdt_probe(struct platform_device *pdev)
+ 	watchdog_set_drvdata(&st_wdog_dev, st_wdog);
+ 	watchdog_set_nowayout(&st_wdog_dev, WATCHDOG_NOWAYOUT);
+@@ -223,14 +228,12 @@ static int st_wdog_probe(struct platform_device *pdev)
+ 	ret = watchdog_init_timeout(&st_wdog_dev, 0, &pdev->dev);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Unable to initialise watchdog timeout\n");
+-		clk_disable_unprepare(clk);
+ 		return ret;
+ 	}
+ 
+-	ret = watchdog_register_device(&st_wdog_dev);
++	ret = devm_watchdog_register_device(&pdev->dev, &st_wdog_dev);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Unable to register watchdog\n");
+-		clk_disable_unprepare(clk);
+ 		return ret;
+ 	}
+ 
+@@ -247,8 +250,6 @@ static int st_wdog_remove(struct platform_device *pdev)
+ 	struct st_wdog *st_wdog = watchdog_get_drvdata(&st_wdog_dev);
+ 
+ 	st_wdog_setup(st_wdog, false);
+-	watchdog_unregister_device(&st_wdog_dev);
+-	clk_disable_unprepare(st_wdog->clk);
+ 
  	return 0;
  }
- 
--static void sirfsoc_wdt_shutdown(struct platform_device *pdev)
--{
--	struct watchdog_device *wdd = platform_get_drvdata(pdev);
--
--	sirfsoc_wdt_disable(wdd);
--}
--
- static int sirfsoc_wdt_remove(struct platform_device *pdev)
- {
--	sirfsoc_wdt_shutdown(pdev);
-+	sirfsoc_wdt_disable(platform_get_drvdata(pdev));
- 	return 0;
- }
- 
-@@ -221,7 +215,6 @@ static struct platform_driver sirfsoc_wdt_driver = {
- 	},
- 	.probe = sirfsoc_wdt_probe,
- 	.remove = sirfsoc_wdt_remove,
--	.shutdown = sirfsoc_wdt_shutdown,
- };
- module_platform_driver(sirfsoc_wdt_driver);
- 
 -- 
 2.7.4
