@@ -1,35 +1,37 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 11 Jan 2017 10:45:13 -0800
-Subject: [PATCH 33/62] watchdog: meson_wdt: Convert to use device managed
- functions and other improvements
-In-Reply-To: <1484095516-12720-3-git-send-email-linux@roeck-us.net> (Guenter
- Roeck's message of "Tue, 10 Jan 2017 16:44:42 -0800")
-References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
- <1484095516-12720-1-git-send-email-linux@roeck-us.net>
- <1484095516-12720-3-git-send-email-linux@roeck-us.net>
-Message-ID: <m2k2a177wm.fsf@baylibre.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 11 Jan 2017 18:45:55 +0000
+Subject: [PATCH v3 2/5] arm64: Work around Falkor erratum 1003
+In-Reply-To: <2069d58c-0b81-dad4-511f-05e7d002eb34@codeaurora.org>
+References: <20170111144118.17062-1-cov@codeaurora.org>
+ <20170111144118.17062-2-cov@codeaurora.org>
+ <20170111180627.GG20288@e104818-lin.cambridge.arm.com>
+ <20170111183339.GC29247@leverpostej>
+ <5da456f8-fcc5-b6e2-d58b-01a671da595b@codeaurora.org>
+ <20170111183738.GD29247@leverpostej>
+ <2069d58c-0b81-dad4-511f-05e7d002eb34@codeaurora.org>
+Message-ID: <20170111184555.GF29247@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guenter Roeck <linux@roeck-us.net> writes:
+On Wed, Jan 11, 2017 at 12:40:42PM -0600, Timur Tabi wrote:
+> On 01/11/2017 12:37 PM, Mark Rutland wrote:
+> >The name, as it is, is perfectly descriptive.
+> >
+> >Let's not sacrifice legibility over a non-issue.
+> 
+> I don't want to kick a dead horse or anything, but changing it to
+> QCOM_FLKR_ERRATUM_1003 would eliminate all the spacing problems
+> without sacrificing anything.
 
-> Use device managed functions to simplify error handling, reduce
-> source code size, improve readability, and reduce the likelyhood of bugs.
-> Other improvements as listed below.
->
-> The conversion was done automatically with coccinelle using the
-> following semantic patches. The semantic patches and the scripts used
-> to generate this commit log are available at
-> https://github.com/groeck/coccinelle-patches
->
-> - Drop assignments to otherwise unused variables
-> - Drop remove function
-> - Drop platform_set_drvdata()
-> - Use devm_watchdog_register_driver() to register watchdog device
-> - Replace shutdown function with call to watchdog_stop_on_reboot()
->
-> Cc: Carlo Caione <carlo@caione.org>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+The CPU is called "Falkor", not "FLKR", and we're not coming up with an
+ACPI table name...
 
-Acked-by: Kevin Hilman <khilman@baylibre.com>
+The ARM Ltd. erratum numbers are global to all parts, so we don't
+include the part name. Is the 1003 erratum number specific to Falkor?
+
+If it's global, you could use QCOM_ERRATUM_1003 instead.
+
+Otherwise, QCOM_FALKOR_ERRATUM_1003 is preferable.
+
+Thanks,
+Mark.
