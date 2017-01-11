@@ -1,35 +1,59 @@
-From: uwe@kleine-koenig.org (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 11 Jan 2017 20:49:46 +0100
-Subject: CONFIG_PCIEASPM breaks PCIe on Marvell Armada 385 machine
-Message-ID: <20170111194942.q5rdma2es6hkmxfe@perseus.defre.kleine-koenig.org>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Thu, 12 Jan 2017 03:55:33 +0800
+Subject: [PATCH 4/4] ARM: dts: sun8i: add OTG function to Lichee Pi Zero
+In-Reply-To: <20170110202443.GC2479@uda0271908>
+References: <20170103152534.20118-1-icenowy@aosc.xyz>
+ <20170103152534.20118-5-icenowy@aosc.xyz> <20170110202443.GC2479@uda0271908>
+Message-ID: <2733831484164533@web1g.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-on an Marvell Armada 385 based machine (Turris Omnia) with 4.9 the
-ath10k driver fails to bind to the matching hardware if CONFIG_PCIEASPM
-is enabled:
 
-# dmesg | grep ath
-[    7.207770] ath10k_pci 0000:02:00.0: Refused to change power state, currently in D3
-[    7.237955] ath10k_pci 0000:02:00.0: failed to wake up device : -110
-[    7.238146] ath10k_pci: probe of 0000:02:00.0 failed with error -110
+11.01.2017, 04:24, "Bin Liu" <b-liu@ti.com>:
+> On Tue, Jan 03, 2017 at 11:25:34PM +0800, Icenowy Zheng wrote:
+>> ?Lichee Pi Zero features a USB OTG port.
+>>
+>> ?Add support for it.
+>>
+>> ?Note: in order to use the Host mode, the board must be powered via the
+>> ?+5V and GND pins.
+>>
+>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> ?---
+>> ??arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 10 ++++++++++
+>> ??1 file changed, 10 insertions(+)
+>>
+>> ?diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+>> ?index 0099affc6ce3..3d9168cbaeca 100644
+>> ?--- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+>> ?+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+>> ?@@ -71,3 +71,13 @@
+>> ??????????pinctrl-names = "default";
+>> ??????????status = "okay";
+>> ??};
+>> ?+
+>> ?+&usb_otg {
+>> ?+ dr_mode = "otg";
+>
+> Why not set this default mode in dtsi instead?
+>
+> Regards,
+> -Bin.
 
-if however PCIEASPM is off, the driver probes correctly and the ath10k
-adapter works fine.
+There's possibly boards which do not have OTG functions.
 
-I wonder if someone has an idea what needs to be done to fix this
-problem. (OK, I could disable PCIEASPM, but I'd like to have a solution
-for a distribution kernel where I think PCIEASPM=y is sensible in
-general.)
+Even the official CDR design of V3s uses the USB controller to
+connect a UVC webcam to make the design a dual-cam design
+(V3s itself has a CSI).
 
-Best regards
-Uwe
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170111/91e57d62/attachment.sig>
+>
+>> ?+ status = "okay";
+>> ?+};
+>> ?+
+>> ?+&usbphy {
+>> ?+ usb0_id_det-gpio = <&pio 5 6 GPIO_ACTIVE_HIGH>;
+>> ?+ status = "okay";
+>> ?+};
+>> ?--
+>> ?2.11.0
