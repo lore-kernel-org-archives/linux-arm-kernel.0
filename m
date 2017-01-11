@@ -1,93 +1,66 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 11 Jan 2017 14:24:34 +0000
-Subject: [PATCH] arm64: Add support for DMA_ATTR_SKIP_CPU_SYNC attribute
- to swiotlb
-In-Reply-To: <1484129477-24121-1-git-send-email-geert+renesas@glider.be>
-References: <1484129477-24121-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <5f4cda9e-9f23-afe1-b191-fbed208b04d0@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 11 Jan 2017 06:25:35 -0800
+Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device managed
+ functions
+In-Reply-To: <a45ed205-7c1b-a298-50c0-fc8b80a846c5@sigmadesigns.com>
+References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-5-git-send-email-linux@roeck-us.net>
+ <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
+ <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
+ <a45ed205-7c1b-a298-50c0-fc8b80a846c5@sigmadesigns.com>
+Message-ID: <a61eb838-4167-3032-bde8-3a8845b780f8@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/17 10:11, Geert Uytterhoeven wrote:
-> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> 
-> This patch adds support for DMA_ATTR_SKIP_CPU_SYNC attribute for
-> dma_{un}map_{page,sg} functions family to swiotlb.
-> 
-> DMA_ATTR_SKIP_CPU_SYNC allows platform code to skip synchronization of
-> the CPU cache for the given buffer assuming that it has been already
-> transferred to 'device' domain.
-> 
-> Ported from IOMMU .{un}map_{sg,page} ops.
-> 
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> v2:
->   - Add Acked-by.
-> 
-> Support for DMA_ATTR_SKIP_CPU_SYNC was included when porting the IOMMU
-> ops from arm to arm64 in commit 13b8629f651164d7 ("arm64: Add IOMMU
-> dma_ops").
-> 
-> Presumably it was an oversight that the existing swiotlb based
-> implementation didn't have support for DMA_ATTR_SKIP_CPU_SYNC yet?
+On 01/11/2017 04:31 AM, Marc Gonzalez wrote:
+> On 11/01/2017 11:52, Guenter Roeck wrote:
+>
+>> On 01/11/2017 01:07 AM, Marc Gonzalez wrote:
+>>
+>>>> @@ -134,12 +134,15 @@ static int tangox_wdt_probe(struct platform_device *pdev)
+>>>>  	err = clk_prepare_enable(dev->clk);
+>>>>  	if (err)
+>>>>  		return err;
+>>>> +	err = devm_add_action_or_reset(&pdev->dev,
+>>>> +				       (void(*)(void *))clk_disable_unprepare,
+>>>> +				       dev->clk);
+>>>> +	if (err)
+>>>> +		return err;
+>>>
+>>> Hello Guenter,
+>>>
+>>> I would rather avoid the function pointer cast.
+>>> How about defining an auxiliary function for the cleanup action?
+>>>
+>>> clk_disable_unprepare() is static inline, so gcc will have to
+>>> define an auxiliary function either way. What do you think?
+>>
+>> Not really. It would just make it more complicated to replace the
+>> call with devm_clk_prepare_enable(), should it ever find its way
+>> into the light of day.
+>
+> More complicated, because the cleanup function will have to be deleted later?
+> The compiler will warn if someone forgets to do that.
+>
+> In my opinion, it's not a good idea to rely on the fact that casting
+> void(*)(struct clk *clk) to void(*)(void *) is likely to work as expected
+> on most platforms. (It has undefined behavior, strictly speaking.)
+>
+I do hear that you object to this code.
 
-Less an oversight, more that nobody's wanted to use it until now ;)
+However, I must admit that you completely lost me here. It is a cast from
+one function pointer to another, passed as argument to another function,
+with a secondary cast of its argument from a typed pointer to a void pointer.
+I don't think C permits for "undefined behavior, strictly speaking".
+Besides, that same mechanism is already used elsewhere, which is how I
+got the idea. Are you claiming that there are situations where it won't
+work ?
 
-Personally I'd prefer flag tests to be "!(x)" rather than "(x) == 0",
-but the latter is already in place, so I'll leave the final word on
-style/consistency nitpicks to Catalin and Will.
+> Do you really dislike the portable solution I suggested? :-(
+>
+It is not more portable than the above. It is more expensive and adds more
+code.
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
-> ---
->  arch/arm64/mm/dma-mapping.c | 12 ++++++++----
->  1 file changed, 8 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index e04082700bb16c35..1d7d5d2881db7c19 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -211,7 +211,8 @@ static dma_addr_t __swiotlb_map_page(struct device *dev, struct page *page,
->  	dma_addr_t dev_addr;
->  
->  	dev_addr = swiotlb_map_page(dev, page, offset, size, dir, attrs);
-> -	if (!is_device_dma_coherent(dev))
-> +	if (!is_device_dma_coherent(dev) &&
-> +	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
->  		__dma_map_area(phys_to_virt(dma_to_phys(dev, dev_addr)), size, dir);
->  
->  	return dev_addr;
-> @@ -222,7 +223,8 @@ static void __swiotlb_unmap_page(struct device *dev, dma_addr_t dev_addr,
->  				 size_t size, enum dma_data_direction dir,
->  				 unsigned long attrs)
->  {
-> -	if (!is_device_dma_coherent(dev))
-> +	if (!is_device_dma_coherent(dev) &&
-> +	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
->  		__dma_unmap_area(phys_to_virt(dma_to_phys(dev, dev_addr)), size, dir);
->  	swiotlb_unmap_page(dev, dev_addr, size, dir, attrs);
->  }
-> @@ -235,7 +237,8 @@ static int __swiotlb_map_sg_attrs(struct device *dev, struct scatterlist *sgl,
->  	int i, ret;
->  
->  	ret = swiotlb_map_sg_attrs(dev, sgl, nelems, dir, attrs);
-> -	if (!is_device_dma_coherent(dev))
-> +	if (!is_device_dma_coherent(dev) &&
-> +	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
->  		for_each_sg(sgl, sg, ret, i)
->  			__dma_map_area(phys_to_virt(dma_to_phys(dev, sg->dma_address)),
->  				       sg->length, dir);
-> @@ -251,7 +254,8 @@ static void __swiotlb_unmap_sg_attrs(struct device *dev,
->  	struct scatterlist *sg;
->  	int i;
->  
-> -	if (!is_device_dma_coherent(dev))
-> +	if (!is_device_dma_coherent(dev) &&
-> +	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
->  		for_each_sg(sgl, sg, nelems, i)
->  			__dma_unmap_area(phys_to_virt(dma_to_phys(dev, sg->dma_address)),
->  					 sg->length, dir);
-> 
+Thanks,
+Guenter
