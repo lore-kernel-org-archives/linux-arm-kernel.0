@@ -1,31 +1,47 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 10 Jan 2017 21:24:57 -0500 (EST)
-Subject: [PATCH net-next 5/8] net: dsa: Export dev_to_net_device()
-In-Reply-To: <20170110201235.21771-6-f.fainelli@gmail.com>
-References: <20170110201235.21771-1-f.fainelli@gmail.com>
- <20170110201235.21771-6-f.fainelli@gmail.com>
-Message-ID: <20170110.212457.38085718141908018.davem@davemloft.net>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Wed, 11 Jan 2017 08:13:38 +0530
+Subject: [PATCH] usb: dwc3-exynos fix unspecified suspend clk error
+ handling
+In-Reply-To: <20170110182552.coom4p6dpdqo2ljv@kozik-lap>
+References: <20170110022131.31042-1-shuahkh@osg.samsung.com>
+ <8784459.rxWqZlDLVg@amdc3058>
+ <28815306-e220-4847-99ce-b058baae0d07@osg.samsung.com>
+ <CGME20170110170942epcas1p3decee28366d7d42b70e7b0669b97326f@epcas1p3.samsung.com>
+ <5156028.4V9iLD3Qkj@amdc3058> <20170110182552.coom4p6dpdqo2ljv@kozik-lap>
+Message-ID: <f32657c2-a0b7-b84c-e5d6-eb33f7705880@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Fainelli <f.fainelli@gmail.com>
-Date: Tue, 10 Jan 2017 12:12:32 -0800
+Hi Krzysztof,
 
-> @@ -491,7 +491,7 @@ struct mii_bus *dsa_host_dev_to_mii_bus(struct device *dev)
->  }
->  EXPORT_SYMBOL_GPL(dsa_host_dev_to_mii_bus);
->  
-> -static struct net_device *dev_to_net_device(struct device *dev)
-> +struct net_device *dev_to_net_device(struct device *dev)
->  {
->  	struct device *d;
->  
-> @@ -508,6 +508,7 @@ static struct net_device *dev_to_net_device(struct device *dev)
->  
->  	return NULL;
->  }
-> +EXPORT_SYMBOL_GPL(dev_to_net_device);
+On Tuesday 10 January 2017 11:55 PM, Krzysztof Kozlowski wrote:
+> On Tue, Jan 10, 2017 at 06:09:40PM +0100, Bartlomiej Zolnierkiewicz wrote:
+>> BTW What is interesting is that the Exynos7 dts patch [2] has never
+>> made it into upstream for some reason.  In the meantime however
+>> Exynos5433 (similar to Exynos7 to some degree) became the user of
+>> susp_clk.
+>>
+>> [1] https://lkml.org/lkml/2014/11/21/247
+>> [2] https://patchwork.kernel.org/patch/5355161/
+>>
+> 
+> +Cc Alim and Pankaj,
+> 
+> Anyone would like to resend [2] after rebasing and testing? Interrupt
+> flags would have to be fixed and status=disabled added.
+> 
 
-Something like this, a public interface with a very high level generic name,
-doesn't belong in the DSA layer.  It belongs in net/core/dev.c or something
-like that.
+Thanks for looping us into this thread.
+
+Well I will be taking care of Exynos USB as Vivek has left Samsung.
+I am currently working on adding Exynos7 USB support, as soon as patches
+are ready for posting will post them. Will take care of review comments
+given for Vivek's patchset [1].
+
+Thanks,
+Pankaj Dubey
+
+> Best regards,
+> Krzysztof
+> 
+> 
