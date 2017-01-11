@@ -1,82 +1,96 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 11 Jan 2017 23:06:31 +0800
-Subject: [PATCH v7 07/15] irqchip: gicv3-its: platform-msi: scan MADT to
- create platform msi domain
+Date: Wed, 11 Jan 2017 23:06:34 +0800
+Subject: [PATCH v7 10/15] ACPI: IORT: move over to iort_node_map_platform_id()
 In-Reply-To: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
 References: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1484147199-4267-8-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1484147199-4267-11-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the introduction of its_pmsi_init_one(), we can add some code
-on top for ACPI support of platform MSI.
+iort_node_map_platform_id() includes the function of
+iort_node_get_id(), so update current iort_node_get_id()
+users and move them over to iort_node_map_platform_id().
 
-We are scanning the MADT table to get the ITS entry(ies), then use
-the information to create the platform msi domain for devices connect
-to it, just like the PCI MSI for ITS did.
+type handing in iort_node_get_id() is duplicate with
+iort_node_map_platform_id(), so clean up a little
+bit to make the code simpler.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Sinan Kaya <okaya@codeaurora.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Tomasz Nowicki <tn@semihalf.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- drivers/irqchip/irq-gic-v3-its-platform-msi.c | 36 +++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ drivers/acpi/arm64/iort.c | 20 ++++++++------------
+ 1 file changed, 8 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-index 3d9efd1..ebe933e 100644
---- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-@@ -103,6 +103,41 @@ static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
- 	return 0;
- }
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 95fd20b..a6c8d2d 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -30,7 +30,6 @@
+ #define IORT_MSI_TYPE		(1 << ACPI_IORT_NODE_ITS_GROUP)
+ #define IORT_IOMMU_TYPE		((1 << ACPI_IORT_NODE_SMMU) |	\
+ 				(1 << ACPI_IORT_NODE_SMMU_V3))
+-#define IORT_TYPE_ANY		(IORT_MSI_TYPE | IORT_IOMMU_TYPE)
  
-+#ifdef CONFIG_ACPI
-+static int __init
-+its_pmsi_parse_madt(struct acpi_subtable_header *header,
-+			const unsigned long end)
-+{
-+	struct acpi_madt_generic_translator *its_entry;
-+	struct fwnode_handle *domain_handle;
-+	const char *node_name;
-+	int err = -ENXIO;
-+
-+	its_entry = (struct acpi_madt_generic_translator *)header;
-+	node_name = kasprintf(GFP_KERNEL, "ITS at 0x%lx",
-+			      (long)its_entry->base_address);
-+	domain_handle = iort_find_domain_token(its_entry->translation_id);
-+	if (!domain_handle) {
-+		pr_err("%s: Unable to locate ITS domain handle\n", node_name);
-+		goto out;
-+	}
-+
-+	err = its_pmsi_init_one(domain_handle, node_name);
-+
-+out:
-+	kfree(node_name);
-+	return err;
-+}
-+
-+static void __init its_pmsi_acpi_init(void)
-+{
-+	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
-+			      its_pmsi_parse_madt, 0);
-+}
-+#else
-+static inline void its_pmsi_acpi_init(void) { }
-+#endif
-+
- static void __init its_pmsi_of_init(void)
+ struct iort_its_msi_chip {
+ 	struct list_head	list;
+@@ -319,8 +318,7 @@ static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
+ 
+ static
+ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
+-					u32 *id_out, u8 type_mask,
+-					int index)
++					u32 *id_out, int index)
  {
- 	struct device_node *np;
-@@ -119,6 +154,7 @@ static void __init its_pmsi_of_init(void)
- static int __init its_pmsi_init(void)
- {
- 	its_pmsi_of_init();
-+	its_pmsi_acpi_init();
- 	return 0;
- }
- early_initcall(its_pmsi_init);
+ 	struct acpi_iort_node *parent;
+ 	struct acpi_iort_id_mapping *map;
+@@ -342,9 +340,6 @@ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
+ 	parent = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
+ 			       map->output_reference);
+ 
+-	if (!(IORT_TYPE_MASK(parent->type) & type_mask))
+-		return NULL;
+-
+ 	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
+ 		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
+ 		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
+@@ -416,7 +411,7 @@ struct acpi_iort_node *iort_node_map_platform_id(struct acpi_iort_node *node,
+ 	u32 id;
+ 
+ 	/* step 1: retrieve the initial dev id */
+-	parent = iort_node_get_id(node, &id, IORT_TYPE_ANY, index);
++	parent = iort_node_get_id(node, &id, index);
+ 	if (!parent)
+ 		return NULL;
+ 
+@@ -424,7 +419,7 @@ struct acpi_iort_node *iort_node_map_platform_id(struct acpi_iort_node *node,
+ 	 * optional step 2: map the initial dev id if its parent is not
+ 	 * the target type we wanted, map it again for the use cases such
+ 	 * as NC (named component) -> SMMU -> ITS. If the type is matched,
+-	 * return the parent pointer directly.
++	 * return the initial dev id and its parent pointer directly.
+ 	 */
+ 	if (!(IORT_TYPE_MASK(parent->type) & type_mask))
+ 		parent = iort_node_map_id(parent, id, id_out, type_mask);
+@@ -660,14 +655,15 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
+ 		if (!node)
+ 			return NULL;
+ 
+-		parent = iort_node_get_id(node, &streamid,
+-					  IORT_IOMMU_TYPE, i++);
++		parent = iort_node_map_platform_id(node, &streamid,
++						   IORT_IOMMU_TYPE, i++);
+ 
+ 		while (parent) {
+ 			ops = iort_iommu_xlate(dev, parent, streamid);
+ 
+-			parent = iort_node_get_id(node, &streamid,
+-						  IORT_IOMMU_TYPE, i++);
++			parent = iort_node_map_platform_id(node, &streamid,
++							   IORT_IOMMU_TYPE,
++							   i++);
+ 		}
+ 	}
+ 
 -- 
 1.9.1
