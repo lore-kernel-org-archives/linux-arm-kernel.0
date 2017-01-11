@@ -1,38 +1,39 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 11 Jan 2017 11:52:36 +0100
-Subject: [PATCH] rtc: armada38x: make struct rtc_class_ops const
-In-Reply-To: <E1cRFxi-00083n-FY@rmk-PC.armlinux.org.uk>
-References: <E1cRFxi-00083n-FY@rmk-PC.armlinux.org.uk>
-Message-ID: <20170111105236.5ucue6ybqvfulese@piout.net>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 11 Jan 2017 02:52:51 -0800
+Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device managed
+ functions
+In-Reply-To: <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
+References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-5-git-send-email-linux@roeck-us.net>
+ <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
+Message-ID: <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/2017 at 10:16:58 +0000, Russell King wrote :
-> Armada38x wants to modify its rtc_class_ops to remove the interrupt
-> handling when there is no usable interrupt, but this means we leave
-> function pointers in writable memory.
-> 
-> Since rtc_class_ops is small, arrange to have two instances, one for
-> when we have interrupts, and one for when we have none, both marked
-> const.  This allows the compiler to place them in read-only memory,
-> which is better than placing them in __ro_after_init.
-> 
-> Thanks to Bhumika Goyal <bhumirks@gmail.com> for pointing out that
-> the structure was writable and submitting a patch to add
-> __ro_after_init.
-> 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
-> As the thread has gone quiet, I'm submitting the patch I sent within that
-> thread.  No one appears to have raised an objection to it (other than what
-> appears to be a misunderstanding.)
-> 
->  drivers/rtc/rtc-armada38x.c | 24 +++++++++++++++++-------
->  1 file changed, 17 insertions(+), 7 deletions(-)
-> 
-Applied, thanks.
+On 01/11/2017 01:07 AM, Marc Gonzalez wrote:
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+>> @@ -134,12 +134,15 @@ static int tangox_wdt_probe(struct platform_device *pdev)
+>>  	err = clk_prepare_enable(dev->clk);
+>>  	if (err)
+>>  		return err;
+>> +	err = devm_add_action_or_reset(&pdev->dev,
+>> +				       (void(*)(void *))clk_disable_unprepare,
+>> +				       dev->clk);
+>> +	if (err)
+>> +		return err;
+>
+> Hello Guenter,
+>
+> I would rather avoid the function pointer cast.
+> How about defining an auxiliary function for the cleanup action?
+>
+> clk_disable_unprepare() is static inline, so gcc will have to
+> define an auxiliary function either way. What do you think?
+>
+
+Not really. It would just make it more complicated to replace the
+call with devm_clk_prepare_enable(), should it ever find its way
+into the light of day.
+
+Guenter
