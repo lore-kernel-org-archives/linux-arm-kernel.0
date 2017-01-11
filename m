@@ -1,202 +1,108 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 11 Jan 2017 16:07:05 +0100
-Subject: [PATCH] simplefb: Separate clk / regulator get and enable steps
-In-Reply-To: <20161104144507.18072-1-hdegoede@redhat.com>
-References: <20161104144507.18072-1-hdegoede@redhat.com>
- <CGME20170111150708epcas5p41496db3ee192f7401fd041929dff09b3@epcas5p4.samsung.com>
-Message-ID: <8943659.T6ei7HPULA@amdc3058>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 11 Jan 2017 23:06:24 +0800
+Subject: [PATCH v7 00/15] ACPI platform MSI support and its example mbigen
+Message-ID: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+With platform msi support landed in the kernel, and the introduction
+of IORT for GICv3 ITS (PCI MSI) and SMMU, the framework for platform msi
+is ready, this patch set add few patches to enable the ACPI platform
+msi support.
 
-Hi,
+For platform device connecting to ITS on arm platform, we have IORT
+table with the named componant node to describe the mappings of paltform
+device and ITS, so we can retrieve the dev id and find its parent
+irqdomain (ITS) from IORT table (simlar with the ACPI ITS support).
 
-On Friday, November 04, 2016 03:45:07 PM Hans de Goede wrote:
-> Currently when a simplefb needs both clocks and regulators and one
-> of the regulators returns -EPROBE_DEFER when we try to get it, we end
-> up disabling the clocks. This causes the screen to go blank; and in some
-> cases my cause hardware state to be lost resulting in the framebuffer not
-> working at all.
-> 
-> This commit splits the get and enable steps and only enables
-> clocks and regulators after successfully getting all of them,
-> fixing the disabling of the clocks which were left enabled by
-> the firmware setting up the simplefb.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+v6 -> v7: 
+	- Introduce iort_node_map_platform_id() to retrieve the
+	  dev id for both NC (named component) -> ITS/SMMU and
+	  NC -> SMMU -> ITS cases, suggested by Lorenzo;
 
-Thanks, patch queued for 4.11.
+	- Reorder the patches and rewrite some commit message;
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+	- Remove the test tags because it has major changes
+	  to retrieve the dev id, Sinan, Majun, Xinwei, could
+	  you please test them again on your platform?
 
-> ---
->  drivers/video/fbdev/simplefb.c | 56 ++++++++++++++++++++++++++++++------------
->  1 file changed, 40 insertions(+), 16 deletions(-)
-> 
-> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-> index 61f799a..a3c44ec 100644
-> --- a/drivers/video/fbdev/simplefb.c
-> +++ b/drivers/video/fbdev/simplefb.c
-> @@ -180,10 +180,12 @@ static int simplefb_parse_pd(struct platform_device *pdev,
->  struct simplefb_par {
->  	u32 palette[PSEUDO_PALETTE_SIZE];
->  #if defined CONFIG_OF && defined CONFIG_COMMON_CLK
-> +	bool clks_enabled;
->  	unsigned int clk_count;
->  	struct clk **clks;
->  #endif
->  #if defined CONFIG_OF && defined CONFIG_REGULATOR
-> +	bool regulators_enabled;
->  	u32 regulator_count;
->  	struct regulator **regulators;
->  #endif
-> @@ -208,12 +210,12 @@ struct simplefb_par {
->   * the fb probe will not help us much either. So just complain and carry on,
->   * and hope that the user actually gets a working fb at the end of things.
->   */
-> -static int simplefb_clocks_init(struct simplefb_par *par,
-> -				struct platform_device *pdev)
-> +static int simplefb_clocks_get(struct simplefb_par *par,
-> +			       struct platform_device *pdev)
->  {
->  	struct device_node *np = pdev->dev.of_node;
->  	struct clk *clock;
-> -	int i, ret;
-> +	int i;
->  
->  	if (dev_get_platdata(&pdev->dev) || !np)
->  		return 0;
-> @@ -244,6 +246,14 @@ static int simplefb_clocks_init(struct simplefb_par *par,
->  		par->clks[i] = clock;
->  	}
->  
-> +	return 0;
-> +}
-> +
-> +static void simplefb_clocks_enable(struct simplefb_par *par,
-> +				   struct platform_device *pdev)
-> +{
-> +	int i, ret;
-> +
->  	for (i = 0; i < par->clk_count; i++) {
->  		if (par->clks[i]) {
->  			ret = clk_prepare_enable(par->clks[i]);
-> @@ -256,8 +266,7 @@ static int simplefb_clocks_init(struct simplefb_par *par,
->  			}
->  		}
->  	}
-> -
-> -	return 0;
-> +	par->clks_enabled = true;
->  }
->  
->  static void simplefb_clocks_destroy(struct simplefb_par *par)
-> @@ -269,7 +278,8 @@ static void simplefb_clocks_destroy(struct simplefb_par *par)
->  
->  	for (i = 0; i < par->clk_count; i++) {
->  		if (par->clks[i]) {
-> -			clk_disable_unprepare(par->clks[i]);
-> +			if (par->clks_enabled)
-> +				clk_disable_unprepare(par->clks[i]);
->  			clk_put(par->clks[i]);
->  		}
->  	}
-> @@ -277,8 +287,10 @@ static void simplefb_clocks_destroy(struct simplefb_par *par)
->  	kfree(par->clks);
->  }
->  #else
-> -static int simplefb_clocks_init(struct simplefb_par *par,
-> +static int simplefb_clocks_get(struct simplefb_par *par,
->  	struct platform_device *pdev) { return 0; }
-> +static void simplefb_clocks_enable(struct simplefb_par *par,
-> +	struct platform_device *pdev) { }
->  static void simplefb_clocks_destroy(struct simplefb_par *par) { }
->  #endif
->  
-> @@ -305,14 +317,14 @@ static void simplefb_clocks_destroy(struct simplefb_par *par) { }
->   * the fb probe will not help us much either. So just complain and carry on,
->   * and hope that the user actually gets a working fb at the end of things.
->   */
-> -static int simplefb_regulators_init(struct simplefb_par *par,
-> -	struct platform_device *pdev)
-> +static int simplefb_regulators_get(struct simplefb_par *par,
-> +				   struct platform_device *pdev)
->  {
->  	struct device_node *np = pdev->dev.of_node;
->  	struct property *prop;
->  	struct regulator *regulator;
->  	const char *p;
-> -	int count = 0, i = 0, ret;
-> +	int count = 0, i = 0;
->  
->  	if (dev_get_platdata(&pdev->dev) || !np)
->  		return 0;
-> @@ -354,6 +366,14 @@ static int simplefb_regulators_init(struct simplefb_par *par,
->  	}
->  	par->regulator_count = i;
->  
-> +	return 0;
-> +}
-> +
-> +static void simplefb_regulators_enable(struct simplefb_par *par,
-> +				       struct platform_device *pdev)
-> +{
-> +	int i, ret;
-> +
->  	/* Enable all the regulators */
->  	for (i = 0; i < par->regulator_count; i++) {
->  		ret = regulator_enable(par->regulators[i]);
-> @@ -365,15 +385,14 @@ static int simplefb_regulators_init(struct simplefb_par *par,
->  			par->regulators[i] = NULL;
->  		}
->  	}
-> -
-> -	return 0;
-> +	par->regulators_enabled = true;
->  }
->  
->  static void simplefb_regulators_destroy(struct simplefb_par *par)
->  {
->  	int i;
->  
-> -	if (!par->regulators)
-> +	if (!par->regulators || !par->regulators_enabled)
->  		return;
->  
->  	for (i = 0; i < par->regulator_count; i++)
-> @@ -381,8 +400,10 @@ static void simplefb_regulators_destroy(struct simplefb_par *par)
->  			regulator_disable(par->regulators[i]);
->  }
->  #else
-> -static int simplefb_regulators_init(struct simplefb_par *par,
-> +static int simplefb_regulators_get(struct simplefb_par *par,
->  	struct platform_device *pdev) { return 0; }
-> +static void simplefb_regulators_enable(struct simplefb_par *par,
-> +	struct platform_device *pdev) { }
->  static void simplefb_regulators_destroy(struct simplefb_par *par) { }
->  #endif
->  
-> @@ -453,14 +474,17 @@ static int simplefb_probe(struct platform_device *pdev)
->  	}
->  	info->pseudo_palette = par->palette;
->  
-> -	ret = simplefb_clocks_init(par, pdev);
-> +	ret = simplefb_clocks_get(par, pdev);
->  	if (ret < 0)
->  		goto error_unmap;
->  
-> -	ret = simplefb_regulators_init(par, pdev);
-> +	ret = simplefb_regulators_get(par, pdev);
->  	if (ret < 0)
->  		goto error_clocks;
->  
-> +	simplefb_clocks_enable(par, pdev);
-> +	simplefb_regulators_enable(par, pdev);
-> +
->  	dev_info(&pdev->dev, "framebuffer at 0x%lx, 0x%x bytes, mapped to 0x%p\n",
->  			     info->fix.smem_start, info->fix.smem_len,
->  			     info->screen_base);
+	- rebased on top of 4.10-rc3 and Lorenzo's patch
+          https://patchwork.kernel.org/patch/9507041/
+
+	- Tested against Agustin's patch [1-2/3] "[PATCH V9 0/3] irqchip: qcom:
+          Add IRQ combiner driver"
+
+v5 -> v6:
+        - Call acpi_configure_pmsi_domain() for platform devices in
+          acpi_platform_notify() as it's cleaner (suggested by Rafael)
+        - Remove the "u8 type" for iort_id_map() because it's unused
+        - Rebase on top of 4.10-rc2
+        - Collect test and review tags
+
+v4 -> v5:
+        - Add mbigen support back with tested on with Agustin's patchset,
+          and it's a good example of how ACPI platform MSI works
+        - rebased on top of lastest Linus tree (commit 52bce91 splice: reinstate SIGPIPE/EPIPE handling)
+
+v3 -> v4:
+        - Drop mbi-gen patches to just submit platform msi support because
+          will rebase mbi-gen patches on top of Agustin's patchset, and discusion
+          is going there.
+        - Add a patch to support device topology such as NC(named componant, paltform device)
+          ->SMMU->ITS which suggested by Lorenzo;
+        - rebased on top of Lorenzo's v9 of ACPI IORT ARM SMMU support;
+        - rebased on top of 4.9-rc7
+
+v2 -> v3:
+        - Drop RFC tag
+        - Rebase against v4.9-rc2 and Lorenzo's v6 of ACPI IORT ARM SMMU support [1]
+        - Add 3 cleanup patches (patch 1, 2, 3)
+        - Drop arch_init call patch from last version
+        - Introduce a callback for platform device to set msi domain
+        - Introduce a new API to get paltform device's domain instead of
+          reusing the PCI one in previous version
+        - Add a patch to rework iort_node_get_id()
+
+[1]: http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1251993.html
+
+v1 -> v2:
+        - Fix the bug of if multi Interrupt() resoures in single _PRS,
+          we need to calculate all the irq numbers (I missed it in previous
+          version);
+        - Rebased on Marc's irq/irqchip-4.9 branch and Lorenzo's v5
+          SMMU patches (also Robin's SMMu patches)
+        - Add patch irqchip: mbigen: promote mbigen init.
+
+
+Hanjun Guo (13):
+  ACPI: IORT: fix the indentation in iort_scan_node()
+  ACPI: IORT: add missing comment for iort_dev_find_its_id()
+  ACPI: IORT: minor cleanup for iort_match_node_callback()
+  irqchip: gic-v3-its: keep the head file include in alphabetic order
+  irqchip: gicv3-its: platform-msi: refactor its_pmsi_prepare()
+  irqchip: gicv3-its: platform-msi: refactor its_pmsi_init() to prepare
+    for ACPI
+  irqchip: gicv3-its: platform-msi: scan MADT to create platform msi
+    domain
+  ACPI: IORT: rename iort_node_map_rid() to make it generic
+  ACPI: platform-msi: retrieve dev id from IORT
+  ACPI: IORT: move over to iort_node_map_platform_id()
+  ACPI: platform: setup MSI domain for ACPI based platform device
+  msi: platform: make platform_msi_create_device_domain() ACPI aware
+  irqchip: mbigen: Add ACPI support
+
+Kefeng Wang (2):
+  irqchip: mbigen: drop module owner
+  irqchip: mbigen: introduce mbigen_of_create_domain()
+
+ drivers/acpi/arm64/iort.c                     | 161 +++++++++++++++++++++-----
+ drivers/acpi/glue.c                           |   6 +
+ drivers/base/platform-msi.c                   |   3 +-
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c | 106 +++++++++++++----
+ drivers/irqchip/irq-gic-v3-its.c              |   3 +-
+ drivers/irqchip/irq-mbigen.c                  | 109 ++++++++++++++---
+ include/linux/acpi_iort.h                     |  11 ++
+ 7 files changed, 322 insertions(+), 77 deletions(-)
+
+-- 
+1.9.1
