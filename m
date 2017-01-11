@@ -1,11 +1,11 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 11 Jan 2017 11:20:26 +0100
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Wed, 11 Jan 2017 11:20:41 +0100
 Subject: [PATCH v6 02/14] irqchip: gic-v3-its: keep the head file include
  in alphabetic order
 In-Reply-To: <1483363905-2806-3-git-send-email-hanjun.guo@linaro.org>
 References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
  <1483363905-2806-3-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1d9e6611-410c-daf4-87ab-ea71d3efb8a7@gmail.com>
+Message-ID: <ef759a3a-bbdb-2586-24a8-6ad650b07d41@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
