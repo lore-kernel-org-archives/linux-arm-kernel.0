@@ -1,124 +1,74 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 11 Jan 2017 14:34:58 +0000
-Subject: [RFC PATCH v4 0/5] ARM: Fix dma_alloc_coherent() and friends for
- NOMMU
-In-Reply-To: <CA+M3ks5JP14SzprzE90-ST8b3URJECgpJ=dxw5XKvaxYEF3UCw@mail.gmail.com>
-References: <1484057925-23586-1-git-send-email-vladimir.murzin@arm.com>
- <CA+M3ks5JP14SzprzE90-ST8b3URJECgpJ=dxw5XKvaxYEF3UCw@mail.gmail.com>
-Message-ID: <f4d17374-eb46-79f7-e394-cb2739f71ef4@arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 11 Jan 2017 15:39:17 +0100
+Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device
+ managed functions
+In-Reply-To: <a45ed205-7c1b-a298-50c0-fc8b80a846c5@sigmadesigns.com>
+References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-5-git-send-email-linux@roeck-us.net>
+ <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
+ <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
+ <a45ed205-7c1b-a298-50c0-fc8b80a846c5@sigmadesigns.com>
+Message-ID: <20170111143917.hedhyfu6m5dopag7@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/17 13:17, Benjamin Gaignard wrote:
-> 2017-01-10 15:18 GMT+01:00 Vladimir Murzin <vladimir.murzin@arm.com>:
->> Hi,
->>
->> It seem that addition of cache support for M-class cpus uncovered
->> latent bug in DMA usage. NOMMU memory model has been treated as being
->> always consistent; however, for R/M classes of cpu memory can be
->> covered by MPU which in turn might configure RAM as Normal
->> i.e. bufferable and cacheable. It breaks dma_alloc_coherent() and
->> friends, since data can stuck in caches now or be buffered.
->>
->> This patch set is trying to address the issue by providing region of
->> memory suitable for consistent DMA operations. It is supposed that
->> such region is marked by MPU as non-cacheable. Robin suggested to
->> advertise such memory as reserved shared-dma-pool, rather then using
->> homebrew command line option, and extend dma-coherent to provide
->> default DMA area in the similar way as it is done for CMA (PATCH
->> 2/5). It allows us to offload all bookkeeping on generic coherent DMA
->> framework, and it is seems that it might be reused by other
->> architectures like c6x and blackfin.
->>
->> Dedicated DMA region is required for cases other than:
->>  - MMU/MPU is off
->>  - cpu is v7m w/o cache support
->>  - device is coherent
->>
->> In case one of the above conditions is true dma operations are forced
->> to be coherent and wired with dma_noop_ops.
->>
->> To make life easier NOMMU dma operations are kept in separate
->> compilation unit.
->>
->> Since the issue was reported in the same time as Benjamin sent his
->> patch [1] to allow mmap for NOMMU, his case is also addressed in this
->> series (PATCH 1/5 and PATCH 3/5).
->>
->> Thanks!
+On Wed, Jan 11, 2017 at 01:31:47PM +0100, Marc Gonzalez wrote:
+> On 11/01/2017 11:52, Guenter Roeck wrote:
 > 
-> I have tested this v4 on my setup (stm32f4, no cache, no MPU) and unfortunately
-> it doesn't work with my drm/kms driver.
+> > On 01/11/2017 01:07 AM, Marc Gonzalez wrote:
+> > 
+> >>> @@ -134,12 +134,15 @@ static int tangox_wdt_probe(struct platform_device *pdev)
+> >>>  	err = clk_prepare_enable(dev->clk);
+> >>>  	if (err)
+> >>>  		return err;
+> >>> +	err = devm_add_action_or_reset(&pdev->dev,
+> >>> +				       (void(*)(void *))clk_disable_unprepare,
+> >>> +				       dev->clk);
+> >>> +	if (err)
+> >>> +		return err;
 
-I guess the same is for fbmem, but would be better to have confirmation since
-amba-clcd I use has not been ported to drm/kms (yet), so I can't test.
+This looks wrong. There is no clk_unprepare_disable when
+devm_add_action_or_reset fails.
 
-> I haven't any errors but nothing is displayed unlike what I have when
-> using current dma-mapping
-> code.
-> I guess the issue is coming from dma-noop where __get_free_pages() is
-> used instead of alloc_pages()
-> in dma-mapping.
-
-Unless I've missed something bellow is a call stack for both
-
-#1
-__alloc_simple_buffer
-	__dma_alloc_buffer
-		alloc_pages
-		split_page
-		__dma_clear_buffer
-			memset
-	page_address
-
-#2
-__get_free_pages
-	alloc_pages
-	page_address
-
-So the difference is that nommu case in dma-mapping.c memzeros memory, handles
-DMA_ATTR_NO_KERNEL_MAPPING and does optimisation of memory usage.
-
-Is something from above critical for your driver?
-
+> >>
+> >> Hello Guenter,
+> >>
+> >> I would rather avoid the function pointer cast.
+> >> How about defining an auxiliary function for the cleanup action?
+> >>
+> >> clk_disable_unprepare() is static inline, so gcc will have to
+> >> define an auxiliary function either way. What do you think?
+> > 
+> > Not really. It would just make it more complicated to replace the
+> > call with devm_clk_prepare_enable(), should it ever find its way
+> > into the light of day.
 > 
-> Since my hardware doesn't have cache or MPU (and so use dma-noop) I
-> haven't reserved specific memory region.
-> Buffer addresses and vma parameters look correct... What could I have
-> miss here ?
+> More complicated, because the cleanup function will have to be deleted later?
+> The compiler will warn if someone forgets to do that.
+> 
+> In my opinion, it's not a good idea to rely on the fact that casting
+> void(*)(struct clk *clk) to void(*)(void *) is likely to work as expected
+> on most platforms. (It has undefined behavior, strictly speaking.)
 
-No ideas, sorry...
+I would expect it to work on all (Linux) platforms. Anyhow, I wonder if
+there couldn't be found a better solution.
 
-Cheers
-Vladimir
+If in the end it looks like the following that would be good I think:
 
-> 
-> Benjamin
-> 
->>
->> [1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8633/1
->>
->> Vladimir Murzin (5):
->>   dma: Add simple dma_noop_mmap
->>   drivers: dma-coherent: Introduce default DMA pool
->>   ARM: NOMMU: Introduce dma operations for noMMU
->>   ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class cpus
->>   ARM: dma-mapping: Remove traces of NOMMU code
->>
->>  .../bindings/reserved-memory/reserved-memory.txt   |   3 +
->>  arch/arm/include/asm/dma-mapping.h                 |   3 +-
->>  arch/arm/mm/Kconfig                                |   2 +-
->>  arch/arm/mm/Makefile                               |   5 +-
->>  arch/arm/mm/dma-mapping-nommu.c                    | 252 +++++++++++++++++++++
->>  arch/arm/mm/dma-mapping.c                          |  26 +--
->>  drivers/base/dma-coherent.c                        |  59 ++++-
->>  lib/dma-noop.c                                     |  21 ++
->>  8 files changed, 335 insertions(+), 36 deletions(-)
->>  create mode 100644 arch/arm/mm/dma-mapping-nommu.c
->>
->> --
->> 2.0.0
->>
-> 
-> 
-> 
+	clk = devm_clk_get(...);
+	if (IS_ERR(clk))
+		...
+
+	ret = devm_clk_prepare_enable(clk)
+	if (ret)
+		return ret;
+
+	...
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
