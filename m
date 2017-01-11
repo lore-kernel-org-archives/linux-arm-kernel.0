@@ -1,87 +1,52 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 11 Jan 2017 15:15:03 -0600
-Subject: [PATCH] arm64: dts: exynos: Replace small letter of base
- address/offset on Exynos5433
-In-Reply-To: <1484096148-17120-1-git-send-email-cw00.choi@samsung.com>
-References: <CGME20170111005552epcas1p4a1f6ed88022b46544dec4b3801583267@epcas1p4.samsung.com>
- <1484096148-17120-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20170111211503.6kwqaunb5mpe6eb2@rob-hp-laptop>
+Date: Wed, 11 Jan 2017 15:15:20 -0600
+Subject: [PATCH] Documentation: dt: reset: Revise typos in TI syscon
+ reset example
+In-Reply-To: <20170109192814.26811-1-s-anna@ti.com>
+References: <20170109192814.26811-1-s-anna@ti.com>
+Message-ID: <20170111211520.w3sy5pkvjydiwvcs@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 09:55:48AM +0900, Chanwoo Choi wrote:
-> This patch replaces the small letter of base address, offset and hex value
-> with the capital letter to keep the consistency on Exynos5433.
-
-You mean the other way around, right?
-
+On Mon, Jan 09, 2017 at 01:28:14PM -0600, Suman Anna wrote:
+> Fix couple of typos in the example given in the TI syscon reset
+> binding. The ti,reset-bits used for DSP0 are corrected to match
+> the values that will be used in the actual DT node.
 > 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Suman Anna <s-anna@ti.com>
 > ---
->  arch/arm64/boot/dts/exynos/exynos5433.dtsi | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
+> Hi Philipp,
 > 
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> index abaf6b4d599d..d7ed1a68b6fd 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> @@ -231,7 +231,7 @@
->  		compatible = "arm,psci";
->  		method = "smc";
->  		cpu_off = <0x84000002>;
-> -		cpu_on = <0xC4000003>;
-> +		cpu_on = <0xc4000003>;
->  	};
->  
->  	reboot: syscon-reboot {
-> @@ -753,7 +753,7 @@
->  
->  		dsi: dsi at 13900000 {
->  			compatible = "samsung,exynos5433-mipi-dsi";
-> -			reg = <0x13900000 0xC0>;
-> +			reg = <0x13900000 0xc0>;
->  			interrupts = <GIC_SPI 205 IRQ_TYPE_LEVEL_HIGH>;
->  			phys = <&mipi_phy 1>;
->  			phy-names = "dsim";
-> @@ -880,9 +880,9 @@
->  			iommus = <&sysmmu_jpeg>;
->  		};
->  
-> -		mfc: codec at 152E0000 {
-> +		mfc: codec at 152e0000 {
->  			compatible = "samsung,exynos5433-mfc";
-> -			reg = <0x152E0000 0x10000>;
-> +			reg = <0x152e0000 0x10000>;
->  			interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
->  			clock-names = "pclk", "aclk", "aclk_xiu";
->  			clocks = <&cmu_mfc CLK_PCLK_MFC>,
-> @@ -914,7 +914,7 @@
->  
->  		sysmmu_gscl0: sysmmu at 13c80000 {
->  			compatible = "samsung,exynos-sysmmu";
-> -			reg = <0x13C80000 0x1000>;
-> +			reg = <0x13c80000 0x1000>;
->  			interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
->  			clock-names = "aclk", "pclk";
->  			clocks = <&cmu_gscl CLK_ACLK_SMMU_GSCL0>,
-> @@ -924,7 +924,7 @@
->  
->  		sysmmu_gscl1: sysmmu at 13c90000 {
->  			compatible = "samsung,exynos-sysmmu";
-> -			reg = <0x13C90000 0x1000>;
-> +			reg = <0x13c90000 0x1000>;
->  			interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
->  			clock-names = "aclk", "pclk";
->  			clocks = <&cmu_gscl CLK_ACLK_SMMU_GSCL1>,
-> @@ -934,7 +934,7 @@
->  
->  		sysmmu_gscl2: sysmmu at 13ca0000 {
->  			compatible = "samsung,exynos-sysmmu";
-> -			reg = <0x13CA0000 0x1000>;
-> +			reg = <0x13ca0000 0x1000>;
->  			interrupts = <GIC_SPI 292 IRQ_TYPE_LEVEL_HIGH>;
->  			clock-names = "aclk", "pclk";
->  			clocks = <&cmu_gscl CLK_ACLK_SMMU_GSCL2>,
-> -- 
-> 1.9.1
+> This is the Documentation part fix that goes along with
+> the ti-syscon-reset fix that you have on your next branch.
+> I will be submitting the DT nodes very soon
 > 
+> regards
+> Suman
+> 
+>  Documentation/devicetree/bindings/reset/ti-syscon-reset.txt | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt b/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
+> index 164c7f34c451..21ba739b162e 100644
+> --- a/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
+> +++ b/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
+> @@ -63,7 +63,7 @@ Example:
+>  --------
+>  The following example demonstrates a syscon node, the reset controller node
+>  using the syscon node, and a consumer (a DSP device) on the TI Keystone 2
+> -Edison SoC.
+> +66AK2E SoC.
+>  
+>  / {
+>  	soc {
+> @@ -71,13 +71,13 @@ Edison SoC.
+>  			compatible = "syscon", "simple-mfd";
+>  			reg = <0x02350000 0x1000>;
+>  
+> -			pscrst: psc-reset {
+> +			pscrst: psc-reset-controller {
+
+Really, this should be just 'reset-controller'.
+
+Rob
