@@ -1,37 +1,46 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 11 Jan 2017 14:50:31 +0000
-Subject: [PATCH] arm64: avoid increasing DMA masks above what hardware
- supports
-In-Reply-To: <09cac197-9e57-5d3e-e742-f29c00051813@cogentembedded.com>
-References: <11daacde-5399-039f-80a3-01d7bd13e9e8@arm.com>
- <1484056844-9567-1-git-send-email-nikita.yoush@cogentembedded.com>
- <dca35acf-1adf-aa85-7a0b-d0c6ec702fa1@arm.com>
- <67314806-361d-e0ac-9292-37542160ead5@cogentembedded.com>
- <57459a4a-2c57-e081-8f27-cb83f23b5815@arm.com>
- <09cac197-9e57-5d3e-e742-f29c00051813@cogentembedded.com>
-Message-ID: <c5bada32-fbaf-3631-268b-db49dffe3eb9@arm.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Wed, 11 Jan 2017 16:50:57 +0200
+Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device managed
+ functions
+In-Reply-To: <20170111143917.hedhyfu6m5dopag7@pengutronix.de>
+References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-5-git-send-email-linux@roeck-us.net>
+ <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
+ <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
+ <a45ed205-7c1b-a298-50c0-fc8b80a846c5@sigmadesigns.com>
+ <20170111143917.hedhyfu6m5dopag7@pengutronix.de>
+Message-ID: <3d6670d5-bc35-62cf-81b9-9d41a2f4e803@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/17 13:41, Nikita Yushchenko wrote:
->> Yes, I think that ought to work, although the __iommu_setup_dma_ops()
->> call will still want a real size reflecting the default mask
+Hello Uwe,
+
+On 01/11/2017 04:39 PM, Uwe Kleine-K?nig wrote:
+> On Wed, Jan 11, 2017 at 01:31:47PM +0100, Marc Gonzalez wrote:
+>> On 11/01/2017 11:52, Guenter Roeck wrote:
+>>
+>>> On 01/11/2017 01:07 AM, Marc Gonzalez wrote:
+>>>
+>>>>> @@ -134,12 +134,15 @@ static int tangox_wdt_probe(struct platform_device *pdev)
+>>>>>  	err = clk_prepare_enable(dev->clk);
+>>>>>  	if (err)
+>>>>>  		return err;
+>>>>> +	err = devm_add_action_or_reset(&pdev->dev,
+>>>>> +				       (void(*)(void *))clk_disable_unprepare,
+>>>>> +				       dev->clk);
+>>>>> +	if (err)
+>>>>> +		return err;
 > 
-> I see iommu_dma_ops do not define set_dma_mask.
-> 
-> So what if setup was done for size reflecting one mask and then driver
-> changes mask?  Will things still operate correctly?
+> This looks wrong. There is no clk_unprepare_disable when
+> devm_add_action_or_reset fails.
 
-We've overridden dma_set_mask() at the function level, so it should
-always apply regardless. Besides, none of the arm64 ops implement
-.set_dma_mask anyway, so we could possibly drop the references to it
-altogether.
+actually there is a call to clk_disable_unprepare() on error path, you may
+take a look at devm_add_action_or_reset() implementation.
 
-Conversely, I suppose we could just implement said callback for
-swiotlb_dma_ops and iommu_dma_ops with the parent_dma_mask-checking
-function and drop the HAVE_ARCH_DMA_SET_MASK override instead. I'm not
-sure which approach is preferable - the latter seems arguably cleaner in
-isolation, but would also be less consistent with how the coherent mask
-has to be handled. Ho hum.
+Your comment is valid for devm_add_action() function though, but it's not
+the case here.
 
-Robin.
+--
+With best wishes,
+Vladimir
