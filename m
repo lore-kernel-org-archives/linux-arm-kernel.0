@@ -1,54 +1,50 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 11 Jan 2017 01:08:03 +0100
-Subject: [PATCHv3 3/8] rtc: add STM32 RTC driver
-In-Reply-To: <1483623809-29937-4-git-send-email-amelie.delaunay@st.com>
-References: <1483623809-29937-1-git-send-email-amelie.delaunay@st.com>
- <1483623809-29937-4-git-send-email-amelie.delaunay@st.com>
-Message-ID: <20170111000803.mlie6kizcsj2o7lh@piout.net>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 10 Jan 2017 21:18:20 -0300
+Subject: [PATCH] usb: dwc3-exynos remove suspend clock unspecified debug
+ message
+In-Reply-To: <20170110212059.21995-1-shuahkh@osg.samsung.com>
+References: <20170110212059.21995-1-shuahkh@osg.samsung.com>
+Message-ID: <74dfb6fb-6ab0-135b-5d0a-60b69f35ff5a@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks good to me, however...
+Hello Shuah,
 
+On 01/10/2017 06:20 PM, Shuah Khan wrote:
+> dwc3-exynos prints debug message when suspend clock is not specified.
+> The suspend clock is optional and driver can work without it.
+> 
+> This debug message doesn't add any value and leads to confusion and
+> concern. Remove it.
+> 
+> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> ---
+> This patch is a result of the disussion on the following patch.
+> https://lkml.org/lkml/2017/1/9/891
+> 
+> drivers/usb/dwc3/dwc3-exynos.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
+> index e27899b..3e8407a 100644
+> --- a/drivers/usb/dwc3/dwc3-exynos.c
+> +++ b/drivers/usb/dwc3/dwc3-exynos.c
+> @@ -128,10 +128,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+>  	clk_prepare_enable(exynos->clk);
+>  
+>  	exynos->susp_clk = devm_clk_get(dev, "usbdrd30_susp_clk");
+> -	if (IS_ERR(exynos->susp_clk)) {
+> -		dev_info(dev, "no suspend clk specified\n");
 
-On 05/01/2017 at 14:43:24 +0100, Amelie Delaunay wrote :
-> +struct stm32_rtc {
-> +	struct rtc_device *rtc_dev;
-> +	void __iomem *base;
-> +	struct clk *ck_rtc;
-> +	spinlock_t lock; /* Protects registers accesses */
+Sorry for being late in the discussion, but what about making it a
+dev_dbg() instead? That way the message may not confuse others but
+still keep information that could be useful for debugging purposes.
 
-This spinlock seems to be useless, the rtc ops_lock is already
-protecting everywhere it is taken.
+I know the current message isn't great but keeping it as debug allows
+to improve it later.
 
-> +	int irq_alarm;
-> +};
-> +
-
-[...]
-
-> +static int stm32_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
-> +{
-> +	struct stm32_rtc *rtc = dev_get_drvdata(dev);
-> +	struct rtc_time *tm = &alrm->time;
-> +	unsigned long irqflags;
-> +	unsigned int cr, isr, alrmar;
-> +	int ret = 0;
-> +
-> +	if (rtc_valid_tm(tm)) {
-> +		dev_err(dev, "Alarm time not valid.\n");
-> +		return -EINVAL;
-
-This will never happen, tm is already checked multiple times (up to
-three) in the core before this function can be called.
-
-> +	}
-> +
-
-You don't need to resend the whole series, just this patch. I'll take
-2/8 and 3/8, the other ones can go through the stm32 tree.
-
+Best regards,
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
