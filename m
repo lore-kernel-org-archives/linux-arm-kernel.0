@@ -1,72 +1,50 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 11 Jan 2017 17:01:54 +0000
-Subject: [PATCH v2 1/5] ARM: wire up HWCAP2 feature bits to the CPU modalias
+Date: Wed, 11 Jan 2017 17:01:55 +0000
+Subject: [PATCH v2 2/5] crypto: arm/aes-ce - enable module autoloading based
+ on CPU feature bits
 In-Reply-To: <1484154118-22139-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1484154118-22139-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1484154118-22139-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1484154118-22139-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wire up the generic support for exposing CPU feature bits via the
-modalias in /sys/device/system/cpu. This allows udev to automatically
-load modules for things like crypto algorithms that are implemented
-using optional instructions.
+Make the module autoloadable by tying it to the CPU feature bit that
+describes whether the optional instructions it relies on are implemented
+by the current CPU.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/Kconfig                  |  1 +
- arch/arm/include/asm/cpufeature.h | 32 ++++++++++++++++++++
- 2 files changed, 33 insertions(+)
+ arch/arm/crypto/aes-ce-glue.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5fab553fd03a..3758466365ee 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -21,6 +21,7 @@ config ARM
- 	select GENERIC_ALLOCATOR
- 	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
- 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
-+	select GENERIC_CPU_AUTOPROBE
- 	select GENERIC_EARLY_IOREMAP
- 	select GENERIC_IDLE_POLL_SETUP
- 	select GENERIC_IRQ_PROBE
-diff --git a/arch/arm/include/asm/cpufeature.h b/arch/arm/include/asm/cpufeature.h
-new file mode 100644
-index 000000000000..134bd4c63d53
---- /dev/null
-+++ b/arch/arm/include/asm/cpufeature.h
-@@ -0,0 +1,32 @@
-+/*
-+ * Copyright (C) 2017 Linaro Ltd. <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_CPUFEATURE_H
-+#define __ASM_CPUFEATURE_H
-+
-+#include <asm/hwcap.h>
-+
-+/*
-+ * Due to the fact that ELF_HWCAP is a 32-bit type on ARM, and given the number
-+ * of optional CPU features it defines, ARM's CPU capability bits have been
-+ * distributed over separate elf_hwcap and elf_hwcap2 variables, each of which
-+ * covers a subset of the available CPU features.
-+ *
-+ * Currently, only a few of those are suitable for automatic module loading
-+ * (which is the primary use case of this facility) and those happen to be all
-+ * covered by HWCAP2. So let's only expose those via the CPU modalias for now.
-+ */
-+#define MAX_CPU_FEATURES	(8 * sizeof(elf_hwcap2))
-+#define cpu_feature(x)		ilog2(HWCAP2_ ## x)
-+
-+static inline bool cpu_have_feature(unsigned int num)
-+{
-+	return elf_hwcap2 & (1UL << num);
-+}
-+
-+#endif
+diff --git a/arch/arm/crypto/aes-ce-glue.c b/arch/arm/crypto/aes-ce-glue.c
+index 8857531915bf..98c68ad101e5 100644
+--- a/arch/arm/crypto/aes-ce-glue.c
++++ b/arch/arm/crypto/aes-ce-glue.c
+@@ -14,6 +14,7 @@
+ #include <crypto/aes.h>
+ #include <crypto/internal/simd.h>
+ #include <crypto/internal/skcipher.h>
++#include <linux/cpufeature.h>
+ #include <linux/module.h>
+ #include <crypto/xts.h>
+ 
+@@ -428,9 +429,6 @@ static int __init aes_init(void)
+ 	int err;
+ 	int i;
+ 
+-	if (!(elf_hwcap2 & HWCAP2_AES))
+-		return -ENODEV;
+-
+ 	err = crypto_register_skciphers(aes_algs, ARRAY_SIZE(aes_algs));
+ 	if (err)
+ 		return err;
+@@ -454,5 +452,5 @@ static int __init aes_init(void)
+ 	return err;
+ }
+ 
+-module_init(aes_init);
++module_cpu_feature_match(AES, aes_init);
+ module_exit(aes_exit);
 -- 
 2.7.4
