@@ -1,92 +1,76 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Wed, 11 Jan 2017 10:03:40 -0600
-Subject: [PATCH] ARM: defconfig: qcom: add APQ8060 DragonBoard devices
-In-Reply-To: <0cd4197f-0055-bd8b-5d8f-dc16e008c46d@baylibre.com>
-References: <20170110095521.14146-1-linus.walleij@linaro.org>
- <20170110145348.GD5710@hector.attlocal.net>
- <CACRpkdb+bH1bj14d-2rBMadJQLCdVgdeuc07ESkuQpWt9UQ6rg@mail.gmail.com>
- <7762461.Mcpxx0AiPM@wuerfel>
- <0cd4197f-0055-bd8b-5d8f-dc16e008c46d@baylibre.com>
-Message-ID: <20170111160340.GF5710@hector.attlocal.net>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 11 Jan 2017 17:06:49 +0100
+Subject: [PATCH 04/15] video: fbdev: use permission-specific DEVICE_ATTR
+ variants
+In-Reply-To: <1477769829-22230-5-git-send-email-Julia.Lawall@lip6.fr>
+References: <1477769829-22230-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1477769829-22230-5-git-send-email-Julia.Lawall@lip6.fr>
+ <CGME20170111160652epcas5p3f1a8c0858a669910b51ece8cfe654a96@epcas5p3.samsung.com>
+Message-ID: <13619076.BMdhC73baQ@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 03:11:01PM +0100, Neil Armstrong wrote:
-> On 01/11/2017 03:08 PM, Arnd Bergmann wrote:
-> > On Wednesday, January 11, 2017 2:19:55 PM CET Linus Walleij wrote:
-> >> On Tue, Jan 10, 2017 at 3:53 PM, Andy Gross <andy.gross@linaro.org> wrote:
-> >>> On Tue, Jan 10, 2017 at 10:55:21AM +0100, Linus Walleij wrote:
-> >>>> This default-enables the devices found on the APQ8060 DragonBoard
-> >>>> in the qcom_defconfig:
-> >>>>
-> >>>> - EBI2 bus
-> >>>> - SMSC911x ethernet
-> >>>> - LEDs class and PM8058 LEDs driver, trigger and heartbeat
-> >>>>   trigger (so we get heartbeat on the board by default)
-> >>>> - IIO framework, including the HRTimer trigger, KXSD9
-> >>>>   accelerometer, MPU3050 gyroscope, AK8975 magnetometer and
-> >>>>   BMP085 pressure sensor
-> >>>>
-> >>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> >>>
-> >>> This brings up a point of discussion.  Do we even need the qcom_defconfig any
-> >>> more?  Is everyone comfortable with using the multi_v7_defconfig?
-> > 
-> > I think having one specialized defconfig for the platform is helpful for
-> > the build/boot testing, e.g. it can show whether a boot failure with
-> > multi_v7_defconfig is the result of a qcom-specific change, or a side-effect
-> > of something that was done on another platform.
-> > 
-> >>> Aside from size of the image, i can't think of any other reason to keep around
-> >>> the separate qcom file.
-> >>
-> >> Actually a bit of Arnd/Olof question.
-> >>
-> >> Bystander opinion below:
-> >>
-> >> That is pretty much up to the maintainer (you) I guess.
-> >> Reasons would be:
-> >>
-> >> - Lower footprint (because you may not need all stuff selected
-> >>   as 'y' compiled-in in multi_v7) on some platforms this is even
-> >>   necessary to get a bootable image or one that will load in
-> >>   reasonable time.
-> >>
-> >> - Enable a few things by default (both compiled-in and modules)
-> >>   that multi_v7 would consider to be littering
-> >>
-> >> - For "my" systems I usually like them because these defconfigs
-> >>   have vastly shorter compile time (because so much stuff that
-> >>   idon't concern me is left out).
-> >>
-> >> On the other hand: some ARMv7 system maintainers have x86
-> >> ambitions: compile once, run everywhere, and certainly that is
-> >> the ambition with multi_v7, and if that overshadows all the above,
-> >> just kill off qcom_defconfig and be happy :)
-> > 
-> > We recently killed of the Broadcom defconfig file that actually
-> > contained some very different platforms that had not much in common
-> > besides the company name.
-> > 
-> > I think my preference is to keep it, but if Andy wants it removed
-> > and nobody complains, that's fine too.
-> > 
-> > 	Arnd
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
+
+Hi,
+
+On Saturday, October 29, 2016 09:36:58 PM Julia Lawall wrote:
+> Use DEVICE_ATTR_RW for read-write attributes.  This simplifies the
+> source code, improves readbility, and reduces the chance of
+> inconsistencies.
 > 
-> Hi all,
+> The semantic patch that makes this change is as follows:
+> (http://coccinelle.lip6.fr/)
 > 
-> In fact, as far as I remember the multi_v7 did not fit on the MDM9615
-> due to it's limited memory available to Linux.
+> // <smpl>
+> @rw@
+> declarer name DEVICE_ATTR;
+> identifier x,x_show,x_store;
+> @@
+> 
+> DEVICE_ATTR(x, \(0644\|S_IRUGO|S_IWUSR\), x_show, x_store);
+> 
+> @script:ocaml@
+> x << rw.x;
+> x_show << rw.x_show;
+> x_store << rw.x_store;
+> @@
+> 
+> if not (x^"_show" = x_show && x^"_store" = x_store)
+> then Coccilib.include_match false
+> 
+> @@
+> declarer name DEVICE_ATTR_RW;
+> identifier rw.x,rw.x_show,rw.x_store;
+> @@
+> 
+> - DEVICE_ATTR(x, \(0644\|S_IRUGO|S_IWUSR\), x_show, x_store);
+> + DEVICE_ATTR_RW(x);
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-This was mainly a user poll.  We'll keep it in as there is at least one user who
-cannot use the multiv7 due to size.  That alone is enough to keep it around.
+Thanks, patch queued for 4.11.
 
-Linus, I'll add this to my pull list.
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
 
-Andy
+> ---
+>  drivers/video/fbdev/wm8505fb.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/video/fbdev/wm8505fb.c b/drivers/video/fbdev/wm8505fb.c
+> index e925619..253ffe9 100644
+> --- a/drivers/video/fbdev/wm8505fb.c
+> +++ b/drivers/video/fbdev/wm8505fb.c
+> @@ -182,7 +182,7 @@ static ssize_t contrast_store(struct device *dev,
+>  	return count;
+>  }
+>  
+> -static DEVICE_ATTR(contrast, 0644, contrast_show, contrast_store);
+> +static DEVICE_ATTR_RW(contrast);
+>  
+>  static inline u_int chan_to_field(u_int chan, struct fb_bitfield *bf)
+>  {
