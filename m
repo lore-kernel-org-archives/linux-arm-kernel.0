@@ -1,47 +1,49 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 11 Jan 2017 16:02:35 -0600
-Subject: CONFIG_PCIEASPM breaks PCIe on Marvell Armada 385 machine
-In-Reply-To: <20170111194942.q5rdma2es6hkmxfe@perseus.defre.kleine-koenig.org>
-References: <20170111194942.q5rdma2es6hkmxfe@perseus.defre.kleine-koenig.org>
-Message-ID: <20170111220235.GP14532@bhelgaas-glaptop.roam.corp.google.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Wed, 11 Jan 2017 16:31:56 -0600
+Subject: [Patch v3 0/2] Support ARM SMCC SoC vendor quirks
+Message-ID: <1484173918-25090-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+At least one SoC vendor (Qualcomm) requires additional processing done
+during ARM SMCCC calls.  As such, an additional parameter to the
+arm_smccc_smc is required to be able to handle SoC specific quirks.
 
-On Wed, Jan 11, 2017 at 08:49:46PM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> on an Marvell Armada 385 based machine (Turris Omnia) with 4.9 the
-> ath10k driver fails to bind to the matching hardware if CONFIG_PCIEASPM
-> is enabled:
-> 
-> # dmesg | grep ath
-> [    7.207770] ath10k_pci 0000:02:00.0: Refused to change power state, currently in D3
-> [    7.237955] ath10k_pci 0000:02:00.0: failed to wake up device : -110
-> [    7.238146] ath10k_pci: probe of 0000:02:00.0 failed with error -110
-> 
-> if however PCIEASPM is off, the driver probes correctly and the ath10k
-> adapter works fine.
-> 
-> I wonder if someone has an idea what needs to be done to fix this
-> problem. (OK, I could disable PCIEASPM, but I'd like to have a solution
-> for a distribution kernel where I think PCIEASPM=y is sensible in
-> general.)
+The Qualcomm quirk is necessary due to the fact that the scm call can
+be interrupted on Qualcomm ARM64 platforms.  When this occurs, the
+call must be restarted using information that was passed back during
+the original smc call.
 
-PCIEASPM=y is definitely sensible and disabling ASPM is OK for a
-workaround but is not a fix.
+The first patch in this series adds a quirk structure and also adds a
+quirk parameter to arm_smccc_smc calls.  I added macros to allow users
+to choose the API they need.  This keeps all of the current users who
+do not need quirks from having to change anything.
 
-We have several open issues related to ASPM:
+The second patch adds the Qualcomm quirk and also implements the
+Qualcomm firmware changes required to handle the restarting of the
+interrupted SMC call.
 
-  https://bugzilla.kernel.org/show_bug.cgi?id=102311 ASPM: ASMEDA asm1062 not working
-  https://bugzilla.kernel.org/show_bug.cgi?id=187731 Null pointer dereference in ASPM
-  https://bugzilla.kernel.org/show_bug.cgi?id=189951 Enabling ASPM causes NIC performance issue
-  https://bugzilla.kernel.org/show_bug.cgi?id=60111 NULL pointer deref in ASPM alloc_pcie_link_state()
+The original patch set for the SMCCC session ID is located at:
+https://lkml.org/lkml/2016/8/20/7
 
-I don't recognize yours as being one of these.  Can you open a new
-issue and attach the complete dmesg log and "lspci -vv" output?
+Changes from v2:
+  - Use variadic macros
 
-Is this a regression?
+Changes from v1:
+  - Add macros to handle both use cases per review comments
 
-Bjorn
+Andy Gross (2):
+  arm: kernel: Add SMC structure parameter
+  firmware: qcom: scm: Fix interrupted SCM calls
+
+ arch/arm/kernel/armksyms.c      |  2 +-
+ arch/arm/kernel/smccc-call.S    |  7 ++++---
+ arch/arm64/kernel/arm64ksyms.c  |  2 +-
+ arch/arm64/kernel/asm-offsets.c |  7 +++++--
+ arch/arm64/kernel/smccc-call.S  | 16 ++++++++++++----
+ drivers/firmware/qcom_scm-64.c  | 13 ++++++++++---
+ include/linux/arm-smccc.h       | 37 ++++++++++++++++++++++++++++++-------
+ 7 files changed, 63 insertions(+), 21 deletions(-)
+
+-- 
+1.9.1
