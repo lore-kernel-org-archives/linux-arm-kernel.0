@@ -1,102 +1,20 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Wed, 11 Jan 2017 16:28:12 +0100
-Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device managed
- functions
-In-Reply-To: <a61eb838-4167-3032-bde8-3a8845b780f8@roeck-us.net>
-References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
- <1484100561-17638-1-git-send-email-linux@roeck-us.net>
- <1484100561-17638-5-git-send-email-linux@roeck-us.net>
- <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
- <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
- <a45ed205-7c1b-a298-50c0-fc8b80a846c5@sigmadesigns.com>
- <a61eb838-4167-3032-bde8-3a8845b780f8@roeck-us.net>
-Message-ID: <f7d9227c-4912-5c52-5ba7-ae7fa3b89857@sigmadesigns.com>
+From: dhowells@redhat.com (David Howells)
+Date: Wed, 11 Jan 2017 15:29:24 +0000
+Subject: [PATCH 8/8] efi: Add EFI_SECURE_BOOT bit [ver #6]
+In-Reply-To: <20170111145138.GB29649@codeblueprint.co.uk>
+References: <20170111145138.GB29649@codeblueprint.co.uk>
+ <148120020832.5854.5448601415491330495.stgit@warthog.procyon.org.uk>
+ <148120026820.5854.13036556358308461345.stgit@warthog.procyon.org.uk>
+Message-ID: <7979.1484148564@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/2017 15:25, Guenter Roeck wrote:
-> On 01/11/2017 04:31 AM, Marc Gonzalez wrote:
->> On 11/01/2017 11:52, Guenter Roeck wrote:
->>
->>> On 01/11/2017 01:07 AM, Marc Gonzalez wrote:
->>>
->>>>> @@ -134,12 +134,15 @@ static int tangox_wdt_probe(struct platform_device *pdev)
->>>>>  	err = clk_prepare_enable(dev->clk);
->>>>>  	if (err)
->>>>>  		return err;
->>>>> +	err = devm_add_action_or_reset(&pdev->dev,
->>>>> +				       (void(*)(void *))clk_disable_unprepare,
->>>>> +				       dev->clk);
->>>>> +	if (err)
->>>>> +		return err;
->>>>
->>>> Hello Guenter,
->>>>
->>>> I would rather avoid the function pointer cast.
->>>> How about defining an auxiliary function for the cleanup action?
->>>>
->>>> clk_disable_unprepare() is static inline, so gcc will have to
->>>> define an auxiliary function either way. What do you think?
->>>
->>> Not really. It would just make it more complicated to replace the
->>> call with devm_clk_prepare_enable(), should it ever find its way
->>> into the light of day.
->>
->> More complicated, because the cleanup function will have to be deleted later?
->> The compiler will warn if someone forgets to do that.
->>
->> In my opinion, it's not a good idea to rely on the fact that casting
->> void(*)(struct clk *clk) to void(*)(void *) is likely to work as expected
->> on most platforms. (It has undefined behavior, strictly speaking.)
->
-> I do hear that you object to this code.
-> 
-> However, I must admit that you completely lost me here. It is a cast from
-> one function pointer to another,
+Matt Fleming <matt@codeblueprint.co.uk> wrote:
 
-Perhaps you are used to work at the assembly level, where pointers are
-just addresses, and all pointers are interchangeable.
+> Before we add more efi.flags bits I'd like this series to include the
+> patch that makes use of EFI_SECURE_BOOT. Alternatively, you move this
+> last patch to a new series.
 
-At a slightly higher level (C abstract machine), it is not so.
+Are you willing to take the kernel lock-down patches also?
 
-> passed as argument to another function,
-> with a secondary cast of its argument from a typed pointer to a void pointer.
-> I don't think C permits for "undefined behavior, strictly speaking".
-
-The C standard leaves quite a lot of behavior undefined, e.g.
-
-char *foo = "hello";
-foo[1] = 'a'; // UB
-
-char buf[4];
-*(int *)&buf = 0xdeadbeef; // UB
-
-1 << 64; // UB
-
-> Besides, that same mechanism is already used elsewhere, which is how I
-> got the idea. Are you claiming that there are situations where it won't
-> work ?
-
-If this technique is already used elsewhere in the kernel, then I'll
-crawl back under my rock (and weep).
-
-I can see two issues with the code you propose.
-
-First is the same for all casts: silencing potential warnings,
-e.g. if the prototype of clk_disable_unprepare ever changed.
-(Though casts are required for vararg function arguments.)
-
-Second is just theory and not a real-world concern.
-
->> Do you really dislike the portable solution I suggested? :-(
->
-> It is not more portable than the above. It is more expensive and adds more
-> code.
-
-Maybe I am mistaken. Can you tell me why adding an auxiliary function
-is more expensive? (In CPU cycles?)
-
-clk_disable_unprepare() is static inline, so an auxiliary function
-exists either way (implicit or explicit).
-
-Regards.
+David
