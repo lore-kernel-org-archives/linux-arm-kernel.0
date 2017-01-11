@@ -1,67 +1,72 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Wed, 11 Jan 2017 14:07:17 -0600
-Subject: [GIT PULL 2/2] SoCFPGA DTS updates for v4.11, part 1
-In-Reply-To: <1484165237-26640-1-git-send-email-dinguyen@kernel.org>
-References: <1484165237-26640-1-git-send-email-dinguyen@kernel.org>
-Message-ID: <1484165237-26640-2-git-send-email-dinguyen@kernel.org>
+From: b-liu@ti.com (Bin Liu)
+Date: Wed, 11 Jan 2017 14:08:11 -0600
+Subject: [PATCH 4/4] ARM: dts: sun8i: add OTG function to Lichee Pi Zero
+In-Reply-To: <2733831484164533@web1g.yandex.ru>
+References: <20170103152534.20118-1-icenowy@aosc.xyz>
+ <20170103152534.20118-5-icenowy@aosc.xyz>
+ <20170110202443.GC2479@uda0271908>
+ <2733831484164533@web1g.yandex.ru>
+Message-ID: <20170111200811.GA16865@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, and Olof:
+On Thu, Jan 12, 2017 at 03:55:33AM +0800, Icenowy Zheng wrote:
+> 
+> 
+> 11.01.2017, 04:24, "Bin Liu" <b-liu@ti.com>:
+> > On Tue, Jan 03, 2017 at 11:25:34PM +0800, Icenowy Zheng wrote:
+> >> ?Lichee Pi Zero features a USB OTG port.
+> >>
+> >> ?Add support for it.
+> >>
+> >> ?Note: in order to use the Host mode, the board must be powered via the
+> >> ?+5V and GND pins.
+> >>
+> >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> >> ?---
+> >> ??arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 10 ++++++++++
+> >> ??1 file changed, 10 insertions(+)
+> >>
+> >> ?diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+> >> ?index 0099affc6ce3..3d9168cbaeca 100644
+> >> ?--- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+> >> ?+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+> >> ?@@ -71,3 +71,13 @@
+> >> ??????????pinctrl-names = "default";
+> >> ??????????status = "okay";
+> >> ??};
+> >> ?+
+> >> ?+&usb_otg {
+> >> ?+ dr_mode = "otg";
+> >
+> > Why not set this default mode in dtsi instead?
+> >
+> > Regards,
+> > -Bin.
+> 
+> There's possibly boards which do not have OTG functions.
 
-Please pull in these DTS updates for v4.11.
+That is board specific.
 
-Thanks,
-Dinh
+You'd better to define the default dr_mode which the musb _controller_
+supports in the dtsi, and then override it in a specific board dts if
+necessary.
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+Regards,
+-Bin.
 
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v4.11_part_1
-
-for you to fetch changes up to 7f0f5460d46867a8f980683136a054cff1357780:
-
-  ARM: dts: socfpga: add missing compatible string for SDRAM controller (2017-01-06 01:42:06 -0600)
-
-----------------------------------------------------------------
-SoCFPGA DTS updates for v4.11, part 1
-- Adds FPGA manager bits
-- Enable I2C on Cyclone5 and Arria5 devkits
-- Adds LED support on C5/A5 devkits
-- Enables CAN on C5 devkit
-- Enables watchdog
-- Add NAND on Arria10
-- Add the LTC2977 Power Monitor on Arria10 devkit
-
-----------------------------------------------------------------
-Alan Tull (1):
-      ARM: dts: socfpga: add base fpga region and fpga bridges
-
-Dinh Nguyen (10):
-      ARM: dts: socfpga: enable GPIO and LEDs for Cyclone5 and Arria5 devkits
-      ARM: dts: socfpga: set desired i2c clock on Cyclone5 and Arria5 devkits
-      ARM: dts: socfpga: Add Rohm DH2228FV DAC
-      ARM: dts: socfpga: enable CAN on Cyclone5 devkit
-      ARM: dts: socfpga: enable watchdog timer on Arria5 and Arria10
-      ARM: dts: socfpga: add the LTC2977 power monitor on Arria10 devkit
-      ARM: dts: socfpga: add fpga-manager node for Arria10
-      ARM: dts: socfpga: fpga manager data is 32 bits
-      ARM: dts: socfpga: add fpga region support on Arria10
-      ARM: dts: socfpga: add missing compatible string for SDRAM controller
-
-Graham Moore (1):
-      ARM: dts: socfpga: Add NAND device tree for Arria10
-
- arch/arm/boot/dts/Makefile                       |  1 +
- arch/arm/boot/dts/socfpga.dtsi                   | 31 +++++++++++++-
- arch/arm/boot/dts/socfpga_arria10.dtsi           | 32 +++++++++++++-
- arch/arm/boot/dts/socfpga_arria10_socdk.dtsi     |  9 ++++
- arch/arm/boot/dts/socfpga_arria10_socdk_nand.dts | 31 ++++++++++++++
- arch/arm/boot/dts/socfpga_arria5.dtsi            |  4 ++
- arch/arm/boot/dts/socfpga_arria5_socdk.dts       | 43 +++++++++++++++++++
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts     | 53 ++++++++++++++++++++++++
- 8 files changed, 201 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/dts/socfpga_arria10_socdk_nand.dts
+> 
+> Even the official CDR design of V3s uses the USB controller to
+> connect a UVC webcam to make the design a dual-cam design
+> (V3s itself has a CSI).
+> 
+> >
+> >> ?+ status = "okay";
+> >> ?+};
+> >> ?+
+> >> ?+&usbphy {
+> >> ?+ usb0_id_det-gpio = <&pio 5 6 GPIO_ACTIVE_HIGH>;
+> >> ?+ status = "okay";
+> >> ?+};
+> >> ?--
+> >> ?2.11.0
