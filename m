@@ -1,98 +1,86 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Wed, 11 Jan 2017 09:41:52 +0000
-Subject: [PATCH v8 16/18] vfio/type1: Allow transparent MSI IOVA allocation
+Date: Wed, 11 Jan 2017 09:41:47 +0000
+Subject: [PATCH v8 11/18] iommu/arm-smmu-v3: Implement reserved region get/put
+ callbacks
 In-Reply-To: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
 References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1484127714-3263-17-git-send-email-eric.auger@redhat.com>
+Message-ID: <1484127714-3263-12-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When attaching a group to the container, check the group's
-reserved regions and test whether the IOMMU translates MSI
-transactions. If yes, we initialize an IOVA allocator through
-the iommu_get_msi_cookie API. This will allow the MSI IOVAs
-to be transparently allocated on MSI controller's compose().
+iommu/arm-smmu: Implement reserved region get/put callbacks
+
+The get() populates the list with the MSI IOVA reserved window.
+
+At the moment an arbitray MSI IOVA window is set at 0x8000000
+of size 1MB. This will allow to report those info in iommu-group
+sysfs.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
 
 ---
 
-v3 -> v4:
-- test region's type: IOMMU_RESV_MSI
-- restructure the code to prepare for safety assessment
-- reword title
----
- drivers/vfio/vfio_iommu_type1.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+v7 -> v8:
+- added Will's A-b
 
-diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index 9266271..5651faf 100644
---- a/drivers/vfio/vfio_iommu_type1.c
-+++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -39,6 +39,7 @@
- #include <linux/pid_namespace.h>
- #include <linux/mdev.h>
- #include <linux/notifier.h>
-+#include <linux/dma-iommu.h>
+v4: creation
+---
+ drivers/iommu/arm-smmu-v3.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 4d6ec44..6c4111c 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -412,6 +412,9 @@
+ /* High-level queue structures */
+ #define ARM_SMMU_POLL_TIMEOUT_US	100
  
- #define DRIVER_VERSION  "0.2"
- #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
-@@ -1181,6 +1182,28 @@ static struct vfio_group *find_iommu_group(struct vfio_domain *domain,
- 	return NULL;
++#define MSI_IOVA_BASE			0x8000000
++#define MSI_IOVA_LENGTH			0x100000
++
+ static bool disable_bypass;
+ module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
+ MODULE_PARM_DESC(disable_bypass,
+@@ -1883,6 +1886,29 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+ 	return iommu_fwspec_add_ids(dev, args->args, 1);
  }
  
-+static bool vfio_iommu_has_resv_msi(struct iommu_group *group,
-+				    phys_addr_t *base)
++static void arm_smmu_get_resv_regions(struct device *dev,
++				      struct list_head *head)
 +{
-+	struct list_head group_resv_regions;
-+	struct iommu_resv_region *region, *next;
-+	bool ret = false;
++	struct iommu_resv_region *region;
++	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
 +
-+	INIT_LIST_HEAD(&group_resv_regions);
-+	iommu_get_group_resv_regions(group, &group_resv_regions);
-+	list_for_each_entry(region, &group_resv_regions, list) {
-+		if (region->type & IOMMU_RESV_MSI) {
-+			*base = region->start;
-+			ret = true;
-+			goto out;
-+		}
-+	}
-+out:
-+	list_for_each_entry_safe(region, next, &group_resv_regions, list)
-+		kfree(region);
-+	return ret;
++	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
++					 prot, IOMMU_RESV_MSI);
++	if (!region)
++		return;
++
++	list_add_tail(&region->list, head);
 +}
 +
- static int vfio_iommu_type1_attach_group(void *iommu_data,
- 					 struct iommu_group *iommu_group)
- {
-@@ -1189,6 +1212,8 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
- 	struct vfio_domain *domain, *d;
- 	struct bus_type *bus = NULL, *mdev_bus;
- 	int ret;
-+	bool resv_msi;
-+	phys_addr_t resv_msi_base;
- 
- 	mutex_lock(&iommu->lock);
- 
-@@ -1258,6 +1283,8 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
- 	if (ret)
- 		goto out_domain;
- 
-+	resv_msi = vfio_iommu_has_resv_msi(iommu_group, &resv_msi_base);
++static void arm_smmu_put_resv_regions(struct device *dev,
++				      struct list_head *head)
++{
++	struct iommu_resv_region *entry, *next;
 +
- 	INIT_LIST_HEAD(&domain->group_list);
- 	list_add(&group->next, &domain->group_list);
- 
-@@ -1304,6 +1331,9 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
- 	if (ret)
- 		goto out_detach;
- 
-+	if (resv_msi && iommu_get_msi_cookie(domain->domain, resv_msi_base))
-+		goto out_detach;
++	list_for_each_entry_safe(entry, next, head, list)
++		kfree(entry);
++}
 +
- 	list_add(&domain->next, &iommu->domain_list);
+ static struct iommu_ops arm_smmu_ops = {
+ 	.capable		= arm_smmu_capable,
+ 	.domain_alloc		= arm_smmu_domain_alloc,
+@@ -1898,6 +1924,8 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+ 	.domain_get_attr	= arm_smmu_domain_get_attr,
+ 	.domain_set_attr	= arm_smmu_domain_set_attr,
+ 	.of_xlate		= arm_smmu_of_xlate,
++	.get_resv_regions	= arm_smmu_get_resv_regions,
++	.put_resv_regions	= arm_smmu_put_resv_regions,
+ 	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
+ };
  
- 	mutex_unlock(&iommu->lock);
 -- 
 1.9.1
