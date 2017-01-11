@@ -1,47 +1,56 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 11 Jan 2017 14:06:01 -0300
-Subject: [PATCH] usb: dwc3 dwc3_exynos_probe() change goto labels to
- meaningful names
-In-Reply-To: <20170111164537.2981-1-shuahkh@osg.samsung.com>
-References: <20170111164537.2981-1-shuahkh@osg.samsung.com>
-Message-ID: <d32213e3-98c8-6c8c-231c-53aaba6468ff@osg.samsung.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 11 Jan 2017 18:19:05 +0100
+Subject: [PATCH v5 02/12] mmc: sdhci: Export sdhci_set_ios() from sdhci.c
+In-Reply-To: <cover.8527229dae6c124f24c5e637430c2cdc86f80392.1484154449.git-series.gregory.clement@free-electrons.com>
+References: <cover.8527229dae6c124f24c5e637430c2cdc86f80392.1484154449.git-series.gregory.clement@free-electrons.com>
+Message-ID: <0963475695aab0f33fc999314b9a533524432340.1484154449.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shuah,
+From: Hu Ziji <huziji@marvell.com>
 
-On 01/11/2017 01:45 PM, Shuah Khan wrote:
-> Change goto labels to meaningful names from a series of errNs.
-> 
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> ---
->  drivers/usb/dwc3/dwc3-exynos.c | 22 +++++++++++-----------
->  1 file changed, 11 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
-> index f7421c2..ea50f74 100644
-> --- a/drivers/usb/dwc3/dwc3-exynos.c
-> +++ b/drivers/usb/dwc3/dwc3-exynos.c
-> @@ -147,53 +147,53 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
->  	exynos->vdd33 = devm_regulator_get(dev, "vdd33");
->  	if (IS_ERR(exynos->vdd33)) {
->  		ret = PTR_ERR(exynos->vdd33);
-> -		goto err2;
-> +		goto vdd33_err;
->  	}
+Export sdhci_set_ios() in sdhci.c.
+Thus vendor sdhci driver can implement its own set_ios() routine.
 
-I think it's better to use as labels what will be done in the error path
-rather than what failed. IOW, "disable_axius_clk" or "disable_clks" are
-more clear than vdd33_err for me, since can give you an idea of what will
-happen in the error path.
+Signed-off-by: Hu Ziji <huziji@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/mmc/host/sdhci.c | 3 ++-
+ drivers/mmc/host/sdhci.h | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-But I don't have a strong opinion and your naming is an improvement over
-the current one, so:
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 23909804ffb8..0e9ed0fadff9 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1570,7 +1570,7 @@ void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
+ }
+ EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);
+ 
+-static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
++void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ {
+ 	struct sdhci_host *host = mmc_priv(mmc);
+ 	unsigned long flags;
+@@ -1730,6 +1730,7 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	mmiowb();
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ }
++EXPORT_SYMBOL_GPL(sdhci_set_ios);
+ 
+ static int sdhci_get_cd(struct mmc_host *mmc)
+ {
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index 0b66f210ae82..3563c0c384ca 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -691,6 +691,7 @@ void sdhci_set_bus_width(struct sdhci_host *host, int width);
+ void sdhci_reset(struct sdhci_host *host, u8 mask);
+ void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing);
+ int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode);
++void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
+ 
+ #ifdef CONFIG_PM
+ extern int sdhci_suspend_host(struct sdhci_host *host);
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+git-series 0.9.1
