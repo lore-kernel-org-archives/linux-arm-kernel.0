@@ -1,104 +1,70 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 11 Jan 2017 13:59:38 +0000
-Subject: [PATCH] coresight: STM: Balance enable/disable
-In-Reply-To: <CAG2=9p8CMZD37KPbp+LCyDeizUHaDmw0NfqQHPvzKdCR9L0XZw@mail.gmail.com>
-References: <1484047315-14407-1-git-send-email-suzuki.poulose@arm.com>
- <20170110173637.GA12100@linaro.org>
- <CAG2=9p8CMZD37KPbp+LCyDeizUHaDmw0NfqQHPvzKdCR9L0XZw@mail.gmail.com>
-Message-ID: <e2710e1c-471d-2645-5ce0-30e222c85b52@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Jan 2017 15:08:08 +0100
+Subject: [PATCH] ARM: defconfig: qcom: add APQ8060 DragonBoard devices
+In-Reply-To: <CACRpkdb+bH1bj14d-2rBMadJQLCdVgdeuc07ESkuQpWt9UQ6rg@mail.gmail.com>
+References: <20170110095521.14146-1-linus.walleij@linaro.org>
+ <20170110145348.GD5710@hector.attlocal.net>
+ <CACRpkdb+bH1bj14d-2rBMadJQLCdVgdeuc07ESkuQpWt9UQ6rg@mail.gmail.com>
+Message-ID: <7762461.Mcpxx0AiPM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/17 11:41, Chunyan Zhang wrote:
-> On 11 January 2017 at 01:36, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
->> On Tue, Jan 10, 2017 at 11:21:55AM +0000, Suzuki K Poulose wrote:
->>> The stm is automatically enabled when an application sets the policy
->>> via ->link() call back by using coresight_enable(), which keeps the
->>> refcount of the current users of the STM. However, the unlink() callback
->>> issues stm_disable() directly, which leaves the STM turned off, without
->>> the coresight layer knowing about it. This prevents any further uses
->>> of the STM hardware as the coresight layer still thinks the STM is
->>> turned on and doesn't issue an stm_enable(). Even manually enabling
->>> the STM via sysfs can't really enable the hw.
->>>
->>> e.g,
->>>
->>> $ echo 1 > $CS_DEVS/$ETR/enable_sink
->>> $ mkdir -p $CONFIG_FS/stp-policy/$source.0/stm_test/
->>> $ echo 32768 65535 > $CONFIG_FS/stp-policy/$source.0/stm_test/channels
->>> $ echo 64 > $CS_DEVS/$source/traceid
->>> $ ./stm_app
->>> Sending 64000 byte blocks of pattern 0 at 0us intervals
->>> Success to map channel(32768~32783) to 0xffffa95fa000
->>> Sending on channel 32768
->>> $ dd if=/dev/$ETR of=~/trace.bin.1
->>> 597+1 records in
->>> 597+1 records out
->>> 305920 bytes (306 kB) copied, 0.399952 s, 765 kB/s
->>> $ ./stm_app
->>> Sending 64000 byte blocks of pattern 0 at 0us intervals
->>> Success to map channel(32768~32783) to 0xffff7e9e2000
->>> Sending on channel 32768
->>> $ dd if=/dev/$ETR of=~/trace.bin.2
->>> 0+0 records in
->>> 0+0 records out
->>> 0 bytes (0 B) copied, 0.0232083 s, 0.0 kB/s
->>>
->>> Note that we don't get any data from the ETR for the second session.
->>>
->>> Also dmesg shows :
->>>
->>> [   77.520458] coresight-tmc 20800000.etr: TMC-ETR enabled
->>> [   77.537097] coresight-replicator etr_replicator at 20890000: REPLICATOR enabled
->>> [   77.558828] coresight-replicator main_replicator at 208a0000: REPLICATOR enabled
->>> [   77.581068] coresight-funnel 208c0000.main_funnel: FUNNEL inport 0 enabled
->>> [   77.602217] coresight-tmc 20840000.etf: TMC-ETF enabled
->>> [   77.618422] coresight-stm 20860000.stm: STM tracing enabled
->>> [  139.554252] coresight-stm 20860000.stm: STM tracing disabled
->>>  # End of first tracing session
->>> [  146.351135] coresight-tmc 20800000.etr: TMC read start
->>> [  146.514486] coresight-tmc 20800000.etr: TMC read end
->>>  # Note that the STM is not turned on via stm_generic_link()->coresight_enable()
->>>  # and hence none of the components are turned on.
->>> [  152.479080] coresight-tmc 20800000.etr: TMC read start
->>> [  152.542632] coresight-tmc 20800000.etr: TMC read end
->>>
->>> This patch balances the unlink operation by using the coresight_disable(),
->>> keeping the coresight layer in sync with the hardware state.
->>>
->>> Fixes: commit 237483aa5cf43 ("coresight: stm: adding driver for CoreSight STM component")
->>> Cc: Pratik Patel <pratikp@codeaurora.org>
->>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->>> Cc: Chunyan Zhang <zhang.chunyan@linaro.org>
->>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>> Cc: stable at vger.kernel.org # 4.7+
->>> Reported-by: Robert Walker <robert.walker@arm.com>
->>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>> ---
->>>  drivers/hwtracing/coresight/coresight-stm.c | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
->>> index 3524452..57b7330 100644
->>> --- a/drivers/hwtracing/coresight/coresight-stm.c
->>> +++ b/drivers/hwtracing/coresight/coresight-stm.c
->>> @@ -356,7 +356,7 @@ static void stm_generic_unlink(struct stm_data *stm_data,
->>>       if (!drvdata || !drvdata->csdev)
->>>               return;
->>>
->>> -     stm_disable(drvdata->csdev, NULL);
->>> +     coresight_disable(drvdata->csdev);
->>
->> This looks valid to me.
->>
->> Chunyan, any reason to use stm_disable() directly rather than calling it as part
->> of the device OPS in coresight_disable()?
->
-> I don't think there's some special reason for this. I simply hadn't
-> noticed that these two operations didn't use two balanced functions.
+On Wednesday, January 11, 2017 2:19:55 PM CET Linus Walleij wrote:
+> On Tue, Jan 10, 2017 at 3:53 PM, Andy Gross <andy.gross@linaro.org> wrote:
+> > On Tue, Jan 10, 2017 at 10:55:21AM +0100, Linus Walleij wrote:
+> >> This default-enables the devices found on the APQ8060 DragonBoard
+> >> in the qcom_defconfig:
+> >>
+> >> - EBI2 bus
+> >> - SMSC911x ethernet
+> >> - LEDs class and PM8058 LEDs driver, trigger and heartbeat
+> >>   trigger (so we get heartbeat on the board by default)
+> >> - IIO framework, including the HRTimer trigger, KXSD9
+> >>   accelerometer, MPU3050 gyroscope, AK8975 magnetometer and
+> >>   BMP085 pressure sensor
+> >>
+> >> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> >
+> > This brings up a point of discussion.  Do we even need the qcom_defconfig any
+> > more?  Is everyone comfortable with using the multi_v7_defconfig?
 
-Please can I have an Ack/Reviewed -by on it, so that we can push it
-as a fix.
+I think having one specialized defconfig for the platform is helpful for
+the build/boot testing, e.g. it can show whether a boot failure with
+multi_v7_defconfig is the result of a qcom-specific change, or a side-effect
+of something that was done on another platform.
 
+> > Aside from size of the image, i can't think of any other reason to keep around
+> > the separate qcom file.
+> 
+> Actually a bit of Arnd/Olof question.
+> 
+> Bystander opinion below:
+> 
+> That is pretty much up to the maintainer (you) I guess.
+> Reasons would be:
+> 
+> - Lower footprint (because you may not need all stuff selected
+>   as 'y' compiled-in in multi_v7) on some platforms this is even
+>   necessary to get a bootable image or one that will load in
+>   reasonable time.
+> 
+> - Enable a few things by default (both compiled-in and modules)
+>   that multi_v7 would consider to be littering
+> 
+> - For "my" systems I usually like them because these defconfigs
+>   have vastly shorter compile time (because so much stuff that
+>   idon't concern me is left out).
+> 
+> On the other hand: some ARMv7 system maintainers have x86
+> ambitions: compile once, run everywhere, and certainly that is
+> the ambition with multi_v7, and if that overshadows all the above,
+> just kill off qcom_defconfig and be happy :)
 
-Suzuki
+We recently killed of the Broadcom defconfig file that actually
+contained some very different platforms that had not much in common
+besides the company name.
+
+I think my preference is to keep it, but if Andy wants it removed
+and nobody complains, that's fine too.
+
+	Arnd
