@@ -1,27 +1,202 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 11 Jan 2017 15:05:14 +0000
-Subject: [PATCH 0/8] efi: Pass secure boot mode to kernel [ver #6]
-In-Reply-To: <20170111150150.GC29649@codeblueprint.co.uk>
-References: <148120020832.5854.5448601415491330495.stgit@warthog.procyon.org.uk>
- <20170111150150.GC29649@codeblueprint.co.uk>
-Message-ID: <CAKv+Gu-PR9KoEe+RwgohC-BSyE+5CPR98HjnohSiGL8yw17-HA@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 11 Jan 2017 16:07:05 +0100
+Subject: [PATCH] simplefb: Separate clk / regulator get and enable steps
+In-Reply-To: <20161104144507.18072-1-hdegoede@redhat.com>
+References: <20161104144507.18072-1-hdegoede@redhat.com>
+ <CGME20170111150708epcas5p41496db3ee192f7401fd041929dff09b3@epcas5p4.samsung.com>
+Message-ID: <8943659.T6ei7HPULA@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 January 2017 at 15:01, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> On Thu, 08 Dec, at 12:30:08PM, David Howells wrote:
->>
->> Here's a set of patches that can determine the secure boot state of the
->> UEFI BIOS and pass that along to the main kernel image.  This involves
->> generalising ARM's efi_get_secureboot() function and making it mixed-mode
->> safe.
->
-> This version looks OK to me apart from the couple of comments I made.
->
-> Ard, did you take a look? In particular some boot testing on ARM/arm64
-> would be useful. x86 boots fine in both regular and mixed mode but
-> I've only tested without Secure Boot enabled.
 
-I did take a look at these patches (and commented on them) as they
-were coming in, but I haven't yet gone through them as thoroughly as I
-should. I will test them on ARM/arm64 as well.
+Hi,
+
+On Friday, November 04, 2016 03:45:07 PM Hans de Goede wrote:
+> Currently when a simplefb needs both clocks and regulators and one
+> of the regulators returns -EPROBE_DEFER when we try to get it, we end
+> up disabling the clocks. This causes the screen to go blank; and in some
+> cases my cause hardware state to be lost resulting in the framebuffer not
+> working at all.
+> 
+> This commit splits the get and enable steps and only enables
+> clocks and regulators after successfully getting all of them,
+> fixing the disabling of the clocks which were left enabled by
+> the firmware setting up the simplefb.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+
+Thanks, patch queued for 4.11.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+> ---
+>  drivers/video/fbdev/simplefb.c | 56 ++++++++++++++++++++++++++++++------------
+>  1 file changed, 40 insertions(+), 16 deletions(-)
+> 
+> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
+> index 61f799a..a3c44ec 100644
+> --- a/drivers/video/fbdev/simplefb.c
+> +++ b/drivers/video/fbdev/simplefb.c
+> @@ -180,10 +180,12 @@ static int simplefb_parse_pd(struct platform_device *pdev,
+>  struct simplefb_par {
+>  	u32 palette[PSEUDO_PALETTE_SIZE];
+>  #if defined CONFIG_OF && defined CONFIG_COMMON_CLK
+> +	bool clks_enabled;
+>  	unsigned int clk_count;
+>  	struct clk **clks;
+>  #endif
+>  #if defined CONFIG_OF && defined CONFIG_REGULATOR
+> +	bool regulators_enabled;
+>  	u32 regulator_count;
+>  	struct regulator **regulators;
+>  #endif
+> @@ -208,12 +210,12 @@ struct simplefb_par {
+>   * the fb probe will not help us much either. So just complain and carry on,
+>   * and hope that the user actually gets a working fb at the end of things.
+>   */
+> -static int simplefb_clocks_init(struct simplefb_par *par,
+> -				struct platform_device *pdev)
+> +static int simplefb_clocks_get(struct simplefb_par *par,
+> +			       struct platform_device *pdev)
+>  {
+>  	struct device_node *np = pdev->dev.of_node;
+>  	struct clk *clock;
+> -	int i, ret;
+> +	int i;
+>  
+>  	if (dev_get_platdata(&pdev->dev) || !np)
+>  		return 0;
+> @@ -244,6 +246,14 @@ static int simplefb_clocks_init(struct simplefb_par *par,
+>  		par->clks[i] = clock;
+>  	}
+>  
+> +	return 0;
+> +}
+> +
+> +static void simplefb_clocks_enable(struct simplefb_par *par,
+> +				   struct platform_device *pdev)
+> +{
+> +	int i, ret;
+> +
+>  	for (i = 0; i < par->clk_count; i++) {
+>  		if (par->clks[i]) {
+>  			ret = clk_prepare_enable(par->clks[i]);
+> @@ -256,8 +266,7 @@ static int simplefb_clocks_init(struct simplefb_par *par,
+>  			}
+>  		}
+>  	}
+> -
+> -	return 0;
+> +	par->clks_enabled = true;
+>  }
+>  
+>  static void simplefb_clocks_destroy(struct simplefb_par *par)
+> @@ -269,7 +278,8 @@ static void simplefb_clocks_destroy(struct simplefb_par *par)
+>  
+>  	for (i = 0; i < par->clk_count; i++) {
+>  		if (par->clks[i]) {
+> -			clk_disable_unprepare(par->clks[i]);
+> +			if (par->clks_enabled)
+> +				clk_disable_unprepare(par->clks[i]);
+>  			clk_put(par->clks[i]);
+>  		}
+>  	}
+> @@ -277,8 +287,10 @@ static void simplefb_clocks_destroy(struct simplefb_par *par)
+>  	kfree(par->clks);
+>  }
+>  #else
+> -static int simplefb_clocks_init(struct simplefb_par *par,
+> +static int simplefb_clocks_get(struct simplefb_par *par,
+>  	struct platform_device *pdev) { return 0; }
+> +static void simplefb_clocks_enable(struct simplefb_par *par,
+> +	struct platform_device *pdev) { }
+>  static void simplefb_clocks_destroy(struct simplefb_par *par) { }
+>  #endif
+>  
+> @@ -305,14 +317,14 @@ static void simplefb_clocks_destroy(struct simplefb_par *par) { }
+>   * the fb probe will not help us much either. So just complain and carry on,
+>   * and hope that the user actually gets a working fb at the end of things.
+>   */
+> -static int simplefb_regulators_init(struct simplefb_par *par,
+> -	struct platform_device *pdev)
+> +static int simplefb_regulators_get(struct simplefb_par *par,
+> +				   struct platform_device *pdev)
+>  {
+>  	struct device_node *np = pdev->dev.of_node;
+>  	struct property *prop;
+>  	struct regulator *regulator;
+>  	const char *p;
+> -	int count = 0, i = 0, ret;
+> +	int count = 0, i = 0;
+>  
+>  	if (dev_get_platdata(&pdev->dev) || !np)
+>  		return 0;
+> @@ -354,6 +366,14 @@ static int simplefb_regulators_init(struct simplefb_par *par,
+>  	}
+>  	par->regulator_count = i;
+>  
+> +	return 0;
+> +}
+> +
+> +static void simplefb_regulators_enable(struct simplefb_par *par,
+> +				       struct platform_device *pdev)
+> +{
+> +	int i, ret;
+> +
+>  	/* Enable all the regulators */
+>  	for (i = 0; i < par->regulator_count; i++) {
+>  		ret = regulator_enable(par->regulators[i]);
+> @@ -365,15 +385,14 @@ static int simplefb_regulators_init(struct simplefb_par *par,
+>  			par->regulators[i] = NULL;
+>  		}
+>  	}
+> -
+> -	return 0;
+> +	par->regulators_enabled = true;
+>  }
+>  
+>  static void simplefb_regulators_destroy(struct simplefb_par *par)
+>  {
+>  	int i;
+>  
+> -	if (!par->regulators)
+> +	if (!par->regulators || !par->regulators_enabled)
+>  		return;
+>  
+>  	for (i = 0; i < par->regulator_count; i++)
+> @@ -381,8 +400,10 @@ static void simplefb_regulators_destroy(struct simplefb_par *par)
+>  			regulator_disable(par->regulators[i]);
+>  }
+>  #else
+> -static int simplefb_regulators_init(struct simplefb_par *par,
+> +static int simplefb_regulators_get(struct simplefb_par *par,
+>  	struct platform_device *pdev) { return 0; }
+> +static void simplefb_regulators_enable(struct simplefb_par *par,
+> +	struct platform_device *pdev) { }
+>  static void simplefb_regulators_destroy(struct simplefb_par *par) { }
+>  #endif
+>  
+> @@ -453,14 +474,17 @@ static int simplefb_probe(struct platform_device *pdev)
+>  	}
+>  	info->pseudo_palette = par->palette;
+>  
+> -	ret = simplefb_clocks_init(par, pdev);
+> +	ret = simplefb_clocks_get(par, pdev);
+>  	if (ret < 0)
+>  		goto error_unmap;
+>  
+> -	ret = simplefb_regulators_init(par, pdev);
+> +	ret = simplefb_regulators_get(par, pdev);
+>  	if (ret < 0)
+>  		goto error_clocks;
+>  
+> +	simplefb_clocks_enable(par, pdev);
+> +	simplefb_regulators_enable(par, pdev);
+> +
+>  	dev_info(&pdev->dev, "framebuffer at 0x%lx, 0x%x bytes, mapped to 0x%p\n",
+>  			     info->fix.smem_start, info->fix.smem_len,
+>  			     info->screen_base);
