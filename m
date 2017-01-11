@@ -1,76 +1,150 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 11 Jan 2017 12:18:53 -0600
-Subject: [PATCH] PCI:MSI Return -ENOSPC when requested vectors is not
- enough
-In-Reply-To: <1480558504-18691-1-git-send-email-dennis.chen@arm.com>
-References: <1480558504-18691-1-git-send-email-dennis.chen@arm.com>
-Message-ID: <20170111181853.GA14532@bhelgaas-glaptop.roam.corp.google.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 11 Jan 2017 18:22:08 +0000
+Subject: [PATCH v3 2/5] arm64: Work around Falkor erratum 1003
+In-Reply-To: <20170111180627.GG20288@e104818-lin.cambridge.arm.com>
+References: <20170111144118.17062-1-cov@codeaurora.org>
+ <20170111144118.17062-2-cov@codeaurora.org>
+ <20170111180627.GG20288@e104818-lin.cambridge.arm.com>
+Message-ID: <278a45c0-bd49-b8a2-63ae-80ad851bab9b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2016 at 10:15:04AM +0800, Dennis Chen wrote:
-> The __pci_enable_msi_range() should return -ENOSPC instead of -EINVAL
-> when the device doesn't have enough vectors as required, just as the 
-> MSI-X vector allocator does in __pci_enable_msix_range(). Otherwise, 
-> some drivers depending on that return value will probably fallback to
-> the legacy interrupt directly, for example, in commit 17a51f12cfbd2814
-> ("ahci: only try to use multi-MSI mode if there is more than 1 port"), the
-> ahci driver will fallback to single MSI mode only when the return value
-> is -ENOSPC in case of required vectors is not enough, else the driver will
-> use legacy interrupt which has been observed on a x86 box with 6-port SATA
-> controller.
-
-Unless Christoph objects, I'll apply this, but I don't understand the
-situation with 17a51f12cfbd.  That commit doesn't check for EINVAL or
-ENOSPC so I don't know what the connection with this patch is.
-
-I know Christoph said he changed something in ahci to treat all errors
-the same, but I don't know where that is, either.
-
-If there's a revision of Linus' tree that is broken, please give the
-details so I can at least describe which versions are broken, when it
-got fixed by Christoph, and figure out whether we need stable
-backports or anything.
-
-Bjorn
-
-> With this patch, when a MSI-capable device doesn't have enough MSI
-> vectors as requested, it will fallback to single MSI mode while not
-> legacy interrupt.
+On 11/01/17 18:06, Catalin Marinas wrote:
+> Some minor comments below, nothing fundamental (as long as you say the
+> new sequence doesn't have the speculative TLB load problem I mentioned
+> on a previous version).
 > 
-> Signed-off-by: Dennis Chen <dennis.chen@arm.com>
-> Cc: Tejun Heo <tj@kernel.org>
-> Cc: Christoph Hellwig <hch@lst.de>
-> Cc: Tom Long Nguyen <tom.l.nguyen@intel.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Steve Capper <steve.capper@arm.com>
-> Cc: linux-ide at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  drivers/pci/msi.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> On Wed, Jan 11, 2017 at 09:41:15AM -0500, Christopher Covington wrote:
+>> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+>> index 405da11..7151aed 100644
+>> --- a/Documentation/arm64/silicon-errata.txt
+>> +++ b/Documentation/arm64/silicon-errata.txt
+>> @@ -42,24 +42,25 @@ file acts as a registry of software workarounds in the Linux Kernel and
+>>  will be updated when new workarounds are committed and backported to
+>>  stable kernels.
+>>  
+>> -| Implementor    | Component       | Erratum ID      | Kconfig                 |
+>> -+----------------+-----------------+-----------------+-------------------------+
+>> -| ARM            | Cortex-A53      | #826319         | ARM64_ERRATUM_826319    |
+>> -| ARM            | Cortex-A53      | #827319         | ARM64_ERRATUM_827319    |
+>> -| ARM            | Cortex-A53      | #824069         | ARM64_ERRATUM_824069    |
+>> -| ARM            | Cortex-A53      | #819472         | ARM64_ERRATUM_819472    |
+>> -| ARM            | Cortex-A53      | #845719         | ARM64_ERRATUM_845719    |
+>> -| ARM            | Cortex-A53      | #843419         | ARM64_ERRATUM_843419    |
+>> -| ARM            | Cortex-A57      | #832075         | ARM64_ERRATUM_832075    |
+>> -| ARM            | Cortex-A57      | #852523         | N/A                     |
+>> -| ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220    |
+>> -| ARM            | Cortex-A72      | #853709         | N/A                     |
+>> -| ARM            | MMU-500         | #841119,#826419 | N/A                     |
+>> -|                |                 |                 |                         |
+>> -| Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375    |
+>> -| Cavium         | ThunderX ITS    | #23144          | CAVIUM_ERRATUM_23144    |
+>> -| Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154    |
+>> -| Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456    |
+>> -| Cavium         | ThunderX SMMUv2 | #27704          | N/A		       |
+>> -|                |                 |                 |                         |
+>> -| Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585     |
+>> +| Implementor   | Component       | Erratum ID      | Kconfig                  |
+>> ++---------------+-----------------+-----------------+--------------------------+
+>> +| ARM           | Cortex-A53      | #826319         | ARM64_ERRATUM_826319     |
+>> +| ARM           | Cortex-A53      | #827319         | ARM64_ERRATUM_827319     |
+>> +| ARM           | Cortex-A53      | #824069         | ARM64_ERRATUM_824069     |
+>> +| ARM           | Cortex-A53      | #819472         | ARM64_ERRATUM_819472     |
+>> +| ARM           | Cortex-A53      | #845719         | ARM64_ERRATUM_845719     |
+>> +| ARM           | Cortex-A53      | #843419         | ARM64_ERRATUM_843419     |
+>> +| ARM           | Cortex-A57      | #832075         | ARM64_ERRATUM_832075     |
+>> +| ARM           | Cortex-A57      | #852523         | N/A                      |
+>> +| ARM           | Cortex-A57      | #834220         | ARM64_ERRATUM_834220     |
+>> +| ARM           | Cortex-A72      | #853709         | N/A                      |
+>> +| ARM           | MMU-500         | #841119,#826419 | N/A                      |
+>> +|               |                 |                 |                          |
+>> +| Cavium        | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375     |
+>> +| Cavium        | ThunderX ITS    | #23144          | CAVIUM_ERRATUM_23144     |
+>> +| Cavium        | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154     |
+>> +| Cavium        | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456     |
+>> +| Cavium        | ThunderX SMMUv2 | #27704          | N/A                      |
+>> +|               |                 |                 |                          |
+>> +| Freescale/NXP | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585      |
+>> +| Qualcomm      | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003 |
 > 
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index ad70507..da37113 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -1084,7 +1084,7 @@ static int __pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec,
->  	if (nvec < 0)
->  		return nvec;
->  	if (nvec < minvec)
-> -		return -EINVAL;
-> +		return -ENOSPC;
->  
->  	if (nvec > maxvec)
->  		nvec = maxvec;
-> -- 
-> 2.7.4
+> Please don't change the "Implementor" column width, there is no point
+> and it makes the patch harder to read (i.e. this hunk should only have
+> one line).
 > 
+>> diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+>> index 4c63cb1..5a0a82a 100644
+>> --- a/arch/arm64/mm/context.c
+>> +++ b/arch/arm64/mm/context.c
+>> @@ -87,6 +87,11 @@ static void flush_context(unsigned int cpu)
+>>  	/* Update the list of reserved ASIDs and the ASID bitmap. */
+>>  	bitmap_clear(asid_map, 0, NUM_USER_ASIDS);
+>>  
+>> +	/* Reserve ASID for Falkor erratum 1003 */
+>> +	if (IS_ENABLED(CONFIG_QCOM_FALKOR_ERRATUM_1003) &&
+>> +	    cpus_have_cap(ARM64_WORKAROUND_QCOM_FALKOR_E1003))
+>> +		__set_bit(FALKOR_RESERVED_ASID, asid_map);
+>> +
+>>  	/*
+>>  	 * Ensure the generation bump is observed before we xchg the
+>>  	 * active_asids.
+>> @@ -244,6 +249,11 @@ static int asids_init(void)
+>>  		panic("Failed to allocate bitmap for %lu ASIDs\n",
+>>  		      NUM_USER_ASIDS);
+>>  
+>> +	/* Reserve ASID for Falkor erratum 1003 */
+>> +	if (IS_ENABLED(CONFIG_QCOM_FALKOR_ERRATUM_1003) &&
+>> +	    cpus_have_cap(ARM64_WORKAROUND_QCOM_FALKOR_E1003))
+>> +		__set_bit(FALKOR_RESERVED_ASID, asid_map);
+>> +
+>>  	pr_info("ASID allocator initialised with %lu entries\n", NUM_USER_ASIDS);
+>>  	return 0;
+>>  }
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> You could as well write a small static function in this file and call it
+> twice.
+> 
+>> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+>> index 32682be..9ee46df 100644
+>> --- a/arch/arm64/mm/proc.S
+>> +++ b/arch/arm64/mm/proc.S
+>> @@ -23,6 +23,7 @@
+>>  #include <asm/assembler.h>
+>>  #include <asm/asm-offsets.h>
+>>  #include <asm/hwcap.h>
+>> +#include <asm/mmu_context.h>
+>>  #include <asm/pgtable.h>
+>>  #include <asm/pgtable-hwdef.h>
+>>  #include <asm/cpufeature.h>
+>> @@ -140,6 +141,18 @@ ENDPROC(cpu_do_resume)
+>>  ENTRY(cpu_do_switch_mm)
+>>  	mmid	x1, x1				// get mm->context.id
+>>  	bfi	x0, x1, #48, #16		// set the ASID
+>> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
+>> +alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
+>> +	mrs     x2, ttbr0_el1
+>> +	mov     x3, #FALKOR_RESERVED_ASID
+>> +	bfi     x2, x3, #48, #16                // reserved ASID + old BADDR
+>> +	msr     ttbr0_el1, x2
+>> +	isb
+>> +	bfi     x2, x0, #0, #48                 // reserved ASID + new BADDR
+>> +	msr     ttbr0_el1, x2
+>> +	isb
+>> +alternative_else_nop_endif
+>> +#endif
+>>  	msr	ttbr0_el1, x0			// set TTBR0
+>>  	isb
+>>  	post_ttbr0_update_workaround
+> 
+> Please move the above hunk to a pre_ttbr0_update_workaround macro for
+> consistency with post_ttbr0_update_workaround.
+
+In which case (and also for consistency), should we add that pre_ttbr0
+macro to entry.S, just before __uaccess_ttbr0_enable? It may not be
+needed in the SW pan case, but it is probably worth entertaining the
+idea that there may be something to do there...
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
