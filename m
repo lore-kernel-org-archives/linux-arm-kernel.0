@@ -1,22 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Jan 2017 16:24:43 +0100
-Subject: [PATCH 3/5] pinctrl: sunxi: add driver for V3s SoC
-In-Reply-To: <20170103151629.19447-4-icenowy@aosc.xyz>
-References: <20170103151629.19447-1-icenowy@aosc.xyz>
- <20170103151629.19447-4-icenowy@aosc.xyz>
-Message-ID: <CACRpkdZaAz6JBovLAYAx4mmv1PwrMeKN36ip2HM4S0u3dH2Hwg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 11 Jan 2017 15:25:09 +0000
+Subject: [PATCH] arm64: assembler: make adr_l work in modules under KASLR
+In-Reply-To: <20170111151822.GC26344@leverpostej>
+References: <1484146493-18460-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170111151822.GC26344@leverpostej>
+Message-ID: <CAKv+Gu9DxMzSTVRPdeSaJQNqe5RGjS_qzVzBU1SpGs5EZvCE1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 3, 2017 at 4:16 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
-
-> V3s SoC features only a pin controller (for the lack of CPUs part).
+On 11 January 2017 at 15:18, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Ard,
 >
-> Add a driver for this controller.
+> On Wed, Jan 11, 2017 at 02:54:53PM +0000, Ard Biesheuvel wrote:
+>> When CONFIG_RANDOMIZE_MODULE_REGION_FULL=y, the offset between loaded
+>> modules and the core kernel may exceed 4 GB, putting symbols exported
+>> by the core kernel out of the reach of the ordinary adrp/add instruction
+>> pairs used to generate relative symbol references. So make the adr_l
+>> macro emit a movz/movk sequence instead when executing in module context.
 >
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> AFAICT, we only use adr_l in a few assembly files that shouldn't matter
+> to modules:
+>
+> * arch/arm64/kernel/head.S
+> * arch/arm64/kernel/sleep.S
+> * arch/arm64/kvm/hyp-init.S
+> * arch/arm64/kvm/hyp/hyp-entry.S
+>
+> ... so I don't follow why we need this.
+>
+> Have I missed something? Or do you intend to use this in module code in
+> future?
+>
 
-Patch applied with Maxime's ACK.
+Yes. E.g., the scalar AES cipher that I am proposing for v4.11 reuses
+the lookup tables from crypto/aes_generic.c, which may be built into
+the core kernel, while the code itself may be built as a module.
 
-Yours,
-Linus Walleij
+But in general, if the macro is available to modules, I would like to
+make sure that it does not result in code that builds fine but may
+fail in some cases only at runtime, especially given the fact that
+there is also a Cortex-A53 erratum regarding adrp instructions, for
+which reason we build modules with -mcmodel=large (which amounts to
+the same thing as the patch above)
+
+> It seems somewhat surprising to me to have adr_l expand to something
+> that doesn't use adr/adrp, but that's not necessarily a problem.
+>
+
+I did realise that, but I don't think it is a problem tbh.
