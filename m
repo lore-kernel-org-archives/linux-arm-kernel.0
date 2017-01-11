@@ -1,89 +1,42 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 11 Jan 2017 23:06:30 +0800
-Subject: [PATCH v7 06/15] irqchip: gicv3-its: platform-msi: refactor
- its_pmsi_init() to prepare for ACPI
+Date: Wed, 11 Jan 2017 23:06:28 +0800
+Subject: [PATCH v7 04/15] irqchip: gic-v3-its: keep the head file include in
+ alphabetic order
 In-Reply-To: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
 References: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1484147199-4267-7-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1484147199-4267-5-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce its_pmsi_init_one() to refactor the code to isolate
-ACPI&DT common code to prepare for ACPI later.
+Rearrange header file includes to alphabetic order. As acpi_iort.h
+includes acpi.h so remove the duplidate acpi.h inclusion as well.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Tomasz Nowicki <tn@semihalf.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- drivers/irqchip/irq-gic-v3-its-platform-msi.c | 45 ++++++++++++++++-----------
- 1 file changed, 27 insertions(+), 18 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-index 3c94278..3d9efd1 100644
---- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-@@ -82,34 +82,43 @@ static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
- 	{},
- };
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 69b040f..f471939 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -15,14 +15,13 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
--static int __init its_pmsi_init(void)
-+static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
-+				const char *name)
- {
--	struct device_node *np;
- 	struct irq_domain *parent;
- 
-+	parent = irq_find_matching_fwnode(fwnode, DOMAIN_BUS_NEXUS);
-+	if (!parent || !msi_get_domain_info(parent)) {
-+		pr_err("%s: unable to locate ITS domain\n", name);
-+		return -ENXIO;
-+	}
-+
-+	if (!platform_msi_create_irq_domain(fwnode, &its_pmsi_domain_info,
-+					    parent)) {
-+		pr_err("%s: unable to create platform domain\n", name);
-+		return -ENXIO;
-+	}
-+
-+	pr_info("Platform MSI: %s domain created\n", name);
-+	return 0;
-+}
-+
-+static void __init its_pmsi_of_init(void)
-+{
-+	struct device_node *np;
-+
- 	for (np = of_find_matching_node(NULL, its_device_id); np;
- 	     np = of_find_matching_node(np, its_device_id)) {
- 		if (!of_property_read_bool(np, "msi-controller"))
- 			continue;
- 
--		parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
--		if (!parent || !msi_get_domain_info(parent)) {
--			pr_err("%s: unable to locate ITS domain\n",
--			       np->full_name);
--			continue;
--		}
--
--		if (!platform_msi_create_irq_domain(of_node_to_fwnode(np),
--						    &its_pmsi_domain_info,
--						    parent)) {
--			pr_err("%s: unable to create platform domain\n",
--			       np->full_name);
--			continue;
--		}
--
--		pr_info("Platform MSI: %s domain created\n", np->full_name);
-+		its_pmsi_init_one(of_node_to_fwnode(np), np->full_name);
- 	}
-+}
- 
-+static int __init its_pmsi_init(void)
-+{
-+	its_pmsi_of_init();
- 	return 0;
- }
- early_initcall(its_pmsi_init);
+-#include <linux/acpi.h>
++#include <linux/acpi_iort.h>
+ #include <linux/bitmap.h>
+ #include <linux/cpu.h>
+ #include <linux/delay.h>
+ #include <linux/dma-iommu.h>
+ #include <linux/interrupt.h>
+ #include <linux/irqdomain.h>
+-#include <linux/acpi_iort.h>
+ #include <linux/log2.h>
+ #include <linux/mm.h>
+ #include <linux/msi.h>
 -- 
 1.9.1
