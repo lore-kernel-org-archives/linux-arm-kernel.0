@@ -1,71 +1,86 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 10 Jan 2017 18:09:07 -0800
-Subject: [PATCH 53/62] watchdog: st_lpc_wdt: Convert to use device managed
- functions
+Date: Tue, 10 Jan 2017 18:09:09 -0800
+Subject: [PATCH 55/62] watchdog: sunxi_wdt: Convert to use device managed
+ functions and other improvements
 In-Reply-To: <1484100561-17638-1-git-send-email-linux@roeck-us.net>
 References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
  <1484100561-17638-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1484100561-17638-2-git-send-email-linux@roeck-us.net>
+Message-ID: <1484100561-17638-4-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use device managed functions to simplify error handling, reduce
 source code size, improve readability, and reduce the likelyhood of bugs.
+Other improvements as listed below.
 
 The conversion was done automatically with coccinelle using the
 following semantic patches. The semantic patches and the scripts used
 to generate this commit log are available at
 https://github.com/groeck/coccinelle-patches
 
-- Use devm_add_action_or_reset() for calls to clk_disable_unprepare
+- Drop assignments to otherwise unused variables
+- Drop remove function
+- Drop platform_set_drvdata()
 - Use devm_watchdog_register_driver() to register watchdog device
+- Replace shutdown function with call to watchdog_stop_on_reboot()
 
-Cc: Patrice Chotard <patrice.chotard@st.com>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- drivers/watchdog/st_lpc_wdt.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ drivers/watchdog/sunxi_wdt.c | 24 ++----------------------
+ 1 file changed, 2 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/watchdog/st_lpc_wdt.c b/drivers/watchdog/st_lpc_wdt.c
-index e6100e447dd8..d561fbf1df85 100644
---- a/drivers/watchdog/st_lpc_wdt.c
-+++ b/drivers/watchdog/st_lpc_wdt.c
-@@ -215,6 +215,11 @@ static int st_wdog_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "Unable to enable clock\n");
- 		return ret;
- 	}
-+	ret = devm_add_action_or_reset(&pdev->dev,
-+				       (void(*)(void *))clk_disable_unprepare,
-+				       clk);
-+	if (ret)
-+		return ret;
+diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
+index 953bb7b7446f..9728fa32c357 100644
+--- a/drivers/watchdog/sunxi_wdt.c
++++ b/drivers/watchdog/sunxi_wdt.c
+@@ -242,8 +242,6 @@ static int sunxi_wdt_probe(struct platform_device *pdev)
+ 	if (!sunxi_wdt)
+ 		return -EINVAL;
  
- 	watchdog_set_drvdata(&st_wdog_dev, st_wdog);
- 	watchdog_set_nowayout(&st_wdog_dev, WATCHDOG_NOWAYOUT);
-@@ -223,14 +228,12 @@ static int st_wdog_probe(struct platform_device *pdev)
- 	ret = watchdog_init_timeout(&st_wdog_dev, 0, &pdev->dev);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Unable to initialise watchdog timeout\n");
--		clk_disable_unprepare(clk);
- 		return ret;
- 	}
+-	platform_set_drvdata(pdev, sunxi_wdt);
+-
+ 	device = of_match_device(sunxi_wdt_dt_ids, &pdev->dev);
+ 	if (!device)
+ 		return -ENODEV;
+@@ -270,7 +268,8 @@ static int sunxi_wdt_probe(struct platform_device *pdev)
  
--	ret = watchdog_register_device(&st_wdog_dev);
-+	ret = devm_watchdog_register_device(&pdev->dev, &st_wdog_dev);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Unable to register watchdog\n");
--		clk_disable_unprepare(clk);
- 		return ret;
- 	}
+ 	sunxi_wdt_stop(&sunxi_wdt->wdt_dev);
  
-@@ -247,8 +250,6 @@ static int st_wdog_remove(struct platform_device *pdev)
- 	struct st_wdog *st_wdog = watchdog_get_drvdata(&st_wdog_dev);
+-	err = watchdog_register_device(&sunxi_wdt->wdt_dev);
++	watchdog_stop_on_reboot(&sunxi_wdt->wdt_dev);
++	err = devm_watchdog_register_device(&pdev->dev, &sunxi_wdt->wdt_dev);
+ 	if (unlikely(err))
+ 		return err;
  
- 	st_wdog_setup(st_wdog, false);
--	watchdog_unregister_device(&st_wdog_dev);
--	clk_disable_unprepare(st_wdog->clk);
- 
+@@ -280,27 +279,8 @@ static int sunxi_wdt_probe(struct platform_device *pdev)
  	return 0;
  }
+ 
+-static int sunxi_wdt_remove(struct platform_device *pdev)
+-{
+-	struct sunxi_wdt_dev *sunxi_wdt = platform_get_drvdata(pdev);
+-
+-	watchdog_unregister_device(&sunxi_wdt->wdt_dev);
+-	watchdog_set_drvdata(&sunxi_wdt->wdt_dev, NULL);
+-
+-	return 0;
+-}
+-
+-static void sunxi_wdt_shutdown(struct platform_device *pdev)
+-{
+-	struct sunxi_wdt_dev *sunxi_wdt = platform_get_drvdata(pdev);
+-
+-	sunxi_wdt_stop(&sunxi_wdt->wdt_dev);
+-}
+-
+ static struct platform_driver sunxi_wdt_driver = {
+ 	.probe		= sunxi_wdt_probe,
+-	.remove		= sunxi_wdt_remove,
+-	.shutdown	= sunxi_wdt_shutdown,
+ 	.driver		= {
+ 		.name		= DRV_NAME,
+ 		.of_match_table	= sunxi_wdt_dt_ids,
 -- 
 2.7.4
