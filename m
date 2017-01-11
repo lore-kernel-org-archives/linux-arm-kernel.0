@@ -1,43 +1,49 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 11 Jan 2017 17:01:53 +0000
-Subject: [PATCH v2 0/5] ARM: add module autoloading support for crypto modules
-Message-ID: <1484154118-22139-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Wed, 11 Jan 2017 17:01:57 +0000
+Subject: [PATCH v2 4/5] crypto: arm/sha1-ce - enable module autoloading based
+ on CPU feature bits
+In-Reply-To: <1484154118-22139-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1484154118-22139-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1484154118-22139-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series wires up the crypto modules that use the ARM 32-bit versions of
-the ARMv8 Crypto Extensions to udev autoloading, by exposing the HWCAP2
-feature bits via the CPU modalias. This is very similar to the arm64
-implementation, with the notable exception that ARM has its CPU feature
-definitions split across HWCAP and HWCAP2.
+Make the module autoloadable by tying it to the CPU feature bit that
+describes whether the optional instructions it relies on are implemented
+by the current CPU.
 
-Given that the crypto feature bits are all exposed via HWCAP2, and considering
-that there are currently no features exposed via HWCAP that are relevant to
-udev module autoloading, exposing HWCAP2 only should be sufficient, at least
-for now.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/crypto/sha1-ce-glue.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-Changes since v1:
-- rebase onto v4.10-rc2
-
-Ard Biesheuvel (5):
-  ARM: wire up HWCAP2 feature bits to the CPU modalias
-  crypto: arm/aes-ce - enable module autoloading based on CPU feature
-    bits
-  crypto: arm/ghash-ce - enable module autoloading based on CPU feature
-    bits
-  crypto: arm/sha1-ce - enable module autoloading based on CPU feature
-    bits
-  crypto: arm/sha2-ce - enable module autoloading based on CPU feature
-    bits
-
- arch/arm/Kconfig                  |  1 +
- arch/arm/crypto/aes-ce-glue.c     |  6 ++--
- arch/arm/crypto/ghash-ce-glue.c   |  6 ++--
- arch/arm/crypto/sha1-ce-glue.c    |  5 ++-
- arch/arm/crypto/sha2-ce-glue.c    |  5 ++-
- arch/arm/include/asm/cpufeature.h | 32 ++++++++++++++++++++
- 6 files changed, 41 insertions(+), 14 deletions(-)
- create mode 100644 arch/arm/include/asm/cpufeature.h
-
+diff --git a/arch/arm/crypto/sha1-ce-glue.c b/arch/arm/crypto/sha1-ce-glue.c
+index 80bc2fcd241a..555f72b5e659 100644
+--- a/arch/arm/crypto/sha1-ce-glue.c
++++ b/arch/arm/crypto/sha1-ce-glue.c
+@@ -11,6 +11,7 @@
+ #include <crypto/internal/hash.h>
+ #include <crypto/sha.h>
+ #include <crypto/sha1_base.h>
++#include <linux/cpufeature.h>
+ #include <linux/crypto.h>
+ #include <linux/module.h>
+ 
+@@ -82,8 +83,6 @@ static struct shash_alg alg = {
+ 
+ static int __init sha1_ce_mod_init(void)
+ {
+-	if (!(elf_hwcap2 & HWCAP2_SHA1))
+-		return -ENODEV;
+ 	return crypto_register_shash(&alg);
+ }
+ 
+@@ -92,5 +91,5 @@ static void __exit sha1_ce_mod_fini(void)
+ 	crypto_unregister_shash(&alg);
+ }
+ 
+-module_init(sha1_ce_mod_init);
++module_cpu_feature_match(SHA1, sha1_ce_mod_init);
+ module_exit(sha1_ce_mod_fini);
 -- 
 2.7.4
