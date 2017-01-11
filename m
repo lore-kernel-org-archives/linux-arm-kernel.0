@@ -1,54 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Jan 2017 14:50:19 +0100
-Subject: [PATCH 1/2] crypto: mediatek - remove ARM dependencies
-Message-ID: <20170111135104.3961730-1-arnd@arndb.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 11 Jan 2017 14:51:39 +0100
+Subject: [PATCH 0/3] arm64: dts: A64 board MMC support
+In-Reply-To: <1484011353-21480-1-git-send-email-andre.przywara@arm.com>
+References: <1484011353-21480-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <20170111135139.ktirdwmzhyv3cn2q@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building the mediatek driver on an older ARM architecture results in a
-harmless warning:
+Hi,
 
-warning: (ARCH_OMAP2PLUS_TYPICAL && CRYPTO_DEV_MEDIATEK) selects NEON which has unmet direct dependencies (VFPv3 && CPU_V7)
+On Tue, Jan 10, 2017 at 01:22:30AM +0000, Andre Przywara wrote:
+> These patches here go on top of Maxime's latest A64 MMC series and
+> enable the MMC controllers on the boards using the A64 SoC.
+> As the BananaPi-M64 DT now looks different, lets adds support for
+> that board as well, with one major difference to the Pine64 being the eMMC
+> chip.
+> 
+> I could't find commit f9ca9b952ee1 Maxime mentioned in his cover letter,
+> so I applied his patches on top of sunxi/for-next and cherry-picked
+> b4b8664d29 to fix the arm64 build.
 
-We could add an explicit dependency on CPU_V7, but it seems nicer to
-open up the build to additional configurations. This replaces the ARM
-optimized algorithm selection with the normal one that all other drivers
-use, and that in turn lets us relax the dependency on ARM and drop
-a number of the unrelated 'select' statements.
+I'm fine with all your patches. I've queued them in my MMC series, and
+will continue pushing them and / or merging them if it's ok for you.
 
-Obviously a real user would still select those other optimized drivers
-as a fallback, but as there is no strict dependency, we can leave that
-up to the user.
+Thanks!
+Maxime
 
-Fixes: 785e5c616c84 ("crypto: mediatek - Add crypto driver support for some MediaTek chips")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/crypto/Kconfig | 11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-index 8ded3af88b16..9d37ae07b4ce 100644
---- a/drivers/crypto/Kconfig
-+++ b/drivers/crypto/Kconfig
-@@ -555,15 +555,12 @@ config CRYPTO_DEV_ROCKCHIP
- 
- config CRYPTO_DEV_MEDIATEK
- 	tristate "MediaTek's EIP97 Cryptographic Engine driver"
--	depends on ARM && (ARCH_MEDIATEK || COMPILE_TEST)
--	select NEON
--	select KERNEL_MODE_NEON
--	select ARM_CRYPTO
-+	depends on (ARM && ARCH_MEDIATEK) || COMPILE_TEST
- 	select CRYPTO_AES
- 	select CRYPTO_BLKCIPHER
--	select CRYPTO_SHA1_ARM_NEON
--	select CRYPTO_SHA256_ARM
--	select CRYPTO_SHA512_ARM
-+	select CRYPTO_SHA1
-+	select CRYPTO_SHA256
-+	select CRYPTO_SHA512
- 	select CRYPTO_HMAC
- 	help
- 	  This driver allows you to utilize the hardware crypto accelerator
 -- 
-2.9.0
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170111/753e0bee/attachment.sig>
