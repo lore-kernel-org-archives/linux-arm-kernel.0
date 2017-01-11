@@ -1,92 +1,29 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Wed, 11 Jan 2017 14:33:26 -0600
-Subject: [PATCH 4/4] ARM: dts: sun8i: add OTG function to Lichee Pi Zero
-In-Reply-To: <418251484165614@web21h.yandex.ru>
-References: <20170103152534.20118-1-icenowy@aosc.xyz>
- <20170103152534.20118-5-icenowy@aosc.xyz>
- <20170110202443.GC2479@uda0271908>
- <2733831484164533@web1g.yandex.ru>
- <20170111200811.GA16865@uda0271908>
- <418251484165614@web21h.yandex.ru>
-Message-ID: <20170111203326.GB16865@uda0271908>
+From: mike.leach@linaro.org (Mike Leach)
+Date: Wed, 11 Jan 2017 20:44:07 +0000
+Subject: [PATCH v2 0/2] arm64: dts: juno: Updates for juno r1/r2 boards
+Message-ID: <1484167449-14432-1-git-send-email-mike.leach@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 04:13:34AM +0800, Icenowy Zheng wrote:
-> 
-> 
-> 12.01.2017, 04:08, "Bin Liu" <b-liu@ti.com>:
-> > On Thu, Jan 12, 2017 at 03:55:33AM +0800, Icenowy Zheng wrote:
-> >> ?11.01.2017, 04:24, "Bin Liu" <b-liu@ti.com>:
-> >> ?> On Tue, Jan 03, 2017 at 11:25:34PM +0800, Icenowy Zheng wrote:
-> >> ?>> ?Lichee Pi Zero features a USB OTG port.
-> >> ?>>
-> >> ?>> ?Add support for it.
-> >> ?>>
-> >> ?>> ?Note: in order to use the Host mode, the board must be powered via the
-> >> ?>> ?+5V and GND pins.
-> >> ?>>
-> >> ?>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> >> ?>> ?---
-> >> ?>> ??arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 10 ++++++++++
-> >> ?>> ??1 file changed, 10 insertions(+)
-> >> ?>>
-> >> ?>> ?diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-> >> ?>> ?index 0099affc6ce3..3d9168cbaeca 100644
-> >> ?>> ?--- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-> >> ?>> ?+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-> >> ?>> ?@@ -71,3 +71,13 @@
-> >> ?>> ??????????pinctrl-names = "default";
-> >> ?>> ??????????status = "okay";
-> >> ?>> ??};
-> >> ?>> ?+
-> >> ?>> ?+&usb_otg {
-> >> ?>> ?+ dr_mode = "otg";
-> >> ?>
-> >> ?> Why not set this default mode in dtsi instead?
-> >> ?>
-> >> ?> Regards,
-> >> ?> -Bin.
-> >>
-> >> ?There's possibly boards which do not have OTG functions.
-> >
-> > That is board specific.
-> >
-> > You'd better to define the default dr_mode which the musb _controller_
-> > supports in the dtsi, and then override it in a specific board dts if
-> > necessary.
-> 
-> Is there MUSB controllers which do not support a certain mode?
+Juno r1/r2 boards have different CoreSight infrastructure outside the
+clusters. This patchset moves the none cluster CoreSight to separate
+.dtsi files to allow for these differences.
 
-I am not aware of any. That is why I recommended to set "otg" in dtsi,
-then override it in board dts if a port is specically designed to
-host-only or device-only mode.
+v2 moves the Addition of the STM component into a separate patch.
 
-> 
-> (I remembered my omap3-n900 which do not work under OTG mode...)
+Mike Leach (2):
+  arm64: dts: juno: Fix CoreSight support for Juno r1/r2 variants
+  arm64: dts: juno: Adds missing CoreSight STM component.
 
-I belive it is n900 board specific. omap3 itself doesn't have such
-limitation, AFAIK.
+ arch/arm64/boot/dts/arm/juno-base.dtsi    | 135 ---------------
+ arch/arm64/boot/dts/arm/juno-cs-r0.dtsi   | 166 +++++++++++++++++++
+ arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 266 ++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/arm/juno-r1.dts       |   1 +
+ arch/arm64/boot/dts/arm/juno-r2.dts       |   1 +
+ arch/arm64/boot/dts/arm/juno.dts          |   1 +
+ 6 files changed, 435 insertions(+), 135 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r0.dtsi
+ create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
 
-Regards,
--Bin.
-
-> 
-> >
-> > Regards,
-> > -Bin.
-> >
-> >> ?Even the official CDR design of V3s uses the USB controller to
-> >> ?connect a UVC webcam to make the design a dual-cam design
-> >> ?(V3s itself has a CSI).
-> >>
-> >> ?>
-> >> ?>> ?+ status = "okay";
-> >> ?>> ?+};
-> >> ?>> ?+
-> >> ?>> ?+&usbphy {
-> >> ?>> ?+ usb0_id_det-gpio = <&pio 5 6 GPIO_ACTIVE_HIGH>;
-> >> ?>> ?+ status = "okay";
-> >> ?>> ?+};
-> >> ?>> ?--
-> >> ?>> ?2.11.0
+-- 
+2.7.4
