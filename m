@@ -1,47 +1,39 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Wed, 11 Jan 2017 08:13:38 +0530
-Subject: [PATCH] usb: dwc3-exynos fix unspecified suspend clk error
- handling
-In-Reply-To: <20170110182552.coom4p6dpdqo2ljv@kozik-lap>
-References: <20170110022131.31042-1-shuahkh@osg.samsung.com>
- <8784459.rxWqZlDLVg@amdc3058>
- <28815306-e220-4847-99ce-b058baae0d07@osg.samsung.com>
- <CGME20170110170942epcas1p3decee28366d7d42b70e7b0669b97326f@epcas1p3.samsung.com>
- <5156028.4V9iLD3Qkj@amdc3058> <20170110182552.coom4p6dpdqo2ljv@kozik-lap>
-Message-ID: <f32657c2-a0b7-b84c-e5d6-eb33f7705880@samsung.com>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Wed, 11 Jan 2017 13:58:28 +0800
+Subject: [PATCH] arm64: hugetlb: fix the wrong return value for
+ huge_ptep_set_access_flags
+Message-ID: <1484114308-6068-1-git-send-email-shijie.huang@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+In current code, the @changed always returns the last one's
+status for the huge page with the contiguous bit set.
+This is really not what we want. Even one of the PTEs is changed,
+we should tell it to the caller.
 
-On Tuesday 10 January 2017 11:55 PM, Krzysztof Kozlowski wrote:
-> On Tue, Jan 10, 2017 at 06:09:40PM +0100, Bartlomiej Zolnierkiewicz wrote:
->> BTW What is interesting is that the Exynos7 dts patch [2] has never
->> made it into upstream for some reason.  In the meantime however
->> Exynos5433 (similar to Exynos7 to some degree) became the user of
->> susp_clk.
->>
->> [1] https://lkml.org/lkml/2014/11/21/247
->> [2] https://patchwork.kernel.org/patch/5355161/
->>
-> 
-> +Cc Alim and Pankaj,
-> 
-> Anyone would like to resend [2] after rebasing and testing? Interrupt
-> flags would have to be fixed and status=disabled added.
-> 
+This patch fixes this issue.
 
-Thanks for looping us into this thread.
+Fixes: 66b3923a1a0f ("arm64: hugetlb: add support for PTE contiguous bit")
+Cc: stable at vger.kernel.org
+Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+---
+ arch/arm64/mm/hugetlbpage.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Well I will be taking care of Exynos USB as Vivek has left Samsung.
-I am currently working on adding Exynos7 USB support, as soon as patches
-are ready for posting will post them. Will take care of review comments
-given for Vivek's patchset [1].
+diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+index 964b7549af5c..e25584d72396 100644
+--- a/arch/arm64/mm/hugetlbpage.c
++++ b/arch/arm64/mm/hugetlbpage.c
+@@ -239,7 +239,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+                ncontig = find_num_contig(vma->vm_mm, addr, cpte,
+                                          *cpte, &pgsize);
+                for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize) {
+-                       changed = ptep_set_access_flags(vma, addr, cpte,
++                       changed |= ptep_set_access_flags(vma, addr, cpte,
+                                                        pfn_pte(pfn,
+                                                                hugeprot),
+                                                        dirty);
+--
+2.5.5
 
-Thanks,
-Pankaj Dubey
-
-> Best regards,
-> Krzysztof
-> 
-> 
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
