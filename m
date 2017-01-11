@@ -1,44 +1,36 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 11 Jan 2017 16:42:00 +0100
-Subject: [PATCH v8 2/5] i2c: Add STM32F4 I2C driver
-In-Reply-To: <CAOAejn2cDzPgqvWZf7ASvtST+aDeaAebf=1aMWA9Zd8CDg4pmA@mail.gmail.com>
-References: <1483607246-14771-1-git-send-email-cedric.madianga@gmail.com>
- <1483607246-14771-3-git-send-email-cedric.madianga@gmail.com>
- <20170111082208.vzu7xgpd4eakyldl@pengutronix.de>
- <CAOAejn2eOy2sn1VkE979ne23Sj9L6+kaQDNpL1EUKb2m=6sGXw@mail.gmail.com>
- <CAOAejn2cDzPgqvWZf7ASvtST+aDeaAebf=1aMWA9Zd8CDg4pmA@mail.gmail.com>
-Message-ID: <20170111154200.xcxdlnnakyttumzw@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 11 Jan 2017 16:47:46 +0100
+Subject: [PATCH] gpio: mvebu: fix warning when building on 64-bit
+In-Reply-To: <E1cR5IG-0008Gw-HV@rmk-PC.armlinux.org.uk>
+References: <E1cR5IG-0008Gw-HV@rmk-PC.armlinux.org.uk>
+Message-ID: <CACRpkdZ_LciV5a5Sj+YfGtfws2hvdSjscx0tu4=1RNYTXWU4gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Cedric,
+On Tue, Jan 10, 2017 at 11:53 PM, Russell King
+<rmk+kernel@armlinux.org.uk> wrote:
 
-On Wed, Jan 11, 2017 at 03:20:41PM +0100, M'boumba Cedric Madianga wrote:
-> >
-> >> +              */
-> >> +             reg = i2c_dev->base + STM32F4_I2C_CR1;
-> >> +             stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR1_ACK);
-> >> +             stm32f4_i2c_set_bits(reg, STM32F4_I2C_CR1_POS);
-> >
-> > You could get rid of this, when caching the value of CR1. Would save two
-> > register reads here. This doesn't work for all registers, but it should
-> > be possible to apply for most of them, maybe enough to get rid of the
-> > clr_bits and set_bits function.
-> 
-> I agree at many places I could save registers read by not using
-> clr_bits and set_bits function when the registers in question has been
-> already read.
-> But it is not enough to get rid of the clr_bits and set_bits function.
-> For example when calling stm32f4_i2c_terminate_xfer(), the CR1
-> register is never read before so set_bits function is useful.
+> Casting a pointer to an int is not portable, and provokes a compiler
+> warning.  Cast to unsigned long instead to avoid the warning.
+>
+> drivers/gpio/gpio-mvebu.c: In function 'mvebu_gpio_probe':
+> drivers/gpio/gpio-mvebu.c:662:17: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+>    soc_variant = (int) match->data;
+>                  ^
+>
+> This will be needed when building gpio-mvebu for Armada 7k/8k ARM64
+> SoCs.
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+> Linus,
+>
+> I don't think this is necessary to push into -rc, as its not yet used
+> on ARM64 - GPIO support is not yet present in the DTS files, and the
+> Kconfig doesn't allow the driver to be built on ARM64.  Hence, please
+> queue for the next merge window as a low priority fix.
 
-I didn't double check the manual, but I would expect that CR1 isn't
-modified by hardware. So you can cache the result in the driver data
-structure and do the necessary modifications with that one.
+Fair enough, queued for next. Thanks!
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Yours,
+Linus Walleij
