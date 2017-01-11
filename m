@@ -1,144 +1,80 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 11 Jan 2017 09:51:10 -0800
-Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device
- managed functions
-In-Reply-To: <f7d9227c-4912-5c52-5ba7-ae7fa3b89857@sigmadesigns.com>
-References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
- <1484100561-17638-1-git-send-email-linux@roeck-us.net>
- <1484100561-17638-5-git-send-email-linux@roeck-us.net>
- <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
- <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
- <a45ed205-7c1b-a298-50c0-fc8b80a846c5@sigmadesigns.com>
- <a61eb838-4167-3032-bde8-3a8845b780f8@roeck-us.net>
- <f7d9227c-4912-5c52-5ba7-ae7fa3b89857@sigmadesigns.com>
-Message-ID: <20170111175110.GB22289@roeck-us.net>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 Jan 2017 17:56:49 +0000
+Subject: [RFC PATCH 1/2] ARM: vfp - allow kernel mode NEON in softirq
+ context
+In-Reply-To: <1483991849-32448-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1483991849-32448-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1483991849-32448-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170111175649.GK14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 04:28:12PM +0100, Marc Gonzalez wrote:
-> On 11/01/2017 15:25, Guenter Roeck wrote:
-> > On 01/11/2017 04:31 AM, Marc Gonzalez wrote:
-> >> On 11/01/2017 11:52, Guenter Roeck wrote:
-> >>
-> >>> On 01/11/2017 01:07 AM, Marc Gonzalez wrote:
-> >>>
-> >>>>> @@ -134,12 +134,15 @@ static int tangox_wdt_probe(struct platform_device *pdev)
-> >>>>>  	err = clk_prepare_enable(dev->clk);
-> >>>>>  	if (err)
-> >>>>>  		return err;
-> >>>>> +	err = devm_add_action_or_reset(&pdev->dev,
-> >>>>> +				       (void(*)(void *))clk_disable_unprepare,
-> >>>>> +				       dev->clk);
-> >>>>> +	if (err)
-> >>>>> +		return err;
-> >>>>
-> >>>> Hello Guenter,
-> >>>>
-> >>>> I would rather avoid the function pointer cast.
-> >>>> How about defining an auxiliary function for the cleanup action?
-> >>>>
-> >>>> clk_disable_unprepare() is static inline, so gcc will have to
-> >>>> define an auxiliary function either way. What do you think?
-> >>>
-> >>> Not really. It would just make it more complicated to replace the
-> >>> call with devm_clk_prepare_enable(), should it ever find its way
-> >>> into the light of day.
-> >>
-> >> More complicated, because the cleanup function will have to be deleted later?
-> >> The compiler will warn if someone forgets to do that.
-> >>
-> >> In my opinion, it's not a good idea to rely on the fact that casting
-> >> void(*)(struct clk *clk) to void(*)(void *) is likely to work as expected
-> >> on most platforms. (It has undefined behavior, strictly speaking.)
-> >
-> > I do hear that you object to this code.
-> > 
-> > However, I must admit that you completely lost me here. It is a cast from
-> > one function pointer to another,
-> 
-> Perhaps you are used to work at the assembly level, where pointers are
-> just addresses, and all pointers are interchangeable.
-> 
-> At a slightly higher level (C abstract machine), it is not so.
-> 
-> > passed as argument to another function,
-> > with a secondary cast of its argument from a typed pointer to a void pointer.
-> > I don't think C permits for "undefined behavior, strictly speaking".
-> 
-> The C standard leaves quite a lot of behavior undefined, e.g.
-> 
-> char *foo = "hello";
-> foo[1] = 'a'; // UB
-> 
-> char buf[4];
-> *(int *)&buf = 0xdeadbeef; // UB
-> 
-> 1 << 64; // UB
-> 
-Ah, yes, I stand corrected.
+On Mon, Jan 09, 2017 at 07:57:28PM +0000, Ard Biesheuvel wrote:
+> This updates the kernel mode NEON handling to allow the NEON to be used
+> in softirq context as well as process context. This involves disabling
+> softirq processing when the NEON is used in kernel mode in process context,
+> and dealing with the situation where 'current' is not the owner of the
+> userland context that is present in the NEON register file when the NEON
+> is enabled in kernel mode.
 
-However, some other unrelated undefined behavior does not mean that this
-specific behavior is undefined.
+I really don't like this idea as-is.
 
-So far we have a claim that a cast to a void * may somehow be different
-to a cast to a different pointer, if used as function argument, and that
-the behavior with such a cast may be undefined. In other words, you claim
-that a function implemented as, say,
+We have cases where kernel code accesses VFP to (eg) save or restore
+register state, such as during signal handling.  We assume that this
+will not be interrupted by another user, and that if we enable access
+to the VFP, it will stay enabled.  If it gets disabled beneath us, then
+things won't go well.
 
-   void func(int *var) {}
+For example, consider vfp_sync_hwstate():
 
-might result in undefined behavior if some header file declares it as
+vfp_sync_hwstate()
+  vfp_state_in_hw() => true
+    fpexc read
+	softirq happens
+		kernel_neon_begin()
+		kernel_neon_end()
+    fpexc re-enabled
+    current register state saved out (corrupting what was there)
+    fpexc restored, possible in an enabled state
 
-    void func(void *);
+Or we could have:
 
-and it is called as
+vfp_sync_hwstate()
+  vfp_state_in_hw() => true
+	softirq happens
+		kernel_neon_begin()
+		kernel_neon_end()
+    fpexc read
+    fpexc re-enabled
+    current register state saved out (corrupting what was there)
+    fpexc disabled
 
-    int var;
+Or worse:
 
-    func(&var);
+vfp_sync_hwstate()
+  vfp_state_in_hw() => true
+    fpexc read
+    fpexc re-enabled
+	softirq happens
+		kernel_neon_begin()
+		kernel_neon_end()
+    current register state saved out, blowing up because VFP is
+     unexpectedly disabled
 
-That seems really far fetched to me.
+So we would need to disable softirqs around every sensitive point in the
+VFP support code, and over all VFP instruction emulations for those VFPs
+which bounce "difficult" operations to the kernel support code.
 
-I do get the message that you do not like this kind of cast. But that doesn't
-mean it is not correct.
+> The rationale for this change is that the NEON is shared with the ARMv8
+> Crypto Extensions (which are also defined for the AArch32 execution state),
+> which can give a huge performance boost (15x) to use cases like mac80211
+> CCMP processing, which executes in softirq context.
 
-> > Besides, that same mechanism is already used elsewhere, which is how I
-> > got the idea. Are you claiming that there are situations where it won't
-> > work ?
-> 
-> If this technique is already used elsewhere in the kernel, then I'll
-> crawl back under my rock (and weep).
-> 
+I think, once the implementation is more correct, this would need to
+be re-evaluated, and I'd also like other more general performance
+measurements as well (eg, latency.)
 
-git grep "(void(\*)(void \*))"
-
-and variants thereof:
-
-git grep "(void(\*)"
-
-> I can see two issues with the code you propose.
-> 
-> First is the same for all casts: silencing potential warnings,
-> e.g. if the prototype of clk_disable_unprepare ever changed.
-> (Though casts are required for vararg function arguments.)
-> 
-Understood. However, one should really hope that anyone changing
-an API has a look at all its callers and does not just pray that
-there are no problems.
-
-> Second is just theory and not a real-world concern.
-> 
-> >> Do you really dislike the portable solution I suggested? :-(
-> >
-> > It is not more portable than the above. It is more expensive and adds more
-> > code.
-> 
-> Maybe I am mistaken. Can you tell me why adding an auxiliary function
-> is more expensive? (In CPU cycles?)
-> 
-In terms of code required. The idea here is to simplify the code, not
-to make it more complex. The auxiliary function needs to be declared
-and maintained in each affected file. I do find it easier and better
-(and safer, for that matter) to let the C compiler handle it.
-
-Guenter
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
