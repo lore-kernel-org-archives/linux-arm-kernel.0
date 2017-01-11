@@ -1,52 +1,118 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 11 Jan 2017 15:15:20 -0600
-Subject: [PATCH] Documentation: dt: reset: Revise typos in TI syscon
- reset example
-In-Reply-To: <20170109192814.26811-1-s-anna@ti.com>
-References: <20170109192814.26811-1-s-anna@ti.com>
-Message-ID: <20170111211520.w3sy5pkvjydiwvcs@rob-hp-laptop>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 11 Jan 2017 22:17:58 +0100
+Subject: [PATCH v2 1/6] mmc: sunxi: Always set signal delay to 0 for A64
+In-Reply-To: <96ba5fd8-d551-5993-f347-202c47efec8c@arm.com>
+References: <cover.493dc67855a5f1837e875d37307319a03d14d1d0.1483980339.git-series.maxime.ripard@free-electrons.com>
+ <5eff19eec2b110bb643a38e7fef221208f585589.1483980339.git-series.maxime.ripard@free-electrons.com>
+ <96ba5fd8-d551-5993-f347-202c47efec8c@arm.com>
+Message-ID: <20170111211758.wt24lx5b63rgujia@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 01:28:14PM -0600, Suman Anna wrote:
-> Fix couple of typos in the example given in the TI syscon reset
-> binding. The ti,reset-bits used for DSP0 are corrected to match
-> the values that will be used in the actual DT node.
+On Tue, Jan 10, 2017 at 12:30:41AM +0000, Andr? Przywara wrote:
+> On 09/01/17 16:46, Maxime Ripard wrote:
+> > Experience have shown that the using the  autocalibration could severely
+> > degrade the performances of the MMC bus.
+> > 
+> > Allwinner is using in its BSP a delay set to 0 for all the modes but HS400.
+> > Remove the calibration code for now, and add comments to document our
+> > findings.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/mmc/host/sunxi-mmc.c | 50 ++++++++++++-------------------------
+> >  1 file changed, 17 insertions(+), 33 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> > index b1d1303389a7..ea9552a0d820 100644
+> > --- a/drivers/mmc/host/sunxi-mmc.c
+> > +++ b/drivers/mmc/host/sunxi-mmc.c
+> > @@ -683,41 +683,19 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+> >  
+> >  static int sunxi_mmc_calibrate(struct sunxi_mmc_host *host, int reg_off)
+> >  {
+> > -	u32 reg = readl(host->reg_base + reg_off);
+> > -	u32 delay;
+> > -	unsigned long timeout;
+> > -
+> >  	if (!host->cfg->can_calibrate)
+> >  		return 0;
+> >  
+> > -	reg &= ~(SDXC_CAL_DL_MASK << SDXC_CAL_DL_SW_SHIFT);
+> > -	reg &= ~SDXC_CAL_DL_SW_EN;
+> > -
+> > -	writel(reg | SDXC_CAL_START, host->reg_base + reg_off);
+> > -
+> > -	dev_dbg(mmc_dev(host->mmc), "calibration started\n");
+> > -
+> > -	timeout = jiffies + HZ * SDXC_CAL_TIMEOUT;
+> > -
+> > -	while (!((reg = readl(host->reg_base + reg_off)) & SDXC_CAL_DONE)) {
+> > -		if (time_before(jiffies, timeout))
+> > -			cpu_relax();
+> > -		else {
+> > -			reg &= ~SDXC_CAL_START;
+> > -			writel(reg, host->reg_base + reg_off);
+> > -
+> > -			return -ETIMEDOUT;
+> > -		}
+> > -	}
+> > -
+> > -	delay = (reg >> SDXC_CAL_DL_SHIFT) & SDXC_CAL_DL_MASK;
+> > -
+> > -	reg &= ~SDXC_CAL_START;
+> > -	reg |= (delay << SDXC_CAL_DL_SW_SHIFT) | SDXC_CAL_DL_SW_EN;
+> > -
+> > -	writel(reg, host->reg_base + reg_off);
+> > -
+> > -	dev_dbg(mmc_dev(host->mmc), "calibration ended, reg is 0x%x\n", reg);
+> > +	/*
+> > +	 * FIXME:
+> > +	 * This is not clear how the calibration is supposed to work
+> > +	 * yet. The best rate have been obtained by simply setting the
+> > +	 * delay to 0, as Allwinner does in its BSP.
+> > +	 *
+> > +	 * The only mode that doesn't have such a delay is HS400, that
+> > +	 * is in itself a TODO.
+> > +	 */
+> > +	writel(SDXC_CAL_DL_SW_EN, host->reg_base + reg_off);
+> >  
+> >  	return 0;
+> >  }
+> > @@ -806,7 +784,13 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+> >  	if (ret)
+> >  		return ret;
+> >  
+> > -	/* TODO: enable calibrate on sdc2 SDXC_REG_DS_DL_REG of A64 */
+> > +	/*
+> > +	 * FIXME:
+> > +	 *
+> > +	 * In HS400 we'll also need to calibrate the data strobe
+> > +	 * signal. This should only happen on the MMC2 controller (at
+> > +	 * least on the A64 and older SoCs).
 > 
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> ---
-> Hi Philipp,
-> 
-> This is the Documentation part fix that goes along with
-> the ti-syscon-reset fix that you have on your next branch.
-> I will be submitting the DT nodes very soon
-> 
-> regards
-> Suman
-> 
->  Documentation/devicetree/bindings/reset/ti-syscon-reset.txt | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt b/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
-> index 164c7f34c451..21ba739b162e 100644
-> --- a/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
-> +++ b/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
-> @@ -63,7 +63,7 @@ Example:
->  --------
->  The following example demonstrates a syscon node, the reset controller node
->  using the syscon node, and a consumer (a DSP device) on the TI Keystone 2
-> -Edison SoC.
-> +66AK2E SoC.
->  
->  / {
->  	soc {
-> @@ -71,13 +71,13 @@ Edison SoC.
->  			compatible = "syscon", "simple-mfd";
->  			reg = <0x02350000 0x1000>;
->  
-> -			pscrst: psc-reset {
-> +			pscrst: psc-reset-controller {
+> Which older SoCs have this calibration register and a DS signal?
+> Is that supposed to mean "other" SoCs?
 
-Really, this should be just 'reset-controller'.
+That was supposed to mean that newer (than A64) SoCs might have that
+calibration on other controllers than MMC2. But you're right that it
+actually applies only to A64 anyway, I'll remove the and older part.
 
-Rob
+> Other than that:
+> 
+> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170111/1c8767ce/attachment.sig>
