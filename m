@@ -1,162 +1,124 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Wed, 11 Jan 2017 16:31:57 -0600
-Subject: [Patch v3 1/2] arm: kernel: Add SMC structure parameter
+Date: Wed, 11 Jan 2017 16:31:58 -0600
+Subject: [Patch v3 2/2] firmware: qcom: scm: Fix interrupted SCM calls
 In-Reply-To: <1484173918-25090-1-git-send-email-andy.gross@linaro.org>
 References: <1484173918-25090-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <1484173918-25090-2-git-send-email-andy.gross@linaro.org>
+Message-ID: <1484173918-25090-3-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a quirk parameter to the arm_smccc_smc call.  The quirk
-structure allows for specialized SMC operations due to SoC specific
-requirements.  The current arm_smccc_smc is renamed and macros are used
-instead to specify the standard arm_smccc_smc or the arm_smccc_smc_quirk
-function.
+This patch adds a Qualcomm specific quirk to the arm_smccc_smc call.
 
-This patch and partial implementation was suggested by Will Deacon.
+On Qualcomm ARM64 platforms, the SMC call can return before it has
+completed.  If this occurs, the call can be restarted, but it requires
+using the returned session ID value from the interrupted SMC call.
+
+The quirk stores off the session ID from the interrupted call in the
+quirk structure so that it can be used by the caller.
+
+This patch folds in a fix given by Sricharan R:
+https://lkml.org/lkml/2016/9/28/272
 
 Signed-off-by: Andy Gross <andy.gross@linaro.org>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/armksyms.c      |  2 +-
- arch/arm/kernel/smccc-call.S    |  7 ++++---
- arch/arm64/kernel/arm64ksyms.c  |  2 +-
- arch/arm64/kernel/asm-offsets.c |  7 +++++--
- arch/arm64/kernel/smccc-call.S  |  7 ++++---
- include/linux/arm-smccc.h       | 26 ++++++++++++++++++++++----
- 6 files changed, 37 insertions(+), 14 deletions(-)
+ arch/arm64/kernel/smccc-call.S |  9 ++++++++-
+ drivers/firmware/qcom_scm-64.c | 13 ++++++++++---
+ include/linux/arm-smccc.h      | 11 ++++++++---
+ 3 files changed, 26 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
-index 7e45f69..c2a8e79 100644
---- a/arch/arm/kernel/armksyms.c
-+++ b/arch/arm/kernel/armksyms.c
-@@ -178,6 +178,6 @@
- #endif
- 
- #ifdef CONFIG_HAVE_ARM_SMCCC
--EXPORT_SYMBOL(arm_smccc_smc);
-+EXPORT_SYMBOL(__arm_smccc_smc);
- EXPORT_SYMBOL(arm_smccc_hvc);
- #endif
-diff --git a/arch/arm/kernel/smccc-call.S b/arch/arm/kernel/smccc-call.S
-index 2e48b67..eb666d7 100644
---- a/arch/arm/kernel/smccc-call.S
-+++ b/arch/arm/kernel/smccc-call.S
-@@ -46,11 +46,12 @@ UNWIND(	.fnend)
- /*
-  * void smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
-  *		  unsigned long a3, unsigned long a4, unsigned long a5,
-- *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
-+ *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res,
-+ *		  struct arm_smccc_quirk *quirk)
-  */
--ENTRY(arm_smccc_smc)
-+ENTRY(__arm_smccc_smc)
- 	SMCCC SMCCC_SMC
--ENDPROC(arm_smccc_smc)
-+ENDPROC(__arm_smccc_smc)
- 
- /*
-  * void smccc_hvc(unsigned long a0, unsigned long a1, unsigned long a2,
-diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
-index 78f3680..43370a0 100644
---- a/arch/arm64/kernel/arm64ksyms.c
-+++ b/arch/arm64/kernel/arm64ksyms.c
-@@ -73,5 +73,5 @@
- #endif
- 
- 	/* arm-smccc */
--EXPORT_SYMBOL(arm_smccc_smc);
-+EXPORT_SYMBOL(__arm_smccc_smc);
- EXPORT_SYMBOL(arm_smccc_hvc);
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index bc049af..b3bb7ef 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -143,8 +143,11 @@ int main(void)
-   DEFINE(SLEEP_STACK_DATA_SYSTEM_REGS,	offsetof(struct sleep_stack_data, system_regs));
-   DEFINE(SLEEP_STACK_DATA_CALLEE_REGS,	offsetof(struct sleep_stack_data, callee_saved_regs));
- #endif
--  DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
--  DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
-+  DEFINE(ARM_SMCCC_RES_X0_OFFS,		offsetof(struct arm_smccc_res, a0));
-+  DEFINE(ARM_SMCCC_RES_X2_OFFS,		offsetof(struct arm_smccc_res, a2));
-+  DEFINE(ARM_SMCCC_QUIRK_ID_OFFS,	offsetof(struct arm_smccc_quirk, id));
-+  DEFINE(ARM_SMCCC_QUIRK_STATE_OFFS,	offsetof(struct arm_smccc_quirk, state));
-+
-   BLANK();
-   DEFINE(HIBERN_PBE_ORIG,	offsetof(struct pbe, orig_address));
-   DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
 diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
-index ae0496f..6290696 100644
+index 6290696..72ecdca 100644
 --- a/arch/arm64/kernel/smccc-call.S
 +++ b/arch/arm64/kernel/smccc-call.S
-@@ -27,11 +27,12 @@
- /*
-  * void arm_smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
-  *		  unsigned long a3, unsigned long a4, unsigned long a5,
-- *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
-+ *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res,
-+ *		  struct arm_smccc_quirk *quirk)
+@@ -12,6 +12,7 @@
+  *
   */
--ENTRY(arm_smccc_smc)
-+ENTRY(__arm_smccc_smc)
- 	SMCCC	smc
--ENDPROC(arm_smccc_smc)
-+ENDPROC(__arm_smccc_smc)
+ #include <linux/linkage.h>
++#include <linux/arm-smccc.h>
+ #include <asm/asm-offsets.h>
  
- /*
-  * void arm_smccc_hvc(unsigned long a0, unsigned long a1, unsigned long a2,
+ 	.macro SMCCC instr
+@@ -20,7 +21,13 @@
+ 	ldr	x4, [sp]
+ 	stp	x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
+ 	stp	x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
+-	ret
++	ldr	x4, [sp, #8]
++	cbz	x4, 1f /* no quirk structure */
++	ldr	x9, [x4, #ARM_SMCCC_QUIRK_ID_OFFS]
++	cmp	x9, #ARM_SMCCC_QUIRK_QCOM_A6
++	b.ne	1f
++	str	x6, [x4, ARM_SMCCC_QUIRK_STATE_OFFS]
++1:	ret
+ 	.cfi_endproc
+ 	.endm
+ 
+diff --git a/drivers/firmware/qcom_scm-64.c b/drivers/firmware/qcom_scm-64.c
+index 4a0f5ea..1e2e519 100644
+--- a/drivers/firmware/qcom_scm-64.c
++++ b/drivers/firmware/qcom_scm-64.c
+@@ -91,6 +91,7 @@ static int qcom_scm_call(struct device *dev, u32 svc_id, u32 cmd_id,
+ 	dma_addr_t args_phys = 0;
+ 	void *args_virt = NULL;
+ 	size_t alloc_len;
++	struct arm_smccc_quirk quirk = {.id = ARM_SMCCC_QUIRK_QCOM_A6};
+ 
+ 	if (unlikely(arglen > N_REGISTER_ARGS)) {
+ 		alloc_len = N_EXT_QCOM_SCM_ARGS * sizeof(u64);
+@@ -131,10 +132,16 @@ static int qcom_scm_call(struct device *dev, u32 svc_id, u32 cmd_id,
+ 					 qcom_smccc_convention,
+ 					 ARM_SMCCC_OWNER_SIP, fn_id);
+ 
++		quirk.state.a6 = 0;
++
+ 		do {
+-			arm_smccc_smc(cmd, desc->arginfo, desc->args[0],
+-				      desc->args[1], desc->args[2], x5, 0, 0,
+-				      res);
++			arm_smccc_smc_quirk(cmd, desc->arginfo, desc->args[0],
++				      desc->args[1], desc->args[2], x5,
++				      quirk.state.a6, 0, res, &quirk);
++
++			if (res->a0 == QCOM_SCM_INTERRUPTED)
++				cmd = res->a0;
++
+ 		} while (res->a0 == QCOM_SCM_INTERRUPTED);
+ 
+ 		mutex_unlock(&qcom_scm_lock);
 diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-index b5abfda..3e28d08 100644
+index 3e28d08..9ca3a10 100644
 --- a/include/linux/arm-smccc.h
 +++ b/include/linux/arm-smccc.h
-@@ -72,19 +72,33 @@ struct arm_smccc_res {
- };
+@@ -14,9 +14,6 @@
+ #ifndef __LINUX_ARM_SMCCC_H
+ #define __LINUX_ARM_SMCCC_H
  
+-#include <linux/linkage.h>
+-#include <linux/types.h>
+-
+ /*
+  * This file provides common defines for ARM SMC Calling Convention as
+  * specified in
+@@ -60,6 +57,13 @@
+ #define ARM_SMCCC_OWNER_TRUSTED_OS	50
+ #define ARM_SMCCC_OWNER_TRUSTED_OS_END	63
+ 
++#define ARM_SMCCC_QUIRK_NONE		0
++#define ARM_SMCCC_QUIRK_QCOM_A6		1 /* Save/restore register a6 */
++
++#ifndef __ASSEMBLY__
++
++#include <linux/linkage.h>
++#include <linux/types.h>
  /**
-- * arm_smccc_smc() - make SMC calls
-+ * struct arm_smccc_quirk - Contains quirk information
-+ * id contains quirk identification
-+ * state contains the quirk specific information
-+ */
-+struct arm_smccc_quirk {
-+	int	id;
-+	union {
-+		unsigned long a6;
-+	} state;
-+};
-+
-+/**
-+ * __arm_smccc_smc() - make SMC calls
-  * @a0-a7: arguments passed in registers 0 to 7
-  * @res: result values from registers 0 to 3
-+ * @quirk: optional quirk structure
-  *
-  * This function is used to make SMC calls following SMC Calling Convention.
-  * The content of the supplied param are copied to registers 0 to 7 prior
-  * to the SMC instruction. The return values are updated with the content
-- * from register 0 to 3 on return from the SMC instruction.
-+ * from register 0 to 3 on return from the SMC instruction.  An optional
-+ * quirk structure provides vendor specific behavior.
-  */
--asmlinkage void arm_smccc_smc(unsigned long a0, unsigned long a1,
-+asmlinkage void __arm_smccc_smc(unsigned long a0, unsigned long a1,
- 			unsigned long a2, unsigned long a3, unsigned long a4,
- 			unsigned long a5, unsigned long a6, unsigned long a7,
--			struct arm_smccc_res *res);
-+			struct arm_smccc_res *res, struct arm_smccc_quirk *quirk);
+  * struct arm_smccc_res - Result from SMC/HVC call
+  * @a0-a3 result values from registers 0 to 3
+@@ -119,4 +123,5 @@ asmlinkage void arm_smccc_hvc(unsigned long a0, unsigned long a1,
  
- /**
-  * arm_smccc_hvc() - make HVC calls
-@@ -101,4 +115,8 @@ asmlinkage void arm_smccc_hvc(unsigned long a0, unsigned long a1,
- 			unsigned long a5, unsigned long a6, unsigned long a7,
- 			struct arm_smccc_res *res);
+ #define arm_smccc_smc_quirk(...) __arm_smccc_smc(__VA_ARGS__)
  
-+#define arm_smccc_smc(...) __arm_smccc_smc(__VA_ARGS__, NULL)
-+
-+#define arm_smccc_smc_quirk(...) __arm_smccc_smc(__VA_ARGS__)
-+
++#endif /*__ASSEMBLY__*/
  #endif /*__LINUX_ARM_SMCCC_H*/
 -- 
 1.9.1
