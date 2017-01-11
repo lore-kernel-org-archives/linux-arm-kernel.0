@@ -1,66 +1,47 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 11 Jan 2017 06:25:35 -0800
-Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device managed
- functions
-In-Reply-To: <a45ed205-7c1b-a298-50c0-fc8b80a846c5@sigmadesigns.com>
-References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
- <1484100561-17638-1-git-send-email-linux@roeck-us.net>
- <1484100561-17638-5-git-send-email-linux@roeck-us.net>
- <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
- <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
- <a45ed205-7c1b-a298-50c0-fc8b80a846c5@sigmadesigns.com>
-Message-ID: <a61eb838-4167-3032-bde8-3a8845b780f8@roeck-us.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 11 Jan 2017 08:29:45 -0600
+Subject: [PATCH] firmware: ti_sci: fix strncat length check
+In-Reply-To: <20170111133808.3757036-1-arnd@arndb.de>
+References: <20170111133808.3757036-1-arnd@arndb.de>
+Message-ID: <CAGo_u6qoQohj6=vsVumOHRiSxviPA2=2aW-zGhQJ9cQPUdzjgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2017 04:31 AM, Marc Gonzalez wrote:
-> On 11/01/2017 11:52, Guenter Roeck wrote:
+On Wed, Jan 11, 2017 at 7:37 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> gcc-7 notices that the length we pass to strncat is wrong:
 >
->> On 01/11/2017 01:07 AM, Marc Gonzalez wrote:
->>
->>>> @@ -134,12 +134,15 @@ static int tangox_wdt_probe(struct platform_device *pdev)
->>>>  	err = clk_prepare_enable(dev->clk);
->>>>  	if (err)
->>>>  		return err;
->>>> +	err = devm_add_action_or_reset(&pdev->dev,
->>>> +				       (void(*)(void *))clk_disable_unprepare,
->>>> +				       dev->clk);
->>>> +	if (err)
->>>> +		return err;
->>>
->>> Hello Guenter,
->>>
->>> I would rather avoid the function pointer cast.
->>> How about defining an auxiliary function for the cleanup action?
->>>
->>> clk_disable_unprepare() is static inline, so gcc will have to
->>> define an auxiliary function either way. What do you think?
->>
->> Not really. It would just make it more complicated to replace the
->> call with devm_clk_prepare_enable(), should it ever find its way
->> into the light of day.
+> drivers/firmware/ti_sci.c: In function 'ti_sci_probe':
+> drivers/firmware/ti_sci.c:204:32: error: specified bound 50 equals the size of the destination [-Werror=stringop-overflow=]
 >
-> More complicated, because the cleanup function will have to be deleted later?
-> The compiler will warn if someone forgets to do that.
+> Instead of the total length, we must pass the length of the
+> remaining space here.
 >
-> In my opinion, it's not a good idea to rely on the fact that casting
-> void(*)(struct clk *clk) to void(*)(void *) is likely to work as expected
-> on most platforms. (It has undefined behavior, strictly speaking.)
+> Fixes: aa276781a64a ("firmware: Add basic support for TI System Control Interface (TI-SCI) protocol")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/firmware/ti_sci.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 >
-I do hear that you object to this code.
+> diff --git a/drivers/firmware/ti_sci.c b/drivers/firmware/ti_sci.c
+> index 874ff32db366..00cfed3c3e1a 100644
+> --- a/drivers/firmware/ti_sci.c
+> +++ b/drivers/firmware/ti_sci.c
+> @@ -202,7 +202,8 @@ static int ti_sci_debugfs_create(struct platform_device *pdev,
+>         info->debug_buffer[info->debug_region_size] = 0;
+>
+>         info->d = debugfs_create_file(strncat(debug_name, dev_name(dev),
+> -                                             sizeof(debug_name)),
+> +                                             sizeof(debug_name) -
+> +                                             sizeof("ti_sci_debug@")),
+>                                       0444, NULL, info, &ti_sci_debug_fops);
+>         if (IS_ERR(info->d))
+>                 return PTR_ERR(info->d);
 
-However, I must admit that you completely lost me here. It is a cast from
-one function pointer to another, passed as argument to another function,
-with a secondary cast of its argument from a typed pointer to a void pointer.
-I don't think C permits for "undefined behavior, strictly speaking".
-Besides, that same mechanism is already used elsewhere, which is how I
-got the idea. Are you claiming that there are situations where it won't
-work ?
+Aargh.. thanks.... Santosh: if you could pick this up.. using
+strlen(debug_name) might be an overkill here.
 
-> Do you really dislike the portable solution I suggested? :-(
->
-It is not more portable than the above. It is more expensive and adds more
-code.
+Acked-by: Nishanth Menon <nm@ti.com>
 
-Thanks,
-Guenter
+---
+Regards,
+Nishanth Menon
