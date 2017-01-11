@@ -1,11 +1,11 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 10 Jan 2017 16:44:53 -0800
-Subject: [PATCH 44/62] watchdog: pnx4008_wdt: Convert to use device managed
+Date: Tue, 10 Jan 2017 16:44:48 -0800
+Subject: [PATCH 39/62] watchdog: of_xilinx_wdt: Convert to use device managed
  functions
 In-Reply-To: <1484095516-12720-1-git-send-email-linux@roeck-us.net>
 References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
  <1484095516-12720-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1484095516-12720-14-git-send-email-linux@roeck-us.net>
+Message-ID: <1484095516-12720-9-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,70 +19,76 @@ https://github.com/groeck/coccinelle-patches
 
 - Use devm_add_action_or_reset() for calls to clk_disable_unprepare
 - Replace 'goto l; ... l: return e;' with 'return e;'
+- Drop assignments to otherwise unused variables
 - Drop remove function
+- Drop platform_set_drvdata()
 - Use devm_watchdog_register_driver() to register watchdog device
 
-Cc: Vladimir Zapolskiy <vz@mleia.com>
-Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
+Cc: Michal Simek <michal.simek@xilinx.com>
+Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- drivers/watchdog/pnx4008_wdt.c | 23 +++++++----------------
- 1 file changed, 7 insertions(+), 16 deletions(-)
+ drivers/watchdog/of_xilinx_wdt.c | 28 ++++++++--------------------
+ 1 file changed, 8 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
-index 0529aed158a4..a0cda8748c9b 100644
---- a/drivers/watchdog/pnx4008_wdt.c
-+++ b/drivers/watchdog/pnx4008_wdt.c
-@@ -202,6 +202,11 @@ static int pnx4008_wdt_probe(struct platform_device *pdev)
- 	ret = clk_prepare_enable(wdt_clk);
- 	if (ret)
- 		return ret;
-+	ret = devm_add_action_or_reset(&pdev->dev,
-+				       (void(*)(void *))clk_disable_unprepare,
-+				       wdt_clk);
-+	if (ret)
-+		return ret;
+diff --git a/drivers/watchdog/of_xilinx_wdt.c b/drivers/watchdog/of_xilinx_wdt.c
+index fae7fe929ea3..277de711c31f 100644
+--- a/drivers/watchdog/of_xilinx_wdt.c
++++ b/drivers/watchdog/of_xilinx_wdt.c
+@@ -210,38 +210,27 @@ static int xwdt_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "unable to enable clock\n");
+ 		return rc;
+ 	}
++	rc = devm_add_action_or_reset(&pdev->dev,
++				      (void(*)(void *))clk_disable_unprepare,
++				      xdev->clk);
++	if (rc)
++		return rc;
  
- 	pnx4008_wdd.bootstatus = (readl(WDTIM_RES(wdt_base)) & WDOG_RESET) ?
- 			WDIOF_CARDRESET : 0;
-@@ -211,28 +216,15 @@ static int pnx4008_wdt_probe(struct platform_device *pdev)
- 
- 	pnx4008_wdt_stop(&pnx4008_wdd);	/* disable for now */
- 
--	ret = watchdog_register_device(&pnx4008_wdd);
-+	ret = devm_watchdog_register_device(&pdev->dev, &pnx4008_wdd);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "cannot register watchdog device\n");
--		goto disable_clk;
-+		return ret;
+ 	rc = xwdt_selftest(xdev);
+ 	if (rc == XWT_TIMER_FAILED) {
+ 		dev_err(&pdev->dev, "SelfTest routine error\n");
+-		goto err_clk_disable;
++		return rc;
  	}
  
- 	dev_info(&pdev->dev, "heartbeat %d sec\n", pnx4008_wdd.timeout);
+-	rc = watchdog_register_device(xilinx_wdt_wdd);
++	rc = devm_watchdog_register_device(&pdev->dev, xilinx_wdt_wdd);
+ 	if (rc) {
+ 		dev_err(&pdev->dev, "Cannot register watchdog (err=%d)\n", rc);
+-		goto err_clk_disable;
++		return rc;
+ 	}
  
- 	return 0;
--
--disable_clk:
--	clk_disable_unprepare(wdt_clk);
--	return ret;
--}
--
--static int pnx4008_wdt_remove(struct platform_device *pdev)
--{
--	watchdog_unregister_device(&pnx4008_wdd);
--
--	clk_disable_unprepare(wdt_clk);
+ 	dev_info(&pdev->dev, "Xilinx Watchdog Timer at %p with timeout %ds\n",
+ 		 xdev->base, xilinx_wdt_wdd->timeout);
+ 
+-	platform_set_drvdata(pdev, xdev);
 -
 -	return 0;
+-err_clk_disable:
+-	clk_disable_unprepare(xdev->clk);
+-
+-	return rc;
+-}
+-
+-static int xwdt_remove(struct platform_device *pdev)
+-{
+-	struct xwdt_device *xdev = platform_get_drvdata(pdev);
+-
+-	watchdog_unregister_device(&xdev->xilinx_wdt_wdd);
+-	clk_disable_unprepare(xdev->clk);
+-
+ 	return 0;
  }
  
- #ifdef CONFIG_OF
-@@ -249,7 +241,6 @@ static struct platform_driver platform_wdt_driver = {
- 		.of_match_table = of_match_ptr(pnx4008_wdt_match),
- 	},
- 	.probe = pnx4008_wdt_probe,
--	.remove = pnx4008_wdt_remove,
- };
+@@ -255,7 +244,6 @@ MODULE_DEVICE_TABLE(of, xwdt_of_match);
  
- module_platform_driver(platform_wdt_driver);
+ static struct platform_driver xwdt_driver = {
+ 	.probe       = xwdt_probe,
+-	.remove      = xwdt_remove,
+ 	.driver = {
+ 		.name  = WATCHDOG_NAME,
+ 		.of_match_table = xwdt_of_match,
 -- 
 2.7.4
