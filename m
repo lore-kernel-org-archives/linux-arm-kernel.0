@@ -1,32 +1,36 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 11 Jan 2017 11:50:12 +0100
-Subject: [PATCHv3 3/8] rtc: add STM32 RTC driver
-In-Reply-To: <ff7a532e-a2a7-920a-29d9-e8a82d6ed915@st.com>
-References: <1483623809-29937-1-git-send-email-amelie.delaunay@st.com>
- <1483623809-29937-4-git-send-email-amelie.delaunay@st.com>
- <20170111000803.mlie6kizcsj2o7lh@piout.net>
- <1feb3a23-7450-2b5c-9c1c-c7ecacd7fa17@st.com>
- <20170111101708.ujcgo7kpyywymyzp@piout.net>
- <ff7a532e-a2a7-920a-29d9-e8a82d6ed915@st.com>
-Message-ID: <20170111105012.ut6jxlmlf3qv37li@piout.net>
+Date: Wed, 11 Jan 2017 11:52:36 +0100
+Subject: [PATCH] rtc: armada38x: make struct rtc_class_ops const
+In-Reply-To: <E1cRFxi-00083n-FY@rmk-PC.armlinux.org.uk>
+References: <E1cRFxi-00083n-FY@rmk-PC.armlinux.org.uk>
+Message-ID: <20170111105236.5ucue6ybqvfulese@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/2017 at 11:42:50 +0100, Amelie DELAUNAY wrote :
+On 11/01/2017 at 10:16:58 +0000, Russell King wrote :
+> Armada38x wants to modify its rtc_class_ops to remove the interrupt
+> handling when there is no usable interrupt, but this means we leave
+> function pointers in writable memory.
 > 
-> On 01/11/2017 11:17 AM, Alexandre Belloni wrote:
-> > On 11/01/2017 at 11:07:16 +0100, Amelie DELAUNAY wrote :
-> > > > This will never happen, tm is already checked multiple times (up to
-> > > > three) in the core before this function can be called.
-> > > > 
-> > > You're right. I'll remove all rtc_valid_tm calls.
-> > 
-> > You can keep the one in read_time
-> > 
-> Even if rtc_valid_tm is called just after rtc->ops->read_time() in
-> __rtc_read_time ?
-
-Ah yes, I forgot it was added, you can remove all of them.
+> Since rtc_class_ops is small, arrange to have two instances, one for
+> when we have interrupts, and one for when we have none, both marked
+> const.  This allows the compiler to place them in read-only memory,
+> which is better than placing them in __ro_after_init.
+> 
+> Thanks to Bhumika Goyal <bhumirks@gmail.com> for pointing out that
+> the structure was writable and submitting a patch to add
+> __ro_after_init.
+> 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+> As the thread has gone quiet, I'm submitting the patch I sent within that
+> thread.  No one appears to have raised an objection to it (other than what
+> appears to be a misunderstanding.)
+> 
+>  drivers/rtc/rtc-armada38x.c | 24 +++++++++++++++++-------
+>  1 file changed, 17 insertions(+), 7 deletions(-)
+> 
+Applied, thanks.
 
 -- 
 Alexandre Belloni, Free Electrons
