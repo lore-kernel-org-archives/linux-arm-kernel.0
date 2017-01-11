@@ -1,27 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Jan 2017 15:44:37 +0100
-Subject: [PATCHv3 3/5] pinctrl: mvebu: pinctrl driver for 98DX3236 SoC
-In-Reply-To: <20170106041517.9589-4-chris.packham@alliedtelesis.co.nz>
-References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
- <20170106041517.9589-1-chris.packham@alliedtelesis.co.nz>
- <20170106041517.9589-4-chris.packham@alliedtelesis.co.nz>
-Message-ID: <CACRpkdaC+USN7YhZo49LAL9sorMxbTfhQbT5NrAu5D=Q1DHnnA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 11 Jan 2017 14:49:03 +0000
+Subject: Unhandled level 2 translation fault (11) at 0x000000b8, esr
+ 0x92000046, rpi3 (aarch64)
+In-Reply-To: <20170110121423.GF19960@e104818-lin.cambridge.arm.com>
+References: <CAGDbNAD7-TM6+x0A3FebTOPYmqQqbm1w29ZwH+9qePaAvhxTKw@mail.gmail.com>
+ <20161230151323.583b7ac5@xhacker>
+ <CAGDbNAAGqFqt7X+=XYRLAp=L_fTv9dAAe=wu4T_W-FCGqnYHHg@mail.gmail.com>
+ <20170109151354.GC7593@e104818-lin.cambridge.arm.com>
+ <CAGDbNAC-8w1xytLuzWTMnWLi8=j1ShkwE3CLXQ5q75m_RibCMA@mail.gmail.com>
+ <20170110121423.GF19960@e104818-lin.cambridge.arm.com>
+Message-ID: <20170111144902.GA20288@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 6, 2017 at 5:15 AM, Chris Packham
-<chris.packham@alliedtelesis.co.nz> wrote:
+On Tue, Jan 10, 2017 at 12:14:23PM +0000, Catalin Marinas wrote:
+> On Mon, Jan 09, 2017 at 07:06:19PM +0100, Bas van Tiel wrote:
+> > > I defined STACKSIZE to the kernel's SIGSTKSZ (16384) and it seems to run
+> > > fine, though I'll leave it longer/overnight (on a Juno board). With the
+> > > 4K signal stack it was crashing shortly after start.
+> > 
+> > I tried the STACKSIZE of 16384 for both the RPI3 and the PINEA64 board
+> > and still see the same behaviour of crashing. Sometimes the process
+> > is also blocked for a long time before it crashes.
+> > 
+> > Setting the interval to 200 usec [5 Khz] will help to crash it faster.
+> > 
+> > To further isolate the issue I will create a kernel module (based on a
+> > hrtimer) that will sent a periodic signal to the registered process
+> > and execute the same sighandler logic to check if the problem is still
+> > there.
+> 
+> I lowered the interval to 100us (it was 100ms in the original file) and
+> I can indeed trigger segfault easily on Juno. But it doesn't fail in the
+> same way every time, I sometimes get permission fault, other times bad
+> frame.
 
-> From: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
->
-> This pinctrl driver supports the 98DX3236, 98DX3336 and 98DX4251 SoCs
-> from Marvell.
->
-> Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+With 100us interval, it segfaults on x86 fairly quickly as well, so I
+don't think it's a kernel issue.
 
-I am waiting for an ACK or comment from the maintainers on
-this patch. Sebastian?
-
-Yours,
-Linus Walleij
+-- 
+Catalin
