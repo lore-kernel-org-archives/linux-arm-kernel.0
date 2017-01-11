@@ -1,55 +1,39 @@
-From: mbrugger@suse.com (Matthias Brugger)
-Date: Wed, 11 Jan 2017 11:20:41 +0100
-Subject: [PATCH v6 02/14] irqchip: gic-v3-its: keep the head file include
- in alphabetic order
-In-Reply-To: <1483363905-2806-3-git-send-email-hanjun.guo@linaro.org>
-References: <1483363905-2806-1-git-send-email-hanjun.guo@linaro.org>
- <1483363905-2806-3-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <ef759a3a-bbdb-2586-24a8-6ad650b07d41@suse.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 11 Jan 2017 10:26:47 +0000
+Subject: [PATCH] PCI/MSI: pci-xgene-msi: Fix CPU hotplug registration handling
+Message-ID: <1484130407-24707-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The conversion to the new hotplug state machine introduced a regression
+where a successful hotplug registration would be treated as an error,
+effectively disabling the MSI driver forever.
 
+Fix it by doing the proper check on the return value.
 
-On 02/01/17 14:31, Hanjun Guo wrote:
-> The head file is strictly in alphabetic order now, so let's
-> be the rule breaker. As acpi_iort.h includes acpi.h so remove
-> the duplidate acpi.h inclusion as well.
->
+Fixes: 9c248f8896e6 ("PCI/xgene-msi: Convert to hotplug state machine")
+Cc: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Cc: Duc Dang <dhdang@apm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: stable at vger.kernel.org
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/pci/host/pci-xgene-msi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Sounds strange, maybe someting like:
-Rearrange header file includes to alphabetic order. As acpi_iort.h...
-
-Regards,
-Matthias
-
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Majun <majun258@huawei.com>
-> Tested-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
->
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 69b040f..f471939 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -15,14 +15,13 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->
-> -#include <linux/acpi.h>
-> +#include <linux/acpi_iort.h>
->  #include <linux/bitmap.h>
->  #include <linux/cpu.h>
->  #include <linux/delay.h>
->  #include <linux/dma-iommu.h>
->  #include <linux/interrupt.h>
->  #include <linux/irqdomain.h>
-> -#include <linux/acpi_iort.h>
->  #include <linux/log2.h>
->  #include <linux/mm.h>
->  #include <linux/msi.h>
->
+diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
+index 1f38d08..f1b633b 100644
+--- a/drivers/pci/host/pci-xgene-msi.c
++++ b/drivers/pci/host/pci-xgene-msi.c
+@@ -517,7 +517,7 @@ static int xgene_msi_probe(struct platform_device *pdev)
+ 
+ 	rc = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "pci/xgene:online",
+ 			       xgene_msi_hwirq_alloc, NULL);
+-	if (rc)
++	if (rc < 0)
+ 		goto err_cpuhp;
+ 	pci_xgene_online = rc;
+ 	rc = cpuhp_setup_state(CPUHP_PCI_XGENE_DEAD, "pci/xgene:dead", NULL,
+-- 
+2.1.4
