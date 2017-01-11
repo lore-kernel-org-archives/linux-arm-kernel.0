@@ -1,55 +1,291 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 11 Jan 2017 23:06:27 +0800
-Subject: [PATCH v7 03/15] ACPI: IORT: minor cleanup for
- iort_match_node_callback()
-In-Reply-To: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
-References: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1484147199-4267-4-git-send-email-hanjun.guo@linaro.org>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Wed, 11 Jan 2017 17:59:11 +0200
+Subject: [RESEND PATCH v5] arm64: dts: qcom: Add msm8916 CoreSight components
+Message-ID: <20170111155911.29216-1-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cleanup iort_match_node_callback() a little bit to reduce
-some lines of code.
+From: "Ivan T. Ivanov" <ivan.ivanov@linaro.org>
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Tomasz Nowicki <tn@semihalf.com>
+Add initial set of CoreSight components found on Qualcomm msm8916 and
+apq8016 based platforms, including the DragonBoard 410c board.
+
+Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
 ---
- drivers/acpi/arm64/iort.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 15f32bf..208eac9 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -253,17 +253,15 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
- 					    void *context)
- {
- 	struct device *dev = context;
--	acpi_status status;
-+	acpi_status status = AE_NOT_FOUND;
+Changes since v4: (https://lkml.org/lkml/2016/11/17/533)
+ * Move everything into the SoC dtsi file as suggested by Stephen Boyd.
+ * Updated commit message.
+ * Got Ack from Mathieu.
+
+Changes since v3: (https://lkml.org/lkml/2015/5/11/134)
+ * Include msm8916-coresight.dtsi into msm8916.dtsi
+
+Changes since v2: (https://lkml.org/lkml/2015/4/29/242)
+ * Added "1x" to "qcom,coresight-replicator" compatible string, to match what
+   devicetree bindings documentations says.
+
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 241 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 241 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index f8ff327667c5..014d76e7dddf 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -14,6 +14,7 @@
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/clock/qcom,gcc-msm8916.h>
+ #include <dt-bindings/reset/qcom,gcc-msm8916.h>
++#include <dt-bindings/clock/qcom,rpmcc.h>
  
- 	if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT) {
- 		struct acpi_buffer buf = { ACPI_ALLOCATE_BUFFER, NULL };
- 		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
- 		struct acpi_iort_named_component *ncomp;
+ / {
+ 	model = "Qualcomm Technologies, Inc. MSM8916";
+@@ -856,6 +857,246 @@
+ 				memory-region = <&mpss_mem>;
+ 			};
+ 		};
++
++		tpiu at 820000 {
++			compatible = "arm,coresight-tpiu", "arm,primecell";
++			reg = <0x820000 0x1000>;
++
++			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++			clock-names = "apb_pclk", "atclk";
++
++			port {
++				tpiu_in: endpoint {
++					slave-mode;
++					remote-endpoint = <&replicator_out1>;
++				};
++			};
++		};
++
++		funnel at 821000 {
++			compatible = "arm,coresight-funnel", "arm,primecell";
++			reg = <0x821000 0x1000>;
++
++			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++			clock-names = "apb_pclk", "atclk";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				/*
++				 * Not described input ports:
++				 * 0 - connected to Resource and Power Manger CPU ETM
++				 * 1 - not-connected
++				 * 2 - connected to Modem CPU ETM
++				 * 3 - not-connected
++				 * 5 - not-connected
++				 * 6 - connected trought funnel to Wireless CPU ETM
++				 * 7 - connected to STM component
++				 */
++
++				port at 4 {
++					reg = <4>;
++					funnel0_in4: endpoint {
++						slave-mode;
++						remote-endpoint = <&funnel1_out>;
++					};
++				};
++				port at 8 {
++					reg = <0>;
++					funnel0_out: endpoint {
++						remote-endpoint = <&etf_in>;
++					};
++				};
++			};
++		};
++
++		replicator at 824000 {
++			compatible = "qcom,coresight-replicator1x", "arm,primecell";
++			reg = <0x824000 0x1000>;
++
++			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++			clock-names = "apb_pclk", "atclk";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					replicator_out0: endpoint {
++						remote-endpoint = <&etr_in>;
++					};
++				};
++				port at 1 {
++					reg = <1>;
++					replicator_out1: endpoint {
++						remote-endpoint = <&tpiu_in>;
++					};
++				};
++				port at 2 {
++					reg = <0>;
++					replicator_in: endpoint {
++						slave-mode;
++						remote-endpoint = <&etf_out>;
++					};
++				};
++			};
++		};
++
++		etf at 825000 {
++			compatible = "arm,coresight-tmc", "arm,primecell";
++			reg = <0x825000 0x1000>;
++
++			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++			clock-names = "apb_pclk", "atclk";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					etf_out: endpoint {
++						slave-mode;
++						remote-endpoint = <&funnel0_out>;
++					};
++				};
++				port at 1 {
++					reg = <0>;
++					etf_in: endpoint {
++						remote-endpoint = <&replicator_in>;
++					};
++				};
++			};
++		};
++
++		etr at 826000 {
++			compatible = "arm,coresight-tmc", "arm,primecell";
++			reg = <0x826000 0x1000>;
++
++			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++			clock-names = "apb_pclk", "atclk";
++
++			port {
++				etr_in: endpoint {
++					slave-mode;
++					remote-endpoint = <&replicator_out0>;
++				};
++			};
++		};
++
++		funnel at 841000 {	/* APSS funnel only 4 inputs are used */
++			compatible = "arm,coresight-funnel", "arm,primecell";
++			reg = <0x841000 0x1000>;
++
++			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++			clock-names = "apb_pclk", "atclk";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					funnel1_in0: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm0_out>;
++					};
++				};
++				port at 1 {
++					reg = <1>;
++					funnel1_in1: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm1_out>;
++					};
++				};
++				port at 2 {
++					reg = <2>;
++					funnel1_in2: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm2_out>;
++					};
++				};
++				port at 3 {
++					reg = <3>;
++					funnel1_in3: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm3_out>;
++					};
++				};
++				port at 4 {
++					reg = <0>;
++					funnel1_out: endpoint {
++						remote-endpoint = <&funnel0_in4>;
++					};
++				};
++			};
++		};
++
++		etm at 85c000 {
++			compatible = "arm,coresight-etm4x", "arm,primecell";
++			reg = <0x85c000 0x1000>;
++
++			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++			clock-names = "apb_pclk", "atclk";
++
++			cpu = <&CPU0>;
++
++			port {
++				etm0_out: endpoint {
++				remote-endpoint = <&funnel1_in0>;
++				};
++			};
++		};
++
++		etm at 85d000 {
++			compatible = "arm,coresight-etm4x", "arm,primecell";
++			reg = <0x85d000 0x1000>;
++
++			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++			clock-names = "apb_pclk", "atclk";
++
++			cpu = <&CPU1>;
++
++			port {
++				etm1_out: endpoint {
++					remote-endpoint = <&funnel1_in1>;
++				};
++			};
++		};
++
++		etm at 85e000 {
++			compatible = "arm,coresight-etm4x", "arm,primecell";
++			reg = <0x85e000 0x1000>;
++
++			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++			clock-names = "apb_pclk", "atclk";
++
++			cpu = <&CPU2>;
++
++			port {
++				etm2_out: endpoint {
++					remote-endpoint = <&funnel1_in2>;
++				};
++			};
++		};
++
++		etm at 85f000 {
++			compatible = "arm,coresight-etm4x", "arm,primecell";
++			reg = <0x85f000 0x1000>;
++
++			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++			clock-names = "apb_pclk", "atclk";
++
++			cpu = <&CPU3>;
++
++			port {
++				etm3_out: endpoint {
++					remote-endpoint = <&funnel1_in3>;
++				};
++			};
++		};
+ 	};
  
--		if (!adev) {
--			status = AE_NOT_FOUND;
-+		if (!adev)
- 			goto out;
--		}
- 
- 		status = acpi_get_name(adev->handle, ACPI_FULL_PATHNAME, &buf);
- 		if (ACPI_FAILURE(status)) {
-@@ -289,8 +287,6 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
- 		 */
- 		status = pci_rc->pci_segment_number == pci_domain_nr(bus) ?
- 							AE_OK : AE_NOT_FOUND;
--	} else {
--		status = AE_NOT_FOUND;
- 	}
- out:
- 	return status;
--- 
-1.9.1
+ 	smd {
