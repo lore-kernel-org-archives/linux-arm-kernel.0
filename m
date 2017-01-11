@@ -1,80 +1,37 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Wed, 11 Jan 2017 11:22:11 -0800
-Subject: [PATCH v2] PCI: thunder-pem: Add support for cn81xx and cn83xx SoCs.
-Message-ID: <20170111192211.29049-1-ddaney.cavm@gmail.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Thu, 12 Jan 2017 03:39:53 +0800
+Subject: [PATCH 2/5] clk: sunxi-ng: add support for V3s CCU
+In-Reply-To: <20170110181006.yrd6moy2mctzoc4c@lukather>
+References: <20170103151629.19447-1-icenowy@aosc.xyz>
+ <20170103151629.19447-3-icenowy@aosc.xyz>
+ <20170110181006.yrd6moy2mctzoc4c@lukather>
+Message-ID: <2705031484163593@web1g.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Daney <david.daney@cavium.com>
 
-The pci-thunder-pem driver was initially developed for cn88xx SoCs.
-The cn81xx and cn83xx members of the same family of SoCs has a
-slightly different configuration of interrupt resources in the PEM
-hardware, which prevents the INTA legacy interrupt source from
-functioning with the current driver.
 
-There are two fixes required:
+11.01.2017, 02:10, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> On Tue, Jan 03, 2017 at 11:16:26PM +0800, Icenowy Zheng wrote:
+>> ?V3s has a similar but cut-down CCU to H3.
+>>
+>> ?Add support for it.
+>>
+>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>
+> It looks like there's nothing different but the clocks that you
+> register with the H3, please just use the H3 driver.
 
-1) Don't fixup the PME interrupt on the newer SoCs as it already has
-the proper value.
+Nope.
 
-2) Report MSI-X Capability Table Size of 2 for the newer SoCs, so the
-core MSI-X code doesn't inadvertently clobber the INTA machinery that
-happens to reside immediately following the table.
+It has a different PLL (PLL_ISP) at different address, and some
+different muxes.
 
-Signed-off-by: David Daney <david.daney@cavium.com>
----
-
-Changes from v1: Fixed comment typo.
-
- drivers/pci/host/pci-thunder-pem.c | 25 ++++++++++++++++++++-----
- 1 file changed, 20 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
-index af722eb..52b5bdc 100644
---- a/drivers/pci/host/pci-thunder-pem.c
-+++ b/drivers/pci/host/pci-thunder-pem.c
-@@ -36,7 +36,7 @@ struct thunder_pem_pci {
- static int thunder_pem_bridge_read(struct pci_bus *bus, unsigned int devfn,
- 				   int where, int size, u32 *val)
- {
--	u64 read_val;
-+	u64 read_val, tmp_val;
- 	struct pci_config_window *cfg = bus->sysdata;
- 	struct thunder_pem_pci *pem_pci = (struct thunder_pem_pci *)cfg->priv;
- 
-@@ -65,13 +65,28 @@ static int thunder_pem_bridge_read(struct pci_bus *bus, unsigned int devfn,
- 		read_val |= 0x00007000; /* Skip MSI CAP */
- 		break;
- 	case 0x70: /* Express Cap */
--		/* PME interrupt on vector 2*/
--		read_val |= (2u << 25);
-+		/*
-+		 * Change PME interrupt to vector 2 on T88 where it
-+		 * reads as 0, else leave it alone.
-+		 */
-+		if (!(read_val & (0x1f << 25)))
-+			read_val |= (2u << 25);
- 		break;
- 	case 0xb0: /* MSI-X Cap */
--		/* TableSize=4, Next Cap is EA */
-+		/* TableSize=2 or 4, Next Cap is EA */
- 		read_val &= 0xc00000ff;
--		read_val |= 0x0003bc00;
-+		/*
-+		 * If Express Cap(0x70) raw PME vector reads as 0 we are on
-+		 * T88 and TableSize is reported as 4, else TableSize
-+		 * is 2.
-+		 */
-+		writeq(0x70, pem_pci->pem_reg_base + PEM_CFG_RD);
-+		tmp_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
-+		tmp_val >>= 32;
-+		if (!(tmp_val & (0x1f << 25)))
-+			read_val |= 0x0003bc00;
-+		else
-+			read_val |= 0x0001bc00;
- 		break;
- 	case 0xb4:
- 		/* Table offset=0, BIR=0 */
--- 
-2.9.3
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
