@@ -1,21 +1,36 @@
-From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Wed, 11 Jan 2017 16:41:20 +0300
-Subject: [PATCH] arm64: avoid increasing DMA masks above what hardware
- supports
-In-Reply-To: <57459a4a-2c57-e081-8f27-cb83f23b5815@arm.com>
-References: <11daacde-5399-039f-80a3-01d7bd13e9e8@arm.com>
- <1484056844-9567-1-git-send-email-nikita.yoush@cogentembedded.com>
- <dca35acf-1adf-aa85-7a0b-d0c6ec702fa1@arm.com>
- <67314806-361d-e0ac-9292-37542160ead5@cogentembedded.com>
- <57459a4a-2c57-e081-8f27-cb83f23b5815@arm.com>
-Message-ID: <09cac197-9e57-5d3e-e742-f29c00051813@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Jan 2017 14:41:40 +0100
+Subject: [PATCH] ARM: mv78xx0: fix possible PCI buffer overflow
+Message-ID: <20170111134159.3832518-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Yes, I think that ought to work, although the __iommu_setup_dma_ops()
-> call will still want a real size reflecting the default mask
+gcc-7.0 reports a potential array overflow:
 
-I see iommu_dma_ops do not define set_dma_mask.
+arch/arm/mach-mv78xx0/pcie.c: In function 'mv78xx0_pcie_preinit':
+arch/arm/mach-mv78xx0/pcie.c:81:4: error: output may be truncated before the last format character [-Werror=format-truncation=]
 
-So what if setup was done for size reflecting one mask and then driver
-changes mask?  Will things still operate correctly?
+I haven't checked if this can actually happen, but making the
+array one 32-bit word longer addresses the warning and makes
+it completely safe.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-mv78xx0/pcie.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-mv78xx0/pcie.c b/arch/arm/mach-mv78xx0/pcie.c
+index 13a7d72ee0c4..81ff4327a962 100644
+--- a/arch/arm/mach-mv78xx0/pcie.c
++++ b/arch/arm/mach-mv78xx0/pcie.c
+@@ -29,7 +29,7 @@ struct pcie_port {
+ 	u8			root_bus_nr;
+ 	void __iomem		*base;
+ 	spinlock_t		conf_lock;
+-	char			mem_space_name[16];
++	char			mem_space_name[20];
+ 	struct resource		res;
+ };
+ 
+-- 
+2.9.0
