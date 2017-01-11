@@ -1,39 +1,38 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 11 Jan 2017 02:52:51 -0800
-Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device managed
- functions
-In-Reply-To: <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
-References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
- <1484100561-17638-1-git-send-email-linux@roeck-us.net>
- <1484100561-17638-5-git-send-email-linux@roeck-us.net>
- <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
-Message-ID: <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 11 Jan 2017 10:54:05 +0000
+Subject: [PATCH v29 4/9] arm64: kdump: implement machine_crash_shutdown()
+In-Reply-To: <20170111063626.GE20972@linaro.org>
+References: <20161228043347.27358-1-takahiro.akashi@linaro.org>
+ <20161228043605.27470-3-takahiro.akashi@linaro.org>
+ <20170110113248.GC21598@arm.com>
+ <20170111063626.GE20972@linaro.org>
+Message-ID: <20170111105405.GF12388@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2017 01:07 AM, Marc Gonzalez wrote:
+On Wed, Jan 11, 2017 at 03:36:28PM +0900, AKASHI Takahiro wrote:
+> On Tue, Jan 10, 2017 at 11:32:48AM +0000, Will Deacon wrote:
+> > On Wed, Dec 28, 2016 at 01:36:01PM +0900, AKASHI Takahiro wrote:
+> > > @@ -22,6 +25,7 @@
+> > >  extern const unsigned char arm64_relocate_new_kernel[];
+> > >  extern const unsigned long arm64_relocate_new_kernel_size;
+> > >  
+> > > +static bool in_crash_kexec;
+> > 
+> > Do you actually need this bool? Why not call kexec_crash_loaded() instead?
+> 
+> The two have different meanings:
+> "in_crash_kexec" indicates that kdump is taking place, while
+> kexec_crash_loaded() tells us only whether crash dump kernel has been
+> loaded or not.
+> 
+> It is crucial to distinguish them especially for machine_kexec()
+> which can be called on normal kexec even if kdump has been set up.
 
->> @@ -134,12 +134,15 @@ static int tangox_wdt_probe(struct platform_device *pdev)
->>  	err = clk_prepare_enable(dev->clk);
->>  	if (err)
->>  		return err;
->> +	err = devm_add_action_or_reset(&pdev->dev,
->> +				       (void(*)(void *))clk_disable_unprepare,
->> +				       dev->clk);
->> +	if (err)
->> +		return err;
->
-> Hello Guenter,
->
-> I would rather avoid the function pointer cast.
-> How about defining an auxiliary function for the cleanup action?
->
-> clk_disable_unprepare() is static inline, so gcc will have to
-> define an auxiliary function either way. What do you think?
->
+Ah, I see. So how about just doing:
 
-Not really. It would just make it more complicated to replace the
-call with devm_clk_prepare_enable(), should it ever find its way
-into the light of day.
+  if (kimage == kexec_crash_image)
 
-Guenter
+in machine_kexec?
+
+Will
