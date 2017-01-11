@@ -1,95 +1,61 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 11 Jan 2017 17:40:11 +0000
-Subject: [RFC PATCH 1/2] ARM: vfp - allow kernel mode NEON in softirq
- context
-In-Reply-To: <1483991849-32448-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1483991849-32448-1-git-send-email-ard.biesheuvel@linaro.org>
- <1483991849-32448-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu-ykMwg7ta41viF3pvtdmbkRBv+v09n87ZhQs3TiVXmuQ@mail.gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Wed, 11 Jan 2017 18:43:30 +0100
+Subject: [PATCH 0/4] Amlogic Meson SAR ADC support
+Message-ID: <20170111174334.24343-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 January 2017 at 19:57, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> This updates the kernel mode NEON handling to allow the NEON to be used
-> in softirq context as well as process context. This involves disabling
-> softirq processing when the NEON is used in kernel mode in process context,
-> and dealing with the situation where 'current' is not the owner of the
-> userland context that is present in the NEON register file when the NEON
-> is enabled in kernel mode.
->
-> The rationale for this change is that the NEON is shared with the ARMv8
-> Crypto Extensions (which are also defined for the AArch32 execution state),
-> which can give a huge performance boost (15x) to use cases like mac80211
-> CCMP processing, which executes in softirq context.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/vfp/vfpmodule.c | 22 ++++++++++++++------
->  1 file changed, 16 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-> index 569d5a650a4a..814752811537 100644
-> --- a/arch/arm/vfp/vfpmodule.c
-> +++ b/arch/arm/vfp/vfpmodule.c
-> @@ -690,26 +690,33 @@ void kernel_neon_begin(void)
->         u32 fpexc;
->
->         /*
-> -        * Kernel mode NEON is only allowed outside of interrupt context
-> +        * Kernel mode NEON is only allowed outside of hardirq context
->          * with preemption disabled. This will make sure that the kernel
->          * mode NEON register contents never need to be preserved.
->          */
-> -       BUG_ON(in_interrupt());
-> +       BUG_ON(in_irq());
->         cpu = get_cpu();
->
-> +       /*
-> +        * Disable softirq processing while the NEON is used by the kernel in
-> +        * process context. This ensures that only a single kernel mode NEON
-> +        * state is live at any given time.
-> +        */
-> +       if (!in_serving_softirq())
-> +               local_bh_disable();
-> +
->         fpexc = fmrx(FPEXC) | FPEXC_EN;
->         fmxr(FPEXC, fpexc);
->
->         /*
-> -        * Save the userland NEON/VFP state. Under UP,
-> -        * the owner could be a task other than 'current'
-> +        * Save the userland NEON/VFP state. Under UP, or when executing in
-> +        * softirq context, the owner could be a task other than 'current'
->          */
->         if (vfp_state_in_hw(cpu, thread))
->                 vfp_save_state(&thread->vfpstate, fpexc);
-> -#ifndef CONFIG_SMP
->         else if (vfp_current_hw_state[cpu] != NULL)
->                 vfp_save_state(vfp_current_hw_state[cpu], fpexc);
-> -#endif
-> +
+This series add support for the SAR ADC on Amlogic Meson GXBB, GXL and
+GXM SoCs.
+The hardware on GXBB provides 10-bit ADC results, while GXL and GXM are
+providing 12-bit results. Support for older SoCs (Meson8b and Meson8)
+can be added with little effort, most of which is testing I guess (I
+don't have any pre-GXBB hardware so I can't say).
 
-Actually, I think this should not be necessary (and the change to the
-comment is incorrect). Whether we're in process or softirq context
-makes no difference here, and the comment is slightly confusing: under
-SMP, the owner could also be a task other than 'current', but due to
-the eager preserve, the latest userland NEON state will already have
-been recorded, and there is no need doing it again.
+A new set of clocks had to be added to the GXBB clock controller (used
+by the GXBB/GXL/GXM SoCs) which are required to get the ADC working.
 
->         vfp_current_hw_state[cpu] = NULL;
->  }
->  EXPORT_SYMBOL(kernel_neon_begin);
-> @@ -718,7 +725,10 @@ void kernel_neon_end(void)
->  {
->         /* Disable the NEON/VFP unit. */
->         fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
-> +       if (!in_serving_softirq())
-> +               local_bh_enable();
->         put_cpu();
-> +
->  }
->  EXPORT_SYMBOL(kernel_neon_end);
->
-> --
-> 2.7.4
->
+The ADC itself can sample multiple channels at the same time and allows
+capturing multiple samples (which can be used for filtering/averaging).
+The ADC results are stored inside a FIFO register. More details on what
+the driver supports (or doesn't) can be found in the description of
+patch #3.
+
+The code is based on the public S805 (Meson8b) and S905 (GXBB)
+datasheets, as well as by reading (various versions of) the vendor
+driver and by inspecting the registers on the vendor kernels of my
+testing-hardware.
+
+Typical use-cases for the ADC on the Meson GX SoCs are:
+- adc-keys ("ADC attached resistor ladder buttons")
+- SoC temperature measurement (not supported by this driver yet as
+  the system firmware does this already and provides the values via the
+  SCPI protocol)
+- "version-strapping" (different resistor values are used to indicate
+  the board-revision)
+- and of course typical ADC measurements
+
+
+Martin Blumenstingl (4):
+  Documentation: dt-bindings: add the Amlogic Meson SAR ADC
+    documentation
+  clk: gxbb: add the SAR ADC clocks and expose them
+  iio: adc: add a driver for the SAR ADC found in Amlogic Meson SoCs
+  ARM64: dts: meson: meson-gx: add the SAR ADC
+
+ .../bindings/iio/adc/amlogic,meson-saradc.txt      |  31 +
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi          |   8 +
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  10 +
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         |  10 +
+ drivers/clk/meson/gxbb.c                           |  48 ++
+ drivers/clk/meson/gxbb.h                           |   9 +-
+ drivers/iio/adc/Kconfig                            |  12 +
+ drivers/iio/adc/Makefile                           |   1 +
+ drivers/iio/adc/meson_saradc.c                     | 860 +++++++++++++++++++++
+ include/dt-bindings/clock/gxbb-clkc.h              |   4 +
+ 10 files changed, 990 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/amlogic,meson-saradc.txt
+ create mode 100644 drivers/iio/adc/meson_saradc.c
+
+-- 
+2.11.0
