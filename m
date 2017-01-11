@@ -1,40 +1,102 @@
-From: dhowells@redhat.com (David Howells)
-Date: Wed, 11 Jan 2017 15:27:23 +0000
-Subject: [PATCH 5/8] efi: Get the secure boot status [ver #6]
-In-Reply-To: <20170111143304.GA29649@codeblueprint.co.uk>
-References: <20170111143304.GA29649@codeblueprint.co.uk>
- <148120020832.5854.5448601415491330495.stgit@warthog.procyon.org.uk>
- <148120024570.5854.10638278395097394138.stgit@warthog.procyon.org.uk>
-Message-ID: <7948.1484148443@warthog.procyon.org.uk>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Wed, 11 Jan 2017 16:28:12 +0100
+Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device managed
+ functions
+In-Reply-To: <a61eb838-4167-3032-bde8-3a8845b780f8@roeck-us.net>
+References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-5-git-send-email-linux@roeck-us.net>
+ <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
+ <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
+ <a45ed205-7c1b-a298-50c0-fc8b80a846c5@sigmadesigns.com>
+ <a61eb838-4167-3032-bde8-3a8845b780f8@roeck-us.net>
+Message-ID: <f7d9227c-4912-5c52-5ba7-ae7fa3b89857@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matt Fleming <matt@codeblueprint.co.uk> wrote:
-
-> > +	movb	$0, BP_secure_boot(%rsi)
-> >  #ifdef CONFIG_EFI_STUB
-> >  	/*
-> >  	 * The entry point for the PE/COFF executable is efi_pe_entry, so
+On 11/01/2017 15:25, Guenter Roeck wrote:
+> On 01/11/2017 04:31 AM, Marc Gonzalez wrote:
+>> On 11/01/2017 11:52, Guenter Roeck wrote:
+>>
+>>> On 01/11/2017 01:07 AM, Marc Gonzalez wrote:
+>>>
+>>>>> @@ -134,12 +134,15 @@ static int tangox_wdt_probe(struct platform_device *pdev)
+>>>>>  	err = clk_prepare_enable(dev->clk);
+>>>>>  	if (err)
+>>>>>  		return err;
+>>>>> +	err = devm_add_action_or_reset(&pdev->dev,
+>>>>> +				       (void(*)(void *))clk_disable_unprepare,
+>>>>> +				       dev->clk);
+>>>>> +	if (err)
+>>>>> +		return err;
+>>>>
+>>>> Hello Guenter,
+>>>>
+>>>> I would rather avoid the function pointer cast.
+>>>> How about defining an auxiliary function for the cleanup action?
+>>>>
+>>>> clk_disable_unprepare() is static inline, so gcc will have to
+>>>> define an auxiliary function either way. What do you think?
+>>>
+>>> Not really. It would just make it more complicated to replace the
+>>> call with devm_clk_prepare_enable(), should it ever find its way
+>>> into the light of day.
+>>
+>> More complicated, because the cleanup function will have to be deleted later?
+>> The compiler will warn if someone forgets to do that.
+>>
+>> In my opinion, it's not a good idea to rely on the fact that casting
+>> void(*)(struct clk *clk) to void(*)(void *) is likely to work as expected
+>> on most platforms. (It has undefined behavior, strictly speaking.)
+>
+> I do hear that you object to this code.
 > 
-> Is clearing ::secure_boot really necessary? Any code path that goes
-> via efi_main() will set it correctly and all other code paths should
-> get it cleared in sanitize_boot_params(), no?
+> However, I must admit that you completely lost me here. It is a cast from
+> one function pointer to another,
 
-No.
+Perhaps you are used to work at the assembly level, where pointers are
+just addresses, and all pointers are interchangeable.
 
-The boot_params->secure_boot parameter exists whether or not efi_main() is
-traversed (ie. if EFI isn't enabled or CONFIG_EFI_STUB=n) and, if not cleared,
-is of uncertain value.
+At a slightly higher level (C abstract machine), it is not so.
 
-Further, sanitize_boot_params() has to be modified by this patch so as not to
-clobber the secure_boot flag.
+> passed as argument to another function,
+> with a secondary cast of its argument from a typed pointer to a void pointer.
+> I don't think C permits for "undefined behavior, strictly speaking".
 
-> What's the distinction between the unset and unknown enums?
+The C standard leaves quite a lot of behavior undefined, e.g.
 
-unset -> The flag was cleared by head.S and efi_get_secureboot() was never
-called.
+char *foo = "hello";
+foo[1] = 'a'; // UB
 
-unknown -> efi_get_secureboot() tried and failed to access the EFI variables
-that should give the state.
+char buf[4];
+*(int *)&buf = 0xdeadbeef; // UB
 
-David
+1 << 64; // UB
+
+> Besides, that same mechanism is already used elsewhere, which is how I
+> got the idea. Are you claiming that there are situations where it won't
+> work ?
+
+If this technique is already used elsewhere in the kernel, then I'll
+crawl back under my rock (and weep).
+
+I can see two issues with the code you propose.
+
+First is the same for all casts: silencing potential warnings,
+e.g. if the prototype of clk_disable_unprepare ever changed.
+(Though casts are required for vararg function arguments.)
+
+Second is just theory and not a real-world concern.
+
+>> Do you really dislike the portable solution I suggested? :-(
+>
+> It is not more portable than the above. It is more expensive and adds more
+> code.
+
+Maybe I am mistaken. Can you tell me why adding an auxiliary function
+is more expensive? (In CPU cycles?)
+
+clk_disable_unprepare() is static inline, so an auxiliary function
+exists either way (implicit or explicit).
+
+Regards.
