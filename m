@@ -1,29 +1,70 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Wed, 11 Jan 2017 10:02:49 +0800
-Subject: [PATCH v4 1/2] arm64: dts: rockchip: add "rockchip, grf" property
- for RK3399 PMUCRU/CRU
-In-Reply-To: <1799437.apf7OqdtKq@phil>
-References: <1484028930-20305-1-git-send-email-zhengxing@rock-chips.com>
- <CAD=FV=Wwu3q_LqwYUWcJQRvp5neVOS9szgsYFONWTRJ0X8hRTA@mail.gmail.com>
- <58758498.40309@rock-chips.com> <1799437.apf7OqdtKq@phil>
-Message-ID: <58759249.4020808@rock-chips.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 10 Jan 2017 18:09:06 -0800
+Subject: [PATCH 52/62] watchdog: sirfsoc_wdt: Convert to use device managed
+ functions and other improvements
+In-Reply-To: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+Message-ID: <1484100561-17638-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Use device managed functions to simplify error handling, reduce
+source code size, improve readability, and reduce the likelyhood of bugs.
+Other improvements as listed below.
 
-On 2017?01?11? 09:12, Heiko Stuebner wrote:
->> I just woud like to add this patch to avoid getting some unavailable
->> MUXGRF clock and need to debug it again,
->> if we support it one day in future.
-> could you just check, if we have any other grf-based muxes that we may need in
-> the future. Right now I only see pclkin_isp1_wrapper describing such a mux,
-> but it would be cool if you could check again.
->
->
-OK, we will check these.  :)
+The conversion was done automatically with coccinelle using the
+following semantic patches. The semantic patches and the scripts used
+to generate this commit log are available at
+https://github.com/groeck/coccinelle-patches
 
-Thanks.
+- Use devm_watchdog_register_driver() to register watchdog device
+- Replace shutdown function with call to watchdog_stop_on_reboot()
 
+Cc: Barry Song <baohua@kernel.org>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+ drivers/watchdog/sirfsoc_wdt.c | 13 +++----------
+ 1 file changed, 3 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/watchdog/sirfsoc_wdt.c b/drivers/watchdog/sirfsoc_wdt.c
+index 3050a0031479..fb88e04d18ae 100644
+--- a/drivers/watchdog/sirfsoc_wdt.c
++++ b/drivers/watchdog/sirfsoc_wdt.c
+@@ -161,7 +161,8 @@ static int sirfsoc_wdt_probe(struct platform_device *pdev)
+ 	watchdog_set_nowayout(&sirfsoc_wdd, nowayout);
+ 	sirfsoc_wdd.parent = &pdev->dev;
+ 
+-	ret = watchdog_register_device(&sirfsoc_wdd);
++	watchdog_stop_on_reboot(&sirfsoc_wdd);
++	ret = devm_watchdog_register_device(&pdev->dev, &sirfsoc_wdd);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -170,16 +171,9 @@ static int sirfsoc_wdt_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static void sirfsoc_wdt_shutdown(struct platform_device *pdev)
+-{
+-	struct watchdog_device *wdd = platform_get_drvdata(pdev);
+-
+-	sirfsoc_wdt_disable(wdd);
+-}
+-
+ static int sirfsoc_wdt_remove(struct platform_device *pdev)
+ {
+-	sirfsoc_wdt_shutdown(pdev);
++	sirfsoc_wdt_disable(platform_get_drvdata(pdev));
+ 	return 0;
+ }
+ 
+@@ -221,7 +215,6 @@ static struct platform_driver sirfsoc_wdt_driver = {
+ 	},
+ 	.probe = sirfsoc_wdt_probe,
+ 	.remove = sirfsoc_wdt_remove,
+-	.shutdown = sirfsoc_wdt_shutdown,
+ };
+ module_platform_driver(sirfsoc_wdt_driver);
+ 
 -- 
-- Xing Zheng
+2.7.4
