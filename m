@@ -1,31 +1,69 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 11 Jan 2017 18:19:15 +0100
-Subject: [PATCH v5 12/12] arm64: configs: enable SDHCI driver for Xenon
+Date: Wed, 11 Jan 2017 18:19:13 +0100
+Subject: [PATCH v5 10/12] arm64: dts: marvell: add eMMC support for Armada 37xx
 In-Reply-To: <cover.8527229dae6c124f24c5e637430c2cdc86f80392.1484154449.git-series.gregory.clement@free-electrons.com>
 References: <cover.8527229dae6c124f24c5e637430c2cdc86f80392.1484154449.git-series.gregory.clement@free-electrons.com>
-Message-ID: <cfd5aee4adf7f27e77263f7aa99a7accf05ac3ba.1484154449.git-series.gregory.clement@free-electrons.com>
+Message-ID: <7af8ed182e2e5dd962dc14f7295ca87d5d115fef.1484154449.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the driver for the SDHCI controller found on the
-Marvell Armada 3700 and 7K/8K ARM64 SoCs.
+Add the eMMC support for Armada 37xx SoC and enable it in the Armada 3720
+DB board.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts | 16 ++++++++++++++++
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 11 +++++++++++
+ 2 files changed, 27 insertions(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 869dded0f09f..341fc631f598 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -390,6 +390,7 @@ CONFIG_MMC_DW_EXYNOS=y
- CONFIG_MMC_DW_K3=y
- CONFIG_MMC_DW_ROCKCHIP=y
- CONFIG_MMC_SUNXI=y
-+CONFIG_MMC_SDHCI_XENON=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+index 89de0a751093..118796b325e5 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+@@ -72,6 +72,22 @@
+ 	status = "okay";
+ };
+ 
++&sdhci0 {
++	non-removable;
++	bus-width = <8>;
++	mmc-ddr-1_8v;
++	mmc-hs400-1_8v;
++	marvell,pad-type = "fixed-1-8v";
++	status = "okay";
++
++	#address-cells = <1>;
++	#size-cells = <0>;
++	mmccard: mmccard at 0 {
++		compatible = "mmc-card";
++		reg = <0>;
++	};
++};
++
+ /* CON31 */
+ &usb3 {
+ 	status = "okay";
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index bab5c6ff5745..966b6f030bfa 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -184,6 +184,17 @@
+ 				};
+ 			};
+ 
++			sdhci0: sdhci at d8000 {
++				compatible = "marvell,armada-3700-sdhci",
++				"marvell,sdhci-xenon";
++				reg = <0xd8000 0x300
++				       0x17808 0x4>;
++				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&nb_periph_clk 0>;
++				clock-names = "core";
++				status = "disabled";
++			};
++
+ 			sata: sata at e0000 {
+ 				compatible = "marvell,armada-3700-ahci";
+ 				reg = <0xe0000 0x2000>;
 -- 
 git-series 0.9.1
