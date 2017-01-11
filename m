@@ -1,43 +1,99 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Tue, 10 Jan 2017 17:38:44 -0700
-Subject: [PATCH] usb: dwc3-exynos fix axius clock error path to do cleanup
-In-Reply-To: <006ab225-6e16-b1d7-567c-d1f236702589@osg.samsung.com>
-References: <20170110230528.7612-1-shuahkh@osg.samsung.com>
- <e4f0b77a-d827-08fa-c4f6-950197c54358@osg.samsung.com>
- <c1938cd9-9bcf-d28b-48fd-be6a22a1f3f7@osg.samsung.com>
- <006ab225-6e16-b1d7-567c-d1f236702589@osg.samsung.com>
-Message-ID: <d937dbc2-5883-775e-8c32-56750cbbbb4c@osg.samsung.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 10 Jan 2017 16:44:41 -0800
+Subject: [PATCH 32/62] watchdog: meson_gxbb_wdt: Convert to use device managed
+ functions and other improvements
+In-Reply-To: <1484095516-12720-1-git-send-email-linux@roeck-us.net>
+References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+ <1484095516-12720-1-git-send-email-linux@roeck-us.net>
+Message-ID: <1484095516-12720-2-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2017 05:32 PM, Javier Martinez Canillas wrote:
-> Hello Shuah,
-> 
-> On 01/10/2017 09:30 PM, Shuah Khan wrote:
-> 
-> [snip]
-> 
->>>>  	clk_disable_unprepare(exynos->axius_clk);
->>>> +axius_clk_err:
->>>
->>> This label isn't consistent with the others, I know the errN aren't great
->>> so what about changing those to meaningful names in a preparatory patch?
->>>
->>> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>>
->>> Best regards,
->>>
->>
->> Javier,
->>
->> Right they aren't consistent. Changing them all to a better naming scheme
->> will have be done in another cleanup patch in my opinion. I don't want to
->> include cleanup in this fix.
->>
-> 
-> I didn't mean to be done in the same patch, that's why I said in another
-> preparatory patch.
+Use device managed functions to simplify error handling, reduce
+source code size, improve readability, and reduce the likelyhood of bugs.
+Other improvements as listed below.
 
-Yes. I can send the cleanup patch.
+The conversion was done automatically with coccinelle using the
+following semantic patches. The semantic patches and the scripts used
+to generate this commit log are available at
+https://github.com/groeck/coccinelle-patches
 
--- Shuah
+- Use devm_add_action_or_reset() for calls to clk_disable_unprepare
+- Check return value from clk_prepare_enable()
+- Replace 'val = e; return val;' with 'return e;'
+- Replace 'if (e) return e; return 0;' with 'return e;'
+- Drop assignments to otherwise unused variables
+- Replace 'if (e) { return expr; }' with 'if (e) return expr;'
+- Drop remove function
+- Use devm_watchdog_register_driver() to register watchdog device
+- Replace shutdown function with call to watchdog_stop_on_reboot()
+
+Cc: Carlo Caione <carlo@caione.org>
+Cc: Kevin Hilman <khilman@baylibre.com>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+ drivers/watchdog/meson_gxbb_wdt.c | 38 ++++++++++----------------------------
+ 1 file changed, 10 insertions(+), 28 deletions(-)
+
+diff --git a/drivers/watchdog/meson_gxbb_wdt.c b/drivers/watchdog/meson_gxbb_wdt.c
+index 45d47664a00a..913d8a644460 100644
+--- a/drivers/watchdog/meson_gxbb_wdt.c
++++ b/drivers/watchdog/meson_gxbb_wdt.c
+@@ -203,7 +203,14 @@ static int meson_gxbb_wdt_probe(struct platform_device *pdev)
+ 	if (IS_ERR(data->clk))
+ 		return PTR_ERR(data->clk);
+ 
+-	clk_prepare_enable(data->clk);
++	ret = clk_prepare_enable(data->clk);
++	if (ret)
++		return ret;
++	ret = devm_add_action_or_reset(&pdev->dev,
++				       (void(*)(void *))clk_disable_unprepare,
++				       data->clk);
++	if (ret)
++		return ret;
+ 
+ 	platform_set_drvdata(pdev, data);
+ 
+@@ -224,37 +231,12 @@ static int meson_gxbb_wdt_probe(struct platform_device *pdev)
+ 
+ 	meson_gxbb_wdt_set_timeout(&data->wdt_dev, data->wdt_dev.timeout);
+ 
+-	ret = watchdog_register_device(&data->wdt_dev);
+-	if (ret) {
+-		clk_disable_unprepare(data->clk);
+-		return ret;
+-	}
+-
+-	return 0;
+-}
+-
+-static int meson_gxbb_wdt_remove(struct platform_device *pdev)
+-{
+-	struct meson_gxbb_wdt *data = platform_get_drvdata(pdev);
+-
+-	watchdog_unregister_device(&data->wdt_dev);
+-
+-	clk_disable_unprepare(data->clk);
+-
+-	return 0;
+-}
+-
+-static void meson_gxbb_wdt_shutdown(struct platform_device *pdev)
+-{
+-	struct meson_gxbb_wdt *data = platform_get_drvdata(pdev);
+-
+-	meson_gxbb_wdt_stop(&data->wdt_dev);
++	watchdog_stop_on_reboot(&data->wdt_dev);
++	return devm_watchdog_register_device(&pdev->dev, &data->wdt_dev);
+ }
+ 
+ static struct platform_driver meson_gxbb_wdt_driver = {
+ 	.probe	= meson_gxbb_wdt_probe,
+-	.remove	= meson_gxbb_wdt_remove,
+-	.shutdown = meson_gxbb_wdt_shutdown,
+ 	.driver = {
+ 		.name = "meson-gxbb-wdt",
+ 		.pm = &meson_gxbb_wdt_pm_ops,
+-- 
+2.7.4
