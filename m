@@ -1,50 +1,43 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 11 Jan 2017 17:01:55 +0000
-Subject: [PATCH v2 2/5] crypto: arm/aes-ce - enable module autoloading based
- on CPU feature bits
-In-Reply-To: <1484154118-22139-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1484154118-22139-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1484154118-22139-3-git-send-email-ard.biesheuvel@linaro.org>
+Date: Wed, 11 Jan 2017 17:01:53 +0000
+Subject: [PATCH v2 0/5] ARM: add module autoloading support for crypto modules
+Message-ID: <1484154118-22139-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the module autoloadable by tying it to the CPU feature bit that
-describes whether the optional instructions it relies on are implemented
-by the current CPU.
+This series wires up the crypto modules that use the ARM 32-bit versions of
+the ARMv8 Crypto Extensions to udev autoloading, by exposing the HWCAP2
+feature bits via the CPU modalias. This is very similar to the arm64
+implementation, with the notable exception that ARM has its CPU feature
+definitions split across HWCAP and HWCAP2.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/crypto/aes-ce-glue.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+Given that the crypto feature bits are all exposed via HWCAP2, and considering
+that there are currently no features exposed via HWCAP that are relevant to
+udev module autoloading, exposing HWCAP2 only should be sufficient, at least
+for now.
 
-diff --git a/arch/arm/crypto/aes-ce-glue.c b/arch/arm/crypto/aes-ce-glue.c
-index 8857531915bf..98c68ad101e5 100644
---- a/arch/arm/crypto/aes-ce-glue.c
-+++ b/arch/arm/crypto/aes-ce-glue.c
-@@ -14,6 +14,7 @@
- #include <crypto/aes.h>
- #include <crypto/internal/simd.h>
- #include <crypto/internal/skcipher.h>
-+#include <linux/cpufeature.h>
- #include <linux/module.h>
- #include <crypto/xts.h>
- 
-@@ -428,9 +429,6 @@ static int __init aes_init(void)
- 	int err;
- 	int i;
- 
--	if (!(elf_hwcap2 & HWCAP2_AES))
--		return -ENODEV;
--
- 	err = crypto_register_skciphers(aes_algs, ARRAY_SIZE(aes_algs));
- 	if (err)
- 		return err;
-@@ -454,5 +452,5 @@ static int __init aes_init(void)
- 	return err;
- }
- 
--module_init(aes_init);
-+module_cpu_feature_match(AES, aes_init);
- module_exit(aes_exit);
+Changes since v1:
+- rebase onto v4.10-rc2
+
+Ard Biesheuvel (5):
+  ARM: wire up HWCAP2 feature bits to the CPU modalias
+  crypto: arm/aes-ce - enable module autoloading based on CPU feature
+    bits
+  crypto: arm/ghash-ce - enable module autoloading based on CPU feature
+    bits
+  crypto: arm/sha1-ce - enable module autoloading based on CPU feature
+    bits
+  crypto: arm/sha2-ce - enable module autoloading based on CPU feature
+    bits
+
+ arch/arm/Kconfig                  |  1 +
+ arch/arm/crypto/aes-ce-glue.c     |  6 ++--
+ arch/arm/crypto/ghash-ce-glue.c   |  6 ++--
+ arch/arm/crypto/sha1-ce-glue.c    |  5 ++-
+ arch/arm/crypto/sha2-ce-glue.c    |  5 ++-
+ arch/arm/include/asm/cpufeature.h | 32 ++++++++++++++++++++
+ 6 files changed, 41 insertions(+), 14 deletions(-)
+ create mode 100644 arch/arm/include/asm/cpufeature.h
+
 -- 
 2.7.4
