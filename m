@@ -1,23 +1,79 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Wed, 11 Jan 2017 10:11:04 +0900
-Subject: [PATCH] arm64: dts: exynos: Replace small letter of base
- address/offset on Exynos5433
-In-Reply-To: <1484096148-17120-1-git-send-email-cw00.choi@samsung.com>
-References: <CGME20170111005552epcas1p4a1f6ed88022b46544dec4b3801583267@epcas1p4.samsung.com>
- <1484096148-17120-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20170111011104.ggx7pvldmy5af2fh@gangnam.samsung>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 11 Jan 2017 02:12:58 +0100
+Subject: [PATCH v4 1/2] arm64: dts: rockchip: add "rockchip,
+ grf" property for RK3399 PMUCRU/CRU
+In-Reply-To: <58758498.40309@rock-chips.com>
+References: <1484028930-20305-1-git-send-email-zhengxing@rock-chips.com>
+ <CAD=FV=Wwu3q_LqwYUWcJQRvp5neVOS9szgsYFONWTRJ0X8hRTA@mail.gmail.com>
+ <58758498.40309@rock-chips.com>
+Message-ID: <1799437.apf7OqdtKq@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
-
-> This patch replaces the small letter of base address, offset and hex value
-> with the capital letter to keep the consistency on Exynos5433.
+Am Mittwoch, 11. Januar 2017, 09:04:24 CET schrieb Xing Zheng:
+> Hi Doug,
 > 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> On 2017?01?11? 02:45, Doug Anderson wrote:
+> > Hi,
+> > 
+> > On Mon, Jan 9, 2017 at 10:15 PM, Xing Zheng <zhengxing@rock-chips.com> 
+wrote:
+> >> The structure rockchip_clk_provider needs to refer the GRF regmap
+> >> in somewhere, if the CRU node has not "rockchip,grf" property,
+> >> calling syscon_regmap_lookup_by_phandle will return an invalid GRF
+> >> regmap, and the MUXGRF type clock will be not supported.
+> >> 
+> >> Therefore, we need to add them.
+> >> 
+> >> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+> >> ---
+> >> 
+> >> Changes in v4:
+> >> - separte the binding patch
+> >> 
+> >> Changes in v3:
+> >> - add optional roperty rockchip,grf in rockchip,rk3399-cru.txt
+> >> 
+> >> Changes in v2:
+> >> - referring pmugrf for PMUGRU
+> >> - fix the typo "invaild" in COMMIT message
+> >> 
+> >>   arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 ++
+> >>   1 file changed, 2 insertions(+)
+> > 
+> > This seems fine to me, so:
+> > 
+> > Reviewed-by: Douglas Anderson <dianders@chromium.org>
+> > 
+> > ...but I will say that before you actually add any real "MUXGRF"
+> > clocks on rk3399 you _might_ need to rework the code to make things
+> > truly "optional".  If it turns out that any existing clocks that
+> > already exist today already go through one of these muxes in the GRF
+> > and we've always been assuming one setting of the mux, we'll need to
+> > make sure we keep assuming that setting of the mux even if the "grf"
+> > isn't specified.
+> > 
+> > As I understand it, your motivation for this patch is to eventually be
+> > able to model the EDP reference clock which can either be xin24 or
+> > "edp osc".  Presumably the eDP "reference clock" isn't related to any
+> > of the pre-existing eDP clocks so that one should be safe.
+> 
+> Hmm... I had intended to use this patch for EDP reference clock, but we
+> don't need to change the parent
+> clock (see the BUG: 61664).
 
-Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
+Yep that sounds ok. As I said in my replies, we don't support the edp in the 
+mainline kernel yet, so nothing old can break here :-)
 
-You will make Krzysztof happy by guessing the correct subject :)
 
-Andi
+> I just woud like to add this patch to avoid getting some unavailable
+> MUXGRF clock and need to debug it again,
+> if we support it one day in future.
+
+could you just check, if we have any other grf-based muxes that we may need in 
+the future. Right now I only see pclkin_isp1_wrapper describing such a mux, 
+but it would be cool if you could check again.
+
+
+Thanks
+Heiko
