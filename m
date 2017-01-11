@@ -1,99 +1,21 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 11 Jan 2017 14:54:53 +0000
-Subject: [PATCH] arm64: assembler: make adr_l work in modules under KASLR
-Message-ID: <1484146493-18460-1-git-send-email-ard.biesheuvel@linaro.org>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Wed, 11 Jan 2017 15:01:50 +0000
+Subject: [PATCH 0/8] efi: Pass secure boot mode to kernel [ver #6]
+In-Reply-To: <148120020832.5854.5448601415491330495.stgit@warthog.procyon.org.uk>
+References: <148120020832.5854.5448601415491330495.stgit@warthog.procyon.org.uk>
+Message-ID: <20170111150150.GC29649@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_RANDOMIZE_MODULE_REGION_FULL=y, the offset between loaded
-modules and the core kernel may exceed 4 GB, putting symbols exported
-by the core kernel out of the reach of the ordinary adrp/add instruction
-pairs used to generate relative symbol references. So make the adr_l
-macro emit a movz/movk sequence instead when executing in module context.
+On Thu, 08 Dec, at 12:30:08PM, David Howells wrote:
+> 
+> Here's a set of patches that can determine the secure boot state of the
+> UEFI BIOS and pass that along to the main kernel image.  This involves
+> generalising ARM's efi_get_secureboot() function and making it mixed-mode
+> safe.
 
-While at it, remove the pointless special case for the stack pointer.
+This version looks OK to me apart from the couple of comments I made.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/assembler.h | 36 +++++++++++++++-----
- 1 file changed, 27 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 446f6c46d4b1..3a4301163e04 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -164,22 +164,25 @@ lr	.req	x30		// link register
- 
- /*
-  * Pseudo-ops for PC-relative adr/ldr/str <reg>, <symbol> where
-- * <symbol> is within the range +/- 4 GB of the PC.
-+ * <symbol> is within the range +/- 4 GB of the PC when running
-+ * in core kernel context. In module context, a movz/movk sequence
-+ * is used, since modules may be loaded far away from the kernel
-+ * when KASLR is in effect.
-  */
- 	/*
- 	 * @dst: destination register (64 bit wide)
- 	 * @sym: name of the symbol
--	 * @tmp: optional scratch register to be used if <dst> == sp, which
--	 *       is not allowed in an adrp instruction
- 	 */
--	.macro	adr_l, dst, sym, tmp=
--	.ifb	\tmp
-+	.macro	adr_l, dst, sym
-+#ifndef MODULE
- 	adrp	\dst, \sym
- 	add	\dst, \dst, :lo12:\sym
--	.else
--	adrp	\tmp, \sym
--	add	\dst, \tmp, :lo12:\sym
--	.endif
-+#else
-+	movz	\dst, #:abs_g3:\sym
-+	movk	\dst, #:abs_g2_nc:\sym
-+	movk	\dst, #:abs_g1_nc:\sym
-+	movk	\dst, #:abs_g0_nc:\sym
-+#endif
- 	.endm
- 
- 	/*
-@@ -190,6 +193,7 @@ lr	.req	x30		// link register
- 	 *       the address
- 	 */
- 	.macro	ldr_l, dst, sym, tmp=
-+#ifndef MODULE
- 	.ifb	\tmp
- 	adrp	\dst, \sym
- 	ldr	\dst, [\dst, :lo12:\sym]
-@@ -197,6 +201,15 @@ lr	.req	x30		// link register
- 	adrp	\tmp, \sym
- 	ldr	\dst, [\tmp, :lo12:\sym]
- 	.endif
-+#else
-+	.ifb	\tmp
-+	adr_l	\dst, \sym
-+	ldr	\dst, [\dst]
-+	.else
-+	adr_l	\tmp, \sym
-+	ldr	\dst, [\tmp]
-+	.endif
-+#endif
- 	.endm
- 
- 	/*
-@@ -206,8 +219,13 @@ lr	.req	x30		// link register
- 	 *       while <src> needs to be preserved.
- 	 */
- 	.macro	str_l, src, sym, tmp
-+#ifndef MODULE
- 	adrp	\tmp, \sym
- 	str	\src, [\tmp, :lo12:\sym]
-+#else
-+	adr_l	\tmp, \sym
-+	str	\src, [\tmp]
-+#endif
- 	.endm
- 
- 	/*
--- 
-2.7.4
+Ard, did you take a look? In particular some boot testing on ARM/arm64
+would be useful. x86 boots fine in both regular and mixed mode but
+I've only tested without Secure Boot enabled.
