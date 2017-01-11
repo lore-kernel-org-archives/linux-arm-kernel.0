@@ -1,33 +1,80 @@
-From: nleeder@codeaurora.org (Leeder, Neil)
-Date: Tue, 10 Jan 2017 19:46:49 -0500
-Subject: System/uncore PMUs and unit aggregation
-In-Reply-To: <20170110185459.GB12728@arm.com>
-References: <20161117181708.GT22855@arm.com>
- <2cb0eb12-979c-7eff-7c51-ce9e06b3740c@codeaurora.org>
- <20170110185459.GB12728@arm.com>
-Message-ID: <60062949-a695-db5d-d642-eb403518df36@codeaurora.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 11 Jan 2017 09:55:48 +0900
+Subject: [PATCH] arm64: dts: exynos: Replace small letter of base
+ address/offset on Exynos5433
+References: <CGME20170111005552epcas1p4a1f6ed88022b46544dec4b3801583267@epcas1p4.samsung.com>
+Message-ID: <1484096148-17120-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/10/2017 1:54 PM, Will Deacon wrote:
-> Mark and I had a chat about this earlier today and I think we largely agree
-> with you. That is, for composite PMUs with a notion of CPU affinity for
-> their component units, it makes sense to use the event affinity as a means
-> to address these units, rather than e.g. create separate PMU instances.
->
-> However, for PMUs that don't have this notion of affinity, the units should
-> either be exposed individually or, in the case that there is something like
-> shared control logic, they should be addressed through the config fields
-> (e.g. the hisilicon cache with the bank=NN option).
->
-> I think this fits with your driver, so please post an updated version
-> addressing Mark's unrelated review comments.
->
-Thanks Will. I'll post a new patch which covers Marks's comments.
+This patch replaces the small letter of base address, offset and hex value
+with the capital letter to keep the consistency on Exynos5433.
 
-Neil
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+index abaf6b4d599d..d7ed1a68b6fd 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+@@ -231,7 +231,7 @@
+ 		compatible = "arm,psci";
+ 		method = "smc";
+ 		cpu_off = <0x84000002>;
+-		cpu_on = <0xC4000003>;
++		cpu_on = <0xc4000003>;
+ 	};
+ 
+ 	reboot: syscon-reboot {
+@@ -753,7 +753,7 @@
+ 
+ 		dsi: dsi at 13900000 {
+ 			compatible = "samsung,exynos5433-mipi-dsi";
+-			reg = <0x13900000 0xC0>;
++			reg = <0x13900000 0xc0>;
+ 			interrupts = <GIC_SPI 205 IRQ_TYPE_LEVEL_HIGH>;
+ 			phys = <&mipi_phy 1>;
+ 			phy-names = "dsim";
+@@ -880,9 +880,9 @@
+ 			iommus = <&sysmmu_jpeg>;
+ 		};
+ 
+-		mfc: codec at 152E0000 {
++		mfc: codec at 152e0000 {
+ 			compatible = "samsung,exynos5433-mfc";
+-			reg = <0x152E0000 0x10000>;
++			reg = <0x152e0000 0x10000>;
+ 			interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "pclk", "aclk", "aclk_xiu";
+ 			clocks = <&cmu_mfc CLK_PCLK_MFC>,
+@@ -914,7 +914,7 @@
+ 
+ 		sysmmu_gscl0: sysmmu at 13c80000 {
+ 			compatible = "samsung,exynos-sysmmu";
+-			reg = <0x13C80000 0x1000>;
++			reg = <0x13c80000 0x1000>;
+ 			interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "aclk", "pclk";
+ 			clocks = <&cmu_gscl CLK_ACLK_SMMU_GSCL0>,
+@@ -924,7 +924,7 @@
+ 
+ 		sysmmu_gscl1: sysmmu at 13c90000 {
+ 			compatible = "samsung,exynos-sysmmu";
+-			reg = <0x13C90000 0x1000>;
++			reg = <0x13c90000 0x1000>;
+ 			interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "aclk", "pclk";
+ 			clocks = <&cmu_gscl CLK_ACLK_SMMU_GSCL1>,
+@@ -934,7 +934,7 @@
+ 
+ 		sysmmu_gscl2: sysmmu at 13ca0000 {
+ 			compatible = "samsung,exynos-sysmmu";
+-			reg = <0x13CA0000 0x1000>;
++			reg = <0x13ca0000 0x1000>;
+ 			interrupts = <GIC_SPI 292 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "aclk", "pclk";
+ 			clocks = <&cmu_gscl CLK_ACLK_SMMU_GSCL2>,
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm 
-Technologies Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+1.9.1
