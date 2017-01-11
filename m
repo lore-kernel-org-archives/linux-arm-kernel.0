@@ -1,88 +1,192 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 11 Jan 2017 18:28:15 +0000
-Subject: [PATCH v2] arm64: do not set dma masks that device connection
- can't handle
-In-Reply-To: <7c6a1523-e41b-ad83-501a-27c260b9f9ee@cogentembedded.com>
-References: <1483947002-16410-1-git-send-email-nikita.yoush@cogentembedded.com>
- <07253eaa-5729-0f15-42b6-e8403f1f0412@cogentembedded.com>
- <11daacde-5399-039f-80a3-01d7bd13e9e8@arm.com> <6116278.nQQUSuo3l4@wuerfel>
- <5c5cd4fd-4854-a2dd-10b6-9cc98e63a85c@arm.com>
- <7c6a1523-e41b-ad83-501a-27c260b9f9ee@cogentembedded.com>
-Message-ID: <b6648c47-89ef-d9d6-72bb-91b49bab8f96@arm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 11 Jan 2017 12:30:55 -0600
+Subject: [PATCH] PCI: mvebu: Handle changes to the bridge windows while
+ enabled
+In-Reply-To: <20161212183020.GA30274@obsidianresearch.com>
+References: <20161212183020.GA30274@obsidianresearch.com>
+Message-ID: <20170111183055.GD14532@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/17 12:37, Nikita Yushchenko wrote:
->> I actually have a third variation of this problem involving a PCI root
->> complex which *could* drive full-width (40-bit) addresses, but won't,
->> due to the way its PCI<->AXI interface is programmed. That would require
->> even more complicated dma-ranges handling to describe the windows of
->> valid physical addresses which it *will* pass, so I'm not pressing the
->> issue - let's just get the basic DMA mask case fixed first.
+On Mon, Dec 12, 2016 at 11:30:20AM -0700, Jason Gunthorpe wrote:
+> The PCI core will write to the bridge window config multiple times
+> while they are enabled. This can lead to mbus failures like:
 > 
-> R-Car + NVMe is actually not "basic case".
-
-I meant "basic" in terms of what needs to be done in Linux - simply
-preventing device drivers from overwriting the DT-configured DMA mask
-will make everything work as well as well as it possibly can on R-Car,
-both with or without the IOMMU, since apparently all you need is to
-ensure a PCI device never gets given a DMA address above 4GB. The
-situation where PCI devices *can* DMA to all of physical memory, but
-can't use arbitrary addresses *outside* it - which only becomes a
-problem with an IOMMU - is considerably trickier.
-
-> It has PCI<->AXI interface involved.
-> PCI addresses are 64-bit and controller does handle 64-bit addresses
-> there. Mapping between PCI addresses and AXI addresses is defined. But
-> AXI is 32-bit.
+>  mvebu_mbus: cannot add window '4:e8', conflicts with another window
+>  mvebu-pcie mbus:pex at e0000000: Could not create MBus window at [mem 0xe0000000-0xe00fffff]: -22
 > 
-> SoC has iommu that probably could be used between PCIe module and RAM.
-> Although AFAIK nobody made that working yet.
+> For me this is happening during a hotplug cycle. The PCI core is
+> not changing the values, just writing them twice while active.
 > 
-> Board I work with has 4G of RAM, in 4 banks, located at different parts
-> of wide address space, and only one of them is below 4G. But if iommu is
-> capable of translating addresses such that 4 gigabyte banks map to first
-> 4 gigabytes of address space, then all memory will become available for
-> DMA from PCIe device.
+> The patch addresses the general case of any change to an active window,
+> but not atomically. The code is slightly refactored so io and mem
+> can share more of the window logic.
 
-The aforementioned situation on Juno is similar yet different - the PLDA
-XR3 root complex uses an address-based lookup table to translate
-outgoing PCI memory space transactions to AXI bus addresses with the
-appropriate attributes, in power-of-two-sized regions. The firmware
-configures 3 LUT entries - 2GB at 0x8000_0000 and 8GB at 0x8_8000_0000
-with cache-coherent attributes to cover the DRAM areas, plus a small one
-with device attributes covering the GICv2m MSI frame. The issue is that
-there is no "no match" translation, so any transaction not within one of
-those regions never makes it out of the root complex at all.
+Looks good to me, but I'm waiting for an ack from Thomas or Jason (listed
+as maintainers and already cc'd).
 
-That's fine in normal operation, as there's nothing outside those
-regions in the physical memory map a PCI device should be accessing
-anyway, but turning on the SMMU is another matter - since the IOVA
-allocator runs top-down, a PCI device with a 64-bit DMA mask will do a
-dma_map or dma_alloc, get the physical page mapped to an IOVA up around
-FF_FFFF_F000 (the SMMU will constrain things to the system bus width of
-40 bits), then try to access that address and get a termination straight
-back from the RC. Similarly, A KVM guest which wants to place its memory
-at arbitrary locations and expect device passthrough to work is going to
-have a bad time.
-
-I don't know if it's feasible to have the firmware set the LUT up
-differently, as that might lead to other problems when not using the
-SMMU, and/or just require far more than the 8 available LUT entries
-(assuming they have to be non-overlapping - I'm not 100% sure and
-documentation is sparse). Thus it seems appropriate to describe the
-currently valid PCI-AXI translations with dma-ranges, but then we'd have
-multiple entries - last time I looked Linux simply ignores all but the
-last one in that case - which can't be combined into a simple bitmask,
-so I'm not entirely sure where to go from there. Especially as so far it
-seems to be a problem exclusive to one not-widely-available ageing
-early-access development platform...
-
-It happens that limiting all PCI DMA masks to 32 bits would bodge around
-this problem thanks to the current IOVA allocator behaviour, but that's
-pretty yuck, and would force unnecessary bouncing for the non-SMMU case.
-My other hack to carve up IOVA domains to reserve all addresses not
-matching memblocks is hardly any more realistic, hence why the SMMU is
-in the Juno DT in a change-it-at-your-own-peril "disabled" state ;)
-
-Robin.
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> ---
+>  drivers/pci/host/pci-mvebu.c | 101 +++++++++++++++++++++++++------------------
+>  1 file changed, 60 insertions(+), 41 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index 307f81d6b479af..af724731b22f53 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -133,6 +133,12 @@ struct mvebu_pcie {
+>  	int nports;
+>  };
+>  
+> +struct mvebu_pcie_window {
+> +	phys_addr_t base;
+> +	phys_addr_t remap;
+> +	size_t size;
+> +};
+> +
+>  /* Structure representing one PCIe interface */
+>  struct mvebu_pcie_port {
+>  	char *name;
+> @@ -150,10 +156,8 @@ struct mvebu_pcie_port {
+>  	struct mvebu_sw_pci_bridge bridge;
+>  	struct device_node *dn;
+>  	struct mvebu_pcie *pcie;
+> -	phys_addr_t memwin_base;
+> -	size_t memwin_size;
+> -	phys_addr_t iowin_base;
+> -	size_t iowin_size;
+> +	struct mvebu_pcie_window memwin;
+> +	struct mvebu_pcie_window iowin;
+>  	u32 saved_pcie_stat;
+>  };
+>  
+> @@ -379,23 +383,45 @@ static void mvebu_pcie_add_windows(struct mvebu_pcie_port *port,
+>  	}
+>  }
+>  
+> +static void mvebu_pcie_set_window(struct mvebu_pcie_port *port,
+> +				  unsigned int target, unsigned int attribute,
+> +				  const struct mvebu_pcie_window *desired,
+> +				  struct mvebu_pcie_window *cur)
+> +{
+> +	if (desired->base == cur->base && desired->remap == cur->remap &&
+> +	    desired->size == cur->size)
+> +		return;
+> +
+> +	if (cur->size != 0) {
+> +		mvebu_pcie_del_windows(port, cur->base, cur->size);
+> +		cur->size = 0;
+> +		cur->base = 0;
+> +
+> +		/*
+> +		 * If something tries to change the window while it is enabled
+> +		 * the change will not be done atomically. That would be
+> +		 * difficult to do in the general case.
+> +		 */
+> +	}
+> +
+> +	if (desired->size == 0)
+> +		return;
+> +
+> +	mvebu_pcie_add_windows(port, target, attribute, desired->base,
+> +			       desired->size, desired->remap);
+> +	*cur = *desired;
+> +}
+> +
+>  static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+>  {
+> -	phys_addr_t iobase;
+> +	struct mvebu_pcie_window desired = {};
+>  
+>  	/* Are the new iobase/iolimit values invalid? */
+>  	if (port->bridge.iolimit < port->bridge.iobase ||
+>  	    port->bridge.iolimitupper < port->bridge.iobaseupper ||
+>  	    !(port->bridge.command & PCI_COMMAND_IO)) {
+> -
+> -		/* If a window was configured, remove it */
+> -		if (port->iowin_base) {
+> -			mvebu_pcie_del_windows(port, port->iowin_base,
+> -					       port->iowin_size);
+> -			port->iowin_base = 0;
+> -			port->iowin_size = 0;
+> -		}
+> -
+> +		mvebu_pcie_set_window(port, port->io_target, port->io_attr,
+> +				      &desired, &port->iowin);
+>  		return;
+>  	}
+>  
+> @@ -412,32 +438,27 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+>  	 * specifications. iobase is the bus address, port->iowin_base
+>  	 * is the CPU address.
+>  	 */
+> -	iobase = ((port->bridge.iobase & 0xF0) << 8) |
+> -		(port->bridge.iobaseupper << 16);
+> -	port->iowin_base = port->pcie->io.start + iobase;
+> -	port->iowin_size = ((0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
+> -			    (port->bridge.iolimitupper << 16)) -
+> -			    iobase) + 1;
+> -
+> -	mvebu_pcie_add_windows(port, port->io_target, port->io_attr,
+> -			       port->iowin_base, port->iowin_size,
+> -			       iobase);
+> +	desired.remap = ((port->bridge.iobase & 0xF0) << 8) |
+> +			(port->bridge.iobaseupper << 16);
+> +	desired.base = port->pcie->io.start + desired.remap;
+> +	desired.size = ((0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
+> +			 (port->bridge.iolimitupper << 16)) -
+> +			desired.remap) +
+> +		       1;
+> +
+> +	mvebu_pcie_set_window(port, port->io_target, port->io_attr, &desired,
+> +			      &port->iowin);
+>  }
+>  
+>  static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+>  {
+> +	struct mvebu_pcie_window desired = {.remap = MVEBU_MBUS_NO_REMAP};
+> +
+>  	/* Are the new membase/memlimit values invalid? */
+>  	if (port->bridge.memlimit < port->bridge.membase ||
+>  	    !(port->bridge.command & PCI_COMMAND_MEMORY)) {
+> -
+> -		/* If a window was configured, remove it */
+> -		if (port->memwin_base) {
+> -			mvebu_pcie_del_windows(port, port->memwin_base,
+> -					       port->memwin_size);
+> -			port->memwin_base = 0;
+> -			port->memwin_size = 0;
+> -		}
+> -
+> +		mvebu_pcie_set_window(port, port->mem_target, port->mem_attr,
+> +				      &desired, &port->memwin);
+>  		return;
+>  	}
+>  
+> @@ -447,14 +468,12 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+>  	 * window to setup, according to the PCI-to-PCI bridge
+>  	 * specifications.
+>  	 */
+> -	port->memwin_base  = ((port->bridge.membase & 0xFFF0) << 16);
+> -	port->memwin_size  =
+> -		(((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
+> -		port->memwin_base + 1;
+> -
+> -	mvebu_pcie_add_windows(port, port->mem_target, port->mem_attr,
+> -			       port->memwin_base, port->memwin_size,
+> -			       MVEBU_MBUS_NO_REMAP);
+> +	desired.base = ((port->bridge.membase & 0xFFF0) << 16);
+> +	desired.size = (((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
+> +		       desired.base + 1;
+> +
+> +	mvebu_pcie_set_window(port, port->mem_target, port->mem_attr, &desired,
+> +			      &port->memwin);
+>  }
+>  
+>  /*
+> -- 
+> 2.7.4
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
