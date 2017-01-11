@@ -1,59 +1,41 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu, 12 Jan 2017 03:55:33 +0800
-Subject: [PATCH 4/4] ARM: dts: sun8i: add OTG function to Lichee Pi Zero
-In-Reply-To: <20170110202443.GC2479@uda0271908>
-References: <20170103152534.20118-1-icenowy@aosc.xyz>
- <20170103152534.20118-5-icenowy@aosc.xyz> <20170110202443.GC2479@uda0271908>
-Message-ID: <2733831484164533@web1g.yandex.ru>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Wed, 11 Jan 2017 14:07:16 -0600
+Subject: [GIT PULL 1/2] SoCFPGA defconfig updates for v4.11
+Message-ID: <1484165237-26640-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd, Kevin, and Olof:
 
+Please pull in this defconfig update for v4.11.
 
-11.01.2017, 04:24, "Bin Liu" <b-liu@ti.com>:
-> On Tue, Jan 03, 2017 at 11:25:34PM +0800, Icenowy Zheng wrote:
->> ?Lichee Pi Zero features a USB OTG port.
->>
->> ?Add support for it.
->>
->> ?Note: in order to use the Host mode, the board must be powered via the
->> ?+5V and GND pins.
->>
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ?---
->> ??arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 10 ++++++++++
->> ??1 file changed, 10 insertions(+)
->>
->> ?diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
->> ?index 0099affc6ce3..3d9168cbaeca 100644
->> ?--- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
->> ?+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
->> ?@@ -71,3 +71,13 @@
->> ??????????pinctrl-names = "default";
->> ??????????status = "okay";
->> ??};
->> ?+
->> ?+&usb_otg {
->> ?+ dr_mode = "otg";
->
-> Why not set this default mode in dtsi instead?
->
-> Regards,
-> -Bin.
+Thanks,
+Dinh
 
-There's possibly boards which do not have OTG functions.
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
-Even the official CDR design of V3s uses the USB controller to
-connect a UVC webcam to make the design a dual-cam design
-(V3s itself has a CSI).
+  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 
->
->> ?+ status = "okay";
->> ?+};
->> ?+
->> ?+&usbphy {
->> ?+ usb0_id_det-gpio = <&pio 5 6 GPIO_ACTIVE_HIGH>;
->> ?+ status = "okay";
->> ?+};
->> ?--
->> ?2.11.0
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_defconfig_updates_for_v4.11
+
+for you to fetch changes up to 4fdf18242408cc0b32b3a1a06510376bf609fa60:
+
+  ARM: socfpga_defconfig: update defconfig for SoCFPGA (2017-01-03 20:29:08 -0600)
+
+----------------------------------------------------------------
+SoCFPGA defconfig updates for v4.11
+- enables Marvell PHY support
+- enable MTD(I2C EEPROM), and NAND support
+- enable SPI, RTC and LED support
+- enables OF CONFIGFS to support DTS overlays
+- enables more FS options
+- enables A10 hwmon support
+
+----------------------------------------------------------------
+Dinh Nguyen (1):
+      ARM: socfpga_defconfig: update defconfig for SoCFPGA
+
+ arch/arm/configs/socfpga_defconfig | 28 ++++++++++++++++++++++++++--
+ 1 file changed, 26 insertions(+), 2 deletions(-)
