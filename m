@@ -1,91 +1,28 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 11 Jan 2017 23:06:38 +0800
-Subject: [PATCH v7 14/15] irqchip: mbigen: introduce mbigen_of_create_domain()
-In-Reply-To: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
-References: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1484147199-4267-15-git-send-email-hanjun.guo@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 11 Jan 2017 16:16:31 +0100
+Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
+ enable panel
+In-Reply-To: <50499352-fa14-64c4-1a74-db4827757a2d@arm.com>
+References: <20161221032717.13154-1-vz@mleia.com>
+ <CACRpkdZE6VgJA27+Wh=Gxd7yOXpLMyT7yCB2PYA36y0gvosHFQ@mail.gmail.com>
+ <20170102142228.GI14217@n2100.armlinux.org.uk>
+ <252ad888-fa9d-695a-58ed-46806e4374fd@mleia.com>
+ <50499352-fa14-64c4-1a74-db4827757a2d@arm.com>
+Message-ID: <CACRpkdYv87Tmp6i-vccVmtVD5NDk2y1=62sgP7VQgWctC+t3Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kefeng Wang <wangkefeng.wang@huawei.com>
+On Tue, Jan 10, 2017 at 2:47 PM, Vladimir Murzin
+<vladimir.murzin@arm.com> wrote:
 
-Introduce mbigen_of_create_domain() to consolidate OF related
-code and prepare for ACPI later, no funtional change.
+> In another thread Benjamin pointed at patch [1] in drm/kms part for noMMU.
+>
+> [1] https://cgit.freedesktop.org/drm/drm-misc/commit/?id=62a0d98a188cc4ebd8ea54b37d274ec20465e464
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Reviewed-by: Ma Jun <majun258@huawei.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
----
- drivers/irqchip/irq-mbigen.c | 42 +++++++++++++++++++++++++++---------------
- 1 file changed, 27 insertions(+), 15 deletions(-)
+Problem solved?
 
-diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-index c01ab41..4e11da5 100644
---- a/drivers/irqchip/irq-mbigen.c
-+++ b/drivers/irqchip/irq-mbigen.c
-@@ -236,27 +236,15 @@ static int mbigen_irq_domain_alloc(struct irq_domain *domain,
- 	.free		= irq_domain_free_irqs_common,
- };
- 
--static int mbigen_device_probe(struct platform_device *pdev)
-+static int mbigen_of_create_domain(struct platform_device *pdev,
-+				   struct mbigen_device *mgn_chip)
- {
--	struct mbigen_device *mgn_chip;
-+	struct device *parent;
- 	struct platform_device *child;
- 	struct irq_domain *domain;
- 	struct device_node *np;
--	struct device *parent;
--	struct resource *res;
- 	u32 num_pins;
- 
--	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
--	if (!mgn_chip)
--		return -ENOMEM;
--
--	mgn_chip->pdev = pdev;
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	mgn_chip->base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(mgn_chip->base))
--		return PTR_ERR(mgn_chip->base);
--
- 	for_each_child_of_node(pdev->dev.of_node, np) {
- 		if (!of_property_read_bool(np, "interrupt-controller"))
- 			continue;
-@@ -280,6 +268,30 @@ static int mbigen_device_probe(struct platform_device *pdev)
- 			return -ENOMEM;
- 	}
- 
-+	return 0;
-+}
-+
-+static int mbigen_device_probe(struct platform_device *pdev)
-+{
-+	struct mbigen_device *mgn_chip;
-+	struct resource *res;
-+	int err;
-+
-+	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
-+	if (!mgn_chip)
-+		return -ENOMEM;
-+
-+	mgn_chip->pdev = pdev;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	mgn_chip->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-+	if (IS_ERR(mgn_chip->base))
-+		return PTR_ERR(mgn_chip->base);
-+
-+	err = mbigen_of_create_domain(pdev, mgn_chip);
-+	if (err)
-+		return err;
-+
- 	platform_set_drvdata(pdev, mgn_chip);
- 	return 0;
- }
--- 
-1.9.1
+Vladimir: I do not require in any way that you create a CLCD driver for DRM,
+I just think it would be very very nice...
+
+Yours,
+Linus Walleij
