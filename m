@@ -1,97 +1,132 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 12 Jan 2017 15:55:58 +0530
-Subject: [PATCH 09/37] PCI: dwc: designware: Parse *num-lanes* property in
- dw_pcie_setup_rc
+Date: Thu, 12 Jan 2017 15:55:56 +0530
+Subject: [PATCH 07/37] PCI: dwc: designware: Get device pointer at the start
+ of dw_pcie_host_init
 In-Reply-To: <1484216786-17292-1-git-send-email-kishon@ti.com>
 References: <1484216786-17292-1-git-send-email-kishon@ti.com>
-Message-ID: <1484216786-17292-10-git-send-email-kishon@ti.com>
+Message-ID: <1484216786-17292-8-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-*num-lanes* dt property is parsed in dw_pcie_host_init. However
-*num-lanes* property is applicable to both root complex mode and
-endpoint mode. As a first step, move the parsing of this property
-outside dw_pcie_host_init. This is in preparation for splitting
-pcie-designware.c to pcie-designware.c and pcie-designware-host.c
+No functional change. Get device pointer at the beginning of
+dw_pcie_host_init instead of getting it all over dw_pcie_host_init.
+This is in preparation for splitting struct pcie_port into host and
+core structures (Once split pcie_port will not have device pointer).
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/dwc/pcie-designware.c |   18 +++++++++++-------
- drivers/pci/dwc/pcie-designware.h |    1 -
- 2 files changed, 11 insertions(+), 8 deletions(-)
+ drivers/pci/dwc/pcie-designware.c |   33 +++++++++++++++++----------------
+ 1 file changed, 17 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
-index 00a0fdc..89cdb6b 100644
+index d0ea310..330596b 100644
 --- a/drivers/pci/dwc/pcie-designware.c
 +++ b/drivers/pci/dwc/pcie-designware.c
-@@ -551,10 +551,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
+@@ -449,8 +449,9 @@ static u8 dw_pcie_iatu_unroll_enabled(struct pcie_port *pp)
+ 
+ int dw_pcie_host_init(struct pcie_port *pp)
+ {
+-	struct device_node *np = pp->dev->of_node;
+-	struct platform_device *pdev = to_platform_device(pp->dev);
++	struct device *dev = pp->dev;
++	struct device_node *np = dev->of_node;
++	struct platform_device *pdev = to_platform_device(dev);
+ 	struct pci_bus *bus, *child;
+ 	struct resource *cfg_res;
+ 	int i, ret;
+@@ -464,14 +465,14 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 		pp->cfg0_base = cfg_res->start;
+ 		pp->cfg1_base = cfg_res->start + pp->cfg0_size;
+ 	} else if (!pp->va_cfg0_base) {
+-		dev_err(pp->dev, "missing *config* reg space\n");
++		dev_err(dev, "missing *config* reg space\n");
+ 	}
+ 
+ 	ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &pp->io_base);
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = devm_request_pci_bus_resources(&pdev->dev, &res);
++	ret = devm_request_pci_bus_resources(dev, &res);
+ 	if (ret)
+ 		goto error;
+ 
+@@ -481,7 +482,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 		case IORESOURCE_IO:
+ 			ret = pci_remap_iospace(win->res, pp->io_base);
+ 			if (ret) {
+-				dev_warn(pp->dev, "error %d: failed to map resource %pR\n",
++				dev_warn(dev, "error %d: failed to map resource %pR\n",
+ 					 ret, win->res);
+ 				resource_list_destroy_entry(win);
+ 			} else {
+@@ -511,10 +512,10 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 	}
+ 
+ 	if (!pp->dbi_base) {
+-		pp->dbi_base = devm_ioremap(pp->dev, pp->cfg->start,
++		pp->dbi_base = devm_ioremap(dev, pp->cfg->start,
+ 					resource_size(pp->cfg));
+ 		if (!pp->dbi_base) {
+-			dev_err(pp->dev, "error with ioremap\n");
++			dev_err(dev, "error with ioremap\n");
+ 			ret = -ENOMEM;
+ 			goto error;
+ 		}
+@@ -523,20 +524,20 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 	pp->mem_base = pp->mem->start;
+ 
+ 	if (!pp->va_cfg0_base) {
+-		pp->va_cfg0_base = devm_ioremap(pp->dev, pp->cfg0_base,
++		pp->va_cfg0_base = devm_ioremap(dev, pp->cfg0_base,
+ 						pp->cfg0_size);
+ 		if (!pp->va_cfg0_base) {
+-			dev_err(pp->dev, "error with ioremap in function\n");
++			dev_err(dev, "error with ioremap in function\n");
+ 			ret = -ENOMEM;
+ 			goto error;
  		}
  	}
  
--	ret = of_property_read_u32(np, "num-lanes", &pci->lanes);
--	if (ret)
--		pci->lanes = 0;
--
- 	ret = of_property_read_u32(np, "num-viewport", &pci->num_viewport);
- 	if (ret)
- 		pci->num_viewport = 2;
-@@ -751,18 +747,26 @@ static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+ 	if (!pp->va_cfg1_base) {
+-		pp->va_cfg1_base = devm_ioremap(pp->dev, pp->cfg1_base,
++		pp->va_cfg1_base = devm_ioremap(dev, pp->cfg1_base,
+ 						pp->cfg1_size);
+ 		if (!pp->va_cfg1_base) {
+-			dev_err(pp->dev, "error with ioremap\n");
++			dev_err(dev, "error with ioremap\n");
+ 			ret = -ENOMEM;
+ 			goto error;
+ 		}
+@@ -552,11 +553,11 @@ int dw_pcie_host_init(struct pcie_port *pp)
  
- void dw_pcie_setup_rc(struct pcie_port *pp)
- {
-+	int ret;
-+	u32 lanes;
- 	u32 val;
- 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
-+	struct device *dev = pci->dev;
-+	struct device_node *np = dev->of_node;
+ 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+ 		if (!pp->ops->msi_host_init) {
+-			pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
++			pp->irq_domain = irq_domain_add_linear(dev->of_node,
+ 						MAX_MSI_IRQS, &msi_domain_ops,
+ 						&dw_pcie_msi_chip);
+ 			if (!pp->irq_domain) {
+-				dev_err(pp->dev, "irq domain init failed\n");
++				dev_err(dev, "irq domain init failed\n");
+ 				ret = -ENXIO;
+ 				goto error;
+ 			}
+@@ -575,12 +576,12 @@ int dw_pcie_host_init(struct pcie_port *pp)
  
- 	/* get iATU unroll support */
- 	pci->iatu_unroll_enabled = dw_pcie_iatu_unroll_enabled(pci);
- 	dev_dbg(pci->dev, "iATU unroll: %s\n",
- 		pci->iatu_unroll_enabled ? "enabled" : "disabled");
- 
-+	ret = of_property_read_u32(np, "num-lanes", &lanes);
-+	if (ret)
-+		lanes = 0;
-+
- 	/* set the number of lanes */
- 	val = dw_pcie_readl_dbi(pci, PCIE_PORT_LINK_CONTROL);
- 	val &= ~PORT_LINK_MODE_MASK;
--	switch (pci->lanes) {
-+	switch (lanes) {
- 	case 1:
- 		val |= PORT_LINK_MODE_1_LANES;
- 		break;
-@@ -776,7 +780,7 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
- 		val |= PORT_LINK_MODE_8_LANES;
- 		break;
- 	default:
--		dev_err(pci->dev, "num-lanes %u: invalid value\n", pci->lanes);
-+		dev_err(pci->dev, "num-lanes %u: invalid value\n", lanes);
- 		return;
- 	}
- 	dw_pcie_writel_dbi(pci, PCIE_PORT_LINK_CONTROL, val);
-@@ -784,7 +788,7 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
- 	/* set link width speed control register */
- 	val = dw_pcie_readl_dbi(pci, PCIE_LINK_WIDTH_SPEED_CONTROL);
- 	val &= ~PORT_LOGIC_LINK_WIDTH_MASK;
--	switch (pci->lanes) {
-+	switch (lanes) {
- 	case 1:
- 		val |= PORT_LOGIC_LINK_WIDTH_1_LANES;
- 		break;
-diff --git a/drivers/pci/dwc/pcie-designware.h b/drivers/pci/dwc/pcie-designware.h
-index d4b3d43..491fbe3 100644
---- a/drivers/pci/dwc/pcie-designware.h
-+++ b/drivers/pci/dwc/pcie-designware.h
-@@ -148,7 +148,6 @@ struct dw_pcie_ops {
- struct dw_pcie {
- 	struct device		*dev;
- 	void __iomem		*dbi_base;
--	u32			lanes;
- 	u32			num_viewport;
- 	u8			iatu_unroll_enabled;
- 	struct pcie_port	pp;
+ 	pp->root_bus_nr = pp->busn->start;
+ 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+-		bus = pci_scan_root_bus_msi(pp->dev, pp->root_bus_nr,
++		bus = pci_scan_root_bus_msi(dev, pp->root_bus_nr,
+ 					    &dw_pcie_ops, pp, &res,
+ 					    &dw_pcie_msi_chip);
+-		dw_pcie_msi_chip.dev = pp->dev;
++		dw_pcie_msi_chip.dev = dev;
+ 	} else
+-		bus = pci_scan_root_bus(pp->dev, pp->root_bus_nr, &dw_pcie_ops,
++		bus = pci_scan_root_bus(dev, pp->root_bus_nr, &dw_pcie_ops,
+ 					pp, &res);
+ 	if (!bus) {
+ 		ret = -ENOMEM;
 -- 
 1.7.9.5
