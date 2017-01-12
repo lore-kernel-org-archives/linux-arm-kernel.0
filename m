@@ -1,31 +1,45 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Thu, 12 Jan 2017 10:50:10 -0500
-Subject: [PATCH] ARM: dts: NSP: Fix DT ranges error
-Message-ID: <1484236210-16067-1-git-send-email-jon.mason@broadcom.com>
+From: nicolas.dichtel@6wind.com (Nicolas Dichtel)
+Date: Thu, 12 Jan 2017 16:52:57 +0100
+Subject: [PATCH v2 7/7] uapi: export all headers under uapi directories
+In-Reply-To: <20170109125638.GA15506@infradead.org>
+References: <bf83da6b-01ef-bf44-b3e1-ca6fc5636818@6wind.com>
+ <1483695839-18660-1-git-send-email-nicolas.dichtel@6wind.com>
+ <1483695839-18660-8-git-send-email-nicolas.dichtel@6wind.com>
+ <20170109125638.GA15506@infradead.org>
+Message-ID: <464a1323-4450-e563-ff59-9e6d57b75959@6wind.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The range size for axi is 0x2 bytes too small, as the QSPI needs
-0x11c408 + 0x004 (which is 0x0011c40c, not 0x0011c40a).  No errors have
-been observed with this shortcoming, but fixing it for correctness.
+Le 09/01/2017 ? 13:56, Christoph Hellwig a ?crit :
+> On Fri, Jan 06, 2017 at 10:43:59AM +0100, Nicolas Dichtel wrote:
+>> Regularly, when a new header is created in include/uapi/, the developer
+>> forgets to add it in the corresponding Kbuild file. This error is usually
+>> detected after the release is out.
+>>
+>> In fact, all headers under uapi directories should be exported, thus it's
+>> useless to have an exhaustive list.
+>>
+>> After this patch, the following files, which were not exported, are now
+>> exported (with make headers_install_all):
+> 
+> ... snip ...
+> 
+>> linux/genwqe/.install
+>> linux/genwqe/..install.cmd
+>> linux/cifs/.install
+>> linux/cifs/..install.cmd
+> 
+> I'm pretty sure these should not be exported!
+> 
+Those files are created in every directory:
+$ find usr/include/ -name '\.\.install.cmd' | wc -l
+71
+$ find usr/include/ -name '\.install' | wc -l
+71
 
-Signed-off-by: Jon Mason <jon.mason@broadcom.com>
----
- arch/arm/boot/dts/bcm-nsp.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+See also
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/scripts/Makefile.headersinst#n32
 
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index 6c58c78..832795b 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -160,7 +160,7 @@
- 
- 	axi {
- 		compatible = "simple-bus";
--		ranges = <0x00000000 0x18000000 0x0011c40a>;
-+		ranges = <0x00000000 0x18000000 0x0011c40c>;
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 
--- 
-2.7.4
+
+Thank you,
+Nicolas
