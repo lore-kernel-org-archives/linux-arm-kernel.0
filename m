@@ -1,104 +1,113 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 12 Jan 2017 15:20:10 +0000
-Subject: [PATCH v3 3/3] arm64: dts: juno: add missing CoreSight STM component
+Date: Thu, 12 Jan 2017 15:20:08 +0000
+Subject: [PATCH v3 1/3] arm64: dts: juno: refactor CoreSight support on Juno r0
 In-Reply-To: <1484234410-7670-1-git-send-email-sudeep.holla@arm.com>
 References: <1484234410-7670-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1484234410-7670-4-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1484234410-7670-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mike Leach <mike.leach@linaro.org>
+Currently the Coresight components are supported only on Juno r0
+variant. In preparation to add support to Juno r1/r2 variants, this
+patch refactors the existing coresight device nodes so that r1/r2
+support can be added easily.
 
-This patch adds the missing CoreSight STM component definition to the
-device tree of all the juno variants(r0,r1,r2)
-
-STM component is connected to different funnels depending on Juno
-platform variant.
-
-Signed-off-by: Mike Leach <mike.leach@linaro.org>
-[sudeep.holla at arm.com: minor changelog update and reorganising the STM
-	node back into juno-base.dtsi to avoid duplication]
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm64/boot/dts/arm/juno-base.dtsi | 15 +++++++++++++++
- arch/arm64/boot/dts/arm/juno-r1.dts    |  4 ++++
- arch/arm64/boot/dts/arm/juno-r2.dts    |  4 ++++
- arch/arm64/boot/dts/arm/juno.dts       | 16 ++++++++++++++++
- 4 files changed, 39 insertions(+)
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 16 ++++++++--------
+ arch/arm64/boot/dts/arm/juno.dts       |  8 ++++++++
+ 2 files changed, 16 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index 6d7f56573e89..77fe75de5cae 100644
+index 7d832247d0db..6d7f56573e89 100644
 --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
 +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -182,6 +182,21 @@
+@@ -83,7 +83,7 @@
+ 	 * The actual size is just 4K though 64K is reserved. Access to the
+ 	 * unmapped reserved region results in a DECERR response.
+ 	 */
+-	etf at 20010000 {
++	etf0 at 20010000 {
+ 		compatible = "arm,coresight-tmc", "arm,primecell";
+ 		reg = <0 0x20010000 0 0x1000>;
+ 
+@@ -97,7 +97,7 @@
+ 			/* input port */
+ 			port at 0 {
+ 				reg = <0>;
+-				etf_in_port: endpoint {
++				etf0_in_port: endpoint {
+ 					slave-mode;
+ 					remote-endpoint = <&main_funnel_out_port>;
+ 				};
+@@ -106,8 +106,7 @@
+ 			/* output port */
+ 			port at 1 {
+ 				reg = <0>;
+-				etf_out_port: endpoint {
+-					remote-endpoint = <&replicator_in_port0>;
++				etf0_out_port: endpoint {
+ 				};
+ 			};
+ 		};
+@@ -128,7 +127,8 @@
  		};
  	};
  
-+	stm at 20100000 {
-+		compatible = "arm,coresight-stm", "arm,primecell";
-+		reg = <0 0x20100000 0 0x1000>,
-+		      <0 0x28000000 0 0x180000>;
-+		reg-names = "stm-base", "stm-stimulus-base";
-+
-+		clocks = <&soc_smc50mhz>;
-+		clock-names = "apb_pclk";
-+		power-domains = <&scpi_devpd 0>;
-+		port {
-+			stm_out_port: endpoint {
-+			};
-+		};
-+	};
-+
- 	etm0: etm at 22040000 {
- 		compatible = "arm,coresight-etm4x", "arm,primecell";
- 		reg = <0 0x22040000 0 0x1000>;
-diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
-index d4b85d9d343e..6df25c7a6b90 100644
---- a/arch/arm64/boot/dts/arm/juno-r1.dts
-+++ b/arch/arm64/boot/dts/arm/juno-r1.dts
-@@ -236,3 +236,7 @@
- &replicator_in_port0 {
- 	remote-endpoint = <&csys2_funnel_out_port>;
- };
-+
-+&stm_out_port {
-+	remote-endpoint = <&csys1_funnel_in_port0>;
-+};
-diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts b/arch/arm64/boot/dts/arm/juno-r2.dts
-index 14b29517065c..dafe92c20f65 100644
---- a/arch/arm64/boot/dts/arm/juno-r2.dts
-+++ b/arch/arm64/boot/dts/arm/juno-r2.dts
-@@ -236,3 +236,7 @@
- &replicator_in_port0 {
- 	remote-endpoint = <&csys2_funnel_out_port>;
- };
-+
-+&stm_out_port {
-+	remote-endpoint = <&csys1_funnel_in_port0>;
-+};
+-	main-funnel at 20040000 {
++	/* This is labelled cssys0 funnel in the Juno r1/r2 TRM */
++	main_funnel: main-funnel at 20040000 {
+ 		compatible = "arm,coresight-funnel", "arm,primecell";
+ 		reg = <0 0x20040000 0 0x1000>;
+ 
+@@ -139,13 +139,15 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
++			/* output port */
+ 			port at 0 {
+ 				reg = <0>;
+ 				main_funnel_out_port: endpoint {
+-					remote-endpoint = <&etf_in_port>;
++					remote-endpoint = <&etf0_in_port>;
+ 				};
+ 			};
+ 
++			/* input ports */
+ 			port at 1 {
+ 				reg = <0>;
+ 				main_funnel_in_port0: endpoint {
+@@ -161,7 +163,6 @@
+ 					remote-endpoint = <&cluster1_funnel_out_port>;
+ 				};
+ 			};
+-
+ 		};
+ 	};
+ 
+@@ -382,7 +383,6 @@
+ 				reg = <0>;
+ 				replicator_in_port0: endpoint {
+ 					slave-mode;
+-					remote-endpoint = <&etf_out_port>;
+ 				};
+ 			};
+ 		};
 diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-index ba10d688beaa..dbec40a4c4a7 100644
+index ac5ceb73f45f..ba10d688beaa 100644
 --- a/arch/arm64/boot/dts/arm/juno.dts
 +++ b/arch/arm64/boot/dts/arm/juno.dts
-@@ -211,3 +211,19 @@
- &replicator_in_port0 {
- 	remote-endpoint = <&etf0_out_port>;
+@@ -203,3 +203,11 @@
+ &etm5 {
+ 	cpu = <&A53_3>;
  };
 +
-+&stm_out_port {
-+	remote-endpoint = <&main_funnel_in_port2>;
++&etf0_out_port {
++	remote-endpoint = <&replicator_in_port0>;
 +};
 +
-+&main_funnel {
-+	ports {
-+		port at 3 {
-+			reg = <2>;
-+			main_funnel_in_port2: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&stm_out_port>;
-+			};
-+		};
-+	};
++&replicator_in_port0 {
++	remote-endpoint = <&etf0_out_port>;
 +};
 -- 
 2.7.4
