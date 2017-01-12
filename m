@@ -1,16 +1,14 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 12 Jan 2017 10:51:07 +0000
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 12 Jan 2017 10:50:04 +0000
 Subject: kvm: deadlock in kvm_vgic_map_resources
 In-Reply-To: <20170112104253.GB13547@cbox>
 References: <CACT4Y+YRg=H0F-_QTtPf0--o85sQCb__j=V25tPchx9ycYtyKg@mail.gmail.com>
  <70371c5c-d0c0-b59e-b12c-fd8359392763@arm.com>
  <286255e8-918e-66b5-012f-f347a2ae71cd@arm.com>
  <0994d5a9-d9f4-7b80-4b16-1797c093edb5@arm.com> <20170112104253.GB13547@cbox>
-Message-ID: <f9202750-c816-c47f-35e8-9c3dca96aa3c@arm.com>
+Message-ID: <a4acacfb-8178-b904-f27d-235fc4a58275@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi,
 
 On 12/01/17 10:42, Christoffer Dall wrote:
 > On Thu, Jan 12, 2017 at 10:30:39AM +0000, Marc Zyngier wrote:
@@ -186,15 +184,7 @@ On 12/01/17 10:42, Christoffer Dall wrote:
 > 
 > Hmm, not a fan of passing this variable around.  How about this instead
 > then (untested):
-
-Yes, I like that version more.
-And if we now move the calls to __kvm_vgic_destroy() into vgic-init.c
-(as in Marc's first patch, but just before dropping the lock), we don't
-even need to export __kvm_vgic_destroy(), right?
-
-Cheers,
-Andre.
-
+> 
 > diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
 > index 5114391..a25806b 100644
 > --- a/virt/kvm/arm/vgic/vgic-init.c
@@ -240,6 +230,11 @@ Andre.
 > +	mutex_unlock(&kvm->lock);
 > +}
 > +
+
+I initially wrote that exactly, but ended up deciding against as it
+changes the locking more than strictly necessary. On the other hand, I
+think this looks better, so if everyone agrees I'll take that.
+
 >  /**
 >   * vgic_lazy_init: Lazy init is only allowed if the GIC exposed to the guest
 >   * is a GICv2. A GICv3 must be explicitly initialized by the guest using the
@@ -266,24 +261,12 @@ Andre.
 >  	if (ret)
 > -		kvm_vgic_destroy(kvm);
 > +		__kvm_vgic_destroy(kvm);
->  	return ret;
->  }
->  
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 859f65c..74a0bbb 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -37,6 +37,8 @@ struct vgic_vmcr {
->  	u32	pmr;
->  };
->  
-> +void __kvm_vgic_destroy(struct kvm *kvm);
-> +
->  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->  			      u32 intid);
->  void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq);
-> 
-> 
-> Thanks,
-> -Christoffer
-> 
+
+I'm still keen on factoring the destroy calls in the calling function.
+Is there any reason why we wouldn't do it?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
