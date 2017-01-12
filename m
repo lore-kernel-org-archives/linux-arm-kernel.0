@@ -1,23 +1,39 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 12 Jan 2017 13:34:10 -0800
-Subject: [RESEND] spi: davinci: Allow device tree devices to use DMA
-In-Reply-To: <1483673177-31516-1-git-send-email-david@lechnology.com> (David
- Lechner's message of "Thu, 5 Jan 2017 21:26:17 -0600")
-References: <1483673177-31516-1-git-send-email-david@lechnology.com>
-Message-ID: <m24m146jzh.fsf@baylibre.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 12 Jan 2017 13:38:16 -0800
+Subject: [PATCH -next] soc: ti: wkup_m3_ipc: Fix error return code in
+ wkup_m3_ipc_probe()
+In-Reply-To: <20170112145341.783-1-weiyj.lk@gmail.com>
+References: <20170112145341.783-1-weiyj.lk@gmail.com>
+Message-ID: <20170112213815.GK2630@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Lechner <david@lechnology.com> writes:
+* Wei Yongjun <weiyj.lk@gmail.com> [170112 06:55]:
+> From: Wei Yongjun <weiyongjun1@huawei.com>
+> 
+> Fix to return a negative error code from the kthread_run() error
+> handling case instead of 0, as done elsewhere in this function.
+> 
+> Fixes: cdd5de500b2c ("soc: ti: Add wkup_m3_ipc driver")
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> ---
+>  drivers/soc/ti/wkup_m3_ipc.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
+> index 8bfa44b..369aef5 100644
+> --- a/drivers/soc/ti/wkup_m3_ipc.c
+> +++ b/drivers/soc/ti/wkup_m3_ipc.c
+> @@ -457,6 +457,7 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
+>  
+>  	if (IS_ERR(task)) {
+>  		dev_err(dev, "can't create rproc_boot thread\n");
+> +		ret = PTR_ERR(task);
+>  		goto err_put_rproc;
+>  	}
+> 
+> 
 
-> This allows SPI devices specified in a device tree to use DMA when the
-> master controller.
+Applying into omap-for-v4.10/fixes thanks.
 
-Enabling DMA for spi-davinci isn't quite ready yet since this driver is
-blindly using dma_map_single() on addresses passed in.  MTD seems to use
-vmalloc'd buffers, which cannot be passed direclty to dma_map_single().
-
-I thinks this driver needs an update to use spi_map_buf() to be able to
-handle vmalloc'd buffers before always enabling DMA.
-
-Kevin
+Tony
