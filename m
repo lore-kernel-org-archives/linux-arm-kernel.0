@@ -1,53 +1,26 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 12 Jan 2017 18:19:54 +0100
-Subject: [PATCH 2/5] clk: sunxi-ng: add support for V3s CCU
-In-Reply-To: <2714901484163893@web1g.yandex.ru>
-References: <20170103151629.19447-1-icenowy@aosc.xyz>
- <20170103151629.19447-3-icenowy@aosc.xyz>
- <20170110181006.yrd6moy2mctzoc4c@lukather>
- <2705031484163593@web1g.yandex.ru>
- <2714901484163893@web1g.yandex.ru>
-Message-ID: <20170112171954.mj45su57fixzo6og@lukather>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 12 Jan 2017 17:20:19 +0000
+Subject: [PATCH] iommu/arm-smmu-v3: limit use of 2-level stream tables
+In-Reply-To: <1484077633-18376-1-git-send-email-nwatters@codeaurora.org>
+References: <20161220102209.GC10132@arm.com>
+ <1484077633-18376-1-git-send-email-nwatters@codeaurora.org>
+Message-ID: <20170112172019.GI13843@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 03:44:53AM +0800, Icenowy Zheng wrote:
+On Tue, Jan 10, 2017 at 02:47:13PM -0500, Nate Watterson wrote:
+> In the current arm-smmu-v3 driver, all smmus that support 2-level
+> stream tables are being forced to use them. This is suboptimal for
+> smmus that support fewer stream id bits than would fill in a single
+> second level table. This patch limits the use of 2-level tables to
+> smmus that both support the feature and whose first level table can
+> possibly contain more than a single entry.
 > 
-> 
-> 12.01.2017, 03:40, "Icenowy Zheng" <icenowy@aosc.xyz>:
-> > 11.01.2017, 02:10, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> >> ?On Tue, Jan 03, 2017 at 11:16:26PM +0800, Icenowy Zheng wrote:
-> >>> ??V3s has a similar but cut-down CCU to H3.
-> >>>
-> >>> ??Add support for it.
-> >>>
-> >>> ??Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> >>
-> >> ?It looks like there's nothing different but the clocks that you
-> >> ?register with the H3, please just use the H3 driver.
-> >
-> > Nope.
-> >
-> > It has a different PLL (PLL_ISP) at different address, and some
-> > different muxes.
-> 
-> Forgot to mention the missing of PLL_DE and related misses.
+> Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 21 ++++++++++-----------
+>  1 file changed, 10 insertions(+), 11 deletions(-)
 
-Those are not conflicting, it's just a slightly different set of
-clocks.
+Thanks Nate, I'll queue this for 4.11. Sorry for messing you about before.
 
-So there's really nothing undoable.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170112/c54bf580/attachment.sig>
+Will
