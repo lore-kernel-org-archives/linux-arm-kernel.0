@@ -1,83 +1,101 @@
-From: abelvesa@gmail.com (Abel Vesa)
-Date: Thu, 12 Jan 2017 02:19:57 +0200
-Subject: [PATCH] arm: ftrace: Adds support for
- CONFIG_DYNAMIC_FTRACE_WITH_REGS
-In-Reply-To: <20170110155112.GB14894@pathway.suse.cz>
-References: <1481233595-22112-1-git-send-email-abelvesa@linux.com>
- <20161208224655.GA6319@gce>
- <20170110155112.GB14894@pathway.suse.cz>
-Message-ID: <20170112001957.GA5458@nuc>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Wed, 11 Jan 2017 16:32:34 -0800
+Subject: [PATCH v6 11/25] usb: chipidea: vbus event may exist before
+ starting gadget
+In-Reply-To: <20170103080031.GC14542@b29397-desktop>
+References: <20161228225711.698-1-stephen.boyd@linaro.org>
+ <20161228225711.698-12-stephen.boyd@linaro.org>
+ <20170103080031.GC14542@b29397-desktop>
+Message-ID: <148418115431.32258.10648057913784071156@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 04:51:12PM +0100, Petr Mladek wrote:
-> On Thu 2016-12-08 22:46:55, Abel Vesa wrote:
-> > On Thu, Dec 08, 2016 at 09:46:35PM +0000, Abel Vesa wrote:
-> > > From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-> > > 
-> > > From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+Quoting Peter Chen (2017-01-03 00:00:31)
+> On Wed, Dec 28, 2016 at 02:56:57PM -0800, Stephen Boyd wrote:
+> > From: Peter Chen <peter.chen@nxp.com>
 > > 
-> > >From statement twice in the commit message. Will resend.
-> > > 
-> > > The DYNAMIC_FTRACE_WITH_REGS configuration makes it possible for a ftrace
-> > > operation to specify if registers need to saved/restored by the ftrace handler.
-> > > This is needed by kgraft and possibly other ftrace-based tools, and the ARM
-> > > architecture is currently lacking this feature. It would also be the first step
-> > > to support the "Kprobes-on-ftrace" optimization on ARM.
-> > > 
-> > > This patch introduces a new ftrace handler that stores the registers on the
-> > > stack before calling the next stage. The registers are restored from the stack
-> > > before going back to the instrumented function.
-> > > 
-> > > A side-effect of this patch is to activate the support for ftrace_modify_call()
-> > > as it defines ARCH_SUPPORTS_FTRACE_OPS for the ARM architecture
-> > > 
-> > > Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-> > > Signed-off-by: Abel Vesa <abelvesa@linux.com>
-> > > ---
-> > >  arch/arm/Kconfig               |  2 ++
-> > >  arch/arm/include/asm/ftrace.h  |  4 +++
-> > >  arch/arm/kernel/entry-ftrace.S | 78 ++++++++++++++++++++++++++++++++++++++++++
-> > >  arch/arm/kernel/ftrace.c       | 33 ++++++++++++++++++
-> > >  4 files changed, 117 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > > index b5d529f..87f1a9f 100644
-> > > --- a/arch/arm/Kconfig
-> > > +++ b/arch/arm/Kconfig
-> > > @@ -50,6 +50,7 @@ config ARM
-> > >  	select HAVE_DMA_API_DEBUG
-> > >  	select HAVE_DMA_CONTIGUOUS if MMU
-> > >  	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
-> > > +	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
-> > >  	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
-> > >  	select HAVE_EXIT_THREAD
-> > >  	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
-> > > @@ -90,6 +91,7 @@ config ARM
-> > >  	select PERF_USE_VMALLOC
-> > >  	select RTC_LIB
-> > >  	select SYS_SUPPORTS_APM_EMULATION
-> > > +	select FRAME_POINTER if DYNAMIC_FTRACE_WITH_REGS && FUNCTION_GRAPH_TRACER
-Hi Petr,
+> > At some situations, the vbus may already be there before starting
+> > gadget. So we need to check vbus event after switch to gadget in
+> > order to handle missing vbus event. The typical use cases are plugging
+> > vbus cable before driver load or the vbus has already been there
+> > after stopping host but before starting gadget.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> > Tested-by: Stephen Boyd <stephen.boyd@linaro.org>
+> > Reviewed-by: Stephen Boyd <stephen.boyd@linaro.org>
+> > [sboyd at codeaurora.org: Modify comment text per list discussion]
+> > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> > ---
+> >  drivers/usb/chipidea/core.c |  4 ----
+> >  drivers/usb/chipidea/otg.c  | 14 +++++++++-----
+> >  drivers/usb/chipidea/udc.c  |  2 ++
+> >  3 files changed, 11 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> > index 8a020ebbbe2f..37f888e31f10 100644
+> > --- a/drivers/usb/chipidea/core.c
+> > +++ b/drivers/usb/chipidea/core.c
+> > @@ -979,10 +979,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+> >       }
+> >  
+> >       if (!ci_otg_is_fsm_mode(ci)) {
+> > -             /* only update vbus status for peripheral */
+> > -             if (ci->role == CI_ROLE_GADGET)
+> > -                     ci_handle_vbus_change(ci);
+> > -
+> >               ret = ci_role_start(ci, ci->role);
+> >               if (ret) {
+> >                       dev_err(dev, "can't start %s role\n",
+> > diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+> > index 695f3fe3ae21..c972ed23b8ec 100644
+> > --- a/drivers/usb/chipidea/otg.c
+> > +++ b/drivers/usb/chipidea/otg.c
+> > @@ -134,9 +134,9 @@ void ci_handle_vbus_change(struct ci_hdrc *ci)
+> >       if (!ci->is_otg)
+> >               return;
+> >  
+> > -     if (hw_read_otgsc(ci, OTGSC_BSV))
+> > +     if (hw_read_otgsc(ci, OTGSC_BSV) && !ci->vbus_active)
+> >               usb_gadget_vbus_connect(&ci->gadget);
+> > -     else
+> > +     else if (!hw_read_otgsc(ci, OTGSC_BSV) && ci->vbus_active)
+> >               usb_gadget_vbus_disconnect(&ci->gadget);
+> >  }
+> >  
+> > @@ -175,10 +175,14 @@ static void ci_handle_id_switch(struct ci_hdrc *ci)
+> >  
+> >               ci_role_stop(ci);
+> >  
+> > -             if (role == CI_ROLE_GADGET)
+> > +             if (role == CI_ROLE_GADGET &&
+> > +                             IS_ERR(ci->platdata->vbus_extcon.edev))
+> >                       /*
+> > -                      * wait vbus lower than OTGSC_BSV before connecting
+> > -                      * to host
+> > +                      * wait vbus lower than OTGSC_BSV before connecting to
+> > +                      * host. If connecting status is from an external
+> > +                      * connector instead of register, we don't need to care
+> > +                      * vbus on the board, since it will not affect external
+> > +                      * connector status.
+> >                        */
+> >                       hw_wait_vbus_lower_bsv(ci);
+> >  
+> > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+> > index 732b281485de..0db56fb7e9e9 100644
+> > --- a/drivers/usb/chipidea/udc.c
+> > +++ b/drivers/usb/chipidea/udc.c
+> > @@ -1961,6 +1961,8 @@ static int udc_id_switch_for_device(struct ci_hdrc *ci)
+> >               /* Clear and enable BSV irq */
+> >               hw_write_otgsc(ci, OTGSC_BSVIS | OTGSC_BSVIE,
+> >                                       OTGSC_BSVIS | OTGSC_BSVIE);
+> > +     /* vbus change may has already been occurred */
+> > +     ci_handle_vbus_change(ci);
+> >  
+> >       return 0;
 > 
-> FRAME_POINTER is not for free. It takes space on the stack. Also there
-> is a performance penalty. Do we really need to depend on it? If so,
-> it might be worth a note in the commit message.
+> After thinking more, the above change will affect OTG FSM which calls
+> this API too, but handle vbus change later, see ci_otg_start_host and
+> ci_otg_start_gadget. How about changing patch like below:
 
-I was trying to create my own patch when I found this work done by 
-Jean-Jacques, so I haven't looked specifically for the FRAME_POINTER 
-part. I looked now at it and you seem to be right, FRAME_POINTER is 
-not needed. 
-
-I will get rid of the FRAME_POINTER part, change the authorship and
-send it again in the following days.
->
-> I made only a quick look at the patch. It looks reasonable. But I do
-> not have enough knowledge about the arm architecture, assembly, and
-> ftrace-specifics. Also I cannot test it easily. So issues might
-> be hidden to my eyes.
-> 
-> Best Regards,
-> Petr
-Thanks,
-Abel
+Ok. I'll give it a spin but I think that should work too. I don't have
+any hardware to test the OTG FSM to make sure things don't break.
