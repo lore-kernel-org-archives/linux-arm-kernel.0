@@ -1,68 +1,120 @@
-From: ping.bai@nxp.com (Jacky Bai)
-Date: Thu, 12 Jan 2017 02:57:20 +0000
-Subject: [PATCH v2 05/12] Document: dt: binding: imx: update pinctrl doc
- for imx6sll
-In-Reply-To: <CACRpkdYTpEHyzBY-mA4YUsj=xt46Pibka3-4VHwUXosfgbgp1Q@mail.gmail.com>
-References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
- <1482832070-22668-6-git-send-email-ping.bai@nxp.com>
- <CACRpkdYUME8K+JusA0ORRKqxyBuhDdyei8eg7UZbHidKw9=bQw@mail.gmail.com>
- <AM3PR04MB5304992095753B761E66A9A87640@AM3PR04MB530.eurprd04.prod.outlook.com>
- <CACRpkdYTpEHyzBY-mA4YUsj=xt46Pibka3-4VHwUXosfgbgp1Q@mail.gmail.com>
-Message-ID: <AM3PR04MB530A88C5C0E7C6AD2C59B9E87790@AM3PR04MB530.eurprd04.prod.outlook.com>
+From: steve_longerbeam@mentor.com (Steve Longerbeam)
+Date: Wed, 11 Jan 2017 19:22:54 -0800
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <CAJ+vNU2zU++Xam_UpDPfmSQhauhhS3_z8L-+ww6o-D9brWhiwA@mail.gmail.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <CAJ+vNU2zU++Xam_UpDPfmSQhauhhS3_z8L-+ww6o-D9brWhiwA@mail.gmail.com>
+Message-ID: <afe51f5f-03dd-4092-9ec0-297afb1453c7@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCH v2 05/12] Document: dt: binding: imx: update pinctrl doc
-> for imx6sll
-> 
-> On Mon, Jan 9, 2017 at 3:32 AM, Jacky Bai <ping.bai@nxp.com> wrote:
-> 
-> > I have look into the above commit on using generic binding. But I
-> > think the generic pinconf is not very easy to add in imx pinctrl Driver. imx
-> pinctrl use a different way to parse the pin configure.
-> 
-> OK atleast I need an indication from one of the i.MX maintainers how they
-> want to proceed.
-> 
-> > Each fsl,pin entry  looks like <PIN_FUNC_ID  CONFIG> in dts, the
-> > CONFIG is the pad setting value like pull-up, open-drain, drive strength etc.
-> The above config bit definition is specific to each SOC in the PAD CTL register.
-> >
-> > If we want set the pin config to enable hysteresis, 47KOhm Pull Up,
-> > 50Mhz speed, 80Ohm driver strength and Fast Slew Rate, then the CONFIG
-> value should be 0x17059( ORs corresponding bit definition).
-> 
-> Hysteresis is an input property and does not make sense on something that
-> need drive strength and slew rate configuration which are output properties.
-> (I guess you mean 80mA drive strength.)
-> 
+Hi Tim,
 
-For some bi-direction pins, like SD DATA pin, we may need to enable the hysteresis configuration.
 
-> Actually such oxymoronic settings is a good reason to migrate to generic
-> bindings because when you describe stuff with generic strings you see better
-> what is going on, and we can add sanity checks to cases like this in the generic
-> code where it would indeed be valid to ask why this combination of settings is
-> being made.
-> 
+On 01/11/2017 03:14 PM, Tim Harvey wrote:
+>
+> <snip>
+>
+> Hi Steve,
+>
+> I took a stab at testing this today on a gw51xx which has an adv7180
+> hooked up as follows:
+> - i2c3 at 0x20
+> - 8bit data bus from DAT12 to DAT19, HSYNC, VSYNC, PIXCLK on CSI0 pads
+> (CSI0_IPU1)
+> - PWRDWN# on MX6QDL_PAD_CSI0_DATA_EN__GPIO5_IO20
+> - IRQ# on MX6QDL_PAD_CSI0_DAT5__GPIO5_IO23
+> - all three analog inputs available to off-board connector
+>
+> My patch to the imx6qdl-gw51xx dtsi is:
 
-Another thing is that we can use a pins-tool program developed by NXP to generate the pinctrl configuration code that can
-be used directly in dts. This tiny program can avoid pin function conflict. As on i.MX, there are so may pins, each pin can be used
-for up 8  function. Configuring the pins is a time-consuming work.  This tools is very useful for customer to generate the dts code.  
+As long as you used the patch to imx6qdl-sabreauto.dtsti that adds
+the adv7180 support as a guide, you should be ok here.
 
-Using generic pinconf is another option, but it may need more time to add it and more work to do.  For now, I think we can still keep the legacy method?
- 
-> > This value will be set in
-> > PAD CTL register to config the corresponding pin.
-> 
-> Yes? That is common. It looks like that in DT:
-> 
-> {
->    input-schmitt-enable;
->    bias-pull-up = <47000>;
->    slew-rate = <50000000>;
->    drive-strength = <80000>;
-> };
-> 
-> Yours,
-> Linus Walleij
+> <snip>
+>
+>
+>
+> On an IMX6Q I'm getting the following when the adv7180 module loads:
+> [   12.862477] adv7180 2-0020: chip found @ 0x20 (21a8000.i2c)
+> [   12.907767] imx-media: Registered subdev adv7180 2-0020
+> [   12.907793] imx-media soc:media at 0: Entity type for entity adv7180
+> 2-0020 was not initialized!
+> [   12.907867] imx-media: imx_media_create_link: adv7180 2-0020:0 ->
+> ipu1_csi0_mux:1
+>
+> Is the warning that adv7180 was not initialized expected and or an issue?
+
+Yeah it's still a bug in the adv7180 driver, needs fixing.
+
+>
+> Now that your driver is hooking into the current media framework, I'm
+> not at all clear on how to link and configure the media entities.
+
+It's all documented at Documentation/media/v4l-drivers/imx.rst.
+Follow the SabreAuto pipeline setup example.
+
+
+
+> <snip>
+>
+>
+> Additionally I've found that on an IMX6S/IMX6DL we crash while
+> registering the media-ic subdev's:
+> [    3.975473] imx-media: Registered subdev ipu1_csi1_mux
+> [    3.980921] imx-media: Registered subdev ipu1_csi0_mux
+> [    4.003205] imx-media: Registered subdev ipu1_ic_prpenc
+> [    4.025373] imx-media: Registered subdev ipu1_ic_prpvf
+> [    4.037944] ------------[ cut here ]------------
+> [    4.042571] Kernel BUG at c06717dc [verbose debug info unavailable]
+> [    4.048845] Internal error: Oops - BUG: 0 [#1] SMP ARM
+> [    4.053990] Modules linked in:
+> [    4.057076] CPU: 1 PID: 1 Comm: swapper/0 Not tainted
+> 4.9.0-rc6-00524-g84dad6e-dirty #446
+> [    4.065260] Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+> ...
+> [    4.296250] [<c0671780>] (v4l2_subdev_init) from [<c06fb02c>]
+> (imx_ic_probe+0x94/0x1ac)
+> [    4.304271] [<c06faf98>] (imx_ic_probe) from [<c05173d8>]
+> (platform_drv_probe+0x54/0xb8)
+> [    4.312373]  r9:c0d5e858 r8:00000000 r7:fffffdfb r6:c0e5dbf8
+> r5:da603810 r4:c16738d8
+> [    4.320129] [<c0517384>] (platform_drv_probe) from [<c0515978>]
+> (driver_probe_device+0x20c/0x2c0)
+> [    4.329010]  r7:c0e5dbf8 r6:00000000 r5:da603810 r4:c16738d8
+> [    4.334681] [<c051576c>] (driver_probe_device) from [<c0515af4>]
+> (__driver_attach+0xc8/0xcc)
+> [    4.343129]  r9:c0d5e858 r8:00000000 r7:00000000 r6:da603844
+> r5:c0e5dbf8 r4:da603810
+> [    4.350889] [<c0515a2c>] (__driver_attach) from [<c0513adc>]
+> (bus_for_each_dev+0x74/0xa8)
+> [    4.359078]  r7:00000000 r6:c0515a2c r5:c0e5dbf8 r4:00000000
+> [    4.364753] [<c0513a68>] (bus_for_each_dev) from [<c05151d4>]
+> (driver_attach+0x20/0x28)
+>
+> I assume there is an iteration that needs a test on a missing pointer
+> only available on chips with both IPU's or PRP
+
+Yep, I only have quad boards here so I haven't gotten around to
+testing on S/DL.
+
+But it looks like I forgot to clear out the csi subdev pointer array before
+passing it to imx_media_of_parse(). I think that might explain the OOPS
+above. Try this patch:
+
+diff --git a/drivers/staging/media/imx/imx-media-dev.c 
+b/drivers/staging/media/imx/imx-media-dev.c
+index 357654d..0cf2d61 100644
+--- a/drivers/staging/media/imx/imx-media-dev.c
++++ b/drivers/staging/media/imx/imx-media-dev.c
+@@ -379,7 +379,7 @@ static int imx_media_probe(struct platform_device *pdev)
+  {
+         struct device *dev = &pdev->dev;
+         struct device_node *node = dev->of_node;
+-       struct imx_media_subdev *csi[4];
++       struct imx_media_subdev *csi[4] = {0};
+         struct imx_media_dev *imxmd;
+         int ret;
+
+
+Steve
