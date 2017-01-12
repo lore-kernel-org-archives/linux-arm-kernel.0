@@ -1,91 +1,25 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 12 Jan 2017 09:58:44 +0100
-Subject: [PATCH v5 4/4] drm/rockchip: Implement CRC debugfs API
-In-Reply-To: <20170112085844.19878-1-tomeu.vizoso@collabora.com>
-References: <20170112085844.19878-1-tomeu.vizoso@collabora.com>
-Message-ID: <20170112085844.19878-5-tomeu.vizoso@collabora.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 12 Jan 2017 09:11:16 +0000
+Subject: [PATCH v7 0/4] arm64: arch_timer: Add workaround for
+ hisilicon-161601 erratum
+In-Reply-To: <6c33e4e9-6472-4738-aea2-55dcaab3a94f@huawei.com>
+References: <1483772858-10380-1-git-send-email-dingtianhong@huawei.com>
+ <6c33e4e9-6472-4738-aea2-55dcaab3a94f@huawei.com>
+Message-ID: <ff9c81c2-90ef-a5c2-6f0b-c6cf5d0d11a9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the .set_crc_source() callback and call the DP helpers
-accordingly to start and stop CRC capture.
+On 12/01/17 04:23, Ding Tianhong wrote:
+> Hi Marc:
+> 
+> How about this v7, if any suggestions very grateful.
 
-This is only done if this CRTC is currently using the eDP connector.
+It's been less than 5 days since you posted this. I'll get to it once I
+finish reviewing all the other patches that are sitting in the queue
+right before yours.
 
-v3: Remove superfluous check on rockchip_crtc_state->output_type
+Thanks,
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
-
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 42 +++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index fb5f001f51c3..6e5eb1aa182a 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -19,6 +19,7 @@
- #include <drm/drm_crtc_helper.h>
- #include <drm/drm_flip_work.h>
- #include <drm/drm_plane_helper.h>
-+#include <drm/bridge/analogix_dp.h>
- 
- #include <linux/kernel.h>
- #include <linux/module.h>
-@@ -1105,6 +1106,46 @@ static void vop_crtc_destroy_state(struct drm_crtc *crtc,
- 	kfree(s);
- }
- 
-+static struct drm_connector *vop_get_edp_connector(struct vop *vop)
-+{
-+	struct drm_crtc *crtc = &vop->crtc;
-+	struct drm_connector *connector;
-+
-+	mutex_lock(&crtc->dev->mode_config.mutex);
-+	drm_for_each_connector(connector, crtc->dev)
-+		if (connector->connector_type == DRM_MODE_CONNECTOR_eDP) {
-+			mutex_unlock(&crtc->dev->mode_config.mutex);
-+			return connector;
-+		}
-+	mutex_unlock(&crtc->dev->mode_config.mutex);
-+
-+	return NULL;
-+}
-+
-+static int vop_crtc_set_crc_source(struct drm_crtc *crtc,
-+				   const char *source_name, size_t *values_cnt)
-+{
-+	struct vop *vop = to_vop(crtc);
-+	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc->state);
-+	struct drm_connector *connector;
-+	int ret;
-+
-+	connector = vop_get_edp_connector(vop);
-+	if (!connector)
-+		return -EINVAL;
-+
-+	*values_cnt = 3;
-+
-+	if (source_name && strcmp(source_name, "auto") == 0)
-+		ret = analogix_dp_start_crc(connector);
-+	else if (!source_name)
-+		ret = analogix_dp_stop_crc(connector);
-+	else
-+		ret = -EINVAL;
-+
-+	return ret;
-+}
-+
- static const struct drm_crtc_funcs vop_crtc_funcs = {
- 	.set_config = drm_atomic_helper_set_config,
- 	.page_flip = drm_atomic_helper_page_flip,
-@@ -1112,6 +1153,7 @@ static const struct drm_crtc_funcs vop_crtc_funcs = {
- 	.reset = vop_crtc_reset,
- 	.atomic_duplicate_state = vop_crtc_duplicate_state,
- 	.atomic_destroy_state = vop_crtc_destroy_state,
-+	.set_crc_source = vop_crtc_set_crc_source,
- };
- 
- static void vop_fb_unref_worker(struct drm_flip_work *work, void *val)
+	M.
 -- 
-2.9.3
+Jazz is not dead. It just smells funny...
