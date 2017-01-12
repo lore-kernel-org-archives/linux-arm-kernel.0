@@ -1,39 +1,97 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Jan 2017 12:16:24 +0000
-Subject: [PATCH 1/2] dma-mapping: let arch know origin of dma range
- passed to arch_setup_dma_ops()
-In-Reply-To: <764334db-3400-58c6-cc4b-3f7ce66daa27@cogentembedded.com>
-References: <dca35acf-1adf-aa85-7a0b-d0c6ec702fa1@arm.com>
- <1484159512-28515-1-git-send-email-nikita.yoush@cogentembedded.com>
- <1484159512-28515-2-git-send-email-nikita.yoush@cogentembedded.com>
- <30025121.yS4lyZEDrk@wuerfel>
- <764334db-3400-58c6-cc4b-3f7ce66daa27@cogentembedded.com>
-Message-ID: <20170112121623.GH1771@arm.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu, 12 Jan 2017 13:29:24 +0100
+Subject: [kvm-unit-tests PATCH 1/6] libcflat: add PRI(dux)32 format types
+In-Reply-To: <20170111162841.15569-2-alex.bennee@linaro.org>
+References: <20170111162841.15569-1-alex.bennee@linaro.org>
+ <20170111162841.15569-2-alex.bennee@linaro.org>
+Message-ID: <4286b719-ff75-d2cd-68b5-cb9d9bb89553@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 08:52:51AM +0300, Nikita Yushchenko wrote:
-> >> diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-> >> index 5ac373c..480b644 100644
-> >> --- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-> >> +++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-> >> @@ -540,7 +540,7 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
-> >>  
-> >>  	/* Objects are coherent, unless 'no shareability' flag set. */
-> >>  	if (!(obj_desc->flags & DPRC_OBJ_FLAG_NO_MEM_SHAREABILITY))
-> >> -		arch_setup_dma_ops(&mc_dev->dev, 0, 0, NULL, true);
-> >> +		arch_setup_dma_ops(&mc_dev->dev, 0, 0, false, NULL, true);
-> >>  
-> >>  	/*
-> >>  	 * The device-specific probe callback will get invoked by device_add()
-> > 
-> > Why are these actually calling arch_setup_dma_ops() here in the first
-> > place? Are these all devices that are DMA masters without an OF node?
+
+
+On 11/01/2017 17:28, Alex Benn?e wrote:
+> So we can have portable formatting of uint32_t types. However there is
+> a catch. Different compilers can use legally subtly different types
+> though so we need to probe the compiler defined intdef.h first.
+
+Interesting, what platform has long uint32_t?  I thought the issue was
+whether 64-bit is long or "long long".
+
+Paolo
+
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> ---
+>  Makefile       |  1 +
+>  configure      | 13 +++++++++++++
+>  lib/libcflat.h |  9 +++++++++
+>  3 files changed, 23 insertions(+)
 > 
-> I don't know, but that's a different topic. This patch just adds
-> argument and sets it to false everywhere but in the location when range
-> should be definitely enforced.
-
-I also wouldn't lose any sleep over a staging driver.
-
-Will
+> diff --git a/Makefile b/Makefile
+> index a32333b..9822d9a 100644
+> --- a/Makefile
+> +++ b/Makefile
+> @@ -55,6 +55,7 @@ CFLAGS += $(fomit_frame_pointer)
+>  CFLAGS += $(fno_stack_protector)
+>  CFLAGS += $(fno_stack_protector_all)
+>  CFLAGS += $(wno_frame_address)
+> +CFLAGS += $(if $(U32_LONG_FMT),-D__U32_LONG_FMT__,)
+>  
+>  CXXFLAGS += $(CFLAGS)
+>  
+> diff --git a/configure b/configure
+> index 995c8fa..127868c 100755
+> --- a/configure
+> +++ b/configure
+> @@ -109,6 +109,18 @@ if [ -f $testdir/run ]; then
+>      ln -fs $testdir/run $testdir-run
+>  fi
+>  
+> +# check if uint32_t needs a long format modifier
+> +cat << EOF > lib_test.c
+> +#include <inttypes.h>
+> +EOF
+> +
+> +$cross_prefix$cc lib_test.c -E | grep "typedef" | grep "long" | grep "uint32_t" &> /dev/null
+> +exit=$?
+> +if [ $exit -eq 0 ]; then
+> +    u32_long=true
+> +fi
+> +rm -f lib_test.c
+> +
+>  # check for dependent 32 bit libraries
+>  if [ "$arch" != "arm" ]; then
+>  cat << EOF > lib_test.c
+> @@ -155,4 +167,5 @@ TEST_DIR=$testdir
+>  FIRMWARE=$firmware
+>  ENDIAN=$endian
+>  PRETTY_PRINT_STACKS=$pretty_print_stacks
+> +U32_LONG_FMT=$u32_long
+>  EOF
+> diff --git a/lib/libcflat.h b/lib/libcflat.h
+> index 380395f..e80fc50 100644
+> --- a/lib/libcflat.h
+> +++ b/lib/libcflat.h
+> @@ -58,12 +58,21 @@ typedef _Bool		bool;
+>  #define true  1
+>  
+>  #if __SIZEOF_LONG__ == 8
+> +#  define __PRI32_PREFIX
+>  #  define __PRI64_PREFIX	"l"
+>  #  define __PRIPTR_PREFIX	"l"
+>  #else
+> +#if defined(__U32_LONG_FMT__)
+> +#  define __PRI32_PREFIX        "l"
+> +#else
+> +#  define __PRI32_PREFIX
+> +#endif
+>  #  define __PRI64_PREFIX	"ll"
+>  #  define __PRIPTR_PREFIX
+>  #endif
+> +#define PRId32  __PRI32_PREFIX	"d"
+> +#define PRIu32  __PRI32_PREFIX	"u"
+> +#define PRIx32  __PRI32_PREFIX	"x"
+>  #define PRId64  __PRI64_PREFIX	"d"
+>  #define PRIu64  __PRI64_PREFIX	"u"
+>  #define PRIx64  __PRI64_PREFIX	"x"
+> 
