@@ -1,60 +1,109 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 12 Jan 2017 13:43:13 +0000
-Subject: [PATCH 1/2] dma-mapping: let arch know origin of dma range passed
- to arch_setup_dma_ops()
-In-Reply-To: <3273119.LjYLKcrNcz@wuerfel>
-References: <dca35acf-1adf-aa85-7a0b-d0c6ec702fa1@arm.com>
- <764334db-3400-58c6-cc4b-3f7ce66daa27@cogentembedded.com>
- <20170112121623.GH1771@arm.com> <3273119.LjYLKcrNcz@wuerfel>
-Message-ID: <f3fcd74b-7264-7ff2-4f70-7bf4235302de@arm.com>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Thu, 12 Jan 2017 14:47:42 +0100
+Subject: [PATCH v8 2/5] i2c: Add STM32F4 I2C driver
+In-Reply-To: <20170112120309.fmrt2lwz3vklqmti@pengutronix.de>
+References: <1483607246-14771-1-git-send-email-cedric.madianga@gmail.com>
+ <1483607246-14771-3-git-send-email-cedric.madianga@gmail.com>
+ <20170111082208.vzu7xgpd4eakyldl@pengutronix.de>
+ <CAOAejn2eOy2sn1VkE979ne23Sj9L6+kaQDNpL1EUKb2m=6sGXw@mail.gmail.com>
+ <20170111153940.dtxzvtdici3r7l54@pengutronix.de>
+ <CAOAejn2pW20VPP_yGtvJ_ufvj6Xj1poBiiA2WqkALiaLyyONug@mail.gmail.com>
+ <20170112120309.fmrt2lwz3vklqmti@pengutronix.de>
+Message-ID: <CAOAejn289GLOSP-nPJnO_VpXLpyhTsF1bWQ7Ns9OfgPQCa8YTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/17 13:25, Arnd Bergmann wrote:
-> On Thursday, January 12, 2017 12:16:24 PM CET Will Deacon wrote:
->> On Thu, Jan 12, 2017 at 08:52:51AM +0300, Nikita Yushchenko wrote:
->>>>> diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
->>>>> index 5ac373c..480b644 100644
->>>>> --- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
->>>>> +++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
->>>>> @@ -540,7 +540,7 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
->>>>>  
->>>>>    /* Objects are coherent, unless 'no shareability' flag set. */
->>>>>    if (!(obj_desc->flags & DPRC_OBJ_FLAG_NO_MEM_SHAREABILITY))
->>>>> -          arch_setup_dma_ops(&mc_dev->dev, 0, 0, NULL, true);
->>>>> +          arch_setup_dma_ops(&mc_dev->dev, 0, 0, false, NULL, true);
->>>>>  
->>>>>    /*
->>>>>     * The device-specific probe callback will get invoked by device_add()
->>>>
->>>> Why are these actually calling arch_setup_dma_ops() here in the first
->>>> place? Are these all devices that are DMA masters without an OF node?
->>>
->>> I don't know, but that's a different topic. This patch just adds
->>> argument and sets it to false everywhere but in the location when range
->>> should be definitely enforced.
+2017-01-12 13:03 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello Cedric,
+>
+> On Thu, Jan 12, 2017 at 12:23:12PM +0100, M'boumba Cedric Madianga wrote:
+>> 2017-01-11 16:39 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+>> > On Wed, Jan 11, 2017 at 02:58:44PM +0100, M'boumba Cedric Madianga wrote:
+>> >> 2017-01-11 9:22 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+>> >> > This is surprising. I didn't recheck the manual, but that looks very
+>> >> > uncomfortable.
+>> >>
+>> >> I agree but this exactly the hardware way of working described in the
+>> >> reference manual.
+>> >
+>> > IMHO that's a hw bug. This makes it for example impossible to implement
+>> > SMBus block transfers (I think).
 >>
->> I also wouldn't lose any sleep over a staging driver.
-> 
-> I think this is in the process of being moved out of staging, and
-> my question was about the other two as well:
+>> This is not correct.
+>> Setting STOP/START bit does not mean the the pulse will be sent right now.
+>> Here we have just to prepare the hardware for the 2 next pulse but the
+>> STOP/START/ACK pulse will be generated at the right time as required
+>> by I2C specification.
+>> So SMBus block transfer will be possible.
+>
+> A block transfer consists of a byte that specifies the count of bytes
+> yet to come. So the device sends for example:
+>
+>         0x01 0xab
+>
+> So when you read the 1 in the first byte it's already too late to set
+> STOP to get it after the 2nd byte.
+>
+> Not sure I got all the required details right, though.
 
-The fsl-mc is actually a sort-of-bus-controller probing and configuring
-its (directly DMA-capable) child devices, so is in fact legitimate here.
+Ok I understand your use case but I always think that the harware manages it.
+If I take the above example, the I2C SMBus block read transaction will
+be as below:
+S Addr Wr [A] Comm [A]
+           S Addr Rd [A] [Count] A [Data1] A [Data2] NA P
 
-> drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
+The first message is a single byte-transmission so there is no problem.
 
-That one is completely bogus, and should just go away.
+The second message is a N-byte reception with N = 3
 
-> drivers/iommu/rockchip-iommu.c
+When the I2C controller has finished to send the device address (S
+Addr Rd), the ADDR flag is set and an interrupt is raised.
+In the routine that handles ADDR event, we set ACK bit in order to
+generate ACK pulse as soon as a data byte is received in the shift
+register and then we clear the ADDR flag.
+Please note that the SCL line is stretched low until ADDR flag is cleared.
+So, as far I understand, the device could not sent any data as long as
+the SCL line is stretched low. Right ?
 
-That one is part of some ugly trickery involving creating a fake device
-to represent multiple separate IOMMU devices. The driver could probably
-be reworked to not need it (the Exynos IOMMU handles a similar situation
-without such tricks), but it's non-trivial.
+Then, as soon as the SCL line is high, the device could send the first
+data byte (Count).
+When this byte is received in the shift register, an ACK is
+automatically generated as defined during adress match phase and the
+data byte is pushed in DR (data register).
+Then, an interrupt is raised as RXNE (RX not empty) flag is set.
+In the routine that handles RXNE event, as N=3, we just clear all
+buffer interrupts in order to avoid another system preemption due to
+RXNE event but we does not read the data in DR.
 
-Robin.
+After receiving the ACK, the device could send the second data byte (Data1).
+When this byte is received in the shift register, an ACK is
+automatically generated.
+As the first data byte has not been read yet in DR, the BTF (Byte
+Transfer Finihed) flag is set and an interrupt is raised.
+So, in that case, the SCL line is also streched low as long as the
+data register has not been read.
+In the routine that handle BTF event, we enable NACK in order to
+generate this pulse as soon as the last data byte will be received and
+then we read DR register ([Count])
+At this moment, SCL line is released and the device could send the
+last data byte.
 
-> 
-> 	Arnd
-> 
+After receiving the ACK, the device could send the third and last data
+byte (Data2)
+When this byte is received in the shift register, a NACK is
+automatically generated as we enable it as explained above.
+As the second data byte  (Data1) has not been read yet in DR, the BTF
+flag is set again and an interrupt is raised.
+The SCL line is stretched low and in that way we could set the STOP
+bit to generate this pulse.
+Then we run 2 consecutives read of DR to retrieve [Data1] and [Data2]
+and to set SCL high.
+
+So, thanks to SCL stretching, it seems that NA and P will be generated
+at the right time.
+
+Please let me know if it is not correct.
+
+Best regards,
+
+Cedric
