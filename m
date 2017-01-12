@@ -1,37 +1,49 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 12 Jan 2017 12:35:03 +0000
-Subject: [kvm-unit-tests PATCH 4/6] docs: mention checkpatch in the README
-In-Reply-To: <322298cd-aefa-e945-d3f4-1237767a06ef@redhat.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu, 12 Jan 2017 13:35:58 +0100
+Subject: [kvm-unit-tests PATCH 2/6] lib/pci: fix BAR format strings
+In-Reply-To: <20170111162841.15569-3-alex.bennee@linaro.org>
 References: <20170111162841.15569-1-alex.bennee@linaro.org>
- <20170111162841.15569-5-alex.bennee@linaro.org>
- <322298cd-aefa-e945-d3f4-1237767a06ef@redhat.com>
-Message-ID: <87lgug318o.fsf@linaro.org>
+ <20170111162841.15569-3-alex.bennee@linaro.org>
+Message-ID: <faf255f3-2a97-4b94-9866-161060f646a1@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Paolo Bonzini <pbonzini@redhat.com> writes:
 
-> On 11/01/2017 17:28, Alex Benn?e wrote:
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->> ---
->>  README.md | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/README.md b/README.md
->> index 5027b62..9462824 100644
->> --- a/README.md
->> +++ b/README.md
->> @@ -79,3 +79,4 @@ You can add the following to .git/config to do this automatically for you:
->>      [format]
->>          subjectprefix = kvm-unit-tests PATCH
->>
->> +Please run the kernel's ./scripts/checkpatch.pl on new patches
->
-> Does it really work well on kvm-unit-tests?
+On 11/01/2017 17:28, Alex Benn?e wrote:
+> Using %x as a format string is not portable across 32/64 bit builds.
+> Use explicit PRIx32 format strings like the 64 bit version above.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> ---
+>  lib/pci.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/lib/pci.c b/lib/pci.c
+> index 6416191..597d8f2 100644
+> --- a/lib/pci.c
+> +++ b/lib/pci.c
+> @@ -67,7 +67,7 @@ bool pci_setup_msi(struct pci_dev *dev, uint64_t msi_addr, uint32_t msi_data)
+>  		pci_config_writel(addr, offset + PCI_MSI_DATA_32, msi_data);
+>  		printf("MSI: dev 0x%x init 32bit address: ", addr);
+>  	}
+> -	printf("addr=0x%lx, data=0x%x\n", msi_addr, msi_data);
+> +	printf("addr=0x%" PRIx64 ", data=0x%" PRIx32 "\n", msi_addr, msi_data);
 
-Well I keep getting pulled up on kernel coding style on my reviews so if
-we mean it we should enforce it.
+Applying only the %lx -> %"PRIx64" change for now (though it's also in
+Andrew's 32-bit compilation fixes patch).
 
---
-Alex Benn?e
+Paolo
+>  
+>  	msi_control |= PCI_MSI_FLAGS_ENABLE;
+>  	pci_config_writew(addr, offset + PCI_MSI_FLAGS, msi_control);
+> @@ -237,7 +237,7 @@ void pci_bar_print(struct pci_dev *dev, int bar_num)
+>  		printf("BAR#%d,%d [%" PRIx64 "-%" PRIx64 " ",
+>  		       bar_num, bar_num + 1, start, end);
+>  	} else {
+> -		printf("BAR#%d [%02x-%02x ",
+> +		printf("BAR#%d [%" PRIx32 "-%" PRIx32 " ",
+>  		       bar_num, (uint32_t)start, (uint32_t)end);
+>  	}
+>  
+> 
