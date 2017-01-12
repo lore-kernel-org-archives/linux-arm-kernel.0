@@ -1,26 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Jan 2017 17:20:19 +0000
-Subject: [PATCH] iommu/arm-smmu-v3: limit use of 2-level stream tables
-In-Reply-To: <1484077633-18376-1-git-send-email-nwatters@codeaurora.org>
-References: <20161220102209.GC10132@arm.com>
- <1484077633-18376-1-git-send-email-nwatters@codeaurora.org>
-Message-ID: <20170112172019.GI13843@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 12 Jan 2017 18:22:53 +0100
+Subject: [PATCH] ASoC: sun4i-spdif: Add support for the H3 SoC
+In-Reply-To: <20170112164516.15877-1-codekipper@gmail.com>
+References: <20170112164516.15877-1-codekipper@gmail.com>
+Message-ID: <20170112172253.746ipbhes5s7xs2k@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 02:47:13PM -0500, Nate Watterson wrote:
-> In the current arm-smmu-v3 driver, all smmus that support 2-level
-> stream tables are being forced to use them. This is suboptimal for
-> smmus that support fewer stream id bits than would fill in a single
-> second level table. This patch limits the use of 2-level tables to
-> smmus that both support the feature and whose first level table can
-> possibly contain more than a single entry.
+On Thu, Jan 12, 2017 at 05:45:16PM +0100, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
 > 
-> Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 21 ++++++++++-----------
->  1 file changed, 10 insertions(+), 11 deletions(-)
+> The H3 SoC uses the same SPDIF block as found in earlier SoCs, but its
+> TXFIFO is mapped to another address.
+> 
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 
-Thanks Nate, I'll queue this for 4.11. Sorry for messing you about before.
+You should also document the new compatible.
 
-Will
+Once this is done, you have my:
+
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170112/6de91701/attachment.sig>
