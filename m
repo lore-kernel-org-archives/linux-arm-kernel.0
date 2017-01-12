@@ -1,31 +1,55 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 13 Jan 2017 00:44:44 +0800
-Subject: [PATCH 2/2] crypto: mediatek - fix format string for 64-bit builds
-In-Reply-To: <20170111135601.4047225-1-arnd@arndb.de>
-References: <20170111135104.3961730-1-arnd@arndb.de>
- <20170111135601.4047225-1-arnd@arndb.de>
-Message-ID: <20170112164444.GC20313@gondor.apana.org.au>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Thu, 12 Jan 2017 17:45:16 +0100
+Subject: [PATCH] ASoC: sun4i-spdif: Add support for the H3 SoC
+Message-ID: <20170112164516.15877-1-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 02:55:20PM +0100, Arnd Bergmann wrote:
-> After I enabled COMPILE_TEST for non-ARM targets, I ran into these
-> warnings:
-> 
-> crypto/mediatek/mtk-aes.c: In function 'mtk_aes_info_map':
-> crypto/mediatek/mtk-aes.c:224:28: error: format '%d' expects argument of type 'int', but argument 3 has type 'long unsigned int' [-Werror=format=]
->    dev_err(cryp->dev, "dma %d bytes error\n", sizeof(*info));
-> crypto/mediatek/mtk-sha.c:344:28: error: format '%d' expects argument of type 'int', but argument 3 has type 'long unsigned int' [-Werror=format=]
-> crypto/mediatek/mtk-sha.c:550:21: error: format '%u' expects argument of type 'unsigned int', but argument 4 has type 'size_t {aka long unsigned int}' [-Werror=format=]
-> 
-> The correct format for size_t is %zu, so use that in all three
-> cases.
-> 
-> Fixes: 785e5c616c84 ("crypto: mediatek - Add crypto driver support for some MediaTek chips")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+From: Marcus Cooper <codekipper@gmail.com>
 
-Patch applied.  Thanks.
+The H3 SoC uses the same SPDIF block as found in earlier SoCs, but its
+TXFIFO is mapped to another address.
+
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+---
+ sound/soc/sunxi/sun4i-spdif.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/sound/soc/sunxi/sun4i-spdif.c b/sound/soc/sunxi/sun4i-spdif.c
+index fec62ee1fc72..c03cd07a9b19 100644
+--- a/sound/soc/sunxi/sun4i-spdif.c
++++ b/sound/soc/sunxi/sun4i-spdif.c
+@@ -103,6 +103,8 @@
+ 	#define SUN4I_SPDIF_ISTA_RXOSTA			BIT(1)
+ 	#define SUN4I_SPDIF_ISTA_RXASTA			BIT(0)
+ 
++#define SUN8I_SPDIF_TXFIFO	(0x20)
++
+ #define SUN4I_SPDIF_TXCNT	(0x24)
+ 
+ #define SUN4I_SPDIF_RXCNT	(0x28)
+@@ -417,6 +419,11 @@ static const struct sun4i_spdif_quirks sun6i_a31_spdif_quirks = {
+ 	.has_reset	= true,
+ };
+ 
++static const struct sun4i_spdif_quirks sun8i_h3_spdif_quirks = {
++	.reg_dac_txdata	= SUN8I_SPDIF_TXFIFO,
++	.has_reset	= true,
++};
++
+ static const struct of_device_id sun4i_spdif_of_match[] = {
+ 	{
+ 		.compatible = "allwinner,sun4i-a10-spdif",
+@@ -426,6 +433,10 @@ static const struct of_device_id sun4i_spdif_of_match[] = {
+ 		.compatible = "allwinner,sun6i-a31-spdif",
+ 		.data = &sun6i_a31_spdif_quirks,
+ 	},
++	{
++		.compatible = "allwinner,sun8i-h3-spdif",
++		.data = &sun8i_h3_spdif_quirks,
++	},
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, sun4i_spdif_of_match);
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.11.0
