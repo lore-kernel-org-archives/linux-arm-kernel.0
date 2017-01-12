@@ -1,29 +1,39 @@
-From: baolin.wang@linaro.org (Baolin Wang)
-Date: Thu, 12 Jan 2017 14:43:00 +0800
-Subject: [PATCH v2 3/3] phy: rockchip-inno-usb2: Set EXTCON_USB when
- EXTCON_CHG_USB_SDP was set
-In-Reply-To: <CAMz4kuJP9Q7Ly4uRBjCFU32YzbVbnsGyk+wHc+M=g8W=uDBsEQ@mail.gmail.com>
-References: <7b9836ce2ca34118a2acd1ea113605a5f13b4439.1482307697.git.baolin.wang@linaro.org>
- <23666cc1a5ff123ece5bdbb9821d1eab280d0927.1482307697.git.baolin.wang@linaro.org>
- <CAMz4kuJP9Q7Ly4uRBjCFU32YzbVbnsGyk+wHc+M=g8W=uDBsEQ@mail.gmail.com>
-Message-ID: <CAMz4ku+X8v2HH5L_fS60naNTqR1ZFKYeWuXuHqjg0UsHQq1dsQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Jan 2017 08:04:54 +0100
+Subject: [PATCH] ARM: defconfig: include QCOM_EBI2 in multi_v7
+In-Reply-To: <cee567ef-adc3-eb3f-81bb-e8a678b35fa8@codeaurora.org>
+References: <20170110100931.15791-1-linus.walleij@linaro.org>
+ <CAOesGMh-5oyzjsby=R9c=euAngsq9=cNwJFDhEEKWtzxoqzLKA@mail.gmail.com>
+ <CACRpkdacU0X1NH5HRwTvt1Wtn=9iqEs0MYQ_vt4UsGV67S4kBA@mail.gmail.com>
+ <cee567ef-adc3-eb3f-81bb-e8a678b35fa8@codeaurora.org>
+Message-ID: <CACRpkdZt+8K+R4p5zyHirMFU-RdBQ1Q+-3EHWc31t5s-sgyNyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 January 2017 at 13:54, Baolin Wang <baolin.wang@linaro.org> wrote:
-> Hi Kison and Heiko,
->
-> On 21 December 2016 at 16:12, Baolin Wang <baolin.wang@linaro.org> wrote:
->> According to the documentation, we should set the EXTCON_USB when
->> one SDP charger connector was reported.
+On Thu, Jan 12, 2017 at 2:01 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 01/11/2017 07:22 AM, Linus Walleij wrote:
+>> On Tue, Jan 10, 2017 at 7:02 PM, Olof Johansson <olof@lixom.net> wrote:
+>>> On Tue, Jan 10, 2017 at 2:09 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>>> This adds the Qualcomm External Bus Interface 2 to the multi_v7
+>>>> defconfig: it is hard for users to realize that this is a
+>>>> required driver for getting things like ethernet, and a necessary
+>>>> prerequisite to get the external bus discoverable on the
+>>>> MSM8660/APQ8060 machines.
+>>> Is it the kind of option that should really be selected through
+>>> Kconfig instead for those platforms?
 >>
->> Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
->> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Stephen Boyd question.
+>>
+>> AFAIK the ambition is to go with the platform to have zero
+>> stuff in mach-qcom/* and thus it all becomes a defconfig
+>> thing.
 >
-> Could you apply this patch if there are no other comments? Thanks.
+> It could be made a 'default ARCH_QCOM' type of thing. Then the config
+> doesn't need an update unless you want to turn it off.
 
-Ping?
+OK I will do that.
 
--- 
-Baolin.wang
-Best Regards
+Olof: let's scrap this patch.
+
+Yours,
+Linus Walleij
