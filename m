@@ -1,31 +1,85 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 12 Jan 2017 12:11:47 +0000
-Subject: [PATCH v2 2/2] arm64: dts: juno: Adds missing CoreSight STM
- component.
-In-Reply-To: <DB6PR0802MB2198449A31AD8624B48045428C790@DB6PR0802MB2198.eurprd08.prod.outlook.com>
-References: <1484167449-14432-1-git-send-email-mike.leach@linaro.org>
- <1484167449-14432-3-git-send-email-mike.leach@linaro.org>
- <0120ef9b-2e01-e00a-2de8-c540ab70af85@arm.com>
- <DB6PR0802MB2198449A31AD8624B48045428C790@DB6PR0802MB2198.eurprd08.prod.outlook.com>
-Message-ID: <4388546d-f78e-e47f-5edc-eb0a78c3a27f@arm.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Thu, 12 Jan 2017 13:15:42 +0100
+Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device managed
+ functions
+In-Reply-To: <yw1xlgugldws.fsf@unicorn.mansr.com>
+References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-5-git-send-email-linux@roeck-us.net>
+ <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
+ <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
+ <a45ed205-7c1b-a298-50c0-fc8b80a846c5@sigmadesigns.com>
+ <a61eb838-4167-3032-bde8-3a8845b780f8@roeck-us.net>
+ <f7d9227c-4912-5c52-5ba7-ae7fa3b89857@sigmadesigns.com>
+ <20170111175110.GB22289@roeck-us.net>
+ <0f68aa11-161b-0435-ea0f-851432464bc1@sigmadesigns.com>
+ <yw1xlgugldws.fsf@unicorn.mansr.com>
+Message-ID: <0f8550e9-3f1c-6240-5c2f-c776bd238d0b@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/01/2017 12:24, M?ns Rullg?rd wrote:
 
-
-On 12/01/17 11:24, Mike Leach wrote:
-> Hi Sudeep,
+> Marc Gonzalez writes:
 > 
-> I'm fine with that - less duplication the better.
+>>> So far we have a claim that a cast to a void * may somehow be different
+>>> to a cast to a different pointer, if used as function argument, and that
+>>> the behavior with such a cast may be undefined. In other words, you claim
+>>> that a function implemented as, say,
+>>>
+>>>    void func(int *var) {}
+>>>
+>>> might result in undefined behavior if some header file declares it as
+>>>
+>>>     void func(void *);
+>>>
+>>> and it is called as
+>>>
+>>>     int var;
+>>>
+>>>     func(&var);
+>>>
+>>> That seems really far fetched to me.
+>>
+>> Thanks for giving me an opportunity to play the language lawyer :-)
+>>
+>> C99 6.3.2.3 sub-clause 8 states:
+>>
+>> "A pointer to a function of one type may be converted to a pointer to
+>> a function of another type and back again; the result shall compare
+>> equal to the original pointer. If a converted pointer is used to call
+>> a function whose type is not compatible with the pointed-to type, the
+>> behavior is undefined."
+>>
+>> So, the behavior is undefined, not when you cast clk_disable_unprepare,
+>> but when clk_disable_unprepare is later called through the devres->action
+>> function pointer.
 > 
-> I've not played with .dts files much to I hadn't realised that type
-> of construction was possible.
+> Only if the function types are incompatible.  C99 6.7.5.3 subclause 15:
 > 
+>   For two function types to be compatible, both shall specify compatible
+>   return types.  Moreover, the parameter type lists, if both are
+>   present, shall agree in the number of parameters and in use of the
+>   ellipsis terminator; corresponding parameters shall have compatible
+>   types.
+> 
+> The question then is whether pointer to void and pointer to struct clk
+> are compatible types.
 
-OK I spent some time and I think we can do the same for other coresight
-components too. I will modify post the series but I need your help to
-validate the change running core-sight tests.
+6.2.7 Compatible type and composite type
+sub-clause 1
 
--- 
-Regards,
-Sudeep
+"Two types have compatible type if their types are the same. Additional rules for
+determining whether two types are compatible are described in 6.7.2 for type specifiers,
+in 6.7.3 for type qualifiers, and in 6.7.5 for declarators."
+
+6.7.5.1 Pointer declarators
+sub-clause 2
+
+"For two pointer types to be compatible, both shall be identically qualified and both shall
+be pointers to compatible types."
+
+I don't think void and struct clk are compatible types.
+AFAIU, conversion and compatibility are two separate subjects.
+
+Regards.
