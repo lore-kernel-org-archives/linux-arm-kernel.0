@@ -1,198 +1,131 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 12 Jan 2017 09:51:37 -0700
-Subject: [PATCH v3 2/3] arm64: dts: juno: fix CoreSight support for Juno
- r1/r2 variants
-In-Reply-To: <1484234410-7670-3-git-send-email-sudeep.holla@arm.com>
-References: <1484234410-7670-1-git-send-email-sudeep.holla@arm.com>
- <1484234410-7670-3-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CANLsYkymGdrM8z-ZWan0Fn+Ymq97oHAJtW3G0YdUAxpWSf+aaw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 12 Jan 2017 16:52:54 +0000
+Subject: [RFC 01/13] KVM: arm/arm64: Add vITS save/restore API
+ documentation
+In-Reply-To: <1484236613-24633-2-git-send-email-eric.auger@redhat.com>
+References: <1484236613-24633-1-git-send-email-eric.auger@redhat.com>
+ <1484236613-24633-2-git-send-email-eric.auger@redhat.com>
+Message-ID: <4fe81c1b-9956-d458-b0ef-b7219f1249fe@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 January 2017 at 08:20, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> From: Mike Leach <mike.leach@linaro.org>
->
-> The CoreSight support added for Juno is valid for only Juno r0.
-> The Juno r1 and r2 variants have additional components and alternative
-> connection routes between trace source and sinks.
->
-> This patch builds on top of the existing r0 support and extends it to
-> Juno r1/r2 variants.
->
-> Signed-off-by: Mike Leach <mike.leach@linaro.org>
-> [sudeep.holla at arm.com: minor changelog update and reorganising the common
->         coresight components back into juno-base.dtsi to avoid duplication]
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Hi Eric,
+
+On 12/01/17 15:56, Eric Auger wrote:
+> Add description for how to access vITS registers and how to flush/restore
+> vITS tables into/from memory
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
 > ---
->  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 102 ++++++++++++++++++++++++++++++
->  arch/arm64/boot/dts/arm/juno-r1.dts       |   9 +++
->  arch/arm64/boot/dts/arm/juno-r2.dts       |   9 +++
->  3 files changed, 120 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->
-> diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
-> new file mode 100644
-> index 000000000000..89fcef366ff9
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
-> @@ -0,0 +1,102 @@
-> +       csys1_funnel at 20130000 {
-> +               compatible = "arm,coresight-funnel", "arm,primecell";
-> +               reg = <0 0x20130000 0 0x1000>;
+>  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 70 ++++++++++++++++++++++
+>  1 file changed, 70 insertions(+)
+> 
+> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+> index 6081a5b..bd74613 100644
+> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+> @@ -36,3 +36,73 @@ Groups:
+>      -ENXIO:  ITS not properly configured as required prior to setting
+>               this attribute
+>      -ENOMEM: Memory shortage when allocating ITS internal data
 > +
-> +               clocks = <&soc_smc50mhz>;
-> +               clock-names = "apb_pclk";
-> +               power-domains = <&scpi_devpd 0>;
-> +               ports {
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
+> +  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+> +  Attributes:
+> +      The attr field of kvm_device_attr encodes the offset of the
+> +      ITS register, relative to the ITS control frame base address
+> +      (ITS_base).
 > +
-> +                       /* input port */
-> +                       port at 0 {
-> +                               reg = <0>;
-> +                               csys1_funnel_out_port: endpoint {
-> +                                       remote-endpoint =
-> +                                               <&etf1_in_port>;
-> +                               };
-> +                       };
+> +      kvm_device_attr.addr points to a __u64 value whatever the width
+> +      of the addressed register (32/64 bits).
 > +
-> +                       /* output port */
-> +                       port at 1 {
-> +                               reg = <0>;
-> +                               csys1_funnel_in_port0: endpoint {
-> +                                       slave-mode;
-> +                               };
-> +                       };
+> +      Writes to read-only registers are ignored by the kernel except
+> +      for a single register, GITS_READR. Normally this register is RO
+> +      but it needs to be restored otherwise commands in the queue will
+> +      be re-executed after CWRITER setting.
+> +
+> +      For other registers, Getting or setting a register has the same
+> +      effect as reading/writing the register on real hardware.
+> +  Errors:
+> +    -ENXIO: Offset does not correspond to any supported register
+> +    -EFAULT: Invalid user pointer for attr->addr
+> +    -EINVAL: Offset is not 64-bit aligned
+> +
+> +  KVM_DEV_ARM_VGIC_GRP_ITS_TABLES
+> +  Attributes
+> +       The attr field of kvm_device_attr is not used.
+> +
+> +       request the flush-save/restore of the ITS tables, namely
+> +       the device table, the collection table, all the ITT tables,
+> +       the LPI pending tables. On save, the tables are flushed
+> +       into guest memory at the location provisionned by the guest
 
-The comments related to the input and output port are reversed.
+					    provisioned
+
+> +       in GITS_BASER (device and collection tables), on MAPD command
+> +       (ITT_addr), GICR_PENDBASERs (pending tables).
+> +
+> +       This means the GIC should be restored before the ITS and all
+> +       ITS registers but the GITS_CTRL must be restored before
+> +       restoring the ITS tables.
+> +
+> +       Note the LPI configuration table is read-only for the
+> +       in-kernel ITS and its save/restore goes through the standard
+> +       RAM save/restore.
+> +
+> +       The layout of the tables in guest memory defines an ABI.
+> +       The entries are laid out in memory as follows;
+> +
+> +    Device Table Entry (DTE) layout: entry size = 16 bytes
+> +
+> +    bits:     | 63   ...  32  | 31 ... 6 | 5 | 4   ...   0 |
+> +    values:   |   DeviceID    |   Resv   | V |    Size     |
+> +
+> +    bits:     | 63 ... 44 | 43  ...  0  |
+> +    values:   |    Resv   |  ITT_addr   |
+
+While I appreciate this layout represents the absolute maximum an ITS
+could implement, I'm a bit concerned about the amount of memory we may
+end-up requiring here. All the ITSs implementations I know of seem to
+get away with 8 bytes per entry. Maybe I'm just too worried.
+
+Also, please mention that ITT_addr is actually ITT_addr[51:8], as we're
+guaranteed to have an ITT that is 256 byte aligned.
 
 > +
-> +               };
-> +       };
+> +    Collection Table Entry (CTE) layout: entry size = 8 bytes
 > +
-> +       etf1 at 20140000 {
-> +               compatible = "arm,coresight-tmc", "arm,primecell";
-> +               reg = <0 0x20140000 0 0x1000>;
+> +    bits:     | 63| 62 ..  52  | 51 ... 16 | 15  ...   0 |
+> +    values:   | V |    RES0    |  RDBase   |    ICID     |
 > +
-> +               clocks = <&soc_smc50mhz>;
-> +               clock-names = "apb_pclk";
-> +               power-domains = <&scpi_devpd 0>;
-> +               ports {
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
+> +    Interrupt Translation Table Entry (ITTE) layout: entry size = 16 bytes
+
+The actual name is Interrupt Translation Entry (ITE). I have a patch
+renaming this all over the vgic-its.c file...
+
 > +
-> +                       /* input port */
-> +                       port at 0 {
-> +                               reg = <0>;
-> +                               etf1_in_port: endpoint {
-> +                                       slave-mode;
-> +                                       remote-endpoint =
-> +                                               <&csys1_funnel_out_port>;
-> +                               };
-> +                       };
+> +    bits:     | 63   ...  32  | 31 ... 17 | 16 | 15  ...  0 |
+> +    values:   |   DeviceID    |    RES0   | V  |    ICID    |
 > +
-> +                       /* output port */
-> +                       port at 1 {
-> +                               reg = <0>;
-> +                               etf1_out_port: endpoint {
-> +                                       remote-endpoint =
-> +                                               <&csys2_funnel_in_port1>;
-> +                               };
-> +                       };
-> +               };
-> +       };
+> +    bits:     | 63 ...  32    | 31      ...        0 |
+> +    values:   |   pINTID      |        EventID       |
+
+Same concern here. 32bit DevID, EventID and INTID seem a bit over the
+top. But maybe we shouldn't be concerned about memory... ;-)
+
 > +
-> +       csys2_funnel at 20150000 {
-> +               compatible = "arm,coresight-funnel", "arm,primecell";
-> +               reg = <0 0x20150000 0 0x1000>;
+> +    LPI Pending Table layout:
 > +
-> +               clocks = <&soc_smc50mhz>;
-> +               clock-names = "apb_pclk";
-> +               power-domains = <&scpi_devpd 0>;
-> +               ports {
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +
-> +                       /* output port */
-> +                       port at 0 {
-> +                               reg = <0>;
-> +                               csys2_funnel_out_port: endpoint {
-> +                                       remote-endpoint =
-> +                                               <&replicator_in_port0>;
-> +                               };
-> +                       };
-> +
-> +                       /* input ports */
-> +                       port at 1 {
-> +                               reg = <0>;
-> +                               csys2_funnel_in_port0: endpoint {
-> +                                       slave-mode;
-> +                                       remote-endpoint = <&etf0_out_port>;
-> +                               };
-> +                       };
-> +
-> +                       port at 2 {
-> +                               reg = <1>;
-> +                               csys2_funnel_in_port1: endpoint {
-> +                                       slave-mode;
-> +                                       remote-endpoint = <&etf1_out_port>;
-> +                               };
-> +                       };
-> +
-> +               };
-> +       };
-> diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
-> index eec37feee8fc..d4b85d9d343e 100644
-> --- a/arch/arm64/boot/dts/arm/juno-r1.dts
-> +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
-> @@ -178,6 +178,7 @@
->         };
->
->         #include "juno-base.dtsi"
-> +       #include "juno-cs-r1r2.dtsi"
->  };
->
->  &memtimer {
-> @@ -227,3 +228,11 @@
->  &gpu1_thermal_zone {
->         status = "okay";
->  };
-> +
-> +&etf0_out_port {
-> +       remote-endpoint = <&csys2_funnel_in_port0>;
-> +};
-> +
-> +&replicator_in_port0 {
-> +       remote-endpoint = <&csys2_funnel_out_port>;
-> +};
-> diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts b/arch/arm64/boot/dts/arm/juno-r2.dts
-> index 28f40ec44090..14b29517065c 100644
-> --- a/arch/arm64/boot/dts/arm/juno-r2.dts
-> +++ b/arch/arm64/boot/dts/arm/juno-r2.dts
-> @@ -178,6 +178,7 @@
->         };
->
->         #include "juno-base.dtsi"
-> +       #include "juno-cs-r1r2.dtsi"
->  };
->
->  &memtimer {
-> @@ -227,3 +228,11 @@
->  &gpu1_thermal_zone {
->         status = "okay";
->  };
-> +
-> +&etf0_out_port {
-> +       remote-endpoint = <&csys2_funnel_in_port0>;
-> +};
-> +
-> +&replicator_in_port0 {
-> +       remote-endpoint = <&csys2_funnel_out_port>;
-> +};
-> --
-> 2.7.4
->
-> _______________________________________________
-> CoreSight mailing list
-> CoreSight at lists.linaro.org
-> https://lists.linaro.org/mailman/listinfo/coresight
+> +    As specified in the ARM Generic Interrupt Controller Architecture
+> +    Specification GIC Architecture version 3.0 and version 4. The first
+> +    1kB contains only zeros.
+> 
+
+You definitely want to relax this. An ITS implementation is allowed (and
+actually encouraged) to maintain a coarse map in the first kB, and use
+this to quickly scan the table, which would be very useful on restore.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
