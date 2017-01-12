@@ -1,50 +1,47 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Thu, 12 Jan 2017 19:34:19 +0100
-Subject: Nokia N900: mixers changed between 4.6 and 4.10,
- no longer can use in-call speaker
-In-Reply-To: <20170112181826.GA28290@amd>
-References: <20170112181826.GA28290@amd>
-Message-ID: <201701121934.19810@pali>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Thu, 12 Jan 2017 19:41:38 +0100
+Subject: [PATCH] arm64: errata: Provide macro for major and minor cpu
+ revisions
+In-Reply-To: <20170112153315.GC13843@arm.com>
+References: <20170111121143.9586-1-rrichter@cavium.com>
+ <20170112153315.GC13843@arm.com>
+Message-ID: <20170112184138.GN4930@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 January 2017 19:18:26 Pavel Machek wrote:
-> Hi!
+On 12.01.17 15:33:15, Will Deacon wrote:
+> On Wed, Jan 11, 2017 at 01:11:42PM +0100, Robert Richter wrote:
+> > Definition of cpu ranges are hard to read if the cpu variant is not
+> > zero. Provide MIDR_CPU_FULL_REV() macro to describe the full hardware
+> > revision of a cpu including variant and (minor) revision.
+> > 
+> > Signed-off-by: Robert Richter <rrichter@cavium.com>
+> > ---
+> >  arch/arm64/include/asm/cputype.h |  3 +++
+> >  arch/arm64/kernel/cpu_errata.c   | 15 +++++++++------
+> >  arch/arm64/kernel/cpufeature.c   |  8 +++-----
+> >  3 files changed, 15 insertions(+), 11 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+> > index 26a68ddb11c1..983e59cbdd54 100644
+> > --- a/arch/arm64/include/asm/cputype.h
+> > +++ b/arch/arm64/include/asm/cputype.h
+> > @@ -56,6 +56,9 @@
+> >  	(0xf			<< MIDR_ARCHITECTURE_SHIFT) | \
+> >  	((partnum)		<< MIDR_PARTNUM_SHIFT))
+> >  
+> > +#define MIDR_CPU_FULL_REV(var, rev) \
+> > +	(((var)	<< MIDR_VARIANT_SHIFT) | (rev))
 > 
-> In v4.10 (and probably v4.9, too) I can no longer use the in-call
-> speaker. I can no longer use the wired headset, either.
-> 
-> v4.4 (and probably v4.6) works ok.
-> 
-> Any ideas? Does wired headset / in-call speaker work for you?
-> 
-> "Mono" and "Mono DAC" options are still there.. but something else
-> changed, as alsamixer now shows way many more options (meaning they
-> are shorter?) and I get complains from alsactl:
-> 
-> alsactl: set_control:1328: failed to obtain info for control #49 (No
-> such file or directory)
-> ...
-> alsactl: set_control:1328: failed to obtain info for control #229 (No
-> such file or directory)
-> 
-> 
-> 
-> 								Pavel
+> Minor nit, but could you rename this to MIDR_CPU_VAR_REV instead please?
+> The revision field *is* the bottom 4 bits, so "full" rev doesn't really
+> make a lot of sense.
 
-Looks like there are not so much commits related to 
-sound/soc/omap/rx51.c Maybe it can be one of these twos?
+Yeah, this is that I had in my first version. I wasn't sure on the
+naming, so I am fine with your proposal.
 
-cb7e62256e99d285e415cf75db67558f0f8bb107
-6d2de5ab4328718302c54b20222c6b1a574c3fce
+Will resubmit.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170112/2c86eae0/attachment.sig>
+Thanks,
+
+-Robert
