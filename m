@@ -1,40 +1,63 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 12 Jan 2017 19:18:26 +0100
-Subject: Nokia N900: mixers changed between 4.6 and 4.10, no longer can use
- in-call speaker
-Message-ID: <20170112181826.GA28290@amd>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 12 Jan 2017 18:29:32 +0000
+Subject: [PATCH v2 2/2] arm64: cacheinfo: add support to override cache levels
+ via device tree
+In-Reply-To: <1484245772-31511-1-git-send-email-sudeep.holla@arm.com>
+References: <1484245772-31511-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1484245772-31511-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+The cache hierarchy can be identified through Cache Level ID(CLIDR)
+architected system register. However in some cases it will provide
+only the number of cache levels that are integrated into the processor
+itself. In other words, it can't provide any information about the
+caches that are external and/or transparent.
 
-In v4.10 (and probably v4.9, too) I can no longer use the in-call
-speaker. I can no longer use the wired headset, either.
+Some platforms require to export the information about all such external
+caches to the userspace applications via the sysfs interface.
 
-v4.4 (and probably v4.6) works ok.
+This patch adds support to override the cache levels using device tree
+to take such external non-architected caches into account.
 
-Any ideas? Does wired headset / in-call speaker work for you?
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ arch/arm64/kernel/cacheinfo.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-"Mono" and "Mono DAC" options are still there.. but something else
-changed, as alsamixer now shows way many more options (meaning they
-are shorter?) and I get complains from alsactl:
+diff --git a/arch/arm64/kernel/cacheinfo.c b/arch/arm64/kernel/cacheinfo.c
+index 9617301f76b5..3f2250fc391b 100644
+--- a/arch/arm64/kernel/cacheinfo.c
++++ b/arch/arm64/kernel/cacheinfo.c
+@@ -84,7 +84,7 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
 
-alsactl: set_control:1328: failed to obtain info for control #49 (No
-such file or directory)
-...
-alsactl: set_control:1328: failed to obtain info for control #229 (No
-such file or directory)
+ static int __init_cache_level(unsigned int cpu)
+ {
+-	unsigned int ctype, level, leaves;
++	unsigned int ctype, level, leaves, of_level;
+ 	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
 
+ 	for (level = 1, leaves = 0; level <= MAX_CACHE_LEVEL; level++) {
+@@ -97,6 +97,17 @@ static int __init_cache_level(unsigned int cpu)
+ 		leaves += (ctype == CACHE_TYPE_SEPARATE) ? 2 : 1;
+ 	}
 
-
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170112/686d3a2c/attachment-0001.sig>
++	of_level = of_find_last_cache_level(cpu);
++	if (level < of_level) {
++		/*
++		 * some external caches not specified in CLIDR_EL1
++		 * the information may be available in the device tree
++		 * only unified external caches are considered here
++		 */
++		leaves += (of_level - level);
++		level = of_level;
++	}
++
+ 	this_cpu_ci->num_levels = level;
+ 	this_cpu_ci->num_leaves = leaves;
+ 	return 0;
+--
+2.7.4
