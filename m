@@ -1,202 +1,161 @@
 From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Thu, 12 Jan 2017 11:15:19 -0700
-Subject: [PATCH V7 05/10] acpi: apei: handle SEA notification type for ARMv8
+Date: Thu, 12 Jan 2017 11:15:22 -0700
+Subject: [PATCH V7 08/10] ras: acpi / apei: generate trace event for
+ unrecognized CPER section
 In-Reply-To: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
 References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <1484244924-24786-6-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <1484244924-24786-9-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM APEI extension proposal added SEA (Synchrounous External
-Abort) notification type for ARMv8.
-Add a new GHES error source handling function for SEA. If an error
-source's notification type is SEA, then this function can be registered
-into the SEA exception handler. That way GHES will parse and report
-SEA exceptions when they occur.
+UEFI spec allows for non-standard section in Common Platform Error
+Record. This is defined in section N.2.3 of UEFI version 2.5.
+
+Currently if the CPER section's type (UUID) does not match with
+any section type that the kernel knows how to parse, trace event
+is not generated for such section. And thus user is not able to know
+happening of such hardware error, including error record of
+non-standard section.
+
+This commit generates a trace event which contains raw error data
+for unrecognized CPER section.
 
 Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
 Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
 ---
- arch/arm64/Kconfig        |  2 ++
- drivers/acpi/apei/Kconfig | 14 ++++++++
- drivers/acpi/apei/ghes.c  | 84 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 100 insertions(+)
+ drivers/acpi/apei/ghes.c | 22 ++++++++++++++++++++--
+ drivers/ras/ras.c        |  1 +
+ include/ras/ras_event.h  | 45 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 66 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index b380c87..0465601 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -53,6 +53,8 @@ config ARM64
- 	select HANDLE_DOMAIN_IRQ
- 	select HARDIRQS_SW_RESEND
- 	select HAVE_ACPI_APEI if (ACPI && EFI)
-+	select HAVE_ACPI_APEI_SEA if (ACPI && EFI)
-+	select HAVE_NMI if HAVE_ACPI_APEI_SEA
- 	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
- 	select HAVE_ARCH_AUDITSYSCALL
- 	select HAVE_ARCH_BITREVERSE
-diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
-index b0140c8..3786ff1 100644
---- a/drivers/acpi/apei/Kconfig
-+++ b/drivers/acpi/apei/Kconfig
-@@ -4,6 +4,20 @@ config HAVE_ACPI_APEI
- config HAVE_ACPI_APEI_NMI
- 	bool
- 
-+config HAVE_ACPI_APEI_SEA
-+	bool "APEI Synchronous External Abort logging/recovering support"
-+	depends on ARM64
-+	help
-+	  This option should be enabled if the system supports
-+	  firmware first handling of SEA (Synchronous External Abort).
-+	  SEA happens with certain faults of data abort or instruction
-+	  abort synchronous exceptions on ARMv8 systems. If a system
-+	  supports firmware first handling of SEA, the platform analyzes
-+	  and handles hardware error notifications with SEA, and it may then
-+	  form a HW error record for the OS to parse and handle. This
-+	  option allows the OS to look for such HW error record, and
-+	  take appropriate action.
-+
- config ACPI_APEI
- 	bool "ACPI Platform Error Interface (APEI)"
- 	select MISC_FILESYSTEMS
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 2acbc60..87efe26 100644
+index 4e9a20d..a32c1b1 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -44,12 +44,17 @@
- #include <linux/pci.h>
+@@ -45,11 +45,13 @@
  #include <linux/aer.h>
  #include <linux/nmi.h>
-+#include <linux/hardirq.h>
+ #include <linux/hardirq.h>
++#include <linux/uuid.h>
  
  #include <acpi/actbl1.h>
  #include <acpi/ghes.h>
  #include <acpi/apei.h>
  #include <asm/tlbflush.h>
++#include <ras/ras_event.h>
  
-+#ifdef CONFIG_HAVE_ACPI_APEI_SEA
-+#include <asm/system_misc.h>
-+#endif
-+
- #include "apei-internal.h"
+ #ifdef CONFIG_HAVE_ACPI_APEI_SEA
+ #include <asm/system_misc.h>
+@@ -458,11 +460,21 @@ static void ghes_do_proc(struct ghes *ghes,
+ {
+ 	int sev, sec_sev;
+ 	struct acpi_hest_generic_data *gdata;
++	uuid_le sec_type;
++	uuid_le *fru_id = &NULL_UUID_LE;
++	char *fru_text = "";
  
- #define GHES_PFX	"GHES: "
-@@ -767,6 +772,62 @@ static struct notifier_block ghes_notifier_sci = {
- 	.notifier_call = ghes_notify_sci,
- };
+ 	sev = ghes_severity(estatus->error_severity);
+ 	apei_estatus_for_each_section(estatus, gdata) {
+ 		sec_sev = ghes_severity(gdata->error_severity);
+-		if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
++		sec_type = *(uuid_le *)gdata->section_type;
++
++		if (gdata->validation_bits & CPER_SEC_VALID_FRU_ID)
++			fru_id = (uuid_le *)gdata->fru_id;
++		if (gdata->validation_bits & CPER_SEC_VALID_FRU_TEXT)
++			fru_text = gdata->fru_text;
++
++		if (!uuid_le_cmp(sec_type,
+ 				 CPER_SEC_PLATFORM_MEM)) {
+ 			struct cper_sec_mem_err *mem_err;
  
-+#ifdef CONFIG_HAVE_ACPI_APEI_SEA
-+static LIST_HEAD(ghes_sea);
-+
-+static int ghes_notify_sea(struct notifier_block *this,
-+				  unsigned long event, void *data)
-+{
-+	struct ghes *ghes;
-+	int ret = NOTIFY_DONE;
-+
-+	nmi_enter();
-+	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
-+		if (!ghes_proc(ghes))
-+			ret = NOTIFY_OK;
-+	}
-+	nmi_exit();
-+
-+	return ret;
-+}
-+
-+static struct notifier_block ghes_notifier_sea = {
-+	.notifier_call = ghes_notify_sea,
-+};
-+
-+static int ghes_sea_add(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	if (list_empty(&ghes_sea))
-+		register_sea_notifier(&ghes_notifier_sea);
-+	list_add_rcu(&ghes->list, &ghes_sea);
-+	mutex_unlock(&ghes_list_mutex);
-+	return 0;
-+}
-+
-+static void ghes_sea_remove(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	list_del_rcu(&ghes->list);
-+	if (list_empty(&ghes_sea))
-+		unregister_sea_notifier(&ghes_notifier_sea);
-+	mutex_unlock(&ghes_list_mutex);
-+}
-+#else /* CONFIG_HAVE_ACPI_APEI_SEA */
-+static inline int ghes_sea_add(struct ghes *ghes)
-+{
-+	pr_err(GHES_PFX "ID: %d, trying to add SEA notification which is not supported\n",
-+	       ghes->generic->header.source_id);
-+	return -ENOTSUPP;
-+}
-+
-+static inline void ghes_sea_remove(struct ghes *ghes)
-+{
-+	pr_err(GHES_PFX "ID: %d, trying to remove SEA notification which is not supported\n",
-+	       ghes->generic->header.source_id);
-+}
-+#endif /* CONFIG_HAVE_ACPI_APEI_SEA */
-+
- #ifdef CONFIG_HAVE_ACPI_APEI_NMI
- /*
-  * printk is not safe in NMI context.  So in NMI handler, we allocate
-@@ -1011,6 +1072,14 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_EXTERNAL:
- 	case ACPI_HEST_NOTIFY_SCI:
- 		break;
-+	case ACPI_HEST_NOTIFY_SEA:
-+		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_SEA)) {
-+			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEA is not supported\n",
-+				generic->header.source_id);
-+			rc = -ENOTSUPP;
-+			goto err;
+@@ -473,7 +485,7 @@ static void ghes_do_proc(struct ghes *ghes,
+ 			ghes_handle_memory_failure(gdata, sev);
+ 		}
+ #ifdef CONFIG_ACPI_APEI_PCIEAER
+-		else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
++		else if (!uuid_le_cmp(sec_type,
+ 				      CPER_SEC_PCIE)) {
+ 			struct cper_sec_pcie *pcie_err;
+ 
+@@ -506,6 +518,12 @@ static void ghes_do_proc(struct ghes *ghes,
+ 
+ 		}
+ #endif
++		else {
++			void *unknown_err = acpi_hest_generic_data_payload(gdata);
++			trace_unknown_sec_event(&sec_type,
++					fru_id, fru_text, sec_sev,
++					unknown_err, gdata->error_data_length);
 +		}
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
- 			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
-@@ -1022,6 +1091,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 		pr_warning(GHES_PFX "Generic hardware error source: %d notified via local interrupt is not supported!\n",
- 			   generic->header.source_id);
- 		goto err;
-+	case ACPI_HEST_NOTIFY_GPIO:
-+	case ACPI_HEST_NOTIFY_SEI:
-+	case ACPI_HEST_NOTIFY_GSIV:
-+		pr_warn(GHES_PFX "Generic hardware error source: %d notified via notification type %u is not supported\n",
-+			generic->header.source_id, generic->header.source_id);
-+		rc = -ENOTSUPP;
-+		goto err;
- 	default:
- 		pr_warning(FW_WARN GHES_PFX "Unknown notification type: %u for generic hardware error source: %d\n",
- 			   generic->notify.type, generic->header.source_id);
-@@ -1076,6 +1152,11 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 		list_add_rcu(&ghes->list, &ghes_sci);
- 		mutex_unlock(&ghes_list_mutex);
- 		break;
-+	case ACPI_HEST_NOTIFY_SEA:
-+		rc = ghes_sea_add(ghes);
-+		if (rc)
-+			goto err_edac_unreg;
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_add(ghes);
- 		break;
-@@ -1118,6 +1199,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
- 			unregister_acpi_hed_notifier(&ghes_notifier_sci);
- 		mutex_unlock(&ghes_list_mutex);
- 		break;
-+	case ACPI_HEST_NOTIFY_SEA:
-+		ghes_sea_remove(ghes);
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_remove(ghes);
- 		break;
+ 	}
+ }
+ 
+diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c
+index b67dd36..fb2500b 100644
+--- a/drivers/ras/ras.c
++++ b/drivers/ras/ras.c
+@@ -27,3 +27,4 @@ subsys_initcall(ras_init);
+ EXPORT_TRACEPOINT_SYMBOL_GPL(extlog_mem_event);
+ #endif
+ EXPORT_TRACEPOINT_SYMBOL_GPL(mc_event);
++EXPORT_TRACEPOINT_SYMBOL_GPL(unknown_sec_event);
+diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
+index 1791a12..5861b6f 100644
+--- a/include/ras/ras_event.h
++++ b/include/ras/ras_event.h
+@@ -162,6 +162,51 @@ TRACE_EVENT(mc_event,
+ );
+ 
+ /*
++ * Unknown Section Report
++ *
++ * This event is generated when hardware detected a hardware
++ * error event, which may be of non-standard section as defined
++ * in UEFI spec appendix "Common Platform Error Record", or may
++ * be of sections for which TRACE_EVENT is not defined.
++ *
++ */
++TRACE_EVENT(unknown_sec_event,
++
++	TP_PROTO(const uuid_le *sec_type,
++		 const uuid_le *fru_id,
++		 const char *fru_text,
++		 const u8 sev,
++		 const u8 *err,
++		 const u32 len),
++
++	TP_ARGS(sec_type, fru_id, fru_text, sev, err, len),
++
++	TP_STRUCT__entry(
++		__array(char, sec_type, 16)
++		__array(char, fru_id, 16)
++		__string(fru_text, fru_text)
++		__field(u8, sev)
++		__field(u32, len)
++		__dynamic_array(u8, buf, len)
++	),
++
++	TP_fast_assign(
++		memcpy(__entry->sec_type, sec_type, sizeof(uuid_le));
++		memcpy(__entry->fru_id, fru_id, sizeof(uuid_le));
++		__assign_str(fru_text, fru_text);
++		__entry->sev = sev;
++		__entry->len = len;
++		memcpy(__get_dynamic_array(buf), err, len);
++	),
++
++	TP_printk("severity: %d; sec type:%pU; FRU: %pU %s; data len:%d; raw data:%s",
++		  __entry->sev, __entry->sec_type,
++		  __entry->fru_id, __get_str(fru_text),
++		  __entry->len,
++		  __print_hex(__get_dynamic_array(buf), __entry->len))
++);
++
++/*
+  * PCIe AER Trace event
+  *
+  * These events are generated when hardware detects a corrected or
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
