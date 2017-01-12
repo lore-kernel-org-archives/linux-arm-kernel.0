@@ -1,95 +1,29 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu, 12 Jan 2017 07:41:57 +0100
-Subject: [PATCH 1/1] iommu/arm-smmu: Fix for ThunderX erratum #27704
-In-Reply-To: <2c048126-a4d6-16af-987a-3174401a3960@arm.com>
-References: <1484135507-24872-1-git-send-email-tn@semihalf.com>
- <2c048126-a4d6-16af-987a-3174401a3960@arm.com>
-Message-ID: <b0eb1127-182e-63e3-6dd4-c3b40228b909@semihalf.com>
+From: baolin.wang@linaro.org (Baolin Wang)
+Date: Thu, 12 Jan 2017 14:43:00 +0800
+Subject: [PATCH v2 3/3] phy: rockchip-inno-usb2: Set EXTCON_USB when
+ EXTCON_CHG_USB_SDP was set
+In-Reply-To: <CAMz4kuJP9Q7Ly4uRBjCFU32YzbVbnsGyk+wHc+M=g8W=uDBsEQ@mail.gmail.com>
+References: <7b9836ce2ca34118a2acd1ea113605a5f13b4439.1482307697.git.baolin.wang@linaro.org>
+ <23666cc1a5ff123ece5bdbb9821d1eab280d0927.1482307697.git.baolin.wang@linaro.org>
+ <CAMz4kuJP9Q7Ly4uRBjCFU32YzbVbnsGyk+wHc+M=g8W=uDBsEQ@mail.gmail.com>
+Message-ID: <CAMz4ku+X8v2HH5L_fS60naNTqR1ZFKYeWuXuHqjg0UsHQq1dsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.01.2017 13:19, Robin Murphy wrote:
-> On 11/01/17 11:51, Tomasz Nowicki wrote:
->> The goal of erratum #27704 workaround was to make sure that ASIDs and VMIDs
->> are unique across all SMMU instances on affected Cavium systems.
->>
->> Currently, the workaround code partitions ASIDs and VMIDs by increasing
->> global cavium_smmu_context_count which in turn becomes the base ASID and VMID
->> value for the given SMMU instance upon the context bank initialization.
->>
->> For systems with multiple SMMU instances this approach implies the risk
->> of crossing 8-bit ASID, like for CN88xx capable of 4 SMMUv2, 128 context bank each:
->> SMMU_0 (0-127 ASID RANGE)
->> SMMU_1 (127-255 ASID RANGE)
->> SMMU_2 (256-383 ASID RANGE) <--- crossing 8-bit ASID
->> SMMU_3 (384-511 ASID RANGE) <--- crossing 8-bit ASID
+On 3 January 2017 at 13:54, Baolin Wang <baolin.wang@linaro.org> wrote:
+> Hi Kison and Heiko,
 >
-> I could swear that at some point in the original discussion it was said
-> that the TLBs were only shared between pairs of SMMUs, so in fact 0/1
-> and 2/3 are independent of each other
-
-Indeed TLBs are only shared between pairs of SMMUs but the workaround 
-makes sure ASIDs are unique across all SMMU instances so we do not have 
-to bother about SMMUs probe order.
-
-  - out of interest, have you
-> managed to hit an actual problem in practice or is this patch just by
-> inspection?
-
-Except SMMU0/1 devices all other devices under other SMMUs will fail on 
-guest power off/on. Since we try to invalidate tlb with 16bit ASID but 
-we actually have 8 bit zero padded 16 bit entry.
-
->
-> Of course, depending on the SMMUs to probe in the right order isn't
-> particularly robust, so it's still probably a worthwhile change.
->
->> Since we use 8-bit ASID now we effectively misconfigure ASID[15:8] bits for
->> SMMU_CBn_TTBRm register. Also, we still use non-zero ASID[15:8] bits
->> upon context invalidation. This patch adds 16-bit ASID support for stage-1
->> AArch64 contexts for Cavium SMMUv2 model so that we use ASIDs consistently.
+> On 21 December 2016 at 16:12, Baolin Wang <baolin.wang@linaro.org> wrote:
+>> According to the documentation, we should set the EXTCON_USB when
+>> one SDP charger connector was reported.
 >>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> ---
->>  drivers/iommu/arm-smmu.c | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index a60cded..ae8f059 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -260,6 +260,7 @@ enum arm_smmu_s2cr_privcfg {
->>
->>  #define TTBCR2_SEP_SHIFT		15
->>  #define TTBCR2_SEP_UPSTREAM		(0x7 << TTBCR2_SEP_SHIFT)
->> +#define TTBCR2_AS			(1 << 4)
->>
->>  #define TTBRn_ASID_SHIFT		48
->>
->> @@ -778,6 +779,9 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
->>  			reg = pgtbl_cfg->arm_lpae_s1_cfg.tcr;
->>  			reg2 = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
->>  			reg2 |= TTBCR2_SEP_UPSTREAM;
->> +			if (smmu->model == CAVIUM_SMMUV2 &&
+>> Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+>> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
 >
-> I'd be inclined to say "smmu->version == ARM_SMMU_V2" there, rather than
-> make it Cavium-specific - we enable 16-bit VMID unconditionally where
-> supported, so I don't see any reason not to handle 16-bit ASIDs in the
-> same manner.
+> Could you apply this patch if there are no other comments? Thanks.
 
-I agree, I will enable 16-bit ASID for ARM_SMMU_V2.
+Ping?
 
->
->> +			    cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
->> +				reg2 |= TTBCR2_AS;
->>  		}
->>  		if (smmu->version > ARM_SMMU_V1)
->>  			writel_relaxed(reg2, cb_base + ARM_SMMU_CB_TTBCR2);
->>
->
-> Either way:
->
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-Thanks Robin!
-
-Tomasz
+-- 
+Baolin.wang
+Best Regards
