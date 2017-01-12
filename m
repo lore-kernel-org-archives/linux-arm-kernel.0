@@ -1,33 +1,44 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 12 Jan 2017 21:24:50 +0800
-Subject: [PATCH v7 0/4] arm64: arch_timer: Add workaround for
- hisilicon-161601 erratum
-In-Reply-To: <ff9c81c2-90ef-a5c2-6f0b-c6cf5d0d11a9@arm.com>
-References: <1483772858-10380-1-git-send-email-dingtianhong@huawei.com>
- <6c33e4e9-6472-4738-aea2-55dcaab3a94f@huawei.com>
- <ff9c81c2-90ef-a5c2-6f0b-c6cf5d0d11a9@arm.com>
-Message-ID: <06fd3327-f451-bc0d-b80c-4200bc9fadaa@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 Jan 2017 14:25:54 +0100
+Subject: [PATCH 1/2] dma-mapping: let arch know origin of dma range passed
+ to arch_setup_dma_ops()
+In-Reply-To: <20170112121623.GH1771@arm.com>
+References: <dca35acf-1adf-aa85-7a0b-d0c6ec702fa1@arm.com>
+ <764334db-3400-58c6-cc4b-3f7ce66daa27@cogentembedded.com>
+ <20170112121623.GH1771@arm.com>
+Message-ID: <3273119.LjYLKcrNcz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 2017/1/12 17:11, Marc Zyngier wrote:
-> On 12/01/17 04:23, Ding Tianhong wrote:
->> Hi Marc:
->>
->> How about this v7, if any suggestions very grateful.
+On Thursday, January 12, 2017 12:16:24 PM CET Will Deacon wrote:
+> On Thu, Jan 12, 2017 at 08:52:51AM +0300, Nikita Yushchenko wrote:
+> > >> diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
+> > >> index 5ac373c..480b644 100644
+> > >> --- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
+> > >> +++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
+> > >> @@ -540,7 +540,7 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
+> > >>  
+> > >>    /* Objects are coherent, unless 'no shareability' flag set. */
+> > >>    if (!(obj_desc->flags & DPRC_OBJ_FLAG_NO_MEM_SHAREABILITY))
+> > >> -          arch_setup_dma_ops(&mc_dev->dev, 0, 0, NULL, true);
+> > >> +          arch_setup_dma_ops(&mc_dev->dev, 0, 0, false, NULL, true);
+> > >>  
+> > >>    /*
+> > >>     * The device-specific probe callback will get invoked by device_add()
+> > > 
+> > > Why are these actually calling arch_setup_dma_ops() here in the first
+> > > place? Are these all devices that are DMA masters without an OF node?
+> > 
+> > I don't know, but that's a different topic. This patch just adds
+> > argument and sets it to false everywhere but in the location when range
+> > should be definitely enforced.
 > 
-> It's been less than 5 days since you posted this. I'll get to it once I
-> finish reviewing all the other patches that are sitting in the queue
-> right before yours.
-> 
+> I also wouldn't lose any sleep over a staging driver.
 
-Ok and sorry for the noisy.
+I think this is in the process of being moved out of staging, and
+my question was about the other two as well:
 
-Thanks
-Ding
+drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
+drivers/iommu/rockchip-iommu.c
 
-> Thanks,
-> 
-> 	M.
-> 
+	Arnd
