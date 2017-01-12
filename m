@@ -1,25 +1,106 @@
-From: fweimer@redhat.com (Florian Weimer)
-Date: Thu, 12 Jan 2017 17:13:25 +0100
-Subject: [Question] New mmap64 syscall?
-In-Reply-To: <20170103205437.GA22548@amd>
-References: <20161206185440.GA4654@yury-N73SV>
- <f544bcc3-8aae-1bd0-b744-9964fc038a51@redhat.com>
- <20161207154811.GA15248@yury-N73SV>
- <14981df2-b120-17c3-a5a8-5cbbd2008c4f@redhat.com>
- <20170103205437.GA22548@amd>
-Message-ID: <59af3a6f-f30c-46a5-2d0b-6a7e36668e6b@redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 12 Jan 2017 16:16:14 +0000
+Subject: [PATCH] KVM: arm/arm64: vgic: Fix deadlock on error handling
+Message-ID: <1484237774-19047-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2017 09:54 PM, Pavel Machek wrote:
-> ...actually, with strace and batched interface, it will be impossible
-> to see what is going on because of races. So I'm not sure if I like
-> the batched interface at all...
+Dmitry Vyukov reported that the syzkaller fuzzer triggered a
+deadlock in the vgic setup code when an error was detected, as
+the cleanup code tries to take a lock that is already held by
+the setup code.
 
-I'm not sure if I understand this problem.
+The fix is to avoid retaking the lock when cleaning up, by
+telling the cleanup function that we already hold it.
 
-ioctl, fcntl, most socket system calls, even open all have this problem 
-as well, right?
+Cc: stable at vger.kernel.org
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-init.c | 18 +++++++++++++-----
+ virt/kvm/arm/vgic/vgic-v2.c   |  2 --
+ virt/kvm/arm/vgic/vgic-v3.c   |  2 --
+ 3 files changed, 13 insertions(+), 9 deletions(-)
 
-Thanks,
-Florian
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 5114391..c737ea0 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -268,15 +268,11 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
+ {
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+ 
+-	mutex_lock(&kvm->lock);
+-
+ 	dist->ready = false;
+ 	dist->initialized = false;
+ 
+ 	kfree(dist->spis);
+ 	dist->nr_spis = 0;
+-
+-	mutex_unlock(&kvm->lock);
+ }
+ 
+ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
+@@ -286,7 +282,8 @@ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
+ 	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
+ }
+ 
+-void kvm_vgic_destroy(struct kvm *kvm)
++/* To be called with kvm->lock held */
++static void __kvm_vgic_destroy(struct kvm *kvm)
+ {
+ 	struct kvm_vcpu *vcpu;
+ 	int i;
+@@ -297,6 +294,13 @@ void kvm_vgic_destroy(struct kvm *kvm)
+ 		kvm_vgic_vcpu_destroy(vcpu);
+ }
+ 
++void kvm_vgic_destroy(struct kvm *kvm)
++{
++	mutex_lock(&kvm->lock);
++	__kvm_vgic_destroy(kvm);
++	mutex_unlock(&kvm->lock);
++}
++
+ /**
+  * vgic_lazy_init: Lazy init is only allowed if the GIC exposed to the guest
+  * is a GICv2. A GICv3 must be explicitly initialized by the guest using the
+@@ -348,6 +352,10 @@ int kvm_vgic_map_resources(struct kvm *kvm)
+ 		ret = vgic_v2_map_resources(kvm);
+ 	else
+ 		ret = vgic_v3_map_resources(kvm);
++
++	if (ret)
++		__kvm_vgic_destroy(kvm);
++
+ out:
+ 	mutex_unlock(&kvm->lock);
+ 	return ret;
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index 9bab867..834137e 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -293,8 +293,6 @@ int vgic_v2_map_resources(struct kvm *kvm)
+ 	dist->ready = true;
+ 
+ out:
+-	if (ret)
+-		kvm_vgic_destroy(kvm);
+ 	return ret;
+ }
+ 
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 7df1b90..a4c7fff 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -308,8 +308,6 @@ int vgic_v3_map_resources(struct kvm *kvm)
+ 	dist->ready = true;
+ 
+ out:
+-	if (ret)
+-		kvm_vgic_destroy(kvm);
+ 	return ret;
+ }
+ 
+-- 
+2.1.4
