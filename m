@@ -1,89 +1,91 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 12 Jan 2017 13:21:44 +0900
-Subject: [PATCH v29 4/9] arm64: kdump: implement machine_crash_shutdown()
-In-Reply-To: <20170111105405.GF12388@arm.com>
-References: <20161228043347.27358-1-takahiro.akashi@linaro.org>
- <20161228043605.27470-3-takahiro.akashi@linaro.org>
- <20170110113248.GC21598@arm.com>
- <20170111063626.GE20972@linaro.org>
- <20170111105405.GF12388@arm.com>
-Message-ID: <20170112042143.GF20972@linaro.org>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Thu, 12 Jan 2017 12:23:14 +0800
+Subject: [PATCH v7 0/4] arm64: arch_timer: Add workaround for
+ hisilicon-161601 erratum
+In-Reply-To: <1483772858-10380-1-git-send-email-dingtianhong@huawei.com>
+References: <1483772858-10380-1-git-send-email-dingtianhong@huawei.com>
+Message-ID: <6c33e4e9-6472-4738-aea2-55dcaab3a94f@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 10:54:05AM +0000, Will Deacon wrote:
-> On Wed, Jan 11, 2017 at 03:36:28PM +0900, AKASHI Takahiro wrote:
-> > On Tue, Jan 10, 2017 at 11:32:48AM +0000, Will Deacon wrote:
-> > > On Wed, Dec 28, 2016 at 01:36:01PM +0900, AKASHI Takahiro wrote:
-> > > > @@ -22,6 +25,7 @@
-> > > >  extern const unsigned char arm64_relocate_new_kernel[];
-> > > >  extern const unsigned long arm64_relocate_new_kernel_size;
-> > > >  
-> > > > +static bool in_crash_kexec;
-> > > 
-> > > Do you actually need this bool? Why not call kexec_crash_loaded() instead?
-> > 
-> > The two have different meanings:
-> > "in_crash_kexec" indicates that kdump is taking place, while
-> > kexec_crash_loaded() tells us only whether crash dump kernel has been
-> > loaded or not.
-> > 
-> > It is crucial to distinguish them especially for machine_kexec()
-> > which can be called on normal kexec even if kdump has been set up.
-> 
-> Ah, I see. So how about just doing:
-> 
->   if (kimage == kexec_crash_image)
-> 
-> in machine_kexec?
+Hi Marc:
 
-Yeah, it should work.
-Do you want to merge the following hunk,
-or expect that I will re-send the whole patch series
-(with other changes if any)?
+How about this v7, if any suggestions very grateful.
 
--Takahiro AkASHI
+Thanks.
+Ding
 
-> Will
-===8<==
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index 994fe0bc5cc0..c0fc3d458195 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -26,7 +26,6 @@
- extern const unsigned char arm64_relocate_new_kernel[];
- extern const unsigned long arm64_relocate_new_kernel_size;
- 
--static bool in_crash_kexec;
- static unsigned long kimage_start;
- 
- /**
-@@ -154,7 +153,7 @@ void machine_kexec(struct kimage *kimage)
- 	 * New cpus may have become stuck_in_kernel after we loaded the image.
- 	 */
- 	BUG_ON((cpus_are_stuck_in_kernel() || (num_online_cpus() > 1)) &&
--			!WARN_ON(in_crash_kexec));
-+			!WARN_ON(kimage == kexec_crash_image));
- 
- 	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
- 	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
-@@ -206,8 +205,8 @@ void machine_kexec(struct kimage *kimage)
- 	 * relocation is complete.
- 	 */
- 
--	cpu_soft_restart(!in_crash_kexec, reboot_code_buffer_phys, kimage->head,
--		kimage_start, 0);
-+	cpu_soft_restart(kimage != kexec_crash_image,
-+		reboot_code_buffer_phys, kimage->head, kimage_start, 0);
- 
- 	BUG(); /* Should never get here. */
- }
-@@ -250,8 +249,6 @@ void machine_crash_shutdown(struct pt_regs *regs)
- {
- 	local_irq_disable();
- 
--	in_crash_kexec = true;
--
- 	/* shutdown non-crashing cpus */
- 	smp_send_crash_stop();
- 
+On 2017/1/7 15:07, Ding Tianhong wrote:
+> Erratum Hisilicon-161601 says that the ARM generic timer counter "has the
+> potential to contain an erroneous value when the timer value changes".
+> Accesses to TVAL (both read and write) are also affected due to the implicit counter
+> read.  Accesses to CVAL are not affected.
+> 
+> The workaround is to reread the system count registers until the value of the second
+> read is larger than the first one by less than 32, the system counter can be guaranteed
+> not to return wrong value twice by back-to-back read and the error value is always larger
+> than the correct one by 32. Writes to TVAL are replaced with an equivalent write to CVAL.
+> 
+> v2: Introducing a new generic erratum handling mechanism for fsl,a008585 and hisilicon,161601.
+>     Significant rework based on feedback, including seperate the fsl erratum a008585
+>     to another patch, update the erratum name and remove unwanted code.
+> 
+> v3: Introducing the erratum_workaround_set_sne generic function for fsl erratum a008585
+>     and make the #define __fsl_a008585_read_reg to be private to the .c file instead of
+>     being globally visible. After discussion with Marc and Will, a consensus decision was
+>     made to remove the commandline parameter for enabling fsl,erratum-a008585 erratum,
+>     and make some generic name more specific, export timer_unstable_counter_workaround
+>     for module access.
+>     
+>     Significant rework based on feedback, including fix some alignment problem, make the
+>     #define __hisi_161601_read_reg to be private to the .c file instead of being globally
+>     visible, add more accurate annotation and modify a bit of logical format to enable
+>     arch_timer_read_ool_enabled, remove the kernel commandline parameter
+>     clocksource.arm_arch_timer.hisilicon-161601.
+> 
+>     Introduce a generic aquick framework for erratum in ACPI mode.
+> 
+> v4: rename the quirk handler parameter to make it more generic, and
+>     avoid break loop when handling the quirk becasue it need to
+>     support multi quirks handler.
+> 
+>     update some data structures for acpi mode. 
+> 
+> v5: Adapt the new kernel-parameters.txt for latest kernel version.
+>     Set the retries of reread system counter to 50, because it is possible 
+>     that some interrupts may lead to more than twice read errors and break the loop,
+>     it will trigger the warning, so we set the number of retries far beyond the number of
+>     iterations the loop has been observed to take.
+> 
+> v6: The last 2 patches in the previous version about the ACPI mode will conflict witch Fuwei's
+>     GTDT patches, so remove the ACPI part and only support the DT base code for this patch set.
+> 
+>     We have trigger a bug when select the CONFIG_FUNCTION_GRAPH_TRACER and enable function_graph
+>     to /sys/kernel/debug/tracing/current_tracer, the system will stall into an endless loop, it looks
+>     like that the ftrace_graph_caller will be related to xxx.read_cntvct_el0 and read the system counter
+>     again, so mark the xxx.read_cntvct_el0 with notrace to fix the problem.
+> 
+> v7: Introduce a new general config symbol named CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND to enable the workaround
+>     for any chips which has similar arch timer erratum just like "fsl,erratum_a008585" and "hisilicon,erratum_161601",
+>     modify the struct arch_timer_erratum_workaround to be compatible different chip erratum more easily, and
+>     reconstruction some code base on the new config symbol and struct, thanks to Marc's suggestion. 
+> 
+> Ding Tianhong (4):
+>   arm64: arch_timer: Add device tree binding for hisilicon-161601
+>     erratum
+>   arm64: arch_timer: Introduce a generic erratum handing mechanism for
+>     fsl-a008585
+>   arm64: arch_timer: Work around Erratum Hisilicon-161601
+>   arm64: arch timer: Add timer erratum property for Hip05-d02 and
+>     Hip06-d03
+> 
+>  Documentation/admin-guide/kernel-parameters.txt    |   9 --
+>  Documentation/arm64/silicon-errata.txt             |   1 +
+>  .../devicetree/bindings/arm/arch_timer.txt         |   8 ++
+>  arch/arm64/boot/dts/hisilicon/hip05.dtsi           |   1 +
+>  arch/arm64/boot/dts/hisilicon/hip06.dtsi           |   1 +
+>  arch/arm64/include/asm/arch_timer.h                |  38 ++----
+>  drivers/clocksource/Kconfig                        |  18 +++
+>  drivers/clocksource/arm_arch_timer.c               | 150 +++++++++++++++------
+>  8 files changed, 152 insertions(+), 74 deletions(-)
+> 
