@@ -1,77 +1,49 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 12 Jan 2017 12:37:53 +0100
-Subject: [PATCH] rtc: armada38x: avoid unused-function warning
-In-Reply-To: <20170112111321.3219446-1-arnd@arndb.de>
-References: <20170112111321.3219446-1-arnd@arndb.de>
-Message-ID: <20170112113753.bwaux5fjptlayu2r@piout.net>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 12 Jan 2017 13:47:09 +0200
+Subject: [PATCH 16/62] watchdog: digicolor_wdt: Convert to use device
+ managed functions and other improvements
+In-Reply-To: <1484091325-9199-17-git-send-email-linux@roeck-us.net>
+References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+ <1484091325-9199-17-git-send-email-linux@roeck-us.net>
+Message-ID: <20170112114708.3d4chjtu3fibb7px@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Guenter,
 
-On 12/01/2017 at 12:13:08 +0100, Arnd Bergmann wrote :
-> When CONFIG_PM_SLEEP is not set, rtc_update_mbus_timing_params becomes
-> unused, now that armada38x_rtc_probe() no longer calls
-> rtc_update_mbus_timing_params on startup:
+On Tue, Jan 10, 2017 at 03:34:33PM -0800, Guenter Roeck wrote:
+> Use device managed functions to simplify error handling, reduce
+> source code size, improve readability, and reduce the likelyhood of bugs.
+> Other improvements as listed below.
 > 
-> drivers/rtc/rtc-armada38x.c:79:13: error: 'rtc_update_mbus_timing_params' defined but not used [-Werror=unused-function]
+> The conversion was done automatically with coccinelle using the
+> following semantic patches. The semantic patches and the scripts used
+> to generate this commit log are available at
+> https://github.com/groeck/coccinelle-patches
 > 
-> This addresses the warning by marking the PM functions as __maybe_unused,
-> so the unused functions get silently dropped. I could not tell from
-> the changelog if dropping the call to armada38x_rtc_probe() was
-> intended here, and if that is the correct thing to do without
-> CONFIG_PM_SLEEP, so we might need a different fix that brings it back.
+> - Replace 'goto l; ... l: return e;' with 'return e;'
+> - Replace 'val = e; return val;' with 'return e;'
+> - Drop assignments to otherwise unused variables
+> - Replace 'if (e) { return expr; }' with 'if (e) return expr;'
+> - Drop remove function
+> - Replace of_iomap() with platform_get_resource() followed by
+>   devm_ioremap_resource()
+> - Drop platform_set_drvdata()
+> - Replace &pdev->dev with dev if 'struct device *dev' is a declared
+>   variable
+> - Use devm_watchdog_register_driver() to register watchdog device
+> - Replace shutdown function with call to watchdog_stop_on_reboot()
 > 
+> Cc: Baruch Siach <baruch@tkos.co.il>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 
-Thanks for the report, Russell's patch didn't apply cleanly and it seems
-I messed up when applying. I've just restored the
-rtc_update_mbus_timing_params() call in probe as this should be.
+Acked-by: Baruch Siach <baruch@tkos.co.il>
+Tested-by: Baruch Siach <baruch@tkos.co.il>
 
-
-Thanks again and sorry about this.
-
-> Fixes: 4c492eb022c2 ("rtc: armada38x: make struct rtc_class_ops const")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/rtc/rtc-armada38x.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
-> index 4f75c619bbba..2e451acccd9c 100644
-> --- a/drivers/rtc/rtc-armada38x.c
-> +++ b/drivers/rtc/rtc-armada38x.c
-> @@ -338,8 +338,7 @@ static __init int armada38x_rtc_probe(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -#ifdef CONFIG_PM_SLEEP
-> -static int armada38x_rtc_suspend(struct device *dev)
-> +static int __maybe_unused armada38x_rtc_suspend(struct device *dev)
->  {
->  	if (device_may_wakeup(dev)) {
->  		struct armada38x_rtc *rtc = dev_get_drvdata(dev);
-> @@ -350,7 +349,7 @@ static int armada38x_rtc_suspend(struct device *dev)
->  	return 0;
->  }
->  
-> -static int armada38x_rtc_resume(struct device *dev)
-> +static int __maybe_unused armada38x_rtc_resume(struct device *dev)
->  {
->  	if (device_may_wakeup(dev)) {
->  		struct armada38x_rtc *rtc = dev_get_drvdata(dev);
-> @@ -363,7 +362,6 @@ static int armada38x_rtc_resume(struct device *dev)
->  
->  	return 0;
->  }
-> -#endif
->  
->  static SIMPLE_DEV_PM_OPS(armada38x_rtc_pm_ops,
->  			 armada38x_rtc_suspend, armada38x_rtc_resume);
-> -- 
-> 2.9.0
-> 
+Thanks,
+baruch
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
