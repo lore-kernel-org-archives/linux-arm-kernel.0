@@ -1,40 +1,119 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 12 Jan 2017 17:52:44 +0100
-Subject: [linux-sunxi] Re: [PATCH 4/5] ARM: dts: sunxi: add dtsi file for
- V3s SoC
-In-Reply-To: <20170111065638.uW1SQ7Kq@smtp3m.mail.yandex.net>
-References: <20170111065638.uW1SQ7Kq@smtp3m.mail.yandex.net>
-Message-ID: <20170112165244.js3qrgo2nbazycmn@lukather>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 12 Jan 2017 17:56:29 +0100
+Subject: [kvm-unit-tests PATCH 1/6] libcflat: add PRI(dux)32 format types
+In-Reply-To: <4286b719-ff75-d2cd-68b5-cb9d9bb89553@redhat.com>
+References: <20170111162841.15569-1-alex.bennee@linaro.org>
+ <20170111162841.15569-2-alex.bennee@linaro.org>
+ <4286b719-ff75-d2cd-68b5-cb9d9bb89553@redhat.com>
+Message-ID: <20170112165629.nbczamlqlpsqaauh@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 11:56:32AM +0800, Icenowy Zheng wrote:
+On Thu, Jan 12, 2017 at 01:29:24PM +0100, Paolo Bonzini wrote:
 > 
-> 2017?1?11? 02:21? Maxime Ripard <maxime.ripard@free-electrons.com>???
-> >
-> > On Tue, Jan 03, 2017 at 11:16:28PM +0800, Icenowy Zheng wrote: 
-> > > + uart0_pins_a: uart0 at 0 { 
-> > > + pins = "PB8", "PB9"; 
-> > > + function = "uart0"; 
-> > > + bias-pull-up; 
-> >
-> > Why do you need a pullup here? 
 > 
-> I think TX needs one, but RX do not need.
+> On 11/01/2017 17:28, Alex Benn?e wrote:
+> > So we can have portable formatting of uint32_t types. However there is
+> > a catch. Different compilers can use legally subtly different types
+> > though so we need to probe the compiler defined intdef.h first.
+> 
+> Interesting, what platform has long uint32_t?  I thought the issue was
+> whether 64-bit is long or "long long".
+> 
+> Paolo
+> 
+> > Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> > ---
+> >  Makefile       |  1 +
+> >  configure      | 13 +++++++++++++
+> >  lib/libcflat.h |  9 +++++++++
+> >  3 files changed, 23 insertions(+)
+> > 
+> > diff --git a/Makefile b/Makefile
+> > index a32333b..9822d9a 100644
+> > --- a/Makefile
+> > +++ b/Makefile
+> > @@ -55,6 +55,7 @@ CFLAGS += $(fomit_frame_pointer)
+> >  CFLAGS += $(fno_stack_protector)
+> >  CFLAGS += $(fno_stack_protector_all)
+> >  CFLAGS += $(wno_frame_address)
+> > +CFLAGS += $(if $(U32_LONG_FMT),-D__U32_LONG_FMT__,)
+> >  
+> >  CXXFLAGS += $(CFLAGS)
+> >  
+> > diff --git a/configure b/configure
+> > index 995c8fa..127868c 100755
+> > --- a/configure
+> > +++ b/configure
+> > @@ -109,6 +109,18 @@ if [ -f $testdir/run ]; then
+> >      ln -fs $testdir/run $testdir-run
+> >  fi
+> >  
+> > +# check if uint32_t needs a long format modifier
+> > +cat << EOF > lib_test.c
+> > +#include <inttypes.h>
+> > +EOF
+> > +
+> > +$cross_prefix$cc lib_test.c -E | grep "typedef" | grep "long" | grep "uint32_t" &> /dev/null
 
-That's (at best) board specific. So it belongs in the DTS if it's
-truely needed.
+This won't work with cross compilers that don't have inttypes.h in their
+path (like mine). How about something like
 
-Maxime
+ cat << EOF > lib_test.c
+ __UINT32_TYPE__
+ EOF
+ u32_long="`aarch64-linux-gnu-gcc lib_test.c -E | awk '/unsigned/ && $2 == "long"'`"
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170112/f8f7e9e4/attachment-0001.sig>
+Although I feel there should be a compiler macro way to do this without
+a need for configure/makefile trickery at all...
+
+Thanks,
+drew
+
+
+> > +exit=$?
+> > +if [ $exit -eq 0 ]; then
+> > +    u32_long=true
+> > +fi
+> > +rm -f lib_test.c
+> > +
+> >  # check for dependent 32 bit libraries
+> >  if [ "$arch" != "arm" ]; then
+> >  cat << EOF > lib_test.c
+> > @@ -155,4 +167,5 @@ TEST_DIR=$testdir
+> >  FIRMWARE=$firmware
+> >  ENDIAN=$endian
+> >  PRETTY_PRINT_STACKS=$pretty_print_stacks
+> > +U32_LONG_FMT=$u32_long
+> >  EOF
+> > diff --git a/lib/libcflat.h b/lib/libcflat.h
+> > index 380395f..e80fc50 100644
+> > --- a/lib/libcflat.h
+> > +++ b/lib/libcflat.h
+> > @@ -58,12 +58,21 @@ typedef _Bool		bool;
+> >  #define true  1
+> >  
+> >  #if __SIZEOF_LONG__ == 8
+> > +#  define __PRI32_PREFIX
+> >  #  define __PRI64_PREFIX	"l"
+> >  #  define __PRIPTR_PREFIX	"l"
+> >  #else
+> > +#if defined(__U32_LONG_FMT__)
+> > +#  define __PRI32_PREFIX        "l"
+> > +#else
+> > +#  define __PRI32_PREFIX
+> > +#endif
+> >  #  define __PRI64_PREFIX	"ll"
+> >  #  define __PRIPTR_PREFIX
+> >  #endif
+> > +#define PRId32  __PRI32_PREFIX	"d"
+> > +#define PRIu32  __PRI32_PREFIX	"u"
+> > +#define PRIx32  __PRI32_PREFIX	"x"
+> >  #define PRId64  __PRI64_PREFIX	"d"
+> >  #define PRIu64  __PRI64_PREFIX	"u"
+> >  #define PRIx64  __PRI64_PREFIX	"x"
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
