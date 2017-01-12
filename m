@@ -1,121 +1,109 @@
-From: Wenyou.Yang@microchip.com (Wenyou.Yang at microchip.com)
-Date: Thu, 12 Jan 2017 01:25:22 +0000
-Subject: [PATCH 1/3] ARM: at91: flush the L2 cache before entering cpu idle
-In-Reply-To: <20170111111814.GJ14217@n2100.armlinux.org.uk>
-References: <20170106065947.30631-1-wenyou.yang@atmel.com>
- <20170106065947.30631-2-wenyou.yang@atmel.com>
- <20170110161821.vp673jyfqx6s76pg@piout.net>
- <CACh+v5NX9Da__zXtnVGgbO9wYAzEJy-8rjVPHdQx_F6QDk+xZg@mail.gmail.com>
- <F9F4555C4E01D7469D37975B62D0EFBB496BE4@CHN-SV-EXMX07.mchp-main.com>
- <CACh+v5M3tU4WHMqAX0zm2H=zzwc0+XChyG1tnH2aHxaacm6C=A@mail.gmail.com>
- <20170111111814.GJ14217@n2100.armlinux.org.uk>
-Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB497F2B@CHN-SV-EXMX07.mchp-main.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 12 Jan 2017 02:28:02 +0100
+Subject: [PATCH v4 1/2] arm64: dts: rockchip: add "rockchip,
+ grf" property for RK3399 PMUCRU/CRU
+In-Reply-To: <CAD=FV=WMQ22G67YoQx2t7J6_ZuB3sUjVjXh-0KhPEO_6zbiyUQ@mail.gmail.com>
+References: <1484028930-20305-1-git-send-email-zhengxing@rock-chips.com>
+ <1523574.hS8CXi1tTP@diego>
+ <CAD=FV=WMQ22G67YoQx2t7J6_ZuB3sUjVjXh-0KhPEO_6zbiyUQ@mail.gmail.com>
+Message-ID: <1637274.yXLKltLVD2@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at armlinux.org.uk]
-> Sent: 2017?1?11? 19:18
-> To: Jean-Jacques Hiblot <jjhiblot@gmail.com>
-> Cc: Wenyou Yang - A41535 <Wenyou.Yang@microchip.com>; Alexandre Belloni
-> <alexandre.belloni@free-electrons.com>; Mark Rutland <mark.rutland@arm.com>;
-> devicetree <devicetree@vger.kernel.org>; Nicolas Ferre
-> <nicolas.ferre@atmel.com>; Linux Kernel Mailing List <linux-
-> kernel at vger.kernel.org>; robh+dt <robh+dt@kernel.org>; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/3] ARM: at91: flush the L2 cache before entering cpu idle
+Am Mittwoch, 11. Januar 2017, 16:50:10 CET schrieb Doug Anderson:
+> Hi,
 > 
-> On Wed, Jan 11, 2017 at 12:05:05PM +0100, Jean-Jacques Hiblot wrote:
-> > 2017-01-11 9:15 GMT+01:00  <Wenyou.Yang@microchip.com>:
-> > > Hi Jean-Jacques,
-> > >
-> > >> -----Original Message-----
-> > >> From: Jean-Jacques Hiblot [mailto:jjhiblot at gmail.com]
-> > >> Sent: 2017?1?11? 0:51
-> > >> To: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > >> Cc: Wenyou Yang - A41535 <Wenyou.Yang@microchip.com>; Mark Rutland
-> > >> <mark.rutland@arm.com>; devicetree <devicetree@vger.kernel.org>;
-> > >> Russell King <linux@arm.linux.org.uk>; Wenyou Yang - A41535
-> > >> <Wenyou.Yang@microchip.com>; Nicolas Ferre
-> > >> <nicolas.ferre@atmel.com>; Linux Kernel Mailing List
-> > >> <linux-kernel@vger.kernel.org>; Rob Herring <robh+dt@kernel.org>;
-> > >> linux-arm-kernel at lists.infradead.org
-> > >> Subject: Re: [PATCH 1/3] ARM: at91: flush the L2 cache before
-> > >> entering cpu idle
-> > >>
-> > >> 2017-01-10 17:18 GMT+01:00 Alexandre Belloni
-> > >> <alexandre.belloni@free-electrons.com>:
-> > >> > I though a bit more about it, and I don't really like the new
-> > >> > compatible string. I don't feel this should be necessary.
-> > >> >
-> > >> > What about the following:
-> > >> >
-> > >> > diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-> > >> > index
-> > >> > b4332b727e9c..0333aca63e44 100644
-> > >> > --- a/arch/arm/mach-at91/pm.c
-> > >> > +++ b/arch/arm/mach-at91/pm.c
-> > >> > @@ -53,6 +53,7 @@ extern void at91_pinctrl_gpio_resume(void);
-> > >> > static struct {
-> > >> >         unsigned long uhp_udp_mask;
-> > >> >         int memctrl;
-> > >> > +       bool has_l2_cache;
-> > >> >  } at91_pm_data;
-> > >> >
-> > >> >  void __iomem *at91_ramc_base[2]; @@ -267,6 +268,11 @@ static
-> > >> > void at91_ddr_standby(void)
-> > >> >         u32 lpr0, lpr1 = 0;
-> > >> >         u32 saved_lpr0, saved_lpr1 = 0;
-> > >> >
-> > >>
-> > >> > +       if (at91_pm_data.has_l2_cache) {
-> > >> > +               flush_cache_all();
-> > >> what is the point of calling flush_cache_all() here ? Do we really
-> > >> care that dirty data in L1 is written to DDR ? I may be missing
-> > >> something but to me it's just extra latency.
-> > >
-> > > Are you mean use outer_flush_all() to flush all cache lines in the outer cache
-> only?
-> >
-> > Yes that's what I meant. You see, you don't flush the cache for
-> > sama5d3 so it shouldn't be required either for sam5d4. You should be
-> > able to test it quickly and see if L1 flush is indeed required by
-> > replacing  flush_cache_all() with outer_flush_all(). BTW is highly
-> > probable that L2 cache flush is done in outer_disable() so calling
-> > outer_flush_all() is probably no required.
+> On Tue, Jan 10, 2017 at 11:58 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> > Hi Doug,
+> > 
+> > Am Dienstag, 10. Januar 2017, 20:46:12 schrieb Heiko St?bner:
+> >> Am Dienstag, 10. Januar 2017, 10:45:48 schrieb Doug Anderson:
+> >> > Hi,
+> >> > 
+> >> > On Mon, Jan 9, 2017 at 10:15 PM, Xing Zheng <zhengxing@rock-chips.com>
+> >> 
+> >> wrote:
+> >> > > The structure rockchip_clk_provider needs to refer the GRF regmap
+> >> > > in somewhere, if the CRU node has not "rockchip,grf" property,
+> >> > > calling syscon_regmap_lookup_by_phandle will return an invalid GRF
+> >> > > regmap, and the MUXGRF type clock will be not supported.
+> >> > > 
+> >> > > Therefore, we need to add them.
+> >> > > 
+> >> > > Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+> >> > > ---
+> >> > > 
+> >> > > Changes in v4:
+> >> > > - separte the binding patch
+> >> > > 
+> >> > > Changes in v3:
+> >> > > - add optional roperty rockchip,grf in rockchip,rk3399-cru.txt
+> >> > > 
+> >> > > Changes in v2:
+> >> > > - referring pmugrf for PMUGRU
+> >> > > - fix the typo "invaild" in COMMIT message
+> >> > > 
+> >> > >  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 ++
+> >> > >  1 file changed, 2 insertions(+)
+> >> > 
+> >> > This seems fine to me, so:
+> >> > 
+> >> > Reviewed-by: Douglas Anderson <dianders@chromium.org>
+> >> > 
+> >> > ...but I will say that before you actually add any real "MUXGRF"
+> >> > clocks on rk3399 you _might_ need to rework the code to make things
+> >> > truly "optional".  If it turns out that any existing clocks that
+> >> > already exist today already go through one of these muxes in the GRF
+> >> > and we've always been assuming one setting of the mux, we'll need to
+> >> > make sure we keep assuming that setting of the mux even if the "grf"
+> >> > isn't specified.
+> >> 
+> >> I guess I see that a bit more relaxed :-) .
+> >> 
+> >> I.e. the GRF being optional is a remnant of syscons not being available
+> >> when the clocks get set up- so were coming in later or not at all. For
+> >> the rk3288 I converted, there we never really had the case of the GRF
+> >> missing.
+> >> 
+> >> And the GRF mux for the vcodec now present is not being used by anything
+> >> yet (neither driver nor binding), so no old devicetree can break.
+> >> 
+> >> > As I understand it, your motivation for this patch is to eventually be
+> >> > able to model the EDP reference clock which can either be xin24 or
+> >> > "edp osc".  Presumably the eDP "reference clock" isn't related to any
+> >> > of the pre-existing eDP clocks so that one should be safe.
+> >> 
+> >> Same here, so far we don't even have edp or even any other graphical
+> >> output
+> >> on the rk3399, so again there is no old devicetree that could break when
+> >> the grf is not specified.
+> > 
+> > reading all of the above again, it feels like you essentially also said
+> > similar things already in your original reply and I misread some of it.
+> > 
+> > But again, I don't see the need for any more code right now, as hopefully
+> > the simple stuff we currently only support does not have any grf-based
+> > muxes in it. Xing + Rockchip people, please correct me if I'm wrong here
+> > :-)
+> Right.  I have no objection to Xing's patch.  I just want to make sure
+> that if it's listed as "Optional" that it's really optional.
 > 
-> Please don't.  Read the comments in the code, and understand the APIs that
-> you're suggesting people use _before_ making the suggestion:
-> 
-> /**
->  * outer_flush_all - clean and invalidate all cache lines in the outer cache
->  *
->  * Note: depending on implementation, this may not be atomic - it must
->  * only be called with interrupts disabled and no other active outer
->  * cache masters.
->  *
->  * It is intended that this function is only used by implementations
->  * needing to override the outer_cache.disable() method due to security.
->  * (Some implementations perform this as a clean followed by an invalidate.)  */
-> 
-> So, outer_flush_all() should not be called except from L2 cache code
-> implementing the outer_disable() function - it's not intended for platforms to use.
-> 
-> There are, however, sadly three users of outer_flush_all() which have crept in
-> through arm-soc, that should be outer_disable() instead.
+> I was worried that we would introduce some GRF-based mux in the
+> _middle_ of some existing clock tree because we simply didn't model
+> the mux before and assumed one particular setting.  If nothing like
+> that ever happens then we're fine.
 
-Here, outer_flush_all() should not be called, calling outer_disable() is enough. Is it right?
+Thankfully the clock diagrams on the old socs were pretty verbose, listing all
+grf-based clocks as well. For example the rk3288 seems to have two and it
+seems I've been carrying dummy definitions for those from the time I did the
+initial clock tree [0].
 
-In the implementation of l2c_disable(void) of in mm/cache-l2x0.c, the outer_cache.flush_all() is called.
-
-> 
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+And thankfully grf-based clocks somehow always only get used for more
+"esotheric" components like vcodec and iep on the rk3288 :-) .
 
 
-Best Regards,
-Wenyou Yang
+Heiko
+
+[0] https://github.com/mmind/linux-rockchip/blob/devel/workbench/drivers/clk/rockchip/clk-rk3288.c
+lines 371 and 799 .. looks like I'll need to add the iep clock as well
+at some point.
