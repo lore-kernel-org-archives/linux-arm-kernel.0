@@ -1,433 +1,277 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 12 Jan 2017 11:39:06 +0100
-Subject: [PATCH 1/2] mmc: mediatek: Use data tune for CMD line tune
-In-Reply-To: <1484215490-7494-2-git-send-email-yong.mao@mediatek.com>
-References: <1484215490-7494-1-git-send-email-yong.mao@mediatek.com>
- <1484215490-7494-2-git-send-email-yong.mao@mediatek.com>
-Message-ID: <CAPDyKFq0_WpCAAmUDfaKApq7=tdpjNqL896FC=QPfGgE9JaEHA@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 12 Jan 2017 11:42:53 +0100
+Subject: kvm: deadlock in kvm_vgic_map_resources
+In-Reply-To: <0994d5a9-d9f4-7b80-4b16-1797c093edb5@arm.com>
+References: <CACT4Y+YRg=H0F-_QTtPf0--o85sQCb__j=V25tPchx9ycYtyKg@mail.gmail.com>
+ <70371c5c-d0c0-b59e-b12c-fd8359392763@arm.com>
+ <286255e8-918e-66b5-012f-f347a2ae71cd@arm.com>
+ <0994d5a9-d9f4-7b80-4b16-1797c093edb5@arm.com>
+Message-ID: <20170112104253.GB13547@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 January 2017 at 11:04, Yong Mao <yong.mao@mediatek.com> wrote:
-> From: yong mao <yong.mao@mediatek.com>
->
-> CMD response CRC error may cause cannot boot up
-> Change to use data tune for CMD line
-> Separate cmd internal delay for HS200/HS400 mode
-
-Please try to work a little bit on improving the change log. Moreover
-as this is a fix for a regression (it seems like so?), please try to
-make that clear.
-
->
-> Signed-off-by: Yong Mao <yong.mao@mediatek.com>
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+On Thu, Jan 12, 2017 at 10:30:39AM +0000, Marc Zyngier wrote:
+> On 12/01/17 09:55, Andre Przywara wrote:
+> > Hi,
+> > 
+> > On 12/01/17 09:32, Marc Zyngier wrote:
+> >> Hi Dmitry,
+> >>
+> >> On 11/01/17 19:01, Dmitry Vyukov wrote:
+> >>> Hello,
+> >>>
+> >>> While running syzkaller fuzzer I've got the following deadlock.
+> >>> On commit 9c763584b7c8911106bb77af7e648bef09af9d80.
+> >>>
+> >>>
+> >>> =============================================
+> >>> [ INFO: possible recursive locking detected ]
+> >>> 4.9.0-rc6-xc2-00056-g08372dd4b91d-dirty #50 Not tainted
+> >>> ---------------------------------------------
+> >>> syz-executor/20805 is trying to acquire lock:
+> >>> (
+> >>> &kvm->lock
+> >>> ){+.+.+.}
+> >>> , at:
+> >>> [< inline >] kvm_vgic_dist_destroy
+> >>> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:271
+> >>> [<ffff2000080ea4bc>] kvm_vgic_destroy+0x34/0x250
+> >>> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:294
+> >>> but task is already holding lock:
+> >>> (&kvm->lock){+.+.+.}, at:
+> >>> [<ffff2000080ea7e4>] kvm_vgic_map_resources+0x2c/0x108
+> >>> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:343
+> >>> other info that might help us debug this:
+> >>> Possible unsafe locking scenario:
+> >>> CPU0
+> >>> ----
+> >>> lock(&kvm->lock);
+> >>> lock(&kvm->lock);
+> >>> *** DEADLOCK ***
+> >>> May be due to missing lock nesting notation
+> >>> 2 locks held by syz-executor/20805:
+> >>> #0:(&vcpu->mutex){+.+.+.}, at:
+> >>> [<ffff2000080bcc30>] vcpu_load+0x28/0x1d0
+> >>> arch/arm64/kvm/../../../virt/kvm/kvm_main.c:143
+> >>> #1:(&kvm->lock){+.+.+.}, at:
+> >>> [<ffff2000080ea7e4>] kvm_vgic_map_resources+0x2c/0x108
+> >>> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:343
+> >>> stack backtrace:
+> >>> CPU: 2 PID: 20805 Comm: syz-executor Not tainted
+> >>> 4.9.0-rc6-xc2-00056-g08372dd4b91d-dirty #50
+> >>> Hardware name: Hardkernel ODROID-C2 (DT)
+> >>> Call trace:
+> >>> [<ffff200008090560>] dump_backtrace+0x0/0x3c8 arch/arm64/kernel/traps.c:69
+> >>> [<ffff200008090948>] show_stack+0x20/0x30 arch/arm64/kernel/traps.c:219
+> >>> [< inline >] __dump_stack lib/dump_stack.c:15
+> >>> [<ffff200008895840>] dump_stack+0x100/0x150 lib/dump_stack.c:51
+> >>> [< inline >] print_deadlock_bug kernel/locking/lockdep.c:1728
+> >>> [< inline >] check_deadlock kernel/locking/lockdep.c:1772
+> >>> [< inline >] validate_chain kernel/locking/lockdep.c:2250
+> >>> [<ffff2000081c8718>] __lock_acquire+0x1938/0x3440 kernel/locking/lockdep.c:3335
+> >>> [<ffff2000081caa84>] lock_acquire+0xdc/0x1d8 kernel/locking/lockdep.c:3746
+> >>> [< inline >] __mutex_lock_common kernel/locking/mutex.c:521
+> >>> [<ffff200009700004>] mutex_lock_nested+0xdc/0x7b8 kernel/locking/mutex.c:621
+> >>> [< inline >] kvm_vgic_dist_destroy
+> >>> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:271
+> >>> [<ffff2000080ea4bc>] kvm_vgic_destroy+0x34/0x250
+> >>> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:294
+> >>> [<ffff2000080ec290>] vgic_v2_map_resources+0x218/0x430
+> >>> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v2.c:295
+> >>> [<ffff2000080ea884>] kvm_vgic_map_resources+0xcc/0x108
+> >>> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:348
+> >>> [< inline >] kvm_vcpu_first_run_init
+> >>> arch/arm64/kvm/../../../arch/arm/kvm/arm.c:505
+> >>> [<ffff2000080d2768>] kvm_arch_vcpu_ioctl_run+0xab8/0xce0
+> >>> arch/arm64/kvm/../../../arch/arm/kvm/arm.c:591
+> >>> [<ffff2000080c1fec>] kvm_vcpu_ioctl+0x434/0xc08
+> >>> arch/arm64/kvm/../../../virt/kvm/kvm_main.c:2557
+> >>> [< inline >] vfs_ioctl fs/ioctl.c:43
+> >>> [<ffff200008450c38>] do_vfs_ioctl+0x128/0xfc0 fs/ioctl.c:679
+> >>> [< inline >] SYSC_ioctl fs/ioctl.c:694
+> >>> [<ffff200008451b78>] SyS_ioctl+0xa8/0xb8 fs/ioctl.c:685
+> >>> [<ffff200008083ef0>] el0_svc_naked+0x24/0x28 arch/arm64/kernel/entry.S:755
+> >>
+> >> Nice catch, and many thanks for reporting this.
+> >>
+> >> The bug is fairly obvious. Christoffer, what do you think? I don't think
+> >> we need to hold the kvm->lock all the way, but I'd like another pair of
+> >> eyes (the coffee machine is out of order again, and tea doesn't cut it).
+> >>
+> >> Thanks,
+> >>
+> >> 	M.
+> >>
+> >> From 93f80b20fb9351a49ee8b74eed3fc59c84651371 Mon Sep 17 00:00:00 2001
+> >> From: Marc Zyngier <marc.zyngier@arm.com>
+> >> Date: Thu, 12 Jan 2017 09:21:56 +0000
+> >> Subject: [PATCH] KVM: arm/arm64: vgic: Fix deadlock on error handling
+> >>
+> >> Dmitry Vyukov reported that the syzkaller fuzzer triggered a
+> >> deadlock in the vgic setup code when an error was detected, as
+> >> the cleanup code tries to take a lock that is already held by
+> >> the setup code.
+> >>
+> >> The fix is pretty obvious: move the cleaup call after having
+> >> dropped the lock, since not much can happen at that point.
+> >                           ^^^^^^^^
+> > Is that really true? If for instance the calls to
+> > vgic_register_dist_iodev() or kvm_phys_addr_ioremap() in
+> > vgic_v2_map_resources() fail, we leave the function with a half
+> > initialized VGIC (because vgic_init() succeeded). 
+> 
+> But we only set dist->ready to true when everything went OK. How is 
+> that an issue?
+> 
+> > Dropping the lock at
+> > this point without having the GIC cleaned up before sounds a bit
+> > suspicious (I may be wrong on this, though).
+> 
+> Thinking of it, that may open a race with vgic init call, leading to 
+> leaking distributor memory.
+> 
+> > 
+> > Can't we just document that kvm_vgic_destroy() needs to be called with
+> > the kvm->lock held and take the lock around the only other caller
+> > (kvm_arch_destroy_vm() in arch/arm/kvm/arm.c)?
+> > We can then keep holding the lock in the map_resources calls.
+> > Though we might still move the calls to kvm_vgic_destroy() into the
+> > wrapper function as a cleanup (as shown below), just before dropping the
+> > lock.
+> 
+> I'd rather keep the changes limited to the vgic code, and save myself 
+> having to document more locking (we already have our fair share here). 
+> How about this (untested):
+> 
+> From 24dc3f5750da20d89e0ce9b7855d125d0100bee8 Mon Sep 17 00:00:00 2001
+> From: Marc Zyngier <marc.zyngier@arm.com>
+> Date: Thu, 12 Jan 2017 09:21:56 +0000
+> Subject: [PATCH] KVM: arm/arm64: vgic: Fix deadlock on error handling
+> 
+> Dmitry Vyukov reported that the syzkaller fuzzer triggered a
+> deadlock in the vgic setup code when an error was detected, as
+> the cleanup code tries to take a lock that is already held by
+> the setup code.
+> 
+> The fix is to avoid retaking the lock when cleaning up, by
+> telling the cleanup function that we already hold it.
+> 
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm64/boot/dts/mediatek/mt8173-evb.dts |    3 +
-
-Changes to the DTS files should be a separate change. Please split it
-into its own patch.
-
->  drivers/mmc/host/mtk-sd.c                   |  169 +++++++++++++++++++++++----
->  2 files changed, 149 insertions(+), 23 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> index 0ecaad4..29c3100 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> @@ -134,6 +134,9 @@
->         bus-width = <8>;
->         max-frequency = <50000000>;
->         cap-mmc-highspeed;
-> +       hs200-cmd-int-delay = <26>;
-> +       hs400-cmd-int-delay = <14>;
-> +       cmd-resp-sel = <0>; /* 0: rising, 1: falling */
->         vmmc-supply = <&mt6397_vemc_3v3_reg>;
->         vqmmc-supply = <&mt6397_vio18_reg>;
->         non-removable;
-> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> index 80ba034..93eb395 100644
-> --- a/drivers/mmc/host/mtk-sd.c
-> +++ b/drivers/mmc/host/mtk-sd.c
-> @@ -75,6 +75,7 @@
->  #define MSDC_PATCH_BIT1  0xb4
->  #define MSDC_PAD_TUNE    0xec
->  #define PAD_DS_TUNE      0x188
-> +#define PAD_CMD_TUNE     0x18c
->  #define EMMC50_CFG0      0x208
->
->  /*--------------------------------------------------------------------------*/
-> @@ -210,12 +211,17 @@
->  #define MSDC_PATCH_BIT_SPCPUSH    (0x1 << 29)  /* RW */
->  #define MSDC_PATCH_BIT_DECRCTMO   (0x1 << 30)  /* RW */
->
-> -#define MSDC_PAD_TUNE_DATRRDLY   (0x1f <<  8)  /* RW */
-> -#define MSDC_PAD_TUNE_CMDRDLY    (0x1f << 16)  /* RW */
-> +#define MSDC_PAD_TUNE_DATWRDLY    (0x1f <<  0)  /* RW */
-> +#define MSDC_PAD_TUNE_DATRRDLY    (0x1f <<  8) /* RW */
-> +#define MSDC_PAD_TUNE_CMDRDLY     (0x1f << 16)  /* RW */
-> +#define MSDC_PAD_TUNE_CMDRRDLY    (0x1f << 22)  /* RW */
-
-Is there a white space change somewhere here? I don't see any changes
-to MSDC_PAD_TUNE_DATRRDLY and MSDC_PAD_TUNE_CMDRDLY.
-
-> +#define MSDC_PAD_TUNE_CLKTDLY     (0x1f << 27)  /* RW */
->
-> -#define PAD_DS_TUNE_DLY1         (0x1f << 2)   /* RW */
-> -#define PAD_DS_TUNE_DLY2         (0x1f << 7)   /* RW */
-> -#define PAD_DS_TUNE_DLY3         (0x1f << 12)  /* RW */
-> +#define PAD_DS_TUNE_DLY1          (0x1f << 2)   /* RW */
-> +#define PAD_DS_TUNE_DLY2          (0x1f << 7)   /* RW */
-> +#define PAD_DS_TUNE_DLY3          (0x1f << 12)  /* RW */
-> +
-
-Ditto.
-
-> +#define PAD_CMD_TUNE_RX_DLY3      (0x1f << 1)   /* RW */
->
->  #define EMMC50_CFG_PADCMD_LATCHCK (0x1 << 0)   /* RW */
->  #define EMMC50_CFG_CRCSTS_EDGE    (0x1 << 3)   /* RW */
-> @@ -236,7 +242,9 @@
->  #define CMD_TIMEOUT         (HZ/10 * 5)        /* 100ms x5 */
->  #define DAT_TIMEOUT         (HZ    * 5)        /* 1000ms x5 */
->
-> -#define PAD_DELAY_MAX  32 /* PAD delay cells */
-> +#define PAD_DELAY_MAX            32 /* PAD delay cells */
-
-Ditto.
-
-> +#define ENOUGH_MARGIN_MIN        12 /* Enough Margin */
-> +#define PREFER_START_POS_MAX     4  /* Prefer start position */
->  /*--------------------------------------------------------------------------*/
->  /* Descriptor Structure                                                     */
->  /*--------------------------------------------------------------------------*/
-> @@ -284,12 +292,14 @@ struct msdc_save_para {
->         u32 patch_bit0;
->         u32 patch_bit1;
->         u32 pad_ds_tune;
-> +       u32 pad_cmd_tune;
->         u32 emmc50_cfg0;
->  };
->
->  struct msdc_tune_para {
->         u32 iocon;
->         u32 pad_tune;
-> +       u32 pad_cmd_tune;
->  };
->
->  struct msdc_delay_phase {
-> @@ -331,6 +341,9 @@ struct msdc_host {
->         unsigned char timing;
->         bool vqmmc_enabled;
->         u32 hs400_ds_delay;
-> +       u32 hs200_cmd_int_delay; /* cmd internal delay for HS200/SDR104 */
-> +       u32 hs400_cmd_int_delay; /* cmd internal delay for HS400 */
-> +       u32 hs200_cmd_resp_sel; /* cmd response sample selection */
->         bool hs400_mode;        /* current eMMC will run at hs400 mode */
->         struct msdc_save_para save_para; /* used when gate HCLK */
->         struct msdc_tune_para def_tune_para; /* default tune setting */
-> @@ -596,12 +609,21 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
->          */
->         if (host->sclk <= 52000000) {
->                 writel(host->def_tune_para.iocon, host->base + MSDC_IOCON);
-> -               writel(host->def_tune_para.pad_tune, host->base + MSDC_PAD_TUNE);
-> +               writel(host->def_tune_para.pad_tune,
-> +                      host->base + MSDC_PAD_TUNE);
-
-Please don't change code just because you feel like doing it. This is
-a completely unessarry change and it makes it harder for me to review.
-
-Can you go thorugh the complete patch and make sure to undo all
-similar changes, there are more of them.
-
->         } else {
-> -               writel(host->saved_tune_para.iocon, host->base + MSDC_IOCON);
-> -               writel(host->saved_tune_para.pad_tune, host->base + MSDC_PAD_TUNE);
-> +               writel(host->saved_tune_para.iocon,
-> +                      host->base + MSDC_IOCON);
-> +               writel(host->saved_tune_para.pad_tune,
-> +                      host->base + MSDC_PAD_TUNE);
-> +               writel(host->saved_tune_para.pad_cmd_tune,
-> +                      host->base + PAD_CMD_TUNE);
->         }
->
-> +       if (timing == MMC_TIMING_MMC_HS400)
-> +               sdr_set_field(host->base + PAD_CMD_TUNE,
-> +                             MSDC_PAD_TUNE_CMDRRDLY,
-> +                             host->hs400_cmd_int_delay);
->         dev_dbg(host->dev, "sclk: %d, timing: %d\n", host->sclk, timing);
+>  virt/kvm/arm/vgic/vgic-init.c | 21 ++++++++++++++++-----
+>  virt/kvm/arm/vgic/vgic-v2.c   |  2 --
+>  virt/kvm/arm/vgic/vgic-v3.c   |  2 --
+>  3 files changed, 16 insertions(+), 9 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index 5114391..30d74e2 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -264,11 +264,12 @@ int vgic_init(struct kvm *kvm)
+>  	return ret;
 >  }
->
-> @@ -1302,7 +1324,8 @@ static struct msdc_delay_phase get_best_delay(struct msdc_host *host, u32 delay)
->                         len_final = len;
->                 }
->                 start += len ? len : 1;
-> -               if (len >= 8 && start_final < 4)
-> +               if (len >= ENOUGH_MARGIN_MIN &&
-> +                   start_final < PREFER_START_POS_MAX)
->                         break;
->         }
->
-> @@ -1325,48 +1348,128 @@ static int msdc_tune_response(struct mmc_host *mmc, u32 opcode)
->         struct msdc_host *host = mmc_priv(mmc);
->         u32 rise_delay = 0, fall_delay = 0;
->         struct msdc_delay_phase final_rise_delay, final_fall_delay = { 0,};
-> +       struct msdc_delay_phase internal_delay_phase;
->         u8 final_delay, final_maxlen;
-> +       u32 internal_delay = 0;
->         int cmd_err;
-> -       int i;
-> +       int i, j;
->
-> +       if (mmc->ios.timing == MMC_TIMING_MMC_HS200 ||
-> +           mmc->ios.timing == MMC_TIMING_UHS_SDR104)
-> +               sdr_set_field(host->base + MSDC_PAD_TUNE,
-> +                             MSDC_PAD_TUNE_CMDRRDLY,
-> +                             host->hs200_cmd_int_delay);
->         sdr_clr_bits(host->base + MSDC_IOCON, MSDC_IOCON_RSPL);
->         for (i = 0 ; i < PAD_DELAY_MAX; i++) {
->                 sdr_set_field(host->base + MSDC_PAD_TUNE,
->                               MSDC_PAD_TUNE_CMDRDLY, i);
-> -               mmc_send_tuning(mmc, opcode, &cmd_err);
-> -               if (!cmd_err)
-> -                       rise_delay |= (1 << i);
-> +               for (j = 0; j < 3; j++) {
+>  
+> -static void kvm_vgic_dist_destroy(struct kvm *kvm)
+> +static void kvm_vgic_dist_destroy(struct kvm *kvm, bool locked)
+>  {
+>  	struct vgic_dist *dist = &kvm->arch.vgic;
+>  
+> -	mutex_lock(&kvm->lock);
+> +	if (!locked)
+> +		mutex_lock(&kvm->lock);
 
-Any reason to why looping three times makes sense? Maybe add a comment?
+Hmm, not a fan of passing this variable around.  How about this instead
+then (untested):
 
-> +                       mmc_send_tuning(mmc, opcode, &cmd_err);
-> +                       if (!cmd_err) {
-> +                               rise_delay |= (1 << i);
-> +                       } else {
-> +                               rise_delay &= ~(1 << i);
-> +                               break;
-> +                       }
-> +               }
->         }
->         final_rise_delay = get_best_delay(host, rise_delay);
->         /* if rising edge has enough margin, then do not scan falling edge */
-> -       if (final_rise_delay.maxlen >= 10 ||
-> -           (final_rise_delay.start == 0 && final_rise_delay.maxlen >= 4))
-> +       if (final_rise_delay.maxlen >= ENOUGH_MARGIN_MIN &&
-> +           final_rise_delay.start < PREFER_START_POS_MAX)
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 5114391..a25806b 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -264,19 +264,16 @@ int vgic_init(struct kvm *kvm)
+ 	return ret;
+ }
+ 
++/* Must be called with the kvm->lock held */
+ static void kvm_vgic_dist_destroy(struct kvm *kvm)
+ {
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+ 
+-	mutex_lock(&kvm->lock);
+-
+ 	dist->ready = false;
+ 	dist->initialized = false;
+ 
+ 	kfree(dist->spis);
+ 	dist->nr_spis = 0;
+-
+-	mutex_unlock(&kvm->lock);
+ }
+ 
+ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
+@@ -286,7 +283,7 @@ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
+ 	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
+ }
+ 
+-void kvm_vgic_destroy(struct kvm *kvm)
++void __kvm_vgic_destroy(struct kvm *kvm)
+ {
+ 	struct kvm_vcpu *vcpu;
+ 	int i;
+@@ -297,6 +294,13 @@ void kvm_vgic_destroy(struct kvm *kvm)
+ 		kvm_vgic_vcpu_destroy(vcpu);
+ }
+ 
++void kvm_vgic_destroy(struct kvm *kvm)
++{
++	mutex_lock(&kvm->lock);
++	__kvm_vgic_destroy(kvm);
++	mutex_unlock(&kvm->lock);
++}
++
+ /**
+  * vgic_lazy_init: Lazy init is only allowed if the GIC exposed to the guest
+  * is a GICv2. A GICv3 must be explicitly initialized by the guest using the
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index 9bab867..c6f7ec7 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -294,7 +294,7 @@ int vgic_v2_map_resources(struct kvm *kvm)
+ 
+ out:
+ 	if (ret)
+-		kvm_vgic_destroy(kvm);
++		__kvm_vgic_destroy(kvm);
+ 	return ret;
+ }
+ 
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 5c9f974..f1c7819 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -303,7 +303,7 @@ int vgic_v3_map_resources(struct kvm *kvm)
+ 
+ out:
+ 	if (ret)
+-		kvm_vgic_destroy(kvm);
++		__kvm_vgic_destroy(kvm);
+ 	return ret;
+ }
+ 
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 859f65c..74a0bbb 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -37,6 +37,8 @@ struct vgic_vmcr {
+ 	u32	pmr;
+ };
+ 
++void __kvm_vgic_destroy(struct kvm *kvm);
++
+ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ 			      u32 intid);
+ void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq);
 
-This looks like clean-ups, as you are converting from magic numbers to
-defines. Please make this kind of changes separately.
 
->                 goto skip_fall;
->
->         sdr_set_bits(host->base + MSDC_IOCON, MSDC_IOCON_RSPL);
->         for (i = 0; i < PAD_DELAY_MAX; i++) {
->                 sdr_set_field(host->base + MSDC_PAD_TUNE,
->                               MSDC_PAD_TUNE_CMDRDLY, i);
-> -               mmc_send_tuning(mmc, opcode, &cmd_err);
-> -               if (!cmd_err)
-> -                       fall_delay |= (1 << i);
-> +               for (j = 0; j < 3; j++) {
-
-3?
-
-> +                       mmc_send_tuning(mmc, opcode, &cmd_err);
-> +                       if (!cmd_err) {
-> +                               fall_delay |= (1 << i);
-> +                       } else {
-> +                               fall_delay &= ~(1 << i);
-> +                               break;
-> +                       };
-> +               }
->         }
->         final_fall_delay = get_best_delay(host, fall_delay);
->
->  skip_fall:
->         final_maxlen = max(final_rise_delay.maxlen, final_fall_delay.maxlen);
-> +       if (final_fall_delay.maxlen >= ENOUGH_MARGIN_MIN &&
-> +           final_fall_delay.start < PREFER_START_POS_MAX)
-> +               final_maxlen = final_fall_delay.maxlen;
->         if (final_maxlen == final_rise_delay.maxlen) {
->                 sdr_clr_bits(host->base + MSDC_IOCON, MSDC_IOCON_RSPL);
-> -               sdr_set_field(host->base + MSDC_PAD_TUNE, MSDC_PAD_TUNE_CMDRDLY,
-> +               sdr_set_field(host->base + MSDC_PAD_TUNE,
-> +                             MSDC_PAD_TUNE_CMDRDLY,
->                               final_rise_delay.final_phase);
->                 final_delay = final_rise_delay.final_phase;
->         } else {
->                 sdr_set_bits(host->base + MSDC_IOCON, MSDC_IOCON_RSPL);
-> -               sdr_set_field(host->base + MSDC_PAD_TUNE, MSDC_PAD_TUNE_CMDRDLY,
-> +               sdr_set_field(host->base + MSDC_PAD_TUNE,
-> +                             MSDC_PAD_TUNE_CMDRDLY,
->                               final_fall_delay.final_phase);
->                 final_delay = final_fall_delay.final_phase;
->         }
-> +       if (host->hs200_cmd_int_delay)
-> +               goto skip_internal;
->
-> +       for (i = 0; i < PAD_DELAY_MAX; i++) {
-> +               sdr_set_field(host->base + MSDC_PAD_TUNE,
-> +                             MSDC_PAD_TUNE_CMDRRDLY, i);
-> +               mmc_send_tuning(mmc, opcode, &cmd_err);
-> +               if (!cmd_err)
-> +                       internal_delay |= (1 << i);
-> +       }
-> +       dev_info(host->dev, "Final internal delay: 0x%x\n", internal_delay);
-
-I don't think dev_info() is what you want, right? Perhaps dev_dbg(),
-anything at all.
-
-> +       internal_delay_phase = get_best_delay(host, internal_delay);
-> +       sdr_set_field(host->base + MSDC_PAD_TUNE, MSDC_PAD_TUNE_CMDRRDLY,
-> +                     internal_delay_phase.final_phase);
-> +skip_internal:
-> +       dev_info(host->dev, "Final cmd pad delay: %x\n", final_delay);
-
-I don't think dev_info() is what you want, right? Perhaps dev_dbg(),
-anything at all.
-
-> +       return final_delay == 0xff ? -EIO : 0;
-> +}
-> +
-> +static int hs400_tune_response(struct mmc_host *mmc, u32 opcode)
-> +{
-> +       struct msdc_host *host = mmc_priv(mmc);
-> +       u32 cmd_delay = 0;
-> +       struct msdc_delay_phase final_cmd_delay = { 0,};
-> +       u8 final_delay;
-> +       int cmd_err;
-> +       int i, j;
-> +
-> +       /* select EMMC50 PAD CMD tune */
-> +       sdr_set_bits(host->base + PAD_CMD_TUNE, BIT(0));
-> +
-> +       if (mmc->ios.timing == MMC_TIMING_MMC_HS200 ||
-> +           mmc->ios.timing == MMC_TIMING_UHS_SDR104)
-> +               sdr_set_field(host->base + MSDC_PAD_TUNE,
-> +                             MSDC_PAD_TUNE_CMDRRDLY,
-> +                             host->hs200_cmd_int_delay);
-> +       sdr_set_field(host->base + MSDC_IOCON, MSDC_IOCON_RSPL,
-> +                     host->hs200_cmd_resp_sel);
-> +       for (i = 0 ; i < PAD_DELAY_MAX; i++) {
-> +               sdr_set_field(host->base + PAD_CMD_TUNE,
-> +                             PAD_CMD_TUNE_RX_DLY3, i);
-> +               for (j = 0; j < 3; j++) {
-
-3?
-
-> +                       mmc_send_tuning(mmc, opcode, &cmd_err);
-> +                       if (!cmd_err) {
-> +                               cmd_delay |= (1 << i);
-> +                       } else {
-> +                               cmd_delay &= ~(1 << i);
-> +                               break;
-> +                       }
-> +               }
-> +       }
-> +       final_cmd_delay = get_best_delay(host, cmd_delay);
-> +       sdr_set_field(host->base + PAD_CMD_TUNE, PAD_CMD_TUNE_RX_DLY3,
-> +                     final_cmd_delay.final_phase);
-> +       final_delay = final_cmd_delay.final_phase;
-> +
-> +       dev_info(host->dev, "Final cmd pad delay: %x\n", final_delay);
-
-dev_info() -> dev_dbg() or remove it.
-
->         return final_delay == 0xff ? -EIO : 0;
->  }
->
-> @@ -1389,7 +1492,7 @@ static int msdc_tune_data(struct mmc_host *mmc, u32 opcode)
->         }
->         final_rise_delay = get_best_delay(host, rise_delay);
->         /* if rising edge has enough margin, then do not scan falling edge */
-> -       if (final_rise_delay.maxlen >= 10 ||
-> +       if (final_rise_delay.maxlen >= ENOUGH_MARGIN_MIN ||
-
-Clean up. Move to separate change.
-
->             (final_rise_delay.start == 0 && final_rise_delay.maxlen >= 4))
->                 goto skip_fall;
->
-> @@ -1422,6 +1525,7 @@ static int msdc_tune_data(struct mmc_host *mmc, u32 opcode)
->                 final_delay = final_fall_delay.final_phase;
->         }
->
-> +       dev_info(host->dev, "Final data pad delay: %x\n", final_delay);
-
-dev_info() -> dev_dbg() or remove it.
-
->         return final_delay == 0xff ? -EIO : 0;
->  }
->
-> @@ -1430,10 +1534,13 @@ static int msdc_execute_tuning(struct mmc_host *mmc, u32 opcode)
->         struct msdc_host *host = mmc_priv(mmc);
->         int ret;
->
-> +       if (host->hs400_mode)
-> +               ret = hs400_tune_response(mmc, opcode);
-> +       else
->         ret = msdc_tune_response(mmc, opcode);
-
-Because of the new else clause, seems like above needs an intendation.
-
->         if (ret == -EIO) {
->                 dev_err(host->dev, "Tune response fail!\n");
-> -               return ret;
-> +               goto out;
-
-Not needed, remove the label and this change.
-
->         }
->         if (host->hs400_mode == false) {
->                 ret = msdc_tune_data(mmc, opcode);
-> @@ -1443,6 +1550,8 @@ static int msdc_execute_tuning(struct mmc_host *mmc, u32 opcode)
->
->         host->saved_tune_para.iocon = readl(host->base + MSDC_IOCON);
->         host->saved_tune_para.pad_tune = readl(host->base + MSDC_PAD_TUNE);
-> +       host->saved_tune_para.pad_cmd_tune = readl(host->base + PAD_CMD_TUNE);
-> +out:
->         return ret;
->  }
->
-> @@ -1553,6 +1662,18 @@ static int msdc_drv_probe(struct platform_device *pdev)
->                 dev_dbg(&pdev->dev, "hs400-ds-delay: %x\n",
->                         host->hs400_ds_delay);
->
-> +       if (!of_property_read_u32(pdev->dev.of_node, "hs200-cmd-int-delay",
-> +                                 &host->hs200_cmd_int_delay))
-> +               dev_dbg(&pdev->dev, "host->hs200-cmd-int-delay: %x\n",
-> +                       host->hs200_cmd_int_delay);
-> +       if (!of_property_read_u32(pdev->dev.of_node, "hs400-cmd-int-delay",
-> +                                 &host->hs400_cmd_int_delay))
-> +               dev_dbg(&pdev->dev, "host->hs400-cmd-int-delay: %x\n",
-> +                       host->hs400_cmd_int_delay);
-> +       if (!of_property_read_u32(pdev->dev.of_node, "cmd-resp-sel",
-> +                                 &host->hs200_cmd_resp_sel))
-> +               dev_dbg(&pdev->dev, "host->hs200_cmd-resp-sel: %x\n",
-> +                       host->hs200_cmd_resp_sel);
-
-I suggest you take the oppotunity to move the MTK DTS parsing into its
-own function, include the existing parsing of the "hs400-ds-delay".
-This improve the readablitity of the code.
-
->         host->dev = &pdev->dev;
->         host->mmc = mmc;
->         host->src_clk_freq = clk_get_rate(host->src_clk);
-> @@ -1663,6 +1784,7 @@ static void msdc_save_reg(struct msdc_host *host)
->         host->save_para.patch_bit0 = readl(host->base + MSDC_PATCH_BIT);
->         host->save_para.patch_bit1 = readl(host->base + MSDC_PATCH_BIT1);
->         host->save_para.pad_ds_tune = readl(host->base + PAD_DS_TUNE);
-> +       host->save_para.pad_cmd_tune = readl(host->base + PAD_CMD_TUNE);
->         host->save_para.emmc50_cfg0 = readl(host->base + EMMC50_CFG0);
->  }
->
-> @@ -1675,6 +1797,7 @@ static void msdc_restore_reg(struct msdc_host *host)
->         writel(host->save_para.patch_bit0, host->base + MSDC_PATCH_BIT);
->         writel(host->save_para.patch_bit1, host->base + MSDC_PATCH_BIT1);
->         writel(host->save_para.pad_ds_tune, host->base + PAD_DS_TUNE);
-> +       writel(host->save_para.pad_cmd_tune, host->base + PAD_CMD_TUNE);
->         writel(host->save_para.emmc50_cfg0, host->base + EMMC50_CFG0);
->  }
->
-> --
-> 1.7.9.5
->
-
-Kind regards
-Uffe
+Thanks,
+-Christoffer
