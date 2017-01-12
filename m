@@ -1,30 +1,48 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Thu, 12 Jan 2017 14:07:52 +0100
-Subject: NVMe vs DMA addressing limitations
-In-Reply-To: <3306663.hKmLLq1hhl@wuerfel>
-References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
- <20170110144839.GB27156@lst.de>
- <80676b35-121b-0462-23fc-ed5608e1e671@grimberg.me>
- <3306663.hKmLLq1hhl@wuerfel>
-Message-ID: <20170112130752.GA14465@lst.de>
+From: uwe@kleine-koenig.org (=?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?=)
+Date: Thu, 12 Jan 2017 14:18:46 +0100
+Subject: CONFIG_PCIEASPM breaks PCIe on Marvell Armada 385 machine
+In-Reply-To: <20170111220235.GP14532@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170111194942.q5rdma2es6hkmxfe@perseus.defre.kleine-koenig.org>
+ <20170111220235.GP14532@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <9f48e2a8-e1e0-e3db-af48-12297f8521f2@kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 12:56:07PM +0100, Arnd Bergmann wrote:
-> That is an interesting question: We actually have the
-> "DMA_ATTR_NO_KERNEL_MAPPING" for this case, and ARM implements
-> it in the coherent interface, so that might be a good fit.
+On 01/11/2017 11:02 PM, Bjorn Helgaas wrote:
+> Hi Uwe,
+> 
+> On Wed, Jan 11, 2017 at 08:49:46PM +0100, Uwe Kleine-K?nig wrote:
+>> Hello,
+>>
+>> on an Marvell Armada 385 based machine (Turris Omnia) with 4.9 the
+>> ath10k driver fails to bind to the matching hardware if CONFIG_PCIEASPM
+>> is enabled:
+>>
+>> [...]
+> We have several open issues related to ASPM:
+> 
+>   https://bugzilla.kernel.org/show_bug.cgi?id=102311 ASPM: ASMEDA asm1062 not working
+>   https://bugzilla.kernel.org/show_bug.cgi?id=187731 Null pointer dereference in ASPM
+>   https://bugzilla.kernel.org/show_bug.cgi?id=189951 Enabling ASPM causes NIC performance issue
+>   https://bugzilla.kernel.org/show_bug.cgi?id=60111 NULL pointer deref in ASPM alloc_pcie_link_state()
+> 
+> I don't recognize yours as being one of these.  Can you open a new
+> issue and attach the complete dmesg log and "lspci -vv" output?
 
-Yes. my WIP HMB patch uses DMA_ATTR_NO_KERNEL_MAPPING, although I'm
-workin on x86 at the moment where it's a no-op.
+Done: https://bugzilla.kernel.org/show_bug.cgi?id=192441
 
-> Implementing it in the streaming API makes no sense since we
-> already have a kernel mapping here, but using a normal allocation
-> (possibly with DMA_ATTR_NON_CONSISTENT or DMA_ATTR_SKIP_CPU_SYNC,
-> need to check) might help on other architectures that have
-> limited amounts of coherent memory and no CMA.
+> Is this a regression?
 
-Though about that - but in the end DMA_ATTR_NO_KERNEL_MAPPING implies
-those, so instead of using lots of flags in driver I'd rather fix
-up more dma_ops implementations to take advantage of
-DMA_ATTR_NO_KERNEL_MAPPING.
+As written in the bug report this also happens on 4.7.
+
+Best regards
+Uwe
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170112/d9f681f1/attachment.sig>
