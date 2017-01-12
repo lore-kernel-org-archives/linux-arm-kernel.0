@@ -1,45 +1,39 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 12 Jan 2017 15:20:07 +0000
-Subject: [PATCH v3 0/3] arm64: dts: juno: CoreSight support updates
-Message-ID: <1484234410-7670-1-git-send-email-sudeep.holla@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 12 Jan 2017 16:24:20 +0100
+Subject: CONFIG_PCIEASPM breaks PCIe on Marvell Armada 385 machine
+In-Reply-To: <20170112150310.GA5746@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170111194942.q5rdma2es6hkmxfe@perseus.defre.kleine-koenig.org>
+ <20170111220235.GP14532@bhelgaas-glaptop.roam.corp.google.com>
+ <9f48e2a8-e1e0-e3db-af48-12297f8521f2@kleine-koenig.org>
+ <20170112150310.GA5746@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170112152420.GK13033@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+>   pci_bus 0000:00: root bus resource [mem 0xe0000000-0xe7ffffff]
+>   pci 0000:02:00.0: reg 0x10: [mem 0xe8000000-0xe81fffff 64bit]
+>   pci 0000:02:00.0: reg 0x30: [mem 0xe8200000-0xe820ffff pref]
+>   pci 0000:02:00.0: of_irq_parse_pci() failed with rc=134
+>   pci 0000:02:00.0: BAR 0: assigned [mem 0xe0000000-0xe01fffff 64bit]
+>   pci 0000:02:00.0: BAR 0: error updating (0xe0000004 != 0xffffffff)
+>   pci 0000:02:00.0: BAR 0: error updating (high 0x000000 != 0xffffffff)
+> 
+> 3) No idea what the of_irq_parse_pci() issue is.
 
-I just did some refactoring to reduced thge churn and duplication.
-Can you check if this work for you ? I could not give it much testing.
+134 is 0x86.
 
-Regards,
-Sudeep
+Could it be:
 
---->8
-Juno r1/r2 boards have different CoreSight infrastructure outside the
-CPU clusters. This patchset adds the additional coreSight components to
-separate .dtsi files to support these differences.
+#define PCIBIOS_DEVICE_NOT_FOUND        0x86
 
-v1->v2:
-	- moved the addition of the STM component into a separate patch
+pci-mvebu.c will return this in a few places, mvebu_pcie_wr_conf(),
+mvebu_pcie_rd_conf().
 
-v2->v3:
-	- moved the back the common coreSight components back into
-	  juno-base.dtsi
+Could this be
 
+rc = pci_read_config_byte(pdev, PCI_INTERRUPT_PIN, &pin);
 
-Mike Leach (2):
-  arm64: dts: juno: fix CoreSight support for Juno r1/r2 variants
-  arm64: dts: juno: add missing CoreSight STM component
+It looks like pci_read_config_byte() is expected to return a real
+errno value, and maybe it is returning PCIBIOS_DEVICE_NOT_FOUND?
 
-Sudeep Holla (1):
-  arm64: dts: juno: refactor CoreSight support on Juno r0
-
- arch/arm64/boot/dts/arm/juno-base.dtsi    |  31 ++++++---
- arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 102 ++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/arm/juno-r1.dts       |  13 ++++
- arch/arm64/boot/dts/arm/juno-r2.dts       |  13 ++++
- arch/arm64/boot/dts/arm/juno.dts          |  24 +++++++
- 5 files changed, 175 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
-
---
-2.7.4
+      Andrew
