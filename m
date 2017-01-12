@@ -1,56 +1,198 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 12 Jan 2017 16:48:08 +0000
-Subject: [PATCH v2 0/7] crypto: ARM/arm64 - AES and ChaCha20 updates for
- v4.11
-In-Reply-To: <20170112164504.GD20313@gondor.apana.org.au>
-References: <1484152915-26517-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170112164504.GD20313@gondor.apana.org.au>
-Message-ID: <CAKv+Gu9a5ZsWtT0XYczPBf54L7d5Whu5gG1eUOt8T-wms0orbg@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 12 Jan 2017 09:51:37 -0700
+Subject: [PATCH v3 2/3] arm64: dts: juno: fix CoreSight support for Juno
+ r1/r2 variants
+In-Reply-To: <1484234410-7670-3-git-send-email-sudeep.holla@arm.com>
+References: <1484234410-7670-1-git-send-email-sudeep.holla@arm.com>
+ <1484234410-7670-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CANLsYkymGdrM8z-ZWan0Fn+Ymq97oHAJtW3G0YdUAxpWSf+aaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 January 2017 at 16:45, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> On Wed, Jan 11, 2017 at 04:41:48PM +0000, Ard Biesheuvel wrote:
->> This adds ARM and arm64 implementations of ChaCha20, scalar AES and SIMD
->> AES (using bit slicing). The SIMD algorithms in this series take advantage
->> of the new skcipher walksize attribute to iterate over the input in the most
->> efficient manner possible.
->>
->> Patch #1 adds a NEON implementation of ChaCha20 for ARM.
->>
->> Patch #2 adds a NEON implementation of ChaCha20 for arm64.
->>
->> Patch #3 modifies the existing NEON and ARMv8 Crypto Extensions implementations
->> of AES-CTR to be available as a synchronous skcipher as well. This is intended
->> for the mac80211 code, which uses synchronous encapsulations of ctr(aes)
->> [ccm, gcm] in softirq context, during which arm64 supports use of SIMD code.
->>
->> Patch #4 adds a scalar implementation of AES for arm64, using the key schedule
->> generation routines and lookup tables of the generic code in crypto/aes_generic.
->>
->> Patch #5 does the same for ARM, replacing existing scalar code that originated
->> in the OpenSSL project, and contains redundant key schedule generation routines
->> and lookup tables (and is slightly slower on modern cores)
->>
->> Patch #6 replaces the ARM bit sliced NEON code with a new implementation that
->> has a number of advantages over the original code (which also originated in the
->> OpenSSL project.) The performance should be identical.
->>
->> Patch #7 adds a port of the ARM bit-sliced AES code to arm64, in ECB, CBC, CTR
->> and XTS modes.
->>
->> Due to the size of patch #7, it may be difficult to apply these patches from
->> patchwork, so I pushed them here as well:
+On 12 January 2017 at 08:20, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> From: Mike Leach <mike.leach@linaro.org>
 >
-> It seems to have made it.
+> The CoreSight support added for Juno is valid for only Juno r0.
+> The Juno r1 and r2 variants have additional components and alternative
+> connection routes between trace source and sinks.
 >
-> All applied.  Thanks.
+> This patch builds on top of the existing r0 support and extends it to
+> Juno r1/r2 variants.
+>
+> Signed-off-by: Mike Leach <mike.leach@linaro.org>
+> [sudeep.holla at arm.com: minor changelog update and reorganising the common
+>         coresight components back into juno-base.dtsi to avoid duplication]
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 102 ++++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/arm/juno-r1.dts       |   9 +++
+>  arch/arm64/boot/dts/arm/juno-r2.dts       |   9 +++
+>  3 files changed, 120 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+>
+> diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+> new file mode 100644
+> index 000000000000..89fcef366ff9
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+> @@ -0,0 +1,102 @@
+> +       csys1_funnel at 20130000 {
+> +               compatible = "arm,coresight-funnel", "arm,primecell";
+> +               reg = <0 0x20130000 0 0x1000>;
+> +
+> +               clocks = <&soc_smc50mhz>;
+> +               clock-names = "apb_pclk";
+> +               power-domains = <&scpi_devpd 0>;
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       /* input port */
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               csys1_funnel_out_port: endpoint {
+> +                                       remote-endpoint =
+> +                                               <&etf1_in_port>;
+> +                               };
+> +                       };
+> +
+> +                       /* output port */
+> +                       port at 1 {
+> +                               reg = <0>;
+> +                               csys1_funnel_in_port0: endpoint {
+> +                                       slave-mode;
+> +                               };
+> +                       };
 
-Actually, patch #6 was the huge one not #7, and I don't see it in your tree yet.
+The comments related to the input and output port are reversed.
 
-https://git.kernel.org/cgit/linux/kernel/git/ardb/linux.git/commit/?h=crypto-arm-v4.11&id=cbf03b255f7c
-
-The order does not matter, though, so could you please put it on top? Thanks.
-
--- 
-Ard.
+> +
+> +               };
+> +       };
+> +
+> +       etf1 at 20140000 {
+> +               compatible = "arm,coresight-tmc", "arm,primecell";
+> +               reg = <0 0x20140000 0 0x1000>;
+> +
+> +               clocks = <&soc_smc50mhz>;
+> +               clock-names = "apb_pclk";
+> +               power-domains = <&scpi_devpd 0>;
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       /* input port */
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               etf1_in_port: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint =
+> +                                               <&csys1_funnel_out_port>;
+> +                               };
+> +                       };
+> +
+> +                       /* output port */
+> +                       port at 1 {
+> +                               reg = <0>;
+> +                               etf1_out_port: endpoint {
+> +                                       remote-endpoint =
+> +                                               <&csys2_funnel_in_port1>;
+> +                               };
+> +                       };
+> +               };
+> +       };
+> +
+> +       csys2_funnel at 20150000 {
+> +               compatible = "arm,coresight-funnel", "arm,primecell";
+> +               reg = <0 0x20150000 0 0x1000>;
+> +
+> +               clocks = <&soc_smc50mhz>;
+> +               clock-names = "apb_pclk";
+> +               power-domains = <&scpi_devpd 0>;
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       /* output port */
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               csys2_funnel_out_port: endpoint {
+> +                                       remote-endpoint =
+> +                                               <&replicator_in_port0>;
+> +                               };
+> +                       };
+> +
+> +                       /* input ports */
+> +                       port at 1 {
+> +                               reg = <0>;
+> +                               csys2_funnel_in_port0: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&etf0_out_port>;
+> +                               };
+> +                       };
+> +
+> +                       port at 2 {
+> +                               reg = <1>;
+> +                               csys2_funnel_in_port1: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&etf1_out_port>;
+> +                               };
+> +                       };
+> +
+> +               };
+> +       };
+> diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+> index eec37feee8fc..d4b85d9d343e 100644
+> --- a/arch/arm64/boot/dts/arm/juno-r1.dts
+> +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+> @@ -178,6 +178,7 @@
+>         };
+>
+>         #include "juno-base.dtsi"
+> +       #include "juno-cs-r1r2.dtsi"
+>  };
+>
+>  &memtimer {
+> @@ -227,3 +228,11 @@
+>  &gpu1_thermal_zone {
+>         status = "okay";
+>  };
+> +
+> +&etf0_out_port {
+> +       remote-endpoint = <&csys2_funnel_in_port0>;
+> +};
+> +
+> +&replicator_in_port0 {
+> +       remote-endpoint = <&csys2_funnel_out_port>;
+> +};
+> diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts b/arch/arm64/boot/dts/arm/juno-r2.dts
+> index 28f40ec44090..14b29517065c 100644
+> --- a/arch/arm64/boot/dts/arm/juno-r2.dts
+> +++ b/arch/arm64/boot/dts/arm/juno-r2.dts
+> @@ -178,6 +178,7 @@
+>         };
+>
+>         #include "juno-base.dtsi"
+> +       #include "juno-cs-r1r2.dtsi"
+>  };
+>
+>  &memtimer {
+> @@ -227,3 +228,11 @@
+>  &gpu1_thermal_zone {
+>         status = "okay";
+>  };
+> +
+> +&etf0_out_port {
+> +       remote-endpoint = <&csys2_funnel_in_port0>;
+> +};
+> +
+> +&replicator_in_port0 {
+> +       remote-endpoint = <&csys2_funnel_out_port>;
+> +};
+> --
+> 2.7.4
+>
+> _______________________________________________
+> CoreSight mailing list
+> CoreSight at lists.linaro.org
+> https://lists.linaro.org/mailman/listinfo/coresight
