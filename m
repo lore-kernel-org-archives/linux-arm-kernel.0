@@ -1,61 +1,139 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 12 Jan 2017 18:17:13 +0100
-Subject: [PATCH 1/5] arm: sunxi: add support for V3s SoC
-In-Reply-To: <2706391484163632@web1g.yandex.ru>
-References: <20170103151629.19447-1-icenowy@aosc.xyz>
- <20170103151629.19447-2-icenowy@aosc.xyz>
- <20170110180926.ilqtygttpfgbetvu@lukather>
- <2706391484163632@web1g.yandex.ru>
-Message-ID: <20170112171713.vzlhoak3ykr3aomp@lukather>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Thu, 12 Jan 2017 17:18:25 +0000
+Subject: [kvm-unit-tests PATCH 1/6] libcflat: add PRI(dux)32 format types
+In-Reply-To: <20170112165629.nbczamlqlpsqaauh@hawk.localdomain>
+References: <20170111162841.15569-1-alex.bennee@linaro.org>
+ <20170111162841.15569-2-alex.bennee@linaro.org>
+ <4286b719-ff75-d2cd-68b5-cb9d9bb89553@redhat.com>
+ <20170112165629.nbczamlqlpsqaauh@hawk.localdomain>
+Message-ID: <87fuko2o4e.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1;4601;0c
-On Thu, Jan 12, 2017 at 03:40:32AM +0800, Icenowy Zheng wrote:
-> 
-> 
-> 11.01.2017, 02:09, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> > On Tue, Jan 03, 2017 at 11:16:25PM +0800, Icenowy Zheng wrote:
-> >> ?Allwinner V3s is a low-end single-core Cortex-A7 SoC, with 64MB
-> >> ?integrated DRAM, and several peripherals.
-> >>
-> >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> >> ?---
-> >> ??Documentation/arm/sunxi/README | 4 ++++
-> >> ??arch/arm/mach-sunxi/sunxi.c | 1 +
-> >> ??2 files changed, 5 insertions(+)
-> >>
-> >> ?diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
-> >> ?index cd0243302bc1..91ec8f2055be 100644
-> >> ?--- a/Documentation/arm/sunxi/README
-> >> ?+++ b/Documentation/arm/sunxi/README
-> >> ?@@ -67,6 +67,10 @@ SunXi family
-> >> ??????????+ Datasheet
-> >> ????????????http://dl.linux-sunxi.org/H3/Allwinner_H3_Datasheet_V1.0.pdf
-> >>
-> >> ?+ - Allwinner V3s (sun8i)
-> >> ?+ + Datasheet
-> >> ?+ https://www.goprawn.com/forum/allwinner-cams/783-allwinner-v3s-soc-datasheet
-> >> ?+
-> >
-> > Please don't put random links in there, but at least something that we
-> > know will be there in a couple of weeks/monthes/years
-> 
-> Is http://linux-sunxi.org/File:Allwinner_V3s_Datasheet_V1.0.pdf acceptable?
 
-It's much better, yes.
+Andrew Jones <drjones@redhat.com> writes:
 
-Thanks!
-Maxime
+> On Thu, Jan 12, 2017 at 01:29:24PM +0100, Paolo Bonzini wrote:
+>>
+>>
+>> On 11/01/2017 17:28, Alex Benn?e wrote:
+>> > So we can have portable formatting of uint32_t types. However there is
+>> > a catch. Different compilers can use legally subtly different types
+>> > though so we need to probe the compiler defined intdef.h first.
+>>
+>> Interesting, what platform has long uint32_t?  I thought the issue was
+>> whether 64-bit is long or "long long".
+>>
+>> Paolo
+>>
+>> > Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> > ---
+>> >  Makefile       |  1 +
+>> >  configure      | 13 +++++++++++++
+>> >  lib/libcflat.h |  9 +++++++++
+>> >  3 files changed, 23 insertions(+)
+>> >
+>> > diff --git a/Makefile b/Makefile
+>> > index a32333b..9822d9a 100644
+>> > --- a/Makefile
+>> > +++ b/Makefile
+>> > @@ -55,6 +55,7 @@ CFLAGS += $(fomit_frame_pointer)
+>> >  CFLAGS += $(fno_stack_protector)
+>> >  CFLAGS += $(fno_stack_protector_all)
+>> >  CFLAGS += $(wno_frame_address)
+>> > +CFLAGS += $(if $(U32_LONG_FMT),-D__U32_LONG_FMT__,)
+>> >
+>> >  CXXFLAGS += $(CFLAGS)
+>> >
+>> > diff --git a/configure b/configure
+>> > index 995c8fa..127868c 100755
+>> > --- a/configure
+>> > +++ b/configure
+>> > @@ -109,6 +109,18 @@ if [ -f $testdir/run ]; then
+>> >      ln -fs $testdir/run $testdir-run
+>> >  fi
+>> >
+>> > +# check if uint32_t needs a long format modifier
+>> > +cat << EOF > lib_test.c
+>> > +#include <inttypes.h>
+>> > +EOF
+>> > +
+>> > +$cross_prefix$cc lib_test.c -E | grep "typedef" | grep "long" | grep "uint32_t" &> /dev/null
+>
+> This won't work with cross compilers that don't have inttypes.h in their
+> path (like mine). How about something like
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170112/acac9672/attachment.sig>
+Hmm good point, in my case inttypes.h came from the libnewlib-dev package.
+
+>
+>  cat << EOF > lib_test.c
+>  __UINT32_TYPE__
+>  EOF
+>  u32_long="`aarch64-linux-gnu-gcc lib_test.c -E | awk '/unsigned/ && $2 == "long"'`"
+
+Hmm it is not clear from the docs if this is a GCCism. If it is do we
+care? Also the docs do say:
+
+"Some of these macros may not be defined on particular systems if GCC does not provide a stdint.h header on those systems. "
+
+> Although I feel there should be a compiler macro way to do this without
+> a need for configure/makefile trickery at all...
+
+I did ask our toolchain bods. They started going on about potential
+solutions using _Generic but I fear that might be worse in this case!
+
+>
+> Thanks,
+> drew
+>
+>
+>> > +exit=$?
+>> > +if [ $exit -eq 0 ]; then
+>> > +    u32_long=true
+>> > +fi
+>> > +rm -f lib_test.c
+>> > +
+>> >  # check for dependent 32 bit libraries
+>> >  if [ "$arch" != "arm" ]; then
+>> >  cat << EOF > lib_test.c
+>> > @@ -155,4 +167,5 @@ TEST_DIR=$testdir
+>> >  FIRMWARE=$firmware
+>> >  ENDIAN=$endian
+>> >  PRETTY_PRINT_STACKS=$pretty_print_stacks
+>> > +U32_LONG_FMT=$u32_long
+>> >  EOF
+>> > diff --git a/lib/libcflat.h b/lib/libcflat.h
+>> > index 380395f..e80fc50 100644
+>> > --- a/lib/libcflat.h
+>> > +++ b/lib/libcflat.h
+>> > @@ -58,12 +58,21 @@ typedef _Bool		bool;
+>> >  #define true  1
+>> >
+>> >  #if __SIZEOF_LONG__ == 8
+>> > +#  define __PRI32_PREFIX
+>> >  #  define __PRI64_PREFIX	"l"
+>> >  #  define __PRIPTR_PREFIX	"l"
+>> >  #else
+>> > +#if defined(__U32_LONG_FMT__)
+>> > +#  define __PRI32_PREFIX        "l"
+>> > +#else
+>> > +#  define __PRI32_PREFIX
+>> > +#endif
+>> >  #  define __PRI64_PREFIX	"ll"
+>> >  #  define __PRIPTR_PREFIX
+>> >  #endif
+>> > +#define PRId32  __PRI32_PREFIX	"d"
+>> > +#define PRIu32  __PRI32_PREFIX	"u"
+>> > +#define PRIx32  __PRI32_PREFIX	"x"
+>> >  #define PRId64  __PRI64_PREFIX	"d"
+>> >  #define PRIu64  __PRI64_PREFIX	"u"
+>> >  #define PRIx64  __PRI64_PREFIX	"x"
+>> >
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe kvm" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+--
+Alex Benn?e
