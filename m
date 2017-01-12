@@ -1,50 +1,95 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 12 Jan 2017 08:34:20 +0200
-Subject: [PATCH] arm64: dts: exynos: Replace small letter of base
- address/offset on Exynos5433
-In-Reply-To: <CAGTfZH0H_kA9cRPG4Vqh3iLZncfXqfKDFiSYEXV1zp+9yFP25Q@mail.gmail.com>
-References: <CGME20170111005552epcas1p4a1f6ed88022b46544dec4b3801583267@epcas1p4.samsung.com>
- <1484096148-17120-1-git-send-email-cw00.choi@samsung.com>
- <20170111162613.lxkc7k75f6q3fsz2@kozik-lap>
- <CAGTfZH0H_kA9cRPG4Vqh3iLZncfXqfKDFiSYEXV1zp+9yFP25Q@mail.gmail.com>
-Message-ID: <CAJKOXPd3bXWVP5p=vrbsuTaRaLpA+_StG4QW4LCpRbsrhOTuPg@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Thu, 12 Jan 2017 07:41:57 +0100
+Subject: [PATCH 1/1] iommu/arm-smmu: Fix for ThunderX erratum #27704
+In-Reply-To: <2c048126-a4d6-16af-987a-3174401a3960@arm.com>
+References: <1484135507-24872-1-git-send-email-tn@semihalf.com>
+ <2c048126-a4d6-16af-987a-3174401a3960@arm.com>
+Message-ID: <b0eb1127-182e-63e3-6dd4-c3b40228b909@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 11:22 PM, Chanwoo Choi <cwchoi00@gmail.com> wrote:
-> 2017-01-12 1:26 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
->> On Wed, Jan 11, 2017 at 09:55:48AM +0900, Chanwoo Choi wrote:
->>> This patch replaces the small letter of base address, offset and hex value
->>> with the capital letter to keep the consistency on Exynos5433.
->>>
->>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>> ---
->>>  arch/arm64/boot/dts/exynos/exynos5433.dtsi | 14 +++++++-------
->>>  1 file changed, 7 insertions(+), 7 deletions(-)
->>>
->>> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
->>> index abaf6b4d599d..d7ed1a68b6fd 100644
->>> --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
->>> +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
->>> @@ -231,7 +231,7 @@
->>>               compatible = "arm,psci";
->>>               method = "smc";
->>>               cpu_off = <0x84000002>;
->>> -             cpu_on = <0xC4000003>;
->>> +             cpu_on = <0xc4000003>;
+On 11.01.2017 13:19, Robin Murphy wrote:
+> On 11/01/17 11:51, Tomasz Nowicki wrote:
+>> The goal of erratum #27704 workaround was to make sure that ASIDs and VMIDs
+>> are unique across all SMMU instances on affected Cavium systems.
 >>
->> There is no point of such "improvements". This is just unnecessary
->> churn.
+>> Currently, the workaround code partitions ASIDs and VMIDs by increasing
+>> global cavium_smmu_context_count which in turn becomes the base ASID and VMID
+>> value for the given SMMU instance upon the context bank initialization.
 >>
->> Sometimes such things are accepted as part of some bigger work (vide
->> recent Andrzej's sysmmu for HDMI/TV). But on its own? No sense at all.
+>> For systems with multiple SMMU instances this approach implies the risk
+>> of crossing 8-bit ASID, like for CN88xx capable of 4 SMMUv2, 128 context bank each:
+>> SMMU_0 (0-127 ASID RANGE)
+>> SMMU_1 (127-255 ASID RANGE)
+>> SMMU_2 (256-383 ASID RANGE) <--- crossing 8-bit ASID
+>> SMMU_3 (384-511 ASID RANGE) <--- crossing 8-bit ASID
 >
-> Do you mean that this patch is not reasonable? or
-> The modification of cpu_on property is only not reasonable?
+> I could swear that at some point in the original discussion it was said
+> that the TLBs were only shared between pairs of SMMUs, so in fact 0/1
+> and 2/3 are independent of each other
+
+Indeed TLBs are only shared between pairs of SMMUs but the workaround 
+makes sure ASIDs are unique across all SMMU instances so we do not have 
+to bother about SMMUs probe order.
+
+  - out of interest, have you
+> managed to hit an actual problem in practice or is this patch just by
+> inspection?
+
+Except SMMU0/1 devices all other devices under other SMMUs will fail on 
+guest power off/on. Since we try to invalidate tlb with 16bit ASID but 
+we actually have 8 bit zero padded 16 bit entry.
+
 >
-> It is simple for the consistency to use the hex value in dts file.
+> Of course, depending on the SMMUs to probe in the right order isn't
+> particularly robust, so it's still probably a worthwhile change.
+>
+>> Since we use 8-bit ASID now we effectively misconfigure ASID[15:8] bits for
+>> SMMU_CBn_TTBRm register. Also, we still use non-zero ASID[15:8] bits
+>> upon context invalidation. This patch adds 16-bit ASID support for stage-1
+>> AArch64 contexts for Cavium SMMUv2 model so that we use ASIDs consistently.
+>>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> ---
+>>  drivers/iommu/arm-smmu.c | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index a60cded..ae8f059 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -260,6 +260,7 @@ enum arm_smmu_s2cr_privcfg {
+>>
+>>  #define TTBCR2_SEP_SHIFT		15
+>>  #define TTBCR2_SEP_UPSTREAM		(0x7 << TTBCR2_SEP_SHIFT)
+>> +#define TTBCR2_AS			(1 << 4)
+>>
+>>  #define TTBRn_ASID_SHIFT		48
+>>
+>> @@ -778,6 +779,9 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+>>  			reg = pgtbl_cfg->arm_lpae_s1_cfg.tcr;
+>>  			reg2 = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
+>>  			reg2 |= TTBCR2_SEP_UPSTREAM;
+>> +			if (smmu->model == CAVIUM_SMMUV2 &&
+>
+> I'd be inclined to say "smmu->version == ARM_SMMU_V2" there, rather than
+> make it Cavium-specific - we enable 16-bit VMID unconditionally where
+> supported, so I don't see any reason not to handle 16-bit ASIDs in the
+> same manner.
 
-The patch is not reasonable (as sent alone).
+I agree, I will enable 16-bit ASID for ARM_SMMU_V2.
 
-Best regards,
-Krzysztof
+>
+>> +			    cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
+>> +				reg2 |= TTBCR2_AS;
+>>  		}
+>>  		if (smmu->version > ARM_SMMU_V1)
+>>  			writel_relaxed(reg2, cb_base + ARM_SMMU_CB_TTBCR2);
+>>
+>
+> Either way:
+>
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Thanks Robin!
+
+Tomasz
