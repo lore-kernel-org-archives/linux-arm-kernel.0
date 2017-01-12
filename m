@@ -1,31 +1,63 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 12 Jan 2017 18:04:21 +0100
-Subject: [kvm-unit-tests PATCH 3/6] docs: move README to README.md and
- symlink
-In-Reply-To: <20170111162841.15569-4-alex.bennee@linaro.org>
-References: <20170111162841.15569-1-alex.bennee@linaro.org>
- <20170111162841.15569-4-alex.bennee@linaro.org>
-Message-ID: <20170112170421.kr4jlyjzavifu2f6@hawk.localdomain>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 12 Jan 2017 17:06:30 +0000
+Subject: [RFC 06/13] KVM: arm64: ITS: Expose ITT_Entry_Size in GITS_TYPER
+In-Reply-To: <1484236613-24633-7-git-send-email-eric.auger@redhat.com>
+References: <1484236613-24633-1-git-send-email-eric.auger@redhat.com>
+ <1484236613-24633-7-git-send-email-eric.auger@redhat.com>
+Message-ID: <3efc34ee-36c1-860a-365a-a9363b7fc8e5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 04:28:38PM +0000, Alex Benn?e wrote:
-> This allows a slightly nicer formatting of the text when displayed on
-> some repository hosts. We keep a symlink from README for the
-> old-school purists.
+Hi Eric,
+
+On 12/01/17 15:56, Eric Auger wrote:
+> An ITT_Entry_Size of 2x8Bytes is reported to the guest
+> to provision for ITTE state storage.
 > 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
 > ---
->  README    | 69 +----------------------------------------------------
->  README.md | 81 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 82 insertions(+), 68 deletions(-)
->  mode change 100644 => 120000 README
->  create mode 100644 README.md
+>  include/linux/irqchip/arm-gic-v3.h | 1 +
+>  virt/kvm/arm/vgic/vgic-its.c       | 3 +++
+>  2 files changed, 4 insertions(+)
+> 
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index 170e00a..8cfd81bc 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -233,6 +233,7 @@
+>  #define GITS_CTLR_QUIESCENT		(1U << 31)
+>  
+>  #define GITS_TYPER_PLPIS		(1UL << 0)
+> +#define GITS_TYPER_ITT_ENTRY_SIZE_SHIFT	4
+>  #define GITS_TYPER_IDBITS_SHIFT		8
+>  #define GITS_TYPER_DEVBITS_SHIFT	13
+>  #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index e174220..96378b8 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -33,6 +33,8 @@
+>  #include "vgic.h"
+>  #include "vgic-mmio.h"
+>  
+> +#define ITTE_SIZE 16
+> +
+>  /*
+>   * Creates a new (reference to a) struct vgic_irq for a given LPI.
+>   * If this LPI is already mapped on another ITS, we increase its refcount
+> @@ -399,6 +401,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
+>  	 */
+>  	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
+>  	reg |= 0x0f << GITS_TYPER_IDBITS_SHIFT;
+> +	reg |= ITTE_SIZE << GITS_TYPER_ITT_ENTRY_SIZE_SHIFT;
 
-Please use 'format-patch -M' to create patches when renaming files.
-I'm not sure I care about having a .md version or not, but only
-one README* file in the root dir would be my preference, i.e. if we
-want a .md version, then let's just have that, i.e no symlink.
+The field is defined as the "... number of bytes per translation table
+entry, minus one.". So it should be: (ITTE_SIZE - 1) << ...
 
-Thanks,
-drew
+Cheers,
+Andre.
+
+>  
+>  	return extract_bytes(reg, addr & 7, len);
+>  }
+> 
