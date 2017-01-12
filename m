@@ -1,120 +1,81 @@
-From: steve_longerbeam@mentor.com (Steve Longerbeam)
-Date: Wed, 11 Jan 2017 19:22:54 -0800
-Subject: [PATCH v3 00/24] i.MX Media Driver
-In-Reply-To: <CAJ+vNU2zU++Xam_UpDPfmSQhauhhS3_z8L-+ww6o-D9brWhiwA@mail.gmail.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <CAJ+vNU2zU++Xam_UpDPfmSQhauhhS3_z8L-+ww6o-D9brWhiwA@mail.gmail.com>
-Message-ID: <afe51f5f-03dd-4092-9ec0-297afb1453c7@mentor.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 11 Jan 2017 19:41:14 -0800
+Subject: [PATCH net-next v2 03/10] net: dsa: Suffix function manipulating
+ device_node with _dn
+In-Reply-To: <20170112034121.27697-1-f.fainelli@gmail.com>
+References: <20170112034121.27697-1-f.fainelli@gmail.com>
+Message-ID: <20170112034121.27697-4-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim,
+Make it clear that these functions take a device_node structure pointer
 
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ net/dsa/dsa2.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-On 01/11/2017 03:14 PM, Tim Harvey wrote:
->
-> <snip>
->
-> Hi Steve,
->
-> I took a stab at testing this today on a gw51xx which has an adv7180
-> hooked up as follows:
-> - i2c3 at 0x20
-> - 8bit data bus from DAT12 to DAT19, HSYNC, VSYNC, PIXCLK on CSI0 pads
-> (CSI0_IPU1)
-> - PWRDWN# on MX6QDL_PAD_CSI0_DATA_EN__GPIO5_IO20
-> - IRQ# on MX6QDL_PAD_CSI0_DAT5__GPIO5_IO23
-> - all three analog inputs available to off-board connector
->
-> My patch to the imx6qdl-gw51xx dtsi is:
-
-As long as you used the patch to imx6qdl-sabreauto.dtsti that adds
-the adv7180 support as a guide, you should be ok here.
-
-> <snip>
->
->
->
-> On an IMX6Q I'm getting the following when the adv7180 module loads:
-> [   12.862477] adv7180 2-0020: chip found @ 0x20 (21a8000.i2c)
-> [   12.907767] imx-media: Registered subdev adv7180 2-0020
-> [   12.907793] imx-media soc:media at 0: Entity type for entity adv7180
-> 2-0020 was not initialized!
-> [   12.907867] imx-media: imx_media_create_link: adv7180 2-0020:0 ->
-> ipu1_csi0_mux:1
->
-> Is the warning that adv7180 was not initialized expected and or an issue?
-
-Yeah it's still a bug in the adv7180 driver, needs fixing.
-
->
-> Now that your driver is hooking into the current media framework, I'm
-> not at all clear on how to link and configure the media entities.
-
-It's all documented at Documentation/media/v4l-drivers/imx.rst.
-Follow the SabreAuto pipeline setup example.
-
-
-
-> <snip>
->
->
-> Additionally I've found that on an IMX6S/IMX6DL we crash while
-> registering the media-ic subdev's:
-> [    3.975473] imx-media: Registered subdev ipu1_csi1_mux
-> [    3.980921] imx-media: Registered subdev ipu1_csi0_mux
-> [    4.003205] imx-media: Registered subdev ipu1_ic_prpenc
-> [    4.025373] imx-media: Registered subdev ipu1_ic_prpvf
-> [    4.037944] ------------[ cut here ]------------
-> [    4.042571] Kernel BUG at c06717dc [verbose debug info unavailable]
-> [    4.048845] Internal error: Oops - BUG: 0 [#1] SMP ARM
-> [    4.053990] Modules linked in:
-> [    4.057076] CPU: 1 PID: 1 Comm: swapper/0 Not tainted
-> 4.9.0-rc6-00524-g84dad6e-dirty #446
-> [    4.065260] Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
-> ...
-> [    4.296250] [<c0671780>] (v4l2_subdev_init) from [<c06fb02c>]
-> (imx_ic_probe+0x94/0x1ac)
-> [    4.304271] [<c06faf98>] (imx_ic_probe) from [<c05173d8>]
-> (platform_drv_probe+0x54/0xb8)
-> [    4.312373]  r9:c0d5e858 r8:00000000 r7:fffffdfb r6:c0e5dbf8
-> r5:da603810 r4:c16738d8
-> [    4.320129] [<c0517384>] (platform_drv_probe) from [<c0515978>]
-> (driver_probe_device+0x20c/0x2c0)
-> [    4.329010]  r7:c0e5dbf8 r6:00000000 r5:da603810 r4:c16738d8
-> [    4.334681] [<c051576c>] (driver_probe_device) from [<c0515af4>]
-> (__driver_attach+0xc8/0xcc)
-> [    4.343129]  r9:c0d5e858 r8:00000000 r7:00000000 r6:da603844
-> r5:c0e5dbf8 r4:da603810
-> [    4.350889] [<c0515a2c>] (__driver_attach) from [<c0513adc>]
-> (bus_for_each_dev+0x74/0xa8)
-> [    4.359078]  r7:00000000 r6:c0515a2c r5:c0e5dbf8 r4:00000000
-> [    4.364753] [<c0513a68>] (bus_for_each_dev) from [<c05151d4>]
-> (driver_attach+0x20/0x28)
->
-> I assume there is an iteration that needs a test on a missing pointer
-> only available on chips with both IPU's or PRP
-
-Yep, I only have quad boards here so I haven't gotten around to
-testing on S/DL.
-
-But it looks like I forgot to clear out the csi subdev pointer array before
-passing it to imx_media_of_parse(). I think that might explain the OOPS
-above. Try this patch:
-
-diff --git a/drivers/staging/media/imx/imx-media-dev.c 
-b/drivers/staging/media/imx/imx-media-dev.c
-index 357654d..0cf2d61 100644
---- a/drivers/staging/media/imx/imx-media-dev.c
-+++ b/drivers/staging/media/imx/imx-media-dev.c
-@@ -379,7 +379,7 @@ static int imx_media_probe(struct platform_device *pdev)
-  {
-         struct device *dev = &pdev->dev;
-         struct device_node *node = dev->of_node;
--       struct imx_media_subdev *csi[4];
-+       struct imx_media_subdev *csi[4] = {0};
-         struct imx_media_dev *imxmd;
-         int ret;
-
-
-Steve
+diff --git a/net/dsa/dsa2.c b/net/dsa/dsa2.c
+index 6e3675220fef..04ab62251fe3 100644
+--- a/net/dsa/dsa2.c
++++ b/net/dsa/dsa2.c
+@@ -94,8 +94,8 @@ static bool dsa_port_is_cpu(struct dsa_port *port)
+ 	return !!of_parse_phandle(port->dn, "ethernet", 0);
+ }
+ 
+-static bool dsa_ds_find_port(struct dsa_switch *ds,
+-			     struct device_node *port)
++static bool dsa_ds_find_port_dn(struct dsa_switch *ds,
++				struct device_node *port)
+ {
+ 	u32 index;
+ 
+@@ -105,8 +105,8 @@ static bool dsa_ds_find_port(struct dsa_switch *ds,
+ 	return false;
+ }
+ 
+-static struct dsa_switch *dsa_dst_find_port(struct dsa_switch_tree *dst,
+-					    struct device_node *port)
++static struct dsa_switch *dsa_dst_find_port_dn(struct dsa_switch_tree *dst,
++					       struct device_node *port)
+ {
+ 	struct dsa_switch *ds;
+ 	u32 index;
+@@ -116,7 +116,7 @@ static struct dsa_switch *dsa_dst_find_port(struct dsa_switch_tree *dst,
+ 		if (!ds)
+ 			continue;
+ 
+-		if (dsa_ds_find_port(ds, port))
++		if (dsa_ds_find_port_dn(ds, port))
+ 			return ds;
+ 	}
+ 
+@@ -137,7 +137,7 @@ static int dsa_port_complete(struct dsa_switch_tree *dst,
+ 		if (!link)
+ 			break;
+ 
+-		dst_ds = dsa_dst_find_port(dst, link);
++		dst_ds = dsa_dst_find_port_dn(dst, link);
+ 		of_node_put(link);
+ 
+ 		if (!dst_ds)
+@@ -546,7 +546,7 @@ static int dsa_parse_ports_dn(struct device_node *ports, struct dsa_switch *ds)
+ 	return 0;
+ }
+ 
+-static int dsa_parse_member(struct device_node *np, u32 *tree, u32 *index)
++static int dsa_parse_member_dn(struct device_node *np, u32 *tree, u32 *index)
+ {
+ 	int err;
+ 
+@@ -592,7 +592,7 @@ static int _dsa_register_switch(struct dsa_switch *ds, struct device *dev)
+ 	u32 tree, index;
+ 	int i, err;
+ 
+-	err = dsa_parse_member(np, &tree, &index);
++	err = dsa_parse_member_dn(np, &tree, &index);
+ 	if (err)
+ 		return err;
+ 
+-- 
+2.9.3
