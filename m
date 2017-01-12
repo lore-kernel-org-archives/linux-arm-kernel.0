@@ -1,76 +1,32 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 12 Jan 2017 13:09:30 +0530
-Subject: [PATCH v2 5/5] ARM: dts: Add LEGO MINDSTORMS EV3 dts
-In-Reply-To: <1dd57ac3-554f-7d66-97b0-b76c3ddc7854@lechnology.com>
-References: <1483677228-2325-1-git-send-email-david@lechnology.com>
- <1483677228-2325-6-git-send-email-david@lechnology.com>
- <e8136b8a-b8f7-7b1b-693a-955dc17f1de9@ti.com>
- <1dd57ac3-554f-7d66-97b0-b76c3ddc7854@lechnology.com>
-Message-ID: <7d48023a-f6b3-c543-0ec5-131f1f1e99b8@ti.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 12 Jan 2017 13:48:16 +0530
+Subject: [PATCH v2 3/3] phy: rockchip-inno-usb2: Set EXTCON_USB when
+ EXTCON_CHG_USB_SDP was set
+In-Reply-To: <CAMz4ku+X8v2HH5L_fS60naNTqR1ZFKYeWuXuHqjg0UsHQq1dsQ@mail.gmail.com>
+References: <7b9836ce2ca34118a2acd1ea113605a5f13b4439.1482307697.git.baolin.wang@linaro.org>
+ <23666cc1a5ff123ece5bdbb9821d1eab280d0927.1482307697.git.baolin.wang@linaro.org>
+ <CAMz4kuJP9Q7Ly4uRBjCFU32YzbVbnsGyk+wHc+M=g8W=uDBsEQ@mail.gmail.com>
+ <CAMz4ku+X8v2HH5L_fS60naNTqR1ZFKYeWuXuHqjg0UsHQq1dsQ@mail.gmail.com>
+Message-ID: <58773BC8.2050808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 January 2017 09:55 PM, David Lechner wrote:
+Hi,
 
->>> +&spi0 {
->>> +    status = "okay";
->>> +    pinctrl-names = "default";
->>> +    pinctrl-0 = <&spi0_pins>, <&spi0_cs0_pin>, <&spi0_cs3_pin>;
->>> +
->>> +    flash at 0 {
->>> +        compatible = "n25q128a13", "jedec,spi-nor";
->>> +        reg = <0>;
->>> +        spi-max-frequency = <50000000>;
->>> +        ti,spi-wdelay = <8>;
->>> +
->>> +        /* Partitions are based on the official firmware from LEGO */
->>> +        partitions {
->>> +            #address-cells = <1>;
->>> +            #size-cells = <1>;
->>> +            partition at 0 {
->>> +                label = "U-Boot";
->>> +                reg = <0 0x40000>;
->>> +            };
->>> +
->>> +            partition at 40000 {
->>> +                label = "U-Boot Env";
->>> +                reg = <0x40000 0x10000>;
->>> +            };
->>> +
->>> +            partition at 50000 {
->>> +                label = "Kernel";
->>> +                reg = <0x50000 0x200000>;
->>> +            };
->>> +
->>> +            partition at 250000 {
->>> +                label = "Filesystem";
->>> +                reg = <0x250000 0xa50000>;
->>> +            };
->>> +
->>> +            partition at cb0000 {
->>> +                label = "Storage";
->>> +                reg = <0xcb0000 0x2f0000>;
->>> +            };
->>> +        };
->>> +    };
->>> +
->>> +    adc at 3 {
->>> +        compatible = "ti-ads7957";
+On Thursday 12 January 2017 12:13 PM, Baolin Wang wrote:
+> On 3 January 2017 at 13:54, Baolin Wang <baolin.wang@linaro.org> wrote:
+>> Hi Kison and Heiko,
 >>
->> So looks like this works because of_register_spi_device() sets up
->> modalias of spi device from compatible string. I am fine with it, just
->> highlighting it here to make sure this is acceptable practice. I did not
->> really find any precedence for using SPI device name as compatible
->> property in existing DTS files.
-> 
-> Indeed. It looks like this sort of "trivial" device binding is just used
-> for i2c devices. I will submit some patches to add proper device tree
-> bindings and change this to "ti,ads7957".
+>> On 21 December 2016 at 16:12, Baolin Wang <baolin.wang@linaro.org> wrote:
+>>> According to the documentation, we should set the EXTCON_USB when
+>>> one SDP charger connector was reported.
+>>>
+>>> Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+>>> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>
+>> Could you apply this patch if there are no other comments? Thanks.
 
-Alright, if you are going to do that, then I suggest you respin this
-patch with the adc node dropped for now. That way we can ensure basic
-board support in v4.11. If dependencies pan out, the adc can go in too
-as a separate patch.
+Does it fix something? Or else it can go in the next merge window.
 
-Thanks,
-Sekhar
+Thanks
+Kishon
