@@ -1,25 +1,40 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Thu, 12 Jan 2017 02:12:39 +0200
-Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device managed
- functions
-In-Reply-To: <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Thu, 12 Jan 2017 02:13:45 +0200
+Subject: [PATCH 44/62] watchdog: pnx4008_wdt: Convert to use device
+ managed functions
+In-Reply-To: <1484095516-12720-14-git-send-email-linux@roeck-us.net>
 References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
- <1484100561-17638-1-git-send-email-linux@roeck-us.net>
- <1484100561-17638-5-git-send-email-linux@roeck-us.net>
- <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
- <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
-Message-ID: <CAHp75VfUUJaCLXgZ+jNj18ZEMXSNnaw6UvEZcuP7J22apojPYQ@mail.gmail.com>
+ <1484095516-12720-1-git-send-email-linux@roeck-us.net>
+ <1484095516-12720-14-git-send-email-linux@roeck-us.net>
+Message-ID: <94652a06-cd97-5ad2-a40b-fca3a4a33ccb@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 12:52 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On 01/11/2017 01:07 AM, Marc Gonzalez wrote:
-> Not really. It would just make it more complicated to replace the
-> call with devm_clk_prepare_enable(), should it ever find its way
-> into the light of day.
-Actually what is the status to the patch series which brings devm_clk
-stuff like prepare_enable()? It was submitted 2(?) years ago.
+Hi Guenter,
 
--- 
-With Best Regards,
-Andy Shevchenko
+On 01/11/2017 02:44 AM, Guenter Roeck wrote:
+> Use device managed functions to simplify error handling, reduce
+> source code size, improve readability, and reduce the likelyhood of bugs.
+> 
+> The conversion was done automatically with coccinelle using the
+> following semantic patches. The semantic patches and the scripts used
+> to generate this commit log are available at
+> https://github.com/groeck/coccinelle-patches
+> 
+> - Use devm_add_action_or_reset() for calls to clk_disable_unprepare
+> - Replace 'goto l; ... l: return e;' with 'return e;'
+> - Drop remove function
+> - Use devm_watchdog_register_driver() to register watchdog device
+> 
+> Cc: Vladimir Zapolskiy <vz@mleia.com>
+
+Acked-by: Vladimir Zapolskiy <vz@mleia.com>
+
+Thank you for the cleanup.
+
+> Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+
+--
+With best wishes,
+Vladimir
