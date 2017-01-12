@@ -1,106 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 12 Jan 2017 16:16:14 +0000
-Subject: [PATCH] KVM: arm/arm64: vgic: Fix deadlock on error handling
-Message-ID: <1484237774-19047-1-git-send-email-marc.zyngier@arm.com>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Thu, 12 Jan 2017 17:17:47 +0100
+Subject: [PATCH v8 2/5] i2c: Add STM32F4 I2C driver
+In-Reply-To: <CAOAejn2pW20VPP_yGtvJ_ufvj6Xj1poBiiA2WqkALiaLyyONug@mail.gmail.com>
+References: <1483607246-14771-1-git-send-email-cedric.madianga@gmail.com>
+ <1483607246-14771-3-git-send-email-cedric.madianga@gmail.com>
+ <20170111082208.vzu7xgpd4eakyldl@pengutronix.de>
+ <CAOAejn2eOy2sn1VkE979ne23Sj9L6+kaQDNpL1EUKb2m=6sGXw@mail.gmail.com>
+ <20170111153940.dtxzvtdici3r7l54@pengutronix.de>
+ <CAOAejn2pW20VPP_yGtvJ_ufvj6Xj1poBiiA2WqkALiaLyyONug@mail.gmail.com>
+Message-ID: <CAOAejn1MWjW5h+EvCtt3aLPAQfndro6PhLTZTRs95VTOfRBJxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry Vyukov reported that the syzkaller fuzzer triggered a
-deadlock in the vgic setup code when an error was detected, as
-the cleanup code tries to take a lock that is already held by
-the setup code.
+>>> > I don't understand scl_period = 1 ?s for Fast Mode. For a bus freqency
+>>> > of 400 kHz we need low + high = 2.5 ?s. Is there a factor 10 missing
+>>> > somewhere?
+>>>
+>>> As CCR = SCL_period * I2C parent clk frequency with minimal freq =
+>>> 2Mhz and SCL_period = 1 we have:
+>>> CCR = 1 * 2Mhz = 2.
+>>> But to compute, scl_low and scl_high in Fast mode, we have to do the
+>>> following thing as Duty=1:
+>>> scl_high = 9 * CCR * I2C parent clk period
+>>> scl_low = 16 * CCR * I2C parent clk period
+>>> In our example:
+>>> scl_high = 9 * 2 * 0,0000005 = 0,000009 sec = 9 ?s
+>>> scl_low = 16 * 2 * 0.0000005 = 0,000016 sec = 16 ?s
+>>> So low + high = 27 ?s > 2,5 ?s
+>>
+>> For me 9 ?s + 16 ?s is 25 ?s, resulting in 40 kHz. That's why I wondered
+>> if there is a factor 10 missing somewhere.
+>
+> Hum ok. I am going to double-check what is wrong because when I check
+> with the scope I always reach 400Khz for SCL.
+> I will let you know.
 
-The fix is to avoid retaking the lock when cleaning up, by
-telling the cleanup function that we already hold it.
+There is one point I miss here that is described in the reference manual:
+To reach the 400 kHz maximum I?C fast mode clock, the I2C parent rate
+must be a multiple of 10 MHz.
+So, contrary to what we said in a previous thread, 400 kHz could not
+be reached with low frequencies.
+In that way, we could compute CCR with duty = 0 by default.
+So, I find another formula very close to the first one I pushed in the
+first version:
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic/vgic-init.c | 18 +++++++++++++-----
- virt/kvm/arm/vgic/vgic-v2.c   |  2 --
- virt/kvm/arm/vgic/vgic-v3.c   |  2 --
- 3 files changed, 13 insertions(+), 9 deletions(-)
+In fast mode, we compute CCR with duty = 0:
+t_scl_high = CCR * I2C parent clk period
+t_scl_low = 2 *CCR * I2C parent clk period
+So, CCR = I2C parent rate / 400 kHz / 3
 
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 5114391..c737ea0 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -268,15 +268,11 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
- {
- 	struct vgic_dist *dist = &kvm->arch.vgic;
- 
--	mutex_lock(&kvm->lock);
--
- 	dist->ready = false;
- 	dist->initialized = false;
- 
- 	kfree(dist->spis);
- 	dist->nr_spis = 0;
--
--	mutex_unlock(&kvm->lock);
- }
- 
- void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
-@@ -286,7 +282,8 @@ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
- 	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
- }
- 
--void kvm_vgic_destroy(struct kvm *kvm)
-+/* To be called with kvm->lock held */
-+static void __kvm_vgic_destroy(struct kvm *kvm)
- {
- 	struct kvm_vcpu *vcpu;
- 	int i;
-@@ -297,6 +294,13 @@ void kvm_vgic_destroy(struct kvm *kvm)
- 		kvm_vgic_vcpu_destroy(vcpu);
- }
- 
-+void kvm_vgic_destroy(struct kvm *kvm)
-+{
-+	mutex_lock(&kvm->lock);
-+	__kvm_vgic_destroy(kvm);
-+	mutex_unlock(&kvm->lock);
-+}
-+
- /**
-  * vgic_lazy_init: Lazy init is only allowed if the GIC exposed to the guest
-  * is a GICv2. A GICv3 must be explicitly initialized by the guest using the
-@@ -348,6 +352,10 @@ int kvm_vgic_map_resources(struct kvm *kvm)
- 		ret = vgic_v2_map_resources(kvm);
- 	else
- 		ret = vgic_v3_map_resources(kvm);
-+
-+	if (ret)
-+		__kvm_vgic_destroy(kvm);
-+
- out:
- 	mutex_unlock(&kvm->lock);
- 	return ret;
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 9bab867..834137e 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -293,8 +293,6 @@ int vgic_v2_map_resources(struct kvm *kvm)
- 	dist->ready = true;
- 
- out:
--	if (ret)
--		kvm_vgic_destroy(kvm);
- 	return ret;
- }
- 
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 7df1b90..a4c7fff 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -308,8 +308,6 @@ int vgic_v3_map_resources(struct kvm *kvm)
- 	dist->ready = true;
- 
- out:
--	if (ret)
--		kvm_vgic_destroy(kvm);
- 	return ret;
- }
- 
--- 
-2.1.4
+For example with parent rate = 40 MHz:
+CCR = 40000000 / 400000 / 3 = 33.333333333 = 33
+t_scl_high = 33 * (1 / 2000000) = 825 ns > 600 ns
+t_scl_low = 2 * 16 * (1 / 2000000) = 1650 ns > 1300 ns
+
+It seems ok now.
+
+Best regards,
+
+Cedric
