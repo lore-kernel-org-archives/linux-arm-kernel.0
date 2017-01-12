@@ -1,30 +1,40 @@
-From: john@phrozen.org (John Crispin)
-Date: Thu, 12 Jan 2017 09:23:14 +0100
-Subject: [PATCH 0/4] ARM: dts: mt7623: Add initial Geek Force support
-In-Reply-To: <3fecb422-8185-7ee0-c203-2bfdc4fd1393@phrozen.org>
-References: <20170108133100.10428-1-afaerber@suse.de>
- <91f5ec74-1aa1-f2ad-24e9-14267cbe8498@phrozen.org>
- <d6bd3783-d124-9871-d3b4-93e366517895@suse.de>
- <3fecb422-8185-7ee0-c203-2bfdc4fd1393@phrozen.org>
-Message-ID: <0bd6567e-1c5b-0ff6-d044-57d25e1a40d2@phrozen.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Jan 2017 09:27:03 +0100
+Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
+ enable panel
+In-Reply-To: <330598fa-d331-3695-b0a2-3590059e2be4@mleia.com>
+References: <20161221032717.13154-1-vz@mleia.com>
+ <CACRpkdZE6VgJA27+Wh=Gxd7yOXpLMyT7yCB2PYA36y0gvosHFQ@mail.gmail.com>
+ <20170102142228.GI14217@n2100.armlinux.org.uk>
+ <252ad888-fa9d-695a-58ed-46806e4374fd@mleia.com>
+ <50499352-fa14-64c4-1a74-db4827757a2d@arm.com>
+ <CACRpkdYv87Tmp6i-vccVmtVD5NDk2y1=62sgP7VQgWctC+t3Tg@mail.gmail.com>
+ <330598fa-d331-3695-b0a2-3590059e2be4@mleia.com>
+Message-ID: <CACRpkdZdzGq8Atk2YMa23ZLRjnVGYBYQjEzu_q__s-yYkWg5hA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
+On Thu, Jan 12, 2017 at 1:05 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
+> On 01/11/2017 05:16 PM, Linus Walleij wrote:
+>> On Tue, Jan 10, 2017 at 2:47 PM, Vladimir Murzin
+>> <vladimir.murzin@arm.com> wrote:
+>>
+>>> In another thread Benjamin pointed at patch [1] in drm/kms part for noMMU.
+>>>
+>>> [1] https://cgit.freedesktop.org/drm/drm-misc/commit/?id=62a0d98a188cc4ebd8ea54b37d274ec20465e464
+>>
+>> Problem solved?
+>>
+>> Vladimir: I do not require in any way that you create a CLCD driver for DRM,
+>> I just think it would be very very nice...
+>>
+>
+> I have no other option, this series is unreviewed and thus unlikely it will
+> be applied, still a panel PCB on my board needs power management support.
 
-had a look last night why the ethernet dtsi was not added and it
-obviously was not added as we were waiting for the clk-mt2701 to be
-merged. the ethernet dtsi will have phandles pointing at the clk nodes
-which did not exist at the time. same is true for the PWM code.
+Hm I can ACK it I guess, but mergeing it into an unmaintained subsystem
+is another issue, just not very optimal. If you get it working on your system
+I can look into migrating all the old users to DRM as well.
 
-i sat down last night and worked out what pending patches i still have
-for mt7623 and out of the ~80 required to get v4.4 working i only need
-around 10 for v4.10-rc1.
-
-i started to rebase these patches last night and will have time to test
-them tomorrow or early next week. as the pwrap node alone is around 200
-lines of devicetree we need to figure out a way to add this to the dts
-files without duplicating it. i'll try to post a series early next week
-that we can then discuss and rebase your geekboard patches on.
-
-	John
+Yours,
+Linus Walleij
