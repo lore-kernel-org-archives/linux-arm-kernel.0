@@ -1,220 +1,152 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 12 Jan 2017 18:28:13 +0100
-Subject: [linux-sunxi][PATCH] ARM: dts: sun8i-h3: Add dts for the Beelink
- X2 STB
-In-Reply-To: <20170112171135.7822-1-codekipper@gmail.com>
-References: <20170112171135.7822-1-codekipper@gmail.com>
-Message-ID: <20170112172813.cbwqfpjlprkxdzcp@lukather>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 12 Jan 2017 18:32:04 +0100
+Subject: [kvm-unit-tests PATCH 6/6] run_tests: allow passing of options
+ to QEMU
+In-Reply-To: <20170111162841.15569-7-alex.bennee@linaro.org>
+References: <20170111162841.15569-1-alex.bennee@linaro.org>
+ <20170111162841.15569-7-alex.bennee@linaro.org>
+Message-ID: <20170112173204.ufd2ggw7iz7xv772@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jan 12, 2017 at 06:11:35PM +0100, codekipper at gmail.com wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
+On Wed, Jan 11, 2017 at 04:28:41PM +0000, Alex Benn?e wrote:
+> This allows additional options to be passed to QEMU. It follows the
+> convention of passing parameters after a -- to the child process. In
+> my case I'm using it to toggle MTTCG on an off:
 > 
-> The Beelink X2 is an STB based on the Allwinner H3 SoC with a uSD slot,
-> 2 USB ports( 1 * USB-2 Host, 1 USB OTG), a 10/100M ethernet port using the
-> SoC's integrated PHY, Wifi via a RTL8189ETV sdio wifi chip, HDMI, an IR
-> receiver, 1 LEDs and an optical S/PDIF connector.
+>   ./run_tests.sh -- --accel tcg,thread=multi
 > 
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> 
 > ---
->  arch/arm/boot/dts/Makefile                |   1 +
->  arch/arm/boot/dts/sun8i-h3-beelink-x2.dts | 187 ++++++++++++++++++++++++++++++
->  2 files changed, 188 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
+> v1
+>   - changes from -o to --
+>   - fixed whitespace damage
+> ---
+>  README.md              |  6 ++++++
+>  run_tests.sh           | 13 +++++++++++--
+>  scripts/functions.bash |  7 ++++---
+>  3 files changed, 21 insertions(+), 5 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 78a94b747059..75960b1468a4 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -857,6 +857,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
->  	sun8i-a83t-cubietruck-plus.dtb \
->  	sun8i-h2-plus-orangepi-zero.dtb \
->  	sun8i-h3-bananapi-m2-plus.dtb \
-> +	sun8i-h3-beelink-x2.dtb \
->  	sun8i-h3-nanopi-m1.dtb	\
->  	sun8i-h3-nanopi-neo.dtb \
->  	sun8i-h3-orangepi-2.dtb \
-> diff --git a/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts b/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
-> new file mode 100644
-> index 000000000000..bc5aed52cb1d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
-> @@ -0,0 +1,187 @@
-> +/*
-> + * Copyright (C) 2017 Marcus Cooper <codekipper@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
+> diff --git a/README.md b/README.md
+> index fa3a445..1bd6dcb 100644
+> --- a/README.md
+> +++ b/README.md
+> @@ -55,6 +55,12 @@ To extend or disable the timeouts:
+>  
+>      TIMEOUT=0 ./run_tests.sh
+>  
+> +Any arguments past the end-of-arguments marker (--) is passed on down
+> +to the QEMU invocation. This can of course be combined with the other
+> +modifiers:
 > +
-> +/dts-v1/;
-> +#include "sun8i-h3.dtsi"
-> +#include "sunxi-common-regulators.dtsi"
+> +    ACCEL=tcg ./run_tests.sh -v -- --accel tcg,thread=multi
 > +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+>  # Contributing
+>  
+>  ## Directory structure
+> diff --git a/run_tests.sh b/run_tests.sh
+> index 254129d..3270fba 100755
+> --- a/run_tests.sh
+> +++ b/run_tests.sh
+> @@ -13,7 +13,7 @@ function usage()
+>  {
+>  cat <<EOF
+>  
+> -Usage: $0 [-g group] [-h] [-v]
+> +Usage: $0 [-g group] [-h] [-v] [-- QEMU options]
+>  
+>      -g: Only execute tests in the given group
+>      -h: Output this help text
+> @@ -22,6 +22,8 @@ Usage: $0 [-g group] [-h] [-v]
+>  Set the environment variable QEMU=/path/to/qemu-system-ARCH to
+>  specify the appropriate qemu binary for ARCH-run.
+>  
+> +All options specified after -- are passed on to QEMU.
 > +
-> +/ {
-> +	model = "Beelink X2";
-> +	compatible = "roofull,beelink-x2", "allwinner,sun8i-h3";
+>  EOF
+>  }
+>  
+> @@ -29,6 +31,7 @@ RUNTIME_arch_run="./$TEST_DIR/run"
+>  source scripts/runtime.bash
+>  
+>  while getopts "g:hv" opt; do
 > +
-> +	aliases {
-> +		serial0 = &uart0;
-> +		/* ethernet0 is the H3 emac, defined in sun8i-h3.dtsi */
-> +		ethernet1 = &rtl8189ftv;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pwr_led_x2>;
 
-Please drop all the pinctrl nodes for the GPIOs. They're useless, and
-will be harmful when we'll switch to a stricter pinctrl driver.
+stray blank line added?
+
+>      case $opt in
+>          g)
+>              only_group=$OPTARG
+> @@ -46,6 +49,12 @@ while getopts "g:hv" opt; do
+>      esac
+>  done
+>  
+> +# Any options left for QEMU?
+> +shift $((OPTIND-1))
+> +if [ "$#" -gt  0 ]; then
+> +    extra_opts="$@"
+> +fi
+
+We can unconditionally do the extra_opts="$@", extra_opts will just
+be null in the case there aren't more args, like it was before.
 
 > +
-> +		pwr_led {
-> +			label = "beelink-x2:red:pwr";
-> +			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
-> +			default-state = "on";
-> +		};
-> +	};
-> +
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&sw_r_x2>;
-> +
-> +		sw4 {
-> +			label = "power";
-> +			linux,code = <BTN_0>;
+>  RUNTIME_log_stderr () { cat >> test.log; }
+>  RUNTIME_log_stdout () {
+>      if [ "$PRETTY_PRINT_STACKS" = "yes" ]; then
+> @@ -59,4 +68,4 @@ RUNTIME_log_stdout () {
+>  config=$TEST_DIR/unittests.cfg
+>  rm -f test.log
+>  printf "BUILD_HEAD=$(cat build-head)\n\n" > test.log
+> -for_each_unittest $config run
+> +for_each_unittest $config run "$extra_opts"
+> diff --git a/scripts/functions.bash b/scripts/functions.bash
+> index ee9143c..60fbc6a 100644
+> --- a/scripts/functions.bash
+> +++ b/scripts/functions.bash
+> @@ -3,10 +3,11 @@ function for_each_unittest()
+>  {
+>  	local unittests="$1"
+>  	local cmd="$2"
+> +	local extra_opts=$3
+>  	local testname
+>  	local smp
+>  	local kernel
+> -	local opts
+> +	local opts=$extra_opts
+>  	local groups
+>  	local arch
+>  	local check
+> @@ -21,7 +22,7 @@ function for_each_unittest()
+>  			testname=${BASH_REMATCH[1]}
+>  			smp=1
+>  			kernel=""
+> -			opts=""
+> +			opts=$extra_opts
+>  			groups=""
+>  			arch=""
+>  			check=""
+> @@ -32,7 +33,7 @@ function for_each_unittest()
+>  		elif [[ $line =~ ^smp\ *=\ *(.*)$ ]]; then
+>  			smp=${BASH_REMATCH[1]}
+>  		elif [[ $line =~ ^extra_params\ *=\ *(.*)$ ]]; then
+> -			opts=${BASH_REMATCH[1]}
+> +			opts="$opts ${BASH_REMATCH[1]}"
 
-Should that be BTN_0 then if the label is that one?
+How do QEMU opts work with respect to precedence? If the later
+opts override the earlier (I think they do), then we should put
+opts after rematch here, because the user explicitly added those
+options to the command line, and therefore probably prefers them.
 
-> +			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
-> +		};
-> +	};
-> +
-> +	wifi_pwrseq: wifi_pwrseq {
-> +		compatible = "mmc-pwrseq-simple";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&wifi_en_x2>;
-> +		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
-> +	};
-> +};
-> +
-> +&ehci1 {
-> +	status = "okay";
-> +};
-> +
-> +&ir {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&ir_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&mmc0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-> +	vmmc-supply = <&reg_vcc3v3>;
-> +	bus-width = <4>;
-> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
-> +	cd-inverted;
-> +	status = "okay";
-> +};
-> +
-> +&mmc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc1_pins_a>;
-> +	vmmc-supply = <&reg_vcc3v3>;
-> +	bus-width = <4>;
-> +	non-removable;
-> +	status = "okay";
-> +
-> +	/*
-> +	 * Explicitly define the sdio device, so that we can add an ethernet
-> +	 * alias for it (which e.g. makes u-boot set a mac-address).
-> +	 */
-> +	rtl8189ftv: sdio_wifi at 1 {
-> +		reg = <1>;
-> +	};
-> +};
-> +
-> +&mmc2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc2_8bit_pins>;
-> +	vmmc-supply = <&reg_vcc3v3>;
-> +	bus-width = <8>;
-> +	non-removable;
-> +	cap-mmc-hw-reset;
-> +	status = "okay";
-> +};
-> +
-> +&mmc2_8bit_pins {
-> +	/* Increase drive strength for DDR modes */
-> +	drive-strength = <40>;
+>  		elif [[ $line =~ ^groups\ *=\ *(.*)$ ]]; then
+>  			groups=${BASH_REMATCH[1]}
+>  		elif [[ $line =~ ^arch\ *=\ *(.*)$ ]]; then
+> -- 
+> 2.11.0
+>
 
-Have you actually tested that it was needed?
+Thanks for this patch! I'm looking forward to making use of it for
+testing Peter's EL2 series with/without "-machine virtualization=on"
 
-> +	/* eMMC is missing pull-ups */
-> +	bias-pull-up;
-
-This is already enabled in the DTSI.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170112/d4f5d1b3/attachment-0001.sig>
+drew
