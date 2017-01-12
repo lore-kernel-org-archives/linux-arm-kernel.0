@@ -1,122 +1,85 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 12 Jan 2017 15:56:06 +0530
-Subject: [PATCH 17/37] Documentation: PCI: Guide to use pci endpoint configfs
+Date: Thu, 12 Jan 2017 15:56:17 +0530
+Subject: [PATCH 28/37] dt-bindings: PCI: dra7xx: Add dt bindings for pci
+ dra7xx EP mode
 In-Reply-To: <1484216786-17292-1-git-send-email-kishon@ti.com>
 References: <1484216786-17292-1-git-send-email-kishon@ti.com>
-Message-ID: <1484216786-17292-18-git-send-email-kishon@ti.com>
+Message-ID: <1484216786-17292-29-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Documentation to help users use pci endpoint to configure
-pci endpoint function and to bind the endpoint function
-with endpoint controller.
+Add device tree binding documentation for pci dra7xx EP mode.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- Documentation/PCI/00-INDEX                      |    2 +
- Documentation/PCI/endpoint/pci-endpoint-cfs.txt |   84 +++++++++++++++++++++++
- 2 files changed, 86 insertions(+)
- create mode 100644 Documentation/PCI/endpoint/pci-endpoint-cfs.txt
+ Documentation/devicetree/bindings/pci/ti-pci.txt |   37 ++++++++++++++++++----
+ 1 file changed, 30 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/PCI/00-INDEX b/Documentation/PCI/00-INDEX
-index ba950b2..f84a23c 100644
---- a/Documentation/PCI/00-INDEX
-+++ b/Documentation/PCI/00-INDEX
-@@ -14,3 +14,5 @@ pcieaer-howto.txt
- 	- the PCI Express Advanced Error Reporting Driver Guide HOWTO
- endpoint/pci-endpoint.txt
- 	- guide to add endpoint controller driver and endpoint function driver.
-+endpoint/pci-endpoint-cfs.txt
-+	- guide to use configfs to configure the pci endpoint function.
-diff --git a/Documentation/PCI/endpoint/pci-endpoint-cfs.txt b/Documentation/PCI/endpoint/pci-endpoint-cfs.txt
-new file mode 100644
-index 0000000..b1f1613
---- /dev/null
-+++ b/Documentation/PCI/endpoint/pci-endpoint-cfs.txt
-@@ -0,0 +1,84 @@
-+                   CONFIGURING PCI ENDPOINT USING CONFIGFS
-+                    Kishon Vijay Abraham I <kishon@ti.com>
+diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
+index 60e2516..62f5f59 100644
+--- a/Documentation/devicetree/bindings/pci/ti-pci.txt
++++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
+@@ -1,17 +1,22 @@
+ TI PCI Controllers
+ 
+ PCIe Designware Controller
+- - compatible: Should be "ti,dra7-pcie""
+- - reg : Two register ranges as listed in the reg-names property
+- - reg-names : The first entry must be "ti-conf" for the TI specific registers
+-	       The second entry must be "rc-dbics" for the designware pcie
+-	       registers
+-	       The third entry must be "config" for the PCIe configuration space
++ - compatible: Should be "ti,dra7-pcie" for RC
++	       Should be "ti,dra7-pcie-ep" for EP
+  - phys : list of PHY specifiers (used by generic PHY framework)
+  - phy-names : must be "pcie-phy0", "pcie-phy1", "pcie-phyN".. based on the
+ 	       number of PHYs as specified in *phys* property.
+  - ti,hwmods : Name of the hwmod associated to the pcie, "pcie<X>",
+ 	       where <X> is the instance number of the pcie from the HW spec.
++ - num-lanes as specified in ../designware-pcie.txt
 +
-+The PCI Endpoint Core exposes configfs entry (pci_ep) in order to configure the
-+PCI endpoint function and in order to bind the endpoint function
-+with the endpoint controller. (For introducing other mechanisms to
-+configure the PCI Endpoint Function refer [1]).
++HOST MODE
++=========
++ - reg : Two register ranges as listed in the reg-names property
++ - reg-names : The first entry must be "ti-conf" for the TI specific registers
++	       The second entry must be "rc-dbics" for the designware pcie
++	       registers
++	       The third entry must be "config" for the PCIe configuration space
+  - interrupts : Two interrupt entries must be specified. The first one is for
+ 		main interrupt line and the second for MSI interrupt line.
+  - #address-cells,
+@@ -19,13 +24,31 @@ PCIe Designware Controller
+    #interrupt-cells,
+    device_type,
+    ranges,
+-   num-lanes,
+    interrupt-map-mask,
+    interrupt-map : as specified in ../designware-pcie.txt
+ 
++DEVICE MODE
++===========
++ - reg : Four register ranges as listed in the reg-names property
++ - reg-names : "ti-conf" for the TI specific registers
++	       "ep_dbics" for the standard configuration registers as
++		they are locally accessed within the DIF CS space
++	       "ep_dbics2" for the standard configuration registers as
++		they are locally accessed within the DIF CS2 space
++	       "addr_space" used to map remote RC address space
++ - interrupts : one interrupt entries must be specified for main interrupt.
++ - num-ib-windows : number of inbound address translation windows
++ - num-ob-windows : number of outbound address translation windows
 +
-+*) Mounting configfs
+ Optional Property:
+  - gpios : Should be added if a gpio line is required to drive PERST# line
+ 
++NOTE: Two dt nodes should be added for each PCI controller; one for host
++mode and another for device mode. So in order for PCI to
++work in host mode, EP mode dt node should be disabled and in order to PCI to
++work in EP mode, host mode dt node should be disabled. And host mode and EP
++mode are mutually exclusive.
 +
-+The PCI Endpoint Core layer creates pci_ep directory in the mounted configfs
-+directory. configfs can be mounted using the following command.
-+
-+	mount -t configfs none /sys/kernel/config
-+
-+*) Directory Structure
-+
-+The pci_ep configfs directory structure has been created to reflect the
-+natural tree like structure of PCI devices. So every directory created
-+inside pci_ep represents a EPC device and every directory created inside
-+epf directory represents EPF device.
-+
-+/sys/kernel/config/pci_ep/
-+			 | <dir>/ --------------------------------------> [2]
-+				| epc
-+				| epf/
-+				     | <dir>/ --------------------------> [3]
-+					    | vendorid
-+					    | deviceid
-+					    | revid
-+					    | progif_code
-+					    | subclass_code
-+					    | baseclass_code
-+					    | cache_line_size
-+					    | subsys_vendor_id
-+					    | subsys_id
-+					    | interrupt_pin
-+					    | function
-+
-+*) Creating configfs entry for EPC
-+
-+Any directory created inside *pci_ep* represents an EPC device. In the above
-+directory structure [2] represents an EPC device. It consists of
-+
-+	*) epc: Use it to associate the configfs entry to an actual EPC device.
-+		The list of valid entries for this field can be obtained from
-+			ls /sys/class/pci_epc/
-+
-+	*) epf: Directory that contains all the endpoint functions. The name
-+		of the created directory determines the driver this particular
-+		epf device will be bound to. The name can be obtained either
-+		from the function binding documentation [4] or
-+			ls /sys/bus/pci-epf/drivers
-+
-+		If more than one endpoint function device has to be bound to
-+		the same driver, then the directory should be created using
-+		the following notation
-+			mkdir <name>.<num>
-+
-+*) Creating configfs entry for EPF
-+
-+Any directory created inside *epf* directory represents an EPF device. In the
-+above directory structure, [3] represents an EPF device. It consists of the
-+following entries that can be used to configure the standard configuration
-+header of the endpoint function. (These entries are created by the
-+framework when any new directory is created inside epf directory.)
-+
-+        | vendorid
-+        | deviceid
-+        | revid
-+        | progif_code
-+        | subclass_code
-+        | baseclass_code
-+        | cache_line_size
-+        | subsys_vendor_id
-+        | subsys_id
-+        | interrupt_pin
-+
-+The following entry identifies the function driver that is bound to the
-+function device
-+	| function
-+
-+[1] -> Documentation/PCI/endpoint/pci-endpoint.txt
-+[4] -> Documentation/PCI/endpoint/function/binding/
+ Example:
+ axi {
+ 	compatible = "simple-bus";
 -- 
 1.7.9.5
