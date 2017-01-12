@@ -1,61 +1,72 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 12 Jan 2017 15:56:21 +0530
-Subject: [PATCH 32/37] Documentation: misc-devices: Add Documentation for
- pci-endpoint-test driver
+Date: Thu, 12 Jan 2017 15:56:14 +0530
+Subject: [PATCH 25/37] dt-bindings: PCI: Add dt bindings for pci designware EP
+ mode
 In-Reply-To: <1484216786-17292-1-git-send-email-kishon@ti.com>
 References: <1484216786-17292-1-git-send-email-kishon@ti.com>
-Message-ID: <1484216786-17292-33-git-send-email-kishon@ti.com>
+Message-ID: <1484216786-17292-26-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Documentation for pci-endpoint-test driver.
+Add device tree binding documentation for pci designware EP mode.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- Documentation/misc-devices/pci-endpoint-test.txt |   35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/misc-devices/pci-endpoint-test.txt
+ .../devicetree/bindings/pci/designware-pcie.txt    |   26 ++++++++++++++------
+ 1 file changed, 18 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/misc-devices/pci-endpoint-test.txt b/Documentation/misc-devices/pci-endpoint-test.txt
-new file mode 100644
-index 0000000..4385718
---- /dev/null
-+++ b/Documentation/misc-devices/pci-endpoint-test.txt
-@@ -0,0 +1,35 @@
-+Driver for PCI Endpoint Test Function
-+
-+This driver should be used as a host side driver if the root complex is
-+connected to a configurable pci endpoint running *pci_epf_test* function
-+driver configured according to [1].
-+
-+The "pci_endpoint_test" driver can be used to perform the following tests.
-+
-+The PCI driver for the test device performs the following tests
-+	*) verifying addresses programmed in BAR
-+	*) raise legacy IRQ
-+	*) raise MSI IRQ
-+	*) read data
-+	*) write data
-+	*) copy data
-+
-+This misc driver creates /dev/pci-endpoint-test.<num> for every
-+*pci_epf_test* function connected to the root complex and "ioctls"
-+should be used to perform the above tests.
-+
-+ioctl
-+-----
-+ PCITEST_BAR: Tests the BAR. The number of the BAR that has to be tested
-+	      should be passed as argument.
-+ PCITEST_LEGACY_IRQ: Tests legacy IRQ
-+ PCITEST_MSI: Tests message signalled interrupts. The MSI number that has
-+	      to be tested should be passed as argument.
-+ PCITEST_WRITE: Perform write tests. The size of the buffer should be passed
-+		as argument.
-+ PCITEST_READ: Perform read tests. The size of the buffer should be passed
-+	       as argument.
-+ PCITEST_COPY: Perform read tests. The size of the buffer should be passed
-+	       as argument.
-+
-+[1] -> Documentation/PCI/endpoint/function/binding/pci-test.txt
+diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+index 1392c70..b2480dd 100644
+--- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+@@ -6,30 +6,40 @@ Required properties:
+ - reg-names: Must be "config" for the PCIe configuration space.
+     (The old way of getting the configuration address space from "ranges"
+     is deprecated and should be avoided.)
++- num-lanes: number of lanes to use
++RC mode:
+ - #address-cells: set to <3>
+ - #size-cells: set to <2>
+ - device_type: set to "pci"
+ - ranges: ranges for the PCI memory and I/O regions
+ - #interrupt-cells: set to <1>
+-- interrupt-map-mask and interrupt-map: standard PCI properties
+-	to define the mapping of the PCIe interface to interrupt
++- interrupt-map-mask and interrupt-map: standard PCI
++	properties to define the mapping of the PCIe interface to interrupt
+ 	numbers.
+-- num-lanes: number of lanes to use
++EP mode:
++- num-ib-windows: number of inbound address translation
++        windows
++- num-ob-windows: number of outbound address translation
++        windows
+ 
+ Optional properties:
+-- num-viewport: number of view ports configured in hardware.  If a platform
+-  does not specify it, the driver assumes 2.
+ - num-lanes: number of lanes to use (this property should be specified unless
+   the link is brought already up in BIOS)
+ - reset-gpio: gpio pin number of power good signal
+-- bus-range: PCI bus numbers covered (it is recommended for new devicetrees to
+-  specify this property, to keep backwards compatibility a range of 0x00-0xff
+-  is assumed if not present)
+ - clocks: Must contain an entry for each entry in clock-names.
+ 	See ../clocks/clock-bindings.txt for details.
+ - clock-names: Must include the following entries:
+ 	- "pcie"
+ 	- "pcie_bus"
++RC mode:
++- num-viewport: number of view ports configured in
++  hardware. If a platform does not specify it, the driver assumes 2.
++- bus-range: PCI bus numbers covered (it is recommended
++  for new devicetrees to specify this property, to keep backwards
++  compatibility a range of 0x00-0xff is assumed if not present)
++EP mode:
++- max-functions: maximum number of functions that can be
++  configured
+ 
+ Example configuration:
+ 
 -- 
 1.7.9.5
