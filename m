@@ -1,35 +1,58 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 12 Jan 2017 16:21:35 -0500 (EST)
-Subject: [PATCH net-next v2 05/10] drivers: base: Add device_find_class()
-In-Reply-To: <20170112034121.27697-6-f.fainelli@gmail.com>
-References: <20170112034121.27697-1-f.fainelli@gmail.com>
- <20170112034121.27697-6-f.fainelli@gmail.com>
-Message-ID: <20170112.162135.441956368122992032.davem@davemloft.net>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Thu, 12 Jan 2017 23:26:14 +0200
+Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
+ enable panel
+In-Reply-To: <CACRpkdZdzGq8Atk2YMa23ZLRjnVGYBYQjEzu_q__s-yYkWg5hA@mail.gmail.com>
+References: <20161221032717.13154-1-vz@mleia.com>
+ <CACRpkdZE6VgJA27+Wh=Gxd7yOXpLMyT7yCB2PYA36y0gvosHFQ@mail.gmail.com>
+ <20170102142228.GI14217@n2100.armlinux.org.uk>
+ <252ad888-fa9d-695a-58ed-46806e4374fd@mleia.com>
+ <50499352-fa14-64c4-1a74-db4827757a2d@arm.com>
+ <CACRpkdYv87Tmp6i-vccVmtVD5NDk2y1=62sgP7VQgWctC+t3Tg@mail.gmail.com>
+ <330598fa-d331-3695-b0a2-3590059e2be4@mleia.com>
+ <CACRpkdZdzGq8Atk2YMa23ZLRjnVGYBYQjEzu_q__s-yYkWg5hA@mail.gmail.com>
+Message-ID: <d1534f4b-e564-d87e-b408-9b7215a90de2@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Fainelli <f.fainelli@gmail.com>
-Date: Wed, 11 Jan 2017 19:41:16 -0800
-
-> Add a helper function to lookup a device reference given a class name.
-> This is a preliminary patch to remove adhoc code from net/dsa/dsa.c and
-> make it more generic.
+On 01/12/2017 10:27 AM, Linus Walleij wrote:
+> On Thu, Jan 12, 2017 at 1:05 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
+>> On 01/11/2017 05:16 PM, Linus Walleij wrote:
+>>> On Tue, Jan 10, 2017 at 2:47 PM, Vladimir Murzin
+>>> <vladimir.murzin@arm.com> wrote:
+>>>
+>>>> In another thread Benjamin pointed at patch [1] in drm/kms part for noMMU.
+>>>>
+>>>> [1] https://cgit.freedesktop.org/drm/drm-misc/commit/?id=62a0d98a188cc4ebd8ea54b37d274ec20465e464
+>>>
+>>> Problem solved?
+>>>
+>>> Vladimir: I do not require in any way that you create a CLCD driver for DRM,
+>>> I just think it would be very very nice...
+>>>
+>>
+>> I have no other option, this series is unreviewed and thus unlikely it will
+>> be applied, still a panel PCB on my board needs power management support.
 > 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  drivers/base/core.c    | 19 +++++++++++++++++++
->  include/linux/device.h |  1 +
->  2 files changed, 20 insertions(+)
-> 
-> diff --git a/drivers/base/core.c b/drivers/base/core.c
-> index 020ea7f05520..3dd6047c10d8 100644
-> --- a/drivers/base/core.c
-> +++ b/drivers/base/core.c
-> @@ -2065,6 +2065,25 @@ struct device *device_find_child(struct device *parent, void *data,
->  }
->  EXPORT_SYMBOL_GPL(device_find_child);
->  
-> +static int dev_is_class(struct device *dev, void *class)
+> Hm I can ACK it I guess, but mergeing it into an unmaintained subsystem
+> is another issue, just not very optimal. 
 
-I know you are just moving code, but this class argumnet is a string
-and thus should be "char *" or even "const char *".
++ Bartlomiej
+
+Linus, your ack is always more than appreciated.
+
+To all appearance Bartlomiej is a new honoured framebuffer layer maintainer.
+
+Bartlomiej, do you have the changes under discussion in your mailbox or
+should I resend them to you directly for review?
+
+> If you get it working on your system I can look into migrating all the old
+> users to DRM as well.
+> 
+
+Sure, I started development of a simple CLCD DRM driver as an own attractive
+exercise, I'll keep you informed of the progress.
+
+--
+With best wishes,
+Vladimir
