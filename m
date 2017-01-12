@@ -1,44 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Jan 2017 14:06:14 +0100
-Subject: [GIT PULL] Ux500 development for v4.11
-Message-ID: <CACRpkdZnk-qpJi-FOPuMyWBT-=AEK7krxZJZp=UZYzjbuBOK7Q@mail.gmail.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Thu, 12 Jan 2017 14:07:52 +0100
+Subject: NVMe vs DMA addressing limitations
+In-Reply-To: <3306663.hKmLLq1hhl@wuerfel>
+References: <1483044304-2085-1-git-send-email-nikita.yoush@cogentembedded.com>
+ <20170110144839.GB27156@lst.de>
+ <80676b35-121b-0462-23fc-ed5608e1e671@grimberg.me>
+ <3306663.hKmLLq1hhl@wuerfel>
+Message-ID: <20170112130752.GA14465@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+On Thu, Jan 12, 2017 at 12:56:07PM +0100, Arnd Bergmann wrote:
+> That is an interesting question: We actually have the
+> "DMA_ATTR_NO_KERNEL_MAPPING" for this case, and ARM implements
+> it in the coherent interface, so that might be a good fit.
 
-here is a set of two patches ready to be queued for v4.11 already.
+Yes. my WIP HMB patch uses DMA_ATTR_NO_KERNEL_MAPPING, although I'm
+workin on x86 at the moment where it's a no-op.
 
-Please pull them to a suitable branch on the ARM SoC tree.
+> Implementing it in the streaming API makes no sense since we
+> already have a kernel mapping here, but using a normal allocation
+> (possibly with DMA_ATTR_NON_CONSISTENT or DMA_ATTR_SKIP_CPU_SYNC,
+> need to check) might help on other architectures that have
+> limited amounts of coherent memory and no CMA.
 
-Yours,
-Linus Walleij
-
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
-
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-dev-for-armsoc
-
-for you to fetch changes up to f3c05596344fa09074220513583bc5d6ff2d5c43:
-
-  ARM: ux500: remove duplicated include from cpu-db8500.c (2017-01-12
-14:02:34 +0100)
-
-----------------------------------------------------------------
-Some two collected patches simplifying some Ux500
-stuff.
-
-----------------------------------------------------------------
-Linus Walleij (1):
-      ARM: ux500: simplify secondary boot
-
-Wei Yongjun (1):
-      ARM: ux500: remove duplicated include from cpu-db8500.c
-
- arch/arm/mach-ux500/cpu-db8500.c |  1 -
- arch/arm/mach-ux500/platsmp.c    | 45 +++++++++++++++++-----------------------
- 2 files changed, 19 insertions(+), 27 deletions(-)
+Though about that - but in the end DMA_ATTR_NO_KERNEL_MAPPING implies
+those, so instead of using lots of flags in driver I'd rather fix
+up more dma_ops implementations to take advantage of
+DMA_ATTR_NO_KERNEL_MAPPING.
