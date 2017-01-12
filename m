@@ -1,45 +1,63 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 12 Jan 2017 18:40:51 +0100
-Subject: [PATCH v2] ARM64: dts: meson-gxbb-odroidc2: Disable SCPI DVFS
-In-Reply-To: <1483689872-30389-1-git-send-email-narmstrong@baylibre.com>
-References: <1483689872-30389-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CAFBinCDmF2-W4SFMSNrYwUpejYkV=rw-f3yhG3=mTmWxy4J8uA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 12 Jan 2017 18:41:23 +0100
+Subject: [PATCH 2/5] clk: sunxi-ng: add support for V3s CCU
+In-Reply-To: <20170112203149.VhtuR9dM@smtp3j.mail.yandex.net>
+References: <20170112203149.VhtuR9dM@smtp3j.mail.yandex.net>
+Message-ID: <20170112174122.iqzrcyytfefqspwq@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+On Fri, Jan 13, 2017 at 01:31:41AM +0800, Icenowy Zheng wrote:
+> 
+> 2017?1?13? 01:19? Maxime Ripard <maxime.ripard@free-electrons.com>???
+> >
+> > On Thu, Jan 12, 2017 at 03:44:53AM +0800, Icenowy Zheng wrote: 
+> > > 
+> > > 
+> > > 12.01.2017, 03:40, "Icenowy Zheng" <icenowy@aosc.xyz>: 
+> > > > 11.01.2017, 02:10, "Maxime Ripard" <maxime.ripard@free-electrons.com>: 
+> > > >> ?On Tue, Jan 03, 2017 at 11:16:26PM +0800, Icenowy Zheng wrote: 
+> > > >>> ??V3s has a similar but cut-down CCU to H3. 
+> > > >>> 
+> > > >>> ??Add support for it. 
+> > > >>> 
+> > > >>> ??Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz> 
+> > > >> 
+> > > >> ?It looks like there's nothing different but the clocks that you 
+> > > >> ?register with the H3, please just use the H3 driver. 
+> > > > 
+> > > > Nope. 
+> > > > 
+> > > > It has a different PLL (PLL_ISP) at different address, and some 
+> > > > different muxes. 
+> > > 
+> > > Forgot to mention the missing of PLL_DE and related misses. 
+> >
+> > Those are not conflicting, it's just a slightly different set of 
+> > clocks. 
+> 
+> If saying so, we can have only one ccu driver, and make every ccu
+> register different set ;-)
+> 
+> V3s itself is a totally different SoC with H3.
+> 
+> The relationship of V3s and H3 can be farther than the relationship
+> of A33 and H3?
 
-(adding Brian Kim, one of the Hardkernel developers to this conversation)
+A33 and H3 are an entirely different story. The H3 and A33 have
+conflicting clocks (ie same clocks with different parameters). This is
+not your case.
 
-On Fri, Jan 6, 2017 at 9:04 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
-> The current hardware is not able to run with all cores enabled at a
-> cluster frequency superior at 1536MHz.
-> But the currently shipped u-boot for the platform still reports an OPP
-> table with possible DVFS frequency up to 2GHz, and will not change since
-> the off-tree linux tree supports limiting the OPPs with a kernel parameter.
-> A recent u-boot change reports the boot-time DVFS around 100MHz and
-> the default performance cpufreq governor sets the maximum frequency.
-> Previous version of u-boot reported to be already at the max OPP and
-> left the OPP as is.
-> Nevertheless, other governors like ondemand could setup the max frequency
-> and make the system crash.
->
-> This patch disables the DVFS clock and disables cpufreq.
-I don't have any Odroid-C2 board, but having to live without cpufreq
-sounds bad for the Odroid-C2 users.
-What would we expect from a kernel perspective (maybe the Hardkernel
-guys would adjust their u-boot instead of us adjusting to the behavior
-of one specific device? one solution that I could think of involves
-the "maxcpus" kernel parameter (see [0]), if this is not set u-boot
-should report a max CPU frequency of 1536MHz (= max frequency for 4
-active cores). Based on the "maxcpus" value additional frequencies can
-be unlocked (this could be step-by-step if there are different
-frequencies for one core/two cores/etc.). However, I'd like to hear
-other opinions as well.
+Maxime
 
-
-Regards,
-Martin
-
-
-[0] http://lxr.free-electrons.com/source/Documentation/kernel-parameters.txt?v=4.8#L2163
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170112/8631d007/attachment.sig>
