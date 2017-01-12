@@ -1,61 +1,53 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 12 Jan 2017 17:19:41 +0000
-Subject: [PATCH v3 0/3] arm64: dts: juno: CoreSight support updates
-In-Reply-To: <CANLsYkxm-6eBsURrN_pO1833QNfVL4Li98P48C6ktsytyyagdg@mail.gmail.com>
-References: <1484234410-7670-1-git-send-email-sudeep.holla@arm.com>
- <CANLsYkxm-6eBsURrN_pO1833QNfVL4Li98P48C6ktsytyyagdg@mail.gmail.com>
-Message-ID: <c42f1b0a-dbe9-6c00-b940-2bab4b891dac@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 12 Jan 2017 18:19:54 +0100
+Subject: [PATCH 2/5] clk: sunxi-ng: add support for V3s CCU
+In-Reply-To: <2714901484163893@web1g.yandex.ru>
+References: <20170103151629.19447-1-icenowy@aosc.xyz>
+ <20170103151629.19447-3-icenowy@aosc.xyz>
+ <20170110181006.yrd6moy2mctzoc4c@lukather>
+ <2705031484163593@web1g.yandex.ru>
+ <2714901484163893@web1g.yandex.ru>
+Message-ID: <20170112171954.mj45su57fixzo6og@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 12/01/17 17:08, Mathieu Poirier wrote:
-> On 12 January 2017 at 08:20, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> Hi Mike,
->>
->> I just did some refactoring to reduced thge churn and duplication.
->> Can you check if this work for you ? I could not give it much testing.
->>
->> Regards,
->> Sudeep
->>
->> --->8
->> Juno r1/r2 boards have different CoreSight infrastructure outside the
->> CPU clusters. This patchset adds the additional coreSight components to
->> separate .dtsi files to support these differences.
->>
->> v1->v2:
->>         - moved the addition of the STM component into a separate patch
->>
->> v2->v3:
->>         - moved the back the common coreSight components back into
->>           juno-base.dtsi
->>
->>
->> Mike Leach (2):
->>   arm64: dts: juno: fix CoreSight support for Juno r1/r2 variants
->>   arm64: dts: juno: add missing CoreSight STM component
->>
->> Sudeep Holla (1):
->>   arm64: dts: juno: refactor CoreSight support on Juno r0
->>
->>  arch/arm64/boot/dts/arm/juno-base.dtsi    |  31 ++++++---
->>  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 102 ++++++++++++++++++++++++++++++
->>  arch/arm64/boot/dts/arm/juno-r1.dts       |  13 ++++
->>  arch/arm64/boot/dts/arm/juno-r2.dts       |  13 ++++
->>  arch/arm64/boot/dts/arm/juno.dts          |  24 +++++++
->>  5 files changed, 175 insertions(+), 8 deletions(-)
->>  create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+On Thu, Jan 12, 2017 at 03:44:53AM +0800, Icenowy Zheng wrote:
 > 
-> For the set:
 > 
-> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Tested-by: Mathieu Poirier <mathieu.poirier@linaro.org> (On R0 only)
+> 12.01.2017, 03:40, "Icenowy Zheng" <icenowy@aosc.xyz>:
+> > 11.01.2017, 02:10, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> >> ?On Tue, Jan 03, 2017 at 11:16:26PM +0800, Icenowy Zheng wrote:
+> >>> ??V3s has a similar but cut-down CCU to H3.
+> >>>
+> >>> ??Add support for it.
+> >>>
+> >>> ??Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> >>
+> >> ?It looks like there's nothing different but the clocks that you
+> >> ?register with the H3, please just use the H3 driver.
+> >
+> > Nope.
+> >
+> > It has a different PLL (PLL_ISP) at different address, and some
+> > different muxes.
 > 
+> Forgot to mention the missing of PLL_DE and related misses.
 
-Thanks for reviewing and testing.
+Those are not conflicting, it's just a slightly different set of
+clocks.
+
+So there's really nothing undoable.
+
+Maxime
 
 -- 
-Regards,
-Sudeep
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170112/c54bf580/attachment.sig>
