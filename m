@@ -1,30 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 12 Jan 2017 18:39:57 +0100
-Subject: [PATCH] ASoC: sunxi: Add bindings for sun8i to SPDIF
-In-Reply-To: <20170112173343.9953-1-codekipper@gmail.com>
-References: <20170112173343.9953-1-codekipper@gmail.com>
-Message-ID: <20170112173957.u4bnjbzfytrbi4so@lukather>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Thu, 12 Jan 2017 18:40:51 +0100
+Subject: [PATCH v2] ARM64: dts: meson-gxbb-odroidc2: Disable SCPI DVFS
+In-Reply-To: <1483689872-30389-1-git-send-email-narmstrong@baylibre.com>
+References: <1483689872-30389-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CAFBinCDmF2-W4SFMSNrYwUpejYkV=rw-f3yhG3=mTmWxy4J8uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 06:33:43PM +0100, codekipper at gmail.com wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
-> 
-> The H3 SoC uses the same SPDIF block as found in earlier SoCs, but the
-> transmit fifo is at a different address.
-> 
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+Hi Neil,
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+(adding Brian Kim, one of the Hardkernel developers to this conversation)
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170112/388153bd/attachment.sig>
+On Fri, Jan 6, 2017 at 9:04 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> The current hardware is not able to run with all cores enabled at a
+> cluster frequency superior at 1536MHz.
+> But the currently shipped u-boot for the platform still reports an OPP
+> table with possible DVFS frequency up to 2GHz, and will not change since
+> the off-tree linux tree supports limiting the OPPs with a kernel parameter.
+> A recent u-boot change reports the boot-time DVFS around 100MHz and
+> the default performance cpufreq governor sets the maximum frequency.
+> Previous version of u-boot reported to be already at the max OPP and
+> left the OPP as is.
+> Nevertheless, other governors like ondemand could setup the max frequency
+> and make the system crash.
+>
+> This patch disables the DVFS clock and disables cpufreq.
+I don't have any Odroid-C2 board, but having to live without cpufreq
+sounds bad for the Odroid-C2 users.
+What would we expect from a kernel perspective (maybe the Hardkernel
+guys would adjust their u-boot instead of us adjusting to the behavior
+of one specific device? one solution that I could think of involves
+the "maxcpus" kernel parameter (see [0]), if this is not set u-boot
+should report a max CPU frequency of 1536MHz (= max frequency for 4
+active cores). Based on the "maxcpus" value additional frequencies can
+be unlocked (this could be step-by-step if there are different
+frequencies for one core/two cores/etc.). However, I'd like to hear
+other opinions as well.
+
+
+Regards,
+Martin
+
+
+[0] http://lxr.free-electrons.com/source/Documentation/kernel-parameters.txt?v=4.8#L2163
