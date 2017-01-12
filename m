@@ -1,192 +1,172 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 12 Jan 2017 18:07:26 +0000
-Subject: [RFC PATCH v4 0/5] ARM: Fix dma_alloc_coherent() and friends for
- NOMMU
-In-Reply-To: <78458e5f-6b30-ab9b-1226-83fe3a844e3a@arm.com>
-References: <1484057925-23586-1-git-send-email-vladimir.murzin@arm.com>
- <CA+M3ks5JP14SzprzE90-ST8b3URJECgpJ=dxw5XKvaxYEF3UCw@mail.gmail.com>
- <f4d17374-eb46-79f7-e394-cb2739f71ef4@arm.com>
- <CA+M3ks5jTNSLLOetvOUZP=B=a2wPNjXadbw6Zcn475Okc4QEPw@mail.gmail.com>
- <CA+M3ks6abvJV1RJtZhD1ixrnVhC5V3PL1+7DdwB+_tVg+vTkaw@mail.gmail.com>
- <1908ef72-beb0-1855-3c49-d5a37f014c17@arm.com>
- <c9bb8baa-ae3d-27cd-8c9f-2d77e1f5c62b@arm.com>
- <78458e5f-6b30-ab9b-1226-83fe3a844e3a@arm.com>
-Message-ID: <8a428278-fe0f-ca1f-2b6a-96fdbb363db4@arm.com>
+From: tbaicar@codeaurora.org (Tyler Baicar)
+Date: Thu, 12 Jan 2017 11:15:14 -0700
+Subject: [PATCH V7 00/10] Add UEFI 2.6 and ACPI 6.1 updates for RAS on ARM64
+Message-ID: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/17 17:15, Vladimir Murzin wrote:
-> On 12/01/17 17:04, Robin Murphy wrote:
->> On 12/01/17 16:52, Vladimir Murzin wrote:
->>> On 12/01/17 10:55, Benjamin Gaignard wrote:
->>>> 2017-01-12 11:35 GMT+01:00 Benjamin Gaignard <benjamin.gaignard@linaro.org>:
->>>>> 2017-01-11 15:34 GMT+01:00 Vladimir Murzin <vladimir.murzin@arm.com>:
->>>>>> On 11/01/17 13:17, Benjamin Gaignard wrote:
->>>>>>> 2017-01-10 15:18 GMT+01:00 Vladimir Murzin <vladimir.murzin@arm.com>:
->>>>>>>> Hi,
->>>>>>>>
->>>>>>>> It seem that addition of cache support for M-class cpus uncovered
->>>>>>>> latent bug in DMA usage. NOMMU memory model has been treated as being
->>>>>>>> always consistent; however, for R/M classes of cpu memory can be
->>>>>>>> covered by MPU which in turn might configure RAM as Normal
->>>>>>>> i.e. bufferable and cacheable. It breaks dma_alloc_coherent() and
->>>>>>>> friends, since data can stuck in caches now or be buffered.
->>>>>>>>
->>>>>>>> This patch set is trying to address the issue by providing region of
->>>>>>>> memory suitable for consistent DMA operations. It is supposed that
->>>>>>>> such region is marked by MPU as non-cacheable. Robin suggested to
->>>>>>>> advertise such memory as reserved shared-dma-pool, rather then using
->>>>>>>> homebrew command line option, and extend dma-coherent to provide
->>>>>>>> default DMA area in the similar way as it is done for CMA (PATCH
->>>>>>>> 2/5). It allows us to offload all bookkeeping on generic coherent DMA
->>>>>>>> framework, and it is seems that it might be reused by other
->>>>>>>> architectures like c6x and blackfin.
->>>>>>>>
->>>>>>>> Dedicated DMA region is required for cases other than:
->>>>>>>>  - MMU/MPU is off
->>>>>>>>  - cpu is v7m w/o cache support
->>>>>>>>  - device is coherent
->>>>>>>>
->>>>>>>> In case one of the above conditions is true dma operations are forced
->>>>>>>> to be coherent and wired with dma_noop_ops.
->>>>>>>>
->>>>>>>> To make life easier NOMMU dma operations are kept in separate
->>>>>>>> compilation unit.
->>>>>>>>
->>>>>>>> Since the issue was reported in the same time as Benjamin sent his
->>>>>>>> patch [1] to allow mmap for NOMMU, his case is also addressed in this
->>>>>>>> series (PATCH 1/5 and PATCH 3/5).
->>>>>>>>
->>>>>>>> Thanks!
->>>>>>>
->>>>>>> I have tested this v4 on my setup (stm32f4, no cache, no MPU) and unfortunately
->>>>>>> it doesn't work with my drm/kms driver.
->>>>>>
->>>>>> I guess the same is for fbmem, but would be better to have confirmation since
->>>>>> amba-clcd I use has not been ported to drm/kms (yet), so I can't test.
->>>>>>
->>>>>>> I haven't any errors but nothing is displayed unlike what I have when
->>>>>>> using current dma-mapping
->>>>>>> code.
->>>>>>> I guess the issue is coming from dma-noop where __get_free_pages() is
->>>>>>> used instead of alloc_pages()
->>>>>>> in dma-mapping.
->>>>>>
->>>>>> Unless I've missed something bellow is a call stack for both
->>>>>>
->>>>>> #1
->>>>>> __alloc_simple_buffer
->>>>>>         __dma_alloc_buffer
->>>>>>                 alloc_pages
->>>>>>                 split_page
->>>>>>                 __dma_clear_buffer
->>>>>>                         memset
->>>>>>         page_address
->>>>>>
->>>>>> #2
->>>>>> __get_free_pages
->>>>>>         alloc_pages
->>>>>>         page_address
->>>>>>
->>>>>> So the difference is that nommu case in dma-mapping.c memzeros memory, handles
->>>>>> DMA_ATTR_NO_KERNEL_MAPPING and does optimisation of memory usage.
->>>>>>
->>>>>> Is something from above critical for your driver?
->>>>>
->>>>> I have removed all the diff (split_page,  __dma_clear_buffer, memset)
->>>>> from #1 and it is still working.
->>>>> DMA_ATTR_NO_KERNEL_MAPPING flag is not set when allocating the buffer.
->>>>>
->>>>> I have investigated more and found that dma-noop doesn't take care of
->>>>> "dma-ranges" property which is set in DT.
->>>>> I believed that is the root cause of my problem with your patches.
->>>>
->>>> After testing changing virt_to_phys to virt_to_dma in dma-noop.c fix the issue
->>>> modetest and fbdemo are now still functional.
->>>>
->>>
->>> Thanks for narrowing it down! I did not noticed that stm32f4 remap its memory,
->>> so dma-ranges property is in use.
->>>
->>> It looks like virt_to_dma is ARM specific, so I probably have to discard idea
->>> of reusing dma-noop-ops and switch logic into dma-mapping-nommu.c based on
->>> is_device_dma_coherent(dev) check.
->>
->> dma_pfn_offset is a member of struct device, so it should be OK for
->> dma_noop_ops to also make reference to it (and assume it's zero if not
->> explicitly set).
->>
->>> Meanwhile, I'm quite puzzled on how such memory remaping should work together
->>> with reserved memory. It seem it doesn't account dma-ranges while reserving
->>> memory (it is too early) nor while allocating/mapping/etc.
->>
->> The reserved memory is described in terms of CPU physical addresses, so
->> a device offset shouldn't matter from that perspective. It only comes
->> into play at the point you generate the dma_addr_t to hand off to the
->> device - only then do you need to transform the CPU physical address of
->> the allocated/mapped page into the device's view of that page (i.e.
->> subtract the offset).
-> 
-> Thanks for explanation! So dma-coherent.c should be modified, right? I see
-> that some architectures provide phys_to_dma/dma_to_phys helpers primary for
-> swiotlb, is it safe to reuse them given that default implementation is
-> provided? Nothing under Documentation explains how they supposed to be used,
-> sorry if asking stupid question.
+When a memory error, CPU error, PCIe error, or other type of hardware error
+that's covered by RAS occurs, firmware should populate the shared GHES memory
+location with the proper GHES structures to notify the OS of the error.
+For example, platforms that implement firmware first handling may implement
+separate GHES sources for corrected errors and uncorrected errors. If the
+error is an uncorrectable error, then the firmware will notify the OS
+immediately since the error needs to be handled ASAP. The OS will then be able
+to take the appropriate action needed such as offlining a page. If the error
+is a corrected error, then the firmware will not interrupt the OS immediately.
+Instead, the OS will see and report the error the next time it's GHES timer
+expires. The kernel will first parse the GHES structures and report the errors
+through the kernel logs and then notify the user space through RAS trace
+events. This allows user space applications such as RAS Daemon to see the
+errors and report them however the user desires. This patchset extends the
+kernel functionality for RAS errors based on updates in the UEFI 2.6 and
+ACPI 6.1 specifications.
 
-Those are essentially SWIOTLB-specific, so can't be universally relied
-upon. I think something like this ought to suffice:
+An example flow from firmware to user space could be:
 
----8<---
-diff --git a/lib/dma-noop.c b/lib/dma-noop.c
-index 3d766e78fbe2..fbb1b37750d5 100644
---- a/lib/dma-noop.c
-+++ b/lib/dma-noop.c
-@@ -8,6 +8,11 @@
- #include <linux/dma-mapping.h>
- #include <linux/scatterlist.h>
+                 +---------------+
+       +-------->|               |
+       |         |  GHES polling |--+
++-------------+  |    source     |  |   +---------------+   +------------+
+|             |  +---------------+  |   |  Kernel GHES  |   |            |
+|  Firmware   |                     +-->|  CPER AER and |-->|  RAS trace |
+|             |  +---------------+  |   |  EDAC drivers |   |   event    |
++-------------+  |               |  |   +---------------+   +------------+
+       |         |  GHES sci     |--+
+       +-------->|   source      |
+                 +---------------+
 
-+static dma_addr_t dma_noop_dev_offset(struct device *dev)
-+{
-+       return (dma_addr_t)dev->dma_pfn_offset << PAGE_SHIFT;
-+}
-+
- static void *dma_noop_alloc(struct device *dev, size_t size,
-                            dma_addr_t *dma_handle, gfp_t gfp,
-                            unsigned long attrs)
-@@ -16,7 +21,7 @@ static void *dma_noop_alloc(struct device *dev, size_t
-size,
+Add support for Generic Hardware Error Source (GHES) v2, which introduces the
+capability for the OS to acknowledge the consumption of the error record
+generated by the Reliability, Availability and Serviceability (RAS) controller.
+This eliminates potential race conditions between the OS and the RAS controller.
 
-        ret = (void *)__get_free_pages(gfp, get_order(size));
-        if (ret)
--               *dma_handle = virt_to_phys(ret);
-+               *dma_handle = virt_to_phys(ret) - dma_noop_dev_offset(dev);
-        return ret;
- }
+Add support for the timestamp field added to the Generic Error Data Entry v3,
+allowing the OS to log the time that the error is generated by the firmware,
+rather than the time the error is consumed. This improves the correctness of
+event sequences when analyzing error logs. The timestamp is added in
+ACPI 6.1, reference Table 18-343 Generic Error Data Entry.
 
-@@ -32,7 +37,7 @@ static dma_addr_t dma_noop_map_page(struct device
-*dev, struct page *page,
-                                      enum dma_data_direction dir,
-                                      unsigned long attrs)
- {
--       return page_to_phys(page) + offset;
-+       return page_to_phys(page) + offset - dma_noop_dev_offset(dev);
- }
+Add support for ARMv8 Common Platform Error Record (CPER) per UEFI 2.6
+specification. ARMv8 specific processor error information is reported as part of
+the CPER records.  This provides more detail on for processor error logs. This
+can help describe ARMv8 cache, tlb, and bus errors.
 
- static int dma_noop_map_sg(struct device *dev, struct scatterlist *sgl,
-int nents,
-@@ -47,7 +52,8 @@ static int dma_noop_map_sg(struct device *dev, struct
-scatterlist *sgl, int nent
+Synchronous External Abort (SEA) represents a specific processor error condition
+in ARM systems. A handler is added to recognize SEA errors, and a notifier is
+added to parse and report the errors before the process is killed. Refer to
+section N.2.1.1 in the Common Platform Error Record appendix of the UEFI 2.6
+specification.
 
-                BUG_ON(!sg_page(sg));
-                va = sg_virt(sg);
--               sg_dma_address(sg) = (dma_addr_t)virt_to_phys(va);
-+               sg_dma_address(sg) = (dma_addr_t)virt_to_phys(va) -
-+                                       dma_noop_dev_offset(dev);
-                sg_dma_len(sg) = sg->length;
-        }
---->8---
+Currently the kernel ignores CPER records that are unrecognized.
+On the other hand, UEFI spec allows for non-standard (eg. vendor
+proprietary) error section type in CPER (Common Platform Error Record),
+as defined in section N2.3 of UEFI version 2.5. Therefore, user
+is not able to see hardware error data of non-standard section.
 
-intentionally whitespace-damaged by copy-pasting off my terminal to
-emphasise how utterly untested it is ;)
+If section Type field of Generic Error Data Entry is unrecognized,
+prints out the raw data in dmesg buffer, and also adds a tracepoint
+for reporting such hardware errors.
 
-Robin.
+Currently even if an error status block's severity is fatal, the kernel
+does not honor the severity level and panic. With the firmware first
+model, the platform could inform the OS about a fatal hardware error
+through the non-NMI GHES notification type. The OS should panic when a
+hardware error record is received with this severity.
+
+Add support to handle SEAs that occur while a KVM guest kernel is
+running. Currently these are unsupported by the guest abort handling.
+
+V7: Update a couple prints for ARM processor errors
+    Add Print notifying if overflow occurred for ARM processor errors
+    Check for ARM configuration to allow the compiler to ignore ARM code
+     on non-ARM systems
+    Use SEA acronym instead of spelling it out
+    Update fault_info prints to be more clear
+    Add NMI locking to SEA notification
+    Remove error info structure from ARM trace event since there can be
+     a variable amount of these structures
+
+V6: Change HEST_TYPE_GENERIC_V2 to IS_HEST_TYPE_GENERIC_V2 for readability
+    Move APEI helper defines from cper.h to ghes.h
+    Add data_len decrement back into print loop
+    Change references to ARMv8 to just ARM
+    Rewrite ARM processor context info parsing
+    Check valid bit of ARM error info field before printing it
+    Add include of linux/uuid.h in ghes.c
+
+V5: Fix GHES goto logic for error conditions
+    Change ghes_do_read_ack to ghes_ack_error
+    Make sure data version check is >= 3
+    Use CPER helper functions in print functions
+    Make handle_guest_sea() dummy function static for arm
+    Add arm to subject line for KVM patch
+
+V4: Add bit offset left shift to read_ack_write value
+    Make HEST generic and generic_v2 structures a union in the ghes structure
+    Move gdata v3 helper functions into ghes.h to avoid duplication
+    Reorder the timestamp print and avoid memcpy
+    Add helper functions for gdata size checking
+    Rename the SEA functions
+    Add helper function for GHES panics
+    Set fru_id to NULL UUID at variable declaration
+    Limit ARM trace event parameters to the needed structures
+    Reorder the ARM trace event variables to save space
+    Add comment for why we don't pass SEAs to the guest when it aborts
+    Move ARM trace event call into GHES driver instead of CPER
+
+V3: Fix unmapped address to the read_ack_register in ghes.c
+    Add helper function to get the proper payload based on generic data entry
+     version
+    Move timestamp print to avoid changing function calls in cper.c
+    Remove patch "arm64: exception: handle instruction abort at current EL"
+     since the el1_ia handler is already added in 4.8
+    Add EFI and ARM64 dependencies for HAVE_ACPI_APEI_SEA
+    Add a new trace event for ARM type errors
+    Add support to handle KVM guest SEAs
+
+V2: Add PSCI state print for the ARMv8 error type.
+    Separate timestamp year into year and century using BCD format.
+    Rebase on top of ACPICA 20160318 release and remove header file changes
+     in include/acpi/actbl1.h.
+    Add panic OS with fatal error status block patch.
+    Add processing of unrecognized CPER error section patches with updates
+     from previous comments. Original patches: https://lkml.org/lkml/2015/9/8/646
+
+V1: https://lkml.org/lkml/2016/2/5/544
+
+Jonathan (Zhixiong) Zhang (1):
+  acpi: apei: panic OS with fatal error status block
+
+Tyler Baicar (9):
+  acpi: apei: read ack upon ghes record consumption
+  ras: acpi/apei: cper: generic error data entry v3 per ACPI 6.1
+  efi: parse ARM processor error
+  arm64: exception: handle Synchronous External Abort
+  acpi: apei: handle SEA notification type for ARMv8
+  efi: print unrecognized CPER section
+  ras: acpi / apei: generate trace event for unrecognized CPER section
+  trace, ras: add ARM processor error trace event
+  arm/arm64: KVM: add guest SEA support
+
+ arch/arm/include/asm/kvm_arm.h       |   1 +
+ arch/arm/include/asm/system_misc.h   |   5 +
+ arch/arm/kvm/mmu.c                   |  18 ++-
+ arch/arm64/Kconfig                   |   2 +
+ arch/arm64/include/asm/kvm_arm.h     |   1 +
+ arch/arm64/include/asm/system_misc.h |  15 +++
+ arch/arm64/mm/fault.c                |  71 ++++++++++--
+ drivers/acpi/apei/Kconfig            |  14 +++
+ drivers/acpi/apei/ghes.c             | 188 ++++++++++++++++++++++++++++---
+ drivers/acpi/apei/hest.c             |   7 +-
+ drivers/firmware/efi/cper.c          | 209 ++++++++++++++++++++++++++++++++---
+ drivers/ras/ras.c                    |   2 +
+ include/acpi/ghes.h                  |  27 ++++-
+ include/linux/cper.h                 |  54 +++++++++
+ include/ras/ras_event.h              |  79 +++++++++++++
+ 15 files changed, 649 insertions(+), 44 deletions(-)
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
