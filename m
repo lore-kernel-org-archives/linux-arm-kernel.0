@@ -1,153 +1,53 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 12 Jan 2017 15:56:02 +0530
-Subject: [PATCH 13/37] PCI: dwc: Remove dependency of designware to CONFIG_PCI
+Date: Thu, 12 Jan 2017 15:55:51 +0530
+Subject: [PATCH 02/37] PCI: dwc: designware: Add new *ops* for cpu addr fixup
 In-Reply-To: <1484216786-17292-1-git-send-email-kishon@ti.com>
 References: <1484216786-17292-1-git-send-email-kishon@ti.com>
-Message-ID: <1484216786-17292-14-git-send-email-kishon@ti.com>
+Message-ID: <1484216786-17292-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_PCI is used to enable the host mode PCI. In preparation for adding
-endpoint mode support to designware driver, remove the dependency of
-designware to CONFIG_PCI and make only the host specific part depend on
-CONFIG_PCI.
+Some platforms (like dra7xx) require only the least 28 bits of the
+corresponding 32 bit CPU address to be programmed in the address
+translation unit. This modified address is stored in io_base/mem_base/
+cfg0_base/cfg1_base in dra7xx_pcie_host_init. While this is okay for
+host mode where the address range is fixed, device mode requires
+different addresses to be programmed based on the host buffer address.
+Add a new ops to get the least 28 bits of the corresponding 32 bit
+CPU address and invoke it before programming the address translation
+unit.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/Makefile        |    3 +++
- drivers/pci/Makefile    |    3 ---
- drivers/pci/dwc/Kconfig |   13 ++++++++++++-
- 3 files changed, 15 insertions(+), 4 deletions(-)
+ drivers/pci/dwc/pcie-designware.c |    3 +++
+ drivers/pci/dwc/pcie-designware.h |    1 +
+ 2 files changed, 4 insertions(+)
 
-diff --git a/drivers/Makefile b/drivers/Makefile
-index 060026a..f521cb0 100644
---- a/drivers/Makefile
-+++ b/drivers/Makefile
-@@ -15,6 +15,9 @@ obj-$(CONFIG_PINCTRL)		+= pinctrl/
- obj-$(CONFIG_GPIOLIB)		+= gpio/
- obj-y				+= pwm/
- obj-$(CONFIG_PCI)		+= pci/
-+# PCI dwc controller drivers
-+obj-y				+= pci/dwc/
+diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
+index bed1999..d68bc7b 100644
+--- a/drivers/pci/dwc/pcie-designware.c
++++ b/drivers/pci/dwc/pcie-designware.c
+@@ -195,6 +195,9 @@ static void dw_pcie_prog_outbound_atu(struct pcie_port *pp, int index,
+ {
+ 	u32 retries, val;
+ 
++	if (pp->ops->cpu_addr_fixup)
++		cpu_addr = pp->ops->cpu_addr_fixup(cpu_addr);
 +
- obj-$(CONFIG_PARISC)		+= parisc/
- obj-$(CONFIG_RAPIDIO)		+= rapidio/
- obj-y				+= video/
-diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
-index b7e9751..8db5079 100644
---- a/drivers/pci/Makefile
-+++ b/drivers/pci/Makefile
-@@ -66,8 +66,5 @@ obj-$(CONFIG_OF) += of.o
+ 	if (pp->iatu_unroll_enabled) {
+ 		dw_pcie_writel_unroll(pp, index, PCIE_ATU_UNR_LOWER_BASE,
+ 			lower_32_bits(cpu_addr));
+diff --git a/drivers/pci/dwc/pcie-designware.h b/drivers/pci/dwc/pcie-designware.h
+index a567ea2..32f4602 100644
+--- a/drivers/pci/dwc/pcie-designware.h
++++ b/drivers/pci/dwc/pcie-designware.h
+@@ -54,6 +54,7 @@ struct pcie_port {
+ };
  
- ccflags-$(CONFIG_PCI_DEBUG) := -DDEBUG
- 
--# PCI dwc controller drivers
--obj-y += dwc/
--
- # PCI host controller drivers
- obj-y += host/
-diff --git a/drivers/pci/dwc/Kconfig b/drivers/pci/dwc/Kconfig
-index d0bdfb5..bee8b52 100644
---- a/drivers/pci/dwc/Kconfig
-+++ b/drivers/pci/dwc/Kconfig
-@@ -1,16 +1,17 @@
- menu "DesignWare PCI Core Support"
--	depends on PCI
- 
- config PCIE_DW
- 	bool
- 
- config PCIE_DW_HOST
-         bool
-+	depends on PCI
- 	depends on PCI_MSI_IRQ_DOMAIN
-         select PCIE_DW
- 
- config PCI_DRA7XX
- 	bool "TI DRA7xx PCIe controller"
-+	depends on PCI
- 	depends on OF && HAS_IOMEM && TI_PIPE3
- 	depends on PCI_MSI_IRQ_DOMAIN
- 	select PCIE_DW_HOST
-@@ -21,6 +22,7 @@ config PCI_DRA7XX
- 
- config PCIE_DW_PLAT
- 	bool "Platform bus based DesignWare PCIe Controller"
-+	depends on PCI
- 	depends on PCI_MSI_IRQ_DOMAIN
- 	select PCIE_DW_HOST
- 	---help---
-@@ -33,6 +35,7 @@ config PCIE_DW_PLAT
- 
- config PCI_EXYNOS
- 	bool "Samsung Exynos PCIe controller"
-+	depends on PCI
- 	depends on SOC_EXYNOS5440 || COMPILE_TEST
- 	depends on PCI_MSI_IRQ_DOMAIN
- 	select PCIEPORTBUS
-@@ -40,6 +43,7 @@ config PCI_EXYNOS
- 
- config PCI_IMX6
- 	bool "Freescale i.MX6 PCIe controller"
-+	depends on PCI
- 	depends on SOC_IMX6Q || COMPILE_TEST
- 	depends on PCI_MSI_IRQ_DOMAIN
- 	select PCIEPORTBUS
-@@ -47,6 +51,7 @@ config PCI_IMX6
- 
- config PCIE_SPEAR13XX
- 	bool "STMicroelectronics SPEAr PCIe controller"
-+	depends on PCI
- 	depends on ARCH_SPEAR13XX || COMPILE_TEST
- 	depends on PCI_MSI_IRQ_DOMAIN
- 	select PCIEPORTBUS
-@@ -56,6 +61,7 @@ config PCIE_SPEAR13XX
- 
- config PCI_KEYSTONE
- 	bool "TI Keystone PCIe controller"
-+	depends on PCI
- 	depends on ARCH_KEYSTONE || COMPILE_TEST
- 	depends on PCI_MSI_IRQ_DOMAIN
- 	select PCIEPORTBUS
-@@ -68,6 +74,7 @@ config PCI_KEYSTONE
- 
- config PCI_LAYERSCAPE
- 	bool "Freescale Layerscape PCIe controller"
-+	depends on PCI
- 	depends on OF && (ARM || ARCH_LAYERSCAPE || COMPILE_TEST)
- 	depends on PCI_MSI_IRQ_DOMAIN
- 	select MFD_SYSCON
-@@ -78,6 +85,7 @@ config PCI_LAYERSCAPE
- config PCI_HISI
- 	depends on OF && ARM64
- 	bool "HiSilicon Hip05 and Hip06 SoCs PCIe controllers"
-+	depends on PCI
- 	depends on PCI_MSI_IRQ_DOMAIN
- 	select PCIEPORTBUS
- 	select PCIE_DW_HOST
-@@ -87,6 +95,7 @@ config PCI_HISI
- 
- config PCIE_QCOM
- 	bool "Qualcomm PCIe controller"
-+	depends on PCI
- 	depends on (ARCH_QCOM || COMPILE_TEST) && OF
- 	depends on PCI_MSI_IRQ_DOMAIN
- 	select PCIEPORTBUS
-@@ -98,6 +107,7 @@ config PCIE_QCOM
- 
- config PCIE_ARMADA_8K
- 	bool "Marvell Armada-8K PCIe controller"
-+	depends on PCI
- 	depends on ARCH_MVEBU || COMPILE_TEST
- 	depends on PCI_MSI_IRQ_DOMAIN
- 	select PCIEPORTBUS
-@@ -110,6 +120,7 @@ config PCIE_ARMADA_8K
- 
- config PCIE_ARTPEC6
- 	bool "Axis ARTPEC-6 PCIe controller"
-+	depends on PCI
- 	depends on MACH_ARTPEC6 || COMPILE_TEST
- 	depends on PCI_MSI_IRQ_DOMAIN
- 	select PCIEPORTBUS
+ struct pcie_host_ops {
++	u64 (*cpu_addr_fixup)(u64 cpu_addr);
+ 	u32 (*readl_rc)(struct pcie_port *pp, u32 reg);
+ 	void (*writel_rc)(struct pcie_port *pp, u32 reg, u32 val);
+ 	int (*rd_own_conf)(struct pcie_port *pp, int where, int size, u32 *val);
 -- 
 1.7.9.5
