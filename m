@@ -1,229 +1,46 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Thu, 12 Jan 2017 18:11:35 +0100
-Subject: [linux-sunxi][PATCH] ARM: dts: sun8i-h3: Add dts for the Beelink X2
- STB
-Message-ID: <20170112171135.7822-1-codekipper@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 12 Jan 2017 18:13:45 +0100
+Subject: [linux-sunxi] Re: [PATCH 2/5] clk: sunxi-ng: add support for V3s
+ CCU
+In-Reply-To: <20170111065524.tILSH8cS@smtp1p.mail.yandex.net>
+References: <20170111065524.tILSH8cS@smtp1p.mail.yandex.net>
+Message-ID: <20170112171345.nzkgg6jjyz6ywb54@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+Hi,
 
-The Beelink X2 is an STB based on the Allwinner H3 SoC with a uSD slot,
-2 USB ports( 1 * USB-2 Host, 1 USB OTG), a 10/100M ethernet port using the
-SoC's integrated PHY, Wifi via a RTL8189ETV sdio wifi chip, HDMI, an IR
-receiver, 1 LEDs and an optical S/PDIF connector.
+On Wed, Jan 11, 2017 at 11:55:16AM +0800, Icenowy Zheng wrote:
+> 
+> 2017?1?11? 02:10? Maxime Ripard <maxime.ripard@free-electrons.com>???
+> >
+> > On Tue, Jan 03, 2017 at 11:16:26PM +0800, Icenowy Zheng wrote: 
+> > > V3s has a similar but cut-down CCU to H3. 
+> > > 
+> > > Add support for it. 
+> > > 
+> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz> 
+> >
+> > It looks like there's nothing different but the clocks that you 
+> > register with the H3, please just use the H3 driver. 
+> 
+> USB gate part is different, and many things have gone.
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
----
- arch/arm/boot/dts/Makefile                |   1 +
- arch/arm/boot/dts/sun8i-h3-beelink-x2.dts | 187 ++++++++++++++++++++++++++++++
- 2 files changed, 188 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
+As far as I can see, you're only adding a few clocks, and removing a
+bunch. This is definitely something that can be dealt with by simply
+registering a slightly different set of clocks, like we're doing on
+sun5i.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 78a94b747059..75960b1468a4 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -857,6 +857,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a83t-cubietruck-plus.dtb \
- 	sun8i-h2-plus-orangepi-zero.dtb \
- 	sun8i-h3-bananapi-m2-plus.dtb \
-+	sun8i-h3-beelink-x2.dtb \
- 	sun8i-h3-nanopi-m1.dtb	\
- 	sun8i-h3-nanopi-neo.dtb \
- 	sun8i-h3-orangepi-2.dtb \
-diff --git a/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts b/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
-new file mode 100644
-index 000000000000..bc5aed52cb1d
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
-@@ -0,0 +1,187 @@
-+/*
-+ * Copyright (C) 2017 Marcus Cooper <codekipper@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun8i-h3.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Beelink X2";
-+	compatible = "roofull,beelink-x2", "allwinner,sun8i-h3";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		/* ethernet0 is the H3 emac, defined in sun8i-h3.dtsi */
-+		ethernet1 = &rtl8189ftv;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwr_led_x2>;
-+
-+		pwr_led {
-+			label = "beelink-x2:red:pwr";
-+			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
-+			default-state = "on";
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sw_r_x2>;
-+
-+		sw4 {
-+			label = "power";
-+			linux,code = <BTN_0>;
-+			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wifi_en_x2>;
-+		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
-+	};
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&ir {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir_pins_a>;
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins_a>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+
-+	/*
-+	 * Explicitly define the sdio device, so that we can add an ethernet
-+	 * alias for it (which e.g. makes u-boot set a mac-address).
-+	 */
-+	rtl8189ftv: sdio_wifi at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_8bit_pins>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <8>;
-+	non-removable;
-+	cap-mmc-hw-reset;
-+	status = "okay";
-+};
-+
-+&mmc2_8bit_pins {
-+	/* Increase drive strength for DDR modes */
-+	drive-strength = <40>;
-+	/* eMMC is missing pull-ups */
-+	bias-pull-up;
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&r_pio {
-+	pwr_led_x2: led_pins at 0 {
-+		pins = "PL10";
-+		function = "gpio_out";
-+	};
-+
-+	sw_r_x2: key_pins at 0 {
-+		pins = "PL3";
-+		function = "gpio_in";
-+	};
-+
-+	wifi_en_x2: wifi_en_pin {
-+		pins = "PL7";
-+		function = "gpio_out";
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	/* USB VBUS is on as long as VCC-IO is on */
-+	status = "okay";
-+};
+Maxime
+
 -- 
-2.11.0
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170112/32eeed87/attachment.sig>
