@@ -1,35 +1,25 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Thu, 12 Jan 2017 02:05:45 +0200
-Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
- enable panel
-In-Reply-To: <CACRpkdYv87Tmp6i-vccVmtVD5NDk2y1=62sgP7VQgWctC+t3Tg@mail.gmail.com>
-References: <20161221032717.13154-1-vz@mleia.com>
- <CACRpkdZE6VgJA27+Wh=Gxd7yOXpLMyT7yCB2PYA36y0gvosHFQ@mail.gmail.com>
- <20170102142228.GI14217@n2100.armlinux.org.uk>
- <252ad888-fa9d-695a-58ed-46806e4374fd@mleia.com>
- <50499352-fa14-64c4-1a74-db4827757a2d@arm.com>
- <CACRpkdYv87Tmp6i-vccVmtVD5NDk2y1=62sgP7VQgWctC+t3Tg@mail.gmail.com>
-Message-ID: <330598fa-d331-3695-b0a2-3590059e2be4@mleia.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Thu, 12 Jan 2017 02:12:39 +0200
+Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device managed
+ functions
+In-Reply-To: <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
+References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-5-git-send-email-linux@roeck-us.net>
+ <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
+ <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
+Message-ID: <CAHp75VfUUJaCLXgZ+jNj18ZEMXSNnaw6UvEZcuP7J22apojPYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2017 05:16 PM, Linus Walleij wrote:
-> On Tue, Jan 10, 2017 at 2:47 PM, Vladimir Murzin
-> <vladimir.murzin@arm.com> wrote:
-> 
->> In another thread Benjamin pointed at patch [1] in drm/kms part for noMMU.
->>
->> [1] https://cgit.freedesktop.org/drm/drm-misc/commit/?id=62a0d98a188cc4ebd8ea54b37d274ec20465e464
-> 
-> Problem solved?
-> 
-> Vladimir: I do not require in any way that you create a CLCD driver for DRM,
-> I just think it would be very very nice...
-> 
+On Wed, Jan 11, 2017 at 12:52 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> On 01/11/2017 01:07 AM, Marc Gonzalez wrote:
+> Not really. It would just make it more complicated to replace the
+> call with devm_clk_prepare_enable(), should it ever find its way
+> into the light of day.
+Actually what is the status to the patch series which brings devm_clk
+stuff like prepare_enable()? It was submitted 2(?) years ago.
 
-I have no other option, this series is unreviewed and thus unlikely it will
-be applied, still a panel PCB on my board needs power management support.
-
---
-With best wishes,
-Vladimir
+-- 
+With Best Regards,
+Andy Shevchenko
