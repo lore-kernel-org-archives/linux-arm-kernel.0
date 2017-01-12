@@ -1,120 +1,55 @@
 From: christopher.lee.bostic@gmail.com (christopher.lee.bostic at gmail.com)
-Date: Thu, 12 Jan 2017 16:27:09 -0600
-Subject: [PATCH v2 06/18] drivers/fsi: Add FSI crc calculators to library
-Message-ID: <1484260029-79307-1-git-send-email-christopher.lee.bostic@gmail.com>
+Date: Thu, 12 Jan 2017 16:28:04 -0600
+Subject: [PATCH v2 07/18] drivers/fsi: Kick off master scan via sysfs
+Message-ID: <1484260084-79366-1-git-send-email-christopher.lee.bostic@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+From: Chris Bostic <cbostic@us.ibm.com>
 
-Add some helpers for the crc checks for the slave configuration table.
-This works 4-bits-at-a-time, using a simple table approach.
+Move master scan from automatic kick off early in kernel power up
+to a scan file that can be invoked at any particular time based
+on needs of a given platform.
 
-We will need this in the FSI core code, as well as any master
-implementations that need to calculate CRCs in software.
-
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
-
 ---
+ drivers/fsi/fsi-core.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-V2 - Move crc utilities out of the FSI core and move into linux/lib.
----
- include/linux/crc-fsi.h | 29 +++++++++++++++++++++++++++++
- lib/Makefile            |  1 +
- lib/crc-fsi.c           | 39 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 69 insertions(+)
- create mode 100644 include/linux/crc-fsi.h
- create mode 100644 lib/crc-fsi.c
-
-diff --git a/include/linux/crc-fsi.h b/include/linux/crc-fsi.h
-new file mode 100644
-index 0000000..e96d2f0
---- /dev/null
-+++ b/include/linux/crc-fsi.h
-@@ -0,0 +1,29 @@
-+/*
-+ * FSI CRC calculator
-+ *
-+ * Copyright (C) IBM Corporation 2016
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ *
-+ * Implements the standard FSI CRC:
-+ *
-+ *   Width 1 - 32
-+ *   Poly  0x0017 (x^4 + x^2 + x^1 + x^0)
-+ */
-+
-+#ifndef CRC_FSI_H
-+#define CRC_FSI_H
-+
-+#include <linux/types.h>
-+
-+uint8_t crc_fsi(uint8_t c, uint64_t x, int bits);
-+
-+#endif /* CRC_FSI_H */
-diff --git a/lib/Makefile b/lib/Makefile
-index 50144a3..c840628 100644
---- a/lib/Makefile
-+++ b/lib/Makefile
-@@ -230,3 +230,4 @@ obj-$(CONFIG_UBSAN) += ubsan.o
- UBSAN_SANITIZE_ubsan.o := n
+diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
+index 3160c1c..5f9f7a9 100644
+--- a/drivers/fsi/fsi-core.c
++++ b/drivers/fsi/fsi-core.c
+@@ -53,8 +53,19 @@ static int fsi_master_scan(struct fsi_master *master)
+ 			fsi_slave_init(master, link, slave_id);
  
- obj-$(CONFIG_SBITMAP) += sbitmap.o
-+obj-$(CONFIG_FSI) += crc-fsi.o
-diff --git a/lib/crc-fsi.c b/lib/crc-fsi.c
-new file mode 100644
-index 0000000..55cfe9d
---- /dev/null
-+++ b/lib/crc-fsi.c
-@@ -0,0 +1,39 @@
-+/*
-+ * FSI CRC calculator
-+ *
-+ * Copyright (C) IBM Corporation 2016
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/types.h>
-+#include <linux/crc-fsi.h>
-+
-+/* crc helpers */
-+static const uint8_t crc_fsi_tab[] = {
-+	0x0, 0x7, 0xe, 0x9, 0xb, 0xc, 0x5, 0x2,
-+	0x1, 0x6, 0xf, 0x8, 0xa, 0xd, 0x4, 0x3,
-+};
-+
-+uint8_t crc_fsi(uint8_t c, uint64_t x, int bits)
-+{
-+	int i;
-+
-+	/* Align to 4-bits */
-+	bits = (bits + 3) & ~0x3;
-+
-+	/* Calculate crc4 over four-bit nibbles, starting at the MSbit */
-+	for (i = bits; i >= 0; i -= 4)
-+		c = crc_fsi_tab[c ^ ((x >> i) & 0xf)];
-+
-+	return c;
+ 	return 0;
 +}
-+EXPORT_SYMBOL_GPL(crc_fsi);
++
++static ssize_t store_scan(struct device *dev,
++				struct device_attribute *attr,
++				const char *buf,
++				size_t count)
++{
++	struct fsi_master *master = dev_get_drvdata(dev);
+ 
++	fsi_master_scan(master);
++	return count;
+ }
++static DEVICE_ATTR(scan, 0200, NULL, store_scan);
+ 
+ int fsi_master_register(struct fsi_master *master)
+ {
+@@ -63,8 +74,8 @@ int fsi_master_register(struct fsi_master *master)
+ 
+ 	master->idx = ida_simple_get(&master_ida, 0, 0, GFP_KERNEL);
+ 	get_device(master->dev);
+-	fsi_master_scan(master);
+-	return 0;
++	dev_set_drvdata(master->dev, master);
++	return device_create_file(master->dev, &dev_attr_scan);
+ }
+ EXPORT_SYMBOL_GPL(fsi_master_register);
+ 
 -- 
 1.8.2.2
