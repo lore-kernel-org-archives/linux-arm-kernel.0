@@ -1,32 +1,78 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 12 Jan 2017 14:06:27 -0800
-Subject: [PATCH] clk: stm32f4: avoid uninitialized variable access
-In-Reply-To: <20170111134107.3821564-1-arnd@arndb.de>
-References: <20170111134107.3821564-1-arnd@arndb.de>
-Message-ID: <20170112220627.GQ17126@codeaurora.org>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Fri, 13 Jan 2017 00:12:56 +0200
+Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
+In-Reply-To: <20170111100139.GC12388@arm.com>
+References: <85015f1653eb7e36f992708362b75d1f4391b783.1484070340.git.robin.murphy@arm.com>
+ <4833e705fb6841fbfdbee3b1a21a7bc917292410.1484070340.git.robin.murphy@arm.com>
+ <20170111013046-mutt-send-email-mst@kernel.org>
+ <20170111100139.GC12388@arm.com>
+Message-ID: <20170112232931-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11, Arnd Bergmann wrote:
-> The failure path in the newly added function tries to free an
-> uninitialized pointer:
+On Wed, Jan 11, 2017 at 10:01:39AM +0000, Will Deacon wrote:
+> On Wed, Jan 11, 2017 at 01:33:31AM +0200, Michael S. Tsirkin wrote:
+> > On Tue, Jan 10, 2017 at 05:51:18PM +0000, Robin Murphy wrote:
+> > > From: Will Deacon <will.deacon@arm.com>
+> > > 
+> > > Booting Linux on an ARM fastmodel containing an SMMU emulation results
+> > > in an unexpected I/O page fault from the legacy virtio-blk PCI device:
+> > > 
+> > > [    1.211721] arm-smmu-v3 2b400000.smmu: event 0x10 received:
+> > > [    1.211800] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
+> > > [    1.211880] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
+> > > [    1.211959] arm-smmu-v3 2b400000.smmu:	0x00000008fa081002
+> > > [    1.212075] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
+> > > [    1.212155] arm-smmu-v3 2b400000.smmu: event 0x10 received:
+> > > [    1.212234] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
+> > > [    1.212314] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
+> > > [    1.212394] arm-smmu-v3 2b400000.smmu:	0x00000008fa081000
+> > > [    1.212471] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
+> > > 
+> > > <system hangs failing to read partition table>
+> > > 
+> > > This is because the virtio-blk is behind an SMMU, so we have consequently
+> > > swizzled its DMA ops and configured the SMMU to translate accesses. This
+> > > then requires the vring code to use the DMA API to establish translations,
+> > > otherwise all transactions will result in fatal faults and termination.
+> > > 
+> > > Given that ARM-based systems only see an SMMU if one is really present
+> > > (the topology is all described by firmware tables such as device-tree or
+> > > IORT), then we can safely use the DMA API for all virtio devices.
+> > > 
+> > > Cc: Andy Lutomirski <luto@kernel.org>
+> > > Cc: Michael S. Tsirkin <mst@redhat.com>
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > 
+> > I'd like to better understand then need for this one.
+> > Can't the device in question just set VIRTIO_F_IOMMU_PLATFORM ?
+> > 
+> > I'd rather we avoided need for more hacks and just
+> > have everyone switch to that.
 > 
-> drivers/clk/clk-stm32f4.c: In function 'stm32f4_rcc_init':
-> drivers/clk/clk-stm32f4.c:1106:4: error: 'gate' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> There are a couple of problems with VIRTIO_F_IOMMU_PLATFORM:
 > 
-> I'm adding an initialization to NULL here to make the kfree()
-> succeed, and I'm also rearranging the cleanup so that the
-> same kfree() is used for any error path, making the function
-> slightly more robust against newly introduced bugs in the
-> error handling.
+> 1. It doesn't exist for legacy devices, which are all we have on the
+>    platform in question.
 > 
-> Fixes: daf2d117cbca ("clk: stm32f4: Add lcd-tft clock")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
+> 2. It's not documented in the virtio sp^H^HSTOP PRESS. I see you applied
+>    my patch ;). Thanks.
+> 
+> In which case, for non-legacy devices we should definitely be using
+> VIRTIO_F_IOMMU_PLATFORM, but since this platform hasn't yet moved to the
+> world of flying cars, could we unconditionally set the DMA ops on ARM
+> for legacy devices? The alternative is disabling the SMMU altogether,
+> but that's less than ideal because there are non-virtio devices on the
+> same PCI bus.
+> 
+> Will
 
-Applied to clk-next. Seems I need to update my compiler to find
-these warnings.
+I'd rather people didn't use SMMU with legacy devices.
+Can't you guys just code up the virtio 1 layout in QEMU?
+I took a look and it's not a big deal now that two other
+transports converted, except mmio code in QEMU doesn't
+use linux header to it's a bit messy.
+I'll send a patch to clean that up.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+MST
