@@ -1,31 +1,22 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 12 Jan 2017 09:59:32 +0000
-Subject: [PATCH v3 2/5] arm64: Work around Falkor erratum 1003
-In-Reply-To: <20170111183738.GD29247@leverpostej>
-References: <20170111144118.17062-1-cov@codeaurora.org>
- <20170111144118.17062-2-cov@codeaurora.org>
- <20170111180627.GG20288@e104818-lin.cambridge.arm.com>
- <20170111183339.GC29247@leverpostej>
- <5da456f8-fcc5-b6e2-d58b-01a671da595b@codeaurora.org>
- <20170111183738.GD29247@leverpostej>
-Message-ID: <20170112095932.q54jyb33gxyp2ccu@localhost>
+From: yong.mao@mediatek.com (Yong Mao)
+Date: Thu, 12 Jan 2017 18:04:48 +0800
+Subject: [PATCH 0/2] Use data tune for CMD line tune
+Message-ID: <1484215490-7494-1-git-send-email-yong.mao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 06:37:39PM +0000, Mark Rutland wrote:
-> On Wed, Jan 11, 2017 at 12:35:55PM -0600, Timur Tabi wrote:
-> > On 01/11/2017 12:33 PM, Mark Rutland wrote:
-> > >It'll need to affect all lines since the kconfig column needs to expand
-> > >by at least one character to fit QCOM_FALKOR_ERRATUM_1003.
-> > 
-> > Or we can make the macro shorter.
-> 
-> The name, as it is, is perfectly descriptive.
-> 
-> Let's not sacrifice legibility over a non-issue.
+CMD response CRC error may cause cannot boot up
+Change to use data tune for CMD line
+Separate cmd internal delay for HS200/HS400 mode
 
-I agree, I didn't realise that the we expand the last column already.
-It's a non-issue indeed.
+yong mao (2):
+  mmc: mediatek: Use data tune for CMD line tune
+  mmc: dt-bindings: update Mediatek MMC bindings
+
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt |   6 +
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |   3 +
+ drivers/mmc/host/mtk-sd.c                        | 169 ++++++++++++++++++++---
+ 3 files changed, 155 insertions(+), 23 deletions(-)
 
 -- 
-Catalin
+1.8.1.1
