@@ -1,25 +1,30 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 12 Jan 2017 11:54:05 +0100
-Subject: [PATCH v2] Documentation: dt: reset: Revise typos in TI syscon
- reset example
-In-Reply-To: <20170112012217.18115-1-s-anna@ti.com>
-References: <20170109192814.26811-1-s-anna@ti.com>
- <20170112012217.18115-1-s-anna@ti.com>
-Message-ID: <1484218445.2376.10.camel@pengutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 12 Jan 2017 16:24:43 +0530
+Subject: [PATCH] ARM: dts: dra72-evm-revc: fix typo in ethernet-phy node
+Message-ID: <6027fbe6a797e840e57e25a35273aff39e2e00a7.1484218375.git.nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 11.01.2017, 19:22 -0600 schrieb Suman Anna:
-> Fix couple of typos in the example given in the TI syscon reset
-> binding. The ti,reset-bits used for DSP0 are corrected to match
-> the values that will be used in the actual DT node.
-> 
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> ---
-> v2: Address Rob Herring's comment to change the reset node name
->     from "psc-reset" to "reset-controller"
+Fix a typo in impedance setting for ethernet-phy at 3
 
-I've applied the patch, thank you.
+Fixes: b76db38cd8ae ("ARM: dts: dra72-evm-revc: add phy impedance settings")
+Cc: Mugunthan V N <mugunthanvnm@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/boot/dts/dra72-evm-revc.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-regards
-Philipp
+diff --git a/arch/arm/boot/dts/dra72-evm-revc.dts b/arch/arm/boot/dts/dra72-evm-revc.dts
+index c3d939c9666c..3f808a47df03 100644
+--- a/arch/arm/boot/dts/dra72-evm-revc.dts
++++ b/arch/arm/boot/dts/dra72-evm-revc.dts
+@@ -75,6 +75,6 @@
+ 		ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_25_NS>;
+ 		ti,tx-internal-delay = <DP83867_RGMIIDCTL_250_PS>;
+ 		ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_8_B_NIB>;
+-		ti,min-output-imepdance;
++		ti,min-output-impedance;
+ 	};
+ };
+-- 
+2.9.0
