@@ -1,40 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Jan 2017 09:27:03 +0100
-Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
- enable panel
-In-Reply-To: <330598fa-d331-3695-b0a2-3590059e2be4@mleia.com>
-References: <20161221032717.13154-1-vz@mleia.com>
- <CACRpkdZE6VgJA27+Wh=Gxd7yOXpLMyT7yCB2PYA36y0gvosHFQ@mail.gmail.com>
- <20170102142228.GI14217@n2100.armlinux.org.uk>
- <252ad888-fa9d-695a-58ed-46806e4374fd@mleia.com>
- <50499352-fa14-64c4-1a74-db4827757a2d@arm.com>
- <CACRpkdYv87Tmp6i-vccVmtVD5NDk2y1=62sgP7VQgWctC+t3Tg@mail.gmail.com>
- <330598fa-d331-3695-b0a2-3590059e2be4@mleia.com>
-Message-ID: <CACRpkdZdzGq8Atk2YMa23ZLRjnVGYBYQjEzu_q__s-yYkWg5hA@mail.gmail.com>
+From: baolin.wang@linaro.org (Baolin Wang)
+Date: Thu, 12 Jan 2017 16:37:13 +0800
+Subject: [PATCH v2 3/3] phy: rockchip-inno-usb2: Set EXTCON_USB when
+ EXTCON_CHG_USB_SDP was set
+In-Reply-To: <58773BC8.2050808@ti.com>
+References: <7b9836ce2ca34118a2acd1ea113605a5f13b4439.1482307697.git.baolin.wang@linaro.org>
+ <23666cc1a5ff123ece5bdbb9821d1eab280d0927.1482307697.git.baolin.wang@linaro.org>
+ <CAMz4kuJP9Q7Ly4uRBjCFU32YzbVbnsGyk+wHc+M=g8W=uDBsEQ@mail.gmail.com>
+ <CAMz4ku+X8v2HH5L_fS60naNTqR1ZFKYeWuXuHqjg0UsHQq1dsQ@mail.gmail.com>
+ <58773BC8.2050808@ti.com>
+Message-ID: <CAMz4ku+2yZUtmd0DVqj-_GUZ77YVpOvOrC-2kedEWSmJA7AdSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 1:05 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
-> On 01/11/2017 05:16 PM, Linus Walleij wrote:
->> On Tue, Jan 10, 2017 at 2:47 PM, Vladimir Murzin
->> <vladimir.murzin@arm.com> wrote:
->>
->>> In another thread Benjamin pointed at patch [1] in drm/kms part for noMMU.
->>>
->>> [1] https://cgit.freedesktop.org/drm/drm-misc/commit/?id=62a0d98a188cc4ebd8ea54b37d274ec20465e464
->>
->> Problem solved?
->>
->> Vladimir: I do not require in any way that you create a CLCD driver for DRM,
->> I just think it would be very very nice...
->>
+Hi,
+
+On 12 January 2017 at 16:18, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi,
 >
-> I have no other option, this series is unreviewed and thus unlikely it will
-> be applied, still a panel PCB on my board needs power management support.
+> On Thursday 12 January 2017 12:13 PM, Baolin Wang wrote:
+>> On 3 January 2017 at 13:54, Baolin Wang <baolin.wang@linaro.org> wrote:
+>>> Hi Kison and Heiko,
+>>>
+>>> On 21 December 2016 at 16:12, Baolin Wang <baolin.wang@linaro.org> wrote:
+>>>> According to the documentation, we should set the EXTCON_USB when
+>>>> one SDP charger connector was reported.
+>>>>
+>>>> Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+>>>> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>>
+>>> Could you apply this patch if there are no other comments? Thanks.
+>
+> Does it fix something? Or else it can go in the next merge window.
 
-Hm I can ACK it I guess, but mergeing it into an unmaintained subsystem
-is another issue, just not very optimal. If you get it working on your system
-I can look into migrating all the old users to DRM as well.
+Just fix the correct usage of EXTCON_CHG_USB_SDP connector. It's okay
+for me that it can go in the next merge window. Thanks.
 
-Yours,
-Linus Walleij
+-- 
+Baolin.wang
+Best Regards
