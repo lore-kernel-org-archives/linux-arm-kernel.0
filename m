@@ -1,44 +1,97 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Thu, 12 Jan 2017 19:58:25 +0100
-Subject: [PATCH v3] arm64: mm: Fix NOMAP page initialization
-In-Reply-To: <20170112160535.GF13843@arm.com>
-References: <20161216165437.21612-1-rrichter@cavium.com>
- <CAKv+Gu_SmTNguC=tSCwYOL2kx-DogLvSYRZc56eGP=JhdrUOsA@mail.gmail.com>
- <c74d6ec6-16ba-dccc-3b0d-a8bedcb46dc5@linaro.org>
- <cbbf14fd-a1cc-2463-ba67-acd6d61e9db1@linaro.org>
- <CAKv+Gu8-+0LUTN0+8OGWRhd22Ls5cMQqTJcjKQK_0N=Uc-0jog@mail.gmail.com>
- <20170109115320.GI4930@rric.localdomain>
- <20170112160535.GF13843@arm.com>
-Message-ID: <20170112185825.GE5020@rric.localdomain>
+From: bart.vanassche@sandisk.com (Bart Van Assche)
+Date: Thu, 12 Jan 2017 11:06:55 -0800
+Subject: [PATCH v2 03/26] treewide: Consolidate set_dma_ops() implementations
+In-Reply-To: <20170112190718.6728-1-bart.vanassche@sandisk.com>
+References: <20170112190718.6728-1-bart.vanassche@sandisk.com>
+Message-ID: <20170112190718.6728-4-bart.vanassche@sandisk.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.01.17 16:05:36, Will Deacon wrote:
-> On Mon, Jan 09, 2017 at 12:53:20PM +0100, Robert Richter wrote:
+Now that all set_dma_ops() implementations are identical (ignoring
+BUG_ON() statements), remove the architecture specific definitions
+and add a definition in <linux/dma-mapping.h>.
 
-> > Kernel compile times (3 runs each):
-> > 
-> > pfn_valid_within():
-> > 
-> > real    6m4.088s
-> > user    372m57.607s
-> > sys     16m55.158s
-> > 
-> > real    6m1.532s
-> > user    372m48.453s
-> > sys     16m50.370s
-> > 
-> > real    6m4.061s
-> > user    373m18.753s
-> > sys     16m57.027s
-> 
-> Did you reboot the machine between each build here, or only when changing
-> kernel? If the latter, do you see variations in kernel build time by simply
-> rebooting the same Image?
+Signed-off-by: Bart Van Assche <bart.vanassche@sandisk.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Chris Metcalf <cmetcalf@mellanox.com>
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: linux-arch at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Russell King <linux@armlinux.org.uk>
+---
+ arch/arm/include/asm/dma-mapping.h     | 6 ------
+ arch/powerpc/include/asm/dma-mapping.h | 5 -----
+ arch/tile/include/asm/dma-mapping.h    | 5 -----
+ include/linux/dma-mapping.h            | 5 +++++
+ 4 files changed, 5 insertions(+), 16 deletions(-)
 
-I built it in a loop on the shell, so no reboots between builds. Note
-that I was building the kernel in /dev/shm to not access harddisks. I
-think build times should be comparable then since there is no fs
-caching.
-
--Robert
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index 312f4d0564d6..c7432d647e53 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -31,12 +31,6 @@ static inline const struct dma_map_ops *get_dma_ops(struct device *dev)
+ 		return __generic_dma_ops(dev);
+ }
+ 
+-static inline void set_dma_ops(struct device *dev, const struct dma_map_ops *ops)
+-{
+-	BUG_ON(!dev);
+-	dev->dma_ops = ops;
+-}
+-
+ #define HAVE_ARCH_DMA_SUPPORTED 1
+ extern int dma_supported(struct device *dev, u64 mask);
+ 
+diff --git a/arch/powerpc/include/asm/dma-mapping.h b/arch/powerpc/include/asm/dma-mapping.h
+index 59fbd4abcbf8..8275603ba4d5 100644
+--- a/arch/powerpc/include/asm/dma-mapping.h
++++ b/arch/powerpc/include/asm/dma-mapping.h
+@@ -91,11 +91,6 @@ static inline const struct dma_map_ops *get_dma_ops(struct device *dev)
+ 	return dev->dma_ops;
+ }
+ 
+-static inline void set_dma_ops(struct device *dev, const struct dma_map_ops *ops)
+-{
+-	dev->dma_ops = ops;
+-}
+-
+ /*
+  * get_dma_offset()
+  *
+diff --git a/arch/tile/include/asm/dma-mapping.h b/arch/tile/include/asm/dma-mapping.h
+index c0620697eaad..2562995a6ac9 100644
+--- a/arch/tile/include/asm/dma-mapping.h
++++ b/arch/tile/include/asm/dma-mapping.h
+@@ -59,11 +59,6 @@ static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t daddr)
+ 
+ static inline void dma_mark_clean(void *addr, size_t size) {}
+ 
+-static inline void set_dma_ops(struct device *dev, const struct dma_map_ops *ops)
+-{
+-	dev->dma_ops = ops;
+-}
+-
+ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
+ {
+ 	if (!dev->dma_mask)
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index f1da68b82c63..e97f23e8b2d9 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -164,6 +164,11 @@ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
+ 
+ #ifdef CONFIG_HAS_DMA
+ #include <asm/dma-mapping.h>
++static inline void set_dma_ops(struct device *dev,
++			       const struct dma_map_ops *dma_ops)
++{
++	dev->dma_ops = dma_ops;
++}
+ #else
+ /*
+  * Define the dma api to allow compilation but not linking of
+-- 
+2.11.0
