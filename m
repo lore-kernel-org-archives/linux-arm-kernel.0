@@ -1,22 +1,44 @@
 From: yong.mao@mediatek.com (Yong Mao)
-Date: Thu, 12 Jan 2017 18:04:48 +0800
-Subject: [PATCH 0/2] Use data tune for CMD line tune
-Message-ID: <1484215490-7494-1-git-send-email-yong.mao@mediatek.com>
+Date: Thu, 12 Jan 2017 18:04:50 +0800
+Subject: [PATCH 2/2] mmc: dt-bindings: update Mediatek MMC bindings
+In-Reply-To: <1484215490-7494-1-git-send-email-yong.mao@mediatek.com>
+References: <1484215490-7494-1-git-send-email-yong.mao@mediatek.com>
+Message-ID: <1484215490-7494-3-git-send-email-yong.mao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CMD response CRC error may cause cannot boot up
-Change to use data tune for CMD line
-Separate cmd internal delay for HS200/HS400 mode
+From: yong mao <yong.mao@mediatek.com>
 
-yong mao (2):
-  mmc: mediatek: Use data tune for CMD line tune
-  mmc: dt-bindings: update Mediatek MMC bindings
+Add description for hs200-cmd-int-delay
+Add description for hs400-cmd-int-delay
+Add description for cmd-resp-sel
 
- Documentation/devicetree/bindings/mmc/mtk-sd.txt |   6 +
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |   3 +
- drivers/mmc/host/mtk-sd.c                        | 169 ++++++++++++++++++++---
- 3 files changed, 155 insertions(+), 23 deletions(-)
+Signed-off-by: Yong Mao <yong.mao@mediatek.com>
+---
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+index 0120c7f..2dbb3b0 100644
+--- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
++++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+@@ -21,6 +21,9 @@ Optional properties:
+ - assigned-clocks: PLL of the source clock
+ - assigned-clock-parents: parent of source clock, used for HS400 mode to get 400Mhz source clock
+ - hs400-ds-delay: HS400 DS delay setting
++- hs200-cmd-int-delay: HS200 command internal delay setting
++- hs400-cmd-int-delay: HS400 command internal delay setting
++- cmd-resp-sel: command response sample selection
+ 
+ Examples:
+ mmc0: mmc at 11230000 {
+@@ -38,4 +41,7 @@ mmc0: mmc at 11230000 {
+ 	assigned-clocks = <&topckgen CLK_TOP_MSDC50_0_SEL>;
+ 	assigned-clock-parents = <&topckgen CLK_TOP_MSDCPLL_D2>;
+ 	hs400-ds-delay = <0x14015>;
++	hs200-cmd-int-delay = <26>;
++	hs400-cmd-int-delay = <14>;
++	cmd-resp-sel = <0>; /* 0: rising, 1: falling */
+ };
 -- 
-1.8.1.1
+1.7.9.5
