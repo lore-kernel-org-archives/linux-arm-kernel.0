@@ -1,45 +1,71 @@
-From: nicolas.dichtel@6wind.com (Nicolas Dichtel)
-Date: Thu, 12 Jan 2017 16:52:57 +0100
-Subject: [PATCH v2 7/7] uapi: export all headers under uapi directories
-In-Reply-To: <20170109125638.GA15506@infradead.org>
-References: <bf83da6b-01ef-bf44-b3e1-ca6fc5636818@6wind.com>
- <1483695839-18660-1-git-send-email-nicolas.dichtel@6wind.com>
- <1483695839-18660-8-git-send-email-nicolas.dichtel@6wind.com>
- <20170109125638.GA15506@infradead.org>
-Message-ID: <464a1323-4450-e563-ff59-9e6d57b75959@6wind.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 12 Jan 2017 15:55:58 +0000
+Subject: [PATCH v3 2/5] arm64: Work around Falkor erratum 1003
+In-Reply-To: <278a45c0-bd49-b8a2-63ae-80ad851bab9b@arm.com>
+References: <20170111144118.17062-1-cov@codeaurora.org>
+ <20170111144118.17062-2-cov@codeaurora.org>
+ <20170111180627.GG20288@e104818-lin.cambridge.arm.com>
+ <278a45c0-bd49-b8a2-63ae-80ad851bab9b@arm.com>
+Message-ID: <20170112155558.ud4ln3lk5lpwxrq3@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 09/01/2017 ? 13:56, Christoph Hellwig a ?crit :
-> On Fri, Jan 06, 2017 at 10:43:59AM +0100, Nicolas Dichtel wrote:
->> Regularly, when a new header is created in include/uapi/, the developer
->> forgets to add it in the corresponding Kbuild file. This error is usually
->> detected after the release is out.
->>
->> In fact, all headers under uapi directories should be exported, thus it's
->> useless to have an exhaustive list.
->>
->> After this patch, the following files, which were not exported, are now
->> exported (with make headers_install_all):
+On Wed, Jan 11, 2017 at 06:22:08PM +0000, Marc Zyngier wrote:
+> On 11/01/17 18:06, Catalin Marinas wrote:
+> > On Wed, Jan 11, 2017 at 09:41:15AM -0500, Christopher Covington wrote:
+> >> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> >> index 32682be..9ee46df 100644
+> >> --- a/arch/arm64/mm/proc.S
+> >> +++ b/arch/arm64/mm/proc.S
+> >> @@ -23,6 +23,7 @@
+> >>  #include <asm/assembler.h>
+> >>  #include <asm/asm-offsets.h>
+> >>  #include <asm/hwcap.h>
+> >> +#include <asm/mmu_context.h>
+> >>  #include <asm/pgtable.h>
+> >>  #include <asm/pgtable-hwdef.h>
+> >>  #include <asm/cpufeature.h>
+> >> @@ -140,6 +141,18 @@ ENDPROC(cpu_do_resume)
+> >>  ENTRY(cpu_do_switch_mm)
+> >>  	mmid	x1, x1				// get mm->context.id
+> >>  	bfi	x0, x1, #48, #16		// set the ASID
+> >> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
+> >> +alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
+> >> +	mrs     x2, ttbr0_el1
+> >> +	mov     x3, #FALKOR_RESERVED_ASID
+> >> +	bfi     x2, x3, #48, #16                // reserved ASID + old BADDR
+> >> +	msr     ttbr0_el1, x2
+> >> +	isb
+> >> +	bfi     x2, x0, #0, #48                 // reserved ASID + new BADDR
+> >> +	msr     ttbr0_el1, x2
+> >> +	isb
+> >> +alternative_else_nop_endif
+> >> +#endif
+> >>  	msr	ttbr0_el1, x0			// set TTBR0
+> >>  	isb
+> >>  	post_ttbr0_update_workaround
+> > 
+> > Please move the above hunk to a pre_ttbr0_update_workaround macro for
+> > consistency with post_ttbr0_update_workaround.
 > 
-> ... snip ...
-> 
->> linux/genwqe/.install
->> linux/genwqe/..install.cmd
->> linux/cifs/.install
->> linux/cifs/..install.cmd
-> 
-> I'm pretty sure these should not be exported!
-> 
-Those files are created in every directory:
-$ find usr/include/ -name '\.\.install.cmd' | wc -l
-71
-$ find usr/include/ -name '\.install' | wc -l
-71
+> In which case (and also for consistency), should we add that pre_ttbr0
+> macro to entry.S, just before __uaccess_ttbr0_enable? It may not be
+> needed in the SW pan case, but it is probably worth entertaining the
+> idea that there may be something to do there...
 
-See also
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/scripts/Makefile.headersinst#n32
+It may actually be needed in entry.S as well. With SW PAN, we move the
+context switching from cpu_do_switch_mm to the kernel_exit macro when
+returning to user. In this case we are switching from the reserved ASID
+0 and reserved TTBR0_EL1 (pointing to a zeroed page) to the user's
+TTBR0_EL1 and ASID. If the ASID switch isn't taken into account, we may
+end up with new TLB entries being tagged with the reserved ASID. Apart
+from a potential loss of protection with TTBR0 PAN, is there anything
+else that could go wrong? Maybe a TLB conflict if we mix TLBs from
+multiple address spaces tagged with the same reserved ASID.
 
+If the above is an issue, we would need to patch
+__uaccess_ttbr0_enable() as well, though I'm more inclined to make this
+erratum not selectable when TTBR0 PAN is enabled.
 
-Thank you,
-Nicolas
+-- 
+Catalin
