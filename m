@@ -1,29 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Jan 2017 15:44:20 +0000
-Subject: [PATCH] arm64: assembler: make adr_l work in modules under KASLR
-In-Reply-To: <1484146493-18460-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1484146493-18460-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170112154420.GE13843@arm.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 12 Jan 2017 09:44:54 -0600
+Subject: [PATCH] bus: qcom_ebi2: default y if ARCH_QCOM
+In-Reply-To: <20170112070855.22214-1-linus.walleij@linaro.org>
+References: <20170112070855.22214-1-linus.walleij@linaro.org>
+Message-ID: <20170112154454.GG5710@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 02:54:53PM +0000, Ard Biesheuvel wrote:
-> When CONFIG_RANDOMIZE_MODULE_REGION_FULL=y, the offset between loaded
-> modules and the core kernel may exceed 4 GB, putting symbols exported
-> by the core kernel out of the reach of the ordinary adrp/add instruction
-> pairs used to generate relative symbol references. So make the adr_l
-> macro emit a movz/movk sequence instead when executing in module context.
+On Thu, Jan 12, 2017 at 08:08:55AM +0100, Linus Walleij wrote:
+> Since we want this external bus to be available on multi_v7 builds,
+> set to default ARCH_QCOM so we get it selected whenever QCOM is
+> enabled.
 > 
-> While at it, remove the pointless special case for the stack pointer.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  arch/arm64/include/asm/assembler.h | 36 +++++++++++++++-----
->  1 file changed, 27 insertions(+), 9 deletions(-)
+> Andy: I guess you could queue this to ARM SoC, they seem so manage
+> drivers/bus from there.
 
-Given that you need this for 4.11, I suggest Catalin takes it as a fix
-for 4.10 to avoid the crypto dependency.
+No worries.  I'll add this to my list.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
 
-Will
+Thanks,
+
+Andy
