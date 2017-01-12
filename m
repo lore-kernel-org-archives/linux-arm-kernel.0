@@ -1,49 +1,109 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 12 Jan 2017 11:37:32 -0800
-Subject: [PATCH v3 10/24] ARM: dts: imx6-sabreauto: add pinctrl for gpt
- input capture
-In-Reply-To: <1483755102-24785-11-git-send-email-steve_longerbeam@mentor.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-11-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <CAJ+vNU1ci=fbeemJcBGCAk40PETdcov7Fm112F5FePL9SR4cFQ@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 12 Jan 2017 14:52:18 -0600
+Subject: [PATCH 1/3] misc: sram: Split sram data structures into local header
+In-Reply-To: <20170112205220.26325-1-d-gerlach@ti.com>
+References: <20170112205220.26325-1-d-gerlach@ti.com>
+Message-ID: <20170112205220.26325-2-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 6, 2017 at 6:11 PM, Steve Longerbeam <slongerbeam@gmail.com> wrote:
-> Add pinctrl groups for both GPT input capture channels.
->
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> ---
->  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> index 967c3b8..495709f 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> @@ -457,6 +457,18 @@
->                         >;
->                 };
->
-> +               pinctrl_gpt_input_capture0: gptinputcapture0grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_SD1_DAT0__GPT_CAPTURE1       0x1b0b0
-> +                       >;
-> +               };
-> +
-> +               pinctrl_gpt_input_capture1: gptinputcapture1grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_SD1_DAT1__GPT_CAPTURE2       0x1b0b0
-> +                       >;
-> +               };
-> +
->                 pinctrl_spdif: spdifgrp {
->                         fsl,pins = <
->                                 MX6QDL_PAD_KEY_COL3__SPDIF_IN 0x1b0b0
-> --
+In preparation of a coming file split of the sram driver, move the
+common data structures into a local header file that can be shared
+between files related to the sram driver.
 
-Steve,
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ drivers/misc/sram.c | 30 ++----------------------------
+ drivers/misc/sram.h | 39 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+), 28 deletions(-)
+ create mode 100644 drivers/misc/sram.h
 
-These are not used anywhere.
-
-Tim
+diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
+index b33ab8ce47ab..4ef5affd03d7 100644
+--- a/drivers/misc/sram.c
++++ b/drivers/misc/sram.c
+@@ -31,35 +31,9 @@
+ #include <linux/mfd/syscon.h>
+ #include <soc/at91/atmel-secumod.h>
+ 
+-#define SRAM_GRANULARITY	32
+-
+-struct sram_partition {
+-	void __iomem *base;
+-
+-	struct gen_pool *pool;
+-	struct bin_attribute battr;
+-	struct mutex lock;
+-};
+-
+-struct sram_dev {
+-	struct device *dev;
+-	void __iomem *virt_base;
+-
+-	struct gen_pool *pool;
+-	struct clk *clk;
++#include "sram.h"
+ 
+-	struct sram_partition *partition;
+-	u32 partitions;
+-};
+-
+-struct sram_reserve {
+-	struct list_head list;
+-	u32 start;
+-	u32 size;
+-	bool export;
+-	bool pool;
+-	const char *label;
+-};
++#define SRAM_GRANULARITY	32
+ 
+ static ssize_t sram_read(struct file *filp, struct kobject *kobj,
+ 			 struct bin_attribute *attr,
+diff --git a/drivers/misc/sram.h b/drivers/misc/sram.h
+new file mode 100644
+index 000000000000..52501a84468c
+--- /dev/null
++++ b/drivers/misc/sram.h
+@@ -0,0 +1,39 @@
++/*
++ * Defines for the SRAM driver
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#ifndef __SRAM_H
++#define __SRAM_H
++
++struct sram_partition {
++	void __iomem *base;
++
++	struct gen_pool *pool;
++	struct bin_attribute battr;
++	struct mutex lock;
++	struct list_head list;
++};
++
++struct sram_dev {
++	struct device *dev;
++	void __iomem *virt_base;
++
++	struct gen_pool *pool;
++	struct clk *clk;
++
++	struct sram_partition *partition;
++	u32 partitions;
++};
++
++struct sram_reserve {
++	struct list_head list;
++	u32 start;
++	u32 size;
++	bool export;
++	bool pool;
++	const char *label;
++};
++#endif /* __SRAM_H */
+-- 
+2.11.0
