@@ -1,39 +1,24 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 Jan 2017 13:38:16 -0800
-Subject: [PATCH -next] soc: ti: wkup_m3_ipc: Fix error return code in
- wkup_m3_ipc_probe()
-In-Reply-To: <20170112145341.783-1-weiyj.lk@gmail.com>
-References: <20170112145341.783-1-weiyj.lk@gmail.com>
-Message-ID: <20170112213815.GK2630@atomide.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 12 Jan 2017 16:50:30 -0500 (EST)
+Subject: [PATCH] net: thunderx: acpi: fix LMAC initialization
+In-Reply-To: <1484234886-22172-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+References: <1484234886-22172-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20170112.165030.1356353468945456367.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Wei Yongjun <weiyj.lk@gmail.com> [170112 06:55]:
-> From: Wei Yongjun <weiyongjun1@huawei.com>
-> 
-> Fix to return a negative error code from the kthread_run() error
-> handling case instead of 0, as done elsewhere in this function.
-> 
-> Fixes: cdd5de500b2c ("soc: ti: Add wkup_m3_ipc driver")
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-> ---
->  drivers/soc/ti/wkup_m3_ipc.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
-> index 8bfa44b..369aef5 100644
-> --- a/drivers/soc/ti/wkup_m3_ipc.c
-> +++ b/drivers/soc/ti/wkup_m3_ipc.c
-> @@ -457,6 +457,7 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
->  
->  	if (IS_ERR(task)) {
->  		dev_err(dev, "can't create rproc_boot thread\n");
-> +		ret = PTR_ERR(task);
->  		goto err_put_rproc;
->  	}
-> 
-> 
+From: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+Date: Thu, 12 Jan 2017 07:28:06 -0800
 
-Applying into omap-for-v4.10/fixes thanks.
+> While probing BGX we requesting appropriate QLM for it's configuration
+> and get LMAC count by that request. Then, while reading configured
+> MAC values from SSDT table we need to save them in proper mapping:
+>   BGX[i]->lmac[j].mac = <MAC value>
+> to later provide for initialization stuff. In order to fill
+> such mapping properly we need to add lmac index to be used while
+> acpi initialization since at this moment bgx->lmac_count already contains
+> actual value.
+> 
+> Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
 
-Tony
+Applied.
