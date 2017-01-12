@@ -1,71 +1,93 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 12 Jan 2017 15:55:58 +0000
-Subject: [PATCH v3 2/5] arm64: Work around Falkor erratum 1003
-In-Reply-To: <278a45c0-bd49-b8a2-63ae-80ad851bab9b@arm.com>
-References: <20170111144118.17062-1-cov@codeaurora.org>
- <20170111144118.17062-2-cov@codeaurora.org>
- <20170111180627.GG20288@e104818-lin.cambridge.arm.com>
- <278a45c0-bd49-b8a2-63ae-80ad851bab9b@arm.com>
-Message-ID: <20170112155558.ud4ln3lk5lpwxrq3@localhost>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Thu, 12 Jan 2017 16:56:40 +0100
+Subject: [RFC 00/13] vITS save/restore
+Message-ID: <1484236613-24633-1-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 06:22:08PM +0000, Marc Zyngier wrote:
-> On 11/01/17 18:06, Catalin Marinas wrote:
-> > On Wed, Jan 11, 2017 at 09:41:15AM -0500, Christopher Covington wrote:
-> >> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> >> index 32682be..9ee46df 100644
-> >> --- a/arch/arm64/mm/proc.S
-> >> +++ b/arch/arm64/mm/proc.S
-> >> @@ -23,6 +23,7 @@
-> >>  #include <asm/assembler.h>
-> >>  #include <asm/asm-offsets.h>
-> >>  #include <asm/hwcap.h>
-> >> +#include <asm/mmu_context.h>
-> >>  #include <asm/pgtable.h>
-> >>  #include <asm/pgtable-hwdef.h>
-> >>  #include <asm/cpufeature.h>
-> >> @@ -140,6 +141,18 @@ ENDPROC(cpu_do_resume)
-> >>  ENTRY(cpu_do_switch_mm)
-> >>  	mmid	x1, x1				// get mm->context.id
-> >>  	bfi	x0, x1, #48, #16		// set the ASID
-> >> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
-> >> +alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
-> >> +	mrs     x2, ttbr0_el1
-> >> +	mov     x3, #FALKOR_RESERVED_ASID
-> >> +	bfi     x2, x3, #48, #16                // reserved ASID + old BADDR
-> >> +	msr     ttbr0_el1, x2
-> >> +	isb
-> >> +	bfi     x2, x0, #0, #48                 // reserved ASID + new BADDR
-> >> +	msr     ttbr0_el1, x2
-> >> +	isb
-> >> +alternative_else_nop_endif
-> >> +#endif
-> >>  	msr	ttbr0_el1, x0			// set TTBR0
-> >>  	isb
-> >>  	post_ttbr0_update_workaround
-> > 
-> > Please move the above hunk to a pre_ttbr0_update_workaround macro for
-> > consistency with post_ttbr0_update_workaround.
-> 
-> In which case (and also for consistency), should we add that pre_ttbr0
-> macro to entry.S, just before __uaccess_ttbr0_enable? It may not be
-> needed in the SW pan case, but it is probably worth entertaining the
-> idea that there may be something to do there...
+This series specifies and implements an API aimed at saving and restoring
+the state of the in-kernel emulated ITS device.
 
-It may actually be needed in entry.S as well. With SW PAN, we move the
-context switching from cpu_do_switch_mm to the kernel_exit macro when
-returning to user. In this case we are switching from the reserved ASID
-0 and reserved TTBR0_EL1 (pointing to a zeroed page) to the user's
-TTBR0_EL1 and ASID. If the ASID switch isn't taken into account, we may
-end up with new TLB entries being tagged with the reserved ASID. Apart
-from a potential loss of protection with TTBR0 PAN, is there anything
-else that could go wrong? Maybe a TLB conflict if we mix TLBs from
-multiple address spaces tagged with the same reserved ASID.
+The ITS is programmed through registers and tables. Those later tables
+are allocated by the guest.  Their base address is programmed in
+registers or table entries before the ITS is enabled.
 
-If the above is an issue, we would need to patch
-__uaccess_ttbr0_enable() as well, though I'm more inclined to make this
-erratum not selectable when TTBR0 PAN is enabled.
+The ITS is free to use some of them to flush its internal caches. This
+is likely to be used when entering low power state.
+
+Therefore, for save/restore use case, it looks natural to use this
+guest RAM allocated space to save the table related data. However,
+currently,The ITS in-kernel emulated device does not use all of those
+tables and for those it uses, it does not always sync them with its
+cached data. Additional sync must happen for:
+- the collection table
+- the device table
+- the per-device translation tables
+- the LPI pending tables.
+
+The LPI configration table and the command queues do not need extra
+syncs.
+
+So the bulk of the work in this series consists in the table
+save/restore rather than register save/restore.
+
+An alternative to flushing the tables into guest RAM could have been
+to flush them into a separate user-space buffer. However the drawback
+of this alternative is that the virtualizer would allocate dedicated
+buffers to store the data that should normally be laid out in guest
+RAM. It would also be obliged to re-compute their size from
+register/table content.
+
+So saving the tables in guest RAM better fit the ITS programming
+model and optimizes the memory usage. The drawback of this solution
+is it brings additional challenges at user-space level to make sure
+the guest RAM is frozen after table sync.
+
+The code is functional while saving/restoring a guest using
+virtio-net-pci.  However many points deserve additional tests.
+I share the series at that stage to get the documentation reviewed
+and main principles discussed.
+
+The series applies on top of Vijaya's series:
+- [PATCH v10 0/8] arm/arm64: vgic: Implement API for vGICv3 live
+  migration
+  http://www.spinics.net/lists/arm-kernel/msg546383.html
+
+Best Regards
+
+Eric
+
+Git: complete series available at
+https://github.com/eauger/linux/tree/v4.10-rc3-its-mig-rfc-v1
+
+* Testing:
+- on Cavium using a virtio-net-pci guest and virsh save/restore
+  commands
+
+Eric Auger (13):
+  KVM: arm/arm64: Add vITS save/restore API documentation
+  arm/arm64: vgic: turn vgic_find_mmio_region into public
+  KVM: arm64: ITS: KVM_DEV_ARM_VGIC_GRP_ITS_REGS group
+  KVM: arm64: ITS: Implement vgic_its_has_attr_regs and attr_regs_access
+  KVM: arm64: ITS: Implement vgic_mmio_uaccess_write_its_creadr
+  KVM: arm64: ITS: Expose ITT_Entry_Size in GITS_TYPER
+  KVM: arm64: ITS: Change entry_size and indirect bit in BASER
+  KVM: arm64: ITS: On MAPD interpret and store itt_addr and size
+  KVM: arm64: ITS: KVM_DEV_ARM_VGIC_GRP_ITS_TABLES group
+  KVM: arm64: ITS: vgic_its_alloc_itte/device
+  KVM: arm64: ITS: Collection table save/restore
+  KVM: arm64: ITS: Device and translation table flush
+  KVM: arm64: ITS: Pending table save/restore
+
+ Documentation/virtual/kvm/devices/arm-vgic-its.txt |  70 +++
+ arch/arm/include/uapi/asm/kvm.h                    |   2 +
+ arch/arm64/include/uapi/asm/kvm.h                  |   2 +
+ include/kvm/arm_vgic.h                             |   3 +
+ include/linux/irqchip/arm-gic-v3.h                 |   1 +
+ virt/kvm/arm/vgic/vgic-its.c                       | 655 +++++++++++++++++++--
+ virt/kvm/arm/vgic/vgic-mmio.c                      |   3 +-
+ virt/kvm/arm/vgic/vgic-mmio.h                      |  14 +-
+ 8 files changed, 705 insertions(+), 45 deletions(-)
 
 -- 
-Catalin
+2.5.5
