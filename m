@@ -1,141 +1,56 @@
-From: Mike.Leach@arm.com (Mike Leach)
-Date: Thu, 12 Jan 2017 11:24:15 +0000
-Subject: [PATCH v2 2/2] arm64: dts: juno: Adds missing CoreSight STM
- component.
-In-Reply-To: <0120ef9b-2e01-e00a-2de8-c540ab70af85@arm.com>
-References: <1484167449-14432-1-git-send-email-mike.leach@linaro.org>
- <1484167449-14432-3-git-send-email-mike.leach@linaro.org>
- <0120ef9b-2e01-e00a-2de8-c540ab70af85@arm.com>
-Message-ID: <DB6PR0802MB2198449A31AD8624B48045428C790@DB6PR0802MB2198.eurprd08.prod.outlook.com>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Thu, 12 Jan 2017 12:25:31 +0100
+Subject: [PATCH v8 2/5] i2c: Add STM32F4 I2C driver
+In-Reply-To: <20170111154200.xcxdlnnakyttumzw@pengutronix.de>
+References: <1483607246-14771-1-git-send-email-cedric.madianga@gmail.com>
+ <1483607246-14771-3-git-send-email-cedric.madianga@gmail.com>
+ <20170111082208.vzu7xgpd4eakyldl@pengutronix.de>
+ <CAOAejn2eOy2sn1VkE979ne23Sj9L6+kaQDNpL1EUKb2m=6sGXw@mail.gmail.com>
+ <CAOAejn2cDzPgqvWZf7ASvtST+aDeaAebf=1aMWA9Zd8CDg4pmA@mail.gmail.com>
+ <20170111154200.xcxdlnnakyttumzw@pengutronix.de>
+Message-ID: <CAOAejn1OfcHpj7s4VOrv3wHEBGuShXzJcu3OEgwi8k3_HAjqvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+Hi Uwe,
 
-I'm fine with that - less duplication the better.
+2017-01-11 16:42 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello Cedric,
+>
+> On Wed, Jan 11, 2017 at 03:20:41PM +0100, M'boumba Cedric Madianga wrote:
+>> >
+>> >> +              */
+>> >> +             reg = i2c_dev->base + STM32F4_I2C_CR1;
+>> >> +             stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR1_ACK);
+>> >> +             stm32f4_i2c_set_bits(reg, STM32F4_I2C_CR1_POS);
+>> >
+>> > You could get rid of this, when caching the value of CR1. Would save two
+>> > register reads here. This doesn't work for all registers, but it should
+>> > be possible to apply for most of them, maybe enough to get rid of the
+>> > clr_bits and set_bits function.
+>>
+>> I agree at many places I could save registers read by not using
+>> clr_bits and set_bits function when the registers in question has been
+>> already read.
+>> But it is not enough to get rid of the clr_bits and set_bits function.
+>> For example when calling stm32f4_i2c_terminate_xfer(), the CR1
+>> register is never read before so set_bits function is useful.
+>
+> I didn't double check the manual, but I would expect that CR1 isn't
+> modified by hardware. So you can cache the result in the driver data
+> structure and do the necessary modifications with that one.
 
-I've not played with .dts files much to I hadn't realised that type of construction was possible.
+CR1 is modified by hardware to clear some bits set by software during
+the communication.
 
-Regards
+>
+> Best regards
+> Uwe
+>
+> --
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
-Mike
+Best regards,
 
-----------------------------------------------------------------
-Mike Leach                           +44 (0)1254 893911 (Direct)
-Principal Engineer                   +44 (0)1254 893900 (Main)
-Arm Blackburn Design Centre          +44 (0)1254 893901 (Fax)
-Belthorn House
-Walker Rd                            mailto:mike.leach at arm.com
-Guide
-Blackburn
-BB1 2QE
-----------------------------------------------------------------
-
-
-> -----Original Message-----
-> From: CoreSight [mailto:coresight-bounces at lists.linaro.org] On Behalf Of
-> Sudeep Holla
-> Sent: 12 January 2017 11:15
-> To: Mike Leach; Liviu Dudau; Lorenzo Pieralisi
-> Cc: coresight at lists.linaro.org; Suzuki Poulose; linux-arm-
-> kernel at lists.infradead.org; Sudeep Holla
-> Subject: Re: [PATCH v2 2/2] arm64: dts: juno: Adds missing CoreSight STM
-> component.
->
->
->
-> On 11/01/17 20:44, Mike Leach wrote:
-> > Add missing CoreSight STM component definition to Juno CoreSight
-> > infrastructure juno-cs-rX.dtsi files.
-> >
-> > Component connected to different funnels depending on Juno platform
-> variant.
-> >
-> > Signed-off-by: Mike Leach <mike.leach@linaro.org>
-> > ---
-> >  arch/arm64/boot/dts/arm/juno-cs-r0.dtsi   | 16 ++++++++++++++++
-> >  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 16 ++++++++++++++++
-> >  2 files changed, 32 insertions(+)
-> >
->
-> Can we avoid duplication with something like below ? I don't have strong
-> opinion but I just saw the opportunity. I can squash it in if you
-> agree(no need to repost).
->
-> Regards,
-> Sudeep
->
-> -->8
->
-> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi
-> b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> index 7c89000f954d..15fcd09d9d84 100644
-> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> @@ -83,6 +83,21 @@
->   * The actual size is just 4K though 64K is reserved. Access to the
->   * unmapped reserved region results in a DECERR response.
->   */
-> +stm at 20100000 {
-> +compatible = "arm,coresight-stm", "arm,primecell";
-> +reg = <0 0x20100000 0 0x1000>,
-> +      <0 0x28000000 0 0x180000>;
-> +reg-names = "stm-base", "stm-stimulus-base";
-> +
-> +clocks = <&soc_smc50mhz>;
-> +clock-names = "apb_pclk";
-> +power-domains = <&scpi_devpd 0>;
-> +port {
-> +stm_out_port: endpoint {
-> +};
-> +};
-> +};
-> +
->  etm0: etm at 22040000 {
->  compatible = "arm,coresight-etm4x", "arm,primecell";
->  reg = <0 0x22040000 0 0x1000>;
-> diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts
-> b/arch/arm64/boot/dts/arm/juno-r1.dts
-> index 881339536e90..1c16a96ff677 100644
-> --- a/arch/arm64/boot/dts/arm/juno-r1.dts
-> +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
-> @@ -228,3 +228,7 @@
->  &gpu1_thermal_zone {
->  status = "okay";
->  };
-> +
-> +&stm_out_port {
-> +remote-endpoint = <&csys1_funnel_in_port0>;
-> +};
-> diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts
-> b/arch/arm64/boot/dts/arm/juno-r2.dts
-> index fca3a1705114..69890cc1edae 100644
-> --- a/arch/arm64/boot/dts/arm/juno-r2.dts
-> +++ b/arch/arm64/boot/dts/arm/juno-r2.dts
-> @@ -228,3 +228,7 @@
->  &gpu1_thermal_zone {
->  status = "okay";
->  };
-> +
-> +&stm_out_port {
-> +remote-endpoint = <&csys1_funnel_in_port0>;
-> +};
-> diff --git a/arch/arm64/boot/dts/arm/juno.dts
-> b/arch/arm64/boot/dts/arm/juno.dts
-> index c90c37b66db5..ad270e090ba4 100644
-> --- a/arch/arm64/boot/dts/arm/juno.dts
-> +++ b/arch/arm64/boot/dts/arm/juno.dts
-> @@ -204,3 +204,7 @@
->  &etm5 {
->  cpu = <&A53_3>;
->  };
-> +
-> +&stm_out_port {
-> +remote-endpoint = <&main_funnel_in_port2>;
-> +};
->
-> _______________________________________________
-> CoreSight mailing list
-> CoreSight at lists.linaro.org
-> https://lists.linaro.org/mailman/listinfo/coresight
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+Cedric
