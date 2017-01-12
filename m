@@ -1,77 +1,60 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 12 Jan 2017 17:19:00 +0000
-Subject: [PATCH v3 2/3] arm64: dts: juno: fix CoreSight support for Juno
- r1/r2 variants
-In-Reply-To: <CANLsYkymGdrM8z-ZWan0Fn+Ymq97oHAJtW3G0YdUAxpWSf+aaw@mail.gmail.com>
+Date: Thu, 12 Jan 2017 17:19:41 +0000
+Subject: [PATCH v3 0/3] arm64: dts: juno: CoreSight support updates
+In-Reply-To: <CANLsYkxm-6eBsURrN_pO1833QNfVL4Li98P48C6ktsytyyagdg@mail.gmail.com>
 References: <1484234410-7670-1-git-send-email-sudeep.holla@arm.com>
- <1484234410-7670-3-git-send-email-sudeep.holla@arm.com>
- <CANLsYkymGdrM8z-ZWan0Fn+Ymq97oHAJtW3G0YdUAxpWSf+aaw@mail.gmail.com>
-Message-ID: <f585cc88-1601-4bd7-5992-e6c220577c0b@arm.com>
+ <CANLsYkxm-6eBsURrN_pO1833QNfVL4Li98P48C6ktsytyyagdg@mail.gmail.com>
+Message-ID: <c42f1b0a-dbe9-6c00-b940-2bab4b891dac@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 12/01/17 16:51, Mathieu Poirier wrote:
+On 12/01/17 17:08, Mathieu Poirier wrote:
 > On 12 January 2017 at 08:20, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> From: Mike Leach <mike.leach@linaro.org>
+>> Hi Mike,
 >>
->> The CoreSight support added for Juno is valid for only Juno r0.
->> The Juno r1 and r2 variants have additional components and alternative
->> connection routes between trace source and sinks.
+>> I just did some refactoring to reduced thge churn and duplication.
+>> Can you check if this work for you ? I could not give it much testing.
 >>
->> This patch builds on top of the existing r0 support and extends it to
->> Juno r1/r2 variants.
+>> Regards,
+>> Sudeep
 >>
->> Signed-off-by: Mike Leach <mike.leach@linaro.org>
->> [sudeep.holla at arm.com: minor changelog update and reorganising the common
->>         coresight components back into juno-base.dtsi to avoid duplication]
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
+>> --->8
+>> Juno r1/r2 boards have different CoreSight infrastructure outside the
+>> CPU clusters. This patchset adds the additional coreSight components to
+>> separate .dtsi files to support these differences.
+>>
+>> v1->v2:
+>>         - moved the addition of the STM component into a separate patch
+>>
+>> v2->v3:
+>>         - moved the back the common coreSight components back into
+>>           juno-base.dtsi
+>>
+>>
+>> Mike Leach (2):
+>>   arm64: dts: juno: fix CoreSight support for Juno r1/r2 variants
+>>   arm64: dts: juno: add missing CoreSight STM component
+>>
+>> Sudeep Holla (1):
+>>   arm64: dts: juno: refactor CoreSight support on Juno r0
+>>
+>>  arch/arm64/boot/dts/arm/juno-base.dtsi    |  31 ++++++---
 >>  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 102 ++++++++++++++++++++++++++++++
->>  arch/arm64/boot/dts/arm/juno-r1.dts       |   9 +++
->>  arch/arm64/boot/dts/arm/juno-r2.dts       |   9 +++
->>  3 files changed, 120 insertions(+)
+>>  arch/arm64/boot/dts/arm/juno-r1.dts       |  13 ++++
+>>  arch/arm64/boot/dts/arm/juno-r2.dts       |  13 ++++
+>>  arch/arm64/boot/dts/arm/juno.dts          |  24 +++++++
+>>  5 files changed, 175 insertions(+), 8 deletions(-)
 >>  create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->>
->> diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->> new file mode 100644
->> index 000000000000..89fcef366ff9
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->> @@ -0,0 +1,102 @@
->> +       csys1_funnel at 20130000 {
->> +               compatible = "arm,coresight-funnel", "arm,primecell";
->> +               reg = <0 0x20130000 0 0x1000>;
->> +
->> +               clocks = <&soc_smc50mhz>;
->> +               clock-names = "apb_pclk";
->> +               power-domains = <&scpi_devpd 0>;
->> +               ports {
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +
->> +                       /* input port */
->> +                       port at 0 {
->> +                               reg = <0>;
->> +                               csys1_funnel_out_port: endpoint {
->> +                                       remote-endpoint =
->> +                                               <&etf1_in_port>;
->> +                               };
->> +                       };
->> +
->> +                       /* output port */
->> +                       port at 1 {
->> +                               reg = <0>;
->> +                               csys1_funnel_in_port0: endpoint {
->> +                                       slave-mode;
->> +                               };
->> +                       };
 > 
-> The comments related to the input and output port are reversed.
+> For the set:
+> 
+> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Tested-by: Mathieu Poirier <mathieu.poirier@linaro.org> (On R0 only)
 > 
 
-Fixed locally.
+Thanks for reviewing and testing.
 
 -- 
 Regards,
