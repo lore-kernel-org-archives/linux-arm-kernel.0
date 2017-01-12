@@ -1,56 +1,168 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Thu, 12 Jan 2017 12:25:31 +0100
-Subject: [PATCH v8 2/5] i2c: Add STM32F4 I2C driver
-In-Reply-To: <20170111154200.xcxdlnnakyttumzw@pengutronix.de>
-References: <1483607246-14771-1-git-send-email-cedric.madianga@gmail.com>
- <1483607246-14771-3-git-send-email-cedric.madianga@gmail.com>
- <20170111082208.vzu7xgpd4eakyldl@pengutronix.de>
- <CAOAejn2eOy2sn1VkE979ne23Sj9L6+kaQDNpL1EUKb2m=6sGXw@mail.gmail.com>
- <CAOAejn2cDzPgqvWZf7ASvtST+aDeaAebf=1aMWA9Zd8CDg4pmA@mail.gmail.com>
- <20170111154200.xcxdlnnakyttumzw@pengutronix.de>
-Message-ID: <CAOAejn1OfcHpj7s4VOrv3wHEBGuShXzJcu3OEgwi8k3_HAjqvQ@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 12 Jan 2017 11:26:00 +0000
+Subject: [RFC PATCH 01/10] prctl: Add skeleton for PR_SVE_{SET,
+ GET}_VL controls
+In-Reply-To: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
+References: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1484220369-23970-2-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+This patch adds a do-nothing skeleton for the arm64 Scalable Vector
+Extension control prctls.
 
-2017-01-11 16:42 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Cedric,
->
-> On Wed, Jan 11, 2017 at 03:20:41PM +0100, M'boumba Cedric Madianga wrote:
->> >
->> >> +              */
->> >> +             reg = i2c_dev->base + STM32F4_I2C_CR1;
->> >> +             stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR1_ACK);
->> >> +             stm32f4_i2c_set_bits(reg, STM32F4_I2C_CR1_POS);
->> >
->> > You could get rid of this, when caching the value of CR1. Would save two
->> > register reads here. This doesn't work for all registers, but it should
->> > be possible to apply for most of them, maybe enough to get rid of the
->> > clr_bits and set_bits function.
->>
->> I agree at many places I could save registers read by not using
->> clr_bits and set_bits function when the registers in question has been
->> already read.
->> But it is not enough to get rid of the clr_bits and set_bits function.
->> For example when calling stm32f4_i2c_terminate_xfer(), the CR1
->> register is never read before so set_bits function is useful.
->
-> I didn't double check the manual, but I would expect that CR1 isn't
-> modified by hardware. So you can cache the result in the driver data
-> structure and do the necessary modifications with that one.
+These prctls are only avilable with
 
-CR1 is modified by hardware to clear some bits set by software during
-the communication.
+    CONFIG_ARM64=y
+    CONFIG_ARM64_SVE=y
 
->
-> Best regards
-> Uwe
->
-> --
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Otherwise they will compile out and return -EINVAL if attempted
+from userspace.
 
-Best regards,
+The backend functions sve_{set,get}_task_vl() will be fleshed out
+with actual functionality in subsequent patches.
 
-Cedric
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+
+There will probably also be a call to discover the signal frame size
+(MINSIGSTKSZ equivalent) for the current configuration, something like
+
+ * PR_GET_MINSIGSTKSZ
+
+This series doesn't add this yet: only the PR_SVE_{SET,GET}_VL prctls
+are provided.
+
+
+ arch/arm64/include/asm/fpsimd.h    | 19 +++++++++++++++++++
+ arch/arm64/include/asm/processor.h |  4 ++++
+ arch/arm64/kernel/fpsimd.c         | 13 +++++++++++++
+ include/uapi/linux/prctl.h         |  4 ++++
+ kernel/sys.c                       | 12 ++++++++++++
+ 5 files changed, 52 insertions(+)
+
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index 88bcf69..e13259e 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -17,6 +17,7 @@
+ #define __ASM_FP_H
+ 
+ #include <asm/ptrace.h>
++#include <asm/errno.h>
+ 
+ #ifndef __ASSEMBLY__
+ 
+@@ -110,12 +111,30 @@ extern unsigned int sve_get_vl(void);
+ extern void fpsimd_sync_to_sve(struct task_struct *task);
+ 
+ #ifdef CONFIG_ARM64_SVE
++
+ extern void fpsimd_sync_to_fpsimd(struct task_struct *task);
+ extern void fpsimd_sync_from_fpsimd_zeropad(struct task_struct *task);
++extern int sve_set_task_vl(struct task_struct *task,
++			   unsigned long vector_length, unsigned long flags);
++extern int sve_get_task_vl(struct task_struct *task);
++
+ #else /* !CONFIG_ARM64_SVE */
++
+ static void __maybe_unused fpsimd_sync_to_fpsimd(struct task_struct *task) { }
+ static void __maybe_unused fpsimd_sync_from_fpsimd_zeropad(
+ 	struct task_struct *task) { }
++
++static int __maybe_unused sve_set_task_vl(struct task_struct *task,
++	unsigned long vector_length, unsigned long flags)
++{
++	return -EINVAL;
++}
++
++static int __maybe_unused sve_get_task_vl(struct task_struct *task)
++{
++	return -EINVAL;
++}
++
+ #endif /* !CONFIG_ARM64_SVE */
+ 
+ #endif
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 747c65a..6f0f300 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -190,4 +190,8 @@ int cpu_enable_pan(void *__unused);
+ int cpu_enable_uao(void *__unused);
+ int cpu_enable_cache_maint_trap(void *__unused);
+ 
++#define SVE_SET_VL(task, vector_length, flags) \
++	sve_set_task_vl(task, vector_length, flags)
++#define SVE_GET_VL(task) sve_get_task_vl(task)
++
+ #endif /* __ASM_PROCESSOR_H */
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 2c113e4..bdacfcd 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -468,6 +468,19 @@ void fpsimd_sync_from_fpsimd_zeropad(struct task_struct *task)
+ 	__fpsimd_sync_from_fpsimd_zeropad(task, sve_vq_from_vl(vl));
+ }
+ 
++/* PR_SVE_SET_VL */
++int sve_set_task_vl(struct task_struct *task,
++		    unsigned long vector_length, unsigned long flags)
++{
++	return -EINVAL;
++}
++
++/* PR_SVE_GET_VL */
++int sve_get_task_vl(struct task_struct *task)
++{
++	return -EINVAL;
++}
++
+ #endif /* CONFIG_ARM64_SVE */
+ 
+ #ifdef CONFIG_KERNEL_MODE_NEON
+diff --git a/include/uapi/linux/prctl.h b/include/uapi/linux/prctl.h
+index a8d0759..e32e2da 100644
+--- a/include/uapi/linux/prctl.h
++++ b/include/uapi/linux/prctl.h
+@@ -197,4 +197,8 @@ struct prctl_mm_map {
+ # define PR_CAP_AMBIENT_LOWER		3
+ # define PR_CAP_AMBIENT_CLEAR_ALL	4
+ 
++/* arm64 Scalable Vector Extension controls */
++#define PR_SVE_SET_VL			48	/* set task vector length */
++#define PR_SVE_GET_VL			49	/* get task vector length */
++
+ #endif /* _LINUX_PRCTL_H */
+diff --git a/kernel/sys.c b/kernel/sys.c
+index 842914e..5f50385 100644
+--- a/kernel/sys.c
++++ b/kernel/sys.c
+@@ -103,6 +103,12 @@
+ #ifndef SET_FP_MODE
+ # define SET_FP_MODE(a,b)	(-EINVAL)
+ #endif
++#ifndef SVE_SET_VL
++# define SVE_SET_VL(a,b,c)	(-EINVAL)
++#endif
++#ifndef SVE_GET_VL
++# define SVE_GET_VL(a)		(-EINVAL)
++#endif
+ 
+ /*
+  * this is where the system-wide overflow UID and GID are defined, for
+@@ -2261,6 +2267,12 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
+ 	case PR_GET_FP_MODE:
+ 		error = GET_FP_MODE(me);
+ 		break;
++	case PR_SVE_SET_VL:
++		error = SVE_SET_VL(me, arg2, arg3);
++		break;
++	case PR_SVE_GET_VL:
++		error = SVE_GET_VL(me);
++		break;
+ 	default:
+ 		error = -EINVAL;
+ 		break;
+-- 
+2.1.4
