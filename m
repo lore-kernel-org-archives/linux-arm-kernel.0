@@ -1,79 +1,124 @@
 From: christopher.lee.bostic@gmail.com (christopher.lee.bostic at gmail.com)
-Date: Thu, 12 Jan 2017 16:34:57 -0600
-Subject: [PATCH v2 14/18] drivers/fsi: Add FSI bus documentation
-Message-ID: <1484260497-80241-1-git-send-email-christopher.lee.bostic@gmail.com>
+Date: Thu, 12 Jan 2017 16:35:43 -0600
+Subject: [PATCH v2 15/18] drivers/fsi: Add documentation for GPIO based FSI
+ master
+Message-ID: <1484260543-80300-1-git-send-email-christopher.lee.bostic@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chris Bostic <cbostic@us.ibm.com>
 
-Add details on the basic functions of the FSI serial bus.
+Define the device tree bindings for the GPIO master type.
 
 Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
----
- Documentation/devicetree/bindings/fsi/fsi.txt | 54 +++++++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fsi/fsi.txt
 
-diff --git a/Documentation/devicetree/bindings/fsi/fsi.txt b/Documentation/devicetree/bindings/fsi/fsi.txt
+---
+
+V2 - Break out this documentation update from the code implementing
+     The GPIO master function.
+
+   - Move the documentation to an earlier patch than the code
+     implementing the function.
+
+   - Document all 'compatible' strings used in the series.
+
+   - Write binding document in terms of hardware, not software.
+
+   - Elaborate on what a GPIO based FSI master is versus a non
+     GPIO based master.
+
+   - Give a more detailed description of what each pin in the GPIO
+     FSI master is to be used for.
+
+   - Re-order compatible strings in example so that most specific
+     comes first.
+
+   - Indicate the proper order each pin should be initialized.
+
+   - Fix an unmatched '>' bracket in the example for binding.
+
+   - Bracket each element of the example list items individually.
+---
+ .../devicetree/bindings/fsi/fsi-master-gpio.txt    | 71 ++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
+
+diff --git a/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt b/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
 new file mode 100644
-index 0000000..7fa2394
+index 0000000..5d589bf
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/fsi/fsi.txt
-@@ -0,0 +1,54 @@
-+FSI: Flexible Support processor Interface
++++ b/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
+@@ -0,0 +1,71 @@
++Device-tree bindings for FSI master implemented with GPIO
++---------------------------------------------------------
 +
-+FSI is a two line serial bus capable of running at speeds up to 166 MHz.
-+The lines consist of a clock responsible for synchronizing the target device
-+(slave) with the master which is responsible for all transactions on the bus.
-+The master owns the clock line and is the only side allowed to change its
-+state. The second line, SDA, is a data line that conveys information to/from
-+the slave who samples based on the clock line.  The data line is
-+bi-directional.
++Typically a FSI master is defined in hardware with output control
++lines designated for Enable, Data, Clock, etc..  In the case of
++a 'GPIO FSI master', however, it may be the case that there is no
++such master defined in hardware and must be implemented in standard
++GPIO to interact with its slaves.  In this 'virtual' FSI master
++case the GPIO pins representing clk and data are directly
++connected to the slaves.
 +
-+The master initiates communication by sending a command to the slave and
-+depending on the type of command will allow the slave to control the bus
-+to return requested data.  All commands are CRC protected.  The slave upon
-+receipt of a command will determine if the CRC is correct and discard
-+the data if noise has corrupted the line.  In the same manner the master
-+will verify the CRC received from the slave.
++The GPIO FSI master node
++-------------------------
++This node describes a FSI master implmented with GPIO.
++Required property:
++	compatible = "ibm,fsi-master-gpio"
 +
-+Types of commands:
-+Read 32 bit:  Read a 32 bit word from a specified address on the slave.
-+Read 16 bit:  Read a 16 bit 'half word' from a specified address on the slave.
-+read 8 bit:   Read a byte from a specified address on the slave.
-+Write 32,16,8 bit: Write to a specified address on the slave with the provided
-+		data.
-+BREAK:		Initialize the slave's logic to receive commands.
-+TERM:		Terminate the slave's error lockout to resume communications
-+		after an error on the bus is detected.
-+D-POLL:		Poll the slave to determine when it is no longer buy processing
-+		a previous command.
-+I-POLL:		Interrupt signal check.  Master queries slave to see if any
-+		interrupts are asserting.
-+
-+High fanout capability:
-+FSI buses can be chained together in 'hub' configurations to expand the
-+available communications channels and thus allow connetion to more slaves.
++The standard FSI master node
++----------------------------
++This node describes a FSI master implmemented fully in hardware
++with dedicated input/output pins required for its function (i.e.
++not using generic GPIO pins).
++Required property:
++	compatible = "ibm,fsi-master"
 +
 +
-+Typical implementation
++GPIO FSI master property/pin descriptions
++------------------------------------------
++clk -	The master controlled clock line that indicates to the
++	slave when to read in or send out new data - required.
++data -	The serial data line containing information to be sent or
++	received by the master.  This line is bi-directional.  During
++	command phase the master controls the line and when a response
++	is required the slave takes control - required.
++enable - Controls power state of data line - optional.
++trans - Voltage translator control. In some applications the data line
++	must have its signal levels altered by a translator. If this is
++	necessary then control of signal direction is managed via this
++	line - optional.
++mux -	Multiplexor control.  This activates/deactivates the data line
++	in cases where it is one of many possible selections via mux -
++	optional.
 +
-+ FSI master ----- slave with local FSI master (hub) ------- downstream slave
++Required properties:
++	- compatible = "ibm,fsi-master-gpio";
++	- clk-gpios;
++	- data-gpios;
++
++Optional properties:
++	- enable-gpios;
++	- trans-gpios;
++	- mux-gpios;
++
++Order of property activation:
++1. clk
++2. data
++3. trans
++4. enable
++5. mux
 +
 +
-+Each two line combination of a clock and data line is collectively referred
-+to as a 'FSI link'.   Depending on hardware the primary FSI master may support
-+up to 64 links.  Hub FSI masters can support at most 8 links.  Total number
-+of supported slaves can grow exponentially depending on how many hubs are
-+placed in the path.  Presently only two hubs in the chain are allowed but
-+in the future this may be expanded.
++Example:
 +
-+The slave hardware logic responsible for decoding FSI master commands is
-+contained in a CFAM (Common Field replaceable unit Access Macro).  Up to
-+4 slaves or CFAMs can be connected on each FSI link.  CFAMs in addition
-+to the slave logic (or engine) can contain other functions that allow access
-+via FSI.  Common additional functionality includes I2C masters, GPIO
-+controllers, UARTs, etc...
++fsi-master {
++	compatible = "ibm,fsi-master-gpio", "ibm,fsi-master";
++	clk-gpios = <&gpio 0>, <&gpio 6>;
++	data-gpios = <&gpio 1>, <&gpio 7>;
++	enable-gpios = <&gpio 2>, <&gpio 8>;
++	trans-gpios = <&gpio 3>, <&gpio 9>;
++	mux-gpios = <&gpio 4>, <&gpio 10>;
++}
 -- 
 1.8.2.2
