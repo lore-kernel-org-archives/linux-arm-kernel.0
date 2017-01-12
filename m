@@ -1,182 +1,104 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 12 Jan 2017 15:09:26 +0000
-Subject: [PATCH v29 3/9] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <20161228043605.27470-2-takahiro.akashi@linaro.org>
-References: <20161228043347.27358-1-takahiro.akashi@linaro.org>
- <20161228043605.27470-2-takahiro.akashi@linaro.org>
-Message-ID: <20170112150926.GA12249@leverpostej>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 12 Jan 2017 15:20:10 +0000
+Subject: [PATCH v3 3/3] arm64: dts: juno: add missing CoreSight STM component
+In-Reply-To: <1484234410-7670-1-git-send-email-sudeep.holla@arm.com>
+References: <1484234410-7670-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1484234410-7670-4-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Mike Leach <mike.leach@linaro.org>
 
-As a general note, I must apologise for my minimial review of the series
-until this point. Judging by the way the DT parts are organised. I'm
-very concerned with the way the DT parts are organised, and clearly I
-did not communicate my concerns and suggestions effectively in prior
-rounds of review.
+This patch adds the missing CoreSight STM component definition to the
+device tree of all the juno variants(r0,r1,r2)
 
-On Wed, Dec 28, 2016 at 01:36:00PM +0900, AKASHI Takahiro wrote:
-> "crashkernel=" kernel parameter specifies the size (and optionally
-> the start address) of the system ram used by crash dump kernel.
-> reserve_crashkernel() will allocate and reserve the memory at the startup
-> of primary kernel.
-> 
-> This memory range will be exported to userspace via:
-> 	- an entry named "Crash kernel" in /proc/iomem, and
-> 	- "linux,crashkernel-base" and "linux,crashkernel-size" under
-> 	  /sys/firmware/devicetree/base/chosen
+STM component is connected to different funnels depending on Juno
+platform variant.
 
-> +#ifdef CONFIG_KEXEC_CORE
-> +static unsigned long long crash_size, crash_base;
-> +static struct property crash_base_prop = {
-> +	.name = "linux,crashkernel-base",
-> +	.length = sizeof(u64),
-> +	.value = &crash_base
-> +};
-> +static struct property crash_size_prop = {
-> +	.name = "linux,crashkernel-size",
-> +	.length = sizeof(u64),
-> +	.value = &crash_size,
-> +};
-> +
-> +static int __init export_crashkernel(void)
-> +{
-> +	struct device_node *node;
-> +	int ret;
-> +
-> +	if (!crash_size)
-> +		return 0;
-> +
-> +	/* Add /chosen/linux,crashkernel-* properties */
-> +	node = of_find_node_by_path("/chosen");
-> +	if (!node)
-> +		return -ENOENT;
-> +
-> +	/*
-> +	 * There might be existing crash kernel properties, but we can't
-> +	 * be sure what's in them, so remove them.
-> +	 */
-> +	of_remove_property(node, of_find_property(node,
-> +				"linux,crashkernel-base", NULL));
-> +	of_remove_property(node, of_find_property(node,
-> +				"linux,crashkernel-size", NULL));
-> +
-> +	ret = of_add_property(node, &crash_base_prop);
-> +	if (ret)
-> +		goto ret_err;
-> +
-> +	ret = of_add_property(node, &crash_size_prop);
-> +	if (ret)
-> +		goto ret_err;
-> +
-> +	return 0;
-> +
-> +ret_err:
-> +	pr_warn("Exporting crashkernel region to device tree failed\n");
-> +	return ret;
-> +}
-> +late_initcall(export_crashkernel);
+Signed-off-by: Mike Leach <mike.leach@linaro.org>
+[sudeep.holla at arm.com: minor changelog update and reorganising the STM
+	node back into juno-base.dtsi to avoid duplication]
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 15 +++++++++++++++
+ arch/arm64/boot/dts/arm/juno-r1.dts    |  4 ++++
+ arch/arm64/boot/dts/arm/juno-r2.dts    |  4 ++++
+ arch/arm64/boot/dts/arm/juno.dts       | 16 ++++++++++++++++
+ 4 files changed, 39 insertions(+)
 
-I very much do not like this.
-
-I don't think we should be modifying the DT exposed to userspace in this
-manner, in the usual boot path, especially given that the kernel itself
-does not appear to be a consumer of this property. I do not think that
-it is right to use the DT exposed to userspace as a communication
-channel solely between the kernel and userspace.
-
-So I think we should drop the above, and for arm64 have userspace
-consistently use /proc/iomem (or perhaps a new kexec-specific file) to
-determine the region reserved for the crash kernel, if it needs to know
-this.
-
-I'll have further comments on this front in the binding patch.
-
-> +/*
-> + * reserve_crashkernel() - reserves memory for crash kernel
-> + *
-> + * This function reserves memory area given in "crashkernel=" kernel command
-> + * line parameter. The memory reserved is used by dump capture kernel when
-> + * primary kernel is crashing.
-> + */
-> +static void __init reserve_crashkernel(void)
-> +{
-> +	int ret;
-> +
-> +	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-> +				&crash_size, &crash_base);
-> +	/* no crashkernel= or invalid value specified */
-> +	if (ret || !crash_size)
-> +		return;
-> +
-> +	if (crash_base == 0) {
-> +		/* Current arm64 boot protocol requires 2MB alignment */
-> +		crash_base = memblock_find_in_range(0, ARCH_LOW_ADDRESS_LIMIT,
-> +				crash_size, SZ_2M);
-> +		if (crash_base == 0) {
-> +			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-> +				crash_size);
-> +			return;
-> +		}
-> +	} else {
-> +		/* User specifies base address explicitly. */
-> +		if (!memblock_is_region_memory(crash_base, crash_size) ||
-> +			memblock_is_region_reserved(crash_base, crash_size)) {
-> +			pr_warn("crashkernel has wrong address or size\n");
-> +			return;
-> +		}
-> +
-> +		if (!IS_ALIGNED(crash_base, SZ_2M)) {
-> +			pr_warn("crashkernel base address is not 2MB aligned\n");
-> +			return;
-> +		}
-> +	}
-> +	memblock_reserve(crash_base, crash_size);
-
-This will mean that the crash kernel will have a permanent alias in the linear
-map which is vulnerable to being clobbered. There could also be issues
-with mismatched attributes in future.
-
-We're probably ok for now, but in future we'll likely want to fix this
-up to remove the region (or mark it nomap), and only map it temporarily
-when loading things into the region.
-
-> +
-> +	pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
-> +		crash_size >> 20, crash_base >> 20);
-> +
-> +	crashk_res.start = crash_base;
-> +	crashk_res.end = crash_base + crash_size - 1;
-> +}
-> +#else
-> +static void __init reserve_crashkernel(void)
-> +{
-> +	;
-
-Nit: the ';' line can go.
-
-> +}
-> +#endif /* CONFIG_KEXEC_CORE */
-> +
->  /*
->   * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
->   * currently assumes that for memory starting above 4G, 32-bit devices will
-> @@ -331,6 +438,9 @@ void __init arm64_memblock_init(void)
->  		arm64_dma_phys_limit = max_zone_dma_phys();
->  	else
->  		arm64_dma_phys_limit = PHYS_MASK + 1;
-> +
-> +	reserve_crashkernel();
-> +
->  	dma_contiguous_reserve(arm64_dma_phys_limit);
->  
->  	memblock_allow_resize();
-> -- 
-> 2.11.0
-
-Other than my comments regarding the DT usage above, this looks fine to
-me.
-
-Thanks,
-Mark.
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index 6d7f56573e89..77fe75de5cae 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -182,6 +182,21 @@
+ 		};
+ 	};
+ 
++	stm at 20100000 {
++		compatible = "arm,coresight-stm", "arm,primecell";
++		reg = <0 0x20100000 0 0x1000>,
++		      <0 0x28000000 0 0x180000>;
++		reg-names = "stm-base", "stm-stimulus-base";
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		power-domains = <&scpi_devpd 0>;
++		port {
++			stm_out_port: endpoint {
++			};
++		};
++	};
++
+ 	etm0: etm at 22040000 {
+ 		compatible = "arm,coresight-etm4x", "arm,primecell";
+ 		reg = <0 0x22040000 0 0x1000>;
+diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+index d4b85d9d343e..6df25c7a6b90 100644
+--- a/arch/arm64/boot/dts/arm/juno-r1.dts
++++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+@@ -236,3 +236,7 @@
+ &replicator_in_port0 {
+ 	remote-endpoint = <&csys2_funnel_out_port>;
+ };
++
++&stm_out_port {
++	remote-endpoint = <&csys1_funnel_in_port0>;
++};
+diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts b/arch/arm64/boot/dts/arm/juno-r2.dts
+index 14b29517065c..dafe92c20f65 100644
+--- a/arch/arm64/boot/dts/arm/juno-r2.dts
++++ b/arch/arm64/boot/dts/arm/juno-r2.dts
+@@ -236,3 +236,7 @@
+ &replicator_in_port0 {
+ 	remote-endpoint = <&csys2_funnel_out_port>;
+ };
++
++&stm_out_port {
++	remote-endpoint = <&csys1_funnel_in_port0>;
++};
+diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+index ba10d688beaa..dbec40a4c4a7 100644
+--- a/arch/arm64/boot/dts/arm/juno.dts
++++ b/arch/arm64/boot/dts/arm/juno.dts
+@@ -211,3 +211,19 @@
+ &replicator_in_port0 {
+ 	remote-endpoint = <&etf0_out_port>;
+ };
++
++&stm_out_port {
++	remote-endpoint = <&main_funnel_in_port2>;
++};
++
++&main_funnel {
++	ports {
++		port at 3 {
++			reg = <2>;
++			main_funnel_in_port2: endpoint {
++				slave-mode;
++				remote-endpoint = <&stm_out_port>;
++			};
++		};
++	};
++};
+-- 
+2.7.4
