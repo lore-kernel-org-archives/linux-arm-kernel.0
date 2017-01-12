@@ -1,40 +1,48 @@
-From: baolin.wang@linaro.org (Baolin Wang)
-Date: Thu, 12 Jan 2017 16:37:13 +0800
-Subject: [PATCH v2 3/3] phy: rockchip-inno-usb2: Set EXTCON_USB when
- EXTCON_CHG_USB_SDP was set
-In-Reply-To: <58773BC8.2050808@ti.com>
-References: <7b9836ce2ca34118a2acd1ea113605a5f13b4439.1482307697.git.baolin.wang@linaro.org>
- <23666cc1a5ff123ece5bdbb9821d1eab280d0927.1482307697.git.baolin.wang@linaro.org>
- <CAMz4kuJP9Q7Ly4uRBjCFU32YzbVbnsGyk+wHc+M=g8W=uDBsEQ@mail.gmail.com>
- <CAMz4ku+X8v2HH5L_fS60naNTqR1ZFKYeWuXuHqjg0UsHQq1dsQ@mail.gmail.com>
- <58773BC8.2050808@ti.com>
-Message-ID: <CAMz4ku+2yZUtmd0DVqj-_GUZ77YVpOvOrC-2kedEWSmJA7AdSg@mail.gmail.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 12 Jan 2017 09:58:40 +0100
+Subject: [PATCH v5 0/4] drm/dp: Implement CRC debugfs API
+Message-ID: <20170112085844.19878-1-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 12 January 2017 at 16:18, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi,
->
-> On Thursday 12 January 2017 12:13 PM, Baolin Wang wrote:
->> On 3 January 2017 at 13:54, Baolin Wang <baolin.wang@linaro.org> wrote:
->>> Hi Kison and Heiko,
->>>
->>> On 21 December 2016 at 16:12, Baolin Wang <baolin.wang@linaro.org> wrote:
->>>> According to the documentation, we should set the EXTCON_USB when
->>>> one SDP charger connector was reported.
->>>>
->>>> Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
->>>> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>
->>> Could you apply this patch if there are no other comments? Thanks.
->
-> Does it fix something? Or else it can go in the next merge window.
+this series builds up on the API for exposing captured CRCs through
+debugfs.
 
-Just fix the correct usage of EXTCON_CHG_USB_SDP connector. It's okay
-for me that it can go in the next merge window. Thanks.
+It adds new DP helpers for starting and stopping CRC capture and gets
+the Rockchip driver to use it.
+
+Also had to add a connector backpointer to the drm_dp_aux struct so we could
+wait for the right vblank and store the CRCs afterwards, I will be glad
+to hear about better alternatives.
+
+With these patches, tests in IGT such as kms_pipe_crc_basic and
+kms_plane do pass on RK3288.
+
+In this v5, "drm/dp: add helpers for capture of frame CRCs" has gone
+back to the more explicit way of just retrying once.
+
+Also, I have left the connector back pointer in the AUX structure, as on
+IRC nor danvet nor me could find a good reason to change it.
+
+Thanks,
+
+Tomeu
+
+
+Tomeu Vizoso (4):
+  drm/bridge: analogix_dp: set connector to drm_dp_aux
+  drm/dp: add helpers for capture of frame CRCs
+  drm/bridge: analogix_dp: add helpers for capture of frame CRCs
+  drm/rockchip: Implement CRC debugfs API
+
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  34 ++++--
+ drivers/gpu/drm/drm_dp_helper.c                    | 124 +++++++++++++++++++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |  42 +++++++
+ include/drm/bridge/analogix_dp.h                   |   3 +
+ include/drm/drm_dp_helper.h                        |   7 ++
+ 5 files changed, 202 insertions(+), 8 deletions(-)
 
 -- 
-Baolin.wang
-Best Regards
+2.9.3
