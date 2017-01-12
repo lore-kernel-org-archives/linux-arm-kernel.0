@@ -1,61 +1,43 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Thu, 12 Jan 2017 17:17:47 +0100
-Subject: [PATCH v8 2/5] i2c: Add STM32F4 I2C driver
-In-Reply-To: <CAOAejn2pW20VPP_yGtvJ_ufvj6Xj1poBiiA2WqkALiaLyyONug@mail.gmail.com>
-References: <1483607246-14771-1-git-send-email-cedric.madianga@gmail.com>
- <1483607246-14771-3-git-send-email-cedric.madianga@gmail.com>
- <20170111082208.vzu7xgpd4eakyldl@pengutronix.de>
- <CAOAejn2eOy2sn1VkE979ne23Sj9L6+kaQDNpL1EUKb2m=6sGXw@mail.gmail.com>
- <20170111153940.dtxzvtdici3r7l54@pengutronix.de>
- <CAOAejn2pW20VPP_yGtvJ_ufvj6Xj1poBiiA2WqkALiaLyyONug@mail.gmail.com>
-Message-ID: <CAOAejn1MWjW5h+EvCtt3aLPAQfndro6PhLTZTRs95VTOfRBJxQ@mail.gmail.com>
+From: jengelh@inai.de (Jan Engelhardt)
+Date: Thu, 12 Jan 2017 17:28:13 +0100 (CET)
+Subject: [PATCH v2 7/7] uapi: export all headers under uapi directories
+In-Reply-To: <464a1323-4450-e563-ff59-9e6d57b75959@6wind.com>
+References: <bf83da6b-01ef-bf44-b3e1-ca6fc5636818@6wind.com>
+ <1483695839-18660-1-git-send-email-nicolas.dichtel@6wind.com>
+ <1483695839-18660-8-git-send-email-nicolas.dichtel@6wind.com>
+ <20170109125638.GA15506@infradead.org>
+ <464a1323-4450-e563-ff59-9e6d57b75959@6wind.com>
+Message-ID: <alpine.LSU.2.20.1701121727180.19188@erq.vanv.qr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> > I don't understand scl_period = 1 ?s for Fast Mode. For a bus freqency
->>> > of 400 kHz we need low + high = 2.5 ?s. Is there a factor 10 missing
->>> > somewhere?
+On Thursday 2017-01-12 16:52, Nicolas Dichtel wrote:
+
+>Le 09/01/2017 ? 13:56, Christoph Hellwig a ?crit :
+>> On Fri, Jan 06, 2017 at 10:43:59AM +0100, Nicolas Dichtel wrote:
+>>> Regularly, when a new header is created in include/uapi/, the developer
+>>> forgets to add it in the corresponding Kbuild file. This error is usually
+>>> detected after the release is out.
 >>>
->>> As CCR = SCL_period * I2C parent clk frequency with minimal freq =
->>> 2Mhz and SCL_period = 1 we have:
->>> CCR = 1 * 2Mhz = 2.
->>> But to compute, scl_low and scl_high in Fast mode, we have to do the
->>> following thing as Duty=1:
->>> scl_high = 9 * CCR * I2C parent clk period
->>> scl_low = 16 * CCR * I2C parent clk period
->>> In our example:
->>> scl_high = 9 * 2 * 0,0000005 = 0,000009 sec = 9 ?s
->>> scl_low = 16 * 2 * 0.0000005 = 0,000016 sec = 16 ?s
->>> So low + high = 27 ?s > 2,5 ?s
->>
->> For me 9 ?s + 16 ?s is 25 ?s, resulting in 40 kHz. That's why I wondered
->> if there is a factor 10 missing somewhere.
->
-> Hum ok. I am going to double-check what is wrong because when I check
-> with the scope I always reach 400Khz for SCL.
-> I will let you know.
+>>> In fact, all headers under uapi directories should be exported, thus it's
+>>> useless to have an exhaustive list.
+>>>
+>>> After this patch, the following files, which were not exported, are now
+>>> exported (with make headers_install_all):
+>> 
+>> ... snip ...
+>> 
+>>> linux/genwqe/.install
+>>> linux/genwqe/..install.cmd
+>>> linux/cifs/.install
+>>> linux/cifs/..install.cmd
+>> 
+>> I'm pretty sure these should not be exported!
+>> 
+>Those files are created in every directory:
+>$ find usr/include/ -name '\.\.install.cmd' | wc -l
+>71
 
-There is one point I miss here that is described in the reference manual:
-To reach the 400 kHz maximum I?C fast mode clock, the I2C parent rate
-must be a multiple of 10 MHz.
-So, contrary to what we said in a previous thread, 400 kHz could not
-be reached with low frequencies.
-In that way, we could compute CCR with duty = 0 by default.
-So, I find another formula very close to the first one I pushed in the
-first version:
+That still does not mean they should be exported.
 
-In fast mode, we compute CCR with duty = 0:
-t_scl_high = CCR * I2C parent clk period
-t_scl_low = 2 *CCR * I2C parent clk period
-So, CCR = I2C parent rate / 400 kHz / 3
-
-For example with parent rate = 40 MHz:
-CCR = 40000000 / 400000 / 3 = 33.333333333 = 33
-t_scl_high = 33 * (1 / 2000000) = 825 ns > 600 ns
-t_scl_low = 2 * 16 * (1 / 2000000) = 1650 ns > 1300 ns
-
-It seems ok now.
-
-Best regards,
-
-Cedric
+Anything but headers (and directories as a skeleton structure) is maximally suspicious.
