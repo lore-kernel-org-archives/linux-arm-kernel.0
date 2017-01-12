@@ -1,39 +1,36 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Wed, 11 Jan 2017 19:48:38 -0600
-Subject: [PATCH v2 0/5] Reset Controller Nodes for TI Keystone platforms
-Message-ID: <20170112014843.19569-1-s-anna@ti.com>
+Date: Wed, 11 Jan 2017 19:48:39 -0600
+Subject: [PATCH v2 1/5] ARM: Keystone: Enable ARCH_HAS_RESET_CONTROLLER
+In-Reply-To: <20170112014843.19569-1-s-anna@ti.com>
+References: <20170112014843.19569-1-s-anna@ti.com>
+Message-ID: <20170112014843.19569-2-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+The Keystone 2 family of SoCs will use various Reset Controller
+drivers for managing the resets of remote processor devices like
+DSPs on the SoC, so select the ARCH_HAS_RESET_CONTROLLER option
+by default to enable the Reset framework.
 
-This is a slightly updated patch series for the reset controller nodes for
-TI Keystone2 SoCs. The only change is to rename the reset controller nodes
-from "psc-reset-controller" to just "reset-controller" following Rob Herring's
-comment on the Documentation update patch [1]. There are no changes to the first
-2 patches. I have already posted a v2 for the Documentation update as well.
-Please pick this up instead of the v1 series [2].
+Signed-off-by: Suman Anna <s-anna@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+v2: No changes
 
-regards
-Suman
+ arch/arm/mach-keystone/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-[1] https://www.spinics.net/lists/arm-kernel/msg553646.html
-[2] https://www.spinics.net/lists/arm-kernel/msg552911.html
-
-
-Suman Anna (5):
-  ARM: Keystone: Enable ARCH_HAS_RESET_CONTROLLER
-  ARM: dts: keystone: Add PSC node
-  ARM: dts: keystone-k2hk: Add PSC reset controller node
-  ARM: dts: keystone-k2l: Add PSC reset controller node
-  ARM: dts: keystone-k2e: Add PSC reset controller node
-
- arch/arm/boot/dts/keystone-k2e.dtsi  | 13 +++++++++++++
- arch/arm/boot/dts/keystone-k2hk.dtsi | 20 ++++++++++++++++++++
- arch/arm/boot/dts/keystone-k2l.dtsi  | 16 ++++++++++++++++
- arch/arm/boot/dts/keystone.dtsi      |  5 +++++
- arch/arm/mach-keystone/Kconfig       |  1 +
- 5 files changed, 55 insertions(+)
-
+diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
+index 24bd64dabdfc..554357035f30 100644
+--- a/arch/arm/mach-keystone/Kconfig
++++ b/arch/arm/mach-keystone/Kconfig
+@@ -4,6 +4,7 @@ config ARCH_KEYSTONE
+ 	select ARM_GIC
+ 	select HAVE_ARM_ARCH_TIMER
+ 	select KEYSTONE_TIMER
++	select ARCH_HAS_RESET_CONTROLLER
+ 	select ARM_ERRATA_798181 if SMP
+ 	select COMMON_CLK_KEYSTONE
+ 	select ARCH_SUPPORTS_BIG_ENDIAN
 -- 
 2.10.2
