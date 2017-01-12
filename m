@@ -1,56 +1,42 @@
-From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Thu, 12 Jan 2017 07:28:06 -0800
-Subject: [PATCH] net: thunderx: acpi: fix LMAC initialization
-Message-ID: <1484234886-22172-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 12 Jan 2017 15:33:15 +0000
+Subject: [PATCH] arm64: errata: Provide macro for major and minor cpu
+ revisions
+In-Reply-To: <20170111121143.9586-1-rrichter@cavium.com>
+References: <20170111121143.9586-1-rrichter@cavium.com>
+Message-ID: <20170112153315.GC13843@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While probing BGX we requesting appropriate QLM for it's configuration
-and get LMAC count by that request. Then, while reading configured
-MAC values from SSDT table we need to save them in proper mapping:
-  BGX[i]->lmac[j].mac = <MAC value>
-to later provide for initialization stuff. In order to fill
-such mapping properly we need to add lmac index to be used while
-acpi initialization since at this moment bgx->lmac_count already contains
-actual value.
+On Wed, Jan 11, 2017 at 01:11:42PM +0100, Robert Richter wrote:
+> Definition of cpu ranges are hard to read if the cpu variant is not
+> zero. Provide MIDR_CPU_FULL_REV() macro to describe the full hardware
+> revision of a cpu including variant and (minor) revision.
+> 
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> ---
+>  arch/arm64/include/asm/cputype.h |  3 +++
+>  arch/arm64/kernel/cpu_errata.c   | 15 +++++++++------
+>  arch/arm64/kernel/cpufeature.c   |  8 +++-----
+>  3 files changed, 15 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+> index 26a68ddb11c1..983e59cbdd54 100644
+> --- a/arch/arm64/include/asm/cputype.h
+> +++ b/arch/arm64/include/asm/cputype.h
+> @@ -56,6 +56,9 @@
+>  	(0xf			<< MIDR_ARCHITECTURE_SHIFT) | \
+>  	((partnum)		<< MIDR_PARTNUM_SHIFT))
+>  
+> +#define MIDR_CPU_FULL_REV(var, rev) \
+> +	(((var)	<< MIDR_VARIANT_SHIFT) | (rev))
 
-Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
----
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+Minor nit, but could you rename this to MIDR_CPU_VAR_REV instead please?
+The revision field *is* the bottom 4 bits, so "full" rev doesn't really
+make a lot of sense.
 
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index be30ad0..a3f4f83 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -47,8 +47,9 @@ struct lmac {
- struct bgx {
- 	u8			bgx_id;
- 	struct	lmac		lmac[MAX_LMAC_PER_BGX];
--	int			lmac_count;
-+	u8			lmac_count;
- 	u8			max_lmac;
-+	u8                      acpi_lmac_idx;
- 	void __iomem		*reg_base;
- 	struct pci_dev		*pdev;
- 	bool                    is_dlm;
-@@ -1073,13 +1074,13 @@ static acpi_status bgx_acpi_register_phy(acpi_handle handle,
- 	if (acpi_bus_get_device(handle, &adev))
- 		goto out;
- 
--	acpi_get_mac_address(dev, adev, bgx->lmac[bgx->lmac_count].mac);
-+	acpi_get_mac_address(dev, adev, bgx->lmac[bgx->acpi_lmac_idx].mac);
- 
--	SET_NETDEV_DEV(&bgx->lmac[bgx->lmac_count].netdev, dev);
-+	SET_NETDEV_DEV(&bgx->lmac[bgx->acpi_lmac_idx].netdev, dev);
- 
--	bgx->lmac[bgx->lmac_count].lmacid = bgx->lmac_count;
-+	bgx->lmac[bgx->acpi_lmac_idx].lmacid = bgx->acpi_lmac_idx;
-+	bgx->acpi_lmac_idx++; /* move to next LMAC */
- out:
--	bgx->lmac_count++;
- 	return AE_OK;
- }
- 
--- 
-1.8.3.1
+If you repost with that change, I'll pick it up for 4.11.
+
+Thanks,
+
+Will
