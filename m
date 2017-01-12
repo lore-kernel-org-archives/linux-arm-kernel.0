@@ -1,39 +1,59 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 12 Jan 2017 17:05:29 +0000
-Subject: [RFC 07/13] KVM: arm64: ITS: Change entry_size and indirect bit
- in BASER
-In-Reply-To: <1484236613-24633-8-git-send-email-eric.auger@redhat.com>
-References: <1484236613-24633-1-git-send-email-eric.auger@redhat.com>
- <1484236613-24633-8-git-send-email-eric.auger@redhat.com>
-Message-ID: <dc26dc19-313b-375b-0d9b-f4ff411a914f@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 12 Jan 2017 10:08:20 -0700
+Subject: [PATCH v3 0/3] arm64: dts: juno: CoreSight support updates
+In-Reply-To: <1484234410-7670-1-git-send-email-sudeep.holla@arm.com>
+References: <1484234410-7670-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CANLsYkxm-6eBsURrN_pO1833QNfVL4Li98P48C6ktsytyyagdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/17 15:56, Eric Auger wrote:
-> Change the device table entry_size to 16 bytes instead of 8.
-> We also Store the device and collection device in the its
-> struct.
-> 
-> The patch also clears the indirect bit for the device BASER.
-> The indirect bit is set as read-only.
+On 12 January 2017 at 08:20, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> Hi Mike,
+>
+> I just did some refactoring to reduced thge churn and duplication.
+> Can you check if this work for you ? I could not give it much testing.
+>
+> Regards,
+> Sudeep
+>
+> --->8
+> Juno r1/r2 boards have different CoreSight infrastructure outside the
+> CPU clusters. This patchset adds the additional coreSight components to
+> separate .dtsi files to support these differences.
+>
+> v1->v2:
+>         - moved the addition of the STM component into a separate patch
+>
+> v2->v3:
+>         - moved the back the common coreSight components back into
+>           juno-base.dtsi
+>
+>
+> Mike Leach (2):
+>   arm64: dts: juno: fix CoreSight support for Juno r1/r2 variants
+>   arm64: dts: juno: add missing CoreSight STM component
+>
+> Sudeep Holla (1):
+>   arm64: dts: juno: refactor CoreSight support on Juno r0
+>
+>  arch/arm64/boot/dts/arm/juno-base.dtsi    |  31 ++++++---
+>  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 102 ++++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/arm/juno-r1.dts       |  13 ++++
+>  arch/arm64/boot/dts/arm/juno-r2.dts       |  13 ++++
+>  arch/arm64/boot/dts/arm/juno.dts          |  24 +++++++
+>  5 files changed, 175 insertions(+), 8 deletions(-)
+>  create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
 
-Err... Why? We *really* want to continue supporting indirect tables, as
-this is a massive memory saver for the guest.
+For the set:
 
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
-> ---
-> 
-> TODO: investigate support of 2 level tables, ie. enabling
-> Indirect = 1. Support of 2 level tables is implementation
-> defined.
+Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Tested-by: Mathieu Poirier <mathieu.poirier@linaro.org> (On R0 only)
 
-Clearly, that's a regression. What exactly is the issue that decided you
-to disable it?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>
+> --
+> 2.7.4
+>
+> _______________________________________________
+> CoreSight mailing list
+> CoreSight at lists.linaro.org
+> https://lists.linaro.org/mailman/listinfo/coresight
