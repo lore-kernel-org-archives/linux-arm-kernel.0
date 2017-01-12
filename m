@@ -1,52 +1,50 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 12 Jan 2017 18:34:10 +0000
-Subject: [QUESTION] Arm64: Query L3 cache info via DT
-In-Reply-To: <5874A03A.9000901@huawei.com>
-References: <58633494.9030708@huawei.com>
- <81784854-11f8-468a-a280-69be0a714a3b@arm.com> <5874A03A.9000901@huawei.com>
-Message-ID: <1e257239-ac1e-949b-b3e7-84228466d892@arm.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Thu, 12 Jan 2017 19:34:19 +0100
+Subject: Nokia N900: mixers changed between 4.6 and 4.10,
+ no longer can use in-call speaker
+In-Reply-To: <20170112181826.GA28290@amd>
+References: <20170112181826.GA28290@amd>
+Message-ID: <201701121934.19810@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/01/17 08:50, Tan Xiaojun wrote:
-[...]
-
-> diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-> index 4b472a3..aac18c2 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-> @@ -215,18 +215,30 @@
+On Thursday 12 January 2017 19:18:26 Pavel Machek wrote:
+> Hi!
 > 
->                 cluster0_l2: l2-cache0 {
->                         compatible = "cache";
-> +                       next-level-cache = <&die0_l3c>;
->                 };
+> In v4.10 (and probably v4.9, too) I can no longer use the in-call
+> speaker. I can no longer use the wired headset, either.
 > 
->                 cluster1_l2: l2-cache1 {
->                         compatible = "cache";
-> +                       next-level-cache = <&die0_l3c>;
->                 };
+> v4.4 (and probably v4.6) works ok.
 > 
->                 cluster2_l2: l2-cache2 {
->                         compatible = "cache";
-> +                       next-level-cache = <&die0_l3c>;
->                 };
+> Any ideas? Does wired headset / in-call speaker work for you?
 > 
->                 cluster3_l2: l2-cache3 {
->                         compatible = "cache";
-> +                       next-level-cache = <&die0_l3c>;
-> +               };
-> +
-> +               die0_l3c: l3-cache {
-> +                       compatible = "cache";
-> +                       cache-size = <16777216>;
-> +                       cache-line-size = <64>;
-> +                       cache-block-size = <16>;
+> "Mono" and "Mono DAC" options are still there.. but something else
+> changed, as alsamixer now shows way many more options (meaning they
+> are shorter?) and I get complains from alsactl:
+> 
+> alsactl: set_control:1328: failed to obtain info for control #49 (No
+> such file or directory)
+> ...
+> alsactl: set_control:1328: failed to obtain info for control #229 (No
+> such file or directory)
+> 
+> 
+> 
+> 								Pavel
 
-You need to add cache-level = <3> with v2 patch set to work.
+Looks like there are not so much commits related to 
+sound/soc/omap/rx51.c Maybe it can be one of these twos?
+
+cb7e62256e99d285e415cf75db67558f0f8bb107
+6d2de5ab4328718302c54b20222c6b1a574c3fce
 
 -- 
-Regards,
-Sudeep
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170112/2c86eae0/attachment.sig>
