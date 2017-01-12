@@ -1,50 +1,59 @@
-From: anurupvasu@gmail.com (Anurup M)
-Date: Thu, 12 Jan 2017 11:17:37 +0530
-Subject: [PATCH v3 04/10] Documentation: perf: hisi: Documentation for
- HiP05/06/07 PMU event counting.
-In-Reply-To: <20170110175500.GD24036@leverpostej>
-References: <1483339777-23973-1-git-send-email-anurup.m@huawei.com>
- <20170110175500.GD24036@leverpostej>
-Message-ID: <58771879.2010604@gmail.com>
+From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
+Date: Thu, 12 Jan 2017 08:52:51 +0300
+Subject: [PATCH 1/2] dma-mapping: let arch know origin of dma range passed
+ to arch_setup_dma_ops()
+In-Reply-To: <30025121.yS4lyZEDrk@wuerfel>
+References: <dca35acf-1adf-aa85-7a0b-d0c6ec702fa1@arm.com>
+ <1484159512-28515-1-git-send-email-nikita.yoush@cogentembedded.com>
+ <1484159512-28515-2-git-send-email-nikita.yoush@cogentembedded.com>
+ <30025121.yS4lyZEDrk@wuerfel>
+Message-ID: <764334db-3400-58c6-cc4b-3f7ce66daa27@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+>> diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
+>> index 5ac373c..480b644 100644
+>> --- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
+>> +++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
+>> @@ -540,7 +540,7 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
+>>  
+>>  	/* Objects are coherent, unless 'no shareability' flag set. */
+>>  	if (!(obj_desc->flags & DPRC_OBJ_FLAG_NO_MEM_SHAREABILITY))
+>> -		arch_setup_dma_ops(&mc_dev->dev, 0, 0, NULL, true);
+>> +		arch_setup_dma_ops(&mc_dev->dev, 0, 0, false, NULL, true);
+>>  
+>>  	/*
+>>  	 * The device-specific probe callback will get invoked by device_add()
+> 
+> Why are these actually calling arch_setup_dma_ops() here in the first
+> place? Are these all devices that are DMA masters without an OF node?
 
+I don't know, but that's a different topic. This patch just adds
+argument and sets it to false everywhere but in the location when range
+should be definitely enforced.
 
-On Tuesday 10 January 2017 11:25 PM, Mark Rutland wrote:
-> On Mon, Jan 02, 2017 at 01:49:37AM -0500, Anurup M wrote:
->> +The Hisilicon SoC HiP05/06/07 chips consist of various independent system
->> +device PMU's such as L3 cache(L3C) and Miscellaneous Nodes(MN).
->> +These PMU devices are independent and have hardware logic to gather
->> +statistics and performance information.
+>> @@ -126,6 +127,8 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>>  			return;
+>>  		}
+>>  		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
 >> +
->> +HiP0x chips are encapsulated by multiple CPU and IO die's. The CPU die is
->> +called as Super CPU cluster (SCCL) which includes 16 cpu-cores. Every SCCL
->> +is further grouped as CPU clusters (CCL) which includes 4 cpu-cores each.
->> +Each SCCL has 1 L3 cache and 1 MN units.
-> Are there systems with multiple SCCLs? Or is there only one SCCL per
-> system?
+>> +		enforce_range = true;
+>>  	}
+>>  
+>>  	dev->dma_pfn_offset = offset;
+> 
+> Hmm, I think when the dma-ranges are missing, we should either enforce
+> a 32-bit mask, or disallow DMA completely. It's probably too late for
+> the latter, I wish we had done this earlier in order to force everyone
+> on ARM64 to have a valid dma-ranges property for any DMA master.
 
-The HiP0x are encapsulated by multiple SCCL (CPU die) and SICL (IO die).
-The HiP06 and HiP07 have two SCCLs.
+This can be done over time.
 
->> +The L3 cache is shared by all CPU cores in a CPU die. The L3C has four banks
->> +(or instances). Each bank or instance of L3C has Eight 32-bit counter
->> +registers and also event control registers. The HiP05/06 chip L3 cache has
->> +22 statistics events. The HiP07 chip has 66 statistics events. These events
->> +are very useful for debugging.
-> Is an L3C associated with a subset of physical memory (as with the ARM
-> CCN's L3C), or is it associated with a set of CPUs (e.g.  only those in
-> a single SCCL) covering all physical memory (as with each CPU's L1 &
-> L2)?
+However the very idea of this version of patch is - keep working pieces
+as-is, thus for now setting enforce_range to false in case of no defined
+dma-ranges is intentional.
 
-Yes the L3C is associated with the set of CPUs in a single SCCL covering 
-all physical memory.
-The L3 cache in all  the SCCLs share the complete physical memory.
+What I should re-check is - does rcar dtsi set dma-ranges, and add it if
+it does not.
 
-
-Thanks,
-Anurup
-
-> Thanks,
-> Mark.
+Nikita
