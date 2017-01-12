@@ -1,54 +1,121 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 11 Jan 2017 19:22:17 -0600
-Subject: [PATCH v2] Documentation: dt: reset: Revise typos in TI syscon reset
- example
-In-Reply-To: <20170109192814.26811-1-s-anna@ti.com>
-References: <20170109192814.26811-1-s-anna@ti.com>
-Message-ID: <20170112012217.18115-1-s-anna@ti.com>
+From: Wenyou.Yang@microchip.com (Wenyou.Yang at microchip.com)
+Date: Thu, 12 Jan 2017 01:25:22 +0000
+Subject: [PATCH 1/3] ARM: at91: flush the L2 cache before entering cpu idle
+In-Reply-To: <20170111111814.GJ14217@n2100.armlinux.org.uk>
+References: <20170106065947.30631-1-wenyou.yang@atmel.com>
+ <20170106065947.30631-2-wenyou.yang@atmel.com>
+ <20170110161821.vp673jyfqx6s76pg@piout.net>
+ <CACh+v5NX9Da__zXtnVGgbO9wYAzEJy-8rjVPHdQx_F6QDk+xZg@mail.gmail.com>
+ <F9F4555C4E01D7469D37975B62D0EFBB496BE4@CHN-SV-EXMX07.mchp-main.com>
+ <CACh+v5M3tU4WHMqAX0zm2H=zzwc0+XChyG1tnH2aHxaacm6C=A@mail.gmail.com>
+ <20170111111814.GJ14217@n2100.armlinux.org.uk>
+Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB497F2B@CHN-SV-EXMX07.mchp-main.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix couple of typos in the example given in the TI syscon reset
-binding. The ti,reset-bits used for DSP0 are corrected to match
-the values that will be used in the actual DT node.
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
-v2: Address Rob Herring's comment to change the reset node name
-    from "psc-reset" to "reset-controller"
-    
- Documentation/devicetree/bindings/reset/ti-syscon-reset.txt | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt b/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
-index 164c7f34c451..c516d24959f2 100644
---- a/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
-+++ b/Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
-@@ -63,7 +63,7 @@ Example:
- --------
- The following example demonstrates a syscon node, the reset controller node
- using the syscon node, and a consumer (a DSP device) on the TI Keystone 2
--Edison SoC.
-+66AK2E SoC.
- 
- / {
- 	soc {
-@@ -71,13 +71,13 @@ Edison SoC.
- 			compatible = "syscon", "simple-mfd";
- 			reg = <0x02350000 0x1000>;
- 
--			pscrst: psc-reset {
-+			pscrst: reset-controller {
- 				compatible = "ti,k2e-pscrst", "ti,syscon-reset";
- 				#reset-cells = <1>;
- 
- 				ti,reset-bits = <
--					0xa3c 8 0xa3c 8 0x83c 8 (ASSERT_SET|DEASSERT_CLEAR|STATUS_SET)   /* 0: pcrst-dsp0 */
--					0xa40 5 0xa44 3 0     0 (ASSERT_SET|DEASSERT_CLEAR|STATUS_NONE)  /* 1: pcrst-example */
-+					0xa3c 8 0xa3c 8 0x83c 8 (ASSERT_CLEAR | DEASSERT_SET   | STATUS_CLEAR) /* 0: dsp0 */
-+					0xa40 5 0xa44 3 0     0 (ASSERT_SET   | DEASSERT_CLEAR | STATUS_NONE)  /* 1: example */
- 				>;
- 			};
- 		};
--- 
-2.10.2
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at armlinux.org.uk]
+> Sent: 2017?1?11? 19:18
+> To: Jean-Jacques Hiblot <jjhiblot@gmail.com>
+> Cc: Wenyou Yang - A41535 <Wenyou.Yang@microchip.com>; Alexandre Belloni
+> <alexandre.belloni@free-electrons.com>; Mark Rutland <mark.rutland@arm.com>;
+> devicetree <devicetree@vger.kernel.org>; Nicolas Ferre
+> <nicolas.ferre@atmel.com>; Linux Kernel Mailing List <linux-
+> kernel at vger.kernel.org>; robh+dt <robh+dt@kernel.org>; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/3] ARM: at91: flush the L2 cache before entering cpu idle
+> 
+> On Wed, Jan 11, 2017 at 12:05:05PM +0100, Jean-Jacques Hiblot wrote:
+> > 2017-01-11 9:15 GMT+01:00  <Wenyou.Yang@microchip.com>:
+> > > Hi Jean-Jacques,
+> > >
+> > >> -----Original Message-----
+> > >> From: Jean-Jacques Hiblot [mailto:jjhiblot at gmail.com]
+> > >> Sent: 2017?1?11? 0:51
+> > >> To: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > >> Cc: Wenyou Yang - A41535 <Wenyou.Yang@microchip.com>; Mark Rutland
+> > >> <mark.rutland@arm.com>; devicetree <devicetree@vger.kernel.org>;
+> > >> Russell King <linux@arm.linux.org.uk>; Wenyou Yang - A41535
+> > >> <Wenyou.Yang@microchip.com>; Nicolas Ferre
+> > >> <nicolas.ferre@atmel.com>; Linux Kernel Mailing List
+> > >> <linux-kernel@vger.kernel.org>; Rob Herring <robh+dt@kernel.org>;
+> > >> linux-arm-kernel at lists.infradead.org
+> > >> Subject: Re: [PATCH 1/3] ARM: at91: flush the L2 cache before
+> > >> entering cpu idle
+> > >>
+> > >> 2017-01-10 17:18 GMT+01:00 Alexandre Belloni
+> > >> <alexandre.belloni@free-electrons.com>:
+> > >> > I though a bit more about it, and I don't really like the new
+> > >> > compatible string. I don't feel this should be necessary.
+> > >> >
+> > >> > What about the following:
+> > >> >
+> > >> > diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> > >> > index
+> > >> > b4332b727e9c..0333aca63e44 100644
+> > >> > --- a/arch/arm/mach-at91/pm.c
+> > >> > +++ b/arch/arm/mach-at91/pm.c
+> > >> > @@ -53,6 +53,7 @@ extern void at91_pinctrl_gpio_resume(void);
+> > >> > static struct {
+> > >> >         unsigned long uhp_udp_mask;
+> > >> >         int memctrl;
+> > >> > +       bool has_l2_cache;
+> > >> >  } at91_pm_data;
+> > >> >
+> > >> >  void __iomem *at91_ramc_base[2]; @@ -267,6 +268,11 @@ static
+> > >> > void at91_ddr_standby(void)
+> > >> >         u32 lpr0, lpr1 = 0;
+> > >> >         u32 saved_lpr0, saved_lpr1 = 0;
+> > >> >
+> > >>
+> > >> > +       if (at91_pm_data.has_l2_cache) {
+> > >> > +               flush_cache_all();
+> > >> what is the point of calling flush_cache_all() here ? Do we really
+> > >> care that dirty data in L1 is written to DDR ? I may be missing
+> > >> something but to me it's just extra latency.
+> > >
+> > > Are you mean use outer_flush_all() to flush all cache lines in the outer cache
+> only?
+> >
+> > Yes that's what I meant. You see, you don't flush the cache for
+> > sama5d3 so it shouldn't be required either for sam5d4. You should be
+> > able to test it quickly and see if L1 flush is indeed required by
+> > replacing  flush_cache_all() with outer_flush_all(). BTW is highly
+> > probable that L2 cache flush is done in outer_disable() so calling
+> > outer_flush_all() is probably no required.
+> 
+> Please don't.  Read the comments in the code, and understand the APIs that
+> you're suggesting people use _before_ making the suggestion:
+> 
+> /**
+>  * outer_flush_all - clean and invalidate all cache lines in the outer cache
+>  *
+>  * Note: depending on implementation, this may not be atomic - it must
+>  * only be called with interrupts disabled and no other active outer
+>  * cache masters.
+>  *
+>  * It is intended that this function is only used by implementations
+>  * needing to override the outer_cache.disable() method due to security.
+>  * (Some implementations perform this as a clean followed by an invalidate.)  */
+> 
+> So, outer_flush_all() should not be called except from L2 cache code
+> implementing the outer_disable() function - it's not intended for platforms to use.
+> 
+> There are, however, sadly three users of outer_flush_all() which have crept in
+> through arm-soc, that should be outer_disable() instead.
+
+Here, outer_flush_all() should not be called, calling outer_disable() is enough. Is it right?
+
+In the implementation of l2c_disable(void) of in mm/cache-l2x0.c, the outer_cache.flush_all() is called.
+
+> 
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+
+
+Best Regards,
+Wenyou Yang
