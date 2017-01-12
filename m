@@ -1,212 +1,122 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 12 Jan 2017 15:56:22 +0530
-Subject: [PATCH 33/37] tools: PCI: Add a userspace tool to test PCI endpoint
+Date: Thu, 12 Jan 2017 15:56:06 +0530
+Subject: [PATCH 17/37] Documentation: PCI: Guide to use pci endpoint configfs
 In-Reply-To: <1484216786-17292-1-git-send-email-kishon@ti.com>
 References: <1484216786-17292-1-git-send-email-kishon@ti.com>
-Message-ID: <1484216786-17292-34-git-send-email-kishon@ti.com>
+Message-ID: <1484216786-17292-18-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a userspace tool to invoke the ioctls exposed by the
-PCI endpoint test driver to perform various PCI tests.
+Add Documentation to help users use pci endpoint to configure
+pci endpoint function and to bind the endpoint function
+with endpoint controller.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- tools/pci/pcitest.c |  186 +++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 186 insertions(+)
- create mode 100644 tools/pci/pcitest.c
+ Documentation/PCI/00-INDEX                      |    2 +
+ Documentation/PCI/endpoint/pci-endpoint-cfs.txt |   84 +++++++++++++++++++++++
+ 2 files changed, 86 insertions(+)
+ create mode 100644 Documentation/PCI/endpoint/pci-endpoint-cfs.txt
 
-diff --git a/tools/pci/pcitest.c b/tools/pci/pcitest.c
+diff --git a/Documentation/PCI/00-INDEX b/Documentation/PCI/00-INDEX
+index ba950b2..f84a23c 100644
+--- a/Documentation/PCI/00-INDEX
++++ b/Documentation/PCI/00-INDEX
+@@ -14,3 +14,5 @@ pcieaer-howto.txt
+ 	- the PCI Express Advanced Error Reporting Driver Guide HOWTO
+ endpoint/pci-endpoint.txt
+ 	- guide to add endpoint controller driver and endpoint function driver.
++endpoint/pci-endpoint-cfs.txt
++	- guide to use configfs to configure the pci endpoint function.
+diff --git a/Documentation/PCI/endpoint/pci-endpoint-cfs.txt b/Documentation/PCI/endpoint/pci-endpoint-cfs.txt
 new file mode 100644
-index 0000000..39b5b0b
+index 0000000..b1f1613
 --- /dev/null
-+++ b/tools/pci/pcitest.c
-@@ -0,0 +1,186 @@
-+/**
-+ * Userspace PCI Endpoint Test Module
-+ *
-+ * Copyright (C) 2017 Texas Instruments
-+ * Author: Kishon Vijay Abraham I <kishon@ti.com>
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 of
-+ * the License as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
++++ b/Documentation/PCI/endpoint/pci-endpoint-cfs.txt
+@@ -0,0 +1,84 @@
++                   CONFIGURING PCI ENDPOINT USING CONFIGFS
++                    Kishon Vijay Abraham I <kishon@ti.com>
 +
-+#include <errno.h>
-+#include <fcntl.h>
-+#include <stdbool.h>
-+#include <stdio.h>
-+#include <stdlib.h>
-+#include <sys/ioctl.h>
-+#include <time.h>
-+#include <unistd.h>
++The PCI Endpoint Core exposes configfs entry (pci_ep) in order to configure the
++PCI endpoint function and in order to bind the endpoint function
++with the endpoint controller. (For introducing other mechanisms to
++configure the PCI Endpoint Function refer [1]).
 +
-+#include <linux/pcitest.h>
++*) Mounting configfs
 +
-+#define BILLION 1E9
++The PCI Endpoint Core layer creates pci_ep directory in the mounted configfs
++directory. configfs can be mounted using the following command.
 +
-+static char *result[] = { "NOT OKAY", "OKAY" };
++	mount -t configfs none /sys/kernel/config
 +
-+struct pci_test {
-+	char		*device;
-+	char		barnum;
-+	bool		legacyirq;
-+	unsigned int	msinum;
-+	bool		read;
-+	bool		write;
-+	bool		copy;
-+	unsigned long	size;
-+};
++*) Directory Structure
 +
-+static int run_test(struct pci_test *test)
-+{
-+	long ret;
-+	int fd;
-+	struct timespec start, end;
-+	double time;
++The pci_ep configfs directory structure has been created to reflect the
++natural tree like structure of PCI devices. So every directory created
++inside pci_ep represents a EPC device and every directory created inside
++epf directory represents EPF device.
 +
-+	fd = open(test->device, O_RDWR);
-+	if (fd < 0) {
-+		perror("can't open PCI Endpoint Test device");
-+		return fd;
-+	}
++/sys/kernel/config/pci_ep/
++			 | <dir>/ --------------------------------------> [2]
++				| epc
++				| epf/
++				     | <dir>/ --------------------------> [3]
++					    | vendorid
++					    | deviceid
++					    | revid
++					    | progif_code
++					    | subclass_code
++					    | baseclass_code
++					    | cache_line_size
++					    | subsys_vendor_id
++					    | subsys_id
++					    | interrupt_pin
++					    | function
 +
-+	if (test->barnum >= 0 && test->barnum <= 5) {
-+		ret = ioctl(fd, PCITEST_BAR, test->barnum);
-+		fprintf(stdout, "BAR%d:\t\t", test->barnum);
-+		if (ret < 0)
-+			fprintf(stdout, "TEST FAILED\n");
-+		else
-+			fprintf(stdout, "%s\n", result[ret]);
-+	}
++*) Creating configfs entry for EPC
 +
-+	if (test->legacyirq) {
-+		ret = ioctl(fd, PCITEST_LEGACY_IRQ, 0);
-+		fprintf(stdout, "LEGACY IRQ:\t");
-+		if (ret < 0)
-+			fprintf(stdout, "TEST FAILED\n");
-+		else
-+			fprintf(stdout, "%s\n", result[ret]);
-+	}
++Any directory created inside *pci_ep* represents an EPC device. In the above
++directory structure [2] represents an EPC device. It consists of
 +
-+	if (test->msinum > 0 && test->msinum <= 32) {
-+		ret = ioctl(fd, PCITEST_MSI, test->msinum);
-+		fprintf(stdout, "MSI%d:\t\t", test->msinum);
-+		if (ret < 0)
-+			fprintf(stdout, "TEST FAILED\n");
-+		else
-+			fprintf(stdout, "%s\n", result[ret]);
-+	}
++	*) epc: Use it to associate the configfs entry to an actual EPC device.
++		The list of valid entries for this field can be obtained from
++			ls /sys/class/pci_epc/
 +
-+	if (test->write) {
-+		ret = ioctl(fd, PCITEST_WRITE, test->size);
-+		fprintf(stdout, "WRITE (%7ld bytes):\t\t", test->size);
-+		if (ret < 0)
-+			fprintf(stdout, "TEST FAILED\n");
-+		else
-+			fprintf(stdout, "%s\n", result[ret]);
-+	}
++	*) epf: Directory that contains all the endpoint functions. The name
++		of the created directory determines the driver this particular
++		epf device will be bound to. The name can be obtained either
++		from the function binding documentation [4] or
++			ls /sys/bus/pci-epf/drivers
 +
-+	if (test->read) {
-+		ret = ioctl(fd, PCITEST_READ, test->size);
-+		fprintf(stdout, "READ (%7ld bytes):\t\t", test->size);
-+		if (ret < 0)
-+			fprintf(stdout, "TEST FAILED\n");
-+		else
-+			fprintf(stdout, "%s\n", result[ret]);
-+	}
++		If more than one endpoint function device has to be bound to
++		the same driver, then the directory should be created using
++		the following notation
++			mkdir <name>.<num>
 +
-+	if (test->copy) {
-+		ret = ioctl(fd, PCITEST_COPY, test->size);
-+		fprintf(stdout, "COPY (%7ld bytes):\t\t", test->size);
-+		if (ret < 0)
-+			fprintf(stdout, "TEST FAILED\n");
-+		else
-+			fprintf(stdout, "%s\n", result[ret]);
-+	}
++*) Creating configfs entry for EPF
 +
-+	fflush(stdout);
-+}
++Any directory created inside *epf* directory represents an EPF device. In the
++above directory structure, [3] represents an EPF device. It consists of the
++following entries that can be used to configure the standard configuration
++header of the endpoint function. (These entries are created by the
++framework when any new directory is created inside epf directory.)
 +
-+int main(int argc, char **argv)
-+{
-+	int c;
-+	struct pci_test *test;
++        | vendorid
++        | deviceid
++        | revid
++        | progif_code
++        | subclass_code
++        | baseclass_code
++        | cache_line_size
++        | subsys_vendor_id
++        | subsys_id
++        | interrupt_pin
 +
-+	test = calloc(1, sizeof(*test));
-+	if (!test) {
-+		perror("Fail to allocate memory for pci_test\n");
-+		return -ENOMEM;
-+	}
++The following entry identifies the function driver that is bound to the
++function device
++	| function
 +
-+	/* since '0' is a valid BAR number, initialize it to -1 */
-+	test->barnum = -1;
-+
-+	/* set default size as 100KB */
-+	test->size = 0x19000;
-+
-+	/* set default endpoint device */
-+	test->device = "/dev/pci-endpoint-test.0";
-+
-+	while ((c = getopt(argc, argv, "D:b:m:lrwcs:")) != EOF)
-+	switch (c) {
-+	case 'D':
-+		test->device = optarg;
-+		continue;
-+	case 'b':
-+		test->barnum = atoi(optarg);
-+		if (test->barnum < 0 || test->barnum > 5)
-+			goto usage;
-+		continue;
-+	case 'l':
-+		test->legacyirq = true;
-+		continue;
-+	case 'm':
-+		test->msinum = atoi(optarg);
-+		if (test->msinum < 1 || test->msinum > 32)
-+			goto usage;
-+		continue;
-+	case 'r':
-+		test->read = true;
-+		continue;
-+	case 'w':
-+		test->write = true;
-+		continue;
-+	case 'c':
-+		test->copy = true;
-+		continue;
-+	case 's':
-+		test->size = strtoul(optarg, NULL, 0);
-+		continue;
-+	case '?':
-+	case 'h':
-+	default:
-+usage:
-+		fprintf(stderr,
-+			"usage: %s [options]\n"
-+			"Options:\n"
-+			"\t-D <dev>		pci endpoint test device {default: /dev/pci-endpoint-test.0}\n"
-+			"\t-b <bar num>		BAR test (bar number between 0..5)\n"
-+			"\t-m <msi num>		MSI test (msi number between 1..32)\n"
-+			"\t-r			Read buffer test\n"
-+			"\t-w			Write buffer test\n"
-+			"\t-c			Copy buffer test\n"
-+			"\t-s <size>		Size of buffer {default: 100KB}\n",
-+			argv[0]);
-+		return -EINVAL;
-+	}
-+
-+	run_test(test);
-+	return 0;
-+}
++[1] -> Documentation/PCI/endpoint/pci-endpoint.txt
++[4] -> Documentation/PCI/endpoint/function/binding/
 -- 
 1.7.9.5
