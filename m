@@ -1,48 +1,66 @@
-From: uwe@kleine-koenig.org (=?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?=)
-Date: Thu, 12 Jan 2017 14:18:46 +0100
-Subject: CONFIG_PCIEASPM breaks PCIe on Marvell Armada 385 machine
-In-Reply-To: <20170111220235.GP14532@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170111194942.q5rdma2es6hkmxfe@perseus.defre.kleine-koenig.org>
- <20170111220235.GP14532@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <9f48e2a8-e1e0-e3db-af48-12297f8521f2@kleine-koenig.org>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 12 Jan 2017 07:24:53 -0600
+Subject: [PATCH 1/2][UPDATE] of: base: add support to get the number of
+ cache levels
+In-Reply-To: <1484049616-22388-1-git-send-email-sudeep.holla@arm.com>
+References: <1484048479-19767-1-git-send-email-sudeep.holla@arm.com>
+ <1484049616-22388-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CAL_Jsq+wawaXeFPnmYw++YMiMzMm+9nSn498Dj7KsGzkfndfog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2017 11:02 PM, Bjorn Helgaas wrote:
-> Hi Uwe,
-> 
-> On Wed, Jan 11, 2017 at 08:49:46PM +0100, Uwe Kleine-K?nig wrote:
->> Hello,
->>
->> on an Marvell Armada 385 based machine (Turris Omnia) with 4.9 the
->> ath10k driver fails to bind to the matching hardware if CONFIG_PCIEASPM
->> is enabled:
->>
->> [...]
-> We have several open issues related to ASPM:
-> 
->   https://bugzilla.kernel.org/show_bug.cgi?id=102311 ASPM: ASMEDA asm1062 not working
->   https://bugzilla.kernel.org/show_bug.cgi?id=187731 Null pointer dereference in ASPM
->   https://bugzilla.kernel.org/show_bug.cgi?id=189951 Enabling ASPM causes NIC performance issue
->   https://bugzilla.kernel.org/show_bug.cgi?id=60111 NULL pointer deref in ASPM alloc_pcie_link_state()
-> 
-> I don't recognize yours as being one of these.  Can you open a new
-> issue and attach the complete dmesg log and "lspci -vv" output?
+On Tue, Jan 10, 2017 at 6:00 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> It is useful to have helper function just to get the number of cache
+> levels for a given logical cpu. This patch adds the support for the
+> same.
+>
+> It will be used on ARM64 platform where the device tree provides the
+> information for the additional non-architected/transparent/external
+> last level caches that are not integrated with the processors.
+>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/of/base.c  | 23 +++++++++++++++++++++++
+>  include/linux/of.h |  1 +
+>  2 files changed, 24 insertions(+)
+>
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index d4bea3c797d6..80e557eca858 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/cpu.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> +#include <linux/of_device.h>
+>  #include <linux/of_graph.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/slab.h>
+> @@ -2268,6 +2269,28 @@ struct device_node *of_find_next_cache_node(const struct device_node *np)
+>  }
+>
+>  /**
+> + * of_count_cache_levels - Find the total number of cache levels for the
+> + *                        given logical cpu
+> + *
+> + * @cpu: cpu number(logical index) for which cache levels is being counted
+> + *
+> + * Returns the total number of cache levels for the given logical cpu
+> + */
+> +int of_count_cache_levels(unsigned int cpu)
+> +{
+> +       int level = 0;
+> +       struct device_node *np = of_cpu_device_node_get(cpu);
+> +
+> +       while (np) {
+> +               level++;
 
-Done: https://bugzilla.kernel.org/show_bug.cgi?id=192441
+This will return 1 if you have a cpu node and no cache nodes. Are you
+assuming the cpu has a cache?
 
-> Is this a regression?
+Perhaps you should just find the last level cache node and then just
+read "cache-level".
 
-As written in the bug report this also happens on 4.7.
-
-Best regards
-Uwe
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170112/d9f681f1/attachment.sig>
+Rob
