@@ -1,91 +1,61 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 12 Jan 2017 12:23:14 +0800
-Subject: [PATCH v7 0/4] arm64: arch_timer: Add workaround for
- hisilicon-161601 erratum
-In-Reply-To: <1483772858-10380-1-git-send-email-dingtianhong@huawei.com>
-References: <1483772858-10380-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <6c33e4e9-6472-4738-aea2-55dcaab3a94f@huawei.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Thu, 12 Jan 2017 12:50:44 +0800
+Subject: [PATCH v5] arm64: dts: mt8173: add mmsel clocks for 4K support
+In-Reply-To: <1470279438-60372-1-git-send-email-bibby.hsieh@mediatek.com>
+References: <1470279438-60372-1-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <CAGS+omAZvHmSz6bJcvisC1LZgxwbd-HzvYMDrHXzfkY3mZZEsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc:
+Hi Matthias,
 
-How about this v7, if any suggestions very grateful.
+(Trying again to send plain text email)...
 
-Thanks.
-Ding
+On Thu, Aug 4, 2016 at 10:57 AM, Bibby Hsieh <bibby.hsieh@mediatek.com> wrote:
+> To support HDMI 4K resolution, mmsys need clcok
+> mm_sel to be 400MHz.
+>
+> The board .dts file should override the clock rate
+> property with the higher VENCPLL frequency the board
+> supports HDMI 4K resolution.
+>
+> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
 
-On 2017/1/7 15:07, Ding Tianhong wrote:
-> Erratum Hisilicon-161601 says that the ARM generic timer counter "has the
-> potential to contain an erroneous value when the timer value changes".
-> Accesses to TVAL (both read and write) are also affected due to the implicit counter
-> read.  Accesses to CVAL are not affected.
-> 
-> The workaround is to reread the system count registers until the value of the second
-> read is larger than the first one by less than 32, the system counter can be guaranteed
-> not to return wrong value twice by back-to-back read and the error value is always larger
-> than the correct one by 32. Writes to TVAL are replaced with an equivalent write to CVAL.
-> 
-> v2: Introducing a new generic erratum handling mechanism for fsl,a008585 and hisilicon,161601.
->     Significant rework based on feedback, including seperate the fsl erratum a008585
->     to another patch, update the erratum name and remove unwanted code.
-> 
-> v3: Introducing the erratum_workaround_set_sne generic function for fsl erratum a008585
->     and make the #define __fsl_a008585_read_reg to be private to the .c file instead of
->     being globally visible. After discussion with Marc and Will, a consensus decision was
->     made to remove the commandline parameter for enabling fsl,erratum-a008585 erratum,
->     and make some generic name more specific, export timer_unstable_counter_workaround
->     for module access.
->     
->     Significant rework based on feedback, including fix some alignment problem, make the
->     #define __hisi_161601_read_reg to be private to the .c file instead of being globally
->     visible, add more accurate annotation and modify a bit of logical format to enable
->     arch_timer_read_ool_enabled, remove the kernel commandline parameter
->     clocksource.arm_arch_timer.hisilicon-161601.
-> 
->     Introduce a generic aquick framework for erratum in ACPI mode.
-> 
-> v4: rename the quirk handler parameter to make it more generic, and
->     avoid break loop when handling the quirk becasue it need to
->     support multi quirks handler.
-> 
->     update some data structures for acpi mode. 
-> 
-> v5: Adapt the new kernel-parameters.txt for latest kernel version.
->     Set the retries of reread system counter to 50, because it is possible 
->     that some interrupts may lead to more than twice read errors and break the loop,
->     it will trigger the warning, so we set the number of retries far beyond the number of
->     iterations the loop has been observed to take.
-> 
-> v6: The last 2 patches in the previous version about the ACPI mode will conflict witch Fuwei's
->     GTDT patches, so remove the ACPI part and only support the DT base code for this patch set.
-> 
->     We have trigger a bug when select the CONFIG_FUNCTION_GRAPH_TRACER and enable function_graph
->     to /sys/kernel/debug/tracing/current_tracer, the system will stall into an endless loop, it looks
->     like that the ftrace_graph_caller will be related to xxx.read_cntvct_el0 and read the system counter
->     again, so mark the xxx.read_cntvct_el0 with notrace to fix the problem.
-> 
-> v7: Introduce a new general config symbol named CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND to enable the workaround
->     for any chips which has similar arch timer erratum just like "fsl,erratum_a008585" and "hisilicon,erratum_161601",
->     modify the struct arch_timer_erratum_workaround to be compatible different chip erratum more easily, and
->     reconstruction some code base on the new config symbol and struct, thanks to Marc's suggestion. 
-> 
-> Ding Tianhong (4):
->   arm64: arch_timer: Add device tree binding for hisilicon-161601
->     erratum
->   arm64: arch_timer: Introduce a generic erratum handing mechanism for
->     fsl-a008585
->   arm64: arch_timer: Work around Erratum Hisilicon-161601
->   arm64: arch timer: Add timer erratum property for Hip05-d02 and
->     Hip06-d03
-> 
->  Documentation/admin-guide/kernel-parameters.txt    |   9 --
->  Documentation/arm64/silicon-errata.txt             |   1 +
->  .../devicetree/bindings/arm/arch_timer.txt         |   8 ++
->  arch/arm64/boot/dts/hisilicon/hip05.dtsi           |   1 +
->  arch/arm64/boot/dts/hisilicon/hip06.dtsi           |   1 +
->  arch/arm64/include/asm/arch_timer.h                |  38 ++----
->  drivers/clocksource/Kconfig                        |  18 +++
->  drivers/clocksource/arm_arch_timer.c               | 150 +++++++++++++++------
->  8 files changed, 152 insertions(+), 74 deletions(-)
-> 
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+
+
+It looks like this patch was lost.  It is actually a prerequisite for
+MTK 4k HDMI support, which already landed in v4.9.
+
+See the email thread entitled:
+[PATCH v5 0/3] MT8173 HDMI 4K support <https://lkml.org/lkml/2016/9/28/893>
+
+Or these three:
+
+0d2200794f0a drm/mediatek: modify the factor to make the pll_rate set
+in the 1G-2G range
+968253bd7caa drm/mediatek: enhance the HDMI driving current
+d542b7c473f0 drm/mediatek: do mtk_hdmi_send_infoframe after HDMI clock enable
+
+-Dan
+
+> ---
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi |    2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index 78529e4..c3f32f3 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -690,6 +690,8 @@
+>                         compatible = "mediatek,mt8173-mmsys", "syscon";
+>                         reg = <0 0x14000000 0 0x1000>;
+>                         power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> +                       assigned-clocks = <&topckgen CLK_TOP_MM_SEL>;
+> +                       assigned-clock-rates = <400000000>;
+>                         #clock-cells = <1>;
+>                 };
+>
+> --
+> 1.7.9.5
+>
