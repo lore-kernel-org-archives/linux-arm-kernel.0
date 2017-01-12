@@ -1,215 +1,166 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 12 Jan 2017 15:55:54 +0530
-Subject: [PATCH 05/37] PCI: dwc: Add platform_set_drvdata
-In-Reply-To: <1484216786-17292-1-git-send-email-kishon@ti.com>
-References: <1484216786-17292-1-git-send-email-kishon@ti.com>
-Message-ID: <1484216786-17292-6-git-send-email-kishon@ti.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Thu, 12 Jan 2017 11:55:21 +0100
+Subject: [RFC PATCH v4 0/5] ARM: Fix dma_alloc_coherent() and friends for
+ NOMMU
+In-Reply-To: <CA+M3ks5jTNSLLOetvOUZP=B=a2wPNjXadbw6Zcn475Okc4QEPw@mail.gmail.com>
+References: <1484057925-23586-1-git-send-email-vladimir.murzin@arm.com>
+ <CA+M3ks5JP14SzprzE90-ST8b3URJECgpJ=dxw5XKvaxYEF3UCw@mail.gmail.com>
+ <f4d17374-eb46-79f7-e394-cb2739f71ef4@arm.com>
+ <CA+M3ks5jTNSLLOetvOUZP=B=a2wPNjXadbw6Zcn475Okc4QEPw@mail.gmail.com>
+Message-ID: <CA+M3ks6abvJV1RJtZhD1ixrnVhC5V3PL1+7DdwB+_tVg+vTkaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add platform_set_drvdata in all designware based drivers to store the
-private data structure of the driver so that dev_set_drvdata can be
-used to get back private data pointer in add_pcie_port/host_init.
-This is in preparation for splitting struct pcie_port into core and
-host only structures. After the split pcie_port will not be part of
-the driver's private data structure and *container_of* used now
-to get the private data pointer cannot be used.
+2017-01-12 11:35 GMT+01:00 Benjamin Gaignard <benjamin.gaignard@linaro.org>:
+> 2017-01-11 15:34 GMT+01:00 Vladimir Murzin <vladimir.murzin@arm.com>:
+>> On 11/01/17 13:17, Benjamin Gaignard wrote:
+>>> 2017-01-10 15:18 GMT+01:00 Vladimir Murzin <vladimir.murzin@arm.com>:
+>>>> Hi,
+>>>>
+>>>> It seem that addition of cache support for M-class cpus uncovered
+>>>> latent bug in DMA usage. NOMMU memory model has been treated as being
+>>>> always consistent; however, for R/M classes of cpu memory can be
+>>>> covered by MPU which in turn might configure RAM as Normal
+>>>> i.e. bufferable and cacheable. It breaks dma_alloc_coherent() and
+>>>> friends, since data can stuck in caches now or be buffered.
+>>>>
+>>>> This patch set is trying to address the issue by providing region of
+>>>> memory suitable for consistent DMA operations. It is supposed that
+>>>> such region is marked by MPU as non-cacheable. Robin suggested to
+>>>> advertise such memory as reserved shared-dma-pool, rather then using
+>>>> homebrew command line option, and extend dma-coherent to provide
+>>>> default DMA area in the similar way as it is done for CMA (PATCH
+>>>> 2/5). It allows us to offload all bookkeeping on generic coherent DMA
+>>>> framework, and it is seems that it might be reused by other
+>>>> architectures like c6x and blackfin.
+>>>>
+>>>> Dedicated DMA region is required for cases other than:
+>>>>  - MMU/MPU is off
+>>>>  - cpu is v7m w/o cache support
+>>>>  - device is coherent
+>>>>
+>>>> In case one of the above conditions is true dma operations are forced
+>>>> to be coherent and wired with dma_noop_ops.
+>>>>
+>>>> To make life easier NOMMU dma operations are kept in separate
+>>>> compilation unit.
+>>>>
+>>>> Since the issue was reported in the same time as Benjamin sent his
+>>>> patch [1] to allow mmap for NOMMU, his case is also addressed in this
+>>>> series (PATCH 1/5 and PATCH 3/5).
+>>>>
+>>>> Thanks!
+>>>
+>>> I have tested this v4 on my setup (stm32f4, no cache, no MPU) and unfortunately
+>>> it doesn't work with my drm/kms driver.
+>>
+>> I guess the same is for fbmem, but would be better to have confirmation since
+>> amba-clcd I use has not been ported to drm/kms (yet), so I can't test.
+>>
+>>> I haven't any errors but nothing is displayed unlike what I have when
+>>> using current dma-mapping
+>>> code.
+>>> I guess the issue is coming from dma-noop where __get_free_pages() is
+>>> used instead of alloc_pages()
+>>> in dma-mapping.
+>>
+>> Unless I've missed something bellow is a call stack for both
+>>
+>> #1
+>> __alloc_simple_buffer
+>>         __dma_alloc_buffer
+>>                 alloc_pages
+>>                 split_page
+>>                 __dma_clear_buffer
+>>                         memset
+>>         page_address
+>>
+>> #2
+>> __get_free_pages
+>>         alloc_pages
+>>         page_address
+>>
+>> So the difference is that nommu case in dma-mapping.c memzeros memory, handles
+>> DMA_ATTR_NO_KERNEL_MAPPING and does optimisation of memory usage.
+>>
+>> Is something from above critical for your driver?
+>
+> I have removed all the diff (split_page,  __dma_clear_buffer, memset)
+> from #1 and it is still working.
+> DMA_ATTR_NO_KERNEL_MAPPING flag is not set when allocating the buffer.
+>
+> I have investigated more and found that dma-noop doesn't take care of
+> "dma-ranges" property which is set in DT.
+> I believed that is the root cause of my problem with your patches.
 
-Cc: Jingoo Han <jingoohan1@gmail.com>
-Cc: Richard Zhu <hongxing.zhu@nxp.com>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Murali Karicheri <m-karicheri2@ti.com>
-Cc: Minghuan Lian <minghuan.Lian@freescale.com>
-Cc: Mingkai Hu <mingkai.hu@freescale.com>
-Cc: Roy Zang <tie-fei.zang@freescale.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Niklas Cassel <niklas.cassel@axis.com>
-Cc: Jesper Nilsson <jesper.nilsson@axis.com>
-Cc: Joao Pinto <Joao.Pinto@synopsys.com>
-Cc: Zhou Wang <wangzhou1@hisilicon.com>
-Cc: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-Cc: Stanimir Varbanov <svarbanov@mm-sol.com>
-Cc: Pratyush Anand <pratyush.anand@gmail.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- drivers/pci/dwc/pci-dra7xx.c           |    3 ++-
- drivers/pci/dwc/pci-exynos.c           |    3 ++-
- drivers/pci/dwc/pci-imx6.c             |    3 ++-
- drivers/pci/dwc/pci-keystone.c         |    2 ++
- drivers/pci/dwc/pci-layerscape.c       |    2 ++
- drivers/pci/dwc/pcie-armada8k.c        |    2 ++
- drivers/pci/dwc/pcie-artpec6.c         |    2 ++
- drivers/pci/dwc/pcie-designware-plat.c |    2 ++
- drivers/pci/dwc/pcie-hisi.c            |    2 ++
- drivers/pci/dwc/pcie-qcom.c            |    2 ++
- drivers/pci/dwc/pcie-spear13xx.c       |    3 ++-
- 11 files changed, 22 insertions(+), 4 deletions(-)
+After testing changing virt_to_phys to virt_to_dma in dma-noop.c fix the issue
+modetest and fbdemo are now still functional.
 
-diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
-index 2073d46..aeeab74 100644
---- a/drivers/pci/dwc/pci-dra7xx.c
-+++ b/drivers/pci/dwc/pci-dra7xx.c
-@@ -433,6 +433,8 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	platform_set_drvdata(pdev, dra7xx);
-+
- 	pm_runtime_enable(dev);
- 	ret = pm_runtime_get_sync(dev);
- 	if (ret < 0) {
-@@ -459,7 +461,6 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
- 	if (ret < 0)
- 		goto err_gpio;
- 
--	platform_set_drvdata(pdev, dra7xx);
- 	return 0;
- 
- err_gpio:
-diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-exynos.c
-index f1c544b..c179e7a 100644
---- a/drivers/pci/dwc/pci-exynos.c
-+++ b/drivers/pci/dwc/pci-exynos.c
-@@ -583,11 +583,12 @@ static int __init exynos_pcie_probe(struct platform_device *pdev)
- 		goto fail_bus_clk;
- 	}
- 
-+	platform_set_drvdata(pdev, exynos_pcie);
-+
- 	ret = exynos_add_pcie_port(exynos_pcie, pdev);
- 	if (ret < 0)
- 		goto fail_bus_clk;
- 
--	platform_set_drvdata(pdev, exynos_pcie);
- 	return 0;
- 
- fail_bus_clk:
-diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-index c8cefb0..6e5d06f 100644
---- a/drivers/pci/dwc/pci-imx6.c
-+++ b/drivers/pci/dwc/pci-imx6.c
-@@ -719,11 +719,12 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
- 	if (ret)
- 		imx6_pcie->link_gen = 1;
- 
-+	platform_set_drvdata(pdev, imx6_pcie);
-+
- 	ret = imx6_add_pcie_port(imx6_pcie, pdev);
- 	if (ret < 0)
- 		return ret;
- 
--	platform_set_drvdata(pdev, imx6_pcie);
- 	return 0;
- }
- 
-diff --git a/drivers/pci/dwc/pci-keystone.c b/drivers/pci/dwc/pci-keystone.c
-index 043c19a..4c7ba35 100644
---- a/drivers/pci/dwc/pci-keystone.c
-+++ b/drivers/pci/dwc/pci-keystone.c
-@@ -422,6 +422,8 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	platform_set_drvdata(pdev, ks_pcie);
-+
- 	ret = ks_add_pcie_port(ks_pcie, pdev);
- 	if (ret < 0)
- 		goto fail_clk;
-diff --git a/drivers/pci/dwc/pci-layerscape.c b/drivers/pci/dwc/pci-layerscape.c
-index ea78913..89e8817 100644
---- a/drivers/pci/dwc/pci-layerscape.c
-+++ b/drivers/pci/dwc/pci-layerscape.c
-@@ -268,6 +268,8 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
- 	if (!ls_pcie_is_bridge(pcie))
- 		return -ENODEV;
- 
-+	platform_set_drvdata(pdev, pcie);
-+
- 	ret = ls_add_pcie_port(pcie);
- 	if (ret < 0)
- 		return ret;
-diff --git a/drivers/pci/dwc/pcie-armada8k.c b/drivers/pci/dwc/pcie-armada8k.c
-index 0ac0f18..5a28dcb 100644
---- a/drivers/pci/dwc/pcie-armada8k.c
-+++ b/drivers/pci/dwc/pcie-armada8k.c
-@@ -226,6 +226,8 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
- 		goto fail;
- 	}
- 
-+	platform_set_drvdata(pdev, pcie);
-+
- 	ret = armada8k_add_pcie_port(pcie, pdev);
- 	if (ret)
- 		goto fail;
-diff --git a/drivers/pci/dwc/pcie-artpec6.c b/drivers/pci/dwc/pcie-artpec6.c
-index 212786b..187a98d 100644
---- a/drivers/pci/dwc/pcie-artpec6.c
-+++ b/drivers/pci/dwc/pcie-artpec6.c
-@@ -261,6 +261,8 @@ static int artpec6_pcie_probe(struct platform_device *pdev)
- 	if (IS_ERR(artpec6_pcie->regmap))
- 		return PTR_ERR(artpec6_pcie->regmap);
- 
-+	platform_set_drvdata(pdev, artpec6_pcie);
-+
- 	ret = artpec6_add_pcie_port(artpec6_pcie, pdev);
- 	if (ret < 0)
- 		return ret;
-diff --git a/drivers/pci/dwc/pcie-designware-plat.c b/drivers/pci/dwc/pcie-designware-plat.c
-index 1a02038..bb58540 100644
---- a/drivers/pci/dwc/pcie-designware-plat.c
-+++ b/drivers/pci/dwc/pcie-designware-plat.c
-@@ -104,6 +104,8 @@ static int dw_plat_pcie_probe(struct platform_device *pdev)
- 	if (IS_ERR(pp->dbi_base))
- 		return PTR_ERR(pp->dbi_base);
- 
-+	platform_set_drvdata(pdev, dw_plat_pcie);
-+
- 	ret = dw_plat_add_pcie_port(pp, pdev);
- 	if (ret < 0)
- 		return ret;
-diff --git a/drivers/pci/dwc/pcie-hisi.c b/drivers/pci/dwc/pcie-hisi.c
-index a301a71..ecc1b08 100644
---- a/drivers/pci/dwc/pcie-hisi.c
-+++ b/drivers/pci/dwc/pcie-hisi.c
-@@ -287,6 +287,8 @@ static int hisi_pcie_probe(struct platform_device *pdev)
- 	if (IS_ERR(pp->dbi_base))
- 		return PTR_ERR(pp->dbi_base);
- 
-+	platform_set_drvdata(pdev, hisi_pcie);
-+
- 	ret = hisi_add_pcie_port(hisi_pcie, pdev);
- 	if (ret)
- 		return ret;
-diff --git a/drivers/pci/dwc/pcie-qcom.c b/drivers/pci/dwc/pcie-qcom.c
-index 734ba0d..2c24c45 100644
---- a/drivers/pci/dwc/pcie-qcom.c
-+++ b/drivers/pci/dwc/pcie-qcom.c
-@@ -725,6 +725,8 @@ static int qcom_pcie_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	platform_set_drvdata(pdev, pcie);
-+
- 	ret = dw_pcie_host_init(pp);
- 	if (ret) {
- 		dev_err(dev, "cannot initialize host\n");
-diff --git a/drivers/pci/dwc/pcie-spear13xx.c b/drivers/pci/dwc/pcie-spear13xx.c
-index dafe8b8..5970566 100644
---- a/drivers/pci/dwc/pcie-spear13xx.c
-+++ b/drivers/pci/dwc/pcie-spear13xx.c
-@@ -270,11 +270,12 @@ static int spear13xx_pcie_probe(struct platform_device *pdev)
- 	if (of_property_read_bool(np, "st,pcie-is-gen1"))
- 		spear13xx_pcie->is_gen1 = true;
- 
-+	platform_set_drvdata(pdev, spear13xx_pcie);
-+
- 	ret = spear13xx_add_pcie_port(spear13xx_pcie, pdev);
- 	if (ret < 0)
- 		goto fail_clk;
- 
--	platform_set_drvdata(pdev, spear13xx_pcie);
- 	return 0;
- 
- fail_clk:
+>
+> Benjamin
+>
+>>
+>>>
+>>> Since my hardware doesn't have cache or MPU (and so use dma-noop) I
+>>> haven't reserved specific memory region.
+>>> Buffer addresses and vma parameters look correct... What could I have
+>>> miss here ?
+>>
+>> No ideas, sorry...
+>>
+>> Cheers
+>> Vladimir
+>>
+>>>
+>>> Benjamin
+>>>
+>>>>
+>>>> [1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8633/1
+>>>>
+>>>> Vladimir Murzin (5):
+>>>>   dma: Add simple dma_noop_mmap
+>>>>   drivers: dma-coherent: Introduce default DMA pool
+>>>>   ARM: NOMMU: Introduce dma operations for noMMU
+>>>>   ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class cpus
+>>>>   ARM: dma-mapping: Remove traces of NOMMU code
+>>>>
+>>>>  .../bindings/reserved-memory/reserved-memory.txt   |   3 +
+>>>>  arch/arm/include/asm/dma-mapping.h                 |   3 +-
+>>>>  arch/arm/mm/Kconfig                                |   2 +-
+>>>>  arch/arm/mm/Makefile                               |   5 +-
+>>>>  arch/arm/mm/dma-mapping-nommu.c                    | 252 +++++++++++++++++++++
+>>>>  arch/arm/mm/dma-mapping.c                          |  26 +--
+>>>>  drivers/base/dma-coherent.c                        |  59 ++++-
+>>>>  lib/dma-noop.c                                     |  21 ++
+>>>>  8 files changed, 335 insertions(+), 36 deletions(-)
+>>>>  create mode 100644 arch/arm/mm/dma-mapping-nommu.c
+>>>>
+>>>> --
+>>>> 2.0.0
+>>>>
+>>>
+>>>
+>>>
+>>
+>
+>
+>
+> --
+> Benjamin Gaignard
+>
+> Graphic Study Group
+>
+> Linaro.org ? Open source software for ARM SoCs
+>
+> Follow Linaro: Facebook | Twitter | Blog
+
+
+
 -- 
-1.7.9.5
+Benjamin Gaignard
+
+Graphic Study Group
+
+Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro: Facebook | Twitter | Blog
