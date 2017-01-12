@@ -1,118 +1,83 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Thu, 12 Jan 2017 15:30:44 +0100
-Subject: [PATCH] arm: ftrace: Adds support for
- CONFIG_DYNAMIC_FTRACE_WITH_REGS
-In-Reply-To: <20170112001957.GA5458@nuc>
-References: <1481233595-22112-1-git-send-email-abelvesa@linux.com>
- <20161208224655.GA6319@gce> <20170110155112.GB14894@pathway.suse.cz>
- <20170112001957.GA5458@nuc>
-Message-ID: <CACh+v5M-BDru3OyhrROBqPKJuSN=yoxVstN-fqZGh8SU1EHQiw@mail.gmail.com>
+From: b-liu@ti.com (Bin Liu)
+Date: Thu, 12 Jan 2017 08:50:14 -0600
+Subject: [PATCH 4/4] ARM: dts: sun8i: add OTG function to Lichee Pi Zero
+In-Reply-To: <20170111210638.ppdnpzdd2l6x4lyo@lukather>
+References: <20170103152534.20118-1-icenowy@aosc.xyz>
+ <20170103152534.20118-5-icenowy@aosc.xyz>
+ <20170110202443.GC2479@uda0271908>
+ <2733831484164533@web1g.yandex.ru>
+ <20170111200811.GA16865@uda0271908>
+ <20170111210638.ppdnpzdd2l6x4lyo@lukather>
+Message-ID: <20170112145014.GC16865@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-01-12 1:19 GMT+01:00 Abel Vesa <abelvesa@gmail.com>:
-> On Tue, Jan 10, 2017 at 04:51:12PM +0100, Petr Mladek wrote:
->> On Thu 2016-12-08 22:46:55, Abel Vesa wrote:
->> > On Thu, Dec 08, 2016 at 09:46:35PM +0000, Abel Vesa wrote:
->> > > From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
->> > >
->> > > From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
->> >
->> > >From statement twice in the commit message. Will resend.
->> > >
->> > > The DYNAMIC_FTRACE_WITH_REGS configuration makes it possible for a ftrace
->> > > operation to specify if registers need to saved/restored by the ftrace handler.
->> > > This is needed by kgraft and possibly other ftrace-based tools, and the ARM
->> > > architecture is currently lacking this feature. It would also be the first step
->> > > to support the "Kprobes-on-ftrace" optimization on ARM.
->> > >
->> > > This patch introduces a new ftrace handler that stores the registers on the
->> > > stack before calling the next stage. The registers are restored from the stack
->> > > before going back to the instrumented function.
->> > >
->> > > A side-effect of this patch is to activate the support for ftrace_modify_call()
->> > > as it defines ARCH_SUPPORTS_FTRACE_OPS for the ARM architecture
->> > >
->> > > Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
->> > > Signed-off-by: Abel Vesa <abelvesa@linux.com>
->> > > ---
->> > >  arch/arm/Kconfig               |  2 ++
->> > >  arch/arm/include/asm/ftrace.h  |  4 +++
->> > >  arch/arm/kernel/entry-ftrace.S | 78 ++++++++++++++++++++++++++++++++++++++++++
->> > >  arch/arm/kernel/ftrace.c       | 33 ++++++++++++++++++
->> > >  4 files changed, 117 insertions(+)
->> > >
->> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> > > index b5d529f..87f1a9f 100644
->> > > --- a/arch/arm/Kconfig
->> > > +++ b/arch/arm/Kconfig
->> > > @@ -50,6 +50,7 @@ config ARM
->> > >   select HAVE_DMA_API_DEBUG
->> > >   select HAVE_DMA_CONTIGUOUS if MMU
->> > >   select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
->> > > + select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
->> > >   select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
->> > >   select HAVE_EXIT_THREAD
->> > >   select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
->> > > @@ -90,6 +91,7 @@ config ARM
->> > >   select PERF_USE_VMALLOC
->> > >   select RTC_LIB
->> > >   select SYS_SUPPORTS_APM_EMULATION
->> > > + select FRAME_POINTER if DYNAMIC_FTRACE_WITH_REGS && FUNCTION_GRAPH_TRACER
-> Hi Petr,
->>
->> FRAME_POINTER is not for free. It takes space on the stack. Also there
->> is a performance penalty. Do we really need to depend on it? If so,
->> it might be worth a note in the commit message.
->
+On Wed, Jan 11, 2017 at 10:06:38PM +0100, Maxime Ripard wrote:
+> On Wed, Jan 11, 2017 at 02:08:11PM -0600, Bin Liu wrote:
+> > On Thu, Jan 12, 2017 at 03:55:33AM +0800, Icenowy Zheng wrote:
+> > > 
+> > > 
+> > > 11.01.2017, 04:24, "Bin Liu" <b-liu@ti.com>:
+> > > > On Tue, Jan 03, 2017 at 11:25:34PM +0800, Icenowy Zheng wrote:
+> > > >> ?Lichee Pi Zero features a USB OTG port.
+> > > >>
+> > > >> ?Add support for it.
+> > > >>
+> > > >> ?Note: in order to use the Host mode, the board must be powered via the
+> > > >> ?+5V and GND pins.
+> > > >>
+> > > >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> > > >> ?---
+> > > >> ??arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 10 ++++++++++
+> > > >> ??1 file changed, 10 insertions(+)
+> > > >>
+> > > >> ?diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+> > > >> ?index 0099affc6ce3..3d9168cbaeca 100644
+> > > >> ?--- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+> > > >> ?+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+> > > >> ?@@ -71,3 +71,13 @@
+> > > >> ??????????pinctrl-names = "default";
+> > > >> ??????????status = "okay";
+> > > >> ??};
+> > > >> ?+
+> > > >> ?+&usb_otg {
+> > > >> ?+ dr_mode = "otg";
+> > > >
+> > > > Why not set this default mode in dtsi instead?
+> > > >
+> > > > Regards,
+> > > > -Bin.
+> > > 
+> > > There's possibly boards which do not have OTG functions.
+> > 
+> > That is board specific.
+> 
+> Exactly, and this is why it should be done in the board DT.
 
-FRAME_POINTER is not needed. the dependency is wrong and should be removed.
-The code must be modified to not use fp register:
+I am just suggesting based on the common practice. If a .dtsi exists for
+a family, the .dtsi describes the device and common properties for all
+possible boards, and each board .dts adds or overrides its specific
+implementation. Kernel has many devices/boards done in this way - define
+the default dr_mode in .dtsi.
 
---- a/arch/arm/kernel/entry-ftrace.S
-+++ b/arch/arm/kernel/entry-ftrace.S
-@@ -130,7 +130,8 @@ ftrace_graph_regs_call:
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- .macro __ftrace_graph_regs_caller
+In this case, I suggest to set the common dr_mode in .dtsi, then each
+board .dts only overrides it if the implementation is different. 
 
--       sub     r0, fp, #4                      @ lr of instrumented
-routine (parent)
-+       add     r0, sp, #64             @ r0 is now a pointer to lr of
-+                                       @ instrumented routine
+> 
+> The controller in the Allwinner SoCs do not handle directly the ID pin
+> and VBUS, but rather rely on a GPIO to do so.
+> 
+> So boards with OTG will need setup anyway, at least to tell which
+> GPIOs are used. There's no point in enforcing a default if it doesn't
+> work by default.
 
-        @ called from __ftrace_regs_caller
-        ldr     r1, [sp, #56]                   @ instrumented routine (func)
-@@ -139,8 +140,9 @@ ftrace_graph_regs_call:
-        mov     r2, fp                          @ frame pointer
-        bl      prepare_ftrace_return
+Then define a default which supposes to work for most boards.
 
--       ldr     lr, [fp, #-4]                   @ restore lr from the stack
--       ldmia   sp, {r0-r11, ip, sp}            @ restore r0 through sp
-+       ldr     lr, [sp, #64]           @ get the previous LR value from stack
-+       ldmia   sp, {r0-r11, ip, sp}    @ pop the saved registers INCLUDING
-+                                       @ the stack pointer
-        ret     ip
- .endm
- #endif
+Why I suggest this, is because defining a default dr_mode which works
+for most cases in dtsi could prevent a little surprise in MUSB function.
+If someone designs a new board but forgets to define dr_mode in the new
+board DT, the MUSB driver will default to org mode, which might not be
+intended.
 
-
-Jean-Jacques
-
-
-> I was trying to create my own patch when I found this work done by
-> Jean-Jacques, so I haven't looked specifically for the FRAME_POINTER
-> part. I looked now at it and you seem to be right, FRAME_POINTER is
-> not needed.
->
-> I will get rid of the FRAME_POINTER part, change the authorship and
-> send it again in the following days.
->>
->> I made only a quick look at the patch. It looks reasonable. But I do
->> not have enough knowledge about the arm architecture, assembly, and
->> ftrace-specifics. Also I cannot test it easily. So issues might
->> be hidden to my eyes.
->>
->> Best Regards,
->> Petr
-> Thanks,
-> Abel
+Regards,
+-Bin.
