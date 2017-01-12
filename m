@@ -1,18 +1,18 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Jan 2017 14:01:47 +0100
-Subject: [GIT PULL] Ux500 PM fix from Arnd
-Message-ID: <CACRpkdbb5JkPW=1ObA8eAnyKJ5vmEWkHa4Wmv-qRQa2Vr2xjLQ@mail.gmail.com>
+Date: Thu, 12 Jan 2017 14:06:14 +0100
+Subject: [GIT PULL] Ux500 development for v4.11
+Message-ID: <CACRpkdZnk-qpJi-FOPuMyWBT-=AEK7krxZJZp=UZYzjbuBOK7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi ARM SoC folks,
 
-this was forgotten on my fixes branch, sorry. Please pull it
-in for fixes in the ARM SoC tree.
+here is a set of two patches ready to be queued for v4.11 already.
+
+Please pull them to a suitable branch on the ARM SoC tree.
 
 Yours,
 Linus Walleij
-
 
 The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
@@ -21,18 +21,24 @@ The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-fix-for-armsoc
+tags/ux500-dev-for-armsoc
 
-for you to fetch changes up to f0e8faa7a5e894b0fc99d24be1b18685a92ea466:
+for you to fetch changes up to f3c05596344fa09074220513583bc5d6ff2d5c43:
 
-  ARM: ux500: fix prcmu_is_cpu_in_wfi() calculation (2017-01-12 13:25:39 +0100)
-
-----------------------------------------------------------------
-A single PM fix from Arnd
+  ARM: ux500: remove duplicated include from cpu-db8500.c (2017-01-12
+14:02:34 +0100)
 
 ----------------------------------------------------------------
-Arnd Bergmann (1):
-      ARM: ux500: fix prcmu_is_cpu_in_wfi() calculation
+Some two collected patches simplifying some Ux500
+stuff.
 
- arch/arm/mach-ux500/pm.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+----------------------------------------------------------------
+Linus Walleij (1):
+      ARM: ux500: simplify secondary boot
+
+Wei Yongjun (1):
+      ARM: ux500: remove duplicated include from cpu-db8500.c
+
+ arch/arm/mach-ux500/cpu-db8500.c |  1 -
+ arch/arm/mach-ux500/platsmp.c    | 45 +++++++++++++++++-----------------------
+ 2 files changed, 19 insertions(+), 27 deletions(-)
