@@ -1,58 +1,56 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 12 Jan 2017 15:28:20 +0000
-Subject: [PATCH 1/2][UPDATE] of: base: add support to get the number of
- cache levels
-In-Reply-To: <CAL_Jsq+wawaXeFPnmYw++YMiMzMm+9nSn498Dj7KsGzkfndfog@mail.gmail.com>
-References: <1484048479-19767-1-git-send-email-sudeep.holla@arm.com>
- <1484049616-22388-1-git-send-email-sudeep.holla@arm.com>
- <CAL_Jsq+wawaXeFPnmYw++YMiMzMm+9nSn498Dj7KsGzkfndfog@mail.gmail.com>
-Message-ID: <14f13c99-2fa4-b195-59f8-ddd9ec5b4037@arm.com>
+From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
+Date: Thu, 12 Jan 2017 07:28:06 -0800
+Subject: [PATCH] net: thunderx: acpi: fix LMAC initialization
+Message-ID: <1484234886-22172-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+While probing BGX we requesting appropriate QLM for it's configuration
+and get LMAC count by that request. Then, while reading configured
+MAC values from SSDT table we need to save them in proper mapping:
+  BGX[i]->lmac[j].mac = <MAC value>
+to later provide for initialization stuff. In order to fill
+such mapping properly we need to add lmac index to be used while
+acpi initialization since at this moment bgx->lmac_count already contains
+actual value.
 
+Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+---
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-On 12/01/17 13:24, Rob Herring wrote:
-> On Tue, Jan 10, 2017 at 6:00 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> It is useful to have helper function just to get the number of cache
->> levels for a given logical cpu. This patch adds the support for the
->> same.
->>
->> It will be used on ARM64 platform where the device tree provides the
->> information for the additional non-architected/transparent/external
->> last level caches that are not integrated with the processors.
->>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  drivers/of/base.c  | 23 +++++++++++++++++++++++
->>  include/linux/of.h |  1 +
->>  2 files changed, 24 insertions(+)
->>
-
-[...]
-
->> +int of_count_cache_levels(unsigned int cpu)
->> +{
->> +       int level = 0;
->> +       struct device_node *np = of_cpu_device_node_get(cpu);
->> +
->> +       while (np) {
->> +               level++;
-> 
-> This will return 1 if you have a cpu node and no cache nodes. Are you
-> assuming the cpu has a cache?
-> 
-
-Ah right, that's completely wrong assumption.
-
-> Perhaps you should just find the last level cache node and then just
-> read "cache-level".
-> 
-
-Yes, sounds better. I will update accordingly. Thanks for the suggestion.
-
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index be30ad0..a3f4f83 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -47,8 +47,9 @@ struct lmac {
+ struct bgx {
+ 	u8			bgx_id;
+ 	struct	lmac		lmac[MAX_LMAC_PER_BGX];
+-	int			lmac_count;
++	u8			lmac_count;
+ 	u8			max_lmac;
++	u8                      acpi_lmac_idx;
+ 	void __iomem		*reg_base;
+ 	struct pci_dev		*pdev;
+ 	bool                    is_dlm;
+@@ -1073,13 +1074,13 @@ static acpi_status bgx_acpi_register_phy(acpi_handle handle,
+ 	if (acpi_bus_get_device(handle, &adev))
+ 		goto out;
+ 
+-	acpi_get_mac_address(dev, adev, bgx->lmac[bgx->lmac_count].mac);
++	acpi_get_mac_address(dev, adev, bgx->lmac[bgx->acpi_lmac_idx].mac);
+ 
+-	SET_NETDEV_DEV(&bgx->lmac[bgx->lmac_count].netdev, dev);
++	SET_NETDEV_DEV(&bgx->lmac[bgx->acpi_lmac_idx].netdev, dev);
+ 
+-	bgx->lmac[bgx->lmac_count].lmacid = bgx->lmac_count;
++	bgx->lmac[bgx->acpi_lmac_idx].lmacid = bgx->acpi_lmac_idx;
++	bgx->acpi_lmac_idx++; /* move to next LMAC */
+ out:
+-	bgx->lmac_count++;
+ 	return AE_OK;
+ }
+ 
 -- 
-Regards,
-Sudeep
+1.8.3.1
