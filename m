@@ -1,145 +1,93 @@
-From: christopher.lee.bostic@gmail.com (christopher.lee.bostic at gmail.com)
-Date: Thu, 12 Jan 2017 15:54:51 -0600
-Subject: [PATCH v2 00/18] FSI device driver introduction
-Message-ID: <1484258091-78752-1-git-send-email-christopher.lee.bostic@gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 12 Jan 2017 16:02:19 -0600
+Subject: [PATCH v2] PCI: thunder-pem: Add support for cn81xx and cn83xx
+ SoCs.
+In-Reply-To: <20170111192211.29049-1-ddaney.cavm@gmail.com>
+References: <20170111192211.29049-1-ddaney.cavm@gmail.com>
+Message-ID: <20170112220219.GG8312@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Bostic <cbostic@us.ibm.com>
+On Wed, Jan 11, 2017 at 11:22:11AM -0800, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> The pci-thunder-pem driver was initially developed for cn88xx SoCs.
+> The cn81xx and cn83xx members of the same family of SoCs has a
+> slightly different configuration of interrupt resources in the PEM
+> hardware, which prevents the INTA legacy interrupt source from
+> functioning with the current driver.
+> 
+> There are two fixes required:
+> 
+> 1) Don't fixup the PME interrupt on the newer SoCs as it already has
+> the proper value.
+> 
+> 2) Report MSI-X Capability Table Size of 2 for the newer SoCs, so the
+> core MSI-X code doesn't inadvertently clobber the INTA machinery that
+> happens to reside immediately following the table.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
 
-Introduction of the IBM 'Flexible Support Interface' (FSI) bus device
-driver. FSI is a high fan out serial bus consisting of a clock and a serial
-data line capable of running at speeds up to 166 MHz.
+Applied to pci/host-thunder for v4.11, thanks!
 
-This set provides the basic framework to add FSI extensions to the
-Linux bus and device models. Master specific implementations are
-defined to utilize the core FSI function.
-
-In Linux, we have a core FSI "bus type", along with drivers for FSI
-masters and engines.
-
-The FSI master drivers expose a read/write interface to the bus address
-space. The master drivers are under drivers/fsi/fsi-master-*.c.
-
-The core handles probing and discovery of slaves and slave
-engines, using those read/write interfaces. It is responsible for
-creating the endpoint Linux devices corresponding to the discovered
-engines on each slave.
-
-Slave engines are identified by an 'engine' type, and an optional
-version. Engine, a.k.a. client, drivers are matched and bound to these
-engines during discovery.
-
-This patch set does not include extended FSI function such as:
-    *  Hub master support
-    *  Cascaded master support
-    *  Application layer hot plug notification
-    *  Application layer FSI bus status interface
-
-Common FSI terminology:
-
-* Master
-    Controller of the FSI bus.  Only the master is allowed to control the
-    clock line and is the initiator of all transactions on a bus.
-
-* Slave
-    The receiver or target of a master initiated transaction.  The slave
-    cannot initiate communications on a bus and must respond to any
-    master requests for data.
-
-* CFAM
-    Stands for Common Field replaceable unit Access Macro.  A CFAM is an
-    ASIC residing in any device requiring FSI communications. CFAMs
-    consist of an array of hardware 'engines' used for various purposes.
-    I2C masters, UARTs, General Purpose IO hardware are common types of
-    these engines.
-
-* Configuration Space / Table
-    A table contained at the beginning of each CFAM address space.
-    This table lists information such as the CFAM's ID, which engine types
-    and versions it has available, as well as its addressing range.
-
-* FSI Engine driver
-    A device driver that registers with the FSI core so that it can access
-    devices it owns on an FSI bus.
-
-
-Chris Bostic (8):
-  drivers/fsi: Kick off master scan via sysfs
-  drivers/fsi: Set up links for slave communication
-  drivers/fsi: Set slave SMODE to init communication
-  drivers/fsi: Remove all scanned devices during master unregister
-  drivers/fsi: Add FSI bus documentation
-  drivers/fsi: Add documentation for GPIO based FSI master
-  drivers/fsi: Document FSI master sysfs files in ABI
-  drivers/fsi: Add GPIO based FSI master
-
-Jeremy Kerr (10):
-  drivers/fsi: Add empty fsi bus definitions
-  drivers/fsi: Add device & driver definitions
-  drivers/fsi: add driver to device matches
-  drivers/fsi: Add fsi master definition
-  drivers/fsi: Add slave definition
-  drivers/fsi: Add empty master scan
-  drivers/fsi: Add FSI crc calculators to library
-  drivers/fsi: Implement slave initialisation
-  drivers/fsi: scan slaves & register devices
-  drivers/fsi: Add device read/write/peek functions
-
-Changes for v2:
-    - Change from atomic global for master number to ida simple
-      interface.
-    - Add valid pointer checks on register and unregister utils.
-    - Move CRC calculation utilities out of driver to lib path.
-    - Clean up white space issues.
-    - Remove added list management of master devices and use
-      instead the device_for_each_child method available in the
-      bus.
-    - Add new patch to document FSI bus functionality.
-    - Add new patch documenting FSI gpio master.
-    - Rearrage patch set to have documentation earlier than code
-      implementing it.
-    - Document all comptible strings used in device tree bindings.
-    - Elaborate documentation definition of FSI GPIO master.
-    - Describe in more detail what each GPIO FSI master pin is for.
-    - Re-order compatible strings in example binding so that most
-      specific device comes first.
-    - Indicate proper activation order of all FSI GPIO master pins.
-    - Fix an unmatched '>' bracket in the example for binding.
-    - Bracket each element of the example bindings individually.
-    - Add new patch documenting sysfs-bus-fsi attributes.
-    - Merge FSI GPIO master init into probe function.
-    - Set pin initial values at time of pin request.
-    - Assign value of master->master.dev at probe time.
-    - Use get_optional interfac for all optional GPIO pins.
-
-
- Documentation/ABI/testing/sysfs-bus-fsi            |   6 +
- .../devicetree/bindings/fsi/fsi-master-gpio.txt    |  71 +++
- Documentation/devicetree/bindings/fsi/fsi.txt      |  54 +++
- drivers/Kconfig                                    |   2 +
- drivers/Makefile                                   |   1 +
- drivers/fsi/Kconfig                                |  23 +
- drivers/fsi/Makefile                               |   3 +
- drivers/fsi/fsi-core.c                             | 494 +++++++++++++++++++
- drivers/fsi/fsi-master-gpio.c                      | 530 +++++++++++++++++++++
- drivers/fsi/fsi-master.h                           |  39 ++
- include/linux/crc-fsi.h                            |  29 ++
- include/linux/fsi.h                                |  60 +++
- lib/Makefile                                       |   1 +
- lib/crc-fsi.c                                      |  39 ++
- 14 files changed, 1352 insertions(+)
- create mode 100644 Documentation/ABI/testing/sysfs-bus-fsi
- create mode 100644 Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
- create mode 100644 Documentation/devicetree/bindings/fsi/fsi.txt
- create mode 100644 drivers/fsi/Kconfig
- create mode 100644 drivers/fsi/Makefile
- create mode 100644 drivers/fsi/fsi-core.c
- create mode 100644 drivers/fsi/fsi-master-gpio.c
- create mode 100644 drivers/fsi/fsi-master.h
- create mode 100644 include/linux/crc-fsi.h
- create mode 100644 include/linux/fsi.h
- create mode 100644 lib/crc-fsi.c
-
--- 
-1.8.2.2
+> ---
+> 
+> Changes from v1: Fixed comment typo.
+> 
+>  drivers/pci/host/pci-thunder-pem.c | 25 ++++++++++++++++++++-----
+>  1 file changed, 20 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+> index af722eb..52b5bdc 100644
+> --- a/drivers/pci/host/pci-thunder-pem.c
+> +++ b/drivers/pci/host/pci-thunder-pem.c
+> @@ -36,7 +36,7 @@ struct thunder_pem_pci {
+>  static int thunder_pem_bridge_read(struct pci_bus *bus, unsigned int devfn,
+>  				   int where, int size, u32 *val)
+>  {
+> -	u64 read_val;
+> +	u64 read_val, tmp_val;
+>  	struct pci_config_window *cfg = bus->sysdata;
+>  	struct thunder_pem_pci *pem_pci = (struct thunder_pem_pci *)cfg->priv;
+>  
+> @@ -65,13 +65,28 @@ static int thunder_pem_bridge_read(struct pci_bus *bus, unsigned int devfn,
+>  		read_val |= 0x00007000; /* Skip MSI CAP */
+>  		break;
+>  	case 0x70: /* Express Cap */
+> -		/* PME interrupt on vector 2*/
+> -		read_val |= (2u << 25);
+> +		/*
+> +		 * Change PME interrupt to vector 2 on T88 where it
+> +		 * reads as 0, else leave it alone.
+> +		 */
+> +		if (!(read_val & (0x1f << 25)))
+> +			read_val |= (2u << 25);
+>  		break;
+>  	case 0xb0: /* MSI-X Cap */
+> -		/* TableSize=4, Next Cap is EA */
+> +		/* TableSize=2 or 4, Next Cap is EA */
+>  		read_val &= 0xc00000ff;
+> -		read_val |= 0x0003bc00;
+> +		/*
+> +		 * If Express Cap(0x70) raw PME vector reads as 0 we are on
+> +		 * T88 and TableSize is reported as 4, else TableSize
+> +		 * is 2.
+> +		 */
+> +		writeq(0x70, pem_pci->pem_reg_base + PEM_CFG_RD);
+> +		tmp_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
+> +		tmp_val >>= 32;
+> +		if (!(tmp_val & (0x1f << 25)))
+> +			read_val |= 0x0003bc00;
+> +		else
+> +			read_val |= 0x0001bc00;
+>  		break;
+>  	case 0xb4:
+>  		/* Table offset=0, BIR=0 */
+> -- 
+> 2.9.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
