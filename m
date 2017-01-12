@@ -1,113 +1,415 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 Jan 2017 20:07:09 +0100
-Subject: [PATCH] KVM: arm/arm64: vgic: Fix deadlock on error handling
-In-Reply-To: <1484237774-19047-1-git-send-email-marc.zyngier@arm.com>
-References: <1484237774-19047-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20170112190709.GA18045@cbox>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 12 Jan 2017 14:32:47 -0600
+Subject: [PATCH v3] ARM: dts: Add LEGO MINDSTORMS EV3 dts
+Message-ID: <1484253167-27568-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 04:16:14PM +0000, Marc Zyngier wrote:
-> Dmitry Vyukov reported that the syzkaller fuzzer triggered a
-> deadlock in the vgic setup code when an error was detected, as
-> the cleanup code tries to take a lock that is already held by
-> the setup code.
-> 
-> The fix is to avoid retaking the lock when cleaning up, by
-> telling the cleanup function that we already hold it.
-> 
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+This adds a device tree definition file for LEGO MINDSTORMS EV3.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+What is working:
 
-> ---
->  virt/kvm/arm/vgic/vgic-init.c | 18 +++++++++++++-----
->  virt/kvm/arm/vgic/vgic-v2.c   |  2 --
->  virt/kvm/arm/vgic/vgic-v3.c   |  2 --
->  3 files changed, 13 insertions(+), 9 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-> index 5114391..c737ea0 100644
-> --- a/virt/kvm/arm/vgic/vgic-init.c
-> +++ b/virt/kvm/arm/vgic/vgic-init.c
-> @@ -268,15 +268,11 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
->  {
->  	struct vgic_dist *dist = &kvm->arch.vgic;
->  
-> -	mutex_lock(&kvm->lock);
-> -
->  	dist->ready = false;
->  	dist->initialized = false;
->  
->  	kfree(dist->spis);
->  	dist->nr_spis = 0;
-> -
-> -	mutex_unlock(&kvm->lock);
->  }
->  
->  void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
-> @@ -286,7 +282,8 @@ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
->  	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
->  }
->  
-> -void kvm_vgic_destroy(struct kvm *kvm)
-> +/* To be called with kvm->lock held */
-> +static void __kvm_vgic_destroy(struct kvm *kvm)
->  {
->  	struct kvm_vcpu *vcpu;
->  	int i;
-> @@ -297,6 +294,13 @@ void kvm_vgic_destroy(struct kvm *kvm)
->  		kvm_vgic_vcpu_destroy(vcpu);
->  }
->  
-> +void kvm_vgic_destroy(struct kvm *kvm)
-> +{
-> +	mutex_lock(&kvm->lock);
-> +	__kvm_vgic_destroy(kvm);
-> +	mutex_unlock(&kvm->lock);
-> +}
-> +
->  /**
->   * vgic_lazy_init: Lazy init is only allowed if the GIC exposed to the guest
->   * is a GICv2. A GICv3 must be explicitly initialized by the guest using the
-> @@ -348,6 +352,10 @@ int kvm_vgic_map_resources(struct kvm *kvm)
->  		ret = vgic_v2_map_resources(kvm);
->  	else
->  		ret = vgic_v3_map_resources(kvm);
-> +
-> +	if (ret)
-> +		__kvm_vgic_destroy(kvm);
-> +
->  out:
->  	mutex_unlock(&kvm->lock);
->  	return ret;
-> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-> index 9bab867..834137e 100644
-> --- a/virt/kvm/arm/vgic/vgic-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-v2.c
-> @@ -293,8 +293,6 @@ int vgic_v2_map_resources(struct kvm *kvm)
->  	dist->ready = true;
->  
->  out:
-> -	if (ret)
-> -		kvm_vgic_destroy(kvm);
->  	return ret;
->  }
->  
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index 7df1b90..a4c7fff 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -308,8 +308,6 @@ int vgic_v3_map_resources(struct kvm *kvm)
->  	dist->ready = true;
->  
->  out:
-> -	if (ret)
-> -		kvm_vgic_destroy(kvm);
->  	return ret;
->  }
->  
-> -- 
-> 2.1.4
-> 
+* Pin muxing
+* Pinconf
+* GPIOs
+* MicroSD card reader
+* UART on input port 1
+* Buttons
+* LEDs
+* Poweroff/reset
+* Flash memory
+* EEPROM
+* USB host port
+* USB peripheral port
+
+What is not working/to be added later:
+
+* Speaker - have patch submitted to get pwm-beeper working - maybe someday
+  it will have a real sound driver that uses PRU
+* A/DC chip - have driver submitted and accepted - waiting for ack on
+  device tree bindings
+* Display - waiting for "simple DRM" to be mainlined
+* Bluetooth - needs new driver for sequencing power/enable/clock
+* Input and output ports - need some sort of new phy or extcon driver as
+  well as PRU UART and PRU I2C drivers
+* Battery indication - needs new power supply driver
+
+Note on flash partitions:
+
+These partitions are based on the official EV3 firmware from LEGO. It is
+expected that most users of the mainline kernel on EV3 will be booting from
+an SD card while retaining the official firmware in the flash memory.
+Furthermore, the official firmware uses an ancient U-Boot (2009) that has
+no device tree support. So, it makes sense to have this partition table in
+the EV3 device tree file. In the unlikely case that anyone does create their
+own firmware image with different partitioning, they can use a modern
+U-Boot in their own firmware image that modifies the device tree with the
+custom partitions.
+
+Signed-off-by: David Lechner <david@lechnology.com>
+---
+
+v3 changes:
+* required defconfig patches have been picked up in linux-davinci tree, so this
+  is the only patch left in the series
+* Added aliases node for consistent naming of serial ports
+* Added memory node
+* Removed nodes that are not finalized yet
+* Renamed button labels to match EV3 users manual
+
+v2 changes:
+* Dropped defconfig patches that have already been pick up
+* Added some new defconfig patches
+* Updated device tree file based on feedback and new available bindings
+  * Renamed file to include da850- prefix
+  * Changed button labels
+  * Fixed LED names
+  * Added beeper device for sound
+  * Added regulators for USB and A/DC
+  * Removed unused pinmux nodes
+  * Added pinconf for buttons
+  * Enabled pwms
+  * Used preferred bindings for flash partitions
+  * Added A/DC spi device
+  * Enabled USB
+
+ arch/arm/boot/dts/Makefile           |   3 +-
+ arch/arm/boot/dts/da850-lego-ev3.dts | 313 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 315 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/da850-lego-ev3.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 78a94b7..1a19e7a 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -130,7 +130,8 @@ dtb-$(CONFIG_ARCH_CLPS711X) += \
+ dtb-$(CONFIG_ARCH_DAVINCI) += \
+ 	da850-lcdk.dtb \
+ 	da850-enbw-cmc.dtb \
+-	da850-evm.dtb
++	da850-evm.dtb \
++	da850-lego-ev3.dtb
+ dtb-$(CONFIG_ARCH_DIGICOLOR) += \
+ 	cx92755_equinox.dtb
+ dtb-$(CONFIG_ARCH_EFM32) += \
+diff --git a/arch/arm/boot/dts/da850-lego-ev3.dts b/arch/arm/boot/dts/da850-lego-ev3.dts
+new file mode 100644
+index 0000000..7aaf902
+--- /dev/null
++++ b/arch/arm/boot/dts/da850-lego-ev3.dts
+@@ -0,0 +1,313 @@
++/*
++ * Device tree for LEGO MINDSTORMS EV3
++ *
++ * Copyright (C) 2017 David Lechner <david@lechnology.com>
++ *
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation, version 2.
++ */
++
++/dts-v1/;
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/linux-event-codes.h>
++#include <dt-bindings/pwm/pwm.h>
++
++#include "da850.dtsi"
++
++/ {
++	compatible = "lego,ev3", "ti,da850";
++	model = "LEGO MINDSTORMS EV3";
++
++	aliases {
++		serial1 = &serial1;
++	};
++
++	memory at c0000000 {
++		device_type = "memory";
++		reg = <0xc0000000 0x04000000>;
++	};
++
++	/*
++	 * The buttons on the EV3 are mapped to keyboard keys.
++	 */
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		label = "EV3 Brick Buttons";
++		pinctrl-names = "default";
++		pinctrl-0 = <&button_pins>, <&button_bias>;
++
++		center {
++			label = "Center";
++			linux,code = <KEY_ENTER>;
++			gpios = <&gpio 29 GPIO_ACTIVE_HIGH>;
++		};
++
++		left {
++			label = "Left";
++			linux,code = <KEY_LEFT>;
++			gpios = <&gpio 102 GPIO_ACTIVE_HIGH>;
++		};
++
++		back {
++			label = "Back";
++			linux,code = <KEY_BACKSPACE>;
++			gpios = <&gpio 106 GPIO_ACTIVE_HIGH>;
++		};
++
++		right {
++			label = "Right";
++			linux,code = <KEY_RIGHT>;
++			gpios = <&gpio 124 GPIO_ACTIVE_HIGH>;
++		};
++
++		down {
++			label = "Down";
++			linux,code = <KEY_DOWN>;
++			gpios = <&gpio 126 GPIO_ACTIVE_HIGH>;
++		};
++
++		up {
++			label = "Up";
++			linux,code = <KEY_UP>;
++			gpios = <&gpio 127 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
++	/*
++	 * The EV3 has two built-in bi-color LEDs behind the buttons.
++	 */
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins>;
++
++		left_green {
++			label = "led0:green:brick-status";
++			/* GP6[13] */
++			gpios = <&gpio 103 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
++		};
++
++		right_red {
++			label = "led1:red:brick-status";
++			/* GP6[7] */
++			gpios = <&gpio 108 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
++		};
++
++		left_red {
++			label = "led0:red:brick-status";
++			/* GP6[12] */
++			gpios = <&gpio 109 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
++		};
++
++		right_green {
++			label = "led1:green:brick-status";
++			/* GP6[14] */
++			gpios = <&gpio 110 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
++		};
++	};
++
++	/*
++	 * The EV3 is powered down by turning off the main 5V supply.
++	 */
++	gpio-poweroff {
++		compatible = "gpio-poweroff";
++		gpios = <&gpio 107 GPIO_ACTIVE_LOW>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&system_power_pin>;
++	};
++
++	/*
++	 * This is a 5V current limiting regulator that is shared by USB,
++	 * the sensor (input) ports, the motor (output) ports and the A/DC.
++	 */
++	vcc5v: regulator1 {
++		pinctrl-names = "default";
++		pinctrl-0 = <&vcc5v_pins>;
++		compatible = "regulator-fixed";
++		regulator-name = "vcc5v";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio 101 0>;
++		over-current-gpios = <&gpio 99 GPIO_ACTIVE_LOW>;
++		enable-active-high;
++		regulator-boot-on;
++	};
++};
++
++&pmx_core {
++	status = "okay";
++
++	spi0_cs3_pin: pinmux_spi0_cs3_pin {
++		pinctrl-single,bits = <
++			/* CS3 */
++			0xc 0x01000000 0x0f000000
++		>;
++	};
++
++	mmc0_cd_pin: pinmux_mmc0_cd {
++		pinctrl-single,bits = <
++			/* GP5[14] */
++			0x2C 0x00000080 0x000000f0
++		>;
++	};
++
++	button_pins: pinmux_button_pins {
++		pinctrl-single,bits = <
++			/* GP1[13] */
++			0x8 0x00000800 0x00000f00
++			/* GP6[10] */
++			0x34 0x00800000 0x00f00000
++			/* GP6[6] */
++			0x38 0x00000080 0x000000f0
++			/* GP7[12], GP7[14], GP7[15] */
++			0x40 0x00808800 0x00f0ff00
++		>;
++	};
++
++	led_pins: pinmux_led_pins {
++		pinctrl-single,bits = <
++			/* GP6[12], GP6[13], GP6[14] */
++			0x34 0x00008880 0x0000fff0
++			/* GP6[7] */
++			0x38 0x00000008 0x0000000f
++		>;
++	};
++
++	system_power_pin: pinmux_system_power {
++		pinctrl-single,bits = <
++			/* GP6[11] */
++			0x34 0x00080000 0x000f0000
++		>;
++	};
++
++	vcc5v_pins: pinmux_vcc5v {
++		pinctrl-single,bits = <
++			/* GP6[5] */
++			0x40 0x00000080 0x000000f0
++			/* GP6[3] */
++			0x4c 0x00008000 0x0000f000
++		>;
++	};
++};
++
++&pinconf {
++	status = "okay";
++
++	/* Buttons have external pulldown resistors */
++	button_bias: button-bias-groups {
++		disable {
++			groups = "cp5", "cp24", "cp25", "cp28";
++			bias-disable;
++		};
++	};
++};
++
++/* Input port 1 */
++&serial1 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&serial1_rxtx_pins>;
++};
++
++&rtc0 {
++	status = "okay";
++};
++
++&i2c0 {
++	status = "okay";
++	clock-frequency = <400000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins>;
++
++	/*
++	 * EEPROM contains the first stage bootloader, HW ID and Bluetooth MAC.
++	 */
++	eeprom at 50 {
++		compatible = "at24,24c128";
++		pagesize = <64>;
++		read-only;
++		reg = <0x50>;
++	};
++};
++
++&wdt {
++	status = "okay";
++};
++
++&mmc0 {
++	status = "okay";
++	max-frequency = <50000000>;
++	bus-width = <4>;
++	cd-gpios = <&gpio 94 GPIO_ACTIVE_LOW>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>, <&mmc0_cd_pin>;
++};
++
++&spi0 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0_pins>, <&spi0_cs0_pin>, <&spi0_cs3_pin>;
++
++	flash at 0 {
++		compatible = "n25q128a13", "jedec,spi-nor";
++		reg = <0>;
++		spi-max-frequency = <50000000>;
++		ti,spi-wdelay = <8>;
++
++		/* Partitions are based on the official firmware from LEGO */
++		partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			partition at 0 {
++				label = "U-Boot";
++				reg = <0 0x40000>;
++			};
++
++			partition at 40000 {
++				label = "U-Boot Env";
++				reg = <0x40000 0x10000>;
++			};
++
++			partition at 50000 {
++				label = "Kernel";
++				reg = <0x50000 0x200000>;
++			};
++
++			partition at 250000 {
++				label = "Filesystem";
++				reg = <0x250000 0xa50000>;
++			};
++
++			partition at cb0000 {
++				label = "Storage";
++				reg = <0xcb0000 0x2f0000>;
++			};
++		};
++	};
++};
++
++&gpio {
++	status = "okay";
++};
++
++&usb_phy {
++	status = "okay";
++};
++
++&usb0 {
++	status = "okay";
++};
++
++&usb1 {
++	status = "okay";
++	vbus-supply = <&vcc5v>;
++};
+-- 
+2.7.4
