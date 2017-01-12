@@ -1,50 +1,229 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 12 Jan 2017 18:09:22 +0100
-Subject: [kvm-unit-tests PATCH 4/6] docs: mention checkpatch in the README
-In-Reply-To: <87lgug318o.fsf@linaro.org>
-References: <20170111162841.15569-1-alex.bennee@linaro.org>
- <20170111162841.15569-5-alex.bennee@linaro.org>
- <322298cd-aefa-e945-d3f4-1237767a06ef@redhat.com>
- <87lgug318o.fsf@linaro.org>
-Message-ID: <20170112170922.kfr4mssz6udxhu4s@hawk.localdomain>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Thu, 12 Jan 2017 18:11:35 +0100
+Subject: [linux-sunxi][PATCH] ARM: dts: sun8i-h3: Add dts for the Beelink X2
+ STB
+Message-ID: <20170112171135.7822-1-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 12:35:03PM +0000, Alex Benn?e wrote:
-> 
-> Paolo Bonzini <pbonzini@redhat.com> writes:
-> 
-> > On 11/01/2017 17:28, Alex Benn?e wrote:
-> >> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> >> ---
-> >>  README.md | 1 +
-> >>  1 file changed, 1 insertion(+)
-> >>
-> >> diff --git a/README.md b/README.md
-> >> index 5027b62..9462824 100644
-> >> --- a/README.md
-> >> +++ b/README.md
-> >> @@ -79,3 +79,4 @@ You can add the following to .git/config to do this automatically for you:
-> >>      [format]
-> >>          subjectprefix = kvm-unit-tests PATCH
-> >>
-> >> +Please run the kernel's ./scripts/checkpatch.pl on new patches
+From: Marcus Cooper <codekipper@gmail.com>
 
-s/patches/files
+The Beelink X2 is an STB based on the Allwinner H3 SoC with a uSD slot,
+2 USB ports( 1 * USB-2 Host, 1 USB OTG), a 10/100M ethernet port using the
+SoC's integrated PHY, Wifi via a RTL8189ETV sdio wifi chip, HDMI, an IR
+receiver, 1 LEDs and an optical S/PDIF connector.
 
-All patches should be new :-)
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+---
+ arch/arm/boot/dts/Makefile                |   1 +
+ arch/arm/boot/dts/sun8i-h3-beelink-x2.dts | 187 ++++++++++++++++++++++++++++++
+ 2 files changed, 188 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
 
-drew
-
-> >
-> > Does it really work well on kvm-unit-tests?
-> 
-> Well I keep getting pulled up on kernel coding style on my reviews so if
-> we mean it we should enforce it.
-> 
-> --
-> Alex Benn?e
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 78a94b747059..75960b1468a4 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -857,6 +857,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a83t-cubietruck-plus.dtb \
+ 	sun8i-h2-plus-orangepi-zero.dtb \
+ 	sun8i-h3-bananapi-m2-plus.dtb \
++	sun8i-h3-beelink-x2.dtb \
+ 	sun8i-h3-nanopi-m1.dtb	\
+ 	sun8i-h3-nanopi-neo.dtb \
+ 	sun8i-h3-orangepi-2.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts b/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
+new file mode 100644
+index 000000000000..bc5aed52cb1d
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
+@@ -0,0 +1,187 @@
++/*
++ * Copyright (C) 2017 Marcus Cooper <codekipper@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun8i-h3.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	model = "Beelink X2";
++	compatible = "roofull,beelink-x2", "allwinner,sun8i-h3";
++
++	aliases {
++		serial0 = &uart0;
++		/* ethernet0 is the H3 emac, defined in sun8i-h3.dtsi */
++		ethernet1 = &rtl8189ftv;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwr_led_x2>;
++
++		pwr_led {
++			label = "beelink-x2:red:pwr";
++			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
++			default-state = "on";
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&sw_r_x2>;
++
++		sw4 {
++			label = "power";
++			linux,code = <BTN_0>;
++			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	wifi_pwrseq: wifi_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		pinctrl-names = "default";
++		pinctrl-0 = <&wifi_en_x2>;
++		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
++	};
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&ir {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ir_pins_a>;
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
++	cd-inverted;
++	status = "okay";
++};
++
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++
++	/*
++	 * Explicitly define the sdio device, so that we can add an ethernet
++	 * alias for it (which e.g. makes u-boot set a mac-address).
++	 */
++	rtl8189ftv: sdio_wifi at 1 {
++		reg = <1>;
++	};
++};
++
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_8bit_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <8>;
++	non-removable;
++	cap-mmc-hw-reset;
++	status = "okay";
++};
++
++&mmc2_8bit_pins {
++	/* Increase drive strength for DDR modes */
++	drive-strength = <40>;
++	/* eMMC is missing pull-ups */
++	bias-pull-up;
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&r_pio {
++	pwr_led_x2: led_pins at 0 {
++		pins = "PL10";
++		function = "gpio_out";
++	};
++
++	sw_r_x2: key_pins at 0 {
++		pins = "PL3";
++		function = "gpio_in";
++	};
++
++	wifi_en_x2: wifi_en_pin {
++		pins = "PL7";
++		function = "gpio_out";
++	};
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
++	status = "okay";
++};
++
++&usbphy {
++	/* USB VBUS is on as long as VCC-IO is on */
++	status = "okay";
++};
+-- 
+2.11.0
