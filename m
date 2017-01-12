@@ -1,60 +1,27 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 11 Jan 2017 19:48:43 -0600
-Subject: [PATCH v2 5/5] ARM: dts: keystone-k2e: Add PSC reset controller node
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Wed, 11 Jan 2017 18:28:20 -0800
+Subject: [PATCH v2 0/5] Reset Controller Nodes for TI Keystone platforms
 In-Reply-To: <20170112014843.19569-1-s-anna@ti.com>
 References: <20170112014843.19569-1-s-anna@ti.com>
-Message-ID: <20170112014843.19569-6-s-anna@ti.com>
+Message-ID: <e5b84f7c-fb55-25f2-8079-47b4a7ecde1a@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Power Sleep Controller (PSC) module contains specific
-memory-mapped registers that can be used to perform reset
-management using specific bits for the DSPs available on the
-SoC. The PSC is defined using a syscon node, and the reset
-functionality is defined using a child syscon reset controller
-node.
+On 1/11/17 5:48 PM, Suman Anna wrote:
+> Hi Santosh,
+>
+> This is a slightly updated patch series for the reset controller nodes for
+> TI Keystone2 SoCs. The only change is to rename the reset controller nodes
+> from "psc-reset-controller" to just "reset-controller" following Rob Herring's
+> comment on the Documentation update patch [1]. There are no changes to the first
+> 2 patches. I have already posted a v2 for the Documentation update as well.
+> Please pick this up instead of the v1 series [2].
+>
+I haven't picked up V1 so no worries. Even V2 I won't apply for another
+week to give some more time if there are any more comments on the
+bindings.
 
-Add this syscon reset controller node as well as the reset
-control data for the resets it supports for the 66AK2E SoCs.
+Thanks for following up.
 
-Signed-off-by: Andrew F. Davis <afd@ti.com>
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
-v2: change reset node name from psc-reset-controller to reset-controller
-
- arch/arm/boot/dts/keystone-k2e.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/arch/arm/boot/dts/keystone-k2e.dtsi b/arch/arm/boot/dts/keystone-k2e.dtsi
-index 9d1d8a64d10e..0dd4cdd6d40c 100644
---- a/arch/arm/boot/dts/keystone-k2e.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2e.dtsi
-@@ -8,6 +8,8 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <dt-bindings/reset/ti-syscon.h>
-+
- / {
- 	compatible = "ti,k2e", "ti,keystone";
- 	model = "Texas Instruments Keystone 2 Edison SoC";
-@@ -94,6 +96,17 @@
- 			};
- 		};
- 
-+		psc: power-sleep-controller at 02350000 {
-+			pscrst: reset-controller {
-+				compatible = "ti,k2e-pscrst", "ti,syscon-reset";
-+				#reset-cells = <1>;
-+
-+				ti,reset-bits = <
-+					0xa3c 8 0xa3c 8 0x83c 8 (ASSERT_CLEAR | DEASSERT_SET | STATUS_CLEAR) /* 0: dsp0 */
-+				>;
-+			};
-+		};
-+
- 		dspgpio0: keystone_dsp_gpio at 02620240 {
- 			compatible = "ti,keystone-dsp-gpio";
- 			gpio-controller;
--- 
-2.10.2
+Regards,
+Santosh
