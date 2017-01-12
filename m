@@ -1,166 +1,33 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 12 Jan 2017 11:26:06 +0000
-Subject: [RFC PATCH 07/10] arm64/sve: Add vector length inheritance control
-In-Reply-To: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
-References: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1484220369-23970-8-git-send-email-Dave.Martin@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 12 Jan 2017 12:28:18 +0100
+Subject: [PATCH] rtc: armada38x: hide maybe-uninitialized warning
+In-Reply-To: <20170111145112.722743-1-arnd@arndb.de>
+References: <20170111145112.722743-1-arnd@arndb.de>
+Message-ID: <20170112112818.q2gxfgw7j3alo2ln@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the vector length is inherited across both fork() and
-exec().
+Hi Arnd,
 
-Inheritance across fork() is desirable both for creating a copy of
-a process (traditional fork) or creating a thread (where we want
-all threads to share the same VL by default).
+On 11/01/2017 at 15:50:31 +0100, Arnd Bergmann wrote :
+> The function is too complicated for gcc to realize that this variable
+> does eventually get initialized, causing a harmless warning:
+> 
+> drivers/rtc/rtc-armada38x.c: In function 'read_rtc_register_wa':
+> drivers/rtc/rtc-armada38x.c:131:25: warning: 'index_max' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> 
+> This adds an explicit initializion at the start of the function.
+> I generally try to avoid that, but it seems appropriate here,
+> as we start out with max=0 as well.
+> 
+> Fixes: 61cffa2438e3 ("rtc: armada38x: Follow the new recommendation for errata implementation")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Inheritance across exec() is less desirable, because of the ABI
-impact of large vector lengths on the size of the signal frame --
-when running a new binary, there is no guarantee that the new
-binary is compatible with these ABI changes.
+Actually, I fixed that one directly in the commit yesterday as it has
+been reported to me multiple times already.
 
-This flag makes the vector length non-inherited by default.
-Instead, the vector length is reset to a system default value,
-unless the THREAD_VL_INHERIT flag has been set for the thread.
 
-THREAD_VL_INHERIT is currently sticky: i.e., if set, it gets
-inherited too.  This behaviour may be refined in future if it is
-not flexible enough.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/include/asm/processor.h |  7 +++++++
- arch/arm64/kernel/fpsimd.c         | 33 ++++++++++++++++++++++++++-------
- include/uapi/linux/prctl.h         |  5 +++++
- 3 files changed, 38 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 96eada9..45ef11d 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -27,6 +27,7 @@
- 
- #ifdef __KERNEL__
- 
-+#include <linux/prctl.h>
- #include <linux/string.h>
- 
- #include <asm/alternative.h>
-@@ -84,11 +85,17 @@ struct thread_struct {
- #endif
- 	struct fpsimd_state	fpsimd_state;
- 	u16			sve_vl;		/* SVE vector length */
-+	u16			sve_flags;	/* SVE related flags */
- 	unsigned long		fault_address;	/* fault info */
- 	unsigned long		fault_code;	/* ESR_EL1 value */
- 	struct debug_info	debug;		/* debugging */
- };
- 
-+/* Flags for sve_flags (intentionally defined to match the prctl flags) */
-+
-+/* Inherit sve_vl and sve_flags across execve(): */
-+#define THREAD_VL_INHERIT	PR_SVE_SET_VL_INHERIT
-+
- #ifdef CONFIG_COMPAT
- #define task_user_tls(t)						\
- ({									\
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 32caca3..f010a1c 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -292,12 +292,15 @@ void fpsimd_flush_thread(void)
- 		 * User tasks must have a valid vector length set, but tasks
- 		 * forked early (e.g., init) may not have one yet.
- 		 * By now, we will know what the hardware supports, so set the
--		 * task vector length if it doesn't have one:
-+		 * task vector length to default if doesn't have one, or if
-+		 * the thread wasn't configured to inherit SVE configuration:
- 		 */
--		if (!current->thread.sve_vl) {
-+		if (!current->thread.sve_vl ||
-+		    !(current->thread.sve_flags & THREAD_VL_INHERIT)) {
- 			BUG_ON(!sve_vl_valid(sve_max_vl));
- 
- 			current->thread.sve_vl = sve_max_vl;
-+			current->thread.sve_flags = 0;
- 		}
- 	}
- 
-@@ -506,10 +509,10 @@ int sve_set_vector_length(struct task_struct *task,
- 	 */
- 	if (!(flags & PR_SVE_SET_VL_THREAD) && get_nr_threads(task) != 1)
- 		return -EINVAL;
--
- 	flags &= ~(unsigned long)PR_SVE_SET_VL_THREAD;
--	if (flags)
--		return -EINVAL; /* No other flags defined yet */
-+
-+	if (flags & ~(unsigned long)PR_SVE_SET_VL_INHERIT)
-+		return -EINVAL;
- 
- 	if (!sve_vl_valid(vl))
- 		return -EINVAL;
-@@ -542,11 +545,27 @@ int sve_set_vector_length(struct task_struct *task,
- 
- 	task->thread.sve_vl = vl;
- 
-+	/* The THREAD_VL_* flag encodings match the relevant PR_* flags: */
-+	task->thread.sve_flags = flags;
-+
- 	fpsimd_flush_task_state(task);
- 
- 	return 0;
- }
- 
-+/*
-+ * Encode the current vector length and flags for return.
-+ * This is only required for prctl(): ptrace has separate fields
-+ */
-+static int sve_prctl_status(struct task_struct const *task)
-+{
-+	int ret = task->thread.sve_vl;
-+
-+	ret |= task->thread.sve_vl << 16;
-+
-+	return ret;
-+}
-+
- /* PR_SVE_SET_VL */
- int sve_set_task_vl(struct task_struct *task,
- 		    unsigned long vector_length, unsigned long flags)
-@@ -565,7 +584,7 @@ int sve_set_task_vl(struct task_struct *task,
- 	if (ret)
- 		return ret;
- 
--	return task->thread.sve_vl;
-+	return sve_prctl_status(task);
- }
- 
- /* PR_SVE_GET_VL */
-@@ -574,7 +593,7 @@ int sve_get_task_vl(struct task_struct *task)
- 	if (!(elf_hwcap & HWCAP_SVE))
- 		return -EINVAL;
- 
--	return task->thread.sve_vl;
-+	return sve_prctl_status(task);
- }
- 
- #endif /* CONFIG_ARM64_SVE */
-diff --git a/include/uapi/linux/prctl.h b/include/uapi/linux/prctl.h
-index c55530b..cff6214 100644
---- a/include/uapi/linux/prctl.h
-+++ b/include/uapi/linux/prctl.h
-@@ -200,6 +200,11 @@ struct prctl_mm_map {
- /* arm64 Scalable Vector Extension controls */
- #define PR_SVE_SET_VL			48	/* set task vector length */
- # define PR_SVE_SET_VL_THREAD		(1 << 1) /* set just this thread */
-+# define PR_SVE_SET_VL_INHERIT		(1 << 2) /* inherit across exec */
- #define PR_SVE_GET_VL			49	/* get task vector length */
-+/* Decode helpers for the return value from PR_SVE_GET_VL: */
-+# define PR_SVE_GET_VL_LEN(ret)		((ret) & 0x3fff) /* vector length */
-+# define PR_SVE_GET_VL_INHERIT		(PR_SVE_SET_VL_INHERIT << 16)
-+/* For conveinence, PR_SVE_SET_VL returns the result in the same encoding */
- 
- #endif /* _LINUX_PRCTL_H */
 -- 
-2.1.4
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
