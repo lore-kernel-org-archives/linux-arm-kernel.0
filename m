@@ -1,89 +1,70 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 12 Jan 2017 18:29:31 +0000
-Subject: [PATCH v2 1/2] of: base: add support to find the level of the last
- cache
-Message-ID: <1484245772-31511-1-git-send-email-sudeep.holla@arm.com>
+From: tbaicar@codeaurora.org (Tyler Baicar)
+Date: Thu, 12 Jan 2017 11:15:21 -0700
+Subject: [PATCH V7 07/10] efi: print unrecognized CPER section
+In-Reply-To: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
+References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <1484244924-24786-8-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is useful to have helper function just to get the number of cache
-levels for a given logical cpu. We can obtain the same by just checking
-the level at which the last cache is present. This patch adds support
-to find the level of the last cache for a given cpu.
+UEFI spec allows for non-standard section in Common Platform Error
+Record. This is defined in section N.2.3 of UEFI version 2.5.
 
-It will be used on ARM64 platform where the device tree provides the
-information for the additional non-architected/transparent/external
-last level caches that are not integrated with the processors.
+Currently if the CPER section's type (UUID) does not match with
+one of the section types that the kernel knows how to parse, the
+section is skipped. Therefore, user is not able to see
+such CPER data, for instance, error record of non-standard section.
 
-Suggested-by: Rob Herring <robh+dt@kernel.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+For above mentioned case, this change prints out the raw data in
+hex in dmesg buffer. Data length is taken from Error Data length
+field of Generic Error Data Entry.
+
+Following is a sample output from dmesg:
+[  115.771702] {1}[Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 2
+[  115.779042] {1}[Hardware Error]: It has been corrected by h/w and requires no further action
+[  115.787456] {1}[Hardware Error]: event severity: corrected
+[  115.792927] {1}[Hardware Error]:  Error 0, type: corrected
+[  115.798415] {1}[Hardware Error]:  fru_id: 00000000-0000-0000-0000-000000000000
+[  115.805596] {1}[Hardware Error]:  fru_text:
+[  115.816105] {1}[Hardware Error]:  section type: d2e2621c-f936-468d-0d84-15a4ed015c8b
+[  115.823880] {1}[Hardware Error]:  section length: 88
+[  115.828779] {1}[Hardware Error]:   00000000: 01000001 00000002 5f434345 525f4543
+[  115.836153] {1}[Hardware Error]:   00000010: 0000574d 00000000 00000000 00000000
+[  115.843531] {1}[Hardware Error]:   00000020: 00000000 00000000 00000000 00000000
+[  115.850908] {1}[Hardware Error]:   00000030: 00000000 00000000 00000000 00000000
+[  115.858288] {1}[Hardware Error]:   00000040: fe800000 00000000 00000004 5f434345
+[  115.865665] {1}[Hardware Error]:   00000050: 525f4543 0000574d
+
+Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
 ---
- drivers/of/base.c  | 27 +++++++++++++++++++++++++++
- include/linux/of.h |  1 +
- 2 files changed, 28 insertions(+)
+ drivers/firmware/efi/cper.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-v1->v2:
-	- Moved to using "cache-level" in the last level cache instead
-	  of counting through all the nodes as suggested by Rob
-
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index d4bea3c797d6..c1128a077aea 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -25,6 +25,7 @@
- #include <linux/cpu.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_device.h>
- #include <linux/of_graph.h>
- #include <linux/spinlock.h>
- #include <linux/slab.h>
-@@ -2268,6 +2269,32 @@ struct device_node *of_find_next_cache_node(const struct device_node *np)
- }
-
- /**
-+ * of_find_last_cache_level - Find the level at which the last cache is
-+ * 		present for the given logical cpu
-+ *
-+ * @cpu: cpu number(logical index) for which the last cache level is needed
-+ *
-+ * Returns the the level at which the last cache is present. It is exactly
-+ * same as  the total number of cache levels for the given logical cpu.
-+ */
-+int of_find_last_cache_level(unsigned int cpu)
-+{
-+	int cache_level = 0;
-+	struct device_node *prev = NULL, *np = of_cpu_device_node_get(cpu);
+diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
+index c2b0a12..48cb8ee 100644
+--- a/drivers/firmware/efi/cper.c
++++ b/drivers/firmware/efi/cper.c
+@@ -591,8 +591,16 @@ static void cper_estatus_print_section(
+ 			cper_print_proc_arm(newpfx, arm_err);
+ 		else
+ 			goto err_section_too_small;
+-	} else
+-		printk("%s""section type: unknown, %pUl\n", newpfx, sec_type);
++	} else {
++		const void *unknown_err;
 +
-+	while (np) {
-+		prev = np;
-+		of_node_put(np);
-+		np = of_find_next_cache_node(np);
++		unknown_err = acpi_hest_generic_data_payload(gdata);
++		printk("%ssection type: %pUl\n", newpfx, sec_type);
++		printk("%ssection length: %d\n", newpfx,
++		       gdata->error_data_length);
++		print_hex_dump(newpfx, "", DUMP_PREFIX_OFFSET, 16, 4,
++			       unknown_err, gdata->error_data_length, 0);
 +	}
-+
-+	if (prev)
-+		of_property_read_u32(prev, "cache-level", &cache_level);
-+
-+	return cache_level;
-+}
-+
-+/**
-  * of_graph_parse_endpoint() - parse common endpoint node properties
-  * @node: pointer to endpoint device_node
-  * @endpoint: pointer to the OF endpoint data structure
-diff --git a/include/linux/of.h b/include/linux/of.h
-index d72f01009297..21e6323de0f3 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -280,6 +280,7 @@ extern struct device_node *of_get_child_by_name(const struct device_node *node,
-
- /* cache lookup */
- extern struct device_node *of_find_next_cache_node(const struct device_node *);
-+extern int of_find_last_cache_level(unsigned int cpu);
- extern struct device_node *of_find_node_with_property(
- 	struct device_node *from, const char *prop_name);
-
---
-2.7.4
+ 
+ 	return;
+ 
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
