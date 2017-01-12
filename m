@@ -1,28 +1,22 @@
-From: christopher.lee.bostic@gmail.com (christopher.lee.bostic at gmail.com)
-Date: Thu, 12 Jan 2017 16:37:35 -0600
-Subject: [PATCH v2 18/18] insert build break
-Message-ID: <1484260655-80477-1-git-send-email-christopher.lee.bostic@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 Jan 2017 23:42:30 +0100
+Subject: [PATCH] clk: stm32f4: avoid uninitialized variable access
+In-Reply-To: <20170112220627.GQ17126@codeaurora.org>
+References: <20170111134107.3821564-1-arnd@arndb.de>
+ <20170112220627.GQ17126@codeaurora.org>
+Message-ID: <CAK8P3a3ieV29jgh0jhioN3KjZCfP2drPAQme_+1oMuTTSiA4NQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Bostic <cbostic@us.ibm.com>
+On Thu, Jan 12, 2017 at 11:06 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>
+> Applied to clk-next. Seems I need to update my compiler to find
+> these warnings.
 
-Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
----
- drivers/fsi/fsi-core.c | 1 +
- 1 file changed, 1 insertion(+)
+I'm currently playing with gcc-7, which adds a lot of new warnings
+(including many false positives). gcc-6 was supposed to have better
+warnings than 5, but I didn't find the difference that noticeable. 5
+or 6 is probably best at the moment, and if you have at least 4.9
+there is no urgent need to upgrade.
 
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 28b82d1..db09836 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -42,6 +42,7 @@
- 
- static DEFINE_IDA(master_ida);
- 
-+
- struct fsi_slave {
- 	struct device		dev;
- 	struct fsi_master	*master;
--- 
-1.8.2.2
+    Arnd
