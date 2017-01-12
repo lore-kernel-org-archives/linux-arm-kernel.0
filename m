@@ -1,131 +1,175 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 12 Jan 2017 16:52:54 +0000
-Subject: [RFC 01/13] KVM: arm/arm64: Add vITS save/restore API
- documentation
-In-Reply-To: <1484236613-24633-2-git-send-email-eric.auger@redhat.com>
-References: <1484236613-24633-1-git-send-email-eric.auger@redhat.com>
- <1484236613-24633-2-git-send-email-eric.auger@redhat.com>
-Message-ID: <4fe81c1b-9956-d458-b0ef-b7219f1249fe@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 12 Jan 2017 16:52:56 +0000
+Subject: [RFC PATCH v4 0/5] ARM: Fix dma_alloc_coherent() and friends for
+ NOMMU
+In-Reply-To: <CA+M3ks6abvJV1RJtZhD1ixrnVhC5V3PL1+7DdwB+_tVg+vTkaw@mail.gmail.com>
+References: <1484057925-23586-1-git-send-email-vladimir.murzin@arm.com>
+ <CA+M3ks5JP14SzprzE90-ST8b3URJECgpJ=dxw5XKvaxYEF3UCw@mail.gmail.com>
+ <f4d17374-eb46-79f7-e394-cb2739f71ef4@arm.com>
+ <CA+M3ks5jTNSLLOetvOUZP=B=a2wPNjXadbw6Zcn475Okc4QEPw@mail.gmail.com>
+ <CA+M3ks6abvJV1RJtZhD1ixrnVhC5V3PL1+7DdwB+_tVg+vTkaw@mail.gmail.com>
+Message-ID: <1908ef72-beb0-1855-3c49-d5a37f014c17@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-On 12/01/17 15:56, Eric Auger wrote:
-> Add description for how to access vITS registers and how to flush/restore
-> vITS tables into/from memory
+On 12/01/17 10:55, Benjamin Gaignard wrote:
+> 2017-01-12 11:35 GMT+01:00 Benjamin Gaignard <benjamin.gaignard@linaro.org>:
+>> 2017-01-11 15:34 GMT+01:00 Vladimir Murzin <vladimir.murzin@arm.com>:
+>>> On 11/01/17 13:17, Benjamin Gaignard wrote:
+>>>> 2017-01-10 15:18 GMT+01:00 Vladimir Murzin <vladimir.murzin@arm.com>:
+>>>>> Hi,
+>>>>>
+>>>>> It seem that addition of cache support for M-class cpus uncovered
+>>>>> latent bug in DMA usage. NOMMU memory model has been treated as being
+>>>>> always consistent; however, for R/M classes of cpu memory can be
+>>>>> covered by MPU which in turn might configure RAM as Normal
+>>>>> i.e. bufferable and cacheable. It breaks dma_alloc_coherent() and
+>>>>> friends, since data can stuck in caches now or be buffered.
+>>>>>
+>>>>> This patch set is trying to address the issue by providing region of
+>>>>> memory suitable for consistent DMA operations. It is supposed that
+>>>>> such region is marked by MPU as non-cacheable. Robin suggested to
+>>>>> advertise such memory as reserved shared-dma-pool, rather then using
+>>>>> homebrew command line option, and extend dma-coherent to provide
+>>>>> default DMA area in the similar way as it is done for CMA (PATCH
+>>>>> 2/5). It allows us to offload all bookkeeping on generic coherent DMA
+>>>>> framework, and it is seems that it might be reused by other
+>>>>> architectures like c6x and blackfin.
+>>>>>
+>>>>> Dedicated DMA region is required for cases other than:
+>>>>>  - MMU/MPU is off
+>>>>>  - cpu is v7m w/o cache support
+>>>>>  - device is coherent
+>>>>>
+>>>>> In case one of the above conditions is true dma operations are forced
+>>>>> to be coherent and wired with dma_noop_ops.
+>>>>>
+>>>>> To make life easier NOMMU dma operations are kept in separate
+>>>>> compilation unit.
+>>>>>
+>>>>> Since the issue was reported in the same time as Benjamin sent his
+>>>>> patch [1] to allow mmap for NOMMU, his case is also addressed in this
+>>>>> series (PATCH 1/5 and PATCH 3/5).
+>>>>>
+>>>>> Thanks!
+>>>>
+>>>> I have tested this v4 on my setup (stm32f4, no cache, no MPU) and unfortunately
+>>>> it doesn't work with my drm/kms driver.
+>>>
+>>> I guess the same is for fbmem, but would be better to have confirmation since
+>>> amba-clcd I use has not been ported to drm/kms (yet), so I can't test.
+>>>
+>>>> I haven't any errors but nothing is displayed unlike what I have when
+>>>> using current dma-mapping
+>>>> code.
+>>>> I guess the issue is coming from dma-noop where __get_free_pages() is
+>>>> used instead of alloc_pages()
+>>>> in dma-mapping.
+>>>
+>>> Unless I've missed something bellow is a call stack for both
+>>>
+>>> #1
+>>> __alloc_simple_buffer
+>>>         __dma_alloc_buffer
+>>>                 alloc_pages
+>>>                 split_page
+>>>                 __dma_clear_buffer
+>>>                         memset
+>>>         page_address
+>>>
+>>> #2
+>>> __get_free_pages
+>>>         alloc_pages
+>>>         page_address
+>>>
+>>> So the difference is that nommu case in dma-mapping.c memzeros memory, handles
+>>> DMA_ATTR_NO_KERNEL_MAPPING and does optimisation of memory usage.
+>>>
+>>> Is something from above critical for your driver?
+>>
+>> I have removed all the diff (split_page,  __dma_clear_buffer, memset)
+>> from #1 and it is still working.
+>> DMA_ATTR_NO_KERNEL_MAPPING flag is not set when allocating the buffer.
+>>
+>> I have investigated more and found that dma-noop doesn't take care of
+>> "dma-ranges" property which is set in DT.
+>> I believed that is the root cause of my problem with your patches.
 > 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> ---
->  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 70 ++++++++++++++++++++++
->  1 file changed, 70 insertions(+)
-> 
-> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> index 6081a5b..bd74613 100644
-> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> @@ -36,3 +36,73 @@ Groups:
->      -ENXIO:  ITS not properly configured as required prior to setting
->               this attribute
->      -ENOMEM: Memory shortage when allocating ITS internal data
-> +
-> +  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
-> +  Attributes:
-> +      The attr field of kvm_device_attr encodes the offset of the
-> +      ITS register, relative to the ITS control frame base address
-> +      (ITS_base).
-> +
-> +      kvm_device_attr.addr points to a __u64 value whatever the width
-> +      of the addressed register (32/64 bits).
-> +
-> +      Writes to read-only registers are ignored by the kernel except
-> +      for a single register, GITS_READR. Normally this register is RO
-> +      but it needs to be restored otherwise commands in the queue will
-> +      be re-executed after CWRITER setting.
-> +
-> +      For other registers, Getting or setting a register has the same
-> +      effect as reading/writing the register on real hardware.
-> +  Errors:
-> +    -ENXIO: Offset does not correspond to any supported register
-> +    -EFAULT: Invalid user pointer for attr->addr
-> +    -EINVAL: Offset is not 64-bit aligned
-> +
-> +  KVM_DEV_ARM_VGIC_GRP_ITS_TABLES
-> +  Attributes
-> +       The attr field of kvm_device_attr is not used.
-> +
-> +       request the flush-save/restore of the ITS tables, namely
-> +       the device table, the collection table, all the ITT tables,
-> +       the LPI pending tables. On save, the tables are flushed
-> +       into guest memory at the location provisionned by the guest
-
-					    provisioned
-
-> +       in GITS_BASER (device and collection tables), on MAPD command
-> +       (ITT_addr), GICR_PENDBASERs (pending tables).
-> +
-> +       This means the GIC should be restored before the ITS and all
-> +       ITS registers but the GITS_CTRL must be restored before
-> +       restoring the ITS tables.
-> +
-> +       Note the LPI configuration table is read-only for the
-> +       in-kernel ITS and its save/restore goes through the standard
-> +       RAM save/restore.
-> +
-> +       The layout of the tables in guest memory defines an ABI.
-> +       The entries are laid out in memory as follows;
-> +
-> +    Device Table Entry (DTE) layout: entry size = 16 bytes
-> +
-> +    bits:     | 63   ...  32  | 31 ... 6 | 5 | 4   ...   0 |
-> +    values:   |   DeviceID    |   Resv   | V |    Size     |
-> +
-> +    bits:     | 63 ... 44 | 43  ...  0  |
-> +    values:   |    Resv   |  ITT_addr   |
-
-While I appreciate this layout represents the absolute maximum an ITS
-could implement, I'm a bit concerned about the amount of memory we may
-end-up requiring here. All the ITSs implementations I know of seem to
-get away with 8 bytes per entry. Maybe I'm just too worried.
-
-Also, please mention that ITT_addr is actually ITT_addr[51:8], as we're
-guaranteed to have an ITT that is 256 byte aligned.
-
-> +
-> +    Collection Table Entry (CTE) layout: entry size = 8 bytes
-> +
-> +    bits:     | 63| 62 ..  52  | 51 ... 16 | 15  ...   0 |
-> +    values:   | V |    RES0    |  RDBase   |    ICID     |
-> +
-> +    Interrupt Translation Table Entry (ITTE) layout: entry size = 16 bytes
-
-The actual name is Interrupt Translation Entry (ITE). I have a patch
-renaming this all over the vgic-its.c file...
-
-> +
-> +    bits:     | 63   ...  32  | 31 ... 17 | 16 | 15  ...  0 |
-> +    values:   |   DeviceID    |    RES0   | V  |    ICID    |
-> +
-> +    bits:     | 63 ...  32    | 31      ...        0 |
-> +    values:   |   pINTID      |        EventID       |
-
-Same concern here. 32bit DevID, EventID and INTID seem a bit over the
-top. But maybe we shouldn't be concerned about memory... ;-)
-
-> +
-> +    LPI Pending Table layout:
-> +
-> +    As specified in the ARM Generic Interrupt Controller Architecture
-> +    Specification GIC Architecture version 3.0 and version 4. The first
-> +    1kB contains only zeros.
+> After testing changing virt_to_phys to virt_to_dma in dma-noop.c fix the issue
+> modetest and fbdemo are now still functional.
 > 
 
-You definitely want to relax this. An ITS implementation is allowed (and
-actually encouraged) to maintain a coarse map in the first kB, and use
-this to quickly scan the table, which would be very useful on restore.
+Thanks for narrowing it down! I did not noticed that stm32f4 remap its memory,
+so dma-ranges property is in use.
 
-Thanks,
+It looks like virt_to_dma is ARM specific, so I probably have to discard idea
+of reusing dma-noop-ops and switch logic into dma-mapping-nommu.c based on
+is_device_dma_coherent(dev) check.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Meanwhile, I'm quite puzzled on how such memory remaping should work together
+with reserved memory. It seem it doesn't account dma-ranges while reserving
+memory (it is too early) nor while allocating/mapping/etc.
+
+Cheers
+Vladimir
+
+>>
+>> Benjamin
+>>
+>>>
+>>>>
+>>>> Since my hardware doesn't have cache or MPU (and so use dma-noop) I
+>>>> haven't reserved specific memory region.
+>>>> Buffer addresses and vma parameters look correct... What could I have
+>>>> miss here ?
+>>>
+>>> No ideas, sorry...
+>>>
+>>> Cheers
+>>> Vladimir
+>>>
+>>>>
+>>>> Benjamin
+>>>>
+>>>>>
+>>>>> [1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8633/1
+>>>>>
+>>>>> Vladimir Murzin (5):
+>>>>>   dma: Add simple dma_noop_mmap
+>>>>>   drivers: dma-coherent: Introduce default DMA pool
+>>>>>   ARM: NOMMU: Introduce dma operations for noMMU
+>>>>>   ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class cpus
+>>>>>   ARM: dma-mapping: Remove traces of NOMMU code
+>>>>>
+>>>>>  .../bindings/reserved-memory/reserved-memory.txt   |   3 +
+>>>>>  arch/arm/include/asm/dma-mapping.h                 |   3 +-
+>>>>>  arch/arm/mm/Kconfig                                |   2 +-
+>>>>>  arch/arm/mm/Makefile                               |   5 +-
+>>>>>  arch/arm/mm/dma-mapping-nommu.c                    | 252 +++++++++++++++++++++
+>>>>>  arch/arm/mm/dma-mapping.c                          |  26 +--
+>>>>>  drivers/base/dma-coherent.c                        |  59 ++++-
+>>>>>  lib/dma-noop.c                                     |  21 ++
+>>>>>  8 files changed, 335 insertions(+), 36 deletions(-)
+>>>>>  create mode 100644 arch/arm/mm/dma-mapping-nommu.c
+>>>>>
+>>>>> --
+>>>>> 2.0.0
+>>>>>
+>>>>
+>>>>
+>>>>
+>>>
+>>
+>>
+>>
+>> --
+>> Benjamin Gaignard
+>>
+>> Graphic Study Group
+>>
+>> Linaro.org ? Open source software for ARM SoCs
+>>
+>> Follow Linaro: Facebook | Twitter | Blog
+> 
+> 
+> 
