@@ -1,222 +1,106 @@
-From: codekipper@gmail.com (Code Kipper)
-Date: Thu, 12 Jan 2017 18:39:06 +0100
-Subject: [linux-sunxi][PATCH] ARM: dts: sun8i-h3: Add dts for the Beelink
- X2 STB
-In-Reply-To: <20170112172813.cbwqfpjlprkxdzcp@lukather>
-References: <20170112171135.7822-1-codekipper@gmail.com>
- <20170112172813.cbwqfpjlprkxdzcp@lukather>
-Message-ID: <CAEKpxBk-PJb70s-kPur86mW1OYLvuGg3oXQkyH94+2qGZhon4Q@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 12 Jan 2017 18:39:38 +0100
+Subject: [PATCH 4/4] ARM: dts: sun8i: add OTG function to Lichee Pi Zero
+In-Reply-To: <20170112145014.GC16865@uda0271908>
+References: <20170103152534.20118-1-icenowy@aosc.xyz>
+ <20170103152534.20118-5-icenowy@aosc.xyz>
+ <20170110202443.GC2479@uda0271908>
+ <2733831484164533@web1g.yandex.ru>
+ <20170111200811.GA16865@uda0271908>
+ <20170111210638.ppdnpzdd2l6x4lyo@lukather>
+ <20170112145014.GC16865@uda0271908>
+Message-ID: <20170112173938.5am5njwrbs6p62br@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 January 2017 at 18:28, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Thu, Jan 12, 2017 at 06:11:35PM +0100, codekipper at gmail.com wrote:
->> From: Marcus Cooper <codekipper@gmail.com>
->>
->> The Beelink X2 is an STB based on the Allwinner H3 SoC with a uSD slot,
->> 2 USB ports( 1 * USB-2 Host, 1 USB OTG), a 10/100M ethernet port using the
->> SoC's integrated PHY, Wifi via a RTL8189ETV sdio wifi chip, HDMI, an IR
->> receiver, 1 LEDs and an optical S/PDIF connector.
->>
->> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
->> ---
->>  arch/arm/boot/dts/Makefile                |   1 +
->>  arch/arm/boot/dts/sun8i-h3-beelink-x2.dts | 187 ++++++++++++++++++++++++++++++
->>  2 files changed, 188 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 78a94b747059..75960b1468a4 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -857,6 +857,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
->>       sun8i-a83t-cubietruck-plus.dtb \
->>       sun8i-h2-plus-orangepi-zero.dtb \
->>       sun8i-h3-bananapi-m2-plus.dtb \
->> +     sun8i-h3-beelink-x2.dtb \
->>       sun8i-h3-nanopi-m1.dtb  \
->>       sun8i-h3-nanopi-neo.dtb \
->>       sun8i-h3-orangepi-2.dtb \
->> diff --git a/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts b/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
->> new file mode 100644
->> index 000000000000..bc5aed52cb1d
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
->> @@ -0,0 +1,187 @@
->> +/*
->> + * Copyright (C) 2017 Marcus Cooper <codekipper@gmail.com>
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This file is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->> +
->> +/dts-v1/;
->> +#include "sun8i-h3.dtsi"
->> +#include "sunxi-common-regulators.dtsi"
->> +
->> +#include <dt-bindings/gpio/gpio.h>
->> +#include <dt-bindings/input/input.h>
->> +#include <dt-bindings/pinctrl/sun4i-a10.h>
->> +
->> +/ {
->> +     model = "Beelink X2";
->> +     compatible = "roofull,beelink-x2", "allwinner,sun8i-h3";
->> +
->> +     aliases {
->> +             serial0 = &uart0;
->> +             /* ethernet0 is the H3 emac, defined in sun8i-h3.dtsi */
->> +             ethernet1 = &rtl8189ftv;
->> +     };
->> +
->> +     chosen {
->> +             stdout-path = "serial0:115200n8";
->> +     };
->> +
->> +     leds {
->> +             compatible = "gpio-leds";
->> +             pinctrl-names = "default";
->> +             pinctrl-0 = <&pwr_led_x2>;
->
-> Please drop all the pinctrl nodes for the GPIOs. They're useless, and
-> will be harmful when we'll switch to a stricter pinctrl driver.
->
-ACK
->> +
->> +             pwr_led {
->> +                     label = "beelink-x2:red:pwr";
->> +                     gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
->> +                     default-state = "on";
->> +             };
->> +     };
->> +
->> +     gpio_keys {
->> +             compatible = "gpio-keys";
->> +             pinctrl-names = "default";
->> +             pinctrl-0 = <&sw_r_x2>;
->> +
->> +             sw4 {
->> +                     label = "power";
->> +                     linux,code = <BTN_0>;
->
-> Should that be BTN_0 then if the label is that one?
->
-ACK
->> +                     gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
->> +             };
->> +     };
->> +
->> +     wifi_pwrseq: wifi_pwrseq {
->> +             compatible = "mmc-pwrseq-simple";
->> +             pinctrl-names = "default";
->> +             pinctrl-0 = <&wifi_en_x2>;
->> +             reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
->> +     };
->> +};
->> +
->> +&ehci1 {
->> +     status = "okay";
->> +};
->> +
->> +&ir {
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&ir_pins_a>;
->> +     status = "okay";
->> +};
->> +
->> +&mmc0 {
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
->> +     vmmc-supply = <&reg_vcc3v3>;
->> +     bus-width = <4>;
->> +     cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
->> +     cd-inverted;
->> +     status = "okay";
->> +};
->> +
->> +&mmc1 {
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&mmc1_pins_a>;
->> +     vmmc-supply = <&reg_vcc3v3>;
->> +     bus-width = <4>;
->> +     non-removable;
->> +     status = "okay";
->> +
->> +     /*
->> +      * Explicitly define the sdio device, so that we can add an ethernet
->> +      * alias for it (which e.g. makes u-boot set a mac-address).
->> +      */
->> +     rtl8189ftv: sdio_wifi at 1 {
->> +             reg = <1>;
->> +     };
->> +};
->> +
->> +&mmc2 {
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&mmc2_8bit_pins>;
->> +     vmmc-supply = <&reg_vcc3v3>;
->> +     bus-width = <8>;
->> +     non-removable;
->> +     cap-mmc-hw-reset;
->> +     status = "okay";
->> +};
->> +
->> +&mmc2_8bit_pins {
->> +     /* Increase drive strength for DDR modes */
->> +     drive-strength = <40>;
->
-> Have you actually tested that it was needed?
->
-I'll confess that I've rushed this one as I just wanted to verify my
-spdif changes. I'll respin this,
-BR,
-CK
->> +     /* eMMC is missing pull-ups */
->> +     bias-pull-up;
->
-> This is already enabled in the DTSI.
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Hi Bin,
+
+On Thu, Jan 12, 2017 at 08:50:14AM -0600, Bin Liu wrote:
+> On Wed, Jan 11, 2017 at 10:06:38PM +0100, Maxime Ripard wrote:
+> > On Wed, Jan 11, 2017 at 02:08:11PM -0600, Bin Liu wrote:
+> > > On Thu, Jan 12, 2017 at 03:55:33AM +0800, Icenowy Zheng wrote:
+> > > > 
+> > > > 
+> > > > 11.01.2017, 04:24, "Bin Liu" <b-liu@ti.com>:
+> > > > > On Tue, Jan 03, 2017 at 11:25:34PM +0800, Icenowy Zheng wrote:
+> > > > >> ?Lichee Pi Zero features a USB OTG port.
+> > > > >>
+> > > > >> ?Add support for it.
+> > > > >>
+> > > > >> ?Note: in order to use the Host mode, the board must be powered via the
+> > > > >> ?+5V and GND pins.
+> > > > >>
+> > > > >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> > > > >> ?---
+> > > > >> ??arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 10 ++++++++++
+> > > > >> ??1 file changed, 10 insertions(+)
+> > > > >>
+> > > > >> ?diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+> > > > >> ?index 0099affc6ce3..3d9168cbaeca 100644
+> > > > >> ?--- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+> > > > >> ?+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+> > > > >> ?@@ -71,3 +71,13 @@
+> > > > >> ??????????pinctrl-names = "default";
+> > > > >> ??????????status = "okay";
+> > > > >> ??};
+> > > > >> ?+
+> > > > >> ?+&usb_otg {
+> > > > >> ?+ dr_mode = "otg";
+> > > > >
+> > > > > Why not set this default mode in dtsi instead?
+> > > > >
+> > > > > Regards,
+> > > > > -Bin.
+> > > > 
+> > > > There's possibly boards which do not have OTG functions.
+> > > 
+> > > That is board specific.
+> > 
+> > Exactly, and this is why it should be done in the board DT.
+> 
+> I am just suggesting based on the common practice. If a .dtsi exists for
+> a family, the .dtsi describes the device and common properties for all
+> possible boards, and each board .dts adds or overrides its specific
+> implementation. Kernel has many devices/boards done in this way - define
+> the default dr_mode in .dtsi.
+> 
+> In this case, I suggest to set the common dr_mode in .dtsi, then each
+> board .dts only overrides it if the implementation is different. 
+> 
+> > 
+> > The controller in the Allwinner SoCs do not handle directly the ID pin
+> > and VBUS, but rather rely on a GPIO to do so.
+> > 
+> > So boards with OTG will need setup anyway, at least to tell which
+> > GPIOs are used. There's no point in enforcing a default if it doesn't
+> > work by default.
+> 
+> Then define a default which supposes to work for most boards.
+> 
+> Why I suggest this, is because defining a default dr_mode which works
+> for most cases in dtsi could prevent a little surprise in MUSB function.
+> If someone designs a new board but forgets to define dr_mode in the new
+> board DT, the MUSB driver will default to org mode, which might not be
+> intended.
+
+The point is that there is no sensible default. Some boards don't have
+an ID pin and no VBUS (peripheral), some don't have an ID pin but VBUS
+(host), and some have an ID pin but no controllable VBUS, some have an
+ID pin and a controllable VBUS, but we have no idea which GPIOs are
+used.
+
+There's no way we can have something that works on most cases.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170112/f36ac00b/attachment-0001.sig>
