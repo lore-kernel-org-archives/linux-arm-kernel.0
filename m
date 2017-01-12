@@ -1,61 +1,50 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Thu, 12 Jan 2017 12:50:44 +0800
-Subject: [PATCH v5] arm64: dts: mt8173: add mmsel clocks for 4K support
-In-Reply-To: <1470279438-60372-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1470279438-60372-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <CAGS+omAZvHmSz6bJcvisC1LZgxwbd-HzvYMDrHXzfkY3mZZEsw@mail.gmail.com>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Thu, 12 Jan 2017 11:17:37 +0530
+Subject: [PATCH v3 04/10] Documentation: perf: hisi: Documentation for
+ HiP05/06/07 PMU event counting.
+In-Reply-To: <20170110175500.GD24036@leverpostej>
+References: <1483339777-23973-1-git-send-email-anurup.m@huawei.com>
+ <20170110175500.GD24036@leverpostej>
+Message-ID: <58771879.2010604@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
-
-(Trying again to send plain text email)...
-
-On Thu, Aug 4, 2016 at 10:57 AM, Bibby Hsieh <bibby.hsieh@mediatek.com> wrote:
-> To support HDMI 4K resolution, mmsys need clcok
-> mm_sel to be 400MHz.
->
-> The board .dts file should override the clock rate
-> property with the higher VENCPLL frequency the board
-> supports HDMI 4K resolution.
->
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
 
 
-It looks like this patch was lost.  It is actually a prerequisite for
-MTK 4k HDMI support, which already landed in v4.9.
+On Tuesday 10 January 2017 11:25 PM, Mark Rutland wrote:
+> On Mon, Jan 02, 2017 at 01:49:37AM -0500, Anurup M wrote:
+>> +The Hisilicon SoC HiP05/06/07 chips consist of various independent system
+>> +device PMU's such as L3 cache(L3C) and Miscellaneous Nodes(MN).
+>> +These PMU devices are independent and have hardware logic to gather
+>> +statistics and performance information.
+>> +
+>> +HiP0x chips are encapsulated by multiple CPU and IO die's. The CPU die is
+>> +called as Super CPU cluster (SCCL) which includes 16 cpu-cores. Every SCCL
+>> +is further grouped as CPU clusters (CCL) which includes 4 cpu-cores each.
+>> +Each SCCL has 1 L3 cache and 1 MN units.
+> Are there systems with multiple SCCLs? Or is there only one SCCL per
+> system?
 
-See the email thread entitled:
-[PATCH v5 0/3] MT8173 HDMI 4K support <https://lkml.org/lkml/2016/9/28/893>
+The HiP0x are encapsulated by multiple SCCL (CPU die) and SICL (IO die).
+The HiP06 and HiP07 have two SCCLs.
 
-Or these three:
+>> +The L3 cache is shared by all CPU cores in a CPU die. The L3C has four banks
+>> +(or instances). Each bank or instance of L3C has Eight 32-bit counter
+>> +registers and also event control registers. The HiP05/06 chip L3 cache has
+>> +22 statistics events. The HiP07 chip has 66 statistics events. These events
+>> +are very useful for debugging.
+> Is an L3C associated with a subset of physical memory (as with the ARM
+> CCN's L3C), or is it associated with a set of CPUs (e.g.  only those in
+> a single SCCL) covering all physical memory (as with each CPU's L1 &
+> L2)?
 
-0d2200794f0a drm/mediatek: modify the factor to make the pll_rate set
-in the 1G-2G range
-968253bd7caa drm/mediatek: enhance the HDMI driving current
-d542b7c473f0 drm/mediatek: do mtk_hdmi_send_infoframe after HDMI clock enable
+Yes the L3C is associated with the set of CPUs in a single SCCL covering 
+all physical memory.
+The L3 cache in all  the SCCLs share the complete physical memory.
 
--Dan
 
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi |    2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index 78529e4..c3f32f3 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -690,6 +690,8 @@
->                         compatible = "mediatek,mt8173-mmsys", "syscon";
->                         reg = <0 0x14000000 0 0x1000>;
->                         power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> +                       assigned-clocks = <&topckgen CLK_TOP_MM_SEL>;
-> +                       assigned-clock-rates = <400000000>;
->                         #clock-cells = <1>;
->                 };
->
-> --
-> 1.7.9.5
->
+Thanks,
+Anurup
+
+> Thanks,
+> Mark.
