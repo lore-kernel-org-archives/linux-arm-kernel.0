@@ -1,164 +1,85 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 12 Jan 2017 09:32:43 +0000
-Subject: kvm: deadlock in kvm_vgic_map_resources
-In-Reply-To: <CACT4Y+YRg=H0F-_QTtPf0--o85sQCb__j=V25tPchx9ycYtyKg@mail.gmail.com>
-References: <CACT4Y+YRg=H0F-_QTtPf0--o85sQCb__j=V25tPchx9ycYtyKg@mail.gmail.com>
-Message-ID: <70371c5c-d0c0-b59e-b12c-fd8359392763@arm.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Thu, 12 Jan 2017 10:44:07 +0100
+Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device managed
+ functions
+In-Reply-To: <20170111175110.GB22289@roeck-us.net>
+References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-5-git-send-email-linux@roeck-us.net>
+ <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
+ <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
+ <a45ed205-7c1b-a298-50c0-fc8b80a846c5@sigmadesigns.com>
+ <a61eb838-4167-3032-bde8-3a8845b780f8@roeck-us.net>
+ <f7d9227c-4912-5c52-5ba7-ae7fa3b89857@sigmadesigns.com>
+ <20170111175110.GB22289@roeck-us.net>
+Message-ID: <0f68aa11-161b-0435-ea0f-851432464bc1@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+On 11/01/2017 18:51, Guenter Roeck wrote:
 
-On 11/01/17 19:01, Dmitry Vyukov wrote:
-> Hello,
+> However, some other unrelated undefined behavior does not mean that this
+> specific behavior is undefined.
+
+True :-)
+
+Let me just give two additional examples of UB that /have/ bitten
+Linux kernel devs.
+
+int i;
+for (i = 1; i > 0; ++i)
+	/* do_something(); */
+
+=> optimized into an infinite loop
+
+and
+
+void func(struct foo *p) {
+	int n = p->field;
+	if (!p) return;
+
+=> null-pointer check optimized away
+
+> So far we have a claim that a cast to a void * may somehow be different
+> to a cast to a different pointer, if used as function argument, and that
+> the behavior with such a cast may be undefined. In other words, you claim
+> that a function implemented as, say,
 > 
-> While running syzkaller fuzzer I've got the following deadlock.
-> On commit 9c763584b7c8911106bb77af7e648bef09af9d80.
+>    void func(int *var) {}
 > 
+> might result in undefined behavior if some header file declares it as
 > 
-> =============================================
-> [ INFO: possible recursive locking detected ]
-> 4.9.0-rc6-xc2-00056-g08372dd4b91d-dirty #50 Not tainted
-> ---------------------------------------------
-> syz-executor/20805 is trying to acquire lock:
-> (
-> &kvm->lock
-> ){+.+.+.}
-> , at:
-> [< inline >] kvm_vgic_dist_destroy
-> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:271
-> [<ffff2000080ea4bc>] kvm_vgic_destroy+0x34/0x250
-> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:294
-> but task is already holding lock:
-> (&kvm->lock){+.+.+.}, at:
-> [<ffff2000080ea7e4>] kvm_vgic_map_resources+0x2c/0x108
-> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:343
-> other info that might help us debug this:
-> Possible unsafe locking scenario:
-> CPU0
-> ----
-> lock(&kvm->lock);
-> lock(&kvm->lock);
-> *** DEADLOCK ***
-> May be due to missing lock nesting notation
-> 2 locks held by syz-executor/20805:
-> #0:(&vcpu->mutex){+.+.+.}, at:
-> [<ffff2000080bcc30>] vcpu_load+0x28/0x1d0
-> arch/arm64/kvm/../../../virt/kvm/kvm_main.c:143
-> #1:(&kvm->lock){+.+.+.}, at:
-> [<ffff2000080ea7e4>] kvm_vgic_map_resources+0x2c/0x108
-> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:343
-> stack backtrace:
-> CPU: 2 PID: 20805 Comm: syz-executor Not tainted
-> 4.9.0-rc6-xc2-00056-g08372dd4b91d-dirty #50
-> Hardware name: Hardkernel ODROID-C2 (DT)
-> Call trace:
-> [<ffff200008090560>] dump_backtrace+0x0/0x3c8 arch/arm64/kernel/traps.c:69
-> [<ffff200008090948>] show_stack+0x20/0x30 arch/arm64/kernel/traps.c:219
-> [< inline >] __dump_stack lib/dump_stack.c:15
-> [<ffff200008895840>] dump_stack+0x100/0x150 lib/dump_stack.c:51
-> [< inline >] print_deadlock_bug kernel/locking/lockdep.c:1728
-> [< inline >] check_deadlock kernel/locking/lockdep.c:1772
-> [< inline >] validate_chain kernel/locking/lockdep.c:2250
-> [<ffff2000081c8718>] __lock_acquire+0x1938/0x3440 kernel/locking/lockdep.c:3335
-> [<ffff2000081caa84>] lock_acquire+0xdc/0x1d8 kernel/locking/lockdep.c:3746
-> [< inline >] __mutex_lock_common kernel/locking/mutex.c:521
-> [<ffff200009700004>] mutex_lock_nested+0xdc/0x7b8 kernel/locking/mutex.c:621
-> [< inline >] kvm_vgic_dist_destroy
-> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:271
-> [<ffff2000080ea4bc>] kvm_vgic_destroy+0x34/0x250
-> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:294
-> [<ffff2000080ec290>] vgic_v2_map_resources+0x218/0x430
-> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v2.c:295
-> [<ffff2000080ea884>] kvm_vgic_map_resources+0xcc/0x108
-> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:348
-> [< inline >] kvm_vcpu_first_run_init
-> arch/arm64/kvm/../../../arch/arm/kvm/arm.c:505
-> [<ffff2000080d2768>] kvm_arch_vcpu_ioctl_run+0xab8/0xce0
-> arch/arm64/kvm/../../../arch/arm/kvm/arm.c:591
-> [<ffff2000080c1fec>] kvm_vcpu_ioctl+0x434/0xc08
-> arch/arm64/kvm/../../../virt/kvm/kvm_main.c:2557
-> [< inline >] vfs_ioctl fs/ioctl.c:43
-> [<ffff200008450c38>] do_vfs_ioctl+0x128/0xfc0 fs/ioctl.c:679
-> [< inline >] SYSC_ioctl fs/ioctl.c:694
-> [<ffff200008451b78>] SyS_ioctl+0xa8/0xb8 fs/ioctl.c:685
-> [<ffff200008083ef0>] el0_svc_naked+0x24/0x28 arch/arm64/kernel/entry.S:755
+>     void func(void *);
+> 
+> and it is called as
+> 
+>     int var;
+> 
+>     func(&var);
+> 
+> That seems really far fetched to me.
 
-Nice catch, and many thanks for reporting this.
+Thanks for giving me an opportunity to play the language lawyer :-)
 
-The bug is fairly obvious. Christoffer, what do you think? I don't think
-we need to hold the kvm->lock all the way, but I'd like another pair of
-eyes (the coffee machine is out of order again, and tea doesn't cut it).
+C99 6.3.2.3 sub-clause 8 states:
 
-Thanks,
+"A pointer to a function of one type may be converted to a pointer to a function of another
+type and back again; the result shall compare equal to the original pointer. If a converted
+pointer is used to call a function whose type is not compatible with the pointed-to type,
+the behavior is undefined."
 
-	M.
+So, the behavior is undefined, not when you cast clk_disable_unprepare,
+but when clk_disable_unprepare is later called through the devres->action
+function pointer.
 
->From 93f80b20fb9351a49ee8b74eed3fc59c84651371 Mon Sep 17 00:00:00 2001
-From: Marc Zyngier <marc.zyngier@arm.com>
-Date: Thu, 12 Jan 2017 09:21:56 +0000
-Subject: [PATCH] KVM: arm/arm64: vgic: Fix deadlock on error handling
+However, I agree that it will work as expected on typical platforms
+(where all pointers are the same size, and the calling convention
+treats all pointers the same).
 
-Dmitry Vyukov reported that the syzkaller fuzzer triggered a
-deadlock in the vgic setup code when an error was detected, as
-the cleanup code tries to take a lock that is already held by
-the setup code.
+> I do get the message that you do not like this kind of cast. But that doesn't
+> mean it is not correct.
 
-The fix is pretty obvious: move the cleaup call after having
-dropped the lock, since not much can happen at that point.
+If it's already widely used in the kernel, it seems there is no point
+fighting it ;-)
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic/vgic-init.c | 4 ++++
- virt/kvm/arm/vgic/vgic-v2.c   | 2 --
- virt/kvm/arm/vgic/vgic-v3.c   | 2 --
- 3 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 5114391..0e0c295 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -350,6 +350,10 @@ int kvm_vgic_map_resources(struct kvm *kvm)
- 		ret = vgic_v3_map_resources(kvm);
- out:
- 	mutex_unlock(&kvm->lock);
-+
-+	if (ret)
-+		kvm_vgic_destroy(kvm);
-+
- 	return ret;
- }
- 
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 9bab867..834137e 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -293,8 +293,6 @@ int vgic_v2_map_resources(struct kvm *kvm)
- 	dist->ready = true;
- 
- out:
--	if (ret)
--		kvm_vgic_destroy(kvm);
- 	return ret;
- }
- 
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 7df1b90..a4c7fff 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -308,8 +308,6 @@ int vgic_v3_map_resources(struct kvm *kvm)
- 	dist->ready = true;
- 
- out:
--	if (ret)
--		kvm_vgic_destroy(kvm);
- 	return ret;
- }
- 
--- 
-2.1.4
-
-
--- 
-Jazz is not dead. It just smells funny...
+Regards.
