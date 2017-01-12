@@ -1,55 +1,49 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Thu, 12 Jan 2017 17:45:16 +0100
-Subject: [PATCH] ASoC: sun4i-spdif: Add support for the H3 SoC
-Message-ID: <20170112164516.15877-1-codekipper@gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 13 Jan 2017 00:45:04 +0800
+Subject: [PATCH v2 0/7] crypto: ARM/arm64 - AES and ChaCha20 updates for
+ v4.11
+In-Reply-To: <1484152915-26517-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1484152915-26517-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170112164504.GD20313@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+On Wed, Jan 11, 2017 at 04:41:48PM +0000, Ard Biesheuvel wrote:
+> This adds ARM and arm64 implementations of ChaCha20, scalar AES and SIMD
+> AES (using bit slicing). The SIMD algorithms in this series take advantage
+> of the new skcipher walksize attribute to iterate over the input in the most
+> efficient manner possible.
+> 
+> Patch #1 adds a NEON implementation of ChaCha20 for ARM.
+> 
+> Patch #2 adds a NEON implementation of ChaCha20 for arm64.
+> 
+> Patch #3 modifies the existing NEON and ARMv8 Crypto Extensions implementations
+> of AES-CTR to be available as a synchronous skcipher as well. This is intended
+> for the mac80211 code, which uses synchronous encapsulations of ctr(aes)
+> [ccm, gcm] in softirq context, during which arm64 supports use of SIMD code.
+> 
+> Patch #4 adds a scalar implementation of AES for arm64, using the key schedule
+> generation routines and lookup tables of the generic code in crypto/aes_generic.
+> 
+> Patch #5 does the same for ARM, replacing existing scalar code that originated
+> in the OpenSSL project, and contains redundant key schedule generation routines
+> and lookup tables (and is slightly slower on modern cores)
+> 
+> Patch #6 replaces the ARM bit sliced NEON code with a new implementation that
+> has a number of advantages over the original code (which also originated in the
+> OpenSSL project.) The performance should be identical.
+> 
+> Patch #7 adds a port of the ARM bit-sliced AES code to arm64, in ECB, CBC, CTR
+> and XTS modes.
+> 
+> Due to the size of patch #7, it may be difficult to apply these patches from
+> patchwork, so I pushed them here as well:
 
-The H3 SoC uses the same SPDIF block as found in earlier SoCs, but its
-TXFIFO is mapped to another address.
+It seems to have made it.
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
----
- sound/soc/sunxi/sun4i-spdif.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/sound/soc/sunxi/sun4i-spdif.c b/sound/soc/sunxi/sun4i-spdif.c
-index fec62ee1fc72..c03cd07a9b19 100644
---- a/sound/soc/sunxi/sun4i-spdif.c
-+++ b/sound/soc/sunxi/sun4i-spdif.c
-@@ -103,6 +103,8 @@
- 	#define SUN4I_SPDIF_ISTA_RXOSTA			BIT(1)
- 	#define SUN4I_SPDIF_ISTA_RXASTA			BIT(0)
- 
-+#define SUN8I_SPDIF_TXFIFO	(0x20)
-+
- #define SUN4I_SPDIF_TXCNT	(0x24)
- 
- #define SUN4I_SPDIF_RXCNT	(0x28)
-@@ -417,6 +419,11 @@ static const struct sun4i_spdif_quirks sun6i_a31_spdif_quirks = {
- 	.has_reset	= true,
- };
- 
-+static const struct sun4i_spdif_quirks sun8i_h3_spdif_quirks = {
-+	.reg_dac_txdata	= SUN8I_SPDIF_TXFIFO,
-+	.has_reset	= true,
-+};
-+
- static const struct of_device_id sun4i_spdif_of_match[] = {
- 	{
- 		.compatible = "allwinner,sun4i-a10-spdif",
-@@ -426,6 +433,10 @@ static const struct of_device_id sun4i_spdif_of_match[] = {
- 		.compatible = "allwinner,sun6i-a31-spdif",
- 		.data = &sun6i_a31_spdif_quirks,
- 	},
-+	{
-+		.compatible = "allwinner,sun8i-h3-spdif",
-+		.data = &sun8i_h3_spdif_quirks,
-+	},
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, sun4i_spdif_of_match);
+All applied.  Thanks.
 -- 
-2.11.0
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
