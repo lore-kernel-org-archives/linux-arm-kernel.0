@@ -1,66 +1,33 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 12 Jan 2017 07:24:53 -0600
-Subject: [PATCH 1/2][UPDATE] of: base: add support to get the number of
- cache levels
-In-Reply-To: <1484049616-22388-1-git-send-email-sudeep.holla@arm.com>
-References: <1484048479-19767-1-git-send-email-sudeep.holla@arm.com>
- <1484049616-22388-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CAL_Jsq+wawaXeFPnmYw++YMiMzMm+9nSn498Dj7KsGzkfndfog@mail.gmail.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Thu, 12 Jan 2017 21:24:50 +0800
+Subject: [PATCH v7 0/4] arm64: arch_timer: Add workaround for
+ hisilicon-161601 erratum
+In-Reply-To: <ff9c81c2-90ef-a5c2-6f0b-c6cf5d0d11a9@arm.com>
+References: <1483772858-10380-1-git-send-email-dingtianhong@huawei.com>
+ <6c33e4e9-6472-4738-aea2-55dcaab3a94f@huawei.com>
+ <ff9c81c2-90ef-a5c2-6f0b-c6cf5d0d11a9@arm.com>
+Message-ID: <06fd3327-f451-bc0d-b80c-4200bc9fadaa@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 6:00 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> It is useful to have helper function just to get the number of cache
-> levels for a given logical cpu. This patch adds the support for the
-> same.
->
-> It will be used on ARM64 platform where the device tree provides the
-> information for the additional non-architected/transparent/external
-> last level caches that are not integrated with the processors.
->
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  drivers/of/base.c  | 23 +++++++++++++++++++++++
->  include/linux/of.h |  1 +
->  2 files changed, 24 insertions(+)
->
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index d4bea3c797d6..80e557eca858 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -25,6 +25,7 @@
->  #include <linux/cpu.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/of_device.h>
->  #include <linux/of_graph.h>
->  #include <linux/spinlock.h>
->  #include <linux/slab.h>
-> @@ -2268,6 +2269,28 @@ struct device_node *of_find_next_cache_node(const struct device_node *np)
->  }
->
->  /**
-> + * of_count_cache_levels - Find the total number of cache levels for the
-> + *                        given logical cpu
-> + *
-> + * @cpu: cpu number(logical index) for which cache levels is being counted
-> + *
-> + * Returns the total number of cache levels for the given logical cpu
-> + */
-> +int of_count_cache_levels(unsigned int cpu)
-> +{
-> +       int level = 0;
-> +       struct device_node *np = of_cpu_device_node_get(cpu);
-> +
-> +       while (np) {
-> +               level++;
 
-This will return 1 if you have a cpu node and no cache nodes. Are you
-assuming the cpu has a cache?
+On 2017/1/12 17:11, Marc Zyngier wrote:
+> On 12/01/17 04:23, Ding Tianhong wrote:
+>> Hi Marc:
+>>
+>> How about this v7, if any suggestions very grateful.
+> 
+> It's been less than 5 days since you posted this. I'll get to it once I
+> finish reviewing all the other patches that are sitting in the queue
+> right before yours.
+> 
 
-Perhaps you should just find the last level cache node and then just
-read "cache-level".
+Ok and sorry for the noisy.
 
-Rob
+Thanks
+Ding
+
+> Thanks,
+> 
+> 	M.
+> 
