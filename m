@@ -1,33 +1,35 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 12 Jan 2017 12:28:18 +0100
-Subject: [PATCH] rtc: armada38x: hide maybe-uninitialized warning
-In-Reply-To: <20170111145112.722743-1-arnd@arndb.de>
-References: <20170111145112.722743-1-arnd@arndb.de>
-Message-ID: <20170112112818.q2gxfgw7j3alo2ln@piout.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 12 Jan 2017 11:31:55 +0000
+Subject: [RFC PATCH 09/10] drivers/perf: Add support for ARMv8.2
+ Statistical Profiling Extension
+In-Reply-To: <20170110160419.4cc3d61c9d652e5d5da13f15@arm.com>
+References: <1483467027-14547-1-git-send-email-will.deacon@arm.com>
+ <1483467027-14547-10-git-send-email-will.deacon@arm.com>
+ <20170110160419.4cc3d61c9d652e5d5da13f15@arm.com>
+Message-ID: <891006af-9b82-59e8-b91e-ccf1399726a0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 11/01/2017 at 15:50:31 +0100, Arnd Bergmann wrote :
-> The function is too complicated for gcc to realize that this variable
-> does eventually get initialized, causing a harmless warning:
+On 10/01/17 22:04, Kim Phillips wrote:
+> On Tue, 3 Jan 2017 18:10:26 +0000
+> Will Deacon <will.deacon@arm.com> wrote:
 > 
-> drivers/rtc/rtc-armada38x.c: In function 'read_rtc_register_wa':
-> drivers/rtc/rtc-armada38x.c:131:25: warning: 'index_max' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>> +#define DRVNAME				"arm_spe_pmu"
 > 
-> This adds an explicit initializion at the start of the function.
-> I generally try to avoid that, but it seems appropriate here,
-> as we start out with max=0 as well.
+> Based on Intel naming "intel_pt" and "intel_bts', I had expected
+> "arm-spe" as the universal basename for SPE.  I don't really care about
+> whether '_pmu' is included, but it's yet another naming inconsistency we
+> have with coresight's "cs_etm" (the other being prefixed with "arm_").
 > 
-> Fixes: 61cffa2438e3 ("rtc: armada38x: Follow the new recommendation for errata implementation")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Also, nit, since I don't know why perf userspace tools can't handle
+> dashes in PMU names (commit 3d1ff755e367 "arm: perf: clean up PMU
+> names" doesn't say), can we at least start to use dashes in our
+> filenames?  arm-spe-pmu.c is easier to type than arm_spe_pmu.c.
 
-Actually, I fixed that one directly in the commit yesterday as it has
-been reported to me multiple times already.
+Fortunately, not everyone is using a UK/US keyboard... ;-)
 
+Thanks,
 
+	M.
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
