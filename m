@@ -1,139 +1,78 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 12 Jan 2017 17:18:25 +0000
-Subject: [kvm-unit-tests PATCH 1/6] libcflat: add PRI(dux)32 format types
-In-Reply-To: <20170112165629.nbczamlqlpsqaauh@hawk.localdomain>
-References: <20170111162841.15569-1-alex.bennee@linaro.org>
- <20170111162841.15569-2-alex.bennee@linaro.org>
- <4286b719-ff75-d2cd-68b5-cb9d9bb89553@redhat.com>
- <20170112165629.nbczamlqlpsqaauh@hawk.localdomain>
-Message-ID: <87fuko2o4e.fsf@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 12 Jan 2017 17:19:00 +0000
+Subject: [PATCH v3 2/3] arm64: dts: juno: fix CoreSight support for Juno
+ r1/r2 variants
+In-Reply-To: <CANLsYkymGdrM8z-ZWan0Fn+Ymq97oHAJtW3G0YdUAxpWSf+aaw@mail.gmail.com>
+References: <1484234410-7670-1-git-send-email-sudeep.holla@arm.com>
+ <1484234410-7670-3-git-send-email-sudeep.holla@arm.com>
+ <CANLsYkymGdrM8z-ZWan0Fn+Ymq97oHAJtW3G0YdUAxpWSf+aaw@mail.gmail.com>
+Message-ID: <f585cc88-1601-4bd7-5992-e6c220577c0b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Andrew Jones <drjones@redhat.com> writes:
 
-> On Thu, Jan 12, 2017 at 01:29:24PM +0100, Paolo Bonzini wrote:
+On 12/01/17 16:51, Mathieu Poirier wrote:
+> On 12 January 2017 at 08:20, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> From: Mike Leach <mike.leach@linaro.org>
 >>
+>> The CoreSight support added for Juno is valid for only Juno r0.
+>> The Juno r1 and r2 variants have additional components and alternative
+>> connection routes between trace source and sinks.
 >>
->> On 11/01/2017 17:28, Alex Benn?e wrote:
->> > So we can have portable formatting of uint32_t types. However there is
->> > a catch. Different compilers can use legally subtly different types
->> > though so we need to probe the compiler defined intdef.h first.
+>> This patch builds on top of the existing r0 support and extends it to
+>> Juno r1/r2 variants.
 >>
->> Interesting, what platform has long uint32_t?  I thought the issue was
->> whether 64-bit is long or "long long".
+>> Signed-off-by: Mike Leach <mike.leach@linaro.org>
+>> [sudeep.holla at arm.com: minor changelog update and reorganising the common
+>>         coresight components back into juno-base.dtsi to avoid duplication]
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 102 ++++++++++++++++++++++++++++++
+>>  arch/arm64/boot/dts/arm/juno-r1.dts       |   9 +++
+>>  arch/arm64/boot/dts/arm/juno-r2.dts       |   9 +++
+>>  3 files changed, 120 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
 >>
->> Paolo
->>
->> > Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->> > ---
->> >  Makefile       |  1 +
->> >  configure      | 13 +++++++++++++
->> >  lib/libcflat.h |  9 +++++++++
->> >  3 files changed, 23 insertions(+)
->> >
->> > diff --git a/Makefile b/Makefile
->> > index a32333b..9822d9a 100644
->> > --- a/Makefile
->> > +++ b/Makefile
->> > @@ -55,6 +55,7 @@ CFLAGS += $(fomit_frame_pointer)
->> >  CFLAGS += $(fno_stack_protector)
->> >  CFLAGS += $(fno_stack_protector_all)
->> >  CFLAGS += $(wno_frame_address)
->> > +CFLAGS += $(if $(U32_LONG_FMT),-D__U32_LONG_FMT__,)
->> >
->> >  CXXFLAGS += $(CFLAGS)
->> >
->> > diff --git a/configure b/configure
->> > index 995c8fa..127868c 100755
->> > --- a/configure
->> > +++ b/configure
->> > @@ -109,6 +109,18 @@ if [ -f $testdir/run ]; then
->> >      ln -fs $testdir/run $testdir-run
->> >  fi
->> >
->> > +# check if uint32_t needs a long format modifier
->> > +cat << EOF > lib_test.c
->> > +#include <inttypes.h>
->> > +EOF
->> > +
->> > +$cross_prefix$cc lib_test.c -E | grep "typedef" | grep "long" | grep "uint32_t" &> /dev/null
->
-> This won't work with cross compilers that don't have inttypes.h in their
-> path (like mine). How about something like
+>> diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+>> new file mode 100644
+>> index 000000000000..89fcef366ff9
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+>> @@ -0,0 +1,102 @@
+>> +       csys1_funnel at 20130000 {
+>> +               compatible = "arm,coresight-funnel", "arm,primecell";
+>> +               reg = <0 0x20130000 0 0x1000>;
+>> +
+>> +               clocks = <&soc_smc50mhz>;
+>> +               clock-names = "apb_pclk";
+>> +               power-domains = <&scpi_devpd 0>;
+>> +               ports {
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <0>;
+>> +
+>> +                       /* input port */
+>> +                       port at 0 {
+>> +                               reg = <0>;
+>> +                               csys1_funnel_out_port: endpoint {
+>> +                                       remote-endpoint =
+>> +                                               <&etf1_in_port>;
+>> +                               };
+>> +                       };
+>> +
+>> +                       /* output port */
+>> +                       port at 1 {
+>> +                               reg = <0>;
+>> +                               csys1_funnel_in_port0: endpoint {
+>> +                                       slave-mode;
+>> +                               };
+>> +                       };
+> 
+> The comments related to the input and output port are reversed.
+> 
 
-Hmm good point, in my case inttypes.h came from the libnewlib-dev package.
+Fixed locally.
 
->
->  cat << EOF > lib_test.c
->  __UINT32_TYPE__
->  EOF
->  u32_long="`aarch64-linux-gnu-gcc lib_test.c -E | awk '/unsigned/ && $2 == "long"'`"
-
-Hmm it is not clear from the docs if this is a GCCism. If it is do we
-care? Also the docs do say:
-
-"Some of these macros may not be defined on particular systems if GCC does not provide a stdint.h header on those systems. "
-
-> Although I feel there should be a compiler macro way to do this without
-> a need for configure/makefile trickery at all...
-
-I did ask our toolchain bods. They started going on about potential
-solutions using _Generic but I fear that might be worse in this case!
-
->
-> Thanks,
-> drew
->
->
->> > +exit=$?
->> > +if [ $exit -eq 0 ]; then
->> > +    u32_long=true
->> > +fi
->> > +rm -f lib_test.c
->> > +
->> >  # check for dependent 32 bit libraries
->> >  if [ "$arch" != "arm" ]; then
->> >  cat << EOF > lib_test.c
->> > @@ -155,4 +167,5 @@ TEST_DIR=$testdir
->> >  FIRMWARE=$firmware
->> >  ENDIAN=$endian
->> >  PRETTY_PRINT_STACKS=$pretty_print_stacks
->> > +U32_LONG_FMT=$u32_long
->> >  EOF
->> > diff --git a/lib/libcflat.h b/lib/libcflat.h
->> > index 380395f..e80fc50 100644
->> > --- a/lib/libcflat.h
->> > +++ b/lib/libcflat.h
->> > @@ -58,12 +58,21 @@ typedef _Bool		bool;
->> >  #define true  1
->> >
->> >  #if __SIZEOF_LONG__ == 8
->> > +#  define __PRI32_PREFIX
->> >  #  define __PRI64_PREFIX	"l"
->> >  #  define __PRIPTR_PREFIX	"l"
->> >  #else
->> > +#if defined(__U32_LONG_FMT__)
->> > +#  define __PRI32_PREFIX        "l"
->> > +#else
->> > +#  define __PRI32_PREFIX
->> > +#endif
->> >  #  define __PRI64_PREFIX	"ll"
->> >  #  define __PRIPTR_PREFIX
->> >  #endif
->> > +#define PRId32  __PRI32_PREFIX	"d"
->> > +#define PRIu32  __PRI32_PREFIX	"u"
->> > +#define PRIx32  __PRI32_PREFIX	"x"
->> >  #define PRId64  __PRI64_PREFIX	"d"
->> >  #define PRIu64  __PRI64_PREFIX	"u"
->> >  #define PRIx64  __PRI64_PREFIX	"x"
->> >
->> --
->> To unsubscribe from this list: send the line "unsubscribe kvm" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
---
-Alex Benn?e
+-- 
+Regards,
+Sudeep
