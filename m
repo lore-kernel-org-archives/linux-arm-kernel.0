@@ -1,589 +1,69 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 13 Jan 2017 11:03:03 +0000
-Subject: [RFC] Kernel panic down to swiotlb when doing insmod a simple
- driver
-In-Reply-To: <d64931b6-8875-51ea-06a0-e0981e12f859@rock-chips.com>
-References: <d64931b6-8875-51ea-06a0-e0981e12f859@rock-chips.com>
-Message-ID: <99472068-069a-7759-8d6e-019fd875264d@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Jan 2017 11:02:40 +0000
+Subject: [PATCH RFC 0/5] mvebu cleanups and preparation for Armada 7k/8k
+Message-ID: <20170113110240.GA29164@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/01/17 10:00, Shawn Lin wrote:
-> Hi,
-> 
-> Sorry for sending this RFC for help as I couldn't find some useful hint
-> to slove my issue by git-log the swiotlb commit from kernel v4.4 to
-> v4.9 and I'm also not familar with these stuff. So could you kindly
-> point me to the right direction to debug it? Thanks. :)
-> 
-> --------------------------------------
-> We just have a very simple wifi driver *built as ko module* which only
-> have a probe function to do the basic init work and call SDIO API to
-> transfer some bytes.
-> 
-> Env: kernel 4.4 stable tree, ARM64(rk3399)
-> 
-> Two cases are included:
+(Resend including linux-arm-kernel)
 
-And they are both wrong :)
+This patch series cleans up the mvebu pin controller implementation
+such that we can support multiple pin controllers as found in Armada
+7k and 8k SoCs.
 
-> The crash case:
-> 
-> u8 __aligned(32) buf[PAGE_SIZE]; //global here in ko driver file
+Currently, in order to do that, we would have to have static variables
+and multiple implementations of functions whose only purpose is to
+read from the correct static variable.  This is caused by a lack of
+driver private data passed into the mvebu pin controller's methods.
 
-It is only valid to do DMA from linear map addresses - I'm not sure if
-the modules area was in the linear map before, but either way it
-probably isn't now (Ard, Mark?). Either way, I don't believe static data
-honours ARCH_DMA_MINALIGN in general, so it's still highly inadvisable.
+Most mvebu pin controllers methods are performing exactly the same
+action, so it makes sense to generalise the methods, which in turn
+lets us come up with a fairly standardised set of methods.
 
-> static int wifi_probe(struct sdio_func *func, const struct
-> sdio_device_id *id)
-> {
->   // prepare some SDIO work before
->   printk("wifi_probe: buf = 0x%x\n", buf);
->   sdio_memcpy_toio(func, 0, buf, 200);
-> }
-> 
-> The workable case:
-> 
-> static int wifi_probe(struct sdio_func *func, const struct
-> sdio_device_id *id)
-> {
-> 
->    u8 __aligned(32) buf[PAGE_SIZE]; //move inside the probe function
+Another important side effect of these changes is that the structures
+with function pointers are now marked const - as they should be in
+today's security concious kernel programming environment.
 
-No. DMA from the stack is right out, both for the aforementioned
-alignment reasons, and the fact that we now have (or will have)
-virtually-mapped stacks. One of the benefits of the latter is that it
-catches bugs like this ;)
+I've included everything except the 7k and 8k drivers, which, before
+Thomas went away, he suggested changes to these, so they aren't ready
+for submission yet.  However, the rest of the ground work is, and I'd
+like users of this code to test it - I don't have all these platforms!
 
-Get your buffer from kmalloc() or a page allocation, and everything
-should be correct.
+I'm aware of other mvebu SoC support, so I think it's probably a good
+idea to get these patches out there and known about, so folk can
+consider how they'd like to order merging the changes - obviously new
+SoCs with new pinctrl files will need updates somewhere...
 
-Robin.
+The cleanup side of these patches (without the last adding the regmap
+support) shows a reduction in code size:
 
->   // prepare some SDIO work before
->   printk("wifi_probe: buf = 0x%x\n", buf);
->   sdio_memcpy_toio(func, 0, buf, 200);
-> }
-> 
-> -------------
-> How to repro it:
-> insmod the KO module, then kernel panic when trying to bounce a buffer
-> in swiotlb but the workable case I didn't see kernel did that memcpy
-> by adding some log, strange?
-> 
-> parsing vmlinux, it locates to arch/arm64/lib/copy_template.S:167
-> 
-> 165 .Lcpy_body_large:
-> 166         /* pre-get 64 bytes data. */
-> 167         ldp1    A_l, A_h, src, #16
-> 168         ldp1    B_l, B_h, src, #16
-> 169         ldp1    C_l, C_h, src, #16
-> 170         ldp1    D_l, D_h, src, #16
-> 
-> --------------------------------------------------------------
-> 
-> The full crash log looks like
-> 
-> [  236.748210] wifi_probe: buf = 0xffffff8000a40b80
-> [  236.748258] swiotlb_tbl_map_single: orig_addr = 0xfffffffff8c40b80,
-> tlb_addr = 0xf7eae000 //I added log here
-> [  236.748276] Unable to handle kernel paging request at virtual address
-> fffffffff8c40b80
-> [  236.776486] pgd = ffffffc0b3417000
-> [  236.776789] [fffffffff8c40b80] *pgd=00000000b3427003,
-> *pud=00000000b3427003, *pmd=0000000000000000
-> [  236.777601] Internal error: Oops: 96000005 [#1] PREEMPT SMP
-> [  236.778093] Modules linked in: drvtst(O+)
-> [  236.778463] CPU: 0 PID: 1918 Comm: insmod Tainted: G           O
-> 4.4.36 #25
-> [  236.779096] Hardware name: Rockchip RK3399 Evaluation Board v3 edp
-> (Android) (DT)
-> [  236.779753] task: ffffffc0e3db0c40 ti: ffffffc0b342c000 task.ti:
-> ffffffc0b342c000
-> [  236.780418] PC is at __memcpy+0x100/0x180
-> [  236.780777] LR is at swiotlb_tbl_map_single+0x254/0x274
-> [  236.781237] pc : [<ffffff80083579c0>] lr : [<ffffff800837cf70>]
-> pstate: 20000145
-> [  236.781885] sp : ffffffc0b342f530
-> [  236.782178] x29: ffffffc0b342f530 x28: 0000000000000001
-> [  236.782653] x27: 0000000000200000 x26: ffffffc0e8874810
-> [  236.783127] x25: 0000000000000001 x24: 00000000000000c8
-> [  236.783601] x23: fffffffff8c40b80 x22: ffffff8009158480
-> [  236.784075] x21: 00000000f7eae000 x20: ffffff8009158000
-> [  236.784550] x19: 00000000f7eae000 x18: 00000000004ff888
-> [  236.785023] x17: 0000000000000000 x16: ffffff80081bbc74
-> [  236.785498] x15: 0b030f0000000000 x14: 3034633866666666
-> [  236.785972] x13: 6666666666783020 x12: 3d20726464615f67
-> [  236.786446] x11: 69726f20656c676e x10: 69735f70616d5f6c
-> [  236.786919] x9 : 62745f626c746f69 x8 : ffffff80082e8c1c
-> [  236.787392] x7 : 0000000000000000 x6 : ffffffc0f7eae000
-> [  236.787866] x5 : 0000000000000001 x4 : 0000000000000000
-> [  236.788340] x3 : 0000000000000007 x2 : 0000000000000048
-> [  236.788815] x1 : fffffffff8c40b80 x0 : ffffffc0f7eae000
-> [  236.789291]
-> [  236.789291] PC: 0xffffff8008357940:
-> [  236.789728] 7940  36180062 f8408423 f80084c3 36100062 b8404423
-> b80044c3 36080062 78402423
-> [  236.790484] 7960  780024c3 36000562 38401423 380014c3 14000028
-> f1020042 5400024a a8c12027
-> [  236.791236] 7980  a88120c7 a8c12829 a8c1302b a88128c9 a88130cb
-> a8c1382d a88138cd f240145f
-> [  236.791988] 79a0  54fffba1 1400001b d503201f d503201f d503201f
-> d503201f d503201f d503201f
-> [  236.792739] 79c0  a8c12027 a8c12829 a8c1302b a8c1382d a88120c7
-> a8c12027 a88128c9 a8c12829
-> [  236.793490] 79e0  a88130cb a8c1302b a88138cd a8c1382d f1010042
-> 54fffeea a88120c7 a88128c9
-> [  236.794243] 7a00  a88130cb a88138cd f240145f 54fff841 d65f03c0
-> d503201f d503201f d503201f
-> [  236.794995] 7a20  d503201f d503201f d503201f d503201f d503201f
-> d503201f d503201f d503201f
-> [  236.795748]
-> [  236.795748] LR: 0xffffff800837cef0:
-> [  236.796186] cef0  d0004f81 aa1a03e0 912ad821 aa1803e2 9404fda9
-> 1400001b 6b19001f 540000e2
-> [  236.796939] cf10  0b130003 53155001 11000400 8b21c2e1 f8237841
-> 17fffff9 d0004f80 b0003821
-> [  236.797694] cf30  912b7800 91344021 aa1703e2 aa1503e3 aa1503f3
-> 97f784ba 7100079f 54000128
-> [  236.798445] cf50  d0005fc0 aa1803e2 f9453c01 cb0102a0 cb0102e1
-> b25a6400 b25a6421 97ff6a55
-> [  236.799197] cf70  aa1303e0 a94153f3 a9425bf5 a94363f7 a9446bf9
-> a94573fb a8c77bfd d65f03c0
-> [  236.799949] cf90  d4210000 90006ee5 911200a5 a9bf7bfd 910003fd
-> f94018a0 f9401ca5 cb000020
-> [  236.800703] cfb0  934ba800 f86078a5 b10004bf 540003e0 92402820
-> 8b0000a5 34000084 7100049f
-> [  236.801455] cfd0  54000180 14000018 721e787f 540000c1 d0005fc0
-> f9453c03 cb0300a0 cb030021
-> [  236.802209]
-> [  236.802209] SP: 0xffffffc0b342f4b0:
-> [  236.802647] f4b0  09158480 ffffff80 f8c40b80 ffffffff 000000c8
-> 00000000 00000001 00000000
-> [  236.803400] f4d0  e8874810 ffffffc0 00200000 00000000 00000001
-> 00000000 b342f530 ffffffc0
-> [  236.804152] f4f0  0837cf70 ffffff80 b342f530 ffffffc0 083579c0
-> ffffff80 20000145 00000000
-> [  236.804903] f510  ffffffff 00000000 00000140 00000000 00000000
-> 00000080 00000000 00000000
-> [  236.805654] f530  b342f5a0 ffffffc0 0837dc18 ffffff80 00000001
-> 00000000 b342f890 ffffffc0
-> [  236.806405] f550  00000001 00000000 00000000 00000000 00000000
-> 00000000 09158000 ffffff80
-> [  236.807157] f570  08f76000 ffffff80 09158000 ffffff80 b342f890
-> ffffffc0 e8874810 ffffffc0
-> [  236.807909] f590  00000140 00000000 001efd5c 00000000 b342f600
-> ffffffc0 0809359c ffffff80
-> [  236.808662]
-> [  236.808662] X0: 0xffffffc0f7eadf80:
-> [  236.809099] df80  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.809852] dfa0  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.810603] dfc0  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.811355] dfe0  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.812106] e000  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.812858] e020  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.813608] e040  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.814360] e060  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.815114]
-> [  236.815114] X1: 0xfffffffff8c40b00:
-> [  236.815552] 0b00  ******** ******** ******** ******** ********
-> ******** ******** ********
-> [  236.816309] 0b20  ******** ******** ******** ******** ********
-> ******** ******** ********
-> [  236.817065] 0b40  ******** ******** ******** ******** ********
-> ******** ******** ********
-> [  236.817820] 0b60  ******** ******** ******** ******** ********
-> ******** ******** ********
-> [  236.818575] 0b80  ******** ******** ******** ******** ********
-> ******** ******** ********
-> [  236.819328] 0ba0  ******** ******** ******** ******** ********
-> ******** ******** ********
-> [  236.820082] 0bc0  ******** ******** ******** ******** ********
-> ******** ******** ********
-> [  236.820836] 0be0  ******** ******** ******** ******** ********
-> ******** ******** ********
-> [  236.821595]
-> [  236.821595] X6: 0xffffffc0f7eadf80:
-> [  236.822032] df80  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.822785] dfa0  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.823537] dfc0  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.824289] dfe0  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.825040] e000  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.825792] e020  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.826543] e040  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.827295] e060  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.828049]
-> [  236.828049] X8: 0xffffff80082e8b9c:
-> [  236.828487] 8b9c  14000006 f9400453 14000004 f9400853 14000002
-> f9400c53 aa1303e0 94000529
-> [  236.829239] 8bbc  aa1303e0 94000532 52800000 14000002 128002a0
-> f9400bf3 a8c27bfd d65f03c0
-> [  236.829993] 8bdc  a9bf7bfd 71001c1f aa0403e1 910003fd 128002a3
-> 54000101 f94048e0 12800163
-> [  236.830746] 8bfc  f9400c00 b4000080 2a0603e2 9400049e 2a0003e3
-> 2a0303e0 a8c17bfd d65f03c0
-> [  236.831497] 8c1c  a9b97bfd 7100081f 910003fd a90363f7 d0006477
-> f90023f9 a9025bf5 a90153f3
-> [  236.832249] 8c3c  f9452ae2 aa0403f6 f90037a2 53001cb4 aa0603f5
-> f94048f3 54000061 f9400660
-> [  236.833002] 8c5c  14000008 71000c1f 54000061 f9400a60 14000004
-> 71001c1f 54000101 f9400e60
-> [  236.833754] 8c7c  12800167 b40008a0 aa1603e1 2a1503e2 94000426
-> 14000040 128002a7 350007e0
-> [  236.834510]
-> [  236.834510] X16: 0xffffff80081bbbf4:
-> [  236.834955] bbf4  2a1503e1 97fffec4 3100101f 54000261 d5384100
-> f9400800 90000002 912c4042
-> [  236.835708] bc14  91102003 f9020402 f9000476 b9001075 37f80114
-> f9401fa0 f9000c60 f94023a0
-> [  236.836460] bc34  f9001060 52800020 b9001460 14000002 b900147f
-> 12804060 f94027a2 93407c00
-> [  236.837212] bc54  f9452a61 eb01005f 54000040 97fb80af a94153f3
-> a9425bf5 a8c57bfd d65f03c0
-> [  236.837964] bc74  a9b67bfd 910003fd a9025bf5 f0006dd6 f90023f9
-> a90363f7 aa0003f8 aa0103f7
-> [  236.838716] bc94  f9452ac0 aa0403f9 a90153f3 f9004fa0 aa0203f3
-> aa0303f4 b4000302 d5384100
-> [  236.839466] bcb4  f9400400 aa0203e3 b1004063 fa403062 9a9f87e1
-> 9101e3a0 b40000c1 aa0203e1
-> [  236.840218] bcd4  d2800202 94066c4a b4000080 1400001d a9007c1f
-> 1400001b f9403fa1 910223a0
-> [  236.840973]
-> [  236.840973] X20: 0xffffff8009157f80:
-> [  236.841418] 7f80  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.842169] 7fa0  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.842920] 7fc0  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.843672] 7fe0  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.844422] 8000  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.845174] 8020  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.845925] 8040  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.846677] 8060  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.847431]
-> [  236.847431] X22: 0xffffff8009158400:
-> [  236.847876] 8400  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.848628] 8420  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.849379] 8440  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.850130] 8460  00000000 00000000 00000000 00000000 00030003
-> 00000000 00f100f1 00000000
-> [  236.850882] 8480  00000080 00000000 f7ea6000 00000000 f7eee000
-> 00000000 00000000 00000000
-> [  236.851633] 84a0  00010001 00000001 f7f75000 ffffffc0 f7eae000
-> 00000000 f7ea5000 ffffffc0
-> [  236.852388] 84c0  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.853139] 84e0  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.853892]
-> [  236.853892] X23: 0xfffffffff8c40b00:
-> [  236.854338] 0b00  ******** ******** ******** ******** ********
-> ******** ******** ********
-> [  236.855093] 0b20  ******** ******** ******** ******** ********
-> ******** ******** ********
-> [  236.855846] 0b40  ******** ******** ******** ******** ********
-> ******** ******** ********
-> [  236.856601] 0b60  ******** ******** ******** ******** ********
-> ******** ******** ********
-> [  236.857356] 0b80  ******** ******** ******** ******** ********
-> ******** ******** ********
-> [  236.858109] 0ba0  ******** ******** ******** ******** ********
-> ******** ******** ********
-> [  236.858864] 0bc0  ******** ******** ******** ******** ********
-> ******** ******** ********
-> [  236.859620] 0be0  ******** ******** ******** ******** ********
-> ******** ******** ********
-> [  236.860377]
-> [  236.860377] X26: 0xffffffc0e8874790:
-> [  236.860822] 4790  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.861573] 47b0  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.862324] 47d0  00000000 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000
-> [  236.863075] 47f0  00000000 00000000 00000000 00000000 e885d140
-> ffffffc0 ffffffff 00000000
-> [  236.863828] 4810  08fefcc0 ffffff80 e933b480 ffffffc0 e885d140
-> ffffffc0 e5b7c020 ffffffc0
-> [  236.864581] 4830  e5b24430 ffffffc0 08fefcd0 ffffff80 e929d480
-> ffffffc0 08fef9d0 ffffff80
-> [  236.865335] 4850  e88999d8 ffffffc0 00000005 00000007 00000000
-> 00000000 00000000 00000000
-> [  236.866087] 4870  00000001 00000000 e8874878 ffffffc0 e8874878
-> ffffffc0 00000000 00000000
-> [  236.866843]
-> [  236.866843] X29: 0xffffffc0b342f4b0:
-> [  236.867288] f4b0  09158480 ffffff80 f8c40b80 ffffffff 000000c8
-> 00000000 00000001 00000000
-> [  236.868041] f4d0  e8874810 ffffffc0 00200000 00000000 00000001
-> 00000000 b342f530 ffffffc0
-> [  236.868794] f4f0  0837cf70 ffffff80 b342f530 ffffffc0 083579c0
-> ffffff80 20000145 00000000
-> [  236.869547] f510  ffffffff 00000000 00000140 00000000 00000000
-> 00000080 00000000 00000000
-> [  236.870297] f530  b342f5a0 ffffffc0 0837dc18 ffffff80 00000001
-> 00000000 b342f890 ffffffc0
-> [  236.871049] f550  00000001 00000000 00000000 00000000 00000000
-> 00000000 09158000 ffffff80
-> [  236.871800] f570  08f76000 ffffff80 09158000 ffffff80 b342f890
-> ffffffc0 e8874810 ffffffc0
-> [  236.872552] f590  00000140 00000000 001efd5c 00000000 b342f600
-> ffffffc0 0809359c ffffff80
-> [  236.873304]
-> [  236.873442] Process insmod (pid: 1918, stack limit = 0xffffffc0b342c020)
-> [  236.874031] Stack: (0xffffffc0b342f530 to 0xffffffc0b3430000)
-> [  236.874539] f520:                                   ffffffc0b342f5a0
-> ffffff800837dc18
-> [  236.875226] f540: 0000000000000001 ffffffc0b342f890 0000000000000001
-> 0000000000000000
-> [  236.875915] f560: 0000000000000000 ffffff8009158000 ffffff8008f76000
-> ffffff8009158000
-> [  236.876605] f580: ffffffc0b342f890 ffffffc0e8874810 0000000000000140
-> 00000000001efd5c
-> [  236.877293] f5a0: ffffffc0b342f600 ffffff800809359c ffffffc0b342f890
-> ffffffc0e8874810
-> [  236.877981] f5c0: 0000000000000000 0000000000000001 0000000000000001
-> ffffffc0b342f938
-> [  236.878670] f5e0: ffffffc0b342f8f0 ffffffc0e5b7c738 0000000000001000
-> 0000000000000000
-> [  236.879358] f600: ffffffc0b342f640 ffffff800871113c ffffffc0b342f8f0
-> ffffff8008f88b60
-> [  236.880047] f620: 0000000000000000 ffffffc0e8874810 0000000000000001
-> ffffff8000a40b80
-> [  236.880735] f640: ffffffc0b342f6a0 ffffff80087129cc ffffffc0e5b45018
-> ffffffc0b342f8b0
-> [  236.881423] f660: ffffff8008f76000 0000000020002775 ffffffc0e5b7c700
-> ffffffc0b342f8b0
-> [  236.882112] f680: ffffff8008f76000 0000000000000001 ffffffc0b342f890
-> 0000000000000001
-> [  236.882800] f6a0: ffffffc0b342f730 ffffff80087132e0 ffffffc0e5b45018
-> ffffffc0e5b7c000
-> [  236.883489] f6c0: ffffffc0e5b7c700 ffffff8000a40b80 ffffff8008f76000
-> ffffffc0b342f8b0
-> [  236.884178] f6e0: ffffffc0b342f938 ffffffc0b342f8f0 0000000000001000
-> ffffff800871325c
-> [  236.884867] f700: ffffffc0e5b45018 ffffffc0e5b7c000 ffffffc0e5b7c700
-> ffffff8000a40b80
-> [  236.885555] f720: ffffff8008f76000 cb88537fdc8ba624 ffffffc0b342f770
-> ffffff80086f8b44
-> [  236.886243] f740: ffffffc0e5b7c000 00000000000001f4 00000000ffffff85
-> ffffff80086f8ac0
-> [  236.886931] f760: ffffffc0e5b7c000 ffffffc0b342f938 ffffffc0b342f7a0
-> ffffff80087ae0e8
-> [  236.887619] f780: ffffffc0b342f938 ffffffc0e5b7c000 00000000ffffff85
-> ffffffc0b342f938
-> [  236.888308] f7a0: ffffffc0b342f7c0 ffffff80086f9c74 ffffffc0e5b7c000
-> ffffffc0b342f938
-> [  236.888996] f7c0: ffffffc0b342f800 ffffff800870421c 00000000000000c8
-> 0000000000000001
-> [  236.889685] f7e0: ffffffc0e5b7c800 ffffff8000a40b80 ffffff8008f76000
-> ffffffc0b342f8b0
-> [  236.890372] f800: ffffffc0b342f9a0 ffffff8008705800 00000000000000c8
-> 0000000000000000
-> [  236.891061] f820: ffffff8000a40b80 0000000000000001 ffffff8008dfdc48
-> ffffff8008dfdc81
-> [  236.891748] f840: ffffff8008dfdcdb 0000000000000001 ffffffc0e5b44c00
-> 00000000000000c8
-> [  236.892436] f860: ffffffc0e5b44c00 00000000000000c8 000000000000002a
-> ffffff800911d000
-> [  236.893125] f880: 0000000000000140 ffffff8000000000 03ffffbdbfe31002
-> 000000c800000b80
-> [  236.893813] f8a0: 0000000000000000 0000000000000000 940000c800000035
-> 0000000000000000
-> [  236.894501] f8c0: 0000000000000000 00000000000001b5 00000000ffffff8d
-> 0000000000000000
-> [  236.895190] f8e0: ffffffc0b342f8f0 ffffffc0b342f938 000000003b9aca00
-> 00000001000000c8
-> [  236.895878] f900: 00000100ffffff8d 0000000000000000 0000000000000000
-> ffffffc0b342f938
-> [  236.896566] f920: 0000000000000001 ffffffc0b342f890 0000000000000000
-> 0000000000000000
-> [  236.897254] f940: ffffffc0b342f8b0 ffffffc0b342f8f0 0000000000000000
-> 0000000000000000
-> [  236.897942] f960: 0000000000000000 ffffffc0b342f968 ffffffc0b342f968
-> ffffff80086f8b98
-> [  236.898630] f980: 0000000000000000 0000000000000000 0000000000000000
-> cb88537fdc8ba624
-> [  236.899319] f9a0: ffffffc0b342fa00 ffffff8008705954 ffffffc0e5b44c00
-> 00000000000000c8
-> [  236.900007] f9c0: ffffff8000a40b80 ffffff8000a410a0 ffffff8000a407d8
-> 0000000000000029
-> [  236.900695] f9e0: 0000000000000000 ffffffc0e926a480 0000000000000001
-> 0000000000000038
-> [  236.901384] fa00: ffffffc0b342fa10 ffffff8000a40108 ffffffc0b342fa60
-> ffffff8008704734
-> [  236.902072] fa20: ffffffc0e5b44c08 0000000000000000 ffffffc0e5b44c00
-> ffffff8000a40410
-> [  236.902760] fa40: ffffff8000a407d8 0000000000000029 0000000000000000
-> ffffff8008704704
-> [  236.903447] fa60: ffffffc0b342faa0 ffffff80084bfd6c ffffffc0e5b44c08
-> 0000000000000000
-> [  236.904136] fa80: ffffff800915d000 ffffff8008fef000 ffffff8000a407d8
-> 0000000000000000
-> [  236.904824] faa0: ffffffc0b342faf0 ffffff80084bff68 ffffffc0e5b44c08
-> ffffffc0e5b44c68
-> [  236.905512] fac0: ffffff8000a407d8 ffffff80084bff04 ffffff8009028a38
-> 0000000000000000
-> [  236.906201] fae0: 0000000000000000 ffffff80084bff40 ffffffc0b342fb20
-> ffffff80084bee18
-> [  236.906889] fb00: 0000000000000000 ffffff8008f76000 ffffff8000a407d8
-> ffffff80084bff04
-> [  236.907577] fb20: ffffffc0b342fb70 ffffff80084bf8ac ffffff8000a407d8
-> 0000000000000000
-> [  236.908265] fb40: ffffffc0f6e996c0 ffffff8008fef000 ffffffc0b342fb60
-> ffffffc0e8b8f4a8
-> [  236.908953] fb60: ffffffc0e5486ea8 cb88537fdc8ba624 ffffffc0b342fb80
-> ffffff80084bf45c
-> [  236.909641] fb80: ffffffc0b342fbc0 ffffff80084c0afc ffffff8000a407d8
-> ffffff8008f84b20
-> [  236.910329] fba0: 0000000000000000 ffffff8008f76000 ffffff8008f84b20
-> cb88537fdc8ba624
-> [  236.911017] fbc0: ffffffc0b342fbf0 ffffff8008704580 ffffff8000a44000
-> ffffff8008f84b20
-> [  236.911706] fbe0: ffffffc0f6dda1c0 ffffff8008f76000 ffffffc0b342fc00
-> ffffff8000a40228
-> [  236.912394] fc00: ffffffc0b342fc10 ffffff8000a4400c ffffffc0b342fc20
-> ffffff8008082ba4
-> [  236.913082] fc20: ffffffc0b342fcb0 ffffff800815e564 ffffff8000a40880
-> ffffff8008f96000
-> [  236.913770] fc40: 0000000000000001 ffffffc0d58a1e40 ffffff8008a4a2d0
-> 0000000000000000
-> [  236.914458] fc60: 0000000000000001 ffffff8008f96000 ffffff8008a4a2d0
-> 0000000000000000
-> [  236.915146] fc80: 0000000000000000 ffffffc0e926a480 0000000000000001
-> ffffffc0b342fe50
-> [  236.915835] fca0: 0000000000000001 cb88537fdc8ba624 ffffffc0b342fce0
-> ffffff80081150f0
-> [  236.916523] fcc0: ffffff8000a40880 ffffffc0b342fe50 0000000000000001
-> ffffff8008f96000
-> [  236.917212] fce0: ffffffc0b342fe00 ffffff800811562c 00000000000014d8
-> ffffff800ca364d8
-> [  236.917900] fd00: 0000007f922804e8 0000000000000000 ffffff8008f76000
-> 000000555bb25d20
-> [  236.918588] fd20: 0000000000010000 ffffffc0b342c000 ffffff8008a42000
-> ffffffc0b342c000
-> [  236.919275] fd40: 0000000000000077 0000000000000076 0000000000000064
-> 0000000000000072
-> [  236.919963] fd60: 000000000000006e 0000000000000018 0000000000000040
-> 0000000000000040
-> [  236.920652] fd80: ffffff8000a42500 ffffff8008f76000 0000000000000124
-> ffffff8008112064
-> [  236.921340] fda0: ffffff8008f76000 000000555bb25d20 000000000000011d
-> 0000000000000069
-> [  236.922028] fdc0: ffffffc0b342fe00 0000000000000000 0000000000000000
-> 0000000000000000
-> [  236.922716] fde0: 0000007f00000000 0000000000000000 ffffffc000000000
-> cb88537fdc8ba624
-> [  236.923405] fe00: 0000000000000000 ffffff80080826f0 0000000000000000
-> 0000007f9223f010
-> [  236.924092] fe20: ffffffffffffffff 0000007f9235e904 0000000060000000
-> 0000000000000015
-> [  236.924780] fe40: 000000000000011d 0000000000000069 ffffff800c9f5000
-> 00000000000414d8
-> [  236.925469] fe60: ffffff800ca35bd8 ffffff800ca1711f ffffff800ca17d08
-> 0000000000002500
-> [  236.926157] fe80: 0000000000002b00 0000000000000000 0000000000000000
-> 0000000000000dd8
-> [  236.926844] fea0: 0000002300000022 000000000000000d 0000000000000009
-> cb88537fdc8ba624
-> [  236.927532] fec0: 0000007f9223f010 00000000000414d8 000000555bb25d20
-> 0000000000000000
-> [  236.928220] fee0: 0000000000000001 0000000000000000 0000000000000000
-> 0000007f9223f000
-> [  236.928909] ff00: 0000000000000069 0000007f9223f010 0000000000042000
-> 0000000000000001
-> [  236.929597] ff20: 0000007f92280fe0 0000007f92281000 0000007f923f4a70
-> 0000000000002000
-> [  236.930285] ff40: 000000555bb23ae0 0000007f9235e8e4 0000000000000f00
-> 00000000000414d8
-> [  236.930972] ff60: 0000007f9223f010 0000000000000003 00000000000414d8
-> 0000000000000000
-> [  236.931660] ff80: 0000000000000000 000000555bb26d20 0000000000000010
-> 0000000000000000
-> [  236.932348] ffa0: 0000000000000000 0000007fe750e100 000000555bade83c
-> 0000007fe750e0b0
-> [  236.933036] ffc0: 0000007f9235e904 0000000060000000 0000007f9223f010
-> 0000000000000069
-> [  236.933725] ffe0: 0000000000000000 0000000000000000 3420320216190109
-> 7375020101333632
-> [  236.934409] Call trace:
-> [  236.934632] Exception stack(0xffffffc0b342f340 to 0xffffffc0b342f470)
-> [  236.935200] f340: 00000000f7eae000 0000008000000000 ffffffc0b342f530
-> ffffff80083579c0
-> [  236.935888] f360: 0000000020000145 0000000000000053 ffffff8008f93688
-> 000000000007e7b8
-> [  236.936577] f380: 0000000000000002 ffffff8008f93688 0000000000000063
-> 000000000909b7e8
-> [  236.937266] f3a0: ffffffc0b342f440 ffffff80080e8d08 ffffff8008f76000
-> ffffff80080e8cd4
-> [  236.937953] f3c0: 00000000f7eae000 ffffff8009158480 fffffffff8c40b80
-> 00000000000000c8
-> [  236.938641] f3e0: 0000000000000001 ffffffc0e8874810 0000000000200000
-> cb88537fdc8ba624
-> [  236.939329] f400: ffffffc0f7eae000 fffffffff8c40b80 0000000000000048
-> 0000000000000007
-> [  236.940017] f420: 0000000000000000 0000000000000001 ffffffc0f7eae000
-> 0000000000000000
-> [  236.940705] f440: ffffff80082e8c1c 62745f626c746f69 69735f70616d5f6c
-> 69726f20656c676e
-> [  236.941392] f460: 3d20726464615f67 6666666666783020
-> [  236.941826] [<ffffff80083579c0>] __memcpy+0x100/0x180
-> [  236.942274] [<ffffff800837dc18>] swiotlb_map_sg_attrs+0xa8/0x170
-> [  236.942810] [<ffffff800809359c>] __swiotlb_map_sg_attrs+0x24/0x8c
-> [  236.943353] [<ffffff800871113c>]
-> dw_mci_pre_dma_transfer.isra.16+0xf0/0x11c
-> [  236.943967] [<ffffff80087129cc>] __dw_mci_start_request+0x17c/0x4d0
-> [  236.944520] [<ffffff80087132e0>] dw_mci_request+0xb8/0xf0
-> [  236.945002] [<ffffff80086f8b44>] __mmc_start_request+0x9c/0xc0
-> [  236.945520] [<ffffff80087ae0e8>] mmc_start_request.part.17+0x100/0x11c
-> [  236.946097] [<ffffff80086f9c74>] mmc_wait_for_req+0x78/0x1a8
-> [  236.946600] [<ffffff800870421c>] mmc_io_rw_extended+0x27c/0x2fc
-> [  236.947124] [<ffffff8008705800>] sdio_io_rw_ext_helper+0x1e4/0x238
-> [  236.947670] [<ffffff8008705954>] sdio_memcpy_toio+0x24/0x2c
-> [  236.948169] [<ffffff8000a40108>] wifi_probe+0xa8/0x198 [drvtst]
-> [  236.948708] [<ffffff8008704734>] sdio_bus_probe+0xb0/0x140
-> [  236.949195] [<ffffff80084bfd6c>] driver_probe_device+0x118/0x2b0
-> [  236.949724] [<ffffff80084bff68>] __driver_attach+0x64/0x90
-> [  236.950212] [<ffffff80084bee18>] bus_for_each_dev+0x80/0xb0
-> [  236.950706] [<ffffff80084bf8ac>] driver_attach+0x20/0x28
-> [  236.951176] [<ffffff80084bf45c>] bus_add_driver+0xe8/0x1ec
-> [  236.951661] [<ffffff80084c0afc>] driver_register+0x98/0xe4
-> [  236.952147] [<ffffff8008704580>] sdio_register_driver+0x24/0x2c
-> [  236.952675] [<ffffff8000a40228>] wifi_sdio_init+0x30/0x68 [drvtst]
-> [  236.953241] [<ffffff8000a4400c>] wifi_drv_init+0xc/0x38 [drvtst]
-> [  236.953789] [<ffffff8008082ba4>] do_one_initcall+0x17c/0x198
-> [  236.954293] [<ffffff800815e564>] do_init_module+0x60/0x1b8
-> [  236.954779] [<ffffff80081150f0>] load_module+0x1660/0x1a50
-> [  236.955264] [<ffffff800811562c>] SyS_init_module+0x14c/0x180
-> [  236.955765] [<ffffff80080826f0>] el0_svc_naked+0x24/0x28
-> [  236.956237] Code: d503201f d503201f d503201f d503201f (a8c12027)
-> [  236.956794] ---[ end trace 2030cf6e7c948d05 ]---
-> [  236.984113] Kernel panic - not syncing: Fatal exception in interrupt
-> 
+ drivers/pinctrl/mvebu/pinctrl-armada-370.c | 24 +-------
+ drivers/pinctrl/mvebu/pinctrl-armada-375.c | 24 +-------
+ drivers/pinctrl/mvebu/pinctrl-armada-38x.c | 24 +-------
+ drivers/pinctrl/mvebu/pinctrl-armada-39x.c | 24 +-------
+ drivers/pinctrl/mvebu/pinctrl-armada-xp.c  | 35 +++--------
+ drivers/pinctrl/mvebu/pinctrl-dove.c       | 96 +++++++++++++++++-------------
+ drivers/pinctrl/mvebu/pinctrl-kirkwood.c   | 32 +++-------
+ drivers/pinctrl/mvebu/pinctrl-mvebu.c      | 77 +++++++++++++++++++++---
+ drivers/pinctrl/mvebu/pinctrl-mvebu.h      | 51 +++++++---------
+ drivers/pinctrl/mvebu/pinctrl-orion.c      |  8 ++-
+ 10 files changed, 183 insertions(+), 212 deletions(-)
+
+Adding regmap support increases the code size again:
+
+ drivers/pinctrl/mvebu/pinctrl-armada-370.c |  24 +----
+ drivers/pinctrl/mvebu/pinctrl-armada-375.c |  24 +----
+ drivers/pinctrl/mvebu/pinctrl-armada-38x.c |  24 +----
+ drivers/pinctrl/mvebu/pinctrl-armada-39x.c |  24 +----
+ drivers/pinctrl/mvebu/pinctrl-armada-xp.c  |  35 ++------
+ drivers/pinctrl/mvebu/pinctrl-dove.c       |  96 +++++++++++---------
+ drivers/pinctrl/mvebu/pinctrl-kirkwood.c   |  32 ++-----
+ drivers/pinctrl/mvebu/pinctrl-mvebu.c      | 137 +++++++++++++++++++++++++++--
+ drivers/pinctrl/mvebu/pinctrl-mvebu.h      |  65 ++++++++------
+ drivers/pinctrl/mvebu/pinctrl-orion.c      |   8 +-
+ 10 files changed, 257 insertions(+), 212 deletions(-)
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
