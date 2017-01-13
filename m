@@ -1,90 +1,60 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Fri, 13 Jan 2017 13:37:58 +0100
-Subject: [PATCH 04/10] sata: hardreset: retry if phys link is down
+Date: Fri, 13 Jan 2017 13:38:00 +0100
+Subject: [PATCH 06/10] sata: ahci_da850: implement a softreset quirk
 In-Reply-To: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1484311084-31547-5-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1484311084-31547-7-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sata core driver already retries to resume the link because some
-controllers ignore writes to the SControl register.
+There's an issue with the da850 SATA controller: if port multiplier
+support is compiled in, but we're connecting the drive directly to
+the SATA port on the board, the drive can't be detected.
 
-We have a use case with the da850 SATA controller where at PLL0
-frequency of 456MHz (needed to properly service the LCD controller)
-the chip becomes unstable and the hardreset operation is ignored the
-first time 50% of times.
-
-Retrying just the resume operation doesn't work - we need to issue
-the phy/wake reset again to make it work.
-
-If ata_phys_link_offline() returns true in sata_link_hardreset(),
-retry a couple times before really giving up.
+To make SATA work on the da850-lcdk board: first try to softreset
+with pmp - if the operation fails with -EBUSY, retry without pmp.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/ata/libata-core.c | 16 ++++++++++++----
- include/linux/libata.h    |  4 +++-
- 2 files changed, 15 insertions(+), 5 deletions(-)
+ drivers/ata/ahci_da850.c | 22 +++++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/ata/libata-core.c b/drivers/ata/libata-core.c
-index 9cd0a2d..3b848a3 100644
---- a/drivers/ata/libata-core.c
-+++ b/drivers/ata/libata-core.c
-@@ -3985,8 +3985,8 @@ int sata_link_hardreset(struct ata_link *link, const unsigned long *timing,
- 			unsigned long deadline,
- 			bool *online, int (*check_ready)(struct ata_link *))
- {
-+	int rc, retry = ATA_LINK_RESET_TRIES;
- 	u32 scontrol;
--	int rc;
+diff --git a/drivers/ata/ahci_da850.c b/drivers/ata/ahci_da850.c
+index 5930af81..bb9eb4c 100644
+--- a/drivers/ata/ahci_da850.c
++++ b/drivers/ata/ahci_da850.c
+@@ -54,11 +54,31 @@ static void da850_sata_init(struct device *dev, void __iomem *pwrdn_reg,
+ 	writel(val, ahci_base + SATA_P0PHYCR_REG);
+ }
  
- 	DPRINTK("ENTER\n");
- 
-@@ -4009,7 +4009,7 @@ int sata_link_hardreset(struct ata_link *link, const unsigned long *timing,
- 
- 		sata_set_spd(link);
- 	}
--
-+retry:
- 	/* issue phy wake/reset */
- 	if ((rc = sata_scr_read(link, SCR_CONTROL, &scontrol)))
- 		goto out;
-@@ -4028,9 +4028,17 @@ int sata_link_hardreset(struct ata_link *link, const unsigned long *timing,
- 	rc = sata_link_resume(link, timing, deadline);
- 	if (rc)
- 		goto out;
--	/* if link is offline nothing more to do */
--	if (ata_phys_link_offline(link))
++static int ahci_da850_softreset(struct ata_link *link,
++				unsigned int *class, unsigned long deadline)
++{
++	int pmp, ret;
 +
-+	if (ata_phys_link_offline(link)) {
-+		if (retry--) {
-+			ata_link_warn(link,
-+				      "link still offline after hardreset - retrying\n");
-+			goto retry;
-+		}
++	pmp = sata_srst_pmp(link);
 +
-+		/* if link is still offline nothing more to do */
- 		goto out;
-+	}
++	ret = ahci_do_softreset(link, class, pmp, deadline, ahci_check_ready);
++	if (pmp && ret == -EBUSY)
++		return ahci_do_softreset(link, class, 0,
++					 deadline, ahci_check_ready);
++
++	return ret;
++}
++
++static struct ata_port_operations ahci_da850_port_ops = {
++	.inherits = &ahci_platform_ops,
++	.softreset = ahci_da850_softreset,
++};
++
+ static const struct ata_port_info ahci_da850_port_info = {
+ 	.flags		= AHCI_FLAG_COMMON,
+ 	.pio_mask	= ATA_PIO4,
+ 	.udma_mask	= ATA_UDMA6,
+-	.port_ops	= &ahci_platform_ops,
++	.port_ops	= &ahci_da850_port_ops,
+ };
  
- 	/* Link is online.  From this point, -ENODEV too is an error. */
- 	if (online)
-diff --git a/include/linux/libata.h b/include/linux/libata.h
-index c170be5..2c840c0 100644
---- a/include/linux/libata.h
-+++ b/include/linux/libata.h
-@@ -392,8 +392,10 @@ enum {
- 	/* max tries if error condition is still set after ->error_handler */
- 	ATA_EH_MAX_TRIES	= 5,
- 
--	/* sometimes resuming a link requires several retries */
-+	/* sometimes resuming a link requires several retries... */
- 	ATA_LINK_RESUME_TRIES	= 5,
-+	/* ... and sometimes we need to retry the whole reset procedure */
-+	ATA_LINK_RESET_TRIES	= 5,
- 
- 	/* how hard are we gonna try to probe/recover devices */
- 	ATA_PROBE_MAX_TRIES	= 3,
+ static struct scsi_host_template ahci_platform_sht = {
 -- 
 2.9.3
