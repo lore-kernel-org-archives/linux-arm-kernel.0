@@ -1,113 +1,64 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 13 Jan 2017 17:28:25 +0100
-Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
-In-Reply-To: <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
-References: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
- <1484291609-20195-3-git-send-email-guochun.mao@mediatek.com>
- <20170113151747.6bc85245@bbrezillon>
- <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
- <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
-Message-ID: <20170113172825.75d545a3@bbrezillon>
+From: Joao.Pinto@synopsys.com (Joao Pinto)
+Date: Fri, 13 Jan 2017 16:34:26 +0000
+Subject: [PATCH 02/37] PCI: dwc: designware: Add new *ops* for cpu addr
+ fixup
+In-Reply-To: <1484216786-17292-3-git-send-email-kishon@ti.com>
+References: <1484216786-17292-1-git-send-email-kishon@ti.com>
+ <1484216786-17292-3-git-send-email-kishon@ti.com>
+Message-ID: <68f59de0-104f-41aa-886d-52d43ecd8e6b@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Jan 2017 17:13:55 +0100
-Marek Vasut <marek.vasut@gmail.com> wrote:
 
-> On 01/13/2017 04:12 PM, Matthias Brugger wrote:
-> > 
-> > 
-> > On 13/01/17 15:17, Boris Brezillon wrote:  
-> >> On Fri, 13 Jan 2017 15:13:29 +0800
-> >> Guochun Mao <guochun.mao@mediatek.com> wrote:
-> >>  
-> >>> Add Mediatek nor flash node.
-> >>>
-> >>> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
-> >>> ---
-> >>>  arch/arm/boot/dts/mt2701-evb.dts |   25 +++++++++++++++++++++++++
-> >>>  arch/arm/boot/dts/mt2701.dtsi    |   12 ++++++++++++
-> >>>  2 files changed, 37 insertions(+)
-> >>>
-> >>> diff --git a/arch/arm/boot/dts/mt2701-evb.dts
-> >>> b/arch/arm/boot/dts/mt2701-evb.dts
-> >>> index 082ca88..85e5ae8 100644
-> >>> --- a/arch/arm/boot/dts/mt2701-evb.dts
-> >>> +++ b/arch/arm/boot/dts/mt2701-evb.dts
-> >>> @@ -24,6 +24,31 @@
-> >>>      };
-> >>>  };
-> >>>
-> >>> +&nor_flash {
-> >>> +    pinctrl-names = "default";
-> >>> +    pinctrl-0 = <&nor_pins_default>;
-> >>> +    status = "okay";
-> >>> +    flash at 0 {
-> >>> +        compatible = "jedec,spi-nor";
-> >>> +        reg = <0>;
-> >>> +    };
-> >>> +};
-> >>> +
-> >>> +&pio {
-> >>> +    nor_pins_default: nor {
-> >>> +        pins1 {
-> >>> +            pinmux = <MT2701_PIN_240_EXT_XCS__FUNC_EXT_XCS>,
-> >>> +                 <MT2701_PIN_241_EXT_SCK__FUNC_EXT_SCK>,
-> >>> +                 <MT2701_PIN_239_EXT_SDIO0__FUNC_EXT_SDIO0>,
-> >>> +                 <MT2701_PIN_238_EXT_SDIO1__FUNC_EXT_SDIO1>,
-> >>> +                 <MT2701_PIN_237_EXT_SDIO2__FUNC_EXT_SDIO2>,
-> >>> +                 <MT2701_PIN_236_EXT_SDIO3__FUNC_EXT_SDIO3>;
-> >>> +            drive-strength = <MTK_DRIVE_4mA>;
-> >>> +            bias-pull-up;
-> >>> +        };
-> >>> +    };
-> >>> +};
-> >>> +
-> >>>  &uart0 {
-> >>>      status = "okay";
-> >>>  };
-> >>> diff --git a/arch/arm/boot/dts/mt2701.dtsi
-> >>> b/arch/arm/boot/dts/mt2701.dtsi
-> >>> index bdf8954..1eefce4 100644
-> >>> --- a/arch/arm/boot/dts/mt2701.dtsi
-> >>> +++ b/arch/arm/boot/dts/mt2701.dtsi
-> >>> @@ -227,6 +227,18 @@
-> >>>          status = "disabled";
-> >>>      };
-> >>>
-> >>> +    nor_flash: spi at 11014000 {
-> >>> +        compatible = "mediatek,mt2701-nor",
-> >>> +                 "mediatek,mt8173-nor";  
-> >>
-> >> Why define both here? Is "mediatek,mt8173-nor" really providing a
-> >> subset of the features supported by "mediatek,mt2701-nor"?
-> >>  
-> > 
-> > I think even if the ip block is the same, we should provide both
-> > bindings, just in case in the future we find out that mt2701 has some
-> > hidden bug, feature or bug-feature. This way even if we update the
-> > driver, we stay compatible with older device tree blobs in the wild.
-> > 
-> > We can drop the mt2701-nor in the bindings definition if you want. 
+Hi Kishon,
 
-Oh, sorry, I misunderstood. What I meant is that if you want to
-list/support all possible compatibles, maybe you should just put one
-compatible in your DT and patch your driver (+ binding doc) to define
-all of them.
-
+?s 10:25 AM de 1/12/2017, Kishon Vijay Abraham I escreveu:
+> Some platforms (like dra7xx) require only the least 28 bits of the
+> corresponding 32 bit CPU address to be programmed in the address
+> translation unit. This modified address is stored in io_base/mem_base/
+> cfg0_base/cfg1_base in dra7xx_pcie_host_init. While this is okay for
+> host mode where the address range is fixed, device mode requires
+> different addresses to be programmed based on the host buffer address.
+> Add a new ops to get the least 28 bits of the corresponding 32 bit
+> CPU address and invoke it before programming the address translation
+> unit.
 > 
-> This exactly. We should have a DT compat in the form:
-> compatible = "vendor,<soc>-block", "vendor,<oldest-compat-soc>-block";
-> Then if we find a problem in the future, we can match on the
-> "vendor,<soc>-block" and still support the old DTs.
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/pci/dwc/pcie-designware.c |    3 +++
+>  drivers/pci/dwc/pcie-designware.h |    1 +
+>  2 files changed, 4 insertions(+)
+> 
+> diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
+> index bed1999..d68bc7b 100644
+> --- a/drivers/pci/dwc/pcie-designware.c
+> +++ b/drivers/pci/dwc/pcie-designware.c
+> @@ -195,6 +195,9 @@ static void dw_pcie_prog_outbound_atu(struct pcie_port *pp, int index,
+>  {
+>  	u32 retries, val;
+>  
+> +	if (pp->ops->cpu_addr_fixup)
+> +		cpu_addr = pp->ops->cpu_addr_fixup(cpu_addr);
+> +
+>  	if (pp->iatu_unroll_enabled) {
+>  		dw_pcie_writel_unroll(pp, index, PCIE_ATU_UNR_LOWER_BASE,
+>  			lower_32_bits(cpu_addr));
+> diff --git a/drivers/pci/dwc/pcie-designware.h b/drivers/pci/dwc/pcie-designware.h
+> index a567ea2..32f4602 100644
+> --- a/drivers/pci/dwc/pcie-designware.h
+> +++ b/drivers/pci/dwc/pcie-designware.h
+> @@ -54,6 +54,7 @@ struct pcie_port {
+>  };
+>  
+>  struct pcie_host_ops {
+> +	u64 (*cpu_addr_fixup)(u64 cpu_addr);
+>  	u32 (*readl_rc)(struct pcie_port *pp, u32 reg);
+>  	void (*writel_rc)(struct pcie_port *pp, u32 reg, u32 val);
+>  	int (*rd_own_conf)(struct pcie_port *pp, int where, int size, u32 *val);
+> 
 
-Not sure it's only in term of whose IP appeared first. My understanding
-is that it's a way to provide inheritance. For example:
+I think this is an acceptable fixup, I am ok with it.
 
-	"<soc-vendor>,<ip-version>", "<ip-vendor>,<ip-version>";
+Reviewed-By: Joao Pinto <jpinto@synopsys.com>
 
-or
-
-	"<soc-vendor>,<full-featured-ip-version>","<soc-vendor>,<basic-feature-ip-version>";
-
-BTW, which one is the oldest between mt8173 and mt2701? :-)
+Joao
