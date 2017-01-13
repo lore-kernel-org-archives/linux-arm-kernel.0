@@ -1,59 +1,67 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Thu, 12 Jan 2017 16:48:25 -0800
-Subject: [PATCH] PCI: iproc: fix kernel crash if dev->of_node not defined
-In-Reply-To: <6891f43f-25e7-1411-800e-97e6788f2f27@gmail.com>
-References: <1484266817-6725-1-git-send-email-aospan@netup.ru>
- <6891f43f-25e7-1411-800e-97e6788f2f27@gmail.com>
-Message-ID: <e5301de6-9a6c-7deb-4ff7-ccd462c4381e@broadcom.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 12 Jan 2017 16:52:06 -0800
+Subject: [PATCH] ARM64: dts: meson-gxbb-odroidc2: fix GbE tx link breakage
+In-Reply-To: <1482319894-656-1-git-send-email-jbrunet@baylibre.com> (Jerome
+ Brunet's message of "Wed, 21 Dec 2016 12:31:34 +0100")
+References: <1482319894-656-1-git-send-email-jbrunet@baylibre.com>
+Message-ID: <m2r3476atl.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-On 1/12/2017 4:22 PM, Florian Fainelli wrote:
-> On 01/12/2017 04:20 PM, Abylay Ospan wrote:
->> pcie->dev->of_node not always defined (NULL) and can cause crash:
->>
->> [   19.053195] Unable to handle kernel NULL pointer dereference at
->> virtual address 00000020
->> [<c0b0370c>] (of_n_addr_cells) from [<c06599c4>]
->> (iproc_pcie_setup+0x30c/0xce0)
->>
->> this patch adds sanity check to prevent crash.
-> 
-> Humm, how can it not be defined based on your earlier comment that you
-> are using this on NSP which is Device Tree exclusively? I would agree if
-> this was seen on e.g: MIPS/BCMA (47xx).
+> OdroidC2 GbE link breaks under heavy tx transfer. This happens even if the
+> MAC does not enable Energy Efficient Ethernet (No Low Power state Idle on
+> the Tx path). The problem seems to come from the phy Rx path, entering the
+> LPI state.
+>
+> Disabling EEE advertisement on the phy prevent this feature to be
+> negociated with the link partner and solve the issue.
+>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+>
+> This patch is based on Linus recent master branch [0]
+> This patch depends on the series [1] which has been merged in this branch.
+>
+> 0: ba6d973f78eb ("Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net")
+> 1: http://lkml.kernel.org/r/1480326409-25419-1-git-send-email-jbrunet at baylibre.com
+>    Fix integration of eee-broken-modes
+>    
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> index 238fbeacd330..d8933e9e9a5a 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> @@ -147,6 +147,18 @@
+>  	status = "okay";
+>  	pinctrl-0 = <&eth_rgmii_pins>;
+>  	pinctrl-names = "default";
+> +	phy-handle = <&eth_phy0>;
+> +
+> +	mdio {
+> +		compatible = "snps,dwmac-mdio";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		eth_phy0: ethernet-phy at 0 {
+> +			reg = <0>;
+> +			eee-broken-1000t;
+> +		};
+> +	};
 
-I thought Abylay mentioned:
+There's already an MDIO node in the meson-gx.dtsi (using the same
+compatible), shouldn't you just override that and add the new
+properties?
 
-"Tested on Broadcom NorthStar machine ('Edgecore ECW7220-L') with two
-PCIe wifi
-adapters (b43 BCM4331 and ath10k QCA988X)."
+What would make things easier is if the names were like Martin used in
+his reset patch, so that when I merge them together it's not a major
+conflict.
 
-That is a NorthStar device which is BCMA based?
+Thanks,
 
-> 
->>
->> Signed-off-by: Abylay Ospan <aospan@netup.ru>
->> ---
->>  drivers/pci/host/pcie-iproc.c | 3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
->> index 3ebc025..f2836a9 100644
->> --- a/drivers/pci/host/pcie-iproc.c
->> +++ b/drivers/pci/host/pcie-iproc.c
->> @@ -952,6 +952,9 @@ static int pci_dma_range_parser_init(struct of_pci_range_parser *parser,
->>  	const int na = 3, ns = 2;
->>  	int rlen;
->>  
->> +	if (!node)
->> +		return -ENOENT;
->> +
->>  	parser->node = node;
->>  	parser->pna = of_n_addr_cells(node);
->>  	parser->np = parser->pna + na + ns;
->>
-> 
-> 
+Kevin
+
+[1] https://patchwork.kernel.org/patch/9459409/
