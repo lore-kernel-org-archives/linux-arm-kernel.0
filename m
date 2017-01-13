@@ -1,42 +1,21 @@
-From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
-Date: Thu, 12 Jan 2017 21:34:59 -0500
-Subject: [PATCH net-next v2 00/10] net: dsa: Support for pdata in dsa2
-In-Reply-To: <20170112034121.27697-1-f.fainelli@gmail.com>
-References: <20170112034121.27697-1-f.fainelli@gmail.com>
-Message-ID: <87fuknpu0c.fsf@weeman.i-did-not-set--mail-host-address--so-tickle-me>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Fri, 13 Jan 2017 10:50:38 +0800
+Subject: [PATCH] arm64: hugetlb: fix the wrong return value for
+ huge_ptep_set_access_flags
+In-Reply-To: <20170111101924.GA18044@e104818-lin.cambridge.arm.com>
+References: <1484114308-6068-1-git-send-email-shijie.huang@arm.com>
+ <20170111060044.GA6112@sha-win-210.asiapac.arm.com>
+ <20170111101924.GA18044@e104818-lin.cambridge.arm.com>
+Message-ID: <20170113025036.GA11941@sha-win-210.asiapac.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+On Wed, Jan 11, 2017 at 10:19:25AM +0000, Catalin Marinas wrote:
+> The disclaimer is not the main issue. The patch that ended up on the
+> list seems to have been corrupted probably by the SMTP server (all tabs
+> converted to spaces).
+Thanks for pointing this. I will change another SMTP server if the issue
+still exists in future.
 
-Florian Fainelli <f.fainelli@gmail.com> writes:
-
-> Hi all,
->
-> This is not exactly new, and was sent before, although back then, I did not
-> have an user of the pre-declared MDIO board information, but now we do. Note
-> that I have additional changes queued up to have b53 register platform data for
-> MIPS bcm47xx and bcm63xx.
->
-> Yes I know that we should have the Orion platforms eventually be converted to
-> Device Tree, but until that happens, I don't want any remaining users of the
-> old "dsa" platform device (hence the previous DTS submissions for ARM/mvebu)
-> and, there will be platforms out there that most likely won't never see DT
-> coming their way (BCM47xx is almost 100% sure, BCM63xx maybe not in a distant
-> future).
->
-> We would probably want the whole series to be merged via David Miller's tree
-> to simplify things.
->
-> Greg, can you Ack/Nack patch 5 since it touched the core LDD?
->
-> Thanks!
-
-I've tested this patchset on my mv88e6xxx (DTS) boards to make sure
-nothing was broken, since it touches the driver. Looks good!
-
-Tested-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
-
-Thanks,
-
-        Vivien
+Thanks
+Huang Shijie
