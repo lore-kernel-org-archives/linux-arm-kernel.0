@@ -1,82 +1,38 @@
-From: erin.lo@mediatek.com (Erin Lo)
-Date: Fri, 13 Jan 2017 16:42:58 +0800
-Subject: [PATCH v2 6/6] arm: dts: mt2701: Add thermal device node.
-In-Reply-To: <1484296978-18572-1-git-send-email-erin.lo@mediatek.com>
-References: <1484296978-18572-1-git-send-email-erin.lo@mediatek.com>
-Message-ID: <1484296978-18572-7-git-send-email-erin.lo@mediatek.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 13 Jan 2017 09:45:13 +0100
+Subject: [PATCH v8 2/5] i2c: Add STM32F4 I2C driver
+In-Reply-To: <20170113082903.GA1446@katana>
+References: <20170111153940.dtxzvtdici3r7l54@pengutronix.de>
+ <CAOAejn2pW20VPP_yGtvJ_ufvj6Xj1poBiiA2WqkALiaLyyONug@mail.gmail.com>
+ <20170112120309.fmrt2lwz3vklqmti@pengutronix.de>
+ <CAOAejn289GLOSP-nPJnO_VpXLpyhTsF1bWQ7Ns9OfgPQCa8YTw@mail.gmail.com>
+ <20170112174902.j52foglkdouyz36n@pengutronix.de>
+ <CAOAejn3tPi0fjy+t-UhMTvAq7LfdKJJdbcLw2su1-YAGDZMxew@mail.gmail.com>
+ <20170112211004.z3wylc7vrubulc3x@pengutronix.de>
+ <CAOAejn1HAU5spQeXmYPH4XH0L5bGuoFgguozwMp=uLKcXDEPEw@mail.gmail.com>
+ <20170113072650.orx6vl2orqfakcuk@pengutronix.de>
+ <20170113082903.GA1446@katana>
+Message-ID: <20170113084513.wvuxkanrlmgz3ang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dawei Chien <dawei.chien@mediatek.com>
+On Fri, Jan 13, 2017 at 09:29:03AM +0100, Wolfram Sang wrote:
+> 
+> > (But note that this is irrelevant for the patch as the driver doesn't
+> > claim to support this kind of transfer.)
+> 
+> Yes, I wanted to mention that, too.
+> 
+> I'd think the series is good to go in?
 
-Add thermal controller device nodes for MT2701.
+AFAICT there are some unaddressed comments that Cedrics claimed to fix
+before our discussion was dominated by block transfers.
 
-Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
-Signed-off-by: Erin Lo <erin.lo@mediatek.com>
----
- arch/arm/boot/dts/mt2701.dtsi | 43 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+Best regards
+Uwe
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 3847f70..c43d5f8 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -89,6 +89,36 @@
- 		clock-output-names = "rtc32k";
- 	};
- 
-+	thermal-zones {
-+		cpu_thermal: cpu_thermal {
-+			polling-delay-passive = <1000>; /* milliseconds */
-+			polling-delay = <1000>; /* milliseconds */
-+
-+			thermal-sensors = <&thermal 0>;
-+			sustainable-power = <1000>;
-+
-+			trips {
-+				threshold: trip-point at 0 {
-+					temperature = <68000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				target: trip-point at 1 {
-+					temperature = <85000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				cpu_crit: cpu_crit at 0 {
-+					temperature = <115000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupt-parent = <&gic>;
-@@ -270,6 +300,19 @@
- 		status = "disabled";
- 	};
- 
-+	thermal: thermal at 1100b000 {
-+		#thermal-sensor-cells = <0>;
-+		compatible = "mediatek,mt2701-thermal";
-+		reg = <0 0x1100b000 0 0x1000>;
-+		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
-+		clock-names = "therm", "auxadc";
-+		resets = <&pericfg 0x10>;
-+		reset-names = "therm";
-+		mediatek,auxadc = <&auxadc>;
-+		mediatek,apmixedsys = <&apmixedsys>;
-+	};
-+
- 	nandc: nfi at 1100d000 {
- 		compatible = "mediatek,mt2701-nfc";
- 		reg = <0 0x1100d000 0 0x1000>;
+
+
 -- 
-1.9.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
