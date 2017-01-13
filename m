@@ -1,37 +1,33 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Fri, 13 Jan 2017 16:35:03 +0000
-Subject: [PATCH 04/37] PCI: dwc: designware: Move the register defines to
- designware header file
-In-Reply-To: <1484216786-17292-5-git-send-email-kishon@ti.com>
-References: <1484216786-17292-1-git-send-email-kishon@ti.com>
- <1484216786-17292-5-git-send-email-kishon@ti.com>
-Message-ID: <0913dcb3-ecb8-b926-981d-f5d3baa9d8b7@synopsys.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Fri, 13 Jan 2017 08:36:29 -0800
+Subject: [PATCH RESEND 1/2] memory: aemif: allow passing device lookup
+ table as platform data
+In-Reply-To: <1484301626-30345-2-git-send-email-bgolaszewski@baylibre.com>
+References: <1484301626-30345-1-git-send-email-bgolaszewski@baylibre.com>
+ <1484301626-30345-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <95240fc2-c4d7-1cd8-64b8-6e3b89b9a2e2@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Greg,
 
-?s 10:25 AM de 1/12/2017, Kishon Vijay Abraham I escreveu:
-> No functional change. Move the register defines and other macros from
-> pcie-designware.c to pcie-designware.h. This is in preparation to
-> split the pcie-designware.c file into designware core file and host
-> specific file.
-> 
-> While at that also fix a checkpatch warning.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+On 1/13/2017 2:00 AM, Bartosz Golaszewski wrote:
+> TI aemif driver creates its own subnodes of the device tree in order
+> to guarantee that all child devices are probed after the AEMIF timing
+> parameters are configured.
+>
+> Some devices (e.g. da850) use struct of_dev_auxdata for clock lookup
+> but nodes created from within the aemif driver can't access the lookup
+> table.
+>
+> Create a platform data structure that holds a pointer to
+> of_dev_auxdata so that we can use it with of_platform_populate().
+>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> Acked-by: Sekhar Nori <nsekhar@ti.com>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@oracle.com>
 > ---
->  drivers/pci/dwc/pcie-designware.c |   70 ------------------------------------
->  drivers/pci/dwc/pcie-designware.h |   71 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 71 insertions(+), 70 deletions(-)
-> 
-> diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
-> index d68bc7b..0b928dc 100644
-> --- a/drivers/pci/dwc/pcie-designware.c
-> +++ b/drivers/pci/dwc/pcie-designware.c
-> @@ -25,76 +25,6 @@
->  
->  #include "pcie-designware.h"
+Can you please take this one patch via your driver core ?
 
-Make sense.
-
-Reviewed-By: Joao Pinto <jpinto@synopsys.com>
+Regards,
+Santosh
