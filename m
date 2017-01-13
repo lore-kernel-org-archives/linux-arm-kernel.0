@@ -1,72 +1,170 @@
-From: tanxiaojun@huawei.com (Tan Xiaojun)
-Date: Fri, 13 Jan 2017 17:06:33 +0800
-Subject: [PATCH v2 2/2] arm64: cacheinfo: add support to override cache
- levels via device tree
-In-Reply-To: <1484245772-31511-2-git-send-email-sudeep.holla@arm.com>
-References: <1484245772-31511-1-git-send-email-sudeep.holla@arm.com>
- <1484245772-31511-2-git-send-email-sudeep.holla@arm.com>
-Message-ID: <58789899.3080909@huawei.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Fri, 13 Jan 2017 10:07:56 +0100
+Subject: [RFC 01/13] KVM: arm/arm64: Add vITS save/restore API
+ documentation
+In-Reply-To: <4fe81c1b-9956-d458-b0ef-b7219f1249fe@arm.com>
+References: <1484236613-24633-1-git-send-email-eric.auger@redhat.com>
+ <1484236613-24633-2-git-send-email-eric.auger@redhat.com>
+ <4fe81c1b-9956-d458-b0ef-b7219f1249fe@arm.com>
+Message-ID: <e58a566d-e100-d31a-fb26-a15a793d3623@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/1/13 2:29, Sudeep Holla wrote:
-> The cache hierarchy can be identified through Cache Level ID(CLIDR)
-> architected system register. However in some cases it will provide
-> only the number of cache levels that are integrated into the processor
-> itself. In other words, it can't provide any information about the
-> caches that are external and/or transparent.
-> 
-> Some platforms require to export the information about all such external
-> caches to the userspace applications via the sysfs interface.
-> 
-> This patch adds support to override the cache levels using device tree
-> to take such external non-architected caches into account.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Hi Marc,
 
-Tested-by: Tan Xiaojun <tanxiaojun@huawei.com>
+On 12/01/2017 17:52, Marc Zyngier wrote:
+> Hi Eric,
+> 
+> On 12/01/17 15:56, Eric Auger wrote:
+>> Add description for how to access vITS registers and how to flush/restore
+>> vITS tables into/from memory
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>> ---
+>>  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 70 ++++++++++++++++++++++
+>>  1 file changed, 70 insertions(+)
+>>
+>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>> index 6081a5b..bd74613 100644
+>> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>> @@ -36,3 +36,73 @@ Groups:
+>>      -ENXIO:  ITS not properly configured as required prior to setting
+>>               this attribute
+>>      -ENOMEM: Memory shortage when allocating ITS internal data
+>> +
+>> +  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+>> +  Attributes:
+>> +      The attr field of kvm_device_attr encodes the offset of the
+>> +      ITS register, relative to the ITS control frame base address
+>> +      (ITS_base).
+>> +
+>> +      kvm_device_attr.addr points to a __u64 value whatever the width
+>> +      of the addressed register (32/64 bits).
+>> +
+>> +      Writes to read-only registers are ignored by the kernel except
+>> +      for a single register, GITS_READR. Normally this register is RO
+>> +      but it needs to be restored otherwise commands in the queue will
+>> +      be re-executed after CWRITER setting.
+>> +
+>> +      For other registers, Getting or setting a register has the same
+>> +      effect as reading/writing the register on real hardware.
+>> +  Errors:
+>> +    -ENXIO: Offset does not correspond to any supported register
+>> +    -EFAULT: Invalid user pointer for attr->addr
+>> +    -EINVAL: Offset is not 64-bit aligned
+>> +
+>> +  KVM_DEV_ARM_VGIC_GRP_ITS_TABLES
+>> +  Attributes
+>> +       The attr field of kvm_device_attr is not used.
+>> +
+>> +       request the flush-save/restore of the ITS tables, namely
+>> +       the device table, the collection table, all the ITT tables,
+>> +       the LPI pending tables. On save, the tables are flushed
+>> +       into guest memory at the location provisionned by the guest
+> 
+> 					    provisioned
+> 
+>> +       in GITS_BASER (device and collection tables), on MAPD command
+>> +       (ITT_addr), GICR_PENDBASERs (pending tables).
+>> +
+>> +       This means the GIC should be restored before the ITS and all
+>> +       ITS registers but the GITS_CTRL must be restored before
+>> +       restoring the ITS tables.
+>> +
+>> +       Note the LPI configuration table is read-only for the
+>> +       in-kernel ITS and its save/restore goes through the standard
+>> +       RAM save/restore.
+>> +
+>> +       The layout of the tables in guest memory defines an ABI.
+>> +       The entries are laid out in memory as follows;
+>> +
+>> +    Device Table Entry (DTE) layout: entry size = 16 bytes
+>> +
+>> +    bits:     | 63   ...  32  | 31 ... 6 | 5 | 4   ...   0 |
+>> +    values:   |   DeviceID    |   Resv   | V |    Size     |
+>> +
+>> +    bits:     | 63 ... 44 | 43  ...  0  |
+>> +    values:   |    Resv   |  ITT_addr   |
+> 
+> While I appreciate this layout represents the absolute maximum an ITS
+> could implement, I'm a bit concerned about the amount of memory we may
+> end-up requiring here. All the ITSs implementations I know of seem to
+> get away with 8 bytes per entry. Maybe I'm just too worried.
 
-> ---
->  arch/arm64/kernel/cacheinfo.c | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
+OK so I would propose a 16b DeviceId and 16b eventid
+
+bits:     | 63   ...  48  | 47 ... 4 | 3   ...   0 |
+values:   |   DeviceID    | ITT_addr |    Size     |
+
+I can use the size field as a validity indicator
+
 > 
-> diff --git a/arch/arm64/kernel/cacheinfo.c b/arch/arm64/kernel/cacheinfo.c
-> index 9617301f76b5..3f2250fc391b 100644
-> --- a/arch/arm64/kernel/cacheinfo.c
-> +++ b/arch/arm64/kernel/cacheinfo.c
-> @@ -84,7 +84,7 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
+> Also, please mention that ITT_addr is actually ITT_addr[51:8], as we're
+> guaranteed to have an ITT that is 256 byte aligned.
+sure
 > 
->  static int __init_cache_level(unsigned int cpu)
->  {
-> -	unsigned int ctype, level, leaves;
-> +	unsigned int ctype, level, leaves, of_level;
->  	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+>> +
+>> +    Collection Table Entry (CTE) layout: entry size = 8 bytes
+>> +
+>> +    bits:     | 63| 62 ..  52  | 51 ... 16 | 15  ...   0 |
+>> +    values:   | V |    RES0    |  RDBase   |    ICID     |
+>> +
+>> +    Interrupt Translation Table Entry (ITTE) layout: entry size = 16 bytes
 > 
->  	for (level = 1, leaves = 0; level <= MAX_CACHE_LEVEL; level++) {
-> @@ -97,6 +97,17 @@ static int __init_cache_level(unsigned int cpu)
->  		leaves += (ctype == CACHE_TYPE_SEPARATE) ? 2 : 1;
->  	}
+> The actual name is Interrupt Translation Entry (ITE). I have a patch
+> renaming this all over the vgic-its.c file...
+ok
 > 
-> +	of_level = of_find_last_cache_level(cpu);
-> +	if (level < of_level) {
-> +		/*
-> +		 * some external caches not specified in CLIDR_EL1
-> +		 * the information may be available in the device tree
-> +		 * only unified external caches are considered here
-> +		 */
-> +		leaves += (of_level - level);
-> +		level = of_level;
-> +	}
-> +
->  	this_cpu_ci->num_levels = level;
->  	this_cpu_ci->num_leaves = leaves;
->  	return 0;
-> --
-> 2.7.4
+>> +
+>> +    bits:     | 63   ...  32  | 31 ... 17 | 16 | 15  ...  0 |
+>> +    values:   |   DeviceID    |    RES0   | V  |    ICID    |
+>> +
+>> +    bits:     | 63 ...  32    | 31      ...        0 |
+>> +    values:   |   pINTID      |        EventID       |
 > 
+> Same concern here. 32bit DevID, EventID and INTID seem a bit over the
+> top. But maybe we shouldn't be concerned about memory... ;-)
+So I would suggest encoding
+16b DeviceId
+16b eventid
+16b collection ID
+16b pINTID
+
+bits:     | 63   ...  48  | 47 ... 32 | 31 ... 15 | 15  ...  0 |
+values:   |   DeviceID    |   pINTID  |  EventId  |   ICID     |
+
+a null pINTID would meen the ITE is invalid.
+
+Does that make sense or should I instead reduce the number of bits
+allocated to collections and keep the pINTID bit number larger?
+
+
 > 
-> .
+>> +
+>> +    LPI Pending Table layout:
+>> +
+>> +    As specified in the ARM Generic Interrupt Controller Architecture
+>> +    Specification GIC Architecture version 3.0 and version 4. The first
+>> +    1kB contains only zeros.
+>>
+> 
+> You definitely want to relax this. An ITS implementation is allowed (and
+> actually encouraged) to maintain a coarse map in the first kB, and use
+> this to quickly scan the table, which would be very useful on restore.
+Maybe I miss something here. Currently I restore the ITEs before the
+pending tables. So considering all the ITEs I know which LPI are defined
+and which pending bits need to be restored. Why would I need to use a
+coarse map for?
+
+I understand the CPU cannot write the pending tables in our back, spec
+says behavior would be unpredictable, right?
+
+Thanks
+
+Eric
+> 
+> Thanks,
+> 
+> 	M.
 > 
