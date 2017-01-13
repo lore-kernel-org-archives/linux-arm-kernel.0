@@ -1,41 +1,45 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 13 Jan 2017 16:32:25 +0200
-Subject: [GIT PULL] ARM: exynos: Fixes for v4.10
-Message-ID: <20170113143225.11311-1-krzk@kernel.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 13 Jan 2017 20:02:52 +0530
+Subject: [PATCH 00/10] ARM: da850-lcdk: add SATA support
+In-Reply-To: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <fa513599-1ac1-51e9-4da3-f4ed61ba0ce2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Friday 13 January 2017 06:07 PM, Bartosz Golaszewski wrote:
+> This series contains all the changes necessary to make SATA work on
+> the da850-lcdk board.
+> 
+> The first patch adds a clock lookup entry required for the ahci core
+> to retrieve a functional clock.
+> 
+> The second enables relevant config options for all davinci boards.
+> 
+> The third adds device tree bindings for the ahci_da850 driver.
+> 
+> The fourth adds a workaround for a SATA controller instability we
+> detected after increasing the PLL0 frequency for proper LCD
+> controller support.
+> 
+> Patches 5 through 7 extend the ahci_da850 driver - add DT support,
+> un-hardcode the clock multiplier value and add a workaround for
+> a quirk present on the da850 SATA controller.
+> 
+> Patches 8-10 add the device tree changes required to probe the driver.
+> 
+> I'm posting the series as a whole to give all reviewers the full
+> picture and visibility of the changes required, if needed I can resend
+> the patches separately.
 
-Just a couple of minor fixes for this release cycle.
+I just tested this series on my LCDK board using a Western Digital SATA
+HDD and it works great with some basic read / write tests. Thanks!
 
-Best regards,
-Krzysztof
+For the non-platform patches which I wont be queuing:
 
+Tested-by: Sekhar Nori <nsekhar@ti.com>
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+I will take a look at the series closely next week.
 
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-4.10
-
-for you to fetch changes up to 3ef01c968fbfb21c2f16281445d30a865ee4412c:
-
-  ARM: s3c2410_defconfig: Fix invalid values for NF_CT_PROTO_* (2017-01-02 21:05:34 +0200)
-
-----------------------------------------------------------------
-Samsung fixes for v4.10:
-1. Update maintainers entry with Patchwork address.
-2. Fix invalid values for NF_CT_PROTO_* in s3c2410 defconfig (these options
-   cannot be modules anymore).
-
-----------------------------------------------------------------
-Krzysztof Kozlowski (2):
-      MAINTAINERS: Add Patchwork URL to Samsung Exynos entry
-      ARM: s3c2410_defconfig: Fix invalid values for NF_CT_PROTO_*
-
- MAINTAINERS                        | 1 +
- arch/arm/configs/s3c2410_defconfig | 6 +++---
- 2 files changed, 4 insertions(+), 3 deletions(-)
+Thanks,
+Sekhar
