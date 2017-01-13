@@ -1,52 +1,19 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 13 Jan 2017 18:57:39 +0000
-Subject: [PATCH] arm64: dts: marvell: add generic-ahci compatibles for CP110
- ahci
-Message-ID: <E1cS72h-0004nc-Rr@rmk-PC.armlinux.org.uk>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 13 Jan 2017 19:57:52 +0100
+Subject: [PATCH 1/4] clk: rockchip: add rk3288 isp_in clock ids
+In-Reply-To: <1484049560-14820-1-git-send-email-jacob-chen@iotwrt.com>
+References: <1484049560-14820-1-git-send-email-jacob-chen@iotwrt.com>
+Message-ID: <2449565.hTUeJeJ7Db@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Testing with an Armada 8040 board shows that adding the generic-ahci
-compatible to the CP110 AHCI nodes gets us working AHCI on the board.
-A previous patch series posted by Thomas Petazzoni was retracted when
-it was realised that the IP was supposed to be, and is, compatible
-with the standard register layout.
+Am Dienstag, 10. Januar 2017, 19:59:17 CET schrieb Jacob Chen:
+> Add clock-ids for the isp block of the rk3288.
+> 
+> 
+> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
 
-Add this compatible.
+applied for 4.11
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 3 ++-
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 3 ++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index 464b491c7291..65ad781d7910 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -128,7 +128,8 @@
- 			};
- 
- 			cpm_sata0: sata at 540000 {
--				compatible = "marvell,armada-8k-ahci";
-+				compatible = "marvell,armada-8k-ahci",
-+					     "generic-ahci";
- 				reg = <0x540000 0x30000>;
- 				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&cpm_syscon0 1 15>;
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index b10f4781d8fb..168d667d50a3 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -128,7 +128,8 @@
- 			};
- 
- 			cps_sata0: sata at 540000 {
--				compatible = "marvell,armada-8k-ahci";
-+				compatible = "marvell,armada-8k-ahci",
-+					     "generic-ahci";
- 				reg = <0x540000 0x30000>;
- 				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&cps_syscon0 1 15>;
--- 
-2.7.4
+Thanks
+Heiko
