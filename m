@@ -1,68 +1,87 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Fri, 13 Jan 2017 06:33:33 +0000
-Subject: [PATCH v5 3/3] dmaengine: xilinx_dma: Fix race condition in the
- driver for multiple descriptor scenario
-In-Reply-To: <20170113062225.GR3573@localhost>
-References: <1483771530-8545-1-git-send-email-appanad@xilinx.com>
- <1483771530-8545-4-git-send-email-appanad@xilinx.com>
- <20170110084917.GA3573@localhost>
- <C246CAC1457055469EF09E3A7AC4E11A4A6662F1@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20170113053627.GQ3573@localhost>
- <C246CAC1457055469EF09E3A7AC4E11A4A6666CF@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20170113062225.GR3573@localhost>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A6666F3@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: mike.looijmans@topic.nl (Mike Looijmans)
+Date: Fri, 13 Jan 2017 07:40:17 +0100
+Subject: [PATCH] i2c: i2c-cadence: Don't register the adapter until it's
+ ready
+In-Reply-To: <428e8fc8-8b23-8e2c-763e-d977aaa98691@mleia.com>
+References: <1483613240-32501-1-git-send-email-mike.looijmans@topic.nl>
+ <428e8fc8-8b23-8e2c-763e-d977aaa98691@mleia.com>
+Message-ID: <469bf72b-70e6-24d2-99b1-79b6f0a635bb@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
-	
-	Thanks for the review...
+?On 06-01-17 22:34, Vladimir Zapolskiy wrote:
+> Hello Mike,
+>
+> On 01/05/2017 12:47 PM, Mike Looijmans wrote:
+>> The driver calls i2c_add_adapter before writing to config registers,
+>> resulting in dmesg output like this, where devices fail to initialize:
+>>
+>> cdns-i2c ff030000.i2c: timeout waiting on completion
+>> pca953x 1-0041: failed reading register
+>> pca953x: probe of 1-0041 failed with error -110
+>> at24 1-0050: 512 byte 24c04 EEPROM, writable, 1 bytes/write
+>> cdns-i2c ff030000.i2c: 100 kHz mmio ff030000 irq 197
+>>
+>> The adapter is being used before it completed the "probe". To fix
+>> this, make "i2c_add_adapter" the last thing it calls in probe.
+>> It also makes sense to show the adapter initialization before
+>> the devices on the bus.
+>
+> commonly "it also" in a commit message means a change, which should be done
+> separately, and this is the case here as well.
+>
+> Because the adapter registration i2c_add_adapter() can fail, information
+> about the adapter initialization would be expected only in case of
+> successful registration.
 
-[Snip]
-> > > Btw how and when does DMA stop, assuming it is circular it never
-> > > would, isn't there a valid/stop flag associated with a descriptor
-> > > which tells DMA engine what to do next
-> >
-> > There are two registers that controls the DMA transfers.
-> > Current descriptor and tail descriptor register.
-> > When current descriptor reaches tail descriptor dma engine will pause.
-> >
-> > When reprogramming the tail descriptor the DMA engine will starts fetching
-> descriptors again.
-> >
-> > But with the existing driver flow if we reprogram the tail descriptor
-> > The tail descriptor next descriptor field is pointing to an invalid
-> > location Causing data corruption...
-> 
-> So the solution is..?
+I would argue that the "info" message means "the I2C adapter is ready for 
+transaction now, and we'll start initializing devices on the bus". That is the 
+case before it calls i2c_add_adapter().
 
-This patch.
-I mean if we have a set of descriptors in chain (in circular manner last descriptor points to first descriptor)
-It always points to valid descriptors. 
+When i2c_add_adapter() runs, it will start probing devices on the bus. This 
+yields very confusing output, as it will output things in a reversed order:
 
-Will update the patch commit description in the next version...
+- device X on I2C bus
+- device Y on I2C bus
+- cdns-i2c ff030000.i2c: 100 kHz mmio ff030000 irq 197
 
-> 
-> > > Btw there is something wrong with your MUA perhaps line are
-> > > titlecased for no reason. This is typically behavious of non linux
-> > > tool which may not be great tool for this work.
-> >
-> > Thanks for pointing it out.
-> > I usually replies from outlook from a windows machine.
-> > Will check with others in my team how they configured their mail client.
-> 
-> Yeah that isnt right tool for the job. See Documentation/process/email-
-> clients.rst
-> 
-> FWIW, I use mutt, vim as editor with exchange servers, seems to work well for
-> me now.
+This is especially confusing if there are multiple I2C adapters with muxes 
+behind them, the order then becomes like this:
 
-Thanks for pointing it out will go through it.
-Will install mutt in my Linux machine will start replying from that
+- Device X on bus 0
+- Mux A on bus 0 registering bus 2, 3 and 4
+- I2C controller for bus 0
+- Device Y on bus 1
+- I2C controller for bus 1
+- Device Z on bus 2
+- etc..
 
-Regards,
-Kedar.
+> The information sent to the kernel log buffer here is quite trivial,
+> probably dev_info() can be just removed, but in any case it should be
+> a separate change.
 
-> 
+Fine with me too.
+
+>
+>> Signed-off-by: Mike Looijmans <mike.looijmans@topic.nl>
+>
 > --
-> ~Vinod
+> With best wishes,
+> Vladimir
+>
+
+
+
+Kind regards,
+
+Mike Looijmans
+System Expert
+
+TOPIC Products
+Materiaalweg 4, NL-5681 RJ Best
+Postbus 440, NL-5680 AK Best
+Telefoon: +31 (0) 499 33 69 79
+E-mail: mike.looijmans at topicproducts.com
+Website: www.topicproducts.com
+
+Please consider the environment before printing this e-mail
