@@ -1,24 +1,25 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 13 Jan 2017 15:20:41 +0200
-Subject: [PATCH v4 1/4] dmaengine: pl330: remove pdata based initialization
-In-Reply-To: <1484292400-29730-2-git-send-email-m.szyprowski@samsung.com>
-References: <1484292400-29730-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170113072651eucas1p214662327fe5a3dfbaa79d11c2a0b195a@eucas1p2.samsung.com>
- <1484292400-29730-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170113132041.3k7sr7ciy46dd42q@kozik-lap>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 13 Jan 2017 18:56:12 +0530
+Subject: [PATCH v3 02/15] ARM: davinci: Don't rely on public mmc header to
+ include leds.h
+In-Reply-To: <1484313256-25993-3-git-send-email-ulf.hansson@linaro.org>
+References: <1484313256-25993-1-git-send-email-ulf.hansson@linaro.org>
+ <1484313256-25993-3-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <ccc2cc5c-b9a9-aca2-9677-22c5cd698ad7@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 08:26:37AM +0100, Marek Szyprowski wrote:
-> This driver is now used only on platforms which support device tree, so
-> it is safe to remove legacy platform data based initialization code.
+On Friday 13 January 2017 06:44 PM, Ulf Hansson wrote:
+> Some of the davinci boards, da850-evm, dm644x-evm and neuros-osd2 depends
+> on leds.h. Explicitly include it instead of relying on the public mmc
+> header host.h.
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  arch/arm/plat-samsung/devs.c |  1 -
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: <linux-arm-kernel@lists.infradead.org>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-For plat-samsung:
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-Best regards,
-Krzysztof
+Thanks,
+Sekhar
