@@ -1,49 +1,67 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 13 Jan 2017 12:57:58 +0100
-Subject: [PATCH v3 02/24] ARM: dts: imx6qdl: Add compatible, clocks,
- irqs to MIPI CSI-2 node
-In-Reply-To: <1483755102-24785-3-git-send-email-steve_longerbeam@mentor.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-3-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1484308678.31475.24.camel@pengutronix.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 13 Jan 2017 12:59:17 +0100
+Subject: [PATCH] iommu/dma: Add support for DMA_ATTR_FORCE_CONTIGUOUS
+In-Reply-To: <d336ef3b-4fe6-5ebb-9fed-071fa79028df@arm.com>
+References: <1484305674-15018-1-git-send-email-geert+renesas@glider.be>
+ <d336ef3b-4fe6-5ebb-9fed-071fa79028df@arm.com>
+Message-ID: <CAMuHMdWBfTm_QRuB7x-ZDh0bgGmHokqm7=F2b0rjQTYzizC9hA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 06.01.2017, 18:11 -0800 schrieb Steve Longerbeam:
-> Add to the MIPI CSI2 receiver node: compatible string, interrupt sources,
-> clocks.
-> 
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> ---
->  arch/arm/boot/dts/imx6qdl.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index 53e6e63..42926e9 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -1125,7 +1125,14 @@
->  			};
->  
->  			mipi_csi: mipi at 021dc000 {
-> +				compatible = "fsl,imx6-mipi-csi2";
->  				reg = <0x021dc000 0x4000>;
-> +				interrupts = <0 100 0x04>, <0 101 0x04>;
-> +				clocks = <&clks IMX6QDL_CLK_HSI_TX>,
-> +					 <&clks IMX6QDL_CLK_VIDEO_27M>,
-> +					 <&clks IMX6QDL_CLK_EIM_SEL>;
+Hi Robin,
 
-I think the latter should be EIM_PODF
+On Fri, Jan 13, 2017 at 12:32 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 13/01/17 11:07, Geert Uytterhoeven wrote:
+>> Add support for DMA_ATTR_FORCE_CONTIGUOUS to the generic IOMMU DMA code.
+>> This allows to allocate physically contiguous DMA buffers on arm64
+>> systems with an IOMMU.
+>
+> Can anyone explain what this attribute is actually used for? I've never
+> quite figured it out.
 
-> +				clock-names = "dphy", "cfg", "pix";
+My understanding is that DMA_ATTR_FORCE_CONTIGUOUS is needed when using
+an IOMMU but wanting the buffers to be both contiguous in IOVA space and
+physically contiguous to allow passing to devices without IOMMU.
 
-and I'm not sure dphy is the right name for this one. Is that the pll
-ref input?
+Main users are graphic and remote processors.
 
-> +				status = "disabled";
->  			};
->  
->  			mipi_dsi: mipi at 021e0000 {
+>> --- a/drivers/iommu/dma-iommu.c
+>> +++ b/drivers/iommu/dma-iommu.c
 
-regards
-Philipp
+>> @@ -265,6 +272,20 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count,
+>>       /* IOMMU can map any pages, so himem can also be used here */
+>>       gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
+>>
+>> +     if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
+>> +             int order = get_order(count << PAGE_SHIFT);
+>> +             struct page *page;
+>> +
+>> +             page = dma_alloc_from_contiguous(dev, count, order);
+>> +             if (!page)
+>> +                     return NULL;
+>> +
+>> +             while (count--)
+>> +                     pages[i++] = page++;
+>> +
+>> +             return pages;
+>> +     }
+>> +
+>
+> This is really yuck. Plus it's entirely pointless to go through the
+> whole page array/scatterlist dance when we know the buffer is going to
+> be physically contiguous - it should just be allocate, map, done. I'd
+> much rather see standalone iommu_dma_{alloc,free}_contiguous()
+> functions, and let the arch code handle dispatching appropriately.
+
+Fair enough.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
