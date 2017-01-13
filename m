@@ -1,63 +1,98 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 13 Jan 2017 10:45:24 +0000
-Subject: [PATCH v7 12/15] msi: platform: make
- platform_msi_create_device_domain() ACPI aware
-In-Reply-To: <1484147199-4267-13-git-send-email-hanjun.guo@linaro.org>
-References: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
- <1484147199-4267-13-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20170113104524.GC20837@red-moon>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Fri, 13 Jan 2017 11:43:56 +0100
+Subject: [PATCH 1/1] iommu/arm-smmu: Fix for ThunderX erratum #27704
+In-Reply-To: <b0eb1127-182e-63e3-6dd4-c3b40228b909@semihalf.com>
+References: <1484135507-24872-1-git-send-email-tn@semihalf.com>
+ <2c048126-a4d6-16af-987a-3174401a3960@arm.com>
+ <b0eb1127-182e-63e3-6dd4-c3b40228b909@semihalf.com>
+Message-ID: <1c3253d8-bcaa-e507-cddf-dec952362104@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 11:06:36PM +0800, Hanjun Guo wrote:
-> platform_msi_create_device_domain() is used to ctreate
-> irqdomain for the device such as irqchip mbigen generating
-> the MSIs, it's almost ready for ACPI use except
-> of_node_to_fwnode() is for dt only, make it ACPI aware then
-> things will work in both DTS and ACPI.
+On 12.01.2017 07:41, Tomasz Nowicki wrote:
+> On 11.01.2017 13:19, Robin Murphy wrote:
+>> On 11/01/17 11:51, Tomasz Nowicki wrote:
+>>> The goal of erratum #27704 workaround was to make sure that ASIDs and
+>>> VMIDs
+>>> are unique across all SMMU instances on affected Cavium systems.
+>>>
+>>> Currently, the workaround code partitions ASIDs and VMIDs by increasing
+>>> global cavium_smmu_context_count which in turn becomes the base ASID
+>>> and VMID
+>>> value for the given SMMU instance upon the context bank initialization.
+>>>
+>>> For systems with multiple SMMU instances this approach implies the risk
+>>> of crossing 8-bit ASID, like for CN88xx capable of 4 SMMUv2, 128
+>>> context bank each:
+>>> SMMU_0 (0-127 ASID RANGE)
+>>> SMMU_1 (127-255 ASID RANGE)
+>>> SMMU_2 (256-383 ASID RANGE) <--- crossing 8-bit ASID
+>>> SMMU_3 (384-511 ASID RANGE) <--- crossing 8-bit ASID
+>>
+>> I could swear that at some point in the original discussion it was said
+>> that the TLBs were only shared between pairs of SMMUs, so in fact 0/1
+>> and 2/3 are independent of each other
+>
+> Indeed TLBs are only shared between pairs of SMMUs but the workaround
+> makes sure ASIDs are unique across all SMMU instances so we do not have
+> to bother about SMMUs probe order.
+>
+>  - out of interest, have you
+>> managed to hit an actual problem in practice or is this patch just by
+>> inspection?
+>
+> Except SMMU0/1 devices all other devices under other SMMUs will fail on
+> guest power off/on. Since we try to invalidate tlb with 16bit ASID but
+> we actually have 8 bit zero padded 16 bit entry.
+>
+>>
+>> Of course, depending on the SMMUs to probe in the right order isn't
+>> particularly robust, so it's still probably a worthwhile change.
+>>
+>>> Since we use 8-bit ASID now we effectively misconfigure ASID[15:8]
+>>> bits for
+>>> SMMU_CBn_TTBRm register. Also, we still use non-zero ASID[15:8] bits
+>>> upon context invalidation. This patch adds 16-bit ASID support for
+>>> stage-1
+>>> AArch64 contexts for Cavium SMMUv2 model so that we use ASIDs
+>>> consistently.
+>>>
+>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>>> ---
+>>>  drivers/iommu/arm-smmu.c | 4 ++++
+>>>  1 file changed, 4 insertions(+)
+>>>
+>>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>>> index a60cded..ae8f059 100644
+>>> --- a/drivers/iommu/arm-smmu.c
+>>> +++ b/drivers/iommu/arm-smmu.c
+>>> @@ -260,6 +260,7 @@ enum arm_smmu_s2cr_privcfg {
+>>>
+>>>  #define TTBCR2_SEP_SHIFT        15
+>>>  #define TTBCR2_SEP_UPSTREAM        (0x7 << TTBCR2_SEP_SHIFT)
+>>> +#define TTBCR2_AS            (1 << 4)
+>>>
+>>>  #define TTBRn_ASID_SHIFT        48
+>>>
+>>> @@ -778,6 +779,9 @@ static void arm_smmu_init_context_bank(struct
+>>> arm_smmu_domain *smmu_domain,
+>>>              reg = pgtbl_cfg->arm_lpae_s1_cfg.tcr;
+>>>              reg2 = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
+>>>              reg2 |= TTBCR2_SEP_UPSTREAM;
+>>> +            if (smmu->model == CAVIUM_SMMUV2 &&
+>>
+>> I'd be inclined to say "smmu->version == ARM_SMMU_V2" there, rather than
+>> make it Cavium-specific - we enable 16-bit VMID unconditionally where
+>> supported, so I don't see any reason not to handle 16-bit ASIDs in the
+>> same manner.
+>
+> I agree, I will enable 16-bit ASID for ARM_SMMU_V2.
+>
 
-"The irqdomain creation carried out in:
+Actually, the ARM_SMMU_CTX_FMT_AARCH64 context check is all we need here:
 
-platform_msi_create_device_domain()
++			if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
++				reg2 |= TTBCR2_AS;
 
-relies on the fwnode_handle interrupt controller token to associate the
-interrupt controller with a specific irqdomain. Current code relies on
-the OF layer to retrieve a fwnode_handle for the device representing the
-interrupt controller from its device->of_node pointer.  This makes
-platform_msi_create_device_domain() DT specific whilst it really is not
-because after the merge of commit f94277af03ea ("of/platform: Initialise
-dev->fwnode appropriately") the fwnode_handle can easily be retrieved
-from the dev->fwnode pointer in a firmware agnostic way.
-
-Update platform_msi_create_device_domain() to retrieve the interrupt
-controller fwnode_handle from the dev->fwnode pointer so that it can
-be used seamlessly in ACPI and DT systems".
-
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Greg KH <gregkh@linuxfoundation.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Greg KH <gregkh@linuxfoundation.org>
-> ---
->  drivers/base/platform-msi.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
-> index be6a599..035ca3b 100644
-> --- a/drivers/base/platform-msi.c
-> +++ b/drivers/base/platform-msi.c
-> @@ -345,8 +345,7 @@ struct irq_domain *
->  
->  	data->host_data = host_data;
->  	domain = irq_domain_create_hierarchy(dev->msi_domain, 0, nvec,
-> -					     of_node_to_fwnode(dev->of_node),
-> -					     ops, data);
-> +					     dev->fwnode, ops, data);
->  	if (!domain)
->  		goto free_priv;
->  
-> -- 
-> 1.9.1
-> 
+Thanks,
+Tomasz
