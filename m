@@ -1,58 +1,115 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 13 Jan 2017 10:17:10 -0800
-Subject: [GIT PULL] Amlogic fixes for v4.10-rc4
-Message-ID: <m2inpi6d09.fsf@baylibre.com>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Fri, 13 Jan 2017 12:17:43 -0600
+Subject: [RFC PATCH v2 09/10] drivers/perf: Add support for ARMv8.2
+ Statistical Profiling Extension
+In-Reply-To: <20170113170307.GK3253@arm.com>
+References: <1484323429-15231-1-git-send-email-will.deacon@arm.com>
+ <1484323429-15231-10-git-send-email-will.deacon@arm.com>
+ <20170113104042.169ceea12820d2b6b74b31f9@arm.com>
+ <20170113170307.GK3253@arm.com>
+Message-ID: <20170113121743.31e09c7242d500d41469a068@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Fri, 13 Jan 2017 17:03:07 +0000
+Will Deacon <will.deacon@arm.com> wrote:
 
-Please pull a couple fixes for v4.10-rc.
+> On Fri, Jan 13, 2017 at 10:40:42AM -0600, Kim Phillips wrote:
+> > On Fri, 13 Jan 2017 16:03:48 +0000
+> > Will Deacon <will.deacon@arm.com> wrote:
+> > 
+> > > +#define DRVNAME				"arm_spe_pmu"
+> > 
+> > PMU is implied.  "arm_spe"?
+> 
+> As stated before, I'm going for consistency here.
 
-The branch is based on v4.10-rc3 to not conflict with another DT fix
-that when in for -rc2.
+me too, but apparently under the user-visible interface domain rather
+than the driver source path domain.
 
-Kevin
+> Is it causing any
+> real issues on the tooling side?
 
+Intel has a consistent "intel_pt", "intel_bts", and 'pmu' occurs
+nowhere in their nomenclature.
 
-The following changes since commit a121103c922847ba5010819a3f250f1f7fc84ab8:
+Whether good or bad, we currently have "cs_etm".  This patch now gives
+us "arm_spe_pmu".  I'm just trying to save the suffix consistency for
+now, esp. since IDK how amenable "cs_etm" is to change, and 'perf list'
+calls things "PMU event"s anyway.
 
-  Linux 4.10-rc3 (2017-01-08 14:18:17 -0800)
+I think the root cause might be the device tree node's
+"arm,arm-spe-pmu-v1" compatiblity string, which I also find
+a bit self-redundant ("arm,arm-"), but I'm not familiar with what's
+being denoted there either (e.g., if the latter 'arm-' is an arch
+reference, then SPE's might be 'armv8'?).  The device tree node isn't
+exposed to the user, however.
 
-are available in the git repository at:
+> > > +	if (is_kernel_in_hyp_mode()) {
+> > > +		if (attr->exclude_kernel != attr->exclude_hv)
+> > > +			return -EOPNOTSUPP;
+> > > +	} else if (!attr->exclude_hv) {
+> > > +		return -EOPNOTSUPP;
+> > > +	}
+> > > +
+> > > +	reg = arm_spe_event_to_pmsfcr(event);
+> > > +	if ((reg & BIT(PMSFCR_EL1_FE_SHIFT)) &&
+> > > +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_EVT))
+> > > +		return -EOPNOTSUPP;
+> > > +
+> > > +	if ((reg & BIT(PMSFCR_EL1_FT_SHIFT)) &&
+> > > +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_TYP))
+> > > +		return -EOPNOTSUPP;
+> > > +
+> > > +	if ((reg & BIT(PMSFCR_EL1_FL_SHIFT)) &&
+> > > +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_LAT))
+> > > +		return -EOPNOTSUPP;
+> > > +
+> > > +	return 0;
+> > > +}
+> > 
+> > Please insert pr_* statements before blindly returning errors before a
+> > better facility becomes available.
+> 
+> That was discussed in the thread I linked to last time:
+> 
+> https://lkml.org/lkml/2015/8/26/661
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-fixes-2
+ok, thanks for pinpointing the exact message this time.
 
-for you to fetch changes up to 64a8225e9f9dec0e5cd2f5640743699056da4e4e:
+> and there are good reasons not to add those prints.
 
-  ARM64: dts: meson-gx: Add reserved memory zone and usable memory range (2017-01-12 17:00:50 -0800)
+Processing that message (indentations are now quoting Peter Zijlstra):
 
-----------------------------------------------------------------
-Amlogic fixes for v4.10-rc4
-- odroid-c2: disable DVFS to avoid crashes due to broken SCPI
-- fix misc. crashes by adding known reserved memory regions
+> Not really. That is something that's limited to root. Whereas the
+> problem is very much wider than that.
 
-----------------------------------------------------------------
-Neil Armstrong (2):
-      ARM64: dts: meson-gxbb-odroidc2: Disable SCPI DVFS
-      ARM64: dts: meson-gx: Add reserved memory zone and usable memory range
+For the purposes of the SPE driver discussion, I'm ok limiting the
+context of using the SPE as root.
 
- arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi       |  5 -----
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi                 | 12 ++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    |  6 +++++-
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts       | 10 +++++++++-
- arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts           |  9 +++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts           |  9 +++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi          |  5 -----
- arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts  |  6 +++++-
- arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts   |  6 +++++-
- arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts |  6 +++++-
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi               |  2 +-
- arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts     |  6 +++++-
- arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts      |  9 +++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p231.dts      |  9 +++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts      |  6 +++++-
- arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts       |  6 +++++-
- arch/arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts       |  9 +++++++++
- arch/arm64/boot/dts/amlogic/meson-gxm-s912-q201.dts       |  9 +++++++++
- 18 files changed, 111 insertions(+), 19 deletions(-)
+> If you set one bit wrong in the pretty large perf_event_attr you've got
+> a fair chance of getting -EINVAL on trying to create the event. Good
+> luck finding what you did wrong.
+
+yes, this is the problem, and the SPE introduces a whole new set of
+validity requirements that should be being communicated clearly, e.g.,
+its restrictive event frequency specification.
+
+> Any user can create events (for their own tasks), this does not require
+> root.
+
+I don't think this is relevant to our discussion.
+
+> Allowing users to flip your @debugging flag would be an insta DoS.
+
+I think this is a reference to the non-root case, and might be mitigated
+by either using dynamic or ratelimited pr_ versions if it were.
+
+> Furthermore, its very unfriendly in that you have to (manually) go
+> correlate random dmesg output with some program action.
+
+Andrew Morton addresses this, and I did read all other follow-ups and
+still conclude that adding pr_ messages is 1000x better than not, for
+the user, and at least for the time being.
+
+Kim
