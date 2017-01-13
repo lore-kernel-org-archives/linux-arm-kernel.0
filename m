@@ -1,68 +1,87 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri, 13 Jan 2017 12:36:47 +0800
-Subject: [PATCH 2/5] clk: sunxi-ng: add support for V3s CCU
-In-Reply-To: <20170112174122.iqzrcyytfefqspwq@lukather>
-References: <20170112203149.VhtuR9dM@smtp3j.mail.yandex.net>
- <20170112174122.iqzrcyytfefqspwq@lukather>
-Message-ID: <895011484282207@web8g.yandex.ru>
+From: aospan@netup.ru (Abylay Ospan)
+Date: Thu, 12 Jan 2017 23:55:23 -0500
+Subject: [PATCH] PCI: iproc: fix kernel crash if dev->of_node not defined
+In-Reply-To: <6cfba8af-1e9b-cb43-4898-61d6fb8f12ca@broadcom.com>
+References: <1484266817-6725-1-git-send-email-aospan@netup.ru>
+ <6891f43f-25e7-1411-800e-97e6788f2f27@gmail.com>
+ <e5301de6-9a6c-7deb-4ff7-ccd462c4381e@broadcom.com>
+ <6cfba8af-1e9b-cb43-4898-61d6fb8f12ca@broadcom.com>
+Message-ID: <CAK3bHNVQ9Rbuwf1i54h7uLLdkUvyGibmfJpD6zRjt1gYiQD7Hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Florian,
+
+> Still, upstream Linux support for Northstar is Device Tree, and BCMA bus
+> should fill in of_nodes accordingly, if not, that's a bug that must be
+> fixed at the BCMA layer.
+
+yes, this is a source of the problem. Devices allocated in
+'bcma_bus_scan' but of_node doesn't assigned.
+Is some code missing in drivers/bcma/ which should assign of_node ?
+
+I can suggest following "hacky" patch for this (works for me):
+
+Author: Abylay Ospan <aospan@netup.ru>
+Date:   Fri Jan 13 07:24:13 2017 +0300
+
+    bcma: force assign 'of_node' for devices on the bus
+
+    prevent other code to fail if no 'of_node' defined
+
+    Signed-off-by: Abylay Ospan <aospan@netup.ru>
+
+diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
+index 2c1798e..4fe1c92 100644
+--- a/drivers/bcma/main.c
++++ b/drivers/bcma/main.c
+@@ -301,6 +301,11 @@ void bcma_init_bus(struct bcma_bus *bus)
+ static void bcma_register_core(struct bcma_bus *bus, struct bcma_device *core)
+ {
+        int err;
++       struct device * dev;
++
++       dev = bcma_bus_get_host_dev(bus);
++       if (dev && !core->dev.of_node)
++               core->dev.of_node = dev->of_node;
 
 
-13.01.2017, 01:41, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> On Fri, Jan 13, 2017 at 01:31:41AM +0800, Icenowy Zheng wrote:
->> ?2017?1?13? 01:19? Maxime Ripard <maxime.ripard@free-electrons.com>???
->> ?>
->> ?> On Thu, Jan 12, 2017 at 03:44:53AM +0800, Icenowy Zheng wrote:
->> ?> >
->> ?> >
->> ?> > 12.01.2017, 03:40, "Icenowy Zheng" <icenowy@aosc.xyz>:
->> ?> > > 11.01.2017, 02:10, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
->> ?> > >> ?On Tue, Jan 03, 2017 at 11:16:26PM +0800, Icenowy Zheng wrote:
->> ?> > >>> ??V3s has a similar but cut-down CCU to H3.
->> ?> > >>>
->> ?> > >>> ??Add support for it.
->> ?> > >>>
->> ?> > >>> ??Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ?> > >>
->> ?> > >> ?It looks like there's nothing different but the clocks that you
->> ?> > >> ?register with the H3, please just use the H3 driver.
->> ?> > >
->> ?> > > Nope.
->> ?> > >
->> ?> > > It has a different PLL (PLL_ISP) at different address, and some
->> ?> > > different muxes.
->> ?> >
->> ?> > Forgot to mention the missing of PLL_DE and related misses.
->> ?>
->> ?> Those are not conflicting, it's just a slightly different set of
->> ?> clocks.
->>
->> ?If saying so, we can have only one ccu driver, and make every ccu
->> ?register different set ;-)
->>
->> ?V3s itself is a totally different SoC with H3.
->>
->> ?The relationship of V3s and H3 can be farther than the relationship
->> ?of A33 and H3?
->
-> A33 and H3 are an entirely different story. The H3 and A33 have
-> conflicting clocks (ie same clocks with different parameters). This is
-> not your case.
-
-I think V3s and H3 has also conflicting clocks, e.g. CLK_DE.
-
-The mux of CLK_DE in V3s is PLL_PERIPHx2 and PLL_VIDEO, but on H3
-it's PLL_PERIPHx2 and PLL_DE (V3s lacks PLL_DE).
-
-(What I say that there's a PLL missing means that there will also be mux
-changes... I think you can understand this... sorry.)
+if it's ok I will send this patch in separate email.
 
 >
-> Maxime
+>>
+>>>
+>>>>
+>>>> Signed-off-by: Abylay Ospan <aospan@netup.ru>
+>>>> ---
+>>>>  drivers/pci/host/pcie-iproc.c | 3 +++
+>>>>  1 file changed, 3 insertions(+)
+>>>>
+>>>> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+>>>> index 3ebc025..f2836a9 100644
+>>>> --- a/drivers/pci/host/pcie-iproc.c
+>>>> +++ b/drivers/pci/host/pcie-iproc.c
+>>>> @@ -952,6 +952,9 @@ static int pci_dma_range_parser_init(struct of_pci_range_parser *parser,
+>>>>     const int na = 3, ns = 2;
+>>>>     int rlen;
+>>>>
+>>>> +   if (!node)
+>>>> +           return -ENOENT;
+>>>> +
+>>>>     parser->node = node;
+>>>>     parser->pna = of_n_addr_cells(node);
+>>>>     parser->np = parser->pna + na + ns;
+>>>>
+>>>
+>>>
+>
 >
 > --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> Florian
+
+
+
+-- 
+Abylay Ospan,
+NetUP Inc.
+http://www.netup.tv
