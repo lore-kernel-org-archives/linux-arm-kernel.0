@@ -1,30 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Jan 2017 18:00:42 +0100
-Subject: [PATCH v4 0/4] DMA Engine: switch PL330 driver to non-irq-safe
- runtime PM
-In-Reply-To: <60596eee-12a9-58f3-387e-145a5bc28aaa@samsung.com>
-References: <CGME20170113072651eucas1p2b7487d97894de93daab24adb6745087c@eucas1p2.samsung.com>
- <CAPDyKFqDGs6OkG-NKiY9Xd3hHEJOJB1YJ2O0_3Tojrzv_xR-yw@mail.gmail.com>
- <60596eee-12a9-58f3-387e-145a5bc28aaa@samsung.com>
-Message-ID: <3102129.expA2ZvqTx@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 13 Jan 2017 17:03:07 +0000
+Subject: [RFC PATCH v2 09/10] drivers/perf: Add support for ARMv8.2
+ Statistical Profiling Extension
+In-Reply-To: <20170113104042.169ceea12820d2b6b74b31f9@arm.com>
+References: <1484323429-15231-1-git-send-email-will.deacon@arm.com>
+ <1484323429-15231-10-git-send-email-will.deacon@arm.com>
+ <20170113104042.169ceea12820d2b6b74b31f9@arm.com>
+Message-ID: <20170113170307.GK3253@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 13, 2017 3:12:57 PM CET Marek Szyprowski wrote:
-> On 2017-01-13 14:59, Ulf Hansson wrote:
-> > On 13 January 2017 at 08:26, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > I did only a brief review so far, particularly concentrating on the
-> > changes for device links and runtime PM. I like it!
-> >
-> > Perhaps we can get someone like Arnd/Vinod to comment in general idea
-> > from a DT and DMA slave channel point of view. I don't know that stuff
-> > good enough to give good opinion.
+On Fri, Jan 13, 2017 at 10:40:42AM -0600, Kim Phillips wrote:
+> On Fri, 13 Jan 2017 16:03:48 +0000
+> Will Deacon <will.deacon@arm.com> wrote:
 > 
-> Arnd already said that it looks good:
-> http://www.spinics.net/lists/dmaengine/msg12186.html
+> > +#define DRVNAME				"arm_spe_pmu"
+> 
+> PMU is implied.  "arm_spe"?
 
-Rihgt, feel free to add my
+As stated before, I'm going for consistency here. Is it causing any
+real issues on the tooling side?
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > +	if (is_kernel_in_hyp_mode()) {
+> > +		if (attr->exclude_kernel != attr->exclude_hv)
+> > +			return -EOPNOTSUPP;
+> > +	} else if (!attr->exclude_hv) {
+> > +		return -EOPNOTSUPP;
+> > +	}
+> > +
+> > +	reg = arm_spe_event_to_pmsfcr(event);
+> > +	if ((reg & BIT(PMSFCR_EL1_FE_SHIFT)) &&
+> > +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_EVT))
+> > +		return -EOPNOTSUPP;
+> > +
+> > +	if ((reg & BIT(PMSFCR_EL1_FT_SHIFT)) &&
+> > +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_TYP))
+> > +		return -EOPNOTSUPP;
+> > +
+> > +	if ((reg & BIT(PMSFCR_EL1_FL_SHIFT)) &&
+> > +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_LAT))
+> > +		return -EOPNOTSUPP;
+> > +
+> > +	return 0;
+> > +}
+> 
+> Please insert pr_* statements before blindly returning errors before a
+> better facility becomes available.
 
-	Arnd
+That was discussed in the thread I linked to last time:
+
+https://lkml.org/lkml/2015/8/26/661
+
+and there are good reasons not to add those prints.
+
+Will
