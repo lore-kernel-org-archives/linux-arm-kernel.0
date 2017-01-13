@@ -1,138 +1,25 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Fri, 13 Jan 2017 19:03:41 +0100
-Subject: [kvm-unit-tests PATCH 1/6] libcflat: add PRI(dux)32 format types
-In-Reply-To: <20170112165629.nbczamlqlpsqaauh@hawk.localdomain>
-References: <20170111162841.15569-1-alex.bennee@linaro.org>
- <20170111162841.15569-2-alex.bennee@linaro.org>
- <4286b719-ff75-d2cd-68b5-cb9d9bb89553@redhat.com>
- <20170112165629.nbczamlqlpsqaauh@hawk.localdomain>
-Message-ID: <20170113180341.3hvo4ixs74kjgcmo@kamzik.brq.redhat.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Fri, 13 Jan 2017 19:06:02 +0100
+Subject: [PATCH 16/37] PCI: endpoint: Introduce configfs entry for
+ configuring EP functions
+In-Reply-To: <1484216786-17292-17-git-send-email-kishon@ti.com>
+References: <1484216786-17292-1-git-send-email-kishon@ti.com>
+ <1484216786-17292-17-git-send-email-kishon@ti.com>
+Message-ID: <20170113180602.GA30346@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 05:56:29PM +0100, Andrew Jones wrote:
-> On Thu, Jan 12, 2017 at 01:29:24PM +0100, Paolo Bonzini wrote:
-> > 
-> > 
-> > On 11/01/2017 17:28, Alex Benn?e wrote:
-> > > So we can have portable formatting of uint32_t types. However there is
-> > > a catch. Different compilers can use legally subtly different types
-> > > though so we need to probe the compiler defined intdef.h first.
-> > 
-> > Interesting, what platform has long uint32_t?  I thought the issue was
-> > whether 64-bit is long or "long long".
-> > 
-> > Paolo
-> > 
-> > > Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> > > ---
-> > >  Makefile       |  1 +
-> > >  configure      | 13 +++++++++++++
-> > >  lib/libcflat.h |  9 +++++++++
-> > >  3 files changed, 23 insertions(+)
-> > > 
-> > > diff --git a/Makefile b/Makefile
-> > > index a32333b..9822d9a 100644
-> > > --- a/Makefile
-> > > +++ b/Makefile
-> > > @@ -55,6 +55,7 @@ CFLAGS += $(fomit_frame_pointer)
-> > >  CFLAGS += $(fno_stack_protector)
-> > >  CFLAGS += $(fno_stack_protector_all)
-> > >  CFLAGS += $(wno_frame_address)
-> > > +CFLAGS += $(if $(U32_LONG_FMT),-D__U32_LONG_FMT__,)
-> > >  
-> > >  CXXFLAGS += $(CFLAGS)
-> > >  
-> > > diff --git a/configure b/configure
-> > > index 995c8fa..127868c 100755
-> > > --- a/configure
-> > > +++ b/configure
-> > > @@ -109,6 +109,18 @@ if [ -f $testdir/run ]; then
-> > >      ln -fs $testdir/run $testdir-run
-> > >  fi
-> > >  
-> > > +# check if uint32_t needs a long format modifier
-> > > +cat << EOF > lib_test.c
-> > > +#include <inttypes.h>
-> > > +EOF
-> > > +
-> > > +$cross_prefix$cc lib_test.c -E | grep "typedef" | grep "long" | grep "uint32_t" &> /dev/null
-> 
-> This won't work with cross compilers that don't have inttypes.h in their
-> path (like mine). How about something like
+Hi Kishon,
 
-Paolo,
+a couple comments on the configfs layout based on my experiments with
+your previous drop to implement a NVMe device using it.
 
-I see you merged the above. As I stated in this mail, that doesn't work
-for my environment, neither arm nor powerpc cross-compile for me now...
+I don't think most of these configfs files should be present here, as
+they are properties of the implemented PCIe devices.  E.g. for my
+NVMe device they will be sort of hardcoded most of the time, as they
+would be for other devices that would always have a fixed vendor/device/
+class ID, cacheline size, etc.
 
-Please replace with something like I proposed below. We can probably
-replace the awk with a grep though.
-
-Thanks,
-drew
-
-
-> 
->  cat << EOF > lib_test.c
->  __UINT32_TYPE__
->  EOF
->  u32_long="`aarch64-linux-gnu-gcc lib_test.c -E | awk '/unsigned/ && $2 == "long"'`"
-> 
-> Although I feel there should be a compiler macro way to do this without
-> a need for configure/makefile trickery at all...
-> 
-> Thanks,
-> drew
-> 
-> 
-> > > +exit=$?
-> > > +if [ $exit -eq 0 ]; then
-> > > +    u32_long=true
-> > > +fi
-> > > +rm -f lib_test.c
-> > > +
-> > >  # check for dependent 32 bit libraries
-> > >  if [ "$arch" != "arm" ]; then
-> > >  cat << EOF > lib_test.c
-> > > @@ -155,4 +167,5 @@ TEST_DIR=$testdir
-> > >  FIRMWARE=$firmware
-> > >  ENDIAN=$endian
-> > >  PRETTY_PRINT_STACKS=$pretty_print_stacks
-> > > +U32_LONG_FMT=$u32_long
-> > >  EOF
-> > > diff --git a/lib/libcflat.h b/lib/libcflat.h
-> > > index 380395f..e80fc50 100644
-> > > --- a/lib/libcflat.h
-> > > +++ b/lib/libcflat.h
-> > > @@ -58,12 +58,21 @@ typedef _Bool		bool;
-> > >  #define true  1
-> > >  
-> > >  #if __SIZEOF_LONG__ == 8
-> > > +#  define __PRI32_PREFIX
-> > >  #  define __PRI64_PREFIX	"l"
-> > >  #  define __PRIPTR_PREFIX	"l"
-> > >  #else
-> > > +#if defined(__U32_LONG_FMT__)
-> > > +#  define __PRI32_PREFIX        "l"
-> > > +#else
-> > > +#  define __PRI32_PREFIX
-> > > +#endif
-> > >  #  define __PRI64_PREFIX	"ll"
-> > >  #  define __PRIPTR_PREFIX
-> > >  #endif
-> > > +#define PRId32  __PRI32_PREFIX	"d"
-> > > +#define PRIu32  __PRI32_PREFIX	"u"
-> > > +#define PRIx32  __PRI32_PREFIX	"x"
-> > >  #define PRId64  __PRI64_PREFIX	"d"
-> > >  #define PRIu64  __PRI64_PREFIX	"u"
-> > >  #define PRIx64  __PRI64_PREFIX	"x"
-> > > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe kvm" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+In the end what we'll to be able to do here is to be able to create
+a directory for each function driver, which then can create it's own
+attributes inside it.
