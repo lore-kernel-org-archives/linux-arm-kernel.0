@@ -1,82 +1,63 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 13 Jan 2017 11:25:52 +0000
-Subject: [RFC] Kernel panic down to swiotlb when doing insmod a simple
- driver
-In-Reply-To: <99472068-069a-7759-8d6e-019fd875264d@arm.com>
-References: <d64931b6-8875-51ea-06a0-e0981e12f859@rock-chips.com>
- <99472068-069a-7759-8d6e-019fd875264d@arm.com>
-Message-ID: <CAKv+Gu-aaGuHmshi=aiexUD=dxuia7tHKm3LQt3RG-7D_3v9Mw@mail.gmail.com>
+Date: Fri, 13 Jan 2017 11:27:48 +0000
+Subject: [PATCH] arm64/mm: use phys_addr_t
+In-Reply-To: <20170113112205.GA26804@leverpostej>
+References: <1484287175-14342-1-git-send-email-miles.chen@mediatek.com>
+ <20170113112205.GA26804@leverpostej>
+Message-ID: <CAKv+Gu__4S+0B39SXn46sqxsH0OXeusotZOBmvzZmw-yRRzdjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 January 2017 at 11:03, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 13/01/17 10:00, Shawn Lin wrote:
->> Hi,
+On 13 January 2017 at 11:22, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Jan 13, 2017 at 01:59:35PM +0800, miles.chen at mediatek.com wrote:
+>> From: Miles Chen <miles.chen@mediatek.com>
 >>
->> Sorry for sending this RFC for help as I couldn't find some useful hint
->> to slove my issue by git-log the swiotlb commit from kernel v4.4 to
->> v4.9 and I'm also not familar with these stuff. So could you kindly
->> point me to the right direction to debug it? Thanks. :)
+>> Use phys_addr_t instead of unsigned long for the
+>> return value of __pa(), make code easy to understand.
 >>
->> --------------------------------------
->> We just have a very simple wifi driver *built as ko module* which only
->> have a probe function to do the basic init work and call SDIO API to
->> transfer some bytes.
->>
->> Env: kernel 4.4 stable tree, ARM64(rk3399)
->>
->> Two cases are included:
+>> Signed-off-by: Miles Chen <miles.chen@mediatek.com>
 >
-> And they are both wrong :)
->
->> The crash case:
->>
->> u8 __aligned(32) buf[PAGE_SIZE]; //global here in ko driver file
->
-> It is only valid to do DMA from linear map addresses - I'm not sure if
-> the modules area was in the linear map before, but either way it
-> probably isn't now (Ard, Mark?). Either way, I don't believe static data
-> honours ARCH_DMA_MINALIGN in general, so it's still highly inadvisable.
+> This looks sensible to me. It's consistent with the types these
+> variables are compared against, and with the types of function
+> parameters these are passed as.
 >
 
-The __aligned() modifier should work fine: the alignment is propagated
-to the ELF section alignment, which in turn is honoured by the module
-loader. The problem is that '32' is too low for non-coherent DMA to be
-safe. In general, alignments up to 4 KB should work everywhere.
+Indeed. But doesn't it clash with Laura's series?
 
-I am surprised though that this ever  worked as a module, given that
-modules are (and have always been) loaded in the vmalloc area, which
-means VA to PA translations performed in the DMA layer on the
-addresses of statically allocated buffers are unlikely to return
-correct values (as your panic log proves)
-
->> static int wifi_probe(struct sdio_func *func, const struct
->> sdio_device_id *id)
->> {
->>   // prepare some SDIO work before
->>   printk("wifi_probe: buf = 0x%x\n", buf);
->>   sdio_memcpy_toio(func, 0, buf, 200);
->> }
->>
->> The workable case:
->>
->> static int wifi_probe(struct sdio_func *func, const struct
->> sdio_device_id *id)
->> {
->>
->>    u8 __aligned(32) buf[PAGE_SIZE]; //move inside the probe function
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
 >
-> No. DMA from the stack is right out, both for the aforementioned
-> alignment reasons, and the fact that we now have (or will have)
-> virtually-mapped stacks. One of the benefits of the latter is that it
-> catches bugs like this ;)
+> Thanks,
+> Mark.
 >
-
-Actually, aligned stack variables also work fine. But DMA involving
-the stack is not, so that is not really relevant.
-
-> Get your buffer from kmalloc() or a page allocation, and everything
-> should be correct.
+>> ---
+>>  arch/arm64/mm/mmu.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> index 17243e4..7eb7c21 100644
+>> --- a/arch/arm64/mm/mmu.c
+>> +++ b/arch/arm64/mm/mmu.c
+>> @@ -359,8 +359,8 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+>>
+>>  static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end)
+>>  {
+>> -     unsigned long kernel_start = __pa(_text);
+>> -     unsigned long kernel_end = __pa(__init_begin);
+>> +     phys_addr_t kernel_start = __pa(_text);
+>> +     phys_addr_t kernel_end = __pa(__init_begin);
+>>
+>>       /*
+>>        * Take care not to create a writable alias for the
+>> --
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
-
-Agreed.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
