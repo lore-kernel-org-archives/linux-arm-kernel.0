@@ -1,213 +1,240 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 13 Jan 2017 09:12:19 +0000
-Subject: [RFC PATCH v4 0/5] ARM: Fix dma_alloc_coherent() and friends for
- NOMMU
-In-Reply-To: <8a428278-fe0f-ca1f-2b6a-96fdbb363db4@arm.com>
-References: <1484057925-23586-1-git-send-email-vladimir.murzin@arm.com>
- <CA+M3ks5JP14SzprzE90-ST8b3URJECgpJ=dxw5XKvaxYEF3UCw@mail.gmail.com>
- <f4d17374-eb46-79f7-e394-cb2739f71ef4@arm.com>
- <CA+M3ks5jTNSLLOetvOUZP=B=a2wPNjXadbw6Zcn475Okc4QEPw@mail.gmail.com>
- <CA+M3ks6abvJV1RJtZhD1ixrnVhC5V3PL1+7DdwB+_tVg+vTkaw@mail.gmail.com>
- <1908ef72-beb0-1855-3c49-d5a37f014c17@arm.com>
- <c9bb8baa-ae3d-27cd-8c9f-2d77e1f5c62b@arm.com>
- <78458e5f-6b30-ab9b-1226-83fe3a844e3a@arm.com>
- <8a428278-fe0f-ca1f-2b6a-96fdbb363db4@arm.com>
-Message-ID: <5c3476e2-fae4-677c-3ed9-7a4eb4263ecb@arm.com>
+From: chris.packham@alliedtelesis.co.nz (Chris Packham)
+Date: Fri, 13 Jan 2017 22:12:16 +1300
+Subject: [PATCHv4 1/5] clk: mvebu: support for 98DX3236 SoC
+In-Reply-To: <20170113091222.7132-1-chris.packham@alliedtelesis.co.nz>
+References: <20170113091222.7132-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20170113091222.7132-2-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/17 18:07, Robin Murphy wrote:
-> On 12/01/17 17:15, Vladimir Murzin wrote:
->> On 12/01/17 17:04, Robin Murphy wrote:
->>> On 12/01/17 16:52, Vladimir Murzin wrote:
->>>> On 12/01/17 10:55, Benjamin Gaignard wrote:
->>>>> 2017-01-12 11:35 GMT+01:00 Benjamin Gaignard <benjamin.gaignard@linaro.org>:
->>>>>> 2017-01-11 15:34 GMT+01:00 Vladimir Murzin <vladimir.murzin@arm.com>:
->>>>>>> On 11/01/17 13:17, Benjamin Gaignard wrote:
->>>>>>>> 2017-01-10 15:18 GMT+01:00 Vladimir Murzin <vladimir.murzin@arm.com>:
->>>>>>>>> Hi,
->>>>>>>>>
->>>>>>>>> It seem that addition of cache support for M-class cpus uncovered
->>>>>>>>> latent bug in DMA usage. NOMMU memory model has been treated as being
->>>>>>>>> always consistent; however, for R/M classes of cpu memory can be
->>>>>>>>> covered by MPU which in turn might configure RAM as Normal
->>>>>>>>> i.e. bufferable and cacheable. It breaks dma_alloc_coherent() and
->>>>>>>>> friends, since data can stuck in caches now or be buffered.
->>>>>>>>>
->>>>>>>>> This patch set is trying to address the issue by providing region of
->>>>>>>>> memory suitable for consistent DMA operations. It is supposed that
->>>>>>>>> such region is marked by MPU as non-cacheable. Robin suggested to
->>>>>>>>> advertise such memory as reserved shared-dma-pool, rather then using
->>>>>>>>> homebrew command line option, and extend dma-coherent to provide
->>>>>>>>> default DMA area in the similar way as it is done for CMA (PATCH
->>>>>>>>> 2/5). It allows us to offload all bookkeeping on generic coherent DMA
->>>>>>>>> framework, and it is seems that it might be reused by other
->>>>>>>>> architectures like c6x and blackfin.
->>>>>>>>>
->>>>>>>>> Dedicated DMA region is required for cases other than:
->>>>>>>>>  - MMU/MPU is off
->>>>>>>>>  - cpu is v7m w/o cache support
->>>>>>>>>  - device is coherent
->>>>>>>>>
->>>>>>>>> In case one of the above conditions is true dma operations are forced
->>>>>>>>> to be coherent and wired with dma_noop_ops.
->>>>>>>>>
->>>>>>>>> To make life easier NOMMU dma operations are kept in separate
->>>>>>>>> compilation unit.
->>>>>>>>>
->>>>>>>>> Since the issue was reported in the same time as Benjamin sent his
->>>>>>>>> patch [1] to allow mmap for NOMMU, his case is also addressed in this
->>>>>>>>> series (PATCH 1/5 and PATCH 3/5).
->>>>>>>>>
->>>>>>>>> Thanks!
->>>>>>>>
->>>>>>>> I have tested this v4 on my setup (stm32f4, no cache, no MPU) and unfortunately
->>>>>>>> it doesn't work with my drm/kms driver.
->>>>>>>
->>>>>>> I guess the same is for fbmem, but would be better to have confirmation since
->>>>>>> amba-clcd I use has not been ported to drm/kms (yet), so I can't test.
->>>>>>>
->>>>>>>> I haven't any errors but nothing is displayed unlike what I have when
->>>>>>>> using current dma-mapping
->>>>>>>> code.
->>>>>>>> I guess the issue is coming from dma-noop where __get_free_pages() is
->>>>>>>> used instead of alloc_pages()
->>>>>>>> in dma-mapping.
->>>>>>>
->>>>>>> Unless I've missed something bellow is a call stack for both
->>>>>>>
->>>>>>> #1
->>>>>>> __alloc_simple_buffer
->>>>>>>         __dma_alloc_buffer
->>>>>>>                 alloc_pages
->>>>>>>                 split_page
->>>>>>>                 __dma_clear_buffer
->>>>>>>                         memset
->>>>>>>         page_address
->>>>>>>
->>>>>>> #2
->>>>>>> __get_free_pages
->>>>>>>         alloc_pages
->>>>>>>         page_address
->>>>>>>
->>>>>>> So the difference is that nommu case in dma-mapping.c memzeros memory, handles
->>>>>>> DMA_ATTR_NO_KERNEL_MAPPING and does optimisation of memory usage.
->>>>>>>
->>>>>>> Is something from above critical for your driver?
->>>>>>
->>>>>> I have removed all the diff (split_page,  __dma_clear_buffer, memset)
->>>>>> from #1 and it is still working.
->>>>>> DMA_ATTR_NO_KERNEL_MAPPING flag is not set when allocating the buffer.
->>>>>>
->>>>>> I have investigated more and found that dma-noop doesn't take care of
->>>>>> "dma-ranges" property which is set in DT.
->>>>>> I believed that is the root cause of my problem with your patches.
->>>>>
->>>>> After testing changing virt_to_phys to virt_to_dma in dma-noop.c fix the issue
->>>>> modetest and fbdemo are now still functional.
->>>>>
->>>>
->>>> Thanks for narrowing it down! I did not noticed that stm32f4 remap its memory,
->>>> so dma-ranges property is in use.
->>>>
->>>> It looks like virt_to_dma is ARM specific, so I probably have to discard idea
->>>> of reusing dma-noop-ops and switch logic into dma-mapping-nommu.c based on
->>>> is_device_dma_coherent(dev) check.
->>>
->>> dma_pfn_offset is a member of struct device, so it should be OK for
->>> dma_noop_ops to also make reference to it (and assume it's zero if not
->>> explicitly set).
->>>
->>>> Meanwhile, I'm quite puzzled on how such memory remaping should work together
->>>> with reserved memory. It seem it doesn't account dma-ranges while reserving
->>>> memory (it is too early) nor while allocating/mapping/etc.
->>>
->>> The reserved memory is described in terms of CPU physical addresses, so
->>> a device offset shouldn't matter from that perspective. It only comes
->>> into play at the point you generate the dma_addr_t to hand off to the
->>> device - only then do you need to transform the CPU physical address of
->>> the allocated/mapped page into the device's view of that page (i.e.
->>> subtract the offset).
->>
->> Thanks for explanation! So dma-coherent.c should be modified, right? I see
->> that some architectures provide phys_to_dma/dma_to_phys helpers primary for
->> swiotlb, is it safe to reuse them given that default implementation is
->> provided? Nothing under Documentation explains how they supposed to be used,
->> sorry if asking stupid question.
-> 
-> Those are essentially SWIOTLB-specific, so can't be universally relied
-> upon. I think something like this ought to suffice:
+The 98DX3236, 98DX3336, 98DX4521 and variants have a different TCLK from
+the Armada XP (200MHz vs 250MHz). The CPU core clock is fixed at 800MHz.
 
-Yup, but what about dma-coherent.c? Currently it has 
+The clock gating options are a subset of those on the Armada XP.
 
-int dma_alloc_from_coherent(struct device *dev, ssize_t size,
-				       dma_addr_t *dma_handle, void **ret)
-{
-...
-	*dma_handle = mem->device_base + (pageno << PAGE_SHIFT);
-	*ret = mem->virt_base + (pageno << PAGE_SHIFT);
-...
-}
+The core clock divider is different to the Armada XP also.
 
-In case reserved memory is described in terms of CPU phys addresses, would not
-we need to take into account dma_pfn_offset? What I'm missing?
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+---
 
-Thanks
-Vladimir
+Notes:
+    Changes in v2:
+    - Update devicetree binding documentation for new compatible string
+    Changes in v3:
+    - Add 98dx3236 support to mvebu/clk-corediv.c rather than creating a new
+      driver.
+    - Document mv98dx3236-corediv-clock binding
+    Changes in v4:
+    - None
 
-> 
-> ---8<---
-> diff --git a/lib/dma-noop.c b/lib/dma-noop.c
-> index 3d766e78fbe2..fbb1b37750d5 100644
-> --- a/lib/dma-noop.c
-> +++ b/lib/dma-noop.c
-> @@ -8,6 +8,11 @@
->  #include <linux/dma-mapping.h>
->  #include <linux/scatterlist.h>
-> 
-> +static dma_addr_t dma_noop_dev_offset(struct device *dev)
-> +{
-> +       return (dma_addr_t)dev->dma_pfn_offset << PAGE_SHIFT;
-> +}
-> +
->  static void *dma_noop_alloc(struct device *dev, size_t size,
->                             dma_addr_t *dma_handle, gfp_t gfp,
->                             unsigned long attrs)
-> @@ -16,7 +21,7 @@ static void *dma_noop_alloc(struct device *dev, size_t
-> size,
-> 
->         ret = (void *)__get_free_pages(gfp, get_order(size));
->         if (ret)
-> -               *dma_handle = virt_to_phys(ret);
-> +               *dma_handle = virt_to_phys(ret) - dma_noop_dev_offset(dev);
->         return ret;
->  }
-> 
-> @@ -32,7 +37,7 @@ static dma_addr_t dma_noop_map_page(struct device
-> *dev, struct page *page,
->                                       enum dma_data_direction dir,
->                                       unsigned long attrs)
->  {
-> -       return page_to_phys(page) + offset;
-> +       return page_to_phys(page) + offset - dma_noop_dev_offset(dev);
->  }
-> 
->  static int dma_noop_map_sg(struct device *dev, struct scatterlist *sgl,
-> int nents,
-> @@ -47,7 +52,8 @@ static int dma_noop_map_sg(struct device *dev, struct
-> scatterlist *sgl, int nent
-> 
->                 BUG_ON(!sg_page(sg));
->                 va = sg_virt(sg);
-> -               sg_dma_address(sg) = (dma_addr_t)virt_to_phys(va);
-> +               sg_dma_address(sg) = (dma_addr_t)virt_to_phys(va) -
-> +                                       dma_noop_dev_offset(dev);
->                 sg_dma_len(sg) = sg->length;
->         }
-> --->8---
-> 
-> intentionally whitespace-damaged by copy-pasting off my terminal to
-> emphasise how utterly untested it is ;)
-> 
-> Robin.
-> 
+ .../bindings/clock/mvebu-corediv-clock.txt         |  1 +
+ .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |  1 +
+ drivers/clk/mvebu/armada-xp.c                      | 42 ++++++++++++++++++++++
+ drivers/clk/mvebu/clk-corediv.c                    | 23 ++++++++++++
+ drivers/clk/mvebu/clk-cpu.c                        | 31 ++++++++++++++--
+ 5 files changed, 96 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt
+index 520562a7dc2a..c7b4e3a6b2c6 100644
+--- a/Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt
++++ b/Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt
+@@ -7,6 +7,7 @@ Required properties:
+ - compatible : must be "marvell,armada-370-corediv-clock",
+ 		       "marvell,armada-375-corediv-clock",
+ 		       "marvell,armada-380-corediv-clock",
++                       "marvell,mv98dx3236-corediv-clock",
+ 
+ - reg : must be the register address of Core Divider control register
+ - #clock-cells : from common clock binding; shall be set to 1
+diff --git a/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
+index 99c214660bdc..7f28506eaee7 100644
+--- a/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
++++ b/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
+@@ -3,6 +3,7 @@ Device Tree Clock bindings for cpu clock of Marvell EBU platforms
+ Required properties:
+ - compatible : shall be one of the following:
+ 	"marvell,armada-xp-cpu-clock" - cpu clocks for Armada XP
++	"marvell,mv98dx3236-cpu-clock" - cpu clocks for 98DX3236 SoC
+ - reg : Address and length of the clock complex register set, followed
+         by address and length of the PMU DFS registers
+ - #clock-cells : should be set to 1.
+diff --git a/drivers/clk/mvebu/armada-xp.c b/drivers/clk/mvebu/armada-xp.c
+index b3094315a3c0..0413bf8284e0 100644
+--- a/drivers/clk/mvebu/armada-xp.c
++++ b/drivers/clk/mvebu/armada-xp.c
+@@ -52,6 +52,12 @@ static u32 __init axp_get_tclk_freq(void __iomem *sar)
+ 	return 250000000;
+ }
+ 
++/* MV98DX3236 TCLK frequency is fixed to 200MHz */
++static u32 __init mv98dx3236_get_tclk_freq(void __iomem *sar)
++{
++	return 200000000;
++}
++
+ static const u32 axp_cpu_freqs[] __initconst = {
+ 	1000000000,
+ 	1066000000,
+@@ -89,6 +95,12 @@ static u32 __init axp_get_cpu_freq(void __iomem *sar)
+ 	return cpu_freq;
+ }
+ 
++/* MV98DX3236 CLK frequency is fixed to 800MHz */
++static u32 __init mv98dx3236_get_cpu_freq(void __iomem *sar)
++{
++	return 800000000;
++}
++
+ static const int axp_nbclk_ratios[32][2] __initconst = {
+ 	{0, 1}, {1, 2}, {2, 2}, {2, 2},
+ 	{1, 2}, {1, 2}, {1, 1}, {2, 3},
+@@ -158,6 +170,14 @@ static const struct coreclk_soc_desc axp_coreclks = {
+ 	.num_ratios = ARRAY_SIZE(axp_coreclk_ratios),
+ };
+ 
++static const struct coreclk_soc_desc mv98dx3236_coreclks = {
++	.get_tclk_freq = mv98dx3236_get_tclk_freq,
++	.get_cpu_freq = mv98dx3236_get_cpu_freq,
++	.get_clk_ratio = NULL,
++	.ratios = NULL,
++	.num_ratios = 0,
++};
++
+ /*
+  * Clock Gating Control
+  */
+@@ -195,6 +215,15 @@ static const struct clk_gating_soc_desc axp_gating_desc[] __initconst = {
+ 	{ }
+ };
+ 
++static const struct clk_gating_soc_desc mv98dx3236_gating_desc[] __initconst = {
++	{ "ge1", NULL, 3, 0 },
++	{ "ge0", NULL, 4, 0 },
++	{ "pex00", NULL, 5, 0 },
++	{ "sdio", NULL, 17, 0 },
++	{ "xor0", NULL, 22, 0 },
++	{ }
++};
++
+ static void __init axp_clk_init(struct device_node *np)
+ {
+ 	struct device_node *cgnp =
+@@ -206,3 +235,16 @@ static void __init axp_clk_init(struct device_node *np)
+ 		mvebu_clk_gating_setup(cgnp, axp_gating_desc);
+ }
+ CLK_OF_DECLARE(axp_clk, "marvell,armada-xp-core-clock", axp_clk_init);
++
++static void __init mv98dx3236_clk_init(struct device_node *np)
++{
++	struct device_node *cgnp =
++		of_find_compatible_node(NULL, NULL, "marvell,armada-xp-gating-clock");
++
++	mvebu_coreclk_setup(np, &mv98dx3236_coreclks);
++
++	if (cgnp)
++		mvebu_clk_gating_setup(cgnp, mv98dx3236_gating_desc);
++}
++CLK_OF_DECLARE(mv98dx3236_clk, "marvell,mv98dx3236-core-clock",
++	       mv98dx3236_clk_init);
+diff --git a/drivers/clk/mvebu/clk-corediv.c b/drivers/clk/mvebu/clk-corediv.c
+index d1e5863d3375..8491979f4096 100644
+--- a/drivers/clk/mvebu/clk-corediv.c
++++ b/drivers/clk/mvebu/clk-corediv.c
+@@ -71,6 +71,10 @@ static const struct clk_corediv_desc mvebu_corediv_desc[] = {
+ 	{ .mask = 0x3f, .offset = 8, .fieldbit = 1 }, /* NAND clock */
+ };
+ 
++static const struct clk_corediv_desc mv98dx3236_corediv_desc[] = {
++	{ .mask = 0x0f, .offset = 6, .fieldbit = 26 }, /* NAND clock */
++};
++
+ #define to_corediv_clk(p) container_of(p, struct clk_corediv, hw)
+ 
+ static int clk_corediv_is_enabled(struct clk_hw *hwclk)
+@@ -232,6 +236,18 @@ static const struct clk_corediv_soc_desc armada375_corediv_soc = {
+ 	.ratio_offset = 0x4,
+ };
+ 
++static const struct clk_corediv_soc_desc mv98dx3236_corediv_soc = {
++	.descs = mv98dx3236_corediv_desc,
++	.ndescs = ARRAY_SIZE(mv98dx3236_corediv_desc),
++	.ops = {
++		.recalc_rate = clk_corediv_recalc_rate,
++		.round_rate = clk_corediv_round_rate,
++		.set_rate = clk_corediv_set_rate,
++	},
++	.ratio_reload = BIT(10),
++	.ratio_offset = 0x8,
++};
++
+ static void __init
+ mvebu_corediv_clk_init(struct device_node *node,
+ 		       const struct clk_corediv_soc_desc *soc_desc)
+@@ -313,3 +329,10 @@ static void __init armada380_corediv_clk_init(struct device_node *node)
+ }
+ CLK_OF_DECLARE(armada380_corediv_clk, "marvell,armada-380-corediv-clock",
+ 	       armada380_corediv_clk_init);
++
++static void __init mv98dx3236_corediv_clk_init(struct device_node *node)
++{
++	return mvebu_corediv_clk_init(node, &mv98dx3236_corediv_soc);
++}
++CLK_OF_DECLARE(mv98dx3236_corediv_clk, "marvell,mv98dx3236-corediv-clock",
++	       mv98dx3236_corediv_clk_init);
+diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
+index 5837eb8a212f..3b8f0e14fa01 100644
+--- a/drivers/clk/mvebu/clk-cpu.c
++++ b/drivers/clk/mvebu/clk-cpu.c
+@@ -165,7 +165,9 @@ static const struct clk_ops cpu_ops = {
+ 	.set_rate = clk_cpu_set_rate,
+ };
+ 
+-static void __init of_cpu_clk_setup(struct device_node *node)
++/* Add parameter to allow this to support different clock operations. */
++static void __init _of_cpu_clk_setup(struct device_node *node,
++			const struct clk_ops *cpu_clk_ops)
+ {
+ 	struct cpu_clk *cpuclk;
+ 	void __iomem *clock_complex_base = of_iomap(node, 0);
+@@ -218,7 +220,7 @@ static void __init of_cpu_clk_setup(struct device_node *node)
+ 		cpuclk[cpu].hw.init = &init;
+ 
+ 		init.name = cpuclk[cpu].clk_name;
+-		init.ops = &cpu_ops;
++		init.ops = cpu_clk_ops;
+ 		init.flags = 0;
+ 		init.parent_names = &cpuclk[cpu].parent_name;
+ 		init.num_parents = 1;
+@@ -243,5 +245,30 @@ static void __init of_cpu_clk_setup(struct device_node *node)
+ 	iounmap(clock_complex_base);
+ }
+ 
++/* Use this function to call the generic setup with the correct
++ * clock operation
++ */
++static void __init of_cpu_clk_setup(struct device_node *node)
++{
++	_of_cpu_clk_setup(node, &cpu_ops);
++}
++
+ CLK_OF_DECLARE(armada_xp_cpu_clock, "marvell,armada-xp-cpu-clock",
+ 					 of_cpu_clk_setup);
++
++/* Define the clock and operations for the mv98dx3236 - it cannot perform
++ * any operations.
++ */
++static const struct clk_ops mv98dx3236_cpu_ops = {
++	.recalc_rate = NULL,
++	.round_rate = NULL,
++	.set_rate = NULL,
++};
++
++static void __init of_mv98dx3236_cpu_clk_setup(struct device_node *node)
++{
++	_of_cpu_clk_setup(node, &mv98dx3236_cpu_ops);
++}
++
++CLK_OF_DECLARE(mv98dx3236_cpu_clock, "marvell,mv98dx3236-cpu-clock",
++					 of_mv98dx3236_cpu_clk_setup);
+-- 
+2.11.0.24.ge6920cf
