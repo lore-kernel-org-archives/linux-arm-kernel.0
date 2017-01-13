@@ -1,34 +1,39 @@
 From: david@lechnology.com (David Lechner)
-Date: Fri, 13 Jan 2017 14:00:11 -0600
-Subject: [PATCH v2 1/2] ARM: davinci: Allocate extra interrupts
+Date: Fri, 13 Jan 2017 14:00:12 -0600
+Subject: [PATCH v2 2/2] ARM: davinci_all_defconfig: enable iio
 In-Reply-To: <1484337612-11120-1-git-send-email-david@lechnology.com>
 References: <1484337612-11120-1-git-send-email-david@lechnology.com>
-Message-ID: <1484337612-11120-2-git-send-email-david@lechnology.com>
+Message-ID: <1484337612-11120-3-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allocates extra interrupts for mach-davinci. These extra interrupts
-are need for things like IIO triggers.
+This enables the iio subsystem. This will be used by LEGO MINDSTORMS EV3,
+which has an ADS7957 chip.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
- arch/arm/mach-davinci/include/mach/irqs.h | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/configs/davinci_all_defconfig | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/include/mach/irqs.h b/arch/arm/mach-davinci/include/mach/irqs.h
-index edb2ca6..2b56bb2 100644
---- a/arch/arm/mach-davinci/include/mach/irqs.h
-+++ b/arch/arm/mach-davinci/include/mach/irqs.h
-@@ -403,7 +403,9 @@
- 
- /* da850 currently has the most gpio pins (144) */
- #define DAVINCI_N_GPIO			144
-+/* Extra IRQs for things like IIO triggers */
-+#define DAVINCI_N_SPARE_IRQ		16
- /* da850 currently has the most irqs so use DA850_N_CP_INTC_IRQ */
--#define NR_IRQS				(DA850_N_CP_INTC_IRQ + DAVINCI_N_GPIO)
-+#define NR_IRQS (DA850_N_CP_INTC_IRQ + DAVINCI_N_GPIO + DAVINCI_N_SPARE_IRQ)
- 
- #endif /* __ASM_ARCH_IRQS_H */
+diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+index f598daa..8cc0409 100644
+--- a/arch/arm/configs/davinci_all_defconfig
++++ b/arch/arm/configs/davinci_all_defconfig
+@@ -201,6 +201,15 @@ CONFIG_TI_EDMA=y
+ CONFIG_MEMORY=y
+ CONFIG_TI_AEMIF=m
+ CONFIG_DA8XX_DDRCTL=y
++CONFIG_IIO=m
++CONFIG_IIO_BUFFER=y
++CONFIG_IIO_BUFFER_CB=m
++CONFIG_IIO_KFIFO_BUF=m
++CONFIG_IIO_TRIGGER=y
++CONFIG_IIO_SW_DEVICE=m
++CONFIG_IIO_SW_TRIGGER=m
++CONFIG_IIO_HRTIMER_TRIGGER=m
++CONFIG_IIO_SYSFS_TRIGGER=m
+ CONFIG_PWM=y
+ CONFIG_PWM_TIECAP=m
+ CONFIG_PWM_TIEHRPWM=m
 -- 
 2.7.4
