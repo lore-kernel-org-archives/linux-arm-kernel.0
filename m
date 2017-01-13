@@ -1,47 +1,36 @@
 From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Fri, 13 Jan 2017 18:46:56 +0800
-Subject: [PATCH v4 1/3] dt: bindings: add documentation for zx2967 family
- thermal sensor
-Message-ID: <1484304418-17489-1-git-send-email-baoyou.xie@linaro.org>
+Date: Fri, 13 Jan 2017 18:46:57 +0800
+Subject: [PATCH v4 2/3] MAINTAINERS: add zx2967 thermal drivers to ARM ZTE
+ architecture
+In-Reply-To: <1484304418-17489-1-git-send-email-baoyou.xie@linaro.org>
+References: <1484304418-17489-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <1484304418-17489-2-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds dt-binding documentation for zx2967 family thermal sensor.
+Add the zx2967 thermal drivers as maintained by ARM ZTE
+architecture maintainers, as they're parts of the core IP.
 
 Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Shawn Guo <shawnguo@kernel.org>
 ---
- .../devicetree/bindings/thermal/zx2967-thermal.txt  | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
+ MAINTAINERS | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt b/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
-new file mode 100644
-index 0000000..86f941c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
-@@ -0,0 +1,21 @@
-+* ZTE zx2967 family Thermal
-+
-+Required Properties:
-+- compatible: should be one of the following.
-+    * zte,zx296718-thermal
-+- reg: physical base address of the controller and length of memory mapped
-+    region.
-+- clocks : Pairs of phandle and specifier referencing the controller's clocks.
-+- clock-names: "gate" for the topcrm clock.
-+	       "pclk" for the apb clock.
-+- #thermal-sensor-cells: must be 0.
-+
-+Example:
-+
-+	tempsensor: tempsensor at 148a000 {
-+		compatible = "zte,zx296718-thermal";
-+		reg = <0x0148a000 0x20>;
-+		clocks = <&topcrm TEMPSENSOR_GATE>, <&audiocrm AUDIO_TS_PCLK>;
-+		clock-names = "gate", "pclk";
-+		#thermal-sensor-cells = <0>;
-+	};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 64f04df..2793808 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1981,9 +1981,11 @@ S:	Maintained
+ F:	arch/arm/mach-zx/
+ F:	drivers/clk/zte/
+ F:	drivers/soc/zte/
++F:	drivers/thermal/zx*
+ F:	Documentation/devicetree/bindings/arm/zte.txt
+ F:	Documentation/devicetree/bindings/clock/zx296702-clk.txt
+ F:	Documentation/devicetree/bindings/soc/zte/
++F:	Documentation/devicetree/bindings/thermal/zx*
+ F:	include/dt-bindings/soc/zx*.h
+ 
+ ARM/ZYNQ ARCHITECTURE
 -- 
 2.7.4
