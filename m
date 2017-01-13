@@ -1,9 +1,9 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 13 Jan 2017 11:18:57 +0000
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 13 Jan 2017 11:22:05 +0000
 Subject: [PATCH] arm64/mm: use phys_addr_t
 In-Reply-To: <1484287175-14342-1-git-send-email-miles.chen@mediatek.com>
 References: <1484287175-14342-1-git-send-email-miles.chen@mediatek.com>
-Message-ID: <20170113111857.GB30292@e104818-lin.cambridge.arm.com>
+Message-ID: <20170113112205.GA26804@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,6 +14,16 @@ On Fri, Jan 13, 2017 at 01:59:35PM +0800, miles.chen at mediatek.com wrote:
 > return value of __pa(), make code easy to understand.
 > 
 > Signed-off-by: Miles Chen <miles.chen@mediatek.com>
+
+This looks sensible to me. It's consistent with the types these
+variables are compared against, and with the types of function
+parameters these are passed as.
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
 > ---
 >  arch/arm64/mm/mmu.c | 4 ++--
 >  1 file changed, 2 insertions(+), 2 deletions(-)
@@ -30,7 +40,14 @@ On Fri, Jan 13, 2017 at 01:59:35PM +0800, miles.chen at mediatek.com wrote:
 > -	unsigned long kernel_end = __pa(__init_begin);
 > +	phys_addr_t kernel_start = __pa(_text);
 > +	phys_addr_t kernel_end = __pa(__init_begin);
-
-Looks fine.
-
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>  
+>  	/*
+>  	 * Take care not to create a writable alias for the
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
