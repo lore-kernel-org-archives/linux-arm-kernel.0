@@ -1,50 +1,30 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Fri, 13 Jan 2017 12:03:00 -0800
-Subject: [PATCH v6 23/25] usb: chipidea: Pullup D+ in device mode via phy
- APIs
-In-Reply-To: <20170113033536.GA20723@b29397-desktop>
-References: <20161228225711.698-1-stephen.boyd@linaro.org>
- <20161228225711.698-24-stephen.boyd@linaro.org>
- <20170103065318.GB14542@b29397-desktop>
- <148418039309.32258.7247753739063801774@sboyd-linaro>
- <20170112095040.GA15726@b29397-desktop>
- <148426139182.20672.2422337338087784924@sboyd-linaro>
- <20170113033536.GA20723@b29397-desktop>
-Message-ID: <148433778067.32719.6179204976256776867@sboyd-linaro>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 13 Jan 2017 12:03:59 -0800
+Subject: [PATCH v4] ARM64: dts: meson-gx: Add reserved memory zone and
+ usable memory range
+In-Reply-To: <1484129414-23325-1-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Wed, 11 Jan 2017 11:10:14 +0100")
+References: <1484129414-23325-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <m21sw66828.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Chen (2017-01-12 19:35:36)
-> On Thu, Jan 12, 2017 at 02:49:51PM -0800, Stephen Boyd wrote:
-> > 
-> > With the boards I have, vbus is not routed to the phy. Instead, there's
-> > a vbus comparator on the PMIC where the vbus line from the usb
-> > receptacle is sent. The vbus extcon driver probes the comparator on the
-> > PMIC to see if vbus is present or not and then notifies extcon users
-> > when vbus changes.
-> > 
-> > The ULPI register we write in the phy is a vendor specific register
-> > (called MISC_A) that has two bits. If you look at
-> > qcom_usb_hs_phy_set_mode() in this series you'll see that we set
-> > VBUSVLDEXTSEL and VBUSVLDEXT. VBUSVLDEXTSEL controls a mux in the phy
-> > that chooses between an internal comparator, in the case where vbus goes
-> > to the phy, or an external signal input to the phy, VBUSVLDEXT, to
-> > consider as the "session valid" signal. It looks like the session valid
-> > signal drives the D+ pullup resistor in the phy. These bits in MISC_A
-> > don't matter when the phy is in host mode.
-> > 
-> > So when the board doesn't route vbus to the phy, we have to toggle the
-> > VBUSVLDEXT bit to signal to the phy that the vbus is there or not. I
-> > also see that we're not supposed to toggle the VBUSVLDEXTSEL bit when in
-> > "normal" operating mode. So perhaps we should do everything in the
-> > qcom_usb_hs_phy_set_mode() routine during the role switch as you
-> > suggest, except toggle the VBUSVLDEXT bit. Toggling the VBUSVLDEXT bit
-> > can be done via some new phy op when the extcon triggers?
-> 
-> Why not call phy_set_mode(phy, DEVICE) directly at ci_handle_vbus_change when
-> you get extcon vbus event?
-> 
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-Right, I can call phy_set_mode(phy, DEVICE) there, but is that correct?
-How do we signal vbus is gone, with phy_set_mode(phy, HOST)? Mode
-doesn't seem the same as "vbus status changed" so this feels wrong.
+> The Amlogic Meson GXBB/GXL/GXM secure monitor uses part of the memory space,
+> this patch adds this reserved zone and redefines the usable memory range.
+>
+> The memory node is also moved from the dtsi files into the proper dts files
+> to handle variants memory sizes.
+>
+> This patch also fixes the memory sizes for the following platforms :
+> - gxl-s905x-p212 : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
+> - gxm-s912-q201 : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
+> - gxl-s905d-p231 : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
+> - gxl-nexbox-a95x : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
+>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+
+Queued for v4.10-rc.
+
+Kevin
