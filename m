@@ -1,89 +1,101 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 13 Jan 2017 10:55:09 +0100
-Subject: [PATCH] ARM64: dts: meson-gxbb-odroidc2: fix GbE tx link breakage
-In-Reply-To: <m2r3476atl.fsf@baylibre.com>
-References: <1482319894-656-1-git-send-email-jbrunet@baylibre.com>
- <m2r3476atl.fsf@baylibre.com>
-Message-ID: <1484301309.8168.7.camel@baylibre.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Fri, 13 Jan 2017 11:00:25 +0100
+Subject: [PATCH RESEND 1/2] memory: aemif: allow passing device lookup table
+ as platform data
+In-Reply-To: <1484301626-30345-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1484301626-30345-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1484301626-30345-2-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-01-12 at 16:52 -0800, Kevin Hilman wrote:
-> Jerome Brunet <jbrunet@baylibre.com> writes:
-> 
-> > 
-> > OdroidC2 GbE link breaks under heavy tx transfer. This happens even
-> > if the
-> > MAC does not enable Energy Efficient Ethernet (No Low Power state
-> > Idle on
-> > the Tx path). The problem seems to come from the phy Rx path,
-> > entering the
-> > LPI state.
-> > 
-> > Disabling EEE advertisement on the phy prevent this feature to be
-> > negociated with the link partner and solve the issue.
-> > 
-> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> > ---
-> > 
-> > This patch is based on Linus recent master branch [0]
-> > This patch depends on the series [1] which has been merged in this
-> > branch.
-> > 
-> > 0: ba6d973f78eb ("Merge
-> > git://git.kernel.org/pub/scm/linux/kernel/git/davem/net")
-> > 1: http://lkml.kernel.org/r/1480326409-25419-1-git-send-email-jbrun
-> > et at baylibre.com
-> > ???Fix integration of eee-broken-modes
-> > ???
-> > ?arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 12
-> > ++++++++++++
-> > ?1 file changed, 12 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> > b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> > index 238fbeacd330..d8933e9e9a5a 100644
-> > --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> > +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> > @@ -147,6 +147,18 @@
-> > ?	status = "okay";
-> > ?	pinctrl-0 = <&eth_rgmii_pins>;
-> > ?	pinctrl-names = "default";
-> > +	phy-handle = <&eth_phy0>;
-> > +
-> > +	mdio {
-> > +		compatible = "snps,dwmac-mdio";
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		eth_phy0: ethernet-phy at 0 {
-> > +			reg = <0>;
-> > +			eee-broken-1000t;
-> > +		};
-> > +	};
-> 
-> There's already an MDIO node in the meson-gx.dtsi (using the same
-> compatible), shouldn't you just override that and add the new
-> properties?
+TI aemif driver creates its own subnodes of the device tree in order
+to guarantee that all child devices are probed after the AEMIF timing
+parameters are configured.
 
-Hum, yeah in the changes queued from 4.11, right ?
-But not in the latest rc from Linus. Since this is a fix, it was
-actually target for this branch.
+Some devices (e.g. da850) use struct of_dev_auxdata for clock lookup
+but nodes created from within the aemif driver can't access the lookup
+table.
 
-I guess you'd prefer to avoid merge conflicts when the 4.10 is tagged.
-How do you want to handle this ?
+Create a platform data structure that holds a pointer to
+of_dev_auxdata so that we can use it with of_platform_populate().
 
-> 
-> What would make things easier is if the names were like Martin used
-> in
-> his reset patch, so that when I merge them together it's not a major
-> conflict.
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@oracle.com>
+---
+ drivers/memory/ti-aemif.c              |  8 +++++++-
+ include/linux/platform_data/ti-aemif.h | 23 +++++++++++++++++++++++
+ 2 files changed, 30 insertions(+), 1 deletion(-)
+ create mode 100644 include/linux/platform_data/ti-aemif.h
 
-Sure, no problem. I'll change it to match what has been done by Martin.
-
-> 
-> Thanks,
-> 
-> Kevin
-> 
-> [1] https://patchwork.kernel.org/patch/9459409/
+diff --git a/drivers/memory/ti-aemif.c b/drivers/memory/ti-aemif.c
+index a579a0f..22c1aee 100644
+--- a/drivers/memory/ti-aemif.c
++++ b/drivers/memory/ti-aemif.c
+@@ -20,6 +20,7 @@
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
++#include <linux/platform_data/ti-aemif.h>
+ 
+ #define TA_SHIFT	2
+ #define RHOLD_SHIFT	4
+@@ -335,6 +336,8 @@ static int aemif_probe(struct platform_device *pdev)
+ 	struct device_node *np = dev->of_node;
+ 	struct device_node *child_np;
+ 	struct aemif_device *aemif;
++	struct aemif_platform_data *pdata;
++	struct of_dev_auxdata *dev_lookup;
+ 
+ 	if (np == NULL)
+ 		return 0;
+@@ -343,6 +346,9 @@ static int aemif_probe(struct platform_device *pdev)
+ 	if (!aemif)
+ 		return -ENOMEM;
+ 
++	pdata = dev_get_platdata(&pdev->dev);
++	dev_lookup = pdata ? pdata->dev_lookup : NULL;
++
+ 	platform_set_drvdata(pdev, aemif);
+ 
+ 	aemif->clk = devm_clk_get(dev, NULL);
+@@ -390,7 +396,7 @@ static int aemif_probe(struct platform_device *pdev)
+ 	 * parameters are set.
+ 	 */
+ 	for_each_available_child_of_node(np, child_np) {
+-		ret = of_platform_populate(child_np, NULL, NULL, dev);
++		ret = of_platform_populate(child_np, NULL, dev_lookup, dev);
+ 		if (ret < 0)
+ 			goto error;
+ 	}
+diff --git a/include/linux/platform_data/ti-aemif.h b/include/linux/platform_data/ti-aemif.h
+new file mode 100644
+index 0000000..ac72e11
+--- /dev/null
++++ b/include/linux/platform_data/ti-aemif.h
+@@ -0,0 +1,23 @@
++/*
++ * TI DaVinci AEMIF platform glue.
++ *
++ * Copyright (C) 2017 BayLibre SAS
++ *
++ * Author:
++ *   Bartosz Golaszewski <bgolaszewski@baylibre.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __TI_DAVINCI_AEMIF_DATA_H__
++#define __TI_DAVINCI_AEMIF_DATA_H__
++
++#include <linux/of_platform.h>
++
++struct aemif_platform_data {
++	struct of_dev_auxdata *dev_lookup;
++};
++
++#endif /* __TI_DAVINCI_AEMIF_DATA_H__ */
+-- 
+2.9.3
