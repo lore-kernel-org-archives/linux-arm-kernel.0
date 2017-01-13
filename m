@@ -1,111 +1,62 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 13 Jan 2017 11:31:33 +0000
-Subject: [PATCH 3/3] KVM: arm/arm64: vgic: Fix deadlock on error handling
+Date: Fri, 13 Jan 2017 11:31:31 +0000
+Subject: [PATCH 1/3] KVM: arm/arm64: Fix occasional warning from the timer
+ work function
 In-Reply-To: <1484307093-29153-1-git-send-email-marc.zyngier@arm.com>
 References: <1484307093-29153-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1484307093-29153-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1484307093-29153-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry Vyukov reported that the syzkaller fuzzer triggered a
-deadlock in the vgic setup code when an error was detected, as
-the cleanup code tries to take a lock that is already held by
-the setup code.
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-The fix is to avoid retaking the lock when cleaning up, by
-telling the cleanup function that we already hold it.
+When a VCPU blocks (WFI) and has programmed the vtimer, we program a
+soft timer to expire in the future to wake up the vcpu thread when
+appropriate.  Because such as wake up involves a vcpu kick, and the
+timer expire function can get called from interrupt context, and the
+kick may sleep, we have to schedule the kick in the work function.
 
-Cc: stable at vger.kernel.org
-Reported-by: Dmitry Vyukov <dvyukov@google.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+The work function currently has a warning that gets raised if it turns
+out that the timer shouldn't fire when it's run, which was added because
+the idea was that in that case the work should never have been cancelled.
+
+However, it turns out that this whole thing is racy and we can get
+spurious warnings.  The problem is that we clear the armed flag in the
+work function, which may run in parallel with the
+kvm_timer_unschedule->timer_disarm() call.  This results in a possible
+situation where the timer_disarm() call does not call
+cancel_work_sync(), which effectively synchronizes the completion of the
+work function with running the VCPU.  As a result, the VCPU thread
+proceeds before the work function completees, causing changes to the
+timer state such that kvm_timer_should_fire(vcpu) returns false in the
+work function.
+
+All we do in the work function is to kick the VCPU, and an occasional
+rare extra kick never harmed anyone.  Since the race above is extremely
+rare, we don't bother checking if the race happens but simply remove the
+check and the clearing of the armed flag from the work function.
+
+Reported-by: Matthias Brugger <mbrugger@suse.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-init.c | 18 +++++++++++++-----
- virt/kvm/arm/vgic/vgic-v2.c   |  2 --
- virt/kvm/arm/vgic/vgic-v3.c   |  2 --
- 3 files changed, 13 insertions(+), 9 deletions(-)
+ virt/kvm/arm/arch_timer.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 5114391..c737ea0 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -268,15 +268,11 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
- {
- 	struct vgic_dist *dist = &kvm->arch.vgic;
- 
--	mutex_lock(&kvm->lock);
--
- 	dist->ready = false;
- 	dist->initialized = false;
- 
- 	kfree(dist->spis);
- 	dist->nr_spis = 0;
--
--	mutex_unlock(&kvm->lock);
- }
- 
- void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
-@@ -286,7 +282,8 @@ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
- 	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
- }
- 
--void kvm_vgic_destroy(struct kvm *kvm)
-+/* To be called with kvm->lock held */
-+static void __kvm_vgic_destroy(struct kvm *kvm)
- {
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index a2dbbcc..a7fe606 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -89,9 +89,6 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
  	struct kvm_vcpu *vcpu;
- 	int i;
-@@ -297,6 +294,13 @@ void kvm_vgic_destroy(struct kvm *kvm)
- 		kvm_vgic_vcpu_destroy(vcpu);
- }
  
-+void kvm_vgic_destroy(struct kvm *kvm)
-+{
-+	mutex_lock(&kvm->lock);
-+	__kvm_vgic_destroy(kvm);
-+	mutex_unlock(&kvm->lock);
-+}
-+
- /**
-  * vgic_lazy_init: Lazy init is only allowed if the GIC exposed to the guest
-  * is a GICv2. A GICv3 must be explicitly initialized by the guest using the
-@@ -348,6 +352,10 @@ int kvm_vgic_map_resources(struct kvm *kvm)
- 		ret = vgic_v2_map_resources(kvm);
- 	else
- 		ret = vgic_v3_map_resources(kvm);
-+
-+	if (ret)
-+		__kvm_vgic_destroy(kvm);
-+
- out:
- 	mutex_unlock(&kvm->lock);
- 	return ret;
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 9bab867..834137e 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -293,8 +293,6 @@ int vgic_v2_map_resources(struct kvm *kvm)
- 	dist->ready = true;
+ 	vcpu = container_of(work, struct kvm_vcpu, arch.timer_cpu.expired);
+-	vcpu->arch.timer_cpu.armed = false;
+-
+-	WARN_ON(!kvm_timer_should_fire(vcpu));
  
- out:
--	if (ret)
--		kvm_vgic_destroy(kvm);
- 	return ret;
- }
- 
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 5c9f974..e6b03fd 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -302,8 +302,6 @@ int vgic_v3_map_resources(struct kvm *kvm)
- 	dist->ready = true;
- 
- out:
--	if (ret)
--		kvm_vgic_destroy(kvm);
- 	return ret;
- }
- 
+ 	/*
+ 	 * If the vcpu is blocked we want to wake it up so that it will see
 -- 
 2.1.4
