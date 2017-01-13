@@ -1,55 +1,75 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 13 Jan 2017 14:53:18 +0100
-Subject: [PATCH 4/4] clk: rockchip: add rk3288 cif_out clock
-In-Reply-To: <1484049560-14820-4-git-send-email-jacob-chen@iotwrt.com>
-References: <1484049560-14820-1-git-send-email-jacob-chen@iotwrt.com>
- <1484049560-14820-4-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <2707876.A5Xp7pLXJo@phil>
+From: ravibabu@ti.com (Ravi Babu)
+Date: Fri, 13 Jan 2017 18:10:33 +0530
+Subject: [PATCH 1/2] ARM: dts: dra7-evm: increase QSPI SPL partition size
+In-Reply-To: <1484311234-21978-1-git-send-email-ravibabu@ti.com>
+References: <1484311234-21978-1-git-send-email-ravibabu@ti.com>
+Message-ID: <1484311234-21978-2-git-send-email-ravibabu@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacob,
+The SPL size for DRA74x platform has increased and
+is now more than 64KB. Increase QSPI SPL partition
+size to 256KB for DRA74x EVM.
 
-Am Dienstag, 10. Januar 2017, 19:59:20 CET schrieb Jacob Chen:
-> Add the clocks for the cif block of the rk3288
-> 
-> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
-> ---
->  drivers/clk/rockchip/clk-rk3288.c | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/drivers/clk/rockchip/clk-rk3288.c
-> b/drivers/clk/rockchip/clk-rk3288.c index 8047cea..f071c24 100644
-> --- a/drivers/clk/rockchip/clk-rk3288.c
-> +++ b/drivers/clk/rockchip/clk-rk3288.c
-> @@ -192,6 +192,7 @@ PNAME(mux_uart1_p)	= { "uart1_src", "uart1_frac",
-> "xin24m" }; PNAME(mux_uart2_p)	= { "uart2_src", "uart2_frac", "xin24m" };
->  PNAME(mux_uart3_p)	= { "uart3_src", "uart3_frac", "xin24m" };
->  PNAME(mux_uart4_p)	= { "uart4_src", "uart4_frac", "xin24m" };
-> +PNAME(mux_cif_out_p)	= { "cif_src", "xin24m" };
->  PNAME(mux_vip_out_p)	= { "vip_src", "xin24m" };
->  PNAME(mux_mac_p)	= { "mac_pll_src", "ext_gmac" };
->  PNAME(mux_hsadcout_p)	= { "hsadc_src", "ext_hsadc" };
-> @@ -448,6 +449,12 @@ static struct rockchip_clk_branch rk3288_clk_branches[]
-> __initdata = { RK3288_CLKSEL_CON(6), 14, 2, MFLAGS, 8, 6, DFLAGS,
->  			RK3288_CLKGATE_CON(3), 15, GFLAGS),
-> 
-> +	COMPOSITE_NOGATE(0, "cif_src", mux_pll_src_cpll_gpll_p, 0,
-> +			RK3288_CLKSEL_CON(26), 8, 1, MFLAGS, 9, 5, DFLAGS),
-> +	COMPOSITE_NODIV(SCLK_CIF_OUT, "sclk_cif_out", mux_cif_out_p, 0,
-> +			RK3288_CLKSEL_CON(26), 15, 1, MFLAGS,
-> +			RK3288_CLKGATE_CON(3), 7, GFLAGS),
-> +
+QSPI partition numbering changes because of this.
 
-we already have vip_src and sclk_vip_out defined, which I guess are the clocks 
-you are adding here and according to the TRM I have the names are also correct 
-(clock diagram 2).
+Signed-off-by: Ravi Babu <ravibabu@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/boot/dts/dra7-evm.dts | 24 ++++++------------------
+ 1 file changed, 6 insertions(+), 18 deletions(-)
 
-But the clkid is not set yet, so I'd suggest adding SCLK_VIP_OUT and assigning 
-to the existing clocks.
-
-Also, according to the clock diagram, the gate needs to be (and already is) 
-part of the vip_src clock and not the sclk_vip_out.
-
-
-Heiko
+diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+index 132f2be..2784241 100644
+--- a/arch/arm/boot/dts/dra7-evm.dts
++++ b/arch/arm/boot/dts/dra7-evm.dts
+@@ -681,41 +681,29 @@
+ 		 */
+ 		partition at 0 {
+ 			label = "QSPI.SPL";
+-			reg = <0x00000000 0x000010000>;
++			reg = <0x00000000 0x000040000>;
+ 		};
+ 		partition at 1 {
+-			label = "QSPI.SPL.backup1";
+-			reg = <0x00010000 0x00010000>;
+-		};
+-		partition at 2 {
+-			label = "QSPI.SPL.backup2";
+-			reg = <0x00020000 0x00010000>;
+-		};
+-		partition at 3 {
+-			label = "QSPI.SPL.backup3";
+-			reg = <0x00030000 0x00010000>;
+-		};
+-		partition at 4 {
+ 			label = "QSPI.u-boot";
+ 			reg = <0x00040000 0x00100000>;
+ 		};
+-		partition at 5 {
++		partition at 2 {
+ 			label = "QSPI.u-boot-spl-os";
+ 			reg = <0x00140000 0x00080000>;
+ 		};
+-		partition at 6 {
++		partition at 3 {
+ 			label = "QSPI.u-boot-env";
+ 			reg = <0x001c0000 0x00010000>;
+ 		};
+-		partition at 7 {
++		partition at 4 {
+ 			label = "QSPI.u-boot-env.backup1";
+ 			reg = <0x001d0000 0x0010000>;
+ 		};
+-		partition at 8 {
++		partition at 5 {
+ 			label = "QSPI.kernel";
+ 			reg = <0x001e0000 0x0800000>;
+ 		};
+-		partition at 9 {
++		partition at 6 {
+ 			label = "QSPI.file-system";
+ 			reg = <0x009e0000 0x01620000>;
+ 		};
+-- 
+1.9.1
