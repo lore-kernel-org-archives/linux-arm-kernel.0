@@ -1,56 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Jan 2017 17:03:07 +0000
-Subject: [RFC PATCH v2 09/10] drivers/perf: Add support for ARMv8.2
- Statistical Profiling Extension
-In-Reply-To: <20170113104042.169ceea12820d2b6b74b31f9@arm.com>
-References: <1484323429-15231-1-git-send-email-will.deacon@arm.com>
- <1484323429-15231-10-git-send-email-will.deacon@arm.com>
- <20170113104042.169ceea12820d2b6b74b31f9@arm.com>
-Message-ID: <20170113170307.GK3253@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 13 Jan 2017 18:11:28 +0100
+Subject: [GIT PULL] ARM: mvebu: defconfig64 for v4.11 (#1)
+Message-ID: <871sw6996n.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 10:40:42AM -0600, Kim Phillips wrote:
-> On Fri, 13 Jan 2017 16:03:48 +0000
-> Will Deacon <will.deacon@arm.com> wrote:
-> 
-> > +#define DRVNAME				"arm_spe_pmu"
-> 
-> PMU is implied.  "arm_spe"?
+Hi,
 
-As stated before, I'm going for consistency here. Is it causing any
-real issues on the tooling side?
+Here is the first pull request for defconfig64 for mvebu for v4.11.
 
-> > +	if (is_kernel_in_hyp_mode()) {
-> > +		if (attr->exclude_kernel != attr->exclude_hv)
-> > +			return -EOPNOTSUPP;
-> > +	} else if (!attr->exclude_hv) {
-> > +		return -EOPNOTSUPP;
-> > +	}
-> > +
-> > +	reg = arm_spe_event_to_pmsfcr(event);
-> > +	if ((reg & BIT(PMSFCR_EL1_FE_SHIFT)) &&
-> > +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_EVT))
-> > +		return -EOPNOTSUPP;
-> > +
-> > +	if ((reg & BIT(PMSFCR_EL1_FT_SHIFT)) &&
-> > +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_TYP))
-> > +		return -EOPNOTSUPP;
-> > +
-> > +	if ((reg & BIT(PMSFCR_EL1_FL_SHIFT)) &&
-> > +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_LAT))
-> > +		return -EOPNOTSUPP;
-> > +
-> > +	return 0;
-> > +}
-> 
-> Please insert pr_* statements before blindly returning errors before a
-> better facility becomes available.
+Gregory
 
-That was discussed in the thread I linked to last time:
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
-https://lkml.org/lkml/2015/8/26/661
+  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 
-and there are good reasons not to add those prints.
+are available in the git repository at:
 
-Will
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig64-4.11-1
+
+for you to fetch changes up to 299d2f0238ec75bd13cc8c69a4cd6dbb9e7837be:
+
+  arm64: defconfig: enable XORv2 for Marvell Armada 7K/8K (2017-01-03 16:38:51 +0100)
+
+----------------------------------------------------------------
+mvebu defconfig64 for 4.11 (part 1)
+
+Update arm64 defconfig by adding XORv2 for Marvell Armada 7K/8K
+
+----------------------------------------------------------------
+Thomas Petazzoni (1):
+      arm64: defconfig: enable XORv2 for Marvell Armada 7K/8K
+
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
