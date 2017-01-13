@@ -1,70 +1,56 @@
-From: florian.fainelli@broadcom.com (Florian Fainelli)
-Date: Thu, 12 Jan 2017 17:20:43 -0800
-Subject: [PATCH] PCI: iproc: fix kernel crash if dev->of_node not defined
-In-Reply-To: <e5301de6-9a6c-7deb-4ff7-ccd462c4381e@broadcom.com>
-References: <1484266817-6725-1-git-send-email-aospan@netup.ru>
- <6891f43f-25e7-1411-800e-97e6788f2f27@gmail.com>
- <e5301de6-9a6c-7deb-4ff7-ccd462c4381e@broadcom.com>
-Message-ID: <6cfba8af-1e9b-cb43-4898-61d6fb8f12ca@broadcom.com>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Fri, 13 Jan 2017 09:27:06 +0800
+Subject: [PATCH v20 0/4] Mediatek MT8173 CMDQ support
+In-Reply-To: <1483499169-16329-1-git-send-email-hs.liao@mediatek.com>
+References: <1483499169-16329-1-git-send-email-hs.liao@mediatek.com>
+Message-ID: <1484270826.14822.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2017 04:48 PM, Ray Jui wrote:
-> Hi Florian,
+On Wed, 2017-01-04 at 11:06 +0800, HS Liao wrote:
+> Hi,
 > 
-> On 1/12/2017 4:22 PM, Florian Fainelli wrote:
->> On 01/12/2017 04:20 PM, Abylay Ospan wrote:
->>> pcie->dev->of_node not always defined (NULL) and can cause crash:
->>>
->>> [   19.053195] Unable to handle kernel NULL pointer dereference at
->>> virtual address 00000020
->>> [<c0b0370c>] (of_n_addr_cells) from [<c06599c4>]
->>> (iproc_pcie_setup+0x30c/0xce0)
->>>
->>> this patch adds sanity check to prevent crash.
->>
->> Humm, how can it not be defined based on your earlier comment that you
->> are using this on NSP which is Device Tree exclusively? I would agree if
->> this was seen on e.g: MIPS/BCMA (47xx).
+> This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
+> to help write registers with critical time limitation, such as
+> updating display configuration during the vblank. It controls Global
+> Command Engine (GCE) hardware to achieve this requirement.
 > 
-> I thought Abylay mentioned:
+> These patches have a build dependency on top of v4.10-rc2.
 > 
-> "Tested on Broadcom NorthStar machine ('Edgecore ECW7220-L') with two
-> PCIe wifi
-> adapters (b43 BCM4331 and ath10k QCA988X)."
+> Changes since v19:
+>  - rebase to v4.10-rc2
 > 
-> That is a NorthStar device which is BCMA based?
+> Best regards,
+> HS Liao
+> 
+> HS Liao (4):
+>   dt-bindings: soc: Add documentation for the MediaTek GCE unit
+>   mailbox: mediatek: Add Mediatek CMDQ driver
+>   arm64: dts: mt8173: Add GCE node
+>   soc: mediatek: Add Mediatek CMDQ helper
+> 
+>  .../devicetree/bindings/mailbox/mtk-gce.txt        |  43 ++
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  10 +
+>  drivers/mailbox/Kconfig                            |  10 +
+>  drivers/mailbox/Makefile                           |   2 +
+>  drivers/mailbox/mtk-cmdq-mailbox.c                 | 596 +++++++++++++++++++++
+>  drivers/soc/mediatek/Kconfig                       |  12 +
+>  drivers/soc/mediatek/Makefile                      |   1 +
+>  drivers/soc/mediatek/mtk-cmdq-helper.c             | 310 +++++++++++
+>  include/linux/mailbox/mtk-cmdq-mailbox.h           |  75 +++
+>  include/linux/soc/mediatek/mtk-cmdq.h              | 174 ++++++
+>  10 files changed, 1233 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/mtk-gce.txt
+>  create mode 100644 drivers/mailbox/mtk-cmdq-mailbox.c
+>  create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
+>  create mode 100644 include/linux/mailbox/mtk-cmdq-mailbox.h
+>  create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
+> 
 
-Still, upstream Linux support for Northstar is Device Tree, and BCMA bus
-should fill in of_nodes accordingly, if not, that's a bug that must be
-fixed at the BCMA layer.
+Hi Jassi, Matthias,
 
-> 
->>
->>>
->>> Signed-off-by: Abylay Ospan <aospan@netup.ru>
->>> ---
->>>  drivers/pci/host/pcie-iproc.c | 3 +++
->>>  1 file changed, 3 insertions(+)
->>>
->>> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
->>> index 3ebc025..f2836a9 100644
->>> --- a/drivers/pci/host/pcie-iproc.c
->>> +++ b/drivers/pci/host/pcie-iproc.c
->>> @@ -952,6 +952,9 @@ static int pci_dma_range_parser_init(struct of_pci_range_parser *parser,
->>>  	const int na = 3, ns = 2;
->>>  	int rlen;
->>>  
->>> +	if (!node)
->>> +		return -ENOENT;
->>> +
->>>  	parser->node = node;
->>>  	parser->pna = of_n_addr_cells(node);
->>>  	parser->np = parser->pna + na + ns;
->>>
->>
->>
+Sorry to disturb you.
+Do you have any further comments on CMDQ v20?
 
-
--- 
-Florian
+Thanks.
+HS
