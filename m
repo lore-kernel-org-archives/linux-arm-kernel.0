@@ -1,97 +1,94 @@
-From: ping.bai@nxp.com (Jacky Bai)
-Date: Fri, 13 Jan 2017 03:04:37 +0000
-Subject: [PATCH v2 04/12] driver: clk: imx: Add clock driver for imx6sll
-In-Reply-To: <20170112220536.GP17126@codeaurora.org>
-References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
- <1482832070-22668-5-git-send-email-ping.bai@nxp.com>
- <20170110003753.GM17126@codeaurora.org>
- <AM3PR04MB5307CB38AA904535AF8D80D87670@AM3PR04MB530.eurprd04.prod.outlook.com>
- <20170112220536.GP17126@codeaurora.org>
-Message-ID: <AM3PR04MB53027B627AE8CEC6D7D0D1B87780@AM3PR04MB530.eurprd04.prod.outlook.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 13 Jan 2017 11:35:36 +0800
+Subject: [PATCH v6 23/25] usb: chipidea: Pullup D+ in device mode via phy
+ APIs
+In-Reply-To: <148426139182.20672.2422337338087784924@sboyd-linaro>
+References: <20161228225711.698-1-stephen.boyd@linaro.org>
+ <20161228225711.698-24-stephen.boyd@linaro.org>
+ <20170103065318.GB14542@b29397-desktop>
+ <148418039309.32258.7247753739063801774@sboyd-linaro>
+ <20170112095040.GA15726@b29397-desktop>
+ <148426139182.20672.2422337338087784924@sboyd-linaro>
+Message-ID: <20170113033536.GA20723@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCH v2 04/12] driver: clk: imx: Add clock driver for imx6sll
+On Thu, Jan 12, 2017 at 02:49:51PM -0800, Stephen Boyd wrote:
+> Quoting Peter Chen (2017-01-12 01:50:40)
+> > On Wed, Jan 11, 2017 at 04:19:53PM -0800, Stephen Boyd wrote:
+> > > Quoting Peter Chen (2017-01-02 22:53:19)
+> > > > On Wed, Dec 28, 2016 at 02:57:09PM -0800, Stephen Boyd wrote:
+> > > > > If the phy supports it, call phy_set_mode() to pull up D+ when
+> > > > > required by setting the mode to PHY_MODE_USB_DEVICE. If we want
+> > > > > to remove the pullup, set the mode to PHY_MODE_USB_HOST.
+> > > > > 
+> > > [..]
+> > > > > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+> > > > > index 0d532a724d48..6d61fa0689b0 100644
+> > > > > --- a/drivers/usb/chipidea/udc.c
+> > > > > +++ b/drivers/usb/chipidea/udc.c
+> > > > > @@ -1609,10 +1610,15 @@ static int ci_udc_pullup(struct usb_gadget *_gadget, int is_on)
+> > > > >               return 0;
+> > > > >  
+> > > > >       pm_runtime_get_sync(&ci->gadget.dev);
+> > > > > -     if (is_on)
+> > > > > +     if (is_on) {
+> > > > > +             if (ci->phy)
+> > > > > +                     phy_set_mode(ci->phy, PHY_MODE_USB_DEVICE);
+> > > > >               hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
+> > > > > -     else
+> > > > > +     } else {
+> > > > >               hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
+> > > > > +             if (ci->phy)
+> > > > > +                     phy_set_mode(ci->phy, PHY_MODE_USB_HOST);
+> > > > > +     }
+> > > > >       pm_runtime_put_sync(&ci->gadget.dev);
+> > > > >  
+> > > > >       return 0;
+> > > > 
+> > > > Would you describe the use case for it? Why not adding it at
+> > > > role switch routine?
+> > > > 
+> > > 
+> > > This is about pulling up D+. The phy I have requires that we manually
+> > > pull up D+ by writing a ULPI register before we set the run/stop bit.
+> > 
+> > Afaik, only controller can pull up dp when it is at device mode by
+> > setting USBCMD_RS. At host mode, clear USBCMD_RS will only stopping
+> > sending SoF from controller side.
+> > 
+> > I am puzzled why you can pull up D+ by writing an ULPI register, perhaps,
+> > your phy needs DP to change before switching the mode? Would you
+> > double confirm that?
 > 
-> > > > +
-> > > > +static const char *pll_bypass_src_sels[] = { "osc", "dummy", };
-> > >
-> > > All these should be const char * const unless something is wrong.
-> >
-> > If changed to 'const char * const', it vill has argument type mismatch
-> > error, as imx_clk_* wrapper function has argument type 'const char *'.
+> With the boards I have, vbus is not routed to the phy. Instead, there's
+> a vbus comparator on the PMIC where the vbus line from the usb
+> receptacle is sent. The vbus extcon driver probes the comparator on the
+> PMIC to see if vbus is present or not and then notifies extcon users
+> when vbus changes.
 > 
-> Hmm that's unfortunate.
+> The ULPI register we write in the phy is a vendor specific register
+> (called MISC_A) that has two bits. If you look at
+> qcom_usb_hs_phy_set_mode() in this series you'll see that we set
+> VBUSVLDEXTSEL and VBUSVLDEXT. VBUSVLDEXTSEL controls a mux in the phy
+> that chooses between an internal comparator, in the case where vbus goes
+> to the phy, or an external signal input to the phy, VBUSVLDEXT, to
+> consider as the "session valid" signal. It looks like the session valid
+> signal drives the D+ pullup resistor in the phy. These bits in MISC_A
+> don't matter when the phy is in host mode.
 > 
-> >
-> > >
-> > > > +
-> > > > +	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
-> > > > +		clk_prepare_enable(clks[clks_init_on[i]]);
-> > >
-> > > Critical clocks?
-> >
-> > Yes, these clocks must be always on.
-> >
-> > >
-> > > > +
-> > > > +	if (IS_ENABLED(CONFIG_USB_MXS_PHY)) {
-> > > > +		clk_prepare_enable(clks[IMX6SLL_CLK_USBPHY1_GATE]);
-> > > > +		clk_prepare_enable(clks[IMX6SLL_CLK_USBPHY2_GATE]);
-> > >
-> > > The phy driver can't enable these?
-> >
-> > The reason why we enable these two clks here is in below commit commit
-> > a5120e89e7e187a91852896f586876c7a2030804
-> > Author: Peter Chen <peter.chen@freescale.com>
-> > Date:   Fri Jan 18 10:38:05 2013 +0800
-> >       ARM i.MX6: change mxs usbphy clock usage
-> >
-> 
-> So can we mark these clks with CLK_IS_CRITICAL flag then instead?
-> Or are they disabled out of the bootloader?
-> 
+> So when the board doesn't route vbus to the phy, we have to toggle the
+> VBUSVLDEXT bit to signal to the phy that the vbus is there or not. I
+> also see that we're not supposed to toggle the VBUSVLDEXTSEL bit when in
+> "normal" operating mode. So perhaps we should do everything in the
+> qcom_usb_hs_phy_set_mode() routine during the role switch as you
+> suggest, except toggle the VBUSVLDEXT bit. Toggling the VBUSVLDEXT bit
+> can be done via some new phy op when the extcon triggers?
 
-Sure, using 'CLK_IS_CRITICAL'  should be ok for clks_init_on clocks.  But for  USBPHY*_GATE, it is
-only enabled when CONIG_USB_MXC_PHY is true.  And another concern is if we need to add CLK_IS_CRITICAL
-flag to clks_init_on clocks, we may need to add new wrapper function to register these critical clock. It is not very good.
+Why not call phy_set_mode(phy, DEVICE) directly at ci_handle_vbus_change when
+you get extcon vbus event?
 
- > >
-> > > > +	}
-> > > > +
-> > > > +	/* Lower the AHB clock rate before changing the clock source. */
-> > > > +	clk_set_rate(clks[IMX6SLL_CLK_AHB], 99000000);
-> > > > +
-> > > > +	/* Change periph_pre clock to pll2_bus to adjust AXI rate to 264MHz */
-> > > > +	clk_set_parent(clks[IMX6SLL_CLK_PERIPH_CLK2_SEL],
-> > > clks[IMX6SLL_CLK_PLL3_USB_OTG]);
-> > > > +	clk_set_parent(clks[IMX6SLL_CLK_PERIPH],
-> > > clks[IMX6SLL_CLK_PERIPH_CLK2]);
-> > > > +	clk_set_parent(clks[IMX6SLL_CLK_PERIPH_PRE],
-> > > clks[IMX6SLL_CLK_PLL2_BUS]);
-> > > > +	clk_set_parent(clks[IMX6SLL_CLK_PERIPH],
-> > > > +clks[IMX6SLL_CLK_PERIPH_PRE]);
-> > > > +
-> > > > +	clk_set_rate(clks[IMX6SLL_CLK_AHB], 132000000);
-> > >
-> > > assigned-clocks for rates now? Or perhaps we shouldn't be exposing
-> > > these as clks if they have some sort of complicated rate sequence
-> > > switch that we can't guarantee with the clk_ops we have today.
-> >
-> > These clks will be used by some peripherals, so we need to expose these
-> clocks.
-> > And the above parent and rate swith sequence is not very easy to be
-> > handled in assigned-clocks, So we leave it in this place.
-> >
-> 
-> How do we guarantee that the rate switch doesn't happen later on, requiring
-> this coordinated sequence of clk operations?
-> 
+-- 
 
-This clock sequence is used for increasing the AXI and AHB bus clock rate. In normal
-use, it is very rarely that we need to change them again. If we really need to change
-AXI and AHB bus clock later, a similar sequence must be used to do this.
-
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux
-> Foundation Collaborative Project
+Best Regards,
+Peter Chen
