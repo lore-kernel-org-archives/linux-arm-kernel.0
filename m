@@ -1,39 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Jan 2017 12:06:14 +0000
-Subject: [PATCH] arm64/mm: use phys_addr_t
-In-Reply-To: <20170113114553.GD26804@leverpostej>
-References: <1484287175-14342-1-git-send-email-miles.chen@mediatek.com>
- <20170113112205.GA26804@leverpostej>
- <CAKv+Gu__4S+0B39SXn46sqxsH0OXeusotZOBmvzZmw-yRRzdjA@mail.gmail.com>
- <20170113114553.GD26804@leverpostej>
-Message-ID: <20170113120614.GE3253@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 13 Jan 2017 17:54:35 +0530
+Subject: [PATCH v2 3/5] ARM: davinci_all_defconfig: enable iio and ADS7950
+In-Reply-To: <b29c37b2-382c-dbab-966b-4463e3127676@ti.com>
+References: <1483677228-2325-1-git-send-email-david@lechnology.com>
+ <1483677228-2325-4-git-send-email-david@lechnology.com>
+ <cb9455bc-2658-9826-823b-2aa845237fed@ti.com>
+ <01ec2c94-46e0-3534-94e8-bd92f78b70ec@lechnology.com>
+ <b29c37b2-382c-dbab-966b-4463e3127676@ti.com>
+Message-ID: <3c4f8952-0a64-fc49-bd87-452dbbf7a946@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 11:45:54AM +0000, Mark Rutland wrote:
-> On Fri, Jan 13, 2017 at 11:27:48AM +0000, Ard Biesheuvel wrote:
-> > On 13 January 2017 at 11:22, Mark Rutland <mark.rutland@arm.com> wrote:
-> > > On Fri, Jan 13, 2017 at 01:59:35PM +0800, miles.chen at mediatek.com wrote:
-> > >> From: Miles Chen <miles.chen@mediatek.com>
-> > >>
-> > >> Use phys_addr_t instead of unsigned long for the
-> > >> return value of __pa(), make code easy to understand.
-> > >>
-> > >> Signed-off-by: Miles Chen <miles.chen@mediatek.com>
-> > >
-> > > This looks sensible to me. It's consistent with the types these
-> > > variables are compared against, and with the types of function
-> > > parameters these are passed as.
-> > >
-> > 
-> > Indeed. But doesn't it clash with Laura's series?
+On Wednesday 11 January 2017 01:53 PM, Sekhar Nori wrote:
+> On Tuesday 10 January 2017 09:13 PM, David Lechner wrote:
+>> On 01/09/2017 06:29 AM, Sekhar Nori wrote:
+>>> On Friday 06 January 2017 10:03 AM, David Lechner wrote:
+>>>> This enables the iio subsystem and the TI ADS7950 driver. This is
+>>>> used by
+>>>> LEGO MINDSTORMS EV3, which has an ADS7957 chip.
+>>>
+>>> Can you add your sign-off?
+>>>
+>>>> ---
+>>>>
+>>>> The CONFIG_TI_ADS7950 driver is currently in iio/testing, so some
+>>>> coordination
+>>>> may be needed before picking up this patch.
+>>>>
+>>>>  arch/arm/configs/davinci_all_defconfig | 7 +++++++
+>>>>  1 file changed, 7 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/configs/davinci_all_defconfig
+>>>> b/arch/arm/configs/davinci_all_defconfig
+>>>> index 2b1967a..a899876 100644
+>>>> --- a/arch/arm/configs/davinci_all_defconfig
+>>>> +++ b/arch/arm/configs/davinci_all_defconfig
+>>>> @@ -200,6 +200,13 @@ CONFIG_TI_EDMA=y
+>>>>  CONFIG_MEMORY=y
+>>>>  CONFIG_TI_AEMIF=m
+>>>>  CONFIG_DA8XX_DDRCTL=y
+>>>> +CONFIG_IIO=m
+>>>> +CONFIG_IIO_BUFFER_CB=m
+>>>> +CONFIG_IIO_SW_DEVICE=m
+>>>> +CONFIG_IIO_SW_TRIGGER=m
+>>>
+>>>> +CONFIG_TI_ADS7950=m
+>>>
+>>> Can you separate this from rest of the patch. I would like to enable
+>>> this option only after I can find the symbol in linux-next.
+>>
+>> Will resend without CONFIG_TI_ADS7950
+>>
+>>>
+>>>> +CONFIG_IIO_HRTIMER_TRIGGER=m
+>>>> +CONFIG_IIO_SYSFS_TRIGGER=m
+>>>
+>>> Need CONFIG_IIO_TRIGGER=y also for these two options to take effect.
+>>
+>> CONFIG_IIO_TRIGGER is selected by IIO_TRIGGERED_BUFFER [=m] && IIO [=m]
+>> && IIO_BUFFER [=y], so save_defconfig does not pick it up.
 > 
-> Good point.
-> 
-> Yes, but only for the RHS of the assignment changing. This'll need to be
-> rebased atop of the arm64 for-next/core branch, or Catalin/Will might
-> fix it up when applying, perhaps?
+> I do remember I did not see these two modules did not get enabled in
+> .config after 'make davinci_all_defconfig'. Will check what I may have
+> missed.
 
-Yeah, it's dead easy for me to fix up.
+So IIO_TRIGGERED_BUFFER is not selected in my tree because I dont have
+the ADS7950 driver enabled. Same thing with IIO_BUFFER.
 
-Will
+Can you try this patch over my tree?
+
+Thanks,
+Sekhar
