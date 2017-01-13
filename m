@@ -1,100 +1,56 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 13 Jan 2017 17:13:55 +0100
-Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
-In-Reply-To: <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
-References: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
- <1484291609-20195-3-git-send-email-guochun.mao@mediatek.com>
- <20170113151747.6bc85245@bbrezillon>
- <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
-Message-ID: <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Jan 2017 16:19:52 +0000
+Subject: [PATCH v3 1/8] arm: put types.h in uapi
+In-Reply-To: <4633e475-47f2-5627-81a9-a1747dfddbc0@6wind.com>
+References: <1484304406-10820-2-git-send-email-nicolas.dichtel@6wind.com>
+ <3131144.4Ej3KFWRbz@wuerfel>
+ <1484304406-10820-1-git-send-email-nicolas.dichtel@6wind.com>
+ <25063.1484321803@warthog.procyon.org.uk>
+ <4633e475-47f2-5627-81a9-a1747dfddbc0@6wind.com>
+Message-ID: <20170113161951.GT14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2017 04:12 PM, Matthias Brugger wrote:
-> 
-> 
-> On 13/01/17 15:17, Boris Brezillon wrote:
->> On Fri, 13 Jan 2017 15:13:29 +0800
->> Guochun Mao <guochun.mao@mediatek.com> wrote:
->>
->>> Add Mediatek nor flash node.
->>>
->>> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
->>> ---
->>>  arch/arm/boot/dts/mt2701-evb.dts |   25 +++++++++++++++++++++++++
->>>  arch/arm/boot/dts/mt2701.dtsi    |   12 ++++++++++++
->>>  2 files changed, 37 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/mt2701-evb.dts
->>> b/arch/arm/boot/dts/mt2701-evb.dts
->>> index 082ca88..85e5ae8 100644
->>> --- a/arch/arm/boot/dts/mt2701-evb.dts
->>> +++ b/arch/arm/boot/dts/mt2701-evb.dts
->>> @@ -24,6 +24,31 @@
->>>      };
->>>  };
->>>
->>> +&nor_flash {
->>> +    pinctrl-names = "default";
->>> +    pinctrl-0 = <&nor_pins_default>;
->>> +    status = "okay";
->>> +    flash at 0 {
->>> +        compatible = "jedec,spi-nor";
->>> +        reg = <0>;
->>> +    };
->>> +};
->>> +
->>> +&pio {
->>> +    nor_pins_default: nor {
->>> +        pins1 {
->>> +            pinmux = <MT2701_PIN_240_EXT_XCS__FUNC_EXT_XCS>,
->>> +                 <MT2701_PIN_241_EXT_SCK__FUNC_EXT_SCK>,
->>> +                 <MT2701_PIN_239_EXT_SDIO0__FUNC_EXT_SDIO0>,
->>> +                 <MT2701_PIN_238_EXT_SDIO1__FUNC_EXT_SDIO1>,
->>> +                 <MT2701_PIN_237_EXT_SDIO2__FUNC_EXT_SDIO2>,
->>> +                 <MT2701_PIN_236_EXT_SDIO3__FUNC_EXT_SDIO3>;
->>> +            drive-strength = <MTK_DRIVE_4mA>;
->>> +            bias-pull-up;
->>> +        };
->>> +    };
->>> +};
->>> +
->>>  &uart0 {
->>>      status = "okay";
->>>  };
->>> diff --git a/arch/arm/boot/dts/mt2701.dtsi
->>> b/arch/arm/boot/dts/mt2701.dtsi
->>> index bdf8954..1eefce4 100644
->>> --- a/arch/arm/boot/dts/mt2701.dtsi
->>> +++ b/arch/arm/boot/dts/mt2701.dtsi
->>> @@ -227,6 +227,18 @@
->>>          status = "disabled";
->>>      };
->>>
->>> +    nor_flash: spi at 11014000 {
->>> +        compatible = "mediatek,mt2701-nor",
->>> +                 "mediatek,mt8173-nor";
->>
->> Why define both here? Is "mediatek,mt8173-nor" really providing a
->> subset of the features supported by "mediatek,mt2701-nor"?
->>
-> 
-> I think even if the ip block is the same, we should provide both
-> bindings, just in case in the future we find out that mt2701 has some
-> hidden bug, feature or bug-feature. This way even if we update the
-> driver, we stay compatible with older device tree blobs in the wild.
-> 
-> We can drop the mt2701-nor in the bindings definition if you want.
+On Fri, Jan 13, 2017 at 05:01:01PM +0100, Nicolas Dichtel wrote:
+> Please, do not remove the email subject when you reply. I restore it to
+> ease the thread follow-up.
 
-This exactly. We should have a DT compat in the form:
-compatible = "vendor,<soc>-block", "vendor,<oldest-compat-soc>-block";
-Then if we find a problem in the future, we can match on the
-"vendor,<soc>-block" and still support the old DTs.
+I mentioned it to David, and he says it's because the long list of
+recipients is breaking his mailer.  I've already posed the question
+about whether that's exploitable!
 
-The question is, does the "vendor,<soc>-block" go into the binding
-document as well or do we only have "vendor,<oldest-compat-soc>-block"
-there ?
+> Le 13/01/2017 ? 16:36, David Howells a ?crit :
+> > Nicolas Dichtel <nicolas.dichtel@6wind.com> wrote:
+> > 
+> >> This header file is exported, thus move it to uapi.
+> > 
+> > Exported how?
+> 
+> It is listed in include/uapi/asm-generic/Kbuild.asm, which is included by
+> arch/arm/include/uapi/asm/Kbuild.
+
+We really should not be installing non-uapi header files to userland
+under _any_ circumstance - this to me sounds like a bug in kbuild.
+
+The assumption is that headers outside of uapi directories are not
+part of the user visible API, and so can be freely modified - which
+in the presence of this bug is untrue.
+
+However, as it's happening, and this header has been there since 2013
+(commit 09096f6a0ee2 - "ARM: 7822/1: add workaround for ambiguous C99
+stdint.h types") it's now well and truely part of the user API whether
+we intended it to be or not, so your patch looks to me like the correct
+thing to do.
+
+I think it needs further evaluation to make sure kbuild isn't going to
+do something else silly, like subsitute include/asm-generic/types.h for
+the now missing arch/arm/include/asm/types.h
+
+I wonder how many more headers are unintentionally exported.
+
+... what a mess. :(
 
 -- 
-Best regards,
-Marek Vasut
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
