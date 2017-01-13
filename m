@@ -1,131 +1,42 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 13 Jan 2017 08:26:36 +0100
-Subject: [PATCH v4 0/4] DMA Engine: switch PL330 driver to non-irq-safe runtime
- PM
-References: <CGME20170113072651eucas1p2b7487d97894de93daab24adb6745087c@eucas1p2.samsung.com>
-Message-ID: <1484292400-29730-1-git-send-email-m.szyprowski@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 13 Jan 2017 08:26:50 +0100
+Subject: [PATCH v8 2/5] i2c: Add STM32F4 I2C driver
+In-Reply-To: <CAOAejn1HAU5spQeXmYPH4XH0L5bGuoFgguozwMp=uLKcXDEPEw@mail.gmail.com>
+References: <20170111082208.vzu7xgpd4eakyldl@pengutronix.de>
+ <CAOAejn2eOy2sn1VkE979ne23Sj9L6+kaQDNpL1EUKb2m=6sGXw@mail.gmail.com>
+ <20170111153940.dtxzvtdici3r7l54@pengutronix.de>
+ <CAOAejn2pW20VPP_yGtvJ_ufvj6Xj1poBiiA2WqkALiaLyyONug@mail.gmail.com>
+ <20170112120309.fmrt2lwz3vklqmti@pengutronix.de>
+ <CAOAejn289GLOSP-nPJnO_VpXLpyhTsF1bWQ7Ns9OfgPQCa8YTw@mail.gmail.com>
+ <20170112174902.j52foglkdouyz36n@pengutronix.de>
+ <CAOAejn3tPi0fjy+t-UhMTvAq7LfdKJJdbcLw2su1-YAGDZMxew@mail.gmail.com>
+ <20170112211004.z3wylc7vrubulc3x@pengutronix.de>
+ <CAOAejn1HAU5spQeXmYPH4XH0L5bGuoFgguozwMp=uLKcXDEPEw@mail.gmail.com>
+Message-ID: <20170113072650.orx6vl2orqfakcuk@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-This patchset changes the way the runtime PM is implemented in the PL330 DMA
-engine driver. The main goal of such change is to add support for the audio
-power domain to Exynos5 SoCs (5250, 542x, 5433, probably others) and let
-it to be properly turned off, when no audio is being used. Switching to
-non-irq-safe runtime PM is required to properly let power domain to be
-turned off (irq-safe runtime PM keeps power domain turned on all the time)
-and to integrate with clock controller's runtime PM (this cannot be
-workarounded any other way, PL330 uses clocks from the controller, which
-belongs to the same power domain).
+On Thu, Jan 12, 2017 at 10:28:20PM +0100, M'boumba Cedric Madianga wrote:
+> Please see below a quote from datasheet that clearly described how to handle
+> For 2-byte reception:
+> ? Wait until ADDR = 1 (SCL stretched low until the ADDR flag is cleared)
+> ? Set ACK low, set POS high
+> ? Clear ADDR flag
+> ? Wait until BTF = 1 (Data 1 in DR, Data2 in shift register, SCL
+> stretched low until a data1 is read)
+> ? Set STOP high
+> ? Read data 1 and 2
 
-For more details of the proposed change to the PL330 driver see patch #4.
-
-Audio power domain on Exynos5 SoCs contains following hardware modules:
-1. clock controller
-2. pin controller
-3. PL330 DMA controller
-4. I2S audio controller
-
-Patches for adding or fixing runtime PM for each of the above devices is
-handled separately.
-
-Runtime PM patches for clock controllers is possible and has been proposed
-in the following thread (pending review): "[PATCH v4 0/4] Add runtime PM
-support for clocks (on Exynos SoC example)",
-http://www.spinics.net/lists/arm-kernel/msg550747.html
-
-Runtime PM support for Exynos pin controller has been posted in the
-following thread: "[PATCH 0/9] Runtime PM for Exynos pin controller driver",
-http://www.spinics.net/lists/arm-kernel/msg550161.html
-
-Exynos I2S driver supports runtime PM, but some fixes were needed for it
-and they are already queued to linux-next.
-
-This patchset is based on linux-next from 13th January 2017 with "dmaengine:
-pl330: fix double lock" patch applied.
+The problem is that you only know that you have a 2 byte transfer after
+you read the first byte (and it's a 1). (But note that this is
+irrelevant for the patch as the driver doesn't claim to support this
+kind of transfer.)
 
 Best regards
-Marek Szyprowski
-Samsung R&D Institute Poland
-
-
-Changelog:
-
-v4:
-- rebased onto "dmaengine: pl330: fix double lock" patch:
-  http://www.spinics.net/lists/dmaengine/msg12289.html
-- added a mutex to protect runtime PM links creation/removal to avoid races
-- moved mem2mem channel case handing to pl330_{add,del}_slave_pm_link
-  functions to simplify code and error paths
-
-v3: http://www.spinics.net/lists/dmaengine/msg12245.html
-- removed pl330_filter function as suggested by Arnd Bergmann
-- removed pl330.h from arch/arm/plat-samsung/devs.c
-- fixes some minor style issues pointed by Krzysztof Kozlowski
-
-v2: https://www.spinics.net/lists/arm-kernel/msg552772.html
-- rebased onto linux next-20170109
-- improved patch description
-- separated patch #3 from #4 (storing a pointer to slave device for each
-  DMA channel) as requested by Krzysztof Kozlowski
-
-v1: https://www.spinics.net/lists/arm-kernel/msg550008.html
-- initial version
-
-
-Patch summary:
-
-Marek Szyprowski (4):
-  dmaengine: pl330: remove pdata based initialization
-  dmaengine: Forward slave device pointer to of_xlate callback
-  dmaengine: pl330: Store pointer to slave device
-  dmaengine: pl330: Don't require irq-safe runtime PM
-
- arch/arm/plat-samsung/devs.c    |   1 -
- drivers/dma/amba-pl08x.c        |   2 +-
- drivers/dma/at_hdmac.c          |   4 +-
- drivers/dma/at_xdmac.c          |   2 +-
- drivers/dma/bcm2835-dma.c       |   2 +-
- drivers/dma/coh901318.c         |   2 +-
- drivers/dma/cppi41.c            |   2 +-
- drivers/dma/dma-jz4780.c        |   2 +-
- drivers/dma/dmaengine.c         |   2 +-
- drivers/dma/dw/platform.c       |   2 +-
- drivers/dma/edma.c              |   4 +-
- drivers/dma/fsl-edma.c          |   2 +-
- drivers/dma/img-mdc-dma.c       |   2 +-
- drivers/dma/imx-dma.c           |   2 +-
- drivers/dma/imx-sdma.c          |   2 +-
- drivers/dma/k3dma.c             |   2 +-
- drivers/dma/lpc18xx-dmamux.c    |   2 +-
- drivers/dma/mmp_pdma.c          |   2 +-
- drivers/dma/mmp_tdma.c          |   2 +-
- drivers/dma/moxart-dma.c        |   2 +-
- drivers/dma/mxs-dma.c           |   2 +-
- drivers/dma/nbpfaxi.c           |   2 +-
- drivers/dma/of-dma.c            |  20 +++--
- drivers/dma/pl330.c             | 189 +++++++++++++++++++---------------------
- drivers/dma/pxa_dma.c           |   2 +-
- drivers/dma/qcom/bam_dma.c      |   2 +-
- drivers/dma/sh/rcar-dmac.c      |   2 +-
- drivers/dma/sh/shdma-of.c       |   2 +-
- drivers/dma/sh/usb-dmac.c       |   2 +-
- drivers/dma/sirf-dma.c          |   2 +-
- drivers/dma/st_fdma.c           |   2 +-
- drivers/dma/ste_dma40.c         |   2 +-
- drivers/dma/stm32-dma.c         |   2 +-
- drivers/dma/sun4i-dma.c         |   2 +-
- drivers/dma/sun6i-dma.c         |   2 +-
- drivers/dma/tegra20-apb-dma.c   |   2 +-
- drivers/dma/tegra210-adma.c     |   2 +-
- drivers/dma/xilinx/xilinx_dma.c |   2 +-
- drivers/dma/xilinx/zynqmp_dma.c |   2 +-
- drivers/dma/zx_dma.c            |   2 +-
- include/linux/amba/pl330.h      |  35 --------
- include/linux/of_dma.h          |  17 ++--
- 42 files changed, 151 insertions(+), 189 deletions(-)
- delete mode 100644 include/linux/amba/pl330.h
+Uwe
 
 -- 
-1.9.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
