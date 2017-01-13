@@ -1,36 +1,68 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 13 Jan 2017 18:11:28 +0100
-Subject: [GIT PULL] ARM: mvebu: defconfig64 for v4.11 (#1)
-Message-ID: <871sw6996n.fsf@free-electrons.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 13 Jan 2017 17:11:39 +0000
+Subject: [PATCH] coresight: STM: Balance enable/disable
+In-Reply-To: <CANLsYkyO-anR4V411tHFkNBPNy0Vk3DCympLScP9ZC=uJ-UX9g@mail.gmail.com>
+References: <1484047315-14407-1-git-send-email-suzuki.poulose@arm.com>
+ <CANLsYkyO-anR4V411tHFkNBPNy0Vk3DCympLScP9ZC=uJ-UX9g@mail.gmail.com>
+Message-ID: <c59476a6-f2c8-6b00-ca46-d2d2379d44c9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 13/01/17 16:48, Mathieu Poirier wrote:
+> On 10 January 2017 at 04:21, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>> The stm is automatically enabled when an application sets the policy
+>> via ->link() call back by using coresight_enable(), which keeps the
+>> refcount of the current users of the STM. However, the unlink() callback
+>> issues stm_disable() directly, which leaves the STM turned off, without
+>> the coresight layer knowing about it. This prevents any further uses
+>> of the STM hardware as the coresight layer still thinks the STM is
+>> turned on and doesn't issue an stm_enable(). Even manually enabling
+>> the STM via sysfs can't really enable the hw.
+>>
+...
+>>
+>> This patch balances the unlink operation by using the coresight_disable(),
+>> keeping the coresight layer in sync with the hardware state.
+>>
+>> Fixes: commit 237483aa5cf43 ("coresight: stm: adding driver for CoreSight STM component")
+>> Cc: Pratik Patel <pratikp@codeaurora.org>
+>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Cc: Chunyan Zhang <zhang.chunyan@linaro.org>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: stable at vger.kernel.org # 4.7+
+>> Reported-by: Robert Walker <robert.walker@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>  drivers/hwtracing/coresight/coresight-stm.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
+>> index 3524452..57b7330 100644
+>> --- a/drivers/hwtracing/coresight/coresight-stm.c
+>> +++ b/drivers/hwtracing/coresight/coresight-stm.c
+>> @@ -356,7 +356,7 @@ static void stm_generic_unlink(struct stm_data *stm_data,
+>>         if (!drvdata || !drvdata->csdev)
+>>                 return;
+>>
+>> -       stm_disable(drvdata->csdev, NULL);
+>> +       coresight_disable(drvdata->csdev);
+>>  }
+>>
+>>  static phys_addr_t
+>
+> Applied - thanks,
 
-Here is the first pull request for defconfig64 for mvebu for v4.11.
+Mathieu, Greg,
 
-Gregory
+I think this should go into 4.10 (either way, as fix in this cycle or via stable after the release). I think
+it would be easier if it goes in as fix during one of these rc cycle.
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+Please let me know your thoughts.
 
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+Suzuki
 
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig64-4.11-1
-
-for you to fetch changes up to 299d2f0238ec75bd13cc8c69a4cd6dbb9e7837be:
-
-  arm64: defconfig: enable XORv2 for Marvell Armada 7K/8K (2017-01-03 16:38:51 +0100)
-
-----------------------------------------------------------------
-mvebu defconfig64 for 4.11 (part 1)
-
-Update arm64 defconfig by adding XORv2 for Marvell Armada 7K/8K
-
-----------------------------------------------------------------
-Thomas Petazzoni (1):
-      arm64: defconfig: enable XORv2 for Marvell Armada 7K/8K
-
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+> Mathieu
+>
+>> --
+>> 2.7.4
+>>
