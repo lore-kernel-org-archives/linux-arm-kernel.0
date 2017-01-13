@@ -1,53 +1,65 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Jan 2017 16:03:41 +0000
-Subject: [RFC PATCH v2 02/10] arm64: cpufeature: Don't enforce system-wide SPE
- capability
-In-Reply-To: <1484323429-15231-1-git-send-email-will.deacon@arm.com>
-References: <1484323429-15231-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1484323429-15231-3-git-send-email-will.deacon@arm.com>
+Date: Fri, 13 Jan 2017 16:03:39 +0000
+Subject: [RFC PATCH v2 00/10] Add support for the ARMv8.2 Statistical
+ Profiling Extension
+Message-ID: <1484323429-15231-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The statistical profiling extension (SPE) is an optional feature of
-ARMv8.1 and is unlikely to be supported by all of the CPUs in a
-heterogeneous system.
+Hello,
 
-This patch updates the cpufeature checks so that such systems are not
-tainted as unsupported.
+This is RFCv2 of the patches originally posted here:
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Suzuki Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/sysreg.h | 1 +
- arch/arm64/kernel/cpufeature.c  | 3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/476450.html
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 98ae03f8eedd..e156e7793a65 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -190,6 +190,7 @@
- #define ID_AA64MMFR2_CNP_SHIFT		0
- 
- /* id_aa64dfr0 */
-+#define ID_AA64DFR0_PMSVER_SHIFT	32
- #define ID_AA64DFR0_CTX_CMPS_SHIFT	28
- #define ID_AA64DFR0_WRPS_SHIFT		20
- #define ID_AA64DFR0_BRPS_SHIFT		12
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 47d0226620e8..c18eb78d3a00 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -180,7 +180,8 @@ static const struct arm64_ftr_bits ftr_id_mmfr0[] = {
- };
- 
- static const struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
-+	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 36, 28, 0),
-+	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64DFR0_PMSVER_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
+Changes since RFCv1 include:
+
+  * Use EXPORT_SYMBOL_GPL instead of EXPORT_SYMBOL
+  * Remove unused CPP macro
+  * Added tags for the first couple of patches (which are now queued in arm64)
+  * Added a brief overview of SPE to the commit log for the perf driver
+
+All feedback welcome,
+
+Will
+
+--->8
+
+Will Deacon (10):
+  arm64: cpufeature: allow for version discrepancy in PMU
+    implementations
+  arm64: cpufeature: Don't enforce system-wide SPE capability
+  arm64: KVM: Save/restore the host SPE state when entering/leaving a VM
+  arm64: head.S: Enable EL1 (host) access to SPE when entered at EL2
+  genirq: export irq_get_percpu_devid_partition to modules
+  perf/core: Export AUX buffer helpers to modules
+  perf: Directly pass PERF_AUX_* flags to perf_aux_output_end
+  perf/core: Add PERF_AUX_FLAG_COLLISION to report colliding samples
+  drivers/perf: Add support for ARMv8.2 Statistical Profiling Extension
+  dt-bindings: Document devicetree binding for ARM SPE
+
+ Documentation/devicetree/bindings/arm/spe-pmu.txt |   20 +
+ arch/arm64/include/asm/kvm_arm.h                  |    3 +
+ arch/arm64/include/asm/kvm_host.h                 |    7 +-
+ arch/arm64/include/asm/sysreg.h                   |    1 +
+ arch/arm64/kernel/cpufeature.c                    |    9 +-
+ arch/arm64/kernel/head.S                          |   14 +-
+ arch/arm64/kvm/debug.c                            |    6 +
+ arch/arm64/kvm/hyp/debug-sr.c                     |   66 +-
+ arch/arm64/kvm/hyp/switch.c                       |   13 +-
+ arch/x86/events/intel/bts.c                       |   11 +-
+ arch/x86/events/intel/pt.c                        |   11 +-
+ drivers/hwtracing/coresight/coresight-etm-perf.c  |    5 +-
+ drivers/perf/Kconfig                              |    8 +
+ drivers/perf/Makefile                             |    1 +
+ drivers/perf/arm_spe_pmu.c                        | 1244 +++++++++++++++++++++
+ include/linux/perf_event.h                        |    4 +-
+ include/uapi/linux/perf_event.h                   |    1 +
+ kernel/events/ring_buffer.c                       |   16 +-
+ kernel/irq/irqdesc.c                              |    1 +
+ 19 files changed, 1413 insertions(+), 28 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/spe-pmu.txt
+ create mode 100644 drivers/perf/arm_spe_pmu.c
+
 -- 
 2.1.4
