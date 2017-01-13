@@ -1,69 +1,82 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 13 Jan 2017 14:45:35 +0000
-Subject: [PATCH RFC v2 3/4] ARM: dts: imx6*-hummingboard2: use proper gpio
- flags definitions
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 13 Jan 2017 14:45:40 +0000
+Subject: [PATCH RFC v2 4/4] ARM: dts: imx6*-hummingboard2: convert to more
+ conventional vmmc-supply
 In-Reply-To: <20170113144449.GQ14217@n2100.armlinux.org.uk>
 References: <20170113144449.GQ14217@n2100.armlinux.org.uk>
-Message-ID: <E1cS36l-0002wP-7x@rmk-PC.armlinux.org.uk>
+Message-ID: <E1cS36q-0002wW-C3@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use proper gpio flag definitions for GPIOs rather than using opaque
-uninformative numbers.
-
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 26 +++++++++++++++++++-------
+ 1 file changed, 19 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-index 734487edf200..88aaed26dd77 100644
+index 88aaed26dd77..f19d30b34ac4 100644
 --- a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-@@ -50,7 +50,7 @@
- 
- 	ir_recv: ir-receiver {
- 		compatible = "gpio-ir-receiver";
--		gpios = <&gpio7 9 1>;
-+		gpios = <&gpio7 9 GPIO_ACTIVE_LOW>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_hummingboard2_gpio7_9>;
+@@ -56,11 +56,6 @@
  		linux,rc-map-name = "rc-rc6-mce";
-@@ -80,7 +80,7 @@
- 	reg_usbh1_vbus: regulator-usb-h1-vbus {
+ 	};
+ 
+-	usdhc2_pwrseq: usdhc2-pwrseq {
+-		compatible = "mmc-pwrseq-simple";
+-		reset-gpios = <&gpio4 30 GPIO_ACTIVE_HIGH>;
+-	};
+-
+ 	reg_3p3v: regulator-3p3v {
  		compatible = "regulator-fixed";
- 		enable-active-high;
--		gpio = <&gpio1 0 0>;
-+		gpio = <&gpio1 0 GPIO_ACTIVE_HIGH>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_hummingboard2_usbh1_vbus>;
- 		regulator-name = "usb_h1_vbus";
-@@ -91,7 +91,7 @@
- 	reg_usbotg_vbus: regulator-usb-otg-vbus {
- 		compatible = "regulator-fixed";
- 		enable-active-high;
--		gpio = <&gpio3 22 0>;
-+		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_hummingboard2_usbotg_vbus>;
- 		regulator-name = "usb_otg_vbus";
-@@ -102,7 +102,7 @@
- 	reg_usbh2_vbus: regulator-usb-h2-vbus {
- 		compatible = "regulator-gpio";
- 		enable-active-high;
--		enable-gpio = <&gpio2 13 0>;
-+		enable-gpio = <&gpio2 13 GPIO_ACTIVE_HIGH>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_hummingboard2_usbh2_vbus>;
- 		regulator-name = "usb_h2_vbus";
-@@ -114,7 +114,7 @@
- 	reg_usbh3_vbus: regulator-usb-h3-vbus {
- 		compatible = "regulator-gpio";
- 		enable-active-high;
--		enable-gpio = <&gpio7 10 0>;
-+		enable-gpio = <&gpio7 10 GPIO_ACTIVE_HIGH>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_hummingboard2_usbh3_vbus>;
- 		regulator-name = "usb_h3_vbus";
+ 		regulator-name = "3P3V";
+@@ -123,6 +118,18 @@
+ 		regulator-boot-on;
+ 	};
+ 
++	reg_usdhc2_vmmc: reg-usdhc2-vmmc {
++		compatible = "regulator-fixed";
++		gpio = <&gpio4 30 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_hummingboard2_vmmc>;
++		regulator-boot-on;
++		regulator-max-microvolt = <3300000>;
++		regulator-min-microvolt = <3300000>;
++		regulator-name = "usdhc2_vmmc";
++		startup-delay-us = <1000>;
++	};
++
+ 	sound-sgtl5000 {
+ 		audio-codec = <&sgtl5000>;
+ 		audio-routing =
+@@ -393,7 +400,6 @@
+ 
+ 		pinctrl_hummingboard2_usdhc2_aux: hummingboard2-usdhc2-aux {
+ 			fsl,pins = <
+-				MX6QDL_PAD_GPIO_4__GPIO1_IO04    0x1f071
+ 				MX6QDL_PAD_KEY_ROW1__SD2_VSELECT 0x1b071
+ 				MX6QDL_PAD_DISP0_DAT9__GPIO4_IO30 0x1b0b0
+ 			>;
+@@ -432,6 +438,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_hummingboard2_vmmc: hummingboard2-vmmc {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_4__GPIO1_IO04    0x1f071
++			>;
++		};
++
+ 		pinctrl_hummingboard2_usdhc3: hummingboard2-usdhc3 {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17059
+@@ -519,7 +531,7 @@
+ 		&pinctrl_hummingboard2_usdhc2_aux
+ 		&pinctrl_hummingboard2_usdhc2_200mhz
+ 	>;
+-	mmc-pwrseq = <&usdhc2_pwrseq>;
++	vmmc-supply = <&reg_usdhc2_vmmc>;
+ 	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
 -- 
 2.7.4
