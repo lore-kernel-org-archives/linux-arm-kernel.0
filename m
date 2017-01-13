@@ -1,51 +1,36 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 13 Jan 2017 08:26:39 +0100
-Subject: [PATCH v4 3/4] dmaengine: pl330: Store pointer to slave device
-In-Reply-To: <1484292400-29730-1-git-send-email-m.szyprowski@samsung.com>
-References: <1484292400-29730-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170113072652eucas1p21a2e7300622470d018bfa0f327d16132@eucas1p2.samsung.com>
-Message-ID: <1484292400-29730-4-git-send-email-m.szyprowski@samsung.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 13 Jan 2017 08:15:45 +0100
+Subject: [PATCH v2 18/18] insert build break
+In-Reply-To: <1484260655-80477-1-git-send-email-christopher.lee.bostic@gmail.com>
+References: <1484260655-80477-1-git-send-email-christopher.lee.bostic@gmail.com>
+Message-ID: <20170113071545.GB12441@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Store the pointer to slave device, which requested our channel. It will be
-later used to implement runtime PM of PL330 DMA controller. Although
-DMA channels might be requested many times, each DMA peripheral channel is
-physically dedicated only for specific hardware, so there should be only
-one slave device for each channel.
+On Thu, Jan 12, 2017 at 04:37:35PM -0600, christopher.lee.bostic at gmail.com wrote:
+> From: Chris Bostic <cbostic@us.ibm.com>
+> 
+> Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- drivers/dma/pl330.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+I can not accept patches that have no changelog text, and this one is
+very odd:
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index b6b2cc912380..c77a3494659c 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -450,6 +450,7 @@ struct dma_pl330_chan {
- 
- 	/* for runtime pm tracking */
- 	bool active;
-+	struct device *slave;
- };
- 
- struct pl330_dmac {
-@@ -2093,6 +2094,14 @@ static struct dma_chan *of_dma_pl330_xlate(struct of_phandle_args *dma_spec,
- 	if (chan_id >= pl330->num_peripherals)
- 		return NULL;
- 
-+	if (!pl330->peripherals[chan_id].slave) {
-+		pl330->peripherals[chan_id].slave = slave;
-+	} else if (pl330->peripherals[chan_id].slave != slave) {
-+		dev_err(pl330->ddma.dev,
-+			"Can't use same channel with multiple slave devices!\n");
-+		return NULL;
-+	}
-+
- 	return dma_get_slave_channel(&pl330->peripherals[chan_id].chan);
- }
- 
--- 
-1.9.1
+> ---
+>  drivers/fsi/fsi-core.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
+> index 28b82d1..db09836 100644
+> --- a/drivers/fsi/fsi-core.c
+> +++ b/drivers/fsi/fsi-core.c
+> @@ -42,6 +42,7 @@
+>  
+>  static DEFINE_IDA(master_ida);
+>  
+> +
+
+Huh?
+
+Did something go wrong with your scripts?
+
+greg k-h
