@@ -1,130 +1,46 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Fri, 13 Jan 2017 10:10:34 +0800
-Subject: [PATCH] coresight: STM: Balance enable/disable
-In-Reply-To: <e2710e1c-471d-2645-5ce0-30e222c85b52@arm.com>
-References: <1484047315-14407-1-git-send-email-suzuki.poulose@arm.com>
- <20170110173637.GA12100@linaro.org>
- <CAG2=9p8CMZD37KPbp+LCyDeizUHaDmw0NfqQHPvzKdCR9L0XZw@mail.gmail.com>
- <e2710e1c-471d-2645-5ce0-30e222c85b52@arm.com>
-Message-ID: <CAG2=9p9ZW1tsKb83yRiQwOuj75VWdcB+i=cCUvevyLyH74Qz2g@mail.gmail.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Fri, 13 Jan 2017 10:30:05 +0800
+Subject: [PATCH] arm64: dts: mt8173: Fix cpu_thermal cooling-maps contributions
+Message-ID: <20170113023006.150845-1-djkurtz@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 January 2017 at 21:59, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 11/01/17 11:41, Chunyan Zhang wrote:
->>
->> On 11 January 2017 at 01:36, Mathieu Poirier <mathieu.poirier@linaro.org>
->> wrote:
->>>
->>> On Tue, Jan 10, 2017 at 11:21:55AM +0000, Suzuki K Poulose wrote:
->>>>
->>>> The stm is automatically enabled when an application sets the policy
->>>> via ->link() call back by using coresight_enable(), which keeps the
->>>> refcount of the current users of the STM. However, the unlink() callback
->>>> issues stm_disable() directly, which leaves the STM turned off, without
->>>> the coresight layer knowing about it. This prevents any further uses
->>>> of the STM hardware as the coresight layer still thinks the STM is
->>>> turned on and doesn't issue an stm_enable(). Even manually enabling
->>>> the STM via sysfs can't really enable the hw.
->>>>
->>>> e.g,
->>>>
->>>> $ echo 1 > $CS_DEVS/$ETR/enable_sink
->>>> $ mkdir -p $CONFIG_FS/stp-policy/$source.0/stm_test/
->>>> $ echo 32768 65535 > $CONFIG_FS/stp-policy/$source.0/stm_test/channels
->>>> $ echo 64 > $CS_DEVS/$source/traceid
->>>> $ ./stm_app
->>>> Sending 64000 byte blocks of pattern 0 at 0us intervals
->>>> Success to map channel(32768~32783) to 0xffffa95fa000
->>>> Sending on channel 32768
->>>> $ dd if=/dev/$ETR of=~/trace.bin.1
->>>> 597+1 records in
->>>> 597+1 records out
->>>> 305920 bytes (306 kB) copied, 0.399952 s, 765 kB/s
->>>> $ ./stm_app
->>>> Sending 64000 byte blocks of pattern 0 at 0us intervals
->>>> Success to map channel(32768~32783) to 0xffff7e9e2000
->>>> Sending on channel 32768
->>>> $ dd if=/dev/$ETR of=~/trace.bin.2
->>>> 0+0 records in
->>>> 0+0 records out
->>>> 0 bytes (0 B) copied, 0.0232083 s, 0.0 kB/s
->>>>
->>>> Note that we don't get any data from the ETR for the second session.
->>>>
->>>> Also dmesg shows :
->>>>
->>>> [   77.520458] coresight-tmc 20800000.etr: TMC-ETR enabled
->>>> [   77.537097] coresight-replicator etr_replicator at 20890000: REPLICATOR
->>>> enabled
->>>> [   77.558828] coresight-replicator main_replicator at 208a0000: REPLICATOR
->>>> enabled
->>>> [   77.581068] coresight-funnel 208c0000.main_funnel: FUNNEL inport 0
->>>> enabled
->>>> [   77.602217] coresight-tmc 20840000.etf: TMC-ETF enabled
->>>> [   77.618422] coresight-stm 20860000.stm: STM tracing enabled
->>>> [  139.554252] coresight-stm 20860000.stm: STM tracing disabled
->>>>  # End of first tracing session
->>>> [  146.351135] coresight-tmc 20800000.etr: TMC read start
->>>> [  146.514486] coresight-tmc 20800000.etr: TMC read end
->>>>  # Note that the STM is not turned on via
->>>> stm_generic_link()->coresight_enable()
->>>>  # and hence none of the components are turned on.
->>>> [  152.479080] coresight-tmc 20800000.etr: TMC read start
->>>> [  152.542632] coresight-tmc 20800000.etr: TMC read end
->>>>
->>>> This patch balances the unlink operation by using the
->>>> coresight_disable(),
->>>> keeping the coresight layer in sync with the hardware state.
->>>>
->>>> Fixes: commit 237483aa5cf43 ("coresight: stm: adding driver for
->>>> CoreSight STM component")
->>>> Cc: Pratik Patel <pratikp@codeaurora.org>
->>>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->>>> Cc: Chunyan Zhang <zhang.chunyan@linaro.org>
->>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>>> Cc: stable at vger.kernel.org # 4.7+
->>>> Reported-by: Robert Walker <robert.walker@arm.com>
->>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>>> ---
->>>>  drivers/hwtracing/coresight/coresight-stm.c | 2 +-
->>>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/hwtracing/coresight/coresight-stm.c
->>>> b/drivers/hwtracing/coresight/coresight-stm.c
->>>> index 3524452..57b7330 100644
->>>> --- a/drivers/hwtracing/coresight/coresight-stm.c
->>>> +++ b/drivers/hwtracing/coresight/coresight-stm.c
->>>> @@ -356,7 +356,7 @@ static void stm_generic_unlink(struct stm_data
->>>> *stm_data,
->>>>       if (!drvdata || !drvdata->csdev)
->>>>               return;
->>>>
->>>> -     stm_disable(drvdata->csdev, NULL);
->>>> +     coresight_disable(drvdata->csdev);
->>>
->>>
->>> This looks valid to me.
->>>
->>> Chunyan, any reason to use stm_disable() directly rather than calling it
->>> as part
->>> of the device OPS in coresight_disable()?
->>
->>
->> I don't think there's some special reason for this. I simply hadn't
->> noticed that these two operations didn't use two balanced functions.
->
->
-> Please can I have an Ack/Reviewed -by on it, so that we can push it
-> as a fix.
+According to [0], the contribution field for each cooling-device express
+their relative power efficiency. Higher weights express higher power
+efficiency.  Weighting is relative such that if each cooling device has a
+weight of 1 they are considered equal. This is particularly useful in
+heterogeneous systems where two cooling devices may perform the same kind
+of compute, but with different efficiency.
 
-Sure, I've had a run with this patch, it works well, so,
-Reviewed-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+[0] Documentation/thermal/power_allocator.txt
 
-Thanks,
-Chunyan
+According to Mediatek IC designer, the power efficiency ratio between the
+LITTLE core cluster (cooling-device cpu0) and big core cluster
+(cooling-device cpu1) is around 3:1 (3072:1024).
 
->
->
-> Suzuki
->
+Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 12e702771f5c..9a3b0d20f7a8 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -182,12 +182,12 @@
+ 				map at 0 {
+ 					trip = <&target>;
+ 					cooling-device = <&cpu0 0 0>;
+-					contribution = <1024>;
++					contribution = <3072>;
+ 				};
+ 				map at 1 {
+ 					trip = <&target>;
+ 					cooling-device = <&cpu2 0 0>;
+-					contribution = <2048>;
++					contribution = <1024>;
+ 				};
+ 			};
+ 		};
+-- 
+2.11.0.390.gc69c2f50cf-goog
