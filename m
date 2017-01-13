@@ -1,50 +1,20 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 13 Jan 2017 15:35:54 +0000
-Subject: [RFC PATCH] arm64: defconfig: enable SMMUv3 config
-In-Reply-To: <20170112094729.c2a5tjzsnyubtmte@localhost>
-References: <1483962646-33767-1-git-send-email-wangzhou1@hisilicon.com>
- <5876CF7C.8080907@hisilicon.com> <20170112094729.c2a5tjzsnyubtmte@localhost>
-Message-ID: <5878F3DA.3090005@hisilicon.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Jan 2017 15:52:29 +0000
+Subject: [PATCH 3/3] rtc: stm32: use 32-bit cast for BIT() macro
+In-Reply-To: <20170113153311.2611510-3-arnd@arndb.de>
+References: <20170113153311.2611510-1-arnd@arndb.de>
+ <20170113153311.2611510-3-arnd@arndb.de>
+Message-ID: <20170113155229.GS14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jan 13, 2017 at 04:32:53PM +0100, Arnd Bergmann wrote:
+> -#define PWR_CR_DBP			BIT(8)
+> +#define PWR_CR_DBP			(u32)BIT(8)
 
+Shouldn't that have parens around it as it's no longer a simple expression.
 
-On 2017/1/12 9:47, Catalin Marinas wrote:
-> On Thu, Jan 12, 2017 at 08:36:12AM +0800, Zhou Wang wrote:
->> On 2017/1/9 19:50, Zhou Wang wrote:
->>> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
->>> ---
->>>  arch/arm64/configs/defconfig | 1 +
->>>  1 file changed, 1 insertion(+)
->>>
->>> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
->>> index 869dded..3520c50 100644
->>> --- a/arch/arm64/configs/defconfig
->>> +++ b/arch/arm64/configs/defconfig
->>> @@ -440,6 +440,7 @@ CONFIG_PLATFORM_MHU=y
->>>  CONFIG_BCM2835_MBOX=y
->>>  CONFIG_HI6220_MBOX=y
->>>  CONFIG_ARM_SMMU=y
->>> +CONFIG_ARM_SMMU_V3=y
->>>  CONFIG_RASPBERRYPI_POWER=y
->>>  CONFIG_QCOM_SMEM=y
->>>  CONFIG_QCOM_SMD=y
->>
->> I just happened to find there is no SMMUv3 config in arm64 defconfig.
->>
->> Maybe we should add it in defconfig or I miss something.
-> 
-
-Hi Arnd,
-
-> It looks fine to me but it's usually the arm-soc guys picking the
-> defconfig patches.
-> 
-
-It is fine to me.
-Is it OK for me to pick up this or will you directly pick up this?
-Thanks!
-
-Best Regards,
-Wei Xu
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
