@@ -1,51 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Jan 2017 09:19:04 +0000
-Subject: [PATCH v3] arm64: mm: Fix NOMAP page initialization
-In-Reply-To: <20170112185825.GE5020@rric.localdomain>
-References: <20161216165437.21612-1-rrichter@cavium.com>
- <CAKv+Gu_SmTNguC=tSCwYOL2kx-DogLvSYRZc56eGP=JhdrUOsA@mail.gmail.com>
- <c74d6ec6-16ba-dccc-3b0d-a8bedcb46dc5@linaro.org>
- <cbbf14fd-a1cc-2463-ba67-acd6d61e9db1@linaro.org>
- <CAKv+Gu8-+0LUTN0+8OGWRhd22Ls5cMQqTJcjKQK_0N=Uc-0jog@mail.gmail.com>
- <20170109115320.GI4930@rric.localdomain>
- <20170112160535.GF13843@arm.com>
- <20170112185825.GE5020@rric.localdomain>
-Message-ID: <20170113091903.GA22538@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 13 Jan 2017 09:22:15 +0000
+Subject: [RFC 07/13] KVM: arm64: ITS: Change entry_size and indirect bit
+ in BASER
+In-Reply-To: <89752a29-d533-1f4c-9e9b-93e8bd0556b3@redhat.com>
+References: <1484236613-24633-1-git-send-email-eric.auger@redhat.com>
+ <1484236613-24633-8-git-send-email-eric.auger@redhat.com>
+ <dc26dc19-313b-375b-0d9b-f4ff411a914f@arm.com>
+ <89752a29-d533-1f4c-9e9b-93e8bd0556b3@redhat.com>
+Message-ID: <7538fddf-919f-5428-a665-485ea1be6e9a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 07:58:25PM +0100, Robert Richter wrote:
-> On 12.01.17 16:05:36, Will Deacon wrote:
-> > On Mon, Jan 09, 2017 at 12:53:20PM +0100, Robert Richter wrote:
+On 13/01/17 08:57, Auger Eric wrote:
+> Hi Marc,
 > 
-> > > Kernel compile times (3 runs each):
-> > > 
-> > > pfn_valid_within():
-> > > 
-> > > real    6m4.088s
-> > > user    372m57.607s
-> > > sys     16m55.158s
-> > > 
-> > > real    6m1.532s
-> > > user    372m48.453s
-> > > sys     16m50.370s
-> > > 
-> > > real    6m4.061s
-> > > user    373m18.753s
-> > > sys     16m57.027s
-> > 
-> > Did you reboot the machine between each build here, or only when changing
-> > kernel? If the latter, do you see variations in kernel build time by simply
-> > rebooting the same Image?
-> 
-> I built it in a loop on the shell, so no reboots between builds. Note
-> that I was building the kernel in /dev/shm to not access harddisks. I
-> think build times should be comparable then since there is no fs
-> caching.
+> On 12/01/2017 18:05, Marc Zyngier wrote:
+>> On 12/01/17 15:56, Eric Auger wrote:
+>>> Change the device table entry_size to 16 bytes instead of 8.
+>>> We also Store the device and collection device in the its
+>>> struct.
+>>>
+>>> The patch also clears the indirect bit for the device BASER.
+>>> The indirect bit is set as read-only.
+>>
+>> Err... Why? We *really* want to continue supporting indirect tables, as
+>> this is a massive memory saver for the guest.
+>>
+>>>
+>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>>
+>>> ---
+>>>
+>>> TODO: investigate support of 2 level tables, ie. enabling
+>>> Indirect = 1. Support of 2 level tables is implementation
+>>> defined.
+>>
+>> Clearly, that's a regression. What exactly is the issue that decided you
+>> to disable it?
+> Well no valuable reason besides I saw it was optional, lack of
+> time/knowledge and a bit of laziness. I will address this requirement in
+> my next respin.
 
-I guess I'm really asking what the standard deviation is if you *do* reboot
-between builds, using the same kernel. It's hard to tell whether the numbers
-are due to the patches, or just because of noise incurred by the way things
-happen to initialise.
+Ah, I was worried about something much more fundamental! ;-)
 
-Will
+> For my curiosity why did we choose not allowing the feature for
+> collections. Is that just because we think their number if going
+> sufficiently small compared to devices?
+
+Collections are usually a much smaller number (directly related to the
+number of CPUs in the system), and can be kept very compact. Devices, on
+the other hand, can be extremely sparse (to the point where a guest can
+fail to allocate enough memory to cover the required range).
+
+TBH, we could allow it for collections as well. It is just not that useful.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
