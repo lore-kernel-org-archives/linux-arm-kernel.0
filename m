@@ -1,304 +1,106 @@
-From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Fri, 13 Jan 2017 18:46:58 +0800
-Subject: [PATCH v4 3/3] thermal: zx2967: add thermal driver for ZTE's zx2967
- family
-In-Reply-To: <1484304418-17489-1-git-send-email-baoyou.xie@linaro.org>
-References: <1484304418-17489-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <1484304418-17489-3-git-send-email-baoyou.xie@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 13 Jan 2017 10:54:29 +0000
+Subject: [PATCH 1/1] iommu/arm-smmu: Fix for ThunderX erratum #27704
+In-Reply-To: <1c3253d8-bcaa-e507-cddf-dec952362104@semihalf.com>
+References: <1484135507-24872-1-git-send-email-tn@semihalf.com>
+ <2c048126-a4d6-16af-987a-3174401a3960@arm.com>
+ <b0eb1127-182e-63e3-6dd4-c3b40228b909@semihalf.com>
+ <1c3253d8-bcaa-e507-cddf-dec952362104@semihalf.com>
+Message-ID: <26969cd9-5af5-ff4d-75d8-425469c02705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds thermal driver for ZTE's zx2967 family.
+On 13/01/17 10:43, Tomasz Nowicki wrote:
+> On 12.01.2017 07:41, Tomasz Nowicki wrote:
+>> On 11.01.2017 13:19, Robin Murphy wrote:
+>>> On 11/01/17 11:51, Tomasz Nowicki wrote:
+>>>> The goal of erratum #27704 workaround was to make sure that ASIDs and
+>>>> VMIDs
+>>>> are unique across all SMMU instances on affected Cavium systems.
+>>>>
+>>>> Currently, the workaround code partitions ASIDs and VMIDs by increasing
+>>>> global cavium_smmu_context_count which in turn becomes the base ASID
+>>>> and VMID
+>>>> value for the given SMMU instance upon the context bank initialization.
+>>>>
+>>>> For systems with multiple SMMU instances this approach implies the risk
+>>>> of crossing 8-bit ASID, like for CN88xx capable of 4 SMMUv2, 128
+>>>> context bank each:
+>>>> SMMU_0 (0-127 ASID RANGE)
+>>>> SMMU_1 (127-255 ASID RANGE)
+>>>> SMMU_2 (256-383 ASID RANGE) <--- crossing 8-bit ASID
+>>>> SMMU_3 (384-511 ASID RANGE) <--- crossing 8-bit ASID
+>>>
+>>> I could swear that at some point in the original discussion it was said
+>>> that the TLBs were only shared between pairs of SMMUs, so in fact 0/1
+>>> and 2/3 are independent of each other
+>>
+>> Indeed TLBs are only shared between pairs of SMMUs but the workaround
+>> makes sure ASIDs are unique across all SMMU instances so we do not have
+>> to bother about SMMUs probe order.
+>>
+>>  - out of interest, have you
+>>> managed to hit an actual problem in practice or is this patch just by
+>>> inspection?
+>>
+>> Except SMMU0/1 devices all other devices under other SMMUs will fail on
+>> guest power off/on. Since we try to invalidate tlb with 16bit ASID but
+>> we actually have 8 bit zero padded 16 bit entry.
+>>
+>>>
+>>> Of course, depending on the SMMUs to probe in the right order isn't
+>>> particularly robust, so it's still probably a worthwhile change.
+>>>
+>>>> Since we use 8-bit ASID now we effectively misconfigure ASID[15:8]
+>>>> bits for
+>>>> SMMU_CBn_TTBRm register. Also, we still use non-zero ASID[15:8] bits
+>>>> upon context invalidation. This patch adds 16-bit ASID support for
+>>>> stage-1
+>>>> AArch64 contexts for Cavium SMMUv2 model so that we use ASIDs
+>>>> consistently.
+>>>>
+>>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>>>> ---
+>>>>  drivers/iommu/arm-smmu.c | 4 ++++
+>>>>  1 file changed, 4 insertions(+)
+>>>>
+>>>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>>>> index a60cded..ae8f059 100644
+>>>> --- a/drivers/iommu/arm-smmu.c
+>>>> +++ b/drivers/iommu/arm-smmu.c
+>>>> @@ -260,6 +260,7 @@ enum arm_smmu_s2cr_privcfg {
+>>>>
+>>>>  #define TTBCR2_SEP_SHIFT        15
+>>>>  #define TTBCR2_SEP_UPSTREAM        (0x7 << TTBCR2_SEP_SHIFT)
+>>>> +#define TTBCR2_AS            (1 << 4)
+>>>>
+>>>>  #define TTBRn_ASID_SHIFT        48
+>>>>
+>>>> @@ -778,6 +779,9 @@ static void arm_smmu_init_context_bank(struct
+>>>> arm_smmu_domain *smmu_domain,
+>>>>              reg = pgtbl_cfg->arm_lpae_s1_cfg.tcr;
+>>>>              reg2 = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
+>>>>              reg2 |= TTBCR2_SEP_UPSTREAM;
+>>>> +            if (smmu->model == CAVIUM_SMMUV2 &&
+>>>
+>>> I'd be inclined to say "smmu->version == ARM_SMMU_V2" there, rather than
+>>> make it Cavium-specific - we enable 16-bit VMID unconditionally where
+>>> supported, so I don't see any reason not to handle 16-bit ASIDs in the
+>>> same manner.
+>>
+>> I agree, I will enable 16-bit ASID for ARM_SMMU_V2.
+>>
+> 
+> Actually, the ARM_SMMU_CTX_FMT_AARCH64 context check is all we need here:
+> 
+> +            if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
+> +                reg2 |= TTBCR2_AS;
 
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
----
- drivers/thermal/Kconfig          |   6 +
- drivers/thermal/Makefile         |   1 +
- drivers/thermal/zx2967_thermal.c | 253 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 260 insertions(+)
- create mode 100644 drivers/thermal/zx2967_thermal.c
+Ah, clever! The horrible SMMUv1 64KB supplement supports AArch64
+contexts without being SMMUv2, but of course doesn't have stage 1 :)
 
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index 18f2de6..0dd597e 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -445,3 +445,9 @@ config BCM2835_THERMAL
- 	  Support for thermal sensors on Broadcom bcm2835 SoCs.
- 
- endif
-+
-+config ZX2967_THERMAL
-+	tristate "Thermal sensors on zx2967 SoC"
-+	depends on ARCH_ZX
-+	help
-+	  Support for thermal sensors on ZTE zx2967 SoCs.
-diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-index 677c6d9..c00c05e 100644
---- a/drivers/thermal/Makefile
-+++ b/drivers/thermal/Makefile
-@@ -57,3 +57,4 @@ obj-$(CONFIG_HISI_THERMAL)     += hisi_thermal.o
- obj-$(CONFIG_MTK_THERMAL)	+= mtk_thermal.o
- obj-$(CONFIG_GENERIC_ADC_THERMAL)	+= thermal-generic-adc.o
- obj-$(CONFIG_BCM2835_THERMAL)	+= bcm2835_thermal.o
-+obj-$(CONFIG_ZX2967_THERMAL)	+= zx2967_thermal.o
-diff --git a/drivers/thermal/zx2967_thermal.c b/drivers/thermal/zx2967_thermal.c
-new file mode 100644
-index 0000000..e77d07c
---- /dev/null
-+++ b/drivers/thermal/zx2967_thermal.c
-@@ -0,0 +1,253 @@
-+/*
-+ * ZTE's zx2967 family thermal sensor driver
-+ *
-+ * Copyright (C) 2017 ZTE Ltd.
-+ *
-+ * Author: Baoyou Xie <baoyou.xie@linaro.org>
-+ *
-+ * License terms: GNU General Public License (GPL) version 2
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/thermal.h>
-+
-+/* Power Mode: 0->low 1->high */
-+#define ZX2967_THERMAL_POWER_MODE	0
-+
-+/* DCF Control Register */
-+#define ZX2967_THERMAL_DCF		0x4
-+
-+/* Selection Register */
-+#define ZX2967_THERMAL_SEL		0x8
-+
-+/* Control Register */
-+#define ZX2967_THERMAL_CTRL		0x10
-+
-+#define ZX2967_THERMAL_READY		0x1000
-+#define ZX2967_THERMAL_TEMP_MASK	0xfff
-+#define ZX2967_THERMAL_ID_MASK		0x18
-+#define ZX2967_THERMAL_ID0		0x8
-+#define ZX2967_THERMAL_ID1		0x10
-+
-+struct zx2967_thermal_sensor {
-+	struct zx2967_thermal_priv *priv;
-+	struct thermal_zone_device *tzd;
-+	int id;
-+};
-+
-+#define NUM_SENSORS	1
-+
-+struct zx2967_thermal_priv {
-+	struct zx2967_thermal_sensor	sensors[NUM_SENSORS];
-+	struct mutex			lock;
-+	struct clk			*clk_gate;
-+	struct clk			*pclk;
-+	void __iomem			*regs;
-+	struct device			*dev;
-+};
-+
-+static int zx2967_thermal_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
-+
-+	if (priv && priv->pclk)
-+		clk_disable_unprepare(priv->pclk);
-+
-+	if (priv && priv->clk_gate)
-+		clk_disable_unprepare(priv->clk_gate);
-+
-+	return 0;
-+}
-+
-+static int zx2967_thermal_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
-+	int error;
-+
-+	error = clk_prepare_enable(priv->clk_gate);
-+	if (error)
-+		return error;
-+
-+	error = clk_prepare_enable(priv->pclk);
-+	if (error) {
-+		clk_disable_unprepare(priv->clk_gate);
-+		return error;
-+	}
-+
-+	return 0;
-+}
-+
-+static int zx2967_thermal_get_temp(void *data, int *temp)
-+{
-+	void __iomem *regs;
-+	struct zx2967_thermal_sensor *sensor = data;
-+	struct zx2967_thermal_priv *priv = sensor->priv;
-+	unsigned long timeout = jiffies + msecs_to_jiffies(100);
-+	u32 val, sel_id;
-+
-+	regs = priv->regs;
-+	mutex_lock(&priv->lock);
-+
-+	writel_relaxed(0, regs + ZX2967_THERMAL_POWER_MODE);
-+	writel_relaxed(2, regs + ZX2967_THERMAL_DCF);
-+
-+	val = readl_relaxed(regs + ZX2967_THERMAL_SEL);
-+	val &= ~ZX2967_THERMAL_ID_MASK;
-+	sel_id = sensor->id ? ZX2967_THERMAL_ID0 : ZX2967_THERMAL_ID1;
-+	val |= sel_id;
-+	writel_relaxed(val, regs + ZX2967_THERMAL_SEL);
-+
-+	usleep_range(100, 300);
-+	val = readl_relaxed(regs + ZX2967_THERMAL_CTRL);
-+	while (!(val & ZX2967_THERMAL_READY)) {
-+		if (time_after(jiffies, timeout)) {
-+			dev_err(priv->dev, "Thermal sensor %d data timeout\n",
-+				sensor->id);
-+			mutex_unlock(&priv->lock);
-+			return -ETIMEDOUT;
-+		}
-+		val = readl_relaxed(regs + ZX2967_THERMAL_CTRL);
-+	}
-+
-+	writel_relaxed(3, regs + ZX2967_THERMAL_DCF);
-+	val = readl_relaxed(regs + ZX2967_THERMAL_CTRL)
-+			 & ZX2967_THERMAL_TEMP_MASK;
-+	writel_relaxed(1, regs + ZX2967_THERMAL_POWER_MODE);
-+
-+	/*
-+	 * Calculate temperature
-+	 *   922	initial value of calibration cure
-+	 *   1.951	slope of calibration cure
-+	 */
-+	*temp = DIV_ROUND_CLOSEST((val - 922) * 1000, 1951);
-+
-+	mutex_unlock(&priv->lock);
-+
-+	return 0;
-+}
-+
-+static struct thermal_zone_of_device_ops zx2967_of_thermal_ops = {
-+	.get_temp = zx2967_thermal_get_temp,
-+};
-+
-+static int zx2967_thermal_probe(struct platform_device *pdev)
-+{
-+	struct zx2967_thermal_priv *priv;
-+	struct resource *res;
-+	int ret, i;
-+
-+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	priv->regs = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(priv->regs))
-+		return PTR_ERR(priv->regs);
-+
-+	priv->clk_gate = devm_clk_get(&pdev->dev, "gate");
-+	if (IS_ERR(priv->clk_gate)) {
-+		ret = PTR_ERR(priv->clk_gate);
-+		dev_err(&pdev->dev, "failed to get clock gate: %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = clk_prepare_enable(priv->clk_gate);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to enable converter clock: %d\n",
-+			ret);
-+		return ret;
-+	}
-+
-+	priv->pclk = devm_clk_get(&pdev->dev, "pclk");
-+	if (IS_ERR(priv->pclk)) {
-+		ret = PTR_ERR(priv->pclk);
-+		dev_err(&pdev->dev, "failed to get apb clock: %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = clk_prepare_enable(priv->pclk);
-+	if (ret) {
-+		clk_disable_unprepare(priv->clk_gate);
-+		dev_err(&pdev->dev, "failed to enable converter clock: %d\n",
-+			ret);
-+		return ret;
-+	}
-+
-+	mutex_init(&priv->lock);
-+	for (i = 0; i < NUM_SENSORS; i++) {
-+		struct zx2967_thermal_sensor *sensor = &priv->sensors[i];
-+
-+		sensor->priv = priv;
-+		sensor->id = i;
-+		sensor->tzd = thermal_zone_of_sensor_register(&pdev->dev,
-+					i, sensor, &zx2967_of_thermal_ops);
-+		if (IS_ERR(sensor->tzd)) {
-+			ret = PTR_ERR(sensor->tzd);
-+			dev_err(&pdev->dev, "failed to register sensor %d: %d\n",
-+				i, ret);
-+			goto remove_ts;
-+		}
-+	}
-+	priv->dev = &pdev->dev;
-+	platform_set_drvdata(pdev, priv);
-+
-+	return 0;
-+
-+remove_ts:
-+	clk_disable_unprepare(priv->clk_gate);
-+	clk_disable_unprepare(priv->pclk);
-+	for (i--; i >= 0; i--)
-+		thermal_zone_of_sensor_unregister(&pdev->dev,
-+						  priv->sensors[i].tzd);
-+
-+	return ret;
-+}
-+
-+static int zx2967_thermal_exit(struct platform_device *pdev)
-+{
-+	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
-+	int i;
-+
-+	for (i = 0; i < NUM_SENSORS; i++) {
-+		struct zx2967_thermal_sensor *sensor = &priv->sensors[i];
-+
-+		thermal_zone_of_sensor_unregister(&pdev->dev, sensor->tzd);
-+	}
-+	clk_disable_unprepare(priv->pclk);
-+	clk_disable_unprepare(priv->clk_gate);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id zx2967_thermal_id_table[] = {
-+	{ .compatible = "zte,zx296718-thermal" },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, zx2967_thermal_id_table);
-+
-+static SIMPLE_DEV_PM_OPS(zx2967_thermal_pm_ops,
-+			 zx2967_thermal_suspend, zx2967_thermal_resume);
-+
-+static struct platform_driver zx2967_thermal_driver = {
-+	.probe = zx2967_thermal_probe,
-+	.remove = zx2967_thermal_exit,
-+	.driver = {
-+		.name = "zx2967_thermal",
-+		.of_match_table = zx2967_thermal_id_table,
-+		.pm = &zx2967_thermal_pm_ops,
-+	},
-+};
-+module_platform_driver(zx2967_thermal_driver);
-+
-+MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
-+MODULE_DESCRIPTION("ZTE zx2967 thermal driver");
-+MODULE_LICENSE("GPL");
--- 
-2.7.4
+Robin.
+
+> 
+> Thanks,
+> Tomasz
