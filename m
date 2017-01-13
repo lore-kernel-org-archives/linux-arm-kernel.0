@@ -1,43 +1,52 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 13 Jan 2017 19:53:58 +0100
-Subject: [PATCH] phy: meson8b-usb2: fix offsets for some of the registers
-Message-ID: <20170113185358.8362-1-martin.blumenstingl@googlemail.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Fri, 13 Jan 2017 18:57:39 +0000
+Subject: [PATCH] arm64: dts: marvell: add generic-ahci compatibles for CP110
+ ahci
+Message-ID: <E1cS72h-0004nc-Rr@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The register offsets for REG_DBG_UART (and all following) were off by
-0x4. This was not a problem yet because these registers are currently
-not used by the driver.
+Testing with an Armada 8040 board shows that adding the generic-ahci
+compatible to the CP110 AHCI nodes gets us working AHCI on the board.
+A previous patch series posted by Thomas Petazzoni was retracted when
+it was realised that the IP was supposed to be, and is, compatible
+with the standard register layout.
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Add this compatible.
+
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/phy/phy-meson8b-usb2.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 3 ++-
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 3 ++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/phy/phy-meson8b-usb2.c b/drivers/phy/phy-meson8b-usb2.c
-index 33c9f4ba157d..30f56a6a411f 100644
---- a/drivers/phy/phy-meson8b-usb2.c
-+++ b/drivers/phy/phy-meson8b-usb2.c
-@@ -81,9 +81,9 @@
- 	#define REG_ADP_BC_ACA_PIN_GND			BIT(25)
- 	#define REG_ADP_BC_ACA_PIN_FLOAT		BIT(26)
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index 464b491c7291..65ad781d7910 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -128,7 +128,8 @@
+ 			};
  
--#define REG_DBG_UART					0x14
-+#define REG_DBG_UART					0x10
+ 			cpm_sata0: sata at 540000 {
+-				compatible = "marvell,armada-8k-ahci";
++				compatible = "marvell,armada-8k-ahci",
++					     "generic-ahci";
+ 				reg = <0x540000 0x30000>;
+ 				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&cpm_syscon0 1 15>;
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index b10f4781d8fb..168d667d50a3 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -128,7 +128,8 @@
+ 			};
  
--#define REG_TEST					0x18
-+#define REG_TEST					0x14
- 	#define REG_TEST_DATA_IN_MASK			GENMASK(3, 0)
- 	#define REG_TEST_EN_MASK			GENMASK(7, 4)
- 	#define REG_TEST_ADDR_MASK			GENMASK(11, 8)
-@@ -93,7 +93,7 @@
- 	#define REG_TEST_DATA_OUT_MASK			GENMASK(19, 16)
- 	#define REG_TEST_DISABLE_ID_PULLUP		BIT(20)
- 
--#define REG_TUNE					0x1c
-+#define REG_TUNE					0x18
- 	#define REG_TUNE_TX_RES_TUNE_MASK		GENMASK(1, 0)
- 	#define REG_TUNE_TX_HSXV_TUNE_MASK		GENMASK(3, 2)
- 	#define REG_TUNE_TX_VREF_TUNE_MASK		GENMASK(7, 4)
+ 			cps_sata0: sata at 540000 {
+-				compatible = "marvell,armada-8k-ahci";
++				compatible = "marvell,armada-8k-ahci",
++					     "generic-ahci";
+ 				reg = <0x540000 0x30000>;
+ 				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&cps_syscon0 1 15>;
 -- 
-2.11.0
+2.7.4
