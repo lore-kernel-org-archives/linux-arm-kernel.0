@@ -1,83 +1,36 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 12 Jan 2017 21:17:00 -0800
-Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device managed
- functions
-In-Reply-To: <20170111143917.hedhyfu6m5dopag7@pengutronix.de>
-References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
- <1484100561-17638-1-git-send-email-linux@roeck-us.net>
- <1484100561-17638-5-git-send-email-linux@roeck-us.net>
- <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
- <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
- <a45ed205-7c1b-a298-50c0-fc8b80a846c5@sigmadesigns.com>
- <20170111143917.hedhyfu6m5dopag7@pengutronix.de>
-Message-ID: <56a43861-e875-2239-1046-91a26c009160@roeck-us.net>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 13 Jan 2017 10:59:39 +0530
+Subject: [PATCH v5 1/3] dmaengine: xilinx_dma: Check for channel idle
+ state before submitting dma descriptor
+In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A666658@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1483771530-8545-1-git-send-email-appanad@xilinx.com>
+ <1483771530-8545-2-git-send-email-appanad@xilinx.com>
+ <20170110062349.GY3573@localhost>
+ <C246CAC1457055469EF09E3A7AC4E11A4A666658@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <20170113052939.GP3573@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2017 06:39 AM, Uwe Kleine-K?nig wrote:
-> On Wed, Jan 11, 2017 at 01:31:47PM +0100, Marc Gonzalez wrote:
->> On 11/01/2017 11:52, Guenter Roeck wrote:
->>
->>> On 01/11/2017 01:07 AM, Marc Gonzalez wrote:
->>>
->>>>> @@ -134,12 +134,15 @@ static int tangox_wdt_probe(struct platform_device *pdev)
->>>>>  	err = clk_prepare_enable(dev->clk);
->>>>>  	if (err)
->>>>>  		return err;
->>>>> +	err = devm_add_action_or_reset(&pdev->dev,
->>>>> +				       (void(*)(void *))clk_disable_unprepare,
->>>>> +				       dev->clk);
->>>>> +	if (err)
->>>>> +		return err;
->
-> This looks wrong. There is no clk_unprepare_disable when
-> devm_add_action_or_reset fails.
->
->>>>
->>>> Hello Guenter,
->>>>
->>>> I would rather avoid the function pointer cast.
->>>> How about defining an auxiliary function for the cleanup action?
->>>>
->>>> clk_disable_unprepare() is static inline, so gcc will have to
->>>> define an auxiliary function either way. What do you think?
->>>
->>> Not really. It would just make it more complicated to replace the
->>> call with devm_clk_prepare_enable(), should it ever find its way
->>> into the light of day.
->>
->> More complicated, because the cleanup function will have to be deleted later?
->> The compiler will warn if someone forgets to do that.
->>
->> In my opinion, it's not a good idea to rely on the fact that casting
->> void(*)(struct clk *clk) to void(*)(void *) is likely to work as expected
->> on most platforms. (It has undefined behavior, strictly speaking.)
->
-> I would expect it to work on all (Linux) platforms. Anyhow, I wonder if
-> there couldn't be found a better solution.
->
-> If in the end it looks like the following that would be good I think:
->
-> 	clk = devm_clk_get(...);
-> 	if (IS_ERR(clk))
-> 		...
->
-> 	ret = devm_clk_prepare_enable(clk)
-> 	if (ret)
-> 		return ret;
->
+On Fri, Jan 13, 2017 at 04:28:11AM +0000, Appana Durga Kedareswara Rao wrote:
+> Hi Vinod,
+> 
+> 	Thanks for the review...
+> > 
+> > On Sat, Jan 07, 2017 at 12:15:28PM +0530, Kedareswara rao Appana wrote:
+> > > Add channel idle state to ensure that dma descriptor is not
+> > > submitted when VDMA engine is in progress.
+> > 
+> > any reason why you want to make your own varible and not use the HW to
+> > query
+> > as done earlier. It is not clear to me why that is removed from description
+> 
+> We need to poll for a bit in the status register to know the dma state.
+> We are currently doing that in the driver hot path
+> To avoid this using own variables.
 
-It turns out that at least one static analyzer complains about different
-parameter pointer types in situations like this, and at least one embedded
-compiler manages to create function names with embedded parameter type
-(eg it appends an 'i' to the function name for each integer parameter).
+It would be worthwhile to document these, down the line people may not
+remeber the motivation
 
-With that, I consider the typecast to be too risky after all. It may work
-for all of today's Linux architectures and compilers, but who knows if I
-get flooded with static analyzer warnings, and who knows if gcc version
-18.0 or binutils 35.0 makes it truly incompatible (following the logic of
-"we can, therefore we do"). Since I also dislike the stub function solution,
-at least in this situation, I'll drop all patches touching clk_prepare_enable(),
-and wait for devm_clk_prepare_enable() to be available.
 
-Guenter
+-- 
+~Vinod
