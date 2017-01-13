@@ -1,33 +1,24 @@
 From: guochun.mao@mediatek.com (Guochun Mao)
-Date: Fri, 13 Jan 2017 15:13:28 +0800
-Subject: [PATCH v1 1/2] Documentation: mtk-quadspi: update DT bindings
-In-Reply-To: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
-References: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
-Message-ID: <1484291609-20195-2-git-send-email-guochun.mao@mediatek.com>
+Date: Fri, 13 Jan 2017 15:13:27 +0800
+Subject: [PATCH v1 0/2] add nor flash node for mt2701
+Message-ID: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "mediatek,mt2701-nor" for nor flash node's compatible.
+This patch series based on v4.10-rc2, include MT2701 spinor node and bindings.
 
-Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
----
- .../devicetree/bindings/mtd/mtk-quadspi.txt        |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Dependent on "Add clock and power domain DT nodes for Mediatek MT2701"[1].
 
-diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-index fb314f0..f83d31d 100644
---- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-+++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-@@ -1,7 +1,9 @@
- * Serial NOR flash controller for MTK MT81xx (and similar)
- 
- Required properties:
--- compatible: 	  should be "mediatek,mt8173-nor";
-+- compatible: 	  should contain:
-+		  "mediatek,mt2701-nor" for MT2701,
-+		  "mediatek,mt8173-nor" for MT8173.
- - reg: 		  physical base address and length of the controller's register
- - clocks: 	  the phandle of the clocks needed by the nor controller
- - clock-names: 	  the names of the clocks
--- 
-1.7.9.5
+[1] http://lists.infradead.org/pipermail/linux-mediatek/2016-December/007637.html
+
+Guochun Mao (2):
+  Documentation: mtk-quadspi: update DT bindings
+  arm: dts: mt2701: add nor flash node
+
+ .../devicetree/bindings/mtd/mtk-quadspi.txt        |  4 +++-
+ arch/arm/boot/dts/mt2701-evb.dts                   | 25 ++++++++++++++++++++++
+ arch/arm/boot/dts/mt2701.dtsi                      | 12 +++++++++++
+ 3 files changed, 40 insertions(+), 1 deletion(-)
+
+--
+1.8.1.1.dirty
