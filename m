@@ -1,77 +1,131 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 13 Jan 2017 16:02:27 +0100
-Subject: [PATCH v6 3/3] arm: dts: mt2701: Add node for Mediatek JPEG
- Decoder
-In-Reply-To: <1484011718.10361.7.camel@mtksdaap41>
-References: <1479353915-5043-1-git-send-email-rick.chang@mediatek.com>
- <1479353915-5043-4-git-send-email-rick.chang@mediatek.com>
- <d602365a-e87b-5bae-8698-bd43063ef079@xs4all.nl>
- <1479784905.8964.15.camel@mtksdaap41>
- <badf8125-27ed-9c5b-fbc0-75716ffdfb0e@xs4all.nl>
- <1479866054.8964.21.camel@mtksdaap41> <1479894203.8964.29.camel@mtksdaap41>
- <1483670099.18931.5.camel@mtksdaap41>
- <974d20f3-5133-0869-2a35-c1617bec5d6e@xs4all.nl>
- <c35bd06d-f012-1289-e765-02dc26b87e27@gmail.com>
- <1484011718.10361.7.camel@mtksdaap41>
-Message-ID: <267403e5-18ac-0c74-10ca-cc36b909dfb4@gmail.com>
+Date: Fri, 13 Jan 2017 16:05:01 +0100
+Subject: [PATCH v2 2/6] arm: dts: mt2701: Add iommu/smi device node
+In-Reply-To: <1484296978-18572-3-git-send-email-erin.lo@mediatek.com>
+References: <1484296978-18572-1-git-send-email-erin.lo@mediatek.com>
+ <1484296978-18572-3-git-send-email-erin.lo@mediatek.com>
+Message-ID: <02062506-f917-0140-4934-31d7d3317b80@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Hi Erin,
 
-On 10/01/17 02:28, Eddie Huang wrote:
-> Hi Matthias,
->
-> On Mon, 2017-01-09 at 19:45 +0100, Matthias Brugger wrote:
->>
->> On 09/01/17 12:29, Hans Verkuil wrote:
->>> Hi Rick,
->>>
->>> On 01/06/2017 03:34 AM, Rick Chang wrote:
->>>> Hi Hans,
->>>>
->>>> The dependence on [1] has been merged in 4.10, but [2] has not.Do you have
->>>> any idea about this patch series? Should we wait for [2] or we could merge
->>>> the source code and dt-binding first?
->>>
->>> Looking at [2] I noticed that the last comment was July 4th. What is the reason
->>> it hasn't been merged yet?
->>>
->>> If I know [2] will be merged for 4.11, then I am fine with merging this media
->>> patch series. The dependency of this patch on [2] is something Mauro can handle.
->>>
->>> If [2] is not merged for 4.11, then I think it is better to wait until it is
->>> merged.
->>>
->>
->> I can't take [2] because there is no scpsys in the dts present. It seems
->> that it got never posted.
->>
->> Rick can you please follow-up with James and provide a patch which adds
->> a scpsys node to the mt2701.dtsi?
->>
->
-> James sent three MT2701 dts patches [1] two weeks ago, these three
-> patches include scpsys node. Please take a reference. And We will send
-> new MT2701 ionmmu/smi dtsi node patch base on [1] later, thus you can
-> accept and merge to 4.11.
->
+I just took the patch from Honghui he send in june.
+Please see my comment inline.
 
-Thanks for the clarification. I pulled all this patches into 
-v4.10-next/dts32
+On 13/01/17 09:42, Erin Lo wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
+>
+> Add the device node of iommu and smi for MT2701.
+>
+> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> ---
+>  arch/arm/boot/dts/mt2701.dtsi | 54 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 54 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+> index eb4c6fd..87be52c 100644
+> --- a/arch/arm/boot/dts/mt2701.dtsi
+> +++ b/arch/arm/boot/dts/mt2701.dtsi
+> @@ -17,6 +17,7 @@
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/reset/mt2701-resets.h>
+> +#include <dt-bindings/memory/mt2701-larb-port.h>
+>  #include "skeleton64.dtsi"
+>  #include "mt2701-pinfunc.h"
+>
+> @@ -161,6 +162,16 @@
+>  		clock-names = "system-clk", "rtc-clk";
+>  	};
+>
+> +	smi_common: smi at 1000c000 {
+> +		compatible = "mediatek,mt2701-smi-common";
+> +		reg = <0 0x1000c000 0 0x1000>;
+> +		clocks = <&infracfg CLK_INFRA_SMI>,
+> +			 <&mmsys CLK_MM_SMI_COMMON>,
+> +			 <&infracfg CLK_INFRA_SMI>;
+> +		clock-names = "apb", "smi", "async";
+> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+> +	};
+> +
+>  	sysirq: interrupt-controller at 10200100 {
+>  		compatible = "mediatek,mt2701-sysirq",
+>  			     "mediatek,mt6577-sysirq";
+> @@ -170,6 +181,16 @@
+>  		reg = <0 0x10200100 0 0x1c>;
+>  	};
+>
+> +	iommu: mmsys_iommu at 10205000 {
+> +		compatible = "mediatek,mt2701-m4u";
+> +		reg = <0 0x10205000 0 0x1000>;
+> +		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&infracfg CLK_INFRA_M4U>;
+> +		clock-names = "bclk";
+> +		mediatek,larbs = <&larb0 &larb1 &larb2>;
+> +		#iommu-cells = <1>;
+> +	};
+> +
+>  	apmixedsys: syscon at 10209000 {
+>  		compatible = "mediatek,mt2701-apmixedsys", "syscon";
+>  		reg = <0 0x10209000 0 0x1000>;
+> @@ -272,18 +293,51 @@
+>  		#clock-cells = <1>;
+>  	};
+>
+> +	larb0: larb at 14010000 {
+> +		compatible = "mediatek,mt2701-smi-larb";
+> +		reg = <0 0x14010000 0 0x1000>;
+> +		mediatek,smi = <&smi_common>;
+> +		mediatek,larbidx = <0>;
 
-Hans will you take v9 of this patch set?
-Then I'll take the dts patch.
+Did I miss something? 'mediatek,larbidx' does not sound familiar to me.
 
 Regards,
 Matthias
 
-> [1]
-> https://patchwork.kernel.org/patch/9489991/
-> https://patchwork.kernel.org/patch/9489985/
-> https://patchwork.kernel.org/patch/9489989/
+> +		clocks = <&mmsys CLK_MM_SMI_LARB0>,
+> +			 <&mmsys CLK_MM_SMI_LARB0>;
+> +		clock-names = "apb", "smi";
+> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+> +	};
+> +
+>  	imgsys: syscon at 15000000 {
+>  		compatible = "mediatek,mt2701-imgsys", "syscon";
+>  		reg = <0 0x15000000 0 0x1000>;
+>  		#clock-cells = <1>;
+>  	};
 >
-> Thanks,
-> Eddie
+> +	larb2: larb at 15001000 {
+> +		compatible = "mediatek,mt2701-smi-larb";
+> +		reg = <0 0x15001000 0 0x1000>;
+> +		mediatek,smi = <&smi_common>;
+> +		mediatek,larbidx = <2>;
+> +		clocks = <&imgsys CLK_IMG_SMI_COMM>,
+> +			 <&imgsys CLK_IMG_SMI_COMM>;
+> +		clock-names = "apb", "smi";
+> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
+> +	};
+> +
+>  	vdecsys: syscon at 16000000 {
+>  		compatible = "mediatek,mt2701-vdecsys", "syscon";
+>  		reg = <0 0x16000000 0 0x1000>;
+>  		#clock-cells = <1>;
+>  	};
 >
+> +	larb1: larb at 16010000 {
+> +		compatible = "mediatek,mt2701-smi-larb";
+> +		reg = <0 0x16010000 0 0x1000>;
+> +		mediatek,smi = <&smi_common>;
+> +		mediatek,larbidx = <1>;
+> +		clocks = <&vdecsys CLK_VDEC_CKGEN>,
+> +			 <&vdecsys CLK_VDEC_LARB>;
+> +		clock-names = "apb", "smi";
+> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_VDEC>;
+> +	};
+> +
+>  	hifsys: syscon at 1a000000 {
+>  		compatible = "mediatek,mt2701-hifsys", "syscon";
+>  		reg = <0 0x1a000000 0 0x1000>;
 >
