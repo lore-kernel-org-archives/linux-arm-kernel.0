@@ -1,60 +1,63 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 13 Jan 2017 16:29:17 +0100
-Subject: [PATCH v2 3/6] arm: dts: mt2701: Add nand device node
-In-Reply-To: <1484296978-18572-4-git-send-email-erin.lo@mediatek.com>
+Date: Fri, 13 Jan 2017 16:29:25 +0100
+Subject: [PATCH v2 4/6] arm: dts: mt2701: Add auxadc device node.
+In-Reply-To: <1484296978-18572-5-git-send-email-erin.lo@mediatek.com>
 References: <1484296978-18572-1-git-send-email-erin.lo@mediatek.com>
- <1484296978-18572-4-git-send-email-erin.lo@mediatek.com>
-Message-ID: <eedd5138-049e-419e-edb4-51be7f75be97@gmail.com>
+ <1484296978-18572-5-git-send-email-erin.lo@mediatek.com>
+Message-ID: <341850d0-6f32-9288-4399-96f0d2d00c6f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 On 13/01/17 09:42, Erin Lo wrote:
-> From: Xiaolei Li <xiaolei.li@mediatek.com>
+> From: Zhiyong Tao <zhiyong.tao@mediatek.com>
 >
-> Add mt2701 nand device node, include nfi and bch ecc.
+> Add auxadc device node for MT2701.
 >
-> Signed-off-by: Xiaolei Li <xiaolei.li@mediatek.com>
+> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
 > Signed-off-by: Erin Lo <erin.lo@mediatek.com>
 > ---
->  arch/arm/boot/dts/mt2701.dtsi | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
+>  arch/arm/boot/dts/mt2701-evb.dts | 4 ++++
+>  arch/arm/boot/dts/mt2701.dtsi    | 9 +++++++++
+>  2 files changed, 13 insertions(+)
 >
 
 Applied to v4.10-next/dts32
 
+> diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
+> index 879f1eb..a483798 100644
+> --- a/arch/arm/boot/dts/mt2701-evb.dts
+> +++ b/arch/arm/boot/dts/mt2701-evb.dts
+> @@ -24,6 +24,10 @@
+>  	};
+>  };
+>
+> +&auxadc {
+> +	status = "okay";
+> +};
+> +
+>  &pio {
+>  	spi_pins_a: spi0 at 0 {
+>  		pins_spi {
 > diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-> index 87be52c..1182c43 100644
+> index 1182c43..4f52019 100644
 > --- a/arch/arm/boot/dts/mt2701.dtsi
 > +++ b/arch/arm/boot/dts/mt2701.dtsi
-> @@ -261,6 +261,28 @@
->  		status = "disabled";
+> @@ -208,6 +208,15 @@
+>  		      <0 0x10216000 0 0x2000>;
 >  	};
 >
-> +	nandc: nfi at 1100d000 {
-> +		compatible = "mediatek,mt2701-nfc";
-> +		reg = <0 0x1100d000 0 0x1000>;
-> +		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&pericfg CLK_PERI_NFI>,
-> +			 <&pericfg CLK_PERI_NFI_PAD>;
-> +		clock-names = "nfi_clk", "pad_clk";
-> +		status = "disabled";
-> +		ecc-engine = <&bch>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +	};
-> +
-> +	bch: ecc at 1100e000 {
-> +		compatible = "mediatek,mt2701-ecc";
-> +		reg = <0 0x1100e000 0 0x1000>;
-> +		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&pericfg CLK_PERI_NFI_ECC>;
-> +		clock-names = "nfiecc_clk";
+> +	auxadc: adc at 11001000 {
+> +		compatible = "mediatek,mt2701-auxadc";
+> +		reg = <0 0x11001000 0 0x1000>;
+> +		clocks = <&pericfg CLK_PERI_AUXADC>;
+> +		clock-names = "main";
+> +		#io-channel-cells = <1>;
 > +		status = "disabled";
 > +	};
 > +
->  	spi1: spi at 11016000 {
->  		compatible = "mediatek,mt2701-spi";
->  		#address-cells = <1>;
+>  	uart0: serial at 11002000 {
+>  		compatible = "mediatek,mt2701-uart",
+>  			     "mediatek,mt6577-uart";
 >
