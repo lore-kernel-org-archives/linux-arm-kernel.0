@@ -1,46 +1,42 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Fri, 13 Jan 2017 10:30:05 +0800
-Subject: [PATCH] arm64: dts: mt8173: Fix cpu_thermal cooling-maps contributions
-Message-ID: <20170113023006.150845-1-djkurtz@chromium.org>
+From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
+Date: Thu, 12 Jan 2017 21:34:59 -0500
+Subject: [PATCH net-next v2 00/10] net: dsa: Support for pdata in dsa2
+In-Reply-To: <20170112034121.27697-1-f.fainelli@gmail.com>
+References: <20170112034121.27697-1-f.fainelli@gmail.com>
+Message-ID: <87fuknpu0c.fsf@weeman.i-did-not-set--mail-host-address--so-tickle-me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to [0], the contribution field for each cooling-device express
-their relative power efficiency. Higher weights express higher power
-efficiency.  Weighting is relative such that if each cooling device has a
-weight of 1 they are considered equal. This is particularly useful in
-heterogeneous systems where two cooling devices may perform the same kind
-of compute, but with different efficiency.
+Hi Florian,
 
-[0] Documentation/thermal/power_allocator.txt
+Florian Fainelli <f.fainelli@gmail.com> writes:
 
-According to Mediatek IC designer, the power efficiency ratio between the
-LITTLE core cluster (cooling-device cpu0) and big core cluster
-(cooling-device cpu1) is around 3:1 (3072:1024).
+> Hi all,
+>
+> This is not exactly new, and was sent before, although back then, I did not
+> have an user of the pre-declared MDIO board information, but now we do. Note
+> that I have additional changes queued up to have b53 register platform data for
+> MIPS bcm47xx and bcm63xx.
+>
+> Yes I know that we should have the Orion platforms eventually be converted to
+> Device Tree, but until that happens, I don't want any remaining users of the
+> old "dsa" platform device (hence the previous DTS submissions for ARM/mvebu)
+> and, there will be platforms out there that most likely won't never see DT
+> coming their way (BCM47xx is almost 100% sure, BCM63xx maybe not in a distant
+> future).
+>
+> We would probably want the whole series to be merged via David Miller's tree
+> to simplify things.
+>
+> Greg, can you Ack/Nack patch 5 since it touched the core LDD?
+>
+> Thanks!
 
-Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I've tested this patchset on my mv88e6xxx (DTS) boards to make sure
+nothing was broken, since it touches the driver. Looks good!
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 12e702771f5c..9a3b0d20f7a8 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -182,12 +182,12 @@
- 				map at 0 {
- 					trip = <&target>;
- 					cooling-device = <&cpu0 0 0>;
--					contribution = <1024>;
-+					contribution = <3072>;
- 				};
- 				map at 1 {
- 					trip = <&target>;
- 					cooling-device = <&cpu2 0 0>;
--					contribution = <2048>;
-+					contribution = <1024>;
- 				};
- 			};
- 		};
--- 
-2.11.0.390.gc69c2f50cf-goog
+Tested-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+
+Thanks,
+
+        Vivien
