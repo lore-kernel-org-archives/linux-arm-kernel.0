@@ -1,50 +1,110 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 13 Jan 2017 18:12:04 +0100
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.11 (#1)
-Message-ID: <87y3ye7ul7.fsf@free-electrons.com>
+From: Joao.Pinto@synopsys.com (Joao Pinto)
+Date: Fri, 13 Jan 2017 17:13:12 +0000
+Subject: [PATCH 09/37] PCI: dwc: designware: Parse *num-lanes* property in
+ dw_pcie_setup_rc
+In-Reply-To: <1484216786-17292-10-git-send-email-kishon@ti.com>
+References: <1484216786-17292-1-git-send-email-kishon@ti.com>
+ <1484216786-17292-10-git-send-email-kishon@ti.com>
+Message-ID: <c3c55af3-29d1-dc59-3ae4-9a4132c99092@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Here is the first pull request for dt64 for mvebu for v4.11.
+?s 10:25 AM de 1/12/2017, Kishon Vijay Abraham I escreveu:
+> *num-lanes* dt property is parsed in dw_pcie_host_init. However
+> *num-lanes* property is applicable to both root complex mode and
+> endpoint mode. As a first step, move the parsing of this property
+> outside dw_pcie_host_init. This is in preparation for splitting
+> pcie-designware.c to pcie-designware.c and pcie-designware-host.c
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/pci/dwc/pcie-designware.c |   18 +++++++++++-------
+>  drivers/pci/dwc/pcie-designware.h |    1 -
+>  2 files changed, 11 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
+> index 00a0fdc..89cdb6b 100644
+> --- a/drivers/pci/dwc/pcie-designware.c
+> +++ b/drivers/pci/dwc/pcie-designware.c
+> @@ -551,10 +551,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  		}
+>  	}
+>  
+> -	ret = of_property_read_u32(np, "num-lanes", &pci->lanes);
+> -	if (ret)
+> -		pci->lanes = 0;
+> -
+>  	ret = of_property_read_u32(np, "num-viewport", &pci->num_viewport);
+>  	if (ret)
+>  		pci->num_viewport = 2;
+> @@ -751,18 +747,26 @@ static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+>  
+>  void dw_pcie_setup_rc(struct pcie_port *pp)
+>  {
+> +	int ret;
+> +	u32 lanes;
+>  	u32 val;
+>  	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> +	struct device *dev = pci->dev;
+> +	struct device_node *np = dev->of_node;
+>  
+>  	/* get iATU unroll support */
+>  	pci->iatu_unroll_enabled = dw_pcie_iatu_unroll_enabled(pci);
+>  	dev_dbg(pci->dev, "iATU unroll: %s\n",
+>  		pci->iatu_unroll_enabled ? "enabled" : "disabled");
+>  
+> +	ret = of_property_read_u32(np, "num-lanes", &lanes);
+> +	if (ret)
+> +		lanes = 0;
 
-Gregory
+You moved from host_init to root complex setup function, which in my opinion did
+not improve (in this scope).
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+I suggest that instead of making so much intermediary patches, which is nice to
+understand your development sequence, but hard to review. Wouldn't be better to
+condense some of the patches? We would have a cloear vision of the final product :)
 
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+Joao
 
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.11-1
-
-for you to fetch changes up to 58a748f7dc29d8a7bb74c6cbba6a82425dbba5cc:
-
-  ARM64: dts: marvell: Correct license text (2017-01-03 16:24:34 +0100)
-
-----------------------------------------------------------------
-mvebu dt64 for 4.11 (part 1)
-
-- Correct license text which was mangled when switching to dual license
-- Add SPI and I2C nodes on Armada 3700(driver support had been already
-  merged)
-- Add support for the ethernet switch on the EspressoBin board (driver
-  support not yet merged)
-
-----------------------------------------------------------------
-Alexandre Belloni (1):
-      ARM64: dts: marvell: Correct license text
-
-Romain Perier (4):
-      arm64: dts: marvell: Add ethernet switch definition for the ESPRESSObin
-      arm64: dts: marvell: Add definition of SPI controller for Armada 3700
-      arm64: dts: marvell: Enable spi0 on the board Armada-3720-db
-      arm64: dts: marvell: Add I2C definitions for the Armada 3700
-
- arch/arm64/boot/dts/marvell/armada-371x.dtsi       | 10 +--
- arch/arm64/boot/dts/marvell/armada-3720-db.dts     | 44 +++++++++++--
- .../boot/dts/marvell/armada-3720-espressobin.dts   | 76 ++++++++++++++++++++--
- arch/arm64/boot/dts/marvell/armada-372x.dtsi       | 10 +--
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi       | 39 +++++++++--
- 5 files changed, 154 insertions(+), 25 deletions(-)
+> +
+>  	/* set the number of lanes */
+>  	val = dw_pcie_readl_dbi(pci, PCIE_PORT_LINK_CONTROL);
+>  	val &= ~PORT_LINK_MODE_MASK;
+> -	switch (pci->lanes) {
+> +	switch (lanes) {
+>  	case 1:
+>  		val |= PORT_LINK_MODE_1_LANES;
+>  		break;
+> @@ -776,7 +780,7 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
+>  		val |= PORT_LINK_MODE_8_LANES;
+>  		break;
+>  	default:
+> -		dev_err(pci->dev, "num-lanes %u: invalid value\n", pci->lanes);
+> +		dev_err(pci->dev, "num-lanes %u: invalid value\n", lanes);
+>  		return;
+>  	}
+>  	dw_pcie_writel_dbi(pci, PCIE_PORT_LINK_CONTROL, val);
+> @@ -784,7 +788,7 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
+>  	/* set link width speed control register */
+>  	val = dw_pcie_readl_dbi(pci, PCIE_LINK_WIDTH_SPEED_CONTROL);
+>  	val &= ~PORT_LOGIC_LINK_WIDTH_MASK;
+> -	switch (pci->lanes) {
+> +	switch (lanes) {
+>  	case 1:
+>  		val |= PORT_LOGIC_LINK_WIDTH_1_LANES;
+>  		break;
+> diff --git a/drivers/pci/dwc/pcie-designware.h b/drivers/pci/dwc/pcie-designware.h
+> index d4b3d43..491fbe3 100644
+> --- a/drivers/pci/dwc/pcie-designware.h
+> +++ b/drivers/pci/dwc/pcie-designware.h
+> @@ -148,7 +148,6 @@ struct dw_pcie_ops {
+>  struct dw_pcie {
+>  	struct device		*dev;
+>  	void __iomem		*dbi_base;
+> -	u32			lanes;
+>  	u32			num_viewport;
+>  	u8			iatu_unroll_enabled;
+>  	struct pcie_port	pp;
+> 
