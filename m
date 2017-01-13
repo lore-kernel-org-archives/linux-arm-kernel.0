@@ -1,132 +1,104 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Fri, 13 Jan 2017 15:04:30 -0800
-Subject: [PATCH v3 06/24] ARM: dts: imx6-sabrelite: add OV5642 and OV5640
- camera sensors
-In-Reply-To: <1484309021.31475.29.camel@pengutronix.de>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-7-git-send-email-steve_longerbeam@mentor.com>
- <1484309021.31475.29.camel@pengutronix.de>
-Message-ID: <1bb64209-7c58-fe10-3db9-c5b8103eda90@gmail.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Fri, 13 Jan 2017 16:04:56 -0700
+Subject: [PATCH v8 16/18] vfio/type1: Allow transparent MSI IOVA allocation
+In-Reply-To: <1484127714-3263-17-git-send-email-eric.auger@redhat.com>
+References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
+ <1484127714-3263-17-git-send-email-eric.auger@redhat.com>
+Message-ID: <20170113160456.61a744d8@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 11 Jan 2017 09:41:52 +0000
+Eric Auger <eric.auger@redhat.com> wrote:
+
+> When attaching a group to the container, check the group's
+> reserved regions and test whether the IOMMU translates MSI
+> transactions. If yes, we initialize an IOVA allocator through
+> the iommu_get_msi_cookie API. This will allow the MSI IOVAs
+> to be transparently allocated on MSI controller's compose().
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 
-On 01/13/2017 04:03 AM, Philipp Zabel wrote:
-> Am Freitag, den 06.01.2017, 18:11 -0800 schrieb Steve Longerbeam:
->> Enables the OV5642 parallel-bus sensor, and the OV5640 MIPI CSI-2 sensor.
->> Both hang off the same i2c2 bus, so they require different (and non-
->> default) i2c slave addresses.
->>
->> The OV5642 connects to the parallel-bus mux input port on ipu1_csi0_mux.
->>
->> The OV5640 connects to the input port on the MIPI CSI-2 receiver on
->> mipi_csi. It is set to transmit over MIPI virtual channel 1.
->>
->> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
->> ---
->>   arch/arm/boot/dts/imx6dl-sabrelite.dts   |   5 ++
->>   arch/arm/boot/dts/imx6q-sabrelite.dts    |   6 ++
->>   arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 118 +++++++++++++++++++++++++++++++
->>   3 files changed, 129 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/imx6dl-sabrelite.dts b/arch/arm/boot/dts/imx6dl-sabrelite.dts
->> index 0f06ca5..fec2524 100644
->> --- a/arch/arm/boot/dts/imx6dl-sabrelite.dts
->> +++ b/arch/arm/boot/dts/imx6dl-sabrelite.dts
->> @@ -48,3 +48,8 @@
->>   	model = "Freescale i.MX6 DualLite SABRE Lite Board";
->>   	compatible = "fsl,imx6dl-sabrelite", "fsl,imx6dl";
->>   };
->> +
->> +&ipu1_csi1_from_ipu1_csi1_mux {
->> +	data-lanes = <0 1>;
->> +	clock-lanes = <2>;
->> +};
->> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
->> index 66d10d8..9e2d26d 100644
->> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
->> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
->> @@ -52,3 +52,9 @@
->>   &sata {
->>   	status = "okay";
->>   };
->> +
->> +&ipu1_csi1_from_mipi_vc1 {
->> +	data-lanes = <0 1>;
->> +	clock-lanes = <2>;
->> +};
->> +
->> diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
->> index 795b5a5..bca9fed 100644
->> --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
->> +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
->> @@ -39,6 +39,8 @@
->>    *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->>    *     OTHER DEALINGS IN THE SOFTWARE.
->>    */
->> +
->> +#include <dt-bindings/clock/imx6qdl-clock.h>
->>   #include <dt-bindings/gpio/gpio.h>
->>   #include <dt-bindings/input/input.h>
->>   
->> @@ -96,6 +98,15 @@
->>   		};
->>   	};
->>   
->> +	mipi_xclk: mipi_xclk {
->> +		compatible = "pwm-clock";
->> +		#clock-cells = <0>;
->> +		clock-frequency = <22000000>;
->> +		clock-output-names = "mipi_pwm3";
->> +		pwms = <&pwm3 0 45>; /* 1 / 45 ns = 22 MHz */
->> +		status = "okay";
->> +	};
->> +
->>   	gpio-keys {
->>   		compatible = "gpio-keys";
->>   		pinctrl-names = "default";
->> @@ -220,6 +231,22 @@
->>   	};
->>   };
->>   
->> +&ipu1_csi0_from_ipu1_csi0_mux {
->> +	bus-width = <8>;
->> +	data-shift = <12>; /* Lines 19:12 used */
->> +	hsync-active = <1>;
->> +	vync-active = <1>;
->> +};
->> +
->> +&ipu1_csi0_mux_from_parallel_sensor {
->> +	remote-endpoint = <&ov5642_to_ipu1_csi0_mux>;
->> +};
->> +
->> +&ipu1_csi0 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_ipu1_csi0>;
->> +};
->> +
->>   &audmux {
->>   	pinctrl-names = "default";
->>   	pinctrl-0 = <&pinctrl_audmux>;
->> @@ -299,6 +326,52 @@
->>   	pinctrl-names = "default";
->>   	pinctrl-0 = <&pinctrl_i2c2>;
->>   	status = "okay";
->> +
->> +	ov5640: camera at 40 {
->> +		compatible = "ovti,ov5640";
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pinctrl_ov5640>;
->> +		clocks = <&mipi_xclk>;
->> +		clock-names = "xclk";
->> +		reg = <0x40>;
->> +		xclk = <22000000>;
-> This is superfluous, you can use clk_get_rate on mipi_xclk.
+Acked-by: Alex Williamson <alex.williamson@redhat.com>
 
-This property is actually there to tell the driver what to set the
-rate to, with clk_set_rate(). So you are saying it would be better
-to set the rate in the device tree and the driver should only
-retrieve the rate?
 
-Steve
+> ---
+> 
+> v3 -> v4:
+> - test region's type: IOMMU_RESV_MSI
+> - restructure the code to prepare for safety assessment
+> - reword title
+> ---
+>  drivers/vfio/vfio_iommu_type1.c | 30 ++++++++++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
+> 
+> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+> index 9266271..5651faf 100644
+> --- a/drivers/vfio/vfio_iommu_type1.c
+> +++ b/drivers/vfio/vfio_iommu_type1.c
+> @@ -39,6 +39,7 @@
+>  #include <linux/pid_namespace.h>
+>  #include <linux/mdev.h>
+>  #include <linux/notifier.h>
+> +#include <linux/dma-iommu.h>
+>  
+>  #define DRIVER_VERSION  "0.2"
+>  #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+> @@ -1181,6 +1182,28 @@ static struct vfio_group *find_iommu_group(struct vfio_domain *domain,
+>  	return NULL;
+>  }
+>  
+> +static bool vfio_iommu_has_resv_msi(struct iommu_group *group,
+> +				    phys_addr_t *base)
+> +{
+> +	struct list_head group_resv_regions;
+> +	struct iommu_resv_region *region, *next;
+> +	bool ret = false;
+> +
+> +	INIT_LIST_HEAD(&group_resv_regions);
+> +	iommu_get_group_resv_regions(group, &group_resv_regions);
+> +	list_for_each_entry(region, &group_resv_regions, list) {
+> +		if (region->type & IOMMU_RESV_MSI) {
+> +			*base = region->start;
+> +			ret = true;
+> +			goto out;
+> +		}
+> +	}
+> +out:
+> +	list_for_each_entry_safe(region, next, &group_resv_regions, list)
+> +		kfree(region);
+> +	return ret;
+> +}
+> +
+>  static int vfio_iommu_type1_attach_group(void *iommu_data,
+>  					 struct iommu_group *iommu_group)
+>  {
+> @@ -1189,6 +1212,8 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+>  	struct vfio_domain *domain, *d;
+>  	struct bus_type *bus = NULL, *mdev_bus;
+>  	int ret;
+> +	bool resv_msi;
+> +	phys_addr_t resv_msi_base;
+>  
+>  	mutex_lock(&iommu->lock);
+>  
+> @@ -1258,6 +1283,8 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+>  	if (ret)
+>  		goto out_domain;
+>  
+> +	resv_msi = vfio_iommu_has_resv_msi(iommu_group, &resv_msi_base);
+> +
+>  	INIT_LIST_HEAD(&domain->group_list);
+>  	list_add(&group->next, &domain->group_list);
+>  
+> @@ -1304,6 +1331,9 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+>  	if (ret)
+>  		goto out_detach;
+>  
+> +	if (resv_msi && iommu_get_msi_cookie(domain->domain, resv_msi_base))
+> +		goto out_detach;
+> +
+>  	list_add(&domain->next, &iommu->domain_list);
+>  
+>  	mutex_unlock(&iommu->lock);
