@@ -1,106 +1,46 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 13 Jan 2017 10:54:29 +0000
-Subject: [PATCH 1/1] iommu/arm-smmu: Fix for ThunderX erratum #27704
-In-Reply-To: <1c3253d8-bcaa-e507-cddf-dec952362104@semihalf.com>
-References: <1484135507-24872-1-git-send-email-tn@semihalf.com>
- <2c048126-a4d6-16af-987a-3174401a3960@arm.com>
- <b0eb1127-182e-63e3-6dd4-c3b40228b909@semihalf.com>
- <1c3253d8-bcaa-e507-cddf-dec952362104@semihalf.com>
-Message-ID: <26969cd9-5af5-ff4d-75d8-425469c02705@arm.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Fri, 13 Jan 2017 10:55:38 +0000
+Subject: [PATCH net-next v2 05/10] drivers: base: Add device_find_class()
+In-Reply-To: <81f5965c-3484-92d9-5c04-94c5b73735d0@gmail.com>
+References: <20170112034121.27697-1-f.fainelli@gmail.com>
+ <20170112034121.27697-6-f.fainelli@gmail.com>
+ <20170112.162135.441956368122992032.davem@davemloft.net>
+ <81f5965c-3484-92d9-5c04-94c5b73735d0@gmail.com>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6DB02620D3@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/01/17 10:43, Tomasz Nowicki wrote:
-> On 12.01.2017 07:41, Tomasz Nowicki wrote:
->> On 11.01.2017 13:19, Robin Murphy wrote:
->>> On 11/01/17 11:51, Tomasz Nowicki wrote:
->>>> The goal of erratum #27704 workaround was to make sure that ASIDs and
->>>> VMIDs
->>>> are unique across all SMMU instances on affected Cavium systems.
->>>>
->>>> Currently, the workaround code partitions ASIDs and VMIDs by increasing
->>>> global cavium_smmu_context_count which in turn becomes the base ASID
->>>> and VMID
->>>> value for the given SMMU instance upon the context bank initialization.
->>>>
->>>> For systems with multiple SMMU instances this approach implies the risk
->>>> of crossing 8-bit ASID, like for CN88xx capable of 4 SMMUv2, 128
->>>> context bank each:
->>>> SMMU_0 (0-127 ASID RANGE)
->>>> SMMU_1 (127-255 ASID RANGE)
->>>> SMMU_2 (256-383 ASID RANGE) <--- crossing 8-bit ASID
->>>> SMMU_3 (384-511 ASID RANGE) <--- crossing 8-bit ASID
->>>
->>> I could swear that at some point in the original discussion it was said
->>> that the TLBs were only shared between pairs of SMMUs, so in fact 0/1
->>> and 2/3 are independent of each other
->>
->> Indeed TLBs are only shared between pairs of SMMUs but the workaround
->> makes sure ASIDs are unique across all SMMU instances so we do not have
->> to bother about SMMUs probe order.
->>
->>  - out of interest, have you
->>> managed to hit an actual problem in practice or is this patch just by
->>> inspection?
->>
->> Except SMMU0/1 devices all other devices under other SMMUs will fail on
->> guest power off/on. Since we try to invalidate tlb with 16bit ASID but
->> we actually have 8 bit zero padded 16 bit entry.
->>
->>>
->>> Of course, depending on the SMMUs to probe in the right order isn't
->>> particularly robust, so it's still probably a worthwhile change.
->>>
->>>> Since we use 8-bit ASID now we effectively misconfigure ASID[15:8]
->>>> bits for
->>>> SMMU_CBn_TTBRm register. Also, we still use non-zero ASID[15:8] bits
->>>> upon context invalidation. This patch adds 16-bit ASID support for
->>>> stage-1
->>>> AArch64 contexts for Cavium SMMUv2 model so that we use ASIDs
->>>> consistently.
->>>>
->>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->>>> ---
->>>>  drivers/iommu/arm-smmu.c | 4 ++++
->>>>  1 file changed, 4 insertions(+)
->>>>
->>>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->>>> index a60cded..ae8f059 100644
->>>> --- a/drivers/iommu/arm-smmu.c
->>>> +++ b/drivers/iommu/arm-smmu.c
->>>> @@ -260,6 +260,7 @@ enum arm_smmu_s2cr_privcfg {
->>>>
->>>>  #define TTBCR2_SEP_SHIFT        15
->>>>  #define TTBCR2_SEP_UPSTREAM        (0x7 << TTBCR2_SEP_SHIFT)
->>>> +#define TTBCR2_AS            (1 << 4)
->>>>
->>>>  #define TTBRn_ASID_SHIFT        48
->>>>
->>>> @@ -778,6 +779,9 @@ static void arm_smmu_init_context_bank(struct
->>>> arm_smmu_domain *smmu_domain,
->>>>              reg = pgtbl_cfg->arm_lpae_s1_cfg.tcr;
->>>>              reg2 = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
->>>>              reg2 |= TTBCR2_SEP_UPSTREAM;
->>>> +            if (smmu->model == CAVIUM_SMMUV2 &&
->>>
->>> I'd be inclined to say "smmu->version == ARM_SMMU_V2" there, rather than
->>> make it Cavium-specific - we enable 16-bit VMID unconditionally where
->>> supported, so I don't see any reason not to handle 16-bit ASIDs in the
->>> same manner.
->>
->> I agree, I will enable 16-bit ASID for ARM_SMMU_V2.
->>
+From: Florian Fainelli
+> Sent: 12 January 2017 22:51
+> On 01/12/2017 01:21 PM, David Miller wrote:
+> > From: Florian Fainelli <f.fainelli@gmail.com>
+> > Date: Wed, 11 Jan 2017 19:41:16 -0800
+> >
+> >> Add a helper function to lookup a device reference given a class name.
+> >> This is a preliminary patch to remove adhoc code from net/dsa/dsa.c and
+> >> make it more generic.
+...
+> >> +static int dev_is_class(struct device *dev, void *class)
+> >
+> > I know you are just moving code, but this class argumnet is a string
+> > and thus should be "char *" or even "const char *".
 > 
-> Actually, the ARM_SMMU_CTX_FMT_AARCH64 context check is all we need here:
+> Well, this is really so that we don't need to cast the arguments passed
+> to device_find_child(), which takes a void *data as well. If we made
+> that a const char *class, we'd get warnings that look like these:
 > 
-> +            if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
-> +                reg2 |= TTBCR2_AS;
+> drivers/base/core.c: In function 'device_find_class':
+> drivers/base/core.c:2083:2: warning: passing argument 2 of
+> 'device_find_child' discards 'const' qualifier from pointer target type
+> [enabled by default]
+>   return device_find_child(parent, class, dev_is_class);
+>   ^
+> drivers/base/core.c:2050:16: note: expected 'void *' but argument is of
+> type 'const char *'
+>  struct device *device_find_child(struct device *parent, void *data,
+>                 ^
+...
 
-Ah, clever! The horrible SMMUv1 64KB supplement supports AArch64
-contexts without being SMMUv2, but of course doesn't have stage 1 :)
+Maybe device_find_child() needs changing to take 'const void *' ?
 
-Robin.
-
-> 
-> Thanks,
-> Tomasz
+	David
