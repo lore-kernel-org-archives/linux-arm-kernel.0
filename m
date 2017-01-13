@@ -1,173 +1,67 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 13 Jan 2017 12:07:54 +0100
-Subject: [PATCH] iommu/dma: Add support for DMA_ATTR_FORCE_CONTIGUOUS
-Message-ID: <1484305674-15018-1-git-send-email-geert+renesas@glider.be>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 13 Jan 2017 12:08:47 +0100
+Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
+ enable panel
+In-Reply-To: <d1534f4b-e564-d87e-b408-9b7215a90de2@mleia.com>
+References: <20161221032717.13154-1-vz@mleia.com>
+ <CGME20170112212713epcas2p108e55dc682911981f750f197f30c7d5f@epcas2p1.samsung.com>
+ <d1534f4b-e564-d87e-b408-9b7215a90de2@mleia.com>
+Message-ID: <3057141.7Vn8X5ONyT@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for DMA_ATTR_FORCE_CONTIGUOUS to the generic IOMMU DMA code.
-This allows to allocate physically contiguous DMA buffers on arm64
-systems with an IOMMU.
 
-Note that as this uses the CMA allocator, setting this attribute has a
-runtime-dependency on CONFIG_DMA_CMA, just like on arm32.
+Hi,
 
-For arm64 systems using swiotlb, no changes are needed to support the
-allocation of physically contiguous DMA buffers:
-  - swiotlb always uses physically contiguous buffers (up to
-    IO_TLB_SEGSIZE = 128 pages),
-  - arm64's __dma_alloc_coherent() already calls
-    dma_alloc_from_contiguous() when CMA is available.
+On Thursday, January 12, 2017 11:26:14 PM Vladimir Zapolskiy wrote:
+> On 01/12/2017 10:27 AM, Linus Walleij wrote:
+> > On Thu, Jan 12, 2017 at 1:05 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
+> >> On 01/11/2017 05:16 PM, Linus Walleij wrote:
+> >>> On Tue, Jan 10, 2017 at 2:47 PM, Vladimir Murzin
+> >>> <vladimir.murzin@arm.com> wrote:
+> >>>
+> >>>> In another thread Benjamin pointed at patch [1] in drm/kms part for noMMU.
+> >>>>
+> >>>> [1] https://cgit.freedesktop.org/drm/drm-misc/commit/?id=62a0d98a188cc4ebd8ea54b37d274ec20465e464
+> >>>
+> >>> Problem solved?
+> >>>
+> >>> Vladimir: I do not require in any way that you create a CLCD driver for DRM,
+> >>> I just think it would be very very nice...
+> >>>
+> >>
+> >> I have no other option, this series is unreviewed and thus unlikely it will
+> >> be applied, still a panel PCB on my board needs power management support.
+> > 
+> > Hm I can ACK it I guess, but mergeing it into an unmaintained subsystem
+> > is another issue, just not very optimal. 
+> 
+> + Bartlomiej
+> 
+> Linus, your ack is always more than appreciated.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm64/mm/dma-mapping.c |  4 ++--
- drivers/iommu/dma-iommu.c   | 44 ++++++++++++++++++++++++++++++++++----------
- include/linux/dma-iommu.h   |  2 +-
- 3 files changed, 37 insertions(+), 13 deletions(-)
++1
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 1d7d5d2881db7c19..5fba14a21163e41f 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -589,7 +589,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
- 		addr = dma_common_pages_remap(pages, size, VM_USERMAP, prot,
- 					      __builtin_return_address(0));
- 		if (!addr)
--			iommu_dma_free(dev, pages, iosize, handle);
-+			iommu_dma_free(dev, pages, iosize, handle, attrs);
- 	} else {
- 		struct page *page;
- 		/*
-@@ -642,7 +642,7 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
- 
- 		if (WARN_ON(!area || !area->pages))
- 			return;
--		iommu_dma_free(dev, area->pages, iosize, &handle);
-+		iommu_dma_free(dev, area->pages, iosize, &handle, attrs);
- 		dma_common_free_remap(cpu_addr, size, VM_USERMAP);
- 	} else {
- 		iommu_dma_unmap_page(dev, handle, iosize, 0, 0);
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index 2db0d641cf4505b5..b991e8dcbbbb35c5 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -30,6 +30,7 @@
- #include <linux/pci.h>
- #include <linux/scatterlist.h>
- #include <linux/vmalloc.h>
-+#include <linux/dma-contiguous.h>
- 
- struct iommu_dma_msi_page {
- 	struct list_head	list;
-@@ -238,15 +239,21 @@ static void __iommu_dma_unmap(struct iommu_domain *domain, dma_addr_t dma_addr)
- 	__free_iova(iovad, iova);
- }
- 
--static void __iommu_dma_free_pages(struct page **pages, int count)
-+static void __iommu_dma_free_pages(struct device *dev, struct page **pages,
-+				   int count, unsigned long attrs)
- {
--	while (count--)
--		__free_page(pages[count]);
-+	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
-+		dma_release_from_contiguous(dev, pages[0], count);
-+	} else {
-+		while (count--)
-+			__free_page(pages[count]);
-+	}
- 	kvfree(pages);
- }
- 
--static struct page **__iommu_dma_alloc_pages(unsigned int count,
--		unsigned long order_mask, gfp_t gfp)
-+static struct page **__iommu_dma_alloc_pages(struct device *dev,
-+		unsigned int count, unsigned long order_mask, gfp_t gfp,
-+		unsigned long attrs)
- {
- 	struct page **pages;
- 	unsigned int i = 0, array_size = count * sizeof(*pages);
-@@ -265,6 +272,20 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count,
- 	/* IOMMU can map any pages, so himem can also be used here */
- 	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
- 
-+	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
-+		int order = get_order(count << PAGE_SHIFT);
-+		struct page *page;
-+
-+		page = dma_alloc_from_contiguous(dev, count, order);
-+		if (!page)
-+			return NULL;
-+
-+		while (count--)
-+			pages[i++] = page++;
-+
-+		return pages;
-+	}
-+
- 	while (count) {
- 		struct page *page = NULL;
- 		unsigned int order_size;
-@@ -294,7 +315,7 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count,
- 			__free_pages(page, order);
- 		}
- 		if (!page) {
--			__iommu_dma_free_pages(pages, i);
-+			__iommu_dma_free_pages(dev, pages, i, attrs);
- 			return NULL;
- 		}
- 		count -= order_size;
-@@ -310,15 +331,17 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count,
-  * @pages: Array of buffer pages as returned by iommu_dma_alloc()
-  * @size: Size of buffer in bytes
-  * @handle: DMA address of buffer
-+ * @attrs: DMA attributes used for allocation of this buffer
-  *
-  * Frees both the pages associated with the buffer, and the array
-  * describing them
-  */
- void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
--		dma_addr_t *handle)
-+		dma_addr_t *handle, unsigned long attrs)
- {
- 	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), *handle);
--	__iommu_dma_free_pages(pages, PAGE_ALIGN(size) >> PAGE_SHIFT);
-+	__iommu_dma_free_pages(dev, pages, PAGE_ALIGN(size) >> PAGE_SHIFT,
-+			       attrs);
- 	*handle = DMA_ERROR_CODE;
- }
- 
-@@ -365,7 +388,8 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
- 		alloc_sizes = min_size;
- 
- 	count = PAGE_ALIGN(size) >> PAGE_SHIFT;
--	pages = __iommu_dma_alloc_pages(count, alloc_sizes >> PAGE_SHIFT, gfp);
-+	pages = __iommu_dma_alloc_pages(dev, count, alloc_sizes >> PAGE_SHIFT,
-+					gfp, attrs);
- 	if (!pages)
- 		return NULL;
- 
-@@ -403,7 +427,7 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
- out_free_iova:
- 	__free_iova(iovad, iova);
- out_free_pages:
--	__iommu_dma_free_pages(pages, count);
-+	__iommu_dma_free_pages(dev, pages, count, attrs);
- 	return NULL;
- }
- 
-diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
-index 7f7e9a7e3839966c..35fa6b7f9bac9b35 100644
---- a/include/linux/dma-iommu.h
-+++ b/include/linux/dma-iommu.h
-@@ -44,7 +44,7 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
- 		unsigned long attrs, int prot, dma_addr_t *handle,
- 		void (*flush_page)(struct device *, const void *, phys_addr_t));
- void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
--		dma_addr_t *handle);
-+		dma_addr_t *handle, unsigned long attrs);
- 
- int iommu_dma_mmap(struct page **pages, size_t size, struct vm_area_struct *vma);
- 
--- 
-1.9.1
+> To all appearance Bartlomiej is a new honoured framebuffer layer maintainer.
+> 
+> Bartlomiej, do you have the changes under discussion in your mailbox or
+> should I resend them to you directly for review?
+
+No need for resend, I picked them from the list and they are on TODO.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+> > If you get it working on your system I can look into migrating all the old
+> > users to DRM as well.
+> > 
+> 
+> Sure, I started development of a simple CLCD DRM driver as an own attractive
+> exercise, I'll keep you informed of the progress.
+> 
+> --
+> With best wishes,
+> Vladimir
