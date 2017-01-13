@@ -1,94 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Jan 2017 09:25:22 +0000
-Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
-In-Reply-To: <20170112232931-mutt-send-email-mst@kernel.org>
-References: <85015f1653eb7e36f992708362b75d1f4391b783.1484070340.git.robin.murphy@arm.com>
- <4833e705fb6841fbfdbee3b1a21a7bc917292410.1484070340.git.robin.murphy@arm.com>
- <20170111013046-mutt-send-email-mst@kernel.org>
- <20170111100139.GC12388@arm.com>
- <20170112232931-mutt-send-email-mst@kernel.org>
-Message-ID: <20170113092522.GB22538@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 13 Jan 2017 09:30:28 +0000
+Subject: [PATCH v2 2/2] arm64: cacheinfo: add support to override cache
+ levels via device tree
+In-Reply-To: <58789899.3080909@huawei.com>
+References: <1484245772-31511-1-git-send-email-sudeep.holla@arm.com>
+ <1484245772-31511-2-git-send-email-sudeep.holla@arm.com>
+ <58789899.3080909@huawei.com>
+Message-ID: <609a80c7-9a85-2786-1e5a-a5c2340900b9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 12:12:56AM +0200, Michael S. Tsirkin wrote:
-> On Wed, Jan 11, 2017 at 10:01:39AM +0000, Will Deacon wrote:
-> > On Wed, Jan 11, 2017 at 01:33:31AM +0200, Michael S. Tsirkin wrote:
-> > > On Tue, Jan 10, 2017 at 05:51:18PM +0000, Robin Murphy wrote:
-> > > > From: Will Deacon <will.deacon@arm.com>
-> > > > 
-> > > > Booting Linux on an ARM fastmodel containing an SMMU emulation results
-> > > > in an unexpected I/O page fault from the legacy virtio-blk PCI device:
-> > > > 
-> > > > [    1.211721] arm-smmu-v3 2b400000.smmu: event 0x10 received:
-> > > > [    1.211800] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
-> > > > [    1.211880] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
-> > > > [    1.211959] arm-smmu-v3 2b400000.smmu:	0x00000008fa081002
-> > > > [    1.212075] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
-> > > > [    1.212155] arm-smmu-v3 2b400000.smmu: event 0x10 received:
-> > > > [    1.212234] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
-> > > > [    1.212314] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
-> > > > [    1.212394] arm-smmu-v3 2b400000.smmu:	0x00000008fa081000
-> > > > [    1.212471] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
-> > > > 
-> > > > <system hangs failing to read partition table>
-> > > > 
-> > > > This is because the virtio-blk is behind an SMMU, so we have consequently
-> > > > swizzled its DMA ops and configured the SMMU to translate accesses. This
-> > > > then requires the vring code to use the DMA API to establish translations,
-> > > > otherwise all transactions will result in fatal faults and termination.
-> > > > 
-> > > > Given that ARM-based systems only see an SMMU if one is really present
-> > > > (the topology is all described by firmware tables such as device-tree or
-> > > > IORT), then we can safely use the DMA API for all virtio devices.
-> > > > 
-> > > > Cc: Andy Lutomirski <luto@kernel.org>
-> > > > Cc: Michael S. Tsirkin <mst@redhat.com>
-> > > > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > > 
-> > > I'd like to better understand then need for this one.
-> > > Can't the device in question just set VIRTIO_F_IOMMU_PLATFORM ?
-> > > 
-> > > I'd rather we avoided need for more hacks and just
-> > > have everyone switch to that.
-> > 
-> > There are a couple of problems with VIRTIO_F_IOMMU_PLATFORM:
-> > 
-> > 1. It doesn't exist for legacy devices, which are all we have on the
-> >    platform in question.
-> > 
-> > 2. It's not documented in the virtio sp^H^HSTOP PRESS. I see you applied
-> >    my patch ;). Thanks.
-> > 
-> > In which case, for non-legacy devices we should definitely be using
-> > VIRTIO_F_IOMMU_PLATFORM, but since this platform hasn't yet moved to the
-> > world of flying cars, could we unconditionally set the DMA ops on ARM
-> > for legacy devices? The alternative is disabling the SMMU altogether,
-> > but that's less than ideal because there are non-virtio devices on the
-> > same PCI bus.
-> > 
+
+
+On 13/01/17 09:06, Tan Xiaojun wrote:
+> On 2017/1/13 2:29, Sudeep Holla wrote:
+>> The cache hierarchy can be identified through Cache Level ID(CLIDR)
+>> architected system register. However in some cases it will provide
+>> only the number of cache levels that are integrated into the processor
+>> itself. In other words, it can't provide any information about the
+>> caches that are external and/or transparent.
+>>
+>> Some platforms require to export the information about all such external
+>> caches to the userspace applications via the sysfs interface.
+>>
+>> This patch adds support to override the cache levels using device tree
+>> to take such external non-architected caches into account.
+>>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 > 
-> I'd rather people didn't use SMMU with legacy devices.
+> Tested-by: Tan Xiaojun <tanxiaojun@huawei.com>
+> 
 
-I'm afraid we've been doing that for two years and the model already
-exists in a mature state, being actively used for development and
-validation by ARM and our partners. One of the big things its used for
-is to develop SMMU and GIC (our interrupt controller) code with PCI, so
-dropping the SMMU from the picture isn't an option.
+Thanks for testing.
 
-> Can't you guys just code up the virtio 1 layout in QEMU?
-> I took a look and it's not a big deal now that two other
-> transports converted, except mmio code in QEMU doesn't
-> use linux header to it's a bit messy.
-> I'll send a patch to clean that up.
-
-If the model ever changes in this area (which isn't planned atm), the
-right thing to do would be to move to modern virtio. However, we're stuck
-with what we have for the forseeable future and it works just fine if we
-use the DMA API. If we don't use it, Linux no longer boots because it
-installs the SMMU-backed DMA ops for the virtio devices and everything
-faults.
-
-I really don't understand why this is controversial.
-
-Will
+-- 
+Regards,
+Sudeep
