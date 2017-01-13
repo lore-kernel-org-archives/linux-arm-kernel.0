@@ -1,108 +1,36 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 13 Jan 2017 11:17:56 +0000
-Subject: [PATCH v29 9/9] Documentation: dt: chosen properties for arm64
- kdump
-In-Reply-To: <20170113091339.GK20972@linaro.org>
-References: <20161228043347.27358-1-takahiro.akashi@linaro.org>
- <20161228043734.27535-1-takahiro.akashi@linaro.org>
- <20170112153944.GB12249@leverpostej>
- <20170113091339.GK20972@linaro.org>
-Message-ID: <20170113111756.GC26120@leverpostej>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 13 Jan 2017 11:18:57 +0000
+Subject: [PATCH] arm64/mm: use phys_addr_t
+In-Reply-To: <1484287175-14342-1-git-send-email-miles.chen@mediatek.com>
+References: <1484287175-14342-1-git-send-email-miles.chen@mediatek.com>
+Message-ID: <20170113111857.GB30292@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 06:13:49PM +0900, AKASHI Takahiro wrote:
-> On Thu, Jan 12, 2017 at 03:39:45PM +0000, Mark Rutland wrote:
-> > On Wed, Dec 28, 2016 at 01:37:34PM +0900, AKASHI Takahiro wrote:
-> > > +linux,crashkernel-base
-> > > +linux,crashkernel-size
-> > > +----------------------
-> > > +
-> > > +These properties (currently used on PowerPC and arm64) indicates
-> > > +the base address and the size, respectively, of the reserved memory
-> > > +range for crash dump kernel.
-> > 
-> > From this description, it's not clear to me what the (expected)
-> > consumers of this property are, nor what is expected to provide it.
-> > 
-> > In previous rounds of review, I had assumed that this was used to
-> > describe a preference to the first kernel as to what region of memory
-> > should be used for a subsequent kdump kernel. Looking around, I'm not
-> > sure if I was correct in that assessment.
-> > 
-> > I see that arch/powerpc seems to consume this property to configure
-> > crashk_res, but it also rewrites it based on crashk_res, presumably for
-> > the benefit of userspace. It's not clear to me how on powerpc the kdump
-> > kernel knows its memory range -- is more DT modification done in the
-> > kernel and/or userspace?
+On Fri, Jan 13, 2017 at 01:59:35PM +0800, miles.chen at mediatek.com wrote:
+> From: Miles Chen <miles.chen@mediatek.com>
 > 
-> I don't believe that powerpc will rewrite the property any way.
-> As far as I know from *the source code*, powerpc kernel retrieves
-> the memory range for crash dump kernel from a kernel command line, i.e.
-> crashkernel=, and then exposes it through DT to userspace (assuming
-> kexec-tools).
-
-The rewriting I describe is in export_crashk_values() in
-arch/powerpc/kernel/machine_kexec.c, where the code deletes existing the
-properties, and adds new ones, to the DT exposed to userspace.
-
-So I think we're just quibbling over the definition of "rewrite".
-
-> > arm64 we should either ensure that /proc/iomem is consistently usable
-> > (and have userspace consistently use it), or we should expose a new file
-> > specifically to expose this information.
+> Use phys_addr_t instead of unsigned long for the
+> return value of __pa(), make code easy to understand.
 > 
-> The thing that I had in my mind when adding this property is that
-> /proc/iomem would be obsolete in the future, then we should have
-> an alternative in hand.
-
-Ok.
-
-My disagreement is with using the DT as a channel to convey information
-from the kernel to userspace.
-
-I'm more than happy for a new file or other mechanism to express this
-information. For example, we could add
-/sys/kernel/kexec_crash_{base,size} or similar.
-
-
-> > Further, I do not think we need this property. It makes more sense to me
-> > for the preference of a a region to be described to the *first* kernel
-> > using the command line consistently.
-> > 
-> > So I think we should drop this property, and not use it on arm64. Please
-> > document this as powerpc only.
+> Signed-off-by: Miles Chen <miles.chen@mediatek.com>
+> ---
+>  arch/arm64/mm/mmu.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> OK, but if we drop the property from arm64 code, we have no reason
-> to leave its description in this patch.
-> (In fact, there are a few more (undocumented) properties that only ppc
-> uses for kdump.)
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 17243e4..7eb7c21 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -359,8 +359,8 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+>  
+>  static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end)
+>  {
+> -	unsigned long kernel_start = __pa(_text);
+> -	unsigned long kernel_end = __pa(__init_begin);
+> +	phys_addr_t kernel_start = __pa(_text);
+> +	phys_addr_t kernel_end = __pa(__init_begin);
 
-I'm happy to drop it, then.
+Looks fine.
 
-> > > +linux,usable-memory-range
-> > > +-------------------------
-> > > +
-> > > +This property (currently used only on arm64) holds the memory range,
-> > > +the base address and the size, which can be used as system ram on
-> > > +the *current* kernel. Note that, if this property is present, any memory
-> > > +regions under "memory" nodes in DT blob or ones marked as "conventional
-> > > +memory" in EFI memory map should be ignored.
-> > 
-> > Could you please replace this with:
-> > 
-> >   This property (arm64 only) holds a base address and size, describing a
-> >   limited region in which memory may be considered available for use by
-> >   the kernel. Memory outside of this range is not available for use.
-> >   
-> >   This property describes a limitation: memory within this range is only
-> >   valid when also described through another mechanism that the kernel
-> >   would otherwise use to determine available memory (e.g. memory nodes
-> >   or the EFI memory map). Valid memory may be sparse within the range.
-> 
-> Sure.
-
-Cheers!
-
-Thanks,
-Mark.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
