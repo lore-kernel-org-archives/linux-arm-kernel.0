@@ -1,163 +1,349 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 13 Jan 2017 18:13:49 +0900
-Subject: [PATCH v29 9/9] Documentation: dt: chosen properties for arm64
- kdump
-In-Reply-To: <20170112153944.GB12249@leverpostej>
-References: <20161228043347.27358-1-takahiro.akashi@linaro.org>
- <20161228043734.27535-1-takahiro.akashi@linaro.org>
- <20170112153944.GB12249@leverpostej>
-Message-ID: <20170113091339.GK20972@linaro.org>
+From: chris.packham@alliedtelesis.co.nz (Chris Packham)
+Date: Fri, 13 Jan 2017 22:12:20 +1300
+Subject: [PATCHv4 5/5] arm: mvebu: Add device tree for db-dxbc2 and
+ db-xc3-24g4xg boards
+In-Reply-To: <20170113091222.7132-1-chris.packham@alliedtelesis.co.nz>
+References: <20170113091222.7132-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20170113091222.7132-6-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 03:39:45PM +0000, Mark Rutland wrote:
-> Hi,
-> 
-> On Wed, Dec 28, 2016 at 01:37:34PM +0900, AKASHI Takahiro wrote:
-> > From: James Morse <james.morse@arm.com>
-> > 
-> > Add documentation for
-> > 	linux,crashkernel-base and crashkernel-size,
-> > 	linux,usable-memory-range
-> > 	linux,elfcorehdr
-> > used by arm64 kdump to decribe the kdump reserved area, and
-> > the elfcorehdr's location within it.
-> > 
-> > Signed-off-by: James Morse <james.morse@arm.com>
-> > [takahiro.akashi at linaro.org: added "linux,crashkernel-base" and "-size" ]
-> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > Cc: devicetree at vger.kernel.org
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > ---
-> >  Documentation/devicetree/bindings/chosen.txt | 50 ++++++++++++++++++++++++++++
-> >  1 file changed, 50 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
-> > index 6ae9d82d4c37..7b115165e9ec 100644
-> > --- a/Documentation/devicetree/bindings/chosen.txt
-> > +++ b/Documentation/devicetree/bindings/chosen.txt
-> > @@ -52,3 +52,53 @@ This property is set (currently only on PowerPC, and only needed on
-> >  book3e) by some versions of kexec-tools to tell the new kernel that it
-> >  is being booted by kexec, as the booting environment may differ (e.g.
-> >  a different secondary CPU release mechanism)
-> > +
-> > +linux,crashkernel-base
-> > +linux,crashkernel-size
-> > +----------------------
-> > +
-> > +These properties (currently used on PowerPC and arm64) indicates
-> > +the base address and the size, respectively, of the reserved memory
-> > +range for crash dump kernel.
-> 
-> From this description, it's not clear to me what the (expected)
-> consumers of this property are, nor what is expected to provide it.
-> 
-> In previous rounds of review, I had assumed that this was used to
-> describe a preference to the first kernel as to what region of memory
-> should be used for a subsequent kdump kernel. Looking around, I'm not
-> sure if I was correct in that assessment.
-> 
-> I see that arch/powerpc seems to consume this property to configure
-> crashk_res, but it also rewrites it based on crashk_res, presumably for
-> the benefit of userspace. It's not clear to me how on powerpc the kdump
-> kernel knows its memory range -- is more DT modification done in the
-> kernel and/or userspace?
+These boards are Marvell's evaluation boards for the 98DX4251 and
+98DX3336 SoCs.
 
-I don't believe that powerpc will rewrite the property any way.
-As far as I know from *the source code*, powerpc kernel retrieves
-the memory range for crash dump kernel from a kernel command line, i.e.
-crashkernel=, and then exposes it through DT to userspace (assuming
-kexec-tools).
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+---
+ arch/arm/boot/dts/db-dxbc2.dts      | 159 ++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/db-xc3-24g4xg.dts | 155 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 314 insertions(+)
+ create mode 100644 arch/arm/boot/dts/db-dxbc2.dts
+ create mode 100644 arch/arm/boot/dts/db-xc3-24g4xg.dts
 
-> I disagree with modifying this property to expose it to userspace. For
-
-Apart from the context of discussions, is this a shared consensus?
-
-> arm64 we should either ensure that /proc/iomem is consistently usable
-> (and have userspace consistently use it), or we should expose a new file
-> specifically to expose this information.
-
-The thing that I had in my mind when adding this property is that
-/proc/iomem would be obsolete in the future, then we should have
-an alternative in hand.
-
-> Further, I do not think we need this property. It makes more sense to me
-> for the preference of a a region to be described to the *first* kernel
-> using the command line consistently.
-> 
-> So I think we should drop this property, and not use it on arm64. Please
-> document this as powerpc only.
-
-OK, but if we drop the property from arm64 code, we have no reason
-to leave its description in this patch.
-(In fact, there are a few more (undocumented) properties that only ppc
-uses for kdump.)
-
-> > +e.g.
-> > +
-> > +/ {
-> > +	chosen {
-> > +		linux,crashkernel-base = <0x9 0xf0000000>;
-> > +		linux,crashkernel-size = <0x0 0x10000000>;
-> > +	};
-> > +};
-> 
-> > +
-> > +linux,usable-memory-range
-> > +-------------------------
-> > +
-> > +This property (currently used only on arm64) holds the memory range,
-> > +the base address and the size, which can be used as system ram on
-> > +the *current* kernel. Note that, if this property is present, any memory
-> > +regions under "memory" nodes in DT blob or ones marked as "conventional
-> > +memory" in EFI memory map should be ignored.
-> 
-> Could you please replace this with:
-> 
->   This property (arm64 only) holds a base address and size, describing a
->   limited region in which memory may be considered available for use by
->   the kernel. Memory outside of this range is not available for use.
->   
->   This property describes a limitation: memory within this range is only
->   valid when also described through another mechanism that the kernel
->   would otherwise use to determine available memory (e.g. memory nodes
->   or the EFI memory map). Valid memory may be sparse within the range.
-
-Sure.
-
-Thanks,
--Takahiro AKASHI
-
-> To clarify why we need this, given by above comments w.r.r. the
-> linux,crashkernel-* properties:
-> 
-> * It preserves all the original memory map information (e.g. memory
->   nodes and/or EFI memory map)
-> 
-> * It works consistently, regardless of how the kdump kernel would
->   otherwise determine which memory to use (memory nodes, EFI, etc).
-> 
-> * It will be simply and reliable for an in-kernel purgatory to insert,
->   if we need a kexec_file_load()-based kdump (e.g. without requiring
->   memory map rewrites, and avoiding clashes with command line
->   parameters). For a first kernel, this is not as big a concern.
-> 
-> > +linux,elfcorehdr
-> > +----------------
-> > +
-> > +This property (currently used only on arm64) holds the memory range,
-> > +the address and the size, of the elf core header which mainly describes
-> > +the panicked kernel's memory layout as PT_LOAD segments of elf format.
-> > +e.g.
-> > +
-> > +/ {
-> > +	chosen {
-> > +		linux,elfcorehdr = <0x9 0xfffff000 0x0 0x800>;
-> > +	};
-> > +};
-> 
-> This property looks fine to me.
-> 
-> Thanks,
-> Mark.
+diff --git a/arch/arm/boot/dts/db-dxbc2.dts b/arch/arm/boot/dts/db-dxbc2.dts
+new file mode 100644
+index 000000000000..f56786cea5f8
+--- /dev/null
++++ b/arch/arm/boot/dts/db-dxbc2.dts
+@@ -0,0 +1,159 @@
++/*
++ * Device Tree file for DB-DXBC2 board
++ *
++ * Copyright (C) 2016 Allied Telesis Labs
++ *
++ * Based on armada-xp-db.dts
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ *
++ * Note: this Device Tree assumes that the bootloader has remapped the
++ * internal registers to 0xf1000000 (instead of the default
++ * 0xd0000000). The 0xf1000000 is the default used by the recent,
++ * DT-capable, U-Boot bootloaders provided by Marvell. Some earlier
++ * boards were delivered with an older version of the bootloader that
++ * left internal registers mapped at 0xd0000000. If you are in this
++ * situation, you should either update your bootloader (preferred
++ * solution) or the below Device Tree should be adjusted.
++ */
++
++/dts-v1/;
++#include "armada-xp-98dx4251.dtsi"
++
++/ {
++	model = "Marvell Bobcat2 Evaluation Board";
++	compatible = "marvell,db-dxbc2", "marvell,armadaxp-98dx4251", "marvell,armadaxp", "marvell,armada-370-xp";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlyprintk";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0 0x00000000 0 0x20000000>; /* 512 MB */
++	};
++
++	soc {
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
++			  MBUS_ID(0x03, 0x00) 0 0 0xa8000000 0x4000000
++			  MBUS_ID(0x08, 0x00) 0 0 0xac000000 0x100000>;
++
++		devbus-bootcs {
++			status = "okay";
++
++			/* Device Bus parameters are required */
++
++			/* Read parameters */
++			devbus,bus-width    = <16>;
++			devbus,turn-off-ps  = <60000>;
++			devbus,badr-skew-ps = <0>;
++			devbus,acc-first-ps = <124000>;
++			devbus,acc-next-ps  = <248000>;
++			devbus,rd-setup-ps  = <0>;
++			devbus,rd-hold-ps   = <0>;
++
++			/* Write parameters */
++			devbus,sync-enable = <0>;
++			devbus,wr-high-ps  = <60000>;
++			devbus,wr-low-ps   = <60000>;
++			devbus,ale-wr-ps   = <60000>;
++		};
++
++		internal-regs {
++			serial at 12000 {
++				status = "okay";
++			};
++			serial at 12100 {
++				status = "okay";
++			};
++
++			i2c at 11000 {
++				clock-frequency = <100000>;
++				status = "okay";
++			};
++
++			mvsdio at d4000 {
++				pinctrl-0 = <&sdio_pins>;
++				pinctrl-names = "default";
++				status = "okay";
++				/* No CD or WP GPIOs */
++				broken-cd;
++			};
++
++			nand at d0000 {
++				status = "okay";
++				num-cs = <1>;
++				marvell,nand-keep-config;
++				marvell,nand-enable-arbiter;
++				nand-on-flash-bbt;
++				nand-ecc-strength = <4>;
++				nand-ecc-step-size = <512>;
++			};
++		};
++	};
++};
++
++&spi0 {
++	status = "okay";
++
++	spi-flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "m25p64";
++		reg = <0>; /* Chip select 0 */
++		spi-max-frequency = <20000000>;
++		m25p,fast-read;
++
++		partition at u-boot {
++			reg = <0x00000000 0x00100000>;
++			label = "u-boot";
++		};
++		partition at u-boot-env {
++			reg = <0x00100000 0x00040000>;
++			label = "u-boot-env";
++		};
++		partition at unused {
++			reg = <0x00140000 0x00ec0000>;
++			label = "unused";
++		};
++
++	};
++};
+diff --git a/arch/arm/boot/dts/db-xc3-24g4xg.dts b/arch/arm/boot/dts/db-xc3-24g4xg.dts
+new file mode 100644
+index 000000000000..5eb89ffb9a7d
+--- /dev/null
++++ b/arch/arm/boot/dts/db-xc3-24g4xg.dts
+@@ -0,0 +1,155 @@
++/*
++ * Device Tree file for DB-XC3-24G4XG board
++ *
++ * Copyright (C) 2016 Allied Telesis Labs
++ *
++ * Based on armada-xp-db.dts
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ *
++ * Note: this Device Tree assumes that the bootloader has remapped the
++ * internal registers to 0xf1000000 (instead of the default
++ * 0xd0000000). The 0xf1000000 is the default used by the recent,
++ * DT-capable, U-Boot bootloaders provided by Marvell. Some earlier
++ * boards were delivered with an older version of the bootloader that
++ * left internal registers mapped at 0xd0000000. If you are in this
++ * situation, you should either update your bootloader (preferred
++ * solution) or the below Device Tree should be adjusted.
++ */
++
++/dts-v1/;
++#include "armada-xp-98dx3336.dtsi"
++
++/ {
++	model = "DB-XC3-24G4XG";
++	compatible = "marvell,db-xc3-24g4xg", "marvell,armadaxp-98dx3336", "marvell,armadaxp", "marvell,armada-370-xp";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlyprintk";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0 0x00000000 0 0x40000000>; /* 1 GB */
++	};
++
++	soc {
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
++			  MBUS_ID(0x03, 0x00) 0 0 0xa8000000 0x4000000
++			  MBUS_ID(0x08, 0x00) 0 0 0xac000000 0x100000>;
++
++		devbus-bootcs {
++			status = "okay";
++
++			/* Device Bus parameters are required */
++
++			/* Read parameters */
++			devbus,bus-width    = <16>;
++			devbus,turn-off-ps  = <60000>;
++			devbus,badr-skew-ps = <0>;
++			devbus,acc-first-ps = <124000>;
++			devbus,acc-next-ps  = <248000>;
++			devbus,rd-setup-ps  = <0>;
++			devbus,rd-hold-ps   = <0>;
++
++			/* Write parameters */
++			devbus,sync-enable = <0>;
++			devbus,wr-high-ps  = <60000>;
++			devbus,wr-low-ps   = <60000>;
++			devbus,ale-wr-ps   = <60000>;
++		};
++
++		internal-regs {
++			serial at 12000 {
++				status = "okay";
++			};
++			serial at 12100 {
++				status = "okay";
++			};
++
++			i2c at 11000 {
++				clock-frequency = <100000>;
++				status = "okay";
++			};
++
++			mvsdio at d4000 {
++				status = "disabled";
++			};
++
++			nand at d0000 {
++				status = "okay";
++				num-cs = <1>;
++				marvell,nand-keep-config;
++				marvell,nand-enable-arbiter;
++				nand-on-flash-bbt;
++				nand-ecc-strength = <4>;
++				nand-ecc-step-size = <512>;
++			};
++		};
++	};
++};
++
++&spi0 {
++	status = "okay";
++
++	spi-flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "m25p64";
++		reg = <0>; /* Chip select 0 */
++		spi-max-frequency = <20000000>;
++		m25p,fast-read;
++
++		partition at u-boot {
++			reg = <0x00000000 0x00100000>;
++			label = "u-boot";
++		};
++		partition at u-boot-env {
++			reg = <0x00100000 0x00040000>;
++			label = "u-boot-env";
++		};
++		partition at unused {
++			reg = <0x00140000 0x00ec0000>;
++			label = "unused";
++		};
++
++	};
++};
+-- 
+2.11.0.24.ge6920cf
