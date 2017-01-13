@@ -1,26 +1,90 @@
-From: nicolas.dichtel@6wind.com (Nicolas Dichtel)
-Date: Fri, 13 Jan 2017 17:08:34 +0100
-Subject: [PATCH v3 4/8] x86: stop exporting msr-index.h to userland
-In-Reply-To: <25483.1484322229@warthog.procyon.org.uk>
-References: <1484304406-10820-5-git-send-email-nicolas.dichtel@6wind.com>
- <3131144.4Ej3KFWRbz@wuerfel>
- <1484304406-10820-1-git-send-email-nicolas.dichtel@6wind.com>
- <25483.1484322229@warthog.procyon.org.uk>
-Message-ID: <dd826bc7-e1ef-be29-e0c3-692afb346036@6wind.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 13 Jan 2017 16:12:10 +0000
+Subject: [PATCH v3 3/5] arm64: Create and use __tlbi_dsb() macros
+In-Reply-To: <8f8057f5-d33f-15b3-de9f-6e718c23e97d@codeaurora.org>
+References: <20170111144118.17062-1-cov@codeaurora.org>
+ <20170111144118.17062-3-cov@codeaurora.org>
+ <20170112165852.GH13843@arm.com>
+ <8f8057f5-d33f-15b3-de9f-6e718c23e97d@codeaurora.org>
+Message-ID: <20170113161209.GI3253@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 13/01/2017 ? 16:43, David Howells a ?crit :
->> -header-y += msr-index.h
+On Fri, Jan 13, 2017 at 10:12:36AM -0500, Christopher Covington wrote:
+> On 01/12/2017 11:58 AM, Will Deacon wrote:
+> > On Wed, Jan 11, 2017 at 09:41:16AM -0500, Christopher Covington wrote:
+> >> +#define __tlbi_asm_dsb(as, op, attr, ...) do {				       \
+> >> +		__TLBI_FOR(op, ##__VA_ARGS__)				       \
+> >> +			asm (__TLBI_INSTR(op, ##__VA_ARGS__)		       \
+> >> +			__TLBI_IO(op, ##__VA_ARGS__));			       \
+> >> +		asm volatile (	     as			"\ndsb " #attr "\n"    \
+> >> +		: : : "memory"); } while (0)
+> >> +
+> >> +#define __tlbi_dsb(...)	__tlbi_asm_dsb("", ##__VA_ARGS__)
+> > 
+> > I can't deny that this is cool, but ultimately it's completely unreadable.
+> > What I was thinking you'd do would be make __tlbi expand to:
+> > 
+> >   tlbi
+> >   dsb
+> >   tlbi
+> >   dsb
+> > 
+> > for Falkor, and:
+> > 
+> >   tlbi
+> >   nop
+> >   nop
+> >   nop
+> > 
+> > for everybody else.
 > 
-> I see it on my desktop as /usr/include/asm/msr-index.h and it's been there at
-> least four years - and as such it's part of the UAPI.  I don't think you can
-> remove it unless you can guarantee there are no userspace users.
-I keep it in the v2 of the series, but the maintainer, Borislav Petkov, asks me
-to un-export it.
+> Thanks for the suggestion. So would __tlbi take a dsb sharability argument in
+> your proposal? Or would it be communicated in some other fashion, maybe inferred
+> from the tlbi argument? Or would the workaround dsbs all be the worst/broadest
+> case?
 
-I will follow the maintainer decision.
+I think always using inner-shareable should be ok. If you wanted to optimise
+this, you'd want to avoid the workaround altogether for non-shareable
+invalidation, but that's fairly rare and I doubt you'd be able to measure
+the impact.
 
+> > Wouldn't that localise this change sufficiently that you wouldn't need
+> > to change all the callers and encode the looping in your cpp macros?
+> > 
+> > I realise you get an extra dsb in some places with that change, but I'd
+> > like to see numbers for the impact of that on top of the workaround. If
+> > it's an issue, then an alternative sequence would be:
+> > 
+> >   tlbi
+> >   dsb
+> >   tlbi
+> > 
+> > and you'd rely on the existing dsb to complete that.
+> > 
+> > Having said that, I don't understand how your current loop code works
+> > when the workaround is applied. AFAICT, you end up emitting something
+> > like:
+> > 
+> > dsb ishst
+> > for i in 0 to n
+> > 	tlbi va+i
+> > dsb
+> > tlbi va+n
+> > dsb
+> > 
+> > which looks wrong to me. Am I misreading something here?
+> 
+> You're right, I am off by 1 << (PAGE_SHIFT - 12) here. I would need to
+> increment, compare, not take the loop branch (regular for loop stuff),
+> then decrement (missing) and perform TLB invalidation again (present but
+> using incorrect value).
 
-Regards,
-Nicolas
+It also strikes me as odd that you only need one extra TLBI after the loop
+has finished, as opposed to a tlbi; dsb; tlbi loop body (which is what you'd
+get if you modified __tlbi as I suggest).
+
+Is it sufficient to have one extra TLBI after the loop and, if so, is the
+performance impact of my suggestion therefore unacceptable?
+
+Will
