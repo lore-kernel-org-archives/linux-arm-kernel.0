@@ -1,57 +1,63 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 13 Jan 2017 18:40:37 +0800
-Subject: [PATCH 1/2] dma-mapping: let arch know origin of dma range
- passed to arch_setup_dma_ops()
-In-Reply-To: <1484159512-28515-2-git-send-email-nikita.yoush@cogentembedded.com>
-Message-ID: <201701131852.pk5JuBJy%fengguang.wu@intel.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 13 Jan 2017 10:45:24 +0000
+Subject: [PATCH v7 12/15] msi: platform: make
+ platform_msi_create_device_domain() ACPI aware
+In-Reply-To: <1484147199-4267-13-git-send-email-hanjun.guo@linaro.org>
+References: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
+ <1484147199-4267-13-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20170113104524.GC20837@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nikita,
+On Wed, Jan 11, 2017 at 11:06:36PM +0800, Hanjun Guo wrote:
+> platform_msi_create_device_domain() is used to ctreate
+> irqdomain for the device such as irqchip mbigen generating
+> the MSIs, it's almost ready for ACPI use except
+> of_node_to_fwnode() is for dt only, make it ACPI aware then
+> things will work in both DTS and ACPI.
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.10-rc3 next-20170112]
-[cannot apply to arm64/for-next/core]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+"The irqdomain creation carried out in:
 
-url:    https://github.com/0day-ci/linux/commits/Nikita-Yushchenko/dma-mapping-let-arch-know-origin-of-dma-range-passed-to-arch_setup_dma_ops/20170113-152733
-config: x86_64-randconfig-u0-01131618 (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+platform_msi_create_device_domain()
 
-All errors (new ones prefixed by >>):
+relies on the fwnode_handle interrupt controller token to associate the
+interrupt controller with a specific irqdomain. Current code relies on
+the OF layer to retrieve a fwnode_handle for the device representing the
+interrupt controller from its device->of_node pointer.  This makes
+platform_msi_create_device_domain() DT specific whilst it really is not
+because after the merge of commit f94277af03ea ("of/platform: Initialise
+dev->fwnode appropriately") the fwnode_handle can easily be retrieved
+from the dev->fwnode pointer in a firmware agnostic way.
 
-   drivers/acpi/scan.c: In function 'acpi_dma_configure':
->> drivers/acpi/scan.c:1388:2: error: too many arguments to function 'arch_setup_dma_ops'
-     arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, false, iommu,
-     ^~~~~~~~~~~~~~~~~~
-   In file included from drivers/acpi/scan.c:15:0:
-   include/linux/dma-mapping.h:611:20: note: declared here
-    static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base,
-                       ^~~~~~~~~~~~~~~~~~
+Update platform_msi_create_device_domain() to retrieve the interrupt
+controller fwnode_handle from the dev->fwnode pointer so that it can
+be used seamlessly in ACPI and DT systems".
 
-vim +/arch_setup_dma_ops +1388 drivers/acpi/scan.c
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-  1382		iommu = iort_iommu_configure(dev);
-  1383	
-  1384		/*
-  1385		 * Assume dma valid range starts at 0 and covers the whole
-  1386		 * coherent_dma_mask.
-  1387		 */
-> 1388		arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, false, iommu,
-  1389				   attr == DEV_DMA_COHERENT);
-  1390	}
-  1391	EXPORT_SYMBOL_GPL(acpi_dma_configure);
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 25665 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170113/7e91dc43/attachment-0001.gz>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Greg KH <gregkh@linuxfoundation.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Greg KH <gregkh@linuxfoundation.org>
+> ---
+>  drivers/base/platform-msi.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
+> index be6a599..035ca3b 100644
+> --- a/drivers/base/platform-msi.c
+> +++ b/drivers/base/platform-msi.c
+> @@ -345,8 +345,7 @@ struct irq_domain *
+>  
+>  	data->host_data = host_data;
+>  	domain = irq_domain_create_hierarchy(dev->msi_domain, 0, nvec,
+> -					     of_node_to_fwnode(dev->of_node),
+> -					     ops, data);
+> +					     dev->fwnode, ops, data);
+>  	if (!domain)
+>  		goto free_priv;
+>  
+> -- 
+> 1.9.1
+> 
