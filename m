@@ -1,32 +1,29 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 13 Jan 2017 13:03:41 -0600
-Subject: [PATCH v4 3/4] dt-bindings: add "microchip,24c128" compatible string
-In-Reply-To: <1484334222-14223-1-git-send-email-david@lechnology.com>
-References: <1484334222-14223-1-git-send-email-david@lechnology.com>
-Message-ID: <1484334222-14223-4-git-send-email-david@lechnology.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 13 Jan 2017 20:10:54 +0100
+Subject: [PATCH v4 0/2] Add support rockchip,
+ grf property for RK3399 PMU/GRU
+In-Reply-To: <1484028930-20305-1-git-send-email-zhengxing@rock-chips.com>
+References: <1484028930-20305-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <3210111.1N6x2AkRMx@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds "microchip,24c128" to the list of compatible strings for i2c
-eeproms.
+Am Dienstag, 10. Januar 2017, 14:15:28 CET schrieb Xing Zheng:
+> Hi,
+>   The structure rockchip_clk_provider needs to refer the GRF regmap
+> in somewhere, if the CRU node has not "rockchip,grf" property,
+> calling syscon_regmap_lookup_by_phandle will return an invalid GRF
+> regmap, and the MUXGRF type clock will be not supported.
+> 
+> Therefore, we need to add them.
+> 
+> Thanks.
 
-Signed-off-by: David Lechner <david@lechnology.com>
----
- Documentation/devicetree/bindings/eeprom/eeprom.txt | 2 ++
- 1 file changed, 2 insertions(+)
+applied both for 4.11
 
-diff --git a/Documentation/devicetree/bindings/eeprom/eeprom.txt b/Documentation/devicetree/bindings/eeprom/eeprom.txt
-index 735bc94..5696eb5 100644
---- a/Documentation/devicetree/bindings/eeprom/eeprom.txt
-+++ b/Documentation/devicetree/bindings/eeprom/eeprom.txt
-@@ -10,6 +10,8 @@ Required properties:
- 
- 	"catalyst,24c32"
- 
-+	"microchip,24c128"
-+
- 	"ramtron,24c64"
- 
- 	"renesas,r1ex24002"
--- 
-2.7.4
+binding-change is in my clock-branch (so that dt-binding doc changes stay 
+together) and the dts change is of course in the dts64 branch.
+
+
+Thanks
+Heiko
