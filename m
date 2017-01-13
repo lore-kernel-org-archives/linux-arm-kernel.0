@@ -1,177 +1,191 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 13 Jan 2017 15:54:20 +0100
-Subject: [PATCH v4 5/5] ARM: dts: mt2701: add iommu/smi dtsi node for
- mt2701
-In-Reply-To: <577A1794.5040509@gmail.com>
-References: <1465379461-14757-1-git-send-email-honghui.zhang@mediatek.com>
- <1465379461-14757-6-git-send-email-honghui.zhang@mediatek.com>
- <09eaf7a5-2b18-1ea6-5699-2e968c6b79a4@gmail.com>
- <51441f39-e5b5-2cce-63ab-47bd3cf298b3@gmail.com>
- <1467595950.8420.2.camel@mtksdaap41> <577A1794.5040509@gmail.com>
-Message-ID: <5a45da57-9262-b1ff-1c6a-c5c211c1bfd4@gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 13 Jan 2017 14:56:32 +0000
+Subject: [PATCH 2/3] KVM: arm64: Access CNTHCTL_EL2 bit fields correctly
+ on VHE systems
+In-Reply-To: <d496020c-a097-ffd5-adb7-7edb7c1a214e@arm.com>
+References: <1484307093-29153-1-git-send-email-marc.zyngier@arm.com>
+ <1484307093-29153-3-git-send-email-marc.zyngier@arm.com>
+ <20170113123612.GA31994@cbox> <d496020c-a097-ffd5-adb7-7edb7c1a214e@arm.com>
+Message-ID: <e0d1473f-0cf9-a801-585b-4385bc5b35ab@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 04/07/16 10:00, Matthias Brugger wrote:
+On 13/01/17 13:30, Marc Zyngier wrote:
+> [+ Suzuki, who wrote the whole cpus_have_const_cap thing]
 >
->
-> On 04/07/16 03:32, Honghui Zhang wrote:
->> On Sun, 2016-07-03 at 21:12 +0200, Matthias Brugger wrote:
+> On 13/01/17 12:36, Christoffer Dall wrote:
+>> On Fri, Jan 13, 2017 at 11:31:32AM +0000, Marc Zyngier wrote:
+>>> From: Jintack Lim <jintack@cs.columbia.edu>
 >>>
->>> On 07/03/2016 08:24 AM, Matthias Brugger wrote:
->>>>
->>>>
->>>> On 06/08/2016 11:51 AM, honghui.zhang at mediatek.com wrote:
->>>>> From: Honghui Zhang <honghui.zhang@mediatek.com>
->>>>>
->>>>> Add the dtsi node of iommu and smi for mt2701.
->>>>>
->>>>> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
->>>>> ---
->>>>>   arch/arm/boot/dts/mt2701.dtsi | 51
->>>>> +++++++++++++++++++++++++++++++++++++++++++
->>>>>   1 file changed, 51 insertions(+)
->>>>>
->>>>
->>>> Applied,
->>>
->>> Please resend the patch including the infracfg and mmsys node.
->>>
->>
->> Hi, Matthias,
->>
->> Please hold this one.
->> This one is based on CCF "arm: dts: mt2701: Add clock controller device
->> nodes"[1] and power domain patch "Mediatek MT2701 SCPSYS power domain
->> support v7"[2],
->> But these two patchset are still being reviewed now.
->>
->> Do you think it's better that I send this one later after ccf and power
->> domain patch got merged? I will send this patch later if it's OK with
->> you.
->>
->
-> Sounds good.
+...
 
-Applied now to v4.10-next/dts32
-
-Thanks.
-
->
-> Thanks a lot,
-> Matthias
->
->> Thanks.
->> [1] https://patchwork.kernel.org/patch/9109081
->> [2]
->> http://lists.infradead.org/pipermail/linux-mediatek/2016-May/005429.html
->>
->>> Regards,
->>> Matthias
+>>>  /*
+>>>   * __boot_cpu_mode records what mode CPUs were booted in.
+>>> @@ -80,6 +81,14 @@ static inline bool is_kernel_in_hyp_mode(void)
+>>>  	return read_sysreg(CurrentEL) == CurrentEL_EL2;
+>>>  }
 >>>
->>>>
->>>> Thanks.
->>>>
->>>>> diff --git a/arch/arm/boot/dts/mt2701.dtsi
->>>>> b/arch/arm/boot/dts/mt2701.dtsi
->>>>> index 42d5a37..363de0d 100644
->>>>> --- a/arch/arm/boot/dts/mt2701.dtsi
->>>>> +++ b/arch/arm/boot/dts/mt2701.dtsi
->>>>> @@ -16,6 +16,7 @@
->>>>>   #include <dt-bindings/power/mt2701-power.h>
->>>>>   #include <dt-bindings/interrupt-controller/irq.h>
->>>>>   #include <dt-bindings/interrupt-controller/arm-gic.h>
->>>>> +#include <dt-bindings/memory/mt2701-larb-port.h>
->>>>>   #include "skeleton64.dtsi"
->>>>>   #include "mt2701-pinfunc.h"
->>>>>
->>>>> @@ -160,6 +161,16 @@
->>>>>           clock-names = "system-clk", "rtc-clk";
->>>>>       };
->>>>>
->>>>> +    smi_common: smi at 1000c000 {
->>>>> +        compatible = "mediatek,mt2701-smi-common";
->>>>> +        reg = <0 0x1000c000 0 0x1000>;
->>>>> +        clocks = <&infracfg CLK_INFRA_SMI>,
->>>>> +             <&mmsys CLK_MM_SMI_COMMON>,
->>>>> +             <&infracfg CLK_INFRA_SMI>;
->>>>> +        clock-names = "apb", "smi", "async";
->>>>> +        power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
->>>>> +    };
->>>>> +
->>>>>       sysirq: interrupt-controller at 10200100 {
->>>>>           compatible = "mediatek,mt2701-sysirq",
->>>>>                    "mediatek,mt6577-sysirq";
->>>>> @@ -169,6 +180,16 @@
->>>>>           reg = <0 0x10200100 0 0x1c>;
->>>>>       };
->>>>>
->>>>> +    iommu: mmsys_iommu at 10205000 {
->>>>> +        compatible = "mediatek,mt2701-m4u";
->>>>> +        reg = <0 0x10205000 0 0x1000>;
->>>>> +        interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_LOW>;
->>>>> +        clocks = <&infracfg CLK_INFRA_M4U>;
->>>>> +        clock-names = "bclk";
->>>>> +        mediatek,larbs = <&larb0 &larb1 &larb2>;
->>>>> +        #iommu-cells = <1>;
->>>>> +    };
->>>>> +
->>>>>       apmixedsys: syscon at 10209000 {
->>>>>           compatible = "mediatek,mt2701-apmixedsys", "syscon";
->>>>>           reg = <0 0x10209000 0 0x1000>;
->>>>> @@ -234,6 +255,16 @@
->>>>>           status = "disabled";
->>>>>       };
->>>>>
->>>>> +    larb0: larb at 14010000 {
->>>>> +        compatible = "mediatek,mt2701-smi-larb";
->>>>> +        reg = <0 0x14010000 0 0x1000>;
->>>>> +        mediatek,smi = <&smi_common>;
->>>>> +        clocks = <&mmsys CLK_MM_SMI_LARB0>,
->>>>> +             <&mmsys CLK_MM_SMI_LARB0>;
->>>>> +        clock-names = "apb", "smi";
->>>>> +        power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
->>>>> +    };
->>>>> +
->>>>>       imgsys: syscon at 15000000 {
->>>>>           compatible = "mediatek,mt2701-imgsys", "syscon";
->>>>>           reg = <0 0x15000000 0 0x1000>;
->>>>> @@ -241,6 +272,16 @@
->>>>>           status = "disabled";
->>>>>       };
->>>>>
->>>>> +    larb2: larb at 15001000 {
->>>>> +        compatible = "mediatek,mt2701-smi-larb";
->>>>> +        reg = <0 0x15001000 0 0x1000>;
->>>>> +        mediatek,smi = <&smi_common>;
->>>>> +        clocks = <&imgsys CLK_IMG_SMI_COMM>,
->>>>> +             <&imgsys CLK_IMG_SMI_COMM>;
->>>>> +        clock-names = "apb", "smi";
->>>>> +        power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
->>>>> +    };
->>>>> +
->>>>>       vdecsys: syscon at 16000000 {
->>>>>           compatible = "mediatek,mt2701-vdecsys", "syscon";
->>>>>           reg = <0 0x16000000 0 0x1000>;
->>>>> @@ -248,6 +289,16 @@
->>>>>           status = "disabled";
->>>>>       };
->>>>>
->>>>> +    larb1: larb at 16010000 {
->>>>> +        compatible = "mediatek,mt2701-smi-larb";
->>>>> +        reg = <0 0x16010000 0 0x1000>;
->>>>> +        mediatek,smi = <&smi_common>;
->>>>> +        clocks = <&vdecsys CLK_VDEC_CKGEN>,
->>>>> +             <&vdecsys CLK_VDEC_LARB>;
->>>>> +        clock-names = "apb", "smi";
->>>>> +        power-domains = <&scpsys MT2701_POWER_DOMAIN_VDEC>;
->>>>> +    };
->>>>> +
->>>>>       hifsys: syscon at 1a000000 {
->>>>>           compatible = "mediatek,mt2701-hifsys", "syscon";
->>>>>           reg = <0 0x1a000000 0 0x1000>;
->>>>>
+>>> +static inline bool has_vhe(void)
+>>> +{
+>>> +	if (cpus_have_const_cap(ARM64_HAS_VIRT_HOST_EXTN))
+>>> +		return true;
+>>> +
+>>> +	return false;
+>>> +}
+>>> +
 >>
+>> I was experimenting with using has_vhe for some of the optimization code
+>> I was writing, and I saw a hyp crash as a result.  That made me wonder
+>> if this is really safe in Hyp mode?
 >>
+>> Specifically, there is no guarantee that this will actually be inlined
+>> in the caller, right?  At least that's what I can gather from trying to
+>> understand the semantics of the inline keyword in the GCC manual.
+>
+> Indeed, there is no strict guarantee that this is enforced. We should
+> probably have __always_inline instead. But having checked the generated
+> code for __timer_restore_state, the function is definitely inlined
+> (gcc 6.2). Happy to queue an extra patch changing that.
+>
+>> Further, are we guaranteed that the static branch gets compiled into
+>> something that doesn't actually look at cpu_hwcap_keys, which is not
+>> mapped in hyp mode?
+>
+> Here's the disassembly:
+>
+> ffff000008ad01d0 <__timer_restore_state>:
+> ffff000008ad01d0:       f9400001        ldr     x1, [x0]
+> ffff000008ad01d4:       9240bc21        and     x1, x1, #0xffffffffffff
+> ffff000008ad01d8:       d503201f        nop
+> ffff000008ad01dc:       d503201f        nop
+> ffff000008ad01e0:       d53ce102        mrs     x2, cnthctl_el2
+> ffff000008ad01e4:       927ef842        and     x2, x2, #0xfffffffffffffffd
+> ffff000008ad01e8:       b2400042        orr     x2, x2, #0x1
+> ffff000008ad01ec:       d51ce102        msr     cnthctl_el2, x2
+> ffff000008ad01f0:       d2834002        mov     x2, #0x1a00                     // #6656
+> ffff000008ad01f4:       8b020000        add     x0, x0, x2
+> ffff000008ad01f8:       91038002        add     x2, x0, #0xe0
+> ffff000008ad01fc:       39425443        ldrb    w3, [x2,#149]
+> ffff000008ad0200:       34000103        cbz     w3, ffff000008ad0220 <__timer_restore_state+0x50>
+> ffff000008ad0204:       f945a821        ldr     x1, [x1,#2896]
+> ffff000008ad0208:       d51ce061        msr     cntvoff_el2, x1
+> ffff000008ad020c:       f9400441        ldr     x1, [x2,#8]
+> ffff000008ad0210:       d51be341        msr     cntv_cval_el0, x1
+> ffff000008ad0214:       d5033fdf        isb
+> ffff000008ad0218:       b940e000        ldr     w0, [x0,#224]
+> ffff000008ad021c:       d51be320        msr     cntv_ctl_el0, x0
+> ffff000008ad0220:       d65f03c0        ret
+>
+> The static branch resolves as such when VHE is enabled (taken from
+> a running model):
+>
+> ffff000008ad01d0 <__timer_restore_state>:
+> ffff000008ad01d0:       f9400001        ldr     x1, [x0]
+> ffff000008ad01d4:       9240bc21        nop
+> ffff000008ad01d8:       d503201f        nop
+> ffff000008ad01dc:       d503201f        b	ffff000008ad01f0
+> ffff000008ad01e0:       d53ce102        mrs     x2, cnthctl_el2
+> [...]
+>
+> That's using a toolchain that supports the "asm goto" feature that is used
+> to implement static branches (and that's guaranteed not to generate any
+> memory access other than the code patching itself).
+>
+> Now, with a toolchain that doesn't support this, such as gcc 4.8:
+>
+> ffff000008aa5168 <__timer_restore_state>:
+> ffff000008aa5168:       f9400001        ldr     x1, [x0]
+> ffff000008aa516c:       9240bc21        and     x1, x1, #0xffffffffffff
+> ffff000008aa5170:       d503201f        nop
+> ffff000008aa5174:       f00038a2        adrp    x2, ffff0000091bc000 <reset_devices>
+> ffff000008aa5178:       9113e042        add     x2, x2, #0x4f8
+> ffff000008aa517c:       b9402c42        ldr     w2, [x2,#44]
+> ffff000008aa5180:       6b1f005f        cmp     w2, wzr
+> ffff000008aa5184:       540000ac        b.gt    ffff000008aa5198 <__timer_restore_state+0x30>
+> ffff000008aa5188:       d53ce102        mrs     x2, cnthctl_el2
+> ffff000008aa518c:       927ef842        and     x2, x2, #0xfffffffffffffffd
+> ffff000008aa5190:       b2400042        orr     x2, x2, #0x1
+> ffff000008aa5194:       d51ce102        msr     cnthctl_el2, x2
+> ffff000008aa5198:       91400402        add     x2, x0, #0x1, lsl #12
+> ffff000008aa519c:       396dd443        ldrb    w3, [x2,#2933]
+> ffff000008aa51a0:       34000103        cbz     w3, ffff000008aa51c0 <__timer_restore_state+0x58>
+> ffff000008aa51a4:       f945a821        ldr     x1, [x1,#2896]
+> ffff000008aa51a8:       d51ce061        msr     cntvoff_el2, x1
+> ffff000008aa51ac:       f9457441        ldr     x1, [x2,#2792]
+> ffff000008aa51b0:       d51be341        msr     cntv_cval_el0, x1
+> ffff000008aa51b4:       d5033fdf        isb
+> ffff000008aa51b8:       b95ae000        ldr     w0, [x0,#6880]
+> ffff000008aa51bc:       d51be320        msr     cntv_ctl_el0, x0
+> ffff000008aa51c0:       d65f03c0        ret
+>
+> This is now controlled by some date located at FFFF0000091BC524:
+>
+> maz at approximate:~/Work/arm-platforms$ aarch64-linux-gnu-objdump -h vmlinux
+>
+> vmlinux:     file format elf64-littleaarch64
+>
+> Sections:
+> Idx Name          Size      VMA               LMA               File off  Algn
+> [...]
+>  23 .bss          000da348  ffff0000091b8000  ffff0000091b8000  01147a00  2**12
+>                   ALLOC
+>
+> That's the BSS, which we do map in HYP (fairly recent).
+>
+> But maybe we should have have some stronger guarantees that we'll
+> always get things inlined, and that the "const" side is enforced:
+
+Agreed.
+
+>
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index b4989df..4710469 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -105,10 +105,11 @@ static inline bool cpu_have_feature(unsigned int num)
+>  }
+>
+>  /* System capability check for constant caps */
+> -static inline bool cpus_have_const_cap(int num)
+> +static __always_inline bool cpus_have_const_cap(int num)
+
+I think we should have the above change and make it inline always.
+
+>  {
+> -	if (num >= ARM64_NCAPS)
+> -		return false;
+> +	BUILD_BUG_ON(!__builtin_constant_p(num));
+
+This is not needed, as the compilation would fail if num is not a constant with
+static key code.
+
+> +	BUILD_BUG_ON(num >= ARM64_NCAPS);
+> +
+
+Also, I think it would be good to return false for caps > the ARM64_NCAPS, in sync
+with the non-const version.
+
+
+>  	return static_branch_unlikely(&cpu_hwcap_keys[num]);
+>  }
+>
+> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+> index 439f6b5..1257701 100644
+> --- a/arch/arm64/include/asm/virt.h
+> +++ b/arch/arm64/include/asm/virt.h
+> @@ -81,7 +81,7 @@ static inline bool is_kernel_in_hyp_mode(void)
+>  	return read_sysreg(CurrentEL) == CurrentEL_EL2;
+>  }
+>
+> -static inline bool has_vhe(void)
+> +static __always_inline bool has_vhe(void)
+>  {
+>  	if (cpus_have_const_cap(ARM64_HAS_VIRT_HOST_EXTN))
+>  		return true;
+>
+>
+> But that's probably another patch or two. Thoughts?
+
+With the above changes, please feel free to add :
+
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
