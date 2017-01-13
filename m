@@ -1,50 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 13 Jan 2017 13:36:21 +0100
-Subject: [PATCH] iommu/dma: Add support for DMA_ATTR_FORCE_CONTIGUOUS
-In-Reply-To: <0e5c066f-ddf6-30ce-392e-79bd0f401a18@arm.com>
-References: <1484305674-15018-1-git-send-email-geert+renesas@glider.be>
- <d336ef3b-4fe6-5ebb-9fed-071fa79028df@arm.com>
- <CAMuHMdWBfTm_QRuB7x-ZDh0bgGmHokqm7=F2b0rjQTYzizC9hA@mail.gmail.com>
- <0e5c066f-ddf6-30ce-392e-79bd0f401a18@arm.com>
-Message-ID: <CAMuHMdVnteoor56EYG1Ka7t0o8+OKNehGnk6YUciTXdEQ5KKcQ@mail.gmail.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Fri, 13 Jan 2017 13:37:57 +0100
+Subject: [PATCH 03/10] devicetree: bindings: add bindings for ahci-da850
+In-Reply-To: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1484311084-31547-4-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Add DT bindings for the TI DA850 AHCI SATA controller.
 
-On Fri, Jan 13, 2017 at 1:17 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 13/01/17 11:59, Geert Uytterhoeven wrote:
->> On Fri, Jan 13, 2017 at 12:32 PM, Robin Murphy <robin.murphy@arm.com> wrote:
->>> On 13/01/17 11:07, Geert Uytterhoeven wrote:
->>>> Add support for DMA_ATTR_FORCE_CONTIGUOUS to the generic IOMMU DMA code.
->>>> This allows to allocate physically contiguous DMA buffers on arm64
->>>> systems with an IOMMU.
->>>
->>> Can anyone explain what this attribute is actually used for? I've never
->>> quite figured it out.
->>
->> My understanding is that DMA_ATTR_FORCE_CONTIGUOUS is needed when using
->> an IOMMU but wanting the buffers to be both contiguous in IOVA space and
->> physically contiguous to allow passing to devices without IOMMU.
->>
->> Main users are graphic and remote processors.
->
-> Sure, I assumed it must be to do with buffer sharing, but the systems
-> I'm aware of which have IOMMUs in their media subsystems tend to have
-> them in front of every IP block involved, so I was curious as to what
-> bit of non-IOMMU hardware wanted to play too. The lone in-tree use in
-> the Exynos DRM driver was never very revealing, and the new one I see in
-> the Qualcomm PIL driver frankly looks redundant to me.
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ .../devicetree/bindings/ata/ahci-da850.txt          | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/ata/ahci-da850.txt
 
-I'll let the GPU-literate people comment on that...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/Documentation/devicetree/bindings/ata/ahci-da850.txt b/Documentation/devicetree/bindings/ata/ahci-da850.txt
+new file mode 100644
+index 0000000..d07c241
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ata/ahci-da850.txt
+@@ -0,0 +1,21 @@
++Device tree binding for the TI DA850 AHCI SATA Controller
++---------------------------------------------------------
++
++Required properties:
++  - compatible: must be "ti,da850-ahci"
++  - reg: physical base addresses and sizes of the controller's register areas
++  - interrupts: interrupt specifier (refer to the interrupt binding)
++
++Optional properties:
++  - clocks: clock specifier (refer to the common clock binding)
++  - da850,clk_multiplier: the multiplier for the reference clock needed
++                          for 1.5GHz PLL output
++
++Example:
++
++	sata: ahci at 0x218000 {
++		compatible = "ti,da850-ahci";
++		reg = <0x218000 0x2000>, <0x22c018 0x4>;
++		interrupts = <67>;
++		da850,clk_multiplier = <7>;
++	};
+-- 
+2.9.3
