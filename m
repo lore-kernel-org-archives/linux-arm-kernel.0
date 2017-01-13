@@ -1,59 +1,111 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 13 Jan 2017 11:31:30 +0000
-Subject: [PATCH 0/3] KVM/ARM updates for 4.10-rc4
-Message-ID: <1484307093-29153-1-git-send-email-marc.zyngier@arm.com>
+Date: Fri, 13 Jan 2017 11:31:33 +0000
+Subject: [PATCH 3/3] KVM: arm/arm64: vgic: Fix deadlock on error handling
+In-Reply-To: <1484307093-29153-1-git-send-email-marc.zyngier@arm.com>
+References: <1484307093-29153-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1484307093-29153-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Radim, Paolo,
+Dmitry Vyukov reported that the syzkaller fuzzer triggered a
+deadlock in the vgic setup code when an error was detected, as
+the cleanup code tries to take a lock that is already held by
+the setup code.
 
-Here's the KVM/ARM updates for 4.10-rc4. Two timer fixes, and one vgic
-fix for a deadlock that's been reported this week (which should land
-into stable).
+The fix is to avoid retaking the lock when cleaning up, by
+telling the cleanup function that we already hold it.
 
-Please pull.
-
-Thanks,
-
-	M.
-
-The following changes since commit a121103c922847ba5010819a3f250f1f7fc84ab8:
-
-  Linux 4.10-rc3 (2017-01-08 14:18:17 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.10-rc4
-
-for you to fetch changes up to 1193e6aeecb36c74c48c7cd0f641acbbed9ddeef:
-
-  KVM: arm/arm64: vgic: Fix deadlock on error handling (2017-01-13 11:19:35 +0000)
-
-----------------------------------------------------------------
-KVM/ARM updates for 4.10-rc4
-
-- Fix for timer setup on VHE machines
-- Drop spurious warning when the timer races against
-  the vcpu running again
-- Prevent a vgic deadlock when the initialization fails
-
-----------------------------------------------------------------
-Christoffer Dall (1):
-      KVM: arm/arm64: Fix occasional warning from the timer work function
-
-Jintack Lim (1):
-      KVM: arm64: Access CNTHCTL_EL2 bit fields correctly on VHE systems
-
-Marc Zyngier (1):
-      KVM: arm/arm64: vgic: Fix deadlock on error handling
-
- arch/arm/include/asm/virt.h   |  5 +++++
- arch/arm/kvm/arm.c            |  3 +++
- arch/arm64/include/asm/virt.h |  9 +++++++++
- include/kvm/arm_arch_timer.h  |  1 +
- virt/kvm/arm/arch_timer.c     | 26 +++++++++++++++++++++++---
- virt/kvm/arm/hyp/timer-sr.c   | 33 +++++++++++++++++++++------------
+Cc: stable at vger.kernel.org
+Reported-by: Dmitry Vyukov <dvyukov@google.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
  virt/kvm/arm/vgic/vgic-init.c | 18 +++++++++++++-----
  virt/kvm/arm/vgic/vgic-v2.c   |  2 --
  virt/kvm/arm/vgic/vgic-v3.c   |  2 --
- 9 files changed, 75 insertions(+), 24 deletions(-)
+ 3 files changed, 13 insertions(+), 9 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 5114391..c737ea0 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -268,15 +268,11 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
+ {
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+ 
+-	mutex_lock(&kvm->lock);
+-
+ 	dist->ready = false;
+ 	dist->initialized = false;
+ 
+ 	kfree(dist->spis);
+ 	dist->nr_spis = 0;
+-
+-	mutex_unlock(&kvm->lock);
+ }
+ 
+ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
+@@ -286,7 +282,8 @@ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
+ 	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
+ }
+ 
+-void kvm_vgic_destroy(struct kvm *kvm)
++/* To be called with kvm->lock held */
++static void __kvm_vgic_destroy(struct kvm *kvm)
+ {
+ 	struct kvm_vcpu *vcpu;
+ 	int i;
+@@ -297,6 +294,13 @@ void kvm_vgic_destroy(struct kvm *kvm)
+ 		kvm_vgic_vcpu_destroy(vcpu);
+ }
+ 
++void kvm_vgic_destroy(struct kvm *kvm)
++{
++	mutex_lock(&kvm->lock);
++	__kvm_vgic_destroy(kvm);
++	mutex_unlock(&kvm->lock);
++}
++
+ /**
+  * vgic_lazy_init: Lazy init is only allowed if the GIC exposed to the guest
+  * is a GICv2. A GICv3 must be explicitly initialized by the guest using the
+@@ -348,6 +352,10 @@ int kvm_vgic_map_resources(struct kvm *kvm)
+ 		ret = vgic_v2_map_resources(kvm);
+ 	else
+ 		ret = vgic_v3_map_resources(kvm);
++
++	if (ret)
++		__kvm_vgic_destroy(kvm);
++
+ out:
+ 	mutex_unlock(&kvm->lock);
+ 	return ret;
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index 9bab867..834137e 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -293,8 +293,6 @@ int vgic_v2_map_resources(struct kvm *kvm)
+ 	dist->ready = true;
+ 
+ out:
+-	if (ret)
+-		kvm_vgic_destroy(kvm);
+ 	return ret;
+ }
+ 
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 5c9f974..e6b03fd 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -302,8 +302,6 @@ int vgic_v3_map_resources(struct kvm *kvm)
+ 	dist->ready = true;
+ 
+ out:
+-	if (ret)
+-		kvm_vgic_destroy(kvm);
+ 	return ret;
+ }
+ 
+-- 
+2.1.4
