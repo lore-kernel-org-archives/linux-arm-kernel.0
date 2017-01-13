@@ -1,70 +1,92 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 13 Jan 2017 17:34:10 +0530
-Subject: [PATCH v3] ARM: dts: Add LEGO MINDSTORMS EV3 dts
-In-Reply-To: <1484253167-27568-1-git-send-email-david@lechnology.com>
-References: <1484253167-27568-1-git-send-email-david@lechnology.com>
-Message-ID: <3066d614-0676-319a-6149-6d723e1cf35f@ti.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 13 Jan 2017 12:05:12 +0000
+Subject: [RFC] Kernel panic down to swiotlb when doing insmod a simple
+ driver
+In-Reply-To: <CAKv+Gu9PX17PKR7qAgmh1nryTdpnUOErVZGbXKEFPE46=gf-yw@mail.gmail.com>
+References: <d64931b6-8875-51ea-06a0-e0981e12f859@rock-chips.com>
+ <99472068-069a-7759-8d6e-019fd875264d@arm.com>
+ <CAKv+Gu-aaGuHmshi=aiexUD=dxuia7tHKm3LQt3RG-7D_3v9Mw@mail.gmail.com>
+ <bf4b1861-7190-c888-b9be-646e2a2297bb@arm.com>
+ <CAKv+Gu_5QC4=9SmyBWTZaQUcsJudKB=2g5Bs=MVyRPUGtWPJ4w@mail.gmail.com>
+ <039058a7-9e5a-d931-5bec-f0f3ccc86cf3@arm.com>
+ <CAKv+Gu9PX17PKR7qAgmh1nryTdpnUOErVZGbXKEFPE46=gf-yw@mail.gmail.com>
+Message-ID: <25d9cd7b-b587-c0ce-31b3-149899fcbff4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 January 2017 02:02 AM, David Lechner wrote:
-> This adds a device tree definition file for LEGO MINDSTORMS EV3.
+On 13/01/17 11:54, Ard Biesheuvel wrote:
+> On 13 January 2017 at 11:52, Robin Murphy <robin.murphy@arm.com> wrote:
+>> On 13/01/17 11:49, Ard Biesheuvel wrote:
+>>> On 13 January 2017 at 11:47, Robin Murphy <robin.murphy@arm.com> wrote:
+>>>> On 13/01/17 11:25, Ard Biesheuvel wrote:
+>>>>> On 13 January 2017 at 11:03, Robin Murphy <robin.murphy@arm.com> wrote:
+>>>>>> On 13/01/17 10:00, Shawn Lin wrote:
+>>>>>>> Hi,
+>>>>>>>
+>>>>>>> Sorry for sending this RFC for help as I couldn't find some useful hint
+>>>>>>> to slove my issue by git-log the swiotlb commit from kernel v4.4 to
+>>>>>>> v4.9 and I'm also not familar with these stuff. So could you kindly
+>>>>>>> point me to the right direction to debug it? Thanks. :)
+>>>>>>>
+>>>>>>> --------------------------------------
+>>>>>>> We just have a very simple wifi driver *built as ko module* which only
+>>>>>>> have a probe function to do the basic init work and call SDIO API to
+>>>>>>> transfer some bytes.
+>>>>>>>
+>>>>>>> Env: kernel 4.4 stable tree, ARM64(rk3399)
+>>>>>>>
+>>>>>>> Two cases are included:
+>>>>>>
+>>>>>> And they are both wrong :)
+>>>>>>
+>>>>>>> The crash case:
+>>>>>>>
+>>>>>>> u8 __aligned(32) buf[PAGE_SIZE]; //global here in ko driver file
+>>>>>>
+>>>>>> It is only valid to do DMA from linear map addresses - I'm not sure if
+>>>>>> the modules area was in the linear map before, but either way it
+>>>>>> probably isn't now (Ard, Mark?). Either way, I don't believe static data
+>>>>>> honours ARCH_DMA_MINALIGN in general, so it's still highly inadvisable.
+>>>>>>
+>>>>>
+>>>>> The __aligned() modifier should work fine: the alignment is propagated
+>>>>> to the ELF section alignment, which in turn is honoured by the module
+>>>>> loader. The problem is that '32' is too low for non-coherent DMA to be
+>>>>> safe. In general, alignments up to 4 KB should work everywhere.
+>>>>
+>>>> Does that alignment also implicitly apply to the size, though? In other
+>>>> words, given:
+>>>>
+>>>> static int X
+>>>> static int __aligned(32) Y;
+>>>> static int Z;
+>>>>
+>>>> is it guaranteed that if, say, X gets placed at .data + 0, so Y goes to
+>>>> .data + 32, then Z *cannot* be placed at .data + 36?
+>>>>
+>>>
+>>> I'm not sure if I understand the question: why would it be incorrect
+>>> for Z to be placed at .data + 36?
+>>
+>> Because they'd then wind up in the same cache line, so non-coherent DMA
+>> to Y will result in concurrent CPU updates to Z being lost/corrupted.
+>> ARCH_DMA_MINALIGN isn't about alignemnt per se, it's about keeping
+>> things in distinct cache writeback granules.
+>>
 > 
-> What is working:
+> I understand that. But the original code did
 > 
-> * Pin muxing
-> * Pinconf
-> * GPIOs
-> * MicroSD card reader
-> * UART on input port 1
-> * Buttons
-> * LEDs
-> * Poweroff/reset
-> * Flash memory
-> * EEPROM
-> * USB host port
-> * USB peripheral port
+>  u8 __aligned(32) buf[PAGE_SIZE]; //global here in ko driver file
 > 
-> What is not working/to be added later:
+> so there the size is guaranteed to be a multiple of the CWG
 > 
-> * Speaker - have patch submitted to get pwm-beeper working - maybe someday
->   it will have a real sound driver that uses PRU
-> * A/DC chip - have driver submitted and accepted - waiting for ack on
->   device tree bindings
-> * Display - waiting for "simple DRM" to be mainlined
-> * Bluetooth - needs new driver for sequencing power/enable/clock
-> * Input and output ports - need some sort of new phy or extcon driver as
->   well as PRU UART and PRU I2C drivers
-> * Battery indication - needs new power supply driver
-> 
-> Note on flash partitions:
-> 
-> These partitions are based on the official EV3 firmware from LEGO. It is
-> expected that most users of the mainline kernel on EV3 will be booting from
-> an SD card while retaining the official firmware in the flash memory.
-> Furthermore, the official firmware uses an ancient U-Boot (2009) that has
-> no device tree support. So, it makes sense to have this partition table in
-> the EV3 device tree file. In the unlikely case that anyone does create their
-> own firmware image with different partitioning, they can use a modern
-> U-Boot in their own firmware image that modifies the device tree with the
-> custom partitions.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
+> So to answer your question: no, the compiler will not round up the
+> size of the allocation to the alignment, it will only align the start.
 
-There are couple of checkpatch errors that show up. The compatible
-"lego,ev3" needs to be documented in
-Documentation/devicetree/bindings/arm/davinci.txt
+Right. I was deliberately ignoring the "you happen to get away with it
+in this case because..." part because I think the "DMA to static
+data/stack is not safe in general" message is important :)
 
-"at24,24c128" is undocumented. Is that an atmel chip on the EV3? If the
-manufacturer name is not clear,
-Documentation/devicetree/bindings/eeprom/eeprom.txt advises using just
-"24c128"
+Thanks for the clarification.
 
-Finally, lego needs to be added to
-Documentation/devicetree/bindings/vendor-prefixes.txt
-
-Can you please submit the documentation portions as separate patches in
-a series along with this patch.
-
-Thanks,
-Sekhar
+Robin.
