@@ -1,57 +1,108 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Jan 2017 15:20:59 +0000
-Subject: [PATCH RFC 0/7] Clean up PHY MMD accessors
-Message-ID: <20170113152059.GR14217@n2100.armlinux.org.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 13 Jan 2017 16:21:04 +0100
+Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
+In-Reply-To: <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
+References: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
+ <1484291609-20195-3-git-send-email-guochun.mao@mediatek.com>
+ <20170113151747.6bc85245@bbrezillon>
+ <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
+Message-ID: <20170113162104.4d2a624c@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series cleans up phylib's MMD accessors, so that we have a common
-way of accessing the Clause 45 register set.
+On Fri, 13 Jan 2017 16:12:20 +0100
+Matthias Brugger <matthias.bgg@gmail.com> wrote:
 
-The current situation is far from ideal - we have phy_(read|write)_mmd()
-which accesses Clause 45 registers over Clause 45 accesses, and we have
-phy_(read|write)_mmd_indirect(), which accesses Clause 45 registers via
-Clause 22 register 13/14.
+> On 13/01/17 15:17, Boris Brezillon wrote:
+> > On Fri, 13 Jan 2017 15:13:29 +0800
+> > Guochun Mao <guochun.mao@mediatek.com> wrote:
+> >  
+> >> Add Mediatek nor flash node.
+> >>
+> >> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+> >> ---
+> >>  arch/arm/boot/dts/mt2701-evb.dts |   25 +++++++++++++++++++++++++
+> >>  arch/arm/boot/dts/mt2701.dtsi    |   12 ++++++++++++
+> >>  2 files changed, 37 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
+> >> index 082ca88..85e5ae8 100644
+> >> --- a/arch/arm/boot/dts/mt2701-evb.dts
+> >> +++ b/arch/arm/boot/dts/mt2701-evb.dts
+> >> @@ -24,6 +24,31 @@
+> >>  	};
+> >>  };
+> >>
+> >> +&nor_flash {
+> >> +	pinctrl-names = "default";
+> >> +	pinctrl-0 = <&nor_pins_default>;
+> >> +	status = "okay";
+> >> +	flash at 0 {
+> >> +		compatible = "jedec,spi-nor";
+> >> +		reg = <0>;
+> >> +	};
+> >> +};
+> >> +
+> >> +&pio {
+> >> +	nor_pins_default: nor {
+> >> +		pins1 {
+> >> +			pinmux = <MT2701_PIN_240_EXT_XCS__FUNC_EXT_XCS>,
+> >> +				 <MT2701_PIN_241_EXT_SCK__FUNC_EXT_SCK>,
+> >> +				 <MT2701_PIN_239_EXT_SDIO0__FUNC_EXT_SDIO0>,
+> >> +				 <MT2701_PIN_238_EXT_SDIO1__FUNC_EXT_SDIO1>,
+> >> +				 <MT2701_PIN_237_EXT_SDIO2__FUNC_EXT_SDIO2>,
+> >> +				 <MT2701_PIN_236_EXT_SDIO3__FUNC_EXT_SDIO3>;
+> >> +			drive-strength = <MTK_DRIVE_4mA>;
+> >> +			bias-pull-up;
+> >> +		};
+> >> +	};
+> >> +};
+> >> +
+> >>  &uart0 {
+> >>  	status = "okay";
+> >>  };
+> >> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+> >> index bdf8954..1eefce4 100644
+> >> --- a/arch/arm/boot/dts/mt2701.dtsi
+> >> +++ b/arch/arm/boot/dts/mt2701.dtsi
+> >> @@ -227,6 +227,18 @@
+> >>  		status = "disabled";
+> >>  	};
+> >>
+> >> +	nor_flash: spi at 11014000 {
+> >> +		compatible = "mediatek,mt2701-nor",
+> >> +			     "mediatek,mt8173-nor";  
+> >
+> > Why define both here? Is "mediatek,mt8173-nor" really providing a
+> > subset of the features supported by "mediatek,mt2701-nor"?
+> >  
+> 
+> I think even if the ip block is the same, we should provide both 
+> bindings, just in case in the future we find out that mt2701 has some 
+> hidden bug, feature or bug-feature. This way even if we update the 
+> driver, we stay compatible with older device tree blobs in the wild.
 
-Generic code uses the indirect methods to access standard Clause 45
-features, and when we come to add Clause 45 PHY support to phylib, we
-would need to make these conditional upon the PHY type, or duplicate
-these functions.
+I'm fine with this approach, but in this case, defining both is wrong.
 
-An alternative solution is to merge these accessors together, and select
-the appropriate access method depending upon the 802.3 clause that the
-PHY conforms with.  The result is that we have a single set of
-phy_(read|write)_mmd() accessors.
+> 
+> We can drop the mt2701-nor in the bindings definition if you want.
 
-For cases which require special handling, we still allow PHY drivers to
-override all MMD accesses - except rather than just overriding the
-indirect accesses.  This keeps existing overrides working.
+Yes, please.
 
-Combining the two also has another beneficial side effect - we get rid
-of similar functions that take arguments in different orders.  The
-old direct accessors took the phy structure, devad and register number,
-whereas the indirect accessors took the phy structure, register number
-and devad in that order.  Care must be taken when updating future
-drivers that the argument order is correct, and the function name is
-not merely replaced.
-
-This patch set is against 4.10-rc3 at present.
-
- drivers/net/phy/Makefile      |   3 +-
- drivers/net/phy/bcm-phy-lib.c |  12 ++---
- drivers/net/phy/dp83867.c     |  18 +++----
- drivers/net/phy/intel-xway.c  |  26 +++++-----
- drivers/net/phy/micrel.c      |  13 +++--
- drivers/net/phy/microchip.c   |   5 +-
- drivers/net/phy/phy-core.c    | 101 ++++++++++++++++++++++++++++++++++++++
- drivers/net/phy/phy.c         | 110 ++++--------------------------------------
- drivers/net/phy/phy_device.c  |   4 +-
- drivers/net/usb/lan78xx.c     |  10 ++--
- include/linux/phy.h           |  56 +++++++++------------
- 11 files changed, 176 insertions(+), 182 deletions(-)
- create mode 100644 drivers/net/phy/phy-core.c
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> 
+> Regards,
+> Matthias
+> 
+> >> +		reg = <0 0x11014000 0 0xe0>;
+> >> +		clocks = <&pericfg CLK_PERI_FLASH>,
+> >> +			 <&topckgen CLK_TOP_FLASH_SEL>;
+> >> +		clock-names = "spi", "sf";
+> >> +		#address-cells = <1>;
+> >> +		#size-cells = <0>;
+> >> +		status = "disabled";
+> >> +	};
+> >> +
+> >>  	mmsys: syscon at 14000000 {
+> >>  		compatible = "mediatek,mt2701-mmsys", "syscon";
+> >>  		reg = <0 0x14000000 0 0x1000>;  
+> >  
