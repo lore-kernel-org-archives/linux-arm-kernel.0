@@ -1,131 +1,73 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Fri, 13 Jan 2017 09:30:17 +0100
-Subject: [PATCH] arm: ftrace: Adds support for
- CONFIG_DYNAMIC_FTRACE_WITH_REGS
-In-Reply-To: <CACh+v5M-BDru3OyhrROBqPKJuSN=yoxVstN-fqZGh8SU1EHQiw@mail.gmail.com>
-References: <1481233595-22112-1-git-send-email-abelvesa@linux.com>
- <20161208224655.GA6319@gce> <20170110155112.GB14894@pathway.suse.cz>
- <20170112001957.GA5458@nuc>
- <CACh+v5M-BDru3OyhrROBqPKJuSN=yoxVstN-fqZGh8SU1EHQiw@mail.gmail.com>
-Message-ID: <CACh+v5MsC8_qOMYdm1qpduEPVmRG+mgCDibVEfyc3Pzk06V1Eg@mail.gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Fri, 13 Jan 2017 09:31:51 +0100
+Subject: [RFC 06/13] KVM: arm64: ITS: Expose ITT_Entry_Size in GITS_TYPER
+In-Reply-To: <3efc34ee-36c1-860a-365a-a9363b7fc8e5@arm.com>
+References: <1484236613-24633-1-git-send-email-eric.auger@redhat.com>
+ <1484236613-24633-7-git-send-email-eric.auger@redhat.com>
+ <3efc34ee-36c1-860a-365a-a9363b7fc8e5@arm.com>
+Message-ID: <a47500ab-5084-cc5b-f32f-7a911b6ffc72@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-01-12 15:30 GMT+01:00 Jean-Jacques Hiblot <jjhiblot@traphandler.com>:
-> 2017-01-12 1:19 GMT+01:00 Abel Vesa <abelvesa@gmail.com>:
->> On Tue, Jan 10, 2017 at 04:51:12PM +0100, Petr Mladek wrote:
->>> On Thu 2016-12-08 22:46:55, Abel Vesa wrote:
->>> > On Thu, Dec 08, 2016 at 09:46:35PM +0000, Abel Vesa wrote:
->>> > > From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
->>> > >
->>> > > From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
->>> >
->>> > >From statement twice in the commit message. Will resend.
->>> > >
->>> > > The DYNAMIC_FTRACE_WITH_REGS configuration makes it possible for a ftrace
->>> > > operation to specify if registers need to saved/restored by the ftrace handler.
->>> > > This is needed by kgraft and possibly other ftrace-based tools, and the ARM
->>> > > architecture is currently lacking this feature. It would also be the first step
->>> > > to support the "Kprobes-on-ftrace" optimization on ARM.
->>> > >
->>> > > This patch introduces a new ftrace handler that stores the registers on the
->>> > > stack before calling the next stage. The registers are restored from the stack
->>> > > before going back to the instrumented function.
->>> > >
->>> > > A side-effect of this patch is to activate the support for ftrace_modify_call()
->>> > > as it defines ARCH_SUPPORTS_FTRACE_OPS for the ARM architecture
->>> > >
->>> > > Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
->>> > > Signed-off-by: Abel Vesa <abelvesa@linux.com>
->>> > > ---
->>> > >  arch/arm/Kconfig               |  2 ++
->>> > >  arch/arm/include/asm/ftrace.h  |  4 +++
->>> > >  arch/arm/kernel/entry-ftrace.S | 78 ++++++++++++++++++++++++++++++++++++++++++
->>> > >  arch/arm/kernel/ftrace.c       | 33 ++++++++++++++++++
->>> > >  4 files changed, 117 insertions(+)
->>> > >
->>> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->>> > > index b5d529f..87f1a9f 100644
->>> > > --- a/arch/arm/Kconfig
->>> > > +++ b/arch/arm/Kconfig
->>> > > @@ -50,6 +50,7 @@ config ARM
->>> > >   select HAVE_DMA_API_DEBUG
->>> > >   select HAVE_DMA_CONTIGUOUS if MMU
->>> > >   select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
->>> > > + select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
->>> > >   select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
->>> > >   select HAVE_EXIT_THREAD
->>> > >   select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
->>> > > @@ -90,6 +91,7 @@ config ARM
->>> > >   select PERF_USE_VMALLOC
->>> > >   select RTC_LIB
->>> > >   select SYS_SUPPORTS_APM_EMULATION
->>> > > + select FRAME_POINTER if DYNAMIC_FTRACE_WITH_REGS && FUNCTION_GRAPH_TRACER
->> Hi Petr,
->>>
->>> FRAME_POINTER is not for free. It takes space on the stack. Also there
->>> is a performance penalty. Do we really need to depend on it? If so,
->>> it might be worth a note in the commit message.
->>
->
-> FRAME_POINTER is not needed. the dependency is wrong and should be removed.
-> The code must be modified to not use fp register:
->
-> --- a/arch/arm/kernel/entry-ftrace.S
-> +++ b/arch/arm/kernel/entry-ftrace.S
-> @@ -130,7 +130,8 @@ ftrace_graph_regs_call:
->  #ifdef CONFIG_FUNCTION_GRAPH_TRACER
->  .macro __ftrace_graph_regs_caller
->
-> -       sub     r0, fp, #4                      @ lr of instrumented
-> routine (parent)
-> +       add     r0, sp, #64             @ r0 is now a pointer to lr of
-> +                                       @ instrumented routine
+Hi Andre,
 
-I made some tests after sending this email. And it turns out that it
-doesn't work if we change  "sub     r0, fp, #4" to "add     r0, sp,
-#64 " here.
-So it looks like there is a dependency on FRAME_POINTER after all.
-Note that the same is true for  __ftrace_graph_caller. I don't know if
-the 'graph' feature of ftrace requires intrinsically FRAME_POINTER but
-it looks like it currently does on ARM (with or without register
-saving)
-I'll try to spend some time on the subject next week.
-
->
->         @ called from __ftrace_regs_caller
->         ldr     r1, [sp, #56]                   @ instrumented routine (func)
-> @@ -139,8 +140,9 @@ ftrace_graph_regs_call:
->         mov     r2, fp                          @ frame pointer
->         bl      prepare_ftrace_return
->
-> -       ldr     lr, [fp, #-4]                   @ restore lr from the stack
-> -       ldmia   sp, {r0-r11, ip, sp}            @ restore r0 through sp
-> +       ldr     lr, [sp, #64]           @ get the previous LR value from stack
-> +       ldmia   sp, {r0-r11, ip, sp}    @ pop the saved registers INCLUDING
-> +                                       @ the stack pointer
->         ret     ip
->  .endm
->  #endif
->
->
-> Jean-Jacques
->
->
->> I was trying to create my own patch when I found this work done by
->> Jean-Jacques, so I haven't looked specifically for the FRAME_POINTER
->> part. I looked now at it and you seem to be right, FRAME_POINTER is
->> not needed.
+On 12/01/2017 18:06, Andre Przywara wrote:
+> Hi Eric,
+> 
+> On 12/01/17 15:56, Eric Auger wrote:
+>> An ITT_Entry_Size of 2x8Bytes is reported to the guest
+>> to provision for ITTE state storage.
 >>
->> I will get rid of the FRAME_POINTER part, change the authorship and
->> send it again in the following days.
->>>
->>> I made only a quick look at the patch. It looks reasonable. But I do
->>> not have enough knowledge about the arm architecture, assembly, and
->>> ftrace-specifics. Also I cannot test it easily. So issues might
->>> be hidden to my eyes.
->>>
->>> Best Regards,
->>> Petr
->> Thanks,
->> Abel
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>> ---
+>>  include/linux/irqchip/arm-gic-v3.h | 1 +
+>>  virt/kvm/arm/vgic/vgic-its.c       | 3 +++
+>>  2 files changed, 4 insertions(+)
+>>
+>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>> index 170e00a..8cfd81bc 100644
+>> --- a/include/linux/irqchip/arm-gic-v3.h
+>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>> @@ -233,6 +233,7 @@
+>>  #define GITS_CTLR_QUIESCENT		(1U << 31)
+>>  
+>>  #define GITS_TYPER_PLPIS		(1UL << 0)
+>> +#define GITS_TYPER_ITT_ENTRY_SIZE_SHIFT	4
+>>  #define GITS_TYPER_IDBITS_SHIFT		8
+>>  #define GITS_TYPER_DEVBITS_SHIFT	13
+>>  #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index e174220..96378b8 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -33,6 +33,8 @@
+>>  #include "vgic.h"
+>>  #include "vgic-mmio.h"
+>>  
+>> +#define ITTE_SIZE 16
+>> +
+>>  /*
+>>   * Creates a new (reference to a) struct vgic_irq for a given LPI.
+>>   * If this LPI is already mapped on another ITS, we increase its refcount
+>> @@ -399,6 +401,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
+>>  	 */
+>>  	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
+>>  	reg |= 0x0f << GITS_TYPER_IDBITS_SHIFT;
+>> +	reg |= ITTE_SIZE << GITS_TYPER_ITT_ENTRY_SIZE_SHIFT;
+> 
+> The field is defined as the "... number of bytes per translation table
+> entry, minus one.". So it should be: (ITTE_SIZE - 1) << ...
+
+You're perfectly right. I will fix that
+
+Thanks
+
+Eric
+> 
+> Cheers,
+> Andre.
+> 
+>>  
+>>  	return extract_bytes(reg, addr & 7, len);
+>>  }
+>>
