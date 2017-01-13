@@ -1,92 +1,30 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Fri, 13 Jan 2017 18:59:02 +0200
-Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
-In-Reply-To: <CALCETrXYwp4BJbwFo4P1hEvubyDh1mN+W4L-tQVYjh3e7F-Q9A@mail.gmail.com>
-References: <85015f1653eb7e36f992708362b75d1f4391b783.1484070340.git.robin.murphy@arm.com>
- <4833e705fb6841fbfdbee3b1a21a7bc917292410.1484070340.git.robin.murphy@arm.com>
- <20170111013046-mutt-send-email-mst@kernel.org>
- <20170111100139.GC12388@arm.com>
- <CALCETrXYwp4BJbwFo4P1hEvubyDh1mN+W4L-tQVYjh3e7F-Q9A@mail.gmail.com>
-Message-ID: <20170113184639-mutt-send-email-mst@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Jan 2017 18:00:42 +0100
+Subject: [PATCH v4 0/4] DMA Engine: switch PL330 driver to non-irq-safe
+ runtime PM
+In-Reply-To: <60596eee-12a9-58f3-387e-145a5bc28aaa@samsung.com>
+References: <CGME20170113072651eucas1p2b7487d97894de93daab24adb6745087c@eucas1p2.samsung.com>
+ <CAPDyKFqDGs6OkG-NKiY9Xd3hHEJOJB1YJ2O0_3Tojrzv_xR-yw@mail.gmail.com>
+ <60596eee-12a9-58f3-387e-145a5bc28aaa@samsung.com>
+Message-ID: <3102129.expA2ZvqTx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 10:12:36AM -0800, Andy Lutomirski wrote:
-> On Wed, Jan 11, 2017 at 2:01 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Jan 11, 2017 at 01:33:31AM +0200, Michael S. Tsirkin wrote:
-> >> On Tue, Jan 10, 2017 at 05:51:18PM +0000, Robin Murphy wrote:
-> >> > From: Will Deacon <will.deacon@arm.com>
-> >> >
-> >> > Booting Linux on an ARM fastmodel containing an SMMU emulation results
-> >> > in an unexpected I/O page fault from the legacy virtio-blk PCI device:
-> >> >
-> >> > [    1.211721] arm-smmu-v3 2b400000.smmu: event 0x10 received:
-> >> > [    1.211800] arm-smmu-v3 2b400000.smmu:   0x00000000fffff010
-> >> > [    1.211880] arm-smmu-v3 2b400000.smmu:   0x0000020800000000
-> >> > [    1.211959] arm-smmu-v3 2b400000.smmu:   0x00000008fa081002
-> >> > [    1.212075] arm-smmu-v3 2b400000.smmu:   0x0000000000000000
-> >> > [    1.212155] arm-smmu-v3 2b400000.smmu: event 0x10 received:
-> >> > [    1.212234] arm-smmu-v3 2b400000.smmu:   0x00000000fffff010
-> >> > [    1.212314] arm-smmu-v3 2b400000.smmu:   0x0000020800000000
-> >> > [    1.212394] arm-smmu-v3 2b400000.smmu:   0x00000008fa081000
-> >> > [    1.212471] arm-smmu-v3 2b400000.smmu:   0x0000000000000000
-> >> >
-> >> > <system hangs failing to read partition table>
-> >> >
-> >> > This is because the virtio-blk is behind an SMMU, so we have consequently
-> >> > swizzled its DMA ops and configured the SMMU to translate accesses. This
-> >> > then requires the vring code to use the DMA API to establish translations,
-> >> > otherwise all transactions will result in fatal faults and termination.
-> >> >
-> >> > Given that ARM-based systems only see an SMMU if one is really present
-> >> > (the topology is all described by firmware tables such as device-tree or
-> >> > IORT), then we can safely use the DMA API for all virtio devices.
-> >> >
-> >> > Cc: Andy Lutomirski <luto@kernel.org>
-> >> > Cc: Michael S. Tsirkin <mst@redhat.com>
-> >> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> >>
-> >> I'd like to better understand then need for this one.
-> >> Can't the device in question just set VIRTIO_F_IOMMU_PLATFORM ?
-> >>
-> >> I'd rather we avoided need for more hacks and just
-> >> have everyone switch to that.
+On Friday, January 13, 2017 3:12:57 PM CET Marek Szyprowski wrote:
+> On 2017-01-13 14:59, Ulf Hansson wrote:
+> > On 13 January 2017 at 08:26, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > I did only a brief review so far, particularly concentrating on the
+> > changes for device links and runtime PM. I like it!
 > >
-> > There are a couple of problems with VIRTIO_F_IOMMU_PLATFORM:
-> >
-> > 1. It doesn't exist for legacy devices, which are all we have on the
-> >    platform in question.
-> >
-> > 2. It's not documented in the virtio sp^H^HSTOP PRESS. I see you applied
-> >    my patch ;). Thanks.
-> >
-> > In which case, for non-legacy devices we should definitely be using
-> > VIRTIO_F_IOMMU_PLATFORM, but since this platform hasn't yet moved to the
-> > world of flying cars, could we unconditionally set the DMA ops on ARM
-> > for legacy devices? The alternative is disabling the SMMU altogether,
-> > but that's less than ideal because there are non-virtio devices on the
-> > same PCI bus.
+> > Perhaps we can get someone like Arnd/Vinod to comment in general idea
+> > from a DT and DMA slave channel point of view. I don't know that stuff
+> > good enough to give good opinion.
 > 
-> Also, on ARM, using the DMA API appears to *always* be the correct
-> approach.  Why not do it all the time, then?  The non-DMA-API path is
-> a legacy thing that is needed because a few platforms incorrectly
-> enumerate their IOMMUs.  ARM gets it right, so I don't see why ARM
-> should be subject to the legacy mess.
+> Arnd already said that it looks good:
+> http://www.spinics.net/lists/dmaengine/msg12186.html
 
-I didn't realize ARM gets this right. QEMU still pokes at
-physical addresses directly in legacy mode so I wonder how could
-that be the case. I'll try to find out.
+Rihgt, feel free to add my
 
-> Even on x86, it should be possible to get the code into a state where
-> using DMA ops is always correct.
-> 
-> --Andy
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-This I could totally get behind. A driver would install some per device
-flag to make it figure out IOMMU does not apply, and in a portable way
-since at least x86 and PPC need this, maybe more. This would/should
-also handle the bug that admin can bind vfio to legacy virtio
-devices even without the noiommu mode.
-
--- 
-MST
+	Arnd
