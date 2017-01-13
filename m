@@ -1,55 +1,109 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 13 Jan 2017 15:21:53 +0000
-Subject: [PATCH RFC 3/7] net: lan78xx: update for
- phy_(read|write)_mmd_indirect() removal
+Date: Fri, 13 Jan 2017 15:21:48 +0000
+Subject: [PATCH RFC 2/7] net: phy: make phy_(read|write)_mmd() generic MMD
+ accessors
 In-Reply-To: <20170113152059.GR14217@n2100.armlinux.org.uk>
 References: <20170113152059.GR14217@n2100.armlinux.org.uk>
-Message-ID: <E1cS3ft-0003Xc-OH@rmk-PC.armlinux.org.uk>
+Message-ID: <E1cS3fo-0003XV-Js@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-lan78xx appears to use phylib in a rather weird way, accessing the PHY
-partly through phylib, and partly by makign direct accesses to it,
-including to the Clause 45 registers.  As the indirect MMD accessors are
-going away, update this driver to use the plain phy_(read|write)_mmd()
-accessors instead.
+Make phy_(read|write)_mmd() generic 802.3 clause 45 register accessors
+for both Clause 22 and Clause 45 PHYs, using either the direct register
+reading for Clause 45, or the indirect method for Clause 22 PHYs.
+Allow this behaviour to be overriden by PHY drivers where necessary.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/net/usb/lan78xx.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/net/phy/phy-core.c | 31 +++++++++++++++++++++++--------
+ include/linux/phy.h        | 24 ++++++++++++++++++++++++
+ 2 files changed, 47 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/net/usb/lan78xx.c b/drivers/net/usb/lan78xx.c
-index 08f8703e4d54..5e222d47f212 100644
---- a/drivers/net/usb/lan78xx.c
-+++ b/drivers/net/usb/lan78xx.c
-@@ -1951,10 +1951,10 @@ static int lan8835_fixup(struct phy_device *phydev)
- 	struct lan78xx_net *dev = netdev_priv(phydev->attached_dev);
+diff --git a/drivers/net/phy/phy-core.c b/drivers/net/phy/phy-core.c
+index b8d8276a3099..b50b3a64cf6a 100644
+--- a/drivers/net/phy/phy-core.c
++++ b/drivers/net/phy/phy-core.c
+@@ -69,11 +69,18 @@ EXPORT_SYMBOL(phy_read_mmd_indirect);
+  */
+ int phy_read_mmd(struct phy_device *phydev, int devad, u32 regnum)
+ {
+-	if (!phydev->is_c45)
+-		return -EOPNOTSUPP;
++	if (regnum > (u16)~0 || devad > 32)
++		return -EINVAL;
  
- 	/* LED2/PME_N/IRQ_N/RGMII_ID pin to IRQ_N mode */
--	buf = phy_read_mmd_indirect(phydev, 0x8010, 3);
-+	buf = phy_read_mmd(phydev, MDIO_MMD_PCS, 0x8010);
- 	buf &= ~0x1800;
- 	buf |= 0x0800;
--	phy_write_mmd_indirect(phydev, 0x8010, 3, buf);
-+	phy_write_mmd(phydev, MDIO_MMD_PCS, 0x8010, buf);
+-	return mdiobus_read(phydev->mdio.bus, phydev->mdio.addr,
+-			    MII_ADDR_C45 | (devad << 16) | (regnum & 0xffff));
++	if (phydev->drv->read_mmd)
++		return phydev->drv->read_mmd(phydev, devad, regnum);
++
++	if (phydev->is_c45) {
++		u32 addr = MII_ADDR_C45 | (devad << 16) | (regnum & 0xffff);
++		return mdiobus_read(phydev->mdio.bus, phydev->mdio.addr, addr);
++	}
++
++	return phy_read_mmd_indirect(phydev, regnum, devad);
+ }
+ EXPORT_SYMBOL(phy_read_mmd);
  
- 	/* RGMII MAC TXC Delay Enable */
- 	ret = lan78xx_write_reg(dev, MAC_RGMII_ID,
-@@ -1974,11 +1974,11 @@ static int ksz9031rnx_fixup(struct phy_device *phydev)
+@@ -125,11 +132,19 @@ EXPORT_SYMBOL(phy_write_mmd_indirect);
+  */
+ int phy_write_mmd(struct phy_device *phydev, int devad, u32 regnum, u16 val)
+ {
+-	if (!phydev->is_c45)
+-		return -EOPNOTSUPP;
++	if (regnum > (u16)~0 || devad > 32)
++		return -EINVAL;
  
- 	/* Micrel9301RNX PHY configuration */
- 	/* RGMII Control Signal Pad Skew */
--	phy_write_mmd_indirect(phydev, 4, 2, 0x0077);
-+	phy_write_mmd(phydev, MDIO_MMD_WIS, 4, 0x0077);
- 	/* RGMII RX Data Pad Skew */
--	phy_write_mmd_indirect(phydev, 5, 2, 0x7777);
-+	phy_write_mmd(phydev, MDIO_MMD_WIS, 5, 0x7777);
- 	/* RGMII RX Clock Pad Skew */
--	phy_write_mmd_indirect(phydev, 8, 2, 0x1FF);
-+	phy_write_mmd(phydev, MDIO_MMD_WIS, 8, 0x1FF);
+-	regnum = MII_ADDR_C45 | ((devad & 0x1f) << 16) | (regnum & 0xffff);
++	if (phydev->drv->read_mmd)
++		return phydev->drv->write_mmd(phydev, devad, regnum, val);
++
++	if (phydev->is_c45) {
++		u32 addr = MII_ADDR_C45 | (devad << 16) | (regnum & 0xffff);
++
++		return mdiobus_write(phydev->mdio.bus, phydev->mdio.addr,
++				     addr, val);
++	}
  
- 	dev->interface = PHY_INTERFACE_MODE_RGMII_RXID;
+-	return mdiobus_write(phydev->mdio.bus, phydev->mdio.addr, regnum, val);
++	return phy_write_mmd_indirect(phydev, regnum, devad, val);
+ }
+ EXPORT_SYMBOL(phy_write_mmd);
+diff --git a/include/linux/phy.h b/include/linux/phy.h
+index 72acb0233b5f..54fa76efb096 100644
+--- a/include/linux/phy.h
++++ b/include/linux/phy.h
+@@ -583,6 +583,30 @@ struct phy_driver {
+ 	 */
+ 	void (*link_change_notify)(struct phy_device *dev);
  
++	/*
++	 * Phy specific driver override for reading a MMD register.
++	 * This function is optional for PHY specific drivers.  When
++	 * not provided, the default MMD read function will be used
++	 * by phy_read_mmd(), which will use either a direct read for
++	 * Clause 45 PHYs or an indirect read for Clause 22 PHYs.
++	 *  devnum is the MMD device number within the PHY device,
++	 *  regnum is the register within the selected MMD device.
++	 */
++	int (*read_mmd)(struct phy_device *dev, int devnum, u16 regnum);
++
++	/*
++	 * Phy specific driver override for writing a MMD register.
++	 * This function is optional for PHY specific drivers.  When
++	 * not provided, the default MMD write function will be used
++	 * by phy_write_mmd(), which will use either a direct write for
++	 * Clause 45 PHYs, or an indirect write for Clause 22 PHYs.
++	 *  devnum is the MMD device number within the PHY device,
++	 *  regnum is the register within the selected MMD device.
++	 *  val is the value to be written.
++	 */
++	int (*write_mmd)(struct phy_device *dev, int devnum, u16 regnum,
++			 u16 val);
++
+ 	/* A function provided by a phy specific driver to override the
+ 	 * the PHY driver framework support for reading a MMD register
+ 	 * from the PHY. If not supported, return -1. This function is
 -- 
 2.7.4
