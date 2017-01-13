@@ -1,41 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Jan 2017 16:32:52 +0100
-Subject: [PATCH 2/3] rtc: stm32: fix building without CONFIG_OF
+Date: Fri, 13 Jan 2017 16:32:53 +0100
+Subject: [PATCH 3/3] rtc: stm32: use 32-bit cast for BIT() macro
 In-Reply-To: <20170113153311.2611510-1-arnd@arndb.de>
 References: <20170113153311.2611510-1-arnd@arndb.de>
-Message-ID: <20170113153311.2611510-2-arnd@arndb.de>
+Message-ID: <20170113153311.2611510-3-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new driver has a stray #ifdef in it that causes a build error:
+Using the ~ operator on a BIT() constant results in a large 'unsigned long'
+constant that won't fit into an 'unsigned int' function argument on 64-bit
+architectures, resulting in a harmless build warning in x86 allmodconfig:
 
-drivers/rtc/rtc-stm32.c:718:21: error: 'stm32_rtc_of_match' undeclared here (not in a function); did you mean 'stm32_rtc_pm_ops'?
+drivers/rtc/rtc-stm32.c: In function 'stm32_rtc_probe':
+drivers/rtc/rtc-stm32.c:651:51: error: large integer implicitly truncated to unsigned type [-Werror=overflow]
+  regmap_update_bits(rtc->dbp, PWR_CR, PWR_CR_DBP, ~PWR_CR_DBP);
 
-As the #ifdef serves no purpose here, let's just remove it.
+This works around the warning by adding an explict cast to 'u32', but
+that is unfortunately a bit ugly and I feel there should be a better
+way to do this, possibly with some changes to either the bitops.h
+header or the regmap API.
 
+Cc: Mark Brown <broonie@kernel.org>
 Fixes: 4e64350f42e2 ("rtc: add STM32 RTC driver")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/rtc/rtc-stm32.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/rtc/rtc-stm32.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/rtc/rtc-stm32.c b/drivers/rtc/rtc-stm32.c
-index 3513e052722f..8c599f52124c 100644
+index 8c599f52124c..05d3dc89e55f 100644
 --- a/drivers/rtc/rtc-stm32.c
 +++ b/drivers/rtc/rtc-stm32.c
-@@ -490,13 +490,11 @@ static const struct rtc_class_ops stm32_rtc_ops = {
- 	.alarm_irq_enable = stm32_rtc_alarm_irq_enable,
- };
+@@ -92,7 +92,7 @@
+ /* STM32_PWR_CR */
+ #define PWR_CR				0x00
+ /* STM32_PWR_CR bit field */
+-#define PWR_CR_DBP			BIT(8)
++#define PWR_CR_DBP			(u32)BIT(8)
  
--#ifdef CONFIG_OF
- static const struct of_device_id stm32_rtc_of_match[] = {
- 	{ .compatible = "st,stm32-rtc" },
- 	{}
- };
- MODULE_DEVICE_TABLE(of, stm32_rtc_of_match);
--#endif
- 
- static int stm32_rtc_init(struct platform_device *pdev,
- 			  struct stm32_rtc *rtc)
+ struct stm32_rtc {
+ 	struct rtc_device *rtc_dev;
 -- 
 2.9.0
