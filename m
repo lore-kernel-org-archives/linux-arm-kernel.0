@@ -1,53 +1,99 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 13 Jan 2017 09:57:27 +0100
-Subject: [RFC 07/13] KVM: arm64: ITS: Change entry_size and indirect bit
- in BASER
-In-Reply-To: <dc26dc19-313b-375b-0d9b-f4ff411a914f@arm.com>
-References: <1484236613-24633-1-git-send-email-eric.auger@redhat.com>
- <1484236613-24633-8-git-send-email-eric.auger@redhat.com>
- <dc26dc19-313b-375b-0d9b-f4ff411a914f@arm.com>
-Message-ID: <89752a29-d533-1f4c-9e9b-93e8bd0556b3@redhat.com>
+From: tanxiaojun@huawei.com (Tan Xiaojun)
+Date: Fri, 13 Jan 2017 17:05:59 +0800
+Subject: [PATCH v2 1/2] of: base: add support to find the level of the
+ last cache
+In-Reply-To: <1484245772-31511-1-git-send-email-sudeep.holla@arm.com>
+References: <1484245772-31511-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <58789877.1010705@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On 2017/1/13 2:29, Sudeep Holla wrote:
+> It is useful to have helper function just to get the number of cache
+> levels for a given logical cpu. We can obtain the same by just checking
+> the level at which the last cache is present. This patch adds support
+> to find the level of the last cache for a given cpu.
+> 
+> It will be used on ARM64 platform where the device tree provides the
+> information for the additional non-architected/transparent/external
+> last level caches that are not integrated with the processors.
+> 
+> Suggested-by: Rob Herring <robh+dt@kernel.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-On 12/01/2017 18:05, Marc Zyngier wrote:
-> On 12/01/17 15:56, Eric Auger wrote:
->> Change the device table entry_size to 16 bytes instead of 8.
->> We also Store the device and collection device in the its
->> struct.
->>
->> The patch also clears the indirect bit for the device BASER.
->> The indirect bit is set as read-only.
-> 
-> Err... Why? We *really* want to continue supporting indirect tables, as
-> this is a massive memory saver for the guest.
-> 
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->>
->> TODO: investigate support of 2 level tables, ie. enabling
->> Indirect = 1. Support of 2 level tables is implementation
->> defined.
-> 
-> Clearly, that's a regression. What exactly is the issue that decided you
-> to disable it?
-Well no valuable reason besides I saw it was optional, lack of
-time/knowledge and a bit of laziness. I will address this requirement in
-my next respin.
+Tested-by: Tan Xiaojun <tanxiaojun@huawei.com>
 
-For my curiosity why did we choose not allowing the feature for
-collections. Is that just because we think their number if going
-sufficiently small compared to devices?
-
-Thanks
-
-Eric
+> ---
+>  drivers/of/base.c  | 27 +++++++++++++++++++++++++++
+>  include/linux/of.h |  1 +
+>  2 files changed, 28 insertions(+)
 > 
-> Thanks,
+> v1->v2:
+> 	- Moved to using "cache-level" in the last level cache instead
+> 	  of counting through all the nodes as suggested by Rob
 > 
-> 	M.
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index d4bea3c797d6..c1128a077aea 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/cpu.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> +#include <linux/of_device.h>
+>  #include <linux/of_graph.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/slab.h>
+> @@ -2268,6 +2269,32 @@ struct device_node *of_find_next_cache_node(const struct device_node *np)
+>  }
+> 
+>  /**
+> + * of_find_last_cache_level - Find the level at which the last cache is
+> + * 		present for the given logical cpu
+> + *
+> + * @cpu: cpu number(logical index) for which the last cache level is needed
+> + *
+> + * Returns the the level at which the last cache is present. It is exactly
+> + * same as  the total number of cache levels for the given logical cpu.
+> + */
+> +int of_find_last_cache_level(unsigned int cpu)
+> +{
+> +	int cache_level = 0;
+> +	struct device_node *prev = NULL, *np = of_cpu_device_node_get(cpu);
+> +
+> +	while (np) {
+> +		prev = np;
+> +		of_node_put(np);
+> +		np = of_find_next_cache_node(np);
+> +	}
+> +
+> +	if (prev)
+> +		of_property_read_u32(prev, "cache-level", &cache_level);
+> +
+> +	return cache_level;
+> +}
+> +
+> +/**
+>   * of_graph_parse_endpoint() - parse common endpoint node properties
+>   * @node: pointer to endpoint device_node
+>   * @endpoint: pointer to the OF endpoint data structure
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index d72f01009297..21e6323de0f3 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -280,6 +280,7 @@ extern struct device_node *of_get_child_by_name(const struct device_node *node,
+> 
+>  /* cache lookup */
+>  extern struct device_node *of_find_next_cache_node(const struct device_node *);
+> +extern int of_find_last_cache_level(unsigned int cpu);
+>  extern struct device_node *of_find_node_with_property(
+>  	struct device_node *from, const char *prop_name);
+> 
+> --
+> 2.7.4
+> 
+> 
+> .
 > 
