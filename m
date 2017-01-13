@@ -1,67 +1,45 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 13 Jan 2017 12:08:47 +0100
-Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
- enable panel
-In-Reply-To: <d1534f4b-e564-d87e-b408-9b7215a90de2@mleia.com>
-References: <20161221032717.13154-1-vz@mleia.com>
- <CGME20170112212713epcas2p108e55dc682911981f750f197f30c7d5f@epcas2p1.samsung.com>
- <d1534f4b-e564-d87e-b408-9b7215a90de2@mleia.com>
-Message-ID: <3057141.7Vn8X5ONyT@amdc3058>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 13 Jan 2017 11:12:16 +0000
+Subject: [PATCH v2] KVM: arm/arm64: Fix occasional warning from the timer
+ work function
+In-Reply-To: <20170109111856.8439-1-christoffer.dall@linaro.org>
+References: <20170109111856.8439-1-christoffer.dall@linaro.org>
+Message-ID: <daadc615-b9b8-7510-7978-b6854a5184b1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Thursday, January 12, 2017 11:26:14 PM Vladimir Zapolskiy wrote:
-> On 01/12/2017 10:27 AM, Linus Walleij wrote:
-> > On Thu, Jan 12, 2017 at 1:05 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
-> >> On 01/11/2017 05:16 PM, Linus Walleij wrote:
-> >>> On Tue, Jan 10, 2017 at 2:47 PM, Vladimir Murzin
-> >>> <vladimir.murzin@arm.com> wrote:
-> >>>
-> >>>> In another thread Benjamin pointed at patch [1] in drm/kms part for noMMU.
-> >>>>
-> >>>> [1] https://cgit.freedesktop.org/drm/drm-misc/commit/?id=62a0d98a188cc4ebd8ea54b37d274ec20465e464
-> >>>
-> >>> Problem solved?
-> >>>
-> >>> Vladimir: I do not require in any way that you create a CLCD driver for DRM,
-> >>> I just think it would be very very nice...
-> >>>
-> >>
-> >> I have no other option, this series is unreviewed and thus unlikely it will
-> >> be applied, still a panel PCB on my board needs power management support.
-> > 
-> > Hm I can ACK it I guess, but mergeing it into an unmaintained subsystem
-> > is another issue, just not very optimal. 
+On 09/01/17 11:18, Christoffer Dall wrote:
+> When a VCPU blocks (WFI) and has programmed the vtimer, we program a
+> soft timer to expire in the future to wake up the vcpu thread when
+> appropriate.  Because such as wake up involves a vcpu kick, and the
+> timer expire function can get called from interrupt context, and the
+> kick may sleep, we have to schedule the kick in the work function.
 > 
-> + Bartlomiej
+> The work function currently has a warning that gets raised if it turns
+> out that the timer shouldn't fire when it's run, which was added because
+> the idea was that in that case the work should never have been cancelled.
 > 
-> Linus, your ack is always more than appreciated.
-
-+1
-
-> To all appearance Bartlomiej is a new honoured framebuffer layer maintainer.
+> However, it turns out that this whole thing is racy and we can get
+> spurious warnings.  The problem is that we clear the armed flag in the
+> work function, which may run in parallel with the
+> kvm_timer_unschedule->timer_disarm() call.  This results in a possible
+> situation where the timer_disarm() call does not call
+> cancel_work_sync(), which effectively synchronizes the completion of the
+> work function with running the VCPU.  As a result, the VCPU thread
+> proceeds before the work function completees, causing changes to the
+> timer state such that kvm_timer_should_fire(vcpu) returns false in the
+> work function.
 > 
-> Bartlomiej, do you have the changes under discussion in your mailbox or
-> should I resend them to you directly for review?
-
-No need for resend, I picked them from the list and they are on TODO.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> > If you get it working on your system I can look into migrating all the old
-> > users to DRM as well.
-> > 
+> All we do in the work function is to kick the VCPU, and an occasional
+> rare extra kick never harmed anyone.  Since the race above is extremely
+> rare, we don't bother checking if the race happens but simply remove the
+> check and the clearing of the armed flag from the work function.
 > 
-> Sure, I started development of a simple CLCD DRM driver as an own attractive
-> exercise, I'll keep you informed of the progress.
-> 
-> --
-> With best wishes,
-> Vladimir
+> Reported-by: Matthias Brugger <mbrugger@suse.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
