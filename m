@@ -1,68 +1,118 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 13 Jan 2017 17:11:39 +0000
-Subject: [PATCH] coresight: STM: Balance enable/disable
-In-Reply-To: <CANLsYkyO-anR4V411tHFkNBPNy0Vk3DCympLScP9ZC=uJ-UX9g@mail.gmail.com>
-References: <1484047315-14407-1-git-send-email-suzuki.poulose@arm.com>
- <CANLsYkyO-anR4V411tHFkNBPNy0Vk3DCympLScP9ZC=uJ-UX9g@mail.gmail.com>
-Message-ID: <c59476a6-f2c8-6b00-ca46-d2d2379d44c9@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 13 Jan 2017 18:11:47 +0100
+Subject: [GIT PULL] ARM: mvebu: dt for v4.11 (#1)
+Message-ID: <87ziiu7ulo.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/01/17 16:48, Mathieu Poirier wrote:
-> On 10 January 2017 at 04:21, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
->> The stm is automatically enabled when an application sets the policy
->> via ->link() call back by using coresight_enable(), which keeps the
->> refcount of the current users of the STM. However, the unlink() callback
->> issues stm_disable() directly, which leaves the STM turned off, without
->> the coresight layer knowing about it. This prevents any further uses
->> of the STM hardware as the coresight layer still thinks the STM is
->> turned on and doesn't issue an stm_enable(). Even manually enabling
->> the STM via sysfs can't really enable the hw.
->>
-...
->>
->> This patch balances the unlink operation by using the coresight_disable(),
->> keeping the coresight layer in sync with the hardware state.
->>
->> Fixes: commit 237483aa5cf43 ("coresight: stm: adding driver for CoreSight STM component")
->> Cc: Pratik Patel <pratikp@codeaurora.org>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Cc: Chunyan Zhang <zhang.chunyan@linaro.org>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: stable at vger.kernel.org # 4.7+
->> Reported-by: Robert Walker <robert.walker@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>  drivers/hwtracing/coresight/coresight-stm.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
->> index 3524452..57b7330 100644
->> --- a/drivers/hwtracing/coresight/coresight-stm.c
->> +++ b/drivers/hwtracing/coresight/coresight-stm.c
->> @@ -356,7 +356,7 @@ static void stm_generic_unlink(struct stm_data *stm_data,
->>         if (!drvdata || !drvdata->csdev)
->>                 return;
->>
->> -       stm_disable(drvdata->csdev, NULL);
->> +       coresight_disable(drvdata->csdev);
->>  }
->>
->>  static phys_addr_t
->
-> Applied - thanks,
+Hi,
 
-Mathieu, Greg,
+Here is the first pull request for dt for mvebu for v4.11.
 
-I think this should go into 4.10 (either way, as fix in this cycle or via stable after the release). I think
-it would be easier if it goes in as fix during one of these rc cycle.
+Gregory
 
-Please let me know your thoughts.
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
-Suzuki
+  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 
-> Mathieu
->
->> --
->> 2.7.4
->>
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.11-1
+
+for you to fetch changes up to 7b7db5ab33d2292d9b037cda0c41a795b094d940:
+
+  ARM: dts: turris-omnia: add support for ethernet switch (2017-01-05 13:59:18 +0100)
+
+----------------------------------------------------------------
+mvebu dt for 4.11 (part 1)
+
+- Add support for the ethernet switch on the Turris Omnia board
+- Clean up and improvement for ClearFog boards
+- Correct license text which was mangled when switching to dual license
+
+----------------------------------------------------------------
+Alexandre Belloni (1):
+      ARM: dts: mvebu: Correct license text
+
+Russell King (14):
+      ARM: dts: armada388-clearfog: fix SPI flash #size-cells
+      ARM: dts: armada388-clearfog: move SPI flash into microsom
+      ARM: dts: armada388-clearfog: move sdhci pinctrl node to microsom
+      ARM: dts: armada388-clearfog: split clearfog DTS file
+      ARM: dts: armada388-clearfog: move DSA switch
+      ARM: dts: armada388-clearfog: move second PCIe port
+      ARM: dts: armada388-clearfog: move SPI CS1
+      ARM: dts: armada388-clearfog: move rear button
+      ARM: dts: armada388-clearfog: add base model DTS file
+      ARM: dts: armada388-clearfog: add pro model DTS file
+      ARM: dts: armada388-clearfog: move device specific pinctrl nodes
+      ARM: dts: armada388-clearfog: move I2C nodes
+      ARM: dts: armada388-clearfog: move ethernet related nodes
+      ARM: dts: armada388-clearfog: move uart nodes
+
+Uwe Kleine-K?nig (1):
+      ARM: dts: turris-omnia: add support for ethernet switch
+
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/armada-370-db.dts                |  10 +-
+ arch/arm/boot/dts/armada-370-dlink-dns327l.dts     |  10 +-
+ arch/arm/boot/dts/armada-370-mirabox.dts           |  10 +-
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts     |  10 +-
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts     |  10 +-
+ arch/arm/boot/dts/armada-370-rd.dts                |  10 +-
+ arch/arm/boot/dts/armada-370-synology-ds213j.dts   |  10 +-
+ arch/arm/boot/dts/armada-370-xp.dtsi               |  10 +-
+ arch/arm/boot/dts/armada-370.dtsi                  |  10 +-
+ arch/arm/boot/dts/armada-375-db.dts                |  10 +-
+ arch/arm/boot/dts/armada-375.dtsi                  |  10 +-
+ arch/arm/boot/dts/armada-380.dtsi                  |  10 +-
+ arch/arm/boot/dts/armada-385-turris-omnia.dts      |  58 +++-
+ arch/arm/boot/dts/armada-385.dtsi                  |  10 +-
+ arch/arm/boot/dts/armada-388-clearfog-base.dts     | 109 ++++++
+ arch/arm/boot/dts/armada-388-clearfog-pro.dts      |  55 +++
+ arch/arm/boot/dts/armada-388-clearfog.dts          | 374 ++++-----------------
+ arch/arm/boot/dts/armada-388-clearfog.dtsi         | 307 +++++++++++++++++
+ arch/arm/boot/dts/armada-388-db.dts                |  10 +-
+ arch/arm/boot/dts/armada-388-rd.dts                |  10 +-
+ .../arm/boot/dts/armada-38x-solidrun-microsom.dtsi | 130 ++++---
+ arch/arm/boot/dts/armada-38x.dtsi                  |  10 +-
+ arch/arm/boot/dts/armada-390-db.dts                |  10 +-
+ arch/arm/boot/dts/armada-390.dtsi                  |  10 +-
+ arch/arm/boot/dts/armada-395.dtsi                  |  10 +-
+ arch/arm/boot/dts/armada-398-db.dts                |  10 +-
+ arch/arm/boot/dts/armada-398.dtsi                  |  10 +-
+ arch/arm/boot/dts/armada-39x.dtsi                  |  10 +-
+ arch/arm/boot/dts/armada-xp-axpwifiap.dts          |  10 +-
+ arch/arm/boot/dts/armada-xp-db.dts                 |  10 +-
+ arch/arm/boot/dts/armada-xp-gp.dts                 |  10 +-
+ arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts    |  10 +-
+ arch/arm/boot/dts/armada-xp-matrix.dts             |  10 +-
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi           |  10 +-
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi           |  10 +-
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi           |  10 +-
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts     |  10 +-
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   |  10 +-
+ arch/arm/boot/dts/armada-xp-synology-ds414.dts     |  10 +-
+ arch/arm/boot/dts/armada-xp.dtsi                   |  10 +-
+ arch/arm/boot/dts/dove-cm-a510.dtsi                |  10 +-
+ arch/arm/boot/dts/dove-sbc-a510.dts                |  10 +-
+ arch/arm/boot/dts/kirkwood-linkstation-6282.dtsi   |  10 +-
+ .../boot/dts/kirkwood-linkstation-duo-6281.dtsi    |  10 +-
+ arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts   |  10 +-
+ arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts    |  10 +-
+ arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts  |  10 +-
+ arch/arm/boot/dts/kirkwood-linkstation-lswvl.dts   |  10 +-
+ arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts   |  10 +-
+ arch/arm/boot/dts/kirkwood-linkstation.dtsi        |  10 +-
+ arch/arm/boot/dts/mvebu-linkstation-fan.dtsi       |  10 +-
+ .../boot/dts/mvebu-linkstation-gpio-simple.dtsi    |  10 +-
+ arch/arm/boot/dts/orion5x-kuroboxpro.dts           |  10 +-
+ arch/arm/boot/dts/orion5x-linkstation-lsgl.dts     |  10 +-
+ arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts   |  10 +-
+ arch/arm/boot/dts/orion5x-linkstation.dtsi         |  10 +-
+ arch/arm/boot/dts/orion5x-lschl.dts                |  10 +-
+ arch/arm/boot/dts/orion5x-lswsgl.dts               |  10 +-
+ 59 files changed, 933 insertions(+), 622 deletions(-)
+ create mode 100644 arch/arm/boot/dts/armada-388-clearfog-base.dts
+ create mode 100644 arch/arm/boot/dts/armada-388-clearfog-pro.dts
+ create mode 100644 arch/arm/boot/dts/armada-388-clearfog.dtsi
