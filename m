@@ -1,45 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 13 Jan 2017 11:12:16 +0000
-Subject: [PATCH v2] KVM: arm/arm64: Fix occasional warning from the timer
- work function
-In-Reply-To: <20170109111856.8439-1-christoffer.dall@linaro.org>
-References: <20170109111856.8439-1-christoffer.dall@linaro.org>
-Message-ID: <daadc615-b9b8-7510-7978-b6854a5184b1@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 13 Jan 2017 11:14:19 +0000
+Subject: [PATCH v3 0/3] arm64: dts: juno: CoreSight support updates
+In-Reply-To: <CAJ9a7Vha=GiyEcVkzh-N9s7XN8N94KAiM=iY2W4MyLqLWRe-2w@mail.gmail.com>
+References: <1484234410-7670-1-git-send-email-sudeep.holla@arm.com>
+ <CANLsYkxm-6eBsURrN_pO1833QNfVL4Li98P48C6ktsytyyagdg@mail.gmail.com>
+ <c42f1b0a-dbe9-6c00-b940-2bab4b891dac@arm.com>
+ <CAJ9a7Vha=GiyEcVkzh-N9s7XN8N94KAiM=iY2W4MyLqLWRe-2w@mail.gmail.com>
+Message-ID: <4683cc8b-ac0f-673e-4df4-951de36a580d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/17 11:18, Christoffer Dall wrote:
-> When a VCPU blocks (WFI) and has programmed the vtimer, we program a
-> soft timer to expire in the future to wake up the vcpu thread when
-> appropriate.  Because such as wake up involves a vcpu kick, and the
-> timer expire function can get called from interrupt context, and the
-> kick may sleep, we have to schedule the kick in the work function.
-> 
-> The work function currently has a warning that gets raised if it turns
-> out that the timer shouldn't fire when it's run, which was added because
-> the idea was that in that case the work should never have been cancelled.
-> 
-> However, it turns out that this whole thing is racy and we can get
-> spurious warnings.  The problem is that we clear the armed flag in the
-> work function, which may run in parallel with the
-> kvm_timer_unschedule->timer_disarm() call.  This results in a possible
-> situation where the timer_disarm() call does not call
-> cancel_work_sync(), which effectively synchronizes the completion of the
-> work function with running the VCPU.  As a result, the VCPU thread
-> proceeds before the work function completees, causing changes to the
-> timer state such that kvm_timer_should_fire(vcpu) returns false in the
-> work function.
-> 
-> All we do in the work function is to kick the VCPU, and an occasional
-> rare extra kick never harmed anyone.  Since the race above is extremely
-> rare, we don't bother checking if the race happens but simply remove the
-> check and the clearing of the armed flag from the work function.
-> 
-> Reported-by: Matthias Brugger <mbrugger@suse.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-	M.
+On 13/01/17 11:09, Mike Leach wrote:
+> Hi Sudeep,
+> 
+> 
+> Patchset tested successfully on juno-r1
+> 
+
+Thanks and I did a quick test on Juno R2. I have pushed the branch [1]
+with minor comment change as pointed out my Mathieu.
+
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Sudeep
+
+[1]
+git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
+for-next/updates/juno
