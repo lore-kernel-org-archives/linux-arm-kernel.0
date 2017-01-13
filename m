@@ -1,212 +1,50 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 13 Jan 2017 13:36:12 +0100
-Subject: [PATCH 2/3] KVM: arm64: Access CNTHCTL_EL2 bit fields correctly
- on VHE systems
-In-Reply-To: <1484307093-29153-3-git-send-email-marc.zyngier@arm.com>
-References: <1484307093-29153-1-git-send-email-marc.zyngier@arm.com>
- <1484307093-29153-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20170113123612.GA31994@cbox>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 13 Jan 2017 13:36:21 +0100
+Subject: [PATCH] iommu/dma: Add support for DMA_ATTR_FORCE_CONTIGUOUS
+In-Reply-To: <0e5c066f-ddf6-30ce-392e-79bd0f401a18@arm.com>
+References: <1484305674-15018-1-git-send-email-geert+renesas@glider.be>
+ <d336ef3b-4fe6-5ebb-9fed-071fa79028df@arm.com>
+ <CAMuHMdWBfTm_QRuB7x-ZDh0bgGmHokqm7=F2b0rjQTYzizC9hA@mail.gmail.com>
+ <0e5c066f-ddf6-30ce-392e-79bd0f401a18@arm.com>
+Message-ID: <CAMuHMdVnteoor56EYG1Ka7t0o8+OKNehGnk6YUciTXdEQ5KKcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 11:31:32AM +0000, Marc Zyngier wrote:
-> From: Jintack Lim <jintack@cs.columbia.edu>
-> 
-> Current KVM world switch code is unintentionally setting wrong bits to
-> CNTHCTL_EL2 when E2H == 1, which may allow guest OS to access physical
-> timer.  Bit positions of CNTHCTL_EL2 are changing depending on
-> HCR_EL2.E2H bit.  EL1PCEN and EL1PCTEN are 1st and 0th bits when E2H is
-> not set, but they are 11th and 10th bits respectively when E2H is set.
-> 
-> In fact, on VHE we only need to set those bits once, not for every world
-> switch. This is because the host kernel runs in EL2 with HCR_EL2.TGE ==
-> 1, which makes those bits have no effect for the host kernel execution.
-> So we just set those bits once for guests, and that's it.
-> 
-> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/include/asm/virt.h   |  5 +++++
->  arch/arm/kvm/arm.c            |  3 +++
->  arch/arm64/include/asm/virt.h |  9 +++++++++
->  include/kvm/arm_arch_timer.h  |  1 +
->  virt/kvm/arm/arch_timer.c     | 23 +++++++++++++++++++++++
->  virt/kvm/arm/hyp/timer-sr.c   | 33 +++++++++++++++++++++------------
->  6 files changed, 62 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-> index a2e75b8..6dae195 100644
-> --- a/arch/arm/include/asm/virt.h
-> +++ b/arch/arm/include/asm/virt.h
-> @@ -80,6 +80,11 @@ static inline bool is_kernel_in_hyp_mode(void)
->  	return false;
->  }
->  
-> +static inline bool has_vhe(void)
-> +{
-> +	return false;
-> +}
-> +
->  /* The section containing the hypervisor idmap text */
->  extern char __hyp_idmap_text_start[];
->  extern char __hyp_idmap_text_end[];
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 1167678..9d74464 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -1099,6 +1099,9 @@ static void cpu_init_hyp_mode(void *dummy)
->  	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
->  	__cpu_init_stage2();
->  
-> +	if (is_kernel_in_hyp_mode())
-> +		kvm_timer_init_vhe();
-> +
->  	kvm_arm_init_debug();
->  }
->  
-> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-> index fea1073..439f6b5 100644
-> --- a/arch/arm64/include/asm/virt.h
-> +++ b/arch/arm64/include/asm/virt.h
-> @@ -47,6 +47,7 @@
->  #include <asm/ptrace.h>
->  #include <asm/sections.h>
->  #include <asm/sysreg.h>
-> +#include <asm/cpufeature.h>
->  
->  /*
->   * __boot_cpu_mode records what mode CPUs were booted in.
-> @@ -80,6 +81,14 @@ static inline bool is_kernel_in_hyp_mode(void)
->  	return read_sysreg(CurrentEL) == CurrentEL_EL2;
->  }
->  
-> +static inline bool has_vhe(void)
-> +{
-> +	if (cpus_have_const_cap(ARM64_HAS_VIRT_HOST_EXTN))
-> +		return true;
-> +
-> +	return false;
-> +}
-> +
+Hi Robin,
 
-I was experimenting with using has_vhe for some of the optimization code
-I was writing, and I saw a hyp crash as a result.  That made me wonder
-if this is really safe in Hyp mode?
+On Fri, Jan 13, 2017 at 1:17 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 13/01/17 11:59, Geert Uytterhoeven wrote:
+>> On Fri, Jan 13, 2017 at 12:32 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+>>> On 13/01/17 11:07, Geert Uytterhoeven wrote:
+>>>> Add support for DMA_ATTR_FORCE_CONTIGUOUS to the generic IOMMU DMA code.
+>>>> This allows to allocate physically contiguous DMA buffers on arm64
+>>>> systems with an IOMMU.
+>>>
+>>> Can anyone explain what this attribute is actually used for? I've never
+>>> quite figured it out.
+>>
+>> My understanding is that DMA_ATTR_FORCE_CONTIGUOUS is needed when using
+>> an IOMMU but wanting the buffers to be both contiguous in IOVA space and
+>> physically contiguous to allow passing to devices without IOMMU.
+>>
+>> Main users are graphic and remote processors.
+>
+> Sure, I assumed it must be to do with buffer sharing, but the systems
+> I'm aware of which have IOMMUs in their media subsystems tend to have
+> them in front of every IP block involved, so I was curious as to what
+> bit of non-IOMMU hardware wanted to play too. The lone in-tree use in
+> the Exynos DRM driver was never very revealing, and the new one I see in
+> the Qualcomm PIL driver frankly looks redundant to me.
 
-Specifically, there is no guarantee that this will actually be inlined
-in the caller, right?  At least that's what I can gather from trying to
-understand the semantics of the inline keyword in the GCC manual.
+I'll let the GPU-literate people comment on that...
 
-Further, are we guaranteed that the static branch gets compiled into
-something that doesn't actually look at cpu_hwcap_keys, which is not
-mapped in hyp mode?
+Gr{oetje,eeting}s,
 
-Thanks,
--Christoffer
+                        Geert
 
->  #ifdef CONFIG_ARM64_VHE
->  extern void verify_cpu_run_el(void);
->  #else
-> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-> index b717ed9..5c970ce 100644
-> --- a/include/kvm/arm_arch_timer.h
-> +++ b/include/kvm/arm_arch_timer.h
-> @@ -76,4 +76,5 @@ void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
->  
->  void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
->  
-> +void kvm_timer_init_vhe(void);
->  #endif
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index a7fe606..6a084cd 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -24,6 +24,7 @@
->  
->  #include <clocksource/arm_arch_timer.h>
->  #include <asm/arch_timer.h>
-> +#include <asm/kvm_hyp.h>
->  
->  #include <kvm/arm_vgic.h>
->  #include <kvm/arm_arch_timer.h>
-> @@ -509,3 +510,25 @@ void kvm_timer_init(struct kvm *kvm)
->  {
->  	kvm->arch.timer.cntvoff = kvm_phys_timer_read();
->  }
-> +
-> +/*
-> + * On VHE system, we only need to configure trap on physical timer and counter
-> + * accesses in EL0 and EL1 once, not for every world switch.
-> + * The host kernel runs at EL2 with HCR_EL2.TGE == 1,
-> + * and this makes those bits have no effect for the host kernel execution.
-> + */
-> +void kvm_timer_init_vhe(void)
-> +{
-> +	/* When HCR_EL2.E2H ==1, EL1PCEN and EL1PCTEN are shifted by 10 */
-> +	u32 cnthctl_shift = 10;
-> +	u64 val;
-> +
-> +	/*
-> +	 * Disallow physical timer access for the guest.
-> +	 * Physical counter access is allowed.
-> +	 */
-> +	val = read_sysreg(cnthctl_el2);
-> +	val &= ~(CNTHCTL_EL1PCEN << cnthctl_shift);
-> +	val |= (CNTHCTL_EL1PCTEN << cnthctl_shift);
-> +	write_sysreg(val, cnthctl_el2);
-> +}
-> diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
-> index 798866a..63e28dd 100644
-> --- a/virt/kvm/arm/hyp/timer-sr.c
-> +++ b/virt/kvm/arm/hyp/timer-sr.c
-> @@ -35,10 +35,16 @@ void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
->  	/* Disable the virtual timer */
->  	write_sysreg_el0(0, cntv_ctl);
->  
-> -	/* Allow physical timer/counter access for the host */
-> -	val = read_sysreg(cnthctl_el2);
-> -	val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
-> -	write_sysreg(val, cnthctl_el2);
-> +	/*
-> +	 * We don't need to do this for VHE since the host kernel runs in EL2
-> +	 * with HCR_EL2.TGE ==1, which makes those bits have no impact.
-> +	 */
-> +	if (!has_vhe()) {
-> +		/* Allow physical timer/counter access for the host */
-> +		val = read_sysreg(cnthctl_el2);
-> +		val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
-> +		write_sysreg(val, cnthctl_el2);
-> +	}
->  
->  	/* Clear cntvoff for the host */
->  	write_sysreg(0, cntvoff_el2);
-> @@ -50,14 +56,17 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
->  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->  	u64 val;
->  
-> -	/*
-> -	 * Disallow physical timer access for the guest
-> -	 * Physical counter access is allowed
-> -	 */
-> -	val = read_sysreg(cnthctl_el2);
-> -	val &= ~CNTHCTL_EL1PCEN;
-> -	val |= CNTHCTL_EL1PCTEN;
-> -	write_sysreg(val, cnthctl_el2);
-> +	/* Those bits are already configured at boot on VHE-system */
-> +	if (!has_vhe()) {
-> +		/*
-> +		 * Disallow physical timer access for the guest
-> +		 * Physical counter access is allowed
-> +		 */
-> +		val = read_sysreg(cnthctl_el2);
-> +		val &= ~CNTHCTL_EL1PCEN;
-> +		val |= CNTHCTL_EL1PCTEN;
-> +		write_sysreg(val, cnthctl_el2);
-> +	}
->  
->  	if (timer->enabled) {
->  		write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
-> -- 
-> 2.1.4
-> 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
