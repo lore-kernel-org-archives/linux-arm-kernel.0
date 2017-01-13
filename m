@@ -1,69 +1,36 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 13 Jan 2017 16:32:39 +0100
-Subject: [PATCH v5] arm64: dts: mt8173: add mmsel clocks for 4K support
-In-Reply-To: <CAGS+omAZvHmSz6bJcvisC1LZgxwbd-HzvYMDrHXzfkY3mZZEsw@mail.gmail.com>
-References: <1470279438-60372-1-git-send-email-bibby.hsieh@mediatek.com>
- <CAGS+omAZvHmSz6bJcvisC1LZgxwbd-HzvYMDrHXzfkY3mZZEsw@mail.gmail.com>
-Message-ID: <0786f0e3-791a-4173-7506-cbb0bcb9f521@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Jan 2017 16:32:51 +0100
+Subject: [PATCH 1/3] rtc: stm32: remove __exit annotation on remove callback
+Message-ID: <20170113153311.2611510-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The remove function can be called at runtime for a manual 'unbind'
+operation and must not be left out from a built-in driver, as kbuild
+complains:
 
+`stm32_rtc_remove' referenced in section `.data.stm32_rtc_driver' of drivers/rtc/rtc-stm32.o: defined in discarded section `.exit.text' of drivers/rtc/rtc-stm32.o
 
-On 12/01/17 05:50, Daniel Kurtz wrote:
-> Hi Matthias,
->
-> (Trying again to send plain text email)...
->
-> On Thu, Aug 4, 2016 at 10:57 AM, Bibby Hsieh <bibby.hsieh@mediatek.com> wrote:
->> To support HDMI 4K resolution, mmsys need clcok
->> mm_sel to be 400MHz.
->>
->> The board .dts file should override the clock rate
->> property with the higher VENCPLL frequency the board
->> supports HDMI 4K resolution.
->>
->> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
->
-> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
->
+This removes the extraneous annotation.
 
-Applied to v4.10-next/dts
-Thanks
+Fixes: 4e64350f42e2 ("rtc: add STM32 RTC driver")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/rtc/rtc-stm32.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
->
-> It looks like this patch was lost.  It is actually a prerequisite for
-> MTK 4k HDMI support, which already landed in v4.9.
->
-> See the email thread entitled:
-> [PATCH v5 0/3] MT8173 HDMI 4K support <https://lkml.org/lkml/2016/9/28/893>
->
-> Or these three:
->
-> 0d2200794f0a drm/mediatek: modify the factor to make the pll_rate set
-> in the 1G-2G range
-> 968253bd7caa drm/mediatek: enhance the HDMI driving current
-> d542b7c473f0 drm/mediatek: do mtk_hdmi_send_infoframe after HDMI clock enable
->
-> -Dan
->
->> ---
->>  arch/arm64/boot/dts/mediatek/mt8173.dtsi |    2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> index 78529e4..c3f32f3 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> @@ -690,6 +690,8 @@
->>                         compatible = "mediatek,mt8173-mmsys", "syscon";
->>                         reg = <0 0x14000000 0 0x1000>;
->>                         power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
->> +                       assigned-clocks = <&topckgen CLK_TOP_MM_SEL>;
->> +                       assigned-clock-rates = <400000000>;
->>                         #clock-cells = <1>;
->>                 };
->>
->> --
->> 1.7.9.5
->>
+diff --git a/drivers/rtc/rtc-stm32.c b/drivers/rtc/rtc-stm32.c
+index c4789b5a5d81..3513e052722f 100644
+--- a/drivers/rtc/rtc-stm32.c
++++ b/drivers/rtc/rtc-stm32.c
+@@ -657,7 +657,7 @@ static int stm32_rtc_probe(struct platform_device *pdev)
+ 	return ret;
+ }
+ 
+-static int __exit stm32_rtc_remove(struct platform_device *pdev)
++static int stm32_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct stm32_rtc *rtc = platform_get_drvdata(pdev);
+ 	unsigned int cr;
+-- 
+2.9.0
