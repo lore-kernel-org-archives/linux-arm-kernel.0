@@ -1,98 +1,47 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri, 13 Jan 2017 11:43:56 +0100
-Subject: [PATCH 1/1] iommu/arm-smmu: Fix for ThunderX erratum #27704
-In-Reply-To: <b0eb1127-182e-63e3-6dd4-c3b40228b909@semihalf.com>
-References: <1484135507-24872-1-git-send-email-tn@semihalf.com>
- <2c048126-a4d6-16af-987a-3174401a3960@arm.com>
- <b0eb1127-182e-63e3-6dd4-c3b40228b909@semihalf.com>
-Message-ID: <1c3253d8-bcaa-e507-cddf-dec952362104@semihalf.com>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Fri, 13 Jan 2017 18:46:56 +0800
+Subject: [PATCH v4 1/3] dt: bindings: add documentation for zx2967 family
+ thermal sensor
+Message-ID: <1484304418-17489-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.01.2017 07:41, Tomasz Nowicki wrote:
-> On 11.01.2017 13:19, Robin Murphy wrote:
->> On 11/01/17 11:51, Tomasz Nowicki wrote:
->>> The goal of erratum #27704 workaround was to make sure that ASIDs and
->>> VMIDs
->>> are unique across all SMMU instances on affected Cavium systems.
->>>
->>> Currently, the workaround code partitions ASIDs and VMIDs by increasing
->>> global cavium_smmu_context_count which in turn becomes the base ASID
->>> and VMID
->>> value for the given SMMU instance upon the context bank initialization.
->>>
->>> For systems with multiple SMMU instances this approach implies the risk
->>> of crossing 8-bit ASID, like for CN88xx capable of 4 SMMUv2, 128
->>> context bank each:
->>> SMMU_0 (0-127 ASID RANGE)
->>> SMMU_1 (127-255 ASID RANGE)
->>> SMMU_2 (256-383 ASID RANGE) <--- crossing 8-bit ASID
->>> SMMU_3 (384-511 ASID RANGE) <--- crossing 8-bit ASID
->>
->> I could swear that at some point in the original discussion it was said
->> that the TLBs were only shared between pairs of SMMUs, so in fact 0/1
->> and 2/3 are independent of each other
->
-> Indeed TLBs are only shared between pairs of SMMUs but the workaround
-> makes sure ASIDs are unique across all SMMU instances so we do not have
-> to bother about SMMUs probe order.
->
->  - out of interest, have you
->> managed to hit an actual problem in practice or is this patch just by
->> inspection?
->
-> Except SMMU0/1 devices all other devices under other SMMUs will fail on
-> guest power off/on. Since we try to invalidate tlb with 16bit ASID but
-> we actually have 8 bit zero padded 16 bit entry.
->
->>
->> Of course, depending on the SMMUs to probe in the right order isn't
->> particularly robust, so it's still probably a worthwhile change.
->>
->>> Since we use 8-bit ASID now we effectively misconfigure ASID[15:8]
->>> bits for
->>> SMMU_CBn_TTBRm register. Also, we still use non-zero ASID[15:8] bits
->>> upon context invalidation. This patch adds 16-bit ASID support for
->>> stage-1
->>> AArch64 contexts for Cavium SMMUv2 model so that we use ASIDs
->>> consistently.
->>>
->>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->>> ---
->>>  drivers/iommu/arm-smmu.c | 4 ++++
->>>  1 file changed, 4 insertions(+)
->>>
->>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->>> index a60cded..ae8f059 100644
->>> --- a/drivers/iommu/arm-smmu.c
->>> +++ b/drivers/iommu/arm-smmu.c
->>> @@ -260,6 +260,7 @@ enum arm_smmu_s2cr_privcfg {
->>>
->>>  #define TTBCR2_SEP_SHIFT        15
->>>  #define TTBCR2_SEP_UPSTREAM        (0x7 << TTBCR2_SEP_SHIFT)
->>> +#define TTBCR2_AS            (1 << 4)
->>>
->>>  #define TTBRn_ASID_SHIFT        48
->>>
->>> @@ -778,6 +779,9 @@ static void arm_smmu_init_context_bank(struct
->>> arm_smmu_domain *smmu_domain,
->>>              reg = pgtbl_cfg->arm_lpae_s1_cfg.tcr;
->>>              reg2 = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
->>>              reg2 |= TTBCR2_SEP_UPSTREAM;
->>> +            if (smmu->model == CAVIUM_SMMUV2 &&
->>
->> I'd be inclined to say "smmu->version == ARM_SMMU_V2" there, rather than
->> make it Cavium-specific - we enable 16-bit VMID unconditionally where
->> supported, so I don't see any reason not to handle 16-bit ASIDs in the
->> same manner.
->
-> I agree, I will enable 16-bit ASID for ARM_SMMU_V2.
->
+This patch adds dt-binding documentation for zx2967 family thermal sensor.
 
-Actually, the ARM_SMMU_CTX_FMT_AARCH64 context check is all we need here:
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Shawn Guo <shawnguo@kernel.org>
+---
+ .../devicetree/bindings/thermal/zx2967-thermal.txt  | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
 
-+			if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
-+				reg2 |= TTBCR2_AS;
-
-Thanks,
-Tomasz
+diff --git a/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt b/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
+new file mode 100644
+index 0000000..86f941c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
+@@ -0,0 +1,21 @@
++* ZTE zx2967 family Thermal
++
++Required Properties:
++- compatible: should be one of the following.
++    * zte,zx296718-thermal
++- reg: physical base address of the controller and length of memory mapped
++    region.
++- clocks : Pairs of phandle and specifier referencing the controller's clocks.
++- clock-names: "gate" for the topcrm clock.
++	       "pclk" for the apb clock.
++- #thermal-sensor-cells: must be 0.
++
++Example:
++
++	tempsensor: tempsensor at 148a000 {
++		compatible = "zte,zx296718-thermal";
++		reg = <0x0148a000 0x20>;
++		clocks = <&topcrm TEMPSENSOR_GATE>, <&audiocrm AUDIO_TS_PCLK>;
++		clock-names = "gate", "pclk";
++		#thermal-sensor-cells = <0>;
++	};
+-- 
+2.7.4
