@@ -1,88 +1,139 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 13 Jan 2017 16:27:57 +0100
-Subject: [PATCH v2 6/6] arm: dts: mt2701: Add thermal device node.
-In-Reply-To: <1484296978-18572-7-git-send-email-erin.lo@mediatek.com>
+Date: Fri, 13 Jan 2017 16:29:09 +0100
+Subject: [PATCH v2 1/6] arm: dts: mt2701: Add spi device node
+In-Reply-To: <1484296978-18572-2-git-send-email-erin.lo@mediatek.com>
 References: <1484296978-18572-1-git-send-email-erin.lo@mediatek.com>
- <1484296978-18572-7-git-send-email-erin.lo@mediatek.com>
-Message-ID: <c8bbd4a4-2207-44f0-4462-3761c1d6c8a9@gmail.com>
+ <1484296978-18572-2-git-send-email-erin.lo@mediatek.com>
+Message-ID: <bff0dc57-e997-973f-032e-fec0ba6b8767@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 On 13/01/17 09:42, Erin Lo wrote:
-> From: Dawei Chien <dawei.chien@mediatek.com>
+> From: Leilk Liu <leilk.liu@mediatek.com>
 >
-> Add thermal controller device nodes for MT2701.
+> Add spi device node for MT2701.
 >
-> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
 > Signed-off-by: Erin Lo <erin.lo@mediatek.com>
 > ---
->  arch/arm/boot/dts/mt2701.dtsi | 43 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 43 insertions(+)
+>  arch/arm/boot/dts/mt2701-evb.dts | 50 ++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/mt2701.dtsi    | 39 +++++++++++++++++++++++++++++++
+>  2 files changed, 89 insertions(+)
 >
-> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-> index 3847f70..c43d5f8 100644
-> --- a/arch/arm/boot/dts/mt2701.dtsi
-> +++ b/arch/arm/boot/dts/mt2701.dtsi
-> @@ -89,6 +89,36 @@
->  		clock-output-names = "rtc32k";
+
+Applied to v4.10-next/dts32
+
+> diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
+> index 082ca88..879f1eb 100644
+> --- a/arch/arm/boot/dts/mt2701-evb.dts
+> +++ b/arch/arm/boot/dts/mt2701-evb.dts
+> @@ -24,6 +24,56 @@
 >  	};
+>  };
 >
-> +	thermal-zones {
-> +		cpu_thermal: cpu_thermal {
-> +			polling-delay-passive = <1000>; /* milliseconds */
-> +			polling-delay = <1000>; /* milliseconds */
-> +
-> +			thermal-sensors = <&thermal 0>;
-> +			sustainable-power = <1000>;
-> +
-> +			trips {
-> +				threshold: trip-point at 0 {
-> +					temperature = <68000>;
-> +					hysteresis = <2000>;
-> +					type = "passive";
-> +				};
-> +
-> +				target: trip-point at 1 {
-> +					temperature = <85000>;
-> +					hysteresis = <2000>;
-> +					type = "passive";
-> +				};
-> +
-> +				cpu_crit: cpu_crit at 0 {
-> +					temperature = <115000>;
-> +					hysteresis = <2000>;
-> +					type = "critical";
-> +				};
-> +			};
+> +&pio {
+> +	spi_pins_a: spi0 at 0 {
+> +		pins_spi {
+> +			pinmux = <MT2701_PIN_53_SPI0_CSN__FUNC_SPI0_CS>,
+> +				 <MT2701_PIN_54_SPI0_CK__FUNC_SPI0_CK>,
+> +				 <MT2701_PIN_55_SPI0_MI__FUNC_SPI0_MI>,
+> +				 <MT2701_PIN_56_SPI0_MO__FUNC_SPI0_MO>;
+> +			bias-disable;
 > +		};
 > +	};
 > +
->  	timer {
->  		compatible = "arm,armv7-timer";
->  		interrupt-parent = <&gic>;
-> @@ -270,6 +300,19 @@
+> +	spi_pins_b: spi1 at 0 {
+> +		pins_spi {
+> +			pinmux = <MT2701_PIN_7_SPI1_CSN__FUNC_SPI1_CS>,
+> +				 <MT2701_PIN_8_SPI1_MI__FUNC_SPI1_MI>,
+> +				 <MT2701_PIN_9_SPI1_MO__FUNC_SPI1_MO>,
+> +				 <MT2701_PIN_199_SPI1_CLK__FUNC_SPI1_CK>;
+> +			bias-disable;
+> +		};
+> +	};
+> +
+> +	spi_pins_c: spi2 at 0 {
+> +		pins_spi {
+> +			pinmux = <MT2701_PIN_101_SPI2_CSN__FUNC_SPI2_CS>,
+> +				 <MT2701_PIN_102_SPI2_MI__FUNC_SPI2_MI>,
+> +				 <MT2701_PIN_103_SPI2_MO__FUNC_SPI2_MO>,
+> +				 <MT2701_PIN_104_SPI2_CLK__FUNC_SPI2_CK>;
+> +			bias-disable;
+> +		};
+> +	};
+> +};
+> +
+> +&spi0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&spi_pins_a>;
+> +	status = "disabled";
+> +};
+> +
+> +&spi1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&spi_pins_b>;
+> +	status = "disabled";
+> +};
+> +
+> +&spi2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&spi_pins_c>;
+> +	status = "disabled";
+> +};
+> +
+>  &uart0 {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+> index bdf8954..eb4c6fd 100644
+> --- a/arch/arm/boot/dts/mt2701.dtsi
+> +++ b/arch/arm/boot/dts/mt2701.dtsi
+> @@ -227,6 +227,45 @@
 >  		status = "disabled";
 >  	};
 >
-> +	thermal: thermal at 1100b000 {
-> +		#thermal-sensor-cells = <0>;
-> +		compatible = "mediatek,mt2701-thermal";
-> +		reg = <0 0x1100b000 0 0x1000>;
-> +		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
-> +		clock-names = "therm", "auxadc";
-> +		resets = <&pericfg 0x10>;
-
-should be MT2701_PERI_AUXADC_SW_RST, right?
-
-> +		reset-names = "therm";
-> +		mediatek,auxadc = <&auxadc>;
-> +		mediatek,apmixedsys = <&apmixedsys>;
+> +	spi0: spi at 1100a000 {
+> +		compatible = "mediatek,mt2701-spi";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		reg = <0 0x1100a000 0 0x100>;
+> +		interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&topckgen CLK_TOP_SYSPLL3_D2>,
+> +			 <&topckgen CLK_TOP_SPI0_SEL>,
+> +			 <&pericfg CLK_PERI_SPI0>;
+> +		clock-names = "parent-clk", "sel-clk", "spi-clk";
+> +		status = "disabled";
 > +	};
 > +
->  	nandc: nfi at 1100d000 {
->  		compatible = "mediatek,mt2701-nfc";
->  		reg = <0 0x1100d000 0 0x1000>;
+> +	spi1: spi at 11016000 {
+> +		compatible = "mediatek,mt2701-spi";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		reg = <0 0x11016000 0 0x100>;
+> +		interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&topckgen CLK_TOP_SYSPLL3_D2>,
+> +			 <&topckgen CLK_TOP_SPI1_SEL>,
+> +			 <&pericfg CLK_PERI_SPI1>;
+> +		clock-names = "parent-clk", "sel-clk", "spi-clk";
+> +		status = "disabled";
+> +	};
+> +
+> +	spi2: spi at 11017000 {
+> +		compatible = "mediatek,mt2701-spi";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		reg = <0 0x11017000 0 0x1000>;
+> +		interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&topckgen CLK_TOP_SYSPLL3_D2>,
+> +			 <&topckgen CLK_TOP_SPI2_SEL>,
+> +			 <&pericfg CLK_PERI_SPI2>;
+> +		clock-names = "parent-clk", "sel-clk", "spi-clk";
+> +		status = "disabled";
+> +	};
+> +
+>  	mmsys: syscon at 14000000 {
+>  		compatible = "mediatek,mt2701-mmsys", "syscon";
+>  		reg = <0 0x14000000 0 0x1000>;
 >
