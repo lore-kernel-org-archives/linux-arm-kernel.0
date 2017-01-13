@@ -1,19 +1,37 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 12 Jan 2017 16:07:46 -0800
-Subject: [PATCH] ARM: dts: NSP: Fix DT ranges error
-In-Reply-To: <1484236210-16067-1-git-send-email-jon.mason@broadcom.com>
-References: <1484236210-16067-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <88ba8fb2-071c-73cb-d26a-b5b2dbdd0f4f@gmail.com>
+From: aospan@netup.ru (Abylay Ospan)
+Date: Fri, 13 Jan 2017 03:20:17 +0300
+Subject: [PATCH] PCI: iproc: fix kernel crash if dev->of_node not defined
+Message-ID: <1484266817-6725-1-git-send-email-aospan@netup.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2017 07:50 AM, Jon Mason wrote:
-> The range size for axi is 0x2 bytes too small, as the QSPI needs
-> 0x11c408 + 0x004 (which is 0x0011c40c, not 0x0011c40a).  No errors have
-> been observed with this shortcoming, but fixing it for correctness.
-> 
-> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+pcie->dev->of_node not always defined (NULL) and can cause crash:
 
-Applied to devicetree/fixes thanks Jon.
+[   19.053195] Unable to handle kernel NULL pointer dereference at
+virtual address 00000020
+[<c0b0370c>] (of_n_addr_cells) from [<c06599c4>]
+(iproc_pcie_setup+0x30c/0xce0)
+
+this patch adds sanity check to prevent crash.
+
+Signed-off-by: Abylay Ospan <aospan@netup.ru>
+---
+ drivers/pci/host/pcie-iproc.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+index 3ebc025..f2836a9 100644
+--- a/drivers/pci/host/pcie-iproc.c
++++ b/drivers/pci/host/pcie-iproc.c
+@@ -952,6 +952,9 @@ static int pci_dma_range_parser_init(struct of_pci_range_parser *parser,
+ 	const int na = 3, ns = 2;
+ 	int rlen;
+ 
++	if (!node)
++		return -ENOENT;
++
+ 	parser->node = node;
+ 	parser->pna = of_n_addr_cells(node);
+ 	parser->np = parser->pna + na + ns;
 -- 
-Florian
+2.7.4
