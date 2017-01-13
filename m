@@ -1,53 +1,92 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Jan 2017 17:58:04 +0100
-Subject: [RFC PATCH] arm64: defconfig: enable SMMUv3 config
-In-Reply-To: <5878F3DA.3090005@hisilicon.com>
-References: <1483962646-33767-1-git-send-email-wangzhou1@hisilicon.com>
- <20170112094729.c2a5tjzsnyubtmte@localhost> <5878F3DA.3090005@hisilicon.com>
-Message-ID: <3026029.1QgHzGBYeh@wuerfel>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Fri, 13 Jan 2017 18:59:02 +0200
+Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
+In-Reply-To: <CALCETrXYwp4BJbwFo4P1hEvubyDh1mN+W4L-tQVYjh3e7F-Q9A@mail.gmail.com>
+References: <85015f1653eb7e36f992708362b75d1f4391b783.1484070340.git.robin.murphy@arm.com>
+ <4833e705fb6841fbfdbee3b1a21a7bc917292410.1484070340.git.robin.murphy@arm.com>
+ <20170111013046-mutt-send-email-mst@kernel.org>
+ <20170111100139.GC12388@arm.com>
+ <CALCETrXYwp4BJbwFo4P1hEvubyDh1mN+W4L-tQVYjh3e7F-Q9A@mail.gmail.com>
+Message-ID: <20170113184639-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 13, 2017 3:35:54 PM CET Wei Xu wrote:
-> On 2017/1/12 9:47, Catalin Marinas wrote:
-> > On Thu, Jan 12, 2017 at 08:36:12AM +0800, Zhou Wang wrote:
-> >> On 2017/1/9 19:50, Zhou Wang wrote:
-> >>> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
-> >>> ---
-> >>>  arch/arm64/configs/defconfig | 1 +
-> >>>  1 file changed, 1 insertion(+)
-> >>>
-> >>> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> >>> index 869dded..3520c50 100644
-> >>> --- a/arch/arm64/configs/defconfig
-> >>> +++ b/arch/arm64/configs/defconfig
-> >>> @@ -440,6 +440,7 @@ CONFIG_PLATFORM_MHU=y
-> >>>  CONFIG_BCM2835_MBOX=y
-> >>>  CONFIG_HI6220_MBOX=y
-> >>>  CONFIG_ARM_SMMU=y
-> >>> +CONFIG_ARM_SMMU_V3=y
-> >>>  CONFIG_RASPBERRYPI_POWER=y
-> >>>  CONFIG_QCOM_SMEM=y
-> >>>  CONFIG_QCOM_SMD=y
+On Wed, Jan 11, 2017 at 10:12:36AM -0800, Andy Lutomirski wrote:
+> On Wed, Jan 11, 2017 at 2:01 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Jan 11, 2017 at 01:33:31AM +0200, Michael S. Tsirkin wrote:
+> >> On Tue, Jan 10, 2017 at 05:51:18PM +0000, Robin Murphy wrote:
+> >> > From: Will Deacon <will.deacon@arm.com>
+> >> >
+> >> > Booting Linux on an ARM fastmodel containing an SMMU emulation results
+> >> > in an unexpected I/O page fault from the legacy virtio-blk PCI device:
+> >> >
+> >> > [    1.211721] arm-smmu-v3 2b400000.smmu: event 0x10 received:
+> >> > [    1.211800] arm-smmu-v3 2b400000.smmu:   0x00000000fffff010
+> >> > [    1.211880] arm-smmu-v3 2b400000.smmu:   0x0000020800000000
+> >> > [    1.211959] arm-smmu-v3 2b400000.smmu:   0x00000008fa081002
+> >> > [    1.212075] arm-smmu-v3 2b400000.smmu:   0x0000000000000000
+> >> > [    1.212155] arm-smmu-v3 2b400000.smmu: event 0x10 received:
+> >> > [    1.212234] arm-smmu-v3 2b400000.smmu:   0x00000000fffff010
+> >> > [    1.212314] arm-smmu-v3 2b400000.smmu:   0x0000020800000000
+> >> > [    1.212394] arm-smmu-v3 2b400000.smmu:   0x00000008fa081000
+> >> > [    1.212471] arm-smmu-v3 2b400000.smmu:   0x0000000000000000
+> >> >
+> >> > <system hangs failing to read partition table>
+> >> >
+> >> > This is because the virtio-blk is behind an SMMU, so we have consequently
+> >> > swizzled its DMA ops and configured the SMMU to translate accesses. This
+> >> > then requires the vring code to use the DMA API to establish translations,
+> >> > otherwise all transactions will result in fatal faults and termination.
+> >> >
+> >> > Given that ARM-based systems only see an SMMU if one is really present
+> >> > (the topology is all described by firmware tables such as device-tree or
+> >> > IORT), then we can safely use the DMA API for all virtio devices.
+> >> >
+> >> > Cc: Andy Lutomirski <luto@kernel.org>
+> >> > Cc: Michael S. Tsirkin <mst@redhat.com>
+> >> > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > >>
-> >> I just happened to find there is no SMMUv3 config in arm64 defconfig.
+> >> I'd like to better understand then need for this one.
+> >> Can't the device in question just set VIRTIO_F_IOMMU_PLATFORM ?
 > >>
-> >> Maybe we should add it in defconfig or I miss something.
-> > 
+> >> I'd rather we avoided need for more hacks and just
+> >> have everyone switch to that.
+> >
+> > There are a couple of problems with VIRTIO_F_IOMMU_PLATFORM:
+> >
+> > 1. It doesn't exist for legacy devices, which are all we have on the
+> >    platform in question.
+> >
+> > 2. It's not documented in the virtio sp^H^HSTOP PRESS. I see you applied
+> >    my patch ;). Thanks.
+> >
+> > In which case, for non-legacy devices we should definitely be using
+> > VIRTIO_F_IOMMU_PLATFORM, but since this platform hasn't yet moved to the
+> > world of flying cars, could we unconditionally set the DMA ops on ARM
+> > for legacy devices? The alternative is disabling the SMMU altogether,
+> > but that's less than ideal because there are non-virtio devices on the
+> > same PCI bus.
 > 
-> Hi Arnd,
-> 
-> > It looks fine to me but it's usually the arm-soc guys picking the
-> > defconfig patches.
-> > 
-> 
-> It is fine to me.
-> Is it OK for me to pick up this or will you directly pick up this?
-> Thanks!
+> Also, on ARM, using the DMA API appears to *always* be the correct
+> approach.  Why not do it all the time, then?  The non-DMA-API path is
+> a legacy thing that is needed because a few platforms incorrectly
+> enumerate their IOMMUs.  ARM gets it right, so I don't see why ARM
+> should be subject to the legacy mess.
 
-Either way works for me. I usually recommend platform maintainers
-picking up patches and then sending them on to arm at kernel.org,
-as that gets our attention quicker. A patch that gets sent with
-me personally on Cc might get lost in the email.
+I didn't realize ARM gets this right. QEMU still pokes at
+physical addresses directly in legacy mode so I wonder how could
+that be the case. I'll try to find out.
 
-	Arnd
+> Even on x86, it should be possible to get the code into a state where
+> using DMA ops is always correct.
+> 
+> --Andy
+
+This I could totally get behind. A driver would install some per device
+flag to make it figure out IOMMU does not apply, and in a portable way
+since at least x86 and PPC need this, maybe more. This would/should
+also handle the bug that admin can bind vfio to legacy virtio
+devices even without the noiommu mode.
+
+-- 
+MST
