@@ -1,35 +1,54 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Fri, 13 Jan 2017 13:38:03 +0100
-Subject: [PATCH 09/10] ARM: dts: da850: add the SATA node
+Date: Fri, 13 Jan 2017 13:38:02 +0100
+Subject: [PATCH 08/10] ARM: dts: da850: add pinmux settings for the SATA
+ controller
 In-Reply-To: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1484311084-31547-10-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1484311084-31547-9-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the SATA node to the da850 device tree.
+Add pinmux sub-nodes for all muxed SATA pins.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/boot/dts/da850.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/da850.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
 diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 1f6a47d..f5086b1 100644
+index 104155d..1f6a47d 100644
 --- a/arch/arm/boot/dts/da850.dtsi
 +++ b/arch/arm/boot/dts/da850.dtsi
-@@ -427,6 +427,12 @@
- 			phy-names = "usb-phy";
- 			status = "disabled";
- 		};
-+		sata: ahci at 0x218000 {
-+			compatible = "ti,da850-ahci";
-+			reg = <0x218000 0x2000>, <0x22c018 0x4>;
-+			interrupts = <67>;
-+			status = "disabled";
-+		};
- 		mdio: mdio at 224000 {
- 			compatible = "ti,davinci_mdio";
- 			#address-cells = <1>;
+@@ -78,6 +78,30 @@
+ 					0x10 0x00220000 0x00ff0000
+ 				>;
+ 			};
++			sata_cp_det_pin: pinmux_sata_cp_det_pin {
++				pinctrl-single,bits = <
++					/* SATA_CP_DET */
++					0x0c 0x00000000 0xf0000000
++				>;
++			};
++			sata_mp_switch_pin: pinmux_sata_mp_switch_pin {
++				pinctrl-single,bits = <
++					/* SATA_MP_SWITCH */
++					0x0c 0x00000000 0x0f000000
++				>;
++			};
++			sata_cp_pod_pin: pinmux_sata_cp_pod_pin {
++				pinctrl-single,bits = <
++					/* SATA_CP_POD */
++					0x10 0x40000000 0xf0000000
++				>;
++			};
++			sata_led_pin: pinmux_sata_led_pin {
++				pinctrl-single,bits = <
++					/* SATA_LED */
++					0x10 0x04000000 0x0f000000
++				>;
++			};
+ 			i2c0_pins: pinmux_i2c0_pins {
+ 				pinctrl-single,bits = <
+ 					/* I2C0_SDA,I2C0_SCL */
 -- 
 2.9.3
