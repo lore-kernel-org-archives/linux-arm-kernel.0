@@ -1,49 +1,101 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Fri, 13 Jan 2017 05:32:39 +0000
-Subject: [PATCH v5 1/3] dmaengine: xilinx_dma: Check for channel idle
- state before submitting dma descriptor
-In-Reply-To: <20170113052939.GP3573@localhost>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 13 Jan 2017 11:06:27 +0530
+Subject: [PATCH v5 3/3] dmaengine: xilinx_dma: Fix race condition in the
+ driver for multiple descriptor scenario
+In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A6662F1@XAP-PVEXMBX01.xlnx.xilinx.com>
 References: <1483771530-8545-1-git-send-email-appanad@xilinx.com>
- <1483771530-8545-2-git-send-email-appanad@xilinx.com>
- <20170110062349.GY3573@localhost>
- <C246CAC1457055469EF09E3A7AC4E11A4A666658@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20170113052939.GP3573@localhost>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A666694@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <1483771530-8545-4-git-send-email-appanad@xilinx.com>
+ <20170110084917.GA3573@localhost>
+ <C246CAC1457055469EF09E3A7AC4E11A4A6662F1@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <20170113053627.GQ3573@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
-	
-	Thanks for the review...
+On Thu, Jan 12, 2017 at 02:19:49PM +0000, Appana Durga Kedareswara Rao wrote:
+> Hi Vinod,
 > 
-> On Fri, Jan 13, 2017 at 04:28:11AM +0000, Appana Durga Kedareswara Rao
-> wrote:
-> > Hi Vinod,
-> >
-> > 	Thanks for the review...
+> 	Thanks for the review...    
+> 
+> > On Sat, Jan 07, 2017 at 12:15:30PM +0530, Kedareswara rao Appana wrote:
+> > > When driver is handling AXI DMA SoftIP When user submits multiple
+> > > descriptors back to back on the S2MM(recv) side with the current
+> > > driver flow the last buffer descriptor next bd points to a invalid
+> > > location resulting the invalid data or errors in the DMA engine.
+> > 
+> > Can you rephrase this, it a bit hard to understand.
+> 
+> When DMA is receiving packets h/w expects the descriptors
+> Should be in the form of a ring (I mean h/w buffer descriptor
+> Next descriptor field should always point to valid address
+> So that when DMA engine go and fetch that next descriptor it always 
+> Sees a valid address).
+>
+> 
+> But with the current driver implementation when user queues
+> Multiple descriptors the last descriptor next descriptor field
+> Pointing to an invalid location causing data corruption or 
+> Errors from the DMA h/w engine...
+> 
+> To avoid this issue creating a Buffer descriptor Chain during 
+> Channel allocation and using those buffer descriptors for processing
+> User requested data.
+
+Is it not doable to to modify the next pointer to point to subsequent
+transaction. IOW you are modifying tail descriptor to point to subsequent
+descriptor.
+
+Btw how and when does DMA stop, assuming it is circular it never would,
+isn't there a valid/stop flag associated with a descriptor which tells DMA
+engine what to do next
+
+
+Btw there is something wrong with your MUA perhaps line are titlecased for
+no reason. This is typically behavious of non linux tool which may not be
+great tool for this work.
+
+> 
+> Please let me know if the above explanation is not clear will explain in detail....
+> 
+> > 
 > > >
-> > > On Sat, Jan 07, 2017 at 12:15:28PM +0530, Kedareswara rao Appana wrote:
-> > > > Add channel idle state to ensure that dma descriptor is not
-> > > > submitted when VDMA engine is in progress.
+> > > This patch fixes this issue by creating a BD Chain during
+> > 
+> > whats a BD?
+> 
+> Buffer descriptor.
+
+Thats nowhere mentioned..
+
+> 
+> > 
+> > > channel allocation itself and use those BD's.
 > > >
-> > > any reason why you want to make your own varible and not use the HW
-> > > to query as done earlier. It is not clear to me why that is removed
-> > > from description
-> >
-> > We need to poll for a bit in the status register to know the dma state.
-> > We are currently doing that in the driver hot path To avoid this using
-> > own variables.
+> > > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> > > ---
+> > >
+> > >  drivers/dma/xilinx/xilinx_dma.c | 133
+> > > +++++++++++++++++++++++++---------------
+> > >  1 file changed, 83 insertions(+), 50 deletions(-)
+> > >
+> > > diff --git a/drivers/dma/xilinx/xilinx_dma.c
+> > > b/drivers/dma/xilinx/xilinx_dma.c index 0e9c02e..af2159d 100644
+> > > --- a/drivers/dma/xilinx/xilinx_dma.c
+> > > +++ b/drivers/dma/xilinx/xilinx_dma.c
+> > > @@ -163,6 +163,7 @@
+> > >  #define XILINX_DMA_BD_SOP		BIT(27)
+> > >  #define XILINX_DMA_BD_EOP		BIT(26)
+> > >  #define XILINX_DMA_COALESCE_MAX		255
+> > > +#define XILINX_DMA_NUM_DESCS		255
+> > 
+> > why 255?
 > 
-> It would be worthwhile to document these, down the line people may not
-> remeber the motivation
-
-Sure will add comments during the variable initialization
-In the driver...
-
-Regards,
-Kedar.
-
+> It is not an h/w limitation 
+> Allocating 255 descriptors (Each descriptor is capable of sending 7MB data)
+> So roughly using allocated descriptors DMA engine can transfer 1GB data
+> And in the driver we are reusing the allocated descriptors when they are free.
 > 
-> 
-> --
-> ~Vinod
+> Regards,
+> Kedar.
+
+-- 
+~Vinod
