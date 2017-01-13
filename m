@@ -1,74 +1,24 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 13 Jan 2017 13:49:07 +0100
-Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
-In-Reply-To: <1484291609-20195-3-git-send-email-guochun.mao@mediatek.com>
-References: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
- <1484291609-20195-3-git-send-email-guochun.mao@mediatek.com>
-Message-ID: <967e01c2-ebb2-882e-9342-873f19d59cb9@gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 13 Jan 2017 15:20:41 +0200
+Subject: [PATCH v4 1/4] dmaengine: pl330: remove pdata based initialization
+In-Reply-To: <1484292400-29730-2-git-send-email-m.szyprowski@samsung.com>
+References: <1484292400-29730-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170113072651eucas1p214662327fe5a3dfbaa79d11c2a0b195a@eucas1p2.samsung.com>
+ <1484292400-29730-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20170113132041.3k7sr7ciy46dd42q@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2017 08:13 AM, Guochun Mao wrote:
-> Add Mediatek nor flash node.
+On Fri, Jan 13, 2017 at 08:26:37AM +0100, Marek Szyprowski wrote:
+> This driver is now used only on platforms which support device tree, so
+> it is safe to remove legacy platform data based initialization code.
 > 
-> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > ---
->  arch/arm/boot/dts/mt2701-evb.dts |   25 +++++++++++++++++++++++++
->  arch/arm/boot/dts/mt2701.dtsi    |   12 ++++++++++++
->  2 files changed, 37 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
-> index 082ca88..85e5ae8 100644
-> --- a/arch/arm/boot/dts/mt2701-evb.dts
-> +++ b/arch/arm/boot/dts/mt2701-evb.dts
-> @@ -24,6 +24,31 @@
->  	};
->  };
->  
-> +&nor_flash {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&nor_pins_default>;
-> +	status = "okay";
-> +	flash at 0 {
-> +		compatible = "jedec,spi-nor";
-> +		reg = <0>;
-> +	};
-> +};
-> +
-> +&pio {
-> +	nor_pins_default: nor {
-> +		pins1 {
-> +			pinmux = <MT2701_PIN_240_EXT_XCS__FUNC_EXT_XCS>,
-> +				 <MT2701_PIN_241_EXT_SCK__FUNC_EXT_SCK>,
-> +				 <MT2701_PIN_239_EXT_SDIO0__FUNC_EXT_SDIO0>,
-> +				 <MT2701_PIN_238_EXT_SDIO1__FUNC_EXT_SDIO1>,
-> +				 <MT2701_PIN_237_EXT_SDIO2__FUNC_EXT_SDIO2>,
-> +				 <MT2701_PIN_236_EXT_SDIO3__FUNC_EXT_SDIO3>;
-> +			drive-strength = <MTK_DRIVE_4mA>;
-> +			bias-pull-up;
-> +		};
-> +	};
-> +};
-> +
->  &uart0 {
->  	status = "okay";
->  };
-> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-> index bdf8954..1eefce4 100644
-> --- a/arch/arm/boot/dts/mt2701.dtsi
-> +++ b/arch/arm/boot/dts/mt2701.dtsi
-> @@ -227,6 +227,18 @@
->  		status = "disabled";
->  	};
->  
-> +	nor_flash: spi at 11014000 {
-> +		compatible = "mediatek,mt2701-nor",
-> +			     "mediatek,mt8173-nor";
+>  arch/arm/plat-samsung/devs.c |  1 -
 
+For plat-samsung:
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-
-Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
-
--- 
 Best regards,
-Marek Vasut
+Krzysztof
