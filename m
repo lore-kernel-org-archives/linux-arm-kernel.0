@@ -1,44 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Jan 2017 16:32:53 +0100
-Subject: [PATCH 3/3] rtc: stm32: use 32-bit cast for BIT() macro
-In-Reply-To: <20170113153311.2611510-1-arnd@arndb.de>
-References: <20170113153311.2611510-1-arnd@arndb.de>
-Message-ID: <20170113153311.2611510-3-arnd@arndb.de>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 13 Jan 2017 16:36:17 +0100
+Subject: [PATCH] arm64: dts: mt8173: Fix cpu_thermal cooling-maps
+ contributions
+In-Reply-To: <20170113023006.150845-1-djkurtz@chromium.org>
+References: <20170113023006.150845-1-djkurtz@chromium.org>
+Message-ID: <ac6266a7-b540-8fdd-7ece-ef4871cceaae@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using the ~ operator on a BIT() constant results in a large 'unsigned long'
-constant that won't fit into an 'unsigned int' function argument on 64-bit
-architectures, resulting in a harmless build warning in x86 allmodconfig:
 
-drivers/rtc/rtc-stm32.c: In function 'stm32_rtc_probe':
-drivers/rtc/rtc-stm32.c:651:51: error: large integer implicitly truncated to unsigned type [-Werror=overflow]
-  regmap_update_bits(rtc->dbp, PWR_CR, PWR_CR_DBP, ~PWR_CR_DBP);
 
-This works around the warning by adding an explict cast to 'u32', but
-that is unfortunately a bit ugly and I feel there should be a better
-way to do this, possibly with some changes to either the bitops.h
-header or the regmap API.
+On 13/01/17 03:30, Daniel Kurtz wrote:
+> According to [0], the contribution field for each cooling-device express
+> their relative power efficiency. Higher weights express higher power
+> efficiency.  Weighting is relative such that if each cooling device has a
+> weight of 1 they are considered equal. This is particularly useful in
+> heterogeneous systems where two cooling devices may perform the same kind
+> of compute, but with different efficiency.
+>
+> [0] Documentation/thermal/power_allocator.txt
+>
+> According to Mediatek IC designer, the power efficiency ratio between the
+> LITTLE core cluster (cooling-device cpu0) and big core cluster
+> (cooling-device cpu1) is around 3:1 (3072:1024).
+>
+> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+> ---
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
 
-Cc: Mark Brown <broonie@kernel.org>
-Fixes: 4e64350f42e2 ("rtc: add STM32 RTC driver")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/rtc/rtc-stm32.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+applied, thanks.
 
-diff --git a/drivers/rtc/rtc-stm32.c b/drivers/rtc/rtc-stm32.c
-index 8c599f52124c..05d3dc89e55f 100644
---- a/drivers/rtc/rtc-stm32.c
-+++ b/drivers/rtc/rtc-stm32.c
-@@ -92,7 +92,7 @@
- /* STM32_PWR_CR */
- #define PWR_CR				0x00
- /* STM32_PWR_CR bit field */
--#define PWR_CR_DBP			BIT(8)
-+#define PWR_CR_DBP			(u32)BIT(8)
- 
- struct stm32_rtc {
- 	struct rtc_device *rtc_dev;
--- 
-2.9.0
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index 12e702771f5c..9a3b0d20f7a8 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -182,12 +182,12 @@
+>  				map at 0 {
+>  					trip = <&target>;
+>  					cooling-device = <&cpu0 0 0>;
+> -					contribution = <1024>;
+> +					contribution = <3072>;
+>  				};
+>  				map at 1 {
+>  					trip = <&target>;
+>  					cooling-device = <&cpu2 0 0>;
+> -					contribution = <2048>;
+> +					contribution = <1024>;
+>  				};
+>  			};
+>  		};
+>
