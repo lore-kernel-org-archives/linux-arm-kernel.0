@@ -1,52 +1,47 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 13 Jan 2017 13:25:31 -0600
-Subject: [PATCH 03/10] devicetree: bindings: add bindings for ahci-da850
-In-Reply-To: <1484311084-31547-4-git-send-email-bgolaszewski@baylibre.com>
-References: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
- <1484311084-31547-4-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <35ff358d-9b17-b2be-38d8-6a51cdddc1a1@lechnology.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 13 Jan 2017 19:29:21 +0000
+Subject: [PATCH v18 00/15] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <20161208173319.6618-1-fu.wei@linaro.org>
+References: <20161208173319.6618-1-fu.wei@linaro.org>
+Message-ID: <20170113192920.GF2472@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2017 06:37 AM, Bartosz Golaszewski wrote:
-> Add DT bindings for the TI DA850 AHCI SATA controller.
->
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  .../devicetree/bindings/ata/ahci-da850.txt          | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/ata/ahci-da850.txt
->
-> diff --git a/Documentation/devicetree/bindings/ata/ahci-da850.txt b/Documentation/devicetree/bindings/ata/ahci-da850.txt
-> new file mode 100644
-> index 0000000..d07c241
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/ata/ahci-da850.txt
-> @@ -0,0 +1,21 @@
-> +Device tree binding for the TI DA850 AHCI SATA Controller
-> +---------------------------------------------------------
-> +
-> +Required properties:
-> +  - compatible: must be "ti,da850-ahci"
-> +  - reg: physical base addresses and sizes of the controller's register areas
-> +  - interrupts: interrupt specifier (refer to the interrupt binding)
-> +
-> +Optional properties:
-> +  - clocks: clock specifier (refer to the common clock binding)
-> +  - da850,clk_multiplier: the multiplier for the reference clock needed
-> +                          for 1.5GHz PLL output
+Hi,
 
-A clock multiplier property seems redundant if you are specifying a 
-clock. It should be possible to get the rate from the clock to determine 
-which multiplier is needed.
+On Fri, Dec 09, 2016 at 01:33:04AM +0800, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+> 
+> This patchset:
+>     (1)Preparation for adding GTDT support in arm_arch_timer:
+>         1. Move some enums and marcos to header file;
+>         2. Add a new enum for spi type;
+>         3. Improve printk relevant code;
+>         4. Rename some enums and defines;
+>         5. Rework PPI determination;
+>         6. Rework counter frequency detection;
+>         7. Refactor arch_timer_needs_probing, move it into DT init call
+>         8. Introduce some new structs and refactor the MMIO timer init code
+>         for reusing some common code.
+> 
+>     (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
+>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
+>     memory-mapped timer and SBSA Generic Watchdog timer.
+>     This driver can help to simplify all the relevant timer drivers,
+>     and separate all the ACPI GTDT knowledge from them.
+> 
+>     (3)Simplify ACPI code for arm_arch_timer
+> 
+>     (4)Add GTDT support for ARM memory-mapped timer.
+> 
+> This patchset has been tested on the following platforms with ACPI enabled:
+>     (1)ARM Foundation v8 model
 
-> +
-> +Example:
-> +
-> +	sata: ahci at 0x218000 {
-> +		compatible = "ti,da850-ahci";
-> +		reg = <0x218000 0x2000>, <0x22c018 0x4>;
-> +		interrupts = <67>;
-> +		da850,clk_multiplier = <7>;
-> +	};
->
+Once v4.10-rc4 comes out this weekend, could you please rebase and
+repost this?
+
+Marc and I will be happy to take a look then.
+
+Thanks,
+Mark.
