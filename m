@@ -1,83 +1,186 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Jan 2017 09:40:30 +0000
-Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
-In-Reply-To: <CALCETrXYwp4BJbwFo4P1hEvubyDh1mN+W4L-tQVYjh3e7F-Q9A@mail.gmail.com>
-References: <85015f1653eb7e36f992708362b75d1f4391b783.1484070340.git.robin.murphy@arm.com>
- <4833e705fb6841fbfdbee3b1a21a7bc917292410.1484070340.git.robin.murphy@arm.com>
- <20170111013046-mutt-send-email-mst@kernel.org>
- <20170111100139.GC12388@arm.com>
- <CALCETrXYwp4BJbwFo4P1hEvubyDh1mN+W4L-tQVYjh3e7F-Q9A@mail.gmail.com>
-Message-ID: <20170113094029.GD22538@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 13 Jan 2017 09:46:44 +0000
+Subject: [RFC 01/13] KVM: arm/arm64: Add vITS save/restore API
+ documentation
+In-Reply-To: <e58a566d-e100-d31a-fb26-a15a793d3623@redhat.com>
+References: <1484236613-24633-1-git-send-email-eric.auger@redhat.com>
+ <1484236613-24633-2-git-send-email-eric.auger@redhat.com>
+ <4fe81c1b-9956-d458-b0ef-b7219f1249fe@arm.com>
+ <e58a566d-e100-d31a-fb26-a15a793d3623@redhat.com>
+Message-ID: <65287f0d-b01f-c63d-dc56-c7052cd9dd33@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 10:12:36AM -0800, Andy Lutomirski wrote:
-> On Wed, Jan 11, 2017 at 2:01 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Jan 11, 2017 at 01:33:31AM +0200, Michael S. Tsirkin wrote:
-> >> On Tue, Jan 10, 2017 at 05:51:18PM +0000, Robin Murphy wrote:
-> >> > From: Will Deacon <will.deacon@arm.com>
-> >> >
-> >> > Booting Linux on an ARM fastmodel containing an SMMU emulation results
-> >> > in an unexpected I/O page fault from the legacy virtio-blk PCI device:
-> >> >
-> >> > [    1.211721] arm-smmu-v3 2b400000.smmu: event 0x10 received:
-> >> > [    1.211800] arm-smmu-v3 2b400000.smmu:   0x00000000fffff010
-> >> > [    1.211880] arm-smmu-v3 2b400000.smmu:   0x0000020800000000
-> >> > [    1.211959] arm-smmu-v3 2b400000.smmu:   0x00000008fa081002
-> >> > [    1.212075] arm-smmu-v3 2b400000.smmu:   0x0000000000000000
-> >> > [    1.212155] arm-smmu-v3 2b400000.smmu: event 0x10 received:
-> >> > [    1.212234] arm-smmu-v3 2b400000.smmu:   0x00000000fffff010
-> >> > [    1.212314] arm-smmu-v3 2b400000.smmu:   0x0000020800000000
-> >> > [    1.212394] arm-smmu-v3 2b400000.smmu:   0x00000008fa081000
-> >> > [    1.212471] arm-smmu-v3 2b400000.smmu:   0x0000000000000000
-> >> >
-> >> > <system hangs failing to read partition table>
-> >> >
-> >> > This is because the virtio-blk is behind an SMMU, so we have consequently
-> >> > swizzled its DMA ops and configured the SMMU to translate accesses. This
-> >> > then requires the vring code to use the DMA API to establish translations,
-> >> > otherwise all transactions will result in fatal faults and termination.
-> >> >
-> >> > Given that ARM-based systems only see an SMMU if one is really present
-> >> > (the topology is all described by firmware tables such as device-tree or
-> >> > IORT), then we can safely use the DMA API for all virtio devices.
-> >> >
-> >> > Cc: Andy Lutomirski <luto@kernel.org>
-> >> > Cc: Michael S. Tsirkin <mst@redhat.com>
-> >> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> >>
-> >> I'd like to better understand then need for this one.
-> >> Can't the device in question just set VIRTIO_F_IOMMU_PLATFORM ?
-> >>
-> >> I'd rather we avoided need for more hacks and just
-> >> have everyone switch to that.
-> >
-> > There are a couple of problems with VIRTIO_F_IOMMU_PLATFORM:
-> >
-> > 1. It doesn't exist for legacy devices, which are all we have on the
-> >    platform in question.
-> >
-> > 2. It's not documented in the virtio sp^H^HSTOP PRESS. I see you applied
-> >    my patch ;). Thanks.
-> >
-> > In which case, for non-legacy devices we should definitely be using
-> > VIRTIO_F_IOMMU_PLATFORM, but since this platform hasn't yet moved to the
-> > world of flying cars, could we unconditionally set the DMA ops on ARM
-> > for legacy devices? The alternative is disabling the SMMU altogether,
-> > but that's less than ideal because there are non-virtio devices on the
-> > same PCI bus.
+On 13/01/17 09:07, Auger Eric wrote:
+> Hi Marc,
 > 
-> Also, on ARM, using the DMA API appears to *always* be the correct
-> approach.  Why not do it all the time, then?  The non-DMA-API path is
-> a legacy thing that is needed because a few platforms incorrectly
-> enumerate their IOMMUs.  ARM gets it right, so I don't see why ARM
-> should be subject to the legacy mess.
+> On 12/01/2017 17:52, Marc Zyngier wrote:
+>> Hi Eric,
+>>
+>> On 12/01/17 15:56, Eric Auger wrote:
+>>> Add description for how to access vITS registers and how to flush/restore
+>>> vITS tables into/from memory
+>>>
+>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>> ---
+>>>  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 70 ++++++++++++++++++++++
+>>>  1 file changed, 70 insertions(+)
+>>>
+>>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>>> index 6081a5b..bd74613 100644
+>>> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>>> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>>> @@ -36,3 +36,73 @@ Groups:
+>>>      -ENXIO:  ITS not properly configured as required prior to setting
+>>>               this attribute
+>>>      -ENOMEM: Memory shortage when allocating ITS internal data
+>>> +
+>>> +  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+>>> +  Attributes:
+>>> +      The attr field of kvm_device_attr encodes the offset of the
+>>> +      ITS register, relative to the ITS control frame base address
+>>> +      (ITS_base).
+>>> +
+>>> +      kvm_device_attr.addr points to a __u64 value whatever the width
+>>> +      of the addressed register (32/64 bits).
+>>> +
+>>> +      Writes to read-only registers are ignored by the kernel except
+>>> +      for a single register, GITS_READR. Normally this register is RO
+>>> +      but it needs to be restored otherwise commands in the queue will
+>>> +      be re-executed after CWRITER setting.
+>>> +
+>>> +      For other registers, Getting or setting a register has the same
+>>> +      effect as reading/writing the register on real hardware.
+>>> +  Errors:
+>>> +    -ENXIO: Offset does not correspond to any supported register
+>>> +    -EFAULT: Invalid user pointer for attr->addr
+>>> +    -EINVAL: Offset is not 64-bit aligned
+>>> +
+>>> +  KVM_DEV_ARM_VGIC_GRP_ITS_TABLES
+>>> +  Attributes
+>>> +       The attr field of kvm_device_attr is not used.
+>>> +
+>>> +       request the flush-save/restore of the ITS tables, namely
+>>> +       the device table, the collection table, all the ITT tables,
+>>> +       the LPI pending tables. On save, the tables are flushed
+>>> +       into guest memory at the location provisionned by the guest
+>>
+>> 					    provisioned
+>>
+>>> +       in GITS_BASER (device and collection tables), on MAPD command
+>>> +       (ITT_addr), GICR_PENDBASERs (pending tables).
+>>> +
+>>> +       This means the GIC should be restored before the ITS and all
+>>> +       ITS registers but the GITS_CTRL must be restored before
+>>> +       restoring the ITS tables.
+>>> +
+>>> +       Note the LPI configuration table is read-only for the
+>>> +       in-kernel ITS and its save/restore goes through the standard
+>>> +       RAM save/restore.
+>>> +
+>>> +       The layout of the tables in guest memory defines an ABI.
+>>> +       The entries are laid out in memory as follows;
+>>> +
+>>> +    Device Table Entry (DTE) layout: entry size = 16 bytes
+>>> +
+>>> +    bits:     | 63   ...  32  | 31 ... 6 | 5 | 4   ...   0 |
+>>> +    values:   |   DeviceID    |   Resv   | V |    Size     |
+>>> +
+>>> +    bits:     | 63 ... 44 | 43  ...  0  |
+>>> +    values:   |    Resv   |  ITT_addr   |
+>>
+>> While I appreciate this layout represents the absolute maximum an ITS
+>> could implement, I'm a bit concerned about the amount of memory we may
+>> end-up requiring here. All the ITSs implementations I know of seem to
+>> get away with 8 bytes per entry. Maybe I'm just too worried.
+> 
+> OK so I would propose a 16b DeviceId and 16b eventid
+> 
+> bits:     | 63   ...  48  | 47 ... 4 | 3   ...   0 |
+> values:   |   DeviceID    | ITT_addr |    Size     |
+> 
+> I can use the size field as a validity indicator
 
-That's what my patch does, but since modern virtio has the
-VIRTIO_F_IOMMU_PLATFORM flag (and the spec says if it's not present then
-the driver must pass physical addresses), it feels to me like we should
-just honour that so that different architectures all have the same
-behaviour. For legacy devices, the horse has bolted and we need
-arch-specific behaviours to keep things working.
+Note that you are allowed to use a 0 size field. It means 1 bit of
+EventID (2 possible interrupts). So maybe using a particular address as
+a valid flag?
 
-Will
+> 
+>>
+>> Also, please mention that ITT_addr is actually ITT_addr[51:8], as we're
+>> guaranteed to have an ITT that is 256 byte aligned.
+> sure
+>>
+>>> +
+>>> +    Collection Table Entry (CTE) layout: entry size = 8 bytes
+>>> +
+>>> +    bits:     | 63| 62 ..  52  | 51 ... 16 | 15  ...   0 |
+>>> +    values:   | V |    RES0    |  RDBase   |    ICID     |
+>>> +
+>>> +    Interrupt Translation Table Entry (ITTE) layout: entry size = 16 bytes
+>>
+>> The actual name is Interrupt Translation Entry (ITE). I have a patch
+>> renaming this all over the vgic-its.c file...
+> ok
+>>
+>>> +
+>>> +    bits:     | 63   ...  32  | 31 ... 17 | 16 | 15  ...  0 |
+>>> +    values:   |   DeviceID    |    RES0   | V  |    ICID    |
+>>> +
+>>> +    bits:     | 63 ...  32    | 31      ...        0 |
+>>> +    values:   |   pINTID      |        EventID       |
+>>
+>> Same concern here. 32bit DevID, EventID and INTID seem a bit over the
+>> top. But maybe we shouldn't be concerned about memory... ;-)
+> So I would suggest encoding
+> 16b DeviceId
+> 16b eventid
+> 16b collection ID
+> 16b pINTID
+> 
+> bits:     | 63   ...  48  | 47 ... 32 | 31 ... 15 | 15  ...  0 |
+> values:   |   DeviceID    |   pINTID  |  EventId  |   ICID     |
+> 
+> a null pINTID would meen the ITE is invalid.
+> 
+> Does that make sense or should I instead reduce the number of bits
+> allocated to collections and keep the pINTID bit number larger?
+
+16bit worth of collections is quite a lot (64k CPUs?). I'd be perfectly
+fine with a smaller number, but let's see what people think.
+
+> 
+> 
+>>
+>>> +
+>>> +    LPI Pending Table layout:
+>>> +
+>>> +    As specified in the ARM Generic Interrupt Controller Architecture
+>>> +    Specification GIC Architecture version 3.0 and version 4. The first
+>>> +    1kB contains only zeros.
+>>>
+>>
+>> You definitely want to relax this. An ITS implementation is allowed (and
+>> actually encouraged) to maintain a coarse map in the first kB, and use
+>> this to quickly scan the table, which would be very useful on restore.
+> Maybe I miss something here. Currently I restore the ITEs before the
+> pending tables. So considering all the ITEs I know which LPI are defined
+> and which pending bits need to be restored. Why would I need to use a
+> coarse map for?
+
+You could, instead of testing all the bits for which you can generate an
+LPI, look at the coarse map, which usually uses one bit to represent
+something like 64 bits of pending table, and find out what is currently
+pending. That's what HW does, but maybe there is no need to do this for
+the SW implementation, specially if we have very few LPIs.
+
+> I understand the CPU cannot write the pending tables in our back, spec
+> says behavior would be unpredictable, right?
+
+Absolutely. Only the ITS can touch that memory.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
