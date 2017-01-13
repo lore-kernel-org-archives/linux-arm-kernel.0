@@ -1,90 +1,100 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Jan 2017 16:12:10 +0000
-Subject: [PATCH v3 3/5] arm64: Create and use __tlbi_dsb() macros
-In-Reply-To: <8f8057f5-d33f-15b3-de9f-6e718c23e97d@codeaurora.org>
-References: <20170111144118.17062-1-cov@codeaurora.org>
- <20170111144118.17062-3-cov@codeaurora.org>
- <20170112165852.GH13843@arm.com>
- <8f8057f5-d33f-15b3-de9f-6e718c23e97d@codeaurora.org>
-Message-ID: <20170113161209.GI3253@arm.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 13 Jan 2017 17:13:55 +0100
+Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
+In-Reply-To: <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
+References: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
+ <1484291609-20195-3-git-send-email-guochun.mao@mediatek.com>
+ <20170113151747.6bc85245@bbrezillon>
+ <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
+Message-ID: <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 10:12:36AM -0500, Christopher Covington wrote:
-> On 01/12/2017 11:58 AM, Will Deacon wrote:
-> > On Wed, Jan 11, 2017 at 09:41:16AM -0500, Christopher Covington wrote:
-> >> +#define __tlbi_asm_dsb(as, op, attr, ...) do {				       \
-> >> +		__TLBI_FOR(op, ##__VA_ARGS__)				       \
-> >> +			asm (__TLBI_INSTR(op, ##__VA_ARGS__)		       \
-> >> +			__TLBI_IO(op, ##__VA_ARGS__));			       \
-> >> +		asm volatile (	     as			"\ndsb " #attr "\n"    \
-> >> +		: : : "memory"); } while (0)
-> >> +
-> >> +#define __tlbi_dsb(...)	__tlbi_asm_dsb("", ##__VA_ARGS__)
-> > 
-> > I can't deny that this is cool, but ultimately it's completely unreadable.
-> > What I was thinking you'd do would be make __tlbi expand to:
-> > 
-> >   tlbi
-> >   dsb
-> >   tlbi
-> >   dsb
-> > 
-> > for Falkor, and:
-> > 
-> >   tlbi
-> >   nop
-> >   nop
-> >   nop
-> > 
-> > for everybody else.
+On 01/13/2017 04:12 PM, Matthias Brugger wrote:
 > 
-> Thanks for the suggestion. So would __tlbi take a dsb sharability argument in
-> your proposal? Or would it be communicated in some other fashion, maybe inferred
-> from the tlbi argument? Or would the workaround dsbs all be the worst/broadest
-> case?
-
-I think always using inner-shareable should be ok. If you wanted to optimise
-this, you'd want to avoid the workaround altogether for non-shareable
-invalidation, but that's fairly rare and I doubt you'd be able to measure
-the impact.
-
-> > Wouldn't that localise this change sufficiently that you wouldn't need
-> > to change all the callers and encode the looping in your cpp macros?
-> > 
-> > I realise you get an extra dsb in some places with that change, but I'd
-> > like to see numbers for the impact of that on top of the workaround. If
-> > it's an issue, then an alternative sequence would be:
-> > 
-> >   tlbi
-> >   dsb
-> >   tlbi
-> > 
-> > and you'd rely on the existing dsb to complete that.
-> > 
-> > Having said that, I don't understand how your current loop code works
-> > when the workaround is applied. AFAICT, you end up emitting something
-> > like:
-> > 
-> > dsb ishst
-> > for i in 0 to n
-> > 	tlbi va+i
-> > dsb
-> > tlbi va+n
-> > dsb
-> > 
-> > which looks wrong to me. Am I misreading something here?
 > 
-> You're right, I am off by 1 << (PAGE_SHIFT - 12) here. I would need to
-> increment, compare, not take the loop branch (regular for loop stuff),
-> then decrement (missing) and perform TLB invalidation again (present but
-> using incorrect value).
+> On 13/01/17 15:17, Boris Brezillon wrote:
+>> On Fri, 13 Jan 2017 15:13:29 +0800
+>> Guochun Mao <guochun.mao@mediatek.com> wrote:
+>>
+>>> Add Mediatek nor flash node.
+>>>
+>>> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+>>> ---
+>>>  arch/arm/boot/dts/mt2701-evb.dts |   25 +++++++++++++++++++++++++
+>>>  arch/arm/boot/dts/mt2701.dtsi    |   12 ++++++++++++
+>>>  2 files changed, 37 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/mt2701-evb.dts
+>>> b/arch/arm/boot/dts/mt2701-evb.dts
+>>> index 082ca88..85e5ae8 100644
+>>> --- a/arch/arm/boot/dts/mt2701-evb.dts
+>>> +++ b/arch/arm/boot/dts/mt2701-evb.dts
+>>> @@ -24,6 +24,31 @@
+>>>      };
+>>>  };
+>>>
+>>> +&nor_flash {
+>>> +    pinctrl-names = "default";
+>>> +    pinctrl-0 = <&nor_pins_default>;
+>>> +    status = "okay";
+>>> +    flash at 0 {
+>>> +        compatible = "jedec,spi-nor";
+>>> +        reg = <0>;
+>>> +    };
+>>> +};
+>>> +
+>>> +&pio {
+>>> +    nor_pins_default: nor {
+>>> +        pins1 {
+>>> +            pinmux = <MT2701_PIN_240_EXT_XCS__FUNC_EXT_XCS>,
+>>> +                 <MT2701_PIN_241_EXT_SCK__FUNC_EXT_SCK>,
+>>> +                 <MT2701_PIN_239_EXT_SDIO0__FUNC_EXT_SDIO0>,
+>>> +                 <MT2701_PIN_238_EXT_SDIO1__FUNC_EXT_SDIO1>,
+>>> +                 <MT2701_PIN_237_EXT_SDIO2__FUNC_EXT_SDIO2>,
+>>> +                 <MT2701_PIN_236_EXT_SDIO3__FUNC_EXT_SDIO3>;
+>>> +            drive-strength = <MTK_DRIVE_4mA>;
+>>> +            bias-pull-up;
+>>> +        };
+>>> +    };
+>>> +};
+>>> +
+>>>  &uart0 {
+>>>      status = "okay";
+>>>  };
+>>> diff --git a/arch/arm/boot/dts/mt2701.dtsi
+>>> b/arch/arm/boot/dts/mt2701.dtsi
+>>> index bdf8954..1eefce4 100644
+>>> --- a/arch/arm/boot/dts/mt2701.dtsi
+>>> +++ b/arch/arm/boot/dts/mt2701.dtsi
+>>> @@ -227,6 +227,18 @@
+>>>          status = "disabled";
+>>>      };
+>>>
+>>> +    nor_flash: spi at 11014000 {
+>>> +        compatible = "mediatek,mt2701-nor",
+>>> +                 "mediatek,mt8173-nor";
+>>
+>> Why define both here? Is "mediatek,mt8173-nor" really providing a
+>> subset of the features supported by "mediatek,mt2701-nor"?
+>>
+> 
+> I think even if the ip block is the same, we should provide both
+> bindings, just in case in the future we find out that mt2701 has some
+> hidden bug, feature or bug-feature. This way even if we update the
+> driver, we stay compatible with older device tree blobs in the wild.
+> 
+> We can drop the mt2701-nor in the bindings definition if you want.
 
-It also strikes me as odd that you only need one extra TLBI after the loop
-has finished, as opposed to a tlbi; dsb; tlbi loop body (which is what you'd
-get if you modified __tlbi as I suggest).
+This exactly. We should have a DT compat in the form:
+compatible = "vendor,<soc>-block", "vendor,<oldest-compat-soc>-block";
+Then if we find a problem in the future, we can match on the
+"vendor,<soc>-block" and still support the old DTs.
 
-Is it sufficient to have one extra TLBI after the loop and, if so, is the
-performance impact of my suggestion therefore unacceptable?
+The question is, does the "vendor,<soc>-block" go into the binding
+document as well or do we only have "vendor,<oldest-compat-soc>-block"
+there ?
 
-Will
+-- 
+Best regards,
+Marek Vasut
