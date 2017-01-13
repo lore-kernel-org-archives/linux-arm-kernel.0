@@ -1,108 +1,313 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 13 Jan 2017 16:21:04 +0100
-Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
-In-Reply-To: <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
-References: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
- <1484291609-20195-3-git-send-email-guochun.mao@mediatek.com>
- <20170113151747.6bc85245@bbrezillon>
- <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
-Message-ID: <20170113162104.4d2a624c@bbrezillon>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Fri, 13 Jan 2017 15:21:43 +0000
+Subject: [PATCH RFC 1/7] net: phy: move phy MMD accessors to phy-core.c
+In-Reply-To: <20170113152059.GR14217@n2100.armlinux.org.uk>
+References: <20170113152059.GR14217@n2100.armlinux.org.uk>
+Message-ID: <E1cS3fj-0003XN-F0@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Jan 2017 16:12:20 +0100
-Matthias Brugger <matthias.bgg@gmail.com> wrote:
+Move the phy_(read|write)__mmd() helpers out of line, they will become
+our main MMD accessor functions, and so will be a little more complex.
+This complexity doesn't belong in an inline function.  Also move the
+_indirect variants as well to keep like functionality together.
 
-> On 13/01/17 15:17, Boris Brezillon wrote:
-> > On Fri, 13 Jan 2017 15:13:29 +0800
-> > Guochun Mao <guochun.mao@mediatek.com> wrote:
-> >  
-> >> Add Mediatek nor flash node.
-> >>
-> >> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
-> >> ---
-> >>  arch/arm/boot/dts/mt2701-evb.dts |   25 +++++++++++++++++++++++++
-> >>  arch/arm/boot/dts/mt2701.dtsi    |   12 ++++++++++++
-> >>  2 files changed, 37 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
-> >> index 082ca88..85e5ae8 100644
-> >> --- a/arch/arm/boot/dts/mt2701-evb.dts
-> >> +++ b/arch/arm/boot/dts/mt2701-evb.dts
-> >> @@ -24,6 +24,31 @@
-> >>  	};
-> >>  };
-> >>
-> >> +&nor_flash {
-> >> +	pinctrl-names = "default";
-> >> +	pinctrl-0 = <&nor_pins_default>;
-> >> +	status = "okay";
-> >> +	flash at 0 {
-> >> +		compatible = "jedec,spi-nor";
-> >> +		reg = <0>;
-> >> +	};
-> >> +};
-> >> +
-> >> +&pio {
-> >> +	nor_pins_default: nor {
-> >> +		pins1 {
-> >> +			pinmux = <MT2701_PIN_240_EXT_XCS__FUNC_EXT_XCS>,
-> >> +				 <MT2701_PIN_241_EXT_SCK__FUNC_EXT_SCK>,
-> >> +				 <MT2701_PIN_239_EXT_SDIO0__FUNC_EXT_SDIO0>,
-> >> +				 <MT2701_PIN_238_EXT_SDIO1__FUNC_EXT_SDIO1>,
-> >> +				 <MT2701_PIN_237_EXT_SDIO2__FUNC_EXT_SDIO2>,
-> >> +				 <MT2701_PIN_236_EXT_SDIO3__FUNC_EXT_SDIO3>;
-> >> +			drive-strength = <MTK_DRIVE_4mA>;
-> >> +			bias-pull-up;
-> >> +		};
-> >> +	};
-> >> +};
-> >> +
-> >>  &uart0 {
-> >>  	status = "okay";
-> >>  };
-> >> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-> >> index bdf8954..1eefce4 100644
-> >> --- a/arch/arm/boot/dts/mt2701.dtsi
-> >> +++ b/arch/arm/boot/dts/mt2701.dtsi
-> >> @@ -227,6 +227,18 @@
-> >>  		status = "disabled";
-> >>  	};
-> >>
-> >> +	nor_flash: spi at 11014000 {
-> >> +		compatible = "mediatek,mt2701-nor",
-> >> +			     "mediatek,mt8173-nor";  
-> >
-> > Why define both here? Is "mediatek,mt8173-nor" really providing a
-> > subset of the features supported by "mediatek,mt2701-nor"?
-> >  
-> 
-> I think even if the ip block is the same, we should provide both 
-> bindings, just in case in the future we find out that mt2701 has some 
-> hidden bug, feature or bug-feature. This way even if we update the 
-> driver, we stay compatible with older device tree blobs in the wild.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ drivers/net/phy/Makefile   |   3 +-
+ drivers/net/phy/phy-core.c | 135 +++++++++++++++++++++++++++++++++++++++++++++
+ drivers/net/phy/phy.c      |  85 ----------------------------
+ include/linux/phy.h        |  20 +------
+ 4 files changed, 139 insertions(+), 104 deletions(-)
+ create mode 100644 drivers/net/phy/phy-core.c
 
-I'm fine with this approach, but in this case, defining both is wrong.
-
-> 
-> We can drop the mt2701-nor in the bindings definition if you want.
-
-Yes, please.
-
-> 
-> Regards,
-> Matthias
-> 
-> >> +		reg = <0 0x11014000 0 0xe0>;
-> >> +		clocks = <&pericfg CLK_PERI_FLASH>,
-> >> +			 <&topckgen CLK_TOP_FLASH_SEL>;
-> >> +		clock-names = "spi", "sf";
-> >> +		#address-cells = <1>;
-> >> +		#size-cells = <0>;
-> >> +		status = "disabled";
-> >> +	};
-> >> +
-> >>  	mmsys: syscon at 14000000 {
-> >>  		compatible = "mediatek,mt2701-mmsys", "syscon";
-> >>  		reg = <0 0x14000000 0 0x1000>;  
-> >  
+diff --git a/drivers/net/phy/Makefile b/drivers/net/phy/Makefile
+index 356859ac7c18..06fa2e04ac7e 100644
+--- a/drivers/net/phy/Makefile
++++ b/drivers/net/phy/Makefile
+@@ -1,6 +1,7 @@
+ # Makefile for Linux PHY drivers and MDIO bus drivers
+ 
+-libphy-y			:= phy.o phy_device.o mdio_bus.o mdio_device.o
++libphy-y			:= phy.o phy_device.o mdio_bus.o mdio_device.o \
++				   phy-core.o
+ libphy-$(CONFIG_SWPHY)		+= swphy.o
+ libphy-$(CONFIG_LED_TRIGGER_PHY)	+= phy_led_triggers.o
+ 
+diff --git a/drivers/net/phy/phy-core.c b/drivers/net/phy/phy-core.c
+new file mode 100644
+index 000000000000..b8d8276a3099
+--- /dev/null
++++ b/drivers/net/phy/phy-core.c
+@@ -0,0 +1,135 @@
++/*
++ * Core PHY library, taken from phy.c
++ *
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ */
++#include <linux/export.h>
++#include <linux/phy.h>
++
++static inline void mmd_phy_indirect(struct mii_bus *bus, int prtad, int devad,
++				    int addr)
++{
++	/* Write the desired MMD Devad */
++	bus->write(bus, addr, MII_MMD_CTRL, devad);
++
++	/* Write the desired MMD register address */
++	bus->write(bus, addr, MII_MMD_DATA, prtad);
++
++	/* Select the Function : DATA with no post increment */
++	bus->write(bus, addr, MII_MMD_CTRL, (devad | MII_MMD_CTRL_NOINCR));
++}
++
++/**
++ * phy_read_mmd_indirect - reads data from the MMD registers
++ * @phydev: The PHY device bus
++ * @prtad: MMD Address
++ * @devad: MMD DEVAD
++ *
++ * Description: it reads data from the MMD registers (clause 22 to access to
++ * clause 45) of the specified phy address.
++ * To read these register we have:
++ * 1) Write reg 13 // DEVAD
++ * 2) Write reg 14 // MMD Address
++ * 3) Write reg 13 // MMD Data Command for MMD DEVAD
++ * 3) Read  reg 14 // Read MMD data
++ */
++int phy_read_mmd_indirect(struct phy_device *phydev, int prtad, int devad)
++{
++	struct phy_driver *phydrv = phydev->drv;
++	int addr = phydev->mdio.addr;
++	int value = -1;
++
++	if (!phydrv->read_mmd_indirect) {
++		struct mii_bus *bus = phydev->mdio.bus;
++
++		mutex_lock(&bus->mdio_lock);
++		mmd_phy_indirect(bus, prtad, devad, addr);
++
++		/* Read the content of the MMD's selected register */
++		value = bus->read(bus, addr, MII_MMD_DATA);
++		mutex_unlock(&bus->mdio_lock);
++	} else {
++		value = phydrv->read_mmd_indirect(phydev, prtad, devad, addr);
++	}
++	return value;
++}
++EXPORT_SYMBOL(phy_read_mmd_indirect);
++
++/**
++ * phy_read_mmd - Convenience function for reading a register
++ * from an MMD on a given PHY.
++ * @phydev: The phy_device struct
++ * @devad: The MMD to read from
++ * @regnum: The register on the MMD to read
++ *
++ * Same rules as for phy_read();
++ */
++int phy_read_mmd(struct phy_device *phydev, int devad, u32 regnum)
++{
++	if (!phydev->is_c45)
++		return -EOPNOTSUPP;
++
++	return mdiobus_read(phydev->mdio.bus, phydev->mdio.addr,
++			    MII_ADDR_C45 | (devad << 16) | (regnum & 0xffff));
++}
++EXPORT_SYMBOL(phy_read_mmd);
++
++/**
++ * phy_write_mmd_indirect - writes data to the MMD registers
++ * @phydev: The PHY device
++ * @prtad: MMD Address
++ * @devad: MMD DEVAD
++ * @data: data to write in the MMD register
++ *
++ * Description: Write data from the MMD registers of the specified
++ * phy address.
++ * To write these register we have:
++ * 1) Write reg 13 // DEVAD
++ * 2) Write reg 14 // MMD Address
++ * 3) Write reg 13 // MMD Data Command for MMD DEVAD
++ * 3) Write reg 14 // Write MMD data
++ */
++void phy_write_mmd_indirect(struct phy_device *phydev, int prtad,
++				   int devad, u32 data)
++{
++	struct phy_driver *phydrv = phydev->drv;
++	int addr = phydev->mdio.addr;
++
++	if (!phydrv->write_mmd_indirect) {
++		struct mii_bus *bus = phydev->mdio.bus;
++
++		mutex_lock(&bus->mdio_lock);
++		mmd_phy_indirect(bus, prtad, devad, addr);
++
++		/* Write the data into MMD's selected register */
++		bus->write(bus, addr, MII_MMD_DATA, data);
++		mutex_unlock(&bus->mdio_lock);
++	} else {
++		phydrv->write_mmd_indirect(phydev, prtad, devad, addr, data);
++	}
++}
++EXPORT_SYMBOL(phy_write_mmd_indirect);
++
++/**
++ * phy_write_mmd - Convenience function for writing a register
++ * on an MMD on a given PHY.
++ * @phydev: The phy_device struct
++ * @devad: The MMD to read from
++ * @regnum: The register on the MMD to read
++ * @val: value to write to @regnum
++ *
++ * Same rules as for phy_write();
++ */
++int phy_write_mmd(struct phy_device *phydev, int devad, u32 regnum, u16 val)
++{
++	if (!phydev->is_c45)
++		return -EOPNOTSUPP;
++
++	regnum = MII_ADDR_C45 | ((devad & 0x1f) << 16) | (regnum & 0xffff);
++
++	return mdiobus_write(phydev->mdio.bus, phydev->mdio.addr, regnum, val);
++}
++EXPORT_SYMBOL(phy_write_mmd);
+diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
+index 25f93a98863b..c6022b66f81d 100644
+--- a/drivers/net/phy/phy.c
++++ b/drivers/net/phy/phy.c
+@@ -1175,91 +1175,6 @@ void phy_mac_interrupt(struct phy_device *phydev, int new_link)
+ }
+ EXPORT_SYMBOL(phy_mac_interrupt);
+ 
+-static inline void mmd_phy_indirect(struct mii_bus *bus, int prtad, int devad,
+-				    int addr)
+-{
+-	/* Write the desired MMD Devad */
+-	bus->write(bus, addr, MII_MMD_CTRL, devad);
+-
+-	/* Write the desired MMD register address */
+-	bus->write(bus, addr, MII_MMD_DATA, prtad);
+-
+-	/* Select the Function : DATA with no post increment */
+-	bus->write(bus, addr, MII_MMD_CTRL, (devad | MII_MMD_CTRL_NOINCR));
+-}
+-
+-/**
+- * phy_read_mmd_indirect - reads data from the MMD registers
+- * @phydev: The PHY device bus
+- * @prtad: MMD Address
+- * @devad: MMD DEVAD
+- *
+- * Description: it reads data from the MMD registers (clause 22 to access to
+- * clause 45) of the specified phy address.
+- * To read these register we have:
+- * 1) Write reg 13 // DEVAD
+- * 2) Write reg 14 // MMD Address
+- * 3) Write reg 13 // MMD Data Command for MMD DEVAD
+- * 3) Read  reg 14 // Read MMD data
+- */
+-int phy_read_mmd_indirect(struct phy_device *phydev, int prtad, int devad)
+-{
+-	struct phy_driver *phydrv = phydev->drv;
+-	int addr = phydev->mdio.addr;
+-	int value = -1;
+-
+-	if (!phydrv->read_mmd_indirect) {
+-		struct mii_bus *bus = phydev->mdio.bus;
+-
+-		mutex_lock(&bus->mdio_lock);
+-		mmd_phy_indirect(bus, prtad, devad, addr);
+-
+-		/* Read the content of the MMD's selected register */
+-		value = bus->read(bus, addr, MII_MMD_DATA);
+-		mutex_unlock(&bus->mdio_lock);
+-	} else {
+-		value = phydrv->read_mmd_indirect(phydev, prtad, devad, addr);
+-	}
+-	return value;
+-}
+-EXPORT_SYMBOL(phy_read_mmd_indirect);
+-
+-/**
+- * phy_write_mmd_indirect - writes data to the MMD registers
+- * @phydev: The PHY device
+- * @prtad: MMD Address
+- * @devad: MMD DEVAD
+- * @data: data to write in the MMD register
+- *
+- * Description: Write data from the MMD registers of the specified
+- * phy address.
+- * To write these register we have:
+- * 1) Write reg 13 // DEVAD
+- * 2) Write reg 14 // MMD Address
+- * 3) Write reg 13 // MMD Data Command for MMD DEVAD
+- * 3) Write reg 14 // Write MMD data
+- */
+-void phy_write_mmd_indirect(struct phy_device *phydev, int prtad,
+-				   int devad, u32 data)
+-{
+-	struct phy_driver *phydrv = phydev->drv;
+-	int addr = phydev->mdio.addr;
+-
+-	if (!phydrv->write_mmd_indirect) {
+-		struct mii_bus *bus = phydev->mdio.bus;
+-
+-		mutex_lock(&bus->mdio_lock);
+-		mmd_phy_indirect(bus, prtad, devad, addr);
+-
+-		/* Write the data into MMD's selected register */
+-		bus->write(bus, addr, MII_MMD_DATA, data);
+-		mutex_unlock(&bus->mdio_lock);
+-	} else {
+-		phydrv->write_mmd_indirect(phydev, prtad, devad, addr, data);
+-	}
+-}
+-EXPORT_SYMBOL(phy_write_mmd_indirect);
+-
+ /**
+  * phy_init_eee - init and check the EEE feature
+  * @phydev: target phy_device struct
+diff --git a/include/linux/phy.h b/include/linux/phy.h
+index f7d95f644eed..72acb0233b5f 100644
+--- a/include/linux/phy.h
++++ b/include/linux/phy.h
+@@ -647,14 +647,7 @@ struct phy_fixup {
+  *
+  * Same rules as for phy_read();
+  */
+-static inline int phy_read_mmd(struct phy_device *phydev, int devad, u32 regnum)
+-{
+-	if (!phydev->is_c45)
+-		return -EOPNOTSUPP;
+-
+-	return mdiobus_read(phydev->mdio.bus, phydev->mdio.addr,
+-			    MII_ADDR_C45 | (devad << 16) | (regnum & 0xffff));
+-}
++int phy_read_mmd(struct phy_device *phydev, int devad, u32 regnum);
+ 
+ /**
+  * phy_read_mmd_indirect - reads data from the MMD registers
+@@ -748,16 +741,7 @@ static inline bool phy_is_pseudo_fixed_link(struct phy_device *phydev)
+  *
+  * Same rules as for phy_write();
+  */
+-static inline int phy_write_mmd(struct phy_device *phydev, int devad,
+-				u32 regnum, u16 val)
+-{
+-	if (!phydev->is_c45)
+-		return -EOPNOTSUPP;
+-
+-	regnum = MII_ADDR_C45 | ((devad & 0x1f) << 16) | (regnum & 0xffff);
+-
+-	return mdiobus_write(phydev->mdio.bus, phydev->mdio.addr, regnum, val);
+-}
++int phy_write_mmd(struct phy_device *phydev, int devad, u32 regnum, u16 val);
+ 
+ /**
+  * phy_write_mmd_indirect - writes data to the MMD registers
+-- 
+2.7.4
