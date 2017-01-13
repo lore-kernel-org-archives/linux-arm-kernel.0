@@ -1,67 +1,24 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 12 Jan 2017 16:52:06 -0800
-Subject: [PATCH] ARM64: dts: meson-gxbb-odroidc2: fix GbE tx link breakage
-In-Reply-To: <1482319894-656-1-git-send-email-jbrunet@baylibre.com> (Jerome
- Brunet's message of "Wed, 21 Dec 2016 12:31:34 +0100")
-References: <1482319894-656-1-git-send-email-jbrunet@baylibre.com>
-Message-ID: <m2r3476atl.fsf@baylibre.com>
+From: jepler@unpythonic.net (Jeff Epler)
+Date: Thu, 12 Jan 2017 19:04:27 -0600
+Subject: [PATCH v2 7/7] uapi: export all headers under uapi directories
+In-Reply-To: <9d68af8a-a609-d7b1-58a9-f1155313b077@6wind.com>
+References: <bf83da6b-01ef-bf44-b3e1-ca6fc5636818@6wind.com>
+ <1483695839-18660-1-git-send-email-nicolas.dichtel@6wind.com>
+ <1483695839-18660-8-git-send-email-nicolas.dichtel@6wind.com>
+ <20170109125638.GA15506@infradead.org>
+ <464a1323-4450-e563-ff59-9e6d57b75959@6wind.com>
+ <alpine.LSU.2.20.1701121727180.19188@erq.vanv.qr>
+ <9d68af8a-a609-d7b1-58a9-f1155313b077@6wind.com>
+Message-ID: <20170113010427.GA22650@unpythonic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jerome Brunet <jbrunet@baylibre.com> writes:
+On Thu, Jan 12, 2017 at 05:32:09PM +0100, Nicolas Dichtel wrote:
+> What I was trying to say is that I export those directories like other are.
+> Removing those files is not related to that series.
 
-> OdroidC2 GbE link breaks under heavy tx transfer. This happens even if the
-> MAC does not enable Energy Efficient Ethernet (No Low Power state Idle on
-> the Tx path). The problem seems to come from the phy Rx path, entering the
-> LPI state.
->
-> Disabling EEE advertisement on the phy prevent this feature to be
-> negociated with the link partner and solve the issue.
->
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> ---
->
-> This patch is based on Linus recent master branch [0]
-> This patch depends on the series [1] which has been merged in this branch.
->
-> 0: ba6d973f78eb ("Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net")
-> 1: http://lkml.kernel.org/r/1480326409-25419-1-git-send-email-jbrunet at baylibre.com
->    Fix integration of eee-broken-modes
->    
->  arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> index 238fbeacd330..d8933e9e9a5a 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> @@ -147,6 +147,18 @@
->  	status = "okay";
->  	pinctrl-0 = <&eth_rgmii_pins>;
->  	pinctrl-names = "default";
-> +	phy-handle = <&eth_phy0>;
-> +
-> +	mdio {
-> +		compatible = "snps,dwmac-mdio";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		eth_phy0: ethernet-phy at 0 {
-> +			reg = <0>;
-> +			eee-broken-1000t;
-> +		};
-> +	};
+Perhaps the correct solution is to only copy files matching "*.h" to
+reduce the risk of copying files incidentally created by kbuild but
+which shouldn't be installed as uapi headers.
 
-There's already an MDIO node in the meson-gx.dtsi (using the same
-compatible), shouldn't you just override that and add the new
-properties?
-
-What would make things easier is if the names were like Martin used in
-his reset patch, so that when I merge them together it's not a major
-conflict.
-
-Thanks,
-
-Kevin
-
-[1] https://patchwork.kernel.org/patch/9459409/
+jeff
