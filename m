@@ -1,27 +1,73 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 13 Jan 2017 14:02:18 -0600
-Subject: [PATCH v2 3/5] ARM: davinci_all_defconfig: enable iio and ADS7950
-In-Reply-To: <3c4f8952-0a64-fc49-bd87-452dbbf7a946@ti.com>
-References: <1483677228-2325-1-git-send-email-david@lechnology.com>
- <1483677228-2325-4-git-send-email-david@lechnology.com>
- <cb9455bc-2658-9826-823b-2aa845237fed@ti.com>
- <01ec2c94-46e0-3534-94e8-bd92f78b70ec@lechnology.com>
- <b29c37b2-382c-dbab-966b-4463e3127676@ti.com>
- <3c4f8952-0a64-fc49-bd87-452dbbf7a946@ti.com>
-Message-ID: <a8ecd4a3-65b9-1719-2d82-1266250dfac5@lechnology.com>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Fri, 13 Jan 2017 21:14:56 +0100
+Subject: [PATCH 4/4] ARM64: dts: meson: meson-gx: add the SAR ADC
+In-Reply-To: <CAFBinCC_AYS0ogzdpGVRoeS2ETjcD6fdmzq3kmX_u=9heBu6oA@mail.gmail.com>
+References: <2c7996a6-9c55-4cee-75a1-01be8732c42a@gmail.com>
+ <CAFBinCC_AYS0ogzdpGVRoeS2ETjcD6fdmzq3kmX_u=9heBu6oA@mail.gmail.com>
+Message-ID: <85c07462-c175-faf8-8dae-403a6291331e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2017 06:24 AM, Sekhar Nori wrote:
-> On Wednesday 11 January 2017 01:53 PM, Sekhar Nori wrote:
+Am 13.01.2017 um 20:50 schrieb Martin Blumenstingl:
+> Hi Heiner,
+> 
+> On Fri, Jan 13, 2017 at 8:32 PM, Heiner Kallweit <hkallweit1@gmail.com> wrote:
+>> Sorry, I'm not subscribed to the two mailing lists, therefore my reply
+>> is outside the thread.
+>>
+>> I'm currently experimenting with an own rudimentary driver for SAR ADC
+>> on a Odroid C2 (S905GXBB). So I have some remarks based on my experience.
+> I hope that we haven't been duplicating too much work!
+> 
+No, my driver doesn't include all the clock handling and relies on the
+boot loader / firmware to do this. Also I don't support averaging mode.
+Your driver is much more comprehensive and I would go with it.
 
->> I do remember I did not see these two modules did not get enabled in
->> .config after 'make davinci_all_defconfig'. Will check what I may have
->> missed.
->
-> So IIO_TRIGGERED_BUFFER is not selected in my tree because I dont have
-> the ADS7950 driver enabled. Same thing with IIO_BUFFER.
->
-> Can you try this patch over my tree?
+I have some features like interrupt mode and calibration which are not
+yet supported in your driver but they can be easily migrated and added
+later.
 
-I've got it sorted now and I have sent a new patch.
+Rgds, Heiner
+
+>> Rgds, Heiner
+>>
+>>> Add the SAR ADC to meson-gxbb.dtsi and meson-gxl.dtsi. GXBB provides a
+>>> 10-bit ADC while GXL (and GXM, which uses the same ADC as GXL) provides
+>>> a 12-bit ADC.
+>>> Some boards use resistor ladder buttons connected through one of the ADC
+>>> channels. On newer devices (GXL and GXM) some boards use pull-ups/downs
+>>> to change the resistance (and thus the ADC value) on of the ADC channels
+>>> to indicate the board revision.
+>>>
+>>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@xxxxxxxxxxxxxx>
+>>> ---
+>>>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi   |  8 ++++++++
+>>>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 10 ++++++++++
+>>>  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 10 ++++++++++
+>>>  3 files changed, 28 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+>>> index cddad8c795ec..ed3bf29eb76a 100644
+>>> --- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+>>> +++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+>>> @@ -237,6 +237,14 @@
+>>>                               status = "disabled";
+>>>                       };
+>>>
+>>> +                     saradc: adc at 8680 {
+>>> +                             compatible = "amlogic,meson-saradc";
+>>> +                             #io-channel-cells = <1>;
+>>> +                             status = "disabled";
+>>> +                             reg = <0x0 0x8680 0x0 0x34>;
+>>> +                             interrupts = <GIC_SPI 9 IRQ_TYPE_EDGE_RISING>;
+>> IRQ 9 dosn't work for me, where does this number come from?
+>> With IRQ 73 interrupt mode is working fine here.
+>> Of course I can't speak for all other Meson variants.
+> I think I took the IRQ from the vendor's mesongxbb.dtsi, depending on
+> whether I'll add IRQ support or not I'll remove or fix this. Thanks
+> for spotting this!
+> 
+> 
+> Regards,
+> Martin
+> 
