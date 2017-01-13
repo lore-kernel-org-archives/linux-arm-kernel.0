@@ -1,27 +1,25 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 13 Jan 2017 17:54:51 +0100
-Subject: [PATCH 1/3] rtc: stm32: remove __exit annotation on remove
- callback
-In-Reply-To: <20170113153311.2611510-1-arnd@arndb.de>
+Date: Fri, 13 Jan 2017 17:55:01 +0100
+Subject: [PATCH 2/3] rtc: stm32: fix building without CONFIG_OF
+In-Reply-To: <20170113153311.2611510-2-arnd@arndb.de>
 References: <20170113153311.2611510-1-arnd@arndb.de>
-Message-ID: <20170113165451.3wsyynukd3su2tcf@piout.net>
+ <20170113153311.2611510-2-arnd@arndb.de>
+Message-ID: <20170113165501.s7qlkrhcpusfnm2s@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/01/2017 at 16:32:51 +0100, Arnd Bergmann wrote :
-> The remove function can be called at runtime for a manual 'unbind'
-> operation and must not be left out from a built-in driver, as kbuild
-> complains:
+On 13/01/2017 at 16:32:52 +0100, Arnd Bergmann wrote :
+> The new driver has a stray #ifdef in it that causes a build error:
 > 
-> `stm32_rtc_remove' referenced in section `.data.stm32_rtc_driver' of drivers/rtc/rtc-stm32.o: defined in discarded section `.exit.text' of drivers/rtc/rtc-stm32.o
+> drivers/rtc/rtc-stm32.c:718:21: error: 'stm32_rtc_of_match' undeclared here (not in a function); did you mean 'stm32_rtc_pm_ops'?
 > 
-> This removes the extraneous annotation.
+> As the #ifdef serves no purpose here, let's just remove it.
 > 
 > Fixes: 4e64350f42e2 ("rtc: add STM32 RTC driver")
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  drivers/rtc/rtc-stm32.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/rtc/rtc-stm32.c | 2 --
+>  1 file changed, 2 deletions(-)
 > 
 Applied, thanks.
 
