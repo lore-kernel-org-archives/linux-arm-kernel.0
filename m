@@ -1,47 +1,90 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 13 Jan 2017 10:15:51 -0800
-Subject: [PATCH] firmware: qcom: scm: Mask APQ8064 core clk dependency
-In-Reply-To: <1484175483-25333-1-git-send-email-andy.gross@linaro.org>
-References: <1484175483-25333-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <20170113181551.GL10531@minitux>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 13 Jan 2017 18:16:42 +0000
+Subject: [PATCH] KVM: arm64: Increase number of memslots to 512
+In-Reply-To: <CAGOz-0aD-hV7sDAX70pSGdCj1J4s4xc4qQBwbaKzVZArfRK2AQ@mail.gmail.com>
+References: <1484153537-20984-1-git-send-email-linucherian@gmail.com>
+ <61fa02f8-b244-6bae-eaa1-cb745ea543e1@arm.com>
+ <CAGOz-0aD-hV7sDAX70pSGdCj1J4s4xc4qQBwbaKzVZArfRK2AQ@mail.gmail.com>
+Message-ID: <6fc30f74-d1ab-028f-7e5f-a5d1fe69c17a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 11 Jan 14:58 PST 2017, Andy Gross wrote:
-
-> This patch masks the core clk requirement for the APQ8064.  Until the
-> other peripherals correctly describe their clock dependencies or the
-> bus driver is put in place to handle the RPM dependencies, this bit
-> will remain masked.
+On 13/01/17 17:25, Linu Cherian wrote:
+> On Fri, Jan 13, 2017 at 5:33 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> Hi Linu,
+>>
+>> On 11/01/17 16:52, linucherian at gmail.com wrote:
+>>> From: Linu Cherian <linu.cherian@cavium.com>
+>>>
+>>> Having only 32 memslots is a real constraint for the maximum number of
+>>> PCI devices that can be assigned to a single guest. Assuming each PCI
+>>> device/virtual function having two memory BAR regions, we could assign
+>>> only 15 devices/virtual functions to a guest.
+>>>
+>>> So increase KVM_MEM_SLOTS_NUM to 512 as done in other archs like x86 and
+>>> powerpc. For this, KVM_USER_MEM_SLOTS has been changed to 508.
+>>>
+>>> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+>>> ---
+>>>  arch/arm/kvm/arm.c                | 3 +++
+>>>  arch/arm64/include/asm/kvm_host.h | 2 +-
+>>>  2 files changed, 4 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>>> index 8f92efa..a19389b 100644
+>>> --- a/arch/arm/kvm/arm.c
+>>> +++ b/arch/arm/kvm/arm.c
+>>> @@ -221,6 +221,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>>>       case KVM_CAP_MAX_VCPUS:
+>>>               r = KVM_MAX_VCPUS;
+>>>               break;
+>>> +     case KVM_CAP_NR_MEMSLOTS:
+>>> +             r = KVM_USER_MEM_SLOTS;
+>>> +             break;
+>>>       case KVM_CAP_MSI_DEVID:
+>>>               if (!kvm)
+>>>                       r = -EINVAL;
+>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>>> index e505038..88f017d 100644
+>>> --- a/arch/arm64/include/asm/kvm_host.h
+>>> +++ b/arch/arm64/include/asm/kvm_host.h
+>>> @@ -30,7 +30,7 @@
+>>>
+>>>  #define __KVM_HAVE_ARCH_INTC_INITIALIZED
+>>>
+>>> -#define KVM_USER_MEM_SLOTS 32
+>>> +#define KVM_USER_MEM_SLOTS 508
+>>>  #define KVM_PRIVATE_MEM_SLOTS 4
+>>>  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
+>>>  #define KVM_HALT_POLL_NS_DEFAULT 500000
+>>>
+>>
+>> I'm not opposed to that patch, but if I may ask: how has that been tested?
+>>
 > 
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
-
-Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-
-Regards,
-Bjorn
-
-> ---
->  drivers/firmware/qcom_scm.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> I have tested this on Cavium ARM64 SOC, by assigning multiple
+> VFs(virtual functions) of a SRIOV device to a single VM. Each VF has
+> two memory regions(two BARs) implemented.
 > 
-> diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
-> index 893f953ea..65d0d9d 100644
-> --- a/drivers/firmware/qcom_scm.c
-> +++ b/drivers/firmware/qcom_scm.c
-> @@ -387,7 +387,7 @@ static int qcom_scm_probe(struct platform_device *pdev)
->  
->  static const struct of_device_id qcom_scm_dt_match[] = {
->  	{ .compatible = "qcom,scm-apq8064",
-> -	  .data = (void *) SCM_HAS_CORE_CLK,
-> +	  /* FIXME: This should have .data = (void *) SCM_HAS_CORE_CLK */
->  	},
->  	{ .compatible = "qcom,scm-msm8660",
->  	  .data = (void *) SCM_HAS_CORE_CLK,
-> -- 
-> 1.9.1
+> Without, this change, when the number of virtual functions assigned to
+> the guest crosses 15, qemu aborts with
+> "kvm_alloc_slot: no free slot available", during guest kernel booting.
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Now, with this change guest kernel boots fine with more than 15 VFs
+> assigned(tested upto 29) and also all the PCI VFs assigned to the guest
+> get listed under lspci with memory resources configured.
+> 
+> Please let me know if you are looking for more specifics like bootlogs etc.
+
+Let me be more precise. At the moment, KVM on arm64 doesn't support the
+delivery of MSIs generated by physical devices into a guest (patches are
+in progress, but not merged yet). So unless you used devices that have
+no need for interrupts, I don't see how this works.
+
+Can you shed some light on your test process?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
