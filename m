@@ -1,96 +1,110 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 13 Jan 2017 09:48:56 -0700
-Subject: [PATCH] coresight: STM: Balance enable/disable
-In-Reply-To: <1484047315-14407-1-git-send-email-suzuki.poulose@arm.com>
-References: <1484047315-14407-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <CANLsYkyO-anR4V411tHFkNBPNy0Vk3DCympLScP9ZC=uJ-UX9g@mail.gmail.com>
+From: Joao.Pinto@synopsys.com (Joao Pinto)
+Date: Fri, 13 Jan 2017 16:49:44 +0000
+Subject: [PATCH 11/37] PCI: dwc: Split pcie-designware.c into host and
+ core files
+In-Reply-To: <1484216786-17292-12-git-send-email-kishon@ti.com>
+References: <1484216786-17292-1-git-send-email-kishon@ti.com>
+ <1484216786-17292-12-git-send-email-kishon@ti.com>
+Message-ID: <4a89fb45-af84-d660-5ef0-12227b141cda@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 January 2017 at 04:21, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> The stm is automatically enabled when an application sets the policy
-> via ->link() call back by using coresight_enable(), which keeps the
-> refcount of the current users of the STM. However, the unlink() callback
-> issues stm_disable() directly, which leaves the STM turned off, without
-> the coresight layer knowing about it. This prevents any further uses
-> of the STM hardware as the coresight layer still thinks the STM is
-> turned on and doesn't issue an stm_enable(). Even manually enabling
-> the STM via sysfs can't really enable the hw.
->
-> e.g,
->
-> $ echo 1 > $CS_DEVS/$ETR/enable_sink
-> $ mkdir -p $CONFIG_FS/stp-policy/$source.0/stm_test/
-> $ echo 32768 65535 > $CONFIG_FS/stp-policy/$source.0/stm_test/channels
-> $ echo 64 > $CS_DEVS/$source/traceid
-> $ ./stm_app
-> Sending 64000 byte blocks of pattern 0 at 0us intervals
-> Success to map channel(32768~32783) to 0xffffa95fa000
-> Sending on channel 32768
-> $ dd if=/dev/$ETR of=~/trace.bin.1
-> 597+1 records in
-> 597+1 records out
-> 305920 bytes (306 kB) copied, 0.399952 s, 765 kB/s
-> $ ./stm_app
-> Sending 64000 byte blocks of pattern 0 at 0us intervals
-> Success to map channel(32768~32783) to 0xffff7e9e2000
-> Sending on channel 32768
-> $ dd if=/dev/$ETR of=~/trace.bin.2
-> 0+0 records in
-> 0+0 records out
-> 0 bytes (0 B) copied, 0.0232083 s, 0.0 kB/s
->
-> Note that we don't get any data from the ETR for the second session.
->
-> Also dmesg shows :
->
-> [   77.520458] coresight-tmc 20800000.etr: TMC-ETR enabled
-> [   77.537097] coresight-replicator etr_replicator at 20890000: REPLICATOR enabled
-> [   77.558828] coresight-replicator main_replicator at 208a0000: REPLICATOR enabled
-> [   77.581068] coresight-funnel 208c0000.main_funnel: FUNNEL inport 0 enabled
-> [   77.602217] coresight-tmc 20840000.etf: TMC-ETF enabled
-> [   77.618422] coresight-stm 20860000.stm: STM tracing enabled
-> [  139.554252] coresight-stm 20860000.stm: STM tracing disabled
->  # End of first tracing session
-> [  146.351135] coresight-tmc 20800000.etr: TMC read start
-> [  146.514486] coresight-tmc 20800000.etr: TMC read end
->  # Note that the STM is not turned on via stm_generic_link()->coresight_enable()
->  # and hence none of the components are turned on.
-> [  152.479080] coresight-tmc 20800000.etr: TMC read start
-> [  152.542632] coresight-tmc 20800000.etr: TMC read end
->
-> This patch balances the unlink operation by using the coresight_disable(),
-> keeping the coresight layer in sync with the hardware state.
->
-> Fixes: commit 237483aa5cf43 ("coresight: stm: adding driver for CoreSight STM component")
-> Cc: Pratik Patel <pratikp@codeaurora.org>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Chunyan Zhang <zhang.chunyan@linaro.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: stable at vger.kernel.org # 4.7+
-> Reported-by: Robert Walker <robert.walker@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+?s 10:26 AM de 1/12/2017, Kishon Vijay Abraham I escreveu:
+> Split pcie-designware.c into pcie-designware-host.c that contains
+> the host specific parts of the driver and pcie-designware.c that
+> contains the parts used by both host driver and endpoint driver.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 > ---
->  drivers/hwtracing/coresight/coresight-stm.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-> index 3524452..57b7330 100644
-> --- a/drivers/hwtracing/coresight/coresight-stm.c
-> +++ b/drivers/hwtracing/coresight/coresight-stm.c
-> @@ -356,7 +356,7 @@ static void stm_generic_unlink(struct stm_data *stm_data,
->         if (!drvdata || !drvdata->csdev)
->                 return;
->
-> -       stm_disable(drvdata->csdev, NULL);
-> +       coresight_disable(drvdata->csdev);
+>  drivers/pci/dwc/Makefile               |    2 +-
+>  drivers/pci/dwc/pcie-designware-host.c |  619 ++++++++++++++++++++++++++++++++
+>  drivers/pci/dwc/pcie-designware.c      |  613 +------------------------------
+>  drivers/pci/dwc/pcie-designware.h      |    8 +
+>  4 files changed, 634 insertions(+), 608 deletions(-)
+>  create mode 100644 drivers/pci/dwc/pcie-designware-host.c
+> 
+> diff --git a/drivers/pci/dwc/Makefile b/drivers/pci/dwc/Makefile
+> index 7d27c14..3b57e55 100644
+> --- a/drivers/pci/dwc/Makefile
+> +++ b/drivers/pci/dwc/Makefile
+> @@ -1,4 +1,4 @@
+
+(snip...)
+
+> -static void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
+> -				      int type, u64 cpu_addr, u64 pci_addr,
+> -				      u32 size)
+> +void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
+> +			       u64 cpu_addr, u64 pci_addr, u32 size)
+>  {
+>  	u32 retries, val;
+>  
+> @@ -186,220 +151,6 @@ static void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
+>  	dev_err(pci->dev, "iATU is not being enabled\n");
 >  }
->
->  static phys_addr_t
 
-Applied - thanks,
-Mathieu
+Kishon, iATU only makes sense in The Root Complex (host), so it should be inside
+the pcie-designware-host.
 
-> --
-> 2.7.4
->
+>  
+> -static struct irq_chip dw_msi_irq_chip = {
+> -	.name = "PCI-MSI",
+> -	.irq_enable = pci_msi_unmask_irq,
+> -	.irq_disable = pci_msi_mask_irq,
+> -	.irq_mask = pci_msi_mask_irq,
+> -	.irq_unmask = pci_msi_unmask_irq,
+> -};
+> -
+
+(snip...)
+
+> -
+> -static const struct irq_domain_ops msi_domain_ops = {
+> -	.map = dw_pcie_msi_map,
+> -};
+> -
+>  static u8 dw_pcie_iatu_unroll_enabled(struct dw_pcie *pci)
+>  {
+>  	u32 val;
+> @@ -454,303 +192,11 @@ static u8 dw_pcie_iatu_unroll_enabled(struct dw_pcie *pci)
+>  	return 0;
+>  }
+
+Kishon, iATU only makes sense in The Root Complex (host), so it should be inside
+the pcie-designware-host.
+
+(snip...)
+
+> diff --git a/drivers/pci/dwc/pcie-designware.h b/drivers/pci/dwc/pcie-designware.h
+> index 491fbe3..808d17b 100644
+> --- a/drivers/pci/dwc/pcie-designware.h
+> +++ b/drivers/pci/dwc/pcie-designware.h
+> @@ -14,6 +14,10 @@
+>  #ifndef _PCIE_DESIGNWARE_H
+>  #define _PCIE_DESIGNWARE_H
+>  
+> +#include <linux/irq.h>
+> +#include <linux/msi.h>
+> +#include <linux/pci.h>
+> +
+>  /* Parameters for the waiting for link up routine */
+>  #define LINK_WAIT_MAX_RETRIES		10
+>  #define LINK_WAIT_USLEEP_MIN		90000
+> @@ -167,4 +171,8 @@ struct dw_pcie {
+>  void dw_pcie_writel_dbi(struct dw_pcie *pci, u32 reg, u32 val);
+>  int dw_pcie_link_up(struct dw_pcie *pci);
+>  int dw_pcie_wait_for_link(struct dw_pcie *pci);
+> +void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
+> +			       int type, u64 cpu_addr, u64 pci_addr,
+> +			       u32 size);
+> +void dw_pcie_setup(struct dw_pcie *pci);
+
+
+Kishon, iATU only makes sense in The Root Complex (host), so it should be inside
+the pcie-designware-host as static.
+
+>  #endif /* _PCIE_DESIGNWARE_H */
+> 
+
+Thanks,
+Joao
