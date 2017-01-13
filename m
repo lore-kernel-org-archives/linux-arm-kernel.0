@@ -1,100 +1,170 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 13 Jan 2017 16:12:20 +0100
-Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
-In-Reply-To: <20170113151747.6bc85245@bbrezillon>
-References: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
- <1484291609-20195-3-git-send-email-guochun.mao@mediatek.com>
- <20170113151747.6bc85245@bbrezillon>
-Message-ID: <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Fri, 13 Jan 2017 10:12:36 -0500
+Subject: [PATCH v3 3/5] arm64: Create and use __tlbi_dsb() macros
+In-Reply-To: <20170112165852.GH13843@arm.com>
+References: <20170111144118.17062-1-cov@codeaurora.org>
+ <20170111144118.17062-3-cov@codeaurora.org> <20170112165852.GH13843@arm.com>
+Message-ID: <8f8057f5-d33f-15b3-de9f-6e718c23e97d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Will,
 
-
-On 13/01/17 15:17, Boris Brezillon wrote:
-> On Fri, 13 Jan 2017 15:13:29 +0800
-> Guochun Mao <guochun.mao@mediatek.com> wrote:
->
->> Add Mediatek nor flash node.
+On 01/12/2017 11:58 AM, Will Deacon wrote:
+> Hi Christopher,
+> 
+> On Wed, Jan 11, 2017 at 09:41:16AM -0500, Christopher Covington wrote:
+>> This refactoring will allow an errata workaround that repeats tlbi dsb
+>> sequences to only change one location. This is not intended to change the
+>> generated assembly and comparison of before and after preprocessor output
+>> of arch/arm64/mm/mmu.c and vmlinux objdump shows no functional changes.
 >>
->> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+>> Signed-off-by: Christopher Covington <cov@codeaurora.org>
 >> ---
->>  arch/arm/boot/dts/mt2701-evb.dts |   25 +++++++++++++++++++++++++
->>  arch/arm/boot/dts/mt2701.dtsi    |   12 ++++++++++++
->>  2 files changed, 37 insertions(+)
+>>  arch/arm64/include/asm/tlbflush.h | 104 +++++++++++++++++++++++++-------------
+>>  1 file changed, 69 insertions(+), 35 deletions(-)
 >>
->> diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
->> index 082ca88..85e5ae8 100644
->> --- a/arch/arm/boot/dts/mt2701-evb.dts
->> +++ b/arch/arm/boot/dts/mt2701-evb.dts
->> @@ -24,6 +24,31 @@
->>  	};
->>  };
->>
->> +&nor_flash {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&nor_pins_default>;
->> +	status = "okay";
->> +	flash at 0 {
->> +		compatible = "jedec,spi-nor";
->> +		reg = <0>;
->> +	};
->> +};
+>> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+>> index deab523..f28813c 100644
+>> --- a/arch/arm64/include/asm/tlbflush.h
+>> +++ b/arch/arm64/include/asm/tlbflush.h
+>> @@ -25,22 +25,69 @@
+>>  #include <asm/cputype.h>
+>>  
+>>  /*
+>> - * Raw TLBI operations.
+>> + * Raw TLBI, DSB operations
+>>   *
+>> - * Where necessary, use the __tlbi() macro to avoid asm()
+>> - * boilerplate. Drivers and most kernel code should use the TLB
+>> - * management routines in preference to the macro below.
+>> + * Where necessary, use __tlbi_*dsb() macros to avoid asm() boilerplate.
+>> + * Drivers and most kernel code should use the TLB management routines in
+>> + * preference to the macros below.
+>>   *
+>> - * The macro can be used as __tlbi(op) or __tlbi(op, arg), depending
+>> - * on whether a particular TLBI operation takes an argument or
+>> - * not. The macros handles invoking the asm with or without the
+>> - * register argument as appropriate.
+>> + * The __tlbi_dsb() macro handles invoking the asm without any register
+>> + * argument, with a single register argument, and with start (included)
+>> + * and end (excluded) range of register arguments. For example:
+>> + *
+>> + * __tlbi_dsb(op, attr)
+>> + *
+>> + * 	tlbi op
+>> + *	dsb attr
+>> + *
+>> + * __tlbi_dsb(op, attr, addr)
+>> + *
+>> + *	mov %[addr], =addr
+>> + *	tlbi op, %[addr]
+>> + *	dsb attr
+>> + *
+>> + * __tlbi_range_dsb(op, attr, start, end)
+>> + *
+>> + * 	mov %[arg], =start
+>> + *	mov %[end], =end
+>> + * for:
+>> + * 	tlbi op, %[addr]
+>> + * 	add %[addr], %[addr], #(1 << (PAGE_SHIFT - 12))
+>> + * 	cmp %[addr], %[end]
+>> + * 	b.ne for
+>> + * 	dsb attr
+>>   */
+>> -#define __TLBI_0(op, arg)		asm ("tlbi " #op)
+>> -#define __TLBI_1(op, arg)		asm ("tlbi " #op ", %0" : : "r" (arg))
+>> -#define __TLBI_N(op, arg, n, ...)	__TLBI_##n(op, arg)
+>>  
+>> -#define __tlbi(op, ...)		__TLBI_N(op, ##__VA_ARGS__, 1, 0)
+>> +#define __TLBI_FOR_0(ig0, ig1, ig2)
+>> +#define __TLBI_INSTR_0(op, ig1, ig2)	"tlbi " #op
+>> +#define __TLBI_IO_0(ig0, ig1, ig2)	: :
 >> +
->> +&pio {
->> +	nor_pins_default: nor {
->> +		pins1 {
->> +			pinmux = <MT2701_PIN_240_EXT_XCS__FUNC_EXT_XCS>,
->> +				 <MT2701_PIN_241_EXT_SCK__FUNC_EXT_SCK>,
->> +				 <MT2701_PIN_239_EXT_SDIO0__FUNC_EXT_SDIO0>,
->> +				 <MT2701_PIN_238_EXT_SDIO1__FUNC_EXT_SDIO1>,
->> +				 <MT2701_PIN_237_EXT_SDIO2__FUNC_EXT_SDIO2>,
->> +				 <MT2701_PIN_236_EXT_SDIO3__FUNC_EXT_SDIO3>;
->> +			drive-strength = <MTK_DRIVE_4mA>;
->> +			bias-pull-up;
->> +		};
->> +	};
->> +};
+>> +#define __TLBI_FOR_1(ig0, ig1, ig2)
+>> +#define __TLBI_INSTR_1(op, ig0, ig1)	"tlbi " #op ", %0"
+>> +#define __TLBI_IO_1(ig0, arg, ig1)	: : "r" (arg)
 >> +
->>  &uart0 {
->>  	status = "okay";
->>  };
->> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
->> index bdf8954..1eefce4 100644
->> --- a/arch/arm/boot/dts/mt2701.dtsi
->> +++ b/arch/arm/boot/dts/mt2701.dtsi
->> @@ -227,6 +227,18 @@
->>  		status = "disabled";
->>  	};
->>
->> +	nor_flash: spi at 11014000 {
->> +		compatible = "mediatek,mt2701-nor",
->> +			     "mediatek,mt8173-nor";
->
-> Why define both here? Is "mediatek,mt8173-nor" really providing a
-> subset of the features supported by "mediatek,mt2701-nor"?
->
-
-I think even if the ip block is the same, we should provide both 
-bindings, just in case in the future we find out that mt2701 has some 
-hidden bug, feature or bug-feature. This way even if we update the 
-driver, we stay compatible with older device tree blobs in the wild.
-
-We can drop the mt2701-nor in the bindings definition if you want.
-
-Regards,
-Matthias
-
->> +		reg = <0 0x11014000 0 0xe0>;
->> +		clocks = <&pericfg CLK_PERI_FLASH>,
->> +			 <&topckgen CLK_TOP_FLASH_SEL>;
->> +		clock-names = "spi", "sf";
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +		status = "disabled";
->> +	};
+>> +#define __TLBI_FOR_2(ig0, start, ig1)	unsigned long addr;		       \
+>> +					for (addr = start; addr < end;	       \
+>> +						addr += 1 << (PAGE_SHIFT - 12))
+>> +#define __TLBI_INSTR_2(op, ig0, ig1)	"tlbi " #op ", %0"
+>> +#define __TLBI_IO_2(ig0, ig1, ig2)	: : "r" (addr)
 >> +
->>  	mmsys: syscon at 14000000 {
->>  		compatible = "mediatek,mt2701-mmsys", "syscon";
->>  		reg = <0 0x14000000 0 0x1000>;
->
+>> +#define __TLBI_FOR_N(op, a1, a2, n, ...)	__TLBI_FOR_##n(op, a1, a2)
+>> +#define __TLBI_INSTR_N(op, a1, a2, n, ...)	__TLBI_INSTR_##n(op, a1, a2)
+>> +#define __TLBI_IO_N(op, a1, a2, n, ...)	__TLBI_IO_##n(op, a1, a2)
+>> +
+>> +#define __TLBI_FOR(op, ...)		__TLBI_FOR_N(op, ##__VA_ARGS__, 2, 1, 0)
+>> +#define __TLBI_INSTR(op, ...)		__TLBI_INSTR_N(op, ##__VA_ARGS__, 2, 1, 0)
+>> +#define __TLBI_IO(op, ...)		__TLBI_IO_N(op, ##__VA_ARGS__, 2, 1, 0)
+>> +
+>> +#define __tlbi_asm_dsb(as, op, attr, ...) do {				       \
+>> +		__TLBI_FOR(op, ##__VA_ARGS__)				       \
+>> +			asm (__TLBI_INSTR(op, ##__VA_ARGS__)		       \
+>> +			__TLBI_IO(op, ##__VA_ARGS__));			       \
+>> +		asm volatile (	     as			"\ndsb " #attr "\n"    \
+>> +		: : : "memory"); } while (0)
+>> +
+>> +#define __tlbi_dsb(...)	__tlbi_asm_dsb("", ##__VA_ARGS__)
+> 
+> I can't deny that this is cool, but ultimately it's completely unreadable.
+> What I was thinking you'd do would be make __tlbi expand to:
+> 
+>   tlbi
+>   dsb
+>   tlbi
+>   dsb
+> 
+> for Falkor, and:
+> 
+>   tlbi
+>   nop
+>   nop
+>   nop
+> 
+> for everybody else.
+
+Thanks for the suggestion. So would __tlbi take a dsb sharability argument in
+your proposal? Or would it be communicated in some other fashion, maybe inferred
+from the tlbi argument? Or would the workaround dsbs all be the worst/broadest
+case?
+
+> Wouldn't that localise this change sufficiently that you wouldn't need
+> to change all the callers and encode the looping in your cpp macros?
+> 
+> I realise you get an extra dsb in some places with that change, but I'd
+> like to see numbers for the impact of that on top of the workaround. If
+> it's an issue, then an alternative sequence would be:
+> 
+>   tlbi
+>   dsb
+>   tlbi
+> 
+> and you'd rely on the existing dsb to complete that.
+> 
+> Having said that, I don't understand how your current loop code works
+> when the workaround is applied. AFAICT, you end up emitting something
+> like:
+> 
+> dsb ishst
+> for i in 0 to n
+> 	tlbi va+i
+> dsb
+> tlbi va+n
+> dsb
+> 
+> which looks wrong to me. Am I misreading something here?
+
+You're right, I am off by 1 << (PAGE_SHIFT - 12) here. I would need to
+increment, compare, not take the loop branch (regular for loop stuff),
+then decrement (missing) and perform TLB invalidation again (present but
+using incorrect value).
+
+Thanks,
+Cov
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
+Aurora Forum, a Linux Foundation Collaborative Project.
