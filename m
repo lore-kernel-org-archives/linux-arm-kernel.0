@@ -1,84 +1,85 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 13 Jan 2017 15:38:44 +0100
-Subject: [PATCH 1/3] arm: dts: mt2701: Sort DT nodes by register address
-In-Reply-To: <1482904006-44232-2-git-send-email-jamesjj.liao@mediatek.com>
-References: <1482904006-44232-1-git-send-email-jamesjj.liao@mediatek.com>
- <1482904006-44232-2-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <bcc5c785-be25-d63b-3041-ae0009a9dc72@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 13 Jan 2017 15:41:48 +0100
+Subject: [PATCH v4 0/4] DMA Engine: switch PL330 driver to non-irq-safe
+ runtime PM
+In-Reply-To: <60596eee-12a9-58f3-387e-145a5bc28aaa@samsung.com>
+References: <CGME20170113072651eucas1p2b7487d97894de93daab24adb6745087c@eucas1p2.samsung.com>
+ <1484292400-29730-1-git-send-email-m.szyprowski@samsung.com>
+ <CAPDyKFqDGs6OkG-NKiY9Xd3hHEJOJB1YJ2O0_3Tojrzv_xR-yw@mail.gmail.com>
+ <60596eee-12a9-58f3-387e-145a5bc28aaa@samsung.com>
+Message-ID: <CAPDyKFqHAhsqn+1cQw4Y4GPYZghY8Z=GgYMO=2e6FPGWP0tzsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+[...]
 
-
-On 28/12/16 06:46, James Liao wrote:
-> This patch rearrange MT2701 DT nodes to keep them in ascending order.
+>>
+>> Marek, this is great work! It's been on my TODO list forever, so I
+>> really appreciate your work here.
+>>
+>> I did only a brief review so far, particularly concentrating on the
+>> changes for device links and runtime PM. I like it!
+>>
+>> Perhaps we can get someone like Arnd/Vinod to comment in general idea
+>> from a DT and DMA slave channel point of view. I don't know that stuff
+>> good enough to give good opinion.
 >
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt2701.dtsi | 36 ++++++++++++++++++------------------
->  1 file changed, 18 insertions(+), 18 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-> index 7eab6f4..73f4b7c 100644
-> --- a/arch/arm/boot/dts/mt2701.dtsi
-> +++ b/arch/arm/boot/dts/mt2701.dtsi
-> @@ -96,24 +96,6 @@
->  			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
->  	};
+> Arnd already said that it looks good:
+> http://www.spinics.net/lists/dmaengine/msg12186.html
+
+Great! Clearly, I haven't fully catched up since the holidays. :-)
+
 >
-> -	pio: pinctrl at 10005000 {
-> -		compatible = "mediatek,mt2701-pinctrl";
-> -		reg = <0 0x1000b000 0 0x1000>;
-> -		mediatek,pctl-regmap = <&syscfg_pctl_a>;
-> -		pins-are-numbered;
-> -		gpio-controller;
-> -		#gpio-cells = <2>;
-> -		interrupt-controller;
-> -		#interrupt-cells = <2>;
-> -		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
-> -	};
-
-Applied the whole series. I fixed the unit address of pio to 1000b000 
-and it's order in the file.
-
-Please check v4.10-next/dts32
-
-Thanks,
-Mathias
-
-> -
-> -	syscfg_pctl_a: syscfg at 10005000 {
-> -		compatible = "mediatek,mt2701-pctl-a-syscfg", "syscon";
-> -		reg = <0 0x10005000 0 0x1000>;
-> -	};
-> -
->  	topckgen: syscon at 10000000 {
->  		compatible = "mediatek,mt2701-topckgen", "syscon";
->  		reg = <0 0x10000000 0 0x1000>;
-> @@ -134,6 +116,24 @@
->  		#reset-cells = <1>;
->  	};
+>> A couple of things that crosses my mind so far:
+>> 1) I have planned to extend pm_runtime_force_suspend|resume() to cover
+>> also device links. Seems like that becomes really useful together with
+>> these changes.
 >
-> +	pio: pinctrl at 10005000 {
-> +		compatible = "mediatek,mt2701-pinctrl";
-> +		reg = <0 0x1000b000 0 0x1000>;
-> +		mediatek,pctl-regmap = <&syscfg_pctl_a>;
-> +		pins-are-numbered;
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <2>;
-> +		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
-> +	};
-> +
-> +	syscfg_pctl_a: syscfg at 10005000 {
-> +		compatible = "mediatek,mt2701-pctl-a-syscfg", "syscon";
-> +		reg = <0 0x10005000 0 0x1000>;
-> +	};
-> +
->  	watchdog: watchdog at 10007000 {
->  		compatible = "mediatek,mt2701-wdt",
->  			     "mediatek,mt6589-wdt";
 >
+> Is is really needed? I thought that this case is already handled by device
+> core. It works perfectly fine for Exynos IOMMU and its client devices for
+> suspend/resume too, which rely on pm_runtime_force_suspend|resume().
+
+Only parent devices are being considered in
+pm_runtime_force_suspend|resume(). Meaning that the runtime PM usage
+count will not be updated for a device's link, even if it should.
+
+I guess what happens is that the pl330 controller will be brought up
+to full power during system resume, even if it isn't necessary to do
+so. If that's the case, it's not the end of the world, we can optimize
+it later on.
+
+Note, this is very theoretical and to be sure, I need to run some
+tests and think more about it.
+
+>
+>> 2) I think there will be some corner cases during system
+>> suspend/resume for pl330. Not sure yet though. However, fixing 1) and
+>> converting the driver to use pm_runtime_force_suspend|resume() should
+>> probably work anyway.
+>
+>
+> Do you have any particular case in mind? Device links ensures that pl330
+> will
+> suspended after its slave devices and waken before them. Is there anything
+> more needed here?
+
+Likely we can consider them as optimizations. See comment above.
+
+>
+>> Allow me to help out looking into 1) and 2). If not for pl330, I am
+>> pretty sure it will be useful for other DMA controllers that
+>> implements device links and runtime PM.
+>
+>
+> I'm open for suggestions.
+>
+> Best regards
+> --
+> Marek Szyprowski, PhD
+> Samsung R&D Institute Poland
+>
+
+Kind regards
+Uffe
