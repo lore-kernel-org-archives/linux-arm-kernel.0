@@ -1,82 +1,111 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 13 Jan 2017 11:54:40 +0000
-Subject: [RFC] Kernel panic down to swiotlb when doing insmod a simple
- driver
-In-Reply-To: <039058a7-9e5a-d931-5bec-f0f3ccc86cf3@arm.com>
-References: <d64931b6-8875-51ea-06a0-e0981e12f859@rock-chips.com>
- <99472068-069a-7759-8d6e-019fd875264d@arm.com>
- <CAKv+Gu-aaGuHmshi=aiexUD=dxuia7tHKm3LQt3RG-7D_3v9Mw@mail.gmail.com>
- <bf4b1861-7190-c888-b9be-646e2a2297bb@arm.com>
- <CAKv+Gu_5QC4=9SmyBWTZaQUcsJudKB=2g5Bs=MVyRPUGtWPJ4w@mail.gmail.com>
- <039058a7-9e5a-d931-5bec-f0f3ccc86cf3@arm.com>
-Message-ID: <CAKv+Gu9PX17PKR7qAgmh1nryTdpnUOErVZGbXKEFPE46=gf-yw@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 13 Jan 2017 12:55:51 +0100
+Subject: [PATCH v3 01/24] [media] dt-bindings: Add bindings for i.MX
+ media driver
+In-Reply-To: <1483755102-24785-2-git-send-email-steve_longerbeam@mentor.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-2-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1484308551.31475.23.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 January 2017 at 11:52, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 13/01/17 11:49, Ard Biesheuvel wrote:
->> On 13 January 2017 at 11:47, Robin Murphy <robin.murphy@arm.com> wrote:
->>> On 13/01/17 11:25, Ard Biesheuvel wrote:
->>>> On 13 January 2017 at 11:03, Robin Murphy <robin.murphy@arm.com> wrote:
->>>>> On 13/01/17 10:00, Shawn Lin wrote:
->>>>>> Hi,
->>>>>>
->>>>>> Sorry for sending this RFC for help as I couldn't find some useful hint
->>>>>> to slove my issue by git-log the swiotlb commit from kernel v4.4 to
->>>>>> v4.9 and I'm also not familar with these stuff. So could you kindly
->>>>>> point me to the right direction to debug it? Thanks. :)
->>>>>>
->>>>>> --------------------------------------
->>>>>> We just have a very simple wifi driver *built as ko module* which only
->>>>>> have a probe function to do the basic init work and call SDIO API to
->>>>>> transfer some bytes.
->>>>>>
->>>>>> Env: kernel 4.4 stable tree, ARM64(rk3399)
->>>>>>
->>>>>> Two cases are included:
->>>>>
->>>>> And they are both wrong :)
->>>>>
->>>>>> The crash case:
->>>>>>
->>>>>> u8 __aligned(32) buf[PAGE_SIZE]; //global here in ko driver file
->>>>>
->>>>> It is only valid to do DMA from linear map addresses - I'm not sure if
->>>>> the modules area was in the linear map before, but either way it
->>>>> probably isn't now (Ard, Mark?). Either way, I don't believe static data
->>>>> honours ARCH_DMA_MINALIGN in general, so it's still highly inadvisable.
->>>>>
->>>>
->>>> The __aligned() modifier should work fine: the alignment is propagated
->>>> to the ELF section alignment, which in turn is honoured by the module
->>>> loader. The problem is that '32' is too low for non-coherent DMA to be
->>>> safe. In general, alignments up to 4 KB should work everywhere.
->>>
->>> Does that alignment also implicitly apply to the size, though? In other
->>> words, given:
->>>
->>> static int X
->>> static int __aligned(32) Y;
->>> static int Z;
->>>
->>> is it guaranteed that if, say, X gets placed at .data + 0, so Y goes to
->>> .data + 32, then Z *cannot* be placed at .data + 36?
->>>
->>
->> I'm not sure if I understand the question: why would it be incorrect
->> for Z to be placed at .data + 36?
->
-> Because they'd then wind up in the same cache line, so non-coherent DMA
-> to Y will result in concurrent CPU updates to Z being lost/corrupted.
-> ARCH_DMA_MINALIGN isn't about alignemnt per se, it's about keeping
-> things in distinct cache writeback granules.
->
+Am Freitag, den 06.01.2017, 18:11 -0800 schrieb Steve Longerbeam:
+> Add bindings documentation for the i.MX media driver.
+> 
+> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> ---
+>  Documentation/devicetree/bindings/media/imx.txt | 57 +++++++++++++++++++++++++
+>  1 file changed, 57 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/imx.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/imx.txt b/Documentation/devicetree/bindings/media/imx.txt
+> new file mode 100644
+> index 0000000..254b64a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/imx.txt
+> @@ -0,0 +1,57 @@
+> +Freescale i.MX Media Video Devices
+> +
+> +Video Media Controller node
+> +---------------------------
+> +
+> +This is the parent media controller node for video capture support.
+> +
+> +Required properties:
+> +- compatible : "fsl,imx-media";
 
-I understand that. But the original code did
+Would you be opposed to calling this "capture-subsystem" instead of
+"imx-media"? We already use "fsl,imx-display-subsystem" and
+"fsl,imx-gpu-subsystem" for the display and GPU compound devices.
 
- u8 __aligned(32) buf[PAGE_SIZE]; //global here in ko driver file
+> +- ports      : Should contain a list of phandles pointing to camera
+> +  	       sensor interface ports of IPU devices
+> +
+> +
+> +fim child node
+> +--------------
+> +
+> +This is an optional child node of the ipu_csi port nodes. If present and
+> +available, it enables the Frame Interval Monitor. Its properties can be
+> +used to modify the method in which the FIM measures frame intervals.
+> +Refer to Documentation/media/v4l-drivers/imx.rst for more info on the
+> +Frame Interval Monitor.
+> +
+> +Optional properties:
+> +- fsl,input-capture-channel: an input capture channel and channel flags,
+> +			     specified as <chan flags>. The channel number
+> +			     must be 0 or 1. The flags can be
+> +			     IRQ_TYPE_EDGE_RISING, IRQ_TYPE_EDGE_FALLING, or
+> +			     IRQ_TYPE_EDGE_BOTH, and specify which input
+> +			     capture signal edge will trigger the input
+> +			     capture event. If an input capture channel is
+> +			     specified, the FIM will use this method to
+> +			     measure frame intervals instead of via the EOF
+> +			     interrupt. The input capture method is much
+> +			     preferred over EOF as it is not subject to
+> +			     interrupt latency errors. However it requires
+> +			     routing the VSYNC or FIELD output signals of
+> +			     the camera sensor to one of the i.MX input
+> +			     capture pads (SD1_DAT0, SD1_DAT1), which also
+> +			     gives up support for SD1.
 
-so there the size is guaranteed to be a multiple of the CWG
+This is a clever method to get better frame timestamps. Too bad about
+the routing requirements. Can this be used on Nitrogen6X?
 
-So to answer your question: no, the compiler will not round up the
-size of the allocation to the alignment, it will only align the start.
+> +
+> +mipi_csi2 node
+> +--------------
+> +
+> +This is the device node for the MIPI CSI-2 Receiver, required for MIPI
+> +CSI-2 sensors.
+> +
+> +Required properties:
+> +- compatible	: "fsl,imx6-mipi-csi2";
+
+I think this should get an additional "snps,dw-mipi-csi2" compatible,
+since the only i.MX6 specific part is the bolted-on IPU2CSI gasket.
+
+> +- reg           : physical base address and length of the register set;
+> +- clocks	: the MIPI CSI-2 receiver requires three clocks: hsi_tx
+> +                  (the DPHY clock), video_27m, and eim_sel;
+
+Note that hsi_tx is incorrectly named. CCGR3[CG8] just happens to be the
+shared gate bit that gates the HSI clocks as well as the MIPI
+"ac_clk_125m", "cfg_clk", "ips_clk", and "pll_refclk" inputs to the mipi
+csi-2 core, but we are missing shared gate clocks in the clock tree for
+these.
+Both cfg_clk and pll_refclk are sourced from video_27m, so "cfg" ->
+video_27m seems fine.
+But I don't get "dphy". Which input clock would that correspond to?
+"pll_refclk?"
+Also the pixel clock input is a gate after aclk_podf (which we call
+eim_podf), not aclk_sel (eim_sel).
+
+> +- clock-names	: must contain "dphy", "cfg", "pix";
+> +
+> +Optional properties:
+> +- interrupts	: must contain two level-triggered interrupts,
+> +                  in order: 100 and 101;
+
+regards
+Philipp
