@@ -1,35 +1,164 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 13 Jan 2017 17:38:36 +0100
-Subject: [PATCH v3 4/8] x86: stop exporting msr-index.h to userland
-In-Reply-To: <dd826bc7-e1ef-be29-e0c3-692afb346036@6wind.com>
-References: <1484304406-10820-5-git-send-email-nicolas.dichtel@6wind.com>
- <3131144.4Ej3KFWRbz@wuerfel>
- <1484304406-10820-1-git-send-email-nicolas.dichtel@6wind.com>
- <25483.1484322229@warthog.procyon.org.uk>
- <dd826bc7-e1ef-be29-e0c3-692afb346036@6wind.com>
-Message-ID: <20170113163836.jn3u6xyfcrbtynut@pd.tnic>
+From: Joao.Pinto@synopsys.com (Joao Pinto)
+Date: Fri, 13 Jan 2017 16:38:24 +0000
+Subject: [PATCH 10/37] PCI: dwc: designware: Fix style errors in
+ pcie-designware.c
+In-Reply-To: <1484216786-17292-11-git-send-email-kishon@ti.com>
+References: <1484216786-17292-1-git-send-email-kishon@ti.com>
+ <1484216786-17292-11-git-send-email-kishon@ti.com>
+Message-ID: <a138b0fb-f584-8953-658f-cf476e3d16e7@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 05:08:34PM +0100, Nicolas Dichtel wrote:
-> Le 13/01/2017 ? 16:43, David Howells a ?crit :
-> >> -header-y += msr-index.h
-> > 
-> > I see it on my desktop as /usr/include/asm/msr-index.h and it's been there at
-> > least four years - and as such it's part of the UAPI.  I don't think you can
-> > remove it unless you can guarantee there are no userspace users.
-> I keep it in the v2 of the series, but the maintainer, Borislav Petkov, asks me
-> to un-export it.
+?s 10:25 AM de 1/12/2017, Kishon Vijay Abraham I escreveu:
+> No functional change. Fix all checkpatch warnings and check errors
+> in pcie-designware.c
 > 
-> I will follow the maintainer decision.
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/pci/dwc/pcie-designware.c |   42 ++++++++++++++++++-------------------
+>  1 file changed, 21 insertions(+), 21 deletions(-)
+> 
+> diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
+> index 89cdb6b..ff04074 100644
+> --- a/drivers/pci/dwc/pcie-designware.c
+> +++ b/drivers/pci/dwc/pcie-designware.c
+> @@ -40,13 +40,13 @@ int dw_pcie_read(void __iomem *addr, int size, u32 *val)
+>  		return PCIBIOS_BAD_REGISTER_NUMBER;
+>  	}
+>  
+> -	if (size == 4)
+> +	if (size == 4) {
+>  		*val = readl(addr);
+> -	else if (size == 2)
+> +	} else if (size == 2) {
+>  		*val = readw(addr);
+> -	else if (size == 1)
+> +	} else if (size == 1) {
+>  		*val = readb(addr);
+> -	else {
+> +	} else {
+>  		*val = 0;
+>  		return PCIBIOS_BAD_REGISTER_NUMBER;
+>  	}
+> @@ -203,16 +203,15 @@ irqreturn_t dw_handle_msi_irq(struct pcie_port *pp)
+>  
+>  	for (i = 0; i < MAX_MSI_CTRLS; i++) {
+>  		dw_pcie_rd_own_conf(pp, PCIE_MSI_INTR0_STATUS + i * 12, 4,
+> -				(u32 *)&val);
+> +				    (u32 *)&val);
+>  		if (val) {
+>  			ret = IRQ_HANDLED;
+>  			pos = 0;
+>  			while ((pos = find_next_bit(&val, 32, pos)) != 32) {
+>  				irq = irq_find_mapping(pp->irq_domain,
+> -						i * 32 + pos);
+> -				dw_pcie_wr_own_conf(pp,
+> -						PCIE_MSI_INTR0_STATUS + i * 12,
+> -						4, 1 << pos);
+> +						       i * 32 + pos);
+> +				dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_STATUS +
+> +						    i * 12, 4, 1 << pos);
+>  				generic_handle_irq(irq);
+>  				pos++;
+>  			}
+> @@ -278,8 +277,9 @@ static void dw_pcie_msi_set_irq(struct pcie_port *pp, int irq)
+>  static int assign_irq(int no_irqs, struct msi_desc *desc, int *pos)
+>  {
+>  	int irq, pos0, i;
+> -	struct pcie_port *pp = (struct pcie_port *) msi_desc_to_pci_sysdata(desc);
+> +	struct pcie_port *pp;
+>  
+> +	pp  = (struct pcie_port *)msi_desc_to_pci_sysdata(desc);
+>  	pos0 = bitmap_find_free_region(pp->msi_irq_in_use, MAX_MSI_IRQS,
+>  				       order_base_2(no_irqs));
+>  	if (pos0 < 0)
+> @@ -341,7 +341,7 @@ static void dw_msi_setup_msg(struct pcie_port *pp, unsigned int irq, u32 pos)
+>  }
+>  
+>  static int dw_msi_setup_irq(struct msi_controller *chip, struct pci_dev *pdev,
+> -			struct msi_desc *desc)
+> +			    struct msi_desc *desc)
+>  {
+>  	int irq, pos;
+>  	struct pcie_port *pp = pdev->bus->sysdata;
+> @@ -389,7 +389,7 @@ static void dw_msi_teardown_irq(struct msi_controller *chip, unsigned int irq)
+>  {
+>  	struct irq_data *data = irq_get_irq_data(irq);
+>  	struct msi_desc *msi = irq_data_get_msi_desc(data);
+> -	struct pcie_port *pp = (struct pcie_port *) msi_desc_to_pci_sysdata(msi);
+> +	struct pcie_port *pp = (struct pcie_port *)msi_desc_to_pci_sysdata(msi);
+>  
+>  	clear_irq_range(pp, irq, 1, data->hwirq);
+>  }
+> @@ -431,7 +431,7 @@ int dw_pcie_link_up(struct dw_pcie *pci)
+>  }
+>  
+>  static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+> -			irq_hw_number_t hwirq)
+> +			   irq_hw_number_t hwirq)
+>  {
+>  	irq_set_chip_and_handler(irq, &dw_msi_irq_chip, handle_simple_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+> @@ -468,8 +468,8 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  
+>  	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
+>  	if (cfg_res) {
+> -		pp->cfg0_size = resource_size(cfg_res)/2;
+> -		pp->cfg1_size = resource_size(cfg_res)/2;
+> +		pp->cfg0_size = resource_size(cfg_res) / 2;
+> +		pp->cfg1_size = resource_size(cfg_res) / 2;
+>  		pp->cfg0_base = cfg_res->start;
+>  		pp->cfg1_base = cfg_res->start + pp->cfg0_size;
+>  	} else if (!pp->va_cfg0_base) {
+> @@ -508,8 +508,8 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  			break;
+>  		case 0:
+>  			pp->cfg = win->res;
+> -			pp->cfg0_size = resource_size(pp->cfg)/2;
+> -			pp->cfg1_size = resource_size(pp->cfg)/2;
+> +			pp->cfg0_size = resource_size(pp->cfg) / 2;
+> +			pp->cfg1_size = resource_size(pp->cfg) / 2;
+>  			pp->cfg0_base = pp->cfg->start;
+>  			pp->cfg1_base = pp->cfg->start + pp->cfg0_size;
+>  			break;
+> @@ -615,7 +615,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  }
+>  
+>  static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+> -		u32 devfn, int where, int size, u32 *val)
+> +				 u32 devfn, int where, int size, u32 *val)
+>  {
+>  	int ret, type;
+>  	u32 busdev, cfg_size;
+> @@ -654,7 +654,7 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+>  }
+>  
+>  static int dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+> -		u32 devfn, int where, int size, u32 val)
+> +				 u32 devfn, int where, int size, u32 val)
+>  {
+>  	int ret, type;
+>  	u32 busdev, cfg_size;
+> @@ -711,7 +711,7 @@ static int dw_pcie_valid_device(struct pcie_port *pp, struct pci_bus *bus,
+>  }
+>  
+>  static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+> -			int size, u32 *val)
+> +			   int size, u32 *val)
+>  {
+>  	struct pcie_port *pp = bus->sysdata;
+>  
+> @@ -727,7 +727,7 @@ static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+>  }
+>  
+>  static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+> -			int where, int size, u32 val)
+> +			   int where, int size, u32 val)
+>  {
+>  	struct pcie_port *pp = bus->sysdata;
+>  
+> 
 
-I'm not the maintainer. I simply think that exporting that file was
-wrong because it if we change something in it, we will break userspace.
-And that should not happen - if userspace needs MSRs, it should do its
-own defines.
+Always good to make clean up! Thanks!
 
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Acked-By: Joao Pinto <jpinto@synopsys.com>
