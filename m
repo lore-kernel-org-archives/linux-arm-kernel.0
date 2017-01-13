@@ -1,42 +1,47 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 13 Jan 2017 18:21:49 +0000
-Subject: [GIT PULL] arm64 fixes for 4.10-rc4
-Message-ID: <20170113182146.GA6825@e104818-lin.cambridge.arm.com>
+From: david@lechnology.com (David Lechner)
+Date: Fri, 13 Jan 2017 12:20:46 -0600
+Subject: [PATCH v3] ARM: dts: Add LEGO MINDSTORMS EV3 dts
+In-Reply-To: <0d69ff4b-c3a6-5126-2590-2268d3b25f92@lechnology.com>
+References: <1484253167-27568-1-git-send-email-david@lechnology.com>
+ <3066d614-0676-319a-6149-6d723e1cf35f@ti.com>
+ <0d69ff4b-c3a6-5126-2590-2268d3b25f92@lechnology.com>
+Message-ID: <f73840dd-6373-e554-311f-d92c1bed060f@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 01/13/2017 12:16 PM, David Lechner wrote:
+> On 01/13/2017 06:04 AM, Sekhar Nori wrote:
+>> On Friday 13 January 2017 02:02 AM, David Lechner wrote:
+>>> This adds a device tree definition file for LEGO MINDSTORMS EV3.
+>>>
+> ...
+>>
+>> There are couple of checkpatch errors that show up. The compatible
+>> "lego,ev3" needs to be documented in
+>> Documentation/devicetree/bindings/arm/davinci.txt
+>>
+>> "at24,24c128" is undocumented. Is that an atmel chip on the EV3? If the
+>> manufacturer name is not clear,
+>> Documentation/devicetree/bindings/eeprom/eeprom.txt advises using just
+>> "24c128"
+>
+> The mfg is microchip, so I guess I will just go with "24c128"
 
-Please pull the arm64 fixes below. Thanks.
+I think I have let the device tree bindings doc confuse me. On second 
+though, I think the correct thing is to included the manufacturer.
 
-The following changes since commit a121103c922847ba5010819a3f250f1f7fc84ab8:
-
-  Linux 4.10-rc3 (2017-01-08 14:18:17 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to 41c066f2c4d436c535616fe182331766c57838f0:
-
-  arm64: assembler: make adr_l work in modules under KASLR (2017-01-12 18:10:52 +0000)
-
-----------------------------------------------------------------
-- Fix huge_ptep_set_access_flags() to return "changed" when any of the
-  ptes in the contiguous range is changed, not just the last one
-
-- Fix the adr_l assembly macro to work in modules under KASLR
-
-----------------------------------------------------------------
-Ard Biesheuvel (1):
-      arm64: assembler: make adr_l work in modules under KASLR
-
-Huang Shijie (1):
-      arm64: hugetlb: fix the wrong return value for huge_ptep_set_access_flags
-
- arch/arm64/include/asm/assembler.h | 36 +++++++++++++++++++++++++++---------
- arch/arm64/mm/hugetlbpage.c        |  2 +-
- 2 files changed, 28 insertions(+), 10 deletions(-)
-
--- 
-Catalin
+>
+>>
+>> Finally, lego needs to be added to
+>> Documentation/devicetree/bindings/vendor-prefixes.txt
+>>
+>> Can you please submit the documentation portions as separate patches in
+>> a series along with this patch.
+>
+> Yes.
+>
+>>
+>> Thanks,
+>> Sekhar
+>>
+>
