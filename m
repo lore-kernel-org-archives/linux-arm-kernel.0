@@ -1,85 +1,101 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 13 Jan 2017 15:41:48 +0100
-Subject: [PATCH v4 0/4] DMA Engine: switch PL330 driver to non-irq-safe
- runtime PM
-In-Reply-To: <60596eee-12a9-58f3-387e-145a5bc28aaa@samsung.com>
-References: <CGME20170113072651eucas1p2b7487d97894de93daab24adb6745087c@eucas1p2.samsung.com>
- <1484292400-29730-1-git-send-email-m.szyprowski@samsung.com>
- <CAPDyKFqDGs6OkG-NKiY9Xd3hHEJOJB1YJ2O0_3Tojrzv_xR-yw@mail.gmail.com>
- <60596eee-12a9-58f3-387e-145a5bc28aaa@samsung.com>
-Message-ID: <CAPDyKFqHAhsqn+1cQw4Y4GPYZghY8Z=GgYMO=2e6FPGWP0tzsg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 13 Jan 2017 14:42:04 +0000
+Subject: [PATCH 2/3] KVM: arm64: Access CNTHCTL_EL2 bit fields correctly
+ on VHE systems
+In-Reply-To: <d496020c-a097-ffd5-adb7-7edb7c1a214e@arm.com>
+References: <1484307093-29153-1-git-send-email-marc.zyngier@arm.com>
+ <1484307093-29153-3-git-send-email-marc.zyngier@arm.com>
+ <20170113123612.GA31994@cbox>
+ <d496020c-a097-ffd5-adb7-7edb7c1a214e@arm.com>
+Message-ID: <20170113144204.GB2472@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+Hi,
 
->>
->> Marek, this is great work! It's been on my TODO list forever, so I
->> really appreciate your work here.
->>
->> I did only a brief review so far, particularly concentrating on the
->> changes for device links and runtime PM. I like it!
->>
->> Perhaps we can get someone like Arnd/Vinod to comment in general idea
->> from a DT and DMA slave channel point of view. I don't know that stuff
->> good enough to give good opinion.
->
->
-> Arnd already said that it looks good:
-> http://www.spinics.net/lists/dmaengine/msg12186.html
+On Fri, Jan 13, 2017 at 01:30:29PM +0000, Marc Zyngier wrote:
+> [+ Suzuki, who wrote the whole cpus_have_const_cap thing]
+> 
+> On 13/01/17 12:36, Christoffer Dall wrote:
+> > On Fri, Jan 13, 2017 at 11:31:32AM +0000, Marc Zyngier wrote:
 
-Great! Clearly, I haven't fully catched up since the holidays. :-)
+> >> +static inline bool has_vhe(void)
+> >> +{
+> >> +	if (cpus_have_const_cap(ARM64_HAS_VIRT_HOST_EXTN))
+> >> +		return true;
+> >> +
+> >> +	return false;
+> >> +}
+> >> +
+> > 
+> > I was experimenting with using has_vhe for some of the optimization code
+> > I was writing, and I saw a hyp crash as a result.  That made me wonder
+> > if this is really safe in Hyp mode?
+> > 
+> > Specifically, there is no guarantee that this will actually be inlined
+> > in the caller, right?  At least that's what I can gather from trying to
+> > understand the semantics of the inline keyword in the GCC manual.
+> 
+> Indeed, there is no strict guarantee that this is enforced. We should
+> probably have __always_inline instead. But having checked the generated
+> code for __timer_restore_state, the function is definitely inlined
+> (gcc 6.2). Happy to queue an extra patch changing that.
 
->
->> A couple of things that crosses my mind so far:
->> 1) I have planned to extend pm_runtime_force_suspend|resume() to cover
->> also device links. Seems like that becomes really useful together with
->> these changes.
->
->
-> Is is really needed? I thought that this case is already handled by device
-> core. It works perfectly fine for Exynos IOMMU and its client devices for
-> suspend/resume too, which rely on pm_runtime_force_suspend|resume().
+> > Further, are we guaranteed that the static branch gets compiled into
+> > something that doesn't actually look at cpu_hwcap_keys, which is not
+> > mapped in hyp mode?
 
-Only parent devices are being considered in
-pm_runtime_force_suspend|resume(). Meaning that the runtime PM usage
-count will not be updated for a device's link, even if it should.
+If I disable CONFIG_JUMP_LABEL (which lives under "General setup", with
+teh title "Optimize very unlikely/likely branches"), I see adrp; add;
+ldr sequences accessing cpu_hwcap_keys when using cpus_have_const_cap()
+in hyp code, even with the patch below.
 
-I guess what happens is that the pl330 controller will be brought up
-to full power during system resume, even if it isn't necessary to do
-so. If that's the case, it's not the end of the world, we can optimize
-it later on.
+Do we have the whole kernel image mapped around hyp, so that this would
+work by relative offset? Do we have a guarantee that adrp+add is used?
 
-Note, this is very theoretical and to be sure, I need to run some
-tests and think more about it.
+Thanks,
+Mark.
 
->
->> 2) I think there will be some corner cases during system
->> suspend/resume for pl330. Not sure yet though. However, fixing 1) and
->> converting the driver to use pm_runtime_force_suspend|resume() should
->> probably work anyway.
->
->
-> Do you have any particular case in mind? Device links ensures that pl330
-> will
-> suspended after its slave devices and waken before them. Is there anything
-> more needed here?
-
-Likely we can consider them as optimizations. See comment above.
-
->
->> Allow me to help out looking into 1) and 2). If not for pl330, I am
->> pretty sure it will be useful for other DMA controllers that
->> implements device links and runtime PM.
->
->
-> I'm open for suggestions.
->
-> Best regards
-> --
-> Marek Szyprowski, PhD
-> Samsung R&D Institute Poland
->
-
-Kind regards
-Uffe
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index b4989df..4710469 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -105,10 +105,11 @@ static inline bool cpu_have_feature(unsigned int num)
+>  }
+>  
+>  /* System capability check for constant caps */
+> -static inline bool cpus_have_const_cap(int num)
+> +static __always_inline bool cpus_have_const_cap(int num)
+>  {
+> -	if (num >= ARM64_NCAPS)
+> -		return false;
+> +	BUILD_BUG_ON(!__builtin_constant_p(num));
+> +	BUILD_BUG_ON(num >= ARM64_NCAPS);
+> +
+>  	return static_branch_unlikely(&cpu_hwcap_keys[num]);
+>  }
+>  
+> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+> index 439f6b5..1257701 100644
+> --- a/arch/arm64/include/asm/virt.h
+> +++ b/arch/arm64/include/asm/virt.h
+> @@ -81,7 +81,7 @@ static inline bool is_kernel_in_hyp_mode(void)
+>  	return read_sysreg(CurrentEL) == CurrentEL_EL2;
+>  }
+>  
+> -static inline bool has_vhe(void)
+> +static __always_inline bool has_vhe(void)
+>  {
+>  	if (cpus_have_const_cap(ARM64_HAS_VIRT_HOST_EXTN))
+>  		return true;
+> 
+> 
+> But that's probably another patch or two. Thoughts?
+> 
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny...
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
