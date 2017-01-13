@@ -1,59 +1,88 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 13 Jan 2017 15:22:04 +0000
-Subject: [PATCH RFC 5/7] net: phy: convert micrel to new read_mmd/write_mmd
- driver methods
-In-Reply-To: <20170113152059.GR14217@n2100.armlinux.org.uk>
-References: <20170113152059.GR14217@n2100.armlinux.org.uk>
-Message-ID: <E1cS3g4-0003Xq-1S@rmk-PC.armlinux.org.uk>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 13 Jan 2017 16:27:57 +0100
+Subject: [PATCH v2 6/6] arm: dts: mt2701: Add thermal device node.
+In-Reply-To: <1484296978-18572-7-git-send-email-erin.lo@mediatek.com>
+References: <1484296978-18572-1-git-send-email-erin.lo@mediatek.com>
+ <1484296978-18572-7-git-send-email-erin.lo@mediatek.com>
+Message-ID: <c8bbd4a4-2207-44f0-4462-3761c1d6c8a9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert micrel to the new read_mmd/write_mmd driver methods.  This
-Clause 22 PHY does not support any MMD access method.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- drivers/net/phy/micrel.c | 13 ++++++-------
- 1 file changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
-index 9a77289109b7..8d6432c23a14 100644
---- a/drivers/net/phy/micrel.c
-+++ b/drivers/net/phy/micrel.c
-@@ -637,8 +637,7 @@ static int ksz8873mll_config_aneg(struct phy_device *phydev)
-  * MMD extended PHY registers.
-  */
- static int
--ksz9021_rd_mmd_phyreg(struct phy_device *phydev, int ptrad, int devnum,
--		      int regnum)
-+ksz9021_rd_mmd_phyreg(struct phy_device *phydev, int devad, u16 regnum)
- {
- 	return -1;
- }
-@@ -646,10 +645,10 @@ ksz9021_rd_mmd_phyreg(struct phy_device *phydev, int ptrad, int devnum,
- /* This routine does nothing since the Micrel ksz9021 does not support
-  * standard IEEE MMD extended PHY registers.
-  */
--static void
--ksz9021_wr_mmd_phyreg(struct phy_device *phydev, int ptrad, int devnum,
--		      int regnum, u32 val)
-+static int
-+ksz9021_wr_mmd_phyreg(struct phy_device *phydev, int devad, u16 regnum, u16 val)
- {
-+	return -1;
- }
- 
- static int kszphy_get_sset_count(struct phy_device *phydev)
-@@ -962,8 +961,8 @@ static struct phy_driver ksphy_driver[] = {
- 	.get_stats	= kszphy_get_stats,
- 	.suspend	= genphy_suspend,
- 	.resume		= genphy_resume,
--	.read_mmd_indirect = ksz9021_rd_mmd_phyreg,
--	.write_mmd_indirect = ksz9021_wr_mmd_phyreg,
-+	.read_mmd	= ksz9021_rd_mmd_phyreg,
-+	.write_mmd	= ksz9021_wr_mmd_phyreg,
- }, {
- 	.phy_id		= PHY_ID_KSZ9031,
- 	.phy_id_mask	= MICREL_PHY_ID_MASK,
--- 
-2.7.4
+On 13/01/17 09:42, Erin Lo wrote:
+> From: Dawei Chien <dawei.chien@mediatek.com>
+>
+> Add thermal controller device nodes for MT2701.
+>
+> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> ---
+>  arch/arm/boot/dts/mt2701.dtsi | 43 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+> index 3847f70..c43d5f8 100644
+> --- a/arch/arm/boot/dts/mt2701.dtsi
+> +++ b/arch/arm/boot/dts/mt2701.dtsi
+> @@ -89,6 +89,36 @@
+>  		clock-output-names = "rtc32k";
+>  	};
+>
+> +	thermal-zones {
+> +		cpu_thermal: cpu_thermal {
+> +			polling-delay-passive = <1000>; /* milliseconds */
+> +			polling-delay = <1000>; /* milliseconds */
+> +
+> +			thermal-sensors = <&thermal 0>;
+> +			sustainable-power = <1000>;
+> +
+> +			trips {
+> +				threshold: trip-point at 0 {
+> +					temperature = <68000>;
+> +					hysteresis = <2000>;
+> +					type = "passive";
+> +				};
+> +
+> +				target: trip-point at 1 {
+> +					temperature = <85000>;
+> +					hysteresis = <2000>;
+> +					type = "passive";
+> +				};
+> +
+> +				cpu_crit: cpu_crit at 0 {
+> +					temperature = <115000>;
+> +					hysteresis = <2000>;
+> +					type = "critical";
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+>  	timer {
+>  		compatible = "arm,armv7-timer";
+>  		interrupt-parent = <&gic>;
+> @@ -270,6 +300,19 @@
+>  		status = "disabled";
+>  	};
+>
+> +	thermal: thermal at 1100b000 {
+> +		#thermal-sensor-cells = <0>;
+> +		compatible = "mediatek,mt2701-thermal";
+> +		reg = <0 0x1100b000 0 0x1000>;
+> +		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
+> +		clock-names = "therm", "auxadc";
+> +		resets = <&pericfg 0x10>;
+
+should be MT2701_PERI_AUXADC_SW_RST, right?
+
+> +		reset-names = "therm";
+> +		mediatek,auxadc = <&auxadc>;
+> +		mediatek,apmixedsys = <&apmixedsys>;
+> +	};
+> +
+>  	nandc: nfi at 1100d000 {
+>  		compatible = "mediatek,mt2701-nfc";
+>  		reg = <0 0x1100d000 0 0x1000>;
+>
