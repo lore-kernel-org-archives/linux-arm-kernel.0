@@ -1,92 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 13 Jan 2017 10:12:40 -0800
-Subject: [PATCH 1/2] ARM: dts: dra7-evm: increase QSPI SPL partition size
-In-Reply-To: <1484311234-21978-2-git-send-email-ravibabu@ti.com>
-References: <1484311234-21978-1-git-send-email-ravibabu@ti.com>
- <1484311234-21978-2-git-send-email-ravibabu@ti.com>
-Message-ID: <20170113181239.GC2630@atomide.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Fri, 13 Jan 2017 10:15:51 -0800
+Subject: [PATCH] firmware: qcom: scm: Mask APQ8064 core clk dependency
+In-Reply-To: <1484175483-25333-1-git-send-email-andy.gross@linaro.org>
+References: <1484175483-25333-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <20170113181551.GL10531@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ravi Babu <ravibabu@ti.com> [170113 04:41]:
-> The SPL size for DRA74x platform has increased and
-> is now more than 64KB. Increase QSPI SPL partition
-> size to 256KB for DRA74x EVM.
+On Wed 11 Jan 14:58 PST 2017, Andy Gross wrote:
+
+> This patch masks the core clk requirement for the APQ8064.  Until the
+> other peripherals correctly describe their clock dependencies or the
+> bus driver is put in place to handle the RPM dependencies, this bit
+> will remain masked.
 > 
-> QSPI partition numbering changes because of this.
+> Signed-off-by: Andy Gross <andy.gross@linaro.org>
 
-And this will break the existing partitions potentially..
-See what was discussed on the list few days ago in thread
-"[PATCH 1/6] ARM: dts: am335x-phycore-som: Update NAND
-partition table".
-
-It's best to have these left empty or as they originally
-were and let u-boot configure the partitions.
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
 Regards,
+Bjorn
 
-Tony
-
-
-
-> Signed-off-by: Ravi Babu <ravibabu@ti.com>
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 > ---
->  arch/arm/boot/dts/dra7-evm.dts | 24 ++++++------------------
->  1 file changed, 6 insertions(+), 18 deletions(-)
+>  drivers/firmware/qcom_scm.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
-> index 132f2be..2784241 100644
-> --- a/arch/arm/boot/dts/dra7-evm.dts
-> +++ b/arch/arm/boot/dts/dra7-evm.dts
-> @@ -681,41 +681,29 @@
->  		 */
->  		partition at 0 {
->  			label = "QSPI.SPL";
-> -			reg = <0x00000000 0x000010000>;
-> +			reg = <0x00000000 0x000040000>;
->  		};
->  		partition at 1 {
-> -			label = "QSPI.SPL.backup1";
-> -			reg = <0x00010000 0x00010000>;
-> -		};
-> -		partition at 2 {
-> -			label = "QSPI.SPL.backup2";
-> -			reg = <0x00020000 0x00010000>;
-> -		};
-> -		partition at 3 {
-> -			label = "QSPI.SPL.backup3";
-> -			reg = <0x00030000 0x00010000>;
-> -		};
-> -		partition at 4 {
->  			label = "QSPI.u-boot";
->  			reg = <0x00040000 0x00100000>;
->  		};
-> -		partition at 5 {
-> +		partition at 2 {
->  			label = "QSPI.u-boot-spl-os";
->  			reg = <0x00140000 0x00080000>;
->  		};
-> -		partition at 6 {
-> +		partition at 3 {
->  			label = "QSPI.u-boot-env";
->  			reg = <0x001c0000 0x00010000>;
->  		};
-> -		partition at 7 {
-> +		partition at 4 {
->  			label = "QSPI.u-boot-env.backup1";
->  			reg = <0x001d0000 0x0010000>;
->  		};
-> -		partition at 8 {
-> +		partition at 5 {
->  			label = "QSPI.kernel";
->  			reg = <0x001e0000 0x0800000>;
->  		};
-> -		partition at 9 {
-> +		partition at 6 {
->  			label = "QSPI.file-system";
->  			reg = <0x009e0000 0x01620000>;
->  		};
+> diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
+> index 893f953ea..65d0d9d 100644
+> --- a/drivers/firmware/qcom_scm.c
+> +++ b/drivers/firmware/qcom_scm.c
+> @@ -387,7 +387,7 @@ static int qcom_scm_probe(struct platform_device *pdev)
+>  
+>  static const struct of_device_id qcom_scm_dt_match[] = {
+>  	{ .compatible = "qcom,scm-apq8064",
+> -	  .data = (void *) SCM_HAS_CORE_CLK,
+> +	  /* FIXME: This should have .data = (void *) SCM_HAS_CORE_CLK */
+>  	},
+>  	{ .compatible = "qcom,scm-msm8660",
+>  	  .data = (void *) SCM_HAS_CORE_CLK,
 > -- 
 > 1.9.1
 > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
