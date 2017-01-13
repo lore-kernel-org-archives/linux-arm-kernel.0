@@ -1,40 +1,38 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Jan 2017 16:03:40 +0000
-Subject: [RFC PATCH v2 01/10] arm64: cpufeature: allow for version discrepancy
- in PMU implementations
+Date: Fri, 13 Jan 2017 16:03:44 +0000
+Subject: [RFC PATCH v2 05/10] genirq: export irq_get_percpu_devid_partition to
+ modules
 In-Reply-To: <1484323429-15231-1-git-send-email-will.deacon@arm.com>
 References: <1484323429-15231-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1484323429-15231-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1484323429-15231-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Perf already supports multiple PMU instances for heterogeneous systems,
-so there's no need to be strict in the cpufeature checking, particularly
-as the PMU extension is optional in the architecture.
+Any modular driver using cluster-affine PPIs needs to be able to call
+irq_get_percpu_devid_partition so that it can enable the IRQ on the
+correct subset of CPUs.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+This patch exports the symbol so that it can be called from within a
+module.
+
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ kernel/irq/irqdesc.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index fdf8f045929f..47d0226620e8 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -184,7 +184,11 @@ static const struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
--	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
-+	/*
-+	 * We can instantiate multiple PMU instances with different levels
-+	 * of support.
-+	 * */
-+	S_ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
- 	ARM64_FTR_END,
+diff --git a/kernel/irq/irqdesc.c b/kernel/irq/irqdesc.c
+index 00bb0aeea1d0..1e6ae73eae59 100644
+--- a/kernel/irq/irqdesc.c
++++ b/kernel/irq/irqdesc.c
+@@ -856,6 +856,7 @@ int irq_get_percpu_devid_partition(unsigned int irq, struct cpumask *affinity)
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(irq_get_percpu_devid_partition);
+ 
+ void kstat_incr_irq_this_cpu(unsigned int irq)
+ {
 -- 
 2.1.4
