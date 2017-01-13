@@ -1,87 +1,83 @@
-From: aospan@netup.ru (Abylay Ospan)
-Date: Thu, 12 Jan 2017 23:55:23 -0500
-Subject: [PATCH] PCI: iproc: fix kernel crash if dev->of_node not defined
-In-Reply-To: <6cfba8af-1e9b-cb43-4898-61d6fb8f12ca@broadcom.com>
-References: <1484266817-6725-1-git-send-email-aospan@netup.ru>
- <6891f43f-25e7-1411-800e-97e6788f2f27@gmail.com>
- <e5301de6-9a6c-7deb-4ff7-ccd462c4381e@broadcom.com>
- <6cfba8af-1e9b-cb43-4898-61d6fb8f12ca@broadcom.com>
-Message-ID: <CAK3bHNVQ9Rbuwf1i54h7uLLdkUvyGibmfJpD6zRjt1gYiQD7Hw@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 12 Jan 2017 21:17:00 -0800
+Subject: [PATCH 56/62] watchdog: tangox_wdt: Convert to use device managed
+ functions
+In-Reply-To: <20170111143917.hedhyfu6m5dopag7@pengutronix.de>
+References: <1484091325-9199-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-1-git-send-email-linux@roeck-us.net>
+ <1484100561-17638-5-git-send-email-linux@roeck-us.net>
+ <bd56e90c-5cb8-02d8-3518-c8f5483a6df4@sigmadesigns.com>
+ <94c4d5c0-f639-eab1-6706-335977690e88@roeck-us.net>
+ <a45ed205-7c1b-a298-50c0-fc8b80a846c5@sigmadesigns.com>
+ <20170111143917.hedhyfu6m5dopag7@pengutronix.de>
+Message-ID: <56a43861-e875-2239-1046-91a26c009160@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
-
-> Still, upstream Linux support for Northstar is Device Tree, and BCMA bus
-> should fill in of_nodes accordingly, if not, that's a bug that must be
-> fixed at the BCMA layer.
-
-yes, this is a source of the problem. Devices allocated in
-'bcma_bus_scan' but of_node doesn't assigned.
-Is some code missing in drivers/bcma/ which should assign of_node ?
-
-I can suggest following "hacky" patch for this (works for me):
-
-Author: Abylay Ospan <aospan@netup.ru>
-Date:   Fri Jan 13 07:24:13 2017 +0300
-
-    bcma: force assign 'of_node' for devices on the bus
-
-    prevent other code to fail if no 'of_node' defined
-
-    Signed-off-by: Abylay Ospan <aospan@netup.ru>
-
-diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
-index 2c1798e..4fe1c92 100644
---- a/drivers/bcma/main.c
-+++ b/drivers/bcma/main.c
-@@ -301,6 +301,11 @@ void bcma_init_bus(struct bcma_bus *bus)
- static void bcma_register_core(struct bcma_bus *bus, struct bcma_device *core)
- {
-        int err;
-+       struct device * dev;
-+
-+       dev = bcma_bus_get_host_dev(bus);
-+       if (dev && !core->dev.of_node)
-+               core->dev.of_node = dev->of_node;
-
-
-if it's ok I will send this patch in separate email.
-
->
+On 01/11/2017 06:39 AM, Uwe Kleine-K?nig wrote:
+> On Wed, Jan 11, 2017 at 01:31:47PM +0100, Marc Gonzalez wrote:
+>> On 11/01/2017 11:52, Guenter Roeck wrote:
 >>
+>>> On 01/11/2017 01:07 AM, Marc Gonzalez wrote:
 >>>
->>>>
->>>> Signed-off-by: Abylay Ospan <aospan@netup.ru>
->>>> ---
->>>>  drivers/pci/host/pcie-iproc.c | 3 +++
->>>>  1 file changed, 3 insertions(+)
->>>>
->>>> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
->>>> index 3ebc025..f2836a9 100644
->>>> --- a/drivers/pci/host/pcie-iproc.c
->>>> +++ b/drivers/pci/host/pcie-iproc.c
->>>> @@ -952,6 +952,9 @@ static int pci_dma_range_parser_init(struct of_pci_range_parser *parser,
->>>>     const int na = 3, ns = 2;
->>>>     int rlen;
->>>>
->>>> +   if (!node)
->>>> +           return -ENOENT;
->>>> +
->>>>     parser->node = node;
->>>>     parser->pna = of_n_addr_cells(node);
->>>>     parser->np = parser->pna + na + ns;
->>>>
->>>
->>>
+>>>>> @@ -134,12 +134,15 @@ static int tangox_wdt_probe(struct platform_device *pdev)
+>>>>>  	err = clk_prepare_enable(dev->clk);
+>>>>>  	if (err)
+>>>>>  		return err;
+>>>>> +	err = devm_add_action_or_reset(&pdev->dev,
+>>>>> +				       (void(*)(void *))clk_disable_unprepare,
+>>>>> +				       dev->clk);
+>>>>> +	if (err)
+>>>>> +		return err;
 >
+> This looks wrong. There is no clk_unprepare_disable when
+> devm_add_action_or_reset fails.
 >
-> --
-> Florian
+>>>>
+>>>> Hello Guenter,
+>>>>
+>>>> I would rather avoid the function pointer cast.
+>>>> How about defining an auxiliary function for the cleanup action?
+>>>>
+>>>> clk_disable_unprepare() is static inline, so gcc will have to
+>>>> define an auxiliary function either way. What do you think?
+>>>
+>>> Not really. It would just make it more complicated to replace the
+>>> call with devm_clk_prepare_enable(), should it ever find its way
+>>> into the light of day.
+>>
+>> More complicated, because the cleanup function will have to be deleted later?
+>> The compiler will warn if someone forgets to do that.
+>>
+>> In my opinion, it's not a good idea to rely on the fact that casting
+>> void(*)(struct clk *clk) to void(*)(void *) is likely to work as expected
+>> on most platforms. (It has undefined behavior, strictly speaking.)
+>
+> I would expect it to work on all (Linux) platforms. Anyhow, I wonder if
+> there couldn't be found a better solution.
+>
+> If in the end it looks like the following that would be good I think:
+>
+> 	clk = devm_clk_get(...);
+> 	if (IS_ERR(clk))
+> 		...
+>
+> 	ret = devm_clk_prepare_enable(clk)
+> 	if (ret)
+> 		return ret;
+>
 
+It turns out that at least one static analyzer complains about different
+parameter pointer types in situations like this, and at least one embedded
+compiler manages to create function names with embedded parameter type
+(eg it appends an 'i' to the function name for each integer parameter).
 
+With that, I consider the typecast to be too risky after all. It may work
+for all of today's Linux architectures and compilers, but who knows if I
+get flooded with static analyzer warnings, and who knows if gcc version
+18.0 or binutils 35.0 makes it truly incompatible (following the logic of
+"we can, therefore we do"). Since I also dislike the stub function solution,
+at least in this situation, I'll drop all patches touching clk_prepare_enable(),
+and wait for devm_clk_prepare_enable() to be available.
 
--- 
-Abylay Ospan,
-NetUP Inc.
-http://www.netup.tv
+Guenter
