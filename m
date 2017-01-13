@@ -1,63 +1,69 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 13 Jan 2017 16:29:25 +0100
-Subject: [PATCH v2 4/6] arm: dts: mt2701: Add auxadc device node.
-In-Reply-To: <1484296978-18572-5-git-send-email-erin.lo@mediatek.com>
-References: <1484296978-18572-1-git-send-email-erin.lo@mediatek.com>
- <1484296978-18572-5-git-send-email-erin.lo@mediatek.com>
-Message-ID: <341850d0-6f32-9288-4399-96f0d2d00c6f@gmail.com>
+Date: Fri, 13 Jan 2017 16:32:39 +0100
+Subject: [PATCH v5] arm64: dts: mt8173: add mmsel clocks for 4K support
+In-Reply-To: <CAGS+omAZvHmSz6bJcvisC1LZgxwbd-HzvYMDrHXzfkY3mZZEsw@mail.gmail.com>
+References: <1470279438-60372-1-git-send-email-bibby.hsieh@mediatek.com>
+ <CAGS+omAZvHmSz6bJcvisC1LZgxwbd-HzvYMDrHXzfkY3mZZEsw@mail.gmail.com>
+Message-ID: <0786f0e3-791a-4173-7506-cbb0bcb9f521@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 13/01/17 09:42, Erin Lo wrote:
-> From: Zhiyong Tao <zhiyong.tao@mediatek.com>
+On 12/01/17 05:50, Daniel Kurtz wrote:
+> Hi Matthias,
 >
-> Add auxadc device node for MT2701.
+> (Trying again to send plain text email)...
 >
-> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
-> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt2701-evb.dts | 4 ++++
->  arch/arm/boot/dts/mt2701.dtsi    | 9 +++++++++
->  2 files changed, 13 insertions(+)
+> On Thu, Aug 4, 2016 at 10:57 AM, Bibby Hsieh <bibby.hsieh@mediatek.com> wrote:
+>> To support HDMI 4K resolution, mmsys need clcok
+>> mm_sel to be 400MHz.
+>>
+>> The board .dts file should override the clock rate
+>> property with the higher VENCPLL frequency the board
+>> supports HDMI 4K resolution.
+>>
+>> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+>
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
 >
 
-Applied to v4.10-next/dts32
+Applied to v4.10-next/dts
+Thanks
 
-> diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
-> index 879f1eb..a483798 100644
-> --- a/arch/arm/boot/dts/mt2701-evb.dts
-> +++ b/arch/arm/boot/dts/mt2701-evb.dts
-> @@ -24,6 +24,10 @@
->  	};
->  };
 >
-> +&auxadc {
-> +	status = "okay";
-> +};
-> +
->  &pio {
->  	spi_pins_a: spi0 at 0 {
->  		pins_spi {
-> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-> index 1182c43..4f52019 100644
-> --- a/arch/arm/boot/dts/mt2701.dtsi
-> +++ b/arch/arm/boot/dts/mt2701.dtsi
-> @@ -208,6 +208,15 @@
->  		      <0 0x10216000 0 0x2000>;
->  	};
+> It looks like this patch was lost.  It is actually a prerequisite for
+> MTK 4k HDMI support, which already landed in v4.9.
 >
-> +	auxadc: adc at 11001000 {
-> +		compatible = "mediatek,mt2701-auxadc";
-> +		reg = <0 0x11001000 0 0x1000>;
-> +		clocks = <&pericfg CLK_PERI_AUXADC>;
-> +		clock-names = "main";
-> +		#io-channel-cells = <1>;
-> +		status = "disabled";
-> +	};
-> +
->  	uart0: serial at 11002000 {
->  		compatible = "mediatek,mt2701-uart",
->  			     "mediatek,mt6577-uart";
+> See the email thread entitled:
+> [PATCH v5 0/3] MT8173 HDMI 4K support <https://lkml.org/lkml/2016/9/28/893>
 >
+> Or these three:
+>
+> 0d2200794f0a drm/mediatek: modify the factor to make the pll_rate set
+> in the 1G-2G range
+> 968253bd7caa drm/mediatek: enhance the HDMI driving current
+> d542b7c473f0 drm/mediatek: do mtk_hdmi_send_infoframe after HDMI clock enable
+>
+> -Dan
+>
+>> ---
+>>  arch/arm64/boot/dts/mediatek/mt8173.dtsi |    2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> index 78529e4..c3f32f3 100644
+>> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> @@ -690,6 +690,8 @@
+>>                         compatible = "mediatek,mt8173-mmsys", "syscon";
+>>                         reg = <0 0x14000000 0 0x1000>;
+>>                         power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+>> +                       assigned-clocks = <&topckgen CLK_TOP_MM_SEL>;
+>> +                       assigned-clock-rates = <400000000>;
+>>                         #clock-cells = <1>;
+>>                 };
+>>
+>> --
+>> 1.7.9.5
+>>
