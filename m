@@ -1,33 +1,64 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 13 Jan 2017 12:59:32 +0100
-Subject: [PATCH v3 05/24] ARM: dts: imx6qdl-sabrelite: remove erratum
- ERR006687 workaround
-In-Reply-To: <1483755102-24785-6-git-send-email-steve_longerbeam@mentor.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-6-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1484308772.31475.25.camel@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 13 Jan 2017 12:03:38 +0000
+Subject: [PATCH] KVM: arm64: Increase number of memslots to 512
+In-Reply-To: <1484153537-20984-1-git-send-email-linucherian@gmail.com>
+References: <1484153537-20984-1-git-send-email-linucherian@gmail.com>
+Message-ID: <61fa02f8-b244-6bae-eaa1-cb745ea543e1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 06.01.2017, 18:11 -0800 schrieb Steve Longerbeam:
-> There is a pin conflict with GPIO_6. This pin functions as a power
-> input pin to the OV5642 camera sensor, but ENET uses it as the h/w
-> workaround for erratum ERR006687, to wake-up the ARM cores on normal
-> RX and TX packet done events. So we need to remove the h/w workaround
-> to support the OV5642. The result is that the CPUidle driver will no
-> longer allow entering the deep idle states on the sabrelite.
-> 
-> This is a partial revert of
-> 
-> commit 6261c4c8f13e ("ARM: dts: imx6qdl-sabrelite: use GPIO_6 for FEC
-> 			interrupt.")
-> commit a28eeb43ee57 ("ARM: dts: imx6: tag boards that have the HW workaround
-> 			for ERR006687")
-> 
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+Hi Linu,
 
-Pity this has to be removed for all, Nitrogen6X should really use DT
-overlays for the add-on boards / cameras.
+On 11/01/17 16:52, linucherian at gmail.com wrote:
+> From: Linu Cherian <linu.cherian@cavium.com>
+> 
+> Having only 32 memslots is a real constraint for the maximum number of
+> PCI devices that can be assigned to a single guest. Assuming each PCI
+> device/virtual function having two memory BAR regions, we could assign
+> only 15 devices/virtual functions to a guest.
+> 
+> So increase KVM_MEM_SLOTS_NUM to 512 as done in other archs like x86 and
+> powerpc. For this, KVM_USER_MEM_SLOTS has been changed to 508.
+> 
+> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+> ---
+>  arch/arm/kvm/arm.c                | 3 +++
+>  arch/arm64/include/asm/kvm_host.h | 2 +-
+>  2 files changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 8f92efa..a19389b 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -221,6 +221,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>  	case KVM_CAP_MAX_VCPUS:
+>  		r = KVM_MAX_VCPUS;
+>  		break;
+> +	case KVM_CAP_NR_MEMSLOTS:
+> +		r = KVM_USER_MEM_SLOTS;
+> +		break;
+>  	case KVM_CAP_MSI_DEVID:
+>  		if (!kvm)
+>  			r = -EINVAL;
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index e505038..88f017d 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -30,7 +30,7 @@
+>  
+>  #define __KVM_HAVE_ARCH_INTC_INITIALIZED
+>  
+> -#define KVM_USER_MEM_SLOTS 32
+> +#define KVM_USER_MEM_SLOTS 508
+>  #define KVM_PRIVATE_MEM_SLOTS 4
+>  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
+>  #define KVM_HALT_POLL_NS_DEFAULT 500000
+> 
 
-regards
-Philipp
+I'm not opposed to that patch, but if I may ask: how has that been tested?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
