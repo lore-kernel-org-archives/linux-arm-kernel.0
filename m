@@ -1,75 +1,163 @@
-From: linucherian@gmail.com (Linu Cherian)
-Date: Fri, 13 Jan 2017 22:55:43 +0530
-Subject: [PATCH] KVM: arm64: Increase number of memslots to 512
-In-Reply-To: <61fa02f8-b244-6bae-eaa1-cb745ea543e1@arm.com>
-References: <1484153537-20984-1-git-send-email-linucherian@gmail.com>
- <61fa02f8-b244-6bae-eaa1-cb745ea543e1@arm.com>
-Message-ID: <CAGOz-0aD-hV7sDAX70pSGdCj1J4s4xc4qQBwbaKzVZArfRK2AQ@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 13 Jan 2017 18:33:40 +0100
+Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
+In-Reply-To: <20170113175628.1793f433@bbrezillon>
+References: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
+ <1484291609-20195-3-git-send-email-guochun.mao@mediatek.com>
+ <20170113151747.6bc85245@bbrezillon>
+ <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
+ <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
+ <20170113172825.75d545a3@bbrezillon>
+ <86c997be-f500-eaa1-3ba5-d21cff6223b7@gmail.com>
+ <20170113175628.1793f433@bbrezillon>
+Message-ID: <0fafcd8d-cf99-de6b-728f-5e3637810b68@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 5:33 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Hi Linu,
->
-> On 11/01/17 16:52, linucherian at gmail.com wrote:
->> From: Linu Cherian <linu.cherian@cavium.com>
+On 01/13/2017 05:56 PM, Boris Brezillon wrote:
+> On Fri, 13 Jan 2017 17:44:12 +0100
+> Marek Vasut <marek.vasut@gmail.com> wrote:
+> 
+>> On 01/13/2017 05:28 PM, Boris Brezillon wrote:
+>>> On Fri, 13 Jan 2017 17:13:55 +0100
+>>> Marek Vasut <marek.vasut@gmail.com> wrote:
+>>>   
+>>>> On 01/13/2017 04:12 PM, Matthias Brugger wrote:  
+>>>>>
+>>>>>
+>>>>> On 13/01/17 15:17, Boris Brezillon wrote:    
+>>>>>> On Fri, 13 Jan 2017 15:13:29 +0800
+>>>>>> Guochun Mao <guochun.mao@mediatek.com> wrote:
+>>>>>>    
+>>>>>>> Add Mediatek nor flash node.
+>>>>>>>
+>>>>>>> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+>>>>>>> ---
+>>>>>>>  arch/arm/boot/dts/mt2701-evb.dts |   25 +++++++++++++++++++++++++
+>>>>>>>  arch/arm/boot/dts/mt2701.dtsi    |   12 ++++++++++++
+>>>>>>>  2 files changed, 37 insertions(+)
+>>>>>>>
+>>>>>>> diff --git a/arch/arm/boot/dts/mt2701-evb.dts
+>>>>>>> b/arch/arm/boot/dts/mt2701-evb.dts
+>>>>>>> index 082ca88..85e5ae8 100644
+>>>>>>> --- a/arch/arm/boot/dts/mt2701-evb.dts
+>>>>>>> +++ b/arch/arm/boot/dts/mt2701-evb.dts
+>>>>>>> @@ -24,6 +24,31 @@
+>>>>>>>      };
+>>>>>>>  };
+>>>>>>>
+>>>>>>> +&nor_flash {
+>>>>>>> +    pinctrl-names = "default";
+>>>>>>> +    pinctrl-0 = <&nor_pins_default>;
+>>>>>>> +    status = "okay";
+>>>>>>> +    flash at 0 {
+>>>>>>> +        compatible = "jedec,spi-nor";
+>>>>>>> +        reg = <0>;
+>>>>>>> +    };
+>>>>>>> +};
+>>>>>>> +
+>>>>>>> +&pio {
+>>>>>>> +    nor_pins_default: nor {
+>>>>>>> +        pins1 {
+>>>>>>> +            pinmux = <MT2701_PIN_240_EXT_XCS__FUNC_EXT_XCS>,
+>>>>>>> +                 <MT2701_PIN_241_EXT_SCK__FUNC_EXT_SCK>,
+>>>>>>> +                 <MT2701_PIN_239_EXT_SDIO0__FUNC_EXT_SDIO0>,
+>>>>>>> +                 <MT2701_PIN_238_EXT_SDIO1__FUNC_EXT_SDIO1>,
+>>>>>>> +                 <MT2701_PIN_237_EXT_SDIO2__FUNC_EXT_SDIO2>,
+>>>>>>> +                 <MT2701_PIN_236_EXT_SDIO3__FUNC_EXT_SDIO3>;
+>>>>>>> +            drive-strength = <MTK_DRIVE_4mA>;
+>>>>>>> +            bias-pull-up;
+>>>>>>> +        };
+>>>>>>> +    };
+>>>>>>> +};
+>>>>>>> +
+>>>>>>>  &uart0 {
+>>>>>>>      status = "okay";
+>>>>>>>  };
+>>>>>>> diff --git a/arch/arm/boot/dts/mt2701.dtsi
+>>>>>>> b/arch/arm/boot/dts/mt2701.dtsi
+>>>>>>> index bdf8954..1eefce4 100644
+>>>>>>> --- a/arch/arm/boot/dts/mt2701.dtsi
+>>>>>>> +++ b/arch/arm/boot/dts/mt2701.dtsi
+>>>>>>> @@ -227,6 +227,18 @@
+>>>>>>>          status = "disabled";
+>>>>>>>      };
+>>>>>>>
+>>>>>>> +    nor_flash: spi at 11014000 {
+>>>>>>> +        compatible = "mediatek,mt2701-nor",
+>>>>>>> +                 "mediatek,mt8173-nor";    
+>>>>>>
+>>>>>> Why define both here? Is "mediatek,mt8173-nor" really providing a
+>>>>>> subset of the features supported by "mediatek,mt2701-nor"?
+>>>>>>    
+>>>>>
+>>>>> I think even if the ip block is the same, we should provide both
+>>>>> bindings, just in case in the future we find out that mt2701 has some
+>>>>> hidden bug, feature or bug-feature. This way even if we update the
+>>>>> driver, we stay compatible with older device tree blobs in the wild.
+>>>>>
+>>>>> We can drop the mt2701-nor in the bindings definition if you want.   
+>>>
+>>> Oh, sorry, I misunderstood. What I meant is that if you want to
+>>> list/support all possible compatibles, maybe you should just put one
+>>> compatible in your DT and patch your driver (+ binding doc) to define
+>>> all of them.  
 >>
->> Having only 32 memslots is a real constraint for the maximum number of
->> PCI devices that can be assigned to a single guest. Assuming each PCI
->> device/virtual function having two memory BAR regions, we could assign
->> only 15 devices/virtual functions to a guest.
+>> Uh, what ? I lost you here :-)
 >>
->> So increase KVM_MEM_SLOTS_NUM to 512 as done in other archs like x86 and
->> powerpc. For this, KVM_USER_MEM_SLOTS has been changed to 508.
+>>>> This exactly. We should have a DT compat in the form:
+>>>> compatible = "vendor,<soc>-block", "vendor,<oldest-compat-soc>-block";
+>>>> Then if we find a problem in the future, we can match on the
+>>>> "vendor,<soc>-block" and still support the old DTs.  
+>>>
+>>> Not sure it's only in term of whose IP appeared first. My understanding
+>>> is that it's a way to provide inheritance. For example:
+>>>
+>>> 	"<soc-vendor>,<ip-version>", "<ip-vendor>,<ip-version>";
+>>>
+>>> or
+>>>
+>>> 	"<soc-vendor>,<full-featured-ip-version>","<soc-vendor>,<basic-feature-ip-version>";
+>>>
+>>> BTW, which one is the oldest between mt8173 and mt2701? :-)  
 >>
->> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
->> ---
->>  arch/arm/kvm/arm.c                | 3 +++
->>  arch/arm64/include/asm/kvm_host.h | 2 +-
->>  2 files changed, 4 insertions(+), 1 deletion(-)
+>> And that's another thing and I agree with you, but I don't think that's
+>> what we're discussing in this thread. But (!), OT, I think we should
+>> codify the rules in Documentation/ . This discussion came up multiple
+>> times recently.
 >>
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index 8f92efa..a19389b 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -221,6 +221,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
->>       case KVM_CAP_MAX_VCPUS:
->>               r = KVM_MAX_VCPUS;
->>               break;
->> +     case KVM_CAP_NR_MEMSLOTS:
->> +             r = KVM_USER_MEM_SLOTS;
->> +             break;
->>       case KVM_CAP_MSI_DEVID:
->>               if (!kvm)
->>                       r = -EINVAL;
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index e505038..88f017d 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -30,7 +30,7 @@
->>
->>  #define __KVM_HAVE_ARCH_INTC_INITIALIZED
->>
->> -#define KVM_USER_MEM_SLOTS 32
->> +#define KVM_USER_MEM_SLOTS 508
->>  #define KVM_PRIVATE_MEM_SLOTS 4
->>  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
->>  #define KVM_HALT_POLL_NS_DEFAULT 500000
->>
->
-> I'm not opposed to that patch, but if I may ask: how has that been tested?
->
+>> And my question still stands, what do we put into the DT here, IMO
+>> compatible = "mediatek,mt2701-nor", "mediatek,mt8173-nor";
+> 
+> I'd say
+> 
+> 	compatible = "mediatek,mt8173-nor";
+> 
+> because both compatible are referring to very specific IP version. It's
+> not the same as
 
-I have tested this on Cavium ARM64 SOC, by assigning multiple
-VFs(virtual functions) of a SRIOV device to a single VM. Each VF has
-two memory regions(two BARs) implemented.
+But then you don't have the ability to handle a block in this particular
+SoC in case there's a bug found in it in the future,
+so IMO it should be:
 
-Without, this change, when the number of virtual functions assigned to
-the guest crosses 15, qemu aborts with
-"kvm_alloc_slot: no free slot available", during guest kernel booting.
+compatible = "mediatek,mt2701-nor", "mediatek,mt8173-nor";
 
-Now, with this change guest kernel boots fine with more than 15 VFs
-assigned(tested upto 29) and also all the PCI VFs assigned to the guest
-get listed under lspci with memory resources configured.
+> 	compatible = "mediatek,mt8173-nor", "mediatek,mt81xx-nor";
 
-Please let me know if you are looking for more specifics like bootlogs etc.
+This doesn't look right, since here we add two new compatibles ...
+
+> where you clearly have a generic compatible which is overloaded by a
+> specific one.
+> 
+> But anyway, I'm not the one taking the decision here, let's wait for DT
+> maintainers reviews.
+> 
+>> and what goes into the binding document ? I guess both too ?
+> 
+> If both exist, they should be both documented.
+> 
+
+
+-- 
+Best regards,
+Marek Vasut
