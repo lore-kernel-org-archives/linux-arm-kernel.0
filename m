@@ -1,41 +1,54 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 13 Jan 2017 09:37:27 +0100
-Subject: [PATCH] i2c: i2c-cadence: Don't register the adapter until it's
- ready
-In-Reply-To: <469bf72b-70e6-24d2-99b1-79b6f0a635bb@topic.nl>
-References: <1483613240-32501-1-git-send-email-mike.looijmans@topic.nl>
- <428e8fc8-8b23-8e2c-763e-d977aaa98691@mleia.com>
- <469bf72b-70e6-24d2-99b1-79b6f0a635bb@topic.nl>
-Message-ID: <20170113083727.GB1446@katana>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Fri, 13 Jan 2017 16:42:55 +0800
+Subject: [PATCH v2 3/6] arm: dts: mt2701: Add nand device node
+In-Reply-To: <1484296978-18572-1-git-send-email-erin.lo@mediatek.com>
+References: <1484296978-18572-1-git-send-email-erin.lo@mediatek.com>
+Message-ID: <1484296978-18572-4-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Xiaolei Li <xiaolei.li@mediatek.com>
 
-> I would argue that the "info" message means "the I2C adapter is ready for
-> transaction now, and we'll start initializing devices on the bus". That is
-> the case before it calls i2c_add_adapter().
+Add mt2701 nand device node, include nfi and bch ecc.
 
-I know what you mean, but i2c_add_adapter does more, and it can fail
-because the adapter is *not* ready to transfer. Seeing the success
-message before is also confusing.
+Signed-off-by: Xiaolei Li <xiaolei.li@mediatek.com>
+Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+---
+ arch/arm/boot/dts/mt2701.dtsi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-> When i2c_add_adapter() runs, it will start probing devices on the bus. This
-> yields very confusing output, as it will output things in a reversed order:
-> 
-> - device X on I2C bus
-> - device Y on I2C bus
-> - cdns-i2c ff030000.i2c: 100 kHz mmio ff030000 irq 197
-
-I agree. That being said, somewhen I started working on moving such
-messages into the core to save string space and have consistent output.
-Then, we can print at the proper time.
-
-So, until then, we should be consistent with the other driver, I'd say.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170113/8487324a/attachment.sig>
+diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+index 87be52c..1182c43 100644
+--- a/arch/arm/boot/dts/mt2701.dtsi
++++ b/arch/arm/boot/dts/mt2701.dtsi
+@@ -261,6 +261,28 @@
+ 		status = "disabled";
+ 	};
+ 
++	nandc: nfi at 1100d000 {
++		compatible = "mediatek,mt2701-nfc";
++		reg = <0 0x1100d000 0 0x1000>;
++		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&pericfg CLK_PERI_NFI>,
++			 <&pericfg CLK_PERI_NFI_PAD>;
++		clock-names = "nfi_clk", "pad_clk";
++		status = "disabled";
++		ecc-engine = <&bch>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
++	bch: ecc at 1100e000 {
++		compatible = "mediatek,mt2701-ecc";
++		reg = <0 0x1100e000 0 0x1000>;
++		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&pericfg CLK_PERI_NFI_ECC>;
++		clock-names = "nfiecc_clk";
++		status = "disabled";
++	};
++
+ 	spi1: spi at 11016000 {
+ 		compatible = "mediatek,mt2701-spi";
+ 		#address-cells = <1>;
+-- 
+1.9.1
