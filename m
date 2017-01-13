@@ -1,45 +1,24 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 13 Jan 2017 20:02:52 +0530
-Subject: [PATCH 00/10] ARM: da850-lcdk: add SATA support
-In-Reply-To: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <fa513599-1ac1-51e9-4da3-f4ed61ba0ce2@ti.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 13 Jan 2017 22:37:09 +0800
+Subject: [PATCH -next] crypto: mediatek - make symbol of_crypto_id static
+In-Reply-To: <20170112150321.4187-1-weiyj.lk@gmail.com>
+References: <20170112150321.4187-1-weiyj.lk@gmail.com>
+Message-ID: <20170113143709.GA26101@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 January 2017 06:07 PM, Bartosz Golaszewski wrote:
-> This series contains all the changes necessary to make SATA work on
-> the da850-lcdk board.
+On Thu, Jan 12, 2017 at 03:03:21PM +0000, Wei Yongjun wrote:
+> From: Wei Yongjun <weiyongjun1@huawei.com>
 > 
-> The first patch adds a clock lookup entry required for the ahci core
-> to retrieve a functional clock.
+> Fixes the following sparse warning:
 > 
-> The second enables relevant config options for all davinci boards.
+> drivers/crypto/mediatek/mtk-platform.c:585:27: warning:
+>  symbol 'of_crypto_id' was not declared. Should it be static?
 > 
-> The third adds device tree bindings for the ahci_da850 driver.
-> 
-> The fourth adds a workaround for a SATA controller instability we
-> detected after increasing the PLL0 frequency for proper LCD
-> controller support.
-> 
-> Patches 5 through 7 extend the ahci_da850 driver - add DT support,
-> un-hardcode the clock multiplier value and add a workaround for
-> a quirk present on the da850 SATA controller.
-> 
-> Patches 8-10 add the device tree changes required to probe the driver.
-> 
-> I'm posting the series as a whole to give all reviewers the full
-> picture and visibility of the changes required, if needed I can resend
-> the patches separately.
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 
-I just tested this series on my LCDK board using a Western Digital SATA
-HDD and it works great with some basic read / write tests. Thanks!
-
-For the non-platform patches which I wont be queuing:
-
-Tested-by: Sekhar Nori <nsekhar@ti.com>
-
-I will take a look at the series closely next week.
-
-Thanks,
-Sekhar
+Patch applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
