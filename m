@@ -1,27 +1,75 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Fri, 13 Jan 2017 17:22:44 +0000
-Subject: [PATCH 07/37] PCI: dwc: designware: Get device pointer at the
- start of dw_pcie_host_init
-In-Reply-To: <1484216786-17292-8-git-send-email-kishon@ti.com>
-References: <1484216786-17292-1-git-send-email-kishon@ti.com>
- <1484216786-17292-8-git-send-email-kishon@ti.com>
-Message-ID: <fbfa32a8-0897-9c8a-618c-bb41fa26c532@synopsys.com>
+From: linucherian@gmail.com (Linu Cherian)
+Date: Fri, 13 Jan 2017 22:55:43 +0530
+Subject: [PATCH] KVM: arm64: Increase number of memslots to 512
+In-Reply-To: <61fa02f8-b244-6bae-eaa1-cb745ea543e1@arm.com>
+References: <1484153537-20984-1-git-send-email-linucherian@gmail.com>
+ <61fa02f8-b244-6bae-eaa1-cb745ea543e1@arm.com>
+Message-ID: <CAGOz-0aD-hV7sDAX70pSGdCj1J4s4xc4qQBwbaKzVZArfRK2AQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jan 13, 2017 at 5:33 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Hi Linu,
+>
+> On 11/01/17 16:52, linucherian at gmail.com wrote:
+>> From: Linu Cherian <linu.cherian@cavium.com>
+>>
+>> Having only 32 memslots is a real constraint for the maximum number of
+>> PCI devices that can be assigned to a single guest. Assuming each PCI
+>> device/virtual function having two memory BAR regions, we could assign
+>> only 15 devices/virtual functions to a guest.
+>>
+>> So increase KVM_MEM_SLOTS_NUM to 512 as done in other archs like x86 and
+>> powerpc. For this, KVM_USER_MEM_SLOTS has been changed to 508.
+>>
+>> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+>> ---
+>>  arch/arm/kvm/arm.c                | 3 +++
+>>  arch/arm64/include/asm/kvm_host.h | 2 +-
+>>  2 files changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index 8f92efa..a19389b 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -221,6 +221,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>>       case KVM_CAP_MAX_VCPUS:
+>>               r = KVM_MAX_VCPUS;
+>>               break;
+>> +     case KVM_CAP_NR_MEMSLOTS:
+>> +             r = KVM_USER_MEM_SLOTS;
+>> +             break;
+>>       case KVM_CAP_MSI_DEVID:
+>>               if (!kvm)
+>>                       r = -EINVAL;
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index e505038..88f017d 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -30,7 +30,7 @@
+>>
+>>  #define __KVM_HAVE_ARCH_INTC_INITIALIZED
+>>
+>> -#define KVM_USER_MEM_SLOTS 32
+>> +#define KVM_USER_MEM_SLOTS 508
+>>  #define KVM_PRIVATE_MEM_SLOTS 4
+>>  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
+>>  #define KVM_HALT_POLL_NS_DEFAULT 500000
+>>
+>
+> I'm not opposed to that patch, but if I may ask: how has that been tested?
+>
 
-Hi!
+I have tested this on Cavium ARM64 SOC, by assigning multiple
+VFs(virtual functions) of a SRIOV device to a single VM. Each VF has
+two memory regions(two BARs) implemented.
 
-?s 10:25 AM de 1/12/2017, Kishon Vijay Abraham I escreveu:
-> No functional change. Get device pointer at the beginning of
-> dw_pcie_host_init instead of getting it all over dw_pcie_host_init.
-> This is in preparation for splitting struct pcie_port into host and
-> core structures (Once split pcie_port will not have device pointer).
-> 
+Without, this change, when the number of virtual functions assigned to
+the guest crosses 15, qemu aborts with
+"kvm_alloc_slot: no free slot available", during guest kernel booting.
 
-I think change should be condense with another patch to reduce the patch-set
-number and to give it real meaning. I understand why you are breaking so much
-the patch, it is has a lot of changes, but in my opinion is too much fragmented.
+Now, with this change guest kernel boots fine with more than 15 VFs
+assigned(tested upto 29) and also all the PCI VFs assigned to the guest
+get listed under lspci with memory resources configured.
 
-Thanks
-Joao
+Please let me know if you are looking for more specifics like bootlogs etc.
