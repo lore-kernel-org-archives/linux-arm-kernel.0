@@ -1,21 +1,19 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 13 Jan 2017 22:37:09 +0800
-Subject: [PATCH -next] crypto: mediatek - make symbol of_crypto_id static
-In-Reply-To: <20170112150321.4187-1-weiyj.lk@gmail.com>
-References: <20170112150321.4187-1-weiyj.lk@gmail.com>
-Message-ID: <20170113143709.GA26101@gondor.apana.org.au>
+Date: Fri, 13 Jan 2017 22:37:34 +0800
+Subject: [PATCH] crypto: arm/aes - avoid reserved 'tt' mnemonic in asm code
+In-Reply-To: <1484296406-13224-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1484296406-13224-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170113143734.GC26101@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 03:03:21PM +0000, Wei Yongjun wrote:
-> From: Wei Yongjun <weiyongjun1@huawei.com>
+On Fri, Jan 13, 2017 at 08:33:26AM +0000, Ard Biesheuvel wrote:
+> The ARMv8-M architecture introduces 'tt' and 'ttt' instructions,
+> which means we can no longer use 'tt' as a register alias on recent
+> versions of binutils for ARM. So replace the alias with 'ttab'.
 > 
-> Fixes the following sparse warning:
-> 
-> drivers/crypto/mediatek/mtk-platform.c:585:27: warning:
->  symbol 'of_crypto_id' was not declared. Should it be static?
-> 
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> Fixes: 81edb4262975 ("crypto: arm/aes - replace scalar AES cipher")
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
 Patch applied.  Thanks.
 -- 
