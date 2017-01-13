@@ -1,61 +1,94 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 13 Jan 2017 09:22:15 +0000
-Subject: [RFC 07/13] KVM: arm64: ITS: Change entry_size and indirect bit
- in BASER
-In-Reply-To: <89752a29-d533-1f4c-9e9b-93e8bd0556b3@redhat.com>
-References: <1484236613-24633-1-git-send-email-eric.auger@redhat.com>
- <1484236613-24633-8-git-send-email-eric.auger@redhat.com>
- <dc26dc19-313b-375b-0d9b-f4ff411a914f@arm.com>
- <89752a29-d533-1f4c-9e9b-93e8bd0556b3@redhat.com>
-Message-ID: <7538fddf-919f-5428-a665-485ea1be6e9a@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 13 Jan 2017 09:25:22 +0000
+Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
+In-Reply-To: <20170112232931-mutt-send-email-mst@kernel.org>
+References: <85015f1653eb7e36f992708362b75d1f4391b783.1484070340.git.robin.murphy@arm.com>
+ <4833e705fb6841fbfdbee3b1a21a7bc917292410.1484070340.git.robin.murphy@arm.com>
+ <20170111013046-mutt-send-email-mst@kernel.org>
+ <20170111100139.GC12388@arm.com>
+ <20170112232931-mutt-send-email-mst@kernel.org>
+Message-ID: <20170113092522.GB22538@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/01/17 08:57, Auger Eric wrote:
-> Hi Marc,
+On Fri, Jan 13, 2017 at 12:12:56AM +0200, Michael S. Tsirkin wrote:
+> On Wed, Jan 11, 2017 at 10:01:39AM +0000, Will Deacon wrote:
+> > On Wed, Jan 11, 2017 at 01:33:31AM +0200, Michael S. Tsirkin wrote:
+> > > On Tue, Jan 10, 2017 at 05:51:18PM +0000, Robin Murphy wrote:
+> > > > From: Will Deacon <will.deacon@arm.com>
+> > > > 
+> > > > Booting Linux on an ARM fastmodel containing an SMMU emulation results
+> > > > in an unexpected I/O page fault from the legacy virtio-blk PCI device:
+> > > > 
+> > > > [    1.211721] arm-smmu-v3 2b400000.smmu: event 0x10 received:
+> > > > [    1.211800] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
+> > > > [    1.211880] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
+> > > > [    1.211959] arm-smmu-v3 2b400000.smmu:	0x00000008fa081002
+> > > > [    1.212075] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
+> > > > [    1.212155] arm-smmu-v3 2b400000.smmu: event 0x10 received:
+> > > > [    1.212234] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
+> > > > [    1.212314] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
+> > > > [    1.212394] arm-smmu-v3 2b400000.smmu:	0x00000008fa081000
+> > > > [    1.212471] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
+> > > > 
+> > > > <system hangs failing to read partition table>
+> > > > 
+> > > > This is because the virtio-blk is behind an SMMU, so we have consequently
+> > > > swizzled its DMA ops and configured the SMMU to translate accesses. This
+> > > > then requires the vring code to use the DMA API to establish translations,
+> > > > otherwise all transactions will result in fatal faults and termination.
+> > > > 
+> > > > Given that ARM-based systems only see an SMMU if one is really present
+> > > > (the topology is all described by firmware tables such as device-tree or
+> > > > IORT), then we can safely use the DMA API for all virtio devices.
+> > > > 
+> > > > Cc: Andy Lutomirski <luto@kernel.org>
+> > > > Cc: Michael S. Tsirkin <mst@redhat.com>
+> > > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > > 
+> > > I'd like to better understand then need for this one.
+> > > Can't the device in question just set VIRTIO_F_IOMMU_PLATFORM ?
+> > > 
+> > > I'd rather we avoided need for more hacks and just
+> > > have everyone switch to that.
+> > 
+> > There are a couple of problems with VIRTIO_F_IOMMU_PLATFORM:
+> > 
+> > 1. It doesn't exist for legacy devices, which are all we have on the
+> >    platform in question.
+> > 
+> > 2. It's not documented in the virtio sp^H^HSTOP PRESS. I see you applied
+> >    my patch ;). Thanks.
+> > 
+> > In which case, for non-legacy devices we should definitely be using
+> > VIRTIO_F_IOMMU_PLATFORM, but since this platform hasn't yet moved to the
+> > world of flying cars, could we unconditionally set the DMA ops on ARM
+> > for legacy devices? The alternative is disabling the SMMU altogether,
+> > but that's less than ideal because there are non-virtio devices on the
+> > same PCI bus.
+> > 
 > 
-> On 12/01/2017 18:05, Marc Zyngier wrote:
->> On 12/01/17 15:56, Eric Auger wrote:
->>> Change the device table entry_size to 16 bytes instead of 8.
->>> We also Store the device and collection device in the its
->>> struct.
->>>
->>> The patch also clears the indirect bit for the device BASER.
->>> The indirect bit is set as read-only.
->>
->> Err... Why? We *really* want to continue supporting indirect tables, as
->> this is a massive memory saver for the guest.
->>
->>>
->>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>>
->>> ---
->>>
->>> TODO: investigate support of 2 level tables, ie. enabling
->>> Indirect = 1. Support of 2 level tables is implementation
->>> defined.
->>
->> Clearly, that's a regression. What exactly is the issue that decided you
->> to disable it?
-> Well no valuable reason besides I saw it was optional, lack of
-> time/knowledge and a bit of laziness. I will address this requirement in
-> my next respin.
+> I'd rather people didn't use SMMU with legacy devices.
 
-Ah, I was worried about something much more fundamental! ;-)
+I'm afraid we've been doing that for two years and the model already
+exists in a mature state, being actively used for development and
+validation by ARM and our partners. One of the big things its used for
+is to develop SMMU and GIC (our interrupt controller) code with PCI, so
+dropping the SMMU from the picture isn't an option.
 
-> For my curiosity why did we choose not allowing the feature for
-> collections. Is that just because we think their number if going
-> sufficiently small compared to devices?
+> Can't you guys just code up the virtio 1 layout in QEMU?
+> I took a look and it's not a big deal now that two other
+> transports converted, except mmio code in QEMU doesn't
+> use linux header to it's a bit messy.
+> I'll send a patch to clean that up.
 
-Collections are usually a much smaller number (directly related to the
-number of CPUs in the system), and can be kept very compact. Devices, on
-the other hand, can be extremely sparse (to the point where a guest can
-fail to allocate enough memory to cover the required range).
+If the model ever changes in this area (which isn't planned atm), the
+right thing to do would be to move to modern virtio. However, we're stuck
+with what we have for the forseeable future and it works just fine if we
+use the DMA API. If we don't use it, Linux no longer boots because it
+installs the SMMU-backed DMA ops for the virtio devices and everything
+faults.
 
-TBH, we could allow it for collections as well. It is just not that useful.
+I really don't understand why this is controversial.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
