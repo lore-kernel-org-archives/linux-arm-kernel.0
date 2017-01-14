@@ -1,29 +1,32 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 14 Jan 2017 19:10:01 +0100 (CET)
-Subject: [PATCH RFC] mmc: mxs-mmc: Implement CMD23 support
-In-Reply-To: <CAOMZO5Czy17FytjyHP_pHHqCetDiYyOHaVOFu5hZHjAD=8rHUA@mail.gmail.com>
-References: <1484414958-2665-1-git-send-email-stefan.wahren@i2se.com>
- <CAOMZO5Czy17FytjyHP_pHHqCetDiYyOHaVOFu5hZHjAD=8rHUA@mail.gmail.com>
-Message-ID: <841116984.219625.1484417401803@email.1und1.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sat, 14 Jan 2017 18:20:12 +0000
+Subject: [BISECT] ARM build errors on GCC v6.2 (crypto: arm/aes - replace
+ scalar AES cipher)
+In-Reply-To: <20170114142435.ashdj2xm5b3kzg2p@kozik-lap>
+References: <20170114142435.ashdj2xm5b3kzg2p@kozik-lap>
+Message-ID: <20170114182011.GX14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Sat, Jan 14, 2017 at 04:24:35PM +0200, Krzysztof Kozlowski wrote:
+> Hi,
+> 
+> allyesconfig and multi_v7_defconfig fail to build on recent linux-next
+> on GCC 6.2.0.
+> 
+> Errors:
+> ../arch/arm/crypto/aes-cipher-core.S: Assembler messages:
+> ../arch/arm/crypto/aes-cipher-core.S:21: Error: selected processor does not support `tt .req ip' in ARM mode
+> ../arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `movw tt,#:lower16:crypto_ft_tab'
+> ../arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `movt tt,#:upper16:crypto_ft_tab'
+> 
+> Compiler: arm-linux-gnueabi-gcc (Ubuntu 6.2.0-5ubuntu12) 6.2.0 20161005
 
-> Fabio Estevam <festevam@gmail.com> hat am 14. Januar 2017 um 18:40 geschrieben:
-> 
-> 
-> Hi Stefan,
-> 
-> On Sat, Jan 14, 2017 at 3:29 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> > This patch implements support for multiblock transfers bounded
-> > by SET_BLOCK_COUNT (CMD23) on the MXS MMC host driver.
-> >
-> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> 
-> Just curious: what is the throughput gain you notice with this patch?
+It's worth pointing out that _assembler_ messages come from _binutils_
+rather than _gcc_.   Please advise which version of _binutils_ you
+are using.  Thanks.
 
-unfortunately i didn't see any noticeable changes on throughput.
-
-> 
-> Thanks
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
