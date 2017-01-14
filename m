@@ -1,36 +1,52 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 14 Jan 2017 20:52:15 +0200
-Subject: [BISECT] ARM build errors on GCC v6.2 (crypto: arm/aes - replace
- scalar AES cipher)
-In-Reply-To: <20170114182011.GX14217@n2100.armlinux.org.uk>
-References: <20170114142435.ashdj2xm5b3kzg2p@kozik-lap>
- <20170114182011.GX14217@n2100.armlinux.org.uk>
-Message-ID: <20170114185215.db7av7u2wujy764n@kozik-lap>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat, 14 Jan 2017 11:01:14 -0800
+Subject: [PATCH net-next v2 05/10] drivers: base: Add device_find_class()
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DB02620D3@AcuExch.aculab.com>
+References: <20170112034121.27697-1-f.fainelli@gmail.com>
+ <20170112034121.27697-6-f.fainelli@gmail.com>
+ <20170112.162135.441956368122992032.davem@davemloft.net>
+ <81f5965c-3484-92d9-5c04-94c5b73735d0@gmail.com>
+ <063D6719AE5E284EB5DD2968C1650D6DB02620D3@AcuExch.aculab.com>
+Message-ID: <0f5e5265-b116-286c-4d72-3aaa72ae83ac@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 14, 2017 at 06:20:12PM +0000, Russell King - ARM Linux wrote:
-> On Sat, Jan 14, 2017 at 04:24:35PM +0200, Krzysztof Kozlowski wrote:
-> > Hi,
-> > 
-> > allyesconfig and multi_v7_defconfig fail to build on recent linux-next
-> > on GCC 6.2.0.
-> > 
-> > Errors:
-> > ../arch/arm/crypto/aes-cipher-core.S: Assembler messages:
-> > ../arch/arm/crypto/aes-cipher-core.S:21: Error: selected processor does not support `tt .req ip' in ARM mode
-> > ../arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `movw tt,#:lower16:crypto_ft_tab'
-> > ../arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `movt tt,#:upper16:crypto_ft_tab'
-> > 
-> > Compiler: arm-linux-gnueabi-gcc (Ubuntu 6.2.0-5ubuntu12) 6.2.0 20161005
+
+
+On 01/13/2017 02:55 AM, David Laight wrote:
+> From: Florian Fainelli
+>> Sent: 12 January 2017 22:51
+>> On 01/12/2017 01:21 PM, David Miller wrote:
+>>> From: Florian Fainelli <f.fainelli@gmail.com>
+>>> Date: Wed, 11 Jan 2017 19:41:16 -0800
+>>>
+>>>> Add a helper function to lookup a device reference given a class name.
+>>>> This is a preliminary patch to remove adhoc code from net/dsa/dsa.c and
+>>>> make it more generic.
+> ...
+>>>> +static int dev_is_class(struct device *dev, void *class)
+>>>
+>>> I know you are just moving code, but this class argumnet is a string
+>>> and thus should be "char *" or even "const char *".
+>>
+>> Well, this is really so that we don't need to cast the arguments passed
+>> to device_find_child(), which takes a void *data as well. If we made
+>> that a const char *class, we'd get warnings that look like these:
+>>
+>> drivers/base/core.c: In function 'device_find_class':
+>> drivers/base/core.c:2083:2: warning: passing argument 2 of
+>> 'device_find_child' discards 'const' qualifier from pointer target type
+>> [enabled by default]
+>>   return device_find_child(parent, class, dev_is_class);
+>>   ^
+>> drivers/base/core.c:2050:16: note: expected 'void *' but argument is of
+>> type 'const char *'
+>>  struct device *device_find_child(struct device *parent, void *data,
+>>                 ^
+> ...
 > 
-> It's worth pointing out that _assembler_ messages come from _binutils_
-> rather than _gcc_.   Please advise which version of _binutils_ you
-> are using.  Thanks.
+> Maybe device_find_child() needs changing to take 'const void *' ?
 
-Ah, yes, so the binutils 2.27 (Ubuntu package: 2.27-8ubuntu2).
-
-However Ard mentioned that this is already fixed.
-
-Best regards,
-Krzysztof
+As a separate patch set, sure, I will add that to my TODO. Thanks!
+-- 
+Florian
