@@ -1,109 +1,41 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 15 Jan 2017 04:04:46 +0900
-Subject: [PATCH] reset: uniphier: add compatible string for LD11 SD-reset block
-Message-ID: <1484420686-28911-1-git-send-email-yamada.masahiro@socionext.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat, 14 Jan 2017 11:12:44 -0800
+Subject: [PATCH net-next v2 08/10] net: dsa: Add support for platform data
+In-Reply-To: <173cffe2-f407-ac43-c5ee-85a70576dd36@gmail.com>
+References: <20170112034121.27697-1-f.fainelli@gmail.com>
+ <20170112034121.27697-9-f.fainelli@gmail.com>
+ <20170113140459.GH10203@lunn.ch>
+ <173cffe2-f407-ac43-c5ee-85a70576dd36@gmail.com>
+Message-ID: <eaee94dd-d7f5-1288-3e26-4b680422ed25@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LD11 SoC is equipped with not only MIO-reset but also SD-reset
-for controlling RST_n pin of the eMMC device.
+On 01/13/2017 02:37 PM, Florian Fainelli wrote:
+> On 01/13/2017 06:04 AM, Andrew Lunn wrote:
+>>> index cd91070b5467..d326fc4afad7 100644
+>>> --- a/net/dsa/dsa2.c
+>>> +++ b/net/dsa/dsa2.c
+>>> @@ -81,17 +81,23 @@ static void dsa_dst_del_ds(struct dsa_switch_tree *dst,
+>>>  
+>>>  static bool dsa_port_is_valid(struct dsa_port *port)
+>>>  {
+>>> -	return !!port->dn;
+>>> +	return !!(port->dn || port->name);
+>>>  }
+>>   
+>> Does this clash with Viviens recent change to make names optional and
+>> have the kernel assign it?
+> 
+> So there were two ways to look at this, one was that could check here
+> that ds->pd is assigned and port->name is assigned, which means that
+> platform data has to provide valid port name. We can also eliminate this
+> check entirely because we now support NULL names just fines.
 
-Update the binding document and remove unneeded "." from each line
-in itemization.
+Considering that the comment above struct dsa_chip_data::port_names in
+net/dsa/dsa.h is pretty clear about the port_names usage, I am tempted
+to keep the code as-is since without a name, for platform data, we would
+not have a way to tell if a port is disabled or not.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- .../devicetree/bindings/reset/uniphier-reset.txt   | 47 +++++++++++-----------
- drivers/reset/reset-uniphier.c                     |  4 ++
- 2 files changed, 28 insertions(+), 23 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/reset/uniphier-reset.txt b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-index 5020524..83ab0f5 100644
---- a/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-+++ b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-@@ -6,14 +6,14 @@ System reset
- 
- Required properties:
- - compatible: should be one of the following:
--    "socionext,uniphier-sld3-reset" - for sLD3 SoC.
--    "socionext,uniphier-ld4-reset"  - for LD4 SoC.
--    "socionext,uniphier-pro4-reset" - for Pro4 SoC.
--    "socionext,uniphier-sld8-reset" - for sLD8 SoC.
--    "socionext,uniphier-pro5-reset" - for Pro5 SoC.
--    "socionext,uniphier-pxs2-reset" - for PXs2/LD6b SoC.
--    "socionext,uniphier-ld11-reset" - for LD11 SoC.
--    "socionext,uniphier-ld20-reset" - for LD20 SoC.
-+    "socionext,uniphier-sld3-reset" - for sLD3 SoC
-+    "socionext,uniphier-ld4-reset"  - for LD4 SoC
-+    "socionext,uniphier-pro4-reset" - for Pro4 SoC
-+    "socionext,uniphier-sld8-reset" - for sLD8 SoC
-+    "socionext,uniphier-pro5-reset" - for Pro5 SoC
-+    "socionext,uniphier-pxs2-reset" - for PXs2/LD6b SoC
-+    "socionext,uniphier-ld11-reset" - for LD11 SoC
-+    "socionext,uniphier-ld20-reset" - for LD20 SoC
- - #reset-cells: should be 1.
- 
- Example:
-@@ -37,14 +37,15 @@ Media I/O (MIO) reset, SD reset
- 
- Required properties:
- - compatible: should be one of the following:
--    "socionext,uniphier-sld3-mio-reset" - for sLD3 SoC.
--    "socionext,uniphier-ld4-mio-reset"  - for LD4 SoC.
--    "socionext,uniphier-pro4-mio-reset" - for Pro4 SoC.
--    "socionext,uniphier-sld8-mio-reset" - for sLD8 SoC.
--    "socionext,uniphier-pro5-sd-reset"  - for Pro5 SoC.
--    "socionext,uniphier-pxs2-sd-reset"  - for PXs2/LD6b SoC.
--    "socionext,uniphier-ld11-mio-reset" - for LD11 SoC.
--    "socionext,uniphier-ld20-sd-reset"  - for LD20 SoC.
-+    "socionext,uniphier-sld3-mio-reset" - for sLD3 SoC
-+    "socionext,uniphier-ld4-mio-reset"  - for LD4 SoC
-+    "socionext,uniphier-pro4-mio-reset" - for Pro4 SoC
-+    "socionext,uniphier-sld8-mio-reset" - for sLD8 SoC
-+    "socionext,uniphier-pro5-sd-reset"  - for Pro5 SoC
-+    "socionext,uniphier-pxs2-sd-reset"  - for PXs2/LD6b SoC
-+    "socionext,uniphier-ld11-mio-reset" - for LD11 SoC (MIO)
-+    "socionext,uniphier-ld11-sd-reset"  - for LD11 SoC (SD)
-+    "socionext,uniphier-ld20-sd-reset"  - for LD20 SoC
- - #reset-cells: should be 1.
- 
- Example:
-@@ -68,13 +69,13 @@ Peripheral reset
- 
- Required properties:
- - compatible: should be one of the following:
--    "socionext,uniphier-ld4-peri-reset"  - for LD4 SoC.
--    "socionext,uniphier-pro4-peri-reset" - for Pro4 SoC.
--    "socionext,uniphier-sld8-peri-reset" - for sLD8 SoC.
--    "socionext,uniphier-pro5-peri-reset" - for Pro5 SoC.
--    "socionext,uniphier-pxs2-peri-reset" - for PXs2/LD6b SoC.
--    "socionext,uniphier-ld11-peri-reset" - for LD11 SoC.
--    "socionext,uniphier-ld20-peri-reset" - for LD20 SoC.
-+    "socionext,uniphier-ld4-peri-reset"  - for LD4 SoC
-+    "socionext,uniphier-pro4-peri-reset" - for Pro4 SoC
-+    "socionext,uniphier-sld8-peri-reset" - for sLD8 SoC
-+    "socionext,uniphier-pro5-peri-reset" - for Pro5 SoC
-+    "socionext,uniphier-pxs2-peri-reset" - for PXs2/LD6b SoC
-+    "socionext,uniphier-ld11-peri-reset" - for LD11 SoC
-+    "socionext,uniphier-ld20-peri-reset" - for LD20 SoC
- - #reset-cells: should be 1.
- 
- Example:
-diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
-index 968c3ae..9c11be3 100644
---- a/drivers/reset/reset-uniphier.c
-+++ b/drivers/reset/reset-uniphier.c
-@@ -390,6 +390,10 @@ static const struct of_device_id uniphier_reset_match[] = {
- 		.data = uniphier_sld3_mio_reset_data,
- 	},
- 	{
-+		.compatible = "socionext,uniphier-ld11-sd-reset",
-+		.data = uniphier_pro5_sd_reset_data,
-+	},
-+	{
- 		.compatible = "socionext,uniphier-ld20-sd-reset",
- 		.data = uniphier_pro5_sd_reset_data,
- 	},
+Does that work for you?
 -- 
-2.7.4
+Florian
