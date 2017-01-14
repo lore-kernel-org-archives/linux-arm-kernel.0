@@ -1,49 +1,74 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 14 Jan 2017 12:19:45 +0100
-Subject: [PATCH] clk: rockchip: rk3288: make aclk_vio1_niu a critical clock
-In-Reply-To: <1484097992-9118-1-git-send-email-jacob-chen@iotwrt.com>
-References: <1484097992-9118-1-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <2173949.kdqYFWM6te@phil>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Sat, 14 Jan 2017 19:34:23 +0800
+Subject: [PATCH v18 00/15] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <20170113192920.GF2472@leverpostej>
+References: <20161208173319.6618-1-fu.wei@linaro.org>
+ <20170113192920.GF2472@leverpostej>
+Message-ID: <CADyBb7vF0v2DwXA8fNUOTQcqriJK1Hp57_G8DKi0WO9FnvrB5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacob,
+Hi Mark,
 
-Am Mittwoch, 11. Januar 2017, 09:26:32 CET schrieb Jacob Chen:
-> According to the pd blocks, VIO1_NIU is required by RGA,ISP and VOP1.
-> Then at least one VIO_NIU should be turned on to supply eDP, HDMI, MIPI.
-> 
-> If eDP,HDMI,MIPI is inited early than VOP or RGA is inited early than VOP1,
-> system will hang.
-> 
-> So make aclk_vio1_niu a critical clock and turn it on at all times.
+On 14 January 2017 at 03:29, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
+>
+> On Fri, Dec 09, 2016 at 01:33:04AM +0800, fu.wei at linaro.org wrote:
+>> From: Fu Wei <fu.wei@linaro.org>
+>>
+>> This patchset:
+>>     (1)Preparation for adding GTDT support in arm_arch_timer:
+>>         1. Move some enums and marcos to header file;
+>>         2. Add a new enum for spi type;
+>>         3. Improve printk relevant code;
+>>         4. Rename some enums and defines;
+>>         5. Rework PPI determination;
+>>         6. Rework counter frequency detection;
+>>         7. Refactor arch_timer_needs_probing, move it into DT init call
+>>         8. Introduce some new structs and refactor the MMIO timer init code
+>>         for reusing some common code.
+>>
+>>     (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
+>>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
+>>     memory-mapped timer and SBSA Generic Watchdog timer.
+>>     This driver can help to simplify all the relevant timer drivers,
+>>     and separate all the ACPI GTDT knowledge from them.
+>>
+>>     (3)Simplify ACPI code for arm_arch_timer
+>>
+>>     (4)Add GTDT support for ARM memory-mapped timer.
+>>
+>> This patchset has been tested on the following platforms with ACPI enabled:
+>>     (1)ARM Foundation v8 model
+>
+> Once v4.10-rc4 comes out this weekend, could you please rebase and
+> repost this?
 
-NIU clocks are part of the interconnect, which we do not model at all yet,
-so I guess all of those should never be turned off (until an interconnect 
-driver handles them).
+Yes, of course.
 
-Could you just make all of them critical in one go please, so that we don't 
-have to each clock on its own once things break?
+I have rebased v19 to the latest v4.10-rc3-e96f8f1, it dosen't need
+any modification.
+I will rebase it every day, and will repost it if it need any  modification.
+
+But for now, V19 works well with the master branch of upstream kernel.
+Do I need to re-post it even if it doesn't need any improvement or
+modification? :-)
+
+>
+> Marc and I will be happy to take a look then.
+
+Great thanks for your help!
+
+>
+> Thanks,
+> Mark.
 
 
-Thanks
-Heiko
 
-> 
-> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
-> ---
->  drivers/clk/rockchip/clk-rk3288.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/clk/rockchip/clk-rk3288.c
-> b/drivers/clk/rockchip/clk-rk3288.c index f071c24..59ee244 100644
-> --- a/drivers/clk/rockchip/clk-rk3288.c
-> +++ b/drivers/clk/rockchip/clk-rk3288.c
-> @@ -815,6 +815,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[]
-> __initdata = { static const char *const rk3288_critical_clocks[]
-> __initconst = { "aclk_cpu",
->  	"aclk_peri",
-> +	"aclk_vio1_niu",
->  	"hclk_peri",
->  	"pclk_pd_pmu",
->  };
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
