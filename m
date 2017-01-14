@@ -1,43 +1,180 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Sat, 14 Jan 2017 07:50:13 +0000
-Subject: [PATCHv4 3/5] pinctrl: mvebu: pinctrl driver for 98DX3236 SoC
-References: <20170113091222.7132-1-chris.packham@alliedtelesis.co.nz>
- <20170113091222.7132-4-chris.packham@alliedtelesis.co.nz>
- <2fca7ac2-9a88-19b1-28c5-5192b9c4a2bc@gmail.com>
-Message-ID: <9996b6a215f944e1a47fa6239d8de21f@svr-chch-ex1.atlnz.lc>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sat, 14 Jan 2017 09:29:58 +0100
+Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
+In-Reply-To: <0fafcd8d-cf99-de6b-728f-5e3637810b68@gmail.com>
+References: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
+ <1484291609-20195-3-git-send-email-guochun.mao@mediatek.com>
+ <20170113151747.6bc85245@bbrezillon>
+ <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
+ <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
+ <20170113172825.75d545a3@bbrezillon>
+ <86c997be-f500-eaa1-3ba5-d21cff6223b7@gmail.com>
+ <20170113175628.1793f433@bbrezillon>
+ <0fafcd8d-cf99-de6b-728f-5e3637810b68@gmail.com>
+Message-ID: <20170114092958.022f2fc8@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/01/17 22:54, Sebastian Hesselbarth wrote:
-> On 13.01.2017 10:12, Chris Packham wrote:
->> From: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
->>
->> This pinctrl driver supports the 98DX3236, 98DX3336 and 98DX4251 SoCs
->> from Marvell.
->>
->> Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
->> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->> Acked-by: Rob Herring <robh@kernel.org>
->> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> ---
->>
->> Notes:
->>     Changes in v2:
->>     - include sdio support for the 98DX4251
->>     Changes in v3:
->>     - None
->>     Changes in v4:
->>     - Correct some discrepencies between binding and driver.
->
-> Well, unfortunately I still see differences between the "gpio" in
-> the binding and "gpo" in the driver.
->
-> Please go back to that list I sent you yesterday and fix them all.
->
+On Fri, 13 Jan 2017 18:33:40 +0100
+Marek Vasut <marek.vasut@gmail.com> wrote:
 
-I think you may have missed my initial reply [1]. Or I have missed your 
-response to it. Long story short "gpo" is intentional because some of 
-those pins can't be used as inputs. But if you still want me to change 
-it I will.
+> On 01/13/2017 05:56 PM, Boris Brezillon wrote:
+> > On Fri, 13 Jan 2017 17:44:12 +0100
+> > Marek Vasut <marek.vasut@gmail.com> wrote:
+> >   
+> >> On 01/13/2017 05:28 PM, Boris Brezillon wrote:  
+> >>> On Fri, 13 Jan 2017 17:13:55 +0100
+> >>> Marek Vasut <marek.vasut@gmail.com> wrote:
+> >>>     
+> >>>> On 01/13/2017 04:12 PM, Matthias Brugger wrote:    
+> >>>>>
+> >>>>>
+> >>>>> On 13/01/17 15:17, Boris Brezillon wrote:      
+> >>>>>> On Fri, 13 Jan 2017 15:13:29 +0800
+> >>>>>> Guochun Mao <guochun.mao@mediatek.com> wrote:
+> >>>>>>      
+> >>>>>>> Add Mediatek nor flash node.
+> >>>>>>>
+> >>>>>>> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+> >>>>>>> ---
+> >>>>>>>  arch/arm/boot/dts/mt2701-evb.dts |   25 +++++++++++++++++++++++++
+> >>>>>>>  arch/arm/boot/dts/mt2701.dtsi    |   12 ++++++++++++
+> >>>>>>>  2 files changed, 37 insertions(+)
+> >>>>>>>
+> >>>>>>> diff --git a/arch/arm/boot/dts/mt2701-evb.dts
+> >>>>>>> b/arch/arm/boot/dts/mt2701-evb.dts
+> >>>>>>> index 082ca88..85e5ae8 100644
+> >>>>>>> --- a/arch/arm/boot/dts/mt2701-evb.dts
+> >>>>>>> +++ b/arch/arm/boot/dts/mt2701-evb.dts
+> >>>>>>> @@ -24,6 +24,31 @@
+> >>>>>>>      };
+> >>>>>>>  };
+> >>>>>>>
+> >>>>>>> +&nor_flash {
+> >>>>>>> +    pinctrl-names = "default";
+> >>>>>>> +    pinctrl-0 = <&nor_pins_default>;
+> >>>>>>> +    status = "okay";
+> >>>>>>> +    flash at 0 {
+> >>>>>>> +        compatible = "jedec,spi-nor";
+> >>>>>>> +        reg = <0>;
+> >>>>>>> +    };
+> >>>>>>> +};
+> >>>>>>> +
+> >>>>>>> +&pio {
+> >>>>>>> +    nor_pins_default: nor {
+> >>>>>>> +        pins1 {
+> >>>>>>> +            pinmux = <MT2701_PIN_240_EXT_XCS__FUNC_EXT_XCS>,
+> >>>>>>> +                 <MT2701_PIN_241_EXT_SCK__FUNC_EXT_SCK>,
+> >>>>>>> +                 <MT2701_PIN_239_EXT_SDIO0__FUNC_EXT_SDIO0>,
+> >>>>>>> +                 <MT2701_PIN_238_EXT_SDIO1__FUNC_EXT_SDIO1>,
+> >>>>>>> +                 <MT2701_PIN_237_EXT_SDIO2__FUNC_EXT_SDIO2>,
+> >>>>>>> +                 <MT2701_PIN_236_EXT_SDIO3__FUNC_EXT_SDIO3>;
+> >>>>>>> +            drive-strength = <MTK_DRIVE_4mA>;
+> >>>>>>> +            bias-pull-up;
+> >>>>>>> +        };
+> >>>>>>> +    };
+> >>>>>>> +};
+> >>>>>>> +
+> >>>>>>>  &uart0 {
+> >>>>>>>      status = "okay";
+> >>>>>>>  };
+> >>>>>>> diff --git a/arch/arm/boot/dts/mt2701.dtsi
+> >>>>>>> b/arch/arm/boot/dts/mt2701.dtsi
+> >>>>>>> index bdf8954..1eefce4 100644
+> >>>>>>> --- a/arch/arm/boot/dts/mt2701.dtsi
+> >>>>>>> +++ b/arch/arm/boot/dts/mt2701.dtsi
+> >>>>>>> @@ -227,6 +227,18 @@
+> >>>>>>>          status = "disabled";
+> >>>>>>>      };
+> >>>>>>>
+> >>>>>>> +    nor_flash: spi at 11014000 {
+> >>>>>>> +        compatible = "mediatek,mt2701-nor",
+> >>>>>>> +                 "mediatek,mt8173-nor";      
+> >>>>>>
+> >>>>>> Why define both here? Is "mediatek,mt8173-nor" really providing a
+> >>>>>> subset of the features supported by "mediatek,mt2701-nor"?
+> >>>>>>      
+> >>>>>
+> >>>>> I think even if the ip block is the same, we should provide both
+> >>>>> bindings, just in case in the future we find out that mt2701 has some
+> >>>>> hidden bug, feature or bug-feature. This way even if we update the
+> >>>>> driver, we stay compatible with older device tree blobs in the wild.
+> >>>>>
+> >>>>> We can drop the mt2701-nor in the bindings definition if you want.     
+> >>>
+> >>> Oh, sorry, I misunderstood. What I meant is that if you want to
+> >>> list/support all possible compatibles, maybe you should just put one
+> >>> compatible in your DT and patch your driver (+ binding doc) to define
+> >>> all of them.    
+> >>
+> >> Uh, what ? I lost you here :-)
 
-[1] - https://lkml.org/lkml/2017/1/12/117
+I mean adding a new entry in the mtk_nor_of_ids table (in
+mtk-quadspi.c) so that the mediatek,mt2701-nor compatible string can be
+matched directly, and you won't need to define 2 compatible strings in
+your device tree.
+
+> >>  
+> >>>> This exactly. We should have a DT compat in the form:
+> >>>> compatible = "vendor,<soc>-block", "vendor,<oldest-compat-soc>-block";
+> >>>> Then if we find a problem in the future, we can match on the
+> >>>> "vendor,<soc>-block" and still support the old DTs.    
+> >>>
+> >>> Not sure it's only in term of whose IP appeared first. My understanding
+> >>> is that it's a way to provide inheritance. For example:
+> >>>
+> >>> 	"<soc-vendor>,<ip-version>", "<ip-vendor>,<ip-version>";
+> >>>
+> >>> or
+> >>>
+> >>> 	"<soc-vendor>,<full-featured-ip-version>","<soc-vendor>,<basic-feature-ip-version>";
+> >>>
+> >>> BTW, which one is the oldest between mt8173 and mt2701? :-)    
+> >>
+> >> And that's another thing and I agree with you, but I don't think that's
+> >> what we're discussing in this thread. But (!), OT, I think we should
+> >> codify the rules in Documentation/ . This discussion came up multiple
+> >> times recently.
+> >>
+> >> And my question still stands, what do we put into the DT here, IMO
+> >> compatible = "mediatek,mt2701-nor", "mediatek,mt8173-nor";  
+> > 
+> > I'd say
+> > 
+> > 	compatible = "mediatek,mt8173-nor";
+> > 
+> > because both compatible are referring to very specific IP version. It's
+> > not the same as  
+> 
+> But then you don't have the ability to handle a block in this particular
+> SoC in case there's a bug found in it in the future,
+> so IMO it should be:
+> 
+> compatible = "mediatek,mt2701-nor", "mediatek,mt8173-nor";
+
+Sorry again, I meant
+
+	compatible = "mediatek,mt2701-nor";
+
+> 
+> > 	compatible = "mediatek,mt8173-nor", "mediatek,mt81xx-nor";  
+> 
+> This doesn't look right, since here we add two new compatibles ...
+
+That was just an example to describe how compatible inheritance works
+(at least that's my understanding of it), it does not apply to this
+particular use case.
+
+> 
+> > where you clearly have a generic compatible which is overloaded by a
+> > specific one.
+> > 
+> > But anyway, I'm not the one taking the decision here, let's wait for DT
+> > maintainers reviews.
+> >   
+> >> and what goes into the binding document ? I guess both too ?  
+> > 
+> > If both exist, they should be both documented.
+> >   
+> 
+> 
