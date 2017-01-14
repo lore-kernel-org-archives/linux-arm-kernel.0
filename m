@@ -1,43 +1,34 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Sat, 14 Jan 2017 11:00:29 +0800
-Subject: [PATCH v7 12/15] msi: platform: make
- platform_msi_create_device_domain() ACPI aware
-In-Reply-To: <20170113104524.GC20837@red-moon>
+Date: Sat, 14 Jan 2017 11:25:18 +0800
+Subject: [PATCH v7 08/15] ACPI: IORT: rename iort_node_map_rid() to make
+ it generic
+In-Reply-To: <20170113114747.GD20837@red-moon>
 References: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
- <1484147199-4267-13-git-send-email-hanjun.guo@linaro.org>
- <20170113104524.GC20837@red-moon>
-Message-ID: <5879944D.9020005@huawei.com>
+ <1484147199-4267-9-git-send-email-hanjun.guo@linaro.org>
+ <20170113114747.GD20837@red-moon>
+Message-ID: <58799A1E.9070708@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/1/13 18:45, Lorenzo Pieralisi wrote:
-> On Wed, Jan 11, 2017 at 11:06:36PM +0800, Hanjun Guo wrote:
->> platform_msi_create_device_domain() is used to ctreate
->> irqdomain for the device such as irqchip mbigen generating
->> the MSIs, it's almost ready for ACPI use except
->> of_node_to_fwnode() is for dt only, make it ACPI aware then
->> things will work in both DTS and ACPI.
-> "The irqdomain creation carried out in:
+On 2017/1/13 19:47, Lorenzo Pieralisi wrote:
+> On Wed, Jan 11, 2017 at 11:06:32PM +0800, Hanjun Guo wrote:
+>> iort_node_map_rid() was designed for both PCI and platform
+>> device, but the rid means requester id is for ITS mappings,
+> I do not understand what this means sorry.
 >
-> platform_msi_create_device_domain()
+>> rename iort_node_map_rid() to iort_node_map_id() and update
+>> its argument names to make it more generic.
+>>
+> "iort_node_map_rid() was designed to take an input id (that is not
+> necessarily a PCI requester id) and map it to an output id (eg an SMMU
+> streamid or an ITS deviceid) according to the mappings provided by an
+> IORT node mapping entries. This means that the iort_node_map_rid() input
+> id is not always a PCI requester id as its name, parameters and local
+> variables suggest, which is misleading.
 >
-> relies on the fwnode_handle interrupt controller token to associate the
-> interrupt controller with a specific irqdomain. Current code relies on
-> the OF layer to retrieve a fwnode_handle for the device representing the
-> interrupt controller from its device->of_node pointer.  This makes
-> platform_msi_create_device_domain() DT specific whilst it really is not
-> because after the merge of commit f94277af03ea ("of/platform: Initialise
-> dev->fwnode appropriately") the fwnode_handle can easily be retrieved
-> from the dev->fwnode pointer in a firmware agnostic way.
->
-> Update platform_msi_create_device_domain() to retrieve the interrupt
-> controller fwnode_handle from the dev->fwnode pointer so that it can
-> be used seamlessly in ACPI and DT systems".
+> Apply the s/rid/id substitution to the iort_node_map_rid() mapping
+> function and its users to make sure its intended usage is clearer."
 
-Much better, I will update the patch.
+Thank your patience, I will update the commit message.
 
->
-> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-Thanks
 Hanjun
