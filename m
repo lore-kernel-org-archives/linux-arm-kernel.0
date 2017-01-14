@@ -1,52 +1,109 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 14 Jan 2017 11:01:14 -0800
-Subject: [PATCH net-next v2 05/10] drivers: base: Add device_find_class()
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DB02620D3@AcuExch.aculab.com>
-References: <20170112034121.27697-1-f.fainelli@gmail.com>
- <20170112034121.27697-6-f.fainelli@gmail.com>
- <20170112.162135.441956368122992032.davem@davemloft.net>
- <81f5965c-3484-92d9-5c04-94c5b73735d0@gmail.com>
- <063D6719AE5E284EB5DD2968C1650D6DB02620D3@AcuExch.aculab.com>
-Message-ID: <0f5e5265-b116-286c-4d72-3aaa72ae83ac@gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 15 Jan 2017 04:04:46 +0900
+Subject: [PATCH] reset: uniphier: add compatible string for LD11 SD-reset block
+Message-ID: <1484420686-28911-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The LD11 SoC is equipped with not only MIO-reset but also SD-reset
+for controlling RST_n pin of the eMMC device.
 
+Update the binding document and remove unneeded "." from each line
+in itemization.
 
-On 01/13/2017 02:55 AM, David Laight wrote:
-> From: Florian Fainelli
->> Sent: 12 January 2017 22:51
->> On 01/12/2017 01:21 PM, David Miller wrote:
->>> From: Florian Fainelli <f.fainelli@gmail.com>
->>> Date: Wed, 11 Jan 2017 19:41:16 -0800
->>>
->>>> Add a helper function to lookup a device reference given a class name.
->>>> This is a preliminary patch to remove adhoc code from net/dsa/dsa.c and
->>>> make it more generic.
-> ...
->>>> +static int dev_is_class(struct device *dev, void *class)
->>>
->>> I know you are just moving code, but this class argumnet is a string
->>> and thus should be "char *" or even "const char *".
->>
->> Well, this is really so that we don't need to cast the arguments passed
->> to device_find_child(), which takes a void *data as well. If we made
->> that a const char *class, we'd get warnings that look like these:
->>
->> drivers/base/core.c: In function 'device_find_class':
->> drivers/base/core.c:2083:2: warning: passing argument 2 of
->> 'device_find_child' discards 'const' qualifier from pointer target type
->> [enabled by default]
->>   return device_find_child(parent, class, dev_is_class);
->>   ^
->> drivers/base/core.c:2050:16: note: expected 'void *' but argument is of
->> type 'const char *'
->>  struct device *device_find_child(struct device *parent, void *data,
->>                 ^
-> ...
-> 
-> Maybe device_find_child() needs changing to take 'const void *' ?
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-As a separate patch set, sure, I will add that to my TODO. Thanks!
+ .../devicetree/bindings/reset/uniphier-reset.txt   | 47 +++++++++++-----------
+ drivers/reset/reset-uniphier.c                     |  4 ++
+ 2 files changed, 28 insertions(+), 23 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/reset/uniphier-reset.txt b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
+index 5020524..83ab0f5 100644
+--- a/Documentation/devicetree/bindings/reset/uniphier-reset.txt
++++ b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
+@@ -6,14 +6,14 @@ System reset
+ 
+ Required properties:
+ - compatible: should be one of the following:
+-    "socionext,uniphier-sld3-reset" - for sLD3 SoC.
+-    "socionext,uniphier-ld4-reset"  - for LD4 SoC.
+-    "socionext,uniphier-pro4-reset" - for Pro4 SoC.
+-    "socionext,uniphier-sld8-reset" - for sLD8 SoC.
+-    "socionext,uniphier-pro5-reset" - for Pro5 SoC.
+-    "socionext,uniphier-pxs2-reset" - for PXs2/LD6b SoC.
+-    "socionext,uniphier-ld11-reset" - for LD11 SoC.
+-    "socionext,uniphier-ld20-reset" - for LD20 SoC.
++    "socionext,uniphier-sld3-reset" - for sLD3 SoC
++    "socionext,uniphier-ld4-reset"  - for LD4 SoC
++    "socionext,uniphier-pro4-reset" - for Pro4 SoC
++    "socionext,uniphier-sld8-reset" - for sLD8 SoC
++    "socionext,uniphier-pro5-reset" - for Pro5 SoC
++    "socionext,uniphier-pxs2-reset" - for PXs2/LD6b SoC
++    "socionext,uniphier-ld11-reset" - for LD11 SoC
++    "socionext,uniphier-ld20-reset" - for LD20 SoC
+ - #reset-cells: should be 1.
+ 
+ Example:
+@@ -37,14 +37,15 @@ Media I/O (MIO) reset, SD reset
+ 
+ Required properties:
+ - compatible: should be one of the following:
+-    "socionext,uniphier-sld3-mio-reset" - for sLD3 SoC.
+-    "socionext,uniphier-ld4-mio-reset"  - for LD4 SoC.
+-    "socionext,uniphier-pro4-mio-reset" - for Pro4 SoC.
+-    "socionext,uniphier-sld8-mio-reset" - for sLD8 SoC.
+-    "socionext,uniphier-pro5-sd-reset"  - for Pro5 SoC.
+-    "socionext,uniphier-pxs2-sd-reset"  - for PXs2/LD6b SoC.
+-    "socionext,uniphier-ld11-mio-reset" - for LD11 SoC.
+-    "socionext,uniphier-ld20-sd-reset"  - for LD20 SoC.
++    "socionext,uniphier-sld3-mio-reset" - for sLD3 SoC
++    "socionext,uniphier-ld4-mio-reset"  - for LD4 SoC
++    "socionext,uniphier-pro4-mio-reset" - for Pro4 SoC
++    "socionext,uniphier-sld8-mio-reset" - for sLD8 SoC
++    "socionext,uniphier-pro5-sd-reset"  - for Pro5 SoC
++    "socionext,uniphier-pxs2-sd-reset"  - for PXs2/LD6b SoC
++    "socionext,uniphier-ld11-mio-reset" - for LD11 SoC (MIO)
++    "socionext,uniphier-ld11-sd-reset"  - for LD11 SoC (SD)
++    "socionext,uniphier-ld20-sd-reset"  - for LD20 SoC
+ - #reset-cells: should be 1.
+ 
+ Example:
+@@ -68,13 +69,13 @@ Peripheral reset
+ 
+ Required properties:
+ - compatible: should be one of the following:
+-    "socionext,uniphier-ld4-peri-reset"  - for LD4 SoC.
+-    "socionext,uniphier-pro4-peri-reset" - for Pro4 SoC.
+-    "socionext,uniphier-sld8-peri-reset" - for sLD8 SoC.
+-    "socionext,uniphier-pro5-peri-reset" - for Pro5 SoC.
+-    "socionext,uniphier-pxs2-peri-reset" - for PXs2/LD6b SoC.
+-    "socionext,uniphier-ld11-peri-reset" - for LD11 SoC.
+-    "socionext,uniphier-ld20-peri-reset" - for LD20 SoC.
++    "socionext,uniphier-ld4-peri-reset"  - for LD4 SoC
++    "socionext,uniphier-pro4-peri-reset" - for Pro4 SoC
++    "socionext,uniphier-sld8-peri-reset" - for sLD8 SoC
++    "socionext,uniphier-pro5-peri-reset" - for Pro5 SoC
++    "socionext,uniphier-pxs2-peri-reset" - for PXs2/LD6b SoC
++    "socionext,uniphier-ld11-peri-reset" - for LD11 SoC
++    "socionext,uniphier-ld20-peri-reset" - for LD20 SoC
+ - #reset-cells: should be 1.
+ 
+ Example:
+diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
+index 968c3ae..9c11be3 100644
+--- a/drivers/reset/reset-uniphier.c
++++ b/drivers/reset/reset-uniphier.c
+@@ -390,6 +390,10 @@ static const struct of_device_id uniphier_reset_match[] = {
+ 		.data = uniphier_sld3_mio_reset_data,
+ 	},
+ 	{
++		.compatible = "socionext,uniphier-ld11-sd-reset",
++		.data = uniphier_pro5_sd_reset_data,
++	},
++	{
+ 		.compatible = "socionext,uniphier-ld20-sd-reset",
+ 		.data = uniphier_pro5_sd_reset_data,
+ 	},
 -- 
-Florian
+2.7.4
