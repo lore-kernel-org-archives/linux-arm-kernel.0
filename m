@@ -1,68 +1,87 @@
 From: jagan@openedev.com (Jagan Teki)
-Date: Sun, 15 Jan 2017 22:50:11 +0100
-Subject: [PATCH 1/2] ARM: dts: imx6ul-isiot: Add eMMC node
-Message-ID: <1484517012-13321-1-git-send-email-jagan@openedev.com>
+Date: Sun, 15 Jan 2017 22:50:12 +0100
+Subject: [PATCH 2/2] ARM: dts: imx6qdl: Fix "ERROR: code indent should use
+ tabs where possible"
+In-Reply-To: <1484517012-13321-1-git-send-email-jagan@openedev.com>
+References: <1484517012-13321-1-git-send-email-jagan@openedev.com>
+Message-ID: <1484517012-13321-2-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-Add usdhc2 node, which is eMMC for Engicam Is.IoT MX6UL modules.
+Fixed code indent tabs in respetcive imx6qdl dtsi files and
+also add space on imx6qdl-icore-rqs.dtsi on usdhc bus-width nodes.
 
-dmesg:
------
-mmc1: SDHCI controller on 2194000.usdhc [2194000.usdhc] using ADMA
-mmc1: new DDR MMC card at address 0001
-mmcblk1: mmc1:0001 M62704 3.53 GiB
-
-Cc: Matteo Lisi <matteo.lisi@engicam.com>
-Cc: Michael Trimarchi <michael@amarulasolutions.com>
-Cc: Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+Cc: Shawn Guo <shawnguo@kernel.org>
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- arch/arm/boot/dts/imx6ul-isiot.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi    | 2 +-
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi    | 2 +-
+ arch/arm/boot/dts/imx6qdl-gw552x.dtsi    | 2 +-
+ arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi | 4 ++--
+ 4 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6ul-isiot.dts b/arch/arm/boot/dts/imx6ul-isiot.dts
-index 077bc26..acb97bd 100644
---- a/arch/arm/boot/dts/imx6ul-isiot.dts
-+++ b/arch/arm/boot/dts/imx6ul-isiot.dts
-@@ -76,6 +76,15 @@
+diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+index b6078b1..91991d6 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+@@ -235,7 +235,7 @@
+ 
+ 			/* VDD_1P8 (1+R1/R2 = 2.505): GPS/VideoIn/ENET-PHY */
+ 			reg_1p8v: sw2 {
+-                                regulator-name = "vdd1p8";
++				regulator-name = "vdd1p8";
+ 				regulator-min-microvolt = <1033310>;
+ 				regulator-max-microvolt = <2004000>;
+ 				lltc,fb-voltage-divider = <301000 200000>;
+diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+index 19cf036..a208e7e 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+@@ -227,7 +227,7 @@
+ 
+ 			/* VDD_1P8 (1+R1/R2 = 2.505): GPS/VideoIn/ENET-PHY */
+ 			reg_1p8v: sw2 {
+-                                regulator-name = "vdd1p8";
++				regulator-name = "vdd1p8";
+ 				regulator-min-microvolt = <1033310>;
+ 				regulator-max-microvolt = <2004000>;
+ 				lltc,fb-voltage-divider = <301000 200000>;
+diff --git a/arch/arm/boot/dts/imx6qdl-gw552x.dtsi b/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
+index 90200fa..67613dd 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
+@@ -162,7 +162,7 @@
+ 
+ 			/* VDD_1P8 (1+R1/R2 = 2.505): ENET-PHY */
+ 			reg_1p8v: sw2 {
+-                                regulator-name = "vdd1p8";
++				regulator-name = "vdd1p8";
+ 				regulator-min-microvolt = <1033310>;
+ 				regulator-max-microvolt = <2004000>;
+ 				lltc,fb-voltage-divider = <301000 200000>;
+diff --git a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+index d5c3aa8..6e29d8b 100644
+--- a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+@@ -223,7 +223,7 @@
+ 	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
+ 	vmcc-supply = <&reg_sd3_vmmc>;
+ 	cd-gpios = <&gpio1 1 GPIO_ACTIVE_LOW>;
+-	bus-witdh=<4>;
++	bus-witdh = <4>;
+ 	no-1-8-v;
  	status = "okay";
  };
- 
-+&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2>;
-+	cd-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>;
-+	bus-width = <8>;
-+	no-1-8-v;
-+	status = "okay";
-+};
-+
- &iomuxc {
- 	pinctrl_uart1: uart1grp {
- 		fsl,pins = <
-@@ -116,4 +125,20 @@
- 			MX6UL_PAD_SD1_DATA3__USDHC1_DATA3 0x170f9
- 		>;
- 	};
-+
-+	pinctrl_usdhc2: usdhc2grp {
-+		fsl,pins = <
-+			MX6UL_PAD_NAND_RE_B__USDHC2_CLK      0x17070
-+			MX6UL_PAD_NAND_WE_B__USDHC2_CMD      0x10070
-+			MX6UL_PAD_NAND_DATA00__USDHC2_DATA0  0x17070
-+			MX6UL_PAD_NAND_DATA01__USDHC2_DATA1  0x17070
-+			MX6UL_PAD_NAND_DATA02__USDHC2_DATA2  0x17070
-+			MX6UL_PAD_NAND_DATA03__USDHC2_DATA3  0x17070
-+			MX6UL_PAD_NAND_DATA04__USDHC2_DATA4  0x17070
-+			MX6UL_PAD_NAND_DATA05__USDHC2_DATA5  0x17070
-+			MX6UL_PAD_NAND_DATA06__USDHC2_DATA6  0x17070
-+			MX6UL_PAD_NAND_DATA07__USDHC2_DATA7  0x17070
-+			MX6UL_PAD_NAND_ALE__USDHC2_RESET_B   0x17070
-+		>;
-+	};
- };
+@@ -234,7 +234,7 @@
+ 	pinctrl-1 = <&pinctrl_usdhc4_100mhz>;
+ 	pinctrl-2 = <&pinctrl_usdhc4_200mhz>;
+ 	vmcc-supply = <&reg_sd4_vmmc>;
+-	bus-witdh=<8>;
++	bus-witdh = <8>;
+ 	no-1-8-v;
+ 	non-removable;
+ 	status = "okay";
 -- 
 1.9.1
