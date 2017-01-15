@@ -1,51 +1,68 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 15 Jan 2017 23:12:49 +0200
-Subject: [PATCH] iommu/dma: Add support for DMA_ATTR_FORCE_CONTIGUOUS
-In-Reply-To: <0e5c066f-ddf6-30ce-392e-79bd0f401a18@arm.com>
-References: <1484305674-15018-1-git-send-email-geert+renesas@glider.be>
- <CAMuHMdWBfTm_QRuB7x-ZDh0bgGmHokqm7=F2b0rjQTYzizC9hA@mail.gmail.com>
- <0e5c066f-ddf6-30ce-392e-79bd0f401a18@arm.com>
-Message-ID: <1782501.BR5drHV8iS@avalon>
+From: jagan@openedev.com (Jagan Teki)
+Date: Sun, 15 Jan 2017 22:50:11 +0100
+Subject: [PATCH 1/2] ARM: dts: imx6ul-isiot: Add eMMC node
+Message-ID: <1484517012-13321-1-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-On Friday 13 Jan 2017 12:17:24 Robin Murphy wrote:
-> On 13/01/17 11:59, Geert Uytterhoeven wrote:
-> > On Fri, Jan 13, 2017 at 12:32 PM, Robin Murphy wrote:
-> >> On 13/01/17 11:07, Geert Uytterhoeven wrote:
-> >>> Add support for DMA_ATTR_FORCE_CONTIGUOUS to the generic IOMMU DMA code.
-> >>> This allows to allocate physically contiguous DMA buffers on arm64
-> >>> systems with an IOMMU.
-> >> 
-> >> Can anyone explain what this attribute is actually used for? I've never
-> >> quite figured it out.
-> > 
-> > My understanding is that DMA_ATTR_FORCE_CONTIGUOUS is needed when using
-> > an IOMMU but wanting the buffers to be both contiguous in IOVA space and
-> > physically contiguous to allow passing to devices without IOMMU.
-> > 
-> > Main users are graphic and remote processors.
-> 
-> Sure, I assumed it must be to do with buffer sharing, but the systems
-> I'm aware of which have IOMMUs in their media subsystems tend to have
-> them in front of every IP block involved, so I was curious as to what
-> bit of non-IOMMU hardware wanted to play too. The lone in-tree use in
-> the Exynos DRM driver was never very revealing, and the new one I see in
-> the Qualcomm PIL driver frankly looks redundant to me.
+Add usdhc2 node, which is eMMC for Engicam Is.IoT MX6UL modules.
 
-If two (or more) devices with different memory requirements are involved in 
-buffer sharing, we need to either allocate and export buffers from the device 
-with the strictest requirements, or to implement a central buffer allocator. 
-In any case, I don't think DMA_ATTR_FORCE_CONTIGUOUS is the right solution to 
-that problem.
+dmesg:
+-----
+mmc1: SDHCI controller on 2194000.usdhc [2194000.usdhc] using ADMA
+mmc1: new DDR MMC card at address 0001
+mmcblk1: mmc1:0001 M62704 3.53 GiB
 
-Forcing contiguous allocation can however help with performance optimization, 
-as mapping physically contiguous memory through IOMMUs can make use of larger 
-page sizes.
+Cc: Matteo Lisi <matteo.lisi@engicam.com>
+Cc: Michael Trimarchi <michael@amarulasolutions.com>
+Cc: Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ arch/arm/boot/dts/imx6ul-isiot.dts | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
+diff --git a/arch/arm/boot/dts/imx6ul-isiot.dts b/arch/arm/boot/dts/imx6ul-isiot.dts
+index 077bc26..acb97bd 100644
+--- a/arch/arm/boot/dts/imx6ul-isiot.dts
++++ b/arch/arm/boot/dts/imx6ul-isiot.dts
+@@ -76,6 +76,15 @@
+ 	status = "okay";
+ };
+ 
++&usdhc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	cd-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>;
++	bus-width = <8>;
++	no-1-8-v;
++	status = "okay";
++};
++
+ &iomuxc {
+ 	pinctrl_uart1: uart1grp {
+ 		fsl,pins = <
+@@ -116,4 +125,20 @@
+ 			MX6UL_PAD_SD1_DATA3__USDHC1_DATA3 0x170f9
+ 		>;
+ 	};
++
++	pinctrl_usdhc2: usdhc2grp {
++		fsl,pins = <
++			MX6UL_PAD_NAND_RE_B__USDHC2_CLK      0x17070
++			MX6UL_PAD_NAND_WE_B__USDHC2_CMD      0x10070
++			MX6UL_PAD_NAND_DATA00__USDHC2_DATA0  0x17070
++			MX6UL_PAD_NAND_DATA01__USDHC2_DATA1  0x17070
++			MX6UL_PAD_NAND_DATA02__USDHC2_DATA2  0x17070
++			MX6UL_PAD_NAND_DATA03__USDHC2_DATA3  0x17070
++			MX6UL_PAD_NAND_DATA04__USDHC2_DATA4  0x17070
++			MX6UL_PAD_NAND_DATA05__USDHC2_DATA5  0x17070
++			MX6UL_PAD_NAND_DATA06__USDHC2_DATA6  0x17070
++			MX6UL_PAD_NAND_DATA07__USDHC2_DATA7  0x17070
++			MX6UL_PAD_NAND_ALE__USDHC2_RESET_B   0x17070
++		>;
++	};
+ };
 -- 
-Regards,
-
-Laurent Pinchart
+1.9.1
