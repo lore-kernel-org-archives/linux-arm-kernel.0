@@ -1,49 +1,60 @@
 From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 15 Jan 2017 15:43:15 +0100
-Subject: [PATCH v4] ARM64: dts: meson-gx: Add reserved memory zone and
+Date: Sun, 15 Jan 2017 16:44:20 +0100
+Subject: [RFT PATCH] ARM64: dts: meson-gxbb: Add reserved memory zone and
  usable memory range
-In-Reply-To: <m21sw66828.fsf@baylibre.com>
-References: <1484129414-23325-1-git-send-email-narmstrong@baylibre.com>
- <m21sw66828.fsf@baylibre.com>
-Message-ID: <d3a00788-c3c1-4b10-90bf-2a8bc6a138f8@suse.de>
+In-Reply-To: <90d5b5a3-6dd8-aab2-8701-112a10e3364c@gmx.de>
+References: <20161212101801.28491-1-narmstrong@baylibre.com>
+ <09bb78ed-c8ec-d21f-d464-16e55c481d4e@gmx.de>
+ <56869b90-6bee-f6ae-a7b1-884b4c0d72c0@baylibre.com>
+ <2ac01237-a7f8-5b3b-0f97-dd49ce6623fb@gmx.de>
+ <90d5b5a3-6dd8-aab2-8701-112a10e3364c@gmx.de>
+Message-ID: <612bc7bc-4ee4-51c0-d7ac-06151854ac03@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 13.01.2017 um 21:03 schrieb Kevin Hilman:
-> Neil Armstrong <narmstrong@baylibre.com> writes:
+Am 23.12.2016 um 10:42 schrieb Heinrich Schuchardt:
+> it really makes a difference if we write
 > 
->> The Amlogic Meson GXBB/GXL/GXM secure monitor uses part of the memory space,
->> this patch adds this reserved zone and redefines the usable memory range.
->>
->> The memory node is also moved from the dtsi files into the proper dts files
->> to handle variants memory sizes.
->>
->> This patch also fixes the memory sizes for the following platforms :
->> - gxl-s905x-p212 : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
->> - gxm-s912-q201 : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
->> - gxl-s905d-p231 : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
->> - gxl-nexbox-a95x : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
->>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>  	memory at 0 {
+>  		device_type = "memory";
+>  		linux,usable-memory = <0x0 0x1000000 0x0 0x7f000000>;
+>  	};
 > 
-> Queued for v4.10-rc.
+> or
+> 
+>  	memory at 0 {
+>  		device_type = "memory";
+>  		reg = <0x0 0x1000000 0x0 0x7f000000>;
+>  	};
+> 
+> The second version leads to failure of the Odroid C2.
+> 
+> When I looked at /sys/firmware/fdt I saw this difference:
+> 
+> --- fails
+> +++ works
+> 
+>         memory at 0 {
+> -               device_type = "memory";
+>                 reg = <0x0 0x0 0x0 0x78000000>;
+> +               device_type = "memory";
+> +               linux,usable-memory = <0x0 0x1000000 0x0 0x7f000000>;
+>         };
+> 
+> I found the following sentence in the NXP forum:
+> In case you want to overwrite the memory usage passed from u-boot, you
+> can use "linux,usable-memory".
+> https://community.nxp.com/thread/382284
 
-What is the motivation for this change? I have a local U-Boot patch to
-detect the amount of memory available as done downstream, but U-Boot
-only updates the reg property that you seem to be abandoning here...
+The Odroid-C2 is in mainline U-Boot. Please submit a patch to U-Boot
+instead of forcing the creation of unnecessary new .dts files onto
+everyone due to hardcoded linux,usable-memory properties. In fact, it
+already reserves 0x1000000, so it seems you are merely using an older
+U-Boot.
 
-So for devices that come in multiple RAM configurations - like R-Box Pro
-- this would require separate .dts files now! This looks very wrong to
-me, especially since I am not aware of other platforms doing the same.
-Instead, there's memory reservations for top and bottom done in U-Boot
-for reg, plus reserved-memory nodes for anything in the middle.
+http://git.denx.de/?p=u-boot.git;a=blob;f=arch/arm/mach-meson/board.c;h=f159cbf849f75ab046e6f3a025bbc97c0bcfd59d;hb=HEAD#l39
 
-Another thing to consider is that uEFI boot (bootefi) handles memory
-reservation differently yet again, on the bootloader level. I have had
-that working fine on Odroid-C2 and Vega S95.
-
-So if there's no bug this is fixing (none mentioned in commit message) I
-strongly object to this patch.
+I would bet that the upper limit is unrelated here.
 
 Regards,
 Andreas
