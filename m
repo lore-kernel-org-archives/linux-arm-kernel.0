@@ -1,54 +1,115 @@
-From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Sun, 15 Jan 2017 21:08:12 +0200
-Subject: Nokia N900: mixers changed between 4.9 and 4.10-rc3, no longer
- can use in-call speaker
-In-Reply-To: <20170115100533.GA15816@amd>
-References: <20170112181826.GA28290@amd> <201701121934.19810@pali>
- <20170114225614.GA25321@amd> <201701150100.54214@pali>
- <20170115100533.GA15816@amd>
-Message-ID: <40dbce4e-d99d-d77d-e682-5b004c70ca40@bitmer.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 15 Jan 2017 20:16:32 +0100
+Subject: [PATCH net-next v3 06/10] net: dsa: Migrate to device_find_class()
+In-Reply-To: <a9ea1f45-b9a5-d840-68e0-9bf9bc7a6598@gmail.com>
+References: <20170114214713.28109-1-f.fainelli@gmail.com>
+ <20170114214713.28109-7-f.fainelli@gmail.com>
+ <20170115110628.GF26374@kroah.com>
+ <fc247aeb-a8d6-5ba9-c26d-cb057a5ac34d@gmail.com>
+ <20170115173949.GA19268@kroah.com>
+ <a9ea1f45-b9a5-d840-68e0-9bf9bc7a6598@gmail.com>
+Message-ID: <20170115191632.GD5643@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2017 12:05 PM, Pavel Machek wrote:
->>> So regression seems to be between v4.9 and v4.10. Any ideas?
->>
->> Interesting... seems there are no sound relevant changes after v4.9.
->>
->> Looks like there are only three commits after v4.9 for sound/soc which 
->> are built for Nokia N900:
->>
->> e411b0b5eb9b65257a050eac333d181d6e00e2c6
->> e7aa450fe17890e59db7d3c2d8eff5b6b41fc531
->> 63c3194b82530bd71fd49db84eb7ab656b8d404a
->>
->> Maybe something not related to sound/soc could broke it?
-> 
-> Lets see.
-> 
-> a9042defa29a01cc538b742eab047848e9b5ae14 -- works ok.
-> ce38207f161513ee3d2bd3860489f07ebe65bc78 --
-> 
-> alsactl: set_control:1328: failed to obtain info for control #229 (No
-> such file or directory)
-> 
-I'm unable to test older kernels at the moment since modules don't load
-by some reason (bluetooth: Unknown symbol _GLOBAL_OFFSET_TABLE_ (err
-0)). Probably some recent regression in my debian/testing installation
-since the same configs were working before.
+> > What exactly is the relationship between these devices (a ascii-art tree
+> > or sysfs tree output might be nice) so I can try to understand what is
+> > going on here.
 
-However v4.9.4 works and with it I can see there is an issue with these
-aic3x controls:
+Hi Greg, Florian
 
-amixer: Unable to find simple control 'Left DAC_L1 Mixer Line',0
+A few diagrams and trees which might help understand what is going on.
 
+The first diagram comes from the 2008 patch which added all this code:
 
+            +-----------+       +-----------+
+            |           | RGMII |           |
+            |           +-------+           +------ 1000baseT MDI ("WAN")
+            |           |       |  6-port   +------ 1000baseT MDI ("LAN1")
+            |    CPU    |       |  ethernet +------ 1000baseT MDI ("LAN2")
+            |           |MIImgmt|  switch   +------ 1000baseT MDI ("LAN3")
+            |           +-------+  w/5 PHYs +------ 1000baseT MDI ("LAN4")
+            |           |       |           |
+            +-----------+       +-----------+
 
-amixer: Unable to find simple control 'Right DAC_R1 Mixer Line',0
+We have an ethernet switch and a host CPU. The switch is connected to
+the CPU in two different ways. RGMII allows us to get Ethernet frames
+from the CPU into the switch. MIImgmt, is the management bus normally
+used for Ethernet PHYs, but Marvell switches also use it for Managing
+switches.
 
+The diagram above is the simplest setup. You can have multiple
+Ethernet switches, connected together via switch ports. Each switch
+has its own MIImgmt connect to the CPU, but there is only one RGMII
+link.
 
-At quick look I don't see why above commits could cause it. Maybe
-regression happened earlier between v4.6 and v4.9?
+When this code was designed back in 2008, it was decided to represent
+this is a platform device, and it has a platform_data, which i have
+slightly edited to keep it simple:
 
--- 
-Jarkko
+struct dsa_platform_data {
+        /*
+         * Reference to a Linux network interface that connects
+         * to the root switch chip of the tree.
+         */
+        struct device   *netdev;
+
+        /*
+         * Info structs describing each of the switch chips
+         * connected via this network interface.
+         */
+        int             nr_chips;
+        struct dsa_chip_data    *chip;
+};
+
+This netdev is the CPU side of the RGMII interface.
+
+Each switch has a dsa_chip_data, again edited:
+
+struct dsa_chip_data {
+        /*
+         * How to access the switch configuration registers.
+         */
+        struct device   *host_dev;
+        int             sw_addr;
+...
+}
+
+The host_dev is the CPU side of the MIImgmt, and we have the address
+the switch is using on the bus.
+
+During probe of this platform device, we need to get from the
+struct device *netdev to a struct net_device *dev.
+
+So the code looks in the device net class to find the device
+
+|   |   |   |-- f1074000.ethernet
+|   |   |   |   |-- deferred_probe
+|   |   |   |   |-- driver -> ../../../../../bus/platform/drivers/mvneta
+|   |   |   |   |-- driver_override
+|   |   |   |   |-- modalias
+|   |   |   |   |-- net
+|   |   |   |   |   `-- eth1
+|   |   |   |   |       |-- addr_assign_type
+|   |   |   |   |       |-- address
+|   |   |   |   |       |-- addr_len
+|   |   |   |   |       |-- broadcast
+|   |   |   |   |       |-- carrier
+|   |   |   |   |       |-- carrier_changes
+|   |   |   |   |       |-- deferred_probe
+|   |   |   |   |       |-- device -> ../../../f1074000.ethernet
+
+and then use container_of() to get the net_device.
+
+Similarly, the code needs to get from struct device *host_dev to a struct mii_bus *.
+
+|   |   |   |-- f1072004.mdio
+|   |   |   |   |-- deferred_probe
+|   |   |   |   |-- driver -> ../../../../../bus/platform/drivers/orion-mdio
+|   |   |   |   |-- driver_override
+|   |   |   |   |-- mdio_bus
+|   |   |   |   |   `-- f1072004.mdio-mi
+|   |   |   |   |       |-- deferred_probe
+|   |   |   |   |       |-- device -> ../../../f1072004.mdio
+
+    Andrew
