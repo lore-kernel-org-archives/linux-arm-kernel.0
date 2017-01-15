@@ -1,78 +1,39 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Sun, 15 Jan 2017 01:00:54 +0100
-Subject: Nokia N900: mixers changed between 4.9 and 4.10-rc3,
- no longer can use in-call speaker
-In-Reply-To: <20170114225614.GA25321@amd>
-References: <20170112181826.GA28290@amd> <201701121934.19810@pali>
- <20170114225614.GA25321@amd>
-Message-ID: <201701150100.54214@pali>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 15 Jan 2017 08:13:06 +0800
+Subject: [PATCH v3] ARM: dts: Add LEGO MINDSTORMS EV3 dts
+In-Reply-To: <1484253167-27568-1-git-send-email-david@lechnology.com>
+Message-ID: <201701150836.H4TibehD%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 14 January 2017 23:56:15 Pavel Machek wrote:
-> Hi!
-> 
-> > > In v4.10 (and probably v4.9, too) I can no longer use the in-call
-> > > speaker. I can no longer use the wired headset, either.
-> > > 
-> > > v4.4 (and probably v4.6) works ok.
-> > > 
-> > > Any ideas? Does wired headset / in-call speaker work for you?
-> > > 
-> > > "Mono" and "Mono DAC" options are still there.. but something
-> > > else changed, as alsamixer now shows way many more options
-> > > (meaning they are shorter?) and I get complains from alsactl:
-> > > 
-> > > alsactl: set_control:1328: failed to obtain info for control #49
-> > > (No such file or directory)
-> > > ...
-> > > alsactl: set_control:1328: failed to obtain info for control #229
-> > > (No such file or directory)
-> > 
-> > Looks like there are not so much commits related to
-> > sound/soc/omap/rx51.c Maybe it can be one of these twos?
-> > 
-> > cb7e62256e99d285e415cf75db67558f0f8bb107
-> > 6d2de5ab4328718302c54b20222c6b1a574c3fce
-> 
-> Both are based on v4.7-rc1. v4.6 worked ok for me.
-> 
-> Lets test mini-v4.7: in-call speaker works ok there, and no alsactl
-> warnings.
-> 
-> mini-v4.7+cb7e62256e99d285e415cf75db67558f0f8bb107+6d2de5ab4328718302
-> c54b20222c6b1a574c3fce
-> 
-> : something seems to be broken there already.
-> 
-> alsactl: set_control:1464: Cannot write control '2:0:0:TPA6130A2
-> Headphone Playback Volume:0' : Remote I/O error
-> 
-> But in-call speakers and wired headset still seems to work.
-> 
-> Lets test mini-v4.9... works ok. I don't even get the remote i/o
-> error. Interesting.
-> 
-> So regression seems to be between v4.9 and v4.10. Any ideas?
+Hi David,
 
-Interesting... seems there are no sound relevant changes after v4.9.
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.10-rc3 next-20170113]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Looks like there are only three commits after v4.9 for sound/soc which 
-are built for Nokia N900:
+url:    https://github.com/0day-ci/linux/commits/David-Lechner/ARM-dts-Add-LEGO-MINDSTORMS-EV3-dts/20170114-145113
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm-u300_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-e411b0b5eb9b65257a050eac333d181d6e00e2c6
-e7aa450fe17890e59db7d3c2d8eff5b6b41fc531
-63c3194b82530bd71fd49db84eb7ab656b8d404a
+All errors (new ones prefixed by >>):
 
-Maybe something not related to sound/soc could broke it?
+>> Error: arch/arm/boot/dts/da850-lego-ev3.dts:310.1-6 Label or path usb1 not found
+   FATAL ERROR: Syntax error parsing input tree
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170115/1ff353d6/attachment.sig>
+Name: .config.gz
+Type: application/gzip
+Size: 12462 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170115/a5b32497/attachment-0001.gz>
