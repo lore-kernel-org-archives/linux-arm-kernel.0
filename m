@@ -1,17 +1,55 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Sun, 15 Jan 2017 13:26:52 +0100
-Subject: [PATCH 3/4] iio: adc: add a driver for the SAR ADC found in
- Amlogic Meson SoCs
-In-Reply-To: <20170111174334.24343-4-martin.blumenstingl@googlemail.com>
-References: <20170111174334.24343-1-martin.blumenstingl@googlemail.com>
- <20170111174334.24343-4-martin.blumenstingl@googlemail.com>
-Message-ID: <0bfa97d1-2ee3-9dd9-dce3-593e93771f03@metafoo.de>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Sun, 15 Jan 2017 12:42:54 +0000
+Subject: [PATCH] arm64: defconfig: disable CONFIG_DEVMEM
+References: <20170113113734.16524-1-leif.lindholm@linaro.org>
+ <20170113114801.GD3253@arm.com>
+Message-ID: <20170115124254.GF25883@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2017 06:43 PM, Martin Blumenstingl wrote:
-> +	indio_dev->name = dev_name(&pdev->dev);
+On Fri, Jan 13, 2017 at 11:48:01AM +0000, Will Deacon wrote:
+> On Fri, Jan 13, 2017 at 11:37:34AM +0000, Leif Lindholm wrote:
+> > /dev/mem is the opposite of what an operating system is for.
+> > Additionally, on arm* it opens up for denial-of-service attacks from
+> > userspace. So leave it disabled by default, requiring people who need
+> > it to enable it explicitly.
+> 
+> I really like the idea, but are we sure that nothing common breaks without
+> this? For example, does Debian still boot nicely with this patch applied?
 
-The name is supposed to be the type of the device, e.g. part name, not the
-name of parent device instance. E.g. meson-gxbb-saradc or meson-gxl-saradc
-in this case.
+Getting distros to not have to shop around for config fragments in
+order to be able to a stable system is one of my main purposes of this
+patch.
+
+Since Debian just published a 4.9 kernel, I gave that a spin (both DT
+and ACPI). No issues.
+
+> Just trying to get a feel for how much userspace this has seen (particularly
+> on ACPI-based systems, which I seem to remember like poking about in here).
+
+There are various tools that let you figure out various things about
+the system (a bit like running dtc on a dump of the active
+device-tree), but nothing actually used for booting a system (much
+like dtc).
+
+/dev/mem has been used for things like dmidecode and acpidump in the
+past, but we fixed those tools back in 2015 to use /sys interfaces
+instead of blindly groping around and hoping for the best.
+
+Stretch version of dmidecode operates as expected on both DT and ACPI
+boot, and acpidump does in the ACPI case (no tables in /sys otherwise).
+
+There may be other tools that will also break if not implementing
+support for access via /sys, but none critical for system operation
+(and currently a denial-of-service waiting to happen anyway).
+
+Systemd will try to access /dev/mem to extract boot timestamp stuff,
+but handles a failure gracefully (i.e. not even a warning message).
+
+On a side note, comparing the resulting configs, there is a
+semi-broken config dependency in lib/Kconfig.debug, meaning
+CONFIG_*STRICT_DEVMEM get set even if CONFIG_DEVMEM is not. 
+But I'll send that out as a separate patch.
+
+/
+    Leif
