@@ -1,47 +1,64 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sun, 15 Jan 2017 09:40:24 -0800
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Sun, 15 Jan 2017 18:49:12 +0100
 Subject: [PATCH net-next v3 00/10] net: dsa: Support for pdata in dsa2
-In-Reply-To: <20170115110831.GH26374@kroah.com>
+In-Reply-To: <bc0d9ea7-17ee-abc3-b2aa-4d241413b9a3@gmail.com>
 References: <20170114214713.28109-1-f.fainelli@gmail.com>
  <20170115110831.GH26374@kroah.com>
-Message-ID: <bc0d9ea7-17ee-abc3-b2aa-4d241413b9a3@gmail.com>
+ <bc0d9ea7-17ee-abc3-b2aa-4d241413b9a3@gmail.com>
+Message-ID: <20170115174912.GA19673@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2017 03:08 AM, Greg KH wrote:
-> On Sat, Jan 14, 2017 at 01:47:03PM -0800, Florian Fainelli wrote:
->> Hi all,
->>
->> This is not exactly new, and was sent before, although back then, I did not
->> have an user of the pre-declared MDIO board information, but now we do. Note
->> that I have additional changes queued up to have b53 register platform data for
->> MIPS bcm47xx and bcm63xx.
->>
->> Yes I know that we should have the Orion platforms eventually be converted to
->> Device Tree, but until that happens, I don't want any remaining users of the
->> old "dsa" platform device (hence the previous DTS submissions for ARM/mvebu)
->> and, there will be platforms out there that most likely won't never see DT
->> coming their way (BCM47xx is almost 100% sure, BCM63xx maybe not in a distant
->> future).
->>
->> We would probably want the whole series to be merged via David Miller's tree
->> to simplify things.
->>
->> Greg, can you Ack/Nack patch 5 since it touched the core LDD?
+On Sun, Jan 15, 2017 at 09:40:24AM -0800, Florian Fainelli wrote:
+> On 01/15/2017 03:08 AM, Greg KH wrote:
+> > On Sat, Jan 14, 2017 at 01:47:03PM -0800, Florian Fainelli wrote:
+> >> Hi all,
+> >>
+> >> This is not exactly new, and was sent before, although back then, I did not
+> >> have an user of the pre-declared MDIO board information, but now we do. Note
+> >> that I have additional changes queued up to have b53 register platform data for
+> >> MIPS bcm47xx and bcm63xx.
+> >>
+> >> Yes I know that we should have the Orion platforms eventually be converted to
+> >> Device Tree, but until that happens, I don't want any remaining users of the
+> >> old "dsa" platform device (hence the previous DTS submissions for ARM/mvebu)
+> >> and, there will be platforms out there that most likely won't never see DT
+> >> coming their way (BCM47xx is almost 100% sure, BCM63xx maybe not in a distant
+> >> future).
+> >>
+> >> We would probably want the whole series to be merged via David Miller's tree
+> >> to simplify things.
+> >>
+> >> Greg, can you Ack/Nack patch 5 since it touched the core LDD?
+> > 
+> > I've NAKed them for now, you need to describe what you are trying to do
+> > here, as it doesn't make any sense to me at the moment.
 > 
-> I've NAKed them for now, you need to describe what you are trying to do
-> here, as it doesn't make any sense to me at the moment.
+> For one, this is moving *existing* code from net/dsa/dsa.c part into the
+> device core for device_find_class() and part into the network device
+> core for dev_to_net_device(). Patch 8 is where this actually gets used.
+> See my individual replies for more details.
+> 
+> Even though the existing code is there in net/dsa/dsa.c, at this point,
+> and for the sake of getting these patches merged via David, I can
+> probably just keep it where it is (like what patch series v1 did) and
+> just namespace it with dsa_. Later on, if this is deemed valuable to
+> other parts of the kernel, I can try to relocate it to the device core,
+> does that sound acceptable?
 
-For one, this is moving *existing* code from net/dsa/dsa.c part into the
-device core for device_find_class() and part into the network device
-core for dev_to_net_device(). Patch 8 is where this actually gets used.
-See my individual replies for more details.
+Nope!
 
-Even though the existing code is there in net/dsa/dsa.c, at this point,
-and for the sake of getting these patches merged via David, I can
-probably just keep it where it is (like what patch series v1 did) and
-just namespace it with dsa_. Later on, if this is deemed valuable to
-other parts of the kernel, I can try to relocate it to the device core,
-does that sound acceptable?
--- 
-Florian
+I really want to try to understand what you all are doing with the
+device tree that you feel that blindly walking it actually comes up with
+a valid result.
+
+See my other email about wanting to see a tree, we can take it from that
+thread to try to consolidate all of these different ones.
+
+And sorry, I know you are just trying to move code around, but this
+isn't the first time this has come up, and I think it needs to be
+resolved properly.
+
+thanks,
+
+greg k-h
