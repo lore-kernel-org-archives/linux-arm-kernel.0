@@ -1,62 +1,97 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 15 Jan 2017 00:11:21 -0200
-Subject: [PATCH RFC v2 4/4] ARM: dts: imx6*-hummingboard2: convert to more
- conventional vmmc-supply
-In-Reply-To: <E1cS36q-0002wW-C3@rmk-PC.armlinux.org.uk>
-References: <20170113144449.GQ14217@n2100.armlinux.org.uk>
- <E1cS36q-0002wW-C3@rmk-PC.armlinux.org.uk>
-Message-ID: <CAOMZO5CUcEWiMpwbgYwcVgZkh41ET3J9E-LQBfc7bmFEGUCvpw@mail.gmail.com>
+From: dhaab@luxul.com (Dan Haab)
+Date: Sat, 14 Jan 2017 19:29:27 -0700
+Subject: [PATCH 1/2] ARM: BCM5301X: Add DT for Luxul XAP-1410
+Message-ID: <1484447368-7622-1-git-send-email-dhaab@luxul.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 12:45 PM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
+Luxul XAP-1410 in a dual-band access point device based on BCM47081 with
+serial flash. It has 3 LEDs and just one (reset) button.
 
-> +       reg_usdhc2_vmmc: reg-usdhc2-vmmc {
-> +               compatible = "regulator-fixed";
-> +               gpio = <&gpio4 30 GPIO_ACTIVE_HIGH>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_hummingboard2_vmmc>;
-> +               regulator-boot-on;
-> +               regulator-max-microvolt = <3300000>;
-> +               regulator-min-microvolt = <3300000>;
-> +               regulator-name = "usdhc2_vmmc";
-> +               startup-delay-us = <1000>;
-> +       };
-> +
->         sound-sgtl5000 {
->                 audio-codec = <&sgtl5000>;
->                 audio-routing =
-> @@ -393,7 +400,6 @@
->
->                 pinctrl_hummingboard2_usdhc2_aux: hummingboard2-usdhc2-aux {
->                         fsl,pins = <
-> -                               MX6QDL_PAD_GPIO_4__GPIO1_IO04    0x1f071
->                                 MX6QDL_PAD_KEY_ROW1__SD2_VSELECT 0x1b071
->                                 MX6QDL_PAD_DISP0_DAT9__GPIO4_IO30 0x1b0b0
->                         >;
-> @@ -432,6 +438,12 @@
->                         >;
->                 };
->
-> +               pinctrl_hummingboard2_vmmc: hummingboard2-vmmc {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_GPIO_4__GPIO1_IO04    0x1f071
+Signed-off-by: Dan Haab <dhaab@luxul.com>
+---
+ arch/arm/boot/dts/Makefile                    |    1 +
+ arch/arm/boot/dts/bcm47081-luxul-xap-1410.dts |   60 +++++++++++++++++++++++++
+ 2 files changed, 61 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm47081-luxul-xap-1410.dts
 
-Shouldn't this be gpio4 30 instead?
-
-> +                       >;
-> +               };
-> +
->                 pinctrl_hummingboard2_usdhc3: hummingboard2-usdhc3 {
->                         fsl,pins = <
->                                 MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17059
-> @@ -519,7 +531,7 @@
->                 &pinctrl_hummingboard2_usdhc2_aux
->                 &pinctrl_hummingboard2_usdhc2_200mhz
->         >;
-> -       mmc-pwrseq = <&usdhc2_pwrseq>;
-> +       vmmc-supply = <&reg_usdhc2_vmmc>;
->         cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
-
-as gpio1 4 seems to be used as card detect.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index cccdbcb..04fd8f0 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -83,6 +83,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm47081-asus-rt-n18u.dtb \
+ 	bcm47081-buffalo-wzr-600dhp2.dtb \
+ 	bcm47081-buffalo-wzr-900dhp.dtb \
++	bcm47081-luxul-xap-1410.dtb \
+ 	bcm4709-asus-rt-ac87u.dtb \
+ 	bcm4709-buffalo-wxr-1900dhp.dtb \
+ 	bcm4709-netgear-r7000.dtb \
+diff --git a/arch/arm/boot/dts/bcm47081-luxul-xap-1410.dts b/arch/arm/boot/dts/bcm47081-luxul-xap-1410.dts
+new file mode 100644
+index 0000000..9b57598
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm47081-luxul-xap-1410.dts
+@@ -0,0 +1,60 @@
++/*
++ * Copyright 2017 Luxul Inc.
++ *
++ * Licensed under the ISC license.
++ */
++
++/dts-v1/;
++
++#include "bcm47081.dtsi"
++
++/ {
++	compatible = "luxul,xap-1410v1", "brcm,bcm47081", "brcm,bcm4708";
++	model = "Luxul XAP-1410 V1";
++
++	chosen {
++		bootargs = "console=ttyS0,115200";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		5ghz {
++			label = "bcm53xx:blue:5ghz";
++			gpios = <&chipcommon 13 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "none";
++		};
++
++		2ghz {
++			label = "bcm53xx:blue:2ghz";
++			gpios = <&chipcommon 14 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "none";
++		};
++
++		status {
++			label = "bcm53xx:green:status";
++			gpios = <&chipcommon 15 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "timer";
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&spi_nor {
++	status = "okay";
++};
+-- 
+1.7.9.5
