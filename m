@@ -1,43 +1,50 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 15 Jan 2017 23:32:52 +0100
-Subject: [PATCH 1/4] tty: serial: meson: allow baud-rates higher than 115200
+Date: Sun, 15 Jan 2017 23:32:55 +0100
+Subject: [PATCH 4/4] ARM64: dts: meson-gxbb-vega-s95: enable the Bluetooth
+ module
 In-Reply-To: <20170115223255.10350-1-martin.blumenstingl@googlemail.com>
 References: <20170115223255.10350-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170115223255.10350-2-martin.blumenstingl@googlemail.com>
+Message-ID: <20170115223255.10350-5-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vendor driver allows setting baud-rates higher than 115200 baud.
-There is a check in the vendor driver which prevents using more than
-115200 baud during startup, however it does not have such a check in
-.set_termios.
-Higher baud-rates are often used by the bluetooth modules embedded into
-the SDIO wifi chips (Amlogic devices use brcmfmac based wifi chips quite
-often, 2000000 baud seems to be a common value for the UART baud-rate in
-Amlogic's "libbt").
-
-I have tested this on a Meson GXL device with uart_A (to which the
-bluetooth module is connected, where initialization times out with
-115200 baud) and uart_AO (which I manually set to 2000000 baud  and then
-connected with my USB UART adapter to that).
+This takes the Bluetooth module out of reset (the reset line is
+connected to GPIOX_20) and enables uart_A which is used to configure the
+module. This is common for all Vega S95 boards.
+The device can then be initialized by running the hciattach tool:
+hciattach -s115200 /dev/ttyAML1 bcm43xx 2000000 flow -
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
- drivers/tty/serial/meson_uart.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
-index 6aea0f4a9165..60f16795d16b 100644
---- a/drivers/tty/serial/meson_uart.c
-+++ b/drivers/tty/serial/meson_uart.c
-@@ -364,7 +364,7 @@ static void meson_uart_set_termios(struct uart_port *port,
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+index ab497126c9a3..9e0a13b1ac93 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+@@ -47,6 +47,7 @@
  
- 	writel(val, port->membase + AML_UART_CONTROL);
+ 	aliases {
+ 		serial0 = &uart_AO;
++		serial1 = &uart_A;
+ 	};
  
--	baud = uart_get_baud_rate(port, termios, old, 9600, 115200);
-+	baud = uart_get_baud_rate(port, termios, old, 9600, 4000000);
- 	meson_uart_change_speed(port, baud);
+ 	chosen {
+@@ -100,6 +101,14 @@
+ 	};
+ };
  
- 	port->read_status_mask = AML_UART_TX_FIFO_WERR;
++/* This is connected to the Bluetooth module of the wifi/BT combo chip: */
++&uart_A {
++	status = "okay";
++	pinctrl-0 = <&uart_a_pins &uart_a_cts_rts_pins>;
++	pinctrl-names = "default";
++	uart-has-rtscts;
++};
++
+ &uart_AO {
+ 	status = "okay";
+ 	pinctrl-0 = <&uart_ao_a_pins>;
 -- 
 2.11.0
