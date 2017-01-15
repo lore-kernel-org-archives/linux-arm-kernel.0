@@ -1,115 +1,52 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 15 Jan 2017 20:16:32 +0100
-Subject: [PATCH net-next v3 06/10] net: dsa: Migrate to device_find_class()
-In-Reply-To: <a9ea1f45-b9a5-d840-68e0-9bf9bc7a6598@gmail.com>
-References: <20170114214713.28109-1-f.fainelli@gmail.com>
- <20170114214713.28109-7-f.fainelli@gmail.com>
- <20170115110628.GF26374@kroah.com>
- <fc247aeb-a8d6-5ba9-c26d-cb057a5ac34d@gmail.com>
- <20170115173949.GA19268@kroah.com>
- <a9ea1f45-b9a5-d840-68e0-9bf9bc7a6598@gmail.com>
-Message-ID: <20170115191632.GD5643@lunn.ch>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sun, 15 Jan 2017 22:08:18 +0100 (CET)
+Subject: mmc: core: complete/wait_for_completion performance
+In-Reply-To: <1484512950.2026.4.camel@embedded.rocks>
+References: <1479644869.2653.3.camel@embedded.rocks>
+ <585759233.283839.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
+ <1479652929.2841.1.camel@embedded.rocks>
+ <187975187.249177.bccdc17e-e9c6-48c2-aeaf-3b81f1b61ec7.open-xchange@email.1und1.de>
+ <1479669034.1975.1.camel@embedded.rocks>
+ <1198138554.59982.63209ba1-8fb4-4a13-9ee0-f746a192f4c7.open-xchange@email.1und1.de>
+ <1481095953.17027.0.camel@embedded.rocks>
+ <123257138.400786.e58aee3b-9fc2-4b39-a030-c2409c5b92fc.open-xchange@email.1und1.de>
+ <1481706204.3994.4.camel@embedded.rocks>
+ <962480933.163666.1481741832090@email.1und1.de>
+ <1481809814.29241.2.camel@embedded.rocks>
+ <875319194.240552.1481827900469@email.1und1.de>
+ <1481882798.31185.3.camel@embedded.rocks>
+ <692865692.72725.1482793390055@email.1und1.de>
+ <1484512950.2026.4.camel@embedded.rocks>
+Message-ID: <264982492.171431.1484514498854@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > What exactly is the relationship between these devices (a ascii-art tree
-> > or sysfs tree output might be nice) so I can try to understand what is
-> > going on here.
+Hi J?rg,
 
-Hi Greg, Florian
+> J?rg Krause <joerg.krause@embedded.rocks> hat am 15. Januar 2017 um 21:42 geschrieben:
+> 
+> 
+> Hi Stefan,
+> 
+> On Tue, 2016-12-27 at 00:03 +0100, Stefan Wahren wrote:
+> > Hi J?rg,
+> > ...
+> > I also rebased an old patch from Shawn Guo [2] with pre_req and
+> > post_req support, tried to call the DMA channel callback from the
+> > interrupt context instead of scheduling the tasklet within the DMA
+> > engine driver and implement CMD23 support [3]. But none of them show
+> > any measurable performance improvement.
+> 
+> I tested the three patches after disabling any debugging options in the
+> config. There is no performance gain, but the timings have changed.
+> Please have a look at the attached graphs. The time between complete()
+> and wait_for_completion() is reduced to 15us whereas the time from
+> return from wait_for_completion() to return to sdio_readsb() increases
+> to 23us (from maybe 2us before).
 
-A few diagrams and trees which might help understand what is going on.
+that confirms my results. I think you are searching on the wrong layer. You better step "back" and take a look at the whole transfer instead of single blocks. Maybe there are some bigger delays.
 
-The first diagram comes from the 2008 patch which added all this code:
+Stefan
 
-            +-----------+       +-----------+
-            |           | RGMII |           |
-            |           +-------+           +------ 1000baseT MDI ("WAN")
-            |           |       |  6-port   +------ 1000baseT MDI ("LAN1")
-            |    CPU    |       |  ethernet +------ 1000baseT MDI ("LAN2")
-            |           |MIImgmt|  switch   +------ 1000baseT MDI ("LAN3")
-            |           +-------+  w/5 PHYs +------ 1000baseT MDI ("LAN4")
-            |           |       |           |
-            +-----------+       +-----------+
-
-We have an ethernet switch and a host CPU. The switch is connected to
-the CPU in two different ways. RGMII allows us to get Ethernet frames
-from the CPU into the switch. MIImgmt, is the management bus normally
-used for Ethernet PHYs, but Marvell switches also use it for Managing
-switches.
-
-The diagram above is the simplest setup. You can have multiple
-Ethernet switches, connected together via switch ports. Each switch
-has its own MIImgmt connect to the CPU, but there is only one RGMII
-link.
-
-When this code was designed back in 2008, it was decided to represent
-this is a platform device, and it has a platform_data, which i have
-slightly edited to keep it simple:
-
-struct dsa_platform_data {
-        /*
-         * Reference to a Linux network interface that connects
-         * to the root switch chip of the tree.
-         */
-        struct device   *netdev;
-
-        /*
-         * Info structs describing each of the switch chips
-         * connected via this network interface.
-         */
-        int             nr_chips;
-        struct dsa_chip_data    *chip;
-};
-
-This netdev is the CPU side of the RGMII interface.
-
-Each switch has a dsa_chip_data, again edited:
-
-struct dsa_chip_data {
-        /*
-         * How to access the switch configuration registers.
-         */
-        struct device   *host_dev;
-        int             sw_addr;
-...
-}
-
-The host_dev is the CPU side of the MIImgmt, and we have the address
-the switch is using on the bus.
-
-During probe of this platform device, we need to get from the
-struct device *netdev to a struct net_device *dev.
-
-So the code looks in the device net class to find the device
-
-|   |   |   |-- f1074000.ethernet
-|   |   |   |   |-- deferred_probe
-|   |   |   |   |-- driver -> ../../../../../bus/platform/drivers/mvneta
-|   |   |   |   |-- driver_override
-|   |   |   |   |-- modalias
-|   |   |   |   |-- net
-|   |   |   |   |   `-- eth1
-|   |   |   |   |       |-- addr_assign_type
-|   |   |   |   |       |-- address
-|   |   |   |   |       |-- addr_len
-|   |   |   |   |       |-- broadcast
-|   |   |   |   |       |-- carrier
-|   |   |   |   |       |-- carrier_changes
-|   |   |   |   |       |-- deferred_probe
-|   |   |   |   |       |-- device -> ../../../f1074000.ethernet
-
-and then use container_of() to get the net_device.
-
-Similarly, the code needs to get from struct device *host_dev to a struct mii_bus *.
-
-|   |   |   |-- f1072004.mdio
-|   |   |   |   |-- deferred_probe
-|   |   |   |   |-- driver -> ../../../../../bus/platform/drivers/orion-mdio
-|   |   |   |   |-- driver_override
-|   |   |   |   |-- mdio_bus
-|   |   |   |   |   `-- f1072004.mdio-mi
-|   |   |   |   |       |-- deferred_probe
-|   |   |   |   |       |-- device -> ../../../f1072004.mdio
-
-    Andrew
+> 
+> J?rg
