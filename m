@@ -1,64 +1,46 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 15 Jan 2017 23:32:54 +0100
-Subject: [PATCH 3/4] ARM64: dts: meson-gx-p23x-q20x: enable the Bluetooth
- module
-In-Reply-To: <20170115223255.10350-1-martin.blumenstingl@googlemail.com>
-References: <20170115223255.10350-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170115223255.10350-4-martin.blumenstingl@googlemail.com>
+Date: Sun, 15 Jan 2017 23:32:51 +0100
+Subject: [PATCH 0/4] Bluetooth support for GXBB/GXL/GXM based devices
+Message-ID: <20170115223255.10350-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This takes the Bluetooth module out of reset (the reset line is
-connected to GPIOX_17) and enables uart_A which is used to configure the
-module.
-This is identical for all boards which inherit meson-gx-p23x-q20x:
-- GXL S905D P230
-- GXL S905D P231
-- GXM S912 Q200
-- GXM S912 Q201
+This adds the missing kernel bits for Bluetooth support on the
+Tronsmart Vega S95 (GXBB based) boards as well as for the GXL
+P230/P231 and GXM Q200/Q201 reference boards.
 
-To get the HCI interface up one has to install bluez-utils and run:
-hciattach -s115200 /dev/ttyAML1 bcm43xx 2000000 flow -
+The Bluetooth functionality on these boards is provided by the
+SDIO wifi/Bluetooth combo-chip (Broadcom bcm43xx based). The
+Bluetooth module on that combo-chip has to be taken out of reset,
+which is taken care of the GPIO in the sdio_pwrseq.
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+Once the module is taken out of reset it can be set up from userspace
+using the "hciattach" tool from bluez, which talks to the Bluetooth
+module which is connected to one of the serial ports (in our case
+uart_A). To get the Bluetooth module initialized within the timeout
+defined by "hciattach" (and to achieve usable speeds for Bluetooth
+transfers) the communication uses a speed of 2000000 baud, which was
+not supported by meson_uart before.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-index 7a078bef04cd..7db779048091 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-@@ -48,6 +48,7 @@
- / {
- 	aliases {
- 		serial0 = &uart_AO;
-+		serial1 = &uart_A;
- 	};
- 
- 	chosen {
-@@ -94,12 +95,21 @@
- 
- 	sdio_pwrseq: sdio-pwrseq {
- 		compatible = "mmc-pwrseq-simple";
--		reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>;
-+		reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>,
-+			      <&gpio GPIOX_17 GPIO_ACTIVE_LOW>;
- 		clocks = <&wifi32k>;
- 		clock-names = "ext_clock";
- 	};
- };
- 
-+/* This is connected to the Bluetooth module of the wifi/BT combo chip: */
-+&uart_A {
-+	status = "okay";
-+	pinctrl-0 = <&uart_a_pins &uart_a_cts_rts_pins>;
-+	pinctrl-names = "default";
-+	uart-has-rtscts;
-+};
-+
- /* This UART is brought out to the DB9 connector */
- &uart_AO {
- 	status = "okay";
+NOTE: The .dts-changes from this series depends on my previous series
+"add support for uart_AO_B" - see [0]
+
+
+[0] http://lists.infradead.org/pipermail/linux-amlogic/2017-January/001982.html
+
+
+Martin Blumenstingl (4):
+  tty: serial: meson: allow baud-rates higher than 115200
+  ARM64: dts: meson-gx: add the serial CTS and RTS pin groups
+  ARM64: dts: meson-gx-p23x-q20x: enable the Bluetooth module
+  ARM64: dts: meson-gxbb-vega-s95: enable the Bluetooth module
+
+ .../arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi | 12 ++++++-
+ .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      |  9 +++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 40 ++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 40 ++++++++++++++++++++++
+ drivers/tty/serial/meson_uart.c                    |  2 +-
+ 5 files changed, 101 insertions(+), 2 deletions(-)
+
 -- 
 2.11.0
