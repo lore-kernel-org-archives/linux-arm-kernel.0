@@ -1,52 +1,51 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 15 Jan 2017 22:08:18 +0100 (CET)
-Subject: mmc: core: complete/wait_for_completion performance
-In-Reply-To: <1484512950.2026.4.camel@embedded.rocks>
-References: <1479644869.2653.3.camel@embedded.rocks>
- <585759233.283839.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
- <1479652929.2841.1.camel@embedded.rocks>
- <187975187.249177.bccdc17e-e9c6-48c2-aeaf-3b81f1b61ec7.open-xchange@email.1und1.de>
- <1479669034.1975.1.camel@embedded.rocks>
- <1198138554.59982.63209ba1-8fb4-4a13-9ee0-f746a192f4c7.open-xchange@email.1und1.de>
- <1481095953.17027.0.camel@embedded.rocks>
- <123257138.400786.e58aee3b-9fc2-4b39-a030-c2409c5b92fc.open-xchange@email.1und1.de>
- <1481706204.3994.4.camel@embedded.rocks>
- <962480933.163666.1481741832090@email.1und1.de>
- <1481809814.29241.2.camel@embedded.rocks>
- <875319194.240552.1481827900469@email.1und1.de>
- <1481882798.31185.3.camel@embedded.rocks>
- <692865692.72725.1482793390055@email.1und1.de>
- <1484512950.2026.4.camel@embedded.rocks>
-Message-ID: <264982492.171431.1484514498854@email.1und1.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 15 Jan 2017 23:12:49 +0200
+Subject: [PATCH] iommu/dma: Add support for DMA_ATTR_FORCE_CONTIGUOUS
+In-Reply-To: <0e5c066f-ddf6-30ce-392e-79bd0f401a18@arm.com>
+References: <1484305674-15018-1-git-send-email-geert+renesas@glider.be>
+ <CAMuHMdWBfTm_QRuB7x-ZDh0bgGmHokqm7=F2b0rjQTYzizC9hA@mail.gmail.com>
+ <0e5c066f-ddf6-30ce-392e-79bd0f401a18@arm.com>
+Message-ID: <1782501.BR5drHV8iS@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi J?rg,
+Hi Robin,
 
-> J?rg Krause <joerg.krause@embedded.rocks> hat am 15. Januar 2017 um 21:42 geschrieben:
+On Friday 13 Jan 2017 12:17:24 Robin Murphy wrote:
+> On 13/01/17 11:59, Geert Uytterhoeven wrote:
+> > On Fri, Jan 13, 2017 at 12:32 PM, Robin Murphy wrote:
+> >> On 13/01/17 11:07, Geert Uytterhoeven wrote:
+> >>> Add support for DMA_ATTR_FORCE_CONTIGUOUS to the generic IOMMU DMA code.
+> >>> This allows to allocate physically contiguous DMA buffers on arm64
+> >>> systems with an IOMMU.
+> >> 
+> >> Can anyone explain what this attribute is actually used for? I've never
+> >> quite figured it out.
+> > 
+> > My understanding is that DMA_ATTR_FORCE_CONTIGUOUS is needed when using
+> > an IOMMU but wanting the buffers to be both contiguous in IOVA space and
+> > physically contiguous to allow passing to devices without IOMMU.
+> > 
+> > Main users are graphic and remote processors.
 > 
-> 
-> Hi Stefan,
-> 
-> On Tue, 2016-12-27 at 00:03 +0100, Stefan Wahren wrote:
-> > Hi J?rg,
-> > ...
-> > I also rebased an old patch from Shawn Guo [2] with pre_req and
-> > post_req support, tried to call the DMA channel callback from the
-> > interrupt context instead of scheduling the tasklet within the DMA
-> > engine driver and implement CMD23 support [3]. But none of them show
-> > any measurable performance improvement.
-> 
-> I tested the three patches after disabling any debugging options in the
-> config. There is no performance gain, but the timings have changed.
-> Please have a look at the attached graphs. The time between complete()
-> and wait_for_completion() is reduced to 15us whereas the time from
-> return from wait_for_completion() to return to sdio_readsb() increases
-> to 23us (from maybe 2us before).
+> Sure, I assumed it must be to do with buffer sharing, but the systems
+> I'm aware of which have IOMMUs in their media subsystems tend to have
+> them in front of every IP block involved, so I was curious as to what
+> bit of non-IOMMU hardware wanted to play too. The lone in-tree use in
+> the Exynos DRM driver was never very revealing, and the new one I see in
+> the Qualcomm PIL driver frankly looks redundant to me.
 
-that confirms my results. I think you are searching on the wrong layer. You better step "back" and take a look at the whole transfer instead of single blocks. Maybe there are some bigger delays.
+If two (or more) devices with different memory requirements are involved in 
+buffer sharing, we need to either allocate and export buffers from the device 
+with the strictest requirements, or to implement a central buffer allocator. 
+In any case, I don't think DMA_ATTR_FORCE_CONTIGUOUS is the right solution to 
+that problem.
 
-Stefan
+Forcing contiguous allocation can however help with performance optimization, 
+as mapping physically contiguous memory through IOMMUs can make use of larger 
+page sizes.
 
-> 
-> J?rg
+-- 
+Regards,
+
+Laurent Pinchart
