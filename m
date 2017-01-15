@@ -1,31 +1,54 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 15 Jan 2017 13:09:40 +0000
-Subject: [PATCH 3/4] iio: adc: add a driver for the SAR ADC found in
- Amlogic Meson SoCs
-In-Reply-To: <0bfa97d1-2ee3-9dd9-dce3-593e93771f03@metafoo.de>
-References: <20170111174334.24343-1-martin.blumenstingl@googlemail.com>
- <20170111174334.24343-4-martin.blumenstingl@googlemail.com>
- <0bfa97d1-2ee3-9dd9-dce3-593e93771f03@metafoo.de>
-Message-ID: <3adef00d-aceb-029f-1f6a-0f6c71721559@kernel.org>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sun, 15 Jan 2017 15:43:15 +0100
+Subject: [PATCH v4] ARM64: dts: meson-gx: Add reserved memory zone and
+ usable memory range
+In-Reply-To: <m21sw66828.fsf@baylibre.com>
+References: <1484129414-23325-1-git-send-email-narmstrong@baylibre.com>
+ <m21sw66828.fsf@baylibre.com>
+Message-ID: <d3a00788-c3c1-4b10-90bf-2a8bc6a138f8@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/01/17 12:26, Lars-Peter Clausen wrote:
-> On 01/11/2017 06:43 PM, Martin Blumenstingl wrote:
->> +	indio_dev->name = dev_name(&pdev->dev);
+Am 13.01.2017 um 21:03 schrieb Kevin Hilman:
+> Neil Armstrong <narmstrong@baylibre.com> writes:
 > 
-> The name is supposed to be the type of the device, e.g. part name, not the
-> name of parent device instance. E.g. meson-gxbb-saradc or meson-gxl-saradc
-> in this case.
-Drat. I've been missing these again.  Somehow, never manage to get them
-onto those things my eyes pick up whilst reviewing.
+>> The Amlogic Meson GXBB/GXL/GXM secure monitor uses part of the memory space,
+>> this patch adds this reserved zone and redefines the usable memory range.
+>>
+>> The memory node is also moved from the dtsi files into the proper dts files
+>> to handle variants memory sizes.
+>>
+>> This patch also fixes the memory sizes for the following platforms :
+>> - gxl-s905x-p212 : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
+>> - gxm-s912-q201 : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
+>> - gxl-s905d-p231 : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
+>> - gxl-nexbox-a95x : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> 
+> Queued for v4.10-rc.
 
-Thanks Lars,
+What is the motivation for this change? I have a local U-Boot patch to
+detect the amount of memory available as done downstream, but U-Boot
+only updates the reg property that you seem to be abandoning here...
 
-Jonathan
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+So for devices that come in multiple RAM configurations - like R-Box Pro
+- this would require separate .dts files now! This looks very wrong to
+me, especially since I am not aware of other platforms doing the same.
+Instead, there's memory reservations for top and bottom done in U-Boot
+for reg, plus reserved-memory nodes for anything in the middle.
+
+Another thing to consider is that uEFI boot (bootefi) handles memory
+reservation differently yet again, on the bootloader level. I have had
+that working fine on Odroid-C2 and Vega S95.
+
+So if there's no bug this is fixing (none mentioned in commit message) I
+strongly object to this patch.
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
