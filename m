@@ -1,126 +1,54 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sun, 15 Jan 2017 09:52:16 -0800
-Subject: [PATCH net-next v3 06/10] net: dsa: Migrate to device_find_class()
-In-Reply-To: <20170115173949.GA19268@kroah.com>
-References: <20170114214713.28109-1-f.fainelli@gmail.com>
- <20170114214713.28109-7-f.fainelli@gmail.com>
- <20170115110628.GF26374@kroah.com>
- <fc247aeb-a8d6-5ba9-c26d-cb057a5ac34d@gmail.com>
- <20170115173949.GA19268@kroah.com>
-Message-ID: <a9ea1f45-b9a5-d840-68e0-9bf9bc7a6598@gmail.com>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Sun, 15 Jan 2017 21:08:12 +0200
+Subject: Nokia N900: mixers changed between 4.9 and 4.10-rc3, no longer
+ can use in-call speaker
+In-Reply-To: <20170115100533.GA15816@amd>
+References: <20170112181826.GA28290@amd> <201701121934.19810@pali>
+ <20170114225614.GA25321@amd> <201701150100.54214@pali>
+ <20170115100533.GA15816@amd>
+Message-ID: <40dbce4e-d99d-d77d-e682-5b004c70ca40@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2017 09:39 AM, Greg KH wrote:
-> On Sun, Jan 15, 2017 at 09:27:22AM -0800, Florian Fainelli wrote:
+On 01/15/2017 12:05 PM, Pavel Machek wrote:
+>>> So regression seems to be between v4.9 and v4.10. Any ideas?
 >>
+>> Interesting... seems there are no sound relevant changes after v4.9.
 >>
->> On 01/15/2017 03:06 AM, Greg KH wrote:
->>> On Sat, Jan 14, 2017 at 01:47:09PM -0800, Florian Fainelli wrote:
->>>> Now that the base device driver code provides an identical
->>>> implementation of dev_find_class() utilize device_find_class() instead
->>>> of our own version of it.
->>>>
->>>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->>>> ---
->>>>  net/dsa/dsa.c | 22 ++--------------------
->>>>  1 file changed, 2 insertions(+), 20 deletions(-)
->>>>
->>>> diff --git a/net/dsa/dsa.c b/net/dsa/dsa.c
->>>> index 2306d1b87c83..77fa4c4f5828 100644
->>>> --- a/net/dsa/dsa.c
->>>> +++ b/net/dsa/dsa.c
->>>> @@ -455,29 +455,11 @@ EXPORT_SYMBOL_GPL(dsa_switch_resume);
->>>>  #endif
->>>>  
->>>>  /* platform driver init and cleanup *****************************************/
->>>> -static int dev_is_class(struct device *dev, void *class)
->>>> -{
->>>> -	if (dev->class != NULL && !strcmp(dev->class->name, class))
->>>> -		return 1;
->>>> -
->>>> -	return 0;
->>>> -}
->>>> -
->>>> -static struct device *dev_find_class(struct device *parent, char *class)
->>>> -{
->>>> -	if (dev_is_class(parent, class)) {
->>>> -		get_device(parent);
->>>> -		return parent;
->>>> -	}
->>>> -
->>>> -	return device_find_child(parent, class, dev_is_class);
->>>> -}
->>>> -
->>>>  struct mii_bus *dsa_host_dev_to_mii_bus(struct device *dev)
->>>>  {
->>>>  	struct device *d;
->>>>  
->>>> -	d = dev_find_class(dev, "mdio_bus");
->>>> +	d = device_find_class(dev, "mdio_bus");
->>>>  	if (d != NULL) {
->>>>  		struct mii_bus *bus;
->>>
->>> You want a peer of your device on a specific class?  What is this for?
+>> Looks like there are only three commits after v4.9 for sound/soc which 
+>> are built for Nokia N900:
 >>
->> It's not a peer of our device, it's a separate device reference from the
->> one looked up in the "net" class. In the classic, and now deprecated DSA
->> device driver model, a "dsa" platform device would represent one or more
->> Ethernet switches, connected via a MDIO bus (this reference above), and
->> one Ethernet device (the CPU/host/management interface). This was
->> completely violating the Linux device driver model and imposed
->> limitations on what bus would be used, and we did not have proper struct
->> device references (therefore no adequate hierarchy either).
+>> e411b0b5eb9b65257a050eac333d181d6e00e2c6
+>> e7aa450fe17890e59db7d3c2d8eff5b6b41fc531
+>> 63c3194b82530bd71fd49db84eb7ab656b8d404a
 >>
->> Thanks to the work of Andrew, we now have proper MDIO, SPI, GPIO, I2C,
->> PCI, platform and drivers that allow us to register with DSA as a
->> specialized kind of device (so we are now finally using the right Linux
->> Device Driver model). What we still need though, in order to our switch
->> to the networking stack is a reference to the master/host network device
->> since we mangle packets in and out of it.
+>> Maybe something not related to sound/soc could broke it?
 > 
-> Ok, but where in the tree are you trying to find this other device?  Are
-> you just going to randomly find any device that happens to be of the
-> specific class type?  That seems really fragile and broken :(
-
-The search is not really random, since the platform data for the DSA
-switch we want to register gives us a reference to a device registered
-via any bus type, and we know (by contract it has to) that it has to
-provide a network device of some kind, we do a specific search in the
-"net" class for that purpose. I agree this is not great.
-
+> Lets see.
 > 
-> You should NEVER have to walk the device tree to find stuff.  Why can't
-> you have a pointer to the device you need to talk to some other way?
-
-We do, I think the existing code just tries to be extra careful here and
-make sure that the device reference we got is actually part of the "net"
-class, indicating that the reference passed is indeed pointing to a
-network device, and not a random device.
-
+> a9042defa29a01cc538b742eab047848e9b5ae14 -- works ok.
+> ce38207f161513ee3d2bd3860489f07ebe65bc78 --
 > 
-> What exactly is the relationship between these devices (a ascii-art tree
-> or sysfs tree output might be nice) so I can try to understand what is
-> going on here.
+> alsactl: set_control:1328: failed to obtain info for control #229 (No
+> such file or directory)
+> 
+I'm unable to test older kernels at the moment since modules don't load
+by some reason (bluetooth: Unknown symbol _GLOBAL_OFFSET_TABLE_ (err
+0)). Probably some recent regression in my debian/testing installation
+since the same configs were working before.
 
-OK, let me try and let's take the case of only one Ethernet switch in
-the system for all simplicity:
+However v4.9.4 works and with it I can see there is an issue with these
+aic3x controls:
 
-- switch device drivers get probed by any kind of bus allocate and
-register a dsa_switch with dsa_register_switch()
+amixer: Unable to find simple control 'Left DAC_L1 Mixer Line',0
 
-- this switch device has platform data (struct dsa_chip_data) that
-describes its port layout (number of ports mostly) and has one struct
-device references to which Ethernet network interface these ports connect to
 
-- a dsa_switch_tree is created, this struct dsa_switch is attached to
-the dsa_switch_tree at position 0 in the tree, we invoke a bunch of
-switch driver operations
 
-- we conclude with attaching this dsa_switch_tree to the network device
-we looked up and assigning the tree to the dsa_ptr member
+amixer: Unable to find simple control 'Right DAC_R1 Mixer Line',0
 
-Documentation/networking/dsa/dsa.txt has some ascii art drawing that
-sort of capture what is going on.
+
+At quick look I don't see why above commits could cause it. Maybe
+regression happened earlier between v4.6 and v4.9?
+
 -- 
-Florian
+Jarkko
