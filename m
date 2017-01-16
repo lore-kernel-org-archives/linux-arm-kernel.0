@@ -1,39 +1,36 @@
-From: fisaksen@baylibre.com (Frode Isaksen)
-Date: Mon, 16 Jan 2017 18:03:09 +0100
-Subject: [PATCH] ARM: dts: da850-lcdk: enable pwm nodes
-Message-ID: <1484586189-3118-1-git-send-email-fisaksen@baylibre.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Mon, 16 Jan 2017 18:08:30 +0100
+Subject: [PATCH v2 net-next 0/2] mvneta xmit_more and bql support
+Message-ID: <1484586512-16412-1-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the ecap1 and ecap2 pwm nodes for the
-lcdk board.
-Note that the other pwm nodes are not enabled,
-since the pins are shared with ethernet and spi.
+Hi,
 
-Signed-off-by: Frode Isaksen <fisaksen@baylibre.com>
----
- arch/arm/boot/dts/da850-lcdk.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+This is a delayed v2 of short patchset, which introduces xmit_more and BQL
+to mvneta driver. The only one change was added in xmit_more support -
+condition check preventing excessive descriptors concatenation before
+flushing in HW.
 
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index 60e027e..6f4c367 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -322,3 +322,15 @@
- 		};
- 	};
- };
-+
-+&ecap1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ecap1_pins>;
-+	status = "okay";
-+};
-+
-+&ecap2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ecap2_pins>;
-+	status = "okay";
-+};
+Any comments or feedback would be welcome.
+
+Best regards,
+Marcin
+
+Changelog:
+v1 -> v2:
+
+* Add checking condition that ensures too much descriptors are not
+  concatenated before flushing in HW.
+
+Marcin Wojtas (1):
+  net: mvneta: add BQL support
+
+Simon Guinot (1):
+  net: mvneta: add xmit_more support
+
+ drivers/net/ethernet/marvell/mvneta.c | 35 +++++++++++++++++++++++++++++------
+ 1 file changed, 29 insertions(+), 6 deletions(-)
+
 -- 
-2.7.4
+1.8.3.1
