@@ -1,100 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Jan 2017 17:50:26 +0000
-Subject: [PATCH v19 06/15] clocksource/drivers/arm_arch_timer: Rework
- counter frequency detection.
-In-Reply-To: <20161221064603.11830-7-fu.wei@linaro.org>
-References: <20161221064603.11830-1-fu.wei@linaro.org>
- <20161221064603.11830-7-fu.wei@linaro.org>
-Message-ID: <20170116175025.GJ5908@leverpostej>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 16 Jan 2017 19:53:46 +0200
+Subject: [PATCH 1/2] spi: pxa2xx: Prepare for edge-triggered interrupts
+In-Reply-To: <7cb06bc7-bcb6-a212-8241-20ad4b2a4a90@siemens.com>
+References: <cover.1484557560.git.jan.kiszka@siemens.com>
+ <6fe26505e67790b27eed28fd7451b51e70b7e8ba.1484557560.git.jan.kiszka@siemens.com>
+ <1484558690.2133.132.camel@linux.intel.com>
+ <7cb06bc7-bcb6-a212-8241-20ad4b2a4a90@siemens.com>
+Message-ID: <CAHp75VfAiZZaU8VzUjwvaCMnAVapp46KoRz8yD8aG2BanBnRyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 21, 2016 at 02:45:54PM +0800, fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
-> 
-> Currently, the counter frequency detection call(arch_timer_detect_rate)
-> combines all the ways to get counter frequency: device-tree property,
-> system coprocessor register, MMIO timer. But in the most of use cases,
-> we don't need all the ways to try:
-> For example, reading device-tree property will be needed only when
-> system boot with device-tree, getting frequency from MMIO timer register
-> will beneeded only when we init MMIO timer.
-> 
-> This patch separates paths to determine frequency:
-> Separate out device-tree code, keep them in device-tree init function.
+On Mon, Jan 16, 2017 at 1:18 PM, Jan Kiszka <jan.kiszka@siemens.com> wrote:
+> On 2017-01-16 10:24, Andy Shevchenko wrote:
+>> On Mon, 2017-01-16 at 10:05 +0100, Jan Kiszka wrote:
+>>> When using the a device with edge-triggered interrupts, such as MSIs,
+>>> the interrupt handler has to ensure that there is a point in time
+>>> during
+>>> its execution where all interrupts sources are silent so that a new
+>>> event can trigger a new interrupt again.
+>>>
+>>> This is achieved here by looping over SSSR evaluation. We need to take
+>>> into account that SSCR1 may be changed by the transfer handler, thus
+>>> we
+>>> need to redo the mask calculation, at least regarding the volatile
+>>> interrupt enable bit (TIE).
+>>
+>> Could you split this to two patches, one just move the code under
+>> question to a helper function (no functional change), the other does
+>> what you state in commit message here?
+>
+> IMHO, factoring out some helper called from the loop in ssp_int won't be
+> a natural split due to the large number of local variables being shared
+> here. But maybe I'm not seeing the design you have in mind, so please
+> propose a useful helper function signature.
 
-Splitting these out makes sense to me.
+At least everything starting from if (!...) {} can be a helper with
+only one parameter. Something like:
 
-> Separate out the MMIO frequency and the sysreg frequency detection call,
-> and use the appropriate one for the counter.
+static int handle_bad_msg(struct driver_data *drv_data)
+{
+  if (...)
+    return 0;
 
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
-> ---
->  drivers/clocksource/arm_arch_timer.c | 49 +++++++++++++++++++++++-------------
->  1 file changed, 31 insertions(+), 18 deletions(-)
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index c7b4482..9a1f138 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -488,27 +488,31 @@ static int arch_timer_starting_cpu(unsigned int cpu)
->  	return 0;
->  }
->  
-> -static void
-> -arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
-> +static void arch_timer_detect_rate(void)
->  {
-> -	/* Who has more than one independent system counter? */
-> -	if (arch_timer_rate)
-> -		return;
-> +	/*
-> +	 * Try to get the timer frequency from
-> +	 * cntfrq_el0(system coprocessor register).
-> +	 */
-> +	if (!arch_timer_rate)
-> +		arch_timer_rate = arch_timer_get_cntfrq();
-> +
-> +	/* Check the timer frequency. */
-> +	if (!arch_timer_rate)
-> +		pr_warn("frequency not available\n");
-> +}
->  
-> +static void arch_timer_mem_detect_rate(void __iomem *cntbase)
-> +{
->  	/*
-> -	 * Try to determine the frequency from the device tree or CNTFRQ,
-> -	 * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
-> +	 * Try to determine the frequency from
-> +	 * CNTFRQ in memory-mapped timer.
->  	 */
-> -	if (!acpi_disabled ||
-> -	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
-> -		if (cntbase)
-> -			arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
-> -		else
-> -			arch_timer_rate = arch_timer_get_cntfrq();
-> -	}
-> +	if (!arch_timer_rate)
-> +		arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
->  
->  	/* Check the timer frequency. */
-> -	if (arch_timer_rate == 0)
-> +	if (!arch_timer_rate)
->  		pr_warn("frequency not available\n");
->  }
+  ...handle it...
+  return 1;
+}
 
-There's a subtle change in behaviour here. Previously for ACPI we'd only
-ever use the sysreg CNTFRQ value for arch_timer_rate, whereas now we
-might use the MMIO timer rate. Maybe that's not a big deal, but I will
-need to think.
+Let's start from above.
 
-Generally, the logic to determine the rate is fairly gnarly regardless.
+P.S. Btw, you totally missed SPI list/maintainers. And you are using
+wrong Jarkko's address.
 
-It would be nice if we could split the MMIO and sysreg rates entirely,
-and kill the implicit relationship between the two, or at least make one
-canonical and warn if the two differ.
-
-Thanks,
-Mark.
+-- 
+With Best Regards,
+Andy Shevchenko
