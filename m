@@ -1,30 +1,48 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 16 Jan 2017 17:57:53 +0100
-Subject: [PATCH] arm64: dts: r8a7795: Add missing power-domains property for
- sata
-Message-ID: <1484585873-30075-1-git-send-email-geert+renesas@glider.be>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Jan 2017 17:00:10 +0000
+Subject: [PATCH v19 00/15] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <20161221064603.11830-1-fu.wei@linaro.org>
+References: <20161221064603.11830-1-fu.wei@linaro.org>
+Message-ID: <20170116170010.GH5908@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This went unnoticed as the sata_rcar driver doesn't support Runtime PM
-yet, but manages module clocks manually.
+Hi,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+On Wed, Dec 21, 2016 at 02:45:48PM +0800, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+> 
+> This patchset:
+>     (1)Preparation for adding GTDT support in arm_arch_timer:
+>         1. Move some enums and marcos to header file;
+>         2. Add a new enum for spi type;
+>         3. Improve printk relevant code;
+>         4. Rename some enums and defines;
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 972e379c05967c32..026a16ac41b422a1 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -1148,6 +1148,7 @@
- 			reg = <0 0xee300000 0 0x1fff>;
- 			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 815>;
-+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
- 			status = "disabled";
- 		};
- 
--- 
-1.9.1
+Can we please rework these first few patches into a series:
+
+1. Clean up printk() usage
+2. Rename the type macros
+3. Rename the PPI enum & enum values
+4. Move the type macro and PPI enum into a header
+5. Add new enum for SPIs
+
+Please leave CNTHCL_* as they originally were. It's not part of the
+interface of the driver, and leaving them as they are will save us an
+interdependency with KVM.
+
+I'm happy to queue that immediately, as it's purely structural and
+shouldn't have a functional impact anywhere. That will also shrink the
+series a bit, and we can rebase the following patches atop of that.
+
+>         5. Rework PPI determination;
+>         6. Rework counter frequency detection;
+>         7. Refactor arch_timer_needs_probing, move it into DT init call
+>         8. Introduce some new structs and refactor the MMIO timer init code
+>         for reusing some common code.
+
+I'll review these in separate replies.
+
+Thanks,
+Mark.
