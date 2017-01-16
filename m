@@ -1,62 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Jan 2017 13:30:42 +0000
-Subject: [PATCH 2/3] KVM: arm64: Access CNTHCTL_EL2 bit fields correctly
- on VHE systems
-In-Reply-To: <e0d1473f-0cf9-a801-585b-4385bc5b35ab@arm.com>
-References: <1484307093-29153-1-git-send-email-marc.zyngier@arm.com>
- <1484307093-29153-3-git-send-email-marc.zyngier@arm.com>
- <20170113123612.GA31994@cbox> <d496020c-a097-ffd5-adb7-7edb7c1a214e@arm.com>
- <e0d1473f-0cf9-a801-585b-4385bc5b35ab@arm.com>
-Message-ID: <61f7dbf1-e20d-e9e4-950c-6a224619cf31@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 16 Jan 2017 13:32:31 +0000
+Subject: [RFC PATCH 08/10] arm64/sve: ptrace: Wire up vector length
+ control and reporting
+In-Reply-To: <20170116122038.GG28060@E107787-LIN>
+References: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
+ <1484220369-23970-9-git-send-email-Dave.Martin@arm.com>
+ <20170116122038.GG28060@E107787-LIN>
+Message-ID: <20170116133231.GO3699@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/01/17 14:56, Suzuki K Poulose wrote:
-> On 13/01/17 13:30, Marc Zyngier wrote:
->> [+ Suzuki, who wrote the whole cpus_have_const_cap thing]
->>
+On Mon, Jan 16, 2017 at 12:20:38PM +0000, Yao Qi wrote:
+> On 17-01-12 11:26:07, Dave Martin wrote:
+> > This patch adds support for manipulating a task's vector length at
+> > runtime via ptrace.
+> > 
+> 
+> I hope kernel doesn't provide such interface to ptracer to change vector
+> length.
+
+It does, with this patch, beacuse...
+
+> The vector length is sort of a read-only property of thread/process/
+> program to debugger, unless we really have a clear requirement to modify
+> vector length in debugging.  I may miss something because I haven't debug
+> SVE code yet.
+
+...the vector length is no longer read-only for the task, thanks to
+the new prctls().
+
+This does add complexity, but I figured that any programmer's model
+state that the thread can modify for itself should be modifiable by the
+debugger, if for no other reason than the user may want to experiment to
+see what happens.  Without a ptrace interface, it would be necessary
+to inject a prctl() call into the target, which is possible but awkward.
+
+gdb must already re-detect the vector length on stop, since the target
+could have called the prctl() in the meantime.
+
+Access via ptrace also allows things like trapping on exec, fork or
+clone and changing the vector length for the new process or thread
+before it starts to run.  I'm guessing here, but such a scenario seems
+legitimate (?)
 
 [...]
 
->> But maybe we should have have some stronger guarantees that we'll
->> always get things inlined, and that the "const" side is enforced:
-> 
-> Agreed.
-> 
->>
->> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
->> index b4989df..4710469 100644
->> --- a/arch/arm64/include/asm/cpufeature.h
->> +++ b/arch/arm64/include/asm/cpufeature.h
->> @@ -105,10 +105,11 @@ static inline bool cpu_have_feature(unsigned int num)
->>  }
->>
->>  /* System capability check for constant caps */
->> -static inline bool cpus_have_const_cap(int num)
->> +static __always_inline bool cpus_have_const_cap(int num)
-> 
-> I think we should have the above change and make it inline always.
-> 
->>  {
->> -	if (num >= ARM64_NCAPS)
->> -		return false;
->> +	BUILD_BUG_ON(!__builtin_constant_p(num));
-> 
-> This is not needed, as the compilation would fail if num is not a constant with
-> static key code.
-> 
->> +	BUILD_BUG_ON(num >= ARM64_NCAPS);
->> +
-> 
-> Also, I think it would be good to return false for caps > the ARM64_NCAPS, in sync
-> with the non-const version.
-
-But what's the semantic? It means we're accessing a capability that
-doesn't exist, which looks like a major bug in my book. Is there any
-valid use case for this?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Cheers
+---Dave
