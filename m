@@ -1,73 +1,67 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 16 Jan 2017 11:26:58 +0100
-Subject: [RFT PATCH] ARM64: dts: meson-gxbb: Add reserved memory zone and
- usable memory range
-In-Reply-To: <612bc7bc-4ee4-51c0-d7ac-06151854ac03@suse.de>
-References: <20161212101801.28491-1-narmstrong@baylibre.com>
- <09bb78ed-c8ec-d21f-d464-16e55c481d4e@gmx.de>
- <56869b90-6bee-f6ae-a7b1-884b4c0d72c0@baylibre.com>
- <2ac01237-a7f8-5b3b-0f97-dd49ce6623fb@gmx.de>
- <90d5b5a3-6dd8-aab2-8701-112a10e3364c@gmx.de>
- <612bc7bc-4ee4-51c0-d7ac-06151854ac03@suse.de>
-Message-ID: <9a1dbb0b-ad3d-7898-3b43-fd8f85892985@baylibre.com>
+From: Joao.Pinto@synopsys.com (Joao Pinto)
+Date: Mon, 16 Jan 2017 10:27:58 +0000
+Subject: [PATCH 11/37] PCI: dwc: Split pcie-designware.c into host and
+ core files
+In-Reply-To: <587C586C.6070003@ti.com>
+References: <1484216786-17292-1-git-send-email-kishon@ti.com>
+ <1484216786-17292-12-git-send-email-kishon@ti.com>
+ <4a89fb45-af84-d660-5ef0-12227b141cda@synopsys.com> <587C586C.6070003@ti.com>
+Message-ID: <0a16c862-312f-655e-3d66-bdb0c1f78584@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2017 04:44 PM, Andreas F?rber wrote:
-> Am 23.12.2016 um 10:42 schrieb Heinrich Schuchardt:
->> it really makes a difference if we write
->>
->>  	memory at 0 {
->>  		device_type = "memory";
->>  		linux,usable-memory = <0x0 0x1000000 0x0 0x7f000000>;
->>  	};
->>
->> or
->>
->>  	memory at 0 {
->>  		device_type = "memory";
->>  		reg = <0x0 0x1000000 0x0 0x7f000000>;
->>  	};
->>
->> The second version leads to failure of the Odroid C2.
->>
->> When I looked at /sys/firmware/fdt I saw this difference:
->>
->> --- fails
->> +++ works
->>
->>         memory at 0 {
->> -               device_type = "memory";
->>                 reg = <0x0 0x0 0x0 0x78000000>;
->> +               device_type = "memory";
->> +               linux,usable-memory = <0x0 0x1000000 0x0 0x7f000000>;
->>         };
->>
->> I found the following sentence in the NXP forum:
->> In case you want to overwrite the memory usage passed from u-boot, you
->> can use "linux,usable-memory".
->> https://community.nxp.com/thread/382284
-> 
-> The Odroid-C2 is in mainline U-Boot. Please submit a patch to U-Boot
-> instead of forcing the creation of unnecessary new .dts files onto
-> everyone due to hardcoded linux,usable-memory properties. In fact, it
-> already reserves 0x1000000, so it seems you are merely using an older
-> U-Boot.
-> 
-> http://git.denx.de/?p=u-boot.git;a=blob;f=arch/arm/mach-meson/board.c;h=f159cbf849f75ab046e6f3a025bbc97c0bcfd59d;hb=HEAD#l39
-> 
-> I would bet that the upper limit is unrelated here.
-> 
-> Regards,
-> Andreas
-> 
 
-Hi Andreas,
+Hi,
 
-I really disagree about relying on any work or properties added by any bootloader here, Amlogic SoCs has
-a lot of u-boot version in the field, and the Odroid-C2 is part of this.
+?s 5:21 AM de 1/16/2017, Kishon Vijay Abraham I escreveu:
+> Hi Joao,
+> 
+> On Friday 13 January 2017 10:19 PM, Joao Pinto wrote:
+>> ?s 10:26 AM de 1/12/2017, Kishon Vijay Abraham I escreveu:
+>>> Split pcie-designware.c into pcie-designware-host.c that contains
+>>> the host specific parts of the driver and pcie-designware.c that
+>>> contains the parts used by both host driver and endpoint driver.
+>>>
+>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>> ---
+>>>  drivers/pci/dwc/Makefile               |    2 +-
+>>>  drivers/pci/dwc/pcie-designware-host.c |  619 ++++++++++++++++++++++++++++++++
+>>>  drivers/pci/dwc/pcie-designware.c      |  613 +------------------------------
+>>>  drivers/pci/dwc/pcie-designware.h      |    8 +
+>>>  4 files changed, 634 insertions(+), 608 deletions(-)
+>>>  create mode 100644 drivers/pci/dwc/pcie-designware-host.c
+>>>
+>>> diff --git a/drivers/pci/dwc/Makefile b/drivers/pci/dwc/Makefile
+>>> index 7d27c14..3b57e55 100644
+>>> --- a/drivers/pci/dwc/Makefile
+>>> +++ b/drivers/pci/dwc/Makefile
+>>> @@ -1,4 +1,4 @@
+>>
+>> (snip...)
+>>
+>>> -static void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
+>>> -				      int type, u64 cpu_addr, u64 pci_addr,
+>>> -				      u32 size)
+>>> +void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
+>>> +			       u64 cpu_addr, u64 pci_addr, u32 size)
+>>>  {
+>>>  	u32 retries, val;
+>>>  
+>>> @@ -186,220 +151,6 @@ static void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
+>>>  	dev_err(pci->dev, "iATU is not being enabled\n");
+>>>  }
+>>
+>> Kishon, iATU only makes sense in The Root Complex (host), so it should be inside
+>> the pcie-designware-host.
+> 
+> That is not true. Outbound ATU should be programmed to access host side buffers
+> and inbound ATU should be programmed for the host to access EP mem space.
 
-Even if Odroid-c2 is in mainline U-Boot or not, the mainline Linux kernel should work using
-any U-boot version even with the one provided by Amlogic on their openlinux distribution channel.
+Sorry, I was not clear enough. What I was trying to suggest is, since the ATU
+programming is done by the host, wouldn't be better to include it in the
+pcie-designware-host? It is just an architectural detail.
 
-Neil
+> 
+> Thanks
+> Kishon
+> 
