@@ -1,102 +1,93 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 Jan 2017 14:24:23 +0100
-Subject: [PATCH 1/2] dt-bindings: gpu: Add Mali Utgard bindings
-Message-ID: <20170116132424.7038-1-maxime.ripard@free-electrons.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 16 Jan 2017 13:24:55 +0000
+Subject: [PATCH v2 2/2] iommu/dma: Implement PCI allocation optimisation
+In-Reply-To: <d899aa686e7c8cb45142fa6785aa539ef3b88dec.1484572209.git.robin.murphy@arm.com>
+References: <d899aa686e7c8cb45142fa6785aa539ef3b88dec.1484572209.git.robin.murphy@arm.com>
+Message-ID: <db8af3d98f2a717c51d007c9c36d3b8eb1acd9a1.1484572209.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM Mali Utgard GPU family is embedded into a number of SoCs from
-Allwinner, Amlogic, Mediatek or Rockchip.
+Whilst PCI devices may have 64-bit DMA masks, they still benefit from
+using 32-bit addresses wherever possible in order to avoid DAC (PCI) or
+longer address packets (PCIe), which may incur a performance overhead.
+Implement the same optimisation as other allocators by trying to get a
+32-bit address first, only falling back to the full mask if that fails.
 
-Add a binding for the GPU of that family.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- .../devicetree/bindings/gpu/arm,mali-utgard.txt    | 76 ++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+ drivers/iommu/dma-iommu.c | 21 +++++++++++++++------
+ 1 file changed, 15 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-new file mode 100644
-index 000000000000..df05ba0ec357
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-@@ -0,0 +1,76 @@
-+ARM Mali Utgard GPU
-+===================
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 9aa432e8fbd3..8adff5f83b38 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -281,19 +281,28 @@ int dma_direction_to_prot(enum dma_data_direction dir, bool coherent)
+ }
+ 
+ static struct iova *__alloc_iova(struct iommu_domain *domain, size_t size,
+-		dma_addr_t dma_limit)
++		dma_addr_t dma_limit, struct device *dev)
+ {
+ 	struct iova_domain *iovad = cookie_iovad(domain);
+ 	unsigned long shift = iova_shift(iovad);
+ 	unsigned long length = iova_align(iovad, size) >> shift;
++	struct iova *iova = NULL;
+ 
+ 	if (domain->geometry.force_aperture)
+ 		dma_limit = min(dma_limit, domain->geometry.aperture_end);
 +
-+Required properties:
-+  - compatible:
-+    * "arm,mali-utgard" and one of the following:
-+      + "arm,mali-300"
-+      + "arm,mali-400"
-+      + "arm,mali-450"
++	/* Try to get PCI devices a SAC address */
++	if (dma_limit > DMA_BIT_MASK(32) && dev_is_pci(dev))
++		iova = alloc_iova(iovad, length, DMA_BIT_MASK(32) >> shift,
++				  true);
+ 	/*
+ 	 * Enforce size-alignment to be safe - there could perhaps be an
+ 	 * attribute to control this per-device, or at least per-domain...
+ 	 */
+-	return alloc_iova(iovad, length, dma_limit >> shift, true);
++	if (!iova)
++		iova = alloc_iova(iovad, length, dma_limit >> shift, true);
 +
-+  - reg: Physical base address and length of the GPU registers
-+
-+  - interrupts: an entry for each entry in interrupt-names.
-+    See ../interrupt-controller/interrupts.txt for details.
-+
-+  - interrupt-names:
-+    * ppX: Pixel Processor X interrupt (X from 0 to 7)
-+    * ppmmuX: Pixel Processor X MMU interrupt (X from 0 to 7)
-+    * pp: Pixel Processor broadcast interrupt (mali-450 only)
-+    * gp: Geometry Processor interrupt
-+    * gpmmu: Geometry Processor MMU interrupt
-+
-+
-+Optional properties:
-+  - interrupt-names:
-+    * pmu: Power Management Unit interrupt, if implemented in hardware
-+
-+Vendor-specific bindings
-+------------------------
-+
-+The Mali GPU is integrated very differently from one SoC to
-+another. In order to accommodate those differences, you have the option
-+to specify one more vendor-specific compatible, among:
-+
-+  - allwinner,sun4i-a10-mali
-+    Required properties:
-+      * clocks: an entry for each entry in clock-names
-+      * clock-names:
-+        + bus: bus clock for the GPU
-+        + core: clock driving the GPU itself
-+      * resets: phandle to the reset line for the GPU
-+
-+  - allwinner,sun7i-a20-mali
-+    Required properties:
-+      * clocks: an entry for each entry in clock-names
-+      * clock-names:
-+        + bus: bus clock for the GPU
-+        + core: clock driving the GPU itself
-+      * resets: phandle to the reset line for the GPU
-+
-+Example:
-+
-+mali: gpu at 01c40000 {
-+	compatible = "allwinner,sun7i-a20-mali", "arm,mali-400",
-+		     "arm,mali-utgard";
-+	reg = <0x01c40000 0x10000>;
-+	interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-+	interrupt-names = "gp",
-+			  "gpmmu",
-+			  "pp0",
-+			  "ppmmu0",
-+			  "pp1",
-+			  "ppmmu1",
-+			  "pmu";
-+	clocks = <&ccu CLK_BUS_GPU>, <&ccu CLK_GPU>;
-+	clock-names = "bus", "core";
-+	resets = <&ccu RST_BUS_GPU>;
-+};
-+
-+
++	return iova;
+ }
+ 
+ /* The IOVA allocator knows what we mapped, so just unmap whatever that was */
+@@ -446,7 +455,7 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
+ 	if (!pages)
+ 		return NULL;
+ 
+-	iova = __alloc_iova(domain, size, dev->coherent_dma_mask);
++	iova = __alloc_iova(domain, size, dev->coherent_dma_mask, dev);
+ 	if (!iova)
+ 		goto out_free_pages;
+ 
+@@ -517,7 +526,7 @@ static dma_addr_t __iommu_dma_map(struct device *dev, phys_addr_t phys,
+ 	struct iova_domain *iovad = cookie_iovad(domain);
+ 	size_t iova_off = iova_offset(iovad, phys);
+ 	size_t len = iova_align(iovad, size + iova_off);
+-	struct iova *iova = __alloc_iova(domain, len, dma_get_mask(dev));
++	struct iova *iova = __alloc_iova(domain, len, dma_get_mask(dev), dev);
+ 
+ 	if (!iova)
+ 		return DMA_ERROR_CODE;
+@@ -675,7 +684,7 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
+ 		prev = s;
+ 	}
+ 
+-	iova = __alloc_iova(domain, iova_len, dma_get_mask(dev));
++	iova = __alloc_iova(domain, iova_len, dma_get_mask(dev), dev);
+ 	if (!iova)
+ 		goto out_restore_sg;
+ 
+@@ -755,7 +764,7 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
+ 
+ 	msi_page->phys = msi_addr;
+ 	if (iovad) {
+-		iova = __alloc_iova(domain, size, dma_get_mask(dev));
++		iova = __alloc_iova(domain, size, dma_get_mask(dev), dev);
+ 		if (!iova)
+ 			goto out_free_page;
+ 		msi_page->iova = iova_dma_addr(iovad, iova);
 -- 
-2.11.0
+2.10.2.dirty
