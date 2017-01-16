@@ -1,52 +1,84 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 Jan 2017 16:21:48 +0100
-Subject: [PATCH] rtc: sun6i: Switch to the external oscillator
-Message-ID: <20170116152148.27439-1-maxime.ripard@free-electrons.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 16 Jan 2017 15:24:13 +0000
+Subject: [PATCH v7 15/15] irqchip: mbigen: Add ACPI support
+In-Reply-To: <587CD754.1050808@huawei.com>
+References: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
+ <1484147199-4267-16-git-send-email-hanjun.guo@linaro.org>
+ <20170113102104.GB20837@red-moon> <58799376.6040302@huawei.com>
+ <20170116113804.GB23703@red-moon> <587CD754.1050808@huawei.com>
+Message-ID: <20170116152413.GA24135@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RTC is clocked from either an internal, imprecise, oscillator or an
-external one, which is usually much more accurate.
+On Mon, Jan 16, 2017 at 10:23:16PM +0800, Hanjun Guo wrote:
+> Hi Lorenzo,
+> 
+> On 2017/1/16 19:38, Lorenzo Pieralisi wrote:
+> > On Sat, Jan 14, 2017 at 10:56:54AM +0800, Hanjun Guo wrote:
+> >> Hi Lorenzo,
+> >>
+> >> On 2017/1/13 18:21, Lorenzo Pieralisi wrote:
+> >>> On Wed, Jan 11, 2017 at 11:06:39PM +0800, Hanjun Guo wrote:
+> >>>> With the preparation of platform msi support and interrupt producer
+> >>>> in DSDT, we can add mbigen ACPI support now.
+> >>>>
+> >>>> We are using _PRS methd to indicate number of irq pins instead
+> >>>> of num_pins in DT to avoid _DSD usage in this case.
+> >>>>
+> >>>> For mbi-gen,
+> >>>>     Device(MBI0) {
+> >>>>           Name(_HID, "HISI0152")
+> >>>>           Name(_UID, Zero)
+> >>>>           Name(_CRS, ResourceTemplate() {
+> >>>>                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
+> >>>>           })
+> >>>>
+> >>>>           Name (_PRS, ResourceTemplate() {
+> >>>> 		  Interrupt(ResourceProducer,...) {12,14,....}
+> >>> I still do not understand why you are using _PRS for this, I think
+> >>> the MBIgen configuration is static and if it is so the Interrupt
+> >>> resource should be part of the _CRS unless there is something I am
+> >>> missing here.
+> >> Sorry for not clear in the commit message. MBIgen is an interrupt producer
+> >> which produces irq resource to devices connecting to it, and MBIgen itself
+> >> don't consume wired interrupts.
+> > That's why you mark it as ResourceProducer, but that's not a reason to
+> > put it in the _PRS instead of _CRS.
+> 
+> If using _CRS for the interrupt resource, the irq number represented
+> will be mapped (i.e acpi_register_gsi()), then will conflict with the
+> irq number of devices consuming it (mbigen is producing the
+> interrupts), but I agree with you that let's ask Rafael's point of
+> view.
 
-The difference perceived between the time elapsed and the time reported by
-the RTC is in a 10% scale, which prevents the RTC from being useful at all.
+Aha ! So here is why you are using _PRS because the kernel turns _CRS
+Interrupt resources (even producers) into GSIs which is probably a
+kernel bug, is that the reason ?
 
-Fortunately, the external oscillator is reported to be mandatory in the
-Allwinner datasheet, so we can just switch to it.
+We don't abuse firmware bindings to make the kernel work, that's _never_
+a good idea.
 
-Cc: stable at vger.kernel.org
-Fixes: 9765d2d94309 ("rtc: sun6i: Add sun6i RTC driver")
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/rtc/rtc-sun6i.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+If the interrupt resource is a Resource Producer core ACPI should not
+register the IRQ because that's not a GSI, probably this should be part of
+Agustin changes too ?
 
-diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
-index c169a2cd4727..dee524cfa13b 100644
---- a/drivers/rtc/rtc-sun6i.c
-+++ b/drivers/rtc/rtc-sun6i.c
-@@ -37,9 +37,11 @@
- 
- /* Control register */
- #define SUN6I_LOSC_CTRL				0x0000
-+#define SUN6I_LOSC_CTRL_KEY			(0x16aa << 16)
- #define SUN6I_LOSC_CTRL_ALM_DHMS_ACC		BIT(9)
- #define SUN6I_LOSC_CTRL_RTC_HMS_ACC		BIT(8)
- #define SUN6I_LOSC_CTRL_RTC_YMD_ACC		BIT(7)
-+#define SUN6I_LOSC_CTRL_EXT_OSC			BIT(0)
- #define SUN6I_LOSC_CTRL_ACC_MASK		GENMASK(9, 7)
- 
- /* RTC */
-@@ -404,6 +406,10 @@ static int sun6i_rtc_probe(struct platform_device *pdev)
- 	/* disable alarm wakeup */
- 	writel(0, chip->base + SUN6I_ALARM_CONFIG);
- 
-+	/* switch to the external, more precise, oscillator */
-+	writel(SUN6I_LOSC_CTRL_KEY | SUN6I_LOSC_CTRL_EXT_OSC,
-+	       chip->base + SUN6I_LOSC_CTRL);
-+
- 	chip->rtc = rtc_device_register("rtc-sun6i", &pdev->dev,
- 					&sun6i_rtc_ops, THIS_MODULE);
- 	if (IS_ERR(chip->rtc)) {
--- 
-2.11.0
+> > IIUC _PRS is there to provide a way to define the possible resource
+> > settings of a _configurable_ device (ie programmable) so that the actual
+> > resource value you would programme with a call to its _SRS is sane (ie
+> > the OS has a way, through the _PRS, to detect what possible resource
+> > settings are available for the device).
+> >
+> > I think Rafael has more insights into how the _PRS is used on x86
+> > systems so I would ask his point of view here before merrily merging
+> > this code.
+> 
+> OK, Rafael is traveling now, hope he will have time to take a look.
+> 
+> How about updating this patch set then sending a new version for review
+> with this patch unchanged? if Rafael have comments on this one, I will
+> send a single updated one for this patch (if no other changes).
+
+I think this patch (and the FW that goes with it) is wrong, but the rest
+of the series, in particular the IORT bits, are ok with me.
+
+Lorenzo
