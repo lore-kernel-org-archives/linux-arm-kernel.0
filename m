@@ -1,55 +1,44 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 Jan 2017 17:56:54 +0100
-Subject: [PATCH v3 4/13] mmc: sunxi: Enable the new timings for the A64 MMC
- controllers
+Date: Mon, 16 Jan 2017 17:56:52 +0100
+Subject: [PATCH v3 2/13] mmc: sunxi: Gate the clock when rate is 0
 In-Reply-To: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
 References: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <b8621ba45fe2f2d8ba70f11bf141998fe98a9962.1484585798.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <1f006fd86d1d9ad5eab0c0c9e435003055466a54.1484585798.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 MMC controllers need to set a "new timings" bit when a new rate is
-set.
+The MMC core assumes that the code will gate the clock when the bus
+frequency is set to 0, which we've been ignoring so far.
 
-The actual meaning of that bit is not clear yet, but not setting it leads
-to some corner-case issues, like the CMD53 failing, which is used to
-implement SDIO packet aggregation.
+Handle that.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/mmc/host/sunxi-mmc.c | 6 ++++++
- 1 file changed, 6 insertions(+), 0 deletions(-)
+ drivers/mmc/host/sunxi-mmc.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index b9c8a62bc212..51d6388a194e 100644
+index ab4324e6eb74..019f95e8e7c5 100644
 --- a/drivers/mmc/host/sunxi-mmc.c
 +++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -253,6 +253,8 @@ struct sunxi_mmc_cfg {
- 
- 	/* does the IP block support autocalibration? */
- 	bool can_calibrate;
-+
-+	bool needs_new_timings;
- };
- 
- struct sunxi_mmc_host {
-@@ -779,6 +781,9 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 	}
- 	mmc_writel(host, REG_CLKCR, rval);
- 
-+	if (host->cfg->needs_new_timings)
-+		mmc_writel(host, REG_SD_NTSR, SDXC_2X_TIMING_MODE);
-+
- 	ret = sunxi_mmc_clk_set_phase(host, ios, rate);
+@@ -765,6 +765,9 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
  	if (ret)
  		return ret;
-@@ -1076,6 +1081,7 @@ static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
- 	.idma_des_size_bits = 16,
- 	.clk_delays = NULL,
- 	.can_calibrate = true,
-+	.needs_new_timings = true,
- };
  
- static const struct of_device_id sunxi_mmc_of_match[] = {
++	if (!ios->clock)
++		return 0;
++
+ 	/* 8 bit DDR requires a higher module clock */
+ 	if (ios->timing == MMC_TIMING_MMC_DDR52 &&
+ 	    ios->bus_width == MMC_BUS_WIDTH_8)
+@@ -882,7 +885,7 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	mmc_writel(host, REG_GCTRL, rval);
+ 
+ 	/* set up clock */
+-	if (ios->clock && ios->power_mode) {
++	if (ios->power_mode) {
+ 		host->ferror = sunxi_mmc_clk_set_rate(host, ios);
+ 		/* Android code had a usleep_range(50000, 55000); here */
+ 	}
 -- 
 git-series 0.8.11
