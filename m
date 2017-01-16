@@ -1,22 +1,95 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Mon, 16 Jan 2017 18:08:47 +0800
-Subject: [Question] A question about arm64 pte
-Message-ID: <d284f510-f025-db84-f21e-a5b167d4bcd2@huawei.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 16 Jan 2017 11:22:45 +0100
+Subject: [PATCH] ARM64: meson-gxbb-p200: add ADC laddered keys
+Message-ID: <1484562165-29449-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
-I have question about arm64 pte.
+Add the 5 buttons connected to a resistor laddered matrix and sampled
+by the SAR ADC channel 0.
 
-For arm64, PTE_WRITE?== PTE_DBM? is to mark whether the page is writable,
-and PTE_DIRTY is to mark whether the page is dirty.
-However, PTE_RDONLY is only cleared when both PTE_WRITE and PTE_DIRTY are set.
+Only the p200 board has these buttons, the P201 doesn't.
 
-Is that means that the page is still writable when PTE_RDONLY is set with PTE_WRITE?
-But in ARM Architecture Reference Manual for ARMv8,
-when PTE_RDONLY is set(AP[2:1] = 0b1x), Acess from EL1 is Ready only?
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts | 50 +++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
 
-so what is the really means of the PTE_RDONLY? could some one help to explain it?
+This patch depends on Martin Blumenstingl's sar adc patchset at [1].
 
-Thanks
-Yisheng Xie
+[1] http://lkml.kernel.org/r/20170115224221.15510-1-martin.blumenstingl at googlemail.com
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+index af7b151..3051cc8 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+@@ -45,6 +45,7 @@
+ /dts-v1/;
+ 
+ #include "meson-gxbb-p20x.dtsi"
++#include <dt-bindings/input/input.h>
+ 
+ / {
+ 	compatible = "amlogic,p200", "amlogic,meson-gxbb";
+@@ -58,6 +59,50 @@
+ 		 */
+ 		linux,usable-memory = <0x0 0x1000000 0x0 0x3f000000>;
+ 	};
++
++	avdd18_usb_adc: regulator-avdd18_usb_adc {
++		compatible = "regulator-fixed";
++		regulator-name = "AVDD18_USB_ADC";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++	};
++
++	adc_keys {
++		compatible = "adc-keys";
++		io-channels = <&saradc 0>;
++		io-channel-names = "buttons";
++		keyup-threshold-microvolt = <1800000>;
++
++		button-home {
++			label = "Home";
++			linux,code = <KEY_HOME>;
++			press-threshold-microvolt = <900000>; /* 50% */
++		};
++
++		button-esc {
++			label = "Esc";
++			linux,code = <KEY_ESC>;
++			press-threshold-microvolt = <684000>; /* 38% */
++		};
++
++		button-up {
++			label = "Volume Up";
++			linux,code = <KEY_VOLUMEUP>;
++			press-threshold-microvolt = <468000>; /* 26% */
++		};
++
++		button-down {
++			label = "Volume Down";
++			linux,code = <KEY_VOLUMEDOWN>;
++			press-threshold-microvolt = <252000>; /* 14% */
++		};
++
++		button-menu {
++			label = "Menu";
++			linux,code = <KEY_MENU>;
++			press-threshold-microvolt = <0>; /* 0% */
++		};
++	};
+ };
+ 
+ &i2c_B {
+@@ -65,3 +110,8 @@
+ 	pinctrl-0 = <&i2c_b_pins>;
+ 	pinctrl-names = "default";
+ };
++
++&saradc {
++	status = "okay";
++	vref-supply = <&avdd18_usb_adc>;
++};
+-- 
+1.9.1
