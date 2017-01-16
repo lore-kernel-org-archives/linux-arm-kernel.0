@@ -1,480 +1,98 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Mon, 16 Jan 2017 23:25:52 +0800
-Subject: [PATCH v1 3/3] watchdog: zx2967: add watchdog controller driver
- for ZTE's zx2967 family
-In-Reply-To: <1484540395-3335-3-git-send-email-baoyou.xie@linaro.org>
-References: <1484540395-3335-1-git-send-email-baoyou.xie@linaro.org>
- <1484540395-3335-3-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <464a75ef-d3c5-9b17-3e73-12ca3cbdb69f@linaro.org>
+From: dhowells@redhat.com (David Howells)
+Date: Mon, 16 Jan 2017 15:39:18 +0000
+Subject: [PATCH 5/8] efi: Get the secure boot status [ver #6]
+In-Reply-To: <20170116144954.GB27351@codeblueprint.co.uk>
+References: <20170116144954.GB27351@codeblueprint.co.uk>
+ <20170111143304.GA29649@codeblueprint.co.uk>
+ <148120020832.5854.5448601415491330495.stgit@warthog.procyon.org.uk>
+ <148120024570.5854.10638278395097394138.stgit@warthog.procyon.org.uk>
+ <7948.1484148443@warthog.procyon.org.uk>
+Message-ID: <794.1484581158@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?01?16? 12:19, Baoyou Xie wrote:
-> This patch adds watchdog controller driver for ZTE's zx2967 family.
->
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-> ---
->  drivers/watchdog/Kconfig      |  10 ++
->  drivers/watchdog/Makefile     |   1 +
->  drivers/watchdog/zx2967_wdt.c | 405 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 416 insertions(+)
->  create mode 100644 drivers/watchdog/zx2967_wdt.c
->
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index 3eb58cb..79027da 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -714,6 +714,16 @@ config ASPEED_WATCHDOG
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called aspeed_wdt.
->
-> +config ZX2967_WATCHDOG
-> +	tristate "ZTE zx2967 SoCs watchdog support"
-> +	depends on ARCH_ZX
-> +	select WATCHDOG_CORE
-> +	help
-> +	  Say Y here to include support for the watchdog timer
-> +	  in ZTE zx2967 SoCs.
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called zx2967_wdt.
-> +
->  # AVR32 Architecture
->
->  config AT32AP700X_WDT
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index caa9f4a..ea08925 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -82,6 +82,7 @@ obj-$(CONFIG_BCM7038_WDT) += bcm7038_wdt.o
->  obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
->  obj-$(CONFIG_RENESAS_WDT) += renesas_wdt.o
->  obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
-> +obj-$(CONFIG_ZX2967_WATCHDOG) += zx2967_wdt.o
->
->  # AVR32 Architecture
->  obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-> diff --git a/drivers/watchdog/zx2967_wdt.c b/drivers/watchdog/zx2967_wdt.c
-> new file mode 100644
-> index 0000000..8791dd2
-> --- /dev/null
-> +++ b/drivers/watchdog/zx2967_wdt.c
-> @@ -0,0 +1,405 @@
-> +/*
-> + * watchdog driver for ZTE's zx2967 family
-> + *
-> + * Copyright (C) 2017 ZTE Ltd.
-> + *
-> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
-> + *
-> + * License terms: GNU General Public License (GPL) version 2
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reboot.h>
-> +#include <linux/reset.h>
-> +#include <linux/watchdog.h>
-> +
-> +#define ZX2967_WDT_CFG_REG			0x4
-> +#define ZX2967_WDT_LOAD_REG			0x8
-> +#define ZX2967_WDT_REFRESH_REG			0x18
-> +#define ZX2967_WDT_START_REG			0x1c
-> +
-> +#define ZX2967_WDT_REFRESH_MASK			0x3f
-> +
-> +#define ZX2967_WDT_CFG_DIV(n)			((((n)&0xff) - 1) << 8)
-> +#define ZX2967_WDT_START_EN			0x1
-> +
-> +#define ZX2967_WDT_WRITEKEY			0x12340000
-> +
-> +#define ZX2967_WDT_DIV_DEFAULT			16
-> +#define ZX2967_WDT_DEFAULT_TIMEOUT		32
-> +#define ZX2967_WDT_MIN_TIMEOUT			1
-> +#define ZX2967_WDT_MAX_TIMEOUT			500
-> +#define ZX2967_WDT_MAX_COUNT			0xffff
-> +
-> +#define ZX2967_WDT_FLAG_REBOOT_MON		(1 << 0)
-> +
-> +#define ZX2967_RESET_MASK_REG			0xb0
-> +
-> +#define zx2967_wdt_write_reg(v, r) \
-> +			writel((v) | ZX2967_WDT_WRITEKEY, r)
-> +#define zx2967_wdt_read_reg(r)			readl(r)
+Matt Fleming <matt@codeblueprint.co.uk> wrote:
 
-For writel and readl, *_relaxed is recommended.
+> On Wed, 11 Jan, at 03:27:23PM, David Howells wrote:
+> > Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> > 
+> > > > +	movb	$0, BP_secure_boot(%rsi)
+> > > >  #ifdef CONFIG_EFI_STUB
+> > > >  	/*
+> > > >  	 * The entry point for the PE/COFF executable is efi_pe_entry, so
+> > > 
+> > > Is clearing ::secure_boot really necessary? Any code path that goes
+> > > via efi_main() will set it correctly and all other code paths should
+> > > get it cleared in sanitize_boot_params(), no?
+> > 
+> > No.
+> > 
+> > The boot_params->secure_boot parameter exists whether or not efi_main() is
+> > traversed (ie. if EFI isn't enabled or CONFIG_EFI_STUB=n) and, if not cleared,
+> > is of uncertain value.
+> >
+> > Further, sanitize_boot_params() has to be modified by this patch so as not to
+> > clobber the secure_boot flag.
+> 
+> Any new parameters that boot loaders do not know about should be
+> cleared to zero by default in the boot loader because boot_params
+> itself should be zero'd when allocated.
 
-> +
-> +static bool nowayout = WATCHDOG_NOWAYOUT;
-> +static unsigned int timeout = ZX2967_WDT_DEFAULT_TIMEOUT;
-> +
-> +struct zx2967_wdt {
-> +	struct device		*dev;
-> +	struct clk		*clock;
-> +	void __iomem		*reg_base;
-> +	unsigned int		conf;
-> +	unsigned int		load;
-> +	unsigned int		flags;
-> +	spinlock_t		lock;
-> +	struct watchdog_device	wdt_device;
-> +	struct notifier_block	restart_handler;
-> +	struct notifier_block	reboot_handler;
-> +};
-> +
-> +static void zx2967_wdt_refresh(struct zx2967_wdt *wdt)
-> +{
-> +	unsigned int val;
-> +
-> +	spin_lock(&wdt->lock);
-> +
-> +	val = zx2967_wdt_read_reg(wdt->reg_base + ZX2967_WDT_REFRESH_REG);
-> +	val ^= ZX2967_WDT_REFRESH_MASK;
-> +	zx2967_wdt_write_reg(val, wdt->reg_base + ZX2967_WDT_REFRESH_REG);
-> +
-> +	spin_unlock(&wdt->lock);
-> +}
-> +
-> +static void __zx2967_wdt_stop(struct zx2967_wdt *wdt)
-> +{
-> +	unsigned int val;
-> +
-> +	spin_lock(&wdt->lock);
-> +
-> +	val = zx2967_wdt_read_reg(wdt->reg_base + ZX2967_WDT_START_REG);
-> +	val &= ~(ZX2967_WDT_START_EN);
-> +	zx2967_wdt_write_reg(val, wdt->reg_base + ZX2967_WDT_START_REG);
-> +
-> +	spin_unlock(&wdt->lock);
-> +}
-> +
-> +static void __zx2967_wdt_start(struct zx2967_wdt *wdt)
-> +{
-> +	unsigned int val;
-> +
-> +	spin_lock(&wdt->lock);
-> +
-> +	val = zx2967_wdt_read_reg(wdt->reg_base + ZX2967_WDT_START_REG);
-> +	val |= ZX2967_WDT_START_EN;
-> +	zx2967_wdt_write_reg(val, wdt->reg_base + ZX2967_WDT_START_REG);
-> +
-> +	spin_unlock(&wdt->lock);
-> +}
-> +
-> +static unsigned int
-> +__zx2967_wdt_set_timeout(struct zx2967_wdt *wdt, unsigned int timeout)
-> +{
-> +	unsigned int freq = clk_get_rate(wdt->clock);
-> +	unsigned int divisor = ZX2967_WDT_DIV_DEFAULT, count;
-> +
-> +	count = timeout * freq;
-> +	if (count > divisor * ZX2967_WDT_MAX_COUNT)
-> +		divisor = DIV_ROUND_UP(count, ZX2967_WDT_MAX_COUNT);
-> +	count = DIV_ROUND_UP(count, divisor);
-> +	zx2967_wdt_write_reg(ZX2967_WDT_CFG_DIV(divisor),
-> +			     wdt->reg_base + ZX2967_WDT_CFG_REG);
-> +	zx2967_wdt_write_reg(count, wdt->reg_base + ZX2967_WDT_LOAD_REG);
+Do you mean the boot loader or the boot wrapper?  If the loader, that is
+outside my control - and given the purpose of the value, I'm not sure I
+want to rely on that.
 
-No spin lock here. Do we really need the spin lock?
+> There are two cases to consider:
+> 
+>  1) boot_params is not zero'd
+>  2) boot_params is zero'd
+> 
+> 1) This is a broken boot loader implementation that violates the x86
+> boot specification and I would never expect ->secure_boot to have a
+> valid value.
 
-> +	zx2967_wdt_refresh(wdt);
-> +
-> +	wdt->load = count;
-> +	dev_info(wdt->dev, "count=%d, timeout=%d, divisor=%d\n",
-> +		 count, timeout, divisor);
-> +
-> +	return (count * divisor) / freq;
-> +}
-> +
-> +static int zx2967_wdt_set_timeout(struct watchdog_device *wdd,
-> +				  unsigned int timeout)
-> +{
-> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	if (watchdog_timeout_invalid(&wdt->wdt_device, timeout)) {
-> +		dev_err(wdt->dev, "timeout %d is invalid\n", timeout);
-> +
-> +		return -EINVAL;
-> +	}
-> +
-> +	wdd->timeout = __zx2967_wdt_set_timeout(wdt, timeout);
-> +
-> +	return 0;
-> +}
-> +
-> +static int zx2967_wdt_start(struct watchdog_device *wdd)
-> +{
-> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	__zx2967_wdt_stop(wdt);
-> +	zx2967_wdt_set_timeout(wdd, wdd->timeout);
-> +	__zx2967_wdt_start(wdt);
-> +
-> +	return 0;
-> +}
-> +
-> +static int zx2967_wdt_stop(struct watchdog_device *wdd)
-> +{
-> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	__zx2967_wdt_stop(wdt);
-> +
-> +	return 0;
-> +}
-> +
-> +static int zx2967_wdt_keepalive(struct watchdog_device *wdd)
-> +{
-> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	zx2967_wdt_refresh(wdt);
-> +
-> +	return 0;
-> +}
-> +
-> +#define ZX2967_WDT_OPTIONS \
-> +	(WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE)
-> +static const struct watchdog_info zx2967_wdt_ident = {
-> +	.options          =     ZX2967_WDT_OPTIONS,
-> +	.firmware_version =	0,
-> +	.identity         =	"zx2967 watchdog",
-> +};
-> +
-> +static struct watchdog_ops zx2967_wdt_ops = {
-> +	.owner = THIS_MODULE,
-> +	.start = zx2967_wdt_start,
-> +	.stop = zx2967_wdt_stop,
-> +	.ping = zx2967_wdt_keepalive,
-> +	.set_timeout = zx2967_wdt_set_timeout,
-> +};
-> +
-> +static void zx2967_wdt_fix_sysdown(struct zx2967_wdt *wdt)
-> +{
-> +	__zx2967_wdt_stop(wdt);
-> +	__zx2967_wdt_set_timeout(wdt, 15);
-> +	__zx2967_wdt_start(wdt);
-> +}
-> +
-> +static int zx2967_wdt_notify_sys(struct notifier_block *this,
-> +			     unsigned long code, void *unused)
-> +{
-> +	struct zx2967_wdt *wdt = container_of(this, struct zx2967_wdt,
-> +					      reboot_handler);
-> +
-> +	wdt->flags |= ZX2967_WDT_FLAG_REBOOT_MON;
-> +	switch (code) {
-> +	case SYS_HALT:
-> +	case SYS_POWER_OFF:
-> +	case SYS_RESTART:
-> +		zx2967_wdt_fix_sysdown(wdt);
-> +		break;
-> +	default:
-> +		break;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int zx2967_wdt_restart(struct notifier_block *this,
-> +			      unsigned long mode, void *cmd)
-> +{
-> +	struct zx2967_wdt *wdt;
-> +
-> +	wdt = container_of(this, struct zx2967_wdt, restart_handler);
-> +
-> +	zx2967_wdt_stop(&wdt->wdt_device);
-> +
-> +	zx2967_wdt_write_reg(0x80, wdt->reg_base + ZX2967_WDT_LOAD_REG);
-> +	zx2967_wdt_refresh(wdt);
-> +	zx2967_wdt_write_reg(ZX2967_WDT_START_EN,
-> +			     wdt->reg_base + ZX2967_WDT_START_REG);
-> +
-> +	zx2967_wdt_start(&wdt->wdt_device);
-> +	/* wait for reset*/
-> +	mdelay(500);
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static void zx2967_reset_mask_config(struct device *dev)
-> +{
-> +	struct device_node *np = NULL;
-> +	void __iomem *reg;
-> +	unsigned int  val, mask, config, size;
-> +	const unsigned int *prop;
-> +
-> +	prop = of_get_property(dev->of_node, "reset-mask-config", &size);
-> +	if (size < (sizeof(*prop) * 2)) {
-> +		dev_err(dev, "bad data for reset-mask-config");
-> +		return;
-> +	}
-> +	config = be32_to_cpup(prop++);
-> +	mask = be32_to_cpup(prop);
-> +	np = of_find_compatible_node(NULL, NULL, "zte,aon-sysctrl");
-> +	if (!np) {
-> +		dev_err(dev, "Cannot found pcu device node\n");
-> +		return;
-> +	}
-> +	reg = of_iomap(np, 0) + ZX2967_RESET_MASK_REG;
-> +	of_node_put(np);
-> +
-> +	val = readl(reg);
-> +	val &= ~mask;
-> +	val |= config;
-> +	writel(val, reg);
-> +}
-> +
-> +static int zx2967_wdt_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev;
-> +	struct zx2967_wdt *wdt;
-> +	struct resource *base;
-> +	int err, ret = 0;
-> +	unsigned int rate, val;
-> +
-> +	struct reset_control *rstc;
-> +
-> +	dev = &pdev->dev;
-> +
-> +	wdt = devm_kzalloc(dev, sizeof(*wdt), GFP_KERNEL);
-> +	if (!wdt) {
-> +		ret = -ENOMEM;
-> +		goto out;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, wdt);
-> +
-> +	wdt->dev = dev;
-> +	spin_lock_init(&wdt->lock);
-> +
-> +	wdt->wdt_device.info = &zx2967_wdt_ident;
-> +	wdt->wdt_device.ops = &zx2967_wdt_ops;
-> +	wdt->wdt_device.timeout = ZX2967_WDT_DEFAULT_TIMEOUT;
-> +	wdt->wdt_device.max_timeout = ZX2967_WDT_MAX_TIMEOUT;
-> +	wdt->wdt_device.min_timeout = ZX2967_WDT_MIN_TIMEOUT;
-> +	wdt->wdt_device.parent = &pdev->dev;
-> +
-> +	base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	wdt->reg_base = devm_ioremap_resource(dev, base);
-> +
-> +	if (of_find_property(dev->of_node, "reset-mask-config", NULL))
-> +		zx2967_reset_mask_config(dev);
-> +
-> +	wdt->reboot_handler.notifier_call = zx2967_wdt_notify_sys;
-> +	ret = register_reboot_notifier(&wdt->reboot_handler);
-> +	wdt->clock = devm_clk_get(dev, "wdtclk");
-> +	if (IS_ERR(wdt->clock)) {
-> +		dev_err(dev, "failed to find watchdog clock source\n");
-> +		ret = PTR_ERR(wdt->clock);
-> +		goto out;
-> +	}
-> +	ret = clk_prepare_enable(wdt->clock);
-> +	if (ret < 0) {
-> +		dev_err(dev, "failed to enable clock\n");
-> +		goto out;
-> +	}
-> +
-> +	rate = clk_get_rate(wdt->clock);
-> +	if (rate == 24000000)
-> +		ret = clk_set_rate(wdt->clock, 32768);
-> +	rate = clk_get_rate(wdt->clock);
+If there's a boot specification that must be complied with, why does
+sanitize_boot_params() even exist?  Why does the comment on it say:
 
-Do you want to check rate again? Or you want to just check set_rate 
-return value?
+ * Deal with bootloaders which fail to initialize unknown fields in
+ * boot_params to zero.  The list fields in this list are taken from
+ * analysis of kexec-tools; if other broken bootloaders initialize a
+ * different set of fields we will need to figure out how to disambiguate.
 
-> +
-> +	rstc = devm_reset_control_get(dev, "wdtrst");
-> +	if (!rstc) {
-> +		dev_info(dev, "rstc get failed");
+> It should not be special-cased in sanitize_boot_params(), it should be
+> zero'd.
 
-dev_err() may be more feasible.
+Sigh.  sanitize_boot_params() is part of the problem.  The startup sequence
+goes something like this:
 
-> +	} else {
-> +		reset_control_assert(rstc);
-> +		mdelay(10);
-> +		reset_control_deassert(rstc);
-> +	}
-> +
-> +	watchdog_set_drvdata(&wdt->wdt_device, wdt);
-> +
-> +	watchdog_init_timeout(&wdt->wdt_device, timeout, &pdev->dev);
-> +	watchdog_set_nowayout(&wdt->wdt_device, nowayout);
-> +
-> +	zx2967_wdt_stop(&wdt->wdt_device);
-> +
-> +	err = watchdog_register_device(&wdt->wdt_device);
-> +	if (unlikely(err)) {
-> +		ret = err;
-> +		goto fail_register;
-> +	}
-> +
-> +	wdt->restart_handler.notifier_call = zx2967_wdt_restart;
-> +	wdt->restart_handler.priority = 128;
-> +	ret = register_restart_handler(&wdt->restart_handler);
-> +	if (ret) {
-> +		pr_err("cannot register restart handler, %d\n", ret);
-> +		goto fail_restart;
-> +	}
-> +
-> +	val = zx2967_wdt_read_reg(wdt->reg_base + ZX2967_WDT_START_REG);
-> +	dev_info(&pdev->dev, "watchdog enabled (timeout=%d sec, nowayout=%d)",
-> +		 wdt->wdt_device.timeout, nowayout);
-> +
-> +	return 0;
-> +
-> +fail_restart:
-> +	watchdog_unregister_device(&wdt->wdt_device);
-> +fail_register:
-> +	clk_disable_unprepare(wdt->clock);
-> +out:
-> +	return ret;
-> +}
-> +
-> +static int zx2967_wdt_remove(struct platform_device *pdev)
-> +{
-> +	struct zx2967_wdt *wdt = platform_get_drvdata(pdev);
-> +
-> +	unregister_restart_handler(&wdt->restart_handler);
-> +	watchdog_unregister_device(&wdt->wdt_device);
-> +	clk_disable_unprepare(wdt->clock);
-> +
-> +	return 0;
-> +}
-> +
-> +static void zx2967_wdt_shutdown(struct platform_device *pdev)
-> +{
-> +	struct zx2967_wdt *wdt = platform_get_drvdata(pdev);
-> +
-> +	if (!(wdt->flags & ZX2967_WDT_FLAG_REBOOT_MON))
-> +		zx2967_wdt_stop(&wdt->wdt_device);
-> +}
-> +
-> +static const struct of_device_id zx2967_wdt_match[] = {
-> +	{ .compatible = "zte,zx296718-wdt", },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, zx2967_wdt_match);
-> +
-> +static const struct platform_device_id zx2967_wdt_ids[] = {
-> +	{ .name = "zx2967-wdt", },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(platform, zx2967_wdt_ids);
-> +
-> +static struct platform_driver zx2967_wdt_driver = {
-> +	.probe		= zx2967_wdt_probe,
-> +	.remove		= zx2967_wdt_remove,
-> +	.shutdown	= zx2967_wdt_shutdown,
-> +	.id_table	= zx2967_wdt_ids,
-> +	.driver		= {
-> +		.name	= "zx2967-wdt",
-> +		.of_match_table	= of_match_ptr(zx2967_wdt_match),
-> +	},
-> +};
-> +module_platform_driver(zx2967_wdt_driver);
-> +
-> +MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
-> +MODULE_DESCRIPTION("ZTE zx2967 Watchdog Device Driver");
-> +MODULE_LICENSE("GPL");
->
+ (0) We enter the boot wrapper.
+
+ (1) We clear the secure-boot status value [my patch adds this].
+
+ (2) The boot wrapper *may* invoke efi_main() - which will determine the
+     secure-boot status.
+
+ (3) The boot wrapper calls extract_kernel() to decompress the kernel.
+
+ (4) extract_kernel() calls sanitize_boot_params() which would otherwise clear
+     the secure-boot flag.
+
+ (5) The boot wrapper jumps into the main kernel image, which now does not see
+     the secure boot status value we calculated.
+
+So, no, sanitize_boot_params() must *not* zero the value unless we change the
+call point for s_b_p().
+
+> 2) In this case ->secure_boot should be zero unless modified inside of
+> efi_main().
+
+I have no idea whether this is guaranteed or not.
+
+> Did you hit the scenario where ->secure_boot has a garbage value while
+> developing these patches? I wouldn't expect to see it in practice.
+
+I haven't actually checked what the value was before I cleared it.  But, I've
+found that security people get seriously paranoid about assuming things to be
+implicitly so;-).
+
+David
