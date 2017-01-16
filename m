@@ -1,44 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 16 Jan 2017 14:39:18 +0000
-Subject: [Question] A question about arm64 pte
-In-Reply-To: <20170116143601.GB6832@e104818-lin.cambridge.arm.com>
-References: <d284f510-f025-db84-f21e-a5b167d4bcd2@huawei.com>
- <20170116115606.GA6832@e104818-lin.cambridge.arm.com>
- <6b7a9bd2-37af-40cd-b723-9e648fbbc7c8@huawei.com>
- <20170116143601.GB6832@e104818-lin.cambridge.arm.com>
-Message-ID: <20170116143918.GC6832@e104818-lin.cambridge.arm.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 16 Jan 2017 15:39:22 +0100
+Subject: [PATCHv3 RESEND 1/8] ARM: dts: stm32: set HSE_RTC clock frequency
+ to 1 MHz on stm32f429
+In-Reply-To: <1484573388-590-1-git-send-email-amelie.delaunay@st.com>
+References: <1484573388-590-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <52199299-524a-631a-d076-080c03433674@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 02:36:02PM +0000, Catalin Marinas wrote:
-> On Mon, Jan 16, 2017 at 08:39:56PM +0800, Yisheng Xie wrote:
-> > On 2017/1/16 19:56, Catalin Marinas wrote:
-> > > On Mon, Jan 16, 2017 at 06:08:47PM +0800, Yisheng Xie wrote:
-> > >> I have question about arm64 pte.
-> > > 
-> > > I assume the context is ARMv8.0 (without hardware DBM support).
-> > 
-> > Yes.
-> > > 
-> > >> For arm64, PTE_WRITE?== PTE_DBM? is to mark whether the page is writable,
-> > >> and PTE_DIRTY is to mark whether the page is dirty.
-> > >> However, PTE_RDONLY is only cleared when both PTE_WRITE and PTE_DIRTY are set.
-> > > 
-> > > That's what set_pte_at() does.
-> > > 
-> > 
-> > So if we mmap a memory region use /dev/mem like:
-> >    fildes = open("/dev/mem", O_RDWR | O_CREAT, 0777);
-> >    addr = mmap(NULL, LEN, PROT_READ | PROT_WRITE, MAP_SHARED, fildes, offset);
-> > 
-> > The PTE_RDONLY will be set? Right ?
-> 
-> Possibly, I haven't checked mmap_mem(). However, that's what you would
-> get with an anonymous mmap() as well.
+Hi Am?lie,
 
-A correction on anonymous mmap(): the original page links to a zeroed
-page, so when dirtying it you also get a new copy, so slightly different
-code path from handle_pte_fault().
+On 01/16/2017 02:29 PM, Amelie Delaunay wrote:
+> This patch set HSE_RTC clock frequency to 1 MHz, as the clock supplied to
+> the RTC must be 1 MHz.
+>
+> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+> ---
+>  arch/arm/boot/dts/stm32f429.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+> index e9324a3..557c1f4 100644
+> --- a/arch/arm/boot/dts/stm32f429.dtsi
+> +++ b/arch/arm/boot/dts/stm32f429.dtsi
+> @@ -433,6 +433,8 @@
+>  			reg = <0x40023800 0x400>;
+>  			clocks = <&clk_hse>, <&clk_i2s_ckin>;
+>  			st,syscfg = <&pwrcfg>;
+> +			assigned-clocks = <&rcc 1 CLK_HSE_RTC>;
+> +			assigned-clock-rates = <1000000>;
+>  		};
+>
+>  		dma1: dma-controller at 40026000 {
+>
 
--- 
-Catalin
+Applied on stm32-dt-for-v4.11
+
+Thanks
+Alex
