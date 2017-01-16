@@ -1,492 +1,334 @@
-From: raviteja.garimella@broadcom.com (Raviteja Garimella)
-Date: Mon, 16 Jan 2017 16:21:43 +0530
-Subject: [PATCH 2/3] Broadcom USB DRD Phy driver for Northstar2
-In-Reply-To: <587C90E2.5020105@ti.com>
-References: <1480485338-23451-1-git-send-email-raviteja.garimella@broadcom.com>
- <1480485338-23451-3-git-send-email-raviteja.garimella@broadcom.com>
- <587C90E2.5020105@ti.com>
-Message-ID: <CAEHZuqOQO3cvBDiGOpovD=iBnRrpfzF1KLudTLngXDs4psC7vw@mail.gmail.com>
+From: a.aubert@overkiz.com (Antoine Aubert)
+Date: Mon, 16 Jan 2017 11:54:23 +0100
+Subject: USB: OHCI: high softirq load
+In-Reply-To: <ad8a54c3-c83d-109f-5cc5-7e77e9deff12@overkiz.com>
+References: <bd83e3b2-b329-3635-2917-0ffe61d3535f@overkiz.com>
+ <20170116100220.0b00658e@bbrezillon>
+ <ad8a54c3-c83d-109f-5cc5-7e77e9deff12@overkiz.com>
+Message-ID: <d49db4ac-fbeb-23ce-d48c-bd087c314328@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+Also, I made a big misunderstanding
 
-On Mon, Jan 16, 2017 at 2:52 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi,
+With EHCI + OHCI = high level of softirq (USB2.0)
+
+OHCI only = normal level
+
+Le 16/01/2017 ? 11:31, Antoine Aubert a ?crit :
+> Thx for your answer Boris
 >
-> On Wednesday 30 November 2016 11:25 AM, Raviteja Garimella wrote:
->> This is driver for USB DRD Phy used in Broadcom's Northstar2
->> SoC. The phy can be configured to be in Device mode or Host
->> mode based on the type of cable connected to the port. The
->> driver registers to  extcon framework to get appropriate
->> connect events for Host/Device cables connect/disconnect
->> states based on VBUS and ID interrupts.
+> Le 16/01/2017 ? 10:02, Boris Brezillon a ?crit :
+>> Hi Antoine,
 >>
->> Signed-off-by: Raviteja Garimella <raviteja.garimella@broadcom.com>
->> ---
->>  drivers/phy/Kconfig              |  13 +
->>  drivers/phy/Makefile             |   1 +
->>  drivers/phy/phy-bcm-ns2-usbdrd.c | 587 +++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 601 insertions(+)
->>  create mode 100644 drivers/phy/phy-bcm-ns2-usbdrd.c
+>> On Mon, 16 Jan 2017 08:45:58 +0100
+>> Antoine Aubert <a.aubert@overkiz.com> wrote:
 >>
->> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
->> index fe00f91..b3b6a73 100644
->> --- a/drivers/phy/Kconfig
->> +++ b/drivers/phy/Kconfig
->> @@ -479,6 +479,19 @@ config PHY_CYGNUS_PCIE
->>         Enable this to support the Broadcom Cygnus PCIe PHY.
->>         If unsure, say N.
+>>> Hi,
+>>>
+>>> Im working on a AT91SAM9G25cu board
+>>> (arch/arm/boot/dts/at91-kizboxmini.dts). We use linux-4.1.31, and when
+>>> OHCI is enabled, I got some wired effects.
+>> Can you test on a more recent kernel (4.9 or 4.10-rc4)?
+> I'll give a try, just need little time ;)
+>>> eg with 3 FTDI pluged, interrupts: more than 3.5k/s, cpu softirq > 24%,
+>>> loadavg > 0.5
+>> Can you check which interrupt is triggered (cat /proc/interrupts),
+> cat /proc/interrupts
+>            CPU0      
+>  16:       2286  atmel-aic   1 Level     pmc, at91_tick, at91_rtc, ttyS0
+>  17:          0       PMC  17 Level     main_rc_osc
+>  18:          0       PMC   0 Level     main_osc
+>  19:          0       PMC  16 Level     mainck
+>  20:          0       PMC   1 Level     clk-plla
+>  21:          0       PMC   6 Level     clk-utmi
+>  22:          0       PMC   3 Level     clk-master
+>  23:     945527  atmel-aic  17 Level     tc_clkevt
+>  24:      21815  atmel-aic  20 Level     at_hdmac
+>  25:          0  atmel-aic  21 Level     at_hdmac
+>  30:     120299  atmel-aic  24 Level     eth0
+>  31:   22783651  atmel-aic  22 Level     ehci_hcd:usb1, ohci_hcd:usb2
+>  99:          0      GPIO  16 Edge      PB_RST
+> 100:          0      GPIO  17 Edge      PB_PROG
+> Err:          0
+>
+>>  and
+>> enable debug messages in drivers/usb/host/ohci-at91.c?
+> [    0.000000] Booting Linux on physical CPU 0x0
+> [    0.000000] Linux version 4.1.31 (antoine at ltp.antoine) (gcc version
+> 4.9.2 (GCC) ) #1 Mon Jan 16 11:04:03 CET 2017
+> [    0.000000] CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=0005317f
+> [    0.000000] CPU: VIVT data cache, VIVT instruction cache
+> [    0.000000] Machine model: Overkiz Kizbox Mini RailDIN
+> [    0.000000] bootconsole [earlycon0] enabled
+> [    0.000000] Memory policy: Data cache writeback
+> [    0.000000] Built 1 zonelists in Zone order, mobility grouping on. 
+> Total pages: 32512
+> [    0.000000] Kernel command line: panic=5 oops=panic root=ubi0:root
+> rootfstype=ubifs ubi.mtd=ubi rw console=ttyS0,115200 earlyprintk
+> loglevel=7 dyndbg='file ohci-at91.c +p'
+> [    0.000000] PID hash table entries: 512 (order: -1, 2048 bytes)
+> [    0.000000] Dentry cache hash table entries: 16384 (order: 4, 65536
+> bytes)
+> [    0.000000] Inode-cache hash table entries: 8192 (order: 3, 32768 bytes)
+> [    0.000000] Memory: 125076K/131072K available (3204K kernel code,
+> 136K rwdata, 1116K rodata, 132K init, 84K bss, 5996K reserved, 0K
+> cma-reserved)
+> [    0.000000] Virtual kernel memory layout:
+> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+> [    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+> [    0.000000]     vmalloc : 0xc8800000 - 0xff000000   ( 872 MB)
+> [    0.000000]     lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
+> [    0.000000]     modules : 0xbf000000 - 0xc0000000   (  16 MB)
+> [    0.000000]       .text : 0xc0008000 - 0xc04404b4   (4322 kB)
+> [    0.000000]       .init : 0xc0441000 - 0xc0462000   ( 132 kB)
+> [    0.000000]       .data : 0xc0462000 - 0xc0484310   ( 137 kB)
+> [    0.000000]        .bss : 0xc0484310 - 0xc0499550   (  85 kB)
+> [    0.000000] SLUB: HWalign=32, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+> [    0.000000] NR_IRQS:16 nr_irqs:16 16
+> [    0.000000] clocksource pit: mask: 0x7ffffff max_cycles: 0x7ffffff,
+> max_idle_ns: 7167226906 ns
+> [    0.000000] sched_clock: 32 bits at 128 Hz, resolution 7812500ns,
+> wraps every 16777215996093750ns
+> [    0.007812] Calibrating delay loop... 198.76 BogoMIPS (lpj=775168)
+> [    0.078125] pid_max: default: 32768 minimum: 301
+> [    0.085937] Mount-cache hash table entries: 1024 (order: 0, 4096 bytes)
+> [    0.093750] Mountpoint-cache hash table entries: 1024 (order: 0, 4096
+> bytes)
+> [    0.101562] CPU: Testing write buffer coherency: ok
+> [    0.101562] Setting up static identity map for 0x20008400 - 0x2000847c
+> [    0.117187] dynamic_debug:ddebug_tokenize: unclosed quote: file
+> [    0.125000] dynamic_debug:ddebug_exec_query: tokenize failed
+> [    0.132812] devtmpfs: initialized
+> [    0.164062] clocksource jiffies: mask: 0xffffffff max_cycles:
+> 0xffffffff, max_idle_ns: 14931722236523437 ns
+> [    0.171875] pinctrl core: initialized pinctrl subsystem
+> [    0.179687] NET: Registered protocol family 16
+> [    0.187500] DMA: preallocated 256 KiB pool for atomic coherent
+> allocations
+> [    0.195312] AT91: Detected SoC family: at91sam9x5
+> [    0.203125] AT91: Detected SoC: at91sam9g25, revision 1
+> [    0.226562] gpio-at91 fffff400.gpio: at address fefff400
+> [    0.234375] gpio-at91 fffff600.gpio: at address fefff600
+> [    0.242187] gpio-at91 fffff800.gpio: at address fefff800
+> [    0.250000] gpio-at91 fffffa00.gpio: at address fefffa00
+> [    0.257812] pinctrl-at91 ahb:apb:pinctrl at fffff400: initialized AT91
+> pinctrl driver
+> [    0.265625] clocksource tcb_clksrc: mask: 0xffffffff max_cycles:
+> 0xffffffff, max_idle_ns: 114675631333 ns
+> [    4.718750] UDP hash table entries: 256 (order: 0, 4096 bytes)
+> [    4.726562] UDP-Lite hash table entries: 256 (order: 0, 4096 bytes)
+> [    4.734375] NET: Registered protocol family 1
+> [    4.742187] futex hash table entries: 256 (order: -1, 3072 bytes)
+> [    4.789062] squashfs: version 4.0 (2009/01/31) Phillip Lougher
+> [    4.804687] io scheduler noop registered (default)
+> [    4.812500] fffff200.serial: ttyS0 at MMIO 0xfffff200 (irq = 16,
+> base_baud = 8333333) is a ATMEL_SERIAL
+> [    4.820312] console [ttyS0] enabled
+> [    4.828125] bootconsole [earlycon0] disabled
+> [    4.851562] brd: module loaded
+> [    4.882812] loop: module loaded
+> [    4.898437] atmel_nand 40000000.nand: Use On Flash BBT
+> [    4.898437] atmel_nand 40000000.nand: Using dma0chan0 for DMA transfers.
+> [    4.906250] nand: device found, Manufacturer ID: 0x2c, Chip ID: 0xf1
+> [    4.914062] nand: Micron MT29F1G08ABAEAWP
+> [    4.921875] nand: 128 MiB, SLC, erase size: 128 KiB, page size: 2048,
+> OOB size: 64
+> [    4.929687] atmel_nand 40000000.nand: minimum ECC: 4 bits in 512 bytes
+> [    4.929687] atmel_nand 40000000.nand: Initialize PMECC params, cap:
+> 4, sector: 512
+> [    4.945312] Bad block table found at page 65472, version 0x01
+> [    4.945312] Bad block table found at page 65408, version 0x01
+> [    4.953125] 2 ofpart partitions found on MTD device atmel_nand
+> [    4.960937] Creating 2 MTD partitions on "atmel_nand":
+> [    4.968750] 0x000000000000-0x000000020000 : "bootstrap"
+> [    4.976562] 0x000000020000-0x000008000000 : "ubi"
+> [    4.992187] macb f802c000.ethernet (unnamed net_device)
+> (uninitialized): invalid hw address, using random
+> [    5.000000] libphy: MACB_mii_bus: probed
+> [    5.093750] macb f802c000.ethernet eth0: Cadence MACB rev 0x0001010c
+> at 0xf802c000 irq 30 (8e:06:02:88:ed:97)
+> [    5.101562] macb f802c000.ethernet eth0: attached PHY driver [Micrel
+> KSZ8081 or KSZ8091] (mii_bus:phy_addr=f802c000.etherne:01, irq=-1)
+> [    5.109375] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+> [    5.117187] ehci-atmel: EHCI Atmel driver
+> [    5.125000] atmel-ehci 700000.ehci: EHCI Host Controller
+> [    5.125000] atmel-ehci 700000.ehci: new USB bus registered, assigned
+> bus number 1
+> [    5.140625] atmel-ehci 700000.ehci: irq 31, io mem 0x00700000
+> [    5.156250] atmel-ehci 700000.ehci: USB 2.0 started, EHCI 1.00
+> [    5.156250] usb usb1: New USB device found, idVendor=1d6b, idProduct=0002
+> [    5.164062] usb usb1: New USB device strings: Mfr=3, Product=2,
+> SerialNumber=1
+> [    5.171875] usb usb1: Product: EHCI Host Controller
+> [    5.179687] usb usb1: Manufacturer: Linux 4.1.31 ehci_hcd
+> [    5.179687] usb usb1: SerialNumber: 700000.ehci
+> [    5.187500] hub 1-0:1.0: USB hub found
+> [    5.195312] hub 1-0:1.0: 3 ports detected
+> [    5.203125] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+> [    5.203125] ohci-atmel: OHCI Atmel driver
+> [    5.210937] at91_ohci 600000.ohci: start
+> [    5.210937] at91_ohci 600000.ohci: USB Host Controller
+> [    5.218750] at91_ohci 600000.ohci: new USB bus registered, assigned
+> bus number 2
+> [    5.226562] at91_ohci 600000.ohci: irq 31, io mem 0x00600000
+> [    5.289062] usb usb2: New USB device found, idVendor=1d6b, idProduct=0001
+> [    5.296875] usb usb2: New USB device strings: Mfr=3, Product=2,
+> SerialNumber=1
+> [    5.304687] usb usb2: Product: USB Host Controller
+> [    5.304687] usb usb2: Manufacturer: Linux 4.1.31 ohci_hcd
+> [    5.312500] usb usb2: SerialNumber: at91
+> [    5.320312] hub 2-0:1.0: USB hub found
+> [    5.320312] at91_ohci 600000.ohci:
+> ohci_at91_hub_control(c7a86800,0xa006,0x2900,0x0000,c78b8b60,000f)
+> [    5.320312] at91_ohci 600000.ohci: wHubCharacteristics 0x0002
+> [    5.328125] at91_ohci 600000.ohci: wHubCharacteristics after 0x0001
+> [    5.328125] hub 2-0:1.0: 1 port detected
+> [    5.328125] at91_ohci 600000.ohci:
+> ohci_at91_hub_control(c7a86800,0xa000,0x0000,0x0000,c78b8b80,0004)
+> [    5.328125] at91_ohci 600000.ohci:
+> ohci_at91_hub_control(c7a86800,0x2303,0x0008,0x0001,c78b8c00,0000)
+> [    5.328125] at91_ohci 600000.ohci: SetPortFeat: POWER
+> [    5.328125] rtc rtc0: alarm rollover not handled
+> [    5.335937] rtc rtc0: invalid alarm value: 1900-1-1 0:0:0
+> [    5.343750] at91_rtc fffffeb0.rtc: rtc core: registered fffffeb0.rtc
+> as rtc0
+> [    5.351562] at91_rtc fffffeb0.rtc: AT91 Real Time Clock driver.
+> [    5.359375] AT91: Starting after software reset
+> [    5.367187] at91sam9_wdt: enabled (heartbeat=15 sec, nowayout=1)
+> [    5.375000] hidraw: raw HID events driver (C) Jiri Kosina
+> [    5.382812] usbcore: registered new interface driver usbhid
+> [    5.382812] usbhid: USB HID core driver
+> [    5.390625] NET: Registered protocol family 17
+> [    5.398437] bridge: automatic filtering via arp/ip/ip6tables has been
+> deprecated. Update your scripts to load br_netfilter if you need this.
+> [    5.421875] ubi0: attaching mtd1
+> [    5.429687] at91_ohci 600000.ohci:
+> ohci_at91_hub_control(c7a86800,0xa300,0x0000,0x0001,c7980a00,0004)
+> [    5.429687] at91_ohci 600000.ohci: GetPortStatus(0)
+> [    5.546875] usb 1-1: new high-speed USB device number 2 using atmel-ehci
+> [    5.703125] usb 1-1: New USB device found, idVendor=0424, idProduct=2512
+> [    5.703125] usb 1-1: New USB device strings: Mfr=0, Product=0,
+> SerialNumber=0
+> [    5.718750] hub 1-1:1.0: USB hub found
+> [    5.718750] hub 1-1:1.0: 2 ports detected
+> [    5.906250] ubi0: scanning is finished
+> [    5.929687] ubi0: attached mtd1 (name "ubi", size 127 MiB)
+> [    5.937500] ubi0: PEB size: 131072 bytes (128 KiB), LEB size: 126976
+> bytes
+> [    5.945312] ubi0: min./max. I/O unit sizes: 2048/2048, sub-page size 2048
+> [    5.945312] ubi0: VID header offset: 2048 (aligned 2048), data
+> offset: 4096
+> [    5.953125] ubi0: good PEBs: 1019, bad PEBs: 4, corrupted PEBs: 0
+> [    5.960937] ubi0: user volume: 9, internal volumes: 1, max. volumes
+> count: 128
+> [    5.968750] ubi0: max/mean erase counter: 22/16, WL threshold: 4096,
+> image sequence number: 1226704751
+> [    5.976562] ubi0: available PEBs: 94, total reserved PEBs: 925, PEBs
+> reserved for bad PEB handling: 16
+> [    5.984375] ubi0: background thread "ubi_bgt0d" started, PID 375
+> [    6.039062] input: gpio_keys as /devices/soc0/gpio_keys/input/input0
+> [    6.046875] at91_rtc fffffeb0.rtc: setting system clock to 2017-01-16
+> 10:22:55 UTC (1484562175)
+> [    6.062500] usb 1-1.1: new full-speed USB device number 3 using
+> atmel-ehci
+> [    6.085937] UBIFS (ubi0:7): background thread "ubifs_bgt0_7" started,
+> PID 434
+> [    6.109375] UBIFS (ubi0:7): recovery needed
+> [    6.187500] usb 1-1.1: New USB device found, idVendor=2d71,
+> idProduct=0703
+> [    6.195312] usb 1-1.1: New USB device strings: Mfr=1, Product=2,
+> SerialNumber=3
+> [    6.203125] usb 1-1.1: Product: C
+> [    6.210937] usb 1-1.1: Manufacturer: OVERKIZ SAS
+> [    6.210937] usb 1-1.1: SerialNumber: 12-16
+> [    6.234375] UBIFS (ubi0:7): recovery completed
+> [    6.234375] UBIFS (ubi0:7): UBIFS: mounted UBI device 0, volume 7,
+> name "root"
+> [    6.242187] UBIFS (ubi0:7): LEB size: 126976 bytes (124 KiB),
+> min./max. I/O unit sizes: 2048 bytes/2048 bytes
+> [    6.250000] UBIFS (ubi0:7): FS size: 49393664 bytes (47 MiB, 389
+> LEBs), journal size 9023488 bytes (8 MiB, 72 LEBs)
+> [    6.257812] UBIFS (ubi0:7): reserved for root: 0 bytes (0 KiB)
+> [    6.265625] UBIFS (ubi0:7): media format: w4/r0 (latest is w4/r0),
+> UUID 8FB0025A-D045-4284-B10B-16D0A55EFC51, small LPT model
+> [    6.281250] VFS: Mounted root (ubifs filesystem) on device 0:13.
+> [    6.289062] devtmpfs: mounted
+> [    6.289062] Freeing unused kernel memory: 132K (c0441000 - c0462000)
+> [    6.359375] usb 1-1.2: new high-speed USB device number 4 using
+> atmel-ehci
+> [    6.476562] usb 1-1.2: New USB device found, idVendor=0424,
+> idProduct=2512
+> [    6.484375] usb 1-1.2: New USB device strings: Mfr=0, Product=0,
+> SerialNumber=0
+> [    6.492187] hub 1-1.2:1.0: USB hub found
+> [    6.500000] hub 1-1.2:1.0: 2 ports detected
+> [    6.789062] usb 1-1.2.1: new full-speed USB device number 5 using
+> atmel-ehci
+> [    6.921875] usb 1-1.2.1: New USB device found, idVendor=2d71,
+> idProduct=0702
+> [    6.921875] usb 1-1.2.1: New USB device strings: Mfr=1, Product=2,
+> SerialNumber=3
+> [    6.929687] usb 1-1.2.1: Product: B
+> [    6.937500] usb 1-1.2.1: Manufacturer: OVERKIZ SAS
+> [    6.945312] usb 1-1.2.1: SerialNumber: 12-16
+> [    7.132812] usb 1-1.2.2: new high-speed USB device number 6 using
+> atmel-ehci
+> [    7.250000] usb 1-1.2.2: New USB device found, idVendor=0424,
+> idProduct=2512
+> [    7.257812] usb 1-1.2.2: New USB device strings: Mfr=0, Product=0,
+> SerialNumber=0
+> [    7.335937] hub 1-1.2.2:1.0: USB hub found
+> [    7.382812] hub 1-1.2.2:1.0: 2 ports detected
+> [    7.476562] usbcore: registered new interface driver usbserial
+> [    7.476562] usbcore: registered new interface driver usbserial_generic
+> [    7.484375] usbserial: USB Serial support registered for generic
+> [    7.632812] usbcore: registered new interface driver ftdi_sio
+> [    7.640625] usbserial: USB Serial support registered for FTDI USB
+> Serial Device
+> [    7.648437] ftdi_sio 1-1.1:1.0: FTDI USB Serial Device converter detected
+> [    7.656250] usb 1-1.1: Detected FT232RL
+> [    7.679687] usb 1-1.2.2.1: new full-speed USB device number 7 using
+> atmel-ehci
+> [    7.796875] usb 1-1.1: FTDI USB Serial Device converter now attached
+> to ttyUSB0
+> [    7.804687] ftdi_sio 1-1.2.1:1.0: FTDI USB Serial Device converter
+> detected
+> [    7.812500] usb 1-1.2.1: Detected FT232RL
+> [    7.820312] cfg80211: Calling CRDA to update world regulatory domain
+> [    7.828125] usb 1-1.2.2.1: New USB device found, idVendor=2d71,
+> idProduct=0700
+> [    7.835937] usb 1-1.2.2.1: New USB device strings: Mfr=1, Product=2,
+> SerialNumber=3
+> [    7.843750] usb 1-1.2.2.1: Product: A
+> [    7.851562] usb 1-1.2.2.1: Manufacturer: OVERKIZ SAS
+> [    7.851562] usb 1-1.2.2.1: SerialNumber: 12-16
+> [    7.914062] usb 1-1.2.1: FTDI USB Serial Device converter now
+> attached to ttyUSB1
+> [    8.000000] ftdi_sio 1-1.2.2.1:1.0: FTDI USB Serial Device converter
+> detected
+> [    8.007812] usb 1-1.2.2.1: Detected FT232RL
+> [    8.054687] usb 1-1.2.2.1: FTDI USB Serial Device converter now
+> attached to ttyUSB2
+> [    8.187500] usb 1-1.2.2.2: new high-speed USB device number 8 using
+> atmel-ehci
+> [    8.312500] usb 1-1.2.2.2: New USB device found, idVendor=7392,
+> idProduct=7811
+> [    8.320312] usb 1-1.2.2.2: New USB device strings: Mfr=1, Product=2,
+> SerialNumber=3
+> [    8.328125] usb 1-1.2.2.2: Product: 802.11n WLAN Adapter
+> [    8.328125] usb 1-1.2.2.2: Manufacturer: Realtek
+> [    8.335937] usb 1-1.2.2.2: SerialNumber: 00e04c000001
+>
+>> Thanks,
 >>
->> +config PHY_NS2_USB_DRD
->> +     tristate "Broadcom Northstar2 USB DRD PHY support"
->> +     depends on OF && (ARCH_BCM_IPROC || COMPILE_TEST)
->> +     select GENERIC_PHY
->> +     select EXTCON
->> +     default ARCH_BCM_IPROC
->> +     help
->> +       Enable this to support the Broadcom Northstar2 USB DRD PHY.
->> +       This driver initializes the PHY in either HOST or DEVICE mode.
->> +       The host or device configuration is read from device tree.
->> +
->> +       If unsure, say N.
->> +
->>  source "drivers/phy/tegra/Kconfig"
+>> Boris
 >>
->>  config PHY_NS2_PCIE
->> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
->> index a534cf5..b733ba2 100644
->> --- a/drivers/phy/Makefile
->> +++ b/drivers/phy/Makefile
->> @@ -58,5 +58,6 @@ obj-$(CONFIG_PHY_TUSB1210)          += phy-tusb1210.o
->>  obj-$(CONFIG_PHY_BRCM_SATA)          += phy-brcm-sata.o
->>  obj-$(CONFIG_PHY_PISTACHIO_USB)              += phy-pistachio-usb.o
->>  obj-$(CONFIG_PHY_CYGNUS_PCIE)                += phy-bcm-cygnus-pcie.o
->> +obj-$(CONFIG_PHY_NS2_USB_DRD)                += phy-bcm-ns2-usbdrd.o
->>  obj-$(CONFIG_ARCH_TEGRA) += tegra/
->>  obj-$(CONFIG_PHY_NS2_PCIE)           += phy-bcm-ns2-pcie.o
->> diff --git a/drivers/phy/phy-bcm-ns2-usbdrd.c b/drivers/phy/phy-bcm-ns2-usbdrd.c
->> new file mode 100644
->> index 0000000..460040d
->> --- /dev/null
->> +++ b/drivers/phy/phy-bcm-ns2-usbdrd.c
->> @@ -0,0 +1,587 @@
->> +/*
->> + * Copyright (C) 2016 Broadcom
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License as
->> + * published by the Free Software Foundation version 2.
->> + *
->> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
->> + * kind, whether express or implied; without even the implied warranty
->> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/delay.h>
->> +#include <linux/extcon.h>
->> +#include <linux/gpio.h>
->> +#include <linux/gpio/consumer.h>
->> +#include <linux/init.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/io.h>
->> +#include <linux/irq.h>
->> +#include <linux/mfd/syscon.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/phy/phy.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/regmap.h>
->> +#include <linux/slab.h>
->> +#include <linux/workqueue.h>
->> +
->> +#define ICFG_DRD_AFE         0x0
->> +#define ICFG_MISC_STAT               0x18
->> +#define ICFG_DRD_P0CTL               0x1C
->> +#define ICFG_STRAP_CTRL              0x20
->> +#define ICFG_FSM_CTRL                0x24
->> +
->> +#define IDM_RST_BIT          BIT(0)
->> +#define AFE_CORERDY_VDDC     BIT(18)
->> +#define PHY_PLL_RESETB               BIT(15)
->> +#define PHY_RESETB           BIT(14)
->> +#define PHY_PLL_LOCK         BIT(0)
->> +
->> +#define DRD_DEV_MODE         BIT(20)
->> +#define OHCI_OVRCUR_POL              BIT(11)
->> +#define ICFG_OFF_MODE                BIT(6)
->> +#define PLL_LOCK_RETRY               1000
->> +
->> +#define EVT_DEVICE           0
->> +#define EVT_HOST             1
->> +#define EVT_IDLE             2
->> +
->> +#define DRD_HOST_MODE                (BIT(2) | BIT(3))
->> +#define DRD_DEVICE_MODE              (BIT(4) | BIT(5))
->> +#define DRD_HOST_VAL         0x803
->> +#define DRD_DEV_VAL          0x807
->> +#define GPIO_DELAY           20
->> +#define PHY_WQ_DELAY         msecs_to_jiffies(600)
->> +
->> +struct ns2_phy_data;
->> +struct ns2_phy_driver {
->> +     void __iomem *icfgdrd_regs;
->> +     void __iomem *idmdrd_rst_ctrl;
->> +     void __iomem *crmu_usb2_ctrl;
->> +     void __iomem *usb2h_strap_reg;
->> +     spinlock_t lock; /* spin lock for phy driver */
->> +     bool host_mode;
->> +     struct ns2_phy_data *data;
->> +     struct extcon_specific_cable_nb extcon_dev;
->> +     struct extcon_specific_cable_nb extcon_host;
->> +     struct notifier_block host_nb;
->> +     struct notifier_block dev_nb;
->> +     struct delayed_work conn_work;
->> +     struct extcon_dev *edev;
->> +     struct gpio_desc *vbus_gpiod;
->> +     struct gpio_desc *id_gpiod;
->> +     int id_irq;
->> +     int vbus_irq;
->> +     unsigned long debounce_jiffies;
->> +     struct delayed_work wq_extcon;
->> +};
->> +
->> +struct ns2_phy_data {
->> +     struct ns2_phy_driver *driver;
->> +     struct phy *phy;
->> +     int new_state;
->> +     bool poweron;
->> +};
->> +
->> +static const unsigned int usb_extcon_cable[] = {
->> +     EXTCON_USB,
->> +     EXTCON_USB_HOST,
->> +     EXTCON_NONE,
->> +};
->> +
->> +static inline int pll_lock_stat(u32 usb_reg, int reg_mask,
->> +                             struct ns2_phy_driver *driver)
->> +{
->> +     int retry = PLL_LOCK_RETRY;
->> +     u32 val;
->> +
->> +     do {
->> +             udelay(1);
->> +             val = readl(driver->icfgdrd_regs + usb_reg);
->> +             if (val & reg_mask)
->> +                     return 0;
->> +     } while (--retry > 0);
->> +
->> +     return -EBUSY;
->> +}
->> +
->> +static int ns2_drd_phy_init(struct phy *phy)
->> +{
->> +     struct ns2_phy_data *data = phy_get_drvdata(phy);
->> +     struct ns2_phy_driver *driver = data->driver;
->> +     unsigned long flags;
->> +     u32 val;
->> +
->> +     spin_lock_irqsave(&driver->lock, flags);
->> +
->> +     val = readl(driver->icfgdrd_regs + ICFG_FSM_CTRL);
->> +
->> +     if (data->new_state == EVT_HOST) {
->> +             val &= ~DRD_DEVICE_MODE;
->> +             val |= DRD_HOST_MODE;
->> +     } else {
->> +             val &= ~DRD_HOST_MODE;
->> +             val |= DRD_DEVICE_MODE;
->> +     }
->> +     writel(val, driver->icfgdrd_regs + ICFG_FSM_CTRL);
->> +
->> +     spin_unlock_irqrestore(&driver->lock, flags);
->> +     return 0;
->> +}
->> +
->> +static int ns2_drd_phy_shutdown(struct phy *phy)
->> +{
->> +     struct ns2_phy_data *data = phy_get_drvdata(phy);
->> +     struct ns2_phy_driver *driver = data->driver;
->> +     unsigned long flags;
->> +     u32 val;
->> +
->> +     spin_lock_irqsave(&driver->lock, flags);
->> +     if (!data->poweron)
->> +             goto exit;
->> +
->> +     val = readl(driver->crmu_usb2_ctrl);
->> +     val &= ~AFE_CORERDY_VDDC;
->> +     writel(val, driver->crmu_usb2_ctrl);
->> +
->> +     driver->host_mode = 0;
->> +     val = readl(driver->crmu_usb2_ctrl);
->> +     val &= ~DRD_DEV_MODE;
->> +     writel(val, driver->crmu_usb2_ctrl);
->> +
->> +     /* Disable Host and Device Mode */
->> +     val = readl(driver->icfgdrd_regs + ICFG_FSM_CTRL);
->> +     val &= ~(DRD_HOST_MODE | DRD_DEVICE_MODE | ICFG_OFF_MODE);
->> +     writel(val, driver->icfgdrd_regs + ICFG_FSM_CTRL);
->> +
->> +     data->poweron = 0;
->> +exit:
->> +     spin_unlock_irqrestore(&driver->lock, flags);
->> +     return 0;
->> +}
->> +
->> +static int ns2_drd_phy_poweron(struct phy *phy)
->> +{
->> +     struct ns2_phy_data *data = phy_get_drvdata(phy);
->> +     struct ns2_phy_driver *driver = data->driver;
->> +     u32 extcon_event = data->new_state;
->> +     unsigned long flags;
->> +     int ret;
->> +     u32 val;
->> +
->> +     spin_lock_irqsave(&driver->lock, flags);
->> +     if (extcon_event == EVT_DEVICE) {
->> +             if (data->poweron)
->> +                     goto exit;
->> +
->> +             writel(DRD_DEV_VAL, driver->icfgdrd_regs + ICFG_DRD_P0CTL);
->> +
->> +             val = readl(driver->icfgdrd_regs + ICFG_FSM_CTRL);
->> +             val &= ~(DRD_HOST_MODE | ICFG_OFF_MODE);
->> +             val |= DRD_DEVICE_MODE;
->> +             writel(val, driver->icfgdrd_regs + ICFG_FSM_CTRL);
->> +
->> +             val = readl(driver->idmdrd_rst_ctrl);
->> +             val &= ~IDM_RST_BIT;
->> +             writel(val, driver->idmdrd_rst_ctrl);
->> +
->> +             val = readl(driver->crmu_usb2_ctrl);
->> +             val |= (AFE_CORERDY_VDDC | DRD_DEV_MODE);
->> +             writel(val, driver->crmu_usb2_ctrl);
->> +
->> +             /* Bring PHY and PHY_PLL out of Reset */
->> +             val = readl(driver->crmu_usb2_ctrl);
->> +             val |= (PHY_PLL_RESETB | PHY_RESETB);
->> +             writel(val, driver->crmu_usb2_ctrl);
->> +
->> +             ret = pll_lock_stat(ICFG_MISC_STAT, PHY_PLL_LOCK, driver);
->> +             if (ret < 0) {
->> +                     dev_err(&phy->dev, "Phy PLL lock failed\n");
->> +                     goto err_shutdown;
->> +             }
->> +     } else {
->> +             if (data->poweron && driver->host_mode)
->> +                     goto exit;
->> +
->> +             writel(DRD_HOST_VAL, driver->icfgdrd_regs + ICFG_DRD_P0CTL);
->> +
->> +             val = readl(driver->icfgdrd_regs + ICFG_FSM_CTRL);
->> +             val &= ~(DRD_DEVICE_MODE | ICFG_OFF_MODE);
->> +             val |= DRD_HOST_MODE;
->> +             writel(val, driver->icfgdrd_regs + ICFG_FSM_CTRL);
->> +
->> +             val = readl(driver->crmu_usb2_ctrl);
->> +             val |= AFE_CORERDY_VDDC;
->> +             writel(val, driver->crmu_usb2_ctrl);
->> +
->> +             ret = pll_lock_stat(ICFG_MISC_STAT, PHY_PLL_LOCK, driver);
->> +             if (ret < 0) {
->> +                     dev_err(&phy->dev, "Phy PLL lock failed\n");
->> +                     goto err_shutdown;
->> +             }
->> +
->> +             val = readl(driver->idmdrd_rst_ctrl);
->> +             val &= ~IDM_RST_BIT;
->> +             writel(val, driver->idmdrd_rst_ctrl);
->> +
->> +             /* port over current Polarity */
->> +             val = readl(driver->usb2h_strap_reg);
->> +             val |= OHCI_OVRCUR_POL;
->> +             writel(val, driver->usb2h_strap_reg);
->> +
->> +             driver->host_mode = 1;
->> +     }
->> +
->> +     data->poweron = 1;
->> +exit:
->> +     spin_unlock_irqrestore(&driver->lock, flags);
->> +     return 0;
->> +
->> +err_shutdown:
->> +     data->poweron = 1;
->> +     spin_unlock_irqrestore(&driver->lock, flags);
->> +     ns2_drd_phy_shutdown(phy);
->> +     return ret;
->> +}
->> +
->> +static void connect_work(struct work_struct *work)
->> +{
->> +     struct ns2_phy_driver *driver;
->> +     struct ns2_phy_data *data;
->> +     u32 extcon_event;
->> +
->> +     driver  = container_of(to_delayed_work(work),
->> +                            struct ns2_phy_driver, conn_work);
->> +     data = driver->data;
->> +     extcon_event = data->new_state;
->> +
->> +     if (extcon_event == EVT_DEVICE || extcon_event == EVT_HOST) {
->> +             ns2_drd_phy_init(data->phy);
->> +             ns2_drd_phy_poweron(data->phy);
->> +     } else if (extcon_event == EVT_IDLE) {
->> +             ns2_drd_phy_shutdown(data->phy);
->> +     }
->> +}
->> +
->> +static int drd_device_notify(struct notifier_block *self,
->> +                          unsigned long event, void *ptr)
->> +{
->> +     struct ns2_phy_driver *driver = container_of(self,
->> +                                     struct ns2_phy_driver, dev_nb);
->> +
->> +     if (event) {
->> +             pr_debug("Device connected\n");
->> +             driver->data->new_state = EVT_DEVICE;
->> +             schedule_delayed_work(&driver->conn_work, 0);
->> +     } else {
->> +             pr_debug("Device disconnected\n");
->> +             driver->data->new_state = EVT_IDLE;
->> +             schedule_delayed_work(&driver->conn_work, PHY_WQ_DELAY);
->> +     }
->> +
->> +     return NOTIFY_DONE;
->> +}
->> +
->> +static int drd_host_notify(struct notifier_block *self,
->> +                        unsigned long event, void *ptr)
->> +{
->> +     struct ns2_phy_driver *driver = container_of(self,
->> +                                     struct ns2_phy_driver, host_nb);
->> +
->> +     if (event) {
->> +             pr_debug("Host connected\n");
->> +             driver->data->new_state = EVT_HOST;
->> +             schedule_delayed_work(&driver->conn_work, 0);
->> +     } else {
->> +             pr_debug("Host disconnected\n");
->> +             driver->data->new_state = EVT_IDLE;
->> +             schedule_delayed_work(&driver->conn_work, PHY_WQ_DELAY);
->> +     }
->> +
->> +     return NOTIFY_DONE;
->> +}
->> +
->> +static void extcon_work(struct work_struct *work)
->> +{
->> +     struct ns2_phy_driver *driver;
->> +     int vbus;
->> +     int id;
->> +
->> +     driver  = container_of(to_delayed_work(work),
->> +                            struct ns2_phy_driver, wq_extcon);
->> +
->> +     id = gpiod_get_value_cansleep(driver->id_gpiod);
->> +     vbus = gpiod_get_value_cansleep(driver->vbus_gpiod);
->> +
->> +     if (!id && vbus) {
->> +             extcon_set_cable_state_(driver->edev, EXTCON_USB_HOST, true);
->> +     } else if (id && !vbus) {
->> +             extcon_set_cable_state_(driver->edev, EXTCON_USB_HOST, false);
->> +             extcon_set_cable_state_(driver->edev, EXTCON_USB, false);
->> +     } else if (id && vbus) {
->> +             extcon_set_cable_state_(driver->edev, EXTCON_USB, true);
->> +     }
->> +}
->> +
->> +static irqreturn_t gpio_irq_handler(int irq, void *dev_id)
->> +{
->> +     struct ns2_phy_driver *driver = dev_id;
->> +
->> +     queue_delayed_work(system_power_efficient_wq, &driver->wq_extcon,
->> +                        driver->debounce_jiffies);
->> +
->> +     return IRQ_HANDLED;
->> +}
->> +
->> +static int register_extcon_notifier(struct ns2_phy_driver *phy_driver,
->> +                                 struct device *dev)
->> +{
->> +     struct extcon_dev *edev;
->> +     int ret;
->> +
->> +     phy_driver->host_nb.notifier_call = drd_host_notify;
->> +     phy_driver->dev_nb.notifier_call = drd_device_notify;
->> +
->> +     edev = phy_driver->edev;
->> +
->> +     /* Register for device change notification */
->> +     ret = extcon_register_notifier(edev, EXTCON_USB,
->> +                                    &phy_driver->dev_nb);
->> +     if (ret < 0) {
->> +             dev_err(dev, "can't register extcon_dev for %s\n", edev->name);
->> +             return ret;
->> +     }
->> +
->> +     /* Register for host change notification */
->> +     ret = extcon_register_notifier(edev, EXTCON_USB_HOST,
->> +                                    &phy_driver->host_nb);
->> +     if (ret < 0) {
->> +             dev_err(dev, "can't register extcon_dev for %s\n", edev->name);
->> +             goto err_dev;
->> +     }
->> +
->> +     /* Check the device cable connect state */
->> +     ret = extcon_get_cable_state_(edev, EXTCON_USB);
->> +     if (ret < 0) {
->> +             dev_err(dev, "can't get extcon_dev state for %s\n", edev->name);
->> +             goto err_host;
->> +     } else if (ret) {
->> +             phy_driver->data->new_state = EVT_DEVICE;
->> +     }
->> +
->> +     /* Check the host cable connect state */
->> +     ret = extcon_get_cable_state_(edev, EXTCON_USB_HOST);
->> +     if (ret < 0) {
->> +             dev_err(dev, "can't get extcon_dev state for %s\n", edev->name);
->> +             goto err_host;
->> +     } else if (ret) {
->> +             phy_driver->data->new_state = EVT_HOST;
->> +     }
->> +
->> +     return 0;
->> +
->> +err_host:
->> +     ret = extcon_unregister_notifier(edev, EXTCON_USB_HOST,
->> +                                     &phy_driver->host_nb);
->> +err_dev:
->> +     ret = extcon_unregister_notifier(edev, EXTCON_USB,
->> +                                     &phy_driver->dev_nb);
->> +     return ret;
->> +}
->> +
->> +static struct phy_ops ops = {
->> +     .init           = ns2_drd_phy_init,
+>>> This issue disappear when disabling OHCI and use EHCI only.
+>>>
+>>> What are the usual causes, and where to begin with ?
+>>>
+>>> Thanks in advance,
+>>>
+> Thanks,
 >
-> Is this really being used by any controller driver? Can you point me to the
-> controller driver that is using this driver?
-
-This will be used by Synopsys UDC that's integrated into Broadcom's Northstar2
-and Cygnus SoC's. I am currently working on upstream review comments for the
-same in a different patch series. The "amd5536udc" driver is being modified for
-platform device support (as per the suggestions I received in reviews).
-
->
->> +     .power_on       = ns2_drd_phy_poweron,
->> +     .power_off      = ns2_drd_phy_shutdown,
->
-> missing .owner.
-
-Will fix this.
-
-Thanks,
-Ravi
->
-> Thanks
-> Kishon
