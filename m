@@ -1,72 +1,52 @@
-From: qiyaoltc@gmail.com (Yao Qi)
-Date: Mon, 16 Jan 2017 15:11:56 +0000
-Subject: [RFC PATCH 08/10] arm64/sve: ptrace: Wire up vector length
- control and reporting
-In-Reply-To: <20170116133231.GO3699@e103592.cambridge.arm.com>
-References: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
- <1484220369-23970-9-git-send-email-Dave.Martin@arm.com>
- <20170116122038.GG28060@E107787-LIN>
- <20170116133231.GO3699@e103592.cambridge.arm.com>
-Message-ID: <20170116151156.GI28060@E107787-LIN>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 16 Jan 2017 16:21:48 +0100
+Subject: [PATCH] rtc: sun6i: Switch to the external oscillator
+Message-ID: <20170116152148.27439-1-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17-01-16 13:32:31, Dave Martin wrote:
-> On Mon, Jan 16, 2017 at 12:20:38PM +0000, Yao Qi wrote:
-> > On 17-01-12 11:26:07, Dave Martin wrote:
-> > > This patch adds support for manipulating a task's vector length at
-> > > runtime via ptrace.
-> > > 
-> > 
-> > I hope kernel doesn't provide such interface to ptracer to change vector
-> > length.
-> 
-> It does, with this patch, beacuse...
-> 
-> > The vector length is sort of a read-only property of thread/process/
-> > program to debugger, unless we really have a clear requirement to modify
-> > vector length in debugging.  I may miss something because I haven't debug
-> > SVE code yet.
-> 
-> ...the vector length is no longer read-only for the task, thanks to
-> the new prctls().
+The RTC is clocked from either an internal, imprecise, oscillator or an
+external one, which is usually much more accurate.
 
-What I meant "read-only" is that debugger can't change it, while the program
-itself can change it via prctl().
+The difference perceived between the time elapsed and the time reported by
+the RTC is in a 10% scale, which prevents the RTC from being useful at all.
 
-> 
-> This does add complexity, but I figured that any programmer's model
-> state that the thread can modify for itself should be modifiable by the
-> debugger, if for no other reason than the user may want to experiment to
-> see what happens.  Without a ptrace interface, it would be necessary
-> to inject a prctl() call into the target, which is possible but awkward.
+Fortunately, the external oscillator is reported to be mandatory in the
+Allwinner datasheet, so we can just switch to it.
 
-We only need such interface if it is useful, see more below.
+Cc: stable at vger.kernel.org
+Fixes: 9765d2d94309 ("rtc: sun6i: Add sun6i RTC driver")
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/rtc/rtc-sun6i.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Suppose it is useful to change vector length through ptrace, we should align
-ptrace interface to prctl() as much as possible.  Looks that both prctl
-change and ptrace change can go through sve_set_vector_length, easy to keep
-two consistent.
-
-> 
-> gdb must already re-detect the vector length on stop, since the target
-> could have called the prctl() in the meantime.
-
-Yes, gdb assumes the vector length may be changed, so it re-detects on
-every stop, but I don't see the need for gdb to change the vector length.
-
-> 
-> Access via ptrace also allows things like trapping on exec, fork or
-> clone and changing the vector length for the new process or thread
-> before it starts to run.  I'm guessing here, but such a scenario seems
-> legitimate (?)
-> 
-
-Yes, these cases are valid, but the usefulness is still questionable to
-me.  I just doubt that SVE developers do need to change vector length
-when they are debugging code.  Note that it is not my strong objection
-to this patch, if kernel people believe this is useful, I am fine with
-it.
-
+diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
+index c169a2cd4727..dee524cfa13b 100644
+--- a/drivers/rtc/rtc-sun6i.c
++++ b/drivers/rtc/rtc-sun6i.c
+@@ -37,9 +37,11 @@
+ 
+ /* Control register */
+ #define SUN6I_LOSC_CTRL				0x0000
++#define SUN6I_LOSC_CTRL_KEY			(0x16aa << 16)
+ #define SUN6I_LOSC_CTRL_ALM_DHMS_ACC		BIT(9)
+ #define SUN6I_LOSC_CTRL_RTC_HMS_ACC		BIT(8)
+ #define SUN6I_LOSC_CTRL_RTC_YMD_ACC		BIT(7)
++#define SUN6I_LOSC_CTRL_EXT_OSC			BIT(0)
+ #define SUN6I_LOSC_CTRL_ACC_MASK		GENMASK(9, 7)
+ 
+ /* RTC */
+@@ -404,6 +406,10 @@ static int sun6i_rtc_probe(struct platform_device *pdev)
+ 	/* disable alarm wakeup */
+ 	writel(0, chip->base + SUN6I_ALARM_CONFIG);
+ 
++	/* switch to the external, more precise, oscillator */
++	writel(SUN6I_LOSC_CTRL_KEY | SUN6I_LOSC_CTRL_EXT_OSC,
++	       chip->base + SUN6I_LOSC_CTRL);
++
+ 	chip->rtc = rtc_device_register("rtc-sun6i", &pdev->dev,
+ 					&sun6i_rtc_ops, THIS_MODULE);
+ 	if (IS_ERR(chip->rtc)) {
 -- 
-Yao (??)
+2.11.0
