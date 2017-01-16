@@ -1,64 +1,44 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 16 Jan 2017 21:37:01 +0900
-Subject: [PATCH v3 5/6] usb: phy: tahvo: Replace the deprecated extcon API
-In-Reply-To: <1484570222-30522-1-git-send-email-cw00.choi@samsung.com>
-References: <1484570222-30522-1-git-send-email-cw00.choi@samsung.com>
- <CGME20170116123714epcas1p11e40ca467ede326b0cf8d094045db1ab@epcas1p1.samsung.com>
-Message-ID: <1484570222-30522-6-git-send-email-cw00.choi@samsung.com>
+Date: Mon, 16 Jan 2017 21:36:56 +0900
+Subject: [PATCH v3 0/6] usb: Replace the deprecated extcon API
+References: <CGME20170116123713epcas1p1d9f40f277e83cb46b9a9333fe2704fb9@epcas1p1.samsung.com>
+Message-ID: <1484570222-30522-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch replaces the deprecated extcon API as following:
-- extcon_set_cable_state_() -> extcon_set_state_sync()
+This patches just replace the deprecated extcon API without any change
+of extcon operation and use the resource-managed function for
+extcon_register_notifier().
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
----
- drivers/usb/phy/phy-tahvo.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+The new extcon API instead of deprecated API.
+- extcon_set_cable_state_() -> extcon_set_state_sync();
+- extcon_get_cable_state_() -> extcon_get_state();
 
-diff --git a/drivers/usb/phy/phy-tahvo.c b/drivers/usb/phy/phy-tahvo.c
-index ab5d364f6e8c..a31c8682e998 100644
---- a/drivers/usb/phy/phy-tahvo.c
-+++ b/drivers/usb/phy/phy-tahvo.c
-@@ -121,7 +121,7 @@ static void check_vbus_state(struct tahvo_usb *tu)
- 	prev_state = tu->vbus_state;
- 	tu->vbus_state = reg & TAHVO_STAT_VBUS;
- 	if (prev_state != tu->vbus_state) {
--		extcon_set_cable_state_(tu->extcon, EXTCON_USB, tu->vbus_state);
-+		extcon_set_state_sync(tu->extcon, EXTCON_USB, tu->vbus_state);
- 		sysfs_notify(&tu->pt_dev->dev.kobj, NULL, "vbus_state");
- 	}
- }
-@@ -130,7 +130,7 @@ static void tahvo_usb_become_host(struct tahvo_usb *tu)
- {
- 	struct retu_dev *rdev = dev_get_drvdata(tu->pt_dev->dev.parent);
- 
--	extcon_set_cable_state_(tu->extcon, EXTCON_USB_HOST, true);
-+	extcon_set_state_sync(tu->extcon, EXTCON_USB_HOST, true);
- 
- 	/* Power up the transceiver in USB host mode */
- 	retu_write(rdev, TAHVO_REG_USBR, USBR_REGOUT | USBR_NSUSPEND |
-@@ -149,7 +149,7 @@ static void tahvo_usb_become_peripheral(struct tahvo_usb *tu)
- {
- 	struct retu_dev *rdev = dev_get_drvdata(tu->pt_dev->dev.parent);
- 
--	extcon_set_cable_state_(tu->extcon, EXTCON_USB_HOST, false);
-+	extcon_set_state_sync(tu->extcon, EXTCON_USB_HOST, false);
- 
- 	/* Power up transceiver and set it in USB peripheral mode */
- 	retu_write(rdev, TAHVO_REG_USBR, USBR_SLAVE_CONTROL | USBR_REGOUT |
-@@ -379,9 +379,9 @@ static int tahvo_usb_probe(struct platform_device *pdev)
- 	}
- 
- 	/* Set the initial cable state. */
--	extcon_set_cable_state_(tu->extcon, EXTCON_USB_HOST,
-+	extcon_set_state_sync(tu->extcon, EXTCON_USB_HOST,
- 			       tu->tahvo_mode == TAHVO_MODE_HOST);
--	extcon_set_cable_state_(tu->extcon, EXTCON_USB, tu->vbus_state);
-+	extcon_set_state_sync(tu->extcon, EXTCON_USB, tu->vbus_state);
- 
- 	/* Create OTG interface */
- 	tahvo_usb_power_off(tu);
+Changes from v2:
+- Rebase these patches based on usb.git[1] (testing/next branch)
+
+Changes from v1:
+- Rebase these patches based on v4.10-rc1.
+- Add acked-by tag from usb maintainer and reviewer.
+- Drop the phy/power-supply/chipidea patches.
+
+[1] https://git.kernel.org/cgit/linux/kernel/git/balbi/usb.git/log/?h=testing/next
+
+Chanwoo Choi (6):
+  usb: dwc3: omap: Replace the extcon API
+  usb: phy: msm: Replace the extcon API
+  usb: phy: omap-otg: Replace the extcon API
+  usb: phy: qcom-8x16-usb: Replace the extcon API
+  usb: phy: tahvo: Replace the deprecated extcon API
+  usb: renesas_usbhs: Replace the deprecated extcon API
+
+ drivers/usb/dwc3/dwc3-omap.c        | 20 +++++++-------------
+ drivers/usb/phy/phy-msm-usb.c       | 33 +++++++++++----------------------
+ drivers/usb/phy/phy-omap-otg.c      | 24 ++++++------------------
+ drivers/usb/phy/phy-qcom-8x16-usb.c | 13 ++++---------
+ drivers/usb/phy/phy-tahvo.c         | 10 +++++-----
+ drivers/usb/renesas_usbhs/common.c  |  2 +-
+ 6 files changed, 34 insertions(+), 68 deletions(-)
+
 -- 
 1.9.1
